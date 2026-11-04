@@ -1982,6 +1982,7 @@
 - `[data-testid="mobile-terminal-retry"]` — interactive — F-MOBILE-1.mobile-terminal-retry
 - `[data-testid="mobile-sessions-updated"]` — display — F-MOBILE-1.mobile-sessions-updated
 - `[data-testid="mobile-task-updated"]` — display — F-MOBILE-1.mobile-task-updated
+- `[data-testid="mobile-task-retry"]` — interactive — F-MOBILE-1.mobile-task-retry
 - `[data-testid="mobile-changes-updated"]` — display — F-MOBILE-1.mobile-changes-updated
 - `[data-testid="mobile-file-updated"]` — display — F-MOBILE-1.mobile-file-updated
 - `[data-testid="mobile-file-error"]` — display — F-MOBILE-1.mobile-file-error

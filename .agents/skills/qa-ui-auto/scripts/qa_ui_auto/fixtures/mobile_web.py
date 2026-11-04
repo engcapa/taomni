@@ -7,24 +7,20 @@ from __future__ import annotations
 import base64
 import hashlib
 import json
-import shutil
-import subprocess
 import threading
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import urlsplit
 from ..mobile_wire import read_frame, write_frame
+from .mobile_assets import build_snapshot
 
 
 def setup(ctx):
     if ctx.cfg['app']['mode'] != 'browser':
         raise RuntimeError('mobile_web is a browser fixture')
     root = Path(__file__).resolve().parents[6]
-    build = subprocess.run([shutil.which('pnpm') or 'pnpm', 'build:mobile'], cwd=root, capture_output=True, text=True, timeout=120)
-    (Path(ctx.case_dir) / 'mobile-build.log').write_text(build.stdout + build.stderr, encoding='utf-8')
-    if build.returncode:
-        raise RuntimeError('Mobile bundle build failed; see mobile-build.log')
-    assets = root / 'src-tauri/resources/mobile-web'
+    ctx._mobile_assets = build_snapshot(root, ctx.case_dir)
+    assets = Path(ctx._mobile_assets.name)
     receipt = Path(ctx.case_dir) / 'mobile-peer.txt'
     receipt.write_text('', encoding='utf-8')
     clients = []
@@ -219,3 +215,6 @@ def teardown(ctx):
     if server:
         server.shutdown()
         server.server_close()
+    snapshot = getattr(ctx, '_mobile_assets', None)
+    if snapshot:
+        snapshot.cleanup()

@@ -33,10 +33,10 @@ verification:
     - {step: 8, expectation: All network recovery assertions passed in the independent receipt.}
     results: [6, 7, 8]
   - id: R2
-    requirement: Changes and file timestamps retain their own last success on failure, show stale state, and recover through visible refresh buttons.
+    requirement: Changes and file timestamps retain their own last success on failure and recover through visible refresh; unreadable task status blocks new instructions until an explicit status retry.
     actions: [7]
     checkpoints:
-    - {step: 7, expectation: Task detail is fresh while retained changes and file are explicitly stale; manual refresh clears errors.}
+    - {step: 7, expectation: 'Independent data refresh clears stale markers; failed status disables Send, explicit status retry restores current running state and retains the draft.'}
     - {step: 8, expectation: Independent network oracle receipt passed.}
     - {step: 9, expectation: No runtime errors.}
     results: [7, 8, 9]

@@ -13421,6 +13421,9 @@ controls:
   - id: mobile-task-updated
     selector: '[data-testid="mobile-task-updated"]'
     kind: display
+  - id: mobile-task-retry
+    selector: '[data-testid="mobile-task-retry"]'
+    kind: interactive
   - id: mobile-changes-updated
     selector: '[data-testid="mobile-changes-updated"]'
     kind: display

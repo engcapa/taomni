@@ -184,6 +184,7 @@ def _selectors_in_step(verb: str, args: Any) -> list[str]:
             'mobile-terminal-more', 'mobile-terminal-fullscreen',
             'mobile-take-control', 'mobile-terminal-back', 'mobile-file-open',
             'mobile-agent-continue', 'mobile-agent-send', 'mobile-task-status',
+            'mobile-task-retry', 'mobile-task-stop', 'mobile-agent-input',
             'mobile-task-updated', 'mobile-changes-updated', 'mobile-file-updated',
             'mobile-changes-error', 'mobile-file-error', 'mobile-file-content',
             'mobile-changes-refresh', 'mobile-file-refresh',

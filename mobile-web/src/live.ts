@@ -30,6 +30,12 @@ export function useLive(instance: Instance, path: string, onFrame: (frame: Frame
     const connect = async () => {
       if (disposed || ended || denied || connecting || channel.current?.readyState === WebSocket.OPEN) return;
       if (!navigator.onLine) { status.current("离线 · 等待网络恢复"); return; }
+      // Retire the previous socket before waiting for a new ticket. Its delayed
+      // close must not clear the pending attempt's gate or schedule a rival.
+      const previous = socket;
+      socket = null;
+      if (channel.current === previous) channel.current = null;
+      previous?.close();
       connecting = true;
       setCanRetry(false);
       status.current(connected ? "重连中" : "连接中");
@@ -82,6 +88,7 @@ export function useLive(instance: Instance, path: string, onFrame: (frame: Frame
         current.onclose = event => {
           if (channel.current === current) channel.current = null;
           if (disposed || socket !== current) return;
+          socket = null;
           connecting = false;
           if (ended || event.code === 4004) { ended = true; status.current("终端已退出或关闭"); return; }
           if (event.code === 4001) { denied = true; status.current("已被实例吊销，请重新配对"); return; }

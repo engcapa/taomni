@@ -29,16 +29,29 @@ TC-MOBILE-011 是 browser 网络注入，不代替真实 Rust 服务。TC-MOBILE
 ## 本地验证记录
 
 - 缺陷改前：移动设置英文回归 2 项均失败（仍是硬编码中文）；改后纳入下述通过集合。
-- focused Vitest：20 文件、74 项通过，覆盖全部 `mobile-web/src` 与移动／飞书设置、搜索、i18n。
-- `tsc -b`、mobile TypeScript、`pnpm check:refactor` 通过；`pnpm build` 已有一次完整通过，最终稳定输入构建结果随后补录。
+- focused Vitest：初轮 20 文件、74 项通过；异步边界补充后 20 文件、77 项通过，覆盖全部 `mobile-web/src` 与移动／飞书设置、搜索、i18n。
+- `tsc -b`、mobile TypeScript、`pnpm check:refactor`、最终稳定输入 `pnpm build` 均通过。构建含内嵌 mobile bundle 与桌面产物；现有 Vite import/config 与大 chunk 提示仍为警告。
 - `cargo check --manifest-path src-tauri/Cargo.toml --lib --locked`：系统 PipeWire 0.3.48 首轮因缺少 `pw_buffer.requested` 失败；设置已有 `~/.cache/taomni-qa/unit-pipewire/install` 1.0.9 的 pkg-config/library 环境后通过。未修改产品 Rust 依赖或系统文件。原生场景仍以 GitHub 的匹配 QA release 为准。
 - Python fixture/CI selection/crash/control 契约：修正调用不存在的 `test_control_coverage` 模块后，正确集合 38 项通过；recovery 断言预算单测 2 项通过。
 - 本地 browser crash-regression：8/8 通过、0 skip，`qa-ui-auto-report/mobile-crash-local/run-20261105-070309-865627176/`，`identity_stable=true`。
-- browser 功能首轮：TC-MOBILE-001/004/006/009/010 通过，011 的测试探针先后遇到 deadline 包装、Playwright expect 签名、全屏遮挡；修正 probe，未强制点击或弱化产品断言。之后 011 的每步断言通过，但当轮编辑了来源，runner 正确判定 `identity_stable=false` 并退出非零；不能作为最终通过。稳定来源完整重跑结果另补录。
-- 失败原件保留在 `qa-ui-auto-report/mobile-local/`；最后一轮 stable 结果在 `qa-ui-auto-report/mobile-final/`。未提交 runtime artifact。
+- browser 功能首轮：TC-MOBILE-001/004/006/009/010 通过，011 的测试探针先后遇到 deadline 包装、Playwright expect 签名、全屏遮挡；修正 probe，未强制点击或弱化产品断言。之后 011 的每步断言通过，但当轮编辑了来源，runner 正确判定 `identity_stable=false` 并退出非零；不能作为最终通过；稳定来源完整重跑见下一条。
+- 最终稳定来源 browser 功能 **6/6 通过、0 failed、0 skipped**：`qa-ui-auto-report/mobile-final/run-20261105-073459-960129656/`，`identity_stable=true`、runner exit 0。包含 TC-MOBILE-001/004/006/009/010/011；配对／草稿即时翻译、每流 5 次后暂停、after_seq 手动续接、旧内容独立过期与刷新恢复均实际执行。
+- fixture 隔离补充后两 worker mobile **6/6**、`identity_stable=true`、exit 0：`qa-ui-auto-report/mobile-parallel/run-20261105-074852-366872636/`。之后 async 边界测试新增未使用形参曾被 mobile `noUnusedParameters` 拒绝（setup 未执行用例）；更名 `_body` 后重新构建与跑例，不把 setup 失败计通过。
+- 首轮失败原件保留在 `qa-ui-auto-report/mobile-local/` 与 `mobile-owned/`，不覆盖失败证据。未提交 runtime artifact。
 
 ## GitHub 验证
 
-使用 `.github/workflows/qa-ui-auto-platforms.yml`，selected TC-MOBILE-001～011，三平台 browser/native，`native_release=true`，保留 workflow 自动合并的完整 crash-regression。新代码提交推送已获授权；运行链接、最终逐例报告、receipt、三平台结果在实际执行后补录，不以规划或 job 绿色冒充验收。
+使用 `.github/workflows/qa-ui-auto-platforms.yml`，selected TC-MOBILE-001～011，三平台 browser/native，`native_release=true`，保留 workflow 自动合并的完整 crash-regression。
+
+- 被测代码：`cbbd11cbaf4d3f11c72d3f24d28be747e8fd08f4`。
+- 首轮 [run 41935060538](https://github.com/engcapa/taomni/actions/runs/41935060538) 在 checkout 阶段失败：`actions/checkout` 把短 SHA 当分支名；无产品用例执行。不删除该失败记录。
+- 修正 dispatch 的 `head` 为完整 40 位 SHA，其余选择不变，已启动：[run 41935324853](https://github.com/engcapa/taomni/actions/runs/41935324853)。
+- 已下载 hosted `selection.json` 核对：被测完整 SHA 正确、无 gaps / unreviewed；Linux browser 14 + native 16、Windows browser 14 + native 12、macOS browser 14 + native 12，共 82 个平台／模式用例。
+- plan 与 catalog gate 已通过，browser、三平台 release build 和 native contracts 已进入执行。
+- 检查 Linux browser 原始 summary/receipt 发现 job 绿色但逐例为 13/14、exit 1：TC-MOBILE-006 加载时收到目录列表（仅 manifest/icons，无 index/assets）。两个 worker 均构建到 Vite `emptyOutDir` 的同一目录，导致已运行的 peer 读取另一次构建中间态。保留失败 artifact；修复为按 checkout 跨进程锁保护“构建 + 复制”，每个 peer 服务独立 immutable snapshot。专门单测覆盖锁互斥、下一轮清空输出不破坏现有 peer、失败释放；不降 browser workers 或删除测试。
+- 同轮 Windows / macOS browser 原始报告各 14/14、稳定来源、exit 0；Linux native contracts job 成功，具体原始契约数待终态 artifact 核对。
+- 独立检查新增两项可复现异步问题：离线旧 socket 的迟到 close 会清除 pending ticket 的连接门闩并产生并发连接；revision 中止 action 自己的 detail 刷新后，旧 idle 值会过早允许第二条指令。两项均先新增失败回归，再修复（新 attempt 等待前退役旧 socket；task loading/unknown/error 阻止发指令并提供状态重试）。
+- 旧 run 不能证明这些后续修复。为避免继续构建过期来源，已取消该 run，保留已有报告；最终完整 SHA 的三平台 selected + crash-regression 另起，不复用旧二进制冒充新源码。
+- 最终逐例报告、receipt、三平台结果在实际执行后补录；不能以已触发或 job 绿色冒充 hosted 验收通过。
 
 仍未验证且不得宣称完成：Android/iOS 真机 IME／相机／安装、用户自备公网 TLS／双 endpoint／PNA、真实飞书应用通知。既有 headless 能力限制不变。

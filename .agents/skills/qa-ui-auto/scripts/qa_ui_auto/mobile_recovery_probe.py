@@ -108,7 +108,21 @@ def freshness(page, case_dir):
     expect(page.get_by_test_id('mobile-file-error')).to_have_count(0)
     expect(page.get_by_test_id('mobile-changes-updated')).not_to_contain_text('可能已过期')
     expect(page.get_by_test_id('mobile-file-updated')).not_to_contain_text('可能已过期')
-    return {'independent_success_times': True, 'stale_file_retained': True, 'refresh_recovered': True}
+    page.get_by_test_id('mobile-task-stop').click()
+    expect(page.get_by_test_id('mobile-task-status')).to_contain_text('空闲')
+    page.route('**/api/v1/sessions/thread*', unavailable)
+    page.get_by_test_id('mobile-agent-continue').click()
+    page.get_by_test_id('mobile-agent-send').click()
+    expect(page.get_by_test_id('mobile-task-retry')).to_be_visible()
+    page.get_by_test_id('mobile-agent-input').fill('retained while status unknown')
+    expect(page.get_by_test_id('mobile-agent-send')).to_be_disabled()
+    page.unroute('**/api/v1/sessions/thread*', unavailable)
+    page.get_by_test_id('mobile-task-retry').click()
+    expect(page.get_by_test_id('mobile-task-status')).to_contain_text('运行中')
+    expect(page.get_by_test_id('mobile-task-retry')).to_have_count(0)
+    expect(page.get_by_test_id('mobile-agent-input')).to_have_value('retained while status unknown')
+    expect(page.get_by_test_id('mobile-agent-send')).to_be_disabled()
+    return {'independent_success_times': True, 'stale_file_retained': True, 'refresh_recovered': True, 'status_failure_blocks_send': True}
 
 
 def run(page, case_dir):

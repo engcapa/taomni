@@ -133,6 +133,28 @@ it("marks a live stream offline immediately instead of treating retained data as
   online.mockRestore();
 });
 
+it("ignores an old close arriving while online recovery is waiting for a ticket", async () => {
+  const online = vi.spyOn(navigator, "onLine", "get").mockReturnValue(true);
+  const { unmount } = renderHook(() => useLive(instance, "/events", () => {}, () => {}));
+  const old = await connect();
+  old.close = () => { old.readyState = 2; }; // Browser close events arrive asynchronously.
+  let finish!: (ticket: { ticket: string }) => void;
+  vi.mocked(request).mockImplementation(() => new Promise(resolve => { finish = resolve as typeof finish; }));
+  online.mockReturnValue(false);
+  act(() => window.dispatchEvent(new Event("offline")));
+  online.mockReturnValue(true);
+  act(() => window.dispatchEvent(new Event("online")));
+  act(() => { old.readyState = 3; old.onclose?.({ code: 1006 }); });
+  await act(async () => { await vi.advanceTimersByTimeAsync(1000); });
+  expect(request).toHaveBeenCalledTimes(2);
+  await act(async () => finish({ ticket: "recovered" }));
+  const recovered = await connect();
+  expect(Socket.all).toHaveLength(2);
+  unmount();
+  expect(recovered.readyState).toBe(3);
+  online.mockRestore();
+});
+
 it("stops requesting tickets for an exited or removed terminal", async () => {
   const { unmount } = renderHook(() => useLive(instance, "/terminals/term:t/stream", () => {}, () => {}));
   const socket = await connect();
