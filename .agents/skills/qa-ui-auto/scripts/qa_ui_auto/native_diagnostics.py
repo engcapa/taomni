@@ -52,10 +52,17 @@ def collect(case_dir: Path, run_root: Path, *, failed: bool):
     roots = [run_root / "native-appdata", run_root / "native-appcache", run_root / "native-appconfig"]
     for root in roots:
         for path in root.rglob("*.log"):
-            if any(part.lower() in {"webview", "ebwebview"} for part in path.relative_to(root).parts):
+            relative = path.relative_to(root)
+            parts = tuple(part.lower() for part in relative.parts)
+            if any(part in {"webview", "ebwebview"} for part in parts):
                 continue  # WebView LevelDB .log files are profile data, not diagnostic text.
+            if any(parts[index:index + 2] == ("orchestration", "worker-state") for index in range(len(parts) - 1)):
+                # Harness logs may contain prompts or credentials. Keep the
+                # entire private worker-state subtree out of collected report
+                # artifacts, not merely out of their original upload location.
+                continue
             if path.stat().st_size <= 10_000_000:
-                target = destination / ("logs-" + root.name) / path.relative_to(root)
+                target = destination / ("logs-" + root.name) / relative
                 target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copyfile(path, target)
     # macOS dirs::cache_dir ignores the QA app override. Only copy JDTLS

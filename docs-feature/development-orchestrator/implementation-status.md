@@ -204,8 +204,26 @@ Additional verified receipts and reliability repairs:
   unchanged. No new per-tool timeline, token display or progress UI is introduced
   by these reliability and validation repairs.
 
-Full hosted product acceptance, Linux native crash evidence and six-harness
-scheduling are not complete at this checkpoint.
+- Downloaded Linux native summaries from run `41740668667` now confirm **14/14
+  passed, zero failed/skipped** across the four ordinary shards. Together with the
+  Windows/macOS raw summaries, the original ORCH API/entry plus applicable complete
+  crash-regression selections passed on all three native platforms at that SHA.
+  This does not cover the subsequently added tail/lifecycle repairs.
+- The same run's **native six-worker case failed** at the Codex task after its
+  real UI dispatch; the receipt is explicitly failed. A green individual workflow
+  job does not override that case failure. Independent canary evidence establishes
+  five harnesses, not all six native scheduling.
+- Hosted run `41745445797` identifies the remaining Codex failure precisely as
+  `bwrap_loopback_address_failed` / `RTM_NEWADDR` / `EPERM`. Commit `f21c2e206`
+  preserves workspace-write/filesystem/seccomp restrictions but lets the fixture
+  Codex worker share its already-enforced loopback-only supervisor namespace;
+  configuration publication is blocked unless the current kernel interface set
+  is exactly `lo`. This is fixture-only network-policy delegation, not host-network
+  access or proof of Codex's independent network-deny mode. Real execution is
+  pending run `41746495508`.
+
+Full hosted acceptance of the latest candidate, new tail/process lifecycle evidence
+and all-six native scheduling are not complete at this checkpoint.
 
 ## Remaining work — not waived by phase 1
 
