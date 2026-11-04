@@ -1,6 +1,52 @@
 use super::tests::{setup, submission};
 
 #[test]
+fn revoked_resource_after_preparation_cannot_enter_worker_dispatch() {
+    let (_tmp, mut inner, project) = setup();
+    let run = inner
+        .create(submission(&project, "prepared-revocation", 2))
+        .unwrap();
+    let lease = inner.reserve(&run.id, run.revision, false).unwrap();
+    inner.begin(&run.id).unwrap();
+    let mut settings = inner.settings().unwrap();
+    settings.resources.clear();
+    settings.planning_resource_id.clear();
+    settings.review_resource_id.clear();
+    inner.save_settings(&settings, 2).unwrap();
+    let mut spawned = false;
+    let outcome = inner.dispatch_worker(&run.id, &lease.resource, &lease.request, || {
+        spawned = true;
+        Ok(())
+    });
+    assert!(outcome.unwrap_err().contains("RESOURCE_REVOKED"));
+    assert!(!spawned);
+    // An unsent reservation can still be dispatched exactly once after explicit
+    // reauthorization. Revocation did not mark the old request as sent.
+    inner.store.mark_sent(&lease.request).unwrap();
+}
+
+#[test]
+fn cancelled_prepared_run_does_not_mark_sent_or_spawn() {
+    let (_tmp, mut inner, project) = setup();
+    let run = inner
+        .create(submission(&project, "prepared-cancel", 2))
+        .unwrap();
+    let lease = inner.reserve(&run.id, run.revision, false).unwrap();
+    inner.begin(&run.id).unwrap();
+    inner.request_cancel(&run.id).unwrap();
+    let mut spawned = false;
+    assert_eq!(
+        inner.dispatch_worker(&run.id, &lease.resource, &lease.request, || {
+            spawned = true;
+            Ok(())
+        }),
+        Err("CANCELLED".into())
+    );
+    assert!(!spawned);
+    inner.store.mark_sent(&lease.request).unwrap();
+}
+
+#[test]
 fn cancel_between_reservation_and_spawn_cannot_lose_the_owner_token() {
     let (_tmp, mut inner, project) = setup();
     let run = inner

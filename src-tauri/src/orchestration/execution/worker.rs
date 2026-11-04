@@ -110,14 +110,16 @@ pub async fn execute(
     // Reserve accounting before the external effect; a crash at this boundary
     // is ambiguous and must not cause redispatch. This counts host dispatches,
     // not a CLI harness's internal LLM requests.
-    runtime.with(&app, |inner| {
-        inner.store.mark_sent(&request_id)?;
-        inner.mutate(&run.id, "worker_dispatch", "One supervised worker dispatch was attempted; internal LLM calls are not included in this counter", |_| Ok(()))?;
-        Ok(())
+    let child = runtime.with(&app, |inner| {
+        let current =
+            crate::ai::config::AiConfig::load(&crate::ai::config::default_ai_config_path());
+        ensure_policy(&current, &resource)?;
+        inner.dispatch_worker(&run.id, &resource, &request_id, || {
+            command.spawn().map_err(|_| {
+                "HARNESS_UNAVAILABLE: cannot start the configured worker executable".into()
+            })
+        })
     })?;
-    let child = command
-        .spawn()
-        .map_err(|_| "HARNESS_UNAVAILABLE: cannot start the configured worker executable")?;
     // Always supervise/reap a successfully spawned process, even when recording
     // the spawn fails. Do not drop a live process tree on a storage error.
     let recorded = runtime.with(&app, |inner| {

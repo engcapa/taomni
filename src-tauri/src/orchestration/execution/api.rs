@@ -1,6 +1,4 @@
-use crate::llm::invocation::{
-    InvocationProtocol, InvocationRequest, InvocationStatus, invoke_stream,
-};
+use crate::llm::invocation::{InvocationProtocol, InvocationRequest, invoke_stream};
 use crate::orchestration::{
     OrchestrationRuntime,
     core::{
@@ -144,19 +142,11 @@ pub async fn execute(
     if let Some(error) = error {
         return Err(error);
     }
-    let receipt = receipt?;
-    if receipt.status != InvocationStatus::Complete {
-        return Err(format!(
-            "INCOMPLETE_PACK: provider stopped with {}",
-            receipt.stop_reason
-        ));
-    }
-    let finish = collector.finish();
-    for artifact in collector.drain_saved() {
+    let outcome = super::collection::finish(&mut collector, receipt, cancel.is_cancelled());
+    for artifact in outcome.candidates {
         runtime.with(&app, |inner| {
             inner.save_candidate(&run.id, artifact).map(|_| ())
         })?;
     }
-    finish?;
-    Ok(())
+    outcome.result
 }

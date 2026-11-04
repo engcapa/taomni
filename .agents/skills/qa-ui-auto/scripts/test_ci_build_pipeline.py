@@ -105,7 +105,11 @@ class BuildPipelineTests(unittest.TestCase):
                 if not rdp and not dual and not orch:
                     self.assertFalse(commands)
                     continue
-                root_tests = [c for c in commands if '--lib' in c and '-p' not in c]
+                root_tests = [c for c in commands if '--lib' in c and '-p' not in c and '--ignored' not in c]
+                native_lifecycle = [c for c in commands if 'hosted_lifecycle_' in c]
+                self.assertEqual(len(native_lifecycle), 1 if orch else 0)
+                if orch:
+                    self.assertEqual(native_lifecycle[0], ['test', '--locked', '--release', '--lib', 'hosted_lifecycle_', '--', '--ignored', '--nocapture'])
                 self.assertEqual(len(root_tests), 1)
                 expected = ['lsp::tests::workspace_watch_lifetime', 'commands::workspace_reads::tests',
                     'workspace::tests::text_and_encoding', 'workspace::tests::encoding_matrix'] + (['rdp::'] if rdp else []) + (['capture::', 'screenshot::', 'mfa::'] if dual else []) + (['orchestration::', 'llm::invocation', 'go_compatibility_tests'] if orch else [])

@@ -31,6 +31,11 @@ if [[ "${QA_ORCH_CONTRACTS:-false}" == true ]]; then
 fi
 # libtest accepts multiple OR filters. Compile/link the root test binary once.
 cargo test --locked "${profile[@]}" --lib -- "${filters[@]}"
+if [[ "${QA_ORCH_CONTRACTS:-false}" == true ]]; then
+  # Real same-group descendant cancellation/leader-exit effects are hosted-only.
+  # Reuse the already-linked root binary; never execute these in local unit runs.
+  cargo test --locked "${profile[@]}" --lib hosted_lifecycle_ -- --ignored --nocapture
+fi
 if [[ "${QA_RDP_CONTRACTS:-false}" == true ]]; then
   cargo test --locked "${profile[@]}" --bin rdp-probe
 fi

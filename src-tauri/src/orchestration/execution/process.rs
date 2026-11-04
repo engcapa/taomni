@@ -101,31 +101,25 @@ pub async fn supervise(
     result
 }
 
-#[cfg(not(windows))]
+#[cfg(unix)]
 async fn stop_tree(child: &mut Child, pid: Option<u32>) -> Result<(), String> {
-    #[cfg(unix)]
-    if let Some(pid) = pid {
-        unsafe {
-            libc::kill(-(pid as i32), libc::SIGTERM);
-        }
-        if tokio::time::timeout(std::time::Duration::from_secs(3), child.wait())
-            .await
-            .is_err()
-        {
-            unsafe {
-                libc::kill(-(pid as i32), libc::SIGKILL);
-            }
-        }
-        // Always stop remaining same-group descendants after reaping the leader.
-        unsafe {
-            libc::kill(-(pid as i32), libc::SIGKILL);
-        }
-    }
-    tokio::time::timeout(std::time::Duration::from_secs(5), child.wait())
-        .await
-        .map_err(|_| "WORKER_STOP_UNKNOWN")?
-        .map_err(|_| "WORKER_STOP_UNKNOWN")?;
+    let pid = pid.ok_or("WORKER_STOP_UNKNOWN: worker process group unavailable")?;
+    // Reap concurrently: on macOS our own unreaped leader would otherwise keep
+    // kill(-pgid, 0) positive. Cached leader exit never substitutes for group proof.
+    let (group, leader) = tokio::join!(
+        super::unix_group::terminate_and_wait(pid),
+        tokio::time::timeout(std::time::Duration::from_secs(9), child.wait()),
+    );
+    group?;
+    leader
+        .map_err(|_| "WORKER_STOP_UNKNOWN: worker leader could not be reaped")?
+        .map_err(|_| "WORKER_STOP_UNKNOWN: worker leader wait failed")?;
     Ok(())
+}
+
+#[cfg(not(any(unix, windows)))]
+async fn stop_tree(_child: &mut Child, _pid: Option<u32>) -> Result<(), String> {
+    Err("WORKER_STOP_UNKNOWN: process group verification is unsupported".into())
 }
 
 pub fn configure(command: &mut Command) {

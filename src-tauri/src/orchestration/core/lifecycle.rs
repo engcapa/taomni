@@ -85,6 +85,31 @@ impl Inner {
         Ok(())
     }
 
+    /// The owner lock serializes this last revocation/cancellation check with
+    /// the short spawn effect. Preparation must not authorize a later spawn.
+    pub fn dispatch_worker<T>(
+        &mut self,
+        id: &str,
+        resource: &AgentResource,
+        request: &str,
+        spawn: impl FnOnce() -> Result<T, String>,
+    ) -> Result<T, String> {
+        self.check_resource_enabled(resource)?;
+        let run = self.store.get(id)?;
+        if self.closing
+            || run.status != "running"
+            || self
+                .active
+                .get(id)
+                .is_none_or(CancellationToken::is_cancelled)
+        {
+            return Err("CANCELLED".into());
+        }
+        self.store.mark_sent(request)?;
+        self.mutate(id, "worker_dispatch", "One supervised worker dispatch was attempted; internal LLM calls are not included in this counter", |_| Ok(()))?;
+        spawn()
+    }
+
     pub fn begin(&mut self, id: &str) -> Result<(), String> {
         self.mutate(
             id,
