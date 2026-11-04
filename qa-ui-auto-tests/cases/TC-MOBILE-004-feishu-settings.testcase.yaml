@@ -87,7 +87,7 @@ steps:
     - none
 - assert_text:
     selector: '[data-testid="feishu-status"]'
-    contains: 已停止
+    contains: Stopped
 - assert_no_runtime_errors: null
 - screenshot: feishu-settings-saved-without-connection.png
 - eval_readonly:
@@ -95,7 +95,7 @@ steps:
     expect_truthy: true
 - assert_text:
     selector: '[data-testid="feishu-settings"]'
-    contains: 内容默认不发送
+    contains: file content is not sent by default
 - click: '[data-testid="feishu-allow-files"]'
 - click: '[data-testid="feishu-save"]'
 - wait_for: '[data-testid="feishu-saved"]'

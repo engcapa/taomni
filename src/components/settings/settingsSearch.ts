@@ -160,7 +160,7 @@ export const SETTINGS_SEARCH_ENTRIES: SettingsSearchEntry[] = [
   },
   {
     id: "mobile-service",
-    titleKeys: [],
+    titleKeys: ["mobileSettings.title", "mobileSettings.allowOpenSessions", "feishuSettings.title"],
     terms: ["mobile", "remote", "pairing", "headless", "移动服务", "手机", "配对", "远程控制", "feishu", "飞书", "机器人", "bot"],
   },
   {

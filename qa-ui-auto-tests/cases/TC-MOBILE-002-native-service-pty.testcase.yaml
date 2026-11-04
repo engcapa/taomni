@@ -36,20 +36,20 @@ steps:
 - wait_for: '[data-testid="mobile-settings"]'
 - assert_text:
     selector: '[data-testid="mobile-settings-status"]'
-    contains: 已关闭
+    contains: Disabled
 - fill:
     selector: '[data-testid="mobile-settings-port"]'
     value: '0'
 - click: '[data-testid="mobile-settings-toggle"]'
 - assert_text:
     selector: '[data-testid="mobile-settings-status"]'
-    contains: 运行中
+    contains: Running
 - click: '[data-testid="mobile-settings-pair"]'
 - wait_for: '[data-testid="mobile-settings-code"]'
 - mobile_service_probe: desktop
 - assert_text:
     selector: '[data-testid="mobile-settings-status"]'
-    contains: 已关闭
+    contains: Disabled
 - assert_file_contains:
     path: ${fixture.mobile_native_receipt}
     contains: '"passed": true'
@@ -73,13 +73,13 @@ verification:
     - step: 5
       expectation: Real native shell prompt is ready.
     - step: 9
-      expectation: '[data-testid="mobile-settings-status"] shows 已关闭.'
+      expectation: '[data-testid="mobile-settings-status"] shows Disabled.'
     - step: 12
-      expectation: '[data-testid="mobile-settings-status"] shows 运行中.'
+      expectation: '[data-testid="mobile-settings-status"] shows Running.'
     - step: 15
       expectation: Real native desktop network, lifecycle and security oracle passes all assertions.
     - step: 16
-      expectation: '[data-testid="mobile-settings-status"] shows 已关闭.'
+      expectation: '[data-testid="mobile-settings-status"] shows Disabled.'
     - step: 17
       expectation: 'Independent receipt contains "passed": true.'
     - step: 18

@@ -13396,7 +13396,46 @@ files:
   - mobile-web/src/CompactKeyboard.tsx
   - mobile-web/src/TerminalControls.tsx
   - mobile-web/src/ConnectionAuthForm.tsx
+  - mobile-web/src/live.ts
+  - mobile-web/src/useSnapshot.ts
+  - src/lib/i18n/locales/mobileSettings.ts
 controls:
+  - id: mobile-offline-note
+    selector: '[data-testid="mobile-offline-note"]'
+    kind: display
+  - id: mobile-instance-availability
+    selector: '[data-testid="mobile-instance-availability"]'
+    kind: display
+  - id: mobile-control-warning
+    selector: '[data-testid="mobile-control-warning"]'
+    kind: display
+  - id: mobile-events-retry
+    selector: '[data-testid="mobile-events-retry"]'
+    kind: interactive
+  - id: mobile-terminal-retry
+    selector: '[data-testid="mobile-terminal-retry"]'
+    kind: interactive
+  - id: mobile-sessions-updated
+    selector: '[data-testid="mobile-sessions-updated"]'
+    kind: display
+  - id: mobile-task-updated
+    selector: '[data-testid="mobile-task-updated"]'
+    kind: display
+  - id: mobile-changes-updated
+    selector: '[data-testid="mobile-changes-updated"]'
+    kind: display
+  - id: mobile-file-updated
+    selector: '[data-testid="mobile-file-updated"]'
+    kind: display
+  - id: mobile-file-error
+    selector: '[data-testid="mobile-file-error"]'
+    kind: display
+  - id: mobile-changes-refresh
+    selector: '[data-testid="mobile-changes-refresh"]'
+    kind: interactive
+  - id: mobile-file-refresh
+    selector: '[data-testid="mobile-file-refresh"]'
+    kind: interactive
   - id: mobile-add-instance
     selector: '[data-testid="mobile-add-instance"]'
     kind: interactive
@@ -13504,6 +13543,12 @@ controls:
     kind: interactive
   - id: mobile-settings-code
     selector: '[data-testid="mobile-settings-code"]'
+    kind: display
+  - id: mobile-settings-endpoint
+    selector: '[data-testid="mobile-settings-endpoint"]'
+    kind: interactive
+  - id: mobile-settings-qr
+    selector: '[data-testid="mobile-settings-qr"]'
     kind: display
   - id: mobile-settings-refresh
     selector: '[data-testid="mobile-settings-refresh"]'
@@ -13800,6 +13845,7 @@ controls:
 - Linux headless 不创建 Tauri/GTK 窗口；桌面工具运行时不可用的路径显式报错。
 - 桌面设置显式允许后，已配对手机可请求新建本地终端或打开已保存会话；TC-MOBILE-005 定义真实 HTTP/WS → 桌面 tab → PTY → 独立磁盘 marker 的 Linux 验证，并保护默认拒绝、跨设备请求隔离和可读标题（运行结果以报告为准）。
 - 当前执行证据与限制见 `docs-feature/mobile-remote-p0-implementation.md`，未验证的平台与真手机能力不作完成声明。
+- TC-MOBILE-010 覆盖 Network 中移动服务／飞书设置中英文即时切换、翻译标题搜索、配对与草稿保持；TC-MOBILE-011 覆盖有限重连、手动按序列续接与任务／改动／文件独立过期标记。TC-MOBILE-003 另验证实际 native 缓存外壳离线提示与网络恢复。
 
 ### P1 飞书 Agent 适配器 🟡
 

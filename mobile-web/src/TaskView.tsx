@@ -1,41 +1,26 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useRef, useState } from "react";
 import { encoded, errorText, request, statusText, type Changes, type Detail, type FileContent, type Instance, type Session } from "./api";
+import { freshness, useSnapshot } from "./useSnapshot";
 
-export function TaskView({ instance, session, revision }: { instance: Instance; session: Session; revision: number }) {
-  const [detail, setDetail] = useState<Detail | null>(null);
+export function TaskView({ instance, session, revision, stale = false }: { instance: Instance; session: Session; revision: number; stale?: boolean }) {
   const [text, setText] = useState("");
   const [history, setHistory] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [changes, setChanges] = useState<Changes | null>(null);
-  const [changesError, setChangesError] = useState("");
-  const [content, setContent] = useState<FileContent | null>(null);
-  const [updated, setUpdated] = useState("");
   const [fileChoice, setFileChoice] = useState<{ path: string; diff: boolean } | null>(null);
   const form = useRef<HTMLFormElement>(null);
   const path = `/sessions/${encoded(session.id)}`;
-  const load = useCallback(async (signal?: AbortSignal) => {
-    const value = await request<Detail>(instance, path, undefined, signal);
-    if (!signal?.aborted) { setDetail(value); setUpdated(new Date().toLocaleTimeString()); }
-  }, [instance, path]);
-  useEffect(() => {
-    const abort = new AbortController();
-    void load(abort.signal).catch(e => { if (!abort.signal.aborted) setError(errorText(e)); });
-    void request<Changes>(instance, `/tasks/${encoded(session.id)}/changes`, undefined, abort.signal).then(v => { if (!abort.signal.aborted) { setChanges(v); setChangesError(""); } }).catch(e => { if (!abort.signal.aborted) setChangesError(errorText(e)); });
-    return () => abort.abort();
-  }, [load, instance, session.id, revision]);
-  useEffect(() => {
-    if (!fileChoice) return;
-    const abort = new AbortController();
-    const base = `/tasks/${encoded(session.id)}`;
-    const route = fileChoice.diff ? `${base}/changes/${encoded(fileChoice.path)}/diff` : `${base}/files?path=${encoded(fileChoice.path)}`;
-    setContent(null);
-    void request<FileContent>(instance, route, undefined, abort.signal).then(v => { if (!abort.signal.aborted) setContent(v); }).catch(e => { if (!abort.signal.aborted) setError(errorText(e)); });
-    return () => abort.abort();
-  }, [instance, session.id, fileChoice, revision]);
+  const base = `/tasks/${encoded(session.id)}`;
+  const task = useSnapshot<Detail>(instance, path, revision);
+  const files = useSnapshot<Changes>(instance, `${base}/changes`, revision);
+  const filePath = fileChoice ? (fileChoice.diff ? `${base}/changes/${encoded(fileChoice.path)}/diff` : `${base}/files?path=${encoded(fileChoice.path)}`) : null;
+  const file = useSnapshot<FileContent>(instance, filePath, revision);
+  const detail = task.value;
+  const changes = files.value;
+  const content = file.value;
   const action = async (route: string, body: unknown, done?: () => void) => {
     setBusy(true); setError("");
-    try { await request(instance, route, body); done?.(); await load(); }
+    try { await request(instance, route, body); done?.(); await task.refresh(); }
     catch (error) { setError(errorText(error)); }
     finally { setBusy(false); }
   };
@@ -55,18 +40,21 @@ export function TaskView({ instance, session, revision }: { instance: Instance; 
       <div className="actions"><button className="primary" data-testid="mobile-agent-send" disabled={busy || !!running || !text.trim() || messageBytes > 32768}>发送指令</button><button type="button" data-testid="mobile-agent-continue" onClick={() => setText("继续")}>继续</button><button type="button" onClick={() => setText("请汇报当前进展、阻塞点和下一步。")}>汇报进展</button></div>
       {history.map((value, i) => <button type="button" className="history" key={i} onClick={() => setText(value)}>{value.slice(0,80)}</button>)}
     </form>
-    {error && <p role="alert" data-testid="mobile-task-error">{error}</p>}
-    <div className="section-heading"><h3>文件改动 · 只读</h3><button onClick={() => { setChangesError(""); void request<Changes>(instance, `/tasks/${encoded(session.id)}/changes`).then(setChanges).catch(e => setChangesError(errorText(e))); }}>刷新</button></div>
-    {changesError && <p className="note" data-testid="mobile-changes-error">{changesError}</p>}
+    {(error || task.error) && <p role="alert" data-testid="mobile-task-error">{error || task.error}</p>}
+    <small className="muted" data-testid="mobile-task-updated">{freshness(task.updated, stale || !!task.error || task.loading, task.loading)}</small>
+    <div className="section-heading"><h3>文件改动 · 只读</h3><button data-testid="mobile-changes-refresh" disabled={files.loading} onClick={() => void files.refresh()}>刷新</button></div>
+    <small className="muted" data-testid="mobile-changes-updated">{freshness(files.updated, stale || !!files.error || files.loading, files.loading)}</small>
+    {files.error && <p className="note" data-testid="mobile-changes-error">{files.error}</p>}
     {changes?.changes.length === 0 && <p className="muted">暂无文件改动</p>}
     {changes?.changes.map(change => <div className="change" key={change.path}><span>{change.change_kind}</span><button data-testid="mobile-file-open" onClick={() => { setError(""); setFileChoice({ path: change.path, diff: false }); }}>{change.path}</button><button data-testid="mobile-diff-open" disabled={!change.diff_available} onClick={() => { setError(""); setFileChoice({ path: change.path, diff: true }); }}>diff</button></div>)}
     {changes?.truncated && <p>改动列表已截断。</p>}
-    {fileChoice && <article className="file-view" data-testid="mobile-file-view"><div className="section-heading"><h3>{fileChoice.path} · {fileChoice.diff ? "diff" : "只读"}</h3><button onClick={() => { setFileChoice(null); setContent(null); }}>关闭</button></div>
+    {fileChoice && <article className="file-view" data-testid="mobile-file-view"><div className="section-heading"><h3>{fileChoice.path} · {fileChoice.diff ? "diff" : "只读"}</h3><button data-testid="mobile-file-refresh" disabled={file.loading} onClick={() => void file.refresh()}>刷新</button><button onClick={() => setFileChoice(null)}>关闭</button></div>
+      <small className="muted" data-testid="mobile-file-updated">{freshness(file.updated, stale || !!file.error || file.loading, file.loading)}</small>
+      {file.error && <p role="alert" data-testid="mobile-file-error">{file.error}</p>}
       {content?.truncated && <p role="status">内容已截断（最大 256 KiB）。</p>}
       {content?.hunks?.map((hunk,i) => <details key={i} open={i === 0}><summary>{i === 0 ? "文件信息" : hunk.split("\n")[0]}</summary><pre>{hunk}</pre></details>)}
       {content?.content !== undefined && <pre data-testid="mobile-file-content">{content.content.split("\n").map((line,i) => <span className="code-line" key={i}><span className="line-number">{i+1}</span>{line}{"\n"}</span>)}</pre>}
-      {!content && !error && <p>正在加载…</p>}
+      {!content && file.loading && <p>正在加载…</p>}
     </article>}
-    <small className="muted">上次更新 {updated || "—"}</small>
   </section>;
 }

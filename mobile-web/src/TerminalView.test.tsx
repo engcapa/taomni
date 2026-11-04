@@ -4,7 +4,7 @@ import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { Frame } from "./live";
 
 const mock = vi.hoisted(() => ({ frame: (_frame: Frame) => {}, status: (_status: string) => {}, send: vi.fn(() => true), input: (_data: string) => {}, resize: (_size: unknown) => {}, term: null as any }));
-vi.mock("./live", () => ({ useLive: (_instance: unknown, _path: string, frame: (frame: Frame) => void, status: (value: string) => void) => { mock.frame = frame; mock.status = status; return mock.send; } }));
+vi.mock("./live", () => ({ useLive: (_instance: unknown, _path: string, frame: (frame: Frame) => void, status: (value: string) => void) => { mock.frame = frame; mock.status = status; return { send: mock.send, canRetry: false, retry: vi.fn() }; } }));
 vi.mock("@xterm/xterm", () => ({ Terminal: class {
   cols = 40; rows = 20; textarea: HTMLTextAreaElement | undefined;
   options: Record<string, unknown>;
@@ -51,6 +51,21 @@ it("keeps read-only input out of the wire, then adopts and follows phone geometr
   mock.send.mockClear();
   act(() => { mock.resize({}); mock.input("x"); vi.advanceTimersByTime(150); });
   expect(mock.send).not.toHaveBeenCalled();
+});
+
+it("warns before takeover and exposes desktop activity without opening the more menu", () => {
+  render(<TerminalView instance={instance} session={session} />);
+  act(() => { mock.status("已连接"); mock.frame({ type: "control", holder: "none", desktop_last_activity_at: 1700000000 }); });
+  expect(screen.getByTestId("mobile-control-warning")).toHaveTextContent("输入可能打断正在执行的命令");
+  expect(screen.getByTestId("mobile-control-warning")).toHaveTextContent("桌面最近活动：");
+  expect(screen.getByTestId("mobile-take-control")).toHaveAttribute("aria-describedby", "mobile-control-warning");
+  expect(screen.queryByTestId("mobile-terminal-menu")).toBeNull();
+  fireEvent.click(screen.getByTestId("mobile-take-control"));
+  expect(mock.send).toHaveBeenCalledWith({ type: "take-control" });
+  connect();
+  expect(screen.queryByTestId("mobile-control-warning")).toBeNull();
+  fireEvent.click(screen.getByTestId("mobile-take-control"));
+  expect(mock.send).toHaveBeenCalledWith({ type: "release-control" });
 });
 
 it("applies sticky Ctrl to the next system-keyboard character and resets on lost control", () => {

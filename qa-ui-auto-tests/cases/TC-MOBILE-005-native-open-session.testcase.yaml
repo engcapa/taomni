@@ -34,7 +34,7 @@ steps:
 - wait_for: '[data-testid="mobile-settings"]'
 - assert_text:
     selector: '[data-testid="mobile-settings-status"]'
-    contains: 已关闭
+    contains: Disabled
 - assert_count:
     selector: '[data-testid="mobile-settings-open-sessions"]:not(:checked)'
     equal: 1
@@ -47,7 +47,7 @@ steps:
 - click: '[data-testid="mobile-settings-toggle"]'
 - assert_text:
     selector: '[data-testid="mobile-settings-status"]'
-    contains: 运行中
+    contains: Running
 - click: '[data-testid="mobile-settings-pair"]'
 - wait_for: '[data-testid="mobile-settings-code"]'
 - mobile_service_probe: open-session
@@ -73,7 +73,7 @@ steps:
 - click: '[data-testid="mobile-settings-toggle"]'
 - assert_text:
     selector: '[data-testid="mobile-settings-status"]'
-    contains: 已关闭
+    contains: Disabled
 - assert_no_runtime_errors: null
 verification:
   review: reviewed

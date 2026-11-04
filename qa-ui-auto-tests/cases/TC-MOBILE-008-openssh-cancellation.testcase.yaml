@@ -30,7 +30,7 @@ steps:
 - click: '[data-testid="mobile-settings-toggle"]'
 - assert_text:
     selector: '[data-testid="mobile-settings-status"]'
-    contains: 运行中
+    contains: Running
 - click: '[data-testid="mobile-settings-open-sessions"]'
 - mobile_service_probe: openssh-cancel
 - assert_file_contains:

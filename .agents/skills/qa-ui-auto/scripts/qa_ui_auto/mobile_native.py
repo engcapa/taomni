@@ -130,7 +130,7 @@ def desktop(ctx, terminal_input):
         assert headers.get('access-control-allow-origin', headers.get('Access-Control-Allow-Origin')) == ORIGIN
         checks.append('settings-revocation-closes-existing-websocket-and-returns-readable-origin-error')
         click(ctx.session, '[data-testid="mobile-settings-toggle"]')
-        until(ctx.session, 'document.querySelector(\'[data-testid="mobile-settings-status"]\')?.textContent.includes("已关闭")')
+        until(ctx.session, 'document.querySelector(\'[data-testid="mobile-settings-status"]\')?.textContent.includes("Disabled")')
         try:
             http(endpoint, '/health')
         except OSError:

@@ -16,7 +16,7 @@ fixtures:
 - mobile_service
 timeout_sec: 120
 description: Launches the matching QA binary with DISPLAY and WAYLAND_DISPLAY removed. A separate disposable profile proves HTTP health/pair/events,
-  profile exclusion and clean process/listener shutdown. A 390x844 Chromium context pairs against the actual embedded PWA and verifies the cached shell offline.
+  profile exclusion and clean process/listener shutdown. A 390x844 Chromium context pairs against the actual embedded PWA and verifies the cached shell offline with an explicit stale-data notice, retained registration and automatic online recovery.
 steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-mobile-headless-password
@@ -50,6 +50,13 @@ verification:
     - 4
     - 5
     - 6
+  - id: R2
+    requirement: The actual embedded PWA retains its instance registration offline, explicitly marks offline data and reconnects after network recovery.
+    actions: [1, 3]
+    checkpoints:
+    - {step: 3, expectation: Browser oracle checks cached shell notice and online recovery against the real headless listener.}
+    - {step: 5, expectation: Only a fully completed native and embedded-PWA probe writes a passing receipt.}
+    results: [3, 5]
   visual:
   - check: No GUI is created by headless.
     method: not-applicable

@@ -3,7 +3,7 @@ import { act, cleanup, fireEvent, render, screen } from "@testing-library/react"
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { OpenStatus } from "./openSession";
 const mock = vi.hoisted(() => ({ request: vi.fn(), open: vi.fn() }));
-vi.mock("./live", () => ({ useLive: () => vi.fn() }));
+vi.mock("./live", () => ({ useLive: () => ({ send: vi.fn(), canRetry: false, retry: vi.fn() }) }));
 vi.mock("./openSession", () => ({ openSession: mock.open }));
 vi.mock("./api", async original => ({ ...await original<typeof import("./api")>(), request: mock.request, loadInstances: () => [], saveInstances: vi.fn() }));
 import { InstanceView } from "./InstanceView";

@@ -40,7 +40,7 @@ export function TerminalView({ instance, session, onBack }: { instance: Instance
   const controlRef = useRef(false); controlRef.current = controlling;
   const modifiersRef = useRef(modifiers); modifiersRef.current = modifiers;
   const fullscreenRef = useRef(fullscreen); fullscreenRef.current = fullscreen;
-  const send = useLive(instance, `/terminals/${encoded(session.id)}/stream`, (frame: Frame) => {
+  const { send, canRetry, retry } = useLive(instance, `/terminals/${encoded(session.id)}/stream`, (frame: Frame) => {
     if (frame.type === "hello") setConnection(String(frame.connection_id || ""));
     else if (frame.type === "output" && typeof frame.data_b64 === "string") {
       terminal.current?.write(Uint8Array.from(atob(frame.data_b64), c => c.charCodeAt(0)));
@@ -194,7 +194,7 @@ export function TerminalView({ instance, session, onBack }: { instance: Instance
       <h2 className="terminal-title" title={session.title}>{session.title || "终端输出"}</h2>
       <div className="terminal-tools">
         <span className="badge" data-testid="mobile-terminal-status" title={status}>{badge}{status !== "已连接" && ` · ${status}`}</span>
-        <button className={controlling ? undefined : "primary"} data-testid="mobile-take-control" disabled={exited || status !== "已连接"} onMouseDown={keepFocus} onClick={() => { setNotice(""); command({ type: controlling ? "release-control" : "take-control" }); }}>{controlling ? "释放" : "接管输入"}</button>
+        <button className={controlling ? undefined : "primary"} data-testid="mobile-take-control" aria-describedby={!controlling && !exited ? "mobile-control-warning" : undefined} disabled={exited || status !== "已连接"} onMouseDown={keepFocus} onClick={() => { setNotice(""); command({ type: controlling ? "release-control" : "take-control" }); }}>{controlling ? "释放" : "接管输入"}</button>
         <TerminalMore>
           <div className="actions">
             <button data-testid="mobile-terminal-font-down" aria-label="缩小字号" disabled={fontSize <= FONT_MIN} onMouseDown={keepFocus} onClick={() => setFontSize(v => clampFontSize(v - 1))}>A−</button>
@@ -206,10 +206,11 @@ export function TerminalView({ instance, session, onBack }: { instance: Instance
           <button data-testid="mobile-paste" aria-pressed={panelOpen} disabled={!controlling} onClick={() => { setInputMode("system"); setPanelOpen(v => !v); }}>多行 / 历史</button>
           <button data-testid="mobile-resize" disabled={!controlling} onClick={() => { fit.current?.fit(); if (terminal.current) command({ type: "resize", cols: terminal.current.cols, rows: terminal.current.rows }); }}>适配尺寸</button>
           <p className="note">拖动输出查看历史，双指缩放调整字号。接管后按手机尺寸重排，桌面输入可随时抢回。</p>
-          {desktopActivity && <p className="note">桌面最近活动：{new Date(desktopActivity * 1000).toLocaleTimeString()}</p>}
         </TerminalMore>
       </div>
     </div>
+    {!controlling && !exited && <p id="mobile-control-warning" className="terminal-notice" data-testid="mobile-control-warning">接管后的输入可能打断正在执行的命令；桌面可随时抢回。{desktopActivity ? `桌面最近活动：${new Date(desktopActivity * 1000).toLocaleTimeString()}` : "桌面最近活动：暂无记录。"}</p>}
+    {canRetry && <button data-testid="mobile-terminal-retry" onClick={retry}>重新连接（保留已接收输出）</button>}
     <div className="terminal-frame">
       <div ref={host} className="terminal" data-testid="mobile-terminal-screen" />
       {scrolledUp && <button className="scroll-latest" data-testid="mobile-terminal-latest" onMouseDown={keepFocus} onClick={() => terminal.current?.scrollToBottom()}>↓ 最新</button>}

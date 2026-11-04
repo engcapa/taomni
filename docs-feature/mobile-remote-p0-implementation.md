@@ -1,6 +1,6 @@
 # Mobile remote P0 实施与验证
 
-本次独立评审处置与新提交验证见 [mobile-feishu-p1-review-resolution.md](mobile-feishu-p1-review-resolution.md)。以下历史运行只证明其标注的提交。
+本次独立评审处置与新提交验证见 [mobile-feishu-p1-review-resolution.md](mobile-feishu-p1-review-resolution.md)。2026-11-05 增量开发与新验证见 [离线恢复、数据新鲜度与设置多语言](mobile-recovery-i18n-implementation.md)。以下历史运行只证明其标注的提交。
 
 关联设计：[mobile-remote-p0-design.md](mobile-remote-p0-design.md)。分支：`feat/mobile-remote-p0`。只实施 TASK-01～TASK-06；TASK-07 / AC-17 属于 P1。
 

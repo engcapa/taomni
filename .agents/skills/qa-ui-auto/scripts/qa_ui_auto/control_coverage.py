@@ -168,8 +168,26 @@ def _selectors_in_step(verb: str, args: Any) -> list[str]:
         return ['[data-testid="mobile-settings-refresh"]', '[data-testid="mobile-settings-revoke"]']
     if verb == "mobile_service_probe" and args == "open-session":
         return ['[data-testid="mobile-settings-open-sessions"]']
+    if verb == "mobile_service_probe" and args == "headless":
+        return [f'[data-testid="{name}"]' for name in (
+            'mobile-offline-note', 'mobile-instance-availability', 'mobile-instance-open',
+            'mobile-first-instance', 'mobile-endpoint', 'mobile-label', 'mobile-pair-code',
+            'mobile-pair-submit', 'mobile-empty-sessions', 'mobile-connection',
+            'mobile-instances-back', 'mobile-instance-error',
+        )]
     if verb == "mobile_browser_probe" and args == "touch-scroll":
         return ['[data-testid="mobile-terminal-screen"]', '[data-testid="mobile-terminal-latest"]']
+    if verb == "mobile_browser_probe" and args == "recovery":
+        return [f'[data-testid="{name}"]' for name in (
+            'mobile-session', 'mobile-control-warning', 'mobile-terminal-retry',
+            'mobile-events-retry', 'mobile-sessions-updated', 'mobile-connection',
+            'mobile-terminal-more', 'mobile-terminal-fullscreen',
+            'mobile-take-control', 'mobile-terminal-back', 'mobile-file-open',
+            'mobile-agent-continue', 'mobile-agent-send', 'mobile-task-status',
+            'mobile-task-updated', 'mobile-changes-updated', 'mobile-file-updated',
+            'mobile-changes-error', 'mobile-file-error', 'mobile-file-content',
+            'mobile-changes-refresh', 'mobile-file-refresh',
+        )]
     out: list[str] = []
     # Short form: `click: '[data-testid="x"]'` → args is a string.
     if isinstance(args, str):

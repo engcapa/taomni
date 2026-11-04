@@ -1,11 +1,17 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ApiError, request, type Instance } from "./api";
+
 export interface Frame { type: string; [key: string]: unknown }
+const RETRY_DELAYS = [1000, 2000, 5000, 10000, 30000];
+
 export function useLive(instance: Instance, path: string, onFrame: (frame: Frame) => void, onStatus: (status: string) => void) {
   const callback = useRef(onFrame);
   const status = useRef(onStatus);
   callback.current = onFrame; status.current = onStatus;
   const channel = useRef<WebSocket | null>(null);
+  const restart = useRef<(() => void) | null>(null);
+  const [canRetry, setCanRetry] = useState(false);
+
   useEffect(() => {
     let disposed = false;
     let socket: WebSocket | null = null;
@@ -16,28 +22,44 @@ export function useLive(instance: Instance, path: string, onFrame: (frame: Frame
     let connected = false;
     let instanceId: string | undefined;
     let ended = false;
+    let denied = false;
+    let connecting = false;
+    let paused = false;
     const abort = new AbortController();
+    setCanRetry(false);
     const connect = async () => {
+      if (disposed || ended || denied || connecting || channel.current?.readyState === WebSocket.OPEN) return;
+      if (!navigator.onLine) { status.current("离线 · 等待网络恢复"); return; }
+      connecting = true;
+      setCanRetry(false);
       status.current(connected ? "重连中" : "连接中");
       try {
         const { ticket } = await request<{ ticket: string }>(instance, "/ws-ticket", {}, abort.signal);
-        if (disposed || ended) return;
+        if (disposed || ended || denied) return;
         const url = new URL(`${instance.endpoint}/api/v1${path}`);
         url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
         if (connected) url.searchParams.set("after_seq", String(sequence));
         url.searchParams.set("ticket", ticket); // one-use credential, never the token
-        socket = new WebSocket(url);
-        channel.current = socket;
+        const current = new WebSocket(url);
+        lastFrame = Date.now();
+        socket = current;
+        channel.current = current;
         const reconnect = connected;
-        socket.onopen = () => {
-          lastFrame = Date.now(); attempts = 0; status.current("已连接");
+        current.onopen = () => {
+          if (disposed || socket !== current) return;
+          connecting = false;
+          lastFrame = Date.now(); status.current("已连接");
           connected = true;
         };
-        socket.onmessage = event => {
+        current.onmessage = event => {
+          if (disposed || socket !== current) return;
           lastFrame = Date.now();
           let frame: Frame;
-          try { frame = JSON.parse(event.data); } catch { socket?.close(); return; }
-          if (frame.type === "heartbeat") { socket?.send(JSON.stringify({ type: "heartbeat-ack" })); return; }
+          try { frame = JSON.parse(event.data); } catch { current.close(); return; }
+          // A valid application frame establishes recovery; merely opening and
+          // immediately dropping a socket must not reset the retry budget.
+          attempts = 0;
+          if (frame.type === "heartbeat") { current.send(JSON.stringify({ type: "heartbeat-ack" })); return; }
           if (frame.type === "hello") {
             const changed = instanceId !== undefined && frame.instance_id !== instanceId;
             instanceId = typeof frame.instance_id === "string" ? frame.instance_id : undefined;
@@ -50,8 +72,6 @@ export function useLive(instance: Instance, path: string, onFrame: (frame: Frame
             callback.current(frame); return;
           }
           if (frame.type === "exit" || (frame.type === "error" && frame.code === "terminal_not_found")) ended = true;
-          // Reconnected terminals resume the retained client buffer. The
-          // automatic initial replay belongs to new viewers only.
           if (typeof frame.seq === "number") {
             if (frame.seq <= sequence) return;
             sequence = frame.seq;
@@ -59,25 +79,66 @@ export function useLive(instance: Instance, path: string, onFrame: (frame: Frame
           if (typeof frame.last_seq === "number") sequence = frame.last_seq;
           callback.current(frame);
         };
-        socket.onclose = event => { if (channel.current === socket) channel.current = null; if (disposed) return; if (ended || event.code === 4004) { status.current("终端已退出或关闭"); return; } if (event.code === 4001) { status.current("已被实例吊销，请重新配对"); return; } retry(); };
-        socket.onerror = () => socket?.close();
+        current.onclose = event => {
+          if (channel.current === current) channel.current = null;
+          if (disposed || socket !== current) return;
+          connecting = false;
+          if (ended || event.code === 4004) { ended = true; status.current("终端已退出或关闭"); return; }
+          if (event.code === 4001) { denied = true; status.current("已被实例吊销，请重新配对"); return; }
+          retry();
+        };
+        current.onerror = () => current.close();
       } catch (error) {
-        if (error instanceof ApiError && ["unauthorized", "origin_denied"].includes(error.code)) { status.current("配对已失效，请重新配对"); return; }
+        connecting = false;
+        if (disposed) return;
+        if (error instanceof ApiError && ["unauthorized", "origin_denied"].includes(error.code)) {
+          denied = true; status.current("配对已失效，请重新配对"); return;
+        }
         retry();
       }
     };
     const retry = () => {
-      if (disposed || ended) return;
+      if (disposed || ended || denied) return;
+      clearTimeout(timer);
+      if (!navigator.onLine) { status.current("离线 · 等待网络恢复"); return; }
+      if (attempts >= RETRY_DELAYS.length) {
+        paused = true; status.current("离线 · 自动重连已暂停，请重试"); setCanRetry(true); return;
+      }
       status.current("离线 · 重连中");
-      timer = setTimeout(connect, [1000, 2000, 5000, 10000, 30000][Math.min(attempts++, 4)]);
+      timer = setTimeout(connect, RETRY_DELAYS[attempts++]);
     };
-    const watchdog = setInterval(() => { if (socket?.readyState === WebSocket.OPEN && Date.now() - lastFrame > 90000) socket.close(); }, 15000);
+    restart.current = () => {
+      if (disposed || ended || denied || channel.current?.readyState === WebSocket.OPEN) return;
+      clearTimeout(timer); attempts = 0; paused = false; void connect();
+    };
+    const online = () => { if (!paused) { clearTimeout(timer); void connect(); } };
+    const offline = () => {
+      if (disposed || ended || denied || paused) return;
+      clearTimeout(timer);
+      status.current("离线 · 等待网络恢复");
+      socket?.close();
+    };
+    window.addEventListener("online", online);
+    window.addEventListener("offline", offline);
+    const watchdog = setInterval(() => {
+      if (socket && Date.now() - lastFrame > (socket.readyState === 0 ? 15000 : 90000) && socket.readyState <= WebSocket.OPEN) socket.close();
+    }, 15000);
     void connect();
-    return () => { disposed = true; abort.abort(); clearTimeout(timer); clearInterval(watchdog); socket?.close(); channel.current = null; };
+    return () => {
+      disposed = true; abort.abort(); clearTimeout(timer); clearInterval(watchdog);
+      window.removeEventListener("online", online);
+      window.removeEventListener("offline", offline);
+      socket?.close(); channel.current = null; restart.current = null;
+    };
   }, [instance.id, instance.token, instance.endpoint, path]);
-  return (frame: Frame) => {
-    if (channel.current?.readyState !== WebSocket.OPEN) return false;
-    try { channel.current.send(JSON.stringify(frame)); return true; }
-    catch { channel.current.close(); return false; }
+
+  return {
+    canRetry,
+    retry: () => restart.current?.(),
+    send: (frame: Frame) => {
+      if (channel.current?.readyState !== WebSocket.OPEN) return false;
+      try { channel.current.send(JSON.stringify(frame)); return true; }
+      catch { channel.current.close(); return false; }
+    },
   };
 }

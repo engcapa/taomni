@@ -38,7 +38,7 @@ def run(ctx, endpoint):
                 ctx.session.click('[data-testid="mobile-settings-revoke"]')
             else:
                 ctx.session.click('[data-testid="mobile-settings-toggle"]')
-                until(ctx.session, 'document.querySelector(\'[data-testid="mobile-settings-status"]\')?.textContent.includes("已关闭")')
+                until(ctx.session, 'document.querySelector(\'[data-testid="mobile-settings-status"]\')?.textContent.includes("Disabled")')
             def dead():
                 try: os.kill(process['pid'], 0)
                 except ProcessLookupError: return True
@@ -52,7 +52,7 @@ def run(ctx, endpoint):
             ctx.session.fill('[data-testid="settings-search-input"]', 'mobile')
             if reason == 'stop':
                 ctx.session.click('[data-testid="mobile-settings-toggle"]')
-                until(ctx.session, 'document.querySelector(\'[data-testid="mobile-settings-status"]\')?.textContent.includes("运行中")')
+                until(ctx.session, 'document.querySelector(\'[data-testid="mobile-settings-status"]\')?.textContent.includes("Running")')
                 from .mobile_native import address
                 endpoint = address(ctx)
             _, observer = pair(endpoint, code(ctx))

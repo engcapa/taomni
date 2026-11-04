@@ -567,7 +567,7 @@
           "$ref": "#/$defs/terminal_input_arg"
         },
         "mobile_service_probe": { "enum": ["desktop", "headless", "open-session", "connection-auth", "openssh-cancel"] },
-        "mobile_browser_probe": { "enum": ["touch-scroll"] },
+        "mobile_browser_probe": { "enum": ["touch-scroll", "recovery"] },
         "native_terminal_burst": {
           "$ref": "#/$defs/native_terminal_burst_arg"
         },

@@ -1,5 +1,6 @@
 import type { en } from "./en";
 import { modelInspectorZh } from "./modelInspector";
+import { feishuSettingsZh, mobileSettingsZh } from "./mobileSettings";
 
 // Use a deep partial to allow gradual translation while still letting the
 // type system flag obvious shape mismatches against the English dictionary.
@@ -55,6 +56,8 @@ export const zhCN: DeepPartial<typeof en> = {
     "retentionHint": "保留份数用于本地自动备份快照，云端文件历史由服务商管理。"
 },
   modelInspector: modelInspectorZh,
+  mobileSettings: mobileSettingsZh,
+  feishuSettings: feishuSettingsZh,
 
   app: {
     name: "Taomni",

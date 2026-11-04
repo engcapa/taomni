@@ -1975,6 +1975,18 @@
 
 ## mobile/control-plane (F-MOBILE-1)
 
+- `[data-testid="mobile-offline-note"]` — display — F-MOBILE-1.mobile-offline-note
+- `[data-testid="mobile-instance-availability"]` — display — F-MOBILE-1.mobile-instance-availability
+- `[data-testid="mobile-control-warning"]` — display — F-MOBILE-1.mobile-control-warning
+- `[data-testid="mobile-events-retry"]` — interactive — F-MOBILE-1.mobile-events-retry
+- `[data-testid="mobile-terminal-retry"]` — interactive — F-MOBILE-1.mobile-terminal-retry
+- `[data-testid="mobile-sessions-updated"]` — display — F-MOBILE-1.mobile-sessions-updated
+- `[data-testid="mobile-task-updated"]` — display — F-MOBILE-1.mobile-task-updated
+- `[data-testid="mobile-changes-updated"]` — display — F-MOBILE-1.mobile-changes-updated
+- `[data-testid="mobile-file-updated"]` — display — F-MOBILE-1.mobile-file-updated
+- `[data-testid="mobile-file-error"]` — display — F-MOBILE-1.mobile-file-error
+- `[data-testid="mobile-changes-refresh"]` — interactive — F-MOBILE-1.mobile-changes-refresh
+- `[data-testid="mobile-file-refresh"]` — interactive — F-MOBILE-1.mobile-file-refresh
 - `[data-testid="mobile-add-instance"]` — interactive — F-MOBILE-1.mobile-add-instance
 - `[data-testid="mobile-empty-instances"]` — display — F-MOBILE-1.mobile-empty-instances
 - `[data-testid="mobile-endpoint"]` — interactive — F-MOBILE-1.mobile-endpoint
@@ -2011,6 +2023,8 @@
 - `[data-testid="mobile-settings-open-sessions"]` — interactive — F-MOBILE-1.mobile-settings-open-sessions
 - `[data-testid="mobile-settings-pair"]` — interactive — F-MOBILE-1.mobile-settings-pair
 - `[data-testid="mobile-settings-code"]` — display — F-MOBILE-1.mobile-settings-code
+- `[data-testid="mobile-settings-endpoint"]` — interactive — F-MOBILE-1.mobile-settings-endpoint
+- `[data-testid="mobile-settings-qr"]` — display — F-MOBILE-1.mobile-settings-qr
 - `[data-testid="mobile-settings-refresh"]` — interactive — F-MOBILE-1.mobile-settings-refresh
 - `[data-testid="mobile-settings-revoke"]` — interactive — F-MOBILE-1.mobile-settings-revoke
 - `[data-testid="mobile-app"]` — display — F-MOBILE-1.mobile-app

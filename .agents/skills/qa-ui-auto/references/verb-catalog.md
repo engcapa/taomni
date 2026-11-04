@@ -439,6 +439,15 @@ move backwards without moving the page, then clicks “最新” and verifies th
 original latest-output position is restored. It writes `mobile-touch-scroll.json`.
 This proves browser event integration, not physical iOS/Android touch hardware.
 
+`mobile_browser_probe: recovery` (browser only, paired instance session list)
+closes both phone WebSockets through Playwright network interception, fails
+five ticket requests per stream, verifies paused retries with output retained, and clicks
+manual reconnect with `after_seq`. It then makes task files/changes fail while
+task details succeed, checks independent timestamps and stale content, and
+recovers through visible refresh controls. It writes `mobile-recovery.json` and
+binds `${fixture.mobile_recovery_receipt}`. This is renderer/network evidence;
+TC-MOBILE-003 separately proves cached shell offline/online on a real listener.
+
 The `mobile_web` browser fixture serves the production mobile bundle with a
 deterministic HTTP/WS peer; it does not establish Rust/native service behavior.
 The `mobile_service` fixture seeds only isolated saved-session rows for native

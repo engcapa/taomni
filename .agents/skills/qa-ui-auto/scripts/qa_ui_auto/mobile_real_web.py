@@ -29,11 +29,18 @@ def probe(endpoint, pairing_code, case_dir):
             context.set_offline(True)
             page.reload(wait_until='domcontentloaded')
             expect(page.get_by_test_id('mobile-instance-open')).to_contain_text('Real headless instance')
+            expect(page.get_by_test_id('mobile-offline-note')).to_contain_text('实时状态可能已过期')
+            expect(page.get_by_test_id('mobile-instance-availability')).to_contain_text('本机离线')
             page.get_by_test_id('mobile-instance-open').click()
             expect(page.get_by_test_id('mobile-instance-error')).to_be_visible()
             assert not failures, failures
             page.screenshot(path=str(Path(case_dir) / 'mobile-real-offline-shell.png'), full_page=True)
+            context.set_offline(False)
+            expect(page.get_by_test_id('mobile-offline-note')).to_have_count(0)
+            expect(page.get_by_test_id('mobile-connection')).to_have_text('已连接', timeout=20000)
+            expect(page.get_by_test_id('mobile-instance-error')).to_have_count(0)
+            assert not failures, failures
             context.close()
         finally:
             browser.close()
-    return {'mobile_real_web': True, 'viewport': '390x844', 'offline_shell': True}
+    return {'mobile_real_web': True, 'viewport': '390x844', 'offline_shell': True, 'offline_notice': True, 'online_recovery': True}

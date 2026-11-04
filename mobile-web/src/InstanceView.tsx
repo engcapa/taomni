@@ -47,7 +47,7 @@ export function InstanceView({ instance, sessionId, onSelect, onCloseSession, on
     refresh();
     return () => { ++generation.current; abort.current?.abort(); openAbort.current?.abort(); if (timer.current) clearTimeout(timer.current); };
   }, [refresh]);
-  useLive(instance, "/events", frame => {
+  const live = useLive(instance, "/events", frame => {
     if (["hello", "resync", "task_status", "file_changed", "session_changed"].includes(frame.type)) {
       if (!timer.current) timer.current = setTimeout(() => { timer.current = null; refresh(); }, 100);
     }
@@ -86,10 +86,11 @@ export function InstanceView({ instance, sessionId, onSelect, onCloseSession, on
   const canOpen = !!data.capabilities?.open_sessions;
   return <>
     <div className="breadcrumb"><button data-testid="mobile-instances-back" onClick={onBack}>‹ 实例</button><span>{instance.label}</span><span className="connection" data-testid="mobile-connection">{status}</span></div>
+    {live.canRetry && <button data-testid="mobile-events-retry" onClick={() => { live.retry(); refresh(); }}>重新连接事件流</button>}
     {error && <div className="card error" role="alert" data-testid="mobile-instance-error"><p>{error}</p><button data-testid="mobile-retry" onClick={refresh}>重试</button></div>}
     {selected ? <>
       <button className="back" data-testid="mobile-sessions-back" onClick={onCloseSession}>‹ 会话列表</button>
-      {selected.kind === "terminal" ? <TerminalView key={selected.id} instance={instance} session={selected} onBack={onCloseSession} /> : <TaskView key={selected.id} instance={instance} session={selected} revision={revision} />}
+      {selected.kind === "terminal" ? <TerminalView key={selected.id} instance={instance} session={selected} onBack={onCloseSession} /> : <TaskView key={selected.id} instance={instance} session={selected} revision={revision} stale={status !== "已连接" || !!error} />}
     </> : <>
       <div className="page-title"><p className="eyebrow">INSTANCE OVERVIEW</p><h1>远程执行，一目了然。</h1><p className="muted">终端与 Agent 留在实例端持续运行。</p></div>
       <div className="stats"><div><strong>{data.sessions.filter(s => s.status === "running").length}</strong><span>正在运行</span></div><div><strong>{data.sessions.filter(s => s.status === "awaiting_confirmation").length}</strong><span>等待确认</span></div><div><strong>{data.sessions.length}</strong><span>全部会话</span></div></div>
@@ -117,6 +118,6 @@ export function InstanceView({ instance, sessionId, onSelect, onCloseSession, on
         {!data.saved_sessions.length && <p className="muted">没有已保存的终端类会话</p>}
       </section>
     </>}
-    <p className="footer">上次更新 {updated || "—"} · {instance.endpoint}</p>
+    <p className="footer" data-testid="mobile-sessions-updated">上次更新 {updated || "—"}{(error || status !== "已连接") && updated ? " · 可能已过期" : ""} · {instance.endpoint}</p>
   </>;
 }

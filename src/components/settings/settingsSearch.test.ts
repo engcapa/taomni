@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
+import { setLocale, t as translate } from "../../lib/i18n";
+afterEach(() => setLocale("en"));
 import {
   ENTRY_TO_GROUP,
   SETTINGS_GROUPS,
@@ -40,6 +42,14 @@ describe("settingsSearch groups", () => {
     const ids = matchingIds("kotlin", t);
     expect(ids).toEqual(["sdks"]);
     expect(groupIdForEntry("sdks")).toBe("code");
+  });
+
+  it.each(["en", "zh-CN"] as const)("finds mobile settings through localized visible titles in %s", locale => {
+    setLocale(locale);
+    for (const key of ["mobileSettings.title", "mobileSettings.allowOpenSessions", "feishuSettings.title"]) {
+      expect(matchingIds(translate(key), translate)).toContain("mobile-service");
+    }
+    expect(groupIdForEntry("mobile-service")).toBe("network");
   });
 
   it("preserves group order even when entry list is reordered", () => {

@@ -1,0 +1,50 @@
+id: TC-MOBILE-011
+title: Phone retains output through bounded reconnect and marks independently stale task data
+covers: [F-MOBILE-1]
+tags: [mobile, recovery, p0]
+modes: [browser]
+fixtures: [mobile_web]
+timeout_sec: 150
+description: >-
+  Production phone bundle with deterministic HTTP/WS peer. External network
+  interception closes both terminal and event WebSockets and fails ticket requests.
+  Five retries per stream then stop; explicit retry resumes after_seq without removing output.
+  Task-detail success must not refresh timestamps on failed changes or file
+  requests. Native cached-PWA offline/recovery evidence belongs to TC-MOBILE-003.
+steps:
+- set_viewport: {width: 390, height: 844}
+- open: ${fixture.mobile_endpoint}
+- click: '[data-testid="mobile-add-instance"]'
+- fill: {selector: '[data-testid="mobile-pair-code"]', value: qa-mobile-code}
+- click: '[data-testid="mobile-pair-submit"]'
+- wait_for: '[data-testid="mobile-session"][data-session-kind="terminal"]'
+- mobile_browser_probe: recovery
+- assert_file_contains: {path: '${fixture.mobile_recovery_receipt}', contains: '"passed": true'}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Before takeover the risk is visible; output survives bounded retry and explicit sequence-preserving reconnection.
+    actions: [1, 2, 3, 4, 5, 7]
+    checkpoints:
+    - {step: 6, expectation: Paired terminal is available.}
+    - {step: 7, expectation: 'Network oracle verifies five retries, pause, retained output, after_seq and recovered control.'}
+    - {step: 8, expectation: All network recovery assertions passed in the independent receipt.}
+    results: [6, 7, 8]
+  - id: R2
+    requirement: Changes and file timestamps retain their own last success on failure, show stale state, and recover through visible refresh buttons.
+    actions: [7]
+    checkpoints:
+    - {step: 7, expectation: Task detail is fresh while retained changes and file are explicitly stale; manual refresh clears errors.}
+    - {step: 8, expectation: Independent network oracle receipt passed.}
+    - {step: 9, expectation: No runtime errors.}
+    results: [7, 8, 9]
+  visual:
+  - check: Network recovery and stale data screenshots are diagnostic.
+    method: not-applicable
+    reason: Output, network counts and data timestamps own acceptance.
+  native:
+  - check: Actual PWA cache offline and online recovery is covered by TC-MOBILE-003.
+    method: not-applicable
+    reason: This case establishes renderer/network behavior only; no real PTY or native listener claim.

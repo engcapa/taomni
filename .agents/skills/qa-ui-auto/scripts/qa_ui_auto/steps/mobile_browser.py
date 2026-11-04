@@ -15,9 +15,14 @@ from . import StepContext, StepError, verb
 
 @verb('mobile_browser_probe')
 def mobile_browser_probe(ctx: StepContext, args: Any) -> None:
-    if args != 'touch-scroll' or ctx.cfg['app']['mode'] != 'browser':
-        raise StepError('mobile_browser_probe requires browser mode and touch-scroll')
+    if args not in ('touch-scroll', 'recovery') or ctx.cfg['app']['mode'] != 'browser':
+        raise StepError('mobile_browser_probe requires browser mode and touch-scroll or recovery')
     if ctx.dry_run:
+        return
+    if args == 'recovery':
+        from ..mobile_recovery_probe import run
+        run(ctx.page, ctx.case_dir)
+        ctx.values['mobile_recovery_receipt'] = str((ctx.case_dir / 'mobile-recovery.json').resolve())
         return
     page = ctx.page
     target = page.locator('[data-testid="mobile-terminal-screen"]')
