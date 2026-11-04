@@ -153,7 +153,9 @@ jobs:
     if: >-
       inputs.scope == 'all' || contains(inputs.case_ids, 'TC-ORCH-') ||
       contains(inputs.tags, 'orchestration') || github.event_name == 'schedule'
-    runs-on: ubuntu-24.04
+    # Keep filesystem sandboxing enabled on the supported 22.04 baseline.
+    # 24.04's unconfined-userns AppArmor policy denies Codex bwrap uid_map.
+    runs-on: ubuntu-22.04
     timeout-minutes: 45
     permissions:
       contents: read
@@ -194,10 +196,10 @@ jobs:
       # any harness; ci_network drops privileges and strips inherited environment.
       - name: Validate all real workers against loopback-only fixtures
         run: |
-          sudo env GITHUB_ACTIONS=true /usr/bin/python3 -I \
+          sudo env GITHUB_ACTIONS=true "$(command -v python)" -I \
             "$GITHUB_WORKSPACE/qa-ui-auto-tests/fixtures/orchestration/ci_network.py" \
             --uid "$(id -u)" --gid "$(id -g)" -- \
-            /usr/bin/python3 -I \
+            "$(command -v python)" -I \
             "$GITHUB_WORKSPACE/qa-ui-auto-tests/fixtures/orchestration/validate_workers.py" \
             --installation "$RUNNER_TEMP/orchestration-harnesses/installation.json" \
             --output "$RUNNER_TEMP/orchestration-evidence" --timeout 120

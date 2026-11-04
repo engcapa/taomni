@@ -63,10 +63,10 @@ locally**; local validation is pure unit tests only.
 python -I "$GITHUB_WORKSPACE/qa-ui-auto-tests/fixtures/orchestration/install_harnesses.py" \
   --root "$RUNNER_TEMP/orchestration-harnesses"
 
-sudo env GITHUB_ACTIONS=true /usr/bin/python3 -I \
+sudo env GITHUB_ACTIONS=true "$(command -v python)" -I \
   "$GITHUB_WORKSPACE/qa-ui-auto-tests/fixtures/orchestration/ci_network.py" \
   --uid "$(id -u)" --gid "$(id -g)" -- \
-  /usr/bin/python3 -I \
+  "$(command -v python)" -I \
   "$GITHUB_WORKSPACE/qa-ui-auto-tests/fixtures/orchestration/validate_workers.py" \
   --installation "$RUNNER_TEMP/orchestration-harnesses/installation.json" \
   --output "$RUNNER_TEMP/orchestration-evidence" --timeout 120
@@ -91,6 +91,15 @@ in hosted run 41745445797). It does not enable host networking, give administrat
 capabilities, change application defaults, or prove Codex's independent tool-network
 deny mode. An external/missing interface fails before writing this config; no
 unisolated fallback, danger-full-access or legacy sandbox bypass is permitted.
+
+The standalone canary uses the supported **Ubuntu 22.04** baseline. On the observed
+24.04 hosted kernel, enabling outer-network delegation uncovered a second genuine
+bwrap `uid_map` EACCES caused by restricted unprivileged user namespaces. Do not
+turn off AppArmor/sysctls or downgrade the worker filesystem sandbox to pass.
+For native all-six acceptance, explicitly request `ubuntu-22.04-x11` (or the
+supported 22.04 VNC profile) and retain that actual desktop/OS identity in the
+selection and receipts. API/crash evidence on 24.04 remains separate; 22.04 worker
+evidence must never be labeled 24.04/26.04 sandbox compatibility.
 
 `validate_workers.py` starts the fixture inside the same namespace, allocates
 real detached Git worktrees, and calls `worker_bridge.py` for the installed

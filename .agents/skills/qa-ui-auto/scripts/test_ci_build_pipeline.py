@@ -31,6 +31,11 @@ class BuildPipelineTests(unittest.TestCase):
             self.assertIn("!contains(matrix.capabilities, 'orchestration-workers')", normal['if'])
         runtime = next(s for s in steps if s.get('name') == "Download this invocation's verified native runtime")
         self.assertLess(steps.index(runtime), steps.index(native))
+        standalone = yaml.safe_load((ROOT / '.github/workflows/qa-ui-auto-platforms.yml').read_text())['jobs']['orchestration-contracts']
+        self.assertEqual(standalone['runs-on'], 'ubuntu-22.04')
+        validation = next(s for s in standalone['steps'] if s.get('name') == 'Validate all real workers against loopback-only fixtures')
+        self.assertEqual(validation['run'].count('"$(command -v python)"'), 2)
+        self.assertNotIn('sysctl', validation['run'])
 
     def test_frontend_regressions_run_once_on_linux_producer_and_keep_original_log(self):
         workflow = yaml.safe_load((ROOT / '.github/workflows/qa-ui-auto-entry.yml').read_text())
