@@ -78,7 +78,19 @@ credentials/proxies, and drops to the runner's nonroot uid/gid before invoking
 the validator. No privileged fallback or outbound interface is allowed.
 Namespace tooling/permission failure blocks the job rather than running online.
 This is a network boundary, not a filesystem sandbox; the disposable runner and
-per-worker files remain necessary.
+per-worker files remain necessary. Current namespace interfaces are queried with
+`socket.if_nameindex()`, not a potentially parent-mounted `/sys/class/net`.
+
+The fixture-only Codex config keeps `sandbox_mode="workspace-write"` and the
+filesystem/PID/IPC/seccomp restrictions, but enables
+`sandbox_workspace_write.network_access=true` **only after another mandatory
+current-namespace loopback check**. The supervisor's namespace supplies network
+isolation: no outbound interface, only the controlled local fixture. This avoids
+Codex's redundant inner bwrap loopback address setup (`RTM_NEWADDR EPERM` observed
+in hosted run 41745445797). It does not enable host networking, give administrative
+capabilities, change application defaults, or prove Codex's independent tool-network
+deny mode. An external/missing interface fails before writing this config; no
+unisolated fallback, danger-full-access or legacy sandbox bypass is permitted.
 
 `validate_workers.py` starts the fixture inside the same namespace, allocates
 real detached Git worktrees, and calls `worker_bridge.py` for the installed

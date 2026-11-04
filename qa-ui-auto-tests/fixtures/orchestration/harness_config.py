@@ -7,7 +7,7 @@ from dataclasses import dataclass
 from pathlib import Path
 from urllib.parse import urlsplit
 
-from receipts import clean_environment, is_linked_worktree
+from receipts import assert_isolated_network, clean_environment, is_linked_worktree
 
 CATALOG_PATH = Path(__file__).resolve().with_name("harness_catalog.json")
 DUMMY_KEY = "taomni-fixture-dummy-not-a-real-key"
@@ -93,6 +93,11 @@ def prepare_launch(installation: dict, harness: str, base_url: str, worktree: Pa
                     "--setting-sources", "", "--strict-mcp-config", "--mcp-config", '{"mcpServers":{}}',
                     "--tools", "Bash", "--allowedTools", "Bash", "--max-turns", "4", prompt]
     elif harness == "codex":
+        # The supervisor's verified network namespace contains only loopback.
+        # Keep Codex's workspace filesystem sandbox, but share that outer netns:
+        # nested bwrap loopback RTM_NEWADDR is denied on the hosted kernel.
+        # Never emit this fixture-only network setting outside the boundary.
+        assert_isolated_network()
         codex = home / ".codex"
         env.update(CODEX_HOME=str(codex), TAOMNI_FIXTURE_KEY=DUMMY_KEY)
         write_private(codex / "config.toml", f'''model = "fixture-worker"
@@ -102,6 +107,8 @@ sandbox_mode = "workspace-write"
 web_search = "disabled"
 check_for_update_on_startup = false
 project_doc_max_bytes = 0
+[sandbox_workspace_write]
+network_access = true
 [analytics]
 enabled = false
 [features]

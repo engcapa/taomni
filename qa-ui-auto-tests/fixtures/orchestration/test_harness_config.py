@@ -9,6 +9,7 @@ import sys
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -23,6 +24,9 @@ class LaunchContractTests(unittest.TestCase):
     def setUp(self):
         self.temp = tempfile.TemporaryDirectory()
         self.addCleanup(self.temp.cleanup)
+        self.kernel_interfaces = patch("receipts.socket.if_nameindex", return_value=[(1, "lo")])
+        self.kernel_interfaces.start()
+        self.addCleanup(self.kernel_interfaces.stop)
         self.root = Path(self.temp.name)
         self.tree = self.root / "worktrees" / "worker"
         self.tree.mkdir(parents=True)
@@ -138,8 +142,15 @@ class LaunchContractTests(unittest.TestCase):
         config = (self.root / "state-sandbox" / "home" / ".codex" / "config.toml").read_text()
         self.assertIn('sandbox_mode = "workspace-write"', config)
         self.assertIn('approval_policy = "never"', config)
+        self.assertIn('[sandbox_workspace_write]\nnetwork_access = true', config)
         self.assertNotIn("danger-full-access", config)
         self.assertNotIn("use_legacy_landlock", config)
+
+    def test_codex_outer_network_delegation_cannot_be_configured_with_an_external_interface(self):
+        state = self.root / "state-unisolated"
+        with patch("receipts.socket.if_nameindex", return_value=[(1, "lo"), (2, "eth0")]), self.assertRaises(RuntimeError):
+            prepare_launch(self.installation, "codex", "http://127.0.0.1:123/v1", self.tree, state, "Task")
+        self.assertFalse((state / "home" / ".codex" / "config.toml").exists())
 
     def test_missing_drifted_identity_and_external_endpoint_fail_closed(self):
         for url in ("https://api.example.test/v1", "http://localhost:123/v1", "http://127.0.0.1:123/",
