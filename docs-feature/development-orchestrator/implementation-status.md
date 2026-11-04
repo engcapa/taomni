@@ -5,6 +5,15 @@ Updated: 2026-11-04. Design baseline: `a13e34dc7`, branch
 approved v0.6 design commit, including staged English commits and hosted QA.
 This file records implementation separately from acceptance evidence.
 
+**Latest verified hosted result:** [run 41764866550](https://github.com/engcapa/taomni/actions/runs/41764866550)
+at `c5d3a2a76fb90d1d5afe6cc37841146245cf2ecb` passed **85/85** selected
+browser/native executions across all three platforms, including Linux native UI
+scheduling of all six real harnesses and the complete applicable crash suite.
+[Detailed evidence and limits](hosted-evidence-20261104.md) retain source/runner,
+binary and invocation identities. This closes the implemented candidate slice's
+hosted execution gate, **not complete P1A or user acceptance**. The old Windows
+startup failure remains unclassified; no richer progress UI was introduced.
+
 ## Phase 1 — shared configuration, conversation UI and candidate execution
 
 Implemented in the working branch:
@@ -337,10 +346,33 @@ Product source identity is unchanged from the earlier three-platform run:
 `34d36891cadc681ba74d691e9503332305d102e2ce40bbd165c9aece38271634`.
 Runner identity is now
 `0434accda255bafcce6f86344b14763a4b512fc8c138a6cfe00ee5cf8643790a`.
-A fresh all-platform browser/native release run with the same final runner and
-all-six Linux native case is still required; do not combine different runner
-revisions into one claimed aggregate pass. The planned product responsibilities
-below remain open independently of that first-slice validation.
+At this Windows-only checkpoint, a fresh all-platform browser/native release
+run with the same final runner and all-six Linux native case was still required;
+different runner revisions were not combined into one claimed aggregate pass.
+
+### Unified final-run evidence
+
+[Run 41764866550](https://github.com/engcapa/taomni/actions/runs/41764866550)
+subsequently passed on `c5d3a2a76fb90d1d5afe6cc37841146245cf2ecb`, attempt 1,
+using the exact source/runner identities above: **39 browser + 45 ordinary native
++ 1 native six-worker case = 85 passed / 0 failed / 0 skipped**. All final gates
+and required supporting jobs passed. No capability gap, unreviewed case or
+infrastructure error was reported. Every raw shard summary and native release
+identity was independently checked, not inferred from green workflow jobs.
+
+The native six-worker receipt binds six distinct UI-submitted runs/worktrees,
+one host dispatch each, twelve actual fixture generations, successful pinned
+process exits, owned markers and artifact hashes. All three native no-newline
+recovery receipts preserve the exact prefix before adding only missing tests.
+The native Rust job passed 131 contracts and explicitly executed/passed both real
+process-lifecycle tests; frontend units passed 676 files / 6258 tests with the one
+existing unit skip, plus 7 separate prototype tests. The old Windows setup failure
+was not reproduced and remains unclassified, not declared fixed or flaky.
+
+See [the immutable evidence report](hosted-evidence-20261104.md) for exact case
+sets, native run IDs, binary hashes, artifact names, visual inspection limits and
+remaining scope. This closes the candidate slice's hosted execution gate only.
+The planned product responsibilities below remain open independently of it.
 
 ## Remaining work — not waived by phase 1
 

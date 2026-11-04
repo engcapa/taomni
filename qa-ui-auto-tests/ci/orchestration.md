@@ -1,5 +1,13 @@
 # Orchestration hosted validation
 
+Latest verified evidence (2026-11-04):
+[run 41764866550](https://github.com/engcapa/taomni/actions/runs/41764866550),
+commit `c5d3a2a76fb90d1d5afe6cc37841146245cf2ecb`, passed **85/85** selected
+three-platform browser/native executions, including the native all-six worker
+case and mandatory crash suite. [Evidence report](../../docs-feature/development-orchestrator/hosted-evidence-20261104.md)
+records invocation/runner/binary identities, raw-receipt checks and scope limits.
+The contracts below explain what those results do and do not establish.
+
 ## Required scope and honest evidence boundaries
 
 The `orchestration-contracts` supporting job in
@@ -17,8 +25,8 @@ It does **not** prove dispatch through Taomni's native scheduler or its product
 worker adapters, renderer lifecycle, cancellation, worktree/bootstrap ownership,
 or cross-platform app behavior. In particular, a green standalone Codex/Pi/
 OpenCode/DeepSeek/ZCode canary does not mean its native scheduling path passed.
-The explicit fixture-supervised launcher path is covered by a separate authored
-native case below; native CLI compatibility still needs actual hosted receipts.
+The explicit fixture-supervised launcher path is covered by the separate native
+case below; its actual hosted receipts must not be replaced by this canary.
 
 Native app scheduling evidence must additionally launch the matching QA release
 binary, create/approve a real run through the product UI/IPC, and correlate its
@@ -108,9 +116,9 @@ the marker or simulate a tool result. Timeouts and process-group cleanup are
 bounded. Extra generation requests, incorrect protocol/results, cross-worker
 writes, source-repository writes or changed worktree base must fail receipts.
 
-## Native Taomni scheduling lane (wired, execution pending)
+## Native Taomni scheduling lane (verified Linux happy path)
 
-`TC-ORCH-WORKER-004` now authors six native UI submissions and explicit approvals,
+`TC-ORCH-WORKER-004` performs six native UI submissions and explicit approvals,
 one per installed harness, then verifies candidates survive a renderer reload.
 The CI planner assigns `orchestration-workers` and `release`, separates this case
 from normal API/crash/service entries even with `shards=1`, and reuses the same
@@ -148,10 +156,12 @@ Linux Rust contract producer receives `QA_ORCH_CONTRACTS=true` and adds
 `orchestration::`, `llm::invocation`, and `go_compatibility_tests` to the same root
 libtest OR-filter invocation, not a second root test-binary build.
 
-This is executable wiring plus offline contract validation, **not an executed
-native pass**. First hosted evidence must still establish installation/CLI
-compatibility and six real native results; the standalone canary is not a
-fallback. The six-worker authored case covers happy-path dispatch, tool execution,
+The final run above verifies this native lane on Ubuntu 22.04 X11 with six
+actual candidate results, distinct worktrees, one host dispatch and two fixture
+generations per harness. Its published `native-six-workers.receipt.json` has
+scope `native_taomni_ui_scheduler_real_six_harnesses` and status `passed`;
+all twelve HTTP request IDs match the redacted request log. The standalone
+canary is not a fallback. This covers happy-path dispatch, tool execution,
 artifact ownership and reload persistence; native worker cancellation/forced
 termination scenarios and non-Linux real-worker validation remain separate gaps.
 
@@ -178,6 +188,9 @@ Check in this order:
   triggered run and all planned browser/native cases to pass. Native scheduling
   and matching crash-regression evidence are still separate acceptance gates.
 
-No hosted run or native/browser result is asserted by this document. The first
-hosted invocation must preserve failures as evidence; source inspection and
-local fixture unit tests do not establish that six live harnesses pass.
+Results above apply only to their exact hosted commit/invocation and authored
+scope. Preserve earlier failures and original receipts; source inspection or
+local fixture unit tests do not establish new live harness passes. The previous
+Windows startup failure was not reproduced and remains unclassified, not proven
+fixed by a subsequent passing run. All later product responsibilities and native
+fault/containment gaps in the evidence report remain open.
