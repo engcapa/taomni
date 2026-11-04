@@ -155,8 +155,11 @@ stream_idle_timeout_ms = 30000
                    OPENCODE_DISABLE_MODELS_FETCH="1", OPENCODE_DISABLE_LSP_DOWNLOAD="1",
                    OPENCODE_DISABLE_AUTOCOMPACT="1", OPENCODE_DISABLE_PROJECT_CONFIG="1",
                    OPENCODE_DISABLE_CLAUDE_CODE="1", OPENCODE_EXPERIMENTAL_DISABLE_FILEWATCHER="1")
+        # Pinned run.ts307-309 shell-quotes positional messages (escaping JSON
+        # quotes). Its stdin branch345 preserves text, so use stdin exclusively.
         command += ["run", "--format", "json", "--title", "Taomni isolated worker",
-                    "--model", "fixture/fixture-worker", prompt]
+                    "--model", "fixture/fixture-worker"]
+        stdin = prompt.encode()
     elif harness == "deepseek-harness":
         env.update(DSH_HOME=str(home / ".dsh"), DEEPSEEK_API_KEY=DUMMY_KEY, DSH_TELEMETRY_DISABLED="1")
         patch = state_root / "fixture.cordis.yml"

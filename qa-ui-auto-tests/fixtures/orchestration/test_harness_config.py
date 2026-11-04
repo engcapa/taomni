@@ -60,7 +60,7 @@ class LaunchContractTests(unittest.TestCase):
                         self.assertEqual(path.stat().st_mode & 0o777, 0o600)
                         self.assertNotIn("api.openai.com", path.read_text())
                         self.assertNotIn("api.anthropic.com", path.read_text())
-                if name in {"codex", "deepseek-harness"}:
+                if name in {"codex", "deepseek-harness", "opencode"}:
                     self.assertEqual(launch.stdin, b"unit prompt\n")
                 else:
                     self.assertIn("unit prompt\n", launch.command)
@@ -81,12 +81,56 @@ class LaunchContractTests(unittest.TestCase):
         prompt = "Task\n" + WORKER_MARKER + json.dumps(marker)
         launch = prepare_launch(self.installation, "opencode", "http://127.0.0.1:123/v1", self.tree,
                                 self.root / "state-newline", prompt)
-        rendered = launch.command[-1]
+        rendered = launch.stdin.decode()
+        self.assertNotIn(prompt, launch.command)
         self.assertTrue(rendered.endswith("\n"))
         from behavior import metadata
         self.assertEqual(metadata({"message": rendered + "</harness-context>"}, WORKER_MARKER), marker)
         with self.assertRaises(ValueError):
             metadata({"message": prompt + "</harness-context>"}, WORKER_MARKER)
+
+    def test_opencode_stdin_preserves_json_quotes_unlike_pinned_positional_transform(self):
+        from behavior import metadata
+        from diagnostics import request_diagnostic
+        marker = {"run_id": "run", "worker_id": "opencode"}
+        prompt = "Execute only fixture tool.\n" + WORKER_MARKER + json.dumps(marker)
+        launch = prepare_launch(self.installation, "opencode", "http://127.0.0.1:123/v1", self.tree,
+                                self.root / "state-stdin", prompt)
+        self.assertEqual(launch.command[-2:], ["--model", "fixture/fixture-worker"])
+        self.assertEqual(launch.stdin, (prompt + "\n").encode())
+        # opencode1.2.27 run.ts307-309 wraps/escapes positional strings;345
+        # appends Bun.stdin.text() verbatim. Reproduce without executing it.
+        positional = chr(34) + (prompt + "\n").replace(chr(34), chr(92) + chr(34)) + chr(34)
+        with self.assertRaises(ValueError):
+            metadata({"content": positional}, WORKER_MARKER)
+        lexical = request_diagnostic({"messages": [{"role": "user", "content": positional}]})
+        error = lexical["worker_metadata_lexical_errors"][0]
+        self.assertEqual(error["category"], "expected_property")
+        self.assertEqual(error["position"], 1)
+        self.assertEqual(error["at"], "backslash")
+        self.assertGreater(error["escaped_double_quote_count"], 0)
+        self.assertEqual(metadata({"content": "\n" + launch.stdin.decode()}, WORKER_MARKER), marker)
+
+    def test_sandbox_tool_diagnostics_report_fixed_operation_errno_and_ignore_descriptions(self):
+        from diagnostics import request_diagnostic
+        secret = "private-secret-never-log"
+        messages = [{"role": "system", "content": "seccomp AppArmor LandlockRestrict failed"},
+                    {"role": "tool", "content": "bwrap: Creating new namespace failed: Operation not permitted " + secret}]
+        diagnostic = request_diagnostic({"messages": messages})
+        self.assertEqual(diagnostic["tool_result_count"], 1)
+        self.assertEqual(diagnostic["sandbox_error_codes"], ["bwrap_create_namespace_failed"])
+        self.assertEqual(diagnostic["sandbox_errno"], ["EPERM"])
+        self.assertEqual(diagnostic["sandbox_backends"], ["bwrap"])
+        self.assertNotIn(secret, json.dumps(diagnostic))
+        for message, code, errno in [
+            ("bwrap: setting uid_map failed: Permission denied", "bwrap_uid_map_failed", "EACCES"),
+            ("bwrap: writing gid_map failed: Operation not permitted", "bwrap_gid_map_failed", "EPERM"),
+            ("bwrap: mount /proc failed: Invalid argument", "bwrap_mount_proc_failed", "EINVAL"),
+            ("failed to install seccomp filter: Function not implemented", "seccomp_install_failed", "ENOSYS"),
+        ]:
+            value = request_diagnostic({"input": [{"type": "function_call_output", "call_id": "x", "output": message}]})
+            self.assertIn(code, value["sandbox_error_codes"])
+            self.assertEqual(value["sandbox_errno"], [errno])
 
     def test_codex_fixture_keeps_filesystem_sandbox_and_never_enables_legacy_bypass(self):
         prepare_launch(self.installation, "codex", "http://127.0.0.1:123/v1", self.tree,

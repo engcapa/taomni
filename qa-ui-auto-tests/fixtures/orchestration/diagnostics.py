@@ -10,6 +10,29 @@ from typing import Any
 
 from behavior import PACK_MARKER, WORKER_MARKER, SHELL_NAMES, FixtureError, metadata, strings, tool_failure_categories
 
+SANDBOX_ERRORS = {
+    "bwrap_create_namespace_failed": r"(?:bwrap|bubblewrap)[^\n]*(?:creating new namespace|create (?:a )?new namespace)[^\n]*(?:failed|not permitted|denied)",
+    "bwrap_unshare_user_namespace": r"(?:bwrap|bubblewrap)[^\n]*(?:unshare|create)[^\n]*user namespace",
+    "bwrap_uid_map_failed": r"(?:setting|writing|write|set)[^\n]*(?:uid_map|uid map|uidmap)[^\n]*(?:failed|denied|not permitted)",
+    "bwrap_gid_map_failed": r"(?:setting|writing|write|set)[^\n]*(?:gid_map|gid map|gidmap)[^\n]*(?:failed|denied|not permitted)",
+    "bwrap_setgroups_failed": r"setgroups[^\n]*(?:failed|denied|not permitted)",
+    "bwrap_mount_proc_failed": r"(?:mount|mounting)[^\n]*(?:/proc|proc filesystem)[^\n]*(?:failed|denied|not permitted)",
+    "bwrap_mount_failed": r"(?:bwrap|bubblewrap)[^\n]*(?:mount|bind)[^\n]*(?:failed|denied|not permitted)",
+    "bwrap_userns_unavailable": r"(?:bwrap|bubblewrap)[^\n]*(?:No permissions to create new namespace|unprivileged user namespaces.*disabled)",
+    "bwrap_setuid_failed": r"(?:bwrap|bubblewrap)[^\n]*(?:setuid|setgid|setresuid|setresgid)[^\n]*(?:failed|denied|not permitted)",
+    "seccomp_install_failed": r"(?:seccomp[^\n]*(?:failed|denied|not permitted)|failed to (?:install|apply)[^\n]*seccomp)",
+    "sandbox_restrictions_failed": r"error applying (?:legacy )?Linux sandbox restrictions",
+    "sandbox_fd_mount_verification_failed": r"failed to verify descriptor-backed bubblewrap mount",
+    "sandbox_capability_verification_failed": r"(?:failed to verify Linux sandbox capabilities|Linux sandbox retained effective or permitted capabilities)",
+    "sandbox_executable_missing": r"(?:execvp|execve|No such file or directory)[^\n]*(?:failed|error)|(?:bwrap|bubblewrap)[^\n]*No such file or directory",
+}
+ERRNO_PHRASES = {"EPERM": r"(?:\bEPERM\b|Operation not permitted|os error 1(?:[^0-9]|$))",
+                 "EACCES": r"(?:\bEACCES\b|Permission denied|os error 13(?:[^0-9]|$))",
+                 "EINVAL": r"(?:\bEINVAL\b|Invalid argument|os error 22(?:[^0-9]|$))",
+                 "ENOSYS": r"(?:\bENOSYS\b|Function not implemented|os error 38(?:[^0-9]|$))",
+                 "ENOENT": r"(?:\bENOENT\b|No such file or directory|os error 2(?:[^0-9]|$))",
+                 "EROFS": r"(?:\bEROFS\b|Read-only file system|os error 30(?:[^0-9]|$))"}
+
 REQUEST_KEYS = frozenset({"messages", "input", "instructions", "system", "tools", "tool_choice", "stream",
                          "model", "max_tokens", "max_output_tokens", "temperature", "previous_response_id"})
 SCHEMA_FIELDS = frozenset({"command", "cmd", "workdir", "cwd", "login", "shell", "description", "timeout",
@@ -42,6 +65,19 @@ def walk_objects(value: Any):
             yield from walk_objects(child)
 
 
+def sandbox_tool_diagnostic(body: dict) -> dict:
+    # Inspect actual returned tool content only, never unrelated system prompts
+    # or schema descriptions mentioning sandboxes without an execution error.
+    results = [item for item in walk_objects(body) if item.get("type") in {"tool_result", "function_call_output"}
+               or item.get("role") == "tool"]
+    text = "\n".join(strings(results))[:1024 * 1024]
+    return {"tool_result_count": len(results),
+            "sandbox_error_codes": [name for name, pattern in SANDBOX_ERRORS.items() if re.search(pattern, text, re.I)],
+            "sandbox_errno": [name for name, pattern in ERRNO_PHRASES.items() if re.search(pattern, text, re.I)],
+            "sandbox_backends": [name for name in ("bwrap", "bubblewrap", "seccomp", "landlock")
+                                 if re.search(r"\b" + name + r"\b", text, re.I)]}
+
+
 def value_shape(value: Any) -> str:
     if value is None:
         return "absent"
@@ -54,9 +90,18 @@ def value_shape(value: Any) -> str:
     return "other"
 
 
+def lexical_class(char: str) -> str:
+    if not char:
+        return "eof"
+    syntax = {"{": "object_open", "}": "object_close", "[": "array_open", "]": "array_close",
+              '"': "double_quote", "'": "single_quote", "\\": "backslash", ":": "colon", ",": "comma"}
+    return syntax.get(char, "space" if char.isspace() else "digit" if char.isdigit() else "letter" if char.isalpha() else "other")
+
+
 def marker_json_diagnostic(text: list[str]) -> dict:
     """Structural JSON error flags only; never expose suffix/prompt contents."""
-    result = {"worker_metadata_json_errors": [], "worker_metadata_terminal_newline": False}
+    result = {"worker_metadata_json_errors": [], "worker_metadata_terminal_newline": False,
+              "worker_metadata_lexical_errors": []}
     for value in text:
         for line in value.splitlines(keepends=True):
             if not line.startswith(WORKER_MARKER):
@@ -70,6 +115,13 @@ def marker_json_diagnostic(text: list[str]) -> dict:
                          "Expecting value": "expected_value", "Expecting ',' delimiter": "expected_delimiter",
                          "Expecting property name enclosed in double quotes": "expected_property"}
                 category = kinds.get(exc.msg, "invalid_json")
+                if len(result["worker_metadata_lexical_errors"]) < 4:
+                    result["worker_metadata_lexical_errors"].append({"category": category,
+                        "position": min(exc.pos, 4096), "length": min(len(raw), 65536),
+                        "at": lexical_class(raw[exc.pos:exc.pos + 1]),
+                        "before": lexical_class(raw[max(0, exc.pos - 1):exc.pos]),
+                        "after": lexical_class(raw[exc.pos + 1:exc.pos + 2]),
+                        "escaped_double_quote_count": min(raw.count(chr(92) + chr(34)), 256)})
                 if category not in result["worker_metadata_json_errors"]:
                     result["worker_metadata_json_errors"].append(category)
                 if category == "trailing_data":
@@ -89,7 +141,7 @@ def request_diagnostic(body: dict) -> dict:
               "worker_marker_embedded": any(WORKER_MARKER in value for value in text),
               "pack_marker_line": any(line.startswith(PACK_MARKER) for value in text for line in value.splitlines()),
               "categories": failure_categories(body), "shell_tools": [], "other_tool_count": 0,
-              **marker_json_diagnostic(text)}
+              **marker_json_diagnostic(text), **sandbox_tool_diagnostic(body)}
     try:
         worker = metadata(body, WORKER_MARKER)
         worker_id = worker.get("worker_id") if worker else None
