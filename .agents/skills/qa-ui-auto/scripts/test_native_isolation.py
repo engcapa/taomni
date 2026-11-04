@@ -533,7 +533,7 @@ class NativeIsolationTest(unittest.TestCase):
                 session = Mock()
                 session.console_entries.return_value = []
                 harness.create_session.side_effect = (
-                    lambda: (order.append("create_session"), session)[1]
+                    lambda **kwargs: (order.append("create_session"), session)[1]
                 )
                 case = SimpleNamespace(
                     id="TC-RESET-ORDER", title="reset ordering probe", tags=[],

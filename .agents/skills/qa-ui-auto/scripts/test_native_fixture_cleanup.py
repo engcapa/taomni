@@ -15,7 +15,7 @@ from qa_ui_auto.steps import StepError
 
 class NativeFixtureCleanupTest(unittest.TestCase):
     def run_case(self, failure=None, setup_failure=False, cleanup_failure=False, close_failure=False,
-                 second_name="second"):
+                 second_name="second", session_failure=None):
         events = []
         first = Fixture("first", lambda ctx: events.append("first-setup"),
                         lambda ctx: events.append("first-cleanup"))
@@ -38,6 +38,7 @@ class NativeFixtureCleanupTest(unittest.TestCase):
         harness = MagicMock()
         harness.__enter__.return_value = harness
         session = harness.create_session.return_value
+        harness.create_session.side_effect = session_failure
         session.console_entries.return_value = []
         def close():
             events.append("session-close")
@@ -70,6 +71,18 @@ class NativeFixtureCleanupTest(unittest.TestCase):
                 self.assertEqual(result["status"], "failed" if failure else "passed")
                 if failure:
                     self.assertEqual(result["failure"]["message"], "original step failure")
+
+    def test_startup_evidence_is_attached_to_failed_case_and_fixtures_still_close(self):
+        from native_webdriver_transport import WebDriverError
+        failure = WebDriverError("document root is not mounted")
+        failure.native_startup_artifacts = {"startup": "/run/TC-FIXTURE-OWNER/startup.json"}
+        events, result = self.run_case(session_failure=failure)
+        self.assertEqual(result["status"], "failed")
+        self.assertEqual(result["failure"]["step_index"], 0)
+        self.assertEqual(result["failure"]["verb"], "<setup>")
+        self.assertEqual(result["failure"]["artifacts"], failure.native_startup_artifacts)
+        self.assertIn("document root is not mounted", result["failure"]["message"])
+        self.assertEqual(events, ["first-setup", "second-setup", "second-cleanup", "first-cleanup"])
 
     def test_later_setup_failure_restores_already_created_fixtures(self):
         events, result = self.run_case(setup_failure=True)

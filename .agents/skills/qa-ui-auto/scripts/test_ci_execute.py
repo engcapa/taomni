@@ -6,10 +6,21 @@ import unittest
 from pathlib import Path
 from unittest.mock import patch
 
-from ci_execute import _classify_runner_result, _prepare_runtime
+from ci_execute import _classify_runner_result, _prepare_runtime, _windows_driver_wrapper
 
 
 class ExecuteRuntimeTests(unittest.TestCase):
+    def test_windows_driver_appends_log_across_owned_process_restarts(self):
+        with tempfile.TemporaryDirectory(prefix="driver report ") as directory:
+            root = Path(directory)
+            previous = root / "webview-driver.log"
+            previous.write_text("first failed session\n", encoding="utf-8")
+            wrapper = _windows_driver_wrapper("C:/Edge Driver/msedgedriver.exe", root)
+            script = wrapper.read_text(encoding="utf-8")
+            self.assertIn('"C:/Edge Driver/msedgedriver.exe" --verbose --append-log ', script)
+            self.assertIn(f'"--log-path={previous}" %*', script)
+            self.assertEqual(previous.read_text(encoding="utf-8"), "first failed session\n")
+
     def test_display_services_use_the_started_desktop_until_their_cleanup_finishes(self):
         for profile in ("ubuntu-22.04-vnc", "ubuntu-26.04-wayland"):
             with self.subTest(profile=profile), tempfile.TemporaryDirectory() as directory:

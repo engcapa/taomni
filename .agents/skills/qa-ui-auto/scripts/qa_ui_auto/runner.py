@@ -461,8 +461,8 @@ def _native_run(cases: list[tc_mod.TestCase], cfg: dict, env: dict, report_root:
                     harness.deadline = deadline
                     java25_home = (cfg.get("app", {}).get("tooling_java25_home")
                                    if "java25_projects" in c.fixtures else None)
-                    session = (harness.create_session(tooling_java_home=java25_home)
-                               if java25_home else harness.create_session())
+                    from native_session_startup import create_case_session
+                    session = create_case_session(harness.create_session, case_dir / "native-startup", java25_home, failure_artifacts)
                     r["timings"]["session_setup_sec"] = time.monotonic() - session_started
                     nctx: NativeStepContext | None = None
                     try:

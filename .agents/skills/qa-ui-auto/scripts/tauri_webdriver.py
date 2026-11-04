@@ -452,33 +452,8 @@ class NativeSession(WebDriverTransport):
         self._window_focus.activate_wayland_window(timeout)
 
     def wait_for_app_ready(self, timeout: float = 20.0) -> None:
-        """Wait until the QA WebView has a mounted application root."""
-        end = time.monotonic() + timeout
-        last_error = ""
-        while time.monotonic() < end:
-            if self.deadline:
-                self.deadline.remaining()
-            try:
-                ready = self.execute(
-                    "return document.readyState === 'complete' && "
-                    "!!document.querySelector('#root > *');"
-                )
-            except (WebDriverError, urllib.error.URLError, OSError, json.JSONDecodeError) as exc:
-                # The bridge is exposed at page-load time, while WebKit may
-                # still be transitioning the document to an evaluable state.
-                last_error = str(exc)
-            else:
-                if ready is True:
-                    return
-                last_error = "document root is not mounted"
-
-            sleep_for = min(0.1, end - time.monotonic())
-            if self.deadline:
-                sleep_for = min(sleep_for, self.deadline.remaining())
-            if sleep_for > 0:
-                time.sleep(sleep_for)
-        detail = f": {last_error}" if last_error else ""
-        raise WebDriverError(f"native app document did not become ready within {timeout:.1f}s{detail}")
+        from native_session_startup import wait_for_app_ready
+        wait_for_app_ready(self, timeout)
 
     def endpoint(self, suffix: str) -> str:
         if not self.session_id:
@@ -1179,7 +1154,8 @@ class NativeHarness:
                     os.environ[key] = previous
             self._previous_env.clear()
 
-    def create_session(self, *, tooling_java_home: str | None = None) -> NativeSession:
+    def create_session(self, *, tooling_java_home: str | None = None,
+                       diagnostics_dir: Path | None = None) -> NativeSession:
         self.driver.ensure_running()
         java_home = tooling_java_home or self.cfg.get("app", {}).get("tooling_java_home")
         if java_home and self._previous_env:
@@ -1197,30 +1173,9 @@ class NativeHarness:
         from native_application_restart import restart_owned_application
         session.application_restarter = lambda: restart_owned_application(self.driver, session)
         session.deadline = getattr(self, "deadline", None)
-        try:
-            session.start()
-            # A Java 25 project must not change the JDK used by unrelated
-            # JDK 21 provider fixtures in the same selected suite.
-            if java_home:
-                session.execute(
-                    "window.localStorage.setItem('taomni.codeWorkspace.lspJavaHome.v1', "
-                    + json.dumps(str(java_home)) + "); return true;"
-                )
-        except BaseException:
-            # If readiness fails after the bridge has started, there is no
-            # session object for the runner's normal finally block to close.
-            # Delete the half-started session so the driver terminates the
-            # app; an orphaned app keeps the run-owned profile (SQLite,
-            # WebView2) locked and every later case's reset fails.  Then mark
-            # the process stale so the next case cannot reuse it.
-            try:
-                session.close()
-            except Exception:  # noqa: BLE001 - preserve the original failure
-                pass
-            with suppress(Exception):
-                self.driver.mark_session_closed()
-            raise
-        return session
+        from native_session_startup import start_owned_session
+        return start_owned_session(session, self.driver, java_home=java_home,
+                                   diagnostics_dir=diagnostics_dir)
 
 
 def native_tool_issues(cfg: dict) -> list[str]:

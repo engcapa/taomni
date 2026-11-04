@@ -236,8 +236,59 @@ Additional verified receipts and reliability repairs:
   policy is changed and no filesystem sandbox is disabled. Evidence remains tied
   to its actual runner/profile, not relabeled as Ubuntu 24 compatibility.
 
-Full hosted acceptance of the latest candidate, new tail UI evidence and all-six
-native scheduling are not complete at this checkpoint.
+### Latest complete hosted run and remaining startup failure
+
+[Run 41748583356](https://github.com/engcapa/taomni/actions/runs/41748583356),
+head `9db34d57e01a9878dc66a89db64ae074c476cafb`, completed with **84 passed /
+1 failed / 0 skipped** out of 85 selected case executions. Browser: Linux,
+Windows and macOS each **13/13**. Ordinary native: Linux Ubuntu 22.04 X11 and
+macOS each **15/15**; Windows **14/15**. The separate native six-worker UI case
+passed **1/1**. No selected capability gaps or unreviewed cases were declared.
+All required supporting jobs passed, including the standalone six-worker canary
+and matching native contracts. The final aggregate correctly **failed** on the
+one actual case failure; green shard jobs are not acceptance.
+
+The native six-worker receipt independently binds six distinct candidate runs,
+owned detached worktrees at the frozen source revision, one host dispatch and
+two actual fixture generations per harness (twelve total), successful pinned
+process exits, native run UUID owner markers and candidate/marker hashes. This
+establishes the authored Linux native happy path for Claude Code, Codex, Pi,
+OpenCode, DeepSeek Harness and ZCode, not the deferred cancellation, dependency
+scheduling, verification or patch-acceptance work. Published diagnostics were
+checked for accidental private worker-state log copies; none were present.
+
+The new no-newline tail case passed on all three native platforms. Its synchronous
+pre-recovery receipt and final artifacts retain the same two prefix candidate
+IDs/bytes/hashes; only missing `tests` is requested and added by the single
+explicit recovery. The tested production ordering is canonical member order,
+not a fixture-specific display order. Hosted native contracts passed **131**
+unit/contract tests, then explicitly ran and passed both real descendant-process
+lifecycle tests that remain ignored locally.
+
+**Unresolved failure:** Windows native shard 1, `TC-ORCH-001`, failed during
+session setup, before any case actions: `native app document did not become ready
+within 20.0s: document root is not mounted`. Its subsequent three cases passed,
+but that does not establish a flake or a cause. The preserved artifact's fixed
+EdgeDriver log was overwritten by later driver restarts, and its desktop capture
+occurred after half-started session cleanup. No historical document URL/window
+label or live screenshot survives to distinguish blank navigation, the idle
+prewarmed overlay, a renderer failure, or pending main bootstrap.
+
+The diagnostic follow-up extracts readiness and half-started ownership into
+`native_session_startup.py`: retain the exact 20-second mounted-root predicate
+and case budget; observe bounded document startup errors; capture URL, Tauri
+window/WebView labels, current/all handles, root structure, resource timings and
+a live WebView screenshot **before** DELETE/owned-tree cleanup. Receipts attach
+to the original failed setup case; optional capture/cleanup failures cannot
+replace its error. EdgeDriver logs append across owned restarts. Pure owner,
+observer, cleanup, report and isolation units cover these boundaries. Existing
+oversized harness methods are reduced instead of growing a new controller.
+This is an evidence repair, **not a claimed fix** for the unclassified Windows
+startup failure. Hosted revalidation remains required and no implicit action
+retry, longer readiness timeout, weakened assertion or progress UI is introduced.
+
+Full hosted acceptance of the current candidate is still blocked by that Windows
+startup failure; the later planned product responsibilities below remain open.
 
 ## Remaining work — not waived by phase 1
 

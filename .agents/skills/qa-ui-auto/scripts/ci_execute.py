@@ -41,6 +41,15 @@ def _prepare_runtime(stack: ExitStack, entry: dict, report: Path, config: dict) 
     return desktop
 
 
+def _windows_driver_wrapper(driver: str, report: Path) -> Path:
+    """Keep every owned driver launch in one chronological diagnostic log."""
+    wrapper = report.resolve() / "webview-driver.cmd"
+    log_path = report.resolve() / "webview-driver.log"
+    wrapper.write_text(f'@echo off\n"{driver}" --verbose --append-log "--log-path={log_path}" %*\n',
+                       encoding="utf-8")
+    return wrapper
+
+
 def _runner_report_complete(report: Path) -> tuple[bool, str | None]:
     """Return whether the runner produced a trustworthy report.
 
@@ -169,9 +178,7 @@ def main():
                 driver = shutil.which("msedgedriver.exe")
                 if not driver:
                     raise RuntimeError("WebView2 driver not found")
-                wrapper = args.report.resolve() / "webview-driver.cmd"
-                log_path = args.report.resolve() / "webview-driver.log"
-                wrapper.write_text(f'@echo off\n"{driver}" --verbose "--log-path={log_path}" %*\n', encoding="utf-8")
+                wrapper = _windows_driver_wrapper(driver, args.report)
                 config["webdriver"] = {"native_driver": str(wrapper)}
             cfg_path = args.report / "config.yaml"
             cfg_path.write_text(yaml.safe_dump(config, sort_keys=False), encoding="utf-8")
