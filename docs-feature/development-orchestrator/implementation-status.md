@@ -307,8 +307,40 @@ Diagnostic rerun checkpoints (preserved, not accepted as native evidence):
   the canonical-path expectation repair; the prior additional QA transport,
   reset, planner and aggregate run passed **75/75**. No local product UI ran.
 
-Full hosted acceptance of the current candidate is still blocked by that Windows
-startup failure; the later planned product responsibilities below remain open.
+### Verified Windows diagnostic revalidation
+
+[Run 41761747756](https://github.com/engcapa/taomni/actions/runs/41761747756),
+head `ba6d9c7f5a2039d98cd22fa313b224f0d9b9fb1b`, attempt 1, completed
+**success**. Downloaded aggregate and every raw shard summary confirm **Windows
+browser 13/13 and native 15/15 passed, zero failed/skipped**, including all
+applicable mandatory crash regressions. No capability gaps, unreviewed cases or
+infrastructure errors were reported. The producer passed the repaired Windows
+session/startup contracts and verified the reused QA release binary's complete
+source/recipe/toolchain/environment identity before publishing it to all shards.
+
+The originally failing `TC-ORCH-001` completed all shared-settings, frozen-task
+snapshot and reload assertions. `TC-ORCH-PARTIAL-006` again preserves the exact
+prefix candidate IDs, byte counts and hashes from the synchronous pre-recovery
+receipt; its failed main and completed recovery ledgers match two real Messages
+requests and one recovery authorization. All six real standalone harnesses also
+passed with two actual protocol requests and a verified tool-produced marker each.
+The native UI six-worker scope was not selected in this Windows-only run.
+
+Driver append-log behavior is now observed in the published artifact: all owned
+launches remain in chronological order, including the explicit cold restart.
+There was **no startup failure in this run**, so it does not execute or establish
+the live failure-capture path beyond the mocked/observer unit contracts. The
+original run `41748583356` failure remains unclassified and preserved; this is a
+successful revalidation, **not proof that its root cause was fixed or a flake**.
+
+Product source identity is unchanged from the earlier three-platform run:
+`34d36891cadc681ba74d691e9503332305d102e2ce40bbd165c9aece38271634`.
+Runner identity is now
+`0434accda255bafcce6f86344b14763a4b512fc8c138a6cfe00ee5cf8643790a`.
+A fresh all-platform browser/native release run with the same final runner and
+all-six Linux native case is still required; do not combine different runner
+revisions into one claimed aggregate pass. The planned product responsibilities
+below remain open independently of that first-slice validation.
 
 ## Remaining work — not waived by phase 1
 
