@@ -62,6 +62,33 @@ TC-MOBILE-011 是 browser 网络注入，不代替真实 Rust 服务。TC-MOBILE
 - 最新 run `41942305100` 的 Linux/macOS browser 原始报告为 13/14：网络 trace 显示第二条 message 与所有 detail GET 都返回 200，故障未注入。已用实际 Playwright 1.55/1.61 的 matcher 对比确认：`thread**` 在 1.61 匹配 `/message`，在 hosted 固定的 1.55 不匹配。改用 `urlsplit(url).path` 明确判断，避免版本相关 glob 语义；不放宽失败后禁发和 draft 保持断言。当前版本本地 TC-MOBILE-011 稳定 1/1、exit 0：`qa-ui-auto-report/mobile-url-predicate/run-20261105-084535-504903231/`；独立 Playwright 1.55 实际 Chromium + loopback HTTP 验证新 predicate：stop 后 GET 200、真实 message POST 200、下一 GET 503。正下载该版专属 Chromium 再跑完整 case；未把接口单测或 matcher 检查冒充 UI case 通过。
 - 精确 predicate 修复提交 `f6a6606c43e0f9cfd541bc999f8e44ba88b12e5e` 已推送；完整三平台 82 项新运行：[41944281882](https://github.com/engcapa/taomni/actions/runs/41944281882)。为释放 runner 已取消 `41942305100` 的剩余重复任务，保留失败报告。
 - `41944281882` Linux browser TC-MOBILE-011 后段仍出现探针竞争：实际 GET 503 已显示重试按钮，但撤销故障后，迟到的 `task_status` 触发 GET 200 自动恢复，按钮在 Playwright 点击前消失。产品自动恢复正确；不改产品或扩大 timeout。将手动恢复阶段的 task_status 推送在网络拦截器中暂缓（从 stop 前开始），前段实时事件与独立数据过期仍正常验证；心跳与其余事件继续转发，assert 实际暂缓了 stop/message 两个状态事件，再通过真实 retry 按钮恢复。独立单测保护转发／暂缓规则，8 项 fixture/probe 单测通过；完整 case 用 hosted Playwright 1.55 + Chromium 140 执行，稳定来源 **1/1 passed、0 skipped、exit 0**：`qa-ui-auto-report/mobile-manual-status/run-20261105-090257-493720354/`，receipt 另断言 `manual_status_retry=true`。
-- 最终逐例报告、receipt、三平台结果在实际执行后补录；不能以已触发或 job 绿色冒充 hosted 验收通过。
+- 最后手动恢复阶段修复提交 `5d3a8be2b7c2b3fb6e2047a75a5194e384dedbab`。同 hosted Playwright 1.55 + Chromium 140 重复执行 TC-MOBILE-011，再次稳定 **1/1、exit 0**：`qa-ui-auto-report/mobile-manual-status-repeat/run-20261105-090447-126426467/`。不调整 timeout、重试预算、产品逻辑或断言。
+- 当前统一验收：[41946131514](https://github.com/engcapa/taomni/actions/runs/41946131514)，完整三平台 browser/native、全部 mobile 与 crash-regression、2 browser workers、matching QA release。已下载最新 selection 核对：82 项、无 gaps/unreviewed；source `7a8d9a9b0d9fb192d3b30c69d882ecc6c521a3e4ad7f3a144b2256f81e6b8101`，runner `34b9f0e62999dae04a146b371fdaad9cf93d2c3a90965e83e2ac768688b1e2d8`。已取消 `41944281882` 的过期重复任务并保留 artifacts。
+### 当前 82 项最终验收（已完成）
 
-仍未验证且不得宣称完成：Android/iOS 真机 IME／相机／安装、用户自备公网 TLS／双 endpoint／PNA、真实飞书应用通知。既有 headless 能力限制不变。
+[41946131514](https://github.com/engcapa/taomni/actions/runs/41946131514) 已成功结束，验证提交 `5d3a8be2b7c2b3fb6e2047a75a5194e384dedbab`。下载全部报告后独立重新聚合与 hosted 结果一致：**82/82 passed、0 failed、0 skipped，passed=true、report_ok=true**。无缺失、重复、gaps、unreviewed 或 infrastructure_errors。
+
+| 平台 | Browser | Native QA release |
+| --- | --- | --- |
+| Linux | 14/14 | 16/16 |
+| Windows | 14/14 | 12/12 |
+| macOS | 14/14 | 12/12 |
+| 合计 | 42/42 | 40/40 |
+
+15 份 runner receipt 已验证，全部来源稳定、非 dry-run，逐个核对 1210 个关联文件的 SHA-256/大小，artifact_errors 与 hosted/independent comparison_errors 均为空；每个平台各分片使用同一个已验证 QA release。Rust 契约 91/91，配套前端合约 18 文件 / 101 项通过。
+
+原始证据与独立结果：`qa-ui-auto-report/hosted-evidence-wedxdcv5/`，其中 `verification-result.json` 为 `passed=true`，`local-verified-ci-summary.json` 与 `hosted-summary/ci-summary.json` 的分组／身份／错误完全一致。测试产品指纹 `7a8d9a9b0d9fb192d3b30c69d882ecc6c521a3e4ad7f3a144b2256f81e6b8101`、runner `34b9f0e62999dae04a146b371fdaad9cf93d2c3a90965e83e2ac768688b1e2d8`。
+
+Linux 二进制 `06f5c58cbfe36a7572e5e68f81afc19d46de0603e67504f48ba672e4d5f522da`；Windows `7b771fb5b3702cb7dc206aff5fd80e744bda7ba90a2d7cd96d9b44f86264b8be`；macOS `409ff333a61df1e1d3ffaa1d52361b95adb79ea8b678ee2d2c255cf3d2f1e4eb`。后续文档不修改被测源码、runner 或用例。
+
+仍未验证且不得宣称完成：Android/iOS 真机 IME／相机／安装、用户自备公网 TLS／双 endpoint／PNA、真实飞书应用通知。用户已明确本轮只要求 Android，iOS 保留未验证但不阻塞；本机 Linux 端口交付前先完成额外真实服务模拟手机 E2E。既有 headless 能力限制不变。
+
+## Session 小结与剩余工作（2026-11-05）
+
+- 本轮新增产品完善：桌面 Network 移动／飞书设置中英文及翻译标题搜索；切换语言保留配对和草稿；离线外壳告知；两条流有界重连和手动 after_seq 恢复；任务／改动／文件各自的成功时间与过期提示；状态未知时禁止重复发送并提供重试；接管风险及桌面最近活动可见；旧 socket 迟到关闭与 task revision 异步所有权修复。
+- 本轮验证工具完善：TC-MOBILE-010/011、真实 headless 外壳离线／联网恢复、并行 mobile bundle 独立快照、跨进程 build 锁、与 hosted Playwright 1.55 兼容的 URL predicate、故障注入与手动重试阶段隔离。保留失败记录，不降低并行数、timeout 或产品断言。
+- 当前 82 项 hosted 交付已收口：`41946131514` 全过，原始 selection / summary / 15 份 receipt / 1210 文件与 QA release 身份独立核验一致。用户要求的本机 Linux 真实服务 + 模拟 Mobile Web E2E 已完成，12 个连贯流程检查全部通过、无页面异常；六个既有 native 边界场景也有本机通过证据。首轮取消 UI 失败及复验原件保留，详见 [本机真实服务手机 E2E](mobile-local-real-e2e-20261105.md)。下一步只请用户配合 Android 真机与真实飞书，不用 stub 代替。
+- 待真实环境验证（不是未实现功能）：Android Chrome / iOS Safari 软键盘、IME、触摸、扫码、PWA 安装及后台恢复；用户提供的双实例 endpoint、HTTPS／反向代理／PNA；飞书 V-08 真实应用发布、通知、审批卡片回调与断线恢复。执行协作见 [真机与真实飞书验收清单](mobile-real-device-acceptance.md)，尚未填任何通过结论。
+- 明确尚未开发的后续候选：Mobile Web 自己的独立 i18n（本轮只补桌面设置）；飞书群聊机器人 mention 入口、身份绑定引导／实例辨识；持久化 IM 发送队列与重启恢复；独立离线监测。后几项见 `mobile-feishu-p1-implementation.md` §P1 之后的建议任务，不自动纳入本轮。
+- 需要先另行定范围：企业微信／服务号、headless 新建终端／新的 Agent 线程、内置中继、原生 App。手机文件编辑、SFTP、数据库、RDP/VNC 仍非当前控制面范围。
+- 前轮已完成而非本 session 新增：紧凑／直接／草稿输入、一次性 SSH/OTP/私钥及跳板／代理认证、手机委托打开本地／保存会话、深链、飞书短命令／卡片。不要把历史实现重复算成本轮新增或继续列为未开发。
