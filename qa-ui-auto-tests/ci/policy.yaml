@@ -14,6 +14,8 @@ smoke:
 - TC-WS-056
 - TC-WS-057
 - TC-IDE-C8-08-code-style-dialog-lifecycle-browser
+- TC-MOBILE-012
+- TC-MOBILE-013
 unavailable: {}
 cases:
 - TC-MOBILE-001

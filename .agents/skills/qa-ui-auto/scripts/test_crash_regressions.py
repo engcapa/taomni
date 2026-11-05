@@ -18,8 +18,10 @@ EXPECTED = {
     "TC-IDE-C8-08-code-style-dialog-lifecycle-browser",
     "TC-WS-038", "TC-WS-039", "TC-WS-045", "TC-WS-051", "TC-WS-052",
     "TC-WS-053", "TC-WS-054", "TC-WS-055", "TC-WS-056", "TC-WS-057",
+    "TC-MOBILE-012", "TC-MOBILE-013",
 }
-BROWSER_ONLY = {"TC-WS-055", "TC-IDE-C8-08-code-style-dialog-lifecycle-browser"}
+BROWSER_ONLY = {"TC-WS-055", "TC-IDE-C8-08-code-style-dialog-lifecycle-browser", "TC-MOBILE-012"}
+NATIVE_ONLY = {"TC-WS-051", "TC-WS-054", "TC-WS-056", "TC-MOBILE-013"}
 
 
 class CrashRegressionTests(unittest.TestCase):
@@ -42,7 +44,7 @@ class CrashRegressionTests(unittest.TestCase):
         self.assertFalse(plan["gaps"])
         self.assertEqual(len(plan["entries"]), 6)
         for entry in plan["entries"]:
-            expected = EXPECTED - (BROWSER_ONLY if entry["mode"] == "native" else {"TC-WS-051", "TC-WS-054", "TC-WS-056"})
+            expected = EXPECTED - (BROWSER_ONLY if entry["mode"] == "native" else NATIVE_ONLY)
             self.assertEqual(set(entry["selected_ids"]), expected)
             self.assertEqual("release" in entry["capabilities"], entry["mode"] == "native")
 

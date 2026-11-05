@@ -36,6 +36,7 @@
 - 第一次真实服务连贯 probe **8 个检查通过**：`qa-ui-auto-report/mobile-cookie-split-probe-20261105-01/`。包含真实 PTY 写入独立 marker、Cookie 过期恢复及不同源请求不携带 Cookie。此轮用新 production assets 覆盖旧已验收 Rust 后端的静态页，**只证明新前端与真实服务的兼容，不冒充新原生二进制部署证据**。
 - 首次本机新 QA release 已编译成功：`qa-ui-auto-report/_local/mobile-cookie-native-build-20261105.log`，Rust release 编译 52m57s，`com.taomni.app.qa` 身份记录生成，进程 exit 0；既有 Rust warnings 与 `imap-proto` future-incompat 提示未改。下一次机器重启后 `src-tauri/target`、Cargo registry、Node 临时工具链与旧 listener 均已消失，日志保留；因此不能凭这次成功日志声称已部署。重新构建将使用持久报告目录下的独立工具链／target／产物备份。
 - 重启恢复时，`pnpm check:refactor` 因 `node_modules` 中 TypeScript 缺失报 `ERR_MODULE_NOT_FOUND`；正在用 pnpm 10 + frozen lockfile 恢复依赖。这是本次环境恢复失败，不能把前一轮通过记录当成重启后的新通过。
+- 阶段性提交 `6ca69d600`（产品）与 `da4d0917d`（QA）已推送。新 hosted 尝试 `42051125929` 在 checkout 前因 dispatch 的 head 输入笔误失败；改为直接读取 `git rev-parse HEAD` 后，`42051558982` 到达 plan，但 mandatory crash contracts 发现新 case 未同步到固定 EXPECTED／smoke 集，4 项中 2 项失败，未执行产品用例。补齐 browser-only／native-only 集及 smoke 注册后，本地 `test_crash_regressions` **4/4 通过**，没有缩减完整 crash 选择；后续新 run 独立记录，不把 plan 失败或 aggregate 绿色当作验收。
 - 本次提交为防重启丢失的阶段性源码产物，不是交付完成：无 assets override 的新二进制复验、8787 部署、新 browser/native 完整 crash-regression 与 hosted 结果仍待实际执行后补录。
 
 ## 部署约束与手工验收
