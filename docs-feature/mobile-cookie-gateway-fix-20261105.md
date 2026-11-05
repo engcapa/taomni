@@ -37,7 +37,12 @@
 - 首次本机新 QA release 已编译成功：`qa-ui-auto-report/_local/mobile-cookie-native-build-20261105.log`，Rust release 编译 52m57s，`com.taomni.app.qa` 身份记录生成，进程 exit 0；既有 Rust warnings 与 `imap-proto` future-incompat 提示未改。下一次机器重启后 `src-tauri/target`、Cargo registry、Node 临时工具链与旧 listener 均已消失，日志保留；因此不能凭这次成功日志声称已部署。重新构建将使用持久报告目录下的独立工具链／target／产物备份。
 - 重启恢复时，`pnpm check:refactor` 因 `node_modules` 中 TypeScript 缺失报 `ERR_MODULE_NOT_FOUND`；正在用 pnpm 10 + frozen lockfile 恢复依赖。这是本次环境恢复失败，不能把前一轮通过记录当成重启后的新通过。
 - 阶段性提交 `6ca69d600`（产品）与 `da4d0917d`（QA）已推送。新 hosted 尝试 `42051125929` 在 checkout 前因 dispatch 的 head 输入笔误失败；改为直接读取 `git rev-parse HEAD` 后，`42051558982` 到达 plan，但 mandatory crash contracts 发现新 case 未同步到固定 EXPECTED／smoke 集，4 项中 2 项失败，未执行产品用例。补齐 browser-only／native-only 集及 smoke 注册后，本地 `test_crash_regressions` **4/4 通过**，没有缩减完整 crash 选择；后续新 run 独立记录，不把 plan 失败或 aggregate 绿色当作验收。
-- 本次提交为防重启丢失的阶段性源码产物，不是交付完成：无 assets override 的新二进制复验、8787 部署、新 browser/native 完整 crash-regression 与 hosted 结果仍待实际执行后补录。
+- 依赖恢复后，Node 22.23.4 + pnpm 10.33.0 的 `check:refactor` 与全部 mobile Vitest **17 文件／77 项重新通过**，没有更改依赖锁文件。Playwright 1.55 + Chromium 140 的新 browser case **1/1**、完整 browser crash-regression **9/9**、受影响 mobile **6/6** 均实际执行并通过（0 failed／0 skipped，receipt exit 0、签名 valid、identity_stable=true）：
+  - `qa-ui-auto-report/mobile-cookie-browser-focused/run-20261105-231735-842418600/`
+  - `qa-ui-auto-report/mobile-cookie-browser-crash/run-20261105-231755-046359713/`
+  - `qa-ui-auto-report/mobile-cookie-browser-retained/run-20261105-232020-170084153/`
+- 当前源码指纹 `931ed079924ed4d5770e3c349d10150b4e216551daf2388e1c0e4a960721de2e`，runner `6158bf1275e5e8017a270a9dc381a9f1f0185c5d651e5f1277297fad2de1a6d5`。新 hosted [42053151261](https://github.com/engcapa/taomni/actions/runs/42053151261) 测试 `edeba3942a191df0f902ae529f99119d8747ce15`：selection 已下载核对同一身份、无 gaps/unreviewed；Linux browser 15 + native 17、Windows/macOS 各 browser 15 + native 13，合计 **88 项**，保留完整 crash 选择。当前仍在执行，不能提前记为通过。
+- 本次提交为防重启丢失的阶段性源码产物，不是交付完成：无 assets override 的新二进制复验、8787 部署、native 完整 crash-regression 与 hosted 最终结果仍待实际执行后补录。
 
 ## 部署约束与手工验收
 
