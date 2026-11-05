@@ -42,6 +42,8 @@
   - `qa-ui-auto-report/mobile-cookie-browser-crash/run-20261105-231755-046359713/`
   - `qa-ui-auto-report/mobile-cookie-browser-retained/run-20261105-232020-170084153/`
 - 当前源码指纹 `931ed079924ed4d5770e3c349d10150b4e216551daf2388e1c0e4a960721de2e`，runner `6158bf1275e5e8017a270a9dc381a9f1f0185c5d651e5f1277297fad2de1a6d5`。新 hosted [42053151261](https://github.com/engcapa/taomni/actions/runs/42053151261) 测试 `edeba3942a191df0f902ae529f99119d8747ce15`：selection 已下载核对同一身份、无 gaps/unreviewed；Linux browser 15 + native 17、Windows/macOS 各 browser 15 + native 13，合计 **88 项**，保留完整 crash 选择。当前仍在执行，不能提前记为通过。
+- `42053151261` Linux browser 原始 artifact 已独立读取：**15/15 passed**、稳定来源、receipt exit 0／valid。Linux build 的 Python gate 随后发现另一处固定 smoke 预期未包含 TC-MOBILE-013（`test_ci_selection` 多 Linux profile 的 4 个 subtest 失败，149 项 suite 停止），没有生成 Linux 新原生执行证据；补齐预期，不移除 case，`test_ci_selection + test_crash_regressions` **25/25 通过**。该次最终结论仍不能宣称全绿，旧 runner 证据不混入新 run。
+- 本机持久目录编译中，sherpa-onnx 1.13.8 上游归档下载被截断而失败（`response body closed before all bytes were read`）；保存失败日志。经已有本地代理完整下载并对照上游 GitHub asset digest 验证 SHA-256 `e1fdc5b67530e15741ef897fa5ffff297056f3bf0c6d829a27af9225a4c4b5a6` 后，通过上游提供的 `SHERPA_ONNX_ARCHIVE_DIR` 离线输入重试，保留增量编译缓存，不修改产品依赖或 Rust 代码。
 - 本次提交为防重启丢失的阶段性源码产物，不是交付完成：无 assets override 的新二进制复验、8787 部署、native 完整 crash-regression 与 hosted 最终结果仍待实际执行后补录。
 
 ## 部署约束与手工验收
