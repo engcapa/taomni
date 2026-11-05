@@ -25,7 +25,7 @@ steps:
 - fill: {selector: '[data-testid="mobile-settings-port"]', value: '0'}
 - click: '[data-testid="mobile-settings-toggle"]'
 - assert_text: {selector: '[data-testid="mobile-settings-status"]', contains: Running}
-- click: '[data-testid="mobile-settings-open-sessions"]'
+- set_check: {selector: '[data-testid="mobile-settings-open-sessions"]', checked: true}
 - assert_count: {selector: '[data-testid="mobile-settings-open-sessions"]:checked', equal: 1}
 - click: '[data-testid="mobile-settings-pair"]'
 - wait_for: '[data-testid="mobile-settings-code"]'

@@ -48,7 +48,9 @@
 - 新原生 TC-MOBILE-013 实际执行 **1/1 passed、0 skipped、exit 0、稳定来源且 receipt valid**：`qa-ui-auto-report/mobile-cookie-native-focused/run-20261105-234933-382337191/`。没有 assets override，真实加载新内嵌 bundle，通过 8 项网关检查、真实 PTY 磁盘 marker、只一个桌面 terminal tab/pane、关闭服务后 pane 保留及 runtime errors 检查；手机／桌面截图已打开检查。当前 runner 因补齐 smoke 契约更新为 `38edbc52d9801d836d959a36290e7ffc11ca917cc050dff2fd90f617b7e0687a`，源码指纹不变。
 - 与 hosted Linux build 完全相同的 Python gate 本机成功结束：149 项中 **148 passed／1 existing skipped**，exit 0；`qa-ui-auto-report/_local/mobile-cookie-hosted-build-contracts-20261105.log`。这不是 149 个产品 UI 场景通过。
 - 后续统一 hosted [42058970983](https://github.com/engcapa/taomni/actions/runs/42058970983) 已触发，head `3488be2bc6f9480be9fc796b9abf6f315eb0e2a2`，仍保留相同 88 项全部 mobile 与完整 crash 选择。前次失败 run 不删除、不混合为统一通过。
-- 本次提交为防重启丢失的阶段性源码产物，不是交付完成：8787 部署、native 完整 crash-regression 与 hosted 最终结果仍待实际执行后补录。
+- 本机完整 native crash 首轮 **1 passed／9 failed／0 skipped**，来源稳定，失败原件：`qa-ui-auto-report/mobile-cookie-native-crash/run-20261105-235004-037781239/`。独立 native case 通过不替代整组。多数编辑器 exact-byte 失败实际输入 `QA-...` 而非要求的 `QA_...`；诊断 trace 显示 keydown `_`、beforeinput/input `-`。同一二进制的独立真实 WebView 探针进一步复现 `_→-`、`+→=`、`:→;`。QA W3C 输入在 Linux 对这些字符显式持有 Shift 后，7 个相同输入值逐字节全部一致（baseline/candidate 证据分别在 `mobile-cookie-native-input-baseline/`、`mobile-cookie-native-input-candidate/`）；不修改 editor 内容、不放宽 exact 断言，非 Linux 动作保持不变。首轮另有 screenshot timeout，复验仍须观察。
+- 新 case 的 open-sessions `click` 后即时 `assert_count` 偶发读到异步回落值；失败截图后续已 checked。改用现有 `set_check` 真实指针操作及读取状态的完成确认，保留原 checked 数量断言与后续实际 PTY 检查，不增加硬编码 sleep，不改产品设置行为。
+- 本次提交为防重启丢失的阶段性源码产物，不是交付完成：8787 部署、修正 QA 输入后的 native 完整 crash-regression 与 hosted 最终结果仍待实际执行后补录。
 
 ## 部署约束与手工验收
 

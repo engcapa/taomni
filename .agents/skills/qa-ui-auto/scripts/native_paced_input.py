@@ -1,6 +1,7 @@
 """One sequential W3C input owner with the same pacing on all native WebViews."""
 from __future__ import annotations
 
+import platform
 from typing import Any, Protocol
 
 from native_webdriver_transport import WebDriverError
@@ -18,7 +19,11 @@ def type_paced_text(session: PacedInputSession, text: str) -> str:
         return "typed 0 chars"
     actions: list[dict[str, Any]] = []
     for character in text:
-        if character.isupper():
+        # WebKitGTK reports key="_" but inserts "-" (similarly +/: etc.)
+        # unless the physical Shift state is held. Keep real W3C input; never
+        # repair the editor document or weaken its exact-byte assertions.
+        shifted_punctuation = platform.system() == "Linux" and character in '~!@#$%^&*()_+{}|:"<>?'
+        if character.isupper() or shifted_punctuation:
             shift = session.MODIFIER_MAP["Shift"]
             actions.append({"type": "keyDown", "value": shift})
             actions.append({"type": "keyDown", "value": character})
