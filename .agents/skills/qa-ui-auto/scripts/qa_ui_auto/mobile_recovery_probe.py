@@ -79,6 +79,16 @@ def reconnect(page, case_dir):
     return {'bounded_retries_per_stream': count // 2, 'streams': 2, 'output_retained': True, 'manual_recovery': True}
 
 
+def fail_status_after_message(route, submitted):
+    """Late stop-event reads may succeed; only a real new message arms failure."""
+    if route.request.method == 'POST' and route.request.url.endswith('/message'):
+        submitted.append(True)
+    elif submitted and route.request.method == 'GET':
+        route.fulfill(status=503, content_type='application/json', body='{"error":"connection_failed"}')
+        return
+    route.continue_()
+
+
 def freshness(page, case_dir):
     """Only task details succeed while changes and an already-open file fail."""
     page.locator('[data-testid="mobile-session"][data-session-kind="agent"]').click()
@@ -110,13 +120,17 @@ def freshness(page, case_dir):
     expect(page.get_by_test_id('mobile-file-updated')).not_to_contain_text('可能已过期')
     page.get_by_test_id('mobile-task-stop').click()
     expect(page.get_by_test_id('mobile-task-status')).to_contain_text('空闲')
-    page.route('**/api/v1/sessions/thread*', unavailable)
+    submitted = []
+    def status_failure(route):
+        fail_status_after_message(route, submitted)
+    page.route('**/api/v1/sessions/thread**', status_failure)
     page.get_by_test_id('mobile-agent-continue').click()
     page.get_by_test_id('mobile-agent-send').click()
     expect(page.get_by_test_id('mobile-task-retry')).to_be_visible()
+    assert len(submitted) == 1, 'status failure must be armed by one actual message POST'
     page.get_by_test_id('mobile-agent-input').fill('retained while status unknown')
     expect(page.get_by_test_id('mobile-agent-send')).to_be_disabled()
-    page.unroute('**/api/v1/sessions/thread*', unavailable)
+    page.unroute('**/api/v1/sessions/thread**', status_failure)
     page.get_by_test_id('mobile-task-retry').click()
     expect(page.get_by_test_id('mobile-task-status')).to_contain_text('运行中')
     expect(page.get_by_test_id('mobile-task-retry')).to_have_count(0)

@@ -33,10 +33,11 @@ TC-MOBILE-011 是 browser 网络注入，不代替真实 Rust 服务。TC-MOBILE
 - `tsc -b`、mobile TypeScript、`pnpm check:refactor`、最终稳定输入 `pnpm build` 均通过。构建含内嵌 mobile bundle 与桌面产物；现有 Vite import/config 与大 chunk 提示仍为警告。
 - `cargo check --manifest-path src-tauri/Cargo.toml --lib --locked`：系统 PipeWire 0.3.48 首轮因缺少 `pw_buffer.requested` 失败；设置已有 `~/.cache/taomni-qa/unit-pipewire/install` 1.0.9 的 pkg-config/library 环境后通过。未修改产品 Rust 依赖或系统文件。原生场景仍以 GitHub 的匹配 QA release 为准。
 - Python fixture/CI selection/crash/control 契约：修正调用不存在的 `test_control_coverage` 模块后，正确集合 38 项通过；recovery 断言预算单测 2 项通过。
-- 本地 browser crash-regression：8/8 通过、0 skip，`qa-ui-auto-report/mobile-crash-local/run-20261105-070309-865627176/`，`identity_stable=true`。
+- 初轮本地 browser crash-regression：8/8 通过、0 skip，`qa-ui-auto-report/mobile-crash-local/run-20261105-070309-865627176/`，`identity_stable=true`。最终 async/fixture 修复后完整重跑仍 **8/8、0 failed、0 skipped、稳定来源、exit 0**：`qa-ui-auto-report/mobile-crash-final/run-20261105-075427-159195783/`。
 - browser 功能首轮：TC-MOBILE-001/004/006/009/010 通过，011 的测试探针先后遇到 deadline 包装、Playwright expect 签名、全屏遮挡；修正 probe，未强制点击或弱化产品断言。之后 011 的每步断言通过，但当轮编辑了来源，runner 正确判定 `identity_stable=false` 并退出非零；不能作为最终通过；稳定来源完整重跑见下一条。
 - 最终稳定来源 browser 功能 **6/6 通过、0 failed、0 skipped**：`qa-ui-auto-report/mobile-final/run-20261105-073459-960129656/`，`identity_stable=true`、runner exit 0。包含 TC-MOBILE-001/004/006/009/010/011；配对／草稿即时翻译、每流 5 次后暂停、after_seq 手动续接、旧内容独立过期与刷新恢复均实际执行。
 - fixture 隔离补充后两 worker mobile **6/6**、`identity_stable=true`、exit 0：`qa-ui-auto-report/mobile-parallel/run-20261105-074852-366872636/`。之后 async 边界测试新增未使用形参曾被 mobile `noUnusedParameters` 拒绝（setup 未执行用例）；更名 `_body` 后重新构建与跑例，不把 setup 失败计通过。
+- 最终 async/fixture 修复来源两 worker **6/6 通过、稳定来源、receipt exit 0**：`qa-ui-auto-report/mobile-owned-final/run-20261105-075403-506697823/`。receipt 额外确认 `status_failure_blocks_send=true`，失败状态手动重读后 draft 保留。与最终 crash-run 同一 source `7a8d9a9b0d9fb192d3b30c69d882ecc6c521a3e4ad7f3a144b2256f81e6b8101`、runner `f0456cb4c274cccd0c669ed30c4d1583f484c7114422e73e9e049130b3203cad`。
 - 首轮失败原件保留在 `qa-ui-auto-report/mobile-local/` 与 `mobile-owned/`，不覆盖失败证据。未提交 runtime artifact。
 
 ## GitHub 验证
@@ -49,9 +50,11 @@ TC-MOBILE-011 是 browser 网络注入，不代替真实 Rust 服务。TC-MOBILE
 - 已下载 hosted `selection.json` 核对：被测完整 SHA 正确、无 gaps / unreviewed；Linux browser 14 + native 16、Windows browser 14 + native 12、macOS browser 14 + native 12，共 82 个平台／模式用例。
 - plan 与 catalog gate 已通过，browser、三平台 release build 和 native contracts 已进入执行。
 - 检查 Linux browser 原始 summary/receipt 发现 job 绿色但逐例为 13/14、exit 1：TC-MOBILE-006 加载时收到目录列表（仅 manifest/icons，无 index/assets）。两个 worker 均构建到 Vite `emptyOutDir` 的同一目录，导致已运行的 peer 读取另一次构建中间态。保留失败 artifact；修复为按 checkout 跨进程锁保护“构建 + 复制”，每个 peer 服务独立 immutable snapshot。专门单测覆盖锁互斥、下一轮清空输出不破坏现有 peer、失败释放；不降 browser workers 或删除测试。
-- 同轮 Windows / macOS browser 原始报告各 14/14、稳定来源、exit 0；Linux native contracts job 成功，具体原始契约数待终态 artifact 核对。
+- 同轮 Windows / macOS browser 原始报告各 14/14、稳定来源、exit 0；Linux native contracts 原始日志为 Rust 91/91（含 mobile 与既有 workspace 合约）及配套 Vitest 98/98。它们只属于 `cbbd11cba`，不替代最终来源验证。
 - 独立检查新增两项可复现异步问题：离线旧 socket 的迟到 close 会清除 pending ticket 的连接门闩并产生并发连接；revision 中止 action 自己的 detail 刷新后，旧 idle 值会过早允许第二条指令。两项均先新增失败回归，再修复（新 attempt 等待前退役旧 socket；task loading/unknown/error 阻止发指令并提供状态重试）。
 - 旧 run 不能证明这些后续修复。为避免继续构建过期来源，已取消该 run，保留已有报告；最终完整 SHA 的三平台 selected + crash-regression 另起，不复用旧二进制冒充新源码。
+- 最终修复代码：`45823a09a830f7f607569222a2c78ba619493f23`；[run 41937465958](https://github.com/engcapa/taomni/actions/runs/41937465958)，仍是三平台 browser/native、2 browser workers、QA release 与完整 crash-regression，不减少选择。已下载该 run 的 `selection.json`，source/runner 指纹与上述最终本地证据完全一致，82 个选择无 gaps/unreviewed。
+- `41937465958` 的 Linux browser 原始报告仍为 13/14：TC-MOBILE-011 探针在 stop 之后先注入 GET 状态失败，迟到的 stop 事件刷新可能先命中，导致下一条消息还没提交，Send 已因状态未知正确禁用。修复仅测试探针：实际 message POST 才开启后续 GET 失败；保留禁发／手动重读／draft 断言，并加网络路由单测。路由必须用 `thread**` 包含 `/message`（单 `*` 不匹配斜杠）；修复后 TC-MOBILE-011 本地稳定来源 **1/1、exit 0**：`qa-ui-auto-report/mobile-ordered-post/run-20261105-080827-222112800/`，专门 fixture/probe 单测 6 项通过。产品源码不变，当前 native 构建继续，不浪费已在运行的构建；最终 runner 修复后必须新 run 验证，不能混合不同 runner 指纹的报告。
 - 最终逐例报告、receipt、三平台结果在实际执行后补录；不能以已触发或 job 绿色冒充 hosted 验收通过。
 
 仍未验证且不得宣称完成：Android/iOS 真机 IME／相机／安装、用户自备公网 TLS／双 endpoint／PNA、真实飞书应用通知。既有 headless 能力限制不变。
