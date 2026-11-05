@@ -444,7 +444,10 @@ closes both phone WebSockets through Playwright network interception, fails
 five ticket requests per stream, verifies paused retries with output retained, and clicks
 manual reconnect with `after_seq`. It then makes task files/changes fail while
 task details succeed, checks independent timestamps and stale content, and
-recovers through visible refresh controls. It writes `mobile-recovery.json` and
+recovers through visible refresh controls. Its final manual task-status retry
+phase temporarily holds only `task_status` frames in the network interceptor,
+so automatic push recovery cannot remove the retry button before it is clicked;
+normal event-driven freshness remains verified in the preceding phase. It writes `mobile-recovery.json` and
 binds `${fixture.mobile_recovery_receipt}`. This is renderer/network evidence;
 TC-MOBILE-003 separately proves cached shell offline/online on a real listener.
 

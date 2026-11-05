@@ -3,7 +3,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from .deadline import BudgetedPage, Deadline
-from .mobile_recovery_probe import expect, fail_status_after_message, task_session_url
+from .mobile_recovery_probe import expect, fail_status_after_message, task_session_url, forward_event
 
 
 class RecoveryExpectTest(unittest.TestCase):
@@ -40,6 +40,24 @@ class RecoveryExpectTest(unittest.TestCase):
         fail_status_after_message(status, submitted)
         status.fulfill.assert_called_once_with(status=503, content_type='application/json', body='{"error":"connection_failed"}')
         status.continue_.assert_not_called()
+
+    def test_only_manual_status_phase_holds_task_pushes_not_other_events(self):
+        client = Mock()
+        delivery = {'task_status': True, 'held': 0}
+        status = '{"type":"task_status","status":"running"}'
+        forward_event(client, status, delivery)
+        client.send.assert_called_once_with(status)
+        client.send.reset_mock()
+        delivery['task_status'] = False
+        forward_event(client, status, delivery)
+        client.send.assert_not_called()
+        self.assertEqual(delivery['held'], 1)
+        heartbeat = '{"type":"heartbeat"}'
+        forward_event(client, heartbeat, delivery)
+        client.send.assert_called_once_with(heartbeat)
+        delivery['task_status'] = True
+        forward_event(client, status, delivery)
+        self.assertEqual(client.send.call_args.args[0], status)
 
     def test_preserves_raw_locator_and_requested_timeout(self):
         locator = Mock()

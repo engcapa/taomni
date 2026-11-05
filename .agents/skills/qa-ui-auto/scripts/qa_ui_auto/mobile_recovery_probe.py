@@ -27,12 +27,24 @@ def expect(locator, timeout=5000):
     return Expected(locator, timeout)
 
 
-def reconnect(page, case_dir):
+def forward_event(client, message, delivery):
+    """Isolate manual status retry from push-triggered recovery in that phase."""
+    if not delivery['task_status'] and isinstance(message, str):
+        frame = json.loads(message)
+        if frame.get('type') == 'task_status':
+            delivery['held'] += 1
+            return
+    client.send(message)
+
+
+def reconnect(page, case_dir, delivery):
     """Start on the paired session list; retain output across a real WS outage."""
     sockets = []
 
     def observe(ws):
         upstream = ws.connect_to_server()
+        if urlsplit(ws.url).path == '/api/v1/events':
+            upstream.on_message(lambda message: forward_event(ws, message, delivery))
         sockets.append((ws, upstream))
 
     page.route_web_socket('**/api/v1/**', observe)
@@ -95,7 +107,7 @@ def fail_status_after_message(route, submitted):
     route.continue_()
 
 
-def freshness(page, case_dir):
+def freshness(page, case_dir, delivery):
     """Only task details succeed while changes and an already-open file fail."""
     page.locator('[data-testid="mobile-session"][data-session-kind="agent"]').click()
     page.get_by_test_id('mobile-file-open').click()
@@ -124,6 +136,10 @@ def freshness(page, case_dir):
     expect(page.get_by_test_id('mobile-file-error')).to_have_count(0)
     expect(page.get_by_test_id('mobile-changes-updated')).not_to_contain_text('可能已过期')
     expect(page.get_by_test_id('mobile-file-updated')).not_to_contain_text('可能已过期')
+    # Normal event-driven refresh was verified above. In the manual-retry phase
+    # hold task_status pushes BEFORE stop, so no late event can refresh detail
+    # between removing the HTTP fault and clicking the actual retry button.
+    delivery['task_status'] = False
     page.get_by_test_id('mobile-task-stop').click()
     expect(page.get_by_test_id('mobile-task-status')).to_contain_text('空闲')
     submitted = []
@@ -142,9 +158,12 @@ def freshness(page, case_dir):
     expect(page.get_by_test_id('mobile-task-retry')).to_have_count(0)
     expect(page.get_by_test_id('mobile-agent-input')).to_have_value('retained while status unknown')
     expect(page.get_by_test_id('mobile-agent-send')).to_be_disabled()
-    return {'independent_success_times': True, 'stale_file_retained': True, 'refresh_recovered': True, 'status_failure_blocks_send': True}
+    assert delivery['held'] >= 2, 'stop and message push recovery were not isolated'
+    delivery['task_status'] = True
+    return {'independent_success_times': True, 'stale_file_retained': True, 'refresh_recovered': True, 'status_failure_blocks_send': True, 'manual_status_retry': True}
 
 
 def run(page, case_dir):
-    receipt = {'reconnect': reconnect(page, case_dir), 'freshness': freshness(page, case_dir), 'passed': True}
+    delivery = {'task_status': True, 'held': 0}
+    receipt = {'reconnect': reconnect(page, case_dir, delivery), 'freshness': freshness(page, case_dir, delivery), 'passed': True}
     (Path(case_dir) / 'mobile-recovery.json').write_text(json.dumps(receipt, indent=2) + '\n', encoding='utf-8')
