@@ -53,7 +53,11 @@
 - 修正输入后再次整组 native 实跑为 **6 passed／4 failed／0 skipped**：`qa-ui-auto-report/mobile-cookie-native-crash/run-20261106-000649-720091417/`。underscore 导致的编辑器／磁盘 exact-byte 失败已消失；余下三项在 screenshot 阶段 timeout，一项冷重启因环境缺少 `wmctrl` 失败，未删截图或冷启动断言。发现手动 Xvfb 启动遗漏 hosted 桌面既有的 `xcompmgr`；用发行版包 SHA-256 核验后只解包到忽略的本机工具目录，补齐 compositor、wmctrl 与 xset，不改系统/用户桌面。后续使用同一二进制与 runner 重跑完整集合；这仍不是预先认定环境为唯一根因或通过。
 - 最终冻结 runner `270df842b8092ebe990a3576302caf1e2c1708d8241d2c38d384b067686c7f4b` 的 browser 完整 crash **9/9**、稳定来源、exit 0：`qa-ui-auto-report/mobile-cookie-final-browser-crash/run-20261106-001141-909121221/`。配套原生 keyboard/contenteditable/transport/fill 合约 **77/77**，macOS paced-input JS **2/2**；既有产品及设置 Vitest **20 文件／92 项**。
 - 最终统一 hosted [42061539325](https://github.com/engcapa/taomni/actions/runs/42061539325) 测试 `f6937302c8b252bf7aca055be3bb911fb835b28d`，selection 已下载核对同一 source／最终 runner，仍为 **88 项**、无 gaps／unreviewed。后续 docs-only 提交不改变被测产品或 runner；前次来源报告不混入此 run。
-- 本次提交为防重启丢失的阶段性源码产物，不是交付完成：8787 部署、匹配本机桌面依赖的 native 完整 crash-regression 与 hosted 最终结果仍待实际执行后补录。
+- 补 compositor 后完整 native 第三轮 **5 passed／5 failed／0 skipped**：`qa-ui-auto-report/mobile-cookie-native-crash/run-20261106-002047-165358838/`，身份稳定；5 项失败都在 screenshot（TC-WS-039／045／051／053／054），没有删除截图、缩减选择或改写失败为成功。补环境依赖并未解决本机 WebKit 截图问题，完整 native crash 验收仍阻塞，须继续诊断或核对 matching hosted 结果。
+- 与本功能直接相关的 retained native **7/7 passed、0 failed／0 skipped、exit 0、稳定来源、receipt valid**：`qa-ui-auto-report/mobile-cookie-native-retained/run-20261106-003641-949732233/`。包含 TC-MOBILE-002／003／004／005／007／008／010，真实 listener／PTY、无 Display headless、飞书设置存储边界（非真实飞书）、委托打开／一次性连接认证／实际 OpenSSH 子进程取消、设置多语言均执行。
+- **2026-11-06 本机 8787 已部署并独立复验通过**。运行备份的匹配 release、独立 QA profile `qa-ui-auto-report/mobile-cookie-android-manual-20261105/`，监听仅 `127.0.0.1:8787`。准确公网 Host health=200、未持 Bearer 的业务 API=401、不批准 Host=403。部署中的 index／JS／CSS／版本化 SW 字节哈希均与当前 production bundle 相同；不是旧二进制加 assets override。证据 `deployment-verification.json` 只记录文件路径与哈希，不含配对码。
+- 在实际 **8787 新内嵌 bundle** 上，带 cookie 鉴权回环网关的连贯 probe **8/8 检查通过、page_errors=[]、assets_override=false**：`qa-ui-auto-report/mobile-cookie-embedded-real-e2e-20261105/`，含真实 PTY 执行独立磁盘 marker、Cookie 过期重新登录、无效响应不导航／不白屏、跨源 Cookie 隔离。手机页面和终端截图已打开检查；不将模拟网关等同用户真实 SLB 登录或 Android 硬件证据。
+- 手工验收环境已可用，不代表全部开发验收完成：本机 native screenshot failures 与 GitHub [42061539325](https://github.com/engcapa/taomni/actions/runs/42061539325) 最终 88 项原始报告／独立聚合仍待收口；真实 Android、SLB 公网登录与真实飞书仍分别由用户协作验证。
 
 ## 部署约束与手工验收
 
