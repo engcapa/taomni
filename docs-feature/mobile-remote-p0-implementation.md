@@ -40,7 +40,7 @@ pnpm build:mobile                # 生成内嵌 PWA，主 build 会自动执行
 
 - 默认无监听。health/pair 与静态外壳公开；其余端点 bearer 鉴权，WS 使用 60 秒单次票据并绑定请求 Origin。长 token 只走 Authorization，不进入 URL。
 - 配对码随机 122 bits、5 分钟单次有效；token 随机 244 bits，绝对有效期 90 天、闲置有效期 30 天，只持久化 SHA-256 哈希，使用常量时间比较。last_used_at 最多每 5 分钟写盘一次，正常停止也刷新。失败按真实对端 IP 限 5 次/5 分钟，不信任 X-Forwarded-For。来源表最多 1024，表满淘汰最旧条目，设备上限 256、票据上限 1024。成功配对不累计失败。回环对端可能是共享反向代理：无效码仍限流，正确的高熵码不受共享桶封禁；不读取未受信的转发 IP。日志仅记录失败来源/计数，不记录码、token、票据、业务内容或连接字段。
-- 两级 CORS：health/pair 回显 Origin；业务端点只放行同源或存在已配对设备的 Origin。不使用 `*`，不使用 Cookie/Allow-Credentials；不信任 Forwarded Host。吊销最后一个同 Origin 设备后移除该 Origin，后续业务请求在进入 handler 前返回 origin_denied。预检允许携带 Authorization 的传输，拒绝响应回显 Origin 以便浏览器读取固定错误码，绝不返回业务数据；已建 WS 收到 device_revoked 关闭码，页面停止重试并提示重新配对。
+- 两级 CORS：health/pair 回显 Origin；业务端点只放行同源或存在已配对设备的 Origin。不使用 `*`，不以 Cookie 授予 Taomni 权限、不发送 Allow-Credentials；不信任 Forwarded Host。用户自备网关的已有登录 Cookie 仅允许由同源 Mobile Web 请求携带，跨实例请求仍 `omit`；详见 [SLB 配对修复](mobile-cookie-gateway-fix-20261105.md)。吊销最后一个同 Origin 设备后移除该 Origin，后续业务请求在进入 handler 前返回 origin_denied。预检允许携带 Authorization 的传输，拒绝响应回显 Origin 以便浏览器读取固定错误码，绝不返回业务数据；已建 WS 收到 device_revoked 关闭码，页面停止重试并提示重新配对。
 - 删除 mobile-devices.json 会使现有设备失效。设备列表保存在实例 profile；WS 票据仅存内存，60 秒单次有效，停止/重新启动即失效。配对码在停止/重新启动时失效。浏览器 token 存 localStorage；界面明确说明其弱于系统密钥库。
 - PTY 文字尾部最多 1000 行、512 KiB、单行 16 KiB；增量 UTF-8、CR 覆盖、非法字节替换。单独保留有界原始 chunk 用于 after_seq 续接；缺口 replay + gap。不是屏幕快照，也不承诺 TUI 屏幕精确恢复。
 - 事件保留 200 条，超界 resync。PTY 广播队列 512 条，发送超时 10 秒；慢消费者断开后续接。30 秒空闲心跳，90 秒无客户端活动断开。REST/WS 帧输入上限 64 KiB；Agent 指令上限 32768 UTF-8 字节，手机按字节提示，413 映射为指令过大。

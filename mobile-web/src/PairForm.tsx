@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { endpoint, errorText, request, type Instance } from "./api";
+import { ApiError, endpoint, errorText, request, type Instance } from "./api";
+import { isPairingResponse } from "./apiContracts";
 
 function Scanner({ onRead, onClose }: { onRead: (value: string) => void; onClose: () => void }) {
   const video = useRef<HTMLVideoElement>(null);
@@ -54,7 +55,8 @@ export function PairForm({ onPair, onCancel }: { onPair: (value: Instance) => vo
       event.preventDefault(); setError(""); setBusy(true); abort.current = new AbortController();
       try {
         const url = endpoint(address.trim());
-        const pair = await request<{ device_id: string; token: string }>({ endpoint: url, token: "" }, "/pair", { endpoint_label: label.trim() || new URL(url).host, pairing_code: code.trim() }, abort.current.signal);
+        const pair = await request<unknown>({ endpoint: url, token: "" }, "/pair", { endpoint_label: label.trim() || new URL(url).host, pairing_code: code.trim() }, abort.current.signal);
+        if (!isPairingResponse(pair)) throw new ApiError("invalid_api_response");
         onPair({ id: `${url}:${pair.device_id}`, endpoint: url, label: label.trim() || new URL(url).host, token: pair.token, deviceId: pair.device_id, lastOnline: Date.now() });
       } catch (error) { if (!(error instanceof DOMException && error.name === "AbortError")) setError(errorText(error)); }
       finally { setBusy(false); }

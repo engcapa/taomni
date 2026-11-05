@@ -357,7 +357,8 @@ PWA 外壳由哪个实例托管，只决定它首次加载的 Origin。切到另
   - `Access-Control-Max-Age: 86400`
   - **不发送** `Access-Control-Allow-Credentials`
   - 禁止出现 `Access-Control-Allow-Origin: *`，不复用 `servers/http.rs` 的做法
-  - 禁止把 token 放进 Cookie：没有 ambient 凭据，回显 Origin 就不构成越权；没有 token 的跨域请求仍会在业务层被拒绝
+  - 禁止把 Taomni token 放进 Cookie；Taomni 不以 ambient Cookie 授予业务权限，没有 token 的跨域请求仍会在业务层被拒绝。
+  - 用户自备 SLB／反向代理可以另有网关登录 Cookie。Mobile Web 仅在实例 endpoint 与当前页面完全同源时使用 `credentials: "same-origin"`，让浏览器携带已有的网关 Cookie；跨实例不同源仍使用 `omit`，不启用 `include`，不读取或保存 Cookie。此例外不改变 Taomni Bearer、Origin、Host、WS 单次票据校验或 `Allow-Credentials` 禁令。API 登录重定向不跟随，HTML／不完整 JSON 不得当作配对成功；失败不得保存无效设备或导航到 `:undefined`。
 - **WS 握手**：服务端在握手时校验 Origin（同源，或在已配对清单中）与票据，缺一即拒绝升级。票据只能经已通过 CORS 与鉴权的 HTTP 接口签发，与上述规则是同一条信任链。
 - **静态资源 `/`**：外壳只从当前打开的实例加载；切换实例时只跨域调用对方 API，不加载对方外壳，因此静态资源不开 CORS。
 

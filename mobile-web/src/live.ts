@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { ApiError, request, type Instance } from "./api";
+import { record } from "./apiContracts";
 
 export interface Frame { type: string; [key: string]: unknown }
 const RETRY_DELAYS = [1000, 2000, 5000, 10000, 30000];
@@ -40,7 +41,9 @@ export function useLive(instance: Instance, path: string, onFrame: (frame: Frame
       setCanRetry(false);
       status.current(connected ? "重连中" : "连接中");
       try {
-        const { ticket } = await request<{ ticket: string }>(instance, "/ws-ticket", {}, abort.signal);
+        const value = await request<unknown>(instance, "/ws-ticket", {}, abort.signal);
+        if (!record(value) || typeof value.ticket !== "string" || !value.ticket.trim()) throw new ApiError("invalid_api_response");
+        const ticket = value.ticket;
         if (disposed || ended || denied) return;
         const url = new URL(`${instance.endpoint}/api/v1${path}`);
         url.protocol = url.protocol === "https:" ? "wss:" : "ws:";
@@ -100,6 +103,9 @@ export function useLive(instance: Instance, path: string, onFrame: (frame: Frame
         if (disposed) return;
         if (error instanceof ApiError && ["unauthorized", "origin_denied"].includes(error.code)) {
           denied = true; status.current("配对已失效，请重新配对"); return;
+        }
+        if (error instanceof ApiError && ["gateway_auth_required", "invalid_api_response"].includes(error.code)) {
+          paused = true; status.current("网关或 API 响应异常，请先完成网关登录再重试"); setCanRetry(true); return;
         }
         retry();
       }

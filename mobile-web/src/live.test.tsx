@@ -155,6 +155,21 @@ it("ignores an old close arriving while online recovery is waiting for a ticket"
   online.mockRestore();
 });
 
+it("does not open a WebSocket with an undefined ticket from a gateway response", async () => {
+  vi.mocked(request).mockResolvedValue({});
+  const status = vi.fn();
+  const { result, unmount } = renderHook(() => useLive(instance, "/events", () => {}, status));
+  await act(async () => { await vi.advanceTimersByTimeAsync(120000); });
+  expect(Socket.all).toHaveLength(0);
+  expect(request).toHaveBeenCalledTimes(1);
+  expect(result.current.canRetry).toBe(true);
+  expect(status).toHaveBeenLastCalledWith("网关或 API 响应异常，请先完成网关登录再重试");
+  vi.mocked(request).mockResolvedValue({ ticket: "valid-after-login" });
+  await act(async () => result.current.retry());
+  expect(Socket.all).toHaveLength(1);
+  unmount();
+});
+
 it("stops requesting tickets for an exited or removed terminal", async () => {
   const { unmount } = renderHook(() => useLive(instance, "/terminals/term:t/stream", () => {}, () => {}));
   const socket = await connect();

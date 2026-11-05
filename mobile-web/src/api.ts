@@ -1,3 +1,5 @@
+import { isStoredInstance, record } from "./apiContracts";
+
 export interface Instance {
   id: string;
   endpoint: string;
@@ -38,13 +40,19 @@ export async function request<T>(instance: Pick<Instance, "endpoint" | "token">,
   const timer = setTimeout(cancel, 15000);
   try {
     const response = await fetch(`${instance.endpoint}/api/v1${path}`, {
-      method: body === undefined ? "GET" : "POST", credentials: "omit", cache: "no-store",
+      // A same-origin gateway may require its existing login cookie. Cookies
+      // never authorize Taomni itself and must not follow cross-instance calls.
+      method: body === undefined ? "GET" : "POST",
+      credentials: new URL(instance.endpoint).origin === location.origin ? "same-origin" : "omit",
+      cache: "no-store", redirect: "manual",
       headers: { ...(instance.token ? { Authorization: `Bearer ${instance.token}` } : {}), ...(body === undefined ? {} : { "Content-Type": "application/json" }) },
       body: body === undefined ? undefined : JSON.stringify(body), signal: abort.signal,
     });
-    const value = await response.json().catch(() => ({})) as { error?: string };
+    if (response.type === "opaqueredirect" || (response.status >= 300 && response.status < 400)) throw new ApiError("gateway_auth_required");
     if (response.status === 413) throw new ApiError("message_too_large");
-    if (!response.ok) throw new ApiError(value.error || "request_failed");
+    const value: unknown = await response.json().catch(() => { throw new ApiError("invalid_api_response"); });
+    if (!record(value)) throw new ApiError("invalid_api_response");
+    if (!response.ok) throw new ApiError(typeof value.error === "string" ? value.error : "request_failed");
     return value as T;
   } catch (error) {
     if (error instanceof ApiError) throw error;
@@ -62,6 +70,8 @@ export function errorText(error: unknown): string {
     invalid_or_expired_code: "配对码错误、已使用或已过期。",
     rate_limited: "尝试过于频繁，请稍后重试。",
     connection_failed: "连接失败，请检查实例、网络和跨域授权后重试。",
+    gateway_auth_required: "网关登录已失效，请先在此浏览器打开实例主页完成登录，再重试。",
+    invalid_api_response: "未收到有效的 Taomni API 响应，请先在此浏览器完成网关登录，并确认实例地址后重试。",
     diff_unavailable: "无可读的本地任务目录或 Git diff。请在桌面建立任务上下文。",
     path_denied: "该路径超出任务目录，访问已拒绝。",
     binary_file: "二进制文件无法以文本显示。",
@@ -92,7 +102,7 @@ const STORAGE = "taomni.mobile.instances.v1";
 export function loadInstances(): Instance[] {
   try {
     const data: unknown = JSON.parse(localStorage.getItem(STORAGE) || "[]");
-    return Array.isArray(data) ? data.filter((v): v is Instance => v && typeof v.id === "string" && typeof v.endpoint === "string" && typeof v.label === "string" && typeof v.token === "string" && typeof v.deviceId === "string") : [];
+    return Array.isArray(data) ? data.filter(isStoredInstance) : [];
   } catch { return []; }
 }
 export function saveInstances(instances: Instance[]) { localStorage.setItem(STORAGE, JSON.stringify(instances)); }

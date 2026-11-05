@@ -355,7 +355,7 @@
 - 输入上限与服务端口径不一致（F-47）。
 
 **api.ts / live.ts**
-- 【代码】请求 `credentials: "omit"`，token 只放 Authorization 头，票据放查询串。
+- 【评审时代码】请求 `credentials: "omit"`，token 只放 Authorization 头，票据放查询串。2026-11-05 对用户自备登录网关补充同源 Cookie 例外；跨实例仍 `omit`，安全边界见 [SLB 配对修复](mobile-cookie-gateway-fix-20261105.md)。
 - 缺口见 F-01、F-02、F-05。
 
 **sw.js / manifest / vite**
@@ -844,7 +844,7 @@
 
 **token 与票据**
 - 到位：
-  - 【代码】token 只放在 Authorization 头，`credentials: "omit"`。
+  - 【评审时代码】token 只放在 Authorization 头，`credentials: "omit"`。后续仅同源网关允许既有登录 Cookie，Taomni 权限仍不依赖 Cookie；详见 [2026-11-05 修复](mobile-cookie-gateway-fix-20261105.md)。
   - WS 只使用 60 秒单次票据，并绑定 Origin；Origin 不匹配时票据也会被 `remove` 消耗掉。
   - CSP 的 `script-src 'self'` 限制了 localStorage 中 token 被 XSS 读取的面。
 - 缺口：

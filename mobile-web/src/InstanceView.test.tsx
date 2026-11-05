@@ -12,6 +12,13 @@ const deferred = <T,>() => { let resolve!: (value: T) => void; let reject!: (err
 beforeEach(() => { mock.request.mockReset(); mock.open.mockReset(); });
 afterEach(cleanup);
 
+it("keeps malformed JSON session responses out of rendering and retains an actionable error", async () => {
+  mock.request.mockResolvedValue({});
+  render(<InstanceView instance={instance} onSelect={vi.fn()} onCloseSession={vi.fn()} onBack={vi.fn()} />);
+  expect(await screen.findByTestId("mobile-instance-error")).toHaveTextContent("有效的 Taomni API");
+  expect(screen.getByTestId("mobile-empty-sessions")).toBeInTheDocument();
+});
+
 it.each(["success", "failure"])("late A cancellation %s cannot abort or clear B", async result => {
   const a = deferred<string>(); const b = deferred<string>(); const cancel = deferred<unknown>();
   const calls: { signal: AbortSignal; progress: (status: OpenStatus) => void }[] = [];

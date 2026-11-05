@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { ApiError, errorText, loadInstances, request, saveInstances, statusText, type Instance, type Session, type SessionList } from "./api";
 import { useLive } from "./live";
+import { isSessionList } from "./apiContracts";
 import { openSession, type OpenTarget, type OpenStatus } from "./openSession";
 import { ConnectionAuthForm } from "./ConnectionAuthForm";
 import { TaskView } from "./TaskView";
@@ -35,6 +36,7 @@ export function InstanceView({ instance, sessionId, onSelect, onCloseSession, on
     abort.current?.abort(); abort.current = new AbortController();
     void request<SessionList>(instance, "/sessions", undefined, abort.current.signal).then(value => {
       if (current !== generation.current) return;
+      if (!isSessionList(value)) throw new ApiError("invalid_api_response");
       try {
         const saved = loadInstances().map(v => v.id === instance.id ? { ...v, lastOnline: Date.now() } : v);
         saveInstances(saved);

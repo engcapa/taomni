@@ -7,6 +7,16 @@ import { saveInstances } from "./api";
 vi.mock("./InstanceView", () => ({ InstanceView: () => null }));
 afterEach(() => { cleanup(); localStorage.clear(); vi.restoreAllMocks(); });
 
+it("recovers an old undefined-device route without loading its broken registration", () => {
+  history.replaceState({}, "", "#/i/https%3A%2F%2Fpc.example%3Aundefined");
+  localStorage.setItem("taomni.mobile.instances.v1", JSON.stringify([{ id: "https://pc.example:undefined", endpoint: "https://pc.example", label: "Bad", deviceId: "", token: "" }]));
+  render(<App />);
+  expect(screen.getByTestId("mobile-instance-missing")).toBeInTheDocument();
+  expect(screen.getByTestId("mobile-add-instance")).toBeEnabled();
+  expect(screen.queryByTestId("mobile-instance-open")).toBeNull();
+  history.replaceState({}, "", "#/");
+});
+
 it("keeps registrations visible offline and never mistakes browser connectivity for instance health", () => {
   saveInstances([{ id: "pc", deviceId: "phone", token: "secret", label: "Home PC", endpoint: "https://pc.example", lastOnline: 1700000000000 }]);
   const online = vi.spyOn(navigator, "onLine", "get").mockReturnValue(false);
