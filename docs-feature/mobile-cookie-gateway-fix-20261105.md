@@ -50,7 +50,10 @@
 - 后续统一 hosted [42058970983](https://github.com/engcapa/taomni/actions/runs/42058970983) 已触发，head `3488be2bc6f9480be9fc796b9abf6f315eb0e2a2`，仍保留相同 88 项全部 mobile 与完整 crash 选择。前次失败 run 不删除、不混合为统一通过。
 - 本机完整 native crash 首轮 **1 passed／9 failed／0 skipped**，来源稳定，失败原件：`qa-ui-auto-report/mobile-cookie-native-crash/run-20261105-235004-037781239/`。独立 native case 通过不替代整组。多数编辑器 exact-byte 失败实际输入 `QA-...` 而非要求的 `QA_...`；诊断 trace 显示 keydown `_`、beforeinput/input `-`。同一二进制的独立真实 WebView 探针进一步复现 `_→-`、`+→=`、`:→;`。QA W3C 输入在 Linux 对这些字符显式持有 Shift 后，7 个相同输入值逐字节全部一致（baseline/candidate 证据分别在 `mobile-cookie-native-input-baseline/`、`mobile-cookie-native-input-candidate/`）；不修改 editor 内容、不放宽 exact 断言，非 Linux 动作保持不变。首轮另有 screenshot timeout，复验仍须观察。
 - 新 case 的 open-sessions `click` 后即时 `assert_count` 偶发读到异步回落值；失败截图后续已 checked。改用现有 `set_check` 真实指针操作及读取状态的完成确认，保留原 checked 数量断言与后续实际 PTY 检查，不增加硬编码 sleep，不改产品设置行为。
-- 本次提交为防重启丢失的阶段性源码产物，不是交付完成：8787 部署、修正 QA 输入后的 native 完整 crash-regression 与 hosted 最终结果仍待实际执行后补录。
+- 修正输入后再次整组 native 实跑为 **6 passed／4 failed／0 skipped**：`qa-ui-auto-report/mobile-cookie-native-crash/run-20261106-000649-720091417/`。underscore 导致的编辑器／磁盘 exact-byte 失败已消失；余下三项在 screenshot 阶段 timeout，一项冷重启因环境缺少 `wmctrl` 失败，未删截图或冷启动断言。发现手动 Xvfb 启动遗漏 hosted 桌面既有的 `xcompmgr`；用发行版包 SHA-256 核验后只解包到忽略的本机工具目录，补齐 compositor、wmctrl 与 xset，不改系统/用户桌面。后续使用同一二进制与 runner 重跑完整集合；这仍不是预先认定环境为唯一根因或通过。
+- 最终冻结 runner `270df842b8092ebe990a3576302caf1e2c1708d8241d2c38d384b067686c7f4b` 的 browser 完整 crash **9/9**、稳定来源、exit 0：`qa-ui-auto-report/mobile-cookie-final-browser-crash/run-20261106-001141-909121221/`。配套原生 keyboard/contenteditable/transport/fill 合约 **77/77**，macOS paced-input JS **2/2**；既有产品及设置 Vitest **20 文件／92 项**。
+- 最终统一 hosted [42061539325](https://github.com/engcapa/taomni/actions/runs/42061539325) 测试 `f6937302c8b252bf7aca055be3bb911fb835b28d`，selection 已下载核对同一 source／最终 runner，仍为 **88 项**、无 gaps／unreviewed。后续 docs-only 提交不改变被测产品或 runner；前次来源报告不混入此 run。
+- 本次提交为防重启丢失的阶段性源码产物，不是交付完成：8787 部署、匹配本机桌面依赖的 native 完整 crash-regression 与 hosted 最终结果仍待实际执行后补录。
 
 ## 部署约束与手工验收
 
