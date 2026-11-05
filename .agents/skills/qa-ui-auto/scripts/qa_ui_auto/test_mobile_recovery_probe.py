@@ -3,7 +3,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from .deadline import BudgetedPage, Deadline
-from .mobile_recovery_probe import expect, fail_status_after_message
+from .mobile_recovery_probe import expect, fail_status_after_message, task_session_url
 
 
 class RecoveryExpectTest(unittest.TestCase):
@@ -17,6 +17,12 @@ class RecoveryExpectTest(unittest.TestCase):
         timeout = assertion.return_value.to_be_visible.call_args.kwargs['timeout']
         self.assertGreater(timeout, 0)
         self.assertLessEqual(timeout, 2000)
+
+    def test_route_predicate_covers_encoded_detail_message_and_rejects_list(self):
+        for suffix in ('thread%3At', 'thread%3At/message', 'thread%3At/stop'):
+            self.assertTrue(task_session_url('http://127.0.0.1/api/v1/sessions/' + suffix))
+        self.assertFalse(task_session_url('http://127.0.0.1/api/v1/sessions'))
+        self.assertFalse(task_session_url('http://127.0.0.1/api/v1/tasks/thread%3At/changes'))
 
     def test_status_fault_waits_for_message_instead_of_racing_the_previous_stop_event(self):
         submitted = []
