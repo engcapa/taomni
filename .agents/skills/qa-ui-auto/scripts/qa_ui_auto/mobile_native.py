@@ -226,4 +226,8 @@ def register(verb, terminal_input):
         if args == 'connection-auth':
             from .mobile_connection_auth import run as connection_auth
             return connection_auth(ctx, address(ctx), text(ctx, '[data-testid="mobile-settings-code"]'))
-        raise StepError('mobile_service_probe requires desktop, headless, open-session connection-auth or openssh-cancel')
+        if args == 'cookie-gateway':
+            from .mobile_cookie_probe import probe
+            probe(address(ctx), text(ctx, '[data-testid="mobile-settings-code"]'), ctx.case_dir, real_pty=True)
+            return 'Authenticated gateway, embedded phone bundle and real PTY marker passed'
+        raise StepError('mobile_service_probe requires desktop, headless, open-session, connection-auth, openssh-cancel or cookie-gateway')

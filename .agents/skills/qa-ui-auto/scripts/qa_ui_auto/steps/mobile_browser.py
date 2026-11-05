@@ -15,9 +15,20 @@ from . import StepContext, StepError, verb
 
 @verb('mobile_browser_probe')
 def mobile_browser_probe(ctx: StepContext, args: Any) -> None:
-    if args not in ('touch-scroll', 'recovery') or ctx.cfg['app']['mode'] != 'browser':
-        raise StepError('mobile_browser_probe requires browser mode and touch-scroll or recovery')
+    if args not in ('touch-scroll', 'recovery', 'cookie-gateway') or ctx.cfg['app']['mode'] != 'browser':
+        raise StepError('mobile_browser_probe requires browser mode and touch-scroll, recovery or cookie-gateway')
     if ctx.dry_run:
+        return
+    if args == 'cookie-gateway':
+        from ..deadline import BudgetedPage
+        from ..mobile_cookie_probe import probe
+        # The probe's Playwright expect() needs real Locators, not budget proxies.
+        page = ctx.page._target if isinstance(ctx.page, BudgetedPage) else ctx.page
+        browser = page.context.browser
+        if browser is None:
+            raise StepError('cookie-gateway requires the existing runner Browser')
+        probe(ctx.values['mobile_endpoint'], 'qa-mobile-code', ctx.case_dir,
+              assets=ctx.values['mobile_assets'], browser=browser)
         return
     if args == 'recovery':
         from ..mobile_recovery_probe import run

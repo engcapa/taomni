@@ -451,6 +451,30 @@ normal event-driven freshness remains verified in the preceding phase. It writes
 binds `${fixture.mobile_recovery_receipt}`. This is renderer/network evidence;
 TC-MOBILE-003 separately proves cached shell offline/online on a real listener.
 
+`mobile_browser_probe: cookie-gateway` (TC-MOBILE-012, browser) requires the
+`mobile_web` fixture. It reuses the runner's existing Browser with an isolated
+phone context, immutable production bundle and deterministic HTTP/WS peer behind
+a loopback authenticated gateway. It verifies same-origin HttpOnly cookies on
+pairing, REST and WebSocket ticket/upgrade requests; Taomni still requires its own
+Bearer token. HTML/incomplete JSON cannot save a broken instance or blank the
+session view; expired gateway login retains pairing and recovers after login.
+Cross-origin pairing must receive neither ambient cookies nor an existing Bearer.
+It asserts no phone page errors and writes sanitized
+`mobile-cookie-gateway-receipt.json` plus a diagnostic screenshot. The fixture
+binds `${fixture.mobile_cookie_receipt}`; no real PTY/native claim is made.
+
+`mobile_service_probe: cookie-gateway` (TC-MOBILE-013, Linux/Windows/macOS native)
+performs the same public phone workflow against the actual Settings-started
+listener and its embedded production bundle, with no assets override or browser
+stub. Enable open-sessions and generate an unused pairing code first. The phone
+opens a local desktop terminal, takes control and sends a shell command over the
+authenticated gateway WebSocket. Exact host marker bytes prove real PTY execution.
+YAML additionally checks a native terminal tab/pane, the marker, service shutdown
+and a surviving desktop pane without runtime errors. `mobile_service` binds
+`${fixture.mobile_cookie_receipt}` and `${fixture.mobile_cookie_marker}` only for
+this case. The external Chromium phone is not a physical device or desktop WebView
+fidelity claim; the listener, embedded assets, IPC and PTY are real native effects.
+
 The `mobile_web` browser fixture serves the production mobile bundle with a
 deterministic HTTP/WS peer; it does not establish Rust/native service behavior.
 The `mobile_service` fixture seeds only isolated saved-session rows for native

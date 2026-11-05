@@ -13397,6 +13397,8 @@ files:
   - mobile-web/src/TerminalControls.tsx
   - mobile-web/src/ConnectionAuthForm.tsx
   - mobile-web/src/live.ts
+  - mobile-web/src/api.ts
+  - mobile-web/src/apiContracts.ts
   - mobile-web/src/useSnapshot.ts
   - src/lib/i18n/locales/mobileSettings.ts
 controls:
@@ -13849,6 +13851,7 @@ controls:
 - 桌面设置显式允许后，已配对手机可请求新建本地终端或打开已保存会话；TC-MOBILE-005 定义真实 HTTP/WS → 桌面 tab → PTY → 独立磁盘 marker 的 Linux 验证，并保护默认拒绝、跨设备请求隔离和可读标题（运行结果以报告为准）。
 - 当前执行证据与限制见 `docs-feature/mobile-remote-p0-implementation.md`，未验证的平台与真手机能力不作完成声明。
 - TC-MOBILE-010 覆盖 Network 中移动服务／飞书设置中英文即时切换、翻译标题搜索、配对与草稿保持；TC-MOBILE-011 覆盖有限重连、手动按序列续接与任务／改动／文件独立过期标记。TC-MOBILE-003 另验证实际 native 缓存外壳离线提示与网络恢复。
+- TC-MOBILE-012（browser）与 TC-MOBILE-013（native）保护 SLB/Cookie 网关下的配对与白屏回归：同源 HttpOnly Cookie、独立 Bearer 权限、跨源不带 Cookie、HTML／不完整 JSON 的可恢复错误，以及网关登录过期后保留配对并恢复。两者均列入 crash-regression；native 使用 QA 内嵌生产手机 bundle、真实监听服务和 PTY 写入独立 marker，并断言桌面终端 pane/tab 与关闭服务后的存活状态，不以 browser peer 代替真实 native 副作用。运行结果以对应原始 receipt 和 runner 报告为准。
 
 ### P1 飞书 Agent 适配器 🟡
 

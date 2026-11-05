@@ -228,6 +228,22 @@ def _touches_for_case(case) -> list[Touch]:  # case: TestCase
         if not isinstance(step, dict) or len(step) != 1:
             continue
         verb, args = step_verb_and_args(step)
+        if verb in {"mobile_browser_probe", "mobile_service_probe"} and args == "cookie-gateway":
+            interacted = (
+                "mobile-first-instance", "mobile-pair-code", "mobile-pair-submit",
+                "mobile-label", "mobile-refresh", "mobile-retry", "mobile-instance-open",
+                "mobile-instances-back", "mobile-add-instance", "mobile-endpoint",
+            )
+            observed = ("mobile-pair-error", "mobile-connection", "mobile-sessions", "mobile-instance-error")
+            if verb == "mobile_service_probe":
+                interacted += (
+                    "mobile-open-local", "mobile-take-control", "mobile-terminal-keyboard",
+                    "mobile-terminal-command", "mobile-terminal-command-send", "mobile-terminal-back",
+                )
+                observed += ("mobile-terminal-screen", "mobile-terminal-status")
+            for names, kind in ((interacted, "interactive"), (observed, "display")):
+                out.extend(Touch(case_id=case.id, selector=f'[data-testid="{name}"]', kind=kind) for name in names)
+            continue
         if verb == "switch_window" and isinstance(args, dict):
             # close_with performs one real click in the source window; the
             # target selector only observes the destination after closure.

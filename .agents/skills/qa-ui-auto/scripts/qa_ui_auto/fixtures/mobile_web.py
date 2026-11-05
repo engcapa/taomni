@@ -208,6 +208,9 @@ def setup(ctx):
     ctx.values['mobile_endpoint'] = f'http://127.0.0.1:{server.server_port}'
     ctx.values['mobile_endpoint2'] = f'http://localhost:{server.server_port}'
     ctx.values['mobile_receipt'] = str(receipt.resolve())
+    ctx.values['mobile_assets'] = str(assets.resolve())
+    if ctx.case_id == 'TC-MOBILE-012':
+        ctx.values['mobile_cookie_receipt'] = str((Path(ctx.case_dir) / 'mobile-cookie-gateway-receipt.json').resolve())
 
 
 def teardown(ctx):
