@@ -59,7 +59,26 @@
 - 在实际 **8787 新内嵌 bundle** 上，带 cookie 鉴权回环网关的连贯 probe **8/8 检查通过、page_errors=[]、assets_override=false**：`qa-ui-auto-report/mobile-cookie-embedded-real-e2e-20261105/`，含真实 PTY 执行独立磁盘 marker、Cookie 过期重新登录、无效响应不导航／不白屏、跨源 Cookie 隔离。手机页面和终端截图已打开检查；不将模拟网关等同用户真实 SLB 登录或 Android 硬件证据。
 - Hosted `42061539325` 已结束，独立下载全部原始报告并重新聚合：**86 passed／2 failed／0 skipped（88 项）**，不是通过。15 份 receipt 与 1261 个关联文件的大小／SHA-256 核验一致、artifact_errors／comparison_errors 为空；证据 `qa-ui-auto-report/hosted-evidence-qo1gz0s9/verification-result.json`。三平台 browser 各 **15/15**；Linux native **16/17**、Windows native **13/13**、macOS native **12/13**。完整 hosted crash tag **57/57**、0 failed／0 skipped；TC-MOBILE-012／013 六个平台模式组合全过，含三平台真实 native gateway／PTY。
 - 两个失败都为 TC-MOBILE-010 的第一项 QR aria-label：用例等待配对 code 元素后立即读取尚未完成动态 import 的 QR，native `assert_attribute` 没有 Playwright 式等待。失败后采集的 Linux／macOS HTML 已有正确英文 QR 标签、无设置错误；不凭事后截图把失败记通过。把原 step13 的 `wait_for(code)` 改为 `wait_for(qr)`，仍检查同一英文／中文精确 aria-label、草稿保留与真实启停，无固定 sleep、无放宽期望、不改产品或重建 binary。更正后的本机 browser／native 各 **1/1**、0 skipped、稳定来源、exit 0／receipt valid，证据 `mobile-settings-qr-browser/`、`mobile-settings-qr-native/`。
-- 手工验收环境持续可用，不代表全部开发验收完成：本机 native screenshot failures 保留，统一 88 项须在 QR 用例修正后重新执行；真实 Android、SLB 公网登录与真实飞书仍分别由用户协作验证。
+- 手工验收环境持续可用；本机 native screenshot failures 保留，不能用 hosted 通过倒改本机失败记录。真实 Android、SLB 公网登录与真实飞书仍分别由用户协作验证。
+
+## 统一验收最终结果（2026-11-06）
+
+QR 等待修正后的 [42068966132](https://github.com/engcapa/taomni/actions/runs/42068966132) 已成功结束，被测提交 `c0ee5faaedc8331f9741884aba3d707db662b191`。按指定 `.github/workflows/qa-ui-auto-platforms.yml` 执行全部 mobile 与完整 crash-regression，使用匹配源码的 QA release，最终 **88/88 passed、0 failed、0 skipped**。
+
+| 平台 | Browser | Native QA release |
+| --- | --- | --- |
+| Linux | 15/15 | 17/17 |
+| Windows | 15/15 | 13/13 |
+| macOS | 15/15 | 13/13 |
+| 合计 | 45/45 | 43/43 |
+
+完整 hosted crash tag **57/57**。新 cookie gateway 用例 TC-MOBILE-012／013 在三个平台的 browser／native 组合全部通过；设置多语言 TC-MOBILE-010 修正后六组合也全部通过。
+
+原始证据已下载至 `qa-ui-auto-report/hosted-evidence-zpc2053x/`：独立重新聚合与 hosted 结果完全一致，`passed=true`、`report_ok=true`；15 份执行 receipt 均核验，1259 个关联文件的 SHA-256／大小一致，artifact_errors、comparison_errors、gaps、unreviewed、infrastructure_errors 均为空。最终结论见 `verification-result.json`、`local-verified-ci-summary.json` 和 `hosted-summary/ci-summary.json`；前轮 86/88 与所有本机失败原件继续保留，不混入本轮通过证据。
+
+产品指纹 `931ed079924ed4d5770e3c349d10150b4e216551daf2388e1c0e4a960721de2e`；runner `270df842b8092ebe990a3576302caf1e2c1708d8241d2c38d384b067686c7f4b`。匹配 hosted QA 二进制 SHA-256：Linux `bbb7a4657ab5fa742bc0331355ea17ac6a4f70959f7037ddd2933e54dd1ddf0f`，Windows `f21d7d3bc6b105a84fb1921b01aedadbdcb5d351bed2f6c0ce9d489496c8d3a8`，macOS `c886498639e1734b50d3f383a4e339a3fbf53ad3e2a796c54aab78acc78cbc42`。本机 8787 保持运行此前独立编译并验证的同源码 release；不把 hosted hash 与本机 hash 混为一份产物。
+
+自动化统一验收已收口；本机 WebKit screenshot transport 的环境问题仍未修复，真实 Android 软键盘／IME／相机／PWA、用户 SLB 登录与真实飞书仍未验证，不能由 hosted 或回环模拟网关结果推定通过。
 
 ## 部署约束与手工验收
 
