@@ -24,7 +24,7 @@ steps:
 - assert_text: {selector: '[data-testid="mobile-settings-status"]', contains: Running}
 - fill: {selector: '[data-testid="mobile-settings-endpoint"]', value: 'https://pc.example.com'}
 - click: '[data-testid="mobile-settings-pair"]'
-- wait_for: '[data-testid="mobile-settings-code"]'
+- wait_for: '[data-testid="mobile-settings-qr"]'
 - assert_attribute: {selector: '[data-testid="mobile-settings-qr"]', name: aria-label, equals: Phone pairing QR code}
 - fill: {selector: '[data-testid="feishu-app-id"]', value: cli_language_draft}
 - fill: {selector: '[data-testid="feishu-app-secret"]', value: qa-unsaved-language-secret}

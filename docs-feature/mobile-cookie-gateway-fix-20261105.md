@@ -57,7 +57,9 @@
 - 与本功能直接相关的 retained native **7/7 passed、0 failed／0 skipped、exit 0、稳定来源、receipt valid**：`qa-ui-auto-report/mobile-cookie-native-retained/run-20261106-003641-949732233/`。包含 TC-MOBILE-002／003／004／005／007／008／010，真实 listener／PTY、无 Display headless、飞书设置存储边界（非真实飞书）、委托打开／一次性连接认证／实际 OpenSSH 子进程取消、设置多语言均执行。
 - **2026-11-06 本机 8787 已部署并独立复验通过**。运行备份的匹配 release、独立 QA profile `qa-ui-auto-report/mobile-cookie-android-manual-20261105/`，监听仅 `127.0.0.1:8787`。准确公网 Host health=200、未持 Bearer 的业务 API=401、不批准 Host=403。部署中的 index／JS／CSS／版本化 SW 字节哈希均与当前 production bundle 相同；不是旧二进制加 assets override。证据 `deployment-verification.json` 只记录文件路径与哈希，不含配对码。
 - 在实际 **8787 新内嵌 bundle** 上，带 cookie 鉴权回环网关的连贯 probe **8/8 检查通过、page_errors=[]、assets_override=false**：`qa-ui-auto-report/mobile-cookie-embedded-real-e2e-20261105/`，含真实 PTY 执行独立磁盘 marker、Cookie 过期重新登录、无效响应不导航／不白屏、跨源 Cookie 隔离。手机页面和终端截图已打开检查；不将模拟网关等同用户真实 SLB 登录或 Android 硬件证据。
-- 手工验收环境已可用，不代表全部开发验收完成：本机 native screenshot failures 与 GitHub [42061539325](https://github.com/engcapa/taomni/actions/runs/42061539325) 最终 88 项原始报告／独立聚合仍待收口；真实 Android、SLB 公网登录与真实飞书仍分别由用户协作验证。
+- Hosted `42061539325` 已结束，独立下载全部原始报告并重新聚合：**86 passed／2 failed／0 skipped（88 项）**，不是通过。15 份 receipt 与 1261 个关联文件的大小／SHA-256 核验一致、artifact_errors／comparison_errors 为空；证据 `qa-ui-auto-report/hosted-evidence-qo1gz0s9/verification-result.json`。三平台 browser 各 **15/15**；Linux native **16/17**、Windows native **13/13**、macOS native **12/13**。完整 hosted crash tag **57/57**、0 failed／0 skipped；TC-MOBILE-012／013 六个平台模式组合全过，含三平台真实 native gateway／PTY。
+- 两个失败都为 TC-MOBILE-010 的第一项 QR aria-label：用例等待配对 code 元素后立即读取尚未完成动态 import 的 QR，native `assert_attribute` 没有 Playwright 式等待。失败后采集的 Linux／macOS HTML 已有正确英文 QR 标签、无设置错误；不凭事后截图把失败记通过。把原 step13 的 `wait_for(code)` 改为 `wait_for(qr)`，仍检查同一英文／中文精确 aria-label、草稿保留与真实启停，无固定 sleep、无放宽期望、不改产品或重建 binary。更正后的本机 browser／native 各 **1/1**、0 skipped、稳定来源、exit 0／receipt valid，证据 `mobile-settings-qr-browser/`、`mobile-settings-qr-native/`。
+- 手工验收环境持续可用，不代表全部开发验收完成：本机 native screenshot failures 保留，统一 88 项须在 QR 用例修正后重新执行；真实 Android、SLB 公网登录与真实飞书仍分别由用户协作验证。
 
 ## 部署约束与手工验收
 
