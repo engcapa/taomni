@@ -1,0 +1,113 @@
+# #778 — Ubuntu/X11 终端字形损坏
+
+## 报告与边界
+
+- issue: https://github.com/engcapa/taomni/issues/778
+- Ubuntu 24.04.4 LTS/X11，Taomni 0.5.3；首次报告，无可靠手动触发步骤。
+- 截图中应用顶部标签与工具栏正常，终端内部分中英文显示字形碎片；复制文本正确。
+  切换屏幕未恢复，锁屏重新登录后恢复。
+- 用户补充：Windows 11 曾在长时运行后出现同类现象，已有 WebGL 开关及
+  context-loss 回退。Ubuntu 此前未报告。
+- 以上定位到 terminal rendering 故障类，但不证明用户 GPU/驱动的具体根因。
+  不把浏览器/托管软件 GPU 的通过声称为复现了原物理设备的间歇故障。
+
+## 代码核对
+
+0.5.3 与调查基线 `604894bea` 都默认 `webglRenderer: true`，只有 macOS native
+通过 `shouldUseTerminalWebgl` 禁用 WebGL。原设置组件却只在 Windows 显示开关。
+已有 context-loss handler 正确地只释放 addon 并刷新终端；图集错误但 context
+仍存活时不会触发它。普通 fit/refresh 不是字形图集重建。
+
+当前稳定 npm 包仍为 `@xterm/addon-webgl@0.19.0`，配 `@xterm/xterm@6.0.0`。
+该版本包含以下相关问题，保留匹配版本而非换用未发布 beta：
+
+1. `clearTexture()` 清空共享 glyph/cache/pages 后未通知其他 renderer 重建 model。
+   其他终端的缓冲不变，但旧 UV/texture-page 坐标指向新 glyph，产生错字/碎片。
+   上游 [#6014](https://github.com/xtermjs/xterm.js/issues/6014)、
+   [#6055](https://github.com/xtermjs/xterm.js/pull/6055)。
+2. 后续上游用 renderer 独立比较单调 `pageLayoutVersion`，替代共享失效 flag：
+   [#6038](https://github.com/xtermjs/xterm.js/issues/6038)、
+   [#6042](https://github.com/xtermjs/xterm.js/pull/6042)。注意 **0.19.0** 的
+   `_requestClearModel` 没有 reset；不能照搬新版的“consume-once”描述为本版
+   已证实行为。clear 漏通知在本版独立存在；merge 路径需要同时保留回归。
+3. 每次 atlas 上传调用 `generateMipmap`；Linux 部分 GPU 堆栈出现损坏，上游改为
+   无 mipmap 的 LINEAR min/mag filters：
+   [#5986](https://github.com/xtermjs/xterm.js/issues/5986)、
+   [#5987](https://github.com/xtermjs/xterm.js/pull/5987)。硬件触发未在本机确认。
+
+## 修复范围
+
+- 使用 pnpm pinned patch 回补上述三个上游修复的相关小范围源码变更；同步发布包
+  的 ESM/CJS runtime 文件（只改 src 不会影响 Vite 选中的 lib）。不升级 xterm core，
+  不修改默认值或用户已持久化选择。
+- atlas clear、page merge、overflow page layout 变化增加 version；各 renderer
+  自行记录已见版本，换 atlas 后重新建立 model。没有逐输出 IPC/定时清缓存。
+- 取消 glyph atlas mipmap，显式使用 LINEAR min/mag；不关闭全应用 GPU/compositing。
+- 将既有 WebGL profile 开关开放给 Linux，保留 Windows 和 macOS 原策略。
+  “右键终端 → Change settings → Use WebGL renderer”可即时关闭；需要后续新终端
+  继承时使用已有 Save as default。会话 profile 的既有持久化语义不变。
+- 不 remount TerminalPanel、不 reset/clear 缓冲、不杀进程、不重连 SSH，不将
+  正常终端送入 WebView renderer-crash recovery。
+
+## 测试设计与证据
+
+用户要求全部 browser/native 用例通过 `.github/workflows/qa-ui-auto-platforms.yml`
+在 GitHub 执行，不在本地执行。静态 TypeScript、catalog、boundary 和单元测试
+与 browser/native 运行证据分开记录。
+
+### V1 — 真实像素复现 `TC-TERM-RENDER-001`
+
+三个同字体/主题/DPR 的真实 xterm 共享一个 atlas。进入 alternate screen，两个
+终端保持 ASCII/CJK/框线 header；第三个清空并重填图集。只刷新受影响终端最后
+一行，避免全 viewport refresh 掩盖旧顶行顶点。独立裁剪前后 screenshot，比较
+4×4 block channel diff ≤14（上游同类 pixel oracle 阈值），同时要求 header 文本、
+几何、Terminal 对象、backend session IDs 不变。再限制测试用新 page 尺寸，填入
+带颜色 glyph 触发实际 merge，并要求 ≥4 page-removal 事件。
+
+调试对象只在 dev/QA 全文观察编译分支注册；production branch 不可达且由打包
+消除。fixture 不向 PTY 输入，cleanup 恢复 atlas 参数与 alternate screen。
+保存原图、期望/实际/差分和 `terminal-rendering.json`，失败记录不覆盖。
+
+- 修复前源码：`69704e664`，尚未使用任何 addon patch。
+- GitHub baseline run：https://github.com/engcapa/taomni/actions/runs/42135031972
+- browser 原始报告：`run-20261106-001617-921328339/TC-TERM-RENDER-001/terminal-rendering.json`。
+  clear 后两份 header 的 `maxBlockChannelDifference` 分别 114、111（阈值14），
+  文本仍为 `REF-0123456789 中文字形 ┌─┐`，`shared`/`sameTerms` 均 true，
+  几何不变；merge 实际发生23次 page removal 后两份差异均为0。保留失败 PNG/receipt。
+  这是受控 library failure 的成功复现；browser local shell 不可用，`sessions: []`，
+  **不能从该 browser 结果声称已验证真实 PTY/SSH 连续性**。
+- native 基线仍在构建；完整 workflow 尚未结束。entry job 的绿色只表示完成了
+  receipt 交付，原始 `runner_exit_code:1` / `case_result_exit_code:1` 与失败用例才是
+  执行结果，最终 summarize 才汇总实际 pass/fail。
+
+### V2 — Linux/Windows 活会话开关 `TC-TERM-RENDER-002`
+
+真实 disposable POSIX SSH shell 记录 `$$` 和未导出的 shell-local marker，打印
+独立 BEFORE 输出行。由当前终端设置关闭 WebGL，检查 addon 释放、原历史仍在；
+只有原 shell PID+变量一致才能打印独立 STABLE 结果行。重开设置仍显示关闭，
+显式重新开启 WebGL后再检查 addon 安装、原 shell/历史与后续输入。browser 使用
+真实 SSH bridge，不将 stub 证据替代 native IPC/WebView。
+
+- 状态：待 GitHub 执行。
+
+### V3 — 保留行为
+
+- 既有 complete `crash-regression` browser/native 集合（workflow 自动合并），native
+  使用匹配 QA release binary。
+- `TC-110` split、`TC-150` current settings、`TC-TERM-TEXT-004` alternate buffer、
+  `TC-154`/`TC-155` 复制与字形选区；按受影响平台安排。
+- focused unit：TerminalAppearanceSettings Linux/Windows/macOS 分支与既有 terminal
+  context-loss/dispose contracts。对 patch 的源码及 ESM/CJS 包行为另设 contracts。
+
+### 剩余物理设备验收
+
+原 Ubuntu 24.04/X11 设备和曾出问题的 Windows 11 设备各记录 GPU/驱动、WebView、
+显示协议、缩放、运行时长与开关状态。长时 TUI/CJK/颜色输出、多 tab 与锁屏/唤醒
+后检查真实截图和复制内容。未完成前明确标为 unverified；不能保证驱动问题已消失，
+也不能从短时软件 GPU 样本宣称零性能退化。
+
+## 源码边界
+
+手写 renderer seam/probe 按生命周期/JS fixture/host pixel oracle 分离。pnpm patch
+包含发布包压缩生成的 bundle，因此单行较长；不将依赖 bundle 拷进产品源模块。
+上游发布含等价修复的稳定兼容版本后，应移除本地 backport 并保留像素回归。

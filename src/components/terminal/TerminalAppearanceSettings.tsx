@@ -58,7 +58,7 @@ function TerminalAppearanceSettingsContent({
   const t = useT();
   const cursorOptions = useMemo(() => buildCursorOptions(t), [t]);
   const rightClickOptions = useMemo(() => buildRightClickOptions(t), [t]);
-  const isWindows = getAppPlatform() === "windows";
+  const supportsWebglRenderer = getAppPlatform() !== "macos";
   const primaryFont = useMemo(() => getPrimaryFontName(profile.fontFamily), [profile.fontFamily]);
   const fontOptions = useTerminalFontOptions(
     [...(fontState.fonts.length > 0 ? fontState.fonts : SAFE_TERMINAL_FONT_FALLBACKS), primaryFont],
@@ -374,8 +374,9 @@ function TerminalAppearanceSettingsContent({
               checked={profile.showScrollbar}
               onChange={(checked) => updateProfile({ showScrollbar: checked })}
             />
-            {isWindows && (
+            {supportsWebglRenderer && (
               <CheckControl
+                testId="terminal-webgl-renderer-toggle"
                 label={t("terminalAppearance.webglRenderer")}
                 checked={profile.webglRenderer}
                 onChange={(checked) => updateProfile({ webglRenderer: checked })}
