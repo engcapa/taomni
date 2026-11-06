@@ -47,7 +47,7 @@ verification:
     - step: 8
       expectation: Native mobile listener is running.
     - step: 10
-      expectation: All three cancellation paths kill the real probe and preserve broker terminal counts after release of a late successful probe.
+      expectation: Settings explicitly refreshes and renders the exact paired device count before revocation, observes every removal, and all three cancellation paths kill the real probe and preserve broker terminal counts after release of a late successful probe.
     - step: 11
       expectation: Original process receipt passed, with no PTY launch events.
     - step: 12

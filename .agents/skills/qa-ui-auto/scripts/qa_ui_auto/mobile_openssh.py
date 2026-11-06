@@ -3,10 +3,29 @@ import json
 import os
 from pathlib import Path
 import time
-from .mobile_native import pair, code, text, ORIGIN
+from .mobile_native import pair, code, text, ORIGIN, disable_service
 from .mobile_wire import http
 from .mobile_open_session import require
 from .terminal_burst_probe import until
+
+
+def refresh_devices(ctx, count):
+    # Pairing occurs through external HTTP, while Settings is poll-driven.
+    # Observe the public list after an explicit refresh rather than racing the
+    # 3s timer or treating an empty stale DOM as successful revocation cleanup.
+    ctx.session.focus('[data-testid="mobile-settings-refresh"]')
+    ctx.session.press_combo('Enter')
+    until(ctx.session, 'document.querySelectorAll(\'[data-testid="mobile-settings-revoke"]\').length === '
+          + str(count) + ' && !document.querySelector(\'[data-testid="mobile-settings-refresh"]\')?.disabled')
+
+
+def revoke_devices(ctx, count):
+    for remaining in range(count, 0, -1):
+        until(ctx.session, 'document.querySelectorAll(\'[data-testid="mobile-settings-revoke"]\').length === '
+              + str(remaining) + ' && !document.querySelector(\'[data-testid="mobile-settings-revoke"]\')?.disabled')
+        ctx.session.focus('[data-testid="mobile-settings-revoke"]')
+        ctx.session.press_combo('Enter')
+        until(ctx.session, 'document.querySelectorAll(\'[data-testid="mobile-settings-revoke"]\').length === ' + str(remaining - 1))
 
 
 def run(ctx, endpoint):
@@ -35,10 +54,10 @@ def run(ctx, endpoint):
             if reason == 'cancel':
                 require(http(endpoint, '/open-requests/' + opened['request_id'] + '/cancel', token, {}, ORIGIN)[0] == 200, 'cancel rejected')
             elif reason == 'revoke':
-                ctx.session.click('[data-testid="mobile-settings-revoke"]')
+                refresh_devices(ctx, 1)
+                revoke_devices(ctx, 1)
             else:
-                ctx.session.click('[data-testid="mobile-settings-toggle"]')
-                until(ctx.session, 'document.querySelector(\'[data-testid="mobile-settings-status"]\')?.textContent.includes("Disabled")')
+                disable_service(ctx)
             def dead():
                 try: os.kill(process['pid'], 0)
                 except ProcessLookupError: return True
@@ -59,8 +78,8 @@ def run(ctx, endpoint):
             after = http(endpoint, '/sessions', observer, origin=ORIGIN)[2]['sessions']
             require(len(after) == len(before), 'cancelled OpenSSH terminal registered in native broker')
             # Remove devices through settings, keeping the next revoke unambiguous.
-            while ctx.session.count('[data-testid="mobile-settings-revoke"]'):
-                ctx.session.click('[data-testid="mobile-settings-revoke"]')
+            refresh_devices(ctx, 1 if reason == 'revoke' else 2)
+            revoke_devices(ctx, 1 if reason == 'revoke' else 2)
             receipt['checks'].append(reason + '-kills-probe-no-late-pty-or-broker-registration')
         receipt['passed'] = True
         return ', '.join(receipt['checks'])

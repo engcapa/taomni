@@ -143,14 +143,15 @@ describe("TerminalAppearanceSettings", () => {
     }));
   });
 
-  it("hides the WebGL renderer setting outside Windows", () => {
+  it("hides the WebGL renderer setting on macOS, whose native renderer is always stable", () => {
+    runtimeMocks.getAppPlatform.mockReturnValue("macos");
     renderAppearance();
 
     expect(screen.queryByRole("checkbox", { name: "Use WebGL renderer" })).not.toBeInTheDocument();
   });
 
-  it("updates the Windows WebGL renderer setting", async () => {
-    runtimeMocks.getAppPlatform.mockReturnValue("windows");
+  it.each(["linux", "windows"])("updates the %s WebGL renderer setting", async (platform) => {
+    runtimeMocks.getAppPlatform.mockReturnValue(platform);
     const user = userEvent.setup();
     const { onProfileChange } = renderAppearance();
 

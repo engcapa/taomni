@@ -118,7 +118,10 @@ export const MailHtmlReader = forwardRef<MailHtmlReaderHandle, MailHtmlReaderPro
           body.scrollHeight, body.offsetHeight,
           root.scrollHeight, root.offsetHeight, 120,
         ));
-        setFrameHeight((prev) => (Math.abs(prev - height) > 1 ? height : prev));
+        // Publish every difference. A 1px lag is not cosmetic: the frame would
+        // keep 1px of scrollable overflow, and Chromium's middle-click
+        // autoscroll would then scroll the frame instead of the reading pane.
+        setFrameHeight((prev) => (prev === height ? prev : height));
       };
       const schedule = () => {
         if (!disposed && frame === undefined) frame = view.requestAnimationFrame(measure);
@@ -146,6 +149,10 @@ export const MailHtmlReader = forwardRef<MailHtmlReaderHandle, MailHtmlReaderPro
         img.addEventListener("load", schedule, { once: true });
         img.addEventListener("error", schedule, { once: true });
       }
+      // Font metric settling changes wrapped height without a DOM mutation or a
+      // body resize, so it needs its own one-shot re-measure. schedule() is a
+      // no-op once this document owner is released.
+      if (doc.fonts?.ready) void doc.fonts.ready.then(schedule, () => {});
       const timers = [view.setTimeout(schedule, 50), view.setTimeout(schedule, 250)];
       schedule();
       releaseDocument = () => {

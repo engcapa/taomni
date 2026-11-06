@@ -86,6 +86,7 @@ from . import mfa          # noqa: E402,F401
 from . import language_startup  # noqa: E402,F401
 from . import file_open  # noqa: E402,F401
 from . import mobile_browser  # noqa: E402,F401
+from . import terminal_rendering  # noqa: E402,F401
 
 from ..window_context import browser_switch
 verb("switch_window")(browser_switch)

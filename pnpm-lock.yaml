@@ -8,6 +8,9 @@ patchedDependencies:
   '@codemirror/view@6.43.11':
     hash: 53e41a9caff1f19d2227bc1eebfb8c8af923e62a4986cc5d5b58c737721d6fb7
     path: patches/@codemirror__view@6.43.11.patch
+  '@xterm/addon-webgl@0.19.0':
+    hash: f768c6600806f5251d2978cb719f4df218c680407baf5a6b605fe737f4ddb212
+    path: patches/@xterm__addon-webgl@0.19.0.patch
   react-resizable-panels@4.12.4:
     hash: 664507cc555c742e48b1d623bcc705c19964ce13ccea02998b12ae10104df8fe
     path: patches/react-resizable-panels@4.12.4.patch
@@ -129,7 +132,7 @@ importers:
         version: 0.12.0
       '@xterm/addon-webgl':
         specifier: ^0.19.0
-        version: 0.19.0
+        version: 0.19.0(patch_hash=f768c6600806f5251d2978cb719f4df218c680407baf5a6b605fe737f4ddb212)
       '@xterm/xterm':
         specifier: ^6.0.0
         version: 6.0.0
@@ -2943,7 +2946,7 @@ snapshots:
 
   '@xterm/addon-web-links@0.12.0': {}
 
-  '@xterm/addon-webgl@0.19.0': {}
+  '@xterm/addon-webgl@0.19.0(patch_hash=f768c6600806f5251d2978cb719f4df218c680407baf5a6b605fe737f4ddb212)': {}
 
   '@xterm/headless@6.0.0': {}
 

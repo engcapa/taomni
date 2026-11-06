@@ -253,9 +253,14 @@ steps:
 - open: ${fixture.mobile_endpoint}/#/session/thread%3Aqa-task
 - wait_for: '[data-testid="mobile-agent-input"]'
 - click: '[data-testid="mobile-agent-continue"]'
+- eval_readonly:
+    expression: document.querySelector('textarea').value === '继续' && !document.querySelector('button.primary').disabled
+    expect_truthy: true
+    timeout_sec: 10
 - press:
     selector: '[data-testid="mobile-agent-input"]'
     key: Control+Enter
+    macos_key: Meta+Enter
 - assert_file_contains:
     path: ${fixture.mobile_receipt}
     contains: AGENT 继续
@@ -277,8 +282,7 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Phone layout pairs and persists two endpoints, controls a WS terminal and routes Agent prompts separately; file and
-      diff remain read-only. The terminal box stays bounded to part of the phone viewport and does not grow from its own fit result.
+    requirement: Phone layout pairs and persists two endpoints, controls a WS terminal and routes Agent prompts separately; file and diff remain read-only. The terminal box stays bounded to part of the phone viewport and does not grow from its own fit result.
     actions:
     - 2
     - 4
@@ -364,8 +368,12 @@ verification:
       expectation: Terminal box is 200px..55% of the phone viewport and has no internal overflow.
     - step: 72
       expectation: Terminal box stays bounded and the key bar remains inside the document after 1.5s (no fit feedback growth).
-    - step: 142
+    - step: 143
       expectation: No runtime errors occurred.
+    - step: 129
+      expectation: Continue fills the instruction and the task status has settled so Send is enabled before Ctrl+Enter (Cmd+Enter on macOS).
+    - step: 131
+      expectation: Independent service receipt contains AGENT 继续 after the single shortcut submission.
     results:
     - 10
     - 11
@@ -389,11 +397,11 @@ verification:
     - 66
     - 70
     - 72
-    - 142
+    - 143
+    - 129
+    - 131
   - id: R2
-    requirement: The phone terminal sends left/right arrows, a sticky Ctrl modifier and strip combos as PTY input, sends a typed command
-      line with Enter from a native field, fills the visual viewport in full screen with the key bar inside it, steps the font size,
-      and opens a saved session and a new local terminal through the instance before attaching to them.
+    requirement: The phone terminal sends left/right arrows, a sticky Ctrl modifier and strip combos as PTY input, sends a typed command line with Enter from a native field, fills the visual viewport in full screen with the key bar inside it, steps the font size, and opens a saved session and a new local terminal through the instance before attaching to them.
     actions:
     - 74
     - 76
@@ -446,8 +454,7 @@ verification:
     - 104
     - 107
   - id: R3
-    requirement: Phone drags scroll terminal history without moving the page and latest restores its position; native command drafts
-      accept symbol, caret and backspace keys locally before explicit send. Compact portrait and landscape keep actions above the bottom.
+    requirement: Phone drags scroll terminal history without moving the page and latest restores its position; native command drafts accept symbol, caret and backspace keys locally before explicit send. Compact portrait and landscape keep actions above the bottom.
     actions:
     - 109
     - 110
@@ -460,8 +467,7 @@ verification:
     - 122
     checkpoints:
     - step: 108
-      expectation: Standard Touch DOM events move rendered xterm history backwards without moving window.scrollY; latest restores the
-        original row.
+      expectation: Standard Touch DOM events move rendered xterm history backwards without moving window.scrollY; latest restores the original row.
     - step: 112
       expectation: Tapping pipe inserts it at the focused command draft caret rather than sending it to the PTY.
     - step: 115
@@ -480,39 +486,38 @@ verification:
     - 121
     - 123
   - id: R4
-    requirement: Feishu-style deep links open the requested task, quick continue plus Ctrl+Enter sends only to the Agent channel, parent
-      navigation remains usable on a direct link, and first-time pairing preserves the requested task.
+    requirement: Feishu-style deep links open the requested task, quick continue plus Ctrl+Enter sends only to the Agent channel, parent navigation remains usable on a direct link, and first-time pairing preserves the requested task.
     actions:
     - 126
     - 128
-    - 129
-    - 131
-    - 132
-    - 134
-    - 136
-    - 138
-    - 139
-    - 140
-    checkpoints:
-    - step: 127
-      expectation: The session deep link immediately opens the Agent composer using the paired instance.
-    - step: 130
-      expectation: The quick continue prompt sent with Ctrl+Enter appears in the independent Agent receipt.
-    - step: 133
-      expectation: Returning from a directly loaded task reaches the session list, not the root or a different instance.
-    - step: 135
-      expectation: The next parent navigation reaches the instance list.
-    - step: 137
-      expectation: The separate localhost origin has no credentials yet and asks for pairing.
-    - step: 141
-      expectation: Pairing from a deep link resumes directly into that Agent task instead of losing its id.
-    results:
-    - 127
     - 130
+    - 132
     - 133
     - 135
     - 137
+    - 139
+    - 140
     - 141
+    checkpoints:
+    - step: 127
+      expectation: The session deep link immediately opens the Agent composer using the paired instance.
+    - step: 131
+      expectation: The quick continue prompt sent with Ctrl+Enter appears in the independent Agent receipt.
+    - step: 134
+      expectation: Returning from a directly loaded task reaches the session list, not the root or a different instance.
+    - step: 136
+      expectation: The next parent navigation reaches the instance list.
+    - step: 138
+      expectation: The separate localhost origin has no credentials yet and asks for pairing.
+    - step: 142
+      expectation: Pairing from a deep link resumes directly into that Agent task instead of losing its id.
+    results:
+    - 127
+    - 131
+    - 134
+    - 136
+    - 138
+    - 142
   visual:
   - check: Phone viewport has no horizontal page overflow.
     method: automated

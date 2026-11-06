@@ -77,7 +77,7 @@ verification:
     - step: 12
       expectation: '[data-testid="mobile-settings-status"] shows Running.'
     - step: 15
-      expectation: Real native desktop network, lifecycle and security oracle passes all assertions.
+      expectation: Real native desktop network, lifecycle and security oracle passes all assertions; after revocation, focus and native Enter activate Disable exactly once, and the actual listener must stop.
     - step: 16
       expectation: '[data-testid="mobile-settings-status"] shows Disabled.'
     - step: 17
