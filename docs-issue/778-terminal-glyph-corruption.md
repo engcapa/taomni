@@ -107,8 +107,9 @@
   `quick_connect`/`auth`，Linux/Windows native 被 planner 记为 not-applicable，**不能
   作为 native 开关已测**。`dd6abda33` 改为共享 fill/click/wait UI 步骤、重映射
   checkpoints；静态检查确认两端 native_support 为 None。通过同一 workflow 补跑
-  https://github.com/engcapa/taomni/actions/runs/42141625169 ，browser/native 全部执行，
-  并保留自动 crash-regression；产品与二进制输入不变。
+  https://github.com/engcapa/taomni/actions/runs/42141625169 ，hosted selection 已确认
+  开关用例纳入 Linux/Windows×browser/native 四种组合，并保留自动 crash-regression；
+  产品与二进制输入不变。实际执行/取消状态见下。
 - `42137876791` 的 Linux native `run-20261106-011509-454753933`：V1 clear/merge
   四组 pixel 差异全部0；三个真实 backend session IDs、对象、缓冲与几何保持不变。
   原始 summary/pixel hash 与 receipt 核对一致，exitCode=0。与修复前 native
@@ -122,15 +123,33 @@
   `native app document did not become ready within 20.0s: document root is not mounted`。
   desktop screenshot 未见应用界面，日志为空，根因未定；同 shard 随后用同一二进制
   完成 V1、WS039/053。最终 aggregate `passed:false`，不是可忽略的绿色运行。
-- 保持产品、20秒超时和用例断言不变，在 `cc1e8095a` 以 workflow 定向复核 Windows
-  `TC-150,TC-TERM-RENDER-002` 加 crash-regression：
-  https://github.com/engcapa/taomni/actions/runs/42144872829 。
-  该源码与主/补充验证的产品/patch/构建输入一致，只有测试/证据增量。
+- 保持产品、20秒超时和用例断言不变，定向复核 Windows `TC-150,TC-TERM-RENDER-002`
+  加 crash-regression。第一次 `42144872829` 仅指定 native，因强制 tag 包含两个
+  browser-only case 而在 plan 阶段被拒绝，**没有执行任何产品用例**。
+  修正为 browser/native 后以 `08e555019` 执行：
+  https://github.com/engcapa/taomni/actions/runs/42145253666 。
+  **最终 workflow success，aggregate passed/report_ok=true，failures及infrastructure_errors均空；
+  Windows browser10/10、native11/11全部通过、无skip。**
+  其中 `TC-150` 原生复核 `run-20261106-020230-553323500` 通过（原冷启动失败仍保留，
+  根因未定，不能据一次复核宣称修好了Windows启动）；V2 `run-20261106-020401-194451800`
+  通过，真实 SSH 原shell PID/变量/历史与后续输入保留；summary hash/receipt核对一致。
+  `08e555019` 与主/补充验证的产品/patch/构建输入一致，只有测试/证据增量。
 - 补充运行 `42141625169`：Linux browser9/9、Windows browser9/9、Linux native10/10
   全通过、无skip。Linux native `run-20261106-012642-363771203` 的 V2 原始
   summary hash/receipt exitCode=0 已核对，真实 SSH 原shell PID/变量/历史与后续输入
-  均保留。Windows native 仍在进行。
+  均保留。Windows重复执行在上述复核全绿后主动取消，不把cancelled写成pass。
 - 首个候选 run `42137113187` 因用例平台/POSIX fixture 声明修正主动取消，不作为证据。
+
+### 最终覆盖结论（2026-11-06）
+
+- 受控同类 glyph 故障在 Linux browser/native 修复前均复现；修复后 Linux/Windows
+  browser/native 的 V1 像素差异全部0，真实native会话身份保持。
+- V2最终共享UI步骤在Linux/Windows browser/native各自实际通过。
+- crash-regression完整集合三平台 browser/native均有同产品输入的实际通过证据；
+  macOS保持默认稳定renderer。主运行并非全绿，Windows补充复核全绿，两者都保留。
+- 最终证据更新只修改本文件，不改变上述产品、用例或构建输入。
+- 原Ubuntu物理GPU间歇触发、Windows11物理设备长时运行仍按下节标unverified；
+  hosted Windows为Windows2025 runner，不冒充Windows11硬件验收。
 
 ### V3 — 保留行为
 
