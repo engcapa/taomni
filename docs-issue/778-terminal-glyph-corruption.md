@@ -23,6 +23,8 @@
 
 1. `clearTexture()` 清空共享 glyph/cache/pages 后未通知其他 renderer 重建 model。
    其他终端的缓冲不变，但旧 UV/texture-page 坐标指向新 glyph，产生错字/碎片。
+   本次是 fixture 显式调用 addon clear 的受控复现；应用目前没有主动 clearAtlas
+   调用，不能把此触发直接归因到原报告的自然长时路径。
    上游 [#6014](https://github.com/xtermjs/xterm.js/issues/6014)、
    [#6055](https://github.com/xtermjs/xterm.js/pull/6055)。
 2. 后续上游用 renderer 独立比较单调 `pageLayoutVersion`，替代共享失效 flag：
@@ -76,9 +78,13 @@
   几何不变；merge 实际发生23次 page removal 后两份差异均为0。保留失败 PNG/receipt。
   这是受控 library failure 的成功复现；browser local shell 不可用，`sessions: []`，
   **不能从该 browser 结果声称已验证真实 PTY/SSH 连续性**。
-- native 基线仍在构建；完整 workflow 尚未结束。entry job 的绿色只表示完成了
-  receipt 交付，原始 `runner_exit_code:1` / `case_result_exit_code:1` 与失败用例才是
-  执行结果，最终 summarize 才汇总实际 pass/fail。
+- Linux native 原始报告：`run-20261106-005150-666502561/TC-TERM-RENDER-001/terminal-rendering.json`。
+  Ubuntu24.04/X11 QA release 的 clear 两份像素差异均144，文字/几何/对象和三个
+  backend session IDs 不变；merge 实际20次 page removal 后差异均0。
+  `summary.json` / pixel report 的 hash 已与原始 receipt 核对；该 shard 原始 exitCode=1。
+  其余9项 native crash-regression 均通过，没有 skip。
+- entry job 的绿色只表示完成了 receipt 交付，原始 `runner_exit_code:1` /
+  `case_result_exit_code:1` 与失败用例才是执行结果，最终 summarize 才汇总实际 pass/fail。
 
 ### V2 — Linux/Windows 活会话开关 `TC-TERM-RENDER-002`
 
@@ -88,7 +94,17 @@
 显式重新开启 WebGL后再检查 addon 安装、原 shell/历史与后续输入。browser 使用
 真实 SSH bridge，不将 stub 证据替代 native IPC/WebView。
 
-- 状态：待 GitHub 执行。
+- 候选源码 `ba3962182`，GitHub run
+  https://github.com/engcapa/taomni/actions/runs/42137876791 ：
+  Linux browser `run-20261106-003939-575332282`、Windows browser
+  `run-20261106-004514-220388900` 中该 case 均通过，分别保留 STABLE/WEBGL 独立
+  输出行与真实 SSH shell 状态。原始 summary hash/receipt exitCode=0 已核对。
+- 同轮 V1：Linux browser `run-20261106-003950-382770900`、Windows browser
+  `run-20261106-004316-455292700` 的 clear/merge 四组 pixel 差异全为0；
+  两平台各14个用例全部通过、0 skip。macOS browser 第一 shard 10/10 通过；
+  renderer-switch case 按实际平台声明不适用于 macOS，不把该排除标成执行 pass。
+- native 修复后及剩余 macOS browser 仍在执行。首个候选 run `42137113187`
+  因用例平台/POSIX fixture 声明修正主动取消，不作为证据。
 
 ### V3 — 保留行为
 
@@ -98,6 +114,13 @@
   `TC-154`/`TC-155` 复制与字形选区；按受影响平台安排。
 - focused unit：TerminalAppearanceSettings Linux/Windows/macOS 分支与既有 terminal
   context-loss/dispose contracts。对 patch 的源码及 ESM/CJS 包行为另设 contracts。
+- 本地支持检查已通过：`pnpm build`（含 tsc/boundary/source-size）、
+  `pnpm check:refactor`、QA catalog gate/development contract；production `dist/assets`
+  搜索确认无 `__TAOMNI_QA_TERMINALS__`/`registerQaTerminalRendering`。
+- 单元：TerminalPanel/Appearance/Viewport 105 passed + 1 existing skipped；
+  profile/registry 9 passed；ESM/CJS backport 6 passed；Python probe/CI selection/build
+  pipeline 28 passed。未在本地运行任何 browser/native 用例。独立只读正确性复核未发现
+  具体问题（不作为运行证据）。
 
 ### 剩余物理设备验收
 
