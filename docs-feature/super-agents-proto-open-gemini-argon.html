@@ -1,0 +1,3349 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-app-theme="dark" data-app-platform="linux">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Taomni Super-Agents — 自主多智能体编排与生产交付工作台 (Prototype · open-gemini-argon)</title>
+  <style>
+    /* ==========================================================================
+       1. Taomni Core Theme Tokens (Synchronized with src/styles/theme.css & platform.css)
+       ========================================================================== */
+    :root {
+      --taomni-color-scheme: light;
+      --taomni-bg: #f8fafc;
+      --taomni-chrome-bg: #e8eef5;
+      --taomni-chrome-border: #cbd5e1;
+      --taomni-panel-bg: #f1f5f9;
+      --taomni-card-bg: #ffffff;
+      --taomni-card-border: #e2e8f0;
+      --taomni-accent: #1e40af;
+      --taomni-accent-soft: #3b82f6;
+      --taomni-text: #0f172a;
+      --taomni-text-muted: #64748b;
+      --taomni-divider: #e2e8f0;
+      --taomni-hover: rgba(15, 23, 42, 0.06);
+      --taomni-selected: #dbeafe;
+      --taomni-selected-border: #93c5fd;
+      --taomni-input-bg: #ffffff;
+      --taomni-input-border: #cbd5e1;
+      --taomni-status-bg: #f1f5f9;
+      --taomni-status-text: #1e293b;
+      --taomni-code-bg: #fbfdff;
+      --taomni-code-gutter-bg: #f4f7fb;
+      --taomni-code-text: #142033;
+      --taomni-code-muted: #475569;
+      --taomni-code-line-number: #64748b;
+      --taomni-code-border: #d9e2ef;
+      --taomni-code-diff-added-bg: rgba(32, 135, 75, 0.14);
+      --taomni-code-diff-deleted-bg: rgba(210, 63, 79, 0.12);
+      --taomni-code-syntax-keyword: #9a3412;
+      --taomni-code-syntax-function: #0369a1;
+      --taomni-code-syntax-type: #0f766e;
+      --taomni-code-syntax-string: #15803d;
+      --taomni-code-syntax-comment: #64748b;
+      --taomni-warning-bg: #fef3c7;
+      --taomni-warning-border: #f59e0b;
+      --taomni-warning-text: #78350f;
+      --taomni-success-bg: #dcfce7;
+      --taomni-success-border: #16a34a;
+      --taomni-success-text: #14532d;
+      --taomni-danger: #dc2626;
+      --taomni-danger-bg: rgba(220, 38, 38, 0.12);
+      --taomni-ui-font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, "Helvetica Neue", sans-serif;
+      --taomni-code-font-family: "JetBrains Mono", "Cascadia Code", "Fira Code", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, Monaco, monospace;
+      --taomni-ui-font-size: 12px;
+      --taomni-shadow-sm: 0 1px 2px rgba(15, 23, 42, 0.05);
+      --taomni-shadow-md: 0 4px 16px -2px rgba(15, 23, 42, 0.08);
+      --taomni-shadow-lg: 0 18px 36px -4px rgba(15, 23, 42, 0.16);
+    }
+
+    html[data-app-theme="dark"] {
+      --taomni-color-scheme: dark;
+      --taomni-bg: #1e1f22;
+      --taomni-panel-bg: #23252a;
+      --taomni-chrome-bg: #16171a;
+      --taomni-chrome-border: #2e3138;
+      --taomni-card-bg: #26282e;
+      --taomni-card-border: #35383f;
+      --taomni-accent: #6aa6f8;
+      --taomni-accent-soft: #8bbcff;
+      --taomni-selected: #25354d;
+      --taomni-selected-border: #4d7ec4;
+      --taomni-hover: rgba(255, 255, 255, 0.06);
+      --taomni-text: #e6eaf0;
+      --taomni-text-muted: #9ca3ad;
+      --taomni-divider: #2e3138;
+      --taomni-input-bg: #191a1c;
+      --taomni-input-border: #35383f;
+      --taomni-status-bg: #191a1c;
+      --taomni-status-text: #c6ccd6;
+      --taomni-code-bg: #1b1c1f;
+      --taomni-code-gutter-bg: #16171a;
+      --taomni-code-text: #d4d8e0;
+      --taomni-code-muted: #8b929d;
+      --taomni-code-line-number: #6f7684;
+      --taomni-code-border: #303238;
+      --taomni-code-diff-added-bg: rgba(46, 160, 67, 0.20);
+      --taomni-code-diff-deleted-bg: rgba(248, 81, 73, 0.18);
+      --taomni-code-syntax-keyword: #cc7832;
+      --taomni-code-syntax-function: #61afef;
+      --taomni-code-syntax-type: #4ec9b0;
+      --taomni-code-syntax-string: #6a9955;
+      --taomni-code-syntax-comment: #7f848e;
+      --taomni-warning-bg: rgba(245, 158, 11, 0.16);
+      --taomni-warning-border: #d97706;
+      --taomni-warning-text: #fde68a;
+      --taomni-success-bg: rgba(34, 197, 94, 0.16);
+      --taomni-success-border: #22c55e;
+      --taomni-success-text: #bbf7d0;
+      --taomni-danger: #f87171;
+      --taomni-danger-bg: rgba(248, 113, 113, 0.15);
+      --taomni-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.28);
+      --taomni-shadow-md: 0 6px 20px -2px rgba(0, 0, 0, 0.42);
+      --taomni-shadow-lg: 0 22px 48px -4px rgba(0, 0, 0, 0.62);
+    }
+
+    /* ==========================================================================
+       2. Base & Orchestration Tokens (Synchronized with src/styles/orchestration.css)
+       ========================================================================== */
+    * { box-sizing: border-box; }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: var(--taomni-ui-font-family);
+      font-size: var(--taomni-ui-font-size);
+      color: var(--taomni-text);
+      background: var(--taomni-chrome-bg);
+      -webkit-font-smoothing: subpixel-antialiased;
+    }
+    button, input, select, textarea { font: inherit; color: inherit; }
+    button { cursor: pointer; }
+    button:disabled { cursor: not-allowed; opacity: 0.48; }
+    :is(button, input, select, textarea):focus-visible {
+      outline: 2px solid var(--taomni-accent);
+      outline-offset: 2px;
+    }
+    svg {
+      width: 15px;
+      height: 15px;
+      flex-shrink: 0;
+      stroke: currentColor;
+      stroke-width: 1.65;
+      fill: none;
+      stroke-linecap: round;
+      stroke-linejoin: round;
+    }
+
+    .orch-root {
+      --orch-bg: var(--taomni-bg);
+      --orch-surface: color-mix(in srgb, var(--orch-bg) 94%, var(--taomni-text));
+      --orch-raised: color-mix(in srgb, var(--orch-bg) 89%, var(--taomni-text));
+      --orch-border: var(--taomni-divider);
+      --orch-text: var(--taomni-text);
+      --orch-muted: var(--taomni-text-muted);
+      --orch-accent: var(--taomni-accent);
+      --orch-selected: color-mix(in srgb, var(--orch-accent) 14%, var(--orch-raised));
+      color: var(--orch-text);
+      line-height: 1.5;
+    }
+
+    /* ==========================================================================
+       3. Taomni Main Window Frame & Left App Rail
+       ========================================================================== */
+    .taomni-window {
+      display: flex;
+      flex-direction: column;
+      width: 100vw;
+      height: 100vh;
+      background: var(--taomni-chrome-bg);
+    }
+    .taomni-workbench-row {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      padding: 4px 6px 4px 0;
+      gap: 0;
+    }
+    .taomni-app-rail {
+      width: 44px;
+      flex-shrink: 0;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 6px 4px;
+      gap: 6px;
+      user-select: none;
+    }
+    .rail-brand {
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      background: var(--taomni-selected);
+      border: 1px solid var(--taomni-selected-border);
+      color: var(--taomni-accent);
+      font-family: Georgia, serif;
+      font-weight: 700;
+      font-size: 15px;
+      display: grid;
+      place-items: center;
+      margin-bottom: 6px;
+    }
+    .rail-btn {
+      position: relative;
+      width: 34px;
+      height: 32px;
+      border: 0;
+      border-radius: 8px;
+      background: transparent;
+      color: var(--taomni-text-muted);
+      display: grid;
+      place-items: center;
+      transition: background 0.15s, color 0.15s;
+    }
+    .rail-btn:hover {
+      background: var(--taomni-hover);
+      color: var(--taomni-text);
+    }
+    .rail-btn.active {
+      background: var(--taomni-selected);
+      color: var(--taomni-accent);
+    }
+    .rail-btn.active::before {
+      content: "";
+      position: absolute;
+      left: -4px;
+      top: 6px;
+      bottom: 6px;
+      width: 3px;
+      border-radius: 0 3px 3px 0;
+      background: var(--taomni-accent);
+    }
+    .rail-badge {
+      position: absolute;
+      top: 3px;
+      right: 3px;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: #f59e0b;
+    }
+    .rail-spacer { flex: 1; }
+
+    /* Main Rounded Canvas Frame */
+    .taomni-canvas-frame {
+      flex: 1;
+      min-width: 0;
+      min-height: 0;
+      border: 1px solid var(--taomni-chrome-border);
+      border-radius: 9px;
+      background: var(--taomni-bg);
+      overflow: hidden;
+      display: flex;
+      box-shadow: var(--taomni-shadow-sm);
+    }
+
+    /* Status Bar */
+    .taomni-statusbar {
+      height: 24px;
+      min-height: 24px;
+      padding: 0 12px;
+      background: var(--taomni-chrome-bg);
+      border-top: 1px solid var(--taomni-chrome-border);
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      font-size: 11px;
+      color: var(--taomni-text-muted);
+      user-select: none;
+    }
+    .status-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .status-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #22c55e;
+    }
+    .status-dot.amber { background: #f59e0b; }
+    .status-dot.blue { background: var(--taomni-accent); }
+
+    /* ==========================================================================
+       4. Left Task & Orchestration Sidebar (.orch-project-sidebar enhanced)
+       ========================================================================== */
+    .orch-project-sidebar {
+      width: 268px;
+      min-width: 268px;
+      background: var(--orch-surface);
+      border-right: 1px solid var(--orch-border);
+      display: flex;
+      flex-direction: column;
+      padding: 12px 10px 0;
+      user-select: none;
+    }
+    .orch-sidebar-title {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin: 0 4px 10px 6px;
+    }
+    .orch-sidebar-title strong {
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: -0.2px;
+    }
+    .router-live-tag {
+      font-size: 9px;
+      padding: 1px 6px;
+      border-radius: 99px;
+      background: var(--taomni-success-bg);
+      color: var(--taomni-success-text);
+      border: 1px solid color-mix(in srgb, var(--taomni-success-border) 45%, transparent);
+      font-weight: 600;
+    }
+    .orch-new-task-button {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid color-mix(in srgb, var(--orch-accent) 45%, var(--orch-border));
+      background: var(--orch-selected);
+      padding: 8px 11px;
+      border-radius: 7px;
+      text-align: left;
+      font-weight: 500;
+      transition: filter 0.15s, background 0.15s;
+    }
+    .orch-new-task-button:hover {
+      filter: brightness(1.08);
+    }
+    .orch-sidebar-search {
+      margin-top: 8px;
+      width: 100%;
+      border: 1px solid var(--orch-border);
+      background: var(--orch-raised);
+      padding: 5px 8px;
+      border-radius: 5px;
+      font-size: 11px;
+    }
+    .orch-sidebar-section {
+      margin: 14px 6px 6px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      font-size: 10px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--orch-muted);
+    }
+    .orch-project-switcher {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      margin: 4px 2px 8px;
+      padding: 5px 8px;
+      border-radius: 6px;
+      background: var(--orch-raised);
+      border: 1px solid var(--orch-border);
+    }
+    .orch-project-switcher select {
+      flex: 1;
+      border: 0;
+      background: transparent;
+      font-weight: 600;
+      font-size: 11px;
+    }
+
+    .orch-task-list {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      overflow-y: auto;
+      min-height: 0;
+      flex: 1;
+      padding-right: 2px;
+    }
+    .orch-task-entry {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      width: 100%;
+      border: 1px solid transparent;
+      background: none;
+      border-radius: 7px;
+      padding: 8px 9px;
+      text-align: left;
+      transition: background 0.12s, border-color 0.12s;
+    }
+    .orch-task-entry:hover {
+      background: var(--orch-raised);
+    }
+    .orch-task-entry.active {
+      background: var(--orch-selected);
+      border-color: color-mix(in srgb, var(--orch-accent) 40%, var(--orch-border));
+    }
+    .task-row-top {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      width: 100%;
+    }
+    .orch-task-dot {
+      display: inline-block;
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--orch-muted);
+      flex-shrink: 0;
+    }
+    .orch-task-dot.green { background: #22c55e; }
+    .orch-task-dot.amber { background: #f59e0b; box-shadow: 0 0 0 3px rgba(245, 158, 11, 0.18); }
+    .orch-task-dot.blue { background: var(--orch-accent); }
+    .orch-task-dot.purple { background: #a855f7; }
+    .orch-task-label {
+      font-size: 11.5px;
+      font-weight: 500;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      flex: 1;
+    }
+    .task-row-meta {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding-left: 14px;
+      font-size: 10px;
+      color: var(--orch-muted);
+    }
+    .task-tpl-tag {
+      padding: 0 5px;
+      border-radius: 3px;
+      background: var(--orch-raised);
+      border: 1px solid var(--orch-border);
+      font-size: 9.5px;
+    }
+    .task-decision-pill {
+      margin-left: auto;
+      padding: 0 5px;
+      border-radius: 3px;
+      background: var(--taomni-warning-bg);
+      color: var(--taomni-warning-text);
+      border: 1px solid color-mix(in srgb, var(--taomni-warning-border) 50%, transparent);
+      font-size: 9.5px;
+      font-weight: 600;
+    }
+    .task-ready-pill {
+      margin-left: auto;
+      padding: 0 5px;
+      border-radius: 3px;
+      background: var(--taomni-success-bg);
+      color: var(--taomni-success-text);
+      font-size: 9.5px;
+      font-weight: 600;
+    }
+
+    /* Durable Lessons & Shared Config Footer */
+    .orch-sidebar-bottom {
+      margin-top: auto;
+      padding-top: 8px;
+      border-top: 1px solid var(--orch-border);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      padding-bottom: 8px;
+    }
+    .orch-shared-config {
+      width: 100%;
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      text-align: left;
+      background: none;
+      border: 1px solid transparent;
+      border-radius: 6px;
+      padding: 7px 8px;
+    }
+    .orch-shared-config:hover {
+      background: var(--orch-raised);
+      border-color: var(--orch-border);
+    }
+    .orch-shared-config strong {
+      font-size: 11.5px;
+      font-weight: 500;
+      display: block;
+    }
+    .orch-shared-config small {
+      font-size: 10px;
+      color: var(--orch-muted);
+      display: block;
+    }
+
+    /* ==========================================================================
+       5. Main Agent Workbench Header & 3-Mode Switcher
+       ========================================================================== */
+    .orch-agent-main {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      background: var(--orch-bg);
+    }
+    .orch-conversation-header {
+      height: 50px;
+      min-height: 50px;
+      padding: 0 14px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      border-bottom: 1px solid var(--orch-border);
+      background: var(--orch-surface);
+    }
+    .header-title-group {
+      display: flex;
+       flex-direction: column;
+      min-width: 0;
+      max-width: 340px;
+    }
+    .header-title-row {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+    }
+    .header-title-row strong {
+      font-size: 13px;
+      font-weight: 600;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+    .header-sub-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 10px;
+      color: var(--orch-muted);
+    }
+    .mono-tag {
+      font-family: var(--taomni-code-font-family);
+      font-size: 10px;
+      padding: 1px 5px;
+      border-radius: 4px;
+      background: var(--orch-raised);
+      border: 1px solid var(--orch-border);
+      color: var(--orch-text);
+    }
+
+    /* 3-Mode Segmented View Switcher */
+    .workbench-mode-tabs {
+      display: inline-flex;
+      align-items: center;
+      background: var(--orch-raised);
+      border: 1px solid var(--orch-border);
+      border-radius: 7px;
+      padding: 2px;
+      gap: 2px;
+      margin: 0 auto;
+    }
+    .mode-tab-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      border: 0;
+      background: transparent;
+      color: var(--orch-muted);
+      padding: 5px 11px;
+      border-radius: 5px;
+      font-size: 11px;
+      font-weight: 500;
+      transition: all 0.15s;
+    }
+    .mode-tab-btn:hover {
+      color: var(--orch-text);
+    }
+    .mode-tab-btn.active {
+      background: var(--orch-bg);
+      color: var(--orch-accent);
+      box-shadow: var(--taomni-shadow-sm);
+    }
+    .mode-count {
+      font-size: 9.5px;
+      padding: 0 5px;
+      border-radius: 99px;
+      background: var(--orch-selected);
+      color: var(--orch-accent);
+    }
+
+    /* Executive Summary Highlight Button */
+    .btn-exec-summary {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 11px;
+      border-radius: 6px;
+      border: 1px solid color-mix(in srgb, var(--orch-accent) 55%, var(--orch-border));
+      background: var(--orch-selected);
+      color: var(--orch-text);
+      font-size: 11px;
+      font-weight: 600;
+      transition: filter 0.15s, transform 0.1s;
+    }
+    .btn-exec-summary:hover {
+      filter: brightness(1.1);
+    }
+    .orch-icon-button {
+      display: inline-grid;
+      place-items: center;
+      padding: 6px;
+      color: var(--orch-muted);
+      background: none;
+      border: 0;
+      border-radius: 5px;
+    }
+    .orch-icon-button:hover {
+      background: var(--orch-raised);
+      color: var(--orch-text);
+    }
+    .orch-solid {
+      border: 1px solid color-mix(in srgb, var(--orch-accent) 65%, var(--orch-bg));
+      background: color-mix(in srgb, var(--orch-accent) 82%, #1d4ed8);
+      color: #ffffff;
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 11.5px;
+      font-weight: 500;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .orch-solid:hover { filter: brightness(1.08); }
+    .orch-outline {
+      border: 1px solid var(--orch-border);
+      background: var(--orch-raised);
+      color: var(--orch-text);
+      border-radius: 6px;
+      padding: 6px 11px;
+      font-size: 11.5px;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .orch-outline:hover { background: var(--orch-selected); }
+    .orch-subtle-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      color: var(--orch-muted);
+      background: var(--orch-raised);
+      border: 1px solid var(--orch-border);
+      border-radius: 4px;
+      padding: 1px 6px;
+      font-size: 10px;
+    }
+
+    /* ==========================================================================
+       6. Ambient Stage Progress Bar (Low-Noise Stage Perception)
+       ========================================================================== */
+    .stage-pipeline-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 8px 16px;
+      background: color-mix(in srgb, var(--orch-surface) 75%, var(--orch-bg));
+      border-bottom: 1px solid var(--orch-border);
+      overflow-x: auto;
+      flex-shrink: 0;
+    }
+    .stage-node {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 4px 9px;
+      border-radius: 6px;
+      font-size: 11px;
+      background: var(--orch-raised);
+      border: 1px solid var(--orch-border);
+      color: var(--orch-muted);
+      white-space: nowrap;
+    }
+    .stage-node.done {
+      border-color: color-mix(in srgb, #22c55e 40%, var(--orch-border));
+      color: var(--orch-text);
+    }
+    .stage-node.done .stage-num {
+      background: #22c55e;
+      color: #052e16;
+    }
+    .stage-node.active {
+      background: var(--orch-selected);
+      border-color: var(--orch-accent);
+      color: var(--orch-text);
+      font-weight: 600;
+    }
+    .stage-node.active .stage-num {
+      background: var(--orch-accent);
+      color: #0f172a;
+    }
+    .stage-node.gate {
+      background: var(--taomni-warning-bg);
+      border-color: var(--taomni-warning-border);
+      color: var(--taomni-warning-text);
+      font-weight: 600;
+    }
+    .stage-num {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      display: grid;
+      place-items: center;
+      font-size: 9.5px;
+      font-weight: 700;
+      background: var(--orch-border);
+      color: var(--orch-muted);
+    }
+    .stage-arrow {
+      color: var(--orch-muted);
+      font-size: 11px;
+      opacity: 0.55;
+    }
+    .noise-filter-pill {
+      margin-left: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 10.5px;
+      color: var(--orch-muted);
+      background: var(--orch-raised);
+      border: 1px solid var(--orch-border);
+      padding: 3px 9px;
+      border-radius: 99px;
+      flex-shrink: 0;
+    }
+
+    /* ==========================================================================
+       7. VIEW 1: Mission & Decision Stream (Low-Noise Signal Cards)
+       ========================================================================== */
+    .workbench-body {
+      flex: 1;
+      min-height: 0;
+      display: flex;
+      overflow: hidden;
+    }
+    .stream-container {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+    }
+    .stream-scroll {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 20px 24px 16px;
+    }
+    .stream-column {
+      max-width: 860px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* Goal & Blueprint Header Card */
+    .goal-card {
+      padding: 13px 16px;
+      background: var(--orch-selected);
+      border: 1px solid color-mix(in srgb, var(--orch-accent) 32%, var(--orch-border));
+      border-radius: 10px;
+    }
+    .goal-card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      margin-bottom: 6px;
+      font-size: 10.5px;
+      color: var(--orch-muted);
+    }
+    .goal-card-body {
+      font-size: 13px;
+      line-height: 1.6;
+      font-weight: 500;
+    }
+    .goal-context-chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 9px;
+    }
+    .context-chip {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 10px;
+      font-family: var(--taomni-code-font-family);
+      padding: 2px 7px;
+      border-radius: 4px;
+      background: var(--orch-bg);
+      border: 1px solid var(--orch-border);
+      color: var(--orch-muted);
+    }
+
+    /* Signal Card Base */
+    .signal-card {
+      border: 1px solid var(--orch-border);
+      border-radius: 10px;
+      background: var(--orch-surface);
+      overflow: hidden;
+      box-shadow: var(--taomni-shadow-sm);
+    }
+    .signal-header {
+      padding: 9px 14px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border-bottom: 1px solid var(--orch-border);
+      background: color-mix(in srgb, var(--orch-raised) 60%, var(--orch-surface));
+      font-size: 11.5px;
+    }
+    .signal-type-tag {
+      font-size: 10px;
+      font-weight: 600;
+      padding: 1px 6px;
+      border-radius: 4px;
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+    }
+    .signal-type-tag.milestone {
+      background: var(--orch-selected);
+      color: var(--orch-accent);
+    }
+    .signal-type-tag.decision {
+      background: var(--taomni-warning-bg);
+      color: var(--taomni-warning-text);
+      border: 1px solid color-mix(in srgb, var(--taomni-warning-border) 50%, transparent);
+    }
+    .signal-type-tag.receipt {
+      background: var(--taomni-success-bg);
+      color: var(--taomni-success-text);
+      border: 1px solid color-mix(in srgb, var(--taomni-success-border) 50%, transparent);
+    }
+    .signal-type-tag.watchdog {
+      background: rgba(168, 85, 247, 0.16);
+      color: #d8b4fe;
+      border: 1px solid rgba(168, 85, 247, 0.35);
+    }
+    .signal-body {
+      padding: 13px 15px;
+      font-size: 12px;
+      line-height: 1.65;
+    }
+
+    /* Subagent Parallel Matrix inside Milestone Card */
+    .subagent-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 8px;
+      margin-top: 10px;
+    }
+    .subagent-box {
+      padding: 8px 10px;
+      border-radius: 7px;
+      background: var(--orch-bg);
+      border: 1px solid var(--orch-border);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .subagent-box-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-size: 11px;
+      font-weight: 600;
+    }
+    .subagent-box small {
+      font-size: 10px;
+      color: var(--orch-muted);
+    }
+
+    /* Decision Request Card Options */
+    .decision-card {
+      border-color: color-mix(in srgb, var(--taomni-warning-border) 65%, var(--orch-border));
+    }
+    .decision-options {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      margin: 10px 0 12px;
+    }
+    .decision-option {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+      padding: 10px 12px;
+      border-radius: 8px;
+      border: 1px solid var(--orch-border);
+      background: var(--orch-bg);
+      cursor: pointer;
+      text-align: left;
+      transition: border-color 0.15s, background 0.15s;
+    }
+    .decision-option:hover {
+      background: var(--orch-raised);
+    }
+    .decision-option.selected {
+      background: var(--orch-selected);
+      border-color: var(--orch-accent);
+    }
+    .decision-radio {
+      width: 15px;
+      height: 15px;
+      border-radius: 50%;
+      border: 2px solid var(--orch-muted);
+      margin-top: 2px;
+      flex-shrink: 0;
+      display: grid;
+      place-items: center;
+    }
+    .decision-option.selected .decision-radio {
+      border-color: var(--orch-accent);
+    }
+    .decision-option.selected .decision-radio::after {
+      content: "";
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--orch-accent);
+    }
+    .decision-opt-content strong {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      margin-bottom: 2px;
+    }
+    .decision-opt-content p {
+      margin: 0;
+      font-size: 11px;
+      color: var(--orch-muted);
+    }
+    .decision-footer {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding-top: 8px;
+      border-top: 1px solid var(--orch-border);
+    }
+    .decision-custom-input {
+      flex: 1;
+      border: 1px solid var(--orch-border);
+      background: var(--orch-bg);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 11px;
+    }
+
+    /* Delivery Receipt Card (ThinkRail + Production Quality Style) */
+    .receipt-stats-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 8px;
+      margin: 10px 0 12px;
+    }
+    .receipt-stat-cell {
+      padding: 8px 10px;
+      border-radius: 7px;
+      background: var(--orch-bg);
+      border: 1px solid var(--orch-border);
+    }
+    .receipt-stat-cell small {
+      display: block;
+      font-size: 10px;
+      color: var(--orch-muted);
+    }
+    .receipt-stat-cell strong {
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .diff-add { color: #4ade80; font-family: var(--taomni-code-font-family); }
+    .diff-del { color: #f87171; font-family: var(--taomni-code-font-family); }
+
+    /* Composer Dock at Bottom of Stream */
+    .orch-composer-dock {
+      width: min(860px, calc(100% - 48px));
+      margin: 8px auto 14px;
+      flex-shrink: 0;
+    }
+    .orch-composer {
+      background: var(--orch-raised);
+      border: 1px solid color-mix(in srgb, var(--orch-border) 70%, var(--orch-muted));
+      border-radius: 12px;
+      box-shadow: var(--taomni-shadow-md);
+      overflow: hidden;
+    }
+    .orch-composer-context {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      min-height: 36px;
+      padding: 4px 12px;
+      border-bottom: 1px solid var(--orch-border);
+      flex-wrap: wrap;
+    }
+    .blueprint-select-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      background: var(--orch-selected);
+      border: 1px solid color-mix(in srgb, var(--orch-accent) 45%, var(--orch-border));
+      border-radius: 5px;
+      padding: 2px 8px;
+      font-size: 11px;
+      font-weight: 500;
+    }
+    .blueprint-select-pill select {
+      border: 0;
+      background: transparent;
+      font-weight: 600;
+      color: var(--orch-accent);
+    }
+    .orch-composer textarea {
+      width: 100%;
+      display: block;
+      background: none;
+      border: 0;
+      resize: none;
+      padding: 10px 14px 4px;
+      height: 54px;
+      font-size: 12.5px;
+      line-height: 1.55;
+    }
+    .orch-composer textarea:focus-visible { outline: none; }
+    .orch-composer-toolbar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 6px 12px 8px;
+      font-size: 11px;
+    }
+
+    /* ==========================================================================
+       8. VIEW 2: Lightweight Spec & Hunk Review IDE (ThinkRail + Taomni Workspace)
+       ========================================================================== */
+    .ide-workbench {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      height: 100%;
+    }
+    .ide-left-tree {
+      width: 270px;
+      min-width: 270px;
+      border-right: 1px solid var(--orch-border);
+      background: var(--orch-surface);
+      display: flex;
+      flex-direction: column;
+    }
+    .ide-tree-tabs {
+      display: flex;
+      border-bottom: 1px solid var(--orch-border);
+      padding: 0 8px;
+      gap: 10px;
+    }
+    .ide-tree-tab {
+      border: 0;
+      background: none;
+      padding: 9px 2px 7px;
+      font-size: 11px;
+      color: var(--orch-muted);
+      border-bottom: 2px solid transparent;
+    }
+    .ide-tree-tab.active {
+      color: var(--orch-text);
+      border-bottom-color: var(--orch-accent);
+      font-weight: 600;
+    }
+    .ide-tree-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+    }
+    .ide-file-item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      width: 100%;
+      border: 0;
+      background: none;
+      padding: 6px 8px;
+      border-radius: 5px;
+      text-align: left;
+      font-size: 11px;
+      font-family: var(--taomni-code-font-family);
+    }
+    .ide-file-item:hover { background: var(--orch-raised); }
+    .ide-file-item.active { background: var(--orch-selected); }
+    .ide-file-item .file-stat { margin-left: auto; font-size: 10px; }
+
+    .ide-main-editor {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      background: var(--taomni-code-bg);
+    }
+    .ide-editor-toolbar {
+      height: 36px;
+      padding: 0 12px;
+      border-bottom: 1px solid var(--taomni-code-border);
+      background: var(--orch-surface);
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 11px;
+    }
+    .ide-breadcrumbs {
+      font-family: var(--taomni-code-font-family);
+      font-size: 11px;
+      color: var(--orch-muted);
+      display: flex;
+      align-items: center;
+      gap: 5px;
+    }
+    .ide-breadcrumbs strong { color: var(--orch-text); }
+    .ide-hunk-scroll {
+      flex: 1;
+      min-height: 0;
+      overflow-y: auto;
+      padding: 14px 18px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    /* Hunk Card with Keep / Revert / Ask Agent */
+    .hunk-card {
+      border: 1px solid var(--taomni-code-border);
+      border-radius: 8px;
+      overflow: hidden;
+      background: var(--taomni-code-bg);
+    }
+    .hunk-card.kept {
+      border-color: color-mix(in srgb, #22c55e 55%, var(--taomni-code-border));
+    }
+    .hunk-card.reverted {
+      border-color: color-mix(in srgb, #f87171 55%, var(--taomni-code-border));
+      opacity: 0.72;
+    }
+    .hunk-header {
+      padding: 6px 12px;
+      background: var(--taomni-code-gutter-bg);
+      border-bottom: 1px solid var(--taomni-code-border);
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: var(--taomni-code-font-family);
+      font-size: 11px;
+      color: var(--taomni-code-muted);
+    }
+    .hunk-actions {
+      margin-left: auto;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--taomni-ui-font-family);
+    }
+    .hunk-btn {
+      border: 1px solid var(--taomni-code-border);
+      background: var(--orch-raised);
+      padding: 2px 8px;
+      border-radius: 4px;
+      font-size: 10.5px;
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .hunk-btn:hover { background: var(--orch-selected); }
+    .hunk-btn.keep.active {
+      background: var(--taomni-success-bg);
+      color: var(--taomni-success-text);
+      border-color: var(--taomni-success-border);
+    }
+    .hunk-btn.revert.active {
+      background: var(--taomni-danger-bg);
+      color: var(--taomni-danger);
+      border-color: var(--taomni-danger);
+    }
+    .diff-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-family: var(--taomni-code-font-family);
+      font-size: 11.5px;
+      line-height: 1.6;
+    }
+    .diff-line { cursor: pointer; }
+    .diff-line:hover td { filter: brightness(1.08); }
+    .diff-line.add { background: var(--taomni-code-diff-added-bg); }
+    .diff-line.del { background: var(--taomni-code-diff-deleted-bg); }
+    .diff-num {
+      width: 42px;
+      padding: 0 8px;
+      text-align: right;
+      color: var(--taomni-code-line-number);
+      background: var(--taomni-code-gutter-bg);
+      user-select: none;
+      border-right: 1px solid var(--taomni-code-border);
+    }
+    .diff-code {
+      padding: 0 12px;
+      white-space: pre;
+      color: var(--taomni-code-text);
+    }
+    /* Anchored Inline Review Comment */
+    .anchored-comment-box {
+      margin: 6px 12px 10px 52px;
+      padding: 10px 12px;
+      border-radius: 7px;
+      background: var(--orch-surface);
+      border: 1px solid var(--orch-accent);
+      font-family: var(--taomni-ui-font-family);
+    }
+
+    /* IDE Terminal / Review Batch Footer */
+    .ide-bottom-drawer {
+      border-top: 1px solid var(--orch-border);
+      background: var(--orch-surface);
+      padding: 8px 14px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+    }
+    .pty-drawer {
+      height: 135px;
+      border-top: 1px solid var(--orch-border);
+      background: #131417;
+      color: #d4d8e0;
+      font-family: var(--taomni-code-font-family);
+      font-size: 11px;
+      padding: 8px 14px;
+      overflow-y: auto;
+      line-height: 1.55;
+    }
+
+    /* ==========================================================================
+       9. VIEW 3: E2E Sandbox Lifecycle & Quality Center
+       ========================================================================== */
+    .qa-workbench {
+      flex: 1;
+      min-width: 0;
+      display: flex;
+      flex-direction: column;
+      height: 100%;
+      overflow-y: auto;
+      padding: 16px 20px;
+      gap: 16px;
+    }
+    .env-lifecycle-card {
+      border: 1px solid var(--orch-border);
+      border-radius: 10px;
+      background: var(--orch-surface);
+      padding: 14px 16px;
+    }
+    .env-top-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      margin-bottom: 14px;
+    }
+    .env-steps-grid {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 10px;
+    }
+    .env-step-box {
+      padding: 10px 12px;
+      border-radius: 8px;
+      background: var(--orch-bg);
+      border: 1px solid var(--orch-border);
+      position: relative;
+    }
+    .env-step-box.ready {
+      border-color: color-mix(in srgb, #22c55e 45%, var(--orch-border));
+    }
+    .env-step-box.running {
+      border-color: var(--orch-accent);
+      background: var(--orch-selected);
+    }
+    .env-step-head {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      font-weight: 600;
+      font-size: 11.5px;
+      margin-bottom: 6px;
+    }
+    .env-probe-list {
+      margin: 0;
+      padding: 0;
+      list-style: none;
+      font-size: 10.5px;
+      color: var(--orch-muted);
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+
+    .qa-lower-split {
+      display: grid;
+      grid-template-columns: 1.35fr 1fr;
+      gap: 14px;
+      min-height: 360px;
+    }
+    .qa-panel {
+      border: 1px solid var(--orch-border);
+      border-radius: 10px;
+      background: var(--orch-surface);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .qa-panel-header {
+      padding: 10px 14px;
+      border-bottom: 1px solid var(--orch-border);
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      background: var(--orch-raised);
+    }
+    .e2e-case-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      padding: 8px 12px;
+      border: 0;
+      border-bottom: 1px solid var(--orch-border);
+      background: none;
+      text-align: left;
+      font-size: 11px;
+    }
+    .e2e-case-row:hover { background: var(--orch-raised); }
+    .e2e-case-row.active { background: var(--orch-selected); }
+    .burnin-dots {
+      display: inline-flex;
+      gap: 3px;
+      margin-left: auto;
+    }
+    .burnin-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+      background: #22c55e;
+    }
+
+    /* ==========================================================================
+       10. Modals: One-Click Executive Summary & Shared Resource/Cost Settings
+       ========================================================================== */
+    .orch-dialog-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 200;
+      display: grid;
+      place-items: center;
+      background: rgba(9, 12, 18, 0.72);
+      backdrop-filter: blur(3px);
+      padding: 18px;
+    }
+    .orch-dialog-backdrop[hidden] { display: none !important; }
+    .orch-dialog {
+      max-height: calc(100vh - 36px);
+      overflow: hidden;
+      border: 1px solid var(--orch-border);
+      border-radius: 12px;
+      background: var(--orch-raised);
+      color: var(--orch-text);
+      box-shadow: var(--taomni-shadow-lg);
+      display: flex;
+      flex-direction: column;
+    }
+    .summary-dialog {
+      width: min(880px, calc(100vw - 36px));
+    }
+    .settings-dialog {
+      width: min(840px, calc(100vw - 36px));
+    }
+    .dialog-header {
+      display: flex;
+      align-items: flex-start;
+      padding: 18px 22px 14px;
+      border-bottom: 1px solid var(--orch-border);
+      background: var(--orch-surface);
+    }
+    .dialog-header h2 {
+      font-size: 16px;
+      margin: 0 0 3px;
+      font-weight: 600;
+    }
+    .dialog-header p {
+      font-size: 11px;
+      margin: 0;
+      color: var(--orch-muted);
+    }
+    .dialog-body {
+      padding: 18px 22px;
+      overflow-y: auto;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .summary-section {
+      border: 1px solid var(--orch-border);
+      border-radius: 8px;
+      background: var(--orch-surface);
+      padding: 12px 14px;
+    }
+    .summary-section h4 {
+      margin: 0 0 8px;
+      font-size: 12px;
+      color: var(--orch-accent);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .summary-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 11px;
+    }
+    .summary-table th, .summary-table td {
+      padding: 7px 9px;
+      border-bottom: 1px solid var(--orch-border);
+      text-align: left;
+      vertical-align: top;
+    }
+    .summary-table th {
+      color: var(--orch-muted);
+      font-weight: 500;
+      background: var(--orch-bg);
+    }
+    .dialog-footer {
+      padding: 12px 20px;
+      border-top: 1px solid var(--orch-border);
+      background: var(--orch-surface);
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 8px;
+    }
+
+    /* Settings Layout */
+    .orch-settings-layout {
+      display: flex;
+      min-height: 430px;
+      max-height: calc(100vh - 190px);
+    }
+    .orch-settings-nav {
+      width: 185px;
+      min-width: 185px;
+      background: var(--orch-surface);
+      padding: 14px 10px;
+      border-right: 1px solid var(--orch-border);
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+    }
+    .orch-settings-tab {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      width: 100%;
+      border: 0;
+      border-radius: 6px;
+      background: none;
+      text-align: left;
+      padding: 8px 10px;
+      color: var(--orch-muted);
+      font-size: 11.5px;
+    }
+    .orch-settings-tab.active {
+      background: var(--orch-selected);
+      color: var(--orch-text);
+      font-weight: 600;
+    }
+    .orch-settings-content {
+      flex: 1;
+      padding: 18px 22px;
+      overflow-y: auto;
+    }
+    .orch-setting-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      padding: 10px 0;
+      border-bottom: 1px solid var(--orch-border);
+      font-size: 11.5px;
+    }
+    .orch-setting-row > label {
+      width: 165px;
+      flex-shrink: 0;
+      color: var(--orch-text);
+      font-weight: 500;
+    }
+    .orch-setting-row :is(select, input:not([type=checkbox]), textarea) {
+      border: 1px solid var(--orch-border);
+      border-radius: 5px;
+      background: var(--orch-surface);
+      padding: 6px 9px;
+      flex: 1;
+      font-size: 11px;
+    }
+    .orch-resource-row {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 9px 10px;
+      border: 1px solid var(--orch-border);
+      border-radius: 7px;
+      background: var(--orch-surface);
+      width: 100%;
+      text-align: left;
+      margin-bottom: 6px;
+    }
+    .orch-resource-row.active {
+      background: var(--orch-selected);
+      border-color: var(--orch-accent);
+    }
+    .orch-resource-icon {
+      width: 32px;
+      height: 26px;
+      display: grid;
+      place-items: center;
+      border-radius: 5px;
+      background: var(--orch-selected);
+      color: var(--orch-accent);
+      font-size: 9.5px;
+      font-weight: 700;
+    }
+    .toast-banner {
+      position: fixed;
+      bottom: 36px;
+      right: 20px;
+      z-index: 300;
+      padding: 10px 16px;
+      border-radius: 8px;
+      background: var(--orch-selected);
+      border: 1px solid var(--orch-accent);
+      color: var(--orch-text);
+      box-shadow: var(--taomni-shadow-md);
+      font-size: 11.5px;
+      font-weight: 500;
+      transition: opacity 0.2s;
+    }
+  </style>
+</head>
+<body>
+  <div class="taomni-window orch-root">
+    <div class="taomni-workbench-row">
+      <!-- ====================================================================
+           1. Taomni Primary Left Rail
+           ==================================================================== -->
+      <nav class="taomni-app-rail" aria-label="Taomni 主导航">
+        <div class="rail-brand" title="Taomni Desktop Workspace">T</div>
+        <button class="rail-btn" title="首页 (Home)" onclick="showToast('已处于 Super-Agents 自主研发中心')">
+          <svg viewBox="0 0 24 24"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+        </button>
+        <button class="rail-btn active" title="Super-Agents 多智能体编排与交付">
+          <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/></svg>
+          <span class="rail-badge" title="1 项任务等待您的架构决策"></span>
+        </button>
+        <button class="rail-btn" title="Code Workspace (轻量 IDE 视图)" onclick="switchWorkbenchMode('ide')">
+          <svg viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        </button>
+        <button class="rail-btn" title="E2E 沙箱环境与自动化测试中心" onclick="switchWorkbenchMode('qa')">
+          <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+        </button>
+        <button class="rail-btn" title="SSH / 远程 BYOM 终端节点" onclick="showToast('BYOM 远程测试节点 ssh://qa-runner-01 已挂载')">
+          <svg viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+        </button>
+        <div class="rail-spacer"></div>
+        <button class="rail-btn" title="切换深色 / 浅色主题 (Theme)" onclick="toggleTheme()">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/></svg>
+        </button>
+        <button class="rail-btn" title="统一开发配置与模型成本路由" onclick="openSettingsModal('routing')">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+        </button>
+      </nav>
+
+      <!-- ====================================================================
+           2. Main Rounded Canvas Frame
+           ==================================================================== -->
+      <div class="taomni-canvas-frame">
+        <!-- Left Sidebar: Project & Multi-Agent Runs -->
+        <aside class="orch-project-sidebar" id="taskSidebar">
+          <div class="orch-sidebar-title">
+            <strong>Super-Agents 编排</strong>
+            <span class="router-live-tag" title="Global Router + External Watchdog 常驻在线">Router 在线</span>
+          </div>
+
+          <!-- Project Selector -->
+          <div class="orch-project-switcher">
+            <svg viewBox="0 0 24 24"><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+            <select id="projectSelect" onchange="showToast('已切换工作区仓库: ' + this.value)">
+              <option value="/workspace/taomni">taomni (当前主工程)</option>
+              <option value="/workspace/payment-core">payment-gateway-rs</option>
+              <option value="/workspace/kiro-engine">kiro-orchestrator</option>
+            </select>
+          </div>
+
+          <button type="button" class="orch-new-task-button" onclick="prepareNewTaskComposer()">
+            <svg viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            <span>新建自主交付任务 (模板驱动)</span>
+          </button>
+
+          <input type="search" class="orch-sidebar-search" placeholder="筛选任务、分支或蓝图模板…" oninput="filterTasks(this.value)" />
+
+          <div class="orch-sidebar-section">
+            <span>并行任务队列 (Worktrees)</span>
+            <span>4 活跃</span>
+          </div>
+
+          <div class="orch-task-list" id="taskListContainer">
+            <!-- Populated dynamically by JS -->
+          </div>
+
+          <div class="orch-sidebar-bottom">
+            <button type="button" class="orch-shared-config" onclick="openLessonsModal()">
+              <svg viewBox="0 0 24 24"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+              <span>
+                <strong>项目持久记忆 (Lessons & Skills)</strong>
+                <small>已沉淀 6 条仓库铁律 · 自动注入</small>
+              </span>
+            </button>
+            <button type="button" class="orch-shared-config" onclick="openSettingsModal('routing')">
+              <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09"/></svg>
+              <span>
+                <strong>统一开发配置与成本路由</strong>
+                <small>生产交付方案 · rev 7 · 5 角色分级</small>
+              </span>
+            </button>
+          </div>
+        </aside>
+
+        <!-- Main Surface -->
+        <main class="orch-agent-main">
+          <!-- Top Header Bar -->
+          <header class="orch-conversation-header">
+            <button type="button" class="orch-icon-button" title="展开/收起任务栏" onclick="toggleSidebar()">
+              <svg viewBox="0 0 24 24"><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+            </button>
+
+            <div class="header-title-group">
+              <div class="header-title-row">
+                <strong id="activeTaskTitle">分布式审计日志与实时告警网关</strong>
+                <span class="orch-subtle-badge" id="activeTaskBlueprintBadge">0-1 有需求无设计</span>
+              </div>
+              <div class="header-sub-row">
+                <span class="mono-tag" id="activeWorktreeTag">worktree: agent/run-9a4f</span>
+                <span id="activeWatchdogTag">Watchdog: 巡检正常 · 0 偏离</span>
+                <span id="activeCostTag">成本: 1.42u ($0.38)</span>
+              </div>
+            </div>
+
+            <!-- 3-Mode Workbench Switcher -->
+            <div class="workbench-mode-tabs" role="tablist">
+              <button type="button" class="mode-tab-btn active" id="tabBtnStream" onclick="switchWorkbenchMode('stream')">
+                <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                <span>主控与决策流</span>
+                <span class="mode-count" id="streamBadgeCount">1 待决策</span>
+              </button>
+              <button type="button" class="mode-tab-btn" id="tabBtnIde" onclick="switchWorkbenchMode('ide')">
+                <svg viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                <span>轻量 IDE 与 Hunk 审阅</span>
+                <span class="mode-count" id="ideBadgeCount">6 files · +318 -42</span>
+              </button>
+              <button type="button" class="mode-tab-btn" id="tabBtnQa" onclick="switchWorkbenchMode('qa')">
+                <svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/><path d="m9 12 2 2 4-4"/></svg>
+                <span>E2E 环境与质量门禁</span>
+                <span class="mode-count" id="qaBadgeCount">Env Ready · 24/24</span>
+              </button>
+            </div>
+
+            <!-- One-Click Executive Summary Button -->
+            <button type="button" class="btn-exec-summary" onclick="openExecutiveSummaryModal()" title="一键汇总：用户提示词、决策答案、开发进度、E2E质量与成本账单">
+              <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+              <span>一键总结汇报</span>
+            </button>
+          </header>
+
+          <!-- Ambient Stage Pipeline Stepper (Always visible, compact) -->
+          <div class="stage-pipeline-bar" id="stagePipelineBar">
+            <!-- Dynamically rendered based on active task's template stages -->
+          </div>
+
+          <!-- ================================================================
+               WORKBENCH BODY: 3 Switchable Surfaces
+               ================================================================ -->
+          <div class="workbench-body">
+
+            <!-- ==============================================================
+                 SURFACE 1: Low-Noise Mission & Decision Stream
+                 ============================================================== -->
+            <section class="stream-container" id="surfaceStream">
+              <div class="stream-scroll">
+                <div class="stream-column" id="streamCardsContainer">
+                  <!-- Populated by JS for the selected task -->
+                </div>
+              </div>
+
+              <!-- Multi-Blueprint Task Composer Dock -->
+              <div class="orch-composer-dock">
+                <div class="orch-composer">
+                  <div class="orch-composer-context">
+                    <span class="blueprint-select-pill" title="选择不同开发场景的工程蓝图">
+                      <svg viewBox="0 0 24 24"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg>
+                      <span>任务蓝图:</span>
+                      <select id="composerBlueprintSelect" onchange="onBlueprintTemplateChange(this.value)">
+                        <option value="0-1-discovery">0→1 需求驱动开发 (有需求无设计 · 自动生成Spec与澄清门禁)</option>
+                        <option value="0-1-spec-driven">0→1 规格驱动开发 (有需求有设计 · 契约冻结与多Agent并行实现)</option>
+                        <option value="legacy-bugfix">既有大库 Bug 修复 (先写复现Red用例 · 最小改动 · 防崩溃回归)</option>
+                        <option value="safe-refactor">存量系统演进与重构 (800行单文件边界 · 零API破坏校验)</option>
+                        <option value="e2e-hardening">专项 E2E 补齐与质量加固 (盲区扫描 · 3x连续防脆弱Burn-in)</option>
+                      </select>
+                    </span>
+                    <span class="orch-subtle-badge" id="blueprintPipelineHint">流水线: 需求澄清 → Spec图谱 → 并行开发 → E2E沙箱 → 独立审查</span>
+                    <span style="flex:1"></span>
+                    <button type="button" class="orch-outline" style="padding:2px 8px;font-size:10px;" onclick="showToast('已挂载 docs-feature/ 与 SPEC.md 上下文快照 (预计 4,280 tokens)')">
+                      + 附加资料 / SPEC.md (3)
+                    </button>
+                  </div>
+                  <textarea id="composerGoalInput" placeholder="下达新任务目标或补充决策指导（支持多任务并发投递，Router 自动分配独立 Git Worktree，默认静默执行仅汇报决策与结果）…"></textarea>
+                  <div class="orch-composer-toolbar">
+                    <span style="color:var(--orch-muted);font-size:10.5px;">
+                      低噪模式已开启：过程代码与思考流已静默折叠，仅推送<strong>待决策项、阶段里程碑与交付收据</strong>
+                    </span>
+                    <span style="flex:1"></span>
+                    <button type="button" class="orch-outline" style="padding:4px 9px;font-size:10.5px;" onclick="openSettingsModal('routing')">
+                      <span>路由配置: 生产交付方案 (rev 7)</span>
+                    </button>
+                    <button type="button" class="orch-solid" onclick="submitNewTaskFromComposer()">
+                      <svg viewBox="0 0 24 24"><line x1="12" y1="19" x2="12" y2="5"/><polyline points="5 12 12 5 19 12"/></svg>
+                      <span>投递任务</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- ==============================================================
+                 SURFACE 2: Lightweight Spec & Hunk Review IDE (ThinkRail + Taomni)
+                 ============================================================== -->
+            <section class="ide-workbench" id="surfaceIde" hidden>
+              <!-- Left Explorer: Changed Files / SPEC.md Graph / Worktree Tree -->
+              <aside class="ide-left-tree">
+                <div class="ide-tree-tabs">
+                  <button type="button" class="ide-tree-tab active" id="ideTabChanges" onclick="switchIdeLeftTab('changes')">本轮变更 (6)</button>
+                  <button type="button" class="ide-tree-tab" id="ideTabSpecs" onclick="switchIdeLeftTab('specs')">SPEC.md 图谱</button>
+                  <button type="button" class="ide-tree-tab" id="ideTabFiles" onclick="switchIdeLeftTab('files')">Worktree 树</button>
+                </div>
+                <div class="ide-tree-list" id="ideTreeListContainer">
+                  <!-- Populated by JS -->
+                </div>
+                <div style="padding:10px;border-top:1px solid var(--orch-border);font-size:10.5px;color:var(--orch-muted);line-height:1.5;">
+                  <div><strong>Git Worktree 隔离保护</strong></div>
+                  <div>当前变更位于独立工作树 <code class="mono-tag">worktrees/run-9a4f</code>，未触碰您的主分支检出区。</div>
+                </div>
+              </aside>
+
+              <!-- Center Diff & Code Hunk Reviewer -->
+              <div class="ide-main-editor">
+                <div class="ide-editor-toolbar">
+                  <div class="ide-breadcrumbs">
+                    <span>worktrees/run-9a4f</span>
+                    <span>/</span>
+                    <strong id="ideCurrentFilePath">src-tauri/src/orchestration/audit_gateway.rs</strong>
+                  </div>
+                  <span class="orch-subtle-badge">SPEC-AUD-02 关联</span>
+                  <span style="flex:1"></span>
+                  <button type="button" class="orch-outline" style="padding:3px 8px;font-size:10.5px;" onclick="togglePtyDrawer()">
+                    <svg viewBox="0 0 24 24"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+                    <span>Worktree 终端 (PTY)</span>
+                  </button>
+                  <button type="button" class="orch-outline" style="padding:3px 8px;font-size:10.5px;" onclick="showToast('已在 Taomni Code Workspace 完整标签页中挂载 worktrees/run-9a4f')">
+                    <span>在完整 Code Workspace 打开 ↗</span>
+                  </button>
+                </div>
+
+                <!-- Hunk Review Scroll Area -->
+                <div class="ide-hunk-scroll" id="ideHunkContainer">
+                  <!-- Populated by JS -->
+                </div>
+
+                <!-- Optional Collapsible Real PTY Terminal -->
+                <div class="pty-drawer" id="idePtyDrawer" hidden>
+                  <div style="color:#5fd58a;">taomni@worktree:run-9a4f (feat/audit-gateway)$ <span style="color:#e6eaf0;">cargo test --package taomni --lib orchestration::audit_gateway</span></div>
+                  <div>   Compiling taomni v0.2.0 (/home/zhyhang/.taomni/orchestration/worktrees/run-9a4f/src-tauri)</div>
+                  <div>    Finished `test` profile [unoptimized + debuginfo] target(s) in 1.84s</div>
+                  <div>     Running unittests src/lib.rs (target/debug/deps/taomni-8a91f02b)</div>
+                  <div>running 6 tests</div>
+                  <div>test orchestration::audit_gateway::tests::redacts_vault_tokens_before_persistence ... <span style="color:#4ade80;">ok</span></div>
+                  <div>test orchestration::audit_gateway::tests::enforces_three_proxy_modes_without_silent_fallback ... <span style="color:#4ade80;">ok</span></div>
+                  <div>test orchestration::audit_gateway::tests::reaps_worker_process_group_on_cancel ... <span style="color:#4ade80;">ok</span></div>
+                  <div style="color:#5fd58a;">taomni@worktree:run-9a4f$ <span style="color:#e6eaf0;">pnpm check:refactor</span></div>
+                  <div style="color:#4ade80;">✓ All touched source files are under 800 physical lines (max: 342 lines). Zero circular dependencies.</div>
+                </div>
+
+                <!-- Bottom Review Batch Action Bar -->
+                <div class="ide-bottom-drawer">
+                  <div style="display:flex;align-items:center;gap:10px;font-size:11px;">
+                    <strong>Hunk 审阅收据:</strong>
+                    <span class="orch-subtle-badge" id="hunkSummaryBadge">2 已保留 (Keep) · 0 已回退 (Revert) · 1 条行内锚定批注待派发</span>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:8px;">
+                    <button type="button" class="orch-outline" onclick="dispatchAnchoredComments()">
+                      <svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                      <span>将行内批注派发给 Worker 精准返工</span>
+                    </button>
+                    <button type="button" class="orch-solid" onclick="acceptAndMergeWorktree()">
+                      <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                      <span>验收通过并合并 Worktree 到主分支</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+            <!-- ==============================================================
+                 SURFACE 3: E2E Sandbox Lifecycle & Production Quality Center
+                 ============================================================== -->
+            <section class="qa-workbench" id="surfaceQa" hidden>
+              <!-- 1. E2E Environment Lifecycle Manager (Create -> Provision -> Start -> Detect) -->
+              <div class="env-lifecycle-card">
+                <div class="env-top-bar">
+                  <div>
+                    <div style="display:flex;align-items:center;gap:8px;">
+                      <strong style="font-size:13.5px;">E2E 自动化运行环境生命周期编排器 (Environment Orchestrator)</strong>
+                      <span class="router-live-tag" id="envGlobalStatusBadge">ENVIRONMENT READY · 4/4 阶段就绪</span>
+                    </div>
+                    <div style="font-size:11px;color:var(--orch-muted);margin-top:2px;">
+                      为当前任务独立 Git Worktree 自动创建、构建布置、启动服务群并执行多维健康探针检测，支撑全自动 E2E 验证。
+                    </div>
+                  </div>
+                  <div style="display:flex;align-items:center;gap:8px;">
+                    <label style="font-size:11px;color:var(--orch-muted);">环境目标:</label>
+                    <select id="envTargetSelect" style="border:1px solid var(--orch-border);background:var(--orch-raised);padding:5px 8px;border-radius:6px;font-size:11px;" onchange="switchEnvTarget(this.value)">
+                      <option value="local_sandbox">本地隔离沙箱 (Local Worktree + 独立端口池 + 进程组监管)</option>
+                      <option value="cloud_ephemeral">云端弹性容器沙箱 (Cloud Ephemeral Namespace · 4并发分片)</option>
+                      <option value="byom_ssh">远程自带机器 (BYOM SSH Daemon · ssh://qa-linux-node-02)</option>
+                    </select>
+                    <button type="button" class="orch-outline" onclick="simulateEnvProvisioningLifecycle()">
+                      <svg viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+                      <span>一键演练: 创建 → 布置 → 启动 → 检测</span>
+                    </button>
+                    <button type="button" class="orch-solid" onclick="runAllE2eCases()">
+                      <svg viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"/></svg>
+                      <span>立即执行全量 E2E 套件 (24 用例)</span>
+                    </button>
+                  </div>
+                </div>
+
+                <!-- 4-Stage Pipeline Cards -->
+                <div class="env-steps-grid" id="envStepsGrid">
+                  <div class="env-step-box ready" id="envStep1">
+                    <div class="env-step-head">
+                      <span>1. 创建环境 (Create)</span>
+                      <span style="color:#4ade80;font-size:10px;">✓ 1.2s</span>
+                    </div>
+                    <ul class="env-probe-list">
+                      <li>• 隔离目录: <code class="mono-tag">env/sandbox-9a4f</code></li>
+                      <li>• 端口分配: Web <code class="mono-tag">:5192</code> / IPC <code class="mono-tag">:5193</code></li>
+                      <li>• 凭据注入: <code class="mono-tag">vault:qa_test_key</code> (已脱敏)</li>
+                    </ul>
+                  </div>
+                  <div class="env-step-box ready" id="envStep2">
+                    <div class="env-step-head">
+                      <span>2. 布置与构建 (Provision)</span>
+                      <span style="color:#4ade80;font-size:10px;">✓ 6.4s</span>
+                    </div>
+                    <ul class="env-probe-list">
+                      <li>• Worktree 快照: <code class="mono-tag">HEAD 8c41e2a + 6 files</code></li>
+                      <li>• 增量编译: Frontend + Rust 测试二进制就绪</li>
+                      <li>• 数据基线: SQLite 审计库 Schema 迁移完成</li>
+                    </ul>
+                  </div>
+                  <div class="env-step-box ready" id="envStep3">
+                    <div class="env-step-head">
+                      <span>3. 启动服务群 (Start)</span>
+                      <span style="color:#4ade80;font-size:10px;">✓ 2.1s</span>
+                    </div>
+                    <ul class="env-probe-list">
+                      <li>• 后端守护: <code class="mono-tag">PID 48210 (unix_group)</code></li>
+                      <li>• 前端宿主: <code class="mono-tag">http://127.0.0.1:5192</code></li>
+                      <li>• 浏览器驱动: <code class="mono-tag">Headless WebDriver :9515</code></li>
+                    </ul>
+                  </div>
+                  <div class="env-step-box ready" id="envStep4">
+                    <div class="env-step-head">
+                      <span>4. 就绪与健康检测 (Detect)</span>
+                      <span style="color:#4ade80;font-size:10px;">✓ 4/4 探针通过</span>
+                    </div>
+                    <ul class="env-probe-list">
+                      <li>• TCP/HTTP 探针: <code class="mono-tag">200 OK (3ms)</code></li>
+                      <li>• Tauri IPC 握手: <code class="mono-tag">orchestration_ping OK</code></li>
+                      <li>• 首屏与异常探针: <code class="mono-tag">0 Runtime Errors</code></li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 2. Lower Split: Automated E2E Test Suite + Multi-Dimensional Review Matrix -->
+              <div class="qa-lower-split">
+                <!-- Left: Auto-Generated E2E Cases & Anti-Flake Burn-In -->
+                <div class="qa-panel">
+                  <div class="qa-panel-header">
+                    <div>
+                      <strong>自动生成的高稳定 E2E 用例集 (QA Architect Agent)</strong>
+                      <span class="orch-subtle-badge" style="margin-left:6px;">覆盖率 100% Spec 节点 · 3x Burn-in 零脆弱</span>
+                    </div>
+                    <button type="button" class="orch-outline" style="padding:3px 8px;font-size:10.5px;" onclick="generateExtraE2eCase()">
+                      + 自动推导新增边界 E2E 用例
+                    </button>
+                  </div>
+                  <div style="flex:1;overflow-y:auto;" id="e2eCasesList">
+                    <!-- Populated by JS -->
+                  </div>
+                </div>
+
+                <!-- Right: Selected E2E Case Spec / Evidence + 4 Quality Gates -->
+                <div class="qa-panel">
+                  <div class="qa-panel-header">
+                    <strong>质量门禁记分卡与 E2E 用例执行证据</strong>
+                    <span class="router-live-tag">准出评分: 96 / 100</span>
+                  </div>
+                  <div style="padding:12px 14px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:12px;">
+                    <!-- 4 Production Gates -->
+                    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                      <div class="subagent-box">
+                        <div class="subagent-box-top"><span>Gate 1: 架构与 800 行边界</span><span style="color:#4ade80;">PASS</span></div>
+                        <small>pnpm check:refactor · 最大文件 342 行 · 0 循环依赖</small>
+                      </div>
+                      <div class="subagent-box">
+                        <div class="subagent-box-top"><span>Gate 2: 单元与集成测试</span><span style="color:#4ade80;">PASS</span></div>
+                        <small>Vitest 42/42 通过 · Cargo test 19/19 通过</small>
+                      </div>
+                      <div class="subagent-box">
+                        <div class="subagent-box-top"><span>Gate 3: E2E + 防崩溃回归</span><span style="color:#4ade80;">24/24 PASS</span></div>
+                        <small>含 6 条 crash-regression · assert_no_runtime_errors</small>
+                      </div>
+                      <div class="subagent-box">
+                        <div class="subagent-box-top"><span>Gate 4: 跨模型独立 Review</span><span style="color:#4ade80;">96/100</span></div>
+                        <small>审阅模型: Claude-4.5-Sonnet · 0 Blocker · 凭据已脱敏</small>
+                      </div>
+                    </div>
+
+                    <!-- Selected E2E YAML & Execution Evidence Preview -->
+                    <div style="border:1px solid var(--orch-border);border-radius:8px;overflow:hidden;background:var(--taomni-code-bg);">
+                      <div style="padding:6px 10px;background:var(--taomni-code-gutter-bg);border-bottom:1px solid var(--taomni-code-border);font-family:var(--taomni-code-font-family);font-size:10.5px;display:flex;justify-content:space-between;">
+                        <span id="selectedE2eTitle">qa-ui-auto-tests/cases/TC-AUD-001-proxy-no-fallback.testcase.yaml</span>
+                        <span style="color:#4ade80;">3/3 Burn-in Stable (410ms)</span>
+                      </div>
+                      <pre id="selectedE2eCode" style="margin:0;padding:10px 12px;font-family:var(--taomni-code-font-family);font-size:11px;line-height:1.55;overflow-x:auto;color:var(--taomni-code-text);"></pre>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <!-- ======================================================================
+         3. Bottom Status Bar
+         ====================================================================== -->
+    <footer class="taomni-statusbar">
+      <span class="status-pill"><span class="status-dot"></span>OrchestrationRuntime: SQLite WAL 已锁定 (.owner.lock)</span>
+      <span class="status-pill"><span class="status-dot blue"></span>活跃 Worktrees: 3 隔离分支 · 并发上限 4 Workers</span>
+      <span class="status-pill"><span class="status-dot"></span>E2E 沙箱 #env-9a4f: 本地 :5192 就绪</span>
+      <span style="flex:1"></span>
+      <span>代理策略: 严格三态 (App / Custom / None 零静默回退)</span>
+      <span>模型: open-gemini-argon</span>
+    </footer>
+  </div>
+
+  <!-- ========================================================================
+       MODAL 1: 一键《任务全景总结汇报 (Executive Summary)》
+       ======================================================================== -->
+  <div class="orch-dialog-backdrop" id="execSummaryModal" hidden>
+    <div class="orch-dialog summary-dialog" role="dialog" aria-modal="true" aria-labelledby="execSummaryTitle">
+      <div class="dialog-header">
+        <div>
+          <h2 id="execSummaryTitle">📋 任务全景总结简报 (Executive Summary)</h2>
+          <p>零过程噪音聚合视图：自动汇总用户提示词、关键决策问答、并行开发进度、E2E 质量证据与成本账单。</p>
+        </div>
+        <span style="flex:1"></span>
+        <button type="button" class="orch-icon-button" onclick="closeExecutiveSummaryModal()" aria-label="关闭">✕</button>
+      </div>
+
+      <div class="dialog-body" id="execSummaryBody">
+        <!-- Populated dynamically by JS -->
+      </div>
+
+      <div class="dialog-footer">
+        <span style="margin-right:auto;font-size:10.5px;color:var(--orch-muted);">
+          由 Global Router 基于 SQLite 确定性状态库生成 · 不额外消耗大模型推理 Token
+        </span>
+        <button type="button" class="orch-outline" onclick="copyExecutiveSummaryMarkdown()">
+          <span>复制 Markdown 汇报</span>
+        </button>
+        <button type="button" class="orch-solid" onclick="closeExecutiveSummaryModal()">
+          <span>完成审阅</span>
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       MODAL 2: 统一开发配置、模型角色分类路由与成本治理 (Shared Settings)
+       ======================================================================== -->
+  <div class="orch-dialog-backdrop" id="settingsModal" hidden>
+    <div class="orch-dialog settings-dialog" role="dialog" aria-modal="true" aria-labelledby="settingsModalTitle">
+      <div class="dialog-header">
+        <div>
+          <h2 id="settingsModalTitle">统一开发配置与模型/Harness 成本路由 (Shared Agent Settings)</h2>
+          <p>配置一次，跨任务复用。每个任务在创建时冻结不可变配置快照 (settingsSnapshot)，保证执行一致性与成本可控。</p>
+        </div>
+        <span style="flex:1"></span>
+        <button type="button" class="orch-icon-button" onclick="closeSettingsModal()" aria-label="关闭">✕</button>
+      </div>
+
+      <div class="orch-settings-layout">
+        <nav class="orch-settings-nav">
+          <button type="button" class="orch-settings-tab active" id="setTabRouting" onclick="switchSettingsTab('routing')">
+            <span>1. 任务角色与成本路由</span>
+          </button>
+          <button type="button" class="orch-settings-tab" id="setTabResources" onclick="switchSettingsTab('resources')">
+            <span>2. LLM / Harness 资源库</span>
+          </button>
+          <p style="font-size:10px;color:var(--orch-muted);line-height:1.7;margin:18px 8px 0;">
+            所有密钥严格采用 Settings / Vault 的 <code>vault:&lt;id&gt;</code> 引用。网络访问支持应用代理、独立代理与强制直连三态。
+          </p>
+        </nav>
+
+        <!-- Settings Tab 1: Role Routing & Cost Governance -->
+        <div class="orch-settings-content" id="settingsPaneRouting">
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+            <h3 style="margin:0;font-size:14px;">生产交付多角色分级方案</h3>
+            <span class="orch-subtle-badge">Revision 7 (Frozen on Run Creation)</span>
+          </div>
+          <p style="font-size:11px;color:var(--orch-muted);margin:0 0 14px;">
+            根据不同子任务的认知复杂度匹配最合适的 LLM Provider 或 Coding Harness，兼顾生产交付质量与 Token 成本效率。
+          </p>
+
+          <div class="orch-setting-row">
+            <label>方案名称 (Plan Name)</label>
+            <input type="text" value="生产交付标准方案 (高低配混合路由)" />
+          </div>
+          <div class="orch-setting-row">
+            <label>全局路由与 Watchdog<br><small style="color:var(--orch-muted);font-weight:400;">高频低噪协调、进度巡检</small></label>
+            <select>
+              <option value="res-router">DeepSeek-V4-Flash API (直连 API · 成本系数 0.15x · 极速低成本)</option>
+              <option value="res-plan">Gemini 4 Argon / Claude Opus API (成本系数 1.20x)</option>
+            </select>
+          </div>
+          <div class="orch-setting-row">
+            <label>规划与架构设计 (Planner)<br><small style="color:var(--orch-muted);font-weight:400;">0-1 Spec 图谱与契约拆解</small></label>
+            <select>
+              <option value="res-plan">Gemini 4 Argon / Claude 4.5 Opus (直连 API · 成本系数 1.20x)</option>
+              <option value="res-rev">GPT-5.2 Architecture API (成本系数 1.10x)</option>
+            </select>
+          </div>
+          <div class="orch-setting-row">
+            <label>并行开发执行池 (Workers)<br><small style="color:var(--orch-muted);font-weight:400;">隔离 Git Worktree 编码实现</small></label>
+            <div style="display:flex;flex-wrap:wrap;gap:10px;flex:1;">
+              <label style="display:flex;align-items:center;gap:5px;font-size:11px;">
+                <input type="checkbox" checked /> Claude Code CLI (1.00x · 核心模块)
+              </label>
+              <label style="display:flex;align-items:center;gap:5px;font-size:11px;">
+                <input type="checkbox" checked /> OpenCode Harness (0.75x · 通用开发)
+              </label>
+              <label style="display:flex;align-items:center;gap:5px;font-size:11px;">
+                <input type="checkbox" checked /> Codex CLI Worker (0.85x · 重构/后端)
+              </label>
+              <label style="display:flex;align-items:center;gap:5px;font-size:11px;">
+                <input type="checkbox" /> Pi Coding Agent (0.50x · 轻量切片)
+              </label>
+            </div>
+          </div>
+          <div class="orch-setting-row">
+            <label>E2E 生成与自愈 (QA Role)<br><small style="color:var(--orch-muted);font-weight:400;">自动编写稳定 E2E 与环境诊断</small></label>
+            <select>
+              <option value="res-qa">OpenCode QA Worker (CLI Worker · 成本系数 0.60x)</option>
+              <option value="res-cc">Claude Code CLI (成本系数 1.00x)</option>
+            </select>
+          </div>
+          <div class="orch-setting-row">
+            <label>独立代码审阅 (Reviewer)<br><small style="color:var(--orch-muted);font-weight:400;">异构模型盲审，规避同源偏见</small></label>
+            <select>
+              <option value="res-rev">Claude 4.5 Sonnet Review API (直连 API · 成本系数 0.80x)</option>
+              <option value="res-plan">Gemini 4 Argon API (成本系数 1.20x)</option>
+            </select>
+          </div>
+          <div class="orch-setting-row">
+            <label>并发与成本护栏</label>
+            <div style="display:flex;flex-direction:column;gap:8px;flex:1;">
+              <div style="display:flex;align-items:center;gap:12px;">
+                <span>最大并行 Worker 数: <input type="number" min="1" max="8" value="4" style="width:58px;" /></span>
+                <span>单任务预算暂停门: <input type="text" value="5.00u (约 $1.50)" style="width:120px;" /></span>
+              </div>
+              <label style="display:flex;align-items:center;gap:6px;font-size:11px;color:var(--orch-muted);">
+                <input type="checkbox" checked /> 启用 Packed Planning（规划阶段优先单次打包生成多份契约产物，追加调用前必须弹窗授权）
+              </label>
+            </div>
+          </div>
+        </div>
+
+        <!-- Settings Tab 2: Execution Resources (API & CLI Workers) -->
+        <div class="orch-settings-content" id="settingsPaneResources" hidden>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+            <h3 style="margin:0;font-size:14px;">已配置执行资源 (LLM Providers & Coding Harnesses)</h3>
+            <button type="button" class="orch-outline" style="padding:4px 9px;font-size:11px;" onclick="showToast('已创建新执行资源草稿，请绑定 Vault 密钥与成本系数')">+ 添加资源</button>
+          </div>
+
+          <button type="button" class="orch-resource-row active">
+            <span class="orch-resource-icon">CLI</span>
+            <div>
+              <strong>Claude Code Built-in Worker</strong>
+              <small style="color:var(--orch-muted);display:block;">harness: claude_code · 成本系数: 1.00x · 代理: 应用代理 (app)</small>
+            </div>
+            <span class="orch-subtle-badge" style="margin-left:auto;">本机 Worker</span>
+          </button>
+
+          <button type="button" class="orch-resource-row">
+            <span class="orch-resource-icon">CLI</span>
+            <div>
+              <strong>OpenCode Supervised Harness</strong>
+              <small style="color:var(--orch-muted);display:block;">harness: opencode · args: run --worktree {worktree} · 成本系数: 0.75x</small>
+            </div>
+            <span class="orch-subtle-badge" style="margin-left:auto;">本机 Worker</span>
+          </button>
+
+          <button type="button" class="orch-resource-row">
+            <span class="orch-resource-icon">API</span>
+            <div>
+              <strong>DeepSeek-V4-Flash Router & Watchdog</strong>
+              <small style="color:var(--orch-muted);display:block;">openai_chat · vault:deepseek_prod · 成本系数: 0.15x · 代理: 直连 (none)</small>
+            </div>
+            <span class="orch-subtle-badge" style="margin-left:auto;">直连 API</span>
+          </button>
+
+          <!-- Selected Resource Detail Form -->
+          <div style="margin-top:14px;padding-top:12px;border-top:1px solid var(--orch-border);">
+            <div class="orch-setting-row">
+              <label>Worker Harness 类型</label>
+              <select>
+                <option value="claude_code" selected>Claude Code (内置受监管适配器)</option>
+                <option value="opencode">OpenCode</option>
+                <option value="codex">Codex</option>
+                <option value="pi">Pi Coding Agent (@earendil-works/pi)</option>
+                <option value="deepseek">DeepSeek Harness (DSH)</option>
+                <option value="zcode">ZCode</option>
+              </select>
+            </div>
+            <div class="orch-setting-row">
+              <label>成本系数 (Cost Coefficient)</label>
+              <input type="number" step="0.05" value="1.00" />
+            </div>
+            <div class="orch-setting-row">
+              <label>Vault 凭据引用 (Key Ref)</label>
+              <input type="text" value="vault:anthropic_team_key" />
+            </div>
+            <div class="orch-setting-row">
+              <label>出站网络代理 (Proxy Mode)</label>
+              <select>
+                <option value="app" selected>应用代理 (默认复用 Settings 代理，失败不静默回退直连)</option>
+                <option value="custom">资源独立代理 (持久化于当前资源，不覆盖全局设置)</option>
+                <option value="none">不使用代理 (强制绕过系统与环境变量代理)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="dialog-footer">
+        <span style="margin-right:auto;font-size:10.5px;color:var(--orch-muted);">
+          保存后将生成 Revision 8；当前正在运行的任务仍保持各自创建时的配置快照。
+        </span>
+        <button type="button" class="orch-outline" onclick="closeSettingsModal()">取消</button>
+        <button type="button" class="orch-solid" onclick="saveSettingsAndClose()">保存统一配置</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ========================================================================
+       MODAL 3: 项目持久记忆库 (Kiro Crew Durable Lessons & Skills)
+       ======================================================================== -->
+  <div class="orch-dialog-backdrop" id="lessonsModal" hidden>
+    <div class="orch-dialog summary-dialog" role="dialog" aria-modal="true">
+      <div class="dialog-header">
+        <div>
+          <h2>📚 项目持久记忆与工程铁律 (Durable Lessons & Reusable Skills)</h2>
+          <p>汲取 Kiro Crew 理念：您在决策门禁或 Hunk 审阅中的每一次纠正，都会沉淀为可见、可编辑的持久记忆，后续任务自动遵守。</p>
+        </div>
+        <span style="flex:1"></span>
+        <button type="button" class="orch-icon-button" onclick="closeLessonsModal()">✕</button>
+      </div>
+      <div class="dialog-body">
+        <table class="summary-table">
+          <thead>
+            <tr>
+              <th>记忆 ID</th>
+              <th>触发范围</th>
+              <th>持久化的工程经验 / 仓库铁律 (Durable Lesson)</th>
+              <th>来源</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code class="mono-tag">LES-01</code></td>
+              <td>全部代码变更</td>
+              <td>单文件物理行数严禁超过 800 行（建议 200-500 行）；拆分模块时禁止产生循环依赖或从子模块反向 import 壳层。</td>
+              <td>AGENTS.md + 审阅沉淀</td>
+            </tr>
+            <tr>
+              <td><code class="mono-tag">LES-02</code></td>
+              <td>外部网络与下载</td>
+              <td>必须支持三态代理（App / Custom / None）；No Proxy 必须绕过系统环境代理，代理失败严禁静默回退直连。</td>
+              <td>用户决策 #D-01</td>
+            </tr>
+            <tr>
+              <td><code class="mono-tag">LES-03</code></td>
+              <td>前端单测执行</td>
+              <td>运行 Vitest 过滤单个文件时禁止添加 <code>--</code> 分隔符，直接使用 <code>pnpm exec vitest run src/path/file.test.ts</code>。</td>
+              <td>Worker 纠偏记录</td>
+            </tr>
+            <tr>
+              <td><code class="mono-tag">LES-04</code></td>
+              <td>E2E 质量准出</td>
+              <td>任何 UI 重构或新特性必须通过全量 <code>crash-regression</code> 套件且断言 <code>assert_no_runtime_errors</code>。</td>
+              <td>QA Gate 铁律</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="dialog-footer">
+        <button type="button" class="orch-solid" onclick="closeLessonsModal()">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Feedback Banner -->
+  <div class="toast-banner" id="toastBanner" hidden></div>
+
+  <!-- ========================================================================
+       Interactive Prototype Logic (Pure Self-Contained Vanilla JS)
+       ======================================================================== -->
+  <script>
+    const TASKS = [
+      {
+        id: "run-9a4f",
+        title: "分布式审计日志与实时告警网关",
+        blueprintId: "0-1-discovery",
+        blueprintLabel: "0-1 有需求无设计",
+        status: "decision",
+        statusLabel: "待拍板决策 (1)",
+        dotClass: "amber",
+        worktree: "agent/run-9a4f",
+        watchdog: "Watchdog: 巡检正常 · 0 偏离",
+        cost: "1.42u ($0.38)",
+        diffStat: "6 files · +318 -42",
+        e2eStat: "Env Ready · 24/24",
+        goal: "从 0 到 1 开发一套高可靠分布式审计日志与实时告警网关模块：支持多通道事件采集、敏感凭据自动脱敏（兼容 vault:<id> 规范）、可配置的三态出站代理告警推送，以及断网本地环形缓冲区的断点续传。目前只有业务需求，请先完成架构设计与关键决策确认，再并行编码并通过自动化 E2E 验收。",
+        sources: ["AGENTS.md", "src-tauri/src/proxy/mod.rs", "src-tauri/src/chat/redact.rs"],
+        followUps: ["确保持久化使用 SQLite WAL 模式，并且单文件严格控制在 500 行以内。"],
+        stages: [
+          { num: "✓", label: "S1 需求澄清与边界", state: "done", time: "14s" },
+          { num: "✓", label: "S2 生成 SPEC.md 图谱", state: "done", time: "22s" },
+          { num: "✓", label: "S3 并行编码 (3 Workers)", state: "done", time: "1m48s" },
+          { num: "!", label: "S4 架构与落盘策略决策", state: "gate", time: "待用户拍板" },
+          { num: "5", label: "S5 E2E 沙箱与 24 用例验证", state: "active", time: "已就绪" },
+          { num: "6", label: "S6 跨模型独立审查", state: "done", time: "96/100" }
+        ],
+        decisions: [
+          {
+            stage: "S1 需求澄清门禁",
+            question: "告警网关外发 Webhook 时，当用户配置了独立代理 (Custom Proxy) 但代理服务器不可达，应如何处理？",
+            answer: "方案 A（已选）：严格阻断并转入本地断点续传队列，显式暴露代理错误，绝不静默回退直连（符合仓库网络铁律）",
+            decidedAt: "10:14:22"
+          },
+          {
+            stage: "S4 缓冲溢出策略决策",
+            question: "当离线环形缓冲区达到磁盘配额上限 (256MB) 时，高优安全审计事件的降级策略？",
+            answer: "待您拍板确认（默认推荐方案 A：按优先级淘汰低优 Debug 遥测并保留 100% 安全审计记录）",
+            decidedAt: "等待拍板"
+          }
+        ],
+        activeDecision: {
+          id: "dec-buffer-policy",
+          stage: "S4 核心落盘策略决策门禁",
+          question: "离线审计队列达到 256MB 配额上限时的背压与淘汰策略选择？",
+          context: "Worker-1 (Rust 后端) 已完成 SQLite 环形缓冲核心实现，但在壓测极端断网 72 小时场景时，需您确认配额满载时的生产级行为（过程代码已静默隐藏，仅汇报决策项）：",
+          selectedOption: "opt-a",
+          resolved: false,
+          options: [
+            {
+              id: "opt-a",
+              title: "方案 A：分级淘汰低优遥测 + 安全审计事件零丢失锁保护 (Recommended)",
+              desc: "优先清理 INFO/DEBUG 级诊断记录，对 SECURITY_AUDIT 级别事件启用独立保留表；超出硬上限时阻塞新非关键写入并发出状态栏告警。",
+              impact: "零额外 Token 开销 · 符合生产合规要求"
+            },
+            {
+              id: "opt-b",
+              title: "方案 B：FIFO 滚动覆盖最旧记录 + 自动压缩归档为 .zst 分片",
+              desc: "不区分事件等级，满 256MB 后自动将旧分片通过 zstd 压缩转储至归档目录。",
+              impact: "+1 个归档清理子任务 · 预计 +0.25u 成本"
+            },
+            {
+              id: "opt-c",
+              title: "方案 C：直接拒绝新审计事件并返回 IPC BUSY 错误",
+              desc: "实现最简单，但高负载断网期间会导致上游业务调用感知失败。",
+              impact: "零额外开发 · 但可用性较低"
+            }
+          ]
+        }
+      },
+      {
+        id: "run-3c81",
+        title: "修复 SSH 高并发重连下 SFTP 句柄泄漏与面板崩溃",
+        blueprintId: "legacy-bugfix",
+        blueprintLabel: "既有大库 Bug 修复",
+        status: "candidate",
+        statusLabel: "候选可合并 (24/24 E2E)",
+        dotClass: "green",
+        worktree: "agent/run-3c81",
+        watchdog: "Watchdog: Red→Green 验证通过",
+        cost: "0.86u ($0.21)",
+        diffStat: "3 files · +84 -19",
+        e2eStat: "Crash-Suite 100%",
+        goal: "生产问题修复：当 SSH 会话因网络抖动触发连续自动重连时，已挂载的 SFTP 文件浏览器偶发出现陈旧 Channel 句柄未释放并触发前端渲染崩溃。请定位根因，先写复现用例，最小化修复并跑通全量 crash-regression 套件。",
+        sources: ["src/layouts/main/reattachSftp.ts", "src-tauri/src/terminal/ssh/agent.rs"],
+        followUps: ["必须包含复现单测与 crash-regression E2E 验证，严禁增加大文件体积。"],
+        stages: [
+          { num: "✓", label: "S1 并行调用链根因定位", state: "done", time: "19s" },
+          { num: "✓", label: "S2 编写失败复现用例 (Red)", state: "done", time: "31s" },
+          { num: "✓", label: "S3 最小外科手术修复 (Green)", state: "done", time: "44s" },
+          { num: "✓", label: "S4 Crash-Regression 全量套件", state: "done", time: "1m12s" },
+          { num: "✓", label: "S5 独立 Review 与交付收据", state: "done", time: "98/100" }
+        ],
+        decisions: [
+          {
+            stage: "S2 根因与修复边界确认",
+            question: "已定位到 reattachSftp 在重连代次 (generation) 递增时未取消上一代挂起的 Promise。采用代数令牌拦截还是重构整个 SFTP Store？",
+            answer: "采用轻量 Generation Token 守卫 + 显式释放旧句柄（仅改动 3 个文件 +84/-19 行，零架构侵入）",
+            decidedAt: "09:42:10"
+          }
+        ],
+        activeDecision: null
+      },
+      {
+        id: "run-7d12",
+        title: "多模型成本账本与单任务预算熔断中心",
+        blueprintId: "0-1-spec-driven",
+        blueprintLabel: "0-1 有需求有设计",
+        status: "running",
+        statusLabel: "后台执行中 (Burn-in 2/3)",
+        dotClass: "blue",
+        worktree: "agent/run-7d12",
+        watchdog: "Watchdog: 3 Subagents 正常收敛",
+        cost: "0.94u ($0.25)",
+        diffStat: "5 files · +246 -31",
+        e2eStat: "Burn-in 2/3 运行中",
+        goal: "按照 docs-feature/cost-governance-spec.md 设计文档，实现多模型成本系数实时统计与单任务预算软上限暂停门。",
+        sources: ["src/components/agents/orchestration/settingsModel.ts", "src-tauri/src/orchestration/core/model.rs"],
+        followUps: [],
+        stages: [
+          { num: "✓", label: "S1 解析设计文档并冻结契约", state: "done", time: "11s" },
+          { num: "✓", label: "S2 3 Subagents 并行实现", state: "done", time: "1m20s" },
+          { num: "●", label: "S3 E2E 沙箱 3x 稳定性验证", state: "active", time: "第 2/3 轮" },
+          { num: "4", label: "S4 跨模型独立审查", state: "pending", time: "等待中" }
+        ],
+        decisions: [
+          {
+            stage: "S1 契约对齐",
+            question: "成本系数 (costCoefficient) 是否支持小数点后两位精度并与历史快照兼容？",
+            answer: "已确认兼容 f64 并在修订快照中保留不可变值",
+            decidedAt: "10:02:05"
+          }
+        ],
+        activeDecision: null
+      },
+      {
+        id: "run-4e90",
+        title: "[Webhook 触发 · Observe 模式] Windows Job 进程树回收偶发超时诊断",
+        blueprintId: "e2e-hardening",
+        blueprintLabel: "事件触发 · Observe",
+        status: "observe",
+        statusLabel: "Observe 预诊断就绪",
+        dotClass: "purple",
+        worktree: "agent/run-4e90",
+        watchdog: "Watchdog: 只读观察模式",
+        cost: "0.18u ($0.04)",
+        diffStat: "1 file · +28 -4 (投机草案)",
+        e2eStat: "复现验证通过",
+        goal: "来自 GitHub Actions CI #482 事件触发（DeepSeek Super-agent 风格投机预执行）：检测到 windows_job.rs 在子进程派孙进程时偶发等待超时。已在后台只读 Worktree 完成复现与 28 行修复草案验证，等待人类授权转为正式 PR。",
+        sources: ["src-tauri/src/orchestration/execution/windows_job.rs"],
+        followUps: [],
+        stages: [
+          { num: "✓", label: "Fast/Slow Path 事件过滤", state: "done", time: "1s" },
+          { num: "✓", label: "后台 Observe 复现与最小修复验证", state: "done", time: "38s" },
+          { num: "!", label: "等待授权转为正式交付分支", state: "gate", time: "低打扰挂起" }
+        ],
+        decisions: [],
+        activeDecision: null
+      }
+    ];
+
+    const CHANGED_FILES = [
+      {
+        path: "src-tauri/src/orchestration/audit_gateway.rs",
+        spec: "SPEC-AUD-01 / 02",
+        add: 148,
+        del: 12,
+        hunks: [
+          {
+            id: "hunk-1",
+            range: "@@ -1,14 +1,38 @@ pub mod audit_gateway",
+            specRef: "SPEC-AUD-01: 敏感凭据落盘前强制脱敏",
+            status: "kept",
+            comment: "",
+            lines: [
+              { old: "1", new: "1", type: "ctx", code: "use crate::chat::redact::redact;" },
+              { old: "2", new: "2", type: "ctx", code: "use crate::proxy::{AppProxyConfig, resolve_outbound_client};" },
+              { old: "3", new: "", type: "del", code: "-pub fn append_raw_event(payload: &str) -> Result<(), String> {" },
+              { old: "", new: "3", type: "add", code: "+/// Enforces vault:<id> redaction and bounded ring-buffer persistence." },
+              { old: "", new: "4", type: "add", code: "+pub fn append_sanitized_event(store: &AuditStore, payload: &str) -> Result<AuditReceipt, String> {" },
+              { old: "", new: "5", type: "add", code: "+    let (clean_payload, redacted_count) = redact(payload);" },
+              { old: "", new: "6", type: "add", code: "+    if clean_payload.contains(\"vault:\") && !is_valid_vault_ref(&clean_payload) {" },
+              { old: "", new: "7", type: "add", code: "+        return Err(\"SECURITY_VIOLATION: plaintext secret detected\".into());" },
+              { old: "", new: "8", type: "add", code: "+    }" },
+              { old: "4", new: "9", type: "ctx", code: "    store.insert_wal_record(&clean_payload, redacted_count)" },
+              { old: "5", new: "10", type: "ctx", code: "}" }
+            ]
+          },
+          {
+            id: "hunk-2",
+            range: "@@ -42,8 +66,24 @@ pub async fn dispatch_webhook_alert",
+            specRef: "SPEC-AUD-02: 严格三态代理与零静默回退",
+            status: "kept",
+            comment: "请确认当 proxy_mode == \"none\" 时，reqwest Client builder 显式调用了 .no_proxy() 以彻底绕过环境变量 HTTP_PROXY。",
+            lines: [
+              { old: "42", new: "66", type: "ctx", code: "pub async fn dispatch_webhook_alert(cfg: &AlertChannelConfig, event: &AuditEvent) -> Result<(), String> {" },
+              { old: "43", new: "", type: "del", code: "-    let client = reqwest::Client::new();" },
+              { old: "", new: "67", type: "add", code: "+    // Strictly honor 'app' | 'custom' | 'none' proxy mode; never fall back to direct on proxy failure." },
+              { old: "", new: "68", type: "add", code: "+    let client = resolve_outbound_client(&cfg.proxy_mode, cfg.custom_proxy.as_ref())" },
+              { old: "", new: "69", type: "add", code: "+        .map_err(|err| format!(\"PROXY_RESOLUTION_FAILED: {err}\"))?;" },
+              { old: "44", new: "70", type: "ctx", code: "    client.post(&cfg.endpoint).json(event).send().await.map_err(|e| e.to_string())?;" },
+              { old: "45", new: "71", type: "ctx", code: "    Ok(())" },
+              { old: "46", new: "72", type: "ctx", code: "}" }
+            ]
+          }
+        ]
+      },
+      {
+        path: "src-tauri/src/orchestration/ring_buffer.rs",
+        spec: "SPEC-AUD-03",
+        add: 92,
+        del: 8,
+        hunks: [
+          {
+            id: "hunk-3",
+            range: "@@ -10,6 +10,28 @@ impl AuditRingBuffer",
+            specRef: "SPEC-AUD-03: 256MB 离线环形缓冲与分级淘汰",
+            status: "pending",
+            comment: "",
+            lines: [
+              { old: "10", new: "10", type: "ctx", code: "pub const MAX_RING_BYTES: u64 = 256 * 1024 * 1024;" },
+              { old: "", new: "11", type: "add", code: "+pub fn evict_low_priority_if_needed(&mut self, incoming_bytes: u64) -> Result<u64, String> {" },
+              { old: "", new: "12", type: "add", code: "+    if self.used_bytes + incoming_bytes <= MAX_RING_BYTES { return Ok(0); }" },
+              { old: "", new: "13", type: "add", code: "+    self.purge_by_severity(&[\"DEBUG\", \"INFO\"], incoming_bytes)" },
+              { old: "", new: "14", type: "add", code: "+}" }
+            ]
+          }
+        ]
+      },
+      {
+        path: "src/components/agents/orchestration/AuditGatewayPanel.tsx",
+        spec: "SPEC-AUD-04",
+        add: 54,
+        del: 14,
+        hunks: []
+      },
+      {
+        path: "qa-ui-auto-tests/cases/TC-AUD-001-proxy-no-fallback.testcase.yaml",
+        spec: "E2E-SUITE",
+        add: 24,
+        del: 8,
+        hunks: []
+      }
+    ];
+
+    const E2E_CASES = [
+      {
+        id: "TC-AUD-001",
+        title: "三态代理验证：Custom 代理不可达时显式报错且零静默直连回退",
+        spec: "SPEC-AUD-02",
+        category: "boundary",
+        duration: "410ms",
+        assertions: 7,
+        yaml: `id: TC-AUD-001-proxy-no-fallback\ntags: [super-agents, audit-gateway, network-proxy]\nenvironment:\n  target: local_sandbox\n  endpoint: http://127.0.0.1:5192\nsteps:\n  - action: configure_resource_proxy\n    mode: custom\n    host: 127.0.0.1\n    port: 59999 # Unreachable dead proxy port\n  - action: trigger_audit_webhook_dispatch\n  - assert_element:\n      testid: orch-error-banner\n      contains: "PROXY_RESOLUTION_FAILED"\n  - assert_metric:\n      direct_fallback_connections: 0\n  - assert_no_runtime_errors: true`
+      },
+      {
+        id: "TC-AUD-002",
+        title: "敏感凭据拦截：日志包含明文 token 时自动脱敏并保留 vault:<id> 引用",
+        spec: "SPEC-AUD-01",
+        category: "happy_path",
+        duration: "290ms",
+        assertions: 5,
+        yaml: `id: TC-AUD-002-vault-redaction\ntags: [super-agents, security]\nsteps:\n  - action: emit_synthetic_audit_event\n    payload: "Authorization: Bearer sk-live-99887766"\n  - assert_sqlite_row:\n      not_contains: "sk-live-99887766"\n      contains: "[REDACTED]"\n  - assert_no_runtime_errors: true`
+      },
+      {
+        id: "TC-AUD-003",
+        title: "断网断点续传：256MB 环形缓冲淘汰低优日志并完整恢复安全事件",
+        spec: "SPEC-AUD-03",
+        category: "boundary",
+        duration: "620ms",
+        assertions: 9,
+        yaml: `id: TC-AUD-003-ring-buffer-resumption\ntags: [super-agents, persistence]\nsteps:\n  - action: simulate_network_offline\n  - action: flood_ring_buffer_to_quota\n  - action: restore_network_online\n  - assert_delivered_security_events: 100%\n  - assert_no_runtime_errors: true`
+      },
+      {
+        id: "TC-CRASH-019",
+        title: "[crash-regression] 快速切换项目与取消运行中 Worker 时零孤儿进程与零界面崩溃",
+        spec: "CRASH-GATE",
+        category: "crash_regression",
+        duration: "540ms",
+        assertions: 8,
+        yaml: `id: TC-CRASH-019-worktree-cancel-switch\ntags: [crash-regression, orchestration]\nsteps:\n  - action: start_parallel_worker_run\n  - action: switch_project_root_rapidly\n    repeat: 5\n  - action: cancel_active_run\n  - assert_process_group_reaped: true\n  - assert_visible:\n      testid: agents-platform-view\n  - assert_no_runtime_errors: true`
+      }
+    ];
+
+    let activeTaskId = TASKS[0].id;
+    let currentWorkbenchMode = "stream";
+    let currentIdeTab = "changes";
+    let selectedFileIndex = 0;
+    let selectedE2eIndex = 0;
+    let showRawTelemetry = false;
+
+    function initPrototype() {
+      renderTaskSidebar();
+      selectTask(activeTaskId);
+      renderIdeTree();
+      renderIdeHunks();
+      renderE2eCases();
+    }
+
+    function renderTaskSidebar(filterText = "") {
+      const container = document.getElementById("taskListContainer");
+      const q = filterText.trim().toLowerCase();
+      const filtered = TASKS.filter(t =>
+        !q || t.title.toLowerCase().includes(q) || t.blueprintLabel.toLowerCase().includes(q) || t.worktree.toLowerCase().includes(q)
+      );
+
+      container.innerHTML = filtered.map(task => {
+        const isActive = task.id === activeTaskId;
+        const badgeHtml = task.status === "decision"
+          ? `<span class="task-decision-pill">${task.statusLabel}</span>`
+          : task.status === "candidate"
+            ? `<span class="task-ready-pill">${task.statusLabel}</span>`
+            : `<span style="margin-left:auto;">${task.statusLabel}</span>`;
+        return `
+          <button type="button" class="orch-task-entry ${isActive ? "active" : ""}" onclick="selectTask('${task.id}')">
+            <div class="task-row-top">
+              <span class="orch-task-dot ${task.dotClass}"></span>
+              <span class="orch-task-label">${task.title}</span>
+            </div>
+            <div class="task-row-meta">
+              <span class="task-tpl-tag">${task.blueprintLabel}</span>
+              ${badgeHtml}
+            </div>
+          </button>
+        `;
+      }).join("");
+    }
+
+    function filterTasks(val) {
+      renderTaskSidebar(val);
+    }
+
+    function selectTask(taskId) {
+      activeTaskId = taskId;
+      const task = TASKS.find(t => t.id === taskId) || TASKS[0];
+      renderTaskSidebar();
+
+      document.getElementById("activeTaskTitle").textContent = task.title;
+      document.getElementById("activeTaskBlueprintBadge").textContent = task.blueprintLabel;
+      document.getElementById("activeWorktreeTag").textContent = "worktree: " + task.worktree;
+      document.getElementById("activeWatchdogTag").textContent = task.watchdog;
+      document.getElementById("activeCostTag").textContent = "成本: " + task.cost;
+      document.getElementById("ideBadgeCount").textContent = task.diffStat;
+      document.getElementById("qaBadgeCount").textContent = task.e2eStat;
+      document.getElementById("streamBadgeCount").textContent =
+        task.activeDecision && !task.activeDecision.resolved ? "1 待决策" : "低噪就绪";
+
+      renderStagePipeline(task);
+      renderStreamCards(task);
+    }
+
+    function renderStagePipeline(task) {
+      const bar = document.getElementById("stagePipelineBar");
+      const nodesHtml = task.stages.map((st, idx) => {
+        const arrow = idx < task.stages.length - 1 ? `<span class="stage-arrow">→</span>` : "";
+        return `
+          <div class="stage-node ${st.state}">
+            <span class="stage-num">${st.num}</span>
+            <span>${st.label}</span>
+            <span style="opacity:0.65;font-size:10px;">${st.time}</span>
+          </div>
+          ${arrow}
+        `;
+      }).join("");
+
+      bar.innerHTML = `
+        ${nodesHtml}
+        <button type="button" class="noise-filter-pill" onclick="toggleTelemetryView()" title="默认隐藏所有 Thinking 与工具刷屏，点击可按需查看底层执行计数">
+          <span>🔇 已静默过滤 142 条过程输出</span>
+          <strong style="color:var(--orch-accent);">${showRawTelemetry ? "收起遥测" : "按需查看"}</strong>
+        </button>
+      `;
+    }
+
+    function toggleTelemetryView() {
+      showRawTelemetry = !showRawTelemetry;
+      const task = TASKS.find(t => t.id === activeTaskId) || TASKS[0];
+      renderStagePipeline(task);
+      renderStreamCards(task);
+    }
+
+    function renderStreamCards(task) {
+      const container = document.getElementById("streamCardsContainer");
+      const parts = [];
+
+      // 1. User Goal & Blueprint Context Card
+      parts.push(`
+        <article class="goal-card">
+          <div class="goal-card-top">
+            <span><strong>您的任务目标 (User Goal)</strong> · 任务蓝图: <strong>${task.blueprintLabel}</strong></span>
+            <span>配置快照: 生产交付标准方案 · rev 7 (已冻结)</span>
+          </div>
+          <div class="goal-card-body">${task.goal}</div>
+          <div class="goal-context-chips">
+            ${task.sources.map(s => `<span class="context-chip">📄 ${s}</span>`).join("")}
+            <span class="context-chip">🌿 隔离分支: ${task.worktree}</span>
+          </div>
+        </article>
+      `);
+
+      // Optional on-demand telemetry drawer (collapsed by default)
+      if (showRawTelemetry) {
+        parts.push(`
+          <article class="signal-card" style="border-style:dashed;">
+            <div class="signal-header">
+              <span class="signal-type-tag watchdog">按需底层遥测 (默认静默不打扰)</span>
+              <span>Global Router / Workers 内部调用聚合摘要</span>
+            </div>
+            <div class="signal-body" style="font-family:var(--taomni-code-font-family);font-size:11px;color:var(--orch-muted);">
+              <div>[Router · DeepSeek-V4-Flash 0.15x] 意图匹配蓝图=${task.blueprintId} · Packed Planning 单次生成 4 份契约节点</div>
+              <div>[Worker-1 · Claude Code CLI] 隔离 Worktree 创建于 ~/.taomni/orchestration/worktrees/${task.id} (38 次文件读取与中间编译已折叠)</div>
+              <div>[Worker-2 · OpenCode QA] 自动派生 24 条 E2E 用例并完成沙箱 :5192 连续 3 轮防脆弱测试</div>
+              <div>[Watchdog · Out-of-Band] 校验测试断言完整性通过 · 单文件最大行数 342 行 (&lt; 800 行上限)</div>
+            </div>
+          </article>
+        `);
+      }
+
+      // 2. Milestone Brief Card (Concise Stage Summary + Parallel Subagent Matrix)
+      parts.push(`
+        <article class="signal-card">
+          <div class="signal-header">
+            <span class="signal-type-tag milestone">阶段性汇报 (Milestone Brief)</span>
+            <strong>SPEC.md 契约图谱已冻结，3 个并行 Subagents 已完成隔离编码</strong>
+            <span style="margin-left:auto;font-size:10px;color:var(--orch-muted);">耗时 2m 10s · 过程输出已折叠</span>
+          </div>
+          <div class="signal-body">
+            <div>系统已完成架构契约拆解并在独立 Git Worktree 中完成模块开发，未产生非必要的中间刷屏输出：</div>
+            <div class="subagent-grid">
+              <div class="subagent-box">
+                <div class="subagent-box-top">
+                  <span>Subagent #1 · 后端核心</span>
+                  <span style="color:#4ade80;">✓ Candidate</span>
+                </div>
+                <small>Harness: Claude Code CLI (1.0x)</small>
+                <small>产物: audit_gateway.rs, ring_buffer.rs</small>
+              </div>
+              <div class="subagent-box">
+                <div class="subagent-box-top">
+                  <span>Subagent #2 · 前端与状态</span>
+                  <span style="color:#4ade80;">✓ Candidate</span>
+                </div>
+                <small>Harness: OpenCode Worker (0.75x)</small>
+                <small>产物: AuditGatewayPanel.tsx</small>
+              </div>
+              <div class="subagent-box">
+                <div class="subagent-box-top">
+                  <span>Subagent #3 · E2E 与沙箱</span>
+                  <span style="color:#4ade80;">✓ 24/24 Passed</span>
+                </div>
+                <small>Harness: OpenCode QA (0.60x)</small>
+                <small>环境: Local Sandbox :5192 就绪</small>
+              </div>
+            </div>
+          </div>
+        </article>
+      `);
+
+      // 3. Decision Request Card (Interactive!)
+      if (task.activeDecision) {
+        const dec = task.activeDecision;
+        if (!dec.resolved) {
+          parts.push(`
+            <article class="signal-card decision-card">
+              <div class="signal-header">
+                <span class="signal-type-tag decision">待您决策 (Decision Gate)</span>
+                <strong>${dec.stage}：${dec.question}</strong>
+                <span style="margin-left:auto;font-size:10px;color:var(--taomni-warning-text);">需要人类拍板后锁定最终合并候选</span>
+              </div>
+              <div class="signal-body">
+                <div style="color:var(--orch-muted);margin-bottom:8px;">${dec.context}</div>
+                <div class="decision-options">
+                  ${dec.options.map(opt => `
+                    <div class="decision-option ${dec.selectedOption === opt.id ? "selected" : ""}" onclick="chooseDecisionOption('${opt.id}')">
+                      <span class="decision-radio"></span>
+                      <div class="decision-opt-content">
+                        <strong>
+                          <span>${opt.title}</span>
+                          <span class="orch-subtle-badge">${opt.impact}</span>
+                        </strong>
+                        <p>${opt.desc}</p>
+                      </div>
+                    </div>
+                  `).join("")}
+                </div>
+                <div class="decision-footer">
+                  <input type="text" id="customDecisionNote" class="decision-custom-input" placeholder="可选：补充额外约束说明（将自动沉淀为项目 Durable Lesson）…" />
+                  <button type="button" class="orch-solid" onclick="confirmActiveDecision()">
+                    <svg viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                    <span>确认决策并生成最终交付物</span>
+                  </button>
+                </div>
+              </div>
+            </article>
+          `);
+        } else {
+          parts.push(`
+            <article class="signal-card">
+              <div class="signal-header">
+                <span class="signal-type-tag receipt">决策已确认</span>
+                <strong>${dec.stage} 已锁定并应用至 Worktree</strong>
+                <span style="margin-left:auto;font-size:10px;color:var(--orch-muted);">已记入《任务全景简报》</span>
+              </div>
+              <div class="signal-body">
+                已应用您的决策选择：<strong>${dec.options.find(o => o.id === dec.selectedOption)?.title}</strong>。
+              </div>
+            </article>
+          `);
+        }
+      }
+
+      // 4. Final Delivery Receipt Card (ThinkRail + Production Quality Gate)
+      parts.push(`
+        <article class="signal-card">
+          <div class="signal-header">
+            <span class="signal-type-tag receipt">交付结果收据 (Delivery Receipt)</span>
+            <strong>生产级候选产物已就绪 · 全部质量门禁通过</strong>
+            <span style="margin-left:auto;font-family:var(--taomni-code-font-family);font-size:11px;">
+              <span class="diff-add">+318</span> <span class="diff-del">−42</span> · 6 files
+            </span>
+          </div>
+          <div class="signal-body">
+            <div>全部代码变更已保存在隔离 Git Worktree (<code class="mono-tag">${task.worktree}</code>)，未经您的审阅绝不自动覆写主工作区：</div>
+            <div class="receipt-stats-grid">
+              <div class="receipt-stat-cell">
+                <small>代码变更收据 (Turn Receipt)</small>
+                <strong>6 Files (<span class="diff-add">+318</span> / <span class="diff-del">-42</span>)</strong>
+              </div>
+              <div class="receipt-stat-cell">
+                <small>自动化 E2E 与防崩溃验证</small>
+                <strong style="color:#4ade80;">24 / 24 通过 (3x 稳定)</strong>
+              </div>
+              <div class="receipt-stat-cell">
+                <small>跨模型独立 Review 评分</small>
+                <strong style="color:#4ade80;">96 / 100 (0 Blocker)</strong>
+              </div>
+              <div class="receipt-stat-cell">
+                <small>宿主派发与加权成本</small>
+                <strong>4 次派发 · ${task.cost}</strong>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+              <button type="button" class="orch-solid" onclick="switchWorkbenchMode('ide')">
+                <svg viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+                <span>进入轻量 IDE 逐块审阅 (Keep / Revert / 批注)</span>
+              </button>
+              <button type="button" class="orch-outline" onclick="switchWorkbenchMode('qa')">
+                <span>查看 E2E 环境与 24 条测试证据</span>
+              </button>
+              <button type="button" class="orch-outline" onclick="openExecutiveSummaryModal()">
+                <span>📋 一键总结：提示词 / 决策答案 / 进度</span>
+              </button>
+            </div>
+          </div>
+        </article>
+      `);
+
+      container.innerHTML = parts.join("");
+    }
+
+    function chooseDecisionOption(optId) {
+      const task = TASKS.find(t => t.id === activeTaskId);
+      if (!task || !task.activeDecision) return;
+      task.activeDecision.selectedOption = optId;
+      renderStreamCards(task);
+    }
+
+    function confirmActiveDecision() {
+      const task = TASKS.find(t => t.id === activeTaskId);
+      if (!task || !task.activeDecision) return;
+      const chosen = task.activeDecision.options.find(o => o.id === task.activeDecision.selectedOption);
+      const customNote = document.getElementById("customDecisionNote")?.value?.trim();
+      task.activeDecision.resolved = true;
+      task.status = "candidate";
+      task.statusLabel = "候选可合并 (24/24 E2E)";
+      task.dotClass = "green";
+      task.stages[3].state = "done";
+      task.stages[3].num = "✓";
+      task.stages[3].time = "已拍板";
+      task.stages[4].state = "done";
+      task.stages[4].num = "✓";
+      task.decisions[1].answer = chosen.title + (customNote ? `（补充约束：${customNote}）` : "");
+      task.decisions[1].decidedAt = new Date().toTimeString().slice(0, 8);
+
+      selectTask(task.id);
+      showToast("决策已确认并写入持久记忆！您可以在右上角点击「一键总结汇报」查看完整决策问答录。");
+    }
+
+    /* ========================================================================
+       Workbench Mode Switching (Stream / IDE / QA)
+       ======================================================================== */
+    function switchWorkbenchMode(mode) {
+      currentWorkbenchMode = mode;
+      document.getElementById("surfaceStream").hidden = mode !== "stream";
+      document.getElementById("surfaceIde").hidden = mode !== "ide";
+      document.getElementById("surfaceQa").hidden = mode !== "qa";
+
+      document.getElementById("tabBtnStream").classList.toggle("active", mode === "stream");
+      document.getElementById("tabBtnIde").classList.toggle("active", mode === "ide");
+      document.getElementById("tabBtnQa").classList.toggle("active", mode === "qa");
+    }
+
+    /* ========================================================================
+       IDE View Logic (Specs Graph, Changed Files, Hunk Keep/Revert/Comment)
+       ======================================================================== */
+    function switchIdeLeftTab(tab) {
+      currentIdeTab = tab;
+      document.getElementById("ideTabChanges").classList.toggle("active", tab === "changes");
+      document.getElementById("ideTabSpecs").classList.toggle("active", tab === "specs");
+      document.getElementById("ideTabFiles").classList.toggle("active", tab === "files");
+      renderIdeTree();
+    }
+
+    function renderIdeTree() {
+      const container = document.getElementById("ideTreeListContainer");
+      if (currentIdeTab === "changes") {
+        container.innerHTML = CHANGED_FILES.map((file, idx) => `
+          <button type="button" class="ide-file-item ${idx === selectedFileIndex ? "active" : ""}" onclick="selectIdeFile(${idx})">
+            <span>📄</span>
+            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${file.path.split("/").pop()}</span>
+            <span class="file-stat"><span class="diff-add">+${file.add}</span> <span class="diff-del">-${file.del}</span></span>
+          </button>
+        `).join("");
+      } else if (currentIdeTab === "specs") {
+        container.innerHTML = `
+          <div style="padding:6px;font-size:11px;display:flex;flex-direction:column;gap:6px;">
+            <div class="subagent-box" onclick="selectIdeFile(0)" style="cursor:pointer;">
+              <div class="subagent-box-top"><span>SPEC-AUD-01</span><span style="color:#4ade80;">Verified</span></div>
+              <small>敏感凭据 vault:&lt;id&gt; 落盘前强制脱敏</small>
+              <small style="color:var(--orch-accent);">↳ audit_gateway.rs · TC-AUD-002</small>
+            </div>
+            <div class="subagent-box" onclick="selectIdeFile(0)" style="cursor:pointer;">
+              <div class="subagent-box-top"><span>SPEC-AUD-02</span><span style="color:#4ade80;">Verified</span></div>
+              <small>出站告警严格遵守三态代理且零静默回退</small>
+              <small style="color:var(--orch-accent);">↳ audit_gateway.rs · TC-AUD-001</small>
+            </div>
+            <div class="subagent-box" onclick="selectIdeFile(1)" style="cursor:pointer;">
+              <div class="subagent-box-top"><span>SPEC-AUD-03</span><span style="color:#4ade80;">Verified</span></div>
+              <small>256MB 离线环形缓冲区与分级淘汰策略</small>
+              <small style="color:var(--orch-accent);">↳ ring_buffer.rs · TC-AUD-003</small>
+            </div>
+          </div>
+        `;
+      } else {
+        container.innerHTML = `
+          <div style="padding:6px 8px;font-family:var(--taomni-code-font-family);font-size:11px;line-height:1.9;color:var(--orch-muted);">
+            <div>📁 src-tauri/src/orchestration/</div>
+            <div style="padding-left:14px;color:var(--orch-text);">🦀 audit_gateway.rs (M)</div>
+            <div style="padding-left:14px;color:var(--orch-text);">🦀 ring_buffer.rs (A)</div>
+            <div style="padding-left:14px;">🦀 service.rs</div>
+            <div style="padding-left:14px;">🦀 worktree.rs</div>
+            <div>📁 src/components/agents/</div>
+            <div style="padding-left:14px;color:var(--orch-text);">⚛️ AuditGatewayPanel.tsx (A)</div>
+            <div>📁 qa-ui-auto-tests/cases/</div>
+            <div style="padding-left:14px;color:var(--orch-text);">🧪 TC-AUD-001.testcase.yaml (A)</div>
+          </div>
+        `;
+      }
+    }
+
+    function selectIdeFile(idx) {
+      selectedFileIndex = idx;
+      const file = CHANGED_FILES[idx];
+      document.getElementById("ideCurrentFilePath").textContent = file.path;
+      renderIdeTree();
+      renderIdeHunks();
+    }
+
+    function renderIdeHunks() {
+      const file = CHANGED_FILES[selectedFileIndex];
+      const container = document.getElementById("ideHunkContainer");
+      const hunks = file.hunks.length ? file.hunks : CHANGED_FILES[0].hunks;
+
+      container.innerHTML = hunks.map(hunk => `
+        <div class="hunk-card ${hunk.status}">
+          <div class="hunk-header">
+            <span>${hunk.range}</span>
+            <span class="orch-subtle-badge">${hunk.specRef}</span>
+            <div class="hunk-actions">
+              <button type="button" class="hunk-btn keep ${hunk.status === "kept" ? "active" : ""}" onclick="setHunkStatus('${hunk.id}', 'kept')">
+                ✓ Keep 保留此块
+              </button>
+              <button type="button" class="hunk-btn revert ${hunk.status === "reverted" ? "active" : ""}" onclick="setHunkStatus('${hunk.id}', 'reverted')">
+                ↺ Revert 回退此块
+              </button>
+              <button type="button" class="hunk-btn" onclick="promptHunkComment('${hunk.id}')">
+                💬 Ask Agent 行内批注
+              </button>
+            </div>
+          </div>
+          <table class="diff-table">
+            <tbody>
+              ${hunk.lines.map(line => `
+                <tr class="diff-line ${line.type}" onclick="promptHunkComment('${hunk.id}')" title="点击任意代码行添加行内锚定 Review 批注">
+                  <td class="diff-num">${line.old}</td>
+                  <td class="diff-num">${line.new}</td>
+                  <td class="diff-code">${escapeHtml(line.code)}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+          ${hunk.comment ? `
+            <div class="anchored-comment-box">
+              <div style="display:flex;justify-content:space-between;font-size:10.5px;color:var(--orch-accent);margin-bottom:4px;">
+                <strong>📌 行内锚定 Review 批注 (Anchored Context -> 将作为结构化上下文发给 Worker)</strong>
+                <span>待派发</span>
+              </div>
+              <div style="font-size:11.5px;">${escapeHtml(hunk.comment)}</div>
+            </div>
+          ` : ""}
+        </div>
+      `).join("");
+
+      updateHunkSummaryBadge();
+    }
+
+    function setHunkStatus(hunkId, status) {
+      for (const f of CHANGED_FILES) {
+        for (const h of f.hunks) {
+          if (h.id === hunkId) h.status = status;
+        }
+      }
+      renderIdeHunks();
+      showToast(status === "kept" ? "已标记保留该代码 Hunk" : "已标记回退该代码 Hunk");
+    }
+
+    function promptHunkComment(hunkId) {
+      for (const f of CHANGED_FILES) {
+        for (const h of f.hunks) {
+          if (h.id === hunkId) {
+            const next = window.prompt("输入针对此代码 Hunk 的审阅修改指令（将携带精确文件路径与行号上下文派发给 Worker）：", h.comment || "请在此处补充单元测试断言并校验错误分支返回码。");
+            if (next !== null) {
+              h.comment = next.trim();
+              renderIdeHunks();
+            }
+          }
+        }
+      }
+    }
+
+    function updateHunkSummaryBadge() {
+      let kept = 0, reverted = 0, comments = 0;
+      for (const f of CHANGED_FILES) {
+        for (const h of f.hunks) {
+          if (h.status === "kept") kept++;
+          if (h.status === "reverted") reverted++;
+          if (h.comment) comments++;
+        }
+      }
+      document.getElementById("hunkSummaryBadge").textContent =
+        `${kept} 已保留 (Keep) · ${reverted} 已回退 (Revert) · ${comments} 条行内锚定批注待派发`;
+    }
+
+    function togglePtyDrawer() {
+      const drawer = document.getElementById("idePtyDrawer");
+      drawer.hidden = !drawer.hidden;
+    }
+
+    function dispatchAnchoredComments() {
+      showToast("已将行内锚定批注与 Hunk 坐标打包派发给 Worker-1，后台静默精准返工中…");
+    }
+
+    function acceptAndMergeWorktree() {
+      showToast("✓ 已通过全部质量门禁！隔离分支 agent/run-9a4f 已安全合并至主工作区并清理临时沙箱。");
+    }
+
+    /* ========================================================================
+       E2E Environment Lifecycle & QA Suite Logic
+       ======================================================================== */
+    function renderE2eCases() {
+      const list = document.getElementById("e2eCasesList");
+      list.innerHTML = E2E_CASES.map((c, idx) => `
+        <button type="button" class="e2e-case-row ${idx === selectedE2eIndex ? "active" : ""}" onclick="selectE2eCase(${idx})">
+          <span style="color:#4ade80;font-weight:700;">✓</span>
+          <code class="mono-tag">${c.id}</code>
+          <span style="flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${c.title}</span>
+          <span class="orch-subtle-badge">${c.spec}</span>
+          <span class="burnin-dots" title="连续 3 轮防脆弱测试全部通过 (3/3 Burn-in Pass)">
+            <span class="burnin-dot"></span><span class="burnin-dot"></span><span class="burnin-dot"></span>
+          </span>
+        </button>
+      `).join("");
+
+      const activeCase = E2E_CASES[selectedE2eIndex] || E2E_CASES[0];
+      document.getElementById("selectedE2eTitle").textContent =
+        `qa-ui-auto-tests/cases/${activeCase.id}.testcase.yaml (${activeCase.assertions} assertions · ${activeCase.duration})`;
+      document.getElementById("selectedE2eCode").textContent = activeCase.yaml;
+    }
+
+    function selectE2eCase(idx) {
+      selectedE2eIndex = idx;
+      renderE2eCases();
+    }
+
+    function switchEnvTarget(target) {
+      const labels = {
+        local_sandbox: "本地隔离沙箱 (Local Worktree + 独立端口 :5192)",
+        cloud_ephemeral: "云端弹性容器沙箱 (k8s://qa-ephemeral-9a4f · 4 并行分片)",
+        byom_ssh: "远程自带机器 (BYOM SSH Daemon · ssh://qa-linux-node-02:22)"
+      };
+      showToast("已切换 E2E 执行环境目标为: " + labels[target]);
+    }
+
+    function simulateEnvProvisioningLifecycle() {
+      const badge = document.getElementById("envGlobalStatusBadge");
+      const ids = ["envStep1", "envStep2", "envStep3", "envStep4"];
+      ids.forEach(id => {
+        const el = document.getElementById(id);
+        el.classList.remove("ready", "running");
+      });
+      badge.textContent = "STAGE 1/4: CREATING SANDBOX…";
+      document.getElementById("envStep1").classList.add("running");
+
+      setTimeout(() => {
+        document.getElementById("envStep1").classList.replace("running", "ready");
+        document.getElementById("envStep2").classList.add("running");
+        badge.textContent = "STAGE 2/4: PROVISIONING WORKTREE & FIXTURES…";
+      }, 450);
+
+      setTimeout(() => {
+        document.getElementById("envStep2").classList.replace("running", "ready");
+        document.getElementById("envStep3").classList.add("running");
+        badge.textContent = "STAGE 3/4: STARTING SUPERVISED SERVICES…";
+      }, 900);
+
+      setTimeout(() => {
+        document.getElementById("envStep3").classList.replace("running", "ready");
+        document.getElementById("envStep4").classList.add("running");
+        badge.textContent = "STAGE 4/4: RUNNING HEALTH & DOM PROBES…";
+      }, 1350);
+
+      setTimeout(() => {
+        document.getElementById("envStep4").classList.replace("running", "ready");
+        badge.textContent = "ENVIRONMENT READY · 4/4 阶段探针全部就绪";
+        showToast("✓ E2E 环境创建、Worktree 布置、服务启动与 4 项健康探针检测全部通过！");
+      }, 1800);
+    }
+
+    function runAllE2eCases() {
+      showToast("正在隔离环境 :5192 中执行 24 条 E2E 用例（含 6 条 crash-regression）… 24/24 全部通过！");
+    }
+
+    function generateExtraE2eCase() {
+      const newId = "TC-AUD-00" + (E2E_CASES.length + 1);
+      E2E_CASES.unshift({
+        id: newId,
+        title: "自动推导：代理鉴权 Vault 密钥轮换后热重载零连接中断验证",
+        spec: "SPEC-AUD-02",
+        category: "boundary",
+        duration: "380ms",
+        assertions: 6,
+        yaml: `id: ${newId}-vault-key-rotation\ntags: [super-agents, auto-synthesized, proxy]\nsteps:\n  - action: rotate_vault_credential\n    ref: "vault:qa_test_key"\n  - action: trigger_audit_webhook_dispatch\n  - assert_delivery_status: 200\n  - assert_no_runtime_errors: true`
+      });
+      selectedE2eIndex = 0;
+      renderE2eCases();
+      showToast(`QA Architect Agent 已根据 SPEC.md 自动生成并跑通 3x 稳定测试: ${newId}`);
+    }
+
+    /* ========================================================================
+       One-Click Executive Summary Modal Logic
+       ======================================================================== */
+    function openExecutiveSummaryModal() {
+      const task = TASKS.find(t => t.id === activeTaskId) || TASKS[0];
+      const body = document.getElementById("execSummaryBody");
+
+      body.innerHTML = `
+        <div class="summary-section">
+          <h4>1. 用户提示词与任务上下文 (User Prompts & Blueprint Context)</h4>
+          <table class="summary-table">
+            <tbody>
+              <tr>
+                <th style="width:140px;">任务标题 / ID</th>
+                <td><strong>${task.title}</strong> (<code class="mono-tag">${task.id}</code>)</td>
+              </tr>
+              <tr>
+                <th>所选工程蓝图</th>
+                <td><span class="orch-subtle-badge">${task.blueprintLabel}</span> (${task.blueprintId})</td>
+              </tr>
+              <tr>
+                <th>原始提示词 (Goal)</th>
+                <td>${task.goal}</td>
+              </tr>
+              <tr>
+                <th>追加指导与上下文</th>
+                <td>
+                  <div>附加文件: ${task.sources.map(s => `<code class="mono-tag">${s}</code>`).join(" ")}</div>
+                  ${task.followUps.length ? `<div style="margin-top:4px;">追加约束: ${task.followUps.join("；")}</div>` : ""}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+
+        <div class="summary-section">
+          <h4>2. 关键决策问答录 (User Decisions & Answers)</h4>
+          <table class="summary-table">
+            <thead>
+              <tr>
+                <th style="width:135px;">所属阶段</th>
+                <th>Agent 提出的架构/边界决策问题</th>
+                <th>用户拍板的决策答案</th>
+                <th style="width:90px;">决策时间</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${task.decisions.length ? task.decisions.map(d => `
+                <tr>
+                  <td><strong>${d.stage}</strong></td>
+                  <td>${d.question}</td>
+                  <td style="color:var(--orch-accent);font-weight:500;">${d.answer}</td>
+                  <td><code class="mono-tag">${d.decidedAt}</code></td>
+                </tr>
+              `).join("") : `<tr><td colspan="4" style="color:var(--orch-muted);">当前任务按既定规格自主推进，无需人工额外决策干预。</td></tr>`}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="summary-section">
+          <h4>3. 开发进度与并行 Subagent 编排状态 (Development Progress)</h4>
+          <div style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;">
+            ${task.stages.map(s => `<span class="orch-subtle-badge">${s.num} ${s.label} (${s.time})</span>`).join("")}
+          </div>
+          <div style="font-size:11px;color:var(--orch-muted);">
+            物理隔离分支: <code class="mono-tag">${task.worktree}</code> · 外部巡检状态: <strong>${task.watchdog}</strong> · 已静默折叠 142 条底层工具与思考流输出。
+          </div>
+        </div>
+
+        <div class="summary-section">
+          <h4>4. E2E 环境就绪度、自动化质量门禁与成本收据 (Quality & Cost Receipt)</h4>
+          <table class="summary-table">
+            <tbody>
+              <tr>
+                <th style="width:140px;">E2E 环境生命周期</th>
+                <td>本地隔离沙箱 <code class="mono-tag">:5192</code> · 创建(1.2s) → 布置(6.4s) → 启动(2.1s) → 探针检测(4/4 健康)</td>
+              </tr>
+              <tr>
+                <th>自动化 E2E 结果</th>
+                <td><strong style="color:#4ade80;">24 / 24 用例通过</strong>（含 6 条 <code>crash-regression</code> 防崩溃回归 · 连续 3 轮 Burn-in 零脆弱）</td>
+              </tr>
+              <tr>
+                <th>独立 Review 结论</th>
+                <td><strong>96 / 100 分</strong>（异构审阅模型 Claude-4.5-Sonnet · 单文件 ≤ 342 行 · 凭据脱敏与三态代理核验通过）</td>
+              </tr>
+              <tr>
+                <th>代码收据与成本</th>
+                <td>变更统计: <strong>${task.diffStat}</strong> · 配置快照: <strong>rev 7</strong> · 累计消耗: <strong>${task.cost}</strong></td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      `;
+
+      document.getElementById("execSummaryModal").hidden = false;
+    }
+
+    function closeExecutiveSummaryModal() {
+      document.getElementById("execSummaryModal").hidden = true;
+    }
+
+    function copyExecutiveSummaryMarkdown() {
+      showToast("✓ 已将结构化《任务全景总结汇报》(Markdown 格式) 复制到剪贴板！");
+    }
+
+    /* ========================================================================
+       Composer & New Task Submission Logic
+       ======================================================================== */
+    function onBlueprintTemplateChange(tplId) {
+      const hints = {
+        "0-1-discovery": "流水线: 需求澄清决策 → 生成SPEC.md图谱 → 架构确认 → 并行开发 → E2E沙箱生成与执行 → 独立审查",
+        "0-1-spec-driven": "流水线: 解析既有设计文档 → 契约冻结 → 多Subagent并行实现 → E2E回归 → 交付收据",
+        "legacy-bugfix": "流水线: 并行调用链切片定位 → 先写失败复现用例(Red) → 外科手术最小修复(Green) → Crash-Regression全跑",
+        "safe-refactor": "流水线: 提取公共API/IPC兼容契约 → 增量Worktree拆分 → 800行与循环依赖检查 → E2E等价验证",
+        "e2e-hardening": "流水线: 覆盖率盲区扫描 → 自动推导E2E用例 → 沙箱启动与3x连续Burn-in防脆弱测试 → 质量报告"
+      };
+      document.getElementById("blueprintPipelineHint").textContent = hints[tplId] || "";
+    }
+
+    function prepareNewTaskComposer() {
+      switchWorkbenchMode("stream");
+      const input = document.getElementById("composerGoalInput");
+      input.focus();
+      showToast("已就绪：请选择上方的「任务蓝图模板」并输入您的开发或修复目标");
+    }
+
+    function submitNewTaskFromComposer() {
+      const input = document.getElementById("composerGoalInput");
+      const select = document.getElementById("composerBlueprintSelect");
+      const text = input.value.trim();
+      if (!text) {
+        showToast("请先输入开发目标描述");
+        input.focus();
+        return;
+      }
+      const labelMap = {
+        "0-1-discovery": "0-1 有需求无设计",
+        "0-1-spec-driven": "0-1 有需求有设计",
+        "legacy-bugfix": "既有大库 Bug 修复",
+        "safe-refactor": "存量演进与重构",
+        "e2e-hardening": "专项 E2E 质量加固"
+      };
+      const newId = "run-" + Math.random().toString(16).slice(2, 6);
+      const newTask = {
+        id: newId,
+        title: text.slice(0, 38),
+        blueprintId: select.value,
+        blueprintLabel: labelMap[select.value] || "自主研发",
+        status: "running",
+        statusLabel: "Router 拆解中",
+        dotClass: "blue",
+        worktree: "agent/" + newId,
+        watchdog: "Watchdog: 已挂载巡检",
+        cost: "0.12u ($0.03)",
+        diffStat: "准备 Worktree 中",
+        e2eStat: "沙箱待命",
+        goal: text,
+        sources: ["AGENTS.md", "SPEC.md"],
+        followUps: [],
+        stages: [
+          { num: "●", label: "S1 契约拆解与 Worktree 冻结", state: "active", time: "进行中" },
+          { num: "2", label: "S2 多 Worker 并行执行", state: "pending", time: "待命" },
+          { num: "3", label: "S3 E2E 环境创建与自动化验证", state: "pending", time: "待命" },
+          { num: "4", label: "S4 独立 Review 与交付收据", state: "pending", time: "待命" }
+        ],
+        decisions: [],
+        activeDecision: null
+      };
+      TASKS.unshift(newTask);
+      input.value = "";
+      selectTask(newId);
+      showToast(`已创建新任务并分配独立 Git Worktree (agent/${newId})，后台静默执行中！`);
+    }
+
+    /* ========================================================================
+       Settings, Lessons, Sidebar & Theme Helpers
+       ======================================================================== */
+    function openSettingsModal(tab = "routing") {
+      document.getElementById("settingsModal").hidden = false;
+      switchSettingsTab(tab);
+    }
+    function closeSettingsModal() {
+      document.getElementById("settingsModal").hidden = true;
+    }
+    function switchSettingsTab(tab) {
+      document.getElementById("settingsPaneRouting").hidden = tab !== "routing";
+      document.getElementById("settingsPaneResources").hidden = tab !== "resources";
+      document.getElementById("setTabRouting").classList.toggle("active", tab === "routing");
+      document.getElementById("setTabResources").classList.toggle("active", tab === "resources");
+    }
+    function saveSettingsAndClose() {
+      closeSettingsModal();
+      showToast("✓ 统一开发配置与模型成本路由已保存 (Revision 8)！新任务将自动沿用。");
+    }
+
+    function openLessonsModal() {
+      document.getElementById("lessonsModal").hidden = false;
+    }
+    function closeLessonsModal() {
+      document.getElementById("lessonsModal").hidden = true;
+    }
+
+    function toggleSidebar() {
+      const sb = document.getElementById("taskSidebar");
+      sb.hidden = !sb.hidden;
+    }
+
+    function toggleTheme() {
+      const html = document.documentElement;
+      const next = html.getAttribute("data-app-theme") === "dark" ? "light" : "dark";
+      html.setAttribute("data-app-theme", next);
+      showToast(next === "dark" ? "已切换至 Taomni 深色主题 (Dark)" : "已切换至 Taomni 浅色主题 (Light)");
+    }
+
+    let toastTimer = null;
+    function showToast(msg) {
+      const banner = document.getElementById("toastBanner");
+      banner.textContent = msg;
+      banner.hidden = false;
+      if (toastTimer) clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => { banner.hidden = true; }, 3400);
+    }
+
+    function escapeHtml(str) {
+      return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    }
+
+    window.addEventListener("DOMContentLoaded", initPrototype);
+  </script>
+</body>
+</html>
