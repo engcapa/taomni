@@ -38,6 +38,21 @@ class PixelOracleTest(TestCase):
                 probe.compare_pixels(before, after, [], {'width': 120, 'height': 60}, folder, 'resize')
 
 
+class HostedCaseEligibilityTest(TestCase):
+    def test_rendering_cases_are_executable_on_both_declared_native_targets(self):
+        from qa_ui_auto.testcase import load_case
+        from qa_ui_auto.verification import native_support
+
+        root = Path(__file__).resolve().parents[4]
+        for case_id in ('TC-TERM-RENDER-001', 'TC-TERM-RENDER-002'):
+            path, = (root / 'qa-ui-auto-tests/cases').glob(case_id + '-*.testcase.yaml')
+            case = load_case(path)
+            for target in ('Linux', 'Windows'):
+                with self.subTest(case=case_id, platform=target):
+                    self.assertIsNone(native_support(case, target),
+                                      'A declared native case must not disappear from hosted selection')
+
+
 class ProbeLifecycleTest(TestCase):
     def test_failure_still_restores_fixture_and_retains_original_observations(self):
         calls = []

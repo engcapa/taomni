@@ -101,9 +101,15 @@
   输出行与真实 SSH shell 状态。原始 summary hash/receipt exitCode=0 已核对。
 - 同轮 V1：Linux browser `run-20261106-003950-382770900`、Windows browser
   `run-20261106-004316-455292700` 的 clear/merge 四组 pixel 差异全为0；
-  两平台各14个用例全部通过、0 skip。macOS browser 第一 shard 10/10 通过；
+  两平台各14个用例全部通过、0 skip。macOS browser 两 shard 合计13/13 通过；
   renderer-switch case 按实际平台声明不适用于 macOS，不把该排除标成执行 pass。
-- native 修复后及剩余 macOS browser 仍在执行。首个候选 run `42137113187`
+- 核对 hosted selection 发现 `ba3962182` 的 `TC-TERM-RENDER-002` 使用 browser-only
+  `quick_connect`/`auth`，Linux/Windows native 被 planner 记为 not-applicable，**不能
+  作为 native 开关已测**。`dd6abda33` 改为共享 fill/click/wait UI 步骤、重映射
+  checkpoints；静态检查确认两端 native_support 为 None。通过同一 workflow 补跑
+  https://github.com/engcapa/taomni/actions/runs/42141625169 ，browser/native 全部执行，
+  并保留自动 crash-regression；产品与二进制输入不变。
+- 三平台 native 的其余回归仍以 `42137876791` 运行。首个候选 run `42137113187`
   因用例平台/POSIX fixture 声明修正主动取消，不作为证据。
 
 ### V3 — 保留行为
