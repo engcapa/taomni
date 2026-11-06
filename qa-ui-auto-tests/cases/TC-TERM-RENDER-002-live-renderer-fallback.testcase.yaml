@@ -1,0 +1,112 @@
+id: TC-TERM-RENDER-002
+title: Linux and Windows can switch a live SSH terminal to the stable renderer without reconnecting
+covers: [F2.2, F3.1, F5.2]
+tags: [terminal, rendering, ssh, p1]
+modes: [browser, native]
+browser_platforms: [Linux, Windows]
+native_platforms: [Linux, Windows]
+fixtures: [reset_db, ssh_posix_required]
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.quickConnectVisible
+    value: 'true'
+- reload_window: null
+- wait_for: '[data-testid="qc-input"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ssh://${cfg.ssh_posix.user}@${cfg.ssh_posix.host}:${cfg.ssh_posix.port}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="auth-prompt"]'
+- fill:
+    selector: '[data-testid="auth-password"]'
+    value: ${env.QA_POSIX_SSH_PASSWORD}
+- click: '[data-testid="auth-submit"]'
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+    timeout_sec: 60
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: "QA_RENDER_SESSION=$$; QA_RENDER_KEPT=kept; printf 'RENDER-BEFORE-OK\\n'"
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    regex: '(?m)^RENDER-BEFORE-OK\r?$'
+- right_click: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- click: '[data-testid="terminal-context-change-settings"]'
+- wait_for: '[data-testid="terminal-current-settings-dialog"]'
+- assert_visible: '[data-testid="terminal-current-settings-dialog"] [data-testid="terminal-webgl-renderer-toggle"]'
+- set_check:
+    selector: '[data-testid="terminal-current-settings-dialog"] [data-testid="terminal-webgl-renderer-toggle"] input'
+    checked: false
+- assert_count:
+    selector: '[data-testid="terminal-current-settings-dialog"] [data-testid="terminal-webgl-renderer-toggle"] input:not(:checked)'
+    equal: 1
+- click: '[data-testid="terminal-current-settings-footer-close"]'
+- eval_readonly:
+    expression: "globalThis.__TAOMNI_QA_TERMINALS__.size === 1 && [...globalThis.__TAOMNI_QA_TERMINALS__.values()][0].getAddon() === null"
+    expect_truthy: true
+    timeout_sec: 5
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    regex: '(?m)^RENDER-BEFORE-OK\r?$'
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: "test \"$QA_RENDER_SESSION\" = \"$$\" && test \"$QA_RENDER_KEPT\" = kept && printf 'RENDER-STABLE-SAME-SHELL\\n'"
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    regex: '(?m)^RENDER-STABLE-SAME-SHELL\r?$'
+- screenshot: terminal-stable-renderer.png
+- right_click: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- click: '[data-testid="terminal-context-change-settings"]'
+- assert_count:
+    selector: '[data-testid="terminal-current-settings-dialog"] [data-testid="terminal-webgl-renderer-toggle"] input:not(:checked)'
+    equal: 1
+- set_check:
+    selector: '[data-testid="terminal-current-settings-dialog"] [data-testid="terminal-webgl-renderer-toggle"] input'
+    checked: true
+- click: '[data-testid="terminal-current-settings-footer-close"]'
+- eval_readonly:
+    expression: "globalThis.__TAOMNI_QA_TERMINALS__.size === 1 && [...globalThis.__TAOMNI_QA_TERMINALS__.values()][0].getAddon() !== null"
+    expect_truthy: true
+    timeout_sec: 5
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: "test \"$QA_RENDER_SESSION\" = \"$$\" && test \"$QA_RENDER_KEPT\" = kept && printf 'RENDER-WEBGL-SAME-SHELL\\n'"
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    regex: '(?m)^RENDER-WEBGL-SAME-SHELL\r?$'
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    regex: '(?m)^RENDER-BEFORE-OK\r?$'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Current-terminal settings expose a functional WebGL switch on Linux and Windows; disabling it replaces only the renderer and preserves the live shell and history.
+    actions: [11, 13, 14, 17, 19, 22]
+    checkpoints:
+    - {step: 16, expectation: The live settings dialog offers the renderer switch.}
+    - {step: 18, expectation: The switch is visibly unchecked.}
+    - {step: 20, expectation: The real WebGL addon is disposed rather than merely hiding a canvas.}
+    - {step: 21, expectation: Existing output is retained.}
+    - {step: 23, expectation: Only the original POSIX shell PID and shell-local variable can produce the independent stable-renderer result line.}
+    results: [16, 18, 20, 21, 23]
+  - id: R2
+    requirement: Reopening settings retains the selection; explicitly re-enabling WebGL recreates the addon without reconnecting or discarding terminal history.
+    actions: [25, 26, 28, 29, 31]
+    checkpoints:
+    - {step: 27, expectation: The reopened settings still show WebGL disabled.}
+    - {step: 30, expectation: A real WebGL addon is installed again.}
+    - {step: 32, expectation: The original shell PID and local variable survive the round trip.}
+    - {step: 33, expectation: The original independent output line still exists.}
+    - {step: 34, expectation: No uncaught runtime errors.}
+    results: [27, 30, 32, 33, 34]
+  visual:
+  - {check: Stable-renderer glyph appearance, method: manual, reason: Review the retained screenshot independently; correct buffer text alone does not establish visual quality.}
+  native:
+  - {check: Live packaged WebView renderer replacement and actual SSH shell continuity, method: automated, reason: Native uses production addon lifecycle and a real disposable SSH server; browser covers the shared UI with its real SSH bridge.}

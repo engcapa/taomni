@@ -16,6 +16,8 @@ smoke:
 - TC-IDE-C8-08-code-style-dialog-lifecycle-browser
 unavailable: {}
 cases:
+- TC-TERM-RENDER-002
+- TC-TERM-RENDER-001
 - TC-WS-086
 - TC-WS-084
 - TC-WS-085

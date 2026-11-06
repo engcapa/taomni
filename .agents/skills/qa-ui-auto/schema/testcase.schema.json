@@ -566,6 +566,9 @@
         "native_terminal_burst": {
           "$ref": "#/$defs/native_terminal_burst_arg"
         },
+        "terminal_rendering_probe": {
+          "type": "null"
+        },
         "compose_text": {
           "$ref": "#/$defs/compose_text_arg"
         },
