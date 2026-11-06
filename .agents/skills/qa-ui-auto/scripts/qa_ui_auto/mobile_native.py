@@ -47,6 +47,20 @@ def pair(endpoint, code):
     return value['device_id'], value['token']
 
 
+def disable_service(ctx):
+    # The Settings search can still smooth-scroll after the last device row
+    # disappears. In the Linux failure trace pointerdown hit the toggle but
+    # pointerup hit a heading, so no button click occurred. Activate the actual
+    # focused button with native keyboard input instead of replaying a click or
+    # calling IPC/DOM writers. Keep both UI and independent listener assertions.
+    selector = '[data-testid="mobile-settings-toggle"]'
+    until(ctx.session, '!!document.querySelector(' + json.dumps(selector) + ') && '
+          '!document.querySelector(' + json.dumps(selector) + ').disabled')
+    ctx.session.focus(selector)
+    ctx.session.press_combo('Enter')
+    until(ctx.session, 'document.querySelector(\'[data-testid="mobile-settings-status"]\')?.textContent.includes("Disabled")')
+
+
 def desktop(ctx, terminal_input):
     endpoint = address(ctx)
     checks = []
@@ -129,8 +143,7 @@ def desktop(ctx, terminal_input):
         assert status == 403 and value['error'] == 'origin_denied'
         assert headers.get('access-control-allow-origin', headers.get('Access-Control-Allow-Origin')) == ORIGIN
         checks.append('settings-revocation-closes-existing-websocket-and-returns-readable-origin-error')
-        click(ctx.session, '[data-testid="mobile-settings-toggle"]')
-        until(ctx.session, 'document.querySelector(\'[data-testid="mobile-settings-status"]\')?.textContent.includes("Disabled")')
+        disable_service(ctx)
         try:
             http(endpoint, '/health')
         except OSError:

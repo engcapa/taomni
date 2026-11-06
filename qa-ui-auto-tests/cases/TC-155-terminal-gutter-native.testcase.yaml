@@ -51,9 +51,20 @@ steps:
 - right_click: '[data-testid="terminal-pane"][data-terminal-active="true"]'
 - click: '[data-testid="context-menu-item-find"]'
 - wait_for: input[placeholder="Find"]
-- fill:
-    selector: input[placeholder="Find"]
-    value: QA-LEFT-GUTTER
+# Native WebKitGTK's paced uppercase keys can leave only "ER" in Find.
+# Paste the fixture through the real OS clipboard, then verify the whole query
+# before using its search hit as the first-column drag/geometry target.
+- host_clipboard:
+    action: set
+    kind: text
+    text: QA-LEFT-GUTTER
+- click: input[placeholder="Find"]
+- press: Mod+a
+- press: Mod+v
+- eval_readonly:
+    expression: document.activeElement.getAttribute("placeholder") === "Find" && document.activeElement.value === "QA-LEFT-GUTTER"
+    expect_truthy: true
+    timeout_sec: 5
 - press: Enter
 - wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"] .terminal-search-hit-active'
 - eval_readonly:
@@ -270,9 +281,20 @@ steps:
 - right_click: '[data-testid="terminal-pane"][data-terminal-active="true"]'
 - click: '[data-testid="context-menu-item-find"]'
 - wait_for: input[placeholder="Find"]
-- fill:
-    selector: input[placeholder="Find"]
-    value: QA-LEFT-GUTTER
+# Native WebKitGTK's paced uppercase keys can leave only "ER" in Find.
+# Paste the fixture through the real OS clipboard, then verify the whole query
+# before using its search hit as the first-column drag/geometry target.
+- host_clipboard:
+    action: set
+    kind: text
+    text: QA-LEFT-GUTTER
+- click: input[placeholder="Find"]
+- press: Mod+a
+- press: Mod+v
+- eval_readonly:
+    expression: document.activeElement.getAttribute("placeholder") === "Find" && document.activeElement.value === "QA-LEFT-GUTTER"
+    expect_truthy: true
+    timeout_sec: 5
 - press: Enter
 - wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"] .terminal-search-hit-active'
 - eval_readonly:
@@ -351,159 +373,165 @@ verification:
     - 3
     - 7
     - 10
-    - 12
-    - 13
+    - 15
     - 17
-    - 19
     - 21
-    - 24
-    - 26
+    - 23
+    - 25
     - 28
-    - 31
-    - 33
+    - 30
+    - 32
+    - 35
     - 37
-    - 40
-    - 46
-    - 48
+    - 41
+    - 44
     - 50
-    - 53
-    - 56
+    - 52
+    - 54
     - 57
-    - 63
-    - 65
+    - 60
+    - 61
     - 67
+    - 69
     - 71
-    - 72
-    - 77
-    - 78
+    - 75
+    - 76
     - 81
-    - 83
-    - 84
+    - 82
     - 85
-    - 86
     - 87
+    - 88
     - 89
     - 90
-    - 92
+    - 91
+    - 93
     - 94
     - 96
+    - 98
     - 100
-    - 103
-    - 105
-    - 106
-    - 110
+    - 104
+    - 107
     - 112
     - 114
-    - 117
-    - 119
-    - 121
-    - 124
-    - 126
-    - 130
+    - 118
+    - 120
+    - 122
+    - 125
+    - 127
+    - 129
+    - 132
+    - 134
+    - 138
     checkpoints:
+    - step: 16
+      expectation: Find contains the complete QA-LEFT-GUTTER query before search and geometry checks.
+    - step: 113
+      expectation: SSH Find contains the complete QA-LEFT-GUTTER query before search and geometry checks.
     - step: 5
       expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left - document.querySelector("[data-terminal-active]").getBoundingClientRect().left >= 8'', timeout_sec: 5}}'
     - step: 6
       expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().right <= document.querySelector("[data-terminal-active]").getBoundingClientRect().right'', timeout_sec: 5}}'
     - step: 8
       expectation: '{assert_pattern: {regex: ''(?m)^QA-LEFT-GUTTER\r?$'', selector: ''[data-testid="terminal-pane"][data-terminal-active="true"]'', timeout_sec: 20}}'
-    - step: 15
+    - step: 19
       expectation: '{eval_readonly: {expect_truthy: true, expression: ''Math.abs(document.querySelector("[data-terminal-active] .terminal-search-hit-active").getBoundingClientRect().left - document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left) < 1'', timeout_sec: 5}}'
-    - step: 22
+    - step: 26
       expectation: '{host_clipboard: {action: assert, equals: QA-LEFT-GUTTER, kind: text}}'
-    - step: 29
+    - step: 33
       expectation: '{host_clipboard: {action: assert, equals: QA-LEFT-GUTTER, kind: text}}'
-    - step: 35
+    - step: 39
       expectation: '{assert_visible: ''[data-testid="terminal-pane"][data-terminal-active="true"] .terminal-block-selection''}'
-    - step: 36
+    - step: 40
       expectation: '{eval_readonly: {expect_truthy: true, expression: ''Math.abs(document.querySelector("[data-terminal-active] .terminal-block-selection").getBoundingClientRect().left - document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left) < 1'', timeout_sec: 5}}'
-    - step: 38
-      expectation: '{host_clipboard: {action: assert, equals: QA-LEFT-GUTTER, kind: text}}'
     - step: 42
-      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left - document.querySelector("[data-terminal-active]").getBoundingClientRect().left >= 8'', timeout_sec: 5}}'
-    - step: 43
-      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().right <= document.querySelector("[data-terminal-active]").getBoundingClientRect().right'', timeout_sec: 5}}'
-    - step: 44
-      expectation: '{eval_readonly: {expect_truthy: true, expression: ''Math.abs(document.querySelector("[data-terminal-active] .terminal-search-hit-active").getBoundingClientRect().left - document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left) < 1'', timeout_sec: 5}}'
-    - step: 51
       expectation: '{host_clipboard: {action: assert, equals: QA-LEFT-GUTTER, kind: text}}'
-    - step: 59
+    - step: 46
       expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left - document.querySelector("[data-terminal-active]").getBoundingClientRect().left >= 8'', timeout_sec: 5}}'
-    - step: 60
+    - step: 47
       expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().right <= document.querySelector("[data-terminal-active]").getBoundingClientRect().right'', timeout_sec: 5}}'
-    - step: 61
+    - step: 48
       expectation: '{eval_readonly: {expect_truthy: true, expression: ''Math.abs(document.querySelector("[data-terminal-active] .terminal-search-hit-active").getBoundingClientRect().left - document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left) < 1'', timeout_sec: 5}}'
-    - step: 68
+    - step: 55
       expectation: '{host_clipboard: {action: assert, equals: QA-LEFT-GUTTER, kind: text}}'
-    - step: 74
+    - step: 63
       expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left - document.querySelector("[data-terminal-active]").getBoundingClientRect().left >= 8'', timeout_sec: 5}}'
-    - step: 75
+    - step: 64
       expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().right <= document.querySelector("[data-terminal-active]").getBoundingClientRect().right'', timeout_sec: 5}}'
+    - step: 65
+      expectation: '{eval_readonly: {expect_truthy: true, expression: ''Math.abs(document.querySelector("[data-terminal-active] .terminal-search-hit-active").getBoundingClientRect().left - document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left) < 1'', timeout_sec: 5}}'
+    - step: 72
+      expectation: '{host_clipboard: {action: assert, equals: QA-LEFT-GUTTER, kind: text}}'
+    - step: 78
+      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left - document.querySelector("[data-terminal-active]").getBoundingClientRect().left >= 8'', timeout_sec: 5}}'
     - step: 79
-      expectation: '{wait_for: {selector: ''[data-testid="collapsed-sidebar-rail"]'', state: detached, timeout_sec: 5}}'
-    - step: 80
-      expectation: '{wait_for: ''[data-testid="sidebar"]''}'
-    - step: 82
-      expectation: '{wait_for: ''[data-testid="session-editor"]''}'
-    - step: 88
-      expectation: '{wait_for: ''[data-testid="bookmark-settings"]''}'
-    - step: 91
-      expectation: '{wait_for: ''[data-testid="session-tree-item"][data-session-name="qa-ui-auto-ssh-terminal-gutter"]''}'
-    - step: 95
-      expectation: '{assert_attribute: {equals: ''${env.QA_SSH_PASSWORD}'', name: value, selector: ''[data-testid="auth-password"]''}}'
-    - step: 98
-      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left - document.querySelector("[data-terminal-active]").getBoundingClientRect().left >= 8'', timeout_sec: 5}}'
-    - step: 99
       expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().right <= document.querySelector("[data-terminal-active]").getBoundingClientRect().right'', timeout_sec: 5}}'
-    - step: 101
+    - step: 83
+      expectation: '{wait_for: {selector: ''[data-testid="collapsed-sidebar-rail"]'', state: detached, timeout_sec: 5}}'
+    - step: 84
+      expectation: '{wait_for: ''[data-testid="sidebar"]''}'
+    - step: 86
+      expectation: '{wait_for: ''[data-testid="session-editor"]''}'
+    - step: 92
+      expectation: '{wait_for: ''[data-testid="bookmark-settings"]''}'
+    - step: 95
+      expectation: '{wait_for: ''[data-testid="session-tree-item"][data-session-name="qa-ui-auto-ssh-terminal-gutter"]''}'
+    - step: 99
+      expectation: '{assert_attribute: {equals: ''${env.QA_SSH_PASSWORD}'', name: value, selector: ''[data-testid="auth-password"]''}}'
+    - step: 102
+      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left - document.querySelector("[data-terminal-active]").getBoundingClientRect().left >= 8'', timeout_sec: 5}}'
+    - step: 103
+      expectation: '{eval_readonly: {expect_truthy: true, expression: ''document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().right <= document.querySelector("[data-terminal-active]").getBoundingClientRect().right'', timeout_sec: 5}}'
+    - step: 105
       expectation: '{assert_pattern: {regex: ''(?m)^QA-LEFT-GUTTER\r?$'', selector: ''[data-testid="terminal-pane"][data-terminal-active="true"]'', timeout_sec: 20}}'
-    - step: 108
+    - step: 116
       expectation: '{eval_readonly: {expect_truthy: true, expression: ''Math.abs(document.querySelector("[data-terminal-active] .terminal-search-hit-active").getBoundingClientRect().left - document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left) < 1'', timeout_sec: 5}}'
-    - step: 115
+    - step: 123
       expectation: '{host_clipboard: {action: assert, equals: QA-LEFT-GUTTER, kind: text}}'
-    - step: 122
+    - step: 130
       expectation: '{host_clipboard: {action: assert, equals: QA-LEFT-GUTTER, kind: text}}'
-    - step: 128
+    - step: 136
       expectation: '{assert_visible: ''[data-testid="terminal-pane"][data-terminal-active="true"] .terminal-block-selection''}'
-    - step: 129
+    - step: 137
       expectation: '{eval_readonly: {expect_truthy: true, expression: ''Math.abs(document.querySelector("[data-terminal-active] .terminal-block-selection").getBoundingClientRect().left - document.querySelector("[data-terminal-active] .xterm-screen").getBoundingClientRect().left) < 1'', timeout_sec: 5}}'
-    - step: 131
+    - step: 139
       expectation: '{host_clipboard: {action: assert, equals: QA-LEFT-GUTTER, kind: text}}'
     results:
+    - 16
+    - 113
     - 5
     - 6
     - 8
-    - 15
-    - 22
-    - 29
-    - 35
-    - 36
-    - 38
+    - 19
+    - 26
+    - 33
+    - 39
+    - 40
     - 42
-    - 43
-    - 44
-    - 51
-    - 59
-    - 60
-    - 61
-    - 68
-    - 74
-    - 75
+    - 46
+    - 47
+    - 48
+    - 55
+    - 63
+    - 64
+    - 65
+    - 72
+    - 78
     - 79
-    - 80
-    - 82
-    - 88
-    - 91
+    - 83
+    - 84
+    - 86
+    - 92
     - 95
-    - 98
     - 99
-    - 101
-    - 108
-    - 115
-    - 122
-    - 128
-    - 129
-    - 131
+    - 102
+    - 103
+    - 105
+    - 116
+    - 123
+    - 130
+    - 136
+    - 137
+    - 139
   visual:
   - check: Inspect first-column spacing, selected text and highlight alignment in normal and fullscreen screenshots.
     method: manual
