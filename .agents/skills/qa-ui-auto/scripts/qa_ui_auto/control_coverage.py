@@ -66,6 +66,7 @@ from qa_ui_auto.testcase import discover, step_verb_and_args  # noqa: E402
 
 
 INTERACTIVE_VERBS = {
+    "mobile_service_probe", "mobile_browser_probe",
     "middle_click",
     "click", "dblclick", "right_click", "hover", "drag_to", "drag_path", "native_click",
     "native_pointer_drag", "native_window_drag",
@@ -161,6 +162,33 @@ def _selectors_in_step(verb: str, args: Any) -> list[str]:
     `screenshot` only touches a selector when given the `selector:` key in
     rich form; the path key is a filename and must NOT be reported.
     """
+    # The specialized native oracle operates these real settings controls;
+    # it never invokes their IPC handlers directly (mobile_native.desktop).
+    if verb == "mobile_service_probe" and args == "desktop":
+        return ['[data-testid="mobile-settings-refresh"]', '[data-testid="mobile-settings-revoke"]']
+    if verb == "mobile_service_probe" and args == "open-session":
+        return ['[data-testid="mobile-settings-open-sessions"]']
+    if verb == "mobile_service_probe" and args == "headless":
+        return [f'[data-testid="{name}"]' for name in (
+            'mobile-offline-note', 'mobile-instance-availability', 'mobile-instance-open',
+            'mobile-first-instance', 'mobile-endpoint', 'mobile-label', 'mobile-pair-code',
+            'mobile-pair-submit', 'mobile-empty-sessions', 'mobile-connection',
+            'mobile-instances-back', 'mobile-instance-error',
+        )]
+    if verb == "mobile_browser_probe" and args == "touch-scroll":
+        return ['[data-testid="mobile-terminal-screen"]', '[data-testid="mobile-terminal-latest"]']
+    if verb == "mobile_browser_probe" and args == "recovery":
+        return [f'[data-testid="{name}"]' for name in (
+            'mobile-session', 'mobile-control-warning', 'mobile-terminal-retry',
+            'mobile-events-retry', 'mobile-sessions-updated', 'mobile-connection',
+            'mobile-terminal-more', 'mobile-terminal-fullscreen',
+            'mobile-take-control', 'mobile-terminal-back', 'mobile-file-open',
+            'mobile-agent-continue', 'mobile-agent-send', 'mobile-task-status',
+            'mobile-task-retry', 'mobile-task-stop', 'mobile-agent-input',
+            'mobile-task-updated', 'mobile-changes-updated', 'mobile-file-updated',
+            'mobile-changes-error', 'mobile-file-error', 'mobile-file-content',
+            'mobile-changes-refresh', 'mobile-file-refresh',
+        )]
     out: list[str] = []
     # Short form: `click: '[data-testid="x"]'` → args is a string.
     if isinstance(args, str):
@@ -200,6 +228,22 @@ def _touches_for_case(case) -> list[Touch]:  # case: TestCase
         if not isinstance(step, dict) or len(step) != 1:
             continue
         verb, args = step_verb_and_args(step)
+        if verb in {"mobile_browser_probe", "mobile_service_probe"} and args == "cookie-gateway":
+            interacted = (
+                "mobile-first-instance", "mobile-pair-code", "mobile-pair-submit",
+                "mobile-label", "mobile-refresh", "mobile-retry", "mobile-instance-open",
+                "mobile-instances-back", "mobile-add-instance", "mobile-endpoint",
+            )
+            observed = ("mobile-pair-error", "mobile-connection", "mobile-sessions", "mobile-instance-error")
+            if verb == "mobile_service_probe":
+                interacted += (
+                    "mobile-open-local", "mobile-take-control", "mobile-terminal-keyboard",
+                    "mobile-terminal-command", "mobile-terminal-command-send", "mobile-terminal-back",
+                )
+                observed += ("mobile-terminal-screen", "mobile-terminal-status")
+            for names, kind in ((interacted, "interactive"), (observed, "display")):
+                out.extend(Touch(case_id=case.id, selector=f'[data-testid="{name}"]', kind=kind) for name in names)
+            continue
         if verb == "switch_window" and isinstance(args, dict):
             # close_with performs one real click in the source window; the
             # target selector only observes the destination after closure.

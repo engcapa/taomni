@@ -10,6 +10,33 @@ from qa_ui_auto.steps import StepError
 
 
 class NativeDragTest(TestCase):
+    def test_tc155_requires_complete_query_before_targeting_search_hit(self):
+        from qa_ui_auto.testcase import load_case
+
+        root = Path(__file__).resolve().parents[4]
+        case = load_case(root / 'qa-ui-auto-tests/cases/TC-155-terminal-gutter-native.testcase.yaml')
+        query_checks = []
+        for index, step in enumerate(case.steps):
+            expression = step.get('eval_readonly', {}).get('expression', '')
+            if 'QA-LEFT-GUTTER' not in expression:
+                continue
+            query_checks.append(index)
+            self.assertIn('.value === "QA-LEFT-GUTTER"', expression)
+            self.assertTrue(step['eval_readonly']['expect_truthy'])
+            self.assertEqual(case.steps[index - 1], {'fill': {
+                'selector': 'input[placeholder="Find"]', 'value': 'QA-LEFT-GUTTER'}})
+            self.assertEqual(case.steps[index + 1], {'press': 'Enter'})
+            geometry = case.steps[index + 3]['eval_readonly']
+            self.assertIn('.terminal-search-hit-active', geometry['expression'])
+            self.assertTrue(geometry['expression'].endswith(' < 1'))
+            self.assertTrue(geometry['expect_truthy'])
+            # Do not let seeded search text make a broken Copy look successful.
+            self.assertEqual(case.steps[index + 4], {'host_clipboard': {
+                'action': 'set', 'kind': 'text', 'text': 'NOT-SELECTED'}})
+        self.assertEqual(len(query_checks), 2, 'local and SSH must both verify the full query')
+        marker_commands = [step['terminal_input']['text'] for step in case.steps if 'terminal_input' in step]
+        self.assertEqual(marker_commands, [' echo QA-LEFT-""GUTTER'] * 2)
+
     def test_offset_uses_one_action_request_and_fixed_viewport_geometry(self):
         with TemporaryDirectory() as directory:
             session = Mock()

@@ -30,8 +30,8 @@ export function useShellSessionTabs(context: UseShellSessionTabsContext) {
     void markConnected(session.id);
   }, [markConnected, setStatusMessage]);
 
-  const openSshTab = useCallback((session: SessionConfig, authMethod: string, authData: string | null) => {
-    const id = `ssh-${session.id}-${Date.now()}`;
+  const openSshTab = useCallback((session: SessionConfig, authMethod: string, authData: string | null, mobileOpenRequestId?: string) => {
+    const id = mobileOpenRequestId ? `ssh-mobile-${mobileOpenRequestId}` : `ssh-${session.id}-${Date.now()}`;
     addTab({
       id,
       type: "terminal",
@@ -49,10 +49,12 @@ export function useShellSessionTabs(context: UseShellSessionTabsContext) {
         authMethod,
         authData,
         optionsJson: session.options_json,
+        mobileOpenRequestId,
       },
       terminalProfile: getSessionTerminalProfile(session.options_json) ?? loadTerminalDefaultProfile(),
     });
     void markConnected(session.id);
+    return id;
   }, [addTab, markConnected]);
 
   const openCommandTerminalTab = useCallback((session: SessionConfig) => {

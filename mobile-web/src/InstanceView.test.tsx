@@ -1,0 +1,39 @@
+import "@testing-library/jest-dom/vitest";
+import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import { afterEach, beforeEach, expect, it, vi } from "vitest";
+import type { OpenStatus } from "./openSession";
+const mock = vi.hoisted(() => ({ request: vi.fn(), open: vi.fn() }));
+vi.mock("./live", () => ({ useLive: () => ({ send: vi.fn(), canRetry: false, retry: vi.fn() }) }));
+vi.mock("./openSession", () => ({ openSession: mock.open }));
+vi.mock("./api", async original => ({ ...await original<typeof import("./api")>(), request: mock.request, loadInstances: () => [], saveInstances: vi.fn() }));
+import { InstanceView } from "./InstanceView";
+const instance = { id: "pc", deviceId: "phone", label: "PC", endpoint: "https://pc.example", token: "t" };
+const deferred = <T,>() => { let resolve!: (value: T) => void; let reject!: (error: Error) => void; const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; };
+beforeEach(() => { mock.request.mockReset(); mock.open.mockReset(); });
+afterEach(cleanup);
+
+it("keeps malformed JSON session responses out of rendering and retains an actionable error", async () => {
+  mock.request.mockResolvedValue({});
+  render(<InstanceView instance={instance} onSelect={vi.fn()} onCloseSession={vi.fn()} onBack={vi.fn()} />);
+  expect(await screen.findByTestId("mobile-instance-error")).toHaveTextContent("有效的 Taomni API");
+  expect(screen.getByTestId("mobile-empty-sessions")).toBeInTheDocument();
+});
+
+it.each(["success", "failure"])("late A cancellation %s cannot abort or clear B", async result => {
+  const a = deferred<string>(); const b = deferred<string>(); const cancel = deferred<unknown>();
+  const calls: { signal: AbortSignal; progress: (status: OpenStatus) => void }[] = [];
+  mock.request.mockImplementation((_instance, path) => path === "/sessions" ? Promise.resolve({ sessions: [], saved_sessions: [], capabilities: { open_sessions: true } }) : cancel.promise);
+  mock.open.mockImplementation((_instance, _target, signal, progress) => { calls.push({ signal, progress }); return calls.length === 1 ? a.promise : b.promise; });
+  render(<InstanceView instance={instance} onSelect={vi.fn()} onCloseSession={vi.fn()} onBack={vi.fn()} />);
+  fireEvent.click(await screen.findByTestId("mobile-open-local"));
+  act(() => calls[0].progress({ request_id: "A", status: "pending" }));
+  fireEvent.click(screen.getByText("取消连接"));
+  await act(async () => { a.reject(new Error("A ended")); });
+  fireEvent.click(screen.getByTestId("mobile-open-local"));
+  act(() => calls[1].progress({ request_id: "B", status: "pending", auth: { id: "B-auth", name: "B challenge", instructions: "", prompts: [{ prompt: "OTP", echo: false, initial: "" }] } }));
+  await act(async () => { if (result === "success") cancel.resolve({}); else cancel.reject(new Error("late A error")); });
+  expect(calls[1].signal.aborted).toBe(false);
+  expect(screen.getByTestId("mobile-connection-auth")).toHaveTextContent("B challenge");
+  expect(screen.getByTestId("mobile-open-status")).not.toHaveTextContent("late A error");
+  expect(screen.getByTestId("mobile-open-local")).toBeDisabled();
+});

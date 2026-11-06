@@ -24,6 +24,7 @@ mod local_history;
 mod lsp;
 mod mail;
 mod mfa;
+mod mobile;
 mod models;
 mod notes;
 mod objectstorage;
@@ -56,6 +57,7 @@ mod wsl;
 
 pub(crate) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
     match invoke.message.command() {
+        command if mobile::handles(command) => mobile::handle(invoke),
         "recovery_get" | "recovery_update" | "recovery_ready" => webview_recovery::handle(invoke),
         "detach_terminal_output"
         | "list_local_shells"

@@ -2,6 +2,7 @@
 // other locales — adding a key here surfaces type errors elsewhere via the
 // shared `Dict` type.
 import { modelInspectorEn } from "./modelInspector";
+import { feishuSettingsEn, mobileSettingsEn } from "./mobileSettings";
 type Dict = {
   [key: string]: string | Dict;
 };
@@ -56,6 +57,8 @@ const dict = {
     "retentionHint": "Retention applies to local scheduled snapshots. Cloud file history is managed by the provider."
 },
   modelInspector: modelInspectorEn,
+  mobileSettings: mobileSettingsEn,
+  feishuSettings: feishuSettingsEn,
 
   app: {
     name: "Taomni",

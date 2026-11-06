@@ -1,9 +1,10 @@
 import json
 import subprocess
+from itertools import chain, cycle, repeat
 from unittest import TestCase
 from unittest.mock import Mock, patch
 
-from native_pointer import MOUSE_SOURCE, TARGET_GEOMETRY, click_viewport_point, prepare_pointer_target
+from native_pointer import MOUSE_SOURCE, TARGET_GEOMETRY, click_viewport_point, prepare_click_target, prepare_pointer_target
 from native_webdriver_transport import WebDriverError
 from qa_ui_auto.deadline import CaseTimeout, Deadline
 
@@ -23,7 +24,7 @@ class NativePointerActionsTest(TestCase):
                          ['pointerMove', 'pointerDown', 'pause', 'pointerUp'])
         self.session.request.reset_mock()
         self.session.find.return_value = 'toolbar'
-        with patch('tauri_webdriver.prepare_pointer_target', return_value={'x': 913, 'y': 21}):
+        with patch('tauri_webdriver.prepare_click_target', return_value={'x': 913, 'y': 21}):
             NativeSession.pointer_button_click(self.session, '[data-testid=toolbar]', 0)
         posts = [c.args[2] for c in self.session.request.call_args_list if c.args[1].endswith('/actions') and c.args[0] == 'POST']
         self.assertEqual(posts[0]['actions'][0]['id'], canvas['id'])
@@ -33,6 +34,47 @@ class NativePointerActionsTest(TestCase):
         with self.assertRaisesRegex(WebDriverError, 'input failed'):
             click_viewport_point(self.session, 280, 240)
         self.assertEqual([c.args[0] for c in self.session.request.call_args_list], ['POST', 'DELETE'])
+
+
+class NativeClickHoverTest(TestCase):
+    def setUp(self):
+        self.session = Mock(deadline=None)
+        self.session.endpoint.side_effect = lambda suffix: '/session/qa' + suffix
+        self.origin = {'element-6066-11e4-a52e-4f735466cecf': 'button'}
+
+    def test_scroll_during_pointer_move_is_rechecked_before_any_button_input(self):
+        first, last = {'x': 696, 'y': 405}, {'x': 696, 'y': 201}
+        self.session.request.side_effect = [None, {**last, 'ready': True},
+                                            None, {**last, 'ready': True}]
+        with patch('native_pointer.prepare_pointer_target', side_effect=[first, last]):
+            self.assertEqual(prepare_click_target(self.session, self.origin), last)
+        moves = [c.args[2]['actions'][0] for c in self.session.request.call_args_list
+                 if c.args[1].endswith('/actions')]
+        self.assertEqual([m['actions'][0]['y'] for m in moves], [405, 201])
+        self.assertTrue(all(m['id'] == MOUSE_SOURCE for m in moves))
+        self.assertTrue(all([a['type'] for a in m['actions']] == ['pointerMove'] for m in moves))
+
+    def test_covering_overlay_after_hover_cannot_authorize_a_click(self):
+        point = {'x': 20, 'y': 30}
+        self.session.request.side_effect = [None, {**point, 'ready': False}]
+        with patch('native_pointer.prepare_pointer_target', side_effect=[
+                point, WebDriverError('covered target')]):
+            with self.assertRaisesRegex(WebDriverError, 'covered target'):
+                prepare_click_target(self.session, self.origin)
+
+    def test_continuous_motion_keeps_one_bounded_preparation_budget(self):
+        self.session.request.side_effect = [None, {'x': 1, 'y': 2, 'ready': True}]
+        with patch('native_pointer.time.monotonic', side_effect=[0, 0, 6]), \
+                patch('native_pointer.prepare_pointer_target', return_value={'x': 3, 'y': 4}):
+            with self.assertRaisesRegex(WebDriverError, 'moved during pointer preparation'):
+                prepare_click_target(self.session, self.origin)
+
+    def test_driver_input_failure_is_never_replayed(self):
+        self.session.request.side_effect = WebDriverError('pointer transport failed')
+        with patch('native_pointer.prepare_pointer_target', return_value={'x': 3, 'y': 4}):
+            with self.assertRaisesRegex(WebDriverError, 'pointer transport failed'):
+                prepare_click_target(self.session, self.origin)
+        self.session.request.assert_called_once()
 
 
 class PointerGeometryTest(TestCase):
@@ -99,37 +141,49 @@ class NativePointerReadinessTest(TestCase):
     def geometry(self, x=270, y=217, ready=True):
         return dict(x=x, y=y, width=420, height=24, ready=ready)
 
+    def respond(self, values):
+        self.session.request.side_effect = chain(values, repeat(values[-1]))
+
+    def test_short_scroll_pause_does_not_activate_the_old_viewport_point(self):
+        # Search can briefly pause its smooth scroll before another layout
+        # frame reaches WebKit's compositor. Two equal samples are insufficient.
+        self.session.request.side_effect = lambda *args: self.geometry(
+            y=217 if self.now < 0.12 else 405)
+        self.assertEqual(prepare_pointer_target(self.session, self.origin),
+                         {'x': 270, 'y': 405})
+        self.assertGreaterEqual(self.now, 0.4)
+
     def test_moving_row_must_settle_before_a_point_can_be_used(self):
-        self.session.request.side_effect = [self.geometry(y=190), self.geometry(y=204),
-                                            self.geometry(), self.geometry()]
+        self.respond([self.geometry(y=190), self.geometry(y=204),
+                      self.geometry(), self.geometry()])
         self.assertEqual(prepare_pointer_target(self.session, self.origin), {'x': 270, 'y': 217})
-        self.assertEqual(self.session.request.call_count, 4)
-        self.assertGreaterEqual(self.now, 0.15)
+        self.assertGreaterEqual(self.session.request.call_count, 4)
+        self.assertGreaterEqual(self.now, 0.4)
         self.assertTrue(all(c.args[1].endswith('/execute/sync') for c in self.session.request.call_args_list))
 
     def test_subpixel_webkit_dimension_jitter_keeps_the_same_physical_target(self):
         first = {**self.geometry(), "width": 738.0000000000001}
         second = {**self.geometry(), "width": 738.0}
-        self.session.request.side_effect = [first, second]
+        self.session.request.side_effect = cycle([first, second])
         self.assertEqual(prepare_pointer_target(self.session, self.origin), {'x': 270, 'y': 217})
-        self.assertEqual(self.session.request.call_count, 2)
+        self.assertGreaterEqual(self.now, 0.3)
 
     def test_covered_point_cannot_satisfy_stability_until_uncovered(self):
-        self.session.request.side_effect = [self.geometry(ready=False), None, self.geometry(ready=False),
-                                            self.geometry(), self.geometry()]
+        self.respond([self.geometry(ready=False), None, self.geometry(ready=False),
+                      self.geometry(), self.geometry()])
         self.assertEqual(prepare_pointer_target(self.session, self.origin), {'x': 270, 'y': 217})
-        self.assertEqual(self.session.request.call_count, 5)
+        self.assertGreaterEqual(self.session.request.call_count, 5)
 
     def test_coverage_resets_an_earlier_stable_candidate(self):
-        self.session.request.side_effect = [self.geometry(), self.geometry(ready=False), None,
-                                            self.geometry(), self.geometry()]
+        self.respond([self.geometry(), self.geometry(ready=False), None,
+                      self.geometry(), self.geometry()])
         prepare_pointer_target(self.session, self.origin)
-        self.assertEqual(self.session.request.call_count, 5)
+        self.assertGreaterEqual(self.session.request.call_count, 5)
 
     def test_layout_growth_scrolls_the_same_target_back_into_view_before_input(self):
         outside = {**self.geometry(ready=False), "outside": True}
-        self.session.request.side_effect = [self.geometry(y=190), outside, None,
-                                            self.geometry(), self.geometry()]
+        self.respond([self.geometry(y=190), outside, None,
+                      self.geometry(), self.geometry()])
         self.assertEqual(prepare_pointer_target(self.session, self.origin), {'x': 270, 'y': 217})
         scroll = self.session.request.call_args_list[2]
         self.assertIn('scrollIntoView', scroll.args[2]['script'])
@@ -138,7 +192,7 @@ class NativePointerReadinessTest(TestCase):
 
     def test_covered_target_can_scroll_clear_of_a_sticky_header_before_input(self):
         covered = {**self.geometry(y=59, ready=False), "outside": False}
-        self.session.request.side_effect = [covered, None, self.geometry(), self.geometry()]
+        self.respond([covered, None, self.geometry(), self.geometry()])
         self.assertEqual(prepare_pointer_target(self.session, self.origin), {'x': 270, 'y': 217})
         scroll = self.session.request.call_args_list[1]
         self.assertIn("block:'center'", scroll.args[2]['script'])

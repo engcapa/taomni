@@ -1,0 +1,223 @@
+"""Production mobile bundle + deterministic HTTP/WS peer, browser UI only.
+
+The real Rust listener/PTY/headless boundary belongs to TC-MOBILE-002/003 and
+Rust mobile:: tests. This fixture does not claim native service evidence.
+"""
+from __future__ import annotations
+import base64
+import hashlib
+import json
+import threading
+from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
+from pathlib import Path
+from urllib.parse import urlsplit
+from ..mobile_wire import read_frame, write_frame
+from .mobile_assets import build_snapshot
+
+
+def setup(ctx):
+    if ctx.cfg['app']['mode'] != 'browser':
+        raise RuntimeError('mobile_web is a browser fixture')
+    root = Path(__file__).resolve().parents[6]
+    ctx._mobile_assets = build_snapshot(root, ctx.case_dir)
+    assets = Path(ctx._mobile_assets.name)
+    receipt = Path(ctx.case_dir) / 'mobile-peer.txt'
+    receipt.write_text('', encoding='utf-8')
+    clients = []
+    lock = threading.RLock()
+    state = {'paired': False, 'connection_id': 'fixture-connection', 'holder': 'none', 'seq': 0, 'event_seq': 0, 'task': 'idle', 'open': 0, 'opens': {}, 'direct': ''}
+    auth_case = ctx.case_id in ('TC-MOBILE-006', 'TC-MOBILE-009')
+    cancel_race = threading.Event()
+
+    def record(text):
+        with lock, receipt.open('a', encoding='utf-8') as f:
+            f.write(text + '\n')
+
+    class Handler(SimpleHTTPRequestHandler):
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args, directory=str(assets), **kwargs)
+
+        def log_message(self, *_):
+            pass
+
+        def reply(self, status, value):
+            raw = json.dumps(value).encode()
+            self.send_response(status)
+            self.cors()
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Length', str(len(raw)))
+            self.end_headers()
+            self.wfile.write(raw)
+
+        def cors(self):
+            if self.headers.get('Origin'):
+                self.send_header('Access-Control-Allow-Origin', self.headers['Origin'])
+            self.send_header('Access-Control-Allow-Headers', 'Authorization, Content-Type')
+            self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+            self.send_header('Vary', 'Origin')
+            self.send_header('Cache-Control', 'no-store')
+
+        def do_OPTIONS(self):
+            self.send_response(204)
+            self.cors()
+            self.end_headers()
+
+        def do_POST(self):
+            path = urlsplit(self.path).path
+            body = json.loads(self.rfile.read(int(self.headers.get('Content-Length', 0))) or b'{}')
+            if path == '/api/v1/pair':
+                if body.get('pairing_code') != 'qa-mobile-code':
+                    return self.reply(400, {'error': 'invalid_or_expired_code'})
+                state['paired'] = True
+                return self.reply(200, {'connection_id': 'fixture-connection', 'device_id': 'qa-phone', 'token': 'qa-mobile-fixture-token'})
+            if self.headers.get('Authorization') != 'Bearer qa-mobile-fixture-token':
+                return self.reply(401, {'error': 'unauthorized'})
+            if path == '/api/v1/ws-ticket':
+                return self.reply(200, {'ticket': 'qa-single-use-fixture-ticket'})
+            if path == '/api/v1/open-requests':
+                record('OPEN ' + body.get('kind', '') + ' ' + str(body.get('saved_session_id') or ''))
+                state['open'] += 1
+                request_id = f"qa-open-{state['open']}"
+                state['opens'][request_id] = {'round': 0 if auth_case and body.get('kind') == 'saved' else 2, 'cancelled': False}
+                return self.reply(200, {'request_id': request_id, 'status': 'pending'})
+            if path.startswith('/api/v1/open-requests/') and path.endswith('/auth'):
+                request_id = path.split('/')[-2]
+                opened = state['opens'][request_id]
+                round_id = opened['round']
+                if opened['cancelled'] or body.get('challenge_id') != f'{request_id}-{round_id}':
+                    return self.reply(409, {'error': 'already_resolved'})
+                expected = ['phone-user', 'qa-temp-secret'] if round_id == 0 else ['123456']
+                if body.get('responses') != expected:
+                    return self.reply(400, {'error': 'invalid_auth_response'})
+                opened['round'] += 1
+                record('AUTH ' + ('login' if round_id == 0 else 'otp'))
+                return self.reply(200, {'status': 'accepted'})
+            if path.startswith('/api/v1/open-requests/') and path.endswith('/cancel'):
+                request_id = path.split('/')[-2]
+                state['opens'][request_id]['cancelled'] = True
+                record('CANCEL ' + request_id)
+                if ctx.case_id == 'TC-MOBILE-009' and request_id == 'qa-open-1':
+                    if not cancel_race.wait(10):
+                        return self.reply(500, {'error': 'next_request_not_observed'})
+                    record('CANCEL_RESPONSE ' + request_id)
+                return self.reply(200, {'status': 'cancelled'})
+            if path.endswith('/message'):
+                record('AGENT ' + body.get('text', ''))
+                state['task'] = 'running'
+                event('task_status', task_id='thread:qa-task', status='running', summary='mobile turn')
+            if path.endswith('/stop'):
+                state['task'] = 'idle'
+                record('AGENT STOP')
+                event('task_status', task_id='thread:qa-task', status='idle', summary='stopped')
+            self.reply(200, {'status': state['task']})
+
+        def do_GET(self):
+            path = urlsplit(self.path).path
+            if self.headers.get('Upgrade', '').lower() == 'websocket':
+                return self.websocket(path)
+            if not path.startswith('/api/v1/'):
+                return super().do_GET()
+            if self.headers.get('Authorization') != 'Bearer qa-mobile-fixture-token':
+                return self.reply(401, {'error': 'unauthorized'})
+            terminal = {'id': 'term:qa-runtime', 'kind': 'terminal', 'title': 'Local shell', 'status': 'running', 'summary': 'QA terminal'}
+            task = {'id': 'thread:qa-task', 'kind': 'agent', 'title': 'Review task', 'status': state['task'], 'summary': 'QA agent'}
+            if path == '/api/v1/sessions':
+                return self.reply(200, {'sessions': [terminal, task], 'saved_sessions': [{'id': 'saved', 'name': 'Build host', 'session_type': 'SSH', 'group_path': 'QA'}],
+                                        'capabilities': {'open_sessions': True}})
+            if path.startswith('/api/v1/open-requests/'):
+                request_id = path.rsplit('/', 1)[1]
+                opened = state['opens'][request_id]
+                if opened['cancelled']:
+                    return self.reply(200, {'request_id': request_id, 'status': 'failed', 'error': 'open_cancelled'})
+                if ctx.case_id == 'TC-MOBILE-009' and request_id == 'qa-open-2':
+                    cancel_race.set()
+                if opened['round'] < 2:
+                    round_id = opened['round']
+                    prompts = [{'prompt': '用户名', 'echo': True, 'initial': 'developer'}, {'prompt': '密码', 'echo': False}] if round_id == 0 else [{'prompt': '一次性验证码', 'echo': False}]
+                    return self.reply(200, {'request_id': request_id, 'status': 'pending', 'auth': {'id': f'{request_id}-{round_id}', 'name': '登录账户' if round_id == 0 else 'SSH 验证码', 'instructions': '仅本次连接使用', 'prompts': prompts}})
+                return self.reply(200, {'request_id': request_id, 'status': 'opened', 'session_id': 'term:qa-opened'})
+            if path.startswith('/api/v1/sessions/'):
+                return self.reply(200, {**task, 'confirmations': []})
+            if path.endswith('/changes'):
+                return self.reply(200, {'changes': [{'path': 'hello.txt', 'change_kind': 'M', 'diff_available': True}]})
+            if path.endswith('/diff'):
+                return self.reply(200, {'path': 'hello.txt', 'hunks': ['diff --git a/hello.txt b/hello.txt\n', '@@ -1 +1 @@\n-old\n+QA_MOBILE_CHANGED\n'], 'truncated': False})
+            return self.reply(200, {'path': 'hello.txt', 'content': 'QA_MOBILE_CHANGED\n', 'truncated': False})
+
+        def websocket(self, path):
+            key = self.headers['Sec-WebSocket-Key']
+            accept = base64.b64encode(hashlib.sha1((key + '258EAFA5-E914-47DA-95CA-C5AB0DC85B11').encode()).digest()).decode()
+            self.send_response(101)
+            self.send_header('Upgrade', 'websocket')
+            self.send_header('Connection', 'Upgrade')
+            self.send_header('Sec-WebSocket-Accept', accept)
+            self.end_headers()
+            is_term = '/terminals/' in path
+            def send(value):
+                with lock:
+                    write_frame(self.wfile, json.dumps(value))
+            with lock:
+                clients.append((is_term, send))
+            try:
+                send({'type': 'hello', 'connection_id': 'fixture-connection', 'instance_id': 'qa', 'run_mode': 'desktop', 'event_seq': state['event_seq']})
+                if is_term:
+                    lines = [f'QA_MOBILE_LOG_{i:03d}' for i in range(120)] + ['QA_MOBILE_REPLAY', '$ ']
+                    send({'type': 'replay', 'lines': lines, 'last_seq': state['seq']})
+                    send({'type': 'control', 'connection_id': 'fixture-connection', 'holder': state['holder']})
+                while True:
+                    opcode, payload = read_frame(self.rfile)
+                    if opcode == 8:
+                        break
+                    if opcode != 1:
+                        continue
+                    value = json.loads(payload)
+                    kind = value.get('type')
+                    if kind == 'take-control':
+                        state['holder'] = 'mobile:qa-phone'
+                        send({'type': 'control', 'connection_id': 'fixture-connection', 'holder': state['holder']})
+                    elif kind == 'release-control':
+                        state['holder'] = 'none'
+                        send({'type': 'control', 'connection_id': 'fixture-connection', 'holder': 'none'})
+                    elif kind == 'input':
+                        text = base64.b64decode(value['data_b64']).decode()
+                        # Escaped so control keys stay readable and line-safe in the receipt.
+                        record('PTY ' + text.encode('unicode_escape').decode('ascii'))
+                        state['direct'] = (state['direct'] + text)[-32:]
+                        if state['direct'].endswith('git che\t'):
+                            record('DIRECT git che\\t')
+                        state['seq'] += 1
+                        send({'type': 'output', 'seq': state['seq'], 'data_b64': base64.b64encode(('\r\n' + text).encode()).decode()})
+                    elif kind == 'resize':
+                        record('RESIZE')
+            except (OSError, EOFError):
+                pass
+            finally:
+                with lock:
+                    clients.remove((is_term, send))
+
+    def event(kind, **fields):
+        with lock:
+            state['event_seq'] += 1
+            for terminal, send in list(clients):
+                if not terminal:
+                    send({'type': kind, 'seq': state['event_seq'], **fields})
+    server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+    server.daemon_threads = True
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    ctx._mobile_web_server = server
+    ctx.values['mobile_endpoint'] = f'http://127.0.0.1:{server.server_port}'
+    ctx.values['mobile_endpoint2'] = f'http://localhost:{server.server_port}'
+    ctx.values['mobile_receipt'] = str(receipt.resolve())
+    ctx.values['mobile_assets'] = str(assets.resolve())
+    if ctx.case_id == 'TC-MOBILE-012':
+        ctx.values['mobile_cookie_receipt'] = str((Path(ctx.case_dir) / 'mobile-cookie-gateway-receipt.json').resolve())
+
+
+def teardown(ctx):
+    server = getattr(ctx, '_mobile_web_server', None)
+    if server:
+        server.shutdown()
+        server.server_close()
+    snapshot = getattr(ctx, '_mobile_assets', None)
+    if snapshot:
+        snapshot.cleanup()

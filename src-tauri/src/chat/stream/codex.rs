@@ -22,7 +22,7 @@ use uuid::Uuid;
 pub(super) async fn stream_codex(turn: StreamTurn<'_>) -> Result<(), String> {
     let StreamTurn {
         req,
-        app,
+        app: desktop_app,
         state,
         event_name,
         thread,
@@ -33,8 +33,10 @@ pub(super) async fn stream_codex(turn: StreamTurn<'_>) -> Result<(), String> {
         user_msg,
         agent_ctx,
     } = turn;
+    let app = desktop_app.ok_or("desktop_required")?;
+    let event_thread_id = req.thread_id.clone();
     let emit = |evt: &StreamEventOut| {
-        let _ = app.emit(&event_name, evt.clone());
+        crate::chat::emit_stream_event(Some(&app), state, &event_thread_id, &event_name, evt);
     };
 
     let assistant_id = Uuid::new_v4().to_string();
@@ -159,7 +161,7 @@ pub(super) async fn stream_codex(turn: StreamTurn<'_>) -> Result<(), String> {
                 });
             let effective_proxy =
                 match crate::agent::codex_bridge::config::resolve_effective_proxy_url(
-                    state.inner(),
+                    state,
                     &ai_config.codex_bridge,
                 ) {
                     Ok(proxy) => proxy,
@@ -229,7 +231,16 @@ pub(super) async fn stream_codex(turn: StreamTurn<'_>) -> Result<(), String> {
         }
     };
 
-    agent_ctx.refresh_runtime_bindings(state.inner()).await;
+    agent_ctx.refresh_runtime_bindings(state).await;
+
+    if state.mobile.turn_cancel(&req.thread_id).is_cancelled() {
+        process.stop().await;
+        emit(&StreamEventOut::Error {
+            id: assistant_id.clone(),
+            message: "Turn was stopped.".into(),
+        });
+        return Ok(());
+    }
 
     let codex_message = {
         let mut prefix = String::new();

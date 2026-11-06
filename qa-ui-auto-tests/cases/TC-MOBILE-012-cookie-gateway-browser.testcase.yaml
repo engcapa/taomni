@@ -1,0 +1,56 @@
+id: TC-MOBILE-012
+title: Cookie gateway pairing rejects malformed responses without blanking the phone view
+covers: [F-MOBILE-1]
+tags: [mobile, authentication, p0, crash-regression]
+modes: [browser]
+fixtures: [mobile_web]
+timeout_sec: 180
+description: >-
+  User-reported SLB-cookie and blank-screen regression. The immutable production
+  phone bundle runs behind a loopback authenticated gateway with the existing
+  deterministic HTTP/WS peer. Public phone controls verify same-origin HttpOnly
+  cookies, independent Bearer authorization, malformed HTML/incomplete JSON,
+  expired-login recovery with retained pairing and cookie-free cross-origin
+  requests. The probe reuses the runner Browser and asserts its own phone page
+  errors. It does not claim real Rust listener, embedded assets or PTY effects;
+  TC-MOBILE-013 owns those native boundaries.
+steps:
+- open: ${fixture.mobile_endpoint}
+- mobile_browser_probe: cookie-gateway
+- assert_file_contains: {path: '${fixture.mobile_cookie_receipt}', contains: '"passed": true'}
+- assert_file_contains: {path: '${fixture.mobile_cookie_receipt}', contains: '"real_pty": false'}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: >-
+      Same-origin gateway login cookies permit public phone pairing, REST and
+      event WebSockets without replacing Taomni Bearer authorization or leaking
+      ambient cookies and an existing Bearer token to another origin.
+    actions: [1, 2]
+    checkpoints:
+    - {step: 2, expectation: 'Gateway oracle checks HttpOnly cookie authentication, successful pairing/list/events, independent Bearer enforcement and cookie-free cross-origin pairing.'}
+    - {step: 3, expectation: All sanitized gateway receipt assertions passed.}
+    results: [2, 3]
+  - id: R2
+    requirement: >-
+      HTML and incomplete JSON cannot save an undefined instance or blank the
+      phone view. Malformed session responses show an actionable error with the
+      list retained; gateway-login expiration retains pairing and recovers after
+      login without a renderer exception.
+    actions: [2]
+    checkpoints:
+    - {step: 2, expectation: 'Public phone controls show actionable errors, retain rendered session content and local pairing, recover through Retry/login and produce no phone page errors.'}
+    - {step: 3, expectation: Sanitized receipt passed the blank-screen and login-recovery assertions.}
+    - {step: 4, expectation: This browser receipt explicitly makes no real PTY claim.}
+    - {step: 5, expectation: No runtime errors occurred in the runner page.}
+    results: [2, 3, 4, 5]
+  visual:
+  - check: Gateway phone screenshot is diagnostic, not a visual-fidelity verdict.
+    method: not-applicable
+    reason: Visible content, error states, persistence and network assertions own acceptance.
+  native:
+  - check: Embedded assets, native listener, desktop terminal and real PTY marker.
+    method: not-applicable
+    reason: TC-MOBILE-013 separately verifies these real native boundaries; this case uses a deterministic peer.

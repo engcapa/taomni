@@ -48,6 +48,35 @@ class NativePacedInputTest(unittest.TestCase):
             {"type": "pause", "duration": 20},
         ])
 
+    def test_linux_shifted_punctuation_holds_shift_for_actual_inserted_bytes(self):
+        with patch("native_paced_input.platform.system", return_value="Linux"):
+            session = self.session()
+            session.type_text("_+:")
+        actions = session.request.call_args_list[0].args[2]["actions"][0]["actions"]
+        for index, value in enumerate("_+:"):
+            self.assertEqual(actions[index * 5:(index + 1) * 5], [
+                {"type": "keyDown", "value": ""},
+                {"type": "keyDown", "value": value},
+                {"type": "keyUp", "value": value},
+                {"type": "keyUp", "value": ""},
+                {"type": "pause", "duration": 20},
+            ])
+
+    def test_shifted_punctuation_keeps_non_linux_actions_unchanged(self):
+        for system in ("Darwin", "Windows"):
+            with self.subTest(system=system), patch("native_paced_input.platform.system", return_value=system):
+                session = self.session()
+                session.type_text("_-")
+                actions = session.request.call_args_list[0].args[2]["actions"][0]["actions"]
+                self.assertEqual(actions, [
+                    {"type": "keyDown", "value": "_"},
+                    {"type": "keyUp", "value": "_"},
+                    {"type": "pause", "duration": 20},
+                    {"type": "keyDown", "value": "-"},
+                    {"type": "keyUp", "value": "-"},
+                    {"type": "pause", "duration": 20},
+                ])
+
     def test_uncertain_input_is_never_replayed_and_releases_its_source(self):
         session = self.session()
         session.request.side_effect = [WebDriverError("input interrupted"), WebDriverError("release failed")]

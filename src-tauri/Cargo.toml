@@ -86,7 +86,7 @@ async-stream = "0.3"
 # auth layer; schemars derives the tool input/output JSON schemas. Versions are
 # already in the tree (tower 0.5 / http 1 / hyper 1 / schemars 1) — additive.
 rmcp = { version = "1", features = ["server", "client", "transport-streamable-http-server", "transport-streamable-http-client-reqwest", "reqwest", "macros"] }
-axum = "0.8"
+axum = { version = "0.8", features = ["ws"] }
 schemars = "1"
 thiserror = "2"
 reqwest = { version = "0.13", features = ["rustls", "json", "form", "stream", "query", "socks", "blocking", "multipart"], default-features = false }
@@ -176,6 +176,7 @@ bcrypt-pbkdf = "0.11"
 generic-array = "1"
 rsa = "0.9"
 sha2 = "0.11"
+subtle = "=2.6.1"
 sha1 = "0.11"
 # VNC Apple Remote Desktop authentication (MD5 of the DH secret is the AES key)
 # and POP3 APOP digest.

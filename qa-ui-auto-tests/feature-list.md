@@ -13373,3 +13373,557 @@ TC-WS-075 adds native Home source-to-document activation coverage for the real `
 TC-WS-077 protects virtual explorer rows in browser/native: bounded DOM rows, Home/End and offscreen ArrowUp selection without activation, actual file opening, search/reset, list view and reverse name sorting. Cold/warm frame budgets remain unchanged in TC-WS-073/074.
 
 TC-WS-078 protects application menu ownership after ordinary-file activation: Close availability before/after the first and last file, a contributed Save with saved-content reopen, and release of the closed editor menu. Browser covers the renderer entry; native menu state and store-subscription cleanup have mounted contracts, with current-source hosted activation performance still gated by TC-WS-064/073.
+
+## 移动端远程控制面
+
+### P0 独立 Mobile Web 与实例移动服务 🟡
+
+<!-- feature
+id: F-MOBILE-1
+status: partial
+area: mobile/control-plane
+components: [MobileServiceSettings, MobileWeb, MobileRuntime]
+files:
+  - src/components/settings/MobileServiceSettings.tsx
+  - src-tauri/src/mobile/mod.rs
+  - src-tauri/src/mobile/server.rs
+  - src-tauri/src/mobile/streams.rs
+  - src-tauri/src/mobile/pty_broker.rs
+  - src-tauri/src/mobile/agent_view.rs
+  - src-tauri/src/mobile/file_view.rs
+  - src-tauri/src/mobile/session_open.rs
+  - src/layouts/main/useMobileBridge.ts
+  - mobile-web/src/App.tsx
+  - mobile-web/src/TerminalView.tsx
+  - mobile-web/src/TaskView.tsx
+  - mobile-web/src/PairForm.tsx
+  - mobile-web/src/InstanceView.tsx
+  - mobile-web/src/TerminalComposer.tsx
+  - mobile-web/src/TerminalKeybar.tsx
+  - mobile-web/src/terminalKeys.ts
+  - src-tauri/src/mobile/connection_auth.rs
+  - src/layouts/main/mobileConnectionAuth.ts
+  - mobile-web/src/CompactKeyboard.tsx
+  - mobile-web/src/TerminalControls.tsx
+  - mobile-web/src/ConnectionAuthForm.tsx
+  - mobile-web/src/live.ts
+  - mobile-web/src/api.ts
+  - mobile-web/src/apiContracts.ts
+  - mobile-web/src/useSnapshot.ts
+  - src/lib/i18n/locales/mobileSettings.ts
+controls:
+  - id: mobile-offline-note
+    selector: '[data-testid="mobile-offline-note"]'
+    kind: display
+  - id: mobile-instance-availability
+    selector: '[data-testid="mobile-instance-availability"]'
+    kind: display
+  - id: mobile-control-warning
+    selector: '[data-testid="mobile-control-warning"]'
+    kind: display
+  - id: mobile-events-retry
+    selector: '[data-testid="mobile-events-retry"]'
+    kind: interactive
+  - id: mobile-terminal-retry
+    selector: '[data-testid="mobile-terminal-retry"]'
+    kind: interactive
+  - id: mobile-sessions-updated
+    selector: '[data-testid="mobile-sessions-updated"]'
+    kind: display
+  - id: mobile-task-updated
+    selector: '[data-testid="mobile-task-updated"]'
+    kind: display
+  - id: mobile-task-retry
+    selector: '[data-testid="mobile-task-retry"]'
+    kind: interactive
+  - id: mobile-changes-updated
+    selector: '[data-testid="mobile-changes-updated"]'
+    kind: display
+  - id: mobile-file-updated
+    selector: '[data-testid="mobile-file-updated"]'
+    kind: display
+  - id: mobile-file-error
+    selector: '[data-testid="mobile-file-error"]'
+    kind: display
+  - id: mobile-changes-refresh
+    selector: '[data-testid="mobile-changes-refresh"]'
+    kind: interactive
+  - id: mobile-file-refresh
+    selector: '[data-testid="mobile-file-refresh"]'
+    kind: interactive
+  - id: mobile-add-instance
+    selector: '[data-testid="mobile-add-instance"]'
+    kind: interactive
+  - id: mobile-empty-instances
+    selector: '[data-testid="mobile-empty-instances"]'
+    kind: display
+  - id: mobile-endpoint
+    selector: '[data-testid="mobile-endpoint"]'
+    kind: interactive
+  - id: mobile-label
+    selector: '[data-testid="mobile-label"]'
+    kind: interactive
+  - id: mobile-pair-code
+    selector: '[data-testid="mobile-pair-code"]'
+    kind: interactive
+  - id: mobile-pair-submit
+    selector: '[data-testid="mobile-pair-submit"]'
+    kind: interactive
+  - id: mobile-sessions
+    selector: '[data-testid="mobile-sessions"]'
+    kind: display
+  - id: mobile-session
+    selector: '[data-testid="mobile-session"]'
+    kind: interactive
+  - id: mobile-saved-session
+    selector: '[data-testid="mobile-saved-session"]'
+    kind: display
+  - id: mobile-terminal-status
+    selector: '[data-testid="mobile-terminal-status"]'
+    kind: display
+  - id: mobile-take-control
+    selector: '[data-testid="mobile-take-control"]'
+    kind: interactive
+  - id: mobile-resize
+    selector: '[data-testid="mobile-resize"]'
+    kind: interactive
+  - id: mobile-paste
+    selector: '[data-testid="mobile-paste"]'
+    kind: interactive
+  - id: mobile-terminal-input
+    selector: '[data-testid="mobile-terminal-input"]'
+    kind: interactive
+  - id: mobile-terminal-send
+    selector: '[data-testid="mobile-terminal-send"]'
+    kind: interactive
+  - id: mobile-sessions-back
+    selector: '[data-testid="mobile-sessions-back"]'
+    kind: interactive
+  - id: mobile-agent-input
+    selector: '[data-testid="mobile-agent-input"]'
+    kind: interactive
+  - id: mobile-agent-send
+    selector: '[data-testid="mobile-agent-send"]'
+    kind: interactive
+  - id: mobile-task-status
+    selector: '[data-testid="mobile-task-status"]'
+    kind: display
+  - id: mobile-task-stop
+    selector: '[data-testid="mobile-task-stop"]'
+    kind: interactive
+  - id: mobile-file-open
+    selector: '[data-testid="mobile-file-open"]'
+    kind: interactive
+  - id: mobile-diff-open
+    selector: '[data-testid="mobile-diff-open"]'
+    kind: interactive
+  - id: mobile-file-content
+    selector: '[data-testid="mobile-file-content"]'
+    kind: display
+  - id: mobile-file-view
+    selector: '[data-testid="mobile-file-view"]'
+    kind: display
+  - id: mobile-instances-back
+    selector: '[data-testid="mobile-instances-back"]'
+    kind: interactive
+  - id: mobile-cloud-open
+    selector: 'article:has(h3:text-is("Cloud")) [data-testid="mobile-instance-open"]'
+    kind: interactive
+  - id: mobile-cloud-remove
+    selector: 'article:has(h3:text-is("Cloud")) [data-testid="mobile-instance-remove"]'
+    kind: interactive
+  - id: mobile-instance-open
+    selector: '[data-testid="mobile-instance-open"]'
+    kind: interactive
+  - id: mobile-instance-remove
+    selector: '[data-testid="mobile-instance-remove"]'
+    kind: interactive
+  - id: mobile-settings
+    selector: '[data-testid="mobile-settings"]'
+    kind: display
+  - id: mobile-settings-status
+    selector: '[data-testid="mobile-settings-status"]'
+    kind: display
+  - id: mobile-settings-port
+    selector: '[data-testid="mobile-settings-port"]'
+    kind: interactive
+  - id: mobile-settings-toggle
+    selector: '[data-testid="mobile-settings-toggle"]'
+    kind: interactive
+  - id: mobile-settings-open-sessions
+    selector: '[data-testid="mobile-settings-open-sessions"]'
+    kind: interactive
+  - id: mobile-settings-pair
+    selector: '[data-testid="mobile-settings-pair"]'
+    kind: interactive
+  - id: mobile-settings-code
+    selector: '[data-testid="mobile-settings-code"]'
+    kind: display
+  - id: mobile-settings-endpoint
+    selector: '[data-testid="mobile-settings-endpoint"]'
+    kind: interactive
+  - id: mobile-settings-qr
+    selector: '[data-testid="mobile-settings-qr"]'
+    kind: display
+  - id: mobile-settings-refresh
+    selector: '[data-testid="mobile-settings-refresh"]'
+    kind: interactive
+  - id: mobile-settings-revoke
+    selector: '[data-testid="mobile-settings-revoke"]'
+    kind: interactive
+  - id: mobile-app
+    selector: '[data-testid="mobile-app"]'
+    kind: display
+  - id: mobile-insecure-note
+    selector: '[data-testid="mobile-insecure-note"]'
+    kind: display
+  - id: mobile-link-pending
+    selector: '[data-testid="mobile-link-pending"]'
+    kind: display
+  - id: mobile-instance-missing
+    selector: '[data-testid="mobile-instance-missing"]'
+    kind: display
+  - id: mobile-first-instance
+    selector: '[data-testid="mobile-first-instance"]'
+    kind: interactive
+  - id: mobile-connection
+    selector: '[data-testid="mobile-connection"]'
+    kind: display
+  - id: mobile-instance-error
+    selector: '[data-testid="mobile-instance-error"]'
+    kind: display
+  - id: mobile-retry
+    selector: '[data-testid="mobile-retry"]'
+    kind: interactive
+  - id: mobile-open-status
+    selector: '[data-testid="mobile-open-status"]'
+    kind: display
+  - id: mobile-open-local
+    selector: '[data-testid="mobile-open-local"]'
+    kind: interactive
+  - id: mobile-refresh
+    selector: '[data-testid="mobile-refresh"]'
+    kind: interactive
+  - id: mobile-empty-sessions
+    selector: '[data-testid="mobile-empty-sessions"]'
+    kind: display
+  - id: mobile-saved-open
+    selector: '[data-testid="mobile-saved-open"]'
+    kind: interactive
+  - id: mobile-pair-form
+    selector: '[data-testid="mobile-pair-form"]'
+    kind: display
+  - id: mobile-pair-error
+    selector: '[data-testid="mobile-pair-error"]'
+    kind: display
+  - id: mobile-task
+    selector: '[data-testid="mobile-task"]'
+    kind: display
+  - id: mobile-agent-continue
+    selector: '[data-testid="mobile-agent-continue"]'
+    kind: interactive
+  - id: mobile-task-error
+    selector: '[data-testid="mobile-task-error"]'
+    kind: display
+  - id: mobile-changes-error
+    selector: '[data-testid="mobile-changes-error"]'
+    kind: display
+  - id: mobile-terminal-command
+    selector: '[data-testid="mobile-terminal-command"]'
+    kind: interactive
+  - id: mobile-terminal-command-send
+    selector: '[data-testid="mobile-terminal-command-send"]'
+    kind: interactive
+  - id: mobile-terminal-send-enter
+    selector: '[data-testid="mobile-terminal-send-enter"]'
+    kind: interactive
+  - id: mobile-terminal-history
+    selector: '[data-testid="mobile-terminal-history"]'
+    kind: interactive
+  - id: mobile-keybar
+    selector: '[data-testid="mobile-keybar"]'
+    kind: display
+  - id: mobile-keystrip
+    selector: '[data-testid="mobile-keystrip"]'
+    kind: display
+  - id: mobile-terminal
+    selector: '[data-testid="mobile-terminal"]'
+    kind: display
+  - id: mobile-terminal-back
+    selector: '[data-testid="mobile-terminal-back"]'
+    kind: interactive
+  - id: mobile-terminal-font-down
+    selector: '[data-testid="mobile-terminal-font-down"]'
+    kind: interactive
+  - id: mobile-terminal-font-up
+    selector: '[data-testid="mobile-terminal-font-up"]'
+    kind: interactive
+  - id: mobile-terminal-keys
+    selector: '[data-testid="mobile-terminal-keys"]'
+    kind: interactive
+  - id: mobile-terminal-fullscreen
+    selector: '[data-testid="mobile-terminal-fullscreen"]'
+    kind: interactive
+  - id: mobile-terminal-screen
+    selector: '[data-testid="mobile-terminal-screen"]'
+    kind: display
+  - id: mobile-terminal-latest
+    selector: '[data-testid="mobile-terminal-latest"]'
+    kind: interactive
+  - id: mobile-terminal-notice
+    selector: '[data-testid="mobile-terminal-notice"]'
+    kind: display
+  - id: mobile-terminal-keyboard
+    selector: '[data-testid="mobile-terminal-keyboard"]'
+    kind: interactive
+  - id: mobile-key-esc
+    selector: '[data-testid="mobile-key-esc"]'
+    kind: interactive
+  - id: mobile-key-ctrl-c
+    selector: '[data-testid="mobile-key-ctrl-c"]'
+    kind: interactive
+  - id: mobile-key-ctrl-l
+    selector: '[data-testid="mobile-key-ctrl-l"]'
+    kind: interactive
+  - id: mobile-key-tab
+    selector: '[data-testid="mobile-key-tab"]'
+    kind: interactive
+  - id: mobile-key-home
+    selector: '[data-testid="mobile-key-home"]'
+    kind: interactive
+  - id: mobile-key-up
+    selector: '[data-testid="mobile-key-up"]'
+    kind: interactive
+  - id: mobile-key-end
+    selector: '[data-testid="mobile-key-end"]'
+    kind: interactive
+  - id: mobile-key-pgup
+    selector: '[data-testid="mobile-key-pgup"]'
+    kind: interactive
+  - id: mobile-key-ctrl
+    selector: '[data-testid="mobile-key-ctrl"]'
+    kind: interactive
+  - id: mobile-key-alt
+    selector: '[data-testid="mobile-key-alt"]'
+    kind: interactive
+  - id: mobile-key-shift-tab
+    selector: '[data-testid="mobile-key-shift-tab"]'
+    kind: interactive
+  - id: mobile-key-pipe
+    selector: '[data-testid="mobile-key-pipe"]'
+    kind: interactive
+  - id: mobile-key-left
+    selector: '[data-testid="mobile-key-left"]'
+    kind: interactive
+  - id: mobile-key-down
+    selector: '[data-testid="mobile-key-down"]'
+    kind: interactive
+  - id: mobile-key-right
+    selector: '[data-testid="mobile-key-right"]'
+    kind: interactive
+  - id: mobile-key-pgdn
+    selector: '[data-testid="mobile-key-pgdn"]'
+    kind: interactive
+  - id: mobile-key-backspace
+    selector: '[data-testid="mobile-key-backspace"]'
+    kind: interactive
+  - id: mobile-key-ctrl-r
+    selector: '[data-testid="mobile-key-ctrl-r"]'
+    kind: interactive
+  - id: mobile-key-ctrl-a
+    selector: '[data-testid="mobile-key-ctrl-a"]'
+    kind: interactive
+  - id: mobile-key-ctrl-e
+    selector: '[data-testid="mobile-key-ctrl-e"]'
+    kind: interactive
+  - id: mobile-key-ctrl-w
+    selector: '[data-testid="mobile-key-ctrl-w"]'
+    kind: interactive
+  - id: mobile-key-ctrl-u
+    selector: '[data-testid="mobile-key-ctrl-u"]'
+    kind: interactive
+  - id: mobile-key-ctrl-k
+    selector: '[data-testid="mobile-key-ctrl-k"]'
+    kind: interactive
+  - id: mobile-key-ctrl-z
+    selector: '[data-testid="mobile-key-ctrl-z"]'
+    kind: interactive
+  - id: mobile-key-ctrl-d
+    selector: '[data-testid="mobile-key-ctrl-d"]'
+    kind: interactive
+  - id: mobile-key-tilde
+    selector: '[data-testid="mobile-key-tilde"]'
+    kind: interactive
+  - id: mobile-key-dash
+    selector: '[data-testid="mobile-key-dash"]'
+    kind: interactive
+  - id: mobile-key-slash
+    selector: '[data-testid="mobile-key-slash"]'
+    kind: interactive
+  - id: mobile-key-star
+    selector: '[data-testid="mobile-key-star"]'
+    kind: interactive
+  - id: mobile-key-gt
+    selector: '[data-testid="mobile-key-gt"]'
+    kind: interactive
+  - id: mobile-key-amp
+    selector: '[data-testid="mobile-key-amp"]'
+    kind: interactive
+  - id: mobile-key-dollar
+    selector: '[data-testid="mobile-key-dollar"]'
+    kind: interactive
+  - id: mobile-key-backslash
+    selector: '[data-testid="mobile-key-backslash"]'
+    kind: interactive
+  - id: mobile-key-backtick
+    selector: '[data-testid="mobile-key-backtick"]'
+    kind: interactive
+  - id: mobile-key-dquote
+    selector: '[data-testid="mobile-key-dquote"]'
+    kind: interactive
+  - id: mobile-key-squote
+    selector: '[data-testid="mobile-key-squote"]'
+    kind: interactive
+  - id: mobile-terminal-more
+    selector: '[data-testid="mobile-terminal-more"]'
+    kind: interactive
+  - id: mobile-terminal-menu
+    selector: '[data-testid="mobile-terminal-menu"]'
+    kind: display
+  - id: mobile-compact-keyboard
+    selector: '[data-testid="mobile-compact-keyboard"]'
+    kind: display
+  - id: mobile-input-modes
+    selector: '[data-testid="mobile-input-modes"]'
+    kind: display
+  - id: mobile-input-compact
+    selector: '[data-testid="mobile-input-compact"]'
+    kind: interactive
+  - id: mobile-input-direct
+    selector: '[data-testid="mobile-input-direct"]'
+    kind: interactive
+  - id: mobile-terminal-direct-input
+    selector: '[data-testid="mobile-terminal-screen"] .xterm-helper-textarea'
+    kind: interactive
+  - id: mobile-input-hide
+    selector: '[data-testid="mobile-input-hide"]'
+    kind: interactive
+  - id: mobile-connection-auth
+    selector: '[data-testid="mobile-connection-auth"]'
+    kind: display
+  - id: mobile-auth-submit
+    selector: '[data-testid="mobile-auth-submit"]'
+    kind: interactive
+  - id: mobile-auth-cancel
+    selector: '[data-testid="mobile-auth-cancel"]'
+    kind: interactive
+  - id: mobile-auth-answer-0
+    selector: '[data-testid="mobile-auth-answer-0"]'
+    kind: interactive
+  - id: mobile-auth-answer-1
+    selector: '[data-testid="mobile-auth-answer-1"]'
+    kind: interactive
+  - id: mobile-type-q
+    selector: '[data-testid="mobile-type-q"]'
+    kind: interactive
+  - id: mobile-type-c
+    selector: '[data-testid="mobile-type-c"]'
+    kind: interactive
+  - id: mobile-type-enter
+    selector: '[data-testid="mobile-type-enter"]'
+    kind: interactive
+  - id: mobile-type-shift
+    selector: '.compact-keyboard button[aria-label="Shift"]'
+    kind: interactive
+  - id: mobile-type-symbols
+    selector: '.compact-keyboard button[aria-label="切换数字符号"]'
+    kind: interactive
+  - id: mobile-type-uppercase
+    selector: '[data-testid="mobile-type-A"]'
+    kind: interactive
+  - id: mobile-type-number
+    selector: '[data-testid="mobile-type-1"]'
+    kind: interactive
+  - id: mobile-type-punctuation
+    selector: '[data-testid="mobile-type-!"]'
+    kind: interactive
+  - id: mobile-type-space
+    selector: '[data-testid="mobile-type-space"]'
+    kind: interactive
+  - id: mobile-type-backspace
+    selector: '[data-testid="mobile-type-backspace"]'
+    kind: interactive
+-->
+
+- 默认不监听；全局设置开启回环/局域网移动服务，生成一次性码、查看与吊销设备。
+- 独立 PWA 支持多个 endpoint、终端共享与单写权、Agent 后续指令及只读文件/diff。
+- Linux headless 不创建 Tauri/GTK 窗口；桌面工具运行时不可用的路径显式报错。
+- 桌面设置显式允许后，已配对手机可请求新建本地终端或打开已保存会话；TC-MOBILE-005 定义真实 HTTP/WS → 桌面 tab → PTY → 独立磁盘 marker 的 Linux 验证，并保护默认拒绝、跨设备请求隔离和可读标题（运行结果以报告为准）。
+- 当前执行证据与限制见 `docs-feature/mobile-remote-p0-implementation.md`，未验证的平台与真手机能力不作完成声明。
+- TC-MOBILE-010 覆盖 Network 中移动服务／飞书设置中英文即时切换、翻译标题搜索、配对与草稿保持；TC-MOBILE-011 覆盖有限重连、手动按序列续接与任务／改动／文件独立过期标记。TC-MOBILE-003 另验证实际 native 缓存外壳离线提示与网络恢复。
+- TC-MOBILE-012（browser）与 TC-MOBILE-013（native）保护 SLB/Cookie 网关下的配对与白屏回归：同源 HttpOnly Cookie、独立 Bearer 权限、跨源不带 Cookie、HTML／不完整 JSON 的可恢复错误，以及网关登录过期后保留配对并恢复。两者均列入 crash-regression；native 使用 QA 内嵌生产手机 bundle、真实监听服务和 PTY 写入独立 marker，并断言桌面终端 pane/tab 与关闭服务后的存活状态，不以 browser peer 代替真实 native 副作用。运行结果以对应原始 receipt 和 runner 报告为准。
+
+### P1 飞书 Agent 适配器 🟡
+
+<!-- feature
+id: F-MOBILE-2
+status: partial
+area: mobile/feishu
+components: [FeishuAdapterSettings, FeishuAdapterRuntime]
+files:
+  - src/components/settings/FeishuAdapterSettings.tsx
+  - src-tauri/src/mobile/im_adapter/mod.rs
+  - src-tauri/src/mobile/im_adapter/actions.rs
+  - src-tauri/src/mobile/im_adapter/config.rs
+  - src-tauri/src/mobile/im_adapter/network.rs
+  - src-tauri/src/mobile/im_adapter/protocol.rs
+  - src-tauri/src/mobile/im_adapter/settings.rs
+  - src-tauri/src/mobile/im_adapter/worker.rs
+controls:
+  - id: feishu-settings
+    selector: '[data-testid="feishu-settings"]'
+    kind: display
+  - id: feishu-loading
+    selector: '[data-testid="feishu-loading"]'
+    kind: display
+  - id: feishu-app-id
+    selector: '[data-testid="feishu-app-id"]'
+    kind: interactive
+  - id: feishu-app-secret
+    selector: '[data-testid="feishu-app-secret"]'
+    kind: interactive
+  - id: feishu-mobile-endpoint
+    selector: '[data-testid="feishu-mobile-endpoint"]'
+    kind: interactive
+  - id: feishu-bindings
+    selector: '[data-testid="feishu-bindings"]'
+    kind: interactive
+  - id: feishu-allow-files
+    selector: '[data-testid="feishu-allow-files"]'
+    kind: interactive
+  - id: feishu-proxy-mode
+    selector: '[data-testid="feishu-proxy-mode"]'
+    kind: interactive
+  - id: feishu-custom-proxy
+    selector: '[data-testid="feishu-custom-proxy"]'
+    kind: display
+  - id: feishu-save
+    selector: '[data-testid="feishu-save"]'
+    kind: interactive
+  - id: feishu-toggle
+    selector: '[data-testid="feishu-toggle"]'
+    kind: interactive
+  - id: feishu-saved
+    selector: '[data-testid="feishu-saved"]'
+    kind: display
+  - id: feishu-status
+    selector: '[data-testid="feishu-status"]'
+    kind: display
+  - id: feishu-error
+    selector: '[data-testid="feishu-error"]'
+    kind: display
+-->
+
+企业自建应用出站长连接、白名单、通知、确认卡片与 Agent 指令/文件快照。
+TC-MOBILE-004 覆盖设置与真实 native 配置 IPC；Rust loopback fixture 覆盖 HTTP/WS 与 Agent 副作用。
+真实飞书应用端到端仍待配置后验证，详见 `docs-feature/mobile-feishu-p1-implementation.md`。

@@ -19,7 +19,7 @@ from tauri_webdriver import NativeHarness, NativeSession, TauriDriverProcess, We
 class NativeSessionTransportTest(TestCase):
     def setUp(self):
         # Geometry polling has separate readiness/real-WebView contracts.
-        target = patch('tauri_webdriver.prepare_pointer_target', return_value={'x': 270, 'y': 217})
+        target = patch('tauri_webdriver.prepare_click_target', return_value={'x': 270, 'y': 217})
         self.prepare_pointer_target = target.start()
         self.addCleanup(target.stop)
 
@@ -560,13 +560,93 @@ class NativeSessionFillTest(TestCase):
         script = session.execute.call_args_list[-1].args[0]
         self.assertIn("HTMLTextAreaElement.prototype", script)
 
-    def test_single_line_text_fill_skips_value_repair(self) -> None:
-        session = self.session(False)
-        session.execute = Mock(side_effect=[False, False, {"kind": "text", "value": "Taomni"}])
-        with patch("tauri_webdriver.platform.system", return_value="Linux"), \
-                patch.dict(os.environ, {"GDK_BACKEND": "x11"}):
-            session.fill("input[name=title]", "Taomni")
-        self.assertEqual(session.execute.call_count, 3)
+    def test_linux_single_line_exact_value_needs_no_retry(self) -> None:
+        for kind in ("text", "search"):
+            with self.subTest(kind=kind):
+                session = self.session(False)
+                session.execute = Mock(side_effect=[False, False, {"kind": kind, "value": "Taomni"}])
+                with patch("tauri_webdriver.platform.system", return_value="Linux"), \
+                        patch.dict(os.environ, {"GDK_BACKEND": "x11"}), \
+                        patch("qa_ui_auto.host_clipboard.get_text") as get_text, \
+                        patch("qa_ui_auto.host_clipboard.set_text") as set_text:
+                    self.assertEqual(session.fill("input[name=title]", "Taomni"), "filled input[name=title]")
+                self.assertEqual(session.execute.call_count, 3)
+                session.type_text.assert_called_once_with("Taomni")
+                session.focus.assert_called_once_with("input[name=title]")
+                self.assertEqual(session.press_combo.call_args_list, [call("Mod+a"), call("Backspace")])
+                get_text.assert_not_called()
+                set_text.assert_not_called()
+
+    def test_linux_single_line_loss_retries_once_with_focused_os_paste(self) -> None:
+        for kind in ("text", "search"):
+            for backend in ("x11", "wayland"):
+                with self.subTest(kind=kind, backend=backend):
+                    session = self.session(False)
+                    selector = f'input[type="{kind}"]'
+                    text = "QA-LEFT-GUTTER"
+                    state = {"focused": False, "value": "", "clipboard": "previous"}
+
+                    def execute(script):
+                        self.assertNotIn("setter.call", script)
+                        if "isContentEditable" in script or "el.type === 'password'" in script:
+                            return False
+                        if "selectionEnd === el.value.length" in script:
+                            return state["focused"]
+                        if "return {kind:" in script:
+                            return {"kind": kind, "value": state["value"]}
+                        self.assertIn('el.value === "QA-LEFT-GUTTER"', script)
+                        return state["value"] == text
+
+                    def type_text(_text):
+                        state.update(value="ER", focused=False)
+
+                    def press(combo):
+                        self.assertTrue(state["focused"], "real keys must target the input")
+                        if combo == "Backspace":
+                            state["value"] = ""
+                        elif combo == "Control+v":
+                            state["value"] = state["clipboard"]
+
+                    session.execute.side_effect = execute
+                    session.focus.side_effect = lambda _selector: state.update(focused=True)
+                    session.type_text.side_effect = type_text
+                    session.press_combo.side_effect = press
+                    with patch("tauri_webdriver.platform.system", return_value="Linux"), \
+                            patch.dict(os.environ, {"GDK_BACKEND": backend}), \
+                            patch("qa_ui_auto.host_clipboard.get_text", return_value="previous"), \
+                            patch("qa_ui_auto.host_clipboard.set_text", side_effect=lambda value: state.update(clipboard=value)) as set_text:
+                        session.fill(selector, text)
+                    self.assertEqual(state, {"focused": True, "value": text, "clipboard": "previous"})
+                    self.assertEqual(set_text.call_args_list, [call(text), call("previous")])
+                    self.assertEqual(session.focus.call_args_list, [call(selector), call(selector)])
+                    self.assertEqual(session.press_combo.call_args_list, [
+                        call("Mod+a"), call("Backspace"), call("Mod+a"), call("Backspace"), call("Control+v")])
+                    session.type_text.assert_called_once_with(text)
+                    session.request.assert_not_called()
+
+    def test_linux_single_line_failed_retry_restores_clipboard_and_keeps_failure(self) -> None:
+        for failure in ("wrong value", "paste failed", "focus failed"):
+            with self.subTest(failure=failure):
+                session = self.session(False)
+                session.execute = Mock(side_effect=[False, False, {"kind": "search", "value": "ER"}, False])
+                if failure == "paste failed":
+                    session.press_combo.side_effect = ["", "", "", "", WebDriverError(failure)]
+                elif failure == "focus failed":
+                    session.focus.side_effect = ["focused", WebDriverError(failure)]
+                expected = "input did not retain the requested value" if failure == "wrong value" else failure
+                with patch("tauri_webdriver.platform.system", return_value="Linux"), \
+                        patch.dict(os.environ, {"GDK_BACKEND": "x11"}), \
+                        patch("qa_ui_auto.host_clipboard.get_text", return_value="previous"), \
+                        patch("qa_ui_auto.host_clipboard.set_text") as set_text, \
+                        patch("tauri_webdriver.time.monotonic", side_effect=[0, 6]):
+                    with self.assertRaisesRegex(WebDriverError, expected):
+                        session.fill('input[type="search"]', "QA-LEFT-GUTTER")
+                expected_clipboard = [] if failure == "focus failed" else [call("QA-LEFT-GUTTER")]
+                self.assertEqual(set_text.call_args_list, expected_clipboard + [call("previous")])
+                self.assertEqual(session.press_combo.call_args_list.count(call("Control+v")),
+                                 0 if failure == "focus failed" else 1)
+                self.assertFalse(any("setter.call" in c.args[0] for c in session.execute.call_args_list))
+                session.request.assert_not_called()
 
     def test_value_repair_rejects_a_control_that_keeps_the_wrong_value(self) -> None:
         session = self.session(False)
@@ -635,13 +715,21 @@ class NativeSessionFillTest(TestCase):
         session.type_text.assert_not_called()
 
     def test_macos_fill_replaces_value_without_synthetic_backspace(self) -> None:
-        session = self.session(False)
-        with patch("tauri_webdriver.platform.system", return_value="Darwin"):
-            session.fill("input[name=title]", "Taomni")
-        session.request.assert_called_once_with(
-            "POST", "/session/session-1/element/element-1/value", {"text": "Taomni"})
-        session.press_combo.assert_not_called()
-        session.type_text.assert_not_called()
+        for selector in ('input[type="text"]', 'input[type="search"]'):
+            with self.subTest(selector=selector):
+                session = self.session(False)
+                with patch("tauri_webdriver.platform.system", return_value="Darwin"), \
+                        patch("qa_ui_auto.host_clipboard.get_text") as get_text, \
+                        patch("qa_ui_auto.host_clipboard.set_text") as set_text:
+                    self.assertEqual(session.fill(selector, "QA-LEFT-GUTTER"), f"filled {selector}")
+                session.request.assert_called_once_with(
+                    "POST", "/session/session-1/element/element-1/value", {"text": "QA-LEFT-GUTTER"})
+                self.assertEqual(session.execute.call_count, 1)
+                session.focus.assert_not_called()
+                session.press_combo.assert_not_called()
+                session.type_text.assert_not_called()
+                get_text.assert_not_called()
+                set_text.assert_not_called()
 
     def test_linux_password_fill_retains_exact_shifted_punctuation(self) -> None:
         session = self.session(False)

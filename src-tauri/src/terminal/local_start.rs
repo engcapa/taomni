@@ -87,6 +87,11 @@ pub(crate) async fn register_routed_terminal(
     route: crate::database::forward::ForwardGuard,
 ) -> Result<(), String> {
     validate_session_id(&session_id)?;
+    let initial_size = handle
+        .master
+        .get_size()
+        .ok()
+        .map(|size| (size.cols, size.rows));
     let terminal = ActiveTerminal::Local {
         _route: route,
         writer: Mutex::new(handle.writer),
@@ -99,6 +104,8 @@ pub(crate) async fn register_routed_terminal(
         if terminals.contains_key(&session_id) {
             return Err(format!("Terminal {} already exists", session_id));
         }
+        state.mobile.broker.register(&session_id);
+        state.mobile.broker.desktop(&session_id, initial_size);
         terminals.insert(session_id.clone(), terminal);
     }
     if let Err(error) = crate::webview_recovery::register_output(
@@ -185,6 +192,11 @@ pub async fn create_local_terminal(
         sdk_environment.as_ref(),
     )?;
 
+    let initial_size = handle
+        .master
+        .get_size()
+        .ok()
+        .map(|size| (size.cols, size.rows));
     let terminal = ActiveTerminal::Local {
         _route: crate::database::forward::ForwardGuard(None),
         writer: Mutex::new(handle.writer),
@@ -197,6 +209,8 @@ pub async fn create_local_terminal(
         if terminals.contains_key(&session_id) {
             return Err(format!("Terminal {} already exists", session_id));
         }
+        state.mobile.broker.register(&session_id);
+        state.mobile.broker.desktop(&session_id, initial_size);
         terminals.insert(session_id.clone(), terminal);
     }
     crate::webview_recovery::register_output(
@@ -264,6 +278,11 @@ pub async fn create_command_terminal(
     )?;
     let (handle, reader) = pty::create_command_pty(cols, rows, &launch.program, &launch.args)?;
 
+    let initial_size = handle
+        .master
+        .get_size()
+        .ok()
+        .map(|size| (size.cols, size.rows));
     let terminal = ActiveTerminal::Local {
         _route: crate::database::forward::ForwardGuard(None),
         writer: Mutex::new(handle.writer),
@@ -276,6 +295,8 @@ pub async fn create_command_terminal(
         if terminals.contains_key(&session_id) {
             return Err(format!("Terminal {} already exists", session_id));
         }
+        state.mobile.broker.register(&session_id);
+        state.mobile.broker.desktop(&session_id, initial_size);
         terminals.insert(session_id.clone(), terminal);
     }
     crate::webview_recovery::register_output(

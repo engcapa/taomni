@@ -2,6 +2,7 @@ import { sshStartupCommand } from "../../../lib/sshSessionOptions";
 import { readSessionBookmark } from "../../../lib/sessionBookmark";
 import { createReconnectPolicy } from "./reconnectPolicy";
 import { Terminal } from "@xterm/xterm";
+import { listen } from "@tauri-apps/api/event";
 import {
   attachTerminalOutput,
   closeTerminal,
@@ -91,7 +92,14 @@ export function connectTerminalBackend(context: ConnectTerminalBackendContext) {
     // SSH connections may demand a second factor (MFA/OTP) via
     // keyboard-interactive auth. Register before createSshTerminal, because
     // the backend emits prompts before that call resolves.
-    const un = await listenSshAuthPrompt(targetSid, (payload) => {
+    const resolved = await listen<string>(`ssh-auth-resolved-${targetSid}`, event => {
+      if (controllerContext.pendingMfaRequestIdRef.current === event.payload) {
+        controllerContext.pendingMfaRequestIdRef.current = null;
+        controllerContext.setMfaPrompt(null);
+      }
+    });
+    let un: () => void;
+    try { un = await listenSshAuthPrompt(targetSid, (payload) => {
       if (lifetime.destroyed) {
         // Window/panel gone — cancel so the backend stops waiting.
         void submitSshAuthResponse(payload.requestId, null).catch(() => { });
@@ -99,11 +107,11 @@ export function connectTerminalBackend(context: ConnectTerminalBackendContext) {
       }
       controllerContext.pendingMfaRequestIdRef.current = payload.requestId;
       controllerContext.setMfaPrompt(payload);
-    });
+    }); } catch (error) { resolved(); throw error; }
     if (lifetime.destroyed) {
-      un();
+      un(); resolved();
     } else {
-      lifetime.unlistenAuthPrompt = un;
+      lifetime.unlistenAuthPrompt = () => { un(); resolved(); };
     }
   };
 
@@ -384,6 +392,7 @@ export function connectTerminalBackend(context: ConnectTerminalBackendContext) {
         opts.x11Trusted !== false,
         backendStartupCommand,
         keepStartupCommandOpen,
+        mode === "initial" ? ssh.mobileOpenRequestId : undefined,
       );
     })
       .then((sessionId) => {

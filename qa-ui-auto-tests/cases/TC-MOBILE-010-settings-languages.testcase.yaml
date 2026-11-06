@@ -1,0 +1,90 @@
+id: TC-MOBILE-010
+title: Network mobile and Feishu settings switch languages without losing drafts or pairing
+covers: [F-MOBILE-1, F-MOBILE-2, F-I18n-1]
+tags: [mobile, settings, i18n, p1]
+modes: [browser, native]
+fixtures: [reset_db]
+timeout_sec: 150
+description: >-
+  Uses the global Settings entry and visible language picker. English and Chinese
+  labels, status, warnings, QR accessibility and search must follow the selected
+  locale without clearing endpoint, pairing code or unsaved Feishu input. Native
+  uses the real listener and pairing IPC in an isolated profile; no Feishu
+  connection, external message or credential save is made.
+steps:
+- open: ${cfg.app.base_url}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: mobile}
+- wait_for: '[data-testid="feishu-app-id"]'
+- assert_text: {selector: '[data-testid="mobile-settings-status"]', contains: 'Disabled · No listening port'}
+- assert_text: {selector: '[data-testid="feishu-status"]', contains: 'Stopped · Delivered 0'}
+- assert_text: {selector: '[data-testid="mobile-settings"]', contains: Allow paired phones to open saved sessions and create local terminals}
+- fill: {selector: '[data-testid="mobile-settings-port"]', value: '0'}
+- click: '[data-testid="mobile-settings-toggle"]'
+- assert_text: {selector: '[data-testid="mobile-settings-status"]', contains: Running}
+- fill: {selector: '[data-testid="mobile-settings-endpoint"]', value: 'https://pc.example.com'}
+- click: '[data-testid="mobile-settings-pair"]'
+- wait_for: '[data-testid="mobile-settings-qr"]'
+- assert_attribute: {selector: '[data-testid="mobile-settings-qr"]', name: aria-label, equals: Phone pairing QR code}
+- fill: {selector: '[data-testid="feishu-app-id"]', value: cli_language_draft}
+- fill: {selector: '[data-testid="feishu-app-secret"]', value: qa-unsaved-language-secret}
+- fill: {selector: '[data-testid="feishu-bindings"]', value: ou_draft oc_draft}
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-zh-CN"]'
+- assert_text: {selector: '[data-testid="mobile-settings-toggle"]', contains: 关闭移动服务}
+- assert_text: {selector: '[data-testid="feishu-status"]', contains: '已停止 · 已送达 0'}
+- assert_attribute: {selector: '[data-testid="mobile-settings-qr"]', name: aria-label, equals: 手机配对二维码}
+- assert_attribute: {selector: '[data-testid="mobile-settings-endpoint"]', name: value, equals: 'https://pc.example.com'}
+- assert_attribute: {selector: '[data-testid="feishu-app-secret"]', name: value, equals: qa-unsaved-language-secret}
+- assert_text: {selector: '[data-testid="mobile-settings"]', contains: 保险库主密码仅在本机输入}
+- assert_text: {selector: '[data-testid="feishu-settings"]', contains: 文件内容默认不发送}
+- fill: {selector: '[data-testid="settings-search-input"]', value: 飞书 Agent 适配器}
+- wait_for: '[data-testid="feishu-bindings"]'
+- assert_text_equals: {selector: '[data-testid="feishu-bindings"]', equals: ou_draft oc_draft}
+- screenshot: mobile-settings-zh.png
+- click: '[data-testid="mobile-settings-toggle"]'
+- assert_text: {selector: '[data-testid="mobile-settings-status"]', contains: 已关闭}
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: Feishu Agent adapter}
+- assert_text: {selector: '[data-testid="mobile-settings-status"]', contains: Disabled}
+- assert_attribute: {selector: '[data-testid="feishu-app-id"]', name: value, equals: cli_language_draft}
+- assert_text_equals: {selector: '[data-testid="feishu-bindings"]', equals: ou_draft oc_draft}
+- assert_disabled: '[data-testid="feishu-toggle"]'
+- screenshot: mobile-settings-en.png
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: English is complete, pairing starts through the actual Settings controls, and locale switching preserves pairing and drafts.
+    actions: [1, 2, 3, 8, 9, 11, 12, 15, 16, 17, 18, 19]
+    checkpoints:
+    - {step: 5, expectation: English disabled listener status.}
+    - {step: 7, expectation: The saved-session authorization control uses its English label.}
+    - {step: 10, expectation: Listener starts through Settings.}
+    - {step: 14, expectation: Pairing QR has an English accessible label.}
+    - {step: 20, expectation: Live action follows Chinese locale.}
+    - {step: 22, expectation: Existing pairing QR follows Chinese locale without regeneration.}
+    - {step: 24, expectation: Unsaved secret survives switching language.}
+    - {step: 26, expectation: Chinese data-export warning remains explicit.}
+    results: [5, 7, 10, 14, 20, 22, 24, 26]
+  - id: R2
+    requirement: Localized visible titles find the Network section and switching back retains drafts while stopping the listener.
+    actions: [27, 31, 33, 34, 35]
+    checkpoints:
+    - {step: 29, expectation: Chinese search retains identity draft.}
+    - {step: 32, expectation: Service stops in Chinese.}
+    - {step: 36, expectation: English title search reveals disabled service.}
+    - {step: 37, expectation: App ID draft remains unchanged.}
+    - {step: 39, expectation: Feishu cannot connect while mobile service is off.}
+    - {step: 41, expectation: No runtime errors.}
+    results: [29, 32, 36, 37, 39, 41]
+  visual:
+  - check: English and Chinese settings remain readable.
+    method: manual
+    reason: Retain both screenshots for label wrapping and warning review.
+  native:
+  - check: Real listener and pairing IPC in the current packaged WebView.
+    method: automated
+    reason: Native mode uses an isolated profile; browser stubs cannot prove listener lifecycle or actual pairing.

@@ -13,8 +13,26 @@ pub struct TerminalOutputSubscriber {
     pub(super) channel: TerminalOutputChannel,
     pub(super) window_label: String,
 }
-pub(super) type TerminalOutputSubscribers =
-    Arc<Mutex<HashMap<String, Vec<TerminalOutputSubscriber>>>>;
+pub struct TerminalOutputHub {
+    desktop: Mutex<HashMap<String, Vec<TerminalOutputSubscriber>>>,
+    pub(crate) broker: Arc<crate::mobile::pty_broker::Broker>,
+}
+impl TerminalOutputHub {
+    pub(crate) fn new(broker: Arc<crate::mobile::pty_broker::Broker>) -> Self {
+        Self {
+            desktop: Mutex::new(HashMap::new()),
+            broker,
+        }
+    }
+    pub(crate) fn lock(
+        &self,
+    ) -> std::sync::LockResult<
+        std::sync::MutexGuard<'_, HashMap<String, Vec<TerminalOutputSubscriber>>>,
+    > {
+        self.desktop.lock()
+    }
+}
+pub(crate) type TerminalOutputSubscribers = Arc<TerminalOutputHub>;
 
 pub(crate) fn revoke_window_outputs(state: &AppState, window_label: &str) {
     if let Ok(mut outputs) = state.terminal.terminal_outputs.lock() {
@@ -49,6 +67,7 @@ pub(super) fn send_terminal_output(
     session_id: &str,
     data: Vec<u8>,
 ) {
+    outputs.broker.output(session_id, &data);
     let Ok(mut outputs) = outputs.lock() else {
         return;
     };

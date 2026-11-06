@@ -38,6 +38,7 @@ mod rdp;
 mod screenshot;
 #[cfg(windows)]
 pub use screenshot::scroll_input::run_helper as run_screenshot_scroll_input;
+pub mod mobile;
 mod sdk;
 mod serial;
 mod servers;
@@ -111,6 +112,9 @@ pub fn resolved_app_data_dir<R: tauri::Runtime>(
 /// directory on macOS.  `dirs` does not honor XDG variables there, so native
 /// QA supplies explicit debug-only overrides instead of changing HOME.
 pub fn resolved_config_dir() -> Option<std::path::PathBuf> {
+    if let Some(root) = mobile::headless::config_root() {
+        return Some(root);
+    }
     if cfg!(debug_assertions) {
         if let Ok(raw) = std::env::var("NEWMOB_CONFIG_DIR") {
             if let Some(path) = qa_override_path(&raw) {
@@ -188,6 +192,7 @@ pub fn run() {
             // Runs before the app-data dir is created so the directory rename
             // targets a non-existent destination on every platform.
             migrate::run(&app_data);
+            app.manage(mobile::headless::ModeLease::acquire(&app_data, false).map_err(std::io::Error::other)?);
             app.manage(backup::coordination::ProfileLease::prepare(&app_data)
                 .map_err(std::io::Error::other)?);
 
@@ -538,6 +543,9 @@ pub fn run() {
             if let tauri::RunEvent::Exit = event {
                 screenshot::shutdown();
                 let state = app_handle.state::<AppState>();
+                tauri::async_runtime::block_on(async {
+                    let _ = tokio::time::timeout(std::time::Duration::from_secs(5), state.mobile.stop()).await;
+                });
                 sockscap::shutdown_on_exit(app_handle, &state);
             }
         });

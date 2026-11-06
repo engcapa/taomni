@@ -129,3 +129,6 @@ output
 # Private ASR corpora and local adapter settings (public fixtures stay explicit)
 /qa-ui-auto-tests/fixtures/voice/private/
 /scripts/asr-bench/*.local.json
+
+# Generated standalone mobile PWA, embedded by build.rs
+src-tauri/resources/mobile-web/

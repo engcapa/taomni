@@ -1,5 +1,5 @@
 use super::active::ActiveTerminal;
-use super::authentication::build_kbd_prompter;
+use super::authentication::build_mobile_kbd_prompter;
 use super::authentication::clear_session_auth_responders;
 use super::io_commands::validate_session_id;
 use super::output::TerminalOutputChannel;
@@ -11,8 +11,6 @@ use crate::terminal::network;
 use crate::terminal::ssh;
 use crate::terminal::x11;
 use crate::terminal::x11_forward;
-use std::io::Read;
-use std::io::Write;
 use std::sync::Arc;
 use tauri::AppHandle;
 use tauri::Emitter;
@@ -152,6 +150,7 @@ pub async fn create_ssh_terminal(
     x11_trusted: Option<bool>,
     startup_command: Option<String>,
     keep_open_after_startup_command: Option<bool>,
+    mobile_open_request_id: Option<String>,
     on_output: TerminalOutputChannel,
     state: State<'_, AppState>,
     app_handle: AppHandle,
@@ -159,6 +158,12 @@ pub async fn create_ssh_terminal(
 ) -> Result<String, String> {
     let output_generation = crate::webview_recovery::output_generation(&app_handle, window.label());
     validate_session_id(&session_id)?;
+    let mobile = crate::mobile::session_open::connection_auth::context(
+        &app_handle,
+        &window,
+        mobile_open_request_id,
+        &session_id,
+    )?;
     {
         let terminals = state.terminal.terminals.read().await;
         if terminals.contains_key(&session_id) {
@@ -196,72 +201,36 @@ pub async fn create_ssh_terminal(
     };
 
     if matches!(auth, ssh::SshAuth::Gssapi) {
-        super::openssh::probe(&host, port, &username, network.as_ref()).await?;
-        let mut launch = super::openssh::launch(&host, port, &username, network.as_ref()).await?;
-        launch.args.insert(0, "-tt".into());
-        if x11.unwrap_or(false) {
-            launch.args.insert(
-                0,
-                if x11_trusted.unwrap_or(true) {
-                    "-Y"
-                } else {
-                    "-X"
-                }
-                .into(),
-            );
-        }
-        if let Some(net) = &network {
-            for forward in &net.local_forwards {
-                launch
-                    .args
-                    .insert(0, format!("-L{}:{}", forward.local, forward.remote));
-            }
-            if !net.local_forwards.is_empty() {
-                launch.args.insert(0, "-oExitOnForwardFailure=yes".into());
-            }
-        }
-        let keep_open = keep_open_after_startup_command.unwrap_or(false);
-        let command = startup_command
-            .as_deref()
-            .map(str::trim)
-            .filter(|s| !s.is_empty());
-        if !keep_open {
-            if let Some(command) = command {
-                launch.args.push(command.into());
-            }
-        }
-        let (mut handle, reader) =
-            super::pty::create_command_pty(cols, rows, &launch.program, &launch.args)?;
-        if keep_open {
-            if let Some(command) = command {
-                handle
-                    .writer
-                    .write_all(format!("{command}\r").as_bytes())
-                    .map_err(|e| e.to_string())?;
-            }
-        }
-        super::local_start::register_routed_terminal(
-            session_id.clone(),
-            handle,
-            reader,
+        return super::ssh_start_openssh::start(
+            session_id,
+            &host,
+            port,
+            &username,
+            cols,
+            rows,
+            network.as_ref(),
+            x11.unwrap_or(false),
+            x11_trusted.unwrap_or(true),
+            startup_command.as_deref(),
+            keep_open_after_startup_command.unwrap_or(false),
             on_output,
             state.inner(),
             app_handle,
             window.label(),
             output_generation,
-            launch.route,
+            mobile.as_ref(),
         )
-        .await?;
-        return Ok(session_id);
+        .await;
     }
 
     // Keyboard-interactive (MFA/OTP) prompter: bridges the SSH auth loop to
     // the frontend so a second factor can be entered mid-connect. Cleaned up
     // below once connect resolves (success or error).
-    let prompter = build_kbd_prompter(
+    let prompter = build_mobile_kbd_prompter(
         app_handle.clone(),
         state.terminal.ssh_auth_responders.clone(),
         session_id.clone(),
+        mobile.clone(),
     );
 
     // X11 forwarding: resolve the local X server + cookie if the session has
@@ -297,7 +266,7 @@ pub async fn create_ssh_terminal(
             keep_open: keep_open_after_startup_command.unwrap_or(false),
         });
 
-    let connect_result = ssh::connect_ssh(
+    let connect = ssh::connect_ssh(
         &host,
         port,
         &username,
@@ -308,8 +277,10 @@ pub async fn create_ssh_terminal(
         Some(&prompter),
         x11_forward,
         startup_command.as_ref(),
-    )
-    .await;
+    );
+    let connect_result =
+        crate::mobile::session_open::connection_auth::during_connection(mobile.as_ref(), connect)
+            .await;
     // Drop any responder left dangling for this session (e.g. auth failed
     // while a prompt round was still registered) so the map doesn't leak.
     clear_session_auth_responders(&state.terminal.ssh_auth_responders, &session_id);
@@ -317,36 +288,49 @@ pub async fn create_ssh_terminal(
 
     let handle_arc = Arc::new(handle);
 
-    // Start any session-attached local port forwards. We capture the join
-    // handles so `close_terminal` can abort them and release the bound
-    // TCP listening ports.
-    let forward_handles = if let Some(n) = &network {
-        if !n.local_forwards.is_empty() {
-            forwards::spawn_local_forwards(
-                handle_arc.clone(),
-                &n.local_forwards,
-                app_handle.clone(),
-                session_id.clone(),
-            )
-        } else {
-            Vec::new()
-        }
-    } else {
-        Vec::new()
-    };
-
-    let terminal = ActiveTerminal::Ssh {
-        channel: Arc::new(AsyncMutex::new(channel)),
-        handle: handle_arc,
-        forwards: AsyncMutex::new(forward_handles),
-    };
-
     {
         let mut terminals = state.terminal.terminals.write().await;
         if terminals.contains_key(&session_id) {
             return Err(format!("Terminal {} already exists", session_id));
         }
-        terminals.insert(session_id.clone(), terminal);
+        let register = || {
+            // Start any session-attached local port forwards. We capture the join
+            // handles so `close_terminal` can abort them and release the bound
+            // TCP listening ports.
+            let forward_handles = if let Some(n) = &network {
+                if !n.local_forwards.is_empty() {
+                    forwards::spawn_local_forwards(
+                        handle_arc.clone(),
+                        &n.local_forwards,
+                        app_handle.clone(),
+                        session_id.clone(),
+                    )
+                } else {
+                    Vec::new()
+                }
+            } else {
+                Vec::new()
+            };
+
+            let terminal = ActiveTerminal::Ssh {
+                channel: Arc::new(AsyncMutex::new(channel)),
+                handle: handle_arc,
+                forwards: AsyncMutex::new(forward_handles),
+            };
+
+            state.mobile.broker.register(&session_id);
+            state.mobile.broker.desktop(&session_id, Some((cols, rows)));
+            terminals.insert(session_id.clone(), terminal);
+            Ok(())
+        };
+        if let Some(mobile) = &mobile {
+            mobile
+                .runtime
+                .open_requests
+                .while_pending(&mobile.request_id, register)?;
+        } else {
+            register()?;
+        }
     }
 
     crate::webview_recovery::register_output(
@@ -391,7 +375,12 @@ pub async fn create_ssh_terminal(
         if let Ok(mut outputs) = outputs.lock() {
             outputs.remove(&sid);
         }
-        let _ = app.emit(&format!("terminal-exit-{}", sid), "closed");
+        outputs.broker.exit(&sid);
+        crate::mobile::events::EventSink::emit(
+            &crate::mobile::events::DesktopSink(app),
+            &format!("terminal-exit-{}", sid),
+            serde_json::json!("closed"),
+        );
     });
 
     Ok(session_id)

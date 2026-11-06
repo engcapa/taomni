@@ -405,3 +405,93 @@ Native only (Linux/Windows/macOS): `{folder?: INBOX, size_delta?: 0, empty_newes
 
 - `mail_server_sparse_sync: {configure_only: true}` disables CONDSTORE before connecting; `mail_server_sparse_sync: null` (native-only, Linux/Windows/macOS): deliver 1,100 sparse ten-digit INBOX UIDs and disconnect the next synchronization FLAGS FETCH; fake IMAP enforces a 4 KiB command limit.
 - `mail_server_assert_sync_transport: null` (native-only): require exactly one injected FLAGS disconnect, a large explicit UID flag batch and zero rejected oversized commands, independently of UI counts.
+
+### `mobile_service_probe` (native)
+
+Arguments: `desktop` or `headless`. `desktop` requires a real local PTY and the
+mobile listener/pairing code opened through Settings. It uses two external
+HTTP/WS devices, operates settings revoke controls, verifies real PTY output
+and desktop input reclamation, then stops the listener. `headless` launches the
+matching QA executable with DISPLAY/WAYLAND_DISPLAY removed in a disposable
+profile, verifies health/pair/events/profile exclusion and clean shutdown.
+Receipts contain assertions and no pairing secrets. See TC-MOBILE-002/003.
+
+The additive `open-session` argument (TC-MOBILE-005) requires Settings with a
+running listener, an unused pairing code, the open-sessions checkbox off, and
+no terminal tabs. With the `mobile_service` fixture it pairs two external devices,
+proves disabled local/saved requests return `open_sessions_disabled`, then clicks
+the real checkbox. Local and saved LocalShell requests must return pending then
+opened with different `term:` ids; another device cannot poll them. It correlates
+each id with one new local desktop tab, a readable mirrored session-list title,
+and WS take-control/input, asserting a separate stdout line and exact independent
+host marker bytes. The saved request also verifies its distinct shell arguments.
+It never invokes app IPC/registry writers and leaves both tabs and the listener
+running for YAML assertions/cleanup. Failures retain the phase and network/desktop
+observations in `mobile-open-session-receipt.json`, without tokens or pairing codes.
+
+`connection-auth` (TC-MOBILE-007, Linux/Windows/macOS) uses the production phone
+bundle against the actual desktop listener and disposable loopback SSH peer.
+Enable the open-sessions checkbox and generate a pairing code first. The probe
+uses public phone controls for one-shot account/password, SSH OTP, encrypted-key
+passphrase, cancellation, failure recovery and new local PTY stdout. It checks
+another device cannot answer and compares the saved row plus independent SSH
+input/output receipts. Credentials remain disposable and are omitted from reports.
+The deterministic SSH peer is not an external shell; physical phone IME is unverified.
+The older `desktop`, `headless` and `open-session` probes remain Linux-only.
+
+`mobile_browser_probe: touch-scroll` (browser only) dispatches standard Touch DOM
+input to the rendered xterm screen, observes its accessible first-row position
+move backwards without moving the page, then clicks “最新” and verifies the
+original latest-output position is restored. It writes `mobile-touch-scroll.json`.
+This proves browser event integration, not physical iOS/Android touch hardware.
+
+`mobile_browser_probe: recovery` (browser only, paired instance session list)
+closes both phone WebSockets through Playwright network interception, fails
+five ticket requests per stream, verifies paused retries with output retained, and clicks
+manual reconnect with `after_seq`. It then makes task files/changes fail while
+task details succeed, checks independent timestamps and stale content, and
+recovers through visible refresh controls. Its final manual task-status retry
+phase temporarily holds only `task_status` frames in the network interceptor,
+so automatic push recovery cannot remove the retry button before it is clicked;
+normal event-driven freshness remains verified in the preceding phase. It writes `mobile-recovery.json` and
+binds `${fixture.mobile_recovery_receipt}`. This is renderer/network evidence;
+TC-MOBILE-003 separately proves cached shell offline/online on a real listener.
+
+`mobile_browser_probe: cookie-gateway` (TC-MOBILE-012, browser) requires the
+`mobile_web` fixture. It reuses the runner's existing Browser with an isolated
+phone context, immutable production bundle and deterministic HTTP/WS peer behind
+a loopback authenticated gateway. It verifies same-origin HttpOnly cookies on
+pairing, REST and WebSocket ticket/upgrade requests; Taomni still requires its own
+Bearer token. HTML/incomplete JSON cannot save a broken instance or blank the
+session view; expired gateway login retains pairing and recovers after login.
+Cross-origin pairing must receive neither ambient cookies nor an existing Bearer.
+It asserts no phone page errors and writes sanitized
+`mobile-cookie-gateway-receipt.json` plus a diagnostic screenshot. The fixture
+binds `${fixture.mobile_cookie_receipt}`; no real PTY/native claim is made.
+
+`mobile_service_probe: cookie-gateway` (TC-MOBILE-013, Linux/Windows/macOS native)
+performs the same public phone workflow against the actual Settings-started
+listener and its embedded production bundle, with no assets override or browser
+stub. Enable open-sessions and generate an unused pairing code first. The phone
+opens a local desktop terminal, takes control and sends a shell command over the
+authenticated gateway WebSocket. Exact host marker bytes prove real PTY execution.
+YAML additionally checks a native terminal tab/pane, the marker, service shutdown
+and a surviving desktop pane without runtime errors. `mobile_service` binds
+`${fixture.mobile_cookie_receipt}` and `${fixture.mobile_cookie_marker}` only for
+this case. The external Chromium phone is not a physical device or desktop WebView
+fidelity claim; the listener, embedded assets, IPC and PTY are real native effects.
+
+The `mobile_web` browser fixture serves the production mobile bundle with a
+deterministic HTTP/WS peer; it does not establish Rust/native service behavior.
+The `mobile_service` fixture seeds only isolated saved-session rows for native
+projection checks and assigns receipt paths.
+
+`mobile_service_probe: openssh-cancel` (TC-MOBILE-008, Linux native) uses the
+`mobile_openssh` fixture to place a deterministic blocking ssh executable on the
+isolated QA app's PATH. It observes real child PIDs, cancels/revokes/stops through
+HTTP or desktop Settings, then releases late probe success and asserts no PTY
+launch or broker registration. This tests process ownership, not Kerberos ticket
+interoperability. The fixture restores PATH and never alters a user executable.
+TC-MOBILE-007 also authenticates through real SSH direct-tcpip jump channels (OTP
+and encrypted key), and HTTP/SOCKS5/application/independent proxies after locking
+the vault through desktop Settings; the peer independently records routing.

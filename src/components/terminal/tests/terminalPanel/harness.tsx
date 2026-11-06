@@ -1,4 +1,10 @@
 import { vi } from "vitest";
+import type { EventCallback } from "@tauri-apps/api/event";
+import type { SshAuthPromptPayload } from "../../../../lib/ipc";
+
+const eventMocks = vi.hoisted(() => ({
+  listen: vi.fn(async (_event: string, _handler: EventCallback<string>) => vi.fn()),
+}));
 
 const terminalMocks = vi.hoisted(() => {
   const focus = vi.fn();
@@ -115,7 +121,7 @@ const ipcMocks = vi.hoisted(() => {
       _workspaceRoot?: string,
     ) => ({ sessionId, shellId: "default" })),
     createSshTerminal: vi.fn(async (sessionId: string) => sessionId),
-    listenSshAuthPrompt: vi.fn(async () => vi.fn()),
+    listenSshAuthPrompt: vi.fn(async (_sessionId: string, _callback: (payload: SshAuthPromptPayload) => void) => vi.fn()),
     submitSshAuthResponse: vi.fn(async () => undefined),
     createTerminalSessionId: vi.fn(() => "terminal-session"),
     encodeBase64: vi.fn((value: string) => btoa(value)),
@@ -237,6 +243,11 @@ vi.mock("@xterm/addon-webgl", () => ({
 
 vi.mock("../../../../lib/ipc", () => ipcMocks);
 
+vi.mock("@tauri-apps/api/event", async (importOriginal) => ({
+  ...await importOriginal<typeof import("@tauri-apps/api/event")>(),
+  listen: eventMocks.listen,
+}));
+
 vi.mock("../../../../lib/clipboard", async () => {
   const actual = await vi.importActual<typeof import("../../../../lib/clipboard")>("../../../../lib/clipboard");
   return {
@@ -278,4 +289,4 @@ export const sshInfo = {
   authData: "secret",
 };
 
-export { clipboardMocks, fitMocks, gitMocks, ipcMocks, sockscapMocks, terminalMocks, webglMocks };
+export { clipboardMocks, eventMocks, fitMocks, gitMocks, ipcMocks, sockscapMocks, terminalMocks, webglMocks };

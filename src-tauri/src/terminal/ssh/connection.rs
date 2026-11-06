@@ -3,7 +3,7 @@ use super::authentication::SshAuth;
 use super::authentication::authenticate;
 use super::configuration::DEFAULT_PTY_MODES;
 use super::configuration::build_client_config;
-use super::transport::build_ssh_transport;
+use super::transport::build_ssh_transport_with_prompter;
 use crate::terminal::network::NetworkSettings;
 use crate::terminal::x11_forward;
 use crate::terminal::x11_forward::XForward;
@@ -132,7 +132,7 @@ pub async fn connect_ssh(
         x11: x11.clone(),
     };
 
-    let stream = build_ssh_transport(host, port, network).await?;
+    let stream = build_ssh_transport_with_prompter(host, port, network, prompter).await?;
     let mut handle = client::connect_stream(config, stream, handler)
         .await
         .map_err(|e| format!("SSH handshake failed: {}", e))?;
@@ -266,7 +266,7 @@ pub async fn connect_ssh_authenticated_with_prompter(
         x11: None,
     };
 
-    let stream = build_ssh_transport(host, port, network).await?;
+    let stream = build_ssh_transport_with_prompter(host, port, network, prompter).await?;
     let mut handle = client::connect_stream(config, stream, handler)
         .await
         .map_err(|e| format!("SSH handshake failed: {}", e))?;

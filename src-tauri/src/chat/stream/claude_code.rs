@@ -21,7 +21,7 @@ use uuid::Uuid;
 pub(super) async fn stream_claude_code(turn: StreamTurn<'_>) -> Result<(), String> {
     let StreamTurn {
         req,
-        app,
+        app: desktop_app,
         state,
         event_name,
         thread,
@@ -32,8 +32,10 @@ pub(super) async fn stream_claude_code(turn: StreamTurn<'_>) -> Result<(), Strin
         user_msg,
         agent_ctx,
     } = turn;
+    let app = desktop_app.ok_or("desktop_required")?;
+    let event_thread_id = req.thread_id.clone();
     let emit = |evt: &StreamEventOut| {
-        let _ = app.emit(&event_name, evt.clone());
+        crate::chat::emit_stream_event(Some(&app), state, &event_thread_id, &event_name, evt);
     };
 
     // Allocate the assistant message id and begin streaming.
@@ -84,7 +86,7 @@ pub(super) async fn stream_claude_code(turn: StreamTurn<'_>) -> Result<(), Strin
         Some(p) => p,
         None => {
             let effective_proxy = match crate::agent::cc_bridge::config::resolve_effective_proxy_url(
-                state.inner(),
+                state,
                 &ai_config.cc_bridge,
             ) {
                 Ok(proxy) => proxy,
@@ -248,13 +250,22 @@ pub(super) async fn stream_claude_code(turn: StreamTurn<'_>) -> Result<(), Strin
         run::ChatRunHandle::bridge_process("claude-code", process.clone()),
     );
 
+    if state.mobile.turn_cancel(&req.thread_id).is_cancelled() {
+        process.stop().await;
+        emit(&StreamEventOut::Error {
+            id: assistant_id.clone(),
+            message: "Turn was stopped.".into(),
+        });
+        return Ok(());
+    }
+
     // 7. Run process with callback to stream
     let assistant_id_clone = assistant_id.clone();
     let app_clone = app.clone();
     let event_name_clone = event_name.clone();
     // Refresh volatile per-turn bindings for backend-side tools: cwd for
     // run_captured and DB connection id for SQL/Redis MCP handlers.
-    agent_ctx.refresh_runtime_bindings(state.inner()).await;
+    agent_ctx.refresh_runtime_bindings(state).await;
 
     // Build the per-turn context prefix CC sees: the live working
     // directory (3.3 — volatile, so injected each turn rather than in the

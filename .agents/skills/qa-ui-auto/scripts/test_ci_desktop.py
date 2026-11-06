@@ -111,6 +111,9 @@ class DesktopTests(unittest.TestCase):
                         return_value={'ID': 'ubuntu', 'VERSION_ID': '24.04'})
         release.start()
         self.addCleanup(release.stop)
+        manager = patch('ci_file_manager.prepare_file_manager', return_value={'ready': True})
+        manager.start()
+        self.addCleanup(manager.stop)
 
     def test_owned_xorg_selects_evdev_keycodes_before_clients_start(self):
         with tempfile.TemporaryDirectory() as d, patch.dict(os.environ, {"DISPLAY": ":99"}), \

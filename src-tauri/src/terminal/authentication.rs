@@ -39,10 +39,20 @@ pub(crate) fn build_kbd_prompter(
     responders: Arc<Mutex<HashMap<String, crate::state::SshAuthResponder>>>,
     session_id: String,
 ) -> ssh::KbdInteractivePrompter {
+    build_mobile_kbd_prompter(app_handle, responders, session_id, None)
+}
+
+pub(crate) fn build_mobile_kbd_prompter(
+    app_handle: AppHandle,
+    responders: Arc<Mutex<HashMap<String, crate::state::SshAuthResponder>>>,
+    session_id: String,
+    mobile: Option<crate::mobile::session_open::connection_auth::MobileAuthContext>,
+) -> ssh::KbdInteractivePrompter {
     Arc::new(move |req: ssh::KbdInteractiveRequest| {
         let app_handle = app_handle.clone();
         let responders = responders.clone();
         let session_id = session_id.clone();
+        let mobile = mobile.clone();
         Box::pin(async move {
             let request_id = format!("{}:{}", session_id, uuid_like());
             let (tx, rx) = tokio::sync::oneshot::channel();
@@ -68,8 +78,37 @@ pub(crate) fn build_kbd_prompter(
                     .collect(),
             };
 
+            let challenge = if let Some(mobile) = &mobile {
+                use crate::mobile::session_open::connection_auth::Prompt;
+                match mobile.runtime.open_requests.publish_ssh(
+                    &mobile.request_id,
+                    payload.name.clone(),
+                    payload.instructions.clone(),
+                    payload
+                        .prompts
+                        .iter()
+                        .map(|p| Prompt {
+                            prompt: p.prompt.clone(),
+                            echo: p.echo,
+                            initial: String::new(),
+                        })
+                        .collect(),
+                    responders.clone(),
+                    request_id.clone(),
+                ) {
+                    Ok(id) => Some(id),
+                    Err(_) => {
+                        if let Ok(mut guard) = responders.lock() {
+                            guard.remove(&request_id);
+                        }
+                        return None;
+                    }
+                }
+            } else {
+                None
+            };
             if app_handle
-                .emit(&format!("ssh-auth-prompt-{}", session_id), payload)
+                .emit(&format!("ssh-auth-prompt-{}", session_id), &payload)
                 .is_err()
             {
                 // No listener / window gone — clean up and cancel.
@@ -81,7 +120,7 @@ pub(crate) fn build_kbd_prompter(
 
             // Wait for the user's answer. A dropped sender (window closed,
             // session torn down) resolves to `Err` → treated as cancellation.
-            match rx.await {
+            let result = match rx.await {
                 Ok(answers) => answers,
                 Err(_) => {
                     if let Ok(mut guard) = responders.lock() {
@@ -89,7 +128,16 @@ pub(crate) fn build_kbd_prompter(
                     }
                     None
                 }
+            };
+            if let (Some(mobile), Some(challenge)) = (&mobile, challenge) {
+                mobile
+                    .runtime
+                    .open_requests
+                    .clear_challenge(&mobile.request_id, &challenge);
             }
+            // Dismiss the desktop prompt too when a phone won the one-shot.
+            let _ = app_handle.emit(&format!("ssh-auth-resolved-{}", session_id), &request_id);
+            result
         }) as Pin<Box<dyn Future<Output = Option<Vec<String>>> + Send>>
     })
 }

@@ -35,6 +35,9 @@ if [[ "${QA_OPERATION:-run}" == run ]]; then
   else
     install_packages xvfb xauth openbox xcompmgr wmctrl xdotool x11-utils \
       x11-xserver-utils libxtst6 xclip imagemagick fcitx5 fcitx5-frontend-gtk3 fcitx5-chinese-addons
+    if [[ "$profile" == ubuntu-24.04-xvfb ]]; then
+      install_packages pcmanfm-qt xdg-utils
+    fi
     if [[ ",${QA_CAPABILITIES:-}," == *,dual-display,* ]]; then
       install_packages xserver-xorg-core xserver-xorg-video-dummy
       if [[ "$profile" == ubuntu-22.04-* ]]; then

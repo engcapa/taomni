@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const maximumLines = 800;
-const roots = ["src", "src-tauri/src", "src-tauri/tests", "scripts", "vite-plugins"];
+const roots = ["mobile-web/src", "src", "src-tauri/src", "src-tauri/tests", "scripts", "vite-plugins"];
 const sourceExtension = /\.(?:[cm]?js|tsx?|rs|py|css)$/;
 const ignoredDirectories = new Set(["node_modules", "target", "dist", ".git", ".gradle"]);
 

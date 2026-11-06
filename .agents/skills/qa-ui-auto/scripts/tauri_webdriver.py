@@ -25,9 +25,11 @@ from typing import Any
 from native_build import QA_APP_ID, verify_identity
 from native_webdriver_transport import WebDriverError, WebDriverTransport
 from native_console import CONSOLE_HOOK_SCRIPT
-from native_pointer import MOUSE_SOURCE, prepare_pointer_target
+from native_element_query import count_elements
+from native_pointer import MOUSE_SOURCE, prepare_click_target
 from native_paced_input import type_paced_text
 from native_window_focus import NativeWindowFocus
+from native_driver_lifecycle import driver_start_environment
 
 
 ROOT = Path.cwd()
@@ -290,7 +292,7 @@ class TauriDriverProcess:
             # same W3C subset over this run-owned loopback port.
             if not self.application.is_file():
                 raise WebDriverError(f"macOS QA application not found: {self.application}")
-            env = dict(os.environ)
+            env = driver_start_environment(self)
             env["TAOMNI_QA_WEBDRIVER_HOST"] = self.host
             env["TAOMNI_QA_WEBDRIVER_PORT"] = str(self.port)
             command = [str(self.application.resolve())]
@@ -312,7 +314,7 @@ class TauriDriverProcess:
             cmd = [self.command, "--port", str(self.port), "--native-port", str(self.native_port)]
             if self.native_driver:
                 cmd += ["--native-driver", str(self.native_driver)]
-            env = dict(os.environ)
+            env = driver_start_environment(self)
             if platform.system() == "Linux" and env.get("GDK_BACKEND") == "wayland":
                 # The app's floating capture windows use a separate XWayland
                 # connection. Keep the parent/DBus activation environment at
@@ -522,12 +524,7 @@ class NativeSession(WebDriverTransport):
         return f"clicked {selector}"
 
     def count(self, selector: str) -> int:
-        using, value = selector_strategy(selector)
-        elements = self.request("POST", self.endpoint("/elements"),
-                                {"using": using, "value": value})
-        if not isinstance(elements, list):
-            raise WebDriverError(f"invalid element list for {selector}: {elements!r}")
-        return len(elements)
+        return count_elements(self, selector, selector_strategy(selector))
 
     def right_click(self, selector: str) -> str:
         return self.pointer_button_click(selector, 2)
@@ -547,10 +544,10 @@ class NativeSession(WebDriverTransport):
             # Scroll only; dispatch the actual context click through W3C input.
             try:
                 self.request("POST", self.endpoint("/execute/sync"), {
-                    "script": "arguments[0].scrollIntoView({block:'nearest', inline:'nearest'});",
+                    "script": "arguments[0].scrollIntoView({block:'nearest', inline:'nearest', behavior:'instant'});",
                     "args": [origin],
                 })
-                point = prepare_pointer_target(self, origin, allow_alternate=button == 2)
+                point = prepare_click_target(self, origin, allow_alternate=button == 2)
             except WebDriverError as exc:
                 if _is_stale_element_error(exc) and attempt < 2:
                     last_stale = exc
@@ -865,8 +862,9 @@ class NativeSession(WebDriverTransport):
         Localized date segments distribute typed digits in locale order and
         multi-line text drops newlines, so real key input can store a
         different string than the requested one without failing anything.
-        Compare the observed value and, only when it differs, apply the exact
-        text through the control's native setter with ordinary input/change
+        Linux single-line text/search must retain real input events: retry a
+        mismatched value once through OS clipboard paste, never a DOM setter.
+        Date/textarea controls use their native setter with ordinary input/change
         events; a value that still differs afterwards fails the step.
         """
         observed = self.execute(
@@ -875,7 +873,17 @@ class NativeSession(WebDriverTransport):
             "const kind = el instanceof HTMLTextAreaElement ? 'textarea' : (el.type || '');"
             "return {kind: kind, value: el.value};"
         )
-        if not isinstance(observed, dict) or observed.get("kind") not in {"date", "textarea"}:
+        if not isinstance(observed, dict):
+            return
+        if platform.system() == "Linux" and observed.get("kind") in {"text", "search"}:
+            if observed.get("value") != text:
+                check = (
+                    f"const el = document.querySelector({json.dumps(selector)});"
+                    f"return el instanceof HTMLInputElement && el.value === {json.dumps(text)};"
+                )
+                self._paste_linux_input(selector, text, check, "input")
+            return
+        if observed.get("kind") not in {"date", "textarea"}:
             return
         if observed.get("value") == text:
             return
@@ -916,6 +924,9 @@ class NativeSession(WebDriverTransport):
         raise WebDriverError(f"Wayland input did not select its existing value: {selector}")
 
     def _paste_linux_password(self, selector: str, text: str, check: str) -> None:
+        self._paste_linux_input(selector, text, check, "password input")
+
+    def _paste_linux_input(self, selector: str, text: str, check: str, kind: str) -> None:
         from qa_ui_auto import host_clipboard
 
         previous = ""
@@ -924,7 +935,7 @@ class NativeSession(WebDriverTransport):
         try:
             # Partial input can show validation feedback and move a centered
             # dialog. WebKit's coordinate click can then hit dialog padding and
-            # blur the password field. Resolve and verify focus before real keys.
+            # blur the input. Resolve and verify focus before real keys.
             self.focus(selector)
             if os.environ.get("GDK_BACKEND", "").split(",")[0] == "wayland":
                 self._select_wayland_fill_input(selector)
@@ -937,7 +948,7 @@ class NativeSession(WebDriverTransport):
             while self.execute(check) is not True:
                 if time.monotonic() >= deadline:
                     # Do not expose credential bytes in driver diagnostics.
-                    raise WebDriverError(f"password input did not retain the requested value: {selector}")
+                    raise WebDriverError(f"{kind} did not retain the requested value: {selector}")
                 time.sleep(0.05)
         finally:
             # Remove the disposable password and retain the prior text payload.

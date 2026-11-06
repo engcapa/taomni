@@ -80,7 +80,7 @@ return original;
 
 def prepare_pointer_target(session, origin: dict, timeout: float = 5.0,
                            *, allow_alternate: bool = False) -> dict:
-    """Wait for two matching points; never activate a target or replay input.
+    """Wait for a stable viewport interval; never activate or replay input.
 
     Element-origin actions leave geometry resolution to the driver. Resolve
     against the current viewport explicitly so a row changing after a save
@@ -89,6 +89,7 @@ def prepare_pointer_target(session, origin: dict, timeout: float = 5.0,
     """
     end = time.monotonic() + timeout
     previous = None
+    stable_since = None
     last = None
     samples = []
     centered = False
@@ -108,8 +109,15 @@ def prepare_pointer_target(session, origin: dict, timeout: float = 5.0,
         current = tuple(round(last[k]) for k in ("x", "y", "width", "height")) if last["ready"] else None
         samples.append(last)
         samples = samples[-6:]
+        now = time.monotonic()
         if current is not None and current == previous:
-            return {"x": int(last["x"]), "y": int(last["y"])}
+            # WebKit search scrolling can pause for more than one sample
+            # before the next layout/compositor update. A sustained interval
+            # prevents sending trusted input to an earlier viewport position.
+            if stable_since is not None and now - stable_since >= 0.3:
+                return {"x": int(last["x"]), "y": int(last["y"])}
+        else:
+            stable_since = now if current is not None else None
         previous = current
         if not last["ready"] and (last.get("outside") is True or not centered):
             # Nearest alignment can leave a control behind a sticky header or
@@ -118,7 +126,7 @@ def prepare_pointer_target(session, origin: dict, timeout: float = 5.0,
             # move it outside again; no input has been sent at this stage.
             centered = True
             session.request("POST", session.endpoint("/execute/sync"), {
-                "script": "arguments[0].scrollIntoView({block:'center', inline:'center'});",
+                "script": "arguments[0].scrollIntoView({block:'center', inline:'center', behavior:'instant'});",
                 "args": [origin],
             })
         remaining = end - time.monotonic()
@@ -127,3 +135,34 @@ def prepare_pointer_target(session, origin: dict, timeout: float = 5.0,
         if session.deadline:
             remaining = min(remaining, session.deadline.remaining())
         time.sleep(min(0.05, remaining))
+
+
+def prepare_click_target(session, origin: dict, timeout: float = 5.0,
+                         *, allow_alternate: bool = False) -> dict:
+    """Check geometry again after the driver has moved the physical pointer.
+
+    WebKit's compositor can advance a pending search scroll during W3C input,
+    even after DOM geometry appeared stable. Hover is safe to repeat; button
+    input is never sent until that round trip still points at the same target.
+    """
+    end = time.monotonic() + timeout
+    while True:
+        remaining = end - time.monotonic()
+        if session.deadline:
+            remaining = min(remaining, session.deadline.remaining())
+        if remaining <= 0:
+            raise WebDriverError("native click target moved during pointer preparation")
+        point = prepare_pointer_target(session, origin, remaining,
+                                       allow_alternate=allow_alternate)
+        session.request("POST", session.endpoint("/actions"), {"actions": [{
+            "type": "pointer", "id": MOUSE_SOURCE,
+            "parameters": {"pointerType": "mouse"}, "actions": [{
+                "type": "pointerMove", "duration": 0, "origin": "viewport", **point,
+            }],
+        }]})
+        current = session.request("POST", session.endpoint("/execute/sync"), {
+            "script": TARGET_GEOMETRY, "args": [origin, allow_alternate],
+        })
+        if (isinstance(current, dict) and current.get("ready") is True
+                and current.get("x") == point["x"] and current.get("y") == point["y"]):
+            return point

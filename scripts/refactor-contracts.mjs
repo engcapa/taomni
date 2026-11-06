@@ -74,6 +74,17 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
           routes.set(name[1], match[2]);
         }
       }
+      // Focused domains may own both their explicit allowlist and handler.
+      for (const match of read(dispatcher).matchAll(/command if (\w+)::handles\(command\) => \1::handle\(invoke\)/g)) {
+        const domain = match[1];
+        const source = read(`src-tauri/src/commands/${domain}.rs`);
+        const predicate = source.match(/fn handles\(command: &str\) -> bool \{\s*matches!\(\s*command,([\s\S]*?)\)\s*\}/);
+        if (!predicate) { errors.push(`Cannot inspect native route predicate: ${domain}`); continue; }
+        for (const name of predicate[1].matchAll(/"(\w+)"/g)) {
+          if (routes.has(name[1])) errors.push(`Duplicate native route: ${name[1]}`);
+          routes.set(name[1], domain);
+        }
+      }
       for (const command of actual.commands) {
         const domain = routes.get(command.name);
         if (!domain || !read(`src-tauri/src/commands/${domain}.rs`).includes(`crate::${command.handler},`)) {

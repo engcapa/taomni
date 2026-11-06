@@ -1,0 +1,67 @@
+id: TC-MOBILE-003
+title: Headless starts without display and owns an exclusive profile
+covers:
+- F-MOBILE-1
+tags:
+- p0
+- mobile
+- native-boundary
+- headless
+modes:
+- native
+native_platforms:
+- Linux
+fixtures:
+- reset_db
+- mobile_service
+timeout_sec: 120
+description: Launches the matching QA binary with DISPLAY and WAYLAND_DISPLAY removed. A separate disposable profile proves HTTP health/pair/events,
+  profile exclusion and clean process/listener shutdown. A 390x844 Chromium context pairs against the actual embedded PWA and verifies the cached shell offline with an explicit stale-data notice, retained registration and automatic online recovery.
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-mobile-headless-password
+- mobile_service_probe: headless
+- assert_file_contains:
+    path: ${fixture.mobile_headless_receipt}
+    contains: '"display": false'
+- assert_file_contains:
+    path: ${fixture.mobile_headless_receipt}
+    contains: '"passed": true'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Matching native binary starts headless with no display, responds using v1 and rejects a second process sharing its
+      profile.
+    actions:
+    - 1
+    checkpoints:
+    - step: 3
+      expectation: Real native headless network, lifecycle and security oracle passes all assertions.
+    - step: 4
+      expectation: 'Independent receipt contains "display": false.'
+    - step: 5
+      expectation: 'Independent receipt contains "passed": true.'
+    - step: 6
+      expectation: No runtime errors occurred.
+    results:
+    - 3
+    - 4
+    - 5
+    - 6
+  - id: R2
+    requirement: The actual embedded PWA retains its instance registration offline, explicitly marks offline data and reconnects after network recovery.
+    actions: [1, 3]
+    checkpoints:
+    - {step: 3, expectation: Browser oracle checks cached shell notice and online recovery against the real headless listener.}
+    - {step: 5, expectation: Only a fully completed native and embedded-PWA probe writes a passing receipt.}
+    results: [3, 5]
+  visual:
+  - check: No GUI is created by headless.
+    method: not-applicable
+    reason: This case explicitly removes display variables.
+  native:
+  - check: Real process and OS profile lock are required.
+    method: automated
+    reason: Subprocess uses the matching QA binary and an isolated on-disk profile.

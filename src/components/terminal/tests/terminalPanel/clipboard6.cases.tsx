@@ -140,6 +140,49 @@ export function registerTerminalPanelClipboard6Cases() {
     }
   });
 
+  it("targets only the first-column output for the complete TC-155 query, not prompt suffix matches", async () => {
+    render(<TerminalPanel visible />);
+    await waitFor(() => expect(terminalMocks.focus).toHaveBeenCalled());
+    const term = terminalMocks.terminalCtor.mock.results[0].value;
+    const lines = [
+      'runner@runnervm7aw5e:~$  echo QA-LEFT-""GUTTER',
+      "QA-LEFT-GUTTER",
+      "runner@runnervm7aw5e:~$ ",
+    ];
+    term.cols = 151;
+    term.rows = 45;
+    term.buffer.active.length = lines.length;
+    term.buffer.active.getLine.mockImplementation((row: number) => ({
+      length: lines[row]?.length ?? 0,
+      getCell: (column: number) => ({ getChars: () => lines[row]?.[column] ?? "", getWidth: () => 1 }),
+    }));
+    const pane = screen.getByTestId("terminal-pane");
+    vi.spyOn(pane.querySelector(".xterm-screen")!, "getBoundingClientRect").mockReturnValue({
+      left: 8, top: 0, right: 1216, bottom: 720, width: 1208, height: 720,
+      x: 8, y: 0, toJSON: () => ({}),
+    });
+    fireEvent.contextMenu(pane);
+    fireEvent.click(screen.getByTestId("context-menu-item-find"));
+    const input = await screen.findByPlaceholderText("Find");
+
+    // The failed native artifact contained this truncated input, not the marker.
+    fireEvent.change(input, { target: { value: "ER" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(screen.getByText("Match 1/6")).toBeInTheDocument();
+    expect(pane.querySelector(".terminal-search-hit-active")).toHaveStyle({ left: "40px", top: "0px" });
+
+    // A complete query excludes both prompts and the quote-split command echo.
+    fireEvent.change(input, { target: { value: "QA-LEFT-GUTTER" } });
+    fireEvent.keyDown(input, { key: "Enter" });
+    expect(input).toHaveValue("QA-LEFT-GUTTER");
+    expect(screen.getByText("Match 1/1")).toBeInTheDocument();
+    expect(pane.querySelectorAll(".terminal-search-hit")).toHaveLength(1);
+    expect(pane.querySelector(".terminal-search-hit-active")).toHaveStyle({
+      left: "8px", top: "16px", width: "112px",
+    });
+    expect(term.select).toHaveBeenLastCalledWith(0, 1, 14);
+  });
+
   it("refreshes search highlights after reflow without replacing a manual selection or advancing the match", async () => {
     render(<TerminalPanel visible />);
     await waitFor(() => expect(terminalMocks.focus).toHaveBeenCalled());

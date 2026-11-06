@@ -357,6 +357,18 @@ export function registerchatStoreNavigation1Cases() {
       vi.clearAllMocks();
     });
 
+    it("shows an in-flight turn error without invoking the non-streaming fallback or adding messages", async () => {
+      vi.mocked(listen).mockResolvedValue(vi.fn());
+      invokeMock.mockRejectedValue("turn_in_progress");
+
+      await expect(useChatStore.getState().sendMessage("thread-db", "another turn"))
+        .rejects.toThrow("当前任务正在执行");
+
+      expect(invokeMock.mock.calls.map(([command]) => command)).toEqual(["chat_stream"]);
+      expect(useChatStore.getState().messages["thread-db"] ?? []).toEqual([]);
+      expect(useChatStore.getState().sendingByThreadId["thread-db"]).toBeFalsy();
+    });
+
     it("sends the live DB connection and selected objects with each turn", async () => {
       await useChatStore.getState().sendMessage("thread-db", "select 多选表前10条记录");
 

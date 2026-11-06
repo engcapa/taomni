@@ -138,6 +138,11 @@ pub(in crate::chat) async fn stream(
         run::ChatRunHandle::bridge_process(thread.provider_id.clone(), process.clone()),
     );
 
+    if state.mobile.turn_cancel(&req.thread_id).is_cancelled() {
+        process.stop().await;
+        emit_error(app, event_name, &assistant_id, "Turn was stopped.".into());
+        return Ok(());
+    }
     let prompt = build_prompt(
         thread,
         history,

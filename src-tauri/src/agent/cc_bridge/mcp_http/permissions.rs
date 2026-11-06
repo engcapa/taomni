@@ -60,6 +60,16 @@ pub(crate) async fn await_permission(
             .unwrap()
             .insert(call_id.clone(), tx);
     }
+    {
+        let state = app.state::<AppState>();
+        state.mobile.confirmations.lock().unwrap().insert(
+            call_id.clone(),
+            serde_json::json!({
+                "id":call_id, "thread_id":scope.thread_id, "tool":tool, "supported":true
+            }),
+        );
+        state.mobile.events.publish(serde_json::json!({"type":"task_status", "task_id":format!("thread:{}",scope.thread_id),"status":"awaiting_confirmation", "summary":tool}));
+    }
     let _ = app.emit(
         "agent-cc-permission",
         serde_json::json!({
@@ -71,19 +81,39 @@ pub(crate) async fn await_permission(
         }),
     );
 
-    match tokio::time::timeout(Duration::from_secs(PERMISSION_TIMEOUT_SECS), rx).await {
-        Ok(Ok(decision)) => decision,
-        _ => {
-            let state = app.state::<AppState>();
-            state
-                .agent
-                .cc_pending_permissions
-                .lock()
-                .unwrap()
-                .remove(&call_id);
-            CcPermissionDecision::Deny
-        }
+    let decision =
+        match tokio::time::timeout(Duration::from_secs(PERMISSION_TIMEOUT_SECS), rx).await {
+            Ok(Ok(decision)) => decision,
+            _ => {
+                let state = app.state::<AppState>();
+                state
+                    .agent
+                    .cc_pending_permissions
+                    .lock()
+                    .unwrap()
+                    .remove(&call_id);
+                CcPermissionDecision::Deny
+            }
+        };
+    let state = app.state::<AppState>();
+    let pending: std::collections::HashSet<_> = state
+        .agent
+        .cc_pending_permissions
+        .lock()
+        .unwrap()
+        .keys()
+        .cloned()
+        .collect();
+    let mut confirmations = state.mobile.confirmations.lock().unwrap();
+    if confirmations.len() > 200 {
+        confirmations
+            .retain(|id, v| v["supported"] != true || pending.contains(id) || id == &call_id);
     }
+    drop(confirmations);
+    state
+        .mobile
+        .task_status(&scope.thread_id, "running", "confirmation_resolved");
+    decision
 }
 
 /// The shared `permission_prompt` grading pipeline used by every flavor's

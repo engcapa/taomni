@@ -12,11 +12,12 @@ export function registerTerminalPanelClipboard7Cases() {
       .mockReturnValueOnce("terminal-session-reconnect");
     const onSessionReady = vi.fn();
 
-    render(<TerminalPanel visible ssh={sshInfo} onSessionReady={onSessionReady} />);
+    render(<TerminalPanel visible ssh={{ ...sshInfo, mobileOpenRequestId: "mobile-open-request" }} onSessionReady={onSessionReady} />);
 
     await waitFor(() => {
       expect(onSessionReady).toHaveBeenCalledWith("terminal-session");
     });
+    expect((ipcMocks.createSshTerminal.mock.calls[0] as unknown[]).at(-1)).toBe("mobile-open-request");
 
     const term = terminalMocks.terminalCtor.mock.results[0].value;
     ipcMocks.terminalExitHandlers.get("terminal-session")?.();
@@ -46,6 +47,7 @@ export function registerTerminalPanelClipboard7Cases() {
       true,
       null,
       false,
+      undefined,
     );
     await waitFor(() => {
       expect(onSessionReady).toHaveBeenCalledWith("terminal-session-reconnect");
@@ -97,6 +99,7 @@ export function registerTerminalPanelClipboard7Cases() {
       true,
       null,
       true,
+      undefined,
     );
 
     const term = terminalMocks.terminalCtor.mock.results[0].value;
@@ -250,6 +253,7 @@ export function registerTerminalPanelClipboard7Cases() {
         true,
         null,
         false,
+        undefined,
       );
       await waitFor(() => {
         expect(ipcMocks.resizeTerminal).toHaveBeenCalledWith("terminal-session-reconnect", 132, 37);

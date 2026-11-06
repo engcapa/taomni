@@ -5,12 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc -b && pnpm check:refactor && vite build",
+    "build": "tsc -b && pnpm check:refactor && pnpm build:mobile && vite build",
     "check:refactor": "node scripts/refactor-contracts.mjs && node scripts/refactor-boundaries.mjs && node scripts/source-file-size.mjs",
     "test": "vitest run",
     "test:tools": "node --test scripts/*.test.mjs",
     "preview": "vite preview",
-    "tauri": "tauri"
+    "tauri": "tauri",
+    "build:mobile": "tsc -p mobile-web/tsconfig.json && vite build --config mobile-web/vite.config.ts",
+    "dev:mobile": "vite --config mobile-web/vite.config.ts"
   },
   "dependencies": {
     "@codemirror/autocomplete": "^6.20.3",

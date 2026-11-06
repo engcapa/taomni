@@ -27,7 +27,7 @@ pub struct MailRuntime {
 /// Runtime ownership for the terminal domain.
 pub struct TerminalRuntime {
     pub terminals: Arc<RwLock<HashMap<String, ActiveTerminal>>>,
-    pub terminal_outputs: Arc<Mutex<HashMap<String, Vec<TerminalOutputSubscriber>>>>,
+    pub terminal_outputs: Arc<crate::terminal::TerminalOutputHub>,
     /// Pending keyboard-interactive auth rounds, keyed by request id. See
     /// [`SshAuthResponder`].
     pub ssh_auth_responders: Arc<Mutex<HashMap<String, SshAuthResponder>>>,

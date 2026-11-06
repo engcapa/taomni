@@ -73,6 +73,7 @@ pub async fn chat_new_thread(
     };
     let db = state.db.lock().map_err(|e| e.to_string())?;
     store::create_thread(&db, &thread).map_err(|e| e.to_string())?;
+    state.mobile.events.publish(serde_json::json!({"type":"session_changed","session_id":format!("thread:{}", thread.id),"change_kind":"opened"}));
     Ok(thread)
 }
 
@@ -108,6 +109,15 @@ pub async fn chat_delete_thread(
         store::delete_thread(&db, &thread_id).map_err(|e| e.to_string())?;
     }
     stop_thread_runtime(&thread_id, &app, state.inner()).await;
+    state.mobile.file_roots.lock().unwrap().remove(&thread_id);
+    state.mobile.roots_changed.notify_one();
+    state
+        .mobile
+        .task_summaries
+        .lock()
+        .unwrap()
+        .remove(&thread_id);
+    state.mobile.events.publish(serde_json::json!({"type":"session_changed","session_id":format!("thread:{thread_id}"),"change_kind":"deleted"}));
     Ok(())
 }
 
