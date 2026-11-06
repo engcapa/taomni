@@ -23,12 +23,8 @@ class NativeDragTest(TestCase):
             query_checks.append(index)
             self.assertIn('.value === "QA-LEFT-GUTTER"', expression)
             self.assertTrue(step['eval_readonly']['expect_truthy'])
-            self.assertEqual(case.steps[index - 4:index], [
-                {'host_clipboard': {'action': 'set', 'kind': 'text', 'text': 'QA-LEFT-GUTTER'}},
-                {'click': 'input[placeholder="Find"]'},
-                {'press': 'Mod+a'},
-                {'press': 'Mod+v'},
-            ])
+            self.assertEqual(case.steps[index - 1], {'fill': {
+                'selector': 'input[placeholder="Find"]', 'value': 'QA-LEFT-GUTTER'}})
             self.assertEqual(case.steps[index + 1], {'press': 'Enter'})
             geometry = case.steps[index + 3]['eval_readonly']
             self.assertIn('.terminal-search-hit-active', geometry['expression'])

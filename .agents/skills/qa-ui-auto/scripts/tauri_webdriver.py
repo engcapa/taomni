@@ -862,8 +862,9 @@ class NativeSession(WebDriverTransport):
         Localized date segments distribute typed digits in locale order and
         multi-line text drops newlines, so real key input can store a
         different string than the requested one without failing anything.
-        Compare the observed value and, only when it differs, apply the exact
-        text through the control's native setter with ordinary input/change
+        Linux single-line text/search must retain real input events: retry a
+        mismatched value once through OS clipboard paste, never a DOM setter.
+        Date/textarea controls use their native setter with ordinary input/change
         events; a value that still differs afterwards fails the step.
         """
         observed = self.execute(
@@ -872,7 +873,17 @@ class NativeSession(WebDriverTransport):
             "const kind = el instanceof HTMLTextAreaElement ? 'textarea' : (el.type || '');"
             "return {kind: kind, value: el.value};"
         )
-        if not isinstance(observed, dict) or observed.get("kind") not in {"date", "textarea"}:
+        if not isinstance(observed, dict):
+            return
+        if platform.system() == "Linux" and observed.get("kind") in {"text", "search"}:
+            if observed.get("value") != text:
+                check = (
+                    f"const el = document.querySelector({json.dumps(selector)});"
+                    f"return el instanceof HTMLInputElement && el.value === {json.dumps(text)};"
+                )
+                self._paste_linux_input(selector, text, check, "input")
+            return
+        if observed.get("kind") not in {"date", "textarea"}:
             return
         if observed.get("value") == text:
             return
@@ -913,6 +924,9 @@ class NativeSession(WebDriverTransport):
         raise WebDriverError(f"Wayland input did not select its existing value: {selector}")
 
     def _paste_linux_password(self, selector: str, text: str, check: str) -> None:
+        self._paste_linux_input(selector, text, check, "password input")
+
+    def _paste_linux_input(self, selector: str, text: str, check: str, kind: str) -> None:
         from qa_ui_auto import host_clipboard
 
         previous = ""
@@ -921,7 +935,7 @@ class NativeSession(WebDriverTransport):
         try:
             # Partial input can show validation feedback and move a centered
             # dialog. WebKit's coordinate click can then hit dialog padding and
-            # blur the password field. Resolve and verify focus before real keys.
+            # blur the input. Resolve and verify focus before real keys.
             self.focus(selector)
             if os.environ.get("GDK_BACKEND", "").split(",")[0] == "wayland":
                 self._select_wayland_fill_input(selector)
@@ -934,7 +948,7 @@ class NativeSession(WebDriverTransport):
             while self.execute(check) is not True:
                 if time.monotonic() >= deadline:
                     # Do not expose credential bytes in driver diagnostics.
-                    raise WebDriverError(f"password input did not retain the requested value: {selector}")
+                    raise WebDriverError(f"{kind} did not retain the requested value: {selector}")
                 time.sleep(0.05)
         finally:
             # Remove the disposable password and retain the prior text payload.
