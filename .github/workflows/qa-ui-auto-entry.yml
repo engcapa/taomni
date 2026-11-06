@@ -73,7 +73,7 @@ jobs:
         if: runner.os == 'Linux' && inputs.operation == 'build'
         run: |
           mkdir -p qa-build-output
-          python -m unittest test_ci_ssh_features test_ci_x11_session test_ci_build_pipeline test_native_windows_integrity test_native_frame_errors test_native_pointer test_native_element_query test_ci_file_manager test_native_application_restart test_native_application_shutdown test_native_window_close_x11 test_native_external_browser test_native_authorization_route test_backup_cloud test_ci_selection test_terminal_rendering_probe qa_ui_auto.test_mobile_native test_native_drag test_tauri_webdriver.NativeSessionFillTest qa_ui_auto.test_mobile_case_readiness
+          python -m unittest test_ci_ssh_features test_ci_x11_session test_ci_build_pipeline test_native_windows_integrity test_native_frame_errors test_native_pointer test_native_element_query test_ci_file_manager test_native_application_restart test_native_application_shutdown test_native_window_close_x11 test_native_external_browser test_native_authorization_route test_backup_cloud test_ci_selection test_terminal_rendering_probe qa_ui_auto.test_mobile_native test_native_drag test_tauri_webdriver.NativeSessionFillTest qa_ui_auto.test_mobile_case_readiness qa_ui_auto.test_mobile_openssh_readiness
           pnpm check:refactor
           node --test scripts/terminal-webgl-backport.test.mjs
           pnpm exec vitest run 2>&1 | tee qa-build-output/frontend-unit-contracts.log
