@@ -1,0 +1,696 @@
+<!doctype html>
+<html lang="zh-CN" data-app-theme="light">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src 'none'; connect-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<title>Taomni · Super Agents 工作台</title>
+<style>
+/* Standalone copies of src/styles/chrome.css tokens; no external assets or fonts. */
+:root {
+  --taomni-bg:#f8fafc; --taomni-chrome-bg:#f1f5f9; --taomni-chrome-border:#cbd5e1;
+  --taomni-titlebar-from:#e2e8f0; --taomni-titlebar-to:#cbd5e1; --taomni-accent:#1e40af;
+  --taomni-sidebar-bg:#f8fafc; --taomni-card-bg:#fff; --taomni-card-border:#e2e8f0;
+  --taomni-text:#0f172a; --taomni-text-muted:#526278; --taomni-divider:#e2e8f0;
+  --taomni-hover:#f1f5f9; --taomni-selected:#dbeafe; --taomni-selected-border:#93c5fd;
+  --taomni-input-bg:#fff; --taomni-input-border:#cbd5e1; --taomni-code-bg:#fbfdff;
+  --taomni-code-font-family:"Cascadia Code","SFMono-Regular",Consolas,"Liberation Mono",monospace;
+  --good:#15803d; --good-bg:#f0fdf4; --warn:#92400e; --warn-bg:#fffbeb;
+  --bad:#b91c1c; --bad-bg:#fff1f2; --shadow:0 12px 40px #0f172a16;
+  font:12px/1.6 Inter,-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans CJK SC","Microsoft YaHei",sans-serif;
+  color:var(--taomni-text); background:var(--taomni-bg); color-scheme:light;
+}
+html[data-app-theme="dark"] {
+  --taomni-bg:#1e1f22; --taomni-chrome-bg:#191a1c; --taomni-chrome-border:#303238;
+  --taomni-titlebar-from:#202124; --taomni-titlebar-to:#191a1c; --taomni-accent:#6aa6f8;
+  --taomni-sidebar-bg:#1e1f22; --taomni-card-bg:#26282e; --taomni-card-border:#35383f;
+  --taomni-text:#e6eaf0; --taomni-text-muted:#9ca3ad; --taomni-divider:#303238;
+  --taomni-hover:#282a30; --taomni-selected:#293b55; --taomni-selected-border:#5c8fd6;
+  --taomni-input-bg:#191a1c; --taomni-input-border:#35383f; --taomni-code-bg:#1e1f22;
+  --good:#86efac; --good-bg:#143022; --warn:#fde68a; --warn-bg:#392b16;
+  --bad:#fca5a5; --bad-bg:#3d2027; --shadow:0 12px 40px #0005; color-scheme:dark;
+}
+* { box-sizing:border-box; }
+body { margin:0; height:100dvh; overflow:hidden; }
+button,input,textarea,select { font:inherit; color:inherit; }
+button { cursor:pointer; border:0; background:none; }
+button:disabled { opacity:.45; cursor:not-allowed; }
+button:focus-visible,input:focus-visible,textarea:focus-visible,select:focus-visible,summary:focus-visible { outline:2px solid var(--taomni-accent); outline-offset:3px; }
+input,select,textarea { border:1px solid var(--taomni-input-border); background:var(--taomni-input-bg); border-radius:5px; padding:8px 10px; width:100%; }
+textarea { resize:vertical; min-height:72px; }
+h1,h2,h3,p { margin:0; } h1 { font-size:25px; line-height:1.4; letter-spacing:-.6px; font-weight:650; }
+h2 { font-size:14px; font-weight:650; } h3 { font-size:12px; font-weight:650; }
+a { color:var(--taomni-accent); } code,pre,.mono { font-family:var(--taomni-code-font-family); }
+pre { white-space:pre-wrap; overflow-wrap:anywhere; font-size:11px; line-height:1.9; margin:0; }
+.muted { color:var(--taomni-text-muted); } .small { font-size:11px; } .eyebrow { color:var(--taomni-text-muted); font-size:10px; letter-spacing:1.4px; font-weight:650; }
+.row { display:flex; align-items:center; gap:10px; } .between { justify-content:space-between; } .wrap { flex-wrap:wrap; } .grow { flex:1; min-width:0; } .stack { display:grid; gap:16px; }
+.btn { display:inline-flex; align-items:center; justify-content:center; gap:6px; padding:6px 11px; border:1px solid var(--taomni-input-border); border-radius:5px; background:var(--taomni-card-bg); min-height:30px; white-space:nowrap; }
+.btn:hover:not(:disabled),.icon-btn:hover { background:var(--taomni-hover); } .btn.primary { background:var(--taomni-accent); border-color:var(--taomni-accent); color:white; }
+html[data-app-theme="dark"] .btn.primary { color:#111827; } .btn.quiet { background:transparent; border-color:transparent; } .btn.danger { color:var(--bad); }
+.icon { width:17px; height:17px; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round; stroke-linejoin:round; flex-shrink:0; }
+.icon-btn { display:inline-grid; place-items:center; width:30px; height:30px; border-radius:5px; flex-shrink:0; }
+.badge { display:inline-flex; align-items:center; gap:5px; border:1px solid var(--taomni-divider); background:var(--taomni-hover); border-radius:4px; padding:2px 7px; font-size:10px; white-space:nowrap; }
+.badge.good { color:var(--good); background:var(--good-bg); border-color:transparent; } .badge.warn { color:var(--warn); background:var(--warn-bg); border-color:transparent; }
+.badge.bad { color:var(--bad); background:var(--bad-bg); border-color:transparent; } .badge.blue { color:var(--taomni-accent); background:var(--taomni-selected); border-color:transparent; }
+.titlebar { height:35px; padding:0 12px; background:linear-gradient(var(--taomni-titlebar-from),var(--taomni-titlebar-to)); border-bottom:1px solid var(--taomni-chrome-border); }
+.brand { font-weight:750; font-size:13px; letter-spacing:-.4px; } .brand-mark { display:grid; place-items:center; background:var(--taomni-accent); color:white; width:20px; height:20px; border-radius:5px; font-size:13px; }
+.title-search { width:280px; height:24px; border:1px solid var(--taomni-chrome-border); border-radius:4px; background:var(--taomni-card-bg); color:var(--taomni-text-muted); justify-content:space-between; padding:0 8px; }
+kbd { font:10px var(--taomni-code-font-family); border:1px solid var(--taomni-divider); border-radius:3px; padding:1px 4px; }
+.app { display:grid; grid-template-columns:48px 224px minmax(0,1fr); height:calc(100dvh - 60px); }
+.rail { display:flex; flex-direction:column; align-items:center; gap:10px; padding:14px 0; border-right:1px solid var(--taomni-chrome-border); background:var(--taomni-chrome-bg); }
+.rail .icon-btn { width:34px; height:34px; color:var(--taomni-text-muted); } .rail .active { color:var(--taomni-accent); background:var(--taomni-selected); position:relative; }
+.rail .active:before { content:""; position:absolute; left:-7px; width:2px; height:22px; background:var(--taomni-accent); }
+.sidebar { border-right:1px solid var(--taomni-divider); background:var(--taomni-sidebar-bg); min-height:0; display:flex; flex-direction:column; }
+.workspace-picker { margin:13px 12px 6px; padding:9px; border:1px solid var(--taomni-divider); border-radius:6px; background:var(--taomni-card-bg); }
+.side-heading { padding:20px 17px 8px; } .side-action { margin:12px; } .tasks { overflow:auto; padding:0 7px; }
+.task { text-align:left; display:block; width:100%; padding:11px 10px; margin:3px 0; border:1px solid transparent; border-radius:6px; }
+.task:hover { background:var(--taomni-hover); } .task.active { background:var(--taomni-selected); border-color:var(--taomni-selected-border); }
+.task-name { display:block; font-weight:550; margin:4px 0 7px; line-height:1.6; } .task small { font-size:10px; color:var(--taomni-text-muted); }
+.side-footer { margin-top:auto; border-top:1px solid var(--taomni-divider); padding:12px 15px; display:grid; gap:7px; }
+.main { min-width:0; display:flex; flex-direction:column; min-height:0; }
+.topbar { height:47px; padding:0 22px; border-bottom:1px solid var(--taomni-divider); background:var(--taomni-card-bg); flex-shrink:0; }
+.tabs { display:flex; gap:22px; padding:0 24px; min-height:43px; border-bottom:1px solid var(--taomni-divider); background:var(--taomni-card-bg); overflow-x:auto; flex-shrink:0; }
+.tab { position:relative; padding:11px 0; white-space:nowrap; color:var(--taomni-text-muted); } .tab[aria-selected="true"] { color:var(--taomni-accent); font-weight:650; }
+.tab[aria-selected="true"]:after { content:""; position:absolute; left:0; bottom:0; height:2px; width:100%; background:var(--taomni-accent); }
+.content { overflow:auto; padding:24px; flex:1; min-height:0; } .page-head { margin-bottom:22px; } .page-head p { margin-top:8px; color:var(--taomni-text-muted); }
+.overview-grid { display:grid; grid-template-columns:minmax(0,1fr) 265px; gap:22px; align-items:start; }
+.card { background:var(--taomni-card-bg); border:1px solid var(--taomni-card-border); border-radius:7px; overflow:hidden; }
+.card-body { padding:18px; } .card-head { padding:13px 17px; border-bottom:1px solid var(--taomni-divider); }
+.decision { border-left:3px solid #d97706; background:var(--warn-bg); padding:16px 18px; border-radius:5px; }
+.decision h2 { margin:4px 0 7px; } .decision .actions { margin-top:13px; }
+.section-label { margin:4px 0 10px; } .phase-track { display:grid; grid-template-columns:repeat(5,1fr); gap:8px; margin:15px 0 20px; }
+.phase { border-top:2px solid var(--taomni-divider); padding-top:10px; } .phase.done { border-color:var(--good); } .phase.current { border-color:var(--taomni-accent); }
+.phase .number { width:19px; height:19px; border-radius:50%; display:inline-grid; place-items:center; font-size:10px; background:var(--taomni-hover); margin-bottom:5px; }
+.phase strong,.phase small { display:block; } .phase small { color:var(--taomni-text-muted); font-size:10px; margin-top:3px; }
+.receipt { display:grid; grid-template-columns:36px 1fr auto; gap:12px; align-items:center; padding:17px; }
+.receipt-icon { width:34px; height:34px; display:grid; place-items:center; border:1px solid var(--taomni-divider); border-radius:7px; color:var(--taomni-accent); }
+.worker-row { display:grid; grid-template-columns:29px minmax(0,1fr) auto; align-items:center; gap:10px; padding:12px 16px; border-bottom:1px solid var(--taomni-divider); }
+.worker-row:last-child { border-bottom:0; } .avatar { width:26px; height:26px; display:grid; place-items:center; border-radius:5px; background:var(--taomni-hover); color:var(--taomni-text-muted); font:11px var(--taomni-code-font-family); }
+.aside-block { border-bottom:1px solid var(--taomni-divider); padding:17px; } .aside-block:last-child { border:0; }
+.keyval { display:flex; align-items:baseline; justify-content:space-between; gap:10px; margin:10px 0; } .keyval span:first-child { color:var(--taomni-text-muted); }
+.budget { height:5px; background:var(--taomni-selected); border-radius:4px; margin:10px 0; overflow:hidden; } .budget>span { display:block; height:100%; background:var(--taomni-accent); width:45.67%; }
+.note { padding:11px 13px; background:var(--taomni-hover); border-radius:5px; color:var(--taomni-text-muted); font-size:11px; }
+.composer { margin-top:20px; border:1px solid var(--taomni-input-border); border-radius:7px; background:var(--taomni-card-bg); padding:12px; }
+.composer textarea { border:0; background:transparent; padding:0 3px; min-height:47px; resize:none; } .composer .muted { font-size:10px; }
+.table-wrap { overflow:auto; } table { border-collapse:collapse; width:100%; text-align:left; font-size:11px; }
+th { background:var(--taomni-hover); color:var(--taomni-text-muted); font-weight:500; white-space:nowrap; }
+th,td { padding:12px 14px; border-bottom:1px solid var(--taomni-divider); vertical-align:top; } tbody tr:last-child td { border-bottom:0; } td.num { font-variant-numeric:tabular-nums; white-space:nowrap; }
+.stats { display:grid; grid-template-columns:repeat(4,1fr); border:1px solid var(--taomni-divider); background:var(--taomni-card-bg); border-radius:7px; margin:17px 0; }
+.stat { padding:16px 18px; border-right:1px solid var(--taomni-divider); } .stat:last-child { border:0; } .stat b { font-size:27px; font-weight:650; display:block; line-height:1.4; }
+.split { display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1fr); gap:18px; } .field { display:grid; gap:6px; margin-bottom:14px; } .field>span { font-weight:550; }
+.env-steps { display:flex; gap:6px; margin:16px 0; flex-wrap:wrap; } .env-step { background:var(--taomni-hover); padding:6px 9px; border-radius:4px; font-size:11px; }
+.env-step.done { background:var(--good-bg); color:var(--good); } .env-step.current { background:var(--taomni-selected); color:var(--taomni-accent); }
+.editor-shell { display:grid; grid-template-columns:210px minmax(0,1fr); border:1px solid var(--taomni-divider); border-radius:6px; overflow:hidden; background:var(--taomni-card-bg); }
+.file-tree { border-right:1px solid var(--taomni-divider); background:var(--taomni-sidebar-bg); padding:12px 7px; } .file-tree button { padding:9px 7px; width:100%; text-align:left; font-size:11px; border-radius:4px; overflow-wrap:anywhere; }
+.file-tree button.active { background:var(--taomni-selected); } .code-header { padding:10px 14px; border-bottom:1px solid var(--taomni-divider); }
+.code { overflow:auto; background:var(--taomni-code-bg); padding:15px 0; } .code-line { display:block; padding:1px 16px; white-space:pre; font:11px/1.9 var(--taomni-code-font-family); }
+.code-line.add { background:var(--good-bg); } .code-line.del { background:var(--bad-bg); } .line-no { display:inline-block; width:34px; color:var(--taomni-text-muted); user-select:none; }
+.terminal { padding:14px 17px; border-top:1px solid var(--taomni-divider); background:var(--taomni-chrome-bg); font:11px/1.8 var(--taomni-code-font-family); }
+.check { display:flex; align-items:baseline; gap:8px; margin:10px 0; } .check input { width:auto; }
+dialog { color:var(--taomni-text); background:var(--taomni-card-bg); border:1px solid var(--taomni-chrome-border); border-radius:9px; box-shadow:var(--shadow); padding:0; width:min(690px,calc(100vw - 32px)); max-height:calc(100dvh - 48px); }
+dialog::backdrop { background:#0f172a55; backdrop-filter:blur(3px); } .dialog-head { padding:18px 22px; border-bottom:1px solid var(--taomni-divider); }
+.dialog-body { padding:22px; overflow:auto; } .dialog-foot { padding:14px 22px; border-top:1px solid var(--taomni-divider); background:var(--taomni-bg); }
+.template-grid { display:grid; grid-template-columns:1fr 1fr; gap:9px; margin-bottom:19px; } .template { border:1px solid var(--taomni-divider); border-radius:6px; padding:12px; cursor:pointer; }
+.template:has(input:checked) { border-color:var(--taomni-accent); background:var(--taomni-selected); } .template input { width:auto; accent-color:var(--taomni-accent); } .template small { display:block; color:var(--taomni-text-muted); margin:4px 0 0 19px; }
+#detail-dialog { margin:0 0 0 auto; height:100dvh; max-height:100dvh; width:min(590px,100vw); border-radius:0; }
+#detail-dialog .dialog-body { height:calc(100dvh - 132px); } .detail-section { padding:16px 0; border-bottom:1px solid var(--taomni-divider); } .detail-section h3 { margin-bottom:8px; }
+.command { width:100%; text-align:left; display:flex; align-items:center; justify-content:space-between; border-radius:5px; padding:11px; } .command:hover { background:var(--taomni-hover); }
+.statusbar { height:25px; padding:0 12px; border-top:1px solid var(--taomni-chrome-border); background:var(--taomni-chrome-bg); font-size:10px; color:var(--taomni-text-muted); }
+#toast { position:fixed; bottom:42px; left:50%; transform:translateX(-50%); background:var(--taomni-text); color:var(--taomni-card-bg); padding:10px 17px; border-radius:6px; box-shadow:var(--shadow); z-index:5; max-width:90vw; }
+[hidden] { display:none!important; } @media(prefers-reduced-motion:reduce) { * { scroll-behavior:auto!important; } }
+@media(max-width:1220px) { .overview-grid { grid-template-columns:minmax(0,1fr); } .context-aside { display:grid; grid-template-columns:1fr 1fr; } .context-aside .aside-block { border:0; } .title-search { width:220px; } }
+@media(max-width:850px) { .app { grid-template-columns:44px minmax(0,1fr); } .sidebar { display:none; } .content { padding:18px; } .topbar { padding:0 15px; } .split { grid-template-columns:1fr; } .title-search { width:170px; } .title-extra { display:none; } .tabs { gap:19px; padding:0 18px; } }
+@media(max-width:560px) { .title-search { width:135px; white-space:nowrap; font-size:10px; } .title-search kbd { display:none; } .topbar { gap:7px; padding:0 10px; } .topbar>.row { gap:6px; } .editor-shell { grid-template-columns:1fr; } .file-tree { border-right:0; border-bottom:1px solid var(--taomni-divider); } .context-aside { display:block; } h1 { font-size:21px; } .stats { grid-template-columns:1fr 1fr; } .stat { border-bottom:1px solid var(--taomni-divider); } .phase-track { gap:5px; } .phase { font-size:10px; } .phase small { display:none; } .receipt { grid-template-columns:29px 1fr; } .receipt .btn { grid-column:2; justify-self:start; } .topbar .small { display:none; } .template-grid { grid-template-columns:1fr; } .titlebar>.muted { display:none; } .statusbar .title-extra { display:none; } }
+@media(forced-colors:active) { .badge,.task.active,.btn,.phase { border:1px solid CanvasText; } .budget>span { background:Highlight; } }
+</style>
+</head>
+<body>
+<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" aria-hidden="true" style="position:absolute"><defs>
+<symbol id="i-grid" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></symbol>
+<symbol id="i-agents" viewBox="0 0 24 24"><path d="m12 3 8 5v8l-8 5-8-5V8Z M4 8l8 5 8-5 M12 13v8 M12 3v5"/></symbol>
+<symbol id="i-branch" viewBox="0 0 24 24"><circle cx="6" cy="5" r="2"/><circle cx="18" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><path d="M6 7v10 M18 7v3c0 4-12 0-12 5"/></symbol>
+<symbol id="i-terminal" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="m7 9 3 3-3 3 M13 15h4"/></symbol>
+<symbol id="i-shield" viewBox="0 0 24 24"><path d="m12 3 8 3v6c0 5-8 9-8 9S4 17 4 12V6Z m-4 9 3 3 5-6"/></symbol>
+<symbol id="i-search" viewBox="0 0 24 24"><circle cx="10" cy="10" r="6"/><path d="m15 15 5 5"/></symbol>
+<symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14 M5 12h14"/></symbol>
+<symbol id="i-settings" viewBox="0 0 24 24"><path d="M4 6h16 M4 12h16 M4 18h16"/><circle cx="9" cy="6" r="2"/><circle cx="16" cy="12" r="2"/><circle cx="8" cy="18" r="2"/></symbol>
+<symbol id="i-file" viewBox="0 0 24 24"><path d="M13 3H5v18h14V9Z M13 3v6h6 M8 13h8 M8 17h5"/></symbol>
+<symbol id="i-clock" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></symbol>
+<symbol id="i-sun" viewBox="0 0 24 24"><circle cx="12" cy="12" r="4"/><path d="M12 2v2 M12 20v2 M2 12h2 M20 12h2 M5 5l1 1 M18 18l1 1 M5 19l1-1 M18 6l1-1"/></symbol>
+<symbol id="i-arrow" viewBox="0 0 24 24"><path d="M4 12h16 m-6-6 6 6-6 6"/></symbol>
+<symbol id="i-cloud" viewBox="0 0 24 24"><path d="M6 18a5 5 0 1 1 0-10 6 6 0 0 1 12 1 4 4 0 0 1 0 9Z"/></symbol>
+<symbol id="i-check" viewBox="0 0 24 24"><path d="m5 12 4 4L19 6"/></symbol>
+</defs></svg>
+<header class="titlebar row">
+  <div class="row"><span class="brand-mark">T</span><span class="brand">taomni</span></div>
+  <span class="muted title-extra">/</span><span class="title-extra small">Workspace</span><span class="badge blue title-extra">Super Agents</span>
+  <div class="grow"></div><button class="title-search row" data-action="commands" aria-label="打开命令面板"><span>搜索或执行命令</span><kbd>Ctrl K</kbd></button>
+  <div class="grow"></div><span class="muted small">离线交互原型 · 所有运行均为演示</span>
+  <button class="icon-btn" data-action="theme" aria-label="切换深浅主题"><svg class="icon"><use href="#i-sun"/></svg></button>
+</header>
+<div class="app">
+  <nav class="rail" aria-label="工具导航">
+    <button class="icon-btn" data-view="workspace" title="Workspace" aria-label="Workspace"><svg class="icon"><use href="#i-grid"/></svg></button>
+    <button class="icon-btn active" data-view="overview" title="Super Agents" aria-label="Super Agents"><svg class="icon"><use href="#i-agents"/></svg></button>
+    <button class="icon-btn" data-view="workspace" title="变更审查" aria-label="变更审查"><svg class="icon"><use href="#i-branch"/></svg></button>
+    <button class="icon-btn" data-view="quality" title="质量中心" aria-label="质量中心"><svg class="icon"><use href="#i-shield"/></svg></button>
+    <button class="icon-btn" data-view="environments" title="执行环境" aria-label="执行环境"><svg class="icon"><use href="#i-cloud"/></svg></button>
+    <div class="grow"></div>
+    <button class="icon-btn" data-action="memory" title="项目记忆与规则" aria-label="项目记忆与规则"><svg class="icon"><use href="#i-file"/></svg></button>
+    <button class="icon-btn" data-view="routing" title="资源与成本" aria-label="资源与成本"><svg class="icon"><use href="#i-settings"/></svg></button>
+  </nav>
+  <aside class="sidebar" aria-label="任务列表">
+    <div class="workspace-picker"><div class="row between"><strong>Taomni</strong><span class="muted">⌄</span></div><span class="muted small mono">~/projects/taomni · 2 roots</span></div>
+    <button class="btn primary side-action" data-action="new-task"><svg class="icon"><use href="#i-plus"/></svg>新建交付任务</button>
+    <div class="side-heading row between"><span class="eyebrow">DELIVERY QUEUE</span><span class="muted small" id="task-count">3</span></div>
+    <div class="tasks" id="task-list"></div>
+    <div class="side-heading"><span class="eyebrow">PROJECT</span></div>
+    <button class="command" data-action="contract" style="padding:8px 17px"><span>交付契约与 Specs</span><span class="muted">↗</span></button>
+    <button class="command" data-action="memory" style="padding:8px 17px"><span>项目记忆与安全规则</span><span class="muted">3</span></button>
+    <div class="side-footer"><div class="row between"><span>⊙ 本地控制面</span><span class="badge good">✓ 演示就绪</span></div><span class="muted small">关闭视图不取消任务；外发、云资源与合并分别授权。</span><span class="mono small">⑂ feat/workspace-grid-fix</span></div>
+  </aside>
+  <main class="main">
+    <div class="topbar row between"><div class="row"><span class="muted">Agents</span><span class="muted">/</span><strong id="breadcrumb" style="white-space:nowrap">TASK-042</strong><span class="badge" id="run-state">等待决策</span></div><div class="row"><span class="small muted">低打扰模式</span><button class="btn" data-action="brief"><svg class="icon"><use href="#i-file"/></svg>生成简报</button><button class="icon-btn" data-action="pause" aria-label="暂停调度" id="pause-button">Ⅱ</button></div></div>
+    <div class="tabs" role="tablist" aria-label="任务视图">
+      <button class="tab" role="tab" id="tab-overview" data-view="overview">交付概览</button>
+      <button class="tab" role="tab" id="tab-workspace" data-view="workspace">工作区与变更 <span class="muted">3</span></button>
+      <button class="tab" role="tab" id="tab-quality" data-view="quality">质量中心</button>
+      <button class="tab" role="tab" id="tab-environments" data-view="environments">执行环境</button>
+      <button class="tab" role="tab" id="tab-routing" data-view="routing">路由与成本</button>
+    </div>
+    <section id="content" class="content" role="tabpanel" aria-labelledby="tab-overview" tabindex="0"></section>
+  </main>
+</div>
+<footer class="statusbar row between"><span id="storage-status">○ 本地演示状态 · 自动保存</span><span class="title-extra">候选 c82e91a · 演示证据非实际执行 · 不会调用模型、创建云资源或操作 Git</span><button data-action="reset">重置演示</button></footer>
+<dialog id="new-task-dialog" aria-labelledby="new-task-title">
+  <form id="new-task-form">
+    <header class="dialog-head row between"><div><div class="eyebrow">NEW DELIVERY</div><h2 id="new-task-title">从目标到可验证交付</h2></div><button type="button" class="icon-btn" data-close aria-label="关闭新建任务">×</button></header>
+    <div class="dialog-body">
+      <p class="muted" style="margin-bottom:16px">模板决定流程和证据要求，不限制 Agent 的具体实现。</p>
+      <div class="template-grid" id="template-grid"></div>
+      <label class="field"><span>目标与验收标准</span><textarea name="goal" required maxlength="600" placeholder="例如：修复多文件布局切换后丢失面板；保留未保存内容，并补充重启与原生回归。"></textarea></label>
+      <label class="field"><span>项目 / 仓库路径（演示，不读取磁盘）</span><input name="project" value="~/projects/taomni" required></label>
+      <div class="split"><label class="field"><span>任务总预算上限 · USD</span><input type="number" name="budget" min="1" max="1000" step="1" value="12" required></label><label class="field"><span>自主程度</span><select name="autonomy"><option>在已授权边界内自主推进</option><option>每阶段确认</option><option>Observe · 只记录不执行</option></select></label></div>
+      <div class="note" id="template-preview"></div>
+      <label class="check"><input type="checkbox" name="cloud">允许提出云端环境申请（不等于批准付费创建）</label>
+    </div>
+    <footer class="dialog-foot row between"><span class="muted small">创建仅加入演示队列，不启动真实 Agent</span><button class="btn primary" type="submit">创建任务 →</button></footer>
+  </form>
+</dialog>
+<dialog id="resource-dialog" aria-labelledby="resource-title">
+  <form id="resource-form">
+    <header class="dialog-head row between"><h2 id="resource-title">配置执行资源</h2><button type="button" class="icon-btn" data-close aria-label="关闭资源配置">×</button></header>
+    <div class="dialog-body">
+      <label class="field"><span>资源名称</span><input name="name" required maxlength="60" placeholder="例如：大库修复 Worker"></label>
+      <div class="split"><label class="field"><span>类型</span><select name="kind"><option>coding harness</option><option>LLM provider API</option></select></label><label class="field"><span>Harness / 协议</span><select name="engine"><option>Claude Code</option><option>Codex</option><option>Pi</option><option>OpenCode</option><option>DeepSeek Harness</option><option>ZCode</option><option>OpenAI Chat</option><option>OpenAI Responses</option><option>Anthropic Messages</option></select></label></div>
+      <label class="field"><span>模型标识（由用户指定）</span><input name="model" required placeholder="使用供应商实际模型 ID；不自动替换"></label>
+      <div class="split"><label class="field"><span>适合任务分类</span><select name="role"><option>大库修复 / 编码</option><option>规划 / 设计</option><option>E2E 编写 / 执行</option><option>独立 Review</option><option>事件路由 / 摘要</option></select></label><label class="field"><span>相对成本系数</span><input name="coefficient" type="number" min="0.01" max="100" step="0.01" value="1" required></label></div>
+      <label class="field"><span>网络代理</span><select name="proxy"><option value="app">使用应用代理（默认）</option><option value="custom">独立资源代理</option><option value="none">不使用代理（绕过系统 / 环境代理）</option></select></label>
+      <label class="field" id="resource-proxy-field" hidden><span>独立代理地址（演示值，不含账号密码）</span><input name="proxyUrl" placeholder="http://127.0.0.1:7890"></label>
+      <div class="note">本原型仅保存非敏感演示配置。生产实现使用 Vault 引用与适配器能力探测；相对成本系数不是美元报价，未知账单不得记为 $0。</div>
+    </div>
+    <footer class="dialog-foot row between"><span class="muted small">不连接供应商，不保存密钥</span><button class="btn primary" type="submit">保存演示资源</button></footer>
+  </form>
+</dialog>
+<dialog id="detail-dialog" aria-labelledby="detail-title"><header class="dialog-head row between"><div><div class="eyebrow">ON DEMAND · 按需展开</div><h2 id="detail-title"></h2></div><button class="icon-btn" data-close aria-label="关闭详情">×</button></header><div class="dialog-body" id="detail-body"></div><footer class="dialog-foot row between"><span class="muted small">原始记录可追溯；不展示模型私有思维链</span><button class="btn" data-action="export">导出当前简报 .md</button></footer></dialog>
+<dialog id="command-dialog" aria-labelledby="command-title"><header class="dialog-head"><h2 id="command-title">前往或执行</h2></header><div class="dialog-body" id="command-list"></div></dialog>
+<div id="toast" role="status" aria-live="polite" hidden></div>
+<script>
+"use strict";
+const KEY = "taomni-super-agents-gpt-6.1-sol-1m-v1";
+const $ = (selector) => document.querySelector(selector);
+const icon = (name) => `<svg class="icon" aria-hidden="true"><use href="#i-${name}"/></svg>`;
+const esc = (value) => String(value).replace(/[&<>"']/g, (char) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[char]));
+const badge = (label, kind = "") => `<span class="badge ${kind}">${esc(label)}</span>`;
+const templates = [
+  ["greenfield", "0 → 1 · 有需求，无设计", "澄清 → 设计决策 → 垂直切片 → 全链路验收"],
+  ["designed", "0 → 1 · 已有需求与设计", "设计差异检查 → 契约 → 并行实现 → 集成验收"],
+  ["bug", "既有大库 · 缺陷修复", "基线 → 复现先红 → 最小修复 → 影响面回归"],
+  ["refactor", "迭代 / 重构 / 依赖升级", "行为契约 → 分批替换 → 等价性与兼容回归"]
+];
+const initial = () => ({
+  view:"overview", theme:"light", selected:"042", paused:false, approved:false, denied:false, grant:null, candidateStale:false,
+  env:{status:"absent",step:0,proxy:"app",proxyUrl:"",location:"cloud",target:"Windows",bytes:0},
+  testing:false, retested:false, decisions:[], prompts:[], kept:false, revision:1, activeFile:0,
+  tasks:[{id:"042",title:"修复四文件 Grid 切换崩溃",type:"bug",budget:12,project:"~/projects/taomni",autonomy:"授权范围内自主",status:"等待决策"},{id:"041",title:"从需求构建团队知识库",type:"greenfield",status:"设计确认"},{id:"039",title:"统一文件搜索快捷键",type:"designed",status:"待验收"}],
+  resources:[{name:"轻量路由器",engine:"Provider API",model:"用户配置的轻量模型",role:"事件路由 / 摘要",coefficient:0.2,proxy:"app"},{name:"编码 Worker",engine:"Claude Code",model:"用户指定模型",role:"大库修复 / 编码",coefficient:1,proxy:"app"},{name:"独立 Reviewer",engine:"Codex",model:"用户指定模型",role:"独立 Review",coefficient:1.1,proxy:"app"}]
+});
+let state = initial();
+try { const saved = JSON.parse(localStorage.getItem(KEY)); if (saved && Array.isArray(saved.tasks) && saved.env && Array.isArray(saved.resources)) state = {...state,...saved}; } catch { /* Storage denial / malformed demo state must not prevent opening the prototype. */ }
+if (state.testing) { state.testing = false; state.testInterrupted = true; }
+let toastTimer, envTimer, testTimer;
+const views = {overview:"交付概览",workspace:"工作区与变更",quality:"质量中心",environments:"执行环境",routing:"路由与成本"};
+if (!views[state.view]) state.view = "overview";
+function save() {
+  try { localStorage.setItem(KEY, JSON.stringify(state)); } catch { $("#storage-status").textContent = "○ 仅本次会话 · 浏览器不允许本地保存"; }
+}
+function toast(message) {
+  $("#toast").textContent = message; $("#toast").hidden = false;
+  clearTimeout(toastTimer); toastTimer = setTimeout(() => $("#toast").hidden = true, 4200);
+}
+function currentTask() { return state.tasks.find((task) => task.id === state.selected) || state.tasks[0]; }
+function environmentScope() { return JSON.stringify([state.revision,state.env.location,state.env.target,state.env.proxy,state.env.proxyUrl]); }
+function cloudAuthorized() { return state.approved && state.grant?.scope === environmentScope(); }
+function invalidateApproval() { state.approved = false; state.denied = false; state.grant = null; }
+function pageHead(kicker, title, description, action = "") {
+  return `
+      <header class="page-head">
+      <div class="row between wrap">
+      <div>
+      <div class="eyebrow">${esc(kicker)}
+      </div><h1>${esc(title)}</h1>
+      </div>${action}
+      </div><p>${esc(description)}</p>
+      </header>`;
+}
+function renderSidebar() {
+  $("#task-count").textContent = state.tasks.length;
+  $("#task-list").innerHTML = state.tasks.map((task) => `<button class="task ${task.id === state.selected ? "active" : ""}" data-task="${esc(task.id)}" aria-pressed="${task.id === state.selected}"><span class="row between"><small class="mono">TASK-${esc(task.id)}</small>${badge(task.id === "042" ? state.candidateStale ? "候选待重做" : cloudAuthorized() || state.env.location !== "cloud" ? "证据待补齐" : state.denied ? "环境阻塞" : task.status : task.status, task.status.includes("决策") ? "warn" : "")}</span><span class="task-name">${esc(task.title)}</span><small>${esc(templates.find((template) => template[0] === task.type)?.[1] || "自定义流程")}</small></button>`).join("");
+}
+function overview() {
+  const task = currentTask();
+  if (task.id === "042" && state.candidateStale) return pageHead("TASK-042 / CANDIDATE STALE",task.title,"锚定 Review 意见已保存，原候选与通过证据仅供历史追溯。",badge("! 待重做，不可交付","warn")) + `
+      <section class="card card-body stack"><h2>本次修改尚未执行</h2><p>旧环境授权已失效、重测已停止。不能把旧版的 42 项通过与费用估算当作新版交付事实。</p><button class="btn" data-action="brief">查看目标、Review 意见与待处理事项</button><button class="btn" data-view="quality">查看证据失效状态</button><p class="muted small">原型不生成新代码；要重新体验初始流程，请使用底栏“重置演示”。</p>
+      </section>`;
+  if (task.id !== "042") return pageHead("TASK-" + task.id + " / DELIVERY CONTRACT",task.title,"演示队列：新任务从契约与证据计划开始，不伪造执行进度。") + `
+      <div class="card card-body stack"><h2>交付契约草案</h2>
+      <div class="note">${esc(templates.find((template) => template[0] === task.type)?.[2] || "澄清 → 执行 → 验证")}
+      </div>
+      <div class="keyval"><span>项目</span><strong>${esc(task.project || "待确认")}</strong>
+      </div>
+      <div class="keyval"><span>预算上限</span><strong>${task.budget ? "$" + Number(task.budget).toFixed(2) : "待确认"}</strong>
+      </div><p>执行前需要：锁定验收标准、基线与设计版本、选择能力匹配的资源、获得执行授权。</p><button class="btn" data-action="contract">查看模板门禁与边界</button><p class="muted small">原型只演示 TASK-042 的详细链路。其它任务不共享它的环境、费用或证据。</p>
+      </div>`;
+  const decision = state.candidateStale ? `
+      <section class="decision"><h2>候选因 Review 意见失效，等待重做</h2><p>旧版通过结果已标记 stale；环境授权失效，不会把旧测试结果计入新版。</p><button class="btn" data-action="brief" style="margin-top:12px">查看待处理意见</button>
+      </section>` : state.env.location !== "cloud" ? `
+      <div class="note row between wrap"><span>${state.env.status === "ready" ? "✓ 演示环境已就绪" : "⊙ 使用非云执行器"} · ${esc(state.env.location === "local" ? "本地隔离" : "BYOM")} / ${esc(state.env.target)}。无需云付费申请，但仍需匹配版本的真实测试证据。</span><button class="btn quiet" data-view="environments">查看环境 →</button>
+      </div>` : cloudAuthorized() ? `
+      <div class="note row between wrap"><span>✓ 已授权本次临时环境申请；不包含生产部署、合并或超预算。</span><button class="btn quiet" data-view="environments">前往准备环境 →</button>
+      </div>` : state.denied ? `
+      <div class="decision"><h2>云环境申请已拒绝</h2><p>Worker 保留候选和失败原件；缺失的平台证据仍然阻止交付。可在执行环境选择本地或 BYOM。</p><button class="btn" data-view="environments" style="margin-top:12px">选择替代环境</button>
+      </div>` : `
+      <section class="decision" aria-label="待决策"><span class="eyebrow">需要你的一次决策 · DEC-017</span><h2>允许申请临时 ${esc(state.env.target)} 环境，补齐原生验证？</h2><p>候选修复已完成。Linux 失败原件已保留；目标 ${esc(state.env.target)} 仍需匹配的 QA release 验证证据。</p><p class="small muted" style="margin-top:5px">上限 $2.40 / 45 分钟 · 仅此任务与候选 · 不接触生产凭据 · 总预算 $12.00</p>
+      <div class="actions row wrap"><button class="btn primary" data-action="approve">批准本次申请</button><button class="btn" data-action="deny">拒绝，保留阻塞</button><button class="btn quiet" data-action="approval-detail">查看权限范围</button>
+      </div>
+      </section>`;
+  return pageHead("TASK-042 / EXISTING CODEBASE · BUG FIX",task.title,"保留 dirty buffer 与面板映射；让修复、回归和验收都有可核验的证据。",badge("⊙ 质量门禁阻塞", "warn")) + `
+      <div class="overview-grid">
+      <div class="stack">${decision}
+
+      <section>
+      <div class="row between section-label"><h2>交付路径</h2><span class="muted small">按验收推进，而不是按对话轮次</span>
+      </div>
+      <div class="phase-track">${[["✓","定位与复现","失败证据已冻结","done"],["✓","设计与契约","3 项行为不变量","done"],["✓","隔离实现","候选 c82e91a","done"],["4","验证与 Review","仍有门禁未满足","current"],["5","验收与交付","不可提前放行",""]].map(([n,t,d,c]) => `
+      <div class="phase ${c}"><span class="number">${n}</span><strong>${t}</strong><small>${d}</small>
+      </div>`).join("")}
+      </div>
+      </section>
+
+      <section class="card">
+      <div class="card-head row between"><h2>本阶段交付收据</h2>${badge("候选，不等于完成")}
+      </div>
+      <div class="receipt"><span class="receipt-icon">${icon("branch")}</span>
+      <div><strong>3 files changed <span class="muted">·</span> +47 −11</strong><p class="muted small">从实时 store 读取布局结果，移除对过期 leaf 的依赖。</p>
+      </div><button class="btn" data-view="workspace">Review changes →</button>
+      </div>
+      <div class="card-head row between" style="border-top:1px solid var(--taomni-divider);border-bottom:0"><span class="small muted">${state.retested ? "43" : "42"} / 46 示例检查通过 · 原始失败不被重测覆盖</span><button class="btn quiet" data-view="quality">查看质量证据 →</button>
+      </div>
+      </section>
+
+      <section class="card">
+      <div class="card-head row between"><h2>团队正在推进什么</h2><button class="btn quiet" data-action="activity">展开执行记录</button>
+      </div>${[["I","Implementation","候选已冻结；独立 worktree / agent/task-042", "✓ 已完成"],["R","Independent Review","发现与反例已归档；等待候选最终验证", "✓ 已审查"],["Q","Quality Worker",state.paused ? "暂停新增调度；已有证据与环境保留" : "保留失败原件；等待环境和原生回归", state.paused ? "Ⅱ 已暂停" : "! 等待验证"]].map(([a,t,d,s]) => `
+      <div class="worker-row"><span class="avatar">${a}</span>
+      <div><strong>${t}</strong><p class="muted small">${d}</p>
+      </div><span class="small muted">${s}</span>
+      </div>`).join("")}
+      </section>
+
+      <div class="composer"><label for="follow-up" class="small muted">追加目标或约束 · 不打断已有执行，先记录再评估影响</label><textarea id="follow-up" placeholder="例如：补充从四文件 Grid 关闭一个文件后再恢复的回归。"></textarea>
+      <div class="row between"><span class="muted">默认只报告决策、阻塞、阶段结果；详细工具记录按需查看。</span><button class="btn primary" data-action="follow-up">提交约束 ${icon("arrow")}</button>
+      </div>
+      </div>
+
+      </div>
+      <aside class="card context-aside">
+      <section class="aside-block">
+      <div class="eyebrow">DELIVERY CONTRACT
+      </div><h2 style="margin-top:7px">完成，不只是代码写完</h2>
+      <div class="check">✓ 四个面板映射正确
+      </div>
+      <div class="check">✓ dirty 正文与编辑能力保留
+      </div>
+      <div class="check">□ 原生崩溃回归证据齐全
+      </div>
+      <div class="check">□ 候选版本与测试版本一致
+      </div><button class="btn quiet" data-action="contract">查看 8 项验收条件 →</button>
+      </section>
+      <section class="aside-block">
+      <div class="row between"><h3>预算护栏</h3><span class="muted small">演示 USD</span>
+      </div>
+      <div class="row" style="align-items:baseline;margin-top:10px"><strong style="font-size:26px">$5.48</strong><span class="muted">/ $12.00</span>
+      </div>
+      <div class="budget" role="meter" aria-label="已确认花费" aria-valuemin="0" aria-valuemax="12" aria-valuenow="5.48"><span></span>
+      </div>
+      <div class="keyval small"><span>运行中预留</span><strong>$1.20</strong>
+      </div>
+      <div class="keyval small"><span>预计最终</span><strong>$8.60 · 非账单</strong>
+      </div><button class="btn quiet" data-view="routing">查看路由与明细 →</button>
+      </section>
+      <section class="aside-block"><h3>执行边界</h3>
+      <div class="keyval small"><span>代码</span><span>隔离 worktree</span>
+      </div>
+      <div class="keyval small"><span>权限</span><span>最小授权 / 禁止生产</span>
+      </div>
+      <div class="keyval small"><span>发布</span><span>单独确认</span>
+      </div><p class="muted small">Worktree 不是安全沙箱。持久化运行由后端拥有，而不是这个视图。</p>
+      </section>
+      </aside>
+      </div>`;
+}
+const fileNames = ["useWorkspaceHostCanvas.ts","useWorkspaceHostCanvas.test.tsx","TC-WS-052-layout.testcase.yaml"];
+const snippets = [
+  [["", "// 演示 diff：合并布局后必须重新读取 store"],["del","const leaves = snapshot.layout.leaves;"],["", "actions.unsplitAll();"],["add","const current = store.getState().layout;"],["add","const leaves = current.leaves;"],["", "// 每次拆分后按稳定 file ID 重新解析 leaf"],["add","const target = resolveLeafForFile(current, fileId);"],["add","actions.split(target.id, \"horizontal\");"]],
+  [["", "it(\"keeps four dirty buffers after Grid → Split → Grid\", () => {"],["add","  const files = openFourDirtyFiles();"],["add","  actions.grid();"],["add","  actions.split();"],["add","  actions.grid();"],["add","  expect(paneFileIds()).toEqual(files.ids);"],["add","  expect(dirtyContents()).toEqual(files.contents);"],["add","  expect(allEditorsAcceptInput()).toBe(true);"],["", "});"]],
+  [["", "# 演示节选；不是可直接执行的完整 YAML"],["add","tags: [crash-regression, workspace, layout]"],["add","modes: [browser, native]"],["add","# 核对 4 个实际 pane 与独立内容，不仅检查异常"],["add","# native 追加保存后的磁盘 hash 与重启恢复断言"],["add","# 失败原件、候选与 QA release SHA 绑定同一收据"]]
+];
+function workspace() {
+  const index = Math.min(Number(state.activeFile) || 0, 2);
+  return pageHead("WORKSPACE / REVIEW FIRST","看改动，而不是翻聊天记录","轻量 IDE 复用项目树、代码视图、终端和 Git；每个执行单元有独立 worktree。",`<button class="btn" data-action="open-ide">在现有 IDE 中打开 ↗</button>`) + `
+      <div class="row between wrap" style="margin-bottom:14px"><span class="mono small">⑂ agent/task-042 · candidate c82e91a · rev ${state.revision}</span>
+      <div class="row">${badge("3 files · +47 −11")}${badge(state.kept ? "✓ 已保留候选" : "待人工抽查",state.kept ? "good" : "")}
+      </div>
+      </div>
+      <div class="editor-shell">
+      <aside class="file-tree">
+      <div class="eyebrow" style="padding:0 7px 10px">CHANGED FILES
+      </div>${fileNames.map((name,i) => `<button class="${index === i ? "active" : ""}" data-file="${i}" aria-pressed="${index === i}"><span class="muted">${i === 2 ? "A" : "M"}</span> ${name}</button>`).join("")}<p class="muted small" style="padding:12px 7px">只读演示 diff，不加载编辑器依赖。真实接入复用现有 CodeMirror 工作区。</p>
+      </aside>
+      <div style="min-width:0">
+      <div class="code-header row between wrap"><span class="mono small">${fileNames[index]}</span>${badge("before → candidate")}
+      </div>
+      <div class="code" aria-label="候选代码差异">${snippets[index].map(([kind,line],i) => `<span class="code-line ${kind}"><span class="line-no">${i + 18}</span>${kind === "add" ? "+" : kind === "del" ? "−" : " "} ${esc(line)}</span>`).join("")}
+      </div>
+      <div class="card-head row between wrap"><span class="small muted">以候选 SHA 为边界；任何重做都会使原有证据过期。</span>
+      <div class="row"><button class="btn" data-action="ask-change">锚定评论 / 交给 Agent</button><button class="btn primary" data-action="keep">保留候选</button>
+      </div>
+      </div>
+      <div class="terminal">
+      <div class="row between"><strong>Terminal / checks · 演示只读</strong>${badge("无真实 PTY")}
+      </div><p class="muted">$ focused-layout-regression<br>42 browser checks passed · native evidence incomplete<br>release gate: BLOCKED (not ready to merge)</p>
+      </div>
+      </div>
+      </div>
+      <div class="note" style="margin-top:16px">保留候选不是合并，也不绕过质量门禁。原型不修改仓库、提交代码或发送评论。
+      </div>`;
+}
+function quality() {
+  if (state.candidateStale) return pageHead("QUALITY / STALE CANDIDATE","旧候选证据已失效","Review 要求重做后，不能把旧 SHA 的通过状态挂到新候选上。",badge("! 全部门禁阻塞","warn")) + `
+      <section class="card card-body stack"><h2>待重做：revision ${state.revision}</h2><p>旧版 42 项通过记录与失败原件仍保留，但只属于旧版候选。尚无新版执行收据。</p><p class="muted">本原型不自动生成新代码，也不为新 revision 伪造通过记录；可重置演示返回原始候选。</p><button class="btn" data-action="activity">查看历史记录</button>
+      </section>`;
+  const passed = state.retested ? 43 : 42;
+  return pageHead("QUALITY / EVIDENCE, NOT CONFIDENCE","没有匹配证据，就不声称可交付","每条验收条件关联用例、候选版本、执行环境与原始收据。自动生成用例不等于测试通过。",`<button class="btn primary" data-action="run-tests" ${state.testing || state.env.target !== "Linux" ? "disabled" : ""} title="仅重测当前失败项 Linux Native；必须选择匹配的 Linux 环境">${state.testing ? "⊙ 正在重测…" : "重测选定失败项"}</button>`) + `
+      <div class="row between wrap">${badge("! 发布门禁：阻塞", "warn")}
+      <div class="row"><button class="btn" data-action="coverage">验收覆盖矩阵</button><button class="btn" data-action="test-authoring">生成 / 审核用例</button>
+      </div>
+      </div>
+      <div class="stats" aria-label="示例验证统计">
+      <div class="stat"><span class="muted">计划检查</span><b>46</b><span class="muted small">示例清单，不代表全覆盖</span>
+      </div>
+      <div class="stat"><span class="muted">✓ 通过</span><b>${passed}</b><span class="muted small">本候选 rev ${state.revision}</span>
+      </div>
+      <div class="stat"><span class="muted">× 当前失败</span><b>${state.retested ? 0 : 1}</b><span class="muted small">原始失败永久保留</span>
+      </div>
+      <div class="stat"><span class="muted">! 阻塞 / 缺失</span><b>3</b><span class="muted small">native crash 三平台</span>
+      </div>
+      </div>
+    ${state.testing ? `
+      <div class="note" role="status" style="margin-bottom:14px">正在模拟运行 Linux 失败项；切换视图不中断。重测不会自动放行缺失的三平台门禁。
+      </div>` : state.testInterrupted ? `
+      <div class="decision" style="margin-bottom:14px">上次演示重测在刷新时中断，未记为通过。可重新发起；生产实现由后端恢复与对账。
+      </div>` : ""}
+
+      <section class="card">
+      <div class="card-head row between"><h2>执行矩阵</h2><span class="muted small mono">SIM-c82e91a / rev ${state.revision}</span>
+      </div>
+      <div class="table-wrap">
+      <table>
+      <thead>
+      <tr><th>检查集合</th><th>范围 / 环境</th><th>检查数</th><th>当前状态</th><th>收据</th>
+      </tr>
+      </thead>
+      <tbody>
+      <tr><td><strong>受影响功能回归</strong><br><span class="muted">面板 / dirty / 输入 / 恢复</span></td><td>Browser · Linux</td><td class="num">30</td><td>${badge("✓ 30 通过", "good")}</td><td><button class="btn quiet" data-evidence="browser-functional">查看 →</button></td>
+      </tr>
+      <tr><td><strong>完整 crash-regression tag</strong><br><span class="muted">演示 manifest：12 个 browser 检查</span></td><td>Browser · Linux</td><td class="num">12</td><td>${badge("✓ 12 通过", "good")}</td><td><button class="btn quiet" data-evidence="browser-crash">查看 →</button></td>
+      </tr>
+      <tr><td><strong>原生布局保存与恢复</strong><br><span class="muted">包含实际 pane 内容与磁盘断言</span></td><td>Native · Linux</td><td class="num">1</td><td>${badge(state.retested ? "✓ 重测通过" : "× 首次失败", state.retested ? "good" : "bad")}</td><td><button class="btn quiet" data-evidence="native-layout">${state.retested ? "原件 + 重测" : "失败原件"} →</button></td>
+      </tr>${["Linux","Windows","macOS"].map((os) => `
+      <tr><td><strong>完整 native crash-regression</strong></td><td>Native · ${os}</td><td class="num">1 gate</td><td>${badge("! 证据未齐", "warn")}</td><td><button class="btn quiet" data-evidence="native-${os}">缺失原因 →</button></td>
+      </tr>`).join("")}
+      </tbody>
+      </table>
+      </div>
+      </section>
+      <div class="split" style="margin-top:18px">
+      <div class="card card-body"><h2>Independent Review</h2><p class="muted" style="margin-top:8px">与实现 Worker 隔离上下文。先定位失效场景，再用反例验证发现；审查结论绑定 diff SHA。</p>
+      <div class="check">✓ 布局映射 / 生命周期 / 过期快照
+      </div>
+      <div class="check">✓ 用户数据与失败语义
+      </div>
+      <div class="check">□ 跨平台最终回归证据
+      </div><button class="btn" data-action="review-report">查看审查收据</button>
+      </div>
+      <div class="card card-body"><h2>最终验收</h2><p class="muted" style="margin:8px 0 13px">候选、新版测试、匹配二进制与环境身份必须一致；旧版通过、跳过和缺失不算通过。</p><button class="btn" disabled>准备交付 · 仍有 3 项门禁阻塞</button><p class="muted small" style="margin-top:11px">生产发布与合并永远是独立能力与授权，不是“测试通过”的隐式副作用。</p>
+      </div>
+      </div>`;
+}
+const envLabels = ["创建隔离环境","依赖与工具链","部署 QA release","启动服务","健康检查","执行预检"];
+function environments() {
+  const env = state.env;
+  const statuses = {absent:"未创建",provisioning:"⊙ 准备中",cancelled:"Ⅱ 已取消 · 保留可复用分片",ready:"✓ 环境就绪"};
+  return pageHead("ENVIRONMENTS / OWNED BY RUNTIME","从环境创建到真实用户路径验证","本地、云端与自带机器采用同一环境契约。准备、下载、启动与检测都是可恢复的后台任务。",badge(statuses[env.status] || "状态未知",env.status === "ready" ? "good" : "")) + `
+      <div class="split">
+      <section class="card card-body"><h2>环境蓝图 · qa-desktop-v3</h2><p class="muted small" style="margin:6px 0 16px">生产方案锁定镜像、工具链、构建 SHA、种子数据、端口与健康探针。</p><label class="field"><span>执行位置</span><select id="env-location" ${["provisioning","ready"].includes(env.status) ? "disabled" : ""}>${[["local","本地隔离执行器"],["cloud","临时云环境 · 独立付费授权"],["byom","BYOM · 自带机器 daemon"]].map(([v,t]) => `<option value="${v}" ${env.location === v ? "selected" : ""}>${t}</option>`).join("")}</select></label><label class="field"><span>目标平台</span><select id="env-target" ${["provisioning","ready"].includes(env.status) ? "disabled" : ""}>${["Linux","Windows","macOS"].map((os) => `<option ${env.target === os ? "selected" : ""}>${os}</option>`).join("")}</select></label><label class="field"><span>网络代理 · feature 独立保存</span><select id="env-proxy" ${env.status === "provisioning" ? "disabled" : ""}>${[["app","使用应用代理（默认）"],["custom","独立环境代理"],["none","不使用代理 · 绕过系统 / 环境代理"]].map(([v,t]) => `<option value="${v}" ${env.proxy === v ? "selected" : ""}>${t}</option>`).join("")}</select></label>${env.proxy === "custom" ? `<label class="field"><span>代理地址（不含凭据）</span><input id="env-proxy-url" value="${esc(env.proxyUrl)}" placeholder="http://127.0.0.1:7890" ${env.status === "provisioning" ? "disabled" : ""}></label>` : ""}
+      <div class="note">代理失败必须报错，不静默直连。原型只演示选择，不发起网络连接；真实凭据由 Vault 管理。
+      </div>
+      </section>
+      <section class="card card-body">
+      <div class="row between"><h2>环境生命周期</h2>${badge("SIM-ENV-042")}
+      </div>
+      <div class="env-steps">${envLabels.map((label,i) => `<span class="env-step ${i < env.step ? "done" : i === env.step && env.status === "provisioning" ? "current" : ""}">${i < env.step ? "✓" : i + 1} ${label}</span>`).join("")}
+      </div>
+      <div class="keyval"><span>当前任务</span><strong>${esc(statuses[env.status] || env.status)}</strong>
+      </div>
+      <div class="keyval"><span>镜像分片（模拟）</span><strong>${env.bytes} / 240 MiB · ${Math.round(env.bytes / 2.4)}%</strong>
+      </div>
+      <div class="keyval"><span>完成步骤</span><strong>${env.step} / 6</strong>
+      </div>
+      <div class="keyval"><span>环境租约</span><strong>45 min · TTL 自动回收</strong>
+      </div>
+      <div class="keyval"><span>健康探针</span><strong>${env.status === "ready" ? "✓ 模拟 API + UI 可达" : "未验证，不接受端口假就绪"}</strong>
+      </div>
+      <div class="row wrap" style="margin:17px 0"><button class="btn primary" data-action="env-start" ${["provisioning","ready"].includes(env.status) ? "disabled" : ""}>${env.status === "cancelled" ? "发现分片并继续准备" : "创建并准备（模拟）"}</button><button class="btn" data-action="env-cancel" ${env.status !== "provisioning" ? "disabled" : ""}>取消准备</button><button class="btn" data-action="env-destroy" ${env.status === "absent" ? "disabled" : ""}>回收环境</button>
+      </div>
+      <div class="note">关闭详情或切换视图不会取消准备；取消保留安全分片，重开可继续。完成前验证 manifest / checksum，失败不替换可用镜像。
+      </div>
+      <details style="margin-top:15px"><summary>查看环境契约</summary><pre style="margin-top:8px">owner: TASK-042 / attempt-03
+source: c82e91a / rev ${state.revision}
+platform: ${esc(env.target)}
+secrets: short-lived references only
+health: API + fixture query + UI locator
+network: allowlist / ${esc(env.proxy)} proxy
+cleanup: lease TTL + owned resource IDs
+publish: verified artifact only</pre>
+      </details>
+      </section>
+      </div>
+      <div class="card card-body" style="margin-top:18px">
+      <div class="row between wrap">
+      <div><h2>环境就绪 ≠ 测试通过</h2><p class="muted">还需要匹配当前源码的 QA release、完整用例 manifest 和真实执行收据。</p>
+      </div><button class="btn" data-view="quality">前往质量中心 →</button>
+      </div>
+      </div>`;
+}
+function routing() {
+  return pageHead("ROUTING / QUALITY-CONSTRAINED COST","把贵的能力用在真正需要的地方","先按能力、隐私和质量筛选，再比较可审计的预期成本；供应商、模型与 Harness 各自保留身份。",`<button class="btn primary" data-action="new-resource">${icon("plus")}配置资源</button>`) + `
+      <div class="note" style="margin-bottom:17px">所有金额、系数与用量均为演示数据，不是厂商报价。Harness 账单未知时必须显示“待对账”，不可当作零成本。
+      </div>
+      <section class="card">
+      <div class="table-wrap">
+      <table>
+      <thead>
+      <tr><th>资源 / 引擎</th><th>模型</th><th>适合任务分类</th><th>相对成本</th><th>代理</th>
+      </tr>
+      </thead>
+      <tbody>${state.resources.map((resource) => `
+      <tr><td><strong>${esc(resource.name)}</strong><br><span class="muted">${esc(resource.engine)}</span></td><td>${esc(resource.model)}</td><td>${esc(resource.role)}</td><td class="num">${Number(resource.coefficient).toFixed(2)}×</td><td>${esc({app:"应用",custom:"独立",none:"直连"}[resource.proxy] || "应用")}</td>
+      </tr>`).join("")}
+      </tbody>
+      </table>
+      </div>
+      </section>
+      <div class="split" style="margin-top:18px">
+      <section class="card">
+      <div class="card-head"><h2>本任务成本账本 · 示例 USD</h2>
+      </div>
+      <table>
+      <thead>
+      <tr><th>用途</th><th>确认费用</th><th>依据</th>
+      </tr>
+      </thead>
+      <tbody>${[["Router / 摘要","0.16","usage receipt"],["规划与设计","0.52","usage receipt"],["编码 Worker","2.96","Harness receipt"],["独立 Review","0.78","Harness receipt"],["QA 生成与分析","0.40","usage receipt"],["环境与存储","0.66","环境租约"],["合计","5.48","模型 4.82 + 环境 0.66"]].map(([a,b,c]) => `
+      <tr><td>${a}</td><td class="num">$${b}</td><td class="muted">${c}</td>
+      </tr>`).join("")}
+      </tbody>
+      </table>
+      </section>
+      <section class="card card-body stack">
+      <div><h2>路由策略 · 平衡</h2><p class="muted" style="margin-top:8px">复杂大库修复交给强编码能力；事件过滤、摘要使用轻量模型；独立审查不能复用实现者会话。</p>
+      </div>
+      <div class="note">估算总额 = 已确认 $5.48 + 在途预留 $1.20 + 后续估算 $1.92 = $8.60。预留结算只记一次，不重复计算。
+      </div>
+      <div class="keyval"><span>任务上限</span><strong>$12.00</strong>
+      </div>
+      <div class="keyval"><span>超额策略</span><strong>暂停新派单，等待决策</strong>
+      </div>
+      <div class="keyval"><span>失败自动重试</span><strong>2 次 / 节点 · 需在授权内</strong>
+      </div><button class="btn" data-action="routing-explain">为什么选择这些资源？</button><button class="btn" data-action="budget-simulation">演示超预算拦截</button>
+      </section>
+      </div>`;
+}
+function render() {
+  document.documentElement.dataset.appTheme = state.theme;
+  const task = currentTask();
+  $("#breadcrumb").textContent = "TASK-" + task.id;
+  $("#run-state").textContent = task.id === "042" ? state.candidateStale ? "候选待重做" : state.paused ? "调度已暂停" : cloudAuthorized() ? "证据待补齐" : state.denied ? "环境阻塞" : state.env.location !== "cloud" ? "证据待补齐" : "等待决策" : task.status;
+  $("#pause-button").textContent = state.paused ? "▷" : "Ⅱ";
+  $("#pause-button").setAttribute("aria-label", state.paused ? "恢复调度" : "暂停调度");
+  document.querySelectorAll(".tab").forEach((tab) => { tab.setAttribute("aria-selected", tab.dataset.view === state.view); tab.tabIndex = tab.dataset.view === state.view ? 0 : -1; });
+  $("#content").setAttribute("aria-labelledby", "tab-" + state.view);
+  $("#content").innerHTML = task.id !== "042" ? overview() : ({overview,workspace,quality,environments,routing}[state.view])();
+  if (task.id !== "042") $("#content").insertAdjacentHTML("afterbegin", `
+      <div class="note" style="margin-bottom:16px">队列任务仅提供契约预览，详细演示请选择 TASK-042。
+      </div>`);
+  renderSidebar(); save();
+}
+function navigate(view) { if (!views[view]) return; state.view = view; render(); $("#content").scrollTop = 0; }
+function detail(title, html) {
+  $("#detail-title").textContent = title; $("#detail-body").innerHTML = html;
+  if (!$("#detail-dialog").open) $("#detail-dialog").showModal();
+}
+const section = (title, body) => `
+      <section class="detail-section"><h3>${esc(title)}</h3>${body}
+      </section>`;
+function briefText() {
+  const task = currentTask();
+  if (task.id !== "042") return `# TASK-${task.id} · ${task.title}\n\n离线原型，非真实执行。\n模板：${task.type}\n状态：契约待确认，未执行\n预算：${task.budget || "待确认"}\n没有执行收据，不能声称交付。\n`;
+  return `# TASK-042 · 交付简报\n\n离线原型，非真实执行。\n用户目标：修复四文件 Grid 切换崩溃，保留面板映射与 dirty 内容。\n追加提示：${state.prompts.join("；") || "无"}\n决策：${state.decisions.join("；") || "DEC-017 等待决策"}\n进度：候选 c82e91a / rev ${state.revision}；3 files +47 −11。\n验证：${state.candidateStale ? "旧版全部证据已失效；新版没有执行收据" : (state.retested ? "43" : "42") + "/46 示例检查通过；3 项 native crash gate 未齐"}。\n费用：确认 $5.48；预留 $1.20；预计最终 $8.60；上限 $12.00。金额仅为演示。\n环境：${state.env.location}/${state.env.target}/${state.env.status}。\n交付结论：阻塞，禁止合并/发布。\n`;
+}
+function showBrief() {
+  detail("交付简报 · 一屏回到上下文", section("用户提示与目标",`<p>${esc(currentTask().title)}</p>${state.prompts.map((prompt) => `<p class="muted">追加：${esc(prompt)}</p>`).join("")}`) + section("决策、进度、证据与边界",`<pre>${esc(briefText())}</pre>`) + section("对外只保留重要信息","<p>这是事实摘要，不是私有思维链。命令输出、用量、测试 trace 与权限审计保留为可检索的独立证据。</p>"));
+}
+function showEvidence(id) {
+  const missing = id.startsWith("native-") && id !== "native-layout";
+  const status = missing ? "BLOCKED / missing release-matched receipt" : id === "native-layout" && !state.retested ? "FAILED / pane mapping mismatch (demo)" : "PASSED (demo)";
+  detail("执行证据 · " + id,section("身份绑定",`<pre>evidence_id: SIM-${esc(id)}-rev${state.revision}
+candidate: c82e91a / revision ${state.revision}
+case_manifest: demo-manifest-v3
+binary: ${missing ? "MISSING — cannot pass" : "SIM-qa-release-c82e91a"}
+runner: SIM-runner-v3 / isolated-profile
+result: ${status}
+artifacts: SIM trace / pane-content / receipt hashes
+provenance: illustrative only, not real filesystem paths</pre>`) + section("失败不可被成功重试覆盖",`<p>SIM-first-failure 始终保留。${state.retested && id === "native-layout" ? "SIM-retest-02 是新 attempt；其通过只影响选定失败项。" : "重测产生新 attempt，并关联原始失败，不修改旧收据。"}</p>`) + section("可支持的结论",`<p>${missing ? "没有证据。环境准备完毕也不能代替用例执行。" : "只支持本候选、本环境和这组实际执行路径；不能外推到所有平台、所有输入。"}</p>`));
+}
+function updateTemplatePreview() {
+  const value = $("#new-task-form input[name=template]:checked").value;
+  $("#template-preview").textContent = templates.find((template) => template[0] === value)[2] + "。共同门禁：静态检查、受影响回归、独立 Review、真实 E2E、完整 crash-regression、生产就绪清单。";
+}
+function stopEnvTimer() { clearInterval(envTimer); envTimer = undefined; }
+function tickEnvironment() {
+  if (state.env.status !== "provisioning") return stopEnvTimer();
+  state.env.bytes = Math.min(240, state.env.bytes + 20);
+  state.env.step = Math.min(6, Math.floor(state.env.bytes / 40));
+  if (state.env.step === 6) { state.env.status = "ready"; stopEnvTimer(); toast("模拟环境就绪；尚未执行测试，也不会自动放行交付。"); }
+  save(); if (state.view === "environments" && state.selected === "042") render();
+}
+function startEnvironment() {
+  if (state.candidateStale) return toast("候选待重做，不能为失效候选创建新环境。");
+  if (state.paused) return toast("调度已暂停，请先恢复。");
+  if (state.env.location === "cloud" && !cloudAuthorized()) { navigate("overview"); return toast("云资源需要本次独立授权，请先处理 DEC-017。"); }
+  if (state.env.proxy === "custom" && !/^https?:\/\/[^\s@]+$/.test(state.env.proxyUrl)) return toast("请填写不含凭据的 http(s) 独立代理地址。");
+  if (state.env.status === "ready" || state.env.status === "provisioning") return;
+  state.env.status = "provisioning"; stopEnvTimer(); envTimer = setInterval(tickEnvironment, 800); render();
+}
+const actions = {
+  theme() { state.theme = state.theme === "light" ? "dark" : "light"; render(); },
+  "new-task"() { $("#new-task-dialog").showModal(); },
+  "new-resource"() { $("#resource-dialog").showModal(); },
+  approve() { state.approved = true; state.denied = false; state.grant = {scope:environmentScope()}; state.decisions.push(`DEC-017：批准本次 ${state.env.target} 云环境，$2.40 / 45min，不含生产与合并`); render(); toast("授权已记录；没有创建真实云资源。请到执行环境启动模拟准备。"); },
+  deny() { state.approved = false; state.denied = true; state.decisions.push("DEC-017：拒绝云资源，保留证据阻塞"); render(); },
+  pause() { state.paused = !state.paused; render(); toast(state.paused ? "已暂停新增派单；已有准备与重测不会被伪装成取消。" : "已恢复调度，仍遵守权限与预算边界。"); },
+  brief: showBrief,
+  "follow-up"() { const prompt = $("#follow-up").value.trim(); if (!prompt) return toast("请先填写需要追加的约束。"); state.prompts.push(prompt.slice(0,2000)); save(); $("#follow-up").value = ""; toast("已保存追加约束，等待影响评估；未自动扩大权限或重启 Worker。"); },
+  "env-start": startEnvironment,
+  "env-cancel"() { stopEnvTimer(); state.env.status = "cancelled"; render(); toast("模拟准备已取消，安全分片保留，可发现并继续。"); },
+  "env-destroy"() { if (!confirm("回收本任务的演示环境与分片？历史测试收据仍保留。")) return; stopEnvTimer(); state.env = {...state.env,status:"absent",step:0,bytes:0}; render(); },
+  "run-tests"() { if (state.candidateStale) return toast("候选已失效，不能重用旧结果。"); if (state.env.target !== "Linux") return toast("选定失败项属于 Linux Native，请在执行环境选择 Linux；Windows 结果不能替代它。"); if (state.paused) return toast("请先恢复调度。"); if (state.env.status !== "ready") { navigate("environments"); return toast("环境未就绪，先完成准备；不会用 stub 冒充原生执行。"); } if (state.testing) return; state.testing = true; state.testInterrupted = false; render(); testTimer = setTimeout(() => { state.testing = false; state.retested = true; save(); render(); toast("模拟重测：选定失败项通过；原始失败保留，3 项平台门禁仍阻塞。"); },2600); },
+  keep() { if (state.candidateStale) return toast("候选待重做，不能保留失效版本作为交付。"); state.kept = true; render(); toast("已保留演示候选，不是 Git 合并，也不代表通过验收。"); },
+  "ask-change"() { detail("锚定 Review 评论",section("候选 / 文件锚点",`<p class="mono">c82e91a / ${esc(fileNames[state.activeFile || 0])} : 18–25</p>`) + section("明确变更请求","<label class='field'><span>交给 Agent 的意见</span><textarea id='review-comment' placeholder='说明具体失效场景、期望行为与需要补充的反例'></textarea></label><button class='btn primary' data-action='submit-review'>保存评论并标记待重做</button>")); },
+  "submit-review"() { const text = $("#review-comment").value.trim(); if (!text) return toast("请填写具体意见。"); state.prompts.push("Review 锚定意见：" + text.slice(0,2000)); state.revision++; state.candidateStale = true; state.retested = false; state.kept = false; state.testing = false; clearTimeout(testTimer); stopEnvTimer(); invalidateApproval(); state.env.status = state.env.status === "absent" ? "absent" : "cancelled"; save(); $("#detail-dialog").close(); render(); toast("评论已保存；候选已标记待重做，旧版通过证据全部失效。"); },
+  "open-ide"() { toast("生产版会打开当前 worktree；此离线原型不调用系统程序。"); },
+  "approval-detail"() { detail("DEC-017 · 精确授权范围",section("允许", "<p>单次创建 TASK-042 / candidate c82e91a 的 ${esc(state.env.target)} 临时 QA 环境；费用上限 $2.40，TTL 45 分钟，固定工具链与出站白名单。</p>") + section("不允许","<p>访问生产数据、复用个人云凭据、修改应用代理、扩展任务范围、自动合并、部署生产、自动续租或超预算。</p>") + section("失效条件","<p>目标候选、权限范围或环境计划摘要发生变化时，授权失效，必须重新决策。</p>")); },
+  contract() { detail("交付契约 / Specs",section("8 项可验收行为","<ol><li>4 个面板映射正确</li><li>dirty 内容不丢失</li><li>每个编辑器可继续输入</li><li>0 / 1 / 2 / 3 / 4 文件边界</li><li>Grid / Split / Single 状态转换</li><li>保存与重启恢复</li><li>失败 / 取消 / 迟到响应处理</li><li>三平台完整 crash-regression 与匹配版本证据</li></ol>") + section("Source of truth","<p>Spec 与代码一起版本化。需求 → 验收条件 → 用例 → 执行 → 证据 → 交付一一关联；需求变化使相关证据过期。</p>")); },
+  coverage() { detail("验收覆盖矩阵",section("覆盖不是一个百分比","<p>每项需求展开角色、状态转换、数据边界、并发、网络故障、权限与平台。使用风险分层与组合覆盖，不宣称穷举。</p>") + section("示例矩阵","<pre>Grid ↔ Split ↔ Single → pane + content + lifecycle\n0/1/2/3/4 files → boundary + actual branch\nDirty/clean + restart → persistence + disk hash\nCancellation/late event → ownership + stale guard\nBrowser + native × Linux/Windows/macOS → receipts</pre>") + section("当前缺口","<p>三平台 native crash 门禁仍缺匹配证据，测试生成与环境就绪均不能填补此缺口。</p>")); },
+  "test-authoring"() { detail("自动生成稳定 E2E 的闭环",section("从契约生成","<p>需求与已有 crash 案例 → 风险矩阵 → 独立 QA 生成草案 → 编译 / 静态校验 → 真实环境执行 → 独立断言审核 → 稳定性验证 → 版本化入库。</p>") + section("禁止伪通过","<p>优先语义 locator / 稳定 test ID；显式就绪与条件等待，不用固定 sleep。核对真实 pane、内容、文件或业务结果，不止 assert_no_runtime_errors。禁止删断言、无限重试、跳过失败来换绿。</p>") + section("Flaky 策略","<p>记录每次 attempt；在固定预算内区分环境 / 产品 / 用例缺陷。隔离 flaky 不等于通过；关键路径隔离后仍阻止发布。</p>")); },
+  "review-report"() { detail("独立 Review 收据",section("审查身份","<pre>reviewer: isolated session / resource reviewer-2\ninput: candidate diff + contract + baseline\noutput: verified findings + counterexamples\nstatus: code review complete, quality gates pending\nproduction merge authority: NONE</pre>") + section("边界","<p>实现者不能自行关闭关键发现；测试作者不能单方面降低验收标准。涉及安全、数据破坏或权限边界时使用独立人工决策。</p>")); },
+  "routing-explain"() { detail("路由解释",section("硬约束优先","<p>编码工具能力、目标平台、上下文容量、数据驻留、沙箱和审查独立性必须满足；不支持的 Harness 适配器不得派单。</p>") + section("再优化成本","<p>比较模型输入 / 输出 / 缓存费用、预计失败与重试、环境租约和时延。相对系数只用于缺乏真实账单时的显式估算，并保留不确定性。</p>") + section("升级与降级","<p>在任务、节点、日预算内有限升级。切换模型涉及隐私、能力或未知成本时重新决策；不暗中拼 Prompt 或启用 Harness 自带的无限派生。</p>")); },
+  "budget-simulation"() { detail("预算护栏已拦截（模拟）",section("拒绝新派单","<p>本次申请 $7.00；已确认 $5.48 + 在途 $1.20 + 新预留 $7.00 = $13.68，超过 $12.00。未创建任务、未调用模型。</p>") + section("下一步","<p>压缩非必要范围、选择已通过能力探测的低成本资源，或由用户明确提高预算。不能静默换成不满足质量要求的模型。</p>")); },
+  memory() { detail("项目记忆与规则",section("已确认规则","<p>① 每次布局转换验证实际 pane 与 dirty 内容。<br>② Worktree 不是 OS 沙箱，禁止访问生产凭据。<br>③ 原始失败不可被重测覆盖。</p>") + section("可治理的记忆","<p>每条 lesson 记录来源、作用域、有效期、冲突与审批；未经审核的总结不能变成执行权限。可查看、编辑、撤销与删除。</p>") + section("后台触发","<p>默认 Observe。CI / Issue / webhook 先经签名、白名单、去重、速率限制和确定性规则；书面规则授权后才创建执行任务。</p>")); },
+  activity() { detail("执行记录 · 默认折叠",section("阶段事件","<pre>10:12 目标与验收契约冻结\n10:14 复现失败，保存原始 receipt\n10:18 Worker worktree ready\n10:26 候选 c82e91a 冻结\n10:29 独立审查与 browser 回归完成\n10:31 native 布局失败原件保留\n10:32 DEC-017 等待环境决策\n（以上为示例时间线，并非真实运行）</pre>") + section("原始记录","<p>生产版提供命令、stdout/stderr、工具收据、权限审计、用量与关联 trace。按任务 / attempt / sequence 检索，敏感数据先脱敏。不会索取或保存模型隐藏思维链。</p>")); },
+  commands() { $("#command-dialog").showModal(); },
+  export() { const blob = new Blob([briefText()],{type:"text/markdown;charset=utf-8"}); const url = URL.createObjectURL(blob); const link = document.createElement("a"); link.href = url; link.download = "TASK-" + currentTask().id + "-demo-brief.md"; link.click(); setTimeout(() => URL.revokeObjectURL(url),1000); },
+  reset() { if (!confirm("重置本原型的演示任务、授权、环境和资源配置？不影响 Taomni 的真实设置。")) return; stopEnvTimer(); clearTimeout(testTimer); state = initial(); render(); }
+};
+$("#template-grid").innerHTML = templates.map(([value,title,desc]) => `<label class="template"><strong><input type="radio" name="template" value="${value}" ${value === "bug" ? "checked" : ""}> ${title}</strong><small>${desc}</small></label>`).join("");
+updateTemplatePreview();
+$("#command-list").innerHTML = Object.entries(views).map(([key,title]) => `<button class="command" data-view="${key}"><span>${title}</span><span class="muted">↵</span></button>`).join("") + `<button class="command" data-action="new-task"><span>新建交付任务</span><kbd>N</kbd></button><button class="command" data-action="brief"><span>生成简报</span><span class="muted">目标 · 决策 · 进度 · 证据</span></button>`;
+document.addEventListener("click", (event) => {
+  const close = event.target.closest("[data-close]"); if (close) return close.closest("dialog").close();
+  const target = event.target.closest("[data-action],[data-view],[data-task],[data-evidence],[data-file]"); if (!target) return;
+  if ($("#command-dialog").open) $("#command-dialog").close();
+  if (target.dataset.view) navigate(target.dataset.view);
+  else if (target.dataset.task) { state.selected = target.dataset.task; state.view = "overview"; render(); }
+  else if (target.dataset.evidence) showEvidence(target.dataset.evidence);
+  else if (target.dataset.file) { state.activeFile = Number(target.dataset.file); render(); }
+  else if (actions[target.dataset.action]) actions[target.dataset.action]();
+});
+document.addEventListener("change", (event) => {
+  const target = event.target;
+  if (target.name === "template") updateTemplatePreview();
+  if (target.name === "proxy") $("#resource-proxy-field").hidden = target.value !== "custom";
+  const map = {"env-location":"location","env-target":"target","env-proxy":"proxy","env-proxy-url":"proxyUrl"};
+  if (map[target.id]) { state.env[map[target.id]] = target.value; invalidateApproval(); if (["env-location","env-target"].includes(target.id)) { state.env.bytes = 0; state.env.step = 0; state.env.status = "absent"; } render(); }
+});
+$("#new-task-form").addEventListener("submit", (event) => {
+  event.preventDefault(); const data = new FormData(event.target); const id = String(Math.max(...state.tasks.map((task) => Number(task.id))) + 1).padStart(3,"0");
+  state.tasks.unshift({id,title:String(data.get("goal")).trim(),type:data.get("template"),budget:Number(data.get("budget")),project:String(data.get("project")),autonomy:data.get("autonomy"),status:"契约待确认"});
+  state.selected = id; state.view = "overview"; $("#new-task-dialog").close(); render(); toast("任务已加入演示队列，未启动真实 Agent。");
+});
+$("#resource-form").addEventListener("submit", (event) => {
+  event.preventDefault(); const data = Object.fromEntries(new FormData(event.target));
+  if (data.proxy === "custom" && !/^https?:\/\/[^\s@]+$/.test(data.proxyUrl)) return toast("独立代理需要合法 http(s) 地址，不接受内嵌凭据。");
+  data.coefficient = Number(data.coefficient); state.resources.push(data); $("#resource-dialog").close(); navigate("routing"); toast("演示资源已保存，没有连接供应商或修改应用设置。");
+});
+document.addEventListener("keydown", (event) => {
+  if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "k") { event.preventDefault(); actions.commands(); }
+  if (event.target.matches(".tab") && ["ArrowLeft","ArrowRight","Home","End"].includes(event.key)) { event.preventDefault(); const keys = Object.keys(views); let i = keys.indexOf(state.view); i = event.key === "Home" ? 0 : event.key === "End" ? keys.length - 1 : (i + (event.key === "ArrowRight" ? 1 : -1) + keys.length) % keys.length; navigate(keys[i]); $("#tab-" + keys[i]).focus(); }
+});
+window.addEventListener("pagehide", save);
+render();
+if (state.env.status === "provisioning") envTimer = setInterval(tickEnvironment,800);
+</script>
+</body>
+</html>
