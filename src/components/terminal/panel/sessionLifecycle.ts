@@ -13,6 +13,7 @@ import { createTaskExitOscParser } from "../../../lib/terminalOutputFilter";
 import { connectTerminalBackend } from "./backendConnection";
 import { collectBufferMatches, getBufferText, terminalAtIdlePrompt } from "./buffer";
 import { ERASE_SAVED_LINES_SEQUENCE } from "./policy";
+import { registerQaTerminalRendering } from "./qaTerminalRendering";
 import { installTerminalComposition } from "./sessionComposition";
 import type { TerminalSessionLifetime } from "./sessionContracts";
 import { type TerminalSessionLifecycleContext } from "./sessionContracts";
@@ -148,6 +149,9 @@ function setupTerminalSession(controllerContext: TerminalSessionLifecycleContext
   }
 
   controllerContext.installTerminalWebgl(term);
+  const unregisterQaRendering = __TAOMNI_TERMINAL_TEXT_MIRROR__
+    ? registerQaTerminalRendering(el, term, () => controllerContext.webglAddonRef.current?.addon ?? null)
+    : undefined;
 
   controllerContext.fitVisibleTerminal();
 
@@ -333,6 +337,7 @@ function setupTerminalSession(controllerContext: TerminalSessionLifecycleContext
     if (lifetime.launchedSockscapPid !== null) {
       void sockscapStopLaunchedApp(lifetime.launchedSockscapPid).catch(() => { });
     }
+    unregisterQaRendering?.();
     term.dispose();
     controllerContext.webglAddonRef.current = null;
     controllerContext.termRef.current = null;

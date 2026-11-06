@@ -56,6 +56,7 @@ from .native_drag import native_drag
 from .host_file_observation import assert_file_sha256 as _assert_file_sha256
 from .save_lock_probe import run as save_reader_lock
 from .terminal_burst_probe import run as terminal_burst
+from .terminal_rendering_probe import register_native as register_terminal_rendering
 
 
 class NativeStepContext:
@@ -1414,6 +1415,7 @@ VERBS["assert_no_runtime_errors"] = assert_no_runtime_errors
 VERBS["drag_to"] = native_drag
 VERBS["terminal_drag_selection"] = _terminal_drag_selection
 VERBS["native_terminal_burst"] = lambda ctx, args: terminal_burst(ctx, args, VERBS["terminal_input"])
+register_terminal_rendering(VERBS)
 
 
 from .window_context import native_switch

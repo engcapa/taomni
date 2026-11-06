@@ -3088,6 +3088,8 @@
 - `input[aria-label="Scrollback lines"]` — interactive — F5.2.scrollback
 - `input[aria-label="Maximum command history entries per host"]` — interactive — F5.2.inline-suggestions-max
 - `[data-testid="terminal-show-scrollbar-toggle"] input[type="checkbox"]` — interactive — F5.2.show-scrollbar
+- `[data-testid="terminal-webgl-renderer-toggle"] input` — interactive [optional] — F5.2.webgl-renderer
+  ↳ `[data-testid="terminal-webgl-renderer-toggle"]` — alias
 - `[data-testid="terminal-copy-on-select-toggle"] input[type="checkbox"]` — interactive — F5.2.copy-on-select
 - `[data-testid="terminal-osc52-clipboard-toggle"] input[type="checkbox"]` — interactive — F5.2.allow-osc52
 - `[data-testid="terminal-read-only-toggle"] input[type="checkbox"]` — interactive — F5.2.read-only
