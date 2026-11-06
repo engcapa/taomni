@@ -1,0 +1,2928 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-app-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Taomni — Super Agents 原型</title>
+<style>
+/* ============================================================================
+   1. Theme tokens — mirrored from src/styles/theme.css
+   ========================================================================== */
+:root {
+  --taomni-bg: #f8fafc;
+  --taomni-chrome-bg: #f1f5f9;
+  --taomni-chrome-border: #cbd5e1;
+  --taomni-titlebar-from: #e2e8f0;
+  --taomni-titlebar-to: #cbd5e1;
+  --taomni-sidebar-bg: #f8fafc;
+  --taomni-panel-bg: #f8fafc;
+  --taomni-card-bg: #ffffff;
+  --taomni-card-border: #e2e8f0;
+  --taomni-status-bg: #f1f5f9;
+  --taomni-status-text: #1e293b;
+  --taomni-text: #0f172a;
+  --taomni-text-muted: #64748b;
+  --taomni-divider: #e2e8f0;
+  --taomni-hover: #f1f5f9;
+  --taomni-selected: #dbeafe;
+  --taomni-selected-border: #93c5fd;
+  --taomni-input-bg: #ffffff;
+  --taomni-input-border: #cbd5e1;
+  --taomni-button-from: #ffffff;
+  --taomni-button-to: #f1f5f9;
+  --taomni-button-hover-from: #ffffff;
+  --taomni-button-hover-to: #e2e8f0;
+  --taomni-accent: #1e40af;
+  --taomni-accent-soft: #3b82f6;
+  --taomni-code-bg: #fbfdff;
+  --taomni-code-text: #142033;
+  --taomni-code-line-number: #64748b;
+  --taomni-success: #15803d;
+  --taomni-warning: #b45309;
+  --taomni-danger: #b91c1c;
+  --taomni-purple: #7c3aed;
+  --taomni-scrollbar-thumb: #cbd5e1;
+  --taomni-ui-font-family: "Inter", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", sans-serif;
+  --taomni-mono: "JetBrains Mono", "Cascadia Code", "SFMono-Regular", Consolas, "Liberation Mono", Menlo, monospace;
+  --taomni-ui-font-size: 12px;
+  --taomni-shadow: 0 6px 20px rgba(15, 23, 42, 0.08);
+  color-scheme: light;
+}
+html[data-app-theme="dark"] {
+  --taomni-bg: #1e1f22;
+  --taomni-chrome-bg: #191a1c;
+  --taomni-chrome-border: #303238;
+  --taomni-titlebar-from: #202124;
+  --taomni-titlebar-to: #191a1c;
+  --taomni-sidebar-bg: #1e1f22;
+  --taomni-panel-bg: #1e1f22;
+  --taomni-card-bg: #26282e;
+  --taomni-card-border: #35383f;
+  --taomni-status-bg: #191a1c;
+  --taomni-status-text: #c6ccd6;
+  --taomni-text: #e6eaf0;
+  --taomni-text-muted: #9ca3ad;
+  --taomni-divider: #303238;
+  --taomni-hover: #282a30;
+  --taomni-selected: #293b55;
+  --taomni-selected-border: #5c8fd6;
+  --taomni-input-bg: #191a1c;
+  --taomni-input-border: #35383f;
+  --taomni-button-from: #2b2d33;
+  --taomni-button-to: #24262b;
+  --taomni-button-hover-from: #35383f;
+  --taomni-button-hover-to: #2b2d33;
+  --taomni-accent: #6aa6f8;
+  --taomni-accent-soft: #8bbcff;
+  --taomni-code-bg: #1e1f22;
+  --taomni-code-text: #d4d4d4;
+  --taomni-code-line-number: #6f7684;
+  --taomni-success: #5fd58a;
+  --taomni-warning: #e0b04a;
+  --taomni-danger: #e37c7c;
+  --taomni-purple: #a78bfa;
+  --taomni-scrollbar-thumb: #3a3d44;
+  --taomni-shadow: 0 20px 60px rgba(0, 0, 0, 0.55);
+  color-scheme: dark;
+}
+
+/* ============================================================================
+   2. Base
+   ========================================================================== */
+*, *::before, *::after { box-sizing: border-box; }
+html, body { height: 100%; }
+body {
+  margin: 0;
+  overflow: hidden;
+  background: var(--taomni-chrome-bg);
+  color: var(--taomni-text);
+  font-family: var(--taomni-ui-font-family);
+  font-size: var(--taomni-ui-font-size);
+  line-height: 1.45;
+  -webkit-font-smoothing: antialiased;
+}
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; opacity: .45; }
+:is(button, input, select, textarea, summary):focus-visible { outline: 2px solid var(--taomni-accent); outline-offset: 2px; }
+svg { display: block; }
+[hidden] { display: none !important; }
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: var(--taomni-scrollbar-thumb); border-radius: 8px; border: 2px solid transparent; background-clip: content-box; }
+::-webkit-scrollbar-track { background: transparent; }
+kbd {
+  font-family: var(--taomni-mono);
+  font-size: 9px;
+  padding: 1px 4px;
+  border-radius: 3px;
+  border: 1px solid var(--taomni-chrome-border);
+  background: var(--taomni-chrome-bg);
+  color: var(--taomni-text-muted);
+}
+.mono { font-family: var(--taomni-mono); }
+.muted { color: var(--taomni-text-muted); }
+.tiny { font-size: 10px; }
+.grow { flex: 1; }
+
+/* ============================================================================
+   3. Window shell
+   ========================================================================== */
+.app { display: flex; flex-direction: column; height: 100vh; }
+.titlebar {
+  height: 34px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 10px;
+  background: linear-gradient(to bottom, var(--taomni-titlebar-from), var(--taomni-titlebar-to));
+  border-bottom: 1px solid var(--taomni-chrome-border);
+  user-select: none;
+}
+.traffic { display: flex; gap: 6px; padding-right: 4px; }
+.traffic i { width: 10px; height: 10px; border-radius: 50%; background: var(--taomni-chrome-border); display: block; }
+.traffic i:nth-child(1) { background: #e0645f; }
+.traffic i:nth-child(2) { background: #dcb03f; }
+.traffic i:nth-child(3) { background: #5fbf65; }
+.app-title { font-size: 11px; color: var(--taomni-text-muted); letter-spacing: .2px; }
+.title-title { font-size: 12px; font-weight: 600; }
+.title-sep { color: var(--taomni-chrome-border); }
+.title-meta { display: flex; align-items: center; gap: 6px; margin-left: auto; color: var(--taomni-text-muted); font-size: 10px; }
+.title-meta .dot { width: 5px; height: 5px; border-radius: 50%; background: var(--taomni-success); display: inline-block; }
+
+.body { flex: 1; min-height: 0; display: flex; }
+
+/* ============================================================================
+   4. Rail
+   ========================================================================== */
+.rail {
+  width: 52px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 8px 0;
+  background: var(--taomni-chrome-bg);
+  border-right: 1px solid var(--taomni-chrome-border);
+}
+.rail-logo {
+  width: 28px; height: 28px;
+  display: grid; place-items: center;
+  border-radius: 8px;
+  background: linear-gradient(150deg, var(--taomni-accent-soft), var(--taomni-accent));
+  color: #fff;
+  font-family: Georgia, serif;
+  font-size: 16px;
+  margin-bottom: 9px;
+}
+.rail-btn {
+  position: relative;
+  width: 40px;
+  border: 0;
+  background: none;
+  color: var(--taomni-text-muted);
+  padding: 6px 0 4px;
+  border-radius: 7px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+  font-size: 9px;
+  line-height: 1.2;
+}
+.rail-btn svg { width: 17px; height: 17px; stroke-width: 1.6; }
+.rail-btn:hover { background: var(--taomni-hover); color: var(--taomni-text); }
+.rail-btn.active { background: var(--taomni-selected); color: var(--taomni-text); }
+.rail-btn.active::before {
+  content: "";
+  position: absolute; left: -6px; top: 9px; bottom: 9px;
+  width: 2px; border-radius: 2px; background: var(--taomni-accent);
+}
+.rail-btn .badge {
+  position: absolute; top: 3px; right: 6px;
+  min-width: 13px; height: 13px; padding: 0 3px;
+  border-radius: 7px; background: var(--taomni-danger); color: #fff;
+  font-size: 8px; display: grid; place-items: center; font-weight: 600;
+}
+.rail-foot { margin-top: auto; display: flex; flex-direction: column; align-items: center; gap: 2px; }
+
+/* ============================================================================
+   5. Panel (secondary sidebar)
+   ========================================================================== */
+.panel {
+  width: 244px;
+  flex-shrink: 0;
+  background: var(--taomni-sidebar-bg);
+  border-right: 1px solid var(--taomni-chrome-border);
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.panel-head { padding: 13px 13px 0; }
+.panel-title { display: flex; align-items: center; gap: 7px; font-size: 13px; font-weight: 600; }
+.panel-title .count { margin-left: auto; font-size: 10px; color: var(--taomni-text-muted); font-weight: 400; }
+.panel-sub { font-size: 10.5px; color: var(--taomni-text-muted); margin: 3px 0 0; }
+.panel-project {
+  display: flex; align-items: center; gap: 7px;
+  margin: 11px 13px 0; padding: 7px 8px;
+  border: 1px solid var(--taomni-chrome-border);
+  border-radius: 6px;
+  background: var(--taomni-card-bg);
+  font-size: 11px;
+}
+.panel-project svg { width: 13px; height: 13px; color: var(--taomni-text-muted); }
+.panel-project span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.panel-project .mono { font-size: 9px; color: var(--taomni-text-muted); margin-left: auto; }
+.panel-search {
+  display: flex; align-items: center; gap: 6px;
+  margin: 9px 13px 0; padding: 5px 8px;
+  border: 1px solid var(--taomni-chrome-border);
+  border-radius: 5px;
+  background: var(--taomni-card-bg);
+}
+.panel-search svg { width: 12px; height: 12px; color: var(--taomni-text-muted); }
+.panel-search input { border: 0; background: none; outline: none; width: 100%; font-size: 11px; }
+.panel-scroll { flex: 1; min-height: 0; overflow-y: auto; padding: 6px 9px 12px; }
+.panel-group { margin-top: 13px; }
+.panel-group-head {
+  display: flex; align-items: center; gap: 6px;
+  padding: 0 5px 5px;
+  font-size: 10px; letter-spacing: .3px;
+  color: var(--taomni-text-muted);
+}
+.panel-group-head .n { margin-left: auto; font-size: 9px; }
+.panel-foot { padding: 9px 11px; border-top: 1px solid var(--taomni-chrome-border); }
+.panel-foot .btn { width: 100%; }
+.panel-note { font-size: 9.5px; color: var(--taomni-text-muted); line-height: 1.6; margin: 8px 3px 0; }
+
+/* ============================================================================
+   6. Buttons / controls
+   ========================================================================== */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: 25px; padding: 0 11px;
+  border: 1px solid var(--taomni-input-border);
+  border-radius: 4px;
+  background: linear-gradient(to bottom, var(--taomni-button-from), var(--taomni-button-to));
+  color: var(--taomni-text);
+  font-size: 11px;
+  white-space: nowrap;
+}
+.btn:hover { background: linear-gradient(to bottom, var(--taomni-button-hover-from), var(--taomni-button-hover-to)); }
+.btn svg { width: 13px; height: 13px; }
+.btn.primary {
+  background: linear-gradient(to bottom, var(--taomni-accent-soft), var(--taomni-accent));
+  border-color: var(--taomni-accent);
+  color: #fff;
+  font-weight: 600;
+}
+.btn.primary:hover { filter: brightness(1.08); }
+.btn.ghost { background: none; border-color: transparent; color: var(--taomni-text-muted); }
+.btn.ghost:hover { background: var(--taomni-hover); color: var(--taomni-text); }
+.btn.sm { min-height: 21px; padding: 0 7px; font-size: 10px; }
+.btn.sm svg { width: 11px; height: 11px; }
+.btn.danger { color: var(--taomni-danger); border-color: color-mix(in srgb, var(--taomni-danger) 45%, var(--taomni-input-border)); }
+.icon-btn {
+  display: inline-grid; place-items: center;
+  width: 25px; height: 25px;
+  border: 0; border-radius: 5px; background: none;
+  color: var(--taomni-text-muted);
+}
+.icon-btn:hover { background: var(--taomni-hover); color: var(--taomni-text); }
+.icon-btn svg { width: 15px; height: 15px; }
+.input {
+  width: 100%; min-height: 26px; padding: 4px 8px;
+  border: 1px solid var(--taomni-input-border);
+  border-radius: 5px;
+  background: var(--taomni-input-bg);
+  font-size: 11px;
+}
+select.input { padding-right: 4px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 4px;
+  padding: 1px 6px;
+  border: 1px solid var(--taomni-chrome-border);
+  border-radius: 4px;
+  background: var(--taomni-chrome-bg);
+  color: var(--taomni-text-muted);
+  font-size: 9.5px;
+  white-space: nowrap;
+}
+.chip svg { width: 10px; height: 10px; }
+.chip.accent { color: var(--taomni-accent); border-color: color-mix(in srgb, var(--taomni-accent) 45%, var(--taomni-chrome-border)); background: color-mix(in srgb, var(--taomni-accent) 9%, transparent); }
+.chip.ok { color: var(--taomni-success); border-color: color-mix(in srgb, var(--taomni-success) 40%, var(--taomni-chrome-border)); }
+.chip.warn { color: var(--taomni-warning); border-color: color-mix(in srgb, var(--taomni-warning) 40%, var(--taomni-chrome-border)); }
+.chip.bad { color: var(--taomni-danger); border-color: color-mix(in srgb, var(--taomni-danger) 40%, var(--taomni-chrome-border)); }
+.seg { display: inline-flex; padding: 2px; gap: 2px; background: var(--taomni-chrome-bg); border: 1px solid var(--taomni-chrome-border); border-radius: 6px; }
+.seg button {
+  border: 0; background: none; color: var(--taomni-text-muted);
+  padding: 3px 8px; border-radius: 4px; font-size: 10px;
+}
+.seg button.active { background: var(--taomni-card-bg); color: var(--taomni-text); box-shadow: 0 1px 2px rgba(0,0,0,.15); }
+
+/* ============================================================================
+   7. Main / content
+   ========================================================================== */
+.main { flex: 1; min-width: 0; display: flex; flex-direction: column; background: var(--taomni-bg); }
+.topbar {
+  height: 42px; flex-shrink: 0;
+  display: flex; align-items: center; gap: 9px;
+  padding: 0 14px;
+  border-bottom: 1px solid var(--taomni-chrome-border);
+  background: var(--taomni-bg);
+}
+.topbar h1 { font-size: 13px; font-weight: 600; margin: 0; white-space: nowrap; }
+.topbar .sub { font-size: 10.5px; color: var(--taomni-text-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.topbar .actions { margin-left: auto; display: flex; align-items: center; gap: 6px; }
+.content { flex: 1; min-height: 0; overflow-y: auto; }
+.view { display: none; height: 100%; }
+.view.active { display: block; }
+.view.col { display: none; flex-direction: column; }
+.view.col.active { display: flex; }
+.view[data-view="mission"] { overflow: hidden; }
+.content[data-mode="detail"] { overflow: hidden; }
+.content[data-mode="detail"] > .view.active { display: flex; flex-direction: column; }
+.content[data-mode="detail"] > .view.active[data-view="mission"] { width: 100%; }
+
+/* ============================================================================
+   8. Status bar
+   ========================================================================== */
+.statusbar {
+  height: 23px; flex-shrink: 0;
+  display: flex; align-items: center; gap: 13px;
+  padding: 0 11px;
+  border-top: 1px solid var(--taomni-chrome-border);
+  background: var(--taomni-status-bg);
+  color: var(--taomni-text-muted);
+  font-size: 10px;
+  user-select: none;
+}
+.statusbar .item { display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+.statusbar svg { width: 11px; height: 11px; }
+.statusbar .push { margin-left: auto; }
+.pulse { width: 6px; height: 6px; border-radius: 50%; background: var(--taomni-success); animation: pulse 2.4s ease-in-out infinite; }
+@keyframes pulse { 0%,100% { opacity: .35; } 50% { opacity: 1; } }
+
+/* ============================================================================
+   9. Mission Control
+   ========================================================================== */
+.section { padding: 16px 18px 26px; }
+.section-head { display: flex; align-items: flex-end; gap: 10px; margin-bottom: 12px; }
+.section-head h2 { font-size: 14px; font-weight: 600; margin: 0; }
+.section-head p { margin: 2px 0 0; font-size: 10.5px; color: var(--taomni-text-muted); }
+.section-head .actions { margin-left: auto; display: flex; gap: 6px; }
+.kpis {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 9px;
+  margin-bottom: 16px;
+}
+.kpi {
+  border: 1px solid var(--taomni-card-border);
+  border-radius: 9px;
+  background: var(--taomni-card-bg);
+  padding: 10px 12px;
+  min-width: 0;
+}
+.kpi-label { font-size: 10px; color: var(--taomni-text-muted); display: flex; align-items: center; gap: 5px; }
+.kpi-label svg { width: 11px; height: 11px; }
+.kpi-value { display: flex; align-items: baseline; gap: 5px; margin-top: 5px; }
+.kpi-value strong { font-size: 21px; font-weight: 600; letter-spacing: -.5px; line-height: 1.1; }
+.kpi-value span { font-size: 10px; color: var(--taomni-text-muted); }
+.kpi-foot { margin-top: 7px; font-size: 9.5px; color: var(--taomni-text-muted); display: flex; align-items: center; gap: 4px; }
+.meter { height: 3px; border-radius: 3px; background: color-mix(in srgb, var(--taomni-text-muted) 22%, transparent); overflow: hidden; margin-top: 7px; }
+.meter i { display: block; height: 100%; border-radius: 3px; background: var(--taomni-accent); }
+.meter i.ok { background: var(--taomni-success); }
+.meter i.warn { background: var(--taomni-warning); }
+.meter i.bad { background: var(--taomni-danger); }
+
+.mission-groups { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; }
+.mgroup { min-width: 0; }
+.mgroup-head { display: flex; align-items: center; gap: 6px; margin-bottom: 7px; padding: 0 2px; }
+.mgroup-head strong { font-size: 11px; font-weight: 600; }
+.mgroup-head .n { color: var(--taomni-text-muted); font-size: 10px; }
+.mgroup-head .line { flex: 1; height: 1px; background: var(--taomni-divider); }
+.mlist { display: flex; flex-direction: column; gap: 6px; }
+.mission-card {
+  border: 1px solid var(--taomni-card-border);
+  border-radius: 8px;
+  background: var(--taomni-card-bg);
+  padding: 10px 11px;
+  cursor: pointer;
+  transition: border-color .12s, background .12s;
+}
+.mission-card:hover { border-color: var(--taomni-selected-border); background: color-mix(in srgb, var(--taomni-selected) 22%, var(--taomni-card-bg)); }
+.mission-card.attention { border-left: 2px solid var(--taomni-warning); }
+.mission-card.ready { border-left: 2px solid var(--taomni-accent); }
+.mission-card.done { opacity: .74; }
+.mc-top { display: flex; align-items: center; gap: 6px; }
+.mc-id { font-family: var(--taomni-mono); font-size: 9px; color: var(--taomni-text-muted); }
+.mc-title { font-size: 11.5px; font-weight: 500; margin: 3px 0 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.mc-sub { display: flex; align-items: center; gap: 7px; margin-top: 7px; font-size: 9.5px; color: var(--taomni-text-muted); flex-wrap: wrap; }
+.mc-sub .sep { width: 1px; height: 8px; background: var(--taomni-divider); }
+.mc-stages { display: flex; gap: 2px; margin-top: 8px; }
+.mc-stage { height: 3px; flex: 1; border-radius: 2px; background: color-mix(in srgb, var(--taomni-text-muted) 20%, transparent); }
+.mc-stage.ok { background: var(--taomni-success); }
+.mc-stage.run { background: var(--taomni-accent); }
+.mc-stage.wait { background: var(--taomni-warning); }
+.mc-stage.fail { background: var(--taomni-danger); }
+.mc-bottom { display: flex; align-items: center; gap: 8px; margin-top: 8px; }
+.mc-cost { font-family: var(--taomni-mono); font-size: 9px; color: var(--taomni-text-muted); margin-left: auto; }
+.mini-budget { width: 58px; height: 3px; border-radius: 2px; background: color-mix(in srgb, var(--taomni-text-muted) 22%, transparent); overflow: hidden; }
+.mini-budget i { display: block; height: 100%; background: var(--taomni-accent); }
+.mini-budget i.warn { background: var(--taomni-warning); }
+
+.attention-list { display: flex; flex-direction: column; gap: 7px; }
+.attention-row {
+  display: flex; align-items: center; gap: 10px;
+  border: 1px solid var(--taomni-card-border);
+  border-left: 2px solid var(--taomni-warning);
+  border-radius: 7px;
+  background: var(--taomni-card-bg);
+  padding: 9px 11px;
+}
+.attention-row svg { width: 14px; height: 14px; color: var(--taomni-warning); }
+.attention-row .q { font-size: 11px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.attention-row .who { font-size: 9.5px; color: var(--taomni-text-muted); margin-left: auto; white-space: nowrap; }
+
+/* ============================================================================
+   10. Mission detail
+   ========================================================================== */
+.mission-shell { display: flex; flex: 1; min-height: 0; }
+.mission-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.stage-rail {
+  display: flex; align-items: center; gap: 0;
+  padding: 10px 16px 9px;
+  border-bottom: 1px solid var(--taomni-chrome-border);
+  overflow-x: auto;
+  scrollbar-width: none;
+  background: var(--taomni-bg);
+}
+.stage-rail::-webkit-scrollbar { display: none; }
+.stage {
+  display: flex; align-items: center; gap: 6px;
+  padding: 5px 9px 5px 6px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+  cursor: default;
+}
+.stage:hover { background: var(--taomni-hover); }
+.stage.active { border-color: var(--taomni-selected-border); background: var(--taomni-selected); }
+.stage-dot { width: 15px; height: 15px; border-radius: 50%; display: grid; place-items: center; font-size: 8px; border: 1px solid var(--taomni-text-muted); color: var(--taomni-text-muted); flex-shrink: 0; }
+.stage-dot.ok { background: var(--taomni-success); border-color: var(--taomni-success); color: #0b1a10; }
+.stage-dot.run { border-color: var(--taomni-accent); color: var(--taomni-accent); }
+.stage-dot.run::after { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--taomni-accent); animation: pulse 1.6s infinite; }
+.stage-dot.wait { border-color: var(--taomni-warning); color: var(--taomni-warning); }
+.stage-dot.fail { border-color: var(--taomni-danger); color: var(--taomni-danger); }
+.stage-label { font-size: 10.5px; color: var(--taomni-text-muted); }
+.stage.active .stage-label, .stage.done .stage-label { color: var(--taomni-text); }
+.stage-arrow { color: var(--taomni-chrome-border); padding: 0 1px; font-size: 10px; }
+
+.thread { flex: 1; min-height: 0; overflow-y: auto; }
+.thread-inner { width: min(780px, calc(100% - 48px)); margin: 18px auto 40px; }
+.msg-user {
+  margin: 0 0 18px 0;
+  padding: 10px 13px;
+  border: 1px solid var(--taomni-chrome-border);
+  border-radius: 9px;
+  background: var(--taomni-selected);
+  font-size: 12px;
+  white-space: pre-wrap;
+}
+.msg-label { display: block; font-size: 9px; color: var(--taomni-text-muted); margin-bottom: 3px; letter-spacing: .3px; }
+.msg-agent { display: flex; gap: 9px; margin-bottom: 18px; }
+.avatar { width: 24px; height: 24px; flex-shrink: 0; display: grid; place-items: center; border-radius: 6px; background: var(--taomni-selected); border: 1px solid var(--taomni-chrome-border); font-family: Georgia, serif; font-size: 12px; }
+.msg-body { flex: 1; min-width: 0; }
+.msg-head { display: flex; align-items: center; gap: 7px; margin-bottom: 6px; }
+.msg-head strong { font-size: 11px; font-weight: 600; }
+.msg-text { font-size: 11.5px; line-height: 1.75; }
+.msg-text p { margin: 0 0 8px; }
+
+.timeline { display: flex; flex-direction: column; gap: 0; margin: 6px 0 14px 33px; }
+.tl-item { display: flex; gap: 9px; position: relative; padding-bottom: 13px; }
+.tl-item::before { content: ""; position: absolute; left: 4px; top: 11px; bottom: 0; width: 1px; background: var(--taomni-divider); }
+.tl-item:last-child { padding-bottom: 2px; }
+.tl-item:last-child::before { display: none; }
+.tl-dot { width: 9px; height: 9px; border-radius: 50%; border: 1px solid var(--taomni-text-muted); background: var(--taomni-bg); margin-top: 3px; flex-shrink: 0; z-index: 1; }
+.tl-dot.ok { background: var(--taomni-success); border-color: var(--taomni-success); }
+.tl-dot.run { border-color: var(--taomni-accent); background: var(--taomni-accent); }
+.tl-body { flex: 1; min-width: 0; }
+.tl-line { display: flex; align-items: center; gap: 7px; flex-wrap: wrap; }
+.tl-line strong { font-size: 11px; font-weight: 500; }
+.tl-line span { font-size: 9.5px; color: var(--taomni-text-muted); }
+.tl-detail { font-size: 10px; color: var(--taomni-text-muted); margin-top: 3px; line-height: 1.6; }
+
+.card {
+  border: 1px solid var(--taomni-card-border);
+  border-radius: 9px;
+  background: var(--taomni-card-bg);
+  overflow: hidden;
+  margin: 0 0 13px;
+}
+.card-head { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-bottom: 1px solid var(--taomni-divider); }
+.card-head strong { font-size: 11px; font-weight: 600; }
+.card-head .chip { margin-left: auto; }
+.card-body { padding: 11px 12px; }
+.card-foot { display: flex; align-items: center; gap: 8px; padding: 9px 12px; border-top: 1px solid var(--taomni-divider); background: color-mix(in srgb, var(--taomni-chrome-bg) 55%, var(--taomni-card-bg)); }
+.card-foot .grow { flex: 1; }
+.card-note { font-size: 10px; color: var(--taomni-text-muted); line-height: 1.7; }
+
+.decision { border-color: color-mix(in srgb, var(--taomni-warning) 48%, var(--taomni-card-border)); }
+.decision .card-head strong { color: var(--taomni-text); }
+.decision-q { font-size: 11.5px; line-height: 1.7; margin: 0 0 9px; }
+.decision-why { font-size: 10px; color: var(--taomni-text-muted); border-left: 2px solid var(--taomni-divider); padding-left: 8px; margin: 0 0 11px; line-height: 1.6; }
+.options { display: flex; flex-direction: column; gap: 6px; }
+.option {
+  display: flex; align-items: flex-start; gap: 9px;
+  padding: 9px 10px;
+  border: 1px solid var(--taomni-chrome-border);
+  border-radius: 6px;
+  background: var(--taomni-bg);
+  text-align: left;
+}
+.option:hover { border-color: var(--taomni-selected-border); }
+.option.selected { border-color: var(--taomni-accent); background: color-mix(in srgb, var(--taomni-accent) 8%, var(--taomni-bg)); }
+.option .radio { width: 13px; height: 13px; border-radius: 50%; border: 1px solid var(--taomni-text-muted); flex-shrink: 0; margin-top: 2px; display: grid; place-items: center; }
+.option.selected .radio { border-color: var(--taomni-accent); }
+.option.selected .radio::after { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--taomni-accent); }
+.option-main { flex: 1; min-width: 0; }
+.option-main strong { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 500; }
+.option-main small { display: block; font-size: 10px; color: var(--taomni-text-muted); margin-top: 2px; line-height: 1.6; }
+.recommend { font-size: 8.5px; color: var(--taomni-accent); border: 1px solid color-mix(in srgb, var(--taomni-accent) 45%, transparent); border-radius: 3px; padding: 0 4px; }
+.decision-foot { display: flex; align-items: center; gap: 8px; margin-top: 11px; padding-top: 10px; border-top: 1px solid var(--taomni-divider); }
+.decision-foot .hint { font-size: 9.5px; color: var(--taomni-text-muted); }
+
+.receipt {
+  display: flex; align-items: center; gap: 9px;
+  padding: 8px 11px;
+  border: 1px solid var(--taomni-divider);
+  border-radius: 7px;
+  background: var(--taomni-card-bg);
+  font-size: 10.5px;
+  margin-bottom: 11px;
+}
+.receipt .sum { font-family: var(--taomni-mono); font-size: 10px; }
+.receipt .add { color: var(--taomni-success); font-family: var(--taomni-mono); }
+.receipt .del { color: var(--taomni-danger); font-family: var(--taomni-mono); }
+.receipt .grow { flex: 1; }
+
+details.proc { margin: 0 0 13px 33px; border: 1px solid var(--taomni-divider); border-radius: 7px; background: var(--taomni-card-bg); }
+details.proc summary {
+  list-style: none; cursor: pointer;
+  display: flex; align-items: center; gap: 7px;
+  padding: 7px 10px;
+  font-size: 10px; color: var(--taomni-text-muted);
+}
+details.proc summary::-webkit-details-marker { display: none; }
+details.proc summary:hover { color: var(--taomni-text); }
+details.proc .proc-body { padding: 0 10px 10px; font-family: var(--taomni-mono); font-size: 9.5px; line-height: 1.85; color: var(--taomni-text-muted); max-height: 220px; overflow-y: auto; }
+details.proc .proc-body div { display: flex; gap: 8px; }
+details.proc .proc-body .t { color: var(--taomni-text-muted); opacity: .65; flex-shrink: 0; }
+details.proc .proc-body .k { color: var(--taomni-accent); flex-shrink: 0; }
+details.proc .proc-body .err { color: var(--taomni-danger); }
+
+.milestone { display: flex; align-items: center; gap: 7px; font-size: 10px; color: var(--taomni-text-muted); margin: 0 0 12px 33px; }
+.milestone::before { content: ""; width: 5px; height: 5px; border-radius: 50%; background: var(--taomni-success); flex-shrink: 0; }
+
+.composer {
+  flex-shrink: 0;
+  width: min(780px, calc(100% - 48px));
+  margin: 8px auto 14px;
+  border: 1px solid color-mix(in srgb, var(--taomni-chrome-border) 75%, var(--taomni-text-muted));
+  border-radius: 11px;
+  background: var(--taomni-card-bg);
+  box-shadow: 0 5px 18px rgba(0,0,0,.14);
+  overflow: hidden;
+}
+.composer textarea {
+  display: block; width: 100%; border: 0; resize: none; outline: none;
+  background: none; padding: 11px 13px 4px; min-height: 46px; max-height: 140px;
+  font-size: 11.5px; line-height: 1.65;
+}
+.composer textarea::placeholder { color: var(--taomni-text-muted); }
+.composer-bar { display: flex; align-items: center; gap: 6px; padding: 5px 8px 8px; }
+.composer-bar .hint { font-size: 9px; color: var(--taomni-text-muted); margin-left: auto; }
+.send { width: 26px; height: 26px; border: 0; border-radius: 7px; background: var(--taomni-text); color: var(--taomni-bg); display: grid; place-items: center; }
+.send svg { width: 14px; height: 14px; }
+
+/* Inspector */
+.inspector { width: 328px; flex-shrink: 0; border-left: 1px solid var(--taomni-chrome-border); background: var(--taomni-sidebar-bg); display: flex; flex-direction: column; min-height: 0; }
+.insp-head { display: flex; align-items: center; gap: 2px; padding: 0 8px; border-bottom: 1px solid var(--taomni-chrome-border); min-height: 36px; }
+.insp-tab { border: 0; background: none; color: var(--taomni-text-muted); font-size: 10.5px; padding: 10px 7px 8px; border-bottom: 2px solid transparent; }
+.insp-tab.active { color: var(--taomni-text); border-bottom-color: var(--taomni-accent); }
+.insp-tab:hover { color: var(--taomni-text); }
+.insp-body { flex: 1; min-height: 0; overflow-y: auto; padding: 12px; }
+.insp-sec { margin-bottom: 15px; }
+.insp-sec h4 { font-size: 10px; font-weight: 600; letter-spacing: .4px; color: var(--taomni-text-muted); margin: 0 0 7px; text-transform: uppercase; }
+.insp-row { display: flex; align-items: center; gap: 8px; padding: 5px 0; font-size: 10.5px; border-bottom: 1px solid color-mix(in srgb, var(--taomni-divider) 55%, transparent); }
+.insp-row:last-child { border-bottom: 0; }
+.insp-row .k { color: var(--taomni-text-muted); min-width: 62px; }
+.insp-row .v { margin-left: auto; text-align: right; font-family: var(--taomni-mono); font-size: 9.5px; overflow: hidden; text-overflow: ellipsis; }
+.insp-row .grow { flex: 1; }
+
+.plan-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px; }
+.plan-list li { display: flex; gap: 8px; align-items: flex-start; }
+.plan-num { width: 17px; height: 17px; border-radius: 50%; border: 1px solid var(--taomni-text-muted); display: grid; place-items: center; font-size: 8.5px; color: var(--taomni-text-muted); flex-shrink: 0; }
+.plan-num.ok { background: var(--taomni-success); border-color: var(--taomni-success); color: #0b1a10; }
+.plan-num.run { border-color: var(--taomni-accent); color: var(--taomni-accent); }
+.plan-num.wait { border-color: var(--taomni-warning); color: var(--taomni-warning); }
+.plan-list strong { display: block; font-size: 10.5px; font-weight: 500; }
+.plan-list small { display: block; font-size: 9.5px; color: var(--taomni-text-muted); line-height: 1.55; margin-top: 1px; }
+
+.file-row { display: flex; align-items: center; gap: 7px; padding: 6px 4px; font-size: 10px; border-radius: 4px; cursor: pointer; }
+.file-row:hover { background: var(--taomni-hover); }
+.file-row.active { background: var(--taomni-selected); }
+.file-row .fp { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; direction: rtl; text-align: left; }
+.file-row .stat { margin-left: auto; font-family: var(--taomni-mono); font-size: 9px; white-space: nowrap; }
+.file-row .stat .a { color: var(--taomni-success); }
+.file-row .stat .d { color: var(--taomni-danger); }
+
+.diff { margin-top: 9px; border: 1px solid var(--taomni-chrome-border); border-radius: 6px; overflow: hidden; background: var(--taomni-code-bg); }
+.diff-head { display: flex; align-items: center; gap: 7px; padding: 5px 8px; background: var(--taomni-chrome-bg); font-family: var(--taomni-mono); font-size: 9px; color: var(--taomni-text-muted); }
+.diff pre { margin: 0; padding: 7px 0; font-family: var(--taomni-mono); font-size: 9.5px; line-height: 1.75; overflow-x: auto; color: var(--taomni-code-text); }
+.diff .l { display: block; padding: 0 8px; white-space: pre; }
+.diff .l.add { background: color-mix(in srgb, var(--taomni-success) 15%, transparent); }
+.diff .l.del { background: color-mix(in srgb, var(--taomni-danger) 15%, transparent); }
+.diff .l .ln { display: inline-block; width: 24px; color: var(--taomni-code-line-number); user-select: none; }
+.hunk-bar { display: flex; align-items: center; gap: 4px; padding: 5px 7px; border-top: 1px solid var(--taomni-chrome-border); background: var(--taomni-chrome-bg); }
+.hunk-bar .lbl { font-size: 9px; color: var(--taomni-text-muted); margin-right: auto; }
+.hunk-bar button { border: 1px solid var(--taomni-input-border); background: var(--taomni-card-bg); border-radius: 4px; font-size: 9px; padding: 2px 6px; }
+.hunk-bar button:hover { border-color: var(--taomni-selected-border); }
+.hunk-bar button.kept { border-color: var(--taomni-success); color: var(--taomni-success); }
+
+/* ============================================================================
+   11. Generic table / list
+   ========================================================================== */
+.table { width: 100%; border-collapse: collapse; font-size: 10.5px; }
+.table th {
+  text-align: left; font-weight: 500; font-size: 9.5px; letter-spacing: .3px;
+  color: var(--taomni-text-muted); text-transform: uppercase;
+  padding: 7px 9px; border-bottom: 1px solid var(--taomni-divider);
+  white-space: nowrap;
+}
+.table td { padding: 8px 9px; border-bottom: 1px solid color-mix(in srgb, var(--taomni-divider) 65%, transparent); vertical-align: middle; }
+.table tr:hover td { background: color-mix(in srgb, var(--taomni-hover) 65%, transparent); }
+.table td.num, .table th.num { text-align: right; font-family: var(--taomni-mono); }
+.table .pname { font-weight: 500; }
+.table .sub { display: block; font-size: 9.5px; color: var(--taomni-text-muted); }
+.table.card-table { border: 1px solid var(--taomni-card-border); border-radius: 9px; overflow: hidden; background: var(--taomni-card-bg); }
+.table.card-table th { background: color-mix(in srgb, var(--taomni-chrome-bg) 60%, var(--taomni-card-bg)); }
+
+.matrix { width: 100%; border-collapse: collapse; font-size: 9.5px; }
+.matrix th, .matrix td { padding: 5px 6px; text-align: center; border-bottom: 1px solid color-mix(in srgb, var(--taomni-divider) 60%, transparent); }
+.matrix th:first-child, .matrix td:first-child { text-align: left; font-size: 10px; }
+.matrix th { color: var(--taomni-text-muted); font-weight: 500; }
+.cell { display: inline-grid; place-items: center; width: 15px; height: 15px; border-radius: 3px; font-size: 8px; }
+.cell.ok { background: color-mix(in srgb, var(--taomni-success) 26%, transparent); color: var(--taomni-success); }
+.cell.warn { background: color-mix(in srgb, var(--taomni-warning) 26%, transparent); color: var(--taomni-warning); }
+.cell.bad { background: color-mix(in srgb, var(--taomni-danger) 26%, transparent); color: var(--taomni-danger); }
+.cell.none { border: 1px dashed color-mix(in srgb, var(--taomni-text-muted) 35%, transparent); color: var(--taomni-text-muted); }
+.cell.run { background: color-mix(in srgb, var(--taomni-accent) 24%, transparent); color: var(--taomni-accent); }
+
+/* ============================================================================
+   12. Templates
+   ========================================================================== */
+.tpl-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(228px, 1fr)); gap: 10px; margin-bottom: 16px; }
+.tpl {
+  border: 1px solid var(--taomni-card-border);
+  border-radius: 9px;
+  background: var(--taomni-card-bg);
+  padding: 11px 12px;
+  cursor: pointer;
+  transition: border-color .12s;
+}
+.tpl:hover { border-color: var(--taomni-selected-border); }
+.tpl.active { border-color: var(--taomni-accent); box-shadow: 0 0 0 1px var(--taomni-accent) inset; }
+.tpl-top { display: flex; align-items: center; gap: 7px; }
+.tpl-icon { width: 25px; height: 25px; border-radius: 6px; display: grid; place-items: center; background: var(--taomni-selected); color: var(--taomni-accent); }
+.tpl-icon svg { width: 13px; height: 13px; }
+.tpl-name { font-size: 11.5px; font-weight: 600; }
+.tpl-id { font-family: var(--taomni-mono); font-size: 9px; color: var(--taomni-text-muted); margin: 5px 0 0; }
+.tpl-desc { font-size: 10px; color: var(--taomni-text-muted); line-height: 1.6; margin: 7px 0 9px; min-height: 32px; }
+.tpl-meta { display: flex; align-items: center; gap: 5px; flex-wrap: wrap; }
+.flow { display: flex; flex-wrap: wrap; align-items: stretch; gap: 4px 0; padding: 4px 0 2px; }
+.flow-node {
+  min-width: 92px; padding: 8px 9px;
+  border: 1px solid var(--taomni-chrome-border);
+  border-radius: 7px;
+  background: var(--taomni-card-bg);
+  flex-shrink: 0;
+}
+.flow-node strong { display: block; font-size: 10px; font-weight: 600; }
+.flow-node small { display: block; font-size: 9px; color: var(--taomni-text-muted); margin-top: 2px; line-height: 1.5; white-space: nowrap; }
+.flow-node, .flow-arrow { flex-shrink: 0; }
+.flow-node.gate { border-style: dashed; border-color: var(--taomni-selected-border); }
+.flow-node.par { border-color: color-mix(in srgb, var(--taomni-purple) 45%, var(--taomni-chrome-border)); }
+.flow-arrow { display: grid; place-items: center; width: 18px; color: var(--taomni-chrome-border); flex-shrink: 0; }
+.flow-arrow svg { width: 11px; height: 11px; }
+
+.two-col { display: grid; grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr); gap: 14px; align-items: start; }
+
+/* ============================================================================
+   13. Fleet
+   ========================================================================== */
+.env-health { display: flex; gap: 3px; }
+.hdot { width: 7px; height: 7px; border-radius: 50%; background: color-mix(in srgb, var(--taomni-text-muted) 30%, transparent); }
+.hdot.ok { background: var(--taomni-success); }
+.hdot.run { background: var(--taomni-accent); animation: pulse 1.6s infinite; }
+.hdot.bad { background: var(--taomni-danger); }
+.lease-bar { width: 74px; height: 4px; border-radius: 3px; background: color-mix(in srgb, var(--taomni-text-muted) 22%, transparent); overflow: hidden; }
+.lease-bar i { display: block; height: 100%; background: var(--taomni-success); }
+.lease-bar i.warn { background: var(--taomni-warning); }
+.env-detail { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
+.env-card { border: 1px solid var(--taomni-card-border); border-radius: 8px; background: var(--taomni-card-bg); padding: 10px 11px; }
+.env-card .row { display: flex; align-items: center; gap: 7px; font-size: 10px; }
+.env-card .row + .row { margin-top: 6px; }
+.env-card .k { color: var(--taomni-text-muted); }
+.env-card .v { margin-left: auto; font-family: var(--taomni-mono); font-size: 9.5px; }
+
+/* ============================================================================
+   14. Quality
+   ========================================================================== */
+.cov-bar { display: flex; height: 7px; border-radius: 4px; overflow: hidden; gap: 2px; background: transparent; }
+.cov-bar i { display: block; height: 100%; border-radius: 3px; }
+.legend { display: flex; align-items: center; gap: 12px; font-size: 9.5px; color: var(--taomni-text-muted); flex-wrap: wrap; }
+.legend span { display: inline-flex; align-items: center; gap: 5px; }
+.legend i { width: 7px; height: 7px; border-radius: 2px; display: inline-block; }
+.finding { border: 1px solid var(--taomni-card-border); border-radius: 7px; background: var(--taomni-card-bg); padding: 9px 10px; }
+.finding + .finding { margin-top: 6px; }
+.finding-head { display: flex; align-items: center; gap: 6px; }
+.finding-head strong { font-size: 10.5px; font-weight: 600; }
+.finding-head .sev { font-size: 8.5px; padding: 0 4px; border-radius: 3px; border: 1px solid currentColor; }
+.finding p { margin: 5px 0 0; font-size: 10px; color: var(--taomni-text-muted); line-height: 1.6; }
+.finding .loc { font-family: var(--taomni-mono); font-size: 9px; color: var(--taomni-text-muted); margin-top: 4px; }
+
+/* ============================================================================
+   15. Briefing
+   ========================================================================== */
+.brief { max-width: 840px; margin: 0 auto; background: var(--taomni-card-bg); border: 1px solid var(--taomni-card-border); border-radius: 10px; }
+.brief-head { padding: 16px 20px 13px; border-bottom: 1px solid var(--taomni-divider); }
+.brief-head .eyebrow { font-size: 9px; letter-spacing: 1.4px; color: var(--taomni-text-muted); }
+.brief-head h2 { font-size: 17px; font-weight: 600; margin: 4px 0 5px; letter-spacing: -.2px; }
+.brief-head .meta { display: flex; align-items: center; gap: 9px; font-size: 10px; color: var(--taomni-text-muted); flex-wrap: wrap; }
+.brief-body { padding: 14px 20px 18px; }
+.brief-sec { padding: 11px 0; border-bottom: 1px solid color-mix(in srgb, var(--taomni-divider) 65%, transparent); }
+.brief-sec:last-child { border-bottom: 0; }
+.brief-sec h3 { font-size: 10px; text-transform: uppercase; letter-spacing: .5px; color: var(--taomni-text-muted); margin: 0 0 6px; display: flex; align-items: center; gap: 6px; }
+.brief-sec h3 .n { width: 15px; height: 15px; border-radius: 50%; border: 1px solid var(--taomni-chrome-border); display: grid; place-items: center; font-size: 8px; }
+.brief-sec p, .brief-sec li { font-size: 10.5px; line-height: 1.75; }
+.brief-sec p { margin: 0; }
+.brief-sec ul { margin: 0; padding-left: 16px; }
+.brief-sec li { margin-bottom: 2px; }
+.brief-sec li::marker { color: var(--taomni-text-muted); }
+.brief-kv { display: grid; grid-template-columns: 96px 1fr; gap: 4px 12px; font-size: 10.5px; }
+.brief-kv dt { color: var(--taomni-text-muted); }
+.brief-kv dd { margin: 0; }
+.brief-cols { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.brief-cols h4 { font-size: 10px; margin: 0 0 4px; color: var(--taomni-text-muted); font-weight: 500; }
+
+/* ============================================================================
+   16. Routing / settings
+   ========================================================================== */
+.set-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+.panel-card { border: 1px solid var(--taomni-card-border); border-radius: 9px; background: var(--taomni-card-bg); overflow: hidden; }
+.panel-card-head { display: flex; align-items: center; gap: 7px; padding: 10px 12px; border-bottom: 1px solid var(--taomni-divider); }
+.panel-card-head strong { font-size: 11px; font-weight: 600; }
+.panel-card-head .chip { margin-left: auto; }
+.panel-card-body { padding: 11px 12px; }
+.set-row { display: flex; align-items: center; gap: 9px; padding: 7px 0; font-size: 10.5px; }
+.set-row + .set-row { border-top: 1px solid color-mix(in srgb, var(--taomni-divider) 50%, transparent); }
+.set-row .k { color: var(--taomni-text-muted); }
+.set-row .control { margin-left: auto; min-width: 120px; }
+.set-row .control.narrow { min-width: 78px; }
+.switch { position: relative; width: 27px; height: 15px; border-radius: 8px; background: var(--taomni-chrome-border); border: 0; padding: 0; flex-shrink: 0; }
+.switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 11px; height: 11px; border-radius: 50%; background: #fff; transition: left .12s; }
+.switch.on { background: var(--taomni-accent); }
+.switch.on::after { left: 14px; }
+.lesson { display: flex; gap: 8px; padding: 8px 0; border-bottom: 1px solid color-mix(in srgb, var(--taomni-divider) 55%, transparent); }
+.lesson:last-child { border-bottom: 0; }
+.lesson .sc { font-family: var(--taomni-mono); font-size: 8.5px; color: var(--taomni-text-muted); flex-shrink: 0; padding-top: 1px; }
+.lesson p { margin: 0; font-size: 10px; line-height: 1.6; }
+.lesson small { display: block; color: var(--taomni-text-muted); font-size: 9px; margin-top: 2px; }
+
+/* ============================================================================
+   17. Misc
+   ========================================================================== */
+.toast {
+  position: fixed; bottom: 34px; right: 18px; transform: translateY(8px);
+  background: var(--taomni-card-bg); color: var(--taomni-text);
+  border: 1px solid var(--taomni-selected-border);
+  border-radius: 7px; padding: 8px 13px; font-size: 11px;
+  box-shadow: var(--taomni-shadow);
+  opacity: 0; pointer-events: none; transition: opacity .16s, transform .16s;
+  z-index: 60;
+}
+.toast.show { opacity: 1; transform: translateY(0); }
+.toast { max-width: 320px; }
+.empty { padding: 40px 20px; text-align: center; color: var(--taomni-text-muted); font-size: 11px; }
+.divider { height: 1px; background: var(--taomni-divider); margin: 12px 0; }
+.stack { display: flex; flex-direction: column; gap: 8px; }
+.row { display: flex; align-items: center; gap: 8px; }
+.right { margin-left: auto; }
+.scroll-x { overflow-x: auto; }
+.nowrap { white-space: nowrap; }
+.ellipsis { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tag-ok { color: var(--taomni-success); }
+.tag-warn { color: var(--taomni-warning); }
+.tag-bad { color: var(--taomni-danger); }
+
+@media (max-width: 1380px) {
+  .kpis { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .mission-groups { grid-template-columns: 1fr; }
+  .two-col { grid-template-columns: 1fr; }
+}
+@media (max-width: 1180px) {
+  .panel { width: 220px; }
+  .inspector { width: 296px; }
+}
+@media (max-width: 980px) {
+  .panel { display: none; }
+  .inspector { position: absolute; right: 0; top: 42px; bottom: 23px; width: min(340px, calc(100% - 52px)); z-index: 8; box-shadow: -10px 0 26px rgba(0,0,0,.35); }
+  .kpis { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- ===================== Title bar ===================== -->
+  <header class="titlebar">
+    <div class="traffic" aria-hidden="true"><i></i><i></i><i></i></div>
+    <span class="app-title">Taomni</span>
+    <span class="title-sep">/</span>
+    <span class="title-title" id="window-title">Mission Control</span>
+    <div class="title-meta">
+      <span class="dot"></span><span>本地执行端在线</span>
+      <span class="title-sep">·</span>
+      <span>应用代理</span>
+      <span class="title-sep">·</span>
+      <span id="today-cost">今日 $18.40 / $40.00</span>
+    </div>
+  </header>
+
+  <div class="body">
+    <!-- ===================== Rail ===================== -->
+    <nav class="rail" aria-label="主导航">
+      <div class="rail-logo" aria-hidden="true">T</div>
+      <button class="rail-btn active" data-nav="missions" data-label="Mission Control">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M8 4v5"/></svg>
+        <span>任务</span>
+        <span class="badge" id="rail-badge">3</span>
+      </button>
+      <button class="rail-btn" data-nav="templates" data-label="Templates">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 5h16M4 12h10M4 19h7"/><circle cx="18" cy="12" r="2"/><circle cx="15" cy="19" r="2"/></svg>
+        <span>模板</span>
+      </button>
+      <button class="rail-btn" data-nav="fleet" data-label="Fleet">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="6" rx="1.5"/><rect x="3" y="14" width="18" height="6" rx="1.5"/><path d="M7 7h.01M7 17h.01"/></svg>
+        <span>环境</span>
+      </button>
+      <button class="rail-btn" data-nav="quality" data-label="Quality">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/><path d="M9 12l2 2 4-4"/></svg>
+        <span>质量</span>
+        <span class="badge" style="background:var(--taomni-warning);color:#1a1206" id="quality-badge">2</span>
+      </button>
+      <button class="rail-btn" data-nav="briefing" data-label="Briefing">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 3h9l4 4v14H6z"/><path d="M9 11h7M9 15h5M9 7h3"/></svg>
+        <span>简报</span>
+      </button>
+      <button class="rail-btn" data-nav="routing" data-label="Routing & Budget">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><circle cx="18" cy="6" r="2.5"/><path d="M8.5 6h7M6 8.5V15a3 3 0 003 3h6.5"/></svg>
+        <span>路由</span>
+      </button>
+      <div class="rail-foot">
+        <button class="rail-btn" data-nav="settings" data-label="Settings">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.7 1.7 0 00.3 1.9l.1.1a2 2 0 11-2.8 2.8l-.1-.1a1.7 1.7 0 00-1.9-.3 1.7 1.7 0 00-1 1.5V21a2 2 0 11-4 0v-.1a1.7 1.7 0 00-1-1.5 1.7 1.7 0 00-1.9.3l-.1.1a2 2 0 11-2.8-2.8l.1-.1a1.7 1.7 0 00.3-1.9 1.7 1.7 0 00-1.5-1H3a2 2 0 110-4h.1a1.7 1.7 0 001.5-1 1.7 1.7 0 00-.3-1.9l-.1-.1a2 2 0 112.8-2.8l.1.1a1.7 1.7 0 001.9.3H9a1.7 1.7 0 001-1.5V3a2 2 0 114 0v.1a1.7 1.7 0 001 1.5 1.7 1.7 0 001.9-.3l.1-.1a2 2 0 112.8 2.8l-.1.1a1.7 1.7 0 00-.3 1.9V9a1.7 1.7 0 001.5 1H21a2 2 0 110 4h-.1a1.7 1.7 0 00-1.5 1z"/></svg>
+          <span>设置</span>
+        </button>
+      </div>
+    </nav>
+
+    <!-- ===================== Side panel ===================== -->
+    <aside class="panel" id="side-panel">
+      <!-- Missions panel -->
+      <div class="panel-view" data-panel="missions">
+        <div class="panel-head">
+          <div class="panel-title">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" style="width:14px;height:14px"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18"/></svg>
+            Mission Control
+            <span class="count" data-count="missions">6</span>
+          </div>
+          <p class="panel-sub">只显示需要你的事情</p>
+        </div>
+        <div class="panel-project">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M3 7h6l2 2h10v9H3z"/></svg>
+          <span>checkout-platform</span>
+          <span class="mono">main</span>
+        </div>
+        <div class="panel-search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5L21 21"/></svg>
+          <input placeholder="搜索任务、分支、证据…" id="mission-search" />
+        </div>
+        <div class="panel-scroll">
+          <div class="panel-group">
+            <div class="panel-group-head">待决策 <span class="n">1</span></div>
+            <button class="mission-card attention" data-open-mission="m-1042" style="width:100%;text-align:left">
+              <div class="mc-top"><span class="mc-id">M-1042</span><span class="chip warn">需决策</span></div>
+              <div class="mc-title">修复支付超时后订单状态不一致</div>
+              <div class="mc-sub"><span>bugfix-large</span><span class="sep"></span><span>2 次中断</span></div>
+              <div class="mc-stages"><i class="mc-stage ok"></i><i class="mc-stage ok"></i><i class="mc-stage ok"></i><i class="mc-stage wait"></i><i class="mc-stage"></i><i class="mc-stage"></i></div>
+            </button>
+          </div>
+          <div class="panel-group">
+            <div class="panel-group-head">运行中 <span class="n">2</span></div>
+            <button class="mission-card" data-open-mission="m-1043" style="width:100%;text-align:left">
+              <div class="mc-top"><span class="mc-id">M-1043</span><span class="chip accent">运行</span></div>
+              <div class="mc-title">新增发票批量导出</div>
+              <div class="mc-sub"><span>feature-existing</span><span class="sep"></span><span>建模</span></div>
+              <div class="mc-stages"><i class="mc-stage ok"></i><i class="mc-stage ok"></i><i class="mc-stage run"></i><i class="mc-stage"></i><i class="mc-stage"></i><i class="mc-stage"></i></div>
+            </button>
+            <button class="mission-card" data-open-mission="m-1044" style="width:100%;text-align:left">
+              <div class="mc-top"><span class="mc-id">M-1044</span><span class="chip accent">运行</span></div>
+              <div class="mc-title">E2E：结算流程稳定性加固</div>
+              <div class="mc-sub"><span>quality-hardening</span><span class="sep"></span><span>3 次连跑</span></div>
+              <div class="mc-stages"><i class="mc-stage ok"></i><i class="mc-stage ok"></i><i class="mc-stage ok"></i><i class="mc-stage run"></i><i class="mc-stage"></i></div>
+            </button>
+          </div>
+          <div class="panel-group">
+            <div class="panel-group-head">待评审 <span class="n">1</span></div>
+            <button class="mission-card ready" data-open-mission="m-1041" style="width:100%;text-align:left">
+              <div class="mc-top"><span class="mc-id">M-1041</span><span class="chip accent">待评审</span></div>
+              <div class="mc-title">租户配置中心 0→1</div>
+              <div class="mc-sub"><span>greenfield-designed</span><span class="sep"></span><span>证据齐全</span></div>
+              <div class="mc-stages"><i class="mc-stage ok"></i><i class="mc-stage ok"></i><i class="mc-stage ok"></i><i class="mc-stage ok"></i><i class="mc-stage ok"></i><i class="mc-stage ok"></i></div>
+            </button>
+          </div>
+          <div class="panel-group">
+            <div class="panel-group-head">最近完成 <span class="n">2</span></div>
+            <button class="mission-card done" data-open-mission="m-1039" style="width:100%;text-align:left">
+              <div class="mc-top"><span class="mc-id">M-1039</span><span class="chip ok">已交付</span></div>
+              <div class="mc-title">修复 Windows 路径分隔符回归</div>
+              <div class="mc-sub"><span>bugfix-large</span><span class="sep"></span><span>PR #482</span></div>
+            </button>
+            <button class="mission-card done" data-open-mission="m-1038" style="width:100%;text-align:left">
+              <div class="mc-top"><span class="mc-id">M-1038</span><span class="chip">只读</span></div>
+              <div class="mc-title">依赖升级风险评估</div>
+              <div class="mc-sub"><span>review-audit</span><span class="sep"></span><span>报告已归档</span></div>
+            </button>
+          </div>
+        </div>
+        <div class="panel-foot">
+          <button class="btn primary" data-action="new-mission">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>
+            新建任务
+          </button>
+          <p class="panel-note">过程默认折叠。只有决策、阻塞、阶段交付与最终结果会出现在主线程。</p>
+        </div>
+      </div>
+
+      <!-- Templates panel -->
+      <div class="panel-view" data-panel="templates" hidden>
+        <div class="panel-head">
+          <div class="panel-title">Templates<span class="count">8</span></div>
+          <p class="panel-sub">任务类别决定流程与预算</p>
+        </div>
+        <div class="panel-search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5L21 21"/></svg>
+          <input placeholder="搜索模板…" />
+        </div>
+        <div class="panel-scroll">
+          <div class="panel-group">
+            <div class="panel-group-head">内置</div>
+            <button class="tpl active" data-tpl="bugfix-large" style="width:100%;text-align:left">
+              <div class="tpl-top"><span class="tpl-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M8 6l-4 6 4 6M16 6l4 6-4 6"/></svg></span><span class="tpl-name">大库缺陷修复</span></div>
+              <p class="tpl-id">bugfix-large · v3</p>
+            </button>
+            <button class="tpl" data-tpl="greenfield-designed" style="width:100%;text-align:left;margin-top:6px">
+              <div class="tpl-top"><span class="tpl-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v18M3 12h18"/></svg></span><span class="tpl-name">0→1（有设计）</span></div>
+              <p class="tpl-id">greenfield-designed · v2</p>
+            </button>
+            <button class="tpl" data-tpl="greenfield-discovery" style="width:100%;text-align:left;margin-top:6px">
+              <div class="tpl-top"><span class="tpl-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg></span><span class="tpl-name">0→1（无设计）</span></div>
+              <p class="tpl-id">greenfield-discovery · v2</p>
+            </button>
+            <button class="tpl" data-tpl="feature-existing" style="width:100%;text-align:left;margin-top:6px">
+              <div class="tpl-top"><span class="tpl-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 12h6"/></svg></span><span class="tpl-name">既有库功能增量</span></div>
+              <p class="tpl-id">feature-existing · v4</p>
+            </button>
+            <button class="tpl" data-tpl="refactor-migration" style="width:100%;text-align:left;margin-top:6px">
+              <div class="tpl-top"><span class="tpl-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 8h13l-3-3M20 16H7l3 3"/></svg></span><span class="tpl-name">重构 / 迁移</span></div>
+              <p class="tpl-id">refactor-migration · v1</p>
+            </button>
+            <button class="tpl" data-tpl="quality-hardening" style="width:100%;text-align:left;margin-top:6px">
+              <div class="tpl-top"><span class="tpl-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/></svg></span><span class="tpl-name">质量加固</span></div>
+              <p class="tpl-id">quality-hardening · v2</p>
+            </button>
+            <button class="tpl" data-tpl="review-audit" style="width:100%;text-align:left;margin-top:6px">
+              <div class="tpl-top"><span class="tpl-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 12s3-7 8-7 8 7 8 7-3 7-8 7-8-7-8-7z"/><circle cx="12" cy="12" r="2.5"/></svg></span><span class="tpl-name">只读审查</span></div>
+              <p class="tpl-id">review-audit · v3</p>
+            </button>
+            <button class="tpl" data-tpl="steward-watch" style="width:100%;text-align:left;margin-top:6px">
+              <div class="tpl-top"><span class="tpl-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l2.5 2.5"/></svg></span><span class="tpl-name">无人值守巡检</span></div>
+              <p class="tpl-id">steward-watch · v1</p>
+            </button>
+          </div>
+        </div>
+        <div class="panel-foot">
+          <button class="btn" data-action="derive-template" style="width:100%">从已完成任务派生</button>
+        </div>
+      </div>
+
+      <!-- Fleet panel -->
+      <div class="panel-view" data-panel="fleet" hidden>
+        <div class="panel-head">
+          <div class="panel-title">Fleet<span class="count">5 活跃</span></div>
+          <p class="panel-sub">环境是编排的一等资源</p>
+        </div>
+        <div class="panel-scroll">
+          <div class="panel-group">
+            <div class="panel-group-head">租约中 <span class="n">4</span></div>
+            <div class="stack" id="fleet-lease-list"></div>
+          </div>
+          <div class="panel-group">
+            <div class="panel-group-head">模板环境</div>
+            <div class="stack">
+              <div class="mission-card" style="cursor:default">
+                <div class="mc-top"><span class="chip ok">就绪</span><span class="right tiny muted">container</span></div>
+                <div class="mc-title" style="margin-top:4px">playwright-jammy</div>
+                <div class="mc-sub">预装 Chromium · pnpm · 2 服务</div>
+              </div>
+              <div class="mission-card" style="cursor:default">
+                <div class="mc-top"><span class="chip">未启动</span><span class="right tiny muted">ssh-host</span></div>
+                <div class="mc-title" style="margin-top:4px">win-build-02</div>
+                <div class="mc-sub">Windows 原生 · 串行独占</div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="panel-foot">
+          <button class="btn" data-action="new-env" style="width:100%">新环境规格</button>
+        </div>
+      </div>
+
+      <!-- Quality panel -->
+      <div class="panel-view" data-panel="quality" hidden>
+        <div class="panel-head">
+          <div class="panel-title">Quality<span class="count">37 用例</span></div>
+          <p class="panel-sub">按验收标准映射覆盖</p>
+        </div>
+        <div class="panel-scroll">
+          <div class="panel-group">
+            <div class="panel-group-head">门禁</div>
+            <div class="stack" id="quality-gates"></div>
+          </div>
+          <div class="panel-group">
+            <div class="panel-group-head">隔离区 <span class="n">2</span></div>
+            <div class="stack" id="quality-quarantine"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Briefing panel -->
+      <div class="panel-view" data-panel="briefing" hidden>
+        <div class="panel-head">
+          <div class="panel-title">Briefing</div>
+          <p class="panel-sub">由账本生成，模型只做措辞</p>
+        </div>
+        <div class="panel-search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="7"/><path d="M16.5 16.5L21 21"/></svg>
+          <input placeholder="选择任务…" />
+        </div>
+        <div class="panel-scroll">
+          <div class="panel-group">
+            <div class="panel-group-head">可生成</div>
+            <div class="stack">
+              <button class="mission-card" data-brief="m-1042" style="width:100%;text-align:left">
+                <div class="mc-top"><span class="mc-id">M-1042</span><span class="chip warn">进行中</span></div>
+                <div class="mc-title">修复支付超时后订单状态不一致</div>
+                <div class="mc-sub">阶段 4/7 · 2 决策 · $6.10</div>
+              </button>
+              <button class="mission-card" data-brief="m-1041" style="width:100%;text-align:left">
+                <div class="mc-top"><span class="mc-id">M-1041</span><span class="chip ok">已完成</span></div>
+                <div class="mc-title">租户配置中心 0→1</div>
+                <div class="mc-sub">7/7 · 证据齐全 · $11.80</div>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Routing panel -->
+      <div class="panel-view" data-panel="routing" hidden>
+        <div class="panel-head">
+          <div class="panel-title">Routing &amp; Budget</div>
+          <p class="panel-sub">先能力，后成本</p>
+        </div>
+        <div class="panel-scroll">
+          <div class="panel-group">
+            <div class="panel-group-head">资源角色</div>
+            <div class="stack" id="routing-roles"></div>
+          </div>
+          <div class="panel-group">
+            <div class="panel-group-head">预算</div>
+            <div class="stack" id="routing-budget"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Settings panel -->
+      <div class="panel-view" data-panel="settings" hidden>
+        <div class="panel-head">
+          <div class="panel-title">Settings</div>
+          <p class="panel-sub">沿用应用 AI 与 Vault 配置</p>
+        </div>
+        <div class="panel-scroll">
+          <div class="panel-group">
+            <div class="panel-group-head">分区</div>
+            <div class="stack">
+              <button class="mission-card" style="width:100%;text-align:left"><div class="mc-title">自治等级与授权</div><div class="mc-sub">不可逆操作白名单</div></button>
+              <button class="mission-card" style="width:100%;text-align:left"><div class="mc-title">触发器</div><div class="mc-sub">GitHub · CI · 定时 · 观察</div></button>
+              <button class="mission-card" style="width:100%;text-align:left"><div class="mc-title">代理与凭据</div><div class="mc-sub">应用 / 专属 / 不使用</div></button>
+              <button class="mission-card" style="width:100%;text-align:left"><div class="mc-title">记忆与 Skills</div><div class="mc-sub">Lesson · Spec · 版本</div></button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ===================== Main ===================== -->
+    <main class="main">
+      <div class="topbar">
+        <button class="btn sm ghost" id="back-btn" hidden>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M15 6l-6 6 6 6"/></svg>
+          任务
+        </button>
+        <h1 id="main-title">Mission Control</h1>
+        <span class="sub" id="main-sub">3 个待处理 · 2 个运行中 · 注意力预算剩余 1 次中断</span>
+        <div class="actions">
+          <div class="seg" id="quiet-toggle">
+            <button class="active" data-quiet="on">安静模式</button>
+            <button data-quiet="off">显示过程</button>
+          </div>
+          <button class="btn sm" data-action="briefing">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M6 3h9l4 4v14H6z"/><path d="M9 11h7M9 15h5"/></svg>
+            简报
+          </button>
+          <button class="btn sm primary" data-action="new-mission">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 5v14M5 12h14"/></svg>
+            新建
+          </button>
+        </div>
+      </div>
+
+      <div class="content" id="content">
+
+        <!-- ===================== Mission Control ===================== -->
+        <section class="view active" data-view="missions">
+          <div class="section">
+            <div class="kpis">
+              <div class="kpi">
+                <div class="kpi-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l2.5 2.5"/></svg>需要你</div>
+                <div class="kpi-value"><strong>3</strong><span>项</span></div>
+                <div class="kpi-foot">1 决策 · 1 评审 · 1 阻塞</div>
+              </div>
+              <div class="kpi">
+                <div class="kpi-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 12h4l2-5 4 10 2-5h4"/></svg>运行中</div>
+                <div class="kpi-value"><strong>2</strong><span>个 Mission</span></div>
+                <div class="kpi-foot"><span class="pulse" style="background:var(--taomni-accent)"></span>4 个 Worker · 2 个环境</div>
+              </div>
+              <div class="kpi">
+                <div class="kpi-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/></svg>质量闸门</div>
+                <div class="kpi-value"><strong>92</strong><span>% 一次通过</span></div>
+                <div class="meter"><i class="ok" style="width:92%"></i></div>
+                <div class="kpi-foot">G1–G6 · 7 天滚动</div>
+              </div>
+              <div class="kpi">
+                <div class="kpi-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 17l5-5 3 3 7-7"/></svg>今日成本</div>
+                <div class="kpi-value"><strong>$18.40</strong><span>/ $40.00</span></div>
+                <div class="meter"><i style="width:46%"></i></div>
+                <div class="kpi-foot">预算内 · 预测 $31.20</div>
+              </div>
+              <div class="kpi">
+                <div class="kpi-label"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="4" y="6" width="16" height="12" rx="2"/><path d="M8 10h8M8 14h5"/></svg>注意力</div>
+                <div class="kpi-value"><strong>72</strong><span>% 输出已折叠</span></div>
+                <div class="meter"><i class="ok" style="width:72%"></i></div>
+                <div class="kpi-foot">可见文本 / 总输出</div>
+              </div>
+            </div>
+
+            <div class="section-head">
+              <div>
+                <h2>需要你决定</h2>
+                <p>每个问题都带推荐项与后果；超时会采用默认动作。</p>
+              </div>
+              <div class="actions">
+                <button class="btn sm ghost" data-action="expand-all">展开过程</button>
+              </div>
+            </div>
+            <div class="attention-list" style="margin-bottom:16px">
+              <div class="attention-row">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M12 4v10M12 18h.01"/><circle cx="12" cy="12" r="9"/></svg>
+                <div class="q"><strong>M-1042</strong> · 修复方案二选一：在支付回调侧加幂等，还是在订单侧加去重？</div>
+                <span class="chip warn">剩余 42 分钟</span>
+                <button class="btn sm primary" data-open-mission="m-1042">回答</button>
+              </div>
+              <div class="attention-row" style="border-left-color:var(--taomni-accent)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" style="color:var(--taomni-accent)"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/><path d="M9 12l2 2 4-4"/></svg>
+                <div class="q"><strong>M-1041</strong> · 证据齐全，等待验收并生成 PR 草稿</div>
+                <span class="chip accent">0 blocker</span>
+                <button class="btn sm" data-open-mission="m-1041">查看</button>
+              </div>
+              <div class="attention-row" style="border-left-color:var(--taomni-danger)">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" style="color:var(--taomni-danger)"><path d="M12 4v10M12 18h.01"/><circle cx="12" cy="12" r="9"/></svg>
+                <div class="q"><strong>M-1040</strong> · 环境 <span class="mono">ssh://win-build-02</span> 健康探测第 3 层失败：服务未就绪</div>
+                <span class="chip bad">已重试 2 次</span>
+                <button class="btn sm" data-nav-jump="fleet">诊断</button>
+              </div>
+            </div>
+
+            <div class="section-head">
+              <div>
+                <h2>任务</h2>
+                <p>按注意力和风险排序，而不是创建时间。</p>
+              </div>
+              <div class="actions">
+                <div class="seg">
+                  <button class="active">活跃</button><button>全部</button><button>归档</button>
+                </div>
+              </div>
+            </div>
+            <div class="mission-groups">
+              <div class="mgroup">
+                <div class="mgroup-head"><strong>进行中</strong><span class="n">2</span><span class="line"></span></div>
+                <div class="mlist">
+                  <div class="mission-card attention" data-open-mission="m-1042">
+                    <div class="mc-top">
+                      <span class="mc-id">M-1042</span>
+                      <span class="chip warn">需决策</span>
+                      <span class="chip">bugfix-large</span>
+                      <span class="mc-cost">$6.10 / $12</span>
+                    </div>
+                    <div class="mc-title">修复支付超时后订单状态不一致</div>
+                    <div class="mc-sub">
+                      <span>阶段 4/7 · 修复</span><span class="sep"></span>
+                      <span>2 次中断</span><span class="sep"></span>
+                      <span>基线 3f2c9a1</span>
+                    </div>
+                    <div class="mc-stages"><i class="mc-stage ok"></i><i class="mc-stage ok"></i><i class="mc-stage ok"></i><i class="mc-stage wait"></i><i class="mc-stage"></i><i class="mc-stage"></i><i class="mc-stage"></i></div>
+                    <div class="mc-bottom">
+                      <span class="chip bad">阻塞</span>
+                      <span class="tiny muted">等待方案选择</span>
+                      <div class="mini-budget"><i style="width:51%"></i></div>
+                    </div>
+                  </div>
+                  <div class="mission-card" data-open-mission="m-1043">
+                    <div class="mc-top">
+                      <span class="mc-id">M-1043</span>
+                      <span class="chip accent">运行</span>
+                      <span class="chip">feature-existing</span>
+                      <span class="mc-cost">$2.30 / $9</span>
+                    </div>
+                    <div class="mc-title">新增发票批量导出</div>
+                    <div class="mc-sub">
+                      <span>阶段 3/6 · 实现</span><span class="sep"></span>
+                      <span>2 并行 Worker</span><span class="sep"></span>
+                      <span>env-cont-7</span>
+                    </div>
+                    <div class="mc-stages"><i class="mc-stage ok"></i><i class="mc-stage ok"></i><i class="mc-stage run"></i><i class="mc-stage"></i><i class="mc-stage"></i><i class="mc-stage"></i></div>
+                    <div class="mc-bottom">
+                      <span class="chip ok">正常</span>
+                      <span class="tiny muted">最后心跳 12s 前</span>
+                      <div class="mini-budget"><i style="width:26%"></i></div>
+                    </div>
+                  </div>
+                  <div class="mission-card" data-open-mission="m-1044">
+                    <div class="mc-top">
+                      <span class="mc-id">M-1044</span>
+                      <span class="chip accent">运行</span>
+                      <span class="chip">quality-hardening</span>
+                      <span class="mc-cost">$1.85 / $6</span>
+                    </div>
+                    <div class="mc-title">E2E：结算流程稳定性加固</div>
+                    <div class="mc-sub">
+                      <span>阶段 4/5 · 稳定性</span><span class="sep"></span>
+                      <span>第 2/3 次连跑</span><span class="sep"></span>
+                      <span>playwright-jammy</span>
+                    </div>
+                    <div class="mc-stages"><i class="mc-stage ok"></i><i class="mc-stage ok"></i><i class="mc-stage ok"></i><i class="mc-stage run"></i><i class="mc-stage"></i></div>
+                    <div class="mc-bottom">
+                      <span class="chip ok">29/29 通过</span>
+                      <span class="tiny muted">重试 1（已记录）</span>
+                      <div class="mini-budget"><i style="width:31%"></i></div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="mgroup">
+                <div class="mgroup-head"><strong>待你验收</strong><span class="n">1</span><span class="line"></span></div>
+                <div class="mlist">
+                  <div class="mission-card ready" data-open-mission="m-1041">
+                    <div class="mc-top">
+                      <span class="mc-id">M-1041</span>
+                      <span class="chip accent">待评审</span>
+                      <span class="chip">greenfield-designed</span>
+                      <span class="mc-cost">$11.80 / $14</span>
+                    </div>
+                    <div class="mc-title">租户配置中心 0→1</div>
+                    <div class="mc-sub">
+                      <span>7/7 阶段</span><span class="sep"></span>
+                      <span>G1–G6 全部通过</span><span class="sep"></span>
+                      <span>12 文件 · +842 −96</span>
+                    </div>
+                    <div class="mc-stages"><i class="mc-stage ok"></i><i class="mc-stage ok"></i><i class="mc-stage ok"></i><i class="mc-stage ok"></i><i class="mc-stage ok"></i><i class="mc-stage ok"></i><i class="mc-stage ok"></i></div>
+                    <div class="mc-bottom">
+                      <span class="chip ok">0 blocker</span>
+                      <span class="chip ok">E2E 3/3 稳定</span>
+                      <div class="mini-budget"><i class="warn" style="width:84%"></i></div>
+                    </div>
+                  </div>
+                </div>
+                <div class="mgroup-head" style="margin-top:14px"><strong>最近完成</strong><span class="n">2</span><span class="line"></span></div>
+                <div class="mlist">
+                  <div class="mission-card done" data-open-mission="m-1039">
+                    <div class="mc-top"><span class="mc-id">M-1039</span><span class="chip ok">已交付</span><span class="chip">bugfix-large</span><span class="mc-cost">PR #482</span></div>
+                    <div class="mc-title">修复 Windows 路径分隔符回归</div>
+                    <div class="mc-sub"><span>1 次中断</span><span class="sep"></span><span>证据包已归档</span><span class="sep"></span><span>$3.20</span></div>
+                  </div>
+                  <div class="mission-card done" data-open-mission="m-1038">
+                    <div class="mc-top"><span class="mc-id">M-1038</span><span class="chip">只读完成</span><span class="chip">review-audit</span><span class="mc-cost">$0.90</span></div>
+                    <div class="mc-title">依赖升级风险评估</div>
+                    <div class="mc-sub"><span>0 次中断</span><span class="sep"></span><span>报告已归档</span></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+<!-- ===================== Mission detail ===================== -->
+        <section class="view col" data-view="mission">
+          <div class="mission-shell">
+            <div class="mission-main">
+              <div class="stage-rail" id="stage-rail"></div>
+              <div class="thread" id="thread">
+                <div class="thread-inner" id="thread-inner"></div>
+              </div>
+              <div class="composer">
+                <textarea id="composer" rows="2" placeholder="补充信息、调整范围或回答当前问题…（Enter 发送，Shift+Enter 换行）"></textarea>
+                <div class="composer-bar">
+                  <span class="chip"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/></svg>act-with-gates</span>
+                  <span class="chip">bugfix-large v3</span>
+                  <span class="chip accent" id="budget-chip">$6.10 / $12.00</span>
+                  <span class="hint">安静模式：过程不进入上下文，只记录账本</span>
+                  <button class="send" data-action="send" aria-label="发送">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+                  </button>
+                </div>
+              </div>
+            </div>
+            <aside class="inspector" id="inspector">
+              <div class="insp-head">
+                <button class="insp-tab active" data-insp="plan">计划</button>
+                <button class="insp-tab" data-insp="changes">变更</button>
+                <button class="insp-tab" data-insp="evidence">证据</button>
+                <button class="insp-tab" data-insp="env">环境</button>
+                <button class="insp-tab" data-insp="cost">成本</button>
+                <span class="grow"></span>
+                <button class="icon-btn" data-action="toggle-inspector" aria-label="关闭检查器">
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M5 5l14 14M19 5L5 19"/></svg>
+                </button>
+              </div>
+              <div class="insp-body" id="insp-body"></div>
+            </aside>
+          </div>
+        </section>
+
+        <!-- ===================== Templates ===================== -->
+        <section class="view" data-view="templates">
+          <div class="section">
+            <div class="section-head">
+              <div>
+                <h2>任务模板</h2>
+                <p>模板决定阶段、退出证据、并行宽度、预算上限与需要授权的动作；不是固定的多 Agent 仪式。</p>
+              </div>
+              <div class="actions">
+                <button class="btn sm" data-action="derive-template">从任务派生</button>
+                <button class="btn sm primary" data-action="new-mission">使用模板</button>
+              </div>
+            </div>
+
+            <div class="tpl-grid">
+              <div class="tpl" data-tpl="greenfield-designed">
+                <div class="tpl-top"><span class="tpl-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3v18M3 12h18"/></svg></span><span class="tpl-name">0→1 · 有设计</span></div>
+                <p class="tpl-id">greenfield-designed · v2</p>
+                <p class="tpl-desc">需求与设计已就绪。以契约拆分并行实现，快速进入验证。</p>
+                <div class="tpl-meta"><span class="chip">act-with-gates</span><span class="chip">预算 中</span><span class="chip">并行 3</span></div>
+              </div>
+              <div class="tpl" data-tpl="greenfield-discovery">
+                <div class="tpl-top"><span class="tpl-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="6"/><path d="M20 20l-4.5-4.5"/></svg></span><span class="tpl-name">0→1 · 无设计</span></div>
+                <p class="tpl-id">greenfield-discovery · v2</p>
+                <p class="tpl-desc">只有想法。先并行探索形成规格草案，经你确认后再实施。</p>
+                <div class="tpl-meta"><span class="chip">propose</span><span class="chip">预算 中高</span><span class="chip">并行 4</span></div>
+              </div>
+              <div class="tpl active" data-tpl="bugfix-large">
+                <div class="tpl-top"><span class="tpl-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M8 6l-4 6 4 6M16 6l4 6-4 6"/></svg></span><span class="tpl-name">大库缺陷修复</span></div>
+                <p class="tpl-id">bugfix-large · v3</p>
+                <p class="tpl-desc">先复现再修。失败用例是事实来源，回归与稳定性证明修复有效。</p>
+                <div class="tpl-meta"><span class="chip">act-with-gates</span><span class="chip">预算 低中</span><span class="chip">并行 4</span></div>
+              </div>
+              <div class="tpl" data-tpl="feature-existing">
+                <div class="tpl-top"><span class="tpl-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="4" y="4" width="16" height="16" rx="2"/><path d="M9 12h6"/></svg></span><span class="tpl-name">既有库功能增量</span></div>
+                <p class="tpl-id">feature-existing · v4</p>
+                <p class="tpl-desc">影响面分析先行，契约冻结后实现，避免破坏既有调用方。</p>
+                <div class="tpl-meta"><span class="chip">act-with-gates</span><span class="chip">预算 中</span><span class="chip">并行 2</span></div>
+              </div>
+              <div class="tpl" data-tpl="refactor-migration">
+                <div class="tpl-top"><span class="tpl-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 8h13l-3-3M20 16H7l3 3"/></svg></span><span class="tpl-name">重构 / 迁移</span></div>
+                <p class="tpl-id">refactor-migration · v1</p>
+                <p class="tpl-desc">策略决策前置，分批变更，每批独立验证后才进入集成。</p>
+                <div class="tpl-meta"><span class="chip">propose</span><span class="chip">预算 高</span><span class="chip">串行为主</span></div>
+              </div>
+              <div class="tpl" data-tpl="quality-hardening">
+                <div class="tpl-top"><span class="tpl-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"/></svg></span><span class="tpl-name">质量加固</span></div>
+                <p class="tpl-id">quality-hardening · v2</p>
+                <p class="tpl-desc">审计覆盖缺口，生成用例，3 次稳定性验证，隔离 flake。</p>
+                <div class="tpl-meta"><span class="chip">act-with-gates</span><span class="chip">预算 中</span><span class="chip">并行 4</span></div>
+              </div>
+              <div class="tpl" data-tpl="review-audit">
+                <div class="tpl-top"><span class="tpl-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M4 12s3-7 8-7 8 7 8 7-3 7-8 7-8-7-8-7z"/><circle cx="12" cy="12" r="2.5"/></svg></span><span class="tpl-name">只读审查</span></div>
+                <p class="tpl-id">review-audit · v3</p>
+                <p class="tpl-desc">多维并行评审，发现必须经过对抗验证才进入阻塞列表。</p>
+                <div class="tpl-meta"><span class="chip">observe</span><span class="chip">预算 低</span><span class="chip">并行 4</span></div>
+              </div>
+              <div class="tpl" data-tpl="steward-watch">
+                <div class="tpl-top"><span class="tpl-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="12" cy="12" r="8"/><path d="M12 8v4l2.5 2.5"/></svg></span><span class="tpl-name">无人值守巡检</span></div>
+                <p class="tpl-id">steward-watch · v1</p>
+                <p class="tpl-desc">监听 CI 与 issue。默认只观察、只复现，有价值才创建任务。</p>
+                <div class="tpl-meta"><span class="chip">observe</span><span class="chip">预算 极低</span><span class="chip">投机</span></div>
+              </div>
+            </div>
+
+            <div class="two-col">
+              <div class="panel-card">
+                <div class="panel-card-head">
+                  <strong id="tpl-detail-name">大库缺陷修复</strong>
+                  <span class="chip accent">bugfix-large · v3</span>
+                  <span class="chip">act-with-gates</span>
+                </div>
+                <div class="panel-card-body">
+                  <p class="card-note" style="margin-bottom:10px">大仓库中的缺陷难以定位。该模板强制"先有失败用例，再有修复"，并要求定位阶段并行假设，避免单线程钻牛角尖。</p>
+                  <div class="flow">
+                    <div class="flow-node"><strong>分诊</strong><small>只读 · 影响面</small></div>
+                    <div class="flow-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg></div>
+                    <div class="flow-node"><strong>复现</strong><small>写失败用例</small></div>
+                    <div class="flow-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg></div>
+                    <div class="flow-node par"><strong>定位 ×2–4</strong><small>并行假设</small></div>
+                    <div class="flow-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg></div>
+                    <div class="flow-node"><strong>修复</strong><small>有界回合</small></div>
+                    <div class="flow-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg></div>
+                    <div class="flow-node gate"><strong>回归</strong><small>3 次稳定</small></div>
+                    <div class="flow-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg></div>
+                    <div class="flow-node gate"><strong>评审</strong><small>0 blocker</small></div>
+                    <div class="flow-arrow"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 5l7 7-7 7"/></svg></div>
+                    <div class="flow-node"><strong>交付</strong><small>PR + 证据</small></div>
+                  </div>
+                  <div class="divider"></div>
+                  <div class="row" style="flex-wrap:wrap;gap:6px">
+                    <span class="chip ok">G1 计划映射</span><span class="chip ok">G2 构建</span><span class="chip ok">G3 用例完备</span>
+                    <span class="chip ok">G4 稳定性</span><span class="chip ok">G5 评审</span><span class="chip warn">G6 生产就绪（人工确认）</span>
+                  </div>
+                </div>
+              </div>
+              <div class="panel-card">
+                <div class="panel-card-head"><strong>退出条件</strong><span class="chip">机器可验证</span></div>
+                <div class="panel-card-body">
+                  <div class="stack">
+                    <div class="lesson"><span class="sc">分诊</span><div><p>根因假设 + 受影响模块清单已写入账本</p><small>缺失则不得进入复现</small></div></div>
+                    <div class="lesson"><span class="sc">复现</span><div><p>存在一条在基线上失败的用例</p><small>3/3 次失败，且失败信息指向预期行为</small></div></div>
+                    <div class="lesson"><span class="sc">定位</span><div><p>至少 1 个候选根因带证据</p><small>文件、行、调用链</small></div></div>
+                    <div class="lesson"><span class="sc">修复</span><div><p>目标用例转绿 + 本地检查通过</p><small>真实退出码</small></div></div>
+                    <div class="lesson"><span class="sc">回归</span><div><p>目标用例与相关套件 3 次连跑通过</p><small>重试需记录，不计为首次通过</small></div></div>
+                    <div class="lesson"><span class="sc">评审</span><div><p>0 blocker / 0 high</p><small>发现需经对抗验证</small></div></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===================== Fleet ===================== -->
+        <section class="view" data-view="fleet">
+          <div class="section">
+            <div class="section-head">
+              <div>
+                <h2>环境与执行资源</h2>
+                <p>环境有独立生命周期：开通、引导、就绪、占用、验证、释放。失败保留现场。</p>
+              </div>
+              <div class="actions">
+                <button class="btn sm" data-action="gc-envs">回收过期租约</button>
+                <button class="btn sm primary" data-action="new-env">新环境</button>
+              </div>
+            </div>
+
+            <div class="env-detail" style="margin-bottom:14px">
+              <div class="env-card">
+                <div class="row"><span class="k">活跃租约</span><span class="v">4 / 6</span></div>
+                <div class="row"><span class="k">就绪</span><span class="v tag-ok">3</span></div>
+                <div class="row"><span class="k">引导中</span><span class="v">1</span></div>
+              </div>
+              <div class="env-card">
+                <div class="row"><span class="k">今日环境成本</span><span class="v">$2.10</span></div>
+                <div class="row"><span class="k">最长占用</span><span class="v">1h 47m</span></div>
+                <div class="row"><span class="k">TTL 回收</span><span class="v">2 次</span></div>
+              </div>
+              <div class="env-card">
+                <div class="row"><span class="k">健康探测</span><span class="v">5 层</span></div>
+                <div class="row"><span class="k">最近失败</span><span class="v tag-bad">L3 语义就绪</span></div>
+                <div class="row"><span class="k">平均就绪</span><span class="v">2m 14s</span></div>
+              </div>
+            </div>
+
+            <div class="panel-card" style="margin-bottom:14px">
+              <div class="panel-card-head"><strong>租约</strong><span class="chip">loopback / 内网</span><button class="btn sm ghost right" data-action="new-env">新规格</button></div>
+              <div class="scroll-x">
+                <table class="table">
+                  <thead>
+                    <tr><th>环境</th><th>形态</th><th>归属</th><th>健康</th><th>租期</th><th class="num">就绪</th><th></th></tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td><span class="pname mono">env-cont-7</span><span class="sub">playwright-jammy · db + mail</span></td>
+                      <td><span class="chip">container</span></td>
+                      <td class="mono">M-1044</td>
+                      <td><div class="env-health"><i class="hdot ok"></i><i class="hdot ok"></i><i class="hdot ok"></i><i class="hdot ok"></i><i class="hdot ok"></i></div></td>
+                      <td><div class="lease-bar"><i style="width:64%"></i></div></td>
+                      <td class="num">2m 08s</td>
+                      <td><button class="btn sm ghost">详情</button></td>
+                    </tr>
+                    <tr>
+                      <td><span class="pname mono">env-cont-8</span><span class="sub">api-staging · 2 services</span></td>
+                      <td><span class="chip">container</span></td>
+                      <td class="mono">M-1043</td>
+                      <td><div class="env-health"><i class="hdot ok"></i><i class="hdot ok"></i><i class="hdot ok"></i><i class="hdot ok"></i><i class="hdot run"></i></div></td>
+                      <td><div class="lease-bar"><i style="width:41%"></i></div></td>
+                      <td class="num">1m 51s</td>
+                      <td><button class="btn sm ghost">详情</button></td>
+                    </tr>
+                    <tr>
+                      <td><span class="pname mono">win-build-02</span><span class="sub">Windows 原生 · 串行独占</span></td>
+                      <td><span class="chip">ssh-host</span></td>
+                      <td class="mono">M-1040</td>
+                      <td><div class="env-health"><i class="hdot ok"></i><i class="hdot ok"></i><i class="hdot bad"></i><i class="hdot"></i><i class="hdot"></i></div></td>
+                      <td><div class="lease-bar"><i class="warn" style="width:88%"></i></div></td>
+                      <td class="num tag-bad">未就绪</td>
+                      <td><button class="btn sm">诊断</button></td>
+                    </tr>
+                    <tr>
+                      <td><span class="pname mono">local-wt-1042</span><span class="sub">worktree · 仅文件隔离</span></td>
+                      <td><span class="chip">local-worktree</span></td>
+                      <td class="mono">M-1042</td>
+                      <td><div class="env-health"><i class="hdot ok"></i><i class="hdot ok"></i><i class="hdot"></i><i class="hdot"></i><i class="hdot"></i></div></td>
+                      <td><div class="lease-bar"><i style="width:33%"></i></div></td>
+                      <td class="num">—</td>
+                      <td><button class="btn sm ghost">详情</button></td>
+                    </tr>
+                    <tr>
+                      <td><span class="pname mono">cloud-ubuntu-4</span><span class="sub">跨平台矩阵 · 按小时</span></td>
+                      <td><span class="chip">cloud-vm</span></td>
+                      <td class="mono">—</td>
+                      <td><div class="env-health"><i class="hdot ok"></i><i class="hdot ok"></i><i class="hdot ok"></i><i class="hdot ok"></i><i class="hdot ok"></i></div></td>
+                      <td><div class="lease-bar"><i style="width:12%"></i></div></td>
+                      <td class="num">3m 02s</td>
+                      <td><button class="btn sm ghost">释放</button></td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+
+            <div class="two-col">
+              <div class="panel-card">
+                <div class="panel-card-head"><strong>新环境规格</strong><span class="chip">EnvSpec</span></div>
+                <div class="panel-card-body">
+                  <div class="set-row"><span class="k">形态</span><select class="input control"><option>container</option><option>local-worktree</option><option>ssh-host</option><option>cloud-vm</option><option>ci-runner</option></select></div>
+                  <div class="set-row"><span class="k">基础镜像</span><input class="input control" value="mcr.microsoft.com/playwright:v1.49.0-jammy" /></div>
+                  <div class="set-row"><span class="k">引导</span><input class="input control" value="pnpm install --frozen-lockfile" /></div>
+                  <div class="set-row"><span class="k">服务</span><input class="input control" value="mysql:8.4 · mailhog" /></div>
+                  <div class="set-row"><span class="k">端口</span><input class="input control narrow mono" value="3000, 5433" /></div>
+                  <div class="set-row"><span class="k">种子</span><input class="input control mono" value="fixtures/checkout-seed.sql" /></div>
+                  <div class="set-row"><span class="k">TTL</span><input class="input control narrow" value="90m" /></div>
+                  <div class="set-row"><span class="k">网络</span><select class="input control"><option>应用代理 + allowlist</option><option>专属代理</option><option>不使用代理</option></select></div>
+                  <div class="decision-foot">
+                    <span class="hint">开通是幂等的；失败保留镜像层与日志。</span>
+                    <span class="grow"></span>
+                    <button class="btn sm" data-action="dry-run-env">试运行</button>
+                    <button class="btn sm primary" data-action="provision">开通</button>
+                  </div>
+                </div>
+              </div>
+              <div class="panel-card">
+                <div class="panel-card-head"><strong>健康探测</strong><span class="chip bad">win-build-02 失败于 L3</span></div>
+                <div class="panel-card-body">
+                  <div class="stack">
+                    <div class="lesson"><span class="sc">L1</span><div><p>进程存活</p><small class="tag-ok">PID 4120 · 容器 running</small></div></div>
+                    <div class="lesson"><span class="sc">L2</span><div><p>端口可达</p><small class="tag-ok">tcp 5985 · tcp 3389</small></div></div>
+                    <div class="lesson"><span class="sc">L3</span><div><p>语义就绪</p><small class="tag-bad">HTTP 200 但 body.status = initializing（超时 30s）</small></div></div>
+                    <div class="lesson"><span class="sc">L4</span><div><p>版本 / 内容匹配</p><small class="muted">未执行：迁移版本无法读取</small></div></div>
+                    <div class="lesson"><span class="sc">L5</span><div><p>E2E 冒烟</p><small class="muted">未执行：10s 最小用例被跳过</small></div></div>
+                  </div>
+                  <div class="divider"></div>
+                  <p class="card-note">端口打开不代表服务可用。系统不会因 L3 失败而静默降级到本地环境；必须显式选择"重试 / 换环境 / 中止"。</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===================== Quality ===================== -->
+        <section class="view" data-view="quality">
+          <div class="section">
+            <div class="section-head">
+              <div>
+                <h2>质量</h2>
+                <p>验收标准 → 可执行用例 → 稳定性 → 证据。任何门禁都不能由模型文本推断通过。</p>
+              </div>
+              <div class="actions">
+                <button class="btn sm" data-action="run-e2e">运行目标用例</button>
+                <button class="btn sm primary" data-action="generate-e2e">生成缺口用例</button>
+              </div>
+            </div>
+
+            <div class="kpis" style="grid-template-columns:repeat(4,minmax(0,1fr))">
+              <div class="kpi">
+                <div class="kpi-label">验收标准覆盖</div>
+                <div class="kpi-value"><strong>31</strong><span>/ 34 条</span></div>
+                <div class="meter"><i class="warn" style="width:91%"></i></div>
+                <div class="kpi-foot">3 条缺少可执行用例</div>
+              </div>
+              <div class="kpi">
+                <div class="kpi-label">E2E 稳定性</div>
+                <div class="kpi-value"><strong>29</strong><span>条稳定</span></div>
+                <div class="meter"><i class="ok" style="width:88%"></i></div>
+                <div class="kpi-foot">3 次连跑 · 2 条隔离</div>
+              </div>
+              <div class="kpi">
+                <div class="kpi-label">Flake 率</div>
+                <div class="kpi-value"><strong>0.7</strong><span>%</span></div>
+                <div class="meter"><i class="ok" style="width:14%"></i></div>
+                <div class="kpi-foot">目标 &lt; 1% · 7 天</div>
+              </div>
+              <div class="kpi">
+                <div class="kpi-label">评审确认率</div>
+                <div class="kpi-value"><strong>68</strong><span>%</span></div>
+                <div class="meter"><i class="ok" style="width:68%"></i></div>
+                <div class="kpi-foot">17 / 25 发现被确认</div>
+              </div>
+            </div>
+
+            <div class="two-col" style="margin-bottom:14px">
+              <div class="panel-card">
+                <div class="panel-card-head"><strong>覆盖矩阵</strong><span class="chip">M-1042 验收标准 × 场景</span></div>
+                <div class="panel-card-body scroll-x">
+                  <table class="matrix">
+                    <thead>
+                      <tr><th>验收标准</th><th>正常</th><th>边界</th><th>错误</th><th>权限</th><th>持久化</th><th>运行时</th></tr>
+                    </thead>
+                    <tbody>
+                      <tr><td>AC-1 超时后查询返回原订单</td><td><span class="cell ok">✓</span></td><td><span class="cell ok">✓</span></td><td><span class="cell ok">✓</span></td><td><span class="cell none">–</span></td><td><span class="cell ok">✓</span></td><td><span class="cell ok">✓</span></td></tr>
+                      <tr><td>AC-2 不产生第二条支付记录</td><td><span class="cell ok">✓</span></td><td><span class="cell warn">~</span></td><td><span class="cell ok">✓</span></td><td><span class="cell none">–</span></td><td><span class="cell ok">✓</span></td><td><span class="cell ok">✓</span></td></tr>
+                      <tr><td>AC-3 并发回调只成功一次</td><td><span class="cell ok">✓</span></td><td><span class="cell ok">✓</span></td><td><span class="cell run">…</span></td><td><span class="cell none">–</span></td><td><span class="cell ok">✓</span></td><td><span class="cell ok">✓</span></td></tr>
+                      <tr><td>AC-4 回调失败可重试且幂等</td><td><span class="cell ok">✓</span></td><td><span class="cell ok">✓</span></td><td><span class="cell ok">✓</span></td><td><span class="cell none">–</span></td><td><span class="cell ok">✓</span></td><td><span class="cell ok">✓</span></td></tr>
+                      <tr><td>AC-5 运营可见修复日志</td><td><span class="cell ok">✓</span></td><td><span class="cell none">–</span></td><td><span class="cell none">–</span></td><td><span class="cell none">–</span></td><td><span class="cell none">–</span></td><td><span class="cell ok">✓</span></td></tr>
+                      <tr><td>AC-6 越权用户不可查询他人订单</td><td><span class="cell ok">✓</span></td><td><span class="cell none">–</span></td><td><span class="cell ok">✓</span></td><td><span class="cell ok">✓</span></td><td><span class="cell none">–</span></td><td><span class="cell ok">✓</span></td></tr>
+                      <tr><td>AC-7 刷新后状态一致</td><td><span class="cell ok">✓</span></td><td><span class="cell none">–</span></td><td><span class="cell none">–</span></td><td><span class="cell none">–</span></td><td><span class="cell ok">✓</span></td><td><span class="cell ok">✓</span></td></tr>
+                    </tbody>
+                  </table>
+                  <div class="legend" style="margin-top:9px">
+                    <span><i style="background:var(--taomni-success)"></i>已覆盖</span>
+                    <span><i style="background:var(--taomni-warning)"></i>部分 / 待加固</span>
+                    <span><i style="background:var(--taomni-accent)"></i>运行中</span>
+                    <span><i style="border:1px dashed var(--taomni-text-muted)"></i>不适用</span>
+                  </div>
+                </div>
+              </div>
+              <div class="panel-card">
+                <div class="panel-card-head"><strong>稳定性</strong><span class="chip ok">第 2/3 次干净运行</span></div>
+                <div class="panel-card-body">
+                  <div class="stack">
+                    <div class="lesson"><span class="sc">R3</span><div><p>第 3 次连跑 · 进行中</p><small>29 用例 · 预计 4m 12s</small></div></div>
+                    <div class="lesson"><span class="sc">R2</span><div><p>第 2 次连跑 · 通过</p><small class="tag-ok">29/29 · 1 次基础设施重试（已记录）</small></div></div>
+                    <div class="lesson"><span class="sc">R1</span><div><p>第 1 次连跑 · 通过</p><small class="tag-ok">29/29 · 无重试</small></div></div>
+                  </div>
+                  <div class="divider"></div>
+                  <div class="row" style="flex-wrap:wrap;gap:6px">
+                    <span class="chip ok">确定性选择器</span><span class="chip ok">无固定 sleep</span>
+                    <span class="chip ok">数据隔离</span><span class="chip warn">2 条隔离</span>
+                  </div>
+                  <p class="card-note" style="margin-top:9px">重试成功不计为首次通过；隔离保留 owner、首次时间与到期日，隔离不等于删除。</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="two-col">
+              <div class="panel-card">
+                <div class="panel-card-head"><strong>用例</strong><span class="chip">TC-1042-*</span></div>
+                <div class="panel-card-body" style="padding:3px 8px 8px">
+                  <table class="table">
+                    <thead><tr><th>用例</th><th>AC</th><th>状态</th><th class="num">耗时</th></tr></thead>
+                    <tbody>
+                      <tr><td class="mono">TC-1042-timeout-requery</td><td>AC-1</td><td><span class="chip ok">稳定</span></td><td class="num">3.2s</td></tr>
+                      <tr><td class="mono">TC-1042-no-duplicate-payment</td><td>AC-2</td><td><span class="chip ok">稳定</span></td><td class="num">4.1s</td></tr>
+                      <tr><td class="mono">TC-1042-concurrent-callback</td><td>AC-3</td><td><span class="chip accent">运行</span></td><td class="num">—</td></tr>
+                      <tr><td class="mono">TC-1042-callback-retry-idempotent</td><td>AC-4</td><td><span class="chip ok">稳定</span></td><td class="num">2.8s</td></tr>
+                      <tr><td class="mono">TC-1042-audit-log-visible</td><td>AC-5</td><td><span class="chip warn">部分</span></td><td class="num">1.9s</td></tr>
+                      <tr><td class="mono">TC-1042-authz-foreign-order</td><td>AC-6</td><td><span class="chip ok">稳定</span></td><td class="num">2.2s</td></tr>
+                      <tr><td class="mono">TC-1042-reload-state</td><td>AC-7</td><td><span class="chip ok">稳定</span></td><td class="num">5.6s</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div class="panel-card">
+                <div class="panel-card-head"><strong>评审发现</strong><span class="chip ok">0 blocker</span><span class="chip warn">1 high</span></div>
+                <div class="panel-card-body">
+                  <div class="finding">
+                    <div class="finding-head"><span class="sev" style="color:var(--taomni-warning)">HIGH</span><strong>并发回调下幂等键作用域过窄</strong></div>
+                    <div class="loc">src/payment/callback.ts:88 · 已确认</div>
+                    <p>幂等键只包含 order_id，未包含支付渠道；同一订单跨渠道回调时可能被误判为重复。</p>
+                  </div>
+                  <div class="finding">
+                    <div class="finding-head"><span class="sev" style="color:var(--taomni-text-muted)">MED</span><strong>审计日志缺少请求追踪 ID</strong></div>
+                    <div class="loc">src/order/audit.ts:41 · 已确认</div>
+                    <p>修复日志可用于运营排查，但无法关联到具体请求链路。</p>
+                  </div>
+                  <div class="finding">
+                    <div class="finding-head"><span class="sev" style="color:var(--taomni-text-muted)">LOW</span><strong>失败分支错误信息重复</strong></div>
+                    <div class="loc">src/payment/errors.ts:12 · 未复现（已剔除）</div>
+                    <p>对抗验证未能复现，未进入阻塞列表。</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===================== Briefing ===================== -->
+        <section class="view" data-view="briefing">
+          <div class="section">
+            <div class="section-head">
+              <div><h2>简报</h2><p>由账本确定性生成：目标、决策、进度、变更、证据、成本、风险。模型只做措辞组织。</p></div>
+              <div class="actions">
+                <button class="btn sm" data-action="copy-brief">复制 Markdown</button>
+                <button class="btn sm primary" data-action="export-brief">导出</button>
+              </div>
+            </div>
+            <div class="brief">
+              <div class="brief-head">
+                <div class="eyebrow">MISSION BRIEFING · M-1042</div>
+                <h2>修复支付超时后订单状态不一致</h2>
+                <div class="meta">
+                  <span class="chip">bugfix-large v3</span>
+                  <span class="chip">act-with-gates</span>
+                  <span>checkout-platform @ 3f2c9a1</span>
+                  <span>·</span>
+                  <span>已运行 2h 14m</span>
+                  <span>·</span>
+                  <span>$6.10 / $12.00</span>
+                </div>
+              </div>
+              <div class="brief-body">
+                <div class="brief-sec">
+                  <h3><span class="n">1</span>目标与约束</h3>
+                  <p>支付回调超时后，用户再次查询订单应返回原订单与正确状态，且不得产生第二条支付记录。</p>
+                  <div class="divider"></div>
+                  <dl class="brief-kv">
+                    <dt>范围</dt><dd class="mono">src/order/**, src/payment/**</dd>
+                    <dt>不在范围</dt><dd class="mono">src/billing/**, 前端支付页</dd>
+                    <dt>验收</dt><dd>AC-1 … AC-7（21 条场景矩阵）</dd>
+                  </dl>
+                </div>
+                <div class="brief-sec">
+                  <h3><span class="n">2</span>关键决策</h3>
+                  <ul>
+                    <li><strong>10:42</strong> 复现方式：使用本地 MySQL 事务隔离，而非 mock —— 选择"真实事务"，理由是 mock 无法证明并发行为。</li>
+                    <li><strong>11:18</strong> 修复位置：在支付回调侧加幂等键，订单侧只读。理由：回调是唯一写入点，订单侧加去重会掩盖上游缺陷。</li>
+                    <li><strong>11:51</strong> 待决：幂等键是否包含渠道 ID（评审发现 high）。</li>
+                  </ul>
+                </div>
+                <div class="brief-sec">
+                  <h3><span class="n">3</span>进度</h3>
+                  <ul>
+                    <li>已完成：分诊、复现、定位、修复（本地检查）</li>
+                    <li>进行中：回归验证（第 2/3 次联跑）</li>
+                    <li>阻塞：等待幂等键作用域决策</li>
+                  </ul>
+                </div>
+                <div class="brief-sec">
+                  <h3><span class="n">4</span>变更</h3>
+                  <div class="receipt" style="margin:0">
+                    <span class="sum">4 files · <span class="add">+142</span> <span class="del">−37</span></span>
+                    <span class="chip">worktree/m-payment-idempotency</span>
+                    <span class="grow"></span>
+                    <span class="muted tiny">基线 3f2c9a1 · 未推送</span>
+                  </div>
+                </div>
+                <div class="brief-sec">
+                  <h3><span class="n">5</span>证据</h3>
+                  <div class="brief-cols">
+                    <div>
+                      <h4>机器检查</h4>
+                      <ul>
+                        <li>构建 / 类型检查：通过（退出码 0）</li>
+                        <li>单测：412 通过 / 0 失败</li>
+                        <li>目标 E2E：29/29（3 次连跑待完成）</li>
+                        <li>相关套件：通过</li>
+                      </ul>
+                    </div>
+                    <div>
+                      <h4>评审</h4>
+                      <ul>
+                        <li>0 blocker · 1 high · 1 medium</li>
+                        <li>对抗验证：3 条发现中 2 条确认</li>
+                        <li>独立模型族：是</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+                <div class="brief-sec">
+                  <h3><span class="n">6</span>成本</h3>
+                  <div class="brief-cols">
+                    <div>
+                      <h4>按阶段</h4>
+                      <ul>
+                        <li>分诊 / 复现 $0.80</li>
+                        <li>定位（并行 3）$1.90</li>
+                        <li>修复 $2.40</li>
+                        <li>回归（进行中）$1.00</li>
+                      </ul>
+                    </div>
+                    <div>
+                      <h4>预算</h4>
+                      <ul>
+                        <li>已用 $6.10 / $12.00（51%）</li>
+                        <li>预测结算 $8.40</li>
+                        <li>无超支风险</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+                <div class="brief-sec">
+                  <h3><span class="n">7</span>风险与未决</h3>
+                  <ul>
+                    <li>幂等键作用域：若不包含渠道，跨渠道回调可能误判为重复（high）。</li>
+                    <li>Windows 原生环境未验证该修复路径。</li>
+                    <li>生产回滚：本次变更无迁移，回滚即还原代码。</li>
+                  </ul>
+                </div>
+                <div class="brief-sec">
+                  <h3><span class="n">8</span>下一步</h3>
+                  <ul>
+                    <li>回答幂等键作用域决策 → 完成第 3 次回归 → 生成 PR 草稿。</li>
+                  </ul>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===================== Routing ===================== -->
+        <section class="view" data-view="routing">
+          <div class="section">
+            <div class="section-head">
+              <div><h2>路由、预算与自治</h2><p>先按能力与授权过滤，再按预估成本/成功概率排序。成本重要，但不能牺牲验收。</p></div>
+              <div class="actions"><button class="btn sm primary" data-action="save-routing">保存</button></div>
+            </div>
+
+            <div class="set-grid" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px">
+              <div class="panel-card">
+                <div class="panel-card-head"><strong>资源角色</strong><span class="chip">复用 Settings provider</span></div>
+                <div class="panel-card-body" style="padding:4px 10px 8px">
+                  <table class="table">
+                    <thead><tr><th>角色</th><th>资源</th><th class="num">系数</th></tr></thead>
+                    <tbody>
+                      <tr><td>Lead / Router</td><td class="mono">triage-api</td><td class="num">0.2</td></tr>
+                      <tr><td>Planner</td><td class="mono">plan-long-ctx</td><td class="num">1.0</td></tr>
+                      <tr><td>Builder</td><td class="mono">cc-sonnet</td><td class="num">1.0</td></tr>
+                      <tr><td>Verifier</td><td class="mono">codex-e2e</td><td class="num">0.8</td></tr>
+                      <tr><td>Reviewer</td><td class="mono">review-alt-family</td><td class="num">0.7</td></tr>
+                      <tr><td>Watchdog</td><td class="mono">triage-api</td><td class="num">0.2</td></tr>
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+              <div class="panel-card">
+                <div class="panel-card-head"><strong>预算</strong><span class="chip accent">三层闸门</span></div>
+                <div class="panel-card-body">
+                  <div class="set-row"><span class="k">单任务上限</span><input class="input control narrow mono" value="$12.00" /></div>
+                  <div class="set-row"><span class="k">单阶段上限</span><input class="input control narrow mono" value="$4.00" /></div>
+                  <div class="set-row"><span class="k">单次尝试上限</span><input class="input control narrow mono" value="$1.50" /></div>
+                  <div class="set-row"><span class="k">每日上限</span><input class="input control narrow mono" value="$40.00" /></div>
+                  <div class="set-row"><span class="k">超支行为</span><select class="input control"><option>转为决策</option><option>中止</option></select></div>
+                  <p class="card-note" style="margin-top:8px">预估值用于排序与预警，不替代供应商真实账单。预估超出剩余 20% 时提前决策。</p>
+                </div>
+              </div>
+              <div class="panel-card">
+                <div class="panel-card-head"><strong>自治等级</strong><span class="chip">默认 act-with-gates</span></div>
+                <div class="panel-card-body">
+                  <div class="set-row"><span class="k">自动只读 / 可逆</span><button class="switch on" aria-label="开"></button></div>
+                  <div class="set-row"><span class="k">推送远端</span><button class="switch" aria-label="关"></button></div>
+                  <div class="set-row"><span class="k">创建 / 更新 PR</span><button class="switch" aria-label="关"></button></div>
+                  <div class="set-row"><span class="k">安装依赖</span><button class="switch" aria-label="关"></button></div>
+                  <div class="set-row"><span class="k">自动合并</span><span class="chip bad">永不允许</span></div>
+                  <p class="card-note" style="margin-top:8px">授权按 Mission 作用域；不跨任务复用。不可逆操作在任何等级下都不自动合并。</p>
+                </div>
+              </div>
+              <div class="panel-card">
+                <div class="panel-card-head"><strong>触发器</strong><span class="chip warn">默认 observe</span></div>
+                <div class="panel-card-body">
+                  <div class="set-row"><span class="k">GitHub issue / PR</span><button class="switch on" aria-label="开"></button></div>
+                  <div class="set-row"><span class="k">CI 失败</span><button class="switch on" aria-label="开"></button></div>
+                  <div class="set-row"><span class="k">定时巡检</span><input class="input control narrow mono" value="0 */2 * * *" /></div>
+                  <div class="set-row"><span class="k">事件预算</span><input class="input control narrow mono" value="$0.50" /></div>
+                  <div class="set-row"><span class="k">白名单作者</span><input class="input control" value="maintainers" /></div>
+                  <p class="card-note" style="margin-top:8px">确定性规则先过滤；LLM 只处理灰区。去重键 = 事件 ID + 仓库 + 规则版本。</p>
+                </div>
+              </div>
+              <div class="panel-card">
+                <div class="panel-card-head"><strong>记忆与规格</strong><span class="chip">可编辑 / 可删除</span></div>
+                <div class="panel-card-body">
+                  <div class="lesson"><span class="sc">L-12</span><div><p>本仓库的 E2E 必须使用真实 MySQL 事务，mock 无法证明并发行为。</p><small>来源：M-1042 决策 · 命中 4 次 · 仓库作用域</small></div></div>
+                  <div class="lesson"><span class="sc">L-09</span><div><p>Windows 路径拼接统一使用 Path API，禁止字符串拼接。</p><small>来源：M-1039 用户纠正 · 命中 7 次</small></div></div>
+                  <div class="lesson"><span class="sc">S-04</span><div><p>Skill：本仓库发布流程（版本号、变更日志、证据）</p><small>v2 · 已评审 · 不含凭据</small></div></div>
+                </div>
+              </div>
+              <div class="panel-card">
+                <div class="panel-card-head"><strong>注意力预算</strong><span class="chip">安静协议</span></div>
+                <div class="panel-card-body">
+                  <div class="set-row"><span class="k">每任务中断上限</span><input class="input control narrow mono" value="3" /></div>
+                  <div class="set-row"><span class="k">里程碑节流</span><input class="input control narrow mono" value="2 min" /></div>
+                  <div class="set-row"><span class="k">过程输出</span><select class="input control"><option>默认折叠</option><option>完全隐藏</option></select></div>
+                  <div class="set-row"><span class="k">通知</span><select class="input control"><option>决策 / 阻塞 / 完成</option><option>仅决策</option></select></div>
+                  <p class="card-note" style="margin-top:8px">超出中断预算后，非阻塞问题收进待决策摘要，只在必须停下的边界再次打断。</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===================== New mission dialog ===================== -->
+        <section class="view" data-view="new">
+          <div class="section" style="max-width:860px;margin:0 auto">
+            <div class="section-head"><div><h2>新建任务</h2><p>选择模板，描述目标；系统会给出契约草案、预算区间与将执行的不可逆操作。</p></div></div>
+            <div class="panel-card">
+              <div class="panel-card-body">
+                <div class="stack">
+                  <div>
+                    <div class="tiny muted" style="margin-bottom:5px">模板</div>
+                    <div class="row" style="flex-wrap:wrap;gap:6px" id="new-tpl-row">
+                      <button class="chip accent" data-newtpl="bugfix-large">大库缺陷修复</button>
+                      <button class="chip" data-newtpl="greenfield-designed">0→1 有设计</button>
+                      <button class="chip" data-newtpl="greenfield-discovery">0→1 无设计</button>
+                      <button class="chip" data-newtpl="feature-existing">功能增量</button>
+                      <button class="chip" data-newtpl="quality-hardening">质量加固</button>
+                    </div>
+                  </div>
+                  <div>
+                    <div class="tiny muted" style="margin-bottom:5px">目标</div>
+                    <textarea class="input" rows="6" style="resize:vertical;line-height:1.7" id="new-goal">支付回调超时后，用户再次查询订单会看到 pending 状态，并且偶尔产生第二条支付记录。需要在回调侧保证幂等，并补充可自动执行的回归用例。</textarea>
+                  </div>
+                  <div class="row" style="gap:10px;flex-wrap:wrap">
+                    <span class="chip">仓库 checkout-platform</span>
+                    <span class="chip">基线 3f2c9a1</span>
+                    <span class="chip">自治 act-with-gates</span>
+                    <span class="chip accent">预算区间 $8–12</span>
+                  </div>
+                  <div class="panel-card" style="margin:0">
+                    <div class="panel-card-head"><strong>将自动执行</strong><span class="chip ok">可逆</span></div>
+                    <div class="panel-card-body" style="padding:6px 12px 10px">
+                      <p class="card-note">只读分析 · 创建隔离 worktree · 运行本地测试 · 生成用例 · 收集证据</p>
+                    </div>
+                  </div>
+                  <div class="panel-card" style="margin:0;border-color:color-mix(in srgb,var(--taomni-warning) 45%,var(--taomni-card-border))">
+                    <div class="panel-card-head"><strong>需要你授权</strong><span class="chip warn">不可逆</span></div>
+                    <div class="panel-card-body" style="padding:6px 12px 10px">
+                      <p class="card-note">推送分支 · 创建 PR · 安装新依赖（若需要）。这些会在执行前单独询问。</p>
+                    </div>
+                  </div>
+                  <div class="decision-foot">
+                    <span class="hint">提交后会先给出契约草案，你确认后才开始实施。</span>
+                    <span class="grow"></span>
+                    <button class="btn" data-nav-jump="missions">取消</button>
+                    <button class="btn primary" data-action="create-mission">创建任务</button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===================== Mission 1041 / 1043 / 1044 (simplified) ===================== -->
+        <section class="view" data-view="mission-simple">
+          <div class="section">
+            <div class="section-head">
+              <div><h2 id="simple-title">租户配置中心 0→1</h2><p id="simple-sub">7/7 阶段完成 · 证据齐全 · 等待验收</p></div>
+              <div class="actions">
+                <button class="btn sm" data-action="briefing">简报</button>
+                <button class="btn sm primary" data-action="accept">验收并生成 PR 草稿</button>
+              </div>
+            </div>
+            <div class="panel-card" style="margin-bottom:12px">
+              <div class="panel-card-body">
+                <div class="receipt" style="margin:0 0 10px"><span class="sum">12 files · <span class="add">+842</span> <span class="del">−96</span></span><span class="chip">greenfield-designed</span><span class="grow"></span><span class="chip ok">G1–G6 通过</span></div>
+                <div class="legend" style="margin-bottom:8px">
+                  <span><i style="background:var(--taomni-success)"></i>计划 / 契约</span>
+                  <span><i style="background:var(--taomni-accent)"></i>实现</span>
+                  <span><i style="background:var(--taomni-warning)"></i>验证</span>
+                </div>
+                <div class="cov-bar" style="height:8px;margin-bottom:12px">
+                  <i style="width:20%;background:var(--taomni-success)"></i>
+                  <i style="width:38%;background:var(--taomni-accent)"></i>
+                  <i style="width:18%;background:var(--taomni-warning)"></i>
+                  <i style="width:24%;background:var(--taomni-success)"></i>
+                </div>
+                <div class="brief-cols">
+                  <div>
+                    <h4 class="tiny muted" style="margin-bottom:5px">交付物</h4>
+                    <ul class="card-note" style="padding-left:15px;margin:0">
+                      <li>规格与计划（含 34 条验收标准）</li>
+                      <li>后端 API + 迁移（可回滚）</li>
+                      <li>前端配置页 + 组件测试</li>
+                      <li>E2E 31 条，3 次连跑稳定</li>
+                      <li>评审 0 blocker，1 medium 已修复</li>
+                    </ul>
+                  </div>
+                  <div>
+                    <h4 class="tiny muted" style="margin-bottom:5px">风险</h4>
+                    <ul class="card-note" style="padding-left:15px;margin:0">
+                      <li>迁移在大表上预计 40s 锁表，需窗口确认</li>
+                      <li>macOS 原生用例未执行</li>
+                    </ul>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div class="panel-card">
+              <div class="panel-card-head"><strong>阶段</strong><span class="chip">全部完成</span></div>
+              <div class="panel-card-body">
+                <div class="timeline" style="margin-left:0">
+                  <div class="tl-item"><span class="tl-dot ok"></span><div class="tl-body"><div class="tl-line"><strong>规格增量</strong><span>34 条验收标准</span></div></div></div>
+                  <div class="tl-item"><span class="tl-dot ok"></span><div class="tl-body"><div class="tl-line"><strong>计划</strong><span>6 个工作包 · 契约 C1</span></div></div></div>
+                  <div class="tl-item"><span class="tl-dot ok"></span><div class="tl-body"><div class="tl-line"><strong>实现</strong><span>2 个并行 Worker · 无冲突</span></div></div></div>
+                  <div class="tl-item"><span class="tl-dot ok"></span><div class="tl-body"><div class="tl-line"><strong>验证</strong><span>构建 · 单测 · E2E 31 条</span></div></div></div>
+                  <div class="tl-item"><span class="tl-dot ok"></span><div class="tl-body"><div class="tl-line"><strong>评审</strong><span>0 blocker · 1 medium</span></div></div></div>
+                  <div class="tl-item"><span class="tl-dot ok"></span><div class="tl-body"><div class="tl-line"><strong>生产就绪检查</strong><span>迁移可回滚 · 无密钥变更</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ===================== Settings ===================== -->
+        <section class="view" data-view="settings">
+          <div class="section">
+            <div class="section-head"><div><h2>设置</h2><p>沿用应用 AI 配置、Vault 与代理；任务专属配置不覆盖应用设置。</p></div></div>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:12px">
+              <div class="panel-card"><div class="panel-card-head"><strong>LLM 与 Coding Harness</strong><span class="chip ok">已配置</span></div><div class="panel-card-body">
+                <div class="set-row"><span class="k">Provider</span><span class="mono">settings/llm.providers</span></div>
+                <div class="set-row"><span class="k">Harness 白名单</span><span class="mono tiny">claude_code · codex · pi · opencode · deepseek · zcode</span></div>
+                <div class="set-row"><span class="k">凭据</span><span class="mono">vault:provider-key</span></div>
+              </div></div>
+              <div class="panel-card"><div class="panel-card-head"><strong>代理</strong><span class="chip">三模式</span></div><div class="panel-card-body">
+                <div class="set-row"><span class="k">默认</span><span>应用代理</span></div>
+                <div class="set-row"><span class="k">专属代理</span><button class="switch" aria-label="关"></button></div>
+                <div class="set-row"><span class="k">不使用代理</span><span class="tiny muted">不隐式走系统代理</span></div>
+                <div class="set-row"><span class="k">失败</span><span class="tiny tag-warn">显式报错，不静默回退</span></div>
+              </div></div>
+              <div class="panel-card"><div class="panel-card-head"><strong>工作区与隔离</strong></div><div class="panel-card-body">
+                <div class="set-row"><span class="k">快照</span><span>已提交 SHA</span></div>
+                <div class="set-row"><span class="k">隔离</span><span>每 attempt 独立 worktree</span></div>
+                <div class="set-row"><span class="k">沙箱</span><span class="tiny tag-warn">worktree 不是操作系统沙箱</span></div>
+                <div class="set-row"><span class="k">保留</span><span>不自动清理</span></div>
+              </div></div>
+              <div class="panel-card"><div class="panel-card-head"><strong>退出与恢复</strong></div><div class="panel-card-body">
+                <div class="set-row"><span class="k">退出</span><span>有序停止或标记中断</span></div>
+                <div class="set-row"><span class="k">恢复</span><span>重放账本，保留现场</span></div>
+                <div class="set-row"><span class="k">外部效果</span><span>先记账后执行</span></div>
+                <div class="set-row"><span class="k">未知边界</span><span class="tiny tag-warn">不自动重派</span></div>
+              </div></div>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <footer class="statusbar">
+    <span class="item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 3v12M6 21v-3M18 3v3M18 21V9"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="6" r="2"/></svg>worktree/m-payment-idempotency</span>
+    <span class="item"><span class="pulse"></span>2 Mission · 4 Worker</span>
+    <span class="item"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M7 8h.01M11 8h.01"/></svg>env-cont-7 · 7 健康</span>
+    <span class="item">$18.40 / $40</span>
+    <span class="item push">应用代理 · 凭据 Vault</span>
+    <span class="item">v0.9.0-dev</span>
+  </footer>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(function () {
+  "use strict";
+
+  const $ = (sel, root) => (root || document).querySelector(sel);
+  const $$ = (sel, root) => Array.from((root || document).querySelectorAll(sel));
+
+  const toast = (() => {
+    const el = $("#toast");
+    let timer = null;
+    return (text) => {
+      el.textContent = text;
+      el.classList.add("show");
+      clearTimeout(timer);
+      timer = setTimeout(() => el.classList.remove("show"), 1900);
+    };
+  })();
+
+  /* ------------------------------------------------------------------
+     Mission data. The prototype renders from a ledger-shaped object,
+     mirroring what the design doc calls Mission / Stage / Decision.
+     ------------------------------------------------------------------ */
+  const MISSIONS = {
+    "m-1042": {
+      id: "M-1042",
+      title: "修复支付超时后订单状态不一致",
+      template: "bugfix-large",
+      version: "v3",
+      autonomy: "act-with-gates",
+      goal: "支付回调超时后，用户再次查询订单会看到 pending 状态，并且偶尔产生第二条支付记录。需要在回调侧保证幂等，并补充可自动执行的回归用例。",
+      base: "3f2c9a1",
+      branch: "worktree/m-payment-idempotency",
+      budget: [6.10, 12.00],
+      elapsed: "2h 14m",
+      interruptions: 2,
+      stages: [
+        { id: "triage", label: "分诊", state: "done" },
+        { id: "reproduce", label: "复现", state: "done" },
+        { id: "localize", label: "定位", state: "done" },
+        { id: "fix", label: "修复", state: "wait", current: true },
+        { id: "regression", label: "回归", state: "" },
+        { id: "review", label: "评审", state: "" },
+        { id: "deliver", label: "交付", state: "" }
+      ],
+      plan: [
+        { t: "分诊：确认影响面与根因假设", s: "已完成 · 只读", state: "ok" },
+        { t: "复现：提交一条基线失败的用例", s: "已完成 · 3/3 失败", state: "ok" },
+        { t: "定位：并行验证 3 个候选根因", s: "已完成 · 命中回调重复写入", state: "ok" },
+        { t: "修复：回调侧幂等 + 订单状态收敛", s: "等待决策：幂等键作用域", state: "wait" },
+        { t: "回归：目标用例 3 次连跑", s: "未开始", state: "" },
+        { t: "评审：正确性 / 并发 / 兼容", s: "未开始", state: "" },
+        { t: "交付：PR 草稿 + 证据包", s: "未开始", state: "" }
+      ],
+      files: [
+        { p: "src/payment/callback.ts", a: 62, d: 11 },
+        { p: "src/payment/idempotency.ts", a: 41, d: 3 },
+        { p: "src/order/status.ts", a: 22, d: 18 },
+        { p: "src/order/__tests__/status.test.ts", a: 17, d: 5 }
+      ],
+      thread: "rich",
+      evidence: [
+        { g: "G1 计划", v: "7/7 验收标准已映射", ok: true },
+        { g: "G2 构建", v: "类型检查 / 单测 / 构建 通过", ok: true },
+        { g: "G3 用例完备", v: "31/34 条有可执行用例", ok: false },
+        { g: "G4 稳定性", v: "第 2/3 次连跑通过", ok: false },
+        { g: "G5 评审", v: "0 blocker · 1 high 待处理", ok: false },
+        { g: "G6 生产就绪", v: "无迁移 · 回滚即还原代码", ok: true }
+      ]
+    },
+    "m-1041": {
+      id: "M-1041",
+      title: "租户配置中心 0→1",
+      template: "greenfield-designed",
+      version: "v2",
+      autonomy: "act-with-gates",
+      goal: "为多租户产品增加配置中心：租户级键值配置、灰度发布、审计记录，并提供管理界面。",
+      base: "a91d7c3",
+      branch: "worktree/tenant-config",
+      budget: [11.80, 14.00],
+      elapsed: "5h 42m",
+      interruptions: 1,
+      stages: [
+        { id: "contract", label: "契约", state: "done" },
+        { id: "plan", label: "计划", state: "done" },
+        { id: "implement", label: "实现", state: "done" },
+        { id: "integrate", label: "集成", state: "done" },
+        { id: "verify", label: "验证", state: "done" },
+        { id: "review", label: "评审", state: "done" },
+        { id: "deliver", label: "交付", state: "done", current: true }
+      ],
+      plan: [
+        { t: "规格增量：34 条验收标准", s: "已完成", state: "ok" },
+        { t: "计划：6 个工作包 + 契约 C1", s: "已完成", state: "ok" },
+        { t: "实现：后端 / 前端 2 路并行", s: "已完成 · 无冲突", state: "ok" },
+        { t: "集成：组合候选 I2", s: "已完成", state: "ok" },
+        { t: "验证：构建 / 单测 / E2E 31 条", s: "已完成 · 3 次稳定", state: "ok" },
+        { t: "评审：0 blocker · 1 medium 已修", s: "已完成", state: "ok" },
+        { t: "生产就绪：迁移可回滚", s: "等待验收", state: "wait" }
+      ],
+      files: [
+        { p: "src/tenant/config/store.ts", a: 184, d: 0 },
+        { p: "src/tenant/config/api.rs", a: 211, d: 0 },
+        { p: "src/components/tenant/ConfigCenter.tsx", a: 236, d: 0 },
+        { p: "migrations/0092_tenant_config.sql", a: 48, d: 0 },
+        { p: "src/tenant/__tests__/config.test.ts", a: 163, d: 96 }
+      ],
+      thread: "done",
+      evidence: [
+        { g: "G1 计划", v: "34/34 验收标准映射", ok: true },
+        { g: "G2 构建", v: "全部通过", ok: true },
+        { g: "G3 用例完备", v: "34/34", ok: true },
+        { g: "G4 稳定性", v: "31 条 3 次连跑通过", ok: true },
+        { g: "G5 评审", v: "0 blocker · 0 high", ok: true },
+        { g: "G6 生产就绪", v: "迁移 40s 锁表需窗口", ok: true }
+      ]
+    },
+    "m-1043": {
+      id: "M-1043",
+      title: "新增发票批量导出",
+      template: "feature-existing",
+      version: "v4",
+      autonomy: "act-with-gates",
+      goal: "支持按时间范围批量导出发票为 CSV / XLSX，异步任务 + 下载中心，大客户单次 5 万条。",
+      base: "3f2c9a1",
+      branch: "worktree/invoice-export",
+      budget: [2.30, 9.00],
+      elapsed: "48m",
+      interruptions: 0,
+      stages: [
+        { id: "impact", label: "影响面", state: "done" },
+        { id: "contract", label: "契约", state: "done" },
+        { id: "implement", label: "实现", state: "run", current: true },
+        { id: "test", label: "测试", state: "" },
+        { id: "review", label: "评审", state: "" },
+        { id: "deliver", label: "交付", state: "" }
+      ],
+      plan: [
+        { t: "影响面：调用方与数据量评估", s: "已完成", state: "ok" },
+        { t: "契约：导出任务 API + 状态机", s: "已完成", state: "ok" },
+        { t: "实现：后端任务 / 前端下载中心", s: "2 个 Worker 运行中", state: "run" },
+        { t: "测试：分页 / 大文件 / 权限", s: "未开始", state: "" },
+        { t: "评审：性能与失败语义", s: "未开始", state: "" }
+      ],
+      files: [
+        { p: "src/invoice/export/task.ts", a: 88, d: 2 },
+        { p: "src/invoice/export/writer.ts", a: 54, d: 0 }
+      ],
+      thread: "running",
+      evidence: [
+        { g: "G1 计划", v: "6/6 已映射", ok: true },
+        { g: "G2 构建", v: "进行中", ok: false },
+        { g: "G3 用例完备", v: "未开始", ok: false }
+      ]
+    },
+    "m-1044": {
+      id: "M-1044",
+      title: "E2E：结算流程稳定性加固",
+      template: "quality-hardening",
+      version: "v2",
+      autonomy: "act-with-gates",
+      goal: "结算流程 E2E 在过去两周出现 9 次 flake。定位根因，改写不稳定用例，保证 3 次连跑干净。",
+      base: "3f2c9a1",
+      branch: "worktree/e2e-settlement",
+      budget: [1.85, 6.00],
+      elapsed: "1h 06m",
+      interruptions: 1,
+      stages: [
+        { id: "audit", label: "覆盖审计", state: "done" },
+        { id: "gaps", label: "缺口", state: "done" },
+        { id: "generate", label: "生成", state: "done" },
+        { id: "stability", label: "稳定性", state: "run", current: true },
+        { id: "report", label: "报告", state: "" }
+      ],
+      plan: [
+        { t: "覆盖审计：29 条用例 / 7 条验收标准", s: "已完成", state: "ok" },
+        { t: "缺口：3 条缺少边界与错误路径", s: "已完成", state: "ok" },
+        { t: "生成：新增 8 条，修复 5 条", s: "已完成", state: "ok" },
+        { t: "稳定性：第 3 次连跑", s: "29/29，进行中", state: "run" },
+        { t: "报告：隔离与 flake 归因", s: "未开始", state: "" }
+      ],
+      files: [
+        { p: "qa-ui-auto-tests/cases/TC-981-settlement-retry.yaml", a: 61, d: 0 },
+        { p: "qa-ui-auto-tests/cases/TC-982-settlement-timeout.yaml", a: 44, d: 0 },
+        { p: "qa-ui-auto-tests/fixtures/settlement.ts", a: 38, d: 22 }
+      ],
+      thread: "running",
+      evidence: [
+        { g: "G3 用例完备", v: "34/34 覆盖", ok: true },
+        { g: "G4 稳定性", v: "2/3 连跑通过", ok: false },
+        { g: "G5 评审", v: "未开始", ok: false }
+      ]
+    }
+  };
+
+  const state = { mission: "m-1042", insp: "plan", quiet: true, nav: "missions", detailFile: 0 };
+
+  /* ------------------------------------------------------------------
+     Navigation
+     ------------------------------------------------------------------ */
+  function setNav(name) {
+    state.nav = name;
+    $$(".rail-btn[data-nav]").forEach((b) => b.classList.toggle("active", b.dataset.nav === name));
+    $$(".panel-view").forEach((p) => { p.hidden = p.dataset.panel !== name; });
+    $$(".view").forEach((v) => v.classList.remove("active"));
+    $("#content").dataset.mode = "";
+    $("#back-btn").hidden = true;
+    const titles = {
+      missions: ["Mission Control", "3 个待处理 · 2 个运行中 · 注意力预算剩余 1 次中断"],
+      templates: ["Templates", "8 个内置模板 · 声明式 · 可派生"],
+      fleet: ["Fleet", "4 个活跃租约 · 5 种环境形态"],
+      quality: ["Quality", "验收标准 → 用例 → 稳定性 → 证据"],
+      briefing: ["Briefing", "由账本生成 · 可导出为 PR 描述"],
+      routing: ["Routing & Budget", "能力优先 · 成本可见 · 超支转决策"],
+      settings: ["Settings", "复用应用 AI、Vault 与代理配置"]
+    };
+    const target = name === "settings" ? "settings" : name;
+    const view = $(`.view[data-view="${target}"]`);
+    if (view) view.classList.add("active");
+    const meta = titles[name] || ["Taomni", ""];
+    $("#main-title").textContent = meta[0];
+    $("#main-sub").textContent = meta[1];
+    $("#window-title").textContent = meta[0];
+    if (name === "missions") renderMissionPanel();
+  }
+
+  function openMission(id) {
+    if (!MISSIONS[id]) return;
+    state.mission = id;
+    state.insp = "plan";
+    state.detailFile = 0;
+    setDetailVisible();
+  }
+
+  function setDetailVisible() {
+    const m = MISSIONS[state.mission];
+    $("#content").dataset.mode = "detail";
+    $$(".view").forEach((v) => v.classList.remove("active"));
+    if (state.mission === "m-1042") {
+      $('.view[data-view="mission"]').classList.add("active");
+      renderMission();
+    } else {
+      $('.view[data-view="mission-simple"]').classList.add("active");
+      renderSimple(m);
+    }
+    $("#main-title").textContent = m.title;
+    $("#main-sub").textContent = `${m.id} · ${m.template} ${m.version} · ${m.autonomy} · $${m.budget[0].toFixed(2)} / $${m.budget[1].toFixed(2)}`;
+    $("#window-title").textContent = m.title;
+    state.nav = "missions";
+    $$(".rail-btn[data-nav]").forEach((b) => b.classList.toggle("active", b.dataset.nav === "missions"));
+    $$(".panel-view").forEach((p) => { p.hidden = p.dataset.panel !== "missions"; });
+    $("#back-btn").hidden = false;
+  }
+
+  /* ------------------------------------------------------------------
+     Mission Control panel re-render (keeps counts in sync)
+     ------------------------------------------------------------------ */
+  function renderMissionPanel() {
+    $$("[data-count='missions']").forEach((el) => { el.textContent = "6"; });
+  }
+
+  /* ------------------------------------------------------------------
+     Mission detail
+     ------------------------------------------------------------------ */
+  function renderStageRail(m) {
+    const rail = $("#stage-rail");
+    rail.innerHTML = m.stages.map((s, i) => {
+      const label = s.state === "done" ? "✓" : (s.state === "run" || s.state === "wait") ? "" : String(i + 1);
+      return `<div class="stage ${s.state === "done" ? "done" : ""} ${s.current ? "active" : ""}" title="${s.label}">
+        <span class="stage-dot ${s.state === "done" ? "ok" : s.state}">${label}</span>
+        <span class="stage-label">${s.label}</span>
+      </div>${i < m.stages.length - 1 ? '<span class="stage-arrow">›</span>' : ""}`;
+    }).join("");
+  }
+
+  function decisionCard() {
+    return `
+      <div class="card decision" data-decision>
+        <div class="card-head">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" style="width:14px;height:14px;color:var(--taomni-warning)"><path d="M12 4v10M12 18h.01"/><circle cx="12" cy="12" r="9"/></svg>
+          <strong>需要你决定</strong>
+          <span class="chip warn">剩余 42 分钟</span>
+          <span class="chip">第 2 / 3 次中断</span>
+        </div>
+        <div class="card-body">
+          <p class="decision-q">幂等键是否应包含支付渠道 ID？评审发现同一订单跨渠道回调时，当前实现可能把不同渠道的合法回调误判为重复。</p>
+          <p class="decision-why">为什么现在问：这决定数据库唯一索引的形状，属于不可逆的 schema 决策；两种方案都可行，但影响后续渠道接入。</p>
+          <div class="options">
+            <button class="option selected" data-option="a">
+              <span class="radio"></span>
+              <span class="option-main">
+                <strong>包含渠道 ID <span class="recommend">推荐</span></strong>
+                <small>唯一索引改为 (order_id, channel, idem_key)。跨渠道可并存；需要一次可回滚的索引迁移，约 40s 锁表。</small>
+              </span>
+            </button>
+            <button class="option" data-option="b">
+              <span class="radio"></span>
+              <span class="option-main">
+                <strong>仅按订单 + 幂等键</strong>
+                <small>不加迁移，改动最小；但未来接入第二支付渠道时必须重新修改，且当前语义可能误拒合法回调。</small>
+              </span>
+            </button>
+            <button class="option" data-option="c">
+              <span class="radio"></span>
+              <span class="option-main">
+                <strong>先缩小范围，只修重复写入</strong>
+                <small>跳过跨渠道场景，记为已知风险；本次交付更快，但 AC-3 并发场景将标为部分覆盖。</small>
+              </span>
+            </button>
+          </div>
+          <div class="decision-foot">
+            <span class="hint">超时将采用推荐项，并记录为"默认决策"。</span>
+            <span class="grow"></span>
+            <button class="btn" data-action="discuss">需要更多信息</button>
+            <button class="btn primary" data-action="answer-decision">确认并继续</button>
+          </div>
+        </div>
+      </div>`;
+  }
+
+  function receiptCard() {
+    return `
+      <div class="receipt">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" style="width:13px;height:13px;color:var(--taomni-text-muted)"><path d="M4 4h10l6 6v10H4z"/><path d="M14 4v6h6"/></svg>
+        <span class="sum">4 files · <span class="add">+142</span> <span class="del">−37</span></span>
+        <span class="chip">修复阶段</span>
+        <span class="grow"></span>
+        <button class="btn sm ghost" data-insp-jump="changes">查看变更</button>
+      </div>`;
+  }
+
+  function procBlock() {
+    return `
+      <details class="proc">
+        <summary>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:11px;height:11px"><path d="M9 6l6 6-6 6"/></svg>
+          过程 · 38 条工具调用 · 12,940 tokens · 已折叠
+        </summary>
+        <div class="proc-body">
+          <div><span class="t">11:04:12</span><span class="k">read</span><span>src/payment/callback.ts</span></div>
+          <div><span class="t">11:04:19</span><span class="k">search</span><span>idempotency_key → 9 处</span></div>
+          <div><span class="t">11:05:02</span><span class="k">bash</span><span>pnpm exec vitest run src/payment</span></div>
+          <div><span class="t">11:05:41</span><span class="err">FAIL payment/callback.test.ts · 1 failed</span></div>
+          <div><span class="t">11:06:10</span><span class="k">read</span><span>migrations/0088_payments.sql</span></div>
+          <div><span class="t">11:07:33</span><span class="k">edit</span><span>src/payment/idempotency.ts +41 −3</span></div>
+          <div><span class="t">11:08:02</span><span class="k">bash</span><span>pnpm exec vitest run src/payment</span></div>
+          <div><span class="t">11:08:39</span><span class="k">PASS</span><span>412 tests · 0 failed</span></div>
+          <div><span class="t">11:09:14</span><span class="k">bash</span><span>pnpm build && pnpm check:refactor</span></div>
+          <div><span class="t">11:10:02</span><span class="k">PASS</span><span>exit 0</span></div>
+        </div>
+      </details>`;
+  }
+
+  function thread1042() {
+    return `
+      <article class="msg-user">
+        <span class="msg-label">你 · 2 小时前</span>
+        <div>${MISSIONS["m-1042"].goal}</div>
+      </article>
+
+      <div class="milestone">已确认契约：7 条验收标准 · 范围已冻结 · 基线 ${MISSIONS["m-1042"].base}</div>
+
+      <article class="msg-agent">
+        <span class="avatar">T</span>
+        <div class="msg-body">
+          <div class="msg-head"><strong>Taomni</strong><span class="chip ok">复现已确认</span><span class="tiny muted">10:58</span></div>
+          <div class="msg-text">
+            <p>在基线提交上，超时后再次查询会返回 <span class="mono">pending</span>，且确有第二条支付记录。已提交失败用例作为事实来源。</p>
+          </div>
+          ${receiptCard()}
+          <div class="timeline">
+            <div class="tl-item"><span class="tl-dot ok"></span><div class="tl-body"><div class="tl-line"><strong>分诊</strong><span>影响 3 个模块</span></div><div class="tl-detail">订单、支付、审计；未触及计费</div></div></div>
+            <div class="tl-item"><span class="tl-dot ok"></span><div class="tl-body"><div class="tl-line"><strong>复现</strong><span>3/3 失败</span></div><div class="tl-detail">TC-1042-timeout-requery 在基线稳定失败</div></div></div>
+            <div class="tl-item"><span class="tl-dot ok"></span><div class="tl-body"><div class="tl-line"><strong>定位</strong><span>3 路并行 · 命中 1</span></div><div class="tl-detail">回调重放时未校验幂等键；订单状态写入与支付记录不在同一事务</div></div></div>
+          </div>
+          ${procBlock()}
+        </div>
+      </article>
+
+      <div class="milestone">修复已完成本地验证 · 等待一个 schema 决策</div>
+
+      <article class="msg-agent">
+        <span class="avatar">T</span>
+        <div class="msg-body">
+          <div class="msg-head"><strong>Taomni</strong><span class="chip warn">需你决定</span><span class="tiny muted">11:12</span></div>
+          <div class="msg-text"><p>修复已在隔离 worktree 完成并通过本地检查。有一个不可逆的索引形状需要你确认。</p></div>
+          ${receiptCard()}
+          ${decisionCard()}
+        </div>
+      </article>
+    `;
+  }
+
+  function threadDone(m) {
+    return `
+      <article class="msg-user">
+        <span class="msg-label">你 · 5 小时前</span>
+        <div>${m.goal}</div>
+      </article>
+      <div class="milestone">全部阶段完成 · G1–G6 通过 · 等待验收</div>
+      <article class="msg-agent">
+        <span class="avatar">T</span>
+        <div class="msg-body">
+          <div class="msg-head"><strong>Taomni</strong><span class="chip ok">可交付</span></div>
+          <div class="msg-text">
+            <p>已完成全部阶段，证据齐全：34 条验收标准全部有可执行用例，E2E 31 条 3 次连跑通过，评审 0 blocker。</p>
+          </div>
+          <div class="receipt">
+            <span class="sum">12 files · <span class="add">+842</span> <span class="del">−96</span></span>
+            <span class="chip">7 个阶段</span>
+            <span class="grow"></span>
+            <button class="btn sm primary" data-action="accept">验收并生成 PR 草稿</button>
+          </div>
+          <div class="card">
+            <div class="card-head"><strong>交付说明</strong><span class="chip ok">G1–G6 通过</span></div>
+            <div class="card-body">
+              <p class="card-note">迁移可回滚；无密钥变更；回滚步骤已写入证据包。唯一风险是大表迁移预计 40s 锁表，建议在低峰窗口执行。</p>
+            </div>
+          </div>
+        </div>
+      </article>`;
+  }
+
+  function threadRunning(m) {
+    return `
+      <article class="msg-user">
+        <span class="msg-label">你 · ${m.elapsed} 前</span>
+        <div>${m.goal}</div>
+      </article>
+      <div class="milestone">阶段进行中 · 最后心跳 12 秒前 · 无阻塞</div>
+      <article class="msg-agent">
+        <span class="avatar">T</span>
+        <div class="msg-body">
+          <div class="msg-head"><strong>Taomni</strong><span class="chip accent">进行中</span><span class="tiny muted">持续推进</span></div>
+          <div class="msg-text"><p>当前阶段进展正常。到达阶段边界或需要决策时会再通知你。</p></div>
+          <div class="receipt">
+            <span class="sum">${m.files.reduce((n, f) => n + f.a, 0)} lines · ${m.files.length} files</span>
+            <span class="chip">${m.template}</span>
+            <span class="grow"></span>
+            <span class="tiny muted">预算 $${m.budget[0].toFixed(2)} / $${m.budget[1].toFixed(2)}</span>
+          </div>
+          <div class="timeline">
+            ${m.plan.filter((p) => p.state === "ok" || p.state === "run").map((p) => `
+              <div class="tl-item"><span class="tl-dot ${p.state === "ok" ? "ok" : "run"}"></span>
+                <div class="tl-body"><div class="tl-line"><strong>${p.t}</strong></div><div class="tl-detail">${p.s}</div></div>
+              </div>`).join("")}
+          </div>
+        </div>
+      </article>`;
+  }
+
+  function renderMission() {
+    const m = MISSIONS[state.mission];
+    renderStageRail(m);
+    const inner = $("#thread-inner");
+    if (m.thread === "rich") inner.innerHTML = thread1042();
+    else if (m.thread === "done") inner.innerHTML = threadDone(m);
+    else inner.innerHTML = threadRunning(m);
+    $("#budget-chip").textContent = `$${m.budget[0].toFixed(2)} / $${m.budget[1].toFixed(2)}`;
+    $("#composer").placeholder = m.id === "m-1042"
+      ? "回答选择或补充约束…（Enter 发送）"
+      : "补充信息或调整范围…（Enter 发送）";
+    applyQuiet();
+    renderInspector();
+  }
+
+  function renderSimple(m) {
+    $("#simple-title").textContent = m.title;
+    $("#simple-sub").textContent = `${m.id} · ${m.template} ${m.version} · ${m.stages.filter((s) => s.state === "done" || s.state === "run").length}/${m.stages.length} 阶段 · $${m.budget[0].toFixed(2)} / $${m.budget[1].toFixed(2)}`;
+  }
+
+  /* ------------------------------------------------------------------
+     Inspector
+     ------------------------------------------------------------------ */
+  function renderInspector() {
+    const m = MISSIONS[state.mission];
+    const body = $("#insp-body");
+    $$(".insp-tab").forEach((t) => t.classList.toggle("active", t.dataset.insp === state.insp));
+
+    if (state.insp === "plan") {
+      body.innerHTML = `
+        <div class="insp-sec">
+          <h4>任务</h4>
+          <div class="insp-row"><span class="k">模板</span><span class="v">${m.template} ${m.version}</span></div>
+          <div class="insp-row"><span class="k">自治</span><span class="v">${m.autonomy}</span></div>
+          <div class="insp-row"><span class="k">基线</span><span class="v">${m.base}</span></div>
+          <div class="insp-row"><span class="k">分支</span><span class="v ellipsis">${m.branch}</span></div>
+          <div class="insp-row"><span class="k">中断</span><span class="v">${m.interruptions} / 3</span></div>
+        </div>
+        <div class="insp-sec">
+          <h4>阶段计划</h4>
+          <ul class="plan-list">
+            ${m.plan.map((p, i) => `
+              <li><span class="plan-num ${p.state === "ok" ? "ok" : p.state === "run" ? "run" : p.state === "wait" ? "wait" : ""}">${p.state === "ok" ? "✓" : i + 1}</span>
+                <div><strong>${p.t}</strong><small>${p.s}</small></div></li>`).join("")}
+          </ul>
+        </div>
+        <div class="insp-sec">
+          <h4>验收标准</h4>
+          <div class="insp-row"><span class="k">AC-1</span><span class="v" style="font-family:inherit;text-align:left">超时后查询返回原订单</span></div>
+          <div class="insp-row"><span class="k">AC-2</span><span class="v" style="font-family:inherit;text-align:left">不产生第二条支付记录</span></div>
+          <div class="insp-row"><span class="k">AC-3</span><span class="v" style="font-family:inherit;text-align:left">并发回调只成功一次</span></div>
+          <div class="insp-row"><span class="k">AC-4</span><span class="v" style="font-family:inherit;text-align:left">失败回调可重试且幂等</span></div>
+        </div>`;
+      return;
+    }
+
+    if (state.insp === "changes") {
+      const f = m.files[state.detailFile] || m.files[0];
+      body.innerHTML = `
+        <div class="insp-sec">
+          <h4>本轮变更 · ${m.files.length} 个文件</h4>
+          ${m.files.map((file, i) => `
+            <div class="file-row ${i === state.detailFile ? "active" : ""}" data-file="${i}">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" style="width:11px;height:11px;color:var(--taomni-text-muted)"><path d="M4 4h10l6 6v10H4z"/><path d="M14 4v6h6"/></svg>
+              <span class="fp">${file.p}</span>
+              <span class="stat"><span class="a">+${file.a}</span> <span class="d">−${file.d}</span></span>
+            </div>`).join("")}
+        </div>
+        <div class="diff">
+          <div class="diff-head"><span>${f.p}</span><span class="grow"></span><span>+${f.a} −${f.d}</span></div>
+          <pre><span class="l"><span class="ln">41</span>async function handleCallback(req: Request) {</span><span class="l"><span class="ln">42</span>  const key = buildIdempotencyKey(req);</span><span class="l del"><span class="ln">43</span>-  const existing = await paymentStore.findByOrder(req.orderId);</span><span class="l add"><span class="ln">43</span>+  const existing = await paymentStore.findByIdemKey(key);</span><span class="l add"><span class="ln">44</span>+  if (existing) return settleExisting(existing, req);</span><span class="l"><span class="ln">45</span>  const payment = await paymentStore.insert({</span><span class="l"><span class="ln">46</span>    orderId: req.orderId,</span><span class="l add"><span class="ln">47</span>+    channel: req.channel,</span><span class="l add"><span class="ln">48</span>+    idemKey: key,</span><span class="l"><span class="ln">49</span>  });</span><span class="l"><span class="ln">50</span>  await orderStore.updateStatus(req.orderId, "paid");</span><span class="l"><span class="ln">51</span>}</span></pre>
+          <div class="hunk-bar">
+            <span class="lbl">hunk 2 / 3</span>
+            <button data-hunk="keep">Keep</button>
+            <button data-hunk="revert">Revert</button>
+            <button data-hunk="ask">Ask agent</button>
+          </div>
+        </div>
+        <p class="card-note" style="margin-top:9px">回执以 worktree 快照统计，不包含未提交的本地改动。</p>`;
+      return;
+    }
+
+    if (state.insp === "evidence") {
+      body.innerHTML = `
+        <div class="insp-sec">
+          <h4>门禁</h4>
+          ${m.evidence.map((e) => `
+            <div class="insp-row">
+              <span class="k">${e.g}</span>
+              <span class="v" style="font-family:inherit;text-align:right">${e.v}</span>
+              <span class="chip ${e.ok ? "ok" : "warn"}">${e.ok ? "通过" : "待定"}</span>
+            </div>`).join("")}
+        </div>
+        <div class="insp-sec">
+          <h4>最近证据</h4>
+          <div class="file-row"><span class="mono">ev-3 · vitest</span><span class="stat"><span class="a">412 passed</span></span></div>
+          <div class="file-row"><span class="mono">ev-2 · build</span><span class="stat"><span class="a">exit 0</span></span></div>
+          <div class="file-row"><span class="mono">ev-1 · e2e run 2</span><span class="stat">29/29</span></div>
+          <p class="card-note" style="margin-top:8px">证据带内容哈希；失败与取消的记录不会被覆盖。</p>
+        </div>`;
+      return;
+    }
+
+    if (state.insp === "env") {
+      body.innerHTML = `
+        <div class="insp-sec">
+          <h4>执行环境</h4>
+          <div class="insp-row"><span class="k">形态</span><span class="v">local-worktree</span></div>
+          <div class="insp-row"><span class="k">路径</span><span class="v ellipsis">~/.taomni/worktrees/m-1042</span></div>
+          <div class="insp-row"><span class="k">隔离</span><span class="v">文件 / Git</span></div>
+          <div class="insp-row"><span class="k">沙箱</span><span class="v tag-warn" style="font-family:inherit">否</span></div>
+          <div class="insp-row"><span class="k">代理</span><span class="v">应用代理</span></div>
+        </div>
+        <div class="insp-sec">
+          <h4>健康</h4>
+          <div class="env-health" style="margin-bottom:7px"><i class="hdot ok"></i><i class="hdot ok"></i><i class="hdot"></i><i class="hdot"></i><i class="hdot"></i></div>
+          <p class="card-note">L1 进程、L2 端口已确认。该环境不承载服务，L3–L5 不适用。E2E 使用 <span class="mono">env-cont-7</span>。</p>
+        </div>
+        <div class="insp-sec">
+          <h4>E2E 环境</h4>
+          <div class="insp-row"><span class="k">env-cont-7</span><span class="v tag-ok">5/5 就绪</span></div>
+          <div class="insp-row"><span class="k">租期</span><span class="v">剩余 58m</span></div>
+        </div>`;
+      return;
+    }
+
+    if (state.insp === "cost") {
+      body.innerHTML = `
+        <div class="insp-sec">
+          <h4>预算</h4>
+          <div class="insp-row"><span class="k">已用</span><span class="v">$${m.budget[0].toFixed(2)}</span></div>
+          <div class="insp-row"><span class="k">上限</span><span class="v">$${m.budget[1].toFixed(2)}</span></div>
+          <div class="meter" style="margin:7px 0"><i style="width:${(m.budget[0] / m.budget[1]) * 100}%"></i></div>
+          <div class="insp-row"><span class="k">预测结算</span><span class="v">$8.40</span></div>
+        </div>
+        <div class="insp-sec">
+          <h4>按阶段</h4>
+          <div class="insp-row"><span class="k">分诊 / 复现</span><span class="v">$0.80</span></div>
+          <div class="insp-row"><span class="k">定位（×3）</span><span class="v">$1.90</span></div>
+          <div class="insp-row"><span class="k">修复</span><span class="v">$2.40</span></div>
+          <div class="insp-row"><span class="k">回归</span><span class="v">$1.00</span></div>
+        </div>
+        <div class="insp-sec">
+          <h4>资源</h4>
+          <div class="insp-row"><span class="k">Builder</span><span class="v">cc-sonnet · ×1.0</span></div>
+          <div class="insp-row"><span class="k">Reviewer</span><span class="v">review-alt · ×0.7</span></div>
+          <div class="insp-row"><span class="k">Router</span><span class="v">triage-api · ×0.2</span></div>
+          <p class="card-note" style="margin-top:8px">系数用于排序与预估；真实账单以供应商返回为准。</p>
+        </div>`;
+    }
+  }
+
+  function applyQuiet() {
+    const on = state.quiet;
+    $$("[data-quiet]").forEach((b) => b.classList.toggle("active", (b.dataset.quiet === "on") === on));
+    $$("details.proc").forEach((d) => { d.open = !on; d.hidden = on; });
+  }
+
+  /* ------------------------------------------------------------------
+     Event wiring
+     ------------------------------------------------------------------ */
+  document.addEventListener("click", (event) => {
+    const el = event.target.closest("button, [data-open-mission], [data-nav-jump], [data-brief], [data-tpl], [data-newtpl], [data-option], [data-file], [data-hunk], [data-quiet]");
+    if (!el) return;
+
+    const missionCard = event.target.closest("[data-open-mission]");
+    if (missionCard) { openMission(missionCard.dataset.openMission); return; }
+
+    const briefCard = event.target.closest("[data-brief]");
+    if (briefCard) { setNav("briefing"); return; }
+
+    const jump = event.target.closest("[data-nav-jump]");
+    if (jump) { setNav(jump.dataset.navJump); return; }
+
+    const rail = event.target.closest(".rail-btn[data-nav]");
+    if (rail) { setNav(rail.dataset.nav); return; }
+
+    const tpl = event.target.closest("[data-tpl]");
+    if (tpl) {
+      $$(".tpl").forEach((t) => t.classList.toggle("active", t === tpl));
+      $$(".panel-view[data-panel='templates'] .tpl").forEach((t) => t.classList.toggle("active", t.dataset.tpl === tpl.dataset.tpl));
+      const name = $(".tpl-name", tpl)?.textContent;
+      if (name) { $("#tpl-detail-name").textContent = name; }
+      toast(`已选择模板 ${tpl.dataset.tpl}`);
+      return;
+    }
+
+    const newtpl = event.target.closest("[data-newtpl]");
+    if (newtpl) {
+      $$("[data-newtpl]").forEach((t) => t.classList.remove("accent"));
+      newtpl.classList.add("accent");
+      return;
+    }
+
+    const quiet = event.target.closest("[data-quiet]");
+    if (quiet) { state.quiet = quiet.dataset.quiet === "on"; applyQuiet(); toast(state.quiet ? "已切换为安静模式" : "已展开过程输出"); return; }
+
+    const option = event.target.closest("[data-option]");
+    if (option) {
+      $$(".option").forEach((o) => o.classList.toggle("selected", o === option));
+      return;
+    }
+
+    const fileRow = event.target.closest("[data-file]");
+    if (fileRow) { state.detailFile = Number(fileRow.dataset.file); renderInspector(); return; }
+
+    const hunk = event.target.closest("[data-hunk]");
+    if (hunk) { hunk.classList.add("kept"); toast(hunk.dataset.hunk === "keep" ? "已保留该 hunk" : hunk.dataset.hunk === "revert" ? "已回退该 hunk" : "已请求 Agent 解释该 hunk"); return; }
+
+    const insp = event.target.closest(".insp-tab");
+    if (insp && insp.dataset.insp) { state.insp = insp.dataset.insp; renderInspector(); return; }
+
+    const btn = event.target.closest("[data-action]");
+    if (!btn) return;
+    const action = btn.dataset.action;
+    if (action === "new-mission") { $$(".view").forEach((v) => v.classList.remove("active")); $('.view[data-view="new"]').classList.add("active"); $("#content").dataset.mode = ""; $("#main-title").textContent = "新建任务"; $("#main-sub").textContent = "模板驱动 · 契约先行 · 授权清晰"; return; }
+    if (action === "create-mission") { toast("已创建任务，正在生成契约草案…"); setTimeout(() => { setNav("missions"); }, 700); return; }
+    if (action === "answer-decision") { toast("已记录决策：包含渠道 ID；继续回归验证"); return; }
+    if (action === "accept") { toast("验收通过，已生成 PR 草稿与证据链接"); return; }
+    if (action === "briefing") { setNav("briefing"); return; }
+    if (action === "copy-brief") { toast("简报 Markdown 已复制"); return; }
+    if (action === "export-brief") { toast("已导出到任务证据目录"); return; }
+    if (action === "generate-e2e") { toast("正在为 3 条缺口生成用例…"); return; }
+    if (action === "run-e2e") { toast("已排队：目标用例 3 次连跑"); return; }
+    if (action === "provision") { toast("环境开通中：引导依赖与健康探测…"); return; }
+    if (action === "dry-run-env") { toast("试运行通过：2 个服务可达，预计就绪 2m 10s"); return; }
+    if (action === "gc-envs") { toast("已回收 2 个过期租约"); return; }
+    if (action === "save-routing") { toast("路由与预算已保存"); return; }
+    if (action === "discuss") { toast("已展开定位证据，可在检查器查看"); state.insp = "evidence"; renderInspector(); return; }
+    if (action === "send") { sendComposer(); return; }
+    if (action === "toggle-inspector") { const i = $("#inspector"); i.hidden = !i.hidden; return; }
+    if (action === "expand-all") { state.quiet = false; applyQuiet(); return; }
+    toast("原型交互：该动作在正式实现中会写入账本");
+  });
+
+  document.addEventListener("click", (event) => {
+    const tab = event.target.closest(".insp-tab");
+    if (tab) return;
+    const jump = event.target.closest("[data-insp-jump]");
+    if (jump) { state.insp = jump.dataset.inspJump; renderInspector(); }
+  });
+
+  $("#back-btn").addEventListener("click", () => setNav("missions"));
+
+  function sendComposer() {
+    const box = $("#composer");
+    const text = box.value.trim();
+    if (!text) { toast("请输入内容"); return; }
+    const inner = $("#thread-inner");
+    if (inner) {
+      const article = document.createElement("article");
+      article.className = "msg-user";
+      article.style.marginTop = "14px";
+      article.innerHTML = `<span class="msg-label">你 · 刚刚</span><div></div>`;
+      article.querySelector("div").textContent = text;
+      inner.appendChild(article);
+      const note = document.createElement("div");
+      note.className = "milestone";
+      note.textContent = "已记录，调度中…";
+      inner.appendChild(note);
+    }
+    box.value = "";
+    toast("已发送");
+  }
+
+  $("#composer").addEventListener("keydown", (event) => {
+    if (event.key === "Enter" && !event.shiftKey) {
+      event.preventDefault();
+      sendComposer();
+    }
+  });
+
+  document.addEventListener("keydown", (event) => {
+    const typing = /INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName);
+    if (event.key === "Escape") {
+      const nav = state.nav;
+      if (nav !== "missions" || state.mission !== "m-1042") { setNav("missions"); return; }
+    }
+    if (typing) return;
+    if (event.key === "b" || event.key === "B") { setNav("briefing"); }
+    if (event.key === "d" || event.key === "D") { openMission("m-1042"); }
+    if (event.key === "j" || event.key === "J") { setNav("missions"); }
+    if (event.key === "k" || event.key === "K") { setNav("templates"); }
+  });
+
+  /* Fleet side panel list */
+  const fleetList = $("#fleet-lease-list");
+  if (fleetList) {
+    fleetList.innerHTML = [
+      ["env-cont-7", "M-1044 · playwright", "ok"],
+      ["env-cont-8", "M-1043 · api-staging", "run"],
+      ["win-build-02", "M-1040 · Windows 原生", "bad"],
+      ["local-wt-1042", "M-1042 · worktree", "ok"]
+    ].map(([name, sub, k]) => `
+      <div class="mission-card" style="cursor:default">
+        <div class="mc-top"><span class="chip ${k === "ok" ? "ok" : k === "bad" ? "bad" : "accent"}">${k === "ok" ? "就绪" : k === "bad" ? "失败" : "引导中"}</span><span class="right mono tiny muted">${name}</span></div>
+        <div class="mc-title" style="margin-top:4px">${sub}</div>
+      </div>`).join("");
+  }
+
+  const qualityGates = $("#quality-gates");
+  if (qualityGates) {
+    qualityGates.innerHTML = [
+      ["G2 构建", "通过", "ok"],
+      ["G3 用例完备", "31 / 34", "warn"],
+      ["G4 稳定性", "2 / 3 连跑", "warn"],
+      ["G5 评审", "1 high 待处理", "bad"]
+    ].map(([g, v, k]) => `
+      <div class="insp-row" style="padding:7px 8px;border:1px solid var(--taomni-card-border);border-radius:6px;background:var(--taomni-card-bg)">
+        <span class="k">${g}</span><span class="v" style="font-family:inherit">${v}</span><span class="chip ${k}">${k === "ok" ? "通过" : k === "warn" ? "待定" : "阻塞"}</span>
+      </div>`).join("");
+  }
+
+  const quarantine = $("#quality-quarantine");
+  if (quarantine) {
+    quarantine.innerHTML = [
+      ["TC-1044-retry-banner", "owner li.wei · 3 天前"],
+      ["TC-1044-currency-load", "owner zh.an · 1 天前"]
+    ].map(([n, s]) => `
+      <div class="mission-card" style="cursor:default">
+        <div class="mc-title mono" style="font-size:10px">${n}</div>
+        <div class="mc-sub">${s}</div>
+      </div>`).join("");
+  }
+
+  const routingRoles = $("#routing-roles");
+  if (routingRoles) {
+    routingRoles.innerHTML = [
+      ["Router", "triage-api", "0.2"], ["Planner", "plan-long-ctx", "1.0"],
+      ["Builder", "cc-sonnet", "1.0"], ["Verifier", "codex-e2e", "0.8"],
+      ["Reviewer", "review-alt", "0.7"]
+    ].map(([r, m, c]) => `
+      <div class="insp-row"><span class="k">${r}</span><span class="v" style="font-family:inherit">${m}</span><span class="chip">×${c}</span></div>`).join("");
+  }
+  const routingBudget = $("#routing-budget");
+  if (routingBudget) {
+    routingBudget.innerHTML = `
+      <div class="insp-row"><span class="k">今日</span><span class="v">$18.40 / $40.00</span></div>
+      <div class="meter" style="margin:6px 0"><i style="width:46%"></i></div>
+      <div class="insp-row"><span class="k">单任务</span><span class="v">$12.00</span></div>
+      <div class="insp-row"><span class="k">单阶段</span><span class="v">$4.00</span></div>`;
+  }
+
+  /* Boot */
+  $("#main-title").textContent = "Mission Control";
+  $("#main-sub").textContent = "3 个待处理 · 2 个运行中 · 注意力预算剩余 1 次中断";
+  $("#window-title").textContent = "Mission Control";
+  toast("原型：可用左侧导航与按键 B / D / K / J 探索");
+})();
+</script>
+</body>
+</html>
