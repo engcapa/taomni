@@ -115,8 +115,22 @@
   144/144 的差异构成受控像素故障的红→绿；不是物理驱动长时触发复现。
 - macOS native 四 shard 合计13/13通过、0 skip，原始 receipt hash 已核对。
   macOS 使用既有稳定 DOM 策略，不声称执行了 native WebGL 像素分支。
-- Windows native 与补充开关 native 验证仍在进行。首个候选 run `42137113187`
-  因用例平台/POSIX fixture 声明修正主动取消，不作为证据。
+- 主验证 `42137876791` 已结束：browser Linux14/14、Windows14/14、macOS13/13；
+  native Linux14/14、macOS13/13；Windows native13/14。所有组合无 skip。
+  Windows V1 `run-20261106-013112-656664600` clear/merge 像素差异全0，三个真实
+  session IDs不变；但该 shard 首个 `TC-150` 在 setup/所有步骤之前失败：
+  `native app document did not become ready within 20.0s: document root is not mounted`。
+  desktop screenshot 未见应用界面，日志为空，根因未定；同 shard 随后用同一二进制
+  完成 V1、WS039/053。最终 aggregate `passed:false`，不是可忽略的绿色运行。
+- 保持产品、20秒超时和用例断言不变，在 `cc1e8095a` 以 workflow 定向复核 Windows
+  `TC-150,TC-TERM-RENDER-002` 加 crash-regression：
+  https://github.com/engcapa/taomni/actions/runs/42144872829 。
+  该源码与主/补充验证的产品/patch/构建输入一致，只有测试/证据增量。
+- 补充运行 `42141625169`：Linux browser9/9、Windows browser9/9、Linux native10/10
+  全通过、无skip。Linux native `run-20261106-012642-363771203` 的 V2 原始
+  summary hash/receipt exitCode=0 已核对，真实 SSH 原shell PID/变量/历史与后续输入
+  均保留。Windows native 仍在进行。
+- 首个候选 run `42137113187` 因用例平台/POSIX fixture 声明修正主动取消，不作为证据。
 
 ### V3 — 保留行为
 
