@@ -793,6 +793,8 @@ area: terminal/local
 components: [TerminalPanel]
 files:
   - src/components/terminal/TerminalPanel.tsx
+  - src/components/terminal/panel/qaTerminalRendering.ts
+  - src/components/terminal/panel/sessionLifecycle.ts
   - src/components/terminal/SelectionToolbar.tsx
   - src/components/ContextMenu.tsx
   - src/lib/terminalCommand.ts
@@ -830,7 +832,8 @@ controls:
     optional: true
 -->
 
-- xterm.js + FitAddon + WebglAddon（失败回退 canvas）+ SearchAddon + WebLinksAddon
+- xterm.js + FitAddon + WebglAddon（失败回退 xterm 默认 DOM 渲染器）+ SearchAddon + WebLinksAddon
+- `TC-TERM-RENDER-001` 用三个真实终端验证共享图集 clear/merge 后静态 ASCII/CJK/框线字形像素、缓冲与会话身份；不把正确的文本镜像误判为正确显示。物理 GPU 长时/锁屏触发仍需独立证据。
 - ResizeObserver + debounce 自动 fit
 - 终端第一列保留 8px 左侧留白；留白位于 xterm 内部，支持从留白处正向/反向拖选与矩形选区，FitAddon 按留白后的宽度计算列数。TC-154（browser）和 TC-155（native）验证首字符、复制内容、搜索/选区高亮及缩放/全屏后的布局，TC-110 覆盖分屏布局。
 - 容器卸载时正确 dispose 终端实例与监听器

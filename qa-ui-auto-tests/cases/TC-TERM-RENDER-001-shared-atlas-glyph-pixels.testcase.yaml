@@ -1,0 +1,54 @@
+id: TC-TERM-RENDER-001
+title: Shared terminal WebGL atlas changes preserve sibling glyph pixels and buffers
+covers: [F2.2]
+tags: [terminal, rendering, p1]
+modes: [browser, native]
+native_platforms: [Linux, Windows]
+fixtures: [reset_db]
+timeout_sec: 180
+# macOS native deliberately uses xterm's non-WebGL renderer. This isolates the
+# library failure class; hosted virtual GPUs do not reproduce a physical driver.
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="welcome-open-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"] .xterm-screen'
+- click: '[data-testid="new-local-terminal"]'
+- assert_count:
+    selector: '[data-testid="terminal-pane"]'
+    equal: 2
+- click: '[data-testid="new-local-terminal"]'
+- assert_count:
+    selector: '[data-testid="terminal-pane"]'
+    equal: 3
+- click: '[data-testid="titlebar-actions-more"]'
+- click: '[data-testid="tab-split-view"]'
+- wait_for: '[data-testid="terminal-split-panes"]'
+- click: '[data-testid="terminal-split-layout-vertical"]'
+- assert_attribute:
+    selector: '[data-testid="terminal-split-panes"]'
+    name: data-layout
+    equals: vertical
+- wait: 2
+- terminal_rendering_probe: null
+- assert_count:
+    selector: '[data-testid="terminal-pane"]'
+    equal: 3
+- assert_no_runtime_errors: null
+- screenshot: terminal-rendering-retained.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Clearing/repopulating a shared WebGL atlas and merging pages must not corrupt unchanged sibling glyph pixels while buffers and live sessions remain intact.
+    actions: [3, 5, 7, 10, 12]
+    checkpoints:
+    - {step: 15, expectation: 'Two real rendered header crops match their originals after clear/merge; exact text, geometry, live Terminal objects and backend identities stay unchanged, and real page-removal events prove the merge path ran.'}
+    - {step: 16, expectation: All three terminal panels remain mounted.}
+    - {step: 17, expectation: No uncaught renderer errors or application crash.}
+    results: [15, 16, 17]
+  visual:
+  - {check: ASCII/CJK/box-drawing header glyph fidelity after atlas invalidation, method: automated, reason: 'Real screenshots are independently cropped and compared with pre-fault pixels, not inferred from terminal text.'}
+  - {check: Original intermittent physical GPU corruption after long sessions and lock/unlock, method: manual, reason: Hosted virtual/software graphics cannot establish the user's hardware trigger; retain that acceptance gap.}
+  native:
+  - {check: Real WebKitGTK/WebView2 terminal renderer and live session identity, method: automated, reason: Native runs use the packaged QA WebView; browser Chromium evidence is a separate layer.}
