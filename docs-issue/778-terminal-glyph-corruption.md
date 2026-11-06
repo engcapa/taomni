@@ -109,7 +109,13 @@
   checkpoints；静态检查确认两端 native_support 为 None。通过同一 workflow 补跑
   https://github.com/engcapa/taomni/actions/runs/42141625169 ，browser/native 全部执行，
   并保留自动 crash-regression；产品与二进制输入不变。
-- 三平台 native 的其余回归仍以 `42137876791` 运行。首个候选 run `42137113187`
+- `42137876791` 的 Linux native `run-20261106-011509-454753933`：V1 clear/merge
+  四组 pixel 差异全部0；三个真实 backend session IDs、对象、缓冲与几何保持不变。
+  原始 summary/pixel hash 与 receipt 核对一致，exitCode=0。与修复前 native
+  144/144 的差异构成受控像素故障的红→绿；不是物理驱动长时触发复现。
+- macOS native 四 shard 合计13/13通过、0 skip，原始 receipt hash 已核对。
+  macOS 使用既有稳定 DOM 策略，不声称执行了 native WebGL 像素分支。
+- Windows native 与补充开关 native 验证仍在进行。首个候选 run `42137113187`
   因用例平台/POSIX fixture 声明修正主动取消，不作为证据。
 
 ### V3 — 保留行为
@@ -123,6 +129,8 @@
 - 本地支持检查已通过：`pnpm build`（含 tsc/boundary/source-size）、
   `pnpm check:refactor`、QA catalog gate/development contract；production `dist/assets`
   搜索确认无 `__TAOMNI_QA_TERMINALS__`/`registerQaTerminalRendering`。
+- GitHub Linux producer 完整前端单元：670 test files passed，6227 passed + 1 existing
+  skipped；`frontend-unit-contracts.log` 保留在 build artifact，未缩小全套范围。
 - 单元：TerminalPanel/Appearance/Viewport 105 passed + 1 existing skipped；
   profile/registry 9 passed；ESM/CJS backport 6 passed；Python probe/CI selection/build
   pipeline 28 passed。未在本地运行任何 browser/native 用例。独立只读正确性复核未发现
