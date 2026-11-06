@@ -244,8 +244,15 @@ export function buildMailReaderBaseCss(options?: {
   const blockedFg = dark ? "#a1a1aa" : "#71717a";
   const blockedBorder = dark ? "#52525b" : "#a1a1aa";
 
+  // The reader sizes the iframe to its content, so this document must never
+  // scroll on its own. Once the frame root can scroll even 1px, Chromium's
+  // middle-click autoscroll targets the frame instead of the reading pane and
+  // the pane stops scrolling (WebView2's auto-hiding overlay scrollbars keep
+  // that sliver invisible). `!important` keeps message CSS from handing the
+  // document its own scrollbar again; programmatic scrolling — window.find()
+  // reveal, scrollIntoView — still works with overflow:hidden.
   return `
-html, body { margin: 0; padding: 0; }
+html, body { margin: 0; padding: 0; overflow: hidden !important; }
 body {
   font-family: ${fontFamily};
   font-size: ${fontSize}px;
