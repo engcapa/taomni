@@ -3,6 +3,10 @@
 const entries = [...(globalThis.__TAOMNI_QA_TERMINALS__?.values() ?? [])];
 if (entries.length !== 3) throw Error(`Expected three real terminals, got ${entries.length}`);
 const atlas = entry => entry.getAddon()?._renderer?._charAtlas;
+if (action === "ready") {
+  const sessions = [...(globalThis.__taomni_terminal_registry__?.entries?.values() ?? [])];
+  return !window.__TAURI_INTERNALS__ || (sessions.length === 3 && sessions.every(entry => entry.isReady?.()));
+}
 const header = "REF-0123456789 中文字形 ┌─┐";
 const state = globalThis.__QA_ATLAS_PROBE__;
 const result = extra => ({
@@ -34,6 +38,9 @@ const flood = (cells, offset) => {
 if (action === "prepare") {
   if (state) throw Error("Atlas probe already installed");
   if (!result().shared) throw Error("Three terminals must share a real WebGL atlas");
+  if (window.__TAURI_INTERNALS__ && result().sessions.length !== 3) {
+    throw Error("Native pixel fixture requires three live backend sessions");
+  }
   const shared = atlas(entries[0]);
   globalThis.__QA_ATLAS_PROBE__ = {
     pending: 0, terms: entries.map(entry => entry.term), shared,

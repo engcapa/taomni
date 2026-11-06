@@ -3,8 +3,9 @@ title: Linux and Windows can switch a live SSH terminal to the stable renderer w
 covers: [F2.2, F3.1, F5.2]
 tags: [terminal, rendering, ssh, p1]
 modes: [browser, native]
+browser_platforms: [Linux, Windows]
 native_platforms: [Linux, Windows]
-fixtures: [reset_db, ssh_required, ssh_posix_required]
+fixtures: [reset_db, ssh_posix_required]
 timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
@@ -14,8 +15,8 @@ steps:
 - reload_window: null
 - wait_for: '[data-testid="qc-input"]'
 - quick_connect:
-    url: ssh://${cfg.ssh.user}@${cfg.ssh.host}:${cfg.ssh.port}
-- auth: ${env.QA_SSH_PASSWORD}
+    url: ssh://${cfg.ssh_posix.user}@${cfg.ssh_posix.host}:${cfg.ssh_posix.port}
+- auth: ${env.QA_POSIX_SSH_PASSWORD}
 - wait_for:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
     timeout_sec: 60

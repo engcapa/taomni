@@ -67,6 +67,11 @@ def run_probe(case_dir: Path, evaluate: Callable, screenshot: Callable, args: An
         raise StepError('Real terminal write/render did not settle')
 
     try:
+        deadline = time.monotonic() + 60
+        while not call('ready'):
+            if time.monotonic() >= deadline:
+                raise StepError('Three native terminal shells did not reach idle readiness')
+            time.sleep(.2)
         call('prepare')
         installed = True
         before = settled()
@@ -110,7 +115,10 @@ def run_probe(case_dir: Path, evaluate: Callable, screenshot: Callable, args: An
                 call('cleanup')
             except Exception as error:
                 record['cleanupError'] = str(error)
-                record['passed'] = False
+                if record['passed']:
+                    record['passed'] = False
+                    path.write_text(json.dumps(record, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
+                    raise StepError('Could not restore terminal rendering fixture') from error
         path.write_text(json.dumps(record, ensure_ascii=False, indent=2) + '\n', encoding='utf-8')
 
 
