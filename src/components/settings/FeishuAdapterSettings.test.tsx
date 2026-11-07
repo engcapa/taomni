@@ -41,6 +41,27 @@ it("translates all settings, counters and secret hints in place without losing d
   expect(screen.getByTestId("feishu-settings")).toHaveTextContent("文件内容默认不发送");
 });
 
+it("keeps unsaved credentials and proxy choices while opening, translating and closing the guide", async () => {
+  render(<FeishuAdapterSettings mobileEnabled={false} />);
+  fireEvent.change(await screen.findByTestId("feishu-app-id"), { target: { value: "cli_draft" } });
+  fireEvent.change(screen.getByTestId("feishu-app-secret"), { target: { value: "unsaved-private-secret" } });
+  fireEvent.change(screen.getByTestId("feishu-bindings"), { target: { value: "ou_draft oc_draft" } });
+  fireEvent.change(screen.getByTestId("feishu-mobile-endpoint"), { target: { value: "https://draft.example.com" } });
+  fireEvent.change(screen.getByTestId("feishu-proxy-mode"), { target: { value: "none" } });
+  fireEvent.click(screen.getByTestId("feishu-guide-toggle"));
+  expect(screen.getByTestId("feishu-guide")).not.toHaveTextContent("unsaved-private-secret");
+  act(() => setLocale("zh-CN"));
+  fireEvent.click(screen.getByTestId("feishu-guide-toggle"));
+  fireEvent.click(screen.getByTestId("feishu-guide-toggle"));
+  expect(screen.getByTestId("feishu-app-id")).toHaveValue("cli_draft");
+  expect(screen.getByTestId("feishu-app-secret")).toHaveValue("unsaved-private-secret");
+  expect(screen.getByTestId("feishu-bindings")).toHaveValue("ou_draft oc_draft");
+  expect(screen.getByTestId("feishu-mobile-endpoint")).toHaveValue("https://draft.example.com");
+  expect(screen.getByTestId("feishu-proxy-mode")).toHaveValue("none");
+  expect(screen.getByTestId("feishu-toggle")).toBeDisabled();
+  expect(ipc.mock.calls.some(([command]) => ["mobile_feishu_save", "mobile_feishu_start", "mobile_start"].includes(command))).toBe(false);
+});
+
 it("edits an independent proxy without changing application settings", async () => {
   render(<FeishuAdapterSettings mobileEnabled />);
   fireEvent.change(await screen.findByTestId("feishu-proxy-mode"), { target: { value: "custom" } });
@@ -57,6 +78,8 @@ it("shows actionable native failures and blocks configuration edits while connec
   render(<FeishuAdapterSettings mobileEnabled />);
   expect(await screen.findByTestId("feishu-app-id")).toBeDisabled();
   expect(screen.getByTestId("feishu-save")).toBeDisabled();
+  fireEvent.click(screen.getByTestId("feishu-guide-toggle"));
+  expect(screen.getByTestId("feishu-guide")).toBeInTheDocument();
   ipc.mockRejectedValueOnce("feishu_network_failed_check_proxy");
   fireEvent.click(screen.getByTestId("feishu-toggle"));
   expect(await screen.findByTestId("feishu-error")).toHaveTextContent("Check the network and selected proxy");

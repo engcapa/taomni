@@ -5,6 +5,7 @@ import { isVaultLockedError, type AppProxyConfig } from "../../lib/ipc";
 import { ensureVaultReady } from "../../lib/vaultGate";
 import { useVaultStore } from "../../stores/vaultStore";
 import { AppProxyPanel } from "./AppProxyPanel";
+import { FeishuSetupGuide } from "./FeishuSetupGuide";
 import { mobileSettingsError } from "./mobileSettingsError";
 
 interface Config {
@@ -78,6 +79,7 @@ export function FeishuAdapterSettings({ mobileEnabled }: { mobileEnabled: boolea
     <h4 className="font-semibold">{t("feishuSettings.title")}</h4>
     <p>{t("feishuSettings.description")}</p>
     <p className="text-[var(--taomni-text-muted)]">{t("feishuSettings.setupHint")}</p>
+    <FeishuSetupGuide />
     <fieldset disabled={busy || running} className="space-y-3">
       <label className="block">{t("feishuSettings.appId")}<input data-testid="feishu-app-id" className="taomni-input w-full" value={draft.app_id} onChange={e => patch({ app_id: e.target.value.trim() })} placeholder="cli_…" autoComplete="off" /></label>
       <label className="block">{t("feishuSettings.appSecret", { hint: t(view.secret_configured ? "feishuSettings.secretSaved" : "feishuSettings.secretVault") })}<input data-testid="feishu-app-secret" className="taomni-input w-full" type="password" value={secret} onChange={e => { setSecret(e.target.value); setSaved(false); }} autoComplete="new-password" /></label>
