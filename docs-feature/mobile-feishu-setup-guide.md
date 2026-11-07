@@ -35,8 +35,24 @@
 | 相关移动服务与设置行为 | MobileServiceSettings、MobileHostSettings、settingsSearch 单测 | 保留现有入口和配置行为 |
 | 应用崩溃回归 | 完整 `crash-regression` 集合 browser/native | 由指定 platforms workflow 自动并入，native 使用匹配源码的 QA release binary |
 
-GitHub 使用 `.github/workflows/qa-ui-auto-platforms.yml`，`scope=selected`、`platforms=linux,windows,macos`、`modes=browser,native`、`native_release=true`，选择 `TC-MOBILE-004,TC-MOBILE-016`。执行结果、原始 artifact 和精确提交身份在完成后补充。
+GitHub 使用 `.github/workflows/qa-ui-auto-platforms.yml`，`scope=selected`、`platforms=linux,windows,macos`、`modes=browser,native`、`native_release=true`，选择 `TC-MOBILE-004,TC-MOBILE-016`，workflow 自动并入完整 `crash-regression` 集合。
 
 本地 Node 22.23.4 / pnpm 10.34.9：上述 5 个组件/设置单测文件 26/26 通过，`pnpm build`（含 TypeScript、`check:refactor` 与 mobile bundle）通过，`qa_ui_auto.audit --gate` 通过。本地 QA browser 首轮因缺少 Playwright Chromium 在 setup 阶段失败，未执行用例；原始日志与 receipt 保留在 `qa-ui-auto-report/_local/feishu-guide/browser/`，GitHub 的实际执行结果另行记录。
+
+2026-11-08 验收：[GitHub 运行 42389295008](https://github.com/engcapa/taomni/actions/runs/42389295008) 成功，测试提交为 `9396929d427e5bb22e79a6a2952c41e94f5ad2db`。
+
+| 环境 | Browser | Native QA release | 失败 / 跳过 |
+| --- | --- | --- | --- |
+| Linux：Ubuntu 24.04 / Xvfb / WebKitGTK，22.04 构建 | 11/11 | 12/12 | 0 / 0 |
+| Windows 2025 x64 / WebView2 | 11/11 | 12/12 | 0 / 0 |
+| macOS 15 ARM64 / WKWebView | 11/11 | 12/12 | 0 / 0 |
+
+合计 browser 33/33、native 36/36，69/69 通过。新指南与原有飞书配置/vault 用例在全部六种组合中均通过，完整崩溃回归也全部通过。原始 selection、summary、receipt、截图位于 `qa-ui-auto-report/github/42389295008/`；汇总 `passed=true`、`report_ok=true`，没有缺失用例、身份不匹配、能力缺口或基础设施错误。每个平台只构建一个匹配源码的 QA release runtime，四个 native 分片共享其原始 binary 身份。
+
+下载全部原始报告后，另以 `ci_collect.py` 和 `qa_ui_auto.ci report` 独立复核源码、用例、runner receipt、配置与 QA binary 身份；结果同为 `passed=true`、`report_ok=true`。复核报告保留在 `qa-ui-auto-report/github/42389295008/verified/`，没有改写原始 receipt。
+
+GitHub 构建前还执行了完整前端单测：695 个文件通过，6353 项通过、1 项按 TerminalPanel 原有编译标记条件跳过（生产文本扫描与 QA 文本镜像为互斥场景）；本次飞书相关测试没有跳过。真实 Rust mobile 契约 97/97 通过。另以本机 Chrome 进行中英文界面检查、Enter/Space 操作和草稿保留检查，运行时错误为 0；截图位于 `qa-ui-auto-report/_local/feishu-guide/visual/`，属于诊断证据，不替代上述 GitHub QA 结果。
+
+首轮 GitHub 运行 `42389247443` 因传错测试 head 参数而取消，没有作为用例通过证据。之后使用实际完整提交 SHA 启动上述成功运行，保留取消记录。
 
 真实飞书租户的管理员授权、机器人收发消息和系统浏览器实际打开不作为自动化通过声明；需使用用户自己的应用配置验证。
