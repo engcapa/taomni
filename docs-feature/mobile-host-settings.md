@@ -57,4 +57,22 @@
 - QA runner 单元契约：**31 passed**；新 YAML schema、所选三平台计划均通过，`gaps=[]`、`unreviewed=[]`。`qa_ui_auto.audit --gate` 通过，未放宽 coverage baseline。
 - 独立只读评审发现并修正了端口校验、IPv6 bracket 后非法后缀，以及旧下划线主机名的兼容问题；相应断言保留。
 - 按用户要求，browser/native 统一通过 `.github/workflows/qa-ui-auto-platforms.yml` 在 GitHub 执行，不以本机旧 QA 二进制代替。计划：`scope=selected`、`platforms=linux,windows,macos`、`modes=browser,native`、`native_release=true`、`tags=crash-regression`，额外选取 `TC-MOBILE-001/002/003/004/005/010/014/015`。共 **84 次**执行（Linux browser 13/native 17，Windows 与 macOS 各 browser 13/native 14），无不可达用例。
-- 补充 SettingsPanel 后聚焦复验为 **5 文件／34 passed**；全量复验仍在运行。首次 GitHub run `42335198753`（提交 `af91696f3`）在本机全量单测发现旧搜索断言后主动取消，不作为 UI 通过证据；后续在修正提交上重新触发相同选择。GitHub 实际运行结果待记录，计划成功不等于运行通过。正式安装实例及其配置保持不变。
+- 补充 SettingsPanel 后聚焦复验为 **5 文件／34 passed**；本机全量复验 **694 文件全部通过，6349 passed／1 原有 skipped／0 failed**。GitHub Linux 构建任务再次运行相同全量测试，计数一致。
+- 首次 GitHub run `42335198753`（提交 `af91696f3`）在本机全量单测发现旧搜索断言后主动取消，不作为 UI 通过证据。修正提交 `ba453bab2595813634786de4e3208cb75304b382` 的 [GitHub run 42335544216](https://github.com/engcapa/taomni/actions/runs/42335544216) **success**，实际结果如下。
+
+| 平台／模式 | 通过／选中 | 失败 | 跳过 |
+| --- | ---: | ---: | ---: |
+| Linux browser | 13/13 | 0 | 0 |
+| Linux native | 17/17 | 0 | 0 |
+| Windows browser | 13/13 | 0 | 0 |
+| Windows native | 14/14 | 0 | 0 |
+| macOS browser | 13/13 | 0 | 0 |
+| macOS native | 14/14 | 0 | 0 |
+| **合计** | **84/84** | **0** | **0** |
+
+- 三个平台的 browser、native release 构建、12 个 native 分片、Linux Rust contracts 及最终汇总任务均成功。`passed=true`、`report_ok=true`，无基础设施错误、缺失证据、未审用例或 capability gaps。只属于 browser 或 Linux native 的既有场景按已声明范围纳入，不把不适用的平台组合伪称通过。
+- 完整 `crash-regression` 已在三平台适用的 browser/native 模式运行。新 `TC-MOBILE-014` 六种平台／模式均通过；新 `TC-MOBILE-015` 三平台原生均通过，每份原始 receipt 含 **60 项检查**，覆盖 default/explicit/allow-all/restricted 四阶段，三次保存前后同一个事件 WebSocket 均可用，Origin、配对和 Bearer 拒绝仍符合预期。
+- Hosted Linux Rust 契约 **97 passed／0 failed／0 ignored**（包含移动模块 74 项及新增 7 项）；独立 mobile/frontend contracts **122 passed**。完整前端全量 **6349 passed／1 原有 skipped**。
+- 原始 selection、报告、截图、receipt、native build identity 和 build/contracts 日志已下载至 ignored `qa-ui-auto-report/_local/mobile-host-evidence-mKfYNz/`，每份 artifact 独立目录。未改写原始证据，使用 `ci_collect.py` 收集至 `mobile-host-collected-coFANh/` 后独立 `qa_ui_auto.ci report` 再汇总；各组合计数、通过判定、source head 和三平台 binary hashes 与 hosted summary 完全一致。截图已核对：中英文风险提示可见，无空白页面，开启全域保留白名单，受限模式列表可编辑。
+- 对应 native release SHA-256：Linux `ddf522be68bcc68d9a500992f3ee54f4fd88c218c2ed51a9e57396bce60b671f`；Windows `1b6c04f11f8a1272f0f52ebdc3ce42407348371a15e53ddbee203abdaef58c3c`；macOS ARM64 `8ebf1d9fe02e57ad027e5f722f325b1d6ee360f9cd8c80d5b27b049c3bd83f42`。
+- 本轮 hosted 平台为 Ubuntu 24.04 Xvfb/Openbox/xcompmgr、Windows 2025 runner、macOS 15 ARM64；不推定其他架构／系统版本、物理手机或用户的真实阿里云网关均已验证。未变更标准快捷键、AppKit 菜单或原生窗口控件，未声称完成物理键盘／菜单栏点击测试。正式安装实例及其配置未由本次开发修改。
