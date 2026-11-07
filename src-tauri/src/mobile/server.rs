@@ -15,7 +15,7 @@ use tokio_util::sync::CancellationToken;
 #[derive(Clone)]
 pub struct Service {
     pub core: Core,
-    pub hosts: Arc<std::collections::HashSet<String>>,
+    pub hosts: Arc<std::sync::RwLock<super::listener_policy::HostPolicy>>,
     pub runtime: Arc<MobileRuntime>,
     pub cancel: CancellationToken,
 }
@@ -98,7 +98,7 @@ async fn cors(State(s): State<Service>, request: axum::extract::Request, next: N
         .and_then(|v| v.to_str().ok())
         .unwrap_or("")
         .to_ascii_lowercase();
-    if !s.hosts.contains(&host) {
+    if !s.hosts.read().is_ok_and(|policy| policy.allows(&host)) {
         return ApiError("host_denied".into()).into_response();
     }
     let path = request.uri().path();

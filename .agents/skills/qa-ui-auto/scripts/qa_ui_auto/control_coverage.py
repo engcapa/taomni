@@ -228,6 +228,12 @@ def _touches_for_case(case) -> list[Touch]:  # case: TestCase
         if not isinstance(step, dict) or len(step) != 1:
             continue
         verb, args = step_verb_and_args(step)
+        if verb == "mobile_service_probe" and args == "host-policy":
+            interacted = ("mobile-settings-allowed-hosts", "mobile-settings-allow-all-hosts", "mobile-settings-save-hosts")
+            observed = ("mobile-settings-status", "mobile-settings-code", "mobile-settings-hosts-saved")
+            for names, kind in ((interacted, "interactive"), (observed, "display")):
+                out.extend(Touch(case_id=case.id, selector=f'[data-testid="{name}"]', kind=kind) for name in names)
+            continue
         if verb in {"mobile_browser_probe", "mobile_service_probe"} and args == "cookie-gateway":
             interacted = (
                 "mobile-first-instance", "mobile-pair-code", "mobile-pair-submit",

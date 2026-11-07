@@ -12,7 +12,7 @@ const initial = () => ({ enabled: false, address: null as string | null, failed_
 
 beforeEach(() => {
   setLocale("en");
-  ipc.mockResolvedValue(initial());
+  ipc.mockImplementation(async command => command === "mobile_listener_get" ? { allowed_hosts: [], allow_all_hosts: false } : initial());
 });
 afterEach(() => {
   cleanup();
@@ -40,7 +40,8 @@ it("translates disabled settings immediately without resetting edited listener o
 
 it("localizes pairing, device metadata and counters while keeping native actions unchanged", async () => {
   const status = { ...initial(), enabled: true, address: "127.0.0.1:8787", devices: [{ device_id: "phone", label: "QA Phone", origin: null, last_used_at: 1700000000 }] };
-  ipc.mockImplementation(async (command) => command === "mobile_pairing_code" ? "QA-PAIR-CODE" : status);
+  ipc.mockImplementation(async (command) => command === "mobile_pairing_code" ? "QA-PAIR-CODE"
+    : command === "mobile_listener_get" ? { allowed_hosts: [], allow_all_hosts: false } : status);
   render(<MobileServiceSettings />);
   await screen.findByText("Running · 127.0.0.1:8787");
   expect(screen.getByTestId("mobile-settings-failures")).toHaveTextContent("Failed pairing attempts: 2");

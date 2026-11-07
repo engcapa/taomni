@@ -11,6 +11,7 @@ mod file_watch;
 pub mod headless;
 mod headless_ops;
 mod listener_policy;
+pub use listener_policy::ListenerConfig;
 pub mod pty_broker;
 mod replay;
 mod server;
@@ -90,6 +91,7 @@ pub struct Running {
     pub address: String,
     pub cancel: CancellationToken,
     pub task: tokio::task::JoinHandle<()>,
+    hosts: Arc<std::sync::RwLock<listener_policy::HostPolicy>>,
 }
 impl Default for MobileRuntime {
     fn default() -> Self {
@@ -195,16 +197,16 @@ impl MobileRuntime {
         let cancel = CancellationToken::new();
         let task_cancel = cancel.clone();
         let runtime = self.clone();
-        let hosts = Arc::new(listener_policy::hosts(
+        let hosts = Arc::new(std::sync::RwLock::new(listener_policy::HostPolicy::load(
             &data,
             listener
                 .local_addr()
                 .map_err(|_| "mobile_address_unavailable")?
                 .port(),
             lan,
-        )?);
+        )?));
         let service = server::Service {
-            hosts,
+            hosts: hosts.clone(),
             core,
             runtime: self.clone(),
             cancel: cancel.clone(),
@@ -232,8 +234,38 @@ impl MobileRuntime {
             address: address.clone(),
             cancel,
             task,
+            hosts,
         });
         Ok(address)
+    }
+    pub async fn listener_config(&self, data: &std::path::Path) -> Result<ListenerConfig, String> {
+        let running = self.lifecycle.lock().await;
+        if let Some(r) = running.as_ref().filter(|r| !r.task.is_finished()) {
+            return r
+                .hosts
+                .read()
+                .map(|policy| policy.config.clone())
+                .map_err(|_| "mobile_listener_unavailable".into());
+        }
+        ListenerConfig::load(data)
+    }
+    pub async fn save_listener_config(
+        &self,
+        data: &std::path::Path,
+        config: ListenerConfig,
+    ) -> Result<ListenerConfig, String> {
+        let config = config.normalized()?;
+        // Serialize with start/stop so the persisted and active policies cannot
+        // diverge. Persist successfully before admitting requests under it.
+        let running = self.lifecycle.lock().await;
+        if let Some(r) = running.as_ref().filter(|r| !r.task.is_finished()) {
+            let mut policy = r.hosts.write().map_err(|_| "mobile_listener_unavailable")?;
+            config.save(data)?;
+            policy.config = config.clone();
+        } else {
+            config.save(data)?;
+        }
+        Ok(config)
     }
     pub async fn stop(&self) {
         self.open_requests.cancel_pending(None);
@@ -253,6 +285,9 @@ impl MobileRuntime {
 
 #[cfg(test)]
 mod service_tests;
+
+#[cfg(test)]
+mod listener_tests;
 
 #[cfg(test)]
 mod task_tests;

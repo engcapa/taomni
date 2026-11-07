@@ -25,9 +25,9 @@ describe("settingsSearch groups", () => {
   });
 
   it("returns ordered unique group ids for multi-group matches", () => {
-    // "proxy" hits app-proxy (network) then ai-acp (ai).
+    // "proxy" also finds Mobile Web reverse-proxy domains in network settings.
     const ids = matchingIds("proxy", t);
-    expect(ids).toEqual(["app-proxy", "ai-acp"]);
+    expect(ids).toEqual(["app-proxy", "mobile-service", "ai-acp"]);
     expect(matchingGroupIds(ids)).toEqual(["network", "ai"]);
   });
 
@@ -46,7 +46,7 @@ describe("settingsSearch groups", () => {
 
   it.each(["en", "zh-CN"] as const)("finds mobile settings through localized visible titles in %s", locale => {
     setLocale(locale);
-    for (const key of ["mobileSettings.title", "mobileSettings.allowOpenSessions", "feishuSettings.title"]) {
+    for (const key of ["mobileSettings.title", "mobileSettings.allowOpenSessions", "mobileSettings.hostsTitle", "mobileSettings.allowAllHosts", "feishuSettings.title"]) {
       expect(matchingIds(translate(key), translate)).toContain("mobile-service");
     }
     expect(groupIdForEntry("mobile-service")).toBe("network");

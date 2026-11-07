@@ -28,6 +28,8 @@ def setup(ctx):
     seed_sessions(ctx, sessions)
     ctx.values["mobile_native_receipt"] = str((Path(ctx.case_dir) / "mobile-native-receipt.json").resolve())
     ctx.values["mobile_headless_receipt"] = str((Path(ctx.case_dir) / "headless-receipt.json").resolve())
+    if ctx.case_id == 'TC-MOBILE-015':
+        ctx.values['mobile_host_policy_receipt'] = str((Path(ctx.case_dir) / 'mobile-host-policy-receipt.json').resolve())
     if ctx.case_id == 'TC-MOBILE-013':
         ctx.values['mobile_cookie_receipt'] = str((Path(ctx.case_dir) / 'mobile-cookie-gateway-receipt.json').resolve())
         ctx.values['mobile_cookie_marker'] = str((Path(ctx.case_dir) / 'gateway-real-pty-marker.txt').resolve())

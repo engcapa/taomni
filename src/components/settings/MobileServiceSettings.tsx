@@ -4,6 +4,7 @@ import { useLocale, useT } from "../../lib/i18n";
 import { qrSvgModel, type QrSvgModel } from "../../lib/mfa/qrSvg";
 import { FeishuAdapterSettings } from "./FeishuAdapterSettings";
 import { mobileSettingsError } from "./mobileSettingsError";
+import { MobileHostSettings } from "./MobileHostSettings";
 
 interface Device { device_id: string; label: string; origin: string | null; last_used_at: number }
 interface Status { enabled: boolean; address: string | null; failed_attempts: number; devices: Device[]; allow_open_sessions?: boolean }
@@ -71,6 +72,7 @@ export function MobileServiceSettings() {
         if (next.address) setEndpoint(next.address);
       })}>{t(status.enabled ? "mobileSettings.disable" : "mobileSettings.enable")}</button>
     </div>
+    <MobileHostSettings />
     <label className="mt-3 block">
       <input data-testid="mobile-settings-open-sessions" type="checkbox" checked={!!status.allow_open_sessions} disabled={busy} onChange={e => {
         const enabled = e.target.checked;
