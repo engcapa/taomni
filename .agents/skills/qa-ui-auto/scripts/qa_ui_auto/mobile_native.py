@@ -243,4 +243,7 @@ def register(verb, terminal_input):
             from .mobile_cookie_probe import probe
             probe(address(ctx), text(ctx, '[data-testid="mobile-settings-code"]'), ctx.case_dir, real_pty=True)
             return 'Authenticated gateway, embedded phone bundle and real PTY marker passed'
-        raise StepError('mobile_service_probe requires desktop, headless, open-session, connection-auth, openssh-cancel or cookie-gateway')
+        if args == 'host-policy':
+            from .mobile_host_policy import run as host_policy
+            return host_policy(ctx, address(ctx), text(ctx, '[data-testid="mobile-settings-code"]'))
+        raise StepError('mobile_service_probe requires desktop, headless, open-session, connection-auth, openssh-cancel, cookie-gateway or host-policy')

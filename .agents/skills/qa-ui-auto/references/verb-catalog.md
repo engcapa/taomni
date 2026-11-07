@@ -416,6 +416,20 @@ matching QA executable with DISPLAY/WAYLAND_DISPLAY removed in a disposable
 profile, verifies health/pair/events/profile exclusion and clean shutdown.
 Receipts contain assertions and no pairing secrets. See TC-MOBILE-002/003.
 
+The additive `host-policy` argument (TC-MOBILE-015, Linux/Windows/macOS native)
+requires a real Settings listener on ephemeral loopback port 0 and an unused
+visible pairing code. It changes only the Host allowlist/allow-all controls using
+normal Settings input and Save. Independent loopback HTTP verifies default
+arbitrary-Host denial, exact hostname/port matching, allow-all and restored live
+restriction for health, embedded shell and authenticated APIs. Pairing codes,
+Origin and Bearer checks must remain enforced in each mode; the same existing
+paired `/events` WebSocket must respond after every save without a listener
+address change. No DNS, environment proxy, external server or direct config/IPC
+writer is used. The sanitized `mobile-host-policy-receipt.json` omits credentials;
+`mobile_service` binds `${fixture.mobile_host_policy_receipt}`. The probe ends in
+restricted mode with its explicit list preserved. TC-MOBILE-014 separately covers
+browser/native Settings persistence, reloads and EN/ZH security warnings.
+
 The additive `open-session` argument (TC-MOBILE-005) requires Settings with a
 running listener, an unused pairing code, the open-sessions checkbox off, and
 no terminal tabs. With the `mobile_service` fixture it pairs two external devices,

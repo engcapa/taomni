@@ -1,4 +1,4 @@
-use super::{Core, MobileRuntime};
+use super::{Core, ListenerConfig, MobileRuntime};
 use crate::state::AppState;
 use serde_json::{Value, json};
 use tauri::State;
@@ -46,6 +46,27 @@ pub async fn mobile_start(
 pub async fn mobile_stop(state: State<'_, AppState>) -> Result<Value, String> {
     state.mobile.stop().await;
     status(&state.mobile).await
+}
+#[tauri::command]
+pub async fn mobile_listener_get(
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<ListenerConfig, String> {
+    state
+        .mobile
+        .listener_config(&crate::resolved_app_data_dir(&app)?)
+        .await
+}
+#[tauri::command]
+pub async fn mobile_listener_save(
+    config: ListenerConfig,
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<ListenerConfig, String> {
+    state
+        .mobile
+        .save_listener_config(&crate::resolved_app_data_dir(&app)?, config)
+        .await
 }
 #[tauri::command]
 pub async fn mobile_pairing_code(state: State<'_, AppState>) -> Result<String, String> {

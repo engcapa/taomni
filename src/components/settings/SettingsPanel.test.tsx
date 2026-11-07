@@ -217,14 +217,16 @@ describe("SettingsPanel", () => {
     await user.type(search, "proxy");
 
     const proxy = container.querySelector('[data-search-id="app-proxy"]');
+    const mobile = container.querySelector('[data-search-id="mobile-service"]');
     const acp = container.querySelector('[data-search-id="ai-acp"]');
     const language = container.querySelector('[data-search-id="language"]');
     expect(proxy).toHaveAttribute("data-search-match", "true");
+    expect(mobile).toHaveAttribute("data-search-match", "true");
     expect(acp).toHaveAttribute("data-search-match", "true");
     expect(language).toHaveAttribute("data-search-match", "false");
 
-    // Application Proxy and ACP proxy policy are separate searchable units.
-    expect(screen.getByTestId("settings-search-count")).toHaveTextContent("1 / 2");
+    // App proxy, Mobile Web reverse-proxy domains and ACP are separate results.
+    expect(screen.getByTestId("settings-search-count")).toHaveTextContent("1 / 3");
     // Matches span Network + AI groups.
     expect(screen.getByTestId("settings-search-group-count")).toHaveTextContent("2 groups");
     expect(screen.getByTestId("settings-group-network")).toHaveAttribute("data-expanded", "true");
@@ -253,13 +255,21 @@ describe("SettingsPanel", () => {
 
     expect(screen.getByTestId("settings-group-network")).toHaveAttribute("data-expanded", "true");
     expect(screen.getByTestId("settings-group-ai")).toHaveAttribute("data-expanded", "true");
-    expect(screen.getByTestId("settings-search-count")).toHaveTextContent("1 / 2");
+    expect(screen.getByTestId("settings-search-count")).toHaveTextContent("1 / 3");
 
     await user.click(screen.getByRole("button", { name: "Next match" }));
-    expect(screen.getByTestId("settings-search-count")).toHaveTextContent("2 / 2");
+    expect(screen.getByTestId("settings-search-count")).toHaveTextContent("2 / 3");
+    expect(document.querySelector('[data-search-id="mobile-service"]')).toHaveStyle({ outline: "2px solid var(--taomni-accent)" });
+
+    await user.click(screen.getByRole("button", { name: "Next match" }));
+    expect(screen.getByTestId("settings-search-count")).toHaveTextContent("3 / 3");
+    expect(document.querySelector('[data-search-id="ai-acp"]')).toHaveStyle({ outline: "2px solid var(--taomni-accent)" });
 
     await user.click(screen.getByRole("button", { name: "Previous match" }));
-    expect(screen.getByTestId("settings-search-count")).toHaveTextContent("1 / 2");
+    expect(screen.getByTestId("settings-search-count")).toHaveTextContent("2 / 3");
+    expect(document.querySelector('[data-search-id="mobile-service"]')).toHaveStyle({ outline: "2px solid var(--taomni-accent)" });
+    await user.click(screen.getByRole("button", { name: "Previous match" }));
+    expect(screen.getByTestId("settings-search-count")).toHaveTextContent("1 / 3");
   });
 
   it("highlights Codex settings from a codex search query", async () => {

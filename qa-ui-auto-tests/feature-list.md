@@ -13382,9 +13382,12 @@ TC-WS-078 protects application menu ownership after ordinary-file activation: Cl
 id: F-MOBILE-1
 status: partial
 area: mobile/control-plane
-components: [MobileServiceSettings, MobileWeb, MobileRuntime]
+components: [MobileServiceSettings, MobileHostSettings, MobileWeb, MobileRuntime]
 files:
   - src/components/settings/MobileServiceSettings.tsx
+  - src/components/settings/MobileHostSettings.tsx
+  - src/lib/mobileListener.ts
+  - src-tauri/src/mobile/listener_policy.rs
   - src-tauri/src/mobile/mod.rs
   - src-tauri/src/mobile/server.rs
   - src-tauri/src/mobile/streams.rs
@@ -13540,6 +13543,27 @@ controls:
     kind: interactive
   - id: mobile-settings
     selector: '[data-testid="mobile-settings"]'
+    kind: display
+  - id: mobile-settings-hosts
+    selector: '[data-testid="mobile-settings-hosts"]'
+    kind: display
+  - id: mobile-settings-hosts-loading
+    selector: '[data-testid="mobile-settings-hosts-loading"]'
+    kind: display
+  - id: mobile-settings-allowed-hosts
+    selector: '[data-testid="mobile-settings-allowed-hosts"]'
+    kind: interactive
+  - id: mobile-settings-allow-all-hosts
+    selector: '[data-testid="mobile-settings-allow-all-hosts"]'
+    kind: interactive
+  - id: mobile-settings-save-hosts
+    selector: '[data-testid="mobile-settings-save-hosts"]'
+    kind: interactive
+  - id: mobile-settings-hosts-warning
+    selector: '[data-testid="mobile-settings-hosts-warning"]'
+    kind: display
+  - id: mobile-settings-hosts-saved
+    selector: '[data-testid="mobile-settings-hosts-saved"]'
     kind: display
   - id: mobile-settings-status
     selector: '[data-testid="mobile-settings-status"]'

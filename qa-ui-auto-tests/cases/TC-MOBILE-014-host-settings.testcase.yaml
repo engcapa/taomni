@@ -1,0 +1,133 @@
+id: TC-MOBILE-014
+title: Mobile Host allowlist and explicit allow-all persist without erasing restrictions
+covers: [F-MOBILE-1, F-I18n-1]
+tags: [mobile, settings, security, p0]
+modes: [browser, native]
+fixtures: [reset_db]
+timeout_sec: 150
+description: >-
+  Uses normal Settings controls in an isolated profile. Restricted defaults,
+  one-host-per-line entries, explicit allow-all, EN/ZH persistent security warnings,
+  and reload persistence must preserve the exact saved list while toggling all.
+  Browser proves renderer/stub wiring only; native repeats with real listener
+  config IPC/disk persistence. TC-MOBILE-015 owns independent real HTTP enforcement
+  and unchanged live-listener ownership. No external service or user config is used.
+steps:
+- open: ${cfg.app.base_url}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: mobile}
+- wait_for: '[data-testid="mobile-settings-hosts"] [data-testid="mobile-settings-save-hosts"]:not(:disabled)'
+- assert_not_visible: '[data-testid="mobile-settings-hosts-loading"]'
+- assert_count: {selector: '[data-testid="mobile-settings-allow-all-hosts"]:not(:checked)', equal: 1}
+- assert_attribute: {selector: '[data-testid="mobile-settings-allowed-hosts"]', name: value, equals: ''}
+- assert_text_equals:
+    selector: '[data-testid="mobile-settings-hosts-warning"]'
+    equals: Allowing all domains disables Host validation and DNS rebinding protection. Pairing, Origin checks, bearer tokens and one-time WebSocket tickets are still required. Only enable this for a trusted reverse proxy.
+- fill:
+    selector: '[data-testid="mobile-settings-allowed-hosts"]'
+    value: "qa-proxy.example.invalid\nqa-proxy-port.example.invalid:18443"
+- click: '[data-testid="mobile-settings-save-hosts"]'
+- wait_for: '[data-testid="mobile-settings-hosts-saved"]'
+- assert_attribute:
+    selector: '[data-testid="mobile-settings-allowed-hosts"]'
+    name: value
+    equals: "qa-proxy.example.invalid\nqa-proxy-port.example.invalid:18443"
+- click: '[data-testid="mobile-settings-allow-all-hosts"]'
+- assert_count: {selector: '[data-testid="mobile-settings-allow-all-hosts"]:checked', equal: 1}
+- assert_attribute:
+    selector: '[data-testid="mobile-settings-allowed-hosts"]'
+    name: value
+    equals: "qa-proxy.example.invalid\nqa-proxy-port.example.invalid:18443"
+- assert_text_equals:
+    selector: '[data-testid="mobile-settings-hosts-warning"]'
+    equals: Allowing all domains disables Host validation and DNS rebinding protection. Pairing, Origin checks, bearer tokens and one-time WebSocket tickets are still required. Only enable this for a trusted reverse proxy.
+- click: '[data-testid="mobile-settings-save-hosts"]'
+- wait_for: '[data-testid="mobile-settings-hosts-saved"]'
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-zh-CN"]'
+- assert_text_equals:
+    selector: '[data-testid="mobile-settings-hosts-warning"]'
+    equals: 允许所有域名会关闭 Host 校验及 DNS 重绑定防护，但仍需配对、Origin 校验、令牌及一次性 WebSocket 票据。仅在可信反向代理环境下开启。
+- assert_count: {selector: '[data-testid="mobile-settings-allow-all-hosts"]:checked', equal: 1}
+- assert_attribute:
+    selector: '[data-testid="mobile-settings-allowed-hosts"]'
+    name: value
+    equals: "qa-proxy.example.invalid\nqa-proxy-port.example.invalid:18443"
+- screenshot: mobile-host-settings-zh-all.png
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- reload_window: null
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: mobile}
+- wait_for: '[data-testid="mobile-settings-save-hosts"]:not(:disabled)'
+- assert_count: {selector: '[data-testid="mobile-settings-allow-all-hosts"]:checked', equal: 1}
+- assert_attribute:
+    selector: '[data-testid="mobile-settings-allowed-hosts"]'
+    name: value
+    equals: "qa-proxy.example.invalid\nqa-proxy-port.example.invalid:18443"
+- assert_text_equals:
+    selector: '[data-testid="mobile-settings-hosts-warning"]'
+    equals: Allowing all domains disables Host validation and DNS rebinding protection. Pairing, Origin checks, bearer tokens and one-time WebSocket tickets are still required. Only enable this for a trusted reverse proxy.
+- click: '[data-testid="mobile-settings-allow-all-hosts"]'
+- click: '[data-testid="mobile-settings-save-hosts"]'
+- wait_for: '[data-testid="mobile-settings-hosts-saved"]'
+- assert_count: {selector: '[data-testid="mobile-settings-allow-all-hosts"]:not(:checked)', equal: 1}
+- assert_attribute:
+    selector: '[data-testid="mobile-settings-allowed-hosts"]'
+    name: value
+    equals: "qa-proxy.example.invalid\nqa-proxy-port.example.invalid:18443"
+- reload_window: null
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: mobile}
+- wait_for: '[data-testid="mobile-settings-save-hosts"]:not(:disabled)'
+- assert_count: {selector: '[data-testid="mobile-settings-allow-all-hosts"]:not(:checked)', equal: 1}
+- assert_attribute:
+    selector: '[data-testid="mobile-settings-allowed-hosts"]'
+    name: value
+    equals: "qa-proxy.example.invalid\nqa-proxy-port.example.invalid:18443"
+- assert_text_equals:
+    selector: '[data-testid="mobile-settings-hosts-warning"]'
+    equals: Allowing all domains disables Host validation and DNS rebinding protection. Pairing, Origin checks, bearer tokens and one-time WebSocket tickets are still required. Only enable this for a trusted reverse proxy.
+- screenshot: mobile-host-settings-en-restricted.png
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Restricted defaults and multiline exact authorities are visible; explicitly enabling all never clears the saved restriction list and keeps the security warning visible in English and Chinese.
+    actions: [1, 2, 3, 9, 10, 13, 17, 19, 20]
+    checkpoints:
+    - {step: 5, expectation: Initial config loading has completed before editing.}
+    - {step: 6, expectation: Fresh profile does not implicitly enable all domains.}
+    - {step: 7, expectation: No extra authorities are configured by default.}
+    - {step: 8, expectation: English warning explains reduced Host/DNS-rebinding protection and retained Origin/auth protection even when all is off.}
+    - {step: 12, expectation: Both the hostname and explicit hostname-port entry remain separate saved lines.}
+    - {step: 14, expectation: Allow-all is explicitly selected by the user.}
+    - {step: 15, expectation: Enabling all retains the complete allowlist.}
+    - {step: 16, expectation: English security warning stays visible with allow-all selected.}
+    - {step: 21, expectation: Chinese warning explains the same security boundary.}
+    - {step: 22, expectation: Language switch does not revert allow-all.}
+    - {step: 23, expectation: Language switch does not discard the list.}
+    results: [5, 6, 7, 8, 12, 14, 15, 16, 21, 22, 23]
+  - id: R2
+    requirement: Reloading restores both allow-all and the full whitelist; switching back to restricted and reloading retains the whitelist and explicit false value.
+    actions: [25, 26, 27, 28, 29, 34, 35, 39, 40, 41]
+    checkpoints:
+    - {step: 31, expectation: Saved allow-all survives renderer reload and fresh Settings mount.}
+    - {step: 32, expectation: Saved list survives while allow-all is persisted.}
+    - {step: 33, expectation: English warning remains complete after remount.}
+    - {step: 37, expectation: Explicitly returning to restricted unchecks allow-all.}
+    - {step: 38, expectation: Returning to restricted restores the original exact list.}
+    - {step: 43, expectation: Restricted false value survives another reload.}
+    - {step: 44, expectation: Restricted list survives another reload unchanged.}
+    - {step: 45, expectation: Warning remains visible in restricted mode.}
+    - {step: 47, expectation: No renderer runtime errors.}
+    results: [31, 32, 33, 37, 38, 43, 44, 45, 47]
+  visual:
+  - check: English and Chinese labels and the always-visible security warning remain readable.
+    method: manual
+    reason: Retained screenshots support wrapping review, not an automated visual verdict.
+  native:
+  - check: Host settings load and save through actual Tauri IPC and persist across renderer reloads in an isolated QA profile.
+    method: automated
+    reason: Browser stubs cannot establish native config persistence; TC-MOBILE-015 independently verifies real HTTP and live listener behavior.

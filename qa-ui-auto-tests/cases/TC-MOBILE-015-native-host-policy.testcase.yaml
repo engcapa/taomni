@@ -1,0 +1,73 @@
+id: TC-MOBILE-015
+title: Native mobile Host policy switches live while Origin pairing and Bearer remain enforced
+covers: [F-MOBILE-1]
+tags: [mobile, settings, security, p0]
+modes: [native]
+fixtures: [reset_db, mobile_service]
+timeout_sec: 180
+description: >-
+  Starts the actual packaged listener through Settings on an ephemeral loopback
+  port. An external HTTP client sends synthetic Host headers without resolving
+  them or using environment proxies. Default arbitrary Host denial, explicit
+  exact-authority matching, allow-all, and restored live restriction are verified
+  against health, embedded shell and authenticated APIs. One paired event socket
+  must remain usable at the same address across every Settings save. Missing or
+  invalid Bearer, unpaired Origin and invalid pairing codes remain rejected in
+  each policy. Config changes use only real Settings controls; receipts omit
+  tokens and codes. TC-MOBILE-014 owns browser/native persistence and EN/ZH warnings.
+steps:
+- open: ${cfg.app.base_url}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: mobile}
+- wait_for: '[data-testid="mobile-settings-save-hosts"]:not(:disabled)'
+- assert_not_visible: '[data-testid="mobile-settings-hosts-loading"]'
+- assert_count: {selector: '[data-testid="mobile-settings-allow-all-hosts"]:not(:checked)', equal: 1}
+- fill: {selector: '[data-testid="mobile-settings-port"]', value: '0'}
+- click: '[data-testid="mobile-settings-toggle"]'
+- assert_text: {selector: '[data-testid="mobile-settings-status"]', contains: Running}
+- click: '[data-testid="mobile-settings-pair"]'
+- wait_for: '[data-testid="mobile-settings-code"]'
+- mobile_service_probe: host-policy
+- assert_file_contains: {path: '${fixture.mobile_host_policy_receipt}', contains: '"passed": true'}
+- assert_count: {selector: '[data-testid="mobile-settings-allow-all-hosts"]:not(:checked)', equal: 1}
+- assert_attribute:
+    selector: '[data-testid="mobile-settings-allowed-hosts"]'
+    name: value
+    equals: "qa-proxy.example.invalid\nqa-proxy-port.example.invalid:18443"
+- assert_text: {selector: '[data-testid="mobile-settings-status"]', contains: Running}
+- screenshot: mobile-native-host-policy-restricted.png
+- press: {selector: '[data-testid="mobile-settings-toggle"]', key: Enter}
+- assert_text: {selector: '[data-testid="mobile-settings-status"]', contains: Disabled}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A fresh real listener rejects arbitrary Host; explicit hostnames and host-port authorities match exactly; allowing all admits arbitrary Host and returning to restricted reinstates exact matching.
+    actions: [1, 2, 3, 7, 8, 10, 12]
+    checkpoints:
+    - {step: 6, expectation: Allow-all is false in the isolated native defaults.}
+    - {step: 9, expectation: Listener starts through the real Settings toggle.}
+    - {step: 12, expectation: 'Independent HTTP checks verify default host_denied, exact host and port boundaries, embedded shell protection, explicit allow-all, and restored restriction.'}
+    - {step: 13, expectation: Sanitized receipt is passing only after every real network assertion.}
+    - {step: 14, expectation: Probe finishes restricted rather than leaving allow-all enabled.}
+    - {step: 15, expectation: The original two explicit authorities remain intact after both toggles.}
+    results: [6, 9, 12, 13, 14, 15]
+  - id: R2
+    requirement: Saving host policy never restarts the listener or drops the existing paired event stream, and never bypasses Origin, pairing-code or Bearer authorization.
+    actions: [8, 10, 12, 18]
+    checkpoints:
+    - {step: 12, expectation: 'One event socket responds after all three saves at the same listener address; valid paired requests succeed while missing and invalid Bearer, unpaired Origin, invalid pair codes and unauthenticated ticket requests fail in every phase.'}
+    - {step: 13, expectation: Receipt includes completed live-socket and security assertions without credentials.}
+    - {step: 16, expectation: The same listener remains Running in Settings after the probe.}
+    - {step: 19, expectation: Explicit cleanup stops the isolated listener through its real toggle.}
+    - {step: 20, expectation: Desktop remains usable without runtime errors.}
+    results: [12, 13, 16, 19, 20]
+  visual:
+  - check: Final native restricted Settings state is retained for diagnosis.
+    method: manual
+    reason: Screenshot is diagnostic; network receipts establish policy behavior.
+  native:
+  - check: Real packaged HTTP middleware and live listener ownership under Settings saves on Linux Windows and macOS.
+    method: automated
+    reason: Loopback-only standard HTTP and existing WebDriver controls need no OS-global input; browser stubs cannot validate middleware, authentication or event-socket continuity. Declared modes are not evidence of execution on unavailable platforms.

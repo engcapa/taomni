@@ -2018,6 +2018,13 @@
 - `[data-testid="mobile-instance-open"]` — interactive — F-MOBILE-1.mobile-instance-open
 - `[data-testid="mobile-instance-remove"]` — interactive — F-MOBILE-1.mobile-instance-remove
 - `[data-testid="mobile-settings"]` — display — F-MOBILE-1.mobile-settings
+- `[data-testid="mobile-settings-hosts"]` — display — F-MOBILE-1.mobile-settings-hosts
+- `[data-testid="mobile-settings-hosts-loading"]` — display — F-MOBILE-1.mobile-settings-hosts-loading
+- `[data-testid="mobile-settings-allowed-hosts"]` — interactive — F-MOBILE-1.mobile-settings-allowed-hosts
+- `[data-testid="mobile-settings-allow-all-hosts"]` — interactive — F-MOBILE-1.mobile-settings-allow-all-hosts
+- `[data-testid="mobile-settings-save-hosts"]` — interactive — F-MOBILE-1.mobile-settings-save-hosts
+- `[data-testid="mobile-settings-hosts-warning"]` — display — F-MOBILE-1.mobile-settings-hosts-warning
+- `[data-testid="mobile-settings-hosts-saved"]` — display — F-MOBILE-1.mobile-settings-hosts-saved
 - `[data-testid="mobile-settings-status"]` — display — F-MOBILE-1.mobile-settings-status
 - `[data-testid="mobile-settings-port"]` — interactive — F-MOBILE-1.mobile-settings-port
 - `[data-testid="mobile-settings-toggle"]` — interactive — F-MOBILE-1.mobile-settings-toggle

@@ -90,7 +90,7 @@ P0 历史验证：[qa-ui-auto-platforms / 41228578529](https://github.com/engcap
 
 ## 评审后补充的部署边界
 
-Host 默认只允许监听端口对应的 loopback（LAN 模式额外包含当前网卡地址）。反向代理保留外部 Host 时，须在 profile 的 `mobile-listener.json` 写入 `{ "allowed_hosts": ["pc.example.com", "pc.example.com:8443"] }` 后重启服务；只填写实际使用的 authority。转发日志应隐藏 WS ticket 查询串。
+Host 默认只允许监听端口对应的 loopback（LAN 模式额外包含当前网卡地址）。反向代理保留外部 Host 时，可在 Settings → 移动服务的访问域名设置中添加 `pc.example.com`、`pc.example.com:8443` 等实际 authority，保存后立即生效；也可显式开启“允许所有域名”，但会失去 Host／DNS 重绑定防护，配对、Origin 与鉴权仍保留。配置兼容 profile 的 `mobile-listener.json`（`allowed_hosts` 和默认 false 的 `allow_all_hosts`）；手工改文件仍需重启服务。详见 [Mobile Web Host 设置](mobile-host-settings.md)。转发日志应隐藏 WS ticket 查询串。
 
 文件根拒绝根目录、家目录本身与本实例 profile/应用配置目录；默认拒绝 .ssh/.aws/.gnupg/.kube/.config/.git、.env 与常见私钥路径。子目录 Git 状态统一换算为任务根相对路径，Git 使用 literal pathspec、关闭 fsmonitor/external diff/textconv，特殊文件在打开前拒绝。已退出终端保留输出尾部，最多保留 64 个退出条目，显式关闭即删除。能从本地子进程取得退出码时发送实际值；SSH/不可取得时为 null。
 

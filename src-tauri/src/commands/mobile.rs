@@ -4,6 +4,8 @@ pub(super) fn handles(command: &str) -> bool {
         "mobile_status"
             | "mobile_start"
             | "mobile_stop"
+            | "mobile_listener_get"
+            | "mobile_listener_save"
             | "mobile_pairing_code"
             | "mobile_revoke"
             | "mobile_open_session_result"
@@ -27,6 +29,8 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         crate::mobile::mobile_status,
         crate::mobile::mobile_start,
         crate::mobile::mobile_stop,
+        crate::mobile::mobile_listener_get,
+        crate::mobile::mobile_listener_save,
         crate::mobile::mobile_pairing_code,
         crate::mobile::mobile_revoke,
         crate::mobile::session_open::mobile_open_session_result,
