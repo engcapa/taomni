@@ -51,10 +51,10 @@
 ## 验证执行
 
 - Node.js 22.23.4、pnpm 10.33.0；锁文件未修改。
-- 聚焦前端测试：4 个文件 **18 passed**（Host 设置、主移动设置、设置搜索、浏览器 stub）。
+- 首轮聚焦前端测试：4 个文件 **18 passed**（Host 设置、主移动设置、设置搜索、浏览器 stub）。全量首次运行 **6347 passed／2 failed／1 skipped**；两项为 SettingsPanel 原有 proxy 搜索仍期待 2 个结果，而 Mobile Web 反向代理设置已使结果变为 3 个。保留失败日志并修正计数，同时补充逐项活动高亮／前后导航断言，不移除搜索功能或断言。
 - `pnpm build`（包含 TypeScript、`check:refactor`、Mobile Web 和桌面生产 bundle）通过；`cargo fmt --manifest-path src-tauri/Cargo.toml -- --check` 通过。
 - Rust 移动模块真实测试：`cargo test --locked --offline --release --lib mobile:: -- --test-threads=2` **74 passed，0 failed，0 ignored**，包括 7 项新增配置与真实 HTTP/WS 测试；使用隔离的临时 profile，未运行本机 UI 套件。
 - QA runner 单元契约：**31 passed**；新 YAML schema、所选三平台计划均通过，`gaps=[]`、`unreviewed=[]`。`qa_ui_auto.audit --gate` 通过，未放宽 coverage baseline。
 - 独立只读评审发现并修正了端口校验、IPv6 bracket 后非法后缀，以及旧下划线主机名的兼容问题；相应断言保留。
 - 按用户要求，browser/native 统一通过 `.github/workflows/qa-ui-auto-platforms.yml` 在 GitHub 执行，不以本机旧 QA 二进制代替。计划：`scope=selected`、`platforms=linux,windows,macos`、`modes=browser,native`、`native_release=true`、`tags=crash-regression`，额外选取 `TC-MOBILE-001/002/003/004/005/010/014/015`。共 **84 次**执行（Linux browser 13/native 17，Windows 与 macOS 各 browser 13/native 14），无不可达用例。
-- GitHub 实际运行结果待触发后记录；计划成功不等于运行通过。正式安装实例及其配置保持不变。
+- 补充 SettingsPanel 后聚焦复验为 **5 文件／34 passed**；全量复验仍在运行。首次 GitHub run `42335198753`（提交 `af91696f3`）在本机全量单测发现旧搜索断言后主动取消，不作为 UI 通过证据；后续在修正提交上重新触发相同选择。GitHub 实际运行结果待记录，计划成功不等于运行通过。正式安装实例及其配置保持不变。
