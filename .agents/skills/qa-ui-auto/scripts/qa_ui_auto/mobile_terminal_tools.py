@@ -44,7 +44,10 @@ def run(page, report, peer_receipt):
     page.screenshot(path=str(report / 'mobile-copy-readonly.png'), full_page=True)
     page.get_by_test_id('mobile-terminal-copy-confirm').click()
     expect(page.get_by_test_id('mobile-terminal-copy-dialog')).to_have_count(0)
-    assert page.evaluate('navigator.clipboard.readText()') == snapshot
+    clipboard = page.evaluate('navigator.clipboard.readText()')
+    # The Windows system clipboard canonicalizes text line endings to CRLF.
+    # Normalize only those pairs; retain every other character and all spaces.
+    assert clipboard.replace('\r\n', '\n') == snapshot, 'Clipboard content differs from the output snapshot'
     expect(page.get_by_test_id('mobile-terminal-notice')).to_contain_text('已复制全部')
     expect(page.get_by_test_id('mobile-terminal-more')).to_be_focused()
     checks.append('readonly-copy-all-includes-scrollback-without-ANSI')
@@ -60,7 +63,7 @@ def run(page, report, peer_receipt):
     page.get_by_test_id('mobile-terminal-copy-confirm').click()
     expect(page.get_by_test_id('mobile-terminal-copy-dialog')).to_have_count(0)
     clipboard = page.evaluate('navigator.clipboard.readText()')
-    assert clipboard == selected['text'], {'selected': selected, 'copied': clipboard[:80], 'length': len(clipboard)}
+    assert clipboard.replace('\r\n', '\n') == selected['text'], {'selected': selected, 'copied': clipboard[:80], 'length': len(clipboard)}
     expect(page.get_by_test_id('mobile-terminal-notice')).to_contain_text('已复制所选')
     checks.append('standard-text-selection-copies-only-the-chosen-range')
 
