@@ -1,13 +1,5 @@
-import {
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  type MouseEvent as ReactMouseEvent,
-  type UIEvent as ReactUIEvent,
-} from "react";
-import { open as tauriOpen } from "@tauri-apps/plugin-shell";
-import { ArrowLeft, Archive, ArchiveRestore, CheckCircle2, Circle, Pin, Plus, Trash2, X } from "lucide-react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ArrowLeft, Archive, ArchiveRestore, CheckCircle2, Circle, Maximize2, Pin, Plus, Trash2, X } from "lucide-react";
 import type { NoteItem, StepInput, UpdateNoteInput } from "../../lib/notes";
 import { useNotesStore } from "../../stores/notesStore";
 import { confirmAppDialog } from "../../lib/appDialogs";
@@ -15,93 +7,15 @@ import { useT } from "../../lib/i18n";
 import { notesThemeStyle } from "../../lib/notes/notesTheme";
 import { NotesSelect } from "./NotesSelect";
 import { NoteDateTimeField } from "./NoteDateTimeField";
-import { extractNoteUrls, findNoteUrlAtIndex } from "../../lib/notes/noteLinks";
-import { isTauriRuntime } from "../../lib/runtime";
-import { renderLinkedNoteText } from "./NoteLinkText";
+import { NoteTextField } from "./NoteTextField";
+import { useNotesContentStore } from "../../stores/notesContentStore";
+import { NoteContentStatus } from "./NoteContentStatus";
+import { getNote } from "../../lib/notes";
+import { openNoteWorkspace } from "../../lib/notes/notesWorkspaceNavigation";
+import { useAppStore } from "../../stores/appStore";
 
 const COLOR_SWATCHES = ["#ef4444", "#f59e0b", "#10b981", "#3b82f6", "#8b5cf6", "#ec4899"];
 const PRIORITIES = [0, 1, 2, 3] as const;
-type TextCursor = "text" | "pointer";
-
-let noteTextMeasureContext: CanvasRenderingContext2D | null | undefined;
-
-function getTextMeasureContext(): CanvasRenderingContext2D | null {
-  if (noteTextMeasureContext !== undefined) return noteTextMeasureContext;
-  if (typeof document === "undefined") {
-    noteTextMeasureContext = null;
-    return noteTextMeasureContext;
-  }
-  noteTextMeasureContext = document.createElement("canvas").getContext("2d");
-  return noteTextMeasureContext;
-}
-
-function syncMeasureFont(ctx: CanvasRenderingContext2D, element: HTMLElement) {
-  const style = window.getComputedStyle(element);
-  ctx.font = style.font || `${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
-}
-
-function textIndexAtX(ctx: CanvasRenderingContext2D, line: string, startIndex: number, x: number): number {
-  if (x <= 0) return startIndex;
-  let previousWidth = 0;
-  for (let i = 0; i < line.length; i += 1) {
-    const width = ctx.measureText(line.slice(0, i + 1)).width;
-    if (x < (previousWidth + width) / 2) return startIndex + i;
-    previousWidth = width;
-  }
-  return startIndex + line.length;
-}
-
-function pointToInputTextIndex(
-  element: HTMLInputElement | HTMLTextAreaElement,
-  text: string,
-  clientX: number,
-  clientY: number,
-): number | null {
-  const ctx = getTextMeasureContext();
-  if (!ctx) return null;
-  const style = window.getComputedStyle(element);
-  syncMeasureFont(ctx, element);
-  const rect = element.getBoundingClientRect();
-  const paddingLeft = Number.parseFloat(style.paddingLeft) || 0;
-  const paddingRight = Number.parseFloat(style.paddingRight) || 0;
-  const paddingTop = Number.parseFloat(style.paddingTop) || 0;
-  const fontSize = Number.parseFloat(style.fontSize) || 12;
-  const parsedLineHeight = Number.parseFloat(style.lineHeight);
-  const lineHeight = Number.isFinite(parsedLineHeight) ? parsedLineHeight : fontSize * 1.35;
-  const x = clientX - rect.left - paddingLeft + element.scrollLeft;
-
-  if (element instanceof HTMLInputElement) {
-    return textIndexAtX(ctx, text, 0, x);
-  }
-
-  const y = clientY - rect.top - paddingTop + element.scrollTop;
-  const contentWidth = Math.max(1, element.clientWidth - paddingLeft - paddingRight);
-  const lines: Array<{ start: number; text: string }> = [];
-  let lineStart = 0;
-  let lineText = "";
-  for (let i = 0; i < text.length; i += 1) {
-    const char = text[i];
-    if (char === "\n") {
-      lines.push({ start: lineStart, text: lineText });
-      lineStart = i + 1;
-      lineText = "";
-      continue;
-    }
-    const next = `${lineText}${char}`;
-    if (lineText && ctx.measureText(next).width > contentWidth) {
-      lines.push({ start: lineStart, text: lineText });
-      lineStart = i;
-      lineText = char;
-    } else {
-      lineText = next;
-    }
-  }
-  lines.push({ start: lineStart, text: lineText });
-  const visualLineIndex = Math.max(0, Math.min(lines.length - 1, Math.floor(y / lineHeight)));
-  const line = lines[visualLineIndex];
-  return textIndexAtX(ctx, line.text, line.start, x);
-}
-
 interface NoteEditorProps {
   note: NoteItem;
   onClose: () => void;
@@ -127,25 +41,26 @@ export function NoteEditor({ note, onClose }: NoteEditorProps) {
   const selectColor = themeStyle["--taomni-text" as keyof typeof themeStyle] as string | undefined;
   const selectBorder = themeStyle["--taomni-input-border" as keyof typeof themeStyle] as string | undefined;
 
-  const [title, setTitle] = useState(note.title);
-  const [body, setBody] = useState(note.body);
+  const document = useNotesContentStore((state) => state.documents[note.id]);
+  const title = document?.title ?? note.title;
+  const body = document?.body ?? note.body;
+  const setTitle = (value: string) => useNotesContentStore.getState().edit(note, { title: value });
+  const setBody = (value: string) => useNotesContentStore.getState().edit(note, { body: value });
+  const [openingWorkspace, setOpeningWorkspace] = useState(false);
   const [steps, setLocalSteps] = useState<StepInput[]>(() =>
     note.steps.map((s) => ({ id: s.id, title: s.title, completed_at: s.completed_at, sort_order: s.sort_order })),
   );
   const [tagIds, setTagIds] = useState<string[]>(() => note.tags.map((tg) => tg.id));
   const [newStep, setNewStep] = useState("");
   const [newTag, setNewTag] = useState("");
-  const [titleCursor, setTitleCursor] = useState<TextCursor>("text");
-  const [bodyCursor, setBodyCursor] = useState<TextCursor>("text");
   const noteIdRef = useRef(note.id);
-  const bodyLinkOverlayRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => { useNotesContentStore.getState().adopt(note); }, [note]);
 
   // Resync the draft when a different note is selected.
   useEffect(() => {
     if (noteIdRef.current !== note.id) {
       noteIdRef.current = note.id;
-      setTitle(note.title);
-      setBody(note.body);
       setLocalSteps(
         note.steps.map((s) => ({ id: s.id, title: s.title, completed_at: s.completed_at, sort_order: s.sort_order })),
       );
@@ -160,23 +75,17 @@ export function NoteEditor({ note, onClose }: NoteEditorProps) {
 
   // Build a full-replace patch from the current draft + an override.
   const commit = (override: Partial<UpdateNoteInput> = {}) => {
-    const patch: UpdateNoteInput = {
-      title,
-      body,
-      pinned: note.pinned,
-      color: note.color,
-      priority: note.priority,
-      due_at: note.due_at,
-      reminder_at: note.reminder_at,
-      repeat_rule: note.repeat_rule,
-      source_tab_id: note.source_tab_id,
-      source_session_id: note.source_session_id,
-      source_title: note.source_title,
-      source_uri: note.source_uri,
-      tag_ids: tagIds,
-      ...override,
-    };
-    void updateNote(note.id, patch);
+    void (async () => {
+      if (!await useNotesContentStore.getState().save(note.id)) return;
+      // Content-only edits must not replace task metadata from an older render.
+      if (!Object.keys(override).some((key) => key !== "title" && key !== "body")) return;
+      const latest = await getNote(note.id);
+      if (!latest) return;
+      await updateNote(note.id, {
+        ...latest, tag_ids: latest.tags.map((tag) => tag.id), ...override,
+        title: latest.title, body: latest.body,
+      });
+    })().catch((error) => console.error("notes: metadata save failed", error));
   };
 
   const persistSteps = (next: StepInput[]) => {
@@ -207,56 +116,6 @@ export function NoteEditor({ note, onClose }: NoteEditorProps) {
     const map = new Map(allTags.map((tg) => [tg.id, tg]));
     return (id: string) => map.get(id)?.name ?? note.tags.find((tg) => tg.id === id)?.name ?? id;
   }, [allTags, note.tags]);
-  const titleHasUrl = useMemo(() => extractNoteUrls(title).length > 0, [title]);
-  const bodyHasUrl = useMemo(() => extractNoteUrls(body).length > 0, [body]);
-  const titleLinkPreview = useMemo(() => renderLinkedNoteText(title), [title]);
-  const bodyLinkPreview = useMemo(() => renderLinkedNoteText(body), [body]);
-
-  useEffect(() => {
-    if (!titleHasUrl) setTitleCursor("text");
-  }, [titleHasUrl]);
-
-  useEffect(() => {
-    if (!bodyHasUrl) setBodyCursor("text");
-  }, [bodyHasUrl]);
-
-  const openNoteUrl = (url: string) => {
-    if (isTauriRuntime()) {
-      void tauriOpen(url).catch((err) => {
-        console.error("notes: failed to open URL", err);
-      });
-      return;
-    }
-    const newWindow = window.open(url, "_blank", "noopener,noreferrer");
-    if (newWindow) newWindow.opener = null;
-  };
-
-  const handleTextUrlClick = (
-    event: ReactMouseEvent<HTMLInputElement | HTMLTextAreaElement>,
-    text: string,
-  ) => {
-    if (!(event.ctrlKey || event.metaKey) || event.altKey) return;
-    const match = findNoteUrlAtIndex(text, event.currentTarget.selectionStart ?? 0);
-    if (!match) return;
-    event.preventDefault();
-    openNoteUrl(match.url);
-  };
-
-  const updateUrlCursor = (
-    event: ReactMouseEvent<HTMLInputElement | HTMLTextAreaElement>,
-    text: string,
-    setCursor: (cursor: TextCursor) => void,
-  ) => {
-    const index = pointToInputTextIndex(event.currentTarget, text, event.clientX, event.clientY);
-    setCursor(index !== null && findNoteUrlAtIndex(text, index) ? "pointer" : "text");
-  };
-
-  const syncBodyLinkOverlayScroll = (event: ReactUIEvent<HTMLTextAreaElement>) => {
-    if (bodyLinkOverlayRef.current) {
-      bodyLinkOverlayRef.current.scrollTop = event.currentTarget.scrollTop;
-    }
-  };
-
   return (
     <div className="flex-1 min-h-0 flex flex-col" data-testid="note-editor" data-note-id={note.id}>
       {/* Editor header */}
@@ -283,6 +142,15 @@ export function NoteEditor({ note, onClose }: NoteEditorProps) {
           {done ? <CheckCircle2 className="w-3.5 h-3.5 text-green-400" /> : <Circle className="w-3.5 h-3.5" />}
         </button>
         <div className="flex-1" />
+        <button type="button" className="taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center"
+          data-testid="note-editor-preview" title={t("notes.largePreview")} aria-label={t("notes.largePreview")}
+          disabled={openingWorkspace}
+          onClick={() => {
+            setOpeningWorkspace(true);
+            void (async () => {
+              if (await useNotesContentStore.getState().save(note.id)) await openNoteWorkspace(note, "preview");
+            })().catch((error) => useAppStore.getState().setStatusMessage(String(error))).finally(() => setOpeningWorkspace(false));
+          }}><Maximize2 className="h-3.5 w-3.5" /></button>
         <button
           type="button"
           className={`taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center ${note.pinned ? "text-[var(--taomni-accent)]" : ""}`}
@@ -334,59 +202,10 @@ export function NoteEditor({ note, onClose }: NoteEditorProps) {
       />
 
       {/* Editable fields */}
+      <NoteContentStatus noteId={note.id} />
       <div className="flex-1 min-h-0 overflow-y-auto p-2 flex flex-col gap-2">
-        <div className="notes-link-field-shell" data-has-url={titleHasUrl || undefined}>
-          {titleHasUrl && (
-            <div
-              className="notes-link-overlay notes-link-overlay-title"
-              aria-hidden="true"
-              data-testid="note-editor-title-link-preview"
-            >
-              {titleLinkPreview}
-            </div>
-          )}
-          <input
-            type="text"
-            className="taomni-input h-7 text-[13px] font-semibold w-full"
-            placeholder={t("notes.titlePlaceholder")}
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            onClick={(e) => handleTextUrlClick(e, title)}
-            onMouseMove={(e) => updateUrlCursor(e, title, setTitleCursor)}
-            onMouseLeave={() => setTitleCursor("text")}
-            onBlur={() => commit({ title })}
-            style={{ cursor: titleCursor }}
-            data-testid="note-editor-title"
-            data-has-url={titleHasUrl || undefined}
-          />
-        </div>
-        <div className="notes-link-field-shell" data-has-url={bodyHasUrl || undefined}>
-          {bodyHasUrl && (
-            <div
-              ref={bodyLinkOverlayRef}
-              className="notes-link-overlay notes-link-overlay-body"
-              aria-hidden="true"
-              data-testid="note-editor-body-link-preview"
-            >
-              {bodyLinkPreview}
-            </div>
-          )}
-          <textarea
-            className="taomni-input notes-link-textarea text-[12px] w-full resize-none min-h-[80px]"
-            placeholder={t("notes.bodyPlaceholder")}
-            value={body}
-            onChange={(e) => setBody(e.target.value)}
-            onClick={(e) => handleTextUrlClick(e, body)}
-            onMouseMove={(e) => updateUrlCursor(e, body, setBodyCursor)}
-            onMouseLeave={() => setBodyCursor("text")}
-            onScroll={syncBodyLinkOverlayScroll}
-            onBlur={() => commit({ body })}
-            style={{ cursor: bodyCursor }}
-            rows={4}
-            data-testid="note-editor-body"
-            data-has-url={bodyHasUrl || undefined}
-          />
-        </div>
+        <NoteTextField kind="title" value={title} onChange={setTitle} onBlur={() => commit({ title })} />
+        <NoteTextField kind="body" value={body} onChange={setBody} onBlur={() => commit({ body })} />
 
         {/* Priority + dates */}
         <div className="flex flex-wrap items-center gap-2 text-[11px]">

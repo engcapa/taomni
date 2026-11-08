@@ -1,4 +1,5 @@
 import { useBookmarkWindows } from "./useBookmarkWindows";
+import { useNotesWorkspaceNavigation } from "./useNotesWorkspaceNavigation";
 import { useCallback, useEffect, useLayoutEffect } from "react";
 import { t as tr } from "../../lib/i18n";
 import { setActiveQueryTab } from "../../lib/queryRegistry";
@@ -25,6 +26,7 @@ export interface UseMainWindowLifecycleContext {
 }
 
 export function useMainWindowLifecycle(context: UseMainWindowLifecycleContext) {
+  useNotesWorkspaceNavigation();
   const { layout } = context;
 
   const openDetachedSftp = useCallback(createOpenDetachedSftp({

@@ -244,6 +244,19 @@ export async function invokeNotes<T>(cmd: string, args?: any): Promise<T> {
       return stubNoteToItem(notes[idx]) as T;
     }
 
+    case "notes_save_content": {
+      const input = args as { id: string; title: string; body: string; expectedTitle: string; expectedBody: string };
+      const notes = loadNotes();
+      const index = notes.findIndex((note) => note.id === input.id);
+      if (index < 0) throw { kind: "missing", message: "The note was deleted." };
+      if (notes[index].title !== input.expectedTitle || notes[index].body !== input.expectedBody) {
+        throw { kind: "conflict", message: "The note was changed in another editor." };
+      }
+      notes[index] = { ...notes[index], title: input.title, body: input.body, updated_at: nowSecsStub() };
+      saveNotes(notes);
+      return stubNoteToItem(notes[index]) as T;
+    }
+
     case "notes_delete": {
       const id = (args as InvokeArgs | undefined)?.id as string | undefined;
       saveNotes(loadNotes().filter((n) => n.id !== id));

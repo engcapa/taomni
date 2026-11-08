@@ -5809,6 +5809,19 @@ files:
   - src/components/notes/FloatingNotesPanel.tsx
   - src/components/tao/TaoAlertInbox.tsx
   - src/components/tao/TaoAlertPoller.tsx
+  - src/components/notes/NoteTextField.tsx
+  - src/components/notes/NoteContentStatus.tsx
+  - src/components/notes/NotesWorkspace.tsx
+  - src/components/notes/NotesWorkspaceDocument.tsx
+  - src/components/notes/NotesWorkspaceSidebar.tsx
+  - src/components/notes/useNotesContentSync.ts
+  - src/components/notes/useNotesWorkspaceCommands.ts
+  - src/lib/notes/notesChanges.ts
+  - src/lib/notes/notesWorkspaceNavigation.ts
+  - src/stores/notesContentStore.ts
+  - src/stores/notesContentRecovery.ts
+  - src/stores/workspaceNotes.ts
+  - src-tauri/src/notes/db/content.rs
 controls:
   - id: tao-hub-tab-chat
     selector: '[data-testid="tao-hub-tab-chat"]'
@@ -5926,6 +5939,95 @@ controls:
     selector: '[data-testid="floating-notes-dock"]'
     kind: interactive
     optional: true
+  - id: note-editor-body
+    selector: '[data-testid="note-editor-body"]'
+    kind: interactive
+  - id: note-editor-pin
+    selector: '[data-testid="note-editor-pin"]'
+    kind: interactive
+  - id: note-editor-preview
+    selector: '[data-testid="note-editor-preview"]'
+    kind: interactive
+  - id: note-editor-title-link-preview
+    selector: '[data-testid="note-editor-title-link-preview"]'
+    kind: display
+  - id: note-editor-body-link-preview
+    selector: '[data-testid="note-editor-body-link-preview"]'
+    kind: display
+  - id: notes-open-workspace
+    selector: '[data-testid="notes-open-workspace"]'
+    kind: interactive
+  - id: notes-workspace
+    selector: '[data-testid="notes-workspace"]'
+    kind: display
+  - id: notes-workspace-sidebar
+    selector: '[data-testid="notes-workspace-sidebar"]'
+    kind: display
+  - id: notes-workspace-document
+    selector: '[data-testid="notes-workspace-document"]'
+    kind: display
+  - id: notes-workspace-new
+    selector: '[data-testid="notes-workspace-new"]'
+    kind: interactive
+  - id: notes-workspace-refresh
+    selector: '[data-testid="notes-workspace-refresh"]'
+    kind: interactive
+  - id: notes-workspace-search
+    selector: '[data-testid="notes-workspace-search"]'
+    kind: interactive
+  - id: notes-workspace-note
+    selector: '[data-testid="notes-workspace-note"]'
+    kind: interactive
+  - id: notes-workspace-title
+    selector: '[data-testid="notes-workspace-title"]'
+    kind: interactive
+  - id: notes-workspace-mode-edit
+    selector: '[data-testid="notes-workspace-mode-edit"]'
+    kind: interactive
+  - id: notes-workspace-mode-split
+    selector: '[data-testid="notes-workspace-mode-split"]'
+    kind: interactive
+  - id: notes-workspace-mode-preview
+    selector: '[data-testid="notes-workspace-mode-preview"]'
+    kind: interactive
+  - id: notes-workspace-save
+    selector: '[data-testid="notes-workspace-save"]'
+    kind: interactive
+  - id: notes-workspace-tao
+    selector: '[data-testid="notes-workspace-tao"]'
+    kind: interactive
+  - id: notes-workspace-editor
+    selector: '[data-testid="notes-workspace-editor"]'
+    kind: interactive
+  - id: notes-workspace-status
+    selector: '[data-testid="notes-workspace-status"]'
+    kind: display
+  - id: notes-detached-window
+    selector: '[data-testid="notes-detached-window"]'
+    kind: display
+  - id: notes-detached-dock
+    selector: '[data-testid="notes-detached-dock"]'
+    kind: interactive
+  - id: note-content-error
+    selector: '[data-testid="note-content-error"]'
+    kind: display
+  - id: note-content-reload
+    selector: '[data-testid="note-content-reload"]'
+    kind: interactive
+  - id: note-content-retry
+    selector: '[data-testid="note-content-retry"]'
+    kind: interactive
+    optional: true  # Storage failures and clipboard recovery have focused unit/native boundary checks.
+  - id: note-content-copy
+    selector: '[data-testid="note-content-copy"]'
+    kind: interactive
+    optional: true  # Storage failures and clipboard recovery have focused unit/native boundary checks.
+  - id: notes-workspace-tab-close
+    selector: '[data-testid="workspace-tab"][data-tab-kind="note"] [data-testid="workspace-tab-close"]'
+    kind: interactive
+  - id: notes-workspace-plus-new
+    selector: '[data-testid="workspace-plus-new-note"]'
+    kind: interactive
 -->
 
 - 主导航条 `rail-chat-button` 统一打开 Tao Hub；按照工作区原型移除贴边悬浮条，Chat / 便签 / 通知与抽屉布局功能保留。
@@ -5934,7 +6036,8 @@ controls:
 - 单例 `FloatingNotesPanel`：hub ↔ floating 模式切换，可拖拽 / 调整大小，Taomni 内部置顶（层级低于 vault / 认证弹窗）
 - `TaoAlertInbox` + `TaoAlertPoller`：便签临期(黄)/过期(红) + AI 后台完成(ai_done) + 邮件新消息汇聚，点击跳转目标或打开事件列表；通知历史默认隐藏，可搜索查询，支持 30/300 条保留上限与手工清空（`localStorage: taomni.taoAlerts.history.v1` / `taomni.taoAlerts.historyLimit.v1`）
 - Chat 抽屉四边可 pinned：左右为侧栏、上/下为横向条（窄窗自动回退浮动，见 `resolveChatDock`）
-- **e2e 测试限制**：Tauri 命令在浏览器模式走 stub（localStorage 模拟 notes.db）；真实持久化、跨进程提醒调度、原生窗口置顶不在浏览器冒烟覆盖，由 Rust / Vitest 单测承担。Ribbon 拖动、上/下 pin、告警优先级与跳转的判定逻辑分别由 `ribbonPlacement`/`chatDock`/`taoAlerts` 单测覆盖
+- 默认 Notes space 复用 Markdown 编辑/分栏/预览，保留原便签快速编辑；大 Preview / 返回便签按稳定笔记 ID 跳转。标题/正文共用草稿，内容保存不修改任务属性；关闭重开/刷新恢复未保存内容。
+- **e2e 测试边界**：Tauri 命令在浏览器模式走 stub（localStorage 模拟 notes.db）；TC-NOTES-008/009 在三端原生 WebView 验证实际保存，TC-NOTES-010 验证独立便签窗口、跨窗口冲突和跳转，TC-NOTES-011 验证 macOS AppKit 保存。物理 Win11 DPI/IME 和 OS 键盘投递另列手工验证。Ribbon 拖动、上/下 pin、告警优先级与跳转的判定逻辑分别由 `ribbonPlacement`/`chatDock`/`taoAlerts` 单测覆盖
 
 ---
 

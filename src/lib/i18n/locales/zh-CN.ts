@@ -1,3 +1,4 @@
+import { notesWorkspaceZhCN } from "./notesWorkspace";
 import type { en } from "./en";
 import { modelInspectorZh } from "./modelInspector";
 import { feishuSettingsZh, mobileSettingsZh } from "./mobileSettings";
@@ -2554,6 +2555,7 @@ export const zhCN: DeepPartial<typeof en> = {
     alertReminder: "提醒",
   },
   notes: {
+    ...notesWorkspaceZhCN,
     title: "便签",
     newNote: "新建便签",
     newNoteAria: "新建一条便签",

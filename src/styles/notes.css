@@ -9,15 +9,21 @@
   z-index: 1;
 }
 
-.notes-link-field-shell[data-has-url="true"] > .taomni-input {
+.notes-link-field-shell[data-has-url="true"]:not(:focus-within) > .taomni-input {
   background: transparent;
   color: transparent;
   caret-color: var(--taomni-text);
 }
 
-.notes-link-field-shell[data-has-url="true"] > .taomni-input::selection {
+.notes-link-field-shell[data-has-url="true"]:not(:focus-within) > .taomni-input::selection {
   color: transparent;
   background: var(--taomni-editor-selection-bg);
+}
+
+/* The editable control must draw both its glyphs and caret. A second text
+   layout can drift with platform font fallback, wrapping, zoom or scrolling. */
+.notes-link-field-shell:focus-within > .notes-link-overlay {
+  visibility: hidden;
 }
 
 .notes-link-overlay {

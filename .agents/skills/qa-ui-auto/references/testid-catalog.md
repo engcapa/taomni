@@ -2256,6 +2256,35 @@
 - `[data-testid="notes-floating-toggle"]` — interactive [optional] — F-TAO-1.notes-floating-toggle
 - `[data-testid="floating-notes-panel"]` — display [optional] — F-TAO-1.floating-notes-panel
 - `[data-testid="floating-notes-dock"]` — interactive [optional] — F-TAO-1.floating-notes-dock
+- `[data-testid="note-editor-body"]` — interactive — F-TAO-1.note-editor-body
+- `[data-testid="note-editor-pin"]` — interactive — F-TAO-1.note-editor-pin
+- `[data-testid="note-editor-preview"]` — interactive — F-TAO-1.note-editor-preview
+- `[data-testid="note-editor-title-link-preview"]` — display — F-TAO-1.note-editor-title-link-preview
+- `[data-testid="note-editor-body-link-preview"]` — display — F-TAO-1.note-editor-body-link-preview
+- `[data-testid="notes-open-workspace"]` — interactive — F-TAO-1.notes-open-workspace
+- `[data-testid="notes-workspace"]` — display — F-TAO-1.notes-workspace
+- `[data-testid="notes-workspace-sidebar"]` — display — F-TAO-1.notes-workspace-sidebar
+- `[data-testid="notes-workspace-document"]` — display — F-TAO-1.notes-workspace-document
+- `[data-testid="notes-workspace-new"]` — interactive — F-TAO-1.notes-workspace-new
+- `[data-testid="notes-workspace-refresh"]` — interactive — F-TAO-1.notes-workspace-refresh
+- `[data-testid="notes-workspace-search"]` — interactive — F-TAO-1.notes-workspace-search
+- `[data-testid="notes-workspace-note"]` — interactive — F-TAO-1.notes-workspace-note
+- `[data-testid="notes-workspace-title"]` — interactive — F-TAO-1.notes-workspace-title
+- `[data-testid="notes-workspace-mode-edit"]` — interactive — F-TAO-1.notes-workspace-mode-edit
+- `[data-testid="notes-workspace-mode-split"]` — interactive — F-TAO-1.notes-workspace-mode-split
+- `[data-testid="notes-workspace-mode-preview"]` — interactive — F-TAO-1.notes-workspace-mode-preview
+- `[data-testid="notes-workspace-save"]` — interactive — F-TAO-1.notes-workspace-save
+- `[data-testid="notes-workspace-tao"]` — interactive — F-TAO-1.notes-workspace-tao
+- `[data-testid="notes-workspace-editor"]` — interactive — F-TAO-1.notes-workspace-editor
+- `[data-testid="notes-workspace-status"]` — display — F-TAO-1.notes-workspace-status
+- `[data-testid="notes-detached-window"]` — display — F-TAO-1.notes-detached-window
+- `[data-testid="notes-detached-dock"]` — interactive — F-TAO-1.notes-detached-dock
+- `[data-testid="note-content-error"]` — display — F-TAO-1.note-content-error
+- `[data-testid="note-content-reload"]` — interactive — F-TAO-1.note-content-reload
+- `[data-testid="note-content-retry"]` — interactive [optional] — F-TAO-1.note-content-retry
+- `[data-testid="note-content-copy"]` — interactive [optional] — F-TAO-1.note-content-copy
+- `[data-testid="workspace-tab"][data-tab-kind="note"] [data-testid="workspace-tab-close"]` — interactive — F-TAO-1.notes-workspace-tab-close
+- `[data-testid="workspace-plus-new-note"]` — interactive — F-TAO-1.notes-workspace-plus-new
 
 ## rdp (F9.7)
 

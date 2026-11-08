@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NotesPanel } from "./NotesPanel";
 import { useNotesStore } from "../../stores/notesStore";
+import { useNotesContentStore } from "../../stores/notesContentStore";
 
 const invokeMock = vi.hoisted(() => vi.fn());
 
@@ -80,6 +81,7 @@ function filterNotes(q: Record<string, unknown>): FakeNote[] {
 beforeEach(() => {
   store = [];
   seq = 0;
+  useNotesContentStore.setState({ documents: {}, catalog: [], recoveryError: null });
   useNotesStore.setState({
     notes: [],
     notesLoaded: false,
@@ -100,6 +102,16 @@ beforeEach(() => {
     switch (cmd) {
       case "notes_list":
         return filterNotes((args.query as Record<string, unknown>) ?? {});
+      case "notes_get":
+        return store.find((note) => note.id === args.id) ?? null;
+      case "notes_save_content": {
+        const note = store.find((item) => item.id === args.id);
+        if (!note) throw { kind: "missing", message: "Deleted" };
+        if (note.title !== args.expectedTitle || note.body !== args.expectedBody) throw { kind: "conflict", message: "Changed" };
+        note.title = args.title as string;
+        note.body = args.body as string;
+        return { ...note };
+      }
       case "notes_get_prefs":
         return {};
       case "notes_list_tags":

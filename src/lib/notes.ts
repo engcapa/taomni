@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { publishNotesChange } from "./notes/notesChanges";
 
 // Wire types mirror the Rust `notes::db` models (snake_case), matching how the
 // chat module surfaces its DB rows. All timestamps are Unix **seconds**.
@@ -156,23 +157,45 @@ export async function getNote(id: string): Promise<NoteItem | null> {
 }
 
 export async function createNote(input: CreateNoteInput = {}): Promise<NoteItem> {
-  return invoke<NoteItem>("notes_create", { input });
+  const note = await invoke<NoteItem>("notes_create", { input });
+  publishNotesChange(note.id);
+  return note;
 }
 
 export async function updateNote(id: string, patch: UpdateNoteInput): Promise<NoteItem | null> {
-  return invoke<NoteItem | null>("notes_update", { id, patch });
+  const note = await invoke<NoteItem | null>("notes_update", { id, patch });
+  publishNotesChange(id);
+  return note;
+}
+
+/** Save content without replacing task metadata; stale text never overwrites a newer edit. */
+export async function saveNoteContent(
+  id: string,
+  content: { title: string; body: string },
+  expected: { title: string; body: string },
+): Promise<NoteItem> {
+  const note = await invoke<NoteItem>("notes_save_content", {
+    id, ...content, expectedTitle: expected.title, expectedBody: expected.body,
+  });
+  publishNotesChange(id);
+  return note;
 }
 
 export async function deleteNote(id: string): Promise<void> {
   await invoke("notes_delete", { id });
+  publishNotesChange(id);
 }
 
 export async function toggleNoteComplete(id: string, completed: boolean): Promise<NoteItem | null> {
-  return invoke<NoteItem | null>("notes_toggle_complete", { id, completed });
+  const note = await invoke<NoteItem | null>("notes_toggle_complete", { id, completed });
+  publishNotesChange(id);
+  return note;
 }
 
 export async function archiveNote(id: string, archived: boolean): Promise<NoteItem | null> {
-  return invoke<NoteItem | null>("notes_archive", { id, archived });
+  const note = await invoke<NoteItem | null>("notes_archive", { id, archived });
+  publishNotesChange(id);
+  return note;
 }
 
 export async function listTags(): Promise<NoteTag[]> {

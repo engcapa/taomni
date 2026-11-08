@@ -1,0 +1,195 @@
+id: TC-NOTES-010
+title: Floating Notes navigates to Workspace and preserves concurrent drafts
+description: Uses the actual application-created Notes window, main-window navigation event, real notes.db and cross-window
+  notifications. Conflicting external saves retain the main draft until explicit confirmed reload; clean editors
+  receive saved changes.
+covers:
+- F-TAO-1
+tags:
+- notes
+- regression
+- p1
+modes:
+- native
+fixtures:
+- reset_db
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-notes-workspace
+- click: '[data-testid="rail-chat-button"]'
+- click: '[data-testid="tao-hub-tab-notes"]'
+- click: '[data-testid="notes-new"]'
+- fill:
+    selector: '[data-testid="note-editor-title"]'
+    value: Shared workspace note
+- fill:
+    selector: '[data-testid="note-editor-body"]'
+    value: '# Shared body original'
+- blur: '[data-testid="note-editor-body"]'
+- click: '[data-testid="note-editor-pin"]'
+- assert_attribute:
+    selector: '[data-testid="note-editor-pin"]'
+    name: aria-pressed
+    equals: 'true'
+- click: '[data-testid="note-editor-back"]'
+- click: '[data-testid="notes-floating-toggle"]'
+- switch_window:
+    selector: '[data-testid="notes-detached-window"]'
+- click: '[data-testid="notes-list-item"]'
+- eval_readonly:
+    expression: document.querySelector(".notes-link-field-shell textarea").value === "# Shared body original"
+    expect_truthy: true
+    timeout_sec: 10
+- click: '[data-testid="note-editor-preview"]'
+- switch_window:
+    selector: '[data-testid="notes-workspace"]'
+- assert_text_equals:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] h1'
+    equals: Shared body original
+- click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-mode-edit"]'
+- press:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"]
+      .cm-content'
+    key: Mod+A
+- type:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"]
+      .cm-content'
+    text: '# Retained main draft'
+- switch_window:
+    selector: '[data-testid="notes-detached-window"]'
+- fill:
+    selector: '[data-testid="note-editor-body"]'
+    value: '# Floating committed'
+- blur: '[data-testid="note-editor-body"]'
+- switch_window:
+    selector: '[data-testid="notes-workspace"]'
+- assert_attribute:
+    selector: '[data-testid="note-content-error"]'
+    name: data-error-kind
+    equals: conflict
+- assert_text_equals:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"]
+      .cm-content'
+    equals: '# Retained main draft'
+- click: '[data-testid="note-content-reload"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- assert_text_equals:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"]
+      .cm-content'
+    equals: '# Floating committed'
+- press:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"]
+      .cm-content'
+    key: Mod+A
+- type:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"]
+      .cm-content'
+    text: '# Saved in main'
+- click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-save"]'
+- assert_not_visible: '[data-testid="notes-workspace-document"][data-active="true"][data-dirty="true"]'
+- switch_window:
+    selector: '[data-testid="notes-detached-window"]'
+- eval_readonly:
+    expression: document.querySelector(".notes-link-field-shell textarea").value === "# Saved in main"
+    expect_truthy: true
+    timeout_sec: 10
+- switch_window:
+    selector: '[data-testid="notes-workspace"]'
+    close_with: '[data-testid="notes-detached-dock"]'
+- assert_visible: '[data-testid="notes-workspace-document"][data-active="true"]'
+- assert_no_runtime_errors: null
+- screenshot: notes-010-native-floating-sync.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Floating Preview opens the same saved note in the main Workspace and activates its preview.
+    actions:
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 11
+    - 12
+    - 13
+    - 14
+    - 16
+    - 17
+    checkpoints:
+    - step: 10
+      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="note-editor-pin"]'', ''name'': ''aria-pressed'',
+        ''equals'': ''true''}}'
+    - step: 15
+      expectation: '{''eval_readonly'': {''expression'': ''document.querySelector(".notes-link-field-shell textarea").value
+        === "# Shared body original"'', ''expect_truthy'': True, ''timeout_sec'': 10}}'
+    - step: 18
+      expectation: '{''assert_text_equals'': {''selector'': ''[data-testid="notes-workspace-document"][data-active="true"]
+        h1'', ''equals'': ''Shared body original''}}'
+    results:
+    - 10
+    - 15
+    - 18
+  - id: R2
+    requirement: An external floating save preserves the main unsaved draft as conflict; confirmed reload obtains
+      the persisted content.
+    actions:
+    - 19
+    - 20
+    - 21
+    - 22
+    - 23
+    - 24
+    - 25
+    - 28
+    - 29
+    checkpoints:
+    - step: 26
+      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="note-content-error"]'', ''name'': ''data-error-kind'',
+        ''equals'': ''conflict''}}'
+    - step: 27
+      expectation: '{''assert_text_equals'': {''selector'': ''[data-testid="notes-workspace-document"][data-active="true"]
+        [data-testid="notes-workspace-editor"] .cm-content'', ''equals'': ''# Retained main draft''}}'
+    - step: 30
+      expectation: '{''assert_text_equals'': {''selector'': ''[data-testid="notes-workspace-document"][data-active="true"]
+        [data-testid="notes-workspace-editor"] .cm-content'', ''equals'': ''# Floating committed''}}'
+    results:
+    - 26
+    - 27
+    - 30
+  - id: R3
+    requirement: Main saves refresh clean floating Notes; docking closes the real floating window and retains the
+      main document.
+    actions:
+    - 31
+    - 32
+    - 33
+    - 35
+    - 37
+    checkpoints:
+    - step: 34
+      expectation: '{''assert_not_visible'': ''[data-testid="notes-workspace-document"][data-active="true"][data-dirty="true"]''}'
+    - step: 36
+      expectation: '{''eval_readonly'': {''expression'': ''document.querySelector(".notes-link-field-shell textarea").value
+        === "# Saved in main"'', ''expect_truthy'': True, ''timeout_sec'': 10}}'
+    - step: 38
+      expectation: '{''assert_visible'': ''[data-testid="notes-workspace-document"][data-active="true"]''}'
+    - step: 39
+      expectation: '{''assert_no_runtime_errors'': None}'
+    results:
+    - 34
+    - 36
+    - 38
+    - 39
+  visual:
+  - check: Inspect Notes space layout and Markdown edit/split/preview at normal desktop size.
+    method: manual
+    reason: Screenshots are retained for review; semantic assertions alone do not certify visual layout.
+  native:
+  - check: Actual detached Notes WebView, emitTo main navigation, cross-window changes, SQLite conflict guard and
+      real window docking.
+    method: automated
+    reason: Required native boundaries cannot be certified by browser stubs.

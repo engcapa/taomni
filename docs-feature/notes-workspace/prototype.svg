@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="650" viewBox="0 0 1280 650">
+  <rect width="1280" height="650" fill="#f1f5f9"/>
+  <g font-family="sans-serif" fill="#0f172a">
+    <text x="28" y="36" font-size="20" font-weight="bold">Notes ↔ Workspace · proposed interaction · v1</text>
+    <text x="28" y="62" font-size="14">One shared note. Compact editing in Tao Notes; Markdown editing and preview in the built-in Notes space.</text>
+    <rect x="28" y="92" width="288" height="480" rx="8" fill="white" stroke="#cbd5e1"/>
+    <text x="44" y="122" font-size="17" font-weight="bold">Tao Notes</text>
+    <path d="M28 140h288" stroke="#cbd5e1"/>
+    <text x="44" y="170" font-size="14">←  ○    Deployment notes</text>
+    <rect x="220" y="148" width="80" height="34" rx="4" fill="#dbeafe"/>
+    <text x="230" y="170" font-size="13" fill="#1d4ed8">↗ Preview</text>
+    <rect x="44" y="200" width="256" height="36" rx="4" fill="#f8fafc" stroke="#cbd5e1"/>
+    <text x="54" y="223" font-size="14">Deployment notes</text>
+    <rect x="44" y="250" width="256" height="156" rx="4" fill="#f8fafc" stroke="#cbd5e1"/>
+    <text x="54" y="276" font-size="14"># Release checklist</text>
+    <text x="54" y="304" font-size="14">- Review changes</text>
+    <text x="54" y="332" font-size="14">- Run regression checks</text>
+    <text x="44" y="442" font-size="13" fill="#64748b">Priority · Due date · Reminder</text>
+    <text x="44" y="470" font-size="13" fill="#64748b">Steps · Tags · Pin · Archive</text>
+    <text x="44" y="544" font-size="13" fill="#64748b">Existing compact workflow retained</text>
+    <path d="M320 165h48" stroke="#2563eb" stroke-width="3"/>
+    <path d="m358 157 10 8-10 8" fill="none" stroke="#2563eb" stroke-width="3"/>
+    <rect x="380" y="92" width="872" height="480" rx="8" fill="white" stroke="#cbd5e1"/>
+    <rect x="380" y="92" width="220" height="480" rx="8" fill="#f8fafc"/>
+    <path d="M600 92v480" stroke="#cbd5e1"/>
+    <text x="398" y="122" font-size="17" font-weight="bold">Workspaces</text>
+    <rect x="396" y="144" width="188" height="36" rx="4" fill="#dbeafe"/>
+    <text x="408" y="167" font-size="14">Notes                     ▾</text>
+    <text x="398" y="210" font-size="14">＋ New note</text>
+    <text x="398" y="246" font-size="13" fill="#64748b">Search notes…</text>
+    <rect x="392" y="262" width="200" height="36" rx="4" fill="#dbeafe"/>
+    <text x="402" y="285" font-size="13">Deployment notes.md</text>
+    <text x="402" y="322" font-size="13">Meeting notes.md</text>
+    <text x="402" y="358" font-size="13">Ideas.md</text>
+    <text x="618" y="121" font-size="14">Deployment notes.md    ×</text>
+    <path d="M600 140h652" stroke="#cbd5e1"/>
+    <text x="618" y="168" font-size="14">Edit   Split   Preview</text>
+    <text x="1050" y="168" font-size="14">Save   ↗ Tao Notes</text>
+    <path d="M600 186h652M926 186v352" stroke="#cbd5e1"/>
+    <g font-family="monospace" font-size="14">
+      <text x="618" y="222" fill="#94a3b8">1</text><text x="646" y="222"># Release checklist</text>
+      <text x="618" y="252" fill="#94a3b8">2</text>
+      <text x="618" y="282" fill="#94a3b8">3</text><text x="646" y="282">- Review changes</text>
+      <text x="618" y="312" fill="#94a3b8">4</text><text x="646" y="312">- Run regression checks</text>
+    </g>
+    <text x="946" y="226" font-size="23" font-weight="bold">Release checklist</text>
+    <text x="952" y="272" font-size="14">• Review changes</text>
+    <text x="952" y="304" font-size="14">• Run regression checks</text>
+    <path d="M600 538h652" stroke="#cbd5e1"/>
+    <text x="618" y="559" font-size="13" fill="#64748b">Markdown · Saved / Modified / Conflict · Shared with Tao Notes</text>
+    <text x="28" y="610" font-size="14" fill="#475569">1280 × 650 wireframe. Notes remain in notes.db; opening Preview does not export or duplicate content.</text>
+    <text x="28" y="634" font-size="13" fill="#475569">Conflicting edits retain the draft and offer reload; tab switches and closing a pane retain unsaved drafts.</text>
+  </g>
+</svg>

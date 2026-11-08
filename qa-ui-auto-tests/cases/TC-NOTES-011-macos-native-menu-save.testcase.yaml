@@ -1,0 +1,111 @@
+id: TC-NOTES-011
+title: Notes Workspace Save participates in the native AppKit menu
+description: Checks actual installed AppKit availability, activation and content persistence for the active Notes
+  document. This does not certify physical keyboard or menu-bar pointer delivery.
+covers:
+- F-TAO-1
+tags:
+- notes
+- regression
+- p1
+modes:
+- native
+fixtures:
+- reset_db
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-notes-workspace
+- click: '[data-testid="rail-chat-button"]'
+- click: '[data-testid="tao-hub-tab-notes"]'
+- click: '[data-testid="notes-new"]'
+- fill:
+    selector: '[data-testid="note-editor-title"]'
+    value: Shared workspace note
+- fill:
+    selector: '[data-testid="note-editor-body"]'
+    value: '# Shared body original'
+- blur: '[data-testid="note-editor-body"]'
+- click: '[data-testid="note-editor-pin"]'
+- assert_attribute:
+    selector: '[data-testid="note-editor-pin"]'
+    name: aria-pressed
+    equals: 'true'
+- click: '[data-testid="note-editor-preview"]'
+- native_menu:
+    action: workspace-command:notes.save
+    enabled: false
+- click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-mode-edit"]'
+- press:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"]
+      .cm-content'
+    key: Mod+A
+- type:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"]
+      .cm-content'
+    text: '# AppKit saved'
+- native_menu:
+    action: workspace-command:notes.save
+    enabled: true
+    activate: true
+- assert_not_visible: '[data-testid="notes-workspace-document"][data-active="true"][data-dirty="true"]'
+- native_menu:
+    action: workspace-command:notes.save
+    enabled: false
+- click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-tao"]'
+- eval_readonly:
+    expression: document.querySelector(".notes-link-field-shell textarea").value === "# AppKit saved"
+    expect_truthy: true
+- assert_no_runtime_errors: null
+- screenshot: notes-011-appkit-save.png
+native_platforms:
+- macOS
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: The AppKit Save command is disabled for clean Notes, enabled for edited content, saves the corresponding
+      note once and becomes disabled again.
+    actions:
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 11
+    - 12
+    - 13
+    - 14
+    - 15
+    - 16
+    - 18
+    - 19
+    checkpoints:
+    - step: 10
+      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="note-editor-pin"]'', ''name'': ''aria-pressed'',
+        ''equals'': ''true''}}'
+    - step: 17
+      expectation: '{''assert_not_visible'': ''[data-testid="notes-workspace-document"][data-active="true"][data-dirty="true"]''}'
+    - step: 20
+      expectation: '{''eval_readonly'': {''expression'': ''document.querySelector(".notes-link-field-shell textarea").value
+        === "# AppKit saved"'', ''expect_truthy'': True}}'
+    - step: 21
+      expectation: '{''assert_no_runtime_errors'': None}'
+    results:
+    - 10
+    - 17
+    - 20
+    - 21
+  visual:
+  - check: Inspect Notes space layout and Markdown edit/split/preview at normal desktop size.
+    method: manual
+    reason: Screenshots are retained for review; semantic assertions alone do not certify visual layout.
+  native:
+  - check: AppKit NSMenu Save flags and activation route through the live Workspace Action host.
+    method: automated
+    reason: Browser renderer menus and synthetic shortcut events cannot certify actual native menu installation.
+  - check: Physical Cmd+S and menu-bar clicking.
+    method: manual
+    reason: The native_menu verb activates AppKit directly without an OS pointer event.

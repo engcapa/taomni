@@ -3,6 +3,7 @@ import { useState } from "react";
 import { ContextMenu } from "../ContextMenu";
 import { useAppDialogs } from "../../lib/appDialogs";
 import { useT } from "../../lib/i18n";
+import { NOTES_WORKSPACE_ID } from "../../stores/workspaceNotes";
 import {
   DEFAULT_WORKSPACE_ID,
   useWorkspacePlatformStore,
@@ -32,7 +33,7 @@ export function WorkspaceSwitcher({ onAddFolder }: WorkspaceSwitcherProps) {
 
   if (!active) return null;
 
-  const workspaceMenu = (workspace: PlatformWorkspace) => workspace.id === DEFAULT_WORKSPACE_ID
+  const workspaceMenu = (workspace: PlatformWorkspace) => workspace.id === DEFAULT_WORKSPACE_ID || workspace.id === NOTES_WORKSPACE_ID
     ? []
     : [
         {
@@ -148,6 +149,7 @@ export function WorkspaceSwitcher({ onAddFolder }: WorkspaceSwitcherProps) {
             {
               label: t("platform.addFolderToWorkspace"),
               testId: "workspace-switcher-add-folder",
+              disabled: active.id === NOTES_WORKSPACE_ID,
               onClick: onAddFolder,
             },
             { label: "", separator: true, onClick: () => undefined },
