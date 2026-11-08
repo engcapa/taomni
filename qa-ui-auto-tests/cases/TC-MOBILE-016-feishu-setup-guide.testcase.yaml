@@ -1,0 +1,246 @@
+id: TC-MOBILE-016
+title: Feishu setup guide explains identity bootstrap and subscriptions without losing configuration drafts
+covers: [F-MOBILE-2, F12.1, F-I18n-1]
+tags: [p1, mobile, feishu]
+modes: [browser, native]
+fixtures: [reset_db]
+timeout_sec: 120
+description: >-
+  Open the production settings entry with the mobile service off, inspect the complete ordered guide,
+  use mouse and keyboard disclosure, switch languages in place and retain unsaved configuration.
+  Native explicitly verifies the guide in the packaged WebView; TC-MOBILE-004 separately verifies real
+  configuration and vault IPC. Official references are inspected without launching external browsers.
+  No Feishu credentials, authorization, API calls or real messages are used.
+steps:
+- open: ${cfg.app.base_url}
+- click: '[data-testid="ribbon-settings"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: feishu
+- wait_for: '[data-testid="feishu-settings"]'
+- assert_disabled: '[data-testid="feishu-toggle"]'
+- assert_not_visible: '[data-testid="feishu-guide"]'
+- fill:
+    selector: '[data-testid="feishu-app-id"]'
+    value: cli_guide_draft
+- fill:
+    selector: '[data-testid="feishu-app-secret"]'
+    value: qa-unsaved-guide-secret
+- fill:
+    selector: '[data-testid="feishu-bindings"]'
+    value: ou_guide_user oc_guide_chat
+- fill:
+    selector: '[data-testid="feishu-mobile-endpoint"]'
+    value: https://guide.example.invalid
+- select_option:
+    selector: '[data-testid="feishu-proxy-mode"]'
+    value: none
+- click: '[data-testid="feishu-guide-toggle"]'
+- assert_attribute:
+    selector: '[data-testid="feishu-guide-toggle"]'
+    name: aria-expanded
+    equals: 'true'
+- assert_count:
+    selector: '[data-testid="feishu-guide"] ol > li'
+    equal: 8
+- assert_text:
+    selector: '[data-testid="feishu-guide-step-create"]'
+    contains: Credentials & Basic Info
+- assert_text:
+    selector: '[data-testid="feishu-guide-step-permissions"]'
+    contains: im:message:send_as_bot
+- assert_text:
+    selector: '[data-testid="feishu-guide-step-permissions"]'
+    contains: im:message.p2p_msg:readonly
+- assert_text:
+    selector: '[data-testid="feishu-guide-step-publish"]'
+    contains: administrator approval
+- assert_text:
+    selector: '[data-testid="feishu-guide-step-user"]'
+    contains: Quick Copy open_id
+- assert_text:
+    selector: '[data-testid="feishu-guide-step-chat"]'
+    contains: data.chat_id
+- assert_text:
+    selector: '[data-testid="feishu-guide-step-chat"]'
+    contains: 'Do not use data.sender.id'
+- assert_text:
+    selector: '[data-testid="feishu-guide-message-example"]'
+    contains: '"msg_type": "text"'
+- assert_text_equals:
+    selector: '[data-testid="feishu-guide-binding-example"]'
+    equals: ou_YOUR_USER_OPEN_ID oc_YOUR_CHAT_ID
+- assert_text:
+    selector: '[data-testid="feishu-guide-step-connect"]'
+    contains: optional Mobile Web address
+- assert_text:
+    selector: '[data-testid="feishu-guide-step-connect"]'
+    contains: wait for Connected
+- assert_text:
+    selector: '[data-testid="feishu-guide-step-events"]'
+    contains: im.message.receive_v1
+- assert_text:
+    selector: '[data-testid="feishu-guide-step-events"]'
+    contains: card.action.trigger
+- assert_text:
+    selector: '[data-testid="feishu-guide-step-verify"]'
+    contains: /taomni list
+- assert_attribute:
+    selector: '[data-testid="feishu-guide-console"]'
+    name: href
+    equals: https://open.feishu.cn/app
+- assert_attribute:
+    selector: '[data-testid="feishu-guide-explorer"]'
+    name: href
+    equals: https://open.feishu.cn/api-explorer?apiName=create&project=im&resource=message&version=v1
+- assert_attribute:
+    selector: '[data-testid="feishu-guide-message-docs"]'
+    name: href
+    equals: https://open.feishu.cn/document/server-docs/im-v1/message/create
+- assert_attribute:
+    selector: '[data-testid="feishu-guide-connection-docs"]'
+    name: href
+    equals: https://open.feishu.cn/document/server-docs/event-subscription-guide/event-subscription-configure-/request-url-configuration-case
+- screenshot: feishu-setup-guide-en.png
+- click: '[data-testid="feishu-guide-toggle"]'
+- assert_not_visible: '[data-testid="feishu-guide"]'
+- assert_attribute:
+    selector: '[data-testid="feishu-guide-toggle"]'
+    name: aria-expanded
+    equals: 'false'
+- press:
+    selector: '[data-testid="feishu-guide-toggle"]'
+    key: Enter
+- assert_visible: '[data-testid="feishu-guide"]'
+- press:
+    selector: '[data-testid="feishu-guide-toggle"]'
+    key: Space
+- assert_not_visible: '[data-testid="feishu-guide"]'
+- click: '[data-testid="feishu-guide-toggle"]'
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-zh-CN"]'
+- assert_text:
+    selector: '[data-testid="feishu-guide"]'
+    contains: 一步一步连接飞书机器人
+- assert_text:
+    selector: '[data-testid="feishu-guide-step-events"]'
+    contains: 未检测到应用连接
+- screenshot: feishu-setup-guide-zh.png
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- assert_text:
+    selector: '[data-testid="feishu-guide"]'
+    contains: Connect a Feishu bot step by step
+- assert_items:
+    selector: '[data-testid="feishu-app-id"]'
+    attribute: value
+    equals: [cli_guide_draft]
+- assert_items:
+    selector: '[data-testid="feishu-app-secret"]'
+    attribute: value
+    equals: [qa-unsaved-guide-secret]
+- assert_text_equals:
+    selector: '[data-testid="feishu-bindings"]'
+    equals: ou_guide_user oc_guide_chat
+- assert_items:
+    selector: '[data-testid="feishu-mobile-endpoint"]'
+    attribute: value
+    equals: [https://guide.example.invalid]
+- assert_items:
+    selector: '[data-testid="feishu-proxy-mode"] option:checked'
+    attribute: value
+    equals: [none]
+- assert_disabled: '[data-testid="feishu-toggle"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: The guide is available before setup and explains credentials, permissions, publication, identity bootstrap, connection order, subscriptions and verification, with official references.
+    actions: [2, 3, 12]
+    checkpoints:
+    - step: 5
+      expectation: Opening help does not require enabling the mobile service or connecting to Feishu.
+    - step: 14
+      expectation: Eight ordered steps cover the full setup path.
+    - step: 15
+      expectation: The credential location in the Developer Console is explained.
+    - step: 16
+      expectation: The exact bot send permission is listed.
+    - step: 17
+      expectation: The exact private-message reception permission is listed.
+    - step: 18
+      expectation: Publication and administrator approval are explained.
+    - step: 19
+      expectation: API Explorer's user ID selection is explained.
+    - step: 20
+      expectation: A setup message response supplies the chat ID before any Taomni connection is required.
+    - step: 21
+      expectation: The guide distinguishes the user's ID from the responding bot's sender ID.
+    - step: 22
+      expectation: An executable text-message payload is provided.
+    - step: 23
+      expectation: The binding example has one user ID and one chat ID separated by a space.
+    - step: 24
+      expectation: The optional Mobile Web address and its purpose are explained.
+    - step: 25
+      expectation: Start Taomni's connection before saving Feishu's persistent subscription mode.
+    - step: 26
+      expectation: The incoming message event name is listed.
+    - step: 27
+      expectation: The card interaction callback name is listed.
+    - step: 28
+      expectation: The guide describes how to verify the list command.
+    - step: 29
+      expectation: The Developer Console link targets the official site.
+    - step: 30
+      expectation: The API Explorer link selects the Send Message API on the official site.
+    - step: 31
+      expectation: An official Send Message reference is available.
+    - step: 32
+      expectation: An official persistent connection reference is available.
+    results: [5, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32]
+  - id: R2
+    requirement: Mouse, Enter and Space toggle the guide; language changes update the open guide and all unsaved configuration survives.
+    actions: [7, 8, 9, 10, 11, 34, 37, 39, 41, 42, 43, 47, 48]
+    checkpoints:
+    - step: 35
+      expectation: Clicking the guide button hides its content.
+    - step: 36
+      expectation: The disclosure exposes its collapsed state to assistive technology.
+    - step: 38
+      expectation: Enter opens the guide.
+    - step: 40
+      expectation: Space closes the guide.
+    - step: 44
+      expectation: Chinese content replaces English in place.
+    - step: 45
+      expectation: The Chinese guide explains recovery when no persistent connection is detected.
+    - step: 49
+      expectation: Switching back restores the English guide without closing it.
+    - step: 50
+      expectation: The edited App ID is retained.
+    - step: 51
+      expectation: The unsaved secret is retained in its password field.
+    - step: 52
+      expectation: Both unsaved binding IDs are retained.
+    - step: 53
+      expectation: The unsaved Mobile Web address is retained.
+    - step: 54
+      expectation: The selected no-proxy mode is retained.
+    - step: 55
+      expectation: Help does not start a connection.
+    - step: 56
+      expectation: No runtime errors occur.
+    results: [35, 36, 38, 40, 44, 45, 49, 50, 51, 52, 53, 54, 55, 56]
+  visual:
+  - check: Guide screenshots are diagnostic artifacts; ordered content assertions establish acceptance.
+    method: not-applicable
+    reason: Visual parity is not requested.
+  native:
+  - check: The embedded guide and disclosure keyboard behavior work in the packaged WebView.
+    method: automated
+    reason: Native execution is explicitly requested; browser stubs do not prove packaged WebView behavior.
+  - check: Launching official URLs in the OS browser and configuring a real Feishu tenant.
+    method: manual
+    reason: Not automated; unit tests cover shared URL dispatch and failure feedback, while this case checks reference targets without sending messages.

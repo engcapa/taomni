@@ -1,3 +1,5 @@
+import { feishuSetupGuideEn, feishuSetupGuideZh } from "./feishuSetupGuide";
+
 export const mobileSettingsEn = {
   title: "Mobile remote",
   description: "View terminals and Agent tasks from a phone browser. Disabled by default; the service is independent of the current workspace.",
@@ -129,6 +131,7 @@ export const mobileSettingsZh: typeof mobileSettingsEn = {
 };
 
 export const feishuSettingsEn = {
+  guide: feishuSetupGuideEn,
   title: "Feishu Agent adapter (P1)",
   loading: "Loading Feishu adapter settings…",
   description: "Uses a custom enterprise app's persistent connection; no public inbound address is needed. Enable the mobile service first. The adapter keeps running when you leave this page and stops when the mobile service is disabled.",
@@ -157,6 +160,7 @@ export const feishuSettingsEn = {
 };
 
 export const feishuSettingsZh: typeof feishuSettingsEn = {
+  guide: feishuSetupGuideZh,
   title: "飞书 Agent 适配器（P1）",
   loading: "正在加载飞书适配器设置…",
   description: "使用企业自建应用的长连接，无需公网入站地址。先开启移动服务；关闭本页继续运行，关闭移动服务会停止适配器。",

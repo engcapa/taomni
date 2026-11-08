@@ -2134,6 +2134,22 @@
 
 - `[data-testid="feishu-settings"]` — display — F-MOBILE-2.feishu-settings
 - `[data-testid="feishu-loading"]` — display — F-MOBILE-2.feishu-loading
+- `[data-testid="feishu-guide-toggle"]` — interactive — F-MOBILE-2.feishu-guide-toggle
+- `[data-testid="feishu-guide"]` — display — F-MOBILE-2.feishu-guide
+- `[data-testid="feishu-guide-step-create"]` — display — F-MOBILE-2.feishu-guide-step-create
+- `[data-testid="feishu-guide-step-permissions"]` — display — F-MOBILE-2.feishu-guide-step-permissions
+- `[data-testid="feishu-guide-step-publish"]` — display — F-MOBILE-2.feishu-guide-step-publish
+- `[data-testid="feishu-guide-step-user"]` — display — F-MOBILE-2.feishu-guide-step-user
+- `[data-testid="feishu-guide-step-chat"]` — display — F-MOBILE-2.feishu-guide-step-chat
+- `[data-testid="feishu-guide-step-connect"]` — display — F-MOBILE-2.feishu-guide-step-connect
+- `[data-testid="feishu-guide-step-events"]` — display — F-MOBILE-2.feishu-guide-step-events
+- `[data-testid="feishu-guide-step-verify"]` — display — F-MOBILE-2.feishu-guide-step-verify
+- `[data-testid="feishu-guide-message-example"]` — display — F-MOBILE-2.feishu-guide-message-example
+- `[data-testid="feishu-guide-binding-example"]` — display — F-MOBILE-2.feishu-guide-binding-example
+- `[data-testid="feishu-guide-console"]` — interactive — F-MOBILE-2.feishu-guide-console
+- `[data-testid="feishu-guide-explorer"]` — interactive — F-MOBILE-2.feishu-guide-explorer
+- `[data-testid="feishu-guide-message-docs"]` — interactive — F-MOBILE-2.feishu-guide-message-docs
+- `[data-testid="feishu-guide-connection-docs"]` — interactive — F-MOBILE-2.feishu-guide-connection-docs
 - `[data-testid="feishu-app-id"]` — interactive — F-MOBILE-2.feishu-app-id
 - `[data-testid="feishu-app-secret"]` — interactive — F-MOBILE-2.feishu-app-secret
 - `[data-testid="feishu-mobile-endpoint"]` — interactive — F-MOBILE-2.feishu-mobile-endpoint

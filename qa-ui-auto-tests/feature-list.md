@@ -13893,9 +13893,11 @@ controls:
 id: F-MOBILE-2
 status: partial
 area: mobile/feishu
-components: [FeishuAdapterSettings, FeishuAdapterRuntime]
+components: [FeishuAdapterSettings, FeishuSetupGuide, FeishuAdapterRuntime]
 files:
   - src/components/settings/FeishuAdapterSettings.tsx
+  - src/components/settings/FeishuSetupGuide.tsx
+  - src/lib/i18n/locales/feishuSetupGuide.ts
   - src-tauri/src/mobile/im_adapter/mod.rs
   - src-tauri/src/mobile/im_adapter/actions.rs
   - src-tauri/src/mobile/im_adapter/config.rs
@@ -13910,6 +13912,54 @@ controls:
   - id: feishu-loading
     selector: '[data-testid="feishu-loading"]'
     kind: display
+  - id: feishu-guide-toggle
+    selector: '[data-testid="feishu-guide-toggle"]'
+    kind: interactive
+  - id: feishu-guide
+    selector: '[data-testid="feishu-guide"]'
+    kind: display
+  - id: feishu-guide-step-create
+    selector: '[data-testid="feishu-guide-step-create"]'
+    kind: display
+  - id: feishu-guide-step-permissions
+    selector: '[data-testid="feishu-guide-step-permissions"]'
+    kind: display
+  - id: feishu-guide-step-publish
+    selector: '[data-testid="feishu-guide-step-publish"]'
+    kind: display
+  - id: feishu-guide-step-user
+    selector: '[data-testid="feishu-guide-step-user"]'
+    kind: display
+  - id: feishu-guide-step-chat
+    selector: '[data-testid="feishu-guide-step-chat"]'
+    kind: display
+  - id: feishu-guide-step-connect
+    selector: '[data-testid="feishu-guide-step-connect"]'
+    kind: display
+  - id: feishu-guide-step-events
+    selector: '[data-testid="feishu-guide-step-events"]'
+    kind: display
+  - id: feishu-guide-step-verify
+    selector: '[data-testid="feishu-guide-step-verify"]'
+    kind: display
+  - id: feishu-guide-message-example
+    selector: '[data-testid="feishu-guide-message-example"]'
+    kind: display
+  - id: feishu-guide-binding-example
+    selector: '[data-testid="feishu-guide-binding-example"]'
+    kind: display
+  - id: feishu-guide-console
+    selector: '[data-testid="feishu-guide-console"]'
+    kind: interactive
+  - id: feishu-guide-explorer
+    selector: '[data-testid="feishu-guide-explorer"]'
+    kind: interactive
+  - id: feishu-guide-message-docs
+    selector: '[data-testid="feishu-guide-message-docs"]'
+    kind: interactive
+  - id: feishu-guide-connection-docs
+    selector: '[data-testid="feishu-guide-connection-docs"]'
+    kind: interactive
   - id: feishu-app-id
     selector: '[data-testid="feishu-app-id"]'
     kind: interactive
@@ -13950,4 +14000,5 @@ controls:
 
 企业自建应用出站长连接、白名单、通知、确认卡片与 Agent 指令/文件快照。
 TC-MOBILE-004 覆盖设置与真实 native 配置 IPC；Rust loopback fixture 覆盖 HTTP/WS 与 Agent 副作用。
+TC-MOBILE-016 覆盖中英文分步配置指南、鼠标/键盘展开收起与配置草稿保留；外部浏览器启动和真实飞书租户配置不由此用例验证。
 真实飞书应用端到端仍待配置后验证，详见 `docs-feature/mobile-feishu-p1-implementation.md`。
