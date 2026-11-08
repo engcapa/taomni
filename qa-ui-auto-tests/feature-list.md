@@ -5980,24 +5980,31 @@ controls:
     kind: interactive
   - id: notes-workspace-title
     selector: '[data-testid="notes-workspace-title"]'
+    aliases: ['[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-title"]']
     kind: interactive
   - id: notes-workspace-mode-edit
     selector: '[data-testid="notes-workspace-mode-edit"]'
+    aliases: ['[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-mode-edit"]']
     kind: interactive
   - id: notes-workspace-mode-split
     selector: '[data-testid="notes-workspace-mode-split"]'
+    aliases: ['[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-mode-split"]']
     kind: interactive
   - id: notes-workspace-mode-preview
     selector: '[data-testid="notes-workspace-mode-preview"]'
+    aliases: ['[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-mode-preview"]']
     kind: interactive
   - id: notes-workspace-save
     selector: '[data-testid="notes-workspace-save"]'
+    aliases: ['[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-save"]']
     kind: interactive
   - id: notes-workspace-tao
     selector: '[data-testid="notes-workspace-tao"]'
+    aliases: ['[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-tao"]']
     kind: interactive
   - id: notes-workspace-editor
     selector: '[data-testid="notes-workspace-editor"]'
+    aliases: ['[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"]']
     kind: interactive
   - id: notes-workspace-status
     selector: '[data-testid="notes-workspace-status"]'
