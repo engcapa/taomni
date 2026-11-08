@@ -62,21 +62,46 @@ pub(super) fn validate_session_id(session_id: &str) -> Result<(), String> {
     Ok(())
 }
 
+#[derive(Clone, Copy, Default, serde::Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum TerminalInputSource {
+    #[default]
+    User,
+    TerminalResponse,
+}
+
 #[tauri::command]
 pub async fn write_terminal(
     session_id: String,
     data: String,
+    source: Option<TerminalInputSource>,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let gate = state.mobile.broker.gate(&session_id).ok();
+    write_desktop_terminal(&state, &session_id, &data, source.unwrap_or_default()).await
+}
+
+pub(crate) async fn write_desktop_terminal(
+    state: &AppState,
+    session_id: &str,
+    data: &str,
+    source: TerminalInputSource,
+) -> Result<(), String> {
+    let gate = state.mobile.broker.gate(session_id).ok();
     let _guard = match gate.as_ref() {
         Some(g) => Some(g.lock().await),
         None => None,
     };
-    if let Some((cols, rows)) = state.mobile.broker.desktop(&session_id, None) {
-        let _ = resize_terminal_inner(&state, &session_id, cols, rows).await;
+    if matches!(source, TerminalInputSource::TerminalResponse) {
+        // Only the controlling emulator should answer queries (in particular
+        // CPR must describe the phone's geometry). Desktop replies neither
+        // reclaim control nor feed a second, stale response into the PTY.
+        if !state.mobile.broker.desktop_response_allowed(session_id) {
+            return Ok(());
+        }
+    } else if let Some((cols, rows)) = state.mobile.broker.desktop(session_id, None) {
+        let _ = resize_terminal_inner(state, session_id, cols, rows).await;
     }
-    write_terminal_inner(&state, &session_id, &data).await
+    write_terminal_inner(state, session_id, data).await
 }
 
 pub(crate) async fn write_terminal_inner(

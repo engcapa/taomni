@@ -10,6 +10,7 @@ import { type TerminalConnectionState } from "./types";
 import { captureBufferCommand } from "./buffer";
 import { INJECTED_INPUT_HOLD_MAX_MS, encodeBinaryStringBase64 } from "./protocol";
 import { streamInlineAi } from "./inlineAi";
+import type { TerminalInputSource } from "../../../lib/terminal/terminalInputSource";
 
 export interface UseTerminalInputContext {
   injectedInputEchoSuppressorRef: import("react").RefObject<InputEchoSuppressor | null>;
@@ -152,8 +153,16 @@ export function useTerminalInput(context: UseTerminalInputContext) {
     sendTerminalInput(data);
   }, [sendTerminalInput, setStatusMessage, setTerminalRuntime, ssh, tabId, trackPending]);
 
-  const writeXtermInput = useCallback((data: string) => {
+  const writeXtermInput = useCallback((data: string, source: TerminalInputSource = "user") => {
     if (readOnlyRef.current) return;
+    if (source === "terminal-response") {
+      const sid = sessionIdRef.current;
+      if (sid && connectionStateRef.current === "connected") {
+        // Protocol replies are not typing, macro input or MultiExec commands.
+        writeTerminal(sid, encodeBase64(data), source).catch(console.error);
+      }
+      return;
+    }
     const filtered = imeGuardRef.current?.filterTerminalData(data) ?? data;
     if (filtered === null) {
       return;

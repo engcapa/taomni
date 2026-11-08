@@ -33,6 +33,8 @@ def setup(ctx):
     if ctx.case_id == 'TC-MOBILE-013':
         ctx.values['mobile_cookie_receipt'] = str((Path(ctx.case_dir) / 'mobile-cookie-gateway-receipt.json').resolve())
         ctx.values['mobile_cookie_marker'] = str((Path(ctx.case_dir) / 'gateway-real-pty-marker.txt').resolve())
+    if ctx.case_id == 'TC-MOBILE-018':
+        ctx.values['mobile_terminal_query_receipt'] = str((Path(ctx.case_dir) / 'mobile-terminal-query.json').resolve())
 
 
 def teardown(ctx):

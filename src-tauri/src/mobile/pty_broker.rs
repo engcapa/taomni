@@ -160,6 +160,13 @@ impl Broker {
             .map(|(d, _)| format!("mobile:{d}"))
             .unwrap_or_else(|| "none".into())
     }
+    pub fn desktop_response_allowed(&self, id: &str) -> bool {
+        self.terminals
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .get(id)
+            .is_none_or(|terminal| terminal.holder.is_none())
+    }
     pub fn desktop(&self, id: &str, size: Option<(u16, u16)>) -> Option<(u16, u16)> {
         let mut ts = self.terminals.lock().unwrap_or_else(|e| e.into_inner());
         let t = ts.get_mut(id)?;

@@ -246,4 +246,7 @@ def register(verb, terminal_input):
         if args == 'host-policy':
             from .mobile_host_policy import run as host_policy
             return host_policy(ctx, address(ctx), text(ctx, '[data-testid="mobile-settings-code"]'))
-        raise StepError('mobile_service_probe requires desktop, headless, open-session, connection-auth, openssh-cancel, cookie-gateway or host-policy')
+        if args == 'terminal-query':
+            from .mobile_terminal_query import run as terminal_query
+            return terminal_query(ctx, address(ctx), text(ctx, '[data-testid="mobile-settings-code"]'), terminal_input)
+        raise StepError('mobile_service_probe requires desktop, headless, open-session, connection-auth, openssh-cancel, cookie-gateway, host-policy or terminal-query')

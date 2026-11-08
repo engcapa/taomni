@@ -103,7 +103,16 @@ button[aria-pressed="true"] { border-color: #65e2c8; color: #65e2c8; }
 .command-bar { display: flex; gap: 6px; margin: 5px 0 0; }
 .command-bar input { margin: 0; flex: 1; min-width: 0; padding: 8px 10px; font: 16px/1.3 ui-monospace, monospace; }
 .command-bar button { flex-shrink: 0; min-height: 36px; padding: 6px 10px; }
-.terminal-notice { margin: 5px 0 0; font-size: 12px; color: #e3c981; max-height: 3.5em; overflow-y: auto; }
+.terminal-toast { position: absolute; top: 8px; left: 8px; right: 8px; z-index: 12; display: flex; align-items: flex-start; gap: 8px; max-height: min(40%, 170px); overflow-y: auto; padding: 10px 12px; border: 1px solid #79663d; border-radius: 8px; color: #f0dba1; background: #27261bed; box-shadow: 0 4px 16px #0006; font-size: 12px; line-height: 1.6; }
+.terminal-toast > div { flex: 1; }
+.terminal-toast p { margin: 0; }
+.terminal-toast p + p { margin-top: 6px; }
+.terminal-toast > button { min-height: 30px; padding: 1px 8px; }
+.terminal-copy-backdrop { position: fixed; inset: 0; z-index: 80; display: flex; align-items: center; justify-content: center; background: #0009; padding: max(14px, env(safe-area-inset-top)) 14px max(14px, env(safe-area-inset-bottom)); }
+.terminal-copy { display: flex; flex-direction: column; gap: 10px; width: min(640px, 100%); height: min(75dvh, 720px); background: #152238; padding: 16px; border: 1px solid #405470; border-radius: 12px; }
+.terminal-copy .section-heading { flex-shrink: 0; }
+.terminal-copy .note { margin: 0; }
+.terminal-copy textarea { flex: 1; min-height: 80px; margin: 0; resize: none; white-space: pre; overflow: auto; font: 14px/1.6 ui-monospace, monospace; user-select: text; -webkit-user-select: text; touch-action: auto; }
 .terminal-more { position: relative; }
 .terminal-menu { position: absolute; top: calc(100% + 6px); right: 0; width: min(280px, 85vw); max-height: 65vh; max-height: 65dvh; overflow-y: auto; z-index: 40; padding: 10px; border: 1px solid #405470; border-radius: 10px; background: #152238; box-shadow: 0 8px 30px #0008; }
 .terminal-menu > button { display: block; width: 100%; margin-bottom: 6px; text-align: left; }

@@ -1,0 +1,55 @@
+id: TC-MOBILE-018
+title: Mobile retains a real TUI through resize and cursor replies while desktop keys still reclaim
+covers: [F-MOBILE-1, F1.6, F2.1]
+tags: [p0, mobile, terminal, native-boundary]
+modes: [native]
+fixtures: [reset_db, mobile_service]
+timeout_sec: 180
+description: >-
+  A real raw Node TUI asks for the cursor position when the phone resizes the PTY,
+  matching the Codex TUI trigger. The embedded phone bundle and desktop xterm both
+  parse the query. Independent PTY disk bytes must contain exactly one answer at
+  the phone geometry, with no control-lost. Real desktop typing must still reclaim
+  and its terminal replies must still work. Browser stubs cannot prove IPC/PTY
+  provenance or native ownership transitions. No Codex account or cloud call.
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-mobile-query-master
+- click: '[data-testid="welcome-open-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"]'
+- assert_pattern: {selector: '[data-testid="terminal-pane"]', regex: '(?m)[$#>%]\s*$', timeout_sec: 25}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: mobile}
+- wait_for: '[data-testid="mobile-settings"]'
+- fill: {selector: '[data-testid="mobile-settings-port"]', value: '0'}
+- click: '[data-testid="mobile-settings-toggle"]'
+- assert_text: {selector: '[data-testid="mobile-settings-status"]', contains: Running}
+- click: '[data-testid="mobile-settings-pair"]'
+- wait_for: '[data-testid="mobile-settings-code"]'
+- mobile_service_probe: terminal-query
+- assert_file_contains: {path: '${fixture.mobile_terminal_query_receipt}', contains: '"passed": true'}
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="terminal"]', equal: 1}
+- assert_no_runtime_errors: null
+- screenshot: native-query-terminal-survives.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: TUI terminal replies after phone size adoption do not revoke mobile ownership or duplicate stale desktop cursor answers.
+    actions: [3, 6, 7, 9, 10, 12, 14]
+    checkpoints:
+    - {step: 5, expectation: The actual platform PTY shell is ready.}
+    - {step: 11, expectation: Settings starts the isolated native listener.}
+    - {step: 14, expectation: 'Native oracle checks resize-triggered queries, phone direct typing, exactly one phone-sized reply per query, retained phone control, real desktop reclaim and working desktop replies.'}
+    - {step: 15, expectation: Sanitized receipt and independent raw PTY JSON prove successful ownership and response handling.}
+    - {step: 16, expectation: The original terminal survives without duplicate tabs.}
+    - {step: 17, expectation: No native renderer runtime errors occurred.}
+    results: [5, 11, 14, 15, 16, 17]
+  visual:
+  - check: Desktop and phone screenshots.
+    method: not-applicable
+    reason: Screenshots are diagnostic; independent PTY bytes and control frames own acceptance.
+  native:
+  - check: Actual Tauri input IPC, desktop xterm replies, phone bundle, native PTY and single-writer ownership.
+    method: automated
+    reason: A matching QA binary runs the raw TUI, with ordinary UI input and independent on-disk responses; no direct write IPC or mock PTY.

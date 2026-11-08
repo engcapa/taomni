@@ -8,6 +8,7 @@ import { isTauriRuntime } from "../../../lib/runtime";
 import { sockscapStopLaunchedApp } from "../../../lib/sockscap";
 import { getDefaultTerminalFontFamily, getPrimaryFontName, isMonospaceFont } from "../../../lib/systemFonts";
 import { consumeTerminalDetachPending } from "../../../lib/terminal/terminalRegistry";
+import { observeTerminalInput } from "../../../lib/terminal/terminalInputSource";
 import { attachTerminalImeGuard, shouldUseLinuxImeGuard, TerminalImeInputGuard } from "../../../lib/terminalImeGuard";
 import { createTaskExitOscParser } from "../../../lib/terminalOutputFilter";
 import { connectTerminalBackend } from "./backendConnection";
@@ -155,7 +156,7 @@ function setupTerminalSession(controllerContext: TerminalSessionLifecycleContext
 
   controllerContext.fitVisibleTerminal();
 
-  term.onData(controllerContext.writeXtermInput);
+  const disposeInput = observeTerminalInput(term, controllerContext.writeXtermInput);
   term.onBinary(controllerContext.writeBinaryInput);
   term.attachCustomKeyEventHandler((event) => {
     if (event.type !== "keydown") return true;
@@ -292,6 +293,7 @@ function setupTerminalSession(controllerContext: TerminalSessionLifecycleContext
   return () => {
     lifetime.destroyed = true;
     lifetime.disposeReconnect?.();
+    disposeInput();
     observer.disconnect();
     el.removeEventListener("scroll", onContainerScroll);
     selectionDisposable.dispose();

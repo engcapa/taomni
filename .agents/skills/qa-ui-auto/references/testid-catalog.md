@@ -1978,6 +1978,16 @@
 - `[data-testid="mobile-offline-note"]` — display — F-MOBILE-1.mobile-offline-note
 - `[data-testid="mobile-instance-availability"]` — display — F-MOBILE-1.mobile-instance-availability
 - `[data-testid="mobile-control-warning"]` — display — F-MOBILE-1.mobile-control-warning
+- `[data-testid="mobile-terminal-hint"]` — interactive — F-MOBILE-1.mobile-terminal-hint
+- `[data-testid="mobile-terminal-toast"]` — display — F-MOBILE-1.mobile-terminal-toast
+- `[data-testid="mobile-terminal-notice-close"]` — interactive — F-MOBILE-1.mobile-terminal-notice-close
+- `[data-testid="mobile-terminal-guidance"]` — display — F-MOBILE-1.mobile-terminal-guidance
+- `[data-testid="mobile-terminal-copy"]` — interactive — F-MOBILE-1.mobile-terminal-copy
+- `[data-testid="mobile-terminal-copy-dialog"]` — display — F-MOBILE-1.mobile-terminal-copy-dialog
+- `[data-testid="mobile-terminal-copy-text"]` — interactive — F-MOBILE-1.mobile-terminal-copy-text
+- `[data-testid="mobile-terminal-copy-confirm"]` — interactive — F-MOBILE-1.mobile-terminal-copy-confirm
+- `[data-testid="mobile-terminal-copy-close"]` — interactive — F-MOBILE-1.mobile-terminal-copy-close
+- `[data-testid="mobile-terminal-copy-error"]` — display — F-MOBILE-1.mobile-terminal-copy-error
 - `[data-testid="mobile-events-retry"]` — interactive — F-MOBILE-1.mobile-events-retry
 - `[data-testid="mobile-terminal-retry"]` — interactive — F-MOBILE-1.mobile-terminal-retry
 - `[data-testid="mobile-sessions-updated"]` — display — F-MOBILE-1.mobile-sessions-updated

@@ -13408,6 +13408,10 @@ files:
   - src/layouts/main/mobileConnectionAuth.ts
   - mobile-web/src/CompactKeyboard.tsx
   - mobile-web/src/TerminalControls.tsx
+  - mobile-web/src/TerminalNotice.tsx
+  - mobile-web/src/TerminalCopy.tsx
+  - src/lib/terminal/terminalInputSource.ts
+  - src-tauri/src/terminal/io_commands.rs
   - mobile-web/src/ConnectionAuthForm.tsx
   - mobile-web/src/live.ts
   - mobile-web/src/api.ts
@@ -13423,6 +13427,36 @@ controls:
     kind: display
   - id: mobile-control-warning
     selector: '[data-testid="mobile-control-warning"]'
+    kind: display
+  - id: mobile-terminal-hint
+    selector: '[data-testid="mobile-terminal-hint"]'
+    kind: interactive
+  - id: mobile-terminal-toast
+    selector: '[data-testid="mobile-terminal-toast"]'
+    kind: display
+  - id: mobile-terminal-notice-close
+    selector: '[data-testid="mobile-terminal-notice-close"]'
+    kind: interactive
+  - id: mobile-terminal-guidance
+    selector: '[data-testid="mobile-terminal-guidance"]'
+    kind: display
+  - id: mobile-terminal-copy
+    selector: '[data-testid="mobile-terminal-copy"]'
+    kind: interactive
+  - id: mobile-terminal-copy-dialog
+    selector: '[data-testid="mobile-terminal-copy-dialog"]'
+    kind: display
+  - id: mobile-terminal-copy-text
+    selector: '[data-testid="mobile-terminal-copy-text"]'
+    kind: interactive
+  - id: mobile-terminal-copy-confirm
+    selector: '[data-testid="mobile-terminal-copy-confirm"]'
+    kind: interactive
+  - id: mobile-terminal-copy-close
+    selector: '[data-testid="mobile-terminal-copy-close"]'
+    kind: interactive
+  - id: mobile-terminal-copy-error
+    selector: '[data-testid="mobile-terminal-copy-error"]'
     kind: display
   - id: mobile-events-retry
     selector: '[data-testid="mobile-events-retry"]'

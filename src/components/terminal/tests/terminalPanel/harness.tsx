@@ -30,6 +30,9 @@ const terminalMocks = vi.hoisted(() => {
       },
       modes,
       parser: {
+        registerCsiHandler: vi.fn(() => ({ dispose: vi.fn() })),
+        registerDcsHandler: vi.fn(() => ({ dispose: vi.fn() })),
+        registerEscHandler: vi.fn(() => ({ dispose: vi.fn() })),
         registerOscHandler: vi.fn((ident: number, handler: (data: string) => boolean | Promise<boolean>) => {
           oscHandlers.set(ident, handler);
           return { dispose: vi.fn() };

@@ -147,5 +147,6 @@ pub(crate) use connection_probe::{
 };
 
 pub(crate) use io_commands::{
-    resize_terminal_inner, send_terminal_signal_inner, write_terminal_inner,
+    TerminalInputSource, resize_terminal_inner, send_terminal_signal_inner, write_desktop_terminal,
+    write_terminal_inner,
 };
