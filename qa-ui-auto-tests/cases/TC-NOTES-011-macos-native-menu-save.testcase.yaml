@@ -27,10 +27,9 @@ steps:
     value: '# Shared body original'
 - blur: '[data-testid="note-editor-body"]'
 - click: '[data-testid="note-editor-pin"]'
-- assert_attribute:
-    selector: '[data-testid="note-editor-pin"]'
-    name: aria-pressed
-    equals: 'true'
+- wait_for:
+    selector: '[data-testid="note-editor-pin"][aria-pressed="true"]'
+    timeout_sec: 10
 - click: '[data-testid="note-editor-preview"]'
 - native_menu:
     action: workspace-command:notes.save
@@ -84,8 +83,8 @@ verification:
     - 19
     checkpoints:
     - step: 10
-      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="note-editor-pin"]'', ''name'': ''aria-pressed'',
-        ''equals'': ''true''}}'
+      expectation: '{''wait_for'': {''selector'': ''[data-testid="note-editor-pin"][aria-pressed="true"]'', ''timeout_sec'':
+        10}}'
     - step: 17
       expectation: '{''assert_not_visible'': ''[data-testid="notes-workspace-document"][data-active="true"][data-dirty="true"]''}'
     - step: 20

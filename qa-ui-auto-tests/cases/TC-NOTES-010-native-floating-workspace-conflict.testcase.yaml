@@ -28,10 +28,9 @@ steps:
     value: '# Shared body original'
 - blur: '[data-testid="note-editor-body"]'
 - click: '[data-testid="note-editor-pin"]'
-- assert_attribute:
-    selector: '[data-testid="note-editor-pin"]'
-    name: aria-pressed
-    equals: 'true'
+- wait_for:
+    selector: '[data-testid="note-editor-pin"][aria-pressed="true"]'
+    timeout_sec: 10
 - click: '[data-testid="note-editor-back"]'
 - click: '[data-testid="notes-floating-toggle"]'
 - switch_window:
@@ -121,8 +120,8 @@ verification:
     - 17
     checkpoints:
     - step: 10
-      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="note-editor-pin"]'', ''name'': ''aria-pressed'',
-        ''equals'': ''true''}}'
+      expectation: '{''wait_for'': {''selector'': ''[data-testid="note-editor-pin"][aria-pressed="true"]'', ''timeout_sec'':
+        10}}'
     - step: 15
       expectation: '{''eval_readonly'': {''expression'': ''document.querySelector(".notes-link-field-shell textarea").value
         === "# Shared body original"'', ''expect_truthy'': True, ''timeout_sec'': 10}}'

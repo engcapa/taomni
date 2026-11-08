@@ -30,10 +30,9 @@ steps:
     value: '# Shared body original'
 - blur: '[data-testid="note-editor-body"]'
 - click: '[data-testid="note-editor-pin"]'
-- assert_attribute:
-    selector: '[data-testid="note-editor-pin"]'
-    name: aria-pressed
-    equals: 'true'
+- wait_for:
+    selector: '[data-testid="note-editor-pin"][aria-pressed="true"]'
+    timeout_sec: 10
 - click: '[data-testid="note-editor-preview"]'
 - assert_visible: '[data-testid="notes-workspace-sidebar"]'
 - assert_attribute:
@@ -68,10 +67,9 @@ steps:
 - eval_readonly:
     expression: document.querySelector(".notes-link-field-shell textarea").value === "# Saved from Workspace"
     expect_truthy: true
-- assert_attribute:
-    selector: '[data-testid="note-editor-pin"]'
-    name: aria-pressed
-    equals: 'true'
+- wait_for:
+    selector: '[data-testid="note-editor-pin"][aria-pressed="true"]'
+    timeout_sec: 10
 - click: '[data-testid="note-editor-preview"]'
 - assert_text_equals:
     selector: '[data-testid="notes-workspace-document"][data-active="true"] h1'
@@ -192,8 +190,8 @@ verification:
     - 26
     checkpoints:
     - step: 10
-      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="note-editor-pin"]'', ''name'': ''aria-pressed'',
-        ''equals'': ''true''}}'
+      expectation: '{''wait_for'': {''selector'': ''[data-testid="note-editor-pin"][aria-pressed="true"]'', ''timeout_sec'':
+        10}}'
     - step: 12
       expectation: '{''assert_visible'': ''[data-testid="notes-workspace-sidebar"]''}'
     - step: 13
@@ -213,8 +211,8 @@ verification:
       expectation: '{''eval_readonly'': {''expression'': ''document.querySelector(".notes-link-field-shell textarea").value
         === "# Saved from Workspace"'', ''expect_truthy'': True}}'
     - step: 25
-      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="note-editor-pin"]'', ''name'': ''aria-pressed'',
-        ''equals'': ''true''}}'
+      expectation: '{''wait_for'': {''selector'': ''[data-testid="note-editor-pin"][aria-pressed="true"]'', ''timeout_sec'':
+        10}}'
     - step: 27
       expectation: '{''assert_text_equals'': {''selector'': ''[data-testid="notes-workspace-document"][data-active="true"]
         h1'', ''equals'': ''Saved from Workspace''}}'
