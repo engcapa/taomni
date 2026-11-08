@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { openPlatformCodeWorkspace } from "./openPlatformCodeWorkspace";
 import { useAppStore } from "../stores/appStore";
 import { DEFAULT_WORKSPACE_ID, useWorkspacePlatformStore } from "../stores/workspacePlatformStore";
+import { NOTES_WORKSPACE_ID } from "../stores/workspaceNotes";
 import type { CodeWorkspaceTabInfo } from "../types";
 
 const project: CodeWorkspaceTabInfo = {
@@ -42,13 +43,15 @@ describe("editor entry point ownership", () => {
     const after = useWorkspacePlatformStore.getState().getWorkspace(id)!;
     expect(after.openTabs).toEqual(before.openTabs);
     expect(after.codeWorkspace?.workspaceInstanceId).toBe(before.codeWorkspace?.workspaceInstanceId);
-    expect(useWorkspacePlatformStore.getState().workspaces).toHaveLength(2);
+    expect(useWorkspacePlatformStore.getState().workspaces.map((workspace) => workspace.id))
+      .toEqual([DEFAULT_WORKSPACE_ID, NOTES_WORKSPACE_ID, id]);
   });
 
   it("reuses a project created from the Workspaces UI by folder identity", () => {
     const existing = useWorkspacePlatformStore.getState().createWorkspace({ name: "Existing", rootPath: "/repo" });
     expect(openPlatformCodeWorkspace({ ...project, looseFiles: [] })).toBe(existing.id);
-    expect(useWorkspacePlatformStore.getState().workspaces).toHaveLength(2);
+    expect(useWorkspacePlatformStore.getState().workspaces.map((workspace) => workspace.id))
+      .toEqual([DEFAULT_WORKSPACE_ID, NOTES_WORKSPACE_ID, existing.id]);
   });
 
   it("routes context-free Code Editor to the default workspace without creating duplicate code tabs", () => {
@@ -59,7 +62,8 @@ describe("editor entry point ownership", () => {
     expect(useAppStore.getState().sidebarCollapsed).toBe(false);
     expect(useWorkspacePlatformStore.getState().getWorkspace(id)?.activeLeftToolWindow).toBe("project");
     expect(openPlatformCodeWorkspace({ repoRoot: "" })).toBe(id);
-    expect(useWorkspacePlatformStore.getState().workspaces).toHaveLength(1);
+    expect(useWorkspacePlatformStore.getState().workspaces.map((workspace) => workspace.id))
+      .toEqual([DEFAULT_WORKSPACE_ID, NOTES_WORKSPACE_ID]);
     expect(useWorkspacePlatformStore.getState().getWorkspace(id)?.openTabs).toHaveLength(1);
   });
 
