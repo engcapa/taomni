@@ -408,6 +408,23 @@ Native only (Linux/Windows/macOS): `{folder?: INBOX, size_delta?: 0, empty_newes
 
 ### `mobile_service_probe` (native)
 
+`mobile_service_probe: terminal-query` (TC-MOBILE-018, Linux/Windows/macOS)
+starts a harmless raw Node TUI through normal desktop terminal input. Its resize
+handler issues a cursor query, as Codex TUI does. The real embedded phone bundle
+must retain control and the PTY's independent disk receipt must show one answer
+per query at the phone geometry. Later phone input also queries successfully;
+real desktop typing must reclaim, and desktop queries must still receive replies.
+This requires Node on the native host and a matching isolated QA binary; no
+Codex process/account or cloud request is used.
+
+`mobile_browser_probe: terminal-tools` (TC-MOBILE-017, browser)
+operates the real phone bundle on the `mobile_web` fixture. It checks six-second
+hint dismissal without terminal reflow, info-button reopen/close, complete
+scrollback and selected-range copy through the browser clipboard, landscape
+overflow and focus return. The peer receipt must remain unchanged while readonly
+tools are used. It grants browser clipboard permissions, never alters product
+state, and does not claim physical phone selection or OS permission UI evidence.
+
 Arguments: `desktop` or `headless`. `desktop` requires a real local PTY and the
 mobile listener/pairing code opened through Settings. It uses two external
 HTTP/WS devices, operates settings revoke controls, verifies real PTY output

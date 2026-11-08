@@ -1,0 +1,74 @@
+id: TC-MOBILE-017
+title: Phone terminal hints disappear without reflow and readonly output can be selected and copied
+covers: [F-MOBILE-1]
+tags: [p0, mobile, terminal, clipboard]
+modes: [browser]
+fixtures: [mobile_web]
+timeout_sec: 120
+description: >-
+  The production phone bundle at phone and landscape sizes uses transient hint
+  overlays and a selectable snapshot including scrollback. Actual browser clipboard
+  reads prove all/selection copy; peer receipts reject terminal input or takeover
+  during readonly copy. Permission-denied/manual fallback has mounted regression
+  tests; physical iOS/Android selection menus are outside this browser case.
+steps:
+- set_viewport: {width: 390, height: 844}
+- open: ${fixture.mobile_endpoint}
+- click: '[data-testid="mobile-first-instance"]'
+- fill: {selector: '[data-testid="mobile-pair-code"]', value: qa-mobile-code}
+- click: '[data-testid="mobile-pair-submit"]'
+- wait_for: '[data-testid="mobile-session"][data-session-kind="terminal"]'
+- click: '[data-testid="mobile-session"][data-session-kind="terminal"]'
+- assert_text: {selector: '[data-testid="mobile-terminal-status"]', contains: 只读}
+- mobile_browser_probe: terminal-tools
+- click: '[data-testid="mobile-terminal-hint"]'
+- assert_text: {selector: '[data-testid="mobile-terminal-notice"]', contains: 已复制所选}
+- assert_text: {selector: '[data-testid="mobile-control-warning"]', contains: 可能打断}
+- click: '[data-testid="mobile-terminal-notice-close"]'
+- click: '[data-testid="mobile-terminal-more"]'
+- click: '[data-testid="mobile-terminal-copy"]'
+- wait_for: '[data-testid="mobile-terminal-copy-dialog"]'
+- press: {selector: '[data-testid="mobile-terminal-copy-text"]', key: 'Control+A', macos_key: 'Meta+A'}
+- click: '[data-testid="mobile-terminal-copy-confirm"]'
+- assert_text: {selector: '[data-testid="mobile-terminal-toast"]', contains: 已复制}
+- click: '[data-testid="mobile-terminal-more"]'
+- click: '[data-testid="mobile-terminal-copy"]'
+- click: '[data-testid="mobile-terminal-copy-close"]'
+- click: '[data-testid="mobile-take-control"]'
+- click: '[data-testid="mobile-terminal-hint"]'
+- assert_text: {selector: '[data-testid="mobile-terminal-guidance"]', contains: 桌面输入可随时抢回}
+- click: '[data-testid="mobile-terminal-notice-close"]'
+- click: '[data-testid="mobile-take-control"]'
+- assert_text: {selector: '[data-testid="mobile-terminal-status"]', contains: 只读}
+- assert_no_runtime_errors: null
+- screenshot: mobile-terminal-tools-finished.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Hints expire in six seconds without resizing the terminal and can be reopened beside either ownership badge.
+    actions: [7, 9, 10, 13, 23, 24, 26, 27]
+    checkpoints:
+    - {step: 9, expectation: 'The overlay is absolute, expires without geometry changes, and reopens/closes through the info button.'}
+    - {step: 12, expectation: Readonly warning is available on demand.}
+    - {step: 25, expectation: Controlling guidance is available through the same info entry.}
+    - {step: 28, expectation: Releasing ownership retains the readonly terminal.}
+    results: [9, 12, 25, 28]
+  - id: R2
+    requirement: Readonly output including scrollback is selectable and copies all or the chosen range without sending terminal input.
+    actions: [9, 14, 15, 17, 18, 20, 21, 22]
+    checkpoints:
+    - {step: 9, expectation: 'Browser clipboard equals the complete snapshot or exact selection; landscape, Escape, close and focus return pass without peer writes.'}
+    - {step: 11, expectation: Copy feedback can be reopened after dismissal.}
+    - {step: 16, expectation: The copy entry opens a real selectable readonly text dialog.}
+    - {step: 19, expectation: Selecting text and activating copy reports success.}
+    - {step: 29, expectation: No page runtime errors occurred.}
+    results: [9, 11, 16, 19, 29]
+  visual:
+  - check: Hint geometry and phone/landscape dialog overflow.
+    method: automated
+    reason: Bounding boxes, absolute positioning and viewport width assertions supplement diagnostic screenshots.
+  native:
+  - check: Physical phone text selection and OS clipboard permission UI.
+    method: manual
+    reason: Browser clipboard and standard DOM keyboard actions do not establish iOS/Android native selection menus; not executed here.

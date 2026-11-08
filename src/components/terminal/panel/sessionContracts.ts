@@ -43,7 +43,7 @@ export interface TerminalSessionLifecycleContext {
   imeGuardRef: import("react").RefObject<TerminalImeInputGuard | null>;
   installTerminalWebgl: (term: Terminal) => void;
   fitVisibleTerminal: (forceSync?: boolean) => void;
-  writeXtermInput: (data: string) => void;
+  writeXtermInput: (data: string, source?: import("../../../lib/terminal/terminalInputSource").TerminalInputSource) => void;
   writeBinaryInput: (data: string) => void;
   handleShortcutKey: (event: KeyboardEvent) => boolean;
   blockSelectionRef: import("react").RefObject<TerminalBlockSelection | null>;

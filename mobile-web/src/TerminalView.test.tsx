@@ -9,7 +9,8 @@ vi.mock("@xterm/xterm", () => ({ Terminal: class {
   cols = 40; rows = 20; textarea: HTMLTextAreaElement | undefined;
   options: Record<string, unknown>;
   modes = { bracketedPasteMode: false, applicationCursorKeysMode: false };
-  buffer = { active: { viewportY: 0, baseY: 0 } };
+  buffer = { active: { viewportY: 0, baseY: 0, length: 1, getLine: () => ({ translateToString: () => "QA readable output 中文", isWrapped: false }) } };
+  getSelection() { return ""; }
   constructor(options: Record<string, unknown>) { this.options = options; mock.term = this; }
   loadAddon() {}
   open(host: HTMLElement) { this.textarea = document.createElement("textarea"); this.textarea.className = "xterm-helper-textarea"; host.appendChild(this.textarea); }
@@ -58,7 +59,7 @@ it("warns before takeover and exposes desktop activity without opening the more 
   act(() => { mock.status("已连接"); mock.frame({ type: "control", holder: "none", desktop_last_activity_at: 1700000000 }); });
   expect(screen.getByTestId("mobile-control-warning")).toHaveTextContent("输入可能打断正在执行的命令");
   expect(screen.getByTestId("mobile-control-warning")).toHaveTextContent("桌面最近活动：");
-  expect(screen.getByTestId("mobile-take-control")).toHaveAttribute("aria-describedby", "mobile-control-warning");
+  expect(screen.getByTestId("mobile-take-control")).toHaveAttribute("aria-describedby", "mobile-terminal-tip");
   expect(screen.queryByTestId("mobile-terminal-menu")).toBeNull();
   fireEvent.click(screen.getByTestId("mobile-take-control"));
   expect(mock.send).toHaveBeenCalledWith({ type: "take-control" });
@@ -66,6 +67,36 @@ it("warns before takeover and exposes desktop activity without opening the more 
   expect(screen.queryByTestId("mobile-control-warning")).toBeNull();
   fireEvent.click(screen.getByTestId("mobile-take-control"));
   expect(mock.send).toHaveBeenCalledWith({ type: "release-control" });
+});
+
+it("hides floating hints after six seconds and reopens the last message and guidance beside the read-only badge", () => {
+  vi.useFakeTimers();
+  render(<TerminalView instance={instance} session={session} />);
+  expect(screen.getByTestId("mobile-terminal-toast").parentElement).toHaveClass("terminal-frame");
+  act(() => vi.advanceTimersByTime(6000));
+  expect(screen.queryByTestId("mobile-terminal-toast")).toBeNull();
+  expect(screen.getByTestId("mobile-take-control")).not.toHaveAttribute("aria-describedby");
+  act(() => mock.frame({ type: "control-lost" }));
+  expect(screen.getByTestId("mobile-terminal-notice")).toHaveTextContent("桌面已抢回");
+  act(() => vi.advanceTimersByTime(6000));
+  expect(screen.queryByTestId("mobile-terminal-toast")).toBeNull();
+  fireEvent.click(screen.getByTestId("mobile-terminal-hint"));
+  expect(screen.getByTestId("mobile-terminal-notice")).toHaveTextContent("桌面已抢回");
+  expect(screen.getByTestId("mobile-control-warning")).toHaveTextContent("接管后的输入可能打断");
+  fireEvent.click(screen.getByTestId("mobile-terminal-notice-close"));
+  expect(screen.queryByTestId("mobile-terminal-toast")).toBeNull();
+});
+
+it("opens a selectable output snapshot from more without taking control or sending terminal input", () => {
+  render(<TerminalView instance={instance} session={session} />);
+  fireEvent.click(screen.getByTestId("mobile-terminal-more"));
+  fireEvent.click(screen.getByTestId("mobile-terminal-copy"));
+  expect(screen.getByTestId("mobile-terminal-copy-text")).toHaveValue("QA readable output 中文");
+  expect(screen.getByTestId("mobile-terminal-copy-text")).toHaveAttribute("readonly");
+  expect(mock.send).not.toHaveBeenCalled();
+  fireEvent.click(screen.getByTestId("mobile-terminal-copy-close"));
+  expect(screen.queryByRole("dialog")).toBeNull();
+  expect(screen.getByTestId("mobile-terminal-more")).toHaveFocus();
 });
 
 it("applies sticky Ctrl to the next system-keyboard character and resets on lost control", () => {

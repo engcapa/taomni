@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode, type Ref } from "react";
 import type { InputMode } from "./terminalDisplay";
 
 const keepFocus = (event: { preventDefault: () => void }) => event.preventDefault();
 
 /** Rare actions live in an overlay so they never take rows from the terminal. */
-export function TerminalMore({ children }: { children: ReactNode }) {
+export function TerminalMore({ children, triggerRef }: { children: ReactNode; triggerRef?: Ref<HTMLButtonElement> }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -16,7 +16,7 @@ export function TerminalMore({ children }: { children: ReactNode }) {
     return () => { document.removeEventListener("pointerdown", close); document.removeEventListener("keydown", escape); };
   }, [open]);
   return <div className="terminal-more" ref={root}>
-    <button data-testid="mobile-terminal-more" aria-label="更多终端操作" aria-expanded={open} onMouseDown={keepFocus} onClick={() => setOpen(v => !v)}>⋯</button>
+    <button ref={triggerRef} data-testid="mobile-terminal-more" aria-label="更多终端操作" aria-expanded={open} onMouseDown={keepFocus} onClick={() => setOpen(v => !v)}>⋯</button>
     {open && <div className="terminal-menu" data-testid="mobile-terminal-menu" onClick={event => {
       const button = (event.target as HTMLElement).closest("button");
       if (button && !button.dataset.testid?.startsWith("mobile-terminal-font-")) setOpen(false);

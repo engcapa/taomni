@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Terminal } from "@xterm/xterm";
 import { FitAddon } from "@xterm/addon-fit";
 import "@xterm/xterm/css/xterm.css";
@@ -11,6 +11,8 @@ import { TerminalInputMode, TerminalMore } from "./TerminalControls";
 import { FONT_MAX, FONT_MIN, MONO_FONT, clampFontSize, loadFontSize, loadFullscreen, loadInputMode, loadKeysOpen, pinTerminal, saveFontSize, saveFullscreen, saveInputMode, saveKeysOpen, type InputMode } from "./terminalDisplay";
 import { NO_MODIFIERS, applyTypedModifiers, encodeBase64, pastePayload, type Modifiers } from "./terminalKeys";
 import { attachTouchGestures } from "./terminalTouch";
+import { TerminalNotice, useTerminalNotice } from "./TerminalNotice";
+import { TerminalCopy, terminalCopyText } from "./TerminalCopy";
 
 const READ_ONLY_HINT = "当前为只读，先点“接管输入”再输入。";
 const keepFocus = (event: { preventDefault: () => void }) => event.preventDefault();
@@ -27,7 +29,10 @@ export function TerminalView({ instance, session, onBack }: { instance: Instance
   const [desktopActivity, setDesktopActivity] = useState<number | null>(null);
   const [holder, setHolder] = useState("none");
   const [status, setStatus] = useState("连接中");
-  const [notice, setNotice] = useState("");
+  const { notice, show: setNotice, dismiss: dismissNotice, reopen: reopenNotice } = useTerminalNotice();
+  const [copyText, setCopyText] = useState<string | null>(null);
+  const moreButton = useRef<HTMLButtonElement>(null);
+  const closeCopy = useCallback(() => setCopyText(null), []);
   const [exited, setExited] = useState(session.status === "exited");
   const [panelOpen, setPanelOpen] = useState(false);
   const [modifiers, setModifiers] = useState<Modifiers>(NO_MODIFIERS);
@@ -188,14 +193,16 @@ export function TerminalView({ instance, session, onBack }: { instance: Instance
     return () => clearTimeout(timer);
   }, [controlling]);
   const badge = exited ? "已退出" : controlling ? "控制中" : holder !== "none" ? "只读 · 他处已接管" : "只读";
+  const guidance = `${!controlling && !exited ? "接管后的输入可能打断正在执行的命令；桌面可随时抢回。" : "桌面输入可随时抢回控制。"}${desktopActivity ? `桌面最近活动：${new Date(desktopActivity * 1000).toLocaleTimeString()}。` : "桌面最近活动：暂无记录。"}拖动输出查看历史，双指缩放调整字号；可在“更多”中复制内容。`;
   return <section ref={card} className={`card terminal-card${fullscreen ? " fullscreen" : ""}`} data-testid="mobile-terminal">
     <div className="section-heading terminal-heading">
       {onBack && <button className="terminal-back" data-testid="mobile-terminal-back" aria-label="返回会话列表" onClick={onBack}>‹</button>}
       <h2 className="terminal-title" title={session.title}>{session.title || "终端输出"}</h2>
       <div className="terminal-tools">
         <span className="badge" data-testid="mobile-terminal-status" title={status}>{badge}{status !== "已连接" && ` · ${status}`}</span>
-        <button className={controlling ? undefined : "primary"} data-testid="mobile-take-control" aria-describedby={!controlling && !exited ? "mobile-control-warning" : undefined} disabled={exited || status !== "已连接"} onMouseDown={keepFocus} onClick={() => { setNotice(""); command({ type: controlling ? "release-control" : "take-control" }); }}>{controlling ? "释放" : "接管输入"}</button>
-        <TerminalMore>
+        <button data-testid="mobile-terminal-hint" aria-label="终端提示" aria-expanded={!!notice} aria-controls="mobile-terminal-tip" onMouseDown={keepFocus} onClick={reopenNotice}>ⓘ</button>
+        <button className={controlling ? undefined : "primary"} data-testid="mobile-take-control" aria-describedby={notice?.help && !controlling && !exited ? "mobile-terminal-tip" : undefined} disabled={exited || status !== "已连接"} onMouseDown={keepFocus} onClick={() => { setNotice(""); command({ type: controlling ? "release-control" : "take-control" }); }}>{controlling ? "释放" : "接管输入"}</button>
+        <TerminalMore triggerRef={moreButton}>
           <div className="actions">
             <button data-testid="mobile-terminal-font-down" aria-label="缩小字号" disabled={fontSize <= FONT_MIN} onMouseDown={keepFocus} onClick={() => setFontSize(v => clampFontSize(v - 1))}>A−</button>
             <small>字号 {fontSize}</small>
@@ -204,21 +211,22 @@ export function TerminalView({ instance, session, onBack }: { instance: Instance
           <button data-testid="mobile-terminal-keys" aria-pressed={keysOpen} onMouseDown={keepFocus} onClick={() => setKeysOpen(v => !v)}>{keysOpen ? "收起快捷键" : "显示快捷键"}</button>
           <button data-testid="mobile-terminal-fullscreen" aria-pressed={fullscreen} onMouseDown={keepFocus} onClick={() => setFullscreen(v => !v)}>{fullscreen ? "退出全屏" : "全屏"}</button>
           <button data-testid="mobile-paste" aria-pressed={panelOpen} disabled={!controlling} onClick={() => { setInputMode("system"); setPanelOpen(v => !v); }}>多行 / 历史</button>
+          <button data-testid="mobile-terminal-copy" onClick={() => { if (terminal.current) setCopyText(terminalCopyText(terminal.current)); }}>复制内容</button>
           <button data-testid="mobile-resize" disabled={!controlling} onClick={() => { fit.current?.fit(); if (terminal.current) command({ type: "resize", cols: terminal.current.cols, rows: terminal.current.rows }); }}>适配尺寸</button>
           <p className="note">拖动输出查看历史，双指缩放调整字号。接管后按手机尺寸重排，桌面输入可随时抢回。</p>
         </TerminalMore>
       </div>
     </div>
-    {!controlling && !exited && <p id="mobile-control-warning" className="terminal-notice" data-testid="mobile-control-warning">接管后的输入可能打断正在执行的命令；桌面可随时抢回。{desktopActivity ? `桌面最近活动：${new Date(desktopActivity * 1000).toLocaleTimeString()}` : "桌面最近活动：暂无记录。"}</p>}
     {canRetry && <button data-testid="mobile-terminal-retry" onClick={retry}>重新连接（保留已接收输出）</button>}
     <div className="terminal-frame">
       <div ref={host} className="terminal" data-testid="mobile-terminal-screen" />
+      <TerminalNotice notice={notice} guidance={guidance} warning={!controlling && !exited} onDismiss={dismissNotice} />
       {scrolledUp && <button className="scroll-latest" data-testid="mobile-terminal-latest" onMouseDown={keepFocus} onClick={() => terminal.current?.scrollToBottom()}>↓ 最新</button>}
     </div>
-    {notice && <p role="status" className="terminal-notice" data-testid="mobile-terminal-notice">{notice}</p>}
     <TerminalComposer disabled={!controlling} systemKeyboard={inputMode === "system"} panelOpen={panelOpen} onSend={sendText} onNotice={setNotice} keyHandler={draftKeyHandler} />
     {keysOpen && <TerminalKeybar disabled={!controlling} modifiers={modifiers} onModifiers={setModifiers} onSend={data => { if (!draftKeyHandler.current?.(data)) input(data); }} appCursor={() => terminal.current?.modes.applicationCursorKeysMode ?? false} />}
     {inputMode === "compact" && controlling && <CompactKeyboard disabled={!controlling} modifiers={modifiers} onSend={data => { if (input(data)) setModifiers(NO_MODIFIERS); }} />}
     <TerminalInputMode mode={inputMode} disabled={!controlling} onChange={changeInputMode} />
+    {copyText !== null && <TerminalCopy text={copyText} returnFocus={moreButton} onClose={closeCopy} onCopied={setNotice} />}
   </section>;
 }

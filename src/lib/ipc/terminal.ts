@@ -360,8 +360,9 @@ export async function testSshConnection(
 export async function writeTerminal(
   sessionId: string,
   data: string,
+  source?: import("../terminal/terminalInputSource").TerminalInputSource,
 ): Promise<void> {
-  return invoke("write_terminal", { sessionId, data });
+  return invoke("write_terminal", { sessionId, data, ...(source ? { source } : {}) });
 }
 
 export async function resizeTerminal(

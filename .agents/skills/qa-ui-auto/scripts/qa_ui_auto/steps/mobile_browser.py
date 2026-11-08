@@ -15,9 +15,15 @@ from . import StepContext, StepError, verb
 
 @verb('mobile_browser_probe')
 def mobile_browser_probe(ctx: StepContext, args: Any) -> None:
-    if args not in ('touch-scroll', 'recovery', 'cookie-gateway') or ctx.cfg['app']['mode'] != 'browser':
-        raise StepError('mobile_browser_probe requires browser mode and touch-scroll, recovery or cookie-gateway')
+    if args not in ('touch-scroll', 'recovery', 'cookie-gateway', 'terminal-tools') or ctx.cfg['app']['mode'] != 'browser':
+        raise StepError('mobile_browser_probe requires browser mode and touch-scroll, recovery, cookie-gateway or terminal-tools')
     if ctx.dry_run:
+        return
+    if args == 'terminal-tools':
+        from ..deadline import BudgetedPage
+        from ..mobile_terminal_tools import run
+        page = ctx.page._target if isinstance(ctx.page, BudgetedPage) else ctx.page
+        run(page, ctx.case_dir, ctx.values['mobile_receipt'])
         return
     if args == 'cookie-gateway':
         from ..deadline import BudgetedPage
