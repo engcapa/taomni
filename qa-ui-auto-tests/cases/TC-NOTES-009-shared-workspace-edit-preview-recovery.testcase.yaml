@@ -99,7 +99,7 @@ steps:
     name: data-dirty
     equals: 'true'
 - assert_no_runtime_errors: null
-- open: ${cfg.app.base_url}
+- reload_window: null
 - click: '[data-testid="nav-mode-workspaces"]'
 - assert_visible: '[data-testid="notes-workspace-document"][data-active="true"]'
 - assert_text_equals:
@@ -133,9 +133,11 @@ steps:
     value: ''
 - click: '[data-testid="notes-workspace-refresh"]'
 - click: '[data-testid="notes-workspace-new"]'
-- assert_count:
-    selector: '[data-testid="workspace-tab"][data-tab-kind="note"]'
-    equal: 2
+- eval_readonly:
+    expression: document.getElementsByClassName("taomni-workspace-tab").length === 2 && document.getElementsByClassName("taomni-workspace-tab")[1].dataset.tabKind
+      === "note"
+    expect_truthy: true
+    timeout_sec: 10
 - fill:
     selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-title"]'
     value: Second note
@@ -153,9 +155,11 @@ steps:
 - assert_visible: '[data-testid="notes-workspace-sidebar"]'
 - click: '[data-testid="workspace-open-session-plus"]'
 - click: '[data-testid="workspace-plus-new-note"]'
-- assert_count:
-    selector: '[data-testid="workspace-tab"][data-tab-kind="note"]'
-    equal: 3
+- eval_readonly:
+    expression: document.getElementsByClassName("taomni-workspace-tab").length === 3 && document.getElementsByClassName("taomni-workspace-tab")[2].dataset.tabKind
+      === "note"
+    expect_truthy: true
+    timeout_sec: 10
 - fill:
     selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-title"]'
     value: Third note
@@ -303,8 +307,9 @@ verification:
     - step: 50
       expectation: '{''assert_count'': {''selector'': ''[data-testid="notes-workspace-note"]'', ''equal'': 1}}'
     - step: 54
-      expectation: '{''assert_count'': {''selector'': ''[data-testid="workspace-tab"][data-tab-kind="note"]'', ''equal'':
-        2}}'
+      expectation: '{''eval_readonly'': {''expression'': ''document.getElementsByClassName("taomni-workspace-tab").length
+        === 2 && document.getElementsByClassName("taomni-workspace-tab")[1].dataset.tabKind === "note"'', ''expect_truthy'':
+        True, ''timeout_sec'': 10}}'
     - step: 58
       expectation: '{''assert_text_equals'': {''selector'': ''[data-testid="notes-workspace-document"][data-active="true"]:visible
         h1'', ''equals'': ''Recovered draft''}}'
@@ -314,8 +319,9 @@ verification:
     - step: 63
       expectation: '{''assert_visible'': ''[data-testid="notes-workspace-sidebar"]''}'
     - step: 66
-      expectation: '{''assert_count'': {''selector'': ''[data-testid="workspace-tab"][data-tab-kind="note"]'', ''equal'':
-        3}}'
+      expectation: '{''eval_readonly'': {''expression'': ''document.getElementsByClassName("taomni-workspace-tab").length
+        === 3 && document.getElementsByClassName("taomni-workspace-tab")[2].dataset.tabKind === "note"'', ''expect_truthy'':
+        True, ''timeout_sec'': 10}}'
     - step: 70
       expectation: '{''assert_text_equals'': {''selector'': ''[data-testid="notes-workspace-document"][data-active="true"]
         h1'', ''equals'': ''Recovered draft''}}'

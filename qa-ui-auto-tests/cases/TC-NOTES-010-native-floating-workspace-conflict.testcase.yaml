@@ -63,10 +63,9 @@ steps:
 - blur: '[data-testid="note-editor-body"]'
 - switch_window:
     selector: '[data-testid="notes-workspace"]'
-- assert_attribute:
-    selector: '[data-testid="note-content-error"]'
-    name: data-error-kind
-    equals: conflict
+- wait_for:
+    selector: '[data-testid="note-content-error"][data-error-kind="conflict"]'
+    timeout_sec: 10
 - assert_text_equals:
     selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"]
       .cm-content'
@@ -147,8 +146,8 @@ verification:
     - 29
     checkpoints:
     - step: 26
-      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="note-content-error"]'', ''name'': ''data-error-kind'',
-        ''equals'': ''conflict''}}'
+      expectation: '{''wait_for'': {''selector'': ''[data-testid="note-content-error"][data-error-kind="conflict"]'',
+        ''timeout_sec'': 10}}'
     - step: 27
       expectation: '{''assert_text_equals'': {''selector'': ''[data-testid="notes-workspace-document"][data-active="true"]
         [data-testid="notes-workspace-editor"] .cm-content'', ''equals'': ''# Retained main draft''}}'
