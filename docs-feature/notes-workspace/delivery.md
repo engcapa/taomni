@@ -1,6 +1,6 @@
 # Notes Workspace delivery
 
-Implementation baseline: `1baeb208e`. Branch: `feat/notes-workspace-and-windows-caret`. Current implementation/QA commit: `93456994b583176079cb252c4b6960de447b86c8`.
+Implementation baseline: `1baeb208e`. Branch: `feat/notes-workspace-and-windows-caret`. Validated implementation/QA commit: `fa09758606ef381e01922f08b33c914573b45529`.
 
 ## Resulting behavior
 
@@ -16,30 +16,32 @@ Focused linked fields now draw text, selection and caret through their actual in
 - 20 QA keyboard/default-action and real CodeMirror translation tests passed after the macOS bridge correction. These cover input/textarea caret insertion, range collapse/extension, surrogate movement, canceled keydown and disabled inputs.
 - Real SQLite: `cargo test --manifest-path src-tauri/Cargo.toml --lib notes::db -- --nocapture` passed all 16 tests, including three new content-save regressions. Log: `qa-ui-auto-report/_local/notes-rust-tests.log`.
 - TypeScript, `pnpm build`, `pnpm check:refactor`, Rust formatting and the QA catalog gate passed. No coverage baseline was changed; four existing control orphans remain. Development case contract sees the product change and four executable QA cases. Existing bundle-size warnings remain.
-- The complete hosted frontend gate on `6decbd3a8` passed 6,375 tests with one existing skip. Both the `48521c61b` and current `93456994b` gates passed 6,380 tests with one existing skip (700 test files). Latest raw log: `qa-ui-auto-report/github/42507023075/job-128812309047.log`.
-- Current hosted Workspace/Mobile native Rust contracts passed 97/97 in job `128812309030`, with 129 supporting frontend contracts also passing. Log: `qa-ui-auto-report/github/42507023075/job-128812309030.log`. RDP contracts are outside this selection and are not claimed.
+- The complete hosted frontend gate on `6decbd3a8` passed 6,375 tests with one existing skip. The matching-source `48521c61b` and `93456994b` gates passed 6,380 tests with one existing skip (700 test files). Raw log: `qa-ui-auto-report/github/42507023075/job-128812309047.log`. The final workflow's frontend gate also passed in job `128821036924`.
+- Matching-source hosted Workspace/Mobile native Rust contracts passed 97/97 in job `128812309030`, with 129 supporting frontend contracts also passing. Log: `qa-ui-auto-report/github/42507023075/job-128812309030.log`. The final native-contract job `128821036945` also passed. RDP contracts are outside this selection and are not claimed.
 - Local browser `notes-browser-verified/run-20261109-000533-195724834`: 6/6 passed. After the QA synchronization correction, `notes-browser-followup/run-20261109-010043-682163926`: 2/2 passed with stable inputs. These are supplementary to the hosted runs below.
 - The bounded return-to-Tao content checks passed local browser 009 in `notes-return-browser/run-20261109-022036-296597089`: 1/1, stable inputs. The exact saved/recovered content expectations remain required.
 
 ## Current hosted validation
 
-Workflow: `.github/workflows/qa-ui-auto-platforms.yml`. Follow-up run [42507023075](https://github.com/engcapa/taomni/actions/runs/42507023075) is fixed to `93456994b583176079cb252c4b6960de447b86c8`, using all three platforms, browser/native and `native_release=true`, with issue publication disabled.
+Workflow: `.github/workflows/qa-ui-auto-platforms.yml`. Final follow-up run [42509872122](https://github.com/engcapa/taomni/actions/runs/42509872122) is fixed to `fa09758606ef381e01922f08b33c914573b45529`, using all three platforms, browser/native and `native_release=true`, with issue publication disabled.
 
-The follow-up selects the corrected Notes 009/010 and the complete `crash-regression` tag. Its manifest has 15 execution entries: 30 browser and 36 native executions, with no selection gaps or unreviewed cases. Each browser platform has Notes 009 and nine crash regressions; each native platform has Notes 009/010 and ten crash regressions. Notes 010 is native-only.
+The final follow-up selects the corrected Notes 009 and the complete `crash-regression` tag. Its manifest has 15 execution entries: 30 browser and 33 native executions, with no selection gaps or unreviewed cases. Each browser platform has Notes 009 and nine crash regressions; each native platform has Notes 009 and ten crash regressions. The unchanged native-only 010 passed on all three platforms in run `42507023075`.
 
 | Hosted platform | Browser | Release native |
 | --- | --- | --- |
-| Ubuntu 24.04 X64 / Xvfb | 10/10 passed | 12/12 passed |
-| Windows Server 2025 X64 / WebView2 | 10/10 passed | 11/12 passed; 009 QA failure |
-| macOS 15 ARM64 / WKWebView | 10/10 passed | 12/12 passed |
+| Ubuntu 24.04 X64 / Xvfb | 10/10 passed | 11/11 passed |
+| Windows Server 2025 X64 / WebView2 | 10/10 passed | 11/11 passed |
+| macOS 15 ARM64 / WKWebView | 10/10 passed | 11/11 passed |
 
-Current source SHA-256: `fa28f0d3066d520948c9b7f1bb7fa01dd14ba2718d6fcbdd99cf266aa94e7b78`; runner SHA-256: `50b8b5a550a9d7c082ab5d55b4651f5998e7828ffe3dbf8809876e380a0d128d`. Browser and all macOS native reports have stable identities. Native reports identify `com.taomni.app.qa`, profile `release`, with the same build-source hash. The macOS binary hash is `2af5383629159407d9727b56bc163ec535e8ecd5f4b7869514524ff78c8b34e9`, matching the prior run.
+The final workflow and `qa-ui-auto-platforms-result` both succeeded: 63/63 cases passed, zero failed/skipped, zero infrastructure errors, zero capability gaps and zero unreviewed cases. `ci-summary.json` records `passed=true` and `report_ok=true`; required frontend/native contract and build jobs succeeded.
 
-Run [42503054521](https://github.com/engcapa/taomni/actions/runs/42503054521) on `48521c61b` supplies unchanged Notes 001–004 browser coverage on all three platforms, Notes 008 native caret coverage on all three platforms, and macOS native AppKit case 011. Its aggregate is a failure: browser 45/45 and native 36/40 passed, with failures confined to the now-corrected 009 on all platforms and 010 on macOS. The unchanged cases retain their passing raw receipts; the follow-up must establish the corrected cases. Both runs have the same product and runner identities.
+Current source SHA-256: `fa28f0d3066d520948c9b7f1bb7fa01dd14ba2718d6fcbdd99cf266aa94e7b78`; runner SHA-256: `50b8b5a550a9d7c082ab5d55b4651f5998e7828ffe3dbf8809876e380a0d128d`. All browser/native reports have stable identities. Native reports identify `com.taomni.app.qa`, profile `release`, with the same build-source hash. Each platform's shards use one verified binary: Linux `2399440de79f0b72e623914e72bb9f3b1426ee6adbb67650bcf172b82ec9115f`, Windows `2b9b1c2963040ce8c867e6c7b1143b85217da873a1c197f7180b088a23570c31`, macOS `2af5383629159407d9727b56bc163ec535e8ecd5f4b7869514524ff78c8b34e9`. These hashes match the prior run's matching-source release builds.
 
-Raw artifacts, receipts and selection are retained under `qa-ui-auto-report/github/42507023075/` and `qa-ui-auto-report/github/42503054521/`. The completed follow-up has 65/66 passes, with its only failure in Windows native 009; the full crash-regression selection passed. The repository's `load_observations` verifier rechecked the 19 unchanged Notes execution cells against their original per-entry configurations, current source/runner identities, exact case hashes and matching receipts. All 19 remain current passes. Final acceptance still requires the corrected 009 on all platforms and aggregate receipt verification. Successful report-upload jobs alone are not case passes.
+Run [42503054521](https://github.com/engcapa/taomni/actions/runs/42503054521) on `48521c61b` supplies unchanged Notes 001–004/008 browser coverage on all three platforms, Notes 008 native caret coverage on all three platforms, and macOS native AppKit case 011. Its aggregate is a failure: browser 45/45 and native 36/40 passed, with failures confined to the now-corrected 009 on all platforms and 010 on macOS. The unchanged cases retain their passing raw receipts; final 009 and prior follow-up 010 now have fresh passing evidence. All three runs have the same product and runner identities.
 
-The three-platform browser screenshots from TC-NOTES-009 were visually inspected at 1440×900: sidebar, active tab, mode/save/return controls and Markdown content align; long tab titles use ellipsis. The follow-up macOS native 009 screenshot shows three stable tabs and the recovered Markdown; prior native 008 screenshots retain mixed Chinese/Latin text and link previews on all three platforms. The macOS 011 native screenshot shows the saved content in both Workspace and compact Tao Notes. These screenshots do not establish physical input or native window-frame compatibility.
+Raw artifacts, receipts and selection are retained under `qa-ui-auto-report/github/42509872122/`, `qa-ui-auto-report/github/42507023075/` and `qa-ui-auto-report/github/42503054521/`. The repository's `load_observations` verifier rechecked all 85 applicable execution cells against their original per-entry configurations, current source/runner identities, exact case hashes and matching receipts. All 85 are current passes: 63 from the final run, three native 010 results from `42507023075`, and 19 unchanged Notes results from `42503054521`. Latest matching outcomes are used, including failures; original failures remain archived. Verification log: `qa-ui-auto-report/_local/notes-final-evidence.log`.
+
+The three-platform browser screenshots from TC-NOTES-009 were visually inspected at 1440×900: sidebar, active tab, mode/save/return controls and Markdown content align; long tab titles use ellipsis. The follow-up macOS native and final Windows native 009 screenshots show stable tabs and the recovered Markdown; prior native 008 screenshots retain mixed Chinese/Latin text and link previews on all three platforms. The macOS 011 native screenshot shows the saved content in both Workspace and compact Tao Notes. These screenshots do not establish physical input or native window-frame compatibility.
 
 ## Acceptance mapping
 
@@ -47,9 +49,9 @@ The three-platform browser screenshots from TC-NOTES-009 were visually inspected
 | --- | --- |
 | AC-01: focused text/caret and retained Notes editing | Notes unit regressions, browser 001–004/008 and native 008 on all three platforms from the matching prior run; physical Win11 checks below remain open |
 | AC-02: metadata-preserving content saves and recoverable conflicts | Shared-store tests, 16 real-SQLite tests and native 010 passing on all three platforms |
-| AC-03: default Notes browsing, stable tabs, Preview/return, recovery | Workspace unit tests, hosted browser 009 on all platforms and native 009 on Linux/macOS; final 009 synchronization correction needs hosted rerun |
+| AC-03: default Notes browsing, stable tabs, Preview/return, recovery | Workspace unit tests and final browser/native 009 passing on all three platforms |
 | AC-04: actual floating window, navigation, cross-window refresh | Native 010 on all three platforms passed conflict preservation, confirmed reload, clean refresh and docking |
-| AC-05: branch, detailed English commits and hosted regression selection | Branch pushed; final hosted aggregate pending |
+| AC-05: branch, detailed English commits and hosted regression selection | Branch pushed with detailed English commits; final three-platform browser/release-native aggregate succeeded, including the full crash selection |
 | macOS Save Action and installed native menu | Mounted ownership tests and current native 011 passed; physical Cmd+S/menu-bar clicking remains outside the bridge |
 
 ## Diagnostic history retained
@@ -64,7 +66,9 @@ The three-platform browser screenshots from TC-NOTES-009 were visually inspected
 
 Run `42503054521` on `48521c61b` passed every crash regression, caret case 008 and AppKit case 011. Its macOS native result was 12/14; Linux and Windows each passed 12/13. Case 010 reached the real cross-window conflict on macOS but checked it before the notification arrived; its failure screenshot/HTML contains the correct conflict alert and intact main draft. Its checkpoint now waits for that same conflict state. Case 009 passed save/return and close/reopen recovery, then tried to refresh a hidden sidebar. Investigation established that native `open` is a no-op: the case had not reloaded, and clicking the already-selected Workspace rail collapsed the sidebar. Step 38 now uses the existing cross-platform `reload_window` action, so native recovery is exercised and the following Workspace navigation starts from the actual fresh Home state. Creation checkpoints also wait for the exact two/three-tab counts and the new tab's note kind. Browser case 009 passed after the actual reload and readiness corrections in `qa-ui-auto-report/notes-reload-browser-checked/`. Commit `93456994b` contains these case corrections with unchanged product/runner source identity; follow-up run `42507023075` supplies their new execution evidence.
 
-Run `42507023075` passed all browser cases and Linux/macOS native 009, but Windows native 009 reached the second return to Tao Notes and evaluated the textarea before the asynchronous SQLite read had mounted the compact editor. Step 60 threw a null-node JavaScript error. Its original failure screenshot and HTML already contain the correct title `Renamed shared note` and body `# Recovered draft`; both drafts and the Workspace Markdown remained intact. The three return-to-Tao content checks now use null-safe reads and the runner's existing ten-second bounded polling. They retain the exact title/body expectations and fail if the editor never arrives. This changes only the case, not product or runner inputs; 009 requires fresh browser/native execution on all three platforms.
+Run `42507023075` passed all browser cases and Linux/macOS native 009, but Windows native 009 reached the second return to Tao Notes and evaluated the textarea before the asynchronous SQLite read had mounted the compact editor. Step 60 threw a null-node JavaScript error. Its original failure screenshot and HTML already contain the correct title `Renamed shared note` and body `# Recovered draft`; both drafts and the Workspace Markdown remained intact. The three return-to-Tao content checks now use null-safe reads and the runner's existing ten-second bounded polling. They retain the exact title/body expectations and fail if the editor never arrives. This changed only the case, not product or runner inputs; final browser/native 009 execution passed on all three platforms.
+
+Run `42507023075` completed with 65/66 passes, no infrastructure errors and all crash regressions passing. Commit `fa0975860` contains the bounded content checkpoints. Attempt `42509817906` failed at checkout because the dispatch used a short `head` SHA; no cases executed and no evidence is claimed. Run `42509872122` uses the full SHA and supplies final execution evidence.
 
 ## Platform limits
 
