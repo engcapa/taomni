@@ -124,14 +124,15 @@ export function NoteDateTimeField({ label, value, onChange, testId }: NoteDateTi
   const fontSizeStyle = notesFontSizeStyle(fontSize);
 
   const [inputText, setInputText] = useState(() => displayValue(value));
+  const inputDirtyRef = useRef(false);
   const [pos, setPos] = useState<{ left: number; top: number } | null>(null);
 
   useEffect(() => {
-    setInputText(displayValue(value));
+    if (!inputDirtyRef.current) setInputText(displayValue(value));
   }, [value]);
 
   useEffect(() => {
-    if (!open) return;
+    if (!open || inputDirtyRef.current) return;
     const parts = partsFromSeconds(value);
     setDraftDate(parts.date);
     setDraftTime(parts.time);
@@ -211,7 +212,10 @@ export function NoteDateTimeField({ label, value, onChange, testId }: NoteDateTi
 
   const commit = (dateValue: string, timeValue: string, close = false) => {
     if (dateValue) {
-      onChange(secondsFromParts(dateValue, timeValue));
+      const next = secondsFromParts(dateValue, timeValue);
+      inputDirtyRef.current = false;
+      setInputText(displayValue(next));
+      onChange(next);
     }
     if (close) setOpen(false);
   };
@@ -256,10 +260,10 @@ export function NoteDateTimeField({ label, value, onChange, testId }: NoteDateTi
 
   const handleInputChange = (e: ChangeEvent<HTMLInputElement>) => {
     const text = e.target.value;
+    inputDirtyRef.current = true;
     setInputText(text);
     const parsed = parseDateTimeString(text);
     if (parsed !== null) {
-      onChange(parsed);
       const parts = partsFromSeconds(parsed);
       if (parts.date) {
         setDraftDate(parts.date);
@@ -270,8 +274,11 @@ export function NoteDateTimeField({ label, value, onChange, testId }: NoteDateTi
   };
 
   const handleInputBlur = () => {
+    if (!inputDirtyRef.current) return;
+    inputDirtyRef.current = false;
     const parsed = parseDateTimeString(inputText);
     if (parsed !== null) {
+      setInputText(displayValue(parsed));
       onChange(parsed);
     } else {
       setInputText(displayValue(value));
@@ -279,12 +286,10 @@ export function NoteDateTimeField({ label, value, onChange, testId }: NoteDateTi
   };
 
   const handleInputKeyDown = (e: ReactKeyboardEvent<HTMLInputElement>) => {
-    if (e.key === "Enter") {
-      const parsed = parseDateTimeString(inputText);
-      if (parsed !== null) {
-        onChange(parsed);
-        setOpen(false);
-      }
+    if (e.key === "Enter" && !e.nativeEvent.isComposing) {
+      e.preventDefault();
+      handleInputBlur();
+      setOpen(false);
     }
   };
 
@@ -314,6 +319,8 @@ export function NoteDateTimeField({ label, value, onChange, testId }: NoteDateTi
           type="button"
           className="taomni-btn h-6 w-6 p-0 inline-flex items-center justify-center"
           onClick={() => {
+            inputDirtyRef.current = false;
+            setInputText("");
             onChange(null);
             setOpen(false);
           }}

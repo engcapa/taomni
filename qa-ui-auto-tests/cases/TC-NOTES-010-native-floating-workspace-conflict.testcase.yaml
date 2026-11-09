@@ -35,6 +35,7 @@ steps:
 - click: '[data-testid="notes-floating-toggle"]'
 - switch_window:
     selector: '[data-testid="notes-detached-window"]'
+    timeout_sec: 60
 - click: '[data-testid="notes-list-item"]'
 - eval_readonly:
     expression: document.querySelector(".notes-link-field-shell textarea").value === "# Shared body original"

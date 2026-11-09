@@ -68,4 +68,46 @@ describe("NoteDateTimeField", () => {
     fireEvent.click(screen.getByTestId("note-editor-due-clear"));
     expect(onChange).toHaveBeenCalledWith(null);
   });
+
+  it("keeps a typed timestamp through late updates and commits the full minutes on blur", () => {
+    const onChange = vi.fn();
+    const props = { label: "Reminder", testId: "reminder", onChange };
+    const { rerender } = render(<NoteDateTimeField {...props} value={localInputToSeconds("2035-06-13T08:00")} />);
+    const input = screen.getByTestId("reminder");
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "2035-06-13 08:1" } });
+    expect(onChange).not.toHaveBeenCalled();
+
+    rerender(<NoteDateTimeField {...props} value={localInputToSeconds("2035-06-13T08:01")} />);
+    expect(input).toHaveValue("2035-06-13 08:1");
+    fireEvent.change(input, { target: { value: "2035-06-13 08:15" } });
+    fireEvent.blur(input);
+    expect(onChange).toHaveBeenCalledExactlyOnceWith(localInputToSeconds("2035-06-13T08:15"));
+  });
+
+  it("commits Enter once and leaves composition input unsubmitted", () => {
+    const onChange = vi.fn();
+    render(<NoteDateTimeField label="Due" testId="due" value={null} onChange={onChange} />);
+    const input = screen.getByTestId("due");
+    fireEvent.focus(input);
+    fireEvent.change(input, { target: { value: "2035-06-13 08:15" } });
+    fireEvent.keyDown(input, { key: "Enter", isComposing: true });
+    expect(onChange).not.toHaveBeenCalled();
+    fireEvent.keyDown(input, { key: "Enter" });
+    fireEvent.blur(input);
+    expect(onChange).toHaveBeenCalledExactlyOnceWith(localInputToSeconds("2035-06-13T08:15"));
+  });
+
+  it("restores invalid text on blur and follows external values when clean", () => {
+    const onChange = vi.fn();
+    const props = { label: "Due", testId: "due", onChange };
+    const { rerender } = render(<NoteDateTimeField {...props} value={localInputToSeconds("2035-06-13T08:00")} />);
+    const input = screen.getByTestId("due");
+    fireEvent.change(input, { target: { value: "unfinished" } });
+    fireEvent.blur(input);
+    expect(onChange).not.toHaveBeenCalled();
+    expect(input).toHaveValue("2035-06-13 08:00");
+    rerender(<NoteDateTimeField {...props} value={localInputToSeconds("2035-06-14T09:30")} />);
+    expect(input).toHaveValue("2035-06-14 09:30");
+  });
 });
