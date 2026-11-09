@@ -133,3 +133,32 @@ it("retries a failed task read without writing stale metadata", async () => {
   expect(useNotesTaskStore.getState().records[id]?.priority).toBe(3);
   expect(ipc.updateNoteMetadata).not.toHaveBeenCalled();
 });
+
+
+it("retires a failed patch when a newer value for the same property succeeds", async () => {
+  const id = "newer-intent";
+  const store = useNotesTaskStore.getState();
+  ipc.updateNoteMetadata.mockRejectedValueOnce(new Error("first failed"))
+    .mockResolvedValueOnce(note({ id, due_at: 200 }));
+  expect(await store.patch(id, { due_at: 100 })).toBe(false);
+  expect(await store.patch(id, { due_at: 200 })).toBe(true);
+  expect(useNotesTaskStore.getState().errors[id]).toBeNull();
+  ipc.getNote.mockResolvedValue(note({ id, due_at: 200 }));
+  await store.retry(id);
+  expect(ipc.updateNoteMetadata).toHaveBeenCalledTimes(2);
+  expect(useNotesTaskStore.getState().records[id]?.due_at).toBe(200);
+});
+
+it("clears failed edits after explicit deletion so retry cannot target the deleted note", async () => {
+  const id = "delete-with-failure";
+  const store = useNotesTaskStore.getState();
+  ipc.updateNoteMetadata.mockRejectedValueOnce(new Error("first failed"));
+  expect(await store.patch(id, { priority: 3 })).toBe(false);
+  ipc.deleteNote.mockResolvedValue(undefined);
+  expect(await store.remove(id)).toBe(true);
+  expect(useNotesTaskStore.getState().errors[id]).toBeNull();
+  expect(useNotesTaskStore.getState().records[id]).toBeNull();
+  ipc.getNote.mockResolvedValue(null);
+  await store.retry(id);
+  expect(ipc.updateNoteMetadata).toHaveBeenCalledTimes(1);
+});

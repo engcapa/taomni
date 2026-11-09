@@ -24,8 +24,8 @@ export const useNotesTaskStore = create<NotesTaskState>((set, get) => {
   const queues = new Map<string, Promise<boolean>>();
   const generations = new Map<string, number>();
   type Operation = () => Promise<NoteItem | null>;
-  const failures = new Map<string, { operation: Operation; message: string }[]>();
-  const run = (id: string, operation: Operation): Promise<boolean> => {
+  const failures = new Map<string, { operation: Operation; message: string; field?: string }[]>();
+  const run = (id: string, operation: Operation, field?: string): Promise<boolean> => {
     generations.set(id, (generations.get(id) ?? 0) + 1);
     set((state) => ({ pending: { ...state.pending, [id]: (state.pending[id] ?? 0) + 1 } }));
     const previous = queues.get(id);
@@ -33,13 +33,15 @@ export const useNotesTaskStore = create<NotesTaskState>((set, get) => {
       if (previous) await previous;
       try {
         const note = await operation();
-        const remaining = (failures.get(id) ?? []).filter((failure) => failure.operation !== operation);
+        const remaining = (failures.get(id) ?? []).filter((failure) =>
+          failure.operation !== operation && (!field || failure.field !== field));
         failures.set(id, remaining);
         set((state) => ({ records: { ...state.records, [id]: note }, errors: { ...state.errors, [id]: remaining[0]?.message ?? null } }));
         return true;
       } catch (error) {
-        const remaining = (failures.get(id) ?? []).filter((failure) => failure.operation !== operation);
-        remaining.push({ operation, message: String(error) });
+        const remaining = (failures.get(id) ?? []).filter((failure) =>
+          failure.operation !== operation && (!field || failure.field !== field));
+        remaining.push({ operation, message: String(error), field });
         failures.set(id, remaining);
         set((state) => ({ errors: { ...state.errors, [id]: remaining[0].message } }));
         return false;
@@ -81,14 +83,18 @@ export const useNotesTaskStore = create<NotesTaskState>((set, get) => {
         }
       }
     },
-    patch: (id, patch) => run(id, () => patchExisting(id, patch)),
+    patch: (id, patch) => run(id, () => patchExisting(id, patch), `metadata:${Object.keys(patch).sort().join(",")}`),
     complete: (id, completed) => get().patch(id, { completed_at: completed ? nowSecs() : null }),
     archive: (id, archived) => run(id, async () => {
       const note = await archiveNote(id, archived);
       if (!note) throw new Error("The note was deleted.");
       return note;
+    }, "archive"),
+    remove: (id) => run(id, async () => {
+      await deleteNote(id);
+      failures.delete(id);
+      return null;
     }),
-    remove: (id) => run(id, async () => { await deleteNote(id); return null; }),
     changeSteps: (id, change) => run(id, async () => {
       const note = await requireNote(id);
       const steps = change(note.steps).map((step, index) => ({ ...step, sort_order: index }));
@@ -106,7 +112,7 @@ export const useNotesTaskStore = create<NotesTaskState>((set, get) => {
     }),
     retry: async (id) => {
       const failed = failures.get(id)?.[0];
-      if (failed) return run(id, failed.operation);
+      if (failed) return run(id, failed.operation, failed.field);
       await get().load(id);
       return !get().errors[id];
     },
