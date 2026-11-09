@@ -13,7 +13,7 @@
 - DEC-03（agent 自决，来源：现有普通文件必须保留真实路径）：使用受保护的 `notes-workspace` 系统工作区，独立于 Default Workspace。笔记仅进入笔记导航，不进入文件/Git/LSP/终端路径。普通 Workspace 保持原实现。
 - DEC-04（agent 自决，来源：并发保护）：两个编辑入口共享窗口内的草稿；跨窗口提交比较实际旧标题/正文，不用秒级时间戳作为版本。冲突/删除/保存失败保留草稿，提供复制、重载（显式放弃确认）或重试。
 
-Notes 工作区的侧栏提供创建、搜索和笔记列表，包含完成和归档笔记，与 Tao Notes 的任务过滤器分开。Tab 标题显示笔记标题加 `.md`，稳定 ID 与标题无关。正文使用现有 Markdown 编辑和预览组件；编辑、分栏、预览切换保留编辑器实例、Undo 和选区。Workspace 中保存由按钮或 Ctrl+S（Windows/Linux）、Cmd+S（macOS）触发；原 Notes 标题/正文仍在失焦时保存。返回 Tao Notes 打开相同笔记和共享草稿。
+Notes 工作区的侧栏提供创建、搜索、状态多选和标签筛选，默认未完成；完成和归档笔记通过对应筛选浏览。列表查询状态与 Tao Notes 分开。Tab 标题显示笔记标题加 `.md`，稳定 ID 与标题无关。正文使用现有 Markdown 编辑和预览组件；编辑、分栏、预览切换保留编辑器实例、Undo 和选区。Workspace 中保存由按钮或 Ctrl+S（Windows/Linux）、Cmd+S（macOS）触发；原 Notes 标题/正文仍在失焦时保存。返回 Tao Notes 打开相同笔记和共享草稿。
 
 ## 状态和接口
 
@@ -23,7 +23,7 @@ Notes 工作区的侧栏提供创建、搜索和笔记列表，包含完成和�
 
 `taomni://notes-changed` 在成功的 Notes 内容/CRUD 操作后通知其他消费者重新读取。当前窗口事件同步发送；浏览器窗口使用 BroadcastChannel，原生使用 Tauri event。订阅按消费者引用计数持有，并释放异步注册后到达的 listener。独立便签窗口的大 Preview 使用 `taomni://notes-open-workspace` 请求主窗口导航并激活主窗口。
 
-原有 `notes_update` 全量替换接口保留。UI 内容改走专用提交；任务属性修改前先提交草稿并读取当前完整笔记，再替换对应属性，避免使用旧渲染携带的正文。无数据库格式迁移、无外网访问及新增依赖。
+原有 `notes_update` 全量替换接口保留。UI 内容改走专用提交；任务属性通过 `notes_update_metadata` 原子局部更新，与正文草稿独立，不携带旧渲染的正文。无数据库格式迁移、无外网访问及新增依赖。
 
 ## 工作包与验收
 
@@ -52,3 +52,27 @@ Notes 工作区的侧栏提供创建、搜索和笔记列表，包含完成和�
 Windows 使用 WebView2，macOS 使用 WKWebView，Linux 使用 WebKitGTK。代码不引入平台专属路径/控件。Markdown/文本编辑通过相同 CodeMirror 模块，macOS 保留 Command 编辑语义；系统菜单与 OS 键盘投递仍需独立核验，不能以桥接 press 冒充。Win11 物理机的缩放/IME复测步骤见 [光标修复设计](../docs-issue/notes-windows-caret-design.md)。托管 Windows Server 2025 的 native 结果只证明其 WebView2 环境。
 
 实际执行结果、提交身份、GitHub run 和证据目录另记 `notes-workspace/delivery.md`。未执行条目保持待验证，图稿/构建/静态审计不充当运行证据。
+
+## 任务能力对等扩展（2026-11-09）
+
+来源：用户要求 Notes space 与 Tao Notes 对等，可设置优先级、置顶、查找、过滤和任务时间等。扩展基线 `748357249`；原有 AC-01–05、草稿/编辑器生命周期和平台边界继续有效。
+
+DEC-05（用户已定，来源：本轮追加要求）：两个入口使用同一笔记、任务模型和操作规则，覆盖完成/重开、置顶、归档/恢复、确认删除、优先级、截止与提醒、颜色、步骤和标签。`due_at` 是计划截止时间，`completed_at` 是实际完成时间，两者分开显示、可设定/清除；设置完成时间即完成，清除即重开。`repeat_rule` 当前仅为保留字段，未有循环任务执行器，本次原样保留。
+
+DEC-06（agent 自决，来源：复用成熟组件与当前 Workspace 结构）：抽取任务操作和属性区供两入口共享，沿用原日期选择器、优先级、步骤和标签控件；Workspace 在正文上方提供可折叠的任务属性区，保留 Markdown 编辑实例和全部模式。侧栏复用状态菜单、标签筛选及笔记卡片。沿用既有控件和主流程，不另设原型审批。默认未完成列表与 Tao Notes 一致，查询/状态选择在两个入口各自保存；筛选只改变侧栏列表，不关闭已打开的文档。
+
+DEC-07（agent 自决，来源：两个窗口/草稿独立提交）：新增 `notes_update_metadata` 原子局部更新，仅修改提供的任务字段；省略保留，显式 null 清空。禁止携带或回写标题/正文。步骤、标签变更通过相同通知机制刷新两入口；每笔记操作串行，晚到读取不能覆盖新操作，失败可见且可重试，不能吞掉失败后关闭编辑器。
+
+| 工作包 | 文件责任 | 验收 |
+|---|---|---|
+| TASK-06 | `notes/db/metadata*`、Notes IPC/lib/stub | AC-06：局部任务更新不覆盖正文/来源/步骤/其他元数据；nullable 契约一致；时间变更才清除提醒确认；标签失败原子回滚 |
+| TASK-07 | `notesTaskStore`、共享 `NoteTaskActions/Details/Steps`、紧凑编辑器和 Workspace 文档 | AC-07：两入口具备同样任务操作与属性；草稿、Undo、选区和模式保留；跨入口刷新、异步/失败有保护 |
+| TASK-08 | Workspace 查询 owner、共享筛选和列表 | AC-08：状态多选 OR、文字/标签 AND、标签名搜索、置顶/截止排序与 Tao Notes 一致；创建清除不匹配查询；列表过滤不卸载文档 |
+| TASK-09 | 聚焦单测、SQLite、QA 用例和 CI 证据 | AC-09：新增对等场景和旧 Notes 回归通过，完整 crash-regression、指定 GitHub browser/native 三端发布二进制验证，并详细英文提交 |
+
+| 验证 | 断言 | 状态 |
+|---|---|---|
+| V-08 | SQLite 元数据更新保留其他字段，省略/null、完成时间、提醒确认和事务回滚 | 待执行，AC-06 |
+| V-09 | 任务 owner/共享 UI 单测：操作串行、读取过期、失败重试、外部刷新、脏正文保留；查询 owner 条件与独立状态 | 待执行，AC-07/08 |
+| V-10 | `TC-NOTES-012` browser/native：Workspace 设置属性/步骤/标签/日期→紧凑入口核对并反向修改→筛选搜索→完成/归档恢复；重载持久化 | 待执行，AC-07/08 |
+| V-11 | 旧 Notes 001–004/008–011 与完整 crash-regression；build/refactor/fmt/contract；GitHub 指定工作流 | 待执行，AC-09 |

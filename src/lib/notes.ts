@@ -99,6 +99,17 @@ export interface UpdateNoteInput {
   tag_ids?: string[];
 }
 
+/** Omitted task fields are retained; explicit null clears a nullable field. */
+export interface NoteMetadataPatch {
+  pinned?: boolean;
+  priority?: number;
+  color?: string | null;
+  due_at?: number | null;
+  reminder_at?: number | null;
+  completed_at?: number | null;
+  tag_ids?: string[];
+}
+
 export interface StepInput {
   id?: string;
   title: string;
@@ -168,6 +179,12 @@ export async function updateNote(id: string, patch: UpdateNoteInput): Promise<No
   return note;
 }
 
+export async function updateNoteMetadata(id: string, patch: NoteMetadataPatch): Promise<NoteItem | null> {
+  const note = await invoke<NoteItem | null>("notes_update_metadata", { id, patch });
+  publishNotesChange(id);
+  return note;
+}
+
 /** Save content without replacing task metadata; stale text never overwrites a newer edit. */
 export async function saveNoteContent(
   id: string,
@@ -207,7 +224,9 @@ export async function upsertTags(tags: TagInput[]): Promise<NoteTag[]> {
 }
 
 export async function setSteps(noteId: string, steps: StepInput[]): Promise<NoteStep[]> {
-  return invoke<NoteStep[]>("notes_set_steps", { noteId, steps });
+  const result = await invoke<NoteStep[]>("notes_set_steps", { noteId, steps });
+  publishNotesChange(noteId);
+  return result;
 }
 
 export async function getPrefs(): Promise<Record<string, string>> {

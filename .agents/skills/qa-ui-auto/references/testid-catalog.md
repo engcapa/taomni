@@ -2290,8 +2290,72 @@
 - `[data-testid="note-content-reload"]` — interactive — F-TAO-1.note-content-reload
 - `[data-testid="note-content-retry"]` — interactive [optional] — F-TAO-1.note-content-retry
 - `[data-testid="note-content-copy"]` — interactive [optional] — F-TAO-1.note-content-copy
+- `[data-testid="notes-workspace-results"]` — display — F-TAO-1.notes-workspace-results
 - `[data-testid="workspace-tab"][data-tab-kind="note"] [data-testid="workspace-tab-close"]` — interactive — F-TAO-1.notes-workspace-tab-close
 - `[data-testid="workspace-plus-new-note"]` — interactive — F-TAO-1.notes-workspace-plus-new
+- `[data-testid="note-editor-priority-menu"] [role="option"]:nth-child(3)` — interactive — F-TAO-1.note-editor-priority-menu
+- `[data-testid="note-editor-priority"]` — interactive — F-TAO-1.note-editor-priority
+- `[data-testid="note-editor-reminder"]` — interactive — F-TAO-1.note-editor-reminder
+- `[data-testid="note-editor-step"]` — display — F-TAO-1.note-editor-step
+- `[data-testid="note-editor-tag"]` — display — F-TAO-1.note-editor-tag
+- `[data-testid="notes-workspace-archive"]` — interactive — F-TAO-1.notes-workspace-archive
+  ↳ `[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-archive"]` — alias
+  ↳ `[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-archive"][aria-pressed="false"]` — alias
+  ↳ `[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-archive"][aria-pressed="true"]` — alias
+- `[data-testid="notes-workspace-color-#10b981"]` — interactive — F-TAO-1.notes-workspace-color-#10b981
+  ↳ `[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-color-#10b981"]` — alias
+  ↳ `[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-color-#10b981"][aria-pressed="true"]` — alias
+- `[data-testid="notes-workspace-color-clear"]` — interactive — F-TAO-1.notes-workspace-color-clear
+  ↳ `[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-color-clear"]` — alias
+- `[data-testid="notes-workspace-complete"]` — interactive — F-TAO-1.notes-workspace-complete
+  ↳ `[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-complete"]` — alias
+  ↳ `[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-complete"][aria-pressed="false"]` — alias
+  ↳ `[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-complete"][aria-pressed="true"]` — alias
+- `[data-testid="notes-workspace-completed-at"]` — interactive — F-TAO-1.notes-workspace-completed-at
+  ↳ `[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-completed-at"]` — alias
+- `[data-testid="notes-workspace-completed-at-clear"]` — interactive — F-TAO-1.notes-workspace-completed-at-clear
+  ↳ `[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-completed-at-clear"]` — alias
+- `[data-testid="notes-workspace-delete"]` — interactive — F-TAO-1.notes-workspace-delete
+  ↳ `[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-delete"]` — alias
+- `[data-testid="notes-workspace-due"]` — interactive — F-TAO-1.notes-workspace-due
+  ↳ `[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-due"]` — alias
+- `[data-testid="notes-workspace-due-clear"]` — interactive — F-TAO-1.notes-workspace-due-clear
+  ↳ `[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-due-clear"]` — alias
+- `[data-testid="notes-workspace-filter-all"]` — interactive — F-TAO-1.notes-workspace-filter-all
+- `[data-testid="notes-workspace-filter-archived"]` — interactive — F-TAO-1.notes-workspace-filter-archived
+- `[data-testid="notes-workspace-filter-completed"]` — interactive — F-TAO-1.notes-workspace-filter-completed
+- `[data-testid="notes-workspace-filter-menu"]` — interactive — F-TAO-1.notes-workspace-filter-menu
+- `[data-testid="notes-workspace-filter-overdue"]` — interactive — F-TAO-1.notes-workspace-filter-overdue
+- `[data-testid="notes-workspace-filter-pinned"]` — interactive — F-TAO-1.notes-workspace-filter-pinned
+- `[data-testid="notes-workspace-list"]` — display — F-TAO-1.notes-workspace-list
+- `[data-testid="notes-workspace-new-step"]` — display — F-TAO-1.notes-workspace-new-step
+  ↳ `[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-new-step"]` — alias
+- `[data-testid="notes-workspace-new-tag"]` — display — F-TAO-1.notes-workspace-new-tag
+  ↳ `[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-new-tag"]` — alias
+- `[data-testid="notes-workspace-pin"]` — interactive — F-TAO-1.notes-workspace-pin
+  ↳ `[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-pin"]` — alias
+  ↳ `[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-pin"][aria-pressed="false"]` — alias
+  ↳ `[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-pin"][aria-pressed="true"]` — alias
+- `[data-testid="notes-workspace-priority"]` — interactive — F-TAO-1.notes-workspace-priority
+  ↳ `[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-priority"]` — alias
+- `[data-testid="notes-workspace-priority-menu"]` — interactive — F-TAO-1.notes-workspace-priority-menu
+  ↳ `[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-priority-menu"] [role="option"]:nth-child(4)` — alias
+- `[data-testid="notes-workspace-properties"]` — interactive — F-TAO-1.notes-workspace-properties
+  ↳ `[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-properties"] > summary` — alias
+- `[data-testid="notes-workspace-reminder"]` — interactive — F-TAO-1.notes-workspace-reminder
+  ↳ `[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-reminder"]` — alias
+- `[data-testid="notes-workspace-reminder-clear"]` — interactive — F-TAO-1.notes-workspace-reminder-clear
+  ↳ `[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-reminder-clear"]` — alias
+- `[data-testid="notes-workspace-step"]` — display — F-TAO-1.notes-workspace-step
+  ↳ `[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-step"]` — alias
+- `[data-testid="notes-workspace-step-complete"]` — interactive — F-TAO-1.notes-workspace-step-complete
+  ↳ `[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-step-complete"]` — alias
+  ↳ `[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-step-complete"][aria-pressed="true"]` — alias
+- `[data-testid="notes-workspace-step-delete"]` — interactive — F-TAO-1.notes-workspace-step-delete
+  ↳ `[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-step-delete"]` — alias
+- `[data-testid="notes-workspace-tag"]` — display — F-TAO-1.notes-workspace-tag
+  ↳ `[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-tag"]` — alias
+  ↳ `[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-tag"] button` — alias
 
 ## rdp (F9.7)
 

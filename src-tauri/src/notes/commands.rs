@@ -53,6 +53,16 @@ pub async fn notes_update(
 }
 
 #[tauri::command]
+pub async fn notes_update_metadata(
+    id: String,
+    patch: db::NoteMetadataPatch,
+    state: State<'_, AppState>,
+) -> Result<Option<NoteItem>, String> {
+    let conn = notes_conn!(state);
+    db::update_metadata(&conn, &id, &patch).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
 pub async fn notes_save_content(
     id: String,
     title: String,

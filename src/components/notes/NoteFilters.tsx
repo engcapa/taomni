@@ -26,6 +26,7 @@ interface NoteStatusFilterProps {
   filters: NoteFilter[];
   onToggleFilter: (filter: NoteFilter) => void;
   className?: string;
+  prefix?: string;
 }
 
 interface NoteTagFiltersProps {
@@ -33,9 +34,10 @@ interface NoteTagFiltersProps {
   tags: NoteTag[];
   onSelectTag: (tagId: string | null) => void;
   className?: string;
+  prefix?: string;
 }
 
-export function NoteStatusFilter({ filters, onToggleFilter, className = "" }: NoteStatusFilterProps) {
+export function NoteStatusFilter({ filters, onToggleFilter, className = "", prefix = "notes" }: NoteStatusFilterProps) {
   const t = useT();
   const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement | null>(null);
@@ -66,7 +68,7 @@ export function NoteStatusFilter({ filters, onToggleFilter, className = "" }: No
     <div
       ref={rootRef}
       className={`relative shrink-0 ${className}`}
-      data-testid="notes-filters"
+      data-testid={`${prefix}-filters`}
       aria-label={t("notes.title")}
     >
       <button
@@ -77,7 +79,7 @@ export function NoteStatusFilter({ filters, onToggleFilter, className = "" }: No
         aria-expanded={open}
         aria-label={buttonLabel}
         title={buttonLabel}
-        data-testid="notes-filter-menu"
+        data-testid={`${prefix}-filter-menu`}
       >
         <ListFilter className="w-3.5 h-3.5" />
         <ChevronDown className="w-2.5 h-2.5" />
@@ -86,7 +88,7 @@ export function NoteStatusFilter({ filters, onToggleFilter, className = "" }: No
         <div
           className="absolute left-0 top-[30px] z-20 w-44 rounded border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-1 shadow-lg"
           role="menu"
-          data-testid="notes-filter-dropdown"
+          data-testid={`${prefix}-filter-dropdown`}
         >
           {FILTERS.map((f) => {
             const active = selected.includes(f);
@@ -96,7 +98,7 @@ export function NoteStatusFilter({ filters, onToggleFilter, className = "" }: No
                 type="button"
                 role="menuitemcheckbox"
                 aria-checked={active}
-                data-testid={`notes-filter-${f}`}
+                data-testid={`${prefix}-filter-${f}`}
                 className={`flex h-7 w-full items-center gap-2 rounded px-2 text-left text-[11px] ${
                   active ? "bg-[var(--taomni-selected)] text-[var(--taomni-accent)]" : "hover:bg-[var(--taomni-hover)]"
                 }`}
@@ -118,6 +120,7 @@ export function NoteTagFilters({
   tagFilterId,
   tags,
   onSelectTag,
+  prefix = "notes",
   className = "flex flex-wrap items-center gap-1 px-2 py-1 border-b border-[var(--taomni-divider)] shrink-0",
 }: NoteTagFiltersProps) {
   if (tags.length === 0) return null;
@@ -132,7 +135,7 @@ export function NoteTagFilters({
             type="button"
             role="tab"
             aria-selected={active}
-            data-testid={`notes-tag-filter-${tag.id}`}
+            data-testid={`${prefix}-tag-filter-${tag.id}`}
             className={`h-5 px-2 rounded-full text-[10px] whitespace-nowrap border transition-colors ${
               active
                 ? "border-[var(--taomni-accent)] bg-[var(--taomni-accent)]/15 text-[var(--taomni-accent)]"

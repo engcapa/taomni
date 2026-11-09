@@ -533,6 +533,8 @@ cases:
 - TC-NOTES-009
 - TC-NOTES-010
 - TC-NOTES-011
+- TC-NOTES-012
+- TC-NOTES-013
 - TC-REPRO-SAVE-01-java-completion-after-saves
 - TC-SSH-VI-001
 - TC-WELCOME-RS-01-directory-order

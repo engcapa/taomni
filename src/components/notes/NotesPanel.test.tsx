@@ -2,6 +2,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NotesPanel } from "./NotesPanel";
 import { useNotesStore } from "../../stores/notesStore";
+import { useNotesTaskStore } from "../../stores/notesTaskStore";
 import { useNotesContentStore } from "../../stores/notesContentStore";
 
 const invokeMock = vi.hoisted(() => vi.fn());
@@ -79,6 +80,7 @@ function filterNotes(q: Record<string, unknown>): FakeNote[] {
 }
 
 beforeEach(() => {
+  useNotesTaskStore.setState({ records: {}, pending: {}, errors: {} });
   store = [];
   seq = 0;
   useNotesContentStore.setState({ documents: {}, catalog: [], recoveryError: null });

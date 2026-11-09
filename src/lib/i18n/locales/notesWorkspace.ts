@@ -1,4 +1,7 @@
 export const notesWorkspaceEn = {
+  completedAt: "Completed at",
+  taskDetails: "Task details",
+  taskSaveFailed: "Task changes could not be saved. Please retry.",
   workspaceTitle: "Notes",
   openWorkspace: "Browse in Notes workspace",
   largePreview: "Preview in workspace",
@@ -22,6 +25,9 @@ export const notesWorkspaceEn = {
 };
 
 export const notesWorkspaceZhCN: typeof notesWorkspaceEn = {
+  completedAt: "完成时间",
+  taskDetails: "任务属性",
+  taskSaveFailed: "任务属性保存失败，请重试。",
   workspaceTitle: "Notes",
   openWorkspace: "在 Notes 工作区浏览",
   largePreview: "在工作区大屏预览",

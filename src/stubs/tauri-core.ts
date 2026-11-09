@@ -123,7 +123,7 @@ for (const command of ["lanchat_status","lanchat_list_peers","lanchat_get_profil
   stubCommandRegistry.register({ domain: "lanchat", command, handler: (args) => invokeLanchat(command, args) });
 }
 
-for (const command of ["notes_list","notes_get","notes_create","notes_update","notes_save_content","notes_delete","notes_toggle_complete","notes_archive","notes_list_tags","notes_upsert_tags","notes_set_steps","notes_get_prefs","notes_set_prefs","notes_list_alerts","notes_ack_alert"]) {
+for (const command of ["notes_list","notes_get","notes_create","notes_update","notes_update_metadata","notes_save_content","notes_delete","notes_toggle_complete","notes_archive","notes_list_tags","notes_upsert_tags","notes_set_steps","notes_get_prefs","notes_set_prefs","notes_list_alerts","notes_ack_alert"]) {
   stubCommandRegistry.register({ domain: "notes", command, handler: (args) => invokeNotes(command, args) });
 }
 

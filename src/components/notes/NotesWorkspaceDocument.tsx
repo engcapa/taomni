@@ -12,6 +12,9 @@ import {
 import { CodeMirrorHost } from "../editor/workspace/CodeMirrorHost";
 import { MarkdownPreview } from "../editor/workspace/MarkdownPreview";
 import type { OpenFileState } from "../editor/workspace/codeWorkspaceModel";
+import { useNoteTask } from "./useNoteTask";
+import { NoteTaskActions, NoteTaskStatus } from "./NoteTaskActions";
+import { NoteTaskDetails } from "./NoteTaskDetails";
 import { NoteContentStatus } from "./NoteContentStatus";
 import { useNotesWorkspaceCommands, type NotesCommandsChange } from "./useNotesWorkspaceCommands";
 
@@ -25,6 +28,7 @@ const noCompletionDiagnostic = () => undefined;
 export function NotesWorkspaceDocument({ tab, visible, onCommandsChange }: { tab: WorkspaceIsolatedTab; visible: boolean; onCommandsChange?: NotesCommandsChange }) {
   const t = useT();
   const noteId = tab.noteId!;
+  const note = useNoteTask(noteId);
   useNotesWorkspaceCommands(noteId, tab.id, tab.workspaceId, onCommandsChange);
   const doc = useNotesContentStore((state) => state.documents[noteId]);
   const [mode, setMode] = useState<NoteWorkspaceMode>(noteWorkspaceModes.get(noteId) ?? "edit");
@@ -89,6 +93,17 @@ export function NotesWorkspaceDocument({ tab, visible, onCommandsChange }: { tab
         <ExternalLink className="h-3.5 w-3.5" />{t("notes.backToTao")}
       </button>
     </div>
+    {note && <div className="flex shrink-0 items-center gap-2 border-b border-[var(--taomni-divider)] px-2 py-1">
+      <NoteTaskActions note={note} prefix="notes-workspace" onDeleted={() => {
+        useWorkspacePlatformStore.getState().closeWorkspaceTab(tab.workspaceId, tab.id);
+      }} />
+      <span className="text-xs text-[var(--taomni-text-muted)]">{t("notes.taskDetails")}</span>
+    </div>}
+    <NoteTaskStatus noteId={noteId} />
+    {note && <details className="shrink-0 border-b border-[var(--taomni-divider)]" data-testid="notes-workspace-properties">
+      <summary className="cursor-pointer px-2 py-1 text-xs">{t("notes.taskDetails")} · {t(`notes.priority_${note.priority}`)}</summary>
+      <div className="max-h-56 overflow-auto p-2"><NoteTaskDetails key={note.id} note={note} prefix="notes-workspace" /></div>
+    </details>}
     <NoteContentStatus noteId={noteId} />
     {!doc && <p className="p-3 text-xs">{t("notes.loading")}</p>}
     {doc && file && <div className="flex min-h-0 flex-1 overflow-hidden">

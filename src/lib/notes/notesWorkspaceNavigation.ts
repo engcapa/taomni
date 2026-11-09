@@ -3,6 +3,7 @@ import { detectDetachedRoute } from "../detachedSession";
 import { isTauriRuntime } from "../runtime";
 import { useAppStore } from "../../stores/appStore";
 import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
+import { useNotesWorkspaceViewStore } from "../../stores/notesWorkspaceViewStore";
 import { useNotesStore } from "../../stores/notesStore";
 import { useChatStore } from "../../stores/chatStore";
 import { useTaoHubStore } from "../../stores/taoHubStore";
@@ -44,7 +45,10 @@ export async function openNoteWorkspace(note: NoteItem, mode: NoteWorkspaceMode 
 }
 
 export async function createAndOpenWorkspaceNote(): Promise<void> {
-  try { await openNoteWorkspace(await createNote()); }
+  try {
+    useNotesWorkspaceViewStore.getState().resetForCreate();
+    await openNoteWorkspace(await createNote());
+  }
   catch (error) { useAppStore.getState().setStatusMessage(String(error)); }
 }
 

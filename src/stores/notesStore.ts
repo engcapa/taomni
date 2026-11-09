@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { coerceFilter, normalizeStatusFilters, toggleStatusFilter } from "../lib/notes/noteFilters";
 import {
   ackAlert as ackAlertIpc,
   archiveNote as archiveNoteIpc,
@@ -96,33 +97,6 @@ function clampNotesFontSize(value: unknown): number {
   const n = typeof value === "number" ? value : Number(value);
   if (!Number.isFinite(n)) return DEFAULT_NOTES_FONT_SIZE;
   return Math.min(MAX_NOTES_FONT_SIZE, Math.max(MIN_NOTES_FONT_SIZE, Math.round(n)));
-}
-
-function coerceFilter(value: unknown): NoteFilter {
-  const filters: NoteFilter[] = [
-    "recent_incomplete",
-    "all",
-    "pinned",
-    "today",
-    "due_soon",
-    "overdue",
-    "completed",
-    "archived",
-    "tag",
-  ];
-  return filters.includes(value as NoteFilter) ? (value as NoteFilter) : "recent_incomplete";
-}
-
-function normalizeStatusFilters(values: unknown): NoteFilter[] {
-  const raw = Array.isArray(values) ? values : [values];
-  const next: NoteFilter[] = [];
-  for (const value of raw) {
-    const filter = coerceFilter(value);
-    if (filter === "tag" || next.includes(filter)) continue;
-    if (filter === "all") return ["all"];
-    next.push(filter);
-  }
-  return next.length > 0 ? next : ["recent_incomplete"];
 }
 
 function normalizePanelPosition(position: NotesPanelPosition): NotesPanelPosition {
@@ -364,15 +338,7 @@ export const useNotesStore = create<NotesStore>((set, get) => ({
   },
 
   toggleStatusFilter: (filter) => {
-    const { statusFilters } = get();
-    if (filter === "tag") return;
-    if (filter === "all") {
-      get().setStatusFilters(["all"]);
-      return;
-    }
-    const base = statusFilters.filter((f) => f !== "all");
-    const next = base.includes(filter) ? base.filter((f) => f !== filter) : [...base, filter];
-    get().setStatusFilters(next);
+    get().setStatusFilters(toggleStatusFilter(get().statusFilters, filter));
   },
 
   setSearch: (search) => {

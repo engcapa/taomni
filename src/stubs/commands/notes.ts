@@ -244,6 +244,34 @@ export async function invokeNotes<T>(cmd: string, args?: any): Promise<T> {
       return stubNoteToItem(notes[idx]) as T;
     }
 
+    case "notes_update_metadata": {
+      const { id, patch } = args as { id: string; patch: import("../../lib/notes").NoteMetadataPatch };
+      const notes = loadNotes();
+      const index = notes.findIndex((note) => note.id === id);
+      if (index < 0) return null as T;
+      if (patch.priority !== undefined && (!Number.isInteger(patch.priority) || patch.priority < 0 || patch.priority > 3)) {
+        throw new Error("priority must be 0–3");
+      }
+      const before = notes[index];
+      const next = { ...before, updated_at: nowSecsStub() };
+      for (const key of ["pinned", "priority", "color", "due_at", "reminder_at", "completed_at"] as const) {
+        if (patch[key] !== undefined) Object.assign(next, { [key]: patch[key] });
+      }
+      if (patch.tag_ids !== undefined) {
+        const tags = loadNoteTags();
+        if (patch.tag_ids.some((tagId) => !tags.some((tag) => tag.id === tagId))) throw new Error("Unknown tag");
+        next.tag_ids = [...new Set(patch.tag_ids)];
+      }
+      notes[index] = next;
+      saveNotes(notes);
+      if (before.due_at !== next.due_at || before.reminder_at !== next.reminder_at || before.completed_at !== next.completed_at) {
+        const acks = loadNoteAcks();
+        for (const key of Object.keys(acks)) if (key.startsWith(`${id}:`)) delete acks[key];
+        saveNoteAcks(acks);
+      }
+      return stubNoteToItem(next) as T;
+    }
+
     case "notes_save_content": {
       const input = args as { id: string; title: string; body: string; expectedTitle: string; expectedBody: string };
       const notes = loadNotes();

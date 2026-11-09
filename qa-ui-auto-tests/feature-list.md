@@ -5822,6 +5822,14 @@ files:
   - src/stores/notesContentRecovery.ts
   - src/stores/workspaceNotes.ts
   - src-tauri/src/notes/db/content.rs
+  - src-tauri/src/notes/db/metadata.rs
+  - src/lib/notes/noteFilters.ts
+  - src/stores/notesTaskStore.ts
+  - src/stores/notesWorkspaceViewStore.ts
+  - src/components/notes/useNoteTask.ts
+  - src/components/notes/NoteTaskActions.tsx
+  - src/components/notes/NoteTaskDetails.tsx
+  - src/components/notes/NoteTaskSteps.tsx
 controls:
   - id: tao-hub-tab-chat
     selector: '[data-testid="tao-hub-tab-chat"]'
@@ -6029,12 +6037,165 @@ controls:
     selector: '[data-testid="note-content-copy"]'
     kind: interactive
     optional: true  # Storage failures and clipboard recovery have focused unit/native boundary checks.
+  - id: notes-workspace-results
+    selector: '[data-testid="notes-workspace-results"]'
+    kind: display
   - id: notes-workspace-tab-close
     selector: '[data-testid="workspace-tab"][data-tab-kind="note"] [data-testid="workspace-tab-close"]'
     kind: interactive
   - id: notes-workspace-plus-new
     selector: '[data-testid="workspace-plus-new-note"]'
     kind: interactive
+  - id: note-editor-priority-menu
+    selector: '[data-testid="note-editor-priority-menu"] [role="option"]:nth-child(3)'
+    kind: interactive
+  - id: note-editor-priority
+    selector: '[data-testid="note-editor-priority"]'
+    kind: interactive
+  - id: note-editor-reminder
+    selector: '[data-testid="note-editor-reminder"]'
+    kind: interactive
+  - id: note-editor-step
+    selector: '[data-testid="note-editor-step"]'
+    kind: display
+  - id: note-editor-tag
+    selector: '[data-testid="note-editor-tag"]'
+    kind: display
+  - id: notes-workspace-archive
+    selector: '[data-testid="notes-workspace-archive"]'
+    kind: interactive
+    aliases:
+    - '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-archive"]'
+    - '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-archive"][aria-pressed="false"]'
+    - '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-archive"][aria-pressed="true"]'
+  - id: notes-workspace-color-#10b981
+    selector: '[data-testid="notes-workspace-color-#10b981"]'
+    kind: interactive
+    aliases:
+    - '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-color-#10b981"]'
+    - '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-color-#10b981"][aria-pressed="true"]'
+  - id: notes-workspace-color-clear
+    selector: '[data-testid="notes-workspace-color-clear"]'
+    kind: interactive
+    aliases:
+    - '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-color-clear"]'
+  - id: notes-workspace-complete
+    selector: '[data-testid="notes-workspace-complete"]'
+    kind: interactive
+    aliases:
+    - '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-complete"]'
+    - '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-complete"][aria-pressed="false"]'
+    - '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-complete"][aria-pressed="true"]'
+  - id: notes-workspace-completed-at
+    selector: '[data-testid="notes-workspace-completed-at"]'
+    kind: interactive
+    aliases:
+    - '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-completed-at"]'
+  - id: notes-workspace-completed-at-clear
+    selector: '[data-testid="notes-workspace-completed-at-clear"]'
+    kind: interactive
+    aliases:
+    - '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-completed-at-clear"]'
+  - id: notes-workspace-delete
+    selector: '[data-testid="notes-workspace-delete"]'
+    kind: interactive
+    aliases:
+    - '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-delete"]'
+  - id: notes-workspace-due
+    selector: '[data-testid="notes-workspace-due"]'
+    kind: interactive
+    aliases:
+    - '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-due"]'
+  - id: notes-workspace-due-clear
+    selector: '[data-testid="notes-workspace-due-clear"]'
+    kind: interactive
+    aliases:
+    - '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-due-clear"]'
+  - id: notes-workspace-filter-all
+    selector: '[data-testid="notes-workspace-filter-all"]'
+    kind: interactive
+  - id: notes-workspace-filter-archived
+    selector: '[data-testid="notes-workspace-filter-archived"]'
+    kind: interactive
+  - id: notes-workspace-filter-completed
+    selector: '[data-testid="notes-workspace-filter-completed"]'
+    kind: interactive
+  - id: notes-workspace-filter-menu
+    selector: '[data-testid="notes-workspace-filter-menu"]'
+    kind: interactive
+  - id: notes-workspace-filter-overdue
+    selector: '[data-testid="notes-workspace-filter-overdue"]'
+    kind: interactive
+  - id: notes-workspace-filter-pinned
+    selector: '[data-testid="notes-workspace-filter-pinned"]'
+    kind: interactive
+  - id: notes-workspace-list
+    selector: '[data-testid="notes-workspace-list"]'
+    kind: display
+  - id: notes-workspace-new-step
+    selector: '[data-testid="notes-workspace-new-step"]'
+    kind: display
+    aliases:
+    - '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-new-step"]'
+  - id: notes-workspace-new-tag
+    selector: '[data-testid="notes-workspace-new-tag"]'
+    kind: display
+    aliases:
+    - '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-new-tag"]'
+  - id: notes-workspace-pin
+    selector: '[data-testid="notes-workspace-pin"]'
+    kind: interactive
+    aliases:
+    - '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-pin"]'
+    - '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-pin"][aria-pressed="false"]'
+    - '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-pin"][aria-pressed="true"]'
+  - id: notes-workspace-priority
+    selector: '[data-testid="notes-workspace-priority"]'
+    kind: interactive
+    aliases:
+    - '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-priority"]'
+  - id: notes-workspace-priority-menu
+    selector: '[data-testid="notes-workspace-priority-menu"]'
+    kind: interactive
+    aliases:
+    - '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-priority-menu"] [role="option"]:nth-child(4)'
+  - id: notes-workspace-properties
+    selector: '[data-testid="notes-workspace-properties"]'
+    kind: interactive
+    aliases:
+    - '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-properties"] > summary'
+  - id: notes-workspace-reminder
+    selector: '[data-testid="notes-workspace-reminder"]'
+    kind: interactive
+    aliases:
+    - '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-reminder"]'
+  - id: notes-workspace-reminder-clear
+    selector: '[data-testid="notes-workspace-reminder-clear"]'
+    kind: interactive
+    aliases:
+    - '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-reminder-clear"]'
+  - id: notes-workspace-step
+    selector: '[data-testid="notes-workspace-step"]'
+    kind: display
+    aliases:
+    - '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-step"]'
+  - id: notes-workspace-step-complete
+    selector: '[data-testid="notes-workspace-step-complete"]'
+    kind: interactive
+    aliases:
+    - '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-step-complete"]'
+    - '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-step-complete"][aria-pressed="true"]'
+  - id: notes-workspace-step-delete
+    selector: '[data-testid="notes-workspace-step-delete"]'
+    kind: interactive
+    aliases:
+    - '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-step-delete"]'
+  - id: notes-workspace-tag
+    selector: '[data-testid="notes-workspace-tag"]'
+    kind: display
+    aliases:
+    - '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-tag"]'
+    - '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-tag"] button'
 -->
 
 - 主导航条 `rail-chat-button` 统一打开 Tao Hub；按照工作区原型移除贴边悬浮条，Chat / 便签 / 通知与抽屉布局功能保留。
@@ -6043,6 +6204,7 @@ controls:
 - 单例 `FloatingNotesPanel`：hub ↔ floating 模式切换，可拖拽 / 调整大小，Taomni 内部置顶（层级低于 vault / 认证弹窗）
 - `TaoAlertInbox` + `TaoAlertPoller`：便签临期(黄)/过期(红) + AI 后台完成(ai_done) + 邮件新消息汇聚，点击跳转目标或打开事件列表；通知历史默认隐藏，可搜索查询，支持 30/300 条保留上限与手工清空（`localStorage: taomni.taoAlerts.history.v1` / `taomni.taoAlerts.historyLimit.v1`）
 - Chat 抽屉四边可 pinned：左右为侧栏、上/下为横向条（窄窗自动回退浮动，见 `resolveChatDock`）
+- Notes space 与 Tao Notes 共享完成/置顶/归档/优先级/截止/提醒/完成时间/颜色/步骤/标签；侧栏提供独立的状态多选、标签和全文搜索。
 - 默认 Notes space 复用 Markdown 编辑/分栏/预览，保留原便签快速编辑；大 Preview / 返回便签按稳定笔记 ID 跳转。标题/正文共用草稿，内容保存不修改任务属性；关闭重开/刷新恢复未保存内容。
 - **e2e 测试边界**：Tauri 命令在浏览器模式走 stub（localStorage 模拟 notes.db）；TC-NOTES-008/009 在三端原生 WebView 验证实际保存，TC-NOTES-010 验证独立便签窗口、跨窗口冲突和跳转，TC-NOTES-011 验证 macOS AppKit 保存。物理 Win11 DPI/IME 和 OS 键盘投递另列手工验证。Ribbon 拖动、上/下 pin、告警优先级与跳转的判定逻辑分别由 `ribbonPlacement`/`chatDock`/`taoAlerts` 单测覆盖
 
