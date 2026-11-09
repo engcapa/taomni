@@ -102,7 +102,8 @@ export function NotesWorkspaceDocument({ tab, visible, onCommandsChange }: { tab
     <NoteTaskStatus noteId={noteId} />
     {note && <details className="shrink-0 border-b border-[var(--taomni-divider)]" data-testid="notes-workspace-properties">
       <summary className="cursor-pointer px-2 py-1 text-xs">{t("notes.taskDetails")} · {t(`notes.priority_${note.priority}`)}</summary>
-      <div className="max-h-56 overflow-auto p-2 pr-4"><NoteTaskDetails key={note.id} note={note} prefix="notes-workspace" /></div>
+      {/* WebKitGTK overlay scrollbars reserve a wider pointer lane than their visible thumb. */}
+      <div className="max-h-56 overflow-auto p-2 pr-8"><NoteTaskDetails key={note.id} note={note} prefix="notes-workspace" /></div>
     </details>}
     <NoteContentStatus noteId={noteId} />
     {!doc && <p className="p-3 text-xs">{t("notes.loading")}</p>}
