@@ -72,7 +72,9 @@ DEC-07（agent 自决，来源：两个窗口/草稿独立提交）：新增 `no
 
 | 验证 | 断言 | 状态 |
 |---|---|---|
-| V-08 | SQLite 元数据更新保留其他字段，省略/null、完成时间、提醒确认和事务回滚 | 待执行，AC-06 |
-| V-09 | 任务 owner/共享 UI 单测：操作串行、读取过期、失败重试、外部刷新、脏正文保留；查询 owner 条件与独立状态 | 待执行，AC-07/08 |
-| V-10 | `TC-NOTES-012` browser/native：Workspace 设置属性/步骤/标签/日期→紧凑入口核对并反向修改→筛选搜索→完成/归档恢复；重载持久化 | 待执行，AC-07/08 |
-| V-11 | 旧 Notes 001–004/008–011 与完整 crash-regression；build/refactor/fmt/contract；GitHub 指定工作流 | 待执行，AC-09 |
+| V-08 | SQLite 元数据更新保留其他字段，省略/null、完成时间、提醒确认和事务回滚 | 生产 Notes DB 模块临时独立 harness 21/21 通过，含 5 项新增元数据场景；AC-06 |
+| V-09 | 任务 owner/共享 UI 单测：操作串行、读取过期、失败重试、外部刷新、脏正文保留；查询 owner 条件与独立状态 | 初始 Notes 聚焦 63/63；最终日期/panel/task/view 30/30 通过，含失败写入被新意图替代和删除后清理；日期输入回归修复前 2 项失败，修复后通过；AC-07/08 |
+| V-10 | `TC-NOTES-012/013` browser/native：Workspace 设置属性/步骤/标签/日期→紧凑入口核对并反向修改→筛选搜索→完成/归档恢复；重载持久化 | GitHub run 42554758761 最终源码两项对等用例在三端 browser/native 全部通过，原始 receipt 已校验；AC-07/08 |
+| V-11 | 旧 Notes 001–004/008–011 与完整 crash-regression；build/refactor/fmt/contract；GitHub 指定工作流 | 最终 build/refactor/fmt/contract 已通过；GitHub run 42554758761 与同源码 Windows 补测 42559690615 合计当前 97/97（browser 51、release native 46）通过，含完整 crash-regression；原始失败保留，当前 receipt/源码/配置/用例哈希已校验；AC-09 |
+
+扩展的实际提交、验证和证据见 [任务对等交付记录](notes-workspace/task-parity-delivery.md)。
