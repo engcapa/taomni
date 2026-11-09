@@ -1,0 +1,333 @@
+id: TC-NOTES-014
+title: Notes Workspace clears search without losing filters, focus or the active dirty draft
+description: Applies precise status and tag filters, clears a nonmatching query through the accessible button and
+  Escape, and verifies input focus plus the active unsaved document throughout.
+covers:
+- F-TAO-1
+- F-WS-1
+tags:
+- notes
+- regression
+- focus
+- p1
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-notes-search-clear
+- click: '[data-testid="rail-chat-button"]'
+- click: '[data-testid="tao-hub-tab-notes"]'
+- click: '[data-testid="notes-open-workspace"]'
+- click: '[data-testid="notes-workspace-new"]'
+- fill:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-title"]'
+    value: Hidden by filters
+- click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-save"]'
+- click: '[data-testid="notes-workspace-new"]'
+- fill:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-title"]'
+    value: Active filtered note
+- click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-save"]'
+- click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-properties"]
+    > summary'
+- click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-pin"]'
+- wait_for:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-pin"][aria-pressed="true"]'
+    timeout_sec: 10
+- fill:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-new-tag"]'
+    value: search-clear-tag
+- press:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-new-tag"]'
+    key: Enter
+- assert_text:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-tag"]'
+    contains: search-clear-tag
+- press:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"]
+      .cm-content'
+    key: Mod+A
+- type:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"]
+      .cm-content'
+    text: '# Unsaved filtered draft'
+- wait_for:
+    selector: '[data-testid="notes-workspace-results"][data-count="2"][aria-busy="false"]'
+    timeout_sec: 10
+- click: '[data-testid="notes-workspace-filter-menu"]'
+- click: '[data-testid="notes-workspace-filter-all"]'
+- click: '[data-testid="notes-workspace-filter-pinned"]'
+- press:
+    selector: '[data-testid="notes-workspace-filter-menu"]'
+    key: Escape
+- click: '[data-testid="notes-workspace-sidebar"] [role="tab"]'
+- wait_for:
+    selector: '[data-testid="notes-workspace-results"][data-count="1"][aria-busy="false"]'
+    timeout_sec: 10
+- assert_count:
+    selector: '[data-testid="notes-workspace-note"]'
+    equal: 1
+- assert_text:
+    selector: '[data-testid="notes-workspace-list"]'
+    contains: Active filtered note
+- assert_attribute:
+    selector: '[data-testid="notes-workspace-sidebar"] [role="tab"]'
+    name: aria-selected
+    equals: 'true'
+- assert_text:
+    selector: '[data-testid="notes-workspace-sidebar"] [role="tab"]'
+    contains: search-clear-tag
+- fill:
+    selector: '[data-testid="notes-workspace-search"]'
+    value: no-matching-note
+- wait_for:
+    selector: '[data-testid="notes-workspace-results"][data-count="0"][aria-busy="false"]'
+    timeout_sec: 10
+- assert_count:
+    selector: '[data-testid="notes-workspace-note"]'
+    equal: 0
+- assert_visible: '[data-testid="notes-workspace-search-clear"]'
+- assert_attribute:
+    selector: '[data-testid="notes-workspace-search-clear"]'
+    name: aria-label
+    equals: Clear search
+- click: '[data-testid="notes-workspace-search-clear"]'
+- wait_for:
+    selector: '[data-testid="notes-workspace-results"][data-count="1"][aria-busy="false"]'
+    timeout_sec: 10
+- assert_count:
+    selector: '[data-testid="notes-workspace-note"]'
+    equal: 1
+- assert_text:
+    selector: '[data-testid="notes-workspace-list"]'
+    contains: Active filtered note
+- eval_readonly:
+    expression: document.activeElement?.getAttribute('data-testid') === 'notes-workspace-search'
+    expect_truthy: true
+    timeout_sec: 10
+- assert_attribute:
+    selector: '[data-testid="notes-workspace-search"]'
+    name: value
+    equals: ''
+- assert_not_visible: '[data-testid="notes-workspace-search-clear"]'
+- assert_attribute:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"]'
+    name: data-dirty
+    equals: 'true'
+- assert_text_equals:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"]
+      .cm-content'
+    equals: '# Unsaved filtered draft'
+- assert_attribute:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-pin"]'
+    name: aria-pressed
+    equals: 'true'
+- assert_attribute:
+    selector: '[data-testid="notes-workspace-filter-menu"]'
+    name: title
+    equals: 'Status: Pinned'
+- assert_attribute:
+    selector: '[data-testid="notes-workspace-sidebar"] [role="tab"]'
+    name: aria-selected
+    equals: 'true'
+- fill:
+    selector: '[data-testid="notes-workspace-search"]'
+    value: still-no-matching-note
+- wait_for:
+    selector: '[data-testid="notes-workspace-results"][data-count="0"][aria-busy="false"]'
+    timeout_sec: 10
+- press:
+    selector: '[data-testid="notes-workspace-search"]'
+    key: Escape
+- wait_for:
+    selector: '[data-testid="notes-workspace-results"][data-count="1"][aria-busy="false"]'
+    timeout_sec: 10
+- assert_count:
+    selector: '[data-testid="notes-workspace-note"]'
+    equal: 1
+- assert_attribute:
+    selector: '[data-testid="notes-workspace-search"]'
+    name: value
+    equals: ''
+- eval_readonly:
+    expression: document.activeElement?.getAttribute('data-testid') === 'notes-workspace-search'
+    expect_truthy: true
+    timeout_sec: 10
+- assert_attribute:
+    selector: '[data-testid="notes-workspace-sidebar"] [role="tab"]'
+    name: aria-selected
+    equals: 'true'
+- assert_attribute:
+    selector: '[data-testid="notes-workspace-filter-menu"]'
+    name: title
+    equals: 'Status: Pinned'
+- assert_attribute:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"]'
+    name: data-dirty
+    equals: 'true'
+- assert_text_equals:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"]
+      .cm-content'
+    equals: '# Unsaved filtered draft'
+- assert_not_visible: '[data-testid="notes-workspace-search-clear"]'
+- assert_no_runtime_errors: null
+- screenshot: notes-014-search-clear-focus.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Pinned-only and tag filters show exactly the intended note; a nonmatching search returns no rows.
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+    - 15
+    - 16
+    - 18
+    - 19
+    - 21
+    - 22
+    - 23
+    - 24
+    - 25
+    - 31
+    checkpoints:
+    - step: 14
+      expectation: The active note is pinned.
+    - step: 17
+      expectation: The active note has search-clear-tag.
+    - step: 20
+      expectation: Both saved notes appear before filtering.
+    - step: 26
+      expectation: The filtered query finishes with one result.
+    - step: 27
+      expectation: Exactly one note row remains.
+    - step: 28
+      expectation: The remaining row is Active filtered note.
+    - step: 29
+      expectation: The tag filter is selected.
+    - step: 30
+      expectation: The selected tag is search-clear-tag.
+    - step: 32
+      expectation: The nonmatching query finishes with zero results.
+    - step: 33
+      expectation: No note row is rendered.
+    - step: 34
+      expectation: The clear search button is visible.
+    - step: 35
+      expectation: The clear button is accessibly named Clear search.
+    results:
+    - 14
+    - 17
+    - 20
+    - 26
+    - 27
+    - 28
+    - 29
+    - 30
+    - 32
+    - 33
+    - 34
+    - 35
+  - id: R2
+    requirement: Clicking Clear search restores the exact filtered result and input focus while retaining the active
+      dirty document.
+    actions:
+    - 36
+    checkpoints:
+    - step: 37
+      expectation: Clearing finishes with one filtered result.
+    - step: 38
+      expectation: Exactly one row returns.
+    - step: 39
+      expectation: The returning row is Active filtered note.
+    - step: 40
+      expectation: The search input owns DOM focus.
+    - step: 41
+      expectation: The search value is empty.
+    - step: 42
+      expectation: The clear button is hidden for an empty query.
+    - step: 43
+      expectation: The active document remains dirty.
+    - step: 44
+      expectation: 'The active editor retains # Unsaved filtered draft.'
+    - step: 45
+      expectation: The active note remains pinned.
+    - step: 46
+      expectation: The status filter remains Pinned only.
+    - step: 47
+      expectation: The original tag filter remains selected.
+    results:
+    - 37
+    - 38
+    - 39
+    - 40
+    - 41
+    - 42
+    - 43
+    - 44
+    - 45
+    - 46
+    - 47
+  - id: R3
+    requirement: Escape clears a second nonmatching query while preserving focus, filters and the active dirty draft.
+    actions:
+    - 48
+    - 50
+    checkpoints:
+    - step: 49
+      expectation: The second nonmatching query finishes with zero results.
+    - step: 51
+      expectation: Escape restores one filtered result.
+    - step: 52
+      expectation: Exactly one note row is rendered.
+    - step: 53
+      expectation: Escape empties the search input.
+    - step: 54
+      expectation: The search input retains DOM focus.
+    - step: 55
+      expectation: The original tag filter remains selected.
+    - step: 56
+      expectation: The status filter remains Pinned only.
+    - step: 57
+      expectation: The active document remains dirty.
+    - step: 58
+      expectation: 'The active editor retains # Unsaved filtered draft.'
+    - step: 59
+      expectation: The clear button is hidden.
+    - step: 60
+      expectation: No runtime errors were recorded.
+    results:
+    - 49
+    - 51
+    - 52
+    - 53
+    - 54
+    - 55
+    - 56
+    - 57
+    - 58
+    - 59
+    - 60
+  visual:
+  - check: Inspect the compact clear control for native-decoration overlap.
+    method: manual
+    reason: DOM assertions do not establish decoration spacing.
+  native:
+  - check: Clear and Escape retain the dirty document through native query IPC and the editor.
+    method: automated
+    reason: Browser stubs do not establish real IPC or packaged WebView focus; OS IME delivery remains unverified.

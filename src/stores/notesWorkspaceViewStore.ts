@@ -24,11 +24,15 @@ interface NotesWorkspaceViewState {
 export const useNotesWorkspaceViewStore = create<NotesWorkspaceViewState>((set, get) => {
   let request = 0;
   let filterRevision = 0;
+  let preferenceWrites = Promise.resolve();
   let initializing: Promise<void> | undefined;
   const setFilters = (statusFilters: NoteFilter[]) => {
-    filterRevision += 1;
+    const revision = ++filterRevision;
     set({ statusFilters });
-    void setPrefs({ [FILTER_PREF]: JSON.stringify(statusFilters) }).catch((error) => set({ error: String(error) }));
+    preferenceWrites = preferenceWrites.then(() => setPrefs({ [FILTER_PREF]: JSON.stringify(statusFilters) }))
+      .catch((error) => {
+        if (revision === filterRevision) set({ error: String(error) });
+      });
   };
   return {
     notes: [], tags: [], search: "", statusFilters: ["recent_incomplete"], tagFilterId: null,

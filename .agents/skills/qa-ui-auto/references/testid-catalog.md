@@ -2268,6 +2268,7 @@
 - `[data-testid="notes-workspace-new"]` — interactive — F-TAO-1.notes-workspace-new
 - `[data-testid="notes-workspace-refresh"]` — interactive — F-TAO-1.notes-workspace-refresh
 - `[data-testid="notes-workspace-search"]` — interactive — F-TAO-1.notes-workspace-search
+- `[data-testid="notes-workspace-search-clear"]` — interactive [optional] — F-TAO-1.notes-workspace-search-clear
 - `[data-testid="notes-workspace-note"]` — interactive — F-TAO-1.notes-workspace-note
 - `[data-testid="notes-workspace-title"]` — interactive — F-TAO-1.notes-workspace-title
   ↳ `[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-title"]` — alias

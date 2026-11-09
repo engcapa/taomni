@@ -48,3 +48,47 @@ it("keeps a user's new status selection when preferences arrive late", async () 
   await initialization;
   expect(useNotesWorkspaceViewStore.getState().statusFilters).toEqual(["all"]);
 });
+it("persists rapid filter changes in invocation order when an older write finishes last", async () => {
+  let persisted = '["recent_incomplete"]';
+  let finishOlderWrite!: () => void;
+  ipc.setPrefs
+    .mockImplementationOnce((prefs: Record<string, string>) => new Promise<void>((resolve) => {
+      finishOlderWrite = () => {
+        persisted = prefs["notes.workspace.statusFilters"];
+        resolve();
+      };
+    }))
+    .mockImplementationOnce(async (prefs: Record<string, string>) => {
+      persisted = prefs["notes.workspace.statusFilters"];
+    });
+  const store = useNotesWorkspaceViewStore.getState();
+  store.toggleFilter("all");
+  store.toggleFilter("completed");
+  await Promise.resolve();
+  finishOlderWrite();
+  await vi.waitFor(() => expect(persisted).toBe('["completed"]'));
+  expect(useNotesWorkspaceViewStore.getState().statusFilters).toEqual(["completed"]);
+  expect(persisted).toBe('["completed"]');
+});
+it("continues later writes after a failure without publishing a stale error", async () => {
+  let rejectOlderWrite!: (error: Error) => void;
+  const persisted: string[] = [];
+  ipc.setPrefs
+    .mockImplementationOnce(() => new Promise<void>((_resolve, reject) => { rejectOlderWrite = reject; }))
+    .mockImplementationOnce(async (prefs: Record<string, string>) => {
+      persisted.push(prefs["notes.workspace.statusFilters"]);
+    });
+  const store = useNotesWorkspaceViewStore.getState();
+  store.toggleFilter("all");
+  store.toggleFilter("completed");
+  await vi.waitFor(() => expect(ipc.setPrefs).toHaveBeenCalledTimes(1));
+  rejectOlderWrite(new Error("old failure"));
+  await vi.waitFor(() => expect(persisted).toEqual(['["completed"]']));
+  expect(ipc.setPrefs).toHaveBeenCalledTimes(2);
+  expect(useNotesWorkspaceViewStore.getState()).toMatchObject({ statusFilters: ["completed"], error: null });
+});
+it("exposes a failure from the newest preference write", async () => {
+  ipc.setPrefs.mockRejectedValueOnce(new Error("latest failure"));
+  useNotesWorkspaceViewStore.getState().toggleFilter("all");
+  await vi.waitFor(() => expect(useNotesWorkspaceViewStore.getState().error).toContain("latest failure"));
+});

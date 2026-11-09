@@ -5983,6 +5983,10 @@ controls:
   - id: notes-workspace-search
     selector: '[data-testid="notes-workspace-search"]'
     kind: interactive
+  - id: notes-workspace-search-clear
+    selector: '[data-testid="notes-workspace-search-clear"]'
+    kind: interactive
+    optional: true
   - id: notes-workspace-note
     selector: '[data-testid="notes-workspace-note"]'
     kind: interactive

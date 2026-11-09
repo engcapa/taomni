@@ -2584,6 +2584,7 @@ const dict = {
     newNoteAria: "Create a new note",
     searchPlaceholder: "Search notes…",
     searchAria: "Search notes",
+    clearSearch: "Clear search",
     untitled: "Untitled note",
     empty: "No notes yet",
     emptyHint: "Create a note to get started.",

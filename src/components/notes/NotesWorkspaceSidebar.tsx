@@ -1,4 +1,4 @@
-import { Plus, RefreshCw, Search } from "lucide-react";
+import { Plus, RefreshCw } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
 import { useNotesWorkspaceViewStore } from "../../stores/notesWorkspaceViewStore";
@@ -9,6 +9,7 @@ import { useT } from "../../lib/i18n";
 import { useNotesContentSync } from "./useNotesContentSync";
 import { NoteStatusFilter, NoteTagFilters } from "./NoteFilters";
 import { NotesList } from "./NotesList";
+import { NotesWorkspaceSearch } from "./NotesWorkspaceSearch";
 import { NoteTaskStatus } from "./NoteTaskActions";
 
 export function NotesWorkspaceSidebar() {
@@ -34,12 +35,7 @@ export function NotesWorkspaceSidebar() {
         title={t("notes.reloadContent")} aria-label={t("notes.reloadContent")}
         onClick={() => { void view.load(); if (activeNoteId) void useNotesTaskStore.getState().load(activeNoteId); }}><RefreshCw className="h-3.5 w-3.5" /></button>
     </div>
-    <label className="relative mt-1">
-      <Search className="pointer-events-none absolute left-1.5 top-2 h-3 w-3 text-[var(--taomni-text-muted)]" />
-      <input type="search" data-testid="notes-workspace-search" className="taomni-input h-7 w-full pl-6 text-xs"
-        aria-label={t("notes.searchAria")} placeholder={t("notes.searchPlaceholder")}
-        value={view.search} onChange={(event) => view.setSearch(event.target.value)} />
-    </label>
+    <NotesWorkspaceSearch value={view.search} onSearch={view.setSearch} />
     <NoteTagFilters tags={view.tags} tagFilterId={view.tagFilterId} onSelectTag={view.setTagFilter}
       prefix="notes-workspace" className="flex max-h-24 shrink-0 flex-wrap gap-1 overflow-auto py-1" />
     {view.error && <p role="alert" className="break-words text-xs text-red-400">{view.error}</p>}

@@ -199,6 +199,14 @@ input.taomni-input[type="search"]::-webkit-search-decoration {
   -webkit-appearance: none;
 }
 /* Leave ::-webkit-search-cancel-button and ::-ms-clear at platform defaults. */
+input.taomni-input.notes-workspace-search::-webkit-search-cancel-button {
+  -webkit-appearance: none;
+  appearance: none;
+  display: none;
+}
+input.taomni-input.notes-workspace-search::-ms-clear {
+  display: none;
+}
 /* Leave input[type=password]::-ms-reveal at platform defaults. */
 select.taomni-input {
   background-color: var(--taomni-input-bg);
