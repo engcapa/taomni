@@ -761,20 +761,7 @@ pub(crate) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         | "screenshot_qa_startup_isolation"
         | "screenshot_qa_startup_flash"
         | "screenshot_qa_x11_compositor_bypass" => screenshot::handle(invoke),
-        "notes_list"
-        | "notes_get"
-        | "notes_create"
-        | "notes_update"
-        | "notes_delete"
-        | "notes_toggle_complete"
-        | "notes_archive"
-        | "notes_list_tags"
-        | "notes_upsert_tags"
-        | "notes_set_steps"
-        | "notes_get_prefs"
-        | "notes_set_prefs"
-        | "notes_list_alerts"
-        | "notes_ack_alert" => notes::handle(invoke),
+        command if notes::handles(command) => notes::handle(invoke),
         "mfa_list"
         | "mfa_codes"
         | "mfa_inspect"

@@ -14,8 +14,42 @@ function normalizeQaWebDriverKey(value) {
   })[value] || value;
 }
 
+function moveQaInputSelection(el, key, modifiers) {
+  if (!(el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement) ||
+      el.disabled || el.selectionStart === null || modifiers.Alt) return false;
+  const start = el.selectionStart;
+  const end = el.selectionEnd;
+  const backward = el.selectionDirection === "backward";
+  const anchor = backward ? end : start;
+  const head = modifiers.Shift ? (backward ? start : end) : start;
+  let target;
+  if ((key === "Home" || key === "End") &&
+      (modifiers.Control || modifiers.Meta || el instanceof HTMLInputElement)) {
+    target = key === "Home" ? 0 : el.value.length;
+  } else if (!modifiers.Control && !modifiers.Meta && key === "ArrowLeft") {
+    const previous = Array.from(el.value.slice(0, head)).pop();
+    target = !modifiers.Shift && start !== end ? start : head - (previous?.length || 0);
+  } else if (!modifiers.Control && !modifiers.Meta && key === "ArrowRight") {
+    const next = Array.from(el.value.slice(modifiers.Shift ? head : end))[0];
+    target = !modifiers.Shift && start !== end ? end : head + (next?.length || 0);
+  } else {
+    return false;
+  }
+  if (modifiers.Shift) {
+    el.setSelectionRange(Math.min(anchor, target), Math.max(anchor, target),
+      target < anchor ? "backward" : "forward");
+  } else {
+    el.setSelectionRange(target, target);
+  }
+  return true;
+}
+
 function dispatchQaKeyDefault(el, key, event, modifiers) {
-  if (event.defaultPrevented || modifiers.Control || modifiers.Meta || modifiers.Alt ||
+  if (event.defaultPrevented) return;
+  // Constructed arrow events have no browser default. Preserve actual input
+  // selection for subsequent typing; this is still WebView, not OS input.
+  if (moveQaInputSelection(el, key, modifiers)) return;
+  if (modifiers.Control || modifiers.Meta || modifiers.Alt ||
       ["Control", "Shift", "Alt", "Meta"].includes(key)) return;
   if (el.isContentEditable) {
     if (key === "Enter") document.execCommand("insertParagraph", false, null);

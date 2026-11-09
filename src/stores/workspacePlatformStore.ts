@@ -12,6 +12,7 @@ import { create } from "zustand";
 import type { SessionConfig } from "../lib/ipc/session";
 import { createWorkspaceTabActions } from "./workspacePlatformTabActions";
 import { createWorkspaceCodeActions } from "./workspacePlatformCodeActions";
+import { createNotesWorkspace, createWorkspaceNotesActions, NOTES_WORKSPACE_ID } from "./workspaceNotes";
 import { workspaceDurableCodeDefinition, type WorkspaceFileTarget } from "../lib/workspaceFileTarget";
 import type { CodeWorkspaceFileRef, CodeWorkspaceTabInfo } from "../types";
 import { cancelWorkspacePlatformPersistence, observeWorkspacePlatformStorage, persistWorkspacePlatformMetadata as persist, PLATFORM_WORKSPACES_STORAGE_KEY } from "./workspacePlatformPersistence";
@@ -29,6 +30,7 @@ export interface WorkspaceRootFolder {
 
 export type WorkspaceTabKind =
   | "file"
+  | "note"
   | "git"
   | "code"
   | "terminal"
@@ -49,6 +51,8 @@ export interface WorkspaceIsolatedTab {
   filePath?: string;
   rootFolderId?: string;
   editorFile?: CodeWorkspaceFileRef;
+  /** Shared Tao Notes document; content remains owned by notes.db. */
+  noteId?: string;
   /** Runtime-only library source owned by the editor/provider. */
   transient?: boolean;
   /** Source `SessionConfig` id for session kinds (any global session). */
@@ -145,6 +149,7 @@ export interface WorkspacePlatformState {
   addCreatedNode: (node: Omit<WorkspaceTreeNode, "id" | "addedAt">) => WorkspaceTreeNode;
   removeCreatedNode: (workspaceId: string, rootFolderId: string, path: string) => void;
   openFileInWorkspace: (workspaceId: string, file: { rootId: string; path: string; name?: string }) => WorkspaceIsolatedTab;
+  openNoteInWorkspace: (noteId: string, title: string) => WorkspaceIsolatedTab;
   openGitTab: (workspaceId: string, focusPath?: string) => WorkspaceIsolatedTab;
   openCodeWorkspaceTab: (workspaceId: string) => WorkspaceIsolatedTab;
   updateCodeWorkspace: (workspaceId: string, info: CodeWorkspaceTabInfo) => void;
@@ -258,13 +263,15 @@ function normalizeWorkspace(workspace: PlatformWorkspace): PlatformWorkspace {
 }
 
 function ensureDefaultWorkspace(workspaces: PlatformWorkspace[]): PlatformWorkspace[] {
-  const rest = workspaces.filter((workspace) => workspace.id !== DEFAULT_WORKSPACE_ID);
+  const rest = workspaces.filter((workspace) => workspace.id !== DEFAULT_WORKSPACE_ID && workspace.id !== NOTES_WORKSPACE_ID);
   const storedDefault = workspaces.find((workspace) => workspace.id === DEFAULT_WORKSPACE_ID);
-  return [storedDefault ? normalizeWorkspace(storedDefault) : createDefaultWorkspace(), ...rest.map(normalizeWorkspace)];
+  const storedNotes = workspaces.find((workspace) => workspace.id === NOTES_WORKSPACE_ID);
+  return [storedDefault ? normalizeWorkspace(storedDefault) : createDefaultWorkspace(),
+    storedNotes ? normalizeWorkspace(storedNotes) : createNotesWorkspace(), ...rest.map(normalizeWorkspace)];
 }
 
 export function readPersistedPlatformState(): Pick<PersistedPlatformState, "workspaces" | "activeWorkspaceId" | "createdNodes"> {
-  const fallback = { workspaces: [createDefaultWorkspace()], activeWorkspaceId: DEFAULT_WORKSPACE_ID, createdNodes: [] };
+  const fallback = { workspaces: [createDefaultWorkspace(), createNotesWorkspace()], activeWorkspaceId: DEFAULT_WORKSPACE_ID, createdNodes: [] };
   if (typeof window === "undefined") return fallback;
   try {
     const raw = window.localStorage.getItem(PLATFORM_WORKSPACES_STORAGE_KEY);
@@ -362,7 +369,7 @@ export const useWorkspacePlatformStore = create<WorkspacePlatformState>((set, ge
   deleteWorkspace: (workspaceId) => {
     const state = get();
     const target = state.workspaces.find((workspace) => workspace.id === workspaceId);
-    if (!target || target.isDefault || target.id === DEFAULT_WORKSPACE_ID) return false;
+    if (!target || target.isDefault || target.id === DEFAULT_WORKSPACE_ID || target.id === NOTES_WORKSPACE_ID) return false;
     const workspaces = state.workspaces.filter((workspace) => workspace.id !== workspaceId);
     const activeWorkspaceId = state.activeWorkspaceId === workspaceId ? DEFAULT_WORKSPACE_ID : state.activeWorkspaceId;
     const createdNodes = state.createdNodes.filter((node) => node.workspaceId !== workspaceId);
@@ -382,6 +389,7 @@ export const useWorkspacePlatformStore = create<WorkspacePlatformState>((set, ge
   },
 
   renameWorkspace: (workspaceId, name) => {
+    if (workspaceId === NOTES_WORKSPACE_ID) return;
     const trimmed = name.trim();
     if (!trimmed) return;
     set((state) => {
@@ -393,6 +401,7 @@ export const useWorkspacePlatformStore = create<WorkspacePlatformState>((set, ge
   },
 
   addRootFolder: (workspaceId, folder) => {
+    if (workspaceId === NOTES_WORKSPACE_ID) return null;
     const path = normalizePath(folder.path);
     if (!path) return null;
     const workspace = get().workspaces.find((candidate) => candidate.id === workspaceId);
@@ -521,6 +530,10 @@ export const useWorkspacePlatformStore = create<WorkspacePlatformState>((set, ge
   },
 
   openGitTab: (workspaceId, focusPath) => {
+    if (workspaceId === NOTES_WORKSPACE_ID) {
+      get().setActiveWorkspace(DEFAULT_WORKSPACE_ID);
+      return get().openGitTab(DEFAULT_WORKSPACE_ID, focusPath);
+    }
     const tab: WorkspaceIsolatedTab = {
       id: `ws:${workspaceId}:git`,
       workspaceId,
@@ -563,8 +576,13 @@ export const useWorkspacePlatformStore = create<WorkspacePlatformState>((set, ge
   },
 
   ...createWorkspaceCodeActions(set, persist),
+  ...createWorkspaceNotesActions(set, get, persist),
 
   openLocalTerminalInWorkspace: (workspaceId, initialCwd) => {
+    if (workspaceId === NOTES_WORKSPACE_ID) {
+      get().setActiveWorkspace(DEFAULT_WORKSPACE_ID);
+      return get().openLocalTerminalInWorkspace(DEFAULT_WORKSPACE_ID, initialCwd);
+    }
     const tab: WorkspaceIsolatedTab = {
       id: newRuntimeId(`ws:${workspaceId}:local`),
       workspaceId,
@@ -585,6 +603,10 @@ export const useWorkspacePlatformStore = create<WorkspacePlatformState>((set, ge
   },
 
   openSessionInWorkspace: (workspaceId, session, options = {}) => {
+    if (workspaceId === NOTES_WORKSPACE_ID) {
+      if (options.activate !== false) get().setActiveWorkspace(DEFAULT_WORKSPACE_ID);
+      return get().openSessionInWorkspace(DEFAULT_WORKSPACE_ID, session, options);
+    }
     const kind = sessionTabKind(session.session_type);
     const tab: WorkspaceIsolatedTab = {
       id: newRuntimeId(`ws:${workspaceId}:sess:${session.id}`),

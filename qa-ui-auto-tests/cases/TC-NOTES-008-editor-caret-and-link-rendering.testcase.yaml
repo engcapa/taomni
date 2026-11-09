@@ -1,0 +1,130 @@
+id: TC-NOTES-008
+title: Notes caret uses the editable text while links remain available on blur
+description: 'Regression for the Windows caret/content offset: linked title/body fields must render their own text while focused,
+  including wrapped mixed Chinese/Latin content and keyboard navigation. Native executes in the packaged WebView; hosted Windows
+  uses WebView2 but is not a physical Windows 11 IME/DPI check.'
+covers:
+- F-TAO-1
+tags:
+- notes
+- regression
+- p1
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+timeout_sec: 90
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-notes-caret
+- click: '[data-testid="rail-chat-button"]'
+- click: '[data-testid="tao-hub-tab-notes"]'
+- click: '[data-testid="notes-new"]'
+- fill:
+    selector: '[data-testid="note-editor-title"]'
+    value: Caret 中文 https://example.com/title
+- assert_not_visible: '[data-testid="note-editor-title-link-preview"]'
+- press:
+    selector: '[data-testid="note-editor-title"]'
+    key: ArrowLeft
+- type:
+    selector: '[data-testid="note-editor-title"]'
+    text: '!'
+- eval_readonly:
+    expression: document.querySelector(".notes-link-field-shell input").value.endsWith("/titl!e")
+    expect_truthy: true
+- fill:
+    selector: '[data-testid="note-editor-body"]'
+    value: '# alpha https://example.com/long/path/to/check/wrapping 中文测试
+
+      第二行 ABC
+
+      第三行 XYZ'
+- assert_not_visible: '[data-testid="note-editor-body-link-preview"]'
+- eval_readonly:
+    expression: getComputedStyle(document.querySelector(".notes-link-field-shell textarea")).color !== "rgba(0, 0, 0, 0)"
+    expect_truthy: true
+- press:
+    selector: '[data-testid="note-editor-body"]'
+    key: Mod+End
+- press: ArrowLeft
+- press: ArrowLeft
+- press: ArrowLeft
+- type:
+    selector: '[data-testid="note-editor-body"]'
+    text: '!'
+- eval_readonly:
+    expression: document.querySelector(".notes-link-field-shell textarea").value.endsWith("第三行 !XYZ")
+    expect_truthy: true
+- blur: '[data-testid="note-editor-body"]'
+- assert_visible: '[data-testid="note-editor-body-link-preview"]'
+- assert_text:
+    selector: '[data-testid="note-editor-body-link-preview"]'
+    contains: 第三行 !XYZ
+- click: '[data-testid="note-editor-back"]'
+- click: '[data-testid="notes-list-item"]'
+- eval_readonly:
+    expression: document.querySelector(".notes-link-field-shell textarea").value.endsWith("第三行 !XYZ")
+    expect_truthy: true
+- assert_no_runtime_errors: null
+- screenshot: notes-008-caret-linked-editing.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Focused editing displays the actual input text and keyboard edits persist at the selected position.
+    actions:
+    - 3
+    - 4
+    - 5
+    - 6
+    - 8
+    - 9
+    - 11
+    - 14
+    - 15
+    - 16
+    - 17
+    - 18
+    - 20
+    - 23
+    - 24
+    checkpoints:
+    - step: 7
+      expectation: '{''assert_not_visible'': ''[data-testid="note-editor-title-link-preview"]''}'
+    - step: 10
+      expectation: '{''eval_readonly'': {''expression'': ''document.querySelector(".notes-link-field-shell input").value.endsWith("/titl!e")'',
+        ''expect_truthy'': True}}'
+    - step: 12
+      expectation: '{''assert_not_visible'': ''[data-testid="note-editor-body-link-preview"]''}'
+    - step: 13
+      expectation: '{''eval_readonly'': {''expression'': ''getComputedStyle(document.querySelector(".notes-link-field-shell
+        textarea")).color !== "rgba(0, 0, 0, 0)"'', ''expect_truthy'': True}}'
+    - step: 19
+      expectation: '{''eval_readonly'': {''expression'': ''document.querySelector(".notes-link-field-shell textarea").value.endsWith("第三行
+        !XYZ")'', ''expect_truthy'': True}}'
+    - step: 21
+      expectation: '{''assert_visible'': ''[data-testid="note-editor-body-link-preview"]''}'
+    - step: 22
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="note-editor-body-link-preview"]'', ''contains'': ''第三行
+        !XYZ''}}'
+    - step: 25
+      expectation: '{''eval_readonly'': {''expression'': ''document.querySelector(".notes-link-field-shell textarea").value.endsWith("第三行
+        !XYZ")'', ''expect_truthy'': True}}'
+    - step: 26
+      expectation: '{''assert_no_runtime_errors'': None}'
+    results:
+    - 10
+    - 13
+    - 19
+    - 25
+    - 26
+  visual:
+  - check: Inspect mixed text, wrapping, selection and caret at 100%, 125%, 150%, 200% display scaling on Windows 11.
+    method: manual
+    reason: Hosted WebView assertions cannot establish physical Windows 11 DPI or IME behavior.
+  native:
+  - check: Execute keyboard editing and persistence through the packaged WebView and real notes.db.
+    method: automated
+    reason: Native WebView glyph rendering and Rust persistence are not covered by browser stubs.

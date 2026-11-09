@@ -17,6 +17,10 @@ mod rows;
 
 mod mutations;
 
+mod content;
+
+mod metadata;
+
 mod query;
 
 mod steps;
@@ -38,6 +42,10 @@ pub use model::{
 };
 
 pub use schema::init_db;
+
+pub use content::{ContentSaveError, save_content};
+
+pub use metadata::{NoteMetadataPatch, update_metadata};
 
 pub use mutations::{
     archive_note, create_note, delete_note, get_note, toggle_complete, update_note,

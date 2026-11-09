@@ -2,7 +2,9 @@ import { useEffect } from "react";
 import { useTabOverviewStore } from "../../stores/tabOverviewStore";
 import { getAppPlatform } from "../../lib/runtime";
 import { useAppStore } from "../../stores/appStore";
-import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
+import { DEFAULT_WORKSPACE_ID, useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
+import { NOTES_WORKSPACE_ID } from "../../stores/workspaceNotes";
+import { createAndOpenWorkspaceNote } from "../../lib/notes/notesWorkspaceNavigation";
 import { useWorkspaceUiStore } from "../../stores/workspaceUiStore";
 import { shellKeyClaimed } from "../../lib/shellKeyClaims";
 
@@ -61,7 +63,9 @@ export function usePlatformShortcuts(): void {
       }
       if (mod && event.altKey && !event.shiftKey && key === "o") {
         event.preventDefault();
-        const workspaceId = useWorkspacePlatformStore.getState().activeWorkspaceId;
+        const platform = useWorkspacePlatformStore.getState();
+        const workspaceId = platform.activeWorkspaceId === NOTES_WORKSPACE_ID ? DEFAULT_WORKSPACE_ID : platform.activeWorkspaceId;
+        platform.setActiveWorkspace(workspaceId);
         state.setActiveSideTab("workspaces");
         state.setSidebarCollapsed(false);
         useWorkspaceUiStore.getState().openSessionPicker(workspaceId);
@@ -70,7 +74,8 @@ export function usePlatformShortcuts(): void {
       // Alt+Insert: new file in the active workspace (IDEA binding).
       if (event.altKey && !mod && !event.shiftKey && key === "insert" && inWorkspace && !isTypingTarget(event.target)) {
         event.preventDefault();
-        useWorkspaceUiStore.getState().openFsModal({ kind: "file", directory: "" });
+        if (useWorkspacePlatformStore.getState().activeWorkspaceId === NOTES_WORKSPACE_ID) void createAndOpenWorkspaceNote();
+        else useWorkspaceUiStore.getState().openFsModal({ kind: "file", directory: "" });
         return;
       }
       // Ctrl+Shift+H: tab details overlay is owned by the tab bar; do nothing.

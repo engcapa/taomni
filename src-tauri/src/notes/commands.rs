@@ -53,6 +53,32 @@ pub async fn notes_update(
 }
 
 #[tauri::command]
+pub async fn notes_update_metadata(
+    id: String,
+    patch: db::NoteMetadataPatch,
+    state: State<'_, AppState>,
+) -> Result<Option<NoteItem>, String> {
+    let conn = notes_conn!(state);
+    db::update_metadata(&conn, &id, &patch).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub async fn notes_save_content(
+    id: String,
+    title: String,
+    body: String,
+    expected_title: String,
+    expected_body: String,
+    state: State<'_, AppState>,
+) -> Result<NoteItem, db::ContentSaveError> {
+    let conn = state
+        .notes_db
+        .lock()
+        .map_err(|e| db::ContentSaveError::Storage(e.to_string()))?;
+    db::save_content(&conn, &id, &title, &body, &expected_title, &expected_body)
+}
+
+#[tauri::command]
 pub async fn notes_delete(id: String, state: State<'_, AppState>) -> Result<(), String> {
     let conn = notes_conn!(state);
     db::delete_note(&conn, &id).map_err(|e| e.to_string())

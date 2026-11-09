@@ -117,4 +117,72 @@ describe("macOS QA WebView keyboard defaults", () => {
     expect(input.checked).toBe(false);
     expect(submit).not.toHaveBeenCalled();
   });
+
+  it("moves an input caret before inserting without appending to the end", () => {
+    const input = document.createElement("input");
+    document.body.append(input);
+    input.value = "Caret 中文 https://example.com/title";
+    press(input, "ArrowLeft");
+    press(input, "!");
+    expect(input.value).toBe("Caret 中文 https://example.com/titl!e");
+  });
+
+  it("moves to the textarea document boundary and edits the selected position", () => {
+    const input = document.createElement("textarea");
+    document.body.append(input);
+    input.value = "第一行\n第三行 XYZ";
+    input.setSelectionRange(0, 0);
+    press(input, "End", { ...plain, Meta: true });
+    press(input, "ArrowLeft");
+    press(input, "ArrowLeft");
+    press(input, "ArrowLeft");
+    press(input, "!");
+    expect(input.value).toBe("第一行\n第三行 !XYZ");
+    press(input, "Home", { ...plain, Control: true });
+    expect(input.selectionStart).toBe(0);
+  });
+
+  it("collapses ranges toward the arrow and extends a selection in either direction", () => {
+    const input = document.createElement("input");
+    document.body.append(input);
+    input.value = "abcd";
+    input.setSelectionRange(1, 3);
+    press(input, "ArrowRight");
+    expect([input.selectionStart, input.selectionEnd]).toEqual([3, 3]);
+    input.setSelectionRange(1, 3);
+    press(input, "ArrowLeft");
+    expect([input.selectionStart, input.selectionEnd]).toEqual([1, 1]);
+    press(input, "ArrowLeft", { ...plain, Shift: true });
+    expect([input.selectionStart, input.selectionEnd, input.selectionDirection]).toEqual([0, 1, "backward"]);
+    press(input, "ArrowRight", { ...plain, Shift: true });
+    press(input, "ArrowRight", { ...plain, Shift: true });
+    expect([input.selectionStart, input.selectionEnd, input.selectionDirection]).toEqual([1, 2, "forward"]);
+  });
+
+  it("keeps surrogate pairs intact and does not emit input events for navigation", () => {
+    const input = document.createElement("input");
+    document.body.append(input);
+    input.value = "中😀";
+    const changed = vi.fn();
+    input.addEventListener("input", changed);
+    press(input, "ArrowLeft");
+    expect(input.selectionStart).toBe(1);
+    press(input, "ArrowRight");
+    expect(input.selectionStart).toBe(3);
+    expect(changed).not.toHaveBeenCalled();
+  });
+
+  it("respects canceled navigation, disabled fields and unsupported modified arrows", () => {
+    const input = document.createElement("input");
+    document.body.append(input);
+    input.value = "abc";
+    input.disabled = true;
+    press(input, "ArrowLeft");
+    input.disabled = false;
+    press(input, "ArrowLeft", { ...plain, Alt: true });
+    input.addEventListener("keydown", (event) => event.preventDefault());
+    press(input, "Home");
+    expect(input.selectionStart).toBe(3);
+    expect(input.value).toBe("abc");
+  });
 });

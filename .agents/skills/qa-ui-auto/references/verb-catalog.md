@@ -42,6 +42,7 @@ activation is still sent exactly once and all original frame budgets apply.
 |------|------|-------|
 | `open` | string URL **or** `{url}` | Navigates and waits for `domcontentloaded`. Auto-runs at step 0 if first step isn't `open`/`goto`. |
 | `goto` | same as `open` | Alias. |
+| `reload_window` | `null` | Browser/native: reload the current document, retaining application storage, and wait for the normal app shell. Use this for store recovery; native `open` only acknowledges the already-launched app. This does not restart the OS process. |
 | `native_restart_app` | `null` | Native only. Uses the production window close control, waits for the browsing context to close, then restarts the run-owned QA application with the same isolated profile. Does not reset fixtures or reseed storage. Unexpected exit confirmation fails explicitly; handle prompts in the case. Requires a new WebDriver session id and records the shutdown path and both ids in `native-application-restarts.jsonl`; the original case deadline remains active. |
 | `wait` | seconds (number or `"3s"`) | Hard sleep; use sparingly. |
 | `switch_window` | `{selector, timeout_sec?, close_with?}` | Browser/native. Enumerates real app-created pages/WebViews and selects the one containing the CSS selector. Optional `close_with` clicks a control once in the source window and requires that window to disappear before selecting the target; a native `no such window` response is accepted only with this observed closure. Never creates a synthetic window or replays an uncertain click. |

@@ -13,6 +13,8 @@ import { WorkspaceSessionsPanel } from "./WorkspaceSessionsPanel";
 import { useSessionStore } from "../../stores/sessionStore";
 import { WorkspaceSwitcher } from "./WorkspaceSwitcher";
 import { useWorkspaceEditorHostStore } from "../../stores/workspaceEditorHostStore";
+import { NOTES_WORKSPACE_ID } from "../../stores/workspaceNotes";
+import { NotesWorkspaceSidebar } from "../notes/NotesWorkspaceSidebar";
 
 export interface WorkspaceSidebarProps {
   onOpenSessionPicker: () => void;
@@ -85,6 +87,11 @@ export function WorkspaceSidebar({ onOpenSessionPicker }: WorkspaceSidebarProps)
   const lens = workspace?.activeLeftToolWindow ?? "project";
   if (!workspace) return null;
   const linkedOpen = linkedOpenByWorkspace[workspace.id] ?? workspace.openTabs.some((tab) => tab.kind === "file");
+
+  if (workspace.id === NOTES_WORKSPACE_ID) return <div data-testid="workspace-sidebar-panel" className="flex min-h-0 flex-1 flex-col">
+    <WorkspaceSwitcher onAddFolder={() => undefined} />
+    <NotesWorkspaceSidebar />
+  </div>;
 
   return (
     <div data-testid="workspace-sidebar-panel" className="flex min-h-0 flex-1 flex-col">

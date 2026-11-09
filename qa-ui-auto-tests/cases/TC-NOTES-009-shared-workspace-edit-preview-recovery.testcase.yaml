@@ -1,0 +1,368 @@
+id: TC-NOTES-009
+title: Notes and Workspace share editing, preview, identity and recoverable drafts
+description: Exercises both real UI entry points, content-only saves, primary save shortcut, metadata retention,
+  title-independent tab identity, close/reopen/reload recovery and default Notes navigation. Native verifies the
+  real SQLite IPC and packaged editor; browser uses stubs.
+covers:
+- F-TAO-1
+- F-WS-1
+tags:
+- notes
+- regression
+- p1
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-notes-workspace
+- click: '[data-testid="rail-chat-button"]'
+- click: '[data-testid="tao-hub-tab-notes"]'
+- click: '[data-testid="notes-new"]'
+- fill:
+    selector: '[data-testid="note-editor-title"]'
+    value: Shared workspace note
+- fill:
+    selector: '[data-testid="note-editor-body"]'
+    value: '# Shared body original'
+- blur: '[data-testid="note-editor-body"]'
+- click: '[data-testid="note-editor-pin"]'
+- wait_for:
+    selector: '[data-testid="note-editor-pin"][aria-pressed="true"]'
+    timeout_sec: 10
+- click: '[data-testid="note-editor-preview"]'
+- assert_visible: '[data-testid="notes-workspace-sidebar"]'
+- assert_attribute:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"]'
+    name: data-mode
+    equals: preview
+- assert_visible: '[data-testid="notes-workspace-status"]'
+- assert_text_equals:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] h1'
+    equals: Shared body original
+- click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-mode-split"]'
+- fill:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-title"]'
+    value: Renamed shared note
+- press:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"]
+      .cm-content'
+    key: Mod+A
+- type:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"]
+      .cm-content'
+    text: '# Saved from Workspace'
+- press:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"]
+      .cm-content'
+    key: Mod+S
+- assert_not_visible: '[data-testid="notes-workspace-document"][data-active="true"][data-dirty="true"]'
+- click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-tao"]'
+- eval_readonly:
+    expression: document.querySelector(".notes-link-field-shell input")?.value === "Renamed shared note"
+    expect_truthy: true
+    timeout_sec: 10
+- eval_readonly:
+    expression: document.querySelector(".notes-link-field-shell textarea")?.value === "# Saved from Workspace"
+    expect_truthy: true
+    timeout_sec: 10
+- wait_for:
+    selector: '[data-testid="note-editor-pin"][aria-pressed="true"]'
+    timeout_sec: 10
+- click: '[data-testid="note-editor-preview"]'
+- assert_text_equals:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] h1'
+    equals: Saved from Workspace
+- click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-mode-edit"]'
+- press:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"]
+      .cm-content'
+    key: Mod+A
+- type:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"]
+      .cm-content'
+    text: '# Recovered draft'
+- assert_attribute:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"]'
+    name: data-dirty
+    equals: 'true'
+- click: '[data-testid="workspace-tab"][data-tab-kind="note"] [data-testid="workspace-tab-close"]'
+- assert_not_visible: '[data-testid="notes-workspace-document"][data-active="true"]'
+- click: '[data-testid="notes-workspace-note"]'
+- assert_text_equals:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"]
+      .cm-content'
+    equals: '# Recovered draft'
+- assert_attribute:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"]'
+    name: data-dirty
+    equals: 'true'
+- assert_no_runtime_errors: null
+- reload_window: null
+- click: '[data-testid="nav-mode-workspaces"]'
+- assert_visible: '[data-testid="notes-workspace-document"][data-active="true"]'
+- assert_text_equals:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"]
+      .cm-content'
+    equals: '# Recovered draft'
+- assert_attribute:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"]'
+    name: data-dirty
+    equals: 'true'
+- click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-save"]'
+- assert_not_visible: '[data-testid="notes-workspace-document"][data-active="true"][data-dirty="true"]'
+- click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-mode-preview"]'
+- assert_text_equals:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] h1'
+    equals: Recovered draft
+- fill:
+    selector: '[data-testid="notes-workspace-search"]'
+    value: not-a-matching-note
+- wait_for:
+    selector: '[data-testid="notes-workspace-results"][data-count="0"][aria-busy="false"]'
+    timeout_sec: 10
+- assert_count:
+    selector: '[data-testid="notes-workspace-note"]'
+    equal: 0
+- fill:
+    selector: '[data-testid="notes-workspace-search"]'
+    value: Renamed
+- wait_for:
+    selector: '[data-testid="notes-workspace-results"][data-count="1"][aria-busy="false"]'
+    timeout_sec: 10
+- assert_count:
+    selector: '[data-testid="notes-workspace-note"]'
+    equal: 1
+- fill:
+    selector: '[data-testid="notes-workspace-search"]'
+    value: ''
+- click: '[data-testid="notes-workspace-refresh"]'
+- click: '[data-testid="notes-workspace-new"]'
+- eval_readonly:
+    expression: document.getElementsByClassName("taomni-workspace-tab").length === 2 && document.getElementsByClassName("taomni-workspace-tab")[1].dataset.tabKind
+      === "note"
+    expect_truthy: true
+    timeout_sec: 10
+- fill:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-title"]'
+    value: Second note
+- click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-save"]'
+- click: '[data-testid="workspace-tab"][data-tab-title="Renamed shared note.md"]'
+- assert_text_equals:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"][data-mode="preview"] h1'
+    equals: Recovered draft
+- click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-tao"]'
+- eval_readonly:
+    expression: document.querySelector(".notes-link-field-shell textarea")?.value === "# Recovered draft"
+    expect_truthy: true
+    timeout_sec: 10
+- click: '[data-testid="note-editor-back"]'
+- click: '[data-testid="notes-open-workspace"]'
+- assert_visible: '[data-testid="notes-workspace-sidebar"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-new-note"]'
+- eval_readonly:
+    expression: document.getElementsByClassName("taomni-workspace-tab").length === 3 && document.getElementsByClassName("taomni-workspace-tab")[2].dataset.tabKind
+      === "note"
+    expect_truthy: true
+    timeout_sec: 10
+- fill:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-title"]'
+    value: Third note
+- click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-save"]'
+- click: '[data-testid="workspace-tab"][data-tab-title="Renamed shared note.md"]'
+- assert_text_equals:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] h1'
+    equals: Recovered draft
+- assert_no_runtime_errors: null
+- screenshot: notes-009-shared-workspace.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Large Preview opens the corresponding Markdown; Workspace primary-S saves content and the same
+      note retains its pinned metadata in Tao Notes.
+    actions:
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 11
+    - 16
+    - 17
+    - 18
+    - 19
+    - 20
+    - 22
+    - 26
+    checkpoints:
+    - step: 10
+      expectation: '{''wait_for'': {''selector'': ''[data-testid="note-editor-pin"][aria-pressed="true"]'', ''timeout_sec'':
+        10}}'
+    - step: 12
+      expectation: '{''assert_visible'': ''[data-testid="notes-workspace-sidebar"]''}'
+    - step: 13
+      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="notes-workspace-document"][data-active="true"]'',
+        ''name'': ''data-mode'', ''equals'': ''preview''}}'
+    - step: 14
+      expectation: '{''assert_visible'': ''[data-testid="notes-workspace-status"]''}'
+    - step: 15
+      expectation: '{''assert_text_equals'': {''selector'': ''[data-testid="notes-workspace-document"][data-active="true"]
+        h1'', ''equals'': ''Shared body original''}}'
+    - step: 21
+      expectation: '{''assert_not_visible'': ''[data-testid="notes-workspace-document"][data-active="true"][data-dirty="true"]''}'
+    - step: 23
+      expectation: '{''eval_readonly'': {''expression'': ''document.querySelector(".notes-link-field-shell input")?.value
+        === "Renamed shared note"'', ''expect_truthy'': True, ''timeout_sec'': 10}}'
+    - step: 24
+      expectation: '{''eval_readonly'': {''expression'': ''document.querySelector(".notes-link-field-shell textarea")?.value
+        === "# Saved from Workspace"'', ''expect_truthy'': True, ''timeout_sec'': 10}}'
+    - step: 25
+      expectation: '{''wait_for'': {''selector'': ''[data-testid="note-editor-pin"][aria-pressed="true"]'', ''timeout_sec'':
+        10}}'
+    - step: 27
+      expectation: '{''assert_text_equals'': {''selector'': ''[data-testid="notes-workspace-document"][data-active="true"]
+        h1'', ''equals'': ''Saved from Workspace''}}'
+    results:
+    - 10
+    - 12
+    - 13
+    - 14
+    - 15
+    - 21
+    - 23
+    - 24
+    - 25
+    - 27
+  - id: R2
+    requirement: Unsaved edits survive closing/reopening their tab and reloading, then save and render correctly.
+    actions:
+    - 28
+    - 29
+    - 30
+    - 32
+    - 34
+    - 38
+    - 39
+    - 43
+    - 45
+    checkpoints:
+    - step: 31
+      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="notes-workspace-document"][data-active="true"]'',
+        ''name'': ''data-dirty'', ''equals'': ''true''}}'
+    - step: 33
+      expectation: '{''assert_not_visible'': ''[data-testid="notes-workspace-document"][data-active="true"]''}'
+    - step: 35
+      expectation: '{''assert_text_equals'': {''selector'': ''[data-testid="notes-workspace-document"][data-active="true"]
+        [data-testid="notes-workspace-editor"] .cm-content'', ''equals'': ''# Recovered draft''}}'
+    - step: 36
+      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="notes-workspace-document"][data-active="true"]'',
+        ''name'': ''data-dirty'', ''equals'': ''true''}}'
+    - step: 37
+      expectation: '{''assert_no_runtime_errors'': None}'
+    - step: 40
+      expectation: '{''assert_visible'': ''[data-testid="notes-workspace-document"][data-active="true"]''}'
+    - step: 41
+      expectation: '{''assert_text_equals'': {''selector'': ''[data-testid="notes-workspace-document"][data-active="true"]
+        [data-testid="notes-workspace-editor"] .cm-content'', ''equals'': ''# Recovered draft''}}'
+    - step: 42
+      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="notes-workspace-document"][data-active="true"]'',
+        ''name'': ''data-dirty'', ''equals'': ''true''}}'
+    - step: 44
+      expectation: '{''assert_not_visible'': ''[data-testid="notes-workspace-document"][data-active="true"][data-dirty="true"]''}'
+    - step: 46
+      expectation: '{''assert_text_equals'': {''selector'': ''[data-testid="notes-workspace-document"][data-active="true"]
+        h1'', ''equals'': ''Recovered draft''}}'
+    results:
+    - 31
+    - 33
+    - 35
+    - 36
+    - 37
+    - 40
+    - 41
+    - 42
+    - 44
+    - 46
+  - id: R3
+    requirement: The default Notes space supports search, refresh, creation, multiple stable tabs and return/browse
+      navigation.
+    actions:
+    - 47
+    - 50
+    - 53
+    - 54
+    - 55
+    - 57
+    - 58
+    - 59
+    - 61
+    - 63
+    - 64
+    - 66
+    - 67
+    - 69
+    - 70
+    - 71
+    checkpoints:
+    - step: 48
+      expectation: '{''wait_for'': {''selector'': ''[data-testid="notes-workspace-results"][data-count="0"][aria-busy="false"]'',
+        ''timeout_sec'': 10}}'
+    - step: 49
+      expectation: '{''assert_count'': {''selector'': ''[data-testid="notes-workspace-note"]'', ''equal'': 0}}'
+    - step: 51
+      expectation: '{''wait_for'': {''selector'': ''[data-testid="notes-workspace-results"][data-count="1"][aria-busy="false"]'',
+        ''timeout_sec'': 10}}'
+    - step: 52
+      expectation: '{''assert_count'': {''selector'': ''[data-testid="notes-workspace-note"]'', ''equal'': 1}}'
+    - step: 56
+      expectation: '{''eval_readonly'': {''expression'': ''document.getElementsByClassName("taomni-workspace-tab").length
+        === 2 && document.getElementsByClassName("taomni-workspace-tab")[1].dataset.tabKind === "note"'', ''expect_truthy'':
+        True, ''timeout_sec'': 10}}'
+    - step: 60
+      expectation: '{''assert_text_equals'': {''selector'': ''[data-testid="notes-workspace-document"][data-active="true"][data-mode="preview"]
+        h1'', ''equals'': ''Recovered draft''}}'
+    - step: 62
+      expectation: '{''eval_readonly'': {''expression'': ''document.querySelector(".notes-link-field-shell textarea")?.value
+        === "# Recovered draft"'', ''expect_truthy'': True, ''timeout_sec'': 10}}'
+    - step: 65
+      expectation: '{''assert_visible'': ''[data-testid="notes-workspace-sidebar"]''}'
+    - step: 68
+      expectation: '{''eval_readonly'': {''expression'': ''document.getElementsByClassName("taomni-workspace-tab").length
+        === 3 && document.getElementsByClassName("taomni-workspace-tab")[2].dataset.tabKind === "note"'', ''expect_truthy'':
+        True, ''timeout_sec'': 10}}'
+    - step: 72
+      expectation: '{''assert_text_equals'': {''selector'': ''[data-testid="notes-workspace-document"][data-active="true"]
+        h1'', ''equals'': ''Recovered draft''}}'
+    - step: 73
+      expectation: '{''assert_no_runtime_errors'': None}'
+    results:
+    - 48
+    - 49
+    - 51
+    - 52
+    - 56
+    - 60
+    - 62
+    - 65
+    - 68
+    - 72
+    - 73
+  visual:
+  - check: Inspect Notes space layout and Markdown edit/split/preview at normal desktop size.
+    method: manual
+    reason: Screenshots are retained for review; semantic assertions alone do not certify visual layout.
+  native:
+  - check: Save/reopen through the real content-only IPC and SQLite, and recover the window-owned draft after WebView
+      reload.
+    method: automated
+    reason: Browser localStorage stubs cannot establish native persistence or packaged WebView behavior.
+  - check: Physical Cmd/Ctrl+S and IME delivery on each OS.
+    method: manual
+    reason: The runner press action establishes app-local routing, not OS shortcut delivery.

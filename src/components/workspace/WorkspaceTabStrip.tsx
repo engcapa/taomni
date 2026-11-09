@@ -14,10 +14,13 @@ import {
 import { maxScrollLeft } from "../tabbar/tabs/scroll";
 import { IconBtn } from "../tabbar/tabs/TabItem";
 import { useWorkspaceTabScroll } from "./useWorkspaceTabScroll";
+import { NOTES_WORKSPACE_ID } from "../../stores/workspaceNotes";
+import { createAndOpenWorkspaceNote } from "../../lib/notes/notesWorkspaceNavigation";
 import { EMPTY_WORKSPACE_TAB_FILTER, filterWorkspaceTabs, hasWorkspaceTabFilter } from "../../lib/workspaceTabFilter";
 
 const KIND_LABEL: Record<WorkspaceTabKind, string> = {
   file: "FILE",
+  note: "NOTE",
   git: "GIT",
   code: "CODE",
   terminal: "TERM",
@@ -30,6 +33,7 @@ const KIND_LABEL: Record<WorkspaceTabKind, string> = {
 
 const KIND_COLOR: Record<WorkspaceTabKind, string> = {
   file: "var(--taomni-text-muted)",
+  note: "var(--taomni-accent)",
   git: "var(--taomni-accent)",
   code: "var(--taomni-purple, #8b5cf6)",
   terminal: "var(--taomni-success, #10b981)",
@@ -82,7 +86,10 @@ export function WorkspaceTabStrip() {
 
   if (!workspace) return null;
 
-  const menuItems: MenuItem[] = [
+  const menuItems: MenuItem[] = workspace.id === NOTES_WORKSPACE_ID ? [{
+    label: t("notes.newNote"), testId: "workspace-plus-new-note", icon: <FilePlus2 className="h-3 w-3" />,
+    onClick: () => { void createAndOpenWorkspaceNote(); },
+  }] : [
     {
       label: t("platform.newFile"),
       testId: "workspace-plus-new-file",

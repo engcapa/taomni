@@ -5,16 +5,18 @@ import { renderLinkedNoteText } from "./NoteLinkText";
 
 interface NotesListProps {
   notes: NoteItem[];
+  prefix?: string;
+  markdownTitles?: boolean;
   activeNoteId: string | null;
   onSelect: (id: string) => void;
   onToggleComplete: (id: string, completed: boolean) => void;
 }
 
 /** A compact, scrollable list of note cards. */
-export function NotesList({ notes, activeNoteId, onSelect, onToggleComplete }: NotesListProps) {
+export function NotesList({ notes, activeNoteId, onSelect, onToggleComplete, prefix = "notes", markdownTitles = false }: NotesListProps) {
   const t = useT();
   return (
-    <ul className="flex flex-col" data-testid="notes-list">
+    <ul className="flex flex-col" data-testid={`${prefix}-list`}>
       {notes.map((note) => {
         const done = note.completed_at !== null;
         const stepTotal = note.steps.length;
@@ -24,7 +26,7 @@ export function NotesList({ notes, activeNoteId, onSelect, onToggleComplete }: N
             <div
               role="button"
               tabIndex={0}
-              data-testid="notes-list-item"
+              data-testid={markdownTitles ? "notes-workspace-note" : `${prefix}-list-item`}
               data-note-id={note.id}
               aria-current={activeNoteId === note.id || undefined}
               className={`group flex items-stretch gap-2 px-2 py-1.5 border-b border-[var(--taomni-divider)] cursor-pointer hover:bg-[var(--taomni-hover)] ${
@@ -32,7 +34,7 @@ export function NotesList({ notes, activeNoteId, onSelect, onToggleComplete }: N
               }`}
               onClick={() => onSelect(note.id)}
               onKeyDown={(e) => {
-                if (e.key === "Enter" || e.key === " ") {
+                if (e.target === e.currentTarget && (e.key === "Enter" || e.key === " ")) {
                   e.preventDefault();
                   onSelect(note.id);
                 }
@@ -41,7 +43,7 @@ export function NotesList({ notes, activeNoteId, onSelect, onToggleComplete }: N
               <div
                 className="w-1 shrink-0 self-stretch rounded-full"
                 style={{ background: note.color ?? "transparent" }}
-                data-testid="notes-list-color"
+                data-testid={`${prefix}-list-color`}
               />
               <button
                 type="button"
@@ -53,7 +55,7 @@ export function NotesList({ notes, activeNoteId, onSelect, onToggleComplete }: N
                 title={done ? t("notes.reopen") : t("notes.complete")}
                 aria-label={done ? t("notes.reopen") : t("notes.complete")}
                 aria-pressed={done}
-                data-testid="notes-toggle-complete"
+                data-testid={`${prefix}-toggle-complete`}
               >
                 {done ? (
                   <CheckCircle2 className="w-4 h-4 text-green-400" />
@@ -69,7 +71,7 @@ export function NotesList({ notes, activeNoteId, onSelect, onToggleComplete }: N
                       done ? "line-through text-[var(--taomni-text-muted)]" : ""
                     }`}
                   >
-                    {renderLinkedNoteText(note.title.trim() || t("notes.untitled"))}
+                    {renderLinkedNoteText(note.title.trim() || t("notes.untitled"))}{markdownTitles ? ".md" : ""}
                   </span>
                 </div>
                 {note.body.trim() && (
@@ -77,6 +79,13 @@ export function NotesList({ notes, activeNoteId, onSelect, onToggleComplete }: N
                     {renderLinkedNoteText(note.body.trim())}
                   </div>
                 )}
+                <div className="flex flex-wrap items-center gap-x-2 text-[10px] text-[var(--taomni-text-muted)]">
+                  {note.priority > 0 && <span data-testid={`${prefix}-list-priority`}>{t(`notes.priority_${note.priority}`)}</span>}
+                  {note.due_at !== null && Number.isFinite(new Date(note.due_at * 1000).getTime()) && <time data-testid={`${prefix}-list-due`} dateTime={new Date(note.due_at * 1000).toISOString()}>
+                    {t("notes.dueAt")}: {new Date(note.due_at * 1000).toLocaleString()}</time>}
+                  {note.archived_at !== null && <span>{t("notes.archived")}</span>}
+                  {note.tags.map((tag) => <span key={tag.id}>#{tag.name}</span>)}
+                </div>
                 {stepTotal > 0 && (
                   <div className="text-[10px] text-[var(--taomni-text-muted)]">
                     {t("notes.stepProgress", { done: stepDone, total: stepTotal })}

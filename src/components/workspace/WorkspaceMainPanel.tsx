@@ -17,6 +17,8 @@ import { WorkspaceGitPanel } from "./WorkspaceGitPanel";
 import { WorkspaceSessionPane } from "./WorkspaceSessionPane";
 import { WorkspaceSessionPickerModal } from "./WorkspaceSessionPickerModal";
 import { revealWorkspaceFolder } from "./workspaceFolderReveal";
+import { NOTES_WORKSPACE_ID } from "../../stores/workspaceNotes";
+import { NotesWorkspace } from "../notes/NotesWorkspace";
 
 const DOCK_TOOLS: WorkspaceBottomTool[] = [
   "terminal",
@@ -76,6 +78,7 @@ function WorkspaceCanvasContents({ workspaceId, visible, onCommandsChange, onEdi
   const canvasLayout = useWorkspaceUiStore((s) => s.canvasLayouts[workspaceId] ?? "single");
 
   if (!workspace) return null;
+  if (workspace.id === NOTES_WORKSPACE_ID) return <NotesWorkspace workspace={workspace} visible={visible} onCommandsChange={onCommandsChange} />;
 
   const activeTab = workspace.openTabs.find((tab) => tab.id === workspace.activeTabId);
   const codeTab = workspace.openTabs.find((tab) => tab.kind === "code");

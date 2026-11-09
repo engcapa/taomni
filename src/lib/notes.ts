@@ -1,4 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
+import { publishNotesChange } from "./notes/notesChanges";
 
 // Wire types mirror the Rust `notes::db` models (snake_case), matching how the
 // chat module surfaces its DB rows. All timestamps are Unix **seconds**.
@@ -98,6 +99,17 @@ export interface UpdateNoteInput {
   tag_ids?: string[];
 }
 
+/** Omitted task fields are retained; explicit null clears a nullable field. */
+export interface NoteMetadataPatch {
+  pinned?: boolean;
+  priority?: number;
+  color?: string | null;
+  due_at?: number | null;
+  reminder_at?: number | null;
+  completed_at?: number | null;
+  tag_ids?: string[];
+}
+
 export interface StepInput {
   id?: string;
   title: string;
@@ -156,23 +168,51 @@ export async function getNote(id: string): Promise<NoteItem | null> {
 }
 
 export async function createNote(input: CreateNoteInput = {}): Promise<NoteItem> {
-  return invoke<NoteItem>("notes_create", { input });
+  const note = await invoke<NoteItem>("notes_create", { input });
+  publishNotesChange(note.id);
+  return note;
 }
 
 export async function updateNote(id: string, patch: UpdateNoteInput): Promise<NoteItem | null> {
-  return invoke<NoteItem | null>("notes_update", { id, patch });
+  const note = await invoke<NoteItem | null>("notes_update", { id, patch });
+  publishNotesChange(id);
+  return note;
+}
+
+export async function updateNoteMetadata(id: string, patch: NoteMetadataPatch): Promise<NoteItem | null> {
+  const note = await invoke<NoteItem | null>("notes_update_metadata", { id, patch });
+  publishNotesChange(id);
+  return note;
+}
+
+/** Save content without replacing task metadata; stale text never overwrites a newer edit. */
+export async function saveNoteContent(
+  id: string,
+  content: { title: string; body: string },
+  expected: { title: string; body: string },
+): Promise<NoteItem> {
+  const note = await invoke<NoteItem>("notes_save_content", {
+    id, ...content, expectedTitle: expected.title, expectedBody: expected.body,
+  });
+  publishNotesChange(id);
+  return note;
 }
 
 export async function deleteNote(id: string): Promise<void> {
   await invoke("notes_delete", { id });
+  publishNotesChange(id);
 }
 
 export async function toggleNoteComplete(id: string, completed: boolean): Promise<NoteItem | null> {
-  return invoke<NoteItem | null>("notes_toggle_complete", { id, completed });
+  const note = await invoke<NoteItem | null>("notes_toggle_complete", { id, completed });
+  publishNotesChange(id);
+  return note;
 }
 
 export async function archiveNote(id: string, archived: boolean): Promise<NoteItem | null> {
-  return invoke<NoteItem | null>("notes_archive", { id, archived });
+  const note = await invoke<NoteItem | null>("notes_archive", { id, archived });
+  publishNotesChange(id);
+  return note;
 }
 
 export async function listTags(): Promise<NoteTag[]> {
@@ -184,7 +224,9 @@ export async function upsertTags(tags: TagInput[]): Promise<NoteTag[]> {
 }
 
 export async function setSteps(noteId: string, steps: StepInput[]): Promise<NoteStep[]> {
-  return invoke<NoteStep[]>("notes_set_steps", { noteId, steps });
+  const result = await invoke<NoteStep[]>("notes_set_steps", { noteId, steps });
+  publishNotesChange(noteId);
+  return result;
 }
 
 export async function getPrefs(): Promise<Record<string, string>> {

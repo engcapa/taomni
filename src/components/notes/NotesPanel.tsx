@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Monitor, PanelRightClose, Plus, Search, Settings } from "lucide-react";
+import { FolderOpen, Monitor, PanelRightClose, Plus, Search, Settings } from "lucide-react";
 import { useNotesStore } from "../../stores/notesStore";
 import { useT } from "../../lib/i18n";
 import { NotesList } from "./NotesList";
@@ -8,6 +8,9 @@ import { NoteEditor } from "./NoteEditor";
 import { NoteThemeSettings } from "./NoteThemeSettings";
 import { notesFontSizeStyle, notesFontStyle, notesThemeDensity, notesThemeStyle } from "../../lib/notes/notesTheme";
 import { emitNotesDockSignal } from "../../lib/notes/notesWindowSync";
+import { useNotesContentSync } from "./useNotesContentSync";
+import { openNotesWorkspace } from "../../lib/notes/notesWorkspaceNavigation";
+import { useAppStore } from "../../stores/appStore";
 
 interface NotesPanelProps {
   showPanelModeToggle?: boolean;
@@ -19,6 +22,7 @@ interface NotesPanelProps {
  * editor replacing the list when a note is selected (§4.2).
  */
 export function NotesPanel({ showPanelModeToggle = true }: NotesPanelProps = {}) {
+  useNotesContentSync();
   const t = useT();
   const notes = useNotesStore((s) => s.notes);
   const loading = useNotesStore((s) => s.loading);
@@ -111,6 +115,9 @@ export function NotesPanel({ showPanelModeToggle = true }: NotesPanelProps = {})
               <Plus className="w-3.5 h-3.5" />
             </button>
             <NoteStatusFilter filters={statusFilters} onToggleFilter={toggleStatusFilter} />
+            <button type="button" className="taomni-btn h-6 w-6 shrink-0 p-0 inline-flex items-center justify-center"
+              data-testid="notes-open-workspace" title={t("notes.openWorkspace")} aria-label={t("notes.openWorkspace")}
+              onClick={() => { void openNotesWorkspace().catch((error) => useAppStore.getState().setStatusMessage(String(error))); }}><FolderOpen className="h-3.5 w-3.5" /></button>
             <div className="relative flex-1 min-w-0">
               <Search className="w-3 h-3 absolute left-1.5 top-1/2 -translate-y-1/2 text-[var(--taomni-text-muted)]" />
               <input

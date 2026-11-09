@@ -218,7 +218,7 @@ describe("workspacePlatformStore (TASK-01)", () => {
   it("repairs corrupt storage with a fresh default workspace", () => {
     window.localStorage.setItem(PLATFORM_WORKSPACES_STORAGE_KEY, "{not-json");
     const reread = readPersistedPlatformState();
-    expect(reread.workspaces).toHaveLength(1);
+    expect(reread.workspaces.map((workspace) => workspace.id)).toEqual([DEFAULT_WORKSPACE_ID, "notes-workspace"]);
     expect(reread.workspaces[0].id).toBe(DEFAULT_WORKSPACE_ID);
     expect(reread.activeWorkspaceId).toBe(DEFAULT_WORKSPACE_ID);
   });

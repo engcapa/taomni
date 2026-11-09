@@ -2,6 +2,7 @@
 // other locales — adding a key here surfaces type errors elsewhere via the
 // shared `Dict` type.
 import { modelInspectorEn } from "./modelInspector";
+import { notesWorkspaceEn } from "./notesWorkspace";
 import { feishuSettingsEn, mobileSettingsEn } from "./mobileSettings";
 type Dict = {
   [key: string]: string | Dict;
@@ -2577,6 +2578,7 @@ const dict = {
     alertReminder: "Reminder",
   },
   notes: {
+    ...notesWorkspaceEn,
     title: "Notes",
     newNote: "New note",
     newNoteAria: "Create a new note",

@@ -1,0 +1,419 @@
+id: TC-NOTES-012
+title: Notes Workspace and Tao Notes share task properties without saving dirty text
+description: Uses both Notes entry points and the shared task UI. Native additionally verifies real SQLite metadata
+  IPC and persistence after WebView reload.
+covers:
+- F-TAO-1
+- F-WS-1
+tags:
+- notes
+- regression
+- p1
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-notes-parity
+- click: '[data-testid="rail-chat-button"]'
+- click: '[data-testid="tao-hub-tab-notes"]'
+- click: '[data-testid="notes-open-workspace"]'
+- click: '[data-testid="notes-workspace-new"]'
+- fill:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-title"]'
+    value: Task parity
+- click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-save"]'
+- click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-properties"]
+    > summary'
+- press:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"]
+      .cm-content'
+    key: Mod+A
+- type:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"]
+      .cm-content'
+    text: '# Unsaved task draft'
+- click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-pin"]'
+- wait_for:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-pin"][aria-pressed="true"]'
+    timeout_sec: 10
+- click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-priority"]'
+- click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-priority-menu"]
+    [role="option"]:nth-child(4)'
+- assert_text:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-priority"]'
+    contains: High
+- fill:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-due"]'
+    value: 2035-06-15 16:30
+- press:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-due"]'
+    key: Escape
+- blur: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-due"]'
+- fill:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-reminder"]'
+    value: 2035-06-14 09:00
+- press:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-reminder"]'
+    key: Escape
+- blur: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-reminder"]'
+- click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-color-#10b981"]'
+- wait_for:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-color-#10b981"][aria-pressed="true"]'
+    timeout_sec: 10
+- fill:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-new-step"]'
+    value: Check native persistence
+- press:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-new-step"]'
+    key: Enter
+- wait_for:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-step"]'
+    timeout_sec: 10
+- assert_count:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-step"]'
+    equal: 1
+- fill:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-step"]
+      input'
+    value: Verify shared task fields
+- blur: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-step"] input'
+- assert_attribute:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-step"]
+      input'
+    name: value
+    equals: Verify shared task fields
+- click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-step-complete"]'
+- wait_for:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-step-complete"][aria-pressed="true"]'
+    timeout_sec: 10
+- fill:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-new-tag"]'
+    value: parity-tag
+- press:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-new-tag"]'
+    key: Enter
+- assert_text:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-tag"]'
+    contains: parity-tag
+- assert_attribute:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"]'
+    name: data-dirty
+    equals: 'true'
+- assert_text_equals:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"]
+      .cm-content'
+    equals: '# Unsaved task draft'
+- click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-save"]'
+- assert_not_visible: '[data-testid="notes-workspace-document"][data-active="true"][data-dirty="true"]'
+- click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-tao"]'
+- wait_for:
+    selector: '[data-testid="note-editor-pin"][aria-pressed="true"]'
+    timeout_sec: 10
+- assert_text:
+    selector: '[data-testid="note-editor-priority"]'
+    contains: High
+- assert_text:
+    selector: '[data-testid="note-editor-tag"]'
+    contains: parity-tag
+- wait_for:
+    selector: '[data-testid="note-editor-step"]'
+    timeout_sec: 10
+- assert_count:
+    selector: '[data-testid="note-editor-step"]'
+    equal: 1
+- eval_readonly:
+    expression: document.querySelector(".notes-link-field-shell textarea")?.value === "# Unsaved task draft"
+    expect_truthy: true
+    timeout_sec: 10
+- click: '[data-testid="note-editor-priority"]'
+- click: '[data-testid="note-editor-priority-menu"] [role="option"]:nth-child(3)'
+- assert_text:
+    selector: '[data-testid="note-editor-priority"]'
+    contains: Medium
+- fill:
+    selector: '[data-testid="note-editor-reminder"]'
+    value: 2035-06-13 08:15
+- press:
+    selector: '[data-testid="note-editor-reminder"]'
+    key: Escape
+- blur: '[data-testid="note-editor-reminder"]'
+- click: '[data-testid="note-editor-pin"]'
+- wait_for:
+    selector: '[data-testid="note-editor-pin"][aria-pressed="false"]'
+    timeout_sec: 10
+- click: '[data-testid="note-editor-preview"]'
+- wait_for:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-pin"][aria-pressed="false"]'
+    timeout_sec: 10
+- assert_attribute:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-reminder"]'
+    name: value
+    equals: 2035-06-13 08:15
+- fill:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-completed-at"]'
+    value: 2026-10-01 12:20
+- press:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-completed-at"]'
+    key: Escape
+- blur: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-completed-at"]'
+- wait_for:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-complete"][aria-pressed="true"]'
+    timeout_sec: 10
+- click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-completed-at-clear"]'
+- wait_for:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-complete"][aria-pressed="false"]'
+    timeout_sec: 10
+- reload_window: null
+- click: '[data-testid="nav-mode-workspaces"]'
+- click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-properties"]
+    > summary'
+- wait_for:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-pin"][aria-pressed="false"]'
+    timeout_sec: 10
+- assert_text:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-priority"]'
+    contains: Medium
+- assert_text:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-tag"]'
+    contains: parity-tag
+- wait_for:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-step-complete"][aria-pressed="true"]'
+    timeout_sec: 10
+- assert_attribute:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-step"]
+      input'
+    name: value
+    equals: Verify shared task fields
+- assert_attribute:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-due"]'
+    name: value
+    equals: 2035-06-15 16:30
+- assert_attribute:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-reminder"]'
+    name: value
+    equals: 2035-06-13 08:15
+- click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-mode-edit"]'
+- assert_text_equals:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"]
+      .cm-content'
+    equals: '# Unsaved task draft'
+- click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-step-delete"]'
+- wait_for:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-step"]'
+    state: detached
+    timeout_sec: 10
+- assert_count:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-step"]'
+    equal: 0
+- click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-tag"] button'
+- wait_for:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-tag"]'
+    state: detached
+    timeout_sec: 10
+- assert_count:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-tag"]'
+    equal: 0
+- click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-due-clear"]'
+- assert_not_visible: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-due-clear"]'
+- click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-reminder-clear"]'
+- assert_not_visible: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-reminder-clear"]'
+- click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-color-clear"]'
+- assert_no_runtime_errors: null
+- screenshot: notes-012-task-parity.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Priority, pin, dates, color, checklist and tags save independently while the CodeMirror draft remains
+      dirty and intact.
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 14
+    - 15
+    - 17
+    - 18
+    - 19
+    - 20
+    - 21
+    - 22
+    - 23
+    - 25
+    - 26
+    - 29
+    - 30
+    - 32
+    - 34
+    - 35
+    checkpoints:
+    - step: 13
+      expectation: The declared UI result is observed.
+    - step: 16
+      expectation: The declared UI result is observed.
+    - step: 24
+      expectation: The declared UI result is observed.
+    - step: 27
+      expectation: The declared UI result is observed.
+    - step: 28
+      expectation: The declared UI result is observed.
+    - step: 31
+      expectation: The declared UI result is observed.
+    - step: 33
+      expectation: The declared UI result is observed.
+    - step: 36
+      expectation: The declared UI result is observed.
+    - step: 37
+      expectation: The declared UI result is observed.
+    - step: 38
+      expectation: The declared UI result is observed.
+    results:
+    - 13
+    - 16
+    - 24
+    - 27
+    - 28
+    - 31
+    - 33
+    - 36
+    - 37
+    - 38
+  - id: R2
+    requirement: Compact Tao Notes shows the same saved properties/body; reverse changes appear in Workspace. Actual
+      completion time completes the task and clearing it reopens it.
+    actions:
+    - 39
+    - 41
+    - 48
+    - 49
+    - 51
+    - 52
+    - 53
+    - 54
+    - 56
+    - 59
+    - 60
+    - 61
+    - 63
+    checkpoints:
+    - step: 40
+      expectation: The declared UI result is observed.
+    - step: 42
+      expectation: The declared UI result is observed.
+    - step: 43
+      expectation: The declared UI result is observed.
+    - step: 44
+      expectation: The declared UI result is observed.
+    - step: 45
+      expectation: The declared UI result is observed.
+    - step: 46
+      expectation: The declared UI result is observed.
+    - step: 47
+      expectation: The declared UI result is observed.
+    - step: 50
+      expectation: The declared UI result is observed.
+    - step: 55
+      expectation: The declared UI result is observed.
+    - step: 57
+      expectation: The declared UI result is observed.
+    - step: 58
+      expectation: The declared UI result is observed.
+    - step: 62
+      expectation: The declared UI result is observed.
+    - step: 64
+      expectation: The declared UI result is observed.
+    results:
+    - 40
+    - 42
+    - 43
+    - 44
+    - 45
+    - 46
+    - 47
+    - 50
+    - 55
+    - 57
+    - 58
+    - 62
+    - 64
+  - id: R3
+    requirement: Priority, schedule, steps and tags survive a WebView reload through the real persistence boundary;
+      fields, steps and tags can also be removed.
+    actions:
+    - 65
+    - 66
+    - 67
+    - 75
+    - 77
+    - 80
+    - 83
+    - 85
+    - 87
+    checkpoints:
+    - step: 68
+      expectation: The declared UI result is observed.
+    - step: 69
+      expectation: The declared UI result is observed.
+    - step: 70
+      expectation: The declared UI result is observed.
+    - step: 71
+      expectation: The declared UI result is observed.
+    - step: 72
+      expectation: The declared UI result is observed.
+    - step: 73
+      expectation: The declared UI result is observed.
+    - step: 74
+      expectation: The declared UI result is observed.
+    - step: 76
+      expectation: The declared UI result is observed.
+    - step: 78
+      expectation: The declared UI result is observed.
+    - step: 79
+      expectation: The declared UI result is observed.
+    - step: 81
+      expectation: The declared UI result is observed.
+    - step: 82
+      expectation: The declared UI result is observed.
+    - step: 84
+      expectation: The declared UI result is observed.
+    - step: 86
+      expectation: The declared UI result is observed.
+    - step: 88
+      expectation: The declared UI result is observed.
+    results:
+    - 68
+    - 69
+    - 70
+    - 71
+    - 72
+    - 73
+    - 74
+    - 76
+    - 78
+    - 79
+    - 81
+    - 82
+    - 84
+    - 86
+    - 88
+  visual:
+  - check: Inspect retained screenshots for clipping, readable task fields and editor space.
+    method: manual
+    reason: DOM assertions alone do not certify visual layout.
+  native:
+  - check: Task patch, tags, steps and status changes persist through real notes.db and IPC after reload.
+    method: automated
+    reason: Browser localStorage stubs cannot establish native persistence.
