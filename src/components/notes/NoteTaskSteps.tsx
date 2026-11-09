@@ -19,7 +19,7 @@ function TaskStep({ step, prefix }: { step: NoteStep; prefix: string }) {
       .then((saved) => { if (saved && revision.current === submittedRevision) setDirty(false); });
   };
   return <div className="flex items-center gap-1.5" data-testid={`${prefix}-step`} data-step-id={step.id}>
-    <button type="button" className="shrink-0 text-[var(--taomni-text-muted)] hover:text-[var(--taomni-accent)]"
+    <button type="button" className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-[var(--taomni-text-muted)] hover:text-[var(--taomni-accent)]"
       data-testid={`${prefix}-step-complete`} aria-pressed={done}
       title={t(done ? "notes.reopen" : "notes.complete")} aria-label={t(done ? "notes.reopen" : "notes.complete")}
       onClick={() => { void change(step.note_id, (steps) => steps.map((item) => item.id === step.id
@@ -29,7 +29,7 @@ function TaskStep({ step, prefix }: { step: NoteStep; prefix: string }) {
     <input type="text" className={`taomni-input h-6 min-w-0 flex-1 text-[11px] ${done ? "line-through text-[var(--taomni-text-muted)]" : ""}`}
       aria-label={t("notes.steps")} value={title} onChange={(event) => { revision.current += 1; setTitle(event.target.value); setDirty(true); }} onBlur={commit}
       onKeyDown={(event) => { if (event.key === "Enter" && !event.nativeEvent.isComposing) { event.preventDefault(); commit(); } }} />
-    <button type="button" className="shrink-0 text-[var(--taomni-text-muted)] hover:text-red-400"
+    <button type="button" className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded text-[var(--taomni-text-muted)] hover:text-red-400"
       data-testid={`${prefix}-step-delete`} title={t("notes.delete")} aria-label={t("notes.delete")}
       onClick={() => { void change(step.note_id, (steps) => steps.filter((item) => item.id !== step.id)); }}><X className="h-3 w-3" /></button>
   </div>;

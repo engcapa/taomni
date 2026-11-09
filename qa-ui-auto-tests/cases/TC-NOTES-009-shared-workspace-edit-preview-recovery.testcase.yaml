@@ -121,12 +121,18 @@ steps:
 - fill:
     selector: '[data-testid="notes-workspace-search"]'
     value: not-a-matching-note
+- wait_for:
+    selector: '[data-testid="notes-workspace-results"][data-count="0"][aria-busy="false"]'
+    timeout_sec: 10
 - assert_count:
     selector: '[data-testid="notes-workspace-note"]'
     equal: 0
 - fill:
     selector: '[data-testid="notes-workspace-search"]'
     value: Renamed
+- wait_for:
+    selector: '[data-testid="notes-workspace-results"][data-count="1"][aria-busy="false"]'
+    timeout_sec: 10
 - assert_count:
     selector: '[data-testid="notes-workspace-note"]'
     equal: 1
@@ -289,57 +295,65 @@ verification:
       navigation.
     actions:
     - 47
-    - 49
-    - 51
-    - 52
+    - 50
     - 53
+    - 54
     - 55
-    - 56
     - 57
+    - 58
     - 59
     - 61
-    - 62
+    - 63
     - 64
-    - 65
+    - 66
     - 67
-    - 68
     - 69
+    - 70
+    - 71
     checkpoints:
     - step: 48
+      expectation: '{''wait_for'': {''selector'': ''[data-testid="notes-workspace-results"][data-count="0"][aria-busy="false"]'',
+        ''timeout_sec'': 10}}'
+    - step: 49
       expectation: '{''assert_count'': {''selector'': ''[data-testid="notes-workspace-note"]'', ''equal'': 0}}'
-    - step: 50
+    - step: 51
+      expectation: '{''wait_for'': {''selector'': ''[data-testid="notes-workspace-results"][data-count="1"][aria-busy="false"]'',
+        ''timeout_sec'': 10}}'
+    - step: 52
       expectation: '{''assert_count'': {''selector'': ''[data-testid="notes-workspace-note"]'', ''equal'': 1}}'
-    - step: 54
+    - step: 56
       expectation: '{''eval_readonly'': {''expression'': ''document.getElementsByClassName("taomni-workspace-tab").length
         === 2 && document.getElementsByClassName("taomni-workspace-tab")[1].dataset.tabKind === "note"'', ''expect_truthy'':
         True, ''timeout_sec'': 10}}'
-    - step: 58
-      expectation: '{''assert_text_equals'': {''selector'': ''[data-testid="notes-workspace-document"][data-active="true"]:visible
-        h1'', ''equals'': ''Recovered draft''}}'
     - step: 60
+      expectation: '{''assert_text_equals'': {''selector'': ''[data-testid="notes-workspace-document"][data-active="true"][data-mode="preview"]
+        h1'', ''equals'': ''Recovered draft''}}'
+    - step: 62
       expectation: '{''eval_readonly'': {''expression'': ''document.querySelector(".notes-link-field-shell textarea")?.value
         === "# Recovered draft"'', ''expect_truthy'': True, ''timeout_sec'': 10}}'
-    - step: 63
+    - step: 65
       expectation: '{''assert_visible'': ''[data-testid="notes-workspace-sidebar"]''}'
-    - step: 66
+    - step: 68
       expectation: '{''eval_readonly'': {''expression'': ''document.getElementsByClassName("taomni-workspace-tab").length
         === 3 && document.getElementsByClassName("taomni-workspace-tab")[2].dataset.tabKind === "note"'', ''expect_truthy'':
         True, ''timeout_sec'': 10}}'
-    - step: 70
+    - step: 72
       expectation: '{''assert_text_equals'': {''selector'': ''[data-testid="notes-workspace-document"][data-active="true"]
         h1'', ''equals'': ''Recovered draft''}}'
-    - step: 71
+    - step: 73
       expectation: '{''assert_no_runtime_errors'': None}'
     results:
     - 48
-    - 50
-    - 54
-    - 58
+    - 49
+    - 51
+    - 52
+    - 56
     - 60
-    - 63
-    - 66
-    - 70
-    - 71
+    - 62
+    - 65
+    - 68
+    - 72
+    - 73
   visual:
   - check: Inspect Notes space layout and Markdown edit/split/preview at normal desktop size.
     method: manual
