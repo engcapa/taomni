@@ -78,6 +78,10 @@ steps:
     selector: '[data-testid="mobile-agent-input"]'
     value: QA_AGENT_PROMPT_CHANNEL
 - wait_for: '[data-testid="mobile-agent-send"]:not([disabled])'
+- eval_readonly:
+    expression: document.querySelector('textarea').value === 'QA_AGENT_PROMPT_CHANNEL' && !document.querySelector('button.primary').disabled && !document.querySelector('[data-testid' + String.fromCharCode(61) + '"mobile-task-updated"]').textContent.includes('正在更新')
+    expect_truthy: true
+    timeout_sec: 10
 - click: '[data-testid="mobile-agent-send"]'
 - assert_text:
     selector: '[data-testid="mobile-task-status"]'
@@ -303,28 +307,28 @@ verification:
     - 35
     - 36
     - 37
-    - 39
-    - 43
-    - 45
-    - 47
-    - 51
+    - 40
+    - 44
+    - 46
+    - 48
     - 52
     - 53
     - 54
     - 55
     - 56
-    - 58
-    - 60
-    - 62
-    - 65
+    - 57
+    - 59
+    - 61
+    - 63
     - 66
-    - 68
+    - 67
     - 69
     - 70
     - 71
     - 72
     - 73
     - 74
+    - 75
     checkpoints:
     - step: 10
       expectation: '[data-testid="mobile-session"] has 1 entry and Agent list entries are hidden.'
@@ -344,37 +348,37 @@ verification:
       expectation: '[data-testid="mobile-terminal-status"] shows 只读.'
     - step: 32
       expectation: '[data-testid="mobile-resize"] is disabled.'
-    - step: 40
-      expectation: '[data-testid="mobile-task-status"] shows 运行中.'
     - step: 41
-      expectation: Independent receipt contains AGENT QA_AGENT_PROMPT_CHANNEL.
+      expectation: '[data-testid="mobile-task-status"] shows 运行中.'
     - step: 42
+      expectation: Independent receipt contains AGENT QA_AGENT_PROMPT_CHANNEL.
+    - step: 43
       expectation: '[data-testid="mobile-agent-send"] is disabled.'
-    - step: 44
+    - step: 45
       expectation: '[data-testid="mobile-task-status"] shows 空闲.'
-    - step: 46
+    - step: 47
       expectation: '[data-testid="mobile-file-content"] shows QA_MOBILE_CHANGED.'
-    - step: 48
-      expectation: '[data-testid="mobile-file-view"] shows @@ -1 +1 @@.'
     - step: 49
+      expectation: '[data-testid="mobile-file-view"] shows @@ -1 +1 @@.'
+    - step: 50
       expectation: Phone document does not overflow horizontally.
-    - step: 59
+    - step: 60
       expectation: '[data-testid="mobile-instance-open"] has 2 entries.'
-    - step: 61
+    - step: 62
       expectation: '[data-testid="mobile-instance-open"] has 2 entries.'
-    - step: 64
+    - step: 65
       expectation: '[data-testid="mobile-session"] has 1 entry and Agent list entries are hidden.'
-    - step: 67
+    - step: 68
       expectation: '[data-testid="mobile-instance-open"] has 1 entries.'
-    - step: 71
+    - step: 72
       expectation: Terminal box is 200px..55% of the phone viewport and has no internal overflow.
-    - step: 73
+    - step: 74
       expectation: Terminal box stays bounded and the key bar remains inside the document after 1.5s (no fit feedback growth).
-    - step: 145
+    - step: 146
       expectation: No runtime errors occurred.
-    - step: 131
+    - step: 132
       expectation: Continue fills the instruction and the task status has settled so Send is enabled before Ctrl+Enter (Cmd+Enter on macOS).
-    - step: 133
+    - step: 134
       expectation: Independent service receipt contains AGENT 继续 after the single shortcut submission.
     results:
     - 10
@@ -386,140 +390,140 @@ verification:
     - 28
     - 30
     - 32
-    - 40
     - 41
     - 42
-    - 44
-    - 46
-    - 48
+    - 43
+    - 45
+    - 47
     - 49
-    - 59
-    - 61
-    - 64
-    - 67
-    - 71
-    - 73
-    - 145
-    - 131
-    - 133
+    - 50
+    - 60
+    - 62
+    - 65
+    - 68
+    - 72
+    - 74
+    - 146
+    - 132
+    - 134
   - id: R2
     requirement: The phone terminal sends left/right arrows, a sticky Ctrl modifier and strip combos as PTY input, sends a typed command line with Enter from a native field, fills the visual viewport in full screen with the key bar inside it, steps the font size, and opens a saved session and a new local terminal through the instance before attaching to them.
     actions:
-    - 75
-    - 77
+    - 76
     - 78
     - 79
     - 80
-    - 84
-    - 86
-    - 87
-    - 90
-    - 93
-    - 97
-    - 99
-    - 102
-    - 103
-    - 107
-    checkpoints:
-    - step: 76
-      expectation: Taking control again shows 控制中.
-    - step: 81
-      expectation: Receipt contains the left arrow sequence ESC [ D.
-    - step: 82
-      expectation: Receipt contains the right arrow sequence ESC [ C.
-    - step: 83
-      expectation: Ctrl armed on the key bar turns the next right arrow into ESC [ 1 ; 5 C.
-    - step: 85
-      expectation: The ^R strip key sends 0x12.
-    - step: 88
-      expectation: The command bar sends the typed line followed by CR.
-    - step: 91
-      expectation: Full screen keeps the card and key bar inside the viewport and the terminal at least 120px tall.
-    - step: 94
-      expectation: A+ raises the terminal font size to 14.
-    - step: 101
-      expectation: Opening a saved session posts an open request for that saved session id.
-    - step: 105
-      expectation: The new local terminal button posts a local open request.
-    - step: 108
-      expectation: Leaving full screen restores page layout without horizontal overflow.
-    results:
-    - 76
     - 81
-    - 82
-    - 83
     - 85
+    - 87
     - 88
     - 91
     - 94
-    - 101
-    - 105
+    - 98
+    - 100
+    - 103
+    - 104
     - 108
+    checkpoints:
+    - step: 77
+      expectation: Taking control again shows 控制中.
+    - step: 82
+      expectation: Receipt contains the left arrow sequence ESC [ D.
+    - step: 83
+      expectation: Receipt contains the right arrow sequence ESC [ C.
+    - step: 84
+      expectation: Ctrl armed on the key bar turns the next right arrow into ESC [ 1 ; 5 C.
+    - step: 86
+      expectation: The ^R strip key sends 0x12.
+    - step: 89
+      expectation: The command bar sends the typed line followed by CR.
+    - step: 92
+      expectation: Full screen keeps the card and key bar inside the viewport and the terminal at least 120px tall.
+    - step: 95
+      expectation: A+ raises the terminal font size to 14.
+    - step: 102
+      expectation: Opening a saved session posts an open request for that saved session id.
+    - step: 106
+      expectation: The new local terminal button posts a local open request.
+    - step: 109
+      expectation: Leaving full screen restores page layout without horizontal overflow.
+    results:
+    - 77
+    - 82
+    - 83
+    - 84
+    - 86
+    - 89
+    - 92
+    - 95
+    - 102
+    - 106
+    - 109
   - id: R3
     requirement: Phone drags scroll terminal history without moving the page and latest restores its position; native command drafts accept symbol, caret and backspace keys locally before explicit send. Compact portrait and landscape keep actions above the bottom.
     actions:
-    - 110
     - 111
     - 112
-    - 114
-    - 115
-    - 117
-    - 120
-    - 121
-    - 123
-    checkpoints:
-    - step: 109
-      expectation: Standard Touch DOM events move rendered xterm history backwards without moving window.scrollY; latest restores the original row.
-    - step: 113
-      expectation: Tapping pipe inserts it at the focused command draft caret rather than sending it to the PTY.
-    - step: 116
-      expectation: On-screen left and backspace edit the draft to |b without losing focus.
-    - step: 118
-      expectation: Only the explicitly sent edited draft reaches the fixture PTY followed by CR.
-    - step: 122
-      expectation: At 844x390 landscape the terminal stays at least 100px tall and all action controls fit without horizontal overflow.
-    - step: 124
-      expectation: At a short 390x400 portrait viewport the terminal and actions remain usable with no horizontal overflow.
-    results:
-    - 109
     - 113
+    - 115
     - 116
     - 118
+    - 121
     - 122
     - 124
+    checkpoints:
+    - step: 110
+      expectation: Standard Touch DOM events move rendered xterm history backwards without moving window.scrollY; latest restores the original row.
+    - step: 114
+      expectation: Tapping pipe inserts it at the focused command draft caret rather than sending it to the PTY.
+    - step: 117
+      expectation: On-screen left and backspace edit the draft to |b without losing focus.
+    - step: 119
+      expectation: Only the explicitly sent edited draft reaches the fixture PTY followed by CR.
+    - step: 123
+      expectation: At 844x390 landscape the terminal stays at least 100px tall and all action controls fit without horizontal overflow.
+    - step: 125
+      expectation: At a short 390x400 portrait viewport the terminal and actions remain usable with no horizontal overflow.
+    results:
+    - 110
+    - 114
+    - 117
+    - 119
+    - 123
+    - 125
   - id: R4
     requirement: Feishu-style deep links open the requested task, quick continue plus Ctrl+Enter sends only to the Agent channel, parent navigation remains usable on a direct link, and first-time pairing preserves the requested task.
     actions:
-    - 127
-    - 129
-    - 132
-    - 134
-    - 135
-    - 137
-    - 139
-    - 141
-    - 142
-    - 143
-    checkpoints:
-    - step: 128
-      expectation: The session deep link immediately opens the Agent composer using the paired instance.
-    - step: 133
-      expectation: The quick continue prompt sent with Ctrl+Enter appears in the independent Agent receipt.
-    - step: 136
-      expectation: Returning from a directly loaded task reaches the session list, not the root or a different instance.
-    - step: 138
-      expectation: The next parent navigation reaches the instance list.
-    - step: 140
-      expectation: The separate localhost origin has no credentials yet and asks for pairing.
-    - step: 144
-      expectation: Pairing from a deep link resumes directly into that Agent task instead of losing its id.
-    results:
     - 128
+    - 130
     - 133
+    - 135
     - 136
     - 138
     - 140
+    - 142
+    - 143
     - 144
+    checkpoints:
+    - step: 129
+      expectation: The session deep link immediately opens the Agent composer using the paired instance.
+    - step: 134
+      expectation: The quick continue prompt sent with Ctrl+Enter appears in the independent Agent receipt.
+    - step: 137
+      expectation: Returning from a directly loaded task reaches the session list, not the root or a different instance.
+    - step: 139
+      expectation: The next parent navigation reaches the instance list.
+    - step: 141
+      expectation: The separate localhost origin has no credentials yet and asks for pairing.
+    - step: 145
+      expectation: Pairing from a deep link resumes directly into that Agent task instead of losing its id.
+    results:
+    - 129
+    - 134
+    - 137
+    - 139
+    - 141
+    - 145
   visual:
   - check: Phone viewport has no horizontal page overflow.
     method: automated
