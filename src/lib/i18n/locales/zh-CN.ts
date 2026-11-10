@@ -2561,6 +2561,7 @@ export const zhCN: DeepPartial<typeof en> = {
     newNoteAria: "新建一条便签",
     searchPlaceholder: "搜索便签…",
     searchAria: "搜索便签",
+    clearSearch: "清除搜索",
     untitled: "未命名便签",
     empty: "还没有便签",
     emptyHint: "新建一条便签开始使用。",
