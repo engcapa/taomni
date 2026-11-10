@@ -122,7 +122,10 @@ def setup(ctx):
             terminal = {'id': 'term:qa-runtime', 'kind': 'terminal', 'title': 'Local shell', 'status': 'running', 'summary': 'QA terminal'}
             task = {'id': 'thread:qa-task', 'kind': 'agent', 'title': 'Review task', 'status': state['task'], 'summary': 'QA agent'}
             if path == '/api/v1/sessions':
-                return self.reply(200, {'sessions': [terminal, task], 'saved_sessions': [{'id': 'saved', 'name': 'Build host', 'session_type': 'SSH', 'group_path': 'QA'}],
+                saved = [{'id': 'saved', 'name': 'Build host', 'session_type': 'SSH', 'group_path': 'QA'}]
+                if ctx.case_id == 'TC-MOBILE-019':
+                    saved += [{'id': 'lab', 'name': 'Console', 'session_type': 'Serial', 'group_path': 'Hardware/Lab'}, {'id': 'local', 'name': 'Local shell', 'session_type': 'Local', 'group_path': None}]
+                return self.reply(200, {'sessions': [terminal, task], 'saved_sessions': saved,
                                         'capabilities': {'open_sessions': True}})
             if path.startswith('/api/v1/open-requests/'):
                 request_id = path.rsplit('/', 1)[1]

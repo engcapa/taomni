@@ -2007,6 +2007,10 @@
 - `[data-testid="mobile-sessions"]` — display — F-MOBILE-1.mobile-sessions
 - `[data-testid="mobile-session"]` — interactive — F-MOBILE-1.mobile-session
 - `[data-testid="mobile-saved-session"]` — display — F-MOBILE-1.mobile-saved-session
+- `[data-testid="mobile-saved-toggle"]` — interactive — F-MOBILE-1.mobile-saved-toggle
+- `[data-testid="mobile-saved-search"]` — interactive — F-MOBILE-1.mobile-saved-search
+- `[data-testid="mobile-saved-search-clear"]` — interactive — F-MOBILE-1.mobile-saved-search-clear
+- `[data-testid="mobile-saved-empty-search"]` — display — F-MOBILE-1.mobile-saved-empty-search
 - `[data-testid="mobile-terminal-status"]` — display — F-MOBILE-1.mobile-terminal-status
 - `[data-testid="mobile-take-control"]` — interactive — F-MOBILE-1.mobile-take-control
 - `[data-testid="mobile-resize"]` — interactive — F-MOBILE-1.mobile-resize

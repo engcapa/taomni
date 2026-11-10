@@ -69,6 +69,21 @@ textarea { min-height: 110px; resize: vertical; }
 .saved-session { align-items: center; }
 .saved-session > div { display: flex; flex-direction: column; gap: 6px; min-width: 0; }
 .saved-session > button { flex-shrink: 0; min-height: 38px; padding: 7px 14px; }
+.saved-session:last-child { border-bottom: 0; }
+.saved-toggle { display: flex; align-items: center; justify-content: space-between; gap: 14px; width: 100%; padding: 0; min-height: 44px; text-align: left; background: transparent; border: 0; border-radius: 0; }
+.saved-toggle > span:first-child { display: flex; flex-direction: column; gap: 5px; min-width: 0; }
+.saved-toggle .eyebrow { display: block; }
+.saved-toggle strong { font-size: 18px; font-weight: 650; }
+.saved-toggle .muted { font-size: 12px; font-weight: 400; }
+.saved-count { display: flex; align-items: center; gap: 12px; flex-shrink: 0; color: #91a3bd; }
+.saved-count > span:last-child { font-size: 23px; color: #65e2c8; line-height: 1; }
+.saved-body { margin-top: 8px; }
+.saved-results { display: grid; gap: 0; }
+.saved-search { display: flex; align-items: center; gap: 8px; margin: 16px 0 5px; }
+.saved-search > span { color: #65e2c8; font-size: 23px; flex-shrink: 0; }
+.saved-search input { margin: 0; min-width: 0; flex: 1; }
+.saved-search button { flex-shrink: 0; min-height: 36px; padding: 6px 10px; font-size: 12px; }
+.saved-result-count { margin: 6px 0 0; color: #91a3bd; font-size: 11px; }
 .heading-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .open-status { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; font-size: 13px; }
 .open-status p { margin: 0; }
