@@ -2007,10 +2007,15 @@
 - `[data-testid="mobile-sessions"]` — display — F-MOBILE-1.mobile-sessions
 - `[data-testid="mobile-session"]` — interactive — F-MOBILE-1.mobile-session
 - `[data-testid="mobile-saved-session"]` — display — F-MOBILE-1.mobile-saved-session
-- `[data-testid="mobile-saved-toggle"]` — interactive — F-MOBILE-1.mobile-saved-toggle
+- `[data-testid="mobile-sessions-search"]` — interactive — F-MOBILE-1.mobile-sessions-search
+- `[data-testid="mobile-sessions-search-clear"]` — interactive — F-MOBILE-1.mobile-sessions-search-clear
+- `[data-testid="mobile-sessions-empty-search"]` — display — F-MOBILE-1.mobile-sessions-empty-search
+- `[data-testid="mobile-sessions-result-count"]` — display — F-MOBILE-1.mobile-sessions-result-count
+- `[data-testid="mobile-sessions-more"]` — interactive — F-MOBILE-1.mobile-sessions-more
 - `[data-testid="mobile-saved-search"]` — interactive — F-MOBILE-1.mobile-saved-search
 - `[data-testid="mobile-saved-search-clear"]` — interactive — F-MOBILE-1.mobile-saved-search-clear
-- `[data-testid="mobile-saved-empty-search"]` — display — F-MOBILE-1.mobile-saved-empty-search
+- `[data-testid="mobile-saved-result-count"]` — display — F-MOBILE-1.mobile-saved-result-count
+- `[data-testid="mobile-saved-more"]` — interactive — F-MOBILE-1.mobile-saved-more
 - `[data-testid="mobile-terminal-status"]` — display — F-MOBILE-1.mobile-terminal-status
 - `[data-testid="mobile-take-control"]` — interactive — F-MOBILE-1.mobile-take-control
 - `[data-testid="mobile-resize"]` — interactive — F-MOBILE-1.mobile-resize

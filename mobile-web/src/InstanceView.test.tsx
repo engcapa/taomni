@@ -27,69 +27,93 @@ it("lists only terminal sessions and excludes agents from the overview counts", 
   expect(screen.getByText("全部会话").parentElement).toHaveTextContent(/^1全部会话$/);
 });
 
-it("collapses saved sessions and searches names, types and groups without losing sessions", async () => {
+it("shows eight terminal sessions per batch and searches titles and summaries across the full list", async () => {
+  mock.request.mockResolvedValue({
+    sessions: Array.from({ length: 20 }, (_, index) => ({
+      id: `term:${index}`, kind: "terminal", title: `Terminal ${String(index).padStart(2, "0")}`,
+      status: "running", summary: index === 17 ? "Database maintenance" : `Summary ${index}`,
+    })),
+    saved_sessions: [], capabilities: { open_sessions: true },
+  });
+  const onSelect = vi.fn();
+  render(<InstanceView instance={instance} onSelect={onSelect} onCloseSession={vi.fn()} onBack={vi.fn()} />);
+  expect(await screen.findAllByTestId("mobile-session")).toHaveLength(8);
+  expect(screen.getByTestId("mobile-sessions-result-count")).toHaveTextContent("共 20 个会话，当前显示 8 条");
+  expect(screen.getByText("全部会话").parentElement).toHaveTextContent(/^20全部会话$/);
+  fireEvent.click(screen.getByTestId("mobile-sessions-more"));
+  expect(screen.getAllByTestId("mobile-session")).toHaveLength(16);
+  fireEvent.click(screen.getByTestId("mobile-sessions-more"));
+  expect(screen.getAllByTestId("mobile-session")).toHaveLength(20);
+  expect(screen.queryByTestId("mobile-sessions-more")).toBeNull();
+
+  const search = screen.getByTestId("mobile-sessions-search");
+  fireEvent.change(search, { target: { value: "  DATABASE  " } });
+  expect(screen.getAllByTestId("mobile-session")).toHaveLength(1);
+  expect(screen.getByTestId("mobile-session")).toHaveTextContent("Database maintenance");
+  fireEvent.click(screen.getByTestId("mobile-sessions-search-clear"));
+  expect(screen.getAllByTestId("mobile-session")).toHaveLength(8);
+  fireEvent.change(search, { target: { value: " missing " } });
+  expect(screen.queryByTestId("mobile-session")).toBeNull();
+  expect(screen.getByTestId("mobile-sessions-empty-search")).toHaveTextContent("没有匹配");
+  fireEvent.click(screen.getByTestId("mobile-sessions-search-clear"));
+  fireEvent.change(search, { target: { value: "terminal 12" } });
+  expect(screen.getAllByTestId("mobile-session")).toHaveLength(1);
+  fireEvent.click(screen.getByTestId("mobile-session"));
+  expect(onSelect).toHaveBeenCalledWith("term:12");
+});
+
+it("batches saved sessions and searches all names, types and groups without losing sessions", async () => {
+  const extra = Array.from({ length: 17 }, (_, index) => ({ id: `extra-${index}`, name: `Archive ${String(index).padStart(2, "0")}`, session_type: "SSH", group_path: "Overflow/Long" }));
   mock.request.mockResolvedValue({
     sessions: [],
     saved_sessions: [
       { id: "build", name: "Build host", session_type: "SSH", group_path: "Production" },
       { id: "lab", name: "Console", session_type: "Serial", group_path: "Hardware/Lab" },
       { id: "local", name: "Local shell", session_type: "Local", group_path: null },
+      ...extra,
     ],
     capabilities: { open_sessions: true },
   });
   render(<InstanceView instance={instance} onSelect={vi.fn()} onCloseSession={vi.fn()} onBack={vi.fn()} />);
-  const toggle = await screen.findByTestId("mobile-saved-toggle");
-  expect(toggle).toHaveAttribute("aria-expanded", "false");
-  expect(screen.queryByTestId("mobile-saved-session")).toBeNull();
-  expect(screen.getByTestId("mobile-saved-toggle")).toHaveTextContent("3");
+  expect(await screen.findAllByTestId("mobile-saved-session")).toHaveLength(8);
+  expect(screen.queryByTestId("mobile-saved-toggle")).toBeNull();
+  expect(screen.getByTestId("mobile-saved-result-count")).toHaveTextContent("共 20 个会话，当前显示 8 条");
+  fireEvent.click(screen.getByTestId("mobile-saved-more"));
+  expect(screen.getAllByTestId("mobile-saved-session")).toHaveLength(16);
+  fireEvent.click(screen.getByTestId("mobile-saved-more"));
+  expect(screen.getAllByTestId("mobile-saved-session")).toHaveLength(20);
+  expect(screen.queryByTestId("mobile-saved-more")).toBeNull();
 
-  fireEvent.click(toggle);
   const search = screen.getByTestId("mobile-saved-search");
-  expect(search).not.toHaveFocus();
-  expect(screen.getAllByTestId("mobile-saved-session")).toHaveLength(3);
-  expect(toggle).toHaveAttribute("aria-expanded", "true");
-
   fireEvent.change(search, { target: { value: "  production  " } });
   expect(screen.getAllByTestId("mobile-saved-session")).toHaveLength(1);
   expect(screen.getByTestId("mobile-saved-session")).toHaveTextContent("Build host");
   fireEvent.change(search, { target: { value: "serial" } });
-  expect(screen.getAllByTestId("mobile-saved-session")).toHaveLength(1);
   expect(screen.getByTestId("mobile-saved-session")).toHaveTextContent("Console");
-  fireEvent.change(search, { target: { value: "lab" } });
+  fireEvent.change(search, { target: { value: "archive 16" } });
   expect(screen.getAllByTestId("mobile-saved-session")).toHaveLength(1);
-  expect(screen.getByTestId("mobile-saved-session")).toHaveTextContent("Console");
+  expect(screen.getByTestId("mobile-saved-session")).toHaveTextContent("Archive 16");
   fireEvent.change(search, { target: { value: "missing" } });
   expect(screen.queryByTestId("mobile-saved-session")).toBeNull();
   expect(screen.getByTestId("mobile-saved-empty-search")).toHaveTextContent("没有匹配");
   fireEvent.click(screen.getByTestId("mobile-saved-search-clear"));
   expect(search).toHaveValue("");
-  expect(screen.getAllByTestId("mobile-saved-session")).toHaveLength(3);
+  expect(screen.getAllByTestId("mobile-saved-session")).toHaveLength(8);
   fireEvent.change(search, { target: { value: "BUILD" } });
   expect(screen.getAllByTestId("mobile-saved-session")).toHaveLength(1);
-  expect(screen.getByTestId("mobile-saved-session")).toHaveTextContent("Build host");
-  fireEvent.click(screen.getByTestId("mobile-saved-toggle"));
-  expect(screen.queryByTestId("mobile-saved-search")).toBeNull();
-  fireEvent.click(screen.getByTestId("mobile-saved-toggle"));
-  expect(screen.getByTestId("mobile-saved-search")).toHaveValue("");
-  expect(screen.getAllByTestId("mobile-saved-session")).toHaveLength(3);
   fireEvent.click(screen.getAllByTestId("mobile-saved-open")[0]);
   expect(mock.open).toHaveBeenCalledWith(instance, { kind: "saved", saved_session_id: "build" }, expect.any(AbortSignal), expect.any(Function));
   await act(async () => {});
 });
 
-it("opens a single saved session directly and still lets the user collapse it", async () => {
+it("opens a single saved session directly without a more button", async () => {
   mock.request.mockResolvedValue({ sessions: [], saved_sessions: [
     { id: "build", name: "Build host", session_type: "SSH", group_path: "QA" },
   ], capabilities: { open_sessions: true } });
   const onSelect = vi.fn();
   render(<InstanceView instance={instance} onSelect={onSelect} onCloseSession={vi.fn()} onBack={vi.fn()} />);
-  const toggle = await screen.findByTestId("mobile-saved-toggle");
-  expect(toggle).toHaveAttribute("aria-expanded", "true");
-  expect(screen.getByTestId("mobile-saved-open")).toBeInTheDocument();
-  fireEvent.click(toggle);
-  expect(toggle).toHaveAttribute("aria-expanded", "false");
-  expect(screen.queryByTestId("mobile-saved-open")).toBeNull();
-  fireEvent.click(toggle);
+  expect(await screen.findByTestId("mobile-saved-open")).toBeInTheDocument();
+  expect(screen.queryByTestId("mobile-saved-more")).toBeNull();
   fireEvent.click(screen.getByTestId("mobile-saved-open"));
   await act(async () => {});
   expect(onSelect).toHaveBeenCalledWith("term:qa-opened");
