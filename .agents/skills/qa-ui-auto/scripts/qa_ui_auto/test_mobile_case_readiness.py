@@ -9,14 +9,17 @@ class MobileShortcutReadinessTest(TestCase):
         root = Path(__file__).resolve().parents[5]
         case = load_case(root / 'qa-ui-auto-tests/cases/TC-MOBILE-001-mobile-web-control-plane.testcase.yaml')
         start = case.steps.index({'click': '[data-testid="mobile-agent-continue"]'})
-        ready = case.steps[start + 1]['eval_readonly']
+        self.assertEqual(case.steps[start + 1], {
+            'wait_for': '[data-testid="mobile-agent-send"]:not([disabled])',
+        })
+        ready = case.steps[start + 2]['eval_readonly']
         self.assertIn(".value === '继续'", ready['expression'])
         self.assertIn("!document.querySelector('button.primary').disabled", ready['expression'])
         self.assertTrue(ready['expect_truthy'])
-        self.assertEqual(case.steps[start + 2], {'press': {
+        self.assertEqual(case.steps[start + 3], {'press': {
             'selector': '[data-testid="mobile-agent-input"]',
             'key': 'Control+Enter', 'macos_key': 'Meta+Enter',
         }})
-        self.assertEqual(case.steps[start + 3], {'assert_file_contains': {
+        self.assertEqual(case.steps[start + 4], {'assert_file_contains': {
             'path': '${fixture.mobile_receipt}', 'contains': 'AGENT 继续',
         }})
