@@ -1,5 +1,5 @@
 id: TC-MOBILE-001
-title: Mobile Web pairs switches instances and separates terminal and Agent input
+title: Mobile Web pairs switches instances and keeps Agent input on deep links
 covers:
 - F-MOBILE-1
 tags:
@@ -30,10 +30,10 @@ steps:
     selector: '[data-testid="mobile-pair-code"]'
     value: qa-mobile-code
 - click: '[data-testid="mobile-pair-submit"]'
-- wait_for: '[data-testid="mobile-session"][data-session-kind="agent"]'
+- wait_for: '[data-testid="mobile-session"][data-session-kind="terminal"]'
 - assert_count:
     selector: '[data-testid="mobile-session"]'
-    equal: 2
+    equal: 1
 - assert_text:
     selector: '[data-testid="mobile-saved-session"]'
     contains: Build host
@@ -73,7 +73,7 @@ steps:
 - click: '[data-testid="mobile-terminal-more"]'
 - screenshot: mobile-terminal-readonly.png
 - click: '[data-testid="mobile-sessions-back"]'
-- click: '[data-testid="mobile-session"][data-session-kind="agent"]'
+- open: ${fixture.mobile_endpoint}/#/session/thread%3Aqa-task
 - fill:
     selector: '[data-testid="mobile-agent-input"]'
     value: QA_AGENT_PROMPT_CHANNEL
@@ -113,7 +113,7 @@ steps:
     selector: '[data-testid="mobile-pair-code"]'
     value: qa-mobile-code
 - click: '[data-testid="mobile-pair-submit"]'
-- wait_for: '[data-testid="mobile-session"][data-session-kind="agent"]'
+- wait_for: '[data-testid="mobile-session"][data-session-kind="terminal"]'
 - click: '[data-testid="mobile-instances-back"]'
 - assert_count:
     selector: '[data-testid="mobile-instance-open"]'
@@ -123,10 +123,10 @@ steps:
     selector: '[data-testid="mobile-instance-open"]'
     equal: 2
 - click: article:has(h3:text-is("Cloud")) [data-testid="mobile-instance-open"]
-- wait_for: '[data-testid="mobile-session"][data-session-kind="agent"]'
+- wait_for: '[data-testid="mobile-session"][data-session-kind="terminal"]'
 - assert_count:
     selector: '[data-testid="mobile-session"]'
-    equal: 2
+    equal: 1
 - click: '[data-testid="mobile-instances-back"]'
 - click: article:has(h3:text-is("Cloud")) [data-testid="mobile-instance-remove"]
 - assert_count:
@@ -282,7 +282,7 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Phone layout pairs and persists two endpoints, controls a WS terminal and routes Agent prompts separately; file and diff remain read-only. The terminal box stays bounded to part of the phone viewport and does not grow from its own fit result.
+    requirement: Phone layout pairs and persists two endpoints, shows only terminals in the instance list, routes deep-linked Agent prompts separately, and keeps file and diff read-only. The terminal box stays bounded to part of the phone viewport and does not grow from its own fit result.
     actions:
     - 2
     - 4
@@ -325,7 +325,7 @@ verification:
     - 73
     checkpoints:
     - step: 10
-      expectation: '[data-testid="mobile-session"] has 2 entries.'
+      expectation: '[data-testid="mobile-session"] has 1 entry and Agent list entries are hidden.'
     - step: 11
       expectation: '[data-testid="mobile-saved-session"] shows Build host.'
     - step: 15
@@ -361,7 +361,7 @@ verification:
     - step: 60
       expectation: '[data-testid="mobile-instance-open"] has 2 entries.'
     - step: 63
-      expectation: '[data-testid="mobile-session"] has 2 entries.'
+      expectation: '[data-testid="mobile-session"] has 1 entry and Agent list entries are hidden.'
     - step: 66
       expectation: '[data-testid="mobile-instance-open"] has 1 entries.'
     - step: 70

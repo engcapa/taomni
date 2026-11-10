@@ -1,0 +1,105 @@
+id: TC-MOBILE-019
+title: Mobile Web hides Agent list entries and searches collapsed saved sessions
+covers: [F-MOBILE-1]
+tags: [mobile, control-plane]
+modes: [browser]
+fixtures: [mobile_web]
+timeout_sec: 120
+description: Production mobile bundle with a terminal, an Agent and three saved terminal configurations. The instance list hides Agents, while the saved-session disclosure searches names, types and groups without losing the open action.
+steps:
+- set_viewport: {width: 390, height: 844}
+- open: ${fixture.mobile_endpoint}
+- wait_for: '[data-testid="mobile-empty-instances"]'
+- click: '[data-testid="mobile-add-instance"]'
+- fill: {selector: '[data-testid="mobile-pair-code"]', value: qa-mobile-code}
+- click: '[data-testid="mobile-pair-submit"]'
+- wait_for: '[data-testid="mobile-session"][data-session-kind="terminal"]'
+- assert_count: {selector: '[data-testid="mobile-session"]', equal: 1}
+- assert_count: {selector: '[data-testid="mobile-session"][data-session-kind="agent"]', equal: 0}
+- wait_for: '[data-testid="mobile-saved-toggle"]'
+- assert_attribute: {selector: '[data-testid="mobile-saved-toggle"]', name: aria-expanded, equals: 'false'}
+- assert_count: {selector: '[data-testid="mobile-saved-session"]', equal: 0}
+- screenshot: mobile-saved-collapsed.png
+- click: '[data-testid="mobile-saved-toggle"]'
+- wait_for: '[data-testid="mobile-saved-search"]'
+- assert_count: {selector: '[data-testid="mobile-saved-session"]', equal: 3}
+- fill: {selector: '[data-testid="mobile-saved-search"]', value: '  BUILD '}
+- assert_count: {selector: '[data-testid="mobile-saved-session"]', equal: 1}
+- assert_text: {selector: '[data-testid="mobile-saved-session"]', contains: Build host}
+- fill: {selector: '[data-testid="mobile-saved-search"]', value: serial}
+- assert_count: {selector: '[data-testid="mobile-saved-session"]', equal: 1}
+- assert_text: {selector: '[data-testid="mobile-saved-session"]', contains: Console}
+- fill: {selector: '[data-testid="mobile-saved-search"]', value: hardware/lab}
+- assert_count: {selector: '[data-testid="mobile-saved-session"]', equal: 1}
+- assert_text: {selector: '[data-testid="mobile-saved-session"]', contains: Console}
+- fill: {selector: '[data-testid="mobile-saved-search"]', value: missing}
+- assert_count: {selector: '[data-testid="mobile-saved-session"]', equal: 0}
+- assert_text: {selector: '[data-testid="mobile-saved-empty-search"]', contains: 没有匹配}
+- screenshot: mobile-saved-search-empty.png
+- click: '[data-testid="mobile-saved-search-clear"]'
+- assert_count: {selector: '[data-testid="mobile-saved-session"]', equal: 3}
+- fill: {selector: '[data-testid="mobile-saved-search"]', value: console}
+- click: '[data-testid="mobile-saved-toggle"]'
+- assert_count: {selector: '[data-testid="mobile-saved-session"]', equal: 0}
+- click: '[data-testid="mobile-saved-toggle"]'
+- wait_for: '[data-testid="mobile-saved-search"]'
+- assert_count: {selector: '[data-testid="mobile-saved-session"]', equal: 3}
+- eval_readonly:
+    expression: document.getElementById('mobile-saved-search').value === '' && document.querySelector('.saved-toggle').getAttribute('aria-expanded') === 'true'
+    expect_truthy: true
+- fill: {selector: '[data-testid="mobile-saved-search"]', value: console}
+- assert_count: {selector: '[data-testid="mobile-saved-session"]', equal: 1}
+- screenshot: mobile-saved-search-filtered.png
+- click: '[data-testid="mobile-saved-open"]'
+- wait_for: '[data-testid="mobile-terminal-screen"]'
+- assert_file_contains: {path: '${fixture.mobile_receipt}', contains: 'OPEN saved lab'}
+- eval_readonly:
+    expression: document.documentElement.scrollWidth <= innerWidth
+    expect_truthy: true
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Only terminal sessions appear in the instance overview even when an Agent is running, and saved sessions are collapsed until requested.
+    actions: [4, 5, 6, 7]
+    checkpoints:
+    - {step: 8, expectation: The running terminal remains available.}
+    - {step: 9, expectation: No Agent list entry is rendered although the fixture returned one.}
+    - {step: 11, expectation: The saved-session disclosure is collapsed with three entries available.}
+    - {step: 12, expectation: Collapsed content has no saved-session rows.}
+    results: [8, 9, 11, 12]
+  - id: R2
+    requirement: Saved-session search trims and case-folds the query across names, types and groups, with a useful empty state and clear/reset behavior.
+    actions: [14, 17, 20, 23, 26, 30, 32, 35]
+    checkpoints:
+    - {step: 15, expectation: Expansion exposes the search field.}
+    - {step: 16, expectation: Expansion shows all three saved configurations.}
+    - {step: 18, expectation: Case-insensitive name search finds one Build host row and trims whitespace.}
+    - {step: 21, expectation: Type search finds only the serial configuration.}
+    - {step: 24, expectation: Group-path search finds Console.}
+    - {step: 27, expectation: An unmatched query shows no saved rows.}
+    - {step: 28, expectation: The empty-search message explains why no rows are shown.}
+    - {step: 31, expectation: Clearing restores every saved session.}
+    - {step: 34, expectation: Collapsing hides all saved-session rows.}
+    - {step: 37, expectation: Reopening restores all three saved configurations.}
+    - {step: 38, expectation: The old filter is gone and the disclosure reports expanded.}
+    results: [16, 18, 21, 24, 27, 28, 31, 34, 37, 38]
+  - id: R3
+    requirement: Searching changes only the visible candidates; opening a match retains the original saved-session request and terminal attachment flow.
+    actions: [39, 42]
+    checkpoints:
+    - {step: 40, expectation: Searching Console leaves exactly one actionable saved-session row.}
+    - {step: 43, expectation: The terminal attaches after opening the filtered saved session.}
+    - {step: 44, expectation: The independent peer receives OPEN saved lab for the Console display name.}
+    - {step: 45, expectation: The phone layout has no horizontal overflow.}
+    - {step: 46, expectation: 'No runtime errors occurred throughout search, disclosure and opening.'}
+    results: [40, 43, 44, 46]
+  visual:
+  - check: Collapsed and expanded saved-session controls remain readable without horizontal page overflow at 390px.
+    method: automated
+    reason: DOM geometry, row counts, screenshots and an expanded filtered-list capture cover the renderer; physical phone appearance remains unverified.
+  native:
+  - check: Native listener, IPC and PTY behavior.
+    method: not-applicable
+    reason: This case uses the deterministic browser peer and only changes renderer filtering, disclosure and search; native service behavior remains owned by existing native cases.

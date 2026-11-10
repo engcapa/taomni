@@ -1,5 +1,6 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ApiError, errorText, loadInstances, request, saveInstances, statusText, type Instance, type Session, type SessionList } from "./api";
+import { SavedSessionsPanel } from "./SavedSessionsPanel";
 import { useLive } from "./live";
 import { isSessionList } from "./apiContracts";
 import { openSession, type OpenTarget, type OpenStatus } from "./openSession";
@@ -27,6 +28,7 @@ export function InstanceView({ instance, sessionId, onSelect, onCloseSession, on
   const [opening, setOpening] = useState<string | null>(null);
   const [openError, setOpenError] = useState("");
   const [openProgress, setOpenProgress] = useState<OpenStatus | null>(null);
+  const terminalSessions = useMemo(() => data.sessions.filter(session => session.kind === "terminal"), [data.sessions]);
   const generation = useRef(0);
   const abort = useRef<AbortController | null>(null);
   const openAbort = useRef<AbortController | null>(null);
@@ -94,31 +96,24 @@ export function InstanceView({ instance, sessionId, onSelect, onCloseSession, on
       <button className="back" data-testid="mobile-sessions-back" onClick={onCloseSession}>‹ 会话列表</button>
       {selected.kind === "terminal" ? <TerminalView key={selected.id} instance={instance} session={selected} onBack={onCloseSession} /> : <TaskView key={selected.id} instance={instance} session={selected} revision={revision} stale={status !== "已连接" || !!error} />}
     </> : <>
-      <div className="page-title"><p className="eyebrow">INSTANCE OVERVIEW</p><h1>远程执行，一目了然。</h1><p className="muted">终端与 Agent 留在实例端持续运行。</p></div>
-      <div className="stats"><div><strong>{data.sessions.filter(s => s.status === "running").length}</strong><span>正在运行</span></div><div><strong>{data.sessions.filter(s => s.status === "awaiting_confirmation").length}</strong><span>等待确认</span></div><div><strong>{data.sessions.length}</strong><span>全部会话</span></div></div>
+      <div className="page-title"><p className="eyebrow">INSTANCE OVERVIEW</p><h1>远程执行，一目了然。</h1><p className="muted">终端留在实例端持续运行。</p></div>
+      <div className="stats"><div><strong>{terminalSessions.filter(s => s.status === "running").length}</strong><span>正在运行</span></div><div><strong>{terminalSessions.filter(s => s.status === "awaiting_confirmation").length}</strong><span>等待确认</span></div><div><strong>{terminalSessions.length}</strong><span>全部会话</span></div></div>
       {(opening || openError) && <div className="card open-status" role="status" data-testid="mobile-open-status">
         {opening ? <><p>正在连接“{opening}”…{openProgress?.auth ? "请填写下方认证信息。" : "如需认证，将在此处提示。"}</p><button disabled={!openProgress?.request_id} onClick={cancelOpen}>取消连接</button></> : <p className="error">{openError}</p>}
         {opening && openError && <p className="error" role="alert">{openError}</p>}
       </div>}
       {opening && openProgress?.auth && <ConnectionAuthForm key={openProgress.auth.id} instance={instance} requestId={openProgress.request_id} challenge={openProgress.auth} onCancel={cancelOpen} />}
-      <div className="section-heading"><h2>终端与任务</h2><div className="heading-actions">
+      <div className="section-heading"><h2>终端会话</h2><div className="heading-actions">
         {canOpen && <button className="primary" data-testid="mobile-open-local" disabled={!!opening} onClick={() => open({ kind: "local" }, "本地终端")}>＋ 本地终端</button>}
         <button data-testid="mobile-refresh" onClick={refresh}>刷新</button>
       </div></div>
       <div className="session-list" data-testid="mobile-sessions">
-        {data.sessions.map(session => <button data-testid="mobile-session" data-session-kind={session.kind} className="session-card" key={session.id} onClick={() => onSelect(session.id)}>
-          <span className={`session-icon ${session.kind}`}>{session.kind === "terminal" ? ">_" : "✧"}</span><span className="session-copy"><strong>{session.title}</strong><small>{session.summary || (session.kind === "terminal" ? "展开日志 · 终端输出与输入" : "Agent 任务 · 指令与文件改动")}</small></span><span className="badge">{statusText(session.status)}</span><span aria-hidden>›</span>
+        {terminalSessions.map(session => <button data-testid="mobile-session" data-session-kind={session.kind} className="session-card" key={session.id} onClick={() => onSelect(session.id)}>
+          <span className={`session-icon ${session.kind}`}>{">_"}</span><span className="session-copy"><strong>{session.title}</strong><small>{session.summary || "展开日志 · 终端输出与输入"}</small></span><span className="badge">{statusText(session.status)}</span><span aria-hidden>›</span>
         </button>)}
-        {!data.sessions.length && <div className="card empty" data-testid="mobile-empty-sessions"><span>⌁</span><h3>暂时没有运行会话</h3><p className="muted">{canOpen ? "点“＋ 本地终端”或在下方打开已保存会话。" : "在桌面打开终端或创建 Agent 线程。headless 模式不会新建终端。"}</p></div>}
+        {!terminalSessions.length && <div className="card empty" data-testid="mobile-empty-sessions"><span>⌁</span><h3>暂时没有运行中的终端</h3><p className="muted">{canOpen ? "点“＋ 本地终端”或在下方打开已保存会话。" : "在桌面打开终端。headless 模式不会新建终端。"}</p></div>}
       </div>
-      <section className="card"><p className="eyebrow">SAVED SESSIONS</p><h2>已保存会话{!canOpen && <span className="muted"> · 只读</span>}</h2>
-        <p className="note">{canOpen ? "在实例的桌面窗口中打开，复用其已保存的凭据、代理与跳板机。" : "在桌面 设置 → 移动服务 中允许后，可在手机上打开已保存会话与新建本地终端。headless 实例不支持。"}</p>
-        {data.saved_sessions.map(session => <div className="saved-session" data-testid="mobile-saved-session" key={session.id}>
-          <div><strong>{session.name}</strong><span>{session.session_type} · {session.group_path || "未分组"}</span></div>
-          {canOpen && <button data-testid="mobile-saved-open" disabled={!!opening} onClick={() => open({ kind: "saved", saved_session_id: session.id }, session.name)}>打开</button>}
-        </div>)}
-        {!data.saved_sessions.length && <p className="muted">没有已保存的终端类会话</p>}
-      </section>
+      <SavedSessionsPanel sessions={data.saved_sessions} canOpen={canOpen} opening={!!opening} onOpen={session => open({ kind: "saved", saved_session_id: session.id }, session.name)} />
     </>}
     <p className="footer" data-testid="mobile-sessions-updated">上次更新 {updated || "—"}{(error || status !== "已连接") && updated ? " · 可能已过期" : ""} · {instance.endpoint}</p>
   </>;
