@@ -256,7 +256,7 @@ steps:
 - click: '[data-testid="mobile-agent-continue"]'
 - wait_for: '[data-testid="mobile-agent-send"]:not([disabled])'
 - eval_readonly:
-    expression: document.querySelector('textarea').value === '继续' && !document.querySelector('button.primary').disabled
+    expression: document.querySelector('textarea').value === '继续' && !document.querySelector('button.primary').disabled && !document.querySelector('[data-testid' + String.fromCharCode(61) + '"mobile-task-updated"]').textContent.includes('正在更新')
     expect_truthy: true
     timeout_sec: 10
 - press:
