@@ -87,8 +87,7 @@ verification:
     - {step: 10, expectation: Saved count is eight}
     - {step: 11, expectation: Terminal result count reports twenty total and eight visible}
     - {step: 12, expectation: Saved result count reports twenty total and eight visible}
-    - {step: 13, expectation: Initial screenshot is captured}
-    results: [8, 9, 10, 11, 12, 13]
+    results: [8, 9, 10, 11, 12]
   - id: R2
     requirement: Session loading reaches twenty entries and captures the expanded list.
     actions: [14, 16, 18, 21]
@@ -98,8 +97,7 @@ verification:
     - {step: 19, expectation: Twenty sessions are visible}
     - {step: 20, expectation: No more sessions are available}
     - {step: 22, expectation: Twenty saved sessions are visible}
-    - {step: 23, expectation: Expanded-session screenshot is captured}
-    results: [15, 17, 19, 20, 22, 23]
+    results: [15, 17, 19, 20, 22]
   - id: R3
     requirement: Active-session search covers summaries, empty results, clearing, and title matching.
     actions: [24, 28, 30, 33, 34]
@@ -126,7 +124,8 @@ verification:
     - {step: 54, expectation: Missing query returns zero saved sessions}
     - {step: 55, expectation: Empty message is visible}
     - {step: 58, expectation: Clear restores eight saved sessions}
-    results: [42, 43, 45, 46, 48, 49, 51, 52, 54, 55, 58]
+    - {step: 60, expectation: Final console query finds exactly one result}
+    results: [42, 43, 45, 46, 48, 49, 51, 52, 54, 55, 58, 60]
   - id: R5
     requirement: Filtered session opening retains identity and responsive layout.
     actions: [36, 38, 62]

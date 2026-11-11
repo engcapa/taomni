@@ -2014,6 +2014,7 @@
 - `[data-testid="mobile-sessions-more"]` — interactive — F-MOBILE-1.mobile-sessions-more
 - `[data-testid="mobile-saved-search"]` — interactive — F-MOBILE-1.mobile-saved-search
 - `[data-testid="mobile-saved-search-clear"]` — interactive — F-MOBILE-1.mobile-saved-search-clear
+- `[data-testid="mobile-saved-empty-search"]` — display — F-MOBILE-1.mobile-saved-empty-search
 - `[data-testid="mobile-saved-result-count"]` — display — F-MOBILE-1.mobile-saved-result-count
 - `[data-testid="mobile-saved-more"]` — interactive — F-MOBILE-1.mobile-saved-more
 - `[data-testid="mobile-terminal-status"]` — display — F-MOBILE-1.mobile-terminal-status

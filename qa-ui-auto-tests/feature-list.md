@@ -13814,6 +13814,9 @@ controls:
   - id: mobile-saved-search-clear
     selector: '[data-testid="mobile-saved-search-clear"]'
     kind: interactive
+  - id: mobile-saved-empty-search
+    selector: '[data-testid="mobile-saved-empty-search"]'
+    kind: display
   - id: mobile-saved-result-count
     selector: '[data-testid="mobile-saved-result-count"]'
     kind: display
