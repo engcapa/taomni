@@ -1,12 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ApiError, errorText, loadInstances, request, saveInstances, statusText, type Instance, type Session, type SessionList } from "./api";
 import { SavedSessionsPanel } from "./SavedSessionsPanel";
+import { SessionResults } from "./SessionResults";
 import { useLive } from "./live";
 import { isSessionList } from "./apiContracts";
 import { openSession, type OpenTarget, type OpenStatus } from "./openSession";
 import { ConnectionAuthForm } from "./ConnectionAuthForm";
 import { TaskView } from "./TaskView";
 import { TerminalView } from "./TerminalView";
+
+const terminalSearchText = (session: Session) => [session.title, session.summary];
 
 /** A session id from a link or a fresh open may not be in the list yet; its prefix says what it is. */
 function placeholder(id: string, title: string): Session {
@@ -107,12 +110,9 @@ export function InstanceView({ instance, sessionId, onSelect, onCloseSession, on
         {canOpen && <button className="primary" data-testid="mobile-open-local" disabled={!!opening} onClick={() => open({ kind: "local" }, "本地终端")}>＋ 本地终端</button>}
         <button data-testid="mobile-refresh" onClick={refresh}>刷新</button>
       </div></div>
-      <div className="session-list" data-testid="mobile-sessions">
-        {terminalSessions.map(session => <button data-testid="mobile-session" data-session-kind={session.kind} className="session-card" key={session.id} onClick={() => onSelect(session.id)}>
-          <span className={`session-icon ${session.kind}`}>{">_"}</span><span className="session-copy"><strong>{session.title}</strong><small>{session.summary || "展开日志 · 终端输出与输入"}</small></span><span className="badge">{statusText(session.status)}</span><span aria-hidden>›</span>
-        </button>)}
-        {!terminalSessions.length && <div className="card empty" data-testid="mobile-empty-sessions"><span>⌁</span><h3>暂时没有运行中的终端</h3><p className="muted">{canOpen ? "点“＋ 本地终端”或在下方打开已保存会话。" : "在桌面打开终端。headless 模式不会新建终端。"}</p></div>}
-      </div>
+      <SessionResults sessions={terminalSessions} searchText={terminalSearchText} listClassName="session-list" listTestId="mobile-sessions" testIdPrefix="mobile-sessions" searchLabel="搜索终端会话" placeholder="搜索名称或摘要" empty={<div className="card empty" data-testid="mobile-empty-sessions"><span>⌁</span><h3>暂时没有运行中的终端</h3><p className="muted">{canOpen ? "点“＋ 本地终端”或在下方打开已保存会话。" : "在桌面打开终端。headless 模式不会新建终端。"}</p></div>} renderItem={session => <button data-testid="mobile-session" data-session-kind={session.kind} className="session-card" key={session.id} onClick={() => onSelect(session.id)}>
+        <span className={`session-icon ${session.kind}`}>{">_"}</span><span className="session-copy"><strong>{session.title}</strong><small>{session.summary || "展开日志 · 终端输出与输入"}</small></span><span className="badge">{statusText(session.status)}</span><span aria-hidden>›</span>
+      </button>} />
       <SavedSessionsPanel sessions={data.saved_sessions} canOpen={canOpen} opening={!!opening} onOpen={session => open({ kind: "saved", saved_session_id: session.id }, session.name)} />
     </>}
     <p className="footer" data-testid="mobile-sessions-updated">上次更新 {updated || "—"}{(error || status !== "已连接") && updated ? " · 可能已过期" : ""} · {instance.endpoint}</p>

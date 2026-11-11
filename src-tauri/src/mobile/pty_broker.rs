@@ -47,6 +47,11 @@ impl Default for Terminal {
         }
     }
 }
+impl Terminal {
+    pub fn summary(&self) -> String {
+        self.replay.summary()
+    }
+}
 pub struct Broker {
     pub enabled: AtomicBool,
     pub terminals: Mutex<HashMap<String, Terminal>>,

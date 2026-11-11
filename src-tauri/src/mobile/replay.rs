@@ -78,10 +78,73 @@ impl Replay {
             .chain(std::iter::once(self.line.clone()))
             .collect()
     }
+
+    pub fn summary(&self) -> String {
+        std::iter::once(&self.line)
+            .chain(self.lines.iter().rev())
+            .find_map(|line| {
+                let cleaned = plain_line(line);
+                (!cleaned.is_empty()).then(|| cleaned.chars().take(160).collect())
+            })
+            .unwrap_or_default()
+    }
 }
+
+fn plain_line(line: &str) -> String {
+    let mut clean = String::new();
+    let mut chars = line.chars();
+    while let Some(ch) = chars.next() {
+        if ch == '\u{1b}' {
+            match chars.next() {
+                Some('[') => {
+                    for c in chars.by_ref() {
+                        if ('\x40'..='\x7e').contains(&c) {
+                            break;
+                        }
+                    }
+                }
+                Some(']') => {
+                    let mut previous_escape = false;
+                    for c in chars.by_ref() {
+                        if c == '\x07' || (c == '\\' && previous_escape) {
+                            break;
+                        }
+                        previous_escape = c == '\x1b';
+                    }
+                }
+                _ => {}
+            }
+            continue;
+        }
+        if !ch.is_control() {
+            clean.push(ch);
+        }
+    }
+    clean.trim().to_owned()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn summary_uses_latest_nonempty_clean_line() {
+        let mut r = Replay::default();
+        r.push(b"old output\n\x1b[31mDatabase maintenance\x1b[0m\n\n");
+        assert_eq!(r.summary(), "Database maintenance");
+        r.push(b"\x1b[32mReady without newline\x1b[0m");
+        assert_eq!(r.summary(), "Ready without newline");
+        r.push(b"\x1b]0;title\x07");
+        assert_eq!(r.summary(), "Ready without newline");
+    }
+
+    #[test]
+    fn summary_caps_long_output() {
+        let mut r = Replay::default();
+        r.push(format!("{}\n", "x".repeat(300)).as_bytes());
+        assert_eq!(r.summary().chars().count(), 160);
+    }
+
     #[test]
     fn malformed_chunks_are_iterative_and_preserve_trailing_ascii() {
         let mut r = Replay::default();
@@ -90,6 +153,7 @@ mod tests {
         assert_eq!(r.lines().last().unwrap(), "end�ok");
         assert!(r.pending.is_empty());
     }
+
     #[test]
     fn bounded_tail_handles_split_unicode_and_carriage_returns() {
         let mut r = Replay::default();
