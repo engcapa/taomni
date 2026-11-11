@@ -245,6 +245,7 @@ async fn http_security_cors_revocation_and_listener_shutdown() {
 
 #[tokio::test]
 async fn two_viewers_share_real_pty_with_readonly_resize_control_and_replay() {
+    let _pty = crate::terminal::pty::test_lock();
     use crate::terminal::{ActiveTerminal, pty};
     use std::{io::Read, sync::Mutex};
     let f = Fixture::new().await;

@@ -438,3 +438,124 @@ async fn task_notifications_link_to_the_session() {
     assert!(confirmation.content.to_string().contains(LINK));
     f.finish().await;
 }
+
+#[test]
+fn terminal_card_offers_follow_refresh_and_key_buttons() {
+    let card = cards::terminal(
+        &linked(),
+        "term:abcd1234-0000",
+        "构建脚本",
+        "running",
+        "line 1\nline 2",
+        true,
+        Some("oc_allowed"),
+    );
+    assert_eq!(card["config"]["update_multi"], true);
+    assert_eq!(card["header"]["title"]["content"], "Taomni 终端 abcd1234");
+    let elements = card["elements"].as_array().unwrap();
+    assert_eq!(elements[0]["text"]["content"], "构建脚本 · 运行中");
+    assert_eq!(elements[1]["text"]["content"], "line 1\nline 2");
+    assert_eq!(
+        buttons(&elements[2]),
+        ["刷新", "停止跟随", "Ctrl-C", "打开手机页面"]
+    );
+    let group = cards::terminal(
+        &config(),
+        "term:abcd1234-0000",
+        "构建脚本",
+        "running",
+        "secrets",
+        false,
+        None,
+    );
+    assert!(!group.to_string().contains("secrets"));
+    assert!(group.to_string().contains("仅限私聊"));
+    let exited = cards::terminal(
+        &config(),
+        "term:abcd1234-0000",
+        "构建脚本",
+        "exited",
+        "",
+        true,
+        Some("oc_allowed"),
+    );
+    assert!(!exited.to_string().contains("Ctrl-C"));
+    assert!(exited.to_string().contains("（暂无输出）"));
+}
+
+#[test]
+fn saved_sessions_card_opens_by_button_and_stays_bounded() {
+    let sessions: Vec<Value> = (0..3)
+        .map(|n| {
+            json!({"id":format!("{n}2345678-abcd"),"name":format!("会话{n}"),
+                "session_type":"SSH"})
+        })
+        .collect();
+    let card = cards::saved(&linked(), &sessions, Some("oc_allowed"));
+    assert_eq!(card["header"]["title"]["content"], "Taomni 已保存会话（3）");
+    assert_eq!(buttons(&card["elements"][1]), ["打开"]);
+    let group = cards::saved(&config(), &sessions, None);
+    assert!(!group.to_string().contains("\"open\""));
+    assert!(group.to_string().contains("仅限私聊"));
+    let many: Vec<Value> = (0..40)
+        .map(|n| json!({"id":format!("{n:08}"),"name":"会话","session_type":"SSH"}))
+        .collect();
+    let bounded = cards::saved(&config(), &many, Some("oc_allowed"));
+    assert!(cards::encoded_len(&bounded) <= CARD_BYTES);
+    assert!(visible_chars(&bounded) <= cards::MESSAGE_CHARS);
+    assert!(bounded.to_string().contains("[已截断] 仅显示前"));
+}
+
+#[test]
+fn terminal_card_callbacks_map_to_commands_and_privacy() {
+    let refresh = json!({"action":"term","op":"refresh","task_id":"term:abcd1234","p2p_chat_id":"oc_allowed"});
+    assert_eq!(
+        cards::callback_command(&refresh, Some("oc_allowed")).unwrap(),
+        ("term-refresh term:abcd1234".into(), true)
+    );
+    assert_eq!(
+        cards::callback_command(&refresh, Some("oc_other"))
+            .unwrap()
+            .1,
+        false
+    );
+    let unfollow = json!({"action":"term","op":"unfollow","task_id":"term:abcd1234","p2p_chat_id":"oc_allowed"});
+    assert_eq!(
+        cards::callback_command(&unfollow, Some("oc_allowed"))
+            .unwrap()
+            .0,
+        "term-unfollow term:abcd1234"
+    );
+    let key =
+        json!({"action":"key","key":"ctrl-c","task_id":"term:abcd1234","p2p_chat_id":"oc_allowed"});
+    assert_eq!(
+        cards::callback_command(&key, Some("oc_allowed")).unwrap().0,
+        "key term:abcd1234 ctrl-c"
+    );
+    let open = json!({"action":"open","saved_id":"12345678","p2p_chat_id":"oc_allowed"});
+    assert_eq!(
+        cards::callback_command(&open, Some("oc_allowed")).unwrap(),
+        ("open 12345678".into(), true)
+    );
+    assert_eq!(
+        cards::callback_command(&json!({"action":"new"}), Some("oc_allowed")).unwrap(),
+        ("new".into(), false)
+    );
+    assert!(
+        cards::callback_command(
+            &json!({"action":"term","op":"nope","task_id":"term:abcd1234"}),
+            Some("oc")
+        )
+        .is_err()
+    );
+    assert!(
+        cards::callback_command(&json!({"action":"open","saved_id":"a b"}), Some("oc")).is_err()
+    );
+    assert!(
+        cards::callback_command(
+            &json!({"action":"key","key":"ctrl-c","task_id":"thread:abcd"}),
+            Some("oc")
+        )
+        .is_err()
+    );
+}

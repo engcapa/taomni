@@ -1,7 +1,7 @@
 use super::{
     Runtime,
     actions::{self, Reply, Request},
-    cards::MESSAGE_CHARS,
+    cards::{self, MESSAGE_CHARS},
     config::Config,
     network::{self, Network},
     protocol::Fragments,
@@ -20,6 +20,8 @@ pub struct Outbound {
     pub kind: &'static str,
     pub content: Value,
     pub uuid: String,
+    /// Terminal to keep refreshing in place after this card is delivered.
+    pub follow: Option<String>,
 }
 impl Outbound {
     pub fn text(chat: String, text: String, key: &str) -> Self {
@@ -28,6 +30,7 @@ impl Outbound {
             kind: "text",
             content: json!({"text":text.chars().take(MESSAGE_CHARS).collect::<String>()}),
             uuid: actions::key(key)[..32].into(),
+            follow: None,
         }
     }
     /// Cards are built within `cards::CARD_BYTES` by their builders.
@@ -39,9 +42,61 @@ impl Outbound {
                 kind: "interactive",
                 content: card,
                 uuid: actions::key(key)[..32].into(),
+                follow: None,
+            },
+            Reply::Terminal { card, term } => Self {
+                chat,
+                kind: "interactive",
+                content: card,
+                uuid: actions::key(key)[..32].into(),
+                follow: Some(term),
             },
         }
     }
+}
+/// Card buttons that update the card in place instead of posting a new
+/// message. The callback must answer within three seconds, so this path only
+/// reads broker state and never waits on the Agent.
+fn inline_card(
+    runtime: &Runtime,
+    core: &Core,
+    config: &Config,
+    request: &Request,
+) -> Option<Value> {
+    // A card forwarded to another chat must never refresh terminal output;
+    // the same private-chat rule as `show`/`file` applies to buttons.
+    if !request.private_chat {
+        return None;
+    }
+    let mut parts = request.command.splitn(2, ' ');
+    let action = parts.next().unwrap_or("");
+    let id = parts.next().unwrap_or("").trim();
+    if action == "term-unfollow" && id.starts_with("term:") {
+        runtime.unfollow(&request.chat, id);
+        let (title, status, tail) = actions::terminal_snapshot(core, id).ok()?;
+        return Some(cards::terminal(
+            config,
+            id,
+            &title,
+            &status,
+            &tail,
+            false,
+            Some(&request.chat),
+        ));
+    }
+    if action == "term-refresh" && id.starts_with("term:") {
+        let (title, status, tail) = actions::terminal_snapshot(core, id).ok()?;
+        return Some(cards::terminal(
+            config,
+            id,
+            &title,
+            &status,
+            &tail,
+            runtime.is_following(&request.chat, id),
+            Some(&request.chat),
+        ));
+    }
+    None
 }
 pub async fn run(
     runtime: Arc<Runtime>,
@@ -55,8 +110,8 @@ pub async fn run(
     tokio::select! {
         _ = cancel.cancelled() => {},
         _ = socket_loop(runtime.clone(), core.clone(), network.clone(), input) => {},
-        _ = business(runtime.clone(), core, network.config.clone(), receiver, output, events) => {},
-        _ = delivery(runtime, network, outbound) => {},
+        _ = business(runtime.clone(), core.clone(), network.config.clone(), receiver, output, events) => {},
+        _ = delivery(runtime, core, network, outbound) => {},
     }
 }
 async fn socket_loop(
@@ -136,15 +191,21 @@ async fn connection(
                 };
                 let card = value["header"]["event_type"] == "card.action.trigger";
                 let mut toast = "已受理，请查看机器人回复";
+                let mut refreshed = None;
                 let accepted = match actions::authorize(&network.config, &value) {
                     Ok(Some(request)) => {
-                        match input.try_reserve() {
-                            Ok(permit) => match actions::claim(core, &request.key) {
-                                Ok(true) => { permit.send(request); true },
-                                Ok(false) => { runtime.status.lock().unwrap_or_else(|e| e.into_inner()).duplicates += 1; true },
-                                Err(error) => { runtime.error(&error); false },
-                            },
-                            Err(_) => { runtime.error("feishu_inbound_queue_full"); false },
+                        if let Some(card) = inline_card(&runtime, core, &network.config, &request) {
+                            refreshed = Some(card);
+                            true
+                        } else {
+                            match input.try_reserve() {
+                                Ok(permit) => match actions::claim(core, &request.key) {
+                                    Ok(true) => { permit.send(request); true },
+                                    Ok(false) => { runtime.status.lock().unwrap_or_else(|e| e.into_inner()).duplicates += 1; true },
+                                    Err(error) => { runtime.error(&error); false },
+                                },
+                                Err(_) => { runtime.error("feishu_inbound_queue_full"); false },
+                            }
                         }
                     }
                     Ok(None) => true,
@@ -156,7 +217,10 @@ async fn connection(
                     }
                 };
                 if !accepted { toast = "暂未受理，队列繁忙或存储不可用，请稍后重试"; }
-                let data = card.then(|| json!({"toast":{"type":"info","content":toast}}));
+                let mut data = card.then(|| json!({"toast":{"type":"info","content":toast}}));
+                if let (Some(card), Some(data)) = (refreshed, data.as_mut()) {
+                    data["card"] = json!({"type":"raw","data":card});
+                }
                 network::write(&mut socket, frame.response(accepted, data)).await?;
             }
         }
@@ -212,19 +276,33 @@ pub(super) fn enqueue(runtime: &Runtime, output: &mpsc::Sender<Outbound>, value:
         runtime.error("feishu_outbound_queue_full_query_snapshot");
     }
 }
-async fn delivery(runtime: Arc<Runtime>, network: Network, mut output: mpsc::Receiver<Outbound>) {
+async fn delivery(
+    runtime: Arc<Runtime>,
+    core: Core,
+    network: Network,
+    mut output: mpsc::Receiver<Outbound>,
+) {
     while let Some(message) = output.recv().await {
         for attempt in 0..5 {
             match network
                 .send(&message.chat, message.kind, &message.content, &message.uuid)
                 .await
             {
-                Ok(()) => {
+                Ok(message_id) => {
                     runtime
                         .status
                         .lock()
                         .unwrap_or_else(|e| e.into_inner())
                         .delivered += 1;
+                    if let Some(term) = message.follow.clone() {
+                        runtime.start_follow(
+                            core.clone(),
+                            network.clone(),
+                            message.chat.clone(),
+                            term,
+                            message_id,
+                        );
+                    }
                     break;
                 }
                 Err(error) => {

@@ -10,8 +10,11 @@ pub const MESSAGE_CHARS: usize = 2000;
 const BODY_CHARS: usize = 1200;
 const TRUNCATED: &str = "\n[已截断]";
 const LIST_ROWS: usize = 20;
+const SAVED_ROWS: usize = 20;
 const TITLE_CHARS: usize = 40;
 const CONFIRMATION_ROWS: usize = 5;
+const TERMINAL_LINES: usize = 18;
+const TERMINAL_CHARS: usize = 1100;
 
 pub fn bounded(text: &str) -> String {
     let mut chars = text.chars();
@@ -110,19 +113,28 @@ fn visible_len(value: &Value) -> usize {
 fn card(title: &str, elements: Vec<Value>) -> Value {
     json!({"config":{"wide_screen_mode":true},"header":{"title":label(title)},"elements":elements})
 }
+/// Followed terminal cards must be shared cards before the adapter may update
+/// them in place (`PATCH /im/v1/messages/:id` requires `update_multi`).
+fn updatable_card(title: &str, elements: Vec<Value>) -> Value {
+    json!({"config":{"wide_screen_mode":true,"update_multi":true},"header":{"title":label(title)},"elements":elements})
+}
 /// Never send an oversized card, including unusually large ids or confirmation
 /// metadata. Keep a bounded, actionable card instead of breaking message JSON.
 fn checked(card: Value) -> Value {
     if encoded_len(&card) <= CARD_BYTES && visible_len(&card) <= MESSAGE_CHARS {
-        card
-    } else {
-        self::card(
-            "Taomni 回复",
-            vec![div(
-                "[已截断] 会话信息过大，请发送“列表”查看摘要，或使用手机页面。",
-            )],
-        )
+        return card;
     }
+    let updatable = card["config"]["update_multi"] == true;
+    let mut fallback = self::card(
+        "Taomni 回复",
+        vec![div(
+            "[已截断] 会话信息过大，请发送“列表”查看摘要，或使用手机页面。",
+        )],
+    );
+    if updatable {
+        fallback["config"]["update_multi"] = json!(true);
+    }
+    fallback
 }
 /// `show` buttons carry the private chat they were sent to; a callback from
 /// any other chat (for example a forwarded card) is not a private query.
@@ -262,6 +274,131 @@ pub fn show(
     checked(card(&format!("Taomni 会话 {short}"), elements))
 }
 
+/// Terminal tail card. The same card is reused for one-off replies and for the
+/// periodic in-place updates, so the adapter builds it from live broker state.
+pub fn terminal(
+    config: &Config,
+    id: &str,
+    title: &str,
+    status: &str,
+    tail: &str,
+    following: bool,
+    p2p_chat: Option<&str>,
+) -> Value {
+    let short = commands::short_id(id);
+    let header = format!("{} · {}", clip(title, TITLE_CHARS), status_text(status));
+    let body = if p2p_chat.is_none() {
+        "终端输出仅限私聊。".to_owned()
+    } else if tail.trim().is_empty() {
+        "（暂无输出）".to_owned()
+    } else {
+        tail.chars().take(TERMINAL_CHARS).collect()
+    };
+    let mut elements = vec![div(&header), div(&body)];
+    let mut buttons = vec![];
+    if let Some(chat) = p2p_chat {
+        buttons.push(callback(
+            "刷新",
+            "default",
+            json!({"action":"term","op":"refresh","task_id":id,"p2p_chat_id":chat}),
+        ));
+        if following {
+            buttons.push(callback(
+                "停止跟随",
+                "default",
+                json!({"action":"term","op":"unfollow","task_id":id,"p2p_chat_id":chat}),
+            ));
+        }
+        if status == "running" {
+            buttons.push(callback(
+                "Ctrl-C",
+                "danger",
+                json!({"action":"key","key":"ctrl-c","task_id":id,"p2p_chat_id":chat}),
+            ));
+        }
+    }
+    if let Some(url) = session_link(config, id) {
+        buttons.push(open_button(&url));
+    }
+    elements.extend(row(buttons));
+    elements.push(
+        json!({"tag":"note","elements":[label(if p2p_chat.is_some() {
+            "输入 <文本> 可直接发送到当前终端；回复里的终端卡片会短暂自动刷新。"
+        } else {
+            "终端输出与输入仅限私聊。"
+        })]}),
+    );
+    checked(updatable_card(&format!("Taomni 终端 {short}"), elements))
+}
+
+/// Saved sessions that can be opened from the chat; opening creates a real
+/// desktop tab and returns its `term:` id.
+pub fn saved(config: &Config, sessions: &[Value], p2p_chat: Option<&str>) -> Value {
+    let mut rows: Vec<Vec<Value>> = vec![];
+    let mut chars = 0;
+    let mut shown = 0;
+    for session in sessions.iter().take(SAVED_ROWS) {
+        let id = session["id"].as_str().unwrap_or("");
+        let name = clip(session["name"].as_str().unwrap_or(""), TITLE_CHARS);
+        let kind = session["session_type"].as_str().unwrap_or("");
+        let line = format!(
+            "{}. {} · {name} · {kind}",
+            shown + 1,
+            commands::short_id(id)
+        );
+        chars += line.chars().count();
+        if chars > BODY_CHARS {
+            break;
+        }
+        shown += 1;
+        let mut elements = vec![div(&line)];
+        if let Some(chat) = p2p_chat {
+            elements.extend(row(vec![callback(
+                "打开",
+                "default",
+                json!({"action":"open","saved_id":id,"p2p_chat_id":chat}),
+            )]));
+        }
+        rows.push(elements);
+    }
+    let mut elements: Vec<Value> = rows.iter().flatten().cloned().collect();
+    if sessions.is_empty() {
+        elements.push(div("暂无已保存会话"));
+    }
+    let mut notes = vec![];
+    if shown < sessions.len() {
+        notes.push(format!(
+            "[已截断] 仅显示前 {} 个，共 {} 个。",
+            shown,
+            sessions.len()
+        ));
+    }
+    notes.push(if p2p_chat.is_some() {
+        "“打开 <短id>”会在桌面新建终端；认证提示在桌面完成。".into()
+    } else {
+        "打开会话仅限私聊。".into()
+    });
+    if let Some(chat) = p2p_chat {
+        elements.extend(row(vec![callback(
+            "新建本地终端",
+            "default",
+            json!({"action":"new","p2p_chat_id":chat}),
+        )]));
+    }
+    if !config.mobile_endpoint.is_empty() {
+        elements.extend(row(vec![open_button(&format!(
+            "{}/#/",
+            config.mobile_endpoint.trim_end_matches('/')
+        ))]));
+    }
+    let notes: Vec<Value> = notes.iter().map(|n| label(n)).collect();
+    elements.push(json!({"tag":"note","elements":notes}));
+    checked(card(
+        &format!("Taomni 已保存会话（{}）", sessions.len()),
+        elements,
+    ))
+}
+
 pub fn confirmation_card(config: &Config, task: &str, confirmation: &Value) -> Value {
     let text = format!(
         "{}\n{}",
@@ -287,23 +424,71 @@ pub fn confirmation_card(config: &Config, task: &str, confirmation: &Value) -> V
 /// Canonical command for a non-decision card button, and whether the click
 /// came from the private chat the button was sent to.
 pub fn callback_command(value: &Value, chat: Option<&str>) -> Result<(String, bool), String> {
-    let task = value["task_id"].as_str().ok_or("invalid_task")?;
-    if task.is_empty()
-        || task.chars().any(char::is_whitespace)
-        || task.len() > 256
-        || !(task
-            .strip_prefix("thread:")
-            .or_else(|| task.strip_prefix("term:")))
-        .is_some_and(|raw| !raw.is_empty())
-    {
-        return Err("invalid_task".into());
-    }
+    let task = || -> Result<&str, String> {
+        let task = value["task_id"].as_str().ok_or("invalid_task")?;
+        if task.is_empty()
+            || task.chars().any(char::is_whitespace)
+            || task.len() > 256
+            || !(task
+                .strip_prefix("thread:")
+                .or_else(|| task.strip_prefix("term:")))
+            .is_some_and(|raw| !raw.is_empty())
+        {
+            return Err("invalid_task".into());
+        }
+        Ok(task)
+    };
     let command = match value["action"].as_str() {
-        Some("show") if task.starts_with("thread:") || task.starts_with("term:") => "show",
-        Some("stop") if task.starts_with("thread:") => "stop",
+        Some("show") => {
+            let task = task()?;
+            format!("show {task}")
+        }
+        Some("stop") => {
+            let task = task()?;
+            if !task.starts_with("thread:") {
+                return Err("invalid_card_action".into());
+            }
+            format!("stop {task}")
+        }
+        Some("term") => {
+            let task = task()?;
+            if !task.starts_with("term:") {
+                return Err("invalid_card_action".into());
+            }
+            match value["op"].as_str() {
+                Some("refresh") => format!("term-refresh {task}"),
+                Some("unfollow") => format!("term-unfollow {task}"),
+                _ => return Err("invalid_card_action".into()),
+            }
+        }
+        Some("key") => {
+            let task = task()?;
+            if !task.starts_with("term:") {
+                return Err("invalid_card_action".into());
+            }
+            let key = value["key"]
+                .as_str()
+                .filter(|key| {
+                    !key.is_empty() && key.len() <= 16 && !key.chars().any(char::is_whitespace)
+                })
+                .ok_or("invalid_card_action")?;
+            format!("key {task} {key}")
+        }
+        Some("open") => {
+            let saved = value["saved_id"]
+                .as_str()
+                .filter(|id| !id.is_empty() && id.len() <= 128)
+                .ok_or("invalid_card_action")?;
+            if saved.chars().any(char::is_whitespace) {
+                return Err("invalid_card_action".into());
+            }
+            format!("open {saved}")
+        }
+        Some("new") => "new".into(),
+        Some("saved") => "saved".into(),
         _ => return Err("invalid_card_action".into()),
     };
     let private =
         chat.is_some_and(|chat| !chat.is_empty() && value["p2p_chat_id"].as_str() == Some(chat));
-    Ok((format!("{command} {task}"), private))
+    Ok((command, private))
 }

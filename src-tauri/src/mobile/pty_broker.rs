@@ -51,6 +51,9 @@ impl Terminal {
     pub fn summary(&self) -> String {
         self.replay.summary()
     }
+    pub fn tail(&self, lines: usize, chars: usize) -> String {
+        self.replay.tail(lines, chars)
+    }
 }
 pub struct Broker {
     pub enabled: AtomicBool,

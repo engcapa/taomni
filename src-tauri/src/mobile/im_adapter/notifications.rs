@@ -95,6 +95,7 @@ impl Notifications {
                             content: actions::confirmation_card(config, task, confirmation),
                             uuid: actions::key(&format!("{id}:{}", confirmation["id"]))[..32]
                                 .into(),
+                            follow: None,
                         },
                     );
                 }

@@ -27,7 +27,7 @@ fn opt_in_persists_and_defaults_to_off() {
 #[test]
 fn requests_resolve_once_and_stay_private_to_their_device() {
     let requests = OpenRequests::default();
-    let id = requests.insert("phone-a").unwrap();
+    let id = requests.insert("phone-a", false).unwrap();
     assert_eq!(requests.poll("phone-a", &id).unwrap()["status"], "pending");
     assert_eq!(
         requests.poll("phone-b", &id).unwrap_err(),
@@ -46,13 +46,13 @@ fn requests_resolve_once_and_stay_private_to_their_device() {
 #[test]
 fn desktop_failures_are_reduced_to_short_codes() {
     let requests = OpenRequests::default();
-    let id = requests.insert("phone").unwrap();
+    let id = requests.insert("phone", false).unwrap();
     requests.resolve(&id, Err("vault_locked".into()));
     assert_eq!(
         requests.poll("phone", &id).unwrap()["error"],
         "vault_locked"
     );
-    let id = requests.insert("phone").unwrap();
+    let id = requests.insert("phone", false).unwrap();
     requests.resolve(&id, Err("Error: <script>connect failed</script>".into()));
     assert_eq!(requests.poll("phone", &id).unwrap()["error"], "open_failed");
 }
@@ -63,14 +63,14 @@ fn pending_requests_are_bounded_per_device_and_cancelled_by_withdrawal() {
     let requests = OpenRequests::default();
     requests.set_allowed(&dir, true).unwrap();
     let ids: Vec<_> = (0..MAX_PENDING_PER_DEVICE)
-        .map(|_| requests.insert("phone").unwrap())
+        .map(|_| requests.insert("phone", false).unwrap())
         .collect();
     assert_eq!(
-        requests.insert("phone").unwrap_err(),
+        requests.insert("phone", false).unwrap_err(),
         "too_many_open_requests"
     );
     assert!(
-        requests.insert("other-phone").is_ok(),
+        requests.insert("other-phone", false).is_ok(),
         "limit is per device"
     );
     requests.set_allowed(&dir, false).unwrap();
@@ -84,7 +84,7 @@ fn pending_requests_are_bounded_per_device_and_cancelled_by_withdrawal() {
 #[test]
 fn pending_requests_time_out() {
     let requests = OpenRequests::default();
-    let id = requests.insert("phone").unwrap();
+    let id = requests.insert("phone", false).unwrap();
     requests
         .requests
         .lock()
@@ -128,7 +128,7 @@ fn headless_and_disabled_instances_refuse_to_open() {
 #[test]
 fn expired_desktop_reports_are_ignored_even_without_a_phone_poll() {
     let requests = OpenRequests::default();
-    let id = requests.insert("phone").unwrap();
+    let id = requests.insert("phone", false).unwrap();
     requests
         .requests
         .lock()
@@ -148,7 +148,7 @@ fn a_desktop_claim_is_single_use_and_rechecks_authorization() {
     let dir = temp_dir("claim");
     let requests = OpenRequests::default();
     requests.set_allowed(&dir, true).unwrap();
-    let id = requests.insert("phone").unwrap();
+    let id = requests.insert("phone", false).unwrap();
     assert!(requests.claim(&id, |device| device == "phone"));
     assert!(!requests.claim(&id, |_| true));
     // Once accepted, this is a normal desktop connection; closing the phone or
@@ -157,7 +157,7 @@ fn a_desktop_claim_is_single_use_and_rechecks_authorization() {
     assert!(requests.resolve(&id, Ok("accepted-terminal".into())));
     assert_eq!(requests.poll("phone", &id).unwrap()["status"], "opened");
     requests.set_allowed(&dir, true).unwrap();
-    let revoked = requests.insert("revoked-phone").unwrap();
+    let revoked = requests.insert("revoked-phone", false).unwrap();
     assert!(!requests.claim(&revoked, |_| false));
     assert_eq!(
         requests.poll("revoked-phone", &revoked).unwrap()["error"],
@@ -167,14 +167,34 @@ fn a_desktop_claim_is_single_use_and_rechecks_authorization() {
 }
 
 #[test]
+fn im_requests_claim_without_a_paired_web_device() {
+    let dir = temp_dir("im-claim");
+    let requests = OpenRequests::default();
+    requests.set_allowed(&dir, true).unwrap();
+    let id = requests.insert("feishu:ou_allowed", true).unwrap();
+    // The Feishu identity is verified against the chat binding, not the Web
+    // device table; the desktop still performs its normal open flow.
+    assert!(requests.claim(&id, |_| false));
+    assert!(requests.resolve(&id, Ok("feishu-terminal".into())));
+    assert_eq!(
+        requests.poll("feishu:ou_allowed", &id).unwrap()["status"],
+        "opened"
+    );
+    requests.set_allowed(&dir, false).unwrap();
+    let blocked = requests.insert("feishu:ou_allowed", true).unwrap();
+    assert!(!requests.claim(&blocked, |_| false));
+    let _ = std::fs::remove_dir_all(dir);
+}
+
+#[test]
 fn completed_requests_cannot_grow_the_registry_without_bound() {
     let requests = OpenRequests::default();
     for _ in 0..MAX_RETAINED_REQUESTS {
-        let id = requests.insert("phone").unwrap();
+        let id = requests.insert("phone", false).unwrap();
         requests.resolve(&id, Err("open_failed".into()));
     }
     assert_eq!(
-        requests.insert("phone").unwrap_err(),
+        requests.insert("phone", false).unwrap_err(),
         "too_many_open_requests"
     );
 }

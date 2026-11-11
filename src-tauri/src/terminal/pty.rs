@@ -35,3 +35,12 @@ pub use shells::{
 pub(crate) use directories::directory_from_history_command;
 
 pub use windows_shells::open_shell_as_administrator;
+
+/// Serializes tests that launch a real PTY. `portable-pty` forks, and two
+/// concurrent forks in one multithreaded test process can deadlock the child
+/// before it execs, which shows up as missing output rather than an error.
+#[cfg(test)]
+pub fn test_lock() -> std::sync::MutexGuard<'static, ()> {
+    static LOCK: std::sync::Mutex<()> = std::sync::Mutex::new(());
+    LOCK.lock().unwrap_or_else(|error| error.into_inner())
+}

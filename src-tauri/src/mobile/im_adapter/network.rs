@@ -111,13 +111,15 @@ impl Network {
         });
         Ok(value)
     }
+    /// Sends a message and returns its platform message id, which card
+    /// follow-up updates need.
     pub async fn send(
         &self,
         chat: &str,
         kind: &str,
         content: &Value,
         uuid: &str,
-    ) -> Result<(), String> {
+    ) -> Result<String, String> {
         let token = self.token().await?;
         let result = self
             .post(
@@ -128,6 +130,38 @@ impl Network {
             )
             .await;
         // Expired/invalid tenant tokens are refreshed on the next bounded retry.
+        self.expire_token_on_error(&result).await;
+        result.map(|value| {
+            value["data"]["message_id"]
+                .as_str()
+                .unwrap_or_default()
+                .to_owned()
+        })
+    }
+    /// Replaces a sent shared card in place (`update_multi` must be set on both
+    /// the old and new card). Used only for the bounded terminal follow window.
+    pub async fn update_card(&self, message_id: &str, card: &Value) -> Result<(), String> {
+        if message_id.is_empty()
+            || message_id.len() > 128
+            || !message_id
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
+        {
+            return Err("feishu_invalid_message_id".into());
+        }
+        let token = self.token().await?;
+        let route = format!("/open-apis/im/v1/messages/{message_id}");
+        let result = self
+            .post(
+                &route,
+                &json!({"content":card.to_string()}),
+                Some(token.as_str()),
+            )
+            .await;
+        self.expire_token_on_error(&result).await;
+        result.map(|_| ())
+    }
+    async fn expire_token_on_error(&self, result: &Result<Value, String>) {
         if result.as_ref().is_err_and(|e| {
             matches!(
                 e.as_str(),
@@ -136,7 +170,6 @@ impl Network {
         }) {
             *self.token.lock().await = None;
         }
-        result.map(|_| ())
     }
     pub async fn connect(&self) -> Result<(Socket, i32, Duration), String> {
         let value = self
