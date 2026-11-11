@@ -44,7 +44,7 @@ export const feishuSetupGuideEn = {
   },
   verify: {
     title: "Verify commands and card buttons",
-    body: "From the bound user's private chat with this bot, send /taomni help, then /taomni list. Check that a reply arrives, the Delivered counter increases and the list card's Show button works. Empty lists are valid when no sessions exist; Agent operations require an existing Agent thread. File content export is optional and defaults off; enable it only if you want private-chat file queries sent to Feishu.",
+    body: "From the bound user's private chat with this bot, send /taomni help, then /taomni list. Check that a reply arrives, the Delivered counter increases and the list card's Show button works. Empty lists are valid when no sessions exist; Agent operations require an existing Agent thread. Terminal use is private-chat only: term <id> shows and briefly follows output, input <text> sends keystrokes, and saved/open/new create a terminal on this computer when Allow phone-opened sessions is on. File content export is optional and defaults off; enable it only if you want private-chat file queries sent to Feishu.",
     troubleshooting: "No bot or permission denied: check publication, administrator approval and user availability. No reply: check im.message.receive_v1, the two permissions and both binding IDs from this app. Rejected counter increases: check the user/chat pair. Card buttons fail: check card.action.trigger. Connecting or reconnecting: check App ID, App Secret and the selected proxy. After permission or subscription changes, publish again.",
   },
 };
@@ -95,7 +95,7 @@ export const feishuSetupGuideZh: typeof feishuSetupGuideEn = {
   },
   verify: {
     title: "验证指令与卡片按钮",
-    body: "使用已绑定用户与该机器人的私聊，依次发送 /taomni help 和 /taomni list。确认收到回复、「已送达」计数增加，列表卡片的「查看」按钮可用。没有会话时列表为空属于正常情况；Agent 操作需要先在 Taomni 中创建 Agent 线程。文件内容导出默认关闭，仅在需要把私聊查询的文件内容发送到飞书时开启。",
+    body: "使用已绑定用户与该机器人的私聊，依次发送 /taomni help 和 /taomni list。确认收到回复、「已送达」计数增加，列表卡片的「查看」按钮可用。没有会话时列表为空属于正常情况；Agent 操作需要先在 Taomni 中创建 Agent 线程。终端操作仅限私聊：term <id> 查看并短暂跟随输出，input <文本> 发送输入，saved/open/new 在开启「允许手机打开会话」后于本机创建终端。文件内容导出默认关闭，仅在需要把私聊查询的文件内容发送到飞书时开启。",
     troubleshooting: "找不到机器人或权限不足：检查发布状态、管理员审批与用户可用范围。没有回复：检查 im.message.receive_v1、两项权限和本应用的两个绑定 ID。「拒绝」计数增加：检查用户与会话是否成对匹配。卡片按钮无效：检查 card.action.trigger。一直连接或重连：检查 App ID、App Secret 与所选代理。权限或订阅变更后记得重新发布。",
   },
 };

@@ -88,6 +88,35 @@ impl Replay {
             })
             .unwrap_or_default()
     }
+
+    /// Most recent cleaned output, for a chat-sized snapshot. Lines are taken
+    /// from the end so a busy terminal shows what just happened; when the cap
+    /// is exceeded the oldest visible text is dropped, not the newest.
+    pub fn tail(&self, max_lines: usize, max_chars: usize) -> String {
+        let mut lines: Vec<String> = Vec::new();
+        for line in self.lines().iter().rev() {
+            let clean = plain_line(line);
+            if clean.is_empty() && lines.is_empty() {
+                continue;
+            }
+            lines.push(clean);
+            if lines.len() >= max_lines.max(1) {
+                break;
+            }
+        }
+        lines.reverse();
+        while lines.last().is_some_and(|line| line.is_empty()) {
+            lines.pop();
+        }
+        let text = lines.join("\n");
+        if text.chars().count() <= max_chars {
+            return text;
+        }
+        let skip = text.chars().count() - max_chars.max(1);
+        let mut clipped: String = text.chars().skip(skip).collect();
+        clipped.insert(0, '…');
+        clipped
+    }
 }
 
 fn plain_line(line: &str) -> String {
@@ -136,6 +165,19 @@ mod tests {
         assert_eq!(r.summary(), "Ready without newline");
         r.push(b"\x1b]0;title\x07");
         assert_eq!(r.summary(), "Ready without newline");
+    }
+
+    #[test]
+    fn tail_keeps_the_newest_clean_lines() {
+        let mut r = Replay::default();
+        r.push(b"one\r\n\x1b[32mtwo\x1b[0m\r\nthree\r\n");
+        assert_eq!(r.tail(2, 100), "two\nthree");
+        assert_eq!(r.tail(10, 100), "one\ntwo\nthree");
+        assert_eq!(r.tail(10, 5), "…three");
+        r.push(b"\n\n");
+        assert_eq!(r.tail(2, 100), "two\nthree");
+        r.push(b"partial");
+        assert_eq!(r.tail(1, 100), "partial");
     }
 
     #[test]

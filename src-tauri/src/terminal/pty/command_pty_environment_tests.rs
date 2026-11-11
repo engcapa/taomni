@@ -6,6 +6,7 @@ use std::io::Read;
 
 #[test]
 fn command_pty_has_a_controlling_tty_and_custom_environment() {
+    let _pty = super::test_lock();
     let args = vec![
         "-c".to_string(),
         "test -t 0 && test \"$TAOMNI_PTY_TEST\" = ok && printf pty-ready".to_string(),

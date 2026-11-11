@@ -42,6 +42,9 @@ enum Outcome {
 
 struct Request {
     device: String,
+    /// Created by the Feishu adapter: identity was checked against the IM
+    /// binding, so the desktop claim does not need a paired Web device.
+    im: bool,
     created: Instant,
     outcome: Outcome,
     /// Once the desktop claims the request, the normal desktop connection flow
@@ -114,7 +117,7 @@ impl OpenRequests {
             }
         }
     }
-    fn insert(&self, device: &str) -> Result<String, String> {
+    fn insert(&self, device: &str, im: bool) -> Result<String, String> {
         let mut requests = self.requests.lock().unwrap_or_else(|e| e.into_inner());
         Self::prune(&mut requests);
         if requests.len() >= MAX_RETAINED_REQUESTS {
@@ -132,6 +135,7 @@ impl OpenRequests {
             id.clone(),
             Request {
                 device: device.into(),
+                im,
                 created: Instant::now(),
                 outcome: Outcome::Pending,
                 claimed: false,
@@ -178,7 +182,7 @@ impl OpenRequests {
         else {
             return false;
         };
-        if !self.allowed() || !authorized(&request.device) {
+        if !self.allowed() || (!request.im && !authorized(&request.device)) {
             request.outcome = Outcome::Failed("open_cancelled".into());
             return false;
         }
@@ -231,6 +235,27 @@ pub fn start(
     device: &str,
     body: &Value,
 ) -> Result<Value, String> {
+    start_with(core, runtime, device, body, false)
+}
+
+/// IM-originated open request. The chat identity was already verified against
+/// the configured binding, and the desktop still runs its normal open flow.
+pub fn start_im(
+    core: &Core,
+    runtime: &MobileRuntime,
+    device: &str,
+    body: &Value,
+) -> Result<Value, String> {
+    start_with(core, runtime, device, body, true)
+}
+
+fn start_with(
+    core: &Core,
+    runtime: &MobileRuntime,
+    device: &str,
+    body: &Value,
+    im: bool,
+) -> Result<Value, String> {
     if !runtime.open_requests.allowed() {
         return Err("open_sessions_disabled".into());
     }
@@ -259,7 +284,7 @@ pub fn start(
         }
         _ => return Err("invalid_open_request".into()),
     };
-    let request_id = runtime.open_requests.insert(device)?;
+    let request_id = runtime.open_requests.insert(device, im)?;
     let payload = json!({"request_id":request_id, "kind":kind, "saved_session_id":saved});
     if app.emit_to("main", OPEN_EVENT, payload).is_err() {
         runtime.open_requests.remove(&request_id);

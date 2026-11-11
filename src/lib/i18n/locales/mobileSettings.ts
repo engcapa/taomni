@@ -17,8 +17,8 @@ export const mobileSettingsEn = {
   hostsSaved: "Domain settings saved and applied.",
   enable: "Enable mobile service",
   disable: "Disable mobile service",
-  allowOpenSessions: "Allow paired phones to open saved sessions and create local terminals",
-  openSessionsHint: "Opens in this computer's desktop window using saved credentials, proxies and jump hosts. Missing connection credentials can be entered on the phone for this connection only; saved sessions are not modified. The vault master password must only be entered on this computer. Desktop mode only; not supported in headless mode. Turning this off blocks requests not yet accepted; connections already accepted by the desktop continue running.",
+  allowOpenSessions: "Allow paired phones and the Feishu adapter to open saved sessions and create local terminals",
+  openSessionsHint: "Opens in this computer's desktop window using saved credentials, proxies and jump hosts. Missing connection credentials can be entered on the phone for this connection only; saved sessions are not modified. The vault master password must only be entered on this computer. Desktop mode only; not supported in headless mode. Feishu requests cannot answer desktop prompts, so finish any authentication on this computer. Turning this off blocks requests not yet accepted; connections already accepted by the desktop continue running.",
   running: "Running · {address}",
   stopped: "Disabled · No listening port",
   networkWarning: "LAN HTTP connections are unencrypted and transmit credentials and content. Use HTTPS over the internet. Enter a LAN address reachable from your phone or your own HTTPS endpoint; 0.0.0.0 and 127.0.0.1 are not remote phone addresses.",
@@ -82,8 +82,8 @@ export const mobileSettingsZh: typeof mobileSettingsEn = {
   hostsSaved: "域名设置已保存并生效。",
   enable: "开启移动服务",
   disable: "关闭移动服务",
-  allowOpenSessions: "允许已配对手机打开已保存会话和新建本地终端",
-  openSessionsHint: "在本机桌面窗口中打开，复用已保存的凭据、代理和跳板机；缺少的连接凭据可在手机填写，仅用于本次连接，不修改已保存的会话。保险库主密码仅在本机输入。仅在桌面运行时可用，headless 不支持。关闭此开关阻止尚未受理的请求；桌面已受理的连接继续运行。",
+  allowOpenSessions: "允许已配对手机和飞书适配器打开已保存会话、新建本地终端",
+  openSessionsHint: "在本机桌面窗口中打开，复用已保存的凭据、代理和跳板机；缺少的连接凭据可在手机填写，仅用于本次连接，不修改已保存的会话。保险库主密码仅在本机输入。仅在桌面运行时可用，headless 不支持。飞书无法回答桌面认证提示，需要认证时请在本机完成。关闭此开关阻止尚未受理的请求；桌面已受理的连接继续运行。",
   running: "运行中 · {address}",
   stopped: "已关闭 · 无监听端口",
   networkWarning: "局域网 HTTP 为明文连接，会传输凭据和内容；互联网请配置 HTTPS。手机请使用可到达的局域网地址或自备 HTTPS endpoint；0.0.0.0 与 127.0.0.1 不能作为远程手机地址。",
@@ -155,7 +155,7 @@ export const feishuSettingsEn = {
   saved: "Settings saved. The secret is never returned.",
   status: "{state} · Delivered {delivered} · Failed {failed} · Rejected {rejected} · Duplicates {duplicates} · Reconnects {reconnects}",
   states: { stopped: "Stopped", connecting: "Connecting", connected: "Connected", reconnecting: "Reconnecting" },
-  commands: "Send /taomni help for commands: list, show, file, send, stop, approve and reject. Only existing Agent threads can be controlled. No PTY input or session creation. Replies and snapshots are truncated.",
+  commands: "Send /taomni help for commands. Terminals: term (follow output), input, key, saved, open, new. Agent: list, show, send, stop, approve, reject. Terminal output and input need a bound private chat; opening sessions also needs “Allow phone-opened sessions” above. Replies, tails and cards are truncated.",
   vaultReason: "Unlock the credential vault to save or use Feishu credentials",
 };
 
@@ -184,6 +184,6 @@ export const feishuSettingsZh: typeof feishuSettingsEn = {
   saved: "设置已保存，密钥不会回传。",
   status: "{state} · 已送达 {delivered} · 发送失败 {failed} · 拒绝 {rejected} · 重复 {duplicates} · 重连 {reconnects}",
   states: { stopped: "已停止", connecting: "连接中", connected: "已连接", reconnecting: "重连中" },
-  commands: "发送 /taomni help 查看命令；支持 list、show、file、send、stop、approve、reject。只操作现有 Agent 线程，不向 PTY 输入，不创建会话。回复与快照会截断。",
+  commands: "发送 /taomni help 查看命令。终端：term（跟随输出）、input、key、saved、open、new；Agent：list、show、send、stop、approve、reject。终端输出与输入仅限已绑定私聊；打开会话还需在上方开启“允许手机打开会话”。回复、输出与卡片会截断。",
   vaultReason: "保存或使用飞书凭据需要解锁凭据库",
 };

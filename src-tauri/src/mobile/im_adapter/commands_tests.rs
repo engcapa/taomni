@@ -240,3 +240,50 @@ async fn short_ids_resolve_before_the_thread_only_rule() {
     );
     f.finish().await;
 }
+
+#[test]
+fn terminal_grammar_keeps_verbatim_input_text() {
+    use super::commands::{key_bytes, parse, resolve_saved};
+    let invocation = parse("输入 ls  -la\u{3000}--color", true).unwrap();
+    assert_eq!(invocation.command, "input ls -la --color");
+    assert_eq!(invocation.after_action, "ls  -la\u{3000}--color");
+    assert_eq!(invocation.after_target, "-la\u{3000}--color");
+    let invocation = parse("/taomni\u{3000}终端\u{3000}term:abcd1234", true).unwrap();
+    assert_eq!(invocation.command, "term term:abcd1234");
+    assert_eq!(invocation.after_action, "term:abcd1234");
+    assert_eq!(invocation.after_target, "");
+    for (text, expected) in [
+        ("终端 abcd1234", "term abcd1234"),
+        ("按键 ctrl-c", "key ctrl-c"),
+        ("保存", "saved"),
+        ("打开 生产机", "open 生产机"),
+        ("新建", "new"),
+        ("输入 ls -la", "input ls -la"),
+    ] {
+        assert_eq!(normalize(text, true).as_deref(), Some(expected), "{text:?}");
+    }
+    assert_eq!(key_bytes("Ctrl-C"), Some(&b"\x03"[..]));
+    assert_eq!(key_bytes("enter"), Some(&b"\r"[..]));
+    assert_eq!(key_bytes("up"), Some(&b"\x1b[A"[..]));
+    assert_eq!(key_bytes("nope"), None);
+
+    let saved = vec![
+        json!({"id":"12345678-abcd-0000","name":"生产机","session_type":"SSH"}),
+        json!({"id":"87654321-abcd-0000","name":"测试机","session_type":"LocalShell"}),
+    ];
+    assert_eq!(
+        resolve_saved(&saved, "12345678-abcd-0000").unwrap(),
+        "12345678-abcd-0000"
+    );
+    assert_eq!(
+        resolve_saved(&saved, "生产机").unwrap(),
+        "12345678-abcd-0000"
+    );
+    assert_eq!(
+        resolve_saved(&saved, "87654321").unwrap(),
+        "87654321-abcd-0000"
+    );
+    assert_eq!(resolve_saved(&saved, "测试").unwrap(), "87654321-abcd-0000");
+    assert!(resolve_saved(&saved, "1").is_err());
+    assert!(resolve_saved(&saved, "缺失").is_err());
+}

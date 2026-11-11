@@ -5,7 +5,7 @@ fn pending(requests: &OpenRequests) -> String {
     requests
         .allowed
         .store(true, std::sync::atomic::Ordering::Relaxed);
-    let id = requests.insert("phone-a").unwrap();
+    let id = requests.insert("phone-a", false).unwrap();
     assert!(requests.claim(&id, |_| true));
     id
 }
@@ -209,7 +209,7 @@ async fn real_http_challenges_require_authentication_and_the_requesting_device()
     requests
         .allowed
         .store(true, std::sync::atomic::Ordering::Relaxed);
-    let id = requests.insert(&device).unwrap();
+    let id = requests.insert(&device, false).unwrap();
     assert!(requests.claim(&id, |_| true));
     let (challenge, rx) = publish(requests, &id);
     let url = format!("{}/api/v1/open-requests/{id}/auth", fixture.endpoint);
