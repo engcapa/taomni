@@ -53,7 +53,7 @@ jobs:
         with:
           node-version: '22'
       - name: Build selection contracts
-        run: node --test scripts/resolve-release-build.test.mjs scripts/release-workflow.test.mjs scripts/sherpa-onnx-cache.test.mjs
+        run: node --test scripts/resolve-release-build.test.mjs scripts/release-workflow.test.mjs scripts/install-linux-release-deps.test.mjs scripts/sherpa-onnx-cache.test.mjs
       - name: Resolve build selection and version
         id: plan
         env:
@@ -124,31 +124,8 @@ jobs:
 
       - name: Install Linux bundle dependencies
         if: matrix.platform == 'ubuntu-22.04'
-        run: |
-          sudo apt-get update
-          # Base bundle deps + LanChat native A/V (native-av feature): nasm builds
-          # openh264's x86 asm, libasound2-dev is cpal's ALSA backend, libv4l-dev
-          # is nokhwa's camera backend. X11 screen capture uses libxcb (already
-          # present on the runner).
-          # meson/ninja/libclang: used to build a newer PipeWire for libspa 0.9.
-          # libpipewire-0.3-dev: stock jammy headers (too old alone); kept so
-          # related packages are present; overlaid by the next step.
-          sudo apt-get install -y \
-            libwebkit2gtk-4.1-dev \
-            libappindicator3-dev \
-            librsvg2-dev \
-            patchelf \
-            libkrb5-dev \
-            nasm \
-            libasound2-dev \
-            libv4l-dev \
-            libpipewire-0.3-dev \
-            libclang-dev \
-            libdbus-1-dev \
-            libudev-dev \
-            meson \
-            ninja-build \
-            pkg-config
+        timeout-minutes: 20
+        run: bash scripts/install-linux-release-deps.sh
 
       # xcap → pipewire → libspa 0.9.x expects spa_video_info_raw.flags and
       # modifier:u64. Ubuntu 22.04's PipeWire ~0.3.48 headers lack those fields.
