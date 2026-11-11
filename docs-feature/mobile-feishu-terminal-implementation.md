@@ -70,7 +70,27 @@
 
 ## 验证
 
-（待本轮执行后回填）
+本机（Linux，Node 24 复用已有依赖，pnpm 11；CI 仍以 Node 22 / pnpm 10 为准）：
+
+- `cargo test --lib mobile::`：87/87 通过，覆盖终端卡片、真实 PTY 输入与按键、私聊限制、已保存会话解析、IM 打开请求 claim，以及既有飞书协议回归。
+- 新增真实 PTY 回归在并行运行时需要串行化：`portable-pty` 并发 fork 可能让子进程在 exec 前卡住。`terminal::pty::test_lock` 只用于测试。
+- `vitest run` 三个飞书设置/指南文件：12/12 通过；`tsc -b` 通过。
+- `cargo fmt --check`、`refactor-contracts`、`refactor-boundaries`、`source-file-size` 均通过。
+- 为让 `listener_tests` 的静态资源用例在本机通过，先执行了 `vite build --config mobile-web/vite.config.ts`；该产物不入库。
+
+GitHub `qa-ui-auto-platforms.yml`，提交 `e6ddc3fd`，`scope=selected` 选择 TC-MOBILE-001/004/016/019，linux/windows/macos × browser/native，`native_release=true`，workflow 自动并入完整 `crash-regression`：
+
+| 环境 | Browser | Native | 失败 / 跳过 / 基础设施错误 |
+| --- | --- | --- | --- |
+| Linux | 13/13 | 12/12 | 0 / 0 / 0 |
+| Windows | 13/13 | 12/12 | 0 / 0 / 0 |
+| macOS | 13/13 | 12/12 | 0 / 0 / 0 |
+
+最终运行 [43017830185](https://github.com/engcapa/taomni/actions/runs/43017830185) 成功，共 75/75 通过；聚合任务报告 `Declared capability gaps: 0; unreviewed cases: 0`。
+
+同提交的前一轮 [43006619865](https://github.com/engcapa/taomni/actions/runs/43006619865) 有 74/75：Windows native 的 TC-MOBILE-016 在 `<setup>` 阶段报 `native app document did not become ready within 20.0s: document root is not mounted`，同分片另外两例通过，属于首次启动的 WebView 就绪偶发问题；重跑分片后该例通过，但同一 run 内重跑导致分片身份与其他分片不一致（`selection/run identity differs`），因此以全新一轮 43017830185 作为最终证据。
+
+真实飞书租户（V-08）仍未验证：卡片原地更新、回调内联卡片、`update_multi` 渲染需要在真实应用上确认。
 
 ## 已知限制
 
