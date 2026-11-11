@@ -13678,6 +13678,7 @@ files:
   - mobile-web/src/PairForm.tsx
   - mobile-web/src/InstanceView.tsx
   - mobile-web/src/SavedSessionsPanel.tsx
+  - mobile-web/src/SessionResults.tsx
   - mobile-web/src/TerminalComposer.tsx
   - mobile-web/src/TerminalKeybar.tsx
   - mobile-web/src/terminalKeys.ts
@@ -13792,8 +13793,20 @@ controls:
   - id: mobile-saved-session
     selector: '[data-testid="mobile-saved-session"]'
     kind: display
-  - id: mobile-saved-toggle
-    selector: '[data-testid="mobile-saved-toggle"]'
+  - id: mobile-sessions-search
+    selector: '[data-testid="mobile-sessions-search"]'
+    kind: interactive
+  - id: mobile-sessions-search-clear
+    selector: '[data-testid="mobile-sessions-search-clear"]'
+    kind: interactive
+  - id: mobile-sessions-empty-search
+    selector: '[data-testid="mobile-sessions-empty-search"]'
+    kind: display
+  - id: mobile-sessions-result-count
+    selector: '[data-testid="mobile-sessions-result-count"]'
+    kind: display
+  - id: mobile-sessions-more
+    selector: '[data-testid="mobile-sessions-more"]'
     kind: interactive
   - id: mobile-saved-search
     selector: '[data-testid="mobile-saved-search"]'
@@ -13804,6 +13817,12 @@ controls:
   - id: mobile-saved-empty-search
     selector: '[data-testid="mobile-saved-empty-search"]'
     kind: display
+  - id: mobile-saved-result-count
+    selector: '[data-testid="mobile-saved-result-count"]'
+    kind: display
+  - id: mobile-saved-more
+    selector: '[data-testid="mobile-saved-more"]'
+    kind: interactive
   - id: mobile-terminal-status
     selector: '[data-testid="mobile-terminal-status"]'
     kind: display
@@ -14204,7 +14223,7 @@ controls:
 
 - 默认不监听；全局设置开启回环/局域网移动服务，生成一次性码、查看与吊销设备。
 - 独立 PWA 支持多个 endpoint、终端共享与单写权、Agent 后续指令及只读文件/diff。实例列表暂不列出 Agent，通知深链仍可进入任务。
-- 多条已保存会话默认折叠，单条可直接打开；展开后可按名称、类型或分组搜索，支持无结果提示、清除和折叠后重置。
+默认显示 8 条，点击“显示更多”每次增加 8 条；运行中的终端和已保存会话均支持搜索、无结果提示、结果计数和清空搜索。
 - Linux headless 不创建 Tauri/GTK 窗口；桌面工具运行时不可用的路径显式报错。
 - 桌面设置显式允许后，已配对手机可请求新建本地终端或打开已保存会话；TC-MOBILE-005 定义真实 HTTP/WS → 桌面 tab → PTY → 独立磁盘 marker 的 Linux 验证，并保护默认拒绝、跨设备请求隔离和可读标题（运行结果以报告为准）。
 - 当前执行证据与限制见 `docs-feature/mobile-remote-p0-implementation.md`，未验证的平台与真手机能力不作完成声明。

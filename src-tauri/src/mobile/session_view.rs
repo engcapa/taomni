@@ -26,7 +26,7 @@ pub async fn list(state: &AppState) -> Result<Value, String> {
             .map_err(|_| "broker_unavailable")?;
         for (id, terminal) in terminals.iter() {
             sessions.push(json!({"id":format!("term:{id}"),"kind":"terminal", "title":terminal.title.as_deref().unwrap_or(id),
-                "status":if terminal.running {"running"} else {"exited"},"last_activity_at":null,"summary":"", "workspace_context":null}));
+                "status":if terminal.running {"running"} else {"exited"},"last_activity_at":null,"summary":terminal.summary(), "workspace_context":null}));
         }
     }
     let (threads, saved) = {

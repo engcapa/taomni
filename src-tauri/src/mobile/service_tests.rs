@@ -123,6 +123,26 @@ async fn send(ws: &mut Ws, value: Value) {
 }
 
 #[tokio::test]
+async fn session_list_exposes_latest_real_terminal_summary() {
+    let f = Fixture::new().await;
+    let (_, token) = f.pair().await;
+    f.state.mobile.broker.register("summary");
+    f.state.mobile.broker.output(
+        "summary",
+        b"old output\r\n\x1b[32mDatabase maintenance\x1b[0m",
+    );
+    let listed = f.get(&token, "/sessions").await;
+    let row = listed["sessions"]
+        .as_array()
+        .unwrap()
+        .iter()
+        .find(|session| session["id"] == "term:summary")
+        .unwrap();
+    assert_eq!(row["summary"], "Database maintenance");
+    f.finish().await;
+}
+
+#[tokio::test]
 async fn http_security_cors_revocation_and_listener_shutdown() {
     let f = Fixture::new().await;
     let health = f

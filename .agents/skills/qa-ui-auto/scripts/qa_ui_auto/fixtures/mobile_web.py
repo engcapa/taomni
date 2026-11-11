@@ -122,10 +122,21 @@ def setup(ctx):
             terminal = {'id': 'term:qa-runtime', 'kind': 'terminal', 'title': 'Local shell', 'status': 'running', 'summary': 'QA terminal'}
             task = {'id': 'thread:qa-task', 'kind': 'agent', 'title': 'Review task', 'status': state['task'], 'summary': 'QA agent'}
             if path == '/api/v1/sessions':
-                saved = [{'id': 'saved', 'name': 'Build host', 'session_type': 'SSH', 'group_path': 'QA'}]
                 if ctx.case_id == 'TC-MOBILE-019':
-                    saved += [{'id': 'lab', 'name': 'Console', 'session_type': 'Serial', 'group_path': 'Hardware/Lab'}, {'id': 'local', 'name': 'Local shell', 'session_type': 'Local', 'group_path': None}]
-                return self.reply(200, {'sessions': [terminal, task], 'saved_sessions': saved,
+                    sessions = [
+                        {'id': f'term:{index}', 'kind': 'terminal', 'title': f'Terminal {index:02d}',
+                         'status': 'running', 'summary': 'Database maintenance' if index == 17 else f'Summary {index}'}
+                        for index in range(20)
+                    ] + [task]
+                    saved = [
+                        {'id': 'build', 'name': 'Build host', 'session_type': 'SSH', 'group_path': 'Production'},
+                        {'id': 'lab', 'name': 'Console', 'session_type': 'Serial', 'group_path': 'Hardware/Lab'},
+                        {'id': 'local', 'name': 'Local shell', 'session_type': 'Local', 'group_path': None},
+                    ] + [{'id': f'extra-{index}', 'name': f'Archive {index:02d}', 'session_type': 'SSH', 'group_path': 'Overflow/Long'} for index in range(17)]
+                else:
+                    sessions = [terminal, task]
+                    saved = [{'id': 'saved', 'name': 'Build host', 'session_type': 'SSH', 'group_path': 'QA'}]
+                return self.reply(200, {'sessions': sessions, 'saved_sessions': saved,
                                         'capabilities': {'open_sessions': True}})
             if path.startswith('/api/v1/open-requests/'):
                 request_id = path.rsplit('/', 1)[1]
