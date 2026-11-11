@@ -329,8 +329,15 @@ async fn dispatch(
             && let Some(selected) =
                 focus(request).and_then(|key| core.state().mobile.im.focus_get(&key))
         {
-            return terminal_reply(core, config, &selected, p2p_chat, request, action == "term")
-                .await;
+            return terminal_reply(
+                core,
+                config,
+                &selected,
+                p2p_chat,
+                request,
+                action != "term-refresh",
+            )
+            .await;
         }
         return Err(commands::usage(action));
     }
@@ -340,7 +347,15 @@ async fn dispatch(
     let task = commands::resolve(sessions, target)?;
     let task = task.as_str();
     if matches!(action, "term" | "term-refresh" | "show") && task.starts_with("term:") {
-        return terminal_reply(core, config, task, p2p_chat, request, action == "term").await;
+        return terminal_reply(
+            core,
+            config,
+            task,
+            p2p_chat,
+            request,
+            action != "term-refresh",
+        )
+        .await;
     }
     if matches!(action, "term" | "term-refresh") {
         return Err("该 id 不是终端。发送“列表”查看终端短 id。".into());
