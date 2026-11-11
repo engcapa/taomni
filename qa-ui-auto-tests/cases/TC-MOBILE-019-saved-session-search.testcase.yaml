@@ -20,10 +20,18 @@ steps:
 - assert_text: {selector: '[data-testid="mobile-sessions-result-count"]', contains: 共 20 个会话，当前显示 8 条}
 - assert_text: {selector: '[data-testid="mobile-saved-result-count"]', contains: 共 20 个会话，当前显示 8 条}
 - screenshot: mobile-session-lists-initial.png
-- click: '[data-testid="mobile-sessions-more"]'
-- assert_count: {selector: '[data-testid="mobile-session"]', equal: 16}
-- click: '[data-testid="mobile-saved-more"]'
-- assert_count: {selector: '[data-testid="mobile-saved-session"]', equal: 16}
+- press: {selector: '[data-testid="mobile-sessions-more"]', key: Enter}
+- eval_readonly:
+    expression: document.querySelectorAll('.session-card').length === 16 && document.activeElement === document.querySelectorAll('.session-card')[8]
+    expect_truthy: true
+- press: Tab
+- eval_readonly:
+    expression: document.activeElement === document.querySelectorAll('.session-card')[9]
+    expect_truthy: true
+- press: {selector: '[data-testid="mobile-saved-more"]', key: Enter}
+- eval_readonly:
+    expression: document.querySelectorAll('.saved-session').length === 16 && document.activeElement === document.querySelectorAll('.saved-session > button')[8]
+    expect_truthy: true
 - click: '[data-testid="mobile-sessions-more"]'
 - assert_count: {selector: '[data-testid="mobile-session"]', equal: 20}
 - assert_count: {selector: '[data-testid="mobile-sessions-more"]', equal: 0}
@@ -36,15 +44,19 @@ steps:
 - screenshot: mobile-session-search-filtered.png
 - click: '[data-testid="mobile-sessions-search-clear"]'
 - assert_count: {selector: '[data-testid="mobile-session"]', equal: 8}
-- fill: {selector: '[data-testid="mobile-sessions-search"]', value: missing}
-- assert_count: {selector: '[data-testid="mobile-session"]', equal: 0}
+- fill: {selector: '[data-testid="mobile-sessions-search"]', value: 'missing-host-with-a-long-unbroken-query-abcdefghijklmnopqrstuvwxyz-0123456789-ABCDEFGHIJKLMNOPQRSTUVWXYZ'}
+- eval_readonly:
+    expression: document.querySelector('.session-empty-search').textContent.includes('没有匹配') && document.documentElement.scrollWidth <= innerWidth
+    expect_truthy: true
 - assert_text: {selector: '[data-testid="mobile-sessions-empty-search"]', contains: 没有匹配}
+- assert_count: {selector: '[data-testid="mobile-session"]', equal: 0}
 - click: '[data-testid="mobile-sessions-search-clear"]'
 - fill: {selector: '[data-testid="mobile-sessions-search"]', value: terminal 12}
 - assert_count: {selector: '[data-testid="mobile-session"]', equal: 1}
 - click: '[data-testid="mobile-session"]'
 - wait_for: '[data-testid="mobile-terminal-screen"]'
-- click: '[data-testid="mobile-sessions-back"]'
+- assert_attribute: {selector: '[data-testid="mobile-terminal"]', name: class, equals: 'card terminal-card fullscreen'}
+- click: '[data-testid="mobile-terminal-back"]'
 - wait_for: '[data-testid="mobile-sessions"]'
 - wait_for: '[data-testid="mobile-saved-search"]'
 - fill: {selector: '[data-testid="mobile-saved-search"]', value: '  BUILD '}
@@ -56,6 +68,10 @@ steps:
 - fill: {selector: '[data-testid="mobile-saved-search"]', value: hardware/lab}
 - assert_count: {selector: '[data-testid="mobile-saved-session"]', equal: 1}
 - assert_text: {selector: '[data-testid="mobile-saved-session"]', contains: Console}
+- fill: {selector: '[data-testid="mobile-saved-search"]', value: 未分组}
+- assert_count: {selector: '[data-testid="mobile-saved-session"]', equal: 1}
+- assert_text: {selector: '[data-testid="mobile-saved-session"]', contains: Local shell}
+- assert_text: {selector: '[data-testid="mobile-saved-session"]', contains: 未分组}
 - fill: {selector: '[data-testid="mobile-saved-search"]', value: Archive 16}
 - assert_count: {selector: '[data-testid="mobile-saved-session"]', equal: 1}
 - assert_text: {selector: '[data-testid="mobile-saved-session"]', contains: Archive 16}
@@ -79,7 +95,7 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Initial session-list counts and screenshots
+    requirement: Initial eight-row session lists report the full twenty-entry totals.
     actions: [4, 5, 6, 7]
     checkpoints:
     - {step: 8, expectation: Terminal count is eight}
@@ -89,58 +105,66 @@ verification:
     - {step: 12, expectation: Saved result count reports twenty total and eight visible}
     results: [8, 9, 10, 11, 12]
   - id: R2
-    requirement: Session loading reaches twenty entries and captures the expanded list.
-    actions: [14, 16, 18, 21]
+    requirement: Both lists reach twenty entries and keyboard activation moves focus into newly revealed rows.
+    actions: [14, 16, 18, 20, 23]
     checkpoints:
-    - {step: 15, expectation: Sixteen sessions are visible}
-    - {step: 17, expectation: Sixteen saved sessions are visible}
-    - {step: 19, expectation: Twenty sessions are visible}
-    - {step: 20, expectation: No more sessions are available}
-    - {step: 22, expectation: Twenty saved sessions are visible}
-    results: [15, 17, 19, 20, 22]
+    - {step: 15, expectation: Sixteen terminal sessions are visible and focus is on the first newly revealed row}
+    - {step: 17, expectation: Tab advances to the next newly revealed terminal row}
+    - {step: 19, expectation: Sixteen saved sessions are visible and focus is on the first newly revealed open action}
+    - {step: 21, expectation: Twenty terminal sessions are visible}
+    - {step: 22, expectation: No more terminal sessions are available}
+    - {step: 24, expectation: Twenty saved sessions are visible}
+    results: [15, 17, 19, 21, 22, 24]
   - id: R3
-    requirement: Active-session search covers summaries, empty results, clearing, and title matching.
-    actions: [24, 28, 30, 33, 34]
+    requirement: Active-session search covers summaries, long empty results without overflow, clearing, and title matching.
+    actions: [26, 30, 32, 36, 37]
     checkpoints:
-    - {step: 25, expectation: Summary search finds one result}
-    - {step: 26, expectation: Summary contains Database maintenance}
-    - {step: 29, expectation: Clearing restores eight results}
-    - {step: 31, expectation: Missing query yields zero sessions}
-    - {step: 32, expectation: Empty message is visible}
-    - {step: 35, expectation: Title search finds one session}
-    results: [25, 26, 29, 31, 32, 35]
+    - {step: 27, expectation: Summary search finds one result}
+    - {step: 28, expectation: Summary contains Database maintenance}
+    - {step: 31, expectation: Clearing restores eight results}
+    - {step: 33, expectation: Long missing query shows an empty message without viewport overflow}
+    - {step: 34, expectation: Empty message is visible}
+    - {step: 35, expectation: Long missing query yields zero sessions}
+    - {step: 38, expectation: Title search finds one session}
+    results: [27, 28, 31, 33, 34, 35, 38]
   - id: R4
-    requirement: Saved-session search covers name, type, group, empty, and clear behavior.
-    actions: [41, 44, 47, 50, 53, 57, 59]
+    requirement: Saved-session search covers name, type, named and ungrouped groups, empty results, and clearing.
+    actions: [45, 48, 51, 54, 58, 61, 65, 67]
     checkpoints:
-    - {step: 42, expectation: Name query returns one session}
-    - {step: 43, expectation: Build host is visible}
-    - {step: 45, expectation: Serial query finds one session}
-    - {step: 46, expectation: Console text is visible}
-    - {step: 48, expectation: Group query returns one session}
-    - {step: 49, expectation: Console group text is visible}
-    - {step: 51, expectation: Archive query finds one result}
-    - {step: 52, expectation: Archive 16 text is visible}
-    - {step: 54, expectation: Missing query returns zero saved sessions}
-    - {step: 55, expectation: Empty message is visible}
-    - {step: 58, expectation: Clear restores eight saved sessions}
-    - {step: 60, expectation: Final console query finds exactly one result}
-    results: [42, 43, 45, 46, 48, 49, 51, 52, 54, 55, 58, 60]
+    - {step: 46, expectation: Name query returns one session}
+    - {step: 47, expectation: Build host is visible}
+    - {step: 49, expectation: Serial query finds one session}
+    - {step: 50, expectation: Console text is visible}
+    - {step: 52, expectation: Group query returns one session}
+    - {step: 53, expectation: Console group text is visible}
+    - {step: 55, expectation: Ungrouped query finds exactly one session}
+    - {step: 56, expectation: The ungrouped Local shell is returned}
+    - {step: 57, expectation: Returned row displays the ungrouped label}
+    - {step: 59, expectation: Archive query finds one result}
+    - {step: 60, expectation: Archive 16 text is visible}
+    - {step: 62, expectation: Missing query returns zero saved sessions}
+    - {step: 63, expectation: Empty message is visible}
+    - {step: 66, expectation: Clear restores eight saved sessions}
+    - {step: 68, expectation: Final console query finds exactly one result}
+    results: [46, 47, 49, 50, 52, 53, 55, 56, 57, 59, 60, 62, 63, 66, 68]
   - id: R5
-    requirement: Filtered session opening retains identity and responsive layout.
-    actions: [36, 38, 62]
+    requirement: Filtered terminal opening returns from the default fullscreen view and saved-session opening retains identity and responsive layout.
+    actions: [39, 42, 70]
     checkpoints:
-    - {step: 37, expectation: Filtered terminal opens}
-    - {step: 39, expectation: Session workspace is visible}
-    - {step: 63, expectation: Saved session opens}
-    - {step: 64, expectation: Receipt records saved lab}
-    - {step: 65, expectation: Viewport has no overflow}
-    - {step: 66, expectation: Runtime has no errors}
-    results: [37, 39, 63, 64, 65, 66]
+    - {step: 38, expectation: Filtered terminal target is uniquely identified}
+    - {step: 40, expectation: Filtered terminal opens}
+    - {step: 41, expectation: Terminal is actually fullscreen by default}
+    - {step: 43, expectation: Session workspace returns from fullscreen}
+    - {step: 44, expectation: Saved-session controls remain available after return}
+    - {step: 71, expectation: Saved session opens}
+    - {step: 72, expectation: Receipt records saved lab}
+    - {step: 73, expectation: Viewport has no overflow}
+    - {step: 74, expectation: Runtime has no errors}
+    results: [38, 40, 41, 43, 44, 71, 72, 73, 74]
   visual:
-  - check: Initial eight-row, filtered and opened-session views remain readable at 390x844 without horizontal overflow or runtime errors.
+  - check: Initial, expanded, filtered and empty session views remain readable at 390x844; keyboard focus enters new rows, long queries do not overflow, and the fullscreen terminal can return to the list.
     method: automated
-    reason: Screenshots, exact row counts, status text and a runtime-error assertion cover the browser renderer; physical-device appearance and native mobile pane behavior remain owned by other cases.
+    reason: Screenshots, exact row counts, focus assertions, fullscreen state and return, overflow checks and a runtime-error assertion cover the browser renderer; physical-device appearance and native mobile pane behavior remain owned by other cases.
   native:
   - check: Native listener, IPC and PTY effects.
     method: not-applicable

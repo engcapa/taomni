@@ -1,5 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { OpenStatus } from "./openSession";
 const mock = vi.hoisted(() => ({ request: vi.fn(), open: vi.fn() }));
@@ -52,8 +53,9 @@ it("shows eight terminal sessions per batch and searches titles and summaries ac
   expect(screen.getByTestId("mobile-session")).toHaveTextContent("Database maintenance");
   fireEvent.click(screen.getByTestId("mobile-sessions-search-clear"));
   expect(screen.getAllByTestId("mobile-session")).toHaveLength(8);
-  fireEvent.change(search, { target: { value: " missing " } });
+  fireEvent.change(search, { target: { value: `missing-${"x".repeat(240)}` } });
   expect(screen.queryByTestId("mobile-session")).toBeNull();
+  expect(screen.getByTestId("mobile-sessions-empty-search")).toHaveClass("session-empty-search");
   expect(screen.getByTestId("mobile-sessions-empty-search")).toHaveTextContent("没有匹配");
   fireEvent.click(screen.getByTestId("mobile-sessions-search-clear"));
   fireEvent.change(search, { target: { value: "terminal 12" } });
@@ -85,6 +87,9 @@ it("batches saved sessions and searches all names, types and groups without losi
   expect(screen.queryByTestId("mobile-saved-more")).toBeNull();
 
   const search = screen.getByTestId("mobile-saved-search");
+  fireEvent.change(search, { target: { value: "未分组" } });
+  expect(screen.getAllByTestId("mobile-saved-session")).toHaveLength(1);
+  expect(screen.getByTestId("mobile-saved-session")).toHaveTextContent("Local shell");
   fireEvent.change(search, { target: { value: "  production  " } });
   expect(screen.getAllByTestId("mobile-saved-session")).toHaveLength(1);
   expect(screen.getByTestId("mobile-saved-session")).toHaveTextContent("Build host");
@@ -93,9 +98,9 @@ it("batches saved sessions and searches all names, types and groups without losi
   fireEvent.change(search, { target: { value: "archive 16" } });
   expect(screen.getAllByTestId("mobile-saved-session")).toHaveLength(1);
   expect(screen.getByTestId("mobile-saved-session")).toHaveTextContent("Archive 16");
-  fireEvent.change(search, { target: { value: "missing" } });
+  fireEvent.change(search, { target: { value: `missing-${"x".repeat(240)}` } });
   expect(screen.queryByTestId("mobile-saved-session")).toBeNull();
-  expect(screen.getByTestId("mobile-saved-empty-search")).toHaveTextContent("没有匹配");
+  expect(screen.getByTestId("mobile-saved-empty-search")).toHaveClass("session-empty-search");
   fireEvent.click(screen.getByTestId("mobile-saved-search-clear"));
   expect(search).toHaveValue("");
   expect(screen.getAllByTestId("mobile-saved-session")).toHaveLength(8);
@@ -106,10 +111,51 @@ it("batches saved sessions and searches all names, types and groups without losi
   await act(async () => {});
 });
 
+it("moves keyboard focus into newly revealed sessions", async () => {
+  mock.request.mockResolvedValue({
+    sessions: Array.from({ length: 20 }, (_, index) => ({ id: `term:${index}`, kind: "terminal", title: `Terminal ${String(index).padStart(2, "0")}`, status: "running", summary: `Summary ${index}` })),
+    saved_sessions: [], capabilities: { open_sessions: true },
+  });
+  const user = userEvent.setup();
+  render(<InstanceView instance={instance} onSelect={vi.fn()} onCloseSession={vi.fn()} onBack={vi.fn()} />);
+  const more = await screen.findByTestId("mobile-sessions-more");
+  more.focus();
+  await user.keyboard("{Enter}");
+  expect(screen.getAllByTestId("mobile-session")).toHaveLength(16);
+  expect(screen.getAllByTestId("mobile-session")[8]).toHaveFocus();
+  await user.tab();
+  expect(screen.getAllByTestId("mobile-session")[9]).toHaveFocus();
+});
+
+it("matches ASCII case consistently under a Turkish browser locale", async () => {
+  const original = String.prototype.toLocaleLowerCase;
+  const locale = vi.spyOn(String.prototype, "toLocaleLowerCase").mockImplementation(function(this: string) {
+    return original.call(this, "tr-TR");
+  });
+  try {
+    mock.request.mockResolvedValue({
+      sessions: [{ id: "term:12", kind: "terminal", title: "Terminal 12", status: "running", summary: "Database maintenance" }],
+      saved_sessions: [{ id: "build", name: "Build host", session_type: "SSH", group_path: "Production" }],
+      capabilities: { open_sessions: true },
+    });
+    render(<InstanceView instance={instance} onSelect={vi.fn()} onCloseSession={vi.fn()} onBack={vi.fn()} />);
+    fireEvent.change(await screen.findByTestId("mobile-sessions-search"), { target: { value: "TERMINAL 12" } });
+    expect(screen.getByTestId("mobile-session")).toHaveTextContent("Terminal 12");
+    fireEvent.change(screen.getByTestId("mobile-sessions-search"), { target: { value: "terminal 12" } });
+    expect(screen.getByTestId("mobile-session")).toHaveTextContent("Terminal 12");
+    fireEvent.change(screen.getByTestId("mobile-saved-search"), { target: { value: "BUILD" } });
+    expect(screen.getByTestId("mobile-saved-session")).toHaveTextContent("Build host");
+    fireEvent.change(screen.getByTestId("mobile-saved-search"), { target: { value: "build" } });
+    expect(screen.getByTestId("mobile-saved-session")).toHaveTextContent("Build host");
+  } finally { locale.mockRestore(); }
+});
+
 it("opens a single saved session directly without a more button", async () => {
-  mock.request.mockResolvedValue({ sessions: [], saved_sessions: [
-    { id: "build", name: "Build host", session_type: "SSH", group_path: "QA" },
-  ], capabilities: { open_sessions: true } });
+  mock.request.mockResolvedValue({
+    sessions: [],
+    saved_sessions: [{ id: "build", name: "Build host", session_type: "SSH", group_path: "QA" }],
+    capabilities: { open_sessions: true },
+  });
   const onSelect = vi.fn();
   render(<InstanceView instance={instance} onSelect={onSelect} onCloseSession={vi.fn()} onBack={vi.fn()} />);
   expect(await screen.findByTestId("mobile-saved-open")).toBeInTheDocument();

@@ -79,6 +79,8 @@ textarea { min-height: 110px; resize: vertical; }
 .session-search input { margin: 0; min-width: 0; flex: 1; }
 .session-search button { flex-shrink: 0; min-height: 36px; padding: 6px 10px; font-size: 12px; }
 .session-result-count { margin: 6px 0 0; color: #91a3bd; font-size: 11px; }
+.session-list, .saved-results { min-width: 0; }
+.session-empty-search { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
 .session-more { width: 100%; margin-top: 10px; }
 .heading-actions { display: flex; gap: 8px; flex-wrap: wrap; }
 .open-status { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; font-size: 13px; }
