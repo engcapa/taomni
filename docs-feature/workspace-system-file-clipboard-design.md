@@ -5,9 +5,10 @@
 - 来源：用户在 #792 拖放导入验收完成后明确要求继续完成系统文件管理器 ↔ Taomni Workspace 的两种跨应用文件粘贴（2026-11-12）。
 - 基线分支 `feat/workspace-file-tree-drop-import`，产品/QA `9430ee61`、说明 `8af88989`；新分支 `feat/workspace-system-file-clipboard`。
 - Windows / macOS / Linux 桌面应用。保持用户要求：本地只做单元测试；GitHub `qa-ui-auto-platforms` 执行 browser/native 与完整 crash-regression。
-- 设计可实施，不代表验证已完成。使用现有 Copy/Paste 上下文菜单及标准快捷键，不改变布局、不新增模式选择，无需图稿决策。
+- **状态：实现完成，2026-11-12三平台托管验收81/81通过。** 使用现有 Copy/Paste 上下文菜单及标准快捷键，不改变布局、不新增模式选择，无需图稿决策；Wayland真实文件管理器、物理OS手势等未验证边界另列，不从托管结果外推。
+- 最终被测候选 `92dd1c90411af79cdb4033c073636383e9c7f8ee`，产品实现 `e714935a`；随后仅归档此文档，不改变被测产品、runner或case指纹。分支已推送，未创建PR、未合并、未关闭#792。
 
-## 现状证据
+## 改前基线证据
 
 - `useWorkspaceFileActions.ts` 的 `treeClipboardRef` 仅保存应用内部一个节点，Copy 通过文本读取/新建实现，不能保留二进制或递归目录；跨根被拒绝。
 - `controller/treeActions.ts::createShowTreeContextMenu` 的 Paste 是否启用只检查内部 ref，因此系统复制无法激活菜单。
@@ -102,12 +103,37 @@ V-CB-01：前端mounted/logic单测；V-CB-02：Rust纯单元；V-CB-03：browse
 - native Rust contracts支持任务与三端release构建均通过。首轮最终 **79 passed / 2 failed / 0 skipped（81次）**；两个失败均为新增TC-WS-090的独立QA边界，workflow按原始失败报告正确标为failure，不能用各execute job的success替代case结果。
 - **Linux native最终四分片14/14 passed、0 failed、0 skipped**，含TC-WS-090全部86steps，以及TC-WS-088全部89steps。原始报告：`/tmp/taomni-clipboard-linux-new.U2mDij/`（shard1/2）、`/tmp/taomni-clipboard-linux-partial.AQL2jg/`（shard3/4）。
 - Linux TC-WS-090 的 `file-clipboard-observations.jsonl` 共10次独立系统格式检查均通过；`system-file-paste.jsonl` 两次均 `passed=true`、`realFileManagerAction=true`，transport明确为 **PCManFM-Qt real X11 Ctrl+V**，文件与递归目录目标完整SHA256/空目录集合符合预期，无host-copy fallback。
+- 已查看首轮Linux native及macOS browser的`workspace-file-clipboard.png`：双根层级、root2新增文件/目录、编辑器中文及原文可见，无明显遮挡；Linux状态栏显示内部Cut移动结果。macOS browser截图仅验证renderer结果，不作为AppKit原生chrome/菜单栏证据。
 - Windows/macOS native各 **13 passed / 1 failed / 0 skipped**；同轮所有其余新/旧专项与crash-regression通过。完整首轮汇总及macOS四分片/Windows余分片保留在 `/tmp/taomni-clipboard-final-first.01h97EIR/`；Windows失败分片原件在 `/tmp/taomni-clipboard-windows-new.lUR3dV/`。
 - 15份runner receipts均已独立核对签名、summary SHA256及实际exit code（失败仍为exit1）；共同产品source fingerprint为 `dbf1b78d8c1deec0e6b9dd065e40c98049ba7f273496e706c303c8fc270b268e`。三端均为 `com.taomni.app.qa` release，同端四分片binary一致：Linux `9135b4655bb8441e905676ab2f2744b7756e109cd8950b4fb94bef82b6aa269e`，Windows `b7c900d19a6faa280cbb2b4070fe765648c22741dcc9e2b2df4ee0cf69e456b7`，macOS `d012c10aa3e14109f52adfea44d65e87f4a77bcba87f3ecaf42fa5ccec94f224`。
 - Windows TC-WS-090 step40：产品已发布真实CF_HDROP，host读出 `D:/.../root1/README.md`，QA预期 `D:\\...\\root1\\README.md`，路径拼写而非文件身份不同。修正提交 `d47d0557` 仅native/Windows归一正反斜杠与drive letter大小写，保持文件名大小写/空格、顺序、数量、目录边界和SHA256原样校验，并在Paste前后使用同一比较；JSONL保留双方原始拼写。新增4项回归，工具18/18单元通过；修前两个入口均重现失败。`test_native_drag + test_ci_selection` 聚合 **64/64 passed**，后者包含全套planner保留测试，不把静态选择当作UI执行。
 - macOS TC-WS-090 step15：独立host工具seed三条file URL后21次都只读回首项，尚未点击产品Paste，故该报告不能验证产品incoming或Finder互操作。工具writer改显式`NSMutableArray`逐项`addObject`，seed立即核对aggregate NSURL和native items的完整数量、顺序及路径；MAC_READ同时记录两组count/path/rawURL，`paths`仍以aggregate为判定，不用逐item结果掩盖差异。新增8项纯Node/JXA脚本契约与现有18项均通过，已接入`test_native_drag.load_tests`。该模型只验证构造、遍历及拒绝截断，不证明真实ObjC行为；首轮缺少item数，具体写/读折叠机制仍待GitHub复跑确认。保留多项严格预期，不降为单项或skip。
-- V-CB-04/05 Linux/X11真实系统互操作已覆盖；Windows真正Shell Paste和macOS多项incoming/Finder Paste尚未执行，须修复上述QA边界并重跑。Wayland真实file-manager Paste仍未执行。
-- 仅GitHub job为success不代表case通过；继续读summary/receipt/独立系统clipboard及磁盘证据，失败原件保留，相关问题修复再跑。
+- QA两项修正完成后 `test_native_drag` 聚合 **49/49 passed**，`pnpm check:refactor` 与diffcheck通过；仅QA工具/文档变化，产品source fingerprint未变。第二轮 [run 43227447704](https://github.com/engcapa/taomni/actions/runs/43227447704)，候选 `92dd1c90411af79cdb4033c073636383e9c7f8ee`，invocation `d550e4d132324755b18d73ae06cb159f`，相同三端browser/native、81次计划、完整crash-regression及release QA binary。
+- 第二轮三端browser原件与receipts核验：各 **13/13 passed、0 failed、0 skipped，共39/39 passed**，TC-WS-089均74steps；非dry-run、identity stable、exit0且summary受有效签名receipt绑定。Linux/macOS原件 `/tmp/taomni-clipboard-rerun-browser.vpxag0nE/`，Windows `/tmp/taomni-clipboard-rerun-winbrowser.aco73r6Y/`。后续三端native最终也全部通过，见下表。
+- macOS、Linux构建日志均明确 `reusing verified QA build (source, recipe, toolchain and environment match)`，不是通过修改指纹制造cache hit；原件 `/tmp/taomni-clipboard-rerun-macbuild.jrV2Te93/`、`/tmp/taomni-clipboard-rerun-linuxbuild.nvTNOVmH/`。Linux Rust支持contracts通过；同轮托管完整前端单元契约 **715 files / 6475 passed / 1 skipped**（保留实际skip，不称全数执行），不是本地UI运行。
+- 第二轮macOS native四分片均已核验 **14/14 passed、0 failed、0 skipped**，含TC-WS-090全部86steps与TC-WS-088全部89steps。原件 `/tmp/taomni-clipboard-rerun-macnative1.P8roYTVg/`、`/tmp/taomni-clipboard-rerun-macnative2.jOKK5F0k/`、`/tmp/taomni-clipboard-rerun-mac-rest.zX1Ny0XL/`。真实aggregate NSURL与native item view均读回完整3项，incoming复制、重名拒绝/恢复、最新B/空clipboard、内部Cut保留通过；同端browser/native合计 **27/27 passed**。
+- macOS `system-file-paste.jsonl` 两次真正 **Finder System Events Edit/Paste Item** 均成功（owned window81/83），分别复制文件与含二进制/空目录的递归目录；目标SHA256/目录集合精确匹配，未使用host-copy fallback。10项clipboard观察与2项Finder证据的文件hash均受有效receipt绑定；当前runner/source指纹及release binary `d012c10a...f224` 与build一致。修复独立工具后，未改产品即可通过原验收；首轮具体ObjC桥接机制不作超出证据的归因。
+- 第二轮Windows native四分片均已核验 **14/14 passed、0 failed、0 skipped**，含TC-WS-090全部86steps与TC-WS-088全部89steps；同端browser/native合计 **27/27 passed**。原件 `/tmp/taomni-clipboard-rerun-winnative3.De6DeGKS/`、`/tmp/taomni-clipboard-rerun-winnative24.jSFHnTc1/`、`/tmp/taomni-clipboard-rerun-winnative1.XjGPGJrF/`。10次独立CF_HDROP观察均通过，路径原始正反斜杠拼写保留；两次真正 **Windows Shell FolderItem InvokeVerb(paste)** 均成功，文件与递归二进制/空目录目标SHA256、完整目录集合均精确匹配，未使用host-copy fallback。summary及clipboard/Paste JSONL均受有效receipt绑定；release binary仍为 `b7c900d1...56b7`，产品source与当前候选一致。
+- 第二轮Linux native四分片均已核验 **14/14 passed、0 failed、0 skipped**，含TC-WS-090全部86steps、TC-WS-088全部89steps与完整保留crash-regression；source/runner与当前候选一致，release binary仍为 `9135b465...269e`，summary签名/哈希/exit0核验通过。原件 `/tmp/taomni-clipboard-rerun-linux134.DaiZ9Gn0/`、`/tmp/taomni-clipboard-rerun-complete.PtcaSHGD/`。10次真实clipboard检查及两次 **PCManFM-Qt real X11 Ctrl+V** 均通过，文件与递归目录的SHA256/空目录集合精确匹配；同端browser/native合计 **27/27 passed**。
+- V-CB-04/05 Linux/X11、macOS、Windows真实系统互操作均通过；本轮所有实际case及汇总均已核验。Wayland真实file-manager Paste仍未执行，不因planner的0 capability gaps而视为已验证。
+- 仅GitHub job为success不代表case通过。本轮已读取全部15份原始summary/有效签名receipt，核对case/source/runner与当前源码指纹、release build identity、独立clipboard及磁盘证据；首轮两个失败原件仍保留，不被重跑结果覆盖。
+
+### 最终验收汇总
+
+[run 43227447704](https://github.com/engcapa/taomni/actions/runs/43227447704) 最终 `completed/success`，`ci-summary.json` 的 `passed=true`、`report_ok=true`、failures与infrastructure errors均为空。
+
+| 平台 | browser | native release | 合计 |
+|---|---:|---:|---:|
+| Linux（X11） | 13/13 | 14/14 | 27/27 |
+| Windows（x64） | 13/13 | 14/14 | 27/27 |
+| macOS（arm64） | 13/13 | 14/14 | 27/27 |
+| **合计** | **39/39** | **42/42** | **81/81** |
+
+- **0 failed、0 skipped、0 infrastructure errors**；新专项、#792拖放、旧008/036/037与完整`crash-regression`均保留。支持job中selected策略跳过的tool/sftp-contracts不算case跳过；本地相关工具单元已单独执行。
+- 最终source fingerprint `dbf1b78d8c1deec0e6b9dd065e40c98049ba7f273496e706c303c8fc270b268e`，runner fingerprint `3fa613f881000e2cbdfbe118de422abc970ba6a8b8667f31cc64918b8f73cd1e`。三端同端四分片分别复用上列完整binary hash；最终15份receipts、81个case fingerprint、selection完整性与build记录均核对通过。
+- 三端每端10项独立原生file-list检查，以及文件/递归目录各一次真正系统Paste，共6次真实文件管理器动作通过；目标字节、空目录与源未修改均有独立host断言，不用URI文本或产品写→产品读自证。
+- 最终汇总、selection及Linux最后分片原件：`/tmp/taomni-clipboard-rerun-complete.PtcaSHGD/`；可分享的长期证据入口是上述GitHub run与其`qa-summary-d550e4d132324755b18d73ae06cb159f`及各平台artifacts。临时目录不是长期存储承诺。
+- 已完成TASK-CB-01..04及V-CB-01..06对应本轮已列自动化范围；以下原生兼容边界仍保持明确未验证，不将部分平台/架构结果泛化。
 
 ## 使用方式与效果
 
@@ -118,12 +144,13 @@ V-CB-01：前端mounted/logic单测；V-CB-02：Rust纯单元；V-CB-03：browse
 5. **剪贴板与焦点**：每次Paste读取最新系统文件列表；系统改复制B后不会粘入陈旧A，文本/空剪贴板也不会重放旧文件。编辑器、输入框和终端保持各自的文本/按键处理，文件快捷键仅树上下文接管。
 6. **Cut边界**：原有同根内部Cut→Paste仍可移动，但不是系统跨应用剪切。离开应用或另一次成功Copy会取消内部Cut意图；系统来件始终复制，不删除外部源。
 
-以上是实现的使用契约；实际通过的平台/入口以托管执行记录为准，不能将尚未执行的Shell/Finder操作写成已验收。
+以上入口已按托管执行记录通过三端专项；外部incoming由host原生API准备列表，outgoing的Shell/Finder/PCManFM-Qt Paste为真实系统动作。自动化不等同人工物理Copy/drag/key手势，具体边界如下。
 
 ## 原生兼容与待验证边界
 
 - Windows：CF_HDROP immediate data + message-only owner窗口，真实Explorer/Shell Paste在native case验证。
 - macOS：原生NSURL对象，不trim/canonicalize；原有AppKit predefined Edit仍保留，新增tree actions不创建竞争的全局accelerator。Finder真正Paste需要System Events辅助功能授权，缺少权限会失败，不能当作通过。
 - Linux：GTK X11/Wayland retained MIME offer，提供标准URI+GNOME copied-files，异步读取不阻塞主线程；Wayland预检聚焦native窗口与keyboard seat。无法区分无offer与权限拒绝时保守报错，不写入无效X11 owner。
-- 默认托管Linux使用X11真实PCManFM-Qt Paste；Wayland真实file-manager Paste、物理Cmd/Ctrl键投递、AppKit menu-bar/responder/IME仍需专门OS验证，不从WebView按键结果推导。
+- 默认托管Linux使用X11真实PCManFM-Qt Paste；Wayland真实file-manager Paste、物理Cmd/Ctrl键投递、Taomni AppKit menu-bar/responder/IME仍需专门OS验证，不从WebView按键结果推导。Finder的真实Paste Item点击已覆盖，但不等同Taomni自身AppKit Edit菜单的系统级验证；Windows使用真实Shell Paste verb，不是物理Explorer按键证据。
+- 三平台incoming文件列表由独立原生API准备，没有宣称真实文件管理器物理Copy手势已覆盖；拖放通过实际产品事件路径，但物理OS拖拽仍需人工检查。macOS托管本轮为arm64，未验证的系统版本/架构、其他Linux文件管理器不可由本轮结果外推。
 - 原生文件列表限制256项、单路径32KiB、总4MiB，失败无text fallback。符号链接本身及合法空格/Unicode路径保持；普通Copy Path/文本复制API不变。
