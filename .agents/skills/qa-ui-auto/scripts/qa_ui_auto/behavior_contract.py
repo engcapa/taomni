@@ -16,6 +16,10 @@ import yaml
 
 def is_check(step: dict) -> bool:
     verb, args = next(iter(step.items()))
+    if verb == "file_clipboard":
+        return args.get("action") == "assert"
+    if verb == "system_file_paste":
+        return True  # Real action plus independent exact target byte/tree check.
     if verb == "terminal_rendering_probe":
         return True
     if verb == "measure_workspace_file_open":

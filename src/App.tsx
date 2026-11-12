@@ -31,7 +31,7 @@ import { useAppTheme } from "./lib/appTheme";
 import { applyCodeViewProfile, loadCodeViewProfile } from "./lib/codeViewProfile";
 import { attachSftpSync } from "./lib/sftpSync";
 import { sweepExpiredHandoffs } from "./components/filebrowser/SftpDetachedWindow";
-import { dispatchNativeFileDrop } from "./lib/osFileDrop";
+import { dispatchNativeDragDrop } from "./lib/nativeFileDrag";
 import { useWebviewGuards } from "./lib/webviewGuards";
 import { isTauriRuntime, getAppPlatform } from "./lib/runtime";
 import { subscribeUiAppearanceStorage, useAppStore } from "./stores/appStore";
@@ -95,15 +95,7 @@ function App() {
     void import("@tauri-apps/api/webview")
       .then(async ({ getCurrentWebview }) => {
         unlisten = await getCurrentWebview().onDragDropEvent((event) => {
-          const payload = event.payload;
-          if (payload.type !== "drop" || payload.paths.length === 0) return;
-
-          const scale = window.devicePixelRatio || 1;
-          dispatchNativeFileDrop({
-            paths: payload.paths,
-            clientX: payload.position.x / scale,
-            clientY: payload.position.y / scale,
-          });
+          dispatchNativeDragDrop(event.payload);
         });
         if (disposed) unlisten?.();
       })

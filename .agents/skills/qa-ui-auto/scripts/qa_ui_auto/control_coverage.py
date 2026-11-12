@@ -69,7 +69,7 @@ INTERACTIVE_VERBS = {
     "mobile_service_probe", "mobile_browser_probe",
     "middle_click",
     "click", "dblclick", "right_click", "hover", "drag_to", "drag_path", "native_click",
-    "native_pointer_drag", "native_window_drag",
+    "native_pointer_drag", "native_window_drag", "os_file_drag",
     "native_folder_dialog",
     "fill", "type", "send_keys", "terminal_input", "press", "blur", "select_option", "upload_file",
     "set_check", "send_text_via_label", "open_session", "click_menu",

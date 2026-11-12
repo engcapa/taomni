@@ -2,6 +2,12 @@ use super::paths::initial_dir_from;
 use std::path::Path;
 use std::process::{Command, Output, Stdio};
 
+#[cfg(target_os = "linux")]
+#[path = "unix_file_clipboard.rs"]
+mod file_clipboard;
+#[cfg(target_os = "linux")]
+pub use file_clipboard::{clipboard_read_files, clipboard_write_files};
+
 pub fn select_private_key_file(current_path: Option<&str>) -> Result<Option<String>, String> {
     let initial = initial_dir_from(current_path);
     open_file_dialog("Select private key", initial.as_deref())
@@ -312,34 +318,12 @@ fn run_kdialog_save(
     handle_output(cmd.output(), "kdialog")
 }
 
+#[cfg(not(target_os = "linux"))]
 pub fn clipboard_read_files() -> Result<Vec<String>, String> {
-    const MIME_TYPES: &[&str] = &["x-special/gnome-copied-files", "text/uri-list"];
-    for mime in MIME_TYPES {
-        if let Some(payload) = run_clipboard_reader("wl-paste", &["--no-newline", "--type", mime])?
-        {
-            let paths = super::paths::clipboard_paths_from_uri_text(&payload);
-            if !paths.is_empty() {
-                return Ok(paths);
-            }
-        }
-    }
-    for mime in MIME_TYPES {
-        if let Some(payload) =
-            run_clipboard_reader("xclip", &["-selection", "clipboard", "-t", mime, "-o"])?
-        {
-            let paths = super::paths::clipboard_paths_from_uri_text(&payload);
-            if !paths.is_empty() {
-                return Ok(paths);
-            }
-        }
-    }
-    if let Some(payload) = run_clipboard_reader("xsel", &["--clipboard", "--output"])? {
-        let paths = super::paths::clipboard_paths_from_uri_text(&payload);
-        if !paths.is_empty() {
-            return Ok(paths);
-        }
-    }
-    Ok(Vec::new())
+    Err(super::clipboard::file_clipboard::error(
+        "unsupported",
+        "native file clipboard is not supported on this Unix platform",
+    ))
 }
 
 fn run_clipboard_reader(program: &str, args: &[&str]) -> Result<Option<String>, String> {
@@ -353,6 +337,10 @@ fn run_clipboard_reader(program: &str, args: &[&str]) -> Result<Option<String>, 
     }
 }
 
+#[cfg(not(target_os = "linux"))]
 pub fn clipboard_write_files(_paths: &[String]) -> Result<(), String> {
-    Err("native file clipboard is not implemented on this Linux desktop".to_string())
+    Err(super::clipboard::file_clipboard::error(
+        "unsupported",
+        "native file clipboard is not supported on this Unix platform",
+    ))
 }

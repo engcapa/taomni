@@ -49,14 +49,12 @@ from typing import Any, Callable
 from .steps import StepError
 from .native_assertions import assert_count, assert_menu_items
 from .linux_ime import current_fcitx_engine
-from .native_editor_probes import register as register_editor_probes
 from . import wayland
 from .runtime_errors import native_assert as assert_no_runtime_errors
 from .native_drag import native_drag
 from .host_file_observation import assert_file_sha256 as _assert_file_sha256
 from .save_lock_probe import run as save_reader_lock
 from .terminal_burst_probe import run as terminal_burst
-from .terminal_rendering_probe import register_native as register_terminal_rendering
 
 
 class NativeStepContext:
@@ -1415,7 +1413,6 @@ VERBS["assert_no_runtime_errors"] = assert_no_runtime_errors
 VERBS["drag_to"] = native_drag
 VERBS["terminal_drag_selection"] = _terminal_drag_selection
 VERBS["native_terminal_burst"] = lambda ctx, args: terminal_burst(ctx, args, VERBS["terminal_input"])
-register_terminal_rendering(VERBS)
 
 
 from .window_context import native_switch
@@ -2706,9 +2703,6 @@ def _do_reload_window(ctx: NativeStepContext, args: Any) -> str:
     return "reloaded; welcome-panel visible"
 
 
-register_editor_probes(_verb)
-
-
 @_verb("parity005_native_fault")
 def _do_parity005_native_fault(ctx: NativeStepContext, args: Any) -> str:
     mode = str(args)
@@ -3385,5 +3379,5 @@ def _do_mail_server_assert_sync_transport(ctx: NativeStepContext, args: Any) -> 
             raise StepError("sync transport: no large explicit UID flag batch was exercised")
     return "one injected FLAGS disconnect recovered; large UID flag batches exercised; no oversized commands"
 
-from .mobile_native import register as register_mobile
-register_mobile(_verb, VERBS["terminal_input"])
+from .native_extensions import register as register_extensions
+register_extensions(_verb, VERBS)

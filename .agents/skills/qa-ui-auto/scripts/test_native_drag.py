@@ -70,3 +70,14 @@ class NativeDragTest(TestCase):
                     VERBS["drag_to"](SimpleNamespace(session=session, case_dir=Path(directory)),
                                      {"from": "#hidden", "by": {"dx": 30}})
                 session.request.assert_not_called()
+
+
+def load_tests(loader, suite, pattern):
+    """Keep synthetic external-drag contracts in the existing hosted drag suite.
+
+    qa-ui-auto-entry and tool-contracts already select this module. No workflow
+    conditions, platform scope or crash-regression selection need to change.
+    """
+    for module in ("test_os_file_drag", "test_workspace_drop_import", "test_file_clipboard", "test_file_clipboard_macos"):
+        suite.addTests(loader.loadTestsFromName(module))
+    return suite

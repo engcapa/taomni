@@ -1,0 +1,286 @@
+id: TC-WS-087
+title: Synthetic HTML5 file drag copies external trees to the explicit workspace root
+description: >-
+  Issue 792. Synthetic HTML5 DragEvent and DataTransfer file-URI text/uri-list
+  enter the production Project tree DOM, never a mocked handler or import IPC.
+  Two roots have identical incoming paths; root1 stays selected while root2 is
+  the drop destination. Browser VFS SHA256 snapshots include every source and
+  destination byte and empty directory, not host disk. os-file-drag.jsonl retains
+  transport, hit geometry, status samples and synthetic provenance. Physical OS
+  file-manager gestures, OS drag delivery and packaged WebViews are unverified.
+modes: [browser]
+covers: [F25.1, F-WS-2]
+tags: [p1, workspace, file-explorer, drop-import, regression]
+fixtures: [reset_db, workspace_drop_import]
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-drop-import
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.platformWorkspaces.v1
+    value: ${fixture.workspace_drop_workspace}
+- reload_window: null
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="session-tree"]'
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="code-workspace-tree"]'
+- click: '[data-testid="code-workspace-tree-view-selector"]'
+- click: '[data-testid="code-workspace-tree-view-project"]'
+- assert_count:
+    selector: '[data-testid="code-workspace-tree-root"]'
+    equal: 2
+- assert_attribute:
+    selector: '[data-testid="code-workspace-tree-root"][data-root-id="root1"][data-tree-kind="root"]'
+    name: data-root-path
+    equals: ${fixture.workspace_drop_root1}
+- assert_attribute:
+    selector: '[data-testid="code-workspace-tree-root"][data-root-id="root2"][data-tree-kind="root"]'
+    name: data-root-path
+    equals: ${fixture.workspace_drop_root2}
+- wait_for: '[data-testid="code-workspace-tree-dir"][data-root-id="root1"][data-path="incoming"][data-tree-kind="dir"]'
+- wait_for: '[data-testid="code-workspace-tree-dir"][data-root-id="root2"][data-path="incoming"][data-tree-kind="dir"]'
+- click: '[data-testid="code-workspace-tree-root"][data-root-id="root1"]'
+- assert_workspace_drop_import: {state: seeded}
+- os_file_drag:
+    selector: '[data-testid="code-workspace-tree-root"][data-root-id="root1"]'
+    phase: enter
+    paths: ['${fixture.workspace_drop_source}/中文 空格.txt']
+- assert_attribute:
+    selector: '[data-testid="code-workspace-tree-root"][data-root-id="root1"]'
+    name: data-drop-target
+    equals: 'true'
+- os_file_drag:
+    selector: '[data-testid="code-workspace-tree-dir"][data-root-id="root2"][data-path="incoming"]'
+    phase: over
+    paths: ['${fixture.workspace_drop_source}/中文 空格.txt']
+- assert_attribute:
+    selector: '[data-testid="code-workspace-tree-dir"][data-root-id="root2"][data-path="incoming"]'
+    name: data-drop-target
+    equals: 'true'
+- assert_count:
+    selector: '[data-testid="code-workspace-tree-root"][data-root-id="root1"][data-drop-target="true"]'
+    equal: 0
+- screenshot: drop-hover-root2-directory.png
+- os_file_drag:
+    selector: '[data-testid="code-workspace-tree-dir"][data-root-id="root2"][data-path="incoming"]'
+    phase: leave
+- assert_count:
+    selector: '[data-testid="code-workspace-tree"] [data-drop-target="true"]'
+    equal: 0
+- assert_workspace_drop_import: {state: seeded}
+- os_file_drag:
+    selector: '[data-testid="code-workspace-tree-dir"][data-root-id="root2"][data-path="incoming"]'
+    phase: enter
+    paths: ['${fixture.workspace_drop_source}/中文 空格.txt', '${fixture.workspace_drop_source}/second file.txt', '${fixture.workspace_drop_source}/递归 目录']
+- os_file_drag:
+    selector: '[data-testid="code-workspace-tree-dir"][data-root-id="root2"][data-path="incoming"]'
+    phase: over
+- assert_attribute:
+    selector: '[data-testid="code-workspace-tree-dir"][data-root-id="root2"][data-path="incoming"]'
+    name: data-drop-target
+    equals: 'true'
+- os_file_drag:
+    selector: '[data-testid="code-workspace-tree-dir"][data-root-id="root2"][data-path="incoming"]'
+    phase: drop
+    paths: ['${fixture.workspace_drop_source}/中文 空格.txt', '${fixture.workspace_drop_source}/second file.txt', '${fixture.workspace_drop_source}/递归 目录']
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: Imported 3 item(s) into drop-root-two / incoming
+- assert_count:
+    selector: '[data-testid="code-workspace-tree"] [data-drop-target="true"]'
+    equal: 0
+- wait_for: '[data-testid="code-workspace-tree-file"][data-root-id="root2"][data-path="incoming/中文 空格.txt"]'
+- wait_for: '[data-testid="code-workspace-tree-file"][data-root-id="root2"][data-path="incoming/second file.txt"]'
+- wait_for: '[data-testid="code-workspace-tree-dir"][data-root-id="root2"][data-path="incoming/递归 目录"]'
+- assert_workspace_drop_import: {state: directory}
+- dblclick: '[data-testid="code-workspace-tree-file"][data-root-id="root2"][data-path="incoming/中文 空格.txt"]'
+- wait_for: '[data-testid="workspace-file-editor"][data-path="incoming/中文 空格.txt"] .cm-content'
+- assert_items:
+    selector: '[data-testid="workspace-file-editor"][data-path="incoming/中文 空格.txt"] .cm-line'
+    equals: [中文与空格文件名, External source stays unchanged., '']
+- dblclick: '[data-testid="code-workspace-tree-dir"][data-root-id="root2"][data-path="incoming/递归 目录"]'
+- wait_for: '[data-testid="code-workspace-tree-dir"][data-root-id="root2"][data-path="incoming/递归 目录/empty folder"]'
+- dblclick: '[data-testid="code-workspace-tree-dir"][data-root-id="root2"][data-path="incoming/递归 目录/nested"]'
+- wait_for: '[data-testid="code-workspace-tree-file"][data-root-id="root2"][data-path="incoming/递归 目录/nested/binary.bin"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-root-id="root2"][data-path="incoming/递归 目录/nested/inner.txt"]'
+- wait_for: '[data-testid="workspace-file-editor"][data-path="incoming/递归 目录/nested/inner.txt"] .cm-content'
+- assert_items:
+    selector: '[data-testid="workspace-file-editor"][data-path="incoming/递归 目录/nested/inner.txt"] .cm-line'
+    equals: [Nested recursive import., Second line., '']
+- os_file_drag:
+    selector: '[data-testid="code-workspace-tree-dir"][data-root-id="root2"][data-path="incoming"]'
+    phase: enter
+    paths: ['${fixture.workspace_drop_source}/collision.txt']
+- os_file_drag:
+    selector: '[data-testid="code-workspace-tree-dir"][data-root-id="root2"][data-path="incoming"]'
+    phase: drop
+    paths: ['${fixture.workspace_drop_source}/collision.txt']
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: Path already exists
+- assert_count:
+    selector: '[data-testid="code-workspace-tree"] [data-drop-target="true"]'
+    equal: 0
+- assert_workspace_drop_import: {state: directory}
+- dblclick: '[data-testid="code-workspace-tree-file"][data-root-id="root2"][data-path="incoming/collision.txt"]'
+- wait_for: '[data-testid="workspace-file-editor"][data-path="incoming/collision.txt"] .cm-content'
+- assert_items:
+    selector: '[data-testid="workspace-file-editor"][data-path="incoming/collision.txt"] .cm-line'
+    equals: [ORIGINAL target bytes must survive., '']
+- os_file_drag:
+    selector: '[data-testid="code-workspace-tree-dir"][data-root-id="root2"][data-path="incoming"]'
+    phase: enter
+    paths: ['${fixture.workspace_drop_source}/recovery fresh.txt']
+- os_file_drag:
+    selector: '[data-testid="code-workspace-tree-dir"][data-root-id="root2"][data-path="incoming"]'
+    phase: drop
+    paths: ['${fixture.workspace_drop_source}/recovery fresh.txt']
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: Imported 1 item(s) into drop-root-two / incoming
+- wait_for: '[data-testid="code-workspace-tree-file"][data-root-id="root2"][data-path="incoming/recovery fresh.txt"]'
+- assert_workspace_drop_import: {state: recovered}
+- click: '[data-testid="code-workspace-tree-dir"][data-root-id="root1"][data-path="incoming"]'
+- os_file_drag:
+    selector: '[data-testid="code-workspace-tree-root"][data-root-id="root2"]'
+    phase: enter
+    paths: ['${fixture.workspace_drop_source}/root file.txt']
+- assert_attribute:
+    selector: '[data-testid="code-workspace-tree-root"][data-root-id="root2"]'
+    name: data-drop-target
+    equals: 'true'
+- os_file_drag:
+    selector: '[data-testid="code-workspace-tree-root"][data-root-id="root2"]'
+    phase: drop
+    paths: ['${fixture.workspace_drop_source}/root file.txt']
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: Imported 1 item(s) into drop-root-two / .
+- wait_for: '[data-testid="code-workspace-tree-file"][data-root-id="root2"][data-path="root file.txt"]'
+- assert_workspace_drop_import: {state: root}
+- os_file_drag:
+    selector: '[data-testid="code-workspace-tree-file"][data-root-id="root2"][data-path="README.md"]'
+    phase: enter
+    paths: ['${fixture.workspace_drop_source}/ignored file.txt']
+- os_file_drag:
+    selector: '[data-testid="code-workspace-tree-file"][data-root-id="root2"][data-path="README.md"]'
+    phase: over
+- assert_count:
+    selector: '[data-testid="code-workspace-tree"] [data-drop-target="true"]'
+    equal: 0
+- os_file_drag:
+    selector: '[data-testid="code-workspace-tree-file"][data-root-id="root2"][data-path="README.md"]'
+    phase: drop
+    paths: ['${fixture.workspace_drop_source}/ignored file.txt']
+- assert_workspace_drop_import: {state: root}
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: Imported 1 item(s) into drop-root-two / .
+- os_file_drag:
+    selector: '[data-testid="code-workspace-tree"]'
+    phase: enter
+    paths: ['${fixture.workspace_drop_source}/ignored blank.txt']
+- os_file_drag:
+    selector: '[data-testid="code-workspace-tree"]'
+    phase: over
+- assert_count:
+    selector: '[data-testid="code-workspace-tree"] [data-drop-target="true"]'
+    equal: 0
+- os_file_drag:
+    selector: '[data-testid="code-workspace-tree"]'
+    phase: drop
+    paths: ['${fixture.workspace_drop_source}/ignored blank.txt']
+- assert_workspace_drop_import: {state: root}
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: Imported 1 item(s) into drop-root-two / .
+- assert_count:
+    selector: '[data-testid="code-workspace-tree-root"]'
+    equal: 2
+- assert_no_runtime_errors: null
+- screenshot: workspace-drop-import-final.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R0
+    requirement: Isolated setup mounts exactly root1/root2 with explicit path and kind metadata and a clean external-source baseline before dragging.
+    actions: [1, 2, 4, 5, 6, 8, 10, 11, 17]
+    checkpoints:
+    - {step: 12, expectation: Exactly two production Project roots are mounted.}
+    - {step: 13, expectation: Root1 identity and kind resolve to its isolated fixture path.}
+    - {step: 14, expectation: Root2 identity and kind resolve to its separate fixture path.}
+    - {step: 15, expectation: Root1 has its own incoming directory.}
+    - {step: 16, expectation: Root2 has an independent same-named incoming directory.}
+    - {step: 18, expectation: Every source and target byte and directory matches the initial independent fixture manifest.}
+    results: [12, 13, 14, 15, 16, 18]
+  - id: R1
+    requirement: Hover transfers between the selected root1 and root2 directory, and leave clears the highlight without changing any bytes.
+    actions: [19, 21, 25]
+    checkpoints:
+    - {step: 20, expectation: Root1 enter highlights the real production root row.}
+    - {step: 22, expectation: Over resolves incoming by root2 identity and highlights that row.}
+    - {step: 23, expectation: The previous root1 highlight is removed.}
+    - {step: 26, expectation: Leave removes every drop target attribute.}
+    - {step: 27, expectation: Exact VFS source and both roots remain at their seeded bytes and directory sets.}
+    results: [20, 22, 23, 26, 27]
+  - id: R2
+    requirement: Multiple external files and a recursive directory copy into root2 incoming regardless of root1 selection; Chinese/spaces, binary and empty directories survive and files open with exact content.
+    actions: [17, 28, 29, 31, 38, 41, 43, 45]
+    checkpoints:
+    - {step: 32, expectation: Completion reports three imported top-level items into drop-root-two / incoming.}
+    - {step: 33, expectation: Drop clears all hover highlights.}
+    - {step: 34, expectation: Chinese/space file appears in root2 incoming.}
+    - {step: 35, expectation: The second independent file appears in root2 incoming.}
+    - {step: 36, expectation: The recursive directory is refreshed in root2.}
+    - {step: 37, expectation: Complete VFS hashes and directories match the copy manifest; root1 and every source byte are unchanged.}
+    - {step: 40, expectation: Chinese file opens with all exact lines and trailing newline.}
+    - {step: 42, expectation: The nested empty directory appears as a directory.}
+    - {step: 44, expectation: Nested binary file appears.}
+    - {step: 47, expectation: Recursive text file opens with every exact line.}
+    results: [32, 33, 34, 35, 36, 37, 40, 42, 44, 47]
+  - id: R3
+    requirement: A conflicting import reports Path already exists, preserves distinct target/source bytes, and a subsequent fresh-file import succeeds.
+    actions: [48, 49, 53, 56, 57]
+    checkpoints:
+    - {step: 50, expectation: Failure feedback contains Path already exists.}
+    - {step: 51, expectation: Failure leaves no hover highlight.}
+    - {step: 52, expectation: All original target and source SHA256 values and directory sets remain unchanged after rejection.}
+    - {step: 55, expectation: Opening the collision target still shows its exact original lines.}
+    - {step: 58, expectation: A fresh import after failure reports one completed item.}
+    - {step: 59, expectation: Recovery file is refreshed in root2 incoming.}
+    - {step: 60, expectation: Complete VFS snapshot includes only the intended fresh copy with source and root1 preserved.}
+    results: [50, 51, 52, 55, 58, 59, 60]
+  - id: R4
+    requirement: Dropping onto the root2 root uses its empty relative directory, not the selected root1 directory.
+    actions: [61, 62, 64]
+    checkpoints:
+    - {step: 63, expectation: Root2 itself is highlighted.}
+    - {step: 65, expectation: Completion names drop-root-two / . as destination.}
+    - {step: 66, expectation: The file appears directly below root2.}
+    - {step: 67, expectation: The complete VFS snapshot places the file only at root2/root file.txt.}
+    results: [63, 65, 66, 67]
+  - id: R5
+    requirement: File-row and genuinely blank Project-tree drops neither highlight nor import; content, both roots and runtime remain usable.
+    actions: [68, 69, 71, 74, 75, 77]
+    checkpoints:
+    - {step: 70, expectation: A file row is not a highlighted target.}
+    - {step: 72, expectation: Exact hashes and directories remain unchanged over a 500ms quiet observation after the file drop.}
+    - {step: 73, expectation: Completion status is not replaced by another import.}
+    - {step: 76, expectation: Blank tree space has no highlighted row.}
+    - {step: 78, expectation: Complete source/root snapshots remain unchanged over 500ms after the blank-space drop.}
+    - {step: 79, expectation: Blank drop leaves prior completion feedback unchanged.}
+    - {step: 80, expectation: Both workspace roots remain mounted.}
+    - {step: 81, expectation: No uncaught runtime error or crash fallback occurred.}
+    results: [70, 72, 73, 76, 78, 79, 80, 81]
+  visual:
+  - check: Highlight visibility, target contrast and tree indentation with Chinese/space paths.
+    method: manual
+    reason: Retained hover/final PNGs need human visual review; attribute assertions alone are not a visual verdict. Unrun in this tooling-only task.
+  native:
+  - check: Real Tauri forwarding and host copy bytes.
+    method: external
+    reason: TC-WS-088 independently exercises the synthetic native event entry and real disk SHA256. This browser case establishes only DOM/VFS behavior; both UI modes remain unrun here.
+  - check: Physical OS file-manager drag gesture and OS event delivery.
+    method: manual
+    reason: Explicit evidence gap. os_file_drag is synthetic even in native; no OS pointer or file-manager automation is performed.

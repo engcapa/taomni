@@ -6,12 +6,14 @@ import { DEFAULT_EXPLORER_SORT, sortExplorerEntries } from "./explorerPreference
 import type { ProjectTreeProps } from "./projectTreeTypes";
 import { projectTreeRows } from "./projectTreeRendering";
 import { ProjectTreeViewport } from "./ProjectTreeViewport";
+import { useProjectTreeFileDrop } from "./useProjectTreeFileDrop";
 
 /**
  * Memoized: the workspace shell re-renders per caret move; with stable
  * handlers (useLatestHandlers) the tree only re-renders when its data changes.
  */
 export const ProjectTree = memo(function ProjectTree(inputProps: ProjectTreeProps) {
+  const dropHostRef = useProjectTreeFileDrop(inputProps.roots, inputProps.onImportPaths);
   const sort = inputProps.sort ?? DEFAULT_EXPLORER_SORT;
   // Selection, caret and dirty-buffer publications do not change directory
   // order. Keep sorting tied to the actual entries and explorer preferences.
@@ -59,7 +61,9 @@ export const ProjectTree = memo(function ProjectTree(inputProps: ProjectTreeProp
     );
   }
 
-  return <ProjectTreeViewport rows={projectTreeRows(props)} selected={props.selected} viewMode={props.treeViewMode} />;
+  return <div ref={dropHostRef} className="min-w-0">
+    <ProjectTreeViewport rows={projectTreeRows(props)} selected={props.selected} viewMode={props.treeViewMode} />
+  </div>;
 });
 
 export type { ProjectTreeProps } from "./projectTreeTypes";

@@ -162,11 +162,14 @@ vi.mock("../../../../lib/runtime", async (importOriginal) => ({
 
 const clipboardMocks = vi.hoisted(() => {
   let inMemoryClipboard = "";
+  let inMemoryFiles: string[] = [];
   const mocks = {
     probeClipboardCapabilities: vi.fn(async () => null),
     readText: vi.fn(async () => inMemoryClipboard),
     readNativeTextResult: vi.fn(async () => ({ ok: true, text: inMemoryClipboard })),
     readTextResult: vi.fn(async () => ({ ok: true, text: inMemoryClipboard })),
+    readFilesResult: vi.fn(async () => ({ ok: true, paths: [...inMemoryFiles] })),
+    writeFiles: vi.fn(async (paths: string[]) => { inMemoryFiles = [...paths]; }),
     writeText: vi.fn(async (text: string) => {
       inMemoryClipboard = text;
     }),
@@ -175,6 +178,9 @@ const clipboardMocks = vi.hoisted(() => {
     ...mocks,
     reset() {
       inMemoryClipboard = "";
+      inMemoryFiles = [];
+      mocks.writeFiles.mockReset().mockImplementation(async (paths: string[]) => { inMemoryFiles = [...paths]; });
+      mocks.readFilesResult.mockReset().mockImplementation(async () => ({ ok: true, paths: [...inMemoryFiles] }));
       mocks.probeClipboardCapabilities.mockReset().mockResolvedValue(null);
       mocks.readText.mockReset().mockImplementation(async () => inMemoryClipboard);
       mocks.readNativeTextResult.mockReset().mockImplementation(async () => ({ ok: true, text: inMemoryClipboard }));

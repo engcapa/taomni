@@ -62,6 +62,7 @@ activation is still sent exactly once and all original frame budgets apply.
 | `mouse_button` | `down` or `up` | Browser and Linux/Windows native: hold/release the left mouse button across steps, using the same native `mouse` input source as `mouse_path`. Native down requires a preceding `mouse_path`, resolves its position in the same input request and retains observed DOM input in `native-mouse-input.json`. Native release/failure clears input sources. macOS bridge does not retain pointer state across requests; restrict such native cases to Linux/Windows. Case teardown closes the isolated browser/session after an assertion failure. |
 | `drag_to` | `{from, to, from_position?, to_position?}` or `{from, by:{dx, dy?, steps?}}` | Target-based drag preserves optional `{x,y}` element offsets (Playwright `source_position`/`target_position`, browser-only). Offset mode moves from the source element's center by CSS pixels without scrolling a target into view; `to` and `by` are mutually exclusive. |
 | `drag_path` | `{selector, points:[{x,y}, ...]}` | Browser-only multipoint pointer drag; 2–256 finite element-relative points, within its bounding box. Sends real mouse down/moves/up, releasing on failure. Use for freehand drawing/selection; assertions own geometry/content results. |
+| `os_file_drag` | `{selector?, phase: enter\|over\|drop\|leave, paths?: string[]}` | Browser/native on all three platforms. **Synthetic event entry, not a real OS/file-manager gesture.** Enter/drop require nonempty absolute paths; over/leave may omit them. Browser dispatches bubbling HTML5 `DragEvent` + `DataTransfer` `text/uri-list` with percent-encoded file URIs. Native settles `window.__TAURI__.event.emitTo({kind:'Webview', label: window.__TAURI__.webview.getCurrentWebview().label}, 'tauri://drag-' + phase, payload)` by starting once through `/execute/sync` and polling a private Promise result slot (WKWebView has no `/execute/async` route), reaching App.tsx's production `onDragDropEvent` forwarding. Non-leave payload is `{paths,position:{x,y}}`, where physical position = actual hit-tested CSS point × devicePixelRatio; native leave payload is exactly null. No mock handler, direct import IPC or product QA hook. Omitted selector uses the body hit point; native leave needs no DOM target. Selecting `code-workspace-tree` requires a genuinely blank hit outside every `data-tree-kind` row; absent/ambiguous/hidden/offscreen/occluded targets fail instead of silently dropping elsewhere. Appends transport, paths, geometry, DOM status samples and synthetic provenance to `os-file-drag.jsonl`, including transport failures; no retry after uncertain delivery. Case assertions own the import/highlight result. |
 | `terminal_drag_selection` | `{selector, direction?: forward\|reverse, modifiers?}` | Browser/native, three platforms. The selector identifies the terminal pane; its active search highlight locates a first-column output marker. Drags between 4 CSS px before the highlight's left edge and 2 px inside its right edge; optional Control+Shift exercises block selection. Native W3C input uses the interactive xterm root as element origin, since the highlight ignores pointer events. macOS dispatches packaged WebView events and does not prove OS mouse input. Records geometry in `terminal-selection-drags.json` and releases input sources on failure. Pair with exact selected-text assertions; the action itself does not establish selection correctness. |
 | `native_click` | `{selector}` | Native Linux/X11 only. Activates the exact test executable window and sends W3C pointer actions through its packaged WebKitGTK session; testcase assertions own the postcondition. |
 | `native_window_drag` | `{selector, dx, dy, y_fraction?}` | Native Linux/X11 only. Identifies the exact QA executable window, normalizes its geometry away from screen edges, sends physical X11 pointer down/moves/up at a fraction of the target's height, and independently reads window displacement and unchanged dimensions. Restores geometry and releases the pointer on failure; appends raw before/after observations to `native-window-drags.jsonl`. |
@@ -166,6 +167,48 @@ The testcase must separately assert the returned path and mounted directory.
 | `assert_file_sha256` | `{path, equals, timeout_sec?}` | Native-only: independently reads host bytes and requires an exact lowercase SHA-256 digest. |
 | `assert_native_process_delta` | `{pattern, baseline, max_delta, timeout_sec?}` | Native Linux only. Counts `/proc/*/cmdline` entries containing `pattern`, writes `native-process-observation.json`, and requires the count increase from `baseline` to remain within `0..max_delta`. |
 | `assert_system_clipboard` | `{equals \| contains \| readable, timeout_sec?}` | Native Linux/X11 only: reads the real CLIPBOARD selection from a separate process, never from the app's DOM or in-process state. The only step that can prove a copy actually crossed the OS boundary. An unresponsive owner is reported as unreadable, never as an empty string. Exactly one assertion key. |
+
+## Workspace external-drop byte oracle
+
+`assert_workspace_drop_import: {state: seeded|directory|recovered|root|cut}` is a
+read-only assertion for the isolated `workspace_drop_import` fixture used by
+TC-WS-087 (browser) and TC-WS-088 (native). It independently compares the entire
+external source plus root1/root2 file SHA256 maps and directory sets, including
+empty directories, against the retained fixture manifest for the named phase.
+Every assertion requires 500ms of unchanged matching snapshots; it fails on the
+first mismatch rather than polling through it. This catches a delayed invalid
+drop and preserves no-overwrite/copy-not-move evidence beyond DOM absence or
+substring assertions. Browser reads actual VFS bytes only; native reads real
+host bytes below the retained report root with no product IPC. The assertion
+never mutates VFS/host bytes, app state or event handlers. Saves every sample and
+failure to `workspace-drop-import-observations.jsonl`; the independent fixture
+inputs/expected hashes live in `workspace-drop-import-fixture.json`. No physical
+OS drag or cross-platform execution is established by these receipts alone.
+
+The fixture exposes `${fixture.workspace_drop_root1}`, `workspace_drop_root2`,
+`workspace_drop_source`, `workspace_drop_workspace` (JSON for `seed_storage`),
+`workspace_drop_manifest` and `workspace_drop_sha_*` digests. Roots share an
+`incoming` path; the source is outside both roots and contains Unicode/spaces,
+nested binary/text, an empty directory, distinct collision bytes and new retry
+files. Native retains all trees; browser owns a unique context-local VFS tree.
+
+## Workspace system file clipboard
+
+| Verb | Args | Evidence boundary |
+|---|---|---|
+| `file_clipboard` | `{action: seed\|assert, paths: string[]}` | Run-owned paths only. Browser uses `/src/stubs/fileClipboard.ts` memory list with VFS paths, never OS clipboard. Native seeds via Windows CF_HDROP, eager AppKit file-url items or a long-lived GTK owner offering BOTH `text/uri-list` and `x-special/gnome-copied-files`; assertion independently reads CF_HDROP/NSURL or actual Linux MIME bytes, never product `clipboard_read_files`. Exact paths plus every host file/directory hash are retained in `file-clipboard-observations.jsonl`; Linux owner is killed during native teardown. Empty list is a no-file negative. No text fallback or personal clipboard restoration/config mutation. This replaces the isolated QA desktop clipboard. |
+| `system_file_paste` | `{directory, paths: string[]}` | Native only. Requires the independent native file list to match `paths` and the target to be empty under the report root. Performs ONE real PCManFM-Qt X11 CtrlV (private DBus/XDG and owned PID/window/focus), Windows Shell FolderItem `InvokeVerb('paste')`, or Finder System Events Edit/Paste Item; then independently requires every copied SHA256 and empty directory. Never `shutil.copy`, `Copy-Item`, Finder duplicate or product import IPC. OS permission/tool/Paste-action failures remain failures in `system-file-paste.jsonl`. Closes only its owned file-manager window/process. Linux Wayland real file-manager Paste is an explicit manual gap and fails instead of silently using X11. |
+
+`workspace_file_clipboard` extends `workspace_drop_import` without changing
+TC-WS-087/088. TC-WS-089/090 use the same exact source/root hash oracle, plus
+latest-B and internal Cut phases (`root` means root2/latest B.txt; `cut` moves
+only root1/cut-retained.txt into root1/incoming). Native external destinations
+`${fixture.workspace_clipboard_external_file}` and
+`${fixture.workspace_clipboard_external_directory}` are empty, run-owned and
+outside the source/roots. Tree Copy/Paste/Cut still use production controls and
+CtrlC/V (Windows/Linux), CmdC/V (macOS) only with the tree focused. WebView keys
+do not establish OS shortcut delivery, AppKit menu-bar responder or IME behavior;
+those gaps stay explicit. All new UI cases are unrun until matching hosted receipts.
 
 ## ED-PARITY-005 controlled browser provider
 

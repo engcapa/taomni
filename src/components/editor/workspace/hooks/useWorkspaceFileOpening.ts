@@ -17,6 +17,7 @@ import { useWorkspaceSession } from "./useWorkspaceSession";
 import { useWorkspaceSurfaceState } from "./useWorkspaceSurfaceState";
 import { useWorkspaceTreeInteractions } from "./useWorkspaceTreeInteractions";
 import { useWorkspaceTreeOpening } from "./useWorkspaceTreeOpening";
+import { useWorkspaceDropImport } from "./useWorkspaceDropImport";
 import { useWorkspaceZoom } from "./useWorkspaceZoom";
 import { useWorkspaceHost } from "../workspaceHostIntegration";
 
@@ -263,7 +264,19 @@ export function useWorkspaceFileOpening(context: UseWorkspaceFileOpeningContext)
     host?.onFolderOpened?.(root.id);
   }, [host?.onFolderOpened, project.toolWindowRouting.toolWindowLayoutRef]);
 
+  const importDroppedPaths = useWorkspaceDropImport({
+    workspaceId: session.workspaceInstanceId,
+    rootsRef: project.projectTree.rootsRef,
+    loadFlatFiles: project.projectTree.treeData.loadFlatFiles,
+    setExpandedRoots: project.uiActions.setExpandedRoots,
+    setExpandedDirs: project.uiActions.setExpandedDirs,
+    loadDir: project.projectTree.treeData.loadDir,
+    refreshPath: project.projectTree.treeData.refreshPath,
+    notifyGitChanged: project.gitSnapshotOwner.notifyWorkspacePathGitChanged,
+    onStatus: session.setStatusMessage,
+  });
   const fileActions = useWorkspaceFileActions({
+    importPaths: importDroppedPaths,
     onRootAdded,
     workspaceId: session.workspaceInstanceId,
     locationController: project.workspaceLocationControllerRef.current,
@@ -325,6 +338,7 @@ export function useWorkspaceFileOpening(context: UseWorkspaceFileOpeningContext)
   return {
     openFile,
     fileActions,
+    importDroppedPaths,
     pendingClosedFilesRef,
     closeFileRef,
     navigation,

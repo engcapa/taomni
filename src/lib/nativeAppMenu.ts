@@ -127,7 +127,10 @@ export function buildAppMenuSpec(params: BuildAppMenuParams): AppMenuSpec {
           label: command.title,
           action: `workspace-command:${command.id}`,
           enabled: command.enabled,
-          ...(command.keybinding ? { accelerator: command.keybinding.replace(/^Ctrl\+/, "CmdOrCtrl+") } : {}),
+          // File clipboard keys belong to the focused tree/WebView responder.
+          // A second global accelerator here would compete with predefined Edit.
+          ...(command.keybinding && !/^workspace\.tree\.(copy|cut|paste)$/.test(command.id)
+            ? { accelerator: command.keybinding.replace(/^Ctrl\+/, "CmdOrCtrl+") } : {}),
         })),
       },
     );

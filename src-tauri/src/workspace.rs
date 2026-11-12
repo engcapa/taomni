@@ -12,6 +12,8 @@ mod file_commands;
 pub use file_commands::*;
 mod resource_operations;
 pub use resource_operations::*;
+mod import_paths;
+pub use import_paths::*;
 mod paths;
 pub use paths::*;
 mod files;
