@@ -6,7 +6,7 @@ from pathlib import Path
 import platform
 
 from .deadline import budget_time as time
-from .file_clipboard import append, scoped
+from .file_clipboard import append, paths_match, scoped
 from .steps import StepError
 from .workspace_drop_observation import host_snapshot
 
@@ -67,7 +67,7 @@ def run(ctx, args):
         from . import host_clipboard as host
         before = clipboard.read()
         record["clipboardBefore"] = before
-        if before["paths"] != paths:
+        if not paths_match(before["paths"], paths, mode="native"):
             raise StepError("system_file_paste: independent native clipboard is not the requested file list")
         expected = expected_snapshot(paths)
         record["expected"] = expected
@@ -100,7 +100,7 @@ def run(ctx, args):
                 raise StepError("system_file_paste: real file manager did not create the exact expected bytes/empty directories")
             time.sleep(.1)
         record["clipboardAfter"] = clipboard.read()
-        if record["clipboardAfter"]["paths"] != paths:
+        if not paths_match(record["clipboardAfter"]["paths"], paths, mode="native"):
             raise StepError("system_file_paste: file manager unexpectedly changed the copied file references")
         record["passed"] = True
         return "real file-manager Paste produced exact SHA256 and empty-directory set"

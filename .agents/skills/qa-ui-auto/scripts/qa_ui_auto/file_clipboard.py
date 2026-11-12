@@ -4,6 +4,7 @@ from __future__ import annotations
 import hashlib
 import json
 from pathlib import Path
+import platform
 from typing import Any
 
 from .deadline import budget_time as time
@@ -42,6 +43,23 @@ def scoped(ctx, paths: list[str], mode: str) -> list[str]:
     return result
 
 
+def paths_match(actual: Any, expected: list[str], *, mode: str) -> bool:
+    if not isinstance(actual, list) or any(not isinstance(path, str) for path in actual):
+        return False
+    if mode != "native" or platform.system() != "Windows":
+        return actual == expected
+
+    def spelling(path: str) -> str:
+        # CF_HDROP preserves the writer's separators. Fold only the drive
+        # letter, not case-sensitive filenames, whitespace, aliases or '..'.
+        path = path.replace("\\", "/")
+        if len(path) >= 3 and path[0].isascii() and path[0].isalpha() and path[1:3] == ":/":
+            path = path[0].lower() + path[1:]
+        return path
+
+    return [spelling(path) for path in actual] == [spelling(path) for path in expected]
+
+
 def digests(paths: list[str]) -> dict:
     from .workspace_drop_observation import host_snapshot
     result = {}
@@ -75,12 +93,12 @@ def run(ctx, args: Any, *, mode: str) -> str:
                 result = native.read(require_files=bool(paths))
                 record["samples"].append(result)
                 record["observation"] = result
-                if result.get("paths") == paths or time.monotonic() >= deadline:
+                if paths_match(result.get("paths"), paths, mode=mode) or time.monotonic() >= deadline:
                     break
                 time.sleep(.1)
             record["fileHashes"] = digests(paths)
         record["observation"] = result
-        if not isinstance(result, dict) or result.get("paths") != paths:
+        if not isinstance(result, dict) or not paths_match(result.get("paths"), paths, mode=mode):
             raise StepError(f"file_clipboard: exact native/VFS path list mismatch: {result!r}")
         record["passed"] = True
         return f"{mode} file-list {action}: {len(paths)} path(s) (no product read IPC)"

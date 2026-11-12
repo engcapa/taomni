@@ -57,6 +57,69 @@ class FileClipboardTests(unittest.TestCase):
         self.assertTrue(all(record["passed"] and record["independentNativeOracle"] for record in records))
         self.assertIn(paths[0], records[0]["fileHashes"])
 
+    def test_native_assert_accepts_windows_separator_and_drive_letter_spelling_without_rewriting_evidence(self):
+        expected = [r"D:\QA\root1\中文 空格.txt"]
+        observed = {"paths": ["d:/QA/root1/中文 空格.txt"], "formats": ["FileDrop"], "nativeFormat": "CF_HDROP"}
+        with patch.object(tool.platform, "system", return_value="Windows"), \
+                patch.object(tool, "scoped", return_value=expected), \
+                patch.object(tool, "digests", return_value={expected[0]: {"sha256": "fixture-sha256"}}), \
+                patch.object(native, "read", return_value=observed), \
+                patch.object(tool.time, "monotonic", side_effect=[0, 6]):
+            tool.native(self.ctx, {"action": "assert", "paths": expected})
+        record = json.loads((self.ctx.case_dir / "file-clipboard-observations.jsonl").read_text())
+        self.assertTrue(record["passed"])
+        self.assertEqual(record["expectedPaths"], expected)
+        self.assertEqual(record["observation"], observed)
+        self.assertIn(expected[0], record["fileHashes"])
+
+    def test_system_paste_accepts_windows_path_spelling_before_and_after_real_shell_action(self):
+        expected_paths = [r"D:\QA\root1\中文 空格.txt"]
+        before = {"paths": ["d:/QA/root1/中文 空格.txt"], "formats": ["FileDrop"]}
+        after = {"paths": [r"d:\QA\root1\中文 空格.txt"], "formats": ["FileDrop"]}
+        destination = Path(self.ctx.values["workspace_clipboard_external_file"])
+        snapshot = paste.expected_snapshot([str(self.source / "中文 空格.txt")])
+        with patch.object(paste.platform, "system", return_value="Windows"), \
+                patch.object(paste, "scoped", return_value=expected_paths), \
+                patch.object(native, "read", side_effect=[before, after]), \
+                patch.object(paste, "expected_snapshot", return_value=snapshot), \
+                patch.object(paste, "host_snapshot", return_value=snapshot), \
+                patch("qa_ui_auto.host_clipboard._ps", return_value="dispatched") as action:
+            paste.run(self.ctx, {"directory": str(destination), "paths": expected_paths})
+        self.assertIn("InvokeVerb('paste')", action.call_args.args[0])
+        record = json.loads((self.ctx.case_dir / "system-file-paste.jsonl").read_text())
+        self.assertTrue(record["passed"])
+        self.assertEqual(record["clipboardBefore"], before)
+        self.assertEqual(record["clipboardAfter"], after)
+        self.assertEqual(record["observed"], snapshot)
+
+    def test_windows_spelling_comparison_preserves_exact_order_names_and_scope(self):
+        expected = [r"D:\QA\one.txt", r"D:\QA\two.txt"]
+        with patch.object(tool.platform, "system", return_value="Windows"):
+            self.assertTrue(tool.paths_match(["d:/QA/one.txt", "D:/QA/two.txt"], expected, mode="native"))
+            for actual in [expected[::-1], expected[:1], expected + expected[:1],
+                           ["D:/QA/other.txt", expected[1]], ["D:/elsewhere/one.txt", expected[1]],
+                           ["D:/QA/ONE.txt", expected[1]], ["D:/QA/one.txt ", expected[1]],
+                           ["D:/QA/../QA/one.txt", expected[1]], None, "D:/QA/one.txt", [None]]:
+                with self.subTest(actual=actual):
+                    self.assertFalse(tool.paths_match(actual, expected, mode="native"))
+            self.assertFalse(tool.paths_match(["d:/QA/one.txt", "D:/QA/two.txt"], expected, mode="browser"))
+        for system in ["Linux", "Darwin"]:
+            with self.subTest(system=system), patch.object(tool.platform, "system", return_value=system):
+                self.assertFalse(tool.paths_match(["d:/QA/one.txt", "D:/QA/two.txt"], expected, mode="native"))
+                self.assertFalse(tool.paths_match(["/tmp/name"], ["/tmp/name "], mode="native"))
+                self.assertTrue(tool.paths_match(expected, expected, mode="native"))
+
+    def test_system_paste_rejects_other_file_before_dispatching_a_file_manager(self):
+        paths = [str(self.source / "中文 空格.txt")]
+        with patch.object(native, "read", return_value={"paths": [str(self.source / "second file.txt")]}), \
+                patch("qa_ui_auto.host_clipboard._ps") as action:
+            with self.assertRaisesRegex(StepError, "not the requested file list"):
+                paste.run(self.ctx, {"directory": self.ctx.values["workspace_clipboard_external_file"], "paths": paths})
+            action.assert_not_called()
+        record = json.loads((self.ctx.case_dir / "system-file-paste.jsonl").read_text())
+        self.assertFalse(record["passed"])
+        self.assertEqual(list(Path(self.ctx.values["workspace_clipboard_external_file"]).iterdir()), [])
+
     def test_browser_only_uses_explicit_memory_clipboard_stub_and_dry_run_has_no_os_access(self):
         self.ctx.page = Mock()
         path = "/preview/workspace-drop-import-unit/source/f.txt"
