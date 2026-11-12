@@ -72,15 +72,16 @@ steps:
     expect_truthy: true
 - assert_no_runtime_errors: null
 - screenshot: notes-008-caret-linked-editing.png
-# reset_db starts the app theme in system mode; its first cycle selects light.
-# The Workspace editor follows the app/code theme, not the local Notes panel palette.
+# Open the actual Workspace before clicking outside the floating Notes drawer;
+# narrow native windows dismiss that drawer when the theme button is clicked.
+- click: '[data-testid="note-editor-preview"]'
+- click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-mode-edit"]'
+# reset_db starts at system; Workspace uses the app theme, not the Notes palette.
 - click: '[data-testid="theme-cycle"]'
 - assert_attribute:
     selector: html
     name: data-app-theme
     equals: light
-- click: '[data-testid="note-editor-preview"]'
-- click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-mode-edit"]'
 - press:
     selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"] .cm-content'
     key: Mod+A
@@ -257,9 +258,9 @@ verification:
     requirement: Keyboard multiline selection includes the final line in light/dark Workspace themes, the selection head
       has no covering active-line fill, a nonzero selection rectangle reaches that line, reverse selection retains
       identical text, and collapsing the range restores the caret highlight. These are structural checks, not a pixel verdict.
-    actions: [28, 30, 31, 32, 33, 35, 36, 37, 38, 45, 48, 50, 51, 52, 53, 60, 61]
+    actions: [28, 29, 30, 32, 33, 35, 36, 37, 38, 45, 48, 50, 51, 52, 53, 60, 61]
     checkpoints:
-    - step: 29
+    - step: 31
       expectation: The app theme is light, rather than a Notes panel-only palette.
     - step: 34
       expectation: The Workspace editor contains the exact four-line fixture with an unselected tail.

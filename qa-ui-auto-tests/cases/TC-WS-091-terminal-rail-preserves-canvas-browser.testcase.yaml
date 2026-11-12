@@ -80,10 +80,7 @@ steps:
 - assert_visible: '[data-testid="workspace-session-pane"][data-session-id="qa-restore-localshell"]'
 - click: '[data-testid="sidebar-tool-window-rail"] [data-testid="code-workspace-bottom-tab-terminal"]'
 - assert_not_visible: '[data-testid="workspace-bottom-dock"]'
-- assert_attribute:
-    selector: '[data-testid="sidebar-tool-window-rail"] [data-testid="code-workspace-bottom-tab-terminal"]'
-    name: aria-pressed
-    equals: 'false'
+- wait_for: '[data-testid="sidebar-tool-window-rail"] [data-testid="code-workspace-bottom-tab-terminal"][aria-pressed="false"]'
 - assert_no_runtime_errors: null
 verification:
   review: reviewed
