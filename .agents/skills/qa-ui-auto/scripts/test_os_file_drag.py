@@ -76,24 +76,33 @@ class OsFileDragTests(unittest.TestCase):
         with self.assertRaises(StepError):
             REGISTRY["os_file_drag"](self.ctx, {"phase": "drop"})
 
-    def test_native_registration_settles_emit_via_execute_async_once(self):
+    def test_native_registration_starts_once_and_polls_through_sync_bridge(self):
         session = Mock()
-        session.endpoint.return_value = "/session/qa/execute/async"
-        session.request.return_value = {"ok": True, "synthetic": True, "eventName": "tauri://drag-drop"}
+        result = {"ok": True, "synthetic": True, "eventName": "tauri://drag-drop"}
+        session.execute.side_effect = [True, {"done": False}, {"done": True, "value": result}, True]
         ctx = SimpleNamespace(session=session, case_dir=self.folder)
         summary = run_native_step(ctx, "os_file_drag", {"selector": "#row", "phase": "drop", "paths": ["/source"]})
-        session.endpoint.assert_called_once_with("/execute/async")
-        method, endpoint, body = session.request.call_args.args
-        self.assertEqual((method, endpoint), ("POST", "/session/qa/execute/async"))
-        self.assertEqual(body["args"][0]["paths"], ["/source"])
-        self.assertEqual(body["args"][0]["mode"], "native")
-        self.assertIn("arguments[arguments.length - 1]", body["script"])
-        self.assertIn(".then(done,", body["script"])
-        self.assertIn("tauri.event.emitTo", body["script"])
-        self.assertNotIn("workspace_import_paths", body["script"])
-        session.execute.assert_not_called()
-        self.assertEqual(session.request.call_count, 1)
+        scripts = [call.args[0] for call in session.execute.call_args_list]
+        self.assertIn('"paths": ["/source"]', scripts[0])
+        self.assertIn('"mode": "native"', scripts[0])
+        self.assertIn("tauri.event.emitTo", scripts[0])
+        self.assertNotIn("workspace_import_paths", scripts[0])
+        self.assertEqual(sum("tauri.event.emitTo" in script for script in scripts), 1)
+        self.assertTrue(scripts[1].startswith("return window["))
+        self.assertTrue(scripts[-1].startswith("delete window["))
+        session.request.assert_not_called()
         self.assertIn("not an OS gesture", summary)
+
+    def test_native_uncertain_delivery_is_not_retried_and_slot_cleanup_is_attempted(self):
+        session = Mock()
+        session.execute.side_effect = [True, RuntimeError("transport failed"), True]
+        ctx = SimpleNamespace(session=session, case_dir=self.folder)
+        with self.assertRaisesRegex(RuntimeError, "transport failed"):
+            drag.native(ctx, {"phase": "drop", "paths": ["/source"]})
+        scripts = [call.args[0] for call in session.execute.call_args_list]
+        self.assertEqual(sum("tauri.event.emitTo" in script for script in scripts), 1)
+        self.assertTrue(scripts[-1].startswith("delete window["))
+        self.assertFalse(self.entries()[-1]["delivered"])
 
     def test_delivery_errors_are_retained_and_never_retried(self):
         for result in [None, {"ok": False, "error": "occluded"}]:

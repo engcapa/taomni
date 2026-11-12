@@ -125,7 +125,19 @@ interface WorkspaceImportResult {
 - TC-WS-087（browser，82 steps）和 TC-WS-088（native，89 steps）reviewed 行为映射校验通过。TC-WS-088 增加 7 项独立磁盘 SHA256 断言。
 - 静态规划已确认三平台每个 browser 组合 12 cases、native 组合 13 cases，包含新专项、TC-WS-008/036/037 保留行为及完整 crash-regression；共 75 次 case 执行计划，native 统一 release build。
 
-GitHub V-05/V-06 尚待执行；提交 SHA、run URL、case/pass/fail/skip、构建 hash、逐平台结果待回填。真实 OS 手势仍未验证。
+GitHub V-05/V-06：[run 43174281571](https://github.com/engcapa/taomni/actions/runs/43174281571)，源码 `ff1d7297f85f4e589b17a205fd3f3b5ed8d10588`，invocation `dbb15134f25748a8b0f397b82d0b4f7c`。
+
+- 实际 hosted selection 已读取核对：Linux/Windows/macOS 各 browser 12、native 13；包含 TC-WS-087/088 与完整 crash-regression，无 capability gaps；native 三端均 release。
+- browser 原始报告与 runner receipts 已下载到 `/tmp/taomni-792-browser-evidence.2IA1jt/{linux,windows,macos}/` 独立目录。
+- **Linux browser：12 passed / 0 failed / 0 skipped；Windows browser：12/0/0；macOS browser：12/0/0。** 每端 TC-WS-087 均为 82 steps passed，`identity_stable=true`、`dry_run=false`、exit code 0。
+- 三端 browser 悬停 PNG 已查看：root2 `incoming` 行的蓝色边框清晰，root1 既有选中背景与拖放目标可区分，未见明显遮挡。此观察只针对 browser 产物，不外推 macOS 原生 chrome 或 OS 手势。
+- native Rust contracts 支持任务通过，Linux/macOS/Windows 三端 release 构建通过。
+- Linux native shard-1 原始报告：4 passed / 0 failed，含 TC-WS-088 全部 89 steps；证据在 `/tmp/taomni-792-linux-native.xZ3zw6/`。
+- macOS native shard-1 原始报告：3 passed / 1 failed；TC-WS-088 在 step 19 的 `os_file_drag` 因 `/execute/async` HTTP 404 失败，尚未发送复制事件。分片 GitHub job 自身显示 success 不等于 case 通过。失败原件保留于 `/tmp/taomni-792-macos-native.zY3iZH/shard-1/`。
+- 查明 WKWebView QA bridge 仅实现 `/execute/sync`，已将工具改为一次启动 Promise + 私有结果 slot 轮询（复用 native screenshot 模式），不重发 uncertain delivery，不调用复制 IPC捷径；新增单测 `test_native_registration_starts_once_and_polls_through_sync_bridge` 与 `test_native_uncertain_delivery_is_not_retried_and_slot_cleanup_is_attempted`。工具专项 9 passed。
+- 此修正仅涉及 QA transport/case 文档，产品源码不变；准备三端 native 重跑新专项及完整 crash-regression。首轮最终聚合及后续 run/二进制 hash 待回填。
+
+真实 OS 文件管理器手势仍未验证。
 
 失败归因参考：主分支 `2d8bc8dc` 的完整 QA [run 43135286535](https://github.com/engcapa/taomni/actions/runs/43135286535) 聚合报告已保存到 `/tmp/taomni-792-baseline.Dw0Jeq/summary.md`（独立下载目录，未运行其中脚本）。该基线包含 Mobile/VNC/Notes/旧 Git tab selector 及少量时延失败；不把其失败结论外推为本次任意失败可忽略。候选出现失败须与原始 case/步骤/产物逐项比对，本次引入的回归必须修复。
 

@@ -2,7 +2,7 @@ id: TC-WS-088
 title: Synthetic Tauri file drag imports into root2 with independent real disk SHA256
 description: >-
   Issue 792. Native is required for real workspace_import_paths IPC and disk copy.
-  os_file_drag awaits the existing WebDriver execute/async endpoint and emits
+  os_file_drag starts once via execute/sync, polls the Promise result slot and emits
   tauri://drag-enter/over/drop/leave to the CURRENT Webview label. Actual hit-tested
   CSS coordinates times devicePixelRatio enter App.tsx onDragDropEvent and the
   production Project tree forwarding, not an import shortcut or product QA hook.

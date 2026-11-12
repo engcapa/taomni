@@ -9,7 +9,9 @@ from __future__ import annotations
 import json
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Any, Protocol
+from uuid import uuid4
 
+from .deadline import budget_time as time
 from .steps import StepError
 
 SCRIPT = Path(__file__).with_suffix(".js").read_text(encoding="utf-8")
@@ -84,13 +86,34 @@ def browser(ctx: Any, args: Any) -> None:
     run(ctx, args, mode="browser", execute=lambda request: ctx.page.evaluate(SCRIPT, request))
 
 
+def _native_execute(ctx: Any, request: dict[str, Any]) -> Any:
+    # WKWebView's bridge implements execute/sync, not execute/async. Start once
+    # and only poll its private result slot, as the native screenshot scenarios
+    # do; never re-emit an event after a timeout or uncertain transport failure.
+    key = json.dumps("__qaFileDrag_" + uuid4().hex)
+    try:
+        started = ctx.session.execute(
+            f"window[{key}] = {{done:false}};\n"
+            f"({SCRIPT})({json.dumps(request)}).then(\n"
+            f"value => window[{key}] = {{done:true,value}},\n"
+            f"error => window[{key}] = {{done:true,value:{{ok:false,error:String(error)}}}});\n"
+            "return true;"
+        )
+        if started is not True:
+            raise StepError("os_file_drag: could not start synthetic native event")
+        deadline = time.monotonic() + 15
+        while time.monotonic() < deadline:
+            state = ctx.session.execute(f"return window[{key}] || null;")
+            if isinstance(state, dict) and state.get("done") is True:
+                return state.get("value")
+            time.sleep(0.05)
+        raise StepError("os_file_drag: native event observation timed out; delivery is uncertain")
+    finally:
+        try:
+            ctx.session.execute(f"delete window[{key}]; return true;")
+        except Exception:
+            pass
+
+
 def native(ctx: Any, args: Any) -> str:
-    # /execute/sync would serialize a Promise rather than settle emitTo. Use the
-    # existing async endpoint and never retry uncertain native event delivery.
-    script = (
-        "const request = arguments[0]; const done = arguments[arguments.length - 1];\n"
-        f"({SCRIPT})(request).then(done, error => done({{ok: false, error: String(error)}}));"
-    )
-    return run(ctx, args, mode="native", execute=lambda request: ctx.session.request(
-        "POST", ctx.session.endpoint("/execute/async"), {"script": script, "args": [request]},
-    ))
+    return run(ctx, args, mode="native", execute=lambda request: _native_execute(ctx, request))

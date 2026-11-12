@@ -554,7 +554,7 @@
           },
           "if": {"properties": {"phase": {"enum": ["enter", "drop"]}}},
           "then": {"required": ["paths"], "properties": {"paths": {"minItems": 1}}},
-          "description": "Synthetic file drag entry only, not an OS gesture. Browser dispatches HTML5 DragEvent with file URI text/uri-list; native awaits targeted Tauri emitTo via execute/async, physical positions = hit-tested CSS coordinates * devicePixelRatio. Leave native payload is null. Omitted selector uses the body hit point; native leave needs no target."
+          "description": "Synthetic file drag entry only, not an OS gesture. Browser dispatches HTML5 DragEvent with file URI text/uri-list; native starts targeted Tauri emitTo once via execute/sync and polls a private Promise result slot, physical positions = hit-tested CSS coordinates * devicePixelRatio. Leave native payload is null. Omitted selector uses the body hit point; native leave needs no target."
         },
         "assert_workspace_drop_import": {
           "type": "object",
