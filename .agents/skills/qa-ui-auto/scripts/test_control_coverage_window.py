@@ -6,6 +6,16 @@ from qa_ui_auto.control_coverage import _touches_for_case
 
 
 class WindowControlCoverageTest(unittest.TestCase):
+    def test_synthetic_file_drag_counts_only_its_explicit_dom_target_as_interactive(self):
+        selector = '[data-testid="code-workspace-tree-dir"][data-root-id="root2"][data-path="incoming"]'
+        case = SimpleNamespace(id="TC-DRAG", steps=[
+            {"os_file_drag": {"selector": selector, "phase": "drop", "paths": ["/source file"]}},
+            {"os_file_drag": {"phase": "leave"}},
+            {"assert_workspace_drop_import": {"state": "directory"}},
+        ])
+        self.assertEqual([(touch.selector, touch.kind) for touch in _touches_for_case(case)],
+                         [(selector, "interactive")])
+
     def test_restore_click_is_interactive_but_destination_is_only_observed(self):
         case = SimpleNamespace(id="TC-WINDOW", steps=[{"switch_window": {
             "selector": '[data-testid="terminal-pane"]',

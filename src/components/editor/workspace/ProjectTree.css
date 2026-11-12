@@ -64,6 +64,15 @@
   color: var(--taomni-code-syntax-number, var(--taomni-accent));
 }
 
+/* Native and HTML5 drags share one transient target, independent of selection. */
+[data-testid="code-workspace-tree"] [data-drop-target="true"] {
+  background: var(--taomni-code-selection-bg) !important;
+  outline: 1px solid var(--taomni-accent);
+}
+[data-testid="code-workspace-tree"] [data-drop-target="true"] .taomni-explorer-list-name {
+  background: var(--taomni-code-selection-bg);
+}
+
 /* Selection remains visible while focus is in the editor or a menu. */
 [data-testid="code-workspace-tree"] [aria-selected="true"],
 [data-testid="code-workspace-tree"] [data-selected="true"] {

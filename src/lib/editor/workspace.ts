@@ -9,6 +9,7 @@ export {
 } from "./workspace/model";
 
 export { workspaceCompactChain, workspaceDetectGitRoots, workspaceListDir, workspaceListFilesRecursive } from "./workspace/tree";
+export { workspaceImportPaths, type WorkspaceImportResult } from "./workspace/importing";
 
 export {
   type DependencyNode,

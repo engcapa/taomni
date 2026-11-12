@@ -18,6 +18,15 @@ def args(**overrides):
 
 
 class SelectionTests(unittest.TestCase):
+    def test_workspace_drop_cases_select_exact_modes_without_extra_services_or_dependencies(self):
+        plan = make_plan(args(scope="selected", case_ids="TC-WS-087,TC-WS-088"))
+        self.assertEqual(len(plan["entries"]), 6)
+        self.assertEqual(plan["gaps"], [])
+        for entry in plan["entries"]:
+            expected = "TC-WS-088" if entry["mode"] == "native" else "TC-WS-087"
+            self.assertEqual(entry["selected_ids"], [expected])
+            self.assertEqual(entry["capabilities"], ["display"] if entry["mode"] == "native" else [])
+
     def test_portable_sftp_lifecycle_uses_posix_without_changing_win32_path_cases(self):
         plan = make_plan(args(scope="selected", case_ids="TC-145"))
         self.assertEqual(len(plan["entries"]), 6)

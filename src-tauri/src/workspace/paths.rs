@@ -79,11 +79,13 @@ pub(super) fn loose_file_path(path: &str) -> Result<PathBuf, String> {
 }
 
 pub(super) fn sanitize_relative_path(value: &str) -> Result<PathBuf, String> {
-    let trimmed = value.trim();
-    if trimmed.is_empty() {
-        return Ok(PathBuf::new());
-    }
-    let path = Path::new(trimmed);
+    sanitize_relative_path_exact(value.trim())
+}
+
+/// Filesystem names obtained from the tree are already exact, not user input.
+/// Keep their whitespace while retaining the same traversal/root validation.
+pub(super) fn sanitize_relative_path_exact(value: &str) -> Result<PathBuf, String> {
+    let path = Path::new(value);
     let mut out = PathBuf::new();
     for component in path.components() {
         match component {

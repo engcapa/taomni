@@ -27,6 +27,7 @@ export interface ProjectTreeProps {
   onSelect: (selection: TreeSelection) => void;
   onOpenFile: (ref: CodeWorkspaceFileRef, options?: { preview?: boolean }) => void;
   onContextMenu: (event: MouseEvent, selection: TreeSelection) => void;
+  onImportPaths?: import("./useProjectTreeFileDrop").ImportDroppedPaths;
   /** Empty workspace entry points (the header keeps them under New +). */
   onAddFolder?: () => void;
   onOpenLooseFile?: () => void;

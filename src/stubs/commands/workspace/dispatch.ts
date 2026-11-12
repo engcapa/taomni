@@ -7,6 +7,7 @@ import { decodeStubBytes, encodeStubText, readStubWorkspaceEncodedFile, sha256By
 import { assertWorkspaceWritablePath, joinWorkspacePath, relativeWorkspacePath } from "./paths";
 import { applyStubWorkspaceResourceOperation, workspaceEntryFromVfs, type StubWorkspaceResourceOperation } from "./resources";
 import { stubSearchCancelIds, stubSearchCancelled, stubWorkspaceSearch } from "./search";
+import { importStubWorkspacePaths } from "./imports";
 
 export async function invokeWorkspace<T>(cmd: string, args?: any): Promise<T> {
   switch (cmd) {
@@ -351,6 +352,9 @@ export async function invokeWorkspace<T>(cmd: string, args?: any): Promise<T> {
         atomicReplaceUsed: false,
       } as T;
     }
+
+    case "workspace_import_paths":
+      return await importStubWorkspacePaths(args?.repoRoot || VFS_ROOT, args?.directory || "", args?.sourcePaths || []) as T;
 
     case "workspace_create_file": {
       const repoRoot = (args?.repoRoot as string) || VFS_ROOT;

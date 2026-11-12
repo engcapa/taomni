@@ -1,3 +1,6 @@
+# Independent per-case two-root/source fixtures; neither mode needs a predecessor.
+TC-WS-087: []
+TC-WS-088: []
 TC-WS-086: []
 TC-WS-084: []
 TC-WS-085: []

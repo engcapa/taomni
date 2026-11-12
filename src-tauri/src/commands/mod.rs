@@ -184,28 +184,7 @@ pub(crate) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         | "sdk_remove_workspace_binding"
         | "sdk_analyze_workspace"
         | "sdk_resolve_workspace" => sdk::handle(invoke),
-        "workspace_list_dir"
-        | "workspace_compact_chain"
-        | "workspace_list_files_recursive"
-        | "workspace_detect_git_roots"
-        | "workspace_detect_tasks"
-        | "workspace_java_run_targets"
-        | "workspace_java_run_target"
-        | "workspace_task_tree"
-        | "workspace_dependency_tree"
-        | "workspace_read_file"
-        | "workspace_read_loose_file"
-        | "workspace_read_file_with_encoding"
-        | "workspace_read_loose_file_with_encoding"
-        | "workspace_write_file"
-        | "workspace_write_loose_file"
-        | "workspace_write_file_encoded"
-        | "workspace_write_loose_file_encoded"
-        | "workspace_create_file"
-        | "workspace_create_dir"
-        | "workspace_delete_path"
-        | "workspace_rename_path"
-        | "workspace_apply_resource_operation" => workspace::handle(invoke),
+        command if workspace::handles(command) => workspace::handle(invoke),
         "workspace_test_results" => test_results::handle(invoke),
         "workspace_execution_model" => workspace_execution::handle(invoke),
         "workspace_ingest_maven_project" | "workspace_ingest_gradle_project" => {

@@ -191,6 +191,7 @@ export function useWorkspaceCommandRouting(context: UseWorkspaceCommandRoutingCo
     onSelect: project.uiActions.setSelected,
     onOpenFile: (ref: CodeWorkspaceFileRef, options?: { preview?: boolean; }) => { void files.treeOpening.requestTreeOpen(ref, options); },
     onContextMenu: files.treeInteractions.showTreeContextMenu,
+    onImportPaths: files.importDroppedPaths,
     onAddFolder: () => executeWorkspaceCommand("workspace.tree.addFolder", { focus: "tree" }),
     onOpenLooseFile: () => executeWorkspaceCommand("workspace.tree.openLooseFile", { focus: "tree" }),
   });

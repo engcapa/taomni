@@ -54,7 +54,7 @@ export interface CreateWorkspaceSideContentsContext {
   expandedDirs: Set<string>;
   treeOpenFileHints: Record<string, import("../projectTreeTypes").ProjectTreeOpenFileHint>;
   gitDecorations: ReturnType<typeof useWorkspaceGitDecorations>;
-  projectTreeHandlers: Pick<Parameters<typeof ProjectTree>[0], "onToggleRoot" | "onToggleDir" | "onSelect" | "onOpenFile" | "onContextMenu">;
+  projectTreeHandlers: Pick<Parameters<typeof ProjectTree>[0], "onToggleRoot" | "onToggleDir" | "onSelect" | "onOpenFile" | "onContextMenu" | "onImportPaths">;
   telemetry: ReturnType<typeof useWorkspaceEditorTelemetry>;
   activeEditorGroupId: string;
   activeFile: import("../editorGroupTypes").OpenFileViewModel | null;

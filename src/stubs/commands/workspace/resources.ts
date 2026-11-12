@@ -1,5 +1,6 @@
 import { VFS_ROOT, vfsRemove, vfsRename, vfsStat, vfsWriteText } from "../../localVfs";
 import { assertWorkspaceWritablePath, joinWorkspacePath, parentWorkspacePath, relativeWorkspacePath } from "./paths";
+import type { WorkspaceEntry } from "../../../lib/editor/workspace/model";
 
 export type StubWorkspaceResourceOperation =
   | {
@@ -102,7 +103,7 @@ export async function applyStubWorkspaceResourceOperation(
   return { ignored: false };
 }
 
-export async function workspaceEntryFromVfs(repoRoot: string, path: string) {
+export async function workspaceEntryFromVfs(repoRoot: string, path: string): Promise<WorkspaceEntry> {
   const entry = await vfsStat(path);
   return {
     name: entry.name,
