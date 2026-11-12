@@ -136,6 +136,7 @@ export function createToolWindowChrome(context: CreateToolWindowChromeContext) {
     ];
   };
   const renderToolWindowPane = (id: string, options: { legacyTestIds?: boolean } = {}) => {
+    if (id === "terminal" && context.host?.terminalTool?.external) return <></>;
     // Project keeps its own IDEA header (title, toolbar, ⋮, —) in FileTreePane.
     if (id === "project") {
       return <ToolWindowSlot nodes={toolWindowNodes} id="project" label="Project" />;
@@ -167,6 +168,10 @@ export function createToolWindowChrome(context: CreateToolWindowChromeContext) {
   const stripeToolIds = ["project", "structure", "documentation", ...bottomDockTabs.map((tab) => tab.id)]
     .filter((id) => !context.host || id !== "git");
   const toggleToolWindowFromStripe = (id: string) => {
+    if (id === "terminal" && context.host?.terminalTool?.onToggle()) {
+      toolWindowLayout.hide(id);
+      return;
+    }
     const side = anchorSide(toolWindowLayout.anchorOf(id));
     if (context.host && (side === "left" ? !context.host.leftToolAreaVisible : !context.host.editorVisible)) {
       context.host.onActivateToolWindow(id, side);
@@ -193,7 +198,9 @@ export function createToolWindowChrome(context: CreateToolWindowChromeContext) {
       badge: meta.badge,
       shortcut: meta.shortcut,
       anchor: toolWindowLayout.anchorOf(id),
-      active: toolWindowLayout.isVisible(id) && (anchorSide(toolWindowLayout.anchorOf(id)) !== "left" || !context.host || context.host.leftToolAreaVisible),
+      active: id === "terminal" && context.host?.terminalTool?.external
+        ? context.host.terminalTool.visible
+        : toolWindowLayout.isVisible(id) && (anchorSide(toolWindowLayout.anchorOf(id)) !== "left" || !context.host || context.host.leftToolAreaVisible),
       testId: bottomTool ? `code-workspace-bottom-tab-${id}` : `code-workspace-tool-rail-${id}`,
       onSelect: () => toggleToolWindowFromStripe(id),
     };
@@ -216,17 +223,25 @@ export function createToolWindowChrome(context: CreateToolWindowChromeContext) {
     onToggleShowNames: toolWindowLayout.toggleShowNames,
     onMove: toolWindowLayout.move,
     onHide: (id: string) => {
+      if (id === "terminal" && context.host?.terminalTool?.external) {
+        context.host.terminalTool.onHide();
+        return;
+      }
       toolWindowLayout.hide(id);
       handleReturnToEditor();
     },
-    onRemoveFromSidebar: (id: string) => toolWindowLayout.removeFromSidebar(id),
+    onRemoveFromSidebar: (id: string) => {
+      if (id === "terminal" && context.host?.terminalTool?.external) context.host.terminalTool.onHide();
+      toolWindowLayout.removeFromSidebar(id);
+    },
   };
   const moreToolWindowsButton = (
     <MoreToolWindowsButton
       tools={stripeToolIds.map((id) => ({ id, label: stripeMeta.get(id)?.label ?? id, icon: stripeMeta.get(id)?.icon }))}
       onPick={(id) => {
         toolWindowLayout.restoreToSidebar(id);
-        if (!toolWindowLayout.isVisible(id)) toggleToolWindowFromStripe(id);
+        if (id === "terminal" && context.host?.terminalTool?.external
+          ? !context.host.terminalTool.visible : !toolWindowLayout.isVisible(id)) toggleToolWindowFromStripe(id);
       }}
     />
   );

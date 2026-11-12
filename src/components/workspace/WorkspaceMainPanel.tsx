@@ -1,9 +1,7 @@
-import { Bookmark, Bug, Database, ListTodo, Search, Server, Terminal, TriangleAlert, X } from "lucide-react";
 import { memo, useEffect, useState } from "react";
 import { type WorkspaceCodeEditorProps } from "./WorkspaceCodeEditor";
 import { WorkspaceFileSurface } from "./WorkspaceFileSurface";
-import { TerminalPanel } from "../terminal/TerminalPanel";
-import { useT } from "../../lib/i18n";
+import { WorkspaceBottomDock } from "./WorkspaceBottomDock";
 import { useAppStore } from "../../stores/appStore";
 import { useWorkspaceUiStore } from "../../stores/workspaceUiStore";
 import { openPlatformCodeWorkspace } from "../../lib/openPlatformCodeWorkspace";
@@ -19,19 +17,6 @@ import { WorkspaceSessionPickerModal } from "./WorkspaceSessionPickerModal";
 import { revealWorkspaceFolder } from "./workspaceFolderReveal";
 import { NOTES_WORKSPACE_ID } from "../../stores/workspaceNotes";
 import { NotesWorkspace } from "../notes/NotesWorkspace";
-
-const DOCK_TOOLS: WorkspaceBottomTool[] = [
-  "terminal",
-  "problems",
-  "run",
-  "find",
-  "bookmarks",
-  "todo",
-  "services",
-  "database",
-];
-
-const DOCK_ICONS = { terminal: Terminal, problems: TriangleAlert, run: Bug, find: Search, bookmarks: Bookmark, todo: ListTodo, services: Server, database: Database };
 
 /**
  * Main canvas of the Workspaces mode (AC-06/07/08).
@@ -63,12 +48,9 @@ const WorkspaceCanvas = memo(function WorkspaceCanvas({ workspaceId, visible, on
 });
 
 function WorkspaceCanvasContents({ workspaceId, visible, onCommandsChange, onEditSession }: { workspaceId: string; visible: boolean } & CommandProps) {
-  const t = useT();
   const workspace = useWorkspacePlatformStore((s) => s.workspaces.find((candidate) => candidate.id === workspaceId));
   const setActiveTab = useWorkspacePlatformStore((s) => s.setActiveWorkspaceTab);
   const openFileInWorkspace = useWorkspacePlatformStore((s) => s.openFileInWorkspace);
-  const setBottomDockOpen = useWorkspacePlatformStore((s) => s.setBottomDockOpen);
-  const setBottomDockTool = useWorkspacePlatformStore((s) => s.setBottomDockTool);
   const setStatusMessage = useAppStore((s) => s.setStatusMessage);
   const sessionPickerOpen = useWorkspaceUiStore((s) => s.sessionPickerOpen);
   const sessionPickerWorkspaceId = useWorkspaceUiStore((s) => s.sessionPickerWorkspaceId);
@@ -82,7 +64,6 @@ function WorkspaceCanvasContents({ workspaceId, visible, onCommandsChange, onEdi
 
   const activeTab = workspace.openTabs.find((tab) => tab.id === workspace.activeTabId);
   const codeTab = workspace.openTabs.find((tab) => tab.kind === "code");
-  const dock = workspace.bottomDock;
   const ordered = activeTab ? [activeTab, ...workspace.openTabs.filter((tab) => tab.id !== activeTab.id)] : workspace.openTabs;
   const paneIds = new Set(ordered.slice(0, canvasLayout === "single" ? 1 : canvasLayout === "split" ? 2 : 4).map((tab) => tab.id));
   const surfaceCount = ordered.filter((tab) => paneIds.has(tab.id) && tab.kind !== "file" && tab.kind !== "code").length
@@ -157,53 +138,7 @@ function WorkspaceCanvasContents({ workspaceId, visible, onCommandsChange, onEdi
 
       </div>
 
-      {dock.open && (
-        <div data-testid="workspace-bottom-dock" className="flex shrink-0 flex-col border-t" style={{ borderColor: "var(--taomni-divider)", height: dock.heightPx, background: "var(--taomni-panel-bg)" }}>
-          <div className="flex h-7 shrink-0 items-center gap-1 border-b px-2" style={{ borderColor: "var(--taomni-divider)" }}>
-            {DOCK_TOOLS.map((tool) => {
-              const Icon = DOCK_ICONS[tool];
-              const label = t(`platform.${tool === "run" ? "runDebug" : tool}` as never) || tool;
-              return (
-              <button
-                key={tool}
-                type="button"
-                data-testid={`workspace-dock-tab-${tool}`}
-                title={label}
-                aria-label={label}
-                aria-pressed={dock.activeTool === tool}
-                className="flex h-6 w-7 shrink-0 items-center justify-center rounded"
-                style={{
-                  background: dock.activeTool === tool ? "var(--taomni-selected)" : "transparent",
-                  color: dock.activeTool === tool ? "var(--taomni-accent)" : "var(--taomni-text-muted)",
-                }}
-                onClick={() => setBottomDockTool(workspace.id, tool)}
-              >
-                <Icon className="h-3.5 w-3.5" />
-              </button>
-              );
-            })}
-            <div className="flex-1" />
-            <button
-              type="button"
-              data-testid="workspace-dock-close"
-              aria-label={t("common.close")}
-              className="rounded p-1 hover:bg-[var(--taomni-hover)]"
-              onClick={() => setBottomDockOpen(workspace.id, false)}
-            >
-              <X className="h-3.5 w-3.5" />
-            </button>
-          </div>
-          <div className="min-h-0 flex-1 overflow-auto" data-testid="workspace-dock-content" data-tool={dock.activeTool}>
-            {dock.activeTool === "terminal" ? (
-              <TerminalPanel tabId={`${workspace.id}:dock-terminal`} tabTitle="Workspace terminal" visible={visible} activeForShortcuts={false} />
-            ) : (
-              <div className="p-3 text-[11.5px]" style={{ color: "var(--taomni-text-muted)" }}>
-                {t("platform.emptyWorkspaceHint")}
-              </div>
-            )}
-          </div>
-        </div>
-      )}
+      <WorkspaceBottomDock workspace={workspace} />
 
       <WorkspaceSessionPickerModal
         open={visible && sessionPickerOpen}

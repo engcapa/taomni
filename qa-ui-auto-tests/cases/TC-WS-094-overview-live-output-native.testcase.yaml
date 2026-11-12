@@ -1,0 +1,201 @@
+id: TC-WS-094
+title: Overview searches live PTY output and highlights stable session cards without reconnecting
+description: 'Native boundary: a real Python producer writes new anchored lines while Overview owns focus. Sessions and Workspaces use the same live buffer observer. Assert new preview text, recent-output badge, stable card position, decay after output stops, filtered Enter navigation and continued execution in the original PTY.'
+covers: [F-WS-1, F-WS-2, F-WS-5, F1.5]
+tags: [p1, workspace-redesign, overview, terminal, native-boundary]
+modes: [native]
+fixtures: [reset_db]
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-overview-live
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="new-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: echo QA_OVERVIEW_STABLE_FIRST
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    regex: (?m)^QA_OVERVIEW_STABLE_FIRST\s*$
+- click: '[data-testid="new-local-terminal"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: 'python -u -c "import time; print(''QA_OVERVIEW_READY'',flush=True); [(time.sleep(1),print(''QA_OVERVIEW_TICK_''+str(i),flush=True)) for i in range(15)]"'
+    submit: true
+    verify:
+      selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+      regex: (?m)^QA_OVERVIEW_READY\s*$
+      attempts: 1
+- click: '[data-testid="tab-overview-trigger"]'
+- wait_for: '[data-testid="tab-overview"][data-scope="sessions"]'
+- assert_count:
+    selector: '[data-testid="tab-overview-card"]'
+    equal: 2
+- wait_for: '[data-testid="tab-overview-card"][data-output-active="true"] [data-testid="tab-overview-output-badge"]'
+- eval_readonly:
+    expression: document.querySelectorAll('.taomni-overview-card')[1].getAttribute('data-output-active') === 'true'
+    expect_truthy: true
+- assert_pattern:
+    selector: '[data-testid="tab-overview-card"]:nth-child(2) [data-testid="tab-overview-summary"]'
+    regex: (?m)^QA_OVERVIEW_TICK_[0-9]+\s*$
+    timeout_sec: 15
+- eval_readonly:
+    expression: document.activeElement?.getAttribute('data-testid') === 'tab-overview-search'
+    expect_truthy: true
+- screenshot: overview-native-session-output-active.png
+- fill:
+    selector: '[data-testid="tab-overview-search"]'
+    value: qa_ovw_tick
+- assert_count:
+    selector: '[data-testid="tab-overview-card"]'
+    equal: 1
+- assert_pattern:
+    selector: '[data-testid="tab-overview-summary"]'
+    regex: (?m)^QA_OVERVIEW_TICK_14\s*$
+    timeout_sec: 30
+- wait_for:
+    selector: '[data-testid="tab-overview-output-badge"]'
+    state: detached
+    timeout_sec: 10
+- press:
+    selector: '[data-testid="tab-overview-search"]'
+    key: Enter
+- assert_not_visible: '[data-testid="tab-overview"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: echo QA_OVERVIEW_SAME_PTY
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    regex: (?m)^QA_OVERVIEW_SAME_PTY\s*$
+- assert_count:
+    selector: '[data-testid="terminal-pane"]'
+    equal: 2
+- click: '[data-testid="nav-mode-workspaces"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-local-terminal"]'
+- wait_for: '[data-testid="workspace-session-pane"] [data-terminal-ready="true"]'
+- terminal_input:
+    selector: '[data-testid="workspace-session-pane"] .xterm-helper-textarea'
+    text: 'python -u -c "import time; print(''QA_WORKSPACE_READY'',flush=True); [(time.sleep(1),print(''QA_WORKSPACE_TICK_''+str(i),flush=True)) for i in range(15)]"'
+    submit: true
+    verify:
+      selector: '[data-testid="workspace-session-pane"] [data-testid="terminal-pane"]'
+      regex: (?m)^QA_WORKSPACE_READY\s*$
+      attempts: 1
+- click: '[data-testid="tab-overview-trigger"]'
+- wait_for: '[data-testid="tab-overview"][data-scope="workspaces"]'
+- wait_for: '[data-testid="tab-overview-card"][data-output-active="true"] [data-testid="tab-overview-output-badge"]'
+- fill:
+    selector: '[data-testid="tab-overview-search"]'
+    value: qa_ws_tick
+- assert_count:
+    selector: '[data-testid="tab-overview-card"]'
+    equal: 1
+- assert_pattern:
+    selector: '[data-testid="tab-overview-summary"]'
+    regex: (?m)^QA_WORKSPACE_TICK_14\s*$
+    timeout_sec: 30
+- screenshot: overview-native-workspace-live-search.png
+- press:
+    selector: '[data-testid="tab-overview-search"]'
+    key: Enter
+- wait_for: '[data-testid="workspace-session-pane"] [data-terminal-ready="true"]'
+- terminal_input:
+    selector: '[data-testid="workspace-session-pane"] .xterm-helper-textarea'
+    text: echo QA_WORKSPACE_SAME_PTY
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="workspace-session-pane"] [data-testid="terminal-pane"]'
+    regex: (?m)^QA_WORKSPACE_SAME_PTY\s*$
+- assert_count:
+    selector: '[data-testid="workspace-tab"]'
+    equal: 1
+- assert_no_runtime_errors: null
+- click: '[data-testid="tab-overview-trigger"]'
+- wait_for: '[data-testid="tab-overview-summary"]'
+- eval_readonly:
+    expression: document.querySelector('.taomni-overview-summary').scrollHeight - document.querySelector('.taomni-overview-summary').scrollTop - document.querySelector('.taomni-overview-summary').clientHeight < 2
+    expect_truthy: true
+    timeout_sec: 5
+- press: Escape
+- assert_not_visible: '[data-testid="tab-overview"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Real ongoing session output reaches the open overview, marks the unchanged second card and leaves keyboard focus on search.
+    actions: [3, 4, 6, 8, 10, 11]
+    checkpoints:
+    - step: 7
+      expectation: First PTY produces an anchored output line before overview opens.
+    - step: 13
+      expectation: Overview has exactly the two existing session cards.
+    - step: 14
+      expectation: New parsed output visibly marks a card.
+    - step: 15
+      expectation: The producing second session stays in the original second card position.
+    - step: 16
+      expectation: A new anchored producer result appears in its preview, not just the command echo.
+    - step: 17
+      expectation: New output does not steal search focus.
+    results: [7, 13, 14, 15, 16, 17]
+  - id: R2
+    requirement: Fuzzy output search stays live, activity decays when output stops, and Enter returns to the original usable PTY.
+    actions: [19, 23, 26]
+    checkpoints:
+    - step: 20
+      expectation: Abbreviated output search identifies exactly one original session.
+    - step: 21
+      expectation: The final producer result appears without closing overview.
+    - step: 22
+      expectation: The recent-output badge disappears after the producer stops.
+    - step: 24
+      expectation: Enter closes the overlay after selecting the matching session.
+    - step: 27
+      expectation: The original PTY executes another command.
+    - step: 28
+      expectation: No terminal was created by overview/search/navigation.
+    results: [20, 21, 22, 24, 27, 28]
+  - id: R3
+    requirement: Workspace terminal output uses the same live observer and fuzzy preview search without leaking or recreating session tabs.
+    actions: [29, 30, 31, 33, 34, 37, 41, 43]
+    checkpoints:
+    - step: 35
+      expectation: Current workspace scope opens.
+    - step: 36
+      expectation: Its producing terminal gets the output badge.
+    - step: 38
+      expectation: Fuzzy output search identifies the sole workspace terminal.
+    - step: 39
+      expectation: The final anchored workspace output appears while overview remains open.
+    - step: 44
+      expectation: Enter returns to the same workspace PTY which executes another command.
+    - step: 45
+      expectation: The workspace still has only the original terminal tab.
+    - step: 46
+      expectation: No runtime errors occurred throughout live updates or navigation.
+    results: [35, 36, 38, 39, 44, 45, 46]
+  - id: R4
+    requirement: Terminal preview follows the latest visible output even when wrapped command text exceeds the card height.
+    actions: [47, 50]
+    checkpoints:
+    - step: 48
+      expectation: The same terminal summary appears on reopening.
+    - step: 49
+      expectation: The summary viewport reaches its bottom rather than clipping the newest output.
+    - step: 51
+      expectation: Escape closes the overlay without changing session ownership.
+    results: [48, 49, 51]
+  visual:
+  - check: Output badges and highlighted borders are readable without obscuring preview text or moving cards.
+    method: manual
+    reason: Review both packaged-WebView screenshots alongside actual text/activity/order assertions.
+  native:
+  - check: Live output travels from real local processes through PTY and xterm into overview, and both original sessions continue accepting commands.
+    method: automated
+    reason: Browser stubs cannot establish PTY process continuity or native buffer updates; input is WebView automation, not physical OS keyboard evidence.

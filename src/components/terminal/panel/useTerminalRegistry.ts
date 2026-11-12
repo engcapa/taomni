@@ -60,6 +60,10 @@ export function useTerminalRegistry(context: UseTerminalRegistryContext) {
         const t = panel.termRef.current;
         return t ? getTerminalPreviewText(t, n) : "";
       },
+      subscribeOutput: (listener) => {
+        const subscription = panel.termRef.current?.onWriteParsed?.(listener);
+        return () => subscription?.dispose();
+      },
       writeInput: (data: string) => {
         if (panel.readOnlyRef.current) return;
         if (/[\r\n]/.test(data)) {

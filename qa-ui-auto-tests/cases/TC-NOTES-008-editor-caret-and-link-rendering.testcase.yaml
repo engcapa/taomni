@@ -1,10 +1,13 @@
 id: TC-NOTES-008
-title: Notes caret uses the editable text while links remain available on blur
-description: 'Regression for the Windows caret/content offset: linked title/body fields must render their own text while focused,
-  including wrapped mixed Chinese/Latin content and keyboard navigation. Native executes in the packaged WebView; hosted Windows
-  uses WebView2 but is not a physical Windows 11 IME/DPI check.'
+title: Notes caret and multiline Workspace selection remain visible in light and dark themes
+description: 'Regressions for linked-field caret/content offset and an opaque active-line fill hiding the final selected
+  Workspace line in dark mode. Real keyboard selection must retain exact text and cover its final line in light/dark themes;
+  screenshot review establishes the pixel result separately. Native executes in the packaged WebView; hosted Windows uses
+  WebView2 but is not a physical Windows 11 IME/DPI check.'
 covers:
 - F-TAO-1
+- F-WS-1
+- F5.5
 tags:
 - notes
 - regression
@@ -14,7 +17,7 @@ modes:
 - native
 fixtures:
 - reset_db
-timeout_sec: 90
+timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-notes-caret
@@ -69,6 +72,139 @@ steps:
     expect_truthy: true
 - assert_no_runtime_errors: null
 - screenshot: notes-008-caret-linked-editing.png
+# Open the actual Workspace before clicking outside the floating Notes drawer;
+# narrow native windows dismiss that drawer when the theme button is clicked.
+- click: '[data-testid="note-editor-preview"]'
+- click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-mode-edit"]'
+# reset_db starts at system; Workspace uses the app theme, not the Notes palette.
+- click: '[data-testid="theme-cycle"]'
+- assert_attribute:
+    selector: html
+    name: data-app-theme
+    equals: light
+- press:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"] .cm-content'
+    key: Mod+A
+# fill uses real Enter key chords for line breaks on native WebKit;
+# raw type would send literal LF key values without an editor newline action.
+- fill:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"] .cm-content'
+    value: |-
+      first line alpha
+      second line 中文
+      final selected line
+      unselected tail
+- assert_items:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - first line alpha
+    - second line 中文
+    - final selected line
+    - unselected tail
+- press:
+    key: Mod+Home
+    macos_key: Meta+ArrowUp
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press:
+    key: Shift+End
+    macos_key: Meta+Shift+ArrowRight
+- eval_readonly:
+    expression: window.getSelection()?.toString() === "first line alpha\nsecond line 中文\nfinal selected line"
+    expect_truthy: true
+- assert_text_equals:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] .cm-activeLine'
+    equals: final selected line
+- eval_readonly:
+    expression: getComputedStyle(document.querySelector(".cm-focused .cm-activeLine")).backgroundColor === "rgba(0, 0, 0, 0)"
+    expect_truthy: true
+- eval_readonly:
+    expression: document.querySelector(".cm-focused .cm-selectionBackground:last-child").getBoundingClientRect().bottom > document.querySelector(".cm-focused .cm-activeLine").getBoundingClientRect().top && document.querySelector(".cm-focused .cm-selectionBackground:last-child").getBoundingClientRect().top < document.querySelector(".cm-focused .cm-activeLine").getBoundingClientRect().bottom
+    expect_truthy: true
+    timeout_sec: 5
+- eval_readonly:
+    expression: document.querySelector(".cm-focused .cm-selectionBackground:last-child").getBoundingClientRect().width > 40
+    expect_truthy: true
+- screenshot: notes-008-selection-light-forward.png
+- press:
+    key: Mod+End
+    macos_key: Meta+ArrowDown
+- eval_readonly:
+    expression: window.getSelection()?.isCollapsed === true
+    expect_truthy: true
+- eval_readonly:
+    expression: getComputedStyle(document.querySelector(".cm-focused .cm-activeLine")).backgroundColor !== "rgba(0, 0, 0, 0)"
+    expect_truthy: true
+- click: '[data-testid="theme-cycle"]'
+- assert_attribute:
+    selector: html
+    name: data-app-theme
+    equals: dark
+- press:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"] .cm-content'
+    key: Mod+Home
+    macos_key: Meta+ArrowUp
+- press: Shift+ArrowDown
+- press: Shift+ArrowDown
+- press:
+    key: Shift+End
+    macos_key: Meta+Shift+ArrowRight
+- eval_readonly:
+    expression: window.getSelection()?.toString() === "first line alpha\nsecond line 中文\nfinal selected line"
+    expect_truthy: true
+- assert_text_equals:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] .cm-activeLine'
+    equals: final selected line
+- eval_readonly:
+    expression: getComputedStyle(document.querySelector(".cm-focused .cm-activeLine")).backgroundColor === "rgba(0, 0, 0, 0)"
+    expect_truthy: true
+- eval_readonly:
+    expression: document.querySelector(".cm-focused .cm-selectionBackground:last-child").getBoundingClientRect().bottom > document.querySelector(".cm-focused .cm-activeLine").getBoundingClientRect().top && document.querySelector(".cm-focused .cm-selectionBackground:last-child").getBoundingClientRect().top < document.querySelector(".cm-focused .cm-activeLine").getBoundingClientRect().bottom
+    expect_truthy: true
+    timeout_sec: 5
+- eval_readonly:
+    expression: document.querySelector(".cm-focused .cm-selectionBackground:last-child").getBoundingClientRect().width > 40
+    expect_truthy: true
+- screenshot: notes-008-selection-dark-forward.png
+- press: ArrowRight
+- press:
+    key: Mod+Shift+Home
+    macos_key: Meta+Shift+ArrowUp
+- eval_readonly:
+    expression: window.getSelection()?.toString() === "first line alpha\nsecond line 中文\nfinal selected line"
+    expect_truthy: true
+- assert_text_equals:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] .cm-activeLine'
+    equals: first line alpha
+- eval_readonly:
+    expression: getComputedStyle(document.querySelector(".cm-focused .cm-activeLine")).backgroundColor === "rgba(0, 0, 0, 0)"
+    expect_truthy: true
+- screenshot: notes-008-selection-dark-reverse.png
+- type:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"] .cm-content'
+    text: replacement
+- assert_items:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - replacement
+    - unselected tail
+- press: Mod+Z
+- assert_items:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - first line alpha
+    - second line 中文
+    - final selected line
+    - unselected tail
+- press: Mod+A
+- eval_readonly:
+    expression: window.getSelection()?.toString() === "first line alpha\nsecond line 中文\nfinal selected line\nunselected tail"
+    expect_truthy: true
+- eval_readonly:
+    expression: getComputedStyle(document.querySelector(".cm-focused .cm-activeLine")).backgroundColor === "rgba(0, 0, 0, 0)"
+    expect_truthy: true
+- screenshot: notes-008-selection-dark-all.png
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -120,11 +256,80 @@ verification:
     - 19
     - 25
     - 26
+  - id: R2
+    requirement: Keyboard multiline selection includes the final line in light/dark Workspace themes, the selection head
+      has no covering active-line fill, a nonzero selection rectangle reaches that line, reverse selection retains
+      identical text, and collapsing the range restores the caret highlight. These are structural checks, not a pixel verdict.
+    actions: [28, 29, 30, 32, 33, 35, 36, 37, 38, 45, 48, 50, 51, 52, 53, 60, 61]
+    checkpoints:
+    - step: 31
+      expectation: The app theme is light, rather than a Notes panel-only palette.
+    - step: 34
+      expectation: The Workspace editor contains the exact four-line fixture with an unselected tail.
+    - step: 39
+      expectation: The real DOM selection equals the first three lines including final selected line, excluding the tail.
+    - step: 40
+      expectation: The forward range head is on final selected line.
+    - step: 41
+      expectation: The light-theme active-line fill is transparent while the range exists.
+    - step: 42
+      expectation: The drawn selection rectangle overlaps the final selected line vertically.
+    - step: 43
+      expectation: The final selection rectangle has nonzero text-width coverage.
+    - step: 46
+      expectation: End-of-document navigation collapses the selection.
+    - step: 47
+      expectation: The collapsed caret has its original nontransparent active-line fill.
+    - step: 49
+      expectation: The app theme is dark.
+    - step: 54
+      expectation: The dark forward DOM selection equals all three requested lines and excludes the tail.
+    - step: 55
+      expectation: The dark forward range head is on final selected line.
+    - step: 56
+      expectation: The opaque dark active-line fill no longer covers the selected head line.
+    - step: 57
+      expectation: The dark selection rectangle overlaps the final selected line vertically.
+    - step: 58
+      expectation: The dark final selection rectangle has nonzero text-width coverage.
+    - step: 62
+      expectation: Reversing the selection retains the same exact three-line selected text.
+    - step: 63
+      expectation: The reverse range head is now on first line alpha.
+    - step: 64
+      expectation: The reverse selection head also has a transparent active-line fill.
+    results: [31, 34, 39, 40, 41, 42, 43, 46, 47, 49, 54, 55, 56, 57, 58, 62, 63, 64]
+  - id: R3
+    requirement: Replacing the range removes all selected lines including the final line but retains the tail;
+      undo restores the entire document and Select All includes its last line without an active-line occluder.
+    actions: [66, 68, 70]
+    checkpoints:
+    - step: 67
+      expectation: The document is exactly replacement followed by the original unselected tail.
+    - step: 69
+      expectation: Undo restores every original line without loss or duplication.
+    - step: 71
+      expectation: Select All returns the exact entire four-line document.
+    - step: 72
+      expectation: Select All leaves the active-line fill transparent.
+    - step: 74
+      expectation: No runtime errors occurred through editing, theme switching and selection.
+    results: [67, 69, 71, 72, 74]
   visual:
-  - check: Inspect mixed text, wrapping, selection and caret at 100%, 125%, 150%, 200% display scaling on Windows 11.
+  - check: Review notes-008-selection-light-forward.png, notes-008-selection-dark-forward.png,
+      notes-008-selection-dark-reverse.png and notes-008-selection-dark-all.png; selected glyphs on the head/final
+      line must have visible selection fill just like the earlier selected lines, with the tail unselected.
     method: manual
-    reason: Hosted WebView assertions cannot establish physical Windows 11 DPI or IME behavior.
+    reason: Exact DOM selection, rectangle geometry and computed CSS establish selection and absence of the known
+      occluder, not composited pixels. Screenshots are artifacts, not an automated pixel-baseline verdict.
+  - check: Inspect mixed text, wrapping, selection and caret at 100%, 125%, 150%, 200% display scaling on Windows 11;
+      additionally inspect a wrapped final selected line and pointer-drag selection in each supported packaged WebView.
+    method: manual
+    reason: Hosted keyboard/WebView assertions cannot establish physical Windows 11 DPI/IME, pointer delivery or
+      every compositor and font-fallback path. Windows WebView2, Linux WebKitGTK and macOS WKWebView remain separate results.
   native:
-  - check: Execute keyboard editing and persistence through the packaged WebView and real notes.db.
+  - check: Execute keyboard editing, exact multiline selection and final-line rectangle checkpoints through the
+      packaged WebView and persistence through real notes.db, retaining the four selection screenshots for review.
     method: automated
-    reason: Native WebView glyph rendering and Rust persistence are not covered by browser stubs.
+    reason: Native glyph layering and Rust persistence are not established by browser stubs; macOS bridge press
+      exercises WKWebView routing, not OS Command-key delivery or AppKit menu accelerators.

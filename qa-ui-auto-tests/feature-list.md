@@ -244,6 +244,8 @@ controls: []
 
 ### 1.5 标签页系统 ✅
 
+Overview 大预览由各视图共用：`TC-WS-093/094` 覆盖名称/路径/协议/工作区/可见摘要的多词模糊搜索、清空/无结果、跨 scope 和 Enter 导航；运行中 session 解析后的输出实时批量更新，近期新输出显示静态徽标/边框且不自动重排卡片。关闭释放订阅和后备轮询；原文档 dirty、会话 owner 及侧栏偏好由原 TC-WS-018/019/046 保留回归。
+
 <!-- feature
 id: F1.5
 status: done
@@ -255,6 +257,12 @@ files:
 - src/components/tabbar/OpenTabsMenu.tsx
 - src/components/tabbar/TabDetailsOverlay.tsx
 - src/components/tabbar/TabOverview.tsx
+- src/components/tabbar/overview/overviewModel.ts
+- src/components/tabbar/overview/OverviewSummary.tsx
+- src/components/tabbar/overview/useTerminalPreviews.ts
+- src/lib/fuzzyMatch.ts
+- src/lib/terminal/terminalRegistry.ts
+- src/components/terminal/panel/useTerminalRegistry.ts
 - src/components/tabbar/PlatformToolbarActions.tsx
 - src/stores/tabOverviewStore.ts
 - src/lib/customDnD.ts
@@ -319,6 +327,18 @@ controls:
   kind: interactive
 - id: tab-overview-empty
   selector: '[data-testid="tab-overview-empty"]'
+  kind: display
+- id: tab-overview-search
+  selector: '[data-testid="tab-overview-search"]'
+  kind: interactive
+- id: tab-overview-search-clear
+  selector: '[data-testid="tab-overview-search-clear"]'
+  kind: interactive
+- id: tab-overview-results
+  selector: '[data-testid="tab-overview-results"]'
+  kind: display
+- id: tab-overview-output-badge
+  selector: '[data-testid="tab-overview-output-badge"]'
   kind: display
 - id: tab-details-overlay
   selector: '[data-testid="tab-details-overlay"]'
@@ -5785,6 +5805,8 @@ controls:
 
 ### 15.1 Tao Notes（便签 / 备忘 / 任务）与统一 Tao Ribbon ✅
 
+`TC-NOTES-008` 除 caret/link 回归外，覆盖 Notes Workspace 在应用亮色/暗色主题下的跨行正反向选区、末行选区矩形与 active-line 遮挡、全选、替换/undo；高亮像素由对应截图人工审阅，不以 CSS 几何断言冒充视觉通过。
+
 <!-- feature
 id: F-TAO-1
 status: done
@@ -8800,6 +8822,7 @@ area: code-workspace/editor-shell
 components: [CodeWorkspaceTab, UndoWorkspaceEditConfirmDialog, WorkspaceTabPolicySettingsDialog, EditorGroup, HighlightingWidget, FileTreePane, TabSwitcher, Breadcrumbs, KeymapSettingsDialog, ClipboardHistoryPopup, ProjectFactsStatusBadge, TodosBookmarksPanel, EditorCompareDialog, LocalHistoryDialog, FileEncodingDialog, AutoImportSettingsDialog, AutoImportCandidateDialog, FileTemplateSettingsDialog, NewJavaClassDialog, RefactorRecoveryReviewDialog]
 files:
   - src/components/editor/workspace/CodeMirrorHost.tsx
+  - src/components/editor/workspace/host/appearance.ts
   - src/components/editor/workspace/views/WorkspaceShellView.tsx
   - src/components/editor/workspace/liveTemplates.ts
   - src/components/editor/workspace/editorSearchPanel.ts
@@ -8831,6 +8854,9 @@ files:
   - src/components/editor/workspace/KeymapSettingsDialog.tsx
   - src/components/editor/workspace/ShortcutKeyCaps.tsx
   - src/components/editor/workspace/panels/ToolWindowRail.tsx
+  - src/components/editor/workspace/panels/WorkspaceTerminalTool.tsx
+  - src/components/editor/workspace/views/toolWindowChrome.tsx
+  - src/components/editor/workspace/workspaceHostIntegration.tsx
   - src/components/editor/workspace/workspaceNavigationBar.ts
   - src/components/editor/workspace/fileTypeIcon.tsx
   - src/components/editor/workspace/importFold.ts
@@ -12638,6 +12664,8 @@ TC-WS-075 keeps the real native execution scan under the same Home responsivenes
 
 ### 12.1 Workspace-first 主壳层：单行工具栏、主导航条 5 大模式与右栏收纳
 
+Issue #797：`TC-WS-091/092` 保护左栏 Terminal 在数据库/shell 画布上只切换 workspace 底部工具窗，不改变当前标签或重建 Code Workspace。底部复用编辑器同一个终端 owner，隐藏/重开及跨模式恢复保留输出；native 额外验证上下 PTY 独立执行及工作区隔离。`TC-IDE-PARITY-010-01/04` 和 `024-03` 保护编辑器工具窗与移动行为。
+
 `TC-WS-058` 在 browser/native 中保留宽导航栏下 viewport 对话框超出画布仍可操作的行为：读取真实命中、设置字体、跨 Home 返回、重复打开并 Escape 关闭，最后验证原有 SSH 终端输出。圆角装饰不能通过整层裁剪破坏此边界；正式性能对照另验证 24 PTY、文件树和编辑器的原始延迟与资源预算。
 
 <!-- feature
@@ -12659,6 +12687,8 @@ files:
 - src/components/sidebar/Sidebar.tsx
 - src/components/workspace/WorkspaceSidebar.tsx
 - src/components/workspace/WorkspaceMainPanel.tsx
+- src/components/workspace/WorkspaceBottomDock.tsx
+- src/components/workspace/useWorkspaceCodeHost.ts
 - src/components/workspace/WorkspaceGitPanel.tsx
 - src/components/workspace/WorkspaceSessionPickerModal.tsx
 - src/components/workspace/WorkspaceSessionPane.tsx
@@ -12666,6 +12696,7 @@ files:
 - src/components/agents/AgentsPlatformView.tsx
 - src/components/search/GlobalCommandModal.tsx
 - src/stores/workspacePlatformStore.ts
+- src/stores/workspaceEditorHostStore.ts
 - src/stores/agentsStore.ts
 - src/stores/workspaceEditorStore.ts
 - src/stores/workspaceUiStore.ts
@@ -12863,6 +12894,8 @@ files:
 - src/components/sidebar/Sidebar.tsx
 - src/components/workspace/WorkspaceSidebar.tsx
 - src/components/workspace/WorkspaceMainPanel.tsx
+- src/components/workspace/WorkspaceBottomDock.tsx
+- src/components/workspace/useWorkspaceCodeHost.ts
 - src/components/workspace/WorkspaceGitPanel.tsx
 - src/components/workspace/WorkspaceSessionPickerModal.tsx
 - src/components/workspace/WorkspaceSessionPane.tsx
@@ -12870,6 +12903,7 @@ files:
 - src/components/agents/AgentsPlatformView.tsx
 - src/components/search/GlobalCommandModal.tsx
 - src/stores/workspacePlatformStore.ts
+- src/stores/workspaceEditorHostStore.ts
 - src/stores/agentsStore.ts
 - src/stores/workspaceEditorStore.ts
 - src/stores/workspaceUiStore.ts
@@ -13308,6 +13342,9 @@ controls:
 - id: workspace-bottom-dock
   selector: '[data-testid="workspace-bottom-dock"]'
   kind: display
+- id: workspace-dock-close
+  selector: '[data-testid="workspace-dock-close"]'
+  kind: interactive
 
 - id: code-workspace-tree-view-list
   selector: '[data-testid="code-workspace-tree-view-list"]'
@@ -13624,6 +13661,8 @@ files:
 - src/components/sidebar/Sidebar.tsx
 - src/components/workspace/WorkspaceSidebar.tsx
 - src/components/workspace/WorkspaceMainPanel.tsx
+- src/components/workspace/WorkspaceBottomDock.tsx
+- src/components/workspace/useWorkspaceCodeHost.ts
 - src/components/workspace/WorkspaceGitPanel.tsx
 - src/components/workspace/WorkspaceSessionPickerModal.tsx
 - src/components/workspace/WorkspaceSessionPane.tsx
@@ -13631,6 +13670,7 @@ files:
 - src/components/agents/AgentsPlatformView.tsx
 - src/components/search/GlobalCommandModal.tsx
 - src/stores/workspacePlatformStore.ts
+- src/stores/workspaceEditorHostStore.ts
 - src/stores/agentsStore.ts
 - src/stores/workspaceEditorStore.ts
 - src/stores/workspaceUiStore.ts

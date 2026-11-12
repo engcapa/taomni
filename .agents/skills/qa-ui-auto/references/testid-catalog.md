@@ -1619,6 +1619,10 @@
 - `[data-testid="tab-overview-current"]` — interactive — F1.5.tab-overview-current
 - `[data-testid="tab-overview-all"]` — interactive — F1.5.tab-overview-all
 - `[data-testid="tab-overview-empty"]` — display — F1.5.tab-overview-empty
+- `[data-testid="tab-overview-search"]` — interactive — F1.5.tab-overview-search
+- `[data-testid="tab-overview-search-clear"]` — interactive — F1.5.tab-overview-search-clear
+- `[data-testid="tab-overview-results"]` — display — F1.5.tab-overview-results
+- `[data-testid="tab-overview-output-badge"]` — display — F1.5.tab-overview-output-badge
 - `[data-testid="tab-details-overlay"]` — display [optional] — F1.5.tab-details-overlay
 - `[data-testid^="tab-details-card-"]` — display [optional] — F1.5.tab-details-card
 - `[data-testid^="tab-details-program-"]` — display [optional] — F1.5.tab-details-program
@@ -1887,6 +1891,7 @@
 - `[data-testid="workspace-canvas-panes"]` — display — F-WS-2.workspace-canvas-panes
 - `[data-testid="workspace-canvas-pane"]` — display — F-WS-2.workspace-canvas-pane
 - `[data-testid="workspace-bottom-dock"]` — display — F-WS-2.workspace-bottom-dock
+- `[data-testid="workspace-dock-close"]` — interactive — F-WS-2.workspace-dock-close
 - `[data-testid="code-workspace-tree-view-list"]` — interactive — F-WS-2.code-workspace-tree-view-list
 - `[data-testid="code-workspace-tree-view-packages"]` — interactive — F-WS-2.code-workspace-tree-view-packages
 - `[data-testid="code-workspace-tree-menu-flatten-packages"]` — interactive — F-WS-2.code-workspace-tree-menu-flatten-packages

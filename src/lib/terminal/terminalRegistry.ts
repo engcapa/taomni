@@ -41,6 +41,8 @@ export interface TerminalRegistryEntry {
   getLastLines: (n: number) => string;
   /** Recent screen text, excluding unused rows below short output. */
   getPreviewText?: (n: number) => string;
+  /** Optional parsed-buffer notifications; unsubscribe does not dispose the terminal. */
+  subscribeOutput?: (listener: () => void) => () => void;
   /** Write text to the terminal's stdin (newlines flow as-is). */
   writeInput: (data: string) => void;
   /** True only when the connected shell is at an idle prompt and accepts input. */

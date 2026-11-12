@@ -10,7 +10,7 @@ import { useWorkspaceTabPolicy } from "../hooks/useWorkspaceTabPolicy";
 import { useWorkspaceToolWindowRouting } from "../hooks/useWorkspaceToolWindowRouting";
 import { useWorkspaceToolWindows } from "../hooks/useWorkspaceToolWindows";
 import { BottomDock } from "../panels/BottomDock";
-import { ToolWindowPortal } from "../panels/ToolWindowHost";
+import { ToolWindowPortal, ToolWindowSlot } from "../panels/ToolWindowHost";
 import { ToolWindowRail, type ToolWindowRailItem } from "../panels/ToolWindowRail";
 import { WorkspaceClipboardSessionContext } from "../workspaceClipboardSession";
 import { WorkspaceObservationBridge } from "../workspaceObservationBridge";
@@ -170,6 +170,10 @@ export function WorkspaceShellView(props: WorkspaceShellViewProps) {
         className="relative h-full w-full min-h-0 flex flex-col overflow-hidden bg-[var(--taomni-code-bg)] text-[var(--taomni-code-text)]"
       >
         <WorkspaceOperationObservations {...workspaceOperationObservationsProps} /><WorkspaceToolbar {...workspaceToolbarProps} />
+        {host?.terminalTool?.external && host.terminalTool.host && createPortal(
+          <ToolWindowSlot nodes={toolWindowRouting.toolWindowNodes} id="terminal" label="Terminal" />,
+          host.terminalTool.host,
+        )}
         {host?.leftToolAreaHost && createPortal(
           <div data-testid="code-workspace-left-tool-area" className="h-full min-h-0" style={toolWindowRouting.leftToolAreaOpen ? undefined : { display: "none" }}>
             {renderToolWindowSideArea("left")}
@@ -318,7 +322,8 @@ export function WorkspaceShellView(props: WorkspaceShellViewProps) {
                 nodes={toolWindowRouting.toolWindowNodes}
                 id={entry.id}
                 label={entry.label}
-                active={toolWindowRouting.toolWindowLayout.isVisible(entry.id)}
+                active={entry.id === "terminal" && host?.terminalTool?.external
+                  ? host.terminalTool.visible : toolWindowRouting.toolWindowLayout.isVisible(entry.id)}
                 renderContent={entry.renderContent}
                 // The terminal keeps Esc for the shell and the tree handles its own.
                 onEscape={entry.id === "terminal" || entry.id === "project" ? undefined : editorCommands.handleReturnToEditor}
@@ -329,8 +334,10 @@ export function WorkspaceShellView(props: WorkspaceShellViewProps) {
             <BottomDock
               onRestoreLayout={toolWindowActions.handleRestoreToolWindowLayout}
               renderPane={(id, placement) => renderToolWindowPane(id, { legacyTestIds: placement === "primary" })}
-              secondaryTab={toolWindowRouting.toolWindowLayout.visibleAt("bottom-right")}
-              open={bottomDockOpen && toolWindowRouting.toolWindowLayout.anchorOf(bottomDockTab) === "bottom-left"}
+              secondaryTab={host?.terminalTool?.external && toolWindowRouting.toolWindowLayout.visibleAt("bottom-right") === "terminal"
+                ? null : toolWindowRouting.toolWindowLayout.visibleAt("bottom-right")}
+              open={bottomDockOpen && toolWindowRouting.toolWindowLayout.anchorOf(bottomDockTab) === "bottom-left"
+                && !(host?.terminalTool?.external && bottomDockTab === "terminal")}
               height={toolWindowActions.currentBottomDockHeight}
               maxHeight={toolWindowActions.maxBottomDockHeight}
               onHeightChange={toolWindowActions.handleBottomDockHeightChange}

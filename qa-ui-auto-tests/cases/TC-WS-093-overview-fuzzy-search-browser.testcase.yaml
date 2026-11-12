@@ -1,0 +1,188 @@
+id: TC-WS-093
+title: Shared Overview fuzzy-searches titles, paths and unsaved content across view scopes
+description: 'Use the production toolbar and shared overview in Workspaces, Home and Tools. Exact card collections, query retention, no-result recovery and Enter navigation must preserve dirty documents. This browser case proves renderer search; TC-WS-094 proves real PTY output updates.'
+covers: [F-WS-1, F-WS-2, F-WS-5, F1.5]
+tags: [p1, workspace-redesign, overview, regression]
+modes: [browser]
+fixtures: [reset_db, platform_workspace_root]
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-overview-search
+- click: '[data-testid="nav-mode-workspaces"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-add-folder"]'
+- fill:
+    selector: '[data-testid="workspace-fs-modal-input"]'
+    value: ${fixture.platform_workspace_root}
+- click: '[data-testid="workspace-fs-modal-confirm"]'
+- click: '[data-testid="code-workspace-tree-root"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
+- wait_for: '[data-testid="workspace-file-editor"] .cm-content'
+- fill:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    value: OverviewUniqueDraft
+- click: '[data-testid="code-workspace-tree-dir"][data-path="src"] [data-testid="code-workspace-tree-dir-arrow"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="src/index.ts"]'
+- wait_for: '[data-testid="workspace-file-editor"][data-path="src/index.ts"]'
+- click: '[data-testid="tab-overview-trigger"]'
+- wait_for: '[data-testid="tab-overview"][data-scope="workspaces"]'
+- eval_readonly:
+    expression: document.activeElement?.getAttribute('data-testid') === 'tab-overview-search'
+    expect_truthy: true
+- fill:
+    selector: '[data-testid="tab-overview-search"]'
+    value: RDM
+- assert_count:
+    selector: '[data-testid="tab-overview-card"]'
+    equal: 1
+- assert_text:
+    selector: '[data-testid="tab-overview-card"]'
+    contains: README.md
+- fill:
+    selector: '[data-testid="tab-overview-search"]'
+    value: ovwunqdrft
+- assert_count:
+    selector: '[data-testid="tab-overview-card"]'
+    equal: 1
+- assert_text:
+    selector: '[data-testid="tab-overview-summary"]'
+    contains: OverviewUniqueDraft
+- click: '[data-testid="tab-overview-all"]'
+- assert_attribute:
+    selector: '[data-testid="tab-overview"]'
+    name: data-scope
+    equals: all
+- eval_readonly:
+    expression: document.querySelector('.taomni-overview-search input').value === 'ovwunqdrft'
+    expect_truthy: true
+- fill:
+    selector: '[data-testid="tab-overview-search"]'
+    value: missing-zzzzzzzz
+- assert_count:
+    selector: '[data-testid="tab-overview-card"]'
+    equal: 0
+- assert_visible: '[data-testid="tab-overview-empty"]'
+- click: '[data-testid="tab-overview-search-clear"]'
+- assert_count:
+    selector: '[data-testid="tab-overview-card"]'
+    equal: 2
+- fill:
+    selector: '[data-testid="tab-overview-search"]'
+    value: src idx
+- assert_count:
+    selector: '[data-testid="tab-overview-card"]'
+    equal: 1
+- press:
+    selector: '[data-testid="tab-overview-search"]'
+    key: Enter
+- assert_not_visible: '[data-testid="tab-overview"]'
+- assert_visible: '[data-testid="workspace-file-editor"][data-path="src/index.ts"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="tab-overview-trigger"]'
+- wait_for: '[data-testid="tab-overview"][data-scope="all"]'
+- fill:
+    selector: '[data-testid="tab-overview-search"]'
+    value: ovwunqdrft
+- assert_count:
+    selector: '[data-testid="tab-overview-card"]'
+    equal: 1
+- click: '[data-testid="tab-overview-card"]'
+- wait_for: '[data-testid="workspace-file-editor"][data-path="README.md"][data-dirty="true"]'
+- assert_text_equals:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    equals: OverviewUniqueDraft
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="tab-overview-trigger"]'
+- wait_for: '[data-testid="tab-overview"][data-scope="all"]'
+- fill:
+    selector: '[data-testid="tab-overview-search"]'
+    value: RDM
+- assert_count:
+    selector: '[data-testid="tab-overview-card"]'
+    equal: 1
+- screenshot: overview-fuzzy-search-tools.png
+- press: Escape
+- assert_not_visible: '[data-testid="tab-overview"]'
+- assert_no_runtime_errors: null
+- click: '[data-testid="tab-overview-trigger"]'
+- wait_for: '[data-testid="tab-overview-results"]'
+- assert_text:
+    selector: '[data-testid="tab-overview-results"]'
+    contains: '2 / 2'
+- press: Escape
+- assert_not_visible: '[data-testid="tab-overview"]'
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Workspace Overview searches fuzzy titles, paths and the existing dirty document; no-result clear restores the exact original card collection.
+    actions: [3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 15, 18, 21, 24, 27, 30, 32]
+    checkpoints:
+    - step: 17
+      expectation: Search receives focus when opening Overview.
+    - step: 19
+      expectation: RDM fuzzy-matches only README.md.
+    - step: 20
+      expectation: The matched card is the intended README, not an arbitrary singleton.
+    - step: 22
+      expectation: Abbreviated unsaved-content query produces exactly one card.
+    - step: 23
+      expectation: The existing dirty buffer is its preview.
+    - step: 25
+      expectation: All scope is active.
+    - step: 26
+      expectation: Query survives a scope change.
+    - step: 28
+      expectation: A missing query yields zero cards.
+    - step: 29
+      expectation: Explicit no-match feedback remains visible.
+    - step: 31
+      expectation: Clear restores exactly two original cards.
+    - step: 33
+      expectation: The path words identify exactly src/index.ts.
+    results: [17, 19, 20, 22, 23, 25, 26, 28, 29, 31, 33]
+  - id: R2
+    requirement: Enter and cards activate the original document from Workspaces/Home/Tools while preserving its dirty text; Escape closes the shared Overview.
+    actions: [34, 37, 38, 40, 42, 45, 46, 48, 51]
+    checkpoints:
+    - step: 35
+      expectation: Enter closes Overview after navigation.
+    - step: 36
+      expectation: The original src/index.ts surface is visible.
+    - step: 39
+      expectation: Home uses the global overview scope.
+    - step: 41
+      expectation: Home fuzzy search finds the original dirty document once.
+    - step: 43
+      expectation: Selecting the card restores the dirty README document.
+    - step: 44
+      expectation: Exact unsaved text is retained.
+    - step: 47
+      expectation: Tools shares the global overview.
+    - step: 49
+      expectation: Tools fuzzy search also identifies README once.
+    - step: 52
+      expectation: Escape closes the overlay.
+    - step: 53
+      expectation: No runtime error occurs throughout scope and document navigation.
+    results: [35, 36, 39, 41, 43, 44, 47, 49, 52, 53]
+  - id: R3
+    requirement: Reopening Overview resets only its ephemeral query and shows the full result count.
+    actions: [54, 57]
+    checkpoints:
+    - step: 55
+      expectation: Result count is visible on a fresh open.
+    - step: 56
+      expectation: The count includes both original tabs after query reset.
+    - step: 58
+      expectation: Escape closes the reopened overlay.
+    results: [55, 56, 58]
+  visual:
+  - check: Search, counts and result cards remain readable in the existing grid.
+    method: manual
+    reason: Review the retained tools-view screenshot; exact result/content assertions prove behavior separately.
+  native:
+  - check: Live PTY output and highlight lifecycle.
+    method: external
+    reason: TC-WS-094 owns the real packaged terminal boundary; this browser case does not claim native output evidence.
