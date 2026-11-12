@@ -8,7 +8,7 @@
 - 权威预期：issue 明确要求保留当前画布标签；会话型标签使用 workspace 底部终端；编辑器视图仍按原方式切换终端。
 - 平台：Windows/WebView2、Linux/WebKitGTK、macOS/WKWebView。此修复不改变原生 AppKit 菜单、系统快捷键或标题栏控件。
 - 本地仅执行单元测试与静态检查，不启动 browser/native 应用。通过 `gh` 在 GitHub `qa-ui-auto-platforms.yml` 运行三平台 browser/native，包含完整 `crash-regression` 集合。
-- 当前状态：#797 功能验收已完成：改前缺陷单测 6/6 失败；候选 Terminal 新增 8 项与相邻回归通过；三平台 browser、61 步真实 PTY/返回编辑器路径和完整 crash 集合均有通过证据。相关 Notes Linux 准备步骤仍在单独补跑；macOS 取消 job 重跑造成的汇总 attempt 身份错误保留为基础设施缺口，不伪造绿灯。
+- 当前状态：#797 功能验收已完成：改前缺陷单测 6/6 失败；候选 Terminal 新增 8 项与相邻回归通过；三平台 browser、61 步真实 PTY/返回编辑器路径和完整 crash 集合均有通过证据。同步 Notes 最终 [43270585278](https://github.com/engcapa/taomni/actions/runs/43270585278) 三平台 browser/native + 完整 crash 全绿；历史 macOS 取消 job 的重跑 attempt 身份错误仍保留原件。
 
 ## 2. 用户契约与验收
 
