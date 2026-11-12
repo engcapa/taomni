@@ -11,28 +11,60 @@ from . import host_clipboard as host
 from .deadline import budget_time as time
 from .steps import StepError
 
-MAC_SEED = host._JXA_PRELUDE + """
+# Build native arrays explicitly: a truthy writeObjects result does not prove
+# that JXA's $(JavaScriptArray) bridge published every requested item. Retain
+# both NSURL aggregate and per-item views; paths stays the aggregate result so
+# the item probe can never disguise a mismatch in the API used by the product.
+MAC_OBSERVE = """
+function observeFiles() {
+  var classes = $.NSMutableArray.alloc.init;
+  classes.addObject($.NSURL);
+  var urls = pb.readObjectsForClassesOptions(classes, $());
+  var aggregateCount = urls.isNil() ? null : Number(urls.count);
+  var aggregatePaths = [], aggregateURLs = [];
+  for (var i = 0; i < aggregateCount; i++) {
+    var url = urls.objectAtIndex(i);
+    aggregateURLs.push(url.absoluteString.js);
+    aggregatePaths.push(url.isFileURL ? url.path.js : null);
+  }
+  var nativeItems = pb.pasteboardItems;
+  var nativeItemCount = nativeItems.isNil() ? null : Number(nativeItems.count);
+  var itemURLs = [], itemPaths = [];
+  for (var j = 0; j < nativeItemCount; j++) {
+    var text = nativeItems.objectAtIndex(j).stringForType($('public.file-url'));
+    itemURLs.push(text.isNil() ? null : text.js);
+    var itemURL = text.isNil() ? null : $.NSURL.URLWithString(text);
+    itemPaths.push(itemURL && !itemURL.isNil() && itemURL.isFileURL ? itemURL.path.js : null);
+  }
+  return {formats: pb.types.isNil() ? [] : ObjC.deepUnwrap(pb.types),
+          paths: aggregatePaths, aggregateCount: aggregateCount,
+          aggregatePaths: aggregatePaths, aggregateURLs: aggregateURLs,
+          nativeItemCount: nativeItemCount, itemURLs: itemURLs, itemPaths: itemPaths};
+}
+"""
+MAC_SEED = host._JXA_PRELUDE + MAC_OBSERVE + """
 var paths = JSON.parse(arg);
-var items = paths.map(function(path) {
+var items = $.NSMutableArray.alloc.init;
+paths.forEach(function(path) {
   var item = $.NSPasteboardItem.alloc.init;
   var url = $.NSURL.fileURLWithPath($(path));
   if (!item.setStringForType(url.absoluteString, $('public.file-url'))) throw new Error('file URL rejected');
-  return item;
+  items.addObject(item);
 });
 pb.clearContents;
-if (!pb.writeObjects($(items))) throw new Error('writeObjects rejected');
-'ok';
-"""
-MAC_READ = host._JXA_PRELUDE + """
-var urls = pb.readObjectsForClassesOptions($([$.NSURL]), $());
-var paths = [];
-if (!urls.isNil()) for (var i = 0; i < urls.count; i++) {
-  var url = urls.objectAtIndex(i);
-  if (!url.isFileURL) throw new Error('non-file URL');
-  paths.push(url.path.js);
+var wrote = Boolean(pb.writeObjects(items));
+var observation = observeFiles();
+observation.wrote = wrote;
+observation.expectedPaths = paths;
+if (!wrote || observation.nativeItemCount !== paths.length ||
+    observation.aggregateCount !== paths.length ||
+    JSON.stringify(observation.itemPaths) !== JSON.stringify(paths) ||
+    JSON.stringify(observation.aggregatePaths) !== JSON.stringify(paths)) {
+  throw new Error('macOS native file-list seed readback mismatch: ' + JSON.stringify(observation));
 }
-JSON.stringify({formats: ObjC.deepUnwrap(pb.types), paths: paths});
+JSON.stringify(observation);
 """
+MAC_READ = host._JXA_PRELUDE + MAC_OBSERVE + "JSON.stringify(observeFiles());"
 WIN_READ = """
 [Console]::OutputEncoding=[Text.Encoding]::UTF8;
 $d=[System.Windows.Forms.Clipboard]::GetDataObject();
