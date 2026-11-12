@@ -85,9 +85,11 @@ steps:
 - press:
     selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"] .cm-content'
     key: Mod+A
-- type:
+# fill uses real Enter key chords for line breaks on native WebKit;
+# raw type would send literal LF key values without an editor newline action.
+- fill:
     selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"] .cm-content'
-    text: |-
+    value: |-
       first line alpha
       second line 中文
       final selected line
