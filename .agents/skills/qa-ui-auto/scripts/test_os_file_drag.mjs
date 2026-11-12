@@ -139,6 +139,24 @@ test("container blank targeting never quietly hits a file or directory row", asy
   assert.equal(h.events[0].target, h.element);
 });
 
+test("short native trees target real bottom padding when every fractional point is occupied", async () => {
+  const h = harness({ pointMode: "child" });
+  h.attrs["data-testid"] = "code-workspace-tree";
+  delete h.attrs["data-tree-kind"];
+  const row = { ...h.child, closest: () => ({ getAttribute: () => "file" }) };
+  h.document.elementFromPoint = (_x, y) => y >= h.rect.bottom - 3 ? h.element : row;
+  const result = await h.run(h.request({ mode: "native", selector: "#tree" }));
+  assert.equal(result.ok, true);
+  assert.equal(result.geometry.treeRow, null);
+  assert.equal(result.geometry.cssPosition.y, 58);
+  assert.equal(h.emissions.length, 1);
+  // Fully occupied containers must still fail rather than target a row.
+  h.document.elementFromPoint = () => row;
+  const occupied = await h.run(h.request({ mode: "native", selector: "#tree" }));
+  assert.equal(occupied.ok, false);
+  assert.equal(h.emissions.length, 1);
+});
+
 test("native API failures remain errors and retain payload; no fallback to DOM or IPC", async () => {
   const h = harness();
   h.tauri.event.emitTo = async () => { throw new Error("emit denied"); };

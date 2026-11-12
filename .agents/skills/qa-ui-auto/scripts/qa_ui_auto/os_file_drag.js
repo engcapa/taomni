@@ -42,10 +42,20 @@ async (request) => {
       // of its rows. For a row, a contained text/icon hit is equally valid.
       const candidates = [[0.5, 0.5], [0.5, 0.9], [0.1, 0.9], [0.9, 0.9], [0.5, 0.1], [0.1, 0.5], [0.9, 0.5]];
       const blankTree = element.getAttribute("data-testid") === "code-workspace-tree";
-      const hits = candidates.map(([fx, fy]) => {
-        const x = left + (right - left) * fx, y = top + (bottom - top) * fy;
-        return { x, y, hit: document.elementFromPoint(x, y) };
-      }).filter(({ hit }) => !blankTree || !hit?.closest("[data-tree-kind]"));
+      const points = candidates.map(([fx, fy]) => ({
+        x: left + (right - left) * fx, y: top + (bottom - top) * fy,
+      }));
+      if (blankTree) {
+        // A short native window can leave only the tree's bottom padding blank.
+        // Fractional samples (even 90%) still land on rows there. Probe inside
+        // the actual container edges, retaining the same real hit/no-row check.
+        const inset = Math.min(2, (right - left) / 2, (bottom - top) / 2);
+        for (const y of [bottom - inset, top + inset]) {
+          for (const x of [(left + right) / 2, left + inset, right - inset]) points.push({ x, y });
+        }
+      }
+      const hits = points.map(({ x, y }) => ({ x, y, hit: document.elementFromPoint(x, y) }))
+        .filter(({ hit }) => !blankTree || !hit?.closest("[data-tree-kind]"));
       point = hits.find(({ hit }) => hit === element)
         ?? hits.find(({ hit }) => hit && element.contains(hit));
       if (!point) throw new Error("Drag target is occluded at every candidate point");

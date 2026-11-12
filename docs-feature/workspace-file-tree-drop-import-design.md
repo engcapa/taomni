@@ -137,6 +137,14 @@ GitHub V-05/V-06：[run 43174281571](https://github.com/engcapa/taomni/actions/r
 - 查明 WKWebView QA bridge 仅实现 `/execute/sync`，已将工具改为一次启动 Promise + 私有结果 slot 轮询（复用 native screenshot 模式），不重发 uncertain delivery，不调用复制 IPC捷径；新增单测 `test_native_registration_starts_once_and_polls_through_sync_bridge` 与 `test_native_uncertain_delivery_is_not_retried_and_slot_cleanup_is_attempted`。工具专项 9 passed。
 - 此修正仅涉及 QA transport/case 文档，产品源码不变；准备三端 native 重跑新专项及完整 crash-regression。首轮最终聚合及后续 run/二进制 hash 待回填。
 
+重跑记录：
+
+- [run 43179426275](https://github.com/engcapa/taomni/actions/runs/43179426275) 在 plan 阶段失败、未执行用例：`modes=native` 与 workflow 强制合入的 browser-only crash cases 冲突（TC-IDE-C8-08、TC-MOBILE-012、TC-WS-055）。这是 dispatch 参数错误，不是产品或测试通过证据，未修改门禁。
+- 已以 `modes=browser,native` 原完整选择再次启动 [run 43185287319](https://github.com/engcapa/taomni/actions/runs/43185287319)，源码 `d0dbd9d3a4b9d1047016c1e5046f1e29bd8e9f27`。三端 browser 再次 36/36 passed。
+- 该 run 的 macOS TC-WS-088 已通过 step 19 的 Tauri 事件入口，导入/递归/冲突/恢复/根落点与只读磁盘快照均通过；step 74 空白目标探测失败：短窗口的树内容占满原来的 10%/50%/90% 采样点，真实空白只剩容器底部 padding。失败原件：`/tmp/taomni-792-retry-macos-native.h1xuzQ/shard-1/run-20261112-085725-538942000/TC-WS-088/`。
+- QA helper 增加容器可见边缘内侧 2px 探测，并继续要求真实 `elementFromPoint` 命中属于容器且不在任何树行内；未删除空白 no-op 断言，不能命中空白仍失败。新增 Node VM 回归同时验证底部真空白成功与全行占用时拒绝，8/8 Node tests、9/9 Python tool tests 通过。产品源码无变更，接着定向重跑 macOS browser/native + 完整 crash-regression；其他平台继续收集本轮结果。
+- 首轮聚合原件 `/tmp/taomni-792-run1-summary.OiTVoO/summary.md`：Linux browser 12/12、Linux native 13/13、Windows browser 12/12、Windows native 13/13、macOS browser 12/12、macOS native 12/13；共 74 passed / 1 failed / 0 skipped，唯一失败为已修正的 macOS QA transport。
+
 真实 OS 文件管理器手势仍未验证。
 
 失败归因参考：主分支 `2d8bc8dc` 的完整 QA [run 43135286535](https://github.com/engcapa/taomni/actions/runs/43135286535) 聚合报告已保存到 `/tmp/taomni-792-baseline.Dw0Jeq/summary.md`（独立下载目录，未运行其中脚本）。该基线包含 Mobile/VNC/Notes/旧 Git tab selector 及少量时延失败；不把其失败结论外推为本次任意失败可忽略。候选出现失败须与原始 case/步骤/产物逐项比对，本次引入的回归必须修复。
