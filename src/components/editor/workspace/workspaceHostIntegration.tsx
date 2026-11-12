@@ -23,6 +23,8 @@ export interface WorkspaceHostIntegration {
   canvasLayout: "single" | "split" | "grid";
   paneFiles: CodeWorkspaceFileRef[];
   leftToolAreaHost: HTMLElement | null;
+  /** The same retained terminal content can be displayed below the host canvas. */
+  terminalTool?: { host: HTMLElement | null; external: boolean; visible: boolean; onToggle: () => boolean; onHide: () => void };
   onActivateFile: (ref: CodeWorkspaceFileRef) => void;
   onOpenGitDiff: (path: string) => void;
   onFolderOpened?: (rootId: string) => void;
@@ -52,6 +54,7 @@ export function useWorkspaceHostPresentation(host: WorkspaceHostIntegration | un
     editorVisible: host.editorVisible,
     leftToolAreaVisible: host.leftToolAreaVisible,
     leftToolAreaHost: host.leftToolAreaHost,
+    terminalTool: host.terminalTool,
     showEditorTabs: host.showEditorTabs,
     navigationItems: host.navigationItems,
     onActivateFile: host.onActivateFile,
@@ -61,7 +64,7 @@ export function useWorkspaceHostPresentation(host: WorkspaceHostIntegration | un
     onLeftToolAreaChange: host.onLeftToolAreaChange,
     registerFileMenu: host.registerFileMenu,
   } : null, [!!host, host?.active, host?.editorVisible, host?.leftToolAreaVisible,
-    host?.leftToolAreaHost, host?.showEditorTabs, host?.navigationItems,
+    host?.leftToolAreaHost, host?.terminalTool, host?.showEditorTabs, host?.navigationItems,
     host?.onActivateFile, host?.onOpenGitDiff, host?.onFolderOpened,
     host?.onActivateToolWindow, host?.onLeftToolAreaChange, host?.registerFileMenu]);
 }

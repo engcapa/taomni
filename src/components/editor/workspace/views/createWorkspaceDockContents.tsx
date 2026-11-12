@@ -38,7 +38,8 @@ import { ProblemsPanel, type ProblemFileGroup } from "../panels/ProblemsPanel";
 import { ReferencesPanel } from "../panels/ReferencesPanel";
 import { RunPanel, type RunPanelHandle, type WorkspaceTaskItem } from "../panels/RunPanel";
 import { StructuralSearchPanel } from "../panels/StructuralSearchPanel";
-import { TerminalDockPanel, type TerminalDockHandle } from "../panels/TerminalDockPanel";
+import { type TerminalDockHandle } from "../panels/TerminalDockPanel";
+import { WorkspaceTerminalTool } from "../panels/WorkspaceTerminalTool";
 import { TestsPanel } from "../panels/TestsPanel";
 import { TodosBookmarksPanel } from "../panels/TodosBookmarksPanel";
 import { type ReplaceFilePreimage, type ReplacePrepareOptions } from "../replaceInFilesModel";
@@ -342,12 +343,12 @@ export function createWorkspaceDockContents(context: CreateWorkspaceDockContents
       icon: WORKSPACE_TOOL_ICONS["terminal"],
       badge: undefined,
       renderContent: () => (
-        <TerminalDockPanel
-          ref={terminalDockRef}
+        <WorkspaceTerminalTool
+          terminalRef={terminalDockRef}
           workspaceInstanceId={workspaceInstanceId}
           roots={roots}
           defaultCwd={activeRoot?.path ?? roots[0]?.path ?? ""}
-          active={bottomDockOpen && bottomDockTab === "terminal"}
+          editorActive={bottomDockOpen && bottomDockTab === "terminal"}
         />
       ),
     },

@@ -1887,6 +1887,7 @@
 - `[data-testid="workspace-canvas-panes"]` — display — F-WS-2.workspace-canvas-panes
 - `[data-testid="workspace-canvas-pane"]` — display — F-WS-2.workspace-canvas-pane
 - `[data-testid="workspace-bottom-dock"]` — display — F-WS-2.workspace-bottom-dock
+- `[data-testid="workspace-dock-close"]` — interactive — F-WS-2.workspace-dock-close
 - `[data-testid="code-workspace-tree-view-list"]` — interactive — F-WS-2.code-workspace-tree-view-list
 - `[data-testid="code-workspace-tree-view-packages"]` — interactive — F-WS-2.code-workspace-tree-view-packages
 - `[data-testid="code-workspace-tree-menu-flatten-packages"]` — interactive — F-WS-2.code-workspace-tree-menu-flatten-packages

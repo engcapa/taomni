@@ -5,10 +5,20 @@ import type { WorkspaceFileMenu } from "../components/editor/workspace/workspace
 export const useWorkspaceEditorHostStore = create<{
   hosts: Record<string, HTMLElement>;
   setHost: (workspaceId: string, element: HTMLElement | null) => void;
+  terminalHosts: Record<string, HTMLElement>;
+  setTerminalHost: (workspaceId: string, element: HTMLElement | null) => void;
   fileMenus: Record<string, Record<string, WorkspaceFileMenu>>;
   setFileMenu: (workspaceId: string, groupId: string, menu: WorkspaceFileMenu | null) => void;
 }>((set) => ({
   hosts: {},
+  terminalHosts: {},
+  setTerminalHost: (workspaceId, element) => set((state) => {
+    if (state.terminalHosts[workspaceId] === element || !element && !state.terminalHosts[workspaceId]) return state;
+    const terminalHosts = { ...state.terminalHosts };
+    if (element) terminalHosts[workspaceId] = element;
+    else delete terminalHosts[workspaceId];
+    return { terminalHosts };
+  }),
   fileMenus: {},
   setFileMenu: (workspaceId, groupId, menu) => set((state) => {
     const current = state.fileMenus[workspaceId] ?? {};

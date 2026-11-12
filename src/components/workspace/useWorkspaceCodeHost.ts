@@ -19,6 +19,7 @@ export { workspaceEditorRuntimeId } from "../../lib/workspaceRuntimeIdentity";
 export function useWorkspaceCodeHost(workspace: PlatformWorkspace, visible: boolean, enabled: boolean): WorkspaceHostIntegration | undefined {
   const t = useT();
   const leftToolAreaHost = useWorkspaceEditorHostStore((state) => state.hosts[workspace.id] ?? null);
+  const terminalHost = useWorkspaceEditorHostStore((state) => state.terminalHosts[workspace.id] ?? null);
   const workspaceMode = useAppStore((state) => state.activeSideTab === "workspaces");
   const selectedWorkspace = useWorkspacePlatformStore((state) => state.activeWorkspaceId === workspace.id);
   const active = workspaceMode && selectedWorkspace;
@@ -27,9 +28,33 @@ export function useWorkspaceCodeHost(workspace: PlatformWorkspace, visible: bool
   // Navigation can synchronously commit an external store. Defer the retained
   // workbench's visibility/portal projection, keeping file targets and buffers
   // current so input can never land in the previous file during a transition.
+  const toggleHostTerminal = useCallback(() => {
+    const app = useAppStore.getState();
+    const store = useWorkspacePlatformStore.getState();
+    const current = store.getWorkspace(workspace.id);
+    if (!current || app.activeSideTab !== "workspaces" || store.activeWorkspaceId !== current.id) return true;
+    const selected = current.openTabs.find((tab) => tab.id === current.activeTabId);
+    const dock = current.bottomDock;
+    if (!dock.open && (!selected || selected.kind === "file" || selected.kind === "code")) return false;
+    if (dock.open && dock.activeTool === "terminal") store.setBottomDockOpen(current.id, false);
+    else store.setBottomDockTool(current.id, "terminal");
+    return true;
+  }, [workspace.id]);
+  const hideHostTerminal = useCallback(() => {
+    useWorkspacePlatformStore.getState().setBottomDockOpen(workspace.id, false);
+  }, [workspace.id]);
+  const terminalExternal = workspace.bottomDock.open || workspace.openTabs.some((tab) => tab.id === workspace.activeTabId && tab.kind !== "file" && tab.kind !== "code");
+  const terminalTool = useMemo(() => ({
+    host: terminalHost,
+    external: terminalExternal,
+    visible: active && workspace.bottomDock.open && workspace.bottomDock.activeTool === "terminal",
+    onToggle: toggleHostTerminal,
+    onHide: hideHostTerminal,
+  }), [terminalHost, terminalExternal, active, workspace.bottomDock.open,
+    workspace.bottomDock.activeTool, toggleHostTerminal, hideHostTerminal]);
   const presentation = useDeferredValue(useMemo(() => ({
-    active, editorVisible: visible, leftToolAreaVisible, leftToolAreaHost,
-  }), [active, visible, leftToolAreaVisible, leftToolAreaHost]));
+    active, editorVisible: visible, leftToolAreaVisible, leftToolAreaHost, terminalTool,
+  }), [active, visible, leftToolAreaVisible, leftToolAreaHost, terminalTool]));
   const canvasLayout = useWorkspaceUiStore((state) => state.canvasLayouts[workspace.id] ?? "single");
   const latest = useRef({ workspace, visible });
   latest.current = { workspace, visible };

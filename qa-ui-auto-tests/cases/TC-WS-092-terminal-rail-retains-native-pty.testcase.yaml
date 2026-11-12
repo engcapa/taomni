@@ -1,0 +1,188 @@
+id: TC-WS-092
+title: Workspace Terminal rail retains the upper shell and the same integrated PTY across contexts
+description: 'Issue 797 native boundary. Both upper and lower terminals execute independent anchored output. The integrated editor terminal moves below a session canvas without remounting, survives Hide, closed Code Workspace, Home and a second workspace, and accepts another command after every restoration. Uses one isolated QA release application on Linux, Windows and macOS.'
+covers: [F-WS-1, F-WS-2, F-WS-5, F25.5]
+tags: [p1, workspace-redesign, terminal, regression, native-boundary]
+modes: [native]
+fixtures: [reset_db, platform_workspace_root]
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-092
+- seed_storage:
+    key: taomni.platformWorkspaces.v1
+    value: '{"version":1,"activeWorkspaceId":"default-workspace","createdNodes":[],"workspaces":[{"id":"default-workspace","name":"Default Workspace","description":"","isDefault":true,"rootFolders":[{"id":"root-1","name":"qa-root","path":"${fixture.platform_workspace_root}","addedAt":1}],"pinnedSessionIds":[],"activeLeftToolWindow":"project","bottomDock":{"open":false,"activeTool":"terminal","heightPx":220},"openTabs":[],"activeTabId":""},{"id":"second-workspace","name":"Second Workspace","description":"","isDefault":false,"rootFolders":[],"pinnedSessionIds":[],"activeLeftToolWindow":"project","bottomDock":{"open":false,"activeTool":"terminal","heightPx":220},"openTabs":[],"activeTabId":""}]}'
+- reload_window: null
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- wait_for: '[data-testid="workspace-tab"][data-tab-kind="code"][data-active="true"]'
+- click: '[data-testid="sidebar-tool-window-rail"] [data-testid="code-workspace-bottom-tab-terminal"]'
+- wait_for:
+    selector: '[data-testid="code-workspace-terminal-dock"] [data-terminal-ready="true"]'
+    timeout_sec: 60
+- terminal_input:
+    selector: '[data-testid="code-workspace-terminal-dock"] .xterm-helper-textarea'
+    text: echo QA_797_INTEGRATED_BEFORE
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="code-workspace-terminal-dock"] [data-testid="terminal-pane"]'
+    regex: (?m)^QA_797_INTEGRATED_BEFORE\s*$
+    timeout_sec: 30
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-local-terminal"]'
+- wait_for:
+    selector: '[data-testid="workspace-session-pane"] [data-terminal-ready="true"]'
+    timeout_sec: 60
+- terminal_input:
+    selector: '[data-testid="workspace-session-pane"] .xterm-helper-textarea'
+    text: echo QA_797_UPPER_BEFORE
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="workspace-session-pane"] [data-testid="terminal-pane"]'
+    regex: (?m)^QA_797_UPPER_BEFORE\s*$
+    timeout_sec: 30
+- click: '[data-testid="sidebar-tool-window-rail"] [data-testid="code-workspace-bottom-tab-terminal"]'
+- wait_for: '[data-testid="workspace-bottom-dock"] [data-testid="code-workspace-terminal-dock"] [data-terminal-ready="true"]'
+- assert_attribute:
+    selector: '[data-testid="workspace-tab"][data-active="true"]'
+    name: data-tab-kind
+    equals: terminal
+- assert_pattern:
+    selector: '[data-testid="workspace-session-pane"] [data-testid="terminal-pane"]'
+    regex: (?m)^QA_797_UPPER_BEFORE\s*$
+- assert_pattern:
+    selector: '[data-testid="workspace-bottom-dock"] [data-testid="terminal-pane"]'
+    regex: (?m)^QA_797_INTEGRATED_BEFORE\s*$
+- assert_count:
+    selector: '[data-testid="terminal-pane"]'
+    equal: 2
+- terminal_input:
+    selector: '[data-testid="workspace-bottom-dock"] .xterm-helper-textarea'
+    text: echo QA_797_BOTTOM_AFTER_MOVE
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="workspace-bottom-dock"] [data-testid="terminal-pane"]'
+    regex: (?m)^QA_797_BOTTOM_AFTER_MOVE\s*$
+    timeout_sec: 30
+- screenshot: workspace-terminal-native-upper-and-lower.png
+- click: '[data-testid="workspace-dock-close"]'
+- assert_not_visible: '[data-testid="workspace-bottom-dock"]'
+- click: '[data-testid="workspace-tab"][data-tab-kind="code"] [data-testid="workspace-tab-close"]'
+- click: '[data-testid="sidebar-tool-window-rail"] [data-testid="code-workspace-bottom-tab-terminal"]'
+- assert_pattern:
+    selector: '[data-testid="workspace-bottom-dock"] [data-testid="terminal-pane"]'
+    regex: (?m)^QA_797_BOTTOM_AFTER_MOVE\s*$
+- assert_count:
+    selector: '[data-testid="workspace-tab"][data-tab-kind="code"]'
+    equal: 0
+- assert_attribute:
+    selector: '[data-testid="workspace-tab"][data-active="true"]'
+    name: data-tab-kind
+    equals: terminal
+- click: '[data-testid="workspace-switcher-button"]'
+- click: '[data-testid="workspace-switcher-option-second-workspace"]'
+- assert_not_visible: '[data-testid="workspace-bottom-dock"]'
+- click: '[data-testid="workspace-switcher-button"]'
+- click: '[data-testid="workspace-switcher-option-default-workspace"]'
+- assert_visible: '[data-testid="workspace-bottom-dock"]'
+- assert_pattern:
+    selector: '[data-testid="workspace-bottom-dock"] [data-testid="terminal-pane"]'
+    regex: (?m)^QA_797_BOTTOM_AFTER_MOVE\s*$
+- click: '[data-testid="nav-mode-home"]'
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="workspace-bottom-dock"] [data-testid="terminal-pane"][data-terminal-active="true"]'
+- terminal_input:
+    selector: '[data-testid="workspace-bottom-dock"] .xterm-helper-textarea'
+    text: echo QA_797_BOTTOM_RESTORED
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="workspace-bottom-dock"] [data-testid="terminal-pane"]'
+    regex: (?m)^QA_797_BOTTOM_RESTORED\s*$
+    timeout_sec: 30
+- terminal_input:
+    selector: '[data-testid="workspace-session-pane"] .xterm-helper-textarea'
+    text: echo QA_797_UPPER_RESTORED
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="workspace-session-pane"] [data-testid="terminal-pane"]'
+    regex: (?m)^QA_797_UPPER_RESTORED\s*$
+    timeout_sec: 30
+- assert_count:
+    selector: '[data-testid="terminal-pane"]'
+    equal: 2
+- assert_count:
+    selector: '[data-testid="workspace-tab"]'
+    equal: 1
+- click: '[data-testid="sidebar-tool-window-rail"] [data-testid="code-workspace-bottom-tab-terminal"]'
+- assert_not_visible: '[data-testid="workspace-bottom-dock"]'
+- assert_visible: '[data-testid="workspace-session-pane"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: The real integrated terminal moves under the shell canvas without replacing the upper tab, losing prior output or creating a second lower PTY.
+    actions: [6, 8, 10, 12, 13, 15, 17, 23]
+    checkpoints:
+    - step: 11
+      expectation: The editor terminal produces an anchored shell result before the session canvas opens.
+    - step: 16
+      expectation: The upper shell independently executes its command.
+    - step: 19
+      expectation: The upper shell remains the active workspace tab.
+    - step: 20
+      expectation: The upper shell retains its original output.
+    - step: 21
+      expectation: The moved integrated terminal retains its original output.
+    - step: 22
+      expectation: Exactly two terminal panels exist, one upper and one lower.
+    - step: 24
+      expectation: The lower terminal executes another command after moving.
+    results: [11, 16, 19, 20, 21, 22, 24]
+  - id: R2
+    requirement: Hide/show with Code Workspace closed and workspace navigation retain the same terminal content without creating Code Workspace.
+    actions: [26, 28, 29, 33, 34, 36, 37]
+    checkpoints:
+    - step: 27
+      expectation: Closing the bottom dock hides its content.
+    - step: 30
+      expectation: Reopening after Code Workspace close retains existing bottom output.
+    - step: 31
+      expectation: Code Workspace stays absent.
+    - step: 32
+      expectation: The upper shell stays selected.
+    - step: 35
+      expectation: The second workspace does not inherit the first workspace dock.
+    - step: 38
+      expectation: Returning restores the first workspace dock.
+    - step: 39
+      expectation: The original lower terminal output remains.
+    results: [27, 30, 31, 32, 35, 38, 39]
+  - id: R3
+    requirement: Returning through Home leaves both real PTYs usable, isolated and bounded, and rail toggle does not hide the upper shell.
+    actions: [40, 42, 44, 46, 50]
+    checkpoints:
+    - step: 45
+      expectation: The restored lower terminal executes a new command, not merely a command echo.
+    - step: 47
+      expectation: The upper shell also continues executing.
+    - step: 48
+      expectation: Only the original two terminal panels exist.
+    - step: 49
+      expectation: No workspace tab has been recreated.
+    - step: 51
+      expectation: Rail toggle hides the external dock.
+    - step: 52
+      expectation: The upper shell remains visible.
+    - step: 53
+      expectation: No uncaught runtime error occurs throughout the case.
+    results: [45, 47, 48, 49, 51, 52, 53]
+  visual:
+  - check: Upper session and lower terminal have distinct usable content bounds.
+    method: manual
+    reason: Retained packaged-WebView screenshot accompanies functional pane/content assertions.
+  native:
+  - check: Real PTY execution, retained integrated content, workspace isolation, hide/show and Home restoration.
+    method: automated
+    reason: Browser stubs cannot prove native shell process ownership or packaged-WebView terminal continuity.

@@ -4,6 +4,9 @@ TC-WS-088: []
 # File clipboard cases extend the isolated fixture, not earlier case execution.
 TC-WS-089: []
 TC-WS-090: []
+# Terminal rail regressions own their workspace/saved-record fixtures.
+TC-WS-091: []
+TC-WS-092: []
 TC-WS-086: []
 TC-WS-084: []
 TC-WS-085: []

@@ -1,0 +1,151 @@
+id: TC-WS-091
+title: Terminal rail preserves database and shell canvases without recreating Code Workspace
+description: 'Issue 797 renderer regression. Open a saved database and local shell through the workspace picker; the actual left rail opens a workspace bottom terminal without changing the active tab or upper content. Close Code Workspace, repeat hide/show and restore through Home. Browser PTY output is not native evidence; TC-WS-092 owns that boundary.'
+covers: [F-WS-1, F-WS-2, F-WS-5, F25.5]
+tags: [p1, workspace-redesign, terminal, regression]
+modes: [browser]
+fixtures: [reset_db, platform_workspace_root, workspace_restore_sessions]
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-091
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-code-workspace"]'
+- wait_for: '[data-testid="workspace-tab"][data-tab-kind="code"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-open-session"]'
+- click: '[data-testid="workspace-session-picker-row"][data-session-id="qa-restore-postgresql"]'
+- wait_for: '[data-testid="workspace-session-pane"][data-kind="database"] [data-testid="sql-editor"] .cm-content'
+- press:
+    selector: '[data-testid="workspace-session-pane"][data-kind="database"] [data-testid="sql-editor"] .cm-content'
+    key: Mod+a
+- type:
+    selector: '[data-testid="workspace-session-pane"][data-kind="database"] [data-testid="sql-editor"] .cm-content'
+    text: SELECT 'QA_797_DATABASE_DRAFT';
+- click: '[data-testid="sidebar-tool-window-rail"] [data-testid="code-workspace-bottom-tab-terminal"]'
+- wait_for: '[data-testid="workspace-bottom-dock"] [data-testid="code-workspace-terminal-dock"]'
+- assert_attribute:
+    selector: '[data-testid="workspace-tab"][data-active="true"]'
+    name: data-session-id
+    equals: qa-restore-postgresql
+- assert_text_equals:
+    selector: '[data-testid="workspace-session-pane"][data-kind="database"] [data-testid="sql-editor"] .cm-content'
+    equals: SELECT 'QA_797_DATABASE_DRAFT';
+- assert_count:
+    selector: '[data-testid="workspace-tab"]'
+    equal: 2
+- assert_visible: '[data-testid="workspace-session-pane"][data-kind="database"]'
+- screenshot: workspace-terminal-database-canvas.png
+- click: '[data-testid="workspace-dock-close"]'
+- click: '[data-testid="workspace-tab"][data-tab-kind="code"] [data-testid="workspace-tab-close"]'
+- assert_count:
+    selector: '[data-testid="workspace-tab"][data-tab-kind="code"]'
+    equal: 0
+- click: '[data-testid="sidebar-tool-window-rail"] [data-testid="code-workspace-bottom-tab-terminal"]'
+- assert_visible: '[data-testid="workspace-bottom-dock"] [data-testid="code-workspace-terminal-dock"]'
+- assert_attribute:
+    selector: '[data-testid="workspace-tab"][data-active="true"]'
+    name: data-session-id
+    equals: qa-restore-postgresql
+- assert_count:
+    selector: '[data-testid="workspace-tab"]'
+    equal: 1
+- assert_text_equals:
+    selector: '[data-testid="workspace-session-pane"][data-kind="database"] [data-testid="sql-editor"] .cm-content'
+    equals: SELECT 'QA_797_DATABASE_DRAFT';
+- right_click: '[data-testid="sidebar-tool-window-rail"] [data-testid="code-workspace-bottom-tab-terminal"]'
+- click: '[data-testid="code-workspace-tool-rail-menu-toggle"]'
+- assert_not_visible: '[data-testid="workspace-bottom-dock"]'
+- click: '[data-testid="workspace-open-session-plus"]'
+- click: '[data-testid="workspace-plus-open-session"]'
+- click: '[data-testid="workspace-session-picker-row"][data-session-id="qa-restore-localshell"]'
+- wait_for: '[data-testid="workspace-session-pane"][data-session-id="qa-restore-localshell"]'
+- click: '[data-testid="sidebar-tool-window-rail"] [data-testid="code-workspace-bottom-tab-terminal"]'
+- assert_visible: '[data-testid="workspace-bottom-dock"] [data-testid="code-workspace-terminal-dock"]'
+- assert_visible: '[data-testid="workspace-session-pane"][data-session-id="qa-restore-localshell"]'
+- assert_attribute:
+    selector: '[data-testid="workspace-tab"][data-active="true"]'
+    name: data-session-id
+    equals: qa-restore-localshell
+- assert_count:
+    selector: '[data-testid="workspace-tab"][data-tab-kind="code"]'
+    equal: 0
+- assert_count:
+    selector: '[data-testid="workspace-bottom-dock"] [data-testid="code-workspace-terminal-dock"]'
+    equal: 1
+- click: '[data-testid="nav-mode-home"]'
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="nav-mode-workspaces"]'
+- assert_visible: '[data-testid="workspace-bottom-dock"] [data-testid="code-workspace-terminal-dock"]'
+- assert_visible: '[data-testid="workspace-session-pane"][data-session-id="qa-restore-localshell"]'
+- click: '[data-testid="sidebar-tool-window-rail"] [data-testid="code-workspace-bottom-tab-terminal"]'
+- assert_not_visible: '[data-testid="workspace-bottom-dock"]'
+- assert_attribute:
+    selector: '[data-testid="sidebar-tool-window-rail"] [data-testid="code-workspace-bottom-tab-terminal"]'
+    name: aria-pressed
+    equals: 'false'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Database draft and active tab remain visible when the actual Terminal rail opens the workspace bottom dock.
+    actions: [6, 7, 8, 10, 11, 12]
+    checkpoints:
+    - step: 14
+      expectation: The database session, not a file or Code Workspace, remains the active tab.
+    - step: 15
+      expectation: The exact SQL draft remains in the upper database editor.
+    - step: 16
+      expectation: No workspace tab is added by Terminal.
+    - step: 17
+      expectation: The database session remains visible with the bottom terminal open.
+    results: [14, 15, 16, 17]
+  - id: R2
+    requirement: Closing Code Workspace does not cause it to be recreated; rail context-menu Hide owns the external dock.
+    actions: [19, 20, 22, 27, 28]
+    checkpoints:
+    - step: 21
+      expectation: Code Workspace is absent after explicit close.
+    - step: 24
+      expectation: The database session remains active on Terminal reopen.
+    - step: 25
+      expectation: Only the original database tab remains.
+    - step: 26
+      expectation: The SQL draft is unchanged after closing Code Workspace and reopening Terminal.
+    - step: 29
+      expectation: Rail context-menu Hide closes the visible workspace dock.
+    results: [21, 24, 25, 26, 29]
+  - id: R3
+    requirement: Shell canvas, dock identity and selected-state restore across Home without creating Code Workspace or duplicate bottom terminals.
+    actions: [30, 31, 32, 34, 40, 42, 45]
+    checkpoints:
+    - step: 35
+      expectation: The workspace terminal opens under the shell.
+    - step: 36
+      expectation: The original shell pane remains visible.
+    - step: 37
+      expectation: The shell session remains selected.
+    - step: 38
+      expectation: No Code Workspace tab was recreated.
+    - step: 39
+      expectation: Exactly one retained terminal dock exists.
+    - step: 43
+      expectation: The bottom terminal returns after Home.
+    - step: 44
+      expectation: The original shell canvas returns after Home.
+    - step: 46
+      expectation: A repeated rail click hides the external terminal.
+    - step: 47
+      expectation: Rail selected state reflects the hidden dock.
+    - step: 48
+      expectation: No uncaught runtime errors occur.
+    results: [35, 36, 37, 38, 39, 43, 44, 46, 47, 48]
+  visual:
+  - check: Database content stays above a bounded workspace terminal rather than being replaced.
+    method: manual
+    reason: Retained screenshot supplies layout evidence; exact tab/content assertions establish the routing result.
+  native:
+  - check: PTY execution, hide/show continuity and workspace ownership.
+    method: external
+    reason: TC-WS-092 runs the actual packaged terminal and backend; browser stubs cannot establish this.

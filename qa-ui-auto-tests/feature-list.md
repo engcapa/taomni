@@ -8831,6 +8831,9 @@ files:
   - src/components/editor/workspace/KeymapSettingsDialog.tsx
   - src/components/editor/workspace/ShortcutKeyCaps.tsx
   - src/components/editor/workspace/panels/ToolWindowRail.tsx
+  - src/components/editor/workspace/panels/WorkspaceTerminalTool.tsx
+  - src/components/editor/workspace/views/toolWindowChrome.tsx
+  - src/components/editor/workspace/workspaceHostIntegration.tsx
   - src/components/editor/workspace/workspaceNavigationBar.ts
   - src/components/editor/workspace/fileTypeIcon.tsx
   - src/components/editor/workspace/importFold.ts
@@ -12638,6 +12641,8 @@ TC-WS-075 keeps the real native execution scan under the same Home responsivenes
 
 ### 12.1 Workspace-first 主壳层：单行工具栏、主导航条 5 大模式与右栏收纳
 
+Issue #797：`TC-WS-091/092` 保护左栏 Terminal 在数据库/shell 画布上只切换 workspace 底部工具窗，不改变当前标签或重建 Code Workspace。底部复用编辑器同一个终端 owner，隐藏/重开及跨模式恢复保留输出；native 额外验证上下 PTY 独立执行及工作区隔离。`TC-IDE-PARITY-010-01/04` 和 `024-03` 保护编辑器工具窗与移动行为。
+
 `TC-WS-058` 在 browser/native 中保留宽导航栏下 viewport 对话框超出画布仍可操作的行为：读取真实命中、设置字体、跨 Home 返回、重复打开并 Escape 关闭，最后验证原有 SSH 终端输出。圆角装饰不能通过整层裁剪破坏此边界；正式性能对照另验证 24 PTY、文件树和编辑器的原始延迟与资源预算。
 
 <!-- feature
@@ -12659,6 +12664,8 @@ files:
 - src/components/sidebar/Sidebar.tsx
 - src/components/workspace/WorkspaceSidebar.tsx
 - src/components/workspace/WorkspaceMainPanel.tsx
+- src/components/workspace/WorkspaceBottomDock.tsx
+- src/components/workspace/useWorkspaceCodeHost.ts
 - src/components/workspace/WorkspaceGitPanel.tsx
 - src/components/workspace/WorkspaceSessionPickerModal.tsx
 - src/components/workspace/WorkspaceSessionPane.tsx
@@ -12666,6 +12673,7 @@ files:
 - src/components/agents/AgentsPlatformView.tsx
 - src/components/search/GlobalCommandModal.tsx
 - src/stores/workspacePlatformStore.ts
+- src/stores/workspaceEditorHostStore.ts
 - src/stores/agentsStore.ts
 - src/stores/workspaceEditorStore.ts
 - src/stores/workspaceUiStore.ts
@@ -12863,6 +12871,8 @@ files:
 - src/components/sidebar/Sidebar.tsx
 - src/components/workspace/WorkspaceSidebar.tsx
 - src/components/workspace/WorkspaceMainPanel.tsx
+- src/components/workspace/WorkspaceBottomDock.tsx
+- src/components/workspace/useWorkspaceCodeHost.ts
 - src/components/workspace/WorkspaceGitPanel.tsx
 - src/components/workspace/WorkspaceSessionPickerModal.tsx
 - src/components/workspace/WorkspaceSessionPane.tsx
@@ -12870,6 +12880,7 @@ files:
 - src/components/agents/AgentsPlatformView.tsx
 - src/components/search/GlobalCommandModal.tsx
 - src/stores/workspacePlatformStore.ts
+- src/stores/workspaceEditorHostStore.ts
 - src/stores/agentsStore.ts
 - src/stores/workspaceEditorStore.ts
 - src/stores/workspaceUiStore.ts
@@ -13308,6 +13319,9 @@ controls:
 - id: workspace-bottom-dock
   selector: '[data-testid="workspace-bottom-dock"]'
   kind: display
+- id: workspace-dock-close
+  selector: '[data-testid="workspace-dock-close"]'
+  kind: interactive
 
 - id: code-workspace-tree-view-list
   selector: '[data-testid="code-workspace-tree-view-list"]'
@@ -13624,6 +13638,8 @@ files:
 - src/components/sidebar/Sidebar.tsx
 - src/components/workspace/WorkspaceSidebar.tsx
 - src/components/workspace/WorkspaceMainPanel.tsx
+- src/components/workspace/WorkspaceBottomDock.tsx
+- src/components/workspace/useWorkspaceCodeHost.ts
 - src/components/workspace/WorkspaceGitPanel.tsx
 - src/components/workspace/WorkspaceSessionPickerModal.tsx
 - src/components/workspace/WorkspaceSessionPane.tsx
@@ -13631,6 +13647,7 @@ files:
 - src/components/agents/AgentsPlatformView.tsx
 - src/components/search/GlobalCommandModal.tsx
 - src/stores/workspacePlatformStore.ts
+- src/stores/workspaceEditorHostStore.ts
 - src/stores/agentsStore.ts
 - src/stores/workspaceEditorStore.ts
 - src/stores/workspaceUiStore.ts
