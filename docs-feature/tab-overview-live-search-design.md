@@ -6,7 +6,7 @@
 - 开始条件：issue #797 的三端 browser、native Terminal 61 步及完整 crash 回归已有通过证据，见 `../docs-issue/797-workspace-terminal-preserve-active-tab-design.md`。同步 Notes 的 Linux QA 多行输入准备修正独立补跑，不将其失败隐藏为通过。
 - 分支：`feat/tab-overview-live-search`，基于 #797/Notes 修复分支；当前产品基线 `741dae97`（后续证据文档另提交）。
 - 三平台：Windows/WebView2、Linux/WebKitGTK、macOS/WKWebView。按用户要求本地仅单元测试与静态检查，browser/native 在 GitHub `qa-ui-auto-platforms` 执行。
-- 状态：实现已完成、本地单测/静态检查通过；hosted browser/native 验收待执行。
+- 状态：实现与验收完成。最终产品提交 `01cc6e76`；GitHub [43289972376](https://github.com/engcapa/taomni/actions/runs/43289972376) 三平台 browser/native、目标及保留行为、完整 crash 集合全部通过。
 
 ## 2. 当前事实与边界
 
@@ -78,4 +78,26 @@
 - QA schema/audit/reviewed contracts、`tsc -b`、`check:refactor` 已通过。拟合批 selected IDs：`TC-WS-093,TC-WS-094,TC-WS-018,TC-WS-019,TC-WS-046` + 完整 `crash-regression`，三平台 browser/native QA release；native readiness/output 原生证明不能从本地 mock 继承。
 - 同步 Notes 修复最终 hosted `43270585278` 全绿：每平台 browser 10/10、native 11/11，无失败/skip/infrastructure，完整 crash 集合；不属于新 overview 功能通过证据。
 
-当前 hosted [43278551836](https://github.com/engcapa/taomni/actions/runs/43278551836)，head `e64d5d23`（product `f6d3a453`），三平台 browser/native release，`shards=1`，selected 包含上述目标/保留 case 与完整 crash 集合。Linux browser raw summary 已核对：11/11 passed、0 skip、identity stable；TC-WS-093 全 58 步通过，实际截图搜索 `RDM` 匹配唯一 README.md 并显示 dirty 文本、结果 count（artifact `qa-linux-browser-0f159bc7d0d441dd9770977569ab251f`，本地 `/tmp/taomni-overview-ci-43278551836-linux-browser-rEfMjF`）。Windows browser 同样 11/11 passed、0 skip、identity stable，TC-WS-093 通过，artifact `qa-windows-browser-0f159bc7d0d441dd9770977569ab251f`。macOS browser job 在 runner acquisition 阶段被取消（`runner_name=""`、`steps=[]`；annotation 明确 macOS ARM64 capacity constraints / job not acquired），未执行不计为 pass/fail。Linux native raw summary 14/14 passed（含原生 IME case），macOS native 13/13 passed，0 skip、identity stable；TC-WS-094 首轮全 46 步 passed。macOS 实际截图的实时徽标/稳定次序正常，但长 command wrap 可将新输出裁在卡片底部：补 `OverviewSummary` 仅终端自动 scroll 到最新行，文件 preview 仍在开头；新增 viewport mounted test 通过，native case 补 R4/51 步。Windows native 首轮仍运行；viewport 跟进需三端补跑，不能继承旧候选的执行结果。不因局部通过宣称全部新功能完成。不合并 PR 或自动关闭 issue。
+### 首轮与跟进原因
+
+首轮 [43278551836](https://github.com/engcapa/taomni/actions/runs/43278551836)，head `e64d5d23`（product `f6d3a453`），Linux/Windows browser 各 11/11 passed；Linux native 14/14、Windows/macOS native 各 13/13 passed，0 skip。唯一缺失为 macOS browser runner acquisition 取消（`runner_name=""`、`steps=[]`，annotation 明确 macOS ARM64 capacity constraints），不是产品或用例失败。
+
+审阅首轮 macOS 截图发现：虽然实时输出文本与徽标检查通过，长 command wrap 可能把最新输出裁在卡片底部。因此补 `OverviewSummary` 只对终端跟随到最新行，文件 preview 保持开头；native case 增加 R4/视口检查至 51 步。旧候选结果不冒充最终修正通过。首轮 artifact invocation `0f159bc7d0d441dd9770977569ab251f` 保留。
+
+### 最终通过证据
+
+最终运行 [43289972376](https://github.com/engcapa/taomni/actions/runs/43289972376)，head `01cc6e76327e348a1ab90aa37f62708ec1d243cb`，invocation `edfb2841c8a644bb89896587eda6d8fe`，三平台 browser/native QA release、单分片，目标/保留用例及完整 `crash-regression`：
+
+| 平台 | Browser | Native | 结果 |
+| --- | --- | --- | --- |
+| Linux / Ubuntu 24.04 Xvfb / WebKitGTK | 11/11 | 14/14 | 全通过，额外含真实 GTK/fcitx overview shortcut 回归 |
+| Windows / WebView2 | 11/11 | 13/13 | 全通过 |
+| macOS 15 ARM64 / WKWebView | 11/11 | 13/13 | 全通过 |
+
+- 合计 73 项执行，0 failed、0 skipped；aggregate `passed=true`、`report_ok=true`、0 infrastructure error/gap/unreviewed。原生 release hashes、source identity 与各 raw receipt 由工作流校验，全部 raw summary `identity_stable=true`。
+- `TC-WS-093` 三平台 browser 全 58 步通过；`TC-WS-094` 三平台 native 全 51 步、R1～R4 全通过。实际预览新输出可见、徽标/边框明显且卡片位置稳定；六张最终 native screenshot（每端 Sessions/Workspaces）均已人工审阅，未把截图生成当作视觉结论。
+- 本地 viewport 最终单测 8 文件 38/38 passed（`/tmp/taomni-overview-follow-latest-units.log`）；`tsc -b`、refactor/module/size、QA schema/audit/reviewed contract 均通过。native Rust contract 和三端构建均由 GitHub 成功执行。
+- 汇总 artifact：`qa-summary-edfb2841c8a644bb89896587eda6d8fe`，本地 `/tmp/taomni-overview-ci-43289972376-summary-FYYFXB/ci-summary.json`。
+- 原始执行 artifact：`qa-{linux,windows,macos}-{browser,native}-edfb2841c8a644bb89896587eda6d8fe`。本地 native：Linux `/tmp/taomni-overview-ci-43289972376-linux-native-kQogS3`，Windows `/tmp/taomni-overview-ci-43289972376-windows-native-m5oynv`，macOS `/tmp/taomni-overview-ci-43289972376-macos-native-0KK6KM`。可从 Actions 下载原件恢复，不改 receipt。
+
+交付已完成，未创建/合并 PR，也未关闭 issue。hosted 三端证据不覆盖所有 macOS/Windows 系统版本、Intel macOS、物理键盘/IME/DPI 或真实硬件性能；既有边界不扩大声称。
