@@ -1,0 +1,169 @@
+id: TC-WS-089
+title: Workspace Paste uses the latest external file list and Copy preserves tree ownership
+description: >-
+  System-file clipboard renderer workflow using only the browser fileClipboard
+  memory list and real Project tree menus/keys. No OS clipboard/file-manager claim.
+  Extends workspace_drop_import with the same independent source/root SHA256 and
+  empty-directory oracle. Context-menu Paste explicitly chooses root2; Ctrl+V on
+  Windows/Linux or Cmd+V on macOS uses the selected root. Latest B replaces old A,
+  empty files never replay A, collision preserves bytes, retry succeeds, exact
+  editor content remains intact, and internal same-root Cut still moves bytes.
+  Shortcut delivery is browser/WebView input, not physical OS keyboard evidence.
+modes: [browser]
+covers: [F25.1, F-WS-2]
+tags: [p1, workspace, file-explorer, file-clipboard, regression]
+fixtures: [reset_db, workspace_file_clipboard]
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-file-clipboard
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.platformWorkspaces.v1
+    value: ${fixture.workspace_drop_workspace}
+- reload_window: null
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="session-tree"]'
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="code-workspace-tree"]'
+- click: '[data-testid="code-workspace-tree-view-selector"]'
+- click: '[data-testid="code-workspace-tree-view-project"]'
+- wait_for: '[data-testid="code-workspace-tree-dir"][data-root-id="root2"][data-path="incoming"]'
+- click: '[data-testid="code-workspace-tree-root"][data-root-id="root1"]'
+- assert_workspace_drop_import: {state: seeded}
+- file_clipboard:
+    action: seed
+    paths: ['${fixture.workspace_drop_source}/中文 空格.txt', '${fixture.workspace_drop_source}/second file.txt', '${fixture.workspace_drop_source}/递归 目录']
+- right_click: '[data-testid="code-workspace-tree-dir"][data-root-id="root2"][data-path="incoming"]'
+- assert_enabled: '[data-testid="code-workspace-tree-paste"]'
+- click: '[data-testid="code-workspace-tree-paste"]'
+- assert_text:
+    selector: '[data-testid="status-bar-message"]'
+    contains: Imported 3 item(s) into drop-root-two / incoming
+- wait_for: '[data-testid="code-workspace-tree-file"][data-root-id="root2"][data-path="incoming/中文 空格.txt"]'
+- wait_for: '[data-testid="code-workspace-tree-dir"][data-root-id="root2"][data-path="incoming/递归 目录"]'
+- assert_workspace_drop_import: {state: directory}
+- dblclick: '[data-testid="code-workspace-tree-file"][data-root-id="root2"][data-path="incoming/中文 空格.txt"]'
+- wait_for: '[data-testid="workspace-file-editor"][data-path="incoming/中文 空格.txt"] .cm-content'
+- assert_items:
+    selector: '[data-testid="workspace-file-editor"][data-path="incoming/中文 空格.txt"] .cm-line'
+    equals: [中文与空格文件名, External source stays unchanged., '']
+- file_clipboard: {action: seed, paths: ['${fixture.workspace_drop_source}/collision.txt']}
+- right_click: '[data-testid="code-workspace-tree-dir"][data-root-id="root2"][data-path="incoming"]'
+- click: '[data-testid="code-workspace-tree-paste"]'
+- assert_text: {selector: '[data-testid="status-bar-message"]', contains: Path already exists}
+- assert_workspace_drop_import: {state: directory}
+- file_clipboard: {action: seed, paths: ['${fixture.workspace_drop_source}/recovery fresh.txt']}
+- click: '[data-testid="code-workspace-tree-dir"][data-root-id="root2"][data-path="incoming"]'
+- press: {selector: '[data-testid="code-workspace-tree-pane"]', key: Control+v, macos_key: Meta+v}
+- assert_text: {selector: '[data-testid="status-bar-message"]', contains: Imported 1 item(s) into drop-root-two / incoming}
+- wait_for: '[data-testid="code-workspace-tree-file"][data-root-id="root2"][data-path="incoming/recovery fresh.txt"]'
+- assert_workspace_drop_import: {state: recovered}
+- right_click: '[data-testid="code-workspace-tree-file"][data-root-id="root1"][data-path="README.md"]'
+- click: '[data-testid="code-workspace-tree-copy"]'
+- assert_text: {selector: '[data-testid="status-bar-message"]', contains: 'Copied file reference: ${fixture.workspace_drop_root1}/README.md'}
+- file_clipboard: {action: assert, paths: ['${fixture.workspace_drop_root1}/README.md']}
+- file_clipboard: {action: seed, paths: ['${fixture.workspace_drop_source}/latest B.txt']}
+- click: '[data-testid="code-workspace-tree-root"][data-root-id="root2"]'
+- press: {selector: '[data-testid="code-workspace-tree-pane"]', key: Control+v, macos_key: Meta+v}
+- assert_text: {selector: '[data-testid="status-bar-message"]', contains: Imported 1 item(s) into drop-root-two / .}
+- wait_for: '[data-testid="code-workspace-tree-file"][data-root-id="root2"][data-path="latest B.txt"]'
+- assert_workspace_drop_import: {state: root}
+- click: '[data-testid="code-workspace-tree-file"][data-root-id="root2"][data-path="latest B.txt"]'
+- press: {selector: '[data-testid="code-workspace-tree-pane"]', key: Control+c, macos_key: Meta+c}
+- assert_text: {selector: '[data-testid="status-bar-message"]', contains: 'Copied file reference: ${fixture.workspace_drop_root2}/latest B.txt'}
+- file_clipboard: {action: assert, paths: ['${fixture.workspace_drop_root2}/latest B.txt']}
+- file_clipboard: {action: seed, paths: []}
+- click: '[data-testid="code-workspace-tree-root"][data-root-id="root2"]'
+- press: {selector: '[data-testid="code-workspace-tree-pane"]', key: Control+v, macos_key: Meta+v}
+- assert_text: {selector: '[data-testid="status-bar-message"]', contains: No files on the system clipboard}
+- assert_workspace_drop_import: {state: root}
+- right_click: '[data-testid="code-workspace-tree-dir"][data-root-id="root2"][data-path="incoming/递归 目录"]'
+- click: '[data-testid="code-workspace-tree-copy"]'
+- assert_text: {selector: '[data-testid="status-bar-message"]', contains: 'Copied file reference: ${fixture.workspace_drop_root2}/incoming/递归 目录'}
+- file_clipboard: {action: assert, paths: ['${fixture.workspace_drop_root2}/incoming/递归 目录']}
+- dblclick: '[data-testid="code-workspace-tree-file"][data-root-id="root2"][data-path="incoming/中文 空格.txt"]'
+- press: {selector: '[data-testid="workspace-file-editor"] .cm-content', key: Control+a, macos_key: Meta+a}
+- press: {selector: '[data-testid="workspace-file-editor"] .cm-content', key: Control+c, macos_key: Meta+c}
+- assert_items:
+    selector: '[data-testid="workspace-file-editor"][data-path="incoming/中文 空格.txt"] .cm-line'
+    equals: [中文与空格文件名, External source stays unchanged., '']
+- assert_workspace_drop_import: {state: root}
+- right_click: '[data-testid="code-workspace-tree-file"][data-root-id="root1"][data-path="cut-retained.txt"]'
+- click: '[data-testid="code-workspace-tree-cut"]'
+- assert_text: {selector: '[data-testid="status-bar-message"]', contains: Cut for moving within this workspace}
+- dblclick: '[data-testid="code-workspace-tree-dir"][data-root-id="root1"][data-path="incoming"]'
+- press: {selector: '[data-testid="code-workspace-tree-pane"]', key: Control+v, macos_key: Meta+v}
+- assert_text: {selector: '[data-testid="status-bar-message"]', contains: Moved to incoming/cut-retained.txt}
+- assert_workspace_drop_import: {state: cut}
+- wait_for: '[data-testid="code-workspace-tree-file"][data-root-id="root1"][data-path="incoming/cut-retained.txt"]'
+- assert_no_runtime_errors: null
+- screenshot: workspace-file-clipboard.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Explicit root2 menu Paste copies external Unicode files plus recursive binary/empty directory while every source and root1 byte survives.
+    actions: [13, 15, 16, 18, 23]
+    checkpoints:
+    - {step: 17, expectation: Paste is available without an internal tree Copy.}
+    - {step: 19, expectation: Three external items completed into the explicit root2 incoming.}
+    - {step: 20, expectation: Unicode/space file is refreshed.}
+    - {step: 21, expectation: Recursive directory is refreshed.}
+    - {step: 22, expectation: Exact complete source/root1/root2 hashes and empty directories match the independent copy manifest.}
+    - {step: 25, expectation: The pasted Unicode file opens with all exact original lines.}
+    results: [17, 19, 20, 21, 22, 25]
+  - id: R2
+    requirement: Collision rejects without overwrite and CtrlV/CmdV in the tree can subsequently import a fresh file once.
+    actions: [26, 27, 28, 31, 32, 33]
+    checkpoints:
+    - {step: 29, expectation: Path already exists is visible.}
+    - {step: 30, expectation: Collision source and original target bytes are unchanged.}
+    - {step: 34, expectation: One fresh item is imported after failure.}
+    - {step: 35, expectation: Recovery file is present in the intended directory.}
+    - {step: 36, expectation: Exact recovered snapshot rejects duplicate/extra writes and root1 pollution.}
+    results: [29, 30, 34, 35, 36]
+  - id: R3
+    requirement: Tree Copy publishes A but newer external B is used by root Paste; empty clipboard cannot replay A or B.
+    actions: [37, 38, 41, 42, 43, 47, 48, 51, 52, 53]
+    checkpoints:
+    - {step: 39, expectation: Tree Copy reports a file reference only after success.}
+    - {step: 40, expectation: The memory file list exactly contains A.}
+    - {step: 44, expectation: Root Paste reports one B import.}
+    - {step: 45, expectation: Latest B is refreshed at root2 itself.}
+    - {step: 46, expectation: Root snapshot includes B but no stale A copy or overwrite.}
+    - {step: 49, expectation: Tree shortcut Copy reports the B file reference.}
+    - {step: 50, expectation: The file list exactly contains root2 B after shortcut Copy.}
+    - {step: 54, expectation: Empty list reports no files rather than replaying a stale reference.}
+    - {step: 55, expectation: Exact source/target bytes remain unchanged after empty Paste.}
+    results: [39, 40, 44, 45, 46, 49, 50, 54, 55]
+  - id: R4
+    requirement: Directory Copy publishes its file reference and editor-owned Copy never imports or changes documents.
+    actions: [56, 57, 60, 61, 62]
+    checkpoints:
+    - {step: 58, expectation: Directory Copy reports the exact recursive directory reference.}
+    - {step: 59, expectation: Memory clipboard contains that directory rather than a text payload.}
+    - {step: 63, expectation: Editor text remains exact after its own select-all and Copy.}
+    - {step: 64, expectation: No tree import side effect occurred from editor Copy.}
+    results: [58, 59, 63, 64]
+  - id: R5
+    requirement: Same-root internal Cut and Paste retain exact move bytes without replacing the system-copy feature with a cross-application move.
+    actions: [65, 66, 68, 69]
+    checkpoints:
+    - {step: 67, expectation: Internal Cut feedback explicitly states within-workspace scope.}
+    - {step: 70, expectation: Same-root move reports its exact destination.}
+    - {step: 71, expectation: Complete snapshot confirms exact source deletion and target creation only for the internal cut file.}
+    - {step: 72, expectation: Moved file is refreshed in root1 incoming.}
+    - {step: 73, expectation: Workspace remains usable without runtime crash errors.}
+    results: [67, 70, 71, 72, 73]
+  visual:
+  - check: Existing tree Copy/Paste/Cut menus and refreshed document hierarchy.
+    method: manual
+    reason: Retained screenshot needs human review; no new layout claim. Unrun during QA tool authoring.
+  native:
+  - check: Real native file-list formats and actual external file-manager Paste.
+    method: external
+    reason: TC-WS-090 separately checks real host formats, independent clipboard paths and real file-manager-created target SHA256; this case is memory/VFS only.
+  - check: Physical macOS Edit responder, IME composition and OS keyboard delivery.
+    method: manual
+    reason: CmdC/CmdV here are browser/WebView chords, not AppKit menu-bar or physical keyboard evidence; product unit tests cover ownership guards separately.

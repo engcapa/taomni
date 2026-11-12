@@ -11,7 +11,6 @@ import {
 import {
   workspaceCreateDir,
   workspaceCreateFile,
-  workspaceReadFile,
   type WorkspaceGitRoot,
 } from "../../../lib/editor/workspace";
 import { gitIgnorePath } from "../../../lib/git";
@@ -41,6 +40,8 @@ import {
   type TreeViewMode,
 } from "./codeWorkspaceModel";
 import type { WorkspaceLocationController } from "./navigationHistoryModel";
+import { useWorkspaceTreeClipboard } from "./useWorkspaceTreeClipboard";
+import type { ImportDroppedPaths } from "./useProjectTreeFileDrop";
 
 type Updater<T> = T | ((current: T) => T);
 type UpdaterSetter<T> = (updater: Updater<T>) => void;
@@ -82,6 +83,7 @@ interface UseWorkspaceFileActionsOptions {
   notifyWorkspacePathGitChanged: (rootId: string, path: string) => void;
   onStatus: (message: string) => void;
   onRootAdded?: (root: CodeWorkspaceRootInfo) => void;
+  importPaths: ImportDroppedPaths;
 }
 
 export interface WorkspaceFileActionsController {
@@ -104,7 +106,7 @@ export interface WorkspaceFileActionsController {
     rootId: string,
     path: string,
     isDirectory?: boolean,
-  ) => void;
+  ) => Promise<void>;
   canPasteTreeClipboard: () => boolean;
   pasteTreeClipboard: (target: RootDirectory) => Promise<void>;
   ignoreWorkspacePath: (rootId: string, path: string, directory: boolean) => Promise<void>;
@@ -144,13 +146,11 @@ export function useWorkspaceFileActions({
   notifyWorkspacePathGitChanged,
   onStatus,
   onRootAdded,
+  importPaths,
 }: UseWorkspaceFileActionsOptions): WorkspaceFileActionsController {
-  const treeClipboardRef = useRef<{
-    mode: "copy" | "cut";
-    rootId: string;
-    path: string;
-    isDirectory: boolean;
-  } | null>(null);
+  const treeClipboard = useWorkspaceTreeClipboard({
+    workspaceId, rootsRef, importPaths, applyResourceOperation, loadDir, loadFlatFiles, onStatus,
+  });
   const findRoot = useCallback(
     (rootId: string) => rootsRef.current?.find((root) => root.id === rootId) ?? null,
     [rootsRef],
@@ -278,6 +278,7 @@ export function useWorkspaceFileActions({
   const readSelection = useCallback(() => getSelected ? getSelected() : selected, [getSelected, selected]);
   const getSelectedRootDirectory = useCallback((): RootDirectory | null => {
     const selected = readSelection();
+    if (selected?.kind === "root") return { rootId: selected.rootId, path: "" };
     if (selected?.kind === "dir") return { rootId: selected.rootId, path: selected.path };
     if (selected?.kind === "file" && selected.ref.kind === "root") {
       return { rootId: selected.ref.rootId, path: parentPath(selected.ref.path) };
@@ -619,93 +620,6 @@ export function useWorkspaceFileActions({
     }
   }, [findRoot, onStatus]);
 
-  const stageTreeClipboard = useCallback((
-    mode: "copy" | "cut",
-    rootId: string,
-    path: string,
-    isDirectory = false,
-  ) => {
-    treeClipboardRef.current = { mode, rootId, path, isDirectory };
-    onStatus(mode === "cut" ? "Cut to clipboard" : "Copied to clipboard");
-  }, [onStatus]);
-
-  const canPasteTreeClipboard = useCallback(() => treeClipboardRef.current !== null, []);
-
-  const pasteTreeClipboard = useCallback(async (target: RootDirectory) => {
-    const clip = treeClipboardRef.current;
-    if (!clip) {
-      onStatus("Nothing to paste");
-      return;
-    }
-    if (clip.rootId !== target.rootId) {
-      onStatus("Cross-root paste is not supported");
-      return;
-    }
-    const root = findRoot(clip.rootId);
-    if (!root) return;
-    const name = basename(clip.path);
-    const destPath = target.path ? `${target.path}/${name}` : name;
-    try {
-      if (clip.mode === "cut") {
-        const operation: LspWorkspaceFileOperation = {
-          kind: "rename",
-          files: [{
-            oldPath: absoluteWorkspacePath(root, clip.path),
-            newPath: absoluteWorkspacePath(root, destPath),
-            isDirectory: clip.isDirectory,
-          }],
-        };
-        await prepareWorkspaceFileOperation(operation);
-        await applyResourceOperation({
-          kind: "rename",
-          oldUri: "",
-          oldPath: absoluteWorkspacePath(root, clip.path),
-          newUri: "",
-          newPath: absoluteWorkspacePath(root, destPath),
-          overwrite: false,
-          ignoreIfExists: false,
-          annotationId: null,
-        });
-        const notificationError = await notifyWorkspaceFileOperationCompleted(operation);
-        treeClipboardRef.current = null;
-        await loadDir(clip.rootId, parentPath(clip.path) || "");
-        await loadDir(target.rootId, target.path);
-        onStatus([
-          `Moved to ${destPath}`,
-          notificationError,
-        ].filter(Boolean).join("; "));
-      } else {
-        const file = await workspaceReadFile(root.path, clip.path);
-        const operation: LspWorkspaceFileOperation = {
-          kind: "create",
-          files: [{ path: absoluteWorkspacePath(root, destPath), isDirectory: false }],
-        };
-        await prepareWorkspaceFileOperation(operation);
-        await workspaceCreateFile(root.path, destPath, file.text);
-        const notificationError = await notifyWorkspaceFileOperationCompleted(operation);
-        await loadDir(clip.rootId, parentPath(clip.path) || "");
-        await loadDir(target.rootId, target.path);
-        notifyWorkspacePathGitChanged(target.rootId, destPath);
-        onStatus([
-          `Copied to ${destPath}`,
-          notificationError,
-        ].filter(Boolean).join("; "));
-      }
-      void loadFlatFiles(root.id, true);
-    } catch (error) {
-      onStatus(errorMessage(error));
-    }
-  }, [
-    applyResourceOperation,
-    findRoot,
-    loadDir,
-    loadFlatFiles,
-    notifyWorkspacePathGitChanged,
-    onStatus,
-    notifyWorkspaceFileOperationCompleted,
-    prepareWorkspaceFileOperation,
-  ]);
-
   const ignoreWorkspacePath = useCallback(async (
     rootId: string,
     path: string,
@@ -749,9 +663,7 @@ export function useWorkspaceFileActions({
     renameSelected,
     deleteSelected,
     revealInExplorer,
-    stageTreeClipboard,
-    canPasteTreeClipboard,
-    pasteTreeClipboard,
+    ...treeClipboard,
     ignoreWorkspacePath,
   };
 }

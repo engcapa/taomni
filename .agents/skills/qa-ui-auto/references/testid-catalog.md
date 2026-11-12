@@ -1771,6 +1771,7 @@
 - `[data-testid="code-workspace-tree-open-default"]` — interactive — F-WS-2.code-workspace-tree-open-default
 - `[data-testid="code-workspace-tree-copy"]` — interactive — F-WS-2.code-workspace-tree-copy
 - `[data-testid="code-workspace-tree-paste"]` — interactive — F-WS-2.code-workspace-tree-paste
+- `[data-testid="code-workspace-tree-cut"]` — interactive — F-WS-2.code-workspace-tree-cut
 - `[data-testid="workspace-plus-add-folder"]` — interactive — F-WS-2.workspace-plus-add-folder
 - `[data-testid="ui-font-family-select"]` — interactive — F-WS-2.ui-font-family-select
 - `#ui-font-size-slider` — interactive — F-WS-2.ui-font-size-slider

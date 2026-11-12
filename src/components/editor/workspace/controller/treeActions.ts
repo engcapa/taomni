@@ -182,7 +182,7 @@ export interface ShowTreeContextMenuContext {
   treeContextMenuSessionRef: import("react").RefObject<{ workspaceInstanceId: string; selection: TreeSelection | null; consumed: boolean; } | null>;
   workspaceInstanceId: string;
   workspaceCommandRunnerRef: import("react").RefObject<(commandId: string, context?: WorkspaceCommandContext) => boolean>;
-  stageTreeClipboard: (mode: "copy" | "cut", rootId: string, path: string, isDirectory?: boolean) => void;
+  stageTreeClipboard: (mode: "copy" | "cut", rootId: string, path: string, isDirectory?: boolean) => Promise<void>;
   canPasteTreeClipboard: () => boolean;
   pasteTreeClipboard: (target: { rootId: string; path: string; }) => Promise<void>;
   openTreeContextMenu: (e: React.MouseEvent, items: MenuItem[]) => void;
@@ -211,24 +211,29 @@ export function createShowTreeContextMenu(controllerContext: ShowTreeContextMenu
         path: string,
         directory: { rootId: string; path: string },
         isDirectory: boolean,
-      ) => [
+      ) => {
+        const selection: TreeSelection = isDirectory
+          ? { kind: "dir", rootId, path }
+          : { kind: "file", ref: { kind: "root", rootId, path } };
+        return [
         {
           label: "Cut",
           testId: "code-workspace-tree-cut",
-          onClick: () => controllerContext.stageTreeClipboard("cut", rootId, path, isDirectory),
+          onClick: run("workspace.tree.cut", { selection }),
         },
         {
           label: "Copy",
           testId: "code-workspace-tree-copy",
-          onClick: () => controllerContext.stageTreeClipboard("copy", rootId, path, isDirectory),
+          onClick: run("workspace.tree.copy", { selection }),
         },
         {
           label: "Paste",
           testId: "code-workspace-tree-paste",
           disabled: !controllerContext.canPasteTreeClipboard(),
-          onClick: () => void controllerContext.pasteTreeClipboard(directory),
+          onClick: run("workspace.tree.paste", { directory }),
         },
-      ];
+        ];
+      };
       if (selection.kind === "file") {
         if (selection.ref.kind === "loose") {
           const ref = selection.ref;
@@ -310,12 +315,13 @@ export function createShowTreeContextMenu(controllerContext: ShowTreeContextMenu
           { label: "New Java Class...", onClick: run("workspace.tree.newJavaClass", { directory: { rootId: selection.rootId, path: "" } }) },
           { label: "New Directory...", testId: "code-workspace-tree-new-directory", onClick: run("workspace.tree.newDirectory", { directory: { rootId: selection.rootId, path: "" } }) },
           { label: "Rename Root...", onClick: run("workspace.tree.rename", { selection }) },
+          { label: "Copy", testId: "code-workspace-tree-copy", onClick: run("workspace.tree.copy", { selection }) },
           { separator: true, label: "" },
           {
             label: "Paste",
             testId: "code-workspace-tree-paste",
             disabled: !controllerContext.canPasteTreeClipboard(),
-            onClick: () => void controllerContext.pasteTreeClipboard({ rootId: selection.rootId, path: "" }),
+            onClick: run("workspace.tree.paste", { directory: { rootId: selection.rootId, path: "" } }),
           },
           { separator: true, label: "" },
           { label: "Copy Path", onClick: run("workspace.tree.copyPath", { rootId: selection.rootId, path: "" }) },

@@ -188,6 +188,8 @@ export interface WorkspaceCommandsContext {
   ignoreWorkspacePath: (rootId: string,path: string,directory: boolean) => Promise<void>;
   findInDirectory: (path: string) => void;
   copyTreePath: (rootId: string,path: string,absolute: boolean) => Promise<void>;
+  stageTreeClipboard: (mode: "copy" | "cut", rootId: string, path: string, isDirectory?: boolean) => Promise<void>;
+  pasteTreeClipboard: (target: { rootId: string; path: string }) => Promise<void>;
   setKeymapCheatSheetOpen: import("react").Dispatch<import("react").SetStateAction<boolean>>;
   coverageReport: WorkspaceCoverageReport|null;
   scanWorkspaceCoverage: () => Promise<void>;

@@ -95,3 +95,4 @@ from ..runtime_errors import browser_assert
 verb("assert_no_runtime_errors")(browser_assert)
 
 from . import os_file_drag  # noqa: E402,F401
+from . import file_clipboard  # noqa: E402,F401

@@ -26,13 +26,18 @@ const ipcMocks = vi.hoisted(() => ({
 const gitMocks = vi.hoisted(() => ({
   gitIgnorePath: vi.fn(),
 }));
+const clipboardMocks = vi.hoisted(() => ({
+  writeText: vi.fn(async () => {}),
+  writeFiles: vi.fn(async () => {}),
+  readFilesResult: vi.fn(async () => ({ ok: true, paths: ["/repo/src/source.ts"] })),
+}));
 
 vi.mock("../../../lib/appDialogs", () => dialogMocks);
 vi.mock("../../../lib/editor/lsp", () => lspMocks);
 vi.mock("../../../lib/editor/workspace", () => workspaceMocks);
 vi.mock("../../../lib/ipc", () => ipcMocks);
 vi.mock("../../../lib/git", () => gitMocks);
-vi.mock("../../../lib/clipboard", () => ({ writeText: vi.fn(async () => {}) }));
+vi.mock("../../../lib/clipboard", () => clipboardMocks);
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn(async () => undefined) }));
 
 const roots: CodeWorkspaceRootInfo[] = [{
@@ -80,6 +85,7 @@ function options(overrides: Record<string, unknown> = {}) {
     applyResourceOperation: vi.fn(async () => {}),
     notifyWorkspacePathGitChanged: vi.fn(),
     onStatus: vi.fn(),
+    importPaths: vi.fn(async () => {}),
     ...overrides,
   };
 }
@@ -98,6 +104,8 @@ describe("useWorkspaceFileActions", () => {
     ipcMocks.selectFilePath.mockReset();
     ipcMocks.selectFolderPath.mockReset();
     gitMocks.gitIgnorePath.mockReset();
+    clipboardMocks.writeFiles.mockClear();
+    clipboardMocks.readFilesResult.mockClear();
   });
 
   it.each(["/new-folder", "/repo"])("reveals and expands a successful folder selection: %s", async (path) => {
@@ -308,49 +316,23 @@ describe("useWorkspaceFileActions", () => {
     });
   });
 
-  it("owns the internal tree clipboard and refreshes Git after paste", async () => {
-    workspaceMocks.workspaceReadFile.mockResolvedValue({
-      path: "src/source.ts",
-      text: "source",
-      size: 6,
-      mtime: 1,
-      hash: "hash",
-    });
-    workspaceMocks.workspaceCreateFile.mockResolvedValue({
-      path: "dest/source.ts",
-      text: "source",
-      size: 6,
-      mtime: 1,
-      hash: "hash-2",
-    });
+  it("publishes system file references and routes Paste through the shared byte import owner", async () => {
     const props = options();
     const { result } = renderHook(() => useWorkspaceFileActions(props));
-
-    act(() => result.current.stageTreeClipboard("copy", "root-1", "src/source.ts"));
+    await act(async () => result.current.stageTreeClipboard("copy", "root-1", "src/source.ts"));
+    expect(clipboardMocks.writeFiles).toHaveBeenCalledWith(["/repo/src/source.ts"]);
     expect(result.current.canPasteTreeClipboard()).toBe(true);
     await act(async () => result.current.pasteTreeClipboard({ rootId: "root-1", path: "dest" }));
-
-    expect(workspaceMocks.workspaceCreateFile).toHaveBeenCalledWith(
-      "/repo",
-      "dest/source.ts",
-      "source",
-    );
-    expect(lspMocks.lspWorkspaceWillFileOperation).toHaveBeenCalledWith("workspace-1", {
-      kind: "create",
-      files: [{ path: "/repo/dest/source.ts", isDirectory: false }],
-    });
-    expect(lspMocks.lspWorkspaceDidFileOperation).toHaveBeenCalledWith("workspace-1", {
-      kind: "create",
-      files: [{ path: "/repo/dest/source.ts", isDirectory: false }],
-    });
-    expect(props.notifyWorkspacePathGitChanged).toHaveBeenCalledWith("root-1", "dest/source.ts");
+    expect(props.importPaths).toHaveBeenCalledWith({ rootId: "root-1", path: "dest" }, ["/repo/src/source.ts"]);
+    expect(workspaceMocks.workspaceReadFile).not.toHaveBeenCalled();
+    expect(workspaceMocks.workspaceCreateFile).not.toHaveBeenCalled();
   });
 
   it("routes a cut directory through rename lifecycle with folder semantics", async () => {
     const props = options();
     const { result } = renderHook(() => useWorkspaceFileActions(props));
 
-    act(() => result.current.stageTreeClipboard("cut", "root-1", "src/module", true));
+    await act(async () => result.current.stageTreeClipboard("cut", "root-1", "src/module", true));
     await act(async () => result.current.pasteTreeClipboard({ rootId: "root-1", path: "dest" }));
 
     const operation = {

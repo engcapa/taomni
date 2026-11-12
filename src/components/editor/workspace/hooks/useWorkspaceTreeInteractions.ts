@@ -16,6 +16,7 @@ import { useWorkspaceEditorCommands } from "./useWorkspaceEditorCommands";
 import { useWorkspaceToolWindowRouting } from "./useWorkspaceToolWindowRouting";
 import { useWorkspaceTreeFocusState } from "./useWorkspaceTreeFocusState";
 import { useWorkspaceTreeOpening } from "./useWorkspaceTreeOpening";
+import { useTreeClipboardEvents } from "./useTreeClipboardEvents";
 import { useWorkspaceUiActions } from "./useWorkspaceUiActions";
 
 
@@ -64,6 +65,7 @@ export function useWorkspaceTreeInteractions(context: UseWorkspaceTreeInteractio
     workspaceInstanceId,
   } = context;
 
+  useTreeClipboardEvents(treeFocus.treePaneRef, workspaceCommandRunnerRef);
   const treeContextMenuSessionRef = useRef<{
     workspaceInstanceId: string;
     selection: TreeSelection | null;

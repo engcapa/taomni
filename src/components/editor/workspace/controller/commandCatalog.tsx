@@ -15,6 +15,7 @@ import { createDiffCommands } from "../commands/diff";
 import { createGitCommands } from "../commands/git";
 import { createExecutionCommands } from "../commands/execution";
 import { createDebugCommands } from "../commands/debug";
+import { createTreeClipboardCommands } from "../commands/treeClipboard";
 
 
 
@@ -203,6 +204,7 @@ export function createWorkspaceCommands(controllerContext: WorkspaceCommandsCont
     files["workspace.tree.openLooseFile"],
     files["workspace.tree.addFolder"],
     files["workspace.tree.open"],
+    ...createTreeClipboardCommands(controllerContext),
     files["workspace.tree.newFile"],
     files["workspace.tree.newDirectory"],
     files["workspace.tree.newJavaClass"],

@@ -7902,6 +7902,14 @@ files:
   - src/components/editor/workspace/panels/DebugPanel.tsx
   - src/components/editor/workspace/useCodeDebugSession.ts
   - src/lib/editor/workspace.ts
+  - src/lib/clipboard.ts
+  - src/components/editor/workspace/useWorkspaceTreeClipboard.ts
+  - src/components/editor/workspace/commands/treeClipboard.ts
+  - src/components/editor/workspace/hooks/useTreeClipboardEvents.ts
+  - src-tauri/src/config/platform/file_clipboard.rs
+  - src-tauri/src/config/platform/unix_file_clipboard.rs
+  - src-tauri/src/config/platform/windows_file_clipboard.rs
+  - src-tauri/src/config/platform/macos_file_clipboard.rs
   - src/lib/terminal/commandInput.ts
   - src-tauri/src/lsp.rs
   - src-tauri/src/workspace_execution.rs
@@ -10299,6 +10307,7 @@ controls:
 
 - 编辑器工作台的壳层控件：文件树（add-folder/open-file 行）、编辑器 pane/tab-strip/.cm-content、底部 dock 的 terminal tab、split down/close、Ctrl+Tab Switcher 弹层与 Keymap 设置面。
 - §8.19.10 C0–C7 gate 用例（TC-IDE-C*）以本 feature 为 covers owner；provider/native 部分的最高 claim 见各 case description。
+- 双向系统文件剪贴板由 F25.1/F-WS-2 共同归属：TC-WS-089 browser 内存列表/VFS；TC-WS-090 三端 native 真格式独立读取、真实文件管理器 Paste 与目标 SHA256/空目录。既有菜单 Copy/Paste/Cut，树焦点 Win/Linux Ctrl+C/V、macOS Cmd+C/V；显式目标优先、最新系统 B 覆盖旧 A、空列表不重放、冲突与恢复、同根 Cut 保留。文件管理器动作权限/依赖缺失是失败，Wayland真实Paste仍是手工gap；不将browser或产品写→产品读当原生证据。本地不运行UI/剪贴板，用例待托管执行。
 - Issue #792 外部文件/递归目录复制导入由 F25.1 与 F-WS-2 共同归属：TC-WS-087（browser HTML5 合成入口/VFS）、TC-WS-088（native Tauri 合成入口/真实磁盘 SHA256），覆盖根/目录悬停与 leave、rootId 多根路由、中文/空格/二进制/空目录、冲突不覆盖与失败后新文件重试、文件/空白不导入。`status-bar-message` 验证完成/冲突提示，瞬时 Importing 文案只保留观察不设虚假时序断言。用例与工具单测/静态检查不代表真实 OS 手势或 UI 已执行；browser/native 与完整 crash-regression 通过 GitHub `qa-ui-auto-platforms`、匹配源码的 QA release 二进制统一运行，本地不启动 UI 测试。
 
 ### 25.2 Provider 语义快照与重构一致性 🟡
@@ -12899,9 +12908,15 @@ controls:
 - id: code-workspace-tree-copy
   selector: '[data-testid="code-workspace-tree-copy"]'
   kind: interactive
+  note: 'TC-WS-089 memory/VFS and TC-WS-090 native file-list + actual system file-manager Paste; publishing a file reference must not silently fall back to text.'
 - id: code-workspace-tree-paste
   selector: '[data-testid="code-workspace-tree-paste"]'
   kind: interactive
+  note: 'TC-WS-089/090: explicit menu target or selected root/dir; read the latest system file list, no stale internal Copy fallback.'
+- id: code-workspace-tree-cut
+  selector: '[data-testid="code-workspace-tree-cut"]'
+  kind: interactive
+  note: 'Internal same-root move only; leaving the app cancels Cut. TC-WS-089/090 retain byte-exact move behavior.'
 - id: workspace-plus-add-folder
   selector: '[data-testid="workspace-plus-add-folder"]'
   kind: interactive

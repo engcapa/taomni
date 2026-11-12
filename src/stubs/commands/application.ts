@@ -2,6 +2,7 @@ import { goStubCatalog } from "../opencodeGoStub";
 import { inspectorStub, inspectorCheckStub } from "../modelInspectorStub";
 import { type InvokeArgs } from "./runtime";
 import { stubSystemRdpStatus } from "./servers";
+import { readFiles, writeFiles, clearFiles } from "../fileClipboard";
 
 export async function invokeApplication<T>(cmd: string, args?: any): Promise<T> {
   switch (cmd) {
@@ -28,7 +29,15 @@ export async function invokeApplication<T>(cmd: string, args?: any): Promise<T> 
       return ((await navigator.clipboard?.readText?.()) ?? "") as T;
     }
 
+    case "clipboard_read_files":
+      return readFiles() as T;
+
+    case "clipboard_write_files":
+      writeFiles(args?.paths || []);
+      return undefined as T;
+
     case "clipboard_write_text": {
+      clearFiles();
       const text = ((args as InvokeArgs | undefined)?.text as string) ?? "";
       if (!navigator.clipboard?.writeText) {
         throw new Error("Clipboard write is not available in browser preview.");

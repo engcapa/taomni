@@ -1,6 +1,9 @@
 # Independent per-case two-root/source fixtures; neither mode needs a predecessor.
 TC-WS-087: []
 TC-WS-088: []
+# File clipboard cases extend the isolated fixture, not earlier case execution.
+TC-WS-089: []
+TC-WS-090: []
 TC-WS-086: []
 TC-WS-084: []
 TC-WS-085: []

@@ -59,7 +59,7 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
   return undefined as T;
 }
 
-for (const command of ["recovery_get","recovery_update","recovery_ready","list_system_fonts","clipboard_read_text","clipboard_write_text","git_blame_lines","exit_app","open_sftp_window","close_current_detached_window","open_detached_window","probe_system_rdp","open_system_rdp_settings","mirror_get_config","mirror_set_config","cuda_pack_status","get_opencode_go_catalog","get_provider_models","test_llm_model","test_llm_connection","get_ai_config","save_ai_config","save_ai_api_key"]) {
+for (const command of ["recovery_get","recovery_update","recovery_ready","list_system_fonts","clipboard_read_text","clipboard_write_text","clipboard_read_files","clipboard_write_files","git_blame_lines","exit_app","open_sftp_window","close_current_detached_window","open_detached_window","probe_system_rdp","open_system_rdp_settings","mirror_get_config","mirror_set_config","cuda_pack_status","get_opencode_go_catalog","get_provider_models","test_llm_model","test_llm_connection","get_ai_config","save_ai_config","save_ai_api_key"]) {
   stubCommandRegistry.register({ domain: "application", command, handler: (args) => invokeApplication(command, args) });
 }
 

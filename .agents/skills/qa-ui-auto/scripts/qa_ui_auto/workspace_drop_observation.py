@@ -14,7 +14,7 @@ from typing import Any
 from .deadline import budget_time as time
 from .steps import StepError
 
-STATES = {"seeded", "directory", "recovered", "root"}
+STATES = {"seeded", "directory", "recovered", "root", "cut"}
 READ_VFS = """async (base) => {
   const vfs = await import('/src/stubs/localVfs.ts');
   const files = {}, directories = [''];
@@ -57,7 +57,7 @@ def host_snapshot(base: Path) -> dict[str, Any]:
 def run(ctx: Any, args: Any, *, mode: str) -> str:
     state = args.get("state") if isinstance(args, dict) and set(args) == {"state"} else None
     if not isinstance(state, str) or state not in STATES:
-        raise StepError("assert_workspace_drop_import: expected {state: seeded|directory|recovered|root}")
+        raise StepError("assert_workspace_drop_import: expected {state: seeded|directory|recovered|root|cut}")
     if getattr(ctx, "dry_run", False):
         return "dry-run only; no filesystem observation"
     record = {"mode": mode, "state": state, "physicalOsGesture": False,

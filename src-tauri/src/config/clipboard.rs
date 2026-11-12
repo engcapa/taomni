@@ -4,6 +4,9 @@ use crate::state::AppState;
 use std::path::PathBuf;
 use tauri::State;
 
+#[path = "platform/file_clipboard.rs"]
+pub(super) mod file_clipboard;
+
 #[tauri::command]
 pub fn clipboard_read_text(state: State<'_, AppState>) -> Result<String, String> {
     #[cfg(target_os = "linux")]
@@ -188,11 +191,18 @@ pub fn clipboard_write_multi_format(payload: ClipboardMultiFormat) -> Result<(),
     }
 }
 
+/// Empty means a successful native read with no file-list format. Backend,
+/// permission and malformed/stale file errors reject the IPC; the legacy
+/// frontend readFiles wrapper may still turn those errors into an empty list.
 #[tauri::command]
-pub fn clipboard_read_files(state: State<'_, AppState>) -> Result<Vec<String>, String> {
+pub async fn clipboard_read_files(state: State<'_, AppState>) -> Result<Vec<String>, String> {
     let _ = state;
-    let native = platform::clipboard_read_files().unwrap_or_default();
-    Ok(native)
+    #[cfg(target_os = "linux")]
+    let paths = platform::clipboard_read_files().await?;
+    #[cfg(not(target_os = "linux"))]
+    let paths = platform::clipboard_read_files()?;
+    file_clipboard::validate_paths(&paths)?;
+    Ok(paths)
 }
 
 #[tauri::command]
@@ -205,14 +215,23 @@ pub fn clipboard_parse_file_paths(text: String) -> Result<Vec<String>, String> {
 }
 
 #[tauri::command]
-pub fn clipboard_write_files(paths: Vec<String>, state: State<'_, AppState>) -> Result<(), String> {
+pub async fn clipboard_write_files(
+    paths: Vec<String>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let _ = state;
+    file_clipboard::validate_paths(&paths)?;
     if paths.is_empty() {
         return Ok(());
     }
-    if platform::clipboard_write_files(&paths).is_ok() {
-        return Ok(());
+    // Only a real native file list is success. In particular, never call the
+    // shared text writer here: path text cannot be pasted as files by Explorer.
+    #[cfg(target_os = "linux")]
+    {
+        platform::clipboard_write_files(&paths).await
     }
-
-    let path_bufs: Vec<PathBuf> = paths.iter().map(PathBuf::from).collect();
-    clipboard_write_text(crate::rdp::cliprdr::paths_to_uri_list(&path_bufs), state)
+    #[cfg(not(target_os = "linux"))]
+    {
+        platform::clipboard_write_files(&paths)
+    }
 }

@@ -264,7 +264,19 @@ export function useWorkspaceFileOpening(context: UseWorkspaceFileOpeningContext)
     host?.onFolderOpened?.(root.id);
   }, [host?.onFolderOpened, project.toolWindowRouting.toolWindowLayoutRef]);
 
+  const importDroppedPaths = useWorkspaceDropImport({
+    workspaceId: session.workspaceInstanceId,
+    rootsRef: project.projectTree.rootsRef,
+    loadFlatFiles: project.projectTree.treeData.loadFlatFiles,
+    setExpandedRoots: project.uiActions.setExpandedRoots,
+    setExpandedDirs: project.uiActions.setExpandedDirs,
+    loadDir: project.projectTree.treeData.loadDir,
+    refreshPath: project.projectTree.treeData.refreshPath,
+    notifyGitChanged: project.gitSnapshotOwner.notifyWorkspacePathGitChanged,
+    onStatus: session.setStatusMessage,
+  });
   const fileActions = useWorkspaceFileActions({
+    importPaths: importDroppedPaths,
     onRootAdded,
     workspaceId: session.workspaceInstanceId,
     locationController: project.workspaceLocationControllerRef.current,
@@ -297,17 +309,6 @@ export function useWorkspaceFileOpening(context: UseWorkspaceFileOpeningContext)
     openFile,
     applyResourceOperation: applyFileActionResourceOperation,
     notifyWorkspacePathGitChanged: project.gitSnapshotOwner.notifyWorkspacePathGitChanged,
-    onStatus: session.setStatusMessage,
-  });
-  const importDroppedPaths = useWorkspaceDropImport({
-    workspaceId: session.workspaceInstanceId,
-    rootsRef: project.projectTree.rootsRef,
-    loadFlatFiles: project.projectTree.treeData.loadFlatFiles,
-    setExpandedRoots: project.uiActions.setExpandedRoots,
-    setExpandedDirs: project.uiActions.setExpandedDirs,
-    loadDir: project.projectTree.treeData.loadDir,
-    refreshPath: project.projectTree.treeData.refreshPath,
-    notifyGitChanged: project.gitSnapshotOwner.notifyWorkspacePathGitChanged,
     onStatus: session.setStatusMessage,
   });
   const treeInteractions = useWorkspaceTreeInteractions({

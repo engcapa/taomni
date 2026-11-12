@@ -7,6 +7,7 @@
 
 import { invoke } from "@tauri-apps/api/core";
 import { getAppPlatform, isTauriRuntime } from "./runtime";
+import { notifyClipboardWritten } from "./clipboardOwnership";
 
 export interface MultiFormatPayload {
   text: string;
@@ -125,12 +126,23 @@ export async function readText(): Promise<string> {
   return (await readTextResult()).text;
 }
 
-export async function readFiles(): Promise<string[]> {
+export type ClipboardFilesReadResult = { ok: true; paths: string[] } | { ok: false; message: string };
+
+export async function readFilesResult(): Promise<ClipboardFilesReadResult> {
   try {
-    return await invoke<string[]>("clipboard_read_files");
-  } catch {
-    return [];
+    const value = await invoke<unknown>("clipboard_read_files");
+    if (!Array.isArray(value) || !value.every((path) => typeof path === "string" && path.length > 0)) {
+      throw new Error("Native file clipboard returned an invalid payload");
+    }
+    return { ok: true, paths: value };
+  } catch (error) {
+    return { ok: false, message: error instanceof Error ? error.message : String(error) };
   }
+}
+
+export async function readFiles(): Promise<string[]> {
+  const result = await readFilesResult();
+  return result.ok ? result.paths : [];
 }
 
 export async function parseFilePaths(text: string): Promise<string[]> {
@@ -148,12 +160,14 @@ export async function parseFilePaths(text: string): Promise<string[]> {
 export async function writeFiles(paths: string[]): Promise<void> {
   if (paths.length === 0) return;
   await invoke("clipboard_write_files", { paths });
+  notifyClipboardWritten();
 }
 
 export async function writeText(text: string): Promise<void> {
   if (!text) return;
   try {
     await invoke("clipboard_write_text", { text });
+    notifyClipboardWritten();
     return;
   } catch {
     // Fallback to browser API (e.g. in dev mode without Tauri runtime).
@@ -161,21 +175,24 @@ export async function writeText(text: string): Promise<void> {
   if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
     try {
       await navigator.clipboard.writeText(text);
+      notifyClipboardWritten();
       return;
     } catch (err) {
-      if (fallbackCopyText(text)) return;
+      if (fallbackCopyText(text)) { notifyClipboardWritten(); return; }
       throw err;
     }
   }
   if (!fallbackCopyText(text)) {
     throw new Error("Clipboard not available");
   }
+  notifyClipboardWritten();
 }
 
 export async function writeMultiFormat(payload: MultiFormatPayload): Promise<void> {
   const { text, html, rtf } = payload;
   if (isTauriRuntime() && getAppPlatform() === "macos") {
     await invoke("clipboard_write_multi_format", { payload });
+    notifyClipboardWritten();
     return;
   }
   const hasItem = typeof ClipboardItem !== "undefined" && navigator.clipboard?.write;
@@ -190,6 +207,7 @@ export async function writeMultiFormat(payload: MultiFormatPayload): Promise<voi
     // RTF on the clipboard they should request the platform-specific path.
     try {
       await navigator.clipboard.write([new ClipboardItem(items)]);
+      notifyClipboardWritten();
       return;
     } catch {
       // Fall through to plain text.
@@ -204,6 +222,7 @@ export async function writeImagePng(blob: Blob): Promise<void> {
     throw new Error("Image clipboard not supported in this environment");
   }
   await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+  notifyClipboardWritten();
 }
 
 /**

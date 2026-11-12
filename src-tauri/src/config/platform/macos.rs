@@ -6,6 +6,10 @@ use std::process::Command;
 
 use super::clipboard::ClipboardMultiFormat;
 
+#[path = "macos_file_clipboard.rs"]
+mod file_clipboard;
+pub use file_clipboard::{clipboard_read_files, clipboard_write_files};
+
 const MAX_FORMAT_BYTES: usize = 16 * 1024 * 1024;
 const MAX_TOTAL_BYTES: usize = 32 * 1024 * 1024;
 
@@ -166,62 +170,6 @@ fn run_osascript(script: &str) -> Result<Option<String>, String> {
     } else {
         Err(format!("open file dialog: {}", stderr.trim()))
     }
-}
-
-pub fn clipboard_read_files() -> Result<Vec<String>, String> {
-    let script = r#"
-use framework "Foundation"
-use framework "AppKit"
-use scripting additions
-
-set pb to current application's NSPasteboard's generalPasteboard()
-set urls to pb's readObjectsForClasses:{current application's NSURL} options:(missing value)
-set paths to {}
-repeat with u in urls
-    if (u's isFileURL()) as boolean then
-        set end of paths to (u's |path|()) as text
-    end if
-end repeat
-set AppleScript's text item delimiters to linefeed
-return paths as text
-"#;
-    let output = Command::new("osascript")
-        .arg("-e")
-        .arg(script)
-        .output()
-        .map_err(|e| format!("macOS clipboard: {e}"))?;
-    if !output.status.success() {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        return Err(format!("macOS clipboard: {}", stderr.trim()));
-    }
-    Ok(String::from_utf8_lossy(&output.stdout)
-        .lines()
-        .map(|line| line.trim().to_string())
-        .filter(|line| !line.is_empty())
-        .collect())
-}
-
-pub fn clipboard_write_files(paths: &[String]) -> Result<(), String> {
-    if paths.is_empty() {
-        return Ok(());
-    }
-    if paths.len() > 256 {
-        return Err("macOS file clipboard accepts at most 256 paths".to_string());
-    }
-
-    let canonical = paths
-        .iter()
-        .map(|path| {
-            std::fs::canonicalize(path)
-                .map_err(|error| format!("macOS file clipboard '{}': {error}", path))
-        })
-        .collect::<Result<Vec<_>, _>>()?;
-    let mut clipboard =
-        arboard::Clipboard::new().map_err(|error| format!("macOS file clipboard init: {error}"))?;
-    clipboard
-        .set()
-        .file_list(&canonical)
-        .map_err(|error| format!("macOS file clipboard write: {error}"))
 }
 
 #[cfg(test)]

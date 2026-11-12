@@ -26,9 +26,15 @@ pub fn select_file_path(_current_path: Option<&str>) -> Result<Option<String>, S
 }
 
 pub fn clipboard_read_files() -> Result<Vec<String>, String> {
-    Ok(Vec::new())
+    Err(super::clipboard::file_clipboard::error(
+        "unsupported",
+        "native file clipboard is not supported on this platform",
+    ))
 }
 
 pub fn clipboard_write_files(_paths: &[String]) -> Result<(), String> {
-    Err("Native file clipboard is not supported on this platform".to_string())
+    Err(super::clipboard::file_clipboard::error(
+        "unsupported",
+        "native file clipboard is not supported on this platform",
+    ))
 }

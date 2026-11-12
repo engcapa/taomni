@@ -170,7 +170,7 @@ The testcase must separately assert the returned path and mounted directory.
 
 ## Workspace external-drop byte oracle
 
-`assert_workspace_drop_import: {state: seeded|directory|recovered|root}` is a
+`assert_workspace_drop_import: {state: seeded|directory|recovered|root|cut}` is a
 read-only assertion for the isolated `workspace_drop_import` fixture used by
 TC-WS-087 (browser) and TC-WS-088 (native). It independently compares the entire
 external source plus root1/root2 file SHA256 maps and directory sets, including
@@ -191,6 +191,24 @@ The fixture exposes `${fixture.workspace_drop_root1}`, `workspace_drop_root2`,
 `incoming` path; the source is outside both roots and contains Unicode/spaces,
 nested binary/text, an empty directory, distinct collision bytes and new retry
 files. Native retains all trees; browser owns a unique context-local VFS tree.
+
+## Workspace system file clipboard
+
+| Verb | Args | Evidence boundary |
+|---|---|---|
+| `file_clipboard` | `{action: seed\|assert, paths: string[]}` | Run-owned paths only. Browser uses `/src/stubs/fileClipboard.ts` memory list with VFS paths, never OS clipboard. Native seeds via Windows CF_HDROP, eager AppKit file-url items or a long-lived GTK owner offering BOTH `text/uri-list` and `x-special/gnome-copied-files`; assertion independently reads CF_HDROP/NSURL or actual Linux MIME bytes, never product `clipboard_read_files`. Exact paths plus every host file/directory hash are retained in `file-clipboard-observations.jsonl`; Linux owner is killed during native teardown. Empty list is a no-file negative. No text fallback or personal clipboard restoration/config mutation. This replaces the isolated QA desktop clipboard. |
+| `system_file_paste` | `{directory, paths: string[]}` | Native only. Requires the independent native file list to match `paths` and the target to be empty under the report root. Performs ONE real PCManFM-Qt X11 CtrlV (private DBus/XDG and owned PID/window/focus), Windows Shell FolderItem `InvokeVerb('paste')`, or Finder System Events Edit/Paste Item; then independently requires every copied SHA256 and empty directory. Never `shutil.copy`, `Copy-Item`, Finder duplicate or product import IPC. OS permission/tool/Paste-action failures remain failures in `system-file-paste.jsonl`. Closes only its owned file-manager window/process. Linux Wayland real file-manager Paste is an explicit manual gap and fails instead of silently using X11. |
+
+`workspace_file_clipboard` extends `workspace_drop_import` without changing
+TC-WS-087/088. TC-WS-089/090 use the same exact source/root hash oracle, plus
+latest-B and internal Cut phases (`root` means root2/latest B.txt; `cut` moves
+only root1/cut-retained.txt into root1/incoming). Native external destinations
+`${fixture.workspace_clipboard_external_file}` and
+`${fixture.workspace_clipboard_external_directory}` are empty, run-owned and
+outside the source/roots. Tree Copy/Paste/Cut still use production controls and
+CtrlC/V (Windows/Linux), CmdC/V (macOS) only with the tree focused. WebView keys
+do not establish OS shortcut delivery, AppKit menu-bar responder or IME behavior;
+those gaps stay explicit. All new UI cases are unrun until matching hosted receipts.
 
 ## ED-PARITY-005 controlled browser provider
 

@@ -18,6 +18,15 @@ def args(**overrides):
 
 
 class SelectionTests(unittest.TestCase):
+    def test_workspace_file_clipboard_selects_only_exact_modes_without_network_services(self):
+        plan = make_plan(args(scope="selected", case_ids="TC-WS-089,TC-WS-090"))
+        self.assertEqual(len(plan["entries"]), 6)
+        self.assertEqual(plan["gaps"], [])
+        for entry in plan["entries"]:
+            expected = "TC-WS-090" if entry["mode"] == "native" else "TC-WS-089"
+            self.assertEqual(entry["selected_ids"], [expected])
+            self.assertEqual(entry["capabilities"], ["display"] if entry["mode"] == "native" else [])
+
     def test_workspace_drop_cases_select_exact_modes_without_extra_services_or_dependencies(self):
         plan = make_plan(args(scope="selected", case_ids="TC-WS-087,TC-WS-088"))
         self.assertEqual(len(plan["entries"]), 6)

@@ -78,6 +78,6 @@ def load_tests(loader, suite, pattern):
     qa-ui-auto-entry and tool-contracts already select this module. No workflow
     conditions, platform scope or crash-regression selection need to change.
     """
-    for module in ("test_os_file_drag", "test_workspace_drop_import"):
+    for module in ("test_os_file_drag", "test_workspace_drop_import", "test_file_clipboard"):
         suite.addTests(loader.loadTestsFromName(module))
     return suite

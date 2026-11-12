@@ -91,6 +91,7 @@
           "workspace_ignored_ancestor_root",
           "workspace_explorer",
           "workspace_drop_import",
+          "workspace_file_clipboard",
           "workspace_search_large",
           "workspace_compact_tree",
           "workspace_hidden_entries",
@@ -543,6 +544,22 @@
         "drag_to": {
           "$ref": "#/$defs/drag_arg"
         },
+        "file_clipboard": {
+          "type": "object", "additionalProperties": false, "required": ["action", "paths"],
+          "properties": {
+            "action": {"enum": ["seed", "assert"]},
+            "paths": {"type": "array", "items": {"type": "string", "minLength": 1}}
+          },
+          "description": "Run-owned fixture file-list seed or exact read assertion. Browser uses only fileClipboard memory/VFS. Native uses independent Windows CF_HDROP, AppKit NSURL or Linux GTK MIME owner/readers, never product clipboard IPC. Retains formats, exact paths and host file hashes. Empty paths seeds/asserts a no-file clipboard."
+        },
+        "system_file_paste": {
+          "type": "object", "additionalProperties": false, "required": ["directory", "paths"],
+          "properties": {
+            "directory": {"type": "string", "minLength": 1},
+            "paths": {"type": "array", "minItems": 1, "items": {"type": "string", "minLength": 1}}
+          },
+          "description": "Native only. Real PCManFM-Qt X11 CtrlV, Windows Shell paste verb or Finder System Events Edit/Paste into an empty run-owned target. Independent SHA256/empty-directory validation; no host file-copy fallback. Permission/unreachable actions fail and retain evidence. Wayland real file-manager Paste remains an explicit gap."
+        },
         "os_file_drag": {
           "type": "object",
           "additionalProperties": false,
@@ -560,7 +577,7 @@
           "type": "object",
           "additionalProperties": false,
           "required": ["state"],
-          "properties": {"state": {"enum": ["seeded", "directory", "recovered", "root"]}},
+          "properties": {"state": {"enum": ["seeded", "directory", "recovered", "root", "cut"]}},
           "description": "Read-only exact SHA-256 and directory-set oracle for workspace_drop_import source and both roots. Browser reads only VFS; native independently re-reads retained host bytes. No IPC or product handler."
         },
         "drag_path": {

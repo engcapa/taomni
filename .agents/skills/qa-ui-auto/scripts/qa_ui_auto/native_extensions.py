@@ -23,3 +23,7 @@ def register(register_verb: RegisterVerb, verbs: dict[str, NativeVerb]) -> None:
     mobile(register_verb, verbs["terminal_input"])
     register_verb("os_file_drag")(os_file_drag)
     register_verb("assert_workspace_drop_import")(assert_workspace_drop_import)
+    from .file_clipboard import native as file_clipboard
+    from .system_file_paste import run as system_file_paste
+    register_verb("file_clipboard")(file_clipboard)
+    register_verb("system_file_paste")(system_file_paste)

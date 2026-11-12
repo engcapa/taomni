@@ -88,6 +88,17 @@ describe("buildAppMenuSpec", () => {
     ]);
   });
 
+  it("does not add a competing native accelerator for Project file clipboard actions", () => {
+    const spec = buildAppMenuSpec({ ...baseParams, workspaceCommands: [
+      { id: "workspace.tree.copy", title: "Copy File", category: "File", keybinding: "Meta+C", enabled: true },
+      { id: "workspace.tree.paste", title: "Paste Files", category: "File", keybinding: "Meta+V", enabled: true },
+    ] });
+    const items = flatten(submenu(spec, "tools").items).filter((node) => node.type === "item" && node.id.startsWith("workspace-command-workspace.tree."));
+    expect(items).toHaveLength(2);
+    expect(items.every((node) => node.type === "item" && node.accelerator === undefined)).toBe(true);
+    expect(submenu(spec, "edit").items.some((node) => node.type === "predefined" && node.item === "Paste")).toBe(true);
+  });
+
   it("includes a standard Window menu", () => {
     const spec = buildAppMenuSpec(baseParams);
     const win = submenu(spec, "window");
