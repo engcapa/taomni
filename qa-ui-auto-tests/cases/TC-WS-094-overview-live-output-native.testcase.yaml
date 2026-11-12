@@ -116,6 +116,14 @@ steps:
     selector: '[data-testid="workspace-tab"]'
     equal: 1
 - assert_no_runtime_errors: null
+- click: '[data-testid="tab-overview-trigger"]'
+- wait_for: '[data-testid="tab-overview-summary"]'
+- eval_readonly:
+    expression: document.querySelector('.taomni-overview-summary').scrollHeight - document.querySelector('.taomni-overview-summary').scrollTop - document.querySelector('.taomni-overview-summary').clientHeight < 2
+    expect_truthy: true
+    timeout_sec: 5
+- press: Escape
+- assert_not_visible: '[data-testid="tab-overview"]'
 verification:
   review: reviewed
   requirements:
@@ -172,6 +180,17 @@ verification:
     - step: 46
       expectation: No runtime errors occurred throughout live updates or navigation.
     results: [35, 36, 38, 39, 44, 45, 46]
+  - id: R4
+    requirement: Terminal preview follows the latest visible output even when wrapped command text exceeds the card height.
+    actions: [47, 50]
+    checkpoints:
+    - step: 48
+      expectation: The same terminal summary appears on reopening.
+    - step: 49
+      expectation: The summary viewport reaches its bottom rather than clipping the newest output.
+    - step: 51
+      expectation: Escape closes the overlay without changing session ownership.
+    results: [48, 49, 51]
   visual:
   - check: Output badges and highlighted borders are readable without obscuring preview text or moving cards.
     method: manual

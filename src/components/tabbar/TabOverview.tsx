@@ -10,6 +10,7 @@ import { useWorkspaceEditorStore } from "../../stores/workspaceEditorStore";
 import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
 import { filterOverviewItems, type PreviewItem } from "./overview/overviewModel";
 import { useTerminalPreviews } from "./overview/useTerminalPreviews";
+import { OverviewSummary } from "./overview/OverviewSummary";
 
 /** Mode-scoped, live text overview. Reading a preview never starts a session. */
 export function TabOverview() {
@@ -63,7 +64,7 @@ function OpenTabOverview() {
       const preview = previews.get(tab.id);
       items.push({ id: tab.id, title: tab.title, kind: detail.connectionLabel, group: t("platform.sessions"),
         endpoint: detail.endpoint ?? detail.cwd ?? "", summary: preview?.text || [detail.sessionLabel, detail.activityLabel].join("\n"),
-        active: mode === "sessions" && activeId === tab.id, outputActive: preview?.outputActive ?? false });
+        active: mode === "sessions" && activeId === tab.id, outputActive: preview?.outputActive ?? false, followLatest: !!preview?.text });
     }
   }
   if (all || mode === "workspaces") {
@@ -76,7 +77,7 @@ function OpenTabOverview() {
           endpoint: session?.host ?? tab.filePath ?? tab.focusPath ?? "",
           summary: preview?.text || doc?.text.slice(0, 1800) || [workspace.name, tab.filePath ?? session?.name ?? tab.title].join("\n"),
           active: mode === "workspaces" && workspace.id === activeWorkspaceId && tab.id === workspace.activeTabId,
-          outputActive: preview?.outputActive ?? false });
+          outputActive: preview?.outputActive ?? false, followLatest: !!preview?.text });
       }
     }
   }
@@ -130,7 +131,7 @@ function OpenTabOverview() {
           <span className="taomni-overview-card-header"><span className="taomni-overview-kind">{item.kind}</span><strong className="min-w-0 flex-1 truncate">{item.title}</strong>
             {item.outputActive && <span data-testid="tab-overview-output-badge" className="taomni-overview-output-badge"><Activity className="h-3 w-3" aria-hidden="true" />{t("platform.overviewNewOutput")}</span>}
             <span className="max-w-[45%] truncate text-[10px] text-[var(--taomni-text-muted)]">{item.endpoint}</span></span>
-          <pre data-testid="tab-overview-summary" className="taomni-overview-summary">{item.summary}</pre>
+          <OverviewSummary text={item.summary} followLatest={!!item.followLatest} />
           <span className="px-3 py-1 text-[10px] text-[var(--taomni-text-muted)]">{item.group}</span>
         </button>)}
       </div>

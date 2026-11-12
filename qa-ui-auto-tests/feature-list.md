@@ -258,6 +258,7 @@ files:
 - src/components/tabbar/TabDetailsOverlay.tsx
 - src/components/tabbar/TabOverview.tsx
 - src/components/tabbar/overview/overviewModel.ts
+- src/components/tabbar/overview/OverviewSummary.tsx
 - src/components/tabbar/overview/useTerminalPreviews.ts
 - src/lib/fuzzyMatch.ts
 - src/lib/terminal/terminalRegistry.ts

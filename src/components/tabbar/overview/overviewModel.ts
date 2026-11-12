@@ -10,6 +10,7 @@ export interface PreviewItem {
   summary: string;
   active: boolean;
   outputActive: boolean;
+  followLatest?: boolean;
 }
 
 /** Each query word may match a different field; activity never reorders cards. */

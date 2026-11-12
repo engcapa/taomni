@@ -73,9 +73,9 @@
 
 - 已实现 `TabOverview` 搜索/清空/count/no-match、Enter/IME/focus、静态新输出徽标；有界 preview observer 带 100ms batch、1s fallback、3s 活动过期与 registry identity guard；原 scorer 通过兼容 facade 复用。
 - 新 `TC-WS-093`：58 步 browser，覆盖 Workspaces/Home/Tools 的 fuzzy 标题/路径/dirty 内容、跨 scope、clear/no-match、Enter、重开 query reset 与原文档内容。
-- 新 `TC-WS-094`：46 步 native，Sessions/Workspaces 的真实 Python producer 每秒输出，overlay 打开时检查新输出行/徽标/不重排/搜索焦点/消退、原 PTY 继续执行。
+- 新 `TC-WS-094`：51 步 native（首轮为 46 步，后补 latest-line viewport 断言），Sessions/Workspaces 的真实 Python producer 每秒输出，overlay 打开时检查新输出行/徽标/不重排/搜索焦点/消退、原 PTY 继续执行。
 - 本地 exact Vitest 7 文件 37/37 passed（overview model/hook/UI、原 fuzzy/file search、registry、shortcut），`/tmp/taomni-overview-final-units.log`。相邻终端/viewport/toolbar 10 文件 147 passed / 1 existing skipped，`/tmp/taomni-overview-retained-units.log`。这两批有重叠，不相加虚报。
 - QA schema/audit/reviewed contracts、`tsc -b`、`check:refactor` 已通过。拟合批 selected IDs：`TC-WS-093,TC-WS-094,TC-WS-018,TC-WS-019,TC-WS-046` + 完整 `crash-regression`，三平台 browser/native QA release；native readiness/output 原生证明不能从本地 mock 继承。
 - 同步 Notes 修复最终 hosted `43270585278` 全绿：每平台 browser 10/10、native 11/11，无失败/skip/infrastructure，完整 crash 集合；不属于新 overview 功能通过证据。
 
-当前 hosted 结果待执行。不因实现或静态检查宣称新功能完成。不合并 PR 或自动关闭 issue。
+当前 hosted [43278551836](https://github.com/engcapa/taomni/actions/runs/43278551836)，head `e64d5d23`（product `f6d3a453`），三平台 browser/native release，`shards=1`，selected 包含上述目标/保留 case 与完整 crash 集合。Linux browser raw summary 已核对：11/11 passed、0 skip、identity stable；TC-WS-093 全 58 步通过，实际截图搜索 `RDM` 匹配唯一 README.md 并显示 dirty 文本、结果 count（artifact `qa-linux-browser-0f159bc7d0d441dd9770977569ab251f`，本地 `/tmp/taomni-overview-ci-43278551836-linux-browser-rEfMjF`）。Windows browser 同样 11/11 passed、0 skip、identity stable，TC-WS-093 通过，artifact `qa-windows-browser-0f159bc7d0d441dd9770977569ab251f`。macOS browser job 在 runner acquisition 阶段被取消（`runner_name=""`、`steps=[]`；annotation 明确 macOS ARM64 capacity constraints / job not acquired），未执行不计为 pass/fail。Linux native raw summary 14/14 passed（含原生 IME case），macOS native 13/13 passed，0 skip、identity stable；TC-WS-094 首轮全 46 步 passed。macOS 实际截图的实时徽标/稳定次序正常，但长 command wrap 可将新输出裁在卡片底部：补 `OverviewSummary` 仅终端自动 scroll 到最新行，文件 preview 仍在开头；新增 viewport mounted test 通过，native case 补 R4/51 步。Windows native 首轮仍运行；viewport 跟进需三端补跑，不能继承旧候选的执行结果。不因局部通过宣称全部新功能完成。不合并 PR 或自动关闭 issue。
