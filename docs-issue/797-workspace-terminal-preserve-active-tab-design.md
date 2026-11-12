@@ -8,7 +8,7 @@
 - 权威预期：issue 明确要求保留当前画布标签；会话型标签使用 workspace 底部终端；编辑器视图仍按原方式切换终端。
 - 平台：Windows/WebView2、Linux/WebKitGTK、macOS/WKWebView。此修复不改变原生 AppKit 菜单、系统快捷键或标题栏控件。
 - 本地仅执行单元测试与静态检查，不启动 browser/native 应用。通过 `gh` 在 GitHub `qa-ui-auto-platforms.yml` 运行三平台 browser/native，包含完整 `crash-regression` 集合。
-- 当前状态：设计可实施且核心实现完成；改前缺陷单测 6/6 失败、候选已通过，hosted 验收待执行。设计与静态检查不代表 UI/native 执行通过。
+- 当前状态：#797 功能验收已完成：改前缺陷单测 6/6 失败；候选 Terminal 新增 8 项与相邻回归通过；三平台 browser、61 步真实 PTY/返回编辑器路径和完整 crash 集合均有通过证据。相关 Notes Linux 准备步骤仍在单独补跑；macOS 取消 job 重跑造成的汇总 attempt 身份错误保留为基础设施缺口，不伪造绿灯。
 
 ## 2. 用户契约与验收
 
@@ -109,8 +109,17 @@
 ### 当前 hosted 证据（进行中）
 
 - 首轮 [Actions 43249483420](https://github.com/engcapa/taomni/actions/runs/43249483420)，候选 `e7af074e`，invocation `651ce36cb0f1413eaa387f95a636ed93`。三平台 browser 均实际执行 14 项：13 passed / 1 failed / 0 skipped。`TC-WS-091` 与所选工作区/编辑器/crash browser 用例全部通过；不能从 job `success` 推断所有 case 通过。
-- 唯一 browser 失败为同步修复的 `TC-NOTES-008` 新断言：CodeMirror 逐 `.cm-line` 渲染，容器 `textContent` 不含行间换行；已在 `f91df2c4` 改为完整有序行集合断言，不改产品预期。首轮原件保留，独立 browser 重跑为 [Actions 43252255037](https://github.com/engcapa/taomni/actions/runs/43252255037)。
-- 首轮三平台 native QA release 构建/执行待完成，不能将 browser 结果当真实 PTY 通过。本地 artifact 读取目录 `/tmp/taomni-797-ci-43249483420-*`；可从 Actions 下载原始 artifact 恢复。
+- 唯一 browser 失败为同步修复的 `TC-NOTES-008` 新断言：CodeMirror 逐 `.cm-line` 渲染，容器 `textContent` 不含行间换行；已在 `f91df2c4` 改为完整有序行集合断言，不改产品预期。首轮原件保留。browser-only 重跑 [Actions 43252255037](https://github.com/engcapa/taomni/actions/runs/43252255037) 在 planner 被强制合并的 native-only crash 用例拒绝，实际零执行，不能计为测试结果。
+- 当前完整重跑 [Actions 43254704251](https://github.com/engcapa/taomni/actions/runs/43254704251)，候选 `1274e150`，三平台 browser/native release，包含 Notes 断言修正及返回编辑器的一次点击 handoff（原始 PTY owner 保持不变）。尚待 case/receipt 验收。
+- 首轮 Linux 与 Windows native 各实际执行 16 项：15 passed / 1 failed / 0 skipped；`TC-WS-092` 的 53 步全部通过，包含上/下独立锚定输出、同一原 terminal 输出、隐藏恢复、关闭 Code Workspace 和跨工作区/Home 返回。两端所选 native crash 及编辑器终端移动/保留行为全部通过。唯一失败仍属 Notes 新用例（Linux 多行文本断言；Windows 窄窗 floating drawer 被 theme click 正常关闭）。macOS native 待完成。Linux native 上下终端截图已审阅，与实际独立输出一致。本地 artifact 目录 `/tmp/taomni-797-ci-43249483420-*`；可从 Actions 下载原始 artifact 恢复。
+- `1274e150` browser：Linux/Windows 各 14/14 passed；macOS 13 passed / 1 failed，`TC-WS-091` 最后立即读取 `aria-pressed` 先于 deferred rail projection，实际 dock 已关闭。`3dcda55d` 改为等待原本要求的 false 属性，不放宽结果。该轮 Linux producer 被无关 `ScreenshotFavorites` thumbnail revoke 单测时序失败阻断（716 文件通过、6492 tests passed；1 file/test failed、1 existing skipped）；相关产品文件没有改动，上一轮相同截图代码 gate 通过，不修改无关产品逻辑。
+- 当前补跑 [Actions 43259354937](https://github.com/engcapa/taomni/actions/runs/43259354937)，`73b889e8`，精确 `TC-WS-091/092`、`TC-NOTES-008` + 完整 `crash-regression`，三平台 browser/native release。三平台 browser 均已核对原始 summary，每端 11/11 passed、0 skip、identity stable；selection head 确认为 `73b889e8`、native_release=true、0 gap，各端 native 选中 12 项、browser 选中 11 项。该轮修正 Notes 先进入 Workspace 再点击 theme，遵循窄窗浮层的现有 outside-click 生命周期；native 待实际报告。
+- `43259354937` 的 macOS native shard 1/2 在分配 runner 前被 GitHub 取消：API 显示 `runner_name=""`、`steps=[]`；check annotation 明确 `The job was not acquired by Runner of type hosted even after multiple attempts`，附 macOS ARM64 capacity constraints。不能视为 case 失败或通过。补跑 [Actions 43264686026](https://github.com/engcapa/taomni/actions/runs/43264686026)，相同 `73b889e8`、macOS browser/native release、`shards=1`、相同目标 + crash 集合，减少 runner 容量需求，不修改 runner 类型或测试断言。
+- `43259354937` 的 macOS native shard 3/4 实际执行共 6/6 passed、0 skip，identity stable。当前 61 步 `TC-WS-092` 的 R1～R4 全部通过，含返回编辑器的一次点击恢复；`TC-WS-038/039/052/053/057` 均通过。artifact 为 `qa-macos-native-shard-{3,4}-d95b618342524e3ab47e567709f94bfe`。未执行 shard 仍须由单分片补跑补齐。
+- `43259354937` 的 Windows native 四个 shard 均已核对 raw summary/receipt：12/12 passed、0 failed/skip、identity stable，含全部 native crash 集合及 `TC-WS-092` R1～R4。Notes 的 74 步也通过并审阅原生亮/暗色选区截图。artifact 为 `qa-windows-native-shard-{1,2,3,4}-d95b618342524e3ab47e567709f94bfe`。Windows browser/native 本轮已全部通过。
+- `43264686026` 的单 macOS native job 再次在 runner acquisition 阶段被同一容量错误取消，steps 仍为空；`gh run rerun --job 131348381072` 后实际执行 12/12 passed、0 skip、identity stable，含 `TC-WS-092` 61 步全部通过及完整 native crash 集合。artifact `qa-macos-native-fc360641f559421c89f0b5f6b016f569`，本地 `/tmp/taomni-797-ci-43264686026-macos-native-J6q1Bi`。对应 Notes 原生亮/暗正反向及全选截图也已审阅。汇总仍失败，唯一 infrastructure 为 `execution selection/run identity differs`（重跑 attempt 与原 selection）；不改原 receipt，也不将其宣称整体绿灯。
+- `43259354937` 的 Linux producer 全量 frontend 单测 717 文件通过、6493 passed / 1 existing skipped（6494 total）；之前截图收藏清理的无关时序失败在未改其源码下通过。成功日志见 `build-log-native-build-linux-x64-release-d95b618342524e3ab47e567709f94bfe`。Linux native 12 项实际 11 passed / 1 failed / 0 skip，所有 #797 和 crash 用例通过，`TC-WS-092` R1～R4、61/61 步通过。唯一失败是 Notes 新用例的多行准备：driver 发 literal LF，真实 DOM 仅一行；`741dae97` 改用已有 contenteditable `fill`（真实 Enter chords），5 项工具单测通过，完整精确选区断言保持。
+- 至此 #797 目标及保留行为的三平台 browser/native 验收有实际通过证据；同步 Notes Linux 补跑为 [43270585278](https://github.com/engcapa/taomni/actions/runs/43270585278) / `741dae97`，三平台 browser/native、单分片、Notes + 完整 crash 集合，结果待收尾。没有将旧失败、取消或汇总身份错误抹成通过。
 
 macOS native bridge 的 DOM 按键只证明 WebView/xterm/PTY 输入链路，不证明物理键盘、AppKit accelerator 或系统 IME；本次未改这些边界。hosted macOS 15 ARM64 不覆盖 Intel 或所有支持版本。
 
