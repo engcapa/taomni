@@ -20,21 +20,32 @@ export function readOnlyExtension(readOnly: boolean): Extension {
 }
 
 
-export const WORKSPACE_EDITOR_STYLE = EditorView.theme({
-  "&": {
-    height: "100%",
-  },
-  ".cm-foldGutter .cm-gutterElement": {
-    minWidth: "1.6ch",
-    padding: "0 4px",
-    // ED-PARITY-011 DEC-011-06: IDEA shows fold markers on gutter hover only.
-    opacity: "0",
-    transition: "opacity 120ms",
-  },
-  ".cm-gutters:hover .cm-foldGutter .cm-gutterElement, .cm-foldGutter .cm-gutterElement:focus-within": {
-    opacity: "1",
-  },
-});
+export const WORKSPACE_EDITOR_STYLE: Extension = [
+  EditorView.editorAttributes.of((view) => ({
+    class: view.state.selection.ranges.some((range) => !range.empty) ? "cm-has-selection" : "",
+  })),
+  EditorView.theme({
+    "&": {
+      height: "100%",
+    },
+    // drawSelection paints below the content. An opaque active-line fill hides
+    // its head line in dark mode. Keep the caret highlight only without a range;
+    // the extra class also outranks an explicit appearance's active-line rule.
+    "&.cm-has-selection .cm-activeLine": {
+      backgroundColor: "transparent",
+    },
+    ".cm-foldGutter .cm-gutterElement": {
+      minWidth: "1.6ch",
+      padding: "0 4px",
+      // ED-PARITY-011 DEC-011-06: IDEA shows fold markers on gutter hover only.
+      opacity: "0",
+      transition: "opacity 120ms",
+    },
+    ".cm-gutters:hover .cm-foldGutter .cm-gutterElement, .cm-foldGutter .cm-gutterElement:focus-within": {
+      opacity: "1",
+    },
+  }),
+];
 
 
 export const LSP_EDITOR_STYLE = EditorView.theme({

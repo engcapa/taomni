@@ -5785,6 +5785,8 @@ controls:
 
 ### 15.1 Tao Notes（便签 / 备忘 / 任务）与统一 Tao Ribbon ✅
 
+`TC-NOTES-008` 除 caret/link 回归外，覆盖 Notes Workspace 在应用亮色/暗色主题下的跨行正反向选区、末行选区矩形与 active-line 遮挡、全选、替换/undo；高亮像素由对应截图人工审阅，不以 CSS 几何断言冒充视觉通过。
+
 <!-- feature
 id: F-TAO-1
 status: done
@@ -8800,6 +8802,7 @@ area: code-workspace/editor-shell
 components: [CodeWorkspaceTab, UndoWorkspaceEditConfirmDialog, WorkspaceTabPolicySettingsDialog, EditorGroup, HighlightingWidget, FileTreePane, TabSwitcher, Breadcrumbs, KeymapSettingsDialog, ClipboardHistoryPopup, ProjectFactsStatusBadge, TodosBookmarksPanel, EditorCompareDialog, LocalHistoryDialog, FileEncodingDialog, AutoImportSettingsDialog, AutoImportCandidateDialog, FileTemplateSettingsDialog, NewJavaClassDialog, RefactorRecoveryReviewDialog]
 files:
   - src/components/editor/workspace/CodeMirrorHost.tsx
+  - src/components/editor/workspace/host/appearance.ts
   - src/components/editor/workspace/views/WorkspaceShellView.tsx
   - src/components/editor/workspace/liveTemplates.ts
   - src/components/editor/workspace/editorSearchPanel.ts
