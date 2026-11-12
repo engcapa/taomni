@@ -237,6 +237,14 @@ html[data-app-theme="dark"] .taomni-main-window {
 .taomni-main-window .taomni-titlebar-actions-overflow .taomni-titlebar-tray-btn { height: 24px; width: 24px; border-radius: 5px; }
 .taomni-tab-overview { position: fixed; inset: 4px 6px 27px 42px; z-index: 9900; display: flex; flex-direction: column; overflow-y: auto; padding: 18px 24px; color: var(--taomni-text); background: color-mix(in srgb, var(--taomni-bg) 92%, transparent); backdrop-filter: blur(10px); }
 .taomni-overview-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; }
+.taomni-overview-search-row { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
+.taomni-overview-search { display: flex; flex: 1; min-width: 0; align-items: center; gap: 8px; border: 1px solid var(--taomni-card-border); border-radius: 6px; padding: 6px 10px; background: var(--taomni-card-bg); }
+.taomni-overview-search:focus-within { border-color: var(--taomni-accent); outline: 1px solid var(--taomni-accent); }
+.taomni-overview-search input { flex: 1; min-width: 0; outline: none; background: transparent; font-size: 12px; }
+.taomni-overview-search button { display: inline-flex; padding: 3px; border-radius: 4px; }
+.taomni-overview-search button:hover { background: var(--taomni-hover); }
+.taomni-overview-card[data-output-active="true"] { border-color: var(--taomni-success, #16a34a); box-shadow: inset 0 0 0 1px var(--taomni-success, #16a34a); }
+.taomni-overview-output-badge { display: inline-flex; flex-shrink: 0; align-items: center; gap: 3px; color: var(--taomni-success, #16a34a); border: 1px solid currentColor; border-radius: 4px; padding: 1px 4px; font-size: 10px; }
 .taomni-overview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 12px; }
 .taomni-overview-card { display: flex; min-width: 0; flex-direction: column; overflow: hidden; text-align: left; border: 1px solid var(--taomni-card-border); border-radius: 10px; background: var(--taomni-card-bg); }
 .taomni-overview-card:hover, .taomni-overview-card:focus-visible, .taomni-overview-card[data-active="true"] { border-color: var(--taomni-accent); outline-color: var(--taomni-accent); }

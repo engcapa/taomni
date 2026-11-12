@@ -7,6 +7,9 @@ TC-WS-090: []
 # Terminal rail regressions own their workspace/saved-record fixtures.
 TC-WS-091: []
 TC-WS-092: []
+# Overview cases own independent documents and local PTYs.
+TC-WS-093: []
+TC-WS-094: []
 TC-NOTES-008: []
 TC-WS-086: []
 TC-WS-084: []

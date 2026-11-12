@@ -244,6 +244,8 @@ controls: []
 
 ### 1.5 标签页系统 ✅
 
+Overview 大预览由各视图共用：`TC-WS-093/094` 覆盖名称/路径/协议/工作区/可见摘要的多词模糊搜索、清空/无结果、跨 scope 和 Enter 导航；运行中 session 解析后的输出实时批量更新，近期新输出显示静态徽标/边框且不自动重排卡片。关闭释放订阅和后备轮询；原文档 dirty、会话 owner 及侧栏偏好由原 TC-WS-018/019/046 保留回归。
+
 <!-- feature
 id: F1.5
 status: done
@@ -255,6 +257,11 @@ files:
 - src/components/tabbar/OpenTabsMenu.tsx
 - src/components/tabbar/TabDetailsOverlay.tsx
 - src/components/tabbar/TabOverview.tsx
+- src/components/tabbar/overview/overviewModel.ts
+- src/components/tabbar/overview/useTerminalPreviews.ts
+- src/lib/fuzzyMatch.ts
+- src/lib/terminal/terminalRegistry.ts
+- src/components/terminal/panel/useTerminalRegistry.ts
 - src/components/tabbar/PlatformToolbarActions.tsx
 - src/stores/tabOverviewStore.ts
 - src/lib/customDnD.ts
@@ -319,6 +326,18 @@ controls:
   kind: interactive
 - id: tab-overview-empty
   selector: '[data-testid="tab-overview-empty"]'
+  kind: display
+- id: tab-overview-search
+  selector: '[data-testid="tab-overview-search"]'
+  kind: interactive
+- id: tab-overview-search-clear
+  selector: '[data-testid="tab-overview-search-clear"]'
+  kind: interactive
+- id: tab-overview-results
+  selector: '[data-testid="tab-overview-results"]'
+  kind: display
+- id: tab-overview-output-badge
+  selector: '[data-testid="tab-overview-output-badge"]'
   kind: display
 - id: tab-details-overlay
   selector: '[data-testid="tab-details-overlay"]'
