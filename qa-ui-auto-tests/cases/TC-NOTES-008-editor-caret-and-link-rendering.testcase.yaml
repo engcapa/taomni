@@ -296,7 +296,7 @@ verification:
       expectation: The reverse range head is now on first line alpha.
     - step: 64
       expectation: The reverse selection head also has a transparent active-line fill.
-    results: [29, 34, 39, 40, 41, 42, 43, 46, 47, 49, 54, 55, 56, 57, 58, 62, 63, 64]
+    results: [31, 34, 39, 40, 41, 42, 43, 46, 47, 49, 54, 55, 56, 57, 58, 62, 63, 64]
   - id: R3
     requirement: Replacing the range removes all selected lines including the final line but retains the tail;
       undo restores the entire document and Select All includes its last line without an active-line occluder.
