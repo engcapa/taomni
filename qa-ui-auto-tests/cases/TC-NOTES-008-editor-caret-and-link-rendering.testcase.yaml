@@ -91,13 +91,13 @@ steps:
       second line 中文
       final selected line
       unselected tail
-- assert_text_equals:
-    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"] .cm-content'
-    equals: |-
-      first line alpha
-      second line 中文
-      final selected line
-      unselected tail
+- assert_items:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - first line alpha
+    - second line 中文
+    - final selected line
+    - unselected tail
 - press:
     key: Mod+Home
     macos_key: Meta+ArrowUp
@@ -180,19 +180,19 @@ steps:
 - type:
     selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"] .cm-content'
     text: replacement
-- assert_text_equals:
-    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"] .cm-content'
-    equals: |-
-      replacement
-      unselected tail
+- assert_items:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - replacement
+    - unselected tail
 - press: Mod+Z
-- assert_text_equals:
-    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"] .cm-content'
-    equals: |-
-      first line alpha
-      second line 中文
-      final selected line
-      unselected tail
+- assert_items:
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"] .cm-content .cm-line'
+    equals:
+    - first line alpha
+    - second line 中文
+    - final selected line
+    - unselected tail
 - press: Mod+A
 - eval_readonly:
     expression: window.getSelection()?.toString() === "first line alpha\nsecond line 中文\nfinal selected line\nunselected tail"
