@@ -65,6 +65,16 @@ steps:
     regex: (?m)^QA_797_BOTTOM_AFTER_MOVE\s*$
     timeout_sec: 30
 - screenshot: workspace-terminal-native-upper-and-lower.png
+- click: '[data-testid="workspace-tab"][data-tab-kind="code"]'
+- click: '[data-testid="sidebar-tool-window-rail"] [data-testid="code-workspace-bottom-tab-terminal"]'
+- wait_for: '[data-testid="code-workspace-bottom-dock"][data-open] [data-testid="terminal-pane"][data-terminal-ready="true"]'
+- assert_pattern:
+    selector: '[data-testid="code-workspace-bottom-dock"] [data-testid="terminal-pane"]'
+    regex: (?m)^QA_797_BOTTOM_AFTER_MOVE\s*$
+- assert_not_visible: '[data-testid="workspace-bottom-dock"]'
+- click: '[data-testid="workspace-tab"][data-tab-kind="terminal"]'
+- click: '[data-testid="sidebar-tool-window-rail"] [data-testid="code-workspace-bottom-tab-terminal"]'
+- wait_for: '[data-testid="workspace-bottom-dock"] [data-testid="terminal-pane"][data-terminal-ready="true"]'
 - click: '[data-testid="workspace-dock-close"]'
 - assert_not_visible: '[data-testid="workspace-bottom-dock"]'
 - click: '[data-testid="workspace-tab"][data-tab-kind="code"] [data-testid="workspace-tab-close"]'
@@ -142,42 +152,55 @@ verification:
     results: [11, 16, 19, 20, 21, 22, 24]
   - id: R2
     requirement: Hide/show with Code Workspace closed and workspace navigation retain the same terminal content without creating Code Workspace.
-    actions: [26, 28, 29, 33, 34, 36, 37]
+    actions: [34, 36, 37, 41, 42, 44, 45]
     checkpoints:
-    - step: 27
-      expectation: Closing the bottom dock hides its content.
-    - step: 30
-      expectation: Reopening after Code Workspace close retains existing bottom output.
-    - step: 31
-      expectation: Code Workspace stays absent.
-    - step: 32
-      expectation: The upper shell stays selected.
     - step: 35
-      expectation: The second workspace does not inherit the first workspace dock.
+      expectation: Closing the bottom dock hides its content.
     - step: 38
-      expectation: Returning restores the first workspace dock.
+      expectation: Reopening after Code Workspace close retains existing bottom output.
     - step: 39
+      expectation: Code Workspace stays absent.
+    - step: 40
+      expectation: The upper shell stays selected.
+    - step: 43
+      expectation: The second workspace does not inherit the first workspace dock.
+    - step: 46
+      expectation: Returning restores the first workspace dock.
+    - step: 47
       expectation: The original lower terminal output remains.
-    results: [27, 30, 31, 32, 35, 38, 39]
+    results: [35, 38, 39, 40, 43, 46, 47]
   - id: R3
     requirement: Returning through Home leaves both real PTYs usable, isolated and bounded, and rail toggle does not hide the upper shell.
-    actions: [40, 42, 44, 46, 50]
+    actions: [48, 50, 52, 54, 58]
     checkpoints:
-    - step: 45
-      expectation: The restored lower terminal executes a new command, not merely a command echo.
-    - step: 47
-      expectation: The upper shell also continues executing.
-    - step: 48
-      expectation: Only the original two terminal panels exist.
-    - step: 49
-      expectation: No workspace tab has been recreated.
-    - step: 51
-      expectation: Rail toggle hides the external dock.
-    - step: 52
-      expectation: The upper shell remains visible.
     - step: 53
+      expectation: The restored lower terminal executes a new command, not merely a command echo.
+    - step: 55
+      expectation: The upper shell also continues executing.
+    - step: 56
+      expectation: Only the original two terminal panels exist.
+    - step: 57
+      expectation: No workspace tab has been recreated.
+    - step: 59
+      expectation: Rail toggle hides the external dock.
+    - step: 60
+      expectation: The upper shell remains visible.
+    - step: 61
       expectation: No uncaught runtime error occurs throughout the case.
-    results: [45, 47, 48, 49, 51, 52, 53]
+    results: [53, 55, 56, 57, 59, 60, 61]
+  - id: R4
+    requirement: Returning to the editor restores its original Terminal toggle with one click and the same retained output; returning to the session keeps the upper shell selected.
+    actions: [26, 27, 31, 32]
+    checkpoints:
+    - step: 28
+      expectation: One rail click reopens the editor's internal terminal dock.
+    - step: 29
+      expectation: The original lower-terminal output remains in the editor dock.
+    - step: 30
+      expectation: The external workspace dock no longer duplicates the editor terminal.
+    - step: 33
+      expectation: The same terminal returns below the upper shell when requested from its rail.
+    results: [28, 29, 30, 33]
   visual:
   - check: Upper session and lower terminal have distinct usable content bounds.
     method: manual

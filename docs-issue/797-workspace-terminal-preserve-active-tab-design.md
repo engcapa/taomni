@@ -87,7 +87,7 @@
 | --- | --- | --- | --- | --- |
 | V-01 | 状态路由、当前标签、dock owner、挂载/隐藏恢复 | `WorkspaceTerminalRouting.test.tsx` 8 项 + 相邻 mounted/unit | 六项缺陷回归全部复现切到 code；保留行为基线见下 | 8 文件 99/99 通过（`/tmp/taomni-797-final-units.log`） |
 | V-02 | 实际 rail → 画布流程、会话/编辑器路径、关闭 Code Workspace 后不重建 | 新增 `TC-WS-091` browser；48 步，covers F-WS-1/F-WS-2/F-WS-5/F25.5 | UI 改前未执行 | YAML/contract/selection 有效；hosted 待执行 |
-| V-03 | 真实 PTY 生命周期、独立上下输出、隐藏/重开及工作区隔离 | 新增 `TC-WS-092` native；53 步，三平台 | UI 改前未执行 | YAML/contract/selection 有效；hosted 待执行 |
+| V-03 | 真实 PTY 生命周期、独立上下输出、隐藏/重开及工作区隔离 | 新增 `TC-WS-092` native；61 步（补充返回编辑器的一次点击恢复），三平台 | UI 改前未执行 | YAML/contract/selection 有效；hosted 待执行 |
 | V-04 | 受影响既有编辑器 Terminal 与文档生命周期 | `TC-IDE-PARITY-010-01`、`TC-IDE-PARITY-010-04-tool-windows-native`、`TC-WS-017`；完整 `crash-regression` 由 hosted 合并 | 下方相关单测通过；UI 未执行 | 待执行 |
 | V-05 | 类型、模块边界、QA case/catalog | `pnpm exec tsc -b`、`pnpm check:refactor`、QA audit/contract/selected plan | QA audit 基线通过；这些检查不证明 UI 或 PTY | TypeScript、refactor、audit gates 和新增两 case 的 reviewed contract 有效；全库 contracts 存在 32 项无关旧缺口（非本次新增），未修订其状态 |
 
@@ -106,7 +106,13 @@
 5. 下载 invocation 对应 `selection.json`、`ci-summary.json`、每组 raw summary/receipt、构建身份与日志；查看新 case、相邻 case 和完整 crash 集合的通过/失败/skip。环境缺失、skip、未产生证据均不是通过。
 6. 保留截图用于查看上下布局、命中和内容；不把 screenshot 成功等同于视觉评审完成。
 
-当前三平台状态均为待执行。macOS native bridge 的 DOM 按键只证明 WebView/xterm/PTY 输入链路，不证明物理键盘、AppKit accelerator 或系统 IME；本次未改这些边界。hosted macOS 15 ARM64 不覆盖 Intel 或所有支持版本。
+### 当前 hosted 证据（进行中）
+
+- 首轮 [Actions 43249483420](https://github.com/engcapa/taomni/actions/runs/43249483420)，候选 `e7af074e`，invocation `651ce36cb0f1413eaa387f95a636ed93`。三平台 browser 均实际执行 14 项：13 passed / 1 failed / 0 skipped。`TC-WS-091` 与所选工作区/编辑器/crash browser 用例全部通过；不能从 job `success` 推断所有 case 通过。
+- 唯一 browser 失败为同步修复的 `TC-NOTES-008` 新断言：CodeMirror 逐 `.cm-line` 渲染，容器 `textContent` 不含行间换行；已在 `f91df2c4` 改为完整有序行集合断言，不改产品预期。首轮原件保留，独立 browser 重跑为 [Actions 43252255037](https://github.com/engcapa/taomni/actions/runs/43252255037)。
+- 首轮三平台 native QA release 构建/执行待完成，不能将 browser 结果当真实 PTY 通过。本地 artifact 读取目录 `/tmp/taomni-797-ci-43249483420-*`；可从 Actions 下载原始 artifact 恢复。
+
+macOS native bridge 的 DOM 按键只证明 WebView/xterm/PTY 输入链路，不证明物理键盘、AppKit accelerator 或系统 IME；本次未改这些边界。hosted macOS 15 ARM64 不覆盖 Intel 或所有支持版本。
 
 ## 8. 收尾、风险与回退
 

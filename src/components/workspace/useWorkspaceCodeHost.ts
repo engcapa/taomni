@@ -35,7 +35,12 @@ export function useWorkspaceCodeHost(workspace: PlatformWorkspace, visible: bool
     if (!current || app.activeSideTab !== "workspaces" || store.activeWorkspaceId !== current.id) return true;
     const selected = current.openTabs.find((tab) => tab.id === current.activeTabId);
     const dock = current.bottomDock;
-    if (!dock.open && (!selected || selected.kind === "file" || selected.kind === "code")) return false;
+    if (!selected || selected.kind === "file" || selected.kind === "code") {
+      // Returning to an editor keeps its original toggle semantics; hand the
+      // same terminal node back instead of requiring an extra click to hide it.
+      if (dock.open) store.setBottomDockOpen(current.id, false);
+      return false;
+    }
     if (dock.open && dock.activeTool === "terminal") store.setBottomDockOpen(current.id, false);
     else store.setBottomDockTool(current.id, "terminal");
     return true;

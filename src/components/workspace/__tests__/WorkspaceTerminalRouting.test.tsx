@@ -168,8 +168,9 @@ describe("workspace Terminal rail routing (#797)", () => {
     expect(terminal).toBeVisible();
     act(() => platform.setActiveWorkspaceTab(DEFAULT_WORKSPACE_ID, code.id));
     fireEvent.click(railTerminal());
-    fireEvent.click(railTerminal());
     expect(screen.getByTestId("test-terminal")).toBe(terminal);
+    expect(screen.getByTestId("code-workspace-bottom-dock")).toContainElement(terminal);
+    expect(terminal).toBeVisible();
     expect(terminal).toHaveTextContent("output");
     expect(terminals.started).toHaveBeenCalledTimes(1);
     expect(terminals.stopped).not.toHaveBeenCalled();
