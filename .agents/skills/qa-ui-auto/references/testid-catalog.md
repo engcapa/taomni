@@ -1120,6 +1120,10 @@
 
 ## files/explorer (F-EXPLORER-1)
 
+- `[data-testid="context-menu-item-file-explorer"]` — interactive — F-EXPLORER-1.explorer-main-menu-entry
+- `[data-testid="explorer-delete-dialog"]` — display — F-EXPLORER-1.explorer-delete-dialog
+- `[data-testid="explorer-properties-dialog"]` — display — F-EXPLORER-1.explorer-properties-dialog
+- `[data-testid="explorer-toast"].error` — display — F-EXPLORER-1.explorer-toast-error
 - `[data-testid="code-workspace-tool-rail-explorer"]` — interactive — F-EXPLORER-1.code-workspace-tool-rail-explorer
 - `[data-testid="code-workspace-tree-open-explorer"]` — interactive — F-EXPLORER-1.code-workspace-tree-open-explorer
 - `[data-testid="code-workspace-tree-open-explorer-new"]` — interactive — F-EXPLORER-1.code-workspace-tree-open-explorer-new

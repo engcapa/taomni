@@ -14427,6 +14427,18 @@ files:
   - src/stores/workspaceExplorerActions.ts
   - src-tauri/src/filebrowser/local_ops/mod.rs
 controls:
+  - id: explorer-main-menu-entry
+    selector: '[data-testid="context-menu-item-file-explorer"]'
+    kind: interactive
+  - id: explorer-delete-dialog
+    selector: '[data-testid="explorer-delete-dialog"]'
+    kind: display
+  - id: explorer-properties-dialog
+    selector: '[data-testid="explorer-properties-dialog"]'
+    kind: display
+  - id: explorer-toast-error
+    selector: '[data-testid="explorer-toast"].error'
+    kind: display
   - id: code-workspace-tool-rail-explorer
     selector: '[data-testid="code-workspace-tool-rail-explorer"]'
     kind: interactive
