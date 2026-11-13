@@ -12,6 +12,7 @@ export const RECOVERY_LIMITATIONS: Record<TabKind, string> = {
   settings: "已保存设置仍可在正常启动时读取；未提交设置可能丢失，不以空白默认值覆盖。",
   placeholder: "此页面的临时状态未恢复，不触发占位工具或外部操作。",
   "file-browser": "已保存文件保留；未保存编辑、目录选择和传输进度可能丢失，不重做删除、移动或覆盖。",
+  "file-viewer": "已保存文件保留；恢复草稿后需核对磁盘版本，不静默覆盖外部修改，远程只读副本不恢复。",
   database: "查询、事务和写入结果未知；不重发 SQL、COMMIT、ROLLBACK，也不为重挂载断开旧连接。",
   redis: "连接和命令结果未知；不重复执行 Redis 命令或恢复订阅副作用。",
   "hbase-shell": "HBase 是 HTTP REST 客户端，不是 PTY；不重发 put、delete 或查询。",

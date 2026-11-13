@@ -15,6 +15,8 @@ import {
 } from "../../../lib/editor/workspace";
 import { gitIgnorePath } from "../../../lib/git";
 import { selectFilePath, selectFolderPath } from "../../../lib/ipc";
+import { classifyFile, openFile as openSharedFile } from "../../../lib/openFile";
+import { fileOpenWorkspaceId } from "../../../lib/fileOpenContext";
 import type {
   CodeWorkspaceFileRef,
   CodeWorkspaceLooseFileInfo,
@@ -202,6 +204,10 @@ export function useWorkspaceFileActions({
 
   const addLooseFilePath = useCallback(async (path: string) => {
     if (!path) return;
+    if (classifyFile(path) !== "source") {
+      await openSharedFile({ path }, { context: "workspace-file", workspaceId: fileOpenWorkspaceId(workspaceId) });
+      return;
+    }
     const file = makeLooseFile(path);
     setLooseFiles((current) => (
       current.some((item) => item.path === file.path) ? current : [...current, file]
@@ -209,7 +215,7 @@ export function useWorkspaceFileActions({
     const ref: CodeWorkspaceFileRef = { kind: "loose", id: file.id, path: file.path };
     setSelected({ kind: "file", ref });
     await openFile(ref);
-  }, [openFile, setLooseFiles, setSelected]);
+  }, [openFile, setLooseFiles, setSelected, workspaceId]);
 
   const openLooseFile = useCallback(async () => {
     const path = await selectFilePath();
@@ -613,6 +619,7 @@ export function useWorkspaceFileActions({
     if (!root) return;
     const absolute = path ? absoluteWorkspacePath(root, path) : normalizeFsPath(root.path);
     try {
+      // Explicit Reveal stays a file-manager action, independent of associations.
       await invoke("sftp_open_path", { path: absolute });
       onStatus(`Opened ${absolute}`);
     } catch (error) {

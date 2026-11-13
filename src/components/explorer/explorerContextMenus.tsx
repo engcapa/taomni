@@ -3,15 +3,17 @@ import { effectiveFileType, type FileEntry } from "../../lib/sftp";
 import { getAppPlatform } from "../../lib/runtime";
 import type { MenuItem } from "../ContextMenu";
 import type { ExplorerOperations } from "./useExplorerOperations";
+import { fileOpenMenu } from "./fileOpenMenu";
 
 type Label = (zh: string, en: string) => string;
 export function explorerItemMenu(entries: FileEntry[], path: string, operations: ExplorerOperations, label: Label,
-  openExplorer: (path: string, forceNew?: boolean) => void, terminal: (path: string) => void): MenuItem[] {
+  openExplorer: (path: string, forceNew?: boolean) => void, terminal: (path: string) => void, workspaceId?: string): MenuItem[] {
   const first = entries[0];
   const multi = entries.length !== 1;
   const directory = !multi && effectiveFileType(first) === "dir";
   const mod = getAppPlatform() === "macos" ? "⌘" : "Ctrl+";
   return [
+    ...(!multi && !directory ? [{ label: label("打开方式", "Open with"), testId: "explorer-context-open-with", children: fileOpenMenu(first.path, workspaceId, label, (message) => operations.notify(message, true)) }] : []),
     { label: label("打开", "Open"), testId: "explorer-context-open", icon: <ExternalLink />, shortcut: "Enter", onClick: () => { for (const entry of entries) void operations.open(entry); } },
     ...(directory ? [{ label: label("在新的 Explorer 标签中打开", "Open in new Explorer tab"), testId: "explorer-context-newtab", icon: <ExternalLink />, onClick: () => openExplorer(first.path, true) }] : []),
     { label: label("在终端中打开", "Open in terminal"), testId: "explorer-context-terminal", icon: <Terminal />, onClick: () => terminal(directory ? first.path : path) },

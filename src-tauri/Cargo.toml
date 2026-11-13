@@ -52,6 +52,9 @@ cc = "1"
 # Tauri 2.12 uses Tao 0.37: older Windows keyboard/IME handling can deadlock
 # on reentrant focus messages during an RDP session switch (tao#1194/#1349).
 tauri = { version = "2.12.0", features = ["protocol-asset", "unstable", "macos-private-api"] }
+# Reuse Tauri's bundled HTML parser to inject the restricted preview bridge
+# before author scripts, without fragile string/regex HTML rewriting.
+tauri-utils = { version = "2.10.1", features = ["html-manipulation-2"] }
 tauri-plugin-log = "2"
 # In-app auto-update: pull signed bundles from GitHub Releases (see
 # claudedocs/auto-update-plan.md). `process` provides relaunch() after install.

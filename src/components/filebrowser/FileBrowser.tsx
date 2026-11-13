@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { useT } from "../../lib/i18n";
+import { openFile } from "../../lib/openFile";
 import { effectiveFileType, type FileEntry, type FsSide } from "../../lib/sftp";
 import { useSftpController } from "../../lib/sftpController";
 import { loadSftpPreferences } from "../../lib/sftpPreferences";
@@ -68,7 +69,7 @@ export function FileBrowser(props: FileBrowserProps) {
         return;
       }
       if (side === "remote") {
-        setDownloadPrompt(entry);
+        await controller.download(entry, "", { openAfter: true });
         return;
       }
       // Local file: open or upload based on global SFTP preference (default: open).
@@ -80,8 +81,7 @@ export function FileBrowser(props: FileBrowserProps) {
         return;
       }
       try {
-        const { sftpOpenPath } = await import("../../lib/sftp");
-        await sftpOpenPath(entry.path);
+        await openFile({ path: entry.path }, { context: "sftp-local" });
       } catch (err) {
         setStatus(t("fileBrowser.statusFailedToOpen", { name: entry.name, error: String(err) }));
       }
@@ -109,14 +109,13 @@ export function FileBrowser(props: FileBrowserProps) {
 
   const handleOpenLocal = useCallback(
     async (entries: FileEntry[]) => {
-      const { sftpOpenPath } = await import("../../lib/sftp");
       for (const entry of entries) {
         if (effectiveFileType(entry) === "dir") {
           await navigate(props.sessionId, "local", entry.path);
           return;
         }
         try {
-          await sftpOpenPath(entry.path);
+          await openFile({ path: entry.path }, { context: "sftp-local" });
         } catch (err) {
           setStatus(t("fileBrowser.statusFailedToOpen", { name: entry.name, error: String(err) }));
         }

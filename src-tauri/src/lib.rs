@@ -51,6 +51,7 @@ mod test_results;
 mod tunnel;
 mod update;
 pub mod vault;
+mod viewer;
 mod vnc;
 /// The VNC special-key hook helper process (`taomni --vnc-special-key-hook <pid>`).
 #[cfg(windows)]
@@ -166,7 +167,7 @@ pub fn run() {
     let context = tauri::generate_context!();
     #[cfg(target_os = "linux")]
     screenshot::shortcut::prepare_portal_identity(&context.config().identifier);
-    let builder = tauri::Builder::default();
+    let builder = viewer::register_protocol(tauri::Builder::default());
     #[cfg(target_os = "macos")]
     let builder = builder.on_web_content_process_terminate(|webview| {
         webview_recovery::terminated(webview.app_handle(), webview.label(), "renderer-exited");
@@ -541,6 +542,7 @@ pub fn run() {
             // WinDivert driver) so no elevated process/driver leaks. The
             // helper's parent-death watchdog covers crash/kill paths.
             if let tauri::RunEvent::Exit = event {
+                viewer::shutdown();
                 screenshot::shutdown();
                 let state = app_handle.state::<AppState>();
                 tauri::async_runtime::block_on(async {

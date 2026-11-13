@@ -29,3 +29,5 @@ def register(register_verb: RegisterVerb, verbs: dict[str, NativeVerb]) -> None:
     register_verb("system_file_paste")(system_file_paste)
     from .explorer_observation import native as assert_explorer_files
     register_verb("assert_explorer_files")(assert_explorer_files)
+    from .file_open_observation import native as assert_file_open_bytes
+    register_verb("assert_file_open_bytes")(assert_file_open_bytes)

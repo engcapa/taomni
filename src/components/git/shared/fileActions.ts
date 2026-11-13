@@ -1,6 +1,8 @@
 import { invoke } from "@tauri-apps/api/core";
 import { writeText } from "../../../lib/clipboard";
 import { loadTerminalDefaultProfile } from "../../../lib/terminalProfile";
+import { openFile } from "../../../lib/openFile";
+import { getLocale } from "../../../lib/i18n";
 import { useAppStore } from "../../../stores/appStore";
 import { useWorkspacePlatformStore } from "../../../stores/workspacePlatformStore";
 import type { MenuItem } from "../../ContextMenu";
@@ -47,7 +49,7 @@ export function gitFileMenuItems(
   contextTarget: GitFileTarget | undefined = targets[0],
 ): MenuItem[] {
   const disabled = targets.length === 0;
-  const run = (action: () => void | Promise<void>, message: string) => {
+  const run = (action: () => unknown | Promise<unknown>, message: string) => {
     void Promise.resolve().then(action).then(() => {
       useAppStore.getState().setStatusMessage(message);
     }).catch((error: unknown) => {
@@ -56,6 +58,15 @@ export function gitFileMenuItems(
   };
   const directory = contextTarget ? fileDirectory(contextTarget) : "";
   return [
+    {
+      label: getLocale().startsWith("zh") ? "预览此文件" : "Preview file",
+      testId: "git-file-preview",
+      disabled: !contextTarget,
+      onClick: () => run(() => openFile({ path: gitFileAbsolutePath(contextTarget!) }, {
+        context: "git", mode: "taomni", workspaceId: useAppStore.getState().activeSideTab === "workspaces"
+          ? useWorkspacePlatformStore.getState().activeWorkspaceId : undefined,
+      }), "Opened file preview"),
+    },
     {
       label: targets.length > 1 ? `Copy paths (${targets.length})` : "Copy Path",
       testId: "git-file-copy-path",

@@ -1,5 +1,8 @@
 import { useState } from "react";
-import { Settings, X } from "lucide-react";
+import { ChevronDown, Pencil, Settings, X } from "lucide-react";
+import { HtmlThumbnail } from "./HtmlThumbnail";
+import { fileOpenMenu } from "../fileOpenMenu";
+import { openFile, classifyFile, supportsFileViewer } from "../../../lib/openFile";
 import { writeText } from "../../../lib/clipboard";
 import { basename, formatBytes, sftpOpenPath, type FileEntry } from "../../../lib/sftp";
 import { useContextMenu } from "../../ContextMenu";
@@ -14,16 +17,18 @@ export interface ExplorerPreviewPaneProps {
   entries: FileEntry[];
   currentPath: string;
   tabId: string;
+  workspaceId?: string;
   onOpen: (entry: FileEntry) => void;
   onClose: () => void;
 }
 
-export function ExplorerPreviewPane({ entries, currentPath, tabId, onOpen, onClose }: ExplorerPreviewPaneProps) {
+export function ExplorerPreviewPane({ entries, currentPath, tabId, workspaceId, onOpen, onClose }: ExplorerPreviewPaneProps) {
   const label = useExplorerLabels();
   const preferences = useExplorerPreferences();
   const preview = useExplorerPreview(entries, currentPath, tabId);
   const menu = useContextMenu();
   const [actionError, setActionError] = useState<{ key: string; message: string } | null>(null);
+  const [imageDimensions, setImageDimensions] = useState<{ key: string; width: number; height: number } | null>(null);
   const entry = entries.length === 1 ? entries[0] : undefined;
   const properties = preview.properties?.[0];
   const displayedSize = entries.reduce((sum, item) => {
@@ -66,7 +71,7 @@ export function ExplorerPreviewPane({ entries, currentPath, tabId, onOpen, onClo
           ? "CSV"
           : preview.kind === "image" || preview.kind === "too-large"
             ? label("图片", "Image")
-            : label("文件", "File");
+            : preview.kind === "html" ? "HTML" : label("文件", "File");
 
   return (
     <aside
@@ -106,29 +111,35 @@ export function ExplorerPreviewPane({ entries, currentPath, tabId, onOpen, onClo
           <>
             <div className="ex-pv-summary" data-testid="explorer-preview-metadata">
               <div className="ex-pv-hero"><ExplorerFileIcon entry={entry} className="ex-pv-hero-icon" /><div><div className="ex-pv-name">{entry.name}</div><div className="ex-pv-type">{typeLabel}</div></div></div>
-              <dl className="ex-pv-meta">
-                <dt>{label("大小", "Size")}</dt><dd>{entry.fileType === "dir" ? `${directorySize === undefined ? "—" : `${lowerBound ? "≥ " : ""}${formatBytes(directorySize)}`} · ${properties?.itemCount ?? "—"} ${label("项", "items")}` : formatBytes(entry.size)}</dd>
-                <dt>{label("修改日期", "Modified")}</dt><dd>{entry.mtime ? new Date(entry.mtime * 1000).toLocaleString() : "—"}</dd>
-                <dt>{label("位置", "Location")}</dt><dd className="ex-pv-location">{currentPath}</dd>
-                {entry.symlinkTarget && <><dt>{label("链接目标", "Link target")}</dt><dd className="ex-pv-location">{entry.symlinkTarget}</dd></>}
-              </dl>
+            </div>
+            <div className="ex-pv-actions">
+              {supportsFileViewer(classifyFile(entry.path)) && <button type="button" className="ex-pv-btn ex-pv-btn-primary" data-testid="explorer-preview-open" onClick={() => perform(() => openFile({ path: entry.path }, { context: "explorer-preview", workspaceId, mode: "taomni" }))}>{label("用 Taomni 打开", "Open in Taomni")}</button>}
+              {["text", "markdown", "svg", "html"].includes(classifyFile(entry.path)) && <button type="button" className="ex-pv-btn" data-testid="explorer-preview-edit" onClick={() => perform(() => openFile({ path: entry.path }, { context: "explorer-preview", workspaceId, mode: "source" }))}><Pencil />{label("编辑", "Edit")}</button>}
+              <button type="button" className="ex-pv-btn" data-testid="explorer-preview-open-with" onClick={(event) => { const rect = event.currentTarget.getBoundingClientRect(); menu.showAt(rect.left, rect.bottom + 4, fileOpenMenu(entry.path, workspaceId, label, (message) => setActionError({ key: preview.key, message }))); }}>{label("打开方式", "Open with")}<ChevronDown /></button>
+              <button type="button" className="ex-pv-btn" data-testid="explorer-preview-system" onClick={() => perform(() => sftpOpenPath(entry.path))}>{label("系统应用", "System app")}</button>
+              <button type="button" className="ex-pv-btn" data-testid="explorer-preview-copy-path" onClick={() => perform(() => writeText(entry.path))}>{label("复制路径", "Copy path")}</button>
             </div>
             <div className="ex-pv-content">
               {preview.kind === "text" && preview.text !== undefined && <TextPreview text={preview.text} wrap={preferences.wrap} />}
               {preview.kind === "markdown" && preview.text !== undefined && <MarkdownFilePreview text={preview.text} />}
+              {preview.kind === "html" && preview.text !== undefined && <HtmlThumbnail content={preview.text} title={entry.name} />}
+              {preview.kind === "image" && entry.name.toLowerCase().endsWith(".svg") && <div className="ex-pv-hint" data-testid="explorer-preview-sanitized">{label("已净化：脚本、事件属性、外部引用已移除；源码保持原样。", "Sanitized: scripts, event handlers and external references removed; source unchanged.")}</div>}
               {preview.kind === "csv" && preview.text !== undefined && <CsvFilePreview text={preview.text} rowsLabel={label("仅显示前 100 行", "Showing the first 100 rows")} />}
-              {preview.kind === "image" && preview.imageUrl && <div className="ex-pv-img"><img data-testid="explorer-preview-image" src={preview.imageUrl} alt={entry.name} onError={() => setActionError({ key: preview.key, message: label("无法解码此图片", "Unable to decode this image") })} /></div>}
+              {preview.kind === "image" && preview.imageUrl && <div className="ex-pv-img"><img data-testid="explorer-preview-image" src={preview.imageUrl} alt={entry.name} onLoad={(event) => setImageDimensions({ key: preview.key, width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight })} onError={() => setActionError({ key: preview.key, message: label("无法解码此图片", "Unable to decode this image") })} /></div>}
               {preview.kind === "directory" && preview.children && <div className="ex-pv-directory">{preview.children.length > 0 ? preview.children.map((child) => <div key={child.path}><ExplorerFileIcon entry={child} className="ex-pv-child-icon" /><span>{child.name}</span></div>) : <span className="ex-pv-hint">{label("（空）", "(Empty)")}</span>}</div>}
               {preview.kind === "metadata" && <div className="ex-pv-none">{label("此类型暂无内容预览", "Content preview is not available for this file type")}<br /><span>{label("可用系统默认应用打开", "Open with the system default application")}</span></div>}
               {preview.kind === "binary" && <div className="ex-pv-none">{label("二进制文件不提供文本预览", "Binary files cannot be previewed as text")}</div>}
               {preview.kind === "too-large" && <div className="ex-pv-none">{label("图片超过预览上限（20 MB）", "Image exceeds the preview limit (20 MB)")}<br />{label("可用系统默认应用打开", "Open with the system default application")}</div>}
               {preview.text !== undefined && <div className="ex-pv-hint">UTF-8 · {label(`预览上限 256 KB`, "Preview limit 256 KB")}</div>}
             </div>
-            <div className="ex-pv-actions">
-              <button type="button" className="ex-pv-btn ex-pv-btn-primary" data-testid="explorer-preview-open" onClick={() => onOpen(entry)}>{label("打开", "Open")}</button>
-              <button type="button" className="ex-pv-btn" data-testid="explorer-preview-system" onClick={() => perform(() => sftpOpenPath(entry.path))}>{label("系统应用", "System app")}</button>
-              <button type="button" className="ex-pv-btn" data-testid="explorer-preview-copy-path" onClick={() => perform(() => writeText(entry.path))}>{label("复制路径", "Copy path")}</button>
-            </div>
+            <dl className="ex-pv-meta ex-pv-footer">
+              {imageDimensions?.key === preview.key && <><dt>{label("尺寸", "Dimensions")}</dt><dd>{imageDimensions.width} × {imageDimensions.height}</dd></>}
+              <dt>{label("大小", "Size")}</dt><dd>{entry.fileType === "dir" ? `${directorySize === undefined ? "—" : `${lowerBound ? "≥ " : ""}${formatBytes(directorySize)}`} · ${properties?.itemCount ?? "—"} ${label("项", "items")}` : formatBytes(entry.size)}</dd>
+              <dt>{label("修改日期", "Modified")}</dt><dd>{entry.mtime ? new Date(entry.mtime * 1000).toLocaleString() : "—"}</dd>
+              <dt>{label("位置", "Location")}</dt><dd className="ex-pv-location">{currentPath}</dd>
+              {entry.symlinkTarget && <><dt>{label("链接目标", "Link target")}</dt><dd className="ex-pv-location">{entry.symlinkTarget}</dd></>}
+            </dl>
+            {entry.fileType === "dir" && <button type="button" className="ex-pv-btn" onClick={() => onOpen(entry)}>{label("打开文件夹", "Open folder")}</button>}
           </>
         )}
         {preview.loading && <div className="ex-pv-hint" data-testid="explorer-preview-loading" role="status">{label("正在加载预览…", "Loading preview…")}</div>}

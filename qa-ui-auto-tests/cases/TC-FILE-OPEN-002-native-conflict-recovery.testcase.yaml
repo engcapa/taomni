@@ -1,0 +1,280 @@
+id: TC-FILE-OPEN-002
+title: Native text save refuses stale hashes, compares/reloads and recovers unsaved drafts
+description: AC08/09/10/21/22. Uses real host files, production IPC, exact-byte oracle and genuine external host writes. Browser
+  stubs cannot establish expected_hash, atomic writes or native recovery. Window reload is renderer recovery, not a process-crash
+  simulation. Physical OS shortcuts/AppKit and process-restart recovery remain separate unrun checks.
+modes:
+- native
+covers:
+- F-FILEOPEN-1
+- F-EXPLORER-1
+tags:
+- p0
+- file-open
+- editor
+- conflict
+- recovery
+- crash-regression
+fixtures:
+- reset_db
+- file_open_files
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-file-open-native
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-file-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Control+l
+    macos_key: Meta+l
+- fill:
+    selector: '[data-testid="explorer-address"]'
+    value: ${fixture.file_open_root}
+- press:
+    selector: '[data-testid="explorer-address"]'
+    key: Enter
+- dblclick: '[data-testid="explorer-file-row"][data-name="notes.txt"]'
+- wait_for: '[data-testid="viewer-editor"] .cm-content'
+- fill:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    value: 'File open saved
+
+      Second line
+
+      中文
+
+      '
+- click: '[data-testid="viewer-save"]'
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/notes.txt
+    sha256: ${fixture.file_open_saved_sha}
+- fill:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    value: 'My unsaved version
+
+      '
+- host_write_file:
+    path: ${fixture.file_open_root}/notes.txt
+    text: 'External disk version
+
+      '
+- click: '[data-testid="viewer-save"]'
+- wait_for: '[data-testid="viewer-conflict"]'
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/notes.txt
+    equals: 'External disk version
+
+      '
+- assert_items:
+    selector: '[data-testid="viewer-editor"] .cm-line'
+    equals:
+    - My unsaved version
+    - ''
+- click: '[data-testid="viewer-compare"]'
+- wait_for: '[data-testid="viewer-diff"]'
+- assert_text:
+    selector: '[data-testid="viewer-diff"]'
+    contains: External disk version
+- assert_text:
+    selector: '[data-testid="viewer-diff"]'
+    contains: My unsaved version
+- press:
+    selector: '[data-testid="viewer-diff"] button'
+    key: Enter
+- click: '[data-testid="viewer-keep"]'
+- assert_not_visible: '[data-testid="viewer-conflict"]'
+- click: '[data-testid="viewer-save"]'
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/notes.txt
+    equals: 'My unsaved version
+
+      '
+- fill:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    value: 'Will reload instead
+
+      '
+- host_write_file:
+    path: ${fixture.file_open_root}/notes.txt
+    text: 'Reload wins disk version
+
+      '
+- click: '[data-testid="viewer-save"]'
+- wait_for: '[data-testid="viewer-conflict"]'
+- click: '[data-testid="viewer-reload"]'
+- assert_items:
+    selector: '[data-testid="viewer-editor"] .cm-line'
+    equals:
+    - Reload wins disk version
+    - ''
+- assert_disabled: '[data-testid="viewer-save"]'
+- fill:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    value: 'Recovered draft exact bytes
+
+      '
+- assert_localstorage:
+    key: taomni.viewer.drafts.v1
+    contains: Recovered draft exact bytes
+- assert_no_runtime_errors: null
+- reload_window: null
+- wait_for: '[data-testid="file-viewer"] [data-testid="viewer-editor"] .cm-content'
+- assert_visible: '[data-testid="viewer-draft-restored"]'
+- assert_items:
+    selector: '[data-testid="viewer-editor"] .cm-line'
+    equals:
+    - Recovered draft exact bytes
+    - ''
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/notes.txt
+    equals: 'Reload wins disk version
+
+      '
+- click: '[data-testid="viewer-save"]'
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/notes.txt
+    equals: 'Recovered draft exact bytes
+
+      '
+- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="tab-item"][data-tab-type="file-browser"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="binary.txt"]'
+- wait_for: '[data-testid="viewer-error"]'
+- assert_text:
+    selector: '[data-testid="viewer-error"]'
+    contains: binary
+- assert_visible: '[data-testid="viewer-system"]'
+- host_write_file:
+    path: ${fixture.file_open_root}/binary.txt
+    text: 'Retry repaired file
+
+      '
+- click: '[data-testid="viewer-retry"]'
+- wait_for: '[data-testid="viewer-editor"] .cm-content'
+- assert_items:
+    selector: '[data-testid="viewer-editor"] .cm-line'
+    equals:
+    - Retry repaired file
+    - ''
+- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="tab-item"][data-tab-type="file-browser"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="large.txt"]'
+- wait_for: '[data-testid="viewer-large-file"]'
+- assert_disabled: '[data-testid="viewer-save"]'
+- assert_attribute:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    name: contenteditable
+    equals: 'false'
+- click: '[data-testid="viewer-chunk-next"]'
+- assert_text:
+    selector: '[data-testid="viewer-editor"]'
+    contains: Large file read-only
+- assert_no_runtime_errors: null
+- screenshot: native-viewer-conflict-recovery.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Native save writes exact bytes and stale expected_hash never silently overwrites the external disk version;
+      Compare and Keep are actionable.
+    actions:
+    - 11
+    - 12
+    - 14
+    - 15
+    - 16
+    - 20
+    - 24
+    - 25
+    - 27
+    checkpoints:
+    - step: 13
+      expectation: All native saved bytes match independent SHA256.
+    - step: 18
+      expectation: External version is still on disk after failed stale save.
+    - step: 19
+      expectation: Unsaved local editor version remains intact.
+    - step: 22
+      expectation: Comparison exposes actual external text.
+    - step: 23
+      expectation: Comparison also exposes actual local draft.
+    - step: 28
+      expectation: Explicit Keep then Save writes the chosen local version.
+    results:
+    - 13
+    - 18
+    - 19
+    - 22
+    - 23
+    - 28
+  - id: R2
+    requirement: Reload chooses external bytes and renderer recovery restores a draft without changing disk until Save.
+    actions:
+    - 29
+    - 30
+    - 31
+    - 33
+    - 36
+    - 39
+    - 44
+    checkpoints:
+    - step: 34
+      expectation: Reload displays exactly the current disk version.
+    - step: 35
+      expectation: Reload clears dirty state.
+    - step: 41
+      expectation: Reloaded host explicitly identifies recovered draft.
+    - step: 42
+      expectation: Recovery content is exact.
+    - step: 43
+      expectation: Unsaved recovery has not modified the host file.
+    - step: 45
+      expectation: Saving restored draft writes exact native bytes.
+    results:
+    - 34
+    - 35
+    - 41
+    - 42
+    - 43
+    - 45
+  - id: R3
+    requirement: Binary failure offers retry/system action; repaired file retries successfully and large text is chunked read-only.
+    actions:
+    - 48
+    - 52
+    - 53
+    - 58
+    - 62
+    checkpoints:
+    - step: 50
+      expectation: Binary refusal includes a concrete reason.
+    - step: 55
+      expectation: Retry loads the repaired file text rather than a blank error page.
+    - step: 60
+      expectation: Large file cannot save.
+    - step: 61
+      expectation: Large editor is actually non-editable.
+    - step: 63
+      expectation: Next chunk retains real file content.
+    - step: 64
+      expectation: All lifecycle/error paths have no uncaught runtime errors.
+    results:
+    - 50
+    - 55
+    - 60
+    - 61
+    - 63
+    - 64
+  visual:
+  - check: Conflict/diff/error/large-file layouts
+    method: manual
+    reason: Screenshots aid review; layout fidelity not certified here.
+  native:
+  - check: Real text writes and hash conflict
+    method: automated
+    reason: Production IPC plus independent host rereads and genuine external mutations.
+  - check: Process crash/restart and physical macOS shortcuts
+    method: manual
+    reason: reload_window is renderer recovery only; AppKit and OS input remain unrun.

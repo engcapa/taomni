@@ -1,0 +1,431 @@
+id: TC-FILE-OPEN-004
+title: Markdown live widgets preserve source, paste a real table/image and export self-contained HTML
+description: AC11/12/13/15. Real CodeMirror renderer and Chromium clipboard, not simulation buttons. Asserts live/source/split
+  rendering, one-step table Undo, stored image bytes/link, export contents and unchanged source bytes. Browser VFS/clipboard
+  and actual browser download are not native OS clipboard/save-dialog evidence. PDF/print, Word/PNG export, native image clipboard
+  formats and dialog failures remain explicit unrun native gaps.
+modes:
+- browser
+covers:
+- F-FILEOPEN-1
+- F-EXPLORER-1
+tags:
+- p0
+- file-open
+- markdown
+- clipboard
+- export
+- crash-regression
+fixtures:
+- reset_db
+- file_open_files
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-file-open-markdown
+- reload_window: null
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-file-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Control+l
+    macos_key: Meta+l
+- fill:
+    selector: '[data-testid="explorer-address"]'
+    value: ${fixture.file_open_root}
+- press:
+    selector: '[data-testid="explorer-address"]'
+    key: Enter
+- dblclick: '[data-testid="explorer-file-row"][data-name="live.md"]'
+- wait_for: '[data-testid="markdown-editor"][data-mode="live"]'
+- assert_visible: '[data-testid="markdown-outline"]'
+- assert_text_equals:
+    selector: '[data-testid="markdown-outline"] button[data-heading-from="0"]'
+    equals: File open Markdown
+- assert_visible: '[data-testid="markdown-image-widget"] img'
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/live.md
+    sha256: ${fixture.file_open_markdown_sha}
+- click: '[data-testid="markdown-outline"] button[data-heading-from="0"]'
+- assert_text:
+    selector: '[data-testid="viewer-editor"] .cm-line'
+    contains: '# File open Markdown'
+- click: '[data-testid="markdown-mode-split"]'
+- wait_for: '[data-testid="markdown-preview"] h1'
+- assert_text_equals:
+    selector: '[data-testid="markdown-preview"] h1'
+    equals: File open Markdown
+- assert_text_equals:
+    selector: '[data-testid="markdown-preview"] strong'
+    equals: Rendered bold
+- click: '[data-testid="markdown-mode-source"]'
+- press:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    key: Control+End
+    macos_key: Meta+ArrowDown
+- press:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    key: Enter
+- seed_clipboard: "Name\tValue\nAlpha\t1"
+- press:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    key: Control+v
+    macos_key: Meta+v
+- wait_for: '[data-testid="markdown-paste-status"]'
+- assert_text:
+    selector: '[data-testid="viewer-editor"]'
+    contains: '| Name | Value |'
+- press:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    key: Control+z
+    macos_key: Meta+z
+- assert_text:
+    selector: '[data-testid="viewer-editor"]'
+    contains: "Name\tValue"
+- press:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    key: Control+Shift+z
+    macos_key: Meta+Shift+z
+- assert_text:
+    selector: '[data-testid="viewer-editor"]'
+    contains: '| Alpha | 1 |'
+- press:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    key: Control+End
+    macos_key: Meta+ArrowDown
+- press:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    key: Enter
+- seed_clipboard_image:
+    selector: '[data-testid="markdown-outline"]'
+- press:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    key: Control+v
+    macos_key: Meta+v
+- assert_text:
+    selector: '[data-testid="markdown-paste-status"]'
+    contains: relative links inserted
+- assert_pattern:
+    selector: '[data-testid="viewer-editor"]'
+    regex: assets/image-[^\s)]+\.png
+- click: '[data-testid="viewer-save"]'
+- click: '[data-testid="markdown-mode-live"]'
+- wait_for: '[data-testid="markdown-table-widget"]'
+- assert_count:
+    selector: '[data-testid="markdown-image-widget"]'
+    min: 2
+- click: '[data-testid="markdown-image-widget"]:has(img[alt="Original"])'
+- click: '[data-testid="markdown-image-widget"]:has(img[alt="Original"]) button[aria-label="Zoom image (view only)"]'
+- assert_text:
+    selector: '[data-testid="markdown-image-widget"]:has(img[alt="Original"]) button[aria-label="Zoom image (view only)"]'
+    contains: 75%
+- assert_count:
+    selector: '[data-testid="file-viewer"][data-dirty="true"]'
+    equal: 0
+- fill:
+    selector: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="1"]'
+    value: '2'
+- click: '[data-testid="markdown-mode-source"]'
+- assert_text:
+    selector: '[data-testid="viewer-editor"]'
+    contains: '| Alpha | 2 |'
+- click: '[data-testid="viewer-save"]'
+- click: '[data-testid="markdown-mode-split"]'
+- assert_count:
+    selector: '[data-testid="markdown-preview"] table tbody tr'
+    equal: 1
+- eval_readonly:
+    expression: document.querySelectorAll(".fv-md-preview-pane img").length === 2 && document.querySelectorAll(".fv-md-preview-pane
+      img")[0].complete && document.querySelectorAll(".fv-md-preview-pane img")[0].naturalWidth > 0 && document.querySelectorAll(".fv-md-preview-pane
+      img")[1].complete && document.querySelectorAll(".fv-md-preview-pane img")[1].naturalWidth > 0
+    expect_truthy: true
+    timeout_sec: 10
+- click: '[data-testid="markdown-export"]'
+- assert_visible: '[data-testid="markdown-export-pdf"]'
+- assert_visible: '[data-testid="markdown-export-png"]'
+- assert_visible: '[data-testid="markdown-export-docx"]'
+- assert_visible: '[data-testid="markdown-export-markdown"]'
+- assert_visible: '[data-testid="markdown-export-richtext"]'
+- assert_visible: '[data-testid="markdown-export-html-source"]'
+- assert_visible: '[data-testid="markdown-export-print"]'
+- click: '[data-testid="markdown-export-pdf"]'
+- wait_for: '[data-testid="markdown-export-settings"]'
+- assert_visible: '[data-testid="markdown-export-confirm"]'
+- press:
+    selector: '[data-testid="markdown-export-settings"] select[aria-label="Paper"]'
+    key: Escape
+- assert_not_visible: '[data-testid="markdown-export-settings"]'
+- click: '[data-testid="markdown-export"]'
+- click: '[data-testid="markdown-export-docx"]'
+- wait_for: '[data-testid="markdown-export-settings"]'
+- assert_visible: '[data-testid="markdown-export-confirm"]'
+- press:
+    selector: '[data-testid="markdown-export-settings"] select[aria-label="Paper"]'
+    key: Escape
+- assert_not_visible: '[data-testid="markdown-export-settings"]'
+- click: '[data-testid="markdown-export"]'
+- click: '[data-testid="markdown-export-print"]'
+- wait_for: '[data-testid="markdown-export-settings"]'
+- assert_visible: '[data-testid="markdown-export-confirm"]'
+- press:
+    selector: '[data-testid="markdown-export-settings"] select[aria-label="Paper"]'
+    key: Escape
+- assert_not_visible: '[data-testid="markdown-export-settings"]'
+- click: '[data-testid="markdown-export"]'
+- assert_download:
+    trigger: '[data-testid="markdown-export-html"]'
+    filename: live.html
+    contains:
+    - File open Markdown
+    - <table
+    - data:image/png;base64,
+    - Alpha
+- assert_text:
+    selector: '[data-testid="markdown-export-status"]'
+    contains: Export completed
+- click: '[data-testid="markdown-export"]'
+- assert_download:
+    trigger: '[data-testid="markdown-export-png"]'
+    filename: live.png
+- assert_text:
+    selector: '[data-testid="markdown-export-status"]'
+    contains: Export completed
+- click: '[data-testid="markdown-export"]'
+- click: '[data-testid="markdown-export-richtext"]'
+- assert_attribute:
+    selector: '[data-testid="markdown-export-status"]'
+    name: data-export-state
+    equals: copied
+- click: '[data-testid="markdown-export"]'
+- click: '[data-testid="markdown-export-html-source"]'
+- assert_attribute:
+    selector: '[data-testid="markdown-export-status"]'
+    name: data-export-state
+    equals: copied
+- click: '[data-testid="markdown-export"]'
+- click: '[data-testid="markdown-export-markdown"]'
+- assert_attribute:
+    selector: '[data-testid="markdown-export-status"]'
+    name: data-export-state
+    equals: failed
+- assert_text:
+    selector: '[data-testid="viewer-operation-error"]'
+    contains: Markdown + image folder export requires the desktop app
+- assert_count:
+    selector: '[data-testid="file-viewer"][data-dirty="true"]'
+    equal: 0
+- assert_count:
+    selector: '[data-testid="file-viewer"][data-dirty="true"]'
+    equal: 0
+- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="live.md"]'
+- wait_for: '[data-testid="markdown-editor"]'
+- click: '[data-testid="markdown-mode-source"]'
+- assert_text:
+    selector: '[data-testid="viewer-editor"]'
+    contains: '| Alpha | 2 |'
+- assert_pattern:
+    selector: '[data-testid="viewer-editor"]'
+    regex: assets/image-[^\s)]+\.png
+- assert_no_runtime_errors: null
+- screenshot: markdown-live-paste-export.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Live mode is default; outline/image and split render actual Markdown without changing its source.
+    actions:
+    - 10
+    - 18
+    checkpoints:
+    - step: 13
+      expectation: Outline contains actual first heading.
+    - step: 14
+      expectation: Live mode displays a real image widget.
+    - step: 15
+      expectation: Mode/render operations leave exact Markdown bytes unchanged.
+    - step: 20
+      expectation: Split mode renders heading syntax.
+    - step: 21
+      expectation: Bold markup becomes a strong element.
+    results:
+    - 13
+    - 14
+    - 15
+    - 20
+    - 21
+  - id: R2
+    requirement: Clipboard TSV converts to standard Markdown with reversible conversion, image paste inserts a relative saved
+      asset and survives reopen.
+    actions:
+    - 23
+    - 25
+    - 26
+    - 29
+    - 31
+    - 33
+    - 34
+    - 35
+    - 36
+    - 39
+    - 40
+    - 51
+    - 97
+    - 98
+    - 100
+    checkpoints:
+    - step: 28
+      expectation: Header has standard Markdown table syntax.
+    - step: 30
+      expectation: One Undo restores the original TSV instead of deleting the paste.
+    - step: 32
+      expectation: Redo restores table conversion exactly once.
+    - step: 37
+      expectation: Real clipboard image completion reports a saved relative link.
+    - step: 38
+      expectation: Inserted image path is under the configured assets directory.
+    - step: 42
+      expectation: Both original and pasted images render in live mode.
+    - step: 53
+      expectation: Split preview images decode real persisted VFS bytes.
+    - step: 101
+      expectation: Reopen retains the converted table.
+    - step: 102
+      expectation: Reopen retains the relative pasted-image path.
+    results:
+    - 28
+    - 30
+    - 32
+    - 37
+    - 38
+    - 42
+    - 53
+    - 101
+    - 102
+  - id: R3
+    requirement: Export exposes all designed formats; HTML download is self-contained and export does not dirty the source.
+    actions:
+    - 54
+    - 80
+    checkpoints:
+    - step: 80
+      expectation: Actual downloaded file contains rendered heading/table and embedded PNG data.
+    - step: 81
+      expectation: Export reports completion.
+    - step: 96
+      expectation: Export did not mark the source dirty.
+    - step: 103
+      expectation: Markdown/paste/export lifecycle has no uncaught runtime error.
+    results:
+    - 80
+    - 81
+    - 96
+    - 103
+  - id: R4
+    requirement: Live outline/image/table actions are real; zoom stays view-only, cell edits serialize standard Markdown,
+      and export settings can cancel without a download.
+    actions:
+    - 16
+    - 22
+    - 39
+    - 43
+    - 44
+    - 47
+    - 48
+    - 50
+    - 54
+    - 62
+    - 65
+    - 67
+    - 68
+    - 71
+    - 73
+    - 74
+    - 77
+    - 79
+    - 100
+    checkpoints:
+    - step: 17
+      expectation: The actual widget/source or export dialog reflects its preceding user action.
+    - step: 45
+      expectation: The actual widget/source or export dialog reflects its preceding user action.
+    - step: 46
+      expectation: The actual widget/source or export dialog reflects its preceding user action.
+    - step: 49
+      expectation: The actual widget/source or export dialog reflects its preceding user action.
+    - step: 64
+      expectation: The actual widget/source or export dialog reflects its preceding user action.
+    - step: 66
+      expectation: The actual widget/source or export dialog reflects its preceding user action.
+    - step: 70
+      expectation: The actual widget/source or export dialog reflects its preceding user action.
+    - step: 72
+      expectation: The actual widget/source or export dialog reflects its preceding user action.
+    - step: 76
+      expectation: The actual widget/source or export dialog reflects its preceding user action.
+    - step: 78
+      expectation: The actual widget/source or export dialog reflects its preceding user action.
+    - step: 96
+      expectation: The actual widget/source or export dialog reflects its preceding user action.
+    - step: 103
+      expectation: Additional widget and dialog lifecycle causes no uncaught runtime errors.
+    results:
+    - 17
+    - 45
+    - 46
+    - 49
+    - 64
+    - 66
+    - 70
+    - 72
+    - 76
+    - 78
+    - 96
+    - 103
+  - id: R5
+    requirement: PNG exports real image bytes; clipboard entries complete; desktop-only folder export fails explicitly without
+      dirtying the source.
+    actions:
+    - 82
+    - 83
+    - 85
+    - 86
+    - 88
+    - 89
+    - 91
+    - 92
+    checkpoints:
+    - step: 83
+      expectation: Actual export artifact, completion/failure status or unchanged source dirty state is asserted.
+    - step: 84
+      expectation: Actual export artifact, completion/failure status or unchanged source dirty state is asserted.
+    - step: 87
+      expectation: Actual export artifact, completion/failure status or unchanged source dirty state is asserted.
+    - step: 90
+      expectation: Actual export artifact, completion/failure status or unchanged source dirty state is asserted.
+    - step: 93
+      expectation: Actual export artifact, completion/failure status or unchanged source dirty state is asserted.
+    - step: 94
+      expectation: Actual export artifact, completion/failure status or unchanged source dirty state is asserted.
+    - step: 95
+      expectation: Actual export artifact, completion/failure status or unchanged source dirty state is asserted.
+    results:
+    - 83
+    - 84
+    - 87
+    - 90
+    - 93
+    - 94
+    - 95
+  visual:
+  - check: Live/source/split widgets and export menu
+    method: manual
+    reason: Screenshot retained; precise Typora/prototype fidelity remains unreviewed.
+  native:
+  - check: Native clipboard image formats, asset disk persistence and OS save dialogs
+    method: manual
+    reason: Browser Chromium/VFS and browser downloads cannot establish these native effects.
+  - check: PDF/print, DOCX, PNG, Markdown-folder exports and export failure/cancel
+    method: manual
+    reason: Formats are visible but their full outputs/system dialogs are not executed by this case.

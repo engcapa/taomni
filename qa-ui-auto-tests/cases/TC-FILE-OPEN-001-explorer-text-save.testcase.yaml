@@ -1,0 +1,229 @@
+id: TC-FILE-OPEN-001
+title: Explorer opens a shared text viewer, saves exact bytes and protects dirty close
+description: AC04/05/08/18/21. Real Explorer double-click and preview/edit entries share one canonical viewer. Edits, Save,
+  Ctrl/Cmd+S, dirty close/cancel/discard and reopen assert actual content, not only runtime-error absence. Browser byte oracle
+  reads IndexedDB VFS only; native disk effects are asserted independently in 002/003.
+modes:
+- browser
+covers:
+- F-FILEOPEN-1
+- F-EXPLORER-1
+tags:
+- p0
+- file-open
+- explorer
+- editor
+- crash-regression
+fixtures:
+- reset_db
+- file_open_files
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-file-open-text
+- reload_window: null
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-file-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Control+l
+    macos_key: Meta+l
+- fill:
+    selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-address"]'
+    value: ${fixture.file_open_root}
+- press:
+    selector: '[data-testid="explorer-address"]'
+    key: Enter
+- wait_for: '[data-testid="explorer-file-row"][data-name="notes.txt"]'
+- click: '[data-testid="explorer-file-row"][data-name="notes.txt"]'
+- assert_text:
+    selector: '[data-testid="explorer-preview-text"]'
+    contains: File open original
+- click: '[data-testid="explorer-preview-open"]'
+- wait_for: '[data-testid="file-viewer"][data-kind="text"] [data-testid="viewer-editor"] .cm-content'
+- assert_items:
+    selector: '[data-testid="viewer-editor"] .cm-line'
+    equals:
+    - File open original
+    - Second line
+    - 中文
+    - ''
+- fill:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    value: 'File open saved
+
+      Second line
+
+      中文
+
+      '
+- assert_attribute:
+    selector: '[data-testid="file-viewer"]'
+    name: data-dirty
+    equals: 'true'
+- assert_enabled: '[data-testid="viewer-save"]'
+- click: '[data-testid="viewer-save"]'
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/notes.txt
+    sha256: ${fixture.file_open_saved_sha}
+- assert_disabled: '[data-testid="viewer-save"]'
+- click: '[data-testid="tab-item"][data-tab-type="file-browser"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="notes.txt"]'
+- wait_for: '[data-testid="file-viewer"] [data-testid="viewer-editor"] .cm-content'
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="file-viewer"]'
+    equal: 1
+- assert_items:
+    selector: '[data-testid="viewer-editor"] .cm-line'
+    equals:
+    - File open saved
+    - Second line
+    - 中文
+    - ''
+- fill:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    value: 'Unsaved close guard
+
+      '
+- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- wait_for: '[data-testid="viewer-close-dialog"]'
+- click: '[data-testid="viewer-close-cancel"]'
+- assert_visible: '[data-testid="file-viewer"]'
+- assert_items:
+    selector: '[data-testid="viewer-editor"] .cm-line'
+    equals:
+    - Unsaved close guard
+    - ''
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/notes.txt
+    sha256: ${fixture.file_open_saved_sha}
+- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="viewer-close-discard"]'
+- wait_for:
+    selector: '[data-testid="file-viewer"]'
+    state: detached
+- dblclick: '[data-testid="explorer-file-row"][data-name="notes.txt"]'
+- wait_for: '[data-testid="viewer-editor"] .cm-content'
+- assert_items:
+    selector: '[data-testid="viewer-editor"] .cm-line'
+    equals:
+    - File open saved
+    - Second line
+    - 中文
+    - ''
+- fill:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    value: 'Shortcut save once
+
+      '
+- press:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    key: Control+s
+    macos_key: Meta+s
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/notes.txt
+    equals: 'Shortcut save once
+
+      '
+- assert_disabled: '[data-testid="viewer-save"]'
+- assert_no_runtime_errors: null
+- screenshot: file-open-text-save-close.png
+- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="binary.txt"]'
+- wait_for: '[data-testid="viewer-error"]'
+- click: '[data-testid="viewer-system"]'
+- assert_text:
+    selector: '[data-testid="viewer-operation-error"]'
+    contains: Opening files with the OS shell is not available in browser preview
+- assert_visible: '[data-testid="viewer-error"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Explorer preview/open and double-click reuse one canonical viewer; Save writes exact bytes.
+    actions:
+    - 11
+    - 13
+    - 16
+    - 19
+    - 22
+    - 23
+    checkpoints:
+    - step: 15
+      expectation: Original text has exactly four lines including final empty line.
+    - step: 17
+      expectation: An edit marks the shared document dirty.
+    - step: 20
+      expectation: Independent VFS SHA256 matches all saved bytes.
+    - step: 25
+      expectation: Reopening through a second entry activates the only viewer tab.
+    - step: 26
+      expectation: Canonical saved content survives activation.
+    results:
+    - 15
+    - 17
+    - 20
+    - 25
+    - 26
+  - id: R2
+    requirement: Cancel preserves dirty edits; discard does not write them; focused Ctrl/Cmd+S saves.
+    actions:
+    - 27
+    - 28
+    - 30
+    - 34
+    - 35
+    - 37
+    - 40
+    - 41
+    checkpoints:
+    - step: 32
+      expectation: Cancel retains exact unsaved editor content.
+    - step: 33
+      expectation: Cancelling close leaves saved disk-model bytes unchanged.
+    - step: 36
+      expectation: Discard closes the actual viewer host.
+    - step: 39
+      expectation: Reopen reads the saved version rather than discarded draft.
+    - step: 42
+      expectation: Focused save chord writes exactly the edited text.
+    - step: 44
+      expectation: Entry and dirty-close lifecycle has no uncaught runtime errors.
+    results:
+    - 32
+    - 33
+    - 36
+    - 39
+    - 42
+    - 44
+  - id: R3
+    requirement: Binary errors keep a real system-app action; browser inability to launch the OS app is explicit and recoverable,
+      not a silent blank page.
+    actions:
+    - 46
+    - 47
+    - 49
+    checkpoints:
+    - step: 50
+      expectation: System-app failure is visible and actionable in browser mode.
+    - step: 51
+      expectation: Viewer error remains available after the handled launch failure.
+    - step: 52
+      expectation: Fallback error has no unhandled exception.
+    results:
+    - 50
+    - 51
+    - 52
+  visual:
+  - check: Viewer toolbar/status and dirty-close layout
+    method: manual
+    reason: Screenshot retained; full prototype fidelity is not certified by DOM assertions.
+  native:
+  - check: Atomic host disk save
+    method: external
+    reason: TC-FILE-OPEN-002/003 exercise real backend writes; this case observes browser VFS only.
+  - check: Native menu accelerator and physical Cmd+S/IME delivery
+    method: manual
+    reason: Browser keys do not prove AppKit dispatch or OS input; macOS runbook checks remain unrun.

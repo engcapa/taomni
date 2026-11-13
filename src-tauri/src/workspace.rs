@@ -24,6 +24,7 @@ mod atomic_write;
 use atomic_write::*;
 mod encoding;
 use encoding::*;
+pub(crate) mod viewer_io;
 #[cfg(test)]
 mod tests;
 

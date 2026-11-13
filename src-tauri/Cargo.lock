@@ -11054,6 +11054,7 @@ dependencies = [
  "tauri-plugin-process",
  "tauri-plugin-shell",
  "tauri-plugin-updater",
+ "tauri-utils",
  "tempfile",
  "thiserror 2.0.20",
  "thrift",

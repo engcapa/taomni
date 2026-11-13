@@ -1,0 +1,158 @@
+id: TC-FILE-OPEN-003
+title: SVG preview is sanitized while split editing saves only the user's raw source
+description: AC01/02/06/07. Explorer SVG preview and ImageViewer render real sanitized blobs. Raw malicious source stays unchanged
+  until an explicit edit/save. Native uses real viewer byte IPC plus independent host rereads; browser uses VFS only. Source
+  sanitization is checked without disabling the iframe/security boundary.
+modes:
+- browser
+- native
+covers:
+- F-FILEOPEN-1
+- F-EXPLORER-1
+tags:
+- p0
+- file-open
+- image
+- svg
+- security
+- crash-regression
+fixtures:
+- reset_db
+- file_open_files
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-file-open-svg
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-file-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Control+l
+    macos_key: Meta+l
+- fill:
+    selector: '[data-testid="explorer-address"]'
+    value: ${fixture.file_open_root}
+- press:
+    selector: '[data-testid="explorer-address"]'
+    key: Enter
+- click: '[data-testid="explorer-file-row"][data-name="unsafe.svg"]'
+- wait_for: '[data-testid="explorer-preview-sanitized"]'
+- assert_visible: '[data-testid="explorer-preview-image"]'
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/unsafe.svg
+    sha256: ${fixture.file_open_svg_original_sha}
+- click: '[data-testid="explorer-preview-open"]'
+- wait_for: '[data-testid="image-viewer"] [data-testid="image-render"]'
+- assert_visible: '[data-testid="image-sanitized"]'
+- eval_readonly:
+    expression: document.querySelector(".image-render").complete && document.querySelector(".image-render").naturalWidth >
+      0 && !window.FILE_OPEN_SVG_UNSAFE
+    expect_truthy: true
+    timeout_sec: 10
+- click: '[data-testid="image-zoom-in"]'
+- click: '[data-testid="image-zoom-out"]'
+- click: '[data-testid="image-zoom-actual"]'
+- click: '[data-testid="image-rotate-right"]'
+- click: '[data-testid="image-flip"]'
+- click: '[data-testid="image-background-dark"]'
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/unsafe.svg
+    sha256: ${fixture.file_open_svg_original_sha}
+- click: '[data-testid="image-svg-mode-code"]'
+- wait_for: '[data-testid="viewer-editor"] .cm-content'
+- assert_text:
+    selector: '[data-testid="viewer-editor"]'
+    contains: window.FILE_OPEN_SVG_UNSAFE
+- click: '[data-testid="image-svg-mode-split"]'
+- assert_visible: '[data-testid="image-render"]'
+- fill:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    value: '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="90"><rect width="160" height="90" fill="#16a34a"/></svg>
+
+      '
+- eval_readonly:
+    expression: document.querySelector(".image-render").complete && document.querySelector(".image-render").naturalWidth ===
+      160
+    expect_truthy: true
+    timeout_sec: 10
+- click: '[data-testid="viewer-save"]'
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/unsafe.svg
+    sha256: ${fixture.file_open_svg_saved_sha}
+- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="tab-item"][data-tab-type="file-browser"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="unsafe.svg"]'
+- wait_for: '[data-testid="image-render"]'
+- eval_readonly:
+    expression: document.querySelector(".image-render").complete && document.querySelector(".image-render").naturalWidth ===
+      160
+    expect_truthy: true
+    timeout_sec: 10
+- assert_no_runtime_errors: null
+- screenshot: svg-sanitized-edit-reopen.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: SVG preview/viewer decode a sanitized image, preserve original malicious source, and transforms do not write.
+    actions:
+    - 9
+    - 13
+    - 17
+    - 18
+    - 19
+    - 20
+    - 21
+    - 22
+    - 24
+    checkpoints:
+    - step: 11
+      expectation: Explorer renders SVG preview.
+    - step: 12
+      expectation: Preview sanitization did not modify source bytes.
+    - step: 16
+      expectation: Viewer image really decodes and its script cannot set the parent marker.
+    - step: 23
+      expectation: Zoom/rotate/flip/background leave exact original bytes unchanged.
+    - step: 26
+      expectation: Code mode still shows original unsanitized source.
+    results:
+    - 11
+    - 12
+    - 16
+    - 23
+    - 26
+  - id: R2
+    requirement: Split source edits update rendering and explicit Save persists exact user source across close/reopen.
+    actions:
+    - 27
+    - 29
+    - 31
+    - 33
+    - 35
+    checkpoints:
+    - step: 30
+      expectation: Actual SVG image dimensions update from the edited source before save.
+    - step: 32
+      expectation: Exact browser/native file bytes match the clean user source.
+    - step: 37
+      expectation: Reopened image decodes with the persisted new dimensions.
+    - step: 38
+      expectation: Sanitize/edit/close lifecycle has no uncaught runtime errors.
+    results:
+    - 30
+    - 32
+    - 37
+    - 38
+  visual:
+  - check: Checker/light/dark image stage and split proportions
+    method: manual
+    reason: Screenshot is retained for review; pixel fidelity remains unverified.
+  native:
+  - check: Actual SVG byte IPC and save/reopen
+    method: automated
+    reason: Native mode reads real blob bytes and checks the host SHA256 independently.
+  - check: Copy-image clipboard and AVIF/platform decoding
+    method: manual
+    reason: This SVG-focused case does not exercise OS clipboard or all codecs.

@@ -5,6 +5,7 @@ import { ChmodDialog } from "./ChmodDialog";
 import { useSftpStore } from "../../stores/sftpStore";
 import { useSftpController } from "../../lib/sftpController";
 import { sftpOpenPath, effectiveFileType, type FileEntry } from "../../lib/sftp";
+import { openFile } from "../../lib/openFile";
 import { useAppStore } from "../../stores/appStore";
 import type { MenuItem } from "../ContextMenu";
 import { useT } from "../../lib/i18n";
@@ -63,7 +64,7 @@ function LegacyLocalFileBrowserPanel({ tabId, initialPath }: Props) {
         return;
       }
       try {
-        await sftpOpenPath(entry.path);
+        await openFile({ path: entry.path }, { context: "local-file-browser" });
       } catch (err) {
         setStatus(t("fileBrowser.statusFailedToOpen", { name: entry.name, error: String(err) }));
       }
@@ -76,7 +77,7 @@ function LegacyLocalFileBrowserPanel({ tabId, initialPath }: Props) {
       return;
     }
     try {
-      await sftpOpenPath(entry.path);
+      await openFile({ path: entry.path }, { context: "local-file-browser" });
     } catch (err) {
       setStatus(t("fileBrowser.statusFailedToOpen", { name: entry.name, error: String(err) }));
     }

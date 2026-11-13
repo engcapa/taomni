@@ -5,6 +5,8 @@ import type { Tab } from "../../../types";
 import { type TabItemProps } from "./model";
 import { TAB_DRAG_MIME } from "./scroll";
 import { ExplorerTabIcon } from "../../explorer/ExplorerTabIcon";
+import { ExplorerFileIcon } from "../../explorer/ExplorerFileIcon";
+import { ViewerDirtyIndicator } from "../../viewer/ViewerDirtyIndicator";
 
 export function dbEngineColor(engine?: string): string {
   switch (engine) {
@@ -64,6 +66,8 @@ export function TabIcon({ tab }: { tab: Tab; }) {
       return <KeyRound className="w-3 h-3" style={{ color: "#c98a00" }} />;
     case "file-browser":
       return <ExplorerTabIcon />;
+    case "file-viewer":
+      return <ExplorerFileIcon name={tab.fileViewer?.path ?? tab.title} className="w-4 h-4" />;
     default:
       return <TerminalIcon className="w-3 h-3" style={{ color: "#2b5d8b" }} />;
   }
@@ -197,6 +201,7 @@ export function TabItem(props: TabItemProps) {
           onKeyDown={(e) => e.stopPropagation()}
         />
       )}
+      {tab.fileViewer && <ViewerDirtyIndicator path={tab.fileViewer.path} />}
       <div className="relative flex-shrink-0">
         <TabIcon tab={tab} />
         {tab.hasNewOutput && (

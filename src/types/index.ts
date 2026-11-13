@@ -6,7 +6,7 @@ import type { ObjectStorageConfig } from "./objectStorage";
 import type { LaunchPreparation } from "../lib/sockscap";
 import type { VncViewerOptions } from "../lib/vncOptions";
 
-export type TabKind = "terminal" | "sftp" | "rdp" | "vnc" | "nettools" | "sockscap" | "welcome" | "settings" | "placeholder" | "file-browser" | "database" | "redis" | "hbase-shell" | "proxy-test" | "object-storage" | "lan-chat" | "git" | "mail" | "mail-unified" | "code-workspace" | "mfa";
+export type TabKind = "terminal" | "sftp" | "rdp" | "vnc" | "nettools" | "sockscap" | "welcome" | "settings" | "placeholder" | "file-browser" | "database" | "redis" | "hbase-shell" | "proxy-test" | "object-storage" | "lan-chat" | "git" | "mail" | "mail-unified" | "code-workspace" | "mfa" | "file-viewer";
 
 /** Presence state of a LAN peer (mirrors the Rust `PresenceStatus`). */
 export type LanPresence = "online" | "away" | "busy" | "offline";
@@ -246,6 +246,14 @@ export interface ProxyTestTabInfo {
   testUrl?: string;
 }
 
+export interface FileViewerTabInfo {
+  path: string;
+  kind: import("../lib/openFile/classifyFile").FileKind;
+  mode?: "taomni" | "source";
+  readOnlyReason?: string;
+  source?: "local" | "remote-temp" | "mail-attachment";
+}
+
 export interface FileBrowserTabInfo {
   initialPath: string;
   /** Missing on legacy File-session metadata; it is migrated to Explorer on render. */
@@ -452,6 +460,7 @@ export interface Tab {
   db?: DbConnectInfo;
   hbase?: HBaseConnectInfo;
   fileBrowser?: FileBrowserTabInfo;
+  fileViewer?: FileViewerTabInfo;
   proxyTest?: ProxyTestTabInfo;
   objectStorage?: ObjectStorageTabInfo;
   mail?: MailTabInfo;

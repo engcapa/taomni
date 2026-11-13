@@ -12,7 +12,9 @@ import type { CodeWorkspaceFileRef, CodeWorkspaceRootInfo } from "../../../../ty
 import { type OpenFileState, type TreeSelection, type WorkspaceTreeCommandPayload, errorMessage, normalizeFsPath, parentPath, relativePathWithinRoot, rootDirKey, shouldHideEntry } from "../codeWorkspaceModel";
 import { type BreadcrumbPathAction, type BreadcrumbPathChild, type BreadcrumbPathSegment } from "../Breadcrumbs";
 import { type WorkspaceEditApplyOptions } from "./mutationTypes";
-import { t } from "../../../../lib/i18n";
+import { getLocale, t } from "../../../../lib/i18n";
+import { openFile } from "../../../../lib/openFile";
+import { fileOpenWorkspaceId } from "../../../../lib/fileOpenContext";
 import { projectExplorerMenu } from "../../../../lib/explorer/projectExplorerMenu";
 
 
@@ -149,7 +151,7 @@ export function createBreadcrumbPathActions(controllerContext: BreadcrumbPathAct
       actions.push({
         id: "reveal-explorer",
         label: "Reveal in Explorer",
-        onSelect: () => { void controllerContext.revealInExplorer(rootId, segment.path); },
+        onSelect: () => { void controllerContext.revealInExplorer(rootId, segment.kind === "file" ? parentPath(segment.path) : segment.path); },
       });
     } else {
       const absolute = normalizeFsPath(segment.path);
@@ -166,7 +168,7 @@ export function createBreadcrumbPathActions(controllerContext: BreadcrumbPathAct
         id: "reveal-explorer",
         label: "Reveal in Explorer",
         onSelect: () => {
-          void invoke("sftp_open_path", { path: absolute })
+          void invoke("sftp_open_path", { path: segment.kind === "file" ? parentPath(absolute) : absolute })
             .then(() => controllerContext.setStatusMessage(`Opened ${absolute}`))
             .catch((err) => controllerContext.setStatusMessage(errorMessage(err)));
         },
@@ -242,8 +244,11 @@ export function createShowTreeContextMenu(controllerContext: ShowTreeContextMenu
           const absolute = normalizeFsPath(ref.path);
           controllerContext.openTreeContextMenu(event, [
             { label: "Open", onClick: run("workspace.tree.open", { selection }) },
+            { label: getLocale().startsWith("zh") ? "用 Taomni 打开" : "Open with Taomni", testId: "code-workspace-tree-open-taomni", onClick: () => {
+              void openFile({ path: absolute }, { context: "workspace-tree", workspaceId: fileOpenWorkspaceId(controllerContext.workspaceInstanceId), mode: "taomni" }).catch((err) => controllerContext.setStatusMessage(errorMessage(err)));
+            } },
             { label: t("sftp.openWithDefault"), testId: "code-workspace-tree-open-default", onClick: () => {
-              void invoke("sftp_open_path", { path: absolute }).catch((err) => controllerContext.setStatusMessage(errorMessage(err)));
+              void openFile({ path: absolute }, { context: "workspace-tree", mode: "system" }).catch((err) => controllerContext.setStatusMessage(errorMessage(err)));
             } },
             { separator: true, label: "" },
             { label: "Copy Path", onClick: () => void writeText(absolute) },
@@ -262,7 +267,16 @@ export function createShowTreeContextMenu(controllerContext: ShowTreeContextMenu
         const dir = parentPath(ref.path);
         controllerContext.openTreeContextMenu(event, [
           { label: "Open", onClick: run("workspace.tree.open", { selection }) },
-          { label: t("sftp.openWithDefault"), testId: "code-workspace-tree-open-default", onClick: () => void controllerContext.revealInExplorer(ref.rootId, ref.path) },
+          { label: getLocale().startsWith("zh") ? "用 Taomni 打开" : "Open with Taomni", testId: "code-workspace-tree-open-taomni", onClick: () => {
+            const root = controllerContext.rootsRef.current.find((item) => item.id === ref.rootId);
+            if (!root) return;
+            void openFile({ path: `${normalizeFsPath(root.path).replace(/\/+$/, "")}/${ref.path}` }, { context: "workspace-tree", workspaceId: fileOpenWorkspaceId(controllerContext.workspaceInstanceId), mode: "taomni" }).catch((err) => controllerContext.setStatusMessage(errorMessage(err)));
+          } },
+          { label: t("sftp.openWithDefault"), testId: "code-workspace-tree-open-default", onClick: () => {
+            const root = controllerContext.rootsRef.current.find((item) => item.id === ref.rootId);
+            if (!root) return;
+            void openFile({ path: `${normalizeFsPath(root.path).replace(/\/+$/, "")}/${ref.path}` }, { context: "workspace-tree", mode: "system" }).catch((err) => controllerContext.setStatusMessage(errorMessage(err)));
+          } },
           { separator: true, label: "" },
           { label: "New File...", onClick: run("workspace.tree.newFile", { directory: { rootId: ref.rootId, path: dir } }) },
           { label: "New Java Class...", onClick: run("workspace.tree.newJavaClass", { directory: { rootId: ref.rootId, path: dir } }) },

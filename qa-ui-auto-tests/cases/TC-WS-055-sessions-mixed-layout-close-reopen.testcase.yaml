@@ -1,7 +1,9 @@
 id: TC-WS-055
 title: 'Crash regression: Sessions split/grid close-to-empty and mixed workspace terminal lifecycle'
-description: Browser preview cannot create native local PTYs. Exercise the real terminal error/empty surfaces, pending panel lifecycle and layout controls without
-  treating them as working shells. TC-WS-056 independently proves real PTY effects in the release WebView.
+description: 'Browser preview cannot create native local PTYs. Exercise the real terminal error/empty surfaces, pending panel lifecycle and layout controls
+  without treating them as working shells. TC-WS-056 independently proves real PTY effects in the release WebView. File-open migration: this IDE pane/layout
+  lifecycle regression explicitly associates .md/.txt with Code Workspace. New viewer defaults are tested separately by TC-FILE-OPEN-001..006; all original
+  pane/content/PTY/save assertions are retained.'
 modes:
 - browser
 covers:
@@ -27,10 +29,13 @@ steps:
 - seed_storage:
     key: taomni.platformWorkspaces.v1
     value: '{"version": 1, "activeWorkspaceId": "default-workspace", "createdNodes": [], "workspaces": [{"id": "default-workspace", "name": "Default Workspace",
-      "description": "", "isDefault": true, "rootFolders": [{"id": "root-1", "name": "qa-root", "path": "${fixture.platform_workspace_root}", "addedAt": 1}],
-      "pinnedSessionIds": [], "activeLeftToolWindow": "project", "bottomDock": {"open": false, "activeTool": "terminal", "heightPx": 220}, "openTabs": [], "activeTabId":
-      ""}, {"id": "second-workspace", "name": "Second Workspace", "description": "", "isDefault": false, "rootFolders": [], "pinnedSessionIds": [], "activeLeftToolWindow":
-      "project", "bottomDock": {"open": false, "activeTool": "terminal", "heightPx": 220}, "openTabs": [], "activeTabId": ""}]}'
+      "description": "", "isDefault": true, "rootFolders": [{"id": "root-1", "name": "qa-root", "path": "${fixture.platform_workspace_root}", "addedAt":
+      1}], "pinnedSessionIds": [], "activeLeftToolWindow": "project", "bottomDock": {"open": false, "activeTool": "terminal", "heightPx": 220}, "openTabs":
+      [], "activeTabId": ""}, {"id": "second-workspace", "name": "Second Workspace", "description": "", "isDefault": false, "rootFolders": [], "pinnedSessionIds":
+      [], "activeLeftToolWindow": "project", "bottomDock": {"open": false, "activeTool": "terminal", "heightPx": 220}, "openTabs": [], "activeTabId": ""}]}'
+- seed_storage:
+    key: taomni.fileOpen.preferences.v1
+    value: '{"associations":{"md":"workspace","txt":"workspace"}}'
 - reload_window: null
 - wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="nav-mode-workspaces"]'
@@ -210,217 +215,217 @@ verification:
   - id: R1
     requirement: Mixed workspace file/terminal layouts preserve one mounted terminal and display the retained file in split/grid.
     actions:
-    - 14
     - 15
-    - 17
+    - 16
     - 18
-    - 23
+    - 19
     - 24
-    - 29
+    - 25
     - 30
-    - 34
+    - 31
     - 35
+    - 36
     checkpoints:
-    - step: 19
-      expectation: '{"assert_no_runtime_errors": null}'
     - step: 20
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "split"}}'
+      expectation: '{"assert_no_runtime_errors": null}'
     - step: 21
-      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-session-pane\"] [data-testid=\"terminal-pane\"]", "equal": 1}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "split"}}'
     - step: 22
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-session-pane\"] [data-testid=\"terminal-pane\"]", "equal": 1}}'
+    - step: 23
       expectation: '{"assert_visible": "[data-testid=\"workspace-canvas-panes\"] [data-testid=\"code-workspace-editor-pane\"] .cm-content"}'
-    - step: 25
-      expectation: '{"assert_no_runtime_errors": null}'
     - step: 26
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "grid"}}'
+      expectation: '{"assert_no_runtime_errors": null}'
     - step: 27
-      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-session-pane\"] [data-testid=\"terminal-pane\"]", "equal": 1}}'
-    - step: 28
-      expectation: '{"assert_visible": "[data-testid=\"workspace-canvas-panes\"] [data-testid=\"code-workspace-editor-pane\"] .cm-content"}'
-    - step: 31
-      expectation: '{"assert_no_runtime_errors": null}'
-    - step: 32
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "single"}}'
-    - step: 33
-      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-session-pane\"] [data-testid=\"terminal-pane\"]", "equal": 1}}'
-    - step: 36
-      expectation: '{"assert_no_runtime_errors": null}'
-    - step: 37
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "grid"}}'
-    - step: 38
+    - step: 28
       expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-session-pane\"] [data-testid=\"terminal-pane\"]", "equal": 1}}'
+    - step: 29
+      expectation: '{"assert_visible": "[data-testid=\"workspace-canvas-panes\"] [data-testid=\"code-workspace-editor-pane\"] .cm-content"}'
+    - step: 32
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 33
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "single"}}'
+    - step: 34
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-session-pane\"] [data-testid=\"terminal-pane\"]", "equal": 1}}'
+    - step: 37
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 38
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "grid"}}'
     - step: 39
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-session-pane\"] [data-testid=\"terminal-pane\"]", "equal": 1}}'
+    - step: 40
       expectation: '{"assert_visible": "[data-testid=\"workspace-canvas-panes\"] [data-testid=\"code-workspace-editor-pane\"] .cm-content"}'
     results:
-    - 19
     - 20
     - 21
     - 22
-    - 25
+    - 23
     - 26
     - 27
     - 28
-    - 31
+    - 29
     - 32
     - 33
-    - 36
+    - 34
     - 37
     - 38
     - 39
+    - 40
   - id: R2
     requirement: Empty, one- and four-session layouts remain usable through repeated grid/split and closing every active session, then reopening.
     actions:
-    - 40
-    - 42
+    - 41
     - 43
-    - 46
+    - 44
     - 47
-    - 50
+    - 48
     - 51
-    - 54
-    - 56
+    - 52
+    - 55
     - 57
-    - 60
-    - 62
-    - 64
-    - 66
+    - 58
+    - 61
+    - 63
+    - 65
     - 67
-    - 71
+    - 68
     - 72
-    - 76
+    - 73
     - 77
-    - 81
-    - 84
-    - 87
-    - 90
-    - 94
+    - 78
+    - 82
+    - 85
+    - 88
+    - 91
+    - 95
     checkpoints:
-    - step: 44
-      expectation: '{"assert_visible": "[data-testid=\"sessions-empty-state\"]"}'
     - step: 45
-      expectation: '{"assert_no_runtime_errors": null}'
-    - step: 48
       expectation: '{"assert_visible": "[data-testid=\"sessions-empty-state\"]"}'
+    - step: 46
+      expectation: '{"assert_no_runtime_errors": null}'
     - step: 49
-      expectation: '{"assert_no_runtime_errors": null}'
-    - step: 52
       expectation: '{"assert_visible": "[data-testid=\"sessions-empty-state\"]"}'
+    - step: 50
+      expectation: '{"assert_no_runtime_errors": null}'
     - step: 53
-      expectation: '{"assert_no_runtime_errors": null}'
-    - step: 58
-      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-split-pane\"]", "equal": 1}}'
-    - step: 59
-      expectation: '{"assert_no_runtime_errors": null}'
-    - step: 68
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"terminal-split-stage\"]", "name": "data-split-layout", "equals": "grid"}}'
-    - step: 69
-      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-split-pane\"]", "equal": 4}}'
-    - step: 70
-      expectation: '{"assert_no_runtime_errors": null}'
-    - step: 73
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"terminal-split-stage\"]", "name": "data-split-layout", "equals": "horizontal"}}'
-    - step: 74
-      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-split-pane\"]", "equal": 4}}'
-    - step: 75
-      expectation: '{"assert_no_runtime_errors": null}'
-    - step: 78
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"terminal-split-stage\"]", "name": "data-split-layout", "equals": "grid"}}'
-    - step: 79
-      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-split-pane\"]", "equal": 4}}'
-    - step: 80
-      expectation: '{"assert_no_runtime_errors": null}'
-    - step: 82
-      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-split-pane\"]", "equal": 3}}'
-    - step: 83
-      expectation: '{"assert_no_runtime_errors": null}'
-    - step: 85
-      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-split-pane\"]", "equal": 2}}'
-    - step: 86
-      expectation: '{"assert_no_runtime_errors": null}'
-    - step: 88
-      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-split-pane\"]", "equal": 1}}'
-    - step: 89
-      expectation: '{"assert_no_runtime_errors": null}'
-    - step: 91
-      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-split-pane\"]", "equal": 0}}'
-    - step: 92
-      expectation: '{"assert_no_runtime_errors": null}'
-    - step: 93
       expectation: '{"assert_visible": "[data-testid=\"sessions-empty-state\"]"}'
-    - step: 96
+    - step: 54
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 59
       expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-split-pane\"]", "equal": 1}}'
+    - step: 60
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 69
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"terminal-split-stage\"]", "name": "data-split-layout", "equals": "grid"}}'
+    - step: 70
+      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-split-pane\"]", "equal": 4}}'
+    - step: 71
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 74
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"terminal-split-stage\"]", "name": "data-split-layout", "equals": "horizontal"}}'
+    - step: 75
+      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-split-pane\"]", "equal": 4}}'
+    - step: 76
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 79
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"terminal-split-stage\"]", "name": "data-split-layout", "equals": "grid"}}'
+    - step: 80
+      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-split-pane\"]", "equal": 4}}'
+    - step: 81
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 83
+      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-split-pane\"]", "equal": 3}}'
+    - step: 84
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 86
+      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-split-pane\"]", "equal": 2}}'
+    - step: 87
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 89
+      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-split-pane\"]", "equal": 1}}'
+    - step: 90
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 92
+      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-split-pane\"]", "equal": 0}}'
+    - step: 93
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 94
+      expectation: '{"assert_visible": "[data-testid=\"sessions-empty-state\"]"}'
     - step: 97
+      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-split-pane\"]", "equal": 1}}'
+    - step: 98
       expectation: '{"assert_no_runtime_errors": null}'
     results:
-    - 44
     - 45
-    - 48
+    - 46
     - 49
-    - 52
+    - 50
     - 53
-    - 58
+    - 54
     - 59
-    - 68
+    - 60
     - 69
     - 70
-    - 73
+    - 71
     - 74
     - 75
-    - 78
+    - 76
     - 79
     - 80
-    - 82
+    - 81
     - 83
-    - 85
+    - 84
     - 86
-    - 88
+    - 87
     - 89
-    - 91
+    - 90
     - 92
     - 93
-    - 96
+    - 94
     - 97
+    - 98
   - id: R3
     requirement: Returning through Home and Tools preserves the independent workspace terminal and its unsaved file.
     actions:
-    - 98
-    - 100
-    - 102
-    - 106
-    - 107
-    - 111
-    checkpoints:
-    - step: 99
-      expectation: '{"assert_no_runtime_errors": null}'
-    - step: 101
-      expectation: '{"assert_no_runtime_errors": null}'
-    - step: 103
-      expectation: '{"assert_no_runtime_errors": null}'
-    - step: 104
-      expectation: '{"assert_visible": "[data-testid=\"workspace-session-pane\"]"}'
-    - step: 105
-      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-session-pane\"] [data-testid=\"terminal-pane\"]", "equal": 1}}'
-    - step: 108
-      expectation: '{"assert_no_runtime_errors": null}'
-    - step: 109
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "single"}}'
-    - step: 110
-      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 0}}'
-    - step: 112
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "equals": "QA_MIXED_CANVAS_DRAFT"}}'
-    - step: 113
-      expectation: '{"assert_no_runtime_errors": null}'
-    results:
     - 99
     - 101
     - 103
+    - 107
+    - 108
+    - 112
+    checkpoints:
+    - step: 100
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 102
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 104
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 105
+      expectation: '{"assert_visible": "[data-testid=\"workspace-session-pane\"]"}'
+    - step: 106
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-session-pane\"] [data-testid=\"terminal-pane\"]", "equal": 1}}'
+    - step: 109
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 110
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "single"}}'
+    - step: 111
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"] [data-testid=\"code-workspace-editor-pane\"]", "equal": 0}}'
+    - step: 113
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "equals": "QA_MIXED_CANVAS_DRAFT"}}'
+    - step: 114
+      expectation: '{"assert_no_runtime_errors": null}'
+    results:
+    - 100
+    - 102
     - 104
     - 105
-    - 108
+    - 106
     - 109
     - 110
-    - 112
+    - 111
     - 113
+    - 114
   visual:
   - check: Pane topology, selected files and preserved editor content
     method: automated

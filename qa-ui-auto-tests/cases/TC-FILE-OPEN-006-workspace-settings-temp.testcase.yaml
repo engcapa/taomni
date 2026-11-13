@@ -1,0 +1,338 @@
+id: TC-FILE-OPEN-006
+title: Workspace file entries dedupe, global settings persist and mail temps stay read-only then release
+description: AC18/19/20. Real project-tree context menu opens a workspace viewer, normal tree entry and second explicit action
+  reuse it. Settings use actual controls and persist across reload. Mail attachment downloads through real native IMAP (browser
+  stub is VFS-only), dedupes the controlled copy and releases its exact observed temp path after final host close. SFTP cancellation/resume
+  and AI/ terminal/Git UI entries are supported by focused unit tests but not exercised here; do not claim complete entry-matrix
+  runtime coverage.
+modes:
+- browser
+- native
+covers:
+- F-FILEOPEN-1
+- F-EXPLORER-1
+- F-MAIL-5
+tags:
+- p0
+- file-open
+- workspace
+- settings
+- mail
+- temporary-file
+- crash-regression
+fixtures:
+- reset_db
+- file_open_files
+- file_open_mail
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-file-open-contexts
+- seed_storage:
+    key: taomni.platformWorkspaces.v1
+    value: ${fixture.file_open_workspace}
+- seed_storage:
+    key: taomni.quickConnectVisible
+    value: 'true'
+- reload_window: null
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="code-workspace-tree"]'
+- click: '[data-testid="code-workspace-tree-view-selector"]'
+- click: '[data-testid="code-workspace-tree-view-project"]'
+- wait_for: '[data-testid="code-workspace-tree-file"][data-path="notes.txt"]'
+- right_click: '[data-testid="code-workspace-tree-file"][data-path="notes.txt"]'
+- click: '[data-testid="code-workspace-tree-open-taomni"]'
+- wait_for: '[data-testid="file-viewer"][data-kind="text"] [data-testid="viewer-editor"] .cm-content'
+- assert_count:
+    selector: '[data-testid="workspace-tab"][data-tab-kind="viewer"]'
+    equal: 1
+- assert_items:
+    selector: '[data-testid="viewer-editor"] .cm-line'
+    equals:
+    - File open original
+    - Second line
+    - 中文
+    - ''
+- right_click: '[data-testid="code-workspace-tree-file"][data-path="notes.txt"]'
+- click: '[data-testid="code-workspace-tree-open-taomni"]'
+- assert_count:
+    selector: '[data-testid="workspace-tab"][data-tab-kind="viewer"]'
+    equal: 1
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/notes.txt
+    sha256: ${fixture.file_open_original_sha}
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: files and opening
+- wait_for: '[data-testid="file-open-settings"]'
+- click: '[data-testid="file-open-default-system"]'
+- select_option:
+    selector: '[data-testid="file-open-association-svg"]'
+    value: taomni
+- fill:
+    selector: '[data-testid="file-open-image-dir"]'
+    value: images
+- fill:
+    selector: '[data-testid="file-open-image-template"]'
+    value: paste-{date}-{time}.png
+- set_check:
+    selector: '[data-testid="file-open-convert-tables"]'
+    checked: false
+- set_check:
+    selector: '[data-testid="file-open-wrap"]'
+    checked: false
+- fill:
+    selector: '[data-testid="file-open-font-size"]'
+    value: '16'
+- select_option:
+    selector: '[data-testid="file-open-html-network"]'
+    value: ask
+- select_option:
+    selector: '[data-testid="html-preview-proxy-mode"]'
+    value: custom
+- assert_visible: '[data-testid="html-preview-custom-proxy-panel"]'
+- select_option:
+    selector: '[data-testid="html-preview-proxy-mode"]'
+    value: none
+- assert_localstorage:
+    key: taomni.fileOpen.preferences.v1
+    contains: '"htmlProxyMode":"none"'
+- assert_not_visible: '[data-testid="html-preview-custom-proxy-panel"]'
+- set_check:
+    selector: '[data-testid="file-open-html-scripts"]'
+    checked: false
+- assert_localstorage:
+    key: taomni.fileOpen.preferences.v1
+    contains: '"defaultHandler":"system"'
+- assert_localstorage:
+    key: taomni.fileOpen.preferences.v1
+    contains: '"svg":"taomni"'
+- assert_localstorage:
+    key: taomni.fileOpen.preferences.v1
+    contains: '"markdownImageDir":"images"'
+- reload_window: null
+- click: '[data-testid="ribbon-settings"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: files and opening
+- wait_for: '[data-testid="file-open-settings"]'
+- assert_attribute:
+    selector: '[data-testid="file-open-default-system"]'
+    name: aria-checked
+    equals: 'true'
+- eval_readonly:
+    expression: document.getElementById("html-preview-proxy-mode").value === "none"
+    expect_truthy: true
+- eval_readonly:
+    expression: document.getElementById("file-open-image-dir").value === "images" && document.getElementById("file-open-font-size").value
+      === "16" && document.getElementById("file-open-html-network").value === "ask"
+    expect_truthy: true
+- click: '[data-testid="file-open-default-taomni"]'
+- assert_attribute:
+    selector: '[data-testid="file-open-default-taomni"]'
+    name: aria-checked
+    equals: 'true'
+- click: '[data-testid="file-open-default-system"]'
+- assert_attribute:
+    selector: '[data-testid="file-open-default-system"]'
+    name: aria-checked
+    equals: 'true'
+- eval_readonly:
+    expression: document.getElementById("html-preview-proxy-mode").value === "none"
+    expect_truthy: true
+- click: '[data-testid="file-open-settings-reset"]'
+- assert_attribute:
+    selector: '[data-testid="file-open-default-taomni"]'
+    name: aria-checked
+    equals: 'true'
+- assert_localstorage:
+    key: taomni.fileOpen.preferences.v1
+    contains: '"markdownImageDir":"assets"'
+- assert_localstorage:
+    key: taomni.fileOpen.preferences.v1
+    contains: '"associations":{}'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="side-tab-sessions"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ${fixture.mail_quick_connect}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="mail-client-tab"]'
+- wait_for: '[data-testid="mail-message-row"][data-subject="Account-level AI policy"]'
+- click: '[data-testid="mail-message-row"][data-subject="Account-level AI policy"]'
+- wait_for: '[data-testid="mail-attachment-open"][data-name="policy.txt"]'
+- dblclick: '[data-testid="mail-attachment-open"][data-name="policy.txt"]'
+- wait_for: '[data-testid="file-viewer"][data-readonly="true"]'
+- assert_visible: '[data-testid="file-viewer"][data-readonly="true"] [data-testid="viewer-readonly"]'
+- assert_disabled: '[data-testid="file-viewer"][data-readonly="true"] [data-testid="viewer-save"]'
+- assert_attribute:
+    selector: '[data-testid="file-viewer"][data-readonly="true"] [data-testid="viewer-editor"] .cm-content'
+    name: contenteditable
+    equals: 'false'
+- assert_items:
+    selector: '[data-testid="file-viewer"][data-readonly="true"] [data-testid="viewer-editor"] .cm-line'
+    equals:
+    - Mail attachment read-only fixture.
+    - Save locally before editing.
+    - ''
+- assert_file_open_bytes:
+    selector: '[data-testid="file-viewer"][data-readonly="true"]'
+    remember: mail-copy
+    equals: 'Mail attachment read-only fixture.
+
+      Save locally before editing.
+
+      '
+- click: '[data-testid="tab-item"][data-tab-type="mail"]'
+- dblclick: '[data-testid="mail-attachment-open"][data-name="policy.txt"]'
+- wait_for: '[data-testid="file-viewer"][data-readonly="true"]'
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="file-viewer"]'
+    equal: 1
+- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- wait_for:
+    selector: '[data-testid="file-viewer"][data-readonly="true"]'
+    state: detached
+- assert_file_open_bytes:
+    remember: mail-copy
+    absent: true
+- assert_no_runtime_errors: null
+- screenshot: global-settings-mail-temp-closed.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Project tree uses the shared workspace viewer and activates rather than duplicating it.
+    actions:
+    - 12
+    - 13
+    - 17
+    - 18
+    checkpoints:
+    - step: 15
+      expectation: First open creates one workspace viewer.
+    - step: 16
+      expectation: Workspace host contains exact original text.
+    - step: 19
+      expectation: Second entry activates the same tab.
+    - step: 20
+      expectation: Opening does not modify actual source bytes.
+    results:
+    - 15
+    - 16
+    - 19
+    - 20
+  - id: R2
+    requirement: All global preference fields persist across reload and Restore defaults clears overrides immediately.
+    actions:
+    - 21
+    - 23
+    - 25
+    - 26
+    - 27
+    - 28
+    - 29
+    - 30
+    - 31
+    - 32
+    - 38
+    - 42
+    - 43
+    - 44
+    - 54
+    checkpoints:
+    - step: 39
+      expectation: Default handler is persisted separately from application settings.
+    - step: 40
+      expectation: Extension-specific override persists.
+    - step: 41
+      expectation: Markdown image directory persists.
+    - step: 46
+      expectation: Remounted Settings reads the saved default choice.
+    - step: 48
+      expectation: Image path/font/network controls restore actual persisted values.
+    - step: 55
+      expectation: Reset switches default back to Taomni.
+    - step: 56
+      expectation: Reset restores assets directory.
+    - step: 57
+      expectation: Reset clears associations.
+    results:
+    - 39
+    - 40
+    - 41
+    - 46
+    - 48
+    - 55
+    - 56
+    - 57
+  - id: R3
+    requirement: Mail opens one controlled read-only copy and final-host close deletes only that observed temporary artifact.
+    actions:
+    - 60
+    - 61
+    - 64
+    - 66
+    - 73
+    - 74
+    - 77
+    checkpoints:
+    - step: 69
+      expectation: Remote copy cannot Save in place.
+    - step: 70
+      expectation: CodeMirror is genuinely non-editable.
+    - step: 71
+      expectation: Downloaded text is exact.
+    - step: 72
+      expectation: Independent VFS/native bytes match downloaded attachment and controlled path is retained.
+    - step: 76
+      expectation: Reopening the same attachment reuses one main viewer.
+    - step: 79
+      expectation: Closing the final host removes its observed controlled temp file.
+    - step: 80
+      expectation: Shared scope/settings/temp lifecycle has no uncaught runtime errors.
+    results:
+    - 69
+    - 70
+    - 71
+    - 72
+    - 76
+    - 79
+    - 80
+  - id: R4
+    requirement: HTML proxy mode has app/custom/none choices, custom panel is feature-local, and none persists across reload
+      without opening network by default.
+    actions:
+    - 33
+    - 35
+    checkpoints:
+    - step: 34
+      expectation: Custom proxy panel visibility or persisted no-proxy mode matches the actual control lifecycle.
+    - step: 36
+      expectation: Custom proxy panel visibility or persisted no-proxy mode matches the actual control lifecycle.
+    - step: 37
+      expectation: Custom proxy panel visibility or persisted no-proxy mode matches the actual control lifecycle.
+    - step: 47
+      expectation: Custom proxy panel visibility or persisted no-proxy mode matches the actual control lifecycle.
+    - step: 53
+      expectation: Custom proxy panel visibility or persisted no-proxy mode matches the actual control lifecycle.
+    results:
+    - 34
+    - 36
+    - 37
+    - 47
+    - 53
+  visual:
+  - check: Prototype scene 7 labels and settings density
+    method: manual
+    reason: Controls are real and unit-tested bilingually; pixel/layout review remains unrun.
+  native:
+  - check: IMAP attachment download, read-only host and temp cleanup
+    method: automated
+    reason: Native mode uses local real IMAP and independent host reads/removal observation.
+  - check: SFTP cancel/resume, AI/terminal/Git entries, Save-as-local and OS system handler
+    method: manual
+    reason: Focused unit tests support implementation; six-case runtime matrix does not yet execute these separate entry workflows.

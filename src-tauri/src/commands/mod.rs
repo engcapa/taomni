@@ -43,6 +43,7 @@ mod test_results;
 mod tunnel;
 mod update;
 mod vault;
+mod viewer;
 mod vnc;
 mod voice;
 mod webview_recovery;
@@ -198,6 +199,18 @@ pub(crate) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         | "sdk_remove_workspace_binding"
         | "sdk_analyze_workspace"
         | "sdk_resolve_workspace" => sdk::handle(invoke),
+        "viewer_stat"
+        | "viewer_read_text"
+        | "viewer_read_bytes"
+        | "viewer_write_text"
+        | "viewer_read_text_chunk"
+        | "viewer_save_pasted_image"
+        | "viewer_html_open"
+        | "viewer_html_close"
+        | "viewer_create_temp"
+        | "viewer_release_temp"
+        | "viewer_temp_allocate"
+        | "viewer_temp_release" => viewer::handle(invoke),
         command if workspace::handles(command) => workspace::handle(invoke),
         "workspace_test_results" => test_results::handle(invoke),
         "workspace_execution_model" => workspace_execution::handle(invoke),

@@ -4,12 +4,15 @@ import { t as tr } from "../../lib/i18n";
 import { sidebarRailGroup } from "../sidebarRailPolicy";
 import { terminalCwdTitlePrefix } from "../../lib/terminalCwd";
 import { getQueryTab } from "../../lib/queryRegistry";
+import { guardViewerClose } from "../../lib/openFile/closeGuard";
+import { documentPathKey } from "../../lib/openFile/pathIdentity";
+import { useDocumentStore } from "../documentStore";
 import { computeDuplicateTitle, computeNewTerminalTitle, updateDuplicateAutoTitle } from "./tabTitles";
 import { type AppState } from "./types";
 import { upsertRecentWorkspaceForTab, writeRecentWorkspaces, newWorkspaceInstanceId } from "./recentWorkspaces";
 import { terminalAutoTitleBase, activeTabIsTerminal, pruneSet, omitRecordKeys } from "./policies";
 
-export const createTabsSlice: StateCreator<AppState, [], [], Pick<AppState, "tabs" | "activeTabId" | "tabFilter" | "addTab" | "duplicateTab" | "removeTab" | "removeTabs" | "updateTabVnc" | "updateTabTitle" | "assignTerminalAutoTitle" | "updateGitTabInfo" | "setActiveTab" | "moveTab" | "moveTabToIndex" | "setTabFilter" | "clearTabFilter">> = (set) => ({
+export const createTabsSlice: StateCreator<AppState, [], [], Pick<AppState, "tabs" | "activeTabId" | "tabFilter" | "addTab" | "duplicateTab" | "removeTab" | "removeTabs" | "updateTabVnc" | "updateTabTitle" | "assignTerminalAutoTitle" | "updateGitTabInfo" | "setActiveTab" | "moveTab" | "moveTabToIndex" | "setTabFilter" | "clearTabFilter">> = (set, get) => ({
   tabs: [
     {
       id: "welcome",
@@ -121,6 +124,11 @@ export const createTabsSlice: StateCreator<AppState, [], [], Pick<AppState, "tab
     }),
 
   removeTab: (id) => {
+    const path = get().tabs.find((tab) => tab.id === id)?.fileViewer?.path;
+    if (path && useDocumentStore.getState().documents[documentPathKey(path)]?.dirty) {
+      guardViewerClose([path], () => get().removeTab(id));
+      return;
+    }
     void getQueryTab(id)?.flushWorkspace?.();
     set((s) => {
       const idx = s.tabs.findIndex((t) => t.id === id);
@@ -157,7 +165,12 @@ export const createTabsSlice: StateCreator<AppState, [], [], Pick<AppState, "tab
     });
   },
 
-  removeTabs: (ids) =>
+  removeTabs: (ids) => {
+    const paths = get().tabs.filter((tab) => ids.includes(tab.id)).flatMap((tab) => tab.fileViewer ? [tab.fileViewer.path] : []);
+    if (paths.some((path) => useDocumentStore.getState().documents[documentPathKey(path)]?.dirty)) {
+      guardViewerClose(paths, () => get().removeTabs(ids));
+      return;
+    }
     set((s) => {
       const idSet = new Set(ids);
       const activeIndex = s.tabs.findIndex((t) => t.id === s.activeTabId);
@@ -198,7 +211,8 @@ export const createTabsSlice: StateCreator<AppState, [], [], Pick<AppState, "tab
         terminalRuntimeByTab: omitRecordKeys(s.terminalRuntimeByTab, idSet),
         statusMessage: tr("status.closedTabs"),
       };
-    }),
+    });
+  },
 
   updateTabVnc: (id, patch) =>
     set((s) => ({

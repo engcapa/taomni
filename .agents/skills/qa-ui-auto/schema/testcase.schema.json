@@ -93,6 +93,8 @@
           "workspace_drop_import",
           "workspace_file_clipboard",
           "explorer_files",
+          "file_open_files",
+          "file_open_mail",
           "explorer_large_directory",
           "workspace_search_large",
           "workspace_compact_tree",
@@ -545,6 +547,28 @@
         },
         "drag_to": {
           "$ref": "#/$defs/drag_arg"
+        },
+        "assert_file_open_bytes": {
+          "type": "object", "additionalProperties": false,
+          "properties": {
+            "path": {"type": "string", "minLength": 1},
+            "selector": {"$ref": "#/$defs/selector"},
+            "remember": {"type": "string", "minLength": 1},
+            "equals": {"type": "string"},
+            "sha256": {"type": "string", "minLength": 1},
+            "absent": {"const": true},
+            "timeout_sec": {"type": "number", "minimum": 0, "maximum": 60}
+          },
+          "description": "Independent exact UTF-8/SHA256/absence oracle inside file_open_files fixture or a DOM-observed controlled viewer temp. remember stores the observed path for post-close absence checks. Browser reads VFS only; native reads real host bytes."
+        },
+        "assert_download": {
+          "type": "object", "additionalProperties": false, "required": ["trigger", "filename"],
+          "properties": {
+            "trigger": {"$ref": "#/$defs/selector"},
+            "filename": {"type": "string", "minLength": 1},
+            "contains": {"type": "array", "items": {"type": "string"}}
+          },
+          "description": "Browser only: click the real export control, wait for actual Playwright download, retain artifact and assert filename/nonempty/content bytes. Not native disk or dialog evidence."
         },
         "file_clipboard": {
           "type": "object", "additionalProperties": false, "required": ["action", "paths"],

@@ -1,8 +1,9 @@
 id: TC-WS-057
 title: 'Crash regression: Default Workspace with Compact Home directories remains usable'
-description: Enable Compact through Appearance on a disposable Home-shaped tree, then restore Default Workspace in that saved mode. Browse a real compressed
+description: 'Enable Compact through Appearance on a disposable Home-shaped tree, then restore Default Workspace in that saved mode. Browse a real compressed
   source chain and a document while the branching AppData directory stays collapsed. Reload and toggle Compact through Appearance; expansion and file contents
-  must survive.
+  must survive. File-open migration: this IDE pane/layout lifecycle regression explicitly associates .md/.txt with Code Workspace. New viewer defaults are
+  tested separately by TC-FILE-OPEN-001..006; all original pane/content/PTY/save assertions are retained.'
 modes:
 - browser
 - native
@@ -28,6 +29,9 @@ steps:
 - seed_storage:
     key: taomni.platformWorkspaces.v1
     value: '{"version":1,"activeWorkspaceId":"default-workspace","createdNodes":[],"workspaces":[{"id":"default-workspace","name":"Default Workspace","description":"","isDefault":true,"rootFolders":[{"id":"root-home","name":"HOME","path":"${fixture.platform_workspace_root}","addedAt":1}],"pinnedSessionIds":[],"activeLeftToolWindow":"project","bottomDock":{"open":false,"activeTool":"terminal","heightPx":220},"openTabs":[],"activeTabId":""}]}'
+- seed_storage:
+    key: taomni.fileOpen.preferences.v1
+    value: '{"associations":{"md":"workspace","txt":"workspace"}}'
 - reload_window: null
 - wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="nav-mode-workspaces"]'
@@ -108,93 +112,93 @@ verification:
       stays collapsed.
     actions:
     - 3
-    - 6
-    - 8
+    - 7
     - 9
     - 10
-    - 15
+    - 11
     - 16
-    - 18
+    - 17
     - 19
+    - 20
     results:
-    - 12
     - 13
     - 14
-    - 17
-    - 20
+    - 15
+    - 18
     - 21
+    - 22
     checkpoints:
-    - step: 12
-      expectation: The restored directory view is Compact.
     - step: 13
-      expectation: AppData remains collapsed.
+      expectation: The restored directory view is Compact.
     - step: 14
+      expectation: AppData remains collapsed.
+    - step: 15
       expectation: Collapsed AppData does not render child rows.
-    - step: 17
+    - step: 18
       expectation: The compact source endpoint opens the actual App.java contents.
-    - step: 20
-      expectation: The document opens with the fixture text.
     - step: 21
+      expectation: The document opens with the fixture text.
+    - step: 22
       expectation: No runtime errors occurred during navigation or file opening.
   - id: R2
     requirement: Home navigation and reload preserve expanded Compact endpoints and document contents without expanding AppData.
     actions:
-    - 22
     - 23
-    - 27
-    - 28
-    results:
     - 24
+    - 28
+    - 29
+    results:
     - 25
     - 26
-    - 30
+    - 27
     - 31
     - 32
     - 33
+    - 34
     checkpoints:
-    - step: 24
-      expectation: The expanded source endpoint is still visible after mode navigation.
     - step: 25
-      expectation: The document row is still visible after mode navigation.
+      expectation: The expanded source endpoint is still visible after mode navigation.
     - step: 26
+      expectation: The document row is still visible after mode navigation.
+    - step: 27
       expectation: Mode navigation caused no runtime errors.
-    - step: 30
-      expectation: The document directory remains expanded after reload.
     - step: 31
-      expectation: AppData remains collapsed after reload.
+      expectation: The document directory remains expanded after reload.
     - step: 32
-      expectation: The document content is restored after reload.
+      expectation: AppData remains collapsed after reload.
     - step: 33
+      expectation: The document content is restored after reload.
+    - step: 34
       expectation: Reload and restoration caused no runtime errors.
   - id: R3
     requirement: Appearance can disable and enable Compact and the restored source endpoint remains usable.
     actions:
-    - 34
     - 35
     - 36
-    - 39
+    - 37
     - 40
     - 41
-    - 44
-    results:
-    - 37
-    - 38
     - 42
-    - 43
     - 45
+    results:
+    - 38
+    - 39
+    - 43
+    - 44
     - 46
+    - 47
     checkpoints:
-    - step: 37
-      expectation: Disabling Compact selects Tree mode.
     - step: 38
+      expectation: Disabling Compact selects Tree mode.
+    - step: 39
       expectation: Tree mode displays the uncompressed src row.
-    - step: 42
-      expectation: Enabling Compact selects Compact mode.
     - step: 43
+      expectation: Enabling Compact selects Compact mode.
+    - step: 44
       expectation: The expanded compact endpoint is visible again.
-    - step: 45
-      expectation: The sibling source file opens with its actual contents.
     - step: 46
+      expectation: The sibling source file opens with its actual contents.
+    - step: 47
       expectation: Repeated Compact transitions caused no runtime errors.
   visual:
   - check: Inspect compressed directory labels and file rows in compact-home-responsive.png.

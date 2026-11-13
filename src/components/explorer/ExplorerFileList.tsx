@@ -151,7 +151,7 @@ export function ExplorerFileList(inputs: FilePanelViewProps) {
               });
             }}
             onClick={(event) => { if (renaming) return; interactions.handleRowClick(entry, event); setFocused(entry.path); if (!event.shiftKey) anchor.current = entry.path; scroll.current?.focus(); }}
-            onDoubleClick={() => { if (!renaming) inputs.onItemDoubleClick(entry); }} onContextMenu={(event) => interactions.handleRowContext(entry, event)}>
+            onDoubleClick={(event) => { if (!renaming) { if (event.ctrlKey || event.metaKey) { void operations.open(entry, true); } else inputs.onItemDoubleClick(entry); } }} onContextMenu={(event) => interactions.handleRowContext(entry, event)}>
             {icons ? <><ExplorerFileIcon entry={entry} /><div className="ex-tile-name">{renaming ? <ExplorerRenameInput entry={entry} /> : entry.name}</div></> : <>
               <div className="ex-name"><ExplorerFileIcon entry={entry} /><span className="truncate flex-1">{renaming ? <ExplorerRenameInput entry={entry} /> : entry.name}</span></div>
               <div className="ex-mod">{entry.mtime ? new Date(entry.mtime * 1000).toLocaleString(undefined, { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : ""}</div>

@@ -14662,6 +14662,9 @@ controls:
   - id: explorer-preview-right
     selector: '[data-testid="explorer-preview-right"]'
     kind: interactive
+  - id: explorer-preview-sanitized
+    selector: '[data-testid="explorer-preview-sanitized"]'
+    kind: display
   - id: explorer-preview-settings
     selector: '[data-testid="explorer-preview-settings"]'
     kind: interactive
@@ -14757,3 +14760,470 @@ controls:
 -->
 
 已接入 Tools/主菜单、工作区导航与项目树、本地终端右键。保持原 File 会话关联与 SFTP 双栏。原型样式、导航/预览/选择、文件操作、回收站撤销及恢复由 TC-EXPLORER-001..005 验证；当前 GitHub 执行证据见 `docs-feature/file-explorer/implementation.md`，不以静态清单宣称原生通过。
+
+## 全局文件打开 / 预览 / 编辑
+
+<!-- feature
+id: F-FILEOPEN-1
+title: Global File Opening and Shared Viewers
+status: implemented
+area: files/viewer
+components: [ViewerShell, TextEditor, ImageViewer, MarkdownEditor, HtmlPreview, FileOpenSettings]
+files:
+  - src/lib/openFile/index.ts
+  - src/lib/openFile/preferences.ts
+  - src/lib/fileOpenTemp.ts
+  - src/lib/fileOpenContext.ts
+  - src/lib/filePathLinks.ts
+  - src/lib/sftpController.ts
+  - src/components/settings/FileOpenSettings.tsx
+  - src/components/chat/useChatFileLinks.ts
+  - src/components/terminal/panel/fileLinks.ts
+  - src/components/mail/client/createAttachmentActions.tsx
+  - src/components/viewer/ViewerShell.tsx
+  - src/components/viewer/TextEditor.tsx
+  - src/components/viewer/ImageViewer.tsx
+  - src/components/viewer/HtmlPreview.tsx
+  - src/components/viewer/HtmlPreviewExternalLinkDialog.tsx
+  - src/components/viewer/markdown/MarkdownEditor.tsx
+  - src/components/viewer/markdown/MarkdownExportMenu.tsx
+  - src-tauri/src/viewer/mod.rs
+controls:
+  - id: file-viewer
+    selector: '[data-testid="file-viewer"]'
+    kind: display
+  - id: viewer-editor
+    selector: '[data-testid="viewer-editor"]'
+    kind: interactive
+  - id: viewer-save
+    selector: '[data-testid="viewer-save"]'
+    kind: interactive
+  - id: viewer-readonly
+    selector: '[data-testid="viewer-readonly"]'
+    kind: display
+  - id: viewer-save-as
+    selector: '[data-testid="viewer-save-as"]'
+    kind: interactive
+  - id: viewer-conflict
+    selector: '[data-testid="viewer-conflict"]'
+    kind: display
+  - id: viewer-reload
+    selector: '[data-testid="viewer-reload"]'
+    kind: interactive
+  - id: viewer-compare
+    selector: '[data-testid="viewer-compare"]'
+    kind: interactive
+  - id: viewer-keep
+    selector: '[data-testid="viewer-keep"]'
+    kind: interactive
+  - id: viewer-diff
+    selector: '[data-testid="viewer-diff"]'
+    kind: display
+  - id: viewer-error
+    selector: '[data-testid="viewer-error"]'
+    kind: display
+  - id: viewer-retry
+    selector: '[data-testid="viewer-retry"]'
+    kind: interactive
+  - id: viewer-system
+    selector: '[data-testid="viewer-system"]'
+    kind: interactive
+  - id: viewer-operation-error
+    selector: '[data-testid="viewer-operation-error"]'
+    kind: display
+  - id: viewer-status
+    selector: '[data-testid="viewer-status"]'
+    kind: display
+  - id: viewer-draft-restored
+    selector: '[data-testid="viewer-draft-restored"]'
+    kind: display
+  - id: viewer-large-file
+    selector: '[data-testid="viewer-large-file"]'
+    kind: display
+  - id: viewer-enable-edit
+    selector: '[data-testid="viewer-enable-edit"]'
+    kind: interactive
+  - id: viewer-chunk-next
+    selector: '[data-testid="viewer-chunk-next"]'
+    kind: interactive
+  - id: viewer-chunk-previous
+    selector: '[data-testid="viewer-chunk-previous"]'
+    kind: interactive
+  - id: viewer-find
+    selector: '[data-testid="viewer-find"]'
+    kind: interactive
+  - id: viewer-wrap
+    selector: '[data-testid="viewer-wrap"]'
+    kind: interactive
+  - id: viewer-font-size
+    selector: '[data-testid="viewer-font-size"]'
+    kind: interactive
+  - id: viewer-encoding
+    selector: '[data-testid="viewer-encoding"]'
+    kind: interactive
+  - id: viewer-eol
+    selector: '[data-testid="viewer-eol"]'
+    kind: interactive
+  - id: viewer-close-dialog
+    selector: '[data-testid="viewer-close-dialog"]'
+    kind: display
+  - id: viewer-close-save
+    selector: '[data-testid="viewer-close-save"]'
+    kind: interactive
+  - id: viewer-close-discard
+    selector: '[data-testid="viewer-close-discard"]'
+    kind: interactive
+  - id: viewer-close-cancel
+    selector: '[data-testid="viewer-close-cancel"]'
+    kind: interactive
+  - id: image-viewer
+    selector: '[data-testid="image-viewer"]'
+    kind: display
+  - id: image-render
+    selector: '[data-testid="image-render"]'
+    kind: display
+  - id: image-stage
+    selector: '[data-testid="image-stage"]'
+    kind: interactive
+  - id: image-sanitized
+    selector: '[data-testid="image-sanitized"]'
+    kind: display
+  - id: image-properties
+    selector: '[data-testid="image-properties"]'
+    kind: display
+  - id: image-svg-mode-render
+    selector: '[data-testid="image-svg-mode-render"]'
+    kind: interactive
+  - id: image-svg-mode-code
+    selector: '[data-testid="image-svg-mode-code"]'
+    kind: interactive
+  - id: image-svg-mode-split
+    selector: '[data-testid="image-svg-mode-split"]'
+    kind: interactive
+  - id: image-zoom-in
+    selector: '[data-testid="image-zoom-in"]'
+    kind: interactive
+  - id: image-zoom-out
+    selector: '[data-testid="image-zoom-out"]'
+    kind: interactive
+  - id: image-zoom-fit
+    selector: '[data-testid="image-zoom-fit"]'
+    kind: interactive
+  - id: image-zoom-actual
+    selector: '[data-testid="image-zoom-actual"]'
+    kind: interactive
+  - id: image-rotate-left
+    selector: '[data-testid="image-rotate-left"]'
+    kind: interactive
+  - id: image-rotate-right
+    selector: '[data-testid="image-rotate-right"]'
+    kind: interactive
+  - id: image-flip
+    selector: '[data-testid="image-flip"]'
+    kind: interactive
+  - id: image-background-checker
+    selector: '[data-testid="image-background-checker"]'
+    kind: interactive
+  - id: image-background-light
+    selector: '[data-testid="image-background-light"]'
+    kind: interactive
+  - id: image-background-dark
+    selector: '[data-testid="image-background-dark"]'
+    kind: interactive
+  - id: image-prev
+    selector: '[data-testid="image-prev"]'
+    kind: interactive
+  - id: image-next
+    selector: '[data-testid="image-next"]'
+    kind: interactive
+  - id: image-copy
+    selector: '[data-testid="image-copy"]'
+    kind: interactive
+  - id: image-copy-path
+    selector: '[data-testid="image-copy-path"]'
+    kind: interactive
+  - id: image-save
+    selector: '[data-testid="image-save"]'
+    kind: interactive
+  - id: image-save-as
+    selector: '[data-testid="image-save-as"]'
+    kind: interactive
+  - id: image-export-png
+    selector: '[data-testid="image-export-png"]'
+    kind: interactive
+  - id: image-reveal
+    selector: '[data-testid="image-reveal"]'
+    kind: interactive
+  - id: markdown-editor
+    selector: '[data-testid="markdown-editor"]'
+    kind: display
+  - id: markdown-live
+    selector: '[data-testid="markdown-live"]'
+    kind: display
+  - id: markdown-source
+    selector: '[data-testid="markdown-source"]'
+    kind: display
+  - id: markdown-split
+    selector: '[data-testid="markdown-split"]'
+    kind: display
+  - id: markdown-mode-live
+    selector: '[data-testid="markdown-mode-live"]'
+    kind: interactive
+  - id: markdown-mode-source
+    selector: '[data-testid="markdown-mode-source"]'
+    kind: interactive
+  - id: markdown-mode-split
+    selector: '[data-testid="markdown-mode-split"]'
+    kind: interactive
+  - id: markdown-focus
+    selector: '[data-testid="markdown-focus"]'
+    kind: interactive
+  - id: markdown-outline
+    selector: '[data-testid="markdown-outline"]'
+    kind: interactive
+  - id: markdown-preview
+    selector: '[data-testid="markdown-preview"]'
+    kind: display
+  - id: markdown-table-widget
+    selector: '[data-testid="markdown-table-widget"]'
+    kind: interactive
+  - id: markdown-image-widget
+    selector: '[data-testid="markdown-image-widget"]'
+    kind: interactive
+  - id: markdown-paste-status
+    selector: '[data-testid="markdown-paste-status"]'
+    kind: display
+  - id: markdown-export
+    selector: '[data-testid="markdown-export"]'
+    kind: interactive
+  - id: markdown-export-menu
+    selector: '[data-testid="markdown-export-menu"]'
+    kind: display
+  - id: markdown-export-html
+    selector: '[data-testid="markdown-export-html"]'
+    kind: interactive
+  - id: markdown-export-pdf
+    selector: '[data-testid="markdown-export-pdf"]'
+    kind: interactive
+  - id: markdown-export-png
+    selector: '[data-testid="markdown-export-png"]'
+    kind: interactive
+  - id: markdown-export-docx
+    selector: '[data-testid="markdown-export-docx"]'
+    kind: interactive
+  - id: markdown-export-markdown
+    selector: '[data-testid="markdown-export-markdown"]'
+    kind: interactive
+  - id: markdown-export-richtext
+    selector: '[data-testid="markdown-export-richtext"]'
+    kind: interactive
+  - id: markdown-export-html-source
+    selector: '[data-testid="markdown-export-html-source"]'
+    kind: interactive
+  - id: markdown-export-print
+    selector: '[data-testid="markdown-export-print"]'
+    kind: interactive
+  - id: markdown-export-settings
+    selector: '[data-testid="markdown-export-settings"]'
+    kind: display
+  - id: markdown-export-confirm
+    selector: '[data-testid="markdown-export-confirm"]'
+    kind: interactive
+  - id: markdown-export-status
+    selector: '[data-testid="markdown-export-status"]'
+    kind: display
+  - id: html-external-dialog
+    selector: '[data-testid="html-external-dialog"]'
+    kind: display
+  - id: html-external-origin
+    selector: '[data-testid="html-external-origin"]'
+    kind: display
+  - id: html-external-url
+    selector: '[data-testid="html-external-url"]'
+    kind: display
+  - id: html-external-cancel
+    selector: '[data-testid="html-external-cancel"]'
+    kind: interactive
+  - id: html-external-open
+    selector: '[data-testid="html-external-open"]'
+    kind: interactive
+  - id: html-preview
+    selector: '[data-testid="html-preview"]'
+    kind: display
+  - id: html-frame
+    selector: '[data-testid="html-frame"]'
+    kind: display
+  - id: html-address
+    selector: '[data-testid="html-address"]'
+    kind: interactive
+  - id: html-back
+    selector: '[data-testid="html-back"]'
+    kind: interactive
+  - id: html-forward
+    selector: '[data-testid="html-forward"]'
+    kind: interactive
+  - id: html-refresh
+    selector: '[data-testid="html-refresh"]'
+    kind: interactive
+  - id: html-device-desktop
+    selector: '[data-testid="html-device-desktop"]'
+    kind: interactive
+  - id: html-device-tablet
+    selector: '[data-testid="html-device-tablet"]'
+    kind: interactive
+  - id: html-device-mobile
+    selector: '[data-testid="html-device-mobile"]'
+    kind: interactive
+  - id: html-zoom
+    selector: '[data-testid="html-zoom"]'
+    kind: interactive
+  - id: html-mode-preview
+    selector: '[data-testid="html-mode-preview"]'
+    kind: interactive
+  - id: html-mode-split
+    selector: '[data-testid="html-mode-split"]'
+    kind: interactive
+  - id: html-source
+    selector: '[data-testid="html-source"]'
+    kind: display
+  - id: html-console-toggle
+    selector: '[data-testid="html-console-toggle"]'
+    kind: interactive
+  - id: html-console
+    selector: '[data-testid="html-console"]'
+    kind: display
+  - id: html-console-clear
+    selector: '[data-testid="html-console-clear"]'
+    kind: interactive
+  - id: html-network-allow
+    selector: '[data-testid="html-network-allow"]'
+    kind: interactive
+  - id: html-network-block
+    selector: '[data-testid="html-network-block"]'
+    kind: interactive
+  - id: html-network-proxy
+    selector: '[data-testid="html-network-proxy"]'
+    kind: display
+  - id: html-network-banner
+    selector: '[data-testid="html-network-banner"]'
+    kind: display
+  - id: html-save-refresh
+    selector: '[data-testid="html-save-refresh"]'
+    kind: interactive
+  - id: file-open-settings
+    selector: '[data-testid="file-open-settings"]'
+    kind: display
+  - id: file-open-settings-reset
+    selector: '[data-testid="file-open-settings-reset"]'
+    kind: interactive
+  - id: file-open-default-taomni
+    selector: '[data-testid="file-open-default-taomni"]'
+    kind: interactive
+  - id: file-open-default-system
+    selector: '[data-testid="file-open-default-system"]'
+    kind: interactive
+  - id: file-open-association-image
+    selector: '[data-testid="file-open-association-image"]'
+    kind: interactive
+  - id: file-open-association-svg
+    selector: '[data-testid="file-open-association-svg"]'
+    kind: interactive
+  - id: file-open-association-text
+    selector: '[data-testid="file-open-association-text"]'
+    kind: interactive
+  - id: file-open-association-data
+    selector: '[data-testid="file-open-association-data"]'
+    kind: interactive
+  - id: file-open-association-markdown
+    selector: '[data-testid="file-open-association-markdown"]'
+    kind: interactive
+  - id: file-open-association-html
+    selector: '[data-testid="file-open-association-html"]'
+    kind: interactive
+  - id: file-open-association-source
+    selector: '[data-testid="file-open-association-source"]'
+    kind: interactive
+  - id: file-open-association-binary
+    selector: '[data-testid="file-open-association-binary"]'
+    kind: interactive
+  - id: file-open-association-custom
+    selector: '[data-testid="file-open-association-custom"]'
+    kind: interactive
+  - id: file-open-extension
+    selector: '[data-testid="file-open-extension"]'
+    kind: interactive
+  - id: file-open-extension-handler
+    selector: '[data-testid="file-open-extension-handler"]'
+    kind: interactive
+  - id: file-open-association-add
+    selector: '[data-testid="file-open-association-add"]'
+    kind: interactive
+  - id: file-open-association-remove
+    selector: '[data-testid="file-open-association-remove"]'
+    kind: interactive
+  - id: file-open-image-dir
+    selector: '[data-testid="file-open-image-dir"]'
+    kind: interactive
+  - id: file-open-image-template
+    selector: '[data-testid="file-open-image-template"]'
+    kind: interactive
+  - id: file-open-convert-tables
+    selector: '[data-testid="file-open-convert-tables"]'
+    kind: interactive
+  - id: file-open-wrap
+    selector: '[data-testid="file-open-wrap"]'
+    kind: interactive
+  - id: file-open-font-size
+    selector: '[data-testid="file-open-font-size"]'
+    kind: interactive
+  - id: html-preview-proxy-mode
+    selector: '[data-testid="html-preview-proxy-mode"]'
+    kind: interactive
+  - id: html-preview-custom-proxy-panel
+    selector: '[data-testid="html-preview-custom-proxy-panel"]'
+    kind: display
+  - id: file-open-html-network
+    selector: '[data-testid="file-open-html-network"]'
+    kind: interactive
+  - id: file-open-html-scripts
+    selector: '[data-testid="file-open-html-scripts"]'
+    kind: interactive
+  - id: file-open-with-taomni
+    selector: '[data-testid="file-open-with-taomni"]'
+    kind: interactive
+  - id: file-open-with-workspace
+    selector: '[data-testid="file-open-with-workspace"]'
+    kind: interactive
+  - id: file-open-with-source
+    selector: '[data-testid="file-open-with-source"]'
+    kind: interactive
+  - id: file-open-with-system
+    selector: '[data-testid="file-open-with-system"]'
+    kind: interactive
+  - id: file-open-with-remember
+    selector: '[data-testid="file-open-with-remember"]'
+    kind: interactive
+  - id: file-open-with-remember-system
+    selector: '[data-testid="file-open-with-remember-system"]'
+    kind: interactive
+  - id: code-workspace-tree-open-taomni
+    selector: '[data-testid="code-workspace-tree-open-taomni"]'
+    kind: interactive
+  - id: git-file-preview
+    selector: '[data-testid="git-file-preview"]'
+    kind: interactive
+  - id: mail-attachment-open
+    selector: '[data-testid="mail-attachment-open"]'
+    kind: interactive
+  - id: mail-attachment-preview
+    selector: '[data-testid="mail-attachment-preview"]'
+    kind: interactive
+  - id: mail-attachment-system
+    selector: '[data-testid="mail-attachment-system"]'
+    kind: interactive
+  - id: ai-file-link
+    selector: '[data-testid="ai-file-link"]'
+    kind: interactive
+-->
+
+TC-FILE-OPEN-001..006 是可执行行为用例并纳入 crash-regression；当前仅静态/单元验证，浏览器与原生执行待匹配构建证据。002 原生文本保存/冲突、003 SVG 原始字节、005 HTML 自定义协议资源/隔离、006 IMAP 附件受控临时副本/清理由各自独立字节或桥接结果验证。004 浏览器剪贴板与下载不作为原生磁盘/剪贴板/打印证据。尚缺：完整入口矩阵运行、SFTP 暂停/取消/重启续传、Markdown 原生图片/打印及各导出格式产物、OS 菜单/快捷键与视觉保真；详见各 case verification.native。

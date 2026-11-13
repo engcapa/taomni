@@ -11,6 +11,9 @@
 import { create } from "zustand";
 import type { SessionConfig } from "../lib/ipc/session";
 import { createWorkspaceTabActions } from "./workspacePlatformTabActions";
+import { guardViewerClose } from "../lib/openFile/closeGuard";
+import { documentPathKey } from "../lib/openFile/pathIdentity";
+import { useDocumentStore } from "./documentStore";
 import { createWorkspaceExplorerActions } from "./workspaceExplorerActions";
 import { createWorkspaceCodeActions } from "./workspacePlatformCodeActions";
 import { createNotesWorkspace, createWorkspaceNotesActions, NOTES_WORKSPACE_ID } from "./workspaceNotes";
@@ -31,6 +34,7 @@ export interface WorkspaceRootFolder {
 
 export type WorkspaceTabKind =
   | "file"
+  | "viewer"
   | "note"
   | "git"
   | "explorer"
@@ -51,6 +55,7 @@ export interface WorkspaceIsolatedTab {
   closable: boolean;
   /** `kind === "file"` payload. */
   filePath?: string;
+  fileViewer?: import("../types").FileViewerTabInfo;
   rootFolderId?: string;
   editorFile?: CodeWorkspaceFileRef;
   /** Shared Tao Notes document; content remains owned by notes.db. */
@@ -157,6 +162,7 @@ export interface WorkspacePlatformState {
   openGitTab: (workspaceId: string, focusPath?: string) => WorkspaceIsolatedTab;
   /** Creation primitive; callers use openExplorer for canonical current-path deduplication. */
   addExplorerTab: (workspaceId: string, path: string) => WorkspaceIsolatedTab;
+  openViewerTab: (workspaceId: string, viewer: import("../types").FileViewerTabInfo) => WorkspaceIsolatedTab;
   updateExplorerPath: (workspaceId: string, tabId: string, path: string) => void;
   openCodeWorkspaceTab: (workspaceId: string) => WorkspaceIsolatedTab;
   updateCodeWorkspace: (workspaceId: string, info: CodeWorkspaceTabInfo) => void;
@@ -336,6 +342,22 @@ export const useWorkspacePlatformStore = create<WorkspacePlatformState>((set, ge
     set({ ...next });
   },
 
+  openViewerTab: (workspaceId, viewer) => {
+    const workspace = get().getWorkspace(workspaceId);
+    if (!workspace) throw new Error(`Workspace not found: ${workspaceId}`);
+    const existing = workspace.openTabs.find((tab) => tab.kind === "viewer" && tab.fileViewer?.path === viewer.path);
+    if (existing) { get().setActiveWorkspaceTab(workspaceId, existing.id); return existing; }
+    const tab: WorkspaceIsolatedTab = { id: newRuntimeId(`ws:${workspaceId}:viewer`), workspaceId,
+      kind: "viewer", filePath: viewer.path, fileViewer: viewer, title: baseName(viewer.path), closable: true,
+      transient: viewer.source !== undefined && viewer.source !== "local", createdAt: Date.now() };
+    set((state) => {
+      const workspaces = updateWorkspace(state.workspaces, workspaceId, (current) => upsertTab(current, tab, true));
+      persist({ ...state, workspaces });
+      return { workspaces };
+    });
+    return tab;
+  },
+
   getWorkspace: (workspaceId) => {
     const state = get();
     return state.workspaces.find((workspace) => workspace.id === (workspaceId ?? state.activeWorkspaceId));
@@ -377,6 +399,11 @@ export const useWorkspacePlatformStore = create<WorkspacePlatformState>((set, ge
     const state = get();
     const target = state.workspaces.find((workspace) => workspace.id === workspaceId);
     if (!target || target.isDefault || target.id === DEFAULT_WORKSPACE_ID || target.id === NOTES_WORKSPACE_ID) return false;
+    const paths = target.openTabs.flatMap((tab) => tab.fileViewer ? [tab.fileViewer.path] : []);
+    if (paths.some((path) => useDocumentStore.getState().documents[documentPathKey(path)]?.dirty)) {
+      guardViewerClose(paths, () => get().deleteWorkspace(workspaceId));
+      return false;
+    }
     const workspaces = state.workspaces.filter((workspace) => workspace.id !== workspaceId);
     const activeWorkspaceId = state.activeWorkspaceId === workspaceId ? DEFAULT_WORKSPACE_ID : state.activeWorkspaceId;
     const createdNodes = state.createdNodes.filter((node) => node.workspaceId !== workspaceId);

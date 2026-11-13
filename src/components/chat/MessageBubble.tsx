@@ -26,6 +26,7 @@ import {
 import { AttachmentChip } from "./AttachmentChip";
 import { useT } from "../../lib/i18n";
 import type { ChatAttachment } from "../../lib/chat/attachments";
+import { useChatFileLinks } from "./useChatFileLinks";
 
 interface MessageBubbleProps {
   message: ChatMessage;
@@ -167,6 +168,8 @@ export function MessageBubble({
     }
   };
 
+  useChatFileLinks(bodyRef, !isUser, `${format}:${stripped}`, preferredTerminalTabId);
+
   // Decorate every inline `<code>` (i.e., NOT inside a <pre>) in the rendered
   // body with a click-to-send affordance. Inline snippets go to the active
   // terminal when available, otherwise to the active DB query tab.
@@ -179,7 +182,7 @@ export function MessageBubble({
     codes.forEach((codeEl) => {
       // Skip code blocks that live inside a <pre> — those already have a
       // dedicated CodeBlockToolbar. We only target true inline code.
-      if (codeEl.closest("pre")) return;
+      if (codeEl.closest("pre") || codeEl.hasAttribute("data-file-path")) return;
       codeEl.classList.add("ai-chat-inline-code");
       codeEl.title = targetEntry
         ? t("chat.inlineCodeTitle")
@@ -470,6 +473,7 @@ function AssistantTextWithTools({
           return (
             <div
               key={`text-${i}`}
+              data-chat-richtext="true"
               dangerouslySetInnerHTML={{ __html: html }}
             />
           );

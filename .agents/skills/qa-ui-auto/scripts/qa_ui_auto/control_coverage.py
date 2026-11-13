@@ -250,6 +250,13 @@ def _touches_for_case(case) -> list[Touch]:  # case: TestCase
             for names, kind in ((interacted, "interactive"), (observed, "display")):
                 out.extend(Touch(case_id=case.id, selector=f'[data-testid="{name}"]', kind=kind) for name in names)
             continue
+        if verb == "assert_download" and isinstance(args, dict):
+            # This artifact assertion clicks its trigger exactly once before
+            # observing the real download; the action must retain attribution.
+            trigger = args.get("trigger")
+            if isinstance(trigger, str):
+                out.append(Touch(case_id=case.id, selector=trigger, kind="interactive"))
+            continue
         if verb == "switch_window" and isinstance(args, dict):
             # close_with performs one real click in the source window; the
             # target selector only observes the destination after closure.

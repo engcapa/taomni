@@ -1,3 +1,10 @@
+# File-open cases own isolated files/mail inputs; none relies on a predecessor's state.
+TC-FILE-OPEN-001: []
+TC-FILE-OPEN-002: []
+TC-FILE-OPEN-003: []
+TC-FILE-OPEN-004: []
+TC-FILE-OPEN-005: []
+TC-FILE-OPEN-006: []
 # Explorer cases own isolated input/byte fixtures and do not depend on another case's state.
 TC-EXPLORER-001: []
 TC-EXPLORER-002: []

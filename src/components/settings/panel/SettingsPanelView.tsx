@@ -21,6 +21,7 @@ import { ClaudeCodePanel } from "../ClaudeCodePanel";
 import { CodeViewAppearanceSettings } from "../CodeViewAppearanceSettings";
 import { CodexCodePanel } from "../CodexCodePanel";
 import { EditorAiLanguagePanel } from "../EditorAiLanguagePanel";
+import { FileOpenSettings } from "../FileOpenSettings";
 import { MobileServiceSettings } from "../MobileServiceSettings";
 import { LanChatSettings } from "../LanChatSettings";
 import { LanguageSection } from "../LanguageSection";
@@ -342,6 +343,9 @@ export function SettingsPanelView(inputs: SettingsPanelViewProps) {
                   </span>
                 </label>
               </section>
+            </SettingsAnchor>
+            <SettingsAnchor id="file-open">
+              <FileOpenSettings />
             </SettingsAnchor>
             <SettingsAnchor id="screenshot">
               <ScreenshotSettings />

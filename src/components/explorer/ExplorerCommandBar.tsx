@@ -5,9 +5,12 @@ import { useContextMenu, type MenuItem } from "../ContextMenu";
 import { setExplorerPreferences, useExplorerPreferences } from "./explorerPreferences";
 import { useExplorerLabels } from "./explorerLabels";
 import type { ExplorerOperations } from "./useExplorerOperations";
+import { fileOpenMenu } from "./fileOpenMenu";
+import { classifyFile, supportsFileViewer } from "../../lib/openFile";
+import { openFile } from "../../lib/openFile";
 
-export function ExplorerCommandBar({ path, selected, operations, onOpenTerminal, onOpenExplorer, previewVisible, onTogglePreview }: {
-  path: string; selected: FileEntry[]; operations: ExplorerOperations;
+export function ExplorerCommandBar({ path, workspaceId, selected, operations, onOpenTerminal, onOpenExplorer, previewVisible, onTogglePreview }: {
+  path: string; workspaceId?: string; selected: FileEntry[]; operations: ExplorerOperations;
   onOpenTerminal: (path: string) => void; onOpenExplorer: (path: string, forceNew?: boolean) => void;
   previewVisible: boolean; onTogglePreview: () => void;
 }) {
@@ -56,6 +59,7 @@ export function ExplorerCommandBar({ path, selected, operations, onOpenTerminal,
       <span className="ex-vsep" />
       <button className="ex-cbtn" data-testid="explorer-cmd-sort" onClick={(event) => show(event, sortMenu)}><ArrowDownWideNarrow />{label("排序", "Sort")}<ChevronDown className="ex-car" /></button>
       <button className="ex-cbtn" data-testid="explorer-cmd-view" onClick={(event) => show(event, viewMenu)}>{preferences.view === "icons" ? <LayoutGrid /> : <List />}{label("查看", "View")}<ChevronDown className="ex-car" /></button>
+      {selected.length === 1 && supportsFileViewer(classifyFile(selected[0].path)) && <><button className="ex-cbtn" data-testid="explorer-cmd-open" onClick={() => void openFile({ path: selected[0].path }, { context: "explorer-command", workspaceId, mode: "taomni" }).catch((error) => operations.notify(String(error), true))}><ExternalLink />{label("用 Taomni 打开", "Open in Taomni")}</button><button className="ex-cbtn" data-testid="explorer-cmd-open-with" onClick={(event) => show(event, fileOpenMenu(selected[0].path, workspaceId, label, (message) => operations.notify(message, true)))}>{label("打开方式", "Open with")}<ChevronDown /></button></>}
       <span className="ex-sp" />
       <button className="ex-cbtn icon" data-testid="explorer-cmd-terminal" title={label("在此处打开终端", "Open terminal here")} disabled={!path} onClick={() => onOpenTerminal(path)}><Terminal /></button>
       <button className="ex-cbtn icon" data-testid="explorer-cmd-newtab" title={label("在新的 Explorer 标签中打开此目录", "Open current folder in new Explorer tab")} disabled={!path} onClick={() => onOpenExplorer(path, true)}><ExternalLink /></button>

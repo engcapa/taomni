@@ -2,6 +2,9 @@ import { workspaceFileTabId } from "../lib/workspaceFileTarget";
 import type { StoreApi } from "zustand";
 import type { WorkspacePlatformState, WorkspaceIsolatedTab } from "./workspacePlatformStore";
 import { computeDuplicateTitle } from "./app/tabTitles";
+import { guardViewerClose } from "../lib/openFile/closeGuard";
+import { documentPathKey } from "../lib/openFile/pathIdentity";
+import { useDocumentStore } from "./documentStore";
 
 type TabActions = Pick<WorkspacePlatformState,
   "closeWorkspaceTab" | "renameWorkspaceTab" | "moveWorkspaceTab" | "duplicateWorkspaceTab" | "setActiveWorkspaceTab" | "syncWorkspaceFiles">;
@@ -42,6 +45,11 @@ export function createWorkspaceTabActions(
     });
   },
   closeWorkspaceTab: (workspaceId, tabId) => {
+    const path = get().getWorkspace(workspaceId)?.openTabs.find((tab) => tab.id === tabId)?.fileViewer?.path;
+    if (path && useDocumentStore.getState().documents[documentPathKey(path)]?.dirty) {
+      guardViewerClose([path], () => get().closeWorkspaceTab(workspaceId, tabId));
+      return;
+    }
     set((state) => {
       const workspaces = updateWorkspace(state.workspaces, workspaceId, (workspace) => {
         if (!workspace.openTabs.some((tab) => tab.id === tabId)) return workspace;

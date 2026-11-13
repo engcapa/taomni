@@ -12,7 +12,6 @@ import {
   sftpListRemote,
   sftpLocalHome,
   sftpMkdir,
-  sftpOpenPath,
   sftpPauseTransfer,
   sftpRemove,
   sftpRename,
@@ -29,7 +28,8 @@ import { newTransferId, useTransferStore } from "../stores/transferStore";
 import { useSftpStore, type PaneSide } from "../stores/sftpStore";
 import { useAppStore } from "../stores/appStore";
 import { encodeBase64 } from "./ipc";
-import { isTauriRuntime } from "./runtime";
+import { openTemporaryFile } from "./fileOpenTemp";
+import { getLocale } from "./i18n";
 
 export interface TransferStartOpts {
   openAfter?: boolean;
@@ -190,6 +190,35 @@ export function useSftpController(sessionId: string) {
       localDir: string,
       opts: TransferStartOpts = {},
     ) => {
+      const isDir = entry.fileType === "dir";
+      if (opts.openAfter && !isDir) {
+        try {
+          await openTemporaryFile({
+            key: JSON.stringify(["sftp", sessionId, entry.path]),
+            fileName: entry.name,
+            source: "remote-temp",
+            readOnlyReason: getLocale().startsWith("zh") ? "远程文件 · 只读副本" : "Remote file · read-only copy",
+            retainPartialOnFailure: true,
+            download: async (localPath) => {
+              const previous = useTransferStore.getState().items.find((item) => item.localPath === localPath && item.remotePath === entry.path && item.sessionId === sessionId && ["error", "cancelled"].includes(item.state));
+              if (previous) useTransferStore.getState().remove(previous.id);
+              const transferId = newTransferId();
+              addTransfer({
+                id: transferId, sessionId, direction: "download", kind: "file",
+                localPath, remotePath: entry.path, size: entry.size, bytes: 0,
+                rate: 0, eta: 0, state: "queued", startedAt: Date.now(), openAfter: true,
+              });
+              await startTransferTracking(transferId, "local");
+              // Backend open_after launches the OS app; all opening now belongs
+              // to the shared service after the download has finished.
+              await sftpDownload(sessionId, transferId, entry.path, localPath, false);
+            },
+          }, { context: "sftp-remote" });
+        } catch (err) {
+          setStatus(`Download failed: ${err instanceof Error ? err.message : err}`);
+        }
+        return;
+      }
       // Defensive fallback: in some bootstrap orderings (notably the
       // detached SFTP window which races attach + first download) the
       // local pane's path can still be empty when the user clicks
@@ -212,7 +241,6 @@ export function useSftpController(sessionId: string) {
         );
         return;
       }
-      const isDir = entry.fileType === "dir";
       const transferId = newTransferId();
       const localPath = joinPath(dir, entry.name);
       addTransfer({
@@ -237,14 +265,7 @@ export function useSftpController(sessionId: string) {
         if (isDir) {
           await sftpDownloadDir(sessionId, transferId, entry.path, localPath);
         } else {
-          await sftpDownload(sessionId, transferId, entry.path, localPath, !!opts.openAfter);
-          if (opts.openAfter && isTauriRuntime()) {
-            try {
-              await sftpOpenPath(localPath);
-            } catch (err) {
-              setStatus(`Saved to ${localPath}, but could not open it: ${err}`);
-            }
-          }
+          await sftpDownload(sessionId, transferId, entry.path, localPath, false);
         }
       } catch (err) {
         setStatus(`Download failed: ${err instanceof Error ? err.message : err}`);
@@ -361,13 +382,16 @@ export function useSftpController(sessionId: string) {
         if (isDir) {
           await sftpDownloadDir(sessionId, transferId, remotePath, localPath);
         } else {
-          await sftpDownload(sessionId, transferId, remotePath, localPath, !!openAfter);
-          if (openAfter && isTauriRuntime()) {
-            try {
-              await sftpOpenPath(localPath);
-            } catch (err) {
-              setStatus(`Saved to ${localPath}, but could not open it: ${err}`);
-            }
+          if (openAfter) {
+            await openTemporaryFile({
+              key: JSON.stringify(["sftp", sessionId, remotePath]),
+              fileName: remotePath.split("/").pop() || "download",
+              source: "remote-temp", retryPath: localPath, retainPartialOnFailure: true,
+              readOnlyReason: getLocale().startsWith("zh") ? "远程文件 · 只读副本" : "Remote file · read-only copy",
+              download: () => sftpDownload(sessionId, transferId, remotePath, localPath, false),
+            }, { context: "sftp-remote" });
+          } else {
+            await sftpDownload(sessionId, transferId, remotePath, localPath, false);
           }
         }
       }

@@ -13,7 +13,7 @@ export const WORKSPACE_TAB_CATEGORIES: readonly WorkspaceTabCategory[] = [
 ];
 
 export function workspaceTabCategory(tab: WorkspaceIsolatedTab): WorkspaceTabCategory {
-  if (tab.kind === "file" || tab.kind === "code" || tab.kind === "explorer") return "files";
+  if (tab.kind === "file" || tab.kind === "viewer" || tab.kind === "code" || tab.kind === "explorer") return "files";
   if (tab.kind === "database") return "database";
   if (tab.kind === "sftp") return "sftp";
   if (tab.kind === "rdp" || tab.kind === "vnc") return "remote";

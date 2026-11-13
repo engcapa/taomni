@@ -6,6 +6,7 @@ import type { MailAddressBookEntry } from "../../lib/mailContacts";
 import { stubAddInviteToCalendar, stubCalDavSync, stubListAgenda } from "../mailCalendarStub";
 import type { MailFilter } from "../../lib/mailFilters";
 import { type InvokeArgs } from "./runtime";
+import { vfsWriteText } from "../localVfs";
 
 export const MAIL_DRAFTS_STORAGE_KEY = "taomni.stub.mailDrafts.v1";
 
@@ -382,7 +383,9 @@ export async function invokeMail<T>(cmd: string, args?: any): Promise<T> {
     case "mail_download_attachment": {
       const invokeArgs = args as InvokeArgs | undefined;
       const targetPath = (invokeArgs?.targetPath as string | undefined) ?? "attachment";
-      return { path: targetPath, name: "policy.txt", contentType: "text/plain", size: 1240 } as T;
+      const text = "Mail attachment read-only fixture.\nSave locally before editing.\n";
+      await vfsWriteText(targetPath, text);
+      return { path: targetPath, name: "policy.txt", contentType: "text/plain", size: new TextEncoder().encode(text).length } as T;
     }
 
     case "mail_mark_read": {

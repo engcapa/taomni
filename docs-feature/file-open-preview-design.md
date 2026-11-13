@@ -4,7 +4,7 @@
 
 - 类型：新增能力 + 现有能力扩展（把分散的“用系统应用打开”统一升级为 Taomni 内置的全局文件打开服务与一组共享查看器 / 编辑器）。
 - 文档位置：`docs-feature/file-open-preview-design.md`；原型与截图位于 `docs-feature/file-open-preview/`。
-- 设计状态：**设计已确认，可进入实施**。DEC-02 / DEC-03 / DEC-04 已由用户选定推荐方案（见决策记录）；尚未开始实现，所有验证为“待执行”。
+- 设计状态：**实现与验证进行中（2026-11-13）**。DEC-02 / DEC-03 / DEC-04 保持用户已确认方案；当前分支 `feat/file-open-improve` 开发，以高保真原型为布局/交互基准。单元与静态检查已开始，browser/native 仅在 GitHub `qa-ui-auto-platforms` 执行；不能将实现或静态原型当作通过证据。实施记录见 §10。
 - 来源（用户需求原文要点）：
   1. 文件资源管理器支持常见文件的预览 / 打开，参考 Win11 资源管理器的预览窗格。
   2. Taomni 自身能打开常见文件：图片、SVG 可查看；txt 类可编辑。
@@ -229,7 +229,7 @@
 
 ## 7. 验证计划
 
-以下全部为**待执行**，设计阶段未运行任何测试。
+本表保留设计阶段验证范围；2026-11-13 已开始本地单元和静态检查，具体命令/结果及 GitHub browser/native 证据另记 §10。未取得 matching receipt 的 UI/原生项仍为**待执行**。
 
 | ID | 层级 | 覆盖 AC | 内容 | 状态 |
 |---|---|---|---|---|
@@ -273,3 +273,7 @@
 - 与 Code Workspace loose-file 编辑状态的整合边界（同一文件在两处同时打开）需要在 TASK-01 先定。
 - 本设计基于 `1344dc3c5` 的静态阅读；实施前需重新核对 §2 各符号与调用点，因 Explorer 等模块仍在演进。
 - 原型与截图仅为评审稿，不是实现、测试或真机证据。
+
+## 10. 实施与验证记录（2026-11-13 起）
+
+详见 [`file-open-preview/implementation-notes.md`](file-open-preview/implementation-notes.md)。该记录包含当前实现边界、Code Workspace 草稿归属、保守大小阈值、依赖懒加载、HTML 代理/沙盒安全契约、专项测试与 GitHub 执行结果。尚无 matching browser/native receipt 的项目不得标记为通过。

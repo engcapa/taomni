@@ -1,4 +1,6 @@
 import { Suspense } from "react";
+import { ViewerShell } from "../../components/viewer/ViewerShell";
+import { ViewerCloseDialog } from "../../components/viewer/ViewerDialogs";
 import { CodeWorkspaceTab } from "../../components/editor/CodeWorkspaceTab";
 import { FileBrowser } from "../../components/filebrowser/FileBrowser";
 import { ExplorerTabPane } from "../../components/explorer/ExplorerTabPane";
@@ -132,6 +134,8 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
     welcomeRestore,
   } = viewProps;
   return (<div className="flex-1 min-h-0 overflow-hidden relative">
+    <ViewerCloseDialog />
+    {tabs.filter((tab) => tab.type === "file-viewer" && tab.fileViewer).map((tab) => <div key={tab.id} className="absolute inset-0" style={{ display: activeTabId === tab.id ? "block" : "none" }}><ViewerShell viewer={tab.fileViewer!} active={activeTabId === tab.id} /></div>)}
     {/* Welcome stays mounted so filters, scroll, and shell
                     selections survive switching to another tab. */}
     <div
@@ -558,6 +562,7 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
       activeTab.type !== "vnc" &&
       activeTab.type !== "rdp" &&
       activeTab.type !== "file-browser" &&
+      activeTab.type !== "file-viewer" &&
       activeTab.type !== "database" &&
       activeTab.type !== "redis" &&
       activeTab.type !== "hbase-shell" &&

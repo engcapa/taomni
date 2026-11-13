@@ -22,6 +22,7 @@ pub(super) enum WriteBytesFault {
     TempWrite,
     TempSync,
     Replace,
+    TargetChanged,
 }
 
 pub(super) fn injected_write_fault(operation: &str) -> std::io::Error {
@@ -64,6 +65,32 @@ pub(super) fn write_workspace_bytes_with_fault(
     expected_hash: Option<&str>,
     fault: WriteBytesFault,
 ) -> Result<WrittenBytesAck, WorkspaceWriteError> {
+    write_workspace_bytes_inner(target, bytes, expected_hash, fault, None)
+}
+
+pub(super) fn write_workspace_bytes_limited(
+    target: &Path,
+    bytes: Vec<u8>,
+    expected_hash: &str,
+    max_bytes: u64,
+) -> Result<WrittenBytesAck, WorkspaceWriteError> {
+    write_workspace_bytes_inner(
+        target,
+        bytes,
+        Some(expected_hash),
+        WriteBytesFault::None,
+        Some(max_bytes),
+    )
+}
+
+fn write_workspace_bytes_inner(
+    target: &Path,
+    bytes: Vec<u8>,
+    expected_hash: Option<&str>,
+    fault: WriteBytesFault,
+    max_bytes: Option<u64>,
+) -> Result<WrittenBytesAck, WorkspaceWriteError> {
+    let _write_guard = viewer_io::serialize_file_write();
     // §8.19.1: compute the pre-mutation bytes identity before touching disk.
     // Every failure after this point carries it, so an unknown or zero-effect
     // error still lets the frontend record the real intended bytes.
@@ -73,8 +100,8 @@ pub(super) fn write_workspace_bytes_with_fault(
         |error: WorkspaceWriteError| error.with_intent(intent_hash.clone(), intent_byte_length);
     // The pre-mutation read also serves the hash precondition when one was
     // requested; the observed value is carried on every failure fact either way.
-    let old_hash: Option<String> = match fs::read(target) {
-        Ok(current) => Some(sha256_hex(&current)),
+    let old_hash: Option<String> = match read_target_hash(target, max_bytes) {
+        Ok(hash) => Some(hash),
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => None,
         Err(error) => {
             return Err(with_intent(classify_io_error("read target", &error))
@@ -180,6 +207,39 @@ pub(super) fn write_workspace_bytes_with_fault(
                 .with_old_hash(old_hash),
         ));
     }
+    if fault == WriteBytesFault::TargetChanged {
+        fs::write(target, b"external change during temp write").unwrap();
+    }
+    // The precondition is checked again after staging, not just before it. This
+    // closes the temp-write race with editors outside Taomni; our process-wide
+    // write guard also excludes other Workspace/Viewer byte publications.
+    if let Some(expected) = expected {
+        let current = match read_target_hash(target, max_bytes) {
+            Ok(hash) => hash,
+            Err(error) => {
+                return Err(temp_failure_with_cleanup(
+                    &tmp,
+                    with_intent(classify_io_error("recheck target", &error))
+                        .with_effect(WorkspaceWriteEffect::None, None)
+                        .with_old_hash(old_hash),
+                ));
+            }
+        };
+        if !current.eq_ignore_ascii_case(expected) {
+            return Err(temp_failure_with_cleanup(
+                &tmp,
+                with_intent(WorkspaceWriteError {
+                    kind: WorkspaceWriteErrorKind::HashMismatch,
+                    message: hash_mismatch_error(expected, &current),
+                    expected_hash: Some(expected.to_string()),
+                    actual_hash: Some(current),
+                    ..WorkspaceWriteError::new(WorkspaceWriteErrorKind::HashMismatch, "")
+                })
+                .with_effect(WorkspaceWriteEffect::None, None)
+                .with_old_hash(old_hash),
+            ));
+        }
+    }
     if fault == WriteBytesFault::Replace {
         let effect = if target.exists() {
             WorkspaceWriteEffect::None
@@ -226,4 +286,33 @@ pub(super) fn write_workspace_bytes_with_fault(
         written_hash: sha256_hex(&bytes),
         written_byte_length: bytes.len() as u64,
     })
+}
+
+fn read_target_hash(target: &Path, max_bytes: Option<u64>) -> std::io::Result<String> {
+    use std::io::Read;
+    let mut file = fs::File::open(target)?;
+    let metadata = file.metadata()?;
+    if !metadata.is_file() {
+        return Err(std::io::Error::other("Target is not a regular file"));
+    }
+    let limit = max_bytes.unwrap_or(u64::MAX);
+    let too_large = || std::io::Error::other("too_large: Target exceeds viewer write limit");
+    if metadata.len() > limit {
+        return Err(too_large());
+    }
+    let mut hasher = Sha256::new();
+    let mut buffer = [0u8; 64 * 1024];
+    let mut read = 0u64;
+    loop {
+        let length = file.read(&mut buffer)?;
+        if length == 0 {
+            break;
+        }
+        read = read.saturating_add(length as u64);
+        if read > limit {
+            return Err(too_large());
+        }
+        hasher.update(&buffer[..length]);
+    }
+    Ok(hex::encode(hasher.finalize()))
 }

@@ -351,6 +351,27 @@ fn encoded_write_missing_target_with_hash_precondition_is_io_error() {
 }
 
 #[test]
+fn expected_hash_is_rechecked_after_temp_write_before_publication() {
+    let dir = tempfile::tempdir().unwrap();
+    let target = dir.path().join("changed.txt");
+    fs::write(&target, b"old").unwrap();
+    let error = write_workspace_bytes_with_fault(
+        &target,
+        b"mine".to_vec(),
+        Some(&sha256_hex(b"old")),
+        WriteBytesFault::TargetChanged,
+    )
+    .unwrap_err();
+    assert_eq!(error.kind, WorkspaceWriteErrorKind::HashMismatch);
+    assert_eq!(error.effect, Some(WorkspaceWriteEffect::None));
+    assert_eq!(
+        fs::read(&target).unwrap(),
+        b"external change during temp write"
+    );
+    assert!(write_temp_entries(dir.path()).is_empty());
+}
+
+#[test]
 fn classify_io_error_maps_permission_denied() {
     let denied = std::io::Error::from(std::io::ErrorKind::PermissionDenied);
     assert_eq!(

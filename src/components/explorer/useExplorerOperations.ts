@@ -11,10 +11,11 @@ import { effectiveFileType, sftpOpenPath, sftpRemove, type FileEntry } from "../
 import { useSftpStore } from "../../stores/sftpStore";
 import { clipboardMatches, getExplorerClipboard, setExplorerClipboard } from "./explorerClipboard";
 import { useExplorerLabels } from "./explorerLabels";
+import { openFile } from "../../lib/openFile";
 
 export interface ExplorerToast { message: string; error?: boolean; undo?: () => void }
 export interface DeletePrompt { entries: FileEntry[]; reason?: string }
-export function useExplorerOperations(tabId: string) {
+export function useExplorerOperations(tabId: string, workspaceId?: string) {
   const label = useExplorerLabels();
   const [toast, setToast] = useState<ExplorerToast | null>(null);
   const [deletePrompt, setDeletePrompt] = useState<DeletePrompt | null>(null);
@@ -66,12 +67,12 @@ export function useExplorerOperations(tabId: string) {
       if (mounted.current) { setBusy(false); setProgress(null); }
     }
   }, [notify]);
-  const open = useCallback(async (entry: FileEntry) => {
+  const open = useCallback(async (entry: FileEntry, alternate = false) => {
     if (effectiveFileType(entry) === "dir") await useSftpStore.getState().navigate(tabId, "local", entry.path);
     else {
-      try { await sftpOpenPath(entry.path); } catch (error) { notify(String(error), true); }
+      try { await openFile({ path: entry.path }, { context: "explorer", workspaceId, alternate }); } catch (error) { notify(String(error), true); }
     }
-  }, [notify, tabId]);
+  }, [notify, tabId, workspaceId]);
   const copy = useCallback(async (entries: FileEntry[], cut: boolean) => {
     if (!entries.length) return;
     const paths = entries.map((entry) => entry.path);

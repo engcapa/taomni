@@ -13,6 +13,7 @@ import { invokeWorkspace } from "./commands/workspace";
 import { invokeSession } from "./commands/session";
 import { invokeFiles } from "./commands/files";
 import { invokeExplorer } from "./commands/explorer";
+import { invokeViewer } from "./commands/viewer";
 import { invokeSdk } from "./commands/sdk";
 import { invokeLsp } from "./commands/lsp";
 import { invokeRemoteDesktop } from "./commands/remoteDesktop";
@@ -30,6 +31,7 @@ const stubCommandRegistry = new CommandRegistry();
 if (typeof window !== "undefined") installStubMailQaControl(mailStubSeed);
 
 export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions): Promise<T> {
+  if (cmd.startsWith("viewer_")) return await invokeViewer(cmd, args) as T;
   if (cmd.startsWith("mobile_")) return await mobileStub(cmd, args) as T;
   if (cmd === "backup_get_policy") {
     return JSON.parse(localStorage.getItem("taomni.backup.policy") || JSON.stringify({
