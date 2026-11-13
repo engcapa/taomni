@@ -1,0 +1,136 @@
+id: TC-SERVERS-002-tab-singleton-native
+title: Native Local servers enforces single tab in main window and across OS processes
+description: >-
+  Native boundary required: verifies real Tauri ModuleLock filesystem/handle lock
+  semantics across two concurrent packaged Taomni processes sharing the app data
+  root (Linux, Windows, macOS). Proves Tools sidebar opens Local servers in a single
+  main-window tab (no detached OS window, no ?servers=main navigation), disables
+  tab Duplicate, focuses the existing tab on repeated trigger, blocks a second OS
+  instance with servers-blocked-dialog until the primary closes its tab or the peer
+  process exits while holding the lock, and confirms ?servers=main inside the main
+  window closes cleanly back to welcome-panel.
+covers:
+- F-Servers-1
+tags:
+- servers
+- regression
+modes:
+- native
+native_platforms:
+- Linux
+- Windows
+- macOS
+fixtures:
+- reset_db
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- wait_for:
+    selector: '[data-testid="welcome-panel"]'
+    timeout_sec: 30
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tool-servers"]'
+- click: '[data-testid="sidebar-tool-servers"]'
+- wait_for:
+    selector: '[data-testid="servers-dialog"]'
+    timeout_sec: 20
+- assert_visible: '[data-testid="tab-bar"]'
+- assert_visible: '[data-testid="servers-tab-panel"]'
+- eval_readonly:
+    expression: "document.querySelectorAll('[data-tab-type'+String.fromCharCode(61)+'\"servers\"]').length === 1 && !window.location.search.includes('servers')"
+    expect_truthy: true
+- right_click: '[data-testid="tab-item"][data-tab-type="servers"]'
+- wait_for: '[data-testid="tab-context-duplicate"]'
+- assert_disabled: '[data-testid="tab-context-duplicate"]'
+- press: Escape
+- wait_for:
+    selector: '[data-testid="tab-context-duplicate"]'
+    state: detached
+    timeout_sec: 5
+- click: '[data-testid="tab-item"][data-tab-type="welcome"]'
+- assert_visible: '[data-testid="welcome-panel"]'
+- click: '[data-testid="sidebar-tool-servers"]'
+- wait_for: '[data-testid="servers-dialog"]'
+- eval_readonly:
+    expression: "document.querySelectorAll('[data-tab-type'+String.fromCharCode(61)+'\"servers\"]').length === 1"
+    expect_truthy: true
+- servers_multi_instance_probe: {}
+- open_route: ?servers=main
+- wait_for:
+    selector: '[data-testid="servers-dialog"]'
+    timeout_sec: 30
+- assert_visible: '[data-testid="servers-tab-panel"]'
+- eval_readonly:
+    expression: "document.querySelectorAll('[data-tab-type'+String.fromCharCode(61)+'\"servers\"]').length === 1"
+    expect_truthy: true
+- click: '[data-testid="servers-dialog-cancel"]'
+- wait_for:
+    selector: '[data-testid="servers-dialog"]'
+    state: detached
+    timeout_sec: 10
+- assert_visible: '[data-testid="welcome-panel"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Opening Local servers in native desktop creates one in-window tab with tab-bar and Duplicate disabled, and repeating the command focuses the existing tab.
+    actions:
+    - 3
+    - 5
+    - 10
+    - 15
+    - 17
+    checkpoints:
+    - step: 6
+      expectation: '{"wait_for": {"selector": "[data-testid=\"servers-dialog\"]", "timeout_sec": 20}}'
+    - step: 7
+      expectation: '{"assert_visible": "[data-testid=\"tab-bar\"]"}'
+    - step: 8
+      expectation: '{"assert_visible": "[data-testid=\"servers-tab-panel\"]"}'
+    - step: 9
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''[data-tab-type''+String.fromCharCode(61)+''\"servers\"]'').length === 1 && !window.location.search.includes(''servers'')", "expect_truthy": true}}'
+    - step: 12
+      expectation: '{"assert_disabled": "[data-testid=\"tab-context-duplicate\"]"}'
+    - step: 19
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''[data-tab-type''+String.fromCharCode(61)+''\"servers\"]'').length === 1", "expect_truthy": true}}'
+    results:
+    - 7
+    - 8
+    - 9
+    - 12
+    - 19
+  - id: R2
+    requirement: Cross-process OS ModuleLock blocks a second Taomni process until release or termination, and ?servers=main reclaims inside the main tab and detaches cleanly on Cancel.
+    actions:
+    - 21
+    - 25
+    checkpoints:
+    - step: 20
+      expectation: '{"servers_multi_instance_probe": {}}'
+    - step: 22
+      expectation: '{"wait_for": {"selector": "[data-testid=\"servers-dialog\"]", "timeout_sec": 30}}'
+    - step: 23
+      expectation: '{"assert_visible": "[data-testid=\"servers-tab-panel\"]"}'
+    - step: 24
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''[data-tab-type''+String.fromCharCode(61)+''\"servers\"]'').length === 1", "expect_truthy": true}}'
+    - step: 26
+      expectation: '{"wait_for": {"selector": "[data-testid=\"servers-dialog\"]", "state": "detached", "timeout_sec": 10}}'
+    - step: 27
+      expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"]"}'
+    - step: 28
+      expectation: '{"assert_no_runtime_errors": null}'
+    results:
+    - 20
+    - 23
+    - 24
+    - 27
+    - 28
+  visual:
+  - check: Tab bar, servers tab panel, and native blocked dialog render in the main WebView on Linux, Windows, and macOS.
+    method: not-applicable
+    reason: UI placement is checked live across both native processes by DOM and layout visibility assertions rather than baseline image diffing.
+  native:
+  - check: Two concurrent QA Taomni processes share the isolated app data root with separate WebView profiles so ModuleLock OS handle contention and crash recovery run on Linux, Windows, and macOS.
+    method: automated
+    reason: Executed natively by servers_multi_instance_probe against two live packaged Taomni instances on each platform.

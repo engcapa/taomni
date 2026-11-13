@@ -1,0 +1,169 @@
+id: TC-SERVERS-001-tab-singleton-browser
+title: Local servers opens as a single tab across triggers and browser contexts
+description: >-
+  Verifies that Local servers (`F-Servers-1`) opens inside the main workspace tab bar
+  rather than an OS popup: clicking the Tools sidebar button opens one `servers` tab
+  with `tab-bar` visible; right-clicking disables Duplicate (`tab-context-duplicate`);
+  re-triggering from Main Menu -> Tools -> Local servers and Ctrl+Shift+S focuses the
+  same single tab; dirty port changes prompt Discard confirmation on Cancel; and
+  `servers_multi_instance_probe` proves cross-page singleton blocking, handover, and
+  unload lease release across concurrent browser contexts.
+covers:
+- F-Servers-1
+tags:
+- servers
+- regression
+modes:
+- browser
+fixtures:
+- reset_db
+timeout_sec: 90
+steps:
+- open: ${cfg.app.base_url}
+- wait_for:
+    selector: '[data-testid="welcome-panel"]'
+    timeout_sec: 30
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tool-servers"]'
+- click: '[data-testid="sidebar-tool-servers"]'
+- wait_for: '[data-testid="servers-dialog"]'
+- assert_visible: '[data-testid="tab-bar"]'
+- assert_visible: '[data-testid="servers-tab-panel"]'
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="servers"]'
+    equal: 1
+- right_click: '[data-testid="tab-item"][data-tab-type="servers"]'
+- wait_for: '[data-testid="tab-context-duplicate"]'
+- assert_disabled: '[data-testid="tab-context-duplicate"]'
+- press: Escape
+- wait_for:
+    selector: '[data-testid="tab-context-duplicate"]'
+    state: detached
+    timeout_sec: 5
+- click: '[data-testid="tab-item"][data-tab-type="welcome"]'
+- assert_visible: '[data-testid="welcome-panel"]'
+- click: '[data-testid="app-main-menu"]'
+- wait_for: '[data-testid="context-menu-item-tools"]'
+- hover: '[data-testid="context-menu-item-tools"]'
+- wait_for: '[data-testid="context-menu-item-servers"]'
+- click: '[data-testid="context-menu-item-servers"]'
+- wait_for: '[data-testid="servers-dialog"]'
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="servers"]'
+    equal: 1
+- click: '[data-testid="tab-item"][data-tab-type="welcome"]'
+- wait_for: '[data-testid="welcome-panel"]'
+- press: Control+Shift+S
+- wait_for: '[data-testid="servers-dialog"]'
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="servers"]'
+    equal: 1
+- click: '[data-testid="server-row-rdp"]'
+- wait_for: '[data-testid="server-field-port"]'
+- fill:
+    selector: '[data-testid="server-field-port"]'
+    value: '13399'
+- click: '[data-testid="servers-dialog-cancel"]'
+- wait_for: '[data-testid="confirm-dialog"]'
+- click: '[data-testid="confirm-dialog-cancel"]'
+- assert_visible: '[data-testid="servers-dialog"]'
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="servers"]'
+    equal: 1
+- click: '[data-testid="servers-dialog-cancel"]'
+- wait_for: '[data-testid="confirm-dialog"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for:
+    selector: '[data-testid="servers-dialog"]'
+    state: detached
+    timeout_sec: 10
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="servers"]'
+    equal: 0
+- click: '[data-testid="sidebar-tool-servers"]'
+- wait_for: '[data-testid="servers-dialog"]'
+- servers_multi_instance_probe: {}
+- click: '[data-testid="tab-item"][data-tab-type="servers"] [data-testid="tab-close"]'
+- wait_for:
+    selector: '[data-testid="servers-dialog"]'
+    state: detached
+    timeout_sec: 10
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="servers"]'
+    equal: 0
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Tools sidebar, Main Menu, and Ctrl+Shift+S open and reuse a single Local servers tab with tab-bar visible and Duplicate disabled.
+    actions:
+    - 3
+    - 5
+    - 10
+    - 15
+    - 21
+    - 26
+    checkpoints:
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"servers-dialog\"]"}'
+    - step: 7
+      expectation: '{"assert_visible": "[data-testid=\"tab-bar\"]"}'
+    - step: 8
+      expectation: '{"assert_visible": "[data-testid=\"servers-tab-panel\"]"}'
+    - step: 9
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"servers\"]", "equal": 1}}'
+    - step: 12
+      expectation: '{"assert_disabled": "[data-testid=\"tab-context-duplicate\"]"}'
+    - step: 23
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"servers\"]", "equal": 1}}'
+    - step: 28
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"servers\"]", "equal": 1}}'
+    results:
+    - 7
+    - 8
+    - 9
+    - 12
+    - 23
+    - 28
+  - id: R2
+    requirement: Dirty configuration changes require confirmation before closing on Cancel, while cross-page singleton locking blocks secondary browser pages until lease release or unload.
+    actions:
+    - 31
+    - 32
+    - 34
+    - 37
+    - 39
+    - 42
+    - 45
+    checkpoints:
+    - step: 35
+      expectation: '{"assert_visible": "[data-testid=\"servers-dialog\"]"}'
+    - step: 36
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"servers\"]", "equal": 1}}'
+    - step: 40
+      expectation: '{"wait_for": {"selector": "[data-testid=\"servers-dialog\"]", "state": "detached", "timeout_sec": 10}}'
+    - step: 41
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"servers\"]", "equal": 0}}'
+    - step: 44
+      expectation: '{"servers_multi_instance_probe": {}}'
+    - step: 46
+      expectation: '{"wait_for": {"selector": "[data-testid=\"servers-dialog\"]", "state": "detached", "timeout_sec": 10}}'
+    - step: 47
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"servers\"]", "equal": 0}}'
+    - step: 48
+      expectation: '{"assert_no_runtime_errors": null}'
+    results:
+    - 35
+    - 41
+    - 44
+    - 47
+    - 48
+  visual:
+  - check: In-tab Local servers panel, tab bar visibility, and blocked/discard dialogs remain unclipped in browser viewport.
+    method: not-applicable
+    reason: DOM layout assertions and native verification in TC-SERVERS-002 cover tab bar, panel, and dialog mounting without relying on static screenshot comparison.
+  native:
+  - check: Real Tauri OS ModuleLock contention and multi-process desktop behavior.
+    method: external
+    reason: Covered by TC-SERVERS-002-tab-singleton-native across Linux, Windows, and macOS binaries; browser mode uses localStorage stubs.

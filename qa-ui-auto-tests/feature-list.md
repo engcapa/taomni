@@ -282,6 +282,7 @@ controls:
 - id: tab-item                 # individual tab; pair with [data-tab-type=...] / [data-tab-title=...] when targeting
   selector: '[data-testid="tab-item"]'
   aliases:
+  - '[data-testid="tab-item"][data-tab-type="welcome"]'
   - ':nth-match([data-testid="tab-item"][data-tab-type="file-browser"], 1)'
   - ':nth-match([data-testid="tab-item"][data-tab-type="file-browser"], 2)'
   - ':nth-match([data-testid="tab-item"][data-tab-type="file-browser"], 3)'
@@ -4930,15 +4931,16 @@ controls:
 
 ## 22. 本地服务器管理（Local Servers）
 
-### 22.1 本地服务器管理窗口 `ServersDialog` ✅
+### 22.1 本地服务器管理标签页 `ServersPanel`（单实例） ✅
 
 <!-- feature
 id: F-Servers-1
 status: done
 area: servers
-components: [ServersDialog, ServerList, ServerRow, ServerSettings, CommonSettings, ServerOutputLog, fields]
+components: [ServersPanel, ServersTabBlockedDialog, ServerList, ServerRow, ServerSettings, CommonSettings, ServerOutputLog, fields]
 files:
-  - src/components/servers/ServersDialog.tsx
+  - src/components/servers/ServersPanel.tsx
+  - src/components/servers/ServersTabBlockedDialog.tsx
   - src/components/servers/ServerList.tsx
   - src/components/servers/ServerRow.tsx
   - src/components/servers/ServerSettings.tsx
@@ -4946,16 +4948,53 @@ files:
   - src/components/servers/ServerOutputLog.tsx
   - src/components/servers/fields.tsx
   - src/lib/servers.ts
+  - src/lib/serversTab.ts
   - src/stores/serversStore.ts
   - src/lib/detachedSession.ts
+  - src/layouts/main/TabContentRouter.tsx
+  - src/components/tabbar/TabBar.tsx
+  - src-tauri/src/servers/tab_lock.rs
+  - src-tauri/src/servers/mod.rs
   - src-tauri/src/windowing/mod.rs
 controls:
-  # Standalone OS window — opened by ribbon "servers" / Ctrl+Shift+S via
-  # open_detached_window(kind=servers). Browser smoke uses ?servers=main.
+  # Single-instance tab ("servers") opened by Tools sidebar, Tools menu, Ctrl+Shift+S,
+  # or ?servers=main. Protected within a window and across running Taomni instances.
+  - id: sidebar-tool-servers
+    selector: '[data-testid="sidebar-tool-servers"]'
+    kind: interactive
+    optional: true       # visible when Tools rail tab is active
+  - id: servers-tab-panel
+    selector: '[data-testid="servers-tab-panel"]'
+    kind: display
+    optional: true
+  - id: tab-servers
+    selector: '[data-testid="tab-item"][data-tab-type="servers"]'
+    kind: display
+    optional: true
+  - id: tab-close-servers
+    selector: '[data-testid="tab-item"][data-tab-type="servers"] [data-testid="tab-close"]'
+    kind: interactive
+    optional: true
+  - id: tab-context-duplicate
+    selector: '[data-testid="tab-context-duplicate"]'
+    kind: display        # disabled menu item asserted on singleton tab context menus
+    optional: true
+  - id: servers-blocked-dialog
+    selector: '[data-testid="servers-blocked-dialog"]'
+    kind: display
+    optional: true
+  - id: servers-blocked-message
+    selector: '[data-testid="servers-blocked-message"]'
+    kind: display
+    optional: true
+  - id: servers-blocked-ok
+    selector: '[data-testid="servers-blocked-ok"]'
+    kind: display        # dismissed inside servers_multi_instance_probe
+    optional: true
   - id: dialog
     selector: '[data-testid="servers-dialog"]'
     kind: display
-    optional: true       # only inside the servers detached window
+    optional: true       # inside the active servers tab
   - id: dialog-cancel
     selector: '[data-testid="servers-dialog-cancel"]'
     kind: interactive

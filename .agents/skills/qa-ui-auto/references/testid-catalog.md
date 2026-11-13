@@ -1716,6 +1716,7 @@
 
 - `[data-testid="tab-bar"]` — display — F1.5.tab-bar
 - `[data-testid="tab-item"]` — interactive — F1.5.tab-item
+  ↳ `[data-testid="tab-item"][data-tab-type="welcome"]` — alias
   ↳ `:nth-match([data-testid="tab-item"][data-tab-type="file-browser"], 1)` — alias
   ↳ `:nth-match([data-testid="tab-item"][data-tab-type="file-browser"], 2)` — alias
   ↳ `:nth-match([data-testid="tab-item"][data-tab-type="file-browser"], 3)` — alias
@@ -2738,6 +2739,14 @@
 
 ## servers (F-Servers-1)
 
+- `[data-testid="sidebar-tool-servers"]` — interactive [optional] — F-Servers-1.sidebar-tool-servers
+- `[data-testid="servers-tab-panel"]` — display [optional] — F-Servers-1.servers-tab-panel
+- `[data-testid="tab-item"][data-tab-type="servers"]` — display [optional] — F-Servers-1.tab-servers
+- `[data-testid="tab-item"][data-tab-type="servers"] [data-testid="tab-close"]` — interactive [optional] — F-Servers-1.tab-close-servers
+- `[data-testid="tab-context-duplicate"]` — display [optional] — F-Servers-1.tab-context-duplicate
+- `[data-testid="servers-blocked-dialog"]` — display [optional] — F-Servers-1.servers-blocked-dialog
+- `[data-testid="servers-blocked-message"]` — display [optional] — F-Servers-1.servers-blocked-message
+- `[data-testid="servers-blocked-ok"]` — display [optional] — F-Servers-1.servers-blocked-ok
 - `[data-testid="servers-dialog"]` — display [optional] — F-Servers-1.dialog
 - `[data-testid="servers-dialog-cancel"]` — interactive [optional] — F-Servers-1.dialog-cancel
 - `[data-testid="servers-dialog-apply"]` — interactive [optional] — F-Servers-1.dialog-apply

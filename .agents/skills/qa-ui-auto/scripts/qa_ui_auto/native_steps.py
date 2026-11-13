@@ -3293,6 +3293,12 @@ def _do_mail_multi_instance_probe(ctx: NativeStepContext, args: Any) -> str:
     return run(ctx, args)
 
 
+@_verb("servers_multi_instance_probe")
+def _do_servers_multi_instance_probe(ctx: NativeStepContext, args: Any) -> str:
+    from .servers_multi_instance import native_run
+    return native_run(ctx, args)
+
+
 @_verb("mail_server_delay_next_read")
 def _do_mail_server_delay_next_read(ctx: NativeStepContext, args: Any) -> str:
     milliseconds = (args or {}).get("milliseconds", 0)

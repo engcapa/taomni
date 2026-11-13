@@ -24,6 +24,7 @@ export function useMainLayoutChrome(context: UseMainLayoutChromeContext) {
   const terminalTabs = layout.tabs.filter((t) => t.type === "terminal");
   const sftpTabs = layout.tabs.filter((t) => t.type === "sftp" && t.sftp);
   const settingsTabs = layout.tabs.filter((t) => t.type === "settings");
+  const serversTabs = layout.tabs.filter((t) => t.type === "servers");
   const gitTabs = layout.tabs.filter((t) => t.type === "git" && t.git);
   const codeWorkspaceTabs = layout.tabs.filter((t) => t.type === "code-workspace" && t.codeWorkspace);
   const vncTabs = layout.tabs.filter((t) => t.type === "vnc" && t.vnc);
@@ -104,6 +105,7 @@ export function useMainLayoutChrome(context: UseMainLayoutChromeContext) {
     splitGridRowWeightsForLayout,
     sftpTabs,
     settingsTabs,
+    serversTabs,
     gitTabs,
     codeWorkspaceTabs,
     vncTabs,

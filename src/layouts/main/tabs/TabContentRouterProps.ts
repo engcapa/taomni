@@ -86,6 +86,7 @@ export interface TabContentRouterProps {
   splitGridRowWeightsForLayout: number[];
   sftpTabs: Tab[];
   settingsTabs: Tab[];
+  serversTabs: Tab[];
   gitTabs: Tab[];
   openCodeWorkspaceTab: (repoRoot: string, initialPath?: string | null) => void;
   codeWorkspaceTabs: Tab[];

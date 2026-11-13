@@ -79,6 +79,8 @@ pub struct AppState {
     /// OS-level SocksCap engine (rules/egress now; capture in later phases).
     pub sockscap: Arc<SocksCapRuntime>,
     pub servers: Arc<ServerRegistry>,
+    /// Exclusive OS file lock held while a window in this process keeps the Local servers tab open.
+    pub servers_tab_lock: Mutex<Option<crate::servers::HeldServersTabLock>>,
     pub clipboard: Arc<Mutex<Option<arboard::Clipboard>>>,
     pub db: Mutex<rusqlite::Connection>,
     /// Dedicated connection to the standalone Tao Notes database (`notes.db`),
@@ -126,6 +128,7 @@ impl AppState {
             tunnels: Arc::new(TunnelRegistry::new()),
             sockscap: Arc::new(SocksCapRuntime::new()),
             servers: Arc::new(ServerRegistry::new()),
+            servers_tab_lock: Mutex::new(None),
             clipboard: Arc::new(Mutex::new(None)),
             db: Mutex::new(db),
             notes_db: Mutex::new(notes_db),

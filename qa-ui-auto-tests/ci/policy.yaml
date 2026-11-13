@@ -751,3 +751,5 @@ cases:
 - TC-BACKUP-CANCEL-001
 - TC-BACKUP-CANCEL-002
 - TC-BACKUP-MAIL-001
+- TC-SERVERS-001-tab-singleton-browser
+- TC-SERVERS-002-tab-singleton-native

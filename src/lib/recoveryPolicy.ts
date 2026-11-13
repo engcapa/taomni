@@ -23,6 +23,7 @@ export const RECOVERY_LIMITATIONS: Record<TabKind, string> = {
   "mail-unified": "发件箱自动发送已暂停；请逐账户核对发送结果与已保存草稿，避免重复发送。",
   "code-workspace": "已保存文件保留；未保存编辑、调试中间态和 AI 结果可能丢失，不重跑 build、turn 或自动批准权限。",
   mfa: "已保存 MFA 条目保留；当前筛选、临时编辑和输入未恢复，不导入或覆盖已有条目。",
+  servers: "已保存本地服务器配置和正在运行的服务不受影响；未点击应用的表单编辑未恢复。",
 };
 
 export function recoveryLimitation(kind: string): string {

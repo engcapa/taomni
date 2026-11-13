@@ -30,6 +30,7 @@ import { TaoAlertPoller } from "../../components/tao/TaoAlertPoller";
 import { TabOverview } from "../../components/tabbar/TabOverview";
 import { MultiExecBar } from "../../components/terminal/MultiExecBar";
 import { UpdateDialog } from "../../components/UpdateDialog";
+import { ServersTabBlockedDialog } from "../../components/servers/ServersTabBlockedDialog";
 import { VaultUnlockDialog } from "../../components/vault/VaultUnlockDialog";
 import { WindowResizeHandles } from "../../components/window/WindowResizeHandles";
 import { startWindowDrag } from "../../lib/windowDrag";
@@ -345,6 +346,7 @@ export function MainLayoutView(props: MainLayoutViewProps) {
                     splitGridRowWeightsForLayout={chrome.splitGridRowWeightsForLayout}
                     sftpTabs={chrome.sftpTabs}
                     settingsTabs={chrome.settingsTabs}
+                    serversTabs={chrome.serversTabs}
                     gitTabs={chrome.gitTabs}
                     openCodeWorkspaceTab={workspaceOpening.openCodeWorkspaceTab}
                     codeWorkspaceTabs={chrome.codeWorkspaceTabs}
@@ -457,6 +459,7 @@ export function MainLayoutView(props: MainLayoutViewProps) {
         {layout.nativeMenu && layout.importExport.previewNode}
 
         {layout.appExitConfirmDialog}
+        <ServersTabBlockedDialog />
         <CallOverlay />
         <WhiteboardOverlay />
         <EdgeDrawer />
