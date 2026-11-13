@@ -141,7 +141,7 @@ steps:
     selector: '[data-testid="servers-dialog"]'
     state: detached
     timeout_sec: 10
-- assert_visible: '[data-testid="sessions-empty-state"]'
+- assert_visible: '[data-testid="tools-empty-state"]'
 - assert_no_runtime_errors: null
 verification:
   review: reviewed
@@ -254,7 +254,7 @@ verification:
     - step: 75
       expectation: '{"eval_readonly": {"expression": "window.opener === null && document.querySelectorAll(''[data-tab-type''+String.fromCharCode(61)+''\"servers\"]'').length === 1", "expect_truthy": true}}'
     - step: 78
-      expectation: '{"assert_visible": "[data-testid=\"sessions-empty-state\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"tools-empty-state\"]"}'
     - step: 79
       expectation: '{"assert_no_runtime_errors": null}'
     results:
