@@ -1,15 +1,21 @@
 import json
 from pathlib import Path
+import subprocess
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest import TestCase
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from qa_ui_auto.native_steps import VERBS
 from qa_ui_auto.steps import StepError
 
 
 class NativeDragTest(TestCase):
+    def setUp(self):
+        points = patch('qa_ui_auto.native_drag.prepare_drag_points', return_value=((5, 5), (70, 90), 8))
+        self.points = points.start()
+        self.addCleanup(points.stop)
+
     def test_tc155_requires_complete_query_before_targeting_search_hit(self):
         from qa_ui_auto.testcase import load_case
 
@@ -40,7 +46,7 @@ class NativeDragTest(TestCase):
     def test_offset_uses_one_action_request_and_fixed_viewport_geometry(self):
         with TemporaryDirectory() as directory:
             session = Mock()
-            session.execute.return_value = {"x": 20, "y": 30, "width": 6, "height": 10}
+            self.points.return_value = ((23, 35), (68, 35), 3)
             ctx = SimpleNamespace(session=session, case_dir=Path(directory))
             VERBS["drag_to"](ctx, {"from": "#handle", "by": {"dx": 45, "steps": 3}})
             payload = session.request.call_args_list[0].args[2]
@@ -49,27 +55,148 @@ class NativeDragTest(TestCase):
                              "pointerMove", "pointerMove", "pointerMove", "pointerUp"])
             self.assertEqual([a["x"] for a in actions if a["type"] == "pointerMove"], [23, 38, 53, 68])
             self.assertEqual(session.request.call_args_list[-1].args[0], "DELETE")
-            self.assertEqual(json.loads((Path(directory) / "native-drags.jsonl").read_text())["end"], [68, 35])
+            receipts = [json.loads(line) for line in (Path(directory) / "native-drags.jsonl").read_text().splitlines()]
+            self.assertEqual(receipts[0]["end"], [68, 35])
+            self.assertEqual(receipts[1]["kind"], "dom-events")
+            self.assertEqual(receipts[0]["traceId"], receipts[1]["traceId"])
+
+    def test_modifier_copy_uses_one_synchronized_key_pointer_request_and_macos_option(self):
+        for system, expected in [("Linux", ""), ("Darwin", "")]:
+            with self.subTest(system=system), TemporaryDirectory() as directory:
+                session = Mock()
+                session.execute.return_value = {"events": [], "dropped": 0}
+                with patch("qa_ui_auto.steps.mouse.platform.system", return_value=system):
+                    VERBS["drag_to"](SimpleNamespace(session=session, case_dir=Path(directory)),
+                                     {"from": "#a", "to": "#b", "modifiers": ["Control"], "macos_modifiers": ["Alt"]})
+                sources = session.request.call_args_list[0].args[2]["actions"]
+                self.assertEqual(len(sources), 2)
+                self.assertEqual(sources[1]["actions"][0], {"type": "keyDown", "value": expected})
+                self.assertEqual(sources[1]["actions"][-1], {"type": "keyUp", "value": expected})
+                self.assertEqual(len(sources[0]["actions"]), len(sources[1]["actions"]))
+                self.assertEqual(session.request.call_args_list[-1].args[0], "DELETE")
+
+    def test_unprepared_target_cannot_be_reported_as_a_delivered_native_drag(self):
+        with TemporaryDirectory() as directory:
+            session = Mock()
+            self.points.side_effect = StepError("target is covered")
+            with self.assertRaisesRegex(StepError, "target is covered"):
+                VERBS["drag_to"](SimpleNamespace(session=session, case_dir=Path(directory)), {"from": "#a", "to": "#b"})
+            session.request.assert_not_called()
+            session.execute.assert_not_called()
+            self.assertFalse((Path(directory) / "native-drags.jsonl").exists())
 
     def test_failed_transport_releases_pointer_and_preserves_failure(self):
         with TemporaryDirectory() as directory:
             session = Mock()
-            session.execute.side_effect = [{"x": 0, "y": 0, "width": 10, "height": 10},
-                                           {"x": 60, "y": 80, "width": 20, "height": 20}]
+            session.execute.return_value = {"events": [], "dropped": 0}
             session.request.side_effect = [RuntimeError("drag rejected"), None]
             with self.assertRaisesRegex(RuntimeError, "rejected"):
                 VERBS["drag_to"](SimpleNamespace(session=session, case_dir=Path(directory)), {"from": "#a", "to": "#b"})
             self.assertEqual(session.request.call_args_list[-1].args[0], "DELETE")
             self.assertTrue((Path(directory) / "native-drags.jsonl").is_file())
 
-    def test_missing_or_hidden_geometry_cannot_start_a_drag(self):
-        for box in (None, {}, {"x": 0, "y": 0, "width": 0, "height": 10}):
-            with self.subTest(box=box), TemporaryDirectory() as directory:
-                session = Mock(); session.execute.return_value = box
-                with self.assertRaises(StepError):
-                    VERBS["drag_to"](SimpleNamespace(session=session, case_dir=Path(directory)),
-                                     {"from": "#hidden", "by": {"dx": 30}})
-                session.request.assert_not_called()
+    def test_passive_dom_trace_wraps_action_and_preserves_actual_event_fields(self):
+        with TemporaryDirectory() as directory:
+            session = Mock()
+            events = [{"type": "pointerdown", "target": {"tag": "SPAN", "path": "/source/file.txt"},
+                       "buttons": 1, "clientX": 746, "clientY": 183, "altKey": False, "ctrlKey": True},
+                      {"type": "pointerup", "target": {"path": "/target/folder"}, "buttons": 0}]
+            self.points.return_value = ((746, 183), (746, 155), 8)
+            session.execute.side_effect = [True, {"events": events, "dropped": 3}]
+            VERBS["drag_to"](SimpleNamespace(session=session, case_dir=Path(directory)), {"from": "#a", "to": "#b"})
+            scripts = [call.args[0] for call in session.execute.call_args_list]
+            self.assertIn("capture: true, passive: true", scripts[0])
+            self.assertIn("state.events.length >= 2048", scripts[0])
+            self.assertIn("event.buttons", scripts[0])
+            self.assertNotIn("preventDefault(", scripts[0])
+            self.assertNotIn("stopPropagation(", scripts[0])
+            self.assertIn("state.stop(); delete window[key]", scripts[1])
+            calls = [call[0] for call in session.mock_calls]
+            self.assertEqual(calls, ["execute", "endpoint", "request", "endpoint", "request", "execute"])
+            receipt = json.loads((Path(directory) / "native-drags.jsonl").read_text().splitlines()[-1])
+            self.assertEqual(receipt["events"], events)
+            self.assertEqual(receipt["dropped"], 3)
+            self.assertNotIn("collectionError", receipt)
+
+    def test_dom_observer_javascript_is_bounded_passive_and_fully_removed(self):
+        from qa_ui_auto.native_drag import _start_dom_trace, _finish_dom_trace
+
+        session = Mock()
+        _start_dom_trace(session, "__qa-test-observer")
+        start_script = session.execute.call_args.args[0]
+        session.execute.return_value = {"events": []}
+        _finish_dom_trace(session, "__qa-test-observer")
+        stop_script = session.execute.call_args.args[0]
+        program = r"""
+const assert = require('node:assert/strict');
+const scripts = JSON.parse(process.argv[1]);
+const listeners = new Map();
+global.window = {
+  addEventListener(type, callback, options) {
+    assert.equal(options.capture, true); assert.equal(options.passive, true);
+    listeners.set(type, callback);
+  },
+  removeEventListener(type, callback, options) {
+    assert.equal(listeners.get(type), callback); assert.equal(options.passive, true);
+    listeners.delete(type);
+  },
+};
+class Element {
+  constructor(tagName, attrs) { Object.assign(this, {tagName, attrs}); }
+  closest() { return this; }
+  getAttribute(name) { return this.attrs[name] ?? null; }
+}
+global.Element = Element;
+const target = new Element('SPAN', {'data-path': '/target/folder', 'data-testid': 'explorer-file-row'});
+global.document = {activeElement: target};
+new Function(scripts[0])();
+const event = {type: 'pointermove', target, buttons: 1, button: 0,
+  clientX: 746, clientY: 155, altKey: true, ctrlKey: false, isTrusted: true};
+for (let index = 0; index < 2050; index++) listeners.get('pointermove')(event);
+const result = new Function(scripts[1])();
+assert.equal(result.events.length, 2048); assert.equal(result.dropped, 2);
+assert.equal(result.events[0].target.path, '/target/folder');
+assert.equal(result.events[0].target.testId, 'explorer-file-row');
+assert.equal(result.events[0].buttons, 1); assert.equal(result.events[0].altKey, true);
+assert.equal(result.events[0].clientX, 746); assert.equal(result.events[0].clientY, 155);
+assert.equal(listeners.size, 0); assert.equal(Object.keys(window).length, 2);
+"""
+        subprocess.run(["node", "-e", program, json.dumps([start_script, stop_script])],
+                       check=True, capture_output=True, text=True)
+
+    def test_failed_drag_collects_and_removes_dom_observer_without_masking_transport_error(self):
+        with TemporaryDirectory() as directory:
+            session = Mock()
+            session.execute.side_effect = [
+                True, {"events": [{"type": "pointercancel", "buttons": 0}], "dropped": 0},
+            ]
+            session.request.side_effect = [RuntimeError("original transport failure"), RuntimeError("release failure")]
+            with self.assertRaisesRegex(RuntimeError, "original transport failure"):
+                VERBS["drag_to"](SimpleNamespace(session=session, case_dir=Path(directory)), {"from": "#a", "to": "#b"})
+            self.assertIn("state.stop(); delete window[key]", session.execute.call_args_list[-1].args[0])
+            receipt = json.loads((Path(directory) / "native-drags.jsonl").read_text().splitlines()[-1])
+            self.assertEqual(receipt["events"][0]["type"], "pointercancel")
+
+    def test_diagnostic_setup_and_collection_errors_do_not_suppress_drag_or_its_failure(self):
+        with TemporaryDirectory() as directory:
+            session = Mock()
+            session.execute.side_effect = [
+                RuntimeError("observer setup blocked"), RuntimeError("observer collection blocked"),
+            ]
+            session.request.side_effect = [RuntimeError("drag failed"), None]
+            with self.assertRaisesRegex(RuntimeError, "drag failed"):
+                VERBS["drag_to"](SimpleNamespace(session=session, case_dir=Path(directory)), {"from": "#a", "by": {"dx": 30}})
+            self.assertEqual(session.request.call_args_list[0].args[0], "POST")
+            receipt = json.loads((Path(directory) / "native-drags.jsonl").read_text().splitlines()[-1])
+            self.assertIn("setup blocked", receipt["setupError"])
+            self.assertIn("collection blocked", receipt["collectionError"])
+
+    def test_target_preparation_receives_exact_source_and_offset_contract(self):
+        with TemporaryDirectory() as directory:
+            session = Mock()
+            args = {"from": "#handle", "by": {"dx": 30, "steps": 3}}
+            VERBS["drag_to"](SimpleNamespace(session=session, case_dir=Path(directory)), args)
+            self.points.assert_called_once_with(session, args)
 
 
 def load_tests(loader, suite, pattern):
@@ -78,6 +205,6 @@ def load_tests(loader, suite, pattern):
     qa-ui-auto-entry and tool-contracts already select this module. No workflow
     conditions, platform scope or crash-regression selection need to change.
     """
-    for module in ("test_os_file_drag", "test_workspace_drop_import", "test_file_clipboard", "test_file_clipboard_macos"):
+    for module in ("test_native_drag_targets", "test_explorer_fixture_selectors", "test_os_file_drag", "test_workspace_drop_import", "test_file_clipboard", "test_file_clipboard_macos"):
         suite.addTests(loader.loadTestsFromName(module))
     return suite

@@ -33,6 +33,12 @@ fn check_read_access(pasteboard: &NSPasteboard) -> Result<(), String> {
 }
 
 pub fn clipboard_read_files() -> Result<Vec<String>, String> {
+    let paths = read_files_raw()?;
+    validate_paths(&paths)?;
+    Ok(paths)
+}
+
+fn read_files_raw() -> Result<Vec<String>, String> {
     autoreleasepool(|_| {
         let pasteboard = NSPasteboard::generalPasteboard();
         check_read_access(&pasteboard)?;
@@ -90,8 +96,27 @@ pub fn clipboard_read_files() -> Result<Vec<String>, String> {
         if paths.is_empty() {
             return Err(error("unavailable", "advertised macOS file list was empty"));
         }
-        validate_paths(&paths)?;
         Ok(paths)
+    })
+}
+
+pub fn clipboard_update_cut_files(
+    expected: &[String],
+    remaining: &[String],
+) -> Result<bool, String> {
+    validate_paths(remaining)?;
+    autoreleasepool(|_| {
+        let pasteboard = NSPasteboard::generalPasteboard();
+        let generation = pasteboard.changeCount();
+        if read_files_raw()? != expected || pasteboard.changeCount() != generation {
+            return Ok(false);
+        }
+        if remaining.is_empty() {
+            pasteboard.clearContents();
+        } else {
+            clipboard_write_files(remaining)?;
+        }
+        Ok(true)
     })
 }
 

@@ -7,6 +7,7 @@ import { Panel, Group as PanelGroup, Separator as PanelResizeHandle } from "reac
 import { SftpSidebar } from "../../../components/filebrowser/SftpSidebar";
 import { TerminalPanel } from "../../../components/terminal/TerminalPanel";
 import { alertAppDialog } from "../../../lib/appDialogs";
+import { openTerminalExplorer } from "../../../lib/explorer/terminalExplorer";
 import { encodeBase64, writeTerminal } from "../../../lib/ipc";
 import { getSessionNetworkSettings, toNetworkSettingsPayload } from "../../../lib/networkSettings";
 import { loadResizableLayout, saveResizableLayout } from "../../../lib/resizableLayout";
@@ -229,6 +230,9 @@ export function TerminalTabContents(inputs: TerminalTabContentsProps) {
               sftpToggle={!terminalSplitVisible && tab.ssh && sshBrowserMode(parseSessionOptions(tab.ssh.optionsJson).sshBrowser) !== "disabled" ? {
                 open: sidebarOpen,
                 onToggle: () => toggleTerminalSftp(tab),
+              } : undefined}
+              explorerToggle={!tab.ssh && !tab.commandTerminal ? {
+                onOpen: (forceNew) => { void openTerminalExplorer(async () => terminalCwdsRef.current[tab.id] ?? await queryTerminalCwd(tab.id), forceNew); },
               } : undefined}
               gitToggle={!tab.ssh && !tab.commandTerminal ? {
                 cwd: terminalCwds[tab.id] ?? null,

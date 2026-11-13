@@ -18,6 +18,7 @@ export interface UseTerminalLifecycleContext {
   commands: ReturnType<typeof useTerminalCommands>;
   interaction: ReturnType<typeof useTerminalInteraction>;
   gitToggle: { cwd: string | null; onOpen: () => void; } | undefined;
+  explorerToggle?: import("./types").TerminalPanelProps["explorerToggle"];
   tabId: string | undefined;
   initialCwd: string | undefined;
   cwdRequestToken: number;
@@ -38,6 +39,7 @@ export function useTerminalLifecycle(context: UseTerminalLifecycleContext) {
     commands,
     interaction,
     gitToggle,
+    explorerToggle,
     tabId,
     initialCwd,
     cwdRequestToken,
@@ -95,6 +97,7 @@ export function useTerminalLifecycle(context: UseTerminalLifecycleContext) {
     effectiveReadOnly,
     openSearch: interaction.openSearch,
     gitToggle,
+    explorerToggle,
     gitState: interaction.gitState,
     increaseFontSize: commands.increaseFontSize,
     decreaseFontSize: commands.decreaseFontSize,

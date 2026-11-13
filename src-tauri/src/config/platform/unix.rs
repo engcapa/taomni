@@ -6,7 +6,10 @@ use std::process::{Command, Output, Stdio};
 #[path = "unix_file_clipboard.rs"]
 mod file_clipboard;
 #[cfg(target_os = "linux")]
-pub use file_clipboard::{clipboard_read_files, clipboard_write_files};
+pub use file_clipboard::{
+    clipboard_read_files, clipboard_update_cut_files, clipboard_write_files,
+    clipboard_write_files_with_cut,
+};
 
 pub fn select_private_key_file(current_path: Option<&str>) -> Result<Option<String>, String> {
     let initial = initial_dir_from(current_path);

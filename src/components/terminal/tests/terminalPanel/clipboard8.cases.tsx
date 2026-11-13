@@ -69,6 +69,34 @@ export function registerTerminalPanelClipboard8Cases() {
     expect(onOpen).toHaveBeenCalledTimes(1);
   });
 
+  it("offers both Explorer entries in a local terminal without reserving a shortcut", async () => {
+    const onOpen = vi.fn();
+    render(<TerminalPanel visible explorerToggle={{ onOpen }} />);
+    await waitFor(() => expect(terminalMocks.terminalCtor).toHaveBeenCalled());
+    fireEvent.contextMenu(screen.getByTestId("terminal-pane"));
+    fireEvent.click(await screen.findByTestId("terminal-context-explorer"));
+    expect(onOpen).toHaveBeenLastCalledWith(false);
+    fireEvent.contextMenu(screen.getByTestId("terminal-pane"));
+    fireEvent.click(await screen.findByTestId("terminal-context-explorer-new"));
+    expect(onOpen).toHaveBeenLastCalledWith(true);
+  });
+
+  it("does not show Explorer actions for an SSH terminal even if an outer caller passes them", async () => {
+    render(<TerminalPanel visible explorerToggle={{ onOpen: vi.fn() }} ssh={{ sessionId: "ssh", host: "localhost", port: 22, username: "test", authMethod: "Password", authData: "test" }} />);
+    await waitFor(() => expect(terminalMocks.terminalCtor).toHaveBeenCalled());
+    fireEvent.contextMenu(screen.getByTestId("terminal-pane"));
+    expect(screen.queryByTestId("terminal-context-explorer")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("terminal-context-explorer-new")).not.toBeInTheDocument();
+  });
+
+  it("does not show Explorer actions for a command terminal", async () => {
+    render(<TerminalPanel visible explorerToggle={{ onOpen: vi.fn() }} commandTerminal={{ kind: "Telnet", host: "localhost", port: 23 }} />);
+    await waitFor(() => expect(terminalMocks.terminalCtor).toHaveBeenCalled());
+    fireEvent.contextMenu(screen.getByTestId("terminal-pane"));
+    expect(screen.queryByTestId("terminal-context-explorer")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("terminal-context-explorer-new")).not.toBeInTheDocument();
+  });
+
   it("saves the current theme as the default for new terminals", async () => {
     const onSessionReady = vi.fn();
 

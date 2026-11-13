@@ -11,6 +11,7 @@
 //!   `sftp-progress-{transferId}` and `sftp-transfer-complete-{transferId}`.
 
 pub mod local;
+pub mod local_ops;
 pub mod sftp;
 pub mod transfer;
 

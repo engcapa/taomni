@@ -10,7 +10,10 @@ use winapi::um::commdlg::{
 
 #[path = "windows_file_clipboard.rs"]
 mod file_clipboard;
-pub use file_clipboard::{clipboard_read_files, clipboard_write_files};
+pub use file_clipboard::{
+    clipboard_read_files, clipboard_update_cut_files, clipboard_write_files,
+    clipboard_write_files_with_cut,
+};
 
 pub fn select_private_key_file(current_path: Option<&str>) -> Result<Option<String>, String> {
     let mut file_buf = [0u16; 32768];

@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { CodeWorkspaceTab } from "../../components/editor/CodeWorkspaceTab";
 import { FileBrowser } from "../../components/filebrowser/FileBrowser";
-import { LocalFileBrowserPanel } from "../../components/filebrowser/LocalFileBrowserPanel";
+import { ExplorerTabPane } from "../../components/explorer/ExplorerTabPane";
 import { GitPanel } from "../../components/git/GitPanel";
 import { WorkspaceGitManager } from "../../components/git/WorkspaceGitManager";
 import { LanChatGate } from "../../components/lanchat/LanChatGate";
@@ -418,9 +418,11 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
           className="absolute inset-0"
           style={{ display: isActive ? "block" : "none" }}
         >
-          <LocalFileBrowserPanel
+          <ExplorerTabPane
             tabId={tab.id}
             initialPath={tab.fileBrowser.initialPath}
+            active={activeTab?.id === tab.id}
+            onOpenTerminal={(path) => { void openLocalTab(undefined, undefined, undefined, undefined, path); }}
           />
         </div>
       );

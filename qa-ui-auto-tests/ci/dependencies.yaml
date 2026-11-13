@@ -1,3 +1,9 @@
+# Explorer cases own isolated input/byte fixtures and do not depend on another case's state.
+TC-EXPLORER-001: []
+TC-EXPLORER-002: []
+TC-EXPLORER-003: []
+TC-EXPLORER-004: []
+TC-EXPLORER-005: []
 # Independent per-case two-root/source fixtures; neither mode needs a predecessor.
 TC-WS-087: []
 TC-WS-088: []

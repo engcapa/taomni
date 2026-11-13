@@ -11,7 +11,8 @@ use winapi::um::winbase::{
 };
 use winapi::um::winuser::{
     CF_HDROP, CloseClipboard, CreateWindowExW, DestroyWindow, EmptyClipboard, GetClipboardData,
-    HWND_MESSAGE, IsClipboardFormatAvailable, OpenClipboard, SetClipboardData,
+    HWND_MESSAGE, IsClipboardFormatAvailable, OpenClipboard, RegisterClipboardFormatW,
+    SetClipboardData,
 };
 
 struct ClipboardGuard;
@@ -56,6 +57,12 @@ pub fn clipboard_read_files() -> Result<Vec<String>, String> {
         return Err(last_error("cannot open Windows clipboard"));
     }
     let _clipboard = ClipboardGuard;
+    let paths = read_files_locked()?;
+    super::super::clipboard::file_clipboard::validate_paths(&paths)?;
+    Ok(paths)
+}
+
+fn read_files_locked() -> Result<Vec<String>, String> {
     if unsafe { IsClipboardFormatAvailable(CF_HDROP) } == 0 {
         return Ok(Vec::new());
     }
@@ -97,15 +104,33 @@ pub fn clipboard_read_files() -> Result<Vec<String>, String> {
             )
         })?);
     }
-    super::super::clipboard::file_clipboard::validate_paths(&paths)?;
     Ok(paths)
 }
 
 pub fn clipboard_write_files(paths: &[String]) -> Result<(), String> {
-    let bytes = hdrop::encode(paths)?;
+    clipboard_write_files_with_cut(paths, false)
+}
+
+pub fn clipboard_write_files_with_cut(paths: &[String], cut: bool) -> Result<(), String> {
     if paths.is_empty() {
         return Ok(());
     }
+    write_files_conditionally(paths, cut, None).map(|_| ())
+}
+
+pub fn clipboard_update_cut_files(
+    expected: &[String],
+    remaining: &[String],
+) -> Result<bool, String> {
+    write_files_conditionally(remaining, true, Some(expected))
+}
+
+fn write_files_conditionally(
+    paths: &[String],
+    cut: bool,
+    expected: Option<&[String]>,
+) -> Result<bool, String> {
+    let bytes = hdrop::encode(paths)?;
     let handle = unsafe { GlobalAlloc(GMEM_MOVEABLE, bytes.len()) };
     if handle.is_null() {
         return Err(last_error("CF_HDROP allocation failed"));
@@ -148,13 +173,45 @@ pub fn clipboard_write_files(paths: &[String]) -> Result<(), String> {
         return Err(last_error("cannot open Windows clipboard"));
     }
     let _clipboard = ClipboardGuard;
+    if let Some(expected) = expected {
+        if read_files_locked()? != expected {
+            return Ok(false);
+        }
+    }
     if unsafe { EmptyClipboard() } == 0 {
         return Err(last_error("cannot empty Windows clipboard"));
+    }
+    if paths.is_empty() {
+        return Ok(true);
     }
     if unsafe { SetClipboardData(CF_HDROP, handle) }.is_null() {
         return Err(last_error("Windows rejected CF_HDROP"));
     }
     // The operating system, not our allocation guard, frees the published data.
     std::mem::forget(allocation);
-    Ok(())
+    // Explorer consumes this standard DWORD format together with CF_HDROP.
+    // MOVE=2 is only advertised for an explicit cut; legacy writers still copy.
+    let format_name: Vec<u16> = "Preferred DropEffect\0".encode_utf16().collect();
+    let format = unsafe { RegisterClipboardFormatW(format_name.as_ptr()) };
+    if format == 0 {
+        return Err(last_error("cannot register Preferred DropEffect"));
+    }
+    let effect_handle = unsafe { GlobalAlloc(GMEM_MOVEABLE, std::mem::size_of::<u32>()) };
+    if effect_handle.is_null() {
+        return Err(last_error("drop effect allocation failed"));
+    }
+    let effect_allocation = GlobalMemory(effect_handle);
+    let effect_memory = unsafe { GlobalLock(effect_handle) };
+    if effect_memory.is_null() {
+        return Err(last_error("drop effect allocation could not be locked"));
+    }
+    unsafe {
+        *(effect_memory as *mut u32) = if cut { 2 } else { 1 };
+        GlobalUnlock(effect_handle);
+    }
+    if unsafe { SetClipboardData(format, effect_handle) }.is_null() {
+        return Err(last_error("Windows rejected Preferred DropEffect"));
+    }
+    std::mem::forget(effect_allocation);
+    Ok(true)
 }

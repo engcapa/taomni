@@ -332,6 +332,7 @@ export function useWorkspaceTreeInteractions(context: UseWorkspaceTreeInteractio
 
   const showTreeContextMenu = useCallback(
     createShowTreeContextMenu({
+      rootsRef,
       setSelected: uiActions.setSelected,
       treeContextMenuSessionRef,
       workspaceInstanceId,

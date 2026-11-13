@@ -7,6 +7,7 @@ import {
   Server,
   Shield,
   FileText,
+  FolderOpen,
   Wrench,
 } from "lucide-react";
 import type { ReactNode } from "react";
@@ -55,6 +56,12 @@ export function ToolsPanel({ onCommand }: { onCommand?: (command: AppCommand) =>
       label: t("menu.codeWorkspace"),
       icon: <FileText className="w-4 h-4 shrink-0" />,
       testId: "sidebar-tool-code-workspace",
+    },
+    {
+      id: "file-explorer",
+      label: t("menu.fileExplorer"),
+      icon: <FolderOpen className="w-4 h-4 shrink-0 text-[var(--taomni-warning,#d97706)]" />,
+      testId: "sidebar-tool-file-explorer",
     },
     {
       id: "mail-unified",

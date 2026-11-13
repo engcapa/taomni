@@ -101,6 +101,7 @@ export function ControlBar({
   const ctx = useContextMenu();
   const menuHost = useMainRailHostStore((s) => s.menuHost);
   const activeSideTab = useAppStore((state) => state.activeSideTab);
+  const hasExplorerTabs = useAppStore((state) => state.tabs.some((tab) => tab.type === "file-browser"));
   const t = useT();
   const {
     hasSessions,
@@ -193,6 +194,7 @@ export function ControlBar({
           { label: t("menu.sockscap"), testId: "context-menu-item-sockscap", icon: <Shield className="w-3 h-3" />, onClick: () => onCommand("sockscap") },
           { label: t("menu.gitRepository"), testId: "context-menu-item-git-repository", icon: <GitBranch className="w-3 h-3" />, onClick: () => onCommand("git") },
           { label: t("menu.codeWorkspace"), testId: "context-menu-item-code-workspace", icon: <FileText className="w-3 h-3" />, onClick: () => onCommand("code-workspace") },
+          { label: t("menu.fileExplorer"), testId: "context-menu-item-file-explorer", icon: <FolderOpen className="w-3 h-3" />, onClick: () => onCommand("file-explorer") },
           ...(commands.length > 0 ? [{
             label: t("menu.codeWorkspaceActions"),
             testId: "context-menu-workspace-actions",
@@ -253,7 +255,7 @@ export function ControlBar({
           <div className="flex h-full min-w-0 items-center gap-1">
             <WorkspaceTabStrip />
           </div>
-        ) : activeSideTab === "home" || activeSideTab === "agents" || activeSideTab === "tools" ? (
+        ) : activeSideTab === "home" || activeSideTab === "agents" || (activeSideTab === "tools" && !hasExplorerTabs) ? (
           <div className="flex h-full items-center gap-2 px-2 text-[12px] font-semibold" data-testid="platform-mode-title">
             {t(activeSideTab === "home" ? "platform.homeTitle" : activeSideTab === "tools" ? "platform.tools" : "platform.agentsTitle")}
           </div>

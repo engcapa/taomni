@@ -33,21 +33,6 @@ class NativeSessionTransportTest(TestCase):
             self.assertEqual(launch.call_args.kwargs["env"]["GDK_BACKEND"], "wayland,x11")
             self.assertEqual(os.environ["GDK_BACKEND"], "wayland")
 
-    def test_modified_click_holds_keys_through_pointer_up_and_releases_them_on_failure(self):
-        session = NativeSession("http://driver.invalid", Path("unused"))
-        session.session_id = "session-1"
-        session.find = Mock(return_value="row-1")
-        session.request = Mock(side_effect=[None, WebDriverError("input failed"), None])
-        with self.assertRaisesRegex(WebDriverError, "input failed"):
-            session.pointer_button_click("#row", 0, ["Control", "Shift"])
-        keys, pointer = session.request.call_args_list[1].args[2]["actions"]
-        self.assertEqual(pointer["id"], "mouse")
-        self.assertEqual(len(keys["actions"]), len(pointer["actions"]))
-        self.assertEqual(keys["actions"][:2], [{"type": "keyDown", "value": "\ue009"}, {"type": "keyDown", "value": "\ue008"}])
-        self.assertEqual(keys["actions"][-2:], [{"type": "keyUp", "value": "\ue008"}, {"type": "keyUp", "value": "\ue009"}])
-        self.assertEqual(pointer["actions"][3:5], [{"type": "pointerDown", "button": 0}, {"type": "pointerUp", "button": 0}])
-        self.assertEqual(session.request.call_args, call("DELETE", "/session/session-1/actions"))
-
     def test_close_has_its_own_budget_after_case_or_diagnostics_timeout(self):
         closed = Mock()
         session = NativeSession("http://driver.invalid", Path("unused"), closed)
@@ -175,44 +160,6 @@ class NativeSessionTransportTest(TestCase):
                                    "title": "Taomni"})
         session.request.assert_called_with("POST", "/session/session-1/window", {"handle": "window-qa"})
 
-    def test_right_click_uses_right_button_and_releases_on_failure(self):
-        session = NativeSession("http://driver.invalid", Path("unused"))
-        session.session_id = "session-1"
-        session.find = Mock(return_value="row-1")
-        session.request = Mock(side_effect=[None, RuntimeError("input failed"), None])
-        with self.assertRaisesRegex(RuntimeError, "input failed"):
-            session.right_click("#file")
-        actions = session.request.call_args_list[1].args[2]["actions"][0]["actions"]
-        self.assertEqual(actions[0]["origin"], "viewport")
-        self.assertEqual((actions[0]["x"], actions[0]["y"]), (270, 217))
-        self.assertEqual([a["button"] for a in actions[1:]], [2, 2])
-        self.assertEqual(session.request.call_args.args, ("DELETE", "/session/session-1/actions"))
-        self.assertNotIn("dispatchEvent", session.request.call_args_list[0].args[2]["script"])
-
-    def test_pointer_click_retries_a_stale_element_reference(self):
-        session = NativeSession("http://driver.invalid", Path("unused"))
-        session.session_id = "session-1"
-        session.find = Mock(side_effect=["row-1", "row-2"])
-        session.request = Mock(side_effect=[
-            WebDriverError("stale element reference: element is not attached to the page document"),
-            None,
-            None,
-            None,
-            None,
-        ])
-        with patch("tauri_webdriver.time.sleep") as sleep:
-            session.right_click("#file")
-        self.assertEqual(session.find.call_count, 2)
-        sleep.assert_called_once_with(0.3)
-        # The retry re-resolves the row and dispatches against the fresh node.
-        actions_call = next(
-            call for call in session.request.call_args_list if call.args[0] == "POST" and call.args[1].endswith("/actions")
-        )
-        actions = actions_call.args[2]["actions"][0]["actions"]
-        self.assertEqual(actions[0]["origin"], "viewport")
-        self.prepare_pointer_target.assert_called_once_with(session, {"element-6066-11e4-a52e-4f735466cecf": "row-2"}, allow_alternate=True)
-        self.assertEqual([a["button"] for a in actions[1:]], [2, 2])
-
     def test_double_click_resolves_refreshed_row_before_sending_pointer_actions(self):
         session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))
         session.session_id = "session-1"
@@ -259,91 +206,6 @@ class NativeSessionTransportTest(TestCase):
                 session.dblclick("#row")
         self.assertEqual(session.find.call_count, 1)
         self.assertEqual(sum(request.args[0] == "POST" for request in session.request.call_args_list), 1)
-
-    def test_click_retries_webkit_stale_element_error(self):
-        session = NativeSession("http://driver.invalid", Path("unused"))
-        session.session_id = "session-1"
-        session.find = Mock(side_effect=["button-1", "button-2"])
-        session.request = Mock(side_effect=[
-            WebDriverError('HTTP 400: {"message":"JavaScript error: Error: stale element"}'),
-            None,
-            None,
-            None,
-        ])
-        with patch("tauri_webdriver.time.sleep") as sleep:
-            session.click("#section")
-        self.assertEqual(session.find.call_count, 2)
-        sleep.assert_called_once_with(0.3)
-        action_urls = [
-            call.args[1] for call in session.request.call_args_list
-            if call.args[0] == "POST" and call.args[1].endswith("/actions")
-        ]
-        self.assertEqual(action_urls, ["/session/session-1/actions"])
-        self.prepare_pointer_target.assert_called_once_with(
-            session, {"element-6066-11e4-a52e-4f735466cecf": "button-2"}, allow_alternate=False)
-
-    def test_click_keeps_intercepted_target_a_failure_without_synthetic_activation(self):
-        session = NativeSession("http://driver.invalid", Path("unused"))
-        session.session_id = "session-1"
-        session.find = Mock(return_value="button-1")
-        session.request = Mock(side_effect=[None, WebDriverError("element click intercepted"), None])
-        session.execute = Mock()
-        with self.assertRaisesRegex(WebDriverError, "element click intercepted"):
-            session.click("#section")
-        session.find.assert_called_once()
-        session.execute.assert_not_called()
-        self.assertEqual(sum(request.args[1].endswith("/actions") and request.args[0] == "POST"
-                             for request in session.request.call_args_list), 1)
-
-    def test_pointer_click_retries_a_null_element_scroll_error(self):
-        session = NativeSession("http://driver.invalid", Path("unused"))
-        session.session_id = "session-1"
-        session.find = Mock(side_effect=["row-1", "row-2"])
-        session.request = Mock(side_effect=[
-            WebDriverError(
-                'HTTP 400: {"value":{"error":"unknown error","message":"JavaScript error: '
-                "TypeError: null is not an object (evaluating 'arguments[0].scrollIntoView')\"}}"
-            ),
-            None,
-            None,
-            None,
-            None,
-        ])
-        with patch("tauri_webdriver.time.sleep") as sleep:
-            session.right_click("#file")
-        self.assertEqual(session.find.call_count, 2)
-        sleep.assert_called_once_with(0.3)
-        actions_call = next(
-            call for call in session.request.call_args_list if call.args[0] == "POST" and call.args[1].endswith("/actions")
-        )
-        actions = actions_call.args[2]["actions"][0]["actions"]
-        self.assertEqual(actions[0]["origin"], "viewport")
-        self.prepare_pointer_target.assert_called_once_with(session, {"element-6066-11e4-a52e-4f735466cecf": "row-2"}, allow_alternate=True)
-
-    def test_pointer_click_gives_up_after_three_stale_references(self):
-        session = NativeSession("http://driver.invalid", Path("unused"))
-        session.session_id = "session-1"
-        session.find = Mock(return_value="row-1")
-        session.request = Mock(side_effect=WebDriverError("stale element reference"))
-        with patch("tauri_webdriver.time.sleep"):
-            with self.assertRaisesRegex(WebDriverError, "stale element reference"):
-                session.right_click("#file")
-        self.assertEqual(session.find.call_count, 3)
-
-    def test_pointer_click_never_replays_an_ambiguous_action_error(self):
-        session = NativeSession("http://driver.invalid", Path("unused"))
-        session.session_id = "session-1"
-        session.find = Mock(return_value="row-1")
-        def request(method, path, *args):
-            if method == 'POST' and path.endswith('/actions'):
-                raise WebDriverError('stale element reference')
-        session.request = Mock(side_effect=request)
-        with self.assertRaisesRegex(WebDriverError, "stale element reference"):
-            session.right_click("#file")
-        session.find.assert_called_once()
-        self.assertEqual(sum(c.args[:2] == ('POST', '/session/session-1/actions')
-                             for c in session.request.call_args_list), 1)
-        self.assertEqual(session.request.call_args, call('DELETE', '/session/session-1/actions'))
 
     def test_count_accepts_empty_but_rejects_invalid_driver_response(self):
         session = NativeSession("http://driver.invalid", Path("unused"))

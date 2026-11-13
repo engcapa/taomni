@@ -26,7 +26,7 @@ from native_build import QA_APP_ID, verify_identity
 from native_webdriver_transport import WebDriverError, WebDriverTransport
 from native_console import CONSOLE_HOOK_SCRIPT
 from native_element_query import count_elements
-from native_pointer import MOUSE_SOURCE, prepare_click_target
+from native_pointer import pointer_button_click, prepare_click_target
 from native_paced_input import type_paced_text
 from native_window_focus import NativeWindowFocus
 from native_driver_lifecycle import driver_start_environment
@@ -403,6 +403,7 @@ class NativeSession(WebDriverTransport):
     #: Non-empty when Linux desktop focus could not be recovered. Focus is a
     #: case assertion, so this is reported and never fails the whole session.
     focus_warning = ""
+    pointer_observations_path: Path | None = None
 
     def __init__(self, driver_url: str, application: Path, on_close: Any | None = None):
         super().__init__(driver_url, application, on_close)
@@ -530,56 +531,9 @@ class NativeSession(WebDriverTransport):
         return self.pointer_button_click(selector, 2)
 
     def pointer_button_click(self, selector: str, button: int, modifiers: list[str] | None = None) -> str:
-        modifier_values = []
-        for name in modifiers or []:
-            if name not in self.MODIFIER_MAP:
-                raise WebDriverError(f"pointer_button_click: unknown modifier {name!r}")
-            modifier_values.append(self.MODIFIER_MAP[name])
-        # Re-resolve stale references during preparation only. Once input
-        # starts, an ambiguous driver failure must never replay a click.
-        last_stale: WebDriverError | None = None
-        for attempt in range(3):
-            element = self.find(selector, interactive=True)
-            origin = {"element-6066-11e4-a52e-4f735466cecf": element}
-            # Scroll only; dispatch the actual context click through W3C input.
-            try:
-                self.request("POST", self.endpoint("/execute/sync"), {
-                    "script": "arguments[0].scrollIntoView({block:'nearest', inline:'nearest', behavior:'instant'});",
-                    "args": [origin],
-                })
-                point = prepare_click_target(self, origin, allow_alternate=button == 2)
-            except WebDriverError as exc:
-                if _is_stale_element_error(exc) and attempt < 2:
-                    last_stale = exc
-                    time.sleep(0.3)
-                    continue
-                raise
-            try:
-                pointer_core = [
-                    {"type": "pointerMove", "duration": 0, "origin": "viewport", **point},
-                    {"type": "pointerDown", "button": button},
-                    {"type": "pointerUp", "button": button},
-                ]
-                actions = []
-                if modifier_values:
-                    actions.append({"type": "key", "id": "click-keyboard", "actions":
-                        [{"type": "keyDown", "value": value} for value in modifier_values]
-                        + [{"type": "pause", "duration": 0} for _ in pointer_core]
-                        + [{"type": "keyUp", "value": value} for value in reversed(modifier_values)]})
-                actions.append({
-                    "type": "pointer", "id": MOUSE_SOURCE,
-                    "parameters": {"pointerType": "mouse"},
-                    "actions": [{"type": "pause", "duration": 0} for _ in modifier_values]
-                        + pointer_core + [{"type": "pause", "duration": 0} for _ in modifier_values],
-                })
-                self.request("POST", self.endpoint("/actions"), {"actions": actions})
-            finally:
-                # A failed release must not mask the original input error.
-                with suppress(WebDriverError):
-                    self.request("DELETE", self.endpoint("/actions"))
-            return f"pointer button {button} clicked {selector}"
-        raise last_stale if last_stale else WebDriverError(
-            f"pointer button {button} click failed: {selector}")
+        return pointer_button_click(self, selector, button, modifiers,
+            data_home=self._window_focus.data_home, prepare_target=prepare_click_target,
+            is_stale=_is_stale_element_error)
 
     def focus(self, selector: str) -> str:
         """Focus for locator-scoped keys without activating a button/tree row."""
@@ -1203,10 +1157,11 @@ class NativeHarness:
                 encoding="utf-8",
             )
         session = NativeSession(self.driver.url, self.application, self.driver.mark_session_closed)
+        session.pointer_observations_path = self.report_root / "native-pointer-clicks.jsonl"
         session.owned_app_pid = (self.driver.proc.pid if platform.system() == "Darwin"
                                  and self.driver.proc and not self.driver.macos_lldb else None)
-        from native_application_restart import restart_owned_application
-        session.application_restarter = lambda: restart_owned_application(self.driver, session)
+        from native_application_restart import bind_application_restarter
+        bind_application_restarter(self.driver, session)
         session.deadline = getattr(self, "deadline", None)
         try:
             session.start()

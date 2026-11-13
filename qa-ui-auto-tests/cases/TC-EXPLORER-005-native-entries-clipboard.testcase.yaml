@@ -1,0 +1,284 @@
+id: TC-EXPLORER-005
+title: Native Explorer opens terminal cwd, publishes real system file clipboard and restores current directory
+description: AC03/07/11/12/13/17/20 native boundary. Explorer opens from Tools and creates a real local terminal in its cwd. Terminal right-click
+  reuses the existing Explorer or explicitly creates another. Real clipboard formats are read independently, a real desktop file manager pastes
+  copied bytes, real external edits refresh preview, and a verified OS-process restart restores persisted path/preferences. The open Explorer
+  remains in place; restart expects and clicks its exact visible exit confirmation, retaining the confirmation and normal-shutdown receipt. No
+  browser stub is native proof.
+modes:
+- native
+covers:
+- F-EXPLORER-1
+- F1.8
+- F2.1
+- F2.2
+tags:
+- p0
+- explorer
+- native-boundary
+- clipboard
+- terminal
+- persistence
+- regression
+fixtures:
+- reset_db
+- explorer_files
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-explorer-native
+- seed_storage:
+    key: taomni.explorer.view.v1
+    value: '{"preview":false}'
+- reload_window: null
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-file-explorer"]'
+- wait_for: '[data-testid="explorer-tab"]'
+- press:
+    selector: '[data-testid="explorer-tab"]'
+    key: Control+l
+    macos_key: Meta+l
+- fill:
+    selector: '[data-testid="explorer-address"]'
+    value: ${fixture.explorer_previews}
+- press:
+    selector: '[data-testid="explorer-address"]'
+    key: Enter
+- wait_for: '[data-testid="explorer-file-row"][data-name="notes.txt"]'
+- click: '[data-testid="explorer-cmd-preview"]'
+- wait_for: '[data-testid="explorer-preview"]'
+- click: '[data-testid="explorer-file-row"][data-name="notes.txt"] .ex-name'
+- wait_for: '[data-testid="explorer-preview-text"]'
+- assert_text:
+    selector: '[data-testid="explorer-preview-text"]'
+    contains: Explorer preview text
+- click: '[data-testid="explorer-file-row"][data-name="logo.png"] .ex-name'
+- wait_for: '[data-testid="explorer-preview-image"]'
+- eval_readonly:
+    expression: document.querySelector(".ex-pv-img img").complete && document.querySelector(".ex-pv-img img").naturalWidth === 1
+    expect_truthy: true
+    timeout_sec: 10
+- screenshot: explorer-native-image-blob.png
+- click: '[data-testid="explorer-file-row"][data-name="notes.txt"] .ex-name'
+- wait_for: '[data-testid="explorer-preview-text"]'
+- click: '[data-testid="explorer-cmd-copy"]'
+- file_clipboard:
+    action: assert
+    paths:
+    - ${fixture.explorer_previews}/notes.txt
+- system_file_paste:
+    directory: ${fixture.explorer_external_target}
+    paths:
+    - ${fixture.explorer_previews}/notes.txt
+- assert_file_contains:
+    path: ${fixture.explorer_external_target}/notes.txt
+    contains: Explorer preview text
+- click: '[data-testid="explorer-preview-settings"]'
+- click: '[data-testid="explorer-preview-bottom"]'
+- assert_attribute:
+    selector: '[data-testid="explorer-preview"]'
+    name: data-position
+    equals: bottom
+- click: '[data-testid="explorer-preview-settings"]'
+- click: '[data-testid="explorer-preview-wrap"]'
+- assert_localstorage:
+    key: taomni.explorer.view.v1
+    contains: '"wrap":true'
+- click: '[data-testid="explorer-cmd-terminal"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: echo QA_EXPLORER_TERMINAL_READY
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    regex: (?m)^QA_EXPLORER_TERMINAL_READY\s*$
+- right_click: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- assert_visible: '[data-testid="terminal-context-explorer"]'
+- assert_visible: '[data-testid="terminal-context-explorer-new"]'
+- click: '[data-testid="terminal-context-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"][data-path="${fixture.explorer_previews}"]'
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="file-browser"]'
+    equal: 1
+- assert_attribute:
+    selector: '[data-testid="explorer-tab"]'
+    name: data-path
+    equals: ${fixture.explorer_previews}
+- click: '[data-testid="tab-item"][data-tab-type="terminal"]'
+- host_write_file:
+    path: ${fixture.explorer_previews}/notes.txt
+    text: 'External editor changed the preview while Explorer was inactive.
+
+      '
+- right_click: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- click: '[data-testid="terminal-context-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"][data-path="${fixture.explorer_previews}"]'
+- click: '[data-testid="explorer-file-row"][data-name="notes.txt"] .ex-name'
+- assert_text:
+    selector: '[data-testid="explorer-preview-text"]'
+    contains: External editor changed the preview
+- assert_no_runtime_errors: null
+- screenshot: explorer-native-clipboard-terminal-preview.png
+- click: '[data-testid="tab-item"][data-tab-type="terminal"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-preview-close"]'
+- assert_localstorage:
+    key: taomni.explorer.view.v1
+    contains: '"preview":false'
+- native_restart_app:
+    expect_exit_confirmation:
+      title: Exit
+      message: There is 1 open tab. Exit Taomni and close it?
+      confirm_label: Exit
+- wait_for: '[data-testid="explorer-tab"]'
+- assert_localstorage:
+    key: taomni.explorer.view.v1
+    contains: '"preview":false'
+- click: '[data-testid="explorer-cmd-preview"]'
+- wait_for: '[data-testid="explorer-preview"]'
+- wait_for: '[data-testid="explorer-tab"][data-path="${fixture.explorer_previews}"]'
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="file-browser"]'
+    equal: 1
+- assert_attribute:
+    selector: '[data-testid="explorer-preview"]'
+    name: data-position
+    equals: bottom
+- assert_localstorage:
+    key: taomni.explorer.view.v1
+    contains: '"wrap":true'
+- click: '[data-testid="explorer-cmd-terminal"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+- right_click: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- click: '[data-testid="terminal-context-explorer-new"]'
+- wait_for: xpath=(//*[@data-testid="tab-item" and @data-tab-type="file-browser"])[2]
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="file-browser"]'
+    equal: 2
+- assert_count:
+    selector: '[data-testid="explorer-tab"]${fixture.explorer_previews_match}'
+    equal: 2
+- assert_no_runtime_errors: null
+- screenshot: explorer-native-new-tab.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Native text reads actual bytes, Copy publishes the OS file list and an independent real desktop file-manager Paste creates exact
+      original content.
+    actions:
+    - 5
+    - 6
+    - 8
+    - 9
+    - 10
+    - 14
+    - 23
+    - 25
+    - 17
+    - 21
+    checkpoints:
+    - step: 16
+      expectation: Native preview shows actual source text.
+    - step: 24
+      expectation: Independent native CFHDROP/NSURL/GTK MIME oracle sees exactly the selected file.
+    - step: 26
+      expectation: Real file-manager target contains original fixture content.
+    - step: 19
+      expectation: The actual packaged WebView decodes native image bytes through a blob URL into a one-pixel image.
+    results:
+    - 16
+    - 24
+    - 26
+    - 19
+  - id: R2
+    requirement: Explorer launches a real terminal in its current cwd; local-terminal context menu returns to existing Explorer rather than opening
+      another; external modification is refreshed.
+    actions:
+    - 33
+    - 35
+    - 37
+    - 40
+    - 44
+    - 45
+    - 46
+    - 47
+    - 49
+    checkpoints:
+    - step: 36
+      expectation: Anchored PTY output proves actual command execution.
+    - step: 38
+      expectation: Local terminal exposes Explorer entry.
+    - step: 39
+      expectation: Local terminal exposes explicit new-tab entry.
+    - step: 42
+      expectation: Existing same-directory Explorer is reused.
+    - step: 43
+      expectation: Terminal cwd maps to the Explorer directory that launched it.
+    - step: 50
+      expectation: Preview re-reads actual externally modified file bytes.
+    results:
+    - 36
+    - 38
+    - 39
+    - 42
+    - 43
+    - 50
+  - id: R3
+    requirement: Explorer current directory and shared preview preferences restore after a verified OS-process restart with Explorer still open.
+      The runner checks the exact visible Exit dialog, clicks its confirm button once through real session input, records the confirmation and
+      waits for normal application/storage shutdown before a new owned native session. Terminal explicit new opens one additional same-cwd Explorer.
+    actions:
+    - 27
+    - 28
+    - 30
+    - 31
+    - 56
+    - 65
+    - 67
+    - 68
+    checkpoints:
+    - step: 29
+      expectation: Bottom position applies before the OS-process restart.
+    - step: 32
+      expectation: Wrap is persisted.
+    - step: 61
+      expectation: Current native directory restores after the verified OS-process restart, not a WebView reload.
+    - step: 62
+      expectation: Restore does not duplicate Explorer.
+    - step: 63
+      expectation: Bottom position restores.
+    - step: 64
+      expectation: Wrap restores.
+    - step: 70
+      expectation: Force-new from terminal adds exactly one Explorer.
+    - step: 71
+      expectation: Both same-cwd Explorer panes remain independently mounted.
+    - step: 72
+      expectation: No runtime errors after native restore and new tab.
+    results:
+    - 29
+    - 32
+    - 61
+    - 62
+    - 63
+    - 64
+    - 70
+    - 71
+    - 72
+  visual:
+  - check: Native packaged preview, terminal context menu and Explorer tabs.
+    method: manual
+    reason: Screenshots retained for prototype comparison; OS native chrome differs by platform.
+  native:
+  - check: Real PTY cwd routing, actual filesystem reads, independent file-list clipboard and real file-manager Paste.
+    method: automated
+    reason: These assertions cannot be established by browser stubs. Clipboard/paste permissions or unavailable actions fail rather than skip.
+  - check: Exact visible exit confirmation, normal application/storage shutdown and a new owned native session with the isolated profile retained.
+    method: automated
+    reason: Step 56 opts into the expected Exit title, one-open-tab message and Exit button. native-application-restarts.jsonl retains the observed
+      dialog, single session.click attempt and resulting closure alongside native shutdown and before/after session ownership proof. Missing,
+      changed, blocked or additional prompts fail; cleanup/kill never counts as successful shutdown.
+  - check: Physical menu/drag/keyboard input
+    method: manual
+    reason: native_restart_app proves actual process restart; terminal text and key delivery still use WebView automation, not physical input.

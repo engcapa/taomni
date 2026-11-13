@@ -92,6 +92,8 @@
           "workspace_explorer",
           "workspace_drop_import",
           "workspace_file_clipboard",
+          "explorer_files",
+          "explorer_large_directory",
           "workspace_search_large",
           "workspace_compact_tree",
           "workspace_hidden_entries",
@@ -572,6 +574,11 @@
           "if": {"properties": {"phase": {"enum": ["enter", "drop"]}}},
           "then": {"required": ["paths"], "properties": {"paths": {"minItems": 1}}},
           "description": "Synthetic file drag entry only, not an OS gesture. Browser dispatches HTML5 DragEvent with file URI text/uri-list; native starts targeted Tauri emitTo once via execute/sync and polls a private Promise result slot, physical positions = hit-tested CSS coordinates * devicePixelRatio. Leave native payload is null. Omitted selector uses the body hit point; native leave needs no target."
+        },
+        "assert_explorer_files": {
+          "type": "object", "additionalProperties": false, "required": ["state"],
+          "properties": {"state": {"enum": ["seeded", "copied", "moved", "renamed", "trashed", "restored", "permanent", "external", "recursive", "drag-folder", "drag-breadcrumb", "drag-tree", "partial"]}},
+          "description": "Read-only complete SHA256/empty-directory oracle for explorer_files. Native independently re-reads host bytes and Linux freedesktop trash metadata/content for trashed; browser reads only actual VFS. No product IPC."
         },
         "assert_workspace_drop_import": {
           "type": "object",
@@ -1054,8 +1061,27 @@
           "description": "Switch to a real app-created browser page/native WebView with the matching CSS selector."
         },
         "native_restart_app": {
-          "type": "null",
-          "description": "Restart the owned isolated native QA process without resetting its profile, sessions, vault or files."
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "required": ["expect_exit_confirmation"],
+              "additionalProperties": false,
+              "properties": {
+                "expect_exit_confirmation": {
+                  "type": "object",
+                  "required": ["title", "message", "confirm_label"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "title": { "type": "string", "pattern": "\\S" },
+                    "message": { "type": "string", "pattern": "\\S" },
+                    "confirm_label": { "type": "string", "pattern": "\\S" }
+                  }
+                }
+              }
+            }
+          ],
+          "description": "Restart the owned isolated native QA process without resetting its profile, sessions, vault or files. Optional expect_exit_confirmation requires the exact visible exit title/message/button label, clicks its confirm button once through session.click and retains evidence; absent or unexpected prompts fail."
         },
         "reload_window": {
           "oneOf": [
@@ -1998,6 +2024,8 @@
         "to": {
           "$ref": "#/$defs/selector"
         },
+        "modifiers": {"type": "array", "uniqueItems": true, "items": {"enum": ["Alt", "Control", "Meta", "Shift"]}},
+        "macos_modifiers": {"type": "array", "uniqueItems": true, "items": {"enum": ["Alt", "Control", "Meta", "Shift"]}},
         "from_position": {
           "$ref": "#/$defs/point",
           "description": "Pixel offset within the 'from' element where the target-based drag starts (Playwright source_position)."

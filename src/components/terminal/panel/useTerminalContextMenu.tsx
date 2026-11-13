@@ -23,6 +23,7 @@ export interface UseTerminalContextMenuContext {
   effectiveReadOnly: boolean;
   openSearch: () => void;
   gitToggle: { cwd: string | null; onOpen: () => void; } | undefined;
+  explorerToggle?: import("./types").TerminalPanelProps["explorerToggle"];
   gitState: TerminalGitState;
   increaseFontSize: () => void;
   decreaseFontSize: () => void;
@@ -74,6 +75,7 @@ export function useTerminalContextMenu(context: UseTerminalContextMenuContext) {
     effectiveReadOnly,
     openSearch,
     gitToggle,
+    explorerToggle,
     gitState,
     increaseFontSize,
     decreaseFontSize,
@@ -137,6 +139,11 @@ export function useTerminalContextMenu(context: UseTerminalContextMenuContext) {
       { label: "Copy formatted text (HTML/RTF)", onClick: () => void copyFormattedSelection(), disabled: !hasSelection },
       { label: "Paste", shortcut: pasteShortcut, onClick: () => void pasteFromClipboard(), disabled: effectiveReadOnly },
       { label: "Find", shortcut: "Ctrl+Shift+F", onClick: openSearch },
+      ...(explorerToggle ? [
+        { label: "", separator: true },
+        { label: t("explorerEntry.openCurrent"), testId: "terminal-context-explorer", onClick: () => explorerToggle.onOpen(false) },
+        { label: t("explorerEntry.openNew"), testId: "terminal-context-explorer-new", onClick: () => explorerToggle.onOpen(true) },
+      ] : []),
       ...(gitToggle
         ? [
           { label: "", separator: true },
@@ -285,6 +292,7 @@ export function useTerminalContextMenu(context: UseTerminalContextMenuContext) {
     getActiveTerminalSelectionText,
     gitState.kind,
     gitToggle,
+    explorerToggle,
     increaseFontSize,
     isMac,
     openSearch,

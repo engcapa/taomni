@@ -13,7 +13,7 @@ export const WORKSPACE_TAB_CATEGORIES: readonly WorkspaceTabCategory[] = [
 ];
 
 export function workspaceTabCategory(tab: WorkspaceIsolatedTab): WorkspaceTabCategory {
-  if (tab.kind === "file" || tab.kind === "code") return "files";
+  if (tab.kind === "file" || tab.kind === "code" || tab.kind === "explorer") return "files";
   if (tab.kind === "database") return "database";
   if (tab.kind === "sftp") return "sftp";
   if (tab.kind === "rdp" || tab.kind === "vnc") return "remote";
@@ -29,7 +29,7 @@ export function filterWorkspaceTabs(tabs: readonly WorkspaceIsolatedTab[], filte
   const query = filter.query.trim().toLocaleLowerCase();
   return tabs.filter((tab) => (
     (filter.category === "all" || workspaceTabCategory(tab) === filter.category)
-    && (!query || [tab.title, tab.filePath, tab.host, tab.username, tab.protocol, tab.sessionType]
+    && (!query || [tab.title, tab.filePath, tab.explorerPath, tab.host, tab.username, tab.protocol, tab.sessionType]
       .some((value) => value?.toLocaleLowerCase().includes(query)))
   ));
 }

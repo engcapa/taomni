@@ -402,37 +402,7 @@ export async function listenSftpAttached(
   );
 }
 
-export function joinPath(base: string, name: string): string {
-  if (!base) return name;
-  if (base === "/") return `/${name}`;
-  if (base.endsWith("/") || base.endsWith("\\")) return `${base}${name}`;
-  if (base.match(/^[A-Z]:\\?$/i)) {
-    return base.endsWith("\\") ? `${base}${name}` : `${base}\\${name}`;
-  }
-  return `${base}/${name}`;
-}
-
-export function parentPath(path: string): string {
-  if (!path || path === "/" || /^[A-Z]:\\?$/i.test(path)) return path || "/";
-  const isWindows = path.includes("\\") && /^[A-Z]:/i.test(path);
-  const sep = isWindows ? "\\" : "/";
-  const trimmed = path.endsWith(sep) ? path.slice(0, -1) : path;
-  const idx = trimmed.lastIndexOf(sep);
-  if (idx <= 0) {
-    if (isWindows) return trimmed.slice(0, 3);
-    return "/";
-  }
-  return trimmed.slice(0, idx) || "/";
-}
-
-export function basename(path: string): string {
-  if (!path) return "";
-  const isWindows = path.includes("\\");
-  const sep = isWindows ? "\\" : "/";
-  const trimmed = path.endsWith(sep) ? path.slice(0, -1) : path;
-  const idx = trimmed.lastIndexOf(sep);
-  return idx < 0 ? trimmed : trimmed.slice(idx + 1);
-}
+export { joinPath, parentPath, basename } from "./filePaths";
 
 export function formatBytes(n: number): string {
   if (n < 1024) return `${n} B`;

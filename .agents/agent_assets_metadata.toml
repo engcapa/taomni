@@ -1,0 +1,30 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "AzHGmikYlYuvzZ3woh4Ur"
+uri = "file://docs-feature/file-explorer/prototype-v1.html"
+type = "html"
+title = "File Explorer 高保真原型 v1"
+description = "可交互原型：Explorer 标签、工作区入口（方案 A/B）、终端右键入口；顶栏可切换 DEC-01/02/03 方案与浅/深主题。"
+logical_id = "4440b0a4-89fc-4967-a3d5-6e3111aa2379"
+content_hash = "sha256:fdc60280e847c6d311b1258b93b6370e4f8b376b48f49fe520e26d8635cb1512"
+size = 82452
+mtime_ms = 1794532796193
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:60676f2f-65ab-4ffe-a440-92a068100961/4440b0a4-89fc-4967-a3d5-6e3111aa2379/06a1d090-5322-49f7-9fd8-c0ad3ebdd6aa"
+storage_version_token = "1794532959010229"
+content_type = "text/html"
+
+[[outputs]]
+id = "LgP2HXuS7BGDUPHSxeXm_"
+uri = "file://docs-feature/file-explorer-design.md"
+type = "text"
+title = "文件资源管理器详细设计（草案）"
+description = "含 AC、DEC、TASK、V 与三端计划；DEC-01/02/03 待决。"
+logical_id = "e680d852-88c7-4e03-9990-102067b51044"
+content_hash = "sha256:84ce02d22709b84f18bbcaa3d49a1433abab1ec20797974f4f910574504d619a"
+size = 42925
+mtime_ms = 1794532944266
+storage_uri = "gcs://replit-rams-assets-pike/rams/assets/repl:60676f2f-65ab-4ffe-a440-92a068100961/e680d852-88c7-4e03-9990-102067b51044/241a8378-47cd-4393-b2db-56afb11abac5"
+storage_version_token = "1794532960326492"
+content_type = "text/markdown"

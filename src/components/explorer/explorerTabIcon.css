@@ -1,0 +1,2 @@
+.taomni-explorer-tab-icon { --ex-folder: #f5b83d; }
+html[data-app-theme="dark"] .taomni-explorer-tab-icon { --ex-folder: #e8b04a; }

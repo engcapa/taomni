@@ -1,0 +1,419 @@
+id: TC-EXPLORER-002
+title: Explorer matches prototype preview types, light/dark geometry, global preferences and narrow overlay
+description: >-
+  AC03/04/05/06/09/10/20. Uses real renderer and IndexedDB bytes, not a fake preview DOM.
+  Fixed 256KiB text and 20MiB image boundaries, binary refusal, quoted/multiline CSV,
+  Markdown, stale selection, shared position/wrap/view and narrow preview overlay.
+  Browser-only explicit trash-unavailable input proves confirmation/cancel renderer
+  but never substitutes for native trash evidence in TC-EXPLORER-003.
+modes: [browser]
+covers: [F-EXPLORER-1, F5.5]
+tags: [p0, explorer, preview, preferences, responsive, regression]
+fixtures: [reset_db, explorer_files]
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-explorer-preview
+- reload_window: null
+- set_viewport: {width: 1600, height: 960}
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-file-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- click: 'button[aria-label="Cycle application theme"]'
+- assert_attribute: {selector: html, name: data-app-theme, equals: light}
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-address"]', value: '${fixture.explorer_previews}'}
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="notes.txt"]'
+- assert_element_geometry: {selector: '[data-testid="explorer-nav-tree"]', min_width: 210, min_height: 200}
+- assert_element_geometry: {selector: '[data-testid="explorer-preview"]', min_width: 300, min_height: 200}
+- eval_readonly:
+    expression: 'getComputedStyle(document.querySelector(".ex-shell")).backgroundColor === "rgb(248, 250, 252)"'
+    expect_truthy: true
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="notes.txt"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview"][data-preview-kind="text"]'
+- assert_text: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-text"]', contains: Explorer preview text}
+- assert_attribute: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-text"]', name: data-line-count, equals: '4'}
+- eval_readonly:
+    expression: 'document.querySelector(".ex-pv").getBoundingClientRect().left >= document.querySelector(".ex-files").getBoundingClientRect().right - 2 && document.querySelector(".ex-pv-text").getBoundingClientRect().height < 100'
+    expect_truthy: true
+- screenshot: explorer-prototype-light.png
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="README.md"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-markdown"] h1'
+- assert_text_equals: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-markdown"] h1', equals: Explorer Markdown}
+- assert_text_equals: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-markdown"] strong', equals: Rendered bold}
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="table.csv"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-csv"]'
+- assert_count: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-csv"] tr', equal: 3}
+- assert_text: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-csv"]', contains: 'quoted, comma'}
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="logo.png"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-image"]'
+- eval_readonly:
+    expression: 'document.querySelector(".ex-pv-img img").complete && document.querySelector(".ex-pv-img img").naturalWidth === 1'
+    expect_truthy: true
+    timeout_sec: 10
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="large.txt"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-truncated"]'
+- assert_text: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-truncated"]', contains: '256 KB'}
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="binary.txt"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview"][data-preview-kind="binary"]'
+- assert_count: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-text"]', equal: 0}
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="unknown.bin"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview"][data-preview-kind="metadata"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="huge.png"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview"][data-preview-kind="too-large"]'
+- assert_count: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-image"]', equal: 0}
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="folder"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview"][data-preview-kind="directory"]'
+- assert_text: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview"]', contains: child.txt}
+- click: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="empty-folder"]', modifiers: [Mod]}
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview"][data-preview-kind="multi"]'
+- assert_text: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-metadata"]', contains: 2 items selected}
+- seed_storage: {key: taomni.explorer.stubTextDelayMs, value: '350'}
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="large.txt"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="notes.txt"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-text"]'
+- assert_text: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-text"]', contains: Explorer preview text}
+- assert_not_visible: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-truncated"]'
+- seed_storage: {key: taomni.explorer.stubTextDelayMs, value: '0'}
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-settings"]'
+- click: '[data-testid="explorer-preview-bottom"]'
+- assert_attribute: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview"]', name: data-position, equals: bottom}
+- eval_readonly:
+    expression: 'document.querySelector(".ex-pv").getBoundingClientRect().top >= document.querySelector(".ex-files").getBoundingClientRect().bottom - 2'
+    expect_truthy: true
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-settings"]'
+- click: '[data-testid="explorer-preview-wrap"]'
+- assert_localstorage: {key: taomni.explorer.view.v1, contains: '"wrap":true'}
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-view"]'
+- click: '[data-testid="explorer-view-icons"]'
+- assert_localstorage: {key: taomni.explorer.view.v1, contains: '"view":"icons"'}
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-view"]'
+- click: '[data-testid="explorer-view-list"]'
+- assert_localstorage: {key: taomni.explorer.view.v1, contains: '"view":"list"'}
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-view"]'
+- click: '[data-testid="explorer-view-details"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-view"]'
+- click: '[data-testid="explorer-view-hidden"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name=".hidden.txt"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-settings"]'
+- click: '[data-testid="explorer-preview-right"]'
+- click: 'button[aria-label="Cycle application theme"]'
+- assert_attribute: {selector: html, name: data-app-theme, equals: dark}
+- eval_readonly:
+    expression: 'getComputedStyle(document.querySelector(".ex-shell")).backgroundColor === "rgb(30, 31, 34)"'
+    expect_truthy: true
+- screenshot: explorer-prototype-dark.png
+- set_viewport: {width: 920, height: 760}
+- assert_not_visible: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview"]'
+- assert_localstorage: {key: taomni.explorer.view.v1, contains: '"preview":true'}
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-preview"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview"]'
+- screenshot: explorer-prototype-narrow-overlay.png
+- set_viewport: {width: 1600, height: 960}
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Alt+p}
+- assert_not_visible: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Alt+p}
+- assert_visible: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-newtab"]'
+- assert_attribute: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview"]', name: data-position, equals: right}
+- assert_localstorage: {key: taomni.explorer.view.v1, contains: '"wrap":true'}
+- assert_no_runtime_errors: null
+- screenshot: explorer-shared-preview-preferences.png
+- click: '[data-testid="tab-item"][data-tab-type="file-browser"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-new"]'
+- click: '[data-testid="explorer-new-folder"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-rename-input"]'
+- fill: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-rename-input"]', value: created-folder}
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-rename-input"]', key: Enter}
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="created-folder"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-new"]'
+- click: '[data-testid="explorer-new-file"]'
+- fill: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-rename-input"]', value: created.txt}
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-rename-input"]', key: Enter}
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="created.txt"]'
+- drag_to:
+    from: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="created.txt"]'
+    to: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="created-folder"]'
+- wait_for: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="created.txt"]', state: detached}
+- dblclick: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="created-folder"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="created.txt"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="created.txt"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-copy"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-paste"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="created - 副本.txt"]'
+- seed_storage: {key: taomni.explorer.stubTrashUnavailable, value: 'true'}
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="created.txt"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-delete"]'
+- wait_for: '[data-testid="explorer-trash-unavailable"]'
+- assert_text: {selector: '[data-testid="explorer-trash-unavailable"]', contains: Trash unavailable}
+- click: '[data-testid="explorer-delete-cancel"]'
+- assert_visible: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="created.txt"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-delete"]'
+- click: '[data-testid="explorer-delete-confirm"]'
+- wait_for: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="created.txt"]', state: detached}
+- assert_visible: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="created - 副本.txt"]'
+- seed_storage: {key: taomni.explorer.stubTrashUnavailable, value: 'false'}
+- file_clipboard:
+    action: seed
+    paths: ['${fixture.explorer_previews}/created-folder/created - 副本.txt', '${fixture.explorer_previews}/missing-source.txt']
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-paste"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="created - 副本 - 副本.txt"]'
+- assert_text: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-toast"]', contains: Not found}
+- assert_visible: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="created - 副本.txt"]'
+- assert_count: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"]', equal: 2}
+- assert_no_runtime_errors: null
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-address"]', value: '${fixture.explorer_previews}'}
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="notes.txt"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="notes.txt"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-text"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-settings"]'
+- click: '[data-testid="explorer-preview-bottom"]'
+- set_viewport: {width: 920, height: 760}
+- assert_not_visible: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-preview"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-text"]'
+- eval_readonly:
+    expression: 'document.querySelector(".ex-preview-overlay").getBoundingClientRect().height <= 190 && document.querySelector(".ex-preview-overlay").getBoundingClientRect().top > document.querySelector(".ex-body").getBoundingClientRect().top && document.querySelector(".ex-preview-overlay").getBoundingClientRect().width >= document.querySelector(".ex-files").getBoundingClientRect().width - 2'
+    expect_truthy: true
+- screenshot: explorer-prototype-narrow-bottom.png
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Preview renders text line numbers, Markdown, quoted CSV and actual decoded image; fixed bounds and binary/unsupported types do
+      not render unsafe contents.
+    actions:
+    - 17
+    - 23
+    - 27
+    - 31
+    - 34
+    - 37
+    - 40
+    - 42
+    - 45
+    - 48
+    checkpoints:
+    - step: 19
+      expectation: Text payload displays fixture content.
+    - step: 20
+      expectation: Exact line count includes trailing newline.
+    - step: 25
+      expectation: Markdown heading is rendered rather than raw syntax.
+    - step: 26
+      expectation: Bold markup renders strong element.
+    - step: 29
+      expectation: Multiline quoted CSV parses into exactly three records.
+    - step: 30
+      expectation: Quoted comma remains in one cell.
+    - step: 33
+      expectation: Blob image decodes to actual one-pixel fixture.
+    - step: 36
+      expectation: Text beyond 256KB shows truncation.
+    - step: 39
+      expectation: Binary text never renders text preview.
+    - step: 41
+      expectation: Unsupported type displays metadata.
+    - step: 44
+      expectation: Oversized image never creates image element.
+    - step: 47
+      expectation: Directory preview shows actual child.
+    - step: 50
+      expectation: Multiple selection displays aggregate metadata.
+    results:
+    - 19
+    - 20
+    - 25
+    - 26
+    - 29
+    - 30
+    - 33
+    - 36
+    - 39
+    - 41
+    - 44
+    - 47
+    - 50
+  - id: R2
+    requirement: Rapid selection ignores stale previews; preview position, wrap, views, hidden files and enabled state persist globally; narrow
+      width collapses without destroying the preference and can manually overlay.
+    actions:
+    - 51
+    - 52
+    - 53
+    - 57
+    - 58
+    - 59
+    - 62
+    - 63
+    - 65
+    - 66
+    - 68
+    - 69
+    - 71
+    - 72
+    - 73
+    - 74
+    - 76
+    - 77
+    - 82
+    - 85
+    - 88
+    - 89
+    - 91
+    - 93
+    checkpoints:
+    - step: 55
+      expectation: Last selected text wins after delayed reads.
+    - step: 56
+      expectation: Stale large-file truncation cannot leak into notes.
+    - step: 60
+      expectation: Bottom position applies.
+    - step: 61
+      expectation: Bottom preview sits below the file list.
+    - step: 64
+      expectation: Wrap persists.
+    - step: 67
+      expectation: Icons preference persists.
+    - step: 70
+      expectation: Compact list preference persists.
+    - step: 75
+      expectation: Hidden file appears after view option.
+    - step: 83
+      expectation: Narrow width collapses preview.
+    - step: 84
+      expectation: Narrow collapse retains enabled preference.
+    - step: 86
+      expectation: Preview manually opens at narrow width.
+    - step: 90
+      expectation: AltP disables preview.
+    - step: 92
+      expectation: AltP enables preview again.
+    - step: 94
+      expectation: New tab receives shared right position.
+    - step: 95
+      expectation: New tab retains global wrap.
+    results:
+    - 55
+    - 56
+    - 60
+    - 61
+    - 64
+    - 67
+    - 70
+    - 75
+    - 83
+    - 84
+    - 86
+    - 90
+    - 92
+    - 94
+    - 95
+  - id: R3
+    requirement: Product Explorer preserves prototype light/dark surface tokens, 210px navigation, 300px preview and right/bottom placement.
+    actions:
+    - 4
+    - 8
+    - 78
+    checkpoints:
+    - step: 9
+      expectation: Light theme active.
+    - step: 14
+      expectation: Navigation width matches prototype.
+    - step: 15
+      expectation: Default preview width matches prototype.
+    - step: 16
+      expectation: Light background matches prototype RGB.
+    - step: 21
+      expectation: Preview sits to the right without overlapping the file list and short text uses content height under 100px, not a 300px blank block.
+    - step: 79
+      expectation: Dark theme active.
+    - step: 80
+      expectation: Dark background matches prototype RGB.
+    results:
+    - 9
+    - 14
+    - 15
+    - 16
+    - 21
+    - 79
+    - 80
+  - id: R4
+    requirement: New file and folder use inline rename; same-volume drag moves into a folder; same-directory copy gets a suffix; unavailable trash
+      requires explicit confirm and cancellation preserves the original.
+    actions:
+    - 98
+    - 99
+    - 100
+    - 102
+    - 103
+    - 105
+    - 106
+    - 107
+    - 108
+    - 110
+    - 112
+    - 114
+    - 115
+    - 116
+    - 118
+    - 119
+    - 120
+    - 123
+    - 125
+    - 126
+    - 129
+    checkpoints:
+    - step: 104
+      expectation: Created folder uses the entered inline name.
+    - step: 109
+      expectation: Created text document uses the entered inline name.
+    - step: 111
+      expectation: Drag moves file out of the source listing.
+    - step: 113
+      expectation: The moved file is visible inside the target folder.
+    - step: 117
+      expectation: Same-directory Paste copies with documented suffix.
+    - step: 122
+      expectation: Trash-unavailable reason explicitly states confirmation is required.
+    - step: 124
+      expectation: Cancelling fallback preserves the original.
+    - step: 127
+      expectation: Confirming fallback removes only the original.
+    - step: 128
+      expectation: Independent copy remains present.
+    - step: 136
+      expectation: No runtime error after fallback and partial-batch recovery.
+    results:
+    - 104
+    - 109
+    - 111
+    - 113
+    - 117
+    - 122
+    - 124
+    - 127
+    - 128
+    - 136
+  - id: R5
+    requirement: A manually expanded narrow bottom preview stays at the bottom with the prototype 190px height, leaving the file list above it usable.
+    actions: [137, 138, 139, 141, 143, 144, 145, 147]
+    checkpoints:
+    - {step: 146, expectation: Narrow layout first auto-collapses while the bottom preference is retained.}
+    - {step: 148, expectation: Manual opening renders the selected real text.}
+    - {step: 149, expectation: 'Overlay is no taller than 190px; starts below the body top and spans file-list width rather than covering the entire list.'}
+    - {step: 151, expectation: Preview transitions leave no runtime error.}
+    results: [146, 148, 149, 151]
+  visual:
+  - check: High-fidelity light/dark/narrow surface and density.
+    method: automated
+    reason: Named prototype dimensions/colors/placement asserted; screenshots retained for human full-fidelity review rather than inferred pixel
+      parity.
+  native:
+  - check: Real image/text IPC and WebKit blob lifecycle.
+    method: external
+    reason: Native003 and native005 cover actual filesystem/clipboard; native preview/blob rendering remains a separate native smoke if selected.

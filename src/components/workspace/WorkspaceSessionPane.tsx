@@ -1,11 +1,12 @@
-import { lazy, Suspense, useEffect } from "react";
+import { lazy, Suspense, useEffect, useRef } from "react";
+import { ExplorerTabPane } from "../explorer/ExplorerTabPane";
+import { openTerminalExplorer } from "../../lib/explorer/terminalExplorer";
 import { useT } from "../../lib/i18n";
 import { useWorkspaceSessionAccess } from "./useWorkspaceSessionAccess";
 import { WorkspaceAdditionalSessionPane } from "./WorkspaceAdditionalSessionPane";
 import { parsePathMappings } from "../filebrowser/PathMappingsEditor";
 import { TerminalPanel } from "../terminal/TerminalPanel";
 import { FileBrowser } from "../filebrowser/FileBrowser";
-import { LocalFileBrowserPanel } from "../filebrowser/LocalFileBrowserPanel";
 import { getSessionTerminalProfile, loadTerminalDefaultProfile, parseSessionOptions } from "../../lib/terminalProfile";
 import { commandTerminalFromSession, localShellSelectionFromSession } from "../../layouts/main/sessionPolicy";
 import { getSessionNetworkSettings, toNetworkSettingsPayload } from "../../lib/networkSettings";
@@ -14,7 +15,7 @@ import { parseVncViewerOptions } from "../../lib/vncOptions";
 import { sessionToDbConnectInfo, sessionToHBaseConnectInfo } from "../../layouts/main/databaseSession";
 import type { SessionConfig } from "../../lib/ipc";
 import { useAppStore } from "../../stores/appStore";
-import type { PlatformWorkspace, WorkspaceIsolatedTab } from "../../stores/workspacePlatformStore";
+import { useWorkspacePlatformStore, type PlatformWorkspace, type WorkspaceIsolatedTab } from "../../stores/workspacePlatformStore";
 import { useSessionStore } from "../../stores/sessionStore";
 import {
   DbLoadingPanel,
@@ -87,12 +88,13 @@ function SavedWorkspaceSession(props: WorkspaceSessionPaneProps & { session: Ses
   return <WorkspaceProtocolPane {...props} session={access.session} auth={access.auth} password={access.password} />;
 }
 
-function WorkspaceProtocolPane({ tab, visible, active = visible, session, auth, password, onEditSession }: WorkspaceSessionPaneProps & {
+function WorkspaceProtocolPane({ workspace, tab, visible, active = visible, session, auth, password, onEditSession }: WorkspaceSessionPaneProps & {
   session?: SessionConfig;
   auth?: { method: string; data: string | null };
   password?: string;
 }) {
   const setActiveSideTab = useAppStore((s) => s.setActiveSideTab);
+  const terminalCwd = useRef<string | null>(null);
   const protocol = session?.session_type ?? tab.protocol ?? "Local";
   useEffect(() => {
     if (session) void useSessionStore.getState().markConnected(session.id)
@@ -113,6 +115,10 @@ function WorkspaceProtocolPane({ tab, visible, active = visible, session, auth, 
           localShell={session && (protocol === "Local" || protocol === "LocalShell") ? localShellSelectionFromSession(session) : undefined}
           terminalProfile={session ? getSessionTerminalProfile(session.options_json) ?? loadTerminalDefaultProfile() : undefined}
           preserveSessionOnUnmount={false}
+          onCwdChange={(cwd) => { terminalCwd.current = cwd; }}
+          explorerToggle={!session || !commandTerminalFromSession(session) ? {
+            onOpen: (forceNew) => { void openTerminalExplorer(async () => terminalCwd.current, forceNew, workspace.id); },
+          } : undefined}
         />
       </div>
     );
@@ -164,7 +170,8 @@ function WorkspaceProtocolPane({ tab, visible, active = visible, session, auth, 
   if (protocol === "File") {
     return (
       <div data-testid="workspace-session-pane" data-kind="file-browser" data-session-id={session.id} className="h-full min-h-0 w-full" style={{ display: visible ? "block" : "none" }}>
-        <LocalFileBrowserPanel tabId={tab.id} initialPath={session.host} />
+        <ExplorerTabPane tabId={tab.id} initialPath={tab.explorerPath ?? session.host} workspaceId={workspace.id} active={visible && active}
+          onOpenTerminal={(path) => { useWorkspacePlatformStore.getState().openLocalTerminalInWorkspace(workspace.id, path); }} />
       </div>
     );
   }

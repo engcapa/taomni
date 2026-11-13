@@ -1118,6 +1118,118 @@
 - `[data-testid="structural-search-backend"]` — display — F25.6.structural-search-backend
 - `[data-testid="code-workspace-bottom-tab-structural"]` — interactive — F25.6.bottom-tab-structural
 
+## files/explorer (F-EXPLORER-1)
+
+- `[data-testid="context-menu-item-file-explorer"]` — interactive — F-EXPLORER-1.explorer-main-menu-entry
+- `[data-testid="explorer-delete-dialog"]` — display — F-EXPLORER-1.explorer-delete-dialog
+- `[data-testid="explorer-properties-dialog"]` — display — F-EXPLORER-1.explorer-properties-dialog
+- `[data-testid="explorer-toast"].error` — display — F-EXPLORER-1.explorer-toast-error
+- `[data-testid="workspace-tab"][data-tab-kind="explorer"]` — display — F-EXPLORER-1.explorer-workspace-tab-ready
+  ↳ `:nth-match([data-testid="workspace-tab"][data-tab-kind="explorer"], 1)` — alias
+  ↳ `:nth-match([data-testid="workspace-tab"][data-tab-kind="explorer"], 2)` — alias
+- `[data-testid="code-workspace-tool-rail-explorer"]` — interactive — F-EXPLORER-1.code-workspace-tool-rail-explorer
+- `[data-testid="code-workspace-tree-open-explorer"]` — interactive — F-EXPLORER-1.code-workspace-tree-open-explorer
+- `[data-testid="code-workspace-tree-open-explorer-new"]` — interactive — F-EXPLORER-1.code-workspace-tree-open-explorer-new
+- `[data-testid="explorer-address"]` — interactive — F-EXPLORER-1.explorer-address
+- `[data-testid="explorer-address-bar"]` — interactive — F-EXPLORER-1.explorer-address-bar
+- `[data-testid="explorer-address-error"]` — display — F-EXPLORER-1.explorer-address-error
+- `[data-testid="explorer-back"]` — interactive — F-EXPLORER-1.explorer-back
+- `[data-testid="explorer-cmd-copy"]` — interactive — F-EXPLORER-1.explorer-cmd-copy
+- `[data-testid="explorer-cmd-cut"]` — interactive — F-EXPLORER-1.explorer-cmd-cut
+- `[data-testid="explorer-cmd-delete"]` — interactive — F-EXPLORER-1.explorer-cmd-delete
+- `[data-testid="explorer-cmd-more"]` — interactive — F-EXPLORER-1.explorer-cmd-more
+- `[data-testid="explorer-cmd-new"]` — interactive — F-EXPLORER-1.explorer-cmd-new
+- `[data-testid="explorer-cmd-newtab"]` — interactive — F-EXPLORER-1.explorer-cmd-newtab
+- `[data-testid="explorer-cmd-paste"]` — interactive — F-EXPLORER-1.explorer-cmd-paste
+- `[data-testid="explorer-cmd-preview"]` — interactive — F-EXPLORER-1.explorer-cmd-preview
+- `[data-testid="explorer-cmd-rename"]` — interactive — F-EXPLORER-1.explorer-cmd-rename
+- `[data-testid="explorer-cmd-sort"]` — interactive — F-EXPLORER-1.explorer-cmd-sort
+- `[data-testid="explorer-cmd-terminal"]` — interactive — F-EXPLORER-1.explorer-cmd-terminal
+- `[data-testid="explorer-cmd-view"]` — interactive — F-EXPLORER-1.explorer-cmd-view
+- `[data-testid="explorer-column-mtime"]` — interactive — F-EXPLORER-1.explorer-column-mtime
+- `[data-testid="explorer-column-name"]` — interactive — F-EXPLORER-1.explorer-column-name
+- `[data-testid="explorer-column-size"]` — interactive — F-EXPLORER-1.explorer-column-size
+- `[data-testid="explorer-column-type"]` — interactive — F-EXPLORER-1.explorer-column-type
+- `[data-testid="explorer-command-bar"]` — display — F-EXPLORER-1.explorer-command-bar
+- `[data-testid="explorer-context-copy"]` — interactive — F-EXPLORER-1.explorer-context-copy
+- `[data-testid="explorer-context-copy-path"]` — interactive — F-EXPLORER-1.explorer-context-copy-path
+- `[data-testid="explorer-context-cut"]` — interactive — F-EXPLORER-1.explorer-context-cut
+- `[data-testid="explorer-context-delete"]` — interactive — F-EXPLORER-1.explorer-context-delete
+- `[data-testid="explorer-context-new-file"]` — interactive — F-EXPLORER-1.explorer-context-new-file
+- `[data-testid="explorer-context-new-folder"]` — interactive — F-EXPLORER-1.explorer-context-new-folder
+- `[data-testid="explorer-context-newtab"]` — interactive — F-EXPLORER-1.explorer-context-newtab
+- `[data-testid="explorer-context-open"]` — interactive — F-EXPLORER-1.explorer-context-open
+- `[data-testid="explorer-context-paste"]` — interactive — F-EXPLORER-1.explorer-context-paste
+- `[data-testid="explorer-context-properties"]` — interactive — F-EXPLORER-1.explorer-context-properties
+- `[data-testid="explorer-context-refresh"]` — interactive — F-EXPLORER-1.explorer-context-refresh
+- `[data-testid="explorer-context-rename"]` — interactive — F-EXPLORER-1.explorer-context-rename
+- `[data-testid="explorer-context-reveal"]` — interactive — F-EXPLORER-1.explorer-context-reveal
+- `[data-testid="explorer-context-terminal"]` — interactive — F-EXPLORER-1.explorer-context-terminal
+- `[data-testid="explorer-crumb"]` — interactive — F-EXPLORER-1.explorer-crumb
+  ↳ `[data-testid="explorer-crumb"]${fixture.explorer_crumb_folder_match}` — alias
+- `[data-testid="explorer-delete-cancel"]` — interactive — F-EXPLORER-1.explorer-delete-cancel
+- `[data-testid="explorer-delete-confirm"]` — interactive — F-EXPLORER-1.explorer-delete-confirm
+- `[data-testid="explorer-file-list"]` — interactive — F-EXPLORER-1.explorer-file-list
+- `[data-testid="explorer-file-row"]` — interactive — F-EXPLORER-1.explorer-file-row
+  ↳ `[data-testid="explorer-file-row"] .ex-name` — alias
+- `[data-testid="tab-item"][data-tab-type="file-browser"] .taomni-explorer-tab-icon path` — display — F-EXPLORER-1.explorer-main-tab-icon
+- `[data-testid="workspace-tab"][data-tab-kind="explorer"] .taomni-explorer-tab-icon path` — display — F-EXPLORER-1.explorer-workspace-tab-icon
+- `[data-testid="explorer-files"]` — display — F-EXPLORER-1.explorer-files
+- `[data-testid="explorer-filter"]` — interactive — F-EXPLORER-1.explorer-filter
+- `[data-testid="explorer-forward"]` — interactive — F-EXPLORER-1.explorer-forward
+- `[data-testid="explorer-nav-newtab"]` — interactive — F-EXPLORER-1.explorer-nav-newtab
+- `[data-testid="explorer-nav-node"]` — interactive — F-EXPLORER-1.explorer-nav-node
+  ↳ `[data-testid="explorer-nav-node"]${fixture.explorer_source_folder_match}` — alias
+  ↳ `[data-testid="explorer-nav-node"]${fixture.explorer_source_match} button` — alias
+- `[data-testid="explorer-nav-shortcut"]` — interactive — F-EXPLORER-1.explorer-nav-shortcut
+- `[data-testid="explorer-nav-tree"]` — display — F-EXPLORER-1.explorer-nav-tree
+- `[data-testid="explorer-new-file"]` — interactive — F-EXPLORER-1.explorer-new-file
+- `[data-testid="explorer-new-folder"]` — interactive — F-EXPLORER-1.explorer-new-folder
+- `[data-testid="explorer-preview"]` — display — F-EXPLORER-1.explorer-preview
+- `[data-testid="explorer-preview-action-error"]` — display — F-EXPLORER-1.explorer-preview-action-error
+- `[data-testid="explorer-preview-bottom"]` — interactive — F-EXPLORER-1.explorer-preview-bottom
+- `[data-testid="explorer-preview-close"]` — interactive — F-EXPLORER-1.explorer-preview-close
+- `[data-testid="explorer-preview-copy-path"]` — interactive — F-EXPLORER-1.explorer-preview-copy-path
+- `[data-testid="explorer-preview-csv"]` — display — F-EXPLORER-1.explorer-preview-csv
+- `[data-testid="explorer-preview-error"]` — display — F-EXPLORER-1.explorer-preview-error
+- `[data-testid="explorer-preview-image"]` — display — F-EXPLORER-1.explorer-preview-image
+- `[data-testid="explorer-preview-loading"]` — display — F-EXPLORER-1.explorer-preview-loading
+- `[data-testid="explorer-preview-markdown"]` — display — F-EXPLORER-1.explorer-preview-markdown
+- `[data-testid="explorer-preview-metadata"]` — display — F-EXPLORER-1.explorer-preview-metadata
+- `[data-testid="explorer-preview-open"]` — interactive — F-EXPLORER-1.explorer-preview-open
+- `[data-testid="explorer-preview-right"]` — interactive — F-EXPLORER-1.explorer-preview-right
+- `[data-testid="explorer-preview-settings"]` — interactive — F-EXPLORER-1.explorer-preview-settings
+- `[data-testid="explorer-preview-system"]` — interactive — F-EXPLORER-1.explorer-preview-system
+- `[data-testid="explorer-preview-text"]` — display — F-EXPLORER-1.explorer-preview-text
+- `[data-testid="explorer-preview-truncated"]` — display — F-EXPLORER-1.explorer-preview-truncated
+- `[data-testid="explorer-preview-wrap"]` — interactive — F-EXPLORER-1.explorer-preview-wrap
+- `[data-testid="explorer-progress"]` — display — F-EXPLORER-1.explorer-progress
+- `[data-testid="explorer-properties-close"]` — interactive — F-EXPLORER-1.explorer-properties-close
+- `[data-testid="explorer-properties-size"]` — display — F-EXPLORER-1.explorer-properties-size
+- `[data-testid="explorer-refresh"]` — interactive — F-EXPLORER-1.explorer-refresh
+- `[data-testid="explorer-rename-input"]` — interactive — F-EXPLORER-1.explorer-rename-input
+- `[data-testid="explorer-restore-tabs"]` — interactive — F-EXPLORER-1.explorer-restore-tabs
+- `[data-testid="explorer-sort-asc"]` — interactive — F-EXPLORER-1.explorer-sort-asc
+- `[data-testid="explorer-sort-desc"]` — interactive — F-EXPLORER-1.explorer-sort-desc
+- `[data-testid="explorer-sort-mtime"]` — interactive — F-EXPLORER-1.explorer-sort-mtime
+- `[data-testid="explorer-sort-name"]` — interactive — F-EXPLORER-1.explorer-sort-name
+- `[data-testid="explorer-sort-size"]` — interactive — F-EXPLORER-1.explorer-sort-size
+- `[data-testid="explorer-sort-type"]` — interactive — F-EXPLORER-1.explorer-sort-type
+- `[data-testid="explorer-status"]` — display — F-EXPLORER-1.explorer-status
+- `[data-testid="explorer-tab"]` — interactive — F-EXPLORER-1.explorer-tab
+  ↳ `[data-testid="explorer-tab"]${fixture.explorer_previews_match}` — alias
+- `[data-testid="explorer-toast"]` — display — F-EXPLORER-1.explorer-toast
+- `[data-testid="explorer-trash-unavailable"]` — display — F-EXPLORER-1.explorer-trash-unavailable
+- `[data-testid="explorer-undo"]` — interactive — F-EXPLORER-1.explorer-undo
+- `[data-testid="explorer-up"]` — interactive — F-EXPLORER-1.explorer-up
+- `[data-testid="explorer-view-details"]` — interactive — F-EXPLORER-1.explorer-view-details
+- `[data-testid="explorer-view-hidden"]` — interactive — F-EXPLORER-1.explorer-view-hidden
+- `[data-testid="explorer-view-icons"]` — interactive — F-EXPLORER-1.explorer-view-icons
+- `[data-testid="explorer-view-list"]` — interactive — F-EXPLORER-1.explorer-view-list
+- `[data-testid="sidebar-tool-file-explorer"]` — interactive — F-EXPLORER-1.sidebar-tool-file-explorer
+- `[data-testid="terminal-context-explorer"]` — interactive — F-EXPLORER-1.terminal-context-explorer
+- `[data-testid="terminal-context-explorer-new"]` — interactive — F-EXPLORER-1.terminal-context-explorer-new
+
 ## git/diff (F26.1)
 
 - `[data-testid="git-change-status"]` — display — F26.1.git-change-status
@@ -1604,6 +1716,10 @@
 
 - `[data-testid="tab-bar"]` — display — F1.5.tab-bar
 - `[data-testid="tab-item"]` — interactive — F1.5.tab-item
+  ↳ `:nth-match([data-testid="tab-item"][data-tab-type="file-browser"], 1)` — alias
+  ↳ `:nth-match([data-testid="tab-item"][data-tab-type="file-browser"], 2)` — alias
+  ↳ `:nth-match([data-testid="tab-item"][data-tab-type="file-browser"], 3)` — alias
+  ↳ `xpath=(//*[@data-testid="tab-item" and @data-tab-type="file-browser"])[2]` — alias
 - `[data-testid="tab-title"]` — interactive — F1.5.tab-title
 - `[data-testid="tab-title-input"]` — interactive [optional] — F1.5.tab-title-input
 - `[data-testid="new-local-terminal"]` — interactive — F1.5.new-local-terminal

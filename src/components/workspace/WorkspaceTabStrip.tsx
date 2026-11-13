@@ -17,11 +17,13 @@ import { useWorkspaceTabScroll } from "./useWorkspaceTabScroll";
 import { NOTES_WORKSPACE_ID } from "../../stores/workspaceNotes";
 import { createAndOpenWorkspaceNote } from "../../lib/notes/notesWorkspaceNavigation";
 import { EMPTY_WORKSPACE_TAB_FILTER, filterWorkspaceTabs, hasWorkspaceTabFilter } from "../../lib/workspaceTabFilter";
+import { ExplorerTabIcon } from "../explorer/ExplorerTabIcon";
 
 const KIND_LABEL: Record<WorkspaceTabKind, string> = {
   file: "FILE",
   note: "NOTE",
   git: "GIT",
+  explorer: "EXPL",
   code: "CODE",
   terminal: "TERM",
   sftp: "SFTP",
@@ -35,6 +37,7 @@ const KIND_COLOR: Record<WorkspaceTabKind, string> = {
   file: "var(--taomni-text-muted)",
   note: "var(--taomni-accent)",
   git: "var(--taomni-accent)",
+  explorer: "var(--taomni-warning, #d97706)",
   code: "var(--taomni-purple, #8b5cf6)",
   terminal: "var(--taomni-success, #10b981)",
   sftp: "var(--taomni-warning, #d97706)",
@@ -185,9 +188,9 @@ export function WorkspaceTabStrip() {
         if (event.button === 1 && tab.closable) closeTab(workspace.id, tab.id);
       }}
     >
-      <span className="shrink-0 rounded px-0.5 text-[8.5px] font-bold" style={{ color: KIND_COLOR[tab.kind], border: `1px solid ${KIND_COLOR[tab.kind]}` }}>
+      {tab.kind === "explorer" ? <ExplorerTabIcon /> : <span className="shrink-0 rounded px-0.5 text-[8.5px] font-bold" style={{ color: KIND_COLOR[tab.kind], border: `1px solid ${KIND_COLOR[tab.kind]}` }}>
         {KIND_LABEL[tab.kind]}
-      </span>
+      </span>}
       <span className="truncate">{tab.title}</span>
       {tab.closable && (
         <button

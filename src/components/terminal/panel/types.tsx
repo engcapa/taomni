@@ -122,6 +122,10 @@ export interface TerminalPanelProps {
     cwd: string | null;
     onOpen: () => void;
   };
+  /** Explorer is context-menu only; no terminal shortcut is reserved. */
+  explorerToggle?: {
+    onOpen: (forceNew: boolean) => void;
+  };
   /** When set, the floating toolbar exposes a "Detach to its own window"
    *  button that calls back into MainLayout. Hidden in detached windows
    *  themselves (which already live in their own OS window). */

@@ -3,6 +3,7 @@ import type { Tab } from "../../types";
 import { useServersStore } from "../../stores/serversStore";
 import { useAppStore } from "../../stores/appStore";
 import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
+import { openExplorer } from "../../lib/explorer/openExplorer";
 import { parseQuickConnectInput } from "../../lib/quickConnect";
 import { type SessionConfig } from "../../lib/ipc";
 import { type TerminalProfile } from "../../lib/terminalProfile";
@@ -194,6 +195,9 @@ export function createHandleCommand(controllerContext: HandleCommandContext): (c
         break;
       case "code-workspace":
         controllerContext.openEmptyCodeWorkspaceTab();
+        break;
+      case "file-explorer":
+        void openExplorer().catch((error) => controllerContext.setStatusMessage(String(error)));
         break;
       case "settings":
         controllerContext.openSettingsTab();

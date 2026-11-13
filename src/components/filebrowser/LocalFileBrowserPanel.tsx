@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { FilePanel } from "./FilePanel";
+import type { FilePanelProps } from "./filePanel/types";
 import { ChmodDialog } from "./ChmodDialog";
 import { useSftpStore } from "../../stores/sftpStore";
 import { useSftpController } from "../../lib/sftpController";
@@ -13,6 +14,8 @@ interface Props {
   /** Stable id used to namespace this tab's pane state in `sftpStore`. */
   tabId: string;
   initialPath: string;
+  /** Explorer owns the local-only lifecycle and supplies the extended presentation. */
+  explorer?: Omit<FilePanelProps, "sessionId" | "side">;
 }
 
 /**
@@ -21,7 +24,12 @@ interface Props {
  * filter box) as the SFTP browser's local pane — wiring the LOCAL side of
  * a synthetic store entry that has no remote channel attached.
  */
-export function LocalFileBrowserPanel({ tabId, initialPath }: Props) {
+export function LocalFileBrowserPanel(props: Props) {
+  if (props.explorer) return <FilePanel sessionId={props.tabId} side="local" {...props.explorer} />;
+  return <LegacyLocalFileBrowserPanel {...props} />;
+}
+
+function LegacyLocalFileBrowserPanel({ tabId, initialPath }: Props) {
   const t = useT();
   const session = useSftpStore((s) => s.sessions[tabId]);
   const attachLocalOnly = useSftpStore((s) => s.attachLocalOnly);

@@ -294,7 +294,7 @@ export async function invokeFiles<T>(cmd: string, args?: any, options?: InvokeOp
 
     case "sftp_list_local_detailed": {
       const path = (args?.path as string) || "";
-      const entries = await vfsList(path);
+      const entries = await vfsList(path, true);
       return { entries, skippedCount: 0, diagnostics: [] } as T;
     }
 

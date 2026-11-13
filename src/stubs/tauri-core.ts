@@ -12,6 +12,7 @@ import { invokeTerminal } from "./commands/terminal";
 import { invokeWorkspace } from "./commands/workspace";
 import { invokeSession } from "./commands/session";
 import { invokeFiles } from "./commands/files";
+import { invokeExplorer } from "./commands/explorer";
 import { invokeSdk } from "./commands/sdk";
 import { invokeLsp } from "./commands/lsp";
 import { invokeRemoteDesktop } from "./commands/remoteDesktop";
@@ -81,6 +82,10 @@ for (const command of ["vault_status","vault_init","vault_unlock","vault_lock","
 
 for (const command of ["select_private_key_file","select_upload_file","select_save_directory","select_save_file_path","select_file_path","select_folder_path","read_file_bytes","check_file_exists","read_plist_session_file","read_stream_open","read_stream_read","read_stream_close","write_stream_open","write_stream_append","write_stream_close","write_stream_abort","temporary_file_path","open_local_shell_as_administrator","sftp_attach","sftp_detach","sftp_list_remote","sftp_list_local","sftp_list_local_detailed","sftp_local_home","sftp_local_drives","sftp_mkdir","sftp_remove","sftp_rename","sftp_stat","sftp_chmod","sftp_upload_dir","sftp_download_dir","sftp_realpath","sftp_read_file_text","sftp_write_file_text","sftp_upload","sftp_download","sftp_upload_bytes","sftp_download_bytes","sftp_cancel_transfer","sftp_pause_transfer","sftp_resume_transfer","sftp_open_path"]) {
   stubCommandRegistry.register({ domain: "files", command, handler: (args, options) => invokeFiles(command, args, options) });
+}
+
+for (const command of ["explorer_canonical_path", "explorer_same_volume", "explorer_write_clipboard_files", "explorer_update_cut_clipboard", "local_copy_entries", "local_move_entries", "local_trash_entries", "local_trash_restore", "local_properties", "explorer_read_preview_text", "explorer_read_preview_bytes", "explorer_cancel_operation", "local_rename_entry", "local_create_entry"]) {
+  stubCommandRegistry.register({ domain: "explorer", command, handler: (args) => invokeExplorer(command, args) });
 }
 
 for (const command of ["sdk_get_registry","sdk_probe_installation","sdk_discover_installations","sdk_save_installation","sdk_remove_installation","sdk_refresh_installations","sdk_set_default","sdk_save_workspace_binding","sdk_remove_workspace_binding","sdk_analyze_workspace","sdk_resolve_workspace"]) {

@@ -44,6 +44,7 @@ export function TerminalPanel({
   sftpToggle,
   chatToggle,
   gitToggle,
+  explorerToggle,
   detachToggle,
 }: TerminalPanelProps) {
   const panel = useTerminalPanelState({
@@ -94,6 +95,7 @@ export function TerminalPanel({
     commands,
     interaction,
     gitToggle,
+    explorerToggle: !ssh && !commandTerminal ? explorerToggle : undefined,
     tabId,
     initialCwd,
     cwdRequestToken,

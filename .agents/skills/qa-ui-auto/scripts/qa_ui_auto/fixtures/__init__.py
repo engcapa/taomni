@@ -69,7 +69,7 @@ from . import x11_session_required
 from . import project_tree
 from . import workspace_search_large
 from . import workspace_explorer, workspace_hidden_entries, workspace_slow_lsp
-from . import workspace_drop_import, workspace_file_clipboard
+from . import workspace_drop_import, workspace_file_clipboard, explorer_files
 from . import workspace_language_files, workspace_slow_sdk
 from . import workspace_watch
 from . import workspace_large_directory, workspace_home_documents
@@ -151,6 +151,8 @@ REGISTRY: dict[str, Fixture] = {
     "workspace_explorer": Fixture("workspace_explorer", workspace_explorer.setup),
     "workspace_drop_import": Fixture("workspace_drop_import", workspace_drop_import.setup, workspace_drop_import.teardown),
     "workspace_file_clipboard": Fixture("workspace_file_clipboard", workspace_file_clipboard.setup, workspace_file_clipboard.teardown),
+    "explorer_files": Fixture("explorer_files", explorer_files.setup, explorer_files.teardown),
+    "explorer_large_directory": Fixture("explorer_large_directory", explorer_files.setup_large, explorer_files.teardown),
     "workspace_compact_tree": Fixture("workspace_compact_tree", workspace_compact_tree.setup),
     "workspace_hidden_entries": Fixture("workspace_hidden_entries", workspace_hidden_entries.setup),
     "workspace_slow_lsp": Fixture("workspace_slow_lsp", workspace_slow_lsp.setup),

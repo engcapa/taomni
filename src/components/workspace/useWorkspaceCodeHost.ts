@@ -1,5 +1,5 @@
 import { workspaceFileTabId, workspaceFileTabRef } from "../../lib/workspaceFileTarget";
-import { useCallback, useDeferredValue, useMemo, useRef } from "react";
+import { useCallback, useDeferredValue, useEffect, useMemo, useRef } from "react";
 import { fileKey } from "../editor/workspace/codeWorkspaceModel";
 import type { WorkspaceFileMenu, WorkspaceHostIntegration, WorkspaceHostSnapshot } from "../editor/workspace/workspaceHostIntegration";
 import { useWorkspaceEditorHostStore } from "../../stores/workspaceEditorHostStore";
@@ -8,7 +8,9 @@ import { useWorkspacePlatformStore, type PlatformWorkspace } from "../../stores/
 import type { CodeWorkspaceFileRef } from "../../types";
 import { useAppStore } from "../../stores/appStore";
 import { useT } from "../../lib/i18n";
-import { GitBranch, MonitorSmartphone } from "lucide-react";
+import { FolderOpen, GitBranch, MonitorSmartphone } from "lucide-react";
+import { openExplorer } from "../../lib/explorer/openExplorer";
+import { getAppPlatform } from "../../lib/runtime";
 import { createElement } from "react";
 import { useWorkspaceUiStore } from "../../stores/workspaceUiStore";
 import { revealWorkspaceFolder } from "./workspaceFolderReveal";
@@ -129,11 +131,34 @@ export function useWorkspaceCodeHost(workspace: PlatformWorkspace, visible: bool
       store.setActiveLeftToolWindow(workspace.id, "sessions");
     },
   }, {
+    id: "workspace-explorer", label: t("menu.fileExplorer"), icon: createElement(FolderOpen),
+    testId: "code-workspace-tool-rail-explorer", shortcut: getAppPlatform() === "macos" ? "Option+3" : "Alt+3",
+    active: activeTab?.kind === "explorer",
+    onSelect: () => {
+      const root = useWorkspacePlatformStore.getState().getWorkspace(workspace.id)?.rootFolders[0]?.path;
+      void openExplorer(root, { workspaceId: workspace.id }).then(() => {
+        if (!root) useAppStore.getState().setStatusMessage(t("explorerEntry.noRoot"));
+      }).catch((error) => useAppStore.getState().setStatusMessage(String(error)));
+    },
+  }, {
     id: "workspace-git", label: t("platform.gitRepo"), icon: createElement(GitBranch),
     testId: "code-workspace-tool-rail-git", shortcut: "Alt+9",
     active: activeTab?.kind === "git",
     onSelect: () => { useWorkspacePlatformStore.getState().openGitTab(workspace.id); },
   }], [t, sidebarExpanded, workspace.id, workspace.activeLeftToolWindow, activeTab?.kind]);
+  useEffect(() => {
+    if (!enabled || !active) return;
+    const handleExplorerShortcut = (event: KeyboardEvent) => {
+      if (event.defaultPrevented || event.isComposing || (event.key !== "3" && event.code !== "Digit3") || !event.altKey
+        || event.ctrlKey || event.metaKey || event.shiftKey) return;
+      const element = event.target instanceof Element ? event.target : null;
+      if (element?.closest("input, textarea, select, [contenteditable='true'], [role='dialog']")) return;
+      event.preventDefault();
+      navigationItems.find((item) => item.id === "workspace-explorer")?.onSelect();
+    };
+    window.addEventListener("keydown", handleExplorerShortcut);
+    return () => window.removeEventListener("keydown", handleExplorerShortcut);
+  }, [enabled, active, navigationItems]);
   const recoverDraft = useCallback((ref: CodeWorkspaceFileRef) => {
     const id = workspaceFileTabId(latest.current.workspace.id, ref);
     const draft = useWorkspaceEditorStore.getState().documents[id];

@@ -214,6 +214,55 @@ pub fn clipboard_parse_file_paths(text: String) -> Result<Vec<String>, String> {
     Ok(files)
 }
 
+/// Explorer's explicit cut operation adds each platform's native move hint.
+/// The shared clipboard_write_files command intentionally retains copy semantics.
+#[tauri::command]
+pub async fn explorer_write_clipboard_files(paths: Vec<String>, cut: bool) -> Result<(), String> {
+    file_clipboard::validate_paths(&paths)?;
+    if paths.is_empty() {
+        return Ok(());
+    }
+    #[cfg(target_os = "linux")]
+    {
+        platform::clipboard_write_files_with_cut(&paths, cut).await
+    }
+    #[cfg(windows)]
+    {
+        platform::clipboard_write_files_with_cut(&paths, cut)
+    }
+    #[cfg(not(any(target_os = "linux", windows)))]
+    {
+        // Finder has no standard file-cut clipboard type: its native Move action
+        // is Option+Command+V on a normal copied file list. App-local cut state
+        // supplies the move intent when pasting back into Explorer.
+        let _ = cut;
+        platform::clipboard_write_files(&paths)
+    }
+}
+
+/// Prune only a still-current app-local cut offer. Expected source paths may
+/// legitimately no longer exist after successful moves, so compare raw formats.
+#[tauri::command]
+pub async fn explorer_update_cut_clipboard(
+    expected_paths: Vec<String>,
+    remaining_paths: Vec<String>,
+) -> Result<bool, String> {
+    file_clipboard::validate_paths(&remaining_paths)?;
+    #[cfg(target_os = "linux")]
+    {
+        platform::clipboard_update_cut_files(&expected_paths, &remaining_paths).await
+    }
+    #[cfg(any(windows, target_os = "macos"))]
+    {
+        platform::clipboard_update_cut_files(&expected_paths, &remaining_paths)
+    }
+    #[cfg(not(any(target_os = "linux", windows, target_os = "macos")))]
+    {
+        let _ = expected_paths;
+        Ok(false)
+    }
+}
+
 #[tauri::command]
 pub async fn clipboard_write_files(
     paths: Vec<String>,

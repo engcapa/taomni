@@ -1,0 +1,72 @@
+id: TC-EXPLORER-004
+title: Explorer virtualizes 10000 actual directory entries and preserves sort/filter/keyboard results
+description: >-
+  AC16. Fixture writes 10000 independent files, VFS in browser and real disk in native.
+  Assert virtualization through bounded rendered rows plus keyboard End reaching final item,
+  exact filter results, sort direction and empty-filter feedback. Execution timings remain
+  raw report observations, not an invented response-time or speedup acceptance threshold.
+modes: [browser, native]
+covers: [F-EXPLORER-1]
+tags: [p1, explorer, large-directory, virtualization, regression]
+fixtures: [reset_db, explorer_large_directory]
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-explorer-large
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-file-explorer"]'
+- wait_for: '[data-testid="explorer-tab"]'
+- press: {selector: '[data-testid="explorer-tab"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.explorer_large}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="entry-00000.txt"]'
+- assert_text: {selector: '[data-testid="explorer-status"]', contains: '10000 items'}
+- assert_count: {selector: '[data-testid="explorer-file-row"]', min: 1, max: 100}
+- press: {selector: '[data-testid="explorer-file-list"]', key: End}
+- wait_for: '[data-testid="explorer-file-row"][data-name="entry-09999.txt"][aria-selected="true"]'
+- assert_count: {selector: '[data-testid="explorer-file-row"]', max: 100}
+- fill: {selector: '[data-testid="explorer-filter"]', value: entry-09999}
+- assert_count: {selector: '[data-testid="explorer-file-row"]', equal: 1}
+- assert_attribute: {selector: '[data-testid="explorer-file-row"]', name: data-name, equals: entry-09999.txt}
+- fill: {selector: '[data-testid="explorer-filter"]', value: missing-no-match}
+- assert_count: {selector: '[data-testid="explorer-file-row"]', equal: 0}
+- assert_text: {selector: '[data-testid="explorer-files"]', contains: No matching items}
+- fill: {selector: '[data-testid="explorer-filter"]', value: entry-0000}
+- assert_count: {selector: '[data-testid="explorer-file-row"]', equal: 10}
+- click: '[data-testid="explorer-cmd-sort"]'
+- click: '[data-testid="explorer-sort-desc"]'
+- assert_items:
+    selector: '[data-testid="explorer-file-row"]'
+    attribute: data-name
+    equals: [entry-00009.txt, entry-00008.txt, entry-00007.txt, entry-00006.txt, entry-00005.txt, entry-00004.txt, entry-00003.txt, entry-00002.txt, entry-00001.txt, entry-00000.txt]
+- click: '[data-testid="explorer-column-name"]'
+- assert_items:
+    selector: '[data-testid="explorer-file-row"]'
+    attribute: data-name
+    equals: [entry-00000.txt, entry-00001.txt, entry-00002.txt, entry-00003.txt, entry-00004.txt, entry-00005.txt, entry-00006.txt, entry-00007.txt, entry-00008.txt, entry-00009.txt]
+- assert_no_runtime_errors: null
+- screenshot: explorer-10000-directory.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Actual 10000-entry listing is virtualized, keyboard navigation reaches final entry, filtering and sorting retain exact results without rendering every row.
+    actions: [3, 4, 6, 7, 8, 12, 15, 18, 21, 23, 24, 26]
+    checkpoints:
+    - {step: 10, expectation: Status counts all 10000 actual entries.}
+    - {step: 11, expectation: Only bounded viewport rows are rendered.}
+    - {step: 13, expectation: End reaches final entry rather than a truncated first page.}
+    - {step: 14, expectation: Last-page navigation remains virtualized.}
+    - {step: 16, expectation: Exact final-name filter returns one row.}
+    - {step: 17, expectation: That row is the requested final file.}
+    - {step: 19, expectation: Missing filter renders zero rows.}
+    - {step: 20, expectation: Empty filter feedback is visible.}
+    - {step: 22, expectation: Prefix returns ten entries.}
+    - {step: 25, expectation: Descending sort order is exact.}
+    - {step: 27, expectation: Column click returns exact ascending order.}
+    - {step: 28, expectation: No runtime crash after repeated sort/filter/navigation.}
+    results: [10, 11, 13, 14, 16, 17, 19, 20, 22, 25, 27, 28]
+  visual:
+  - {check: Dense 28px rows with functional scrollbar and no blank final page., method: manual, reason: Retained final-state screenshot; DOM row bound is not a visual verdict.}
+  native:
+  - {check: Real 10000-file IPC listing in packaged WebView., method: automated, reason: Native fixture creates actual independent files and production list command reads them. Native/browser timing samples must not be called matched performance baseline.}
