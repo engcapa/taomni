@@ -46,5 +46,5 @@ export function ExplorerTabPane(props: ExplorerTabPaneProps) {
       });
     }
   }, [tabId, workspaceId, pane?.path, pane?.loading, pane?.error]);
-  return <ExplorerShell {...shellProps} tabId={tabId} workspaceId={workspaceId} initialPath={startupPath.current} />;
+  return <ExplorerShell {...shellProps} tabId={tabId} workspaceId={workspaceId} active={active} initialPath={startupPath.current} />;
 }

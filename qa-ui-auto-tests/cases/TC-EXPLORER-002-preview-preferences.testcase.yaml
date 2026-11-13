@@ -18,85 +18,85 @@ steps:
 - set_viewport: {width: 1600, height: 960}
 - click: '[data-testid="side-tab-tools"]'
 - click: '[data-testid="sidebar-tool-file-explorer"]'
-- wait_for: '[data-testid="explorer-tab"]:visible'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
 - click: 'button[aria-label="Cycle application theme"]'
 - assert_attribute: {selector: html, name: data-app-theme, equals: light}
-- press: {selector: '[data-testid="explorer-tab"]:visible', key: Control+l, macos_key: Meta+l}
-- fill: {selector: '[data-testid="explorer-tab"]:visible [data-testid="explorer-address"]', value: '${fixture.explorer_previews}'}
-- press: {selector: '[data-testid="explorer-tab"]:visible [data-testid="explorer-address"]', key: Enter}
-- wait_for: '[data-testid="explorer-tab"]:visible [data-testid="explorer-file-row"][data-name="notes.txt"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-address"]', value: '${fixture.explorer_previews}'}
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="notes.txt"]'
 - assert_element_geometry: {selector: '[data-testid="explorer-nav-tree"]', min_width: 210, min_height: 200}
 - assert_element_geometry: {selector: '[data-testid="explorer-preview"]', min_width: 300, min_height: 200}
 - eval_readonly:
     expression: 'getComputedStyle(document.querySelector(".ex-shell")).backgroundColor === "rgb(248, 250, 252)"'
     expect_truthy: true
-- click: '[data-testid="explorer-tab"]:visible [data-testid="explorer-file-row"][data-name="notes.txt"]'
-- wait_for: '[data-testid="explorer-tab"]:visible [data-testid="explorer-preview"][data-preview-kind="text"]'
-- assert_text: {selector: '[data-testid="explorer-tab"]:visible [data-testid="explorer-preview-text"]', contains: Explorer preview text}
-- assert_attribute: {selector: '[data-testid="explorer-tab"]:visible [data-testid="explorer-preview-text"]', name: data-line-count, equals: '4'}
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="notes.txt"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview"][data-preview-kind="text"]'
+- assert_text: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-text"]', contains: Explorer preview text}
+- assert_attribute: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-text"]', name: data-line-count, equals: '4'}
 - eval_readonly:
     expression: 'document.querySelector(".ex-pv").getBoundingClientRect().left >= document.querySelector(".ex-files").getBoundingClientRect().right - 2'
     expect_truthy: true
 - screenshot: explorer-prototype-light.png
-- click: '[data-testid="explorer-tab"]:visible [data-testid="explorer-file-row"][data-name="README.md"]'
-- wait_for: '[data-testid="explorer-tab"]:visible [data-testid="explorer-preview-markdown"] h1'
-- assert_text_equals: {selector: '[data-testid="explorer-tab"]:visible [data-testid="explorer-preview-markdown"] h1', equals: Explorer Markdown}
-- assert_text_equals: {selector: '[data-testid="explorer-tab"]:visible [data-testid="explorer-preview-markdown"] strong', equals: Rendered bold}
-- click: '[data-testid="explorer-tab"]:visible [data-testid="explorer-file-row"][data-name="table.csv"]'
-- wait_for: '[data-testid="explorer-tab"]:visible [data-testid="explorer-preview-csv"]'
-- assert_count: {selector: '[data-testid="explorer-tab"]:visible [data-testid="explorer-preview-csv"] tr', equal: 3}
-- assert_text: {selector: '[data-testid="explorer-tab"]:visible [data-testid="explorer-preview-csv"]', contains: 'quoted, comma'}
-- click: '[data-testid="explorer-tab"]:visible [data-testid="explorer-file-row"][data-name="logo.png"]'
-- wait_for: '[data-testid="explorer-tab"]:visible [data-testid="explorer-preview-image"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="README.md"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-markdown"] h1'
+- assert_text_equals: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-markdown"] h1', equals: Explorer Markdown}
+- assert_text_equals: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-markdown"] strong', equals: Rendered bold}
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="table.csv"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-csv"]'
+- assert_count: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-csv"] tr', equal: 3}
+- assert_text: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-csv"]', contains: 'quoted, comma'}
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="logo.png"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-image"]'
 - eval_readonly:
     expression: 'document.querySelector(".ex-pv-img img").complete && document.querySelector(".ex-pv-img img").naturalWidth === 1'
     expect_truthy: true
     timeout_sec: 10
-- click: '[data-testid="explorer-tab"]:visible [data-testid="explorer-file-row"][data-name="large.txt"]'
-- wait_for: '[data-testid="explorer-tab"]:visible [data-testid="explorer-preview-truncated"]'
-- assert_text: {selector: '[data-testid="explorer-tab"]:visible [data-testid="explorer-preview-truncated"]', contains: '256 KB'}
-- click: '[data-testid="explorer-tab"]:visible [data-testid="explorer-file-row"][data-name="binary.txt"]'
-- wait_for: '[data-testid="explorer-tab"]:visible [data-testid="explorer-preview"][data-preview-kind="binary"]'
-- assert_count: {selector: '[data-testid="explorer-tab"]:visible [data-testid="explorer-preview-text"]', equal: 0}
-- click: '[data-testid="explorer-tab"]:visible [data-testid="explorer-file-row"][data-name="unknown.bin"]'
-- wait_for: '[data-testid="explorer-tab"]:visible [data-testid="explorer-preview"][data-preview-kind="metadata"]'
-- click: '[data-testid="explorer-tab"]:visible [data-testid="explorer-file-row"][data-name="huge.png"]'
-- wait_for: '[data-testid="explorer-tab"]:visible [data-testid="explorer-preview"][data-preview-kind="too-large"]'
-- assert_count: {selector: '[data-testid="explorer-tab"]:visible [data-testid="explorer-preview-image"]', equal: 0}
-- click: '[data-testid="explorer-tab"]:visible [data-testid="explorer-file-row"][data-name="folder"]'
-- wait_for: '[data-testid="explorer-tab"]:visible [data-testid="explorer-preview"][data-preview-kind="directory"]'
-- assert_text: {selector: '[data-testid="explorer-tab"]:visible [data-testid="explorer-preview"]', contains: child.txt}
-- click: {selector: '[data-testid="explorer-tab"]:visible [data-testid="explorer-file-row"][data-name="empty-folder"]', modifiers: [Mod]}
-- wait_for: '[data-testid="explorer-tab"]:visible [data-testid="explorer-preview"][data-preview-kind="multi"]'
-- assert_text: {selector: '[data-testid="explorer-tab"]:visible [data-testid="explorer-preview-metadata"]', contains: 2 items selected}
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="large.txt"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-truncated"]'
+- assert_text: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-truncated"]', contains: '256 KB'}
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="binary.txt"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview"][data-preview-kind="binary"]'
+- assert_count: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-text"]', equal: 0}
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="unknown.bin"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview"][data-preview-kind="metadata"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="huge.png"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview"][data-preview-kind="too-large"]'
+- assert_count: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-image"]', equal: 0}
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="folder"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview"][data-preview-kind="directory"]'
+- assert_text: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview"]', contains: child.txt}
+- click: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="empty-folder"]', modifiers: [Mod]}
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview"][data-preview-kind="multi"]'
+- assert_text: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-metadata"]', contains: 2 items selected}
 - seed_storage: {key: taomni.explorer.stubTextDelayMs, value: '350'}
-- click: '[data-testid="explorer-tab"]:visible [data-testid="explorer-file-row"][data-name="large.txt"]'
-- click: '[data-testid="explorer-tab"]:visible [data-testid="explorer-file-row"][data-name="notes.txt"]'
-- wait_for: '[data-testid="explorer-tab"]:visible [data-testid="explorer-preview-text"]'
-- assert_text: {selector: '[data-testid="explorer-tab"]:visible [data-testid="explorer-preview-text"]', contains: Explorer preview text}
-- assert_not_visible: '[data-testid="explorer-tab"]:visible [data-testid="explorer-preview-truncated"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="large.txt"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="notes.txt"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-text"]'
+- assert_text: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-text"]', contains: Explorer preview text}
+- assert_not_visible: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-truncated"]'
 - seed_storage: {key: taomni.explorer.stubTextDelayMs, value: '0'}
-- click: '[data-testid="explorer-tab"]:visible [data-testid="explorer-preview-settings"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-settings"]'
 - click: '[data-testid="explorer-preview-bottom"]'
-- assert_attribute: {selector: '[data-testid="explorer-tab"]:visible [data-testid="explorer-preview"]', name: data-position, equals: bottom}
+- assert_attribute: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview"]', name: data-position, equals: bottom}
 - eval_readonly:
     expression: 'document.querySelector(".ex-pv").getBoundingClientRect().top >= document.querySelector(".ex-files").getBoundingClientRect().bottom - 2'
     expect_truthy: true
-- click: '[data-testid="explorer-tab"]:visible [data-testid="explorer-preview-settings"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-settings"]'
 - click: '[data-testid="explorer-preview-wrap"]'
 - assert_localstorage: {key: taomni.explorer.view.v1, contains: '"wrap":true'}
-- click: '[data-testid="explorer-tab"]:visible [data-testid="explorer-cmd-view"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-view"]'
 - click: '[data-testid="explorer-view-icons"]'
 - assert_localstorage: {key: taomni.explorer.view.v1, contains: '"view":"icons"'}
-- click: '[data-testid="explorer-tab"]:visible [data-testid="explorer-cmd-view"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-view"]'
 - click: '[data-testid="explorer-view-list"]'
 - assert_localstorage: {key: taomni.explorer.view.v1, contains: '"view":"list"'}
-- click: '[data-testid="explorer-tab"]:visible [data-testid="explorer-cmd-view"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-view"]'
 - click: '[data-testid="explorer-view-details"]'
-- click: '[data-testid="explorer-tab"]:visible [data-testid="explorer-cmd-view"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-view"]'
 - click: '[data-testid="explorer-view-hidden"]'
-- wait_for: '[data-testid="explorer-tab"]:visible [data-testid="explorer-file-row"][data-name=".hidden.txt"]'
-- click: '[data-testid="explorer-tab"]:visible [data-testid="explorer-preview-settings"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name=".hidden.txt"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-settings"]'
 - click: '[data-testid="explorer-preview-right"]'
 - click: 'button[aria-label="Cycle application theme"]'
 - assert_attribute: {selector: html, name: data-app-theme, equals: dark}
@@ -105,63 +105,63 @@ steps:
     expect_truthy: true
 - screenshot: explorer-prototype-dark.png
 - set_viewport: {width: 920, height: 760}
-- assert_not_visible: '[data-testid="explorer-tab"]:visible [data-testid="explorer-preview"]'
+- assert_not_visible: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview"]'
 - assert_localstorage: {key: taomni.explorer.view.v1, contains: '"preview":true'}
-- click: '[data-testid="explorer-tab"]:visible [data-testid="explorer-cmd-preview"]'
-- wait_for: '[data-testid="explorer-tab"]:visible [data-testid="explorer-preview"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-preview"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview"]'
 - screenshot: explorer-prototype-narrow-overlay.png
 - set_viewport: {width: 1600, height: 960}
-- press: {selector: '[data-testid="explorer-tab"]:visible', key: Alt+p}
-- assert_not_visible: '[data-testid="explorer-tab"]:visible [data-testid="explorer-preview"]'
-- press: {selector: '[data-testid="explorer-tab"]:visible', key: Alt+p}
-- assert_visible: '[data-testid="explorer-tab"]:visible [data-testid="explorer-preview"]'
-- click: '[data-testid="explorer-tab"]:visible [data-testid="explorer-cmd-newtab"]'
-- assert_attribute: {selector: '[data-testid="explorer-tab"]:visible [data-testid="explorer-preview"]', name: data-position, equals: right}
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Alt+p}
+- assert_not_visible: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Alt+p}
+- assert_visible: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-newtab"]'
+- assert_attribute: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview"]', name: data-position, equals: right}
 - assert_localstorage: {key: taomni.explorer.view.v1, contains: '"wrap":true'}
 - assert_no_runtime_errors: null
 - screenshot: explorer-shared-preview-preferences.png
 - click: '[data-testid="tab-item"][data-tab-type="file-browser"][data-active="true"] [data-testid="tab-close"]'
-- click: '[data-testid="explorer-tab"]:visible [data-testid="explorer-cmd-new"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-new"]'
 - click: '[data-testid="explorer-new-folder"]'
-- wait_for: '[data-testid="explorer-tab"]:visible [data-testid="explorer-rename-input"]'
-- fill: {selector: '[data-testid="explorer-tab"]:visible [data-testid="explorer-rename-input"]', value: created-folder}
-- press: {selector: '[data-testid="explorer-tab"]:visible [data-testid="explorer-rename-input"]', key: Enter}
-- wait_for: '[data-testid="explorer-tab"]:visible [data-testid="explorer-file-row"][data-name="created-folder"]'
-- click: '[data-testid="explorer-tab"]:visible [data-testid="explorer-cmd-new"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-rename-input"]'
+- fill: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-rename-input"]', value: created-folder}
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-rename-input"]', key: Enter}
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="created-folder"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-new"]'
 - click: '[data-testid="explorer-new-file"]'
-- fill: {selector: '[data-testid="explorer-tab"]:visible [data-testid="explorer-rename-input"]', value: created.txt}
-- press: {selector: '[data-testid="explorer-tab"]:visible [data-testid="explorer-rename-input"]', key: Enter}
-- wait_for: '[data-testid="explorer-tab"]:visible [data-testid="explorer-file-row"][data-name="created.txt"]'
+- fill: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-rename-input"]', value: created.txt}
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-rename-input"]', key: Enter}
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="created.txt"]'
 - drag_to:
-    from: '[data-testid="explorer-tab"]:visible [data-testid="explorer-file-row"][data-name="created.txt"]'
-    to: '[data-testid="explorer-tab"]:visible [data-testid="explorer-file-row"][data-name="created-folder"]'
-- wait_for: {selector: '[data-testid="explorer-tab"]:visible [data-testid="explorer-file-row"][data-name="created.txt"]', state: detached}
-- dblclick: '[data-testid="explorer-tab"]:visible [data-testid="explorer-file-row"][data-name="created-folder"]'
-- wait_for: '[data-testid="explorer-tab"]:visible [data-testid="explorer-file-row"][data-name="created.txt"]'
-- click: '[data-testid="explorer-tab"]:visible [data-testid="explorer-file-row"][data-name="created.txt"]'
-- click: '[data-testid="explorer-tab"]:visible [data-testid="explorer-cmd-copy"]'
-- click: '[data-testid="explorer-tab"]:visible [data-testid="explorer-cmd-paste"]'
-- wait_for: '[data-testid="explorer-tab"]:visible [data-testid="explorer-file-row"][data-name="created - 副本.txt"]'
+    from: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="created.txt"]'
+    to: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="created-folder"]'
+- wait_for: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="created.txt"]', state: detached}
+- dblclick: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="created-folder"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="created.txt"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="created.txt"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-copy"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-paste"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="created - 副本.txt"]'
 - seed_storage: {key: taomni.explorer.stubTrashUnavailable, value: 'true'}
-- click: '[data-testid="explorer-tab"]:visible [data-testid="explorer-file-row"][data-name="created.txt"]'
-- click: '[data-testid="explorer-tab"]:visible [data-testid="explorer-cmd-delete"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="created.txt"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-delete"]'
 - wait_for: '[data-testid="explorer-trash-unavailable"]'
 - assert_text: {selector: '[data-testid="explorer-trash-unavailable"]', contains: Trash unavailable}
 - click: '[data-testid="explorer-delete-cancel"]'
-- assert_visible: '[data-testid="explorer-tab"]:visible [data-testid="explorer-file-row"][data-name="created.txt"]'
-- click: '[data-testid="explorer-tab"]:visible [data-testid="explorer-cmd-delete"]'
+- assert_visible: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="created.txt"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-delete"]'
 - click: '[data-testid="explorer-delete-confirm"]'
-- wait_for: {selector: '[data-testid="explorer-tab"]:visible [data-testid="explorer-file-row"][data-name="created.txt"]', state: detached}
-- assert_visible: '[data-testid="explorer-tab"]:visible [data-testid="explorer-file-row"][data-name="created - 副本.txt"]'
+- wait_for: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="created.txt"]', state: detached}
+- assert_visible: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="created - 副本.txt"]'
 - seed_storage: {key: taomni.explorer.stubTrashUnavailable, value: 'false'}
 - file_clipboard:
     action: seed
     paths: ['${fixture.explorer_previews}/created-folder/created - 副本.txt', '${fixture.explorer_previews}/missing-source.txt']
-- click: '[data-testid="explorer-tab"]:visible [data-testid="explorer-cmd-paste"]'
-- wait_for: '[data-testid="explorer-tab"]:visible [data-testid="explorer-file-row"][data-name="created - 副本 - 副本.txt"]'
-- assert_text: {selector: '[data-testid="explorer-tab"]:visible [data-testid="explorer-toast"]', contains: Not found}
-- assert_visible: '[data-testid="explorer-tab"]:visible [data-testid="explorer-file-row"][data-name="created - 副本.txt"]'
-- assert_count: {selector: '[data-testid="explorer-tab"]:visible [data-testid="explorer-file-row"]', equal: 2}
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-paste"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="created - 副本 - 副本.txt"]'
+- assert_text: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-toast"]', contains: Not found}
+- assert_visible: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="created - 副本.txt"]'
+- assert_count: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"]', equal: 2}
 - assert_no_runtime_errors: null
 verification:
   review: reviewed

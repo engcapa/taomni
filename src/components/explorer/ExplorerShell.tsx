@@ -25,11 +25,12 @@ export interface ExplorerShellProps {
   tabId: string;
   initialPath: string;
   workspaceId?: string;
+  active?: boolean;
   onOpenTerminal?: (path: string) => void;
 }
 
 /** Composition only: directory, filesystem work, preview and navigation have independent owners. */
-export function ExplorerShell({ tabId, initialPath, workspaceId, onOpenTerminal }: ExplorerShellProps) {
+export function ExplorerShell({ tabId, initialPath, workspaceId, active = true, onOpenTerminal }: ExplorerShellProps) {
   const label = useExplorerLabels();
   const preferences = useExplorerPreferences();
   const operations = useExplorerOperations(tabId);
@@ -125,7 +126,7 @@ export function ExplorerShell({ tabId, initialPath, workspaceId, onOpenTerminal 
   const preview = previewVisible ? <ExplorerPreviewPane entries={selected} currentPath={pane?.path ?? initialPath} tabId={tabId} onOpen={(entry) => void operations.open(entry)} onClose={closePreview} /> : null;
   const viewContext = { operations, dropPath, onOpenExplorer: openExplorerAt, onOpenTerminal: terminal, onProperties: () => operations.setProperties(selected) };
   return <ExplorerContext.Provider value={viewContext}>
-    <div ref={root} className="ex-shell" data-testid="explorer-tab" data-tab-id={tabId} data-path={pane?.path ?? initialPath}
+    <div ref={root} className="ex-shell" data-testid="explorer-tab" data-tab-id={tabId} data-path={pane?.path ?? initialPath} data-active={active}
       data-preview-collapsed={preferences.preview && narrow && !previewOverlay ? "true" : "false"} tabIndex={0} onKeyDown={onKeyDown}>
       <ExplorerAddressBar tabId={tabId} pane={pane} home={home} filter={filter} onFilter={setFilter} addressRef={address} />
       <ExplorerCommandBar path={pane?.path ?? ""} selected={selected} operations={operations} onOpenTerminal={terminal} onOpenExplorer={openExplorerAt} previewVisible={previewVisible} onTogglePreview={togglePreview} />

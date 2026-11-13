@@ -40,7 +40,8 @@ steps:
 - click: '[data-testid="explorer-file-row"][data-name="beta.txt"]'
 - click: '[data-testid="explorer-cmd-cut"]'
 - eval_readonly:
-    expression: 'getComputedStyle(document.querySelector(".ex-frow.cut")).opacity === "0.45"'
+    expression: 'document.querySelector(".ex-frow.cut") && getComputedStyle(document.querySelector(".ex-frow.cut")).opacity === "0.45"'
+    timeout_sec: 10
     expect_truthy: true
 - click: '[data-testid="explorer-forward"]'
 - wait_for: '[data-testid="explorer-tab"][data-path="${fixture.explorer_target}"]'

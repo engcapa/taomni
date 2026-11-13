@@ -2,7 +2,6 @@ import { Suspense } from "react";
 import { CodeWorkspaceTab } from "../../components/editor/CodeWorkspaceTab";
 import { FileBrowser } from "../../components/filebrowser/FileBrowser";
 import { ExplorerTabPane } from "../../components/explorer/ExplorerTabPane";
-import { useExplorerTabRecovery } from "../../lib/explorer/useExplorerTabRecovery";
 import { GitPanel } from "../../components/git/GitPanel";
 import { WorkspaceGitManager } from "../../components/git/WorkspaceGitManager";
 import { LanChatGate } from "../../components/lanchat/LanChatGate";
@@ -31,7 +30,6 @@ import { type TabContentRouterProps } from "./tabs/TabContentRouterProps";
 import { TerminalTabContents } from "./tabs/TerminalTabContents";
 
 export function TabContentRouter(viewProps: TabContentRouterProps) {
-  useExplorerTabRecovery();
   const {
     activeTab,
     activeTabId,

@@ -18,36 +18,36 @@ steps:
 - reload_window: null
 - click: '[data-testid="side-tab-tools"]'
 - click: '[data-testid="sidebar-tool-file-explorer"]'
-- wait_for: '[data-testid="explorer-tab"]:visible [data-testid="explorer-nav-tree"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-nav-tree"]'
 - assert_count: {selector: '[data-testid="tab-item"][data-tab-type="file-browser"]', equal: 1}
 - click: '[data-testid="sidebar-tool-file-explorer"]'
 - assert_count: {selector: '[data-testid="tab-item"][data-tab-type="file-browser"]', equal: 1}
-- press: {selector: '[data-testid="explorer-tab"]:visible', key: Control+l, macos_key: Meta+l}
-- fill: {selector: '[data-testid="explorer-tab"]:visible [data-testid="explorer-address"]', value: '${fixture.explorer_source}'}
-- press: {selector: '[data-testid="explorer-tab"]:visible [data-testid="explorer-address"]', key: Enter}
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-address"]', value: '${fixture.explorer_source}'}
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-address"]', key: Enter}
 - wait_for: '[data-testid="explorer-tab"][data-path="${fixture.explorer_source}"]:visible'
-- assert_visible: '[data-testid="explorer-tab"]:visible [data-testid="explorer-nav-node"][data-path="${fixture.explorer_source}"][aria-selected="true"]'
-- assert_visible: '[data-testid="explorer-tab"]:visible [data-testid="explorer-crumb"][data-path="${fixture.explorer_source}"]'
-- dblclick: '[data-testid="explorer-tab"]:visible [data-testid="explorer-file-row"][data-name="folder"]'
+- assert_visible: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-nav-node"][data-path="${fixture.explorer_source}"][aria-selected="true"]'
+- assert_visible: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-crumb"][data-path="${fixture.explorer_source}"]'
+- dblclick: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="folder"]'
 - wait_for: '[data-testid="explorer-tab"][data-path="${fixture.explorer_source}/folder"]:visible'
-- click: '[data-testid="explorer-tab"]:visible [data-testid="explorer-back"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-back"]'
 - wait_for: '[data-testid="explorer-tab"][data-path="${fixture.explorer_source}"]:visible'
-- click: '[data-testid="explorer-tab"]:visible [data-testid="explorer-forward"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-forward"]'
 - wait_for: '[data-testid="explorer-tab"][data-path="${fixture.explorer_source}/folder"]:visible'
-- click: '[data-testid="explorer-tab"]:visible [data-testid="explorer-up"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-up"]'
 - wait_for: '[data-testid="explorer-tab"][data-path="${fixture.explorer_source}"]:visible'
-- click: '[data-testid="explorer-tab"]:visible [data-testid="explorer-crumb"][data-path="${fixture.explorer_operations}"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-crumb"][data-path="${fixture.explorer_operations}"]'
 - wait_for: '[data-testid="explorer-tab"][data-path="${fixture.explorer_operations}"]:visible'
-- click: '[data-testid="explorer-tab"]:visible [data-testid="explorer-nav-node"][data-path="${fixture.explorer_source}"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-nav-node"][data-path="${fixture.explorer_source}"]'
 - wait_for: '[data-testid="explorer-tab"][data-path="${fixture.explorer_source}"]:visible'
-- press: {selector: '[data-testid="explorer-tab"]:visible', key: Control+l, macos_key: Meta+l}
-- fill: {selector: '[data-testid="explorer-tab"]:visible [data-testid="explorer-address"]', value: '${fixture.explorer_base}/does-not-exist'}
-- press: {selector: '[data-testid="explorer-tab"]:visible [data-testid="explorer-address"]', key: Enter}
-- wait_for: '[data-testid="explorer-tab"]:visible [data-testid="explorer-address-error"]'
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-address"]', value: '${fixture.explorer_base}/does-not-exist'}
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-address-error"]'
 - assert_visible: '[data-testid="explorer-tab"][data-path="${fixture.explorer_source}"]:visible'
-- click: '[data-testid="explorer-tab"]:visible [data-testid="explorer-refresh"]'
-- wait_for: {selector: '[data-testid="explorer-tab"]:visible [data-testid="explorer-address-error"]', state: detached}
-- click: '[data-testid="explorer-tab"]:visible [data-testid="explorer-cmd-newtab"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-refresh"]'
+- wait_for: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-address-error"]', state: detached}
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-newtab"]'
 - assert_count: {selector: '[data-testid="tab-item"][data-tab-type="file-browser"]', equal: 2}
 - click: '[data-testid="sidebar-tool-file-explorer"]'
 - assert_count: {selector: '[data-testid="tab-item"][data-tab-type="file-browser"]', equal: 3}

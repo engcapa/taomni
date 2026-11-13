@@ -32,7 +32,7 @@ export function ExplorerAddressBar({ tabId, pane, home, filter, onFilter, addres
   useEffect(() => () => { request.current++; }, []);
   useEffect(() => { request.current++; ctx.close(); }, [path, ctx.close]);
   useEffect(() => { if (!editing) setValue(path); }, [path, editing]);
-  useEffect(() => { crumbContainer.current?.lastElementChild?.scrollIntoView?.({ block: "nearest", inline: "end" }); }, [path]);
+  useEffect(() => { crumbContainer.current?.querySelector(".ex-crumb.last")?.scrollIntoView?.({ block: "nearest", inline: "end" }); }, [path]);
   const go = (next: string) => { void navigate(tabId, "local", next); };
   const subfolders = async (event: React.MouseEvent, entry: { path: string }) => {
     const sequence = ++request.current;
@@ -61,7 +61,7 @@ export function ExplorerAddressBar({ tabId, pane, home, filter, onFilter, addres
         requestAnimationFrame(() => { addressRef.current?.focus(); addressRef.current?.select(); });
       }}>
         {!editing && <div className="ex-crumbs" ref={crumbContainer}>
-          {crumbs.map((crumb, index) => <span key={crumb.path} className="contents">
+          {crumbs.map((crumb, index) => <span key={crumb.path} className="inline-flex shrink-0 items-center">
             <button className={`ex-crumb ${index === crumbs.length - 1 ? "last" : ""}`} data-explorer-drop={crumb.path} data-testid="explorer-crumb" data-path={crumb.path} title={crumb.path} onClick={() => go(crumb.path)}>{index === 0 ? <HardDrive /> : crumb.name}</button>
             {index < crumbs.length - 1 && <button className="ex-csep" title={label("显示子目录", "Show subfolders")} onClick={(event) => void subfolders(event, crumb)}><ChevronRight /></button>}
           </span>)}

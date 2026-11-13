@@ -25,6 +25,7 @@ import { type ConnectQueueEntry, type ControlToolExecutor, type PendingAuth } fr
 import { useTerminalProfiles } from "./useTerminalProfiles";
 import { selectMainLayoutAppState } from "./mainLayoutAppState";
 import { useWorkspaceCommandRegistry } from "./useWorkspaceCommandRegistry";
+import { useExplorerTabRecovery } from "../../lib/explorer/useExplorerTabRecovery";
 
 
 export interface UseMainLayoutStateContext {
@@ -32,6 +33,7 @@ export interface UseMainLayoutStateContext {
 }
 
 export function useMainLayoutState(context: UseMainLayoutStateContext) {
+  useExplorerTabRecovery();
   const { } = context;
   const t = useT();
   const {
