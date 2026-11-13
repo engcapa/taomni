@@ -116,6 +116,46 @@ describe("ServersPanel", () => {
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
     expect(confirmAppDialog).not.toHaveBeenCalled();
   });
+
+  it("allows clearing and retyping NumberInput fields without prepending leading zeroes", async () => {
+    render(<ServersPanel onClose={vi.fn()} />);
+    await waitFor(() => expect(useServersStore.getState().loaded).toBe(true));
+
+    const portInput = screen.getByTestId("server-field-port") as HTMLInputElement;
+    expect(portInput.value).toBe("22");
+
+    fireEvent.change(portInput, { target: { value: "" } });
+    expect(portInput.value).toBe("");
+    expect(useServersStore.getState().dirty).toBe(false);
+
+    for (const next of ["2", "22", "222", "2229"]) {
+      fireEvent.change(portInput, { target: { value: next } });
+    }
+    expect(portInput.value).toBe("2229");
+    expect(useServersStore.getState().configs.ssh.port).toBe(2229);
+    expect(useServersStore.getState().dirty).toBe(true);
+
+    // Clearing and blurring without digits restores the last committed numeric value.
+    fireEvent.change(portInput, { target: { value: "" } });
+    fireEvent.blur(portInput);
+    expect(portInput.value).toBe("2229");
+
+    // Switching servers syncs the input draft to the newly selected server's port.
+    fireEvent.click(screen.getByTestId("server-row-ftp"));
+    await waitFor(() => expect((screen.getByTestId("server-field-port") as HTMLInputElement).value).toBe("21"));
+
+    // Auto-stop seconds uses the shared NumberInput primitive as well.
+    const autoStopToggle = screen.getByTestId("server-field-auto-stop") as HTMLInputElement;
+    if (!autoStopToggle.checked) {
+      fireEvent.click(autoStopToggle);
+    }
+    const autoStopInput = screen.getByTestId("server-field-auto-stop-seconds") as HTMLInputElement;
+    fireEvent.change(autoStopInput, { target: { value: "" } });
+    expect(autoStopInput.value).toBe("");
+    fireEvent.change(autoStopInput, { target: { value: "120" } });
+    expect(autoStopInput.value).toBe("120");
+    expect(useServersStore.getState().configs.ftp.autoStopSeconds).toBe(120);
+  });
 });
 
 describe("ServersTabBlockedDialog", () => {

@@ -331,4 +331,30 @@ export function registerMainLayoutLifecycle4Cases() {
     expect(screen.getByTestId("hbase-shell-tab")).toHaveAttribute("data-namespace", "prod");
     expect(screen.getByTestId("hbase-shell-tab")).toHaveAttribute("data-rest-path", "/gateway/hbase");
   });
+
+  it("opens the singleton servers tab when #servers=main arrives via in-window hashchange", async () => {
+    const originalHref = window.location.href;
+    render(<MainLayout />);
+    expect(useAppStore.getState().tabs.some((tab) => tab.type === "servers")).toBe(false);
+
+    try {
+      window.history.replaceState(null, "", "/#servers=main");
+      act(() => {
+        window.dispatchEvent(new Event("hashchange"));
+      });
+
+      await waitFor(() => {
+        expect(useAppStore.getState().tabs.some((tab) => tab.type === "servers")).toBe(true);
+      });
+      expect(useAppStore.getState().activeTabId).toBe("servers");
+    } finally {
+      const serversTab = useAppStore.getState().tabs.find((tab) => tab.type === "servers");
+      if (serversTab) {
+        act(() => {
+          useAppStore.getState().removeTab(serversTab.id);
+        });
+      }
+      window.history.replaceState(null, "", originalHref);
+    }
+  });
 }

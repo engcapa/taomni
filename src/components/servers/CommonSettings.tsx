@@ -1,6 +1,6 @@
 import { useT } from "../../lib/i18n";
 import type { ServerConfig, ServerDef } from "../../lib/servers";
-import { CheckboxField, FormRow, NumberField, TextField } from "./fields";
+import { CheckboxField, FormRow, NumberField, NumberInput, TextField } from "./fields";
 
 interface Props {
   def: ServerDef;
@@ -47,18 +47,12 @@ export function CommonSettings({ def, config, onChange }: Props) {
 
       {config.autoStop && (
         <FormRow label="">
-          <input
-            type="number"
-            className="taomni-input"
-            data-testid="server-field-auto-stop-seconds"
-            aria-label={t("servers.fields.autoStopSeconds")}
-            style={{ width: 90 }}
+          <NumberInput
+            testId="server-field-auto-stop-seconds"
+            ariaLabel={t("servers.fields.autoStopSeconds")}
             min={1}
-            value={Number.isFinite(config.autoStopSeconds) ? config.autoStopSeconds : ""}
-            onChange={(e) => {
-              const parsed = parseInt(e.target.value || "0", 10);
-              onChange({ autoStopSeconds: Number.isNaN(parsed) ? 0 : parsed });
-            }}
+            value={config.autoStopSeconds}
+            onChange={(autoStopSeconds) => onChange({ autoStopSeconds })}
           />
           <span className="text-[11px]" style={{ color: "var(--taomni-text-muted)" }}>
             {t("servers.fields.autoStopSeconds")}

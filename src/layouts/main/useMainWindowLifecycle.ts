@@ -177,17 +177,29 @@ export function useMainWindowLifecycle(context: UseMainWindowLifecycleContext) {
 
   // Hydrate server configs + statuses once on mount so the servers panel
   // opens with persisted settings and live run state. Also honor `?servers=main`
-  // or `#servers=main` launch routes inside the main window tab bar.
+  // or `#servers=main` launch routes inside the main window tab bar (both on
+  // initial mount and on in-window `#servers=main` hash navigation).
   useEffect(() => {
     void useServersStore.getState().loadAll();
-    if (hasServersRouteParam()) {
-      void openServersTab({ title: tr("servers.dialogTitle") });
-    } else if (
+    const openServersIfRouted = () => {
+      if (hasServersRouteParam()) {
+        void openServersTab({ title: tr("servers.dialogTitle") });
+        return true;
+      }
+      return false;
+    };
+    if (
+      !openServersIfRouted() &&
       hasServersTabClaimMarker() &&
       !useAppStore.getState().tabs.some((tab) => tab.type === "servers")
     ) {
       void releaseServersTabLockSafe();
     }
+    const handleHashChange = () => {
+      openServersIfRouted();
+    };
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
   }, []);
 
   const hasServersTab = layout.tabs.some((tab) => tab.type === "servers");
