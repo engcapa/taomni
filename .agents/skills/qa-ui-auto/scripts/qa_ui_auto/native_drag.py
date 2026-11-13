@@ -9,7 +9,7 @@ from pathlib import Path
 from typing import Any, Protocol
 
 from .steps import StepError
-from .steps.mouse import drag_offset
+from .steps.mouse import drag_modifiers, drag_offset
 
 
 class DragSession(Protocol):
@@ -43,6 +43,7 @@ def native_drag(ctx: DragContext, args: Any) -> str:
         raise StepError("drag_to: expected {from, to|by}")
     if "from_position" in args or "to_position" in args:
         raise StepError("drag_to: element-relative explicit positions are browser-only")
+    modifiers = drag_modifiers(args)
     start = _centre(ctx.session, args["from"])
     offset = drag_offset(args)
     if offset is None:
@@ -62,10 +63,18 @@ def native_drag(ctx: DragContext, args: Any) -> str:
     actions.append({"type": "pointerUp", "button": 0})
     with (ctx.case_dir / "native-drags.jsonl").open("a", encoding="utf-8") as stream:
         stream.write(json.dumps({"args": args, "start": start, "end": end, "actions": actions}) + "\n")
+    sources = [{"type": "pointer", "id": "mouse", "parameters": {"pointerType": "mouse"}, "actions": actions}]
+    if modifiers:
+        keys = {"Control": "", "Alt": "", "Meta": "", "Shift": ""}
+        paused = [{"type": "pause", "duration": 0} for _ in modifiers]
+        sources[0]["actions"] = paused + actions + paused
+        sources.append({"type": "key", "id": "drag-modifiers", "actions": [
+            *[{"type": "keyDown", "value": keys[key]} for key in modifiers],
+            *[{"type": "pause", "duration": 0} for _ in actions],
+            *[{"type": "keyUp", "value": keys[key]} for key in reversed(modifiers)],
+        ]})
     try:
-        ctx.session.request("POST", ctx.session.endpoint("/actions"), {"actions": [{
-            "type": "pointer", "id": "mouse", "parameters": {"pointerType": "mouse"}, "actions": actions,
-        }]})
+        ctx.session.request("POST", ctx.session.endpoint("/actions"), {"actions": sources})
     finally:
         with suppress(Exception):
             ctx.session.request("DELETE", ctx.session.endpoint("/actions"))

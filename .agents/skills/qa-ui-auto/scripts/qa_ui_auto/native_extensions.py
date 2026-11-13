@@ -27,3 +27,5 @@ def register(register_verb: RegisterVerb, verbs: dict[str, NativeVerb]) -> None:
     from .system_file_paste import run as system_file_paste
     register_verb("file_clipboard")(file_clipboard)
     register_verb("system_file_paste")(system_file_paste)
+    from .explorer_observation import native as assert_explorer_files
+    register_verb("assert_explorer_files")(assert_explorer_files)

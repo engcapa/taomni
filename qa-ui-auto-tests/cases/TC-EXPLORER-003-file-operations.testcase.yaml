@@ -1,0 +1,204 @@
+id: TC-EXPLORER-003
+title: Explorer copy, cut, rename, trash undo and permanent delete preserve exact bytes
+description: >-
+  AC05/06/07/08/09/10/18/19 through production controls and isolated files.
+  Browser reads actual IndexedDB VFS; native independently hashes actual disk and,
+  on Linux, freedesktop trash metadata plus deleted payload before Undo. Native
+  WebView keys are not physical OS input evidence. All source/target files and
+  empty directory sets are compared, so DOM absence cannot hide source loss.
+modes: [browser, native]
+covers: [F-EXPLORER-1, F7.2]
+tags: [p0, explorer, filesystem, clipboard, trash, native-boundary, regression]
+fixtures: [reset_db, explorer_files]
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-explorer-operations
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-file-explorer"]'
+- wait_for: '[data-testid="explorer-tab"]'
+- press: {selector: '[data-testid="explorer-tab"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.explorer_source}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="alpha.txt"]'
+- assert_explorer_files: {state: seeded}
+- click: '[data-testid="explorer-file-row"][data-name="alpha.txt"]'
+- click: {selector: '[data-testid="explorer-file-row"][data-name="beta.txt"]', modifiers: [Mod]}
+- assert_count: {selector: '[data-testid="explorer-file-row"][aria-selected="true"]', equal: 2}
+- assert_text: {selector: '[data-testid="explorer-status"]', contains: '2 selected'}
+- click: '[data-testid="explorer-file-row"][data-name="alpha.txt"]'
+- press: {selector: '[data-testid="explorer-file-list"]', key: Control+c, macos_key: Meta+c}
+- press: {selector: '[data-testid="explorer-tab"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.explorer_target}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-tab"][data-path="${fixture.explorer_target}"]'
+- click: '[data-testid="explorer-cmd-paste"]'
+- wait_for: '[data-testid="explorer-file-row"][data-name="alpha - 副本.txt"]'
+- assert_explorer_files: {state: copied}
+- click: '[data-testid="explorer-back"]'
+- wait_for: '[data-testid="explorer-file-row"][data-name="beta.txt"]'
+- click: '[data-testid="explorer-file-row"][data-name="beta.txt"]'
+- click: '[data-testid="explorer-cmd-cut"]'
+- eval_readonly:
+    expression: 'getComputedStyle(document.querySelector(".ex-frow.cut")).opacity === "0.45"'
+    expect_truthy: true
+- click: '[data-testid="explorer-forward"]'
+- wait_for: '[data-testid="explorer-tab"][data-path="${fixture.explorer_target}"]'
+- press: {selector: '[data-testid="explorer-file-list"]', key: Control+v, macos_key: Meta+v}
+- wait_for: '[data-testid="explorer-file-row"][data-name="beta.txt"]'
+- assert_explorer_files: {state: moved}
+- click: '[data-testid="explorer-file-row"][data-name="beta.txt"]'
+- press: {selector: '[data-testid="explorer-file-list"]', key: F2}
+- wait_for: '[data-testid="explorer-rename-input"]'
+- eval_readonly:
+    expression: 'document.activeElement.dataset.testid === "explorer-rename-input" && document.activeElement.selectionStart === 0 && document.activeElement.selectionEnd === 4'
+    expect_truthy: true
+- fill: {selector: '[data-testid="explorer-rename-input"]', value: alpha.txt}
+- press: {selector: '[data-testid="explorer-rename-input"]', key: Enter}
+- wait_for: '[data-testid="explorer-toast"].error'
+- assert_explorer_files: {state: moved}
+- fill: {selector: '[data-testid="explorer-rename-input"]', value: CON.txt}
+- press: {selector: '[data-testid="explorer-rename-input"]', key: Enter}
+- wait_for: '[data-testid="explorer-toast"].error'
+- assert_explorer_files: {state: moved}
+- fill: {selector: '[data-testid="explorer-rename-input"]', value: beta-renamed.txt}
+- press: {selector: '[data-testid="explorer-rename-input"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="beta-renamed.txt"]'
+- assert_explorer_files: {state: renamed}
+- right_click: '[data-testid="explorer-file-row"][data-name="beta-renamed.txt"]'
+- click: '[data-testid="explorer-context-properties"]'
+- wait_for: '[data-testid="explorer-properties-dialog"]'
+- assert_text: {selector: '[data-testid="explorer-properties-dialog"]', contains: beta-renamed.txt}
+- click: '[data-testid="explorer-properties-close"]'
+- press: {selector: '[data-testid="explorer-tab"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.explorer_trash}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="delete-me.txt"]'
+- click: '[data-testid="explorer-file-row"][data-name="delete-me.txt"]'
+- press: {selector: '[data-testid="explorer-file-list"]', key: Delete}
+- wait_for: '[data-testid="explorer-undo"]'
+- assert_count: {selector: '[data-testid="explorer-file-row"][data-name="delete-me.txt"]', equal: 0}
+- assert_explorer_files: {state: trashed}
+- click: '[data-testid="explorer-undo"]'
+- wait_for: '[data-testid="explorer-file-row"][data-name="delete-me.txt"]'
+- assert_explorer_files: {state: restored}
+- click: '[data-testid="explorer-file-row"][data-name="delete-me.txt"]'
+- press: {selector: '[data-testid="explorer-file-list"]', key: Shift+Delete}
+- wait_for: '[data-testid="explorer-delete-dialog"]'
+- click: '[data-testid="explorer-delete-cancel"]'
+- assert_explorer_files: {state: restored}
+- press: {selector: '[data-testid="explorer-file-list"]', key: Shift+Delete}
+- click: '[data-testid="explorer-delete-confirm"]'
+- wait_for: {selector: '[data-testid="explorer-file-row"][data-name="delete-me.txt"]', state: detached}
+- assert_explorer_files: {state: permanent}
+- file_clipboard: {action: seed, paths: ['${fixture.explorer_source}/external.txt']}
+- press: {selector: '[data-testid="explorer-tab"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-address"]', value: '${fixture.explorer_target}'}
+- press: {selector: '[data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-file-row"][data-name="alpha.txt"]'
+- click: '[data-testid="explorer-cmd-paste"]'
+- wait_for: '[data-testid="explorer-file-row"][data-name="external.txt"]'
+- assert_explorer_files: {state: external}
+- file_clipboard: {action: seed, paths: []}
+- click: '[data-testid="explorer-cmd-paste"]'
+- assert_text: {selector: '[data-testid="explorer-toast"]', contains: No files in clipboard}
+- assert_explorer_files: {state: external}
+- file_clipboard: {action: seed, paths: ['${fixture.explorer_source}/folder']}
+- click: '[data-testid="explorer-cmd-paste"]'
+- wait_for: '[data-testid="explorer-file-row"][data-name="folder - 副本"]'
+- assert_explorer_files: {state: recursive}
+- dblclick: '[data-testid="explorer-file-row"][data-name="folder - 副本"]'
+- wait_for: '[data-testid="explorer-file-row"][data-name="nested"]'
+- click: '[data-testid="explorer-file-row"][data-name="nested"]'
+- press: {selector: '[data-testid="explorer-file-list"]', key: Control+a, macos_key: Meta+a}
+- assert_count: {selector: '[data-testid="explorer-file-row"][aria-selected="true"]', equal: 2}
+- assert_no_runtime_errors: null
+- screenshot: explorer-file-operations.png
+- click: '[data-testid="explorer-up"]'
+- wait_for: '[data-testid="explorer-tab"][data-path="${fixture.explorer_target}"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="folder"]'
+- wait_for: '[data-testid="explorer-file-row"][data-name="drag-source.txt"]'
+- drag_to:
+    from: '[data-testid="explorer-file-row"][data-name="drag-source.txt"]'
+    to: '[data-testid="explorer-file-row"][data-name="nested"]'
+- wait_for: {selector: '[data-testid="explorer-file-row"][data-name="drag-source.txt"]', state: detached}
+- wait_for: {selector: '[data-testid="explorer-progress"]', state: detached}
+- assert_explorer_files: {state: drag-folder}
+- dblclick: '[data-testid="explorer-file-row"][data-name="nested"]'
+- wait_for: '[data-testid="explorer-file-row"][data-name="drag-source.txt"]'
+- drag_to:
+    from: '[data-testid="explorer-file-row"][data-name="drag-source.txt"]'
+    to: '[data-testid="explorer-crumb"][data-path="${fixture.explorer_target}/folder"]'
+    modifiers: [Control]
+    macos_modifiers: [Alt]
+- wait_for: {selector: '[data-testid="explorer-progress"]', state: detached}
+- wait_for: '[data-testid="explorer-toast"]'
+- assert_explorer_files: {state: drag-breadcrumb}
+- click: '[data-testid="explorer-nav-node"][data-path="${fixture.explorer_source}"] button'
+- wait_for: '[data-testid="explorer-nav-node"][data-path="${fixture.explorer_source}/folder"]'
+- drag_to:
+    from: '[data-testid="explorer-file-row"][data-name="drag-source.txt"]'
+    to: '[data-testid="explorer-nav-node"][data-path="${fixture.explorer_source}/folder"]'
+- wait_for: {selector: '[data-testid="explorer-file-row"][data-name="drag-source.txt"]', state: detached}
+- wait_for: {selector: '[data-testid="explorer-progress"]', state: detached}
+- assert_explorer_files: {state: drag-tree}
+- click: '[data-testid="explorer-up"]'
+- wait_for: '[data-testid="explorer-file-row"][data-name="nested"]'
+- click: '[data-testid="explorer-up"]'
+- wait_for: '[data-testid="explorer-file-row"][data-name="folder"]'
+- drag_to:
+    from: '[data-testid="explorer-file-row"][data-name="folder"]'
+    by: {dx: 24, steps: 8}
+- wait_for: '[data-testid="explorer-toast"].error'
+- assert_explorer_files: {state: drag-tree}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Multiselect and Copy preserve source bytes while conflict Paste generates a non-overwriting copy suffix.
+    actions: [11, 12, 15, 16, 17, 18, 19, 21]
+    checkpoints:
+    - {step: 13, expectation: Mod-click selects exactly two files.}
+    - {step: 14, expectation: Status reports two selected.}
+    - {step: 22, expectation: Collision copy appears with the documented suffix.}
+    - {step: 23, expectation: 'Exact source, existing destination and new copy bytes plus all directories match.'}
+    results: [13, 14, 22, 23]
+  - id: R2
+    requirement: Cut moves once, inline rename preselects basename, rejects existing/portable-invalid names and preserves content on successful rename.
+    actions: [24, 26, 27, 29, 31, 34, 35, 38, 39, 42, 43, 46, 47]
+    checkpoints:
+    - {step: 28, expectation: Cut row is semi-transparent.}
+    - {step: 33, expectation: Source disappears only after exact target bytes exist.}
+    - {step: 37, expectation: F2 selects beta but not extension.}
+    - {step: 41, expectation: Existing alpha is not overwritten.}
+    - {step: 45, expectation: Invalid name performs no writes.}
+    - {step: 49, expectation: Successful rename preserves all fixture bytes.}
+    results: [28, 33, 37, 41, 45, 49]
+  - id: R3
+    requirement: Properties reflects selected file; Del uses real recoverable trash, Undo restores original bytes, and ShiftDelete requires confirmation with cancel preserving files.
+    actions: [50, 51, 54, 55, 56, 57, 59, 60, 64, 67, 68, 70, 72, 73]
+    checkpoints:
+    - {step: 53, expectation: Properties names the selected renamed file.}
+    - {step: 62, expectation: Deleted row is absent.}
+    - {step: 63, expectation: Full-tree trash state matches; Linux real trashinfo and payload SHA prove actual system trash.}
+    - {step: 66, expectation: Undo restores exact original bytes and directories.}
+    - {step: 71, expectation: Cancelling permanent delete leaves exact restored tree.}
+    - {step: 75, expectation: Confirmed permanent delete removes only the intended file.}
+    results: [53, 62, 63, 66, 71, 75]
+  - id: R4
+    requirement: Latest external clipboard, empty clipboard and recursive directory copy use independent input paths without stale replay or lost empty directories.
+    actions: [76, 77, 78, 79, 81, 84, 85, 88, 89, 92, 94, 95]
+    checkpoints:
+    - {step: 83, expectation: External source is preserved and copied exactly into target.}
+    - {step: 86, expectation: Empty clipboard reports no files rather than replaying previous Cut/Copy.}
+    - {step: 87, expectation: Empty Paste performs no writes.}
+    - {step: 91, expectation: Recursive binary/text/empty directory content exactly matches original and source survives.}
+    - {step: 96, expectation: Select-all selects both folder rows.}
+    - {step: 97, expectation: App remains runtime-error-free after consecutive operations.}
+    results: [83, 86, 87, 91, 96, 97]
+  visual:
+  - {check: 'Prototype row selection, cut opacity, inline rename, properties, toast/Undo and confirmation dialog.', method: automated, reason: Row opacity and input selection are asserted; retained screenshot needs human visual comparison for styling.}
+  native:
+  - {check: Actual local copy/move/rename/trash/restore/delete and external system file-list Paste., method: automated, reason: Native mode uses real IPC and independent full-tree SHA256; Linux trashinfo payload is independently checked. Browser remains VFS-only.}
+  - {check: Physical file-manager drag and platform OS shortcut delivery., method: manual, reason: WebView keys and synthetic controls do not prove physical OS input.}

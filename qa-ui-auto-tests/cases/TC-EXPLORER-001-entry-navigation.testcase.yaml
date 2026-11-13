@@ -1,0 +1,122 @@
+id: TC-EXPLORER-001
+title: Explorer Tools, workspace rail and project-tree entries preserve current-directory dedupe and navigation
+description: >-
+  Production renderer workflow against isolated IndexedDB files. Main and workspace scopes
+  are separate; opening uses current directory, force-new never steals an old pane.
+  Covers AC01/02/10/11/12/14/15/17/20. Browser evidence does not prove disk or OS shell effects.
+modes: [browser]
+covers: [F-EXPLORER-1, F1.8, F25.1, F-WS-2]
+tags: [p0, explorer, navigation, workspace, regression]
+fixtures: [reset_db, explorer_files]
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-explorer-entries
+- seed_storage:
+    key: taomni.platformWorkspaces.v1
+    value: ${fixture.explorer_workspace}
+- reload_window: null
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-file-explorer"]'
+- wait_for: '[data-testid="explorer-tab"]:visible [data-testid="explorer-nav-tree"]'
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="file-browser"]', equal: 1}
+- click: '[data-testid="sidebar-tool-file-explorer"]'
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="file-browser"]', equal: 1}
+- press: {selector: '[data-testid="explorer-tab"]:visible', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-tab"]:visible [data-testid="explorer-address"]', value: '${fixture.explorer_source}'}
+- press: {selector: '[data-testid="explorer-tab"]:visible [data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-tab"][data-path="${fixture.explorer_source}"]:visible'
+- assert_visible: '[data-testid="explorer-tab"]:visible [data-testid="explorer-nav-node"][data-path="${fixture.explorer_source}"][aria-selected="true"]'
+- assert_visible: '[data-testid="explorer-tab"]:visible [data-testid="explorer-crumb"][data-path="${fixture.explorer_source}"]'
+- dblclick: '[data-testid="explorer-tab"]:visible [data-testid="explorer-file-row"][data-name="folder"]'
+- wait_for: '[data-testid="explorer-tab"][data-path="${fixture.explorer_source}/folder"]:visible'
+- click: '[data-testid="explorer-tab"]:visible [data-testid="explorer-back"]'
+- wait_for: '[data-testid="explorer-tab"][data-path="${fixture.explorer_source}"]:visible'
+- click: '[data-testid="explorer-tab"]:visible [data-testid="explorer-forward"]'
+- wait_for: '[data-testid="explorer-tab"][data-path="${fixture.explorer_source}/folder"]:visible'
+- click: '[data-testid="explorer-tab"]:visible [data-testid="explorer-up"]'
+- wait_for: '[data-testid="explorer-tab"][data-path="${fixture.explorer_source}"]:visible'
+- click: '[data-testid="explorer-tab"]:visible [data-testid="explorer-crumb"][data-path="${fixture.explorer_operations}"]'
+- wait_for: '[data-testid="explorer-tab"][data-path="${fixture.explorer_operations}"]:visible'
+- click: '[data-testid="explorer-tab"]:visible [data-testid="explorer-nav-node"][data-path="${fixture.explorer_source}"]'
+- wait_for: '[data-testid="explorer-tab"][data-path="${fixture.explorer_source}"]:visible'
+- press: {selector: '[data-testid="explorer-tab"]:visible', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-tab"]:visible [data-testid="explorer-address"]', value: '${fixture.explorer_base}/does-not-exist'}
+- press: {selector: '[data-testid="explorer-tab"]:visible [data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-tab"]:visible [data-testid="explorer-address-error"]'
+- assert_visible: '[data-testid="explorer-tab"][data-path="${fixture.explorer_source}"]:visible'
+- click: '[data-testid="explorer-tab"]:visible [data-testid="explorer-refresh"]'
+- wait_for: {selector: '[data-testid="explorer-tab"]:visible [data-testid="explorer-address-error"]', state: detached}
+- click: '[data-testid="explorer-tab"]:visible [data-testid="explorer-cmd-newtab"]'
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="file-browser"]', equal: 2}
+- click: '[data-testid="sidebar-tool-file-explorer"]'
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="file-browser"]', equal: 3}
+- click: '[data-testid="app-main-menu"]'
+- hover: '[data-testid="context-menu"] >> text="Tools"'
+- click: '[data-testid="context-menu-item-file-explorer"]'
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="file-browser"]', equal: 3}
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="code-workspace-tree"]'
+- click: '[data-testid="code-workspace-tool-rail-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-path="${fixture.explorer_base}"]:visible'
+- assert_count: {selector: '[data-testid="workspace-tab"][data-tab-kind="explorer"]', equal: 1}
+- click: '[data-testid="code-workspace-tool-rail-explorer"]'
+- assert_count: {selector: '[data-testid="workspace-tab"][data-tab-kind="explorer"]', equal: 1}
+- right_click: '[data-testid="code-workspace-tree-root"][data-root-id="root1"]'
+- click: '[data-testid="code-workspace-tree-open-explorer"]'
+- assert_count: {selector: '[data-testid="workspace-tab"][data-tab-kind="explorer"]', equal: 1}
+- right_click: '[data-testid="code-workspace-tree-root"][data-root-id="root1"]'
+- click: '[data-testid="code-workspace-tree-open-explorer-new"]'
+- assert_count: {selector: '[data-testid="workspace-tab"][data-tab-kind="explorer"]', equal: 2}
+- assert_no_runtime_errors: null
+- reload_window: null
+- wait_for: '[data-testid="workspace-tab"][data-tab-kind="explorer"]'
+- assert_count: {selector: '[data-testid="workspace-tab"][data-tab-kind="explorer"]', equal: 2}
+- assert_visible: '[data-testid="explorer-tab"][data-path="${fixture.explorer_base}"]:visible'
+- assert_no_runtime_errors: null
+- screenshot: explorer-workspace-entries.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Tools opens one home tab; reopening activates it until that tab navigates away.
+    actions: [5, 6, 9, 11, 12, 13, 38]
+    checkpoints:
+    - {step: 8, expectation: Exactly one main Explorer exists after first open.}
+    - {step: 10, expectation: Second open activates instead of duplicating.}
+    - {step: 39, expectation: Navigated-away home can be opened again without changing existing source panes.}
+    results: [8, 10, 39]
+  - id: R2
+    requirement: List, address, breadcrumbs and selected navigation tree follow successful navigation; failed address keeps the current directory and can retry.
+    actions: [11, 12, 13, 17, 19, 21, 23, 25, 27, 29, 30, 31, 34]
+    checkpoints:
+    - {step: 15, expectation: Navigation tree selected path matches committed address.}
+    - {step: 16, expectation: Breadcrumb matches committed address.}
+    - {step: 18, expectation: Double-click opens folder.}
+    - {step: 20, expectation: Back restores source.}
+    - {step: 22, expectation: Forward restores folder.}
+    - {step: 24, expectation: Up restores source.}
+    - {step: 26, expectation: Breadcrumb navigates to operations.}
+    - {step: 28, expectation: Navigation tree returns to source.}
+    - {step: 32, expectation: Missing path produces visible address error.}
+    - {step: 33, expectation: Failed address leaves committed source unchanged.}
+    - {step: 35, expectation: Refresh recovers normal directory view.}
+    results: [15, 16, 18, 20, 22, 24, 26, 28, 32, 33, 35]
+  - id: R3
+    requirement: Force-new and all main/workspace entries respect current-directory dedupe within their separate scopes, including persisted workspace tabs.
+    actions: [36, 40, 41, 42, 44, 46, 49, 51, 52, 54, 55, 58]
+    checkpoints:
+    - {step: 37, expectation: New-tab creates a second independent main Explorer.}
+    - {step: 43, expectation: Tools menu reuses home Explorer.}
+    - {step: 48, expectation: Workspace gets its own Explorer.}
+    - {step: 50, expectation: Repeating rail activation does not duplicate.}
+    - {step: 53, expectation: Project-tree open reuses current workspace Explorer.}
+    - {step: 56, expectation: Project-tree force-new creates exactly one additional workspace Explorer.}
+    - {step: 60, expectation: Both workspace Explorer tabs restore after reload.}
+    - {step: 61, expectation: Restored active directory is unchanged.}
+    - {step: 62, expectation: Runtime remains error free after restore.}
+    results: [37, 43, 48, 50, 53, 56, 60, 61, 62]
+  visual:
+  - {check: 'Workspace Explorer rail, unchanged Project tree and tab ordering.', method: manual, reason: Retained screenshot requires comparison with prototype workspace A; no pixel verdict from presence alone.}
+  native:
+  - {check: 'Real terminal cwd, filesystem and clipboard.', method: external, reason: TC-EXPLORER-003 and 005 provide native boundary assertions; this case is renderer/VFS only.}

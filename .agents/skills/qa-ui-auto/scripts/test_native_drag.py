@@ -3,7 +3,7 @@ from pathlib import Path
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest import TestCase
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from qa_ui_auto.native_steps import VERBS
 from qa_ui_auto.steps import StepError
@@ -50,6 +50,21 @@ class NativeDragTest(TestCase):
             self.assertEqual([a["x"] for a in actions if a["type"] == "pointerMove"], [23, 38, 53, 68])
             self.assertEqual(session.request.call_args_list[-1].args[0], "DELETE")
             self.assertEqual(json.loads((Path(directory) / "native-drags.jsonl").read_text())["end"], [68, 35])
+
+    def test_modifier_copy_uses_one_synchronized_key_pointer_request_and_macos_option(self):
+        for system, expected in [("Linux", ""), ("Darwin", "")]:
+            with self.subTest(system=system), TemporaryDirectory() as directory:
+                session = Mock()
+                session.execute.side_effect = [{"x": 0, "y": 0, "width": 10, "height": 10}, {"x": 60, "y": 80, "width": 20, "height": 20}]
+                with patch("qa_ui_auto.steps.mouse.platform.system", return_value=system):
+                    VERBS["drag_to"](SimpleNamespace(session=session, case_dir=Path(directory)),
+                                     {"from": "#a", "to": "#b", "modifiers": ["Control"], "macos_modifiers": ["Alt"]})
+                sources = session.request.call_args_list[0].args[2]["actions"]
+                self.assertEqual(len(sources), 2)
+                self.assertEqual(sources[1]["actions"][0], {"type": "keyDown", "value": expected})
+                self.assertEqual(sources[1]["actions"][-1], {"type": "keyUp", "value": expected})
+                self.assertEqual(len(sources[0]["actions"]), len(sources[1]["actions"]))
+                self.assertEqual(session.request.call_args_list[-1].args[0], "DELETE")
 
     def test_failed_transport_releases_pointer_and_preserves_failure(self):
         with TemporaryDirectory() as directory:

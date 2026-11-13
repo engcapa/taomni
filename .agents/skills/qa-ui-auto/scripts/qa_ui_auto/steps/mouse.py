@@ -167,8 +167,30 @@ def drag_offset(args: Any) -> tuple[float, float, int] | None:
     return float(by["dx"]), float(by.get("dy", 0)), max(1, int(by.get("steps", 8)))
 
 
+def drag_modifiers(args: Any) -> list[str]:
+    value = args.get("macos_modifiers", args.get("modifiers", [])) if platform.system() == "Darwin" else args.get("modifiers", [])
+    if not isinstance(value, list) or any(item not in {"Alt", "Control", "Meta", "Shift"} for item in value) or len(set(value)) != len(value):
+        raise StepError("drag_to: modifiers must be unique Alt/Control/Meta/Shift keys")
+    return value
+
+
 @verb("drag_to")
 def step_drag_to(ctx: StepContext, args: Any) -> None:
+    modifiers = drag_modifiers(args)
+    if ctx.dry_run:
+        return
+    pressed = []
+    try:
+        for modifier in modifiers:
+            ctx.page.keyboard.down(modifier)
+            pressed.append(modifier)
+        _drag_to_unmodified(ctx, args)
+    finally:
+        for modifier in reversed(pressed):
+            ctx.page.keyboard.up(modifier)
+
+
+def _drag_to_unmodified(ctx: StepContext, args: Any) -> None:
     src = ctx.page.locator(args["from"]).first  # type: ignore[attr-defined]
     offset = drag_offset(args)
     if offset is None:

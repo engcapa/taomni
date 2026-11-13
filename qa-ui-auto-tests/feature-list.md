@@ -14405,3 +14405,313 @@ controls:
 TC-MOBILE-004 覆盖设置与真实 native 配置 IPC；Rust loopback fixture 覆盖 HTTP/WS 与 Agent 副作用。
 TC-MOBILE-016 覆盖中英文分步配置指南、鼠标/键盘展开收起与配置草稿保留；外部浏览器启动和真实飞书租户配置不由此用例验证。
 真实飞书应用端到端仍待配置后验证，详见 `docs-feature/mobile-feishu-p1-implementation.md`。
+
+## 本地文件资源管理器（原型 v1）
+
+<!-- feature
+id: F-EXPLORER-1
+title: Local File Explorer
+status: implemented
+area: files/explorer
+components: [ExplorerShell, ExplorerNavTree, ExplorerFileList, ExplorerPreviewPane]
+files:
+  - src/components/explorer/ExplorerShell.tsx
+  - src/components/explorer/ExplorerNavTree.tsx
+  - src/components/explorer/ExplorerFileList.tsx
+  - src/components/explorer/preview/ExplorerPreviewPane.tsx
+  - src/components/filebrowser/FilePanel.tsx
+  - src/components/filebrowser/LocalFileBrowserPanel.tsx
+  - src/lib/explorer.ts
+  - src/lib/explorer/openExplorer.ts
+  - src/stores/sftp/navigation.ts
+  - src/stores/workspaceExplorerActions.ts
+  - src-tauri/src/filebrowser/local_ops/mod.rs
+controls:
+  - id: code-workspace-tool-rail-explorer
+    selector: '[data-testid="code-workspace-tool-rail-explorer"]'
+    kind: interactive
+  - id: code-workspace-tree-open-explorer
+    selector: '[data-testid="code-workspace-tree-open-explorer"]'
+    kind: interactive
+  - id: code-workspace-tree-open-explorer-new
+    selector: '[data-testid="code-workspace-tree-open-explorer-new"]'
+    kind: interactive
+  - id: explorer-address
+    selector: '[data-testid="explorer-address"]'
+    kind: interactive
+  - id: explorer-address-bar
+    selector: '[data-testid="explorer-address-bar"]'
+    kind: interactive
+  - id: explorer-address-error
+    selector: '[data-testid="explorer-address-error"]'
+    kind: display
+  - id: explorer-back
+    selector: '[data-testid="explorer-back"]'
+    kind: interactive
+  - id: explorer-cmd-copy
+    selector: '[data-testid="explorer-cmd-copy"]'
+    kind: interactive
+  - id: explorer-cmd-cut
+    selector: '[data-testid="explorer-cmd-cut"]'
+    kind: interactive
+  - id: explorer-cmd-delete
+    selector: '[data-testid="explorer-cmd-delete"]'
+    kind: interactive
+  - id: explorer-cmd-more
+    selector: '[data-testid="explorer-cmd-more"]'
+    kind: interactive
+  - id: explorer-cmd-new
+    selector: '[data-testid="explorer-cmd-new"]'
+    kind: interactive
+  - id: explorer-cmd-newtab
+    selector: '[data-testid="explorer-cmd-newtab"]'
+    kind: interactive
+  - id: explorer-cmd-paste
+    selector: '[data-testid="explorer-cmd-paste"]'
+    kind: interactive
+  - id: explorer-cmd-preview
+    selector: '[data-testid="explorer-cmd-preview"]'
+    kind: interactive
+  - id: explorer-cmd-rename
+    selector: '[data-testid="explorer-cmd-rename"]'
+    kind: interactive
+  - id: explorer-cmd-sort
+    selector: '[data-testid="explorer-cmd-sort"]'
+    kind: interactive
+  - id: explorer-cmd-terminal
+    selector: '[data-testid="explorer-cmd-terminal"]'
+    kind: interactive
+  - id: explorer-cmd-view
+    selector: '[data-testid="explorer-cmd-view"]'
+    kind: interactive
+  - id: explorer-column-mtime
+    selector: '[data-testid="explorer-column-mtime"]'
+    kind: interactive
+  - id: explorer-column-name
+    selector: '[data-testid="explorer-column-name"]'
+    kind: interactive
+  - id: explorer-column-size
+    selector: '[data-testid="explorer-column-size"]'
+    kind: interactive
+  - id: explorer-column-type
+    selector: '[data-testid="explorer-column-type"]'
+    kind: interactive
+  - id: explorer-command-bar
+    selector: '[data-testid="explorer-command-bar"]'
+    kind: display
+  - id: explorer-context-copy
+    selector: '[data-testid="explorer-context-copy"]'
+    kind: interactive
+  - id: explorer-context-copy-path
+    selector: '[data-testid="explorer-context-copy-path"]'
+    kind: interactive
+  - id: explorer-context-cut
+    selector: '[data-testid="explorer-context-cut"]'
+    kind: interactive
+  - id: explorer-context-delete
+    selector: '[data-testid="explorer-context-delete"]'
+    kind: interactive
+  - id: explorer-context-new-file
+    selector: '[data-testid="explorer-context-new-file"]'
+    kind: interactive
+  - id: explorer-context-new-folder
+    selector: '[data-testid="explorer-context-new-folder"]'
+    kind: interactive
+  - id: explorer-context-newtab
+    selector: '[data-testid="explorer-context-newtab"]'
+    kind: interactive
+  - id: explorer-context-open
+    selector: '[data-testid="explorer-context-open"]'
+    kind: interactive
+  - id: explorer-context-paste
+    selector: '[data-testid="explorer-context-paste"]'
+    kind: interactive
+  - id: explorer-context-properties
+    selector: '[data-testid="explorer-context-properties"]'
+    kind: interactive
+  - id: explorer-context-refresh
+    selector: '[data-testid="explorer-context-refresh"]'
+    kind: interactive
+  - id: explorer-context-rename
+    selector: '[data-testid="explorer-context-rename"]'
+    kind: interactive
+  - id: explorer-context-reveal
+    selector: '[data-testid="explorer-context-reveal"]'
+    kind: interactive
+  - id: explorer-context-terminal
+    selector: '[data-testid="explorer-context-terminal"]'
+    kind: interactive
+  - id: explorer-crumb
+    selector: '[data-testid="explorer-crumb"]'
+    kind: interactive
+  - id: explorer-delete-cancel
+    selector: '[data-testid="explorer-delete-cancel"]'
+    kind: interactive
+  - id: explorer-delete-confirm
+    selector: '[data-testid="explorer-delete-confirm"]'
+    kind: interactive
+  - id: explorer-file-list
+    selector: '[data-testid="explorer-file-list"]'
+    kind: interactive
+  - id: explorer-file-row
+    selector: '[data-testid="explorer-file-row"]'
+    kind: interactive
+  - id: explorer-files
+    selector: '[data-testid="explorer-files"]'
+    kind: display
+  - id: explorer-filter
+    selector: '[data-testid="explorer-filter"]'
+    kind: interactive
+  - id: explorer-forward
+    selector: '[data-testid="explorer-forward"]'
+    kind: interactive
+  - id: explorer-nav-newtab
+    selector: '[data-testid="explorer-nav-newtab"]'
+    kind: interactive
+  - id: explorer-nav-node
+    selector: '[data-testid="explorer-nav-node"]'
+    kind: interactive
+  - id: explorer-nav-shortcut
+    selector: '[data-testid="explorer-nav-shortcut"]'
+    kind: interactive
+  - id: explorer-nav-tree
+    selector: '[data-testid="explorer-nav-tree"]'
+    kind: display
+  - id: explorer-new-file
+    selector: '[data-testid="explorer-new-file"]'
+    kind: interactive
+  - id: explorer-new-folder
+    selector: '[data-testid="explorer-new-folder"]'
+    kind: interactive
+  - id: explorer-preview
+    selector: '[data-testid="explorer-preview"]'
+    kind: display
+  - id: explorer-preview-action-error
+    selector: '[data-testid="explorer-preview-action-error"]'
+    kind: display
+  - id: explorer-preview-bottom
+    selector: '[data-testid="explorer-preview-bottom"]'
+    kind: interactive
+  - id: explorer-preview-close
+    selector: '[data-testid="explorer-preview-close"]'
+    kind: interactive
+  - id: explorer-preview-copy-path
+    selector: '[data-testid="explorer-preview-copy-path"]'
+    kind: interactive
+  - id: explorer-preview-csv
+    selector: '[data-testid="explorer-preview-csv"]'
+    kind: display
+  - id: explorer-preview-error
+    selector: '[data-testid="explorer-preview-error"]'
+    kind: display
+  - id: explorer-preview-image
+    selector: '[data-testid="explorer-preview-image"]'
+    kind: display
+  - id: explorer-preview-loading
+    selector: '[data-testid="explorer-preview-loading"]'
+    kind: display
+  - id: explorer-preview-markdown
+    selector: '[data-testid="explorer-preview-markdown"]'
+    kind: display
+  - id: explorer-preview-metadata
+    selector: '[data-testid="explorer-preview-metadata"]'
+    kind: display
+  - id: explorer-preview-open
+    selector: '[data-testid="explorer-preview-open"]'
+    kind: interactive
+  - id: explorer-preview-right
+    selector: '[data-testid="explorer-preview-right"]'
+    kind: interactive
+  - id: explorer-preview-settings
+    selector: '[data-testid="explorer-preview-settings"]'
+    kind: interactive
+  - id: explorer-preview-system
+    selector: '[data-testid="explorer-preview-system"]'
+    kind: interactive
+  - id: explorer-preview-text
+    selector: '[data-testid="explorer-preview-text"]'
+    kind: display
+  - id: explorer-preview-truncated
+    selector: '[data-testid="explorer-preview-truncated"]'
+    kind: display
+  - id: explorer-preview-wrap
+    selector: '[data-testid="explorer-preview-wrap"]'
+    kind: interactive
+  - id: explorer-progress
+    selector: '[data-testid="explorer-progress"]'
+    kind: display
+  - id: explorer-properties-close
+    selector: '[data-testid="explorer-properties-close"]'
+    kind: interactive
+  - id: explorer-properties-size
+    selector: '[data-testid="explorer-properties-size"]'
+    kind: display
+  - id: explorer-refresh
+    selector: '[data-testid="explorer-refresh"]'
+    kind: interactive
+  - id: explorer-rename-input
+    selector: '[data-testid="explorer-rename-input"]'
+    kind: interactive
+  - id: explorer-restore-tabs
+    selector: '[data-testid="explorer-restore-tabs"]'
+    kind: interactive
+  - id: explorer-sort-asc
+    selector: '[data-testid="explorer-sort-asc"]'
+    kind: interactive
+  - id: explorer-sort-desc
+    selector: '[data-testid="explorer-sort-desc"]'
+    kind: interactive
+  - id: explorer-sort-mtime
+    selector: '[data-testid="explorer-sort-mtime"]'
+    kind: interactive
+  - id: explorer-sort-name
+    selector: '[data-testid="explorer-sort-name"]'
+    kind: interactive
+  - id: explorer-sort-size
+    selector: '[data-testid="explorer-sort-size"]'
+    kind: interactive
+  - id: explorer-sort-type
+    selector: '[data-testid="explorer-sort-type"]'
+    kind: interactive
+  - id: explorer-status
+    selector: '[data-testid="explorer-status"]'
+    kind: display
+  - id: explorer-tab
+    selector: '[data-testid="explorer-tab"]'
+    kind: interactive
+  - id: explorer-toast
+    selector: '[data-testid="explorer-toast"]'
+    kind: display
+  - id: explorer-trash-unavailable
+    selector: '[data-testid="explorer-trash-unavailable"]'
+    kind: display
+  - id: explorer-undo
+    selector: '[data-testid="explorer-undo"]'
+    kind: interactive
+  - id: explorer-up
+    selector: '[data-testid="explorer-up"]'
+    kind: interactive
+  - id: explorer-view-details
+    selector: '[data-testid="explorer-view-details"]'
+    kind: interactive
+  - id: explorer-view-hidden
+    selector: '[data-testid="explorer-view-hidden"]'
+    kind: interactive
+  - id: explorer-view-icons
+    selector: '[data-testid="explorer-view-icons"]'
+    kind: interactive
+  - id: explorer-view-list
+    selector: '[data-testid="explorer-view-list"]'
+    kind: interactive
+  - id: sidebar-tool-file-explorer
+    selector: '[data-testid="sidebar-tool-file-explorer"]'
+    kind: interactive
+  - id: terminal-context-explorer
+    selector: '[data-testid="terminal-context-explorer"]'
+    kind: interactive
+  - id: terminal-context-explorer-new
+    selector: '[data-testid="terminal-context-explorer-new"]'
+    kind: interactive
+-->
+
+已接入 Tools/主菜单、工作区导航与项目树、本地终端右键。保持原 File 会话关联与 SFTP 双栏。原型样式、导航/预览/选择、文件操作、回收站撤销及恢复由 TC-EXPLORER-001..005 验证；当前 GitHub 执行证据见 `docs-feature/file-explorer/implementation.md`，不以静态清单宣称原生通过。
