@@ -4,11 +4,11 @@
 
 - 类型：现有能力扩展（在现有「文件」会话 / `file-browser` 标签基础上升级为 Windows 11 风格的本地文件资源管理器，并新增工作区与终端入口）
 - 文档位置：`docs-feature/file-explorer-design.md`；原型与截图位于 `docs-feature/file-explorer/`
-- 设计状态：**已实施，GitHub 验证进行中**。DEC-01/02/03 已按确认方案实现；实际代码边界、平台差异与逐项验证证据见 [`file-explorer/implementation.md`](file-explorer/implementation.md)。下方为原设计验收计划，最终通过状态以该实施记录及原始测试报告为准。
+- 设计状态：**已实施，三端所选browser/native自动化87/87通过**（[run43405262473](https://github.com/engcapa/taomni/actions/runs/43405262473)，执行源码`f86468ac`）。DEC-01/02/03 已按确认方案实现；代码边界、逐项证据与未覆盖的物理OS/性能边界见 [`file-explorer/implementation.md`](file-explorer/implementation.md)，不将自动化通过扩大成所有验收边界均已验证。
 - 来源：用户需求——参考 Windows 11 资源管理器（左树、右文件列表、可配置预览窗格、常用文件操作）但更简洁易用；以现有本地文件浏览为基础；工作区的「项目树」要能切换为文件资源管理器（用户建议：左侧工具栏图标，在新标签页打开）；本地会话终端右键可打开 Explorer，作为会话类型标签展示，默认同一目录只保留一个标签并提供「在新标签打开」。
 - 调研基线：提交 `b2d1a753c`，工作树干净，调研时无未提交变更。未运行真实桌面应用；主应用预览（5000 端口）因既有缺失依赖 `@tanstack/react-virtual`（`ProjectTreeViewport.tsx` 引用）无法渲染，与本设计无关，实现前需另行修复，否则无法做浏览器验证。
 - 平台与运行方式：Windows、macOS、Linux 三端 Tauri 桌面应用，代码必须兼容三端构建与运行。
-- 本轮真机执行端：当前环境为 Linux（Replit，Xvfb/Fluxbox 隔离桌面）。三端均保留计划，本轮完成 Linux 验证即可，Windows / macOS 未执行不单独阻塞交付。
+- 设计期最低验证端为Linux；实际按用户要求本地只做单元/静态检查，GitHub三端browser/native均已执行：Linux Ubuntu24.04 Xvfb/Openbox、Windows hosted x64/WebView2、macOS15 ARM64/WKWebView bridge。物理OS操作与其他OS/架构不继承自动化结果，详见实施记录。
 - 推荐方案：
   1. 复用 `FilePanel` 与 `sftpStore` 的本地窗格，在其外新增 `ExplorerShell`：左侧导航树（快速访问 / 工作区 / 此电脑）、地址栏面包屑（可编辑）、命令栏、右侧预览窗格、状态栏。
   2. 本地文件操作补齐：复制 / 剪切 / 粘贴 / 移动 / 拖放 / 回收站删除 / 属性，新增 Rust 命令（现有 sftp 命令没有本地复制与移动）。
@@ -274,41 +274,41 @@ browser stub 只能证明前端逻辑与 IPC 契约；Rust 单测证明文件语
 
 | AC | 方案位置 | 开发任务 | 验证项与平台 | 所需证据 / 实际证据链接 | 当前缺口 |
 |---|---|---|---|---|---|
-| AC-01 | §4 组件与复用 | TASK-01、02 | V-05、V-11 | 002三端browser通过；浅/深/窄窗截图已审阅 | 已实现；全局应用chrome沿用产品，图标最后调整待新截图 |
-| AC-02 | §4 | TASK-02 | V-05、V-11 | 001导航断言及mounted单测 | 已实现；001异步标签等待修正待重跑 |
-| AC-03 | §4 预览 | TASK-04 | V-02、V-05、V-11 | 002三端browser通过；Linux005真实文本/Blob预览走过 | 已实现；Windows/macOS005窄窗点击修正待重跑 |
-| AC-04 | §4 偏好 | TASK-02、04 | V-02、V-11 | 002三端browser通过；偏好/过期响应单测 | 已实现；完整原生重启证据待005通过 |
-| AC-05 | §4 | TASK-02 | V-02、V-05 | 003三端browser通过；选择/框选mounted单测 | 已实现 |
-| AC-06 | §4 本地文件操作 | TASK-03 | V-03、V-05、V-11 | 003重命名/冲突/非法名及字节断言；inline rename单测 | 已实现；原生003后续拖放失败，整用例待通过 |
-| AC-07 | §4 | TASK-03 | V-03、V-11 | 003系统剪切与外部列表输入；005系统文件管理器Paste | 已实现；完整005重跑中，macOS外部移动用Option+Command+V |
-| AC-08 | §4 | TASK-03 | V-03、V-11 | 003列表/树/面包屑拖放与修饰键、拒绝自身；独立字节oracle | 已实现；三端native输入/命中/路径选择器修正待重跑 |
-| AC-09 | §4、DEC-03 | TASK-03 | V-04、V-11 | 003真实Trash/Undo/永久删除；Linux独立trashinfo+payload及18项后端单测 | 已实现；原生003整用例待通过，非browser替代原生 |
+| AC-01 | §4 组件与复用 | TASK-01、02 | V-05、V-11 | 001/002三端browser通过；浅/深/窄窗、主/工作区folder图标截图已审阅 | 已实现；全局应用chrome沿用产品，不声称全应用逐像素复刻 |
+| AC-02 | §4 | TASK-02 | V-05、V-11 | 001三端browser导航/失败断言通过及mounted单测 | 已实现；Windowsdrive/UNC路径另有单测 |
+| AC-03 | §4 预览 | TASK-04 | V-02、V-05、V-11 | 002三端browser通过；005三端native真实文本/Blob图片通过 | 已实现并通过所列用例 |
+| AC-04 | §4 偏好 | TASK-02、04 | V-02、V-11 | 002三端browser含窄窗right/bottom几何、偏好/过期响应；005三端冷重启恢复通过 | 已实现并通过所列用例 |
+| AC-05 | §4 | TASK-02 | V-02、V-05 | 003三端browser/native通过；选择/框选mounted单测 | 已实现 |
+| AC-06 | §4 本地文件操作 | TASK-03 | V-03、V-05、V-11 | 003三端browser/native重命名/冲突/非法名及全树字节断言通过 | 已实现 |
+| AC-07 | §4 | TASK-03 | V-03、V-11 | 003三端系统剪切/外部文件列表通过；005三端真实系统文件管理器Paste及字节验证通过 | 已实现；macOS外部移动用Option+Command+V |
+| AC-08 | §4 | TASK-03 | V-03、V-11 | 003三端browser/native列表/树/面包屑拖放、修饰键、拒绝自身、独立字节oracle通过 | 已实现；WebView动作不等同系统文件管理器物理拖入 |
+| AC-09 | §4、DEC-03 | TASK-03 | V-04、V-11 | 003三端真实Trash/Undo/永久删除通过；Linux独立trashinfo+payload及18项后端单测 | 已实现；不以browser替代原生 |
 | AC-10 | §4 | TASK-02、03 | V-05 | 002/003三端browser通过；键盘/菜单mounted单测 | 已实现；未声称每个菜单项独立UI覆盖 |
-| AC-11 | §4 去重 | TASK-01 | V-01、V-05 | openExplorer单测、001当前目录去重 | 已实现；001异步等待修正待重跑 |
-| AC-12 | §4 | TASK-01 | V-01、V-05 | 001强制新标签与scope隔离 | 已实现；001异步等待修正待重跑 |
-| AC-13 | §4 | TASK-06 | V-07、V-11 | terminal入口单测；Linux005实际PTY cwd走过 | 已实现；三端005待通过 |
-| AC-14 | DEC-01 | TASK-05 | V-07、V-11 | 001工作区入口、WorkspaceExplorerEntry单测 | 已实现方案A；001待重跑 |
-| AC-15 | DEC-01 | TASK-05 | V-07、V-11 | 001项目树复用/新标签及恢复；相关单测 | 已实现；001待重跑 |
+| AC-11 | §4 去重 | TASK-01 | V-01、V-05 | openExplorer单测、001三端当前目录去重；005三端真实终端当前cwd复用通过 | 已实现并通过所列用例 |
+| AC-12 | §4 | TASK-01 | V-01、V-05 | 001三端强制新标签与scope隔离；005三端原生终端force-new通过 | 已实现并通过所列用例 |
+| AC-13 | §4 | TASK-06 | V-07、V-11 | terminal入口/Windows报告归一化单测；005三端实际PTY cwd及去重通过 | 已实现并通过所列用例 |
+| AC-14 | DEC-01 | TASK-05 | V-07、V-11 | 001三端工作区入口通过、WorkspaceExplorerEntry单测 | 已实现方案A |
+| AC-15 | DEC-01 | TASK-05 | V-07、V-11 | 001三端项目树复用/新标签及恢复通过；相关单测 | 已实现 |
 | AC-16 | §4 | TASK-02、07 | V-09 | 004三端browser/native 10,000项通过；虚拟DOM数量断言 | 已实现虚拟列表；未建立匹配性能基线/预定预算，不宣称性能达标或加速 |
-| AC-17 | §4 | TASK-02 | V-11 | 005外部写入后由终端回到Explorer，重新激活刷新；store导航/refresh单测 | 已实现；三端005待通过 |
+| AC-17 | §4 | TASK-02 | V-11 | 005三端外部写入后由终端回到Explorer，重新激活刷新通过；store导航/refresh单测 | 已实现并通过所列用例 |
 | AC-18 | §4 | TASK-03 | V-03、V-06、V-11 | 002部分失败/Trash降级通过；Rust不可覆盖/取消/错误单测 | 已实现；磁盘满/跨物理卷等环境未全面原生注入 |
 | AC-19 | §4 | TASK-01、02 | V-08 | 原File会话关联单测；三端TC-010/043与完整crash通过 | 已保留API/生命周期/持久化契约 |
-| AC-20 | §4 | TASK-01、02 | V-11 | recovery17项单测；001重载；005显式退出确认+OS冷启动 | 已实现；005真实进程重启必须通过，不以reload充当冷启动 |
+| AC-20 | §4 | TASK-01、02 | V-11 | recovery17项单测；001重载；005三端显式退出确认、owned应用重启及目录/偏好恢复通过 | 已实现；Windows未独立枚举全部WebView存储进程，平台收据边界见实施记录 |
 
-三端状态：Linux/Windows/macOS release QA构建与完整crash-regression已在run43372314485通过；该轮87项中78通过/9失败，相关失败仍在修复闭环。Linux Xvfb/Openbox、Windows hosted桌面、macOS ARM64 WKWebView bridge不等同所有实体桌面、物理键盘/AppKit菜单与系统拖放场景。后续run43396714161已84/87通过，三端Explorer001–004、完整crash与SFTP全部通过；仅native005仍有三处失败，其修复及下一轮结果见实施记录。当前不能宣称最终验收全部通过，保留所有原始失败。
+三端状态：最终[run43405262473](https://github.com/engcapa/taomni/actions/runs/43405262473)在`f86468ac`完成87/87通过、0失败/0跳过；各端browser15/15、native14/14，包含全部Explorer用例、完整crash-regression及受影响SFTP。三端release QA构建、native契约与SFTP契约通过，原始receipt/source/build/artifact SHA已核对。Linux Xvfb/Openbox、Windows hosted桌面、macOS ARM64 WKWebView bridge不等同所有实体桌面、物理键盘/AppKit菜单与系统拖放场景；性能基线/预算、全部物理跨卷/磁盘满注入仍未验证。所有历史失败保留，修复与证据见实施记录。
 
 ## 10. 风险、未决项与回退
 
 | 项目 | 影响与依据 | 建议 / 缓解 / 最小验证 | 阻塞的具体任务 | 解除条件 |
 |---|---|---|---|---|
 | 主应用预览依赖 | 设计期曾缺`@tanstack/react-virtual` | 当前依赖3.13.12已存在；三端browser004/native004通过 | 已解除 | 依赖与实际运行证据见实施记录 |
-| Linux 回收站撤销可行性 | 设计期需证明真实Trash/Undo | 已实现真实freedesktop Trash与opaque恢复引用；隔离Rust单测及原生003对应步骤独立SHA通过 | 可行性已解除；完整003仍待重跑 | 不以browser stub替代native收据 |
+| Linux 回收站撤销可行性 | 设计期需证明真实Trash/Undo | 已实现真实freedesktop Trash与opaque恢复引用；隔离Rust单测及原生003对应步骤独立SHA通过 | 已解除；003三端browser/native全用例通过 | 不以browser stub替代native收据 |
 | 跨卷移动与大目录复制 | 失败时可能留下部分结果 | 复制完成后才删除源；进度与取消；部分失败汇总 | 不阻塞 | — |
-| 快捷键冲突（Alt+3、终端 Ctrl+Shift+E） | 可能与现有键位或 IDEA 键位冲突 | 本轮终端入口不设快捷键；Alt+3 在 TASK-05 核对 | TASK-05 | 核对结论 |
+| 快捷键冲突与平台输入 | 工作区Alt/Option+3、Explorer编辑命令需保留focus/IME所有权 | 本轮终端入口不设快捷键；mounted与browser/原生WebView所列用例通过；物理OS键盘/IME及部分Alt文字标签仍有未验证/显示边界 | 自动化已完成，OS手工边界保留 | 见实施记录快捷键范围 |
 | 路径大小写与 UNC 去重 | 误判同目录 | 以规范化路径比较，三端分别测试 | 不阻塞 | — |
 | asset 协议与预览安全 | 暴露面 | 采用受限字节命令，不放宽 scope | 不阻塞 | — |
 | 性能目标缺失 | AC-16 无可比基线 | TASK-07 先测当前 `FilePanel` 基线再定目标 | TASK-07 | 基线数据 |
 
 回退：代码层可恢复 `TabContentRouter` 对 `file-browser` 的旧渲染分支并移除新入口；新增 Rust 命令与 `trash` 依赖无数据迁移，偏好键可保留。会话恢复数据新增字段向后兼容，无需数据回退。
 
-三项决策已确认，无待用户决定的阻塞项。TASK-01~06已实施；TASK-07处于GitHub失败修复与重跑闭环，未满足最终全部通过前不宣称交付完成。
+三项决策已确认，无待用户决定的阻塞项。TASK-01~06已实施；TASK-07的本地单元/静态检查、GitHub三端所选browser/native及完整crash失败修复重跑闭环完成。性能无匹配基线与预定预算，物理OS验证等边界按§9及实施记录保留为未验证，不虚报全部边界完成。

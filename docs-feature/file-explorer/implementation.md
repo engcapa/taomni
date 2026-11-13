@@ -32,11 +32,13 @@
 
 Browser/VFS 不能证明原生文件语义；WebView reload 不等同整个 OS 进程冷重启。macOS bridge 按键不是物理键盘/AppKit 全局菜单证据。截图仅证明执行状态；尺寸与颜色有命名断言，完整像素/交互保真需结合截图审阅。
 
+快捷键验收范围：Explorer非编辑区的Copy/Cut/Paste/Select-all使用Windows/Linux Ctrl与macOS Command；地址Ctrl/Command+L，预览Alt/Option+P，工作区入口Alt/Option+3。文本输入、IME和对话框优先；terminal Control信号不改。上下文菜单显示⌘编辑命令，工作区入口显示Option+3。预览/导航/属性部分提示仍使用跨平台`Alt`文字，macOS Option功能映射已测但文字一致性为剩余显示缺口；物理键盘、Fn键、AppKit系统菜单加速器/重复分发与IME候选窗仍未进行OS级验证，不从WKWebView合成按键推断通过。
+
 ## 当前证据
 
 ### 本地单元与静态检查
 
-- `pnpm test --maxWorkers=2`：最新稳定批次739文件通过，6,667测试通过、1项跳过（`/tmp/explorer-stable-polish-full-unit.log`）。此前737文件/6,663通过保留在`/tmp/explorer-post-ci-full-unit.log`，735文件/6,647通过保留在`/tmp/explorer-full-unit-stable.log`。第一次在并发开发期间运行的全套出现3个尚在修改的模块失败；保留原始`/tmp/explorer-full-unit.log`，不以重跑覆盖旧失败。
+- `pnpm test --maxWorkers=2`：最终提交`f86468ac`稳定批次739文件通过，6,672测试通过、1项跳过（`/tmp/explorer-final-stable-full-unit.log`）；前一稳定polish批次6,667通过保留在`/tmp/explorer-stable-polish-full-unit.log`。此前737文件/6,663通过保留在`/tmp/explorer-post-ci-full-unit.log`，735文件/6,647通过保留在`/tmp/explorer-full-unit-stable.log`。第一次在并发开发期间运行的全套出现3个尚在修改的模块失败；保留原始`/tmp/explorer-full-unit.log`，不以重跑覆盖旧失败。
 - 最后的小型 tree/地址/滚动调整另外跑过对应 mounted 单测；7 文件72项的 Explorer 定向批次通过。预览/交互完整55项、后端18项、剪贴板21项存在重叠，不把批次数相加当作独立用例数。
 - `LIBCLANG_PATH=/usr/lib/llvm-18/lib cargo test --manifest-path src-tauri/Cargo.toml --lib filebrowser::local_ops -- --nocapture`：18通过。
 - 同环境 `cargo test --manifest-path src-tauri/Cargo.toml --lib file_clipboard -- --nocapture`：21通过。
@@ -56,8 +58,9 @@ Browser/VFS 不能证明原生文件语义；WebView reload 不等同整个 OS �
 | [43374078423](https://github.com/engcapa/taomni/actions/runs/43374078423) / `2671e416` | 定向browser001尝试在catalog门禁失败：新增异步等待选择器未登记。补aliases后本地audit通过；无UI执行证据。 |
 | [43374770655](https://github.com/engcapa/taomni/actions/runs/43374770655) / `8c68c55a` | 定向browser001的`modes=browser`与自动完整crash集合内native-only用例不兼容，plan拒绝；无UI执行。后续仍使用`browser,native`，不删减crash集合。 |
 | [43396714161](https://github.com/engcapa/taomni/actions/runs/43396714161) / `2181bd69` | **完成，84通过/3失败，无跳过**：三个平台browser均15/15、native均13/14；Explorer001–004、完整crash-regression、SFTP全通过。仅005仍失败：Linux重复原地pointer move等待超时、macOS底部预览窄窗误全高遮挡、Windows终端OSC7路径`/D:/...`未归一化导致重复无效Explorer。汇总`/tmp/taomni-explorer-round5-summary.jST8Gm`；实际DOM/字节收据保留round5-auto目录。6份browser receipt及全部artifact hash已核对（`/tmp/explorer-round5-browser-receipt-check-stable.log`）；Linux/macOS003原生receipt/build-source与artifact也已核对。 |
+| [43405262473](https://github.com/engcapa/taomni/actions/runs/43405262473) / `f86468ac` | **完成，87/87通过，0失败/0跳过，workflow success**：三端均browser15/15、native14/14；完整Explorer、crash-regression与受影响SFTP通过，三端release构建/native契约/SFTP契约通过。新增folder图标、短文本高度、窄窗bottom几何断言通过，截图已复核。最终`passed=true`、`report_ok=true`，failures/gaps/infrastructure_errors均为空；原始汇总`/tmp/taomni-explorer-final-summary.PlEt3X/ci-summary.json`。18份原始runner receipt、source/build与全部artifact hash已核对，不复用旧source证据。 |
 
-本次相关失败均保留原始报告，不因后续修复而改写旧结果。尚不宣称最终 UI 验收或三端全部通过。
+本次相关失败均保留原始报告，不因后续修复而改写旧结果。最终所选三端自动化验证闭环已通过；不将此扩大成所有物理OS交互、逐像素全应用保真、跨物理卷/磁盘满注入或性能基线均已验证。
 
 ### 本轮失败定位与重跑准备
 
@@ -70,3 +73,25 @@ Browser/VFS 不能证明原生文件语义；WebView reload 不等同整个 OS �
 - run43396714161的Linux和macOS原生003已完整通过，真实列表/树/修饰键面包屑拖放含全树字节oracle。Linux005走过第一次终端右键，但第二次指针已在相同位置，`xdotool mousemove --sync`等待不存在的MotionNotify超时；改为一次真实move后读取实际root坐标核对，不等待坐标必须变化。49项pointer单测及最终合并258项工具/契约单测通过（`/tmp/explorer-native-tools-noop-stable.log`），保留原失败。Linux/macOS003的实际`pointerdown buttons=1`、目标`pointerup buttons=0`、Ctrl/Option复制状态及17次完整树oracle已检查；receipt/build-source/artifact hash也已核对。
 - 同轮macOS005走到外部修改刷新后，截图证明底部偏好在窄窗误沿用全高覆盖层，遮住文件列表；这是本次产品布局问题而非无关失败。覆盖层现按`data-position`分支，bottom固定190px贴底且跨列表宽度，right保持原300px宽侧层；添加002窄窗bottom几何断言、截图与mounted回归。2文件24项单测、类型与边界检查通过。
 - 同轮Windows005的截图/DOM显示终端报告`/D:/...`，初次计数读取了异步打开前一帧，随后错误地新开无法读取的目录。Explorer本地终端入口现复用已有`normalizeLocalStartCwd`，只在本地终端边界转换PowerShell/MSYS报告；SSH与通用地址输入不受影响。新增drive/MSYS/UNC/无法映射的WSL路径单测；005在返回Explorer与force-new后等待真实激活/第二标签再保留精确计数。5文件52项相关单测通过。
+
+### 最终提交的已核对原生证据
+
+最终执行源码提交：`f86468ac06d27c2ab2428f8b3164d179f5d9f960`。生产source SHA：`1d68b22fd320f9f98aeeed033d37306ace2cdb60e2badfab36d10989ad1d2312`；runner SHA：`5410a3e1fef30dff7f5a25171148a083887afebf89c4382041bce1a4e9fb48fe`。后续文档回填不改变这两个指纹。
+
+可重复的GitHub选择（完整crash-regression由workflow自动并入，`publish_issues=false`不创建外部issue）：
+
+```bash
+HTTPS_PROXY=http://10.1.0.80:3228 HTTP_PROXY=http://10.1.0.80:3228 \
+  gh workflow run qa-ui-auto-platforms.yml --ref feat/file-explorer \
+  -f scope=selected -f platforms=linux,windows,macos -f modes=browser,native \
+  -f linux_profiles=ubuntu-24.04-xvfb -f native_release=true \
+  -f case_ids=TC-EXPLORER-001,TC-EXPLORER-002,TC-EXPLORER-003,TC-EXPLORER-004,TC-EXPLORER-005,TC-010,TC-043 \
+  -f publish_issues=false
+```
+
+GitHub run43405262473 artifact key：`5e6642dbb64e479abc4bbbc759c960d0`；最终汇总为`qa-summary-<key>`，每平台原始报告为`qa-<platform>-<mode>-shard-<N>-<key>`。本地临时路径仅用于本次查证，长期定位以run链接、artifact名、提交及内容SHA为准。
+
+- macOS ARM64：run43405262473的4份native summary共14/14通过。receipt、summary/artifact SHA、QA bundle ID及source=`1d68b22fd320f9f98aeeed033d37306ace2cdb60e2badfab36d10989ad1d2312`一致；binary=`1cfaec392e9a8302149dec04bd50e32d3e1aad126d2c7a10b0cac404f22c95e8`。原始目录`/tmp/taomni-explorer-round5-auto-{4jsuqyy3,ii4c6ui4,aua6v7ov,stblma0d}`（脚本历史命名前缀，不代表旧run）。
+- macOS005：独立NSURL/file-url剪贴板观察与Finder System Events真实Edit/Paste Item创建目标副本，hash匹配；PTY输出、外部修改刷新、Blob图片解码、新标签与当前目录恢复通过。退出前精确匹配一标签Exit提示并单次真实session.click，点击后连接关闭使release回复丢失，未重试；旧进程正常exit0、PID 3288→4120，冷启动后偏好与路径断言通过。原始`native-application-restarts.jsonl`及截图已审阅。
+- Linux Ubuntu24.04/Xvfb/Openbox：4份native summary共14/14通过，receipt/build/source及全部artifact SHA匹配；binary=`2500ff598ba786e3a13b6a1e3c2b7809940f3ceeec2337252ffae2fd5f1ea374`。原始`/tmp/taomni-explorer-final-linux.CoxTAA`及`/tmp/taomni-explorer-round5-auto-sumgag_9`。005独立系统文件剪贴板与PCManFM-Qt真实X11 Ctrl+V目标副本hash匹配；确认Exit后旧应用/存储PID 8951/8975/9003/9006结束，WebDriver session由`fe0f4921…`变为`40fd4dce…`，冷启动恢复与force-new通过。003全部17次全树SHA/空目录oracle及真实Trash/Undo通过；004真实10,000文件通过。
+- Windows x64/WebView2：4份native summary共14/14通过，含003/004/005、完整native crash及受影响SFTP。原始`/tmp/taomni-explorer-round5-auto-{ivqnqjny,rfvnlt_b,dqn76ckk,lea98os3}`。receipt/build/source与artifact SHA一致；binary=`1c3c3108c69831b1202a0e1d7842c5a38196a08eb9b2a128f914d8dd894368f1`。005使用Windows Shell FolderItem `InvokeVerb(paste)`创建真实副本并核对hash，非browser/VFS；精确Exit确认后旧窗口关闭、旧driver端口释放，新session由`cdeaa632…`变为`4f930545…`，恢复与force-new通过。Windows收据未像Linux一样列举WebView存储PID/exit code；证据边界是正常窗口关闭、新owned driver/session及持久化断言，不额外宣称每个子进程均有独立正常退出收据。
