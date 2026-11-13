@@ -38,6 +38,8 @@ export function FilePanel({
   onOpenTerminalHere,
   onOpenLocalSelected,
   onRevealInOs,
+  renderView,
+  sortState,
 }: FilePanelProps) {
   const t = useT();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -56,8 +58,10 @@ export function FilePanel({
   const toggleHidden = useStore((s) => s.toggleHidden);
   const ctx = useContextMenu();
 
-  const [sortKey, setSortKey] = useState<"name" | "size" | "mtime" | "type">("name");
-  const [sortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const [localSortKey, setSortKey] = useState<"name" | "size" | "mtime" | "type">("name");
+  const [localSortDir, setSortDir] = useState<"asc" | "desc">("asc");
+  const sortKey = sortState?.key ?? localSortKey;
+  const sortDir = sortState?.dir ?? localSortDir;
   const [draggingOver, setDraggingOver] = useState(false);
   const lastClickedRef = useRef<string | null>(null);
   const columns = useFilePanelColumns({
@@ -117,7 +121,7 @@ export function FilePanel({
           return a.name.localeCompare(b.name) * dir;
       }
     });
-  }, [pane, sortKey, sortDir, showHidden, filterText]);
+  }, [pane?.entries, sortKey, sortDir, showHidden, filterText]);
 
   const normalizedFilter = filterText?.trim() ?? "";
   const filterActive = normalizedFilter.length > 0;
@@ -136,6 +140,10 @@ export function FilePanel({
 
   const onHeaderClick = useCallback(
     (key: typeof sortKey) => {
+      if (sortState) {
+        sortState.onChange(key, key === sortKey && sortDir === "asc" ? "desc" : "asc");
+        return;
+      }
       if (key === sortKey) {
         setSortDir((d) => (d === "asc" ? "desc" : "asc"));
       } else {
@@ -143,7 +151,7 @@ export function FilePanel({
         setSortDir("asc");
       }
     },
-    [sortKey],
+    [sortKey, sortDir, sortState],
   );
 
   useEffect(() => {
@@ -237,7 +245,8 @@ export function FilePanel({
     if (mkdirItem?.onClick) mkdirItem.onClick();
   };
 
-  return <FilePanelView
+  const View = renderView ?? FilePanelView;
+  return <View
     side={side}
     subtitle={subtitle}
     onFilterTextChange={onFilterTextChange}

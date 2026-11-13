@@ -162,6 +162,7 @@ describe("buildAppMenuSpec", () => {
     expect(toolActions).toContain("sockscap");
     expect(toolActions).toContain("git");
     expect(toolActions).toContain("code-workspace");
+    expect(toolActions).toContain("file-explorer");
     expect(toolActions).toContain("lan-chat");
     expect(toolActions).toContain("tools");
     expect(toolActions).not.toContain("packages");

@@ -216,10 +216,58 @@ impl WriteGate {
 }
 
 pub async fn clipboard_write_files(paths: &[String]) -> Result<(), String> {
-    let offer = FileOffer::new(paths)?;
+    clipboard_write_files_with_cut(paths, false).await
+}
+
+pub async fn clipboard_write_files_with_cut(paths: &[String], cut: bool) -> Result<(), String> {
     if paths.is_empty() {
         return Ok(());
     }
+    write_files_conditionally(paths, cut, None)
+        .await
+        .map(|_| ())
+}
+
+pub async fn clipboard_update_cut_files(
+    expected: &[String],
+    remaining: &[String],
+) -> Result<bool, String> {
+    write_files_conditionally(remaining, true, Some(expected.to_vec())).await
+}
+
+fn publish_offer(
+    clipboard: &gtk::Clipboard,
+    offer: FileOffer,
+    empty: bool,
+) -> Result<bool, String> {
+    if empty {
+        clipboard.clear();
+        return Ok(true);
+    }
+    let targets = FileListFormat::ALL.map(|format| {
+        gtk::TargetEntry::new(format.mime(), gtk::TargetFlags::empty(), format as u32)
+    });
+    if clipboard.set_with_data(&targets, move |_, data, info| {
+        if let Some(format) = FileListFormat::ALL.get(info as usize) {
+            data.set(&gdk::Atom::intern(format.mime()), 8, offer.payload(*format));
+        }
+    }) {
+        Ok(true)
+    } else {
+        Err(error(
+            "unavailable",
+            "GTK rejected native file clipboard ownership",
+        ))
+    }
+}
+
+async fn write_files_conditionally(
+    paths: &[String],
+    cut: bool,
+    expected: Option<Vec<String>>,
+) -> Result<bool, String> {
+    let offer = FileOffer::with_cut(paths, cut)?;
+    let empty = paths.is_empty();
     if !gtk::is_initialized() {
         return Err(error("unavailable", "GTK is not initialized"));
     }
@@ -228,33 +276,60 @@ pub async fn clipboard_write_files(paths: &[String]) -> Result<(), String> {
     let deadline = Instant::now() + REQUEST_TIMEOUT;
     let (sender, mut receiver) = oneshot::channel();
     glib::idle_add_once(move || {
-        queued.run(deadline, || {
-            if sender.is_closed() {
+        if sender.is_closed() {
+            return;
+        }
+        let (clipboard, _) = match native_clipboard() {
+            Ok(value) => value,
+            Err(cause) => {
+                let _ = sender.send(Err(cause));
                 return;
             }
-            let result = native_clipboard().and_then(|(clipboard, _)| {
-                let targets = FileListFormat::ALL.map(|format| {
-                    gtk::TargetEntry::new(format.mime(), gtk::TargetFlags::empty(), format as u32)
-                });
-                // gtk_clipboard_set_with_data retains this owned callback and
-                // destroys it only on selection clear/replacement or set failure.
-                // libfm/PCManFM and Nautilus accept the GNOME copy header; URI
-                // consumers (Dolphin/GTK) also get the standard text/uri-list.
-                if clipboard.set_with_data(&targets, move |_, data, info| {
-                    if let Some(format) = FileListFormat::ALL.get(info as usize) {
-                        data.set(&gdk::Atom::intern(format.mime()), 8, offer.payload(*format));
-                    }
-                }) {
-                    Ok(())
-                } else {
-                    Err(error(
-                        "unavailable",
-                        "GTK rejected native file clipboard ownership",
-                    ))
+        };
+        if let Some(expected) = expected {
+            // Keep an owner-change generation until the RAW file data reply is
+            // observed. A new external copy (even the same filenames) wins and
+            // must not be overwritten when a long-running cut finishes.
+            let generation = std::rc::Rc::new(std::cell::Cell::new(0u64));
+            let changed = generation.clone();
+            // gtk-rs omits the typed binding for GdkEventOwnerChange. Only the
+            // notification is needed, so the generic local signal is sufficient.
+            let handler = clipboard.connect_local("owner-change", false, move |_| {
+                changed.set(changed.get().wrapping_add(1));
+                None
+            });
+            let before = generation.get();
+            clipboard.request_contents(
+                &gdk::Atom::intern(FileListFormat::GnomeCopiedFiles.mime()),
+                move |clipboard, data| {
+                    queued.run(deadline, || {
+                        if sender.is_closed() {
+                            return;
+                        }
+                        let current = if data.length() >= 0 && data.format() == 8 {
+                            FileListFormat::GnomeCopiedFiles.decode(&data.data()).ok()
+                        } else {
+                            None
+                        };
+                        let result = if generation.get() == before
+                            && current.as_deref() == Some(expected.as_slice())
+                        {
+                            publish_offer(clipboard, offer, empty)
+                        } else {
+                            Ok(false)
+                        };
+                        let _ = sender.send(result);
+                    });
+                    clipboard.disconnect(handler);
+                },
+            );
+        } else {
+            queued.run(deadline, || {
+                if !sender.is_closed() {
+                    let _ = sender.send(publish_offer(&clipboard, offer, empty));
                 }
             });
-            let _ = sender.send(result);
-        });
+        }
     });
     match tokio::time::timeout(REQUEST_TIMEOUT, &mut receiver).await {
         Ok(result) => {

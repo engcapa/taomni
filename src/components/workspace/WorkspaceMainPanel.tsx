@@ -17,6 +17,7 @@ import { WorkspaceSessionPickerModal } from "./WorkspaceSessionPickerModal";
 import { revealWorkspaceFolder } from "./workspaceFolderReveal";
 import { NOTES_WORKSPACE_ID } from "../../stores/workspaceNotes";
 import { NotesWorkspace } from "../notes/NotesWorkspace";
+import { ExplorerTabPane } from "../explorer/ExplorerTabPane";
 
 /**
  * Main canvas of the Workspaces mode (AC-06/07/08).
@@ -127,6 +128,13 @@ function WorkspaceCanvasContents({ workspaceId, visible, onCommandsChange, onEdi
                 }
               }}
             />
+          </div>
+        ))}
+
+        {workspace.openTabs.filter((tab) => tab.kind === "explorer").map((tab) => (
+          <div key={tab.id} data-testid="workspace-canvas-pane" data-tab-id={tab.id} onMouseDownCapture={() => setActiveTab(workspace.id, tab.id)} className="h-full min-h-0 w-full" style={paneStyle(tab.id)}>
+            <ExplorerTabPane tabId={tab.id} initialPath={tab.explorerPath ?? workspace.rootFolders[0]?.path ?? ""} workspaceId={workspace.id} active={paneVisible(tab.id) && workspace.activeTabId === tab.id}
+              onOpenTerminal={(path) => { useWorkspacePlatformStore.getState().openLocalTerminalInWorkspace(workspace.id, path); }} />
           </div>
         ))}
 

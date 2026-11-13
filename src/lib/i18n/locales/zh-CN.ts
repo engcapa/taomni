@@ -376,6 +376,7 @@ export const zhCN: DeepPartial<typeof en> = {
     servers: "本地服务器…",
     gitRepository: "Git 仓库…",
     codeWorkspace: "代码工作区…",
+    fileExplorer: "文件资源管理器",
     codeWorkspaceActions: "代码工作区操作",
     mfa: "MFA 验证器",
   },
@@ -1284,6 +1285,14 @@ export const zhCN: DeepPartial<typeof en> = {
     selectionExplain: "解释",
     selectionExplainTitle: "新开一个 AI 对话直接解释这段输出",
     selectionDismissTitle: "关闭（Esc）",
+  },
+  explorerEntry: {
+    openCurrent: "在 Explorer 中打开当前目录",
+    openNew: "在新的 Explorer 标签中打开",
+    openHere: "在 Explorer 中打开",
+    cwdUnavailable: "当前终端目录暂不可用，请稍后再试。",
+    noRoot: "当前工作区没有根目录，已在 Explorer 中打开主目录。",
+    restoreTabs: "启动时恢复 Explorer 标签",
   },
   fileBrowser: {
     title: "文件浏览器",

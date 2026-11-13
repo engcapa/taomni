@@ -45,16 +45,20 @@ pub use clipboard::{
     ClipboardCapabilities, ClipboardMultiFormat, clipboard_capabilities,
     clipboard_parse_file_paths, clipboard_read_files, clipboard_read_multi_format,
     clipboard_read_text, clipboard_write_files, clipboard_write_multi_format, clipboard_write_text,
+    explorer_update_cut_clipboard, explorer_write_clipboard_files,
 };
 
 pub(crate) use clipboard::{
     __cmd__clipboard_capabilities, __cmd__clipboard_parse_file_paths, __cmd__clipboard_read_files,
     __cmd__clipboard_read_multi_format, __cmd__clipboard_read_text, __cmd__clipboard_write_files,
     __cmd__clipboard_write_multi_format, __cmd__clipboard_write_text,
+    __cmd__explorer_update_cut_clipboard, __cmd__explorer_write_clipboard_files,
     __tauri_command_name_clipboard_capabilities, __tauri_command_name_clipboard_parse_file_paths,
     __tauri_command_name_clipboard_read_files, __tauri_command_name_clipboard_read_multi_format,
     __tauri_command_name_clipboard_read_text, __tauri_command_name_clipboard_write_files,
     __tauri_command_name_clipboard_write_multi_format, __tauri_command_name_clipboard_write_text,
+    __tauri_command_name_explorer_update_cut_clipboard,
+    __tauri_command_name_explorer_write_clipboard_files,
 };
 
 #[cfg(any(all(unix, not(target_os = "macos")), test))]

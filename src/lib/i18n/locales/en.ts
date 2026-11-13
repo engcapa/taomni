@@ -377,6 +377,7 @@ const dict = {
     servers: "Local servers…",
     gitRepository: "Git repository…",
     codeWorkspace: "Code workspace…",
+    fileExplorer: "File Explorer",
     codeWorkspaceActions: "Code workspace actions",
     mfa: "MFA authenticator",
   },
@@ -1285,6 +1286,14 @@ const dict = {
     selectionExplain: "Explain",
     selectionExplainTitle: "Open a new AI thread to explain this output",
     selectionDismissTitle: "Close (Esc)",
+  },
+  explorerEntry: {
+    openCurrent: "Open current directory in Explorer",
+    openNew: "Open in a new Explorer tab",
+    openHere: "Open in Explorer",
+    cwdUnavailable: "The current terminal directory is not available yet.",
+    noRoot: "This workspace has no root folder. Explorer opened the home directory.",
+    restoreTabs: "Restore Explorer tabs on startup",
   },
   fileBrowser: {
     title: "File browser",

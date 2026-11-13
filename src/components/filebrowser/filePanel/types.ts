@@ -1,3 +1,5 @@
+import type { ReactNode } from "react";
+import type { FilePanelViewProps } from "./FilePanelView";
 import { type FileEntry } from "../../../lib/sftp";
 import { type FilePanelStoreHook, type PaneSide } from "../../../stores/sftpStore";
 import { type MenuItem } from "../../ContextMenu";
@@ -18,6 +20,13 @@ export interface ColWidths {
 export interface FilePanelProps {
   sessionId: string;
   side: PaneSide;
+  /** Alternative presentation using the same directory, sorting and selection owner. */
+  renderView?: (inputs: FilePanelViewProps) => ReactNode;
+  sortState?: {
+    key: "name" | "size" | "mtime" | "type";
+    dir: "asc" | "desc";
+    onChange: (key: "name" | "size" | "mtime" | "type", dir: "asc" | "desc") => void;
+  };
   /**
    * Optional store driving this panel. Defaults to the SFTP store. The
    * object-storage browser passes its own store (same {@link FilePanelStore}

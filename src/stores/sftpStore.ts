@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import { parentPath } from "../lib/filePaths";
 import { sftpAttach, sftpDetach, sftpLocalHome, sftpRealpath } from "../lib/sftp";
 import { inFlightAttaches, sessionRefCounts } from "./sftp/lifetime";
 import {
@@ -6,15 +7,14 @@ import {
   emptyPane,
   errorMessage,
   freshSession,
-  isConnectionError,
-  isSftpRefreshDirectorySignal,
   listingState,
   listSide,
   loadInitialListing,
-  pushHistory,
   WINDOWS_DRIVES_ROOT,
 } from "./sftp/listing";
 import { type SftpStoreState } from "./sftp/model";
+import { createLocalAttachment } from "./sftp/localAttachment";
+import { createPaneNavigation, invalidatePaneRequests } from "./sftp/navigation";
 
 export const useSftpStore = create<SftpStoreState>((set, get) => ({
   sessions: {},
@@ -201,6 +201,7 @@ export const useSftpStore = create<SftpStoreState>((set, get) => ({
       return;
     }
     sessionRefCounts.delete(sessionId);
+    invalidatePaneRequests(sessionId);
     // If a backend attach is mid-flight, defer to its post-attach
     // cleanup branch which will detect the zero refcount and tear down.
     // Calling sftpDetach here would race the still-running sftpAttach
@@ -220,395 +221,24 @@ export const useSftpStore = create<SftpStoreState>((set, get) => ({
     });
   },
 
-  attachLocalOnly: async (sessionId, initialPath) => {
-    // Set up store state for a session that only uses the local pane —
-    // no backend SFTP channel is opened. The remote pane stays empty and
-    // unused. Refcount mirrors `attach` so the matching `detachLocalOnly`
-    // tears the entry down on the last consumer.
-    sessionRefCounts.set(sessionId, (sessionRefCounts.get(sessionId) ?? 0) + 1);
-    if (get().sessions[sessionId]?.attached) return;
-
-    let path = initialPath?.trim() || "";
-    let homeError: string | null = null;
-    if (!path) {
-      try {
-        path = await sftpLocalHome();
-      } catch (error) {
-        homeError = errorMessage(error);
-      }
-    }
-    const load = homeError
-      ? { listing: emptyListing(), error: homeError }
-      : await loadInitialListing(sessionId, "local", path);
-    set((state) => ({
-      sessions: {
-        ...state.sessions,
-        [sessionId]: {
-          ...(state.sessions[sessionId] ?? freshSession(sessionId)),
-          attached: true,
-          attaching: false,
-          homeDir: null,
-          error: null,
-          remote: emptyPane(),
-          local: {
-            ...emptyPane(),
-            path,
-            ...listingState(load.listing),
-            error: load.error,
-            history: path ? [path] : [],
-            historyIndex: path ? 0 : -1,
-          },
-        },
-      },
-    }));
-  },
-
-  detachLocalOnly: (sessionId) => {
-    const remaining = (sessionRefCounts.get(sessionId) ?? 0) - 1;
-    if (remaining > 0) {
-      sessionRefCounts.set(sessionId, remaining);
-      return;
-    }
-    sessionRefCounts.delete(sessionId);
-    set((state) => {
-      const next = { ...state.sessions };
-      delete next[sessionId];
-      return { sessions: next };
-    });
-  },
+  ...createLocalAttachment(set, get),
 
   listPath: async (sessionId, side, path) => (await listSide(sessionId, side, path)).entries,
 
-  refreshPane: async (sessionId, side) => {
-    const session = get().sessions[sessionId];
-    if (!session) return;
-    const pane = session[side];
-    set((state) => ({
-      sessions: {
-        ...state.sessions,
-        [sessionId]: {
-          ...session,
-          [side]: { ...pane, loading: true, error: null },
-        },
-      },
-    }));
-    try {
-      const listing = await listSide(sessionId, side, pane.path);
-      set((state) => {
-        const cur = state.sessions[sessionId];
-        if (!cur) return state;
-        const nextEntries = listing.entries;
-        const alive = new Set(nextEntries.map((e) => e.path));
-        const prunedSelection = cur[side].selection.filter((p) => alive.has(p));
-        return {
-          sessions: {
-            ...state.sessions,
-            [sessionId]: {
-              ...cur,
-              [side]: {
-                ...cur[side],
-                ...listingState(listing),
-                selection: prunedSelection,
-                loading: false,
-                error: null,
-              },
-            },
-          },
-        };
-      });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      set((state) => {
-        const cur = state.sessions[sessionId];
-        if (!cur) return state;
-        const nextSession = {
-          ...cur,
-          [side]: { ...cur[side], loading: false, error: message },
-        };
-        if (side === "remote" && isConnectionError(err)) {
-          nextSession.attached = false;
-          nextSession.error = message;
-        }
-        return {
-          sessions: {
-            ...state.sessions,
-            [sessionId]: nextSession,
-          },
-        };
-      });
-    }
-  },
-
-  navigate: async (sessionId, side, path) => {
-    // The pane mounts before the SFTP channel has finished attaching. A path
-    // submitted during that interval must wait for the channel and initial
-    // listing, otherwise it fails with "not attached" or is overwritten.
-    if (side === "remote") {
-      const attaching = inFlightAttaches.get(sessionId);
-      if (attaching) {
-        try {
-          await attaching;
-        } catch {
-          return; // attach already published the connection error
-        }
-        if (!get().sessions[sessionId]?.attached) return;
-      }
-    }
-    const sess = get().ensureSession(sessionId);
-    const prev = sess[side];
-    set((state) => ({
-      sessions: {
-        ...state.sessions,
-        [sessionId]: {
-          ...state.sessions[sessionId],
-          [side]: {
-            ...prev,
-            path,
-            entries: [],
-            selection: [],
-            skippedEntryCount: 0,
-            entryDiagnostics: [],
-            loading: true,
-            error: null,
-          },
-        },
-      },
-    }));
-    try {
-      const listing = await listSide(sessionId, side, path);
-      set((state) => {
-        const cur = state.sessions[sessionId];
-        if (!cur) return state;
-        const after = pushHistory(
-          {
-            ...cur[side],
-            path,
-            ...listingState(listing),
-            loading: false,
-            error: null,
-            selection: [],
-          },
-          path,
-        );
-        return {
-          sessions: {
-            ...state.sessions,
-            [sessionId]: { ...cur, [side]: after },
-          },
-        };
-      });
-    } catch (err) {
-      let displayErr = err;
-      if (side === "remote" && isSftpRefreshDirectorySignal(err)) {
-        try {
-          const listing = await listSide(sessionId, side, prev.path);
-          set((state) => {
-            const cur = state.sessions[sessionId];
-            if (!cur) return state;
-            return {
-              sessions: {
-                ...state.sessions,
-                [sessionId]: {
-                  ...cur,
-                  [side]: {
-                    ...prev,
-                    ...listingState(listing),
-                    loading: false,
-                    error: null,
-                    selection: [],
-                  },
-                },
-              },
-            };
-          });
-          return;
-        } catch (refreshErr) {
-          displayErr = refreshErr;
-        }
-      }
-      const message = errorMessage(displayErr);
-      set((state) => {
-        const cur = state.sessions[sessionId];
-        if (!cur) return state;
-        const nextSession = {
-          ...cur,
-          [side]: { ...prev, loading: false, error: message },
-        };
-        if (side === "remote" && isConnectionError(displayErr)) {
-          nextSession.attached = false;
-          nextSession.error = message;
-        }
-        return {
-          sessions: {
-            ...state.sessions,
-            [sessionId]: nextSession,
-          },
-        };
-      });
-    }
-  },
-
-  navigateBack: async (sessionId, side) => {
-    const sess = get().sessions[sessionId];
-    if (!sess) return;
-    const pane = sess[side];
-    if (pane.historyIndex <= 0) return;
-    const idx = pane.historyIndex - 1;
-    const path = pane.history[idx];
-    set((state) => ({
-      sessions: {
-        ...state.sessions,
-        [sessionId]: {
-          ...sess,
-          [side]: {
-            ...pane,
-            historyIndex: idx,
-            path,
-            entries: [],
-            selection: [],
-            skippedEntryCount: 0,
-            entryDiagnostics: [],
-            loading: true,
-            error: null,
-          },
-        },
-      },
-    }));
-    try {
-      const listing = await listSide(sessionId, side, path);
-      set((state) => {
-        const cur = state.sessions[sessionId];
-        if (!cur) return state;
-        return {
-          sessions: {
-            ...state.sessions,
-            [sessionId]: {
-              ...cur,
-              [side]: {
-                ...cur[side],
-                ...listingState(listing),
-                loading: false,
-                error: null,
-                selection: [],
-              },
-            },
-          },
-        };
-      });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      set((state) => {
-        const cur = state.sessions[sessionId];
-        if (!cur) return state;
-        const nextSession = {
-          ...cur,
-          [side]: { ...pane, loading: false, error: message },
-        };
-        if (side === "remote" && isConnectionError(err)) {
-          nextSession.attached = false;
-          nextSession.error = message;
-        }
-        return {
-          sessions: {
-            ...state.sessions,
-            [sessionId]: nextSession,
-          },
-        };
-      });
-    }
-  },
-
-  navigateForward: async (sessionId, side) => {
-    const sess = get().sessions[sessionId];
-    if (!sess) return;
-    const pane = sess[side];
-    if (pane.historyIndex >= pane.history.length - 1) return;
-    const idx = pane.historyIndex + 1;
-    const path = pane.history[idx];
-    set((state) => ({
-      sessions: {
-        ...state.sessions,
-        [sessionId]: {
-          ...sess,
-          [side]: {
-            ...pane,
-            historyIndex: idx,
-            path,
-            entries: [],
-            selection: [],
-            skippedEntryCount: 0,
-            entryDiagnostics: [],
-            loading: true,
-            error: null,
-          },
-        },
-      },
-    }));
-    try {
-      const listing = await listSide(sessionId, side, path);
-      set((state) => {
-        const cur = state.sessions[sessionId];
-        if (!cur) return state;
-        return {
-          sessions: {
-            ...state.sessions,
-            [sessionId]: {
-              ...cur,
-              [side]: {
-                ...cur[side],
-                ...listingState(listing),
-                loading: false,
-                error: null,
-                selection: [],
-              },
-            },
-          },
-        };
-      });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      set((state) => {
-        const cur = state.sessions[sessionId];
-        if (!cur) return state;
-        const nextSession = {
-          ...cur,
-          [side]: { ...pane, loading: false, error: message },
-        };
-        if (side === "remote" && isConnectionError(err)) {
-          nextSession.attached = false;
-          nextSession.error = message;
-        }
-        return {
-          sessions: {
-            ...state.sessions,
-            [sessionId]: nextSession,
-          },
-        };
-      });
-    }
-  },
+  ...createPaneNavigation(set, get),
 
   navigateUp: async (sessionId, side) => {
     const sess = get().sessions[sessionId];
     if (!sess) return;
     const path = sess[side].path;
     if (!path || path === "/" || path === WINDOWS_DRIVES_ROOT) return;
-    const isWin = path.includes("\\");
-    // Going "up" from a drive root on the local Windows pane lands on
-    // the synthetic drives root so the user sees C:, D:, … as folders.
-    if (side === "local" && /^[A-Z]:\\?$/i.test(path)) {
+    // Drive roots go to This PC; an UNC share root cannot go above its share.
+    if (side === "local" && /^[A-Z]:[\\/]?$/i.test(path)) {
       await get().navigate(sessionId, side, WINDOWS_DRIVES_ROOT);
       return;
     }
-    const sep = isWin ? "\\" : "/";
-    const trimmed = path.endsWith(sep) ? path.slice(0, -1) : path;
-    const idx = trimmed.lastIndexOf(sep);
-    let parent: string;
-    if (idx <= 0) {
-      parent = isWin ? path.slice(0, 3) : "/";
-    } else {
-      parent = trimmed.slice(0, idx);
-    }
+    const parent = parentPath(path);
+    if (parent === path) return;
     await get().navigate(sessionId, side, parent);
   },
 

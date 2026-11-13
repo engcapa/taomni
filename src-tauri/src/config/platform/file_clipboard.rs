@@ -163,6 +163,10 @@ pub(crate) struct FileOffer {
 #[cfg(any(target_os = "linux", test))]
 impl FileOffer {
     pub(crate) fn new(paths: &[String]) -> Result<Self, String> {
+        Self::with_cut(paths, false)
+    }
+
+    pub(crate) fn with_cut(paths: &[String], cut: bool) -> Result<Self, String> {
         validate_paths(paths)?;
         let uris = paths
             .iter()
@@ -174,7 +178,8 @@ impl FileOffer {
             .collect::<Result<Vec<_>, _>>()?;
         // RFC 2483 text/uri-list uses CRLF. GNOME's copy header uses LF;
         // Nautilus rejects an empty URI, so do not append a final GNOME newline.
-        let gnome = format!("copy\n{}", uris.join("\n")).into_bytes();
+        let gnome =
+            format!("{}\n{}", if cut { "cut" } else { "copy" }, uris.join("\n")).into_bytes();
         let uris = if uris.is_empty() {
             Vec::new()
         } else {

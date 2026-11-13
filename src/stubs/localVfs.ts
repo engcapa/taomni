@@ -163,14 +163,16 @@ export async function vfsHome(): Promise<string> {
   return VIRTUAL_ROOT;
 }
 
-export async function vfsList(path: string): Promise<FileEntry[]> {
+export async function vfsList(path: string, requireDirectory = false): Promise<FileEntry[]> {
   const db = await openDb();
   const target = normalize(path);
   const store = tx(db, "readonly");
   const exists = await get(store, target);
   if (!exists) {
+    if (requireDirectory) throw new Error(`Not found: ${target}`);
     return [];
   }
+  if (requireDirectory && exists.type !== "dir") throw new Error(`Not a directory: ${target}`);
   const list = await listIndex(tx(db, "readonly"), target);
   return list.sort((a, b) => {
     if (a.type !== b.type) return a.type === "dir" ? -1 : 1;

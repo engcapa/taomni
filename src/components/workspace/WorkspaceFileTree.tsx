@@ -4,6 +4,7 @@ import { ContextMenu, type MenuItem } from "../ContextMenu";
 import { useAppDialogs } from "../../lib/appDialogs";
 import { useT } from "../../lib/i18n";
 import { useAppStore } from "../../stores/appStore";
+import { openExplorer } from "../../lib/explorer/openExplorer";
 import {
   deleteWorkspaceEntry,
   entryName,
@@ -167,6 +168,11 @@ export function WorkspaceFileTree({
           { label: t("platform.newFile"), testId: "workspace-tree-new-file", onClick: () => onCreate("file", root, path) },
           { label: t("platform.newFolder"), testId: "workspace-tree-new-folder", onClick: () => onCreate("folder", root, path) },
           { label: t("platform.addRootFolder"), testId: "workspace-tree-add-root", onClick: onAddRoot },
+          ...[false, true].map((forceNew) => ({
+            label: t(forceNew ? "explorerEntry.openNew" : "explorerEntry.openHere"),
+            testId: `workspace-tree-open-explorer${forceNew ? "-new" : ""}`,
+            onClick: () => { void openExplorer(fullPath, { workspaceId: workspace.id, forceNew }).catch((error) => setStatusMessage(String(error))); },
+          })),
           { label: "", separator: true, onClick: () => undefined },
           { label: t("platform.copyPath"), testId: "workspace-tree-copy-path", onClick: () => void copyPath(fullPath) },
           { label: t("platform.rename"), testId: "workspace-tree-rename", onClick: () => void rename(root, path) },

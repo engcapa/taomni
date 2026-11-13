@@ -144,6 +144,29 @@ fn file_clipboard_native_formats_are_real_mime_targets_with_copy_semantics() {
 }
 
 #[test]
+fn file_clipboard_explorer_cut_retains_both_native_formats_without_changing_copy() {
+    let (_dir, paths) = fixture();
+    let copied = FileOffer::new(&paths).unwrap();
+    let cut = FileOffer::with_cut(&paths, true).unwrap();
+    assert!(
+        cut.payload(FileListFormat::GnomeCopiedFiles)
+            .starts_with(b"cut\nfile://")
+    );
+    assert!(
+        copied
+            .payload(FileListFormat::GnomeCopiedFiles)
+            .starts_with(b"copy\nfile://")
+    );
+    assert_eq!(
+        cut.payload(FileListFormat::UriList),
+        copied.payload(FileListFormat::UriList)
+    );
+    for format in FileListFormat::ALL {
+        assert_eq!(format.decode(cut.payload(format)).unwrap(), paths);
+    }
+}
+
+#[test]
 fn file_clipboard_native_reader_never_falls_back_to_plain_paths_or_path_text() {
     let (_dir, paths) = fixture();
     for format in FileListFormat::ALL {

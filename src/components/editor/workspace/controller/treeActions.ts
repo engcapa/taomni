@@ -13,6 +13,7 @@ import { type OpenFileState, type TreeSelection, type WorkspaceTreeCommandPayloa
 import { type BreadcrumbPathAction, type BreadcrumbPathChild, type BreadcrumbPathSegment } from "../Breadcrumbs";
 import { type WorkspaceEditApplyOptions } from "./mutationTypes";
 import { t } from "../../../../lib/i18n";
+import { projectExplorerMenu } from "../../../../lib/explorer/projectExplorerMenu";
 
 
 
@@ -178,6 +179,7 @@ export function createBreadcrumbPathActions(controllerContext: BreadcrumbPathAct
 
 
 export interface ShowTreeContextMenuContext {
+  rootsRef: import("react").RefObject<CodeWorkspaceRootInfo[]>;
   setSelected: (selection: TreeSelection | null) => void;
   treeContextMenuSessionRef: import("react").RefObject<{ workspaceInstanceId: string; selection: TreeSelection | null; consumed: boolean; } | null>;
   workspaceInstanceId: string;
@@ -277,6 +279,7 @@ export function createShowTreeContextMenu(controllerContext: ShowTreeContextMenu
             label: "Reveal in Explorer",
             onClick: () => void controllerContext.revealInExplorer(ref.rootId, dir),
           },
+          ...projectExplorerMenu(controllerContext.workspaceInstanceId, controllerContext.rootsRef.current, ref.rootId, dir),
           { label: "Open in Terminal", onClick: () => controllerContext.openTerminalAt(ref.rootId, ref.path, true) },
         ]);
         return;
@@ -305,6 +308,7 @@ export function createShowTreeContextMenu(controllerContext: ShowTreeContextMenu
             label: "Reveal in Explorer",
             onClick: () => void controllerContext.revealInExplorer(selection.rootId, selection.path),
           },
+          ...projectExplorerMenu(controllerContext.workspaceInstanceId, controllerContext.rootsRef.current, selection.rootId, selection.path),
           { label: "Open in Terminal", onClick: () => controllerContext.openTerminalAt(selection.rootId, selection.path) },
         ]);
         return;
@@ -329,6 +333,7 @@ export function createShowTreeContextMenu(controllerContext: ShowTreeContextMenu
             label: "Reveal in Explorer",
             onClick: () => void controllerContext.revealInExplorer(selection.rootId, ""),
           },
+          ...projectExplorerMenu(controllerContext.workspaceInstanceId, controllerContext.rootsRef.current, selection.rootId, ""),
           { label: "Open in Terminal", onClick: () => controllerContext.openTerminalAt(selection.rootId, "") },
           { separator: true, label: "" },
           { label: "Remove from Workspace", testId: "code-workspace-tree-remove-root", danger: true, onClick: run("workspace.tree.delete", { selection }) },

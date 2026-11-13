@@ -8,7 +8,7 @@ use super::clipboard::ClipboardMultiFormat;
 
 #[path = "macos_file_clipboard.rs"]
 mod file_clipboard;
-pub use file_clipboard::{clipboard_read_files, clipboard_write_files};
+pub use file_clipboard::{clipboard_read_files, clipboard_update_cut_files, clipboard_write_files};
 
 const MAX_FORMAT_BYTES: usize = 16 * 1024 * 1024;
 const MAX_TOTAL_BYTES: usize = 32 * 1024 * 1024;

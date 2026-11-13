@@ -11,6 +11,7 @@
 import { create } from "zustand";
 import type { SessionConfig } from "../lib/ipc/session";
 import { createWorkspaceTabActions } from "./workspacePlatformTabActions";
+import { createWorkspaceExplorerActions } from "./workspaceExplorerActions";
 import { createWorkspaceCodeActions } from "./workspacePlatformCodeActions";
 import { createNotesWorkspace, createWorkspaceNotesActions, NOTES_WORKSPACE_ID } from "./workspaceNotes";
 import { workspaceDurableCodeDefinition, type WorkspaceFileTarget } from "../lib/workspaceFileTarget";
@@ -32,6 +33,7 @@ export type WorkspaceTabKind =
   | "file"
   | "note"
   | "git"
+  | "explorer"
   | "code"
   | "terminal"
   | "sftp"
@@ -63,6 +65,8 @@ export interface WorkspaceIsolatedTab {
   port?: number;
   username?: string | null;
   sessionType?: string;
+  /** Explorer's last committed directory; live navigation remains in sftpStore. */
+  explorerPath?: string;
   /** Git tab: path to focus when opened from the editor. */
   focusPath?: string;
   createdAt: number;
@@ -151,6 +155,9 @@ export interface WorkspacePlatformState {
   openFileInWorkspace: (workspaceId: string, file: { rootId: string; path: string; name?: string }) => WorkspaceIsolatedTab;
   openNoteInWorkspace: (noteId: string, title: string) => WorkspaceIsolatedTab;
   openGitTab: (workspaceId: string, focusPath?: string) => WorkspaceIsolatedTab;
+  /** Creation primitive; callers use openExplorer for canonical current-path deduplication. */
+  addExplorerTab: (workspaceId: string, path: string) => WorkspaceIsolatedTab;
+  updateExplorerPath: (workspaceId: string, tabId: string, path: string) => void;
   openCodeWorkspaceTab: (workspaceId: string) => WorkspaceIsolatedTab;
   updateCodeWorkspace: (workspaceId: string, info: CodeWorkspaceTabInfo) => void;
   openLocalTerminalInWorkspace: (workspaceId: string, initialCwd?: string) => WorkspaceIsolatedTab;
@@ -575,6 +582,7 @@ export const useWorkspacePlatformStore = create<WorkspacePlatformState>((set, ge
     return tab;
   },
 
+  ...createWorkspaceExplorerActions(set, persist),
   ...createWorkspaceCodeActions(set, persist),
   ...createWorkspaceNotesActions(set, get, persist),
 

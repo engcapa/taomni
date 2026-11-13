@@ -248,6 +248,8 @@ export interface ProxyTestTabInfo {
 
 export interface FileBrowserTabInfo {
   initialPath: string;
+  /** Missing on legacy File-session metadata; it is migrated to Explorer on render. */
+  explorer?: true;
 }
 
 /** Connection parameters for an object-storage browser tab (S3 / Azure Blob). */

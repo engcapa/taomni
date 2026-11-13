@@ -157,7 +157,7 @@ export function useProtocolTabs(context: UseProtocolTabsContext) {
       title,
       sessionId,
       closable: true,
-      fileBrowser: { initialPath },
+      fileBrowser: { initialPath, explorer: true },
     });
   }, [addTab]);
 
