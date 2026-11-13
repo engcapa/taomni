@@ -66,3 +66,26 @@ it("reopens with fresh files and empty query, focuses input and activates the cu
   fireEvent.keyDown(window, { key: "Escape" });
   expect(screen.queryByTestId("global-search-modal")).not.toBeInTheDocument();
 });
+
+it("includes Local servers tool command and dispatches taomni:command servers when chosen", () => {
+  const received: string[] = [];
+  const listener = (event: Event) => {
+    received.push((event as CustomEvent<string>).detail);
+  };
+  window.addEventListener("taomni:command", listener);
+  try {
+    render(<GlobalCommandModal />);
+    act(() => useWorkspaceUiStore.getState().openGlobalSearch());
+    const input = screen.getByTestId("global-search-input");
+    fireEvent.change(input, { target: { value: "Local servers" } });
+    const serversResult = screen
+      .getAllByTestId("global-search-result")
+      .find((el) => el.getAttribute("data-result-id") === "servers");
+    expect(serversResult).toBeDefined();
+    fireEvent.click(serversResult!);
+    expect(received).toEqual(["servers"]);
+    expect(useWorkspaceUiStore.getState().globalSearchOpen).toBe(false);
+  } finally {
+    window.removeEventListener("taomni:command", listener);
+  }
+});

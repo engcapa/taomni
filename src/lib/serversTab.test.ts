@@ -131,4 +131,22 @@ describe("serversTab singleton coordination", () => {
     useAppStore.getState().duplicateTab(SERVERS_TAB_ID);
     expect(useAppStore.getState().tabs.filter((tab) => tab.type === "servers")).toHaveLength(1);
   });
+
+  it("fails closed when backend claim_servers_tab rejects and allows reopening after release", async () => {
+    vi.mocked(invoke).mockRejectedValueOnce(new Error("lock directory unavailable"));
+
+    const opened = await openServersTab();
+    expect(opened).toBe(false);
+    expect(useAppStore.getState().tabs.filter((tab) => tab.type === "servers")).toHaveLength(0);
+    expect(useServersStore.getState().tabBlockedMessage).toContain("lock directory unavailable");
+    expect(hasServersTabClaimMarker()).toBe(false);
+
+    vi.mocked(invoke).mockImplementation(async (cmd: string, args?: unknown) =>
+      invokeStubCommand(cmd, args as Record<string, unknown> | undefined),
+    );
+    expect(await openServersTab()).toBe(true);
+    expect(useAppStore.getState().tabs.filter((tab) => tab.type === "servers")).toHaveLength(1);
+    await releaseServersTabLockSafe();
+    expect(localStorage.getItem(STUB_SERVERS_TAB_LOCK_KEY)).toBeNull();
+  });
 });

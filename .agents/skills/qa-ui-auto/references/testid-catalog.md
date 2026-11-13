@@ -2758,10 +2758,12 @@
 - `[data-testid="server-row-ssh-start"]` — interactive [optional] — F-Servers-1.server-row-ssh-start
 - `[data-testid="server-row-ssh-stop"]` — interactive [optional] — F-Servers-1.server-row-ssh-stop
 - `[data-testid="server-row-ssh-settings"]` — interactive [optional] — F-Servers-1.server-row-ssh-settings
+- `[data-testid="server-row-http-start"]` — interactive [optional] — F-Servers-1.server-row-http-start
+- `[data-testid="server-row-http-stop"]` — interactive [optional] — F-Servers-1.server-row-http-stop
 - `[data-testid="server-settings"]` — display [optional] — F-Servers-1.server-settings
 - `[data-testid="server-log"]` — display [optional] — F-Servers-1.server-log
 - `[data-testid="server-log-autoscroll"]` — interactive [optional] — F-Servers-1.server-log-autoscroll
-- `[data-testid="server-log-clear"]` — display [optional] — F-Servers-1.server-log-clear
+- `[data-testid="server-log-clear"]` — interactive [optional] — F-Servers-1.server-log-clear
 
 ## servers/rdp (F-RdpServer-1)
 

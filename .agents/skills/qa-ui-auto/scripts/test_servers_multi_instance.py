@@ -198,7 +198,7 @@ class ServersMultiInstanceTest(unittest.TestCase):
         def open_servers_for(who: str, page: _FakePage) -> None:
             if state["holder"] and state["holder"] != who:
                 page.counts[servers_multi_instance.BLOCKED_DIALOG] = 1
-                page.texts[servers_multi_instance.BLOCKED_MESSAGE] = "Held by primary"
+                page.texts[servers_multi_instance.BLOCKED_MESSAGE] = f"Held by {state['holder']}"
                 return
             state["holder"] = who
             page.counts[servers_multi_instance.SERVERS_TAB] = 1
@@ -253,6 +253,7 @@ class ServersMultiInstanceTest(unittest.TestCase):
             evidence = json.loads((case_dir / "servers-multi-instance.json").read_text(encoding="utf-8"))
             self.assertEqual(evidence["mode"], "browser")
             self.assertEqual(evidence["blockedMessage"], "Held by primary")
+            self.assertEqual(evidence["primaryBlockedMessage"], "Held by peer")
             self.assertIn(("close", True), peer.events)
 
     def test_native_run_exercises_shared_lock_and_process_termination_recovery(self):
@@ -285,7 +286,7 @@ class ServersMultiInstanceTest(unittest.TestCase):
                 elif selector == servers_multi_instance.SIDEBAR_TOOL_SERVERS:
                     if state["holder"] and state["holder"] != self.who:
                         self.counts[servers_multi_instance.BLOCKED_DIALOG] = 1
-                        self.texts[servers_multi_instance.BLOCKED_MESSAGE] = "Locked by PID 1234"
+                        self.texts[servers_multi_instance.BLOCKED_MESSAGE] = f"Locked by {state['holder']}"
                     else:
                         state["holder"] = self.who
                         self.counts[servers_multi_instance.SERVERS_TAB] = 1
@@ -378,7 +379,8 @@ class ServersMultiInstanceTest(unittest.TestCase):
             self.assertEqual(captured_harness_kwargs["cfg"]["webdriver"]["native_port"], 4551)
             evidence = json.loads((case_dir / "servers-multi-instance.json").read_text(encoding="utf-8"))
             self.assertEqual(evidence["mode"], "native")
-            self.assertEqual(evidence["blockedMessage"], "Locked by PID 1234")
+            self.assertEqual(evidence["blockedMessage"], "Locked by primary")
+            self.assertEqual(evidence["primaryBlockedMessage"], "Locked by peer")
 
 
 if __name__ == "__main__":

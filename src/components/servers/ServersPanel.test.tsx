@@ -1,7 +1,13 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { confirmAppDialog } from "../../lib/appDialogs";
-import { SERVER_ORDER, defaultConfig, type ServerConfig, type ServerType } from "../../lib/servers";
+import {
+  SERVER_ORDER,
+  defaultConfig,
+  saveServerConfig,
+  type ServerConfig,
+  type ServerType,
+} from "../../lib/servers";
 import { useServersStore } from "../../stores/serversStore";
 import { ServersPanel } from "./ServersPanel";
 import { ServersTabBlockedDialog } from "./ServersTabBlockedDialog";
@@ -79,6 +85,36 @@ describe("ServersPanel", () => {
     fireEvent.click(screen.getByTestId("servers-dialog-cancel"));
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
     expect(useServersStore.getState().dirty).toBe(false);
+  });
+
+  it("saves edited configs on Apply, logs running port-change hint, and closes cleanly afterward", async () => {
+    const onClose = vi.fn();
+    render(<ServersPanel onClose={onClose} />);
+    await waitFor(() => expect(useServersStore.getState().loaded).toBe(true));
+
+    act(() => {
+      const store = useServersStore.getState();
+      store.clearLog("http");
+      store.setStatus("http", { serverType: "http", status: "running", pid: 4321 });
+      store.selectServer("http");
+      store.patchConfig("http", { port: 18080 });
+    });
+
+    fireEvent.click(screen.getByTestId("servers-dialog-apply"));
+
+    await waitFor(() => expect(saveServerConfig).toHaveBeenCalledTimes(SERVER_ORDER.length));
+    expect(saveServerConfig).toHaveBeenCalledWith(
+      "http",
+      expect.objectContaining({ port: 18080 }),
+    );
+    expect(useServersStore.getState().dirty).toBe(false);
+    expect(useServersStore.getState().runtimes.http.logLines.join("\n")).toContain(
+      "Restart server to apply port change",
+    );
+
+    fireEvent.click(screen.getByTestId("servers-dialog-cancel"));
+    await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
+    expect(confirmAppDialog).not.toHaveBeenCalled();
   });
 });
 

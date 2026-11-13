@@ -138,6 +138,7 @@ def browser_run(ctx: Any, args: Any) -> str:
     peer_console: list[dict[str, Any]] = []
     evidence = BrowserEvidence(peer, peer_console, peer_root)
     blocked_message = ""
+    primary_blocked_message = ""
 
     try:
         peer.goto(base_url, wait_until="domcontentloaded", timeout=30_000)
@@ -177,6 +178,18 @@ def browser_run(ctx: Any, args: Any) -> str:
             ),
             None,
         )
+
+        # Reverse direction: while peer holds the lease, primary must be blocked cleanly.
+        _click_sidebar_servers_browser(primary)
+        primary.locator(BLOCKED_DIALOG).wait_for(state="visible", timeout=10_000)
+        primary_blocked_message = (primary.locator(BLOCKED_MESSAGE).text_content() or "").strip()
+        if not primary_blocked_message:
+            raise StepError("servers_multi_instance_probe: blocked dialog message was empty on primary page")
+        if primary.locator(SERVERS_TAB).count() != 0 or primary.locator(SERVERS_DIALOG).count() != 0:
+            raise StepError("servers_multi_instance_probe: primary opened Local servers tab while peer held lock")
+        primary.locator(BLOCKED_OK).click()
+        primary.locator(BLOCKED_DIALOG).wait_for(state="detached", timeout=10_000)
+
         evidence.close()
 
         # Closing peer while holding the lock must fire unload cleanup so primary can reclaim.
@@ -200,9 +213,11 @@ def browser_run(ctx: Any, args: Any) -> str:
         {
             "mode": "browser",
             "blockedMessage": blocked_message,
+            "primaryBlockedMessage": primary_blocked_message,
             "assertions": [
                 "peer page blocked while primary held Local servers tab",
                 "peer page acquired Local servers tab after primary closed tab",
+                "primary page blocked while peer held Local servers tab",
                 "primary page reclaimed Local servers tab after peer closed while holding lock",
             ],
         },
@@ -232,6 +247,7 @@ def native_run(ctx: Any, args: Any) -> str:
     port, native_port = free_ports()
     cfg.setdefault("webdriver", {}).update(port=port, native_port=native_port)
     blocked_message = ""
+    primary_blocked_message = ""
 
     with NativeHarness(cfg, peer_root, shared_data_env=shared_env) as harness, ExitStack() as cleanup:
         peer_session = harness.create_session()
@@ -263,6 +279,17 @@ def native_run(ctx: Any, args: Any) -> str:
         _require_one(peer, SERVERS_TAB, "peer process did not open exactly one Local servers tab")
         _require_one(peer, SERVERS_PANEL, "peer process did not render servers-tab-panel")
         native_assert(peer_ctx, None)
+
+        # Reverse direction: while peer holds the OS ModuleLock, primary must be blocked cleanly.
+        _click_sidebar_servers_native(primary)
+        primary.act("wait_for", {"selector": BLOCKED_DIALOG, "timeout_sec": 20})
+        primary_blocked_message = (ctx.session.text(BLOCKED_MESSAGE) or "").strip()
+        if not primary_blocked_message:
+            raise StepError("servers_multi_instance_probe: blocked dialog message was empty in primary process")
+        _require_zero(primary, SERVERS_TAB, "blocked primary process opened a Local servers tab")
+        _require_zero(primary, SERVERS_DIALOG, "blocked primary process rendered servers-dialog")
+        primary.act("click", BLOCKED_OK)
+        primary.until(f"{_count_js(BLOCKED_DIALOG)} === 0", 10)
         # Exit NativeHarness while peer still holds the lock so the OS closes the handle on exit.
 
     _click_sidebar_servers_native(primary)
@@ -276,9 +303,11 @@ def native_run(ctx: Any, args: Any) -> str:
             "mode": "native",
             "platform": platform.system(),
             "blockedMessage": blocked_message,
+            "primaryBlockedMessage": primary_blocked_message,
             "assertions": [
                 "peer process blocked with servers-blocked-dialog while primary held ModuleLock",
                 "peer process acquired Local servers tab after primary closed its tab",
+                "primary process blocked with servers-blocked-dialog while peer held ModuleLock",
                 "primary process reclaimed Local servers tab after peer process terminated while holding lock",
             ],
         },

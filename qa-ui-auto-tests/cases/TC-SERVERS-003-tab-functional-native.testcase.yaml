@@ -1,0 +1,271 @@
+id: TC-SERVERS-003-tab-functional-native
+title: Native Local servers HTTP server start/stop, log lifecycle, port Apply warning, and persistence inside singleton tab
+description: >-
+  Verifies end-to-end native Local servers functional behavior inside the in-app
+  single `servers` tab across Linux, Windows, and macOS: opens via Global Command
+  Palette, configures HTTP on 127.0.0.1:28489, starts the real in-process HTTP
+  server and observes listening log output, preserves running status and live logs
+  across Welcome tab switches, applies an updated port (28490) through on-demand
+  vault setup and observes the restart warning, stops the server, clears logs,
+  closes without a discard prompt, and reopens to verify persisted settings and
+  cleared log state.
+covers:
+- F-Servers-1
+tags:
+- servers
+- regression
+modes:
+- native
+native_platforms:
+- Linux
+- Windows
+- macOS
+fixtures:
+- reset_db
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- wait_for:
+    selector: '[data-testid="welcome-panel"]'
+    timeout_sec: 30
+- click: '[data-testid="global-search-trigger"]'
+- wait_for: '[data-testid="global-search-modal"]'
+- fill:
+    selector: '[data-testid="global-search-input"]'
+    value: Local servers
+- click: '[data-testid="global-search-result"][data-result-id="servers"]'
+- wait_for:
+    selector: '[data-testid="servers-dialog"]'
+    timeout_sec: 20
+- assert_visible: '[data-testid="servers-tab-panel"]'
+- assert_disabled: '[data-testid="server-log-clear"]'
+- click: '[data-testid="server-row-http"]'
+- wait_for: '[data-testid="server-field-bind-address"]'
+- assert_attribute:
+    selector: '[data-testid="server-row-http"]'
+    name: data-status
+    equals: stopped
+- assert_disabled: '[data-testid="server-row-http-stop"]'
+- fill:
+    selector: '[data-testid="server-field-bind-address"]'
+    value: 127.0.0.1
+- fill:
+    selector: '[data-testid="server-field-port"]'
+    value: '28489'
+- click: '[data-testid="server-row-http-start"]'
+- wait_for:
+    selector: '[data-testid="server-row-http"][data-status="running"]'
+    timeout_sec: 20
+- assert_enabled: '[data-testid="server-row-http-stop"]'
+- assert_text:
+    selector: '[data-testid="server-log"]'
+    contains: 127.0.0.1:28489
+    timeout_sec: 10
+- assert_enabled: '[data-testid="server-log-clear"]'
+- click: '[data-testid="tab-item"][data-tab-type="welcome"]'
+- assert_visible: '[data-testid="welcome-panel"]'
+- assert_not_visible: '[data-testid="servers-dialog"]'
+- click: '[data-testid="tab-item"][data-tab-type="servers"]'
+- wait_for: '[data-testid="servers-dialog"]'
+- assert_attribute:
+    selector: '[data-testid="server-row-http"]'
+    name: data-status
+    equals: running
+- assert_text:
+    selector: '[data-testid="server-log"]'
+    contains: 127.0.0.1:28489
+    timeout_sec: 5
+- fill:
+    selector: '[data-testid="server-field-port"]'
+    value: '28490'
+- click: '[data-testid="servers-dialog-apply"]'
+- wait_for:
+    selector: '[data-testid="vault-setup-dialog"]'
+    timeout_sec: 15
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: qa-servers-vault-123
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: qa-servers-vault-123
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for:
+    selector: '[data-testid="vault-setup-dialog"]'
+    state: detached
+    timeout_sec: 15
+- assert_text:
+    selector: '[data-testid="server-log"]'
+    contains: Restart server to apply port change
+    timeout_sec: 10
+- click: '[data-testid="server-row-http-stop"]'
+- wait_for:
+    selector: '[data-testid="server-row-http"][data-status="stopped"]'
+    timeout_sec: 20
+- assert_disabled: '[data-testid="server-row-http-stop"]'
+- click: '[data-testid="server-log-clear"]'
+- assert_disabled: '[data-testid="server-log-clear"]'
+- click: '[data-testid="servers-dialog-cancel"]'
+- wait_for:
+    selector: '[data-testid="servers-dialog"]'
+    state: detached
+    timeout_sec: 10
+- assert_not_visible: '[data-testid="confirm-dialog"]'
+- assert_visible: '[data-testid="welcome-panel"]'
+- click: '[data-testid="global-search-trigger"]'
+- wait_for: '[data-testid="global-search-modal"]'
+- fill:
+    selector: '[data-testid="global-search-input"]'
+    value: Local servers
+- click: '[data-testid="global-search-result"][data-result-id="servers"]'
+- wait_for: '[data-testid="servers-dialog"]'
+- click: '[data-testid="server-row-http"]'
+- wait_for: '[data-testid="server-field-port"]'
+- assert_attribute:
+    selector: '[data-testid="server-field-port"]'
+    name: value
+    equals: '28490'
+- assert_attribute:
+    selector: '[data-testid="server-field-bind-address"]'
+    name: value
+    equals: 127.0.0.1
+- assert_attribute:
+    selector: '[data-testid="server-row-http"]'
+    name: data-status
+    equals: stopped
+- assert_disabled: '[data-testid="server-log-clear"]'
+- click: '[data-testid="tab-item"][data-tab-type="servers"] [data-testid="tab-close"]'
+- wait_for:
+    selector: '[data-testid="servers-dialog"]'
+    state: detached
+    timeout_sec: 10
+- assert_visible: '[data-testid="welcome-panel"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Opening Local servers via Global Command Palette starts the built-in HTTP server on 127.0.0.1:28489 and keeps its running state and log output across tab switches.
+    actions:
+    - 3
+    - 5
+    - 6
+    - 10
+    - 14
+    - 15
+    - 16
+    - 21
+    - 24
+    checkpoints:
+    - step: 7
+      expectation: '{"wait_for": {"selector": "[data-testid=\"servers-dialog\"]", "timeout_sec": 20}}'
+    - step: 8
+      expectation: '{"assert_visible": "[data-testid=\"servers-tab-panel\"]"}'
+    - step: 9
+      expectation: '{"assert_disabled": "[data-testid=\"server-log-clear\"]"}'
+    - step: 12
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"server-row-http\"]", "name": "data-status", "equals": "stopped"}}'
+    - step: 13
+      expectation: '{"assert_disabled": "[data-testid=\"server-row-http-stop\"]"}'
+    - step: 17
+      expectation: '{"wait_for": {"selector": "[data-testid=\"server-row-http\"][data-status=\"running\"]", "timeout_sec": 20}}'
+    - step: 18
+      expectation: '{"assert_enabled": "[data-testid=\"server-row-http-stop\"]"}'
+    - step: 19
+      expectation: '{"assert_text": {"selector": "[data-testid=\"server-log\"]", "contains": "127.0.0.1:28489", "timeout_sec": 10}}'
+    - step: 20
+      expectation: '{"assert_enabled": "[data-testid=\"server-log-clear\"]"}'
+    - step: 22
+      expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"]"}'
+    - step: 23
+      expectation: '{"assert_not_visible": "[data-testid=\"servers-dialog\"]"}'
+    - step: 25
+      expectation: '{"wait_for": "[data-testid=\"servers-dialog\"]"}'
+    - step: 26
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"server-row-http\"]", "name": "data-status", "equals": "running"}}'
+    - step: 27
+      expectation: '{"assert_text": {"selector": "[data-testid=\"server-log\"]", "contains": "127.0.0.1:28489", "timeout_sec": 5}}'
+    results:
+    - 8
+    - 17
+    - 18
+    - 19
+    - 23
+    - 26
+    - 27
+  - id: R2
+    requirement: Applying an edited port on a running HTTP server completes on-demand vault setup, logs the restart hint, stops cleanly, and clears logs.
+    actions:
+    - 28
+    - 29
+    - 31
+    - 32
+    - 33
+    - 36
+    - 39
+    checkpoints:
+    - step: 30
+      expectation: '{"wait_for": {"selector": "[data-testid=\"vault-setup-dialog\"]", "timeout_sec": 15}}'
+    - step: 34
+      expectation: '{"wait_for": {"selector": "[data-testid=\"vault-setup-dialog\"]", "state": "detached", "timeout_sec": 15}}'
+    - step: 35
+      expectation: '{"assert_text": {"selector": "[data-testid=\"server-log\"]", "contains": "Restart server to apply port change", "timeout_sec": 10}}'
+    - step: 37
+      expectation: '{"wait_for": {"selector": "[data-testid=\"server-row-http\"][data-status=\"stopped\"]", "timeout_sec": 20}}'
+    - step: 38
+      expectation: '{"assert_disabled": "[data-testid=\"server-row-http-stop\"]"}'
+    - step: 40
+      expectation: '{"assert_disabled": "[data-testid=\"server-log-clear\"]"}'
+    results:
+    - 35
+    - 37
+    - 38
+    - 40
+  - id: R3
+    requirement: After Apply, Cancel closes immediately without a discard prompt, reopening preserves the saved 28490 port and cleared log, and closing via tab-close detaches cleanly.
+    actions:
+    - 41
+    - 45
+    - 47
+    - 48
+    - 50
+    - 56
+    checkpoints:
+    - step: 42
+      expectation: '{"wait_for": {"selector": "[data-testid=\"servers-dialog\"]", "state": "detached", "timeout_sec": 10}}'
+    - step: 43
+      expectation: '{"assert_not_visible": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 44
+      expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"]"}'
+    - step: 49
+      expectation: '{"wait_for": "[data-testid=\"servers-dialog\"]"}'
+    - step: 52
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"server-field-port\"]", "name": "value", "equals": "28490"}}'
+    - step: 53
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"server-field-bind-address\"]", "name": "value", "equals": "127.0.0.1"}}'
+    - step: 54
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"server-row-http\"]", "name": "data-status", "equals": "stopped"}}'
+    - step: 55
+      expectation: '{"assert_disabled": "[data-testid=\"server-log-clear\"]"}'
+    - step: 57
+      expectation: '{"wait_for": {"selector": "[data-testid=\"servers-dialog\"]", "state": "detached", "timeout_sec": 10}}'
+    - step: 58
+      expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"]"}'
+    - step: 59
+      expectation: '{"assert_no_runtime_errors": null}'
+    results:
+    - 43
+    - 44
+    - 52
+    - 53
+    - 54
+    - 55
+    - 58
+    - 59
+  visual:
+  - check: HTTP server configuration, running status indicator, server log output, and vault setup prompt render inside the single servers tab on Linux, Windows, and macOS.
+    method: not-applicable
+    reason: Verified natively across desktop WebViews through live control state, port binding, and layout visibility checks rather than static screenshot diffing.
+  native:
+  - check: Real Tauri server_configs persistence, built-in TCP/HTTP bind and shutdown, and live event streaming across tab lifecycle.
+    method: automated
+    reason: Exercises real Rust HTTP ServerRegistry, SQLite persistence, and OS socket lifecycle in packaged native builds.

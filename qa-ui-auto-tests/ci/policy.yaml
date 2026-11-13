@@ -753,3 +753,4 @@ cases:
 - TC-BACKUP-MAIL-001
 - TC-SERVERS-001-tab-singleton-browser
 - TC-SERVERS-002-tab-singleton-native
+- TC-SERVERS-003-tab-functional-native
