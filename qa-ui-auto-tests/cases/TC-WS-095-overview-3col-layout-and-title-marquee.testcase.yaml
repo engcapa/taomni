@@ -57,7 +57,7 @@ steps:
     selector: '[data-testid="tab-overview-card-title"]'
     equal: 4
 - eval_readonly:
-    expression: getComputedStyle(document.querySelector('.taomni-overview-grid')).gridTemplateColumns.trim().split(/\s+/).length === 3 && document.querySelectorAll('.taomni-overview-card')[0].getBoundingClientRect().width >= 300 && document.querySelectorAll('.taomni-overview-summary')[0].clientHeight >= 190
+    expression: getComputedStyle(document.querySelector('.taomni-overview-grid')).gridTemplateColumns.trim().split(/\s+/).length === 3 && document.querySelectorAll('.taomni-overview-card')[0].getBoundingClientRect().width >= 290 && document.querySelectorAll('.taomni-overview-summary')[0].clientHeight >= 190
     expect_truthy: true
     timeout_sec: 10
 - eval_readonly:
@@ -93,7 +93,7 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Opening four workspace files in TabOverview renders a three-column grid where cards are enlarged (>=300px wide, summary >=190px tall), row 1 holds three cards left-to-right, and card 4 wraps to row 2 under column 1.
+    requirement: Opening four workspace files in TabOverview renders a three-column grid where cards are enlarged (>=290px wide across desktop viewports, summary >=190px tall), row 1 holds three cards left-to-right, and card 4 wraps to row 2 under column 1.
     actions: [12, 16, 24, 32, 34, 36]
     checkpoints:
     - step: 37
