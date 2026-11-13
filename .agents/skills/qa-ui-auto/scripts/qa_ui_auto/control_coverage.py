@@ -70,7 +70,7 @@ INTERACTIVE_VERBS = {
     "middle_click",
     "click", "dblclick", "right_click", "hover", "drag_to", "drag_path", "native_click",
     "native_pointer_drag", "native_window_drag", "os_file_drag",
-    "native_folder_dialog",
+    "native_folder_dialog", "native_file_dialog", "native_paste", "terminal_file_link",
     "fill", "type", "send_keys", "terminal_input", "press", "blur", "select_option", "upload_file",
     "set_check", "send_text_via_label", "open_session", "click_menu",
     "quick_connect", "auth", "attach_sftp", "set_remote_path",
@@ -202,7 +202,7 @@ def _selectors_in_step(verb: str, args: Any) -> list[str]:
         return out
     if not isinstance(args, dict):
         return out
-    if verb == "native_folder_dialog":
+    if verb in {"native_folder_dialog", "native_file_dialog"}:
         return [args["trigger"]] if isinstance(args.get("trigger"), str) else []
     # Rich form: pluck known selector-bearing keys.
     if "selector" in args and isinstance(args["selector"], str):
@@ -249,6 +249,17 @@ def _touches_for_case(case) -> list[Touch]:  # case: TestCase
                 observed += ("mobile-terminal-screen", "mobile-terminal-status")
             for names, kind in ((interacted, "interactive"), (observed, "display")):
                 out.extend(Touch(case_id=case.id, selector=f'[data-testid="{name}"]', kind=kind) for name in names)
+            continue
+        if verb == "viewer_raster" and isinstance(args, dict):
+            if args.get("action") == "wheel":
+                out.append(Touch(case_id=case.id, selector='[data-testid="image-stage"]', kind="interactive"))
+            continue
+        if verb == "show_explorer_preview":
+            out.append(Touch(case_id=case.id, selector='[data-testid="explorer-cmd-preview"]', kind="interactive"))
+            out.append(Touch(case_id=case.id, selector='[data-testid="explorer-preview"]', kind="display"))
+            continue
+        if verb == "html_preview_click":
+            out.append(Touch(case_id=case.id, selector='[data-testid="html-frame"]', kind="interactive"))
             continue
         if verb == "assert_download" and isinstance(args, dict):
             # This artifact assertion clicks its trigger exactly once before

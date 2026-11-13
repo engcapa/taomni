@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { FileText, RotateCcw } from "lucide-react";
 import { AppProxyPanel } from "./AppProxyPanel";
 import { useLocale } from "../../lib/i18n";
@@ -25,6 +25,19 @@ export function FileOpenSettings() {
   const [extension, setExtension] = useState("");
   const [extensionError, setExtensionError] = useState(false);
   const [customHandler, setCustomHandler] = useState<Handler>("taomni");
+  // A real keyboard replacement first clears the field. Keep that intermediate
+  // draft visible instead of immediately restoring a validated default value.
+  const [imageDir, setImageDir] = useState(preferences.markdownImageDir);
+  const [imageTemplate, setImageTemplate] = useState(preferences.markdownImageTemplate);
+  const [fontSize, setFontSize] = useState(String(preferences.fontSize));
+  useEffect(() => setImageDir(preferences.markdownImageDir), [preferences.markdownImageDir]);
+  useEffect(() => setImageTemplate(preferences.markdownImageTemplate), [preferences.markdownImageTemplate]);
+  useEffect(() => setFontSize(String(preferences.fontSize)), [preferences.fontSize]);
+  const restoreDefaults = () => {
+    resetFileOpenPreferences();
+    const next = useFileOpenPreferences.getState();
+    setImageDir(next.markdownImageDir); setImageTemplate(next.markdownImageTemplate); setFontSize(String(next.fontSize));
+  };
   const update = setFileOpenPreferences;
   const handlerLabel = (handler: Handler) => ({
     taomni: label("用 Taomni 打开", "Open with Taomni"),
@@ -62,7 +75,7 @@ export function FileOpenSettings() {
             "Choose the default behavior across Explorer, terminal links, Workspace, mail and AI conversations.",
           )}</p>
         </div>
-        <button type="button" data-testid="file-open-settings-reset" className="taomni-btn inline-flex h-7 shrink-0 items-center gap-1" onClick={() => resetFileOpenPreferences()}>
+        <button type="button" data-testid="file-open-settings-reset" className="taomni-btn inline-flex h-7 shrink-0 items-center gap-1" onClick={restoreDefaults}>
           <RotateCcw className="h-3.5 w-3.5" />{label("恢复默认", "Restore defaults")}
         </button>
       </div>
@@ -124,9 +137,9 @@ export function FileOpenSettings() {
       <h3 className="mb-3 mt-5 text-[13px] font-semibold">Markdown</h3>
       <div className="grid grid-cols-[minmax(120px,170px)_minmax(0,1fr)] items-center gap-3">
         <label htmlFor="file-open-image-dir">{label("粘贴图片保存到", "Save pasted images to")}</label>
-        <div><input id="file-open-image-dir" data-testid="file-open-image-dir" className="taomni-input h-8 w-full max-w-sm" value={preferences.markdownImageDir} onChange={(event) => update({ markdownImageDir: event.target.value })} /><p className="mt-1 text-[var(--taomni-text-muted)]">{label("文档同级 assets/ 文件夹", "assets/ folder next to the document")}</p></div>
+        <div><input id="file-open-image-dir" data-testid="file-open-image-dir" className="taomni-input h-8 w-full max-w-sm" value={imageDir} onChange={(event) => { const value = event.target.value; setImageDir(value); if (value.trim()) update({ markdownImageDir: value }); }} onBlur={() => { if (!imageDir.trim()) setImageDir(preferences.markdownImageDir); }} /><p className="mt-1 text-[var(--taomni-text-muted)]">{label("文档同级 assets/ 文件夹", "assets/ folder next to the document")}</p></div>
         <label htmlFor="file-open-image-template">{label("文件名模板", "File name template")}</label>
-        <div><input id="file-open-image-template" data-testid="file-open-image-template" className="taomni-input h-8 w-full max-w-sm font-mono" value={preferences.markdownImageTemplate} onChange={(event) => update({ markdownImageTemplate: event.target.value })} /><p className="mt-1 text-[var(--taomni-text-muted)]">{label("文件名模板 image-{日期}-{时间}.png", "Template image-{date}-{time}.png")}</p></div>
+        <div><input id="file-open-image-template" data-testid="file-open-image-template" className="taomni-input h-8 w-full max-w-sm font-mono" value={imageTemplate} onChange={(event) => { const value = event.target.value; setImageTemplate(value); if (value.trim()) update({ markdownImageTemplate: value }); }} onBlur={() => { if (!imageTemplate.trim()) setImageTemplate(preferences.markdownImageTemplate); }} /><p className="mt-1 text-[var(--taomni-text-muted)]">{label("文件名模板 image-{日期}-{时间}.png", "Template image-{date}-{time}.png")}</p></div>
         <span>{label("图片链接", "Image links")}</span><span>{label("相对路径（推荐）", "Relative paths (recommended)")}</span>
         <span>{label("粘贴网页/Excel 表格", "Paste web/Excel tables")}</span>
         <label className="flex items-center gap-2"><input type="checkbox" data-testid="file-open-convert-tables" checked={preferences.convertTables} onChange={(event) => update({ convertTables: event.target.checked })} />{label("自动转为 Markdown 表格", "Convert to Markdown tables automatically")}</label>
@@ -154,7 +167,7 @@ export function FileOpenSettings() {
       <h3 className="mb-3 mt-5 text-[13px] font-semibold">{label("编辑器偏好", "Editor preferences")}</h3>
       <div className="flex flex-wrap items-center gap-5">
         <label className="flex items-center gap-2"><input type="checkbox" data-testid="file-open-wrap" checked={preferences.wrap} onChange={(event) => update({ wrap: event.target.checked })} />{label("自动换行", "Word wrap")}</label>
-        <label className="flex items-center gap-2">{label("字号", "Font size")}<input type="number" min={10} max={32} id="file-open-font-size" data-testid="file-open-font-size" className="taomni-input h-8 w-20" value={preferences.fontSize} onChange={(event) => { const value = Number(event.target.value); if (Number.isFinite(value) && value >= 10 && value <= 32) update({ fontSize: value }); }} /></label>
+        <label className="flex items-center gap-2">{label("字号", "Font size")}<input type="number" min={10} max={32} id="file-open-font-size" data-testid="file-open-font-size" className="taomni-input h-8 w-20" value={fontSize} onChange={(event) => { const raw = event.target.value; setFontSize(raw); const value = Number(raw); if (raw && Number.isFinite(value) && value >= 10 && value <= 32) update({ fontSize: value }); }} onBlur={() => setFontSize(String(useFileOpenPreferences.getState().fontSize))} /></label>
       </div>
     </section>
   );

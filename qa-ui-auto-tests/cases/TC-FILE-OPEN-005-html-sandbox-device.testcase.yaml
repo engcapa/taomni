@@ -37,6 +37,8 @@ steps:
 - press:
     selector: '[data-testid="explorer-address"]'
     key: Enter
+- wait_for: '[data-testid="explorer-file-row"][data-name="report.html"]'
+- show_explorer_preview: null
 - click: '[data-testid="explorer-file-row"][data-name="report.html"]'
 - wait_for: '[data-testid="explorer-preview"]'
 - click: '[data-testid="explorer-preview-open"]'
@@ -143,84 +145,84 @@ verification:
     requirement: HTML executes author scripts only in opaque sandbox, resolves local CSS/PNG and blocks parent DOM/network
       by default.
     actions:
-    - 9
     - 11
-    - 18
+    - 13
+    - 20
     checkpoints:
-    - step: 13
+    - step: 15
       expectation: Sandbox grants scripts but never allow-same-origin or top navigation.
-    - step: 14
+    - step: 16
       expectation: File address is a real readonly input.
-    - step: 19
-      expectation: Real iframe author script reached the console bridge.
-    - step: 20
-      expectation: Fixture independently observes exact local CSS color and decoded PNG width.
     - step: 21
-      expectation: Attempted parent DOM access throws across the opaque origin.
+      expectation: Real iframe author script reached the console bridge.
     - step: 22
-      expectation: Fixture network fetch is rejected under default policy.
+      expectation: Fixture independently observes exact local CSS color and decoded PNG width.
     - step: 23
+      expectation: Attempted parent DOM access throws across the opaque origin.
+    - step: 24
+      expectation: Fixture network fetch is rejected under default policy.
+    - step: 25
       expectation: No successful outbound-network marker appears.
     results:
-    - 13
-    - 14
-    - 19
-    - 20
+    - 15
+    - 16
     - 21
     - 22
     - 23
+    - 24
+    - 25
   - id: R2
     requirement: Device width, zoom, source split, console clear/refresh and per-tab network policy have observable effects
       without writing source.
     actions:
-    - 24
-    - 27
+    - 26
     - 29
     - 31
-    - 32
-    - 36
+    - 33
+    - 34
     - 38
     - 40
-    - 44
-    - 49
+    - 42
+    - 46
+    - 51
     checkpoints:
-    - step: 26
-      expectation: Mobile iframe actually measures 390 CSS px.
     - step: 28
-      expectation: Tablet iframe actually measures 768 CSS px.
+      expectation: Mobile iframe actually measures 390 CSS px.
     - step: 30
+      expectation: Tablet iframe actually measures 768 CSS px.
+    - step: 32
       expectation: 75 percent tablet zoom measures 576 CSS px.
-    - step: 34
+    - step: 36
       expectation: Source split shows actual file code.
-    - step: 37
-      expectation: Preview-only mode hides source pane.
     - step: 39
+      expectation: Preview-only mode hides source pane.
+    - step: 41
       expectation: Clear removes current console entries.
-    - step: 42
+    - step: 44
       expectation: Refresh runs the real iframe script again.
-    - step: 43
+    - step: 45
       expectation: Preview controls leave the entire HTML source unchanged.
-    - step: 48
+    - step: 50
       expectation: Temporary allow shows its tag-scoped policy.
-    - step: 51
+    - step: 53
       expectation: Explicit block restores blocked policy.
-    - step: 52
+    - step: 54
       expectation: HTML frame lifecycle has no uncaught runtime error.
-    - step: 47
+    - step: 49
       expectation: Allow-once preview uses the configured application proxy mode via scoped backend session.
     results:
-    - 26
     - 28
     - 30
-    - 34
-    - 37
+    - 32
+    - 36
     - 39
-    - 42
-    - 43
-    - 48
-    - 51
-    - 52
-    - 47
+    - 41
+    - 44
+    - 45
+    - 50
+    - 53
+    - 54
+    - 49
   visual:
   - check: Device toolbar/console/source pane layout
     method: automated

@@ -95,6 +95,10 @@
           "explorer_files",
           "file_open_files",
           "file_open_mail",
+          "html_network_test",
+          "file_open_entries",
+          "markdown_native",
+          "file_open_raster",
           "explorer_large_directory",
           "workspace_search_large",
           "workspace_compact_tree",
@@ -548,6 +552,14 @@
         "drag_to": {
           "$ref": "#/$defs/drag_arg"
         },
+        "viewer_raster": {"oneOf": [{"type": "object", "additionalProperties": false, "required": ["action", "deltaY"], "properties": {"action": {"const": "wheel"}, "deltaY": {"type": "integer", "minimum": -1200, "maximum": 1200, "not": {"const": 0}}}}, {"type": "object", "additionalProperties": false, "required": ["action", "kind"], "properties": {"action": {"const": "clipboard"}, "kind": {"enum": ["image", "path"]}}}]},
+        "show_explorer_preview": {"type": "null", "description": "Idempotent real active Explorer toolbar action: when preview hidden click cmd-preview once then require visible; never changes product state directly."},
+        "native_file_dialog": {"type": "object","additionalProperties": false,"required": ["kind","action"],"properties": {"kind": {"enum": ["save","open","folder"]},"action": {"enum": ["choose","cancel"]},"path": {"type": "string","minLength": 1},"trigger": {"$ref": "#/$defs/selector"},"title": {"type": "string","minLength": 1}}},
+        "native_paste": {"type": "object","additionalProperties": false,"required": ["selector"],"properties": {"selector": {"$ref": "#/$defs/selector"}}},
+        "assert_markdown_artifact": {"type": "object","additionalProperties": false,"required": ["kind","path","source"],"properties": {"kind": {"enum": ["source","pasted-image","html","png","docx","markdown","absent"]},"path": {"type": "string","minLength": 1},"source": {"type": "string","minLength": 1},"timeout_sec": {"type": "number","minimum": 0,"maximum": 60}}},
+        "html_preview_click": {"type": "object","additionalProperties": false,"required": ["target"],"properties": {"target": {"enum": ["next","external","spoof-invalid","spoof-valid","slow","security"]}}},
+        "assert_html_network": {"type": "object","additionalProperties": false,"required": ["state"],"properties": {"state": {"enum": ["blocked","app","custom","none","invalid","slow-started","cancelled","external-cancelled","scripts-off"]}}},
+        "terminal_file_link": {"type": "object","additionalProperties": false,"required": ["selector"],"properties": {"selector": {"$ref": "#/$defs/selector"}}},
         "assert_file_open_bytes": {
           "type": "object", "additionalProperties": false,
           "properties": {

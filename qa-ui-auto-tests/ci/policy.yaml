@@ -1,6 +1,12 @@
 # Register new cases after checking modes, fixtures and hosted capabilities.
 schema: qa-ui-auto.ci-policy.v1
 smoke:
+- TC-FILE-OPEN-012
+- TC-FILE-OPEN-011
+- TC-FILE-OPEN-007
+- TC-FILE-OPEN-008
+- TC-FILE-OPEN-009
+- TC-FILE-OPEN-010
 - TC-001
 - TC-NATIVE-CORE-001
 - TC-WS-038
@@ -24,6 +30,12 @@ smoke:
 - TC-FILE-OPEN-006
 unavailable: {}
 cases:
+- TC-FILE-OPEN-012
+- TC-FILE-OPEN-011
+- TC-FILE-OPEN-007
+- TC-FILE-OPEN-008
+- TC-FILE-OPEN-009
+- TC-FILE-OPEN-010
 - TC-FILE-OPEN-001
 - TC-FILE-OPEN-002
 - TC-FILE-OPEN-003

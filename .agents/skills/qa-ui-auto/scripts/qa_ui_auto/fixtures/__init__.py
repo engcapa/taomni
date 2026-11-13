@@ -70,6 +70,7 @@ from . import project_tree
 from . import workspace_search_large
 from . import workspace_explorer, workspace_hidden_entries, workspace_slow_lsp
 from . import workspace_drop_import, workspace_file_clipboard, explorer_files, file_open_files
+from . import markdown_native, file_open_entries, html_network_test, raster_files
 from . import workspace_language_files, workspace_slow_sdk
 from . import workspace_watch
 from . import workspace_large_directory, workspace_home_documents
@@ -154,6 +155,10 @@ REGISTRY: dict[str, Fixture] = {
     "explorer_files": Fixture("explorer_files", explorer_files.setup, explorer_files.teardown),
     "file_open_files": Fixture("file_open_files", file_open_files.setup, file_open_files.teardown),
     "file_open_mail": Fixture("file_open_mail", file_open_files.setup_mail, mail_server.teardown),
+    "markdown_native": Fixture("markdown_native", markdown_native.setup, markdown_native.teardown),
+    "file_open_entries": Fixture("file_open_entries", file_open_entries.setup, file_open_entries.teardown),
+    "html_network_test": Fixture("html_network_test", html_network_test.setup, html_network_test.teardown),
+    "file_open_raster": Fixture("file_open_raster", raster_files.setup, raster_files.teardown),
     "explorer_large_directory": Fixture("explorer_large_directory", explorer_files.setup_large, explorer_files.teardown),
     "workspace_compact_tree": Fixture("workspace_compact_tree", workspace_compact_tree.setup),
     "workspace_hidden_entries": Fixture("workspace_hidden_entries", workspace_hidden_entries.setup),

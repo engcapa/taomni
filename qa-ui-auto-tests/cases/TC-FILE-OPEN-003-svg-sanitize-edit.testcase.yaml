@@ -1,8 +1,8 @@
 id: TC-FILE-OPEN-003
 title: SVG preview is sanitized while split editing saves only the user's raw source
-description: AC01/02/06/07. Explorer SVG preview and ImageViewer render real sanitized blobs. Raw malicious source stays unchanged
-  until an explicit edit/save. Native uses real viewer byte IPC plus independent host rereads; browser uses VFS only. Source
-  sanitization is checked without disabling the iframe/security boundary.
+description: AC01/02/06/07. Explorer SVG preview and ImageViewer render real sanitized blobs. Raw malicious source stays unchanged until an explicit edit/save.
+  Native uses real viewer byte IPC plus independent host rereads; browser uses VFS only. Source sanitization is checked without disabling the iframe/security
+  boundary.
 modes:
 - browser
 - native
@@ -36,6 +36,8 @@ steps:
 - press:
     selector: '[data-testid="explorer-address"]'
     key: Enter
+- wait_for: '[data-testid="explorer-file-row"][data-name="unsafe.svg"]'
+- show_explorer_preview: null
 - click: '[data-testid="explorer-file-row"][data-name="unsafe.svg"]'
 - wait_for: '[data-testid="explorer-preview-sanitized"]'
 - assert_visible: '[data-testid="explorer-preview-image"]'
@@ -46,8 +48,7 @@ steps:
 - wait_for: '[data-testid="image-viewer"] [data-testid="image-render"]'
 - assert_visible: '[data-testid="image-sanitized"]'
 - eval_readonly:
-    expression: document.querySelector(".image-render").complete && document.querySelector(".image-render").naturalWidth >
-      0 && !window.FILE_OPEN_SVG_UNSAFE
+    expression: document.querySelector(".image-render").complete && document.querySelector(".image-render").naturalWidth > 0 && !window.FILE_OPEN_SVG_UNSAFE
     expect_truthy: true
     timeout_sec: 10
 - click: '[data-testid="image-zoom-in"]'
@@ -72,8 +73,7 @@ steps:
 
       '
 - eval_readonly:
-    expression: document.querySelector(".image-render").complete && document.querySelector(".image-render").naturalWidth ===
-      160
+    expression: document.querySelector(".image-render").complete && document.querySelector(".image-render").naturalWidth === 160
     expect_truthy: true
     timeout_sec: 10
 - click: '[data-testid="viewer-save"]'
@@ -82,11 +82,12 @@ steps:
     sha256: ${fixture.file_open_svg_saved_sha}
 - click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
 - click: '[data-testid="tab-item"][data-tab-type="file-browser"]'
+- wait_for: '[data-testid="explorer-file-row"][data-name="unsafe.svg"]'
+- show_explorer_preview: null
 - dblclick: '[data-testid="explorer-file-row"][data-name="unsafe.svg"]'
 - wait_for: '[data-testid="image-render"]'
 - eval_readonly:
-    expression: document.querySelector(".image-render").complete && document.querySelector(".image-render").naturalWidth ===
-      160
+    expression: document.querySelector(".image-render").complete && document.querySelector(".image-render").naturalWidth === 160
     expect_truthy: true
     timeout_sec: 10
 - assert_no_runtime_errors: null
@@ -97,54 +98,54 @@ verification:
   - id: R1
     requirement: SVG preview/viewer decode a sanitized image, preserve original malicious source, and transforms do not write.
     actions:
-    - 9
-    - 13
-    - 17
-    - 18
+    - 11
+    - 15
     - 19
     - 20
     - 21
     - 22
+    - 23
     - 24
+    - 26
     checkpoints:
-    - step: 11
+    - step: 13
       expectation: Explorer renders SVG preview.
-    - step: 12
+    - step: 14
       expectation: Preview sanitization did not modify source bytes.
-    - step: 16
+    - step: 18
       expectation: Viewer image really decodes and its script cannot set the parent marker.
-    - step: 23
+    - step: 25
       expectation: Zoom/rotate/flip/background leave exact original bytes unchanged.
-    - step: 26
+    - step: 28
       expectation: Code mode still shows original unsanitized source.
     results:
-    - 11
-    - 12
-    - 16
-    - 23
-    - 26
+    - 13
+    - 14
+    - 18
+    - 25
+    - 28
   - id: R2
     requirement: Split source edits update rendering and explicit Save persists exact user source across close/reopen.
     actions:
-    - 27
     - 29
     - 31
     - 33
     - 35
+    - 39
     checkpoints:
-    - step: 30
-      expectation: Actual SVG image dimensions update from the edited source before save.
     - step: 32
+      expectation: Actual SVG image dimensions update from the edited source before save.
+    - step: 34
       expectation: Exact browser/native file bytes match the clean user source.
-    - step: 37
+    - step: 41
       expectation: Reopened image decodes with the persisted new dimensions.
-    - step: 38
+    - step: 42
       expectation: Sanitize/edit/close lifecycle has no uncaught runtime errors.
     results:
-    - 30
     - 32
-    - 37
-    - 38
+    - 34
+    - 41
+    - 42
   visual:
   - check: Checker/light/dark image stage and split proportions
     method: manual

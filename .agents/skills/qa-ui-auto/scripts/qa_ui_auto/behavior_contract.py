@@ -16,6 +16,8 @@ import yaml
 
 def is_check(step: dict) -> bool:
     verb, args = next(iter(step.items()))
+    if verb == "viewer_raster":
+        return isinstance(args, dict) and args.get("action") == "clipboard"
     if verb == "file_clipboard":
         return args.get("action") == "assert"
     if verb == "system_file_paste":

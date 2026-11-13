@@ -1,0 +1,291 @@
+id: TC-FILE-OPEN-009
+title: Native HTML resources use selected proxies, reject escapes and cancel on token close
+description: AC16/17/22. Real packaged WebView loads per-case local HTML/CSS/JS/PNG and its author script requests independently logged
+  loopback resources. App/custom/no-proxy listeners distinguish actual native routes; a bound non-listening proxy proves no direct fallback.
+  A slow origin independently observes connection cancellation after tab closure. No direct Rust invocation, forged product state or
+  parent iframe-DOM inspection substitutes for WebView requests. Windows requires a real symlink or junction; unavailable setup fails
+  rather than skipping.
+modes:
+- native
+covers:
+- F-FILEOPEN-1
+- F-EXPLORER-1
+tags:
+- p0
+- file-open
+- html
+- sandbox
+- security
+- crash-regression
+fixtures:
+- reset_db
+- html_network_test
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-html-native-network
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-file-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Control+l
+    macos_key: Meta+l
+- fill:
+    selector: '[data-testid="explorer-address"]'
+    value: ${fixture.html_network_root}
+- press:
+    selector: '[data-testid="explorer-address"]'
+    key: Enter
+- dblclick: '[data-testid="explorer-file-row"][data-name="default.html"]'
+- wait_for: '[data-testid="html-preview"][data-loaded="true"]'
+- click: '[data-testid="html-console-toggle"]'
+- assert_text:
+    selector: '[data-testid="html-console"]'
+    contains: HTML_QA LOCAL rgb(12, 34, 56) 1 loaded
+    timeout_sec: 20
+- assert_text:
+    selector: '[data-testid="html-console"]'
+    contains: HTML_QA PARENT BLOCKED
+- assert_text:
+    selector: '[data-testid="html-console"]'
+    contains: HTML_QA IPC_GLOBAL undefined
+- assert_html_network:
+    state: blocked
+- click: '[data-testid="html-network-allow"]'
+- wait_for: '[data-testid="html-network-proxy"]'
+- assert_attribute:
+    selector: '[data-testid="html-network-proxy"]'
+    name: data-proxy-mode
+    equals: app
+- assert_html_network:
+    state: app
+- html_preview_click:
+    target: next
+- assert_text:
+    selector: '[data-testid="html-console"]'
+    contains: HTML_QA NEXT READY
+- assert_enabled: '[data-testid="html-back"]'
+- click: '[data-testid="html-back"]'
+- assert_enabled: '[data-testid="html-forward"]'
+- click: '[data-testid="html-forward"]'
+- eval_readonly:
+    expression: document.querySelector('.html-address input').value.endsWith('/next.html')
+    expect_truthy: true
+- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: files and opening
+- wait_for: '[data-testid="file-open-settings"]'
+- select_option:
+    selector: '[data-testid="html-preview-proxy-mode"]'
+    value: custom
+- fill:
+    selector: '[data-testid="html-preview-custom-proxy-panel"] input[aria-label="Proxy host"]'
+    value: 127.0.0.1
+- fill:
+    selector: '[data-testid="html-preview-custom-proxy-panel"] input[type="number"]'
+    value: ${fixture.html_network_custom_port}
+- click: '[data-testid="tab-item"][data-tab-type="file-browser"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="custom.html"]'
+- wait_for: '[data-testid="html-preview"][data-loaded="true"]'
+- click: '[data-testid="html-console-toggle"]'
+- click: '[data-testid="html-network-allow"]'
+- wait_for: '[data-testid="html-network-proxy"]'
+- assert_attribute:
+    selector: '[data-testid="html-network-proxy"]'
+    name: data-proxy-mode
+    equals: custom
+- assert_html_network:
+    state: custom
+- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: files and opening
+- select_option:
+    selector: '[data-testid="html-preview-proxy-mode"]'
+    value: none
+- click: '[data-testid="tab-item"][data-tab-type="file-browser"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="none.html"]'
+- wait_for: '[data-testid="html-preview"][data-loaded="true"]'
+- click: '[data-testid="html-console-toggle"]'
+- click: '[data-testid="html-network-allow"]'
+- wait_for: '[data-testid="html-network-proxy"]'
+- assert_attribute:
+    selector: '[data-testid="html-network-proxy"]'
+    name: data-proxy-mode
+    equals: none
+- assert_html_network:
+    state: none
+- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: files and opening
+- select_option:
+    selector: '[data-testid="html-preview-proxy-mode"]'
+    value: custom
+- fill:
+    selector: '[data-testid="html-preview-custom-proxy-panel"] input[type="number"]'
+    value: ${fixture.html_network_invalid_port}
+- click: '[data-testid="tab-item"][data-tab-type="file-browser"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="invalid.html"]'
+- wait_for: '[data-testid="html-preview"][data-loaded="true"]'
+- click: '[data-testid="html-console-toggle"]'
+- click: '[data-testid="html-network-allow"]'
+- wait_for: '[data-testid="html-network-proxy"]'
+- assert_html_network:
+    state: invalid
+- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: files and opening
+- select_option:
+    selector: '[data-testid="html-preview-proxy-mode"]'
+    value: none
+- click: '[data-testid="tab-item"][data-tab-type="file-browser"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="security.html"]'
+- wait_for: '[data-testid="html-preview"][data-loaded="true"]'
+- click: '[data-testid="html-console-toggle"]'
+- html_preview_click:
+    target: security
+- assert_pattern:
+    selector: '[data-testid="html-console"]'
+    regex: HTML_QA TRAVERSAL (403|BLOCKED)
+- assert_pattern:
+    selector: '[data-testid="html-console"]'
+    regex: HTML_QA LAYERED (403|BLOCKED)
+- assert_pattern:
+    selector: '[data-testid="html-console"]'
+    regex: HTML_QA SYMLINK (403|BLOCKED)
+- assert_pattern:
+    selector: '[data-testid="html-console"]'
+    regex: HTML_QA CROSS_TOKEN (403|BLOCKED)
+- assert_text:
+    selector: '[data-testid="html-console"]'
+    contains: HTML_QA IPC BLOCKED
+- assert_text:
+    selector: '[data-testid="html-console"]'
+    contains: HTML_QA SECURITY DONE
+- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="slow.html"]'
+- wait_for: '[data-testid="html-preview"][data-loaded="true"]'
+- click: '[data-testid="html-console-toggle"]'
+- click: '[data-testid="html-network-allow"]'
+- wait_for: '[data-testid="html-network-proxy"]'
+- html_preview_click:
+    target: slow
+- assert_html_network:
+    state: slow-started
+- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- assert_html_network:
+    state: cancelled
+- assert_no_runtime_errors: null
+- screenshot: html-native-network-closed.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: The actual WebView resolves local assets and cannot reach parent/native IPC; default HTTP requests never reach the
+      origin.
+    actions:
+    - 9
+    - 11
+    checkpoints:
+    - step: 12
+      expectation: Exact CSS color, PNG natural width and external local JS marker arrive through the real console bridge.
+    - step: 13
+      expectation: Parent DOM access is denied by the opaque origin.
+    - step: 14
+      expectation: No Tauri IPC object is injected into the HTML frame.
+    - step: 15
+      expectation: Author fetch rejects and independently logged origin/proxy request count stays zero for default policy.
+    results:
+    - 12
+    - 13
+    - 14
+    - 15
+  - id: R2
+    requirement: Allow-once uses the selected application/custom/no-proxy route and configured proxy failure never falls back to direct.
+    actions:
+    - 16
+    - 31
+    - 38
+    - 45
+    - 50
+    - 57
+    - 63
+    checkpoints:
+    - step: 19
+      expectation: Origin and application proxy both log actual GET with app forwarding provenance.
+    - step: 41
+      expectation: Origin and independent proxy both log actual GET with custom provenance.
+    - step: 53
+      expectation: Only the origin logs direct GET, neither proxy receives this phase.
+    - step: 65
+      expectation: Bound non-listening custom proxy produces handled failure and zero direct origin requests for invalid phase.
+    results:
+    - 19
+    - 41
+    - 53
+    - 65
+  - id: R3
+    requirement: Local navigation owns browser-style history while traversal, cross-token, symlink and IPC requests are denied.
+    actions:
+    - 20
+    - 23
+    - 25
+    - 74
+    checkpoints:
+    - step: 21
+      expectation: Next page code executes through the same token.
+    - step: 26
+      expectation: Back then forward returns to the readable next.html address.
+    - step: 75
+      expectation: Parent traversal never returns outside bytes.
+    - step: 76
+      expectation: Layered encoded traversal never returns outside bytes.
+    - step: 77
+      expectation: Actual symlink/junction outside the canonical root is refused.
+    - step: 78
+      expectation: A different token cannot read this root.
+    - step: 79
+      expectation: IPC protocol fetch rejects in the real frame.
+    results:
+    - 21
+    - 26
+    - 75
+    - 76
+    - 77
+    - 78
+    - 79
+  - id: R4
+    requirement: Closing an HTML viewer invalidates the token and promptly cancels its active native HTTP stream.
+    actions:
+    - 87
+    - 89
+    checkpoints:
+    - step: 88
+      expectation: The independent origin records the started real HTTP stream before closure.
+    - step: 90
+      expectation: Origin sees the peer close rather than waiting for download completion or timeout.
+    - step: 91
+      expectation: Viewer/protocol lifecycle leaves the app runtime healthy.
+    results:
+    - 88
+    - 90
+    - 91
+  visual:
+  - check: Native frame and console visible
+    method: automated
+    reason: Runtime console receipts plus retained screenshot; no prototype pixel fidelity claim.
+  native:
+  - check: Real custom protocol, proxy routing, connection cancellation and symlink/junction root boundaries
+    method: automated
+    reason: Packaged WebView author code plus independent loopback origin/proxy receipts. Browser stubs cannot certify these properties.
+  - check: Native system-browser launch after explicit Open confirmation
+    method: manual
+    reason: This scope never launches external apps. TC-FILE-OPEN-010 tests parent confirmation and Cancel/no IPC instead.

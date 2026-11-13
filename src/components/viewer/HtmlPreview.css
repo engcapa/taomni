@@ -1,6 +1,6 @@
 .html-preview { display: flex; flex: 1; min-height: 0; min-width: 0; flex-direction: column; overflow: hidden; color: var(--text, var(--taomni-text)); }
 .html-toolbar { flex-wrap: wrap; }
-.html-address { height: 28px; min-width: 140px; flex: 1; display: flex; align-items: center; gap: 6px; background: var(--bg, var(--taomni-bg)); border: 1px solid var(--input-b, var(--taomni-divider)); border-radius: 6px; padding: 0 8px; }
+.html-address { height: 30px; min-width: 140px; flex: 1; display: flex; align-items: center; gap: 7px; background: var(--input, var(--taomni-input-bg)); border: 1px solid var(--input-b, var(--taomni-divider)); border-radius: 15px; padding: 0 12px; }
 .html-address input { min-width: 0; flex: 1; height: 100%; border: 0; background: transparent; outline: none; color: inherit; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 12px; text-overflow: ellipsis; }
 .html-address:focus-within { outline: 1px solid var(--accent, var(--taomni-accent)); }
 .html-sandbox { flex: none; display: inline-flex; align-items: center; gap: 3px; padding: 1px 5px; border: 1px solid color-mix(in srgb, #d97706 25%, transparent); border-radius: 4px; color: var(--taomni-warning, #b77911); background: color-mix(in srgb, #d97706 9%, transparent); font-size: 10.5px; }
@@ -17,9 +17,11 @@
 .html-source { display: flex; flex-direction: column; width: 42%; flex: none; min-width: 0; border-right: 1px solid var(--divider, var(--taomni-divider)); overflow: hidden; }
 .html-source[hidden] { display: none; }
 .html-source-label { height: 26px; min-height: 26px; padding: 4px 10px; border-bottom: 1px solid var(--divider, var(--taomni-divider)); color: var(--muted, var(--taomni-text-muted)); font-size: 11px; background: var(--code-bg, var(--taomni-bg)); overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
-.html-stage { position: relative; flex: 1; min-width: 0; min-height: 0; overflow: auto; display: flex; padding: 24px; background: var(--code-bg, var(--taomni-code-bg)); }
-.html-page-shell { position: relative; margin: 0 auto; flex: none; min-height: 100%; height: 100%; background: #fff; box-shadow: 0 2px 14px rgb(0 0 0 / 14%); }
-.html-page-shell[data-device="tablet"], .html-page-shell[data-device="mobile"] { border-radius: 5px; }
+.html-stage { position: relative; flex: 1; min-width: 0; min-height: 0; overflow: auto; display: flex; padding: 0; background: var(--code-bg, var(--taomni-code-bg)); }
+.html-stage[data-device="tablet"], .html-stage[data-device="mobile"] { padding: 14px 0; }
+.html-page-shell { position: relative; margin: 0 auto; flex: none; min-height: 100%; height: 100%; background: #fff; box-shadow: 0 0 0 1px rgb(0 0 0 / 8%); }
+.html-page-shell[data-device="tablet"] { border-radius: 10px; overflow: hidden; }
+.html-page-shell[data-device="mobile"] { border-radius: 18px; overflow: hidden; }
 .html-frame { display: block; border: 0; background: white; transform-origin: top left; max-width: none; }
 .html-loading { position: absolute; top: 8px; left: 50%; transform: translateX(-50%); padding: 4px 10px; border-radius: 5px; background: var(--panel, var(--taomni-panel-bg)); color: var(--muted, var(--taomni-text-muted)); font-size: 11.5px; pointer-events: none; white-space: nowrap; }
 .html-error { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; gap: 10px; padding: 24px; background: var(--bg, var(--taomni-bg)); font-size: 12px; overflow: auto; }

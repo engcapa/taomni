@@ -1,8 +1,8 @@
 id: TC-FILE-OPEN-001
 title: Explorer opens a shared text viewer, saves exact bytes and protects dirty close
-description: AC04/05/08/18/21. Real Explorer double-click and preview/edit entries share one canonical viewer. Edits, Save,
-  Ctrl/Cmd+S, dirty close/cancel/discard and reopen assert actual content, not only runtime-error absence. Browser byte oracle
-  reads IndexedDB VFS only; native disk effects are asserted independently in 002/003.
+description: AC04/05/08/18/21. Real Explorer double-click and preview/edit entries share one canonical viewer. Edits, Save, Ctrl/Cmd+S,
+  dirty close/cancel/discard and reopen assert actual content, not only runtime-error absence. Browser byte oracle reads IndexedDB VFS
+  only; native disk effects are asserted independently in 002/003.
 modes:
 - browser
 covers:
@@ -121,6 +121,9 @@ steps:
     selector: '[data-testid="viewer-editor"] .cm-content'
     key: Control+s
     macos_key: Meta+s
+- assert_text_equals:
+    selector: '[data-testid="viewer-cursor"]'
+    equals: Ln 2, Col 1
 - assert_file_open_bytes:
     path: ${fixture.file_open_root}/notes.txt
     equals: 'Shortcut save once
@@ -187,35 +190,38 @@ verification:
       expectation: Discard closes the actual viewer host.
     - step: 39
       expectation: Reopen reads the saved version rather than discarded draft.
-    - step: 42
+    - step: 43
       expectation: Focused save chord writes exactly the edited text.
-    - step: 44
+    - step: 45
       expectation: Entry and dirty-close lifecycle has no uncaught runtime errors.
+    - step: 42
+      expectation: After editing the line-terminated shortcut-save text, actual status cursor reports line2 column1.
     results:
     - 32
     - 33
     - 36
     - 39
+    - 43
+    - 45
     - 42
-    - 44
   - id: R3
-    requirement: Binary errors keep a real system-app action; browser inability to launch the OS app is explicit and recoverable,
-      not a silent blank page.
+    requirement: Binary errors keep a real system-app action; browser inability to launch the OS app is explicit and recoverable, not
+      a silent blank page.
     actions:
-    - 46
     - 47
-    - 49
+    - 48
+    - 50
     checkpoints:
-    - step: 50
-      expectation: System-app failure is visible and actionable in browser mode.
     - step: 51
-      expectation: Viewer error remains available after the handled launch failure.
+      expectation: System-app failure is visible and actionable in browser mode.
     - step: 52
+      expectation: Viewer error remains available after the handled launch failure.
+    - step: 53
       expectation: Fallback error has no unhandled exception.
     results:
-    - 50
     - 51
     - 52
+    - 53
   visual:
   - check: Viewer toolbar/status and dirty-close layout
     method: manual

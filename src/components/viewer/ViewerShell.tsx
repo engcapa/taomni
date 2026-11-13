@@ -23,6 +23,7 @@ export function ViewerShell({ viewer, active = true, workspaceId }: { viewer: Fi
   const draftError = useDocumentStore((state) => state.draftError);
   const [error, setError] = useState<string | null>(null);
   const [compare, setCompare] = useState(false);
+  const [cursor, setCursor] = useState({ line: 1, column: 1 });
   useEffect(() => {
     hosts.set(key, (hosts.get(key) ?? 0) + 1);
     void useDocumentStore.getState().open(viewer.path, viewer.readOnlyReason);
@@ -58,7 +59,7 @@ export function ViewerShell({ viewer, active = true, workspaceId }: { viewer: Fi
     await openFile({ path }, { context: "viewer-save-as", workspaceId });
   };
   const showError = !document || !!document.error && !document.savedHash && !document.content;
-  return <section className="fv" data-testid="file-viewer" data-path={viewer.path} data-kind={viewer.kind} data-dirty={document?.dirty || undefined} data-readonly={document?.readOnly || undefined} onKeyDown={(event) => {
+  return <section className={`fv${active ? " fv-active" : ""}`} data-testid="file-viewer" data-path={viewer.path} data-kind={viewer.kind} data-active={active} data-dirty={document?.dirty || undefined} data-readonly={document?.readOnly || undefined} onKeyDown={(event) => {
       if (event.defaultPrevented || event.nativeEvent.isComposing || !active || event.altKey || event.shiftKey) return;
       const mod = getAppPlatform() === "macos" ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
       if (mod && event.key.toLowerCase() === "s") {
@@ -73,12 +74,12 @@ export function ViewerShell({ viewer, active = true, workspaceId }: { viewer: Fi
     {!document || document.loading && !document.content ? <div className="fv-loading" role="status">{label("正在打开文件…", "Opening file…")}</div>
       : showError ? <div className="fv-error" data-testid="viewer-error"><AlertCircle /><h3>{label("无法打开文件", "Unable to open file")}</h3><p>{document.error}</p><div><button className="fv-button outline" data-testid="viewer-retry" onClick={() => run(() => useDocumentStore.getState().open(viewer.path, viewer.readOnlyReason))}><RefreshCw />{label("重试", "Retry")}</button><button className="fv-button" data-testid="viewer-system" onClick={() => run(() => sftpOpenPath(viewer.path))}>{label("系统应用", "System app")}</button><button className="fv-button" onClick={() => run(() => openExplorer(parentPath(viewer.path), { workspaceId }))}><FolderOpen />{label("在 Explorer 中显示", "Show in Explorer")}</button></div></div>
       : <Suspense fallback={<div className="fv-loading">{label("正在加载查看器…", "Loading viewer…")}</div>}>
-        {viewer.mode === "source" || document.large ? <TextEditor document={document} onError={setError} workspaceId={workspaceId} />
+        {viewer.mode === "source" || document.large ? <TextEditor document={document} onError={setError} workspaceId={workspaceId} onCursorChange={setCursor} />
           : viewer.kind === "image" || viewer.kind === "svg" ? <ImageViewer document={document} onError={setError} workspaceId={workspaceId} />
             : viewer.kind === "markdown" ? <MarkdownEditor document={document} onError={setError} />
-              : viewer.kind === "html" ? <HtmlPreview document={document} onError={setError} visible={active} workspaceId={workspaceId} /> : <TextEditor document={document} onError={setError} workspaceId={workspaceId} />}
+              : viewer.kind === "html" ? <HtmlPreview document={document} onError={setError} visible={active} workspaceId={workspaceId} /> : <TextEditor document={document} onError={setError} workspaceId={workspaceId} onCursorChange={setCursor} />}
       </Suspense>}
-    {document && !document.loading && !showError && <div className="fv-status" data-testid="viewer-status"><span className={document.dirty ? "dirty" : ""}>{document.dirty ? label("● 未保存", "● Unsaved") : label("已保存", "Saved")}</span>{document.dirty && viewer.kind !== "text" && viewer.mode !== "source" && !document.large && <button className="fv-button" data-testid="viewer-save" disabled={document.readOnly || document.saving} onClick={() => run(() => useDocumentStore.getState().save(viewer.path))}><Save />{label("保存", "Save")}</button>}<span>{document.content.length.toLocaleString()} {label("字符", "characters")}</span><span className="fv-spacer" /><span>{document.encoding} · {document.eol}</span><span>{viewer.kind}</span></div>}
+    {document && !document.loading && !showError && <div className="fv-status" data-testid="viewer-status"><span className={document.dirty ? "dirty" : ""}>{document.dirty ? label("● 未保存", "● Unsaved") : label("已保存", "Saved")}</span>{document.dirty && viewer.kind !== "text" && viewer.mode !== "source" && !document.large && <button className="fv-button" data-testid="viewer-save" disabled={document.readOnly || document.saving} onClick={() => run(() => useDocumentStore.getState().save(viewer.path))}><Save />{label("保存", "Save")}</button>}{(viewer.kind === "text" || viewer.mode === "source" || document.large) && <span data-testid="viewer-cursor">{label(`行 ${cursor.line}，列 ${cursor.column}`, `Ln ${cursor.line}, Col ${cursor.column}`)}</span>}<span>{document.content.length.toLocaleString()} {label("字符", "characters")}</span><span className="fv-spacer" /><span>{document.encoding} · {document.eol}</span><span>{viewer.kind}</span></div>}
     {compare && document?.external && <ViewerDiff disk={document.external.content} mine={document.content} onClose={() => setCompare(false)} />}
   </section>;
 }

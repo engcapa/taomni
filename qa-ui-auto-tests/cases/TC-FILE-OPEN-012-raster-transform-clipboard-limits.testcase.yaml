@@ -1,0 +1,245 @@
+id: TC-FILE-OPEN-012
+title: Raster viewer transforms, real clipboard pixels, sibling navigation and conservative limits
+description: >-
+  AC01/06/22. Opens real Pillow-encoded PNG/JPEG/WebP/GIF through Explorer, observes
+  decoded dimensions and transformed geometry, drives actual wheel and pointer input,
+  checks independent clipboard pixels/path and unchanged original bytes. Native uses
+  real filesystem and OS clipboard; browser proves VFS/Chromium behavior only. Codec
+  failures are explicit failures with visible fallback, never converted to skips.
+modes: [browser, native]
+covers: [F-FILEOPEN-1, F-EXPLORER-1]
+tags: [p0, file-open, image, clipboard, crash-regression]
+fixtures: [reset_db, file_open_raster]
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-file-open-raster
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-file-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Control+l
+    macos_key: Meta+l
+- fill:
+    selector: '[data-testid="explorer-address"]'
+    value: ${fixture.raster_root}
+- press:
+    selector: '[data-testid="explorer-address"]'
+    key: Enter
+- wait_for: '[data-testid="explorer-file-row"][data-name="01-landscape.png"]'
+- show_explorer_preview: null
+- click: '[data-testid="explorer-file-row"][data-name="01-landscape.png"]'
+- wait_for: '[data-testid="explorer-preview"][data-preview-kind="image"]'
+- click: '[data-testid="explorer-preview-open"]'
+- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-render"]'
+- assert_enabled: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-zoom-actual"]'
+- eval_readonly:
+    expression: document.querySelector(".fv-active .image-render").naturalWidth === 640 && document.querySelector(".fv-active .image-render").naturalHeight === 360
+    expect_truthy: true
+- click: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-zoom-actual"]'
+- eval_readonly:
+    expression: Math.abs(document.querySelector(".fv-active .image-render").getBoundingClientRect().width - 640) <= 1 && Math.abs(document.querySelector(".fv-active .image-render").getBoundingClientRect().height - 360) <= 1
+    expect_truthy: true
+- click: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-zoom-in"]'
+- eval_readonly:
+    expression: Math.abs(document.querySelector(".fv-active .image-render").getBoundingClientRect().width - 768) <= 1
+    expect_truthy: true
+- click: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-zoom-out"]'
+- eval_readonly:
+    expression: Math.abs(document.querySelector(".fv-active .image-render").getBoundingClientRect().width - 640) <= 1
+    expect_truthy: true
+- viewer_raster: {action: wheel, deltaY: -120}
+- eval_readonly:
+    expression: document.querySelector(".fv-active .image-render").getBoundingClientRect().width > 640
+    expect_truthy: true
+- click: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-zoom-actual"]'
+- drag_to:
+    from: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-stage"]'
+    by: {dx: 40, dy: 20, steps: 8}
+- eval_readonly:
+    expression: document.querySelector(".fv-active .image-render").style.transform.includes("translate(40px, 20px)")
+    expect_truthy: true
+- click: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-zoom-fit"]'
+- eval_readonly:
+    expression: document.querySelector(".fv-active .image-render").style.transform.includes("translate(0px, 0px)") && document.querySelector(".fv-active .image-render").getBoundingClientRect().width <= document.querySelector(".fv-active .image-stage").clientWidth
+    expect_truthy: true
+- click: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-zoom-actual"]'
+- click: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-rotate-right"]'
+- eval_readonly:
+    expression: Math.abs(document.querySelector(".fv-active .image-render").getBoundingClientRect().width - 360) <= 1 && Math.abs(document.querySelector(".fv-active .image-render").getBoundingClientRect().height - 640) <= 1
+    expect_truthy: true
+- click: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-rotate-left"]'
+- click: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-flip"]'
+- eval_readonly:
+    expression: getComputedStyle(document.querySelector(".fv-active .image-render")).transform.startsWith("matrix(-1,")
+    expect_truthy: true
+- click: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-flip"]'
+- click: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-background-dark"]'
+- eval_readonly:
+    expression: getComputedStyle(document.querySelector(".fv-active .image-stage")).backgroundColor === "rgb(17, 17, 17)"
+    expect_truthy: true
+- click: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-background-light"]'
+- eval_readonly:
+    expression: getComputedStyle(document.querySelector(".fv-active .image-stage")).backgroundColor === "rgb(255, 255, 255)"
+    expect_truthy: true
+- click: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-background-checker"]'
+- eval_readonly:
+    expression: getComputedStyle(document.querySelector(".fv-active .image-stage")).backgroundImage.includes("conic-gradient")
+    expect_truthy: true
+- click: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-copy"]'
+- assert_text:
+    selector: '[data-testid="file-viewer"][data-active="true"] .image-notice'
+    contains: Image copied
+- viewer_raster: {action: clipboard, kind: image}
+- click: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-copy-path"]'
+- assert_text:
+    selector: '[data-testid="file-viewer"][data-active="true"] .image-notice'
+    contains: Path copied
+- viewer_raster: {action: clipboard, kind: path}
+- assert_file_open_bytes:
+    path: ${fixture.raster_png}
+    sha256: ${fixture.raster_png_sha}
+- click: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-next"]'
+- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-render"][alt="02-photo.jpg"]'
+- assert_enabled: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-zoom-actual"]'
+- eval_readonly:
+    expression: document.querySelector(".fv-active .image-render").naturalWidth === 640 && document.querySelector(".fv-active .image-render").naturalHeight === 360
+    expect_truthy: true
+- click: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-filmstrip"] button[aria-label="03-lossless.webp"]'
+- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-render"][alt="03-lossless.webp"]'
+- assert_enabled: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-zoom-actual"]'
+- eval_readonly:
+    expression: document.querySelector(".fv-active .image-render").naturalWidth === 640 && document.querySelector(".fv-active .image-render").naturalHeight === 360
+    expect_truthy: true
+- click: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-filmstrip"] button[aria-label="04-palette.gif"]'
+- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-render"][alt="04-palette.gif"]'
+- assert_enabled: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-zoom-actual"]'
+- eval_readonly:
+    expression: document.querySelector(".fv-active .image-render").naturalWidth === 640 && document.querySelector(".fv-active .image-render").naturalHeight === 360
+    expect_truthy: true
+- click: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-prev"]'
+- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-render"][alt="03-lossless.webp"]'
+- assert_file_open_bytes:
+    path: ${fixture.raster_root}/02-photo.jpg
+    sha256: ${fixture.raster_jpeg_sha}
+- assert_file_open_bytes:
+    path: ${fixture.raster_root}/03-lossless.webp
+    sha256: ${fixture.raster_webp_sha}
+- assert_file_open_bytes:
+    path: ${fixture.raster_root}/04-palette.gif
+    sha256: ${fixture.raster_gif_sha}
+- click: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-filmstrip"] button[aria-label="90-corrupt.png"]'
+- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-stage"] [role="alert"]'
+- assert_text:
+    selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-stage"] [role="alert"]'
+    contains: damaged
+- assert_disabled: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-copy"]'
+- click: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-stage"] [role="alert"] button:first-child'
+- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-stage"] [role="alert"]'
+- click: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-reveal"]'
+- wait_for: '[data-testid="explorer-file-row"][data-name="91-preview-limit.png"]'
+- show_explorer_preview: null
+- click: '[data-testid="explorer-file-row"][data-name="91-preview-limit.png"]'
+- wait_for: '[data-testid="explorer-preview"][data-preview-kind="too-large"]'
+- assert_text:
+    selector: '[data-testid="explorer-preview"]'
+    contains: preview limit (20 MB)
+- click: '[data-testid="explorer-preview-open"]'
+- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-render"][alt="91-preview-limit.png"]'
+- assert_enabled: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-zoom-actual"]'
+- eval_readonly:
+    expression: document.querySelector(".fv-active .image-render").naturalWidth === 640
+    expect_truthy: true
+- click: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-filmstrip"] button[aria-label="92-viewer-limit.png"]'
+- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-stage"] [role="alert"]'
+- assert_text:
+    selector: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-stage"] [role="alert"]'
+    contains: conservative 32 MiB file cap
+- assert_disabled: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-copy"]'
+- assert_no_runtime_errors: null
+- screenshot: raster-viewer-limits-and-controls.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Real raster pixels respond to actual transform controls/wheel/pan without changing source, and clipboard contains original pixels/path.
+    actions: [11, 13, 17, 19, 21, 23, 26, 28, 31, 33, 34, 36, 37, 39, 41, 43, 46]
+    checkpoints:
+    - step: 16
+      expectation: The real PNG decodes to 640 by 360 intrinsic pixels.
+    - step: 18
+      expectation: Actual-size display measures 640 by 360 CSS pixels.
+    - step: 20
+      expectation: Zoom-in multiplies width to 768, and zoom-out returns it to 640.
+    - step: 22
+      expectation: Zoom-out returns actual image width to 640 CSS pixels.
+    - step: 24
+      expectation: A delivered wheel event enlarges the actual image rectangle.
+    - step: 27
+      expectation: Real pointer drag produces exact 40 by 20 translation.
+    - step: 29
+      expectation: Fit resets translation and keeps the image inside the canvas.
+    - step: 32
+      expectation: Quarter-turn rotation swaps displayed width and height.
+    - step: 35
+      expectation: Horizontal flip changes the rendered transform matrix sign.
+    - step: 38
+      expectation: Dark canvas uses actual rgb 17,17,17; light and checker controls also change computed background.
+    - step: 40
+      expectation: Light canvas uses actual white background.
+    - step: 42
+      expectation: Checker canvas exposes the actual repeating conic background.
+    - step: 45
+      expectation: Copied PNG pixels exactly match the independent original fixture oracle.
+    - step: 48
+      expectation: Copied path equals the original fixture path through a clipboard reader, not DOM notice alone.
+    - step: 49
+      expectation: Every transform and clipboard action leaves the full original PNG bytes unchanged.
+    results: [16, 18, 20, 22, 24, 27, 29, 32, 35, 38, 40, 42, 45, 48, 49]
+  - id: R2
+    requirement: JPEG/WebP/GIF siblings decode, navigation and filmstrip activate correct documents, corrupt images and independent 20/32 MiB boundaries expose actionable errors.
+    actions: [50, 54, 58, 62, 67, 71, 73, 76, 79, 83]
+    checkpoints:
+    - step: 53
+      expectation: Next activates the JPEG and independently observes 640 by 360 decoded pixels.
+    - step: 57
+      expectation: Filmstrip activates WebP with real decoded pixels.
+    - step: 61
+      expectation: Filmstrip activates GIF with real decoded pixels; no platform codec gap is silently skipped.
+    - step: 63
+      expectation: Previous returns from GIF to the correct WebP sibling.
+    - step: 64
+      expectation: JPEG full-file bytes are unchanged after viewing and navigation.
+    - step: 65
+      expectation: WebP full-file bytes are unchanged after viewing and navigation.
+    - step: 66
+      expectation: GIF full-file bytes are unchanged after viewing and navigation.
+    - step: 69
+      expectation: Corrupt bytes expose an actionable damaged/unsupported message rather than a blank canvas.
+    - step: 70
+      expectation: Corrupt data cannot be copied as a purported valid image.
+    - step: 72
+      expectation: Retrying corrupt input returns an explicit error and copy remains disabled.
+    - step: 78
+      expectation: Explorer refuses a valid image larger than its independent 20 MiB preview budget.
+    - step: 82
+      expectation: The same over-preview-limit PNG still decodes in the separate viewer under 32 MiB.
+    - step: 85
+      expectation: The 32 MiB viewer budget has explicit conservative, not performance-measured, feedback.
+    - step: 86
+      expectation: Over-viewer-limit data cannot be copied as a purported valid image.
+    - step: 87
+      expectation: Error/retry/navigation leaves no uncaught runtime exception.
+    results: [53, 57, 61, 63, 64, 65, 66, 69, 70, 72, 78, 82, 85, 86, 87]
+  visual:
+  - check: Raster toolbar/canvas/property-sidebar/filmstrip layout against prototype scene 2
+    method: manual
+    reason: Geometry and actual dimensions are asserted, but matching-theme/content screenshots still require hosted review. No visual parity is claimed by schema or unit tests.
+  native:
+  - check: PNG copy reads identical pixels from independent OS clipboard; file hashes and decoder results use actual native files
+    method: automated
+    reason: Native host clipboard tools and Pillow decode the copied PNG; browser uses Chromium clipboard only and cannot establish OS-native clipboard behavior.
+  - check: Save-as/PNG-export native chooser cancellation and failure
+    method: manual
+    reason: This workflow leaves original bytes unchanged and verifies copy output; actual native save dialogs and overwrite failure need a dedicated interactive check, not a fake download success.

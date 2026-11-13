@@ -2,6 +2,7 @@ import { vfsMkdir, vfsReadBytes, vfsRemove, vfsStat, vfsWriteBytes, parentOf, VF
 import { decodeStubBytes, encodeStubText, sha256Bytes } from "./workspace/encoding";
 import { VIEWER_IMAGE_LIMIT, VIEWER_TEXT_EDIT_LIMIT, VIEWER_TEXT_HARD_LIMIT } from "../../lib/viewer";
 import type { ViewerEol } from "../../lib/viewer";
+import { createHtmlResourceLoader } from "./viewerHtmlResources";
 
 const htmlSessions = new Map<string, string[]>();
 const temporaryFiles = new Map<string, string>();
@@ -45,60 +46,45 @@ async function read(path: string, maximum: number, encoding?: string) {
   return { path, content: decoded.content, hash: truncated ? "" : await sha256Bytes(bytes), encoding: label, bom: decoded.bom,
     eol: eol(decoded.content), mtime: stat.mtime, size: stat.size, truncated, nextOffset: decoded.offset };
 }
-function localResource(root: string, source: string, base = root): string | null {
-  if (/^(?:https?:|data:|blob:|file:|javascript:|\/\/|#)/i.test(source)) return null;
-  let decoded: string;
-  try { decoded = decodeURIComponent(source.split(/[?#]/)[0]); } catch { return null; }
-  if (decoded.includes("\\") || decoded.includes("\0") || decoded.startsWith("/")) return null;
-  const segments = base.split("/").filter(Boolean);
-  for (const segment of decoded.split("/")) {
-    if (segment === "..") segments.pop();
-    else if (segment && segment !== ".") segments.push(segment);
-  }
-  const path = `/${segments.join("/")}`;
-  return path.startsWith(`${root}/`) ? path : null;
-}
-
 /** Browser-only simulation. Native protocol, IPC and filesystem security are
  * separately tested; this adapter never claims their evidence. */
-async function htmlOpen(path: string, allowNetwork: boolean, allowScripts: boolean) {
+async function htmlOpen(path: string, allowScripts: boolean) {
   const root = parentOf(path);
   const token = crypto.randomUUID();
   const urls: string[] = [];
   const nonce = crypto.randomUUID().replace(/-/g, "");
   const dom = new DOMParser().parseFromString(new TextDecoder().decode(await vfsReadBytes(path)), "text/html");
   dom.querySelectorAll("base,meta[http-equiv='refresh' i],meta[http-equiv='content-security-policy' i],iframe,object,embed").forEach((node) => node.remove());
-  const asset = async (href: string): Promise<string | null> => {
-    const target = localResource(root, href);
-    if (!target) return null;
-    try {
-      let bytes = new Uint8Array(await vfsReadBytes(target));
-      if (mime(target) === "text/css") {
-        let css = new TextDecoder().decode(bytes);
-        const references = [...css.matchAll(/url\(\s*["']?([^\s)'";]+)["']?\s*\)/gi)];
-        for (const reference of references) {
-          const resource = localResource(root, reference[1], parentOf(target));
-          if (!resource) { if (!allowNetwork) css = css.replace(reference[0], "url(data:,)"); continue; }
-          const data = new Uint8Array(await vfsReadBytes(resource));
-          const url = URL.createObjectURL(new Blob([data], { type: mime(resource) })); urls.push(url);
-          css = css.replace(reference[0], `url(${url})`);
-        }
-        css = css.replace(/@import[^;]+;/gi, "");
-        bytes = new TextEncoder().encode(css);
-      }
-      const url = URL.createObjectURL(new Blob([bytes], { type: mime(target) })); urls.push(url); return url;
-    } catch { return null; }
-  };
-  for (const element of dom.querySelectorAll("[src],[href],[srcset]")) {
-    if (element.tagName === "A") continue;
+  const resources = createHtmlResourceLoader(root);
+  for (const element of dom.querySelectorAll("script")) {
+    const source = element.getAttribute("src");
+    if (!allowScripts) { element.remove(); continue; }
+    if (source !== null) {
+      const code = await resources.script(source);
+      if (code === null) { element.remove(); continue; }
+      element.removeAttribute("src");
+      element.removeAttribute("integrity");
+      element.removeAttribute("crossorigin");
+      // Parsed inline text keeps execution in the opaque child; escaping a
+      // closing tag prevents a local JS string from altering the serialized DOM.
+      element.textContent = code.replace(/<\/script/gi, "<\\/script");
+    }
+    element.setAttribute("nonce", nonce);
+  }
+  for (const element of dom.querySelectorAll("style")) element.textContent = await resources.rewriteCss(element.textContent ?? "");
+  for (const element of dom.querySelectorAll("*")) {
+    for (const attribute of Array.from(element.attributes)) {
+      if (!allowScripts && /^on/i.test(attribute.name)) element.removeAttributeNode(attribute);
+    }
+    if (element.hasAttribute("style")) element.setAttribute("style", await resources.rewriteCss(element.getAttribute("style")!));
+    if (element.tagName === "A" || element.tagName === "SCRIPT") continue;
     element.removeAttribute("srcset");
     for (const attribute of ["src", "href"]) {
       const href = element.getAttribute(attribute);
       if (!href) continue;
-      // Browser VFS has no proxy-aware native transport. Never let an enabled
-      // UI toggle bypass application proxy policy via direct browser requests.
-      if (/^https?:/i.test(href)) { element.removeAttribute(attribute); continue; }
-      const url = await asset(href);
+      // Only known VFS resources become self-contained data. Neither the
+      // network opt-in nor the opaque child can fetch parent-origin blobs.
+      const url = await resources.asset(href);
       if (url) element.setAttribute(attribute, url); else element.removeAttribute(attribute);
     }
   }
@@ -108,8 +94,9 @@ async function htmlOpen(path: string, allowNetwork: boolean, allowScripts: boole
   dom.head.prepend(bridge);
   const policy = dom.createElement("meta");
   policy.httpEquiv = "Content-Security-Policy";
-  const network = ""; // Native token transport is not available in the browser stub.
-  policy.content = `default-src 'none'; script-src ${allowScripts ? "'unsafe-inline' blob:" : `'nonce-${nonce}'`}${allowScripts ? network : ""}; style-src 'unsafe-inline' blob:${network}; img-src blob: data:${network}; font-src blob: data:${network}; connect-src 'none'; frame-src 'none'; object-src 'none'; form-action 'none'; base-uri 'none'`;
+  // Allow only embedded, known local resources. Native proxy transport is not
+  // available here, so allow-once never turns into direct browser networking.
+  policy.content = `default-src 'none'; script-src ${allowScripts ? "'unsafe-inline'" : `'nonce-${nonce}'`}; style-src 'unsafe-inline' data:; img-src data:; font-src data:; connect-src 'none'; frame-src 'none'; object-src 'none'; form-action 'none'; base-uri 'none'`;
   dom.head.prepend(policy);
   const url = URL.createObjectURL(new Blob([`<!doctype html>${dom.documentElement.outerHTML}`], { type: "text/html" }));
   urls.push(url); htmlSessions.set(token, urls);
@@ -166,7 +153,7 @@ export async function invokeViewer(command: string, args: Record<string, unknown
       await vfsWriteBytes(target, new Uint8Array(args.bytes as number[]).buffer);
       return { path: target, relativePath: target.slice(parentOf(docPath).length + 1).split("/").map(encodeURIComponent).join("/") };
     }
-    case "viewer_html_open": return htmlOpen(path, args.allowNetwork === true, args.allowScripts !== false);
+    case "viewer_html_open": return htmlOpen(path, args.allowScripts !== false);
     case "viewer_html_close": {
       const token = String(args.token); htmlSessions.get(token)?.forEach((url) => URL.revokeObjectURL(url)); htmlSessions.delete(token); return;
     }

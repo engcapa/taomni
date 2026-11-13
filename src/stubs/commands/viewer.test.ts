@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { invokeViewer } from "./viewer";
 import { sha256Bytes } from "./workspace/encoding";
 const files = vi.hoisted(() => new Map<string, Uint8Array>());
@@ -11,7 +11,53 @@ vi.mock("../localVfs", () => ({
   vfsRemove: vi.fn(async (path: string) => { for (const candidate of files.keys()) if (candidate === path || candidate.startsWith(`${path}/`)) files.delete(candidate); }),
 }));
 beforeEach(() => { files.clear(); files.set("/preview", new Uint8Array()); vi.clearAllMocks(); });
+afterEach(() => vi.restoreAllMocks());
+function blobText(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.onerror = reject; reader.readAsText(blob); });
+}
+async function htmlOutput(allowScripts = true, allowNetwork = false) {
+  let blob: Blob | undefined;
+  vi.spyOn(URL, "createObjectURL").mockImplementation((value) => { blob = value as Blob; return "blob:http://localhost/html-root"; });
+  const close = vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+  const session = await invokeViewer("viewer_html_open", { path: "/preview/report.html", allowScripts, allowNetwork, proxyMode: "custom" }) as { token: string };
+  const source = await blobText(blob!);
+  await invokeViewer("viewer_html_close", { token: session.token });
+  expect(close).toHaveBeenCalledWith("blob:http://localhost/html-root");
+  return new DOMParser().parseFromString(source, "text/html");
+}
 describe("browser viewer command contract", () => {
+  it("publishes only the root HTML blob; embeds local CSS/image and nonce-inline JS without weakening opaque-frame CSP", async () => {
+    files.set("/preview/report.html", new TextEncoder().encode('<!doctype html><link rel="stylesheet" href="assets/app.css"><h1>Report</h1><img src="assets/pixel.png"><script src="assets/app.js"></script><script src="https://tracker.invalid/app.js"></script>'));
+    files.set("/preview/assets/app.css", new TextEncoder().encode("h1{color:rgb(12,34,56)}"));
+    files.set("/preview/assets/pixel.png", new Uint8Array([137, 80, 78, 71]));
+    files.set("/preview/assets/app.js", new TextEncoder().encode('console.log("LOCAL_JS_OK");'));
+    const document = await htmlOutput();
+    expect(URL.createObjectURL).toHaveBeenCalledTimes(1);
+    expect(document.querySelector("link")?.getAttribute("href")).toMatch(/^data:text\/css;base64,/);
+    expect(document.querySelector("img")?.getAttribute("src")).toBe("data:image/png;base64,iVBORw==");
+    const script = Array.from(document.scripts).find((element) => element.textContent?.includes("LOCAL_JS_OK"));
+    expect(script?.hasAttribute("src")).toBe(false);
+    expect(script?.getAttribute("nonce")).toBeTruthy();
+    expect(document.querySelector("[src^='https:'],[src^='blob:'],[href^='blob:']")).toBeNull();
+    const policy = document.querySelector("meta[http-equiv='Content-Security-Policy']")?.getAttribute("content");
+    expect(policy).toContain("style-src 'unsafe-inline' data:");
+    expect(policy).toContain("img-src data:");
+    expect(policy).toContain("connect-src 'none'");
+    expect(policy).not.toMatch(/script-src[^;]*(?:data:|blob:|https?:)/);
+  });
+  it("keeps author scripts/events removed when disabled and network opt-in never permits direct browser requests", async () => {
+    files.set("/preview/report.html", new TextEncoder().encode('<body onload="alert(1)"><script>alert(1)</script><img src="https://tracker.invalid/pixel"><script src="assets/app.js"></script></body>'));
+    files.set("/preview/assets/app.js", new TextEncoder().encode('console.log("AUTHOR_JS");'));
+    const document = await htmlOutput(false, true);
+    expect(document.querySelector("[onload],[src^='https:']")).toBeNull();
+    expect(Array.from(document.scripts).some((script) => script.textContent?.includes("AUTHOR_JS") || script.textContent?.includes("alert(1)"))).toBe(false);
+    expect(document.scripts).toHaveLength(1);
+    const policy = document.querySelector("meta")?.getAttribute("content");
+    expect(policy).toMatch(/script-src 'nonce-[^']+'/);
+    expect(policy).toContain("connect-src 'none'");
+    expect(policy).not.toContain("http:");
+    expect(policy).not.toContain("https:");
+  });
   it("checks full hash and preserves encoding/BOM/EOL on saving", async () => {
     files.set("/preview/file.txt", new TextEncoder().encode("old\r\n"));
     const initial = await invokeViewer("viewer_read_text", { path: "/preview/file.txt" }) as { hash: string; eol: string };

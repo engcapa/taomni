@@ -2,6 +2,9 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ViewerDocument } from "../../lib/viewer";
 import type { AppProxyConfig } from "../../lib/ipc/proxy";
+// @ts-expect-error node builtin is test-only; production compiler uses DOM globals
+import { readFileSync } from "node:fs";
+const htmlPreviewCss = readFileSync("src/components/viewer/HtmlPreview.css", "utf8") as string;
 
 const mocks = vi.hoisted(() => ({
   open: vi.fn(), close: vi.fn(), external: vi.fn(), save: vi.fn(), system: vi.fn(), openFile: vi.fn(),
@@ -48,6 +51,30 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("HTML preview renderer", () => {
+  it("preserves the prototype full-bleed desktop, device insets, pill address and pane dimensions", async () => {
+    const rule = (selector: string) => htmlPreviewCss.slice(htmlPreviewCss.indexOf(selector + " {"), htmlPreviewCss.indexOf("}", htmlPreviewCss.indexOf(selector + " {")) + 1);
+    expect(rule(".html-stage")).toContain("padding: 0;");
+    expect(rule('.html-stage[data-device="mobile"]')).toContain("padding: 14px 0;");
+    expect(rule(".html-address")).toContain("border-radius: 15px;");
+    expect(rule(".html-source")).toContain("width: 42%;");
+    expect(rule(".html-console")).toContain("height: 150px;");
+    expect(rule(".html-stage")).toContain("overflow: auto;");
+    const originalWidth = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientWidth");
+    Object.defineProperty(HTMLElement.prototype, "clientWidth", { configurable: true, get() { return this.classList?.contains("html-stage") ? 900 : 0; } });
+    try {
+      render(<HtmlPreview document={doc()} onError={vi.fn()} />);
+      const frame = await readyFrame();
+      expect(frame.style.width).toBe("900px");
+      expect(screen.getByTestId("html-stage")).toHaveAttribute("data-device", "desktop");
+      fireEvent.click(screen.getByTestId("html-device-mobile"));
+      expect(frame.style.width).toBe("390px");
+      expect(screen.getByTestId("html-stage")).toHaveAttribute("data-device", "mobile");
+    } finally {
+      if (originalWidth) Object.defineProperty(HTMLElement.prototype, "clientWidth", originalWidth);
+      else delete (HTMLElement.prototype as unknown as { clientWidth?: number }).clientWidth;
+    }
+  });
+
   it("uses the native token protocol and opaque sandbox, with default offline banner", async () => {
     const { unmount } = render(<HtmlPreview document={doc()} onError={vi.fn()} />);
     const frame = await screen.findByTestId("html-frame");

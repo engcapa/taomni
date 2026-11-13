@@ -79,6 +79,8 @@ class FileOpenAssetsTests(unittest.TestCase):
         baselines = {
             "038": ("45a87f7ae2e6fe1833d889fb837b916defbe16129edfc4e9799bc6fc05b34bcb", "d8f9b24431b72e22b2cf6f15aaabc4661796fc07e9ff5e8755ca7407d897a3a2"),
             "039": ("ce45cbf34cdf02a7ae11f6c431e4f02c087945bcb6f1a4697f815d0e9384cafe", "1651be3228596f0ef7b0085247d89a38123a9f33a9ca410d9d1e19b4a9f59795"),
+            "051": ("2dc223ce27527afea8d8b8b373af5101f3e663866181714cd14a71df54a8f596", "031d3de32157a30c5337dd14748c4bf9fe7a1957e9954d627d77a2f90e79004c"),
+            "IDE-C8-08": ("99fe6bd20e0ce2f72e62829587574348035d73a02401cbfdc1a2387ee371bf33", "0f0b84e4c9cc956babcc4b73e5e0662af96d45e98501c546723d4e6ec17bbdce"),
             "052": ("92d8d0ce6d882cf3387a5a6502675f475f03c5cc3e135ac792fb55968d37b845", "cae2b41435d7851ddd93ff14005271d1803e40fbf117ccf566f9a4d4fc4ea00e"),
             "053": ("a8e5c3311a79f05bbf6f01dabb126e1dc1aefa12a6e83ed890b53f0db78a7fb5", "9fa9e9d9ea2f29fa8100fdab79e1b587fd7272883ad9c2d9b5358e592968699c"),
             "054": ("7bd2846b57988de30c9d72f17b128efb70a4977fd96d92a3bef89d4740ca5eaf", "4f21cd1aff5f7c5a8bd92185141b74b5db2a1d1c8a3618f4609c3fdcca40b952"),
@@ -89,26 +91,31 @@ class FileOpenAssetsTests(unittest.TestCase):
         def digest(value):
             return hashlib.sha256(json.dumps(value, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
         for suffix, (steps_sha, contract_sha) in baselines.items():
-            path = next((ROOT / "qa-ui-auto-tests/cases").glob(f"TC-WS-{suffix}-*.testcase.yaml"))
+            pattern = "TC-IDE-C8-08-*.testcase.yaml" if suffix == "IDE-C8-08" else f"TC-WS-{suffix}-*.testcase.yaml"
+            path = next((ROOT / "qa-ui-auto-tests/cases").glob(pattern))
             current = yaml.safe_load(path.read_text())
             seed = [index for index, step in enumerate(current["steps"], 1) if step.get("seed_storage", {}).get("key") == "taomni.fileOpen.preferences.v1"]
             self.assertEqual(len(seed), 1, path.name)
             index = seed[0]
-            without_setup = [step for number, step in enumerate(current["steps"], 1) if number != index]
+            inserted = {index}
+            if suffix == "IDE-C8-08":
+                self.assertEqual(current["steps"][index], {"reload_window": None})
+                inserted.add(index + 1)
+            without_setup = [step for number, step in enumerate(current["steps"], 1) if number not in inserted]
             self.assertEqual(digest(without_setup), steps_sha, path.name)
             self.assertEqual(json.loads(current["steps"][index - 1]["seed_storage"]["value"])["associations"], {"md": "workspace", "txt": "workspace"})
             self.assertEqual(validate_contract(current), [], path.name)
             original = json.loads(json.dumps(current["verification"]["requirements"]))
             for requirement in original:
                 for field in ["actions", "results"]:
-                    requirement[field] = [value - (value > index) for value in requirement[field]]
+                    requirement[field] = [value - sum(position < value for position in inserted) for value in requirement[field]]
                 for checkpoint in requirement["checkpoints"]:
-                    checkpoint["step"] -= checkpoint["step"] > index
+                    checkpoint["step"] -= sum(position < checkpoint["step"] for position in inserted)
             self.assertEqual(digest(original), contract_sha, path.name)
 
-    def test_six_case_schemas_references_and_native_verbs(self):
+    def test_file_open_case_schemas_references_and_native_verbs(self):
         files = sorted((ROOT / "qa-ui-auto-tests/cases").glob("TC-FILE-OPEN-*.testcase.yaml"))
-        self.assertEqual(len(files), 6)
+        self.assertEqual(len(files), 12)
         for path in files:
             document = yaml.safe_load(path.read_text())
             self.assertEqual(validate_contract(document), [], path.name)

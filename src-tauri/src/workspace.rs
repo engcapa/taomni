@@ -24,9 +24,9 @@ mod atomic_write;
 use atomic_write::*;
 mod encoding;
 use encoding::*;
-pub(crate) mod viewer_io;
 #[cfg(test)]
 mod tests;
+pub(crate) mod viewer_io;
 
 use crate::state::AppState;
 use chardetng::EncodingDetector;

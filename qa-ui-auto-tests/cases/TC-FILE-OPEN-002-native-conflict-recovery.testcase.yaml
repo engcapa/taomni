@@ -1,8 +1,8 @@
 id: TC-FILE-OPEN-002
 title: Native text save refuses stale hashes, compares/reloads and recovers unsaved drafts
-description: AC08/09/10/21/22. Uses real host files, production IPC, exact-byte oracle and genuine external host writes. Browser
-  stubs cannot establish expected_hash, atomic writes or native recovery. Window reload is renderer recovery, not a process-crash
-  simulation. Physical OS shortcuts/AppKit and process-restart recovery remain separate unrun checks.
+description: AC08/09/10/21/22. Uses real host files, production IPC, exact-byte oracle and genuine external host writes. Browser stubs cannot establish
+  expected_hash, atomic writes or native recovery. Window reload is renderer recovery, not a process-crash simulation. Physical OS shortcuts/AppKit and
+  process-restart recovery remain separate unrun checks.
 modes:
 - native
 covers:
@@ -35,8 +35,9 @@ steps:
 - press:
     selector: '[data-testid="explorer-address"]'
     key: Enter
+- wait_for: '[data-testid="explorer-file-row"][data-name="notes.txt"]'
 - dblclick: '[data-testid="explorer-file-row"][data-name="notes.txt"]'
-- wait_for: '[data-testid="viewer-editor"] .cm-content'
+- wait_for: '[data-testid="file-viewer"][data-kind="text"] [data-testid="viewer-editor"] .cm-content'
 - fill:
     selector: '[data-testid="viewer-editor"] .cm-content'
     value: 'File open saved
@@ -140,6 +141,7 @@ steps:
       '
 - click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
 - click: '[data-testid="tab-item"][data-tab-type="file-browser"]'
+- wait_for: '[data-testid="explorer-file-row"][data-name="binary.txt"]'
 - dblclick: '[data-testid="explorer-file-row"][data-name="binary.txt"]'
 - wait_for: '[data-testid="viewer-error"]'
 - assert_text:
@@ -152,7 +154,7 @@ steps:
 
       '
 - click: '[data-testid="viewer-retry"]'
-- wait_for: '[data-testid="viewer-editor"] .cm-content'
+- wait_for: '[data-testid="file-viewer"][data-kind="text"] [data-testid="viewer-editor"] .cm-content'
 - assert_items:
     selector: '[data-testid="viewer-editor"] .cm-line'
     equals:
@@ -160,6 +162,7 @@ steps:
     - ''
 - click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
 - click: '[data-testid="tab-item"][data-tab-type="file-browser"]'
+- wait_for: '[data-testid="explorer-file-row"][data-name="large.txt"]'
 - dblclick: '[data-testid="explorer-file-row"][data-name="large.txt"]'
 - wait_for: '[data-testid="viewer-large-file"]'
 - assert_disabled: '[data-testid="viewer-save"]'
@@ -177,96 +180,95 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Native save writes exact bytes and stale expected_hash never silently overwrites the external disk version;
-      Compare and Keep are actionable.
+    requirement: Native save writes exact bytes and stale expected_hash never silently overwrites the external disk version; Compare and Keep are actionable.
     actions:
-    - 11
     - 12
-    - 14
+    - 13
     - 15
     - 16
-    - 20
-    - 24
+    - 17
+    - 21
     - 25
-    - 27
+    - 26
+    - 28
     checkpoints:
-    - step: 13
+    - step: 14
       expectation: All native saved bytes match independent SHA256.
-    - step: 18
-      expectation: External version is still on disk after failed stale save.
     - step: 19
+      expectation: External version is still on disk after failed stale save.
+    - step: 20
       expectation: Unsaved local editor version remains intact.
-    - step: 22
-      expectation: Comparison exposes actual external text.
     - step: 23
+      expectation: Comparison exposes actual external text.
+    - step: 24
       expectation: Comparison also exposes actual local draft.
-    - step: 28
+    - step: 29
       expectation: Explicit Keep then Save writes the chosen local version.
     results:
-    - 13
-    - 18
+    - 14
     - 19
-    - 22
+    - 20
     - 23
-    - 28
+    - 24
+    - 29
   - id: R2
     requirement: Reload chooses external bytes and renderer recovery restores a draft without changing disk until Save.
     actions:
-    - 29
     - 30
     - 31
-    - 33
-    - 36
-    - 39
-    - 44
+    - 32
+    - 34
+    - 37
+    - 40
+    - 45
     checkpoints:
-    - step: 34
-      expectation: Reload displays exactly the current disk version.
     - step: 35
+      expectation: Reload displays exactly the current disk version.
+    - step: 36
       expectation: Reload clears dirty state.
-    - step: 41
-      expectation: Reloaded host explicitly identifies recovered draft.
     - step: 42
-      expectation: Recovery content is exact.
+      expectation: Reloaded host explicitly identifies recovered draft.
     - step: 43
+      expectation: Recovery content is exact.
+    - step: 44
       expectation: Unsaved recovery has not modified the host file.
-    - step: 45
+    - step: 46
       expectation: Saving restored draft writes exact native bytes.
     results:
-    - 34
     - 35
-    - 41
+    - 36
     - 42
     - 43
-    - 45
+    - 44
+    - 46
   - id: R3
     requirement: Binary failure offers retry/system action; repaired file retries successfully and large text is chunked read-only.
     actions:
-    - 48
-    - 52
-    - 53
-    - 58
-    - 62
+    - 50
+    - 54
+    - 55
+    - 61
+    - 65
     checkpoints:
-    - step: 50
+    - step: 52
       expectation: Binary refusal includes a concrete reason.
-    - step: 55
+    - step: 57
       expectation: Retry loads the repaired file text rather than a blank error page.
-    - step: 60
-      expectation: Large file cannot save.
-    - step: 61
-      expectation: Large editor is actually non-editable.
     - step: 63
-      expectation: Next chunk retains real file content.
+      expectation: Large file cannot save.
     - step: 64
+      expectation: Large editor is actually non-editable.
+    - step: 66
+      expectation: Next chunk retains real file content.
+    - step: 67
       expectation: All lifecycle/error paths have no uncaught runtime errors.
     results:
-    - 50
-    - 55
-    - 60
-    - 61
+    - 52
+    - 57
     - 63
     - 64
+    - 66
+    - 67
   visual:
   - check: Conflict/diff/error/large-file layouts
     method: manual

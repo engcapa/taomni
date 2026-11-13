@@ -14831,6 +14831,9 @@ controls:
   - id: viewer-operation-error
     selector: '[data-testid="viewer-operation-error"]'
     kind: display
+  - id: viewer-cursor
+    selector: '[data-testid="viewer-cursor"]'
+    kind: display
   - id: viewer-status
     selector: '[data-testid="viewer-status"]'
     kind: display
@@ -15221,9 +15224,29 @@ controls:
   - id: mail-attachment-system
     selector: '[data-testid="mail-attachment-system"]'
     kind: interactive
+  - id: file-open-chat-history
+    selector: '[data-testid="ai-chat-drawer"] button[title="History"]'
+    kind: interactive
+  - id: file-open-chat-thread
+    selector: '[data-testid="ai-chat-drawer"] >> text=QA file path entry'
+    kind: interactive
   - id: ai-file-link
     selector: '[data-testid="ai-file-link"]'
     kind: interactive
 -->
 
 TC-FILE-OPEN-001..006 是可执行行为用例并纳入 crash-regression；当前仅静态/单元验证，浏览器与原生执行待匹配构建证据。002 原生文本保存/冲突、003 SVG 原始字节、005 HTML 自定义协议资源/隔离、006 IMAP 附件受控临时副本/清理由各自独立字节或桥接结果验证。004 浏览器剪贴板与下载不作为原生磁盘/剪贴板/打印证据。尚缺：完整入口矩阵运行、SFTP 暂停/取消/重启续传、Markdown 原生图片/打印及各导出格式产物、OS 菜单/快捷键与视觉保真；详见各 case verification.native。
+
+
+### 文件打开补充验收矩阵（007–010，执行待 hosted evidence）
+
+| 验收 | 用例 / 层级 | 真实动作与决定性结果 | 当前边界 |
+|---|---|---|---|
+| AC-12 | TC-FILE-OPEN-007 native | 独立 OS PNG clipboard + 实际 Ctrl/Cmd+V；存储图片像素与源 Markdown 相对路径原生读回 | 非 synthetic ClipboardEvent；三端执行待证据 |
+| AC-15 | TC-FILE-OPEN-007 native | 真实保存/目录选择器；独立读取 HTML 图片内嵌、PNG、DOCX ZIP/XML/media、MD 图片夹；取消/图片缺失失败保持源 hash | 最终 PDF/物理打印输出未验证，仅页面设置取消 |
+| AC-18 | TC-FILE-OPEN-008 browser/native | AI persisted transcript 的真实文件芯片、Git 右键预览、终端 SSH 路径 modifier-click 拒绝、SFTP 下载只读内容与清理 | 浏览器 Git/VFS 与 native Git/磁盘分别解释；不宣称现场 AI 生成 |
+| AC-19 | TC-FILE-OPEN-008 browser/native | 实际 POSIX SSH/SFTP payload → 受控只读 temp，原生读回及关闭删除 | 大传输暂停/取消/重启续传独立场景待补；本地终端正向打开单列 |
+| AC-16/17/20 | TC-FILE-OPEN-009 native | loopback origin/proxy 独立日志；app/custom/none、代理失败不回落、取消停止、越界与符号链接拒绝 | 不以 browser stub 认证 native 网络 |
+| AC-16/17/22 | TC-FILE-OPEN-010 browser/native | 真实 iframe 目标指针；脚本禁用、外链父页面确认/取消、伪造 token/消息拒绝、焦点恢复 | macOS opaque frame 需 OS Accessibility/CoreGraphics 权限，拒绝时失败不伪证 |
+
+| AC-18 | TC-FILE-OPEN-011 native | 本地真实 PTY 输出路径 → Ctrl/Cmd+点击 → 正确文本/只一标签/磁盘不变；关闭查看器后 shell 独立锚定输出仍工作 | 不以 browser stub 或 handler 调用代替；hosted执行待证据 |

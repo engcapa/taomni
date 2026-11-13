@@ -70,7 +70,10 @@ export function markdownInput(options: InputOptions): Extension {
         .map((item) => item.getAsFile()).filter((file): file is File => Boolean(file));
       if (images.length) { event.preventDefault(); void insertMarkdownImages(view, images); return true; }
       if (!options.preferences().convertTables) return false;
-      const plain = data.getData("text/plain");
+      // Windows clipboard strings use CRLF, while CM positions count its
+      // normalized LF document. Use the exact inserted length for selection
+      // and the subsequent conversion transaction, not the clipboard length.
+      const plain = data.getData("text/plain").replace(/\r\n?/g, "\n");
       const converted = convertTablePaste(data.getData("text/html"), plain);
       if (!converted) return false;
       if (converted.warning) {

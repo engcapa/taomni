@@ -1,0 +1,389 @@
+id: TC-FILE-OPEN-007
+title: Native Markdown OS image paste and real export artifacts preserve source through cancel/failure
+description: 'AC12/15. Native only: an independent OS clipboard owner publishes a known PNG; an actual OS Ctrl/Cmd+V reaches focused
+  CodeMirror. Real GTK/NSSavePanel/Common Item Dialog save choices select isolated fresh paths. Host-side PNG pixels, DOCX ZIP/XML/media,
+  self-contained HTML and bundled Markdown assets are read independently, not inferred from a toast. Save cancel, missing-image failure
+  and PDF/print page-setup cancel keep the source exact. PDF/print final OS output is not certified: this case cancels page setup before
+  invoking printing.'
+modes:
+- native
+covers:
+- F-FILEOPEN-1
+- F-EXPLORER-1
+tags:
+- p0
+- file-open
+- markdown
+- clipboard
+- export
+- crash-regression
+fixtures:
+- reset_db
+- markdown_native
+timeout_sec: 420
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-markdown-native-artifacts
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-file-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Control+l
+    macos_key: Meta+l
+- fill:
+    selector: '[data-testid="explorer-address"]'
+    value: ${fixture.markdown_native_root}
+- press:
+    selector: '[data-testid="explorer-address"]'
+    key: Enter
+- dblclick: '[data-testid="explorer-file-row"][data-name="live.md"]'
+- wait_for: '[data-testid="markdown-editor"]'
+- click: '[data-testid="markdown-mode-source"]'
+- press:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    key: Control+End
+    macos_key: Meta+ArrowDown
+- press:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    key: Enter
+- host_clipboard:
+    action: set
+    kind: image
+    png: ${fixture.markdown_native_clipboard}
+- click: '[data-testid="viewer-editor"] .cm-content'
+- press:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    key: Control+End
+    macos_key: Meta+ArrowDown
+- native_paste:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+- assert_text:
+    selector: '[data-testid="markdown-paste-status"]'
+    contains: relative links inserted
+    timeout_sec: 30
+- assert_pattern:
+    selector: '[data-testid="viewer-editor"]'
+    regex: assets/image-[^\s)]+\.png
+- click: '[data-testid="viewer-save"]'
+- assert_markdown_artifact:
+    kind: pasted-image
+    path: ${fixture.markdown_native_source}
+    source: ${fixture.markdown_native_source}
+- press:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    key: Control+Home
+    macos_key: Meta+ArrowUp
+- click: '[data-testid="markdown-mode-live"]'
+- wait_for: '[data-testid="markdown-live"] .fv-md-mermaid svg'
+- assert_text:
+    selector: '[data-testid="markdown-live"] .fv-md-mermaid svg'
+    contains: Markdown Source
+- assert_text:
+    selector: '[data-testid="markdown-live"] .fv-md-mermaid svg'
+    contains: Export Artifact
+- click: '[data-testid="ribbon-settings"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: theme
+- wait_for: '[data-testid="app-theme-select"]'
+- click: '[data-testid="app-theme-select"]'
+- click: '[data-testid="app-theme-light"]'
+- click: '[data-testid="tab-item"][data-tab-type="file-viewer"]'
+- assert_attribute:
+    selector: html
+    name: data-app-theme
+    equals: light
+- screenshot: native-markdown-mermaid-live-light.png
+- click: '[data-testid="markdown-mode-split"]'
+- wait_for: '[data-testid="markdown-preview"] .fv-md-mermaid svg'
+- assert_text:
+    selector: '[data-testid="markdown-preview"] .fv-md-mermaid svg'
+    contains: Live Diagram
+- eval_readonly:
+    expression: document.querySelector(".fv-md-preview-pane .fv-md-mermaid svg").getBoundingClientRect().width >= 200 && document.querySelector(".fv-md-preview-pane
+      .fv-md-mermaid svg").getBoundingClientRect().height >= 30
+    expect_truthy: true
+- click: '[data-testid="ribbon-settings"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: theme
+- click: '[data-testid="app-theme-select"]'
+- click: '[data-testid="app-theme-dark"]'
+- click: '[data-testid="tab-item"][data-tab-type="file-viewer"]'
+- assert_attribute:
+    selector: html
+    name: data-app-theme
+    equals: dark
+- assert_visible: '[data-testid="markdown-preview"] .fv-md-mermaid svg'
+- screenshot: native-markdown-mermaid-split-dark.png
+- click: '[data-testid="markdown-export"]'
+- native_file_dialog:
+    kind: save
+    action: choose
+    path: ${fixture.markdown_native_exports}/native.html
+    trigger: '[data-testid="markdown-export-html"]'
+- wait_for: '[data-testid="markdown-export-status"][data-export-state="saved"]'
+- assert_markdown_artifact:
+    kind: html
+    path: ${fixture.markdown_native_exports}/native.html
+    source: ${fixture.markdown_native_source}
+- assert_markdown_artifact:
+    kind: source
+    path: ${fixture.markdown_native_source}
+    source: ${fixture.markdown_native_source}
+- click: '[data-testid="markdown-export"]'
+- native_file_dialog:
+    kind: save
+    action: choose
+    path: ${fixture.markdown_native_exports}/native.png
+    trigger: '[data-testid="markdown-export-png"]'
+- wait_for: '[data-testid="markdown-export-status"][data-export-state="saved"]'
+- assert_markdown_artifact:
+    kind: png
+    path: ${fixture.markdown_native_exports}/native.png
+    source: ${fixture.markdown_native_source}
+- click: '[data-testid="markdown-export"]'
+- click: '[data-testid="markdown-export-docx"]'
+- wait_for: '[data-testid="markdown-export-settings"]'
+- native_file_dialog:
+    kind: save
+    action: choose
+    path: ${fixture.markdown_native_exports}/native.docx
+    trigger: '[data-testid="markdown-export-confirm"]'
+- wait_for: '[data-testid="markdown-export-status"][data-export-state="saved"]'
+- assert_markdown_artifact:
+    kind: docx
+    path: ${fixture.markdown_native_exports}/native.docx
+    source: ${fixture.markdown_native_source}
+- click: '[data-testid="markdown-export"]'
+- native_file_dialog:
+    kind: folder
+    action: choose
+    path: ${fixture.markdown_native_exports}
+    trigger: '[data-testid="markdown-export-markdown"]'
+- wait_for: '[data-testid="markdown-export-status"][data-export-state="saved"]'
+- assert_markdown_artifact:
+    kind: markdown
+    path: ${fixture.markdown_native_exports}/live
+    source: ${fixture.markdown_native_source}
+- assert_markdown_artifact:
+    kind: source
+    path: ${fixture.markdown_native_source}
+    source: ${fixture.markdown_native_source}
+- click: '[data-testid="markdown-export"]'
+- native_file_dialog:
+    kind: save
+    action: cancel
+    trigger: '[data-testid="markdown-export-html"]'
+    path: ${fixture.markdown_native_exports}/cancelled.html
+- wait_for: '[data-testid="markdown-export-status"][data-export-state="cancelled"]'
+- assert_markdown_artifact:
+    kind: absent
+    path: ${fixture.markdown_native_exports}/cancelled.html
+    source: ${fixture.markdown_native_source}
+- assert_markdown_artifact:
+    kind: source
+    path: ${fixture.markdown_native_source}
+    source: ${fixture.markdown_native_source}
+- click: '[data-testid="markdown-export"]'
+- click: '[data-testid="markdown-export-pdf"]'
+- wait_for: '[data-testid="markdown-export-settings"]'
+- select_option:
+    selector: '[data-testid="markdown-export-settings"] select[aria-label="Paper"]'
+    value: Letter
+- press:
+    selector: '[data-testid="markdown-export-settings"] select[aria-label="Paper"]'
+    key: Escape
+- assert_not_visible: '[data-testid="markdown-export-settings"]'
+- assert_markdown_artifact:
+    kind: source
+    path: ${fixture.markdown_native_source}
+    source: ${fixture.markdown_native_source}
+- click: '[data-testid="markdown-export"]'
+- click: '[data-testid="markdown-export-print"]'
+- wait_for: '[data-testid="markdown-export-settings"]'
+- press:
+    selector: '[data-testid="markdown-export-settings"] select[aria-label="Paper"]'
+    key: Escape
+- assert_not_visible: '[data-testid="markdown-export-settings"]'
+- assert_markdown_artifact:
+    kind: source
+    path: ${fixture.markdown_native_source}
+    source: ${fixture.markdown_native_source}
+- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="tab-item"][data-tab-type="file-browser"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="missing-image.md"]'
+- wait_for: '[data-testid="markdown-editor"]'
+- click: '[data-testid="markdown-export"]'
+- click: '[data-testid="markdown-export-html"]'
+- wait_for: '[data-testid="markdown-export-status"][data-export-state="failed"]'
+- assert_visible: '[data-testid="viewer-operation-error"]'
+- assert_file_open_bytes:
+    path: ${fixture.markdown_native_root}/missing-image.md
+    sha256: ${fixture.markdown_native_missing_sha}
+- assert_count:
+    selector: '[data-testid="file-viewer"][data-dirty="true"]'
+    equal: 0
+- assert_no_runtime_errors: null
+- screenshot: native-markdown-artifacts.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Actual OS image Paste stores a standard relative asset whose PNG pixels match the independently seeded clipboard.
+    actions:
+    - 14
+    - 15
+    - 16
+    - 17
+    - 20
+    checkpoints:
+    - step: 18
+      expectation: Real clipboard entry completes through production image save.
+    - step: 19
+      expectation: Source contains a standard relative Markdown PNG link.
+    - step: 21
+      expectation: Independent host image decoding matches all clipboard fixture pixels.
+    results:
+    - 18
+    - 19
+    - 21
+  - id: R2
+    requirement: Real OS save/folder choosers produce self-contained HTML, nonblank PNG, valid DOCX XML/media and resolvable bundled
+      Markdown images without changing source.
+    actions:
+    - 47
+    - 48
+    - 52
+    - 53
+    - 56
+    - 57
+    - 59
+    - 62
+    - 63
+    checkpoints:
+    - step: 50
+      expectation: HTML embeds original/pasted image pixels and contains real heading/body.
+    - step: 51
+      expectation: HTML export leaves saved source exact.
+    - step: 55
+      expectation: Host PNG decodes to a nonblank long document image.
+    - step: 61
+      expectation: DOCX ZIP checksums/XML/body/media are independently valid.
+    - step: 65
+      expectation: Bundled Markdown references resolve to native saved image pixels.
+    - step: 66
+      expectation: All exports leave the source hash unchanged.
+    results:
+    - 50
+    - 51
+    - 55
+    - 61
+    - 65
+    - 66
+  - id: R3
+    requirement: Native chooser cancel, PDF/print setup cancel and missing-image failure are explicit and never modify source.
+    actions:
+    - 67
+    - 68
+    - 72
+    - 73
+    - 75
+    - 76
+    - 79
+    - 80
+    - 82
+    - 87
+    - 89
+    - 90
+    checkpoints:
+    - step: 69
+      expectation: Cancel returns the production cancelled state.
+    - step: 70
+      expectation: Cancel does not publish an output.
+    - step: 71
+      expectation: Cancel preserves saved source bytes.
+    - step: 77
+      expectation: PDF settings cancel closes its real dialog.
+    - step: 78
+      expectation: PDF settings cancellation leaves source exact.
+    - step: 83
+      expectation: Print settings cancel closes its real dialog.
+    - step: 84
+      expectation: Print settings cancellation leaves source exact.
+    - step: 91
+      expectation: Missing native image fails before reporting successful export.
+    - step: 93
+      expectation: Failed export preserves exact missing-image source.
+    - step: 95
+      expectation: Native clipboard/chooser/export lifecycle has no unhandled runtime errors.
+    results:
+    - 69
+    - 70
+    - 71
+    - 77
+    - 78
+    - 83
+    - 84
+    - 91
+    - 93
+    - 95
+  - id: R4
+    requirement: Real native Mermaid flowchart renders node labels and nonzero geometry in live/split; actual theme controls produce
+      light/dark evidence; exported HTML/PNG/DOCX/MD retain diagram.
+    actions:
+    - 22
+    - 23
+    - 27
+    - 28
+    - 30
+    - 31
+    - 32
+    - 35
+    - 39
+    - 40
+    - 41
+    - 42
+    - 43
+    checkpoints:
+    - step: 25
+      expectation: Rendered actual Mermaid SVG labels/geometry or application theme matches the preceding UI action; screenshots retained
+        for aesthetic review.
+    - step: 26
+      expectation: Rendered actual Mermaid SVG labels/geometry or application theme matches the preceding UI action; screenshots retained
+        for aesthetic review.
+    - step: 33
+      expectation: Rendered actual Mermaid SVG labels/geometry or application theme matches the preceding UI action; screenshots retained
+        for aesthetic review.
+    - step: 37
+      expectation: Rendered actual Mermaid SVG labels/geometry or application theme matches the preceding UI action; screenshots retained
+        for aesthetic review.
+    - step: 38
+      expectation: Rendered actual Mermaid SVG labels/geometry or application theme matches the preceding UI action; screenshots retained
+        for aesthetic review.
+    - step: 44
+      expectation: Rendered actual Mermaid SVG labels/geometry or application theme matches the preceding UI action; screenshots retained
+        for aesthetic review.
+    - step: 45
+      expectation: Rendered actual Mermaid SVG labels/geometry or application theme matches the preceding UI action; screenshots retained
+        for aesthetic review.
+    results:
+    - 25
+    - 26
+    - 33
+    - 37
+    - 38
+    - 44
+    - 45
+  visual:
+  - check: Native chooser and Markdown export layout
+    method: manual
+    reason: OS chooser screenshots retained; full visual fidelity requires review.
+  native:
+  - check: Clipboard image and export artifacts
+    method: automated
+    reason: OS clipboard/native Paste/owned chooser plus independent host PNG/ZIP/XML/relative-image verification.
+  - check: Final PDF/physical printer output and OS print-dialog cancellation
+    method: manual
+    reason: Only product page setup cancellation is covered; no physical-printer or PDF artifact is asserted.

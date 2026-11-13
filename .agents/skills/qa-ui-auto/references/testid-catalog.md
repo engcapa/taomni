@@ -1247,6 +1247,7 @@
 - `[data-testid="viewer-retry"]` — interactive — F-FILEOPEN-1.viewer-retry
 - `[data-testid="viewer-system"]` — interactive — F-FILEOPEN-1.viewer-system
 - `[data-testid="viewer-operation-error"]` — display — F-FILEOPEN-1.viewer-operation-error
+- `[data-testid="viewer-cursor"]` — display — F-FILEOPEN-1.viewer-cursor
 - `[data-testid="viewer-status"]` — display — F-FILEOPEN-1.viewer-status
 - `[data-testid="viewer-draft-restored"]` — display — F-FILEOPEN-1.viewer-draft-restored
 - `[data-testid="viewer-large-file"]` — display — F-FILEOPEN-1.viewer-large-file
@@ -1377,6 +1378,8 @@
 - `[data-testid="mail-attachment-open"]` — interactive — F-FILEOPEN-1.mail-attachment-open
 - `[data-testid="mail-attachment-preview"]` — interactive — F-FILEOPEN-1.mail-attachment-preview
 - `[data-testid="mail-attachment-system"]` — interactive — F-FILEOPEN-1.mail-attachment-system
+- `[data-testid="ai-chat-drawer"] button[title="History"]` — interactive — F-FILEOPEN-1.file-open-chat-history
+- `[data-testid="ai-chat-drawer"] >> text=QA file path entry` — interactive — F-FILEOPEN-1.file-open-chat-thread
 - `[data-testid="ai-file-link"]` — interactive — F-FILEOPEN-1.ai-file-link
 
 ## git/diff (F26.1)

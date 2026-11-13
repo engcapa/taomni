@@ -62,7 +62,7 @@ function HtmlPreviewContent({ document, onError, visible = true, workspaceId }: 
   const currentRoute = history.entries[history.index] ?? initialRoute;
   const src = useMemo(() => session ? previewRouteUrl(currentRoute, session) ?? session.url : undefined, [session, currentRoute]);
   const address = htmlFileAddress(document.path, currentRoute, initialRoute);
-  const frameWidth = device === "mobile" ? 390 : device === "tablet" ? 768 : Math.max(1, stageWidth - 48) * 100 / zoom;
+  const frameWidth = device === "mobile" ? 390 : device === "tablet" ? 768 : Math.max(1, stageWidth) * 100 / zoom;
   const desktopWidth = device === "desktop" && !stageWidth ? "100%" : frameWidth;
 
   useEffect(() => {
@@ -191,7 +191,7 @@ function HtmlPreviewContent({ document, onError, visible = true, workspaceId }: 
     {document.dirty && <div className="fv-banner html-dirty-banner"><span>{label("预览显示磁盘上已保存的版本；保存后刷新。", "The preview shows the saved version on disk. Save to refresh.")}</span><span className="fv-spacer" /><button type="button" className="fv-button" data-testid="html-save-refresh" disabled={busy || document.readOnly} onClick={() => void saveAndReload()}><Save />{label("保存并刷新", "Save and refresh")}</button></div>}
     <div className="html-body">
       <div className="html-source" data-testid="html-source" hidden={!split}><div className="html-source-label">{basename(document.path)}</div><EditorSurface document={document} extensions={HTML_EXTENSIONS} /></div>
-      <div className="html-stage" data-testid="html-stage" ref={stage}>
+      <div className="html-stage" data-testid="html-stage" data-device={device} ref={stage}>
         {src && !error && <div className="html-page-shell" data-device={device} style={{ width: typeof desktopWidth === "number" ? desktopWidth * zoom / 100 : desktopWidth }}>
           <iframe key={session?.token} ref={iframe} className="html-frame" data-testid="html-frame" title={label("本地 HTML 沙盒预览", "Local HTML sandbox preview")}
             src={src} sandbox="allow-scripts" referrerPolicy="no-referrer" allow="camera 'none'; microphone 'none'; geolocation 'none'; clipboard-read 'none'; clipboard-write 'none'"

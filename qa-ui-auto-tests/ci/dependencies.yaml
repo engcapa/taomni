@@ -1,3 +1,10 @@
+TC-FILE-OPEN-012: []
+TC-FILE-OPEN-011: []
+# Native artifact/global-entry/security cases own isolated inputs.
+TC-FILE-OPEN-007: []
+TC-FILE-OPEN-008: []
+TC-FILE-OPEN-009: []
+TC-FILE-OPEN-010: []
 # File-open cases own isolated files/mail inputs; none relies on a predecessor's state.
 TC-FILE-OPEN-001: []
 TC-FILE-OPEN-002: []

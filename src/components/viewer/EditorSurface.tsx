@@ -12,6 +12,7 @@ export interface EditorSurfaceProps {
   document: ViewerDocument;
   extensions?: Extension[];
   onView?: (view: EditorView | null) => void;
+  onCursorChange?: (cursor: { line: number; column: number }) => void;
   className?: string;
 }
 const EMPTY_EXTENSIONS: Extension[] = [];
@@ -42,16 +43,18 @@ async function language(path: string): Promise<Extension> {
 
 /** The view owns selection and history; shared store owns document text. Remote
  * store updates never recreate the editor or echo themselves back as user edits. */
-export function EditorSurface({ document: current, extensions = EMPTY_EXTENSIONS, onView, className = "" }: EditorSurfaceProps) {
+export function EditorSurface({ document: current, extensions = EMPTY_EXTENSIONS, onView, onCursorChange, className = "" }: EditorSurfaceProps) {
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
   const currentRef = useRef(current);
   const onViewRef = useRef(onView);
+  const onCursorRef = useRef(onCursorChange);
   const preferences = useFileOpenPreferences();
   const compartments = useRef({ editable: new Compartment(), wrap: new Compartment(), extra: new Compartment(), language: new Compartment() });
   const external = useRef(false);
   currentRef.current = current;
   onViewRef.current = onView;
+  onCursorRef.current = onCursorChange;
   useLayoutEffect(() => {
     if (!host.current) return;
     const settings = useFileOpenPreferences.getState();
@@ -66,11 +69,17 @@ export function EditorSurface({ document: current, extensions = EMPTY_EXTENSIONS
         EditorView.contentAttributes.of({ "data-testid": "viewer-editor-content", "aria-label": "File content" }),
         EditorView.updateListener.of((update) => {
           if (update.docChanged && !external.current) useDocumentStore.getState().edit(currentRef.current.path, update.state.doc.toString());
+          if (update.docChanged || update.selectionSet) {
+            const head = update.state.selection.main.head;
+            const line = update.state.doc.lineAt(head);
+            onCursorRef.current?.({ line: line.number, column: head - line.from + 1 });
+          }
         }),
       ],
     }) });
     view.current = editor;
     onViewRef.current?.(editor);
+    onCursorRef.current?.({ line: 1, column: 1 });
     let alive = true;
     void language(currentRef.current.path).then((extension) => { if (alive) editor.dispatch({ effects: parts.language.reconfigure(extension) }); }).catch(() => {});
     return () => { alive = false; onViewRef.current?.(null); view.current = null; editor.destroy(); };

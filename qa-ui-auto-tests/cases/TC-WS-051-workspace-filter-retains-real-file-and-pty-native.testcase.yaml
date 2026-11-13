@@ -1,7 +1,8 @@
 id: TC-WS-051
 title: Workspace filters and overflow layouts preserve unsaved editor buffers, exact saved bytes and the same live local PTY
-description: 'Native-only boundary: real files are opened and saved via Tauri; independent host disk reread verifies the save. Shell output before and after filtering must
-  be separate anchored output lines and the terminal count stays one.'
+description: 'Native-only boundary: real files are opened and saved via Tauri; independent host disk reread verifies the save. Shell output before and after filtering
+  must be separate anchored output lines and the terminal count stays one. File-open default routing is configured explicitly to the IDE for .md/.txt before this
+  retained editor lifecycle; original content/pane/dirty assertions are unchanged.'
 modes:
 - native
 covers:
@@ -25,10 +26,13 @@ steps:
 - seed_storage:
     key: taomni.platformWorkspaces.v1
     value: '{"version": 1, "activeWorkspaceId": "default-workspace", "createdNodes": [], "workspaces": [{"id": "default-workspace", "name": "Default Workspace", "description":
-      "", "isDefault": true, "rootFolders": [{"id": "root-1", "name": "qa-root", "path": "${fixture.platform_workspace_root}", "addedAt": 1}], "pinnedSessionIds": [], "activeLeftToolWindow":
-      "project", "bottomDock": {"open": false, "activeTool": "terminal", "heightPx": 220}, "openTabs": [], "activeTabId": ""}, {"id": "second-workspace", "name": "Second Workspace",
-      "description": "", "isDefault": false, "rootFolders": [], "pinnedSessionIds": [], "activeLeftToolWindow": "project", "bottomDock": {"open": false, "activeTool": "terminal",
-      "heightPx": 220}, "openTabs": [], "activeTabId": ""}]}'
+      "", "isDefault": true, "rootFolders": [{"id": "root-1", "name": "qa-root", "path": "${fixture.platform_workspace_root}", "addedAt": 1}], "pinnedSessionIds":
+      [], "activeLeftToolWindow": "project", "bottomDock": {"open": false, "activeTool": "terminal", "heightPx": 220}, "openTabs": [], "activeTabId": ""}, {"id":
+      "second-workspace", "name": "Second Workspace", "description": "", "isDefault": false, "rootFolders": [], "pinnedSessionIds": [], "activeLeftToolWindow": "project",
+      "bottomDock": {"open": false, "activeTool": "terminal", "heightPx": 220}, "openTabs": [], "activeTabId": ""}]}'
+- seed_storage:
+    key: taomni.fileOpen.preferences.v1
+    value: '{"associations":{"md":"workspace","txt":"workspace"}}'
 - reload_window: null
 - wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="nav-mode-workspaces"]'
@@ -124,81 +128,81 @@ verification:
     - 1
     - 2
     - 3
-    - 4
-    - 6
+    - 5
     - 7
     - 8
-    - 10
+    - 9
     - 11
     - 12
     - 13
-    - 16
-    - 18
+    - 14
+    - 17
     - 19
-    - 21
-    - 23
+    - 20
+    - 22
     - 24
-    - 26
+    - 25
     - 27
     - 28
     - 29
-    - 32
+    - 30
     - 33
     - 34
-    - 36
-    - 39
+    - 35
+    - 37
     - 40
     - 41
     - 42
-    - 44
-    - 47
-    checkpoints:
-    - step: 15
-      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tab\"]", "equal": 2}}'
-    - step: 17
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]", "regex": "(?m)^QA_FILTER_PTY_BEFORE\\s*$"}}'
-    - step: 20
-      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tab\"]", "equal": 1}}'
-    - step: 22
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "equals": "QA_FILTER_UNSAVED_DRAFT"}}'
-    - step: 25
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "split"}}'
-    - step: 30
-      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tab\"]", "equal": 0}}'
-    - step: 31
-      expectation: '{"assert_visible": "[data-testid=\"workspace-tabs-filter-empty\"]"}'
-    - step: 35
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]", "regex": "(?m)^QA_FILTER_PTY_BEFORE\\s*$"}}'
-    - step: 37
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]", "regex": "(?m)^QA_FILTER_PTY_AFTER\\s*$"}}'
-    - step: 38
-      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-pane\"]", "equal": 1}}'
-    - step: 43
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "equals": "QA_FILTER_UNSAVED_DRAFT"}}'
-    - step: 45
-      expectation: '{"assert_file_sha256": {"path": "${fixture.platform_workspace_root}/README.md", "equals": "6f9d78d9f3af64d8bc4f9b392c6ce5606b48a0140d2d8f82a0fd1975febac0ae"}}'
-    - step: 46
-      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tab\"]", "equal": 1}}'
-    - step: 48
-      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tab\"]", "equal": 2}}'
-    - step: 49
-      expectation: '{"assert_no_runtime_errors": null}'
-    results:
-    - 15
-    - 17
-    - 20
-    - 22
-    - 25
-    - 30
-    - 31
-    - 35
-    - 37
-    - 38
     - 43
     - 45
-    - 46
     - 48
+    checkpoints:
+    - step: 16
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tab\"]", "equal": 2}}'
+    - step: 18
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]", "regex": "(?m)^QA_FILTER_PTY_BEFORE\\s*$"}}'
+    - step: 21
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tab\"]", "equal": 1}}'
+    - step: 23
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "equals": "QA_FILTER_UNSAVED_DRAFT"}}'
+    - step: 26
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-canvas-panes\"]", "name": "data-layout", "equals": "split"}}'
+    - step: 31
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tab\"]", "equal": 0}}'
+    - step: 32
+      expectation: '{"assert_visible": "[data-testid=\"workspace-tabs-filter-empty\"]"}'
+    - step: 36
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]", "regex": "(?m)^QA_FILTER_PTY_BEFORE\\s*$"}}'
+    - step: 38
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]", "regex": "(?m)^QA_FILTER_PTY_AFTER\\s*$"}}'
+    - step: 39
+      expectation: '{"assert_count": {"selector": "[data-testid=\"terminal-pane\"]", "equal": 1}}'
+    - step: 44
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "equals": "QA_FILTER_UNSAVED_DRAFT"}}'
+    - step: 46
+      expectation: '{"assert_file_sha256": {"path": "${fixture.platform_workspace_root}/README.md", "equals": "6f9d78d9f3af64d8bc4f9b392c6ce5606b48a0140d2d8f82a0fd1975febac0ae"}}'
+    - step: 47
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tab\"]", "equal": 1}}'
+    - step: 49
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tab\"]", "equal": 2}}'
+    - step: 50
+      expectation: '{"assert_no_runtime_errors": null}'
+    results:
+    - 16
+    - 18
+    - 21
+    - 23
+    - 26
+    - 31
+    - 32
+    - 36
+    - 38
+    - 39
+    - 44
+    - 46
+    - 47
     - 49
+    - 50
   visual:
   - check: Compact funnel/overflow controls and bounded popovers
     method: automated
@@ -206,5 +210,5 @@ verification:
   native:
   - check: Real editor buffers, file writes and live PTY ownership survive filtering
     method: automated
-    reason: 'Native-only boundary: real files are opened and saved via Tauri; independent host disk reread verifies the save. Shell output before and after filtering must be
-      separate anchored output lines and the terminal count stays one.'
+    reason: 'Native-only boundary: real files are opened and saved via Tauri; independent host disk reread verifies the save. Shell output before and after filtering
+      must be separate anchored output lines and the terminal count stays one.'

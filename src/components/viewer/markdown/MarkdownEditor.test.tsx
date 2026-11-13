@@ -1,5 +1,6 @@
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { EditorView } from "@codemirror/view";
+import { undo, redo } from "@codemirror/commands";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ViewerDocument } from "../../../lib/viewer";
 import { useDocumentStore } from "../../../stores/documentStore";
@@ -42,6 +43,22 @@ describe("MarkdownEditor real host lifecycle", () => {
     expect(screen.getByTestId("markdown-editor")).toHaveClass("fv-md-focus");
     expect(view.state.doc.toString()).toContain("# Changed");
     expect(screen.queryByText(/Simulate|模拟/)).toBeNull();
+  });
+  it("preserves clipboard conversion Undo/Redo through the mounted shared store", async () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByTestId("markdown-mode-source"));
+    const dom = screen.getByTestId("markdown-editor").querySelector<HTMLElement>(".cm-editor")!;
+    const view = EditorView.findFromDOM(dom)!;
+    act(() => view.dispatch({ selection: { anchor: view.state.doc.length } }));
+    const event = new Event("paste", { bubbles: true, cancelable: true });
+    Object.defineProperty(event, "clipboardData", { value: { items: [], getData: (type: string) => type === "text/plain" ? "Name\tValue\r\nAlpha\t1" : "" } });
+    act(() => { view.contentDOM.dispatchEvent(event); });
+    expect(view.state.doc.toString()).toContain("| Alpha | 1 |");
+    act(() => { expect(undo(view)).toBe(true); });
+    expect(view.state.doc.toString()).toContain("Name\tValue\nAlpha\t1");
+    act(() => { expect(redo(view)).toBe(true); });
+    expect(view.state.doc.toString()).toContain("| Alpha | 1 |");
+    expect(useDocumentStore.getState().documents["/docs/a.md"].content).toBe(view.state.doc.toString());
   });
   it("exports actual unsaved content and distinguishes completion, cancellation and errors", async () => {
     vi.mocked(exportMarkdown).mockResolvedValue({ status: "saved", path: "/exports/a.html" });

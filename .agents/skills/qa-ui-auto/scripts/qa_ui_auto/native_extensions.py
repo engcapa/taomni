@@ -31,3 +31,18 @@ def register(register_verb: RegisterVerb, verbs: dict[str, NativeVerb]) -> None:
     register_verb("assert_explorer_files")(assert_explorer_files)
     from .file_open_observation import native as assert_file_open_bytes
     register_verb("assert_file_open_bytes")(assert_file_open_bytes)
+    from .file_dialog import run as native_file_dialog
+    from .native_paste import run as native_paste
+    from .markdown_export_observation import run as assert_markdown_artifact
+    from .terminal_file_link import native as terminal_file_link
+    from .html_preview_observation import native_click, native_observe
+    register_verb("native_file_dialog")(native_file_dialog)
+    register_verb("native_paste")(native_paste)
+    register_verb("assert_markdown_artifact")(assert_markdown_artifact)
+    register_verb("terminal_file_link")(terminal_file_link)
+    register_verb("html_preview_click")(native_click)
+    register_verb("assert_html_network")(native_observe)
+    from .explorer_preview_visibility import native as show_explorer_preview
+    register_verb("show_explorer_preview")(show_explorer_preview)
+    from .viewer_raster import native as viewer_raster
+    register_verb("viewer_raster")(viewer_raster)

@@ -65,7 +65,12 @@ export async function enhanceMarkdown(root: HTMLElement, owner: RenderOwner, str
     const language = /(?:language|lang)-([\w-]+)/.exec(block.className)?.[1] || "";
     if (language === "mermaid") {
       const source = block.textContent || "";
-      jobs.push(ensureMermaidReady().then((mermaid) => mermaid.render(`fv-md-diagram-${++diagramId}`, source)).then((result) => {
+      // SVG text labels survive our SVG-only sanitizer and rasterize into Word
+      // and PNG. Mermaid's default HTML labels use foreignObject, which the
+      // sanitizer intentionally removes. This is view-only configuration; the
+      // document retains its exact standard Mermaid fence/source.
+      const svgSource = `${source}\n%%{init: {"htmlLabels": false, "flowchart": {"htmlLabels": false}}}%%`;
+      jobs.push(ensureMermaidReady().then((mermaid) => mermaid.render(`fv-md-diagram-${++diagramId}`, svgSource)).then((result) => {
         if (owner.cancelled()) return;
         const diagram = document.createElement("div");
         diagram.className = "fv-md-mermaid";

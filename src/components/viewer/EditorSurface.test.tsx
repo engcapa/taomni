@@ -26,6 +26,15 @@ describe("lightweight shared CodeMirror surface", () => {
     expect(view).toBe(original); expect(view!.state.doc.toString()).toBe("shared");
     expect(current().content).toBe("mine");
   });
+  it("publishes actual line and column changes without recreating the view", async () => {
+    let view: EditorView | null = null;
+    const cursor = vi.fn();
+    const current = useDocumentStore.getState().documents[path];
+    render(<div className="fv"><EditorSurface document={current} onView={(value) => { view = value; }} onCursorChange={cursor} /></div>);
+    await waitFor(() => expect(view).not.toBeNull());
+    act(() => view!.dispatch({ changes: { from: 0, to: 3, insert: "one\ntwo" }, selection: { anchor: 6 } }));
+    expect(cursor).toHaveBeenLastCalledWith({ line: 2, column: 3 });
+  });
   it("makes remote and large documents non-editable", async () => {
     const current = useDocumentStore.getState().documents[path];
     const screen = render(<div className="fv"><EditorSurface document={{ ...current, readOnly: true }} /></div>);

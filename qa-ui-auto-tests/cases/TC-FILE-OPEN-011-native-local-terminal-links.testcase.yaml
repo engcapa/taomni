@@ -1,0 +1,167 @@
+id: TC-FILE-OPEN-011
+title: Native local terminal modifier-click opens and dedupes the actual local file
+description: AC18/22. Creates a real local PTY through New Local Terminal, changes into the disposable host folder and types a portable
+  echo of its short relative file path (avoiding terminal-wrap truncation), uses actual terminal Find only to locate the rendered output
+  and trusted Ctrl/Cmd-clicks the real xterm link. Viewer content and independent host bytes prove the target. Repeating through the
+  same terminal activates the only viewer; closing it retains the live PTY. No browser local-terminal stub, provider callback or direct
+  openFile call.
+modes:
+- native
+covers:
+- F-FILEOPEN-1
+- F1.2
+- F25.3
+tags:
+- p0
+- file-open
+- terminal
+- global-entry
+- crash-regression
+fixtures:
+- reset_db
+- file_open_files
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-file-open-local-terminal
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="new-local-terminal"]'
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+    timeout_sec: 60
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: cd "${fixture.file_open_root}"
+    submit: true
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+    timeout_sec: 20
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: echo ./notes.txt
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    regex: (?m)^\./notes\.txt\s*$
+    timeout_sec: 20
+- press:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    key: Control+Shift+f
+    macos_key: Control+Shift+f
+- fill:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] input[placeholder="Find"]'
+    value: notes.txt
+- press:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] input[placeholder="Find"]'
+    key: Enter
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"] .terminal-search-hit-active'
+- terminal_file_link:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- wait_for: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"]'
+- assert_items:
+    selector: '[data-testid="file-viewer"] [data-testid="viewer-editor"] .cm-line'
+    equals:
+    - File open original
+    - Second line
+    - 中文
+    - ''
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/notes.txt
+    sha256: ${fixture.file_open_original_sha}
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="file-viewer"]'
+    equal: 1
+- click: '[data-testid="tab-item"][data-tab-type="terminal"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"] .terminal-search-hit-active'
+- terminal_file_link:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- wait_for: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"]'
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="file-viewer"]'
+    equal: 1
+- assert_items:
+    selector: '[data-testid="file-viewer"] [data-testid="viewer-editor"] .cm-line'
+    equals:
+    - File open original
+    - Second line
+    - 中文
+    - ''
+- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- press:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] input[placeholder="Find"]'
+    key: Escape
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: echo QA_LOCAL_TERMINAL_STILL_LIVE
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    regex: (?m)^QA_LOCAL_TERMINAL_STILL_LIVE\s*$
+    timeout_sec: 20
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/notes.txt
+    sha256: ${fixture.file_open_original_sha}
+- assert_no_runtime_errors: null
+- screenshot: native-local-terminal-file-open.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Real local terminal path modifier-click opens the actual file through the global service without modifying host bytes.
+    actions:
+    - 4
+    - 8
+    - 10
+    - 11
+    - 12
+    - 14
+    checkpoints:
+    - step: 5
+      expectation: A real native local PTY reaches idle prompt readiness.
+    - step: 16
+      expectation: Viewer editor contains the complete actual file contents.
+    - step: 17
+      expectation: Independent host SHA256 remains original.
+    - step: 18
+      expectation: First terminal activation creates one viewer.
+    results:
+    - 16
+    - 17
+    - 18
+  - id: R2
+    requirement: Repeated link activation dedupes the same scope and closing its viewer preserves a working native terminal.
+    actions:
+    - 19
+    - 21
+    - 25
+    - 27
+    - 28
+    checkpoints:
+    - step: 23
+      expectation: The second trusted activation reuses the only viewer.
+    - step: 24
+      expectation: Reused host retains exact file content.
+    - step: 29
+      expectation: Anchored output proves a separate command actually executed after viewer close.
+    - step: 30
+      expectation: Entry and close lifecycle left host file bytes unchanged.
+    - step: 31
+      expectation: No uncaught runtime exception across terminal/viewer activation.
+    results:
+    - 23
+    - 24
+    - 29
+    - 30
+    - 31
+  visual:
+  - check: Terminal link activation and viewer chrome
+    method: manual
+    reason: Screenshot aids visual review but is not prototype-fidelity proof.
+  native:
+  - check: Local PTY, actual terminal link and disk target
+    method: automated
+    reason: Real shell output plus trusted xterm modifier-click and independent host bytes.
+  - check: Physical OS keyboard/menu accelerator delivery
+    method: manual
+    reason: W3C pointer/key actions prove packaged WebView routing, not physical OS input.

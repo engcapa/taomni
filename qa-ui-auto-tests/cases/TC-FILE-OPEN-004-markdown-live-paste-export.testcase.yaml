@@ -3,7 +3,10 @@ title: Markdown live widgets preserve source, paste a real table/image and expor
 description: AC11/12/13/15. Real CodeMirror renderer and Chromium clipboard, not simulation buttons. Asserts live/source/split
   rendering, one-step table Undo, stored image bytes/link, export contents and unchanged source bytes. Browser VFS/clipboard
   and actual browser download are not native OS clipboard/save-dialog evidence. PDF/print, Word/PNG export, native image clipboard
-  formats and dialog failures remain explicit unrun native gaps.
+  formats and dialog failures remain explicit unrun native gaps. Real Mermaid (not mocked) is asserted in live/split and the
+  self-contained HTML artifact. Ctrl+Y is the Linux/Windows standard Redo and Cmd+Shift+Z is used on macOS; async clipboard
+  status waits for actual completion. Light screenshots retained; dark prototype comparison still requires separate hosted
+  visual evidence.
 modes:
 - browser
 covers:
@@ -37,6 +40,7 @@ steps:
 - press:
     selector: '[data-testid="explorer-address"]'
     key: Enter
+- wait_for: '[data-testid="explorer-file-row"][data-name="live.md"]'
 - dblclick: '[data-testid="explorer-file-row"][data-name="live.md"]'
 - wait_for: '[data-testid="markdown-editor"][data-mode="live"]'
 - assert_visible: '[data-testid="markdown-outline"]'
@@ -47,6 +51,22 @@ steps:
 - assert_file_open_bytes:
     path: ${fixture.file_open_root}/live.md
     sha256: ${fixture.file_open_markdown_sha}
+- wait_for: '[data-testid="markdown-live"] .fv-md-mermaid svg'
+- assert_text:
+    selector: '[data-testid="markdown-live"] .fv-md-mermaid'
+    contains: Explorer
+- assert_text:
+    selector: '[data-testid="markdown-live"] .fv-md-mermaid'
+    contains: OpenFile
+- assert_text:
+    selector: '[data-testid="markdown-live"] .fv-md-mermaid'
+    contains: Viewer
+- eval_readonly:
+    expression: document.querySelector('.fv-md-live-surface .fv-md-mermaid svg')?.querySelectorAll(".node").length === 3 &&
+      document.querySelector('.fv-md-live-surface .fv-md-mermaid svg')?.querySelectorAll("path").length >= 2 && !document.querySelector('.fv-md-live-surface
+      .fv-md-mermaid svg')?.querySelector("foreignObject")
+    expect_truthy: true
+- screenshot: markdown-live-mermaid-light.png
 - click: '[data-testid="markdown-outline"] button[data-heading-from="0"]'
 - assert_text:
     selector: '[data-testid="viewer-editor"] .cm-line'
@@ -59,6 +79,22 @@ steps:
 - assert_text_equals:
     selector: '[data-testid="markdown-preview"] strong'
     equals: Rendered bold
+- wait_for: '[data-testid="markdown-preview"] .fv-md-mermaid svg'
+- assert_text:
+    selector: '[data-testid="markdown-preview"] .fv-md-mermaid'
+    contains: Explorer
+- assert_text:
+    selector: '[data-testid="markdown-preview"] .fv-md-mermaid'
+    contains: OpenFile
+- assert_text:
+    selector: '[data-testid="markdown-preview"] .fv-md-mermaid'
+    contains: Viewer
+- eval_readonly:
+    expression: document.querySelector('.fv-md-preview-pane .fv-md-mermaid svg')?.querySelectorAll(".node").length === 3 &&
+      document.querySelector('.fv-md-preview-pane .fv-md-mermaid svg')?.querySelectorAll("path").length >= 2 && !document.querySelector('.fv-md-preview-pane
+      .fv-md-mermaid svg')?.querySelector("foreignObject")
+    expect_truthy: true
+- screenshot: markdown-split-mermaid-light.png
 - click: '[data-testid="markdown-mode-source"]'
 - press:
     selector: '[data-testid="viewer-editor"] .cm-content'
@@ -85,8 +121,8 @@ steps:
     contains: "Name\tValue"
 - press:
     selector: '[data-testid="viewer-editor"] .cm-content'
-    key: Control+Shift+z
-    macos_key: Meta+Shift+z
+    key: Control+y
+    macos_key: Meta+Shift+Z
 - assert_text:
     selector: '[data-testid="viewer-editor"]'
     contains: '| Alpha | 1 |'
@@ -181,6 +217,11 @@ steps:
     - <table
     - data:image/png;base64,
     - Alpha
+    - <svg
+    - fv-md-mermaid
+    - Explorer
+    - OpenFile
+    - Viewer
 - assert_text:
     selector: '[data-testid="markdown-export-status"]'
     contains: Export completed
@@ -193,18 +234,21 @@ steps:
     contains: Export completed
 - click: '[data-testid="markdown-export"]'
 - click: '[data-testid="markdown-export-richtext"]'
+- wait_for: '[data-testid="markdown-export-status"][data-export-state="copied"]'
 - assert_attribute:
     selector: '[data-testid="markdown-export-status"]'
     name: data-export-state
     equals: copied
 - click: '[data-testid="markdown-export"]'
 - click: '[data-testid="markdown-export-html-source"]'
+- wait_for: '[data-testid="markdown-export-status"][data-export-state="copied"]'
 - assert_attribute:
     selector: '[data-testid="markdown-export-status"]'
     name: data-export-state
     equals: copied
 - click: '[data-testid="markdown-export"]'
 - click: '[data-testid="markdown-export-markdown"]'
+- wait_for: '[data-testid="markdown-export-status"][data-export-state="failed"]'
 - assert_attribute:
     selector: '[data-testid="markdown-export-status"]'
     name: data-export-state
@@ -236,188 +280,233 @@ verification:
   - id: R1
     requirement: Live mode is default; outline/image and split render actual Markdown without changing its source.
     actions:
-    - 10
-    - 18
+    - 11
+    - 25
     checkpoints:
-    - step: 13
-      expectation: Outline contains actual first heading.
     - step: 14
-      expectation: Live mode displays a real image widget.
+      expectation: Outline contains actual first heading.
     - step: 15
+      expectation: Live mode displays a real image widget.
+    - step: 16
       expectation: Mode/render operations leave exact Markdown bytes unchanged.
-    - step: 20
+    - step: 27
       expectation: Split mode renders heading syntax.
-    - step: 21
+    - step: 28
       expectation: Bold markup becomes a strong element.
     results:
-    - 13
     - 14
     - 15
-    - 20
-    - 21
+    - 16
+    - 27
+    - 28
   - id: R2
     requirement: Clipboard TSV converts to standard Markdown with reversible conversion, image paste inserts a relative saved
       asset and survives reopen.
     actions:
-    - 23
-    - 25
-    - 26
-    - 29
-    - 31
-    - 33
-    - 34
-    - 35
     - 36
+    - 38
     - 39
-    - 40
-    - 51
-    - 97
-    - 98
-    - 100
+    - 42
+    - 44
+    - 46
+    - 47
+    - 48
+    - 49
+    - 52
+    - 53
+    - 64
+    - 113
+    - 114
+    - 116
     checkpoints:
-    - step: 28
+    - step: 41
       expectation: Header has standard Markdown table syntax.
-    - step: 30
+    - step: 43
       expectation: One Undo restores the original TSV instead of deleting the paste.
-    - step: 32
+    - step: 45
       expectation: Redo restores table conversion exactly once.
-    - step: 37
+    - step: 50
       expectation: Real clipboard image completion reports a saved relative link.
-    - step: 38
+    - step: 51
       expectation: Inserted image path is under the configured assets directory.
-    - step: 42
+    - step: 55
       expectation: Both original and pasted images render in live mode.
-    - step: 53
+    - step: 66
       expectation: Split preview images decode real persisted VFS bytes.
-    - step: 101
+    - step: 117
       expectation: Reopen retains the converted table.
-    - step: 102
+    - step: 118
       expectation: Reopen retains the relative pasted-image path.
     results:
-    - 28
-    - 30
-    - 32
-    - 37
-    - 38
-    - 42
-    - 53
-    - 101
-    - 102
+    - 41
+    - 43
+    - 45
+    - 50
+    - 51
+    - 55
+    - 66
+    - 117
+    - 118
   - id: R3
     requirement: Export exposes all designed formats; HTML download is self-contained and export does not dirty the source.
     actions:
-    - 54
-    - 80
+    - 67
+    - 93
     checkpoints:
-    - step: 80
+    - step: 93
       expectation: Actual downloaded file contains rendered heading/table and embedded PNG data.
-    - step: 81
+    - step: 94
       expectation: Export reports completion.
-    - step: 96
+    - step: 112
       expectation: Export did not mark the source dirty.
-    - step: 103
+    - step: 119
       expectation: Markdown/paste/export lifecycle has no uncaught runtime error.
     results:
-    - 80
-    - 81
-    - 96
-    - 103
+    - 93
+    - 94
+    - 112
+    - 119
   - id: R4
     requirement: Live outline/image/table actions are real; zoom stays view-only, cell edits serialize standard Markdown,
       and export settings can cancel without a download.
     actions:
-    - 16
-    - 22
-    - 39
-    - 43
-    - 44
-    - 47
-    - 48
-    - 50
-    - 54
-    - 62
-    - 65
+    - 23
+    - 35
+    - 52
+    - 56
+    - 57
+    - 60
+    - 61
+    - 63
     - 67
-    - 68
-    - 71
-    - 73
-    - 74
-    - 77
-    - 79
-    - 100
+    - 75
+    - 78
+    - 80
+    - 81
+    - 84
+    - 86
+    - 87
+    - 90
+    - 92
+    - 116
     checkpoints:
-    - step: 17
+    - step: 24
       expectation: The actual widget/source or export dialog reflects its preceding user action.
-    - step: 45
+    - step: 58
       expectation: The actual widget/source or export dialog reflects its preceding user action.
-    - step: 46
+    - step: 59
       expectation: The actual widget/source or export dialog reflects its preceding user action.
-    - step: 49
+    - step: 62
       expectation: The actual widget/source or export dialog reflects its preceding user action.
-    - step: 64
+    - step: 77
       expectation: The actual widget/source or export dialog reflects its preceding user action.
-    - step: 66
+    - step: 79
       expectation: The actual widget/source or export dialog reflects its preceding user action.
-    - step: 70
+    - step: 83
       expectation: The actual widget/source or export dialog reflects its preceding user action.
-    - step: 72
+    - step: 85
       expectation: The actual widget/source or export dialog reflects its preceding user action.
-    - step: 76
+    - step: 89
       expectation: The actual widget/source or export dialog reflects its preceding user action.
-    - step: 78
+    - step: 91
       expectation: The actual widget/source or export dialog reflects its preceding user action.
-    - step: 96
+    - step: 112
       expectation: The actual widget/source or export dialog reflects its preceding user action.
-    - step: 103
+    - step: 119
       expectation: Additional widget and dialog lifecycle causes no uncaught runtime errors.
     results:
-    - 17
-    - 45
-    - 46
-    - 49
-    - 64
-    - 66
-    - 70
-    - 72
-    - 76
-    - 78
-    - 96
-    - 103
+    - 24
+    - 58
+    - 59
+    - 62
+    - 77
+    - 79
+    - 83
+    - 85
+    - 89
+    - 91
+    - 112
+    - 119
   - id: R5
     requirement: PNG exports real image bytes; clipboard entries complete; desktop-only folder export fails explicitly without
       dirtying the source.
     actions:
-    - 82
-    - 83
-    - 85
-    - 86
-    - 88
-    - 89
-    - 91
-    - 92
+    - 95
+    - 96
+    - 98
+    - 99
+    - 102
+    - 103
+    - 106
+    - 107
     checkpoints:
-    - step: 83
+    - step: 96
       expectation: Actual export artifact, completion/failure status or unchanged source dirty state is asserted.
-    - step: 84
+    - step: 97
       expectation: Actual export artifact, completion/failure status or unchanged source dirty state is asserted.
-    - step: 87
+    - step: 101
       expectation: Actual export artifact, completion/failure status or unchanged source dirty state is asserted.
-    - step: 90
+    - step: 105
       expectation: Actual export artifact, completion/failure status or unchanged source dirty state is asserted.
-    - step: 93
+    - step: 109
       expectation: Actual export artifact, completion/failure status or unchanged source dirty state is asserted.
-    - step: 94
+    - step: 110
       expectation: Actual export artifact, completion/failure status or unchanged source dirty state is asserted.
-    - step: 95
+    - step: 111
       expectation: Actual export artifact, completion/failure status or unchanged source dirty state is asserted.
     results:
-    - 83
-    - 84
-    - 87
-    - 90
+    - 96
+    - 97
+    - 101
+    - 105
+    - 109
+    - 110
+    - 111
+  - id: R6
+    requirement: Actual Mermaid renderer produces three labeled SVG nodes and edges in live/split; HTML export preserves embedded
+      diagram SVG without HTML foreignObject labels.
+    actions:
+    - 11
+    - 25
+    - 93
+    checkpoints:
+    - step: 17
+      expectation: Real Mermaid SVG exists and retains node/edge geometry and readable Explorer/OpenFile/Viewer labels.
+    - step: 18
+      expectation: Real Mermaid SVG exists and retains node/edge geometry and readable Explorer/OpenFile/Viewer labels.
+    - step: 19
+      expectation: Real Mermaid SVG exists and retains node/edge geometry and readable Explorer/OpenFile/Viewer labels.
+    - step: 20
+      expectation: Real Mermaid SVG exists and retains node/edge geometry and readable Explorer/OpenFile/Viewer labels.
+    - step: 21
+      expectation: Real Mermaid SVG exists and retains node/edge geometry and readable Explorer/OpenFile/Viewer labels.
+    - step: 29
+      expectation: Real Mermaid SVG exists and retains node/edge geometry and readable Explorer/OpenFile/Viewer labels.
+    - step: 30
+      expectation: Real Mermaid SVG exists and retains node/edge geometry and readable Explorer/OpenFile/Viewer labels.
+    - step: 31
+      expectation: Real Mermaid SVG exists and retains node/edge geometry and readable Explorer/OpenFile/Viewer labels.
+    - step: 32
+      expectation: Real Mermaid SVG exists and retains node/edge geometry and readable Explorer/OpenFile/Viewer labels.
+    - step: 33
+      expectation: Real Mermaid SVG exists and retains node/edge geometry and readable Explorer/OpenFile/Viewer labels.
+    - step: 93
+      expectation: Actual HTML download includes embedded Mermaid SVG and Explorer/OpenFile/Viewer labels.
+    - step: 94
+      expectation: Export completion follows the actual HTML artifact after asynchronous rendering.
+    results:
+    - 17
+    - 18
+    - 19
+    - 20
+    - 21
+    - 29
+    - 30
+    - 31
+    - 32
+    - 33
     - 93
     - 94
-    - 95
   visual:
   - check: Live/source/split widgets and export menu
     method: manual

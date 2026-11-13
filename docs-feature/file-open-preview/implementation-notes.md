@@ -1,6 +1,6 @@
 # Open File Service 实施与验证记录
 
-## 当前状态（2026-11-13）
+## 当前状态（2026-11-14）
 
 - 分支：`feat/file-open-improve`，开发基线 `719109a3`。
 - 实现进行中；此记录不等同于 UI / 原生验收通过。
@@ -46,11 +46,11 @@
 | 检查 | 当前结果 / 证据 |
 |---|---|
 | Node / pnpm | 聚焦批次最终使用 Node 22.23.5 / pnpm 10.30.0，与 CI 主版本一致；初始环境 Node24 已切换。 |
-| 核心+保留前端单元 | `pnpm exec vitest run --maxWorkers=4 src/components/viewer src/components/explorer src/lib/openFile src/lib/markdownAssets.test.ts src/stores/documentStore.test.ts src/stores/documentStore.lifecycle.test.ts src/components/settings/FileOpenSettings.test.tsx src/lib/fileOpenTemp.test.ts src/lib/filePathLinks.test.ts src/components/filebrowser/FileToolbarWiring.test.tsx src/layouts/MainLayout.test.tsx`：首个稳定批次 **33 files / 340 tests passed**；最终扩展集合加入 Explorer 恢复、Workspace/AI/terminal/stub 保留验证，**44 files / 425 tests passed**；HTML 外链 consent 新增测试的被动 effect 就绪问题已用单次发送前显式 await act 修复，生产 bridge 改为 layout effect 防初始页面消息丢失。 |
+| 核心+保留前端单元 | `pnpm exec vitest run --maxWorkers=4 src/components/viewer src/components/explorer src/lib/openFile src/lib/markdownAssets.test.ts src/stores/documentStore.test.ts src/stores/documentStore.lifecycle.test.ts src/components/settings/FileOpenSettings.test.tsx src/lib/fileOpenTemp.test.ts src/lib/filePathLinks.test.ts src/components/filebrowser/FileToolbarWiring.test.tsx src/layouts/MainLayout.test.tsx`：首个稳定批次 **33 files / 340 tests passed**；最终扩展集合加入 Explorer 恢复、Workspace/AI/terminal/stub 保留验证，**44 files / 425 tests passed**；首轮失败修复后的扩展集合（含 HTML data URI 资源、CRLF paste、设置 clear→type、文本行列状态）**45 files / 436 tests passed**；HTML 外链 consent 新增测试的被动 effect 就绪问题已用单次发送前显式 await act 修复，生产 bridge 改为 layout effect 防初始页面消息丢失。 |
 | 类型 / 边界 | `pnpm exec tsc -b --pretty false`、`pnpm check:refactor` 已通过一轮；native 命令契约 821，新增文件均不超过 800 行。最终网络通道变更后复验通过；source size 4600 文件。 |
 | Rust | 最终 `cargo test --manifest-path src-tauri/Cargo.toml --lib viewer:: -- --nocapture`：**24 passed / 0 failed**；`workspace::tests` 保留过滤集：**90 passed / 0 failed**（含 query_workspace 名称匹配项）；编码/BOM/EOL、temp防写、路径越界、代理绕过环境/不回落、取消/大小上限与原子写前置条件通过。 |
-| QA 静态 | 新增 TC-FILE-OPEN-001..006 / policy / dependencies / feature-list / control catalog；schema+audit gate 已通过一轮，无 baseline 放宽；代理新增控件后须刷新。 |
-| GitHub browser/native | **尚未执行**；使用三端 `linux,windows,macos`、`browser,native`、`native_release=true`、六组用例 + 完整 `crash-regression`。待写入 run URL / commit / receipts。 |
+| QA 静态 | 扩充至 TC-FILE-OPEN-001..012，另选择受影响 TC-EXPLORER-001..005 与完整 crash suite；policy/dependencies/smoke/mandatory expectations/feature-list/control catalog 同步。各模式、行为 contract、OS helper 单元通过后才能提交；不放宽 baseline。 |
+| GitHub browser/native | `43451418842` 已执行初轮：Linux/Windows/macOS browser 各 **11 pass / 3 fail**，Windows native **9 pass / 5 fail**。Linux native 格式门禁阻断，macOS hosted ARM64 容量不足未获 runner。**整体未通过**；失败修复与扩充的 001..012 + 受影响 Explorer + 完整 crash suite 待新 commit 执行。详见下表，不以 job 成功替代 case pass。 |
 
 ### 专项用例
 
@@ -60,10 +60,18 @@
 - **004** browser：Markdown 实时/源码/分栏、大纲/表格/图片操作、真实剪贴板粘贴、实际下载内容/各导出入口状态。
 - **005** browser/native：HTML 本地 CSS/图片/脚本实际 bridge 结果、父页面隔离、默认网络阻止、设备尺寸/缩放/源码分栏/console/网络策略。
 - **006** browser/native：工作区入口、设置持久化/恢复默认、独立代理设置、邮件只读临时副本去重/关闭清理。
+- **007** native：真实 OS 图片剪贴板与粘贴、系统保存/目录选择器、HTML/PNG/DOCX/Markdown 图片夹独立产物检查；真实 Mermaid 实时/分栏 SVG、浅深主题截图、导出图形保留；取消/缺图失败不改源码。
+- **008** browser/native：AI 实际文件芯片、Git 预览作用域、SSH 文件路径拒绝误读本地、SFTP 真实下载只读副本与清理。
+- **009** native：独立 HTTP/proxy 日志证明应用/独立/无代理路线、失败不直连、token 关闭取消、相对资源、目录穿越/符号链接/IPC 拒绝。
+- **010** browser/native：页面脚本伪造 bridge 消息也必须父页面确认，取消/Escape 不打开系统浏览器，脚本关闭后无 author 执行。
+- **011** native：真实本地 PTY 输出路径，实际 modifier-click 打开/去重，关闭查看器后终端仍可执行。
+- **012** browser/native：真实 PNG/JPEG/WebP/GIF、缩放/平移/旋转/翻转/背景/缩略导航、复制像素与路径、损坏与大小边界，源字节不变。
+
+以上新增 007..012 的 unit/schema/static 通过不构成真实 UI/OS 结果；必须以接下来 hosted receipts 与产物为准。
 
 ### 保留的 IDE crash-regression 路由
 
-TC-WS-038/039/052/053/054/055/056/057 的目标是原有 IDE 编辑器/面板/终端/布局生命周期，而非新查看器默认值。它们在已有首次 reload 前显式持久化 `.md`/`.txt` → `workspace` 关联，仍通过真实项目树操作进入 Code Workspace；原有 pane/content/dirty/PTY/精确磁盘断言不变，不替换为 Viewer、不 skip。新增一个 setup 步骤后按旧→新索引映射同步全部 verification 引用；专项 TC-FILE-OPEN-001..006 单独保护 Taomni 默认打开。该调整只是保留验收上下文，尚未形成新的 browser/native 执行证据。
+TC-WS-038/039/051/052/053/054/055/056/057 与 TC-IDE-C8-08 的目标是原有 IDE 编辑器/面板/终端/布局生命周期，而非新查看器默认值。它们在已有首次 reload 前显式持久化 `.md`/`.txt` → `workspace` 关联，仍通过真实项目树操作进入 Code Workspace；原有 pane/content/dirty/PTY/精确磁盘断言不变，不替换为 Viewer、不 skip。新增一个 setup 步骤（C8 没有原 reload，因此显式 seed+reload 两步）后按旧→新索引映射同步全部 verification 引用；专项 TC-FILE-OPEN-001..006 单独保护 Taomni 默认打开。该调整只是保留验收上下文，尚未形成新的 browser/native 执行证据。
 
 ### 不可误报的边界
 
@@ -81,3 +89,16 @@ TC-WS-038/039/052/053/054/055/056/057 的目标是原有 IDE 编辑器/面板/�
 |---|---|---|
 | [43449130590](https://github.com/engcapa/taomni/actions/runs/43449130590) | `f7d82646` | checkout 把短 SHA 当分支名，未执行构建/产品用例；改用完整 SHA 重新 dispatch。 |
 | [43449514622](https://github.com/engcapa/taomni/actions/runs/43449514622) | `f7d826460a5d7bd7b1383faadc64ff293bac473f` | planning 单元 `test_crash_regressions` 硬编码旧 tag/smoke 清单，新六例未同步；补齐 EXPECTED、单模式集合与 smoke，并跑契约单元。未执行产品用例，不能视为三端通过。 |
+| [43451418842](https://github.com/engcapa/taomni/actions/runs/43451418842) | `3bc9afa00c353e9eaf6db71b8ee6093cf1be7eda` | 三端 browser 各 11/14 pass；Windows native 9/14 pass。Linux 在 `cargo fmt` 中发现 `workspace.rs` module 排序错误，已修；macOS job annotation：`The job was not acquired by Runner of type hosted even after multiple attempts`，未执行。产品/用例失败见下述修复，待重跑。 |
+
+### 首轮实际失败与对应修复
+
+- **004 Windows Markdown paste**：真实剪贴板 CRLF 字符串与 CM 标准 LF 坐标不一致，导致 `RangeError: Selection points outside document`；先标准化剪贴板换行再计算 selection/替换范围，并补 mounted Undo/Redo 回归。
+- **004 Linux redo**：检查实际输入事件与标准快捷键；保留“Undo 一次变回 TSV、Redo 还原表格”的原始目标，修复自动化按键大小写/平台映射，不删除断言。
+- **004 macOS browser export**：异步复制仍 busy 时立即断言 copied；增加真实完成状态等待，不能只看点击完成。
+- **005 三端 browser HTML**：opaque-origin sandbox 无权读取父 origin 的 blob CSS/图片，截图确实无样式/图片 broken；仅 browser VFS 资源改为受限 data URI，JS nonce-inline，不开放 same-origin 或直连网络。native 协议独立验证不受替换。
+- **002 Windows native**：文件行布局尚在变化时双击命中 next.html 而非 notes.txt；等待命名行并断言目标类型，保留真实双击链路。
+- **003/005 Windows native**：1024 宽原生窗口按设计折叠预览，测试却假设必然挂载；新增幂等真实工具栏 `show_explorer_preview`（不可见才点击一次），同时覆盖窄屏 overlay，而不是改产品为测试强制展开。
+- **006 Windows native**：受控设置输入在 clear 中间态把默认 assets/font 还原，后续输入变成 assetsimages；产品改为合法中间草稿，只有有效值持久化，补 clear→type/恢复默认单元；不靠全局修改测试 driver 制造通过。
+- **C8 / WS051**：旧 IDE 生命周期用例未显式配置源码编辑归属，新默认路由切入查看器；为两个遗漏用例补与其它 IDE crash cases 相同的显式处理器设置，所有旧步骤/断言逆映射 hash 不变。
+- **高保真差异**：hosted HTML desktop 截图有不符原型的 24px 外边距与矩形地址栏，改为 desktop full-bleed、设备模式仅 14px 纵向留白、地址栏 pill 15px；正文/大纲/图表浅深主题的最终判断必须新 hosted 截图复核。

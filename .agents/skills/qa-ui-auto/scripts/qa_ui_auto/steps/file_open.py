@@ -48,6 +48,36 @@ def assert_download(ctx: StepContext, args: Any) -> None:
             stream.write(json.dumps(record) + "\n")
 
 
+@verb("viewer_raster")
+def raster(ctx: StepContext, args: Any) -> None:
+    from ..viewer_raster import browser
+    browser(ctx, args)
+
+
+@verb("show_explorer_preview")
+def show_preview(ctx: StepContext, args: Any) -> None:
+    from ..explorer_preview_visibility import browser
+    browser(ctx, args)
+
+
+@verb("terminal_file_link")
+def terminal_link(ctx: StepContext, args: Any) -> None:
+    from ..terminal_file_link import browser
+    browser(ctx, args)
+
+
+@verb("html_preview_click")
+def html_click(ctx: StepContext, args: Any) -> None:
+    from ..html_preview_observation import browser_click
+    browser_click(ctx, args)
+
+
+@verb("assert_html_network")
+def html_network(ctx: StepContext, args: Any) -> None:
+    from ..html_preview_observation import browser_observe
+    browser_observe(ctx, args)
+
+
 @verb("reveal_project_tree_row")
 def reveal_tree(ctx: StepContext, args: Any) -> None:
     from ..project_tree_reveal import run, validate

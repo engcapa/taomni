@@ -1,0 +1,249 @@
+id: TC-FILE-OPEN-008
+title: AI path chips, Git previews and real SFTP/terminal links use the shared open contract
+description: 'AC18/19/22. Real UI entries, not direct handlers: persisted assistant message input opens through an AI chip; a real/native
+  Git worktree (controlled Git browser fixture) previews through its file context menu; actual POSIX SSH/SFTP delivers known bytes into
+  a controlled read-only temp. Modifier-clicking the SSH terminal path refuses local resolution. Browser local PTYs do not exist, so
+  positive local-terminal opening remains native supplementary coverage rather than a simulated browser pass. No live AI provider generation
+  is claimed.'
+modes:
+- browser
+- native
+covers:
+- F-FILEOPEN-1
+- F25.3
+- F3.1
+- F1.2
+tags:
+- p0
+- file-open
+- global-entry
+- git
+- ai
+- sftp
+- terminal
+- crash-regression
+fixtures:
+- reset_db
+- ssh_posix_required
+- file_open_entries
+timeout_sec: 360
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-file-open-entries
+- seed_storage:
+    key: taomni.quickConnectVisible
+    value: 'true'
+- seed_storage:
+    key: taomni.git.workspace.changes.tree
+    value: '"flat"'
+- seed_storage:
+    key: taomni.recentWorkspaces.v1
+    value: '[{"id":"qa-entry-workspace","name":"entry-workspace","roots":[{"id":"entry-root","name":"entry-workspace","path":"${fixture.parity008_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"entry-root","path":"repo-a/same.txt"},"lastOpenedAt":1756100000000,"isGitRepo":false}]'
+- reload_window: null
+- click: '[data-testid="rail-chat-button"]'
+- wait_for: '[data-testid="ai-chat-drawer"][data-open="true"]'
+- click: '[data-testid="ai-chat-drawer"] button[title="History"]'
+- click: '[data-testid="ai-chat-drawer"] >> text=QA file path entry'
+- wait_for: '[data-testid="ai-file-link"]'
+- click: '[data-testid="ai-file-link"]'
+- wait_for: '[data-testid="file-viewer"][data-kind="text"] [data-testid="viewer-editor"] .cm-content'
+- assert_items:
+    selector: '[data-testid="file-viewer"] [data-testid="viewer-editor"] .cm-line'
+    equals:
+    - repo-b WORKTREE
+    - shared line
+    - ''
+- click: '[data-testid="ai-chat-drawer-hide"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity008_root}"]'
+- wait_for: '[data-testid="code-workspace-tool-rail-git"]:not([disabled])'
+- click: '[data-testid="code-workspace-tool-rail-git"]'
+- wait_for: '[data-testid="workspace-change-row"][data-repo-root$="repo-b"][data-path="same.txt"]'
+- right_click: '[data-testid="workspace-change-row"][data-repo-root$="repo-b"][data-path="same.txt"]'
+- click: '[data-testid="git-file-preview"]'
+- wait_for: '[data-testid="workspace-tab"][data-tab-kind="viewer"][data-active="true"]'
+- assert_items:
+    selector: '[data-testid="workspace-canvas-pane"] [data-testid="file-viewer"] [data-testid="viewer-editor"] .cm-line'
+    equals:
+    - repo-b WORKTREE
+    - shared line
+    - ''
+- assert_count:
+    selector: '[data-testid="workspace-tab"][data-tab-kind="viewer"]'
+    equal: 1
+- click: '[data-testid="side-tab-sessions"]'
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ssh://${cfg.ssh_posix.user}@${cfg.ssh_posix.host}:${cfg.ssh_posix.port}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="auth-prompt"]'
+- fill:
+    selector: '[data-testid="auth-password"]'
+    value: ${env.QA_POSIX_SSH_PASSWORD}
+- click: '[data-testid="auth-submit"]'
+- wait_for:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+    timeout_sec: 60
+- terminal_input:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    text: printf '\n%s\n\n\n\n\n' '${fixture.file_open_entry_remote}/remote.txt'
+    submit: true
+- assert_pattern:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+    regex: (?m)^${fixture.file_open_entry_remote}/remote\.txt\r?$
+    timeout_sec: 20
+- press:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
+    key: Control+Shift+f
+    macos_key: Control+Shift+f
+- fill:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] input[placeholder="Find"]'
+    value: remote.txt
+- press:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] input[placeholder="Find"]'
+    key: Enter
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"] .terminal-search-hit-active'
+- terminal_file_link:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- assert_text:
+    selector: '[data-testid="status-bar"]'
+    contains: download it through SFTP
+- assert_visible: '[data-testid="terminal-pane"][data-terminal-active="true"]'
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="file-viewer"]'
+    equal: 1
+- press:
+    selector: '[data-testid="terminal-pane"][data-terminal-active="true"] input[placeholder="Find"]'
+    key: Escape
+- click: '[data-testid="titlebar-actions-more"]'
+- click: '[data-testid="attached-sftp-toggle"]'
+- wait_for: '[data-testid="sftp-browser"]'
+- click: '[data-testid="sftp-remote-path-edit"]'
+- fill:
+    selector: '[data-testid="sftp-remote-path"]'
+    value: ${fixture.file_open_entry_remote}
+- press:
+    selector: '[data-testid="sftp-remote-path"]'
+    key: Enter
+- wait_for: '[data-testid="sftp-remote-list"] tr[title="${fixture.file_open_entry_remote}/remote.txt"]'
+- dblclick: '[data-testid="sftp-remote-list"] tr[title="${fixture.file_open_entry_remote}/remote.txt"]'
+- wait_for: '[data-testid="file-viewer"][data-readonly="true"]'
+- assert_visible: '[data-testid="file-viewer"][data-readonly="true"] [data-testid="viewer-readonly"]'
+- assert_disabled: '[data-testid="file-viewer"][data-readonly="true"] [data-testid="viewer-save"]'
+- assert_items:
+    selector: '[data-testid="file-viewer"][data-readonly="true"] [data-testid="viewer-editor"] .cm-line'
+    equals:
+    - SFTP read-only entry bytes.
+    - ''
+- assert_file_open_bytes:
+    selector: '[data-testid="file-viewer"][data-readonly="true"]'
+    remember: sftp-copy
+    equals: 'SFTP read-only entry bytes.
+
+      '
+- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- wait_for:
+    selector: '[data-testid="file-viewer"][data-readonly="true"]'
+    state: detached
+- assert_file_open_bytes:
+    remember: sftp-copy
+    absent: true
+- assert_no_runtime_errors: null
+- screenshot: global-file-entry-workflows.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Real assistant file chip opens the main viewer and Git preview opens one scoped workspace viewer of the same exact
+      worktree document.
+    actions:
+    - 7
+    - 9
+    - 10
+    - 12
+    - 16
+    - 17
+    - 18
+    - 20
+    - 22
+    - 23
+    checkpoints:
+    - step: 14
+      expectation: AI chip opened actual file text, not a shell/query snippet.
+    - step: 25
+      expectation: Git preview opens the same real worktree bytes.
+    - step: 26
+      expectation: Git creates exactly one viewer in workspace scope; it does not replace the independent main host.
+    results:
+    - 14
+    - 25
+    - 26
+  - id: R2
+    requirement: Actual modifier-click on SSH terminal file path gives download-first guidance and never opens the local filesystem
+      copy.
+    actions:
+    - 28
+    - 29
+    - 31
+    - 32
+    - 34
+    - 36
+    - 37
+    - 38
+    - 40
+    checkpoints:
+    - step: 35
+      expectation: Shell independently printed the exact fixture remote path.
+    - step: 41
+      expectation: Modifier-click refuses local interpretation and offers SFTP guidance.
+    - step: 42
+      expectation: The remote terminal remains usable and visible.
+    - step: 43
+      expectation: SSH path click did not create another local viewer.
+    results:
+    - 35
+    - 41
+    - 42
+    - 43
+  - id: R3
+    requirement: Actual SFTP open downloads to a controlled read-only temp, shows exact remote bytes and cleans it after final close.
+    actions:
+    - 44
+    - 45
+    - 46
+    - 48
+    - 52
+    - 58
+    checkpoints:
+    - step: 54
+      expectation: Viewer labels a read-only copy.
+    - step: 55
+      expectation: Remote copy cannot save in place.
+    - step: 56
+      expectation: Editor content matches actual remote fixture.
+    - step: 57
+      expectation: Independent VFS/native temp bytes match the SFTP payload.
+    - step: 60
+      expectation: Final host close removes exactly the observed controlled copy.
+    - step: 61
+      expectation: Global entry lifecycle has no uncaught runtime error.
+    results:
+    - 54
+    - 55
+    - 56
+    - 57
+    - 60
+    - 61
+  visual:
+  - check: AI chip/Git preview/SFTP readonly views
+    method: manual
+    reason: Screenshots retained; prototype fidelity is separate.
+  native:
+  - check: Real SSH/SFTP payload and controlled temp cleanup
+    method: automated
+    reason: Uses configured POSIX service and independent native host bytes; browser proves renderer/VFS only.
+  - check: Positive local-terminal file opening and interrupted SFTP resume/restart
+    method: manual
+    reason: SSH refusal is automated here; browser local PTY is unavailable and resumable large-download lifecycle needs a distinct
+      controlled scenario.

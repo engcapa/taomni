@@ -30,6 +30,20 @@ describe("global file-opening settings", () => {
     expect(screen.getByTestId("file-open-default-taomni")).toHaveAttribute("aria-checked", "true");
   });
 
+  it("allows real clear-then-type replacements without reinserting validated defaults", () => {
+    render(<FileOpenSettings />);
+    for (const [testId, value] of [["file-open-image-dir", "images"], ["file-open-image-template", "paste-{date}-{time}.png"], ["file-open-font-size", "16"]]) {
+      const input = screen.getByTestId(testId) as HTMLInputElement;
+      fireEvent.change(input, { target: { value: "" } });
+      expect(input.value).toBe("");
+      fireEvent.change(input, { target: { value } });
+      expect(input.value).toBe(value);
+    }
+    expect(useFileOpenPreferences.getState()).toMatchObject({ markdownImageDir: "images", markdownImageTemplate: "paste-{date}-{time}.png", fontSize: 16 });
+    fireEvent.click(screen.getByTestId("file-open-settings-reset"));
+    expect(screen.getByTestId("file-open-image-dir")).toHaveValue("assets");
+    expect(screen.getByTestId("file-open-font-size")).toHaveValue(13);
+  });
   it("changes individual extensions without replacing their group and rejects invalid keys", () => {
     render(<FileOpenSettings />);
     fireEvent.change(screen.getByTestId("file-open-extension"), { target: { value: "../txt" } });
