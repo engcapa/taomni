@@ -19,9 +19,11 @@ EXPECTED = {
     "TC-WS-038", "TC-WS-039", "TC-WS-045", "TC-WS-051", "TC-WS-052",
     "TC-WS-053", "TC-WS-054", "TC-WS-055", "TC-WS-056", "TC-WS-057",
     "TC-MOBILE-012", "TC-MOBILE-013",
+    "TC-FILE-OPEN-001", "TC-FILE-OPEN-002", "TC-FILE-OPEN-003",
+    "TC-FILE-OPEN-004", "TC-FILE-OPEN-005", "TC-FILE-OPEN-006",
 }
-BROWSER_ONLY = {"TC-WS-055", "TC-IDE-C8-08-code-style-dialog-lifecycle-browser", "TC-MOBILE-012"}
-NATIVE_ONLY = {"TC-WS-051", "TC-WS-054", "TC-WS-056", "TC-MOBILE-013"}
+BROWSER_ONLY = {"TC-WS-055", "TC-IDE-C8-08-code-style-dialog-lifecycle-browser", "TC-MOBILE-012", "TC-FILE-OPEN-001", "TC-FILE-OPEN-004"}
+NATIVE_ONLY = {"TC-WS-051", "TC-WS-054", "TC-WS-056", "TC-MOBILE-013", "TC-FILE-OPEN-002"}
 
 
 class CrashRegressionTests(unittest.TestCase):

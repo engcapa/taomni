@@ -75,4 +75,9 @@ TC-WS-038/039/052/053/054/055/056/057 的目标是原有 IDE 编辑器/面板/�
 
 ## GitHub 执行与修复循环
 
-待填写。保留失败 run，不覆盖旧证据；与本次改动无关的失败仅在明确定位后单列，不改用例期望制造通过。
+保留失败 run，不覆盖旧证据；与本次改动无关的失败仅在明确定位后单列，不改用例期望制造通过。
+
+| run | 源码 | 结果 / 后续 |
+|---|---|---|
+| [43449130590](https://github.com/engcapa/taomni/actions/runs/43449130590) | `f7d82646` | checkout 把短 SHA 当分支名，未执行构建/产品用例；改用完整 SHA 重新 dispatch。 |
+| [43449514622](https://github.com/engcapa/taomni/actions/runs/43449514622) | `f7d826460a5d7bd7b1383faadc64ff293bac473f` | planning 单元 `test_crash_regressions` 硬编码旧 tag/smoke 清单，新六例未同步；补齐 EXPECTED、单模式集合与 smoke，并跑契约单元。未执行产品用例，不能视为三端通过。 |

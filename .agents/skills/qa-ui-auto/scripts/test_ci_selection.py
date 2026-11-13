@@ -105,7 +105,8 @@ class SelectionTests(unittest.TestCase):
         self.assertEqual(len({e['id'] for e in native}), 4)
         self.assertEqual({e['runner'] for e in native}, {'ubuntu-22.04', 'ubuntu-24.04', 'ubuntu-26.04'})
         expected = {'TC-NATIVE-CORE-001', 'TC-WS-038', 'TC-WS-039', 'TC-WS-045', 'TC-WS-051',
-                    'TC-WS-052', 'TC-WS-053', 'TC-WS-054', 'TC-WS-056', 'TC-WS-057', 'TC-MOBILE-013'}
+                    'TC-WS-052', 'TC-WS-053', 'TC-WS-054', 'TC-WS-056', 'TC-WS-057', 'TC-MOBILE-013',
+                    'TC-FILE-OPEN-002', 'TC-FILE-OPEN-003', 'TC-FILE-OPEN-005', 'TC-FILE-OPEN-006'}
         for entry in native:
             with self.subTest(profile=entry['linux_profile']):
                 self.assertEqual(set(entry['selected_ids']), expected)
