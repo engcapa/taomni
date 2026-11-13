@@ -279,9 +279,9 @@ browser stub 只能证明前端逻辑与 IPC 契约；Rust 单测证明文件语
 | AC-03 | §4 预览 | TASK-04 | V-02、V-05、V-11 | 002三端browser通过；Linux005真实文本/Blob预览走过 | 已实现；Windows/macOS005窄窗点击修正待重跑 |
 | AC-04 | §4 偏好 | TASK-02、04 | V-02、V-11 | 002三端browser通过；偏好/过期响应单测 | 已实现；完整原生重启证据待005通过 |
 | AC-05 | §4 | TASK-02 | V-02、V-05 | 003三端browser通过；选择/框选mounted单测 | 已实现 |
-| AC-06 | §4 本地文件操作 | TASK-03 | V-03、V-05、V-11 | 003复制/移动全树SHA断言及Rust单测 | 已实现；原生003后续拖放失败，整用例待通过 |
+| AC-06 | §4 本地文件操作 | TASK-03 | V-03、V-05、V-11 | 003重命名/冲突/非法名及字节断言；inline rename单测 | 已实现；原生003后续拖放失败，整用例待通过 |
 | AC-07 | §4 | TASK-03 | V-03、V-11 | 003系统剪切与外部列表输入；005系统文件管理器Paste | 已实现；完整005重跑中，macOS外部移动用Option+Command+V |
-| AC-08 | §4 | TASK-03 | V-03、V-11 | 003重命名/冲突/非法名及字节断言 | 已实现；原生003整用例待通过 |
+| AC-08 | §4 | TASK-03 | V-03、V-11 | 003列表/树/面包屑拖放与修饰键、拒绝自身；独立字节oracle | 已实现；三端native输入/命中/路径选择器修正待重跑 |
 | AC-09 | §4、DEC-03 | TASK-03 | V-04、V-11 | 003真实Trash/Undo/永久删除；Linux独立trashinfo+payload及18项后端单测 | 已实现；原生003整用例待通过，非browser替代原生 |
 | AC-10 | §4 | TASK-02、03 | V-05 | 002/003三端browser通过；键盘/菜单mounted单测 | 已实现；未声称每个菜单项独立UI覆盖 |
 | AC-11 | §4 去重 | TASK-01 | V-01、V-05 | openExplorer单测、001当前目录去重 | 已实现；001异步等待修正待重跑 |
@@ -290,12 +290,12 @@ browser stub 只能证明前端逻辑与 IPC 契约；Rust 单测证明文件语
 | AC-14 | DEC-01 | TASK-05 | V-07、V-11 | 001工作区入口、WorkspaceExplorerEntry单测 | 已实现方案A；001待重跑 |
 | AC-15 | DEC-01 | TASK-05 | V-07、V-11 | 001项目树复用/新标签及恢复；相关单测 | 已实现；001待重跑 |
 | AC-16 | §4 | TASK-02、07 | V-09 | 004三端browser/native 10,000项通过；虚拟DOM数量断言 | 已实现虚拟列表；未建立匹配性能基线/预定预算，不宣称性能达标或加速 |
-| AC-17 | §4 | TASK-02 | V-11 | 001错误后保持当前目录、002预览错误、native操作单测 | 已实现；完整相关用例待重跑 |
+| AC-17 | §4 | TASK-02 | V-11 | 005外部写入后由终端回到Explorer，重新激活刷新；store导航/refresh单测 | 已实现；三端005待通过 |
 | AC-18 | §4 | TASK-03 | V-03、V-06、V-11 | 002部分失败/Trash降级通过；Rust不可覆盖/取消/错误单测 | 已实现；磁盘满/跨物理卷等环境未全面原生注入 |
 | AC-19 | §4 | TASK-01、02 | V-08 | 原File会话关联单测；三端TC-010/043与完整crash通过 | 已保留API/生命周期/持久化契约 |
 | AC-20 | §4 | TASK-01、02 | V-11 | recovery17项单测；001重载；005显式退出确认+OS冷启动 | 已实现；005真实进程重启必须通过，不以reload充当冷启动 |
 
-三端状态：Linux/Windows/macOS release QA构建与完整crash-regression已在run43372314485通过；该轮87项中78通过/9失败，相关失败仍在修复闭环。Linux Xvfb/Openbox、Windows hosted桌面、macOS ARM64 WKWebView bridge不等同所有实体桌面、物理键盘/AppKit菜单与系统拖放场景。当前不能宣称最终验收全部通过；保留原始失败，最终逐平台结果见实施记录。
+三端状态：Linux/Windows/macOS release QA构建与完整crash-regression已在run43372314485通过；该轮87项中78通过/9失败，相关失败仍在修复闭环。Linux Xvfb/Openbox、Windows hosted桌面、macOS ARM64 WKWebView bridge不等同所有实体桌面、物理键盘/AppKit菜单与系统拖放场景。后续run43396714161已84/87通过，三端Explorer001–004、完整crash与SFTP全部通过；仅native005仍有三处失败，其修复及下一轮结果见实施记录。当前不能宣称最终验收全部通过，保留所有原始失败。
 
 ## 10. 风险、未决项与回退
 

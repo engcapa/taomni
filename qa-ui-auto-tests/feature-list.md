@@ -284,6 +284,7 @@ controls:
   - ':nth-match([data-testid="tab-item"][data-tab-type="file-browser"], 1)'
   - ':nth-match([data-testid="tab-item"][data-tab-type="file-browser"], 2)'
   - ':nth-match([data-testid="tab-item"][data-tab-type="file-browser"], 3)'
+  - 'xpath=(//*[@data-testid="tab-item" and @data-tab-type="file-browser"])[2]'
   kind: interactive
 - id: tab-title                # the title span inside a tab; double-click to rename
   selector: '[data-testid="tab-title"]'
@@ -14585,6 +14586,9 @@ controls:
   - id: explorer-main-tab-icon
     selector: '[data-testid="tab-item"][data-tab-type="file-browser"] .taomni-explorer-tab-icon path'
     kind: display
+  - id: explorer-workspace-tab-icon
+    selector: '[data-testid="workspace-tab"][data-tab-kind="explorer"] .taomni-explorer-tab-icon path'
+    kind: display
   - id: explorer-files
     selector: '[data-testid="explorer-files"]'
     kind: display
@@ -14710,6 +14714,8 @@ controls:
     kind: display
   - id: explorer-tab
     selector: '[data-testid="explorer-tab"]'
+    aliases:
+    - '[data-testid="explorer-tab"]${fixture.explorer_previews_match}'
     kind: interactive
   - id: explorer-toast
     selector: '[data-testid="explorer-toast"]'

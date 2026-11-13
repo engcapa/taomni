@@ -111,5 +111,7 @@ html[data-app-theme="dark"] .ex-toast button { color:#1d4ed8; }
 .ex-shell [data-taomni-context-menu] button:hover { background:var(--ex-sel); }
 .ex-shell [data-taomni-context-menu] button svg { width:15px; height:15px; color:var(--ex-muted); }
 .ex-preview-overlay .ex-pv { height:100%; border-left:1px solid var(--ex-divider); border-top:0; }
+.ex-preview-overlay[data-position="bottom"] { top:auto; left:0; height:190px; max-height:100%; }
+.ex-preview-overlay[data-position="bottom"] .ex-pv { width:100%; border-left:0; border-top:1px solid var(--ex-divider); }
 @media(max-width:800px) { .ex-search { width:150px; } }
 @media(max-width:600px) { .ex-search { width:100px; } .ex-nav { max-width:160px; } .ex-mod,.ex-type { display:none; } .ex-name { min-width:100px; } }

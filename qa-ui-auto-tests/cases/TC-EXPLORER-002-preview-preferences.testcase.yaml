@@ -35,7 +35,7 @@ steps:
 - assert_text: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-text"]', contains: Explorer preview text}
 - assert_attribute: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-text"]', name: data-line-count, equals: '4'}
 - eval_readonly:
-    expression: 'document.querySelector(".ex-pv").getBoundingClientRect().left >= document.querySelector(".ex-files").getBoundingClientRect().right - 2'
+    expression: 'document.querySelector(".ex-pv").getBoundingClientRect().left >= document.querySelector(".ex-files").getBoundingClientRect().right - 2 && document.querySelector(".ex-pv-text").getBoundingClientRect().height < 100'
     expect_truthy: true
 - screenshot: explorer-prototype-light.png
 - click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="README.md"]'
@@ -162,6 +162,23 @@ steps:
 - assert_text: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-toast"]', contains: Not found}
 - assert_visible: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="created - 副本.txt"]'
 - assert_count: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"]', equal: 2}
+- assert_no_runtime_errors: null
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"]', key: Control+l, macos_key: Meta+l}
+- fill: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-address"]', value: '${fixture.explorer_previews}'}
+- press: {selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-address"]', key: Enter}
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="notes.txt"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="notes.txt"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-text"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-settings"]'
+- click: '[data-testid="explorer-preview-bottom"]'
+- set_viewport: {width: 920, height: 760}
+- assert_not_visible: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-preview"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-preview-text"]'
+- eval_readonly:
+    expression: 'document.querySelector(".ex-preview-overlay").getBoundingClientRect().height <= 190 && document.querySelector(".ex-preview-overlay").getBoundingClientRect().top > document.querySelector(".ex-body").getBoundingClientRect().top && document.querySelector(".ex-preview-overlay").getBoundingClientRect().width >= document.querySelector(".ex-files").getBoundingClientRect().width - 2'
+    expect_truthy: true
+- screenshot: explorer-prototype-narrow-bottom.png
 - assert_no_runtime_errors: null
 verification:
   review: reviewed
@@ -312,7 +329,7 @@ verification:
     - step: 16
       expectation: Light background matches prototype RGB.
     - step: 21
-      expectation: Preview sits to the right without overlapping the file list.
+      expectation: Preview sits to the right without overlapping the file list and short text uses content height under 100px, not a 300px blank block.
     - step: 79
       expectation: Dark theme active.
     - step: 80
@@ -382,6 +399,15 @@ verification:
     - 127
     - 128
     - 136
+  - id: R5
+    requirement: A manually expanded narrow bottom preview stays at the bottom with the prototype 190px height, leaving the file list above it usable.
+    actions: [137, 138, 139, 141, 143, 144, 145, 147]
+    checkpoints:
+    - {step: 146, expectation: Narrow layout first auto-collapses while the bottom preference is retained.}
+    - {step: 148, expectation: Manual opening renders the selected real text.}
+    - {step: 149, expectation: 'Overlay is no taller than 190px; starts below the body top and spans file-list width rather than covering the entire list.'}
+    - {step: 151, expectation: Preview transitions leave no runtime error.}
+    results: [146, 148, 149, 151]
   visual:
   - check: High-fidelity light/dark/narrow surface and density.
     method: automated

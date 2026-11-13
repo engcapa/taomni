@@ -200,6 +200,16 @@ class X11ButtonLifecycleTest(TestCase):
         self.owner = patch('native_pointer_buttons._owned_window', return_value=('0x123', 42)).start()
         self.window_geometry = patch('native_pointer_buttons.window_geometry', return_value=self.geometry).start()
         self.command = patch('native_pointer_buttons.command', return_value='291').start()
+        self.physical_point = {'x': 0, 'y': 0}
+        def command_result(*args):
+            if args[1] == 'mousemove':
+                self.physical_point = {'x': self.geometry['x'] + int(args[-2]),
+                                       'y': self.geometry['y'] + int(args[-1])}
+                return ''
+            if args[1] == 'getmouselocation':
+                return f"X={self.physical_point['x']}\nY={self.physical_point['y']}\nSCREEN=0\nWINDOW=291\n"
+            return '291'
+        self.command.side_effect = command_result
         self.prepare = Mock(return_value=self.point)
 
     def prepare_target(self):
@@ -209,7 +219,7 @@ class X11ButtonLifecycleTest(TestCase):
     def test_real_hover_rechecks_target_before_one_balanced_button_click(self):
         target = self.prepare_target()
         observation = buttons.click_x11_button(self.session, target, 2, selector='#row')
-        self.command.assert_any_call('xdotool', 'mousemove', '--sync', '--window', '0x123', '270', '217')
+        self.command.assert_any_call('xdotool', 'mousemove', '--window', '0x123', '270', '217')
         self.command.assert_called_with('xdotool', 'click', '3')
         self.assertEqual(self.prepare.call_count, 2)
         self.assertEqual(observation['status'], 'completed')
@@ -217,11 +227,26 @@ class X11ButtonLifecycleTest(TestCase):
         self.assertIs(self.session.last_pointer_click, observation)
         self.assertTrue(all(c.args[1].endswith('/execute/async') for c in self.session.request.call_args_list))
 
+    def test_repeated_noop_hover_reads_position_without_waiting_for_motion_event(self):
+        first = self.prepare_target()
+        second = self.prepare_target()
+        self.assertEqual(first.local_point, second.local_point)
+        moves = [entry for entry in self.command.call_args_list if entry.args[1] == 'mousemove']
+        self.assertEqual(len(moves), 2)
+        self.assertTrue(all('--sync' not in entry.args for entry in moves))
+        self.command.assert_any_call('xdotool', 'getmouselocation', '--shell')
+
+    def test_failed_physical_position_observation_cannot_authorize_click(self):
+        self.command.side_effect = lambda *args: 'X=1\nY=2\n' if args[1] == 'getmouselocation' else '291'
+        with self.assertRaisesRegex(WebDriverError, 'did not reach the owned target'):
+            self.prepare_target()
+        self.assertFalse(any('click' in entry.args for entry in self.command.call_args_list))
+
     def test_physical_client_size_scales_viewport_coordinates(self):
         self.window_geometry.return_value = {**self.geometry, 'width': 2000, 'height': 1400}
         target = self.prepare_target()
         self.assertEqual(target.local_point, {'x': 540, 'y': 434})
-        self.command.assert_any_call('xdotool', 'mousemove', '--sync', '--window', '0x123', '540', '434')
+        self.command.assert_any_call('xdotool', 'mousemove', '--window', '0x123', '540', '434')
         buttons.click_x11_button(self.session, target, 1, selector='#row')
         self.command.assert_called_with('xdotool', 'click', '2')
 
@@ -255,6 +280,7 @@ class X11ButtonLifecycleTest(TestCase):
                 self.owner.return_value = ('0x999', 42) if mutation == 'owner' else ('0x123', 42)
                 self.session.request.return_value = {**self.viewport, 'title': 'Changed'} if mutation == 'viewport' else self.viewport
                 self.window_geometry.return_value = {**self.geometry, 'y': 300} if mutation == 'geometry' else self.geometry
+                self.command.side_effect = None
                 self.command.return_value = '999' if mutation == 'focus' else '291'
                 with self.assertRaisesRegex(WebDriverError, 'changed before input'):
                     buttons.click_x11_button(self.session, target, 2, selector='#row')
@@ -368,6 +394,7 @@ class X11ButtonLifecycleTest(TestCase):
     def test_duplicate_or_foreign_windows_never_authorize_input(self):
         with patch('native_pointer_buttons._owned_process', side_effect=lambda app, data, pid: pid == 42), \
                 patch('native_pointer_buttons.managed_windows') as windows:
+            self.command.side_effect = None
             self.command.return_value = 'Taomni QA'
             for candidates, expected in (([('0x1', 42)], ('0x1', 42)),
                     ([('0x1', 99)], None), ([('0x1', 42), ('0x2', 42)], None)):

@@ -18,7 +18,8 @@ export function TextPreview({ text, wrap }: { text: string; wrap: boolean }) {
   }, [virtualizer, text, wrap]);
 
   return (
-    <div ref={scrollRef} data-testid="explorer-preview-text" data-line-count={lines.length} className={`ex-pv-text${wrap ? " ex-pv-wrap" : ""}`}>
+    <div ref={scrollRef} data-testid="explorer-preview-text" data-line-count={lines.length} className={`ex-pv-text${wrap ? " ex-pv-wrap" : ""}`}
+      style={{ height: Math.min(300, virtualizer.getTotalSize() + 18) }}>
       <div className="ex-pv-lines" style={{ height: virtualizer.getTotalSize() }}>
         {virtualizer.getVirtualItems().map((row) => (
           <div

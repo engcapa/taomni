@@ -90,6 +90,21 @@ def _native_window(session: ButtonSession) -> dict[str, Any]:
     return value
 
 
+def _move_physical_pointer(window: str, geometry: dict[str, int], point: dict[str, int]) -> None:
+    # xdotool --sync waits for a MotionNotify change, so moving to the current
+    # terminal position can wait forever. Send the one hover without that flag
+    # and independently read its actual root coordinates, including no-op moves.
+    command("xdotool", "mousemove", "--window", window, str(point["x"]), str(point["y"]))
+    fields = dict(line.split("=", 1) for line in command("xdotool", "getmouselocation", "--shell").splitlines() if "=" in line)
+    try:
+        actual = {axis: int(fields[axis.upper()]) for axis in ("x", "y")}
+    except (KeyError, ValueError) as error:
+        raise WebDriverError("Linux non-left click could not observe physical pointer position") from error
+    expected = {axis: geometry[axis] + point[axis] for axis in ("x", "y")}
+    if actual != expected:
+        raise WebDriverError(f"Linux non-left pointer did not reach the owned target: {actual}; expected {expected}")
+
+
 def prepare_x11_button_target(session: ButtonSession, origin: dict, *, data_home: str | None,
                               allow_alternate: bool, prepare_target: Callable[..., dict]) -> X11ButtonTarget:
     """Own and hover the physical pointer before authorizing any button input."""
@@ -110,8 +125,7 @@ def prepare_x11_button_target(session: ButtonSession, origin: dict, *, data_home
             raise WebDriverError("Linux non-left click has invalid native target geometry")
         local = {k: round(point[k] * geometry[dimension] / viewport[dimension])
                  for k, dimension in (("x", "width"), ("y", "height"))}
-        command("xdotool", "mousemove", "--sync", "--window", window,
-                str(local["x"]), str(local["y"]))
+        _move_physical_pointer(window, geometry, local)
         # OS hover (unlike a W3C move) can open native popups or change layout.
         # Only hover/preparation can repeat; the balanced click is outside this loop.
         if (prepare_target(session, origin, allow_alternate=allow_alternate) == point

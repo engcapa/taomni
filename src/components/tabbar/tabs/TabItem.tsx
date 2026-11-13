@@ -4,8 +4,7 @@ import { useCustomDropTarget, type CustomDragData } from "../../../lib/customDnD
 import type { Tab } from "../../../types";
 import { type TabItemProps } from "./model";
 import { TAB_DRAG_MIME } from "./scroll";
-import { ExplorerFileIcon } from "../../explorer/ExplorerFileIcon";
-import "./explorerTabIcon.css";
+import { ExplorerTabIcon } from "../../explorer/ExplorerTabIcon";
 
 export function dbEngineColor(engine?: string): string {
   switch (engine) {
@@ -64,7 +63,7 @@ export function TabIcon({ tab }: { tab: Tab; }) {
     case "mfa":
       return <KeyRound className="w-3 h-3" style={{ color: "#c98a00" }} />;
     case "file-browser":
-      return <ExplorerFileIcon directory className="taomni-explorer-tab-icon h-3.5 w-3.5" />;
+      return <ExplorerTabIcon />;
     default:
       return <TerminalIcon className="w-3 h-3" style={{ color: "#2b5d8b" }} />;
   }

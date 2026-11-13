@@ -133,6 +133,7 @@ def setup(ctx: Any) -> None:
         "explorer_source": operations + "/source", "explorer_target": operations + "/target",
         "explorer_crumb_folder_match": path_attribute_match(operations + "/target/folder"),
         "explorer_source_match": path_attribute_match(operations + "/source"),
+        "explorer_previews_match": path_attribute_match(preview),
         "explorer_source_folder_match": path_attribute_match(operations + "/source/folder"),
         "explorer_trash": operations + "/trash", "explorer_previews": preview,
         "explorer_workspace": workspace_input(base, preview),

@@ -1173,6 +1173,7 @@
 - `[data-testid="explorer-file-row"]` — interactive — F-EXPLORER-1.explorer-file-row
   ↳ `[data-testid="explorer-file-row"] .ex-name` — alias
 - `[data-testid="tab-item"][data-tab-type="file-browser"] .taomni-explorer-tab-icon path` — display — F-EXPLORER-1.explorer-main-tab-icon
+- `[data-testid="workspace-tab"][data-tab-kind="explorer"] .taomni-explorer-tab-icon path` — display — F-EXPLORER-1.explorer-workspace-tab-icon
 - `[data-testid="explorer-files"]` — display — F-EXPLORER-1.explorer-files
 - `[data-testid="explorer-filter"]` — interactive — F-EXPLORER-1.explorer-filter
 - `[data-testid="explorer-forward"]` — interactive — F-EXPLORER-1.explorer-forward
@@ -1216,6 +1217,7 @@
 - `[data-testid="explorer-sort-type"]` — interactive — F-EXPLORER-1.explorer-sort-type
 - `[data-testid="explorer-status"]` — display — F-EXPLORER-1.explorer-status
 - `[data-testid="explorer-tab"]` — interactive — F-EXPLORER-1.explorer-tab
+  ↳ `[data-testid="explorer-tab"]${fixture.explorer_previews_match}` — alias
 - `[data-testid="explorer-toast"]` — display — F-EXPLORER-1.explorer-toast
 - `[data-testid="explorer-trash-unavailable"]` — display — F-EXPLORER-1.explorer-trash-unavailable
 - `[data-testid="explorer-undo"]` — interactive — F-EXPLORER-1.explorer-undo
@@ -1717,6 +1719,7 @@
   ↳ `:nth-match([data-testid="tab-item"][data-tab-type="file-browser"], 1)` — alias
   ↳ `:nth-match([data-testid="tab-item"][data-tab-type="file-browser"], 2)` — alias
   ↳ `:nth-match([data-testid="tab-item"][data-tab-type="file-browser"], 3)` — alias
+  ↳ `xpath=(//*[@data-testid="tab-item" and @data-tab-type="file-browser"])[2]` — alias
 - `[data-testid="tab-title"]` — interactive — F1.5.tab-title
 - `[data-testid="tab-title-input"]` — interactive [optional] — F1.5.tab-title-input
 - `[data-testid="new-local-terminal"]` — interactive — F1.5.new-local-terminal

@@ -143,7 +143,7 @@ export function ExplorerShell({ tabId, initialPath, workspaceId, active = true, 
             onEmptyContext: () => explorerEmptyMenu(pane?.path ?? initialPath, operations, label, () => void useSftpStore.getState().refreshPane(tabId, "local")),
           }} />
           {previewVisible && !narrow && preferences.previewPosition === "right" && <div className="ex-split" role="separator" aria-orientation="vertical" aria-label={label("调整预览宽度", "Resize preview")} onPointerDown={(event) => resize(event, "preview")} />}
-          {narrow && previewOverlay ? <div className="ex-preview-overlay">{preview}</div> : preview}
+          {narrow && previewOverlay ? <div className="ex-preview-overlay" data-position={preferences.previewPosition}>{preview}</div> : preview}
         </div>
       </div>
       <ExplorerStatusBar entries={visible} selected={selected} />

@@ -36,7 +36,7 @@ Browser/VFS 不能证明原生文件语义；WebView reload 不等同整个 OS �
 
 ### 本地单元与静态检查
 
-- `pnpm test --maxWorkers=2`：最新稳定批次737文件通过，6,663测试通过、1项跳过（`/tmp/explorer-post-ci-full-unit.log`）。此前735文件/6,647通过批次保留在`/tmp/explorer-full-unit-stable.log`。第一次在并发开发期间运行的全套出现3个尚在修改的模块失败；保留原始`/tmp/explorer-full-unit.log`，不以重跑覆盖旧失败。
+- `pnpm test --maxWorkers=2`：最新稳定批次739文件通过，6,667测试通过、1项跳过（`/tmp/explorer-stable-polish-full-unit.log`）。此前737文件/6,663通过保留在`/tmp/explorer-post-ci-full-unit.log`，735文件/6,647通过保留在`/tmp/explorer-full-unit-stable.log`。第一次在并发开发期间运行的全套出现3个尚在修改的模块失败；保留原始`/tmp/explorer-full-unit.log`，不以重跑覆盖旧失败。
 - 最后的小型 tree/地址/滚动调整另外跑过对应 mounted 单测；7 文件72项的 Explorer 定向批次通过。预览/交互完整55项、后端18项、剪贴板21项存在重叠，不把批次数相加当作独立用例数。
 - `LIBCLANG_PATH=/usr/lib/llvm-18/lib cargo test --manifest-path src-tauri/Cargo.toml --lib filebrowser::local_ops -- --nocapture`：18通过。
 - 同环境 `cargo test --manifest-path src-tauri/Cargo.toml --lib file_clipboard -- --nocapture`：21通过。
@@ -55,6 +55,7 @@ Browser/VFS 不能证明原生文件语义；WebView reload 不等同整个 OS �
 | [43372314485](https://github.com/engcapa/taomni/actions/runs/43372314485) / `d1309cab` | **完成，78通过/9失败，无跳过**：三端构建、完整crash-regression、受影响SFTP通过。三端browser002/003/004与native004通过。browser001异步标签计数；native003的Linux残留右键、macOS树目标被状态栏遮挡、Windows路径分隔符选择器；native005的Linux退出确认、Windows/macOS窄窗预览遮挡行中心失败。原始汇总`/tmp/taomni-explorer-round4-summary.z4pzrm`，细节保留`round4-browser.fKykoz`、`round4-native.d1dcCT`、`round4-windows.zG17Np`。恢复污染修复后Mac crash已全部通过。 |
 | [43374078423](https://github.com/engcapa/taomni/actions/runs/43374078423) / `2671e416` | 定向browser001尝试在catalog门禁失败：新增异步等待选择器未登记。补aliases后本地audit通过；无UI执行证据。 |
 | [43374770655](https://github.com/engcapa/taomni/actions/runs/43374770655) / `8c68c55a` | 定向browser001的`modes=browser`与自动完整crash集合内native-only用例不兼容，plan拒绝；无UI执行。后续仍使用`browser,native`，不删减crash集合。 |
+| [43396714161](https://github.com/engcapa/taomni/actions/runs/43396714161) / `2181bd69` | **完成，84通过/3失败，无跳过**：三个平台browser均15/15、native均13/14；Explorer001–004、完整crash-regression、SFTP全通过。仅005仍失败：Linux重复原地pointer move等待超时、macOS底部预览窄窗误全高遮挡、Windows终端OSC7路径`/D:/...`未归一化导致重复无效Explorer。汇总`/tmp/taomni-explorer-round5-summary.jST8Gm`；实际DOM/字节收据保留round5-auto目录。6份browser receipt及全部artifact hash已核对（`/tmp/explorer-round5-browser-receipt-check-stable.log`）；Linux/macOS003原生receipt/build-source与artifact也已核对。 |
 
 本次相关失败均保留原始报告，不因后续修复而改写旧结果。尚不宣称最终 UI 验收或三端全部通过。
 
@@ -64,4 +65,8 @@ Browser/VFS 不能证明原生文件语义；WebView reload 不等同整个 OS �
 - macOS树目标矩形中心虽在WebView内，却被状态栏/滚动裁剪遮挡。native drag现在滚动实际端点并复用稳定`elementFromPoint`命中检查，准备source后再次检查target未移动/遮挡；所有动作与实际DOM事件、完整字节oracle仍保留。
 - Windows从原生列表进入子目录会得到反斜杠路径，fixture输入为正斜杠。用例选择器现匹配相同完整绝对路径的两种分隔符，不采用可能命中别处的basename退让。
 - 窄窗手动预览覆盖行中心时，005点击仍可见的`.ex-name`子元素；不使用force/synthetic click。OS重启保留Explorer标签，并显式声明、核对和点击退出确认；不以关闭全部标签、reload或kill冒充恢复证明。
-- 标签图标复用原型同一文件夹SVG，浅/深色分别使用`#f5b83d`/`#e8b04a`；全局chrome其余部分仍沿用产品。图标及保留SFTP图标的3文件28项单测通过，`tsc`及`check:refactor`通过。最终稳定合并`test_native_drag`、restart/shutdown、pointer/transport、X11/window-drag及case契约共256项通过（`/tmp/explorer-native-tool-unit-stable.log`）；此前与pointer签名修改交叠的失败日志保留在`/tmp/explorer-native-tool-unit-final.log`。catalog audit与三端87项selection plan通过，未更改coverage baseline。下一轮GitHub结果另行追加。
+- 标签图标复用原型同一文件夹SVG，浅/深色分别使用`#f5b83d`/`#e8b04a`；全局chrome其余部分仍沿用产品。图标及保留SFTP图标的3文件28项单测通过，`tsc`及`check:refactor`通过。最终稳定合并`test_native_drag`、restart/shutdown、pointer/transport、X11/window-drag及case契约共256项通过（`/tmp/explorer-native-tool-unit-stable.log`）；此前与pointer签名修改交叠的失败日志保留在`/tmp/explorer-native-tool-unit-final.log`。catalog audit与三端87项selection plan通过，未更改coverage baseline。
+- 后续截图复核：工作区仍显示`EXPL`badge而非原型文件夹，现改为与主标签共享的ExplorerTabIcon；短文本预览原先固定300px导致操作区在窄窗落到滚动区下方，现按实际虚拟内容高度收缩，上限300px，长文本仍虚拟化。对应5文件21项单测通过（`/tmp/explorer-final-polish-unit.log`）；新增完整路径图标与短文本高度断言。完整suite在源码更新交叠时载入旧PreviewContent而运行新测试，产生2个失败（`/tmp/explorer-final-full-unit.log`）；已在稳定源码上重新完整运行739文件/6,667通过、1跳过（`/tmp/explorer-stable-polish-full-unit.log`）。
+- run43396714161的Linux和macOS原生003已完整通过，真实列表/树/修饰键面包屑拖放含全树字节oracle。Linux005走过第一次终端右键，但第二次指针已在相同位置，`xdotool mousemove --sync`等待不存在的MotionNotify超时；改为一次真实move后读取实际root坐标核对，不等待坐标必须变化。49项pointer单测及最终合并258项工具/契约单测通过（`/tmp/explorer-native-tools-noop-stable.log`），保留原失败。Linux/macOS003的实际`pointerdown buttons=1`、目标`pointerup buttons=0`、Ctrl/Option复制状态及17次完整树oracle已检查；receipt/build-source/artifact hash也已核对。
+- 同轮macOS005走到外部修改刷新后，截图证明底部偏好在窄窗误沿用全高覆盖层，遮住文件列表；这是本次产品布局问题而非无关失败。覆盖层现按`data-position`分支，bottom固定190px贴底且跨列表宽度，right保持原300px宽侧层；添加002窄窗bottom几何断言、截图与mounted回归。2文件24项单测、类型与边界检查通过。
+- 同轮Windows005的截图/DOM显示终端报告`/D:/...`，初次计数读取了异步打开前一帧，随后错误地新开无法读取的目录。Explorer本地终端入口现复用已有`normalizeLocalStartCwd`，只在本地终端边界转换PowerShell/MSYS报告；SSH与通用地址输入不受影响。新增drive/MSYS/UNC/无法映射的WSL路径单测；005在返回Explorer与force-new后等待真实激活/第二标签再保留精确计数。5文件52项相关单测通过。

@@ -77,6 +77,9 @@ describe("Explorer preview content", () => {
     expect(text).toHaveAttribute("data-line-count", "2");
     expect(text).toHaveTextContent("first");
     expect(text).toHaveTextContent("second");
+    // Short text follows the prototype's content height instead of reserving a
+    // 300px empty block that pushes actions below the narrow preview viewport.
+    expect(Number.parseFloat(text.style.height)).toBeLessThan(70);
     expect(screen.getByTestId("explorer-preview-truncated")).toHaveTextContent("first 256 KB");
     expect(explorerReadPreviewText).toHaveBeenCalledWith("/fixture/large.txt");
     fireEvent.click(screen.getByTestId("explorer-preview-open"));
@@ -94,6 +97,7 @@ describe("Explorer preview content", () => {
     render(<ExplorerPreviewPane {...props()} />);
     const text = await screen.findByTestId("explorer-preview-text");
     expect(text).toHaveAttribute("data-line-count", "10000");
+    expect(text).toHaveStyle({ height: "300px" });
     expect(text).toHaveTextContent("line 0");
     expect(text.querySelectorAll(".ex-pv-line").length).toBeLessThan(50);
     expect(text.textContent).not.toContain("line 9999");

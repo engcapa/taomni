@@ -160,6 +160,9 @@ describe("Explorer preferences and responsive preview", () => {
     expect(screen.queryByTestId("explorer-preview")).toBeNull(); expect(getExplorerPreferences().preview).toBe(true);
     fireEvent.click(screen.getByTestId("explorer-cmd-preview"));
     expect(screen.getByTestId("explorer-preview").parentElement).toHaveClass("ex-preview-overlay");
+    expect(screen.getByTestId("explorer-preview").parentElement).toHaveAttribute("data-position", "right");
+    act(() => setExplorerPreferences({ previewPosition: "bottom" }));
+    expect(screen.getByTestId("explorer-preview").parentElement).toHaveAttribute("data-position", "bottom");
     expect(root).toHaveAttribute("data-preview-collapsed", "false");
     fireEvent.keyDown(root, { key: "Escape" });
     expect(screen.queryByTestId("explorer-preview")).toBeNull(); expect(getExplorerPreferences().preview).toBe(true);

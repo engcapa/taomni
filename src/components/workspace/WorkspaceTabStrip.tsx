@@ -17,6 +17,7 @@ import { useWorkspaceTabScroll } from "./useWorkspaceTabScroll";
 import { NOTES_WORKSPACE_ID } from "../../stores/workspaceNotes";
 import { createAndOpenWorkspaceNote } from "../../lib/notes/notesWorkspaceNavigation";
 import { EMPTY_WORKSPACE_TAB_FILTER, filterWorkspaceTabs, hasWorkspaceTabFilter } from "../../lib/workspaceTabFilter";
+import { ExplorerTabIcon } from "../explorer/ExplorerTabIcon";
 
 const KIND_LABEL: Record<WorkspaceTabKind, string> = {
   file: "FILE",
@@ -187,9 +188,9 @@ export function WorkspaceTabStrip() {
         if (event.button === 1 && tab.closable) closeTab(workspace.id, tab.id);
       }}
     >
-      <span className="shrink-0 rounded px-0.5 text-[8.5px] font-bold" style={{ color: KIND_COLOR[tab.kind], border: `1px solid ${KIND_COLOR[tab.kind]}` }}>
+      {tab.kind === "explorer" ? <ExplorerTabIcon /> : <span className="shrink-0 rounded px-0.5 text-[8.5px] font-bold" style={{ color: KIND_COLOR[tab.kind], border: `1px solid ${KIND_COLOR[tab.kind]}` }}>
         {KIND_LABEL[tab.kind]}
-      </span>
+      </span>}
       <span className="truncate">{tab.title}</span>
       {tab.closable && (
         <button
