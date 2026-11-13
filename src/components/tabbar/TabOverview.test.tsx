@@ -128,6 +128,25 @@ it("matches a new output in the open search without moving focus", () => {
   expect(input).toHaveFocus();
 });
 
+it("places endpoint metadata in the footer so the header gives maximum room to titles", () => {
+  const ws = useWorkspacePlatformStore.getState();
+  const workspace = ws.createWorkspace({ name: "My Workspace" });
+  ws.openFileInWorkspace(workspace.id, {
+    rootId: "root-1",
+    path: "src/components/tabbar/overview/OverviewTitle.tsx",
+    name: "OverviewTitle.tsx",
+  });
+  useAppStore.setState({ activeSideTab: "workspaces" });
+  render(<TabOverview />);
+  const card = screen.getByTestId("tab-overview-card");
+  const header = card.querySelector(".taomni-overview-card-header")!;
+  const footer = card.querySelector(".taomni-overview-card-footer")!;
+  expect(within(header as HTMLElement).getByTestId("tab-overview-card-title")).toHaveTextContent("OverviewTitle.tsx");
+  expect(header.textContent).not.toContain("src/components/tabbar/overview/OverviewTitle.tsx");
+  expect(footer).toHaveTextContent("My Workspace");
+  expect(footer).toHaveTextContent("src/components/tabbar/overview/OverviewTitle.tsx");
+});
+
 it("traps keyboard focus and restores the invoking button", () => {
   const button = document.createElement("button"); document.body.append(button); button.focus();
   render(<TabOverview />);

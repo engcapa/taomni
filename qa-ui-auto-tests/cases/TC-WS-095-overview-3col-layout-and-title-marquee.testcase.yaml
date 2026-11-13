@@ -1,0 +1,147 @@
+id: TC-WS-095
+title: Overview grid renders three larger columns, footer endpoints, and title marquee on overflow
+description: Opens four workspace documents including short, medium, and overflowing filenames, verifies the TabOverview grid uses three columns with enlarged cards and taller summary previews, verifies endpoint metadata is placed in the card footer so medium titles render without truncation, and verifies CSS marquee subtitle playback on the overflowing title plus card activation.
+covers: [F1.5, F-WS-1, F-WS-2, F-WS-5]
+tags: [p1, overview, workspace, layout, regression]
+modes: [browser, native]
+fixtures: [reset_db, platform_workspace_root]
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-ws-095
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.platformWorkspaces.v1
+    value: '{"version":1,"activeWorkspaceId":"default-workspace","createdNodes":[],"workspaces":[{"id":"default-workspace","name":"Default Workspace","description":"","isDefault":true,"rootFolders":[{"id":"root-1","name":"qa-root","path":"${fixture.platform_workspace_root}","addedAt":1}],"pinnedSessionIds":[],"activeLeftToolWindow":"project","bottomDock":{"open":false,"activeTool":"terminal","heightPx":220},"openTabs":[],"activeTabId":""}]}'
+- reload_window: null
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="session-tree"]'
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="code-workspace-tree"]'
+- click: '[data-testid="code-workspace-tree-root"]'
+- wait_for: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
+- wait_for: '[data-testid="workspace-file-editor"][data-path="README.md"] .cm-content'
+- click: '[data-testid="code-workspace-tree-dir"][data-path="src"] [data-testid="code-workspace-tree-dir-arrow"]'
+- wait_for: '[data-testid="code-workspace-tree-file"][data-path="src/index.ts"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="src/index.ts"]'
+- wait_for: '[data-testid="workspace-file-editor"][data-path="src/index.ts"] .cm-content'
+- click: '[data-testid="code-workspace-tree-root"]'
+- click: '[data-testid="code-workspace-tree-new"]'
+- wait_for: '[data-testid="code-workspace-tree-new-file"]'
+- click: '[data-testid="code-workspace-tree-new-file"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog-input"]'
+    value: overview-medium-title.ts
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="workspace-file-editor"][data-path="overview-medium-title.ts"] .cm-content'
+- click: '[data-testid="code-workspace-tree-root"]'
+- click: '[data-testid="code-workspace-tree-new"]'
+- wait_for: '[data-testid="code-workspace-tree-new-file"]'
+- click: '[data-testid="code-workspace-tree-new-file"]'
+- wait_for: '[data-testid="text-input-dialog"]'
+- fill:
+    selector: '[data-testid="text-input-dialog-input"]'
+    value: overview-title-marquee-overflowing-three-column-card-header-width.ts
+- click: '[data-testid="text-input-dialog-confirm"]'
+- wait_for: '[data-testid="workspace-file-editor"][data-path="overview-title-marquee-overflowing-three-column-card-header-width.ts"] .cm-content'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
+- wait_for: '[data-testid="workspace-file-editor"][data-path="README.md"] .cm-content'
+- click: '[data-testid="tab-overview-trigger"]'
+- wait_for: '[data-testid="tab-overview"][data-scope="workspaces"]'
+- assert_count:
+    selector: '[data-testid="tab-overview-card"]'
+    equal: 4
+- assert_count:
+    selector: '[data-testid="tab-overview-card-title"]'
+    equal: 4
+- eval_readonly:
+    expression: getComputedStyle(document.querySelector('.taomni-overview-grid')).gridTemplateColumns.trim().split(/\s+/).length === 3 && document.querySelectorAll('.taomni-overview-card')[0].getBoundingClientRect().width >= 300 && document.querySelectorAll('.taomni-overview-summary')[0].clientHeight >= 190
+    expect_truthy: true
+    timeout_sec: 10
+- eval_readonly:
+    expression: document.querySelectorAll('.taomni-overview-card')[1].getBoundingClientRect().left > document.querySelectorAll('.taomni-overview-card')[0].getBoundingClientRect().right && document.querySelectorAll('.taomni-overview-card')[2].getBoundingClientRect().left > document.querySelectorAll('.taomni-overview-card')[1].getBoundingClientRect().right
+    expect_truthy: true
+- eval_readonly:
+    expression: document.querySelectorAll('.taomni-overview-card')[3].getBoundingClientRect().top >= document.querySelectorAll('.taomni-overview-card')[0].getBoundingClientRect().bottom && Math.abs(document.querySelectorAll('.taomni-overview-card')[3].getBoundingClientRect().left - document.querySelectorAll('.taomni-overview-card')[0].getBoundingClientRect().left) < 2
+    expect_truthy: true
+- eval_readonly:
+    expression: document.querySelectorAll('.taomni-overview-card')[1].querySelector('.taomni-overview-card-header').textContent.indexOf('src/index.ts') < 0 && document.querySelectorAll('.taomni-overview-card')[1].querySelector('.taomni-overview-card-footer').textContent.indexOf('src/index.ts') >= 0
+    expect_truthy: true
+- wait_for: '[data-testid="tab-overview-card-title"][data-overflowing="true"]'
+- assert_count:
+    selector: '[data-testid="tab-overview-card-title"][data-overflowing="true"]'
+    equal: 1
+- assert_attribute:
+    selector: '[data-testid="tab-overview-card-title"][data-overflowing="true"]'
+    name: title
+    equals: overview-title-marquee-overflowing-three-column-card-header-width.ts
+- assert_attribute:
+    selector: '[data-testid="tab-overview-card-title"][data-overflowing="true"] .taomni-overview-title-track'
+    name: data-marquee
+    equals: overview-title-marquee-overflowing-three-column-card-header-width.ts
+- eval_readonly:
+    expression: getComputedStyle(document.querySelector('.taomni-overview-title-track[data-marquee]')).animationName.indexOf('taomni-overview-marquee') >= 0 && parseFloat(getComputedStyle(document.querySelector('.taomni-overview-title-track[data-marquee]')).animationDuration) >= 4.5
+    expect_truthy: true
+- screenshot: overview-3col-marquee.png
+- click: '[data-testid="tab-overview-card-title"][data-overflowing="true"]'
+- assert_not_visible: '[data-testid="tab-overview"]'
+- wait_for: '[data-testid="workspace-file-editor"][data-path="overview-title-marquee-overflowing-three-column-card-header-width.ts"] .cm-content'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Opening four workspace files in TabOverview renders a three-column grid where cards are enlarged (>=300px wide, summary >=190px tall), row 1 holds three cards left-to-right, and card 4 wraps to row 2 under column 1.
+    actions: [12, 16, 24, 32, 34, 36]
+    checkpoints:
+    - step: 37
+      expectation: TabOverview opens in workspaces scope.
+    - step: 38
+      expectation: All four opened workspace tabs appear as overview cards.
+    - step: 40
+      expectation: CSS grid defines 3 columns with enlarged card width and summary preview height.
+    - step: 41
+      expectation: Cards 0, 1, and 2 sit left-to-right on the first row.
+    - step: 42
+      expectation: Card 3 wraps to row 2 aligned with column 1.
+    results: [38, 40, 41, 42]
+  - id: R2
+    requirement: Endpoint path metadata renders in the card footer instead of squeezing the header, leaving short and medium titles unclipped while only the overflowing long title enables marquee subtitle playback.
+    actions: [36]
+    checkpoints:
+    - step: 39
+      expectation: All four card titles render with the overview card title control.
+    - step: 43
+      expectation: Endpoint metadata appears in the card footer rather than the card header.
+    - step: 44
+      expectation: Overflow detection marks the long filename title as overflowing.
+    - step: 45
+      expectation: Exactly one of the four titles overflows; short and medium titles fit completely.
+    - step: 46
+      expectation: The overflowing title element exposes the full filename attribute.
+    - step: 47
+      expectation: The marquee track exposes data-marquee with the full filename text.
+    - step: 48
+      expectation: Computed CSS animation runs taomni-overview-marquee with duration >= 4.5s.
+    results: [43, 45, 46, 47, 48]
+  - id: R3
+    requirement: Clicking the overflowing-title overview card dismisses TabOverview and activates the corresponding workspace editor tab without runtime errors.
+    actions: [50]
+    checkpoints:
+    - step: 51
+      expectation: TabOverview closes after card selection.
+    - step: 52
+      expectation: The target workspace editor for the overflowing-title file becomes visible.
+    - step: 53
+      expectation: No uncaught runtime errors occur during the case.
+    results: [51, 52, 53]
+  visual:
+  - check: Three-column overview grid proportions, enlarged summary previews, footer metadata spacing, and edge-faded marquee header layout.
+    method: manual
+    reason: Captured screenshot overview-3col-marquee.png supplements automated bounding-box and animation style checks.
+  native:
+  - check: Three-column layout, enlarged card geometry, and CSS marquee title overflow work inside packaged Tauri WebViews across platforms.
+    method: automated
+    reason: Executed natively via qa-ui-auto-platforms across Linux, Windows, and macOS in addition to browser mode.
