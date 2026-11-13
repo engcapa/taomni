@@ -98,7 +98,7 @@ export function startCustomDrag(opts: StartOpts): void {
       window.removeEventListener("pointerup", onPointerUp, true);
       window.removeEventListener("pointercancel", onPointerCancel, true);
       window.removeEventListener("keydown", onKeyDown, true);
-      window.removeEventListener("blur", onBlur, true);
+      window.removeEventListener("blur", onBlur);
     },
   };
   active = drag;
@@ -182,7 +182,9 @@ export function startCustomDrag(opts: StartOpts): void {
   window.addEventListener("pointerup", onPointerUp, true);
   window.addEventListener("pointercancel", onPointerCancel, true);
   window.addEventListener("keydown", onKeyDown, true);
-  window.addEventListener("blur", onBlur, true);
+  // blur does not bubble: capturing it would also cancel on descendant focus
+  // transfers after pointerdown, before the browser sends the first drag move.
+  window.addEventListener("blur", onBlur);
 }
 
 function emit(detail: PointerEventDetail) {

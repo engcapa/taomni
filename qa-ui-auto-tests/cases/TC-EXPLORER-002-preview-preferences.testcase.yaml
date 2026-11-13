@@ -25,8 +25,8 @@ steps:
 - fill: {selector: '[data-testid="explorer-tab"]:visible [data-testid="explorer-address"]', value: '${fixture.explorer_previews}'}
 - press: {selector: '[data-testid="explorer-tab"]:visible [data-testid="explorer-address"]', key: Enter}
 - wait_for: '[data-testid="explorer-tab"]:visible [data-testid="explorer-file-row"][data-name="notes.txt"]'
-- assert_element_geometry: {selector: '[data-testid="explorer-tab"]:visible [data-testid="explorer-nav-tree"]', min_width: 210, min_height: 200}
-- assert_element_geometry: {selector: '[data-testid="explorer-tab"]:visible [data-testid="explorer-preview"]', min_width: 300, min_height: 200}
+- assert_element_geometry: {selector: '[data-testid="explorer-nav-tree"]', min_width: 210, min_height: 200}
+- assert_element_geometry: {selector: '[data-testid="explorer-preview"]', min_width: 300, min_height: 200}
 - eval_readonly:
     expression: 'getComputedStyle(document.querySelector(".ex-shell")).backgroundColor === "rgb(248, 250, 252)"'
     expect_truthy: true

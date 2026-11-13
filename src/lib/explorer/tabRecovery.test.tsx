@@ -63,6 +63,13 @@ describe("Explorer recovery metadata", () => {
     write.mockRestore();
   });
 
+  it("retains the last active Explorer when the current terminal is not restored", () => {
+    renderHook(() => useExplorerTabRecovery());
+    act(() => { useAppStore.getState().addTab(explorer); vi.advanceTimersByTime(200); });
+    act(() => { useAppStore.getState().addTab({ id: "terminal", type: "terminal", title: "Terminal", closable: true }); vi.advanceTimersByTime(200); });
+    expect(readExplorerTabSnapshot().activeTabId).toBe(explorer.id);
+  });
+
   it("flushes the latest navigation on immediate page hide", () => {
     renderHook(() => useExplorerTabRecovery());
     act(() => { useAppStore.getState().addTab(explorer); window.dispatchEvent(new Event("pagehide")); });

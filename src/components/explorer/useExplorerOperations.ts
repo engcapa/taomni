@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { listen } from "@tauri-apps/api/event";
 import { readFilesResult, writeText } from "../../lib/clipboard";
+import { notifyClipboardWritten } from "../../lib/clipboardOwnership";
 import {
   explorerCancelOperation, explorerSameVolume, explorerWriteClipboardFiles, explorerUpdateCutClipboard, localCopyEntries, localMoveEntries,
   localTrashEntries, localTrashRestore, localRenameEntry, localCreateEntry,
@@ -76,6 +77,7 @@ export function useExplorerOperations(tabId: string) {
     const paths = entries.map((entry) => entry.path);
     try {
       await explorerWriteClipboardFiles(paths, cut);
+      notifyClipboardWritten();
       setExplorerClipboard({ paths, cut });
       notify(label(`${cut ? "已剪切" : "已复制"} ${paths.length} 项到剪贴板`, `${cut ? "Cut" : "Copied"} ${paths.length} item(s) to clipboard`));
     } catch (error) { notify(String(error), true); }

@@ -2,7 +2,8 @@ id: TC-EXPLORER-005
 title: Native Explorer opens terminal cwd, publishes real system file clipboard and restores current directory
 description: AC03/07/11/12/13/17/20 native boundary. Explorer opens from Tools and creates a real local terminal in its cwd. Terminal right-click
   reuses the existing Explorer or explicitly creates another. Real clipboard formats are read independently, a real desktop file manager
-  pastes copied bytes, real external edits refresh preview, and reload restores persisted path/preferences. No browser stub is native proof.
+  pastes copied bytes, real external edits refresh preview, and a verified OS-process restart restores persisted path/preferences. No browser
+  stub is native proof.
 modes:
 - native
 covers:
@@ -44,6 +45,15 @@ steps:
 - assert_text:
     selector: '[data-testid="explorer-preview-text"]'
     contains: Explorer preview text
+- click: '[data-testid="explorer-file-row"][data-name="logo.png"]'
+- wait_for: '[data-testid="explorer-preview-image"]'
+- eval_readonly:
+    expression: document.querySelector(".ex-pv-img img").complete && document.querySelector(".ex-pv-img img").naturalWidth === 1
+    expect_truthy: true
+    timeout_sec: 10
+- screenshot: explorer-native-image-blob.png
+- click: '[data-testid="explorer-file-row"][data-name="notes.txt"]'
+- wait_for: '[data-testid="explorer-preview-text"]'
 - click: '[data-testid="explorer-cmd-copy"]'
 - file_clipboard:
     action: assert
@@ -101,7 +111,8 @@ steps:
     contains: External editor changed the preview
 - assert_no_runtime_errors: null
 - screenshot: explorer-native-clipboard-terminal-preview.png
-- reload_window: null
+- click: '[data-testid="tab-item"][data-tab-type="terminal"] [data-testid="tab-close"]'
+- native_restart_app: null
 - wait_for: '[data-testid="explorer-tab"][data-path="${fixture.explorer_previews}"]'
 - assert_count:
     selector: '[data-testid="tab-item"][data-tab-type="file-browser"]'
@@ -138,93 +149,98 @@ verification:
     - 7
     - 8
     - 10
+    - 19
+    - 21
     - 13
-    - 15
+    - 17
     checkpoints:
     - step: 12
       expectation: Native preview shows actual source text.
-    - step: 14
+    - step: 20
       expectation: Independent native CFHDROP/NSURL/GTK MIME oracle sees exactly the selected file.
-    - step: 16
+    - step: 22
       expectation: Real file-manager target contains original fixture content.
+    - step: 15
+      expectation: The actual packaged WebView decodes native image bytes through a blob URL into a one-pixel image.
     results:
     - 12
-    - 14
-    - 16
+    - 20
+    - 22
+    - 15
   - id: R2
     requirement: Explorer launches a real terminal in its current cwd; local-terminal context menu returns to existing Explorer rather than
       opening another; external modification is refreshed.
     actions:
-    - 23
-    - 25
-    - 27
-    - 30
-    - 33
-    - 34
-    - 35
-    - 36
-    - 37
-    checkpoints:
-    - step: 26
-      expectation: Anchored PTY output proves actual command execution.
-    - step: 28
-      expectation: Local terminal exposes Explorer entry.
-    - step: 29
-      expectation: Local terminal exposes explicit new-tab entry.
-    - step: 31
-      expectation: Existing same-directory Explorer is reused.
-    - step: 32
-      expectation: Terminal cwd maps to the Explorer directory that launched it.
-    - step: 38
-      expectation: Preview re-reads actual externally modified file bytes.
-    results:
-    - 26
-    - 28
     - 29
     - 31
-    - 32
-    - 38
-  - id: R3
-    requirement: Explorer current directory and shared preview preferences restore after WebView reload; terminal explicit new opens one
-      additional same-cwd Explorer.
-    actions:
-    - 17
-    - 18
-    - 20
-    - 21
+    - 33
+    - 36
+    - 39
+    - 40
     - 41
-    - 46
-    - 48
-    - 49
-    checkpoints:
-    - step: 19
-      expectation: Bottom position applies before reload.
-    - step: 22
-      expectation: Wrap is persisted.
-    - step: 42
-      expectation: Current native directory restores after reload.
-    - step: 43
-      expectation: Restore does not duplicate Explorer.
-    - step: 44
-      expectation: Bottom position restores.
-    - step: 45
-      expectation: Wrap restores.
-    - step: 50
-      expectation: Force-new from terminal adds exactly one Explorer.
-    - step: 51
-      expectation: Both same-cwd Explorer panes remain independently mounted.
-    - step: 52
-      expectation: No runtime errors after native restore and new tab.
-    results:
-    - 19
-    - 22
     - 42
     - 43
+    checkpoints:
+    - step: 32
+      expectation: Anchored PTY output proves actual command execution.
+    - step: 34
+      expectation: Local terminal exposes Explorer entry.
+    - step: 35
+      expectation: Local terminal exposes explicit new-tab entry.
+    - step: 37
+      expectation: Existing same-directory Explorer is reused.
+    - step: 38
+      expectation: Terminal cwd maps to the Explorer directory that launched it.
+    - step: 44
+      expectation: Preview re-reads actual externally modified file bytes.
+    results:
+    - 32
+    - 34
+    - 35
+    - 37
+    - 38
     - 44
-    - 45
+  - id: R3
+    requirement: Explorer current directory and shared preview preferences restore after a verified OS-process restart; terminal explicit
+      new opens one additional same-cwd Explorer.
+    actions:
+    - 23
+    - 24
+    - 26
+    - 27
+    - 48
+    - 53
+    - 55
+    - 56
+    checkpoints:
+    - step: 25
+      expectation: Bottom position applies before reload.
+    - step: 28
+      expectation: Wrap is persisted.
+    - step: 49
+      expectation: Current native directory restores after reload.
+    - step: 50
+      expectation: Restore does not duplicate Explorer.
+    - step: 51
+      expectation: Bottom position restores.
+    - step: 52
+      expectation: Wrap restores.
+    - step: 57
+      expectation: Force-new from terminal adds exactly one Explorer.
+    - step: 58
+      expectation: Both same-cwd Explorer panes remain independently mounted.
+    - step: 59
+      expectation: No runtime errors after native restore and new tab.
+    results:
+    - 25
+    - 28
+    - 49
     - 50
     - 51
     - 52
+    - 57
+    - 58
+    - 59
   visual:
   - check: Native packaged preview, terminal context menu and Explorer tabs.
     method: manual
@@ -234,6 +250,6 @@ verification:
     method: automated
     reason: These assertions cannot be established by browser stubs. Clipboard/paste permissions or unavailable actions fail rather than
       skip.
-  - check: Cold OS-process restart and physical menu/drag/keyboard input.
+  - check: Physical menu/drag/keyboard input
     method: manual
-    reason: reload_window restores WebView state only; terminal text and key delivery use WebView automation rather than physical input.
+    reason: native_restart_app proves actual process restart; terminal text and key delivery still use WebView automation, not physical input.

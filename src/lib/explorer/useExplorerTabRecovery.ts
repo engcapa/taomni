@@ -22,7 +22,11 @@ export function useExplorerTabRecovery(): void {
       if (timer !== null) clearTimeout(timer);
       timer = null;
       const state = useAppStore.getState();
-      try { writeExplorerTabSnapshot(state.tabs, state.activeTabId); }
+      const activeExplorer = state.tabs.some((tab) => tab.id === state.activeTabId && tab.type === "file-browser");
+      // A terminal is not itself restored by this owner. Keep the most recently
+      // active Explorer as the recovery target rather than restoring hidden panes.
+      const recoveryId = activeExplorer ? state.activeTabId : readExplorerTabSnapshot().activeTabId;
+      try { writeExplorerTabSnapshot(state.tabs, recoveryId); }
       catch { /* A full/unavailable WebView storage must not crash navigation. */ }
     };
     const unsubscribe = useAppStore.subscribe((state, previous) => {

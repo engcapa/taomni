@@ -5,6 +5,7 @@ import { getExplorerClipboard, setExplorerClipboard } from "./explorerClipboard"
 import { useSftpStore } from "../../stores/sftpStore";
 import { freshSession, emptyPane } from "../../stores/sftp/listing";
 import { readFilesResult } from "../../lib/clipboard";
+import { notifyClipboardWritten } from "../../lib/clipboardOwnership";
 import { explorerCancelOperation, explorerWriteClipboardFiles, explorerUpdateCutClipboard, explorerSameVolume, localCopyEntries, localMoveEntries, localTrashEntries, localTrashRestore, localRenameEntry } from "../../lib/explorer";
 import { sftpRemove, type FileEntry } from "../../lib/sftp";
 
@@ -45,6 +46,14 @@ describe("Explorer operation clipboard ownership", () => {
     await act(async () => { await result.current.copy([beta], true); });
     expect(getExplorerClipboard()?.paths).toEqual([alpha.path, beta.path]);
     expect(result.current.toast).toMatchObject({ error: true, message: "Error: clipboard unavailable" });
+  });
+  it("a Copy in another app surface cancels an earlier cut even for the same file list", async () => {
+    const { result } = renderHook(() => useExplorerOperations("tab"));
+    await act(async () => { await result.current.copy([alpha], true); });
+    act(() => notifyClipboardWritten());
+    await act(async () => { await result.current.paste(); });
+    expect(localCopyEntries).toHaveBeenCalled();
+    expect(localMoveEntries).not.toHaveBeenCalled();
   });
   it("system clipboard is authoritative and external files never inherit app-local cut", async () => {
     setExplorerClipboard({ paths: [beta.path], cut: true });

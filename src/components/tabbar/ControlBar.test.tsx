@@ -150,6 +150,15 @@ describe("ControlBar settings button", () => {
     expect(onWorkspaceCommand).toHaveBeenCalledWith("workspace.findInFiles");
   });
 
+  it("shows main session tabs for Explorer opened from Tools instead of hiding them behind a mode title", () => {
+    useAppStore.setState({ activeSideTab: "tools", tabs: [{ id: "explorer", type: "file-browser", title: "Documents", closable: true, fileBrowser: { initialPath: "/docs", explorer: true } }], activeTabId: "explorer" });
+    renderControlBar(vi.fn());
+    expect(screen.getByTestId("tab-bar")).toBeInTheDocument();
+    expect(screen.queryByTestId("platform-mode-title")).not.toBeInTheDocument();
+    act(() => useAppStore.setState({ tabs: [{ id: "welcome", type: "welcome", title: "Welcome", closable: false }], activeTabId: "welcome" }));
+    expect(screen.getByTestId("platform-mode-title")).toHaveTextContent("Tools");
+  });
+
   it("opens the large overview and removes the small hover-preview button", () => {
     renderControlBar(vi.fn());
     expect(screen.queryByTestId("tab-details-hover")).not.toBeInTheDocument();
