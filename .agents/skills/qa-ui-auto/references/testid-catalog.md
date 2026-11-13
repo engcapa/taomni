@@ -1124,6 +1124,9 @@
 - `[data-testid="explorer-delete-dialog"]` — display — F-EXPLORER-1.explorer-delete-dialog
 - `[data-testid="explorer-properties-dialog"]` — display — F-EXPLORER-1.explorer-properties-dialog
 - `[data-testid="explorer-toast"].error` — display — F-EXPLORER-1.explorer-toast-error
+- `[data-testid="workspace-tab"][data-tab-kind="explorer"]` — display — F-EXPLORER-1.explorer-workspace-tab-ready
+  ↳ `:nth-match([data-testid="workspace-tab"][data-tab-kind="explorer"], 1)` — alias
+  ↳ `:nth-match([data-testid="workspace-tab"][data-tab-kind="explorer"], 2)` — alias
 - `[data-testid="code-workspace-tool-rail-explorer"]` — interactive — F-EXPLORER-1.code-workspace-tool-rail-explorer
 - `[data-testid="code-workspace-tree-open-explorer"]` — interactive — F-EXPLORER-1.code-workspace-tree-open-explorer
 - `[data-testid="code-workspace-tree-open-explorer-new"]` — interactive — F-EXPLORER-1.code-workspace-tree-open-explorer-new
@@ -1706,6 +1709,9 @@
 
 - `[data-testid="tab-bar"]` — display — F1.5.tab-bar
 - `[data-testid="tab-item"]` — interactive — F1.5.tab-item
+  ↳ `:nth-match([data-testid="tab-item"][data-tab-type="file-browser"], 1)` — alias
+  ↳ `:nth-match([data-testid="tab-item"][data-tab-type="file-browser"], 2)` — alias
+  ↳ `:nth-match([data-testid="tab-item"][data-tab-type="file-browser"], 3)` — alias
 - `[data-testid="tab-title"]` — interactive — F1.5.tab-title
 - `[data-testid="tab-title-input"]` — interactive [optional] — F1.5.tab-title-input
 - `[data-testid="new-local-terminal"]` — interactive — F1.5.new-local-terminal

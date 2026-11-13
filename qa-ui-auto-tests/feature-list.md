@@ -280,6 +280,10 @@ controls:
   kind: display
 - id: tab-item                 # individual tab; pair with [data-tab-type=...] / [data-tab-title=...] when targeting
   selector: '[data-testid="tab-item"]'
+  aliases:
+  - ':nth-match([data-testid="tab-item"][data-tab-type="file-browser"], 1)'
+  - ':nth-match([data-testid="tab-item"][data-tab-type="file-browser"], 2)'
+  - ':nth-match([data-testid="tab-item"][data-tab-type="file-browser"], 3)'
   kind: interactive
 - id: tab-title                # the title span inside a tab; double-click to rename
   selector: '[data-testid="tab-title"]'
@@ -14438,6 +14442,12 @@ controls:
     kind: display
   - id: explorer-toast-error
     selector: '[data-testid="explorer-toast"].error'
+    kind: display
+  - id: explorer-workspace-tab-ready
+    selector: '[data-testid="workspace-tab"][data-tab-kind="explorer"]'
+    aliases:
+    - ':nth-match([data-testid="workspace-tab"][data-tab-kind="explorer"], 1)'
+    - ':nth-match([data-testid="workspace-tab"][data-tab-kind="explorer"], 2)'
     kind: display
   - id: code-workspace-tool-rail-explorer
     selector: '[data-testid="code-workspace-tool-rail-explorer"]'
