@@ -5,6 +5,7 @@ export const PREVIEW_BATCH_MS = 100;
 export const PREVIEW_ACTIVITY_MS = 3000;
 const FALLBACK_REFRESH_MS = 1000;
 const MAX_PREVIEW_LENGTH = 2400;
+const PREVIEW_LINE_COUNT = 14;
 
 export interface TerminalPreview { text: string; outputActive: boolean; }
 interface WatchedTerminal {
@@ -30,7 +31,7 @@ export function useTerminalPreviews(tabIds: readonly string[]): ReadonlyMap<stri
       for (const [id, value] of watched) {
         if (getTerminal(id) !== value.entry) continue;
         let text = "";
-        try { text = (value.entry?.getPreviewText?.(8) || value.entry?.getLastLines(8) || "").slice(-MAX_PREVIEW_LENGTH); }
+        try { text = (value.entry?.getPreviewText?.(PREVIEW_LINE_COUNT) || value.entry?.getLastLines(PREVIEW_LINE_COUNT) || "").slice(-MAX_PREVIEW_LENGTH); }
         catch { /* A closing terminal is replaced/removed at the next registry tick. */ }
         if (text !== value.text) {
           value.text = text;
@@ -54,7 +55,7 @@ export function useTerminalPreviews(tabIds: readonly string[]): ReadonlyMap<stri
         if (previous && previous.entry === entry) continue;
         previous?.stop?.();
         let text = "";
-        try { text = (entry?.getPreviewText?.(8) || entry?.getLastLines(8) || "").slice(-MAX_PREVIEW_LENGTH); }
+        try { text = (entry?.getPreviewText?.(PREVIEW_LINE_COUNT) || entry?.getLastLines(PREVIEW_LINE_COUNT) || "").slice(-MAX_PREVIEW_LENGTH); }
         catch { /* Registry entries can disappear during terminal teardown. */ }
         const value: WatchedTerminal = { entry, text, changedAt: null };
         watched.set(id, value);

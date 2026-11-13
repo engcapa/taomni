@@ -259,6 +259,7 @@ files:
 - src/components/tabbar/TabOverview.tsx
 - src/components/tabbar/overview/overviewModel.ts
 - src/components/tabbar/overview/OverviewSummary.tsx
+- src/components/tabbar/overview/OverviewTitle.tsx
 - src/components/tabbar/overview/useTerminalPreviews.ts
 - src/lib/fuzzyMatch.ts
 - src/lib/terminal/terminalRegistry.ts
@@ -318,6 +319,9 @@ controls:
 - id: tab-overview-card
   selector: '[data-testid="tab-overview-card"]'
   kind: interactive
+- id: tab-overview-card-title
+  selector: '[data-testid="tab-overview-card-title"]'
+  kind: display
 - id: tab-overview-summary
   selector: '[data-testid="tab-overview-summary"]'
   kind: display

@@ -1730,6 +1730,7 @@
 - `[data-testid="tab-overview-trigger"]` — interactive — F1.5.tab-overview-trigger
 - `[data-testid="tab-overview"]` — display — F1.5.tab-overview
 - `[data-testid="tab-overview-card"]` — interactive — F1.5.tab-overview-card
+- `[data-testid="tab-overview-card-title"]` — display — F1.5.tab-overview-card-title
 - `[data-testid="tab-overview-summary"]` — display — F1.5.tab-overview-summary
 - `[data-testid="tab-overview-close"]` — interactive — F1.5.tab-overview-close
 - `[data-testid="tab-overview-current"]` — interactive — F1.5.tab-overview-current

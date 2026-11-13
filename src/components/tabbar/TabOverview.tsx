@@ -11,6 +11,7 @@ import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
 import { filterOverviewItems, type PreviewItem } from "./overview/overviewModel";
 import { useTerminalPreviews } from "./overview/useTerminalPreviews";
 import { OverviewSummary } from "./overview/OverviewSummary";
+import { OverviewTitle } from "./overview/OverviewTitle";
 
 /** Mode-scoped, live text overview. Reading a preview never starts a session. */
 export function TabOverview() {
@@ -128,11 +129,13 @@ function OpenTabOverview() {
       <div className="taomni-overview-grid">
         {matching.map((item) => <button key={item.id} data-testid="tab-overview-card" data-tab-id={item.id} data-workspace-id={item.workspaceId}
           data-active={item.active || undefined} data-output-active={item.outputActive || undefined} className="taomni-overview-card" onClick={() => activate(item)}>
-          <span className="taomni-overview-card-header"><span className="taomni-overview-kind">{item.kind}</span><strong className="min-w-0 flex-1 truncate">{item.title}</strong>
-            {item.outputActive && <span data-testid="tab-overview-output-badge" className="taomni-overview-output-badge"><Activity className="h-3 w-3" aria-hidden="true" />{t("platform.overviewNewOutput")}</span>}
-            <span className="max-w-[45%] truncate text-[10px] text-[var(--taomni-text-muted)]">{item.endpoint}</span></span>
+          <span className="taomni-overview-card-header"><span className="taomni-overview-kind">{item.kind}</span><OverviewTitle title={item.title} />
+            {item.outputActive && <span data-testid="tab-overview-output-badge" className="taomni-overview-output-badge"><Activity className="h-3 w-3" aria-hidden="true" />{t("platform.overviewNewOutput")}</span>}</span>
           <OverviewSummary text={item.summary} followLatest={!!item.followLatest} />
-          <span className="px-3 py-1 text-[10px] text-[var(--taomni-text-muted)]">{item.group}</span>
+          <span className="taomni-overview-card-footer">
+            <span className={item.endpoint ? "min-w-0 max-w-[48%] shrink-0 truncate" : "min-w-0 truncate"}>{item.group}</span>
+            {item.endpoint && <span className="min-w-0 flex-1 truncate text-right" title={item.endpoint}>{item.endpoint}</span>}
+          </span>
         </button>)}
       </div>
       {matching.length === 0 && <p data-testid="tab-overview-empty" className="p-12 text-center text-[var(--taomni-text-muted)]">{t(items.length ? "platform.overviewNoMatch" : "platform.overviewEmpty")}</p>}

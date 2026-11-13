@@ -245,12 +245,23 @@ html[data-app-theme="dark"] .taomni-main-window {
 .taomni-overview-search button:hover { background: var(--taomni-hover); }
 .taomni-overview-card[data-output-active="true"] { border-color: var(--taomni-success, #16a34a); box-shadow: inset 0 0 0 1px var(--taomni-success, #16a34a); }
 .taomni-overview-output-badge { display: inline-flex; flex-shrink: 0; align-items: center; gap: 3px; color: var(--taomni-success, #16a34a); border: 1px solid currentColor; border-radius: 4px; padding: 1px 4px; font-size: 10px; }
-.taomni-overview-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr)); gap: 12px; }
+.taomni-overview-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
 .taomni-overview-card { display: flex; min-width: 0; flex-direction: column; overflow: hidden; text-align: left; border: 1px solid var(--taomni-card-border); border-radius: 10px; background: var(--taomni-card-bg); }
 .taomni-overview-card:hover, .taomni-overview-card:focus-visible, .taomni-overview-card[data-active="true"] { border-color: var(--taomni-accent); outline-color: var(--taomni-accent); }
-.taomni-overview-card-header { display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 10px; border-bottom: 1px solid var(--taomni-chrome-border); background: var(--taomni-panel-bg); font-size: 12px; }
-.taomni-overview-kind { flex-shrink: 0; border-radius: 3px; padding: 0 3px; font-size: 9px; font-weight: bold; color: var(--taomni-accent); background: var(--taomni-selected); }
-.taomni-overview-summary { height: 120px; overflow: hidden; padding: 10px; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--taomni-mono-font-family, monospace); font-size: 11px; color: var(--taomni-code-text); background: var(--taomni-code-bg); }
+.taomni-overview-card-header { display: flex; width: 100%; align-items: center; gap: 8px; height: 38px; padding: 0 12px; border-bottom: 1px solid var(--taomni-chrome-border); background: var(--taomni-panel-bg); font-size: 12.5px; }
+.taomni-overview-kind { flex-shrink: 0; border-radius: 3px; padding: 1px 5px; font-size: 10px; font-weight: bold; color: var(--taomni-accent); background: var(--taomni-selected); }
+.taomni-overview-title { display: block; flex: 1; min-width: 0; overflow: hidden; line-height: 1.4; font-weight: 600; }
+.taomni-overview-title[data-overflowing="true"] { -webkit-mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 14px), transparent 100%); mask-image: linear-gradient(to right, #000 0, #000 calc(100% - 14px), transparent 100%); }
+.taomni-overview-title-track { display: block; width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.taomni-overview-title-text { white-space: nowrap; }
+.taomni-overview-title-track[data-marquee] { display: inline-flex; width: max-content; align-items: center; overflow: visible; text-overflow: clip; padding-right: 36px; will-change: transform; animation: taomni-overview-marquee var(--taomni-marquee-duration, 8s) linear infinite; }
+.taomni-overview-title-track[data-marquee] .taomni-overview-title-text { flex-shrink: 0; }
+.taomni-overview-title-track[data-marquee]::after { content: attr(data-marquee); flex-shrink: 0; padding-left: 36px; }
+@keyframes taomni-overview-marquee { 0%, 15% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+.taomni-overview-summary { width: 100%; height: clamp(190px, 26vh, 250px); overflow: hidden; padding: 12px; white-space: pre-wrap; overflow-wrap: anywhere; font-family: var(--taomni-mono-font-family, monospace); font-size: 11.5px; line-height: 1.45; color: var(--taomni-code-text); background: var(--taomni-code-bg); }
+.taomni-overview-card-footer { display: flex; width: 100%; align-items: center; justify-content: space-between; gap: 8px; padding: 6px 12px; border-top: 1px solid var(--taomni-chrome-border); font-size: 10.5px; color: var(--taomni-text-muted); }
+@media (max-width: 680px) { .taomni-overview-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 460px) { .taomni-overview-grid { grid-template-columns: 1fr; } }
 @media (max-width: 800px) { .taomni-platform-toolbar-actions { gap: 1px; padding: 0 2px; } .taomni-platform-toolbar-actions .taomni-toolbar-pill { max-width: 100px; overflow: hidden; } .taomni-overview-header { flex-wrap: wrap; } }
 
 /* Keep compact chrome proportional to Settings' UI size. Editor and terminal
