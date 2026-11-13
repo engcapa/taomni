@@ -1,0 +1,572 @@
+<!DOCTYPE html>
+<html lang="zh-CN" class="light">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Taomni 文件打开 / 预览 / 编辑 — 高保真原型 v1</title>
+<style>
+:root{
+  --bg:#f8fafc;--panel:#f1f5f9;--chrome:#e8eef5;--chrome-b:#cbd5e1;--card:#fff;--card-b:#e2e8f0;
+  --accent:#1e40af;--accent-s:#3b82f6;--sel:#dbeafe;--sel-b:#93c5fd;--hover:rgba(15,23,42,.06);--hover2:rgba(15,23,42,.11);
+  --text:#0f172a;--muted:#64748b;--subtle:#94a3b8;--divider:#e2e8f0;--ok:#10b981;--warn:#f59e0b;--danger:#ef4444;
+  --folder:#f5b83d;--input:#fff;--input-b:#cbd5e1;--code-bg:#f1f5f9;--check1:#fff;--check2:#e5e7eb;
+  --k1:#9333ea;--k2:#0369a1;--k3:#15803d;--k4:#b45309;--shadow:0 16px 40px -8px rgba(15,23,42,.25);
+  --sans:system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",Roboto,sans-serif;
+  --mono:'JetBrains Mono',ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+html.dark{
+  --bg:#1e1f22;--panel:#23252a;--chrome:#16171a;--chrome-b:#2e3138;--card:#26282e;--card-b:#35383f;
+  --accent:#6aa6f8;--accent-s:#8bbcff;--sel:#25354d;--sel-b:#4d7ec4;--hover:rgba(255,255,255,.06);--hover2:rgba(255,255,255,.12);
+  --text:#e6eaf0;--muted:#9ca3ad;--subtle:#6e7582;--divider:#2e3138;--ok:#34d399;--warn:#fbbf24;--danger:#f87171;
+  --folder:#e8b04a;--input:#1b1c20;--input-b:#3a3e46;--code-bg:#1a1b1f;--check1:#2b2d33;--check2:#3a3d44;
+  --k1:#c792ea;--k2:#7dcfff;--k3:#9ece6a;--k4:#e0af68;--shadow:0 20px 48px -10px rgba(0,0,0,.7),0 4px 16px -2px rgba(0,0,0,.5);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--sans);font-size:12.5px;line-height:1.4;color:var(--text);background:#0b1020;height:100vh;overflow:hidden;display:flex;flex-direction:column;user-select:none}
+button,input,select{font:inherit;color:inherit;background:none;border:0;outline:0}
+button{cursor:pointer;white-space:nowrap}
+svg.i{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;flex:none}
+::-webkit-scrollbar{width:8px;height:8px}::-webkit-scrollbar-thumb{background:var(--chrome-b);border-radius:4px}::-webkit-scrollbar-track{background:transparent}
+.sp{flex:1}.mono{font-family:var(--mono)}.mut{color:var(--muted)}
+
+/* prototype controller (not product) */
+#proto{background:#0b1020;color:#cbd5e1;padding:7px 14px;display:flex;flex-wrap:wrap;gap:5px 14px;align-items:center;border-bottom:1px solid #1e293b;font-size:12px}
+#proto b{color:#fff}#proto .grp{display:flex;align-items:center;gap:4px}#proto .lbl{color:#64748b;margin-right:2px}
+#proto button{padding:3px 9px;border-radius:5px;border:1px solid #334155;color:#cbd5e1}
+#proto button.on{background:#2563eb;border-color:#2563eb;color:#fff}#proto button:hover:not(.on){background:#1e293b}
+#hint{background:#111a33;color:#93c5fd;padding:6px 14px;font-size:12px;border-bottom:1px solid #1e293b;min-height:28px}
+#stage{flex:1;min-height:0;padding:12px;display:flex;justify-content:center}
+#app{width:100%;max-width:1480px;height:100%;border-radius:10px;overflow:hidden;background:var(--chrome);display:flex;flex-direction:column;box-shadow:0 20px 60px rgba(0,0,0,.5);border:1px solid #1e293b;position:relative}
+
+/* shell */
+#titlebar{height:30px;background:var(--chrome);border-bottom:1px solid var(--chrome-b);display:flex;align-items:center;padding:0 10px;gap:8px;color:var(--muted);font-size:11.5px;flex:none}
+#titlebar .dots{display:flex;gap:6px}#titlebar .dots i{width:10px;height:10px;border-radius:50%;background:var(--chrome-b)}
+#shell{flex:1;min-height:0;display:flex}
+#rail{width:46px;background:var(--chrome);border-right:1px solid var(--chrome-b);display:flex;flex-direction:column;align-items:center;padding:6px 0;gap:2px;flex:none}
+.rbtn{width:36px;height:36px;border-radius:7px;display:flex;align-items:center;justify-content:center;color:var(--muted)}.rbtn:hover{background:var(--hover)}.rbtn.on{background:var(--sel);color:var(--accent)}
+#main{flex:1;min-width:0;display:flex;flex-direction:column;background:var(--bg)}
+#tabs{height:34px;background:var(--chrome);display:flex;align-items:flex-end;padding:0 6px;gap:2px;border-bottom:1px solid var(--chrome-b);flex:none;overflow:hidden}
+.tab{height:29px;max-width:220px;padding:0 8px 0 10px;border-radius:7px 7px 0 0;display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12px;position:relative}
+.tab:hover{background:var(--hover)}.tab.on{background:var(--bg);color:var(--text);box-shadow:inset 0 2px 0 var(--accent-s)}
+.tab .tt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.tab .dirty{width:7px;height:7px;border-radius:50%;background:var(--warn)}
+.tab .x{width:16px;height:16px;border-radius:4px;display:flex;align-items:center;justify-content:center;opacity:.55}.tab .x:hover{background:var(--hover2);opacity:1}
+#content{flex:1;min-height:0;position:relative;display:flex;flex-direction:column}
+#status{height:22px;background:var(--chrome);border-top:1px solid var(--chrome-b);display:flex;align-items:center;padding:0 10px;gap:14px;color:var(--muted);font-size:11px;flex:none}
+.ibtn{width:26px;height:26px;border-radius:5px;display:inline-flex;align-items:center;justify-content:center;color:var(--muted)}
+.ibtn:hover{background:var(--hover);color:var(--text)}.ibtn.on{background:var(--sel);color:var(--accent)}.ibtn:disabled{opacity:.35}
+.cbtn{flex:none;height:26px;padding:0 8px;border-radius:6px;display:inline-flex;align-items:center;gap:5px;color:var(--text);font-size:12px}
+.cbtn:hover{background:var(--hover)}.cbtn.on{background:var(--sel);color:var(--accent)}.cbtn.pri{background:var(--accent-s);color:#fff}.cbtn.pri:hover{filter:brightness(1.08)}
+.cbtn.outline{border:1px solid var(--input-b)}
+.vsep{width:1px;height:18px;background:var(--divider);margin:0 5px;flex:none}
+.seg{display:inline-flex;background:var(--hover);border-radius:6px;padding:2px;gap:2px}
+.seg button{padding:2px 9px;border-radius:4px;font-size:11.5px;color:var(--muted)}.seg button.on{background:var(--card);color:var(--text);box-shadow:0 1px 2px rgba(0,0,0,.15)}
+.bar{display:flex;align-items:center;gap:2px;padding:4px 10px;border-bottom:1px solid var(--divider);flex:none;background:var(--bg)}
+.chip{display:inline-flex;align-items:center;gap:4px;font-size:10.5px;padding:1px 7px;border-radius:9px;background:var(--sel);color:var(--accent);font-weight:600}
+.chip.ok{background:color-mix(in srgb,var(--ok) 18%,transparent);color:var(--ok)}.chip.warn{background:color-mix(in srgb,var(--warn) 20%,transparent);color:var(--warn)}
+.banner{display:flex;align-items:center;gap:8px;padding:6px 12px;font-size:12px;border-bottom:1px solid var(--divider);flex:none}
+.banner.warn{background:color-mix(in srgb,var(--warn) 14%,var(--bg));color:var(--text)}.banner.info{background:var(--sel);color:var(--accent)}
+.toast{position:absolute;right:16px;bottom:34px;background:var(--card);border:1px solid var(--card-b);box-shadow:var(--shadow);border-radius:9px;padding:9px 12px;display:flex;gap:9px;align-items:center;z-index:30;font-size:12px;max-width:380px;animation:pop .25s ease}
+@keyframes pop{0%{transform:translateY(8px);opacity:0}100%{transform:none;opacity:1}}
+.menu{position:absolute;background:var(--card);border:1px solid var(--card-b);border-radius:9px;box-shadow:var(--shadow);padding:4px;min-width:210px;z-index:40;font-size:12px}
+.mi{display:flex;align-items:center;gap:9px;height:28px;padding:0 9px;border-radius:5px;color:var(--text);width:100%;text-align:left}
+.mi:hover{background:var(--hover)}.mi .k{margin-left:auto;color:var(--muted);font-size:11px;padding-left:18px}.mi.def{font-weight:700}.mi.sub::after{content:"›";margin-left:auto;color:var(--muted)}
+.msep{height:1px;background:var(--divider);margin:4px 2px}.mhd{font-size:10.5px;color:var(--muted);padding:5px 9px 2px;font-weight:700}
+.modal-bg{position:absolute;inset:0;background:rgba(2,6,23,.45);z-index:50;display:flex;align-items:center;justify-content:center}
+.modal{background:var(--card);border:1px solid var(--card-b);border-radius:12px;box-shadow:var(--shadow);width:560px;max-width:92%;max-height:92%;overflow:auto}
+.modal h3{font-size:14px;padding:14px 18px 6px}.modal .mb{padding:6px 18px 14px}.modal .mf{display:flex;gap:8px;justify-content:flex-end;padding:10px 18px 14px;border-top:1px solid var(--divider)}
+.fld{display:flex;align-items:center;gap:10px;margin:8px 0}.fld>label{width:110px;color:var(--muted);flex:none}
+.sel,.inp{height:28px;border:1px solid var(--input-b);background:var(--input);border-radius:6px;padding:0 8px;min-width:140px}
+.dim{opacity:.55}
+
+/* file icons / tokens */
+.fi{width:18px;height:18px;flex:none}
+.tk-k{color:var(--k1)}.tk-s{color:var(--k3)}.tk-n{color:var(--k4)}.tk-c{color:var(--subtle);font-style:italic}.tk-f{color:var(--k2)}
+
+/* ============ Explorer ============ */
+.ex{flex:1;min-height:0;display:flex;flex-direction:column}
+.ex-top{display:flex;align-items:center;gap:6px;padding:7px 10px 4px}
+.addr{flex:1;height:30px;border:1px solid var(--input-b);background:var(--input);border-radius:7px;display:flex;align-items:center;padding:0 6px;gap:2px;color:var(--text)}
+.crumb{padding:0 6px;height:22px;border-radius:4px;display:inline-flex;align-items:center}.crumb:hover{background:var(--hover2)}
+.ex-body{flex:1;min-height:0;display:flex}.nav{width:190px;border-right:1px solid var(--divider);background:var(--panel);padding:4px;flex:none;overflow:auto}
+.nav .sec{font-size:10.5px;color:var(--muted);font-weight:700;padding:8px 6px 3px}.nrow{display:flex;align-items:center;gap:6px;height:24px;padding:0 6px;border-radius:5px}.nrow:hover{background:var(--hover)}.nrow.on{background:var(--sel)}
+.files{flex:1;min-width:0;display:flex;flex-direction:column}
+.fhead{display:flex;height:26px;border-bottom:1px solid var(--divider);color:var(--muted);font-size:11.5px;align-items:center}
+.fhead>div,.frow>div{padding:0 8px}
+.frow{display:flex;align-items:center;height:28px;border-radius:5px;margin:0 4px}.frow:hover{background:var(--hover)}.frow.sel{background:var(--sel)}
+.c-name{display:flex;align-items:center;gap:8px;flex:1;min-width:120px;overflow:hidden;white-space:nowrap}.c-mod{width:130px;color:var(--muted)}.c-type{width:100px;color:var(--muted)}.c-size{width:72px;color:var(--muted);text-align:right}
+.pv{width:320px;border-left:1px solid var(--divider);background:var(--panel);display:flex;flex-direction:column;flex:none;min-height:0}
+.pv-h{padding:10px 12px 8px;border-bottom:1px solid var(--divider);display:flex;gap:9px;align-items:center}
+.pv-h .nm{font-weight:600;word-break:break-all}.pv-h .sub{color:var(--muted);font-size:11px}
+.pv-act{display:flex;gap:6px;padding:8px 12px;align-items:center;border-bottom:1px solid var(--divider);flex-wrap:wrap}
+.pv-body{flex:1;min-height:0;overflow:auto;padding:12px}
+.pv-meta{padding:8px 12px 10px;border-top:1px solid var(--divider);display:grid;grid-template-columns:70px 1fr;gap:3px 8px;font-size:11.5px}.pv-meta dt{color:var(--muted)}
+.pv-img{border-radius:6px;overflow:hidden;border:1px solid var(--divider);background:repeating-conic-gradient(var(--check1) 0 25%,var(--check2) 0 50%) 0 0/14px 14px}
+.pv-img svg,.pv-img img{display:block;width:100%;height:auto}
+.pv-code{font-family:var(--mono);font-size:11px;line-height:1.55;background:var(--code-bg);border:1px solid var(--divider);border-radius:6px;padding:6px 0;overflow:auto;white-space:pre}
+.pv-code div{display:flex}.pv-code .ln{width:30px;text-align:right;padding-right:8px;color:var(--subtle);flex:none}
+.pv-trunc{font-size:11px;color:var(--muted);margin-top:6px}
+.csv{border-collapse:collapse;font-size:11px;width:100%}.csv th,.csv td{border:1px solid var(--divider);padding:3px 6px;text-align:left}.csv th{background:var(--hover);font-weight:600}
+.web-thumb{border:1px solid var(--divider);border-radius:6px;overflow:hidden;background:#fff;color:#0f172a;position:relative}
+.web-thumb .badge{position:absolute;top:6px;right:6px}
+
+/* ============ Viewer shared ============ */
+.vwr{flex:1;min-height:0;display:flex;flex-direction:column}
+.vwr-stage{flex:1;min-height:0;position:relative;display:flex;align-items:center;justify-content:center;overflow:hidden;background:repeating-conic-gradient(var(--check1) 0 25%,var(--check2) 0 50%) 0 0/18px 18px}
+.vwr-stage.dark{background:#111}.vwr-stage.light{background:#fff}
+.vwr-side{width:250px;border-left:1px solid var(--divider);background:var(--panel);padding:10px 12px;overflow:auto;flex:none}
+.vwr-side h4{font-size:10.5px;color:var(--muted);letter-spacing:.05em;margin:10px 0 5px}.vwr-side h4:first-child{margin-top:0}
+.vwr-side dl{display:grid;grid-template-columns:72px 1fr;gap:3px 6px;font-size:11.5px}.vwr-side dt{color:var(--muted)}
+.film{height:74px;border-top:1px solid var(--divider);background:var(--panel);display:flex;gap:6px;padding:6px 10px;overflow:auto;flex:none}
+.film .th{width:84px;flex:none;border-radius:5px;overflow:hidden;border:2px solid transparent;position:relative}.film .th.on{border-color:var(--accent-s)}.film .th svg{display:block;width:100%;height:100%}
+.navbtn{position:absolute;top:50%;transform:translateY(-50%);width:34px;height:54px;border-radius:8px;background:rgba(15,23,42,.45);color:#fff;display:flex;align-items:center;justify-content:center}
+.hud{position:absolute;bottom:12px;left:50%;transform:translateX(-50%);background:rgba(15,23,42,.72);color:#fff;border-radius:8px;padding:4px 10px;font-size:11.5px}
+
+/* ============ Editors ============ */
+.ed{flex:1;min-height:0;display:flex;overflow:hidden}
+.code{font-family:var(--mono);font-size:12.5px;line-height:1.65;flex:1;min-width:0;overflow:auto;padding:8px 0;background:var(--bg);user-select:text}
+.code .l{display:flex}.code .l.cur{background:var(--hover)}.code .ln{width:52px;text-align:right;padding-right:14px;color:var(--subtle);flex:none}
+.code .tx{white-space:pre}.caret{display:inline-block;width:1.5px;height:1.15em;background:var(--accent-s);vertical-align:text-bottom;animation:bl 1s steps(2) infinite}@keyframes bl{50%{opacity:0}}
+.find{position:absolute;top:8px;right:18px;background:var(--card);border:1px solid var(--card-b);box-shadow:var(--shadow);border-radius:8px;padding:5px 7px;display:flex;align-items:center;gap:6px;z-index:5}
+.find input{width:150px;height:24px;border:1px solid var(--input-b);background:var(--input);border-radius:5px;padding:0 6px}
+mark.hl{background:color-mix(in srgb,var(--warn) 45%,transparent);color:inherit;border-radius:2px}
+
+/* ============ Markdown live ============ */
+.md-wrap{flex:1;min-height:0;display:flex}
+.olp{width:210px;border-right:1px solid var(--divider);background:var(--panel);overflow:auto;padding:8px 6px;flex:none}
+.olp .ot{font-size:10.5px;color:var(--muted);font-weight:700;padding:2px 6px 6px;display:flex;gap:6px}
+.orow{padding:3px 8px;border-radius:5px;color:var(--text);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.orow:hover{background:var(--hover)}.orow.on{background:var(--sel);color:var(--accent);font-weight:600}
+.md-scroll{flex:1;min-width:0;overflow:auto;position:relative;background:var(--bg);user-select:text}
+.doc{max-width:800px;margin:0 auto;padding:30px 44px 120px;font-size:15px;line-height:1.75;color:var(--text);position:relative}
+.doc .src{color:var(--subtle);font-family:var(--mono);font-weight:400;font-size:.8em}
+.doc h1{font-size:2em;line-height:1.3;margin:.2em 0 .6em;font-weight:700;padding-bottom:.25em;border-bottom:1px solid var(--divider)}
+.doc h2{font-size:1.5em;margin:1.3em 0 .5em;font-weight:700}.doc h3{font-size:1.2em;margin:1.1em 0 .4em;font-weight:700}
+.doc p{margin:.6em 0}.doc code.i{font-family:var(--mono);font-size:.88em;background:var(--code-bg);border:1px solid var(--divider);border-radius:4px;padding:1px 5px}
+.doc blockquote{border-left:4px solid var(--sel-b);margin:.8em 0;padding:.1em 1em;color:var(--muted);background:var(--hover);border-radius:0 6px 6px 0}
+.doc ul,.doc ol{margin:.5em 0 .5em 1.5em}.doc li{margin:.15em 0}.doc li.task{list-style:none;margin-left:-1.3em;display:flex;gap:8px;align-items:baseline}
+.cb{width:15px;height:15px;border:1.5px solid var(--muted);border-radius:4px;display:inline-flex;align-items:center;justify-content:center;flex:none;transform:translateY(2px)}.cb.on{background:var(--accent-s);border-color:var(--accent-s);color:#fff}.cb svg{width:11px;height:11px;stroke-width:3}
+.doc a{color:var(--accent-s);text-decoration:underline}
+.doc .cur-line{background:color-mix(in srgb,var(--accent-s) 7%,transparent);border-radius:6px;margin:0 -10px;padding:0 10px;box-shadow:inset 3px 0 0 var(--accent-s)}
+.doc .caret{height:1em}
+.cblk{background:var(--code-bg);border:1px solid var(--divider);border-radius:8px;margin:.8em 0;font-family:var(--mono);font-size:12.5px;line-height:1.6;position:relative}
+.cblk .lang{position:absolute;top:6px;right:10px;font-size:10.5px;color:var(--muted);font-family:var(--sans)}.cblk pre{padding:10px 14px;overflow:auto}
+.tbl-wrap{position:relative;margin:.9em 0}.tbl-wrap table{border-collapse:collapse;width:100%;font-size:14px}
+.tbl-wrap th,.tbl-wrap td{border:1px solid var(--chrome-b);padding:6px 12px;text-align:left}.tbl-wrap th{background:var(--hover);font-weight:600}
+.tbl-wrap td.act,.tbl-wrap th.act{background:color-mix(in srgb,var(--accent-s) 12%,transparent);box-shadow:inset 0 0 0 2px var(--accent-s)}
+.tbl-tools{position:absolute;top:-34px;left:0;background:var(--card);border:1px solid var(--card-b);box-shadow:var(--shadow);border-radius:8px;padding:3px;display:flex;gap:1px;z-index:6}
+.tbl-grip{position:absolute;left:-20px;top:0;bottom:0;width:14px;display:flex;flex-direction:column;justify-content:center;color:var(--subtle)}
+.img-fig{margin:.9em 0;position:relative;display:inline-block;max-width:100%}.img-fig .frame{border:1px solid var(--divider);border-radius:8px;overflow:hidden;display:block}
+.img-fig.sel .frame{outline:2px solid var(--accent-s)}.img-fig .cap{font-size:12px;color:var(--muted);text-align:center;margin-top:4px}
+.img-tools{position:absolute;top:8px;left:8px;background:rgba(15,23,42,.78);color:#fff;border-radius:7px;padding:3px;display:flex;gap:1px}
+.img-tools button{color:#fff;font-size:11px;padding:2px 7px;border-radius:5px}.img-tools button:hover{background:rgba(255,255,255,.18)}
+.fmt{display:flex;align-items:center;gap:1px;flex-wrap:nowrap}
+.mermaid-box{border:1px solid var(--divider);border-radius:8px;margin:.9em 0;padding:12px;text-align:center;background:var(--code-bg)}
+.split-pane{flex:1;min-width:0;min-height:0;overflow:auto;position:relative}.split-pane+.split-pane{border-left:1px solid var(--divider)}
+.hr{border:0;border-top:2px solid var(--divider);margin:1.4em 0}
+.focus-dim .doc>*:not(.cur-line){opacity:.35}
+
+/* ============ HTML browser ============ */
+.br-bar{display:flex;align-items:center;gap:4px;padding:6px 10px;border-bottom:1px solid var(--divider);flex:none}
+.br-addr{flex:1;height:30px;border:1px solid var(--input-b);background:var(--input);border-radius:15px;display:flex;align-items:center;gap:7px;padding:0 12px;min-width:0}
+.br-addr .u{flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-size:12.5px}
+.br-stage{flex:1;min-height:0;background:#d7dde6;display:flex;justify-content:center;overflow:auto;padding:0;position:relative}
+html.dark .br-stage{background:#101113}
+.page{background:#fff;color:#0f172a;width:100%;min-height:100%;font-family:system-ui,"Segoe UI","PingFang SC",sans-serif;box-shadow:0 0 0 1px rgba(0,0,0,.08);user-select:text;position:relative}
+.page.m{width:390px;margin:14px 0;min-height:auto;border-radius:18px}.page.t{width:768px;margin:14px 0;border-radius:10px}
+.devtools{height:150px;border-top:1px solid var(--divider);background:var(--bg);display:flex;flex-direction:column;flex:none}
+.devtools .dh{display:flex;gap:12px;padding:0 10px;height:26px;align-items:center;border-bottom:1px solid var(--divider);font-size:11.5px;color:var(--muted)}
+.devtools .dh .on{color:var(--accent);font-weight:600;border-bottom:2px solid var(--accent-s);height:100%;display:flex;align-items:center}
+.devtools .dl{flex:1;overflow:auto;font-family:var(--mono);font-size:11.5px;padding:4px 10px;line-height:1.6;user-select:text}
+.dl .w{color:var(--warn)}.dl .e{color:var(--danger)}.dl .o{color:var(--ok)}
+
+/* ============ Entry matrix & settings ============ */
+.grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;padding:16px;overflow:auto;flex:1;align-content:start}
+.card{background:var(--card);border:1px solid var(--card-b);border-radius:10px;display:flex;flex-direction:column;min-height:196px}
+.card .ch{padding:7px 12px;border-bottom:1px solid var(--divider);font-weight:600;display:flex;gap:8px;align-items:center;font-size:12px}
+.card .cb2{flex:1;padding:10px 12px;position:relative;font-size:12px}
+.card .ct{padding:6px 12px;border-top:1px solid var(--divider);color:var(--muted);font-size:11px;background:var(--panel)}
+.core{margin:0 16px 14px;border:1px dashed var(--sel-b);background:var(--sel);color:var(--accent);border-radius:10px;padding:10px 14px;display:flex;gap:16px;align-items:center;font-size:12px}
+.core .box{background:var(--card);border:1px solid var(--sel-b);border-radius:7px;padding:6px 10px;color:var(--text);font-weight:600}
+.tbl2{border-collapse:collapse;width:100%}.tbl2 th,.tbl2 td{border-bottom:1px solid var(--divider);padding:7px 10px;text-align:left}.tbl2 th{color:var(--muted);font-size:11px;font-weight:600;background:var(--panel)}
+.set{flex:1;overflow:auto;padding:18px 24px;max-width:900px}.set h2{font-size:15px;margin:0 0 4px}.set .desc{color:var(--muted);margin-bottom:12px}
+.toggle{width:30px;height:17px;border-radius:9px;background:var(--chrome-b);position:relative;display:inline-block;flex:none}.toggle.on{background:var(--accent-s)}.toggle::after{content:"";position:absolute;top:2px;left:2px;width:13px;height:13px;border-radius:50%;background:#fff;transition:.15s}.toggle.on::after{left:15px}
+</style>
+</head>
+<body>
+<div id="proto">
+  <b>Taomni · 文件打开 / 预览 / 编辑 高保真原型 v1</b>
+  <div class="grp"><span class="lbl">场景</span>
+    <button data-sc="explorer" class="on">① Explorer 预览窗格</button>
+    <button data-sc="image">② 图片 / SVG</button>
+    <button data-sc="text">③ 文本编辑</button>
+    <button data-sc="md">④ Markdown</button>
+    <button data-sc="html">⑤ HTML 预览</button>
+    <button data-sc="entries">⑥ 全局入口</button>
+    <button data-sc="settings">⑦ 打开方式设置</button>
+  </div>
+  <div class="grp"><span class="lbl">DEC-02 MD 编辑</span><button data-dec-md="live" class="on">实时渲染（推荐）</button><button data-dec-md="split">源码+预览分栏</button></div>
+  <div class="grp"><span class="lbl">DEC-03 HTML</span><button data-dec-html="local" class="on">本地沙盒（推荐）</button><button data-dec-html="web">可浏览网页</button></div>
+  <div class="grp"><span class="lbl">DEC-04 双击</span><button data-dec-dbl="taomni" class="on">Taomni 打开（推荐）</button><button data-dec-dbl="system">系统应用</button></div>
+  <div class="grp"><span class="lbl">主题</span><button data-theme="light" class="on">浅</button><button data-theme="dark">深</button></div>
+</div>
+<div id="hint"></div>
+<div id="stage"><div id="app">
+  <div id="titlebar"><div class="dots"><i></i><i></i><i></i></div><span>Taomni</span><span class="mut" style="margin-left:auto" id="tbinfo"></span></div>
+  <div id="shell"><div id="rail"></div><div id="main"><div id="tabs"></div><div id="content"></div></div></div>
+  <div id="status"><span id="st1"></span><span id="st2" style="margin-left:auto"></span></div>
+</div></div>
+
+<script>
+/* ---------- icons ---------- */
+const P={
+ back:'M19 12H5M12 19l-7-7 7-7',fwd:'M5 12h14M12 5l7 7-7 7',up:'M12 19V5M5 12l7-7 7 7',refresh:'M21 12a9 9 0 1 1-3-6.7L21 8M21 3v5h-5',
+ plus:'M12 5v14M5 12h14',minus:'M5 12h14',search:'M11 19a8 8 0 1 0 0-16 8 8 0 0 0 0 16zM21 21l-4.3-4.3',x:'M18 6L6 18M6 6l12 12',check:'M20 6L9 17l-5-5',
+ openx:'M15 3h6v6M10 14L21 3M12 5H5a2 2 0 0 0-2 2v12a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-7',edit:'M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z',
+ folder:'M20 20a2 2 0 0 0 2-2V8a2 2 0 0 0-2-2h-7.9a2 2 0 0 1-1.7-.9L9.6 3.9A2 2 0 0 0 7.9 3H4a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2z',
+ chev:'M9 18l6-6-6-6',down:'M6 9l6 6 6-6',home:'M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM9 22V12h6v10',
+ term:'M4 17l6-6-6-6M12 19h8',git:'M6 3v12M18 9a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM6 21a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 9a9 9 0 0 1-9 9',
+ sess:'M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM3 9h18M9 21V9',ws:'M21 16V8l-9-5-9 5v8l9 5zM3.3 7L12 12l8.7-5M12 22V12',
+ mail:'M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM22 6l-10 7L2 6',chat:'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z',
+ gear:'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM19.4 15a1.7 1.7 0 0 0 .3 1.8l.1.1a2 2 0 1 1-2.8 2.8l-.1-.1a1.7 1.7 0 0 0-1.8-.3 1.7 1.7 0 0 0-1 1.5V21a2 2 0 1 1-4 0v-.1a1.7 1.7 0 0 0-1.1-1.5 1.7 1.7 0 0 0-1.8.3l-.1.1a2 2 0 1 1-2.8-2.8l.1-.1a1.7 1.7 0 0 0 .3-1.8 1.7 1.7 0 0 0-1.5-1H3a2 2 0 1 1 0-4h.1a1.7 1.7 0 0 0 1.5-1.1 1.7 1.7 0 0 0-.3-1.8l-.1-.1a2 2 0 1 1 2.8-2.8l.1.1a1.7 1.7 0 0 0 1.8.3H9a1.7 1.7 0 0 0 1-1.5V3a2 2 0 1 1 4 0v.1a1.7 1.7 0 0 0 1 1.5 1.7 1.7 0 0 0 1.8-.3l.1-.1a2 2 0 1 1 2.8 2.8l-.1.1a1.7 1.7 0 0 0-.3 1.8V9a1.7 1.7 0 0 0 1.5 1H21a2 2 0 1 1 0 4h-.1a1.7 1.7 0 0 0-1.5 1z',
+ rotl:'M1 4v6h6M3.5 15a9 9 0 1 0 2.1-9.4L1 10',rotr:'M23 4v6h-6M20.5 15a9 9 0 1 1-2.1-9.4L23 10',flip:'M12 3v18M16 7l4 5-4 5zM8 7l-4 5 4 5z',
+ fit:'M8 3H5a2 2 0 0 0-2 2v3M21 8V5a2 2 0 0 0-2-2h-3M3 16v3a2 2 0 0 0 2 2h3M16 21h3a2 2 0 0 0 2-2v-3',copy:'M9 9h11a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2zM5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1',
+ save:'M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2zM17 21v-8H7v8M7 3v5h8',export:'M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3',
+ bold:'M6 4h8a4 4 0 0 1 0 8H6zM6 12h9a4 4 0 0 1 0 8H6z',italic:'M19 4h-9M14 20H5M15 4L9 20',strike:'M16 4H9a3 3 0 0 0-2.8 4M8 12h8M17.5 15.5A3.5 3.5 0 0 1 14 20H7',
+ code:'M16 18l6-6-6-6M8 6l-6 6 6 6',link:'M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7',
+ ul:'M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01',ol:'M10 6h11M10 12h11M10 18h11M4 6h1v4M4 10h2M6 18H4l2-3a1.5 1.5 0 0 0-2-1',task:'M9 11l3 3 8-8M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h9',
+ quote:'M3 21c3 0 7-1 7-8V5H3v8h4M14 21c3 0 7-1 7-8V5h-7v8h4',table:'M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM3 9h18M3 15h18M9 3v18M15 3v18',
+ image:'M19 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V5a2 2 0 0 0-2-2zM8.5 10a1.5 1.5 0 1 0 0-3 1.5 1.5 0 0 0 0 3zM21 15l-5-5L5 21',
+ hr:'M3 12h18',trash:'M3 6h18M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2',
+ alignl:'M3 6h18M3 12h12M3 18h16',alignc:'M3 6h18M7 12h10M5 18h14',alignr:'M3 6h18M9 12h12M5 18h16',focus:'M12 8a4 4 0 1 0 0 8 4 4 0 0 0 0-8zM3 12h2M19 12h2M12 3v2M12 19v2',
+ outline:'M3 6h18M7 12h14M11 18h10',eye:'M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12zM12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',lock:'M19 11H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7a2 2 0 0 0-2-2zM7 11V7a5 5 0 0 1 10 0v4',
+ shield:'M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z',phone:'M7 2h10a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM12 18h.01',tablet:'M5 2h14a2 2 0 0 1 2 2v16a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2zM12 18h.01',
+ monitor:'M2 4h20v12H2zM8 20h8M12 16v4',print:'M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z',
+ split:'M3 5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2zM12 3v18',bug:'M8 2l1.9 1.9M16 2l-1.9 1.9M9 7.1V6a3 3 0 0 1 6 0v1.1M12 20a6 6 0 0 1-6-6v-3a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v3a6 6 0 0 1-6 6zM12 20v-9M6 13H2M18 13h4',
+ info:'M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20zM12 16v-4M12 8h.01',moon:'M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z',paste:'M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2M9 2h6a1 1 0 0 1 1 1v2a1 1 0 0 1-1 1H9a1 1 0 0 1-1-1V3a1 1 0 0 1 1-1z'
+};
+const ic=(n,c='')=>`<svg class="i ${c}" viewBox="0 0 24 24"><path d="${P[n]}"/></svg>`;
+const EXTC={ts:'#3178c6',json:'#8b7a2b',md:'#0f766e',txt:'#64748b',png:'#16a34a',jpg:'#16a34a',svg:'#9333ea',pdf:'#dc2626',xlsx:'#15803d',csv:'#15803d',zip:'#a16207',html:'#e34f26',log:'#64748b'};
+const extOf=n=>(n.split('.').pop()||'').toLowerCase();
+const fileSvg=(n,c='fi')=>{const e=extOf(n),col=EXTC[e]||'#64748b';return `<svg class="${c}" viewBox="0 0 24 24"><path d="M6 2h8l5 5v13a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2z" fill="var(--card)" stroke="var(--chrome-b)"/><path d="M14 2v5h5" fill="var(--hover2)" stroke="var(--chrome-b)"/><rect x="4" y="12" width="15" height="6.5" rx="1.5" fill="${col}"/><text x="11.5" y="17.2" font-size="5" font-weight="700" fill="#fff" text-anchor="middle" font-family="sans-serif">${e.slice(0,4).toUpperCase()}</text></svg>`};
+const folderSvg=(c='fi')=>`<svg class="${c}" viewBox="0 0 24 24"><path d="M3 6a2 2 0 0 1 2-2h4.2a2 2 0 0 1 1.5.7L12 6h7a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="var(--folder)"/><path d="M3 9.5h18V17a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z" fill="var(--folder)" opacity=".8"/></svg>`;
+
+/* ---------- sample content ---------- */
+const landscape=(w=640,h=400,id='a')=>`<svg viewBox="0 0 ${w} ${h}" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid slice"><defs><linearGradient id="s${id}" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1e3a8a"/><stop offset=".55" stop-color="#f59e0b"/><stop offset="1" stop-color="#fde68a"/></linearGradient></defs><rect width="${w}" height="${h}" fill="url(#s${id})"/><circle cx="${w*.7}" cy="${h*.5}" r="${h*.09}" fill="#fff7d6"/><path d="M0 ${h*.78} L${w*.18} ${h*.5} L${w*.3} ${h*.66} L${w*.5} ${h*.38} L${w*.72} ${h*.7} L${w*.86} ${h*.55} L${w} ${h*.74} V${h} H0z" fill="#1f2937"/><path d="M0 ${h*.88} Q${w*.3} ${h*.78} ${w*.55} ${h*.9} T${w} ${h*.86} V${h} H0z" fill="#0f172a"/></svg>`;
+const logoSvg=`<svg viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="lg" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#3b82f6"/><stop offset="1" stop-color="#9333ea"/></linearGradient></defs><rect x="20" y="20" width="160" height="160" rx="36" fill="url(#lg)"/><path d="M60 70h80M100 70v70" stroke="#fff" stroke-width="16" stroke-linecap="round"/><circle cx="148" cy="138" r="12" fill="#fde68a"/></svg>`;
+const svgSrc=['<span class="tk-c">&lt;!-- logo.svg 200×200 --&gt;</span>','&lt;<span class="tk-k">svg</span> <span class="tk-f">viewBox</span>=<span class="tk-s">"0 0 200 200"</span>&gt;','  &lt;<span class="tk-k">defs</span>&gt;&lt;<span class="tk-k">linearGradient</span> <span class="tk-f">id</span>=<span class="tk-s">"lg"</span>/&gt;&lt;/<span class="tk-k">defs</span>&gt;','  &lt;<span class="tk-k">rect</span> <span class="tk-f">x</span>=<span class="tk-s">"20"</span> <span class="tk-f">y</span>=<span class="tk-s">"20"</span> <span class="tk-f">width</span>=<span class="tk-s">"160"</span> <span class="tk-f">rx</span>=<span class="tk-s">"36"</span>/&gt;','  &lt;<span class="tk-k">path</span> <span class="tk-f">d</span>=<span class="tk-s">"M60 70h80M100 70v70"</span> <span class="tk-f">stroke</span>=<span class="tk-s">"#fff"</span>/&gt;','  &lt;<span class="tk-k">circle</span> <span class="tk-f">cx</span>=<span class="tk-s">"148"</span> <span class="tk-f">cy</span>=<span class="tk-s">"138"</span> <span class="tk-f">r</span>=<span class="tk-s">"12"</span>/&gt;','&lt;/<span class="tk-k">svg</span>&gt;'];
+const FILES=[
+ {n:'assets',dir:1,m:'2026/11/12 09:41',t:'文件夹',s:''},
+ {n:'architecture.md',m:'2026/11/13 10:22',t:'Markdown',s:'12.4 KB',pv:'md'},
+ {n:'logo.svg',m:'2026/11/11 17:05',t:'SVG 图像',s:'1.2 KB',pv:'svg'},
+ {n:'screenshot-01.png',m:'2026/11/12 15:30',t:'PNG 图像',s:'428 KB',pv:'img'},
+ {n:'photo-team.jpg',m:'2026/11/10 08:12',t:'JPEG 图像',s:'2.1 MB',pv:'img'},
+ {n:'report.html',m:'2026/11/13 09:03',t:'HTML 文档',s:'8.7 KB',pv:'html'},
+ {n:'notes.txt',m:'2026/11/13 11:48',t:'文本文档',s:'3.2 KB',pv:'txt'},
+ {n:'data.csv',m:'2026/11/09 21:10',t:'CSV 表格',s:'46 KB',pv:'csv'},
+ {n:'config.json',m:'2026/11/08 13:57',t:'JSON',s:'1.9 KB',pv:'json'},
+ {n:'taomni.log',m:'2026/11/13 11:59',t:'日志',s:'18.3 MB',pv:'big'},
+ {n:'spec.pdf',m:'2026/11/05 10:00',t:'PDF 文档',s:'1.4 MB',pv:'meta'},
+ {n:'budget.xlsx',m:'2026/11/03 16:44',t:'Excel 工作表',s:'88 KB',pv:'meta'},
+ {n:'backup.zip',m:'2026/10/30 23:10',t:'压缩文件',s:'64 MB',pv:'meta'}
+];
+const mdPreviewHtml=`<h1 style="font-size:17px;margin:0 0 6px;border-bottom:1px solid var(--divider);padding-bottom:4px">Taomni 架构概览</h1><p style="font-size:12px;margin:4px 0">本地优先的桌面工作区，统一终端、文件与编辑体验。</p><h2 style="font-size:14px;margin:10px 0 3px">模块</h2><ul style="margin-left:18px;font-size:12px"><li>前端：<code class="mono" style="background:var(--code-bg);padding:0 3px;border-radius:3px">React 19</code></li><li>后端：Rust + Tauri 2</li></ul><table class="csv" style="margin-top:8px"><tr><th>层</th><th>技术</th></tr><tr><td>UI</td><td>React</td></tr><tr><td>IPC</td><td>Tauri</td></tr></table>`;
+const txtLines=['2026-11-13 周五 站会纪要','','1. 文件资源管理器预览窗格已上线','2. 下一步：用 Taomni 打开常用文件','   - 图片 / SVG 查看器','   - 文本编辑 + Markdown 实时渲染','   - HTML 沙盒预览','','待办：','[ ] 原型评审','[ ] 补充导出清单'];
+const jsonLines=['<span class="tk-n">{</span>','  <span class="tk-f">"name"</span>: <span class="tk-s">"taomni"</span>,','  <span class="tk-f">"version"</span>: <span class="tk-s">"0.9.4"</span>,','  <span class="tk-f">"preview"</span>: <span class="tk-n">{</span>','    <span class="tk-f">"text_limit_kb"</span>: <span class="tk-k">256</span>,','    <span class="tk-f">"image_limit_mb"</span>: <span class="tk-k">20</span>','  <span class="tk-n">}</span>','<span class="tk-n">}</span>'];
+const csvRows=[['月份','访问量','转化率'],['2026-08','12,480','3.2%'],['2026-09','15,902','3.8%'],['2026-10','18,331','4.1%'],['2026-11','9,274','4.4%']];
+
+/* ---------- state ---------- */
+const S={sc:'explorer',theme:'light',md:'live',html:'local',dbl:'taomni',sel:'architecture.md',menu:null,modal:null,toast:null,
+ mdMode:'live',mdFocus:false,mdPasted:{img:false,tbl:false},tblAct:[1,1],imgSel:false,exportDlg:false,
+ imgIdx:0,imgZoom:'适应',imgBg:'checker',svgMode:'split',txtFind:false,txtExt:false,htmlDev:'auto',htmlDevtools:false,htmlView:'page',htmlNet:false,entryPop:null,setTab:'assoc'};
+const $=s=>document.querySelector(s);
+const HINTS={
+ explorer:'预览窗格：与 Win11 一致，选中即预览；底部/标题区「用 Taomni 打开」。点击左侧不同文件体验各类型预览；双击或右键「打开方式」。',
+ image:'图片/SVG 查看器：缩放、旋转、棋盘格背景、文件夹内上一张/下一张、底部缩略图条；SVG 可切换 渲染/代码/分栏 并可编辑。',
+ text:'文本编辑：编码/换行符/自动换行、查找、脏标记，外部修改冲突条。大文件(>5 MB)降级为只读分块查看。',
+ md:'Markdown：默认「实时渲染」(类 Typora)。试试：模拟粘贴图片、模拟粘贴表格、点表格看表格工具条、导出菜单、专注模式；右上角切换 实时/源码/分栏。',
+ html:'HTML 预览（类浏览器）：沙盒 iframe + 只读本地资源；网络默认阻止；设备尺寸、缩放、源码分栏、控制台。DEC-03 可切到「可浏览网页」看差异。',
+ entries:'全局入口：终端文件链接、Workspace 项目树、Git 变更、邮件附件、AI 对话、Explorer —— 全部调用同一个 openFile 服务，由所在上下文决定在主界面标签/工作区标签/独立窗口打开。点击卡片里的链接/文件试试。',
+ settings:'设置 → 文件与打开方式：默认打开方式（按扩展名）、双击行为、Markdown 粘贴图片位置、HTML 沙盒与网络策略。'
+};
+
+/* ---------- shared fragments ---------- */
+function tabsFor(){
+ const T=(on,ico,name,extra='')=>`<div class="tab ${on?'on':''}">${ico}<span class="tt">${name}</span>${extra}<span class="x">${ic('x')}</span></div>`;
+ const folder=`<svg class="i" style="color:var(--folder);fill:var(--folder);stroke:none" viewBox="0 0 24 24"><path d="${P.folder}"/></svg>`;
+ const t=[T(S.sc==='explorer'||S.sc==='entries'||S.sc==='settings',folder,'docs-notes')];
+ const m={image:['logo.svg / 图片',fileSvg('a.svg','fi')],text:['notes.txt',fileSvg('a.txt','fi')],md:['architecture.md',fileSvg('a.md','fi')],html:['report.html',fileSvg('a.html','fi')]};
+ for(const k of ['image','text','md','html']){const dirty=(k==='text'&&S.txtDirty)||(k==='md'&&(S.mdPasted.img||S.mdPasted.tbl));
+  t.push(T(S.sc===k,m[k][1],m[k][0],dirty?'<span class="dirty"></span>':''));}
+ $('#tabs').innerHTML=t.join('');
+}
+function railHtml(){
+ const items=[['sess','会话'],['ws','工作区'],['term','终端'],['git','Git'],['mail','邮件'],['gear','设置']];
+ $('#rail').innerHTML=items.map((x,i)=>`<button class="rbtn ${i===0?'on':''}" title="${x[1]}">${ic(x[0])}</button>`).join('');
+}
+const fmtBtn=(n,t,on='')=>`<button class="ibtn ${on}" title="${t}">${ic(n)}</button>`;
+
+/* ================= scene 1: explorer ================= */
+function preview(f){
+ const meta=(rows)=>`<dl class="pv-meta">${rows.map(r=>`<dt>${r[0]}</dt><dd>${r[1]}</dd>`).join('')}</dl>`;
+ const head=`<div class="pv-h">${f.dir?folderSvg('fi" style="width:28px;height:28px'):fileSvg(f.n,'fi" style="width:28px;height:28px')}<div><div class="nm">${f.n}</div><div class="sub">${f.t} · ${f.s||'—'}</div></div></div>`;
+ const actions=(kind)=>{
+  const taomni=kind!=='meta'&&kind!=='big'?`<button class="cbtn pri" data-act="open">${ic('openx')}用 Taomni 打开</button>`:'';
+  const edit=['md','txt','json','csv','html','svg'].includes(kind)?`<button class="cbtn outline" data-act="open">${ic('edit')}编辑</button>`:'';
+  return `<div class="pv-act">${taomni}${edit}<button class="cbtn outline" data-act="menu">打开方式 ${ic('down')}</button><button class="cbtn" data-act="sys" title="系统默认应用">${ic('monitor')}系统应用</button></div>`;};
+ let body='',rows=[],k=f.pv;
+ if(f.dir) return head+`<div class="pv-body"><div class="mut">8 个项目 · 2.1 MB</div></div>`;
+ if(k==='md'){body=`<div style="font-size:12px;line-height:1.55" >${mdPreviewHtml}</div>`;rows=[['修改日期',f.m],['字数','1,248'],['编码','UTF-8']]}
+ else if(k==='svg'){body=`<div class="pv-img" style="background:var(--card)">${logoSvg}</div><div class="pv-trunc">已移除脚本与外部资源（安全渲染）</div>`;rows=[['尺寸','200 × 200'],['修改日期',f.m]]}
+ else if(k==='img'){body=`<div class="pv-img">${landscape(640,400,'p')}</div>`;rows=[['尺寸',f.n.startsWith('photo')?'4032 × 3024':'1920 × 1200'],['格式',f.t],['修改日期',f.m]]}
+ else if(k==='html'){body=`<div class="web-thumb">${htmlPageMini()}<span class="chip warn badge">${ic('shield')}沙盒预览</span></div><div class="pv-trunc">脚本在隔离沙盒中运行 · 网络已阻止</div>`;rows=[['标题','2026 Q4 数据报告'],['修改日期',f.m]]}
+ else if(k==='txt'){body=`<div class="pv-code">${txtLines.map((l,i)=>`<div><span class="ln">${i+1}</span><span>${l||' '}</span></div>`).join('')}</div>`;rows=[['行数','11'],['编码','UTF-8'],['修改日期',f.m]]}
+ else if(k==='json'){body=`<div class="pv-code">${jsonLines.map((l,i)=>`<div><span class="ln">${i+1}</span><span>${l}</span></div>`).join('')}</div>`;rows=[['行数','8'],['修改日期',f.m]]}
+ else if(k==='csv'){body=`<table class="csv">${csvRows.map((r,i)=>`<tr>${r.map(c=>i?`<td>${c}</td>`:`<th>${c}</th>`).join('')}</tr>`).join('')}</table><div class="pv-trunc">显示前 100 行</div>`;rows=[['行 × 列','1,240 × 3'],['修改日期',f.m]]}
+ else if(k==='big'){body=`<div class="banner warn" style="border-radius:6px;border:1px solid var(--divider)">${ic('info')}文件 18.3 MB，超过 256 KB 预览上限，仅显示开头：</div><div class="pv-code" style="margin-top:8px"><div><span class="ln">1</span><span>2026-11-13 09:00:01 INFO  boot ok</span></div><div><span class="ln">2</span><span>2026-11-13 09:00:02 INFO  vault unlocked</span></div></div><div class="pv-trunc">用 Taomni 打开将以只读分块方式查看</div>`;rows=[['修改日期',f.m]]}
+ else{body=`<div style="text-align:center;padding:24px 0 8px">${fileSvg(f.n,'fi" style="width:64px;height:64px')}<div class="mut" style="margin-top:8px">此类型暂不支持内置预览</div></div>`;rows=[['修改日期',f.m]]}
+ return head+actions(k==='big'?'txt':k)+`<div class="pv-body">${body}</div>`+meta(rows);
+}
+function htmlPageMini(){return `<div style="padding:10px"><div style="font-weight:700;font-size:13px">2026 Q4 数据报告</div><div style="font-size:10px;color:#64748b;margin:2px 0 6px">更新于 2026-11-13</div><svg viewBox="0 0 280 90" style="width:100%"><rect width="280" height="90" fill="#f1f5f9" rx="6"/><g fill="#3b82f6"><rect x="20" y="50" width="28" height="30"/><rect x="64" y="35" width="28" height="45"/><rect x="108" y="22" width="28" height="58"/><rect x="152" y="40" width="28" height="40" fill="#93c5fd"/><rect x="196" y="15" width="28" height="65"/></g></svg></div>`}
+function explorerScene(){
+ const f=FILES.find(x=>x.n===S.sel)||FILES[1];
+ const rows=FILES.map(x=>`<div class="frow ${x.n===S.sel?'sel':''}" data-file="${x.n}"><div class="c-name">${x.dir?folderSvg():fileSvg(x.n)}<span>${x.n}</span></div><div class="c-mod">${x.m}</div><div class="c-type">${x.t}</div><div class="c-size">${x.s}</div></div>`).join('');
+ const menu=S.menu==='open'?openWithMenu(f,'right:332px;top:96px'):'';
+ return `<div class="ex">
+  <div class="ex-top"><button class="ibtn">${ic('back')}</button><button class="ibtn">${ic('fwd')}</button><button class="ibtn">${ic('up')}</button><div class="addr"><span class="crumb">${ic('home')}</span>${ic('chev')}<span class="crumb">projects</span>${ic('chev')}<span class="crumb" style="font-weight:600">docs-notes</span></div></div>
+  <div class="bar" style="padding:2px 10px"><button class="cbtn">${ic('plus')}新建</button><span class="vsep"></span><button class="cbtn">${ic('copy')}复制</button><button class="cbtn">${ic('trash')}删除</button><span class="vsep"></span><button class="cbtn" data-act="open">${ic('openx')}用 Taomni 打开</button><button class="cbtn" data-act="menu">打开方式 ${ic('down')}</button><span class="sp"></span><button class="cbtn on">${ic('split')}预览窗格</button></div>
+  <div class="ex-body"><div class="nav"><div class="sec">快速访问</div><div class="nrow">${ic('home')}主文件夹</div><div class="nrow on">${folderSvg('fi" style="width:15px;height:15px')}docs-notes</div><div class="nrow">${folderSvg('fi" style="width:15px;height:15px')}Downloads</div><div class="sec">此电脑</div><div class="nrow">${ic('monitor')}/</div></div>
+  <div class="files"><div class="fhead"><div style="flex:1">名称</div><div style="width:130px">修改日期</div><div style="width:100px">类型</div><div style="width:72px;text-align:right">大小</div></div><div style="overflow:auto;flex:1;padding-top:3px">${rows}</div></div>
+  <div class="pv" id="pv">${preview(f)}</div></div>${menu}</div>`;
+}
+function openWithMenu(f,pos){
+ const ed=['md','txt','json','csv','html','svg'].includes(f.pv);const k=f.pv;
+ const vw=k==='img'||k==='svg'?'图片查看器':k==='md'?'Markdown 编辑器':k==='html'?'HTML 预览':'文本编辑器';
+ return `<div class="menu" style="${pos}"><div class="mhd">打开方式</div>
+ <button class="mi def" data-act="open">${ic('openx')}Taomni ${vw}<span class="k">默认</span></button>
+ ${ed?`<button class="mi" data-act="open">${ic('edit')}Taomni 文本编辑器（源码）</button>`:''}
+ ${k==='html'?`<button class="mi" data-act="open">${ic('eye')}Taomni HTML 预览</button>`:''}
+ <button class="mi" data-act="ws">${ic('ws')}在 Code Workspace 中打开</button><div class="msep"></div>
+ <button class="mi" data-act="sys">${ic('monitor')}系统默认应用</button><button class="mi sub">选择其他应用…</button><div class="msep"></div>
+ <button class="mi">${ic('check')}记住：.${extOf(f.n)} 始终用 Taomni 打开</button></div>`;
+}
+
+/* ================= scene 2: image / svg ================= */
+const IMGS=[{n:'logo.svg',k:'svg'},{n:'screenshot-01.png',k:'img',w:1920,h:1200},{n:'photo-team.jpg',k:'img',w:4032,h:3024}];
+function imageScene(){
+ const cur=IMGS[S.imgIdx];const isSvg=cur.k==='svg';
+ const bg=S.imgBg==='checker'?'':S.imgBg;
+ let stage;
+ if(isSvg){
+  const code=`<div class="code" style="border-right:1px solid var(--divider)">${svgSrc.map((l,i)=>`<div class="l"><span class="ln">${i+1}</span><span class="tx">${l}</span></div>`).join('')}</div>`;
+  const render=`<div class="vwr-stage ${bg}" style="flex:1"><div style="width:240px;height:240px">${logoSvg}</div><div class="hud">${S.imgZoom} · 200×200</div></div>`;
+  stage=S.svgMode==='split'?`<div style="flex:1;display:flex;min-height:0;min-width:0">${code}${render}</div>`:S.svgMode==='code'?`<div style="flex:1;display:flex">${code}</div>`:`<div style="flex:1;display:flex">${render}</div>`;
+ } else {
+  stage=`<div class="vwr-stage ${bg}" style="flex:1"><div style="width:62%;box-shadow:0 8px 30px rgba(0,0,0,.35)">${landscape(640,400,'v'+S.imgIdx)}</div><button class="navbtn" style="left:12px" data-img="-1">${ic('back')}</button><button class="navbtn" style="right:12px" data-img="1">${ic('fwd')}</button><div class="hud">${S.imgIdx+1} / ${IMGS.length} · ${S.imgZoom} · ${cur.w} × ${cur.h}</div></div>`;
+ }
+ const side=isSvg?`<div class="vwr-side"><h4>属性</h4><dl><dt>类型</dt><dd>SVG 矢量图</dd><dt>尺寸</dt><dd>200 × 200</dd><dt>viewBox</dt><dd>0 0 200 200</dd><dt>大小</dt><dd>1.2 KB</dd></dl><h4>安全</h4><div class="chip ok" style="margin-bottom:4px">${ic('shield')}已净化</div><div class="mut" style="font-size:11.5px">脚本、事件属性、外部引用在渲染中被移除；源码保持原样，不被改写。</div><h4>导出</h4><button class="cbtn outline" style="margin:2px 0">导出 PNG…</button></div>`
+  :`<div class="vwr-side"><h4>属性</h4><dl><dt>文件名</dt><dd>${cur.n}</dd><dt>尺寸</dt><dd>${cur.w} × ${cur.h}</dd><dt>格式</dt><dd>${cur.n.endsWith('png')?'PNG · 8 bit RGBA':'JPEG · sRGB'}</dd><dt>大小</dt><dd>${cur.n.endsWith('png')?'428 KB':'2.1 MB'}</dd><dt>拍摄</dt><dd>${cur.n.endsWith('jpg')?'2026/11/10 08:12':'—'}</dd></dl><h4>操作</h4><div style="display:flex;flex-direction:column;gap:3px"><button class="cbtn outline">${ic('copy')}复制图片</button><button class="cbtn outline">${ic('export')}另存为…</button><button class="cbtn outline">${ic('folder')}在 Explorer 中显示</button></div></div>`;
+ const film=`<div class="film">${IMGS.map((x,i)=>`<div class="th ${i===S.imgIdx?'on':''}" data-thumb="${i}">${x.k==='svg'?`<div style="background:var(--card);height:100%">${logoSvg}</div>`:landscape(160,100,'f'+i)}</div>`).join('')}</div>`;
+ return `<div class="vwr"><div class="bar">
+  <button class="ibtn" data-zoom="out">${ic('minus')}</button><button class="cbtn" data-zoom="reset" style="min-width:52px;justify-content:center">${S.imgZoom}</button><button class="ibtn" data-zoom="in">${ic('plus')}</button><button class="ibtn" data-zoom="fit" title="适应窗口">${ic('fit')}</button><span class="vsep"></span>
+  ${isSvg?'':`<button class="ibtn">${ic('rotl')}</button><button class="ibtn">${ic('rotr')}</button><button class="ibtn">${ic('flip')}</button><span class="vsep"></span>`}
+  <span class="mut" style="font-size:11.5px">背景</span><div class="seg" style="margin-left:4px"><button data-bg="checker" class="${S.imgBg==='checker'?'on':''}">棋盘</button><button data-bg="light" class="${S.imgBg==='light'?'on':''}">浅</button><button data-bg="dark" class="${S.imgBg==='dark'?'on':''}">深</button></div>
+  ${isSvg?`<span class="vsep"></span><div class="seg"><button data-svg="render" class="${S.svgMode==='render'?'on':''}">渲染</button><button data-svg="code" class="${S.svgMode==='code'?'on':''}">代码</button><button data-svg="split" class="${S.svgMode==='split'?'on':''}">分栏</button></div>`:''}
+  <span class="sp"></span><button class="cbtn">${ic('ws')}在 Workspace 中打开</button><button class="cbtn">${ic('monitor')}系统应用</button></div>
+  <div style="flex:1;min-height:0;display:flex"><div style="flex:1;min-width:0;display:flex;flex-direction:column">${stage}${film}</div>${side}</div></div>`;
+}
+
+/* ================= scene 3: text ================= */
+function textScene(){
+ const lines=[...txtLines];if(S.txtDirty)lines.splice(8,0,'   - PDF 预览（P1）');
+ const body=lines.map((l,i)=>{const cur=i===(S.txtDirty?9:3);const hl=S.txtFind?l.replace(/(Taomni|文件)/g,'<mark class="hl">$1</mark>'):l;
+  return `<div class="l ${cur?'cur':''}"><span class="ln">${i+1}</span><span class="tx">${hl||' '}${cur?'<span class="caret"></span>':''}</span></div>`}).join('');
+ return `<div class="vwr"><div class="bar"><button class="cbtn ${S.txtDirty?'pri':''}" data-act="save">${ic('save')}保存 <span style="opacity:.7;font-size:11px">Ctrl+S</span></button><span class="vsep"></span><button class="ibtn" title="撤销">${ic('rotl')}</button><button class="ibtn" title="重做">${ic('rotr')}</button><button class="ibtn ${S.txtFind?'on':''}" data-act="find" title="查找 Ctrl+F">${ic('search')}</button><span class="vsep"></span><button class="cbtn">自动换行 <span class="toggle on"></span></button><button class="cbtn">A⁺ 13px</button><span class="sp"></span><button class="cbtn">UTF-8 ${ic('down')}</button><button class="cbtn">LF ${ic('down')}</button><button class="cbtn">${ic('ws')}在 Workspace 中编辑</button></div>
+ ${S.txtExt?`<div class="banner warn">${ic('info')}<span><b>notes.txt</b> 已被其他程序修改。</span><button class="cbtn outline" data-act="reload">重新加载</button><button class="cbtn outline">比较差异</button><button class="cbtn" data-act="keep">保留我的版本</button></div>`:''}
+ <div class="ed" style="position:relative"><div class="code">${body}</div>${S.txtFind?`<div class="find">${ic('search')}<input value="Taomni"/><span class="mut" style="font-size:11px">1 / 2</span><button class="ibtn">${ic('up')}</button><button class="ibtn">${ic('down')}</button><button class="ibtn" data-act="find">${ic('x')}</button></div>`:''}</div>
+ <div class="bar" style="border-top:1px solid var(--divider);border-bottom:0;padding:3px 12px;font-size:11px;color:var(--muted);gap:16px"><span>${S.txtDirty?'● 未保存':'已保存'}</span><span>行 ${S.txtDirty?10:4}，列 18</span><span>${lines.join('').length} 字符</span><span class="sp"></span><span>${S.txtExt?'':'<button class="cbtn" style="height:20px;font-size:11px" data-act="ext">模拟外部修改</button>'}</span><span>纯文本</span></div></div>`;
+}
+
+/* ================= scene 4: markdown ================= */
+const mdOutline=['Taomni 架构概览','1. 设计目标','2. 模块一览','3. 导出与分享','4. 待办'];
+function mdDoc(){
+ const live=S.md==='live'&&S.mdMode!=='source';
+ const tbl=()=>{const ac=S.tblAct;const cell=(t,r,c,th)=>{const a=ac&&ac[0]===r&&ac[1]===c;return `<${th?'th':'td'} class="${a?'act':''}" data-cell="${r},${c}">${t}</${th?'th':'td'}>`};
+  return `<div class="tbl-wrap">${ac?`<div class="tbl-tools"><button class="ibtn" title="在上方插入行">${ic('plus')}</button><button class="ibtn" title="在左侧插入列">${ic('table')}</button><span class="vsep"></span><button class="ibtn">${ic('alignl')}</button><button class="ibtn">${ic('alignc')}</button><button class="ibtn">${ic('alignr')}</button><span class="vsep"></span><button class="ibtn" title="删除行">${ic('minus')}</button><button class="ibtn" title="删除表格">${ic('trash')}</button><span class="vsep"></span><button class="cbtn" style="font-size:11px">Tab 下一格</button></div>`:''}<table><thead><tr>${cell('层级',0,0,1)}${cell('技术',0,1,1)}${cell('说明',0,2,1)}</tr></thead><tbody><tr>${cell('UI',1,0)}${cell('React 19',1,1)}${cell('组件化界面',1,2)}</tr><tr>${cell('IPC',2,0)}${cell('Tauri 2',2,1)}${cell('类型化命令',2,2)}</tr><tr>${cell('存储',3,0)}${cell('SQLite',3,1)}${cell('本地优先',3,2)}</tr>${S.mdPasted.tbl?`<tr>${cell('导出',4,0)}${cell('HTML / PDF',4,1)}${cell('由粘贴生成',4,2)}</tr><tr>${cell('分享',5,0)}${cell('Word / PNG',5,1)}${cell('由粘贴生成',5,2)}</tr>`:''}</tbody></table></div>`};
+ const pastedImg=S.mdPasted.img?`<div class="img-fig ${S.imgSel?'sel':''}" data-img-fig><span class="frame" style="width:520px;max-width:100%">${landscape(640,330,'m')}</span>${S.imgSel?`<div class="img-tools"><button>缩放 100%</button><button>替换…</button><button>在 Explorer 中显示</button><button>复制路径</button></div>`:''}<div class="cap">图 1：设计稿预览（assets/image-20261113-142530.png）</div></div>`:'';
+ if(!live) return mdSource();
+ const cl=(n,html)=>`<div class="${S.mdCur===n?'cur-line':''}" data-line="${n}">${html}</div>`;
+ const hs=(m,n)=>S.mdCur===n?`<span class="src">${m} </span>`:'';
+ return `<div class="doc">
+  ${cl(0,`<h1>${hs('#',0)}Taomni 架构概览</h1>`)}
+  ${cl(1,`<p>本文档描述 <code class="i">Taomni</code> 的整体结构，由 <b>前端</b>、<b>Rust 后端</b> 与 <i>本地存储</i> 组成。详见 <a>设计文档</a>。${S.mdCur===1?'<span class="caret"></span>':''}</p>`)}
+  <h2>${hs('##',2)}1. 设计目标</h2>
+  <blockquote>本地优先、可恢复、可审计。</blockquote>
+  <ul><li class="task"><span class="cb on">${ic('check')}</span><span style="text-decoration:line-through;color:var(--muted)">统一文件打开服务</span></li><li class="task"><span class="cb">${''}</span><span>Markdown 实时渲染</span></li><li class="task"><span class="cb"></span><span>HTML 沙盒预览</span></li></ul>
+  <h2>2. 模块一览</h2>${tbl()}
+  ${pastedImg}
+  <h2>3. 导出与分享</h2>
+  <p>在右上角 <b>导出</b> 菜单选择格式。公式 <code class="i">E = mc²</code> 与图表均会保留。</p>
+  <div class="cblk"><span class="lang">rust ▾</span><pre><span class="tk-k">fn</span> <span class="tk-f">open_file</span>(path: &amp;<span class="tk-k">str</span>) -&gt; <span class="tk-n">Result</span>&lt;Doc&gt; {\n    <span class="tk-c">// 统一入口：由上下文决定标签位置</span>\n    Doc::load(path)\n}</pre></div>
+  <div class="mermaid-box"><svg viewBox="0 0 360 60" style="width:360px"><g fill="none" stroke="var(--accent-s)" stroke-width="1.5"><rect x="6" y="14" width="86" height="32" rx="6" fill="var(--sel)"/><rect x="136" y="14" width="86" height="32" rx="6" fill="var(--sel)"/><rect x="266" y="14" width="86" height="32" rx="6" fill="var(--sel)"/><path d="M92 30h44M222 30h44"/></g><g font-size="11" fill="var(--text)" text-anchor="middle" font-family="sans-serif"><text x="49" y="34">Explorer</text><text x="179" y="34">openFile</text><text x="309" y="34">Viewer</text></g></svg><div class="mut" style="font-size:11px">Mermaid 图表（实时渲染）</div></div>
+  <hr class="hr"/>
+  <h2>4. 待办</h2><p class="mut">在空行输入 <code class="i">/</code> 唤出插入菜单（标题、表格、图片、代码块、公式、图表）。</p></div>`;
+}
+function mdSource(){
+ const L=['<span class="tk-k"># Taomni 架构概览</span>','','本文档描述 <span class="tk-n">`Taomni`</span> 的整体结构，由 **前端**、**Rust 后端** 与 *本地存储* 组成。','','<span class="tk-k">## 1. 设计目标</span>','','<span class="tk-c">&gt; 本地优先、可恢复、可审计。</span>','','- [x] 统一文件打开服务','- [ ] Markdown 实时渲染','','<span class="tk-k">## 2. 模块一览</span>','','| 层级 | 技术 | 说明 |','| --- | --- | --- |','| UI | React 19 | 组件化界面 |','| IPC | Tauri 2 | 类型化命令 |',S.mdPasted.img?'![图 1：设计稿预览](<span class="tk-s">assets/image-20261113-142530.png</span>)':''];
+ return `<div class="code" style="height:100%">${L.map((l,i)=>`<div class="l"><span class="ln">${i+1}</span><span class="tx">${l||' '}</span></div>`).join('')}</div>`;
+}
+function mdScene(){
+ const ex=S.menu==='export'?`<div class="menu" style="right:12px;top:78px;min-width:236px"><div class="mhd">导出为</div>
+ <button class="mi" data-act="exp">${ic('eye')}HTML（自包含，内嵌图片）</button><button class="mi" data-act="exp">${ic('print')}PDF<span class="k">页面设置</span></button><button class="mi" data-act="exp">${ic('image')}PNG 长图</button><button class="mi" data-act="exp">${ic('save')}Word（.docx）</button><button class="mi" data-act="exp">${ic('save')}Markdown + 图片文件夹</button><div class="msep"></div>
+ <button class="mi" data-act="exp">${ic('copy')}复制为富文本（粘贴到邮件/文档）</button><button class="mi" data-act="exp">${ic('copy')}复制为 HTML 源码</button><button class="mi">${ic('print')}打印…<span class="k">Ctrl+P</span></button></div>`:'';
+ const dlg=S.exportDlg?`<div class="modal-bg"><div class="modal"><h3>导出 PDF — architecture.md</h3><div class="mb">
+  <div class="fld"><label>主题</label><select class="sel"><option>跟随文档（浅色打印友好）</option></select></div>
+  <div class="fld"><label>页面</label><select class="sel"><option>A4</option></select><select class="sel" style="min-width:90px"><option>纵向</option></select><select class="sel" style="min-width:110px"><option>页边距 常规</option></select></div>
+  <div class="fld"><label>包含</label><label><span class="toggle on"></span> 目录</label><label><span class="toggle on"></span> 页码</label><label><span class="toggle"></span> 页眉文件名</label></div>
+  <div class="fld"><label>代码块</label><label><span class="toggle on"></span> 保持换行</label><label><span class="toggle on"></span> 语法高亮</label></div>
+  <div class="pv-trunc">图片以内嵌方式导出；本地相对路径图片已解析。预估 6 页。</div></div>
+  <div class="mf"><button class="cbtn outline" data-act="close">取消</button><button class="cbtn pri" data-act="exp-go">导出…</button></div></div></div>`:'';
+ const modeSeg=S.md==='split'?'':`<div class="seg"><button data-mm="live" class="${S.mdMode==='live'?'on':''}">实时</button><button data-mm="source" class="${S.mdMode==='source'?'on':''}">源码</button><button data-mm="split" class="${S.mdMode==='split'?'on':''}">分栏</button></div>`;
+ let center;
+ if(S.md==='split'||S.mdMode==='split'){
+  center=`<div style="flex:1;display:flex;min-height:0;min-width:0"><div class="split-pane">${mdSource()}</div><div class="split-pane">${renderPrev()}</div></div>`;
+ } else center=`<div class="md-scroll ${S.mdFocus?'focus-dim':''}" id="mdscroll">${mdDoc()}</div>`;
+ return `<div class="vwr" style="position:relative"><div class="bar" style="flex-wrap:nowrap;overflow:hidden"><div class="fmt">
+  <button class="cbtn outline" style="min-width:74px">正文 ${ic('down')}</button><span class="vsep"></span>${fmtBtn('bold','粗体 Ctrl+B')}${fmtBtn('italic','斜体 Ctrl+I')}${fmtBtn('strike','删除线')}${fmtBtn('code','行内代码')}${fmtBtn('link','链接 Ctrl+K')}<span class="vsep"></span>
+  ${fmtBtn('ul','无序列表')}${fmtBtn('ol','有序列表')}${fmtBtn('task','任务列表')}${fmtBtn('quote','引用')}<span class="vsep"></span>${fmtBtn('table','插入表格')}${fmtBtn('image','插入图片')}${fmtBtn('code','代码块')}${fmtBtn('hr','分隔线')}</div>
+  <span class="sp"></span><button class="cbtn outline" data-act="pimg">${ic('paste')}模拟粘贴图片</button><button class="cbtn outline" data-act="ptbl">${ic('paste')}模拟粘贴表格</button><span class="vsep"></span>
+  ${modeSeg}<button class="ibtn ${S.mdFocus?'on':''}" data-act="focus" title="专注模式">${ic('focus')}</button><button class="cbtn pri" data-act="export">${ic('export')}导出 ${ic('down')}</button></div>
+  <div class="md-wrap"><div class="olp"><div class="ot">${ic('outline')}大纲</div>${mdOutline.map((o,i)=>`<div class="orow ${i===1?'on':''}" style="padding-left:${i?20:8}px">${o}</div>`).join('')}</div>${center}</div>${ex}${dlg}</div>`;
+}
+function renderPrev(){const d=S.md;S.md='live';const m=S.mdMode;S.mdMode='live';const h=mdDoc();S.md=d;S.mdMode=m;return h}
+
+/* ================= scene 5: html browser ================= */
+function pageHtml(){return `<div style="background:linear-gradient(120deg,#1e3a8a,#3b82f6);color:#fff;padding:26px 32px"><div style="font-size:12px;opacity:.8">Q4 · 内部</div><div style="font-size:26px;font-weight:700;margin-top:4px">2026 Q4 数据报告</div><div style="opacity:.85;margin-top:4px;font-size:13px">更新于 2026-11-13 · 样式与脚本来自同目录 ./assets</div></div>
+ <div style="display:flex;gap:14px;padding:18px 32px">${[['访问量','18.3k','+12%'],['转化率','4.4%','+0.3pt'],['留存','61%','−1.2pt']].map(c=>`<div style="flex:1;border:1px solid #e2e8f0;border-radius:10px;padding:12px 14px"><div style="font-size:11px;color:#64748b">${c[0]}</div><div style="font-size:24px;font-weight:700">${c[1]}</div><div style="font-size:11px;color:${c[2][0]==='+'?'#16a34a':'#dc2626'}">${c[2]}</div></div>`).join('')}</div>
+ <div style="padding:0 32px 18px"><svg viewBox="0 0 600 160" style="width:100%"><rect width="600" height="160" fill="#f8fafc" rx="8"/><polyline fill="none" stroke="#3b82f6" stroke-width="3" points="20,120 120,100 220,70 320,82 420,40 520,30"/><g fill="#3b82f6"><circle cx="20" cy="120" r="4"/><circle cx="120" cy="100" r="4"/><circle cx="220" cy="70" r="4"/><circle cx="320" cy="82" r="4"/><circle cx="420" cy="40" r="4"/><circle cx="520" cy="30" r="4"/></g></svg></div>
+ <div style="padding:0 32px 24px;font-size:13px;color:#334155">${S.htmlNet?'<div style="display:flex;gap:10px;align-items:center;border:1px solid #bfdbfe;background:#eff6ff;border-radius:8px;padding:8px 12px"><img alt="" src="" style="display:none"/>已加载远程字体 / 统计脚本（本次允许）</div>':'<div style="border:1px dashed #cbd5e1;border-radius:8px;padding:8px 12px;color:#64748b">远程字体与统计脚本被阻止，页面按本地回退字体显示。</div>'}</div>`}
+function htmlScene(){
+ const web=S.html==='web';const dev=S.htmlDev;const cls=dev==='m'?'m':dev==='t'?'t':'';
+ const addr=web?`<span class="chip ok">${ic('lock')}HTTPS</span><span class="u">https://example.org/report</span><span class="chip">应用代理</span>`:`<span class="chip warn">${ic('shield')}沙盒</span><span class="u mono" style="font-size:12px">file:///home/runner/projects/docs-notes/<b>report.html</b></span>`;
+ const warn=web?`<div class="banner info">${ic('info')}网页浏览使用「设置 → 代理」中的应用代理；可在此切换为功能专用代理或不使用代理。下载按钮将进入统一下载队列。</div>`
+  :`<div class="banner ${S.htmlNet?'info':'warn'}">${ic('shield')}${S.htmlNet?'本次已允许网络请求（仅此标签，关闭后恢复）':'网络请求已阻止 · 本地资源（同目录及子目录）可读取 · 脚本在隔离沙盒中运行'}<span class="sp"></span>${S.htmlNet?'':'<button class="cbtn outline" data-act="net">本次允许网络</button>'}</div>`;
+ const split=S.htmlView==='split';
+ const src=`<div class="code" style="height:100%;border-right:1px solid var(--divider)">${['&lt;!doctype html&gt;','&lt;<span class="tk-k">html</span>&gt;&lt;<span class="tk-k">head</span>&gt;','  &lt;<span class="tk-k">link</span> <span class="tk-f">rel</span>=<span class="tk-s">"stylesheet"</span> <span class="tk-f">href</span>=<span class="tk-s">"assets/app.css"</span>&gt;','  &lt;<span class="tk-k">script</span> <span class="tk-f">src</span>=<span class="tk-s">"https://cdn.example/analytics.js"</span>&gt;&lt;/<span class="tk-k">script</span>&gt;','&lt;/<span class="tk-k">head</span>&gt;&lt;<span class="tk-k">body</span>&gt;','  &lt;<span class="tk-k">h1</span>&gt;2026 Q4 数据报告&lt;/<span class="tk-k">h1</span>&gt;'].map((l,i)=>`<div class="l"><span class="ln">${i+1}</span><span class="tx">${l}</span></div>`).join('')}</div>`;
+ const stage=`<div class="br-stage"><div class="page ${cls}" style="${split?'':''}">${pageHtml()}</div></div>`;
+ const dt=S.htmlDevtools?`<div class="devtools"><div class="dh"><span class="on">控制台</span><span>网络</span><span>资源</span><span class="sp"></span><button class="ibtn" data-act="dev">${ic('x')}</button></div><div class="dl"><div class="o">✓ 已加载 assets/app.css (1.2 KB)</div><div class="o">✓ 已加载 assets/chart.js (4.8 KB)</div>${S.htmlNet?'<div class="o">✓ 已加载 https://cdn.example/analytics.js（本次允许）</div>':'<div class="w">⚠ 已阻止 https://cdn.example/analytics.js — 网络已禁用</div><div class="w">⚠ 已阻止 https://fonts.example/inter.woff2</div>'}<div class="e">✕ Uncaught ReferenceError: track is not defined (report.html:42)</div></div></div>`:'';
+ return `<div class="vwr"><div class="br-bar"><button class="ibtn">${ic('back')}</button><button class="ibtn" disabled>${ic('fwd')}</button><button class="ibtn" data-act="reload">${ic('refresh')}</button><div class="br-addr">${addr}</div>
+  <div class="seg" style="margin-left:6px"><button data-dev="auto" class="${dev==='auto'?'on':''}" title="自适应">${ic('monitor')}</button><button data-dev="t" class="${dev==='t'?'on':''}" title="平板 768">${ic('tablet')}</button><button data-dev="m" class="${dev==='m'?'on':''}" title="手机 390">${ic('phone')}</button></div>
+  <button class="cbtn">100% ${ic('down')}</button><div class="seg"><button data-hv="page" class="${S.htmlView==='page'?'on':''}">预览</button><button data-hv="split" class="${split?'on':''}">源码分栏</button></div>
+  <button class="ibtn ${S.htmlDevtools?'on':''}" data-act="dev" title="控制台">${ic('bug')}</button><button class="ibtn" title="用系统浏览器打开">${ic('openx')}</button><button class="ibtn" title="在 Workspace 中编辑">${ic('edit')}</button></div>
+  ${warn}<div style="flex:1;min-height:0;display:flex">${split?`<div style="width:42%;min-width:0">${src}</div>`:''}<div style="flex:1;min-width:0;display:flex">${stage}</div></div>${dt}</div>`;
+}
+
+/* ================= scene 6: global entries ================= */
+function entriesScene(){
+ const pop=(id,items,style)=>S.entryPop===id?`<div class="menu" style="${style}">${items}</div>`:'';
+ const link=(id,txt)=>`<span style="color:var(--accent-s);text-decoration:underline;cursor:pointer" data-entry="${id}">${txt}</span>`;
+ const res=S.entryRes?`<div class="toast" style="bottom:12px">${ic('check')}<div><b>${S.entryRes[0]}</b><div class="mut" style="font-size:11px">${S.entryRes[1]}</div></div></div>`:'';
+ const card=(h,ico,body,tip)=>`<div class="card"><div class="ch">${ic(ico)}${h}</div><div class="cb2">${body}</div><div class="ct">${tip}</div></div>`;
+ const op=(id,pos)=>pop(id,`<button class="mi def" data-open="${id}">${ic('openx')}用 Taomni 打开</button><button class="mi" data-open="${id}-ws">${ic('ws')}在 Code Workspace 中打开</button><button class="mi">${ic('monitor')}系统应用</button>`,pos);
+ return `<div class="grid">
+  ${card('终端','term',`<div style="background:#0f172a;color:#e2e8f0;font-family:var(--mono);font-size:11.5px;border-radius:6px;padding:8px;line-height:1.6">$ ls docs-notes<br>architecture.md  ${link('t','screenshot-01.png')}  report.html<br><span style="color:#64748b">Ctrl/⌘+点击 文件路径 → 打开</span></div>${op('t','left:60px;top:78px')}`,'终端输出中的文件路径可点击（本地终端；SSH 提示先下载）')}
+  ${card('Workspace 项目树','ws',`<div style="font-size:12px;line-height:1.9"><div>▾ ${folderSvg('fi" style="width:14px;height:14px;vertical-align:middle')} docs-notes</div><div style="padding-left:16px">${fileSvg('a.md','fi" style="width:14px;height:14px;vertical-align:middle')} <span data-entry="w" style="cursor:pointer;background:var(--sel);padding:0 4px;border-radius:4px">architecture.md</span></div><div style="padding-left:16px">${fileSvg('a.svg','fi" style="width:14px;height:14px;vertical-align:middle')} logo.svg</div></div>${pop('w',`<button class="mi def" data-open="w">${ic('edit')}在 Workspace 编辑器中打开</button><button class="mi" data-open="w2">${ic('eye')}Markdown 实时渲染</button>`,'left:40px;top:84px')}`,'同一文档：在工作区标签内打开，与主界面共用渲染/编辑组件')}
+  ${card('Git 变更列表','git',`<div style="font-size:12px;line-height:2"><div>M &nbsp;<span data-entry="g" style="cursor:pointer;text-decoration:underline">docs/architecture.md</span></div><div>A &nbsp;assets/<span data-entry="g" style="cursor:pointer;text-decoration:underline">screenshot-01.png</span></div></div>${pop('g',`<button class="mi def" data-open="g">${ic('openx')}预览此文件</button><button class="mi" data-open="g-diff">${ic('git')}查看差异（现有）</button>`,'left:50px;top:62px')}`,'图片/SVG 在 diff 之外增加「预览」；文本继续走 diff')}
+  ${card('邮件附件','mail',`<div style="display:flex;gap:8px;flex-wrap:wrap"><div data-entry="m" style="border:1px solid var(--card-b);border-radius:7px;padding:6px 9px;cursor:pointer;display:flex;gap:6px;align-items:center">${fileSvg('a.png','fi')}design.png <span class="mut">214 KB</span></div><div style="border:1px solid var(--card-b);border-radius:7px;padding:6px 9px;display:flex;gap:6px;align-items:center">${fileSvg('a.pdf','fi')}合同.pdf <span class="mut">1.2 MB</span></div></div>${pop('m',`<button class="mi def" data-open="m">${ic('openx')}在 Taomni 中预览</button><button class="mi">${ic('save')}保存到…</button><button class="mi">${ic('monitor')}系统应用</button>`,'left:20px;top:62px')}`,'附件先落到受控临时目录，只读打开；另存后才可编辑')}
+  ${card('AI 对话','chat',`<div style="background:var(--hover);border-radius:8px;padding:8px 10px;font-size:12px;line-height:1.6">已为你生成报告：<span data-entry="a" style="cursor:pointer;background:var(--sel);color:var(--accent);border-radius:5px;padding:1px 6px">${ic('openx')} report.html</span> 与 <span style="background:var(--sel);color:var(--accent);border-radius:5px;padding:1px 6px">notes.md</span></div>${op('a','left:70px;top:66px')}`,'消息里的本地文件路径渲染为可点击的文件芯片')}
+  ${card('SFTP / 对象存储（下载后）','sess',`<div style="font-size:12px;line-height:1.9"><div>远程：/var/www/<b>index.html</b></div><div class="mut">双击 → 下载到临时目录 → 打开（只读）</div><div style="margin-top:6px"><button class="cbtn outline" data-entry="s">${ic('openx')}打开 index.html</button></div></div>${op('s','left:12px;top:100px')}`,'远程文件默认只读副本；「保存回远程」为后续单独设计')}
+ </div>
+ <div class="core"><div class="box">openFile(target, { context, mode })</div>${ic('fwd')}<div class="box">FileKind 路由<br><span class="mut" style="font-weight:400;font-size:11px">image / svg / text / markdown / html / binary</span></div>${ic('fwd')}<div class="box">主界面标签 · 工作区标签 · 分离窗口</div><span class="sp"></span><span style="max-width:300px">所有入口只传「路径 + 来源上下文」；渲染与编辑由同一套 Viewer 组件承担，状态（草稿、脏标记）由 documentStore 持有。</span></div>${res}`;
+}
+
+/* ================= scene 7: settings ================= */
+function settingsScene(){
+ const rows=[['.png .jpg .gif .webp .bmp .ico .avif','图片查看器','taomni'],['.svg','SVG 查看器（渲染+代码）','taomni'],['.txt .log .ini .conf .env','文本编辑器','taomni'],['.json .yaml .toml .xml .csv','文本编辑器（CSV 有表格视图）','taomni'],['.md .markdown','Markdown 编辑器（实时渲染）','taomni'],['.html .htm','HTML 预览','taomni'],['源码文件 (.ts .rs .py …)','Code Workspace 编辑器','ws'],['.pdf .docx .xlsx .zip','系统默认应用','sys']];
+ return `<div style="display:flex;flex:1;min-height:0"><div class="olp" style="width:190px"><div class="ot">设置</div><div class="orow">外观</div><div class="orow">终端</div><div class="orow on">文件与打开方式</div><div class="orow">代理</div></div>
+ <div class="set"><h2>文件与打开方式</h2><div class="desc">决定在 Taomni 各处（Explorer、终端链接、Workspace、邮件、AI 对话…）打开文件时的默认行为。</div>
+ <div class="fld"><label style="width:170px">双击文件时</label><div class="seg"><button class="${S.dbl==='taomni'?'on':''}" data-dbl="taomni">用 Taomni 打开</button><button class="${S.dbl==='system'?'on':''}" data-dbl="system">用系统应用打开</button></div><span class="mut">Ctrl/⌘ + 双击 取另一种</span></div>
+ <table class="tbl2" style="margin:10px 0 16px"><tr><th>文件类型</th><th>默认打开方式</th><th style="width:40px"></th></tr>${rows.map(r=>`<tr><td class="mono" style="font-size:11.5px">${r[0]}</td><td><select class="sel" style="min-width:230px"><option>${r[1]}</option></select></td><td>${ic('chev')}</td></tr>`).join('')}</table>
+ <h2 style="margin-top:14px">Markdown</h2><div class="fld"><label style="width:170px">粘贴图片保存到</label><select class="sel" style="min-width:230px"><option>文档同级 assets/ 文件夹</option></select><span class="mut">文件名模板 image-{日期}-{时间}.png</span></div>
+ <div class="fld"><label style="width:170px">图片链接</label><select class="sel" style="min-width:230px"><option>相对路径（推荐）</option></select></div>
+ <div class="fld"><label style="width:170px">粘贴网页/Excel 表格</label><label><span class="toggle on"></span> 自动转为 Markdown 表格</label></div>
+ <h2 style="margin-top:14px">HTML 预览</h2><div class="fld"><label style="width:170px">网络请求</label><select class="sel" style="min-width:230px"><option>默认阻止（每标签可临时允许）</option></select></div>
+ <div class="fld"><label style="width:170px">运行脚本</label><label><span class="toggle on"></span> 在隔离沙盒中运行</label></div></div></div>`;
+}
+
+/* ---------- dispatcher ---------- */
+function modalHtml(){
+ if(S.modal==='paste-tbl') return `<div class="modal-bg"><div class="modal" style="width:520px"><h3>检测到表格数据</h3><div class="mb"><div class="mut" style="margin-bottom:8px">剪贴板内容来自 Excel / 网页（TSV，2 行 × 3 列）。</div><table class="csv"><tr><th>导出</th><th>HTML / PDF</th><th>由粘贴生成</th></tr><tr><td>分享</td><td>Word / PNG</td><td>由粘贴生成</td></tr></table></div><div class="mf"><button class="cbtn outline" data-act="ptbl-text">粘贴为纯文本</button><button class="cbtn pri" data-act="ptbl-go">粘贴为 Markdown 表格</button></div></div></div>`;
+ return '';
+}
+function render(){
+ document.documentElement.className=S.theme;
+ $('#hint').textContent=HINTS[S.sc];
+ railHtml();tabsFor();
+ const sc=S.sc;
+ $('#content').innerHTML=({explorer:explorerScene,image:imageScene,text:textScene,md:mdScene,html:htmlScene,entries:entriesScene,settings:settingsScene}[sc])()+modalHtml()+(S.toast?`<div class="toast">${ic('check')}<div>${S.toast}</div></div>`:'');
+ $('#st1').textContent={explorer:'13 个项目 · 选中 1 项',image:'logo.svg · SVG',text:'notes.txt · UTF-8 · LF',md:'architecture.md · Markdown',html:'report.html · 沙盒预览',entries:'全局入口矩阵',settings:'设置'}[sc];
+ $('#st2').textContent=sc==='md'?'1,248 字 · 约 4 分钟阅读':'Taomni';
+ $('#tbinfo').textContent='';
+ $('[data-sc].on')?.classList.remove('on');document.querySelector(`[data-sc="${sc}"]`).classList.add('on');
+ for(const [a,v] of [['dec-md',S.md],['dec-html',S.html],['dec-dbl',S.dbl],['theme',S.theme]]){document.querySelectorAll(`[data-${a}]`).forEach(b=>b.classList.toggle('on',b.dataset[a.replace(/-./g,m=>m[1].toUpperCase())]===v))}
+}
+function toast(t,ms=2600){S.toast=t;render();clearTimeout(toast.t);toast.t=setTimeout(()=>{S.toast=null;render()},ms)}
+
+document.addEventListener('click',e=>{
+ const t=e.target.closest('button,[data-file],[data-cell],[data-entry],[data-thumb],[data-img-fig],.menu,.tab');if(!t&&!S.menu&&!S.entryPop)return;
+ const d=t?.dataset||{};let changed=true;
+ if(d.sc){S.sc=d.sc;S.menu=null;S.modal=null;S.exportDlg=false}
+ else if(d.decMd){S.md=d.decMd;if(d.decMd==='split')S.mdMode='split'}
+ else if(d.decHtml){S.html=d.decHtml}
+ else if(d.decDbl){S.dbl=d.decDbl}
+ else if(d.theme){S.theme=d.theme}
+ else if(d.file){S.sel=d.file;S.menu=null}
+ else if(d.act==='menu'){S.menu=S.menu==='open'?null:'open'}
+ else if(d.act==='open'){S.menu=null;const f=FILES.find(x=>x.n===S.sel);S.sc=f.pv==='md'?'md':f.pv==='html'?'html':(f.pv==='img'||f.pv==='svg')?'image':'text';if(f.pv==='img')S.imgIdx=f.n.startsWith('photo')?2:1;if(f.pv==='svg')S.imgIdx=0}
+ else if(d.act==='ws'){S.menu=null;toast('已在 Code Workspace 中打开 '+S.sel)}
+ else if(d.act==='sys'){S.menu=null;toast('已交给系统默认应用：'+S.sel)}
+ else if(d.img){S.imgIdx=(S.imgIdx+ +d.img+IMGS.length)%IMGS.length}
+ else if(d.thumb){S.imgIdx=+d.thumb}
+ else if(d.bg){S.imgBg=d.bg}
+ else if(d.svg){S.svgMode=d.svg}
+ else if(d.zoom){const z=['25%','50%','适应','100%','200%','400%'];let i=z.indexOf(S.imgZoom);if(d.zoom==='in')i=Math.min(i+1,5);else if(d.zoom==='out')i=Math.max(i-1,0);else i=d.zoom==='fit'?2:3;S.imgZoom=z[i]}
+ else if(d.act==='find'){S.txtFind=!S.txtFind}
+ else if(d.act==='save'){S.txtDirty=false;toast('已保存 notes.txt')}
+ else if(d.act==='ext'){S.txtExt=true}
+ else if(d.act==='reload'&&S.sc==='text'){S.txtExt=false;S.txtDirty=false;toast('已重新加载')}
+ else if(d.act==='keep'){S.txtExt=false}
+ else if(d.mm){S.mdMode=d.mm}
+ else if(d.act==='focus'){S.mdFocus=!S.mdFocus}
+ else if(d.act==='export'){S.menu=S.menu==='export'?null:'export'}
+ else if(d.act==='exp'){S.menu=null;S.exportDlg=true}
+ else if(d.act==='exp-go'){S.exportDlg=false;toast('已导出 architecture.pdf（6 页） · 在 Explorer 中显示')}
+ else if(d.act==='close'){S.exportDlg=false}
+ else if(d.act==='pimg'){S.mdPasted.img=true;S.imgSel=true;S.toast='已粘贴图片 → 保存为 assets/image-20261113-142530.png（相对链接）&nbsp;<u>撤销</u>';render();setTimeout(()=>{S.toast=null;render()},3200);return}
+ else if(d.act==='ptbl'){S.modal='paste-tbl'}
+ else if(d.act==='ptbl-go'){S.modal=null;S.mdPasted.tbl=true;S.tblAct=[4,1]}
+ else if(d.act==='ptbl-text'){S.modal=null}
+ else if(d.cell){S.tblAct=d.cell.split(',').map(Number);S.mdCur=undefined}
+ else if(d.imgFig!==undefined){S.imgSel=!S.imgSel}
+ else if(d.dev){S.htmlDev=d.dev}
+ else if(d.hv){S.htmlView=d.hv}
+ else if(d.act==='dev'){S.htmlDevtools=!S.htmlDevtools}
+ else if(d.act==='net'){S.htmlNet=true;toast('已允许本标签的网络请求')}
+ else if(d.act==='reload'){toast('已刷新（保留滚动位置）')}
+ else if(d.dbl){S.dbl=d.dbl}
+ else if(d.entry){S.entryPop=S.entryPop===d.entry?null:d.entry}
+ else if(d.open){const m={t:['已在主界面标签打开 screenshot-01.png','图片查看器 · 来源：终端 cwd'],w:['已在工作区标签打开 architecture.md','Markdown 实时渲染 · 与主界面同一组件'],w2:['已在工作区标签打开 architecture.md','Markdown 实时渲染'],'w-ws':['已在 Code Workspace 打开','源码编辑器'],g:['已打开预览 screenshot-01.png','只读预览，不改动工作区'],m:['已打开 design.png（只读副本）','附件临时目录，另存后可编辑'],a:['已在主界面标签打开 report.html','HTML 沙盒预览'],s:['已下载并打开 index.html（只读）','远程文件：只读副本'],'t-ws':['已在 Code Workspace 打开','源码编辑器'],'a-ws':['已在 Code Workspace 打开','源码编辑器'],'s-ws':['已在 Code Workspace 打开','源码编辑器'],'g-diff':['打开 diff','沿用现有 Git diff']};S.entryRes=m[d.open]||['已打开',''];S.entryPop=null;render();clearTimeout(S.rt);S.rt=setTimeout(()=>{S.entryRes=null;render()},3000);return}
+ else{ if(S.menu||S.entryPop){if(!e.target.closest('.menu')){S.menu=null;S.entryPop=null}else changed=false}else changed=false}
+ if(changed)render();
+});
+document.addEventListener('dblclick',e=>{const r=e.target.closest('[data-file]');if(r&&S.sc==='explorer'){S.sel=r.dataset.file;if(S.dbl==='taomni'){const f=FILES.find(x=>x.n===S.sel);if(f.pv==='meta'||f.dir){toast(f.dir?'进入文件夹':'此类型交给系统应用打开');return}document.querySelector('[data-act=open]').click()}else toast('已交给系统默认应用：'+S.sel)}});
+document.addEventListener('keydown',e=>{if(S.sc==='text'&&!e.ctrlKey&&!e.metaKey&&e.key.length===1&&document.activeElement===document.body){S.txtDirty=true;render()}});
+const qp=new URLSearchParams(location.search);
+for(const k of ['sc','theme']) if(qp.get(k)) S[k]=qp.get(k);
+if(qp.get('md'))S.md=qp.get('md');if(qp.get('html'))S.html=qp.get('html');if(qp.get('menu'))S.menu=qp.get('menu');
+if(qp.get('sel'))S.sel=qp.get('sel');if(qp.get('pimg')){S.mdPasted.img=true}if(qp.get('ptbl')){S.mdPasted.tbl=true;S.tblAct=[4,1]}
+if(qp.get('mm'))S.mdMode=qp.get('mm');if(qp.get('dev'))S.htmlDevtools=true;if(qp.get('ext'))S.txtExt=true;if(qp.get('find'))S.txtFind=true;
+if(qp.get('pop'))S.entryPop=qp.get('pop');if(qp.get('svg'))S.svgMode=qp.get('svg');if(qp.get('idx'))S.imgIdx=+qp.get('idx');
+if(qp.get('imgsel'))S.imgSel=true;if(qp.get('exp'))S.exportDlg=true;if(qp.get('dirty')){S.txtDirty=true}
+S.mdCur=1;render();
+</script>
+</body>
+</html>

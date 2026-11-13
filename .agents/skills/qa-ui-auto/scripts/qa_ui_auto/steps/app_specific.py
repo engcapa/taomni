@@ -351,3 +351,11 @@ def step_vault_first_run(ctx: StepContext, args: Any) -> None:
     setup.locator("[data-testid='vault-setup-pw2']").fill(password)
     setup.locator("[data-testid='vault-setup-confirm']").click()
     setup.wait_for(state="hidden", timeout=30_000)
+
+
+@verb("servers_multi_instance_probe")
+def step_servers_multi_instance_probe(ctx: StepContext, args: Any) -> None:
+    """Verify Local servers cross-page singleton lock and unload recovery in browser mode."""
+    from ..servers_multi_instance import browser_run
+
+    browser_run(ctx, args)

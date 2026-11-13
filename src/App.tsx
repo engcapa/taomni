@@ -8,7 +8,6 @@ import {
 import DetachedSessionWindow from "./components/detached/DetachedSessionWindow";
 import LanChatDetachedWindow from "./components/detached/LanChatDetachedWindow";
 import { NotesDetachedWindow } from "./components/notes/NotesDetachedWindow";
-import { ServersDialog } from "./components/servers/ServersDialog";
 import { RdpServerApprovalBridge } from "./components/servers/RdpServerApprovalBridge";
 import { detectDetachedRoute } from "./lib/detachedSession";
 import {
@@ -168,8 +167,6 @@ function App() {
       content = <LanChatDetachedWindow id={detachedRoute.id} />;
     } else if (detachedRoute?.kind === "notes") {
       content = <NotesDetachedWindow />;
-    } else if (detachedRoute?.kind === "servers") {
-      content = <ServersDialog />;
     } else {
       hostsRdpApprovals = !detachedRoute;
       content =

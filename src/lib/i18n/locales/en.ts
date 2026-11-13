@@ -1078,6 +1078,7 @@ const dict = {
     welcome: "Welcome",
     settings: "Settings",
     lanChat: "LAN Chat",
+    servers: "Local servers",
     mailUnified: "Unified Mail",
     mfa: "MFA authenticator",
     sshTunnels: "SSH tunnels",
@@ -2011,6 +2012,9 @@ const dict = {
   servers: {
     title: "Servers",
     dialogTitle: "Local servers",
+    tabAlreadyOpenTitle: "Local servers already open",
+    tabAlreadyOpenMessage: "Local servers can only be open in one tab at a time across running Taomni instances. Close the existing Local servers tab first.",
+    tabAlreadyOpenHolder: "Local servers is already open in {holder}. Only one Local servers tab can be open at a time; close that tab first.",
     apply: "Apply",
     cancel: "Cancel",
     start: "Start",

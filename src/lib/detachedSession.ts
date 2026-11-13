@@ -32,8 +32,7 @@ export type DetachedKind =
   | "terminal"
   | "database"
   | "lan-chat"
-  | "notes"
-  | "servers";
+  | "notes";
 
 const STORAGE_PREFIX = "taomni.detached.";
 const REATTACH_PREFIX = "taomni.reattach.";
@@ -219,7 +218,6 @@ export function detectDetachedRoute():
       "database",
       "lan-chat",
       "notes",
-      "servers",
     ] as const) {
       const value = url.searchParams.get(kind);
       if (value) return { kind, id: value };
@@ -238,8 +236,7 @@ function isDetachedKind(value: string): value is DetachedKind {
     value === "terminal" ||
     value === "database" ||
     value === "lan-chat" ||
-    value === "notes" ||
-    value === "servers"
+    value === "notes"
   );
 }
 

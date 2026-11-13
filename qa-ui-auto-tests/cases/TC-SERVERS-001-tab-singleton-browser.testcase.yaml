@@ -1,0 +1,275 @@
+id: TC-SERVERS-001-tab-singleton-browser
+title: Local servers opens as a single tab across triggers and browser contexts
+description: >-
+  Verifies that Local servers (`F-Servers-1`) opens inside the main workspace tab bar
+  rather than an OS popup: clicking Tools sidebar, Main Menu, Ctrl+Shift+S, Global
+  Command Palette, and `#servers=main` opens and reuses a single `servers` tab with
+  `tab-bar` visible and Duplicate disabled (`tab-context-duplicate`); switching tabs
+  preserves dirty port edits while Cancel confirm/discard reverts them; and
+  `servers_multi_instance_probe` proves symmetric cross-page singleton blocking,
+  handover, and unload lease release across concurrent browser contexts.
+covers:
+- F-Servers-1
+tags:
+- servers
+- regression
+modes:
+- browser
+fixtures:
+- reset_db
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- wait_for:
+    selector: '[data-testid="welcome-panel"]'
+    timeout_sec: 30
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tool-servers"]'
+- click: '[data-testid="sidebar-tool-servers"]'
+- wait_for: '[data-testid="servers-dialog"]'
+- assert_visible: '[data-testid="tab-bar"]'
+- assert_visible: '[data-testid="servers-tab-panel"]'
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="servers"]'
+    equal: 1
+- right_click: '[data-testid="tab-item"][data-tab-type="servers"]'
+- wait_for: '[data-testid="tab-context-duplicate"]'
+- assert_disabled: '[data-testid="tab-context-duplicate"]'
+- press: Escape
+- wait_for:
+    selector: '[data-testid="tab-context-duplicate"]'
+    state: detached
+    timeout_sec: 5
+- click: '[data-testid="nav-mode-home"]'
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="app-main-menu"]'
+- wait_for: '[data-testid="context-menu-item-tools"]'
+- hover: '[data-testid="context-menu-item-tools"]'
+- wait_for: '[data-testid="context-menu-item-servers"]'
+- click: '[data-testid="context-menu-item-servers"]'
+- wait_for: '[data-testid="servers-dialog"]'
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="servers"]'
+    equal: 1
+- click: '[data-testid="nav-mode-home"]'
+- wait_for: '[data-testid="welcome-panel"]'
+- press: Control+Shift+S
+- wait_for: '[data-testid="servers-dialog"]'
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="servers"]'
+    equal: 1
+- click: '[data-testid="nav-mode-home"]'
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="global-search-trigger"]'
+- wait_for: '[data-testid="global-search-modal"]'
+- fill:
+    selector: '[data-testid="global-search-input"]'
+    value: Local servers
+- click: '[data-testid="global-search-result"][data-result-id="servers"]'
+- wait_for: '[data-testid="servers-dialog"]'
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="servers"]'
+    equal: 1
+- click: '[data-testid="server-row-ssh"]'
+- wait_for: '[data-testid="server-field-port"]'
+- fill:
+    selector: '[data-testid="server-field-port"]'
+    value: '2229'
+- click: '[data-testid="nav-mode-home"]'
+- wait_for: '[data-testid="welcome-panel"]'
+- assert_not_visible: '[data-testid="servers-dialog"]'
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="tab-bar"]'
+- click: '[data-testid="tab-item"][data-tab-type="servers"]'
+- wait_for: '[data-testid="servers-dialog"]'
+- assert_attribute:
+    selector: '[data-testid="server-field-port"]'
+    name: value
+    equals: '2229'
+- click: '[data-testid="servers-dialog-cancel"]'
+- wait_for: '[data-testid="confirm-dialog"]'
+- click: '[data-testid="confirm-dialog-cancel"]'
+- assert_visible: '[data-testid="servers-dialog"]'
+- assert_attribute:
+    selector: '[data-testid="server-field-port"]'
+    name: value
+    equals: '2229'
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="servers"]'
+    equal: 1
+- click: '[data-testid="servers-dialog-cancel"]'
+- wait_for: '[data-testid="confirm-dialog"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for:
+    selector: '[data-testid="servers-dialog"]'
+    state: detached
+    timeout_sec: 10
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="servers"]'
+    equal: 0
+- assert_visible: '[data-testid="sessions-empty-state"]'
+- click: '[data-testid="global-search-trigger"]'
+- wait_for: '[data-testid="global-search-modal"]'
+- fill:
+    selector: '[data-testid="global-search-input"]'
+    value: Local servers
+- click: '[data-testid="global-search-result"][data-result-id="servers"]'
+- wait_for: '[data-testid="servers-dialog"]'
+- click: '[data-testid="server-row-ssh"]'
+- assert_attribute:
+    selector: '[data-testid="server-field-port"]'
+    name: value
+    equals: '22'
+- servers_multi_instance_probe: {}
+- click: '[data-testid="tab-item"][data-tab-type="servers"] [data-testid="tab-close"]'
+- wait_for:
+    selector: '[data-testid="servers-dialog"]'
+    state: detached
+    timeout_sec: 10
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="servers"]'
+    equal: 0
+- open_route: '#servers=main'
+- wait_for: '[data-testid="servers-dialog"]'
+- assert_visible: '[data-testid="tab-bar"]'
+- assert_visible: '[data-testid="servers-tab-panel"]'
+- eval_readonly:
+    expression: "window.opener === null && document.querySelectorAll('[data-tab-type'+String.fromCharCode(61)+'\"servers\"]').length === 1"
+    expect_truthy: true
+- click: '[data-testid="servers-dialog-cancel"]'
+- wait_for:
+    selector: '[data-testid="servers-dialog"]'
+    state: detached
+    timeout_sec: 10
+- assert_visible: '[data-testid="tools-empty-state"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Tools sidebar, Main Menu, Ctrl+Shift+S, and Global Command Palette open and reuse a single Local servers tab with tab-bar visible and Duplicate disabled.
+    actions:
+    - 3
+    - 5
+    - 10
+    - 15
+    - 21
+    - 26
+    - 29
+    - 31
+    - 33
+    - 34
+    checkpoints:
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"servers-dialog\"]"}'
+    - step: 7
+      expectation: '{"assert_visible": "[data-testid=\"tab-bar\"]"}'
+    - step: 8
+      expectation: '{"assert_visible": "[data-testid=\"servers-tab-panel\"]"}'
+    - step: 9
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"servers\"]", "equal": 1}}'
+    - step: 12
+      expectation: '{"assert_disabled": "[data-testid=\"tab-context-duplicate\"]"}'
+    - step: 23
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"servers\"]", "equal": 1}}'
+    - step: 28
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"servers\"]", "equal": 1}}'
+    - step: 35
+      expectation: '{"wait_for": "[data-testid=\"servers-dialog\"]"}'
+    - step: 36
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"servers\"]", "equal": 1}}'
+    results:
+    - 7
+    - 8
+    - 9
+    - 12
+    - 23
+    - 28
+    - 36
+  - id: R2
+    requirement: Unsaved port edits survive tab switching, prompt Discard confirmation on Cancel, and revert to default when discarded and reopened.
+    actions:
+    - 37
+    - 39
+    - 40
+    - 43
+    - 45
+    - 48
+    - 50
+    - 54
+    - 56
+    - 60
+    - 62
+    - 63
+    - 65
+    checkpoints:
+    - step: 41
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 42
+      expectation: '{"assert_not_visible": "[data-testid=\"servers-dialog\"]"}'
+    - step: 47
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"server-field-port\"]", "name": "value", "equals": "2229"}}'
+    - step: 51
+      expectation: '{"assert_visible": "[data-testid=\"servers-dialog\"]"}'
+    - step: 52
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"server-field-port\"]", "name": "value", "equals": "2229"}}'
+    - step: 53
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"servers\"]", "equal": 1}}'
+    - step: 57
+      expectation: '{"wait_for": {"selector": "[data-testid=\"servers-dialog\"]", "state": "detached", "timeout_sec": 10}}'
+    - step: 58
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"servers\"]", "equal": 0}}'
+    - step: 59
+      expectation: '{"assert_visible": "[data-testid=\"sessions-empty-state\"]"}'
+    - step: 66
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"server-field-port\"]", "name": "value", "equals": "22"}}'
+    results:
+    - 42
+    - 47
+    - 51
+    - 52
+    - 53
+    - 58
+    - 59
+    - 66
+  - id: R3
+    requirement: Cross-page singleton locking blocks secondary and primary browser pages symmetrically until release or unload, and #servers=main opens in-tab cleanly.
+    actions:
+    - 68
+    - 71
+    - 76
+    checkpoints:
+    - step: 67
+      expectation: '{"servers_multi_instance_probe": {}}'
+    - step: 69
+      expectation: '{"wait_for": {"selector": "[data-testid=\"servers-dialog\"]", "state": "detached", "timeout_sec": 10}}'
+    - step: 70
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"servers\"]", "equal": 0}}'
+    - step: 72
+      expectation: '{"wait_for": "[data-testid=\"servers-dialog\"]"}'
+    - step: 73
+      expectation: '{"assert_visible": "[data-testid=\"tab-bar\"]"}'
+    - step: 74
+      expectation: '{"assert_visible": "[data-testid=\"servers-tab-panel\"]"}'
+    - step: 75
+      expectation: '{"eval_readonly": {"expression": "window.opener === null && document.querySelectorAll(''[data-tab-type''+String.fromCharCode(61)+''\"servers\"]'').length === 1", "expect_truthy": true}}'
+    - step: 78
+      expectation: '{"assert_visible": "[data-testid=\"tools-empty-state\"]"}'
+    - step: 79
+      expectation: '{"assert_no_runtime_errors": null}'
+    results:
+    - 67
+    - 70
+    - 73
+    - 74
+    - 75
+    - 78
+    - 79
+  visual:
+  - check: In-tab Local servers panel, tab bar visibility, and blocked/discard dialogs remain unclipped in browser viewport.
+    method: not-applicable
+    reason: DOM layout assertions and native verification in TC-SERVERS-002 cover tab bar, panel, and dialog mounting without relying on static screenshot comparison.
+  native:
+  - check: Real Tauri OS ModuleLock contention and multi-process desktop behavior.
+    method: external
+    reason: Covered by TC-SERVERS-002-tab-singleton-native across Linux, Windows, and macOS binaries; browser mode uses localStorage stubs.

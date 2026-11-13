@@ -100,7 +100,7 @@ for (const command of ["vnc_connect","vnc_test_connection","vnc_disconnect","vnc
   stubCommandRegistry.register({ domain: "remoteDesktop", command, handler: (args) => invokeRemoteDesktop(command, args) });
 }
 
-for (const command of ["load_server_configs","save_server_config","list_server_statuses","list_server_logs","clear_server_log","get_server_status","stop_local_server","start_local_server"]) {
+for (const command of ["load_server_configs","save_server_config","list_server_statuses","list_server_logs","clear_server_log","get_server_status","stop_local_server","start_local_server","claim_servers_tab","release_servers_tab"]) {
   stubCommandRegistry.register({ domain: "servers", command, handler: (args) => invokeServers(command, args) });
 }
 

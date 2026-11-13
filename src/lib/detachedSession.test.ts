@@ -124,9 +124,9 @@ describe("detectDetachedRoute", () => {
     expect(detectDetachedRoute()).toEqual({ kind: "notes", id: "panel" });
   });
 
-  it("parses servers detached routes", () => {
+  it("ignores legacy servers query/hash routes so MainLayout hosts the tab", () => {
     window.history.replaceState(null, "", "/index.html#servers=main");
-    expect(detectDetachedRoute()).toEqual({ kind: "servers", id: "main" });
+    expect(detectDetachedRoute()).toBeNull();
   });
 
   it("ignores unknown kinds", () => {

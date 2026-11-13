@@ -385,6 +385,11 @@
             "expected": {"type": "string"}
           }
         },
+        "servers_multi_instance_probe": {
+          "type": ["object", "null"],
+          "additionalProperties": false,
+          "properties": {}
+        },
         "mail_storage_assert": {
           "type": "object",
           "additionalProperties": false,

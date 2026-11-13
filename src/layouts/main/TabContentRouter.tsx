@@ -10,6 +10,7 @@ import { MailUnifiedTab } from "../../components/mail/MailUnifiedTab";
 import { MfaTab } from "../../components/mfa/MfaTab";
 import { ObjectStorageBrowser } from "../../components/objectstorage/ObjectStorageBrowser";
 import { SettingsPanel } from "../../components/settings/SettingsPanel";
+import { ServersPanel } from "../../components/servers/ServersPanel";
 import { SocksCapPanel } from "../../components/sockscap/SocksCapPanel";
 import { TunnelManager } from "../../components/tunnel/TunnelManager";
 import { WelcomePanel } from "../../components/WelcomePanel";
@@ -93,6 +94,7 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
     setStatusMessage,
     setTerminalSplitLayout,
     settingsTabs,
+    serversTabs,
     sftpTabs,
     splitGridColumnTemplate,
     splitGridColumnWeightsForLayout,
@@ -275,6 +277,20 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
           style={{ display: isActive ? "block" : "none" }}
         >
           <SettingsPanel />
+        </div>
+      );
+    })}
+
+    {serversTabs.map((tab) => {
+      const isActive = activeTabId === tab.id;
+      return (
+        <div
+          key={tab.id}
+          data-testid="servers-tab-panel"
+          className="absolute inset-0 flex flex-col min-h-0"
+          style={{ display: isActive ? "flex" : "none" }}
+        >
+          <ServersPanel onClose={() => removeTab(tab.id)} />
         </div>
       );
     })}
@@ -569,6 +585,7 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
       activeTab.type !== "sockscap" &&
       activeTab.type !== "lan-chat" &&
       activeTab.type !== "mfa" &&
+      activeTab.type !== "servers" &&
       activeTab.type !== "proxy-test" && (
         <UnavailablePanel title={activeTab.title} message={activeTab.message} />
       )}

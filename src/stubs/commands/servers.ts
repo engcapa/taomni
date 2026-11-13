@@ -2,6 +2,101 @@
 
 // ---------- Local servers browser-preview state ----------
 export const STUB_SERVER_CONFIGS_KEY = "taomni.stub.serverConfigs.v1";
+export const STUB_SERVERS_TAB_LOCK_KEY = "taomni.stub.serversTabLock.v1";
+
+const SERVERS_TAB_LOCK_TTL_MS = 15_000;
+const SERVERS_TAB_LOCK_HEARTBEAT_MS = 4_000;
+
+const stubTabOwnerId =
+  typeof crypto !== "undefined" && typeof crypto.randomUUID === "function"
+    ? crypto.randomUUID()
+    : `stub-servers-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+
+let stubLockHeartbeatTimer: number | null = null;
+let stubLockUnloadBound = false;
+
+interface StubServersTabLockRecord {
+  ownerId: string;
+  updatedAt: number;
+}
+
+function readStubServersTabLock(): StubServersTabLockRecord | null {
+  if (typeof localStorage === "undefined") return null;
+  try {
+    const raw = localStorage.getItem(STUB_SERVERS_TAB_LOCK_KEY);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as Partial<StubServersTabLockRecord>;
+    if (typeof parsed.ownerId !== "string" || typeof parsed.updatedAt !== "number") {
+      return null;
+    }
+    if (Date.now() - parsed.updatedAt >= SERVERS_TAB_LOCK_TTL_MS) {
+      return null;
+    }
+    return { ownerId: parsed.ownerId, updatedAt: parsed.updatedAt };
+  } catch {
+    return null;
+  }
+}
+
+function stopStubServersTabHeartbeat() {
+  if (stubLockHeartbeatTimer !== null && typeof window !== "undefined") {
+    window.clearInterval(stubLockHeartbeatTimer);
+  }
+  stubLockHeartbeatTimer = null;
+}
+
+function writeStubServersTabLock() {
+  if (typeof localStorage === "undefined") return;
+  localStorage.setItem(
+    STUB_SERVERS_TAB_LOCK_KEY,
+    JSON.stringify({ ownerId: stubTabOwnerId, updatedAt: Date.now() }),
+  );
+}
+
+function releaseOwnedStubServersTabLock() {
+  stopStubServersTabHeartbeat();
+  if (typeof localStorage === "undefined") return;
+  try {
+    const raw = localStorage.getItem(STUB_SERVERS_TAB_LOCK_KEY);
+    if (!raw) return;
+    const parsed = JSON.parse(raw) as Partial<StubServersTabLockRecord>;
+    if (parsed.ownerId === stubTabOwnerId) {
+      localStorage.removeItem(STUB_SERVERS_TAB_LOCK_KEY);
+    }
+  } catch {
+    /* ignore corrupt lock payload on cleanup */
+  }
+}
+
+function ensureStubLockListeners() {
+  if (typeof window === "undefined") return;
+  if (!stubLockUnloadBound) {
+    stubLockUnloadBound = true;
+    const releaseOnExit = () => {
+      releaseOwnedStubServersTabLock();
+    };
+    window.addEventListener("pagehide", releaseOnExit);
+    window.addEventListener("beforeunload", releaseOnExit);
+  }
+  if (stubLockHeartbeatTimer === null) {
+    stubLockHeartbeatTimer = window.setInterval(() => {
+      const active = readStubServersTabLock();
+      if (active && active.ownerId === stubTabOwnerId) {
+        writeStubServersTabLock();
+      } else {
+        stopStubServersTabHeartbeat();
+      }
+    }, SERVERS_TAB_LOCK_HEARTBEAT_MS);
+  }
+}
+
+/** Test-only helper to reset the in-realm browser stub lock timer cleanly. */
+export function resetStubServersTabLockForTests(): void {
+  releaseOwnedStubServersTabLock();
+  if (typeof localStorage !== "undefined") {
+    localStorage.removeItem(STUB_SERVERS_TAB_LOCK_KEY);
+  }
+}
 
 export const STUB_SERVER_TYPES = ["ssh", "ftp", "tftp", "http", "telnet", "vnc", "nfs", "cron", "iperf", "rdp"];
 
@@ -99,6 +194,22 @@ export async function invokeServers<T>(cmd: string, args?: any): Promise<T> {
         "Local servers run only in the desktop build of Taomni, not in browser preview.",
       );
     }
+
+    case "claim_servers_tab": {
+      const current = readStubServersTabLock();
+      if (current && current.ownerId !== stubTabOwnerId) {
+        return { acquired: false, holder: "another Taomni browser window" } as T;
+      }
+      writeStubServersTabLock();
+      ensureStubLockListeners();
+      return { acquired: true, holder: null } as T;
+    }
+
+    case "release_servers_tab": {
+      releaseOwnedStubServersTabLock();
+      return undefined as T;
+    }
+
     default: throw new Error(`Unhandled servers stub command: ${cmd}`);
   }
 }

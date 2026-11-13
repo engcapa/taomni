@@ -282,6 +282,7 @@ controls:
 - id: tab-item                 # individual tab; pair with [data-tab-type=...] / [data-tab-title=...] when targeting
   selector: '[data-testid="tab-item"]'
   aliases:
+  - '[data-testid="tab-item"][data-tab-type="welcome"]'
   - ':nth-match([data-testid="tab-item"][data-tab-type="file-browser"], 1)'
   - ':nth-match([data-testid="tab-item"][data-tab-type="file-browser"], 2)'
   - ':nth-match([data-testid="tab-item"][data-tab-type="file-browser"], 3)'
@@ -4930,15 +4931,16 @@ controls:
 
 ## 22. 本地服务器管理（Local Servers）
 
-### 22.1 本地服务器管理窗口 `ServersDialog` ✅
+### 22.1 本地服务器管理标签页 `ServersPanel`（单实例） ✅
 
 <!-- feature
 id: F-Servers-1
 status: done
 area: servers
-components: [ServersDialog, ServerList, ServerRow, ServerSettings, CommonSettings, ServerOutputLog, fields]
+components: [ServersPanel, ServersTabBlockedDialog, ServerList, ServerRow, ServerSettings, CommonSettings, ServerOutputLog, fields]
 files:
-  - src/components/servers/ServersDialog.tsx
+  - src/components/servers/ServersPanel.tsx
+  - src/components/servers/ServersTabBlockedDialog.tsx
   - src/components/servers/ServerList.tsx
   - src/components/servers/ServerRow.tsx
   - src/components/servers/ServerSettings.tsx
@@ -4946,16 +4948,53 @@ files:
   - src/components/servers/ServerOutputLog.tsx
   - src/components/servers/fields.tsx
   - src/lib/servers.ts
+  - src/lib/serversTab.ts
   - src/stores/serversStore.ts
   - src/lib/detachedSession.ts
+  - src/layouts/main/TabContentRouter.tsx
+  - src/components/tabbar/TabBar.tsx
+  - src-tauri/src/servers/tab_lock.rs
+  - src-tauri/src/servers/mod.rs
   - src-tauri/src/windowing/mod.rs
 controls:
-  # Standalone OS window — opened by ribbon "servers" / Ctrl+Shift+S via
-  # open_detached_window(kind=servers). Browser smoke uses ?servers=main.
+  # Single-instance tab ("servers") opened by Tools sidebar, Tools menu, Ctrl+Shift+S,
+  # or ?servers=main. Protected within a window and across running Taomni instances.
+  - id: sidebar-tool-servers
+    selector: '[data-testid="sidebar-tool-servers"]'
+    kind: interactive
+    optional: true       # visible when Tools rail tab is active
+  - id: servers-tab-panel
+    selector: '[data-testid="servers-tab-panel"]'
+    kind: display
+    optional: true
+  - id: tab-servers
+    selector: '[data-testid="tab-item"][data-tab-type="servers"]'
+    kind: display
+    optional: true
+  - id: tab-close-servers
+    selector: '[data-testid="tab-item"][data-tab-type="servers"] [data-testid="tab-close"]'
+    kind: interactive
+    optional: true
+  - id: tab-context-duplicate
+    selector: '[data-testid="tab-context-duplicate"]'
+    kind: display        # disabled menu item asserted on singleton tab context menus
+    optional: true
+  - id: servers-blocked-dialog
+    selector: '[data-testid="servers-blocked-dialog"]'
+    kind: display
+    optional: true
+  - id: servers-blocked-message
+    selector: '[data-testid="servers-blocked-message"]'
+    kind: display
+    optional: true
+  - id: servers-blocked-ok
+    selector: '[data-testid="servers-blocked-ok"]'
+    kind: display        # dismissed inside servers_multi_instance_probe
+    optional: true
   - id: dialog
     selector: '[data-testid="servers-dialog"]'
     kind: display
-    optional: true       # only inside the servers detached window
+    optional: true       # inside the active servers tab
   - id: dialog-cancel
     selector: '[data-testid="servers-dialog-cancel"]'
     kind: interactive
@@ -4998,6 +5037,14 @@ controls:
     selector: '[data-testid="server-row-ssh-settings"]'
     kind: interactive
     optional: true
+  - id: server-row-http-start
+    selector: '[data-testid="server-row-http-start"]'
+    kind: interactive
+    optional: true
+  - id: server-row-http-stop
+    selector: '[data-testid="server-row-http-stop"]'
+    kind: interactive
+    optional: true
   # Right pane — settings form + live console for the selected server.
   - id: server-settings
     selector: '[data-testid="server-settings"]'
@@ -5013,18 +5060,18 @@ controls:
     optional: true
   - id: server-log-clear
     selector: '[data-testid="server-log-clear"]'
-    kind: display
+    kind: interactive
     optional: true
 -->
 
-- 从 Ribbon `Servers` 按钮（`ribbon-servers`）或 `Ctrl+Shift+S` 打开**独立 OS 窗口**（`open_detached_window` kind=`servers`，系统标题栏/边框可移动可缩放；已打开则 focus 单例窗口 `servers-main`）；浏览器预览走 `window.open(?servers=main)`
-- 窗口内：左侧服务器列表 + 右侧设置面板 + Cancel/Apply 页脚；无自定义模态标题栏（由系统 chrome 承担）
+- 从 Tools 侧栏按钮（`sidebar-tool-servers`）、主菜单 Tools → Local servers、全局命令面板（`Ctrl/Cmd+K` → `global-search-result[data-result-id="servers"]`）、`Ctrl+Shift+S` 或 `?servers=main` / `#servers=main` 在主工作区标签栏内以**单实例页签**（`tab-item[data-tab-type="servers"]` + `servers-tab-panel`）打开；禁止 Duplicate 或拖出为独立 OS 窗口，同窗口重复触发会激活已有页签；跨浏览器页签通过 `localStorage` 租约、原生多实例通过操作系统 `ModuleLock` 互斥并在竞争实例上弹出 `servers-blocked-dialog` 提示
+- 面板内：左侧服务器列表 + 右侧设置面板 + Cancel/Apply 页脚；通过页签栏切换进出或从 `?servers=main` 入口进入均保持单一页面上下文
 - 支持 10 类本地服务器（`SERVER_DEFS` 顺序）：ssh/sftp、ftp、tftp、http、telnet、vnc、nfs、cron、iperf、rdp；每行（`server-row-${type}`）显示运行状态点 + Start/Stop/Settings 按钮
 - 右栏：`CommonSettings`（监听端口 / 绑定地址 / 自动停止 / 开机自启）+ 每类专属设置表单（`settings/<X>Settings.tsx`，复用 `fields.tsx` 受控原语）+ `ServerOutputLog` 实时输出控制台（自动滚动 `server-log-autoscroll` / 清空 `server-log-clear`）
-- 后端 `src-tauri/src/servers/`：`ServerRegistry` 镜像 Tunnel 架构，配置持久化到 SQLite `server_configs` 表并在启动时 `autostart_servers()`；in-process 纯 Rust（ssh/sftp/http/ftp/tftp/telnet/cron）与受监管系统二进制（vnc/nfs/iperf 经 `which` + `spawn_supervised`，缺工具返回明确错误而非假「运行中」）
-- 输出/状态分别通过 `server://output/<type>` / `server://status/<type>` 事件流推送（`app.emit` 全局，detached 窗口可收）；后端 `ServerRegistry` 另按类型保留最近 500 行输出（`list_server_logs`），窗口打开时先显示窗口关闭期间的历史，清空按钮同时清空后端历史（`clear_server_log`）；Apply 保存所有 dirty 配置，对运行中且端口已改的服务器提示需重启生效；有未保存修改时 Cancel / 系统关闭按钮会确认丢弃
-- i18n key 在 `servers.*`（en / zh-CN 双语）；前端 store 为 `serversStore`，IPC + 类型 + `SERVER_DEFS` 在 `src/lib/servers.ts`
-- **e2e 测试限制**：真正 start/stop 一个服务器会绑定真实端口 / 拉起系统二进制，属带副作用操作；浏览器冒烟只验证对话框 chrome（打开 → 选行 → 设置面板/输出控制台挂载 → Cancel 关闭），实际启停留待 native/手动回归
+- 后端 `src-tauri/src/servers/`：`ServerRegistry` 镜像 Tunnel 架构，`tab_lock.rs` 提供 `claim_servers_tab` / `release_servers_tab` 进程级锁管理并在窗口关闭/销毁及导航清理中释放；配置持久化到 SQLite `server_configs` 表并在启动时 `autostart_servers()`；in-process 纯 Rust（ssh/sftp/http/ftp/tftp/telnet/cron）与受监管系统二进制（vnc/nfs/iperf 经 `which` + `spawn_supervised`，缺工具返回明确错误而非假「运行中」）
+- 输出/状态分别通过 `server://output/<type>` / `server://status/<type>` 事件流推送；后端 `ServerRegistry` 另按类型保留最近 500 行输出（`list_server_logs`），重新打开页签可恢复日志，清空按钮同时清空后端历史（`clear_server_log`）；Apply 保存所有 dirty 配置，对运行中且端口已改的服务器提示 `Restart server to apply port change`；有未保存修改时 Cancel 会确认丢弃，切换到其他页签再切回会保留未保存草稿
+- i18n key 在 `servers.*`（en / zh-CN 双语）；前端 store 为 `serversStore`，IPC + 类型 + `SERVER_DEFS` 在 `src/lib/servers.ts`，单实例页签协调逻辑在 `src/lib/serversTab.ts`
+- **e2e 测试覆盖**：`TC-SERVERS-001-tab-singleton-browser`、`TC-auto-F-Servers-1-servers-dialog` 覆盖浏览器单实例页签及跨上下文互斥，`TC-SERVERS-002-tab-singleton-native` 覆盖原生双进程 OS `ModuleLock` 与热路由切换，`TC-SERVERS-003-tab-functional-native` 覆盖原生 HTTP 启停、日志、热改端口提示及配置持久化
 
 ### 22.2 RDP Server（与 Windows 远程桌面对齐）🚧
 

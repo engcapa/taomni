@@ -428,7 +428,7 @@ class NativeSession(WebDriverTransport):
             if not data_root:
                 raise WebDriverError("Windows WebView2 session requires the QA data directory")
             payload["capabilities"]["alwaysMatch"]["tauri:options"]["webviewOptions"] = {
-                "userDataFolder": str(Path(data_root) / QA_APP_ID / "webview"),
+                "userDataFolder": os.environ.get("TAOMNI_QA_WEBVIEW_DIR") or str(Path(data_root) / QA_APP_ID / "webview"),
                 # Canvas originals use sRGB. Host monitor ICC profiles must
                 # not recolor the QA renderer before native pixel comparison.
                 "additionalBrowserArguments": ["--force-color-profile=srgb"],
@@ -1091,9 +1091,10 @@ class NativeSession(WebDriverTransport):
 
 
 class NativeHarness:
-    def __init__(self, cfg: dict, report_root: Path):
+    def __init__(self, cfg: dict, report_root: Path, *, shared_data_env: dict[str, str] | None = None):
         self.cfg = cfg
         self.report_root = report_root
+        self.shared_data_env = dict(shared_data_env or {})
         self.application = native_binary(cfg)
         self.driver = TauriDriverProcess(cfg, report_root)
         self._previous_env: dict[str, str | None] = {}
@@ -1105,7 +1106,7 @@ class NativeHarness:
             raise WebDriverError(str(exc)) from exc
         isolation_overrides = native_isolation_env(self.report_root)
         tooling_overrides, tooling_evidence = native_tooling_env(self.cfg)
-        overrides = {**isolation_overrides, **tooling_overrides}
+        overrides = {**isolation_overrides, **tooling_overrides, **self.shared_data_env}
         if identity.get("source_sha256"):
             from qa_ui_auto.provenance import source_identity
             if identity["source_sha256"] != source_identity(ROOT):

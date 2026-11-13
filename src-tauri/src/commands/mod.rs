@@ -364,7 +364,9 @@ pub(crate) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         | "probe_system_rdp"
         | "open_system_rdp_settings"
         | "save_server_config"
-        | "load_server_configs" => servers::handle(invoke),
+        | "load_server_configs"
+        | "claim_servers_tab"
+        | "release_servers_tab" => servers::handle(invoke),
         "vnc_connect"
         | "vnc_disconnect"
         | "vnc_test_connection"

@@ -23,6 +23,18 @@ export const createTabsSlice: StateCreator<AppState, [], [], Pick<AppState, "tab
 
   addTab: (tab) =>
     set((s) => {
+      if (tab.type === "servers") {
+        const existing = s.tabs.find((item) => item.type === "servers");
+        if (existing) {
+          return {
+            activeTabId: existing.id,
+            activeSideTab: ["home", "workspaces", "agents"].includes(s.activeSideTab) ? "sessions" : s.activeSideTab,
+            tabFilter: null,
+            terminalSplitActive: false,
+            statusMessage: tr("status.openedTab", { title: existing.title }),
+          };
+        }
+      }
       const nextTabs = [...s.tabs, tab];
       const recentResult = upsertRecentWorkspaceForTab(
         s.recentWorkspaces,
@@ -53,6 +65,7 @@ export const createTabsSlice: StateCreator<AppState, [], [], Pick<AppState, "tab
       const idx = s.tabs.findIndex((t) => t.id === id);
       if (idx === -1) return s;
       const source = s.tabs[idx];
+      if (source.type === "servers") return s;
       const isTerminal = source.type === "terminal";
       // Explicit renames permanently opt out of cwd-derived titles. A duplicate
       // of a manual tab must keep that choice and sequence the renamed title
