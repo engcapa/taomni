@@ -131,6 +131,12 @@ steps:
 - assert_visible: '[data-testid="explorer-tab"][data-path="${fixture.explorer_base}"]:visible'
 - assert_no_runtime_errors: null
 - screenshot: explorer-workspace-entries.png
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="tab-item"][data-tab-type="file-browser"] .taomni-explorer-tab-icon path'
+- assert_attribute:
+    selector: '[data-testid="tab-item"][data-tab-type="file-browser"] .taomni-explorer-tab-icon path'
+    name: fill
+    equals: 'var(--ex-folder)'
 verification:
   review: reviewed
   requirements:
@@ -252,6 +258,13 @@ verification:
     - 70
     - 71
     - 72
+  - id: R4
+    requirement: Main Explorer tabs use the prototype folder SVG and theme-aware folder token rather than the legacy file document icon.
+    actions: [74]
+    checkpoints:
+    - step: 76
+      expectation: Tools retains the main Explorer strip and its folder path uses the Explorer folder color token.
+    results: [76]
   visual:
   - check: Workspace Explorer rail, unchanged Project tree and tab ordering.
     method: manual

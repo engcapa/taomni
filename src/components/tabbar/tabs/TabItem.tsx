@@ -1,9 +1,11 @@
-import { Braces, Database as DatabaseIcon, FileText, Folder, GitBranch, KeyRound, Monitor, Network as NetworkIcon, Terminal as TerminalIcon, X } from "lucide-react";
+import { Braces, Database as DatabaseIcon, Folder, GitBranch, KeyRound, Monitor, Network as NetworkIcon, Terminal as TerminalIcon, X } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { useCustomDropTarget, type CustomDragData } from "../../../lib/customDnD";
 import type { Tab } from "../../../types";
 import { type TabItemProps } from "./model";
 import { TAB_DRAG_MIME } from "./scroll";
+import { ExplorerFileIcon } from "../../explorer/ExplorerFileIcon";
+import "./explorerTabIcon.css";
 
 export function dbEngineColor(engine?: string): string {
   switch (engine) {
@@ -62,7 +64,7 @@ export function TabIcon({ tab }: { tab: Tab; }) {
     case "mfa":
       return <KeyRound className="w-3 h-3" style={{ color: "#c98a00" }} />;
     case "file-browser":
-      return <FileText className="w-3 h-3" style={{ color: "var(--taomni-text-muted)" }} />;
+      return <ExplorerFileIcon directory className="taomni-explorer-tab-icon h-3.5 w-3.5" />;
     default:
       return <TerminalIcon className="w-3 h-3" style={{ color: "#2b5d8b" }} />;
   }

@@ -1166,15 +1166,20 @@
 - `[data-testid="explorer-context-reveal"]` — interactive — F-EXPLORER-1.explorer-context-reveal
 - `[data-testid="explorer-context-terminal"]` — interactive — F-EXPLORER-1.explorer-context-terminal
 - `[data-testid="explorer-crumb"]` — interactive — F-EXPLORER-1.explorer-crumb
+  ↳ `[data-testid="explorer-crumb"]${fixture.explorer_crumb_folder_match}` — alias
 - `[data-testid="explorer-delete-cancel"]` — interactive — F-EXPLORER-1.explorer-delete-cancel
 - `[data-testid="explorer-delete-confirm"]` — interactive — F-EXPLORER-1.explorer-delete-confirm
 - `[data-testid="explorer-file-list"]` — interactive — F-EXPLORER-1.explorer-file-list
 - `[data-testid="explorer-file-row"]` — interactive — F-EXPLORER-1.explorer-file-row
+  ↳ `[data-testid="explorer-file-row"] .ex-name` — alias
+- `[data-testid="tab-item"][data-tab-type="file-browser"] .taomni-explorer-tab-icon path` — display — F-EXPLORER-1.explorer-main-tab-icon
 - `[data-testid="explorer-files"]` — display — F-EXPLORER-1.explorer-files
 - `[data-testid="explorer-filter"]` — interactive — F-EXPLORER-1.explorer-filter
 - `[data-testid="explorer-forward"]` — interactive — F-EXPLORER-1.explorer-forward
 - `[data-testid="explorer-nav-newtab"]` — interactive — F-EXPLORER-1.explorer-nav-newtab
 - `[data-testid="explorer-nav-node"]` — interactive — F-EXPLORER-1.explorer-nav-node
+  ↳ `[data-testid="explorer-nav-node"]${fixture.explorer_source_folder_match}` — alias
+  ↳ `[data-testid="explorer-nav-node"]${fixture.explorer_source_match} button` — alias
 - `[data-testid="explorer-nav-shortcut"]` — interactive — F-EXPLORER-1.explorer-nav-shortcut
 - `[data-testid="explorer-nav-tree"]` — display — F-EXPLORER-1.explorer-nav-tree
 - `[data-testid="explorer-new-file"]` — interactive — F-EXPLORER-1.explorer-new-file

@@ -14565,6 +14565,8 @@ controls:
     kind: interactive
   - id: explorer-crumb
     selector: '[data-testid="explorer-crumb"]'
+    aliases:
+    - '[data-testid="explorer-crumb"]${fixture.explorer_crumb_folder_match}'
     kind: interactive
   - id: explorer-delete-cancel
     selector: '[data-testid="explorer-delete-cancel"]'
@@ -14577,7 +14579,12 @@ controls:
     kind: interactive
   - id: explorer-file-row
     selector: '[data-testid="explorer-file-row"]'
+    aliases:
+    - '[data-testid="explorer-file-row"] .ex-name'
     kind: interactive
+  - id: explorer-main-tab-icon
+    selector: '[data-testid="tab-item"][data-tab-type="file-browser"] .taomni-explorer-tab-icon path'
+    kind: display
   - id: explorer-files
     selector: '[data-testid="explorer-files"]'
     kind: display
@@ -14592,6 +14599,9 @@ controls:
     kind: interactive
   - id: explorer-nav-node
     selector: '[data-testid="explorer-nav-node"]'
+    aliases:
+    - '[data-testid="explorer-nav-node"]${fixture.explorer_source_folder_match}'
+    - '[data-testid="explorer-nav-node"]${fixture.explorer_source_match} button'
     kind: interactive
   - id: explorer-nav-shortcut
     selector: '[data-testid="explorer-nav-shortcut"]'

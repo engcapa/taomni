@@ -36,11 +36,32 @@ Browser/VFS 不能证明原生文件语义；WebView reload 不等同整个 OS �
 
 ### 本地单元与静态检查
 
-- `pnpm test --maxWorkers=2`：735 文件通过，6,647 测试通过、1 项跳过（完整日志 `/tmp/explorer-full-unit-stable.log`）。第一次在并发开发期间运行的全套出现3个尚在修改的模块失败；保留该原始日志 `/tmp/explorer-full-unit.log`，稳定代码重新完整运行后通过，不以旧失败覆盖或伪装通过。
+- `pnpm test --maxWorkers=2`：最新稳定批次737文件通过，6,663测试通过、1项跳过（`/tmp/explorer-post-ci-full-unit.log`）。此前735文件/6,647通过批次保留在`/tmp/explorer-full-unit-stable.log`。第一次在并发开发期间运行的全套出现3个尚在修改的模块失败；保留原始`/tmp/explorer-full-unit.log`，不以重跑覆盖旧失败。
 - 最后的小型 tree/地址/滚动调整另外跑过对应 mounted 单测；7 文件72项的 Explorer 定向批次通过。预览/交互完整55项、后端18项、剪贴板21项存在重叠，不把批次数相加当作独立用例数。
 - `LIBCLANG_PATH=/usr/lib/llvm-18/lib cargo test --manifest-path src-tauri/Cargo.toml --lib filebrowser::local_ops -- --nocapture`：18通过。
 - 同环境 `cargo test --manifest-path src-tauri/Cargo.toml --lib file_clipboard -- --nocapture`：21通过。
 - `pnpm exec tsc -b --pretty false`、`pnpm check:refactor`、`cargo fmt --manifest-path src-tauri/Cargo.toml -- --check`、`git diff --check`：通过。
 - Windows x86_64 GNU / macOS ARM64 临时 source harness 对新增平台路径/回收站/文件剪贴板执行静态 `cargo check` 通过；不是完整应用构建或桌面运行证据。
 
-GitHub run/commit、逐平台结果和关联失败将在执行后回填。尚不宣称 UI 验收或三端通过。
+### GitHub 执行追踪
+
+完整轮次选择三端 `browser,native`、匹配 release QA 构建、TC-EXPLORER-001..005、TC-010/043，加 workflow 自动合并的完整 `crash-regression`；下表单列未进入执行的定向尝试。实际 selection 为每端15个 browser /14个 native，即87个模式-平台用例执行；不能将 GitHub 执行 job 为 success 当作 case 全通过，必须读取 runner summary 与最终汇总。
+
+| Run / 提交 | 结果与后续 |
+|---|---|
+| [43362457801](https://github.com/engcapa/taomni/actions/runs/43362457801) / `6a5dca91` | catalog gate 在UI执行前失败：4个新增 selector orphan。补登记后本地 audit 通过，未改既有基线。无UI通过证据。 |
+| [43362989083](https://github.com/engcapa/taomni/actions/runs/43362989083) / `61ab5dfe` | 三端构建通过；browser大目录与crash集合通过；Tools标签被隐藏、非标准选择器、焦点转移误取消拖动导致Explorer用例失败。修复见`f918a8ac`。原始汇总保留于`/tmp/taomni-explorer-previous-summary.pgldai`。 |
+| [43365859206](https://github.com/engcapa/taomni/actions/runs/43365859206) / `f918a8ac` | 三端构建通过，browser文件操作003/大目录004通过；Linux/Windows crash集合通过。剩余失败包含：工作区重载被主Explorer抢焦点、Markdown断言非标准`:visible`、Windows原生等待剪切态的竞态、窄窗口原生预览未手动展开、终端输入目标错误、macOS面包屑目标在视口外。macOS crash失败也由本次Explorer恢复污染引起，不当作无关失败忽略。原始汇总`/tmp/taomni-explorer-run3-summary.h3fdvS`。 |
+| [43372314485](https://github.com/engcapa/taomni/actions/runs/43372314485) / `d1309cab` | **完成，78通过/9失败，无跳过**：三端构建、完整crash-regression、受影响SFTP通过。三端browser002/003/004与native004通过。browser001异步标签计数；native003的Linux残留右键、macOS树目标被状态栏遮挡、Windows路径分隔符选择器；native005的Linux退出确认、Windows/macOS窄窗预览遮挡行中心失败。原始汇总`/tmp/taomni-explorer-round4-summary.z4pzrm`，细节保留`round4-browser.fKykoz`、`round4-native.d1dcCT`、`round4-windows.zG17Np`。恢复污染修复后Mac crash已全部通过。 |
+| [43374078423](https://github.com/engcapa/taomni/actions/runs/43374078423) / `2671e416` | 定向browser001尝试在catalog门禁失败：新增异步等待选择器未登记。补aliases后本地audit通过；无UI执行证据。 |
+| [43374770655](https://github.com/engcapa/taomni/actions/runs/43374770655) / `8c68c55a` | 定向browser001的`modes=browser`与自动完整crash集合内native-only用例不兼容，plan拒绝；无UI执行。后续仍使用`browser,native`，不删减crash集合。 |
+
+本次相关失败均保留原始报告，不因后续修复而改写旧结果。尚不宣称最终 UI 验收或三端全部通过。
+
+### 本轮失败定位与重跑准备
+
+- Linux拖动原始DOM收据显示开始前`buttons=2`，按左键后变为`buttons=3`且没有`pointerdown`。定位到WebKitGTK W3C非左键释放丢失button的实现路径；测试输入改用已核对QA可执行文件、隔离profile和窗口标题的X11平衡右键点击，绝不让产品接受错误双键状态。其他系统及左键继续既有W3C输入；Wayland非左键路径明确未验证、不回落错误W3C。
+- macOS树目标矩形中心虽在WebView内，却被状态栏/滚动裁剪遮挡。native drag现在滚动实际端点并复用稳定`elementFromPoint`命中检查，准备source后再次检查target未移动/遮挡；所有动作与实际DOM事件、完整字节oracle仍保留。
+- Windows从原生列表进入子目录会得到反斜杠路径，fixture输入为正斜杠。用例选择器现匹配相同完整绝对路径的两种分隔符，不采用可能命中别处的basename退让。
+- 窄窗手动预览覆盖行中心时，005点击仍可见的`.ex-name`子元素；不使用force/synthetic click。OS重启保留Explorer标签，并显式声明、核对和点击退出确认；不以关闭全部标签、reload或kill冒充恢复证明。
+- 标签图标复用原型同一文件夹SVG，浅/深色分别使用`#f5b83d`/`#e8b04a`；全局chrome其余部分仍沿用产品。图标及保留SFTP图标的3文件28项单测通过，`tsc`及`check:refactor`通过。最终稳定合并`test_native_drag`、restart/shutdown、pointer/transport、X11/window-drag及case契约共256项通过（`/tmp/explorer-native-tool-unit-stable.log`）；此前与pointer签名修改交叠的失败日志保留在`/tmp/explorer-native-tool-unit-final.log`。catalog audit与三端87项selection plan通过，未更改coverage baseline。下一轮GitHub结果另行追加。

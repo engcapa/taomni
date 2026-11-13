@@ -1,17 +1,63 @@
 """Restart only this run's owned QA application, retaining its isolated profile."""
 from __future__ import annotations
 
+from functools import partial
 import json
 import os
 from pathlib import Path
 import platform
 import subprocess
 import time
+from typing import TypedDict
 
 from native_process_group import wait_for_driver_ports
 from native_application_shutdown import linux_storage_processes, wait_for_application_shutdown
 from native_webdriver_transport import WebDriverError
 from native_window_close_x11 import close_x11_application_window, x11_window_closed
+
+
+class ExitConfirmation(TypedDict):
+    title: str
+    message: str
+    confirm_label: str
+
+
+CONFIRM_SELECTOR = '[data-testid="confirm-dialog"] [data-testid="confirm-dialog-confirm"]'
+EXIT_DIALOG_OBSERVATION = """
+const visible = el => {
+  if (!el) return false;
+  const rect = el.getBoundingClientRect(), style = getComputedStyle(el);
+  return rect.width > 0 && rect.height > 0 && style.display !== 'none'
+    && style.visibility !== 'hidden' && style.visibility !== 'collapse' && Number(style.opacity) !== 0;
+};
+const dialogs = [...document.querySelectorAll('[data-testid="confirm-dialog"]')].filter(visible);
+if (!dialogs.length) return null;
+const dialog = dialogs[0];
+const buttons = dialog.querySelectorAll('[data-testid="confirm-dialog-confirm"]');
+const button = buttons[0];
+return {
+  count: dialogs.length,
+  title: dialog.getAttribute('aria-label') ?? '',
+  message: dialog.querySelector('[data-testid="confirm-dialog-message"]')?.textContent?.trim() ?? '',
+  confirm_label: button?.textContent?.trim() ?? '',
+  confirm_count: buttons.length,
+  confirm_visible: visible(button),
+  confirm_enabled: !!button && !button.disabled && button.getAttribute('aria-disabled') !== 'true'
+};
+"""
+
+
+def validate_exit_confirmation(value: object) -> ExitConfirmation:
+    fields = {"title", "message", "confirm_label"}
+    if not isinstance(value, dict) or set(value) != fields or any(
+        not isinstance(value.get(field), str) or not value[field].strip() for field in fields
+    ):
+        raise ValueError("expect_exit_confirmation requires exactly nonempty title, message and confirm_label strings")
+    return ExitConfirmation(title=value["title"], message=value["message"], confirm_label=value["confirm_label"])
+
+
+def bind_application_restarter(driver, session) -> None:
+    session.application_restarter = partial(restart_owned_application, driver, session)
 
 
 def close_macos_application_window(application: Path) -> dict:
@@ -34,7 +80,8 @@ def uses_x11_window_close() -> bool:
 
 
 def close_application_window(session, timeout: float = 15,
-                             processes: dict[int, str] | None = None) -> dict | None:
+                             processes: dict[int, str] | None = None, *,
+                             expect_exit_confirmation: ExitConfirmation | None = None) -> dict | None:
     """Use the production close path before releasing the owned driver tree.
 
     DELETE-session/kill is teardown, not a normal application close. In
@@ -50,6 +97,28 @@ def close_application_window(session, timeout: float = 15,
         return (observation is not None and isinstance(error, (BrokenPipeError, ConnectionResetError))) \
             or any(message in str(error).lower() for message in closed_messages)
 
+    confirmation = None
+    if expect_exit_confirmation is not None:
+        expected = validate_exit_confirmation(expect_exit_confirmation)
+        confirmation = {"expected": expected, "selector": CONFIRM_SELECTOR,
+                        "input": "session.click", "click_attempted": False,
+                        "click_returned": False, "closed_after_confirmation": False,
+                        "status": "waiting"}
+        if not isinstance(getattr(session, "application_restart_observation", None), dict):
+            session.application_restart_observation = {}
+        session.application_restart_observation["exit_confirmation"] = confirmation
+        # Never approve a dialog left by an earlier action (delete, backup, etc.).
+        confirmation["before_close"] = session.execute(EXIT_DIALOG_OBSERVATION)
+        if confirmation["before_close"] is not None:
+            raise RuntimeError("QA application exit confirmation was already open before the close request")
+
+    def observed_close():
+        if confirmation is not None:
+            if not confirmation["click_attempted"]:
+                raise RuntimeError("QA application closed without the expected exit confirmation")
+            confirmation.update(closed_after_confirmation=True, status="closed")
+        return observation
+
     observation = None
     try:
         if session.transport == "macOS WKWebView bridge":
@@ -62,40 +131,20 @@ def close_application_window(session, timeout: float = 15,
         else:
             session.click('[data-testid="window-close"]')
     except (WebDriverError, OSError) as error:
-        if "element click intercepted" in str(error).lower():
-            # A transient native overlay can cover the titlebar control while
-            # a pane commits its last update. The production close handler is
-            # still the boundary; dispatch it on the owned DOM node after the
-            # real pointer action was rejected, then verify the context closes.
-            try:
-                dispatched = session.execute(
-                    'const button = document.querySelector("[data-testid=window-close]");'
-                    'if (!button) throw new Error("QA application close control is missing");'
-                    'button.click(); return true;'
-                )
-            except (WebDriverError, OSError) as dispatch_error:
-                # This is the same close handler: WebKit can terminate its
-                # context before returning the script acknowledgement too.
-                if closed(dispatch_error):
-                    return observation
-                raise
-            if dispatched is not True:
-                raise error
-        elif closed(error):
-            return observation
-        else:
-            raise
+        if closed(error):
+            return observed_close()
+        # Interception/uncertain input stays a failure, never a synthetic click.
+        raise
     native_x11 = observation is not None and observation.get("transport") == "X11 window-manager close"
     end = time.monotonic() + timeout
     while time.monotonic() < end:
         if session.deadline:
             session.deadline.remaining()
         if native_x11 and observation is not None and x11_window_closed(observation):
-            return observation
+            return observed_close()
         try:
-            dialog = session.execute(
-                'return document.querySelector("[data-testid=confirm-dialog]")?.textContent ?? null;'
-            )
+            dialog = session.execute(EXIT_DIALOG_OBSERVATION if confirmation is not None else
+                'return document.querySelector("[data-testid=confirm-dialog]")?.textContent ?? null;')
         except (WebDriverError, OSError) as error:
             if native_x11 and observation is not None:
                 # No transport error proves closure. Observe this exact XID
@@ -104,15 +153,52 @@ def close_application_window(session, timeout: float = 15,
                 time.sleep(0.05)
                 continue
             if closed(error):
-                return observation
+                return observed_close()
             raise
         if dialog:
-            raise RuntimeError("QA application close needs confirmation; handle the exit dialog explicitly before restarting")
+            if confirmation is None:
+                raise RuntimeError("QA application close needs confirmation; declare expect_exit_confirmation explicitly before restarting")
+            confirmation["observed"] = dialog
+            if confirmation["click_attempted"]:
+                # It may still be the clicked dialog while React commits; only
+                # observe it. Any replacement prompt must fail without a click.
+                if confirmation.get("dialog_dismissed") or dialog != confirmation["clicked_dialog"]:
+                    raise RuntimeError("QA application showed another confirmation after the exit confirmation")
+            else:
+                if not isinstance(dialog, dict) or any(dialog.get(key) != value for key, value in expected.items()):
+                    raise RuntimeError("QA application exit confirmation did not match the expected title, message and confirm label")
+                if (dialog.get("count") != 1 or dialog.get("confirm_count") != 1
+                        or dialog.get("confirm_visible") is not True or dialog.get("confirm_enabled") is not True):
+                    raise RuntimeError("QA application exit confirmation must have one visible enabled confirm button")
+                confirmation.update(click_attempted=True, clicked_dialog=dict(dialog), status="clicking")
+                try:
+                    session.click(CONFIRM_SELECTOR)
+                except (WebDriverError, OSError) as error:
+                    confirmation["click_error"] = str(error)
+                    request = getattr(session, "last_request", {})
+                    action_attempted = (request.get("method") in {"POST", "DELETE"}
+                                        and str(request.get("path", "")).endswith("/actions")
+                                        and (request.get("phase") in {"response_headers", "response_body",
+                                                                      "decode_response", "complete"}
+                                             or (request.get("method") == "DELETE" and request.get("phase") == "send_request")))
+                    if not closed(error) or not action_attempted:
+                        raise
+                    # Only an action/release reply may be lost as the clicked
+                    # WebView closes. A lost preparation read is not input proof.
+                    # Never replay it; still require closure and normal shutdown.
+                else:
+                    confirmation["click_returned"] = True
+                finally:
+                    confirmation["click_request"] = dict(getattr(session, "last_request", {}))
+                confirmation["status"] = "waiting-for-close"
+        elif confirmation is not None and confirmation["click_attempted"]:
+            confirmation["dialog_dismissed"] = True
         time.sleep(0.05)
     raise RuntimeError("QA application did not close through its window control")
 
 
-def restart_owned_application(driver, session) -> dict:
+def restart_owned_application(driver, session, *,
+                              expect_exit_confirmation: ExitConfirmation | None = None) -> dict:
     deadline = session.deadline
     before = session.session_id
     macos_bridge = session.transport == "macOS WKWebView bridge"
@@ -124,7 +210,8 @@ def restart_owned_application(driver, session) -> dict:
     processes = linux_storage_processes(driver, session.application) if platform.system() == "Linux" else {}
     primary_error = None
     try:
-        close_observation = close_application_window(session, processes=processes)
+        close_observation = close_application_window(session, processes=processes,
+            expect_exit_confirmation=expect_exit_confirmation)
         observation["native_close"] = close_observation
         # The WebView has closed normally. Release transport/ownership without
         # sending DELETE to an already closed browsing context.
@@ -175,10 +262,13 @@ def restart_owned_application(driver, session) -> dict:
     elif session.session_id == before:
         raise RuntimeError("QA application restart did not create a new native session")
     observation["stage"] = "complete"
+    if "exit_confirmation" in observation:
+        observation["exit_confirmation"]["status"] = "verified"
     return {"application": application, "before_session": before,
             "after_session": session.session_id, "profile_retained": True,
             "shutdown": "application-window-close",
             "native_shutdown": observation["native_shutdown"],
+            **({"exit_confirmation": observation["exit_confirmation"]} if "exit_confirmation" in observation else {}),
             **({"driver_port_release": observation["driver_port_release"]} if observation["driver_port_release"] else {}),
             **({"before_owner_pid": before_owner, "after_owner_pid": after_owner} if macos_bridge else {}),
             **({"native_close": close_observation} if close_observation else {})}

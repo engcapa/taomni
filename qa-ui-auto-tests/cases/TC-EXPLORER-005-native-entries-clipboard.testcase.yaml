@@ -2,8 +2,9 @@ id: TC-EXPLORER-005
 title: Native Explorer opens terminal cwd, publishes real system file clipboard and restores current directory
 description: AC03/07/11/12/13/17/20 native boundary. Explorer opens from Tools and creates a real local terminal in its cwd. Terminal right-click
   reuses the existing Explorer or explicitly creates another. Real clipboard formats are read independently, a real desktop file manager
-  pastes copied bytes, real external edits refresh preview, and a verified OS-process restart restores persisted path/preferences. No browser
-  stub is native proof.
+  pastes copied bytes, real external edits refresh preview, and a verified OS-process restart restores persisted path/preferences. The open
+  Explorer remains in place; restart expects and clicks its exact visible exit confirmation, retaining the confirmation and normal-shutdown
+  receipt. No browser stub is native proof.
 modes:
 - native
 covers:
@@ -46,19 +47,19 @@ steps:
 - wait_for: '[data-testid="explorer-file-row"][data-name="notes.txt"]'
 - click: '[data-testid="explorer-cmd-preview"]'
 - wait_for: '[data-testid="explorer-preview"]'
-- click: '[data-testid="explorer-file-row"][data-name="notes.txt"]'
+- click: '[data-testid="explorer-file-row"][data-name="notes.txt"] .ex-name'
 - wait_for: '[data-testid="explorer-preview-text"]'
 - assert_text:
     selector: '[data-testid="explorer-preview-text"]'
     contains: Explorer preview text
-- click: '[data-testid="explorer-file-row"][data-name="logo.png"]'
+- click: '[data-testid="explorer-file-row"][data-name="logo.png"] .ex-name'
 - wait_for: '[data-testid="explorer-preview-image"]'
 - eval_readonly:
     expression: document.querySelector(".ex-pv-img img").complete && document.querySelector(".ex-pv-img img").naturalWidth === 1
     expect_truthy: true
     timeout_sec: 10
 - screenshot: explorer-native-image-blob.png
-- click: '[data-testid="explorer-file-row"][data-name="notes.txt"]'
+- click: '[data-testid="explorer-file-row"][data-name="notes.txt"] .ex-name'
 - wait_for: '[data-testid="explorer-preview-text"]'
 - click: '[data-testid="explorer-cmd-copy"]'
 - file_clipboard:
@@ -111,7 +112,7 @@ steps:
       '
 - right_click: '[data-testid="terminal-pane"][data-terminal-active="true"]'
 - click: '[data-testid="terminal-context-explorer"]'
-- click: '[data-testid="explorer-file-row"][data-name="notes.txt"]'
+- click: '[data-testid="explorer-file-row"][data-name="notes.txt"] .ex-name'
 - assert_text:
     selector: '[data-testid="explorer-preview-text"]'
     contains: External editor changed the preview
@@ -122,7 +123,11 @@ steps:
 - assert_localstorage:
     key: taomni.explorer.view.v1
     contains: '"preview":false'
-- native_restart_app: null
+- native_restart_app:
+    expect_exit_confirmation:
+      title: Exit
+      message: There is 1 open tab. Exit Taomni and close it?
+      confirm_label: Exit
 - wait_for: '[data-testid="explorer-tab"]'
 - assert_localstorage:
     key: taomni.explorer.view.v1
@@ -217,8 +222,9 @@ verification:
     - 42
     - 48
   - id: R3
-    requirement: Explorer current directory and shared preview preferences restore after a verified OS-process restart; terminal explicit
-      new opens one additional same-cwd Explorer.
+    requirement: Explorer current directory and shared preview preferences restore after a verified OS-process restart with Explorer still
+      open. The runner checks the exact visible Exit dialog, clicks its confirm button once through real session input, records the confirmation
+      and waits for normal application/storage shutdown before a new owned native session. Terminal explicit new opens one additional same-cwd Explorer.
     actions:
     - 27
     - 28
@@ -230,11 +236,11 @@ verification:
     - 66
     checkpoints:
     - step: 29
-      expectation: Bottom position applies before reload.
+      expectation: Bottom position applies before the OS-process restart.
     - step: 32
       expectation: Wrap is persisted.
     - step: 59
-      expectation: Current native directory restores after reload.
+      expectation: Current native directory restores after the verified OS-process restart, not a WebView reload.
     - step: 60
       expectation: Restore does not duplicate Explorer.
     - step: 61
@@ -266,6 +272,11 @@ verification:
     method: automated
     reason: These assertions cannot be established by browser stubs. Clipboard/paste permissions or unavailable actions fail rather than
       skip.
+  - check: Exact visible exit confirmation, normal application/storage shutdown and a new owned native session with the isolated profile retained.
+    method: automated
+    reason: Step 54 opts into the expected Exit title, one-open-tab message and Exit button. native-application-restarts.jsonl retains the
+      observed dialog, single session.click attempt and resulting closure alongside native shutdown and before/after session ownership proof.
+      Missing, changed, blocked or additional prompts fail; cleanup/kill never counts as successful shutdown.
   - check: Physical menu/drag/keyboard input
     method: manual
     reason: native_restart_app proves actual process restart; terminal text and key delivery still use WebView automation, not physical input.

@@ -1,11 +1,81 @@
 """Resolve a stable, hit-testable viewport point before native pointer input."""
 import math
+import platform
 import time
 from contextlib import suppress
+from typing import Callable, Protocol
 
+from native_pointer_buttons import (
+    ButtonSession, click_x11_button, prepare_x11_button_target, require_x11_button_input,
+)
 from native_webdriver_transport import WebDriverError
 
 MOUSE_SOURCE = "mouse"
+
+
+class ClickSession(ButtonSession, Protocol):
+    MODIFIER_MAP: dict[str, str]
+
+    def find(self, selector: str, timeout: float = 10.0, *, interactive: bool = False) -> str: ...
+
+
+def pointer_button_click(session: ClickSession, selector: str, button: int,
+                         modifiers: list[str] | None = None, *, data_home: str | None = None,
+                         prepare_target: Callable[..., dict],
+                         is_stale: Callable[[BaseException], bool]) -> str:
+    """Own preparation separately from the single, never-replayed click."""
+    modifier_values = []
+    for name in modifiers or []:
+        if name not in session.MODIFIER_MAP:
+            raise WebDriverError(f"pointer_button_click: unknown modifier {name!r}")
+        modifier_values.append(session.MODIFIER_MAP[name])
+    linux_button = platform.system() == "Linux" and button in (1, 2)
+    if linux_button:
+        require_x11_button_input(modifiers or [])
+    for attempt in range(3):
+        element = session.find(selector, interactive=True)
+        origin = {"element-6066-11e4-a52e-4f735466cecf": element}
+        try:
+            session.request("POST", session.endpoint("/execute/sync"), {
+                "script": "arguments[0].scrollIntoView({block:'nearest', inline:'nearest', behavior:'instant'});",
+                "args": [origin],
+            })
+            if linux_button:
+                target = prepare_x11_button_target(session, origin, data_home=data_home,
+                    allow_alternate=button == 2, prepare_target=prepare_target)
+            else:
+                point = prepare_target(session, origin, allow_alternate=button == 2)
+        except WebDriverError as error:
+            if is_stale(error) and attempt < 2:
+                time.sleep(0.3)
+                continue
+            raise
+        # Input dispatch is deliberately outside the stale-preparation retry.
+        if linux_button:
+            observation = click_x11_button(session, target, button, selector=selector)
+            return f"pointer button {button} clicked {selector} via {observation['transport']}"
+        pointer_core = [
+            {"type": "pointerMove", "duration": 0, "origin": "viewport", **point},
+            {"type": "pointerDown", "button": button},
+            {"type": "pointerUp", "button": button},
+        ]
+        actions = []
+        if modifier_values:
+            actions.append({"type": "key", "id": "click-keyboard", "actions":
+                [{"type": "keyDown", "value": value} for value in modifier_values]
+                + [{"type": "pause", "duration": 0} for _ in pointer_core]
+                + [{"type": "keyUp", "value": value} for value in reversed(modifier_values)]})
+        actions.append({"type": "pointer", "id": MOUSE_SOURCE,
+            "parameters": {"pointerType": "mouse"},
+            "actions": [{"type": "pause", "duration": 0} for _ in modifier_values]
+                + pointer_core + [{"type": "pause", "duration": 0} for _ in modifier_values]})
+        try:
+            session.request("POST", session.endpoint("/actions"), {"actions": actions})
+        finally:
+            with suppress(WebDriverError):
+                session.request("DELETE", session.endpoint("/actions"))
+        return f"pointer button {button} clicked {selector}"
+    raise WebDriverError(f"pointer button {button} click failed: {selector}")
 
 
 def click_viewport_point(session, x: int, y: int, *, move_ms: int = 0,

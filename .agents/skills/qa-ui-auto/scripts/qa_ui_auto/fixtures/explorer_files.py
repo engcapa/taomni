@@ -82,6 +82,19 @@ def operation_states() -> dict[str, Any]:
     return states
 
 
+def path_attribute_match(path: str) -> str:
+    """Match fixture paths in DOM without assuming Windows separator spelling.
+
+    Entered paths retain '/', while native directory entries use '\\'. Both are
+    the same fixture location; JSON string escaping also gives valid CSS strings.
+    No basename-only selector can accidentally select another directory.
+    """
+    spellings = [path]
+    if len(path) > 2 and path[1:3] == ":/":
+        spellings.append(path.replace("/", "\\"))
+    return ":is(" + ",".join("[data-path=" + json.dumps(value, ensure_ascii=False) + "]" for value in spellings) + ")"
+
+
 def setup(ctx: Any) -> None:
     platform_workspace_root.setup(ctx)
     native = (ctx.cfg.get("app") or {}).get("mode") == "native"
@@ -118,6 +131,9 @@ def setup(ctx: Any) -> None:
     ctx.values.update({
         "explorer_base": base, "explorer_operations": operations,
         "explorer_source": operations + "/source", "explorer_target": operations + "/target",
+        "explorer_crumb_folder_match": path_attribute_match(operations + "/target/folder"),
+        "explorer_source_match": path_attribute_match(operations + "/source"),
+        "explorer_source_folder_match": path_attribute_match(operations + "/source/folder"),
         "explorer_trash": operations + "/trash", "explorer_previews": preview,
         "explorer_workspace": workspace_input(base, preview),
         "explorer_alpha_sha": hashlib.sha256(OP_FILES["source/alpha.txt"]).hexdigest(),

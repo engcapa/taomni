@@ -11,6 +11,11 @@ from qa_ui_auto.steps import StepError
 
 
 class NativeDragTest(TestCase):
+    def setUp(self):
+        points = patch('qa_ui_auto.native_drag.prepare_drag_points', return_value=((5, 5), (70, 90), 8))
+        self.points = points.start()
+        self.addCleanup(points.stop)
+
     def test_tc155_requires_complete_query_before_targeting_search_hit(self):
         from qa_ui_auto.testcase import load_case
 
@@ -41,7 +46,7 @@ class NativeDragTest(TestCase):
     def test_offset_uses_one_action_request_and_fixed_viewport_geometry(self):
         with TemporaryDirectory() as directory:
             session = Mock()
-            session.execute.return_value = {"x": 20, "y": 30, "width": 6, "height": 10}
+            self.points.return_value = ((23, 35), (68, 35), 3)
             ctx = SimpleNamespace(session=session, case_dir=Path(directory))
             VERBS["drag_to"](ctx, {"from": "#handle", "by": {"dx": 45, "steps": 3}})
             payload = session.request.call_args_list[0].args[2]
@@ -59,7 +64,7 @@ class NativeDragTest(TestCase):
         for system, expected in [("Linux", ""), ("Darwin", "")]:
             with self.subTest(system=system), TemporaryDirectory() as directory:
                 session = Mock()
-                session.execute.side_effect = [{"x": 0, "y": 0, "width": 10, "height": 10}, {"x": 60, "y": 80, "width": 20, "height": 20}]
+                session.execute.return_value = {"events": [], "dropped": 0}
                 with patch("qa_ui_auto.steps.mouse.platform.system", return_value=system):
                     VERBS["drag_to"](SimpleNamespace(session=session, case_dir=Path(directory)),
                                      {"from": "#a", "to": "#b", "modifiers": ["Control"], "macos_modifiers": ["Alt"]})
@@ -70,20 +75,20 @@ class NativeDragTest(TestCase):
                 self.assertEqual(len(sources[0]["actions"]), len(sources[1]["actions"]))
                 self.assertEqual(session.request.call_args_list[-1].args[0], "DELETE")
 
-    def test_offscreen_target_cannot_be_reported_as_a_delivered_native_drag(self):
+    def test_unprepared_target_cannot_be_reported_as_a_delivered_native_drag(self):
         with TemporaryDirectory() as directory:
             session = Mock()
-            session.execute.side_effect = [{"x": 0, "y": 0, "width": 10, "height": 10, "viewportWidth": 1200, "viewportHeight": 800},
-                                           {"x": 2100, "y": 50, "width": 50, "height": 20, "viewportWidth": 1200, "viewportHeight": 800}]
-            with self.assertRaisesRegex(StepError, "outside the WebView viewport"):
+            self.points.side_effect = StepError("target is covered")
+            with self.assertRaisesRegex(StepError, "target is covered"):
                 VERBS["drag_to"](SimpleNamespace(session=session, case_dir=Path(directory)), {"from": "#a", "to": "#b"})
             session.request.assert_not_called()
+            session.execute.assert_not_called()
+            self.assertFalse((Path(directory) / "native-drags.jsonl").exists())
 
     def test_failed_transport_releases_pointer_and_preserves_failure(self):
         with TemporaryDirectory() as directory:
             session = Mock()
-            session.execute.side_effect = [{"x": 0, "y": 0, "width": 10, "height": 10},
-                                           {"x": 60, "y": 80, "width": 20, "height": 20}]
+            session.execute.return_value = {"events": [], "dropped": 0}
             session.request.side_effect = [RuntimeError("drag rejected"), None]
             with self.assertRaisesRegex(RuntimeError, "rejected"):
                 VERBS["drag_to"](SimpleNamespace(session=session, case_dir=Path(directory)), {"from": "#a", "to": "#b"})
@@ -96,22 +101,18 @@ class NativeDragTest(TestCase):
             events = [{"type": "pointerdown", "target": {"tag": "SPAN", "path": "/source/file.txt"},
                        "buttons": 1, "clientX": 746, "clientY": 183, "altKey": False, "ctrlKey": True},
                       {"type": "pointerup", "target": {"path": "/target/folder"}, "buttons": 0}]
-            session.execute.side_effect = [
-                {"x": 740, "y": 170, "width": 12, "height": 26},
-                {"x": 740, "y": 142, "width": 12, "height": 26},
-                True, {"events": events, "dropped": 3},
-            ]
+            self.points.return_value = ((746, 183), (746, 155), 8)
+            session.execute.side_effect = [True, {"events": events, "dropped": 3}]
             VERBS["drag_to"](SimpleNamespace(session=session, case_dir=Path(directory)), {"from": "#a", "to": "#b"})
             scripts = [call.args[0] for call in session.execute.call_args_list]
-            self.assertIn("capture: true, passive: true", scripts[2])
-            self.assertIn("state.events.length >= 2048", scripts[2])
-            self.assertIn("event.buttons", scripts[2])
-            self.assertNotIn("preventDefault(", scripts[2])
-            self.assertNotIn("stopPropagation(", scripts[2])
-            self.assertIn("state.stop(); delete window[key]", scripts[3])
+            self.assertIn("capture: true, passive: true", scripts[0])
+            self.assertIn("state.events.length >= 2048", scripts[0])
+            self.assertIn("event.buttons", scripts[0])
+            self.assertNotIn("preventDefault(", scripts[0])
+            self.assertNotIn("stopPropagation(", scripts[0])
+            self.assertIn("state.stop(); delete window[key]", scripts[1])
             calls = [call[0] for call in session.mock_calls]
-            self.assertEqual(calls, ["find", "execute", "find", "execute", "execute",
-                                     "endpoint", "request", "endpoint", "request", "execute"])
+            self.assertEqual(calls, ["execute", "endpoint", "request", "endpoint", "request", "execute"])
             receipt = json.loads((Path(directory) / "native-drags.jsonl").read_text().splitlines()[-1])
             self.assertEqual(receipt["events"], events)
             self.assertEqual(receipt["dropped"], 3)
@@ -167,8 +168,6 @@ assert.equal(listeners.size, 0); assert.equal(Object.keys(window).length, 2);
         with TemporaryDirectory() as directory:
             session = Mock()
             session.execute.side_effect = [
-                {"x": 0, "y": 0, "width": 10, "height": 10},
-                {"x": 60, "y": 80, "width": 20, "height": 20},
                 True, {"events": [{"type": "pointercancel", "buttons": 0}], "dropped": 0},
             ]
             session.request.side_effect = [RuntimeError("original transport failure"), RuntimeError("release failure")]
@@ -182,7 +181,6 @@ assert.equal(listeners.size, 0); assert.equal(Object.keys(window).length, 2);
         with TemporaryDirectory() as directory:
             session = Mock()
             session.execute.side_effect = [
-                {"x": 0, "y": 0, "width": 10, "height": 10},
                 RuntimeError("observer setup blocked"), RuntimeError("observer collection blocked"),
             ]
             session.request.side_effect = [RuntimeError("drag failed"), None]
@@ -193,14 +191,12 @@ assert.equal(listeners.size, 0); assert.equal(Object.keys(window).length, 2);
             self.assertIn("setup blocked", receipt["setupError"])
             self.assertIn("collection blocked", receipt["collectionError"])
 
-    def test_missing_or_hidden_geometry_cannot_start_a_drag(self):
-        for box in (None, {}, {"x": 0, "y": 0, "width": 0, "height": 10}):
-            with self.subTest(box=box), TemporaryDirectory() as directory:
-                session = Mock(); session.execute.return_value = box
-                with self.assertRaises(StepError):
-                    VERBS["drag_to"](SimpleNamespace(session=session, case_dir=Path(directory)),
-                                     {"from": "#hidden", "by": {"dx": 30}})
-                session.request.assert_not_called()
+    def test_target_preparation_receives_exact_source_and_offset_contract(self):
+        with TemporaryDirectory() as directory:
+            session = Mock()
+            args = {"from": "#handle", "by": {"dx": 30, "steps": 3}}
+            VERBS["drag_to"](SimpleNamespace(session=session, case_dir=Path(directory)), args)
+            self.points.assert_called_once_with(session, args)
 
 
 def load_tests(loader, suite, pattern):
@@ -209,6 +205,6 @@ def load_tests(loader, suite, pattern):
     qa-ui-auto-entry and tool-contracts already select this module. No workflow
     conditions, platform scope or crash-regression selection need to change.
     """
-    for module in ("test_os_file_drag", "test_workspace_drop_import", "test_file_clipboard", "test_file_clipboard_macos"):
+    for module in ("test_native_drag_targets", "test_explorer_fixture_selectors", "test_os_file_drag", "test_workspace_drop_import", "test_file_clipboard", "test_file_clipboard_macos"):
         suite.addTests(loader.loadTestsFromName(module))
     return suite

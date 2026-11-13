@@ -1061,8 +1061,27 @@
           "description": "Switch to a real app-created browser page/native WebView with the matching CSS selector."
         },
         "native_restart_app": {
-          "type": "null",
-          "description": "Restart the owned isolated native QA process without resetting its profile, sessions, vault or files."
+          "oneOf": [
+            { "type": "null" },
+            {
+              "type": "object",
+              "required": ["expect_exit_confirmation"],
+              "additionalProperties": false,
+              "properties": {
+                "expect_exit_confirmation": {
+                  "type": "object",
+                  "required": ["title", "message", "confirm_label"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "title": { "type": "string", "pattern": "\\S" },
+                    "message": { "type": "string", "pattern": "\\S" },
+                    "confirm_label": { "type": "string", "pattern": "\\S" }
+                  }
+                }
+              }
+            }
+          ],
+          "description": "Restart the owned isolated native QA process without resetting its profile, sessions, vault or files. Optional expect_exit_confirmation requires the exact visible exit title/message/button label, clicks its confirm button once through session.click and retains evidence; absent or unexpected prompts fail."
         },
         "reload_window": {
           "oneOf": [
