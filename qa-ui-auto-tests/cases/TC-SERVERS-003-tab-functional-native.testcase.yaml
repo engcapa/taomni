@@ -5,7 +5,7 @@ description: >-
   single `servers` tab across Linux, Windows, and macOS: opens via Global Command
   Palette, configures HTTP on 127.0.0.1:28489, starts the real in-process HTTP
   server and observes listening log output, preserves running status and live logs
-  across Welcome tab switches, applies an updated port (28490) through on-demand
+  across Home/tab switches, applies an updated port (28490) through on-demand
   vault setup and observes the restart warning, stops the server, clears logs,
   closes without a discard prompt, and reopens to verify persisted settings and
   cleared log state.
@@ -62,9 +62,11 @@ steps:
     contains: 127.0.0.1:28489
     timeout_sec: 10
 - assert_enabled: '[data-testid="server-log-clear"]'
-- click: '[data-testid="tab-item"][data-tab-type="welcome"]'
-- assert_visible: '[data-testid="welcome-panel"]'
+- click: '[data-testid="nav-mode-home"]'
+- wait_for: '[data-testid="welcome-panel"]'
 - assert_not_visible: '[data-testid="servers-dialog"]'
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="tab-bar"]'
 - click: '[data-testid="tab-item"][data-tab-type="servers"]'
 - wait_for: '[data-testid="servers-dialog"]'
 - assert_attribute:
@@ -110,7 +112,7 @@ steps:
     state: detached
     timeout_sec: 10
 - assert_not_visible: '[data-testid="confirm-dialog"]'
-- assert_visible: '[data-testid="welcome-panel"]'
+- assert_visible: '[data-testid="sessions-empty-state"]'
 - click: '[data-testid="global-search-trigger"]'
 - wait_for: '[data-testid="global-search-modal"]'
 - fill:
@@ -138,13 +140,13 @@ steps:
     selector: '[data-testid="servers-dialog"]'
     state: detached
     timeout_sec: 10
-- assert_visible: '[data-testid="welcome-panel"]'
+- assert_visible: '[data-testid="sessions-empty-state"]'
 - assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Opening Local servers via Global Command Palette starts the built-in HTTP server on 127.0.0.1:28489 and keeps its running state and log output across tab switches.
+    requirement: Opening Local servers via Global Command Palette starts the built-in HTTP server on 127.0.0.1:28489 and keeps its running state and log output across Home/tab switches.
     actions:
     - 3
     - 5
@@ -155,6 +157,7 @@ verification:
     - 16
     - 21
     - 24
+    - 26
     checkpoints:
     - step: 7
       expectation: '{"wait_for": {"selector": "[data-testid=\"servers-dialog\"]", "timeout_sec": 20}}'
@@ -175,14 +178,14 @@ verification:
     - step: 20
       expectation: '{"assert_enabled": "[data-testid=\"server-log-clear\"]"}'
     - step: 22
-      expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
     - step: 23
       expectation: '{"assert_not_visible": "[data-testid=\"servers-dialog\"]"}'
-    - step: 25
-      expectation: '{"wait_for": "[data-testid=\"servers-dialog\"]"}'
-    - step: 26
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"server-row-http\"]", "name": "data-status", "equals": "running"}}'
     - step: 27
+      expectation: '{"wait_for": "[data-testid=\"servers-dialog\"]"}'
+    - step: 28
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"server-row-http\"]", "name": "data-status", "equals": "running"}}'
+    - step: 29
       expectation: '{"assert_text": {"selector": "[data-testid=\"server-log\"]", "contains": "127.0.0.1:28489", "timeout_sec": 5}}'
     results:
     - 8
@@ -190,77 +193,77 @@ verification:
     - 18
     - 19
     - 23
-    - 26
-    - 27
+    - 28
+    - 29
   - id: R2
     requirement: Applying an edited port on a running HTTP server completes on-demand vault setup, logs the restart hint, stops cleanly, and clears logs.
     actions:
-    - 28
-    - 29
+    - 30
     - 31
-    - 32
     - 33
-    - 36
-    - 39
+    - 34
+    - 35
+    - 38
+    - 41
     checkpoints:
-    - step: 30
+    - step: 32
       expectation: '{"wait_for": {"selector": "[data-testid=\"vault-setup-dialog\"]", "timeout_sec": 15}}'
-    - step: 34
+    - step: 36
       expectation: '{"wait_for": {"selector": "[data-testid=\"vault-setup-dialog\"]", "state": "detached", "timeout_sec": 15}}'
-    - step: 35
-      expectation: '{"assert_text": {"selector": "[data-testid=\"server-log\"]", "contains": "Restart server to apply port change", "timeout_sec": 10}}'
     - step: 37
+      expectation: '{"assert_text": {"selector": "[data-testid=\"server-log\"]", "contains": "Restart server to apply port change", "timeout_sec": 10}}'
+    - step: 39
       expectation: '{"wait_for": {"selector": "[data-testid=\"server-row-http\"][data-status=\"stopped\"]", "timeout_sec": 20}}'
-    - step: 38
-      expectation: '{"assert_disabled": "[data-testid=\"server-row-http-stop\"]"}'
     - step: 40
+      expectation: '{"assert_disabled": "[data-testid=\"server-row-http-stop\"]"}'
+    - step: 42
       expectation: '{"assert_disabled": "[data-testid=\"server-log-clear\"]"}'
     results:
-    - 35
     - 37
-    - 38
+    - 39
     - 40
+    - 42
   - id: R3
     requirement: After Apply, Cancel closes immediately without a discard prompt, reopening preserves the saved 28490 port and cleared log, and closing via tab-close detaches cleanly.
     actions:
-    - 41
-    - 45
+    - 43
     - 47
-    - 48
+    - 49
     - 50
-    - 56
+    - 52
+    - 58
     checkpoints:
-    - step: 42
-      expectation: '{"wait_for": {"selector": "[data-testid=\"servers-dialog\"]", "state": "detached", "timeout_sec": 10}}'
-    - step: 43
-      expectation: '{"assert_not_visible": "[data-testid=\"confirm-dialog\"]"}'
     - step: 44
-      expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"]"}'
-    - step: 49
-      expectation: '{"wait_for": "[data-testid=\"servers-dialog\"]"}'
-    - step: 52
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"server-field-port\"]", "name": "value", "equals": "28490"}}'
-    - step: 53
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"server-field-bind-address\"]", "name": "value", "equals": "127.0.0.1"}}'
-    - step: 54
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"server-row-http\"]", "name": "data-status", "equals": "stopped"}}'
-    - step: 55
-      expectation: '{"assert_disabled": "[data-testid=\"server-log-clear\"]"}'
-    - step: 57
       expectation: '{"wait_for": {"selector": "[data-testid=\"servers-dialog\"]", "state": "detached", "timeout_sec": 10}}'
-    - step: 58
-      expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"]"}'
+    - step: 45
+      expectation: '{"assert_not_visible": "[data-testid=\"confirm-dialog\"]"}'
+    - step: 46
+      expectation: '{"assert_visible": "[data-testid=\"sessions-empty-state\"]"}'
+    - step: 51
+      expectation: '{"wait_for": "[data-testid=\"servers-dialog\"]"}'
+    - step: 54
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"server-field-port\"]", "name": "value", "equals": "28490"}}'
+    - step: 55
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"server-field-bind-address\"]", "name": "value", "equals": "127.0.0.1"}}'
+    - step: 56
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"server-row-http\"]", "name": "data-status", "equals": "stopped"}}'
+    - step: 57
+      expectation: '{"assert_disabled": "[data-testid=\"server-log-clear\"]"}'
     - step: 59
+      expectation: '{"wait_for": {"selector": "[data-testid=\"servers-dialog\"]", "state": "detached", "timeout_sec": 10}}'
+    - step: 60
+      expectation: '{"assert_visible": "[data-testid=\"sessions-empty-state\"]"}'
+    - step: 61
       expectation: '{"assert_no_runtime_errors": null}'
     results:
-    - 43
-    - 44
-    - 52
-    - 53
+    - 45
+    - 46
     - 54
     - 55
-    - 58
-    - 59
+    - 56
+    - 57
+    - 60
+    - 61
   visual:
   - check: HTTP server configuration, running status indicator, server log output, and vault setup prompt render inside the single servers tab on Linux, Windows, and macOS.
     method: not-applicable

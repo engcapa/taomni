@@ -47,15 +47,17 @@ steps:
     selector: '[data-testid="tab-context-duplicate"]'
     state: detached
     timeout_sec: 5
-- click: '[data-testid="tab-item"][data-tab-type="welcome"]'
-- assert_visible: '[data-testid="welcome-panel"]'
+- click: '[data-testid="nav-mode-home"]'
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tool-servers"]'
 - click: '[data-testid="sidebar-tool-servers"]'
 - wait_for: '[data-testid="servers-dialog"]'
 - eval_readonly:
     expression: "document.querySelectorAll('[data-tab-type'+String.fromCharCode(61)+'\"servers\"]').length === 1"
     expect_truthy: true
-- click: '[data-testid="tab-item"][data-tab-type="welcome"]'
-- assert_visible: '[data-testid="welcome-panel"]'
+- click: '[data-testid="nav-mode-home"]'
+- wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="global-search-trigger"]'
 - wait_for: '[data-testid="global-search-modal"]'
 - fill:
@@ -71,8 +73,11 @@ steps:
 - fill:
     selector: '[data-testid="server-field-port"]'
     value: '2229'
-- click: '[data-testid="tab-item"][data-tab-type="welcome"]'
-- assert_visible: '[data-testid="welcome-panel"]'
+- click: '[data-testid="nav-mode-home"]'
+- wait_for: '[data-testid="welcome-panel"]'
+- assert_not_visible: '[data-testid="servers-dialog"]'
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="tab-bar"]'
 - click: '[data-testid="tab-item"][data-tab-type="servers"]'
 - wait_for: '[data-testid="servers-dialog"]'
 - assert_attribute:
@@ -94,7 +99,7 @@ steps:
     selector: '[data-testid="servers-dialog"]'
     state: detached
     timeout_sec: 10
-- assert_visible: '[data-testid="welcome-panel"]'
+- assert_visible: '[data-testid="sessions-empty-state"]'
 - click: '[data-testid="side-tab-tools"]'
 - wait_for: '[data-testid="sidebar-tool-servers"]'
 - click: '[data-testid="sidebar-tool-servers"]'
@@ -135,7 +140,7 @@ steps:
     selector: '[data-testid="servers-dialog"]'
     state: detached
     timeout_sec: 10
-- assert_visible: '[data-testid="welcome-panel"]'
+- assert_visible: '[data-testid="tools-empty-state"]'
 - assert_no_runtime_errors: null
 verification:
   review: reviewed
@@ -148,13 +153,13 @@ verification:
     - 10
     - 15
     - 17
-    - 20
+    - 19
     - 22
     - 24
-    - 25
-    - 28
+    - 26
+    - 27
     - 30
-    - 31
+    - 32
     - 33
     - 36
     - 38
@@ -162,7 +167,9 @@ verification:
     - 43
     - 46
     - 48
-    - 50
+    - 51
+    - 53
+    - 55
     checkpoints:
     - step: 6
       expectation: '{"wait_for": {"selector": "[data-testid=\"servers-dialog\"]", "timeout_sec": 20}}'
@@ -174,69 +181,72 @@ verification:
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''[data-tab-type''+String.fromCharCode(61)+''\"servers\"]'').length === 1 && !window.location.search.includes(''servers'')", "expect_truthy": true}}'
     - step: 12
       expectation: '{"assert_disabled": "[data-testid=\"tab-context-duplicate\"]"}'
-    - step: 19
+    - step: 21
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''[data-tab-type''+String.fromCharCode(61)+''\"servers\"]'').length === 1", "expect_truthy": true}}'
-    - step: 27
+    - step: 29
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''[data-tab-type''+String.fromCharCode(61)+''\"servers\"]'').length === 1", "expect_truthy": true}}'
     - step: 35
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"server-field-port\"]", "name": "value", "equals": "2229"}}'
+      expectation: '{"assert_not_visible": "[data-testid=\"servers-dialog\"]"}'
     - step: 40
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"server-field-port\"]", "name": "value", "equals": "2229"}}'
     - step: 45
-      expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"]"}'
-    - step: 51
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"server-field-port\"]", "name": "value", "equals": "2229"}}'
+    - step: 50
+      expectation: '{"assert_visible": "[data-testid=\"sessions-empty-state\"]"}'
+    - step: 56
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"server-field-port\"]", "name": "value", "equals": "22"}}'
     results:
     - 7
     - 8
     - 9
     - 12
-    - 19
-    - 27
+    - 21
+    - 29
     - 35
     - 40
     - 45
-    - 51
+    - 50
+    - 56
   - id: R2
     requirement: Cross-process OS ModuleLock blocks competing Taomni instances symmetrically until release or termination, and ?servers=main then / route navigation releases cleanly for immediate reopen.
     actions:
-    - 53
-    - 57
-    - 60
+    - 58
     - 62
-    - 66
+    - 65
+    - 67
+    - 71
     checkpoints:
-    - step: 52
+    - step: 57
       expectation: '{"servers_multi_instance_probe": {}}'
-    - step: 54
-      expectation: '{"wait_for": {"selector": "[data-testid=\"servers-dialog\"]", "timeout_sec": 30}}'
-    - step: 55
-      expectation: '{"assert_visible": "[data-testid=\"servers-tab-panel\"]"}'
-    - step: 56
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''[data-tab-type''+String.fromCharCode(61)+''\"servers\"]'').length === 1", "expect_truthy": true}}'
-    - step: 58
-      expectation: '{"wait_for": {"selector": "[data-testid=\"welcome-panel\"]", "timeout_sec": 30}}'
     - step: 59
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''[data-tab-type''+String.fromCharCode(61)+''\"servers\"]'').length === 0", "expect_truthy": true}}'
-    - step: 63
-      expectation: '{"wait_for": {"selector": "[data-testid=\"servers-dialog\"]", "timeout_sec": 20}}'
-    - step: 64
-      expectation: '{"assert_not_visible": "[data-testid=\"servers-blocked-dialog\"]"}'
-    - step: 65
+      expectation: '{"wait_for": {"selector": "[data-testid=\"servers-dialog\"]", "timeout_sec": 30}}'
+    - step: 60
+      expectation: '{"assert_visible": "[data-testid=\"servers-tab-panel\"]"}'
+    - step: 61
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''[data-tab-type''+String.fromCharCode(61)+''\"servers\"]'').length === 1", "expect_truthy": true}}'
+    - step: 63
+      expectation: '{"wait_for": {"selector": "[data-testid=\"welcome-panel\"]", "timeout_sec": 30}}'
+    - step: 64
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''[data-tab-type''+String.fromCharCode(61)+''\"servers\"]'').length === 0", "expect_truthy": true}}'
     - step: 68
-      expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"]"}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"servers-dialog\"]", "timeout_sec": 20}}'
     - step: 69
+      expectation: '{"assert_not_visible": "[data-testid=\"servers-blocked-dialog\"]"}'
+    - step: 70
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''[data-tab-type''+String.fromCharCode(61)+''\"servers\"]'').length === 1", "expect_truthy": true}}'
+    - step: 73
+      expectation: '{"assert_visible": "[data-testid=\"tools-empty-state\"]"}'
+    - step: 74
       expectation: '{"assert_no_runtime_errors": null}'
     results:
-    - 52
-    - 55
-    - 56
-    - 59
+    - 57
+    - 60
+    - 61
     - 64
-    - 65
-    - 68
     - 69
+    - 70
+    - 73
+    - 74
   visual:
   - check: Tab bar, servers tab panel, and native blocked dialog render in the main WebView on Linux, Windows, and macOS.
     method: not-applicable

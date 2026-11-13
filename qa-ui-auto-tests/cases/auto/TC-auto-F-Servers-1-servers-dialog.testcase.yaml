@@ -4,8 +4,8 @@ description: >-
   Coverage smoke for F-Servers-1 (Local servers manager). Migrated from the old
   detached OS window to an in-app single-instance tab (`tab-item[data-tab-type="servers"]`
   rendering `servers-tab-panel` / `servers-dialog`). Navigating `?servers=main`
-  opens the tab inside the main workspace and Cancel closes the tab cleanly back
-  to the welcome panel.
+  opens the tab inside the main workspace and Cancel closes the tab cleanly to
+  the sessions empty state.
 covers:
 - F-Servers-1
 tags:
@@ -53,7 +53,7 @@ steps:
     selector: '[data-testid="servers-dialog"]'
     state: detached
     timeout_sec: 10
-- assert_visible: '[data-testid="welcome-panel"]'
+- assert_visible: '[data-testid="sessions-empty-state"]'
 - assert_count:
     selector: '[data-testid="tab-item"][data-tab-type="servers"]'
     equal: 0
@@ -62,7 +62,7 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Local servers opens inside a single main-window tab via ?servers=main, selects server configs/logs, and closes back to welcome on Cancel without runtime errors.
+    requirement: Local servers opens inside a single main-window tab via ?servers=main, selects server configs/logs, and closes cleanly to the sessions empty state on Cancel without runtime errors.
     actions:
     - 1
     - 9
@@ -103,7 +103,7 @@ verification:
     - step: 26
       expectation: '{"wait_for": {"selector": "[data-testid=\"servers-dialog\"]", "state": "detached", "timeout_sec": 10}}'
     - step: 27
-      expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"sessions-empty-state\"]"}'
     - step: 28
       expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"servers\"]", "equal": 0}}'
     - step: 29
