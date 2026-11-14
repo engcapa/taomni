@@ -61,6 +61,9 @@ describe("live Markdown decorations and standard-source widgets", () => {
     const view = editor(source, [liveMarkdown(context, false)]);
     const checkbox = view.dom.querySelector<HTMLButtonElement>("[role='checkbox']");
     expect(checkbox).not.toBeNull();
+    expect(view.dom.querySelectorAll("[role='checkbox']")).toHaveLength(2);
+    expect(view.dom.querySelector(".fv-md-task-state")).toBeNull();
+    expect(view.dom.querySelector('[aria-label="done"]')).toHaveAttribute("aria-checked", "true");
     fireEvent.click(checkbox!);
     expect(view.state.doc.toString()).toContain("- [x] todo");
     undo(view); expect(view.state.doc.toString()).toBe(source);

@@ -95,7 +95,9 @@ fn html_local_descendants_load_but_all_traversal_and_bad_origins_are_denied() {
     ] {
         assert_eq!(get(&url, "test-paths").status(), StatusCode::FORBIDDEN);
     }
-    // Tauri's Windows/Android spelling is accepted in the actual handler too.
+    // The localhost spelling is accepted by the actual handler on every
+    // platform; macOS uses it because WKWebView custom-scheme iframes fail to
+    // commit, while Windows/Android already use it.
     let windows = format!(
         "http://taomni-preview.localhost/{}/50%25.css",
         session.token

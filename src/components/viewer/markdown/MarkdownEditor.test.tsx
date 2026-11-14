@@ -6,6 +6,9 @@ import type { ViewerDocument } from "../../../lib/viewer";
 import { useDocumentStore } from "../../../stores/documentStore";
 import { MarkdownEditor } from "./MarkdownEditor";
 import { exportMarkdown } from "./markdownExport";
+// @ts-expect-error Node builtin is confined to unit tests, not the DOM application.
+import { readFileSync } from "node:fs";
+const markdownStyles = readFileSync("src/components/viewer/markdown/markdown.css", "utf8") as string;
 
 vi.mock("../viewerLabels", () => ({ useViewerLabels: () => (_zh: string, en: string) => en }));
 vi.mock("./markdownExport", () => ({ exportMarkdown: vi.fn() }));
@@ -20,8 +23,15 @@ function Harness() {
   const document = useDocumentStore((state) => state.documents["/docs/a.md"]);
   return <MarkdownEditor document={document} onError={vi.fn()} />;
 }
-beforeEach(() => { vi.clearAllMocks(); useDocumentStore.setState({ documents: { "/docs/a.md": fixture() } }); });
-afterEach(() => { cleanup(); useDocumentStore.setState({ documents: {} }); });
+let style: HTMLStyleElement;
+beforeEach(() => {
+  vi.clearAllMocks();
+  style = document.createElement("style");
+  style.textContent = markdownStyles;
+  document.head.append(style);
+  useDocumentStore.setState({ documents: { "/docs/a.md": fixture() } });
+});
+afterEach(() => { cleanup(); style.remove(); useDocumentStore.setState({ documents: {} }); });
 
 describe("MarkdownEditor real host lifecycle", () => {
   it("keeps one source/history across live/source/split/focus switches, with outline navigation", async () => {
@@ -43,6 +53,30 @@ describe("MarkdownEditor real host lifecycle", () => {
     expect(screen.getByTestId("markdown-editor")).toHaveClass("fv-md-focus");
     expect(view.state.doc.toString()).toContain("# Changed");
     expect(screen.queryByText(/Simulate|模拟/)).toBeNull();
+  });
+  it("keeps compact view-only whitespace, subtle heading syntax and editable blank/EOF history", () => {
+    render(<Harness />);
+    const dom = screen.getByTestId("markdown-editor").querySelector<HTMLElement>(".cm-editor")!;
+    const view = EditorView.findFromDOM(dom)!;
+    const marker = dom.querySelector<HTMLElement>(".fv-md-source-marker")!;
+    expect(marker.textContent).toBe("# ");
+    expect(getComputedStyle(marker).fontSize).toBe("0.8em");
+    expect(getComputedStyle(marker).fontWeight).toBe("400");
+    const rendered = dom.querySelector<HTMLElement>(".fv-md-rendered-block")!;
+    expect(getComputedStyle(rendered).whiteSpace).toBe("normal");
+    const blank = source.indexOf("\n\n##") + 1;
+    act(() => view.dispatch({ selection: { anchor: blank } }));
+    expect(dom.querySelector(".fv-md-current-line")).not.toBeNull();
+    act(() => view.dispatch({ changes: { from: blank, insert: "typed" }, selection: { anchor: blank + 5 } }));
+    expect(view.state.doc.toString()).toBe(source.slice(0, blank) + "typed" + source.slice(blank));
+    act(() => { expect(undo(view)).toBe(true); });
+    expect(view.state.doc.toString()).toBe(source);
+    act(() => view.dispatch({ selection: { anchor: view.state.doc.length } }));
+    expect(dom.querySelector(".fv-md-current-line")).not.toBeNull();
+    act(() => view.dispatch({ changes: { from: view.state.doc.length, insert: "end" } }));
+    expect(view.state.doc.toString()).toBe(source + "end");
+    act(() => { expect(undo(view)).toBe(true); });
+    expect(view.state.doc.toString()).toBe(source);
   });
   it("preserves clipboard conversion Undo/Redo through the mounted shared store", async () => {
     render(<Harness />);

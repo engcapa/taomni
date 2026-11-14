@@ -17,6 +17,13 @@ def case(suffix):
     return path, yaml.safe_load(path.read_text(encoding="utf-8"))
 
 
+FINAL_HTML_READY = [
+    {"wait_for": '[data-testid="html-preview"][data-loaded="true"]'},
+    {"assert_text": {"selector": '[data-testid="html-console"]', "contains": "FILE_OPEN_SCRIPT_OK", "timeout_sec": 20}},
+    {"assert_text": {"selector": '[data-testid="html-console"]', "contains": "FILE_OPEN_RESOURCES rgb(12, 34, 56) 1", "timeout_sec": 20}},
+]
+
+
 class PreviewCaseOrderTests(unittest.TestCase):
     def test_initial_named_selection_precedes_actual_preview_toolbar_open_on_all_three_cases(self):
         for suffix, name in [("003", "unsafe.svg"), ("005", "report.html"), ("012", "01-landscape.png")]:
@@ -46,6 +53,18 @@ class PreviewCaseOrderTests(unittest.TestCase):
         source = (ROOT / "src/components/explorer/ExplorerShell.tsx").read_text(encoding="utf-8")
         self.assertIn('else if (event.key === "Escape") { operations.setRenamePath(null); setPreviewOverlay(false); }', source)
 
+    def test_final_html_screenshot_waits_for_new_blocked_session_and_real_resource_markers(self):
+        path, document = case("005")
+        steps = document["steps"]
+        block = steps.index({"click": '[data-testid="html-network-block"]'})
+        self.assertEqual(steps[block + 1], {"assert_visible": '[data-testid="html-network-allow"]'})
+        self.assertEqual(steps[block + 2], {"assert_text": {"selector": '[data-testid="html-network-banner"]', "contains": "Network requests blocked"}})
+        self.assertEqual(steps[block + 3:block + 6], FINAL_HTML_READY)
+        self.assertEqual(steps[block + 6], {"assert_no_runtime_errors": None})
+        self.assertEqual(steps[block + 7], {"screenshot": "html-sandbox-console-device.png"})
+        self.assertEqual(validate_contract(document), [])
+        load_case(path)
+
     def test_all_original_wait_and_assertion_payloads_are_unchanged(self):
         # Frozen from d1c1f7e0 case payloads before the native-overlay ordering
         # correction. Never regenerate these to mask removed assertions.
@@ -56,7 +75,20 @@ class PreviewCaseOrderTests(unittest.TestCase):
         }
         for suffix, (count, digest) in expected.items():
             _, document = case(suffix)
-            checks = [step for step in document["steps"] if next(iter(step)).startswith("assert_") or next(iter(step)) in {"eval_readonly", "wait_for"}]
+            steps = document["steps"]
+            original_steps = steps
+            if suffix == "005":
+                # Added completion assertions are an insertion, not a replacement
+                # baseline. Remove only that exact anchored insertion and keep
+                # every old assertion in its original relative order/digest.
+                block = steps.index({"click": '[data-testid="html-network-block"]'})
+                first, last = block + 3, block + 6
+                self.assertEqual(steps[first:last], FINAL_HTML_READY)
+                original_steps = steps[:first] + steps[last:]
+                cursor = iter(steps)
+                for expected_step in original_steps:
+                    self.assertTrue(any(step == expected_step for step in cursor), suffix)
+            checks = [step for step in original_steps if next(iter(step)).startswith("assert_") or next(iter(step)) in {"eval_readonly", "wait_for"}]
             self.assertEqual(len(checks), count)
             actual = hashlib.sha256(json.dumps(checks, ensure_ascii=False, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
             self.assertEqual(actual, digest, suffix)

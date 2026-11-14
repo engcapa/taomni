@@ -32,7 +32,7 @@ def setup(ctx):
     source = root / "live.md"
     # Native diagram fixture is independent of browser004's content contract.
     diagram = "\n## Delivery graph\n\n```mermaid\nflowchart LR\n  A[Markdown Source] --> B[Live Diagram]\n  B --> C[Export Artifact]\n  style A fill:#dbeafe,stroke:#2563eb\n  style B fill:#dcfce7,stroke:#16a34a\n  style C fill:#fef3c7,stroke:#d97706\n```\n"
-    source.write_bytes(("# File open Markdown\n\n**Rendered bold** and `inline code`.\n\n## Details\n\n![Original](assets/pixel.png)\n\n- [ ] First task\n" + diagram).encode("utf-8"))
+    source.write_bytes(("# File open Markdown\n\n**Rendered bold** and `inline code`.\n\nMath: $x^2$ and $$\\frac{1}{2}$$.\n\n## Details\n\n![Original](assets/pixel.png)\n\n- [ ] First task\n" + diagram).encode("utf-8"))
     bad_source = root / "missing-image.md"
     bad_text = "# Missing image\n\n![Missing](assets/does-not-exist.png)\n"
     bad_source.write_bytes(bad_text.encode())

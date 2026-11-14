@@ -3,7 +3,7 @@
 ## 当前状态（2026-11-14）
 
 - 分支：`feat/file-open-improve`，开发基线 `719109a3`。
-- 实现进行中；此记录不等同于 UI / 原生验收通过。
+- 实现进行中；此记录不等同于 UI / 原生验收通过。当前 KaTeX 补齐与最后一轮 native 修复仍在验证，未提交。
 - 用户指定：本地仅单元测试与静态检查，所有 browser/native 通过 GitHub `qa-ui-auto-platforms.yml`。不在本地启动桌面或浏览器作产品验证。
 - 原型依据：`prototype-v1.html`，采用 DEC-02 A / DEC-03 A / DEC-04 A。不实现原型顶栏的评审控制器、模拟粘贴按钮或固定样本页面。
 
@@ -92,7 +92,8 @@ TC-WS-038/039/051/052/053/054/055/056/057 与 TC-IDE-C8-08 的目标是原有 ID
 | [43451418842](https://github.com/engcapa/taomni/actions/runs/43451418842) | `3bc9afa00c353e9eaf6db71b8ee6093cf1be7eda` | 三端 browser 各 11/14 pass；Windows native 9/14 pass。Linux 在 `cargo fmt` 中发现 `workspace.rs` module 排序错误，已修；macOS job annotation：`The job was not acquired by Runner of type hosted even after multiple attempts`，未执行。产品/用例失败见下述修复，待重跑。 |
 | [43526262110](https://github.com/engcapa/taomni/actions/runs/43526262110) | `d1c1f7e02b4aee848167481ea26c9953e3dfff8f` | 扩充 001..012 + Explorer + 全部 crash：browser 63 次实际执行 **51 pass / 12 fail / 0 skip**，每 OS 17/21 pass。004/008/010/012 三端各同根因失败；005 三端 CSS/图片/隔离/默认离线实证通过，Explorer 001..004 三端 12/12 通过。Linux 完整前端单元 **6881 pass / 7 fail / 1 skip** 阻断 native；macOS `viewer/paths.rs:298` C varargs 不接受 `u16 mode_t`，不是 runner 容量问题。Windows native release 构建成功并实际执行 **12 pass / 11 fail / 0 skip（23 项）**；原有十项 native crash 全通过，新增用例的 pointer/fixture/helper 与 IPC 隔离问题见后续诊断。整体 failure，不声称原生验收通过。 |
 | [43533657129](https://github.com/engcapa/taomni/actions/runs/43533657129) | `5455227dd53583a6209c1b5b3c2dfe608b41c4a4` | 三端 browser-only 复测在 planning 失败，**没有产品执行**。workflow 自动加 mandatory crash tag 后 planner 把 tag 所包含的 native-only cases 也当成不可省略的字面 case ID，错误拒绝单模式；仅修模式选择契约：tag/feature 中未声明该模式的成员保留 not_applicable，显式传入不支持模式的 case ID 仍必须报错。双模式完整 suite 不减少。 |
-| [43536729997](https://github.com/engcapa/taomni/actions/runs/43536729997) | `31dddb5021fe967536a30611a0195238433e0ee2` | 三端 browser-only 复测 workflow 已 success；六 shard 实际 summary/receipt、Mermaid/导出和入口截图正在核对，不凭绿色 job 先报全部 case 验收。此提交不含随后修复的 Wry native 隔离与 Explorer toolbar 高度，不据此证明原生结果。 |
+| [43536729997](https://github.com/engcapa/taomni/actions/runs/43536729997) | `31dddb5021fe967536a30611a0195238433e0ee2` | 六份实际 summary / receipt：三端 browser 每 OS **21/21 pass**，合计 **63 pass / 0 fail / 0 skip**，291份产物hash匹配、`identity_stable=true`、receipt exit0。真实004 Mermaid live/split与HTML/PNG导出标签/连线通过，008的AI/Git/SSHguard/SFTP完整62步通过。视觉仍有 Markdown间距/源码标记差异与Mac005最终截图loading瞬态，不能据此声称严格原型验收。此提交不含随后 Wry native 隔离与 Explorer toolbar 高度修复，不证明原生结果。 |
+| [43541393919](https://github.com/engcapa/taomni/actions/runs/43541393919) | `7a08e692520cbdcba523395998525e606be8c166` | 全三端 browser/native132次已启动，匹配release binary及新Cargo.lock；native-contracts重跑。包含Windows frame隔离和commandbar drag修复，尚未得最终结果。 |
 
 ### 首轮实际失败与对应修复
 
@@ -135,3 +136,12 @@ TC-WS-038/039/051/052/053/054/055/056/057 与 TC-IDE-C8-08 的目标是原有 ID
 - **保留 Explorer003 drag**：已确认本次选中态 commandbar 新增 Open/Open-with 控件触发 Windows 14px 横向 scrollbar，高度在指针拖动中改变，原先的目标行坐标因此落到当前目录容器，源文件未移动。Explorer 使用 custom pointer drag，本就不会产生 HTML5 dragstart/drop，不能误把缺 HTML5 event 当根因。工具栏固定原有 36px 总高、保留横向 scroll access 但不让 scrollbar 占位改变高度；mounted 13 项 / 全 Explorer 九文件81项通过，并在原用例真实 drag 前后各测量工具栏36px（原文件移动/精确字节断言保留、checkpoint机械后移）。browser 通过不能替代原生验证，不标为无关。
 
 本批 native runner / preview sequencing / preserved-case 契约合计 **95/95 pass**，单模式 crash selector **6/6 pass**，浏览器精确63次选择计划与 audit/boundaries/tsc/full rustfmt 均通过。Wry patch 后 `cargo test --lib viewer::` **32/32 pass**（原25+新7脚本隔离回归），只算单元证据。Cargo.lock 已改变，下一次全三端 browser/native 必须匹配新 release binary，并重新执行 native-contracts，不复用旧锁输入的110项结果。
+
+### Browser 通过证据及剩余视觉差异（43536729997）
+
+- 六 summary 的 source `a8928421cf8dd7001c5282b4dac8fd408dbd1e8ad61c6489231c1c730d08a5d7` / runner `dd666ca7393b9b25033383b022b78708a5bb03e83af06a8d313fca736011f4b9` 稳定，63/63实际通过；本轮不含native用例，不冒充OS证据。
+- 004 三端120/120步；独立解析导出 HTML 为1SVG、3nodes、9paths、Explorer/OpenFile/Viewer三标签、无foreignObject、2内嵌PNG；实际800×1342 PNG可见图形/连线、Alpha2表格和粘贴图片。实际图形渲染与导出保留成立，不再仅为mock。
+- 008 三端62/62步；SSH真实帧和SFTP远端28bytes SHA `95c3a6bf820f823c3d0271ab91c10dfff0fb3804e8f54f55faa275a392000efb` 通过，关闭后同temp路径absent。browser本地/Git/temp oracle仍是VFS，不替代native host文件验证。
+- 012三端真实wheel/transform/clipboard路径，原图与复制PNG均640×360、RGBA一致；仅Chromium clipboard，不是OS。Explorer001..004三端12/12pass。
+- 视觉review发现实时正文块间距仍较原型偏大，活动`#`源标记不够弱化；任务checkbox的checked状态未在HTML/PNG中保留。修复后还需匹配源码重新验，不以功能绿替代严格原型。004浅色fixture仅1px图片，不足以证明真实大图工具条；native007深浅截图及DOCX待新原生结果。
+- Mac005最后一次Blocknetwork触发新session后立即截图，留下Loading/console0瞬态；此前功能断言通过，但此截图不算完成态。用真实loaded/console条件等待后再拍，保留全部原断言。

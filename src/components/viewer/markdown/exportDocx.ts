@@ -67,7 +67,7 @@ export async function markdownDocx(root: HTMLElement, title: string, settings: M
           const copy = item.cloneNode(true) as Element;
           copy.querySelectorAll("ul,ol").forEach((nested) => nested.remove());
           result.push(new d.Paragraph({ children: await inline(copy),
-            ...(tag === "ul" ? { bullet: { level: Math.min(depth, 8) } } : { numbering: { reference: "markdown-numbering", level: Math.min(depth, 8) } }) }));
+            ...(item.classList.contains("fv-md-task-item") ? {} : tag === "ul" ? { bullet: { level: Math.min(depth, 8) } } : { numbering: { reference: "markdown-numbering", level: Math.min(depth, 8) } }) }));
           for (const nested of Array.from(item.children).filter((child) => ["UL", "OL"].includes(child.tagName))) {
             const container = document.createElement("div"); container.append(nested.cloneNode(true)); result.push(...await blocks(container, depth + 1));
           }

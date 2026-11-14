@@ -35,7 +35,9 @@ class RenderedBlock extends WidgetType {
       // marked strips input via the shared sanitizer; locate the corresponding
       // task by text instead of assigning checkboxes to unrelated list items.
       const text = this.raw.slice((task.index ?? 0) + task[0].length).split("\n")[0].trim().replace(/[*_`]/g, "");
-      if (!(item.textContent || "").trim().startsWith(text)) return;
+      const labelContent = item.cloneNode(true) as HTMLElement;
+      labelContent.querySelectorAll(".fv-md-task-state,ul,ol").forEach((node) => node.remove());
+      if (!(labelContent.textContent || "").trim().startsWith(text)) return;
       taskIndex++;
       const toggle = document.createElement("button");
       const checked = task[2].toLowerCase() === "x";
@@ -53,7 +55,9 @@ class RenderedBlock extends WidgetType {
       };
       item.classList.add("fv-md-task-item");
       if (checked) item.classList.add("is-checked");
-      item.prepend(toggle);
+      const passive = Array.from(item.children).find((child) => child.classList.contains("fv-md-task-state"));
+      if (passive) passive.replaceWith(toggle);
+      else item.prepend(toggle);
     });
     root.onclick = (event) => {
       const anchor = (event.target as Element).closest("a");
@@ -113,6 +117,7 @@ function decorations(state: EditorState, context: MarkdownWidgetContext, focus: 
           heading ? `fv-md-heading-${heading[1].length}` : "",
           focus && line.from !== currentLine.from ? "fv-md-dim" : ""].filter(Boolean).join(" ");
         ranges.push(Decoration.line({ class: cls }).range(line.from));
+        if (heading) ranges.push(Decoration.mark({ class: "fv-md-source-marker" }).range(line.from, line.from + heading[0].length));
         if (line.to >= end || line.to === state.doc.length) break;
         pos = line.to + 1;
       }

@@ -140,7 +140,7 @@ class MarkdownNativeArtifactsTests(unittest.TestCase):
     def test_html_docx_and_markdown_require_real_image_pixels_and_contents(self):
         image=base64.b64encode(self.clipboard.read_bytes()).decode()
         diagram_svg='<svg xmlns="http://www.w3.org/2000/svg" width="480" height="100"><text>Markdown Source</text><text>Live Diagram</text><text>Export Artifact</text><path d="M0 0L100 100"/></svg>'
-        html=self.exports/'native.html';html.write_text('<h1>File open Markdown</h1><strong>Rendered bold</strong>'+f'<img src="data:image/png;base64,{image}">'*2+diagram_svg)
+        html=self.exports/'native.html';html.write_text('<h1>File open Markdown</h1><strong>Rendered bold</strong><span class="katex">x^2</span>'+f'<img src="data:image/png;base64,{image}">'*2+diagram_svg)
         artifacts.check_artifact('html',html,self.source,self.manifest)
         html.write_text('<h1>File open Markdown</h1><strong>Rendered bold</strong><img src="assets/pixel.png">')
         with self.assertRaises(StepError):artifacts.check_artifact('html',html,self.source,self.manifest)

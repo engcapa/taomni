@@ -13,9 +13,19 @@ from .steps import StepError
 
 READ_VFS = """async (path) => {
   const vfs = await import('/src/stubs/localVfs.ts');
+  const missing = (error) => error instanceof Error && error.message === `Not found: ${path}`;
   try { await vfs.vfsStat(path); }
-  catch (error) { if (String(error).toLowerCase().includes('not found')) return {exists: false}; throw error; }
-  return {exists: true, bytes: Array.from(new Uint8Array(await vfs.vfsReadBytes(path)))};
+  catch (error) { if (missing(error)) return {exists: false}; throw error; }
+  try {
+    return {exists: true, bytes: Array.from(new Uint8Array(await vfs.vfsReadBytes(path)))};
+  } catch (error) {
+    // Cleanup can remove the file after stat. "Not a file" also means a directory
+    // or damaged record, so only a fresh, exact not-found observation proves absence.
+    if (!(error instanceof Error) || error.message !== `Not a file: ${path}`) throw error;
+    try { await vfs.vfsStat(path); }
+    catch (statError) { if (missing(statError)) return {exists: false}; throw statError; }
+    throw error;
+  }
 }"""
 
 
