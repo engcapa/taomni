@@ -59,6 +59,22 @@ describe("shared document owner", () => {
     expect(document().content).toBe("draft"); expect(document().restored).toBe(true);
     expect(document().external?.hash).toBe("new");
   });
+  it("preserves persisted drafts if flushDrafts runs while open() is still loading", async () => {
+    await get().open(path); get().edit(path, "draft");
+    get().release(path);
+    useDocumentStore.setState({ documents: {}, closeRequest: undefined, draftError: undefined });
+    let resolve!: (value: ViewerTextData) => void;
+    vi.mocked(viewerReadText).mockReturnValueOnce(new Promise((done) => { resolve = done; }));
+    const reloading = get().open(path);
+    await Promise.resolve();
+    expect(document().loading).toBe(true);
+    get().flushDrafts();
+    expect(JSON.parse(localStorage.getItem(VIEWER_DRAFTS_KEY)!)[path].content).toBe("draft");
+    resolve(disk("external", "new"));
+    await reloading;
+    expect(document().content).toBe("draft"); expect(document().restored).toBe(true);
+    expect(document().dirty).toBe(true);
+  });
   it("never edits or saves a remote read-only copy", async () => {
     await get().open(path, "Remote copy"); get().edit(path, "blocked"); await get().save(path);
     expect(document().content).toBe("original"); expect(viewerWriteText).not.toHaveBeenCalled();

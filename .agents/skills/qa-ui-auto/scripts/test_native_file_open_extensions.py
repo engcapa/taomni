@@ -65,6 +65,20 @@ class NativeFileDialogTests(unittest.TestCase):
             receipt=json.loads((ctx.case_dir/'native-paste.jsonl').read_text())
             self.assertTrue(receipt['passed']);self.assertFalse(receipt['syntheticClipboardEvent'])
 
+    def test_windows_native_paste_qualifies_system_threading_thread_sleep(self):
+        self.assertIn('System.Threading.Thread.Sleep(', native_paste.WIN)
+
+    def test_native_session_text_uses_textcontent_for_svg_elements(self):
+        from tauri_webdriver import NativeSession
+        session=NativeSession('http://driver.invalid',Path('/qa/taomni'))
+        session.execute=Mock(return_value='Markdown Source')
+        session.find=Mock()
+        self.assertEqual(session.text('svg.flowchart'),'Markdown Source')
+        script=session.execute.call_args.args[0]
+        self.assertIn('SVGElement',script)
+        self.assertIn('textContent',script)
+        session.find.assert_not_called()
+
 
 class GlobalEntryContracts(unittest.TestCase):
     def test_native_terminal_click_uses_one_synchronized_pointer_with_modifier_and_release(self):

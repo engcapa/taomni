@@ -19,6 +19,8 @@ export function readViewerDrafts(): Record<string, ViewerDraft> {
 export function writeViewerDrafts(documents: Record<string, ViewerDocument>): void {
   const drafts = readViewerDrafts();
   for (const [key, document] of Object.entries(documents)) {
+    // Do not discard persisted drafts before an in-flight load (or failed read) applies readViewerDrafts().
+    if (document.loading || document.error) continue;
     if (!document.dirty || document.readOnly) { delete drafts[key]; continue; }
     drafts[key] = {
       path: document.path, content: document.content, savedContent: document.savedContent,

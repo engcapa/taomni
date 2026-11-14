@@ -1005,7 +1005,7 @@ class NativeSession(WebDriverTransport):
         try:
             attr = self.execute(
                 f"const el = document.querySelector({json.dumps(selector)});"
-                "return el ? (el.getAttribute('data-terminal-text') ?? el.innerText ?? '') : '';"
+                "return el ? (el.getAttribute('data-terminal-text') ?? (el instanceof SVGElement ? el.textContent : el.innerText ?? el.textContent) ?? '') : '';"
             )
             if attr is not None:
                 return str(attr)

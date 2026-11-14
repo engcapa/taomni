@@ -1,5 +1,6 @@
 import { measureElement, useVirtualizer } from "@tanstack/react-virtual";
 import { Fragment, useLayoutEffect, useRef, useState } from "react";
+import { observeElementOffsetClean } from "../../../lib/virtualOffsetObserver";
 import type { TreeSelection } from "./codeWorkspaceModel";
 import { registerProjectTreeNavigation } from "./projectTreeNavigation";
 import { projectTreeNavigationTarget } from "./projectTreeNavigationModel";
@@ -68,6 +69,7 @@ export function ProjectTreeViewport({ rows, selected, viewMode }: {
     // Row measurements change the spacer and can adjust ancestor scrolling.
     // Publish them after ResizeObserver delivery to avoid a WebKit resize loop.
     useAnimationFrameWithResizeObserver: true,
+    observeElementOffset: observeElementOffsetClean,
     overscan: 8,
     scrollMargin: insets.margin,
     scrollPaddingStart: insets.header,

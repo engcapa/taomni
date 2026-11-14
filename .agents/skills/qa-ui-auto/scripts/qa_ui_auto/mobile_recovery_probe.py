@@ -113,8 +113,14 @@ def freshness(page, case_dir, delivery):
     expect(page.get_by_test_id('mobile-file-open')).to_be_visible()
     page.get_by_test_id('mobile-file-open').click()
     expect(page.get_by_test_id('mobile-file-content')).to_contain_text('QA_MOBILE_CHANGED')
+    for name in ('mobile-changes-updated', 'mobile-file-updated'):
+        locator = page.get_by_test_id(name)
+        expect(locator).to_contain_text('上次更新')
+        expect(locator).not_to_contain_text('—')
+        expect(locator).not_to_contain_text('正在更新')
+        expect(locator).not_to_contain_text('可能已过期')
     before = {name: page.get_by_test_id(name).inner_text() for name in ('mobile-changes-updated', 'mobile-file-updated')}
-    assert all('—' not in value for value in before.values()), before
+    assert all('—' not in value and '正在更新' not in value and '可能已过期' not in value for value in before.values()), before
 
     def unavailable(route):
         route.fulfill(status=503, content_type='application/json', body='{"error":"connection_failed"}')

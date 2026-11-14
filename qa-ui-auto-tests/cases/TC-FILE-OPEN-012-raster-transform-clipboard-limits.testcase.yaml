@@ -62,7 +62,7 @@ steps:
     expect_truthy: true
 - click: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-zoom-fit"]'
 - eval_readonly:
-    expression: document.querySelector(".fv-active .image-render").style.transform.includes("translate(0px, 0px)") && document.querySelector(".fv-active .image-render").getBoundingClientRect().width <= document.querySelector(".fv-active .image-stage").clientWidth
+    expression: /translate\(0px(?:,\s*0px)?\)/.test(document.querySelector(".fv-active .image-render").style.transform) && document.querySelector(".fv-active .image-render").getBoundingClientRect().width <= document.querySelector(".fv-active .image-stage").clientWidth
     expect_truthy: true
 - click: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-zoom-actual"]'
 - click: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-rotate-right"]'

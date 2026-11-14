@@ -56,7 +56,7 @@ public static class QaPaste {
      }
     }
     BringWindowToTop(hwnd);
-    Thread.Sleep(50);
+    System.Threading.Thread.Sleep(50);
    }
    if(GetForegroundWindow()!=hwnd) throw new Exception("QA window not foreground");
    keybd_event(0x11,0,0,UIntPtr.Zero);

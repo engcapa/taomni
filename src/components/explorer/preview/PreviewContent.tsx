@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
+import { observeElementOffsetClean } from "../../../lib/virtualOffsetObserver";
 import { parseCsvPreview, renderOfflineMarkdown } from "./previewModel";
 
 export function TextPreview({ text, wrap }: { text: string; wrap: boolean }) {
@@ -12,6 +13,7 @@ export function TextPreview({ text, wrap }: { text: string; wrap: boolean }) {
     initialRect: { width: 276, height: 300 },
     overscan: 8,
     useAnimationFrameWithResizeObserver: true,
+    observeElementOffset: observeElementOffsetClean,
   });
   useEffect(() => {
     virtualizer.measure();
