@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted（设计稿，非实现记录；完整设计见 `docs-feature/taomni-modular-split-design.md` v1.2，2026-11-14；v1.2 修订见设计文档修订记录）。
+Accepted（设计稿，非实现记录；完整设计见 `docs-feature/taomni-modular-split-design.md` v1.3，2026-11-14；修订见设计文档 §13.4）。v1.3 经代码实测审查，修订了插件形态与若干边界，并新增 4 个待用户决策项（DEC-1 ~ DEC-4）；§2.1 的用户决策不变，§2.3 的形态描述以 DEC-1 结论为准。
 
 ---
 
@@ -25,14 +25,16 @@ Taomni 是本地优先的 AI 原生远程工作台（Tauri 2 + React 19 + TypeSc
 
 ### 2.2 插件清单（首批，12 个）
 
-`taomni-plugin-rdp-client`、`taomni-plugin-vnc-client`、`taomni-plugin-rdp-server`、`taomni-plugin-vnc-server`、`taomni-plugin-servers`（除 RDP / VNC 外的内置服务器）、`taomni-plugin-sockscap`、`taomni-plugin-lanchat`（暂定，后续可能移除，见设计文档 §4.11）、`taomni-plugin-screenshot`（OCR / 录制引擎；入口留核心）、`taomni-plugin-mfa`、`taomni-plugin-nettools`、`taomni-plugin-ai-voice-local`（Whisper / Sherpa / llama.cpp）、`taomni-plugin-mobile`。数据库、邮件、对象存储、Code Workspace、Tao Agent 全部留核心，不在插件清单里。插件之间零依赖，只依赖核心。
+`taomni-plugin-rdp-client`、`taomni-plugin-vnc-client`、`taomni-plugin-rdp-server`、`taomni-plugin-vnc-server`、`taomni-plugin-servers`（除 RDP / VNC 外的内置服务器）、`taomni-plugin-sockscap`、`taomni-plugin-lanchat`（暂定，后续可能移除，见设计文档 §4.1）、`taomni-plugin-screenshot`（OCR / 录制引擎；入口留核心）、`taomni-plugin-mfa`、`taomni-plugin-nettools`、`taomni-plugin-ai-voice-local`（Whisper / Sherpa / llama.cpp）、`taomni-plugin-mobile`。数据库、邮件、对象存储、Code Workspace、Tao Agent 全部留核心，不在插件清单里。插件之间零依赖，只依赖核心。
 
 ### 2.3 插件运行时与模块商店
 
-- 每个插件一份 `module.json`（id、版本、`coreApiVersion`、平台 / 架构、入口、tab、命令、capabilities、数据目录、签名）；核心启动扫描 `应用数据目录/plugins/<id>/`，校验签名与 `coreApiVersion` 后注册。
-- 前端按注册表动态加载（`React.lazy`），替代 `TabContentRouter` 的静态 import；Rust 侧每个插件是一个 Cargo workspace 成员，`AppState` 拆成 `CoreState + PluginRegistry`，命令按 `plugin:<id>:<cmd>` 命名空间拆分。
+- 每个插件一份 `module.json`（id、slug、版本、`coreApiVersion`、平台、入口、tab、命令、`permissions`、数据目录、备份路径）；签名是包旁的分离 `.minisig`，验证公钥只用核心内置的一把；核心启动扫描 `应用数据目录/plugins/<slug>/`，校验签名记录与 `coreApiVersion` 后注册。
+- 前端按注册表动态加载（`React.lazy`），替代 `TabContentRouter` 的静态 import；插件 chunk 使用宿主提供的 React 与共享库，通过核心自定义 URI scheme 加载（CSP 仅加这一个 scheme）。
+- Rust 侧：v1.2 的“进程内 cdylib Tauri 插件”经审查不成立（Tauri 插件编译期注册、Rust 无稳定 ABI、capability 编译期固定、macOS 库校验、崩溃与卸载），v1.3 **推荐**（待 DEC-1 与 M0 验证门 G1–G7 确认）：原生部分是由核心拉起的插件宿主进程，经 stdio JSON-RPC 与核心通信，高带宽数据走 loopback WebSocket；插件 crate 放 `src-tauri/plugins/<slug>/`，作为现有 workspace 成员以共用 `[patch.crates-io]`；`AppState` 拆成 `CoreState + PluginRegistry`，命令经核心 `plugin_invoke` 分发。
 - 模块商店在应用内：浏览、兼容性检查、下载（断点续传、分片校验、代理三模式、进度与取消）、minisign 验签（与核心同一公钥）、原子安装、启用 / 禁用、卸载（默认保留数据）、回滚到上一版本、离线安装本地插件包。
-- 特权 / 重型模块走 sidecar 独立进程：SocksCap、Servers、RDP Server、本地 LLM；VNC Server 随被监督的系统 VNC daemon 走；其余插件进程内 Tauri 插件。
+- 带原生部分的插件都是宿主进程；SocksCap 额外保留既有提权 helper；VNC Server 监督外部系统 VNC daemon；纯前端插件（`nettools`）没有宿主。
+- 插件之间零依赖是**目标状态**，不是现状：实测屏幕采集引擎住在 `servers/rdp/capture/`（被截图入口、LanChat、RDP 服务端共用）、RDP 服务端复用 RDP 客户端代码、`mobile` 嵌在核心终端热路径里，需先做 10 项共享能力下沉（设计文档 §4.2）才能迁移。
 
 ### 2.4 版本与发布
 
@@ -40,18 +42,20 @@ Taomni 是本地优先的 AI 原生远程工作台（Tauri 2 + React 19 + TypeSc
 - 核心继续 SemVer，插件独立 SemVer，`coreApiVersion`（第一版为 `1`）是兼容矩阵的键；只改一个插件时，只发该插件的新包 + 新的 `modules.json`，不重发核心包。
 - `latest.json`（核心）不变，新增 `modules.json`（插件），生成器扩展现有 `compose-updater-manifest.mjs` 思路，发布是原子操作。
 
-### 2.5 待确认解释（设计文档 §13.2）
+### 2.5 待确认解释（设计文档 §13.2）与 v1.3 待决策项（§13.3）
 
-无。第 3、4、5 项的解释已全部由用户确认：第 3 项（2026-11-14 20:28）——截图入口、备份放核心，MFA、nettools 做插件；第 4 项（20:22）——本地语音 / 模型二进制排除在 Tao Agent“全部”之外；第 5 项（20:22）——“两种类”指客户端与服务端两类，已按 4 个插件落笔。LanChat 为暂定插件，后续可能移除（设计文档 §4.11）。
+无。第 3、4、5 项的解释已全部由用户确认：第 3 项（2026-11-14 20:28）——截图入口、备份放核心，MFA、nettools 做插件；第 4 项（20:22）——本地语音 / 模型二进制排除在 Tao Agent“全部”之外；第 5 项（20:22）——“两种类”指客户端与服务端两类，已按 4 个插件落笔。LanChat 为暂定插件，后续可能移除（设计文档 §4.1）。
+
+v1.3 新增待用户决策项（agent 已给推荐，均不算用户已定）：DEC-1 插件原生部分形态（推荐宿主进程）；DEC-2 允许受控例外（`plugin-mobile`、macOS 屏幕录制授权不通过时的截图 / RDP 服务端）；DEC-3 `plugin-nettools` 实测仅 82 行前端、`proxy/` 是核心基础设施，是否仍做独立插件（推荐并入核心）；DEC-4 滚动长截图归属（推荐留核心）。
 
 ## 3. Consequences
 
 - **正向**：核心默认安装、离线可用；插件可独立发版、独立回滚，核心发版不强制重发全部插件；SocksCap / Servers 等特权面从核心包里移出，风险面可单独审计、单独回滚；商店让“装不装”变成用户选择，不再是打包时决定。
-- **负向 / 成本**：按读法 B，核心还要背数据库全套驱动、邮件全套、HBase、对象存储、编辑器 + LSP + DAP + Git + 构建链、Tao Agent 全套，瘦身效果有限（见设计文档 §1.7）；P1 约 6–11 周（单人全职等效，估算非承诺），`AppState` 拆分与 RDP / VNC 服务端从 `servers/` 拆出是主要风险点。
+- **负向 / 成本**：按读法 B，核心还要背数据库全套驱动、邮件全套、HBase、对象存储、编辑器 + LSP + DAP + Git + 构建链、Tao Agent 全套，瘦身效果有限（见设计文档 §1.7）；P1 约 8–14 周（单人全职等效，估算非承诺；v1.2 的 6–11 周未计入前置解耦与形态验证门），`AppState` 拆分、采集引擎与 RDP 公共代码下沉、`mobile` 与终端热路径解耦是主要风险点；下载来的原生可执行文件在 macOS 自签名发布包、屏幕录制授权、Windows SmartScreen 下的行为是未验证风险（G1–G4）。
 - **未验证**：本文是设计稿，未实测已发布安装包体积基线（M0 第一项工作），未编译插件运行时，未验证插件矩阵发布；体积收益以 M0 基线 + 每批增量为准，不以本文数字为准。
 
 ## 4. References
 
-- 设计文档：`docs-feature/taomni-modular-split-design.md`（v1.2，2026-11-14）
+- 设计文档：`docs-feature/taomni-modular-split-design.md`（v1.3，2026-11-14）
 - 前序设计：`docs-feature/tao-home-design.md`（v1.3，PR #806 已合入）——Tao Home 与 Tao Agent 是核心的一部分
-- 现状核查：本地 main `8233beaca`（Merge PR #808）；`DESIGN.md`；`claudedocs/auto-update-plan.md`（更新与签名）；仓库 `AGENTS.md`（800 行上限、外部网络与下载规则、测试与 crash 回归）
+- 现状核查：v1.2 基于 main `8233beaca`（Merge PR #808），v1.3 审查基于 `f532eb4c3`（Merge PR #809）；`DESIGN.md`；`claudedocs/auto-update-plan.md`（更新与签名）；仓库 `AGENTS.md`（800 行上限、外部网络与下载规则、测试与 crash 回归）
