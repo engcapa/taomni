@@ -291,9 +291,9 @@ fn focus_target_window(app: &tauri::AppHandle, target: &DesktopWindow) -> Result
             .ok_or_else(|| "window_not_found".to_string())?;
         let _ = win.unminimize();
         let _ = win.show();
+        focus_tauri_os_handle(&win);
         win.set_focus()
             .map_err(|_| "window_focus_failed".to_string())?;
-        focus_tauri_os_handle(&win);
         return Ok(());
     }
     if let Some(raw) = target.id.strip_prefix("win:") {

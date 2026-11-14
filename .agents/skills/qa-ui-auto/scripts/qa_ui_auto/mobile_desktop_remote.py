@@ -93,14 +93,35 @@ def _wait_state(lock, state, predicate, message, timeout=15.0):
     raise AssertionError(f'{message}: {snapshot!r}')
 
 
+def _focus_main_window(ctx):
+    """Bring the desktop WebDriver window back in front of the opened browser before UI clicks."""
+    try:
+        handle = ctx.session.request('GET', ctx.session.endpoint('/window'))
+        if handle:
+            ctx.session.request('POST', ctx.session.endpoint('/window'), {'handle': handle})
+    except Exception:
+        pass
+    activate = getattr(getattr(ctx.session, '_window_focus', None), 'activate_linux_window', None)
+    if callable(activate):
+        try:
+            activate()
+        except Exception:
+            pass
+
+
 def run(ctx, endpoint, pairing_code):
     report = Path(ctx.case_dir).resolve()
     receipt = {'passed': False, 'checks': [], 'window_count': 0, 'display_count': 0, 'event_count': 0}
     server, lock, state = _start_target_server()
     target_url = f'http://127.0.0.1:{server.server_address[1]}/'
     try:
+        code_value = pairing_code.strip()
         status, _, pair_data = mobile_wire.http(
-            endpoint, '/pair', None, {'code': pairing_code, 'device_name': 'qa-desktop-probe'}, origin=endpoint,
+            endpoint,
+            '/pair',
+            None,
+            {'endpoint_label': 'qa-desktop-probe', 'pairing_code': code_value},
+            origin=endpoint,
         )
         assert status == 200 and pair_data and pair_data.get('token'), (status, pair_data)
         token = pair_data['token']
@@ -128,6 +149,7 @@ def run(ctx, endpoint, pairing_code):
         receipt['window_count'] = len(windows)
         receipt['checks'].append('server-browser-opens-external-tauri-window-and-loads-url')
 
+        _focus_main_window(ctx)
         ctx.session.click('[data-testid="mobile-settings-screen-capture"]')
         until(
             ctx.session,
@@ -171,6 +193,7 @@ def run(ctx, endpoint, pairing_code):
         )
         receipt['checks'].append('targeted-window-input-activates-server-browser-and-delivers-keystrokes')
 
+        _focus_main_window(ctx)
         ctx.session.click('[data-testid="mobile-settings-pair"]')
         until(
             ctx.session,
@@ -231,6 +254,7 @@ def run(ctx, endpoint, pairing_code):
         )
         receipt['event_count'] = len(snap['events'])
         receipt['checks'].append('real-embedded-mobile-web-desktop-view-renders-screen-and-drives-window-input')
+        _focus_main_window(ctx)
         receipt['passed'] = True
     finally:
         server.shutdown()
