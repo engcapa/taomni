@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Tao Home 高保真原型 v0.2（Taomni）</title>
+<title>Tao Home 高保真原型 v0.3（Taomni）</title>
 <style>
 :root{
   --bg:#fafbfd;--chrome:#f3f5f9;--chrome2:#eaeef4;--card:#fff;--card-b:#e6eaf0;--accent:#2b4fd8;--accent-soft:#5b7cf0;
@@ -102,7 +102,7 @@ kbd{font:11px var(--mono);background:var(--chrome);border:1px solid var(--card-b
 .hero{text-align:center;margin:0 0 18px}
 .hero h1{margin:0;font-size:26px;font-weight:600;letter-spacing:-.3px}.hero p{margin:6px 0 0;color:var(--muted);font-size:14px}
 .tall-hide .hero p{display:none}.xtall-hide .hero{display:none}
-.chat .hero,.chat .launch,.chat .foot{display:none}
+.chat .hero,.chat .foot{display:none}
 .feed{flex:1;min-height:0;overflow:auto;padding:12px 0 6px;display:none;flex-direction:column;gap:22px}
 .chat .feed{display:flex}
 .msg.user{align-self:flex-end;max-width:84%;position:relative}
@@ -190,11 +190,13 @@ pre.code{margin:6px 0;background:var(--code-bg);border-radius:9px;padding:9px 11
 .sug{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
 .sug button{border:0;background:var(--chrome);border-radius:999px;padding:6px 14px;display:flex;gap:7px;align-items:center;color:var(--text)}
 .sug button:hover{background:var(--sel)}.sug small{color:var(--muted);font-size:11px}
+.chat .dock{justify-content:flex-start}
 .chat .sug{justify-content:flex-start;flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px}.chat .sug button{flex:none;padding:3px 11px}.chat .sug small{display:none}
-.launch{display:flex;gap:6px;justify-content:center;margin-top:26px}
-.lbtn{display:flex;flex-direction:column;gap:3px;align-items:center;border:0;background:none;border-radius:11px;padding:7px 12px;color:var(--muted);font-size:11.5px;min-width:68px}
-.lbtn:hover{background:var(--chrome);color:var(--text)}.lbtn svg{width:19px;height:19px}
-.foot{margin:22px 0 10px;text-align:center;font-size:11px;color:var(--muted);display:flex;gap:8px;justify-content:center}
+.dock{display:flex;gap:2px;justify-content:center;align-items:center;margin-top:6px}
+.dbtn{display:flex;gap:6px;align-items:center;border:0;background:none;border-radius:9px;padding:4px 10px;color:var(--muted);font-size:12px;white-space:nowrap}
+.dbtn:hover,.dbtn.on{background:var(--chrome);color:var(--text)}.dbtn svg{width:15px;height:15px}
+.dbtn.first{color:var(--text)}.dsep{width:1px;height:16px;background:var(--div);margin:0 4px;flex:none}
+.foot{margin:18px 0 10px;text-align:center;font-size:11px;color:var(--muted);display:flex;gap:8px;justify-content:center}
 .foot a{color:var(--accent);cursor:pointer}
 
 .side{width:340px;border-left:1px solid var(--div);background:var(--chrome);display:none;flex-direction:column;flex:none}
@@ -210,15 +212,12 @@ pre.code{margin:6px 0;background:var(--code-bg);border-radius:9px;padding:9px 11
 
 .mask{position:absolute;inset:0;background:color-mix(in srgb,var(--bg) 80%,transparent);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;z-index:25}
 .mask.open{display:flex}.mask .card{width:340px;text-align:center}
-.drawer{position:absolute;left:0;top:0;bottom:0;width:310px;background:var(--bg);border-right:1px solid var(--div);box-shadow:var(--shadow);z-index:28;display:none;flex-direction:column;padding:12px}
-.drawer.open{display:flex}
-.drawer .hd{display:flex;align-items:center;gap:8px;margin-bottom:10px}.drawer .hd b{font-size:14px}
-.drawer input{border:1px solid var(--input-b);background:var(--card);color:var(--text);border-radius:9px;padding:7px 10px;margin-bottom:8px}
-.drawer .list{flex:1;overflow:auto;display:flex;flex-direction:column;gap:1px}
-.drawer h6{margin:10px 6px 3px;font-size:11px;color:var(--muted);font-weight:600}
-.thr{display:flex;gap:8px;align-items:center;border:0;background:none;text-align:left;padding:7px 9px;border-radius:9px}
-.thr:hover{background:var(--chrome)}.thr.on{background:var(--sel)}.thr span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.thr small{color:var(--muted);font-size:11px}.thr .run{width:7px;height:7px;border-radius:50%;background:var(--accent);animation:pulse 1s infinite}
+.ptabs{display:flex;gap:2px;padding:2px 4px 6px}
+.ptabs button{border:0;background:none;padding:4px 11px;border-radius:8px;color:var(--muted)}
+.ptabs button.on{background:var(--sel);color:var(--accent)}
+.plist{max-height:min(300px,40vh);overflow:auto;display:none}.plist.on{display:block}
+.plist .it span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.plist h6{margin:8px 10px 2px}
 
 .modal{position:absolute;inset:0;background:rgba(8,10,16,.45);display:none;align-items:flex-start;justify-content:center;z-index:50;padding:16px}
 .modal.open{display:flex}.modal.mid{align-items:center}
@@ -262,17 +261,18 @@ mark{background:var(--mark);color:inherit;border-radius:3px;padding:0 1px}
 .toast{position:absolute;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:#111214;color:#f1f3f6;padding:8px 15px;border-radius:10px;font-size:12px;opacity:0;pointer-events:none;transition:.25s;z-index:90;max-width:80%}
 .toast.show{opacity:1;transform:translateX(-50%)}
 .compact .topbar{padding:0 8px}.compact .sbtn span,.compact .bind .chip.ghost{display:none}.compact .tsp{display:block}
-.compact .srccard{width:100%}.compact .launch{overflow-x:auto;justify-content:flex-start}
-.compact .drawer{width:min(310px,88%)}
+.compact .srccard{width:100%}.compact .dock{overflow-x:auto;justify-content:flex-start}
 </style>
 </head>
 <body>
 <div class="pbar">
-  <b>Tao Home 原型 v0.2</b><span class="note">模拟数据 · 无网络请求</span>
+  <b>Tao Home 原型 v0.3</b><span class="note">模拟数据 · 无网络请求</span>
   <span class="sp"></span>
   <button id="bState">状态与界面 ▾</button>
   <button id="bTheme">浅色 / 暗色</button>
   <button id="bView">桌面 / 窄屏</button>
+  <label title="底部快捷行：未检测到 WSL 时不显示"><input type="checkbox" id="wslChk" checked> 系统有 WSL</label>
+  <label title="同一个 TaoAiChat 组件换宿主：只换绑定栏 / 模式 / 底部行 / 侧栏页签（示意，非 orchestrator 设计）">宿主 <select id="hostSel"><option value="home">首页</option><option value="dev">开发 Agent（示意）</option></select></label>
   <label>速度 <select id="speed"><option value="1">正常</option><option value="3">快 ×3</option><option value="0.5">慢 ×0.5</option></select></label>
   <div class="smenu" id="smenu"></div>
 </div>
@@ -288,7 +288,6 @@ mark{background:var(--mark);color:inherit;border-radius:3px;padding:0 1px}
       <button title="邮件"><svg viewBox="0 0 24 24"><path d="M3 6h18v12H3zM3 7l9 7 9-7"/></svg></button>
       <button title="笔记"><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6zM9 12h7M9 16h5"/></svg></button>
       <span class="sp"></span>
-      <button id="rHist" title="最近（Tao 对话历史）"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/></svg></button>
       <button id="rSet" title="设置"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg></button>
     </div>
     <div class="main">
@@ -296,7 +295,6 @@ mark{background:var(--mark);color:inherit;border-radius:3px;padding:0 1px}
       <div class="home" id="home">
         <div class="col" id="col">
           <div class="topbar" id="topbar">
-            <button class="ibtn" id="bHist" title="对话历史"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg></button>
             <div class="seg" id="modeSeg" role="tablist" aria-label="Tao 模式"><button data-m="ask" class="on" role="tab">问</button><button data-m="do" role="tab">做</button><button data-m="research" role="tab">深研</button></div>
             <div class="bind" id="bind"></div>
             <span class="tsp"></span>
@@ -323,23 +321,23 @@ mark{background:var(--mark);color:inherit;border-radius:3px;padding:0 1px}
                   <div class="voice" id="voice"><span style="color:var(--danger)">●</span><span id="vtime">0:00</span><div class="vbars" id="vbars"></div><button class="btn" id="vcancel">取消</button><button class="btn pri" id="vdone">完成</button></div>
                 </div>
                 <div class="chint" id="chint"></div>
+                <div class="dock" id="dock" aria-label="快捷操作">
+                  <button class="dbtn first" id="lHist" data-pop="1" title="历史：Tao 对话 / 最近会话 / 最近工作区"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/></svg>历史</button>
+                  <i class="dsep"></i>
+                  <button class="dbtn" id="lTerm"><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4zM7 9l3 3-3 3M12 15h5"/></svg>本地终端</button>
+                  <button class="dbtn" id="lWsl"><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4zM8 10h8M8 14h5"/></svg>WSL</button>
+                  <button class="dbtn" id="lSess"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>新会话</button>
+                  <button class="dbtn" id="lWs"><svg viewBox="0 0 24 24"><path d="M3 7h7l2 2h9v10H3z"/></svg>新工作区</button>
+                  <button class="dbtn" id="lMore" data-pop="1"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></svg>更多</button>
+                </div>
               </div>
               <div class="extras">
                 <div class="sug" id="sug"></div>
-                <div class="launch" id="launch">
-                  <button class="lbtn"><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4zM7 9l3 3-3 3M12 15h5"/></svg>本地终端</button>
-                  <button class="lbtn"><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4zM8 10h8M8 14h5"/></svg>WSL</button>
-                  <button class="lbtn"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>新会话</button>
-                  <button class="lbtn"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg>LAN 聊天</button>
-                  <button class="lbtn"><svg viewBox="0 0 24 24"><path d="M3 7h7l2 2h9v10H3z"/></svg>新工作区</button>
-                  <button class="lbtn" id="lMore"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></svg>更多</button>
-                </div>
               </div>
-              <div class="foot" id="foot"><span>Taomni v2.8.0</span><a id="restore">恢复上次会话（3 个标签）</a></div>
+              <div class="foot" id="foot"><span>Taomni v2.8.0</span></div>
             </div>
           </div>
           <div class="pop" id="pop"></div>
-          <div class="drawer" id="drawer"></div>
           <div class="mask" id="mask"><div class="card"><h4 style="justify-content:center">Vault 已锁定</h4><p>进行中的流式请求已中断，已收到的内容已保留。解锁后可重新发起。</p><button class="btn pri" id="unlock">输入主密码解锁</button></div></div>
         </div>
         <aside class="side" id="side" aria-label="侧栏">
@@ -350,7 +348,7 @@ mark{background:var(--mark);color:inherit;border-radius:3px;padding:0 1px}
     </div>
     <div class="ribbon"><span class="dot"></span><span class="t">Tao · 抽屉</span></div>
   </div>
-  <div class="statusbar"><span>● 代理：系统</span><span>出口 allowlist：api.deepseek.com</span><span class="sp"></span><span>状态 <span class="ph" id="phase">S1 空态就绪</span></span></div>
+  <div class="statusbar"><span>● 代理：系统</span><span>出口 allowlist：api.deepseek.com</span><span class="sp"></span><span><span id="hostNote"></span> 状态 <span class="ph" id="phase">S1 空态就绪</span></span></div>
   <div class="modal" id="modal"><div id="dlgwrap" style="display:contents"></div></div>
   <div class="toast" id="toast"></div>
 </div>
@@ -359,8 +357,10 @@ mark{background:var(--mark);color:inherit;border-radius:3px;padding:0 1px}
 <script>
 const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
 const S={tok:0,mode:'ask',think:false,web:false,model:'deepseek-flash',demo:false,hasKey:true,busy:false,
-  bind:{ws:'taomni',term:'本地终端 1',db:null},chips:[],tokens:0,cost:0,stopped:false,speed:1,branch:1,last:null,thr:'new'};
+  bind:{ws:'taomni',term:'本地终端 1',db:null,proj:'taomni',branch:'feat/development-orchestrator'},host:'home',wsl:true,chips:[],tokens:0,cost:0,stopped:false,speed:1,branch:1,last:null,thr:'new'};
 const BIND={ws:{label:'工作区',icon:'📁',items:['taomni','chat-demo','docs-site','infra-notes']},term:{label:'终端',icon:'⌨',items:['本地终端 1','u80（SSH）','WSL · Ubuntu','build-box（SSH）']},db:{label:'数据库',icon:'🗄',items:['u80 · PostgreSQL','analytics · ClickHouse','cache · Redis']}};
+const BIND_DEV={proj:{label:'项目',icon:'📁',items:['taomni','chat-demo','docs-site']},branch:{label:'分支',icon:'⎇',items:['feat/development-orchestrator','main','feat/tao-home']}};
+function curBind(){return S.host==='dev'?BIND_DEV:BIND}
 const MODE_DEF={ask:{think:false,web:false},do:{think:true,web:false},research:{think:true,web:true}};
 const el=(t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e};
 const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
@@ -483,10 +483,10 @@ $('#usageTxt').onclick=e=>{const pct=Math.min(100,S.tokens/10e6*100);const pk=is
 
 /* ---------- popups ---------- */
 function closePop(){$('#pop').classList.remove('open')}
-function openPop(anchor,html,o={}){const p=$('#pop');p.innerHTML=html;p.style.left=p.style.right=p.style.top=p.style.bottom='';
+function openPop(anchor,html,o={}){const p=$('#pop');p.innerHTML=html;p.style.left=p.style.right=p.style.top=p.style.bottom='';p.style.width=o.w?o.w+'px':'';
   const r=anchor.getBoundingClientRect(),cr=$('#col').getBoundingClientRect();
-  if(o.right){p.style.right=Math.max(8,cr.right-r.right)+'px'}else p.style.left=Math.max(8,Math.min(r.left-cr.left,cr.width-260))+'px';
-  if(o.up){p.style.bottom=(cr.bottom-r.top+6)+'px'}else p.style.top=(r.bottom-cr.top+6)+'px';
+  if(o.right){p.style.right=Math.max(8,cr.right-r.right)+'px'}else p.style.left=Math.max(8,Math.min(r.left-cr.left,cr.width-(o.w||260)-8))+'px';
+  if(o.up){p.style.bottom=(cr.bottom-r.top+6)+'px';p.style.maxHeight=Math.max(160,r.top-cr.top-14)+'px'}else{p.style.top=(r.bottom-cr.top+6)+'px';p.style.maxHeight=Math.max(160,cr.bottom-r.bottom-14)+'px'}p.style.overflowY='auto';
   p.classList.add('open');o.onMount&&o.onMount(p);return p}
 document.addEventListener('click',e=>{if(!e.target.closest('#pop')&&!e.target.closest('[data-pop]')&&!e.target.closest('.chip')&&!e.target.closest('.cap')&&!e.target.closest('#bPlus')&&!e.target.closest('#bMore')&&!e.target.closest('#usageTxt')&&!e.target.closest('#lMore'))closePop();
   const c=e.target.closest('.cite');if(c){openSources(c.dataset.n);return}
@@ -495,14 +495,14 @@ document.addEventListener('click',e=>{if(!e.target.closest('#pop')&&!e.target.cl
 
 /* ---------- binding ---------- */
 function renderBind(){const b=$('#bind');b.innerHTML='';let any=false;
-  for(const k of ['ws','term','db']){const d=BIND[k],v=S.bind[k];if(!v)continue;any=true;
+  for(const k of Object.keys(curBind())){const d=curBind()[k],v=S.bind[k];if(!v)continue;any=true;
     const c=el('button','chip ctx',`${d.icon} ${esc(S.demo?d.label+' 1':v)}<span class="x" data-x="${k}" title="解绑">×</span>`);c.dataset.pop=1;
     c.title=d.label+'：'+(k==='term'?'仅在你 @ 引用时发送最近 N 行（已脱敏）':k==='db'?'仅发送表结构；执行 SQL 前二次确认':'只读摘要，不全文上传')+'。绑定本身不发送内容。';
     c.onclick=e=>{if(e.target.dataset.x){S.bind[k]=null;renderBind();return}bindPop(c,k)};b.appendChild(c)}
   const g=el('button','chip ghost','+ 上下文');g.dataset.pop=1;g.onclick=()=>bindPop(g,null);b.appendChild(g)}
-function bindPop(anchor,only){const ks=only?[only]:['ws','term','db'];
-  const html=ks.map(k=>{const d=BIND[k];return `<h6>${d.label}</h6>`+d.items.slice(0,3).map(i=>`<button class="it" data-k="${k}" data-v="${esc(i)}">${d.icon} ${esc(i)}<small>${S.bind[k]===i?'已绑定':''}</small></button>`).join('')}).join('')+'<div class="sep"></div><button class="it" style="color:var(--accent)">浏览全部…</button>';
-  openPop(anchor,html,{onMount:p=>p.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>{S.bind[b.dataset.k]=b.dataset.v;closePop();renderBind();toast('已绑定'+BIND[b.dataset.k].label+'：'+b.dataset.v)})})}
+function bindPop(anchor,only){const ks=only?[only]:Object.keys(curBind());
+  const html=ks.map(k=>{const d=curBind()[k];return `<h6>${d.label}</h6>`+d.items.slice(0,3).map(i=>`<button class="it" data-k="${k}" data-v="${esc(i)}">${d.icon} ${esc(i)}<small>${S.bind[k]===i?'已绑定':''}</small></button>`).join('')}).join('')+'<div class="sep"></div><button class="it" style="color:var(--accent)">浏览全部…</button>';
+  openPop(anchor,html,{onMount:p=>p.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>{S.bind[b.dataset.k]=b.dataset.v;closePop();renderBind();toast('已绑定'+curBind()[b.dataset.k].label+'：'+b.dataset.v)})})}
 
 /* ---------- composer ---------- */
 function renderChips(){const c=$('#chips');c.innerHTML='';
@@ -631,6 +631,9 @@ $('#send').onclick=send;
 const SUGS=[['解释这段报错','终端最近一条 · 已脱敏','Error: listen EADDRINUSE :::5173 —— 解释并给排查步骤'],['写 README','工作区 taomni','阅读 taomni 的目录结构，给出 README 草稿'],['查最近 7 天订单','u80 · PostgreSQL','基于 orders 表结构，写一条查询最近 7 天订单数的 SQL'],['继续迁移脚本评审','上次未完成','继续上次的迁移脚本评审']];
 function renderSug(){const s=$('#sug');s.innerHTML='';s.style.display=S.demo?'none':'';SUGS.forEach(x=>{const b=el('button','',`${x[0]}<small>${x[1]}</small>`);b.onclick=()=>{$('#input').value=x[2];$('#input').focus();$('#input').dispatchEvent(new Event('input'))};s.appendChild(b)})}
 $('#lMore').onclick=e=>openPop(e.currentTarget,'<button class="it">邮件会话</button><button class="it">数据库会话</button><button class="it">VNC / RDP</button><button class="it">本地目录</button>',{up:true});
+$$('#dock .dbtn').forEach(b=>{if(!['lHist','lMore'].includes(b.id))b.onclick=()=>toast('原型：'+b.textContent.trim()+'（打开对应标签，与聊天线程无关）')});
+function applyWsl(){$('#lWsl').style.display=S.wsl?'':'none'}
+$('#wslChk').onchange=e=>{S.wsl=e.target.checked;applyWsl()};
 
 /* ---------- side panel ---------- */
 function openSide(p){$('#side').classList.add('open');$$('#side .tabs button[data-p]').forEach(b=>b.classList.toggle('on',b.dataset.p===p));$$('#side .pane').forEach(x=>x.classList.toggle('on',x.id==='p-'+p))}
@@ -648,17 +651,31 @@ $('#bMore').onclick=e=>openPop(e.currentTarget,`<button class="it" data-a="side"
   else if(a==='imp')openImport();else if(a==='mem')openSettings('mem');else if(a==='set')openSettings('conn');else toast('Ctrl K 搜索 · Ctrl+Enter 发送 · Esc 停止 · @ 引用 · / 技能')})});
 ['#rSet'].forEach(s=>$(s).onclick=()=>openSettings('conn'));$('#goSet').onclick=()=>openSettings('conn');
 $('#reuseKey').onclick=()=>{S.hasKey=true;applyKey();toast('已沿用 Vault 引用；未做连通性测试，如 Key 不适用将在首次发送时提示')};
-$('#unlock').onclick=()=>{$('#mask').classList.remove('open');toast('已解锁')};$('#restore').onclick=()=>toast('原型：恢复上次会话');
+$('#unlock').onclick=()=>{$('#mask').classList.remove('open');toast('已解锁')};
 function applyKey(){$('#nokey').style.display=S.hasKey?'none':'';$('#hero').style.display=S.hasKey?'':'none';setComposer(S.hasKey,S.hasKey?undefined:'请先连接 DeepSeek · 全家桶')}
 
-/* ---------- history drawer ---------- */
-function openHistory(){const d=$('#drawer');d.innerHTML=`<div class="hd"><b>对话</b><span style="flex:1"></span><button class="btn sm pri" id="newT">+ 新对话</button><button class="ibtn" id="hx">×</button></div><input placeholder="搜索对话标题…" id="hq" aria-label="搜索对话"><div class="list" id="hl"></div>
-  <div class="note2" style="margin-top:8px">图标区分轨道：<b>●</b> DeepSeek · 全家桶　<b>○</b> 旧 tao-chat 抽屉。两者同一份线程数据。</div>`;
-  const draw=q=>{const L=$('#hl');L.innerHTML='';THREADS.forEach(([g,items])=>{const f=items.filter(i=>!q||i[0].includes(q));if(!f.length)return;L.appendChild(el('h6','',g));
-    f.forEach(i=>{const b=el('button','thr'+(i[0]===S.thrName?' on':''),`<span>${i[2]?'<i class="run"></i> ':''}${i[1]==='ds'?'● ':'○ '}${esc(i[0])}</span><small>${i[1]==='ds'?'':'旧'}</small>`);b.onclick=async()=>{closeDrawer();clearAll();S.thrName=i[0];toChat();addUser(i[0]);await playReply('ask',{instant:true});scrollEnd()};L.appendChild(b)})})};
-  draw('');$('#hq').oninput=e=>draw(e.target.value);$('#hx').onclick=closeDrawer;$('#newT').onclick=()=>{closeDrawer();clearAll()};d.classList.add('open')}
-function closeDrawer(){$('#drawer').classList.remove('open')}
-$('#bHist').onclick=openHistory;$('#rHist').onclick=openHistory;
+/* ---------- history popover (dock first item) ---------- */
+const RECENT_S=[['u80 · 生产数据库','SSH · 10 分钟前'],['build-box','SSH · 昨天'],['analytics · ClickHouse','ClickHouse · 2 天前'],['本地终端 1','本地 · 3 天前']];
+const RECENT_W=[['taomni','~/code/taomni · 今天'],['chat-demo','~/code/chat-demo · 昨天'],['docs-site','~/code/docs-site · 5 天前']];
+function openHistory(tab){tab=tab||'chat';const nm=(n,i,p)=>S.demo?p+' '+(i+1):esc(n);
+  const chat=THREADS.map(([g,items])=>`<h6>${g}</h6>`+items.map(i=>`<button class="it" data-thr="${esc(i[0])}">${i[1]==='ds'?'●':'○'} <span>${esc(i[0])}</span><small>${i[1]==='ds'?'':'旧 tao-chat'}</small></button>`).join('')).join('');
+  const sess=RECENT_S.map((x,i)=>`<button class="it" data-sess="${i}">🖧 <span>${nm(x[0],i,'会话')}</span><small>${esc(x[1])}</small></button>`).join('');
+  const ws=RECENT_W.map((x,i)=>`<button class="it" data-ws="${i}">📁 <span>${nm(x[0],i,'工作区')}</span><small>${S.demo?'':esc(x[1])}</small></button>`).join('');
+  const tabs=[['chat','Tao 对话'],['sess','最近会话'],['ws','最近工作区']];
+  openPop($('#lHist'),`<div class="ptabs">${tabs.map(t=>`<button data-t="${t[0]}" class="${t[0]===tab?'on':''}">${t[1]}</button>`).join('')}</div>
+   <input class="q" id="hq" placeholder="搜索…" aria-label="搜索历史">
+   <div class="plist ${tab==='chat'?'on':''}" data-l="chat">${chat}</div><div class="plist ${tab==='sess'?'on':''}" data-l="sess">${sess}</div><div class="plist ${tab==='ws'?'on':''}" data-l="ws">${ws}</div>
+   <div class="sep"></div><button class="it" id="hNew">＋ 新 Tao 对话</button><button class="it" id="hResume">↺ 恢复上次会话<small>3 个标签</small></button>
+   ${S.demo?'<div class="note2" style="margin:4px 6px">演示模式：已隐藏会话与工作区名称</div>':''}
+   <div style="padding:4px 10px 2px;font-size:11px;color:var(--muted)">● DeepSeek · 全家桶　○ 旧 tao-chat（同一份线程数据）</div>`,{up:true,w:380,onMount:p=>{
+    const q=p.querySelector('#hq');q.placeholder=tab==='chat'?'搜索对话标题…':tab==='sess'?'搜索最近会话…':'搜索最近工作区…';
+    p.querySelectorAll('.ptabs button').forEach(b=>b.onclick=()=>{p.querySelectorAll('.ptabs button').forEach(x=>x.classList.toggle('on',x===b));p.querySelectorAll('.plist').forEach(l=>l.classList.toggle('on',l.dataset.l===b.dataset.t));q.value='';q.dispatchEvent(new Event('input'));q.focus()});
+    q.oninput=()=>{const v=q.value.trim();p.querySelectorAll('.plist .it').forEach(b=>b.style.display=!v||b.textContent.includes(v)?'':'none')};
+    p.querySelectorAll('[data-thr]').forEach(b=>b.onclick=async()=>{const name=b.dataset.thr;closePop();clearAll();S.thrName=name;toChat();addUser(name);await playReply('ask',{instant:true});scrollEnd()});
+    p.querySelectorAll('[data-sess]').forEach(b=>b.onclick=()=>{closePop();toast('原型：打开会话“'+RECENT_S[b.dataset.sess][0]+'”（在会话标签中打开，不进入聊天）')});
+    p.querySelectorAll('[data-ws]').forEach(b=>b.onclick=()=>{closePop();toast('原型：打开工作区“'+RECENT_W[b.dataset.ws][0]+'”')});
+    p.querySelector('#hNew').onclick=()=>{closePop();clearAll()};p.querySelector('#hResume').onclick=()=>{closePop();toast('原型：恢复上次会话（3 个标签）')}}})}
+$('#lHist').onclick=()=>openHistory();
 
 /* ---------- modal helpers ---------- */
 function openDlg(html,mid){const m=$('#modal');$('#dlgwrap').innerHTML=html;m.classList.toggle('mid',!!mid);m.classList.add('open');m.onmousedown=e=>{if(e.target===m)closeDlg()};return m}
@@ -719,9 +736,17 @@ function openSettings(tab){const NAV=[['conn','连接'],['model','模型与模�
     const rt=$('#rtest');if(rt){const f=()=>{let t=rt.value,n={};REDACT.forEach(r=>{t=t.replace(r[1],()=>{n[r[0]]=(n[r[0]]||0)+1;return '‹已脱敏:'+r[0]+'›'})});$('#rout').textContent=t+'\n\n命中：'+(Object.entries(n).map(e=>e[0]+' '+e[1]).join('、')||'无')};rt.oninput=f;f()}};
   $$('#dlg nav button[data-s]').forEach(b=>b.onclick=()=>show(b.dataset.s));$('#mclose').onclick=closeDlg;show(tab||'conn')}
 
+/* ---------- host profile (TaoAiChat is hosted; host fills slots) ---------- */
+const HOSTS={home:{modes:['问','做','深研'],tabs:['来源','文件','生成物','工作流'],dock:true,tag:''},dev:{modes:['开发','规划','审阅'],tabs:['上下文','变更','候选','任务'],dock:false,tag:' · 宿主=开发 Agent（示意）'}};
+function setHost(h){S.host=h;const H=HOSTS[h];$('#hostSel').value=h;$$('#modeSeg button').forEach((b,i)=>b.textContent=H.modes[i]);
+  ['sources','files','artifacts','workflow'].forEach((k,i)=>{const b=document.querySelector('#side .tabs button[data-p='+k+']');if(b)b.textContent=H.tabs[i]});
+  $('#dock').style.display=H.dock?'':'none';$('#bSearch').title=h==='home'?'搜索 Taomni 本地资料':'搜索（同一个 Tao Search，由宿主决定是否提供）';renderBind();
+  $('#hostNote').textContent=H.tag}
+$('#hostSel').onchange=e=>{const h=e.target.value;clearAll();setHost(h)};
+
 /* ---------- states ---------- */
-function clearAll(){voiceOff();S.tok++;S.stopped=true;toEmpty();S.busy=false;S.stopped=false;S.hasKey=true;S.chips=[];S.localUsed=false;S.thrName=null;renderChips();resetPill(0,0);
-  $('#mask').classList.remove('open');closeDlg();closeDrawer();closePop();resetSide();applyKey();unbusy();setMode('ask');setComposer(true);setPhase('S1 空态就绪')}
+function clearAll(){voiceOff();S.tok++;S.stopped=true;toEmpty();S.busy=false;S.stopped=false;S.hasKey=true;S.chips=[];S.localUsed=false;S.thrName=null;setHost('home');renderChips();resetPill(0,0);
+  $('#mask').classList.remove('open');closeDlg();closePop();resetSide();applyKey();unbusy();setMode('ask');setComposer(true);setPhase('S1 空态就绪')}
 const STATES=[['基础状态'],
  ['S0','无 Key',()=>{S.hasKey=false;applyKey();setPhase('S0 无 Key')}],['S1','空态就绪',()=>{}],
  ['S2','发送中',async()=>{addUser('解释 EADDRINUSE 报错');busy();const m=newAI();m.appendChild(el('div','usage','<span class="spin"></span>&nbsp;等待响应…（同一线程串行，新消息会排队）'));setPhase('S2 发送中')}],
@@ -742,8 +767,9 @@ const STATES=[['基础状态'],
  ['S17','本地资料确认卡（先检索，再选择是否发送）',async()=>{$('#input').value='上次的发布流程是什么？';S.web=false;await send();await sleep(900)}],
  ['新增界面'],
  ['U1','Tao Search（Ctrl K）',()=>openSearch('rsync')],['U2','Tao Search · 过滤语法',()=>openSearch('source:sql since:14 orders')],['U3','Tao Search · 2 字关键词回退',()=>openSearch('发布')],
- ['U4','对话历史抽屉',()=>openHistory()],['U5','语音录制',()=>voiceOn()],['U6','+ 菜单（文件 / 技能 / 工作流）',()=>$('#bPlus').click()],['U7','能力菜单（思考 / 联网 / 模型）',()=>$('#bCap').click()],
+ ['U4','历史（底部行第一项）· Tao 对话',()=>openHistory('chat')],['U4b','历史 · 最近会话',()=>openHistory('sess')],['U4c','历史 · 最近工作区',()=>openHistory('ws')],['U5','语音录制',()=>voiceOn()],['U6','+ 菜单（文件 / 技能 / 工作流）',()=>$('#bPlus').click()],['U7','能力菜单（思考 / 联网 / 模型）',()=>$('#bCap').click()],
  ['U8','工作流库 → 代码 review',()=>runWorkflow('code_review')],['U9','导入 DeepSeek 历史（向导）',()=>openImport()],['U10','设置 · 本地资料与索引',()=>openSettings('local')],['U11','设置 · 记忆与技能',()=>openSettings('mem')],
+ ['U13','系统无 WSL：底部行不显示 WSL',()=>{S.wsl=false;$('#wslChk').checked=false;applyWsl()}],['U14','宿主示意：开发 Agent（同一组件换槽位）',()=>{setHost('dev');addUser('把 Tao 聊天组件接到开发 Agent 的项目任务里');$('#feed').appendChild(el('div','card','<h4>宿主示意</h4><p>TaoAiChat 不变；换掉的只有绑定栏（项目 / 分支）、模式标签、底部快捷行（隐藏）和侧栏页签。</p>'));setPhase('U14 宿主示意')}],
  ['U12','用量与预算浮层',async()=>{S.web=true;syncCap();addUser('查今天 DeepSeek 的模型动态');await playReply('askWeb',{instant:true});$('#usageTxt').click()}]];
 const sm=$('#smenu');STATES.forEach(s=>{if(s.length===1){sm.appendChild(el('h6','',s[0]));return}const b=el('button','',`<i>${s[0]}</i><span>${s[1]}</span>`);b.onclick=async()=>{sm.classList.remove('open');clearAll();await s[2]();scrollEnd()};sm.appendChild(b)});
 $('#bState').onclick=e=>{e.stopPropagation();sm.classList.toggle('open')};
@@ -754,7 +780,7 @@ function fit(){const a=$('#app'),w=a.clientWidth,h=a.clientHeight;a.classList.to
 new ResizeObserver(fit).observe($('#app'));
 window.addEventListener('unhandledrejection',e=>{if(e.reason==='stale'||e.reason==='abort')e.preventDefault()});
 (function(){const h=new Date().getHours();$('#greet').textContent=(h<12?'早上好':h<18?'下午好':'晚上好')+'，Tao 在这里'})();
-renderBind();renderSug();renderChips();syncCap();applyKey();fit();
+renderBind();renderSug();renderChips();syncCap();applyKey();applyWsl();setHost('home');fit();
 </script>
 </body>
 </html>

@@ -1,7 +1,7 @@
-# Tao Home 细化设计（v0.2）：交互、状态、数据与安全落地
+# Tao Home 细化设计（v0.3）：交互、状态、数据与安全落地
 
-> 状态：设计稿（未实现）。v0.2 修订：D-13/15/16 已批准，D-14 改为“不做连通性测试”，新增 §13 本地资料检索、§14 联网调研依据、§15 界面精简规则、§16 原型 v0.2 说明。承接 `docs-feature/tao-home-design.md`（v1.3，以下称“主设计”）与 `claudedocs/adr-tao-home-deepseek-app.md`。
-> 配套高保真原型：`docs-feature/tao-home-prototype.html`（单文件，浏览器直接打开；顶部“状态”菜单可跳转到每个状态）。
+> 状态：设计稿（未实现）。v0.3 修订：① **Tao AI Chat 作为可被宿主嵌入的整体组件**（新增 §6.0，改写 §6.1/§6.3），为日后与 `feat/development-orchestrator` 整合预留边界；② 原首页“启动 / 最近 / 恢复会话”并入聊天输入框下方的**底部快捷行**，**历史**排第一位，WSL 仅在系统检测到时显示，**LAN 聊天入口全部移除**（新增 §3.7）；③ §13 的索引与触发规则拆成 P1-2 开发子任务（§10）。v0.2 修订：D-13/15/16 已批准，D-14 改为“不做连通性测试”，新增 §13 本地资料检索、§14 联网调研依据、§15 界面精简规则、§16 原型 v0.2 说明。承接 `docs-feature/tao-home-design.md`（v1.3，以下称“主设计”）与 `claudedocs/adr-tao-home-deepseek-app.md`。
+> 配套高保真原型：`docs-feature/tao-home-prototype.html`（单文件，浏览器直接打开；顶部“状态与界面”菜单可跳转到每个状态，另有“系统有 WSL”开关与“宿主”切换）。
 > 本文不重复主设计已决策的内容（§16 决策 1–12 全部继承），只做三件事：**复核（§1）、细化（§2–§9）、给出开发可拆分的验收口径（§10–§11）**。
 
 ## 0. 文档边界
@@ -76,13 +76,13 @@ Tao Home 渲染在 Taomni 现有外壳里（标题栏 / 主 rail / 标签栏 / �
 
 | 区域 | 内容 | 空态 | 对话态 |
 |---|---|---|---|
-| A 顶栏 | 模式切换（问/做/深研）· 绑定栏 · 右侧：线程标题 / 用量 / 设置 | 显示 | 显示，下方附 1px 分隔 |
+| A 顶栏 | 模式切换（问/做/深研）· 绑定栏 · 右侧：用量 / 搜索（Ctrl K）/ 更多。**历史入口不在顶栏**（见 D） | 显示 | 显示，下方附 1px 分隔 |
 | B 主舞台 | 空态：问候 + Composer（垂直 38%）；对话态：消息流 | 居中 | 滚动 |
 | C 建议行 | 本地计算的建议卡片（最多 4 张） | 3 行布局 | 收为 1 行横向滚动 |
-| D 启动条 | 本地终端 / WSL / 新会话 / LAN 聊天 / 新工作区 / 更多 | 紧凑图标条 | 隐藏（rail 可达） |
-| E 最近 | 最近 5 个会话/工作区（横向 chip） | 显示 | 隐藏 |
+| D 底部快捷行 | **历史** · 本地终端 · WSL（仅检测到时）· 新会话 · 新工作区 · 更多；**无 LAN 聊天**。位于 Composer 正下方（§3.7） | 显示（居中） | **仍显示**（紧凑，靠左），随 Composer 一起吸底 |
+| E（并入 D） | 原“最近会话 / 最近工作区 / 恢复上次会话”不再单独占一块，收进 D 的“历史”浮层 | — | — |
 | F 右侧栏 | 来源 / 文件 / 生成物 / 工作流 | 隐藏 | 有内容才出现，宽 340px，可收起 |
-| G 页脚 | 版本 + 品牌 T + 恢复上次会话（有才显示） | 小字 | 隐藏 |
+| G 页脚 | 仅版本号 + 品牌 T | 小字 | 隐藏 |
 
 ### 3.2 垂直预算（防止启动区被挤出首屏）
 
@@ -93,12 +93,11 @@ Tao Home 渲染在 Taomni 现有外壳里（标题栏 / 主 rail / 标签栏 / �
 | 顶栏 | 44px | 固定 |
 | 问候 | 64px | H < 600 时隐藏副标题，H < 520 时整块隐藏 |
 | Composer（单行） | 96px | 可随输入增高到 220px 后内部滚动 |
-| 建议行 | 76px | H < 600 时只显示 2 张 |
-| 启动条 | 72px | **永远保留**，H < 520 时降为纯图标 |
-| 最近 | 56px | H < 600 时隐藏，进 rail |
+| 底部快捷行 | 32px | **永远保留**（空态与对话态都在 Composer 下方），H < 520 时降为纯图标 |
+| 建议行 | 76px | H < 600 时只显示 2 张；对话态收为 1 行 |
 | 页脚 | 28px | 固定 |
 
-空态下 Composer 的目标位置是“可用高度的 38%”，但不得使上述任何**永远保留**项落到视口外：布局用 CSS Grid `grid-template-rows: auto minmax(0,1fr) auto`，Composer 区用 `align-self: center` + `max-height`，而不是绝对定位。
+空态下 Composer 的目标位置是“可用高度的 38%”，但不得使上述任何**永远保留**项（含底部快捷行）落到视口外：布局用 CSS Grid `grid-template-rows: auto minmax(0,1fr) auto`，Composer 区用 `align-self: center` + `max-height`，而不是绝对定位。
 
 ### 3.3 绑定栏
 
@@ -132,7 +131,30 @@ Tao Home 渲染在 Taomni 现有外壳里（标题栏 / 主 rail / 标签栏 / �
 
 ### 3.6 演示模式（F9）
 
-设置里的开关，也可在顶栏菜单一键切换：隐藏建议行、最近列表、绑定名称（显示为“终端 1”），Composer 上方的本地资料 chip 只显示类别。默认关。
+设置里的开关，也可在顶栏菜单一键切换：隐藏建议行、历史浮层中的会话 / 工作区名称（显示为“会话 1”）、绑定名称（显示为“终端 1”），Composer 上方的本地资料 chip 只显示类别。默认关。
+
+### 3.7 底部快捷行（原首页快捷操作与历史的新位置）
+
+位置：Composer 与其提示小字的**正下方**，空态与对话态都显示；对话态随 Composer 吸底，不随消息滚走。自左到右：
+
+| 序 | 项 | 行为 | 显示条件 |
+|---|---|---|---|
+| 1 | **历史**（与其余项之间有细分隔） | 向上展开浮层，三个页签：**Tao 对话**（按日期分组，● DeepSeek · 全家桶 / ○ 旧 tao-chat，同一份线程数据，带“进行中”点）· **最近会话** · **最近工作区**；顶部搜索框随页签切换；底部“＋ 新 Tao 对话”“↺ 恢复上次会话（N 个标签）” | 始终 |
+| 2 | 本地终端 | 沿用现有“启动本地终端”（含 shell 选择） | 始终 |
+| 3 | WSL | 沿用现有 WSL 启动 | **仅当 WSL 检测就绪且至少有一个发行版**；否则**整项不渲染**（不置灰） |
+| 4 | 新会话 | 沿用 `onNewSession` | 始终 |
+| 5 | 新工作区 | 沿用 `onOpenNewWorkspace` | 始终 |
+| 6 | 更多 | 邮件会话 / 数据库会话 / VNC·RDP / 本地目录（沿用现有 PlatformLaunchCards 的其余项） | 始终 |
+
+要点：
+
+- **WSL 判定沿用现有逻辑**：`useWelcomeShells` 的 `wslStatus === "ready" && wslDistros.length > 0`（`WelcomePanel.tsx` 现有条件），loading / error / unsupported 一律隐藏。
+- **历史浮层的数据源沿用现有**：最近会话 / 最近工作区来自 `WelcomePanel` 现有的 `recentSessions` / `recentWorkspaces` 与 `WelcomeHistoryPanel`、`RecentSessionsPanel`、`RecentWorkspacesPanel`；本设计只改承载位置，不新建数据。点击最近会话 / 工作区在对应标签打开，**不进入聊天**。
+- **演示模式**：历史浮层中的会话与工作区名称显示为“会话 1 / 工作区 1”，并提示“演示模式：已隐藏名称”。
+- **顶栏与左侧 rail 不再放历史按钮**，历史只有一个入口，避免重复。
+- **快捷行属于宿主，不属于 TaoAiChat**（§6.0）：它是 Home 宿主通过 `belowComposer` 槽位注入的内容；换成别的宿主（如开发 Agent）时可以不提供。
+
+**LAN 聊天移除**：Home 范围内删除所有 LAN 聊天 UI（原“LAN 聊天”启动按钮、`onOpenLanChat` 属性及其测试 id `welcome-open-lanchat`、相关文案）。已核查：`onOpenLanChat` 在 `TabContentRouter.tsx`、`welcome/types.ts`、`PlatformLaunchCards.tsx`、`WelcomePanel.tsx` 中使用；LAN 聊天另有**首页以外的入口**（`ToolsPanel`、`ControlBar`、`useMainMenuActions`、`commandActions`、`useMainUtilityTabs`、若干 store 与 `components/lanchat/`），**本设计只涉及 Home 入口层**，整体下线范围见 §17 待确认项。
 
 ---
 
@@ -207,25 +229,64 @@ Messages API 没有客户端 function calling，Tao 需要让模型“提出”�
 
 ---
 
-## 6. 数据与前后端切分
+## 6. 组件边界与数据切分
+
+### 6.0 Tao AI Chat：可嵌入的整体组件（面向与 `feat/development-orchestrator` 整合）
+
+**背景（已核查，只读检查了该分支的文档与文件清单，未合并、未运行）**：该分支的 v0.6 设计把“开发 Agent”主界面定为“项目 / 任务侧栏 + 会话与输入框 + 按需右侧检查器”；它把旧聊天的 provider 请求 / 流 / 协议代码抽到 `src-tauri/src/llm/*`，自带 `orchestrationStore` 与独立数据表，并明确“聊天线程是交互视图，不是任务状态机，不把 task_id 塞进 thread_id”。两边都要一个“消息流 + 输入框”的会话界面，所以 Tao 的聊天必须做成**宿主可替换槽位的整体组件**，而不是写死在首页里。**该分支的合并时间与最终接口尚未与其作者对齐；本节是 Tao 侧单方面的边界约束，对接时以双方评审为准。**
+
+**组件定义**：`TaoAiChat` = 消息流 + Composer + 块渲染 + 动作卡 + 预算与用量 + 可选侧栏。它**不知道自己在首页**，也不 import 首页、WelcomePanel、rail、任何 `taoHome` 全局状态。
+
+```text
+<TaoAiChat
+  controller={chatController}   // 实例，不是全局单例；每个宿主自建
+  profile={chatProfile}         // 模式列表 / 默认开关 / 侧栏页签 / 文案
+  slots={{ headerLeading, headerTrailing, composerContext,
+           belowComposer, sidePanels }} />
+```
+
+| 对象 | 职责 | 首页宿主（本设计） | 其他宿主（例：开发 Agent，示意） |
+|---|---|---|---|
+| `ChatBackend`（端口） | `send / stop / regenerate / continue / branches / listThreads`，产出统一的块事件流 | `DeepSeekAppBackend`（Rust `deepseek_app`） | 可另写适配器（如接编排器的 LLM 调用服务）；**不要求同协议** |
+| `ContextPorts`（端口） | 读终端 / 工作区 / 数据库 / 笔记摘要（脱敏后）、`TaoSearch` | 绑定栏三项 + 本地检索 | 项目 / 分支 / 文件引用 |
+| `ActionPorts`（端口） | 执行动作提议（Rust 重算级别、限定目标） | 绑定终端 / 工作区 | 由宿主决定可执行范围 |
+| `BudgetPort` | token 预算与工具费确认 | 每轮 10M、确认阈值 | 宿主自定 |
+| `profile` | 模式标签与默认值、侧栏页签名 | 问 / 做 / 深研；来源 / 文件 / 生成物 / 工作流 | 如 开发 / 规划 / 审阅；上下文 / 变更 / 候选 / 任务（**仅为槽位演示，不代表该分支设计**） |
+| 槽位 | `composerContext`=绑定栏、`belowComposer`=底部快捷行、`headerLeading`=宿主导航 | Home 宿主注入 | 开发 Agent 宿主注入项目 / 分支 chip；不提供快捷行 |
+
+边界规则（可用 lint / 目录约束检查）：
+
+1. 组件包 `src/components/tao/ai-chat/` 只对外导出 `index.ts` 中的 `TaoAiChat`、`createChatController`、类型；**宿主不得深引用内部文件**。
+2. 组件内**禁止** import：`WelcomePanel`、`welcome/*`、`layouts/*`、`orchestrationStore`、旧 `chatStore`。需要的数据一律走端口注入。
+3. 状态**按实例隔离**：`createChatController()` 返回独立 store；同一窗口可同时挂两个 `TaoAiChat`（例如首页一个、开发 Agent 一个）互不污染。线程 `runtime` 仍按 `ThreadId` 分键。
+4. 数据表前缀固定为 `ds_app_*` / `tao_*`，**不与编排器的表共用**；Tao 线程与编排任务之间只允许“引用关系”（任务记录 `thread_ref`，线程不记 `task_id`），与编排分支的原则一致。
+5. 后端：`deepseek_app` 先独立实现；编排分支的 `llm/*` 传输层合并后，再评估让 `deepseek_app` 复用其请求 / 流解码（**评估项，不是承诺**）。两边都会改动 `src-tauri/src/chat/` 与 `llm/` 附近文件，开工前先 rebase 并列出冲突面。
+6. 快捷行、历史浮层、LAN 清理、WSL 检测都属于 **Home 宿主层**，不进组件包。
+
+整合验证（P0-0 的退出条件）：原型“宿主”下拉切到“开发 Agent（示意）”，同一个聊天组件只换绑定栏、模式标签、底部行与侧栏页签，其余行为不变；实现时用一个最小“空宿主”测试页复现同样的检查。
 
 ### 6.1 前端模块（只新增，不改 `chatStore`）
 
 ```text
-src/components/tao/home/
-  TaoHomePanel.tsx          组合层 ≤150 行
-  TaoTopBar.tsx             模式 + 绑定 + 用量
-  BindingBar.tsx / BindingPopover.tsx
-  TaoComposer.tsx           包装现有 chat/Composer 壳，注入新轨道能力
+src/components/tao/ai-chat/                 ← 整体组件（可嵌入）
+  index.ts                  对外唯一出口
+  TaoAiChat.tsx             组合层 ≤150 行（接 controller / profile / slots）
+  TopBar.tsx                模式 + 用量 + 宿主槽位
+  Composer.tsx              包装现有 chat/Composer 壳，注入新轨道能力
   MessageList.tsx / blocks/{Thinking,SearchSteps,Text,Sources,ActionCard,UsageLine}.tsx
-  SidePanel.tsx             来源 / 文件 / 生成物 / 工作流
-  SuggestionRow.tsx / LaunchStrip.tsx / RecentStrip.tsx
-  states/{NoKeyCard,ErrorCard,RefusalCard,BudgetCard,VaultLockedMask}.tsx
-src/stores/taoHome/
-  threads.ts  sending.ts  blocks.ts  budget.ts  binding.ts  suggestions.ts  workflow.ts
+  SidePanel.tsx             页签由 profile 决定
+  states/{ErrorCard,RefusalCard,BudgetCard,VaultLockedMask}.tsx
+  ports.ts                  ChatBackend / ContextPorts / ActionPorts / BudgetPort 类型
+  controller/               createChatController：threads / sending / blocks / budget / workflow
+src/components/tao/search/                  ← Tao Search 面板，同样只依赖端口
+src/components/tao/home/                    ← Home 宿主（只做宿主）
+  TaoHomeHost.tsx           组装 TaoAiChat + 槽位
+  BindingBar.tsx / BindingPopover.tsx       → composerContext 槽
+  DockRow.tsx / HistoryPopover.tsx          → belowComposer 槽（复用 WelcomePanel 子组件与数据）
+  SuggestionRow.tsx / NoKeyCard.tsx
 ```
 
-每个文件 ≤800 行（AGENTS.md 上限），目标 ≤300 行；`LaunchStrip` / `RecentStrip` 直接复用 `WelcomePanel` 子组件，不复制。
+每个文件 ≤800 行（AGENTS.md 上限），目标 ≤300 行；`DockRow` 直接复用 `WelcomePanel` 的本地终端 / WSL / 新会话 / 新工作区子组件，不复制；**删除 LAN 聊天入口**。
 
 ### 6.2 新表（补充 F2：分支）
 
@@ -239,26 +300,26 @@ src/stores/taoHome/
 | `tao_workflow_runs` / `_steps` | 见主设计 §9.4.4 | 状态机 |
 | `tao_audit` | 见主设计 §11.1.4 第 7 层 | P2 |
 
-线程元数据沿用旧 `chat_threads` 并新增 `tao_binding`（JSON）、`mode`、`thinking_on`、`web_on`、`model` 列；`provider_id='deepseek-app'`。
+线程元数据沿用旧 `chat_threads` 并新增 `tao_binding`（JSON，键由宿主 profile 决定）、`mode`、`thinking_on`、`web_on`、`model` 列；`provider_id='deepseek-app'`。
 
-### 6.3 `taoHome` store 形状（节选）
+### 6.3 聊天 controller 状态形状（节选；实例级，由 `createChatController()` 创建）
 
 ```ts
 interface TaoHomeState {
   activeThreadId: string | null;
   mode: "ask" | "do" | "research";
-  binding: { workspaceId?: string; terminalId?: string; dbConnectionId?: string };
+  context: Record<string, string | undefined>;   // 绑定项由宿主定义：首页为 workspace / terminal / db，其他宿主可为 project / branch
   composer: { text: string; chips: ContextChip[]; attachments: Attachment[];
               thinking: boolean; web: boolean; model: "deepseek-flash" | "deepseek-v4-pro" };
   runtime: Record<ThreadId, { phase: Phase; budget: BudgetMeter; pendingAction?: ActionProposal }>;
-  ui: { sidePanel: "sources" | "files" | "artifacts" | "workflow" | null; demoMode: boolean };
+  ui: { sidePanel: string | null /* 取自 profile.sidePanels */; demoMode: boolean };
 }
 type Phase = "idle"|"sending"|"thinking"|"searching"|"streaming"|"stopped"
            |"refusal"|"error"|"awaiting_action"|"plan_pending"|"running_workflow"
            |"budget_halt"|"vault_locked";
 ```
 
-`runtime` 按线程隔离，保证“后台线程继续跑”不污染当前线程。
+`runtime` 按线程隔离，保证“后台线程继续跑”不污染当前线程；整个 controller 按实例隔离，保证多个宿主互不污染（§6.0 规则 3）。
 
 ---
 
@@ -310,17 +371,32 @@ type Phase = "idle"|"sending"|"thinking"|"searching"|"streaming"|"stopped"
 
 | 阶段 | 任务块 | 依赖 | 估时（单人等效，非承诺） |
 |---|---|---|---|
+| **P0-0** | **组件边界先行**：`ports.ts`、`createChatController`、`TaoAiChat` 空壳与槽位、目录与 import 边界检查、空宿主测试页（§6.0 退出条件）；开工前 rebase 并列出与 `feat/development-orchestrator` 的冲突面 | 无 | 0.5 周 |
 | P0-1 | Rust：`deepseek_app/{types,messages,context}` + 事件通道 + 错误分类 | 接口冻结（§6、主设计 §7.3） | 1.0–1.5 周 |
-| P0-2 | 前端：`TaoHomePanel` 骨架、状态机 S0–S9、Composer 注入、thinking/正文块 | P0-1 事件 schema | 1.5 周 |
+| P0-2 | 前端：`TaoAiChat` 内的状态机 S0–S9、Composer 注入、thinking/正文块 | P0-0、P0-1 事件 schema | 1.5 周 |
 | P0-3 | 分支树 + 编辑/重新生成（F2 新增） | P0-2 | 0.5 周 |
+| **P0-H** | **Home 宿主**：`TaoHomeHost`、绑定栏、**底部快捷行 + 历史浮层**（§3.7）、WSL 条件显示、**移除 Home 的 LAN 聊天入口及对应测试**、首次发送键提示（D-16）、沿用 Key（D-14） | P0-0 | 1.0 周 |
 | P1-0 | **写入时脱敏 + 历史迁移 + 误伤率评估（F1 前移）** | 无，可与 P0 并行 | 0.5–1 周 |
 | P1-1 | 搜索/读链接/引用/来源栏、文件、语音、标题、导入导出、用量行 | P0 | 2.5–3 周 |
-| P1-2 | `@` 绑定上下文（只读）+ 本地检索 FTS5 + 来源 chip + 脱敏计数 | P1-0 | 1.5–2 周 |
+| **P1-2** | **`@` 绑定上下文 + 本地检索（Tao Search）**，拆分如下 | P1-0 | 合计 2.5–3 周 |
 | P2-1 | 动作协议（D-13）+ 动作卡 + 审计 | P1-2 | 2 周 |
 | P2-2 | 五个内置工作流 + 计划/步骤 UI + 预算 | P2-1 | 2–3 周 |
 | P2-3 | 记忆/SOUL/技能、安全中心、生成物侧栏 | P2-1 | 1.5–2 周 |
 
----
+### P1-2 子任务（来自 §13 的索引表结构与触发规则）
+
+| 子任务 | 内容 | 依赖 | 完成标准 | 估时 |
+|---|---|---|---|---|
+| P1-2a **索引库与表结构** | 新建独立 `tao_index.db`：`doc` 主表、`doc_fts`（`fts5`，`trigram`）、`doc_src_ts` 索引；迁移版本号；SQLite ≥ 3.34 运行时自检（不满足则本地检索不可开启并显式提示） | P1-0 | 空库创建 / 升级 / 自检失败三条路径单测；索引文件缺失可自动重建 | 0.3 周 |
+| P1-2b **写入点同步** | 各源写入脱敏后 upsert（命令 / SQL 历史、笔记、线程、会话配置、保存的查询）；`UNIQUE(source, ref)` 去重；`use_count` 递增；按源开关关闭时清除该源行并重建 FTS | P1-2a | 开关关闭 1 分钟内无该源结果；同一命令重复执行只更新计数与时间 | 0.5 周 |
+| P1-2c **全量重建与迁移** | “重建索引”后台任务（可继续使用、可取消）；从原库全量回灌；备份排除索引文件 | P1-2b | 删除索引后重建，条数与原库一致（E5） | 0.3 周 |
+| P1-2d **查询与排序** | 解析 `source: host: since:`；trigram 查询；**不足 3 字符回退 `LIKE`**（先结构化过滤再扫描）；`bm25` + 时间衰减 + `use_count`；片段限额（5 条 / ≤800 字符 / ≤4000 token）；2 字回退时返回“已改用精确匹配”标志 | P1-2a | E1–E3；20–30 条评测集 Top-5 命中率记录入文档（决定是否做向量，§13.4） | 0.5 周 |
+| P1-2e **Tao Search 面板** | `src/components/tao/search/`：Ctrl/⌘+K、类别过滤、结果列表 + 预览、键盘操作、加入上下文 / 问 Tao / 打开原记录；只依赖 `ContextPorts.search`，不依赖首页 | P1-2d、P0-0 | 原型 U1–U3 行为一致；窄屏预览收起 | 0.5 周 |
+| P1-2f **模型侧触发与确认卡** | 回指词 / `@库` 触发规则（§13.3 第 5 条）；本地先检索 → 确认卡逐条勾选 → 脱敏片段注入；取消勾选的片段不进请求体；回复用绿色“本”角标 | P1-2d、P0-2 | E6；请求体单测断言；无回指词的消息不触发检索 | 0.5 周 |
+| P1-2g **设置：本地资料** | 10 源开关、索引大小与条数、重建按钮、门禁提示（S1–S3 未通过则不可开）、关闭倒计时 | P1-2b | 与原型 U10 一致；门禁状态下开关不可点 | 0.3 周 |
+| P1-2h **`@` 引用菜单（只读）** | `@terminal / @file / @workspace / @db / @note` 菜单与 chip；预览将发送的脱敏文本 | P0-2 | chip 点击可预览；移除后不进请求体 | 0.3 周 |
+
+向量检索（P2，可选）不在上表：仅当 P1-2d 评测集 Top-5 < 80% 才新开任务（`sqlite-vec` + 本地嵌入 + RRF，§13.4）。
 
 ## 11. 验收清单（可直接转测试用例）
 
@@ -346,6 +422,15 @@ type Phase = "idle"|"sending"|"thinking"|"searching"|"streaming"|"stopped"
 - [ ] C4 请求日志与审计不含请求体/响应体
 - [ ] C5 手动锁定 Vault：流立即中断；流式运行期间闲置计时不触发自动锁（D-15）
 - [ ] C6 演示模式开启后首页不出现终端报错建议、真实绑定名
+
+**底部快捷行与组件边界**
+- [ ] H1 快捷行在 Composer 正下方，空态与对话态都显示；“历史”为第一项，顶栏与 rail 无历史按钮
+- [ ] H2 历史浮层三个页签（Tao 对话 / 最近会话 / 最近工作区）可切换且不关闭浮层；搜索框随页签过滤；点最近会话 / 工作区在对应标签打开、不进入聊天
+- [ ] H3 WSL：未就绪、无发行版、加载中、出错、不支持时**均不渲染**；就绪且有发行版才显示（沿用 `wslStatus` 与 `wslDistros`）
+- [ ] H4 Home 范围内搜索不到 LAN 聊天按钮、`onOpenLanChat`、`welcome-open-lanchat`
+- [ ] H5 演示模式下历史浮层不显示真实会话 / 工作区名称
+- [ ] H6 `TaoAiChat` 目录内无对 `WelcomePanel` / `welcome/*` / `layouts/*` / `orchestrationStore` / 旧 `chatStore` 的 import（边界检查通过）
+- [ ] H7 同一窗口挂两个宿主实例（首页 + 空宿主测试页）：各自发送、各自预算与线程状态互不影响
 
 **回归**
 - [ ] D1 旧 ChatDrawer 的现有用例全部通过；`pnpm check:refactor` 通过；新增文件均 ≤800 行
@@ -410,6 +495,10 @@ CREATE INDEX doc_src_ts ON doc(source, ts);
 - [ ] E5 删除 `tao_index.db` 后重建，条数与原库一致；索引文件不在备份包内
 - [ ] E6 “上次的发布流程”触发确认卡；取消勾选的片段不出现在请求体（单测断言请求体）
 
+### 13.7 开发拆分
+
+索引表结构、写入点、查询排序、面板、触发与确认、设置页已拆成 **P1-2a～P1-2h**，见 §10。
+
 ---
 
 ## 14. 联网调研依据（2026-11-14）
@@ -439,27 +528,37 @@ CREATE INDEX doc_src_ts ON doc(source, ts);
 
 对照 v0.1 原型，v0.2 做了以下减法与统一：
 
-1. **顶栏只留五样**：历史、模式、绑定、搜索、更多。用量胶囊仅在有消耗后出现；侧栏、演示模式、导入、记忆、设置、快捷键全部收进“更多”。
+1. **顶栏只留四样**：模式、绑定、搜索、更多（历史移到底部快捷行第一项）。用量胶囊仅在有消耗后出现；侧栏、演示模式、导入、记忆、设置、快捷键全部收进“更多”。
 2. **Composer 工具条只留三样**：`+`（附件 / 引用 / 技能 / 工作流）、能力胶囊（显示“flash · 思考 · 联网”，点开切换），右侧麦克风与发送。原先分散的思考/联网/模型/附件按钮合并。
 3. **渐进披露**：思考块、搜索步骤、来源、用量细节都默认折叠；高风险信息（费用、L2 动作、本地资料外发）默认展开并需明确确认。
 4. **确认强度匹配风险**：只读查看（L1）一键确认；L2 要勾选“已确认命令内容”；清除全部历史需二次确认。本地检索不花钱不外发，所以不弹确认；外发前才弹。
 5. **按范围授权（后续可选）**：动作卡可加“本会话内同类只读命令不再询问”，**仅限 L1 只读**，不适用于写文件、改数据；默认关闭，需在设置打开。本版原型不做，列入 P2 评估。
 6. **命令面板常驻**：Ctrl/⌘+K 在任何位置打开；`/` 技能、`@` 引用是输入框内的第二、第三入口，三者互不重复。
 7. **一次性提示**：发送键提示在首次进入首页显示，点“知道了”后消失，不改变设置（D-16）。
-8. **窄屏**：搜索按钮收为图标，侧栏变覆盖层，历史抽屉最宽 88%，设置导航改为横向。
+8. **窄屏**：搜索按钮收为图标，侧栏变覆盖层，底部快捷行可横向滚动，历史浮层限高并可滚动，设置导航改为横向。
+9. **一个动作只有一个入口**：历史只在底部快捷行；设置只在“更多”与 rail；LAN 聊天不再出现在 Home。
 
 ---
 
-## 16. 原型 v0.2 说明
+## 16. 原型 v0.3 说明
 
 `docs-feature/tao-home-prototype.html`（单文件，离线可开，模拟数据，无网络请求）。
 
-- 顶部“状态与界面”菜单共 **30 项**：基础状态 S0–S17，以及新增界面 U1–U12。
-- 新增界面与交互：
-  - **Tao Search（U1–U3）**：Ctrl/⌘+K、类别过滤、`source:/host:/since:` 语法、高亮、右侧预览、键盘 ↑↓ Enter、2 字关键词回退提示、加入上下文 / 问 Tao / 打开原记录。
-  - **本地资料确认卡（S17）**：发送含回指词的问题，先出现检索结果，逐条勾选后才随本轮发送，回复带绿色 `本` 角标。
-  - **对话历史抽屉（U4）**：搜索、按日期分组、新旧轨道图标、进行中点、新对话。
-  - **语音录制（U5）**、**`+` 菜单（U6）**、**能力菜单（U7）**、**工作流库（U8，运行代码 review 等）**、**导入 DeepSeek 历史四步向导（U9）**、**设置 · 本地资料与索引（U10）**、**设置 · 记忆与技能（U11）**、**用量与预算浮层（U12，含高峰/非高峰提示）**。
-  - 编辑已发送消息并重发（产生分支 2/2）、重新生成、上传文件进度 chip、`/` 技能菜单、`@` 引用菜单。
-  - 无 Key 卡片的“沿用旧 tao-chat 的 Key”只复制 Vault 引用，不做连通性测试。
-- 已用无头浏览器遍历全部 30 个状态、实时问答、本地资料确认、编辑重发、Ctrl+K 搜索加入上下文、工作流菜单，**无页面错误**。原型只证明版式与交互，不证明 API 行为。
+- 顶部“状态与界面”菜单共 **34 项**：S0–S17、U1–U14（含 U4b / U4c）。
+- **v0.3 相对 v0.2 的变化**：
+  - **底部快捷行**位于输入框正下方，空态与对话态都在；**历史**为第一项，点开向上的浮层，含 Tao 对话 / 最近会话 / 最近工作区三页签、搜索、新对话、恢复上次会话（U4 / U4b / U4c）。
+  - 顶栏与左侧 rail 的历史按钮已删除；原“最近”条与页脚“恢复上次会话”并入历史浮层。
+  - **WSL**：顶部“系统有 WSL”开关，取消勾选后快捷行不渲染 WSL（U13）。
+  - **LAN 聊天**：按钮与相关界面已全部移除。
+  - **宿主切换**：顶部“宿主”下拉切到“开发 Agent（示意）”（或 U14），同一个聊天组件只换绑定栏（项目 / 分支）、模式标签、侧栏页签并隐藏快捷行。这是**槽位演示**，不代表 `feat/development-orchestrator` 的界面设计。
+- 保留 v0.2 的全部交互：Tao Search、本地资料确认卡、编辑重发与分支、语音、`+` 菜单、能力菜单、工作流库、导入向导、设置各页、用量浮层。
+- 已用无头浏览器遍历全部 34 个状态，并跑了实时问答、本地资料确认、编辑重发、Ctrl+K 搜索、工作流菜单、历史浮层页签切换与选线程、WSL 开关、宿主切换，**无页面错误**。原型只证明版式与交互，不证明 API 行为。
+
+---
+
+## 17. 待确认项
+
+| # | 事项 | 影响 | 建议 |
+|---|---|---|---|
+| Q-1 | LAN 聊天是否**整体下线**：本设计只删 Home 入口；`ToolsPanel`、`ControlBar`、菜单与命令、`components/lanchat/`、三个 store 与后端仍在 | 范围决定：仅清 Home 入口约 0.5 天，整体下线是一次独立的删除任务 | 先做 Home 入口（已含在 P0-H），整体下线另开任务并先确认没有其他依赖 |
+| Q-2 | 与 `feat/development-orchestrator` 的对接接口 | §6.0 是 Tao 单方约束；该分支的 `llm/*` 抽取、`MainLayoutView` 与 i18n 改动与本设计的落点相邻 | P0-0 开工前先 rebase 并列冲突面，再与该分支作者核对槽位与端口 |
