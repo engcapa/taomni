@@ -45,6 +45,13 @@ export function ExplorerFileList(inputs: FilePanelViewProps) {
     return () => observer.disconnect();
   }, []);
   useEffect(() => { virtual.measure(); }, [rowHeight, columns, virtual, entries.length]);
+  useEffect(() => {
+    // A first render with no rows can leave TanStack's estimate at zero in a
+    // browser worker. Re-measure after the actual rows commit so file rows are
+    // mounted and the Explorer opener never targets an empty virtual window.
+    const frame = requestAnimationFrame(() => virtual.measure());
+    return () => cancelAnimationFrame(frame);
+  }, [entries, virtual]);
   useEffect(() => { scroll.current?.scrollTo?.({ top: 0 }); anchor.current = null; setFocused(null); }, [pane.path, inputs.filterText, preferences.view, inputs.sortKey, inputs.sortDir]);
   useEffect(() => () => rubberCleanup.current?.(), []);
   useEffect(() => {
