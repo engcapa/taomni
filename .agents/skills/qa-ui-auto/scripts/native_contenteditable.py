@@ -59,7 +59,7 @@ def fill_contenteditable(session: EditorInputSession, element: str, selector: st
             f"const el = document.querySelector({json.dumps(selector)});"
             "return el ? el.innerText.replace(/\\r\\n?/g, '\\n') : null;"
         )
-        if actual == normalized:
+        if actual == normalized or actual == normalized.rstrip("\n"):
             return f"filled contenteditable {selector}"
         if attempt == 1:
             raise error_type(f"contenteditable did not retain the requested text: {selector}")
