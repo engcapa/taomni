@@ -27,6 +27,7 @@ from native_webdriver_transport import WebDriverError, WebDriverTransport
 from native_console import CONSOLE_HOOK_SCRIPT
 from native_element_query import count_elements
 from native_pointer import pointer_button_click, prepare_click_target
+from native_doubleclick import double_click
 from native_paced_input import type_paced_text
 from native_window_focus import NativeWindowFocus
 from native_driver_lifecycle import driver_start_environment
@@ -547,62 +548,7 @@ class NativeSession(WebDriverTransport):
         return f"focused {selector}"
 
     def dblclick(self, selector: str) -> str:
-        try:
-            # A file-watcher refresh can replace a tree row between resolving
-            # it and reading geometry. Retry preparation only: once pointer
-            # input starts, never replay a possibly completed double-click.
-            for attempt in range(3):
-                try:
-                    element = self.find(selector, interactive=True)
-                    with suppress(Exception):
-                        self.execute(
-                            f"const el = document.querySelector({json.dumps(selector)});"
-                            "if (el) el.scrollIntoView({block:'center', inline:'center'});"
-                        )
-                        time.sleep(0.1)
-                    rect = self.request("GET", self.element_path(element, "/rect"))
-                    break
-                except WebDriverError as exc:
-                    if _is_stale_element_error(exc) and attempt < 2:
-                        time.sleep(0.3)
-                        continue
-                    raise
-            # Use W3C Actions API so WebKitGTK registers a real double-click.
-            x = int((rect.get("x", 0) + rect.get("width", 0) / 2)) if isinstance(rect, dict) else 0
-            y = int((rect.get("y", 0) + rect.get("height", 0) / 2)) if isinstance(rect, dict) else 0
-            self.request(
-                "POST",
-                self.endpoint("/actions"),
-                {
-                    "actions": [
-                        {
-                            "type": "pointer",
-                            "id": "mouse",
-                            "parameters": {"pointerType": "mouse"},
-                            "actions": [
-                                {"type": "pointerMove", "duration": 0, "x": x, "y": y, "origin": "viewport"},
-                                {"type": "pointerDown", "button": 0},
-                                {"type": "pointerUp", "button": 0},
-                                {"type": "pause", "duration": 50},
-                                {"type": "pointerDown", "button": 0},
-                                {"type": "pointerUp", "button": 0},
-                            ],
-                        }
-                    ]
-                },
-            )
-        except Exception as exc:
-            if "element not interactable" in str(exc) or "element click intercepted" in str(exc):
-                self.execute(
-                    f"const el = document.querySelector({json.dumps(selector)});"
-                    "if (el) {"
-                    "  el.scrollIntoView({block:'center', inline:'center'});"
-                    "  el.dispatchEvent(new MouseEvent('dblclick', {bubbles: true, cancelable: true, view: window}));"
-                    "}"
-                )
-            else:
-                raise
-        return f"double-clicked {selector}"
+        return double_click(self, selector, is_stale=_is_stale_element_error)
 
     def pointer_click(self, selector: str) -> dict[str, int]:
         """Click through W3C pointer actions instead of element /click."""

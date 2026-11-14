@@ -28,8 +28,8 @@ steps:
     selector: '[data-testid="explorer-address"]'
     key: Enter
 - wait_for: '[data-testid="explorer-file-row"][data-name="01-landscape.png"]'
-- show_explorer_preview: null
 - click: '[data-testid="explorer-file-row"][data-name="01-landscape.png"]'
+- show_explorer_preview: null
 - wait_for: '[data-testid="explorer-preview"][data-preview-kind="image"]'
 - click: '[data-testid="explorer-preview-open"]'
 - wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-render"]'
@@ -139,8 +139,11 @@ steps:
 - wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-stage"] [role="alert"]'
 - click: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-reveal"]'
 - wait_for: '[data-testid="explorer-file-row"][data-name="91-preview-limit.png"]'
-- show_explorer_preview: null
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Escape
 - click: '[data-testid="explorer-file-row"][data-name="91-preview-limit.png"]'
+- show_explorer_preview: null
 - wait_for: '[data-testid="explorer-preview"][data-preview-kind="too-large"]'
 - assert_text:
     selector: '[data-testid="explorer-preview"]'
@@ -164,7 +167,7 @@ verification:
   requirements:
   - id: R1
     requirement: Real raster pixels respond to actual transform controls/wheel/pan without changing source, and clipboard contains original pixels/path.
-    actions: [11, 13, 17, 19, 21, 23, 26, 28, 31, 33, 34, 36, 37, 39, 41, 43, 46]
+    actions: [10, 13, 17, 19, 21, 23, 26, 28, 31, 33, 34, 36, 37, 39, 41, 43, 46]
     checkpoints:
     - step: 16
       expectation: The real PNG decodes to 640 by 360 intrinsic pixels.
@@ -199,7 +202,7 @@ verification:
     results: [16, 18, 20, 22, 24, 27, 29, 32, 35, 38, 40, 42, 45, 48, 49]
   - id: R2
     requirement: JPEG/WebP/GIF siblings decode, navigation and filmstrip activate correct documents, corrupt images and independent 20/32 MiB boundaries expose actionable errors.
-    actions: [50, 54, 58, 62, 67, 71, 73, 76, 79, 83]
+    actions: [50, 54, 58, 62, 67, 71, 73, 76, 80, 84]
     checkpoints:
     - step: 53
       expectation: Next activates the JPEG and independently observes 640 by 360 decoded pixels.
@@ -221,17 +224,17 @@ verification:
       expectation: Corrupt data cannot be copied as a purported valid image.
     - step: 72
       expectation: Retrying corrupt input returns an explicit error and copy remains disabled.
-    - step: 78
+    - step: 79
       expectation: Explorer refuses a valid image larger than its independent 20 MiB preview budget.
-    - step: 82
+    - step: 83
       expectation: The same over-preview-limit PNG still decodes in the separate viewer under 32 MiB.
-    - step: 85
-      expectation: The 32 MiB viewer budget has explicit conservative, not performance-measured, feedback.
     - step: 86
-      expectation: Over-viewer-limit data cannot be copied as a purported valid image.
+      expectation: The 32 MiB viewer budget has explicit conservative, not performance-measured, feedback.
     - step: 87
+      expectation: Over-viewer-limit data cannot be copied as a purported valid image.
+    - step: 88
       expectation: Error/retry/navigation leaves no uncaught runtime exception.
-    results: [53, 57, 61, 63, 64, 65, 66, 69, 70, 72, 78, 82, 85, 86, 87]
+    results: [53, 57, 61, 63, 64, 65, 66, 69, 70, 72, 79, 83, 86, 87, 88]
   visual:
   - check: Raster toolbar/canvas/property-sidebar/filmstrip layout against prototype scene 2
     method: manual

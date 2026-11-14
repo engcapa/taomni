@@ -43,8 +43,8 @@ def run(ctx: Any, args: Any, *, mode: str) -> str:
     path = args.get("path")
     observed_temp = False
     if args.get("selector"):
-        script = "return Array.from(document.querySelectorAll(arguments[0])).map(function(el){return el.getAttribute('data-path');});"
-        paths = ctx.session.execute(script, [args["selector"]]) if mode == "native" else ctx.page.locator(args["selector"]).evaluate_all("els => els.map(el => el.getAttribute('data-path'))")
+        script = "return Array.from(document.querySelectorAll(" + json.dumps(args["selector"]) + ")).map(function(el){return el.getAttribute('data-path');});"
+        paths = ctx.session.execute(script) if mode == "native" else ctx.page.locator(args["selector"]).evaluate_all("els => els.map(el => el.getAttribute('data-path'))")
         if not isinstance(paths, list) or len(paths) != 1 or not paths[0]:
             raise StepError("assert_file_open_bytes: expected one observed file viewer path")
         path = paths[0]

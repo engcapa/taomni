@@ -38,8 +38,8 @@ steps:
     selector: '[data-testid="explorer-address"]'
     key: Enter
 - wait_for: '[data-testid="explorer-file-row"][data-name="report.html"]'
-- show_explorer_preview: null
 - click: '[data-testid="explorer-file-row"][data-name="report.html"]'
+- show_explorer_preview: null
 - wait_for: '[data-testid="explorer-preview"]'
 - click: '[data-testid="explorer-preview-open"]'
 - wait_for: '[data-testid="html-preview"][data-loaded="true"]'
@@ -145,7 +145,7 @@ verification:
     requirement: HTML executes author scripts only in opaque sandbox, resolves local CSS/PNG and blocks parent DOM/network
       by default.
     actions:
-    - 11
+    - 10
     - 13
     - 20
     checkpoints:

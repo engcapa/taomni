@@ -26,7 +26,7 @@ def run(ctx, args, mode):
         return "dry-run; no terminal file link activation"
     observation = {"mode": mode, "selector": selector, "trustedPointer": True, "passed": False}
     if mode == "native":
-        point = ctx.session.execute(GEOMETRY, [selector])
+        point = ctx.session.execute(GEOMETRY.replace("arguments[0]", json.dumps(selector)))
     else:
         point = ctx.page.evaluate("(selector)=>{" + GEOMETRY.replace("arguments[0]", "selector") + "}", selector)
     if not point or not point.get("hit"):

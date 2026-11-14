@@ -60,7 +60,7 @@ def run(ctx, args):
     if getattr(ctx, "dry_run", False):
         return "dry-run; no OS Paste"
     selector = args["selector"]
-    focused = ctx.session.execute("const el=document.querySelector(arguments[0]); return !!el && (el===document.activeElement || el.contains(document.activeElement));", [selector])
+    focused = ctx.session.execute("const el=document.querySelector(" + json.dumps(selector) + "); return !!el && (el===document.activeElement || el.contains(document.activeElement));")
     if focused is not True:
         raise StepError("native_paste: target does not own focus")
     observation = {"selector": selector, "syntheticClipboardEvent": False, "passed": False}
