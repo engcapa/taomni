@@ -26,7 +26,7 @@ steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-native-gate-password
 - assert_visible: '[data-testid="welcome-panel"]'
-- assert_visible: '[data-testid="welcome-open-local-terminal"]'
+- assert_visible: '[data-testid="tao-home-local-terminal"]'
 - screenshot: 117-vnc-linux-webkitgtk.png
 verification:
   review: reviewed
@@ -40,7 +40,7 @@ verification:
     - step: 3
       expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"]"}'
     - step: 4
-      expectation: '{"assert_visible": "[data-testid=\"welcome-open-local-terminal\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"tao-home-local-terminal\"]"}'
     results:
     - 3
     - 4

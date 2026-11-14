@@ -11,6 +11,7 @@ mod chat;
 mod config;
 mod dap;
 mod database;
+mod deepseek_app;
 mod dependency_index;
 mod filebrowser;
 mod git;
@@ -598,6 +599,7 @@ pub(crate) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         | "chat_stream"
         | "chat_stop_stream"
         | "inline_qq_stream" => chat::handle(invoke),
+        "deepseek_app_send" | "deepseek_app_stop" => deepseek_app::handle(invoke),
         "models_list"
         | "models_download"
         | "models_delete"

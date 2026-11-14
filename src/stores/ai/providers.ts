@@ -40,6 +40,13 @@ export function defaultChatProviderId(config: AiConfig | null | undefined): stri
   return chatDrawerProviderIds(config, "chat")[0];
 }
 
+/** Tao Home's provider is intentionally separate from the legacy OpenAI-compatible
+ * DeepSeek route; both keys can coexist in the same Vault. */
+export function isDeepSeekAppConfigured(config: AiConfig | null | undefined): boolean {
+  const provider = config?.llm.providers["deepseek-app"];
+  return Boolean(provider?.api_key?.trim() || provider?.api_keys?.some((key) => key.trim()));
+}
+
 export const PROVIDER_GROUP_PREFIX = "group:";
 
 export function providerGroupRouteId(groupId: string): string {

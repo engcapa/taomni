@@ -1,6 +1,6 @@
 id: TC-038
 title: Welcome panel exposes local-terminal launcher
-description: 'Verify the welcome panel renders the "Start local terminal" affordance and
+description: 'Verify the welcome panel renders the "本地终端" affordance and
 
   that clicking it opens a terminal pane. Browser-mode: the local shell is
 
@@ -25,11 +25,11 @@ timeout_sec: 45
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
-- assert_visible: '[data-testid="welcome-open-local-terminal"]'
+- assert_visible: '[data-testid="tao-home-local-terminal"]'
 - assert_text:
     selector: '[data-testid="welcome-panel"]'
-    contains: Start local terminal
-- click: '[data-testid="welcome-open-local-terminal"]'
+    contains: 本地终端
+- click: '[data-testid="welcome-panel"] [data-testid="tao-home-local-terminal"]'
 - wait_for:
     selector: '[data-testid="terminal-pane"]'
     timeout_sec: 20
@@ -47,9 +47,9 @@ verification:
     - step: 2
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
     - step: 3
-      expectation: '{"assert_visible": "[data-testid=\"welcome-open-local-terminal\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"tao-home-local-terminal\"]"}'
     - step: 4
-      expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]", "contains": "Start local terminal"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]", "contains": "本地终端"}}'
     - step: 6
       expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"]", "timeout_sec": 20}}'
     - step: 7

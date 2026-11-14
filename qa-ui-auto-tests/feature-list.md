@@ -102,6 +102,117 @@ controls:
 - 前端目录拆分：`components / layouts / lib / stores / hooks / stubs / types`
 - 同时支持 **Tauri 桌面打包模式** 与 **Vite 浏览器开发预览模式**（通过 `TAURI_ENV_PLATFORM` 自动切换 stub/真实后端）
 
+### 1.11 Tao Home 聊天首页 🟡
+
+<!-- feature
+id: F1.11
+status: partial
+area: tao/home
+components:
+- TaoHomeHost
+- TaoAiChat
+- DockRow
+- HistoryPopover
+- SearchPanel
+files:
+- src/components/tao/home/TaoHomeHost.tsx
+- src/components/tao/home/DockRow.tsx
+- src/components/tao/home/HistoryPopover.tsx
+- src/components/tao/ai-chat/TaoAiChat.tsx
+- src/components/tao/ai-chat/Composer.tsx
+- src/components/tao/search/SearchPanel.tsx
+- src/styles/taoHome.css
+controls:
+- id: tao-home-host
+  selector: '[data-testid="tao-home-host"]'
+  kind: display
+- id: tao-home-topbar
+  selector: '[data-testid="tao-home-topbar"]'
+  kind: display
+- id: tao-home-mode-ask
+  selector: '[data-testid="tao-home-mode-ask"]'
+  kind: interactive
+- id: tao-home-mode-do
+  selector: '[data-testid="tao-home-mode-do"]'
+  kind: interactive
+- id: tao-home-mode-research
+  selector: '[data-testid="tao-home-mode-research"]'
+  kind: interactive
+- id: tao-home-connect-card
+  selector: '[data-testid="tao-home-connect-card"]'
+  kind: display
+- id: tao-home-open-settings
+  selector: '[data-testid="tao-home-open-settings"]'
+  kind: interactive
+- id: tao-home-composer
+  selector: '[data-testid="tao-home-composer"]'
+  kind: display
+- id: tao-home-composer-input
+  selector: '[data-testid="tao-home-composer-input"]'
+  kind: interactive
+- id: tao-home-binding-bar
+  selector: '[data-testid="tao-home-binding-bar"]'
+  kind: display
+- id: tao-home-dock-row
+  selector: '[data-testid="tao-home-dock-row"]'
+  kind: display
+- id: tao-home-history
+  selector: '[data-testid="tao-home-history"]'
+  kind: interactive
+- id: tao-home-history-popover
+  selector: '[data-testid="tao-home-history-popover"]'
+  kind: display
+- id: tao-home-history-tab-chat
+  selector: '[data-testid="tao-home-history-tab-chat"]'
+  kind: interactive
+- id: tao-home-history-tab-sessions
+  selector: '[data-testid="tao-home-history-tab-sessions"]'
+  kind: interactive
+- id: tao-home-history-tab-workspaces
+  selector: '[data-testid="tao-home-history-tab-workspaces"]'
+  kind: interactive
+- id: tao-home-history-search
+  selector: '.tao-home-history-search input'
+  kind: interactive
+- id: tao-home-local-terminal
+  selector: '[data-testid="tao-home-local-terminal"]'
+  kind: interactive
+- id: tao-home-wsl
+  selector: '[data-testid="tao-home-wsl"]'
+  kind: interactive
+  optional: true
+- id: tao-home-new-session
+  selector: '[data-testid="tao-home-new-session"]'
+  kind: interactive
+- id: tao-home-new-workspace
+  selector: '[data-testid="tao-home-new-workspace"]'
+  kind: interactive
+- id: tao-home-dock-more
+  selector: '[data-testid="tao-home-dock-more"]'
+  kind: interactive
+- id: tao-home-lan-chat
+  selector: '[data-testid="tao-home-lan-chat"]'
+  kind: display
+  optional: true
+- id: tao-home-search
+  selector: '[data-testid="tao-home-search"]'
+  kind: interactive
+- id: tao-home-search-panel
+  selector: '[data-testid="tao-home-search-panel"]'
+  kind: display
+- id: tao-home-search-input
+  selector: '[data-testid="tao-home-search-input"]'
+  kind: interactive
+- id: tao-home-demo-toggle
+  selector: '[data-testid="tao-home-demo-toggle"]'
+  kind: interactive
+- id: tao-home-context-preview
+  selector: '.tao-home-context-preview'
+  kind: display
+-->
+
+Tao Home 将问、做、深研三种模式、绑定栏、Composer、消息状态、历史快捷行与本地资料搜索组合为独立宿主；首页入口移除 LAN 聊天，WSL 只在检测到可用发行版时显示。用例 `TC-TAO-HOME-001` 覆盖无 Key 空态、模式切换、历史三页签、搜索快捷键和托管 WebView smoke。
+
 ### 1.2 主窗口三栏布局 ✅
 
 <!-- feature
@@ -441,7 +552,7 @@ controls:
     selector: '[data-testid="welcome-panel"]'
     kind: display
   - id: open-local-terminal
-    selector: '[data-testid="welcome-open-local-terminal"]'
+    selector: '[data-testid="welcome-panel"] [data-testid="tao-home-local-terminal"]'
     kind: interactive
   - id: shell-select
     selector: 'select[aria-label="Terminal shell"]'
@@ -459,7 +570,7 @@ controls:
     selector: 'text="New session…"'
     kind: display # card heading; the action is welcome-new-session below
   - id: new-session-card-testid
-    selector: '[data-testid="welcome-new-session"]'
+    selector: '[data-testid="welcome-panel"] [data-testid="tao-home-new-session"]'
     kind: interactive
   - id: recent-sessions-panel
     selector: '[data-testid="welcome-recent-sessions"]'

@@ -35,6 +35,62 @@ pub struct AiConfig {
     /// One of "ctrl_enter" (default) or "enter".
     #[serde(default = "default_chat_send_shortcut")]
     pub chat_send_shortcut: String,
+    #[serde(default)]
+    pub deepseek_app: DeepSeekAppConfig,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct DeepSeekAppConfig {
+    #[serde(default = "default_true")]
+    pub enabled: bool,
+    #[serde(default = "default_deepseek_model")]
+    pub model: String,
+    #[serde(default)]
+    pub thinking_default: bool,
+    #[serde(default)]
+    pub search_default: bool,
+    #[serde(default = "default_true")]
+    pub safety_check_high: bool,
+    #[serde(default = "default_true")]
+    pub title_enabled: bool,
+    #[serde(default = "default_voice_provider")]
+    pub voice_provider: String,
+    #[serde(default = "default_tts_voice")]
+    pub tts_voice: String,
+    #[serde(default = "default_cost_threshold")]
+    pub cost_confirm_threshold_cny: f64,
+}
+
+fn default_true() -> bool {
+    true
+}
+fn default_deepseek_model() -> String {
+    "deepseek-flash".into()
+}
+fn default_voice_provider() -> String {
+    "local".into()
+}
+fn default_tts_voice() -> String {
+    "stella".into()
+}
+fn default_cost_threshold() -> f64 {
+    0.5
+}
+
+impl Default for DeepSeekAppConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            model: default_deepseek_model(),
+            thinking_default: false,
+            search_default: false,
+            safety_check_high: true,
+            title_enabled: true,
+            voice_provider: default_voice_provider(),
+            tts_voice: default_tts_voice(),
+            cost_confirm_threshold_cny: default_cost_threshold(),
+        }
+    }
 }
 
 pub(super) fn default_chat_output_format() -> String {
@@ -58,6 +114,7 @@ impl Default for AiConfig {
             fully_disabled: false,
             chat_output_format: default_chat_output_format(),
             chat_send_shortcut: default_chat_send_shortcut(),
+            deepseek_app: DeepSeekAppConfig::default(),
         }
     }
 }

@@ -22,7 +22,7 @@ steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-native-terminal-ime-password
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="welcome-open-local-terminal"]'
+- click: '[data-testid="tao-home-local-terminal"]'
 - wait_for:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
     timeout_sec: 60

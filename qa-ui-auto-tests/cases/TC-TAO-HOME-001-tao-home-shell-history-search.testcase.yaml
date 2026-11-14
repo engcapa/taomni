@@ -1,0 +1,84 @@
+id: TC-TAO-HOME-001
+title: Tao Home shell, no-key state, history dock and local search
+description: "Verify the Tao Home high-fidelity shell in browser and the packaged native WebView: no-key Composer state, three modes, binding/dock layout, history tabs, Ctrl/Command+K search, and the removal of the Home LAN entry."
+modes:
+- browser
+- native
+covers:
+- F1.11
+tags:
+- p0
+- tao-home
+- regression
+fixtures:
+- reset_db
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-tao-home-001
+- wait_for: '[data-testid="tao-home-host"]'
+- assert_visible: '[data-testid="welcome-panel"]'
+- assert_visible: '[data-testid="tao-home-topbar"]'
+- assert_visible: '[data-testid="tao-home-mode-ask"]'
+- assert_visible: '[data-testid="tao-home-mode-do"]'
+- assert_visible: '[data-testid="tao-home-mode-research"]'
+- assert_attribute:
+    selector: '[data-testid="tao-home-mode-ask"]'
+    name: aria-selected
+    equals: 'true'
+- assert_visible: '[data-testid="tao-home-connect-card"]'
+- assert_disabled: '[data-testid="tao-home-composer-input"]'
+- assert_visible: '[data-testid="tao-home-binding-bar"]'
+- assert_visible: '[data-testid="tao-home-history"]'
+- assert_visible: '[data-testid="tao-home-local-terminal"]'
+- assert_visible: '[data-testid="welcome-panel"] [data-testid="tao-home-local-terminal"]'
+- assert_visible: '[data-testid="tao-home-new-session"]'
+- assert_visible: '[data-testid="welcome-panel"] [data-testid="tao-home-new-session"]'
+- assert_visible: '[data-testid="tao-home-new-workspace"]'
+- assert_visible: '[data-testid="tao-home-dock-more"]'
+- assert_not_visible: '[data-testid="tao-home-lan-chat"]'
+- click: '[data-testid="tao-home-mode-do"]'
+- assert_attribute:
+    selector: '[data-testid="tao-home-mode-do"]'
+    name: aria-selected
+    equals: 'true'
+- click: '[data-testid="tao-home-mode-research"]'
+- assert_attribute:
+    selector: '[data-testid="tao-home-mode-research"]'
+    name: aria-selected
+    equals: 'true'
+- click: '[data-testid="tao-home-history"]'
+- wait_for: '[data-testid="tao-home-history-popover"]'
+- assert_visible: '[data-testid="tao-home-history-tab-chat"]'
+- assert_visible: '[data-testid="tao-home-history-tab-sessions"]'
+- assert_visible: '[data-testid="tao-home-history-tab-workspaces"]'
+- assert_visible: '.tao-home-history-search input'
+- click: '[data-testid="tao-home-history-tab-sessions"]'
+- assert_text:
+    selector: '[data-testid="tao-home-history-popover"]'
+    contains: 最近会话
+- click: '[data-testid="tao-home-history-tab-workspaces"]'
+- assert_text:
+    selector: '[data-testid="tao-home-history-popover"]'
+    contains: 最近工作区
+- press: Escape
+- assert_not_visible: '[data-testid="tao-home-history-popover"]'
+- press: Mod+k
+- wait_for: '[data-testid="tao-home-search-panel"]'
+- assert_visible: '[data-testid="tao-home-search-input"]'
+- fill:
+    selector: '[data-testid="tao-home-search-input"]'
+    value: xyz-no-local-record
+- wait: 1
+- assert_text:
+    selector: '[data-testid="tao-home-search-panel"]'
+    contains: 本地没有找到相关资料
+- press: Escape
+- assert_not_visible: '[data-testid="tao-home-search-panel"]'
+- click: '[data-testid="tao-home-demo-toggle"]'
+- assert_attribute:
+    selector: '[data-testid="tao-home-demo-toggle"]'
+    name: aria-pressed
+    equals: 'true'
+- assert_no_runtime_errors: null
+- screenshot: tao-home-shell-no-key.png

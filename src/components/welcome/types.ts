@@ -29,7 +29,6 @@ export interface WelcomePanelProps {
   ) => Promise<LocalLaunchOutcome | void> | void;
   onNewSession: () => void;
   onOpenLocalPath?: (path: string, opts?: { embedFolder?: boolean; }) => void;
-  onOpenLanChat?: () => void;
   recentSessions?: SessionConfig[];
   recentWorkspaces?: RecentWorkspace[];
   mailSessions?: SessionConfig[];

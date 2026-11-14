@@ -1771,12 +1771,12 @@
 ## main/welcome (F1.6)
 
 - `[data-testid="welcome-panel"]` — display — F1.6.panel-root
-- `[data-testid="welcome-open-local-terminal"]` — interactive — F1.6.open-local-terminal
+- `[data-testid="welcome-panel"] [data-testid="tao-home-local-terminal"]` — interactive — F1.6.open-local-terminal
 - `select[aria-label="Terminal shell"]` — interactive [optional] — F1.6.shell-select
 - `[data-testid="welcome-open-home-folder"]` — interactive [optional] — F1.6.open-home-folder
 - `button[aria-label="Open as administrator"]` — interactive [optional] — F1.6.open-as-administrator
 - `text="New session…"` — display — F1.6.new-session-card
-- `[data-testid="welcome-new-session"]` — interactive — F1.6.new-session-card-testid
+- `[data-testid="welcome-panel"] [data-testid="tao-home-new-session"]` — interactive — F1.6.new-session-card-testid
 - `[data-testid="welcome-recent-sessions"]` — display — F1.6.recent-sessions-panel
 - `[data-testid="welcome-recent-filter"]` — interactive — F1.6.recent-filter
 - `[data-testid="welcome-recent-type-filter"]` — interactive — F1.6.recent-type-filter
@@ -3341,6 +3341,37 @@
 - `[aria-label="Permissions"]` — display — F7.5.chmod-dialog
 - `#chmod-octal` — interactive — F7.5.chmod-octal
 - `role=button[name="Apply"]` — interactive — F7.5.chmod-apply
+
+## tao/home (F1.11)
+
+- `[data-testid="tao-home-host"]` — display — F1.11.tao-home-host
+- `[data-testid="tao-home-topbar"]` — display — F1.11.tao-home-topbar
+- `[data-testid="tao-home-mode-ask"]` — interactive — F1.11.tao-home-mode-ask
+- `[data-testid="tao-home-mode-do"]` — interactive — F1.11.tao-home-mode-do
+- `[data-testid="tao-home-mode-research"]` — interactive — F1.11.tao-home-mode-research
+- `[data-testid="tao-home-connect-card"]` — display — F1.11.tao-home-connect-card
+- `[data-testid="tao-home-open-settings"]` — interactive — F1.11.tao-home-open-settings
+- `[data-testid="tao-home-composer"]` — display — F1.11.tao-home-composer
+- `[data-testid="tao-home-composer-input"]` — interactive — F1.11.tao-home-composer-input
+- `[data-testid="tao-home-binding-bar"]` — display — F1.11.tao-home-binding-bar
+- `[data-testid="tao-home-dock-row"]` — display — F1.11.tao-home-dock-row
+- `[data-testid="tao-home-history"]` — interactive — F1.11.tao-home-history
+- `[data-testid="tao-home-history-popover"]` — display — F1.11.tao-home-history-popover
+- `[data-testid="tao-home-history-tab-chat"]` — interactive — F1.11.tao-home-history-tab-chat
+- `[data-testid="tao-home-history-tab-sessions"]` — interactive — F1.11.tao-home-history-tab-sessions
+- `[data-testid="tao-home-history-tab-workspaces"]` — interactive — F1.11.tao-home-history-tab-workspaces
+- `.tao-home-history-search input` — interactive — F1.11.tao-home-history-search
+- `[data-testid="tao-home-local-terminal"]` — interactive — F1.11.tao-home-local-terminal
+- `[data-testid="tao-home-wsl"]` — interactive [optional] — F1.11.tao-home-wsl
+- `[data-testid="tao-home-new-session"]` — interactive — F1.11.tao-home-new-session
+- `[data-testid="tao-home-new-workspace"]` — interactive — F1.11.tao-home-new-workspace
+- `[data-testid="tao-home-dock-more"]` — interactive — F1.11.tao-home-dock-more
+- `[data-testid="tao-home-lan-chat"]` — display [optional] — F1.11.tao-home-lan-chat
+- `[data-testid="tao-home-search"]` — interactive — F1.11.tao-home-search
+- `[data-testid="tao-home-search-panel"]` — display — F1.11.tao-home-search-panel
+- `[data-testid="tao-home-search-input"]` — interactive — F1.11.tao-home-search-input
+- `[data-testid="tao-home-demo-toggle"]` — interactive — F1.11.tao-home-demo-toggle
+- `.tao-home-context-preview` — display — F1.11.tao-home-context-preview
 
 ## terminal/appearance (F5.2)
 

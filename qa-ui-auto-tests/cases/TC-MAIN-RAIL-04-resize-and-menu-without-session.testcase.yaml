@@ -147,7 +147,7 @@ steps:
 - eval_readonly:
     expression: document.querySelector('[data-show-names]').getBoundingClientRect().width === 68
     expect_truthy: true
-- click: '[data-testid="welcome-open-local-terminal"]'
+- click: '[data-testid="tao-home-local-terminal"]'
 - wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"]'
 - assert_count:
     selector: '[data-testid="collapsed-sidebar-rail"] [data-testid="sidebar-rail-resize"]'

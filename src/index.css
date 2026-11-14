@@ -20,6 +20,7 @@
 @import "./styles/platform-home.css";
 @import "./styles/components.css";
 @import "./styles/chat.css";
+@import "./styles/taoHome.css";
 @import "./styles/editor.css";
 @import "./styles/controls.css";
 @import "./styles/terminal.css";

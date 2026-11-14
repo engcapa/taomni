@@ -34,7 +34,7 @@ steps:
 - click: '[data-testid="acp-bridge-enabled"]'
 - click: '[data-testid="acp-save"]'
 - click: '[data-testid="nav-mode-home"]'
-- click: '[data-testid="welcome-open-local-terminal"]'
+- click: '[data-testid="tao-home-local-terminal"]'
 - wait_for: '[data-testid="terminal-pane"]'
 - click: '[data-testid="rail-chat-button"]'
 - wait_for: '[data-testid="ai-chat-drawer"]'

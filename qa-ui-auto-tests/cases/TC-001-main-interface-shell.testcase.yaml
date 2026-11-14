@@ -34,9 +34,9 @@ steps:
     contains: Welcome to Taomni
 - assert_text:
     selector: '[data-testid="welcome-panel"]'
-    contains: Start local terminal
-- assert_visible: '[data-testid="welcome-open-local-terminal"]'
-- assert_enabled: '[data-testid="welcome-open-local-terminal"]'
+    contains: 本地终端
+- assert_visible: '[data-testid="tao-home-local-terminal"]'
+- assert_enabled: '[data-testid="tao-home-local-terminal"]'
 - assert_visible: '[data-testid="welcome-version"]'
 - assert_visible: '[data-testid="welcome-version-footer"]'
 - assert_text:
@@ -119,11 +119,11 @@ verification:
     - step: 10
       expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]", "contains": "Welcome to Taomni"}}'
     - step: 11
-      expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]", "contains": "Start local terminal"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]", "contains": "本地终端"}}'
     - step: 12
-      expectation: '{"assert_visible": "[data-testid=\"welcome-open-local-terminal\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"tao-home-local-terminal\"]"}'
     - step: 13
-      expectation: '{"assert_enabled": "[data-testid=\"welcome-open-local-terminal\"]"}'
+      expectation: '{"assert_enabled": "[data-testid=\"tao-home-local-terminal\"]"}'
     - step: 14
       expectation: '{"assert_visible": "[data-testid=\"welcome-version\"]"}'
     - step: 15

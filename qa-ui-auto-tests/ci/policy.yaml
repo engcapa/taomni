@@ -18,6 +18,7 @@ smoke:
 - TC-MOBILE-013
 unavailable: {}
 cases:
+- TC-TAO-HOME-001
 - TC-EXPLORER-001
 - TC-EXPLORER-002
 - TC-EXPLORER-003
