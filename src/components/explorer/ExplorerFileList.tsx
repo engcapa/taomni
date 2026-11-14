@@ -60,11 +60,10 @@ export function ExplorerFileList(inputs: FilePanelViewProps) {
     if (index >= 0) virtual.scrollToIndex(Math.floor(index / columns), { align: "auto" });
   }, [operations.renamePath, columns, entries, virtual]);
   const virtualItems = virtual.getVirtualItems();
-  // TanStack can briefly report an empty range while its first measurement is
-  // waiting for ResizeObserver. Mount the small directory rows during that
-  // window so file actions have a real target; large directories stay fully
-  // virtualized until the measurement arrives.
-  const rows = virtualItems.length || entries.length > 200
+  // Small directories are cheap to mount in full and avoid stale virtual
+  // ranges while TanStack waits for its first ResizeObserver measurement.
+  // Large directories retain virtualization for bounded DOM work.
+  const rows = entries.length > 200
     ? virtualItems
     : Array.from({ length: Math.ceil(entries.length / columns) }, (_, index) => ({ index, start: index * rowHeight }));
   // Use the same store as FilePanel; Explorer has no independent selection model.
