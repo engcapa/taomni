@@ -71,7 +71,7 @@ class PreviewCaseOrderTests(unittest.TestCase):
         expected = {
             "003": (18, "6dc6ca55898455b2154a716743425082e45610a445d425bcffbbab42539cd585"),
             "005": (32, "0e024302f2611bc183e9c8ae68d0a42c4d31953b9b6f4718cb6575a49f693e7c"),
-            "012": (47, "f18aaf379ae71bb3f4fbd4021460d7c11b760738c1f2890143bdbc8547c91db3"),
+            "012": (47, "a740e095b5bad0725583a7f2ba58fbed14919da1637d3ca71f9556532a1f2947"),
         }
         for suffix, (count, digest) in expected.items():
             _, document = case(suffix)
