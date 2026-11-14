@@ -75,19 +75,23 @@ pub async fn open_browser(core: &Core, raw_url: &str) -> Result<BrowserOpenResul
     let result_url = parsed.to_string();
 
     if let Some(existing) = app.get_webview_window(REMOTE_BROWSER_LABEL) {
-        existing
-            .navigate(parsed)
-            .map_err(|_| "desktop_browser_open_failed".to_string())?;
+        existing.navigate(parsed).map_err(|error| {
+            log::warn!("failed to navigate mobile remote browser: {error}");
+            "desktop_browser_open_failed".to_string()
+        })?;
         let _ = existing.set_title(&title);
         let _ = existing.unminimize();
         let _ = existing.show();
         let _ = existing.set_focus();
     } else {
         let app_for_load = app.clone();
-        let builder = tauri::WebviewWindowBuilder::new(
+        let builder = crate::webview_environment::configure(
             app,
-            REMOTE_BROWSER_LABEL,
-            tauri::WebviewUrl::External(parsed),
+            tauri::WebviewWindowBuilder::new(
+                app,
+                REMOTE_BROWSER_LABEL,
+                tauri::WebviewUrl::External(parsed),
+            ),
         )
         .title(&title)
         .inner_size(1120.0, 760.0)
@@ -106,9 +110,10 @@ pub async fn open_browser(core: &Core, raw_url: &str) -> Result<BrowserOpenResul
         });
         #[cfg(not(target_os = "linux"))]
         let builder = builder.center();
-        builder
-            .build()
-            .map_err(|_| "desktop_browser_open_failed".to_string())?;
+        builder.build().map_err(|error| {
+            log::warn!("failed to open mobile remote browser window: {error}");
+            "desktop_browser_open_failed".to_string()
+        })?;
     }
 
     core.state()
