@@ -68,6 +68,14 @@ class NativeFileDialogTests(unittest.TestCase):
     def test_windows_native_paste_qualifies_system_threading_thread_sleep(self):
         self.assertIn('System.Threading.Thread.Sleep(', native_paste.WIN)
 
+    def test_windows_file_dialog_supports_save_as_directui_combobox_and_diagnostics(self):
+        script=(Path(file_dialog.__file__).parent/'folder_dialog_windows.ps1').read_text(encoding='utf-8')
+        self.assertIn('FloatNotifySink',script)
+        self.assertIn('DUIViewWndClassName',script)
+        self.assertIn('HasAncestorControlId(window, dialog, 1148)',script)
+        self.assertIn('UniversalSearchBand',script)
+        self.assertIn('SendControlMessage(edit, 0x00B1',script)
+
     def test_native_session_text_uses_textcontent_for_svg_elements(self):
         from tauri_webdriver import NativeSession
         session=NativeSession('http://driver.invalid',Path('/qa/taomni'))

@@ -124,8 +124,7 @@ pub(super) fn unique_path(
     ))
 }
 
-pub(super) fn canonical_key(path: &Path) -> OpResult<String> {
-    let canonical = destination_dir(path)?;
+fn format_canonical(canonical: PathBuf, normalize_key: bool) -> String {
     let value = canonical.to_string_lossy().into_owned();
     #[cfg(windows)]
     {
@@ -133,10 +132,26 @@ pub(super) fn canonical_key(path: &Path) -> OpResult<String> {
             .strip_prefix(r"\\?\UNC\")
             .map(|p| format!(r"\\{p}"))
             .unwrap_or_else(|| value.strip_prefix(r"\\?\").unwrap_or(&value).to_string());
-        return Ok(value.replace('\\', "/").to_lowercase());
+        if normalize_key {
+            return value.replace('\\', "/").to_lowercase();
+        }
+        return value;
     }
     #[cfg(not(windows))]
-    Ok(value)
+    {
+        let _ = normalize_key;
+        value
+    }
+}
+
+pub(super) fn canonical_key(path: &Path) -> OpResult<String> {
+    let canonical = destination_dir(path)?;
+    Ok(format_canonical(canonical, true))
+}
+
+pub(super) fn canonical_entry_path(path: &Path) -> OpResult<String> {
+    let canonical = fs::canonicalize(path).map_err(|e| OpError::io("resolve path", path, e))?;
+    Ok(format_canonical(canonical, false))
 }
 
 /// Atomic no-replace is essential: a preflight `exists()` check alone can
