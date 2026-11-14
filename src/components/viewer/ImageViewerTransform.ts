@@ -12,6 +12,7 @@ export function useImageTransform(path: string, width: number, height: number, l
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [panning, setPanning] = useState(false);
   const drag = useRef<{ id: number; x: number; y: number; originX: number; originY: number } | null>(null);
+  const handledWheelEvents = useRef(new WeakSet<Event>());
   const scale = mode === "fit" ? fitImageScale(width, height, viewport.width, viewport.height, rotation) : mode === "actual" ? 1 : manualScale;
 
   useEffect(() => {
@@ -23,11 +24,22 @@ export function useImageTransform(path: string, width: number, height: number, l
     if (!element) return;
     const measure = () => setViewport({ width: element.clientWidth, height: element.clientHeight });
     measure();
+    // A viewer tab may mount while hidden and become visible later. Some
+    // WebViews do not emit a ResizeObserver notification for that display
+    // transition, so measure after layout has had a frame to settle as well.
+    const firstFrame = requestAnimationFrame(() => {
+      measure();
+      requestAnimationFrame(measure);
+    });
     const observer = typeof ResizeObserver !== "undefined" ? new ResizeObserver(measure) : null;
     observer?.observe(element);
     window.addEventListener("resize", measure);
-    return () => { observer?.disconnect(); window.removeEventListener("resize", measure); };
-  }, [layout]);
+    return () => {
+      cancelAnimationFrame(firstFrame);
+      observer?.disconnect();
+      window.removeEventListener("resize", measure);
+    };
+  }, [height, layout, path, width]);
 
   const zoom = useCallback((factor: number, point?: { x: number; y: number }) => {
     const next = clampImageScale(scale * factor);
@@ -39,6 +51,8 @@ export function useImageTransform(path: string, width: number, height: number, l
     });
   }, [scale]);
   const wheel = useCallback((event: WheelEvent) => {
+    if (handledWheelEvents.current.has(event)) return;
+    handledWheelEvents.current.add(event);
     if (!width || !height) return;
     event.preventDefault();
     const element = stage.current;
@@ -60,7 +74,7 @@ export function useImageTransform(path: string, width: number, height: number, l
   }, [wheel]);
   const reset = (next: "fit" | "actual") => flushSync(() => { setMode(next); setPan({ x: 0, y: 0 }); });
   return {
-    stage, mode, scale, rotation, flipped, pan, panning, zoom, reset,
+    stage, mode, scale, rotation, flipped, pan, panning, zoom, reset, wheel,
     rotate: (direction: number) => flushSync(() => { setRotation((value) => (value + direction * 90 + 360) % 360); setPan({ x: 0, y: 0 }); }),
     flip: () => flushSync(() => setFlipped((value) => !value)),
     pointerDown: (event: React.PointerEvent<HTMLDivElement>) => {

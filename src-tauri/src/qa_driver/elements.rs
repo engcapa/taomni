@@ -180,7 +180,7 @@ pub(super) async fn element_text<R: Runtime>(
     // Read those descendants explicitly so native assertions observe the same
     // labels that a user sees in the diagram.
     script.push_str(
-        "if (!el) throw new Error('stale element'); const direct=el.innerText || el.textContent || ''; const descendants=el.querySelectorAll ? Array.from(el.querySelectorAll('text, tspan')).map((node)=>node.textContent || node.innerText || '').join(' ') : ''; return direct || descendants || '';",
+        "if (!el) throw new Error('stale element'); const direct=el.innerText || el.textContent || ''; const descendants=el.querySelectorAll ? Array.from(el.querySelectorAll('text, tspan')).map((node)=>node.textContent || node.innerText || '').join(' ') : ''; return descendants.trim() || direct.trim() || '';",
     );
     match eval_js(&state, script).await {
         Ok(value) => ok(value),
