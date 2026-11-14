@@ -1,0 +1,645 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tao Home 高保真原型 v0.1（Taomni）</title>
+<style>
+:root{
+  --bg:#f8fafc;--chrome:#f1f5f9;--chrome2:#e8eef5;--card:#fff;--card-b:#e2e8f0;--accent:#1e40af;--accent-soft:#3b82f6;
+  --sel:#dbeafe;--sel-b:#93c5fd;--text:#0f172a;--muted:#64748b;--div:#e2e8f0;--input-b:#cbd5e1;
+  --warn:#92400e;--warn-bg:#fef3c7;--warn-b:#fcd34d;--danger:#b91c1c;--danger-bg:#fee2e2;--danger-b:#fca5a5;
+  --ok:#15803d;--ok-bg:#dcfce7;--code-bg:#f1f5f9;--think:color-mix(in srgb,var(--accent) 7%,var(--card));
+  --shadow:0 8px 28px rgba(15,23,42,.10);--fs:13px;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+.dark{
+  --bg:#1e1f22;--chrome:#191a1c;--chrome2:#16171a;--card:#26282e;--card-b:#35383f;--accent:#6aa6f8;--accent-soft:#6aa6f8;
+  --sel:#25354d;--sel-b:#4d7ec4;--text:#e6eaf0;--muted:#9ca3ad;--div:#2e3138;--input-b:#3d414a;
+  --warn:#fcd34d;--warn-bg:#3a2f12;--warn-b:#6b5416;--danger:#fca5a5;--danger-bg:#3b1d1d;--danger-b:#7f2d2d;
+  --ok:#86efac;--ok-bg:#14301f;--code-bg:#1b1d22;--think:color-mix(in srgb,var(--accent) 9%,var(--card));--shadow:0 8px 28px rgba(0,0,0,.45);
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{font:var(--fs)/1.5 -apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:#0b0c0e;color:var(--text);display:flex;flex-direction:column}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,textarea:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+/* prototype bar */
+.pbar{height:38px;background:#111214;color:#c9ced6;display:flex;align-items:center;gap:10px;padding:0 12px;font-size:12px;border-bottom:1px solid #2a2c31;flex:none;position:relative;z-index:50}
+.pbar b{color:#fff;font-weight:600}.pbar .sp{flex:1}
+.pbar button,.pbar select{background:#1c1e22;border:1px solid #33363d;color:#d8dce3;border-radius:6px;padding:3px 9px;font-size:12px}
+.pbar button:hover{background:#262930}
+.pbar .note{opacity:.65}
+.smenu{position:absolute;top:36px;left:210px;background:#1c1e22;border:1px solid #33363d;border-radius:8px;padding:6px;width:300px;max-height:70vh;overflow:auto;display:none;box-shadow:0 12px 30px rgba(0,0,0,.5)}
+.smenu.open{display:block}
+.smenu button{display:flex;gap:8px;width:100%;text-align:left;background:none;border:0;padding:5px 8px;border-radius:5px}
+.smenu button:hover{background:#2a2d34}.smenu i{font-style:normal;color:#7da7f5;width:30px;flex:none;font-family:var(--mono)}
+.stagewrap{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;background:#0b0c0e}
+
+/* app frame */
+.app{width:100%;height:100%;display:flex;flex-direction:column;background:var(--bg);color:var(--text);overflow:hidden;position:relative}
+.mobile .stagewrap{padding:14px}
+.mobile .app{width:390px;height:min(100%,800px);border-radius:22px;border:6px solid #2a2c31}
+.titlebar{height:34px;background:var(--chrome2);border-bottom:1px solid var(--div);display:flex;align-items:center;gap:8px;padding:0 10px;font-size:12px;flex:none}
+.titlebar .logo{width:18px;height:18px;border-radius:5px;background:var(--accent);color:#fff;display:grid;place-items:center;font-weight:700;font-size:11px}
+.titlebar .sp{flex:1}.titlebar .wc{display:flex;gap:14px;color:var(--muted)}
+.body{flex:1;min-height:0;display:flex}
+.rail{width:46px;background:var(--chrome);border-right:1px solid var(--div);display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 0;flex:none}
+.rail button{width:34px;height:34px;border:0;background:none;border-radius:8px;color:var(--muted);display:grid;place-items:center}
+.rail button:hover{background:var(--sel)}.rail button.on{background:var(--sel);color:var(--accent)}
+.rail .sp{flex:1}
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.tabbar{height:34px;background:var(--chrome);border-bottom:1px solid var(--div);display:flex;align-items:flex-end;padding:0 6px;gap:2px;flex:none}
+.tab{padding:6px 12px;border-radius:7px 7px 0 0;font-size:12px;color:var(--muted);display:flex;gap:6px;align-items:center;border:1px solid transparent;border-bottom:0}
+.tab.on{background:var(--bg);color:var(--text);border-color:var(--div);position:relative;top:1px}
+.ribbon{width:26px;background:var(--chrome);border-left:1px solid var(--div);display:flex;flex-direction:column;align-items:center;padding-top:10px;gap:10px;flex:none;color:var(--muted)}
+.ribbon .t{writing-mode:vertical-rl;font-size:11px;letter-spacing:1px}
+.ribbon .dot{width:7px;height:7px;border-radius:50%;background:var(--accent-soft)}
+.statusbar{height:24px;background:var(--chrome2);border-top:1px solid var(--div);display:flex;align-items:center;gap:14px;padding:0 10px;font-size:11px;color:var(--muted);flex:none}
+.statusbar .sp{flex:1}.statusbar .ph{font-family:var(--mono);color:var(--accent)}
+.statusbar span{white-space:nowrap}.compact .statusbar span:nth-child(2){display:none}.compact .rail,.compact .ribbon,.compact .titlebar .wc{display:none}
+
+/* home */
+.home{flex:1;min-height:0;display:flex;position:relative}
+.col{flex:1;min-width:0;display:flex;flex-direction:column;position:relative}
+.topbar{height:46px;display:flex;align-items:center;gap:10px;padding:0 14px;border-bottom:1px solid var(--div);flex:none;background:var(--bg)}
+.seg{display:flex;background:var(--chrome);border:1px solid var(--div);border-radius:9px;padding:2px}
+.seg button{border:0;background:none;padding:4px 14px;border-radius:7px;color:var(--muted);font-weight:500}
+.seg button.on{background:var(--card);color:var(--accent);box-shadow:0 1px 2px rgba(0,0,0,.12)}
+.bind{display:flex;gap:6px;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:5px;border:1px solid var(--card-b);background:var(--card);border-radius:999px;padding:2px 9px;font-size:12px;height:26px;white-space:nowrap}
+.chip.empty{border-style:dashed;color:var(--muted);background:none}
+.chip.on{border-color:var(--sel-b);background:var(--sel);color:var(--text)}
+.chip.ctx{border-color:var(--sel-b);background:var(--sel)}
+.chip.loc{border-color:#86efac;background:var(--ok-bg);color:var(--ok)}
+.chip .x{border:0;background:none;color:var(--muted);padding:0 0 0 2px;font-size:14px;line-height:1}
+.chip:hover{filter:brightness(.98)}
+.tsp{flex:1}
+.pill{display:inline-flex;gap:6px;align-items:center;font-size:12px;color:var(--muted);border:1px solid var(--card-b);border-radius:999px;padding:2px 10px;height:26px;background:var(--card)}
+.pill.warn{color:var(--warn);background:var(--warn-bg);border-color:var(--warn-b)}
+.pill.danger{color:var(--danger);background:var(--danger-bg);border-color:var(--danger-b)}
+.ibtn{width:30px;height:30px;border:1px solid transparent;background:none;border-radius:8px;display:grid;place-items:center;color:var(--muted)}
+.ibtn:hover{background:var(--sel);color:var(--text)}.ibtn.on{color:var(--accent);background:var(--sel)}
+.pop{position:absolute;z-index:30;background:var(--card);border:1px solid var(--card-b);border-radius:10px;box-shadow:var(--shadow);padding:6px;min-width:230px;display:none}
+.pop.open{display:block}
+.pop h6{margin:4px 8px;font-size:11px;font-weight:600;color:var(--muted);letter-spacing:.3px}
+.pop button{display:flex;width:100%;gap:8px;align-items:center;text-align:left;border:0;background:none;padding:6px 8px;border-radius:6px}
+.pop button:hover,.pop button.hl{background:var(--sel)}.pop small{color:var(--muted);margin-left:auto}
+.pop input{width:calc(100% - 12px);margin:4px 6px;padding:5px 8px;border:1px solid var(--input-b);background:var(--bg);color:var(--text);border-radius:6px}
+
+.stage{flex:1;min-height:0;display:flex;flex-direction:column;overflow:auto;padding:0 18px}
+.stage.empty{justify-content:center}
+.stage .inner{width:100%;max-width:760px;margin:0 auto;display:flex;flex-direction:column}
+.stage.chat{padding-bottom:0}
+.stage.chat .inner{flex:1;min-height:0}
+.hero{text-align:center;margin:18px 0 16px}
+.hero .mark{width:44px;height:44px;border-radius:13px;background:linear-gradient(135deg,var(--accent),var(--accent-soft));color:#fff;display:grid;place-items:center;font-weight:700;font-size:20px;margin:0 auto 10px}
+.hero h1{margin:0;font-size:22px;font-weight:600}.hero p{margin:4px 0 0;color:var(--muted)}
+.tall-hide .hero p{display:none}.xtall-hide .hero{display:none}
+.chat .hero,.chat .extras .launch,.chat .extras .recent,.chat .foot{display:none}
+.feed{flex:1;min-height:0;overflow:auto;padding:16px 0 8px;display:none;flex-direction:column;gap:18px}
+.chat .feed{display:flex}
+.msg.user{align-self:flex-end;max-width:82%;background:var(--sel);border:1px solid var(--sel-b);border-radius:14px 14px 4px 14px;padding:8px 13px}
+.msg.user .att{margin-top:6px;display:flex;gap:6px;flex-wrap:wrap}
+.msg.ai{display:flex;flex-direction:column;gap:8px;position:relative}
+.ai .who{display:flex;align-items:center;gap:7px;font-weight:600;font-size:12px}
+.ai .who .mk{width:18px;height:18px;border-radius:6px;background:var(--accent);color:#fff;display:grid;place-items:center;font-size:10px}
+.ai .who .acts{margin-left:auto;display:flex;gap:2px;opacity:0;transition:opacity .15s}
+.msg.ai:hover .acts,.compact .msg.ai .acts{opacity:1}
+.acts button{border:0;background:none;color:var(--muted);padding:3px 6px;border-radius:6px;font-size:12px;display:flex;gap:4px;align-items:center}
+.acts button:hover{background:var(--sel);color:var(--text)}
+.txt{font-size:14px;line-height:1.7;word-break:break-word}
+.txt code{font-family:var(--mono);background:var(--code-bg);border:1px solid var(--div);border-radius:4px;padding:0 4px;font-size:12.5px}
+.txt ul{margin:4px 0;padding-left:20px}
+.cite{display:inline-grid;place-items:center;min-width:16px;height:16px;border-radius:5px;background:var(--sel);border:1px solid var(--sel-b);color:var(--accent);font-size:10px;font-weight:600;cursor:pointer;margin:0 1px;vertical-align:1px;padding:0 3px}
+.cite.local{background:var(--ok-bg);border-color:#86efac;color:var(--ok)}
+.cursor{display:inline-block;width:7px;height:15px;background:var(--accent);vertical-align:-2px;margin-left:2px;animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.cursor{animation:none}.spin{animation:none!important}}
+.blk{border-radius:10px}
+.think{background:var(--think);border:1px solid var(--div)}
+.think>button{width:100%;display:flex;gap:7px;align-items:center;border:0;background:none;padding:6px 10px;color:var(--muted);font-size:12px;text-align:left}
+.think .tb{display:none;padding:2px 12px 10px;color:var(--muted);font-size:12.5px;line-height:1.65;white-space:pre-wrap}
+.think.open .tb{display:block}.think.open>button .car{transform:rotate(90deg)}
+.steps{font-size:12px;color:var(--muted);border:1px solid var(--div);border-radius:10px;padding:6px 10px;display:flex;flex-direction:column;gap:3px}
+.steps .st{display:flex;gap:7px;align-items:center}.steps .st.done{color:var(--text)}
+.dot8{width:8px;height:8px;border-radius:50%;background:var(--muted);flex:none}
+.done>.dot8{background:var(--ok)}.run>.dot8{background:var(--accent);animation:pulse 1s infinite}.fail>.dot8{background:var(--danger)}
+@keyframes pulse{50%{opacity:.3}}
+.src{display:flex;gap:8px;flex-wrap:wrap}
+.srccard{border:1px solid var(--card-b);background:var(--card);border-radius:10px;padding:7px 10px;width:calc(33.3% - 6px);min-width:150px;font-size:12px;cursor:pointer}
+.srccard b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.srccard span{color:var(--muted)}
+.srccard:hover{border-color:var(--sel-b)}
+.usage{font-size:11.5px;color:var(--muted);display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.usage .tag{border:1px solid var(--card-b);border-radius:999px;padding:0 7px}
+.card{border:1px solid var(--card-b);background:var(--card);border-radius:12px;padding:12px 14px}
+.card.warn{border-color:var(--warn-b);background:color-mix(in srgb,var(--warn-bg) 55%,var(--card))}
+.card.danger{border-color:var(--danger-b);background:color-mix(in srgb,var(--danger-bg) 55%,var(--card))}
+.card h4{margin:0 0 4px;font-size:13px;display:flex;gap:7px;align-items:center}
+.card p{margin:2px 0 8px;color:var(--muted);font-size:12.5px}
+.btn{border:1px solid var(--input-b);background:var(--card);border-radius:8px;padding:5px 13px}
+.btn:hover{background:var(--sel)}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}.dark .btn.pri{color:#0b1220}
+.btn.pri:hover{filter:brightness(1.08)}
+.btn.dng{background:var(--danger);border-color:var(--danger);color:#fff}.dark .btn.dng{color:#1b0b0b}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.lv{font-size:11px;border-radius:5px;padding:0 6px;font-weight:600}
+.lv.l1{background:var(--warn-bg);color:var(--warn);border:1px solid var(--warn-b)}.lv.l2{background:var(--danger-bg);color:var(--danger);border:1px solid var(--danger-b)}
+pre.code{margin:6px 0;background:var(--code-bg);border:1px solid var(--div);border-radius:8px;padding:8px 10px;font:12px/1.55 var(--mono);overflow:auto;white-space:pre-wrap}
+.kv{display:grid;grid-template-columns:62px 1fr;gap:2px 8px;font-size:12px;color:var(--muted)}.kv b{color:var(--text);font-weight:500}
+.plan li{list-style:none;display:flex;gap:8px;align-items:center;padding:3px 0}.plan ul{margin:6px 0;padding:0}
+.plan .st-i{width:16px;text-align:center}.skipped{text-decoration:line-through;opacity:.5}
+.spin{display:inline-block;width:12px;height:12px;border:2px solid var(--sel-b);border-top-color:var(--accent);border-radius:50%;animation:rot .8s linear infinite}
+@keyframes rot{to{transform:rotate(360deg)}}
+
+.composerWrap{padding:6px 0 4px;flex:none}
+.stage.chat .composerWrap{position:sticky;bottom:0;background:linear-gradient(transparent,var(--bg) 18%);padding-top:14px}
+.composer{border:1px solid var(--input-b);background:var(--card);border-radius:16px;box-shadow:0 2px 14px rgba(15,23,42,.07);transition:border-color .15s}
+.composer:focus-within{border-color:var(--accent)}
+.composer.off{opacity:.55;pointer-events:none}
+.chips{display:flex;gap:6px;flex-wrap:wrap;padding:8px 10px 0}.chips:empty{display:none}
+.composer textarea{display:block;width:100%;border:0;background:none;color:var(--text);resize:none;padding:11px 14px 6px;font:15px/1.5 inherit;min-height:52px;max-height:200px;outline:0}
+.ctool{display:flex;align-items:center;gap:4px;padding:4px 8px 8px}
+.tg{display:inline-flex;gap:5px;align-items:center;border:1px solid var(--card-b);background:none;border-radius:999px;padding:2px 10px;height:28px;color:var(--muted);font-size:12px}
+.tg.on{background:var(--sel);border-color:var(--sel-b);color:var(--accent)}
+.tg:hover{background:var(--sel)}
+.send{width:34px;height:34px;border-radius:50%;border:0;background:var(--accent);color:#fff;display:grid;place-items:center;margin-left:auto}
+.dark .send{color:#0b1220}.send[disabled]{opacity:.35;cursor:not-allowed}.send.stop{background:var(--danger)}
+.chint{font-size:11.5px;color:var(--muted);padding:5px 6px 0;display:flex;gap:10px;flex-wrap:wrap;min-height:20px}
+.chint a{color:var(--accent);cursor:pointer;text-decoration:underline}
+.extras{margin-top:10px}
+.sug{display:flex;gap:8px;flex-wrap:wrap}
+.chat .sug{flex-wrap:nowrap;overflow-x:auto;padding-bottom:4px}
+.sug button{flex:1 1 170px;text-align:left;border:1px solid var(--card-b);background:var(--card);border-radius:12px;padding:8px 11px;display:flex;flex-direction:column;gap:1px;min-width:160px}
+.chat .sug button{flex:none;flex-direction:row;align-items:center;padding:4px 11px;border-radius:999px;min-width:0}
+.chat .sug button small{display:none}
+.sug button:hover{border-color:var(--sel-b);background:var(--sel)}
+.sug b{font-weight:500;font-size:12.5px}.sug small{color:var(--muted);font-size:11px}
+.launch,.recent{display:flex;gap:8px;align-items:center;margin-top:14px;flex-wrap:wrap}
+.label{font-size:11px;color:var(--muted);width:34px;flex:none}
+.lbtn{display:flex;gap:7px;align-items:center;border:1px solid var(--card-b);background:var(--card);border-radius:10px;padding:5px 11px}
+.lbtn:hover{background:var(--sel)}
+.rchip{border:1px solid var(--card-b);background:none;border-radius:999px;padding:2px 10px;font-size:12px;color:var(--muted)}
+.rchip:hover{background:var(--sel);color:var(--text)}
+.foot{margin:22px 0 10px;text-align:center;font-size:11px;color:var(--muted);display:flex;gap:8px;justify-content:center;align-items:center}
+.foot .t{width:14px;height:14px;border-radius:4px;background:var(--accent);color:#fff;display:inline-grid;place-items:center;font-size:9px;font-weight:700}
+.foot a{color:var(--accent);cursor:pointer}
+
+.side{width:340px;border-left:1px solid var(--div);background:var(--chrome);display:none;flex-direction:column;flex:none}
+.side.open{display:flex}
+.side .tabs{display:flex;border-bottom:1px solid var(--div);padding:0 6px;align-items:center}
+.side .tabs button{border:0;background:none;padding:10px 10px;color:var(--muted);border-bottom:2px solid transparent}
+.side .tabs button.on{color:var(--accent);border-color:var(--accent)}
+.side .tabs .cl{margin-left:auto;font-size:16px}
+.side .pane{flex:1;overflow:auto;padding:10px;display:none;flex-direction:column;gap:8px}
+.side .pane.on{display:flex}
+.side .empty{color:var(--muted);text-align:center;margin-top:30px;font-size:12px}
+.sitem{border:1px solid var(--card-b);background:var(--card);border-radius:10px;padding:8px 10px;font-size:12px}
+.sitem.hl{border-color:var(--accent);box-shadow:0 0 0 2px color-mix(in srgb,var(--accent) 25%,transparent)}
+.sitem b{display:block}.sitem span{color:var(--muted)}.sitem .row{margin-top:4px}
+.compact .side{position:absolute;right:0;top:46px;bottom:0;width:min(340px,92%);z-index:20;box-shadow:var(--shadow)}
+
+.mask{position:absolute;inset:0;background:color-mix(in srgb,var(--bg) 82%,transparent);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;z-index:25}
+.mask.open{display:flex}
+.mask .card{width:340px;text-align:center;box-shadow:var(--shadow)}
+
+.modal{position:absolute;inset:0;background:rgba(5,8,15,.5);display:none;align-items:center;justify-content:center;z-index:40;padding:16px}
+.modal.open{display:flex}
+.dlg{width:min(860px,100%);height:min(560px,100%);background:var(--bg);border:1px solid var(--card-b);border-radius:14px;box-shadow:var(--shadow);display:flex;overflow:hidden}
+.dlg nav{width:170px;background:var(--chrome);border-right:1px solid var(--div);padding:10px 8px;display:flex;flex-direction:column;gap:2px;flex:none}
+.dlg nav h5{margin:4px 8px 8px;font-size:13px}
+.dlg nav button{border:0;background:none;text-align:left;padding:7px 10px;border-radius:7px;color:var(--muted)}
+.dlg nav button.on{background:var(--sel);color:var(--accent)}
+.dlg .cnt{flex:1;overflow:auto;padding:16px 20px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.dlg .cnt h3{margin:0;font-size:15px}
+.compact .dlg{flex-direction:column}.compact .dlg nav{width:auto;flex-direction:row;overflow:auto}
+.field{display:flex;flex-direction:column;gap:4px}.field label{font-size:12px;color:var(--muted)}
+.field input,.field select,.field textarea{border:1px solid var(--input-b);background:var(--card);color:var(--text);border-radius:7px;padding:6px 9px;font:inherit}
+.tbl{width:100%;border-collapse:collapse;font-size:12px}.tbl td,.tbl th{border-bottom:1px solid var(--div);padding:6px 8px;text-align:left}
+.tbl th{color:var(--muted);font-weight:500}
+.sw{position:relative;width:34px;height:19px;border-radius:999px;background:var(--input-b);border:0;padding:0;flex:none;transition:.15s}
+.sw::after{content:"";position:absolute;left:2px;top:2px;width:15px;height:15px;border-radius:50%;background:#fff;transition:.15s}
+.sw.on{background:var(--accent)}.sw.on::after{left:17px}.sw[disabled]{opacity:.4;cursor:not-allowed}
+.note2{font-size:12px;color:var(--muted);background:var(--chrome);border:1px solid var(--div);border-radius:8px;padding:8px 10px}
+.toast{position:absolute;left:50%;bottom:22px;transform:translateX(-50%) translateY(20px);background:#111214;color:#f1f3f6;padding:8px 14px;border-radius:9px;font-size:12px;opacity:0;pointer-events:none;transition:.25s;z-index:60;max-width:80%}
+.toast.show{opacity:1;transform:translateX(-50%)}
+.compact .topbar{flex-wrap:wrap;height:auto;padding:6px 10px}.compact .tsp{display:none}
+.compact .launch .lbtn span{display:none}
+.compact .sug button{min-width:140px}
+.compact .srccard{width:100%}
+</style>
+</head>
+<body>
+<div class="pbar">
+  <b>Tao Home 原型 v0.1</b><span class="note">模拟数据 · 无网络请求 · 配套 tao-home-detailed-design.md</span>
+  <span class="sp"></span>
+  <button id="bState">状态 S0–S16 ▾</button>
+  <button id="bTheme">浅色 / 暗色</button>
+  <button id="bView">桌面 / 窄屏</button>
+  <label>动画速度 <select id="speed"><option value="1">正常</option><option value="3">快 ×3</option><option value="0.5">慢 ×0.5</option></select></label>
+  <div class="smenu" id="smenu"></div>
+</div>
+<div class="stagewrap" id="stagewrap">
+<div class="app" id="app">
+  <div class="titlebar"><div class="logo">T</div><b>Taomni</b><span style="color:var(--muted)">本地优先的 AI 原生远程工作台</span><span class="sp"></span><span class="wc"><span>—</span><span>▢</span><span>✕</span></span></div>
+  <div class="body">
+    <div class="rail" aria-label="主导航">
+      <button class="on" title="首页 / Tao"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8M5 10v10h14V10"/></svg></button>
+      <button title="终端"><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4zM7 9l3 3-3 3M12 15h5"/></svg></button>
+      <button title="会话"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg></button>
+      <button title="数据库"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3 3 7 3s7-1.3 7-3V6M5 12c0 1.7 3 3 7 3s7-1.3 7-3"/></svg></button>
+      <button title="邮件"><svg viewBox="0 0 24 24"><path d="M3 6h18v12H3zM3 7l9 7 9-7"/></svg></button>
+      <button title="笔记"><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6zM9 12h7M9 16h5"/></svg></button>
+      <span class="sp"></span>
+      <button title="最近（历史 / 置顶 / 搜索）"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/></svg></button>
+      <button id="rSet" title="设置"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg></button>
+    </div>
+    <div class="main">
+      <div class="tabbar"><div class="tab on"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8M5 10v10h14V10"/></svg>首页</div><div class="tab">本地终端 1</div><div class="tab">u80 · PostgreSQL</div></div>
+      <div class="home" id="home">
+        <div class="col" id="col">
+          <div class="topbar" id="topbar">
+            <div class="seg" id="modeSeg" role="tablist" aria-label="Tao 模式"><button data-m="ask" class="on" role="tab">问</button><button data-m="do" role="tab">做</button><button data-m="research" role="tab">深研</button></div>
+            <div class="bind" id="bind"></div>
+            <span class="tsp"></span>
+            <span class="pill" id="usagePill" title="本轮 token 与估算费用">本轮 0 / 10M · ¥0.00（估算）</span>
+            <button class="ibtn" id="bDemo" title="演示模式：隐藏建议、最近与真实绑定名"><svg viewBox="0 0 24 24"><path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/></svg></button>
+            <button class="ibtn" id="bSide" title="侧栏"><svg viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M15 4v16"/></svg></button>
+            <button class="ibtn" id="bSet" title="Tao 设置"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M19 12a7 7 0 00-.1-1.2l2-1.5-2-3.4-2.3 1a7 7 0 00-2-1.2L14 3h-4l-.6 2.7a7 7 0 00-2 1.2l-2.3-1-2 3.4 2 1.5a7 7 0 000 2.4l-2 1.5 2 3.4 2.3-1a7 7 0 002 1.2L10 21h4l.6-2.7a7 7 0 002-1.2l2.3 1 2-3.4-2-1.5c.1-.4.1-.8.1-1.2z"/></svg></button>
+          </div>
+          <div class="stage empty" id="stage">
+            <div class="inner">
+              <div class="feed" id="feed" aria-live="polite"></div>
+              <div class="hero" id="hero"><div class="mark">T</div><h1 id="greet">早上好，Tao 在这里。</h1><p>Tao — 你的 Develop Buddy。今天想先做什么？</p></div>
+              <div id="nokey" style="display:none;margin-bottom:12px" class="card"><h4>连接 DeepSeek · 全家桶</h4><p>首页的问 / 做 / 深研都需要一把 API Key。Key 只保存在本地 Vault，不会进入前端。</p><div class="row"><button class="btn pri" id="goSet">去设置</button><button class="btn" id="reuseKey">沿用已有的 DeepSeek Key</button><span style="color:var(--muted);font-size:12px">检测到旧 tao-chat 已配置 Key；仅复制 Vault 引用，需先测试连接</span></div></div>
+              <div class="composerWrap">
+                <div class="composer" id="composer">
+                  <div class="chips" id="chips"></div>
+                  <textarea id="input" rows="1" placeholder="问 Tao 任何事…  输入 @ 引用终端 / 文件 / 工作区 / 数据库 / 笔记" aria-label="消息输入"></textarea>
+                  <div class="ctool">
+                    <button class="ibtn" title="上传 / 粘贴 / 拖拽文件" id="bAtt"><svg viewBox="0 0 24 24"><path d="M21 12l-8.5 8.5a5 5 0 01-7-7L14 5a3.5 3.5 0 015 5l-8.5 8.5a2 2 0 01-3-3L15 8"/></svg></button>
+                    <button class="ibtn" title="语音输入（默认本地 Whisper）" id="bMic"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg></button>
+                    <button class="tg" id="tgThink" title="思考">思考</button>
+                    <button class="tg" id="tgWeb" title="联网搜索按次计费">联网</button>
+                    <button class="tg" id="tgModel" title="模型"><span id="modelLbl">deepseek-flash</span> ▾</button>
+                    <button class="send" id="send" title="发送" disabled><svg viewBox="0 0 24 24" id="sendIco"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+                  </div>
+                </div>
+                <div class="chint" id="chint"></div>
+              </div>
+              <div class="extras">
+                <div class="sug" id="sug"></div>
+                <div class="launch" id="launch"><span class="label">启动</span>
+                  <button class="lbtn"><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4zM7 9l3 3-3 3M12 15h5"/></svg><span>本地终端</span></button>
+                  <button class="lbtn"><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4zM8 10h8M8 14h5"/></svg><span>WSL</span></button>
+                  <button class="lbtn"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg><span>新会话</span></button>
+                  <button class="lbtn"><svg viewBox="0 0 24 24"><path d="M4 5h16v11H9l-5 4z"/></svg><span>LAN 聊天</span></button>
+                  <button class="lbtn"><svg viewBox="0 0 24 24"><path d="M3 7h7l2 2h9v10H3z"/></svg><span>新工作区</span></button>
+                  <button class="lbtn"><span>更多 ▾</span></button></div>
+                <div class="recent" id="recent"><span class="label">最近</span></div>
+              </div>
+              <div class="foot" id="foot"><span class="t">T</span><span>Taomni v2.8.0</span><a id="restore">恢复上次会话（3 个标签）</a></div>
+            </div>
+          </div>
+          <div class="pop" id="pop"></div>
+          <div class="mask" id="mask"><div class="card"><h4 style="justify-content:center">🔒 Vault 已锁定</h4><p>进行中的流式请求已中断，已收到的内容已保留。解锁后可从“继续生成”继续。</p><button class="btn pri" id="unlock">输入主密码解锁</button></div></div>
+        </div>
+        <aside class="side" id="side" aria-label="侧栏">
+          <div class="tabs"><button data-p="sources" class="on">来源</button><button data-p="files">文件</button><button data-p="artifacts">生成物</button><button data-p="workflow">工作流</button><button class="cl" id="sideClose" title="收起">×</button></div>
+          <div class="pane on" id="p-sources"><div class="empty">本轮没有来源</div></div>
+          <div class="pane" id="p-files"><div class="empty">本轮没有上传或引用的文件</div></div>
+          <div class="pane" id="p-artifacts"><div class="empty">代码 / SQL / 文档成品会出现在这里</div></div>
+          <div class="pane" id="p-workflow"><div class="empty">没有进行中的工作流</div></div>
+        </aside>
+      </div>
+    </div>
+    <div class="ribbon"><span class="dot"></span><span class="t">Tao · 抽屉</span></div>
+  </div>
+  <div class="statusbar"><span>● 已连接代理：系统</span><span>出口 allowlist：api.deepseek.com</span><span class="sp"></span><span>状态 <span class="ph" id="phase">S1 空态就绪</span></span></div>
+  <div class="modal" id="modal"><div class="dlg" id="dlg"></div></div>
+  <div class="toast" id="toast"></div>
+</div>
+</div>
+
+<script>
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const S={tok:0,mode:'ask',think:false,web:false,model:'deepseek-flash',demo:false,hasKey:true,busy:false,
+  bind:{ws:'taomni',term:'本地终端 1',db:null},chips:[],tokens:0,cost:0,stopped:false,run:null,sources:[],speed:1};
+const BIND={
+  ws:{label:'工作区',icon:'📁',items:['taomni','chat-demo','docs-site','infra-notes']},
+  term:{label:'终端',icon:'⌨',items:['本地终端 1','u80（SSH）','WSL · Ubuntu','build-box（SSH）']},
+  db:{label:'数据库',icon:'🗄',items:['u80 · PostgreSQL','analytics · ClickHouse','cache · Redis']}};
+const MODES={ask:'问',do:'做',research:'深研'};
+const MODE_DEF={ask:{think:false,web:false},do:{think:true,web:false},research:{think:true,web:true}};
+const el=(t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e};
+const esc=s=>s.replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const sleep=ms=>new Promise(r=>setTimeout(r,ms/S.speed));
+const fmtTok=n=>n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(1)+'K':String(n);
+function toast(t){const x=$('#toast');x.textContent=t;x.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>x.classList.remove('show'),2200)}
+function setPhase(t){$('#phase').textContent=t}
+
+/* ---------- markdown-lite ---------- */
+function md(t){
+  const lines=esc(t).split('\n');let out='',ul=false;
+  for(const l of lines){
+    if(/^- /.test(l)){if(!ul){out+='<ul>';ul=true}out+='<li>'+l.slice(2)+'</li>'}
+    else{if(ul){out+='</ul>';ul=false}out+=(l?l:'<br>')+(l?'<br>':'')}
+  }
+  if(ul)out+='</ul>';
+  return out.replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/`([^`]+)`/g,'<code>$1</code>')
+    .replace(/\[(本)?(\d)\]/g,(m,l,n)=>`<span class="cite${l?' local':''}" data-n="${n}" role="button" tabindex="0">${l?'本':''}${n}</span>`).replace(/(<br>)+$/,'');
+}
+
+/* ---------- scenarios (mock) ---------- */
+const SRC=[
+ {t:'DeepSeek 开放应用 API 与 chat-demo 发布说明',s:'api-docs.deepseek.com',d:'2026-11-13 更新日志：Messages 兼容接口、服务端搜索与读链接、Files、ASR/TTS。'},
+ {t:'deepseek-ai/chat-demo（GitHub）',s:'github.com',d:'浏览器直连 API 复刻 DeepSeek App 体验的开源演示，v0.1.1。'},
+ {t:'模型与定价（官方定价页）',s:'api-docs.deepseek.com',d:'价格与上下文窗口以官方页面为准；本原型不含具体价格。'}];
+const SC={
+ ask:{think:'用户贴了一段 EADDRINUSE 报错，需要解释原因并给出排查顺序。先确认是端口被占用，再给只读命令。',thinkSec:2.4,
+  text:'`EADDRINUSE: address already in use :::5173` 表示 **5173 端口已有进程在监听**，新进程无法绑定。\n\n常见原因：\n- 上一次 `pnpm dev` 没有退出（终端被关掉但子进程还在）\n- 另一个项目也在用 Vite 默认端口\n\n建议先**只读排查**，不要直接 kill：\n- `lsof -i :5173` 查看占用进程\n- 确认是自己的开发服务后，再决定停止还是换端口\n\n要我切到“做”模式，在你确认后帮你执行这一步吗？',
+  usage:{i:812,o:436,s:0,f:0,c:0.004}},
+ askWeb:{think:'需要查今天的模型动态；先搜索官方更新日志，再读 chat-demo 仓库说明。',thinkSec:3.1,
+  steps:['搜索：DeepSeek 2026-11 模型 更新','已找到 6 个来源','正在阅读：api-docs.deepseek.com/updates','正在阅读：github.com/deepseek-ai/chat-demo'],
+  text:'截至本次检索，DeepSeek 在 2026-11-13 发布了面向应用的 API 全家桶，包含 Anthropic 兼容的 Messages 接口、服务端搜索与读链接、Files 以及语音能力[1]。同日开源了 `chat-demo`，浏览器直连 API 即可复刻 App 体验[2]。\n\n模型方面默认使用 `deepseek-flash`，深度任务可切到 `deepseek-v4-pro`；具体价格与上下文窗口请以官方定价页为准[3]。\n\n另外，你的命令历史里有一条相关记录[本1]：上周你在 u80 上测试过旧的 `deepseek-chat` 连接。',
+  sources:SRC,usage:{i:6480,o:702,s:1,f:2,c:0.019,red:2}},
+ do:{think:'磁盘告警，需要先找占用最大的目录。这是只读命令，但仍要经确认制；目标限定在已绑定的终端与 cwd。',thinkSec:2.8,
+  text:'磁盘使用率 94%，最可能是 `/var/log` 增长。我先提议一条**只读**命令统计各目录大小，你确认后才会在已绑定的终端执行：',
+  action:{title:'统计 /var/log 下占用最高的目录',level:'L2',kind:'run_command',term:'u80（SSH）',cwd:'/var/log',cmd:'du -sh * 2>/dev/null | sort -rh | head -5',why:'日志目录最可能是占满磁盘的原因；只读，不改任何文件。',
+   out:'18G\tjournal\n2.1G\tnginx\n640M\tapt\n212M\tsyslog.1\n96M\tauth.log',after:'占用最大的是 `journal`（18G）。下一步建议用 `journalctl --disk-usage` 确认，再决定是否按时间清理。清理属于 L2 动作，我会再次请你确认。'},
+  usage:{i:2210,o:388,s:0,f:0,c:0.006}},
+ research:{think:'深研任务：先出计划，让用户确认预计工具费和步骤，再并行搜索与读链接。',thinkSec:2.2,
+  plan:['搜索：DeepSeek 应用 API 能力与限制','并行读链接（3 路）：官方文档 / chat-demo / 定价页','交叉验证来源差异','生成结构化报告（可导出笔记）'],
+  est:'预计搜索约 12–30 次、读链接约 6–12 次，工具费约 ¥0.08–0.25（估算，价格以官方为准）',
+  text:'## 结论\nDeepSeek 的应用 API 把**服务端搜索、读链接、文件与语音**放进同一套 Messages 兼容接口[1][2]。对 Taomni 的含义：\n- Key 与请求留在 Rust 后端，前端不直连[3]\n- “做”模式需要另行决定本地工具协议，Messages 接口没有客户端 function calling\n- 工具费可见化必须随价格表发版，不能写死\n\n## 来源分歧\n两个来源对上下文窗口的描述不一致，已在报告中标注“未核实”。\n\n本地资料中的相关笔记[本1]与上述结论一致。',
+  sources:SRC,usage:{i:48200,o:3105,s:21,f:9,c:0.17,red:3}}
+};
+function chooseSc(){return S.mode==='ask'?(S.web?'askWeb':'ask'):S.mode==='do'?'do':'research'}
+
+/* ---------- DOM builders ---------- */
+function toChat(){$('#stage').classList.remove('empty');$('#stage').classList.add('chat')}
+function toEmpty(){$('#stage').classList.add('empty');$('#stage').classList.remove('chat');$('#feed').innerHTML=''}
+function scrollEnd(){const f=$('#feed');f.scrollTop=f.scrollHeight;requestAnimationFrame(()=>f.scrollTop=f.scrollHeight)}
+function addUser(text){toChat();const m=el('div','msg user',esc(text));
+  if(S.chips.length){const a=el('div','att');S.chips.forEach(c=>a.appendChild(el('span','chip '+c.k,c.l)));m.appendChild(a)}
+  $('#feed').appendChild(m);scrollEnd();return m}
+function newAI(){const m=el('div','msg ai');
+  m.innerHTML='<div class="who"><span class="mk">T</span>Tao<span style="color:var(--muted);font-weight:400">· '+S.model+'</span><span class="acts"></span></div>';
+  $('#feed').appendChild(m);scrollEnd();return m}
+function addActs(m,hand){const a=m.querySelector('.acts');a.innerHTML='<button title="复制">复制</button><button title="朗读">朗读</button><button title="重新生成">重新生成</button><button title="分支">‹ 1/2 ›</button><button title="把当前线程转交给 CC / Codex">交给 CC / Codex 做</button>';
+  a.querySelectorAll('button').forEach(b=>b.onclick=()=>toast('原型：'+b.textContent.trim()+(b.textContent.includes('交给')?'（主入口，见设计 决策 8）':'')))}
+function thinkBlock(m){const b=el('div','blk think open');b.innerHTML='<button><span class="car">▸</span><span class="hl">思考中… <span class="tm">0.0</span> 秒</span></button><div class="tb"></div>';
+  b.firstChild.onclick=()=>{b.classList.toggle('open');b.dataset.touched=1};m.appendChild(b);return b}
+function finishThink(b,sec){b.querySelector('.hl').textContent='已思考 '+sec+' 秒';if(!b.dataset.touched)setTimeout(()=>b.classList.remove('open'),600/S.speed)}
+function stepsBlock(m){const b=el('div','steps');m.appendChild(b);return b}
+function addStep(b,t,state){const s=el('div','st '+state);s.innerHTML='<span class="dot8"></span>'+esc(t);b.appendChild(s);scrollEnd();return s}
+function usageLine(m,u,extra){const d=el('div','usage');
+  d.innerHTML=`<span>输入 ${fmtTok(u.i)} · 输出 ${fmtTok(u.o)}${u.s?` · 搜索 ${u.s} 次 · 抓取 ${u.f} 次`:''} · 约 ¥${u.c.toFixed(3)}（估算，以账单为准）</span>`+(u.red?`<span class="tag" title="只显示类别，不显示原值">已脱敏 ${u.red} 处（密码 1、token ${u.red-1}）</span>`:'')+(extra||'');
+  m.appendChild(d);scrollEnd()}
+function srcCards(m,list){const w=el('div','src');list.forEach((s,i)=>{const c=el('div','srccard',`<b>${i+1}. ${esc(s.t)}</b><span>${esc(s.s)}</span>`);c.onclick=()=>openSources(i+1);w.appendChild(c)});m.appendChild(w)}
+async function stream(box,text,o={}){
+  const t=o.partial?text.slice(0,Math.floor(text.length*o.partial)):text;
+  if(o.instant){box.innerHTML=md(t)+(o.partial?'<span class="cursor"></span>':'');return}
+  const tk=S.tok;let i=0;while(i<t.length){if(tk!==S.tok)throw 'stale';if(S.stopped)throw 'abort';i+=3+Math.floor(Math.random()*4);box.innerHTML=md(t.slice(0,i))+'<span class="cursor"></span>';scrollEnd();await sleep(26)}
+  box.innerHTML=md(t)}
+function addTokens(n,c){S.tokens+=n;S.cost+=c;updPill()}
+function updPill(){const p=$('#usagePill'),pct=S.tokens/10e6;
+  p.textContent=`本轮 ${fmtTok(S.tokens)} / 10M · ¥${S.cost.toFixed(2)}（估算）`;
+  p.className='pill'+(pct>=1?' danger':pct>=.8?' warn':'');
+  if(pct>=.5&&!updPill.s5&&pct<.8){updPill.s5=1;toast('本轮已用预算的 50%（5M token）')}
+  if(pct>=.8&&!updPill.s8&&pct<1){updPill.s8=1;toast('本轮已用预算的 80%，可随时停止')}}
+function resetPill(t,c){S.tokens=t||0;S.cost=c||0;updPill.s5=updPill.s8=0;updPill()}
+
+/* ---------- reply player ---------- */
+async function playReply(key,o={}){
+  const sc=SC[key],m=newAI(),stopAt=o.stopAt,inst=o.instant;
+  S.sources=sc.sources||[];
+  if(sc.plan&&!o.skipPlan){return planFlow(m,sc,o)}
+  let tb;
+  if(sc.think){setPhase('S3 思考中');tb=thinkBlock(m);const box=tb.querySelector('.tb');
+    if(inst){box.textContent=stopAt==='think'?sc.think.slice(0,30)+'…':sc.think}
+    else{let t0=0,iv=setInterval(()=>{t0+=.1*S.speed;tb.querySelector('.tm').textContent=t0.toFixed(1)},100);
+      try{const tk=S.tok;for(let i=0;i<sc.think.length;i+=4){if(tk!==S.tok)throw 'stale';if(S.stopped)throw 'abort';box.textContent=sc.think.slice(0,i);await sleep(22)}}finally{clearInterval(iv)}box.textContent=sc.think}
+    if(stopAt==='think')return m;finishThink(tb,sc.thinkSec)}
+  if(sc.steps){setPhase('S4 搜索 / 读链接中');const sb=stepsBlock(m);
+    for(let i=0;i<sc.steps.length;i++){const last=i===sc.steps.length-1;const st=addStep(sb,sc.steps[i],(stopAt==='search'&&last)?'run':'done');
+      if(stopAt==='search'&&last)return m; if(!inst)await sleep(520)}}
+  setPhase('S5 正文流式');const tx=el('div','txt');m.appendChild(tx);
+  await stream(tx,sc.text,{instant:inst,partial:stopAt==='text'?.55:0});
+  if(stopAt==='text')return m;
+  if(sc.sources){srcCards(m,sc.sources);fillSources(sc.sources)}
+  if(sc.action){return actionFlow(m,sc,o)}
+  finish(m,sc,o);return m}
+function finish(m,sc,o){
+  if(!o.noUsage){usageLine(m,sc.usage);addTokens(sc.usage.i+sc.usage.o,sc.usage.c)}
+  addActs(m);setPhase('S6 完成');unbusy();
+  if(!o.silent){const t=$('.msg.ai:last-child .txt');}
+}
+async function actionFlow(m,sc,o){
+  const a=sc.action,c=el('div','card danger');
+  c.innerHTML=`<h4>动作提议 <span class="lv ${a.level.toLowerCase()}">${a.level} 执行</span><span style="margin-left:auto;font-weight:400;color:var(--muted);font-size:12px">${a.kind}</span></h4>
+   <div class="kv"><span>标题</span><b>${esc(a.title)}</b><span>目标</span><b>${esc(a.term)} · ${esc(a.cwd)}</b><span>理由</span><b>${esc(a.why)}</b></div>
+   <pre class="code" contenteditable="true" spellcheck="false" aria-label="可编辑命令">${esc(a.cmd)}</pre>
+   <div class="row"><label style="font-size:12px;color:var(--muted)"><input type="checkbox" class="ack"> 我已确认命令内容</label><span style="flex:1"></span><button class="btn rej">拒绝</button><button class="btn dng exe" disabled>执行</button></div>
+   <div style="font-size:11.5px;color:var(--muted);margin-top:6px">级别由 Rust 侧按 shell_safety 重新计算，模型声明的级别不能降级；目标限定在已绑定终端。</div>`;
+  m.appendChild(c);scrollEnd();setPhase('S10 等待动作确认');
+  setComposer(false,'请先处理上面的动作提议…');
+  const ack=c.querySelector('.ack'),exe=c.querySelector('.exe');ack.onchange=()=>exe.disabled=!ack.checked;
+  c.querySelector('.rej').onclick=()=>{c.innerHTML='<h4>已拒绝该动作</h4><p>未执行任何命令。</p>';finish(m,sc,{noUsage:false});setComposer(true)};
+  exe.onclick=async()=>{c.className='card';c.innerHTML=`<h4><span class="spin"></span> 正在执行…</h4>`;await sleep(900);
+    c.innerHTML=`<h4>✓ 已执行 <span style="font-weight:400;color:var(--muted);font-size:12px">退出码 0 · 0.42 秒 · 输出已脱敏并截断</span></h4><pre class="code">$ ${esc(a.cmd)}\n${esc(a.out)}</pre><div class="row"><button class="btn" data-t>在终端中查看</button></div>`;
+    c.querySelector('[data-t]').onclick=()=>toast('原型：跳转到终端标签');
+    const tx=el('div','txt');m.appendChild(tx);await stream(tx,a.after,{});finish(m,sc,{});setComposer(true)};
+  if(o.instant&&o.autoAck){ack.checked=true;exe.disabled=false}
+  return m}
+async function planFlow(m,sc,o){
+  setPhase('S11 工作流计划待批');
+  const c=el('div','card plan');
+  c.innerHTML=`<h4>深研计划 <span class="tag" style="font-weight:400;font-size:11px;color:var(--muted)">内置工作流 · 不可编辑模板，可跳过步骤</span></h4>
+   <ul>${sc.plan.map((p,i)=>`<li data-i="${i}"><input type="checkbox" checked aria-label="执行此步骤"><span class="st-i">○</span><span>${esc(p)}</span></li>`).join('')}</ul>
+   <div class="note2" style="margin:6px 0 8px">${esc(sc.est)}。确认计划即确认上述工具费；运行中累计实际费用超过预计上界 1.5 倍时才会再问一次。</div>
+   <div class="row"><button class="btn pri go">开始</button><button class="btn cancel">取消</button><span style="color:var(--muted);font-size:12px">并行度 3 · 可随时停止，已完成步骤保留</span></div>`;
+  m.appendChild(c);scrollEnd();
+  setComposer(false,'计划待确认…');
+  c.querySelector('.cancel').onclick=()=>{c.innerHTML='<h4>已取消计划</h4><p>未产生任何工具费用。</p>';setPhase('S6 完成');unbusy()};
+  c.querySelectorAll('input').forEach(i=>i.onchange=()=>i.parentNode.classList.toggle('skipped',!i.checked));
+  const run=async(frozen)=>{
+    c.querySelectorAll('input').forEach(i=>i.disabled=true);c.querySelector('.row').innerHTML='<button class="btn stopw">停止</button><span style="color:var(--muted);font-size:12px">运行中…</span>';
+    c.querySelector('.stopw').onclick=()=>{S.stopped=true;toast('已停止，已完成步骤保留')};
+    setPhase('S12 工作流运行');openSide('workflow');
+    const wf=$('#p-workflow');wf.innerHTML='';const items=[...c.querySelectorAll('li')];
+    items.forEach((li,i)=>{const w=el('div','sitem',`<b>${i+1}. ${esc(sc.plan[i])}</b><span class="wst">等待</span>`);w.dataset.i=i;wf.appendChild(w)});
+    const tk=S.tok;
+    try{
+    for(let i=0;i<items.length;i++){if(tk!==S.tok)throw 'stale';
+      const li=items[i],w=wf.children[i];
+      if(li.classList.contains('skipped')){li.querySelector('.st-i').textContent='⤼';w.querySelector('.wst').textContent='已跳过';continue}
+      li.querySelector('.st-i').innerHTML='<span class="spin"></span>';w.querySelector('.wst').textContent='进行中';
+      if(frozen&&i===frozen)return;
+      if(S.stopped)throw 'abort';if(!frozen)await sleep(1100);if(tk!==S.tok)throw 'stale';
+      if(i===1){fillSources(SRC)}
+      li.querySelector('.st-i').textContent='✓';w.querySelector('.wst').textContent='已完成 · '+(1+i*.7).toFixed(1)+' 秒';
+      addTokens(i===1?31000:8000,i===1?.09:.03);
+      if(!w.querySelector('.row')&&i===1)w.appendChild(el('div','row','<button class="btn" style="font-size:11px;padding:1px 8px">重试此步</button>'));
+    }
+    c.querySelector('.row').innerHTML='<span style="color:var(--ok)">✓ 计划已完成</span>';
+    setPhase('S5 正文流式');const tx=el('div','txt');m.appendChild(tx);await stream(tx,sc.text,{});
+    srcCards(m,SRC);const art=$('#p-artifacts');art.innerHTML='';art.appendChild(el('div','sitem','<b>深研报告.md</b><span>结构化报告 · 约 1.2K 字</span><div class="row"><button class="btn" style="font-size:11px;padding:1px 8px">复制</button><button class="btn" style="font-size:11px;padding:1px 8px">导出为笔记</button><button class="btn" style="font-size:11px;padding:1px 8px">下载</button></div>'));
+    finish(m,sc,{});setComposer(true);
+    }catch(e){if(e==='stale')return;if(e!=='abort')throw e;S.stopped=false;c.querySelector('.row').innerHTML='<span style="color:var(--warn)">已停止</span><button class="btn go2">继续（不重跑已完成步骤）</button>';setPhase('S7 已停止 / 可继续');unbusy();setComposer(true);c.querySelector('.go2').onclick=()=>toast('原型：从下一步继续')}
+  };
+  c.querySelector('.go').onclick=()=>run(0);
+  o.runWorkflow&&await run(o.runWorkflow);
+  return m}
+
+/* ---------- send / stop ---------- */
+function unbusy(){S.busy=false;S.stopped=false;$('#send').classList.remove('stop');$('#sendIco').innerHTML='<path d="M12 19V5M5 12l7-7 7 7"/>';syncSend()}
+function busy(){S.busy=true;$('#send').classList.add('stop');$('#sendIco').innerHTML='<rect x="7" y="7" width="10" height="10" rx="2"/>';$('#send').disabled=false}
+function syncSend(){$('#send').disabled=!S.busy&&!$('#input').value.trim()}
+function setComposer(on,ph){const c=$('#composer');c.classList.toggle('off',!on);$('#input').placeholder=ph||'问 Tao 任何事…  输入 @ 引用终端 / 文件 / 工作区 / 数据库 / 笔记';$('#input').disabled=!on;if(on)setTimeout(()=>$('#input').focus(),50)}
+async function send(){
+  if(!S.hasKey)return;
+  if(S.busy){S.stopped=true;return}
+  const t=$('#input').value.trim();if(!t)return;
+  $('#input').value='';autosize();addUser(t);S.chips=S.chips.filter(c=>c.k==='ctx'&&false);renderChips();
+  busy();setPhase('S2 发送中');$('.sug').classList.add('x');
+  resetPill(0,0);
+  try{await sleep(500);await playReply(chooseSc())}catch(e){if(e==='stale')return;if(e!=='abort')throw e;stoppedCard()}
+}
+function stoppedCard(){const f=$('#feed'),m=f.querySelector('.msg.ai:last-child');
+  if(m){m.appendChild(el('div','row','<span style="color:var(--warn);font-size:12px">已停止，已收到的内容已保留</span><button class="btn" id="cont">继续生成</button>'));
+    m.querySelector('#cont').onclick=()=>toast('原型：继续生成（canContinueReply）')}
+  setPhase('S7 已停止 / 可继续');unbusy()}
+
+/* ---------- binding / chips / suggestions ---------- */
+function renderBind(){const b=$('#bind');b.innerHTML='';
+  for(const k of ['ws','term','db']){const d=BIND[k],v=S.bind[k];
+    const c=el('button','chip '+(v?'on':'empty'),`<span>${d.icon}</span>${v?esc(S.demo?d.label+' 1':v)+'<span class="x" data-x="'+k+'" title="解绑">×</span>':'+ 绑定'+d.label}`);
+    c.title=d.label+'：'+(k==='term'?'仅在你 @ 引用时发送最近 N 行（已脱敏）':k==='db'?'仅发送表结构；生成 SQL 前确认，执行前二次确认':'只读摘要，不全文上传')+'。绑定本身不发送内容。';
+    c.onclick=e=>{if(e.target.dataset.x){S.bind[k]=null;renderBind();return}openPop(c,k)};b.appendChild(c)}}
+function openPop(anchor,k){const p=$('#pop');const d=BIND[k];
+  p.innerHTML=`<h6>最近的${d.label}</h6><input placeholder="搜索…" aria-label="搜索">`+d.items.map(i=>`<button data-v="${esc(i)}">${d.icon} ${esc(i)}<small>${S.bind[k]===i?'已绑定':''}</small></button>`).join('')+'<button style="color:var(--accent)">浏览全部…</button>';
+  const r=anchor.getBoundingClientRect(),cr=$('#col').getBoundingClientRect();p.style.left=Math.min(r.left-cr.left,cr.width-250)+'px';p.style.top=(r.bottom-cr.top+6)+'px';p.classList.add('open');
+  p.querySelectorAll('button[data-v]').forEach(b=>b.onclick=()=>{S.bind[k]=b.dataset.v;p.classList.remove('open');renderBind();toast('已绑定'+d.label+'：'+b.dataset.v)})}
+function renderChips(){const c=$('#chips');c.innerHTML='';
+  S.chips.forEach((x,i)=>{const e=el('span','chip '+x.k,esc(x.l)+'<button class="x" aria-label="移除">×</button>');e.title=x.k==='loc'?'本地资料（已脱敏）：点击预览将发送的片段':'点击预览将发送的脱敏后文本';
+    e.querySelector('.x').onclick=ev=>{ev.stopPropagation();S.chips.splice(i,1);renderChips()};
+    e.onclick=()=>toast('将发送（脱敏后）：'+(x.k==='loc'?'ssh u80 -p ‹已脱敏› …（命令历史 · 3 条）':'$ npm run dev ⏎ Error: listen EADDRINUSE :::5173'));c.appendChild(e)});
+  const n=S.chips.length;$('#chint').innerHTML=hintHtml(n)}
+function hintHtml(n){let h=`<span>${esc('Ctrl+Enter 发送 · Enter 换行')}</span> <a id="swk">改为 Enter 发送</a>`;
+  if(S.web)h+='<span>联网搜索按次计费（以官方定价为准）</span>';
+  if(n)h+=`<span>本次将发送：正文 + ${n} 条本地资料 <a id="rv">逐条查看 / 取消</a></span>`;
+  return h}
+document.addEventListener('click',e=>{
+  if(e.target.id==='swk'){toast('发送键已切换（原型）：默认设置不被修改，仅一次性提示');return}
+  if(e.target.id==='rv'){toast('原型：可逐条取消每个来源');return}
+  const c=e.target.closest('.cite');if(c){openSources(+c.dataset.n);return}
+  if(!e.target.closest('.pop')&&!e.target.closest('.chip'))$('#pop').classList.remove('open');
+  if(!e.target.closest('#atmenu')&&e.target.id!=='input')hideAt();
+  if(!e.target.closest('.smenu')&&e.target.id!=='bState')$('#smenu').classList.remove('open')});
+const SUGS=[['解释这段报错','终端最近一条 · 已脱敏','Error: listen EADDRINUSE :::5173 —— 解释并给排查步骤'],['给这个项目写 README','工作区 taomni','阅读 taomni 的目录结构，给出 README 草稿'],['用 SQL 查最近 7 天订单','数据库 u80 · PostgreSQL','基于 orders 表结构，写一条查询最近 7 天订单数的 SQL'],['继续：迁移脚本评审','最近会话的未完成话题','继续上次的迁移脚本评审']];
+function renderSug(){const s=$('#sug');s.innerHTML='';s.style.display=S.demo?'none':'';SUGS.forEach(x=>{const b=el('button','',`<b>${x[0]}</b><small>${x[1]}</small>`);b.onclick=()=>{$('#input').value=x[2];$('#input').focus();autosize();syncSend()};s.appendChild(b)});
+  const r=$('#recent');r.style.display=S.demo?'none':'';r.innerHTML='<span class="label">最近</span>';['u80（SSH）','taomni 工作区','analytics · ClickHouse','LAN · 张三','build-box'].forEach(x=>{const b=el('button','rchip',esc(x));b.onclick=()=>toast('原型：打开 '+x);r.appendChild(b)})}
+
+/* ---------- @ menu ---------- */
+function hideAt(){const m=$('#atmenu');if(m)m.remove()}
+function autosize(){const t=$('#input');t.style.height='auto';t.style.height=Math.min(t.scrollHeight,200)+'px'}
+$('#input').addEventListener('input',e=>{autosize();syncSend();hideAt();const v=e.target.value;
+  if(/(^|\s)@$/.test(v)){const m=el('div','pop open','<h6>引用上下文（点选后以 chip 加入本轮）</h6>'+[['terminal:last-30','终端最近 30 行'],['file','文件摘要'],['workspace','工作区文件树摘要'],['db','表结构'],['note','笔记']].map(x=>`<button data-k="${x[0]}">@${x[0]}<small>${x[1]}</small></button>`).join(''));m.id='atmenu';m.style.left='14px';m.style.bottom='100%';m.style.marginBottom='6px';$('#composer').style.position='relative';$('#composer').appendChild(m);
+    m.querySelectorAll('button').forEach(b=>b.onclick=()=>{S.chips.push({k:'ctx',l:'@'+b.dataset.k});$('#input').value=v.replace(/@$/,'');hideAt();renderChips();$('#input').focus()})}
+  if(/上次|上周|历史/.test(v)&&!S.chips.some(c=>c.k==='loc')){S.chips.push({k:'loc',l:'命令历史 · 3 条（本地）'});renderChips()}});
+$('#input').addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();send()}if(e.key==='Escape'){hideAt();if(S.busy)S.stopped=true}});
+$('#send').onclick=send;
+
+/* ---------- toggles ---------- */
+function syncToggles(){$('#tgThink').classList.toggle('on',S.think);$('#tgWeb').classList.toggle('on',S.web);$('#modelLbl').textContent=S.model;$('#chint').innerHTML=hintHtml(S.chips.length)}
+$('#tgThink').onclick=()=>{S.think=!S.think;syncToggles()};
+$('#tgWeb').onclick=()=>{S.web=!S.web;syncToggles()};
+$('#tgModel').onclick=e=>{const p=$('#pop');p.innerHTML='<h6>模型</h6><button data-v="deepseek-flash">deepseek-flash<small>快、便宜（默认）</small></button><button data-v="deepseek-v4-pro">deepseek-v4-pro<small>更强、更贵</small></button>';
+  const r=e.currentTarget.getBoundingClientRect(),cr=$('#col').getBoundingClientRect();p.style.left=Math.min(r.left-cr.left,cr.width-250)+'px';p.style.top=Math.max(50,r.top-cr.top-100)+'px';p.classList.add('open');e.stopPropagation();
+  p.querySelectorAll('button').forEach(b=>b.onclick=()=>{S.model=b.dataset.v;p.classList.remove('open');syncToggles()})};
+$('#modeSeg').onclick=e=>{const b=e.target.closest('button');if(!b)return;setMode(b.dataset.m)};
+function setMode(m){S.mode=m;$$('#modeSeg button').forEach(b=>b.classList.toggle('on',b.dataset.m===m));const d=MODE_DEF[m];S.think=d.think;S.web=d.web;syncToggles();
+  const ph={ask:'问 Tao 任何事…',do:'告诉 Tao 要做什么（每个动作都会先请你确认）…',research:'描述要深入研究的问题（会先给计划与预计费用）…'};$('#input').placeholder=ph[m]+'  输入 @ 引用上下文'}
+$('#bAtt').onclick=()=>{S.chips.push({k:'ctx',l:'📎 schema.sql · 12 KB · 已上传'});renderChips();toast('原型：Files API 上传（进度可取消）')};
+$('#bMic').onclick=()=>toast('原型：录音（默认本地 Whisper，DeepSeek ASR 可选）');
+$('#bDemo').onclick=()=>{S.demo=!S.demo;$('#bDemo').classList.toggle('on',S.demo);renderBind();renderSug();toast(S.demo?'演示模式开：隐藏建议、最近与真实绑定名':'演示模式关')};
+
+/* ---------- side panel ---------- */
+function openSide(p){$('#side').classList.add('open');$('#bSide').classList.add('on');$$('#side .tabs button[data-p]').forEach(b=>b.classList.toggle('on',b.dataset.p===p));$$('#side .pane').forEach(x=>x.classList.toggle('on',x.id==='p-'+p))}
+$$('#side .tabs button[data-p]').forEach(b=>b.onclick=()=>openSide(b.dataset.p));
+$('#sideClose').onclick=()=>{$('#side').classList.remove('open');$('#bSide').classList.remove('on')};
+$('#bSide').onclick=()=>$('#side').classList.contains('open')?$('#sideClose').click():openSide('sources');
+function fillSources(list){const p=$('#p-sources');p.innerHTML='';list.forEach((s,i)=>{const d=el('div','sitem',`<b>${i+1}. ${esc(s.t)}</b><span>${esc(s.s)}</span><div style="margin-top:4px">${esc(s.d)}</div><div class="row"><button class="btn" style="font-size:11px;padding:1px 8px">在系统浏览器打开</button></div>`);d.id='src'+(i+1);p.appendChild(d)});
+  const loc=el('div','sitem','<b>本1. 命令历史（本地）</b><span>2026-11-07 · u80 · 已脱敏 1 处</span><div style="margin-top:4px">curl https://api.deepseek.com/v1/models -H "Authorization: ‹已脱敏›"</div>');loc.id='src本1';p.appendChild(loc)}
+function openSources(n){openSide('sources');const x=$('#src'+n);$$('.sitem.hl').forEach(i=>i.classList.remove('hl'));if(x){x.classList.add('hl');x.scrollIntoView({block:'nearest'})}}
+
+/* ---------- settings ---------- */
+const REDACT=[['密码',/(password|passwd|pwd)\s*[=:]\s*\S+/gi],['token',/(token|api[_-]?key|secret|auth)\s*[=:]\s*\S+/gi],['Bearer',/Bearer\s+[A-Za-z0-9\-._~+\/]+=*/g],['AWS Key',/AKIA[0-9A-Z]{16}/g],['GitHub token',/gh[pous]_[A-Za-z0-9]{20,}|github_pat_\w+/g],['JWT',/eyJ[\w-]+\.[\w-]+\.[\w-]+/g],['连接串',/(postgres|mysql|mongodb):\/\/[^:\s]+:[^@\s]+@\S+/gi]];
+const SRCS=[['会话配置（名 / 主机 / 分组）',1],['命令历史',1],['SQL 历史',1],['保存的查询 / 书签',1],['笔记',1],['聊天线程历史',1],['文件快照内容',0],['工作区文件内容（绑定时）',0],['邮件（默认仅主题与发件人）',0],['语音转写',0]];
+const SEC={
+ conn:()=>`<h3>连接 · DeepSeek · 全家桶</h3><div class="field"><label>API Key（保存到 Vault，前端不可读）</label><input type="password" value="" placeholder="sk-…（保存后只显示 vault 引用）"></div><div class="row"><button class="btn pri" data-t="测试连接（原型：成功）">保存并测试连接</button><button class="btn" data-t="已复制 vault 引用，未复制明文">沿用旧 tao-chat 的 Key</button></div><div class="note2">出口 allowlist 默认只有 <b>api.deepseek.com</b>（+ 已配置的其它 provider 域名与更新域名）；代理失败显性报错，不静默直连。请求日志只记元数据，不记请求与响应体。</div>`,
+ model:()=>`<h3>模型与模式</h3><div class="field"><label>默认模型</label><select><option>deepseek-flash（默认）</option><option>deepseek-v4-pro</option></select></div><table class="tbl"><tr><th>模式</th><th>思考</th><th>联网</th></tr><tr><td>问</td><td>关</td><td>关</td></tr><tr><td>做</td><td>开</td><td>关</td></tr><tr><td>深研</td><td>开</td><td>开</td></tr></table><div class="field"><label>每轮 token 预算（输入 + 输出累计；50% / 80% 提示，到量停下并可续跑）</label><input value="10000000"></div><div class="field"><label>单轮工具费确认阈值（元，0 = 每次都确认）</label><input value="0.5"></div><div class="note2">价格表随应用发版（pricing.json，含 as_of 日期）；缺失或超过 90 天只显示 token，不显示金额。</div>`,
+ local:()=>`<h3>本地资料（Tao 可检索的范围）</h3><div class="note2">默认开启的是“元数据 + 已脱敏文本”，默认关闭的是“全文内容”。关闭后该源索引在 1 分钟内清除。<b>门禁：</b>写入时脱敏迁移未完成时，下方开关不可用。</div><table class="tbl">${SRCS.map((s,i)=>`<tr><td>${s[0]}</td><td style="width:50px"><button class="sw ${s[1]?'on':''}" data-sw aria-label="${s[0]}"></button></td></tr>`).join('')}</table><div class="row"><button class="btn" data-t="已清除检索索引（原型）">清除本地检索索引</button></div>`,
+ red:()=>`<h3>脱敏规则</h3><div class="note2">内置规则 ${REDACT.length} 类（现有 5 条 + 新增）；迁移结果：<b>已清理 128 条</b>含敏感信息的历史记录（只显示数量，不显示内容）。</div><div class="field"><label>在线测试（只在本页内运行，不上传）</label><textarea id="rtest" rows="3">curl -H "Authorization: Bearer abc.def.ghi" postgres://root:hunter2@db:5432/app password=Secr3t AKIAABCDEFGHIJKLMNOP</textarea></div><pre class="code" id="rout"></pre><div class="field"><label>自定义正则（默认空，只存本地）</label><input placeholder="例如 corp-[a-z0-9]{8}"></div>`,
+ voice:()=>`<h3>语音</h3><div class="field"><label>语音识别 ASR</label><select><option>本地 Whisper（默认）</option><option>DeepSeek ASR（可选，需联网）</option></select></div><div class="field"><label>朗读 TTS 音色</label><select><option>stella</option><option>tide</option></select></div><div class="note2">默认仍为本地 Whisper，避免改动离线与首次下载流程。</div>`,
+ sec:()=>`<h3>安全中心</h3><div class="field"><label>Vault 闲置自动锁定</label><select><option>15 分钟（默认）</option><option>5 分钟</option><option>60 分钟</option></select></div><div class="note2">流式任务运行期间闲置计时暂停；仅手动锁定或锁屏会中断请求（决策项 D-15）。</div><table class="tbl"><tr><th>时间</th><th>动作</th><th>目标</th><th>结果</th><th>脱敏</th></tr><tr><td>10:42</td><td>send</td><td>线程 #12</td><td>ok</td><td>2</td></tr><tr><td>10:43</td><td>cmd_exec</td><td>u80 · du -sh</td><td>exit 0</td><td>0</td></tr><tr><td>10:50</td><td>injection_block</td><td>笔记 #7</td><td>已丢弃</td><td>—</td></tr><tr><td>11:02</td><td>vault_lock</td><td>手动</td><td>ok</td><td>—</td></tr></table><div class="row"><button class="btn" data-t="已导出审计日志（原型）">导出</button><button class="btn" data-t="已清空审计日志（原型）">清空</button><button class="btn dng" data-t="需二次确认（原型）">清除全部 Tao 历史…</button></div><div class="note2">本地数据库依赖操作系统账户与磁盘加密保护，未做应用级整库加密（评估结论出来前不写“已加密”）。</div>`};
+function openSettings(tab){const m=$('#modal'),d=$('#dlg');
+  d.innerHTML='<nav><h5>Tao 设置</h5>'+[['conn','连接'],['model','模型与模式'],['local','本地资料'],['red','脱敏'],['voice','语音'],['sec','安全中心']].map(x=>`<button data-s="${x[0]}">${x[1]}</button>`).join('')+'<span style="flex:1"></span><button id="mclose">关闭</button></nav><div class="cnt" id="scnt"></div>';
+  const show=k=>{$$('#dlg nav button[data-s]').forEach(b=>b.classList.toggle('on',b.dataset.s===k));$('#scnt').innerHTML=SEC[k]();
+    $$('#scnt [data-t]').forEach(b=>b.onclick=()=>toast(b.dataset.t));
+    $$('#scnt [data-sw]').forEach(b=>b.onclick=()=>{b.classList.toggle('on');toast('立即生效；关闭的源将在 1 分钟内清除索引')});
+    const rt=$('#rtest');if(rt){const f=()=>{let t=rt.value,n={};REDACT.forEach(r=>{t=t.replace(r[1],()=>{n[r[0]]=(n[r[0]]||0)+1;return '‹已脱敏:'+r[0]+'›'})});$('#rout').textContent=t+'\n\n命中：'+(Object.entries(n).map(e=>e[0]+' '+e[1]).join('、')||'无')};rt.oninput=f;f()}};
+  d.querySelectorAll('nav button[data-s]').forEach(b=>b.onclick=()=>show(b.dataset.s));$('#mclose').onclick=()=>m.classList.remove('open');
+  m.classList.add('open');show(tab||'conn');m.onclick=e=>{if(e.target===m)m.classList.remove('open')}}
+['#bSet','#rSet','#goSet'].forEach(s=>$(s).onclick=()=>openSettings('conn'));
+$('#reuseKey').onclick=()=>{S.hasKey=true;applyKey();toast('已沿用 Vault 引用（需先测试连接确认同一把 Key 可用）')};
+$('#unlock').onclick=()=>{$('#mask').classList.remove('open');toast('已解锁；可从“继续生成”继续')};
+$('#restore').onclick=()=>toast('原型：恢复上次会话');
+function applyKey(){$('#nokey').style.display=S.hasKey?'none':'';$('#hero').style.display=S.hasKey?'':'none';setComposer(S.hasKey,S.hasKey?undefined:'请先连接 DeepSeek · 全家桶')}
+
+/* ---------- states ---------- */
+function clearAll(){S.tok++;S.stopped=true;S.run=null;toEmpty();S.busy=false;S.stopped=false;S.hasKey=true;S.chips=[];renderChips();resetPill(0,0);
+  $('#mask').classList.remove('open');$('#modal').classList.remove('open');$('#side').classList.remove('open');$('#bSide').classList.remove('on');
+  ['sources','files','artifacts','workflow'].forEach(k=>{$('#p-'+k).innerHTML='<div class="empty">'+({sources:'本轮没有来源',files:'本轮没有上传或引用的文件',artifacts:'代码 / SQL / 文档成品会出现在这里',workflow:'没有进行中的工作流'})[k]+'</div>'});
+  applyKey();unbusy();setComposer(true);setMode('ask');setPhase('S1 空态就绪')}
+const STATES=[
+ ['S0','无 Key',()=>{S.hasKey=false;applyKey();setPhase('S0 无 Key')}],
+ ['S1','空态就绪',()=>{}],
+ ['S2','发送中',async()=>{addUser('解释 EADDRINUSE 报错');busy();const m=newAI();m.appendChild(el('div','usage','<span class="spin"></span>&nbsp;等待响应…（同一线程串行，新消息会排队）'));setPhase('S2 发送中')}],
+ ['S3','思考中',async()=>{addUser('解释 EADDRINUSE 报错');busy();await playReply('ask',{instant:true,stopAt:'think'})}],
+ ['S4','搜索 / 读链接中',async()=>{setMode('ask');S.web=true;syncToggles();addUser('查今天 DeepSeek 的模型动态');busy();await playReply('askWeb',{instant:true,stopAt:'search'})}],
+ ['S5','正文流式',async()=>{addUser('解释 EADDRINUSE 报错');busy();await playReply('ask',{instant:true,stopAt:'text'})}],
+ ['S6','完成（含引用 / 来源 / 用量）',async()=>{S.web=true;syncToggles();addUser('查今天 DeepSeek 的模型动态');await playReply('askWeb',{instant:true});openSide('sources')}],
+ ['S7','已停止 / 可继续',async()=>{addUser('解释 EADDRINUSE 报错');await playReply('ask',{instant:true,stopAt:'text'});stoppedCard()}],
+ ['S8','拒答（丢弃思考与正文）',async()=>{addUser('（触发安全校验的请求）');const m=newAI();m.appendChild(el('div','card warn','<h4>安全校验未通过本次回复</h4><p>思考与正文已丢弃，未保存到线程。你可以改写问题后重试。</p><div class="row"><button class="btn" data-t>编辑并重发</button></div>'));setPhase('S8 拒答')}],
+ ['S9','错误（可重试，保留已收块）',async()=>{addUser('解释 EADDRINUSE 报错');await playReply('ask',{instant:true,stopAt:'text'});const m=$('#feed .msg.ai:last-child');m.appendChild(el('div','card danger','<h4>流中断（interrupted）</h4><p>在收到 message_stop 之前连接结束。已收到的内容已保留；不推测断流原因。</p><div class="row"><button class="btn pri">重试</button></div>'));setPhase('S9 错误')}],
+ ['S10','等待动作确认（做）',async()=>{setMode('do');addUser('磁盘快满了，帮我看看哪里占得最多');busy();await playReply('do',{instant:true})}],
+ ['S11','工作流计划待批（深研）',async()=>{setMode('research');addUser('深入研究 DeepSeek 应用 API 对 Taomni 的影响');busy();await playReply('research',{instant:true})}],
+ ['S12','工作流运行中',async()=>{setMode('research');addUser('深入研究 DeepSeek 应用 API 对 Taomni 的影响');busy();await playReply('research',{instant:true,runWorkflow:1})}],
+ ['S13','预算 80%（橙色提示）',async()=>{S.web=true;syncToggles();addUser('查今天 DeepSeek 的模型动态');await playReply('askWeb',{instant:true});resetPill(8.3e6,1.42);toast('本轮已用预算的 80%，可随时停止')}],
+ ['S14','预算 100%（停下，可提高预算续跑）',async()=>{setMode('research');addUser('深入研究 DeepSeek 应用 API 对 Taomni 的影响');const m=newAI();resetPill(10e6,2.1);m.appendChild(el('div','card danger','<h4>本轮 token 预算已用完（10M）</h4><p>已完成：搜索、并行读链接、交叉验证。未完成：生成报告。续跑不会重跑已完成步骤。</p><div class="row"><button class="btn pri">提高预算到 20M 并继续</button><button class="btn">仅保留摘要</button></div>'));setPhase('S14 预算 100%')}],
+ ['S15','Vault 已锁定',async()=>{addUser('解释 EADDRINUSE 报错');await playReply('ask',{instant:true,stopAt:'text'});$('#mask').classList.add('open');setPhase('S15 Vault 已锁')}],
+ ['S16','离线 / 代理失败',async()=>{addUser('解释 EADDRINUSE 报错');const m=newAI();m.appendChild(el('div','card danger','<h4>网络不可用（network）</h4><p>代理“系统”连接失败。不会静默直连；请检查代理设置后重试。</p><div class="row"><button class="btn pri">重试</button><button class="btn" data-t>打开代理设置</button></div>'));setPhase('S16 离线 / 代理失败')}]];
+const sm=$('#smenu');STATES.forEach(s=>{const b=el('button','',`<i>${s[0]}</i><span>${s[1]}</span>`);b.onclick=async()=>{sm.classList.remove('open');clearAll();await s[2]();scrollEnd()};sm.appendChild(b)});
+$('#bState').onclick=e=>{e.stopPropagation();sm.classList.toggle('open')};
+$('#bTheme').onclick=()=>$('#app').classList.toggle('dark')||document.body.classList.toggle('dark',$('#app').classList.contains('dark'));
+$('#bView').onclick=()=>{document.body.classList.toggle('mobile');fit()};
+$('#speed').onchange=e=>S.speed=+e.target.value;
+
+/* ---------- responsive ---------- */
+function fit(){const a=$('#app'),w=a.clientWidth,h=a.clientHeight;a.classList.toggle('compact',w<760);
+  const st=$('#stage');st.classList.toggle('tall-hide',h<600);st.classList.toggle('xtall-hide',h<520)}
+new ResizeObserver(fit).observe($('#app'));
+$('#bTheme').onclick=()=>{const a=$('#app');a.classList.toggle('dark')};
+
+window.addEventListener('unhandledrejection',e=>{if(e.reason==='stale')e.preventDefault()});
+/* ---------- init ---------- */
+(function(){const h=new Date().getHours();$('#greet').textContent=(h<12?'早上好':h<18?'下午好':'晚上好')+'，Tao 在这里。'})();
+renderBind();renderSug();renderChips();syncToggles();applyKey();fit();
+</script>
+</body>
+</html>
