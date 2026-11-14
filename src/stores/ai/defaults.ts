@@ -51,6 +51,7 @@ export const DEFAULT_CONFIG: AiConfig = {
     active: "deepseek",
     providers: {
       deepseek: { base_url: "https://api.deepseek.com/v1", api_key: "", model: "deepseek-chat", runtime: "openai-compat", capabilities: { chat: true } },
+      "deepseek-app": { base_url: "https://api.deepseek.com", api_key: "", model: "deepseek-flash", runtime: "deepseek-messages", capabilities: { chat: true } },
       anthropic: { base_url: "https://api.anthropic.com/v1", api_key: "", model: "claude-sonnet-4-5", runtime: "anthropic", capabilities: { chat: true } },
       "opencode-go": { base_url: "https://opencode.ai/inference/go/v1", api_key: "", model: "deepseek-v4.1-flash", runtime: "opencode-go", capabilities: { chat: true }, proxy_mode: "app" },
       agnes: { base_url: "https://apihub.agnes-ai.com/v1", api_key: "", model: "agnes-2.0-flash", runtime: "openai-compat", capabilities: { chat: true, image_generation: true, video_generation: true }, image_model: "agnes-image-2.1-flash", video_model: "agnes-video-v2.0" },
@@ -118,4 +119,15 @@ export const DEFAULT_CONFIG: AiConfig = {
   fully_disabled: false,
   chat_output_format: "md",
   chat_send_shortcut: "ctrl_enter",
+  deepseek_app: {
+    enabled: true,
+    model: "deepseek-flash",
+    thinking_default: false,
+    search_default: false,
+    safety_check_high: true,
+    title_enabled: true,
+    voice_provider: "local",
+    tts_voice: "stella",
+    cost_confirm_threshold_cny: 0.5,
+  },
 };

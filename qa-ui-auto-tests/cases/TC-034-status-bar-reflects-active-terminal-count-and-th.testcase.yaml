@@ -24,7 +24,7 @@ steps:
 - assert_text:
     selector: '[data-testid="status-bar"]'
     contains: terminals
-- click: '[data-testid="welcome-open-local-terminal"]'
+- click: '[data-testid="tao-home-local-terminal"]'
 - wait_for: '[data-testid="terminal-pane"]'
 - wait: 1
 - assert_text:

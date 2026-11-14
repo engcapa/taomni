@@ -39,6 +39,24 @@ impl Default for LlmConfig {
             },
         );
         providers.insert(
+            "deepseek-app".into(),
+            LlmProviderConfig {
+                base_url: "https://api.deepseek.com".into(),
+                api_key: String::new(),
+                api_keys: Vec::new(),
+                model: "deepseek-flash".into(),
+                protocol_overrides: HashMap::new(),
+                runtime: "deepseek-messages".into(),
+                capabilities: LlmProviderCapabilities::default(),
+                image_model: None,
+                video_model: None,
+                proxy_mode: default_provider_proxy_mode(),
+                proxy_session_id: None,
+                proxy_url: None,
+                custom_proxy: None,
+            },
+        );
+        providers.insert(
             "agnes".into(),
             LlmProviderConfig {
                 base_url: "https://apihub.agnes-ai.com/v1".into(),
@@ -191,6 +209,23 @@ impl LlmConfig {
         self.providers
             .entry("agnes".into())
             .or_insert_with(default_agnes_provider);
+        self.providers
+            .entry("deepseek-app".into())
+            .or_insert_with(|| LlmProviderConfig {
+                base_url: "https://api.deepseek.com".into(),
+                api_key: String::new(),
+                api_keys: Vec::new(),
+                model: "deepseek-flash".into(),
+                protocol_overrides: HashMap::new(),
+                runtime: "deepseek-messages".into(),
+                capabilities: LlmProviderCapabilities::default(),
+                image_model: None,
+                video_model: None,
+                proxy_mode: default_provider_proxy_mode(),
+                proxy_session_id: None,
+                proxy_url: None,
+                custom_proxy: None,
+            });
     }
 }
 

@@ -36,10 +36,10 @@ steps:
 - click: '[data-testid="nav-mode-home"]'
 - wait_for: '[data-testid="collapsed-sidebar-rail"]'
 - assert_visible: '[data-testid="welcome-panel"]'
-- assert_visible: '[data-testid="welcome-open-local-terminal"]'
+- assert_visible: '[data-testid="tao-home-local-terminal"]'
 - assert_text:
     selector: '[data-testid="welcome-panel"]'
-    contains: Start local terminal
+    contains: 本地终端
 - click: '[data-testid="nav-mode-workspaces"]'
 - wait_for: '[data-testid="workspace-switcher"]'
 - click: '[data-testid="side-tab-sessions"]'
@@ -85,9 +85,9 @@ verification:
     - step: 13
       expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"]"}'
     - step: 14
-      expectation: '{"assert_visible": "[data-testid=\"welcome-open-local-terminal\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"tao-home-local-terminal\"]"}'
     - step: 15
-      expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]", "contains": "Start local terminal"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]", "contains": "本地终端"}}'
     - step: 17
       expectation: '{"wait_for": "[data-testid=\"workspace-switcher\"]"}'
     - step: 19

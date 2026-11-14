@@ -20,7 +20,7 @@ fixtures:
 timeout_sec: 45
 steps:
 - open: ${cfg.app.base_url}
-- click: '[data-testid="welcome-open-local-terminal"]'
+- click: '[data-testid="tao-home-local-terminal"]'
 - wait_for: '[data-testid="terminal-pane"]'
 - dblclick: '[data-testid="tab-title"] >> nth=0'
 - wait_for: '[data-testid="tab-title-input"]'

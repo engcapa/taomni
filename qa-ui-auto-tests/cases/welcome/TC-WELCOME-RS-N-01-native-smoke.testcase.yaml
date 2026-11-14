@@ -34,7 +34,7 @@ steps:
     selector: '[data-testid="welcome-restore-last-session"]'
     name: disabled
     equals: ''
-- click: '[data-testid="welcome-open-local-terminal"]'
+- click: '[data-testid="tao-home-local-terminal"]'
 - wait_for:
     selector: '[data-testid="terminal-pane"]'
     timeout_sec: 30

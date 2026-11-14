@@ -35,7 +35,7 @@ steps:
 - wait_for: '[data-testid="status-bar"]'
 - assert_not_visible: '[data-testid="titlebar-actions-more"]'
 - assert_not_visible: '[data-testid="ptt-button"]'
-- click: '[data-testid="welcome-open-local-terminal"]'
+- click: '[data-testid="tao-home-local-terminal"]'
 - wait_for: '[data-testid="terminal-pane"]'
 - click: '[data-testid="rail-chat-button"]'
 - wait_for: '[data-testid="ai-chat-drawer"]'

@@ -15,7 +15,7 @@ description: >-
 steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-mobile-query-master
-- click: '[data-testid="welcome-open-local-terminal"]'
+- click: '[data-testid="tao-home-local-terminal"]'
 - wait_for: '[data-testid="terminal-pane"]'
 - assert_pattern: {selector: '[data-testid="terminal-pane"]', regex: '(?m)[$#>%]\s*$', timeout_sec: 25}
 - click: '[data-testid="ribbon-settings"]'

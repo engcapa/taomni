@@ -89,7 +89,12 @@ pub fn build_router_with_proxy_db(
 
         if !matches!(
             p.runtime.as_str(),
-            "openai-compat" | "llama-server" | "ollama" | "anthropic" | "opencode-go"
+            "openai-compat"
+                | "llama-server"
+                | "ollama"
+                | "anthropic"
+                | "deepseek-messages"
+                | "opencode-go"
         ) {
             tracing::info!(provider = %id, runtime = %p.runtime, "skipping non-openai-compat provider in router");
             continue;
@@ -148,8 +153,10 @@ pub fn build_router_with_proxy_db(
                         proxy_url.clone(),
                     ))
                 }
-                "anthropic" => {
-                    let base_url = if p.base_url.is_empty() {
+                "anthropic" | "deepseek-messages" => {
+                    let base_url = if p.runtime == "deepseek-messages" {
+                        format!("{}/anthropic/v1", p.base_url.trim_end_matches('/'))
+                    } else if p.base_url.is_empty() {
                         "https://api.anthropic.com/v1".to_string()
                     } else {
                         p.base_url.clone()

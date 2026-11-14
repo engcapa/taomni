@@ -13,8 +13,9 @@ import { SettingsPanel } from "../../components/settings/SettingsPanel";
 import { ServersPanel } from "../../components/servers/ServersPanel";
 import { SocksCapPanel } from "../../components/sockscap/SocksCapPanel";
 import { TunnelManager } from "../../components/tunnel/TunnelManager";
-import { WelcomePanel } from "../../components/WelcomePanel";
+import { TaoHomeHost } from "../../components/tao/home/TaoHomeHost";
 import { t as tr } from "../../lib/i18n";
+import { useAppStore } from "../../stores/appStore";
 import {
   DbClientTab,
   DbLoadingPanel,
@@ -31,6 +32,7 @@ import { type TabContentRouterProps } from "./tabs/TabContentRouterProps";
 import { TerminalTabContents } from "./tabs/TerminalTabContents";
 
 export function TabContentRouter(viewProps: TabContentRouterProps) {
+  const storeRecentWorkspaces = useAppStore((state) => state.recentWorkspaces);
   const {
     activeTab,
     activeTabId,
@@ -68,7 +70,6 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
     openDetachedTerminal,
     openDetachedVnc,
     openGitRepository,
-    openLanChatTab,
     openLocalTab,
     openMailAccountById,
     openNewCodeWorkspaceFromWelcome,
@@ -141,7 +142,7 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
       className="absolute inset-0"
       style={{ display: (viewProps.showHome ?? (activeTab?.type === "welcome" || !activeTab)) ? "block" : "none" }}
     >
-      <WelcomePanel
+      <TaoHomeHost
         active={viewProps.showHome ?? (activeTab?.type === "welcome" || !activeTab)}
         restore={{
           view: welcomeRestore.view,
@@ -154,9 +155,8 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
         onStartLocalTerminal={(localShell, cwd) => openLocalTab(localShell?.name ?? tr("tabs.localTerminal"), undefined, undefined, localShell, cwd)}
         onNewSession={handleNewSession}
         onOpenLocalPath={(path, opts) => void handleOpenLocalPath(path, opts)}
-        onOpenLanChat={openLanChatTab}
         recentSessions={welcomeRecentSessions}
-        recentWorkspaces={recentWorkspaces}
+        recentWorkspaces={recentWorkspaces ?? storeRecentWorkspaces}
         mailSessions={welcomeMailSessions}
         onOpenMailSession={handleConnectSession}
         onOpenRecentSession={handleConnectSession}

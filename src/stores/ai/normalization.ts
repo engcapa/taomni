@@ -196,6 +196,7 @@ export function normalizeAiConfig(config: AiConfig): AiConfig {
   const providers = {
     agnes: DEFAULT_CONFIG.llm.providers.agnes,
     anthropic: DEFAULT_CONFIG.llm.providers.anthropic,
+    "deepseek-app": DEFAULT_CONFIG.llm.providers["deepseek-app"],
     "opencode-go": DEFAULT_CONFIG.llm.providers["opencode-go"],
     ...config.llm.providers,
   };
@@ -257,5 +258,16 @@ export function normalizeAiConfig(config: AiConfig): AiConfig {
       })),
     },
     acp_bridge: normalizeAcpBridge(config.acp_bridge),
+    deepseek_app: {
+      enabled: config.deepseek_app?.enabled ?? true,
+      model: config.deepseek_app?.model ?? "deepseek-flash",
+      thinking_default: config.deepseek_app?.thinking_default ?? false,
+      search_default: config.deepseek_app?.search_default ?? false,
+      safety_check_high: true,
+      title_enabled: config.deepseek_app?.title_enabled ?? true,
+      voice_provider: config.deepseek_app?.voice_provider ?? "local",
+      tts_voice: config.deepseek_app?.tts_voice ?? "stella",
+      cost_confirm_threshold_cny: Math.max(0, Number(config.deepseek_app?.cost_confirm_threshold_cny ?? 0.5)),
+    },
   };
 }
