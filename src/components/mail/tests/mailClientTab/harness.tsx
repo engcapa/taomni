@@ -48,6 +48,18 @@ const mailMocks = vi.hoisted(() => ({
   mailRespondInvite: vi.fn(),
 }));
 
+const attachmentOpenMocks = vi.hoisted(() => ({
+  viewerCreateTemp: vi.fn(async (name: string) => ({ path: `/controlled-mail/${name}`, token: "mail-temp" })),
+  viewerReleaseTemp: vi.fn(async () => undefined),
+  openFile: vi.fn(async () => "mail-viewer"),
+}));
+
+vi.mock("../../../../lib/viewer", () => ({
+  viewerCreateTemp: attachmentOpenMocks.viewerCreateTemp,
+  viewerReleaseTemp: attachmentOpenMocks.viewerReleaseTemp,
+}));
+vi.mock("../../../../lib/openFile", () => ({ openFile: attachmentOpenMocks.openFile }));
+
 const eventMocks = vi.hoisted(() => ({
   handlers: new Map<string, (event: { payload: unknown; }) => void>(),
 }));
@@ -261,4 +273,4 @@ export function stepResult(overrides: Partial<MailFolderSyncResult>): MailFolder
   };
 }
 
-export { calendarMocks, chatState, contactMocks, eventMocks, filterMocks, mailMocks };
+export { attachmentOpenMocks, calendarMocks, chatState, contactMocks, eventMocks, filterMocks, mailMocks };

@@ -264,6 +264,25 @@ fn pasted_assets_use_relative_paths_and_unique_exclusive_names() {
 
 #[cfg(unix)]
 #[test]
+fn pasted_assets_keep_private_file_and_directory_modes() {
+    use std::os::unix::fs::PermissionsExt;
+    let fixture = Fixture::new("doc.md", b"doc");
+    let saved =
+        save_pasted_image(fixture.path(), "assets/nested", "private.png", b"image").unwrap();
+    let file_mode = fs::metadata(&saved.path).unwrap().permissions().mode();
+    assert_eq!(file_mode & 0o777 & !0o600, 0);
+    assert_eq!(fs::read(&saved.path).unwrap(), b"image");
+    for directory in ["assets", "assets/nested"] {
+        let mode = fs::metadata(fixture.path.parent().unwrap().join(directory))
+            .unwrap()
+            .permissions()
+            .mode();
+        assert_eq!(mode & 0o777 & !0o700, 0, "{directory}");
+    }
+}
+
+#[cfg(unix)]
+#[test]
 fn pasted_asset_symlink_escape_and_fifo_reads_are_rejected() {
     use std::os::unix::fs::symlink;
     let fixture = Fixture::new("doc.md", b"doc");

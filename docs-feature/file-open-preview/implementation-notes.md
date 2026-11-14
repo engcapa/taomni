@@ -48,9 +48,9 @@
 | Node / pnpm | 聚焦批次最终使用 Node 22.23.5 / pnpm 10.30.0，与 CI 主版本一致；初始环境 Node24 已切换。 |
 | 核心+保留前端单元 | `pnpm exec vitest run --maxWorkers=4 src/components/viewer src/components/explorer src/lib/openFile src/lib/markdownAssets.test.ts src/stores/documentStore.test.ts src/stores/documentStore.lifecycle.test.ts src/components/settings/FileOpenSettings.test.tsx src/lib/fileOpenTemp.test.ts src/lib/filePathLinks.test.ts src/components/filebrowser/FileToolbarWiring.test.tsx src/layouts/MainLayout.test.tsx`：首个稳定批次 **33 files / 340 tests passed**；最终扩展集合加入 Explorer 恢复、Workspace/AI/terminal/stub 保留验证，**44 files / 425 tests passed**；首轮失败修复后的扩展集合（含 HTML data URI 资源、CRLF paste、设置 clear→type、文本行列状态）**45 files / 436 tests passed**；HTML 外链 consent 新增测试的被动 effect 就绪问题已用单次发送前显式 await act 修复，生产 bridge 改为 layout effect 防初始页面消息丢失。 |
 | 类型 / 边界 | `pnpm exec tsc -b --pretty false`、`pnpm check:refactor` 已通过一轮；native 命令契约 821，新增文件均不超过 800 行。最终网络通道变更后复验通过；source size 4600 文件。 |
-| Rust | 最终 `cargo test --manifest-path src-tauri/Cargo.toml --lib viewer:: -- --nocapture`：**24 passed / 0 failed**；`workspace::tests` 保留过滤集：**90 passed / 0 failed**（含 query_workspace 名称匹配项）；编码/BOM/EOL、temp防写、路径越界、代理绕过环境/不回落、取消/大小上限与原子写前置条件通过。 |
+| Rust | 初轮 `cargo test --manifest-path src-tauri/Cargo.toml --lib viewer:: -- --nocapture`：**24 passed / 0 failed**；跨平台 `openat` 修复后新增私有文件/目录权限验证，**25 passed / 0 failed**；`workspace::tests` 保留过滤集：**90 passed / 0 failed**（含 query_workspace 名称匹配项）。编码/BOM/EOL、temp防写、路径越界、代理绕过环境/不回落、取消/大小上限与原子写前置条件通过；macOS 编译仍需 hosted 再验。 |
 | QA 静态 | 扩充至 TC-FILE-OPEN-001..012，另选择受影响 TC-EXPLORER-001..005 与完整 crash suite；policy/dependencies/smoke/mandatory expectations/feature-list/control catalog 同步。各模式、行为 contract、OS helper 单元通过后才能提交；不放宽 baseline。 |
-| GitHub browser/native | `43451418842` 已执行初轮：Linux/Windows/macOS browser 各 **11 pass / 3 fail**，Windows native **9 pass / 5 fail**。Linux native 格式门禁阻断，macOS hosted ARM64 容量不足未获 runner。**整体未通过**；失败修复与扩充的 001..012 + 受影响 Explorer + 完整 crash suite 待新 commit 执行。详见下表，不以 job 成功替代 case pass。 |
+| GitHub browser/native | 初轮 `43451418842`：三端 browser 各 **11 pass / 3 fail**，Windows native **9 pass / 5 fail**。扩充轮 `43526262110`（`d1c1f7e0`）：三端 browser 各 **17 pass / 4 fail / 0 skip**，合计 **51/63 pass**；005 与保留 Explorer 001..004 三端实际通过。Linux native 被完整前端单元 7 项失败阻断；macOS native 被本次新增 `openat` 参数跨平台编译错误阻断；Windows native 构建尚未终止。**整体未通过**，修复后须用匹配源码重跑；不以报告上传 job 成功替代 case pass。 |
 
 ### 专项用例
 
@@ -90,6 +90,7 @@ TC-WS-038/039/051/052/053/054/055/056/057 与 TC-IDE-C8-08 的目标是原有 ID
 | [43449130590](https://github.com/engcapa/taomni/actions/runs/43449130590) | `f7d82646` | checkout 把短 SHA 当分支名，未执行构建/产品用例；改用完整 SHA 重新 dispatch。 |
 | [43449514622](https://github.com/engcapa/taomni/actions/runs/43449514622) | `f7d826460a5d7bd7b1383faadc64ff293bac473f` | planning 单元 `test_crash_regressions` 硬编码旧 tag/smoke 清单，新六例未同步；补齐 EXPECTED、单模式集合与 smoke，并跑契约单元。未执行产品用例，不能视为三端通过。 |
 | [43451418842](https://github.com/engcapa/taomni/actions/runs/43451418842) | `3bc9afa00c353e9eaf6db71b8ee6093cf1be7eda` | 三端 browser 各 11/14 pass；Windows native 9/14 pass。Linux 在 `cargo fmt` 中发现 `workspace.rs` module 排序错误，已修；macOS job annotation：`The job was not acquired by Runner of type hosted even after multiple attempts`，未执行。产品/用例失败见下述修复，待重跑。 |
+| [43526262110](https://github.com/engcapa/taomni/actions/runs/43526262110) | `d1c1f7e02b4aee848167481ea26c9953e3dfff8f` | 扩充 001..012 + Explorer + 全部 crash：browser 63 次实际执行 **51 pass / 12 fail / 0 skip**，每 OS 17/21 pass。004/008/010/012 三端各同根因失败；005 三端 CSS/图片/隔离/默认离线实证通过，Explorer 001..004 三端 12/12 通过。Linux 完整前端单元 **6881 pass / 7 fail / 1 skip** 阻断 native；macOS `viewer/paths.rs:298` C varargs 不接受 `u16 mode_t`，不是 runner 容量问题。Windows native 尚在构建；当前不得声称原生验收通过。 |
 
 ### 首轮实际失败与对应修复
 
@@ -102,3 +103,21 @@ TC-WS-038/039/051/052/053/054/055/056/057 与 TC-IDE-C8-08 的目标是原有 ID
 - **006 Windows native**：受控设置输入在 clear 中间态把默认 assets/font 还原，后续输入变成 assetsimages；产品改为合法中间草稿，只有有效值持久化，补 clear→type/恢复默认单元；不靠全局修改测试 driver 制造通过。
 - **C8 / WS051**：旧 IDE 生命周期用例未显式配置源码编辑归属，新默认路由切入查看器；为两个遗漏用例补与其它 IDE crash cases 相同的显式处理器设置，所有旧步骤/断言逆映射 hash 不变。
 - **高保真差异**：hosted HTML desktop 截图有不符原型的 24px 外边距与矩形地址栏，改为 desktop full-bleed、设备模式仅 14px 纵向留白、地址栏 pill 15px；正文/大纲/图表浅深主题的最终判断必须新 hosted 截图复核。
+
+### 扩充轮实际失败与修复（43526262110）
+
+- **004 三端 Mermaid**：真实页面内错误是 `dayjs/dayjs.min.js ... does not provide an export named 'default'`，尚未进入 Mermaid render，而不是图形标签断言过严。Vite `optimizeDeps.noDiscovery=true` 的显式清单缺少 Mermaid 及其 CommonJS 转换入口；修复预打包清单并补配置契约单元，仍须 hosted 真 SVG / 标签 / 导出验证。不能用 mock Mermaid 单元冒充渲染成功。
+- **004 实时渲染间距**：失败截图与 DOM 证实非活动 Markdown 块之间残留三个 `.cm-line` 空白行，每段额外约 80px，明显不符原型紧凑正文。装饰只合并非活动块的 separator 换行并以渲染块 margin 控制间距，保留当前空白行、EOF 光标和原始 Markdown 字节；补 compact DOM、空白行输入、选区及源码不变单元。新 hosted 浅深主题截图仍需复核。
+- **010 三端 scripts-off**：前半段伪造消息与真实外链确认/取消已通过，step 44 的第二个页面失败。trace 中真实生成的 HTML 含 nonce-only CSP，但可信 bridge `<script>` 无 nonce；`DOMParser` 的 detached document 上 `.nonce=` 在 hosted Chromium 序列化时未反射为属性。仅 browser stub 改为显式 `setAttribute`，补模拟非反射属性的序列化测试；不放宽 CSP、页面脚本、外链确认或防骚扰策略。
+- **012 三端 wheel helper**：实际 `StepContext` 没有 `report_root`，辅助器在发输入前抛 `AttributeError`；改按当前 `case_dir` 核对独立图像 oracle 必须为其直接子文件且非 symlink，补真实 StepContext 单元。此失败没有证明产品缩放、粘贴板或后续限额已经通过。
+- **008 三端 AI → 文件查看器**：step 14 已断言真实文件全文，tab-bound chat 随切到非 chat-capable viewer 自动隐藏；step 15 多余点击隐藏 Hide 按钮。改同一步断言 drawer 不可见，后续 Git/SFTP/PTY 和原有 checkpoint 不删不改步数；后半段本轮尚未执行。
+- **Linux native 门禁**：完整单元暴露新增 file-viewer 后 recovery policy 的旧数量（21→22），以及五项 IDE tree 场景、一个邮件附件 mock 契约。六项先聚焦复现失败后修：IDE 焦点/选择/分栏测试的目标 fixture 明确为真实 `.ts` 源码（普通 `.txt`/`.md` 故意已路由到全局查看器），保留原焦点、Undo、selection 与 split 断言，不 mock classify；邮件测试适配真实 controlled temp + `openFile` 边界，并加强 IMAP section、目标路径和只读来源断言。完整 CodeWorkspaceTab **261/261** + MailClientTab **77/77** 单元通过；recovery 四项通过，其余全前端单元正在验证，不跳过门禁。
+- **macOS native 编译**：`libc::mode_t` 在 Darwin 为 `u16`，传给可变参数 `openat` 必须先做 C integer promotion。使用 `mode as libc::c_uint`，保留 no-follow、exclusive-create、私有文件/目录权限，增加原生权限回归；Linux 单元不等同于 macOS 编译与运行通过。
+
+该轮 browser 六个 summary 的 `identity_stable=true`，`source_sha256=59c78bdc592cd40f18a37e589b7feb301a35ed696ee72089c34fd241428b4583`；实际 receipt `exitCode=1`，未以报告上传 job 的绿色结论冒充 case pass。保留的九项 browser crash 每 OS 均通过（C8、MOBILE012、WS038/039/045/052/053/055/057，共 27 次），新增失败仍阻断整体通过。所有修复必须随下一匹配 candidate 再验。
+
+本批工具/静态复验：`tsc -b`、`pnpm check:refactor`、全局 `cargo fmt --check` 与 QA `audit --gate` 通过，coverage baseline 未变；`pnpm test:tools` **81 pass / 0 fail / 8 skip**（平台/外部工具限制明确跳过，不将 89 项全称为通过）。QA fixtures/helpers/mandatory crash + CI selection 单元合并批次 **62/62 pass**（另一个聚焦 fixtures/helpers/mandatory 子集 **39/39 pass**，不重复累加为独立覆盖）。下一轮 selection 仍为六组、18 shards、三个匹配 release 构建，browser 每 OS 21 项、native 每 OS 23 项，共 132 次；`gaps=[]` 仅为静态计划，不是执行结果。
+
+完整前端单元以两个互不重复批次执行：IDE+Mail 两文件 **338 pass**；其余 766 文件 **6552 pass / 1 fail / 1 skip**。唯一失败为未改动的 `ScreenshotFavorites.test.tsx:48` 在 DOM empty 刚出现时立即检查 passive cleanup 的 `revoke`，本地同文件独立重跑 **4/4 pass**；生产与测试最后改动均不在本功能 diff（历史 `85bae679`）。该次批量失败保留，不改无关截图功能、不称完整批次全绿；hosted Linux gate 继续原样运行完整前端单元。
+
+`43526262110` 的独立 native-contracts job **110 pass / 0 fail**（2026-11-13 23:48 UTC）。本批仅改 viewer Unix openat 参数，RDP/mobile/截图 Rust 源码、Cargo manifests/lock、工具链及 contract workflow 无变更；下一次同 release 配置按 CI runbook 用 `run_rdp_unit_contracts=false` 复用该成功契约证据，仍执行所有选定 native case，未省略 Linux 完整前端单元或匹配 QA binary 构建。

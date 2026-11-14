@@ -295,7 +295,9 @@ fn open_at(
             parent.as_raw_fd(),
             name.as_ptr(),
             flags | libc::O_NOFOLLOW | libc::O_CLOEXEC,
-            mode,
+            // openat is variadic: Darwin's u16 mode_t needs C integer
+            // promotion. Passing it directly fails to compile on macOS.
+            mode as libc::c_uint,
         )
     };
     if fd < 0 {

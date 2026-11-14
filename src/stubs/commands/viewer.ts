@@ -89,7 +89,10 @@ async function htmlOpen(path: string, allowScripts: boolean) {
     }
   }
   const bridge = dom.createElement("script");
-  bridge.nonce = nonce;
+  // DOMParser documents can have no browsing context; assigning the nonce
+  // property there did not serialize an attribute in hosted Chromium. The blob
+  // reparses this markup, so its CSP needs the nonce in the serialized HTML.
+  bridge.setAttribute("nonce", nonce);
   bridge.textContent = `(()=>{const send=(kind,data={})=>parent.postMessage({type:'taomni-html-preview',token:${JSON.stringify(token)},kind,...data},'*');for(const level of ['log','warn','error','info']){const original=console[level];console[level]=(...args)=>{send('console',{level,message:args.map(String).join(' ')});original.apply(console,args)}}addEventListener('error',event=>send('console',{level:'error',message:event.message}));addEventListener('securitypolicyviolation',event=>send('blocked',{message:event.blockedURI}));document.addEventListener('click',event=>{const anchor=event.target.closest?.('a');if(!anchor)return;event.preventDefault();const href=anchor.getAttribute('href');if(href)send(/^https?:/i.test(href)?'external':'navigate',{href})},true);send('console',{level:'info',message:'Local sandbox ready'})})()`;
   dom.head.prepend(bridge);
   const policy = dom.createElement("meta");

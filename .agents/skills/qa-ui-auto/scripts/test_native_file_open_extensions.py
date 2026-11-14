@@ -81,6 +81,23 @@ class GlobalEntryContracts(unittest.TestCase):
             self.assertEqual(keyboard['actions'][-1],{'type':'keyUp','value':''})
             self.assertEqual(calls[-1].args,('DELETE','/actions'))
 
+    def test_file_link_transition_asserts_automatic_chat_hide_without_clicking_hidden_control(self):
+        import yaml
+        from qa_ui_auto.testcase import load_case
+        from qa_ui_auto.behavior_contract import validate_contract
+        root=Path(__file__).resolve().parents[4]
+        path=next((root/'qa-ui-auto-tests/cases').glob('TC-FILE-OPEN-008-*.testcase.yaml'))
+        doc=yaml.safe_load(path.read_text(encoding='utf-8'))
+        # Hosted run43526262110: all three browser platforms proved exact AI
+        # file content, then timed out clicking this already-hidden drawer.
+        # Preserve that successful content checkpoint and the remaining real
+        # Git/SFTP workflow; assert the actual automatic context transition.
+        self.assertEqual(doc['steps'][13]['assert_items']['equals'],['repo-b WORKTREE','shared line',''])
+        self.assertEqual(doc['steps'][14],{'assert_not_visible':'[data-testid="ai-chat-drawer"]'})
+        self.assertFalse(any(step.get('click')=='[data-testid="ai-chat-drawer-hide"]' for step in doc['steps']))
+        self.assertEqual(validate_contract(doc),[])
+        load_case(path)
+
     def test_global_entry_fixture_seeds_persisted_conversation_and_only_owned_remote_payload(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp);case=root/'case';case.mkdir()

@@ -53,7 +53,7 @@ steps:
     - repo-b WORKTREE
     - shared line
     - ''
-- click: '[data-testid="ai-chat-drawer-hide"]'
+- assert_not_visible: '[data-testid="ai-chat-drawer"]'
 - click: '[data-testid="nav-mode-home"]'
 - click: '[data-testid="welcome-history-tab-workspaces"]'
 - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity008_root}"]'
@@ -171,12 +171,15 @@ verification:
     checkpoints:
     - step: 14
       expectation: AI chip opened actual file text, not a shell/query snippet.
+    - step: 15
+      expectation: Activating the non-chat-capable file viewer hides the tab-bound conversation automatically; no hidden Hide button is clicked.
     - step: 25
       expectation: Git preview opens the same real worktree bytes.
     - step: 26
       expectation: Git creates exactly one viewer in workspace scope; it does not replace the independent main host.
     results:
     - 14
+    - 15
     - 25
     - 26
   - id: R2

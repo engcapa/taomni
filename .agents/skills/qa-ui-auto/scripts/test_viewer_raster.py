@@ -12,7 +12,7 @@ from unittest.mock import Mock, patch
 from PIL import Image
 from qa_ui_auto import viewer_raster
 from qa_ui_auto.fixtures import raster_files
-from qa_ui_auto.steps import StepError
+from qa_ui_auto.steps import StepContext, StepError
 
 
 class RasterContracts(unittest.TestCase):
@@ -53,6 +53,25 @@ class RasterContracts(unittest.TestCase):
         viewer_raster.browser(self.ctx, {"action": "wheel", "deltaY": -120})
         self.ctx.page.mouse.wheel.assert_called_once_with(0, -120)
         self.ctx.page.evaluate.assert_not_called()
+
+    def test_browser_real_step_context_needs_no_report_root_and_rejects_oracle_escape(self):
+        manifest = self.ctx.case_dir / "file-open-fixture.json"
+        data = json.loads(manifest.read_text()); data["mode"] = "browser"; manifest.write_text(json.dumps(data))
+        context = StepContext(page=Mock(), case_id="raster", case_dir=self.ctx.case_dir, cfg={}, env={})
+        self.assertFalse(hasattr(context, "report_root"))
+        viewer_raster.browser(context, {"action": "wheel", "deltaY": -120})
+        context.page.mouse.wheel.assert_called_once_with(0, -120)
+        oracle = self.ctx.case_dir / "raster-original.png"
+        external = self.ctx.case_dir.parent / "external.png"
+        external.write_bytes(oracle.read_bytes())
+        oracle.unlink()
+        try:
+            oracle.symlink_to(external)
+        except OSError as error:
+            self.skipTest(f"Symlink creation is unavailable on this test host: {error}")
+        with self.assertRaisesRegex(StepError, "run-owned"):
+            viewer_raster.browser(context, {"action": "wheel", "deltaY": -120})
+        context.page.mouse.wheel.assert_called_once()
 
     def test_native_wheel_uses_w3c_wheel_source_and_hit_tested_geometry(self):
         self.ctx.session = Mock()

@@ -78,7 +78,8 @@ function decorations(state: EditorState, context: MarkdownWidgetContext, focus: 
   const anchor = state.selection.main.head;
   const currentLine = state.doc.lineAt(anchor);
   const blocks = markdownBlocks(state.doc.toString());
-  for (const block of blocks) {
+  for (let index = 0; index < blocks.length; index++) {
+    const block = blocks[index];
     if (!block.raw.trim()) continue;
     const end = block.to - (block.raw.endsWith("\n") ? 1 : 0);
     if (end <= block.from) continue;
@@ -89,7 +90,20 @@ function decorations(state: EditorState, context: MarkdownWidgetContext, focus: 
     else if (image && !active) widget = new ImageWidget(block.from, block.raw, image, context);
     else if (!active) widget = new RenderedBlock(block.from, block.raw, context);
     if (widget) {
-      ranges.push(Decoration.replace({ widget, block: true, inclusive: false }).range(block.from, end));
+      // The HTML block already owns its paragraph/heading spacing. Leaving
+      // Markdown's separator newlines outside a block replacement creates
+      // several full-height empty .cm-line nodes between every rendered block.
+      // Include only inactive separators; a caret in a blank source line must
+      // still get a real editable line, including the final insertion point.
+      let replaceTo = block.to;
+      for (let next = index + 1; next < blocks.length && !blocks[next].raw.trim(); next++) replaceTo = blocks[next].to;
+      for (const selection of state.selection.ranges) {
+        if (selection.from >= block.to && selection.from <= replaceTo) {
+          replaceTo = Math.max(block.to, state.doc.lineAt(selection.from).from);
+        }
+      }
+      const endsAtCaretLine = state.selection.ranges.some((selection) => state.doc.lineAt(selection.from).from === replaceTo);
+      ranges.push(Decoration.replace({ widget, block: true, inclusiveStart: true, inclusiveEnd: !endsAtCaretLine }).range(block.from, replaceTo));
     } else {
       let pos = block.from;
       while (pos <= end) {
@@ -103,6 +117,11 @@ function decorations(state: EditorState, context: MarkdownWidgetContext, focus: 
         pos = line.to + 1;
       }
     }
+  }
+  // Space tokens are not rendered blocks. Keep the active empty source line
+  // visibly editable even when surrounding rendered blocks own their spacing.
+  if (!currentLine.text.trim() && !ranges.some((range) => range.value.spec.class?.includes("fv-md-current-line"))) {
+    ranges.push(Decoration.line({ class: "fv-md-source-line fv-md-current-line" }).range(currentLine.from));
   }
   return Decoration.set(ranges, true);
 }
