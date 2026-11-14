@@ -44,7 +44,7 @@ export function ExplorerFileList(inputs: FilePanelViewProps) {
     setWidth(element.clientWidth);
     return () => observer.disconnect();
   }, []);
-  useEffect(() => { virtual.measure(); }, [rowHeight, columns, virtual]);
+  useEffect(() => { virtual.measure(); }, [rowHeight, columns, virtual, entries.length]);
   useEffect(() => { scroll.current?.scrollTo?.({ top: 0 }); anchor.current = null; setFocused(null); }, [pane.path, inputs.filterText, preferences.view, inputs.sortKey, inputs.sortDir]);
   useEffect(() => () => rubberCleanup.current?.(), []);
   useEffect(() => {
