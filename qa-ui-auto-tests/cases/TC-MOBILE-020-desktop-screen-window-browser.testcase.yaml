@@ -1,0 +1,114 @@
+id: TC-MOBILE-020
+title: Mobile Web enforces screen opt-in, opens server browser, and sends input to target window
+covers: [F-MOBILE-1]
+tags: [p0, mobile, desktop-remote]
+modes: [browser]
+fixtures: [mobile_web]
+timeout_sec: 120
+description: >-
+  Pair Mobile Web at phone dimensions, verify the remote desktop screen stays blocked until
+  explicitly enabled on the host, open a URL in the managed server browser window, select and
+  refresh windows, deliver text and shortcut key inputs, then enable screen capture and inspect
+  multi-display PNG screen refreshes and auto-refresh state without layout overflow.
+steps:
+- set_viewport: {width: 390, height: 844}
+- open: ${fixture.mobile_endpoint}
+- wait_for: '[data-testid="mobile-empty-instances"]'
+- click: '[data-testid="mobile-add-instance"]'
+- fill: {selector: '[data-testid="mobile-pair-code"]', value: qa-mobile-code}
+- click: '[data-testid="mobile-pair-submit"]'
+- wait_for: '[data-testid="mobile-open-desktop"]'
+- click: '[data-testid="mobile-open-desktop"]'
+- wait_for: '[data-testid="mobile-desktop-view"]'
+- wait_for: '[data-testid="mobile-screen-disabled"]'
+- assert_count: {selector: '[data-testid="mobile-screen-image"]', equal: 0}
+- assert_count: {selector: '[data-testid="mobile-window-item"]', equal: 2}
+- screenshot: mobile-desktop-screen-blocked.png
+- click: '[data-testid="mobile-window-item"][data-window-id="win-term"]'
+- assert_items: {selector: '[data-testid="mobile-window-select"] option:checked', attribute: value, equals: [win-term]}
+- fill: {selector: '[data-testid="mobile-browser-url"]', value: 'http://127.0.0.1:4100/demo'}
+- click: '[data-testid="mobile-browser-open"]'
+- assert_text: {selector: '[data-testid="mobile-browser-status"]', contains: 'http://127.0.0.1:4100/demo'}
+- wait_for: '[data-testid="mobile-window-select"] option[value="tauri:mobile-remote-browser"]'
+- assert_items: {selector: '[data-testid="mobile-window-select"] option:checked', attribute: value, equals: ['tauri:mobile-remote-browser']}
+- assert_file_contains: {path: '${fixture.mobile_receipt}', contains: 'BROWSER http://127.0.0.1:4100/demo'}
+- click: '[data-testid="mobile-windows-refresh"]'
+- wait_for: '[data-testid="mobile-window-select"] option[value="tauri:mobile-remote-browser"]'
+- fill: {selector: '[data-testid="mobile-window-input"]', value: 'hello window 123'}
+- click: '[data-testid="mobile-window-send"]'
+- wait_for: '[data-testid="mobile-window-result"]'
+- assert_file_contains: {path: '${fixture.mobile_receipt}', contains: 'WIN_INPUT id=tauri:mobile-remote-browser key=- submit=1 text=hello window 123'}
+- click: '[data-testid="mobile-window-submit"]'
+- fill: {selector: '[data-testid="mobile-window-input"]', value: 'no enter text'}
+- click: '[data-testid="mobile-window-send"]'
+- assert_file_contains: {path: '${fixture.mobile_receipt}', contains: 'WIN_INPUT id=tauri:mobile-remote-browser key=- submit=0 text=no enter text'}
+- click: '[data-testid="mobile-window-key-f5"]'
+- assert_text: {selector: '[data-testid="mobile-window-result"]', contains: 'f5'}
+- assert_file_contains: {path: '${fixture.mobile_receipt}', contains: 'WIN_INPUT id=tauri:mobile-remote-browser key=f5 submit=0 text='}
+- mobile_browser_probe: desktop-enable-screen
+- click: '[data-testid="mobile-desktop-refresh"]'
+- wait_for: '[data-testid="mobile-screen-image"]'
+- assert_text: {selector: '[data-testid="mobile-screen-meta"]', contains: Primary Display}
+- select_option: {selector: '[data-testid="mobile-desktop-display"]', value: display-1}
+- assert_text: {selector: '[data-testid="mobile-screen-meta"]', contains: Secondary Display}
+- assert_file_contains: {path: '${fixture.mobile_receipt}', contains: 'SCREEN display=display-1'}
+- click: '[data-testid="mobile-desktop-auto-refresh"]'
+- assert_attribute: {selector: '[data-testid="mobile-desktop-auto-refresh"]', name: aria-pressed, equals: 'true'}
+- eval_readonly:
+    expression: document.querySelector('img.desktop-screen-img').complete && document.querySelector('img.desktop-screen-img').naturalWidth > 0 && document.documentElement.scrollWidth <= innerWidth
+    expect_truthy: true
+- screenshot: mobile-desktop-screen-live.png
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Remote screen viewing is blocked by default behind the host opt-in notice while desktop windows remain visible.
+    actions: [4, 5, 6, 8]
+    checkpoints:
+    - {step: 9, expectation: Desktop remote view renders.}
+    - {step: 10, expectation: Opt-in disabled warning is displayed.}
+    - {step: 11, expectation: Screen image element is not rendered while disabled.}
+    - {step: 12, expectation: Desktop window chips list available host windows.}
+    results: [9, 10, 11, 12]
+  - id: R2
+    requirement: Opening a URL on the server browser adds and selects the managed browser window and survives window-list refresh.
+    actions: [14, 16, 17, 22]
+    checkpoints:
+    - {step: 15, expectation: Clicking a window chip updates the window selector.}
+    - {step: 18, expectation: Browser status confirms the requested URL opened on the server.}
+    - {step: 19, expectation: Managed server browser window option appears in the selector.}
+    - {step: 20, expectation: Managed server browser window is automatically selected.}
+    - {step: 21, expectation: Server receipt records BROWSER open for the target URL.}
+    - {step: 23, expectation: Refreshing windows retains the managed server browser window.}
+    results: [15, 18, 19, 20, 21, 23]
+  - id: R3
+    requirement: Text input with Enter toggle and quick shortcut keys target the selected window and reach the host peer.
+    actions: [24, 25, 28, 29, 30, 32]
+    checkpoints:
+    - {step: 26, expectation: Window input status feedback renders.}
+    - {step: 27, expectation: Receipt records text dispatch with submit=1 to tauri:mobile-remote-browser.}
+    - {step: 31, expectation: Toggling submit off sends text with submit=0.}
+    - {step: 33, expectation: Clicking F5 reports f5 key delivery in the result banner.}
+    - {step: 34, expectation: Receipt records shortcut key f5 delivery to the target window.}
+    results: [26, 27, 31, 33, 34]
+  - id: R4
+    requirement: Enabling host screen opt-in unlocks valid PNG display capture, display switching, and auto-refresh cleanly.
+    actions: [35, 36, 39, 42]
+    checkpoints:
+    - {step: 37, expectation: Live screen image element appears after enabling and refreshing.}
+    - {step: 38, expectation: Screen metadata shows Primary Display initially.}
+    - {step: 40, expectation: Selecting the second display updates metadata to Secondary Display.}
+    - {step: 41, expectation: Receipt records capture for display-1.}
+    - {step: 43, expectation: Auto-refresh button reports aria-pressed=true.}
+    - {step: 44, expectation: Loaded PNG image has positive dimensions and phone layout does not overflow.}
+    - {step: 46, expectation: No browser runtime errors occurred.}
+    results: [37, 38, 40, 41, 43, 44, 46]
+  visual:
+  - check: Blocked notice, window list, live PNG screen image, display selector and quick-key controls fit within 390x844 without overflow.
+    method: automated
+    reason: Phone viewport overflow checks, loaded naturalWidth image check, and blocked/live screenshots cover DesktopView layout in browser mode.
+  native:
+  - check: OS screen capture, managed Tauri WebView browser window, and OS keystroke delivery.
+    method: not-applicable
+    reason: Browser mode exercises the deterministic HTTP peer; native OS capture, external WebviewWindow creation, and keyboard synthesis are owned by TC-MOBILE-021.

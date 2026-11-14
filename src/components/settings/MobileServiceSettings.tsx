@@ -7,7 +7,7 @@ import { mobileSettingsError } from "./mobileSettingsError";
 import { MobileHostSettings } from "./MobileHostSettings";
 
 interface Device { device_id: string; label: string; origin: string | null; last_used_at: number }
-interface Status { enabled: boolean; address: string | null; failed_attempts: number; devices: Device[]; allow_open_sessions?: boolean }
+interface Status { enabled: boolean; address: string | null; failed_attempts: number; devices: Device[]; allow_open_sessions?: boolean; allow_screen_capture?: boolean }
 
 export function MobileServiceSettings() {
   const t = useT();
@@ -84,6 +84,17 @@ export function MobileServiceSettings() {
       {" "}{t("mobileSettings.allowOpenSessions")}
     </label>
     <p className="mt-1 text-[var(--taomni-text-muted)]">{t("mobileSettings.openSessionsHint")}</p>
+    <label className="mt-3 block">
+      <input data-testid="mobile-settings-screen-capture" type="checkbox" checked={!!status.allow_screen_capture} disabled={busy} onChange={e => {
+        const enabled = e.target.checked;
+        void act(async () => {
+          await invoke("mobile_set_screen_capture", { enabled });
+          setStatus(await invoke<Status>("mobile_status"));
+        });
+      }} />
+      {" "}{t("mobileSettings.allowScreenCapture")}
+    </label>
+    <p className="mt-1 text-[var(--taomni-text-muted)]">{t("mobileSettings.screenCaptureHint")}</p>
     <p className="mt-3" data-testid="mobile-settings-status">{status.enabled
       ? t("mobileSettings.running", { address: status.address ?? "" })
       : t("mobileSettings.stopped")}</p>

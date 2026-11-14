@@ -559,3 +559,64 @@ fn terminal_card_callbacks_map_to_commands_and_privacy() {
         .is_err()
     );
 }
+
+#[test]
+fn desktop_remote_cards_bind_image_key_and_callback_actions() {
+    use crate::mobile::desktop::DesktopWindow;
+    let cfg = linked();
+    assert_eq!(
+        cards::desktop_link(&cfg).as_deref(),
+        Some("https://pc.example:8443/#/desktop")
+    );
+    let pending = cards::screen(
+        &cfg,
+        "显示器 1",
+        "display-0",
+        1280,
+        720,
+        Some("已刷新"),
+        Some("oc_allowed"),
+    );
+    assert!(cards::encoded_len(&pending) <= CARD_BYTES);
+    let patched = cards::with_screen_image_key(pending, "img_v2_qa_key");
+    let raw = patched.to_string();
+    assert!(raw.contains("img_v2_qa_key"), "{raw}");
+    assert!(!raw.contains(cards::SCREEN_IMAGE_PLACEHOLDER), "{raw}");
+
+    let win_card = cards::windows(
+        &cfg,
+        &[DesktopWindow {
+            id: "tauri:mobile-remote-browser".into(),
+            title: "Taomni Browser".into(),
+            app_name: "Taomni".into(),
+            pid: 12,
+            x: 0,
+            y: 0,
+            width: 800,
+            height: 600,
+            minimized: false,
+            focused: true,
+            kind: "tauri_browser".into(),
+        }],
+        Some("oc_allowed"),
+    );
+    assert!(win_card.to_string().contains("Taomni Browser"));
+    assert!(win_card.to_string().contains("/#/desktop"));
+
+    assert_eq!(
+        cards::callback_command(
+            &json!({"action":"screen","p2p_chat_id":"oc_allowed"}),
+            Some("oc_allowed")
+        )
+        .unwrap(),
+        ("screen".into(), true)
+    );
+    assert_eq!(
+        cards::callback_command(
+            &json!({"action":"windows","p2p_chat_id":"oc_other"}),
+            Some("oc_allowed")
+        )
+        .unwrap(),
+        ("windows".into(), false)
+    );
+}

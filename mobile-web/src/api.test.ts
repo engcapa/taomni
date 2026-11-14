@@ -1,5 +1,5 @@
 import { afterEach, expect, it, vi } from "vitest";
-import { request, ApiError, loadInstances } from "./api";
+import { request, ApiError, errorText, loadInstances } from "./api";
 afterEach(() => { vi.unstubAllGlobals(); localStorage.clear(); });
 it("reports the HTTP body limit without misreporting a network failure", async () => {
   vi.stubGlobal("fetch", vi.fn().mockResolvedValue({ status: 413, ok: false, json: async () => { throw new SyntaxError("not JSON"); } }));
@@ -51,4 +51,10 @@ it("keeps cross-origin authentication errors readable without browser cookies", 
   vi.stubGlobal("fetch", fetch);
   await expect(request({ endpoint: "https://pc.example", token: "t" }, "/ws-ticket", {})).rejects.toBeInstanceOf(ApiError);
   expect(fetch.mock.calls[0][1]).toMatchObject({ credentials: "omit", headers: { Authorization: "Bearer t" } });
+});
+
+it("explains desktop screen opt-in, invalid browser URLs, and missing window errors clearly", () => {
+  expect(errorText(new ApiError("screen_capture_disabled"))).toContain("未开启远程查看屏幕");
+  expect(errorText(new ApiError("invalid_browser_url"))).toContain("http://");
+  expect(errorText(new ApiError("window_not_found"))).toContain("窗口已关闭");
 });

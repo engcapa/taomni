@@ -2424,6 +2424,26 @@
 - `[data-testid="mobile-type-!"]` — interactive — F-MOBILE-1.mobile-type-punctuation
 - `[data-testid="mobile-type-space"]` — interactive — F-MOBILE-1.mobile-type-space
 - `[data-testid="mobile-type-backspace"]` — interactive — F-MOBILE-1.mobile-type-backspace
+- `[data-testid="mobile-settings-screen-capture"]` — interactive — F-MOBILE-1.mobile-settings-screen-capture
+- `[data-testid="mobile-open-desktop"]` — interactive — F-MOBILE-1.mobile-open-desktop
+- `[data-testid="mobile-desktop-view"]` — display — F-MOBILE-1.mobile-desktop-view
+- `[data-testid="mobile-desktop-display"]` — interactive — F-MOBILE-1.mobile-desktop-display
+- `[data-testid="mobile-desktop-auto-refresh"]` — interactive — F-MOBILE-1.mobile-desktop-auto-refresh
+- `[data-testid="mobile-desktop-refresh"]` — interactive — F-MOBILE-1.mobile-desktop-refresh
+- `[data-testid="mobile-screen-disabled"]` — display — F-MOBILE-1.mobile-screen-disabled
+- `[data-testid="mobile-screen-image"]` — display — F-MOBILE-1.mobile-screen-image
+- `[data-testid="mobile-screen-meta"]` — display — F-MOBILE-1.mobile-screen-meta
+- `[data-testid="mobile-browser-url"]` — interactive — F-MOBILE-1.mobile-browser-url
+- `[data-testid="mobile-browser-open"]` — interactive — F-MOBILE-1.mobile-browser-open
+- `[data-testid="mobile-browser-status"]` — display — F-MOBILE-1.mobile-browser-status
+- `[data-testid="mobile-windows-refresh"]` — interactive — F-MOBILE-1.mobile-windows-refresh
+- `[data-testid="mobile-window-select"]` — interactive — F-MOBILE-1.mobile-window-select
+- `[data-testid="mobile-window-item"]` — interactive — F-MOBILE-1.mobile-window-item
+- `[data-testid="mobile-window-input"]` — interactive — F-MOBILE-1.mobile-window-input
+- `[data-testid="mobile-window-submit"]` — interactive — F-MOBILE-1.mobile-window-submit
+- `[data-testid="mobile-window-send"]` — interactive — F-MOBILE-1.mobile-window-send
+- `[data-testid="mobile-window-key-f5"]` — interactive — F-MOBILE-1.mobile-window-key-f5
+- `[data-testid="mobile-window-result"]` — display — F-MOBILE-1.mobile-window-result
 
 ## mobile/feishu (F-MOBILE-2)
 

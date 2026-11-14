@@ -1,11 +1,13 @@
 //! Interactive card replies and session deep links. Button values are built
 //! here and parsed back by `callback_command`; keep both sides in sync.
 use super::{commands, config::Config};
+use crate::mobile::desktop::DesktopWindow;
 use serde_json::{Value, json};
 
 /// Feishu caps card request bodies at 30 KB; content is sent as a JSON string.
 pub const CARD_BYTES: usize = 28 * 1024;
 pub const MESSAGE_CHARS: usize = 2000;
+pub const SCREEN_IMAGE_PLACEHOLDER: &str = "__TAOMNI_SCREEN_IMAGE_KEY__";
 /// Same visible-text budget as the 1200-character text replies.
 const BODY_CHARS: usize = 1200;
 const TRUNCATED: &str = "\n[已截断]";
@@ -48,6 +50,11 @@ pub fn session_link(config: &Config, id: &str) -> Option<String> {
             encode_component(id)
         )
     })
+}
+/// Mobile Web route for the desktop screen & window control view.
+pub fn desktop_link(config: &Config) -> Option<String> {
+    (!config.mobile_endpoint.is_empty())
+        .then(|| format!("{}/#/desktop", config.mobile_endpoint.trim_end_matches('/')))
 }
 /// Text suffix with the session deep link, or nothing without an endpoint.
 pub fn link_line(config: &Config, id: &str) -> String {
@@ -486,9 +493,169 @@ pub fn callback_command(value: &Value, chat: Option<&str>) -> Result<(String, bo
         }
         Some("new") => "new".into(),
         Some("saved") => "saved".into(),
+        Some("windows") => "windows".into(),
+        Some("screen") => match value["display"].as_str() {
+            Some(display)
+                if !display.is_empty()
+                    && display.len() <= 128
+                    && !display.chars().any(char::is_whitespace) =>
+            {
+                format!("screen {display}")
+            }
+            Some(_) => return Err("invalid_card_action".into()),
+            None => "screen".into(),
+        },
         _ => return Err("invalid_card_action".into()),
     };
     let private =
         chat.is_some_and(|chat| !chat.is_empty() && value["p2p_chat_id"].as_str() == Some(chat));
     Ok((command, private))
+}
+
+/// Replaces the temporary placeholder image key inside a screen card once uploaded to Feishu.
+pub fn with_screen_image_key(mut card: Value, image_key: &str) -> Value {
+    if let Some(elements) = card["elements"].as_array_mut() {
+        for element in elements {
+            if element["tag"] == "img" && element["img_key"] == SCREEN_IMAGE_PLACEHOLDER {
+                element["img_key"] = json!(image_key);
+            }
+        }
+    }
+    card
+}
+
+/// Interactive card displaying the current desktop screenshot with a one-tap refresh button.
+pub fn screen(
+    config: &Config,
+    display_name: &str,
+    display_id: &str,
+    width: u32,
+    height: u32,
+    subtitle: Option<&str>,
+    p2p_chat: Option<&str>,
+) -> Value {
+    let mut elements = Vec::new();
+    let mut info = format!("显示器：{display_name} · {width}×{height}");
+    if let Some(note_text) = subtitle.filter(|s| !s.trim().is_empty()) {
+        info = format!("{note_text}\n{info}");
+    }
+    elements.push(div(&info));
+    if let Some(chat) = p2p_chat {
+        elements.push(json!({
+            "tag": "img",
+            "img_key": SCREEN_IMAGE_PLACEHOLDER,
+            "alt": label("Taomni 当前桌面屏幕"),
+            "mode": "fit_horizontal",
+            "preview": true
+        }));
+        let mut buttons = vec![
+            callback(
+                "刷新屏幕",
+                "primary",
+                json!({"action":"screen","display":display_id,"p2p_chat_id":chat}),
+            ),
+            callback(
+                "窗口列表",
+                "default",
+                json!({"action":"windows","p2p_chat_id":chat}),
+            ),
+        ];
+        if let Some(url) = desktop_link(config) {
+            buttons.push(open_button(&url));
+        }
+        elements.extend(row(buttons));
+    } else {
+        elements.push(div("当前屏幕仅限私聊查看。"));
+    }
+    elements.push(json!({
+        "tag": "note",
+        "elements": [label("浏览器 <网址> 在服务端打开网页；窗口输入 <序号/id/标题> <文本> 向指定窗口输入。")]
+    }));
+    checked(updatable_card("Taomni 桌面屏幕", elements))
+}
+
+/// Lists active desktop windows with 1-based index, exact ID and focus indicator.
+pub fn windows(config: &Config, list: &[DesktopWindow], p2p_chat: Option<&str>) -> Value {
+    let mut elements = Vec::new();
+    if p2p_chat.is_none() {
+        elements.push(div("窗口列表仅限私聊查看。"));
+    } else if list.is_empty() {
+        elements.push(div("当前没有可用的桌面窗口。"));
+    } else {
+        let mut lines = Vec::new();
+        let mut chars = 0usize;
+        for (index, win) in list.iter().take(12).enumerate() {
+            let state = if win.focused {
+                " [聚焦]"
+            } else if win.minimized {
+                " [最小化]"
+            } else {
+                ""
+            };
+            let title = clip(&win.title, TITLE_CHARS);
+            let app = clip(&win.app_name, 18);
+            let line = format!("{}. {title} · {app}{state} · id:{}", index + 1, win.id);
+            chars += line.chars().count();
+            if chars > BODY_CHARS && !lines.is_empty() {
+                lines.push("……已截断，请打开 Mobile Web 查看完整列表".into());
+                break;
+            }
+            lines.push(line);
+        }
+        elements.push(div(&lines.join("\n")));
+    }
+    if let Some(chat) = p2p_chat {
+        let mut buttons = vec![
+            callback(
+                "刷新窗口",
+                "default",
+                json!({"action":"windows","p2p_chat_id":chat}),
+            ),
+            callback(
+                "查看屏幕",
+                "default",
+                json!({"action":"screen","p2p_chat_id":chat}),
+            ),
+        ];
+        if let Some(url) = desktop_link(config) {
+            buttons.push(open_button(&url));
+        }
+        elements.extend(row(buttons));
+    }
+    elements.push(json!({
+        "tag": "note",
+        "elements": [label("用法：窗口输入 <序号/id/标题> <文本>；窗口回车 <目标> <文本>；窗口按键 <目标> <按键>。")]
+    }));
+    checked(updatable_card("Taomni 桌面窗口", elements))
+}
+
+/// Confirmation card when opening a URL in the server browser while screen viewing is off.
+pub fn browser_opened(
+    config: &Config,
+    url: &str,
+    window_id: &str,
+    p2p_chat: Option<&str>,
+) -> Value {
+    let mut elements = vec![div(&format!(
+        "已在 Taomni 服务端浏览器打开：\n{url}\n窗口：{window_id}\n\n当前未开启查看屏幕；在桌面 Taomni「设置 → 移动服务」勾选允许查看当前屏幕后即可在此查看网页截图与刷新。"
+    ))];
+    if let Some(chat) = p2p_chat {
+        let mut buttons = vec![
+            callback(
+                "查看屏幕",
+                "primary",
+                json!({"action":"screen","p2p_chat_id":chat}),
+            ),
+            callback(
+                "窗口列表",
+                "default",
+                json!({"action":"windows","p2p_chat_id":chat}),
+            ),
+        ];
+        if let Some(link_url) = desktop_link(config) {
+            buttons.push(open_button(&link_url));
+        }
+        elements.extend(row(buttons));
+    }
+    checked(updatable_card("Taomni 服务端浏览器", elements))
 }

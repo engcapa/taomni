@@ -1,4 +1,6 @@
-use super::{Core, MobileRuntime, agent_view, file_view, session_open, session_view, streams};
+use super::{
+    Core, MobileRuntime, agent_view, desktop, file_view, session_open, session_view, streams,
+};
 use axum::{
     Json, Router,
     extract::{ConnectInfo, DefaultBodyLimit, Path, Query, State},
@@ -7,6 +9,7 @@ use axum::{
     response::{IntoResponse, Response},
     routing::{get, post},
 };
+use base64::{Engine as _, engine::general_purpose::STANDARD as B64};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use std::{net::SocketAddr, sync::Arc};
@@ -41,13 +44,26 @@ impl IntoResponse for ApiError {
             | "origin_denied"
             | "path_denied"
             | "not_holder"
-            | "open_sessions_disabled" => StatusCode::FORBIDDEN,
+            | "open_sessions_disabled"
+            | "screen_capture_disabled"
+            | "desktop_screen_permission_required"
+            | "desktop_input_permission_required" => StatusCode::FORBIDDEN,
             "rate_limited" | "too_many_open_requests" => StatusCode::TOO_MANY_REQUESTS,
-            "turn_in_progress" | "already_resolved" | "control_busy" => StatusCode::CONFLICT,
+            "turn_in_progress"
+            | "already_resolved"
+            | "control_busy"
+            | "desktop_required"
+            | "ambiguous_window_target" => StatusCode::CONFLICT,
             "session_not_found"
             | "terminal_not_found"
             | "saved_session_not_found"
-            | "open_request_not_found" => StatusCode::NOT_FOUND,
+            | "open_request_not_found"
+            | "window_not_found" => StatusCode::NOT_FOUND,
+            "desktop_screen_capture_failed"
+            | "desktop_browser_open_failed"
+            | "window_list_failed"
+            | "window_focus_failed"
+            | "window_input_failed" => StatusCode::INTERNAL_SERVER_ERROR,
             _ => StatusCode::BAD_REQUEST,
         };
         (status, Json(json!({"error":self.0}))).into_response()
@@ -155,6 +171,13 @@ pub fn router(s: Service) -> Router {
         .route("/api/v1/open-requests/{id}", get(open_status))
         .route("/api/v1/open-requests/{id}/auth", post(open_auth))
         .route("/api/v1/open-requests/{id}/cancel", post(cancel_open))
+        .route("/api/v1/desktop/screen", get(desktop_screen))
+        .route("/api/v1/desktop/windows", get(desktop_windows))
+        .route(
+            "/api/v1/desktop/windows/{id}/input",
+            post(desktop_window_input),
+        )
+        .route("/api/v1/desktop/browser", post(desktop_browser_open))
         .route("/api/v1/events", get(streams::events))
         .route("/api/v1/terminals/{id}/stream", get(streams::terminal))
         .fallback(get(static_file))
@@ -248,6 +271,64 @@ async fn cancel_open(
     let device = authenticated(&s, &headers)?;
     s.runtime.open_requests.cancel(&device, &id)?;
     Ok(Json(json!({"status":"cancelled"})))
+}
+#[derive(Deserialize)]
+struct ScreenQuery {
+    #[serde(default)]
+    display: Option<String>,
+}
+async fn desktop_screen(
+    State(s): State<Service>,
+    headers: HeaderMap,
+    Query(query): Query<ScreenQuery>,
+) -> ApiResult {
+    authenticated(&s, &headers)?;
+    let shot = desktop::capture_screen(&s.core, query.display.as_deref()).await?;
+    Ok(Json(json!({
+        "mime": shot.mime,
+        "width": shot.width,
+        "height": shot.height,
+        "screen_width": shot.screen_width,
+        "screen_height": shot.screen_height,
+        "display_id": shot.display_id,
+        "display_name": shot.display_name,
+        "displays": shot.displays,
+        "captured_at": shot.captured_at,
+        "image_b64": B64.encode(&shot.png),
+    })))
+}
+async fn desktop_windows(State(s): State<Service>, headers: HeaderMap) -> ApiResult {
+    authenticated(&s, &headers)?;
+    let windows = desktop::list_windows(&s.core).await?;
+    Ok(Json(json!({
+        "windows": windows,
+        "screen_capture_enabled": s.runtime.desktop.screen_allowed(),
+    })))
+}
+async fn desktop_window_input(
+    State(s): State<Service>,
+    headers: HeaderMap,
+    Path(id): Path<String>,
+    Json(body): Json<desktop::WindowInputRequest>,
+) -> ApiResult {
+    authenticated(&s, &headers)?;
+    let result = desktop::send_window_input(&s.core, &id, body).await?;
+    Ok(Json(json!(result)))
+}
+async fn desktop_browser_open(
+    State(s): State<Service>,
+    headers: HeaderMap,
+    Json(body): Json<desktop::browser::BrowserOpenRequest>,
+) -> ApiResult {
+    authenticated(&s, &headers)?;
+    let opened = desktop::open_browser(&s.core, &body.url).await?;
+    Ok(Json(json!({
+        "ok": opened.ok,
+        "url": opened.url,
+        "window_id": opened.window_id,
+        "title": opened.title,
+        "screen_capture_enabled": s.runtime.desktop.screen_allowed(),
+    })))
 }
 async fn detail(State(s): State<Service>, headers: HeaderMap, Path(id): Path<String>) -> ApiResult {
     authenticated(&s, &headers)?;

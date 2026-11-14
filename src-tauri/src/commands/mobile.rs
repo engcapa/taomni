@@ -11,6 +11,7 @@ pub(super) fn handles(command: &str) -> bool {
             | "mobile_open_session_result"
             | "mobile_claim_open_session"
             | "mobile_set_open_sessions"
+            | "mobile_set_screen_capture"
             | "mobile_terminal_title"
             | "mobile_connection_auth"
             | "mobile_cancel_open_session"
@@ -36,6 +37,7 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         crate::mobile::session_open::mobile_open_session_result,
         crate::mobile::session_open::mobile_claim_open_session,
         crate::mobile::session_open::mobile_set_open_sessions,
+        crate::mobile::mobile_set_screen_capture,
         crate::mobile::session_open::mobile_terminal_title,
         crate::mobile::session_open::connection_auth::mobile_connection_auth,
         crate::mobile::session_open::connection_auth::mobile_cancel_open_session,

@@ -59,3 +59,21 @@ it("localizes pairing, device metadata and counters while keeping native actions
   fireEvent.click(screen.getByTestId("mobile-settings-revoke"));
   await waitFor(() => expect(ipc).toHaveBeenCalledWith("mobile_revoke", { deviceId: "phone" }));
 });
+
+it("reflects and toggles the explicit screen capture setting", async () => {
+  const status = { ...initial(), allow_screen_capture: false, allow_open_sessions: false };
+  ipc.mockImplementation(async (command, args?: { enabled?: boolean }) => {
+    if (command === "mobile_listener_get") return { allowed_hosts: [], allow_all_hosts: false };
+    if (command === "mobile_set_screen_capture") {
+      status.allow_screen_capture = Boolean(args?.enabled);
+      return status.allow_screen_capture;
+    }
+    return { ...status };
+  });
+  render(<MobileServiceSettings />);
+  const toggle = await screen.findByTestId("mobile-settings-screen-capture");
+  expect(toggle).not.toBeChecked();
+  fireEvent.click(toggle);
+  await waitFor(() => expect(ipc).toHaveBeenCalledWith("mobile_set_screen_capture", { enabled: true }));
+  await waitFor(() => expect(toggle).toBeChecked());
+});

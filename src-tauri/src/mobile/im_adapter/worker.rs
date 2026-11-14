@@ -22,6 +22,8 @@ pub struct Outbound {
     pub uuid: String,
     /// Terminal to keep refreshing in place after this card is delivered.
     pub follow: Option<String>,
+    /// Optional PNG screenshot to upload via `/im/v1/images` before sending the card.
+    pub image: Option<(Vec<u8>, String)>,
 }
 impl Outbound {
     pub fn text(chat: String, text: String, key: &str) -> Self {
@@ -31,6 +33,7 @@ impl Outbound {
             content: json!({"text":text.chars().take(MESSAGE_CHARS).collect::<String>()}),
             uuid: actions::key(key)[..32].into(),
             follow: None,
+            image: None,
         }
     }
     /// Cards are built within `cards::CARD_BYTES` by their builders.
@@ -43,6 +46,7 @@ impl Outbound {
                 content: card,
                 uuid: actions::key(key)[..32].into(),
                 follow: None,
+                image: None,
             },
             Reply::Terminal { card, term } => Self {
                 chat,
@@ -50,6 +54,19 @@ impl Outbound {
                 content: card,
                 uuid: actions::key(key)[..32].into(),
                 follow: Some(term),
+                image: None,
+            },
+            Reply::Screen {
+                card,
+                png,
+                filename,
+            } => Self {
+                chat,
+                kind: "interactive",
+                content: card,
+                uuid: actions::key(key)[..32].into(),
+                follow: None,
+                image: Some((png, filename)),
             },
         }
     }
@@ -276,6 +293,27 @@ pub(super) fn enqueue(runtime: &Runtime, output: &mpsc::Sender<Outbound>, value:
         runtime.error("feishu_outbound_queue_full_query_snapshot");
     }
 }
+async fn deliver_one(
+    network: &Network,
+    message: &Outbound,
+    uploaded_key: &mut Option<String>,
+) -> Result<String, String> {
+    let content = if let Some((png, filename)) = message.image.as_ref() {
+        if uploaded_key.is_none() {
+            *uploaded_key = Some(network.upload_image(png, filename).await?);
+        }
+        cards::with_screen_image_key(
+            message.content.clone(),
+            uploaded_key.as_deref().unwrap_or(""),
+        )
+    } else {
+        message.content.clone()
+    };
+    network
+        .send(&message.chat, message.kind, &content, &message.uuid)
+        .await
+}
+
 async fn delivery(
     runtime: Arc<Runtime>,
     core: Core,
@@ -283,11 +321,9 @@ async fn delivery(
     mut output: mpsc::Receiver<Outbound>,
 ) {
     while let Some(message) = output.recv().await {
+        let mut uploaded_key: Option<String> = None;
         for attempt in 0..5 {
-            match network
-                .send(&message.chat, message.kind, &message.content, &message.uuid)
-                .await
-            {
+            match deliver_one(&network, &message, &mut uploaded_key).await {
                 Ok(message_id) => {
                     runtime
                         .status

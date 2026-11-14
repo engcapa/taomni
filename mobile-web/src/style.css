@@ -82,7 +82,8 @@ textarea { min-height: 110px; resize: vertical; }
 .session-list, .saved-results { min-width: 0; }
 .session-empty-search { min-width: 0; max-width: 100%; overflow-wrap: anywhere; }
 .session-more { width: 100%; margin-top: 10px; }
-.heading-actions { display: flex; gap: 8px; flex-wrap: wrap; }
+.heading-actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.heading-actions select { width: auto; margin-top: 0; padding: 6px 10px; min-height: 42px; }
 .open-status { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; font-size: 13px; }
 .open-status p { margin: 0; }
 /* Every input mode keeps a bounded output box; fullscreen follows visualViewport. */
@@ -157,5 +158,14 @@ pre { font: 12px/1.7 ui-monospace, "SFMono-Regular", Consolas, monospace; paddin
 summary { cursor: pointer; color: #a7c5df; font: 12px monospace; padding: 12px 0; }
 video { max-width: 100%; border-radius: 8px; }
 .footer { color: #6c819e; overflow-wrap: anywhere; text-align: center; margin-top: 24px; }
+select { display: block; width: 100%; margin-top: 9px; border-radius: 8px; border: 1px solid #31425b; background: #0b1728; color: #edf5ff; padding: 11px 13px; font: inherit; font-size: 14px; outline: none; }
+select:focus { border-color: #65e2c8; box-shadow: 0 0 0 2px #65e2c822; }
+.desktop-screen-img { display: block; width: 100%; height: auto; border-radius: 9px; border: 1px solid #25354c; background: #09121f; }
+.window-chips { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; margin: 12px 0; }
+.window-chip { display: flex; flex-direction: column; gap: 4px; text-align: left; padding: 10px 12px; min-height: 0; background: #152338; }
+.window-chip strong, .window-chip small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.window-chip small { color: #91a3bd; font-size: 11px; }
+.inline-check { display: inline-flex; align-items: center; gap: 8px; margin: 0; cursor: pointer; }
+.inline-check input[type="checkbox"] { display: inline-block; width: 18px; height: 18px; margin: 0; padding: 0; accent-color: #65e2c8; }
 footer { border-top: 1px solid #213047; max-width: 940px; padding: 22px 20px max(22px, env(safe-area-inset-bottom)); margin: auto; color: #647b9b; font-size: 10px; letter-spacing: 1px; display: flex; justify-content: space-between; gap: 12px; }
 @media (max-width: 460px) { .header-label { display: none; } main { padding: 16px 14px 35px; } .card { padding: 18px; } .instance-card { padding: 0; } .terminal-card { padding: 12px; } .session-card { gap: 9px; padding: 13px; } .session-icon { padding: 8px; } .section-heading { flex-wrap: wrap; } }

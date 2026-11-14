@@ -165,8 +165,8 @@ export const SETTINGS_SEARCH_ENTRIES: SettingsSearchEntry[] = [
   },
   {
     id: "mobile-service",
-    titleKeys: ["mobileSettings.title", "mobileSettings.allowOpenSessions", "mobileSettings.hostsTitle", "mobileSettings.allowAllHosts", "feishuSettings.title"],
-    terms: ["mobile", "remote", "pairing", "headless", "host", "domain", "reverse proxy", "allowlist", "移动服务", "手机", "配对", "远程控制", "域名", "白名单", "反向代理", "feishu", "飞书", "机器人", "bot"],
+    titleKeys: ["mobileSettings.title", "mobileSettings.allowOpenSessions", "mobileSettings.allowScreenCapture", "mobileSettings.hostsTitle", "mobileSettings.allowAllHosts", "feishuSettings.title"],
+    terms: ["mobile", "remote", "pairing", "headless", "host", "domain", "reverse proxy", "allowlist", "screen", "window", "browser", "移动服务", "手机", "配对", "远程控制", "域名", "白名单", "反向代理", "屏幕", "窗口", "浏览器", "feishu", "飞书", "机器人", "bot"],
   },
   {
     id: "lanchat",

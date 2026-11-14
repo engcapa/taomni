@@ -6,6 +6,7 @@ import { useLive } from "./live";
 import { isSessionList } from "./apiContracts";
 import { openSession, type OpenTarget, type OpenStatus } from "./openSession";
 import { ConnectionAuthForm } from "./ConnectionAuthForm";
+import { DesktopView } from "./DesktopView";
 import { TaskView } from "./TaskView";
 import { TerminalView } from "./TerminalView";
 
@@ -16,10 +17,13 @@ function placeholder(id: string, title: string): Session {
   return { id, kind: id.startsWith("thread:") ? "agent" : "terminal", title, status: "running", summary: "" };
 }
 
-export function InstanceView({ instance, sessionId, onSelect, onCloseSession, onBack }: {
+export function InstanceView({ instance, sessionId, desktop, onSelect, onOpenDesktop, onCloseDesktop, onCloseSession, onBack }: {
   instance: Instance;
   sessionId?: string;
+  desktop?: boolean;
   onSelect: (sessionId: string) => void;
+  onOpenDesktop?: () => void;
+  onCloseDesktop?: () => void;
   onCloseSession: () => void;
   onBack: () => void;
 }) {
@@ -91,11 +95,15 @@ export function InstanceView({ instance, sessionId, onSelect, onCloseSession, on
   if (listed) known.current = listed;
   const selected = sessionId ? listed ?? (known.current?.id === sessionId ? known.current : placeholder(sessionId, sessionId)) : null;
   const canOpen = !!data.capabilities?.open_sessions;
+  const canDesktopControl = !!data.capabilities?.desktop_control;
   return <>
     <div className="breadcrumb"><button data-testid="mobile-instances-back" onClick={onBack}>‹ 实例</button><span>{instance.label}</span><span className="connection" data-testid="mobile-connection">{status}</span></div>
     {live.canRetry && <button data-testid="mobile-events-retry" onClick={() => { live.retry(); refresh(); }}>重新连接事件流</button>}
     {error && <div className="card error" role="alert" data-testid="mobile-instance-error"><p>{error}</p><button data-testid="mobile-retry" onClick={refresh}>重试</button></div>}
-    {selected ? <>
+    {desktop ? <>
+      <button className="back" data-testid="mobile-sessions-back" onClick={onCloseDesktop ?? onCloseSession}>‹ 会话列表</button>
+      <DesktopView key={instance.id} instance={instance} initialScreenEnabled={!!data.capabilities?.screen_capture} />
+    </> : selected ? <>
       <button className="back" data-testid="mobile-sessions-back" onClick={onCloseSession}>‹ 会话列表</button>
       {selected.kind === "terminal" ? <TerminalView key={selected.id} instance={instance} session={selected} onBack={onCloseSession} /> : <TaskView key={selected.id} instance={instance} session={selected} revision={revision} stale={status !== "已连接" || !!error} />}
     </> : <>
@@ -107,6 +115,7 @@ export function InstanceView({ instance, sessionId, onSelect, onCloseSession, on
       </div>}
       {opening && openProgress?.auth && <ConnectionAuthForm key={openProgress.auth.id} instance={instance} requestId={openProgress.request_id} challenge={openProgress.auth} onCancel={cancelOpen} />}
       <div className="section-heading"><h2>终端会话</h2><div className="heading-actions">
+        {canDesktopControl && onOpenDesktop && <button data-testid="mobile-open-desktop" onClick={onOpenDesktop}>🖥 桌面与浏览器</button>}
         {canOpen && <button className="primary" data-testid="mobile-open-local" disabled={!!opening} onClick={() => open({ kind: "local" }, "本地终端")}>＋ 本地终端</button>}
         <button data-testid="mobile-refresh" onClick={refresh}>刷新</button>
       </div></div>

@@ -3,6 +3,7 @@ mod actions;
 mod cards;
 mod commands;
 mod config;
+mod desktop_actions;
 mod network;
 mod notifications;
 mod protocol;
@@ -59,6 +60,26 @@ impl Default for Runtime {
             instance: uuid::Uuid::new_v4().to_string(),
             focus: Mutex::new(HashMap::new()),
             follows: Mutex::new(HashMap::new()),
+        }
+    }
+}
+/// Waits for the next PTY output chunk (`Some(true)`) or exit (`Some(false)`).
+async fn wait_next_output(
+    rx: &mut Option<tokio::sync::broadcast::Receiver<serde_json::Value>>,
+) -> Option<bool> {
+    let channel = rx.as_mut()?;
+    loop {
+        match channel.recv().await {
+            Ok(event) => match event["type"].as_str() {
+                Some("output") => return Some(true),
+                Some("exit") => return Some(false),
+                _ => {}
+            },
+            Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => return Some(true),
+            Err(tokio::sync::broadcast::error::RecvError::Closed) => {
+                *rx = None;
+                return None;
+            }
         }
     }
 }
@@ -144,10 +165,45 @@ impl Runtime {
         let runtime = self.clone();
         tokio::spawn(async move {
             let config = network.config.clone();
+            let raw_id = term.strip_prefix("term:").unwrap_or(&term);
+            let mut rx = core
+                .state()
+                .mobile
+                .broker
+                .subscribe(raw_id)
+                .ok()
+                .map(|(rx, _)| rx);
+            let mut last: Option<(String, String, String)> = None;
+            let deadline = tokio::time::Instant::now() + FOLLOW_INTERVAL * FOLLOW_TICKS as u32;
+            let mut first = true;
             for _ in 0..FOLLOW_TICKS {
+                let now = tokio::time::Instant::now();
+                if now >= deadline {
+                    break;
+                }
+                let fallback = if first {
+                    first = false;
+                    Duration::from_millis(450)
+                } else {
+                    FOLLOW_INTERVAL
+                };
                 tokio::select! {
                     _ = token.cancelled() => break,
-                    _ = tokio::time::sleep(FOLLOW_INTERVAL) => {}
+                    event = wait_next_output(&mut rx) => {
+                        if event == Some(true) {
+                            // Coalesce burst PTY output briefly without dropping cancellation.
+                            tokio::select! {
+                                _ = token.cancelled() => break,
+                                _ = tokio::time::sleep(Duration::from_millis(200)) => {}
+                            }
+                        } else if event.is_none() {
+                            tokio::select! {
+                                _ = token.cancelled() => break,
+                                _ = tokio::time::sleep(fallback) => {}
+                            }
+                        }
+                    }
+                    _ = tokio::time::sleep(fallback) => {}
                 }
                 let (title, status, tail) = match actions::terminal_snapshot(&core, &term) {
                     Ok(value) => value,
@@ -165,6 +221,11 @@ impl Runtime {
                         break;
                     }
                 };
+                let snapshot = (title.clone(), status.clone(), tail.clone());
+                if last.as_ref() == Some(&snapshot) && status != "exited" {
+                    continue;
+                }
+                last = Some(snapshot);
                 let card =
                     cards::terminal(&config, &term, &title, &status, &tail, true, Some(&chat));
                 if network.update_card(&message_id, &card).await.is_err() {

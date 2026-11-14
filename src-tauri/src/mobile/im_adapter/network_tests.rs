@@ -401,3 +401,140 @@ async fn selected_proxy_failure_never_falls_back_and_none_resolves_direct() {
     assert!(c.resolve_proxy(&f.state).is_err());
     f.finish().await;
 }
+
+#[tokio::test]
+async fn feishu_image_upload_uses_multipart_and_card_follow_updates_use_http_patch() {
+    use axum::{body::Bytes, extract::Path, routing::patch};
+
+    #[derive(Clone, Default)]
+    struct UploadMock {
+        uploads: Arc<Mutex<Vec<Vec<u8>>>>,
+        patched: Arc<Mutex<Vec<(String, Value)>>>,
+        sent: Arc<Mutex<Vec<Value>>>,
+    }
+
+    let mock = UploadMock::default();
+    let app = Router::new()
+        .route(
+            "/open-apis/auth/v3/tenant_access_token/internal",
+            post(|| async {
+                Json(json!({"code":0,"tenant_access_token":"fixture-token","expire":7200}))
+            }),
+        )
+        .route(
+            "/open-apis/im/v1/images",
+            post({
+                let mock = mock.clone();
+                move |headers: axum::http::HeaderMap, body: Bytes| {
+                    let mock = mock.clone();
+                    async move {
+                        assert_eq!(headers["authorization"], "Bearer fixture-token");
+                        mock.uploads.lock().unwrap().push(body.to_vec());
+                        Json(json!({"code":0,"data":{"image_key":"img_v2_mock_screen"}}))
+                    }
+                }
+            }),
+        )
+        .route(
+            "/open-apis/im/v1/messages",
+            post({
+                let mock = mock.clone();
+                move |headers: axum::http::HeaderMap, Json(body): Json<Value>| {
+                    let mock = mock.clone();
+                    async move {
+                        assert_eq!(headers["authorization"], "Bearer fixture-token");
+                        mock.sent.lock().unwrap().push(body);
+                        Json(json!({"code":0,"data":{"message_id":"om_card_1"}}))
+                    }
+                }
+            }),
+        )
+        .route(
+            "/open-apis/im/v1/messages/{message_id}",
+            patch({
+                let mock = mock.clone();
+                move |headers: axum::http::HeaderMap,
+                      Path(id): Path<String>,
+                      Json(body): Json<Value>| {
+                    let mock = mock.clone();
+                    async move {
+                        assert_eq!(headers["authorization"], "Bearer fixture-token");
+                        mock.patched.lock().unwrap().push((id, body));
+                        Json(json!({"code":0,"data":{}}))
+                    }
+                }
+            }),
+        );
+
+    let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let base = format!("http://{}", listener.local_addr().unwrap());
+    let server = tokio::spawn(async move {
+        axum::serve(listener, app).await.unwrap();
+    });
+
+    let mut net = Network::new(config(), Zeroizing::new("fixture-secret".into()), None).unwrap();
+    net.base = base;
+
+    let mut png = b"\x89PNG\r\n\x1a\n".to_vec();
+    png.extend_from_slice(&[1, 2, 3, 4]);
+    let key = net.upload_image(&png, "desktop-screen.png").await.unwrap();
+    assert_eq!(key, "img_v2_mock_screen");
+    {
+        let uploads = mock.uploads.lock().unwrap();
+        assert_eq!(uploads.len(), 1);
+        assert!(uploads[0].windows(8).any(|w| w == b"\x89PNG\r\n\x1a\n"));
+    }
+
+    let card = cards::screen(
+        &config(),
+        "Primary",
+        "display-0",
+        1280,
+        720,
+        Some("已刷新"),
+        Some("oc_allowed"),
+    );
+    let updated_card = cards::with_screen_image_key(card, &key);
+    let sent = worker::Outbound::reply(
+        "oc_allowed".into(),
+        actions::Reply::Screen {
+            card: updated_card.clone(),
+            png: png.clone(),
+            filename: "desktop-screen.png".into(),
+        },
+        "screen-key-1",
+    );
+    assert_eq!(sent.image.as_ref().unwrap().1, "desktop-screen.png");
+
+    let msg_id = net
+        .send(&sent.chat, sent.kind, &sent.content, &sent.uuid)
+        .await
+        .unwrap();
+    assert_eq!(msg_id, "om_card_1");
+    assert!(
+        mock.sent.lock().unwrap()[0]["content"]
+            .as_str()
+            .unwrap()
+            .contains("img_v2_mock_screen")
+    );
+
+    net.update_card(
+        &msg_id,
+        &json!({"header":{"title":{"tag":"plain_text","content":"Updated"}}}),
+    )
+    .await
+    .unwrap();
+    {
+        let patched = mock.patched.lock().unwrap();
+        assert_eq!(patched.len(), 1);
+        assert_eq!(patched[0].0, "om_card_1");
+        assert!(
+            patched[0].1["content"]
+                .as_str()
+                .unwrap()
+                .contains("Updated")
+        );
+    }
+
+    server.abort();
+}

@@ -14288,6 +14288,66 @@ controls:
   - id: mobile-type-backspace
     selector: '[data-testid="mobile-type-backspace"]'
     kind: interactive
+  - id: mobile-settings-screen-capture
+    selector: '[data-testid="mobile-settings-screen-capture"]'
+    kind: interactive
+  - id: mobile-open-desktop
+    selector: '[data-testid="mobile-open-desktop"]'
+    kind: interactive
+  - id: mobile-desktop-view
+    selector: '[data-testid="mobile-desktop-view"]'
+    kind: display
+  - id: mobile-desktop-display
+    selector: '[data-testid="mobile-desktop-display"]'
+    kind: interactive
+  - id: mobile-desktop-auto-refresh
+    selector: '[data-testid="mobile-desktop-auto-refresh"]'
+    kind: interactive
+  - id: mobile-desktop-refresh
+    selector: '[data-testid="mobile-desktop-refresh"]'
+    kind: interactive
+  - id: mobile-screen-disabled
+    selector: '[data-testid="mobile-screen-disabled"]'
+    kind: display
+  - id: mobile-screen-image
+    selector: '[data-testid="mobile-screen-image"]'
+    kind: display
+  - id: mobile-screen-meta
+    selector: '[data-testid="mobile-screen-meta"]'
+    kind: display
+  - id: mobile-browser-url
+    selector: '[data-testid="mobile-browser-url"]'
+    kind: interactive
+  - id: mobile-browser-open
+    selector: '[data-testid="mobile-browser-open"]'
+    kind: interactive
+  - id: mobile-browser-status
+    selector: '[data-testid="mobile-browser-status"]'
+    kind: display
+  - id: mobile-windows-refresh
+    selector: '[data-testid="mobile-windows-refresh"]'
+    kind: interactive
+  - id: mobile-window-select
+    selector: '[data-testid="mobile-window-select"]'
+    kind: interactive
+  - id: mobile-window-item
+    selector: '[data-testid="mobile-window-item"]'
+    kind: interactive
+  - id: mobile-window-input
+    selector: '[data-testid="mobile-window-input"]'
+    kind: interactive
+  - id: mobile-window-submit
+    selector: '[data-testid="mobile-window-submit"]'
+    kind: interactive
+  - id: mobile-window-send
+    selector: '[data-testid="mobile-window-send"]'
+    kind: interactive
+  - id: mobile-window-key-f5
+    selector: '[data-testid="mobile-window-key-f5"]'
+    kind: interactive
+  - id: mobile-window-result
+    selector: '[data-testid="mobile-window-result"]'
+    kind: display
 -->
 
 - 默认不监听；全局设置开启回环/局域网移动服务，生成一次性码、查看与吊销设备。

@@ -7,8 +7,11 @@ it("round-trips every view through the hash", () => {
     { view: "pair" },
     { view: "pair", sessionId: "thread:abc123" },
     { view: "instance", instanceId: "http://192.168.1.5:8787:device-1" },
+    { view: "instance", instanceId: "http://192.168.1.5:8787:device-1", desktop: true },
     { view: "instance", instanceId: "https://pc.example:device", sessionId: "term:ws:abc:local:x9" },
     { view: "link", sessionId: "thread:4f2a" },
+    { view: "desktopLink" },
+    { view: "pair", desktop: true },
   ];
   for (const route of routes) expect(parseRoute(routeHash(route))).toEqual(route);
 });
@@ -16,6 +19,7 @@ it("round-trips every view through the hash", () => {
 it("accepts the deep link format the instance sends to Feishu", () => {
   expect(parseRoute("#/session/thread%3Aabc123")).toEqual({ view: "link", sessionId: "thread:abc123" });
   expect(parseRoute("#/session/term%3Alocal-1")).toEqual({ view: "link", sessionId: "term:local-1" });
+  expect(parseRoute("#/desktop")).toEqual({ view: "desktopLink" });
 });
 
 it("falls back to the instance list for empty or malformed hashes", () => {

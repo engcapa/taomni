@@ -15,8 +15,14 @@ from . import StepContext, StepError, verb
 
 @verb('mobile_browser_probe')
 def mobile_browser_probe(ctx: StepContext, args: Any) -> None:
-    if args not in ('touch-scroll', 'recovery', 'cookie-gateway', 'terminal-tools') or ctx.cfg['app']['mode'] != 'browser':
-        raise StepError('mobile_browser_probe requires browser mode and touch-scroll, recovery, cookie-gateway or terminal-tools')
+    if args == 'desktop-enable-screen' and ctx.cfg['app']['mode'] == 'browser':
+        state = getattr(ctx, '_mobile_web_state', None)
+        if state is None:
+            raise StepError('desktop-enable-screen requires mobile_web fixture')
+        state['screen_allowed'] = True
+        return
+    if args not in ('touch-scroll', 'recovery', 'cookie-gateway', 'terminal-tools', 'desktop-enable-screen') or ctx.cfg['app']['mode'] != 'browser':
+        raise StepError('mobile_browser_probe requires browser mode and touch-scroll, recovery, cookie-gateway, terminal-tools or desktop-enable-screen')
     if ctx.dry_run:
         return
     if args == 'terminal-tools':

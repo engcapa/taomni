@@ -96,6 +96,7 @@ impl Notifications {
                             uuid: actions::key(&format!("{id}:{}", confirmation["id"]))[..32]
                                 .into(),
                             follow: None,
+                            image: None,
                         },
                     );
                 }

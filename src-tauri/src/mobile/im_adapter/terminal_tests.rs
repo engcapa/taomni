@@ -166,3 +166,25 @@ async fn input_without_a_terminal_id_or_focus_is_actionable() {
     assert!(reply.text().contains("未指定终端"), "{}", reply.text());
     f.finish().await;
 }
+
+#[tokio::test]
+async fn sending_terminal_input_auto_refreshes_the_returned_card_output() {
+    let _pty = crate::terminal::pty::test_lock();
+    let f = Fixture::new().await;
+    let core = Core::Headless(f.state.clone());
+    let terminal = TestTerminal::start(&f, "feishu-term").await;
+    let id = "term:feishu-term";
+    let reply = actions::execute_request(
+        &core,
+        &config(),
+        &actions::request(&format!("input {id} echo IMMEDIATE_FEISHU_AUTO"), true),
+    )
+    .await;
+    assert!(
+        reply.text().contains("IMMEDIATE_FEISHU_AUTO"),
+        "expected immediate input reply card to include fresh stdout without calling show: {}",
+        reply.text()
+    );
+    terminal.stop(&f).await;
+    f.finish().await;
+}

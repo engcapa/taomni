@@ -249,4 +249,7 @@ def register(verb, terminal_input):
         if args == 'terminal-query':
             from .mobile_terminal_query import run as terminal_query
             return terminal_query(ctx, address(ctx), text(ctx, '[data-testid="mobile-settings-code"]'), terminal_input)
-        raise StepError('mobile_service_probe requires desktop, headless, open-session, connection-auth, openssh-cancel, cookie-gateway, host-policy or terminal-query')
+        if args == 'desktop-remote':
+            from .mobile_desktop_remote import run as desktop_remote
+            return desktop_remote(ctx, address(ctx), text(ctx, '[data-testid="mobile-settings-code"]'))
+        raise StepError('mobile_service_probe requires desktop, headless, open-session, connection-auth, openssh-cancel, cookie-gateway, host-policy, terminal-query or desktop-remote')
