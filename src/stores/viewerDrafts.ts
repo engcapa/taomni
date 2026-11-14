@@ -19,6 +19,10 @@ export function readViewerDrafts(): Record<string, ViewerDraft> {
 export function writeViewerDrafts(documents: Record<string, ViewerDocument>): void {
   const drafts = readViewerDrafts();
   for (const [key, document] of Object.entries(documents)) {
+    // A reload publishes a loading document before its disk content arrives.
+    // Keep an existing draft through that transient state; the completed
+    // document will reconcile it once loading finishes.
+    if (document.loading) continue;
     if (!document.dirty || document.readOnly) { delete drafts[key]; continue; }
     drafts[key] = {
       path: document.path, content: document.content, savedContent: document.savedContent,

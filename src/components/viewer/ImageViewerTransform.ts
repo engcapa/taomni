@@ -35,24 +35,17 @@ export function useImageTransform(path: string, width: number, height: number, l
       y: (point?.y ?? 0) - ((point?.y ?? 0) - current.y) * ratio }));
     setManualScale(next); setMode("custom");
   }, [scale]);
-  useEffect(() => {
-    const element = stage.current;
-    if (!element) return;
-    const wheel = (event: WheelEvent) => {
-      if (!width || !height) return;
-      event.preventDefault();
-      const bounds = element.getBoundingClientRect();
-      zoom(Math.exp(-Math.max(-200, Math.min(200, event.deltaY)) * 0.002), {
-        x: event.clientX - bounds.left - bounds.width / 2, y: event.clientY - bounds.top - bounds.height / 2,
-      });
-    };
-    element.addEventListener("wheel", wheel, { passive: false });
-    return () => element.removeEventListener("wheel", wheel);
-  }, [zoom, width, height, layout]);
-
   const reset = (next: "fit" | "actual") => { setMode(next); setPan({ x: 0, y: 0 }); };
   return {
     stage, mode, scale, rotation, flipped, pan, panning, zoom, reset,
+    wheel: (event: React.WheelEvent<HTMLDivElement>) => {
+      if (!width || !height) return;
+      event.preventDefault();
+      const bounds = event.currentTarget.getBoundingClientRect();
+      zoom(Math.exp(-Math.max(-200, Math.min(200, event.deltaY)) * 0.002), {
+        x: event.clientX - bounds.left - bounds.width / 2, y: event.clientY - bounds.top - bounds.height / 2,
+      });
+    },
     rotate: (direction: number) => { setRotation((value) => (value + direction * 90 + 360) % 360); setPan({ x: 0, y: 0 }); },
     flip: () => setFlipped((value) => !value),
     pointerDown: (event: React.PointerEvent<HTMLDivElement>) => {

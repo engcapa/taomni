@@ -66,8 +66,12 @@ export function markdownInput(options: InputOptions): Extension {
       if (view.state.readOnly) return false;
       const data = event.clipboardData;
       if (!data) return false;
-      const images = Array.from(data.items).filter((item) => item.kind === "file" && item.type.startsWith("image/"))
+      const itemImages = Array.from(data.items).filter((item) => item.kind === "file" && item.type.startsWith("image/"))
         .map((item) => item.getAsFile()).filter((file): file is File => Boolean(file));
+      // WebKit/Tauri can expose an OS image through DataTransfer.files while
+      // leaving clipboardData.items empty. Prefer items when available, then
+      // use the standards-backed files list without synthesizing an event.
+      const images = itemImages.length ? itemImages : Array.from(data.files ?? []).filter((file) => file.type.startsWith("image/"));
       if (images.length) { event.preventDefault(); void insertMarkdownImages(view, images); return true; }
       if (!options.preferences().convertTables) return false;
       // Windows clipboard strings use CRLF, while CM positions count its

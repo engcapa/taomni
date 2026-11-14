@@ -59,6 +59,14 @@ export function ExplorerFileList(inputs: FilePanelViewProps) {
     const index = entries.findIndex((entry) => entry.path === operations.renamePath);
     if (index >= 0) virtual.scrollToIndex(Math.floor(index / columns), { align: "auto" });
   }, [operations.renamePath, columns, entries, virtual]);
+  const virtualItems = virtual.getVirtualItems();
+  // TanStack can briefly report an empty range while its first measurement is
+  // waiting for ResizeObserver. Mount the small directory rows during that
+  // window so file actions have a real target; large directories stay fully
+  // virtualized until the measurement arrives.
+  const rows = virtualItems.length || entries.length > 200
+    ? virtualItems
+    : Array.from({ length: Math.ceil(entries.length / columns) }, (_, index) => ({ index, start: index * rowHeight }));
   // Use the same store as FilePanel; Explorer has no independent selection model.
   const selectNow = (paths: string[]) => useSftpStore.getState().setSelection(inputs.sessionId, "local", paths);
   const handleKeys = (event: React.KeyboardEvent) => {
@@ -140,7 +148,7 @@ export function ExplorerFileList(inputs: FilePanelViewProps) {
       {!entries.length && !pane.loading && !pane.error && <div className="ex-empty">{label(inputs.filterActive ? "没有匹配的项目" : "此文件夹为空", inputs.filterActive ? "No matching items" : "This folder is empty")}<br /><small>{label("右键可新建文件夹/文件，或把文件拖到这里", "Right-click to create a file or folder, or drag files here")}</small></div>}
       {pane.loading && !entries.length && <div className="ex-empty" role="status">{label("正在加载…", "Loading…")}</div>}
       <div style={{ height: virtual.getTotalSize() + (icons ? 16 : 0), position: "relative", minWidth: icons ? undefined : preferences.view === "list" ? 0 : 460 }}>
-        {virtual.getVirtualItems().flatMap((row) => Array.from({ length: columns }, (_, col) => {
+        {rows.flatMap((row) => Array.from({ length: columns }, (_, col) => {
           const entry = entries[row.index * columns + col];
           if (!entry) return null;
           const directory = effectiveFileType(entry) === "dir";

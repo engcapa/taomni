@@ -106,6 +106,15 @@ describe("clipboard conversion, async ownership and formatting", () => {
     expect(undo(view)).toBe(true); expect(view.state.doc.toString()).toBe("A\tB\nx\ty");
     expect(undo(view)).toBe(true); expect(view.state.doc.toString()).toBe("");
   });
+  it("accepts native clipboard files when WebKit leaves clipboard items empty", async () => {
+    vi.mocked(saveMarkdownImage).mockResolvedValue({ path: "/docs/assets/img.png", relativePath: "assets/img.png", markdown: "![image](assets/img.png)" });
+    const view = editor("before\n", [input()], 7);
+    const event = new Event("paste", { bubbles: true, cancelable: true });
+    Object.defineProperty(event, "clipboardData", { value: { items: [], files: [new File(["image"], "clipboard.png", { type: "image/png" })], getData: () => "" } });
+    view.contentDOM.dispatchEvent(event);
+    await vi.waitFor(() => expect(view.state.doc.toString()).toContain("assets/img.png"));
+    expect(onStatus).toHaveBeenCalledWith("Images saved; relative links inserted");
+  });
   it("maps async image insertion through edits made while saving", async () => {
     let resolve!: (value: Awaited<ReturnType<typeof saveMarkdownImage>>) => void;
     vi.mocked(saveMarkdownImage).mockImplementation(() => new Promise((done) => { resolve = done; }));

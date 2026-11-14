@@ -19,7 +19,7 @@ import { useImageTransform } from "./ImageViewerTransform";
 import { useViewerLabels } from "./viewerLabels";
 import "./ImageViewer.css";
 
-const SVG_EXTENSIONS = [xml()];
+const SVG_EXTENSIONS = [xml({ autoCloseTags: false })];
 type ImageViewerProps = { document: ViewerDocument; onError: (message: string) => void; workspaceId?: string };
 type SvgMode = "render" | "code" | "split";
 
@@ -115,6 +115,7 @@ function ImageViewerContent({ document, onError, workspaceId }: ImageViewerProps
           <div className={`image-stage image-background-${background}${transform.panning ? " is-panning" : ""}`} hidden={svg && svgMode === "code"}
             data-testid="image-stage" ref={transform.stage} tabIndex={0} aria-label={label("图片画布", "Image canvas")}
             onPointerDown={(event) => { event.currentTarget.focus({ preventScroll: true }); transform.pointerDown(event); }}
+            onWheel={transform.wheel}
             onPointerMove={transform.pointerMove} onPointerUp={transform.pointerEnd} onPointerCancel={transform.pointerEnd} onLostPointerCapture={transform.pointerEnd}>
             {resource && !imageError && <img ref={image} key={resource.url} className="image-render" data-testid="image-render" src={resource.url} alt={filename} draggable={false}
               style={{ transform: `translate(${transform.pan.x}px, ${transform.pan.y}px) scale(${transform.scale}) rotate(${transform.rotation}deg) scaleX(${transform.flipped ? -1 : 1})` }}
