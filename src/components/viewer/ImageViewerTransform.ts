@@ -38,17 +38,29 @@ export function useImageTransform(path: string, width: number, height: number, l
       setManualScale(next); setMode("custom");
     });
   }, [scale]);
+  const wheel = useCallback((event: WheelEvent) => {
+    if (!width || !height) return;
+    event.preventDefault();
+    const element = stage.current;
+    if (!element) return;
+    const bounds = element.getBoundingClientRect();
+    zoom(Math.exp(-Math.max(-200, Math.min(200, event.deltaY)) * 0.002), {
+      x: event.clientX - bounds.left - bounds.width / 2,
+      y: event.clientY - bounds.top - bounds.height / 2,
+    });
+  }, [height, width, zoom]);
+  useEffect(() => {
+    const element = stage.current;
+    if (!element) return;
+    // React's delegated wheel listener is passive in WebKit. Register the
+    // canvas listener directly so native wheel input can be cancelled and
+    // applied as a viewer zoom rather than scrolling the surrounding shell.
+    element.addEventListener("wheel", wheel, { passive: false });
+    return () => element.removeEventListener("wheel", wheel);
+  }, [wheel]);
   const reset = (next: "fit" | "actual") => flushSync(() => { setMode(next); setPan({ x: 0, y: 0 }); });
   return {
     stage, mode, scale, rotation, flipped, pan, panning, zoom, reset,
-    wheel: (event: React.WheelEvent<HTMLDivElement>) => {
-      if (!width || !height) return;
-      event.preventDefault();
-      const bounds = event.currentTarget.getBoundingClientRect();
-      zoom(Math.exp(-Math.max(-200, Math.min(200, event.deltaY)) * 0.002), {
-        x: event.clientX - bounds.left - bounds.width / 2, y: event.clientY - bounds.top - bounds.height / 2,
-      });
-    },
     rotate: (direction: number) => flushSync(() => { setRotation((value) => (value + direction * 90 + 360) % 360); setPan({ x: 0, y: 0 }); }),
     flip: () => flushSync(() => setFlipped((value) => !value)),
     pointerDown: (event: React.PointerEvent<HTMLDivElement>) => {
