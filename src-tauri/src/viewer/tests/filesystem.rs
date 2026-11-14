@@ -320,6 +320,32 @@ fn temporary_copy_release_never_accepts_arbitrary_paths() {
     );
     release_temp(&temp.path).unwrap();
     assert!(!std::path::Path::new(&temp.path).exists());
+    let canonical_temp = create_temp("canonical.txt", b"canonical").unwrap();
+    let canonical_path =
+        super::super::paths::display(&fs::canonicalize(&canonical_temp.path).unwrap());
+    release_temp(&canonical_path).unwrap();
+    assert!(!std::path::Path::new(&canonical_temp.path).exists());
+    #[cfg(unix)]
+    {
+        let alias_root = tempfile::tempdir().unwrap();
+        let dir_aliased = create_temp("parent-alias.txt", b"parent-alias").unwrap();
+        let parent_dir = std::path::Path::new(&dir_aliased.path).parent().unwrap();
+        let dir_link = alias_root.path().join("temp-dir-link");
+        std::os::unix::fs::symlink(parent_dir, &dir_link).unwrap();
+        let resolved_via_parent = dir_link.join("parent-alias.txt");
+        release_temp(resolved_via_parent.to_str().unwrap()).unwrap();
+        assert!(!std::path::Path::new(&dir_aliased.path).exists());
+
+        let leaf_target = create_temp("leaf-target.txt", b"leaf").unwrap();
+        let leaf_link = alias_root.path().join("leaf-link.txt");
+        std::os::unix::fs::symlink(&leaf_target.path, &leaf_link).unwrap();
+        assert!(
+            release_temp(leaf_link.to_str().unwrap())
+                .unwrap_err()
+                .starts_with("permission:")
+        );
+        release_temp(&leaf_target.path).unwrap();
+    }
     assert_eq!(fs::read(original.path()).unwrap(), b"untouched");
     let allocated = allocate_temp("stream.txt").unwrap();
     assert_eq!(fs::metadata(&allocated.path).unwrap().len(), 0);

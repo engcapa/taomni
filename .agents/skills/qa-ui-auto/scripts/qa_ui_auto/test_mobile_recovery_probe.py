@@ -3,7 +3,7 @@ import unittest
 from unittest.mock import Mock, patch
 
 from .deadline import BudgetedPage, Deadline
-from .mobile_recovery_probe import expect, fail_status_after_message, task_session_url, forward_event
+from .mobile_recovery_probe import expect, fail_status_after_message, settled_freshness, task_session_url, forward_event
 
 
 class RecoveryExpectTest(unittest.TestCase):
@@ -65,3 +65,17 @@ class RecoveryExpectTest(unittest.TestCase):
             expect(locator, timeout=1234).to_contain_text('retained output')
         assertion.assert_called_once_with(locator)
         assertion.return_value.to_contain_text.assert_called_once_with('retained output', timeout=1234)
+
+
+class SettledFreshnessTests(unittest.TestCase):
+    def test_waits_for_and_returns_atomic_freshness_snapshot(self):
+        expected = {'mobile-changes-updated': '上次更新 3:17:23 PM', 'mobile-file-updated': '上次更新 3:17:23 PM'}
+        handle = Mock()
+        handle.json_value.return_value = expected
+        page = Mock()
+        page.wait_for_function.return_value = handle
+        self.assertEqual(settled_freshness(page), expected)
+        page.wait_for_function.assert_called_once()
+        kwargs = page.wait_for_function.call_args.kwargs
+        self.assertEqual(kwargs['arg'], ['mobile-changes-updated', 'mobile-file-updated'])
+        self.assertEqual(kwargs['timeout'], 10000)

@@ -193,6 +193,38 @@ class MarkdownNativeArtifactsTests(unittest.TestCase):
         (directory/'assets/b.png').unlink()
         with self.assertRaises(StepError):artifacts.check_artifact('markdown',directory,self.source,self.manifest)
 
+    def test_html_export_accepts_mermaid_v11_split_tspan_labels(self):
+        image = base64.b64encode(self.clipboard.read_bytes()).decode()
+        mermaid_v11_svg = (
+            '<svg xmlns="http://www.w3.org/2000/svg" width="540" height="80">'
+            '<g class="nodes">'
+            '<g class="node"><text><tspan class="text-outer-tspan"><tspan class="text-inner-tspan">Markdown</tspan>'
+            '<tspan class="text-inner-tspan"> Source</tspan></tspan></text></g>'
+            '<g class="node"><text><tspan class="text-outer-tspan"><tspan class="text-inner-tspan">Live</tspan>'
+            '<tspan class="text-inner-tspan"> Diagram</tspan></tspan></text></g>'
+            '<g class="node"><text><tspan class="text-outer-tspan"><tspan class="text-inner-tspan">Export</tspan>'
+            '<tspan class="text-inner-tspan"> Artifact</tspan></tspan></text></g>'
+            '</g></svg>'
+        )
+        html = self.exports / 'native.html'
+        html.write_text(
+            '<h1>File open Markdown</h1><strong>Rendered bold</strong><span class="katex">x^2</span>'
+            + f'<img src="data:image/png;base64,{image}">' * 2
+            + mermaid_v11_svg,
+            encoding='utf-8',
+        )
+        artifacts.check_artifact('html', html, self.source, self.manifest)
+        # Diagram text outside SVG must not satisfy the SVG check if SVG lacks the labels.
+        html.write_text(
+            '<h1>File open Markdown</h1><strong>Rendered bold</strong><span class="katex">x^2</span>'
+            + '<p>Markdown Source Live Diagram Export Artifact</p>'
+            + f'<img src="data:image/png;base64,{image}">' * 2
+            + '<svg xmlns="http://www.w3.org/2000/svg"></svg>',
+            encoding='utf-8',
+        )
+        with self.assertRaises(StepError):
+            artifacts.check_artifact('html', html, self.source, self.manifest)
+
     def test_clipboard_fixture_cleanup_restores_text_and_records_format_boundary(self):
         with patch('qa_ui_auto.host_clipboard.set_text') as restore,patch('qa_ui_auto.host_clipboard.clear') as clear:
             markdown_native.teardown(self.ctx)

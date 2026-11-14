@@ -107,19 +107,38 @@ def fail_status_after_message(route, submitted):
     route.continue_()
 
 
+def settled_freshness(page, names=('mobile-changes-updated', 'mobile-file-updated'), timeout=10000):
+    """Wait until all named freshness labels settle and capture them atomically."""
+    handle = page.wait_for_function(
+        """(targetNames) => {
+          const result = {};
+          for (const name of targetNames) {
+            const el = document.querySelector(`[data-testid="${name}"]`);
+            if (!el) return null;
+            const text = (el.innerText || el.textContent || '').trim();
+            if (!text.includes('上次更新') || text.includes('—') || text.includes('正在更新') || text.includes('可能已过期')) {
+              return null;
+            }
+            result[name] = text;
+          }
+          return result;
+        }""",
+        arg=list(names),
+        timeout=timeout,
+    )
+    return handle.json_value()
+
+
 def freshness(page, case_dir, delivery):
     """Only task details succeed while changes and an already-open file fail."""
     page.evaluate("location.hash = '#/session/thread%3Aqa-task'")
     expect(page.get_by_test_id('mobile-file-open')).to_be_visible()
     page.get_by_test_id('mobile-file-open').click()
     expect(page.get_by_test_id('mobile-file-content')).to_contain_text('QA_MOBILE_CHANGED')
-    for name in ('mobile-changes-updated', 'mobile-file-updated'):
-        locator = page.get_by_test_id(name)
-        expect(locator).to_contain_text('上次更新')
-        expect(locator).not_to_contain_text('—')
-        expect(locator).not_to_contain_text('正在更新')
-        expect(locator).not_to_contain_text('可能已过期')
-    before = {name: page.get_by_test_id(name).inner_text() for name in ('mobile-changes-updated', 'mobile-file-updated')}
+    # Let InstanceView's 100ms post-back session_changed debounce complete before
+    # capturing baseline timestamps for stale-data assertions.
+    page.wait_for_timeout(350)
+    before = settled_freshness(page)
     assert all('—' not in value and '正在更新' not in value and '可能已过期' not in value for value in before.values()), before
 
     def unavailable(route):
