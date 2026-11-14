@@ -1,7 +1,10 @@
 import { EditorSelection, Transaction, type Extension } from "@codemirror/state";
 import { EditorView, ViewPlugin, type ViewUpdate } from "@codemirror/view";
 import { isolateHistory } from "@codemirror/commands";
+import { readClipboardImageFiles, readNativeClipboardImagePath } from "../../../lib/clipboard";
 import { saveMarkdownImage } from "../../../lib/markdownAssets";
+import { isTauriRuntime } from "../../../lib/runtime";
+import { VIEWER_IMAGE_LIMIT, viewerReadBytes } from "../../../lib/viewer";
 import { convertTablePaste } from "./markdownModel";
 
 interface InputOptions {
@@ -42,6 +45,32 @@ export async function insertMarkdownImages(view: EditorView, files: Blob[], rang
   } finally { owner.pending.delete(pending); }
 }
 
+async function pasteNativeClipboardImages(view: EditorView): Promise<void> {
+  const owner = owners.get(view);
+  if (!owner || !owner.alive || view.state.readOnly) return;
+  try {
+    const nativePath = await readNativeClipboardImagePath();
+    if (!owner.alive || view.state.readOnly) return;
+    if (nativePath) {
+      const payload = await viewerReadBytes(nativePath, VIEWER_IMAGE_LIMIT);
+      if (!owner.alive || view.state.readOnly || !payload.bytes.length) return;
+      const mime = payload.mime?.startsWith("image/") ? payload.mime : "image/png";
+      const ext = mime === "image/jpeg" ? "jpg" : mime.split("/")[1] || "png";
+      const file = new File([new Uint8Array(payload.bytes)], `clipboard-image.${ext}`, { type: mime });
+      await insertMarkdownImages(view, [file]);
+      return;
+    }
+    const files = await readClipboardImageFiles();
+    if (!owner.alive || view.state.readOnly || !files.length) return;
+    await insertMarkdownImages(view, files);
+  } catch (error) {
+    if (owner.alive) {
+      owner.options.onStatus("");
+      owner.options.onError(error instanceof Error ? error.message : String(error));
+    }
+  }
+}
+
 export function markdownInput(options: InputOptions): Extension {
   return [ViewPlugin.define((view) => {
     const owner: Owner = { pending: new Set(), alive: true, options };
@@ -69,6 +98,12 @@ export function markdownInput(options: InputOptions): Extension {
       const images = Array.from(data.items).filter((item) => item.kind === "file" && item.type.startsWith("image/"))
         .map((item) => item.getAsFile()).filter((file): file is File => Boolean(file));
       if (images.length) { event.preventDefault(); void insertMarkdownImages(view, images); return true; }
+      const hasTextOrHtml = Boolean(data.getData("text/plain") || data.getData("text/html"));
+      if (!hasTextOrHtml && isTauriRuntime()) {
+        event.preventDefault();
+        void pasteNativeClipboardImages(view);
+        return true;
+      }
       if (!options.preferences().convertTables) return false;
       // Windows clipboard strings use CRLF, while CM positions count its
       // normalized LF document. Use the exact inserted length for selection

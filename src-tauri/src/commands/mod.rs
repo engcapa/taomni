@@ -314,6 +314,7 @@ pub(crate) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         | "temporary_file_path"
         | "clipboard_read_text"
         | "clipboard_write_text"
+        | "clipboard_write_image_png"
         | "clipboard_read_multi_format"
         | "clipboard_write_multi_format"
         | "clipboard_capabilities"

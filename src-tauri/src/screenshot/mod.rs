@@ -196,7 +196,7 @@ mod scroll_commands;
 
 mod output_commands;
 
-mod clipboard_copy;
+pub(crate) mod clipboard_copy;
 
 mod overlay_commands;
 

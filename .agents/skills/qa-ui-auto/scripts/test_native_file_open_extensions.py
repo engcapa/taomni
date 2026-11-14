@@ -204,5 +204,27 @@ class MarkdownNativeArtifactsTests(unittest.TestCase):
         records=[json.loads(line) for line in (self.ctx.case_dir/'markdown-artifacts.jsonl').read_text().splitlines()]
         self.assertEqual([record['passed'] for record in records],[True,False])
 
+    def test_windows_native_paste_foreground_activation_handles_empty_fg_and_lock(self):
+        from qa_ui_auto import native_paste
+        self.assertIn('EnumWindows', native_paste.WIN)
+        self.assertIn('attachedTarget', native_paste.WIN)
+        self.assertIn('keybd_event(0x12,0,0,UIntPtr.Zero)', native_paste.WIN)
+        self.assertIn('fgPid=', native_paste.WIN)
+
+        ctx = SimpleNamespace(
+            case_dir=self.root / 'win-case',
+            dry_run=False,
+            session=SimpleNamespace(application='/tmp/taomni.exe', execute=lambda _script: True),
+        )
+        ctx.case_dir.mkdir(parents=True, exist_ok=True)
+        fake_completed = SimpleNamespace(returncode=0, stdout='{"pid":42,"window":99,"transport":"Windows OS Ctrl+V"}', stderr='')
+        with patch('qa_ui_auto.native_paste.platform.system', return_value='Windows'), \
+             patch('qa_ui_auto.native_paste.subprocess.run', return_value=fake_completed) as run_mock:
+            result = native_paste.run(ctx, {'selector': '[data-testid="markdown-editor"] .cm-content'})
+        self.assertIn('native OS paste chord', result)
+        run_mock.assert_called_once()
+        records = [json.loads(line) for line in (ctx.case_dir / 'native-paste.jsonl').read_text().splitlines()]
+        self.assertEqual(records, [{'selector': '[data-testid="markdown-editor"] .cm-content', 'syntheticClipboardEvent': False, 'passed': True, 'pid': 42, 'window': 99, 'transport': 'Windows OS Ctrl+V'}])
+
 
 if __name__=='__main__':unittest.main()

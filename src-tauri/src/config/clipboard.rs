@@ -2,10 +2,66 @@ use super::paths::clipboard_paths_from_uri_text;
 use super::platform;
 use crate::state::AppState;
 use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
 use tauri::State;
+use tauri::ipc::{InvokeBody, Request};
 
 #[path = "platform/file_clipboard.rs"]
 pub(super) mod file_clipboard;
+
+const MAX_CLIPBOARD_IMAGE_BYTES: usize = 64 * 1024 * 1024;
+
+pub(crate) fn decode_clipboard_png(bytes: &[u8]) -> Result<image::RgbaImage, String> {
+    if bytes.is_empty() {
+        return Err("clipboard image payload is empty".to_string());
+    }
+    if bytes.len() > MAX_CLIPBOARD_IMAGE_BYTES {
+        return Err(format!(
+            "clipboard image exceeds {} bytes limit",
+            MAX_CLIPBOARD_IMAGE_BYTES
+        ));
+    }
+    image::load_from_memory_with_format(bytes, image::ImageFormat::Png)
+        .map(|img| img.into_rgba8())
+        .map_err(|error| format!("decode clipboard png: {error}"))
+}
+
+pub(crate) fn write_image_png_bytes(
+    clipboard: &Arc<Mutex<Option<arboard::Clipboard>>>,
+    bytes: &[u8],
+) -> Result<(), String> {
+    let rgba = decode_clipboard_png(bytes)?;
+    crate::screenshot::clipboard_copy::publish(clipboard, &rgba).map_err(|error| error.to_string())
+}
+
+#[tauri::command(async)]
+pub fn clipboard_write_image_png(
+    request: Request<'_>,
+    state: State<'_, AppState>,
+) -> impl std::future::Future<Output = Result<(), String>> + Send + 'static {
+    let payload = match request.body() {
+        InvokeBody::Raw(bytes) => {
+            if bytes.is_empty() {
+                Err("clipboard image payload is empty".to_string())
+            } else if bytes.len() > MAX_CLIPBOARD_IMAGE_BYTES {
+                Err(format!(
+                    "clipboard image exceeds {} bytes limit",
+                    MAX_CLIPBOARD_IMAGE_BYTES
+                ))
+            } else {
+                Ok(bytes.clone())
+            }
+        }
+        InvokeBody::Json(_) => Err("clipboard_write_image_png expects raw bytes".to_string()),
+    };
+    let clipboard = Arc::clone(&state.clipboard);
+    async move {
+        let bytes = payload?;
+        tauri::async_runtime::spawn_blocking(move || write_image_png_bytes(&clipboard, &bytes))
+            .await
+            .map_err(|error| format!("clipboard image worker failed: {error}"))?
+    }
+}
 
 #[tauri::command]
 pub fn clipboard_read_text(state: State<'_, AppState>) -> Result<String, String> {

@@ -218,6 +218,19 @@ export async function writeMultiFormat(payload: MultiFormatPayload): Promise<voi
 
 /** Write a PNG blob as an image to the system clipboard. */
 export async function writeImagePng(blob: Blob): Promise<void> {
+  if (isTauriRuntime()) {
+    const buffer =
+      typeof blob.arrayBuffer === "function"
+        ? await blob.arrayBuffer()
+        : await new Response(blob).arrayBuffer();
+    const bytes = new Uint8Array(buffer);
+    if (bytes.byteLength === 0) {
+      throw new Error("Clipboard image payload is empty");
+    }
+    await invoke("clipboard_write_image_png", bytes);
+    notifyClipboardWritten();
+    return;
+  }
   if (typeof ClipboardItem === "undefined" || !navigator.clipboard?.write) {
     throw new Error("Image clipboard not supported in this environment");
   }
