@@ -1,4 +1,4 @@
-import { useMemo, useState, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useMemo, useState, type KeyboardEvent } from "react";
 import {
   ChevronLeft, ChevronRight, Copy, Download, ExternalLink, FlipHorizontal2, FolderOpen,
   Maximize, Minus, Plus, RotateCcw, RotateCw, Save, ShieldCheck, Code2,
@@ -46,6 +46,37 @@ function ImageViewerContent({ document, onError, workspaceId }: ImageViewerProps
   const imageError = error || (decodeError === resource?.url ? label("图片损坏或当前 WebView 不支持此格式。", "The image is damaged or this WebView does not support its format.") : "");
   const ready = !!resource && !!dimensions.width && !imageError;
   const zoomText = transform.mode === "fit" ? label("适应", "Fit") : `${Math.round(transform.scale * 100)}%`;
+
+  const markDecoded = useCallback(() => {
+    const current = image.current;
+    if (!current || current.naturalWidth <= 0 || current.naturalHeight <= 0) return false;
+    setDecodeError("");
+    setDimensions({ width: current.naturalWidth, height: current.naturalHeight });
+    return true;
+  }, [image, setDimensions]);
+
+  useEffect(() => {
+    if (!resource || imageError) return;
+    let cancelled = false;
+    let timer: ReturnType<typeof window.setTimeout> | undefined;
+    let frame = 0;
+    let attempts = 0;
+    const check = () => {
+      if (cancelled || markDecoded() || attempts++ >= 96) return;
+      timer = window.setTimeout(() => {
+        frame = window.requestAnimationFrame(check);
+      }, 32);
+    };
+    // Native WebViews can complete a blob image between the image commit and
+    // React's onLoad listener. Polling the current element for a short window
+    // also covers decode completion after a hidden viewer becomes visible.
+    if (!markDecoded()) check();
+    return () => {
+      cancelled = true;
+      if (timer !== undefined) window.clearTimeout(timer);
+      if (frame) window.cancelAnimationFrame(frame);
+    };
+  }, [imageError, markDecoded, resource]);
 
   const run = async (action: () => Promise<unknown>, message?: string) => {
     if (working) return;
@@ -119,7 +150,7 @@ function ImageViewerContent({ document, onError, workspaceId }: ImageViewerProps
             onWheel={(event) => transform.wheel(event.nativeEvent)}>
             {resource && !imageError && <img ref={image} key={resource.url} className="image-render" data-testid="image-render" src={resource.url} alt={filename} draggable={false}
               style={{ transform: `translate(${transform.pan.x}px, ${transform.pan.y}px) scale(${transform.scale}) rotate(${transform.rotation}deg) scaleX(${transform.flipped ? -1 : 1})` }}
-              onLoad={(event) => { setDecodeError(""); setDimensions({ width: event.currentTarget.naturalWidth, height: event.currentTarget.naturalHeight }); }}
+              onLoad={() => { markDecoded(); }}
               onError={() => setDecodeError(resource.url)} />}
             {(loading || document.loading) && <div className="image-state" role="status">{label("正在读取图片…", "Loading image…")}</div>}
             {imageError && <div className="image-state" role="alert"><FileError message={imageError === "image_viewer_limit" || /too_large/i.test(imageError) ? label("图片查看器采用保守的 32 MiB 文件上限（尚未完成真机性能测量）；超出上限请使用系统应用。", "The image viewer uses a conservative 32 MiB file cap (not yet native performance-measured). Open larger files in the system app.") : imageError}

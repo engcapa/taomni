@@ -6,6 +6,7 @@ import { effectiveFileType, sftpStat } from "../../../lib/sftp";
 import { getLocale } from "../../../lib/i18n";
 import { getAppPlatform } from "../../../lib/runtime";
 import { normalizeLocalStartCwd } from "../../../lib/terminalCwd";
+import { useAppStore } from "../../../stores/appStore";
 import type { TerminalSessionLifecycleContext } from "./sessionContracts";
 
 /** xterm provider lifetime follows its terminal, not the current visible tab. */
@@ -42,7 +43,23 @@ export function installTerminalFileLinks(term: Terminal, context: TerminalSessio
           }
           void (async () => {
             if (effectiveFileType(await sftpStat("", path, "local")) === "dir") return;
-            await openFile({ path }, { context: "terminal-link", workspaceId: fileOpenWorkspaceForTab(context.tabId), line: link.line });
+            const workspaceId = fileOpenWorkspaceForTab(context.tabId);
+            const opened = await openFile({ path }, { context: "terminal-link", workspaceId, line: link.line });
+            // xterm may restore the terminal tab after the async link handler
+            // completes. Re-assert the main viewer on later tasks as well as
+            // the immediate activation performed by openFile, so a repeated
+            // link click cannot leave an existing viewer hidden behind its
+            // source terminal.
+            if (opened && !workspaceId && useAppStore.getState().tabs.some((tab) => tab.id === opened && tab.type === "file-viewer")) {
+              const activate = () => {
+                const app = useAppStore.getState();
+                app.setActiveSideTab("sessions");
+                app.setActiveTab(opened);
+              };
+              activate();
+              window.setTimeout(activate, 50);
+              window.setTimeout(activate, 250);
+            }
           })().catch((error) => context.setStatusMessage(error instanceof Error ? error.message : String(error)));
         },
       }));
