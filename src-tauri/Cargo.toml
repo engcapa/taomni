@@ -280,6 +280,9 @@ picky-krb = { path = "vendor/picky-krb" }
 portable-pty = { path = "vendor/portable-pty" }
 sspi = { path = "vendor/sspi" }
 tauri-utils = { path = "vendor/tauri-utils" }
+# WebView2 must honor main-frame-only initialization; never inject Tauri IPC
+# credentials into opaque local HTML preview frames (see vendor/wry/VENDORED.md).
+wry = { path = "vendor/wry" }
 winscard = { path = "vendor/winscard" }
 
 [features]

@@ -15,7 +15,7 @@ TEXT = "File open original\nSecond line\n中文\n"
 SAVED = "File open saved\nSecond line\n中文\n"
 SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="80"><script>window.FILE_OPEN_SVG_UNSAFE=true</script><rect width="120" height="80" fill="#2563eb" onload="alert(1)"/><image href="https://example.invalid/tracker.png"/></svg>\n'
 SVG_SAVED = '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="90"><rect width="160" height="90" fill="#16a34a"/></svg>\n'
-MARKDOWN = "# File open Markdown\n\n**Rendered bold** and `inline code`.\n\n## Details\n\n![Original](assets/pixel.png)\n\n- [ ] First task\n\n```mermaid\nflowchart LR\n  Explorer --> OpenFile --> Viewer\n```\n"
+MARKDOWN = "# File open Markdown\n\n**Rendered bold** and `inline code`.\n\nMath: $x^2$ and $$\\frac{1}{2}$$.\n\n## Details\n\n![Original](assets/pixel.png)\n\n- [ ] First task\n\n```mermaid\nflowchart LR\n  Explorer --> OpenFile --> Viewer\n```\n"
 HTML = '''<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="assets/local.css"></head><body><h1>File open HTML</h1><div id="resource">Local resource</div><img id="pixel" src="assets/pixel.png"><a href="next.html">Next local page</a><a href="https://example.invalid/external">External browser</a><script>
 window.addEventListener("load", function () {
   console.log("FILE_OPEN_SCRIPT_OK");

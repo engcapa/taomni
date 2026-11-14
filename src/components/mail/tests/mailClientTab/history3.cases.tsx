@@ -4,7 +4,7 @@ import type { MailDraft, MailFolder, MailFolderSyncResult, MailMessageHeader } f
 import { useAppStore } from "../../../../stores/appStore";
 import type { MailTabInfo } from "../../../../types";
 import { MailClientTab } from "../../MailClientTab";
-import { calendarMocks, eventMocks, folder, info, mailMocks, message, messageBody, renderMailbox, stepResult } from "./harness";
+import { attachmentOpenMocks, calendarMocks, eventMocks, folder, info, mailMocks, message, messageBody, renderMailbox, stepResult } from "./harness";
 
 export interface registerMailClientTabHistory3CasesContext {
   useDraftStore: () => MailDraft[];
@@ -260,13 +260,19 @@ export function registerMailClientTabHistory3Cases(caseContext: registerMailClie
     };
     mailMocks.mailListCachedMessages.mockResolvedValue([large]);
     mailMocks.mailGetMessageBody.mockResolvedValue({ ...messageBody, attachments: large.attachments });
-    mailMocks.mailDownloadAttachment.mockResolvedValue({ path: "/tmp/big.pdf", name: "big.pdf", contentType: "application/pdf", size: 3 });
+    mailMocks.mailDownloadAttachment.mockImplementation(async (_info, _folder, _uid, _index, targetPath) => ({ path: targetPath, name: "big.pdf", contentType: "application/pdf", size: 3 }));
     renderMailbox();
     await screen.findByText(/Second line stays visible/);
     const chip = await screen.findByTitle(/big\.pdf/);
     fireEvent.doubleClick(chip);
     await waitFor(() => expect(mailMocks.mailDownloadAttachment).toHaveBeenCalled());
     expect(mailMocks.mailDownloadAttachment.mock.calls[0][5]).toBe("2");
+    expect(attachmentOpenMocks.viewerCreateTemp).toHaveBeenCalledWith("big.pdf", []);
+    expect(mailMocks.mailDownloadAttachment).toHaveBeenCalledWith(info, large.folder, large.uid, 0, "/controlled-mail/big.pdf", "2");
+    await waitFor(() => expect(attachmentOpenMocks.openFile).toHaveBeenCalledWith({
+      path: "/controlled-mail/big.pdf", source: "mail-attachment", readOnlyReason: "Mail attachment · read-only copy",
+    }, { context: "mail-attachment", mode: undefined }));
+    expect(attachmentOpenMocks.viewerReleaseTemp).not.toHaveBeenCalled();
   });
 
   it("reviews and trusts a self-signed server certificate (AC-44)", async () => {

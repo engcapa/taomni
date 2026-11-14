@@ -31,10 +31,12 @@ describe("self-contained sanitized Markdown output", () => {
     await expect(exportMarkdown("html", "![x](assets/a.png)", "/docs/a.md", DEFAULT_EXPORT_SETTINGS)).rejects.toThrow("permission denied");
     expect(saveExportBlob).not.toHaveBeenCalled();
   });
-  it("renders Mermaid into sanitized embedded SVG and highlights fenced code", async () => {
-    const result = await prepareMarkdownExport("```mermaid\nflowchart LR\nA-->B\n```\n\n```rust\nfn main() {}\n```", "/docs/a.md", DEFAULT_EXPORT_SETTINGS);
+  it("renders Mermaid, KaTeX math and highlighted fenced code into export HTML", async () => {
+    const result = await prepareMarkdownExport("Inline $x^2$ and $$\\frac{1}{2}$$.\n\n```mermaid\nflowchart LR\nA-->B\n```\n\n```rust\nfn main() {}\n```", "/docs/a.md", DEFAULT_EXPORT_SETTINGS);
     expect(result.root.querySelector(".fv-md-mermaid svg")).not.toBeNull();
+    expect(result.root.querySelectorAll(".fv-md-math .katex")).toHaveLength(2);
     expect(result.root.querySelector("pre code .tok-keyword")).not.toBeNull();
+    expect(result.html).toContain("katex");
     expect(result.html).not.toContain("language-mermaid");
   });
   it("applies actual page CSS, header/page counters and inclusion switches", async () => {

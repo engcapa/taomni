@@ -2,6 +2,7 @@
 import hashlib
 import json
 from pathlib import Path
+import subprocess
 import tempfile
 from types import SimpleNamespace
 import unittest
@@ -71,6 +72,134 @@ class FileOpenAssetsTests(unittest.TestCase):
         self.assertNotIn("vfsWrite", script)
         self.assertNotIn("invoke", script)
         self.assertEqual(path, "/preview/file-open-test/gone.txt")
+
+    def test_browser_temp_requires_observed_source_and_reuses_only_retained_path(self):
+        manifest = self.ctx.case_dir / "file-open-fixture.json"
+        data = json.loads(manifest.read_text())
+        data.update(mode="browser", root="/preview/file-open-test")
+        manifest.write_text(json.dumps(data))
+        self.ctx.page = Mock()
+        path = "/preview/.viewer-temp/owned/copy.txt"
+        with self.assertRaisesRegex(StepError, "outside"):
+            oracle.run(self.ctx, {"path": path, "absent": True}, mode="browser")
+        self.ctx.page.evaluate.assert_not_called()
+        self.ctx.page.locator.return_value.evaluate_all.return_value = [path]
+        self.ctx.page.evaluate.return_value = {"exists": True, "bytes": [65]}
+        oracle.run(self.ctx, {"selector": ".readonly-viewer", "remember": "copy", "equals": "A"}, mode="browser")
+        self.ctx.page.evaluate.return_value = {"exists": False}
+        oracle.run(self.ctx, {"remember": "copy", "absent": True}, mode="browser")
+        self.assertEqual(self.ctx.page.evaluate.call_args.args[1], path)
+        with self.assertRaisesRegex(StepError, "outside"):
+            oracle.run(self.ctx, {"path": "/preview/.viewer-temp/other/copy.txt", "absent": True}, mode="browser")
+        self.assertEqual(self.ctx.page.evaluate.call_count, 2)
+
+    def test_browser_absence_never_matches_empty_content_or_empty_digest(self):
+        manifest = self.ctx.case_dir / "file-open-fixture.json"
+        data = json.loads(manifest.read_text())
+        data.update(mode="browser", root="/preview/file-open-test")
+        manifest.write_text(json.dumps(data))
+        self.ctx.page = Mock()
+        self.ctx.page.evaluate.return_value = {"exists": False}
+        for postcondition in ({"equals": ""}, {"sha256": hashlib.sha256(b"").hexdigest()}):
+            with self.subTest(postcondition=postcondition), self.assertRaisesRegex(StepError, "differ"):
+                oracle.run(self.ctx, {"path": "/preview/file-open-test/gone.txt", "timeout_sec": 0, **postcondition}, mode="browser")
+        records = [json.loads(line) for line in (self.ctx.case_dir / "file-open-byte-observations.jsonl").read_text().splitlines()]
+        self.assertEqual([row["passed"] for row in records], [False, False])
+        self.assertTrue(all(row["samples"][0]["exists"] is False for row in records))
+
+    def test_browser_vfs_read_script_proves_absence_without_swallowing_read_errors(self):
+        # Execute the exact observer script. Only its imported VFS boundary is
+        # controlled; this reproduces deletion between the two asynchronous reads.
+        script = r"""
+import assert from "node:assert/strict";
+import { createContext, SourceTextModule, SyntheticModule } from "node:vm";
+
+const source = process.argv[1];
+const path = "/preview/.viewer-temp/owned/copy.txt";
+const missing = () => new Error(`Not found: ${path}`);
+const notFile = () => new Error(`Not a file: ${path}`);
+const file = { fileType: "file" };
+const fixtures = [
+  { name: "regular binary bytes", stats: [file], bytes: [0, 255, 128],
+    expected: { exists: true, bytes: [0, 255, 128] }, calls: ["stat", "read"] },
+  { name: "empty file exists", stats: [file], bytes: [],
+    expected: { exists: true, bytes: [] }, calls: ["stat", "read"] },
+  { name: "already deleted", stats: [missing()], expected: { exists: false }, calls: ["stat"] },
+  { name: "deleted after first stat", stats: [file, missing()], readError: notFile(),
+    expected: { exists: false }, calls: ["stat", "read", "stat"] },
+  { name: "directory remains", stats: [{ fileType: "dir" }, { fileType: "dir" }],
+    readError: notFile(), error: `Not a file: ${path}`, calls: ["stat", "read", "stat"] },
+  { name: "file data missing", stats: [file, file], readError: notFile(),
+    error: `Not a file: ${path}`, calls: ["stat", "read", "stat"] },
+  { name: "initial permission error", stats: [new Error("Permission denied")],
+    error: "Permission denied", calls: ["stat"] },
+  { name: "read permission is not absence", stats: [file, missing()],
+    readError: new Error("Permission denied"), error: "Permission denied", calls: ["stat", "read"] },
+  { name: "binary read failure is not absence", stats: [file, missing()],
+    readError: new Error("Invalid binary data"), error: "Invalid binary data", calls: ["stat", "read"] },
+  { name: "recheck permission error", stats: [file, new Error("Permission denied")],
+    readError: notFile(), error: "Permission denied", calls: ["stat", "read", "stat"] },
+  { name: "not found text inside another failure", stats: [new Error("Backend not found: unavailable")],
+    error: "Backend not found: unavailable", calls: ["stat"] },
+  { name: "other path not found", stats: [new Error(`Not found: ${path}.other`)],
+    error: `Not found: ${path}.other`, calls: ["stat"] },
+  { name: "other path not a file", stats: [file, missing()],
+    readError: new Error(`Not a file: ${path}.other`),
+    error: `Not a file: ${path}.other`, calls: ["stat", "read"] },
+  { name: "unclassified read not found", stats: [file, missing()],
+    readError: missing(), error: `Not found: ${path}`, calls: ["stat", "read"] },
+];
+for (const fixture of fixtures) {
+  const calls = [];
+  const stats = [...fixture.stats];
+  const context = createContext({ Error });
+  const vfs = new SyntheticModule(["vfsStat", "vfsReadBytes"], function () {
+    this.setExport("vfsStat", async (actual) => {
+      assert.equal(actual, path, fixture.name);
+      calls.push("stat");
+      assert.ok(stats.length, `unexpected extra stat: ${fixture.name}`);
+      const value = stats.shift();
+      if (value instanceof Error) throw value;
+      return value;
+    });
+    this.setExport("vfsReadBytes", async (actual) => {
+      assert.equal(actual, path, fixture.name);
+      calls.push("read");
+      if (fixture.readError) throw fixture.readError;
+      return Uint8Array.from(fixture.bytes).buffer;
+    });
+  }, { context });
+  await vfs.link(() => assert.fail("unexpected VFS dependency"));
+  await vfs.evaluate();
+  const observer = new SourceTextModule(`export default (${source});`, {
+    context,
+    importModuleDynamically: async (specifier) => {
+      assert.equal(specifier, "/src/stubs/localVfs.ts");
+      return vfs;
+    },
+  });
+  await observer.link(() => assert.fail("unexpected observer dependency"));
+  await observer.evaluate();
+  try {
+    const value = await observer.namespace.default(path);
+    assert.equal(fixture.error, undefined, `unexpected success: ${fixture.name}`);
+    assert.deepEqual(JSON.parse(JSON.stringify(value)), fixture.expected, fixture.name);
+  } catch (error) {
+    assert.notEqual(fixture.error, undefined, `unexpected error: ${fixture.name}`);
+    assert.equal(error.message, fixture.error, fixture.name);
+    const expectedError = [fixture.readError, ...fixture.stats].find(
+      (value) => value instanceof Error && value.message === fixture.error,
+    );
+    assert.equal(error, expectedError, fixture.name);
+  }
+  assert.deepEqual(calls, fixture.calls, fixture.name);
+}
+"""
+        result = subprocess.run(
+            ["node", "--experimental-vm-modules", "--input-type=module", "-e", script, oracle.READ_VFS],
+            cwd=ROOT, capture_output=True, text=True, timeout=15, check=False,
+        )
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_retained_ide_crash_cases_only_add_explicit_route_setup(self):
         # Frozen semantic contracts from baseline 719109a3; independent of git

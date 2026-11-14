@@ -54,9 +54,31 @@ describe("browser viewer command contract", () => {
     expect(document.scripts).toHaveLength(1);
     const policy = document.querySelector("meta")?.getAttribute("content");
     expect(policy).toMatch(/script-src 'nonce-[^']+'/);
+    const nonce = policy?.match(/script-src 'nonce-([^']+)'/)?.[1];
+    expect(document.scripts[0].getAttribute("nonce")).toBe(nonce);
+    expect(document.scripts[0].textContent).toContain("Local sandbox ready");
     expect(policy).toContain("connect-src 'none'");
     expect(policy).not.toContain("http:");
     expect(policy).not.toContain("https:");
+  });
+  it("serializes the trusted bridge nonce even when a detached-document nonce property does not reflect", async () => {
+    const descriptor = Object.getOwnPropertyDescriptor(HTMLScriptElement.prototype, "nonce");
+    Object.defineProperty(HTMLScriptElement.prototype, "nonce", { configurable: true, get: () => "", set: () => undefined });
+    try {
+      files.set("/preview/report.html", new TextEncoder().encode('<a href="https://example.invalid">External</a><script>window.AUTHOR_SCRIPT=true</script>'));
+      const document = await htmlOutput(false);
+      const policy = document.querySelector("meta")?.getAttribute("content");
+      const nonce = policy?.match(/script-src 'nonce-([^']+)'/)?.[1];
+      expect(nonce).toBeTruthy();
+      expect(document.scripts).toHaveLength(1);
+      expect(document.scripts[0].getAttribute("nonce")).toBe(nonce);
+      expect(document.scripts[0].textContent).toContain("kind,...data");
+      expect(document.documentElement.outerHTML).not.toContain("AUTHOR_SCRIPT");
+      expect(policy).not.toContain("unsafe-inline' blob:");
+    } finally {
+      if (descriptor) Object.defineProperty(HTMLScriptElement.prototype, "nonce", descriptor);
+      else delete (HTMLScriptElement.prototype as unknown as { nonce?: string }).nonce;
+    }
   });
   it("checks full hash and preserves encoding/BOM/EOL on saving", async () => {
     files.set("/preview/file.txt", new TextEncoder().encode("old\r\n"));

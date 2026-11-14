@@ -22,6 +22,11 @@
 .fv-md-live-surface .cm-content{font-family:var(--taomni-font-sans,Inter,system-ui,-apple-system,"Segoe UI",sans-serif)!important}
 .fv-md-live-surface .cm-scroller{font-size:15px}
 .fv-md-live-surface .cm-line{white-space:pre-wrap;overflow-wrap:anywhere}
+/* CM's break-spaces belongs to editable source, not marked's HTML formatting
+   newlines. Otherwise each serializer newline adds a full 26.25px blank line. */
+.fv-md-rendered-block,.fv-md-table-wrap,.fv-md-image{white-space:normal}
+.fv-md-source-marker{color:var(--subtle,var(--muted))!important;font-family:var(--mono,ui-monospace,monospace)!important;font-weight:400!important;font-size:.8em!important;text-decoration:none!important}
+.fv-md-source-marker *{color:inherit!important;font-family:inherit!important;font-weight:inherit!important;font-size:inherit!important;text-decoration:none!important}
 .fv-md-source-line{margin:.3em 0}
 .fv-md-current-line{background:color-mix(in srgb,var(--accent-s) 7%,transparent)!important;border-radius:6px;box-shadow:inset 3px 0 0 var(--accent-s)}
 .fv-md-heading-1{font-size:2em;line-height:1.3;font-weight:700;padding-bottom:.25em!important;border-bottom:1px solid var(--divider);margin:.2em 0 .6em}
@@ -40,6 +45,8 @@
 .fv-md-doc li,.fv-md-rendered-block li{margin:.15em 0}
 .fv-md-task-item{list-style:none;margin-left:-1.3em!important;position:relative;padding-left:23px}
 .fv-md-task{position:absolute;left:0;top:.45em;width:15px;height:15px;border:1.5px solid var(--muted);border-radius:4px;display:inline-flex;align-items:center;justify-content:center;padding:0!important;font-size:11px;line-height:1}
+.fv-md-task-state{position:absolute;left:0;top:0;white-space:normal;font-family:system-ui,sans-serif;color:var(--muted);text-decoration:none}
+.fv-md-task-item.is-checked>.fv-md-task-state{color:var(--accent-s)}
 .fv-md-task.is-checked{background:var(--accent-s);border-color:var(--accent-s);color:#fff}
 .fv-md-task-item.is-checked{text-decoration:line-through;color:var(--muted)}
 .fv-md-doc a,.fv-md-rendered-block a{color:var(--accent-s);text-decoration:underline;cursor:pointer}
@@ -68,6 +75,10 @@
 .fv-md-image-tools button:hover{background:rgba(255,255,255,.18)}
 .fv-md-image.is-error .fv-md-image-frame{min-width:120px;min-height:44px;border-style:dashed}
 .fv-md-mermaid{border:1px solid var(--divider);border-radius:8px;margin:.9em 0;padding:12px;text-align:center;background:var(--code-bg);overflow:auto}
+.fv-md-math{display:inline-block;vertical-align:middle;max-width:100%;overflow-x:auto;overflow-y:hidden}
+.fv-md-math-display{display:block;text-align:center;margin:.8em 0}
+.fv-md-math .katex{font-size:1.05em}
+.fv-md-math-display .katex-display{margin:0}
 .fv-md-mermaid svg{max-width:100%;height:auto;margin:auto}
 .fv-md-render-error,.fv-md-image-error{color:var(--taomni-danger,#dc2626);font-size:12px}
 .fv-md-focus .fv-md-rendered-block,.fv-md-focus .fv-md-table-wrap,.fv-md-focus .fv-md-image,.fv-md-dim{opacity:.35}

@@ -35,7 +35,9 @@ class RenderedBlock extends WidgetType {
       // marked strips input via the shared sanitizer; locate the corresponding
       // task by text instead of assigning checkboxes to unrelated list items.
       const text = this.raw.slice((task.index ?? 0) + task[0].length).split("\n")[0].trim().replace(/[*_`]/g, "");
-      if (!(item.textContent || "").trim().startsWith(text)) return;
+      const labelContent = item.cloneNode(true) as HTMLElement;
+      labelContent.querySelectorAll(".fv-md-task-state,ul,ol").forEach((node) => node.remove());
+      if (!(labelContent.textContent || "").trim().startsWith(text)) return;
       taskIndex++;
       const toggle = document.createElement("button");
       const checked = task[2].toLowerCase() === "x";
@@ -53,7 +55,9 @@ class RenderedBlock extends WidgetType {
       };
       item.classList.add("fv-md-task-item");
       if (checked) item.classList.add("is-checked");
-      item.prepend(toggle);
+      const passive = Array.from(item.children).find((child) => child.classList.contains("fv-md-task-state"));
+      if (passive) passive.replaceWith(toggle);
+      else item.prepend(toggle);
     });
     root.onclick = (event) => {
       const anchor = (event.target as Element).closest("a");
@@ -78,7 +82,8 @@ function decorations(state: EditorState, context: MarkdownWidgetContext, focus: 
   const anchor = state.selection.main.head;
   const currentLine = state.doc.lineAt(anchor);
   const blocks = markdownBlocks(state.doc.toString());
-  for (const block of blocks) {
+  for (let index = 0; index < blocks.length; index++) {
+    const block = blocks[index];
     if (!block.raw.trim()) continue;
     const end = block.to - (block.raw.endsWith("\n") ? 1 : 0);
     if (end <= block.from) continue;
@@ -89,7 +94,20 @@ function decorations(state: EditorState, context: MarkdownWidgetContext, focus: 
     else if (image && !active) widget = new ImageWidget(block.from, block.raw, image, context);
     else if (!active) widget = new RenderedBlock(block.from, block.raw, context);
     if (widget) {
-      ranges.push(Decoration.replace({ widget, block: true, inclusive: false }).range(block.from, end));
+      // The HTML block already owns its paragraph/heading spacing. Leaving
+      // Markdown's separator newlines outside a block replacement creates
+      // several full-height empty .cm-line nodes between every rendered block.
+      // Include only inactive separators; a caret in a blank source line must
+      // still get a real editable line, including the final insertion point.
+      let replaceTo = block.to;
+      for (let next = index + 1; next < blocks.length && !blocks[next].raw.trim(); next++) replaceTo = blocks[next].to;
+      for (const selection of state.selection.ranges) {
+        if (selection.from >= block.to && selection.from <= replaceTo) {
+          replaceTo = Math.max(block.to, state.doc.lineAt(selection.from).from);
+        }
+      }
+      const endsAtCaretLine = state.selection.ranges.some((selection) => state.doc.lineAt(selection.from).from === replaceTo);
+      ranges.push(Decoration.replace({ widget, block: true, inclusiveStart: true, inclusiveEnd: !endsAtCaretLine }).range(block.from, replaceTo));
     } else {
       let pos = block.from;
       while (pos <= end) {
@@ -99,10 +117,16 @@ function decorations(state: EditorState, context: MarkdownWidgetContext, focus: 
           heading ? `fv-md-heading-${heading[1].length}` : "",
           focus && line.from !== currentLine.from ? "fv-md-dim" : ""].filter(Boolean).join(" ");
         ranges.push(Decoration.line({ class: cls }).range(line.from));
+        if (heading) ranges.push(Decoration.mark({ class: "fv-md-source-marker" }).range(line.from, line.from + heading[0].length));
         if (line.to >= end || line.to === state.doc.length) break;
         pos = line.to + 1;
       }
     }
+  }
+  // Space tokens are not rendered blocks. Keep the active empty source line
+  // visibly editable even when surrounding rendered blocks own their spacing.
+  if (!currentLine.text.trim() && !ranges.some((range) => range.value.spec.class?.includes("fv-md-current-line"))) {
+    ranges.push(Decoration.line({ class: "fv-md-source-line fv-md-current-line" }).range(currentLine.from));
   }
   return Decoration.set(ranges, true);
 }

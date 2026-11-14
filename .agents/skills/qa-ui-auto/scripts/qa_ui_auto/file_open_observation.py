@@ -13,9 +13,19 @@ from .steps import StepError
 
 READ_VFS = """async (path) => {
   const vfs = await import('/src/stubs/localVfs.ts');
+  const missing = (error) => error instanceof Error && error.message === `Not found: ${path}`;
   try { await vfs.vfsStat(path); }
-  catch (error) { if (String(error).toLowerCase().includes('not found')) return {exists: false}; throw error; }
-  return {exists: true, bytes: Array.from(new Uint8Array(await vfs.vfsReadBytes(path)))};
+  catch (error) { if (missing(error)) return {exists: false}; throw error; }
+  try {
+    return {exists: true, bytes: Array.from(new Uint8Array(await vfs.vfsReadBytes(path)))};
+  } catch (error) {
+    // Cleanup can remove the file after stat. "Not a file" also means a directory
+    // or damaged record, so only a fresh, exact not-found observation proves absence.
+    if (!(error instanceof Error) || error.message !== `Not a file: ${path}`) throw error;
+    try { await vfs.vfsStat(path); }
+    catch (statError) { if (missing(statError)) return {exists: false}; throw statError; }
+    throw error;
+  }
 }"""
 
 
@@ -43,8 +53,8 @@ def run(ctx: Any, args: Any, *, mode: str) -> str:
     path = args.get("path")
     observed_temp = False
     if args.get("selector"):
-        script = "return Array.from(document.querySelectorAll(arguments[0])).map(function(el){return el.getAttribute('data-path');});"
-        paths = ctx.session.execute(script, [args["selector"]]) if mode == "native" else ctx.page.locator(args["selector"]).evaluate_all("els => els.map(el => el.getAttribute('data-path'))")
+        script = "return Array.from(document.querySelectorAll(" + json.dumps(args["selector"]) + ")).map(function(el){return el.getAttribute('data-path');});"
+        paths = ctx.session.execute(script) if mode == "native" else ctx.page.locator(args["selector"]).evaluate_all("els => els.map(el => el.getAttribute('data-path'))")
         if not isinstance(paths, list) or len(paths) != 1 or not paths[0]:
             raise StepError("assert_file_open_bytes: expected one observed file viewer path")
         path = paths[0]

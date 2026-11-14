@@ -3,7 +3,7 @@
 ## 当前状态（2026-11-14）
 
 - 分支：`feat/file-open-improve`，开发基线 `719109a3`。
-- 实现进行中；此记录不等同于 UI / 原生验收通过。
+- 实现进行中；此记录不等同于 UI / 原生验收通过。当前 KaTeX 补齐与最后一轮 native 修复仍在验证，未提交。
 - 用户指定：本地仅单元测试与静态检查，所有 browser/native 通过 GitHub `qa-ui-auto-platforms.yml`。不在本地启动桌面或浏览器作产品验证。
 - 原型依据：`prototype-v1.html`，采用 DEC-02 A / DEC-03 A / DEC-04 A。不实现原型顶栏的评审控制器、模拟粘贴按钮或固定样本页面。
 
@@ -48,9 +48,9 @@
 | Node / pnpm | 聚焦批次最终使用 Node 22.23.5 / pnpm 10.30.0，与 CI 主版本一致；初始环境 Node24 已切换。 |
 | 核心+保留前端单元 | `pnpm exec vitest run --maxWorkers=4 src/components/viewer src/components/explorer src/lib/openFile src/lib/markdownAssets.test.ts src/stores/documentStore.test.ts src/stores/documentStore.lifecycle.test.ts src/components/settings/FileOpenSettings.test.tsx src/lib/fileOpenTemp.test.ts src/lib/filePathLinks.test.ts src/components/filebrowser/FileToolbarWiring.test.tsx src/layouts/MainLayout.test.tsx`：首个稳定批次 **33 files / 340 tests passed**；最终扩展集合加入 Explorer 恢复、Workspace/AI/terminal/stub 保留验证，**44 files / 425 tests passed**；首轮失败修复后的扩展集合（含 HTML data URI 资源、CRLF paste、设置 clear→type、文本行列状态）**45 files / 436 tests passed**；HTML 外链 consent 新增测试的被动 effect 就绪问题已用单次发送前显式 await act 修复，生产 bridge 改为 layout effect 防初始页面消息丢失。 |
 | 类型 / 边界 | `pnpm exec tsc -b --pretty false`、`pnpm check:refactor` 已通过一轮；native 命令契约 821，新增文件均不超过 800 行。最终网络通道变更后复验通过；source size 4600 文件。 |
-| Rust | 最终 `cargo test --manifest-path src-tauri/Cargo.toml --lib viewer:: -- --nocapture`：**24 passed / 0 failed**；`workspace::tests` 保留过滤集：**90 passed / 0 failed**（含 query_workspace 名称匹配项）；编码/BOM/EOL、temp防写、路径越界、代理绕过环境/不回落、取消/大小上限与原子写前置条件通过。 |
+| Rust | 初轮 `cargo test --manifest-path src-tauri/Cargo.toml --lib viewer:: -- --nocapture`：**24 passed / 0 failed**；跨平台 `openat` 修复后新增私有文件/目录权限验证，**25 passed / 0 failed**；`workspace::tests` 保留过滤集：**90 passed / 0 failed**（含 query_workspace 名称匹配项）。编码/BOM/EOL、temp防写、路径越界、代理绕过环境/不回落、取消/大小上限与原子写前置条件通过；macOS 编译仍需 hosted 再验。 |
 | QA 静态 | 扩充至 TC-FILE-OPEN-001..012，另选择受影响 TC-EXPLORER-001..005 与完整 crash suite；policy/dependencies/smoke/mandatory expectations/feature-list/control catalog 同步。各模式、行为 contract、OS helper 单元通过后才能提交；不放宽 baseline。 |
-| GitHub browser/native | `43451418842` 已执行初轮：Linux/Windows/macOS browser 各 **11 pass / 3 fail**，Windows native **9 pass / 5 fail**。Linux native 格式门禁阻断，macOS hosted ARM64 容量不足未获 runner。**整体未通过**；失败修复与扩充的 001..012 + 受影响 Explorer + 完整 crash suite 待新 commit 执行。详见下表，不以 job 成功替代 case pass。 |
+| GitHub browser/native | 初轮 `43451418842`：三端 browser 各 **11 pass / 3 fail**，Windows native **9 pass / 5 fail**。扩充轮 `43526262110`（`d1c1f7e0`）：三端 browser 各 **17 pass / 4 fail / 0 skip**，合计 **51/63 pass**；005 与保留 Explorer 001..004 三端实际通过。Linux native 被完整前端单元 7 项失败阻断；macOS native 被本次新增 `openat` 参数跨平台编译错误阻断；Windows native 实际 **12 pass / 11 fail / 0 skip**，原十项 native crash 全通过。`43533657129` browser-only 因 planner 单模式 tag 缺陷未执行产品。**整体未通过**，修复后须用匹配源码重跑；不以报告上传 job 成功替代 case pass。 |
 
 ### 专项用例
 
@@ -90,6 +90,10 @@ TC-WS-038/039/051/052/053/054/055/056/057 与 TC-IDE-C8-08 的目标是原有 ID
 | [43449130590](https://github.com/engcapa/taomni/actions/runs/43449130590) | `f7d82646` | checkout 把短 SHA 当分支名，未执行构建/产品用例；改用完整 SHA 重新 dispatch。 |
 | [43449514622](https://github.com/engcapa/taomni/actions/runs/43449514622) | `f7d826460a5d7bd7b1383faadc64ff293bac473f` | planning 单元 `test_crash_regressions` 硬编码旧 tag/smoke 清单，新六例未同步；补齐 EXPECTED、单模式集合与 smoke，并跑契约单元。未执行产品用例，不能视为三端通过。 |
 | [43451418842](https://github.com/engcapa/taomni/actions/runs/43451418842) | `3bc9afa00c353e9eaf6db71b8ee6093cf1be7eda` | 三端 browser 各 11/14 pass；Windows native 9/14 pass。Linux 在 `cargo fmt` 中发现 `workspace.rs` module 排序错误，已修；macOS job annotation：`The job was not acquired by Runner of type hosted even after multiple attempts`，未执行。产品/用例失败见下述修复，待重跑。 |
+| [43526262110](https://github.com/engcapa/taomni/actions/runs/43526262110) | `d1c1f7e02b4aee848167481ea26c9953e3dfff8f` | 扩充 001..012 + Explorer + 全部 crash：browser 63 次实际执行 **51 pass / 12 fail / 0 skip**，每 OS 17/21 pass。004/008/010/012 三端各同根因失败；005 三端 CSS/图片/隔离/默认离线实证通过，Explorer 001..004 三端 12/12 通过。Linux 完整前端单元 **6881 pass / 7 fail / 1 skip** 阻断 native；macOS `viewer/paths.rs:298` C varargs 不接受 `u16 mode_t`，不是 runner 容量问题。Windows native release 构建成功并实际执行 **12 pass / 11 fail / 0 skip（23 项）**；原有十项 native crash 全通过，新增用例的 pointer/fixture/helper 与 IPC 隔离问题见后续诊断。整体 failure，不声称原生验收通过。 |
+| [43533657129](https://github.com/engcapa/taomni/actions/runs/43533657129) | `5455227dd53583a6209c1b5b3c2dfe608b41c4a4` | 三端 browser-only 复测在 planning 失败，**没有产品执行**。workflow 自动加 mandatory crash tag 后 planner 把 tag 所包含的 native-only cases 也当成不可省略的字面 case ID，错误拒绝单模式；仅修模式选择契约：tag/feature 中未声明该模式的成员保留 not_applicable，显式传入不支持模式的 case ID 仍必须报错。双模式完整 suite 不减少。 |
+| [43536729997](https://github.com/engcapa/taomni/actions/runs/43536729997) | `31dddb5021fe967536a30611a0195238433e0ee2` | 六份实际 summary / receipt：三端 browser 每 OS **21/21 pass**，合计 **63 pass / 0 fail / 0 skip**，291份产物hash匹配、`identity_stable=true`、receipt exit0。真实004 Mermaid live/split与HTML/PNG导出标签/连线通过，008的AI/Git/SSHguard/SFTP完整62步通过。视觉仍有 Markdown间距/源码标记差异与Mac005最终截图loading瞬态，不能据此声称严格原型验收。此提交不含随后 Wry native 隔离与 Explorer toolbar 高度修复，不证明原生结果。 |
+| [43541393919](https://github.com/engcapa/taomni/actions/runs/43541393919) | `7a08e692520cbdcba523395998525e606be8c166` | 全三端 browser/native132次已启动，匹配release binary及新Cargo.lock；native-contracts重跑。包含Windows frame隔离和commandbar drag修复，尚未得最终结果。 |
 
 ### 首轮实际失败与对应修复
 
@@ -102,3 +106,42 @@ TC-WS-038/039/051/052/053/054/055/056/057 与 TC-IDE-C8-08 的目标是原有 ID
 - **006 Windows native**：受控设置输入在 clear 中间态把默认 assets/font 还原，后续输入变成 assetsimages；产品改为合法中间草稿，只有有效值持久化，补 clear→type/恢复默认单元；不靠全局修改测试 driver 制造通过。
 - **C8 / WS051**：旧 IDE 生命周期用例未显式配置源码编辑归属，新默认路由切入查看器；为两个遗漏用例补与其它 IDE crash cases 相同的显式处理器设置，所有旧步骤/断言逆映射 hash 不变。
 - **高保真差异**：hosted HTML desktop 截图有不符原型的 24px 外边距与矩形地址栏，改为 desktop full-bleed、设备模式仅 14px 纵向留白、地址栏 pill 15px；正文/大纲/图表浅深主题的最终判断必须新 hosted 截图复核。
+
+### 扩充轮实际失败与修复（43526262110）
+
+- **004 三端 Mermaid**：真实页面内错误是 `dayjs/dayjs.min.js ... does not provide an export named 'default'`，尚未进入 Mermaid render，而不是图形标签断言过严。Vite `optimizeDeps.noDiscovery=true` 的显式清单缺少 Mermaid 及其 CommonJS 转换入口；修复预打包清单并补配置契约单元，仍须 hosted 真 SVG / 标签 / 导出验证。不能用 mock Mermaid 单元冒充渲染成功。
+- **004 实时渲染间距**：失败截图与 DOM 证实非活动 Markdown 块之间残留三个 `.cm-line` 空白行，每段额外约 80px，明显不符原型紧凑正文。装饰只合并非活动块的 separator 换行并以渲染块 margin 控制间距，保留当前空白行、EOF 光标和原始 Markdown 字节；补 compact DOM、空白行输入、选区及源码不变单元。新 hosted 浅深主题截图仍需复核。
+- **010 三端 scripts-off**：前半段伪造消息与真实外链确认/取消已通过，step 44 的第二个页面失败。trace 中真实生成的 HTML 含 nonce-only CSP，但可信 bridge `<script>` 无 nonce；`DOMParser` 的 detached document 上 `.nonce=` 在 hosted Chromium 序列化时未反射为属性。仅 browser stub 改为显式 `setAttribute`，补模拟非反射属性的序列化测试；不放宽 CSP、页面脚本、外链确认或防骚扰策略。
+- **012 三端 wheel helper**：实际 `StepContext` 没有 `report_root`，辅助器在发输入前抛 `AttributeError`；改按当前 `case_dir` 核对独立图像 oracle 必须为其直接子文件且非 symlink，补真实 StepContext 单元。此失败没有证明产品缩放、粘贴板或后续限额已经通过。
+- **008 三端 AI → 文件查看器**：step 14 已断言真实文件全文，tab-bound chat 随切到非 chat-capable viewer 自动隐藏；step 15 多余点击隐藏 Hide 按钮。改同一步断言 drawer 不可见，后续 Git/SFTP/PTY 和原有 checkpoint 不删不改步数；后半段本轮尚未执行。
+- **Linux native 门禁**：完整单元暴露新增 file-viewer 后 recovery policy 的旧数量（21→22），以及五项 IDE tree 场景、一个邮件附件 mock 契约。六项先聚焦复现失败后修：IDE 焦点/选择/分栏测试的目标 fixture 明确为真实 `.ts` 源码（普通 `.txt`/`.md` 故意已路由到全局查看器），保留原焦点、Undo、selection 与 split 断言，不 mock classify；邮件测试适配真实 controlled temp + `openFile` 边界，并加强 IMAP section、目标路径和只读来源断言。完整 CodeWorkspaceTab **261/261** + MailClientTab **77/77** 单元通过；recovery 四项通过，其余全前端单元正在验证，不跳过门禁。
+- **macOS native 编译**：`libc::mode_t` 在 Darwin 为 `u16`，传给可变参数 `openat` 必须先做 C integer promotion。使用 `mode as libc::c_uint`，保留 no-follow、exclusive-create、私有文件/目录权限，增加原生权限回归；Linux 单元不等同于 macOS 编译与运行通过。
+
+该轮 browser 六个 summary 的 `identity_stable=true`，`source_sha256=59c78bdc592cd40f18a37e589b7feb301a35ed696ee72089c34fd241428b4583`；实际 receipt `exitCode=1`，未以报告上传 job 的绿色结论冒充 case pass。保留的九项 browser crash 每 OS 均通过（C8、MOBILE012、WS038/039/045/052/053/055/057，共 27 次），新增失败仍阻断整体通过。所有修复必须随下一匹配 candidate 再验。
+
+本批工具/静态复验：`tsc -b`、`pnpm check:refactor`、全局 `cargo fmt --check` 与 QA `audit --gate` 通过，coverage baseline 未变；`pnpm test:tools` **81 pass / 0 fail / 8 skip**（平台/外部工具限制明确跳过，不将 89 项全称为通过）。QA fixtures/helpers/mandatory crash + CI selection 单元合并批次 **62/62 pass**（另一个聚焦 fixtures/helpers/mandatory 子集 **39/39 pass**，不重复累加为独立覆盖）。下一轮 selection 仍为六组、18 shards、三个匹配 release 构建，browser 每 OS 21 项、native 每 OS 23 项，共 132 次；`gaps=[]` 仅为静态计划，不是执行结果。
+
+完整前端单元以两个互不重复批次执行：IDE+Mail 两文件 **338 pass**；其余 766 文件 **6552 pass / 1 fail / 1 skip**。唯一失败为未改动的 `ScreenshotFavorites.test.tsx:48` 在 DOM empty 刚出现时立即检查 passive cleanup 的 `revoke`，本地同文件独立重跑 **4/4 pass**；生产与测试最后改动均不在本功能 diff（历史 `85bae679`）。该次批量失败保留，不改无关截图功能、不称完整批次全绿；hosted Linux gate 继续原样运行完整前端单元。
+
+`43526262110` 的独立 native-contracts job **110 pass / 0 fail**（2026-11-13 23:48 UTC）。`5455227d` 仅改 viewer Unix openat 参数，RDP/mobile/截图 Rust 源码、Cargo manifests/lock、工具链及 contract workflow 无变更，可按 CI runbook 复用该成功契约证据；后续若原生依赖锁或构建输入改变，重新执行契约，不沿用旧匹配结论。所有选定 native case、Linux 完整前端单元与匹配 QA binary 构建不省略。
+
+### Windows 原生扩充轮诊断（43526262110）
+
+- 四份 matching release summary 均 `identity_stable=true`，合计 **12 pass / 11 fail / 0 skip**。保留十项 native crash（MOBILE013、WS038/039/045/051/052/053/054/056/057）全通过；Explorer004/005 通过。新增 FILE-OPEN native 用例均未完成，不能声称 OS clipboard / exports / proxy 模式已通过。
+- **002 / 007 / 009 / 010 错文件**：真实 DOM/截图分别出现 `next.html`、`large.txt`、`custom.html`，而非请求的 notes/live/default。`NativeSession.dblclick` 只采一次 rect 后立即双击，未用普通点击已有的 stable hit-test/hover 复核。集中提取 `native_doubleclick.py` 拥有稳定准备、单次 W3C 双击及输入源清理，旧 oversized facade 仅委派；失败不重放、不用 DOM 伪造 dblclick 绕过遮挡。对应契约亦移入独立小测试，保留原工作流结果断言。
+- **003 / 005 / 012 窄屏 overlay**：先展开右侧预览 overlay，再点文件整行中心，1028 宽原生截图中中心已被 preview 遮住；安全 hit-test 正确拒绝点击。调整为先真实选中文件，再展开预览；返回时用 Explorer 的真实 Escape 关闭 overlay 后选其它文件，不放宽命中检查。
+- **006 / 011 helper**：调用 `NativeSession.execute(script, args)`，但真实 API 只接收 script，测试 Mock 未限制参数导致漏测。适配真实调用契约，并以 strict 单参 session 单元覆盖；相同检查还发现后续 `native_paste` 的同类错误，真实粘贴和终端 modifier-click 断言仍保留。
+- **008 native 历史会话**：宽泛 `>> text=` 被 native XPath 转换后命中包含全部文本的祖先容器，实际 pointer 在消息空白区域而非会话标题，故未进入 thread。改精确文本叶节点选择，保留真实点击与消息文件链接断言。
+- **009 Windows iframe IPC 隔离**：console 显示 `window.__TAURI_INTERNALS__` 为 object，违背预览 no-IPC 注入边界。本地 patch exact Wry 0.57.0，在 document-created 注入前以引擎不可伪造的 `window.top === window` 实施 main-frame-only flag，IPC bootstrap 同样只在顶层执行；显式 all-frame scripts 保留原字节，独立窗口仍为顶层。不是页面加载后删全局，也不依赖 CSP 修饰。保留 53 个上游编译/许可/provenance 文件（528,394B）+ 小 helper，详见 `src-tauri/vendor/wry/VENDORED.md`，不增加产品 source-size 豁免。Node VM/源契约只辅助验证，新 Windows release 009 仍必须实测 `IPC_GLOBAL undefined`；平台自带 `chrome.webview` 可能存在，不冒称删除它或已证明旧版可成功越权。
+- **保留 Explorer003 drag**：已确认本次选中态 commandbar 新增 Open/Open-with 控件触发 Windows 14px 横向 scrollbar，高度在指针拖动中改变，原先的目标行坐标因此落到当前目录容器，源文件未移动。Explorer 使用 custom pointer drag，本就不会产生 HTML5 dragstart/drop，不能误把缺 HTML5 event 当根因。工具栏固定原有 36px 总高、保留横向 scroll access 但不让 scrollbar 占位改变高度；mounted 13 项 / 全 Explorer 九文件81项通过，并在原用例真实 drag 前后各测量工具栏36px（原文件移动/精确字节断言保留、checkpoint机械后移）。browser 通过不能替代原生验证，不标为无关。
+
+本批 native runner / preview sequencing / preserved-case 契约合计 **95/95 pass**，单模式 crash selector **6/6 pass**，浏览器精确63次选择计划与 audit/boundaries/tsc/full rustfmt 均通过。Wry patch 后 `cargo test --lib viewer::` **32/32 pass**（原25+新7脚本隔离回归），只算单元证据。Cargo.lock 已改变，下一次全三端 browser/native 必须匹配新 release binary，并重新执行 native-contracts，不复用旧锁输入的110项结果。
+
+### Browser 通过证据及剩余视觉差异（43536729997）
+
+- 六 summary 的 source `a8928421cf8dd7001c5282b4dac8fd408dbd1e8ad61c6489231c1c730d08a5d7` / runner `dd666ca7393b9b25033383b022b78708a5bb03e83af06a8d313fca736011f4b9` 稳定，63/63实际通过；本轮不含native用例，不冒充OS证据。
+- 004 三端120/120步；独立解析导出 HTML 为1SVG、3nodes、9paths、Explorer/OpenFile/Viewer三标签、无foreignObject、2内嵌PNG；实际800×1342 PNG可见图形/连线、Alpha2表格和粘贴图片。实际图形渲染与导出保留成立，不再仅为mock。
+- 008 三端62/62步；SSH真实帧和SFTP远端28bytes SHA `95c3a6bf820f823c3d0271ab91c10dfff0fb3804e8f54f55faa275a392000efb` 通过，关闭后同temp路径absent。browser本地/Git/temp oracle仍是VFS，不替代native host文件验证。
+- 012三端真实wheel/transform/clipboard路径，原图与复制PNG均640×360、RGBA一致；仅Chromium clipboard，不是OS。Explorer001..004三端12/12pass。
+- 视觉review发现实时正文块间距仍较原型偏大，活动`#`源标记不够弱化；任务checkbox的checked状态未在HTML/PNG中保留。修复后还需匹配源码重新验，不以功能绿替代严格原型。004浅色fixture仅1px图片，不足以证明真实大图工具条；native007深浅截图及DOCX待新原生结果。
+- Mac005最后一次Blocknetwork触发新session后立即截图，留下Loading/console0瞬态；此前功能断言通过，但此截图不算完成态。用真实loaded/console条件等待后再拍，保留全部原断言。

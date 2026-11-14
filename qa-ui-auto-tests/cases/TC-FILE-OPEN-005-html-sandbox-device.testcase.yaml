@@ -38,8 +38,8 @@ steps:
     selector: '[data-testid="explorer-address"]'
     key: Enter
 - wait_for: '[data-testid="explorer-file-row"][data-name="report.html"]'
-- show_explorer_preview: null
 - click: '[data-testid="explorer-file-row"][data-name="report.html"]'
+- show_explorer_preview: null
 - wait_for: '[data-testid="explorer-preview"]'
 - click: '[data-testid="explorer-preview-open"]'
 - wait_for: '[data-testid="html-preview"][data-loaded="true"]'
@@ -136,6 +136,15 @@ steps:
 - assert_text:
     selector: '[data-testid="html-network-banner"]'
     contains: Network requests blocked
+- wait_for: '[data-testid="html-preview"][data-loaded="true"]'
+- assert_text:
+    selector: '[data-testid="html-console"]'
+    contains: FILE_OPEN_SCRIPT_OK
+    timeout_sec: 20
+- assert_text:
+    selector: '[data-testid="html-console"]'
+    contains: FILE_OPEN_RESOURCES rgb(12, 34, 56) 1
+    timeout_sec: 20
 - assert_no_runtime_errors: null
 - screenshot: html-sandbox-console-device.png
 verification:
@@ -145,7 +154,7 @@ verification:
     requirement: HTML executes author scripts only in opaque sandbox, resolves local CSS/PNG and blocks parent DOM/network
       by default.
     actions:
-    - 11
+    - 10
     - 13
     - 20
     checkpoints:
@@ -207,6 +216,12 @@ verification:
     - step: 53
       expectation: Explicit block restores blocked policy.
     - step: 54
+      expectation: The final blocked-policy session finishes loading before the screenshot is captured.
+    - step: 55
+      expectation: The real author script reruns after restoring blocked network policy.
+    - step: 56
+      expectation: The completed final session independently observes the exact local CSS color and decoded PNG width.
+    - step: 57
       expectation: HTML frame lifecycle has no uncaught runtime error.
     - step: 49
       expectation: Allow-once preview uses the configured application proxy mode via scoped backend session.
@@ -222,6 +237,9 @@ verification:
     - 50
     - 53
     - 54
+    - 55
+    - 56
+    - 57
     - 49
   visual:
   - check: Device toolbar/console/source pane layout

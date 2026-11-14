@@ -40,11 +40,30 @@ describe("live Markdown decorations and standard-source widgets", () => {
     expect(view.dom.querySelector("h1")?.textContent).toBe("Title");
     expect(view.state.doc.toString()).toBe(source);
   });
+  it("does not leave source separator lines between consecutive rendered blocks", () => {
+    const source = "# Title\n\nParagraph\n\n## Details\n\n> Quote\n\n";
+    const view = editor(source, [liveMarkdown(context, false)]);
+    const paragraph = view.contentDOM.querySelector(".fv-md-rendered-block")!;
+    expect(paragraph.textContent?.trim()).toBe("Paragraph");
+    expect(paragraph.nextElementSibling).toHaveClass("fv-md-rendered-block");
+    expect(view.state.doc.toString()).toBe(source);
+    const blank = source.indexOf("\n\n##") + 1;
+    view.dispatch({ selection: { anchor: blank } });
+    expect(view.state.doc.toString()).toBe(source);
+    expect(view.contentDOM.querySelector(".fv-md-current-line")).not.toBeNull();
+    view.dispatch({ changes: { from: blank, insert: "editable" }, selection: { anchor: blank + 8 } });
+    expect(view.state.doc.toString()).toBe(source.slice(0, blank) + "editable" + source.slice(blank));
+    view.dispatch({ selection: { anchor: view.state.doc.length } });
+    expect(view.contentDOM.querySelector(".fv-md-current-line")).not.toBeNull();
+  });
   it("toggles actual task source via checkbox and remains undoable", () => {
     const source = "# Tasks\n\n- [ ] todo\n- [x] done\n";
     const view = editor(source, [liveMarkdown(context, false)]);
     const checkbox = view.dom.querySelector<HTMLButtonElement>("[role='checkbox']");
     expect(checkbox).not.toBeNull();
+    expect(view.dom.querySelectorAll("[role='checkbox']")).toHaveLength(2);
+    expect(view.dom.querySelector(".fv-md-task-state")).toBeNull();
+    expect(view.dom.querySelector('[aria-label="done"]')).toHaveAttribute("aria-checked", "true");
     fireEvent.click(checkbox!);
     expect(view.state.doc.toString()).toContain("- [x] todo");
     undo(view); expect(view.state.doc.toString()).toBe(source);

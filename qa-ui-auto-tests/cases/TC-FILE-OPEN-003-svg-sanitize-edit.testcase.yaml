@@ -37,8 +37,8 @@ steps:
     selector: '[data-testid="explorer-address"]'
     key: Enter
 - wait_for: '[data-testid="explorer-file-row"][data-name="unsafe.svg"]'
-- show_explorer_preview: null
 - click: '[data-testid="explorer-file-row"][data-name="unsafe.svg"]'
+- show_explorer_preview: null
 - wait_for: '[data-testid="explorer-preview-sanitized"]'
 - assert_visible: '[data-testid="explorer-preview-image"]'
 - assert_file_open_bytes:
@@ -83,7 +83,9 @@ steps:
 - click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
 - click: '[data-testid="tab-item"][data-tab-type="file-browser"]'
 - wait_for: '[data-testid="explorer-file-row"][data-name="unsafe.svg"]'
-- show_explorer_preview: null
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Escape
 - dblclick: '[data-testid="explorer-file-row"][data-name="unsafe.svg"]'
 - wait_for: '[data-testid="image-render"]'
 - eval_readonly:
@@ -98,7 +100,7 @@ verification:
   - id: R1
     requirement: SVG preview/viewer decode a sanitized image, preserve original malicious source, and transforms do not write.
     actions:
-    - 11
+    - 10
     - 15
     - 19
     - 20

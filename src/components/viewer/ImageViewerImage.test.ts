@@ -29,6 +29,14 @@ describe("shared offline image policy", () => {
     expect(original).toContain("<script>");
   });
 
+  it("accepts the clean SVG source used by the native edit workflow", async () => {
+    const source = '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="90"><rect width="160" height="90" fill="#16a34a"/></svg>\n';
+    const clean = await textOf(safeImageBlob(bytes(source), "image/svg+xml", 10240));
+    expect(clean).toContain('width="160"');
+    expect(clean).toContain('height="90"');
+    expect(clean).toContain("#16a34a");
+  });
+
   it.each(["not svg", "<svg><unclosed></svg>", "<html></html>"])("rejects malformed or non-SVG input %s", (source) => {
     expect(() => safeImageBlob(bytes(source), "image/svg+xml", 1024)).toThrow("Invalid SVG image");
   });

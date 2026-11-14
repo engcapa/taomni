@@ -3,11 +3,15 @@ import { renderFormatted } from "../../../lib/chat/renderFormatted";
 import { ensureMermaidReady } from "../../editor/workspace/model/mermaid";
 import { highlightTree, classHighlighter } from "@lezer/highlight";
 import { readMarkdownImage } from "../../../lib/markdownAssets";
+import { restoreMarkdownTasks } from "./markdownTasks";
+import { enhanceMarkdownMath, replaceMarkdownMath } from "./markdownMath";
+import "katex/dist/katex.min.css";
 
 // This is presentation enhancement of the existing shared renderer, not a
 // second parser. Workspace/chat retain their existing rendering defaults.
 export function renderMarkdown(content: string): string {
-  return renderFormatted(content, "md") ?? "";
+  const math = replaceMarkdownMath(content);
+  return renderFormatted(math.content, "md") ?? "";
 }
 
 export interface RenderOwner { docPath: string; cancelled: () => boolean; onResize?: () => void }
@@ -100,5 +104,7 @@ export function markdownFragment(content: string): HTMLElement {
     image.removeAttribute("src");
   });
   root.append(template.content);
+  restoreMarkdownTasks(root, content);
+  enhanceMarkdownMath(root, replaceMarkdownMath(content).formulas);
   return root;
 }

@@ -81,6 +81,23 @@ class GlobalEntryContracts(unittest.TestCase):
             self.assertEqual(keyboard['actions'][-1],{'type':'keyUp','value':''})
             self.assertEqual(calls[-1].args,('DELETE','/actions'))
 
+    def test_file_link_transition_asserts_automatic_chat_hide_without_clicking_hidden_control(self):
+        import yaml
+        from qa_ui_auto.testcase import load_case
+        from qa_ui_auto.behavior_contract import validate_contract
+        root=Path(__file__).resolve().parents[4]
+        path=next((root/'qa-ui-auto-tests/cases').glob('TC-FILE-OPEN-008-*.testcase.yaml'))
+        doc=yaml.safe_load(path.read_text(encoding='utf-8'))
+        # Hosted run43526262110: all three browser platforms proved exact AI
+        # file content, then timed out clicking this already-hidden drawer.
+        # Preserve that successful content checkpoint and the remaining real
+        # Git/SFTP workflow; assert the actual automatic context transition.
+        self.assertEqual(doc['steps'][13]['assert_items']['equals'],['repo-b WORKTREE','shared line',''])
+        self.assertEqual(doc['steps'][14],{'assert_not_visible':'[data-testid="ai-chat-drawer"]'})
+        self.assertFalse(any(step.get('click')=='[data-testid="ai-chat-drawer-hide"]' for step in doc['steps']))
+        self.assertEqual(validate_contract(doc),[])
+        load_case(path)
+
     def test_global_entry_fixture_seeds_persisted_conversation_and_only_owned_remote_payload(self):
         with tempfile.TemporaryDirectory() as tmp:
             root=Path(tmp);case=root/'case';case.mkdir()
@@ -123,7 +140,7 @@ class MarkdownNativeArtifactsTests(unittest.TestCase):
     def test_html_docx_and_markdown_require_real_image_pixels_and_contents(self):
         image=base64.b64encode(self.clipboard.read_bytes()).decode()
         diagram_svg='<svg xmlns="http://www.w3.org/2000/svg" width="480" height="100"><text>Markdown Source</text><text>Live Diagram</text><text>Export Artifact</text><path d="M0 0L100 100"/></svg>'
-        html=self.exports/'native.html';html.write_text('<h1>File open Markdown</h1><strong>Rendered bold</strong>'+f'<img src="data:image/png;base64,{image}">'*2+diagram_svg)
+        html=self.exports/'native.html';html.write_text('<h1>File open Markdown</h1><strong>Rendered bold</strong><span class="katex">x^2</span>'+f'<img src="data:image/png;base64,{image}">'*2+diagram_svg)
         artifacts.check_artifact('html',html,self.source,self.manifest)
         html.write_text('<h1>File open Markdown</h1><strong>Rendered bold</strong><img src="assets/pixel.png">')
         with self.assertRaises(StepError):artifacts.check_artifact('html',html,self.source,self.manifest)

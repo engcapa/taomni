@@ -79,6 +79,8 @@ def check_artifact(kind, path, source, manifest):
             raise StepError("HTML export lost fixture content")
         if manifest.get("diagramLabels") and (not re.search(r"<svg[\s>]", html) or any(label not in html for label in manifest["diagramLabels"]) or "language-mermaid" in html):
             raise StepError("HTML export lost the actual rendered Mermaid SVG/labels")
+        if "\\(" in html or "\\[" in html or "katex" not in html:
+            raise StepError("HTML export lost KaTeX-rendered math")
         images = re.findall(r'data:image/png;base64,([A-Za-z0-9+/=]+)', html)
         pixels = [png_info(base64.b64decode(encoded)) for encoded in images]
         expected = png_info(Path(manifest["clipboardPng"]).read_bytes())

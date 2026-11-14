@@ -297,8 +297,14 @@ def make_plan(args) -> dict:
                            and "rdp" in entry["capabilities"]), None)
     for entry in entries:
         entry["rdp_unit_contracts"] = entry["id"] == rdp_unit_owner
-    if explicit - reachable:
-        raise ValueError(f"explicit cases unavailable in requested combinations: {sorted(explicit-reachable)}")
+    # Feature/tag selectors span both modes (including the mandatory crash
+    # suite). A browser-only iteration cannot execute native-only members, but
+    # literal case IDs remain strict so a mistyped/unsupported request fails.
+    mode_inapplicable = {cid for cid in explicit - requested
+                         if not set(by_id[cid].modes).intersection(modes)}
+    unreachable = explicit - reachable - mode_inapplicable
+    if unreachable:
+        raise ValueError(f"explicit cases unavailable in requested combinations: {sorted(unreachable)}")
     if not entries and args.scope != "impacted":
         raise ValueError("selection contains no runnable cases")
     from .ci_sharding import schedule

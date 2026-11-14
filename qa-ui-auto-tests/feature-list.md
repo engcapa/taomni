@@ -15288,7 +15288,7 @@ controls:
     selector: '[data-testid="ai-chat-drawer"] button[title="History"]'
     kind: interactive
   - id: file-open-chat-thread
-    selector: '[data-testid="ai-chat-drawer"] >> text=QA file path entry'
+    selector: 'xpath=//*[@data-testid="ai-chat-drawer"]//div[text()="QA file path entry"]'
     kind: interactive
   - id: ai-file-link
     selector: '[data-testid="ai-file-link"]'

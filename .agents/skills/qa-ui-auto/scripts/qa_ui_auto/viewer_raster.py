@@ -38,8 +38,10 @@ def _fixture(ctx: Any, mode: str) -> dict[str, Any]:
     manifest = json.loads((ctx.case_dir / "file-open-fixture.json").read_text(encoding="utf-8"))
     if manifest.get("schema") != "qa.file-open-fixture.v1" or manifest.get("mode") != mode:
         raise StepError("viewer_raster: mismatched fixture receipt")
-    oracle = (ctx.case_dir / "raster-original.png").resolve()
-    if not oracle.is_relative_to(Path(ctx.report_root).resolve()) or not oracle.is_file():
+    case_dir = Path(ctx.case_dir).resolve()
+    oracle_path = case_dir / "raster-original.png"
+    oracle = oracle_path.resolve()
+    if oracle_path.is_symlink() or oracle.parent != case_dir or not oracle.is_file():
         raise StepError("viewer_raster: image oracle is not a run-owned fixture")
     return manifest
 

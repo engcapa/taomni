@@ -1,6 +1,7 @@
 mod filesystem;
 mod html;
 mod network;
+mod windows_initialization;
 
 use std::fs;
 use std::path::PathBuf;

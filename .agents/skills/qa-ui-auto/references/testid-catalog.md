@@ -1379,7 +1379,7 @@
 - `[data-testid="mail-attachment-preview"]` — interactive — F-FILEOPEN-1.mail-attachment-preview
 - `[data-testid="mail-attachment-system"]` — interactive — F-FILEOPEN-1.mail-attachment-system
 - `[data-testid="ai-chat-drawer"] button[title="History"]` — interactive — F-FILEOPEN-1.file-open-chat-history
-- `[data-testid="ai-chat-drawer"] >> text=QA file path entry` — interactive — F-FILEOPEN-1.file-open-chat-thread
+- `xpath=//*[@data-testid="ai-chat-drawer"]//div[text()="QA file path entry"]` — interactive — F-FILEOPEN-1.file-open-chat-thread
 - `[data-testid="ai-file-link"]` — interactive — F-FILEOPEN-1.ai-file-link
 
 ## git/diff (F26.1)

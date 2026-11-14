@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { effectiveFileType, sftpListLocal, parentPath, basename, type FileEntry } from "../../lib/sftp";
 import { viewerReadBytes, type ViewerDocument } from "../../lib/viewer";
 import { IMAGE_EXTENSIONS, IMAGE_VIEWER_LIMIT, imageExtension, safeImageBlob } from "./ImageViewerImage";
@@ -62,6 +62,14 @@ export function useImageSiblings(document: ViewerDocument, retry: number, enable
 export function useImageDimensions(url?: string) {
   const image = useRef<HTMLImageElement>(null);
   const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
-  useEffect(() => { setDimensions({ width: 0, height: 0 }); }, [url]);
+  useLayoutEffect(() => {
+    // Cached WebView images can finish before passive effects. Reset in the
+    // mount commit, then adopt an already decoded current image rather than
+    // erasing its onLoad dimensions after the image is visibly rendered.
+    const current = image.current;
+    setDimensions(current?.complete && current.naturalWidth > 0
+      ? { width: current.naturalWidth, height: current.naturalHeight }
+      : { width: 0, height: 0 });
+  }, [url]);
   return { image, dimensions, setDimensions };
 }
