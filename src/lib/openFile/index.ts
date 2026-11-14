@@ -89,6 +89,13 @@ export function openFile(target: OpenFileTarget | string, options: OpenFileOptio
     if (mode === "system" || (!supportsFileViewer(kind) && kind !== "source")) return sftpOpenPath(path);
     const key = documentPathKey(path);
     const readOnlyReason = input.readOnlyReason ?? (input.source && input.source !== "local" ? "只读副本 / Read-only copy" : undefined);
+    // Terminal links are repeat activations of the same viewer entry. Resolve
+    // that identity before code-owner routing so a stale workspace context
+    // cannot steal focus from the already-open main viewer.
+    if (options.context === "terminal-link") {
+      const linked = existingViewer(key, options.workspaceId) ?? existingViewer(key);
+      if (linked) return linked;
+    }
     // A remote copy must never enter the independent source editor as writable.
     if (!readOnlyReason && (mode === "workspace" || kind === "source")) {
       if (!useDocumentStore.getState().documents[key] && readViewerDrafts()[key]) {
@@ -129,8 +136,14 @@ export function openFile(target: OpenFileTarget | string, options: OpenFileOptio
       useAppStore.getState().setActiveSideTab("workspaces");
       return tab.id;
     }
+    const app = useAppStore.getState();
+    const activeIndex = app.tabs.findIndex((tab) => tab.id === app.activeTabId);
     const id = `viewer-${crypto.randomUUID()}`;
-    useAppStore.getState().addTab({ id, type: "file-viewer", title: basename(path), closable: true, fileViewer: viewer });
+    app.addTab({ id, type: "file-viewer", title: basename(path), closable: true, fileViewer: viewer });
+    // Keep a newly opened viewer beside the tab that launched it. Closing it
+    // then restores the originating Explorer/terminal tab even when a Settings
+    // tab is also open elsewhere in the strip.
+    if (activeIndex >= 0) useAppStore.getState().moveTabToIndex(id, activeIndex + 1);
     return activateMain(id);
   });
   opening.set(queueKey, result);

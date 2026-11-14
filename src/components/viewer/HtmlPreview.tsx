@@ -95,6 +95,12 @@ function HtmlPreviewContent({ document, onError, visible = true, workspaceId }: 
     const receive = (event: MessageEvent) => {
       const message = readHtmlBridgeMessage(event, iframe.current?.contentWindow ?? null, session);
       if (!message) return;
+      // WKWebView can execute the sandboxed document and deliver its bridge
+      // message without dispatching the iframe load event for a custom URL
+      // scheme. A token-authenticated bridge message proves that the document
+      // committed, so use it as the readiness signal as well.
+      setFrameLoading(false);
+      setFrameError("");
       if (message.kind === "navigate" && message.href) {
         const href = localPreviewHref(message.href, session, src);
         const route = href && previewRoute(href, session);

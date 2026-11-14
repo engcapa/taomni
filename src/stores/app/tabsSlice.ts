@@ -136,7 +136,12 @@ export const createTabsSlice: StateCreator<AppState, [], [], Pick<AppState, "tab
       const next = s.tabs.filter((t) => t.id !== id);
       let activeId = s.activeTabId;
       if (activeId === id) {
-        activeId = next[Math.min(idx, next.length - 1)]?.id ?? null;
+        // A viewer is normally opened from Explorer/terminal and sits beside
+        // that source tab. Closing it should return to the source on the left,
+        // even when a Settings or another tab was opened to its right while
+        // the viewer was active.
+        const previous = tab?.type === "file-viewer" && idx > 0 ? next[idx - 1] : undefined;
+        activeId = previous?.id ?? next[Math.min(idx, next.length - 1)]?.id ?? null;
       }
       const validIds = new Set(next.map((tab) => tab.id));
       const recentResult = upsertRecentWorkspaceForTab(

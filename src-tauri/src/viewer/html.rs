@@ -34,10 +34,11 @@ pub(crate) struct HtmlSession {
 }
 
 fn origin() -> &'static str {
-    // WKWebView does not commit opaque sandbox iframes served from a custom
-    // URL scheme. Use Tauri's localhost HTTP spelling on macOS as well; the
-    // handler still authenticates the same token/owner and serves only GET.
-    if cfg!(any(windows, target_os = "android", target_os = "macos")) {
+    // WebView2 and Android require Wry's localhost workaround for custom URL
+    // schemes. WKWebView registers the scheme directly; using the HTTP-shaped
+    // workaround there bypasses the registered handler and leaves the iframe
+    // permanently loading.
+    if cfg!(any(windows, target_os = "android")) {
         "http://taomni-preview.localhost"
     } else {
         "taomni-preview://localhost"

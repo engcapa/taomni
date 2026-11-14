@@ -175,8 +175,12 @@ pub(super) async fn element_text<R: Runtime>(
         Err(message) => return error(message),
     };
     let mut script = element_lookup(&reference);
+    // WebKit exposes SVGElement.innerText as an empty string even when its
+    // rendered <text> descendants are visible. Prefer a non-empty innerText,
+    // then fall back to textContent so native assertions observe SVG labels in
+    // the same way as browser text assertions.
     script.push_str(
-        "if (!el) throw new Error('stale element'); return el.innerText ?? el.textContent ?? '';",
+        "if (!el) throw new Error('stale element'); return el.innerText || el.textContent || '';",
     );
     match eval_js(&state, script).await {
         Ok(value) => ok(value),

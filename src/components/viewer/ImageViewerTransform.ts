@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { flushSync } from "react-dom";
 import { clampImageScale, fitImageScale } from "./ImageViewerImage";
 
 export function useImageTransform(path: string, width: number, height: number, layout: string) {
@@ -31,11 +32,13 @@ export function useImageTransform(path: string, width: number, height: number, l
   const zoom = useCallback((factor: number, point?: { x: number; y: number }) => {
     const next = clampImageScale(scale * factor);
     const ratio = next / scale;
-    setPan((current) => ({ x: (point?.x ?? 0) - ((point?.x ?? 0) - current.x) * ratio,
-      y: (point?.y ?? 0) - ((point?.y ?? 0) - current.y) * ratio }));
-    setManualScale(next); setMode("custom");
+    flushSync(() => {
+      setPan((current) => ({ x: (point?.x ?? 0) - ((point?.x ?? 0) - current.x) * ratio,
+        y: (point?.y ?? 0) - ((point?.y ?? 0) - current.y) * ratio }));
+      setManualScale(next); setMode("custom");
+    });
   }, [scale]);
-  const reset = (next: "fit" | "actual") => { setMode(next); setPan({ x: 0, y: 0 }); };
+  const reset = (next: "fit" | "actual") => flushSync(() => { setMode(next); setPan({ x: 0, y: 0 }); });
   return {
     stage, mode, scale, rotation, flipped, pan, panning, zoom, reset,
     wheel: (event: React.WheelEvent<HTMLDivElement>) => {
@@ -46,8 +49,8 @@ export function useImageTransform(path: string, width: number, height: number, l
         x: event.clientX - bounds.left - bounds.width / 2, y: event.clientY - bounds.top - bounds.height / 2,
       });
     },
-    rotate: (direction: number) => { setRotation((value) => (value + direction * 90 + 360) % 360); setPan({ x: 0, y: 0 }); },
-    flip: () => setFlipped((value) => !value),
+    rotate: (direction: number) => flushSync(() => { setRotation((value) => (value + direction * 90 + 360) % 360); setPan({ x: 0, y: 0 }); }),
+    flip: () => flushSync(() => setFlipped((value) => !value)),
     pointerDown: (event: React.PointerEvent<HTMLDivElement>) => {
       if (event.button !== 0 || !width || !height || (event.target as HTMLElement).closest("button")) return;
       event.preventDefault();
