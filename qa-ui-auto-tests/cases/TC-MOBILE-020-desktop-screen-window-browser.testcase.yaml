@@ -29,11 +29,11 @@ steps:
 - fill: {selector: '[data-testid="mobile-browser-url"]', value: 'http://127.0.0.1:4100/demo'}
 - click: '[data-testid="mobile-browser-open"]'
 - assert_text: {selector: '[data-testid="mobile-browser-status"]', contains: 'http://127.0.0.1:4100/demo'}
-- wait_for: '[data-testid="mobile-window-select"] option[value="tauri:mobile-remote-browser"]'
+- wait_for: '[data-testid="mobile-window-item"][data-window-id="tauri:mobile-remote-browser"]'
 - assert_items: {selector: '[data-testid="mobile-window-select"] option:checked', attribute: value, equals: ['tauri:mobile-remote-browser']}
 - assert_file_contains: {path: '${fixture.mobile_receipt}', contains: 'BROWSER http://127.0.0.1:4100/demo'}
 - click: '[data-testid="mobile-windows-refresh"]'
-- wait_for: '[data-testid="mobile-window-select"] option[value="tauri:mobile-remote-browser"]'
+- wait_for: '[data-testid="mobile-window-item"][data-window-id="tauri:mobile-remote-browser"]'
 - fill: {selector: '[data-testid="mobile-window-input"]', value: 'hello window 123'}
 - click: '[data-testid="mobile-window-send"]'
 - wait_for: '[data-testid="mobile-window-result"]'

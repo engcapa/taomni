@@ -105,9 +105,7 @@ pub async fn open_browser(core: &Core, raw_url: &str) -> Result<BrowserOpenResul
             }
         });
         #[cfg(not(target_os = "linux"))]
-        {
-            builder = builder.center();
-        }
+        let builder = builder.center();
         builder
             .build()
             .map_err(|_| "desktop_browser_open_failed".to_string())?;

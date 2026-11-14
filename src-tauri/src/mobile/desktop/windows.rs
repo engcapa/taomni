@@ -394,8 +394,9 @@ fn focus_x11_window(xid: u32) -> Result<(), String> {
 
 #[cfg(target_os = "windows")]
 fn focus_os_window(id: u32, _pid: u32) -> Result<(), String> {
-    use windows::Win32::Foundation::{BOOL, HWND, LPARAM};
+    use windows::Win32::Foundation::{HWND, LPARAM};
     use windows::Win32::UI::WindowsAndMessaging::{EnumWindows, IsWindowVisible};
+    use windows::core::BOOL;
 
     struct Search {
         target: u32,
