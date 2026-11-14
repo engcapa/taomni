@@ -35,9 +35,8 @@ steps:
 - wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-render"]'
 - assert_enabled: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-zoom-actual"]'
 - eval_readonly:
-    expression: document.querySelector(".fv-active .image-render")?.naturalWidth === 640 && document.querySelector(".fv-active .image-render")?.naturalHeight === 360
+    expression: document.querySelector(".fv-active .image-render").naturalWidth === 640 && document.querySelector(".fv-active .image-render").naturalHeight === 360
     expect_truthy: true
-    timeout_sec: 10
 - click: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-zoom-actual"]'
 - eval_readonly:
     expression: Math.abs(document.querySelector(".fv-active .image-render").getBoundingClientRect().width - 640) <= 1 && Math.abs(document.querySelector(".fv-active .image-render").getBoundingClientRect().height - 360) <= 1

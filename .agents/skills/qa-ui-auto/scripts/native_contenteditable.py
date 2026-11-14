@@ -34,15 +34,33 @@ def fill_contenteditable(session: EditorInputSession, element: str, selector: st
             time.sleep(.1)
         else:
             raise error_type(f"contenteditable did not receive focus: {selector}")
-    # CodeMirror uses Cmd+A on macOS. Ctrl+A moves to the start of the line,
-    # which leaves old text in place instead of replacing the document.
-    session.press_combo("Mod+a")
-    if not text:
-        session.press_combo("Backspace")
-    else:
-        for index, line in enumerate(text.replace("\r\n", "\n").replace("\r", "\n").split("\n")):
-            if index:
-                session.press_combo("Enter")
-            if line:
-                session.type_text(line)
+    normalized = text.replace("\r\n", "\n").replace("\r", "\n")
+
+    def replace_with_keys() -> None:
+        # CodeMirror uses Cmd+A on macOS. Ctrl+A moves to the start of the line,
+        # which leaves old text in place instead of replacing the document.
+        session.press_combo("Mod+a")
+        if not normalized:
+            session.press_combo("Backspace")
+        else:
+            for index, line in enumerate(normalized.split("\n")):
+                if index:
+                    session.press_combo("Enter")
+                if line:
+                    session.type_text(line)
+
+    # A WebKit contenteditable can commit the selection before the final CM6
+    # line is selected. Verify the real editor text and retry the same trusted
+    # keyboard replacement once rather than allowing a stale suffix (for
+    # example a duplicate </svg>) to reach the product.
+    for attempt in range(2):
+        replace_with_keys()
+        actual = session.execute(
+            f"const el = document.querySelector({json.dumps(selector)});"
+            "return el ? el.innerText.replace(/\\r\\n?/g, '\\n') : null;"
+        )
+        if actual == normalized:
+            return f"filled contenteditable {selector}"
+        if attempt == 1:
+            raise error_type(f"contenteditable did not retain the requested text: {selector}")
     return f"filled contenteditable {selector}"
