@@ -72,8 +72,9 @@ steps:
     value: '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="90"><rect width="160" height="90" fill="#16a34a"/></svg>
 
       '
+- wait_for: '[data-testid="image-render"]'
 - eval_readonly:
-    expression: document.querySelector(".image-render").complete && document.querySelector(".image-render").naturalWidth === 160
+    expression: document.querySelector(".image-render")?.complete === true && document.querySelector(".image-render")?.naturalWidth === 160
     expect_truthy: true
     timeout_sec: 10
 - click: '[data-testid="viewer-save"]'
@@ -89,7 +90,7 @@ steps:
 - dblclick: '[data-testid="explorer-file-row"][data-name="unsafe.svg"]'
 - wait_for: '[data-testid="image-render"]'
 - eval_readonly:
-    expression: document.querySelector(".image-render").complete && document.querySelector(".image-render").naturalWidth === 160
+    expression: document.querySelector(".image-render")?.complete === true && document.querySelector(".image-render")?.naturalWidth === 160
     expect_truthy: true
     timeout_sec: 10
 - assert_no_runtime_errors: null
@@ -131,23 +132,23 @@ verification:
     actions:
     - 29
     - 31
-    - 33
-    - 35
-    - 39
+    - 34
+    - 36
+    - 40
     checkpoints:
-    - step: 32
+    - step: 33
       expectation: Actual SVG image dimensions update from the edited source before save.
-    - step: 34
+    - step: 35
       expectation: Exact browser/native file bytes match the clean user source.
-    - step: 41
-      expectation: Reopened image decodes with the persisted new dimensions.
     - step: 42
+      expectation: Reopened image decodes with the persisted new dimensions.
+    - step: 43
       expectation: Sanitize/edit/close lifecycle has no uncaught runtime errors.
     results:
-    - 32
-    - 34
-    - 41
+    - 33
+    - 35
     - 42
+    - 43
   visual:
   - check: Checker/light/dark image stage and split proportions
     method: manual

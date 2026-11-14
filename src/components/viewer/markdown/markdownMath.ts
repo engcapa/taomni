@@ -12,7 +12,7 @@ function isEscaped(source: string, index: number): boolean {
   return slashes % 2 === 1;
 }
 
-function scanFormula(source: string, start: number, delimiter: "$$" | "$", _display: boolean): { end: number; value: string } | null {
+function scanFormula(source: string, start: number, delimiter: "$$" | "$"): { end: number; value: string } | null {
   for (let cursor = start; cursor < source.length; cursor++) {
     if (source.startsWith(delimiter, cursor) && !isEscaped(source, cursor)) {
       const value = source.slice(start, cursor).trim();
@@ -44,7 +44,7 @@ export function replaceMarkdownMath(source: string): { content: string; formulas
       output += source[cursor++];
       continue;
     }
-    const result = scanFormula(source, cursor + delimiter.length, delimiter, delimiter === "$$");
+    const result = scanFormula(source, cursor + delimiter.length, delimiter);
     if (!result) { output += source[cursor++]; continue; }
     const formula = { token: `${TOKEN_PREFIX}${formulas.length}${TOKEN_SUFFIX}`, source: result.value, display: delimiter === "$$" };
     formulas.push(formula);

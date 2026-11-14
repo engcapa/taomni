@@ -80,9 +80,7 @@ steps:
     selector: '[data-testid="markdown-live"] .fv-md-rendered-block h2'
     equals: Details
 - eval_readonly:
-    expression: document.querySelector(".fv-md-rendered-block h2").getBoundingClientRect().top - document.querySelector(".fv-md-rendered-block
-      p").getBoundingClientRect().bottom >= 0 && document.querySelector(".fv-md-rendered-block h2").getBoundingClientRect().top
-      - document.querySelector(".fv-md-rendered-block p").getBoundingClientRect().bottom < 75
+    expression: document.querySelector(".fv-md-rendered-block h2").getBoundingClientRect().top - document.querySelector(".fv-md-rendered-block:has(.fv-md-math) p").getBoundingClientRect().bottom >= 0 && document.querySelector(".fv-md-rendered-block h2").getBoundingClientRect().top - document.querySelector(".fv-md-rendered-block:has(.fv-md-math) p").getBoundingClientRect().bottom < 75
     expect_truthy: true
 - screenshot: markdown-live-mermaid-light.png
 - click: '[data-testid="markdown-outline"] button[data-heading-from="0"]'

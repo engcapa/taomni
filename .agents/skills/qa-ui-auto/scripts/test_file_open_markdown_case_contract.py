@@ -117,7 +117,7 @@ class MarkdownCaseContractTests(unittest.TestCase):
         }})
         expression = geometry["eval_readonly"]["expression"]
         gap = ('document.querySelector(".fv-md-rendered-block h2").getBoundingClientRect().top'
-               ' - document.querySelector(".fv-md-rendered-block p").getBoundingClientRect().bottom')
+               ' - document.querySelector(".fv-md-rendered-block:has(.fv-md-math) p").getBoundingClientRect().bottom')
         self.assertEqual(expression, gap + " >= 0 && " + gap + " < 75")
         self.assertIn('getComputedStyle(document.querySelector(".fv-md-table-wrap")).whiteSpace === "normal"', additions[55][0]["eval_readonly"]["expression"])
 
