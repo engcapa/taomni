@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted（设计稿，非实现记录；完整设计见 `docs-feature/taomni-modular-split-design.md` v1.3，2026-11-14；修订见设计文档 §13.4）。v1.3 经代码实测审查，修订了插件形态与若干边界，并新增 4 个待用户决策项（DEC-1 ~ DEC-4）；§2.1 的用户决策不变，§2.3 的形态描述以 DEC-1 结论为准。
+Accepted（设计稿，非实现记录；完整设计见 `docs-feature/taomni-modular-split-design.md` v1.3，2026-11-14；修订见设计文档 §13.4）。v1.3 经代码实测审查，修订了插件形态与若干边界，并新增 4 个待用户决策项（DEC-1 ~ DEC-4）；§2.1 的用户决策不变，§2.3 的形态描述对应 DEC-1（用户已选 A）。
 
 ---
 
@@ -31,7 +31,7 @@ Taomni 是本地优先的 AI 原生远程工作台（Tauri 2 + React 19 + TypeSc
 
 - 每个插件一份 `module.json`（id、slug、版本、`coreApiVersion`、平台、入口、tab、命令、`permissions`、数据目录、备份路径）；签名是包旁的分离 `.minisig`，验证公钥只用核心内置的一把；核心启动扫描 `应用数据目录/plugins/<slug>/`，校验签名记录与 `coreApiVersion` 后注册。
 - 前端按注册表动态加载（`React.lazy`），替代 `TabContentRouter` 的静态 import；插件 chunk 使用宿主提供的 React 与共享库，通过核心自定义 URI scheme 加载（CSP 仅加这一个 scheme）。
-- Rust 侧：v1.2 的“进程内 cdylib Tauri 插件”经审查不成立（Tauri 插件编译期注册、Rust 无稳定 ABI、capability 编译期固定、macOS 库校验、崩溃与卸载），v1.3 **推荐**（待 DEC-1 与 M0 验证门 G1–G7 确认）：原生部分是由核心拉起的插件宿主进程，经 stdio JSON-RPC 与核心通信，高带宽数据走 loopback WebSocket；插件 crate 放 `src-tauri/plugins/<slug>/`，作为现有 workspace 成员以共用 `[patch.crates-io]`；`AppState` 拆成 `CoreState + PluginRegistry`，命令经核心 `plugin_invoke` 分发。
+- Rust 侧：v1.2 的“进程内 cdylib Tauri 插件”经审查不成立（Tauri 插件编译期注册、Rust 无稳定 ABI、capability 编译期固定、macOS 库校验、崩溃与卸载），v1.3 方案（DEC-1，用户已选 A；M0 验证门 G1–G7 不通过时重议）：原生部分是由核心拉起的插件宿主进程，经 stdio JSON-RPC 与核心通信，高带宽数据走 loopback WebSocket；插件 crate 放 `src-tauri/plugins/<slug>/`，作为现有 workspace 成员以共用 `[patch.crates-io]`；`AppState` 拆成 `CoreState + PluginRegistry`，命令经核心 `plugin_invoke` 分发。
 - 模块商店在应用内：浏览、兼容性检查、下载（断点续传、分片校验、代理三模式、进度与取消）、minisign 验签（与核心同一公钥）、原子安装、启用 / 禁用、卸载（默认保留数据）、回滚到上一版本、离线安装本地插件包。
 - 带原生部分的插件都是宿主进程；SocksCap 额外保留既有提权 helper；VNC Server 监督外部系统 VNC daemon；纯前端插件（`nettools`）没有宿主。
 - 插件之间零依赖是**目标状态**，不是现状：实测屏幕采集引擎住在 `servers/rdp/capture/`（被截图入口、LanChat、RDP 服务端共用）、RDP 服务端复用 RDP 客户端代码、`mobile` 嵌在核心终端热路径里，需先做 10 项共享能力下沉（设计文档 §4.2）才能迁移。
@@ -46,7 +46,7 @@ Taomni 是本地优先的 AI 原生远程工作台（Tauri 2 + React 19 + TypeSc
 
 无。第 3、4、5 项的解释已全部由用户确认：第 3 项（2026-11-14 20:28）——截图入口、备份放核心，MFA、nettools 做插件；第 4 项（20:22）——本地语音 / 模型二进制排除在 Tao Agent“全部”之外；第 5 项（20:22）——“两种类”指客户端与服务端两类，已按 4 个插件落笔。LanChat 为暂定插件，后续可能移除（设计文档 §4.1）。
 
-v1.3 新增待用户决策项（agent 已给推荐，均不算用户已定）：DEC-1 插件原生部分形态（推荐宿主进程）；DEC-2 允许受控例外（`plugin-mobile`、macOS 屏幕录制授权不通过时的截图 / RDP 服务端）；DEC-3 `plugin-nettools` 实测仅 82 行前端、`proxy/` 是核心基础设施，是否仍做独立插件（推荐并入核心）；DEC-4 滚动长截图归属（推荐留核心）。
+v1.3 新增决策项（DEC-1 用户已定；DEC-2 ~ DEC-4 为 agent 推荐，待用户决策，不算已定）：DEC-1 插件原生部分形态（用户已选宿主进程，M0 验证门通过后落地）；DEC-2 允许受控例外（`plugin-mobile`、macOS 屏幕录制授权不通过时的截图 / RDP 服务端）；DEC-3 `plugin-nettools` 实测仅 82 行前端、`proxy/` 是核心基础设施，是否仍做独立插件（推荐并入核心）；DEC-4 滚动长截图归属（推荐留核心）。
 
 ## 3. Consequences
 
