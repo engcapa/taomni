@@ -48,12 +48,12 @@ def setup(ctx):
 def teardown(ctx):
     from .. import host_clipboard
     previous = getattr(ctx, "_markdown_clipboard_before", None)
-    if previous is None:
+    if not previous:
         host_clipboard.clear()
     else:
         host_clipboard.set_text(previous)
     # Non-text native clipboard formats cannot be restored without retaining
     # personal data or a long-lived owner. Record that boundary, never hide it.
     (ctx.case_dir / "markdown-clipboard-cleanup.json").write_text(json.dumps({
-        "textRestored": previous is not None, "nonTextPreviousFormatsNotRestored": True,
+        "textRestored": bool(previous), "nonTextPreviousFormatsNotRestored": True,
     }), encoding="utf-8")

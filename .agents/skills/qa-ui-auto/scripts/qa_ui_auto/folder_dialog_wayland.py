@@ -30,7 +30,7 @@ def operate(ctx, path: Path | None, title: str, *, kind: str = "folder", cancel_
     if path is None:
         wayland.command("keys", chords=[[0xff1b]])  # Escape
     elif kind == "save":
-        wayland.command("keys", chords=[[0xffe3, ord("l")]])
+        wayland.command("keys", chords=[[0xffe3, ord("l")], [0xffe3, ord("a")], [0xff08]])
         wayland.command("text", text=str(path))
         wayland.command("keys", chords=[[0xffe9, ord("c")]] if cancel_after_path else [[0xffe9, ord("s")]])
     else:

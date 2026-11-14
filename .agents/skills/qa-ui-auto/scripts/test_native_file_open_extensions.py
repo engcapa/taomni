@@ -229,7 +229,21 @@ class MarkdownNativeArtifactsTests(unittest.TestCase):
         with patch('qa_ui_auto.host_clipboard.set_text') as restore,patch('qa_ui_auto.host_clipboard.clear') as clear:
             markdown_native.teardown(self.ctx)
         restore.assert_called_once_with('previous clipboard');clear.assert_not_called()
-        self.assertTrue(json.loads((self.ctx.case_dir/'markdown-clipboard-cleanup.json').read_text())['nonTextPreviousFormatsNotRestored'])
+        receipt = json.loads((self.ctx.case_dir/'markdown-clipboard-cleanup.json').read_text())
+        self.assertTrue(receipt['textRestored'])
+        self.assertTrue(receipt['nonTextPreviousFormatsNotRestored'])
+        self.ctx._markdown_clipboard_before = ''
+        with patch('qa_ui_auto.host_clipboard.set_text') as restore,patch('qa_ui_auto.host_clipboard.clear') as clear:
+            markdown_native.teardown(self.ctx)
+        restore.assert_not_called();clear.assert_called_once_with()
+        receipt = json.loads((self.ctx.case_dir/'markdown-clipboard-cleanup.json').read_text())
+        self.assertFalse(receipt['textRestored'])
+        self.assertTrue(receipt['nonTextPreviousFormatsNotRestored'])
+
+    def test_linux_x11_save_dialog_clears_unselected_extension_before_typing_path(self):
+        from qa_ui_auto import folder_dialog
+        folder_src = Path(folder_dialog.__file__).read_text(encoding='utf-8')
+        self.assertIn('"ctrl+l", "ctrl+a", "BackSpace"', folder_src)
 
     def test_png_cancel_and_failed_receipts(self):
         from PIL import Image, ImageDraw
