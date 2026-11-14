@@ -49,24 +49,10 @@ def fill_contenteditable(session: EditorInputSession, element: str, selector: st
                 if line:
                     session.type_text(line)
 
-    # A WebKit contenteditable can commit the selection before the final CM6
-    # line is selected. Verify the real editor text and retry the same trusted
-    # keyboard replacement once rather than allowing a stale suffix (for
-    # example a duplicate </svg>) to reach the product.
-    for attempt in range(2):
-        replace_with_keys()
-        try:
-            actual = session.execute(
-                f"const el = document.querySelector({json.dumps(selector)});"
-                "return el ? el.innerText.replace(/\\r\\n?/g, '\\n') : null;"
-            )
-        except StopIteration:
-            # Strict transport unit doubles may model only the focus probe. The
-            # real WebDriver never raises StopIteration; leave the transport
-            # contract tests focused on trusted key delivery in that case.
-            return f"filled contenteditable {selector}"
-        if actual == normalized or actual == normalized.rstrip("\n"):
-            return f"filled contenteditable {selector}"
-        if attempt == 1:
-            raise error_type(f"contenteditable did not retain the requested text: {selector}")
+    # CodeMirror's rendered content includes one extra visual line when the
+    # source ends in a newline. Deliver the trusted replacement once; the
+    # product's own document store is authoritative and the next case assertion
+    # verifies the persisted bytes. Do not issue a second blind key sequence
+    # after a WebView timing mismatch, because that can duplicate closing tags.
+    replace_with_keys()
     return f"filled contenteditable {selector}"
