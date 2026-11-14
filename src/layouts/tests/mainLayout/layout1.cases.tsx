@@ -269,7 +269,9 @@ export function registerMainLayoutLayout1Cases() {
         issue: null,
       });
       act(() => useAppStore.getState().setActiveSideTab("home"));
-      await waitFor(() => expect(screen.getByTestId("welcome-restore-status")).toHaveAttribute("data-state", "available"));
+      await waitFor(() => expect(screen.getByTestId("tao-home-history")).toBeInTheDocument());
+      fireEvent.click(screen.getByTestId("tao-home-history"));
+      expect(screen.getByRole("button", { name: /恢复上次会话/ })).toBeInTheDocument();
       expect(useAppStore.getState().activeTabId).toBe("saved-local");
       vi.mocked(getWelcomeRunSnapshot).mockResolvedValue({ record: null, legacyCandidate: null, issue: null });
     });

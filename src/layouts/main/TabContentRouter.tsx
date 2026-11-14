@@ -15,6 +15,7 @@ import { SocksCapPanel } from "../../components/sockscap/SocksCapPanel";
 import { TunnelManager } from "../../components/tunnel/TunnelManager";
 import { TaoHomeHost } from "../../components/tao/home/TaoHomeHost";
 import { t as tr } from "../../lib/i18n";
+import { useAppStore } from "../../stores/appStore";
 import {
   DbClientTab,
   DbLoadingPanel,
@@ -31,6 +32,7 @@ import { type TabContentRouterProps } from "./tabs/TabContentRouterProps";
 import { TerminalTabContents } from "./tabs/TerminalTabContents";
 
 export function TabContentRouter(viewProps: TabContentRouterProps) {
+  const storeRecentWorkspaces = useAppStore((state) => state.recentWorkspaces);
   const {
     activeTab,
     activeTabId,
@@ -154,7 +156,7 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
         onNewSession={handleNewSession}
         onOpenLocalPath={(path, opts) => void handleOpenLocalPath(path, opts)}
         recentSessions={welcomeRecentSessions}
-        recentWorkspaces={recentWorkspaces}
+        recentWorkspaces={recentWorkspaces ?? storeRecentWorkspaces}
         mailSessions={welcomeMailSessions}
         onOpenMailSession={handleConnectSession}
         onOpenRecentSession={handleConnectSession}

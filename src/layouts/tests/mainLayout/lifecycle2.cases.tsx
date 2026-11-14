@@ -188,6 +188,7 @@ export function registerMainLayoutLifecycle2Cases() {
     useAppStore.setState({
       tabs: [{ id: "welcome", type: "welcome", title: "Welcome", closable: false }],
       activeTabId: "welcome",
+      activeSideTab: "home",
       recentWorkspaces: [
         {
           // Deliberately differs from the derived identity to prove the
@@ -205,8 +206,9 @@ export function registerMainLayoutLifecycle2Cases() {
 
     render(<MainLayout />);
 
-    fireEvent.click(screen.getByTestId("welcome-history-tab-workspaces"));
-    fireEvent.click(screen.getByTestId("welcome-recent-workspace-row"));
+    fireEvent.click(screen.getByTestId("tao-home-history"));
+    fireEvent.click(screen.getByTestId("tao-home-history-tab-workspaces"));
+    fireEvent.click(screen.getByRole("button", { name: /ws-audit009/ }));
 
     await waitFor(() => {
       const workspace = useWorkspacePlatformStore.getState().getWorkspace();
