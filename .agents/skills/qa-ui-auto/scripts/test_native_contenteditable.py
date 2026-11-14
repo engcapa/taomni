@@ -7,12 +7,15 @@ from tauri_webdriver import NativeSession, WebDriverError
 
 
 class NativeContenteditableTest(unittest.TestCase):
-    def session(self):
+    def session(self, readback="complete replacement"):
         session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))
         session.session_id = "owned-qa"
         session.find = Mock(return_value="editor")
         session.request = Mock(return_value=None)
-        session.execute = Mock(side_effect=[True, True])
+        results = [True, True]
+        if readback is not None:
+            results.append(readback)
+        session.execute = Mock(side_effect=results)
         session.press_combo = Mock()
         session.type_text = Mock()
         return session
@@ -27,20 +30,20 @@ class NativeContenteditableTest(unittest.TestCase):
                 self.assertFalse(any(c.args[1].endswith("/value") for c in session.request.call_args_list))
 
     def test_empty_replacement_selects_then_deletes_without_synthetic_value(self):
-        session = self.session()
+        session = self.session(readback="")
         session.fill(".cm-content", "")
         self.assertEqual(session.press_combo.call_args_list, [call("Mod+a"), call("Backspace")])
         session.type_text.assert_not_called()
 
     def test_keeps_an_already_focused_editor_before_selecting_and_replacing(self):
-        session = self.session()
+        session = self.session(readback="")
         session.fill(".cm-content", "")
         self.assertFalse(any(c.args[1].endswith("/click") for c in session.request.call_args_list))
         self.assertEqual(session.press_combo.call_args_list, [call("Mod+a"), call("Backspace")])
 
     def test_unfocused_editor_still_gets_a_real_click_and_focus_verification(self):
         session = self.session()
-        session.execute.side_effect = [True, False, True]
+        session.execute.side_effect = [True, False, True, "replacement"]
         session.fill(".cm-content", "replacement")
         clicks = [c for c in session.request.call_args_list if c.args[1].endswith("/click")]
         self.assertEqual(len(clicks), 1)
@@ -55,6 +58,19 @@ class NativeContenteditableTest(unittest.TestCase):
         self.assertEqual(len(clicks), 3)
         session.press_combo.assert_not_called()
         session.type_text.assert_not_called()
+
+    def test_cm_readback_strips_zero_width_spaces_and_retries_stale_content_once(self):
+        session = self.session()
+        session.execute.side_effect = [True, True, "stale", "complete replacement"]
+        session.fill(".cm-content", "complete replacement\n")
+        readback_script = session.execute.call_args_list[-1].args[0]
+        self.assertIn(".cm-line", readback_script)
+        self.assertIn("\\u200b", readback_script)
+        self.assertEqual(session.type_text.call_count, 2)
+        failing = self.session()
+        failing.execute.side_effect = [True, True, "stale", "still stale"]
+        with self.assertRaisesRegex(WebDriverError, "did not retain the requested text"):
+            failing.fill(".cm-content", "complete replacement")
 
 
 if __name__ == "__main__":

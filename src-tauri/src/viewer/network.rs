@@ -189,6 +189,7 @@ pub(super) fn validate_url(value: &str) -> Result<url::Url, String> {
         || url.host_str().is_none()
         || !url.username().is_empty()
         || url.password().is_some()
+        || super::html_loopback::is_own_url(&url)
         || url.host_str().is_some_and(|host| {
             host == "ipc.localhost"
                 || host == "tauri.localhost"

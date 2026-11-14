@@ -157,8 +157,11 @@ fn html_csp_blocks_network_ipc_frames_forms_and_preserves_nonce_bridge() {
         .unwrap();
     assert!(policy.contains("sandbox allow-scripts"));
     assert!(!policy.contains("allow-same-origin"));
-    assert!(!policy.contains(" http:"));
-    assert!(!policy.contains(" https:"));
+    assert!(
+        !policy
+            .split([' ', ';'])
+            .any(|value| matches!(value, "http:" | "https:" | "*"))
+    );
     assert!(!policy.contains("ipc:"));
     assert!(policy.contains("frame-src 'none'"));
     assert!(policy.contains("form-action 'none'"));
@@ -177,8 +180,11 @@ fn html_csp_blocks_network_ipc_frames_forms_and_preserves_nonce_bridge() {
     let policy = response.headers()["Content-Security-Policy"]
         .to_str()
         .unwrap();
-    assert!(!policy.contains(" http:"));
-    assert!(!policy.contains(" https:"));
+    assert!(
+        !policy
+            .split([' ', ';'])
+            .any(|value| matches!(value, "http:" | "https:" | "*"))
+    );
     assert!(policy.contains("sandbox allow-scripts"));
     assert!(!policy.contains("allow-same-origin"));
     let body = String::from_utf8(response.body().clone()).unwrap();

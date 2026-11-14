@@ -37,7 +37,9 @@ fn origin() -> &'static str {
     // WKWebView does not commit opaque sandbox iframes served from a custom
     // URL scheme. Use Tauri's localhost HTTP spelling on macOS as well; the
     // handler still authenticates the same token/owner and serves only GET.
-    if cfg!(any(windows, target_os = "android", target_os = "macos")) {
+    if cfg!(target_os = "macos") {
+        super::html_loopback::origin()
+    } else if cfg!(any(windows, target_os = "android")) {
         "http://taomni-preview.localhost"
     } else {
         "taomni-preview://localhost"
@@ -102,6 +104,17 @@ pub(crate) fn open_html(
     Ok(result)
 }
 
+pub(super) fn preview_owner(token: &str) -> Option<String> {
+    if token.len() != 32 || !token.bytes().all(|byte| byte.is_ascii_hexdigit()) {
+        return None;
+    }
+    registry()
+        .lock()
+        .unwrap_or_else(|error| error.into_inner())
+        .get(token)
+        .map(|preview| preview.owner.clone())
+}
+
 pub(crate) fn close_html(token: &str, owner: &str) -> Result<(), String> {
     let mut registry = registry().lock().unwrap_or_else(|error| error.into_inner());
     if registry
@@ -159,7 +172,7 @@ pub(super) async fn serve_async(request: Request<Vec<u8>>, owner: String) -> Res
             }
         }
         Ok(_) => {
-            return tauri::async_runtime::spawn_blocking(move || serve(&request, &owner))
+            return tokio::task::spawn_blocking(move || serve(&request, &owner))
                 .await
                 .unwrap_or_else(|_| {
                     error_response(StatusCode::FORBIDDEN, "permission: Resource worker failed")
@@ -208,7 +221,8 @@ fn resolve_request(
     let authority = uri.authority().map(|value| value.as_str()).unwrap_or("");
     let scheme = uri.scheme_str().unwrap_or("");
     if !((scheme == SCHEME && authority == "localhost")
-        || (matches!(scheme, "http" | "https") && authority == "taomni-preview.localhost"))
+        || (matches!(scheme, "http" | "https") && authority == "taomni-preview.localhost")
+        || super::html_loopback::is_origin_authority(scheme, authority))
     {
         return Err("permission: Invalid preview origin".into());
     }
@@ -338,6 +352,7 @@ fn error_response(status: StatusCode, message: &str) -> Response<Vec<u8>> {
         .header("Content-Security-Policy", "default-src 'none'; sandbox")
         .header("Cache-Control", "no-store")
         .header("X-Content-Type-Options", "nosniff")
+        .header("Access-Control-Allow-Origin", "null")
         .body(message.as_bytes().to_vec())
         .unwrap()
 }

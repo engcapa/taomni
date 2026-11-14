@@ -34,6 +34,19 @@ async function dispatchQaActions(sources, emitKey, modifiers, resolveOrigin, tar
         if (action.type === "keyDown" || action.type === "keyUp") emitKey(action.type, action.value);
         continue;
       }
+      if (source.type === "wheel") {
+        if (action.type === "scroll") {
+          const [wx, wy] = resolveOrigin(action.origin || "viewport", action.x || 0, action.y || 0);
+          const target = targetAtPoint(wx, wy);
+          target.dispatchEvent(new WheelEvent("wheel", {
+            bubbles: true, cancelable: true, composed: true,
+            clientX: wx, clientY: wy,
+            deltaX: Number(action.deltaX) || 0, deltaY: Number(action.deltaY) || 0, deltaMode: 0,
+            ctrlKey: modifiers.Control, shiftKey: modifiers.Shift, altKey: modifiers.Alt, metaKey: modifiers.Meta,
+          }));
+        }
+        continue;
+      }
       if (source.type !== "pointer") continue;
       const state = states[index];
       const button = action.button || 0;

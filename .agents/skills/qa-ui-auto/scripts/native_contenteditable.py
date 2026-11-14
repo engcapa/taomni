@@ -49,16 +49,23 @@ def fill_contenteditable(session: EditorInputSession, element: str, selector: st
                 if line:
                     session.type_text(line)
 
+    readback_script = (
+        f"const el = document.querySelector({json.dumps(selector)});"
+        "if (!el) return null;"
+        "if (el.classList.contains('cm-content')) {"
+        "  const lines = el.querySelectorAll('.cm-line');"
+        "  if (lines.length) return Array.from(lines, (line) => (line.textContent || '').replace(/\\u200b/g, '')).join('\\n');"
+        "}"
+        "return el.innerText.replace(/\\r\\n?/g, '\\n');"
+    )
+
     # A WebKit contenteditable can commit the selection before the final CM6
-    # line is selected. Verify the real editor text and retry the same trusted
-    # keyboard replacement once rather than allowing a stale suffix (for
-    # example a duplicate </svg>) to reach the product.
+    # line is selected, and CM6's trailing active <br> line serializes as \n\n
+    # under innerText. Read logical .cm-line text when available and retry once
+    # rather than allowing a stale suffix to reach the product.
     for attempt in range(2):
         replace_with_keys()
-        actual = session.execute(
-            f"const el = document.querySelector({json.dumps(selector)});"
-            "return el ? el.innerText.replace(/\\r\\n?/g, '\\n') : null;"
-        )
+        actual = session.execute(readback_script)
         if actual == normalized or actual == normalized.rstrip("\n"):
             return f"filled contenteditable {selector}"
         if attempt == 1:

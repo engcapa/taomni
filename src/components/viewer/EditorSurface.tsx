@@ -35,7 +35,7 @@ async function language(path: string): Promise<Extension> {
   const extension = path.split(".").pop()?.toLowerCase();
   if (extension === "json" || extension === "jsonc") return (await import("@codemirror/lang-json")).json();
   if (extension === "yaml" || extension === "yml") return (await import("@codemirror/lang-yaml")).yaml();
-  if (extension === "svg" || extension === "xml") return (await import("@codemirror/lang-xml")).xml();
+  if (extension === "svg" || extension === "xml") return (await import("@codemirror/lang-xml")).xml({ autoCloseTags: false });
   if (extension === "html" || extension === "htm") return (await import("@codemirror/lang-html")).html();
   if (extension === "md" || extension === "markdown") return (await import("@codemirror/lang-markdown")).markdown();
   return [];

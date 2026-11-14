@@ -176,7 +176,7 @@ pub(super) async fn element_text<R: Runtime>(
     };
     let mut script = element_lookup(&reference);
     script.push_str(
-        "if (!el) throw new Error('stale element'); return el.innerText ?? el.textContent ?? '';",
+        "if (!el) throw new Error('stale element'); return (el instanceof SVGElement ? el.textContent : el.innerText ?? el.textContent) ?? '';",
     );
     match eval_js(&state, script).await {
         Ok(value) => ok(value),

@@ -287,15 +287,22 @@ class NativeSessionFillTest(TestCase):
             session.fill("input[type=date]", "2024-01-15")
         self.assertEqual(session.type_text.call_count, 9)
 
-    def session(self, contenteditable: bool, focus_results: list[bool] | None = None) -> NativeSession:
+    def session(
+        self,
+        contenteditable: bool,
+        focus_results: list[bool] | None = None,
+        readback_results: list[str] | None = None,
+    ) -> NativeSession:
         session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))
         session.session_id = "session-1"
         session.find = Mock(return_value="element-1")
         session.request = Mock(return_value=None)
-        execute_results: list[bool] = [contenteditable]
+        execute_results: list[object] = [contenteditable]
         session.focus = Mock(return_value="focused")
         if contenteditable:
             execute_results.extend(focus_results or [True])
+            if readback_results is not None:
+                execute_results.extend(readback_results)
         else:
             execute_results.append(False)
         session.execute = Mock(side_effect=execute_results)
@@ -304,7 +311,7 @@ class NativeSessionFillTest(TestCase):
         return session
 
     def test_contenteditable_fill_uses_real_key_actions(self) -> None:
-        session = self.session(True)
+        session = self.session(True, readback_results=["cafe\nmatrix\n"])
 
         result = session.fill(".cm-content", "cafe\r\nmatrix\n")
 
@@ -327,7 +334,7 @@ class NativeSessionFillTest(TestCase):
 
     def test_contenteditable_fill_retries_real_click_until_focused(self) -> None:
         # Initial focus observation, then two real-click focus results.
-        session = self.session(True, [False, False, True])
+        session = self.session(True, [False, False, True], readback_results=["text"])
 
         session.fill(".cm-content", "text")
 
@@ -500,7 +507,7 @@ class NativeSessionFillTest(TestCase):
         session.type_text.assert_not_called()
 
     def test_empty_contenteditable_fill_deletes_the_selection(self) -> None:
-        session = self.session(True)
+        session = self.session(True, readback_results=[""])
         session.fill('.cm-content', '')
         session.press_combo.assert_has_calls([call("Mod+a"), call("Backspace")])
         session.type_text.assert_not_called()

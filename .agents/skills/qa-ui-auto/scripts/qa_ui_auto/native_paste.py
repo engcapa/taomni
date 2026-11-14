@@ -33,11 +33,32 @@ using System.Runtime.InteropServices;
 public static class QaPaste {
  [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr hwnd);
  [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+ [DllImport("user32.dll")] static extern bool BringWindowToTop(IntPtr hwnd);
+ [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr hwnd,int cmd);
+ [DllImport("user32.dll")] static extern bool IsIconic(IntPtr hwnd);
+ [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hwnd,IntPtr processId);
+ [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
+ [DllImport("user32.dll")] static extern bool AttachThreadInput(uint attach,uint attachTo,bool fAttach);
  [DllImport("user32.dll")] static extern void keybd_event(byte key,byte scan,uint flags,UIntPtr extra);
  public static long Run(int pid) {
   using(var process=Process.GetProcessById(pid)) {
    var hwnd=process.MainWindowHandle;
-   if(hwnd==IntPtr.Zero || !SetForegroundWindow(hwnd) || GetForegroundWindow()!=hwnd) throw new Exception("QA window not foreground");
+   if(hwnd==IntPtr.Zero) throw new Exception("QA window handle missing");
+   if(IsIconic(hwnd)) ShowWindow(hwnd,9);
+   var fg=GetForegroundWindow();
+   if(fg!=hwnd) {
+    if(!SetForegroundWindow(hwnd) && fg!=IntPtr.Zero) {
+     uint current=GetCurrentThreadId();
+     uint owner=GetWindowThreadProcessId(fg,IntPtr.Zero);
+     if(owner!=0 && owner!=current && AttachThreadInput(current,owner,true)) {
+      try { SetForegroundWindow(hwnd); }
+      finally { AttachThreadInput(current,owner,false); }
+     }
+    }
+    BringWindowToTop(hwnd);
+    Thread.Sleep(50);
+   }
+   if(GetForegroundWindow()!=hwnd) throw new Exception("QA window not foreground");
    keybd_event(0x11,0,0,UIntPtr.Zero);
    try { keybd_event(0x56,0,0,UIntPtr.Zero); keybd_event(0x56,0,2,UIntPtr.Zero); }
    finally { keybd_event(0x11,0,2,UIntPtr.Zero); }

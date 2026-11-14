@@ -18,7 +18,7 @@ steps:
 - wait_for: '[data-testid="feishu-app-id"]'
 - assert_text: {selector: '[data-testid="mobile-settings-status"]', contains: 'Disabled · No listening port'}
 - assert_text: {selector: '[data-testid="feishu-status"]', contains: 'Stopped · Delivered 0'}
-- assert_text: {selector: '[data-testid="mobile-settings"]', contains: Allow paired phones to open saved sessions and create local terminals}
+- assert_text: {selector: '[data-testid="mobile-settings"]', contains: Allow paired phones and the Feishu adapter to open saved sessions and create local terminals}
 - fill: {selector: '[data-testid="mobile-settings-port"]', value: '0'}
 - click: '[data-testid="mobile-settings-toggle"]'
 - assert_text: {selector: '[data-testid="mobile-settings-status"]', contains: Running}

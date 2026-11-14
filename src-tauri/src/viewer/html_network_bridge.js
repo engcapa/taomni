@@ -3,12 +3,13 @@
 const allowNetwork = __VIEWER_ALLOW_NETWORK__;
 const sourceBase = __VIEWER_SOURCE_BASE__ || location.href;
 const encoder = new TextEncoder();
+const rootOrigin = new URL(root).origin;
 const mediate = value => {
   const url = new URL(String(value), sourceBase);
   if (url.href.startsWith(root) || url.protocol === "data:" || url.protocol === "blob:") return url.href;
   if (url.protocol !== "http:" && url.protocol !== "https:") return url.href;
   if (!allowNetwork) throw new TypeError("Network is disabled for this HTML preview");
-  if (url.username || url.password || ["ipc.localhost", "tauri.localhost", "asset.localhost", "taomni-preview.localhost"].includes(url.hostname)) {
+  if (url.username || url.password || url.origin === rootOrigin || ["ipc.localhost", "tauri.localhost", "asset.localhost", "taomni-preview.localhost"].includes(url.hostname)) {
     throw new TypeError("Forbidden HTML resource URL");
   }
   url.hash = "";

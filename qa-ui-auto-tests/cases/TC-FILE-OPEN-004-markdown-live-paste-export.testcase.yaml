@@ -379,6 +379,11 @@ steps:
     selector: '[data-testid="file-viewer"][data-dirty="true"]'
     equal: 0
 - click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="tab-item"][data-tab-type="file-browser"]'
+- assert_attribute:
+    selector: '[data-testid="tab-item"][data-tab-type="file-browser"]'
+    name: data-active
+    equals: 'true'
 - dblclick: '[data-testid="explorer-file-row"][data-name="live.md"]'
 - wait_for: '[data-testid="markdown-editor"]'
 - click: '[data-testid="markdown-mode-source"]'
@@ -432,8 +437,8 @@ verification:
     - 83
     - 108
     - 159
-    - 160
     - 162
+    - 164
     checkpoints:
     - step: 71
       expectation: Header has standard Markdown table syntax.
@@ -449,9 +454,9 @@ verification:
       expectation: Both original and pasted images render in live mode.
     - step: 110
       expectation: Split preview images decode real persisted VFS bytes.
-    - step: 163
+    - step: 165
       expectation: Reopen retains the converted table.
-    - step: 164
+    - step: 166
       expectation: Reopen retains the relative pasted-image path.
     results:
     - 71
@@ -461,8 +466,8 @@ verification:
     - 81
     - 85
     - 110
-    - 163
-    - 164
+    - 165
+    - 166
   - id: R3
     requirement: Export exposes all designed formats; HTML download is self-contained and export does not dirty the source.
     actions:
@@ -475,13 +480,13 @@ verification:
       expectation: Export reports completion.
     - step: 158
       expectation: Export did not mark the source dirty.
-    - step: 165
+    - step: 167
       expectation: Markdown/paste/export lifecycle has no uncaught runtime error.
     results:
     - 139
     - 140
     - 158
-    - 165
+    - 167
   - id: R4
     requirement: Live outline/image/table actions are real; zoom stays view-only, cell edits serialize standard Markdown,
       and export settings can cancel without a download.
@@ -504,7 +509,7 @@ verification:
     - 133
     - 136
     - 138
-    - 162
+    - 164
     checkpoints:
     - step: 29
       expectation: The actual widget/source or export dialog reflects its preceding user action.
@@ -528,7 +533,7 @@ verification:
       expectation: The actual widget/source or export dialog reflects its preceding user action.
     - step: 158
       expectation: The actual widget/source or export dialog reflects its preceding user action.
-    - step: 165
+    - step: 167
       expectation: Additional widget and dialog lifecycle causes no uncaught runtime errors.
     results:
     - 29
@@ -542,7 +547,7 @@ verification:
     - 135
     - 137
     - 158
-    - 165
+    - 167
   - id: R5
     requirement: PNG exports real image bytes; clipboard entries complete; desktop-only folder export fails explicitly without
       dirtying the source.
@@ -647,6 +652,7 @@ verification:
     - 98
     - 100
     - 101
+    - 160
     checkpoints:
     - step: 22
       expectation: Live Markdown renders inline and display KaTeX formulas with actual .katex output.
@@ -697,6 +703,8 @@ verification:
       expectation: After the original edit/save workflow, split preview still preserves the original unchecked task state.
     - step: 112
       expectation: The final passive task marker displays an unchecked glyph.
+    - step: 161
+      expectation: File browser tab is reactivated before reopening live.md.
     results:
     - 22
     - 23
@@ -722,6 +730,7 @@ verification:
     - 103
     - 111
     - 112
+    - 161
   visual:
   - check: Live/source/split widgets and export menu
     method: manual

@@ -109,7 +109,8 @@ def fail_status_after_message(route, submitted):
 
 def freshness(page, case_dir, delivery):
     """Only task details succeed while changes and an already-open file fail."""
-    page.locator('[data-testid="mobile-session"][data-session-kind="agent"]').click()
+    page.evaluate("location.hash = '#/session/thread%3Aqa-task'")
+    expect(page.get_by_test_id('mobile-file-open')).to_be_visible()
     page.get_by_test_id('mobile-file-open').click()
     expect(page.get_by_test_id('mobile-file-content')).to_contain_text('QA_MOBILE_CHANGED')
     before = {name: page.get_by_test_id(name).inner_text() for name in ('mobile-changes-updated', 'mobile-file-updated')}

@@ -81,6 +81,18 @@ class GlobalEntryContracts(unittest.TestCase):
             self.assertEqual(keyboard['actions'][-1],{'type':'keyUp','value':''})
             self.assertEqual(calls[-1].args,('DELETE','/actions'))
 
+    def test_native_terminal_click_parks_on_distinct_cell_before_hover(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            session=SimpleNamespace(execute=Mock(return_value={'x':20,'y':40,'parkX':780,'parkY':380,'width':800,'height':400,'hit':True}),request=Mock(),endpoint=lambda path:path)
+            ctx=SimpleNamespace(case_dir=Path(tmp),session=session)
+            with patch.object(terminal_file_link.platform,'system',return_value='Windows'),patch('qa_ui_auto.deadline.budget_time.sleep'):
+                terminal_file_link.native(ctx,{'selector':'#terminal'})
+            posts=[call.args[2]['actions'] for call in session.request.call_args_list if call.args[0]=='POST' and call.args[1]=='/actions']
+            self.assertEqual(len(posts),3)
+            self.assertEqual(posts[0][0]['actions'][0],{'type':'pointerMove','origin':'viewport','x':780,'y':380,'duration':0})
+            self.assertEqual(posts[1][0]['actions'][0],{'type':'pointerMove','origin':'viewport','x':20,'y':40,'duration':0})
+            self.assertEqual(len(posts[2]),2)
+
     def test_file_link_transition_asserts_automatic_chat_hide_without_clicking_hidden_control(self):
         import yaml
         from qa_ui_auto.testcase import load_case

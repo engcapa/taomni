@@ -19,7 +19,8 @@ import { useImageTransform } from "./ImageViewerTransform";
 import { useViewerLabels } from "./viewerLabels";
 import "./ImageViewer.css";
 
-const SVG_EXTENSIONS = [xml()];
+// Disable autoCloseTags so typing complete <svg>...</svg> markup does not append a duplicate </svg>.
+const SVG_EXTENSIONS = [xml({ autoCloseTags: false })];
 type ImageViewerProps = { document: ViewerDocument; onError: (message: string) => void; workspaceId?: string };
 type SvgMode = "render" | "code" | "split";
 
