@@ -6,6 +6,7 @@ import { effectiveFileType, sftpStat } from "../../../lib/sftp";
 import { getLocale } from "../../../lib/i18n";
 import { getAppPlatform } from "../../../lib/runtime";
 import { normalizeLocalStartCwd } from "../../../lib/terminalCwd";
+import { documentPathKey } from "../../../lib/openFile/pathIdentity";
 import { useAppStore } from "../../../stores/appStore";
 import type { TerminalSessionLifecycleContext } from "./sessionContracts";
 
@@ -50,15 +51,22 @@ export function installTerminalFileLinks(term: Terminal, context: TerminalSessio
             // the immediate activation performed by openFile, so a repeated
             // link click cannot leave an existing viewer hidden behind its
             // source terminal.
-            if (opened && !workspaceId && useAppStore.getState().tabs.some((tab) => tab.id === opened && tab.type === "file-viewer")) {
+            if (!workspaceId) {
+              const key = documentPathKey(path);
               const activate = () => {
                 const app = useAppStore.getState();
+                const id = typeof opened === "string" && app.tabs.some((tab) => tab.id === opened && tab.type === "file-viewer")
+                  ? opened
+                  : app.tabs.find((tab) => tab.type === "file-viewer" && tab.fileViewer && documentPathKey(tab.fileViewer.path) === key)?.id;
+                if (!id) return;
                 app.setActiveSideTab("sessions");
-                app.setActiveTab(opened);
+                app.setActiveTab(id);
               };
               activate();
               window.setTimeout(activate, 50);
               window.setTimeout(activate, 250);
+              window.setTimeout(activate, 1000);
+              window.setTimeout(activate, 3000);
             }
           })().catch((error) => context.setStatusMessage(error instanceof Error ? error.message : String(error)));
         },

@@ -70,6 +70,8 @@ function ImageViewerContent({ document, onError, workspaceId }: ImageViewerProps
     // Native WebViews can complete a blob image between the image commit and
     // React's onLoad listener. Polling the current element for a short window
     // also covers decode completion after a hidden viewer becomes visible.
+    const current = image.current;
+    if (current?.decode) void current.decode().then(markDecoded).catch(() => undefined);
     if (!markDecoded()) check();
     return () => {
       cancelled = true;
