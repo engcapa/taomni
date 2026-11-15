@@ -18,7 +18,10 @@ use crate::hbase::HBaseSession;
 use crate::lsp::LspManager;
 use crate::mail::MailImapPool;
 use crate::objectstorage::ObjectStorageSession;
-use crate::plugin::PluginRegistry;
+use crate::plugin::{
+    PluginRegistry,
+    download::{DownloadManager, HttpDownloadService, ProxyRoute},
+};
 use crate::rdp::ws::RdpSession;
 use crate::sdk::SdkManager;
 use crate::servers::ServerRegistry;
@@ -78,6 +81,9 @@ pub struct AppState {
     /// Installed module metadata and lifecycle state. Plugin implementation
     /// state remains in the supervised host process.
     pub plugins: Arc<PluginRegistry>,
+    /// Background module package downloads survive renderer lifetime and keep
+    /// their final progress snapshot available for reopening the store.
+    pub plugin_downloads: Arc<DownloadManager>,
     pub tunnels: Arc<TunnelRegistry>,
     /// OS-level SocksCap engine (rules/egress now; capture in later phases).
     pub sockscap: Arc<SocksCapRuntime>,
@@ -120,6 +126,10 @@ impl AppState {
             .unwrap_or(mail_db_dir.as_path())
             .join("plugins");
         let plugins = Arc::new(PluginRegistry::new(plugin_root));
+        let plugin_downloads = Arc::new(DownloadManager::new(
+            HttpDownloadService::new(&ProxyRoute::NoProxy)
+                .expect("no-proxy module download client must be constructible"),
+        ));
         // A malformed optional plugin must never prevent the core from
         // starting. Invalid manifests remain visible as disabled records.
         let _ = plugins.scan();
@@ -131,6 +141,7 @@ impl AppState {
         let mobile = Arc::new(crate::mobile::MobileRuntime::default());
         Self {
             plugins,
+            plugin_downloads,
             mobile: mobile.clone(),
             tunnels: Arc::new(TunnelRegistry::new()),
             sockscap: Arc::new(SocksCapRuntime::new()),

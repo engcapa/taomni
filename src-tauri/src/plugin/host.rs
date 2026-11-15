@@ -504,17 +504,11 @@ impl HostProcess {
         }
         let id = self.next_request_id();
         let now_ms = self.elapsed_ms();
-        let message = request_message(
-            &mut self.supervisor,
-            id.clone(),
-            method,
-            params,
-            now_ms,
-        )
-        .map_err(|error| HostProcessError::Rpc {
-            code: error.code,
-            message: error.message,
-        })?;
+        let message = request_message(&mut self.supervisor, id.clone(), method, params, now_ms)
+            .map_err(|error| HostProcessError::Rpc {
+                code: error.code,
+                message: error.message,
+            })?;
         self.write_message(&message)?;
         let response = match self.receive_response(&id, self.supervisor.config.request_timeout) {
             Ok(response) => response,

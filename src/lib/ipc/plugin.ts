@@ -12,6 +12,56 @@ export interface PluginInvokeOptions {
   requestId?: string;
 }
 
+export type ModuleDownloadPhase = "connecting" | "downloading" | "verifying" | "completed" | "cancelled" | "failed";
+
+export interface ModuleDownloadProgress {
+  revision: number;
+  downloaded: number;
+  total?: number | null;
+  phase: ModuleDownloadPhase;
+  error?: string | null;
+}
+
+export interface ModuleDownloadProxyEndpoint {
+  kind: "http" | "socks5";
+  host: string;
+  port: number;
+}
+
+export interface ModuleDownloadOptions {
+  id: string;
+  url: string;
+  partialPath: string;
+  completedPath: string;
+  expectedTotal?: number;
+  proxyMode?: "app" | "custom" | "none";
+  applicationProxy?: ModuleDownloadProxyEndpoint;
+  featureProxy?: ModuleDownloadProxyEndpoint;
+}
+
+export interface ModuleCatalogAsset {
+  url: string;
+  signature: string;
+  sha256: string;
+  size: number;
+}
+
+export interface ModuleCatalogPlugin {
+  id: string;
+  slug: string;
+  name: string;
+  version: string;
+  coreApiVersion: string;
+  platforms: Record<string, ModuleCatalogAsset>;
+}
+
+export interface ModuleCatalog {
+  coreApiVersion: string;
+  sequence: number;
+  updatedAt: string;
+  plugins: Record<string, ModuleCatalogPlugin>;
+}
+
 const SLUG = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
 
 function normalizePluginRecord(value: unknown): PluginRecord {
@@ -51,6 +101,50 @@ export async function uninstallPlugin(slug: string, deleteData = false): Promise
 export async function refreshPlugins(): Promise<PluginRecord[]> {
   const records = await invoke<unknown[]>("plugin_refresh", {});
   return records.map(normalizePluginRecord);
+}
+
+export function startPluginDownload(options: ModuleDownloadOptions): Promise<ModuleDownloadProgress> {
+  if (!options.id || !options.url || !options.partialPath || !options.completedPath) {
+    return Promise.reject(new Error("Invalid module download request"));
+  }
+  return invoke<ModuleDownloadProgress>("plugin_download_start", {
+    id: options.id,
+    url: options.url,
+    partialPath: options.partialPath,
+    completedPath: options.completedPath,
+    expectedTotal: options.expectedTotal,
+    proxyMode: options.proxyMode ?? "app",
+    applicationProxy: options.applicationProxy,
+    featureProxy: options.featureProxy,
+  });
+}
+
+export function getPluginDownloadStatus(id: string): Promise<ModuleDownloadProgress | null> {
+  if (!id) return Promise.reject(new Error("Invalid module download id"));
+  return invoke<ModuleDownloadProgress | null>("plugin_download_status", { id });
+}
+
+export function cancelPluginDownload(id: string): Promise<ModuleDownloadProgress> {
+  if (!id) return Promise.reject(new Error("Invalid module download id"));
+  return invoke<ModuleDownloadProgress>("plugin_download_cancel", { id });
+}
+
+export async function forgetPluginDownload(id: string): Promise<void> {
+  if (!id) throw new Error("Invalid module download id");
+  await invoke("plugin_download_forget", { id });
+}
+
+export function fetchModuleCatalog(
+  url: string,
+  options: Pick<ModuleDownloadOptions, "proxyMode" | "applicationProxy" | "featureProxy"> = {},
+): Promise<ModuleCatalog> {
+  if (!url) return Promise.reject(new Error("Invalid module catalog URL"));
+  return invoke<ModuleCatalog>("plugin_catalog_fetch", {
+    url,
+    proxyMode: options.proxyMode ?? "app",
+    applicationProxy: options.applicationProxy,
+    featureProxy: options.featureProxy,
+  });
 }
 
 /** Route a plugin command through the single core permission boundary. */

@@ -47,8 +47,20 @@ export {
   rollbackPlugin,
   setPluginEnabled,
   uninstallPlugin,
+  startPluginDownload,
+  getPluginDownloadStatus,
+  cancelPluginDownload,
+  forgetPluginDownload,
+  fetchModuleCatalog,
   type PluginInvokeOptions,
   type PluginInvokeRequest,
+  type ModuleDownloadPhase,
+  type ModuleDownloadProgress,
+  type ModuleDownloadProxyEndpoint,
+  type ModuleDownloadOptions,
+  type ModuleCatalogAsset,
+  type ModuleCatalogPlugin,
+  type ModuleCatalog,
 } from "./ipc/plugin";
 
 export {
