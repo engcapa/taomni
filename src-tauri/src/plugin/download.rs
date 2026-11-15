@@ -5,9 +5,17 @@
 //! partial file, and what progress/cancellation state the UI should observe.
 
 use std::fmt;
+use std::path::{Path, PathBuf};
+use std::sync::Arc;
+use std::time::Duration;
 
+use futures::StreamExt;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
+use tokio::io::AsyncWriteExt;
+use tokio::sync::Mutex;
+use tokio::task::JoinHandle;
+use tokio_util::sync::CancellationToken;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
@@ -76,6 +84,18 @@ pub enum DownloadError {
     IncompleteCompletion { downloaded: u64, total: u64 },
     #[error("download task is cancelled")]
     Cancelled,
+    #[error("module download URL is invalid: {0}")]
+    InvalidUrl(String),
+    #[error("module download HTTP request failed: {0}")]
+    Http(String),
+    #[error("module download file operation failed: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("module download output already exists: {0}")]
+    OutputExists(String),
+    #[error("module download task is already active: {0}")]
+    AlreadyActive(String),
+    #[error("module download path is invalid: {0}")]
+    InvalidPath(String),
 }
 
 /// Parse the persisted setting names used by existing download preferences.
@@ -361,11 +381,333 @@ impl DownloadTask {
         self.progress.phase = phase;
         self.progress.error = error;
     }
+
+    fn set_total(&mut self, total: Option<u64>) {
+        if self.progress.total.is_none() {
+            self.progress.total = total;
+        }
+    }
+}
+
+/// A verified, resumable module download request.
+///
+/// `partial_path` and `completed_path` must be separate files.  The service
+/// only renames the partial file after the response has been fully consumed,
+/// so an interrupted or cancelled transfer cannot replace a working module.
+#[derive(Debug, Clone)]
+pub struct DownloadRequest {
+    pub id: String,
+    pub url: String,
+    pub partial_path: PathBuf,
+    pub completed_path: PathBuf,
+    pub expected_total: Option<u64>,
+    pub proxy: ProxyRoute,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DownloadResult {
+    pub path: PathBuf,
+    pub bytes: u64,
+    pub resumed: bool,
+}
+
+/// Native HTTP implementation for plugin packages.
+///
+/// The client is deliberately constructed from a resolved `ProxyRoute`.
+/// `NoProxy` calls reqwest's `no_proxy()` so environment and system proxy
+/// variables cannot silently alter the selected route.
+#[derive(Clone)]
+pub struct HttpDownloadService {
+    client: reqwest::Client,
+}
+
+impl HttpDownloadService {
+    pub fn new(route: &ProxyRoute) -> Result<Self, DownloadError> {
+        let mut builder = reqwest::Client::builder()
+            .connect_timeout(Duration::from_secs(20))
+            .timeout(Duration::from_secs(30));
+        match route {
+            ProxyRoute::NoProxy => {
+                builder = builder.no_proxy();
+            }
+            ProxyRoute::Application(endpoint) | ProxyRoute::Feature(endpoint) => {
+                validate_endpoint(endpoint)?;
+                let scheme = match endpoint.kind {
+                    ProxyKind::Http => "http",
+                    ProxyKind::Socks5 => "socks5h",
+                };
+                let proxy = reqwest::Proxy::all(format!(
+                    "{scheme}://{}:{}",
+                    endpoint.host.trim(),
+                    endpoint.port
+                ))
+                .map_err(|error| DownloadError::Http(error.to_string()))?;
+                builder = builder.no_proxy().proxy(proxy);
+            }
+        }
+        builder
+            .build()
+            .map(|client| Self { client })
+            .map_err(|error| DownloadError::Http(error.to_string()))
+    }
+
+    /// Download a package in the current async task, retaining a partial file
+    /// when cancelled or when the response fails validation.
+    pub async fn download(
+        &self,
+        request: DownloadRequest,
+        task: Arc<Mutex<DownloadTask>>,
+        cancellation: CancellationToken,
+    ) -> Result<DownloadResult, DownloadError> {
+        validate_download_paths(&request.partial_path, &request.completed_path)?;
+        if request.completed_path.exists() {
+            return Err(DownloadError::OutputExists(
+                request.completed_path.display().to_string(),
+            ));
+        }
+        if let Some(parent) = request.partial_path.parent() {
+            tokio::fs::create_dir_all(parent).await?;
+        }
+        if let Some(parent) = request.completed_path.parent() {
+            tokio::fs::create_dir_all(parent).await?;
+        }
+        let existing_len = match tokio::fs::metadata(&request.partial_path).await {
+            Ok(metadata) => metadata.len(),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => 0,
+            Err(error) => return Err(error.into()),
+        };
+        let mut builder = self.client.get(&request.url);
+        if existing_len > 0 {
+            builder = builder.header(reqwest::header::RANGE, format!("bytes={existing_len}-"));
+        }
+        set_task_phase(
+            &task,
+            DownloadPhase::Connecting,
+            existing_len,
+            None,
+            request.expected_total,
+        )
+        .await?;
+        let response = tokio::select! {
+            _ = cancellation.cancelled() => {
+                cancel_task(&task).await;
+                return Err(DownloadError::Cancelled);
+            }
+            result = builder.send() => result.map_err(|error| DownloadError::Http(error.to_string()))?,
+        };
+        let status = response.status().as_u16();
+        let content_length = response.content_length();
+        let content_range = response
+            .headers()
+            .get(reqwest::header::CONTENT_RANGE)
+            .and_then(|value| value.to_str().ok());
+        let decision = match validate_resume_response(
+            existing_len,
+            request.expected_total,
+            status,
+            content_range,
+            content_length,
+        ) {
+            Ok(decision) => decision,
+            Err(error) => {
+                fail_task(&task, existing_len, &error).await;
+                return Err(error);
+            }
+        };
+        let total = request.expected_total.or_else(|| {
+            content_range
+                .and_then(|header| parse_content_range(header).ok())
+                .and_then(|range| range.total)
+                .or_else(|| content_length.map(|length| existing_len.saturating_add(length)))
+        });
+        let offset = match decision {
+            ResumeDecision::Append { offset } => offset,
+            ResumeDecision::Restart | ResumeDecision::Fresh => 0,
+        };
+        set_task_phase(&task, DownloadPhase::Downloading, offset, None, total).await?;
+        let append = matches!(decision, ResumeDecision::Append { .. });
+        let mut file = tokio::fs::OpenOptions::new()
+            .create(true)
+            .write(true)
+            .truncate(!append)
+            .append(append)
+            .open(&request.partial_path)
+            .await?;
+        let mut downloaded = offset;
+        let mut body = response.bytes_stream();
+        while let Some(chunk) = tokio::select! {
+            _ = cancellation.cancelled() => {
+                cancel_task(&task).await;
+                return Err(DownloadError::Cancelled);
+            }
+            chunk = body.next() => chunk,
+        } {
+            let chunk = match chunk {
+                Ok(chunk) => chunk,
+                Err(error) => {
+                    let wrapped = DownloadError::Http(error.to_string());
+                    fail_task(&task, downloaded, &wrapped).await;
+                    return Err(wrapped);
+                }
+            };
+            if cancellation.is_cancelled() {
+                cancel_task(&task).await;
+                return Err(DownloadError::Cancelled);
+            }
+            file.write_all(&chunk).await?;
+            downloaded = downloaded.saturating_add(chunk.len() as u64);
+            set_task_phase(&task, DownloadPhase::Downloading, downloaded, None, total).await?;
+        }
+        file.flush().await?;
+        file.sync_all().await?;
+        if let Some(expected) = total {
+            if downloaded < expected {
+                let error = DownloadError::IncompleteCompletion {
+                    downloaded,
+                    total: expected,
+                };
+                fail_task(&task, downloaded, &error).await;
+                return Err(error);
+            }
+        }
+        set_task_phase(&task, DownloadPhase::Verifying, downloaded, None, total).await?;
+        if request.completed_path.exists() {
+            return Err(DownloadError::OutputExists(
+                request.completed_path.display().to_string(),
+            ));
+        }
+        tokio::fs::rename(&request.partial_path, &request.completed_path).await?;
+        set_task_phase(&task, DownloadPhase::Completed, downloaded, None, total).await?;
+        Ok(DownloadResult {
+            path: request.completed_path,
+            bytes: downloaded,
+            resumed: matches!(decision, ResumeDecision::Append { .. }),
+        })
+    }
+}
+
+/// Background task manager used by native commands and future renderer task
+/// restoration.  A task remains in the map after completion so the UI can
+/// reopen its final state; callers can explicitly forget it later.
+#[derive(Clone)]
+pub struct DownloadManager {
+    service: HttpDownloadService,
+    tasks: Arc<Mutex<std::collections::HashMap<String, Arc<Mutex<DownloadTask>>>>>,
+}
+
+impl DownloadManager {
+    pub fn new(service: HttpDownloadService) -> Self {
+        Self {
+            service,
+            tasks: Arc::new(Mutex::new(std::collections::HashMap::new())),
+        }
+    }
+
+    pub async fn start(&self, request: DownloadRequest) -> Result<DownloadHandle, DownloadError> {
+        let mut tasks = self.tasks.lock().await;
+        if tasks.contains_key(&request.id) {
+            return Err(DownloadError::AlreadyActive(request.id));
+        }
+        let total = request.expected_total;
+        let task = Arc::new(Mutex::new(DownloadTask::new(request.id.clone(), total)));
+        tasks.insert(request.id.clone(), Arc::clone(&task));
+        drop(tasks);
+        let token = CancellationToken::new();
+        let service = self.service.clone();
+        let task_for_worker = Arc::clone(&task);
+        let token_for_worker = token.clone();
+        let join = tokio::spawn(async move {
+            service
+                .download(request, task_for_worker, token_for_worker)
+                .await
+        });
+        let id = task.lock().await.id.clone();
+        Ok(DownloadHandle {
+            id,
+            task,
+            cancellation: token,
+            join,
+        })
+    }
+
+    pub async fn snapshot(&self, id: &str) -> Option<DownloadProgress> {
+        let task = self.tasks.lock().await.get(id).cloned()?;
+        Some(task.lock().await.snapshot().clone())
+    }
+
+    pub async fn forget(&self, id: &str) {
+        self.tasks.lock().await.remove(id);
+    }
+}
+
+pub struct DownloadHandle {
+    pub id: String,
+    task: Arc<Mutex<DownloadTask>>,
+    cancellation: CancellationToken,
+    join: JoinHandle<Result<DownloadResult, DownloadError>>,
+}
+
+impl DownloadHandle {
+    pub async fn snapshot(&self) -> DownloadProgress {
+        self.task.lock().await.snapshot().clone()
+    }
+
+    pub fn cancel(&self) {
+        self.cancellation.cancel();
+    }
+
+    pub async fn wait(self) -> Result<DownloadResult, DownloadError> {
+        match self.join.await {
+            Ok(result) => result,
+            Err(error) => Err(DownloadError::Http(format!(
+                "download task join failed: {error}"
+            ))),
+        }
+    }
+}
+
+fn validate_download_paths(partial: &Path, completed: &Path) -> Result<(), DownloadError> {
+    if partial.as_os_str().is_empty() || completed.as_os_str().is_empty() {
+        return Err(DownloadError::InvalidPath(
+            "download paths must be non-empty".into(),
+        ));
+    }
+    if partial == completed {
+        return Err(DownloadError::InvalidPath(
+            "partial and completed paths must differ".into(),
+        ));
+    }
+    Ok(())
+}
+
+async fn set_task_phase(
+    task: &Arc<Mutex<DownloadTask>>,
+    phase: DownloadPhase,
+    downloaded: u64,
+    error: Option<String>,
+    total: Option<u64>,
+) -> Result<(), DownloadError> {
+    let mut guard = task.lock().await;
+    guard.set_total(total);
+    guard.update(phase, downloaded, error)
+}
+
+async fn cancel_task(task: &Arc<Mutex<DownloadTask>>) {
+    task.lock().await.cancel();
+}
+
+async fn fail_task(task: &Arc<Mutex<DownloadTask>>, downloaded: u64, error: &DownloadError) {
+    let mut guard = task.lock().await;
+    let _ = guard.update(DownloadPhase::Failed, downloaded, Some(error.to_string()));
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Arc;
+    use tempfile::tempdir;
+    use tokio::sync::Mutex;
+    use tokio_util::sync::CancellationToken;
 
     fn endpoint() -> ProxyEndpoint {
         ProxyEndpoint {
@@ -494,5 +836,112 @@ mod tests {
                 .expect("download task restores");
         assert_eq!(restored.id(), "module-1");
         assert_eq!(restored.snapshot(), task.snapshot());
+    }
+
+    async fn serve_download(listener: tokio::net::TcpListener, body: Vec<u8>) {
+        use tokio::io::AsyncReadExt;
+        let (mut socket, _) = listener.accept().await.expect("download client connects");
+        let mut request = vec![0_u8; 4096];
+        let length = socket.read(&mut request).await.expect("request reads");
+        let request = String::from_utf8_lossy(&request[..length]);
+        let range = request
+            .lines()
+            .find_map(|line| line.strip_prefix("Range: bytes="))
+            .and_then(|value| value.trim().trim_end_matches('\r').strip_suffix('-'))
+            .and_then(|value| value.parse::<usize>().ok());
+        let (status, payload, extra) = if let Some(start) = range {
+            let payload = body[start..].to_vec();
+            (
+                "206 Partial Content",
+                payload.clone(),
+                format!(
+                    "Content-Range: bytes {start}-{end}/{total}\r\n",
+                    end = body.len().saturating_sub(1),
+                    total = body.len()
+                ),
+            )
+        } else {
+            ("200 OK", body.clone(), String::new())
+        };
+        let headers = format!(
+            "HTTP/1.1 {status}\r\nContent-Length: {}\r\n{extra}\r\n",
+            payload.len()
+        );
+        use tokio::io::AsyncWriteExt;
+        socket
+            .write_all(headers.as_bytes())
+            .await
+            .expect("response headers write");
+        socket
+            .write_all(&payload)
+            .await
+            .expect("response body write");
+    }
+
+    #[tokio::test]
+    async fn native_http_service_writes_completed_file_and_reports_progress() {
+        let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0))
+            .await
+            .unwrap();
+        let url = format!("http://{}/module.pkg", listener.local_addr().unwrap());
+        let body = b"module-package".to_vec();
+        let server = tokio::spawn(serve_download(listener, body.clone()));
+        let dir = tempdir().unwrap();
+        let request = DownloadRequest {
+            id: "module-fresh".into(),
+            url,
+            partial_path: dir.path().join("module.pkg.part"),
+            completed_path: dir.path().join("module.pkg"),
+            expected_total: Some(body.len() as u64),
+            proxy: ProxyRoute::NoProxy,
+        };
+        let task = Arc::new(Mutex::new(DownloadTask::new(
+            request.id.clone(),
+            request.expected_total,
+        )));
+        let service = HttpDownloadService::new(&request.proxy).unwrap();
+        let result = service
+            .download(request.clone(), task.clone(), CancellationToken::new())
+            .await
+            .unwrap();
+        server.await.unwrap();
+        assert!(!result.resumed);
+        assert_eq!(result.bytes, body.len() as u64);
+        assert_eq!(std::fs::read(&result.path).unwrap(), body);
+        assert_eq!(task.lock().await.snapshot().phase, DownloadPhase::Completed);
+        assert!(!request.partial_path.exists());
+    }
+
+    #[tokio::test]
+    async fn native_http_service_resumes_partial_file_only_after_range_validation() {
+        let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0))
+            .await
+            .unwrap();
+        let url = format!("http://{}/module.pkg", listener.local_addr().unwrap());
+        let body = b"module-package".to_vec();
+        let dir = tempdir().unwrap();
+        let partial = dir.path().join("module.pkg.part");
+        std::fs::write(&partial, &body[..6]).unwrap();
+        let server = tokio::spawn(serve_download(listener, body.clone()));
+        let request = DownloadRequest {
+            id: "module-resume".into(),
+            url,
+            partial_path: partial.clone(),
+            completed_path: dir.path().join("module.pkg"),
+            expected_total: Some(body.len() as u64),
+            proxy: ProxyRoute::NoProxy,
+        };
+        let task = Arc::new(Mutex::new(DownloadTask::new(
+            request.id.clone(),
+            request.expected_total,
+        )));
+        let service = HttpDownloadService::new(&request.proxy).unwrap();
+        let result = service
+            .download(request, task, CancellationToken::new())
+            .await
+            .unwrap();
+        server.await.unwrap();
+        assert!(result.resumed);
+        assert_eq!(std::fs::read(result.path).unwrap(), body);
     }
 }

@@ -7,12 +7,19 @@
 //! without starting a desktop process.
 
 use std::collections::HashMap;
-use std::time::Duration;
+use std::io::{self, BufRead, BufReader, Write};
+use std::path::{Path, PathBuf};
+use std::process::{Child, ChildStdin, Command, Stdio};
+use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
+use std::thread;
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use taomni_plugin_api::{
-    CancelRequest, ErrorCode, HandshakeRequest, HandshakeResponse, Heartbeat, RequestId, RpcError,
-    RpcMessage, RpcNotification, RpcResponse, validate_token, validate_versions,
+    API_VERSION, CancelRequest, ErrorCode, HandshakeRequest, HandshakeResponse, Heartbeat,
+    PROTOCOL_VERSION, RequestId, RpcError, RpcMessage, RpcNotification, RpcRequest, RpcResponse,
+    validate_token, validate_versions,
 };
 use thiserror::Error;
 
@@ -346,6 +353,313 @@ pub fn request_message(
     Ok(RpcMessage::Request(taomni_plugin_api::RpcRequest::new(
         id, method, params,
     )))
+}
+
+/// Errors raised by the concrete stdio process adapter.  The protocol state
+/// machine above remains independently testable; this adapter is the narrow
+/// boundary that turns it into a request/response client for a real host.
+#[derive(Debug, thiserror::Error)]
+pub enum HostProcessError {
+    #[error("failed to spawn plugin host: {0}")]
+    Spawn(#[source] io::Error),
+    #[error("plugin host I/O failed: {0}")]
+    Io(#[source] io::Error),
+    #[error("plugin host frame failed: {0}")]
+    Frame(#[from] FrameError),
+    #[error("plugin host RPC failed ({code}): {message}")]
+    Rpc { code: i32, message: String },
+    #[error("plugin host handshake was rejected: {0}")]
+    Handshake(String),
+    #[error("plugin host request timed out")]
+    Timeout,
+    #[error("plugin host exited unexpectedly")]
+    Crashed,
+    #[error("plugin host returned an unexpected response")]
+    UnexpectedResponse,
+}
+
+type HostReadResult = Result<RpcMessage, HostProcessError>;
+
+/// A single supervised plugin host process.
+///
+/// The child stdout is consumed by a dedicated reader thread so a synchronous
+/// Tauri command can enforce a hard response deadline with `recv_timeout`.
+/// Every invocation is serialized through the owning mutex in `PluginRegistry`;
+/// this keeps request IDs and stdio writes ordered without exposing the child
+/// handles to the renderer.
+pub struct HostProcess {
+    child: Child,
+    stdin: ChildStdin,
+    responses: Receiver<HostReadResult>,
+    supervisor: HostSupervisor,
+    token: String,
+    next_id: u64,
+    started_at: Instant,
+}
+
+impl HostProcess {
+    pub fn start(
+        plugin_id: &str,
+        plugin_version: &str,
+        host: &Path,
+        working_dir: &Path,
+        commands: &[String],
+        permissions: &[String],
+        config: HostSupervisorConfig,
+    ) -> Result<Self, HostProcessError> {
+        let token = process_token();
+        let mut command = Command::new(host);
+        command
+            .current_dir(working_dir)
+            .env("TAOMNI_PLUGIN_TOKEN", &token)
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null());
+        let mut child = command.spawn().map_err(HostProcessError::Spawn)?;
+        let stdin = child.stdin.take().ok_or_else(|| {
+            HostProcessError::Io(io::Error::other("plugin host stdin was not piped"))
+        })?;
+        let stdout = child.stdout.take().ok_or_else(|| {
+            HostProcessError::Io(io::Error::other("plugin host stdout was not piped"))
+        })?;
+        let (sender, responses) = mpsc::channel();
+        spawn_reader(stdout, sender);
+        let started_at = Instant::now();
+        let mut process = Self {
+            child,
+            stdin,
+            responses,
+            supervisor: HostSupervisor::new(plugin_id, config.clone(), 0),
+            token,
+            next_id: 0,
+            started_at,
+        };
+        let handshake_id = process.next_request_id();
+        let request = RpcRequest::new(
+            handshake_id.clone(),
+            "plugin/handshake",
+            Some(
+                serde_json::to_value(HandshakeRequest::new(
+                    plugin_id,
+                    plugin_version,
+                    process.token.clone(),
+                    commands.to_vec(),
+                    permissions.to_vec(),
+                ))
+                .map_err(|error| HostProcessError::Handshake(error.to_string()))?,
+            ),
+        );
+        process.write_message(&RpcMessage::Request(request))?;
+        let response = process.receive_response(&handshake_id, config.request_timeout)?;
+        let result = response
+            .result
+            .ok_or_else(|| response_error(response.error, "handshake returned no result"))?;
+        let handshake: HandshakeResponse = serde_json::from_value(result)
+            .map_err(|error| HostProcessError::Handshake(error.to_string()))?;
+        if let Err(error) = validate_versions(handshake.api_version, handshake.protocol_version) {
+            return Err(HostProcessError::Handshake(error.message));
+        }
+        if !handshake.accepted {
+            return Err(HostProcessError::Handshake(
+                handshake
+                    .error
+                    .map(|error| error.message)
+                    .unwrap_or_else(|| "host rejected handshake".to_owned()),
+            ));
+        }
+        // The core validates the request it sent as well as the response
+        // version above. This keeps a malicious or stale host from entering
+        // the Running state merely by returning `{accepted:true}`.
+        let handshake_request = HandshakeRequest::new(
+            plugin_id,
+            plugin_version,
+            &process.token,
+            commands.to_vec(),
+            permissions.to_vec(),
+        );
+        let accepted = process.supervisor.accept_handshake(
+            &handshake_request,
+            &process.token,
+            process.elapsed_ms(),
+        );
+        if !accepted.accepted {
+            return Err(HostProcessError::Handshake(
+                accepted
+                    .error
+                    .map(|error| error.message)
+                    .unwrap_or_else(|| "core rejected its own handshake".to_owned()),
+            ));
+        }
+        Ok(process)
+    }
+
+    pub fn invoke(
+        &mut self,
+        method: &str,
+        params: Option<Value>,
+    ) -> Result<Value, HostProcessError> {
+        if self.supervisor.state() != HostState::Running {
+            return Err(HostProcessError::Crashed);
+        }
+        let id = self.next_request_id();
+        let message = request_message(
+            &mut self.supervisor,
+            id.clone(),
+            method,
+            params,
+            self.elapsed_ms(),
+        )
+        .map_err(|error| HostProcessError::Rpc {
+            code: error.code,
+            message: error.message,
+        })?;
+        self.write_message(&message)?;
+        let response = match self.receive_response(&id, self.supervisor.config.request_timeout) {
+            Ok(response) => response,
+            Err(error @ HostProcessError::Timeout) => {
+                let _ = self
+                    .supervisor
+                    .cancel_request(&id, Some("request timeout".into()));
+                self.kill();
+                return Err(error);
+            }
+            Err(error) => {
+                self.kill();
+                return Err(error);
+            }
+        };
+        if !self.supervisor.complete_response(&response) {
+            return Err(HostProcessError::UnexpectedResponse);
+        }
+        if let Some(error) = response.error {
+            return Err(HostProcessError::Rpc {
+                code: error.code,
+                message: error.message,
+            });
+        }
+        response.result.ok_or(HostProcessError::UnexpectedResponse)
+    }
+
+    pub fn stop(&mut self) {
+        self.supervisor.stop();
+        self.kill();
+    }
+
+    fn write_message(&mut self, message: &RpcMessage) -> Result<(), HostProcessError> {
+        let bytes = JsonLineCodec::encode(message)?;
+        self.stdin.write_all(&bytes).map_err(HostProcessError::Io)?;
+        self.stdin.flush().map_err(HostProcessError::Io)
+    }
+
+    fn receive_response(
+        &mut self,
+        expected_id: &RequestId,
+        timeout: Duration,
+    ) -> Result<RpcResponse, HostProcessError> {
+        let deadline = Instant::now() + timeout;
+        loop {
+            let remaining = deadline.saturating_duration_since(Instant::now());
+            let message = match self.responses.recv_timeout(remaining) {
+                Ok(message) => message?,
+                Err(RecvTimeoutError::Timeout) => return Err(HostProcessError::Timeout),
+                Err(RecvTimeoutError::Disconnected) => return Err(HostProcessError::Crashed),
+            };
+            match message {
+                RpcMessage::Response(response) => {
+                    if response.id.as_ref() == Some(expected_id) {
+                        return Ok(response);
+                    }
+                }
+                RpcMessage::Notification(notification)
+                    if notification.method == Heartbeat::METHOD =>
+                {
+                    if let Some(params) = notification.params {
+                        if let Ok(heartbeat) = serde_json::from_value::<Heartbeat>(params) {
+                            let _ = self
+                                .supervisor
+                                .record_heartbeat(&heartbeat, self.elapsed_ms());
+                        }
+                    }
+                }
+                RpcMessage::Notification(_) | RpcMessage::Request(_) => {}
+            }
+        }
+    }
+
+    fn next_request_id(&mut self) -> RequestId {
+        self.next_id = self.next_id.saturating_add(1);
+        format!("taomni-{}", self.next_id).into()
+    }
+
+    fn elapsed_ms(&self) -> u64 {
+        self.started_at
+            .elapsed()
+            .as_millis()
+            .min(u128::from(u64::MAX)) as u64
+    }
+
+    fn kill(&mut self) {
+        if self.child.try_wait().ok().flatten().is_none() {
+            let _ = self.child.kill();
+        }
+        let _ = self.child.wait();
+    }
+}
+
+impl Drop for HostProcess {
+    fn drop(&mut self) {
+        self.kill();
+    }
+}
+
+fn spawn_reader(stdout: impl std::io::Read + Send + 'static, sender: Sender<HostReadResult>) {
+    thread::spawn(move || {
+        let mut reader = BufReader::new(stdout);
+        let mut codec = JsonLineCodec::default();
+        let mut bytes = [0u8; 8 * 1024];
+        loop {
+            match reader.read(&mut bytes) {
+                Ok(0) => break,
+                Ok(count) => match codec.push(&bytes[..count]) {
+                    Ok(messages) => {
+                        for message in messages {
+                            if sender.send(Ok(message)).is_err() {
+                                return;
+                            }
+                        }
+                    }
+                    Err(error) => {
+                        let _ = sender.send(Err(HostProcessError::Frame(error)));
+                        return;
+                    }
+                },
+                Err(error) => {
+                    let _ = sender.send(Err(HostProcessError::Io(error)));
+                    return;
+                }
+            }
+        }
+        let _ = sender.send(Err(HostProcessError::Crashed));
+    });
+}
+
+fn response_error(error: Option<RpcError>, fallback: &str) -> HostProcessError {
+    match error {
+        Some(error) => HostProcessError::Rpc {
+            code: error.code,
+            message: error.message,
+        },
+        None => HostProcessError::Handshake(fallback.to_owned()),
+    }
+}
+
+fn process_token() -> String {
+    let mut bytes = [0u8; 32];
+    rand::fill(&mut bytes);
+    // Hex avoids shell/JSON escaping surprises and remains easy to redact in
+    // diagnostics. The token is generated once per process and never stored
+    // in the plugin registry or on disk.
+    bytes.iter().map(|byte| format!("{byte:02x}")).collect()
 }
 
 #[cfg(test)]

@@ -14,7 +14,7 @@ pub mod verify;
 use std::collections::{BTreeSet, HashMap};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
-use std::sync::{Arc, RwLock};
+use std::sync::{Arc, Mutex, RwLock};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -123,6 +123,8 @@ pub enum PluginError {
     PermissionDenied { slug: String, permission: String },
     #[error("plugin host is unavailable for {0}")]
     HostUnavailable(String),
+    #[error("plugin host request failed: {0}")]
+    HostRequest(String),
     #[error("plugin registry I/O failed: {0}")]
     Io(#[from] std::io::Error),
     #[error("plugin registry JSON failed: {0}")]
@@ -136,6 +138,7 @@ pub struct PluginRegistry {
     root: PathBuf,
     core_api_version: String,
     records: Arc<RwLock<HashMap<String, PluginRecord>>>,
+    hosts: Arc<Mutex<HashMap<String, Arc<Mutex<host::HostProcess>>>>>,
 }
 
 impl PluginRegistry {
@@ -144,6 +147,7 @@ impl PluginRegistry {
             root: root.into(),
             core_api_version: CORE_API_VERSION.to_owned(),
             records: Arc::new(RwLock::new(HashMap::new())),
+            hosts: Arc::new(Mutex::new(HashMap::new())),
         }
     }
 
@@ -220,6 +224,16 @@ impl PluginRegistry {
         } else {
             LifecycleState::Disabled
         };
+        if !enabled {
+            if let Some(process) = self
+                .hosts
+                .lock()
+                .expect("plugin host lock poisoned")
+                .remove(slug)
+            {
+                process.lock().expect("plugin process lock poisoned").stop();
+            }
+        }
         let snapshot = records.clone();
         drop(records);
         self.persist_enabled_state(&snapshot)?;
@@ -256,6 +270,7 @@ impl PluginRegistry {
     /// Switch the active immutable version to the previous one and refresh the
     /// registry projection. The host supervisor will re-handshake separately.
     pub fn rollback(&self, slug: &str) -> Result<PluginRecord, PluginError> {
+        self.stop_host(slug);
         install::ModuleInstaller::new(&self.root).rollback(slug)?;
         self.scan()?;
         self.get(slug)
@@ -265,6 +280,7 @@ impl PluginRegistry {
     /// Deactivate a module. Its versions and data remain unless `delete_data`
     /// is explicitly requested by the caller.
     pub fn uninstall(&self, slug: &str, delete_data: bool) -> Result<PluginRecord, PluginError> {
+        self.stop_host(slug);
         install::ModuleInstaller::new(&self.root).uninstall(slug, delete_data)?;
         self.scan()?;
         // Removing the active pointer makes the record `Uninstalled`; clear
@@ -317,7 +333,7 @@ impl PluginRegistry {
         Ok((manifest, state))
     }
 
-    pub fn invoke(&self, slug: &str, command: &str, _payload: Value) -> Result<Value, PluginError> {
+    pub fn invoke(&self, slug: &str, command: &str, payload: Value) -> Result<Value, PluginError> {
         let record = self
             .get(slug)
             .ok_or_else(|| PluginError::NotFound(slug.to_owned()))?;
@@ -330,10 +346,98 @@ impl PluginRegistry {
                 command: command.to_owned(),
             });
         }
-        // The process supervisor is deliberately a separate M0 task. Returning
-        // a stable error here prevents a missing host from becoming a blank UI
-        // and gives the frontend a retry/install path.
-        Err(PluginError::HostUnavailable(slug.to_owned()))
+        let process = self.host_for(slug, &record)?;
+        let result = process
+            .lock()
+            .expect("plugin process lock poisoned")
+            .invoke(command, Some(payload));
+        match result {
+            Ok(value) => Ok(value),
+            Err(error) => {
+                self.stop_host(slug);
+                Err(match error {
+                    host::HostProcessError::Crashed | host::HostProcessError::Spawn(_) => {
+                        PluginError::HostUnavailable(format!("{slug}: {error}"))
+                    }
+                    host::HostProcessError::Timeout => {
+                        PluginError::HostRequest(format!("{slug}: {error}"))
+                    }
+                    other => PluginError::HostRequest(format!("{slug}: {other}")),
+                })
+            }
+        }
+    }
+
+    fn host_for(
+        &self,
+        slug: &str,
+        record: &PluginRecord,
+    ) -> Result<Arc<Mutex<host::HostProcess>>, PluginError> {
+        let host_name = record
+            .manifest
+            .entry
+            .host
+            .as_deref()
+            .ok_or_else(|| PluginError::HostUnavailable(slug.to_owned()))?;
+        let mut hosts = self.hosts.lock().expect("plugin host lock poisoned");
+        if let Some(process) = hosts.get(slug) {
+            return Ok(process.clone());
+        }
+        let (working_dir, host_path) = self.host_location(slug, host_name)?;
+        let process = host::HostProcess::start(
+            &record.manifest.id,
+            &record.manifest.version,
+            &host_path,
+            &working_dir,
+            &record.manifest.commands.iter().cloned().collect::<Vec<_>>(),
+            &record
+                .manifest
+                .permissions
+                .iter()
+                .cloned()
+                .collect::<Vec<_>>(),
+            host::HostSupervisorConfig::default(),
+        )
+        .map_err(|error| PluginError::HostUnavailable(format!("{slug}: {error}")))?;
+        let process = Arc::new(Mutex::new(process));
+        hosts.insert(slug.to_owned(), process.clone());
+        Ok(process)
+    }
+
+    fn host_location(
+        &self,
+        slug: &str,
+        host_name: &str,
+    ) -> Result<(PathBuf, PathBuf), PluginError> {
+        let plugin_dir = self.root.join(slug);
+        let pointer = install::ModuleInstaller::new(&self.root)
+            .active_pointer(slug)
+            .map_err(PluginError::Install)?;
+        let working_dir = pointer
+            .active_version
+            .map(|version| plugin_dir.join("versions").join(version))
+            .unwrap_or_else(|| plugin_dir.clone());
+        let relative = Path::new(host_name);
+        validate_relative_path(host_name)?;
+        let host_path = working_dir.join(relative);
+        if !host_path.is_file() {
+            return Err(PluginError::HostUnavailable(format!(
+                "host executable is missing: {}",
+                host_path.display()
+            )));
+        }
+        Ok((working_dir, host_path))
+    }
+
+    fn stop_host(&self, slug: &str) {
+        if let Some(process) = self
+            .hosts
+            .lock()
+            .expect("plugin host lock poisoned")
+            .remove(slug)
+        {
+            process.lock().expect("plugin process lock poisoned").stop();
+        }
     }
 
     fn validate_manifest(&self, manifest: &ModuleManifest, dir: &Path) -> Result<(), PluginError> {
@@ -371,6 +475,14 @@ impl PluginRegistry {
         }
         for path in manifest.backup_paths.iter() {
             validate_relative_path(path)?;
+        }
+        if let Some(host) = manifest.entry.host.as_deref() {
+            validate_relative_path(host)?;
+        }
+        if manifest.entry.protocol != taomni_plugin_api::RPC_PROTOCOL_VERSION as u16 {
+            return Err(PluginError::InvalidManifest(
+                "entry protocol is incompatible".into(),
+            ));
         }
         Ok(())
     }
