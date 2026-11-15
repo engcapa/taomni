@@ -378,8 +378,6 @@ jobs:
       QA_RUN_ID: ${{ github.run_id }}
       QA_ARTIFACT_KEY: ${{ needs.plan.outputs.artifact_key }}
       QA_HEAD: ${{ needs.plan.outputs.head }}
-      HTTPS_PROXY: http://10.1.0.80:3228
-      HTTP_PROXY: http://10.1.0.80:3228
       NO_PROXY: localhost,127.0.0.1
     steps:
       - uses: actions/checkout@v4
