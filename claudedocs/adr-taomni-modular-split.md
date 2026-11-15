@@ -4,9 +4,9 @@
 
 Accepted as a design decision; M0 implementation is in progress. v1.6 is the current review revision, based on `7bc498b35` (Merge PR #813); it records the 2026-11-15 decision to remove LanChat completely. Plugin migration remains blocked until the G1–G11 feasibility gates pass. The executable plan is in `docs-feature/taomni-modular-split-design.md` §10.1.
 
-本分支已实现插件 API/registry、版本目录原语、真实宿主握手/invoke、原生下载 IPC、设置页本地 registry 投影与升级预检，以及独立清单生成器。生产升级当前只记录安全 pending journal；fixture 的 staging/回滚原语不代表真实旧版升级。核心仍包含待迁出业务，目前唯一独立宿主是 hello-plugin。完整签名安装门、生产监督、共享能力下沉、远端商店和实际 tab 接线、真实 exporter/密钥/快照、业务迁移与最终发布验收仍未完成；逐任务状态与对应 hosted 证据见[实施与验收台账](../docs-feature/taomni-modular-split-progress.md)，不能把基础契约通过视为完整交付。
+本分支已集成插件 API/registry、真实验签安装、宿主监督、共享采集与 RDP 公共库、原生下载、离线安装和升级预检，以及独立清单生成器；各批验证仍须按实际覆盖范围验收。生产升级当前只记录安全 pending journal；fixture 的 staging/回滚原语不代表真实旧版升级。核心仍包含待迁出业务，目前唯一独立宿主是 hello-plugin。核心状态和依赖闭包、远端商店和实际 tab 接线、真实 exporter/密钥/快照、业务迁移与最终发布验收仍未完成；逐任务状态与对应 hosted 证据见[实施与验收台账](../docs-feature/taomni-modular-split-progress.md)，不能把基础契约通过视为完整交付。
 
-本轮代码在本地通过完整 Rust library 单测（2158 passed, 25 ignored）、插件 focused 单测（44 passed）、Settings/ModuleStore Vitest（28 passed）、TypeScript、`check:refactor`、rustfmt 和 QA catalog/audit 门禁；GitHub 多端结果以本轮提交对应的 hosted run 和逐 shard artifact 为准，历史 run 的无关 `TC-FILE-OPEN-*` 失败不作为模块化失败依据。
+验证按源码提交、用例、平台与构建身份记录在台账及原始 artifact 中。历史整库单测和旧 hosted run 不能替代后续修改的验证；无关失败须有具体依据才能单列忽略，本次引入的回归必须修复重跑。
 
 ## 1. Context
 

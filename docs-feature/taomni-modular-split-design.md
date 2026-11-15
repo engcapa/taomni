@@ -7,7 +7,7 @@
 - 目标读者：Taomni 维护者 / 实现者 / 评审者
 - 状态：部分可实施。§13.1 的用户决策有效；M0 基线、契约冻结、宿主验证和共享能力下沉可立即开始，M2 插件迁移必须等待 §5.0 的 G1–G11 全部通过。v1.4 修正了过期基线、插件数量表述、核心依赖隔离遗漏、前端安全边界、数据迁移幂等性和发布例外规则，并新增 TASK-001–TASK-023、AC-001–AC-014、V-001–V-010。v1.5 按新代码更正 MFA 采集、前端 lazy 现状等结论，补充文件查看器、移动端桌面远控与 headless、re-exec 入口、插件数据密钥与备份快照、crash-regression 插件依赖等遗漏，新增 S11–S15、G11、TASK-024/025、AC-015/016、V-011。
 
-当前分支实现进度：插件 API/注册表/前端动态加载、0.5.x 升级 journal 执行器（源指纹、staging、原子 active 指针、幂等重试、失败回滚）、宿主协议监督的可测试逻辑、版本目录安装状态机、`modules.json` 生成器与 release 上传顺序已落地；原生 HTTP 下载、代理/断点续传/取消进度、目录结构校验、下载 IPC 和设置页升级预检已接入，浏览器 stub 也提供明确空状态。独立签名安装门、远端目录的完整 renderer 接线、真实旧版数据导出和 M2 具体插件迁移仍为待办。可复现的 TASK-001 起点记录在 `docs-feature/taomni-modular-split-baseline-20261115.md`。
+当前分支实现进度：插件 API/注册表、版本目录、真实签名安装门、宿主监督、原生下载与设置页离线安装已集成；共享采集和 RDP 公共库已下沉，实际验证范围见[实施与验收台账](taomni-modular-split-progress.md)。生产升级当前只记录只读预检、源指纹和安全 pending journal；测试专用 staging/回滚执行器不代表真实旧版升级已实现。实际业务 tab 路由、远端商店、核心状态与依赖闭包、真实 exporter/密钥/一致快照、业务插件迁移和完整发布验收仍按 §10.1 推进。可复现的 TASK-001 起点记录在 `docs-feature/taomni-modular-split-baseline-20261115.md`。
 
 > 一句话：Taomni 从“一个安装包打全部功能”改成“核心默认安装 + 插件独立打包发布”。第一版不做 P0 多 profile 打包的过渡态，直接做 P1 真插件 + 模块商店；首发目标是全部有效非核心模块，按受控例外规则发布。
 
@@ -829,6 +829,7 @@ v1.2 没有覆盖“已经在用旧版的用户”。核心 0.6.x 默认包不�
 | TASK-012 | 实现备份与迁移框架：修改 `src-tauri/src/backup/`、`src/components/welcome/`、`src/stores/backupStore.ts`；从 `module.json` 读取受限 `backupPaths`，新增迁移 journal、幂等版本、失败回滚和“稍后安装”向导；接入 `backup.snapshot` 与插件 Vault 密钥一致性（TASK-025）。单体升级必须遵循 §6.5.1：只读预检、源指纹、staging 目录、active 原子切换、宿主静默和离线 `pending`。 | TASK-005、009、011、025 | 真实 0.5.x fixture 的 RDP/VNC/Servers/MFA/SocksCap 数据迁移可重跑、可取消、可恢复；验签/下载失败保留旧数据和核心可启动；AC-006/011/017；V-006/012。 |
 | TASK-013 | 建立 hello-plugin 和 G 门实验：`src-tauri/plugins/hello-plugin/`、平台签名/执行脚本、M0 实验记录；按 G1–G11 逐项写通过标准、原始日志和失败处置。 | TASK-002、008、009、011 | 当前端先完成，Windows/macOS/Linux 计划完整；任何未通过的 G 项阻断相关插件批次；AC-004/007/012；V-002/010。 |
 | TASK-014 | 迁移 `plugin-mfa`：`src-tauri/src/mfa/`、`src/components/mfa/`、`commands/mfa.rs`、`mfa.db`、核心 MFA prompt 与 capture 扩展点分离。 | TASK-003、005、007、009、012、013、024、025 | MFA 可独立安装/禁用，SSH `MfaPrompt` 仍在核心，`mfa.db` 数据完整；`mfa.data-key-v1` 经 S12 服务访问；AC-002/006/010/016；V-006/007。 |
+| TASK-015 | 已取消：原 LanChat 插件迁移任务。用户于 2026-11-15 要求彻底删除该功能；保留编号用于历史追踪。 | 无，不再作为其它任务的前置依赖 | 产品、插件、迁移、备份与 QA 入口删除；历史 `lanchat.sqlite` / `lanchat.db` 留原位，不读取、迁移或删除。不创建替代插件。 |
 | TASK-016 | 迁移 VNC/RDP 客户端：`src-tauri/src/vnc`、`src-tauri/src/rdp`、前端和现有 WS relay；会话记录仍由核心管理，凭据按会话一次性下发；`--vnc-special-key-hook` 入口迁入 VNC 宿主二进制（S11）。 | TASK-004、005、007、008、009、013、024 | 客户端功能回归、断开/重连、detach 和未安装占位通过；AC-002/004/010/013；V-007/010。 |
 | TASK-017 | 迁移 RDP/VNC Server：从 `servers/rdp*`、`servers/vnc.rs` 拆出宿主，迁移 tab lock、capture、输入注入、外部 daemon 监督和服务端审批。 | TASK-003、004、008、016 | G2 结论适用；服务启停、退出清理、权限和 tab lock 无残留；AC-004/010/012/013；V-007/010。 |
 | TASK-018 | 迁移 `plugin-servers`：剩余 `servers/`、`server_configs` 一次性迁移、长驻服务清理、`nsis/hooks.nsh` 中不再由核心承担的清理路径。 | TASK-005、008、009、011、012、017 | 旧配置可迁移，核心不再读插件库；SSH/SFTP/rootDir 已知缺口不扩大；AC-006/010/012；V-006/007。 |
@@ -840,7 +841,7 @@ v1.2 没有覆盖“已经在用旧版的用户”。核心 0.6.x 默认包不�
 | TASK-024 | 多进程入口与 profile 协同（v1.5 新增）：`src-tauri/src/main.rs`、`lib.rs`（`ModeLease`）、`backup/coordination.rs`、`mobile/headless*.rs`；冻结 S11 re-exec 归属表、S15 `--headless` 在插件模型下的行为，设计并验证宿主与 `ProfileLease` / 还原的协同。 | TASK-002、005 | G11 有记录；`--ssh-stdio-forward`、`--screenshot-scroll-input` 保持核心且有测试；迁出入口有归属表；AC-015；V-011。 |
 | TASK-025 | 插件数据密钥与一致快照服务（v1.5 新增）：`vault/`（插件作用域固定条目服务，`mfa.data-key-v1` 迁移为按 slug 限定）、`backup/snapshot_context.rs`（`backup.snapshot`）、`module.json` 的 `vaultFixedKeys` / `snapshot` 字段与 schema。 | TASK-002、005 | 宿主不持有 Vault 句柄也能打开自己的库；备份还原后 Vault 与插件库一致；运行中 / 已禁用 / 未安装三种状态的备份与还原用例通过；AC-011/016；V-006。 |
 
-**执行顺序与并行规则**：TASK-001、TASK-002 可先行；TASK-024、TASK-025 在 TASK-005 契约冻结后启动，必须先于 TASK-012、TASK-014、TASK-015 合并；TASK-003/004 可并行但都必须在 TASK-005 前合并；TASK-006 与 TASK-007 可在状态契约冻结后并行；TASK-008–013 是 M0/M1 的关键路径，任何 G1–G11 未通过只允许继续非受影响的文档、fixture 和核心重构；TASK-014–022 严格按依赖闭合逐批迁移，不允许多个任务同时改 `state.rs`、`commands/mod.rs`、`TabContentRouter.tsx` 或 `Cargo.toml` 而没有集成负责人。TASK-023 是唯一的发布收口任务。
+**执行顺序与并行规则**：TASK-001、TASK-002 可先行；TASK-024、TASK-025 在 TASK-005 契约冻结后启动，必须先于 TASK-012、TASK-014 合并；TASK-003/004 可并行但都必须在 TASK-005 前合并；TASK-006 与 TASK-007 可在状态契约冻结后并行；TASK-008–013 是 M0/M1 的关键路径，任何 G1–G11 未通过只允许继续非受影响的文档、fixture 和核心重构；TASK-014–022 中未取消的任务严格按依赖闭合逐批迁移，不允许多个任务同时改 `state.rs`、`commands/mod.rs`、`TabContentRouter.tsx` 或 `Cargo.toml` 而没有集成负责人。TASK-023 是唯一的发布收口任务。
 
 **每项任务的交接包**：实现提交或变更列表、改动文件边界、契约/迁移 fixture、自动化命令及原始结果、三端编译检查、当前端真机证据、未验证项和回退步骤。任务计划本身不代表已领取、已实现或已通过。
 
