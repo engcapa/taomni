@@ -1,6 +1,8 @@
 use super::paths::clipboard_paths_from_uri_text;
 use super::platform;
 use crate::state::AppState;
+use arboard::ImageData;
+use std::borrow::Cow;
 use std::path::PathBuf;
 use tauri::State;
 
@@ -66,6 +68,46 @@ pub fn clipboard_write_text(text: String, state: State<'_, AppState>) -> Result<
             Err(format!("clipboard write: {}", error))
         }
     }
+}
+
+/// Publish a decoded PNG through the long-lived native clipboard owner. Some
+/// packaged WebViews (notably WKWebView) do not expose image ClipboardItems.
+#[tauri::command]
+pub fn clipboard_write_image_png(bytes: Vec<u8>, state: State<'_, AppState>) -> Result<(), String> {
+    let image = image::load_from_memory(&bytes)
+        .map_err(|error| format!("decode PNG for clipboard: {error}"))?
+        .to_rgba8();
+    let width = image.width() as usize;
+    let height = image.height() as usize;
+    let mut last_error = None;
+    for delay in [25_u64, 50, 100, 150, 250] {
+        let result = {
+            let mut guard = state
+                .clipboard
+                .lock()
+                .map_err(|error| format!("clipboard lock: {error}"))?;
+            if guard.is_none() {
+                *guard = arboard::Clipboard::new().ok();
+            }
+            let Some(clipboard) = guard.as_mut() else {
+                return Err("clipboard unavailable".to_string());
+            };
+            clipboard.set_image(ImageData {
+                width,
+                height,
+                bytes: Cow::Borrowed(image.as_raw()),
+            })
+        };
+        match result {
+            Ok(()) => return Ok(()),
+            Err(arboard::Error::ClipboardOccupied) => {
+                last_error = Some("clipboard is temporarily occupied".to_string());
+                std::thread::sleep(std::time::Duration::from_millis(delay));
+            }
+            Err(error) => return Err(format!("clipboard write image: {error}")),
+        }
+    }
+    Err(last_error.unwrap_or_else(|| "clipboard write image failed".to_string()))
 }
 
 #[derive(Debug, serde::Serialize)]

@@ -65,6 +65,7 @@ export function useGridExport(context: UseGridExportContext) {
       if (openAfter && isTauriRuntime()) {
         const path = await temporaryFilePath(filename);
         await writeBytesToPath(path, bytes);
+        // Export's explicit "open in system app" must not follow viewer associations.
         await sftpOpenPath(path);
         setStatus(`Opened ${rowsToExport.length} row(s) with the system default application.`);
         return;

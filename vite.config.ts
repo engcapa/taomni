@@ -59,6 +59,10 @@ export default defineConfig(({ command, mode, isPreview }) => ({
       // The database workspace is lazy-loaded; its formatter imports the
       // CommonJS nearley parser, which needs ESM interop in browser preview.
       "sql-formatter",
+      // Mermaid is loaded only when a document actually contains a diagram.
+      // Its graph includes CommonJS dayjs/plugins; with discovery disabled,
+      // serving those raw modules fails before any diagram can render.
+      "mermaid",
     ],
     // In browser preview the Tauri plugins are aliased to stubs; keep the dep
     // optimizer from pre-bundling the real packages (whose imports reference

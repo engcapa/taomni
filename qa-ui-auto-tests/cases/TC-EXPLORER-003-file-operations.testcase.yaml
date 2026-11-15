@@ -119,9 +119,15 @@ steps:
 - wait_for: '[data-testid="explorer-tab"][data-path="${fixture.explorer_target}"]'
 - dblclick: '[data-testid="explorer-file-row"][data-name="folder"]'
 - wait_for: '[data-testid="explorer-file-row"][data-name="drag-source.txt"]'
+- eval_readonly:
+    expression: Math.abs(document.querySelector(".ex-cmd").getBoundingClientRect().height - 36) <= 1
+    expect_truthy: true
 - drag_to:
     from: '[data-testid="explorer-file-row"][data-name="drag-source.txt"]'
     to: '[data-testid="explorer-file-row"][data-name="nested"]'
+- eval_readonly:
+    expression: Math.abs(document.querySelector(".ex-cmd").getBoundingClientRect().height - 36) <= 1
+    expect_truthy: true
 - wait_for: {selector: '[data-testid="explorer-file-row"][data-name="drag-source.txt"]', state: detached}
 - wait_for: {selector: '[data-testid="explorer-progress"]', state: detached}
 - assert_explorer_files: {state: drag-folder}
@@ -200,15 +206,17 @@ verification:
     results: [83, 86, 87, 91, 96, 97]
   - id: R5
     requirement: Trusted pointer drags move into list/tree folders, Option/Control copies onto the exact parent breadcrumb, and self-drop rejects without mutation.
-    actions: [99, 101, 103, 107, 109, 113, 115, 119, 121, 123]
+    actions: [99, 101, 104, 109, 111, 115, 117, 121, 123, 125]
     checkpoints:
-    - {step: 106, expectation: List-folder default move preserves exact bytes in nested and removes only source.}
-    - {step: 112, expectation: Modifier breadcrumb copy preserves nested source and creates exact parent bytes.}
-    - {step: 118, expectation: Tree drop moves exact bytes to source/folder and preserves prior copy.}
-    - {step: 124, expectation: Self-drop reports error instead of nesting a directory into itself.}
-    - {step: 125, expectation: Self-drop leaves the full byte and empty-directory tree unchanged.}
-    - {step: 126, expectation: No runtime errors after all drag operations.}
-    results: [106, 112, 118, 124, 125, 126]
+    - {step: 103, expectation: Toolbar remains 36px before selection so preparing a drag uses stable row geometry.}
+    - {step: 105, expectation: Selecting the dragged text file adds Open actions without changing the toolbar height or moving the drop target.}
+    - {step: 108, expectation: List-folder default move preserves exact bytes in nested and removes only source.}
+    - {step: 114, expectation: Modifier breadcrumb copy preserves nested source and creates exact parent bytes.}
+    - {step: 120, expectation: Tree drop moves exact bytes to source/folder and preserves prior copy.}
+    - {step: 126, expectation: Self-drop reports error instead of nesting a directory into itself.}
+    - {step: 127, expectation: Self-drop leaves the full byte and empty-directory tree unchanged.}
+    - {step: 128, expectation: No runtime errors after all drag operations.}
+    results: [103, 105, 108, 114, 120, 126, 127, 128]
   visual:
   - {check: 'Prototype row selection, cut opacity, inline rename, properties, toast/Undo and confirmation dialog.', method: automated, reason: Row opacity and input selection are asserted; retained screenshot needs human visual comparison for styling.}
   native:

@@ -192,6 +192,8 @@ export function registerfilesLifecycle3Cases(caseContext: registerfilesLifecycle
     }
   });
   it("ED-TREEOPEN-001 / DEC-TOF-04: context menu Open opens file and grants focus to editor", async () => {
+    // This scenario owns IDE focus/selection/split behavior. Use an actual
+    // source file; ordinary text/Markdown now belongs to the global viewer.
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",
       workspaceId: "ws-ctx-open",
@@ -203,7 +205,7 @@ export function registerfilesLifecycle3Cases(caseContext: registerfilesLifecycle
     };
     caseContext.workspaceTestHarness.workspaceMocks.workspaceListDir.mockResolvedValue([
       caseContext.workspaceTestHarness.entry("README.md", "README.md"),
-      caseContext.workspaceTestHarness.entry("other.txt", "other.txt"),
+      caseContext.workspaceTestHarness.entry("other.ts", "other.ts"),
     ]);
     caseContext.workspaceTestHarness.workspaceMocks.workspaceReadFile.mockImplementation(async (_root: string, path: string) =>
       caseContext.workspaceTestHarness.file(path, path === "README.md" ? "# Readme\n" : "other content\n"));
@@ -211,13 +213,13 @@ export function registerfilesLifecycle3Cases(caseContext: registerfilesLifecycle
     caseContext.workspaceTestHarness.renderWorkspace(workspace);
     await screen.findByTitle("app / README.md");
 
-    const otherRow = (await screen.findAllByTestId("code-workspace-tree-file")).find((r) => r.dataset.path === "other.txt")!;
+    const otherRow = (await screen.findAllByTestId("code-workspace-tree-file")).find((r) => r.dataset.path === "other.ts")!;
     fireEvent.contextMenu(otherRow);
 
     const openButton = await screen.findByRole("button", { name: "Open" });
     fireEvent.click(openButton);
 
-    await screen.findByTitle("app / other.txt");
+    await screen.findByTitle("app / other.ts");
     await waitFor(() => {
       expect(document.activeElement?.classList.contains("cm-content")).toBe(true);
     });

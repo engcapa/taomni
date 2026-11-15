@@ -6,7 +6,7 @@ import { markRecoveryStartup } from "../../lib/runtimeRecovery";
 import { useTaoAlertStore } from "../../stores/taoAlertStore";
 import { registerMailClientTabClipboard2Cases } from "./tests/mailClientTab/clipboard2.cases";
 import { registerMailClientTabEditing1Cases } from "./tests/mailClientTab/editing1.cases";
-import { chatState, eventMocks, filterMocks, folder, info, mailMocks, message, messageBody, renderMailbox, stepResult } from "./tests/mailClientTab/harness";
+import { attachmentOpenMocks, chatState, eventMocks, filterMocks, folder, info, mailMocks, message, messageBody, renderMailbox, stepResult } from "./tests/mailClientTab/harness";
 import { registerMailClientTabHistory3Cases } from "./tests/mailClientTab/history3.cases";
 import { registerMailClientTabHistory4Cases } from "./tests/mailClientTab/history4.cases";
 import { registerMailCacheSynchronizationCases } from "./tests/mailClientTab/cacheSynchronization.cases";
@@ -16,6 +16,7 @@ describe("MailClientTab", () => {
   beforeEach(() => {
     markRecoveryStartup(false);
     for (const mock of Object.values(mailMocks)) mock.mockReset();
+    for (const mock of Object.values(attachmentOpenMocks)) mock.mockClear();
     for (const mock of Object.values(chatState)) {
       if (typeof mock === "function" && "mockReset" in mock) mock.mockReset();
     }

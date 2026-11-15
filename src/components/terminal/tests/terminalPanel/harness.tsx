@@ -39,6 +39,7 @@ const terminalMocks = vi.hoisted(() => {
         }),
       },
       loadAddon: vi.fn(),
+      registerLinkProvider: vi.fn(() => ({ dispose: vi.fn() })),
       open: vi.fn((el: HTMLElement) => {
         const screen = document.createElement("div");
         screen.className = "xterm-screen";

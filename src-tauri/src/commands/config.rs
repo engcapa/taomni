@@ -19,6 +19,7 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         crate::config::temporary_file_path,
         crate::config::clipboard_read_text,
         crate::config::clipboard_write_text,
+        crate::config::clipboard_write_image_png,
         crate::config::clipboard_read_multi_format,
         crate::config::clipboard_write_multi_format,
         crate::config::clipboard_capabilities,

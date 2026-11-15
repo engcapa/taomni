@@ -190,11 +190,11 @@ export function useWorkspaceTreeInteractions(context: UseWorkspaceTreeInteractio
       return;
     }
     if (file.ref.kind === "root") {
-      void fileActions.revealInExplorer(file.ref.rootId, file.ref.path);
+      void fileActions.revealInExplorer(file.ref.rootId, parentPath(file.ref.path));
       return;
     }
     const absolute = normalizeFsPath(file.ref.path);
-    void invoke("sftp_open_path", { path: absolute })
+    void invoke("sftp_open_path", { path: parentPath(absolute) })
       .then(() => setStatusMessage(`Opened ${absolute}`))
       .catch((err) => setStatusMessage(errorMessage(err)));
   }, [fileActions.revealInExplorer, setStatusMessage]);

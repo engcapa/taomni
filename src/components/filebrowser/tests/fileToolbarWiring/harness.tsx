@@ -31,7 +31,10 @@ const sftpMocks = vi.hoisted(() => ({
     isHidden: false,
   })),
   sftpOpenPath: vi.fn(async () => undefined),
+  openFile: vi.fn(async () => undefined),
 }));
+
+vi.mock("../../../../lib/openFile", () => ({ openFile: sftpMocks.openFile }));
 
 vi.mock("../../../../lib/sftpController", () => ({
   useSftpController: () => controllerMocks,

@@ -15,6 +15,8 @@ import { setLocale } from "../../../lib/i18n";
 import { sftpListLocalDetailed, sftpOpenPath, type FileEntry } from "../../../lib/sftp";
 import { getExplorerPreferences, setExplorerPreferences } from "../explorerPreferences";
 import { ExplorerPreviewPane, type ExplorerPreviewPaneProps } from "./ExplorerPreviewPane";
+import { openFile } from "../../../lib/openFile";
+vi.mock("../../../lib/openFile", async (original) => ({ ...await original<typeof import("../../../lib/openFile")>(), openFile: vi.fn(async () => "viewer") }));
 
 vi.mock("../../../lib/explorer", () => ({
   explorerCancelOperation: vi.fn(),
@@ -83,7 +85,7 @@ describe("Explorer preview content", () => {
     expect(screen.getByTestId("explorer-preview-truncated")).toHaveTextContent("first 256 KB");
     expect(explorerReadPreviewText).toHaveBeenCalledWith("/fixture/large.txt");
     fireEvent.click(screen.getByTestId("explorer-preview-open"));
-    expect(input.onOpen).toHaveBeenCalledWith(input.entries[0]);
+    expect(openFile).toHaveBeenCalledWith({ path: "/fixture/large.txt" }, { context: "explorer-preview", workspaceId: undefined, mode: "taomni" });
     fireEvent.click(screen.getByTestId("explorer-preview-system"));
     expect(sftpOpenPath).toHaveBeenCalledWith("/fixture/large.txt");
     fireEvent.click(screen.getByTestId("explorer-preview-copy-path"));
@@ -144,7 +146,7 @@ describe("Explorer preview content", () => {
     expect(screen.getByTestId("explorer-preview-metadata")).toHaveTextContent("1 items · 40 B");
     view.rerender(<ExplorerPreviewPane {...props([file("folder", { fileType: "dir", size: 0 })])} />);
     expect(await screen.findByText("child.txt")).toBeVisible();
-    expect(screen.getByTestId("explorer-preview-metadata")).toHaveTextContent("40 B · 4 items");
+    expect(screen.getByTestId("explorer-preview").querySelector(".ex-pv-footer")).toHaveTextContent("40 B · 4 items");
     view.rerender(<ExplorerPreviewPane {...props([file("folder", { fileType: "dir", size: 0 }), file("notes.txt")])} />);
     await waitFor(() => expect(screen.queryByTestId("explorer-preview-loading")).toBeNull());
     expect(screen.getByTestId("explorer-preview-metadata")).toHaveTextContent("50 B");

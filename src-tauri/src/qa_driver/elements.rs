@@ -175,8 +175,12 @@ pub(super) async fn element_text<R: Runtime>(
         Err(message) => return error(message),
     };
     let mut script = element_lookup(&reference);
+    // WebKit can expose both SVGElement.innerText and the root textContent as
+    // empty strings while rendered <text>/<tspan> descendants are visible.
+    // Read those descendants explicitly so native assertions observe the same
+    // labels that a user sees in the diagram.
     script.push_str(
-        "if (!el) throw new Error('stale element'); return el.innerText ?? el.textContent ?? '';",
+        "if (!el) throw new Error('stale element'); const direct=el.innerText || el.textContent || ''; const descendants=el.querySelectorAll ? Array.from(el.querySelectorAll('text, tspan')).map((node)=>node.textContent || node.innerText || node.outerHTML?.replace(/<[^>]*>/g, ' ') || '').join(' ') : ''; const markup=el.outerHTML?.replace(/<[^>]*>/g, ' ') || ''; return descendants.trim() || direct.trim() || markup.trim() || '';",
     );
     match eval_js(&state, script).await {
         Ok(value) => ok(value),

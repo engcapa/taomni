@@ -1,0 +1,1 @@
+export { documentPathKey } from "./pathIdentity";

@@ -150,6 +150,15 @@ describe("clipboard.readMultiFormat", () => {
 });
 
 describe("clipboard.writeImagePng", () => {
+  it("uses the native image clipboard on desktop runtimes", async () => {
+    clipboardTestMocks.tauri = true;
+    clipboardTestMocks.invoke.mockResolvedValue(undefined);
+    await writeImagePng(new Blob([Uint8Array.of(1, 2, 3)], { type: "image/png" }));
+    expect(clipboardTestMocks.invoke).toHaveBeenCalledWith("clipboard_write_image_png", {
+      bytes: [1, 2, 3],
+    });
+  });
+
   it("rejects when ClipboardItem unavailable", async () => {
     const original = (globalThis as { ClipboardItem?: unknown }).ClipboardItem;
     delete (globalThis as { ClipboardItem?: unknown }).ClipboardItem;

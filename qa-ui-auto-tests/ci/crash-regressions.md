@@ -19,6 +19,12 @@
 | TC-IDE-C8-08 | 已挂载编辑器从 Actions 打开 Code Style 设置；关闭后重开仍有方案修改，dirty 正文保留且可继续输入，保护条件 Hooks 崩溃路径 | browser |
 | TC-MOBILE-012 | 带登录 Cookie 的反向代理返回 HTML／不完整 JSON／登录跳转时，不保存坏配对或进入 `:undefined`；畸形会话列表不白屏，重新登录可恢复 | browser |
 | TC-MOBILE-013 | 与 TC-MOBILE-012 对应的真实 Settings listener 与内嵌 mobile bundle；网关配对、真实 PTY／桌面 pane／独立磁盘 marker、释放与停止服务生命周期 | native/release |
+| TC-FILE-OPEN-001 | Explorer 默认打开、共享去重、文本保存字节、脏关闭取消/丢弃与重新打开 | browser |
+| TC-FILE-OPEN-002 | 真实磁盘保存/冲突/diff/恢复、大文件分块及错误重试 | native |
+| TC-FILE-OPEN-003 | SVG 净化和代码/渲染/分栏切换、原始源码保存 | browser/native |
+| TC-FILE-OPEN-004 | Markdown 实时/源码/分栏、表格/图片粘贴/操作与导出生命周期 | browser |
+| TC-FILE-OPEN-005 | HTML 协议与本地资源、隔离/网络策略、设备/源码/控制台生命周期 | browser/native |
+| TC-FILE-OPEN-006 | 工作区/全局设置切换、邮件只读副本去重与关闭清理 | browser/native |
 
 本地使用隔离的 QA 配置和测试桌面，不清理个人配置。保持 native 串行、全部本地测试 worker 总数不超过 2。下列命令应通过 `background_job.py` 启动，native 使用匹配当前源码的 QA release 二进制：
 

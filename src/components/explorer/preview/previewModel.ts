@@ -1,4 +1,5 @@
 import DOMPurify from "dompurify";
+import { safeImageBlob } from "../../../lib/imageSafety";
 import { renderFormatted } from "../../../lib/chat/renderFormatted";
 import { effectiveFileType, type FileEntry } from "../../../lib/sftp";
 
@@ -6,7 +7,7 @@ export const TEXT_PREVIEW_LIMIT = 256 * 1024;
 export const IMAGE_PREVIEW_LIMIT = 20 * 1024 * 1024;
 export const CSV_PREVIEW_ROWS = 100;
 
-export type PreviewKind = "empty" | "multi" | "directory" | "text" | "markdown" | "csv" | "image" | "metadata" | "binary" | "too-large" | "error";
+export type PreviewKind = "empty" | "multi" | "directory" | "text" | "markdown" | "csv" | "html" | "image" | "metadata" | "binary" | "too-large" | "error";
 
 const TEXT_EXTENSIONS = new Set([
   "txt", "log", "md", "markdown", "csv", "ts", "tsx", "js", "jsx", "mjs", "cjs", "json", "jsonc",
@@ -17,9 +18,6 @@ const TEXT_EXTENSIONS = new Set([
 ]);
 const TEXT_NAMES = new Set(["readme", "license", "licence", "copying", "makefile", "dockerfile", "gemfile", "procfile"]);
 const IMAGE_EXTENSIONS = new Set(["png", "jpg", "jpeg", "gif", "webp", "bmp", "svg", "avif", "ico"]);
-const IMAGE_MIME_TYPES = new Set([
-  "image/png", "image/jpeg", "image/gif", "image/webp", "image/bmp", "image/svg+xml", "image/avif", "image/x-icon", "image/vnd.microsoft.icon",
-]);
 
 export function fileExtension(name: string): string {
   const normalized = name.toLowerCase();
@@ -34,6 +32,7 @@ export function previewKind(entry: FileEntry): PreviewKind {
   if (IMAGE_EXTENSIONS.has(extension)) return entry.size > IMAGE_PREVIEW_LIMIT ? "too-large" : "image";
   if (extension === "md" || extension === "markdown") return "markdown";
   if (extension === "csv") return "csv";
+  if (extension === "html" || extension === "htm") return "html";
   if (TEXT_EXTENSIONS.has(extension) || TEXT_NAMES.has(entry.name.toLowerCase())) return "text";
   return "metadata";
 }
@@ -93,26 +92,5 @@ export function renderOfflineMarkdown(text: string): string {
 
 /** SVG remains an image, never an active document or a network resource loader. */
 export function previewImageBlob(bytes: number[], mime: string): Blob {
-  const contentType = mime.toLowerCase().split(";")[0].trim();
-  if (!IMAGE_MIME_TYPES.has(contentType)) throw new Error("Unsupported image format");
-  if (bytes.length > IMAGE_PREVIEW_LIMIT) throw new Error("too_large: image exceeds 20 MB");
-  const data = new Uint8Array(bytes);
-  if (contentType !== "image/svg+xml") return new Blob([data], { type: contentType });
-  const sanitized = DOMPurify.sanitize(new TextDecoder().decode(data), {
-    USE_PROFILES: { svg: true, svgFilters: true },
-    FORBID_TAGS: ["style", "script", "foreignObject", "image", "use", "feImage", "a", "animate", "animateMotion", "animateTransform", "set"],
-    FORBID_ATTR: ["href", "xlink:href", "style", "src", "srcset"],
-    ALLOW_DATA_ATTR: false,
-  }) as string;
-  const document = new DOMParser().parseFromString(sanitized, "image/svg+xml");
-  if (document.documentElement.localName !== "svg") throw new Error("Invalid SVG image");
-  for (const element of [document.documentElement, ...document.documentElement.querySelectorAll("*")]) {
-    for (const attribute of Array.from(element.attributes)) {
-      // Keep local gradient/clip references, but discard every external CSS URL.
-      if (/url\s*\(/i.test(attribute.value) && !/^url\(\s*["']?#[\w:.-]+["']?\s*\)$/i.test(attribute.value.trim())) {
-        element.removeAttributeNode(attribute);
-      }
-    }
-  }
-  return new Blob([new XMLSerializer().serializeToString(document.documentElement)], { type: contentType });
+  return safeImageBlob(bytes, mime, IMAGE_PREVIEW_LIMIT);
 }

@@ -331,7 +331,7 @@ export function registerFileToolbarWiringLayout2Cases() {
       fireEvent.doubleClick(within(localPanel).getByText("notes.txt"));
 
       await waitFor(() => {
-        expect(sftpMocks.sftpOpenPath).toHaveBeenCalledWith("/work/notes.txt");
+        expect(sftpMocks.openFile).toHaveBeenCalledWith({ path: "/work/notes.txt" }, { context: "sftp-local" });
       });
       expect(controllerMocks.upload).not.toHaveBeenCalled();
     });
@@ -350,7 +350,7 @@ export function registerFileToolbarWiringLayout2Cases() {
           "/work",
         );
       });
-      expect(sftpMocks.sftpOpenPath).not.toHaveBeenCalled();
+      expect(sftpMocks.openFile).not.toHaveBeenCalled();
     });
 
     it("uploads OS-dropped files to the current remote directory", async () => {

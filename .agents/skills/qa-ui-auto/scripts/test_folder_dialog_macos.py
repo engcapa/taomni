@@ -15,9 +15,14 @@ const fs = require('fs'), vm = require('vm');
 const config = JSON.parse(process.argv[1]), actions = [];
 const application = '/Users/runner/work/taomni/taomni/src-tauri/target/qa-ui-auto/debug/taomni';
 const env = { QA_PICKER_APPLICATION:application, QA_PICKER_PATH:'/qa/fixture/project with spaces',
-  QA_PICKER_TITLE:'Select folder to open', QA_PICKER_ACTION:config.action };
+  QA_PICKER_TITLE:config.kind === 'save' ? 'Save as' : 'Select folder to open', QA_PICKER_ACTION:config.action,
+  QA_PICKER_KIND:config.kind || 'folder', QA_PICKER_DIRECTORY:'/qa/fixture/project with spaces', QA_PICKER_FILENAME:'export.html',
+  QA_PICKER_CANCEL_AFTER_PATH:config.cancelAfterPath ? '1' : '' };
 let navigated = false, now = 0, opened = true, goTo = false, location = '';
-const actionName = config.actionName || 'Open';
+const actionName = config.actionName || (config.kind === 'save' ? 'Save' : 'Open');
+let savedName='live.html';
+const nameField={enabled:()=>true,attributes:{byName:()=>({value:()=> 'saveAsName'})}};
+Object.defineProperty(nameField,'value',{get:()=>()=>savedName,set:(value)=>{savedName=value;actions.push('name:'+value);}});
 const button = (name) => ({name:()=>name, enabled:()=>name === 'Cancel' || navigated,
   click:()=>{actions.push(name);opened=false;}});
 const field = {};
@@ -25,7 +30,7 @@ Object.defineProperty(field,'value',{get:()=>()=>location,set:(value)=>{location
 const locationSheet = {textFields:()=>now >= (config.slowGoTo ? 800 : 0) ? [field] : []};
 const panel = {buttons:Object.assign(()=>[button(actionName),button('Cancel')],
   {whose:({name})=>()=>name === actionName || name === 'Cancel' ? [button(name)] : []}),
-  sheets:()=>goTo ? [locationSheet] : []};
+  sheets:()=>goTo ? [locationSheet] : [], textFields:()=>config.kind === 'save' ? [nameField] : [], groups:()=>[]};
 const main = {sheets:()=>!opened ? [] : config.standalone ? (goTo ? [locationSheet] : []) : [panel],
   subrole:()=>config.standalone ? 'AXDialog' : 'AXStandardWindow',
   name:()=>config.standalone ? env.QA_PICKER_TITLE : 'Taomni',
@@ -85,6 +90,21 @@ class MacFolderDialogContracts(unittest.TestCase):
         observed = self.run_helper(action="choose", actionName="Choose")
         self.assertNotIn("error", observed)
         self.assertEqual(observed["actions"][-1], "Choose")
+
+    def test_save_panel_uses_parent_directory_and_exact_filename(self):
+        observed = self.run_helper(action="choose", kind="save")
+        self.assertNotIn("error", observed)
+        self.assertEqual(observed["actions"], ["g", "/qa/fixture/project with spaces", 36, "name:export.html", "Save"])
+
+    def test_save_panel_cancel_never_enters_name_or_chooses_path(self):
+        observed = self.run_helper(action="cancel", kind="save")
+        self.assertNotIn("error", observed)
+        self.assertEqual(observed["actions"], ["Cancel"])
+
+    def test_save_panel_can_cancel_a_typed_owned_filename_without_accepting(self):
+        observed = self.run_helper(action="cancel", kind="save", cancelAfterPath=True)
+        self.assertNotIn("error", observed)
+        self.assertEqual(observed["actions"], ["g", "/qa/fixture/project with spaces", 36, "name:export.html", "Cancel"])
 
     def test_ambiguous_executable_owner_prevents_all_os_input(self):
         observed = self.run_helper(action="choose", duplicate=True)

@@ -33,7 +33,7 @@ export interface ExplorerShellProps {
 export function ExplorerShell({ tabId, initialPath, workspaceId, active = true, onOpenTerminal }: ExplorerShellProps) {
   const label = useExplorerLabels();
   const preferences = useExplorerPreferences();
-  const operations = useExplorerOperations(tabId);
+  const operations = useExplorerOperations(tabId, workspaceId);
   const pane = useExplorerDirectory(tabId, initialPath, operations.notify);
   const [home, setHome] = useState("");
   const [filter, setFilter] = useState("");
@@ -104,7 +104,7 @@ export function ExplorerShell({ tabId, initialPath, workspaceId, active = true, 
     else if (event.altKey && event.key === "ArrowRight") void store.navigateForward(tabId, "local");
     else if ((event.altKey && event.key === "ArrowUp") || event.key === "Backspace") void store.navigateUp(tabId, "local");
     else if (event.altKey && event.key === "Enter" && selected.length) operations.setProperties(selected);
-    else if (event.key === "Enter" && selected.length === 1) void operations.open(selected[0]);
+    else if (event.key === "Enter" && selected.length === 1) void operations.open(selected[0], mod);
     else if (event.key === "Escape") { operations.setRenamePath(null); setPreviewOverlay(false); }
     else handled = false;
     if (handled) { event.preventDefault(); event.stopPropagation(); }
@@ -123,13 +123,13 @@ export function ExplorerShell({ tabId, initialPath, workspaceId, active = true, 
     resizeCleanup.current = cleanup;
     window.addEventListener("pointermove", move); window.addEventListener("pointerup", cleanup); window.addEventListener("pointercancel", cleanup);
   };
-  const preview = previewVisible ? <ExplorerPreviewPane entries={selected} currentPath={pane?.path ?? initialPath} tabId={tabId} onOpen={(entry) => void operations.open(entry)} onClose={closePreview} /> : null;
+  const preview = previewVisible ? <ExplorerPreviewPane entries={selected} currentPath={pane?.path ?? initialPath} tabId={tabId} workspaceId={workspaceId} onOpen={(entry) => void operations.open(entry)} onClose={closePreview} /> : null;
   const viewContext = { operations, dropPath, onOpenExplorer: openExplorerAt, onOpenTerminal: terminal, onProperties: () => operations.setProperties(selected) };
   return <ExplorerContext.Provider value={viewContext}>
     <div ref={root} className="ex-shell" data-testid="explorer-tab" data-tab-id={tabId} data-path={pane?.path ?? initialPath} data-active={active}
       data-preview-collapsed={preferences.preview && narrow && !previewOverlay ? "true" : "false"} tabIndex={0} onKeyDown={onKeyDown}>
       <ExplorerAddressBar tabId={tabId} pane={pane} home={home} filter={filter} onFilter={setFilter} addressRef={address} />
-      <ExplorerCommandBar path={pane?.path ?? ""} selected={selected} operations={operations} onOpenTerminal={terminal} onOpenExplorer={openExplorerAt} previewVisible={previewVisible} onTogglePreview={togglePreview} />
+      <ExplorerCommandBar path={pane?.path ?? ""} workspaceId={workspaceId} selected={selected} operations={operations} onOpenTerminal={terminal} onOpenExplorer={openExplorerAt} previewVisible={previewVisible} onTogglePreview={togglePreview} />
       <div className="ex-body">
         <ExplorerNavTree home={home} path={pane?.path ?? initialPath} dropPath={dropPath} onNavigate={(path) => void useSftpStore.getState().navigate(tabId, "local", path)} onOpenExplorer={openExplorerAt} onOpenTerminal={terminal} />
         <div className="ex-split" role="separator" aria-orientation="vertical" aria-label={label("调整导航宽度", "Resize navigation")} onPointerDown={(event) => resize(event, "nav")} />
@@ -139,7 +139,7 @@ export function ExplorerShell({ tabId, initialPath, workspaceId, active = true, 
             sortState: { key: preferences.sortKey, dir: preferences.sortDir, onChange: (sortKey, sortDir) => setExplorerPreferences({ sortKey, sortDir }) },
             filterText: filter, onFilterTextChange: setFilter,
             onItemDoubleClick: (entry) => void operations.open(entry),
-            onItemContext: (entry, _anchor, selection) => explorerItemMenu(selection.length ? selection : [entry], pane?.path ?? initialPath, operations, label, openExplorerAt, terminal),
+            onItemContext: (entry, _anchor, selection) => explorerItemMenu(selection.length ? selection : [entry], pane?.path ?? initialPath, operations, label, openExplorerAt, terminal, workspaceId),
             onEmptyContext: () => explorerEmptyMenu(pane?.path ?? initialPath, operations, label, () => void useSftpStore.getState().refreshPane(tabId, "local")),
           }} />
           {previewVisible && !narrow && preferences.previewPosition === "right" && <div className="ex-split" role="separator" aria-orientation="vertical" aria-label={label("调整预览宽度", "Resize preview")} onPointerDown={(event) => resize(event, "preview")} />}

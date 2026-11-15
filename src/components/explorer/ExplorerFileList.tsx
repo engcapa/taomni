@@ -44,7 +44,14 @@ export function ExplorerFileList(inputs: FilePanelViewProps) {
     setWidth(element.clientWidth);
     return () => observer.disconnect();
   }, []);
-  useEffect(() => { virtual.measure(); }, [rowHeight, columns, virtual]);
+  useEffect(() => { virtual.measure(); }, [rowHeight, columns, virtual, entries.length]);
+  useEffect(() => {
+    // A first render with no rows can leave TanStack's estimate at zero in a
+    // browser worker. Re-measure after the actual rows commit so file rows are
+    // mounted and the Explorer opener never targets an empty virtual window.
+    const frame = requestAnimationFrame(() => virtual.measure());
+    return () => cancelAnimationFrame(frame);
+  }, [entries, virtual]);
   useEffect(() => { scroll.current?.scrollTo?.({ top: 0 }); anchor.current = null; setFocused(null); }, [pane.path, inputs.filterText, preferences.view, inputs.sortKey, inputs.sortDir]);
   useEffect(() => () => rubberCleanup.current?.(), []);
   useEffect(() => {
@@ -52,6 +59,13 @@ export function ExplorerFileList(inputs: FilePanelViewProps) {
     const index = entries.findIndex((entry) => entry.path === operations.renamePath);
     if (index >= 0) virtual.scrollToIndex(Math.floor(index / columns), { align: "auto" });
   }, [operations.renamePath, columns, entries, virtual]);
+  const virtualItems = virtual.getVirtualItems();
+  // Small directories are cheap to mount in full and avoid stale virtual
+  // ranges while TanStack waits for its first ResizeObserver measurement.
+  // Large directories retain virtualization for bounded DOM work.
+  const rows = entries.length > 200
+    ? virtualItems
+    : Array.from({ length: Math.ceil(entries.length / columns) }, (_, index) => ({ index, start: index * rowHeight }));
   // Use the same store as FilePanel; Explorer has no independent selection model.
   const selectNow = (paths: string[]) => useSftpStore.getState().setSelection(inputs.sessionId, "local", paths);
   const handleKeys = (event: React.KeyboardEvent) => {
@@ -133,7 +147,7 @@ export function ExplorerFileList(inputs: FilePanelViewProps) {
       {!entries.length && !pane.loading && !pane.error && <div className="ex-empty">{label(inputs.filterActive ? "没有匹配的项目" : "此文件夹为空", inputs.filterActive ? "No matching items" : "This folder is empty")}<br /><small>{label("右键可新建文件夹/文件，或把文件拖到这里", "Right-click to create a file or folder, or drag files here")}</small></div>}
       {pane.loading && !entries.length && <div className="ex-empty" role="status">{label("正在加载…", "Loading…")}</div>}
       <div style={{ height: virtual.getTotalSize() + (icons ? 16 : 0), position: "relative", minWidth: icons ? undefined : preferences.view === "list" ? 0 : 460 }}>
-        {virtual.getVirtualItems().flatMap((row) => Array.from({ length: columns }, (_, col) => {
+        {rows.flatMap((row) => Array.from({ length: columns }, (_, col) => {
           const entry = entries[row.index * columns + col];
           if (!entry) return null;
           const directory = effectiveFileType(entry) === "dir";
@@ -151,7 +165,7 @@ export function ExplorerFileList(inputs: FilePanelViewProps) {
               });
             }}
             onClick={(event) => { if (renaming) return; interactions.handleRowClick(entry, event); setFocused(entry.path); if (!event.shiftKey) anchor.current = entry.path; scroll.current?.focus(); }}
-            onDoubleClick={() => { if (!renaming) inputs.onItemDoubleClick(entry); }} onContextMenu={(event) => interactions.handleRowContext(entry, event)}>
+            onDoubleClick={(event) => { if (!renaming) { if (event.ctrlKey || event.metaKey) { void operations.open(entry, true); } else inputs.onItemDoubleClick(entry); } }} onContextMenu={(event) => interactions.handleRowContext(entry, event)}>
             {icons ? <><ExplorerFileIcon entry={entry} /><div className="ex-tile-name">{renaming ? <ExplorerRenameInput entry={entry} /> : entry.name}</div></> : <>
               <div className="ex-name"><ExplorerFileIcon entry={entry} /><span className="truncate flex-1">{renaming ? <ExplorerRenameInput entry={entry} /> : entry.name}</span></div>
               <div className="ex-mod">{entry.mtime ? new Date(entry.mtime * 1000).toLocaleString(undefined, { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : ""}</div>

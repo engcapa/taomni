@@ -109,6 +109,8 @@ activation is still sent exactly once and all original frame budgets apply.
 | Verb | Args | Notes |
 |------|------|-------|
 | `assert_visible` | selector | Browser/native. Waits for a nonzero layout box and visible CSS visibility; attachment alone is insufficient. |
+| `assert_file_open_bytes` | `{path?\|selector?, remember?, equals?\|sha256?\|absent?, timeout_sec?}` | Browser/native. Requires `file_open_files`; exact UTF-8/SHA256/absence read-only oracle confined to its root or a DOM-observed controlled viewer temp. `remember` retains that observed path for post-close absence. Browser reads IndexedDB VFS; native independently reads host bytes, never viewer IPC. Retains file-open-byte-observations.jsonl. |
+| `assert_download` | `{trigger, filename, contains?: string[]}` | Browser only. Clicks the real export control once, waits for an actual Playwright download, retains the file, asserts filename/nonempty/required bytes and records SHA256. Not native disk/dialog evidence. |
 | `assert_no_runtime_errors` | `null` | Browser/native, all platforms. Fails on uncaught exceptions, unhandled promise rejections, the production React root error diagnostic or `[data-testid="app-crash"]`. Ordinary console warnings and handled service errors remain diagnostic. Browser observations span the case including reloads; native observes the current document, so place a checkpoint before and after reload/navigation. Missing monitoring fails. Saves raw observations in `runtime-errors.jsonl` before asserting, including failures. Does not establish OS process survival by itself; retain functional postconditions and native lifecycle assertions. |
 | `assert_not_visible` | selector | Browser/native. Waits until hidden or absent, including mounted nodes with `display:none` or `visibility:hidden`. Use `wait_for` with `state: detached` when DOM removal is required. |
 | `assert_text` | `{selector, contains, timeout_sec?}` | Polls `text_content` and `data-terminal-text` (xterm canvas fallback). |
@@ -134,6 +136,65 @@ inside the current QA report. It verifies that the chooser belongs to the QA
 executable and uses OS input/accessibility on Linux X11, Windows and macOS;
 records ownership, action and failures in `native-folder-dialogs.jsonl`.
 The testcase must separately assert the returned path and mounted directory.
+
+`show_explorer_preview: null` is browser/native and idempotent: it reads the real
+visible active Explorer preview, clicks that Explorer's `explorer-cmd-preview`
+toolbar once only when hidden, then requires it visible. Preserves narrow overlay
+behavior; never sets preferences/store or forces a wide viewport. Failed/uncertain
+input is not replayed. Retains before/after visibility and click count in
+explorer-preview-visibility.jsonl.
+
+`native_file_dialog: {kind: save|open|folder, action: choose|cancel, path?, trigger?, title?}`
+uses the same owned OS chooser transports for real plugin-dialog file saves,
+file opens and export-directory choices. Default titles are `Save as`,
+`Select file to open` and `Select save directory`. Save requires a fresh absolute
+file path with an existing parent inside this run; open/folder require an existing
+file/directory. Arbitrary paths, symlink escape and overwrite acceptance are
+refused. Cancel may optionally type a fresh run-owned filename before cancelling,
+so the case can prove that exact destination was not published; it never accepts
+an overwrite. It never stubs IPC or assigns a dialog result. Optional `trigger` is
+clicked once while the helper operates a modal sheet; records native-file-dialogs.jsonl.
+
+`native_paste: {selector}` requires the exact editor to already own focus and
+sends one actual OS Ctrl+V (Linux/Windows) or Cmd+V (macOS) to the exact QA
+executable. Uses X11/Mutter/Win32 input/System Events; permissions/ambiguous
+ownership fail, with no synthetic ClipboardEvent fallback. Seed the real OS
+clipboard with `host_clipboard` first and assert content/disk afterwards.
+
+`assert_markdown_artifact: {kind: source|pasted-image|html|png|docx|markdown|absent, path, source, timeout_sec?}`
+is native-only, run-root confined and independent of viewer IPC. Checks saved
+source hashes; pasted PNG pixels; HTML embedded image pixels; nonblank PNG;
+DOCX ZIP/XML/media; Markdown relative asset resolution; or cancellation absence.
+Requires `markdown_native` fixture; retains markdown-artifacts.jsonl.
+
+`viewer_raster: {action: wheel, deltaY: nonzero integer -1200..1200}` moves to
+the actual image-stage center and sends browser mouse.wheel/native W3C scroll.
+`viewer_raster: {action: clipboard, kind: image|path}` independently reads the
+fixed raster fixture's clipboard payload: browser ClipboardItem bytes or native
+host clipboard/Pillow exact RGB pixels/path. No arbitrary paths, no synthetic
+wheel events and no native-to-browser evidence fallback; requires file_open_raster.
+
+`terminal_file_link: {selector}` uses the real terminal's active Find highlight
+only to locate output, then sends one trusted Ctrl/Cmd-click at that hit-tested
+point. It never calls openFile or terminal provider callbacks; testcase asserts
+local viewer or SSH download-first guidance. Native uses packaged WebView W3C
+pointer/key actions, not physical OS pointer evidence.
+
+`html_preview_click: {target: next|external|spoof-invalid|spoof-valid|slow|security}`
+requires `html_network_test`, computes a known fixture target relative to the
+actual opaque iframe viewport and delivers one trusted pointer action. On macOS,
+the in-process bridge cannot traverse opaque frames, so an exact-executable-owned
+AXWebArea/CoreGraphics OS click is used; accessibility/screen permissions and
+ambiguous ownership fail with no synthetic fallback. Other native platforms use
+W3C input; browser uses Playwright mouse. No parent handler or state mutation.
+
+`assert_html_network: {state: blocked|app|custom|none|invalid|slow-started|cancelled|external-cancelled|scripts-off}`
+reads independent loopback origin/proxy logs and passively observed transport/
+console outcomes. Browser cannot certify proxy routing; native checks actual
+resource destinations, cancellation and stable request absence. Requires the
+matching fixture and retains html-preview-observations.jsonl. Passive observers
+forward all requests unchanged and fail when unavailable rather than inventing
+zero-request success.
 
 | Verb | Args | Notes |
 |------|------|-------|

@@ -6,6 +6,7 @@ import { resolveShellShortcutRoute } from "../../components/editor/workspace/she
 import { shellKeyClaimed } from "../../lib/shellKeyClaims";
 import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
 import { useAppStore } from "../../stores/appStore";
+import { useDocumentStore } from "../../stores/documentStore";
 import { macCommandDigitIndex } from "./sessionPolicy";
 import { activeWorkspaceRuntimeTabId, workspaceEditorRuntimeId } from "../../lib/workspaceRuntimeIdentity";
 
@@ -84,11 +85,13 @@ export function useMainMenuBridge(context: UseMainMenuBridgeContext) {
     const unsubscribe = subscribeWorkspaceCommands(refresh);
     const unsubscribePlatform = useWorkspacePlatformStore.subscribe(refresh);
     const unsubscribeApp = useAppStore.subscribe(refresh);
+    const unsubscribeViewer = useDocumentStore.subscribe(refresh);
     return () => {
       cancelled = true;
       unsubscribe();
       unsubscribePlatform();
       unsubscribeApp();
+      unsubscribeViewer();
     };
   }, [
     nativeMenu,

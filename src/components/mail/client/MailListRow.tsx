@@ -42,6 +42,7 @@ export const MailListRow = memo(function MailListRow({ message, threadKey, depth
       tabIndex={0}
       aria-pressed={active}
       data-testid="mail-message-row"
+      data-subject={message.subject || "(no subject)"}
       data-uid={message.uid}
       data-checked={checked ? "true" : "false"}
       data-unread={unread ? "true" : "false"}

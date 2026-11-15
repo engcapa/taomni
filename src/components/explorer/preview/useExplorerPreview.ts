@@ -104,7 +104,7 @@ export function useExplorerPreview(entries: FileEntry[], currentPath: string, ta
           }
           await Promise.all(Array.from({ length: Math.min(4, directories.length) }, worker));
           result.truncated = result.properties.some((value) => value.truncated);
-        } else if (kind === "text" || kind === "markdown" || kind === "csv") {
+        } else if (kind === "text" || kind === "markdown" || kind === "csv" || kind === "html") {
           const text = await explorerReadPreviewText(entry.path);
           if (!active) return;
           if (text.binary) {

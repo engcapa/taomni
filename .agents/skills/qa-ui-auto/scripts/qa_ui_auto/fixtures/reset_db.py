@@ -52,6 +52,9 @@ LOCAL_STORAGE_KEYS = [
     "taomni.uiFontSize",
     "taomni.terminalSplitLayout",
     "taomni.recentWorkspaces.v1",
+    "taomni.fileOpen.preferences.v1",
+    "taomni.viewer.tabs.v1",
+    "taomni.viewer.drafts.v1",
 ]
 LOCAL_STORAGE_PREFIXES = [
     "taomni.mail.archive.",

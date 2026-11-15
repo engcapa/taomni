@@ -15,6 +15,7 @@ public static class QaFolderDialog {
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetWindowText(IntPtr window, StringBuilder text, int count);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int GetClassName(IntPtr window, StringBuilder text, int count);
     [DllImport("user32.dll")] public static extern int GetDlgCtrlID(IntPtr window);
+    [DllImport("user32.dll")] static extern IntPtr GetParent(IntPtr window);
     [DllImport("user32.dll")] public static extern bool IsWindowVisible(IntPtr window);
     [DllImport("user32.dll")] public static extern bool IsWindowEnabled(IntPtr window);
     [DllImport("user32.dll")] public static extern bool IsWindow(IntPtr window);
@@ -88,6 +89,19 @@ public static class QaFolderDialog {
         return found[0];
     }
 
+    private static IntPtr FilenameControl(IntPtr dialog) {
+        // Common Item Dialogs may wrap filename Edit in ComboBoxEx32/ComboBox
+        // with id1148; the search field is a separate Edit and must never win.
+        var found = new List<IntPtr>();
+        foreach (var window in Windows(dialog)) {
+            if (Class(window) != "Edit" || !IsWindowVisible(window) || !IsWindowEnabled(window)) continue;
+            var parent = GetParent(window);
+            if (GetDlgCtrlID(window) == 1152 || (parent != IntPtr.Zero && GetDlgCtrlID(parent) == 1148)) found.Add(window);
+        }
+        if (found.Count != 1) throw new InvalidOperationException("No unique owned filename Edit: " + found.Count);
+        return found[0];
+    }
+
     private static bool Open(IntPtr dialog) {
         return IsWindow(dialog) && IsWindowVisible(dialog);
     }
@@ -156,10 +170,11 @@ public static class QaFolderDialog {
         int pid = ProcessId(dialog);
         Console.Error.WriteLine("Owned chooser HWND={0}, pid={1}, title={2}", dialog, pid, Text(dialog));
         if (action == "cancel") {
+            if (!String.IsNullOrEmpty(path)) EnterPath(dialog, FilenameControl(dialog), path);
             if (!Click(dialog, 2)) throw new InvalidOperationException("Chooser Cancel is disabled");
         } else if (action == "choose") {
             // 1152 is the folder field; the last UIA Edit is the Search box.
-            var edit = Control(dialog, 1152, "Edit");
+            var edit = FilenameControl(dialog);
             EnterPath(dialog, edit, path);
             var deadline = DateTime.UtcNow.AddSeconds(10);
             bool invoked = false;

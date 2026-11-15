@@ -25,6 +25,7 @@ const native = vi.hoisted(() => ({
   readFilesResult: vi.fn(),
   writeText: vi.fn(),
   openExplorer: vi.fn(),
+  openFile: vi.fn(async () => "viewer"),
   sftpOpenPath: vi.fn(),
   sftpRemove: vi.fn(),
 }));
@@ -44,6 +45,7 @@ vi.mock("../../../lib/explorer", () => ({
 vi.mock("../../../lib/clipboard", () => ({ readFilesResult: native.readFilesResult, writeText: native.writeText }));
 vi.mock("../../../lib/runtime", () => ({ getAppPlatform: () => native.platform, isTauriRuntime: () => false }));
 vi.mock("../../../lib/explorer/openExplorer", () => ({ openExplorer: native.openExplorer }));
+vi.mock("../../../lib/openFile", async (original) => ({ ...await original<typeof import("../../../lib/openFile")>(), openFile: native.openFile }));
 vi.mock("../../../lib/sftpController", () => ({ useSftpController: () => ({}) }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn(async () => vi.fn()) }));
 vi.mock("../ExplorerNavTree", () => ({ ExplorerNavTree: () => <nav data-testid="explorer-nav-tree" /> }));

@@ -1,0 +1,142 @@
+id: TC-FILE-OPEN-010
+title: Opaque HTML author spoof cannot bypass parent external-link confirmation and script policy
+description: >-
+  AC16/17. Loads the actual local HTML fixture through the viewer, clicks known fixed fixture
+  controls with trusted browser/W3C pointer input, and observes only parent-owned controls and
+  the real console bridge. An invalid token is ignored; an author-generated valid-token external
+  message still requires parent confirmation and Cancel never dispatches open_external_url.
+  Browser uses explicit blob/VFS stubs and cannot prove native protocol/proxy boundaries;
+  TC-FILE-OPEN-009 owns those. Native observes forwarded IPC without replacing its result.
+modes: [browser, native]
+covers: [F-FILEOPEN-1, F-EXPLORER-1]
+tags: [p0, file-open, html, sandbox, security, crash-regression]
+fixtures: [reset_db, html_network_test]
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-html-parent-confirm
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-file-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Control+l
+    macos_key: Meta+l
+- fill:
+    selector: '[data-testid="explorer-address"]'
+    value: ${fixture.html_network_root}
+- press:
+    selector: '[data-testid="explorer-address"]'
+    key: Enter
+- dblclick: '[data-testid="explorer-file-row"][data-name="default.html"]'
+- wait_for: '[data-testid="html-preview"][data-loaded="true"]'
+- click: '[data-testid="html-console-toggle"]'
+- assert_html_network: {state: blocked}
+- html_preview_click: {target: spoof-invalid}
+- assert_text:
+    selector: '[data-testid="html-console"]'
+    contains: HTML_QA SPOOF_INVALID SENT
+- assert_not_visible: '[data-testid="html-external-dialog"]'
+- html_preview_click: {target: spoof-valid}
+- assert_text:
+    selector: '[data-testid="html-console"]'
+    contains: HTML_QA SPOOF_VALID SENT
+- wait_for: '[data-testid="html-external-dialog"]'
+- assert_text_equals:
+    selector: '[data-testid="html-external-origin"]'
+    equals: https://qa-author-spoof.invalid
+- assert_text_equals:
+    selector: '[data-testid="html-external-url"]'
+    equals: https://qa-author-spoof.invalid/${fixture.html_network_nonce}
+- eval_readonly:
+    expression: document.activeElement === document.querySelector('.fv-modal button')
+    expect_truthy: true
+- click: '[data-testid="html-external-cancel"]'
+- assert_html_network: {state: external-cancelled}
+- html_preview_click: {target: external}
+- wait_for: '[data-testid="html-external-dialog"]'
+- assert_text_equals:
+    selector: '[data-testid="html-external-origin"]'
+    equals: https://qa-external.invalid
+- press:
+    selector: '[data-testid="html-external-cancel"]'
+    key: Escape
+- assert_html_network: {state: external-cancelled}
+- assert_not_visible: '[data-testid="html-external-dialog"]'
+- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: files and opening
+- wait_for: '[data-testid="file-open-settings"]'
+- set_check:
+    selector: '[data-testid="file-open-html-scripts"]'
+    checked: false
+- assert_localstorage:
+    key: taomni.fileOpen.preferences.v1
+    contains: '"htmlScripts":false'
+- click: '[data-testid="tab-item"][data-tab-type="file-browser"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="scripts.html"]'
+- wait_for: '[data-testid="html-preview"][data-loaded="true"]'
+- click: '[data-testid="html-console-toggle"]'
+- assert_attribute:
+    selector: '[data-testid="html-frame"]'
+    name: sandbox
+    equals: allow-scripts
+- assert_text:
+    selector: '[data-testid="html-network-banner"]'
+    contains: Page scripts are disabled
+- assert_html_network: {state: scripts-off}
+- html_preview_click: {target: external}
+- wait_for: '[data-testid="html-external-dialog"]'
+- assert_text_equals:
+    selector: '[data-testid="html-external-origin"]'
+    equals: https://qa-external.invalid
+- click: '[data-testid="html-external-cancel"]'
+- assert_not_visible: '[data-testid="html-external-dialog"]'
+- assert_no_runtime_errors: null
+- screenshot: html-script-policy-parent-confirm.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: An invalid-token request is ignored and even an author-forged valid-token external request requires parent consent.
+    actions: [13, 16, 22]
+    checkpoints:
+    - {step: 14, expectation: Actual iframe author handler ran after the trusted point click.}
+    - {step: 15, expectation: Wrong token did not create a parent-owned confirmation.}
+    - {step: 19, expectation: 'Parent displays the normalized destination origin, not author-provided HTML.'}
+    - {step: 20, expectation: Complete destination URL includes the run-specific nonce.}
+    - {step: 21, expectation: Cancel owns initial focus.}
+    - {step: 23, expectation: Cancel removes the dialog and no native external-open IPC was dispatched.}
+    results: [14, 15, 19, 20, 21, 23]
+  - id: R2
+    requirement: A real anchor click enters the same parent confirmation path and Escape cancels without external dispatch.
+    actions: [24, 27]
+    checkpoints:
+    - {step: 26, expectation: Real anchor destination origin appears in the parent dialog.}
+    - {step: 28, expectation: No external-open command or independent outbound request follows Escape.}
+    - {step: 29, expectation: Dialog is absent after Escape.}
+    results: [26, 28, 29]
+  - id: R3
+    requirement: Disabling author scripts persists while the nonce bridge continues mediating external links in an opaque frame.
+    actions: [34, 37, 43, 46]
+    checkpoints:
+    - {step: 35, expectation: Persisted preferences contain htmlScripts false.}
+    - {step: 40, expectation: Frame never gains allow-same-origin.}
+    - {step: 42, expectation: 'No author readiness/fetch marker and no independent scripts-phase request, held for a stable observation interval.'}
+    - {step: 45, expectation: Nonce bridge still routes an actual anchor click to parent confirmation with scripts disabled.}
+    - {step: 47, expectation: Cancel closes the confirmation.}
+    - {step: 48, expectation: Script-policy and confirmation transitions leave runtime healthy.}
+    results: [35, 40, 42, 45, 47, 48]
+  visual:
+  - check: Parent origin/URL and Cancel focus
+    method: automated
+    reason: Exact text and DOM focus observations; screenshot does not certify prototype fidelity or OS menu behavior.
+  native:
+  - check: Real native external command is not dispatched after Cancel/Escape
+    method: automated
+    reason: Passive forwarding observer records the real invoke boundary without changing return values; independent fixture request logs remain unchanged.
+  - check: Actual system browser process opens after explicit Open
+    method: manual
+    reason: This negative-security case deliberately never presses Open or launches an external application.

@@ -18,6 +18,7 @@ import { revealWorkspaceFolder } from "./workspaceFolderReveal";
 import { NOTES_WORKSPACE_ID } from "../../stores/workspaceNotes";
 import { NotesWorkspace } from "../notes/NotesWorkspace";
 import { ExplorerTabPane } from "../explorer/ExplorerTabPane";
+import { ViewerShell } from "../viewer/ViewerShell";
 
 /**
  * Main canvas of the Workspaces mode (AC-06/07/08).
@@ -128,6 +129,12 @@ function WorkspaceCanvasContents({ workspaceId, visible, onCommandsChange, onEdi
                 }
               }}
             />
+          </div>
+        ))}
+
+        {workspace.openTabs.filter((tab) => tab.kind === "viewer" && tab.fileViewer).map((tab) => (
+          <div key={tab.id} data-testid="workspace-canvas-pane" data-tab-id={tab.id} onMouseDownCapture={() => setActiveTab(workspace.id, tab.id)} className="h-full min-h-0 w-full" style={paneStyle(tab.id)}>
+            <ViewerShell viewer={tab.fileViewer!} active={paneVisible(tab.id)} workspaceId={workspace.id} />
           </div>
         ))}
 

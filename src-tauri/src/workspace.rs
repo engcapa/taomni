@@ -26,6 +26,7 @@ mod encoding;
 use encoding::*;
 #[cfg(test)]
 mod tests;
+pub(crate) mod viewer_io;
 
 use crate::state::AppState;
 use chardetng::EncodingDetector;

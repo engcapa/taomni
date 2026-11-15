@@ -175,6 +175,8 @@ export function createMailReaderRenderer(context: CreateMailReaderRendererContex
                       <button
                         key={`${name}-${index}`}
                         type="button"
+                        data-testid="mail-attachment-open"
+                        data-name={name}
                         className="inline-flex items-center gap-1 rounded border border-[var(--taomni-divider)] px-1.5 py-0.5 text-[11px] text-[var(--taomni-text-muted)] hover:bg-[var(--taomni-hover)] disabled:opacity-60"
                         title={`Double-click to open ${name}; right-click to save`}
                         onDoubleClick={() => void handleOpenAttachment(message, attachment, index)}

@@ -6,7 +6,7 @@ from .deadline import budget_time as time
 from .steps import StepError
 
 
-def operate(ctx, path: Path | None, title: str) -> dict:
+def operate(ctx, path: Path | None, title: str, *, kind: str = "folder", cancel_after_path: bool = False) -> dict:
     application = str(Path(ctx.session.application).resolve())
 
     def geometry():
@@ -29,6 +29,10 @@ def operate(ctx, path: Path | None, title: str) -> dict:
     wayland.command("activate", application=application, title=title)
     if path is None:
         wayland.command("keys", chords=[[0xff1b]])  # Escape
+    elif kind == "save":
+        wayland.command("keys", chords=[[0xffe3, ord("l")]])
+        wayland.command("text", text=str(path))
+        wayland.command("keys", chords=[[0xffe9, ord("c")]] if cancel_after_path else [[0xffe9, ord("s")]])
     else:
         # GTK's location entry accepts the requested directory directly, just
         # as on X11. Never select its first child after navigating with Enter.
@@ -42,7 +46,7 @@ def operate(ctx, path: Path | None, title: str) -> dict:
         if time.monotonic() >= deadline:
             raise StepError("native_folder_dialog: owned Wayland chooser did not close")
         time.sleep(0.25)
-        if path is not None and geometry() is not None:
+        if kind == "folder" and path is not None and geometry() is not None:
             wayland.command("keys", chords=[[0xffe9, ord("o")]])
     return {"transport": "Mutter OS keyboard", "application": application,
             "pid": window["pid"], "window": window}

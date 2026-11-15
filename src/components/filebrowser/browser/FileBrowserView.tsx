@@ -366,6 +366,7 @@ export function FileBrowserView(inputs: FileBrowserViewProps) {
                 if (!path) return;
                 void (async () => {
                   try {
+                    // Explicit file-manager reveal, not the global file-open action.
                     const { sftpOpenPath } = await import("../../../lib/sftp");
                     await sftpOpenPath(path);
                   } catch (err) {

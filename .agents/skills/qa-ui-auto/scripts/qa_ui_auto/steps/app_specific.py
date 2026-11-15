@@ -296,9 +296,10 @@ def step_set_check(ctx: StepContext, args: Any) -> None:
     if ctx.dry_run:
         return
     loc = ctx.page.locator(selector).first  # type: ignore[attr-defined]
-    current = loc.is_checked()
-    if current != desired:
-        loc.click(force=True)
+    # Let Playwright wait for stable, unobscured input and verify the resulting
+    # checked state. A forced click during Settings' smooth scroll could miss
+    # the checkbox while this verb still reported success (FILE-OPEN-010).
+    loc.set_checked(desired)
 
 
 @verb("send_text_via_label")

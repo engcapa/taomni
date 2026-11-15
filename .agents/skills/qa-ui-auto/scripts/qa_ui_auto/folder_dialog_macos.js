@@ -7,7 +7,10 @@ const path = readEnv("QA_PICKER_PATH");
 const title = readEnv("QA_PICKER_TITLE");
 const events = Application("System Events");
 const log = (stage) => console.log("native_folder_dialog: " + stage);
-const actionNames = ["Open", "Choose", "Select", "Select Folder"];
+const kind = readEnv("QA_PICKER_KIND") || "folder";
+const actionNames = kind === "save" ? ["Save"] : ["Open", "Choose", "Select", "Select Folder"];
+const parentPath = readEnv("QA_PICKER_DIRECTORY") || path;
+const filename = readEnv("QA_PICKER_FILENAME");
 // NSWorkspace supplies the executable URL without ps argv truncation or a
 // frontmost-process fallback, which can resolve to the automation host itself.
 const applications = $.NSWorkspace.sharedWorkspace.runningApplications;
@@ -96,20 +99,52 @@ if (screenshot) {
   if (Number(capture.terminationStatus) !== 0) throw new Error("Could not capture the owned folder chooser");
 }
 try {
-  if (readEnv("QA_PICKER_ACTION") === "cancel") {
+  const cancelAfterPath = readEnv("QA_PICKER_CANCEL_AFTER_PATH") === "1";
+  if (readEnv("QA_PICKER_ACTION") === "cancel" && !cancelAfterPath) {
     buttons(panel, "Cancel", true)[0].click();
   } else {
     events.keystroke("g", { using: ["command down", "shift down"] });
     const field = waitFor(() => locationField(findPanel() || panel), "Go to Folder location field unavailable");
-    field.value = path;
-    if (field.value() !== path) throw new Error("Go to Folder did not retain the complete path");
+    const location = kind === "save" ? parentPath : path;
+    field.value = location;
+    if (field.value() !== location) throw new Error("Go to Folder did not retain the complete path");
     events.keyCode(36);
     log("Go to Folder submitted");
     waitFor(() => !locationField(findPanel() || panel), "Go to Folder did not finish navigation");
+    if (kind === "save") {
+      // Limit traversal to native panel groups. NSSavePanel's filename is the
+      // enabled text field whose AX identifier or label names the save name.
+      const current = findPanel();
+      const nodes = [current];
+      const candidates = [];
+      for (let depth = 0, start = 0; depth < 4; depth++) {
+        const end = nodes.length;
+        for (let i = start; i < end; i++) {
+          try { candidates.push(...nodes[i].textFields()); } catch (_) { }
+          try { nodes.push(...nodes[i].groups()); } catch (_) { }
+        }
+        start = end;
+      }
+      const named = candidates.filter((candidate) => {
+        try {
+          const identifier = String(candidate.attributes.byName("AXIdentifier").value());
+          return /save|name/i.test(identifier) && candidate.enabled();
+        } catch (_) {
+          try { return /save as|name/i.test(String(candidate.description())) && candidate.enabled(); } catch (_) { return false; }
+        }
+      });
+      const target = named.length === 1 ? named[0] : candidates.filter((candidate) => {
+        try { return candidate.enabled() && String(candidate.value()).includes("."); } catch (_) { return false; }
+      });
+      const name = Array.isArray(target) ? (target.length === 1 ? target[0] : null) : target;
+      if (!name) throw new Error("NSSavePanel filename field is not unique");
+      name.value = filename;
+      if (name.value() !== filename) throw new Error("NSSavePanel did not retain filename");
+    }
     const open = waitFor(() => {
       const current = findPanel();
-      return current && actionButtons(current, true)[0];
-    }, "Folder chooser Open button unavailable");
+      return current && (cancelAfterPath ? buttons(current, "Cancel", true)[0] : actionButtons(current, true)[0]);
+    }, "Native chooser action button unavailable");
     open.click();
   }
   waitFor(() => !findPanel(), "Folder chooser did not close");

@@ -218,11 +218,28 @@ export async function writeMultiFormat(payload: MultiFormatPayload): Promise<voi
 
 /** Write a PNG blob as an image to the system clipboard. */
 export async function writeImagePng(blob: Blob): Promise<void> {
+  let nativeError: unknown;
+  if (isTauriRuntime()) {
+    try {
+      const bytes = Array.from(new Uint8Array(await blob.arrayBuffer()));
+      await invoke("clipboard_write_image_png", { bytes });
+      notifyClipboardWritten();
+      return;
+    } catch (error) {
+      nativeError = error;
+    }
+  }
   if (typeof ClipboardItem === "undefined" || !navigator.clipboard?.write) {
+    if (nativeError) throw nativeError;
     throw new Error("Image clipboard not supported in this environment");
   }
-  await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
-  notifyClipboardWritten();
+  try {
+    await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+    notifyClipboardWritten();
+  } catch (error) {
+    if (nativeError) throw nativeError;
+    throw error;
+  }
 }
 
 /**

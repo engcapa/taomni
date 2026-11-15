@@ -25,7 +25,7 @@ async function blobText(blob: Blob): Promise<string> {
 describe("Explorer preview dispatch", () => {
   it.each([
     ["notes.txt", "text"], [".gitignore", "text"], ["Dockerfile", "text"], ["LICENSE", "text"],
-    ["README.MD", "markdown"], ["notes.markdown", "markdown"], ["data.CSV", "csv"],
+    ["README.MD", "markdown"], ["notes.markdown", "markdown"], ["data.CSV", "csv"], ["report.HTML", "html"], ["index.htm", "html"],
     ["logo.png", "image"], ["vector.svg", "image"], ["binary.bin", "metadata"],
     ["installer.exe", "metadata"], ["document.pdf", "metadata"],
   ])("dispatches %s to %s", (name, kind) => {

@@ -2,6 +2,7 @@ import { useCallback, useEffect } from "react";
 import { t as tr } from "../../lib/i18n";
 import { type SessionConfig } from "../../lib/ipc";
 import { effectiveFileType, openExternalUrl, sftpOpenPath, sftpStat } from "../../lib/sftp";
+import { openFile } from "../../lib/openFile";
 import type { RecentWorkspace } from "../../types";
 import { createContinueConnectQueue, createOpenAfterJumpPassword, createOpenQueuedSession, createQueueVaultUnlock } from "./connectionQueue";
 import { useMainLayoutState } from "./useMainLayoutState";
@@ -20,9 +21,8 @@ export interface UseMainWorkspaceOpeningContext {
 export function useMainWorkspaceOpening(context: UseMainWorkspaceOpeningContext) {
   const { layout, sessionActions } = context;
 
-  // Open a local path or URL: http(s) URLs and files always go to the system handler;
-  // folders open in an embedded Taomni tab when `embedFolder` is true, otherwise
-  // they fall through to the OS file manager via sftpOpenPath.
+  // File entries share the global open service. Explicit folder reveals and
+  // http(s) URLs keep their file-manager/system-browser behavior.
   const handleOpenLocalPath = useCallback(async (
     target: string,
     opts: { embedFolder?: boolean; title?: string; sessionId?: string; } = {},
@@ -55,7 +55,8 @@ export function useMainWorkspaceOpening(context: UseMainWorkspaceOpeningContext)
       return;
     }
     try {
-      await sftpOpenPath(trimmed);
+      if (isDir) await sftpOpenPath(trimmed);
+      else await openFile({ path: trimmed }, { context: "file-session" });
     } catch (err) {
       layout.setStatusMessage(tr("status.openFailed", {
         error: err instanceof Error ? err.message : String(err),

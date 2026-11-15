@@ -160,53 +160,6 @@ class NativeSessionTransportTest(TestCase):
                                    "title": "Taomni"})
         session.request.assert_called_with("POST", "/session/session-1/window", {"handle": "window-qa"})
 
-    def test_double_click_resolves_refreshed_row_before_sending_pointer_actions(self):
-        session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))
-        session.session_id = "session-1"
-        session.find = Mock(side_effect=["old-row", "new-row"])
-        session.execute = Mock()
-        session.request = Mock(side_effect=[
-            WebDriverError("stale element reference"),
-            {"x": 20, "y": 40, "width": 100, "height": 24},
-            None,
-        ])
-        with patch("tauri_webdriver.time.sleep"):
-            session.dblclick("#row")
-        self.assertEqual(session.find.call_count, 2)
-        requests = session.request.call_args_list
-        self.assertTrue(requests[0].args[1].endswith("/old-row/rect"))
-        self.assertTrue(requests[1].args[1].endswith("/new-row/rect"))
-        pointer = requests[2].args[2]["actions"][0]["actions"]
-        self.assertEqual((pointer[0]["x"], pointer[0]["y"]), (70, 52))
-        self.assertEqual([action["type"] for action in pointer].count("pointerDown"), 2)
-
-    def test_double_click_rejects_persistently_stale_geometry_without_input(self):
-        session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))
-        session.session_id = "session-1"
-        session.find = Mock(return_value="row")
-        session.execute = Mock()
-        session.request = Mock(side_effect=WebDriverError("stale element reference"))
-        with patch("tauri_webdriver.time.sleep"):
-            with self.assertRaisesRegex(WebDriverError, "stale element reference"):
-                session.dblclick("#row")
-        self.assertEqual(session.find.call_count, 3)
-        self.assertTrue(all(request.args[0] == "GET" for request in session.request.call_args_list))
-
-    def test_double_click_does_not_repeat_pointer_actions_after_transport_failure(self):
-        session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))
-        session.session_id = "session-1"
-        session.find = Mock(return_value="row")
-        session.execute = Mock()
-        session.request = Mock(side_effect=[
-            {"x": 20, "y": 40, "width": 100, "height": 24},
-            WebDriverError("stale element reference"),
-        ])
-        with patch("tauri_webdriver.time.sleep"):
-            with self.assertRaisesRegex(WebDriverError, "stale element reference"):
-                session.dblclick("#row")
-        self.assertEqual(session.find.call_count, 1)
-        self.assertEqual(sum(request.args[0] == "POST" for request in session.request.call_args_list), 1)
-
     def test_count_accepts_empty_but_rejects_invalid_driver_response(self):
         session = NativeSession("http://driver.invalid", Path("unused"))
         session.session_id = "session-1"

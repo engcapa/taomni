@@ -15,13 +15,8 @@ const opening = new Map<string, Promise<unknown>>();
 
 /** Lexical Windows spelling is only a fallback; native canonicalization decides
  * aliases and actual macOS volume case behavior without lowercasing Unix paths. */
-export function explorerPathKey(path: string): string {
-  if (/^(?:[a-z]:[\\/]|\\\\|\/\/)/i.test(path)) {
-    return path.replace(/^\\\\\?\\UNC\\/i, "//").replace(/^\\\\\?\\/, "")
-      .replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
-  }
-  return path.replace(/\/+$/, "") || "/";
-}
+export { documentPathKey as explorerPathKey } from "../openFile/pathIdentity";
+import { documentPathKey as explorerPathKey } from "../openFile/pathIdentity";
 
 async function canonicalKey(path: string): Promise<string> {
   try {

@@ -1,7 +1,8 @@
 import { type MouseEvent as ReactMouseEvent, type SetStateAction } from "react";
 import { Download, ExternalLink } from "lucide-react";
 import { mailDownloadAttachment, type MailAttachmentInfo, type MailMessageHeader } from "../../../lib/mail";
-import { openLocalPath, temporaryFilePath } from "../../../lib/ipc";
+import { openTemporaryFile } from "../../../lib/fileOpenTemp";
+import { getLocale } from "../../../lib/i18n";
 import { type MenuItem } from "../../ContextMenu";
 import { mailClientErrorMessage } from "./messages";
 import { suggestedAttachmentName, ALL_ATTACHMENTS_INDEX, uniqueAttachmentName, joinLocalPath } from "./attachments";
@@ -42,15 +43,19 @@ export function createAttachmentActions(context: CreateAttachmentActionsContext)
     }
   };
 
-  const handleOpenAttachment = async (message: MailMessageHeader, attachment: MailAttachmentInfo, index: number) => {
+  const handleOpenAttachment = async (message: MailMessageHeader, attachment: MailAttachmentInfo, index: number, mode?: "taomni" | "system") => {
     setDownloadingAttachmentIndex(index);
     setError(null);
     try {
       const defaultPath = suggestedAttachmentName(attachment, index, message.subject);
-      const targetPath = await temporaryFilePath(defaultPath);
-      const result = await mailDownloadAttachment(info, message.folder, message.uid, index, targetPath, attachment.section);
-      await openLocalPath(result.path);
-      setStatus(`Opened attachment ${result.name || defaultPath}`);
+      await openTemporaryFile({
+        key: JSON.stringify(["mail", info.sessionId, message.folder, message.uid, attachment.section, index]),
+        fileName: defaultPath,
+        source: "mail-attachment",
+        readOnlyReason: getLocale().startsWith("zh") ? "邮件附件 · 只读副本" : "Mail attachment · read-only copy",
+        download: async (path) => { await mailDownloadAttachment(info, message.folder, message.uid, index, path, attachment.section); },
+      }, { context: "mail-attachment", mode });
+      setStatus(`Opened attachment ${defaultPath}`);
     } catch (e) {
       setError(mailClientErrorMessage(e));
     } finally {
@@ -100,10 +105,18 @@ export function createAttachmentActions(context: CreateAttachmentActionsContext)
     const busy = downloadingAttachmentIndex !== null;
     const items: MenuItem[] = [
       {
-        label: "Open with default app",
+        label: getLocale().startsWith("zh") ? "在 Taomni 中预览" : "Preview in Taomni",
+        testId: "mail-attachment-preview",
         icon: <ExternalLink className="w-3.5 h-3.5" />,
         disabled: busy,
-        onClick: () => void handleOpenAttachment(message, attachment, index),
+        onClick: () => void handleOpenAttachment(message, attachment, index, "taomni"),
+      },
+      {
+        label: getLocale().startsWith("zh") ? "系统应用" : "System app",
+        testId: "mail-attachment-system",
+        icon: <ExternalLink className="w-3.5 h-3.5" />,
+        disabled: busy,
+        onClick: () => void handleOpenAttachment(message, attachment, index, "system"),
       },
       {
         label: "Save attachment as...",

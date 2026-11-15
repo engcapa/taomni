@@ -1,12 +1,14 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
 import * as clipboard from "../../../lib/clipboard";
+import { openFile } from "../../../lib/openFile";
 import { useAppStore } from "../../../stores/appStore";
 import { useWorkspacePlatformStore } from "../../../stores/workspacePlatformStore";
 import { gitFileAbsolutePath, gitFileMenuItems } from "./fileActions";
 
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 vi.mock("../../../lib/clipboard", () => ({ writeText: vi.fn() }));
+vi.mock("../../../lib/openFile", () => ({ openFile: vi.fn(async () => "viewer") }));
 
 async function select(id: string, targets = [{ repoRoot: "/repo", path: "src/deleted.ts" }]) {
   gitFileMenuItems(targets).find((item) => item.testId === id)!.onClick!();
@@ -70,6 +72,14 @@ describe("Git file actions", () => {
     expect(terminal).toMatchObject({ kind: "terminal", terminalInitialCwd: "/repo/src" });
     expect(current.openTabs).toContainEqual(gitTab);
     expect(useAppStore.getState().activeSideTab).toBe("workspaces");
+  });
+
+  it("previews through the shared service in the owning workspace", async () => {
+    useAppStore.setState({ activeSideTab: "workspaces" });
+    useWorkspacePlatformStore.setState({ activeWorkspaceId: "preview-workspace" });
+    await select("git-file-preview", [{ repoRoot: "/repo", path: "assets/design.svg" }]);
+    expect(openFile).toHaveBeenCalledWith({ path: "/repo/assets/design.svg" }, { context: "git", mode: "taomni", workspaceId: "preview-workspace" });
+    expect(invoke).not.toHaveBeenCalled();
   });
 
   it("opens a regular Git tab's terminal with the configured profile", async () => {

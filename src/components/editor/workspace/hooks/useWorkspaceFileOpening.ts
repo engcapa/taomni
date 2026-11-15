@@ -115,6 +115,7 @@ export function useWorkspaceFileOpening(context: UseWorkspaceFileOpeningContext)
   const treeOpening = useWorkspaceTreeOpening({
     treeFocus: session.treeFocus,
     workspaceInstanceId: session.workspaceInstanceId,
+    rootsRef: project.projectTree.rootsRef,
     editorCommands: session.editorCommands,
     buffers: project.buffers,
     splitLayoutLeaf: session.storeActions.splitLayoutLeaf,

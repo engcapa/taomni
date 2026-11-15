@@ -22,7 +22,7 @@ describe("Explorer mounted context and command workflows", () => {
     fireEvent.contextMenu(row("alpha.txt"), { clientX: 10, clientY: 10 });
     expect(screen.queryByTestId("explorer-context-newtab")).toBeNull();
     fireEvent.click(screen.getByTestId("explorer-context-open"));
-    expect(native.sftpOpenPath).toHaveBeenCalledWith("/fixture/alpha.txt");
+    expect(native.openFile).toHaveBeenCalledWith({ path: "/fixture/alpha.txt" }, { context: "explorer", workspaceId: "workspace-one", alternate: false });
   });
 
   it("right-click preserves multi-selection, disables multi-rename and copies only effective targets", async () => {
@@ -138,7 +138,7 @@ describe("Explorer mounted context and command workflows", () => {
     expect(screen.queryByTestId("explorer-properties-dialog")).toBeNull();
     expect(native.sftpOpenPath).not.toHaveBeenCalled();
     fireEvent.keyDown(list, { key: "Enter" });
-    expect(native.sftpOpenPath).toHaveBeenCalledWith("/fixture/alpha.txt");
+    expect(native.openFile).toHaveBeenCalledWith({ path: "/fixture/alpha.txt" }, { context: "explorer", workspaceId: undefined, alternate: false });
   });
 
   it("opens nested directories by double-click using the same sftpStore pane", async () => {

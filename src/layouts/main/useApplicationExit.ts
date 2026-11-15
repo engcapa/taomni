@@ -5,6 +5,8 @@ import { exitApp } from "../../lib/ipc";
 import { listQueryTabs } from "../../lib/queryRegistry";
 import { t as tr } from "../../lib/i18n";
 import { saveBackupSettingsBeforeExit } from "../../stores/backupSettingsStore";
+import { confirmViewerExit } from "../../lib/openFile/closeGuard";
+import { useDocumentStore } from "../../stores/documentStore";
 
 
 export interface UseApplicationExitContext {
@@ -45,6 +47,8 @@ export function useApplicationExit(context: UseApplicationExitContext) {
     exitRequestInFlightRef.current = true;
     void (async () => {
       try {
+        if (Object.values(useDocumentStore.getState().documents).some((document) => document.dirty)
+          && !(await confirmViewerExit())) return;
         if (!(await confirmExitWithOpenTabs())) return;
         if (!await saveBackupSettingsBeforeExit(() => confirmAppExit({
           title: tr("backupUnified.unsavedTitle"),

@@ -26,6 +26,8 @@ import { useTerminalProfiles } from "./useTerminalProfiles";
 import { selectMainLayoutAppState } from "./mainLayoutAppState";
 import { useWorkspaceCommandRegistry } from "./useWorkspaceCommandRegistry";
 import { useExplorerTabRecovery } from "../../lib/explorer/useExplorerTabRecovery";
+import { useViewerRecovery } from "../../lib/openFile/useViewerRecovery";
+import { activeViewerCommands } from "../../lib/openFile/viewerCommands";
 
 
 export interface UseMainLayoutStateContext {
@@ -34,6 +36,7 @@ export interface UseMainLayoutStateContext {
 
 export function useMainLayoutState(context: UseMainLayoutStateContext) {
   useExplorerTabRecovery();
+  useViewerRecovery();
   const { } = context;
   const t = useT();
   const {
@@ -126,6 +129,8 @@ export function useMainLayoutState(context: UseMainLayoutStateContext) {
   const [tabActionSlot, setTabActionSlot] = useState<HTMLDivElement | null>(null);
   const { workspaceCommandRegistrationsRef, handleWorkspaceCommandsChange, subscribeWorkspaceCommands } = useWorkspaceCommandRegistry();
   const getActiveWorkspaceCommands = useCallback(() => {
+    const viewer = activeViewerCommands();
+    if (viewer) return viewer;
     const app = useAppStore.getState();
     const commandTabId = app.activeSideTab === "workspaces"
       ? activeWorkspaceRuntimeTabId(useWorkspacePlatformStore.getState().getWorkspace())

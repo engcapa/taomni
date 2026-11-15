@@ -47,6 +47,11 @@ export const SETTINGS_SEARCH_ENTRIES: SettingsSearchEntry[] = [
     terms: ["ui font", "font family", "font size", "typography", "interface font", "界面字体", "字体", "字号", "排版", "tool window bar", "sidebar rail", "工具窗口条", "侧栏"],
   },
   {
+    id: "file-open",
+    titleKeys: [],
+    terms: ["file open", "files and opening", "default handler", "association", "extension", "markdown", "pasted images", "html preview", "sandbox", "word wrap", "文件打开", "文件与打开方式", "默认打开方式", "扩展名", "关联", "粘贴图片", "表格", "沙盒", "自动换行"],
+  },
+  {
     id: "screenshot",
     titleKeys: ["settings.screenshotTitle", "settings.screenshotShortcut"],
     terms: ["screenshot", "screen capture", "hotkey", "shortcut", "recording", "截图", "截屏", "快捷键", "热键", "录屏"],
@@ -254,7 +259,7 @@ export const SETTINGS_GROUPS: SettingsGroupDef[] = [
   {
     id: "general",
     titleKey: "settings.groupGeneral",
-    entryIds: ["language", "app-theme", "welcome-history", "global-ui", "screenshot"],
+    entryIds: ["language", "app-theme", "welcome-history", "global-ui", "file-open", "screenshot"],
   },
   {
     id: "code",

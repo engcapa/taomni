@@ -98,6 +98,7 @@ pub fn workspace_write_file(
     contents: String,
     expected_hash: Option<String>,
 ) -> Result<WorkspaceFile, String> {
+    let _write_guard = viewer_io::serialize_file_write();
     let root = canonical_repo_root(&repo_root)?;
     let target = resolve_writable_path(&root, &path)?;
     reject_protected_write(&root, &target)?;
@@ -157,6 +158,7 @@ pub fn workspace_write_loose_file(
     contents: String,
     expected_hash: Option<String>,
 ) -> Result<WorkspaceFile, String> {
+    let _write_guard = viewer_io::serialize_file_write();
     let target = resolve_writable_loose_file_path(&path)?;
     reject_protected_loose_write(&target)?;
 

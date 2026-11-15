@@ -1,0 +1,260 @@
+id: TC-FILE-OPEN-005
+title: Local HTML sandbox loads local resources while isolating parent/network and honoring device controls
+description: AC03/16/17/22. Opens actual fixture HTML, local CSS and PNG through production preview; iframe script emits resource/parent-isolation
+  results through the real console bridge. Never reads opaque iframe DOM from the parent. Native verifies the real custom
+  protocol in the packaged WebView; browser blob stub proves renderer behavior only. External browser process launch, denied
+  path traversal/symlink requests and actual outbound allow-once routing remain gaps.
+modes:
+- browser
+- native
+covers:
+- F-FILEOPEN-1
+- F-EXPLORER-1
+tags:
+- p0
+- file-open
+- html
+- sandbox
+- security
+- crash-regression
+fixtures:
+- reset_db
+- file_open_files
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-file-open-html
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-file-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Control+l
+    macos_key: Meta+l
+- fill:
+    selector: '[data-testid="explorer-address"]'
+    value: ${fixture.file_open_root}
+- press:
+    selector: '[data-testid="explorer-address"]'
+    key: Enter
+- wait_for: '[data-testid="explorer-file-row"][data-name="report.html"]'
+- click: '[data-testid="explorer-file-row"][data-name="report.html"]'
+- show_explorer_preview: null
+- wait_for: '[data-testid="explorer-preview"]'
+- click: '[data-testid="explorer-preview-open"]'
+- wait_for: '[data-testid="html-preview"][data-loaded="true"]'
+- assert_attribute:
+    selector: '[data-testid="html-frame"]'
+    name: sandbox
+    equals: allow-scripts
+- assert_attribute:
+    selector: '[data-testid="html-address"]'
+    name: readonly
+    equals: ''
+- click: '[data-testid="html-address"]'
+- eval_readonly:
+    expression: document.activeElement === document.querySelector(".html-address input")
+    expect_truthy: true
+- assert_text:
+    selector: '[data-testid="html-network-banner"]'
+    contains: Network requests blocked
+- click: '[data-testid="html-console-toggle"]'
+- assert_text:
+    selector: '[data-testid="html-console"]'
+    contains: FILE_OPEN_SCRIPT_OK
+    timeout_sec: 20
+- assert_text:
+    selector: '[data-testid="html-console"]'
+    contains: FILE_OPEN_RESOURCES rgb(12, 34, 56) 1
+    timeout_sec: 20
+- assert_text:
+    selector: '[data-testid="html-console"]'
+    contains: FILE_OPEN_PARENT_BLOCKED
+    timeout_sec: 20
+- assert_text:
+    selector: '[data-testid="html-console"]'
+    contains: FILE_OPEN_NETWORK_BLOCKED
+    timeout_sec: 20
+- eval_readonly:
+    expression: document.querySelector(".html-console-lines").textContent.includes("FILE_OPEN_NETWORK_BAD") === false
+    expect_truthy: true
+- click: '[data-testid="html-device-mobile"]'
+- assert_attribute:
+    selector: '[data-testid="html-device-mobile"]'
+    name: aria-pressed
+    equals: 'true'
+- eval_readonly:
+    expression: Math.abs(document.querySelector(".html-frame").getBoundingClientRect().width - 390) <= 1
+    expect_truthy: true
+- click: '[data-testid="html-device-tablet"]'
+- eval_readonly:
+    expression: Math.abs(document.querySelector(".html-frame").getBoundingClientRect().width - 768) <= 1
+    expect_truthy: true
+- select_option:
+    selector: '[data-testid="html-zoom"]'
+    value: '75'
+- eval_readonly:
+    expression: Math.abs(document.querySelector(".html-frame").getBoundingClientRect().width - 576) <= 1
+    expect_truthy: true
+- click: '[data-testid="html-device-desktop"]'
+- click: '[data-testid="html-mode-split"]'
+- wait_for: '[data-testid="html-source"] [data-testid="viewer-editor"] .cm-content'
+- assert_text:
+    selector: '[data-testid="html-source"]'
+    contains: FILE_OPEN_SCRIPT_OK
+- assert_attribute:
+    selector: '[data-testid="html-frame"]'
+    name: sandbox
+    equals: allow-scripts
+- click: '[data-testid="html-mode-preview"]'
+- assert_not_visible: '[data-testid="html-source"]'
+- click: '[data-testid="html-console-clear"]'
+- assert_count:
+    selector: '[data-testid="html-console"] [data-level]'
+    equal: 0
+- click: '[data-testid="html-refresh"]'
+- wait_for: '[data-testid="html-preview"][data-loaded="true"]'
+- assert_text:
+    selector: '[data-testid="html-console"]'
+    contains: FILE_OPEN_SCRIPT_OK
+    timeout_sec: 20
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/report.html
+    sha256: ${fixture.file_open_html_sha}
+- click: '[data-testid="html-network-allow"]'
+- wait_for: '[data-testid="html-network-block"]'
+- wait_for: '[data-testid="html-network-proxy"]'
+- assert_attribute:
+    selector: '[data-testid="html-network-proxy"]'
+    name: data-proxy-mode
+    equals: app
+- assert_text:
+    selector: '[data-testid="html-network-banner"]'
+    contains: Network access allowed for this tab only
+- click: '[data-testid="html-network-block"]'
+- assert_visible: '[data-testid="html-network-allow"]'
+- assert_text:
+    selector: '[data-testid="html-network-banner"]'
+    contains: Network requests blocked
+- wait_for: '[data-testid="html-preview"][data-loaded="true"]'
+- assert_text:
+    selector: '[data-testid="html-console"]'
+    contains: FILE_OPEN_SCRIPT_OK
+    timeout_sec: 20
+- assert_text:
+    selector: '[data-testid="html-console"]'
+    contains: FILE_OPEN_RESOURCES rgb(12, 34, 56) 1
+    timeout_sec: 20
+- assert_no_runtime_errors: null
+- screenshot: html-sandbox-console-device.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: HTML executes author scripts only in opaque sandbox, resolves local CSS/PNG and blocks parent DOM/network
+      by default.
+    actions:
+    - 10
+    - 13
+    - 20
+    checkpoints:
+    - step: 15
+      expectation: Sandbox grants scripts but never allow-same-origin or top navigation.
+    - step: 16
+      expectation: File address is a real readonly input.
+    - step: 21
+      expectation: Real iframe author script reached the console bridge.
+    - step: 22
+      expectation: Fixture independently observes exact local CSS color and decoded PNG width.
+    - step: 23
+      expectation: Attempted parent DOM access throws across the opaque origin.
+    - step: 24
+      expectation: Fixture network fetch is rejected under default policy.
+    - step: 25
+      expectation: No successful outbound-network marker appears.
+    results:
+    - 15
+    - 16
+    - 21
+    - 22
+    - 23
+    - 24
+    - 25
+  - id: R2
+    requirement: Device width, zoom, source split, console clear/refresh and per-tab network policy have observable effects
+      without writing source.
+    actions:
+    - 26
+    - 29
+    - 31
+    - 33
+    - 34
+    - 38
+    - 40
+    - 42
+    - 46
+    - 51
+    checkpoints:
+    - step: 28
+      expectation: Mobile iframe actually measures 390 CSS px.
+    - step: 30
+      expectation: Tablet iframe actually measures 768 CSS px.
+    - step: 32
+      expectation: 75 percent tablet zoom measures 576 CSS px.
+    - step: 36
+      expectation: Source split shows actual file code.
+    - step: 39
+      expectation: Preview-only mode hides source pane.
+    - step: 41
+      expectation: Clear removes current console entries.
+    - step: 44
+      expectation: Refresh runs the real iframe script again.
+    - step: 45
+      expectation: Preview controls leave the entire HTML source unchanged.
+    - step: 50
+      expectation: Temporary allow shows its tag-scoped policy.
+    - step: 53
+      expectation: Explicit block restores blocked policy.
+    - step: 54
+      expectation: The final blocked-policy session finishes loading before the screenshot is captured.
+    - step: 55
+      expectation: The real author script reruns after restoring blocked network policy.
+    - step: 56
+      expectation: The completed final session independently observes the exact local CSS color and decoded PNG width.
+    - step: 57
+      expectation: HTML frame lifecycle has no uncaught runtime error.
+    - step: 49
+      expectation: Allow-once preview uses the configured application proxy mode via scoped backend session.
+    results:
+    - 28
+    - 30
+    - 32
+    - 36
+    - 39
+    - 41
+    - 44
+    - 45
+    - 50
+    - 53
+    - 54
+    - 55
+    - 56
+    - 57
+    - 49
+  visual:
+  - check: Device toolbar/console/source pane layout
+    method: automated
+    reason: Actual iframe geometry is checked; screenshot still needs prototype fidelity review.
+  native:
+  - check: Custom protocol local resource delivery and bridge isolation
+    method: automated
+    reason: Native mode uses packaged WebView protocol and real CSS/PNG/script resource receipts, never stub frame contents.
+  - check: Outbound allow proxy modes, external browser process and traversal/symlink rejection
+    method: manual
+    reason: This case proves default refusal/renderer toggle only; backend security tests and separate process/network probes
+      are required.
+  - check: Parent-owned external link confirmation origin/URL, Cancel/Escape/focus and explicit system-browser open
+    method: manual
+    reason: html-external-dialog/origin/url/cancel/open are real controls. This case cannot deliver an actual opaque-iframe
+      link click in every native bridge. No synthetic bridge message or direct handler is used as a substitute; unit tests
+      cover no OS launch before confirmation, native system-browser delivery is unrun.

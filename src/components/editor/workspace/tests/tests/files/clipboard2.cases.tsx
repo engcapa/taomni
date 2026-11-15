@@ -338,18 +338,20 @@ export function registerfilesClipboard2Cases(caseContext: registerfilesClipboard
     ).toHaveLength(0));
   });
   it("ED-TREE-001 moves selection without opening files or toggling directories", async () => {
+    // This scenario owns IDE focus/selection/split behavior. Use an actual
+    // source file; ordinary text/Markdown now belongs to the global viewer.
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app", workspaceId: "ws-tree-nav", workspaceInstanceId: "instance-tree-nav",
       name: "Tree navigation", roots: [{ id: "app", name: "app", path: "/repo/app", kind: "folder" }], looseFiles: [],
     };
     caseContext.workspaceTestHarness.workspaceMocks.workspaceListDir.mockImplementation(async (_root: string, path: string) => path === "src"
       ? [caseContext.workspaceTestHarness.entry("example.txt", "src/example.txt")]
-      : [caseContext.workspaceTestHarness.entry("src", "src", "dir"), caseContext.workspaceTestHarness.entry("README.md", "README.md"), caseContext.workspaceTestHarness.entry("notes.txt", "notes.txt")]);
+      : [caseContext.workspaceTestHarness.entry("src", "src", "dir"), caseContext.workspaceTestHarness.entry("README.md", "README.md"), caseContext.workspaceTestHarness.entry("notes.ts", "notes.ts")]);
     caseContext.workspaceTestHarness.workspaceMocks.workspaceReadFile.mockImplementation(async (_root: string, path: string) => caseContext.workspaceTestHarness.file(path, `Keep ${path}`));
     caseContext.workspaceTestHarness.renderWorkspace(workspace);
-    const notes = (await screen.findAllByTestId("code-workspace-tree-file")).find((row) => row.dataset.path === "notes.txt")!;
+    const notes = (await screen.findAllByTestId("code-workspace-tree-file")).find((row) => row.dataset.path === "notes.ts")!;
     fireEvent.doubleClick(notes);
-    await findEditorByTitle("app / notes.txt");
+    await findEditorByTitle("app / notes.ts");
     const before = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-tree-nav");
     const pane = screen.getByTestId("code-workspace-tree-pane");
     fireEvent.keyDown(pane, { key: "ArrowDown" });
@@ -368,14 +370,16 @@ export function registerfilesClipboard2Cases(caseContext: registerfilesClipboard
     expect(selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), "instance-tree-nav").treeSelection).toEqual(after.treeSelection);
   });
   it("ED-TREE-001 expands, enters children, returns to parent and collapses directionally", async () => {
+    // This scenario owns IDE focus/selection/split behavior. Use an actual
+    // source file; ordinary text/Markdown now belongs to the global viewer.
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app", workspaceId: "ws-tree-direction", workspaceInstanceId: "instance-tree-direction",
       name: "Tree direction", roots: [{ id: "app", name: "app", path: "/repo/app", kind: "folder" }], looseFiles: [],
     };
     caseContext.workspaceTestHarness.workspaceMocks.workspaceListDir.mockImplementation(async (_root: string, path: string) => path === "src"
-      ? [caseContext.workspaceTestHarness.entry("example.txt", "src/example.txt")]
+      ? [caseContext.workspaceTestHarness.entry("example.ts", "src/example.ts")]
       : [caseContext.workspaceTestHarness.entry("src", "src", "dir")]);
-    caseContext.workspaceTestHarness.workspaceMocks.workspaceReadFile.mockResolvedValue(caseContext.workspaceTestHarness.file("src/example.txt", "Keep tree navigation"));
+    caseContext.workspaceTestHarness.workspaceMocks.workspaceReadFile.mockResolvedValue(caseContext.workspaceTestHarness.file("src/example.ts", "Keep tree navigation"));
     caseContext.workspaceTestHarness.renderWorkspace(workspace);
     const dir = await screen.findByTestId("code-workspace-tree-dir");
     // Select via the existing context action so this setup does not depend on
@@ -401,10 +405,12 @@ export function registerfilesClipboard2Cases(caseContext: registerfilesClipboard
     await screen.findByTestId("code-workspace-tree-file");
     fireEvent.keyDown(pane, { key: "ArrowDown" });
     fireEvent.keyDown(pane, { key: "Enter" });
-    await waitFor(() => expect(caseContext.workspaceTestHarness.workspaceMocks.workspaceReadFile).toHaveBeenCalledWith("/repo/app", "src/example.txt"));
-    expect(screen.getByRole("treeitem", { name: /example.txt/ })).toHaveAttribute("aria-selected", "true");
+    await waitFor(() => expect(caseContext.workspaceTestHarness.workspaceMocks.workspaceReadFile).toHaveBeenCalledWith("/repo/app", "src/example.ts"));
+    expect(screen.getByRole("treeitem", { name: /example.ts/ })).toHaveAttribute("aria-selected", "true");
   });
   it("ED-TREEOPEN-001: Enter on tree file formally opens and grants focus to editor without editor click", async () => {
+    // This scenario owns IDE focus/selection/split behavior. Use an actual
+    // source file; ordinary text/Markdown now belongs to the global viewer.
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",
       workspaceId: "ws-tree-open-focus",
@@ -415,7 +421,7 @@ export function registerfilesClipboard2Cases(caseContext: registerfilesClipboard
       initialFile: { kind: "root", rootId: "app", path: "README.md" },
     };
     caseContext.workspaceTestHarness.workspaceMocks.workspaceListDir.mockImplementation(async (_root: string, path: string) => path === "src"
-      ? [caseContext.workspaceTestHarness.entry("example.txt", "src/example.txt")]
+      ? [caseContext.workspaceTestHarness.entry("example.ts", "src/example.ts")]
       : [caseContext.workspaceTestHarness.entry("src", "src", "dir"), caseContext.workspaceTestHarness.entry("README.md", "README.md")]);
     const originalText = "hello tree open focus parity\n";
     caseContext.workspaceTestHarness.workspaceMocks.workspaceReadFile.mockImplementation(async (_root: string, path: string) =>
@@ -429,15 +435,15 @@ export function registerfilesClipboard2Cases(caseContext: registerfilesClipboard
 
     // Expand dir by double clicking
     fireEvent.doubleClick(dir);
-    const exampleFile = await screen.findByRole("treeitem", { name: /example.txt/ });
+    const exampleFile = await screen.findByRole("treeitem", { name: /example.ts/ });
     expect(exampleFile).toBeInTheDocument();
 
-    // Select example.txt and press Enter
+    // Select example.ts and press Enter
     fireEvent.click(exampleFile);
     fireEvent.keyDown(pane, { key: "Enter" });
 
-    // Verify example.txt tab is opened and active
-    await findEditorByTitle("app / src/example.txt");
+    // Verify example.ts tab is opened and active
+    await findEditorByTitle("app / src/example.ts");
     await waitFor(() => {
       const activeElement = document.activeElement;
       expect(activeElement?.classList.contains("cm-content")).toBe(true);

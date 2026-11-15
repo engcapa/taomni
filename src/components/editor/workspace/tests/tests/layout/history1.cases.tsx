@@ -452,6 +452,8 @@ export function registerlayoutHistory1Cases(caseContext: registerlayoutHistory1C
     expect(caseContext.workspaceTestHarness.workspaceMocks.workspaceWriteFile).not.toHaveBeenCalled();
   });
   it("opens the selected tree file in a split with Ctrl+Enter", async () => {
+    // This scenario owns IDE focus/selection/split behavior. Use an actual
+    // source file; ordinary text/Markdown now belongs to the global viewer.
     const workspace: CodeWorkspaceTabInfo = {
       repoRoot: "/repo/app",
       workspaceId: "ws-tree-split",
@@ -460,8 +462,8 @@ export function registerlayoutHistory1Cases(caseContext: registerlayoutHistory1C
       roots: [{ id: "app", name: "app", path: "/repo/app", kind: "git" }],
       looseFiles: [],
     };
-    caseContext.workspaceTestHarness.workspaceMocks.workspaceListDir.mockResolvedValue([caseContext.workspaceTestHarness.entry("README.md", "README.md")]);
-    caseContext.workspaceTestHarness.workspaceMocks.workspaceReadFile.mockResolvedValue(caseContext.workspaceTestHarness.file("README.md", "# Readme"));
+    caseContext.workspaceTestHarness.workspaceMocks.workspaceListDir.mockResolvedValue([caseContext.workspaceTestHarness.entry("example.ts", "example.ts")]);
+    caseContext.workspaceTestHarness.workspaceMocks.workspaceReadFile.mockResolvedValue(caseContext.workspaceTestHarness.file("example.ts", "# Readme"));
 
     caseContext.workspaceTestHarness.renderWorkspace(workspace);
     const row = await screen.findByTestId("code-workspace-tree-file");
@@ -479,6 +481,6 @@ export function registerlayoutHistory1Cases(caseContext: registerlayoutHistory1C
     const leafKeys = tree?.type === "split"
       ? tree.children.flatMap((child) => (child.type === "leaf" ? [child.activeKey] : []))
       : [];
-    expect(leafKeys).toContain("root:app:README.md");
+    expect(leafKeys).toContain("root:app:example.ts");
   });
 }

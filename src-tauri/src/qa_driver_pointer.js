@@ -34,6 +34,23 @@ async function dispatchQaActions(sources, emitKey, modifiers, resolveOrigin, tar
         if (action.type === "keyDown" || action.type === "keyUp") emitKey(action.type, action.value);
         continue;
       }
+      if (source.type === "wheel") {
+        // The macOS QA bridge owns WebDriver actions inside WKWebView, so it
+        // must translate wheel sources into the same cancellable DOM input a
+        // native WebView receives. Previously wheel sources fell through the
+        // pointer-only path and returned success without dispatching input.
+        const [x, y] = resolveOrigin(action.origin, Number(action.x) || 0, Number(action.y) || 0);
+        const target = targetAtPoint(x, y);
+        target.dispatchEvent(new WheelEvent("wheel", {
+          bubbles: true, cancelable: true, composed: true,
+          clientX: x, clientY: y,
+          deltaX: Number(action.deltaX) || 0,
+          deltaY: Number(action.deltaY) || 0,
+          deltaZ: Number(action.deltaZ) || 0,
+          deltaMode: Number(action.deltaMode) || 0,
+        }));
+        continue;
+      }
       if (source.type !== "pointer") continue;
       const state = states[index];
       const button = action.button || 0;

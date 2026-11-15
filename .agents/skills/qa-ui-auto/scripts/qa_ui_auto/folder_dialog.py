@@ -4,6 +4,7 @@ from __future__ import annotations
 import json
 import os
 import platform
+import re
 import shutil
 import subprocess
 from concurrent.futures import Future, ThreadPoolExecutor
@@ -39,11 +40,11 @@ def selected_path(ctx, args: dict) -> Path | None:
     return path
 
 
-def linux_dialog(ctx, path: Path | None) -> dict:
+def linux_dialog(ctx, path: Path | None, title: str = TITLE, kind: str = "folder", cancel_after_path: bool = False) -> dict:
     from . import wayland
     if wayland.active():
         from .folder_dialog_wayland import operate
-        return operate(ctx, path, TITLE)
+        return operate(ctx, path, title) if kind == "folder" else operate(ctx, path, title, kind=kind, cancel_after_path=cancel_after_path)
     if not os.environ.get("DISPLAY") or os.environ.get("GDK_BACKEND") == "wayland":
         raise StepError("native_folder_dialog: Linux OS chooser automation requires X11")
     application = Path(ctx.session.application).resolve()
@@ -51,7 +52,7 @@ def linux_dialog(ctx, path: Path | None) -> dict:
     window = None
     pid = None
     while time.monotonic() < deadline:
-        windows = command("xdotool", "search", "--onlyvisible", "--name", "^" + TITLE + "$", check=False).splitlines()
+        windows = command("xdotool", "search", "--onlyvisible", "--name", "^" + re.escape(title) + "$", check=False).splitlines()
         owned = []
         for candidate in windows:
             owner = command("xdotool", "getwindowpid", candidate, check=False)
@@ -74,6 +75,12 @@ def linux_dialog(ctx, path: Path | None) -> dict:
     ImageGrab.grab(xdisplay=os.environ["DISPLAY"]).save(ctx.case_dir / "native-folder-dialog.png")
     if path is None:
         command("xdotool", "key", "--clearmodifiers", "Escape")
+    elif kind == "save":
+        # GtkFileChooserNative Save starts with the Name entry selected. Use
+        # the real location entry with the full owned filename, then Save once.
+        command("xdotool", "key", "--clearmodifiers", "ctrl+l")
+        command("xdotool", "type", "--clearmodifiers", "--delay", "15", "--", str(path))
+        command("xdotool", "key", "--clearmodifiers", "alt+c" if cancel_after_path else "alt+s")
     else:
         # GTK disables Open on Recent until an item is selected. Start from
         # the filesystem view, then submit the location entry directly so
@@ -87,7 +94,7 @@ def linux_dialog(ctx, path: Path | None) -> dict:
         # child directory instead of the requested folder.
         command("xdotool", "key", "--clearmodifiers", "alt+o")
     deadline = time.monotonic() + 10
-    while window in command("xdotool", "search", "--onlyvisible", "--name", "^" + TITLE + "$", check=False).splitlines():
+    while window in command("xdotool", "search", "--onlyvisible", "--name", "^" + re.escape(title) + "$", check=False).splitlines():
         if time.monotonic() > deadline:
             ImageGrab.grab(xdisplay=os.environ["DISPLAY"]).save(ctx.case_dir / "native-folder-dialog-timeout.png")
             raise StepError("native_folder_dialog: chooser did not close")
@@ -96,7 +103,7 @@ def linux_dialog(ctx, path: Path | None) -> dict:
         # removed by a preceding case. Retry the same explicit selection while
         # this owned chooser remains visible; do not navigate into its children.
         time.sleep(0.25)
-        if path is not None and window in command("xdotool", "search", "--onlyvisible", "--name", "^" + TITLE + "$", check=False).splitlines():
+        if kind == "folder" and path is not None and window in command("xdotool", "search", "--onlyvisible", "--name", "^" + re.escape(title) + "$", check=False).splitlines():
             command("xdotool", "key", "--clearmodifiers", "alt+o")
     return {"transport": "X11 OS keyboard", "window": window, "pid": pid, "application": str(application)}
 

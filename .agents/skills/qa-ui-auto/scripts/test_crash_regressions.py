@@ -19,9 +19,12 @@ EXPECTED = {
     "TC-WS-038", "TC-WS-039", "TC-WS-045", "TC-WS-051", "TC-WS-052",
     "TC-WS-053", "TC-WS-054", "TC-WS-055", "TC-WS-056", "TC-WS-057",
     "TC-MOBILE-012", "TC-MOBILE-013",
+    "TC-FILE-OPEN-001", "TC-FILE-OPEN-002", "TC-FILE-OPEN-003",
+    "TC-FILE-OPEN-004", "TC-FILE-OPEN-005", "TC-FILE-OPEN-006",
+    "TC-FILE-OPEN-007", "TC-FILE-OPEN-008", "TC-FILE-OPEN-009", "TC-FILE-OPEN-010", "TC-FILE-OPEN-011", "TC-FILE-OPEN-012",
 }
-BROWSER_ONLY = {"TC-WS-055", "TC-IDE-C8-08-code-style-dialog-lifecycle-browser", "TC-MOBILE-012"}
-NATIVE_ONLY = {"TC-WS-051", "TC-WS-054", "TC-WS-056", "TC-MOBILE-013"}
+BROWSER_ONLY = {"TC-WS-055", "TC-IDE-C8-08-code-style-dialog-lifecycle-browser", "TC-MOBILE-012", "TC-FILE-OPEN-001", "TC-FILE-OPEN-004"}
+NATIVE_ONLY = {"TC-WS-051", "TC-WS-054", "TC-WS-056", "TC-MOBILE-013", "TC-FILE-OPEN-002", "TC-FILE-OPEN-007", "TC-FILE-OPEN-009", "TC-FILE-OPEN-011"}
 
 
 class CrashRegressionTests(unittest.TestCase):
@@ -47,6 +50,29 @@ class CrashRegressionTests(unittest.TestCase):
             expected = EXPECTED - (BROWSER_ONLY if entry["mode"] == "native" else NATIVE_ONLY)
             self.assertEqual(set(entry["selected_ids"]), expected)
             self.assertEqual("release" in entry["capabilities"], entry["mode"] == "native")
+
+    def test_single_mode_tag_keeps_every_applicable_crash_without_scheduling_other_mode(self):
+        for mode, excluded in (("browser", NATIVE_ONLY), ("native", BROWSER_ONLY)):
+            with self.subTest(mode=mode):
+                args = argparse.Namespace(scope="selected", head="", base="", platforms="linux,windows,macos",
+                                          modes=mode, case_ids="", features="", tags="crash-regression",
+                                          shards="1", browser_workers=2)
+                plan = make_plan(args)
+                self.assertFalse(plan["gaps"])
+                self.assertEqual(len(plan["entries"]), 3)
+                for entry in plan["entries"]:
+                    self.assertEqual(entry["mode"], mode)
+                    self.assertEqual(set(entry["selected_ids"]), EXPECTED - excluded)
+                self.assertEqual(bool(plan["builds"]), mode == "native")
+
+    def test_literal_case_ids_still_fail_when_the_requested_mode_cannot_execute_them(self):
+        for mode, case_id in (("browser", "TC-FILE-OPEN-007"), ("native", "TC-FILE-OPEN-004")):
+            with self.subTest(mode=mode):
+                args = argparse.Namespace(scope="selected", head="", base="", platforms="linux",
+                                          modes=mode, case_ids=case_id, features="", tags="crash-regression",
+                                          shards="1", browser_workers=2)
+                with self.assertRaisesRegex(ValueError, "explicit cases unavailable"):
+                    make_plan(args)
 
     def test_pr_and_focused_workflow_entries_keep_crash_suite(self):
         workflow = yaml.safe_load((ROOT / ".github/workflows/qa-ui-auto-platforms.yml").read_text())

@@ -20,6 +20,7 @@ import type { TerminalSessionLifetime } from "./sessionContracts";
 import { type TerminalSessionLifecycleContext } from "./sessionContracts";
 import { installTerminalShellProtocols } from "./sessionProtocols";
 import { createTerminalTransfer } from "./sessionTransfer";
+import { installTerminalFileLinks } from "./fileLinks";
 
 export function createTerminalSessionLifecycle(controllerContext: TerminalSessionLifecycleContext): import("react").EffectCallback {
   return () => setupTerminalSession(controllerContext);
@@ -130,6 +131,7 @@ function setupTerminalSession(controllerContext: TerminalSessionLifecycleContext
     })
   );
   term.open(el);
+  const fileLinks = installTerminalFileLinks(term, controllerContext);
   installTerminalComposition({
     term,
     controllerContext,
@@ -340,6 +342,7 @@ function setupTerminalSession(controllerContext: TerminalSessionLifecycleContext
       void sockscapStopLaunchedApp(lifetime.launchedSockscapPid).catch(() => { });
     }
     unregisterQaRendering?.();
+    fileLinks.dispose();
     term.dispose();
     controllerContext.webglAddonRef.current = null;
     controllerContext.termRef.current = null;

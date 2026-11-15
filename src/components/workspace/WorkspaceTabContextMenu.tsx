@@ -3,6 +3,7 @@ import { ChevronFirst, ChevronLast, ChevronLeft, ChevronRight, ClipboardCopy, Co
 import { ContextMenu, type MenuItem } from "../ContextMenu";
 import { promptAppDialog } from "../../lib/appDialogs";
 import { writeText } from "../../lib/clipboard";
+import { guardViewerClose } from "../../lib/openFile/closeGuard";
 import { useT } from "../../lib/i18n";
 import { useAppStore } from "../../stores/appStore";
 import { useSessionStore } from "../../stores/sessionStore";
@@ -27,9 +28,10 @@ export function WorkspaceTabContextMenu({ workspace, tab, x, y, onClose }: Props
     ? Object.values(fileMenus ?? {}).map((menu) => menu(fileRef)).find(Boolean)
     : null;
   const closeTabs = (others: boolean) => {
-    for (const item of workspace.openTabs) {
-      if (item.closable && (!others || item.id !== tab.id)) store.closeWorkspaceTab(workspace.id, item.id);
-    }
+    const closing = workspace.openTabs.filter((item) => item.closable && (!others || item.id !== tab.id));
+    guardViewerClose(closing.flatMap((item) => item.fileViewer ? [item.fileViewer.path] : []), () => {
+      for (const item of closing) store.closeWorkspaceTab(workspace.id, item.id);
+    });
   };
   const rename = async () => {
     const title = await promptAppDialog({ title: t("tabs.rename"), initialValue: tab.title });

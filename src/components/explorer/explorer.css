@@ -38,7 +38,10 @@ html[data-app-theme="dark"] .ex-shell {
 .ex-csep svg.lucide { width:10px; height:10px; }
 .ex-search { width:210px; height:30px; border:1px solid var(--ex-input-b); background:var(--ex-input); border-radius:7px; display:flex; align-items:center; gap:6px; padding:0 8px; color:var(--ex-muted); }
 .ex-search input { flex:1; min-width:0; outline:none; background:transparent; color:var(--ex-text); }
-.ex-cmd { display:flex; align-items:center; gap:2px; padding:2px 10px 5px; border-bottom:1px solid var(--ex-divider); flex-shrink:0; overflow:auto hidden; }
+/* Selection may add file-open actions during a drag. Keep overflow scrolling
+   inside the original 36px toolbar so native scrollbars cannot shift targets. */
+.ex-cmd { display:flex; align-items:center; gap:2px; padding:2px 10px 5px; height:36px; min-height:36px; border-bottom:1px solid var(--ex-divider); flex-shrink:0; overflow:auto hidden; scrollbar-width:none; }
+.ex-cmd::-webkit-scrollbar { display:none; }
 .ex-cbtn { height:28px; padding:0 8px; border-radius:6px; display:inline-flex; align-items:center; gap:5px; font-size:12px!important; flex-shrink:0; }
 .ex-cbtn:hover:not(:disabled) { background:var(--ex-hover); }
 .ex-cbtn.on { background:var(--ex-sel); color:var(--ex-accent); }

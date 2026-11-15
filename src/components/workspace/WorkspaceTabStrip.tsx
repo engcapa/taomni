@@ -18,9 +18,11 @@ import { NOTES_WORKSPACE_ID } from "../../stores/workspaceNotes";
 import { createAndOpenWorkspaceNote } from "../../lib/notes/notesWorkspaceNavigation";
 import { EMPTY_WORKSPACE_TAB_FILTER, filterWorkspaceTabs, hasWorkspaceTabFilter } from "../../lib/workspaceTabFilter";
 import { ExplorerTabIcon } from "../explorer/ExplorerTabIcon";
+import { ViewerDirtyIndicator } from "../viewer/ViewerDirtyIndicator";
 
 const KIND_LABEL: Record<WorkspaceTabKind, string> = {
   file: "FILE",
+  viewer: "VIEW",
   note: "NOTE",
   git: "GIT",
   explorer: "EXPL",
@@ -35,6 +37,7 @@ const KIND_LABEL: Record<WorkspaceTabKind, string> = {
 
 const KIND_COLOR: Record<WorkspaceTabKind, string> = {
   file: "var(--taomni-text-muted)",
+  viewer: "var(--taomni-accent)",
   note: "var(--taomni-accent)",
   git: "var(--taomni-accent)",
   explorer: "var(--taomni-warning, #d97706)",
@@ -192,6 +195,7 @@ export function WorkspaceTabStrip() {
         {KIND_LABEL[tab.kind]}
       </span>}
       <span className="truncate">{tab.title}</span>
+      {tab.fileViewer && <ViewerDirtyIndicator path={tab.fileViewer.path} />}
       {tab.closable && (
         <button
           type="button"

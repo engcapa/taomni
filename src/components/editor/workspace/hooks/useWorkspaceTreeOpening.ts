@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useRef } from "react";
 import { selectCodeWorkspaceUi, useCodeWorkspaceStore, type EditorGroupId } from "../../../../stores/codeWorkspaceStore";
-import type { CodeWorkspaceFileRef } from "../../../../types";
-import { fileKey } from "../codeWorkspaceModel";
+import type { CodeWorkspaceFileRef, CodeWorkspaceRootInfo } from "../../../../types";
+import { classifyFile, openFile as openSharedFile } from "../../../../lib/openFile";
+import { fileOpenWorkspaceId } from "../../../../lib/fileOpenContext";
+import { useAppStore } from "../../../../stores/appStore";
+import { absoluteWorkspacePath, fileKey } from "../codeWorkspaceModel";
 import { type TreeOpenIntent } from "../controller/mutationTypes";
 import { useWorkspaceBufferStore } from "./useWorkspaceBufferStore";
 import { useWorkspaceEditorCommands } from "./useWorkspaceEditorCommands";
@@ -11,6 +14,7 @@ import { useWorkspaceTreeFocusState } from "./useWorkspaceTreeFocusState";
 export interface UseWorkspaceTreeOpeningContext {
   treeFocus: ReturnType<typeof useWorkspaceTreeFocusState>;
   workspaceInstanceId: string;
+  rootsRef?: import("react").RefObject<CodeWorkspaceRootInfo[]>;
   editorCommands: ReturnType<typeof useWorkspaceEditorCommands>;
   buffers: ReturnType<typeof useWorkspaceBufferStore>;
   splitLayoutLeaf: ReturnType<typeof useCodeWorkspaceStore.getState>["splitLayoutLeaf"];
@@ -102,6 +106,21 @@ export function useWorkspaceTreeOpening(context: UseWorkspaceTreeOpeningContext)
     const epoch = treeFocus.treeInteractionEpochRef.current;
     const requestId = ++treeFocus.treeOpenRequestIdRef.current;
     const readScope = readScopeRef.current;
+    const root = ref.kind === "root" ? context.rootsRef?.current.find((item) => item.id === ref.rootId) : undefined;
+    const path = ref.kind === "loose" ? ref.path : root ? absoluteWorkspacePath(root, ref.path) : undefined;
+    if (path && classifyFile(path) !== "source") {
+      // Viewer hosts own their own focus and draft lifecycle. Never leave an
+      // editor-focus intent/split behind when this open changes host kind.
+      treeFocus.pendingTreeOpenIntentRef.current = null;
+      if (pendingFocusFrame.current) window.cancelAnimationFrame(pendingFocusFrame.current.id);
+      pendingFocusFrame.current = null;
+      try {
+        await openSharedFile({ path }, { context: "workspace-tree", workspaceId: fileOpenWorkspaceId(workspaceInstanceId) });
+      } catch (error) {
+        useAppStore.getState().setStatusMessage(error instanceof Error ? error.message : String(error));
+      }
+      return;
+    }
 
     const currentUi = selectCodeWorkspaceUi(useCodeWorkspaceStore.getState(), workspaceInstanceId);
     let targetGroupId = options.targetGroupId ?? currentUi.activeEditorGroupId;
@@ -143,6 +162,6 @@ export function useWorkspaceTreeOpening(context: UseWorkspaceTreeOpeningContext)
 
     intent.canonicalFileKey = result.canonicalFileKey;
     tryGrantTreeFocus(intent, result.canonicalFileKey);
-  }, [buffers.flushPendingEditorText, openFile, splitLayoutLeaf, tryGrantTreeFocus, workspaceInstanceId]);
+  }, [buffers.flushPendingEditorText, context.rootsRef, openFile, splitLayoutLeaf, tryGrantTreeFocus, workspaceInstanceId]);
   return { requestTreeOpen };
 }

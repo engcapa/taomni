@@ -3,6 +3,9 @@ import { act, fireEvent, screen, waitFor, within } from "@testing-library/react"
 import { describe, expect, it } from "vitest";
 import { useSftpStore } from "../../stores/sftpStore";
 import { getExplorerPreferences, setExplorerPreferences } from "./explorerPreferences";
+// @ts-expect-error node builtin is test-only; production compiler uses DOM globals
+import { readFileSync } from "node:fs";
+const explorerStyles = readFileSync("src/components/explorer/explorer.css", "utf8") as string;
 
 installShellHarness();
 
@@ -50,6 +53,31 @@ describe("Explorer shared FilePanel selection", () => {
     expect(selection()).toEqual(["/fixture/gamma.csv", "/fixture/alpha.txt"]);
     pointer(window, "pointercancel", { clientX: 150, clientY: 45 });
     expect(list.querySelector(".ex-rubber")).toBeNull();
+  });
+
+  it("retains the toolbar height and scroll access when selection adds file-open actions", async () => {
+    const { root } = await mountShell();
+    // jsdom establishes the style/selection contract, not native geometry. The
+    // retained TC-EXPLORER-003 drag measures this box in each hosted WebView.
+    const style = document.createElement("style");
+    style.textContent = explorerStyles.match(/\.ex-cmd \{[^}]+\}/)?.[0] ?? "";
+    document.head.append(style);
+    try {
+      const toolbar = within(root).getByTestId("explorer-command-bar");
+      const height = () => getComputedStyle(toolbar).height;
+      expect(height()).toBe("36px");
+      expect(getComputedStyle(toolbar).minHeight).toBe("36px");
+      expect(getComputedStyle(toolbar).overflow).toBe("auto hidden");
+      expect(getComputedStyle(toolbar).scrollbarWidth).toBe("none");
+      expect(explorerStyles).toContain(".ex-cmd::-webkit-scrollbar { display:none; }");
+      expect(screen.queryByTestId("explorer-cmd-open")).toBeNull();
+      fireEvent.click(row("alpha.txt"));
+      expect(screen.getByTestId("explorer-cmd-open")).toBeEnabled();
+      expect(height()).toBe("36px");
+      fireEvent.click(row("folder"));
+      expect(screen.queryByTestId("explorer-cmd-open")).toBeNull();
+      expect(height()).toBe("36px");
+    } finally { style.remove(); }
   });
 
   it("does not operate on filtered-out selection from toolbar or shell shortcuts", async () => {
