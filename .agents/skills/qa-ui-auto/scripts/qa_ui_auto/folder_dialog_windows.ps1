@@ -197,14 +197,22 @@ public static class QaFolderDialog {
         // Edit text but leaves IFileDialog's internal selection unchanged.
         UIntPtr selectResult;
         SendControlMessage(edit, 0x00B1, UIntPtr.Zero, new IntPtr(-1), 2, 1000, out selectResult);
-        var inputs = new List<Input> { Key(0x08), Key(0x08, 0, 2) };
-        foreach (char character in path) {
-            inputs.Add(Key(0, character, 4));
-            inputs.Add(Key(0, character, 6));
+        var clear = new Input[] { Key(0x08), Key(0x08, 0, 2) };
+        if (SendInput(2, clear, Marshal.SizeOf(typeof(Input))) != 2) {
+            throw new InvalidOperationException("Native chooser could not clear the filename");
         }
-        var values = inputs.ToArray();
-        if (SendInput((uint)values.Length, values, Marshal.SizeOf(typeof(Input))) != values.Length) {
-            throw new InvalidOperationException("Native chooser keyboard input was not delivered completely");
+        Thread.Sleep(50);
+        foreach (char character in path) {
+            if (GetForegroundWindow() != dialog) {
+                throw new InvalidOperationException("Owned chooser lost foreground during path input");
+            }
+            var values = new Input[] { Key(0, character, 4), Key(0, character, 6) };
+            if (SendInput(2, values, Marshal.SizeOf(typeof(Input))) != 2) {
+                throw new InvalidOperationException("Native chooser keyboard input was not delivered completely");
+            }
+            // Let the shell's filename autocomplete process each character.
+            // A single unpaced array can lose characters in long owned paths.
+            Thread.Sleep(5);
         }
         var deadline = DateTime.UtcNow.AddSeconds(5);
         while (EditText(edit) != path && DateTime.UtcNow < deadline) Thread.Sleep(50);

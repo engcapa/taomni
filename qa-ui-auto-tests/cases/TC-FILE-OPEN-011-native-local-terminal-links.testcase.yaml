@@ -38,7 +38,7 @@ steps:
     timeout_sec: 20
 - terminal_input:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
-    text: echo ./notes.txt
+    text: echo ./notes"."txt
     submit: true
 - assert_pattern:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'

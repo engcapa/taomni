@@ -24,12 +24,12 @@ steps:
 - click: '[data-testid="notes-open-workspace"]'
 - click: '[data-testid="notes-workspace-new"]'
 - fill:
-    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-title"]'
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-title"][value=""]:enabled'
     value: Hidden by filters
 - click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-save"]'
 - click: '[data-testid="notes-workspace-new"]'
 - fill:
-    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-title"]'
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-title"][value=""]:enabled'
     value: Active filtered note
 - click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-save"]'
 - click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-properties"]

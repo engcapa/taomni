@@ -39,3 +39,46 @@ TC-005 的脱敏状态日志为 `request_prepared → response-complete → fixt
 4. Word 客户端实际放大视觉、macOS 真实菜单/OS 输入、未贯通的工作流/安全/语音等 AC 仍需各自证据；DOCX XML/像素 oracle 与 WKWebView bridge 不替代这些边界。
 
 所有运行产物在 gitignored 的 `qa-ui-auto-report/`，此文记录可定位的本地证据，不承诺它们已上传。
+
+## 07:49 Windows 扩展回归与测试基础修复
+
+产品源码与上述 QA release 相同。完整 browser 选择（crash-regression 加受影响用例）在
+`qa-ui-auto-report/_local/browser-complete-1116/run-20261116-070140-264120000`
+得到 **27 passed / 0 failed / 1 skipped**；跳过项为当时缺 SSH 的 TC-FILE-OPEN-008。
+修正原生异步完成时序与选择器后，browser focused
+`qa-ui-auto-report/_local/browser-focused-1116/run-20261116-072512-603632300`
+为 **3/3 passed**（FILE013、NOTES008/014）。
+
+完整 native 选择首次遭遇 Windows 超长 mail cache 路径清理失败，造成后续 setup 连锁失败。
+修复已验证的 QA 根路径使用 Win32 verbatim namespace，保留根边界及 symlink 拒绝。
+较短报告路径的运行 `C:/tmp/tqa-1116/run-20261116-070836-744380800` 为
+**21 passed / 5 failed / 1 skipped**；5 个失败均保留。后续针对修正结果如下：
+
+| 具名用例 | 最后补测结果与报告 |
+|---|---|
+| FILE011、MOBILE013、NOTES014 | `C:/tmp/tqa-focus-1116/run-20261116-072509-889414900` 三项 passed；同报告 FILE007/013 仍失败，不能整份计通过 |
+| FILE013 | `C:/tmp/tqa-md2-1116/run-20261116-073342-846127400` passed；同报告 FILE007 的旧 OLE 写剪贴板失败保留 |
+| FILE007 | `C:/tmp/tqa-exp3-1116/run-20261116-074528-226249800` **1/1 passed**：真实 CF_DIB 粘贴、系统 Save/Cancel、HTML/PNG/DOCX/Markdown 产物以及源文件不变 |
+| FILE008 browser | SSH 恢复后 `C:/tmp/tqa-ssh-browser-1116/run-20261116-074528-523561000` **1/1 passed** |
+| FILE008 native | SSH 恢复后 `C:/tmp/tqa-ssh-native-1116/run-20261116-074708-980977500` **1/1 passed**：实际 AI 路径点击、Git 预览、POSIX SSH/SFTP 文件与终端链接边界 |
+
+以上报告均 `source stable: True`。它们建立具名补测证据；期间 runner/YAML 输入有修正，
+不能据此声称最后版本的一次完整 crash suite 全绿，最后输入的整批验证仍需执行。
+
+修正未降低产物要求：先独立校验 OS 粘贴的几何/颜色覆盖，再要求每种导出精确保留
+该已保存 PNG 的像素；DOCX 仍需真正的 drawing extent/media 和清晰度断言。
+换行链接使用实际 client rect 命中同一元素，不绕过遮挡；长保存路径用逐字符 OS 输入，
+仍独立读回完整字段。Windows OLE 写入反复失败后改用 Win32 CF_DIB/Unicode，真实图片
+往返和原有文本恢复已独立验证。未修改个人应用进程/配置；临时 SSH 密码只在脚本内读取，
+不写入命令、报告或提交。
+
+本批 Python 单元 **55 run / 54 passed / 1 skipped**；唯一跳过为当前 Windows 账号没有
+symlink 权限的 POSIX 根边界测试。跨平台原生 pointer 全模块另有同类 symlink 权限错误，
+不作为全模块通过。`pnpm check:refactor` 用 Node 22.23.5/pnpm 10.30.1 通过。
+
+Hosted run [43772442032](https://github.com/engcapa/taomni/actions/runs/43772442032)
+已完成 browser：Linux 27 pass/1 fail，macOS 27 pass/2 fail（raw summaries，不按 job 颜色统计）。
+失败为旧 workspace 选择器和 NOTES008 布局测量时序，当前已修正并经 Windows 补测；
+Linux native producer 被过期的 crash selection 单测阻断，预期集合已修复。
+macOS native release producer 已成功，四个 native shard 正在执行。
+这些跨平台失败仍需新提交后的 hosted 回执关闭。

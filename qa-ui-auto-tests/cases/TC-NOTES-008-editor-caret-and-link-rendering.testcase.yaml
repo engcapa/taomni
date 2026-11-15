@@ -125,6 +125,7 @@ steps:
 - eval_readonly:
     expression: document.querySelector(".cm-focused .cm-selectionBackground:last-child").getBoundingClientRect().width > 40
     expect_truthy: true
+    timeout_sec: 5
 - screenshot: notes-008-selection-light-forward.png
 - press:
     key: Mod+End
@@ -165,6 +166,7 @@ steps:
 - eval_readonly:
     expression: document.querySelector(".cm-focused .cm-selectionBackground:last-child").getBoundingClientRect().width > 40
     expect_truthy: true
+    timeout_sec: 5
 - screenshot: notes-008-selection-dark-forward.png
 - press: ArrowRight
 - press:

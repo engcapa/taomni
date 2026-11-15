@@ -139,7 +139,7 @@ def set_text(text: str) -> None:
         if not text:
             clear()
             return
-        _ps("[System.Windows.Forms.Clipboard]::SetText($arg)", text)
+        _windows_write("$bytes=[Text.Encoding]::Unicode.GetBytes($arg+[char]0);", text, 13)
     elif SYSTEM == "Darwin":
         _run(["pbcopy"], input_bytes=text.encode("utf-8"), env={"LANG": "en_US.UTF-8"})
     elif _wayland_text():
@@ -186,11 +186,15 @@ _WIN32_CLIPBOARD = r"""
 Add-Type -Namespace QaClip -Name Native -MemberDefinition @'
 [DllImport("user32.dll", SetLastError = true)] public static extern bool OpenClipboard(IntPtr owner);
 [DllImport("user32.dll")] public static extern bool CloseClipboard();
+[DllImport("user32.dll", SetLastError = true)] public static extern bool EmptyClipboard();
+[DllImport("user32.dll", SetLastError = true)] public static extern IntPtr SetClipboardData(uint format, IntPtr data);
 [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern uint RegisterClipboardFormat(string name);
 [DllImport("user32.dll")] public static extern IntPtr GetClipboardData(uint format);
 [DllImport("kernel32.dll")] public static extern IntPtr GlobalLock(IntPtr handle);
 [DllImport("kernel32.dll")] public static extern bool GlobalUnlock(IntPtr handle);
 [DllImport("kernel32.dll")] public static extern UIntPtr GlobalSize(IntPtr handle);
+[DllImport("kernel32.dll")] public static extern IntPtr GlobalAlloc(uint flags, UIntPtr bytes);
+[DllImport("kernel32.dll")] public static extern IntPtr GlobalFree(IntPtr handle);
 '@
 """
 
@@ -226,11 +230,40 @@ def get_html() -> str:
     return _xclip_get("text/html").decode("utf-8", "replace")
 
 
+def _windows_write(prepare: str, arg: str, clipboard_format: int) -> None:
+    """Persist owned native memory; no OLE clipboard owner survives the helper."""
+    _ps(_WIN32_CLIPBOARD + prepare +
+        "$owner=New-Object System.Windows.Forms.Form;"
+        "$memory=[IntPtr]::Zero; $open=$false;"
+        "try { $memory=[QaClip.Native]::GlobalAlloc(2,[UIntPtr]::new([UInt64]$bytes.Length));"
+        "if ($memory -eq [IntPtr]::Zero) { throw 'clipboard allocation failed' };"
+        "$ptr=[QaClip.Native]::GlobalLock($memory);"
+        "if ($ptr -eq [IntPtr]::Zero) { throw 'clipboard memory lock failed' };"
+        "try { [Runtime.InteropServices.Marshal]::Copy($bytes,0,$ptr,$bytes.Length) }"
+        "finally { [void][QaClip.Native]::GlobalUnlock($memory) };"
+        "for ($i=0; $i -lt 40 -and -not $open; $i++) {"
+        "$open=[QaClip.Native]::OpenClipboard($owner.Handle);"
+        "if (-not $open) { Start-Sleep -Milliseconds 50 } };"
+        "if (-not $open) { throw 'OS clipboard is busy' };"
+        "if (-not [QaClip.Native]::EmptyClipboard()) { throw 'OS clipboard clear failed' };"
+        f"if ([QaClip.Native]::SetClipboardData({clipboard_format},$memory) -eq [IntPtr]::Zero) {{"
+        "throw 'OS clipboard write failed' }; $memory=[IntPtr]::Zero"
+        "} finally { if ($open) { [void][QaClip.Native]::CloseClipboard() };"
+        "if ($memory -ne [IntPtr]::Zero) { [void][QaClip.Native]::GlobalFree($memory) };"
+        "$owner.Dispose() }", arg)
+
+
 def set_image(png: Path) -> None:
     png = Path(png).resolve()
     if SYSTEM == "Windows":
-        _ps("$img=[System.Drawing.Image]::FromFile($arg);"
-            "[System.Windows.Forms.Clipboard]::SetImage($img)", str(png))
+        # OLE SetImage/Flush can fail on an available interactive clipboard.
+        # Publish a standard CF_DIB via Win32 instead, retaining real OS paste.
+        _windows_write("$img=[System.Drawing.Image]::FromFile($arg);"
+            "$stream=New-Object System.IO.MemoryStream;"
+            "try { $img.Save($stream,[System.Drawing.Imaging.ImageFormat]::Bmp);"
+            "$bmp=$stream.ToArray(); $bytes=New-Object byte[] ($bmp.Length-14);"
+            "[Buffer]::BlockCopy($bmp,14,$bytes,0,$bytes.Length) }"
+            "finally { $stream.Dispose(); $img.Dispose() };", str(png), 8)
     elif SYSTEM == "Darwin":
         _jxa(_JXA_PRELUDE + "var img = $.NSImage.alloc.initWithContentsOfFile($(arg));"
              "pb.clearContents; pb.writeObjects($([img])) ? 'ok' : (function(){throw new Error('writeObjects failed')})()",

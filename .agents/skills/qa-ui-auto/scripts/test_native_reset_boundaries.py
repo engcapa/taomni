@@ -13,6 +13,27 @@ from qa_ui_auto.fixtures import reset_db
 
 
 class NativeResetBoundariesTest(unittest.TestCase):
+    @unittest.skipUnless(os.name == "nt", "Win32 long-path cleanup regression")
+    def test_windows_reset_removes_real_long_mail_cache_paths(self):
+        with tempfile.TemporaryDirectory() as directory:
+            run = Path(directory) / "run"
+            env = native.native_isolation_env(run)
+            profile = Path(env["NEWMOB_DATA_DIR"]) / QA_APP_ID
+            long_file = profile / "mail-cache" / ("account-" + "a" * 70) / "objects" / "35" / ("b" * 64 + ".eml.gz")
+            while len(str(long_file)) < 300:
+                long_file = long_file.parent / ("nested-" + "n" * 25) / long_file.name
+            extended = Path("\\\\?\\" + str(long_file.absolute()))
+            extended.parent.mkdir(parents=True)
+            extended.write_bytes(b"isolated QA mail fixture")
+            self.assertTrue(extended.is_file())
+            unrelated = run / "preserved.txt"
+            unrelated.write_text("outside the QA profile", encoding="utf-8")
+            with patch.dict(os.environ, env):
+                reset_db._reset_native(SimpleNamespace(report_root=run))
+            self.assertFalse(extended.exists())
+            self.assertFalse(profile.exists())
+            self.assertEqual(unrelated.read_text(encoding="utf-8"), "outside the QA profile")
+
     def test_renderer_reset_removes_workspace_and_ide_state_but_retains_unrelated_keys(self):
         session = Mock()
         session.execute.side_effect = [True, True]
@@ -107,7 +128,12 @@ class NativeResetBoundariesTest(unittest.TestCase):
             personal = root / "personal"
             personal.mkdir()
             (personal / "proxy.json").write_text("personal proxy")
-            (config_home / "taomni").symlink_to(personal, target_is_directory=True)
+            try:
+                (config_home / "taomni").symlink_to(personal, target_is_directory=True)
+            except OSError as error:
+                if os.name == "nt" and getattr(error, "winerror", None) == 1314:
+                    self.skipTest("Windows account has no symlink privilege; POSIX CI checks this boundary")
+                raise
             profile = Path(env["XDG_DATA_HOME"]) / QA_APP_ID
             profile.mkdir(parents=True)
             (profile / "taomni.db").touch()

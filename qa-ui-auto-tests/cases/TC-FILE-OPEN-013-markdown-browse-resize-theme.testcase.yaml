@@ -154,7 +154,7 @@ steps:
     name: aria-checked
     equals: 'true'
 - press:
-    selector: '[data-testid="viewer-editor"] .cm-content'
+    selector: '[data-testid="markdown-live"]'
     key: x
 - assert_attribute:
     selector: '[data-testid="file-viewer"]'
@@ -232,7 +232,7 @@ steps:
     expression: document.querySelector('.fv-md-export-settings input').checked === false
     expect_truthy: true
 - press:
-    selector: '[data-testid="markdown-export-settings"]'
+    selector: '[data-testid="markdown-export-toc"]'
     key: Escape
 - assert_count:
     selector: '[data-testid="markdown-export-settings"]'
@@ -243,7 +243,7 @@ steps:
     expression: document.querySelector('.fv-md-export-settings input').checked === false
     expect_truthy: true
 - press:
-    selector: '[data-testid="markdown-export-settings"]'
+    selector: '[data-testid="markdown-export-toc"]'
     key: Escape
 - assert_file_open_bytes:
     path: ${fixture.file_open_root}/live.md
@@ -266,10 +266,7 @@ steps:
       ```
 - click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
 - dblclick: '[data-testid="explorer-file-row"][data-name="live.md"]'
-- assert_attribute:
-    selector: '[data-testid="markdown-editor"]'
-    name: data-editing
-    equals: 'false'
+- wait_for: '[data-testid="markdown-editor"][data-editing="false"]'
 - click: '[data-testid="markdown-mode-split"]'
 - assert_attribute:
     selector: '[data-testid="markdown-preview"] .fv-md-task-state'

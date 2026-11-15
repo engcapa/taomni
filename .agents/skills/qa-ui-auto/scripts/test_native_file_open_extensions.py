@@ -182,8 +182,14 @@ class MarkdownNativeArtifactsTests(unittest.TestCase):
         from PIL import Image, ImageDraw
         diagram_png=io.BytesIO();diagram=Image.new('RGB',(480,100),'white');drawing=ImageDraw.Draw(diagram)
         drawing.rectangle((10,10,120,80),fill=(219,234,254));drawing.rectangle((160,10,280,80),fill=(220,252,231));drawing.rectangle((320,10,470,80),fill=(254,243,199));diagram.save(diagram_png,format='PNG')
+        from qa_ui_auto.markdown_docx_quality import NS
+        namespaces = ' '.join(f'xmlns:{key}="{uri}"' for key, uri in NS.items())
+        document = f'''<w:document {namespaces}><w:body><w:p><w:r><w:t>File open Markdown Rendered bold</w:t></w:r></w:p>
+          <w:p><w:r><w:drawing><wp:inline><wp:extent cx="1371600" cy="285750"/><wp:docPr title="Diagram"/>
+          <a:graphic><a:blip r:embed="diagram"/></a:graphic></wp:inline></w:drawing></w:r></w:p></w:body></w:document>'''
         with zipfile.ZipFile(docx,'w') as archive:
-            archive.writestr('word/document.xml','<document>File open Markdown Rendered bold</document>')
+            archive.writestr('word/document.xml', document)
+            archive.writestr('word/_rels/document.xml.rels', '<Relationships><Relationship Id="diagram" Target="media/diagram.png"/></Relationships>')
             archive.writestr('word/media/one.png',self.clipboard.read_bytes());archive.writestr('word/media/two.png',self.clipboard.read_bytes());archive.writestr('word/media/diagram.png',diagram_png.getvalue())
         artifacts.check_artifact('docx',docx,self.source,self.manifest)
         directory=self.exports/'live';(directory/'assets').mkdir(parents=True)
@@ -192,6 +198,51 @@ class MarkdownNativeArtifactsTests(unittest.TestCase):
         artifacts.check_artifact('markdown',directory,self.source,self.manifest)
         (directory/'assets/b.png').unlink()
         with self.assertRaises(StepError):artifacts.check_artifact('markdown',directory,self.source,self.manifest)
+
+    def test_exports_preserve_the_verified_native_paste_after_clipboard_normalization(self):
+        from PIL import Image
+
+        asset = self.source.parent / 'assets/image-normalized.png'
+        with Image.open(self.clipboard) as original:
+            normalized = original.convert('RGBA')
+            normalized.putpixel((0, 0), (0, 0, 0, 255))
+            normalized.save(asset)
+        with self.source.open('a', encoding='utf-8') as stream:
+            stream.write('\n![image](assets/image-normalized.png)\n')
+        artifacts.check_artifact('pasted-image', self.source, self.source, self.manifest)
+        actual = artifacts.png_info(asset.read_bytes())
+        self.assertEqual(self.manifest['pastedPixels'], actual)
+        self.assertNotEqual(actual, artifacts.png_info(self.clipboard.read_bytes()))
+        self.manifest['diagramLabels'] = []
+
+        encoded = base64.b64encode(asset.read_bytes()).decode()
+        html = self.exports / 'normalized.html'
+        content = '<h1>File open Markdown</h1><strong>Rendered bold</strong><span class="katex">x^2</span>'
+        html.write_text(content + f'<img src="data:image/png;base64,{encoded}">' * 2, encoding='utf-8')
+        artifacts.check_artifact('html', html, self.source, self.manifest)
+
+        docx = self.exports / 'normalized.docx'
+        with zipfile.ZipFile(docx, 'w') as archive:
+            archive.writestr('word/document.xml', '<document>File open Markdown Rendered bold</document>')
+            archive.writestr('word/media/original.png', (self.source.parent / 'assets/pixel.png').read_bytes())
+            archive.writestr('word/media/pasted.png', asset.read_bytes())
+        artifacts.check_artifact('docx', docx, self.source, self.manifest)
+
+        directory = self.exports / 'bundle'
+        (directory / 'assets').mkdir(parents=True)
+        (directory / self.source.name).write_bytes(self.source.read_bytes())
+        for item in ('pixel.png', asset.name):
+            (directory / 'assets' / item).write_bytes((self.source.parent / 'assets' / item).read_bytes())
+        artifacts.check_artifact('markdown', directory, self.source, self.manifest)
+
+        # Replacing the saved paste with a different PNG must still fail.
+        wrong = base64.b64encode(self.clipboard.read_bytes()).decode()
+        html.write_text(content + f'<img src="data:image/png;base64,{wrong}">' * 2, encoding='utf-8')
+        with self.assertRaisesRegex(StepError, 'pasted image pixels'):
+            artifacts.check_artifact('html', html, self.source, self.manifest)
+        (directory / 'assets' / asset.name).write_bytes(self.clipboard.read_bytes())
+        with self.assertRaisesRegex(StepError, 'pasted image pixels'):
+            artifacts.check_artifact('markdown', directory, self.source, self.manifest)
 
     def test_html_export_accepts_mermaid_v11_split_tspan_labels(self):
         image = base64.b64encode(self.clipboard.read_bytes()).decode()

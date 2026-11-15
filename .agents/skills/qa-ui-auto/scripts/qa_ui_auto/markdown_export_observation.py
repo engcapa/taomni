@@ -105,6 +105,10 @@ def check_artifact(kind, path, source, manifest):
                     raise StepError("Pasted native PNG contains too many unexpected pixels")
         manifest["savedSourceSha256"] = source_sha
         manifest["pastedPath"] = str(asset)
+        # Snapshot the independently verified OS paste result. Native clipboard
+        # conversion may normalize edge pixels; exports must preserve the saved
+        # asset exactly rather than repeat that clipboard normalization check.
+        manifest["pastedPixels"] = actual
         return {"pasted": str(asset), "pixels": actual, "sourceSha256": source_sha}
     data = b"" if kind == "markdown" else path.read_bytes()
     result = {"path": str(path), "size": len(data), "sha256": hashlib.sha256(data).hexdigest(), "sourceSha256": source_sha}
@@ -119,7 +123,7 @@ def check_artifact(kind, path, source, manifest):
             raise StepError("HTML export lost KaTeX-rendered math")
         images = re.findall(r'data:image/png;base64,([A-Za-z0-9+/=]+)', html)
         pixels = [png_info(base64.b64decode(encoded)) for encoded in images]
-        expected = png_info(Path(manifest["clipboardPng"]).read_bytes())
+        expected = manifest.get("pastedPixels") or png_info(Path(manifest["clipboardPng"]).read_bytes())
         if len(images) < 2 or expected not in pixels:
             raise StepError("HTML is not self-contained or lost pasted image pixels")
         if re.search(r'<img[^>]+src=["\'](?!data:)', html, re.I):
@@ -157,7 +161,7 @@ def check_artifact(kind, path, source, manifest):
             if "File open Markdown" not in strings or "Rendered bold" not in strings:
                 raise StepError("DOCX lost heading/body content")
             media = [name for name in archive.namelist() if name.startswith("word/media/") and name.endswith(".png")]
-            expected = png_info(Path(manifest["clipboardPng"]).read_bytes())
+            expected = manifest.get("pastedPixels") or png_info(Path(manifest["clipboardPng"]).read_bytes())
             images = [png_info(archive.read(name)) for name in media]
             if len(images) < 2 or expected not in images:
                 raise StepError("DOCX did not embed original and pasted image pixels")
@@ -184,7 +188,7 @@ def check_artifact(kind, path, source, manifest):
             if not asset.is_relative_to(directory) or not asset.is_file():
                 raise StepError("Bundled Markdown image does not resolve inside export")
             pixels.append(png_info(asset.read_bytes()))
-        expected = png_info(Path(manifest["clipboardPng"]).read_bytes())
+        expected = manifest.get("pastedPixels") or png_info(Path(manifest["clipboardPng"]).read_bytes())
         if expected not in pixels:
             raise StepError("Markdown folder export lost pasted image pixels")
         result.update(path=str(directory), images=images)

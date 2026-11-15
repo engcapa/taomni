@@ -131,7 +131,17 @@ const probe = r => {
     outside: right <= left || bottom <= top};
 };
 const original = probe(r);
-if (original.ready || !el.closest('dialog:modal')) return original;
+if (original.ready) return original;
+// Inline links can wrap across lines. Their union's center may hit the line
+// gap; use an actual fragment while retaining the same element hit test.
+const fragments = Array.from(el.getClientRects?.() || []);
+if (fragments.length > 1) {
+  for (const fragment of fragments) {
+    const point = probe(fragment);
+    if (point.ready) return point;
+  }
+}
+if (!el.closest('dialog:modal')) return original;
 // WKWebView can report a top-layer dialog's rect divided by an ancestor's
 // CSS zoom, while elementFromPoint uses viewport coordinates. Correct only
 // that geometry and still require the original element to pass the hit test.
