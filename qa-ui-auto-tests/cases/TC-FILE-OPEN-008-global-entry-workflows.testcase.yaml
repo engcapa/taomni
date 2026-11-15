@@ -164,81 +164,81 @@ verification:
     - 10
     - 12
     - 16
-    - 17
     - 18
-    - 20
-    - 22
+    - 19
+    - 21
     - 23
+    - 24
     checkpoints:
     - step: 14
       expectation: AI chip opened actual file text, not a shell/query snippet.
     - step: 15
       expectation: Activating the non-chat-capable file viewer hides the tab-bound conversation automatically; no hidden Hide button is clicked.
-    - step: 25
-      expectation: Git preview opens the same real worktree bytes.
     - step: 26
+      expectation: Git preview opens the same real worktree bytes.
+    - step: 27
       expectation: Git creates exactly one viewer in workspace scope; it does not replace the independent main host.
     results:
     - 14
     - 15
-    - 25
     - 26
+    - 27
   - id: R2
     requirement: Actual modifier-click on SSH terminal file path gives download-first guidance and never opens the local filesystem
       copy.
     actions:
-    - 28
     - 29
-    - 31
+    - 30
     - 32
-    - 34
-    - 36
+    - 33
+    - 35
     - 37
     - 38
-    - 40
+    - 39
+    - 41
     checkpoints:
-    - step: 35
+    - step: 36
       expectation: Shell independently printed the exact fixture remote path.
-    - step: 41
-      expectation: Modifier-click refuses local interpretation and offers SFTP guidance.
     - step: 42
-      expectation: The remote terminal remains usable and visible.
+      expectation: Modifier-click refuses local interpretation and offers SFTP guidance.
     - step: 43
+      expectation: The remote terminal remains usable and visible.
+    - step: 44
       expectation: SSH path click did not create another local viewer.
     results:
-    - 35
-    - 41
+    - 36
     - 42
     - 43
+    - 44
   - id: R3
     requirement: Actual SFTP open downloads to a controlled read-only temp, shows exact remote bytes and cleans it after final close.
     actions:
-    - 44
     - 45
     - 46
-    - 48
-    - 52
-    - 58
+    - 47
+    - 49
+    - 53
+    - 59
     checkpoints:
-    - step: 54
-      expectation: Viewer labels a read-only copy.
     - step: 55
-      expectation: Remote copy cannot save in place.
+      expectation: Viewer labels a read-only copy.
     - step: 56
-      expectation: Editor content matches actual remote fixture.
+      expectation: Remote copy cannot save in place.
     - step: 57
+      expectation: Editor content matches actual remote fixture.
+    - step: 58
       expectation: Independent VFS/native temp bytes match the SFTP payload.
-    - step: 60
-      expectation: Final host close removes exactly the observed controlled copy.
     - step: 61
+      expectation: Final host close removes exactly the observed controlled copy.
+    - step: 62
       expectation: Global entry lifecycle has no uncaught runtime error.
     results:
-    - 54
     - 55
     - 56
     - 57
-    - 60
+    - 58
     - 61
+    - 62
   visual:
   - check: AI chip/Git preview/SFTP readonly views
     method: manual
