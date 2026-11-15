@@ -98,7 +98,7 @@
 
 - 版本唯一入口是根 `package.json`（0.5.9）；`src-tauri/Cargo.toml` 的 0.3.0 只是 crate 元数据，不是发版号。
 - `src-tauri/tauri.conf.json` 是 `bundle targets: all`、`createUpdaterArtifacts: true`；更新只认 GitHub Release 里唯一的 `latest.json`，由 `scripts/compose-updater-manifest.mjs` 汇总（见 `claudedocs/auto-update-plan.md`）。
-- 发布是 `.github/workflows/release.yml`（tag `v*` 触发，Linux / Windows 矩阵 + macOS 双架构），产物是整包，没有“模块包”的概念，也没有模块清单。
+- 发布仍由 `.github/workflows/release.yml`（tag `v*` 触发，Linux / Windows 矩阵 + macOS 双架构）负责核心整包；本分支已增加可选的插件 artifact 收集、分离签名上传和 `modules.json` 最后发布步骤，尚未接入具体插件构建矩阵。
 
 ### 1.2 一个 Rust 入口、一个全局状态
 
