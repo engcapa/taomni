@@ -38,18 +38,18 @@ steps:
 - click: '[data-testid="code-workspace-tree-dir"][data-path="src"] [data-testid="code-workspace-tree-dir-arrow"]'
 - wait_for: '[data-testid="code-workspace-tree-file"][data-path="src/index.ts"]'
 - dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
-- wait_for: '[data-testid="workspace-file-editor"][data-path="README.md"] .cm-content'
+- wait_for: '[data-testid="file-viewer"][data-path$="README.md"] [data-testid="markdown-live-content"]'
 - press:
-    selector: '[data-testid="workspace-file-editor"][data-path="README.md"] .cm-content'
+    selector: '[data-testid="file-viewer"][data-path$="README.md"] [data-testid="markdown-live-content"]'
     key: Mod+End
 - type:
-    selector: '[data-testid="workspace-file-editor"][data-path="README.md"] .cm-content'
+    selector: '[data-testid="file-viewer"][data-path$="README.md"] [data-testid="markdown-live-content"]'
     text: '
 
       QA_RESTORED_UNSAVED_DRAFT'
-- wait_for: '[data-testid="workspace-file-editor"][data-path="README.md"][data-dirty="true"]'
+- wait_for: '[data-testid="file-viewer"][data-path$="README.md"][data-dirty="true"]'
 - assert_attribute:
-    selector: '[data-testid="workspace-file-editor"][data-path="README.md"]'
+    selector: '[data-testid="file-viewer"][data-path$="README.md"]'
     name: data-dirty
     equals: 'true'
 - click: '[data-testid="workspace-open-session-plus"]'
@@ -163,13 +163,13 @@ steps:
     selector: '[data-testid="workspace-tab"][data-active="true"]'
     name: data-tab-title
     equals: README.md
-- wait_for: '[data-testid="workspace-file-editor"][data-path="README.md"][data-dirty="true"]'
+- wait_for: '[data-testid="file-viewer"][data-path$="README.md"][data-dirty="true"]'
 - assert_attribute:
-    selector: '[data-testid="workspace-file-editor"][data-path="README.md"]'
+    selector: '[data-testid="file-viewer"][data-path$="README.md"]'
     name: data-dirty
     equals: 'true'
 - assert_text:
-    selector: '[data-testid="workspace-file-editor"][data-path="README.md"] .cm-content'
+    selector: '[data-testid="file-viewer"][data-path$="README.md"] [data-testid="markdown-live-content"]'
     contains: QA_RESTORED_UNSAVED_DRAFT
 - assert_file_sha256:
     path: ${fixture.platform_workspace_root}/README.md
@@ -222,19 +222,19 @@ steps:
     text: 'EXTERNAL_RESTORE_CONFLICT
 
       '
-- wait_for: '[data-testid="external-file-conflict-dialog"]'
-- click: '[data-testid="external-file-conflict-dialog"] button[aria-label="Dismiss external file conflict"]'
-- assert_not_visible: '[data-testid="external-file-conflict-dialog"]'
-- click: '[data-testid="workspace-editor-save"]'
+- wait_for: '[data-testid="viewer-conflict"]'
+- click: '[data-testid="viewer-save"]'
+- wait_for: '[data-testid="viewer-operation-error"]'
+- assert_visible: '[data-testid="viewer-conflict"]'
 - assert_text:
-    selector: '[data-testid="status-bar"]'
-    contains: changed
+    selector: '[data-testid="viewer-operation-error"]'
+    contains: conflict
 - assert_file_contains:
     path: ${fixture.platform_workspace_root}/README.md
     contains: EXTERNAL_RESTORE_CONFLICT
-- wait_for: '[data-testid="workspace-file-editor"][data-path="README.md"][data-dirty="true"]'
+- wait_for: '[data-testid="file-viewer"][data-path$="README.md"][data-dirty="true"]'
 - assert_attribute:
-    selector: '[data-testid="workspace-file-editor"][data-path="README.md"]'
+    selector: '[data-testid="file-viewer"][data-path$="README.md"]'
     name: data-dirty
     equals: 'true'
 - native_restart_app: null
@@ -258,13 +258,13 @@ steps:
     - Restored shell
     - README.md
     - qa-restore-ssh
-- wait_for: '[data-testid="workspace-file-editor"][data-path="README.md"][data-dirty="true"]'
+- wait_for: '[data-testid="file-viewer"][data-path$="README.md"][data-dirty="true"]'
 - assert_attribute:
-    selector: '[data-testid="workspace-file-editor"][data-path="README.md"]'
+    selector: '[data-testid="file-viewer"][data-path$="README.md"]'
     name: data-dirty
     equals: 'true'
 - assert_text:
-    selector: '[data-testid="workspace-file-editor"][data-path="README.md"] .cm-content'
+    selector: '[data-testid="file-viewer"][data-path$="README.md"] [data-testid="markdown-live-content"]'
     contains: QA_RESTORED_UNSAVED_DRAFT
 - eval_readonly:
     expression: '!window.localStorage.getItem(''taomni.platformWorkspaces.v1'').includes(''passwordRef'')'
@@ -343,9 +343,9 @@ verification:
     - step: 6
       expectation: '{"wait_for": "[data-testid=\"workspace-fs-modal\"]"}'
     - step: 13
-      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"][data-path=\"README.md\"] .cm-content"}'
+      expectation: '{"wait_for": "[data-testid=\"file-viewer\"][data-path$=\"README.md\"] [data-testid=\"markdown-live-content\"]"}'
     - step: 17
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-file-editor\"][data-path=\"README.md\"]", "name": "data-dirty", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"file-viewer\"][data-path$=\"README.md\"]", "name": "data-dirty", "equals": "true"}}'
     - step: 20
       expectation: '{"wait_for": "[data-testid=\"workspace-session-picker-modal\"]"}'
     - step: 22
@@ -391,9 +391,9 @@ verification:
     - step: 71
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-tab\"][data-active=\"true\"]", "name": "data-tab-title", "equals": "README.md"}}'
     - step: 73
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-file-editor\"][data-path=\"README.md\"]", "name": "data-dirty", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"file-viewer\"][data-path$=\"README.md\"]", "name": "data-dirty", "equals": "true"}}'
     - step: 74
-      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"][data-path=\"README.md\"] .cm-content", "contains": "QA_RESTORED_UNSAVED_DRAFT"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"file-viewer\"][data-path$=\"README.md\"] [data-testid=\"markdown-live-content\"]", "contains": "QA_RESTORED_UNSAVED_DRAFT"}}'
     - step: 75
       expectation: '{"assert_file_sha256": {"path": "${fixture.platform_workspace_root}/README.md", "equals": "6ca435cf0d8229dbdf644e898118d87017d6da85701851dcdcdaaf7d384ace82"}}'
     - step: 77
@@ -407,15 +407,15 @@ verification:
     - step: 92
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"][data-path=\"src/index.ts\"]"}'
     - step: 94
-      expectation: '{"wait_for": "[data-testid=\"external-file-conflict-dialog\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"viewer-conflict\"]"}'
     - step: 96
-      expectation: '{"assert_not_visible": "[data-testid=\"external-file-conflict-dialog\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"viewer-operation-error\"]"}'
     - step: 98
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar\"]", "contains": "changed"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"viewer-operation-error\"]", "contains": "conflict"}}'
     - step: 99
       expectation: '{"assert_file_contains": {"path": "${fixture.platform_workspace_root}/README.md", "contains": "EXTERNAL_RESTORE_CONFLICT"}}'
     - step: 101
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-file-editor\"][data-path=\"README.md\"]", "name": "data-dirty", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"file-viewer\"][data-path$=\"README.md\"]", "name": "data-dirty", "equals": "true"}}'
     - step: 103
       expectation: '{"wait_for": "[data-testid=\"vault-unlock-dialog\"]"}'
     - step: 106
@@ -423,9 +423,9 @@ verification:
     - step: 111
       expectation: '{"assert_items": {"selector": "[data-testid=\"workspace-tab\"]", "attribute": "data-tab-title", "equals": ["Restored shell", "README.md", "qa-restore-ssh"]}}'
     - step: 113
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-file-editor\"][data-path=\"README.md\"]", "name": "data-dirty", "equals": "true"}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"file-viewer\"][data-path$=\"README.md\"]", "name": "data-dirty", "equals": "true"}}'
     - step: 114
-      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"][data-path=\"README.md\"] .cm-content", "contains": "QA_RESTORED_UNSAVED_DRAFT"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"file-viewer\"][data-path$=\"README.md\"] [data-testid=\"markdown-live-content\"]", "contains": "QA_RESTORED_UNSAVED_DRAFT"}}'
     - step: 115
       expectation: '{"eval_readonly": {"expression": "!window.localStorage.getItem(''taomni.platformWorkspaces.v1'').includes(''passwordRef'')", "expect_truthy":
         true}}'
