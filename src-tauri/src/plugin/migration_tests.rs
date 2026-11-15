@@ -188,3 +188,87 @@ fn rejects_path_traversal_and_symlink_sources_without_mutating_roots() {
         assert!(executor.preflight(&[symlink]).is_err());
     }
 }
+
+#[test]
+fn inspects_real_legacy_sqlite_and_builds_only_file_specs() {
+    let dir = tempdir().unwrap();
+    let data = dir.path().join("legacy");
+    fs::create_dir_all(data.join("sockscap")).unwrap();
+    let db = rusqlite::Connection::open(data.join("taomni.db")).unwrap();
+    db.execute_batch(
+        "CREATE TABLE sessions (id TEXT);\
+         CREATE TABLE rdp_certificate_pins (host TEXT);\
+         CREATE TABLE server_configs (id TEXT);",
+    )
+    .unwrap();
+    drop(db);
+    fs::write(data.join("mfa.db"), b"mfa").unwrap();
+    fs::write(data.join("sockscap/config.json"), b"{}").unwrap();
+    fs::write(data.join("lanchat.sqlite"), b"do-not-open").unwrap();
+    let before = fs::read(data.join("lanchat.sqlite")).unwrap();
+
+    let snapshot = inspect_legacy_install(&data, "0.5.9").unwrap();
+    assert_eq!(snapshot.from_version, "0.5.9");
+    assert_eq!(
+        snapshot.database_tables,
+        vec!["rdp_certificate_pins", "server_configs", "sessions"]
+    );
+    assert_eq!(snapshot.candidates.len(), 5);
+    assert!(
+        snapshot
+            .candidates
+            .iter()
+            .any(|candidate| candidate.item == MigrationItem::Mfa)
+    );
+    assert!(
+        snapshot
+            .candidates
+            .iter()
+            .any(|candidate| candidate.item == MigrationItem::SocksCap)
+    );
+    assert_eq!(snapshot.retained_paths, vec![data.join("lanchat.sqlite")]);
+    assert!(
+        snapshot
+            .source_fingerprints
+            .keys()
+            .any(|path| path == "taomni.db")
+    );
+
+    let specs = build_file_migration_specs(&data, &snapshot.candidates).unwrap();
+    assert_eq!(specs.len(), 2);
+    assert!(
+        specs
+            .iter()
+            .all(|spec| { matches!(spec.item, MigrationItem::Mfa | MigrationItem::SocksCap) })
+    );
+    assert_eq!(fs::read(data.join("lanchat.sqlite")).unwrap(), before);
+}
+
+#[test]
+fn preflight_records_vault_fixed_key_without_reading_plaintext() {
+    let dir = tempdir().unwrap();
+    let data = dir.path().join("legacy");
+    fs::create_dir_all(&data).unwrap();
+    let vault = rusqlite::Connection::open(data.join("vault.db")).unwrap();
+    vault
+        .execute_batch(
+            "CREATE TABLE vault_entries (id TEXT PRIMARY KEY, ciphertext BLOB);\
+             INSERT INTO vault_entries(id, ciphertext) VALUES ('mfa.data-key-v1', X'00');",
+        )
+        .unwrap();
+    drop(vault);
+
+    let snapshot = inspect_legacy_install(&data, "0.5.9").unwrap();
+    let evidence = snapshot.vault.expect("vault evidence");
+    assert!(evidence.fixed_key_present);
+    assert_eq!(evidence.path, data.join("vault.db"));
+}
+
+#[test]
+fn missing_legacy_directory_is_an_empty_read_only_snapshot() {
+    let dir = tempdir().unwrap();
+    let data = dir.path().join("does-not-exist");
+    let snapshot = inspect_legacy_install(&data, "0.5.9").unwrap();
+    assert!(snapshot.candidates.is_empty());
+    assert!(!data.exists());
+}
