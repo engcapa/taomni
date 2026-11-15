@@ -140,6 +140,59 @@ class FolderDialogContracts(unittest.TestCase):
                 folder_dialog.selected_path(ctx, {"action": "cancel", "trigger": trigger})
         ctx.session.click.assert_not_called()
 
+    def test_linux_save_dialog_clears_extension_and_retries_submit_or_cancel(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            (root / "case").mkdir()
+            ctx = SimpleNamespace(case_dir=root / "case", session=SimpleNamespace(application="/bin/sh"))
+            search_calls = 0
+
+            def fake_command(*args, check=True):
+                nonlocal search_calls
+                if args[:2] == ("xdotool", "search"):
+                    search_calls += 1
+                    # Discovery -> still open after 1st submit -> closed after retry
+                    return "100" if search_calls <= 3 else ""
+                if args[:2] == ("xdotool", "getwindowpid"):
+                    import os
+                    return str(os.getpid())
+                return ""
+
+            with patch.dict(folder_dialog.os.environ, {"DISPLAY": ":99", "GDK_BACKEND": "x11"}), \
+                    patch("qa_ui_auto.wayland.active", return_value=False), \
+                    patch.object(Path, "resolve", return_value=Path("/bin/sh")), \
+                    patch("PIL.ImageGrab.grab") as grab, \
+                    patch.object(folder_dialog.time, "sleep"), \
+                    patch.object(folder_dialog, "command", side_effect=fake_command) as cmd:
+                folder_dialog.linux_dialog(ctx, root / "exports" / "native.png", title="Save as", kind="save")
+            grab.assert_called_once()
+            key_calls = [c.args for c in cmd.call_args_list if c.args[:2] == ("xdotool", "key")]
+            self.assertEqual(
+                key_calls,
+                [
+                    ("xdotool", "key", "--clearmodifiers", "ctrl+l", "ctrl+a", "BackSpace"),
+                    ("xdotool", "key", "--clearmodifiers", "alt+s"),
+                    ("xdotool", "key", "--clearmodifiers", "alt+s"),
+                ],
+            )
+            search_calls = 0
+            with patch.dict(folder_dialog.os.environ, {"DISPLAY": ":99", "GDK_BACKEND": "x11"}), \
+                    patch("qa_ui_auto.wayland.active", return_value=False), \
+                    patch.object(Path, "resolve", return_value=Path("/bin/sh")), \
+                    patch("PIL.ImageGrab.grab"), \
+                    patch.object(folder_dialog.time, "sleep"), \
+                    patch.object(folder_dialog, "command", side_effect=fake_command) as cmd:
+                folder_dialog.linux_dialog(ctx, root / "exports" / "cancelled.html", title="Save as", kind="save", cancel_after_path=True)
+            key_calls = [c.args for c in cmd.call_args_list if c.args[:2] == ("xdotool", "key")]
+            self.assertEqual(
+                key_calls,
+                [
+                    ("xdotool", "key", "--clearmodifiers", "ctrl+l", "ctrl+a", "BackSpace"),
+                    ("xdotool", "key", "--clearmodifiers", "alt+c"),
+                    ("xdotool", "key", "--clearmodifiers", "alt+c"),
+                ],
+            )
+
     def test_control_coverage_counts_the_trigger_and_never_the_selected_disk_path(self):
         from qa_ui_auto.control_coverage import INTERACTIVE_VERBS, _selectors_in_step
         self.assertIn("native_folder_dialog", INTERACTIVE_VERBS)

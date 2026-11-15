@@ -244,6 +244,8 @@ class MarkdownNativeArtifactsTests(unittest.TestCase):
         from qa_ui_auto import folder_dialog
         folder_src = Path(folder_dialog.__file__).read_text(encoding='utf-8')
         self.assertIn('"ctrl+l", "ctrl+a", "BackSpace"', folder_src)
+        self.assertIn('command("xdotool", "key", "--clearmodifiers", submit_key)', folder_src)
+        self.assertNotIn('if kind == "folder" and path is not None', folder_src)
 
     def test_png_cancel_and_failed_receipts(self):
         from PIL import Image, ImageDraw
