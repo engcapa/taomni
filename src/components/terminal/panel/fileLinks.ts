@@ -65,8 +65,6 @@ export function installTerminalFileLinks(term: Terminal, context: TerminalSessio
               activate();
               window.setTimeout(activate, 50);
               window.setTimeout(activate, 250);
-              window.setTimeout(activate, 1000);
-              window.setTimeout(activate, 3000);
             }
           })().catch((error) => context.setStatusMessage(error instanceof Error ? error.message : String(error)));
         },
