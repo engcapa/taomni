@@ -271,6 +271,9 @@ export function TabItem(props: TabItemProps) {
             onRemove(tab.id);
           }}
           onPointerDown={(e) => e.stopPropagation()}
+          // Activating the tab on mousedown can restore its sidebar layout
+          // and move this close target before the release/click arrives.
+          onMouseDown={(e) => e.stopPropagation()}
         />
       )}
     </div>

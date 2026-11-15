@@ -52,7 +52,7 @@ steps:
 - assert_no_runtime_errors: null
 - click: '[data-testid="tab-item"][data-tab-type="settings"][data-active="true"] [data-testid="tab-close"]'
 - wait_for:
-    selector: '[data-testid="settings-panel"]'
+    selector: '[data-testid="settings-panel"], [data-testid="tab-item"][data-tab-type="settings"]'
     state: detached
 - click: '[data-testid="ribbon-settings"]'
 - wait_for: '[data-testid="settings-panel"]'
@@ -108,6 +108,8 @@ verification:
     requirement: Closing Settings preserves the installation draft and error for a safe retry.
     actions: [18, 20, 22, 29]
     checkpoints:
+    - step: 19
+      expectation: The close gesture removes both the Settings tab and its panel before reopening.
     - step: 24
       expectation: Reopening Settings restores the failed operation state.
     - step: 25
@@ -118,7 +120,7 @@ verification:
       expectation: The signature rejection remains visible after reopening.
     - step: 31
       expectation: A repeated installation reports its failure after reopening Settings.
-    results: [24, 25, 26, 27, 31]
+    results: [19, 24, 25, 26, 27, 31]
   native:
   - check: The archive path reaches native disk access and signature verification without changing installed modules.
     method: automated
