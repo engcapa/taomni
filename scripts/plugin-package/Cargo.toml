@@ -1,0 +1,21 @@
+[package]
+name = "taomni-plugin-package"
+version = "0.1.0"
+edition = "2024"
+publish = false
+
+# Release tooling has its own small, locked dependency graph. It does not link
+# the application or become part of any production plugin's dependency closure.
+[workspace]
+
+[dependencies]
+anyhow = "1"
+base64 = "0.22"
+minisign = "=0.9.1"
+minisign-verify = "0.2.5"
+semver = "1"
+serde_json = "1"
+sha2 = "0.10"
+tempfile = "3"
+zip = { version = "=2.4.2", default-features = false, features = ["deflate"] }
+

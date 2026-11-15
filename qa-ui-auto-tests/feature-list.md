@@ -68,9 +68,27 @@ controls:
   - id: module-offline-refresh-error
     selector: '[data-testid="module-offline-refresh-error"]'
     kind: display
+  - id: module-version-hello-plugin
+    selector: '[data-testid="module-version-hello-plugin"]'
+    kind: display
+  - id: module-action-enable-hello-plugin
+    selector: '[data-testid="module-action-enable-hello-plugin"]'
+    kind: interactive
+  - id: module-action-disable-hello-plugin
+    selector: '[data-testid="module-action-disable-hello-plugin"]'
+    kind: interactive
+  - id: module-action-uninstall-hello-plugin
+    selector: '[data-testid="module-action-uninstall-hello-plugin"]'
+    kind: interactive
+  - id: module-action-install-hello-plugin
+    selector: '[data-testid="module-action-install-hello-plugin"]'
+    kind: interactive
+  - id: module-delete-data-hello-plugin
+    selector: '[data-testid="module-delete-data-hello-plugin"]'
+    kind: interactive
 -->
 
-模块化运行时的可选插件扫描、manifest 校验、前端 chunk 加载、宿主监督、版本目录安装状态机和单体升级 journal 已建立基础契约；LanChat 已从产品、迁移和备份范围删除，模块商店设置入口已接入 native registry 的明确状态和旧版本升级预检状态，下载服务和具体插件迁移仍按设计文档 M0–M3 逐批交付。核心启动、删除、模块商店与升级预检回归见 `TC-MODULES-001`、`TC-MODULES-002`、`TC-MODULES-003`、`TC-MODULES-004`、`TC-MODULES-005`、`TC-MODULES-006`（离线未可信包拒绝与错误恢复）。
+模块化运行时的可选插件扫描、manifest 校验、前端 chunk 加载、宿主监督、版本目录安装状态机和单体升级 journal 已建立基础契约；LanChat 已从产品、迁移和备份范围删除，模块商店设置入口已接入 native registry 的明确状态和旧版本升级预检状态，下载服务和具体插件迁移仍按设计文档 M0–M3 逐批交付。核心启动、删除、模块商店与升级预检回归见 `TC-MODULES-001`–`TC-MODULES-005`；`TC-MODULES-006` 保留 browser/native 未可信离线包拒绝，`TC-MODULES-007` 用生产固定公钥和 GitHub 官方签名 artifact 验证真实安装、宿主调用、启禁、重开、重启重验、篡改拒绝与卸载。新用例未执行前不代表成功证据。
 
 > 本文档基于当前仓库代码、稳定 `data-testid` 目录和自动化用例维护，**仅记录已实现并接入主流程的功能**。架构与现状索引见 `DESIGN.md`、`IMPLEMENTATION_PLAN.md`。
 > 标记说明：

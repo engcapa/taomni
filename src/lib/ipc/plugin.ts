@@ -106,7 +106,11 @@ function normalizePluginRecord(value: unknown): PluginRecord {
   // Rust's serde model calls this field `state`; the renderer uses
   // `lifecycle` so it can distinguish an invalid manifest's disabled state
   // from a missing record. Accept both during the M0 wire-contract rollout.
-  return { ...record, lifecycle: record.lifecycle ?? record.state ?? "disabled" };
+  return {
+    ...record,
+    slug: record.slug ?? record.manifest?.slug ?? "unknown",
+    lifecycle: record.lifecycle ?? record.state ?? "disabled",
+  };
 }
 
 export async function listPlugins(): Promise<PluginRecord[]> {

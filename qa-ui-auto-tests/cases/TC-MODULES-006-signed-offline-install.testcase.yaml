@@ -5,7 +5,7 @@ description: >-
   through Settings. Native mode must execute the actual file/signature gate;
   browser preview must reject explicitly. Neither mode may invent an installed
   module. Closing and reopening Settings retains the draft and failure, and a
-  retry remains safe. Successful trusted installation is a separate native gap.
+  retry remains safe. TC-MODULES-007 separately verifies official trusted native installation.
 covers:
 - F-Modules-1
 tags:
@@ -125,9 +125,6 @@ verification:
   - check: The archive path reaches native disk access and signature verification without changing installed modules.
     method: automated
     reason: Browser preview rejects explicitly and cannot validate native file access or signatures.
-  - check: Install an official signed package and verify activation and restart persistence.
-    method: manual
-    reason: No official production-signed test artifact is available; Rust tests cover actual cryptographic success without overriding the UI trust key.
   visual:
   - check: Local archive, signature input, error and retry remain readable across desktop WebViews.
     method: manual

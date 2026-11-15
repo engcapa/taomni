@@ -79,6 +79,7 @@
           "x11_session_required",
           "bookmark_assets",
           "module_offline_archive",
+          "module_signed_archive",
           "vnc_required",
           "ard_required",
           "jdtls_required",
@@ -899,6 +900,15 @@
               "items": {"$ref": "#/$defs/point"}
             }
           }
+        },
+        "module_signed_probe": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["phase"],
+          "properties": {
+            "phase": {"enum": ["installed", "enabled", "disabled", "invalid", "uninstalled", "tamper-frontend", "restore-frontend"]}
+          },
+          "description": "Native only: fixed official hello plugin_list/ping oracle and exact isolated frontend integrity fault; no YAML-selected commands, paths, keys or state writes."
         },
         "eval_readonly": {
           "$ref": "#/$defs/eval_readonly_arg"

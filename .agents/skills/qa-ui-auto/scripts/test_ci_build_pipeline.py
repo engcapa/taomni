@@ -48,15 +48,17 @@ class BuildPipelineTests(unittest.TestCase):
                     self.assertEqual(data['failures'][0]['case'], 'infrastructure')
                     self.assertEqual(data['infrastructure_errors'][0]['entry'], 'native-contracts')
 
-    def test_each_platform_waits_only_for_its_producer_and_final_gate_keeps_contracts(self):
+    def test_each_platform_waits_for_its_producer_and_optional_signed_input_without_other_core_builds(self):
         jobs = yaml.safe_load((ROOT / '.github/workflows/qa-ui-auto-platforms.yml').read_text())['jobs']
         for platform in ('linux', 'windows', 'macos'):
-            self.assertEqual(jobs[f'execute-{platform}-native']['needs'], ['plan', f'build-{platform}'])
+            self.assertEqual(jobs[f'execute-{platform}-native']['needs'], ['plan', f'build-{platform}', 'signed-modular-packages'])
             self.assertIn(f'execute-{platform}-native', jobs['summarize']['needs'])
             self.assertIn(f'build-{platform}', jobs['summarize']['needs'])
         self.assertEqual(jobs['native-contracts']['needs'], 'plan')
         self.assertIn('native-contracts', jobs['summarize']['needs'])
         self.assertIn('tool-contracts', jobs['summarize']['needs'])
+        self.assertIn('signed-modular-packages', jobs['summarize']['needs'])
+        self.assertIn("contains(needs.plan.outputs.native_matrix, 'signed-module')", jobs['signed-modular-packages']['if'])
         self.assertNotIn('Validate QA tools', [s.get('name') for s in jobs['plan']['steps']])
 
     @unittest.skipUnless(os.name == 'posix' and shutil.which('bash'), 'POSIX shell contract')

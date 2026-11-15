@@ -1,0 +1,170 @@
+name: QA Official Modular Packages
+
+on:
+  workflow_dispatch:
+    inputs:
+      head:
+        description: Repository commit/ref whose hello-plugin is built (no release is published)
+        type: string
+        default: ''
+  workflow_call:
+    inputs:
+      head: {type: string, default: ''}
+      artifact_key: {type: string, default: ''}
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: {required: true}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: {required: false}
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  source:
+    runs-on: ubuntu-24.04
+    outputs:
+      sha: ${{ steps.source.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
+      - id: source
+        name: Require a commit reachable from a repository-owned branch
+        run: |
+          test -n "$(git for-each-ref --format='%(refname)' --contains HEAD refs/remotes/origin/)" || {
+            echo 'Refusing to sign a head outside repository-owned branches.' >&2
+            exit 1
+          }
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  build:
+    name: Build unsigned hello (${{ matrix.platform }})
+    needs: source
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - {os: ubuntu-24.04, target: x86_64-unknown-linux-gnu, platform: linux-x86_64}
+          - {os: windows-latest, target: x86_64-pc-windows-msvc, platform: windows-x86_64}
+          - {os: macos-latest, target: aarch64-apple-darwin, platform: darwin-aarch64}
+          - {os: macos-latest, target: x86_64-apple-darwin, platform: darwin-x86_64}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.source.outputs.sha }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: modular-official-hello-${{ matrix.target }}
+      # Candidate code, Cargo build scripts and host binaries never share a
+      # runner/job with signing secrets. Nothing from this job is executed by
+      # the signing job; it receives only an inert payload directory.
+      - name: Build candidate without signing credentials
+        run: cargo build --manifest-path src-tauri/Cargo.toml -p taomni-hello-plugin --bin taomni-hello-plugin --release --target '${{ matrix.target }}' --locked
+      - name: Stage the platform payload
+        env:
+          MODULE_TARGET: ${{ matrix.target }}
+          MODULE_PLATFORM: ${{ matrix.platform }}
+          MODULE_SOURCE_SHA: ${{ needs.source.outputs.sha }}
+        run: |
+          python - <<'PY'
+          import json, os, pathlib, shutil
+          source = pathlib.Path('src-tauri/plugins/hello-plugin')
+          output = pathlib.Path('unsigned-module')
+          output.mkdir()
+          manifest = json.loads((source / 'module.json').read_text(encoding='utf-8'))
+          host = 'taomni-hello-plugin' + ('.exe' if os.environ['MODULE_PLATFORM'].startswith('windows') else '')
+          manifest['entry']['host'] = host
+          (output / 'module.json').write_text(json.dumps(manifest, indent=2), encoding='utf-8')
+          shutil.copyfile(pathlib.Path('src-tauri/target') / os.environ['MODULE_TARGET'] / 'release' / host, output / host)
+          shutil.copytree(source / 'frontend', output / 'frontend')
+          pathlib.Path('candidate-source.json').write_text(json.dumps({'sourceSha': os.environ['MODULE_SOURCE_SHA'], 'platform': os.environ['MODULE_PLATFORM']}), encoding='utf-8')
+          PY
+      - uses: actions/upload-artifact@v4
+        with:
+          name: unsigned-module-${{ matrix.platform }}-${{ inputs.artifact_key || github.run_id }}
+          path: |
+            unsigned-module/
+            candidate-source.json
+          if-no-files-found: error
+          retention-days: 7
+
+  sign:
+    name: Sign official hello (${{ matrix.platform }})
+    needs: [source, build]
+    # Fork pull requests cannot request a production signature. A manual or
+    # reusable invocation runs the workflow revision trusted by its operator.
+    if: github.event_name != 'pull_request' && github.repository == 'engcapa/taomni'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: [linux-x86_64, windows-x86_64, darwin-aarch64, darwin-x86_64]
+    steps:
+      - name: Checkout the trusted workflow tooling, not the candidate head
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: scripts/plugin-package -> target
+          shared-key: modular-package-signer
+      - name: Compile trusted signer without private-key environment
+        run: |
+          cargo test --manifest-path scripts/plugin-package/Cargo.toml --lib --locked
+          cargo build --manifest-path scripts/plugin-package/Cargo.toml --release --locked
+      - uses: actions/download-artifact@v4
+        with:
+          name: unsigned-module-${{ matrix.platform }}-${{ inputs.artifact_key || github.run_id }}
+          path: candidate
+      - name: Restrict QA signing to the official hello manifest and selected source
+        env:
+          MODULE_PLATFORM: ${{ matrix.platform }}
+          MODULE_SOURCE_SHA: ${{ needs.source.outputs.sha }}
+        run: |
+          python - <<'PY'
+          import json, os, pathlib
+          root = pathlib.Path('candidate')
+          observed = json.loads((root / 'candidate-source.json').read_text(encoding='utf-8'))
+          assert observed == {'sourceSha': os.environ['MODULE_SOURCE_SHA'], 'platform': os.environ['MODULE_PLATFORM']}
+          expected = json.loads(pathlib.Path('src-tauri/plugins/hello-plugin/module.json').read_text(encoding='utf-8'))
+          if os.environ['MODULE_PLATFORM'].startswith('windows'):
+              expected['entry']['host'] += '.exe'
+          actual = json.loads((root / 'unsigned-module/module.json').read_text(encoding='utf-8'))
+          assert actual == expected, 'Candidate metadata differs from the official hello contract'
+          assert actual['id'] == 'taomni-plugin-hello-plugin' and actual['version'] == '0.1.0'
+          allowed = {'module.json', expected['entry']['host'], 'frontend/index.js'}
+          files = {p.relative_to(root / 'unsigned-module').as_posix() for p in (root / 'unsigned-module').rglob('*') if p.is_file()}
+          assert files == allowed, 'Unexpected files in official QA payload'
+          assert not any(p.is_symlink() for p in root.rglob('*'))
+          PY
+      - name: Sign and independently verify against the production pinned public key
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          MODULE_PLATFORM: ${{ matrix.platform }}
+          MODULE_SOURCE_SHA: ${{ needs.source.outputs.sha }}
+        run: >-
+          scripts/plugin-package/target/release/taomni-plugin-package
+          --payload candidate/unsigned-module --platform "$MODULE_PLATFORM"
+          --output signed-module --source-sha "$MODULE_SOURCE_SHA"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: qa-modular-package-${{ matrix.platform }}-${{ inputs.artifact_key || github.run_id }}
+          path: signed-module/
+          if-no-files-found: error
+          retention-days: 14

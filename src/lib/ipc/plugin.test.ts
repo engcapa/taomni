@@ -72,6 +72,20 @@ describe("invokePlugin", () => {
     expect(invokeMock).toHaveBeenNthCalledWith(4, "plugin_uninstall", { slug: "hello-plugin", deleteData: true });
   });
 
+  it("hydrates native module identity from the Rust manifest when no top-level slug is serialized", async () => {
+    const record = {
+      manifest: { slug: "hello-plugin", version: "0.1.0" },
+      state: "enabled", reason: null,
+    };
+    invokeMock.mockResolvedValueOnce([record]).mockResolvedValueOnce({ ...record, state: "disabled" });
+    await expect(listPlugins()).resolves.toEqual([{
+      ...record, slug: "hello-plugin", lifecycle: "enabled",
+    }]);
+    await expect(setPluginEnabled("hello-plugin", false)).resolves.toMatchObject({
+      slug: "hello-plugin", lifecycle: "disabled", manifest: record.manifest,
+    });
+  });
+
   it("rejects unsafe lifecycle slugs before crossing IPC", async () => {
     await expect(installStagedPlugin("../hello", "1.0.0", "/tmp/staged")).rejects.toThrow("Invalid plugin slug");
     await expect(rollbackPlugin("Hello")).rejects.toThrow("Invalid plugin slug");
