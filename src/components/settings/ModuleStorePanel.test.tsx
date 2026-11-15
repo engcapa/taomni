@@ -47,6 +47,15 @@ describe("ModuleStorePanel", () => {
     expect(screen.getByTestId("module-store-core-api")).toHaveTextContent("Core API 1");
   });
 
+  it("distinguishes catalog loading and refresh errors from an empty catalog", () => {
+    const view = render(<ModuleStorePanel catalogLoading catalogError="registry unavailable" />);
+    expect(screen.getByTestId("module-store-loading")).toHaveTextContent("Loading installed modules…");
+    expect(screen.getByTestId("module-store-catalog-error")).toHaveTextContent("registry unavailable");
+    expect(screen.queryByTestId("module-store-empty")).not.toBeInTheDocument();
+    view.rerender(<ModuleStorePanel catalogError="registry unavailable" />);
+    expect(screen.getByTestId("module-store-empty")).toBeInTheDocument();
+  });
+
   it("renders catalog metadata and an enabled module state", () => {
     useModuleStore.getState().hydrate([record({ lifecycle: "enabled" })]);
     render(<ModuleStorePanel catalog={[entry]} />);
