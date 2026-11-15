@@ -49,7 +49,7 @@ pub enum ProxyRoute {
     NoProxy,
 }
 
-#[derive(Debug, Error, Clone, PartialEq, Eq)]
+#[derive(Debug, Error)]
 pub enum DownloadError {
     #[error("unknown module proxy mode: {0}")]
     UnknownProxyMode(String),
@@ -846,9 +846,13 @@ mod tests {
         let request = String::from_utf8_lossy(&request[..length]);
         let range = request
             .lines()
-            .find_map(|line| line.strip_prefix("Range: bytes="))
-            .and_then(|value| value.trim().trim_end_matches('\r').strip_suffix('-'))
-            .and_then(|value| value.parse::<usize>().ok());
+            .find_map(|line| {
+                let lower = line.to_ascii_lowercase();
+                lower
+                    .strip_prefix("range: bytes=")
+                    .and_then(|value| value.trim().trim_end_matches('\r').strip_suffix('-'))
+                    .and_then(|value| value.parse::<usize>().ok())
+            });
         let (status, payload, extra) = if let Some(start) = range {
             let payload = body[start..].to_vec();
             (

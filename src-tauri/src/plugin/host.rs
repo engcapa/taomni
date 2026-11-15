@@ -7,7 +7,7 @@
 //! without starting a desktop process.
 
 use std::collections::HashMap;
-use std::io::{self, BufRead, BufReader, Write};
+use std::io::{self, BufRead, BufReader, Read, Write};
 use std::path::{Path, PathBuf};
 use std::process::{Child, ChildStdin, Command, Stdio};
 use std::sync::mpsc::{self, Receiver, RecvTimeoutError, Sender};
@@ -387,6 +387,7 @@ type HostReadResult = Result<RpcMessage, HostProcessError>;
 /// Every invocation is serialized through the owning mutex in `PluginRegistry`;
 /// this keeps request IDs and stdio writes ordered without exposing the child
 /// handles to the renderer.
+#[derive(Debug)]
 pub struct HostProcess {
     child: Child,
     stdin: ChildStdin,
@@ -502,12 +503,13 @@ impl HostProcess {
             return Err(HostProcessError::Crashed);
         }
         let id = self.next_request_id();
+        let now_ms = self.elapsed_ms();
         let message = request_message(
             &mut self.supervisor,
             id.clone(),
             method,
             params,
-            self.elapsed_ms(),
+            now_ms,
         )
         .map_err(|error| HostProcessError::Rpc {
             code: error.code,
