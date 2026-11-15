@@ -16,6 +16,14 @@ export function TaoAiChat({ controller, profile, slots, disabled = false, active
   const state = useSyncExternalStore(controller.subscribe, controller.getState, controller.getState);
   const thread = state.activeThreadId ? state.threads[state.activeThreadId] : undefined;
   const phase = state.activeThreadId ? state.runtime[state.activeThreadId]?.phase ?? "idle" : "idle";
+  const received = Boolean(thread?.messages.at(-1)?.blocks.some((block) => block.type !== "error" && (block.text || block.sources?.length)));
+  const previous = useRef({ threadId: state.activeThreadId, phase });
+  useEffect(() => {
+    if (active && previous.current.threadId === state.activeThreadId && previous.current.phase === "vault_locked" && phase === "stopped") {
+      rootRef.current?.querySelector<HTMLButtonElement>('[data-testid="tao-home-continue"], [data-testid="tao-home-regenerate"]')?.focus();
+    }
+    previous.current = { threadId: state.activeThreadId, phase };
+  }, [active, phase, state.activeThreadId]);
   useEffect(() => {
     if (!active) return;
     const isSearch = (event: KeyboardEvent) => (getAppPlatform() === "macos" ? event.metaKey : event.ctrlKey) && !event.shiftKey && !event.altKey && event.key.toLowerCase() === "k";
@@ -42,11 +50,11 @@ export function TaoAiChat({ controller, profile, slots, disabled = false, active
       <div className={`tao-home-main ${thread?.messages.length ? "has-messages" : "empty"}`}>
         <div className="tao-home-feed" data-testid="tao-home-feed">
           {thread?.messages.length ? <MessageList thread={thread} phase={phase} controller={controller} /> : <div className="tao-home-empty-stage"><div className="tao-home-greeting"><span className="tao-home-logo">T</span><div><h1>{tr("Tao 在这里")}</h1><p>{tr("Develop Buddy · 问、做、深研你的开发问题")}</p></div></div>{slots?.emptyState}</div>}
-          <RefusalCard phase={phase} /><BudgetCard phase={phase} controller={controller} /><StoppedCard phase={phase} controller={controller} web={state.composer.web} />
+          <RefusalCard phase={phase} /><BudgetCard phase={phase} controller={controller} /><StoppedCard phase={phase} controller={controller} web={state.activeThreadId ? state.runtime[state.activeThreadId]?.lastRequest?.web ?? state.composer.web : state.composer.web} received={received} />
         </div>
-        <div className="tao-home-composer-dock"><div className="tao-home-composer-context">{slots?.composerContext}</div><TaoComposer controller={controller} state={state} disabled={disabled} />{slots?.belowComposer}</div>
+        <div className="tao-home-composer-dock"><div className="tao-home-composer-context">{slots?.composerContext}</div><TaoComposer controller={controller} state={state} disabled={disabled || phase === "vault_locked"} />{slots?.belowComposer}</div>
       </div>
-      <VaultLockedMask phase={phase} />
+      <VaultLockedMask phase={phase} controller={controller} active={active} />
       <SidePanel state={state} profile={profile} controller={controller}>{slots?.sidePanels}</SidePanel>
       <footer className="tao-home-footer"><span>T · Taomni</span><span>v{__APP_VERSION__}</span></footer>
       {disabled && !slots?.emptyState ? <BrowserUnavailableCard onOpenSettings={onOpenSettings} /> : null}

@@ -217,6 +217,8 @@ export interface TaoChatController {
   setActiveThread(threadId: string): void;
   send(content?: string): Promise<boolean>;
   stop(): Promise<void>;
+  /** Call only after an explicit, successful Vault gate; never retries a request. */
+  acknowledgeVaultUnlock(threadId: string): void;
   continueReply(): Promise<boolean>;
   regenerate(): Promise<boolean>;
   approveAction(action: ActionProposal): Promise<void>;

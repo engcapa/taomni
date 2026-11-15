@@ -54,7 +54,7 @@ describe("TaoAiChat", () => {
     let release!: () => void;
     const backend: ChatBackend = {
       send: vi.fn<ChatBackend["send"]>(() => new Promise<Iterable<never>>((resolve) => { release = () => resolve([]); })),
-      continue: vi.fn<NonNullable<ChatBackend["continue"]>>(async () => []),
+      regenerate: vi.fn<NonNullable<ChatBackend["regenerate"]>>(async () => []),
     };
     const controller = createChatController({ backend, profile });
     controller.setChips([{ id: "local-1", kind: "local", label: "构建日志", preview: "token=[REDACTED]", removable: true }]);
@@ -70,8 +70,9 @@ describe("TaoAiChat", () => {
     // controller keeps one transport owner per thread until its finally block.
     release();
     await pending;
-    fireEvent.click(screen.getByRole("button", { name: /继续生成|Continue/ }));
-    await waitFor(() => expect(backend.continue).toHaveBeenCalled());
+    expect(screen.getByTestId("tao-home-stopped-state")).toHaveTextContent("No reply was received");
+    fireEvent.click(screen.getByTestId("tao-home-regenerate"));
+    await waitFor(() => expect(backend.regenerate).toHaveBeenCalled());
   });
 
   it("switches Tao chrome language without recreating controller or losing draft", async () => {

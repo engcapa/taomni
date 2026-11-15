@@ -70,3 +70,5 @@
   gap: 4px;
 }
 .tao-home-side-panel[data-collapsed="true"] .tao-home-side-tabs .tao-home-side-close { margin-left: 0; }
+
+.tao-home-vault-mask button{padding:7px 16px;border:1px solid #ffffff66;border-radius:6px;background:var(--taomni-accent);color:#fff;cursor:pointer}.tao-home-vault-mask button:disabled{opacity:.6;cursor:wait}.tao-home-vault-mask button:focus-visible{outline:2px solid #fff;outline-offset:3px}.tao-home-vault-mask p{max-width:80%;text-align:center;overflow-wrap:anywhere}

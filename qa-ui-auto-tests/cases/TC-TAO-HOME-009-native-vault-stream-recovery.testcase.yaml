@@ -1,0 +1,102 @@
+id: TC-TAO-HOME-009
+title: Native Vault locking cancels Tao HTTP and requires explicit unlock and retry
+description: >-
+  Save a disposable Messages key through production Settings and Vault, start a
+  real slow native HTTP stream, lock Vault from Settings, and independently verify
+  socket cancellation. Retain the partial reply and draft, cancel and retry the
+  real unlock gate, then require a separate user action before another request.
+  Server-side request counts detect automatic paid retries. This protocol fixture
+  does not certify a commercial provider or OS-level shortcut delivery.
+modes: [native]
+covers: [F1.11]
+tags: [p0, tao-home, regression, vault]
+fixtures: [reset_db, tao_messages]
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-tao-home-009
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- click: '[data-testid="tao-home-more"]'
+- click: '[data-testid="tao-home-settings"]'
+- wait_for: '[data-testid="tao-settings"]'
+- click: '[data-testid="tao-settings-save"]'
+- vault_first_run: qa-tao-home-009
+- assert_text:
+    selector: '[data-testid="tao-settings-status"]'
+    contains: Saved
+- click: '[data-testid="nav-mode-home"]'
+- fill:
+    selector: '[data-testid="tao-home-composer-input"]'
+    value: QA-SLOW
+- click: '[data-testid="tao-home-send"]'
+- assert_text:
+    selector: '[data-testid="tao-home-message-assistant"]'
+    contains: Partial reply
+- fill:
+    selector: '[data-testid="tao-home-composer-input"]'
+    value: Draft retained across Vault recovery
+- click: '[data-testid="ribbon-settings"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: vault
+- click: '[data-testid="vault-lock-button"]'
+- assert_file_contains:
+    path: ${fixture.tao_messages_log}
+    contains: slow-network-cancelled
+    timeout_sec: 10
+- click: '[data-testid="nav-mode-home"]'
+- wait_for: '[data-testid="tao-home-vault-locked"]'
+- assert_not_visible: '[data-testid="tao-home-error-state"]'
+- assert_attribute:
+    selector: '[data-testid="tao-home-composer-input"]'
+    name: disabled
+    equals: ''
+- assert_text:
+    selector: '[data-testid="tao-home-message-list"]'
+    contains: Partial reply
+- wait: 1
+- assert_json_file:
+    path: ${fixture.tao_messages_counts}
+    expect: {requests: 1, cancelled: 1, completed: 0}
+- screenshot: tao-vault-locked-partial.png
+- click: '[data-testid="tao-home-vault-unlock"]'
+- wait_for: '[data-testid="vault-unlock-dialog"]'
+- press:
+    selector: '[data-testid="vault-unlock-pw"]'
+    key: Escape
+- assert_not_visible: '[data-testid="vault-unlock-dialog"]'
+- assert_visible: '[data-testid="tao-home-vault-locked"]'
+- eval_readonly:
+    expression: document.activeElement?.getAttribute('data-testid') === 'tao-home-vault-unlock'
+    expect_truthy: true
+    timeout_sec: 5
+- click: '[data-testid="tao-home-vault-unlock"]'
+- fill:
+    selector: '[data-testid="vault-unlock-pw"]'
+    value: qa-tao-home-009
+- click: '[data-testid="vault-unlock-confirm"]'
+- assert_not_visible: '[data-testid="vault-unlock-dialog"]'
+- assert_not_visible: '[data-testid="tao-home-vault-locked"]'
+- wait_for: '[data-testid="tao-home-continue"]'
+- eval_readonly:
+    expression: document.activeElement?.getAttribute('data-testid') === 'tao-home-continue' && document.querySelector('.tao-home-composer textarea').value === 'Draft retained across Vault recovery'
+    expect_truthy: true
+    timeout_sec: 5
+- wait: 1
+- assert_json_file:
+    path: ${fixture.tao_messages_counts}
+    expect: {requests: 1, cancelled: 1, completed: 0}
+- screenshot: tao-vault-unlocked-explicit-recovery.png
+- click: '[data-testid="tao-home-message-regenerate"]'
+- assert_text:
+    selector: '[data-testid="tao-home-message-assistant"]'
+    contains: Partial reply
+- assert_json_file:
+    path: ${fixture.tao_messages_counts}
+    expect: {requests: 2, cancelled: 1}
+- click: '[data-testid="tao-home-stop"]'
+- assert_json_file:
+    path: ${fixture.tao_messages_counts}
+    expect: {requests: 2, cancelled: 2, completed: 0}
+- assert_no_runtime_errors: null

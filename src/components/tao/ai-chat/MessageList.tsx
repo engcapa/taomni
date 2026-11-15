@@ -50,6 +50,7 @@ function Block({ block, phase, controller }: { block: TaoBlock; phase?: TaoPhase
   if (block.type === "action" && block.action) return <ActionCard action={block.action} controller={controller} />;
   if (block.type === "usage" && block.usage) return <div className="tao-home-usage-line">{tr("输入")} {block.usage.inputTokens} · {tr("输出")} {block.usage.outputTokens} · {tr("搜索")} {block.usage.searchCalls} · {tr("读链接")} {block.usage.fetchCalls} · {block.usage.estimatedCostCny === undefined ? tr("费用未知") : tr("约 ¥{amount}（估算）", { amount: block.usage.estimatedCostCny.toFixed(4) })}</div>;
   if (block.type === "error" && block.error) {
+    if (phase === "vault_locked" && block.error.category === "vault_locked") return null;
     if (phase === "refusal" && block.error.category === "configuration") return null;
     return <div className="tao-home-error-card" data-testid="tao-home-error-state"><strong>{tr(block.error.category === "network" ? "网络不可用" : block.error.category === "interrupted" ? "流中断" : block.error.category === "protocol" ? "请求参数无效" : block.error.category === "configuration" ? "配置不可用" : "Tao 暂时无法完成")}</strong><p>{block.error.message}</p><button type="button" data-testid="tao-home-retry" onClick={() => void controller.regenerate()}>{tr("重试")}</button></div>;
   }

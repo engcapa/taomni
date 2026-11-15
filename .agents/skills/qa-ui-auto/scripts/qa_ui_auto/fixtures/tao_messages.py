@@ -35,11 +35,23 @@ def setup(ctx):
     root.mkdir(parents=True, exist_ok=True)
     log = Path(ctx.case_dir) / "tao-messages-events.txt"
     log.write_text("", encoding="utf-8")
+    observation = Path(ctx.case_dir) / "tao-messages-counts.json"
+    counts = {"requests": 0, "cancelled": 0, "completed": 0}
+    observation.write_text(json.dumps(counts), encoding="utf-8")
     lock, stopping = threading.Lock(), threading.Event()
 
     def record(text):
         with lock, log.open("a", encoding="utf-8") as output:
             output.write(text + "\n")
+            if " POST " in text:
+                counts["requests"] += 1
+            if text == "slow-network-cancelled":
+                counts["cancelled"] += 1
+            if text == "completed":
+                counts["completed"] += 1
+            pending = observation.with_suffix(".tmp")
+            pending.write_text(json.dumps(counts), encoding="utf-8")
+            pending.replace(observation)
 
     class Handler(BaseHTTPRequestHandler):
         protocol_version = "HTTP/1.1"
@@ -127,7 +139,7 @@ def setup(ctx):
                                     safety_check_high=True, title_enabled=True, voice_provider="local", tts_voice="stella", cost_confirm_threshold_cny=.5))
     (root / "ai.json").write_text(json.dumps(config), encoding="utf-8")
     (root / "proxy.json").write_text(json.dumps(proxy(app)), encoding="utf-8")
-    ctx.values.update(tao_messages_log=str(log), tao_messages_config=str(root / "ai.json"))
+    ctx.values.update(tao_messages_log=str(log), tao_messages_config=str(root / "ai.json"), tao_messages_counts=str(observation))
 
 
 def teardown(ctx):

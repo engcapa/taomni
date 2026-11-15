@@ -312,6 +312,15 @@ controls:
 - id: tao-home-settings
   selector: '[data-testid="tao-home-settings"]'
   kind: interactive
+- id: tao-home-vault-locked
+  selector: '[data-testid="tao-home-vault-locked"]'
+  kind: display
+- id: tao-home-vault-unlock
+  selector: '[data-testid="tao-home-vault-unlock"]'
+  kind: interactive
+- id: tao-home-continue
+  selector: '[data-testid="tao-home-continue"]'
+  kind: interactive
 - id: tao-settings
   selector: '[data-testid="tao-settings"]'
   kind: display

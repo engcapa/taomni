@@ -3584,6 +3584,9 @@
 - `[data-testid="tao-home-error-state"]` — display — F1.11.tao-home-error-state
 - `[data-testid="tao-home-retry"]` — interactive — F1.11.tao-home-retry
 - `[data-testid="tao-home-settings"]` — interactive — F1.11.tao-home-settings
+- `[data-testid="tao-home-vault-locked"]` — display — F1.11.tao-home-vault-locked
+- `[data-testid="tao-home-vault-unlock"]` — interactive — F1.11.tao-home-vault-unlock
+- `[data-testid="tao-home-continue"]` — interactive — F1.11.tao-home-continue
 - `[data-testid="tao-settings"]` — display — F1.11.tao-settings
 - `[data-testid="tao-settings-save"]` — interactive — F1.11.tao-settings-save
 - `[data-testid="tao-settings-status"]` — display — F1.11.tao-settings-status

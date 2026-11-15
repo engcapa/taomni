@@ -11,6 +11,7 @@ import type {
   TaoChatController,
   TaoChatState,
   TaoEvent,
+  TaoErrorCategory,
   TaoMessage,
   TaoRequest,
   TaoThread,
@@ -36,8 +37,9 @@ function now(): number {
   return Date.now();
 }
 
-function classifyError(error: unknown): "protocol" | "http" | "network" {
+function classifyError(error: unknown): TaoErrorCategory {
   const text = String(error).toLowerCase();
+  if (/vault_locked|vault (?:is )?locked/.test(text)) return "vault_locked";
   if (/invalid args|missing field|deserialize|protocol/.test(text)) return "protocol";
   if (/401|403|429|http|unauthorized/.test(text)) return "http";
   return "network";
@@ -213,7 +215,7 @@ export function createChatController(options: ChatControllerOptions = {}): TaoCh
       });
       const actions = state.threads[threadId]?.messages.at(-1)?.blocks.filter((block) => block.type === "action" && block.action).map((block) => block.action!);
       patchThread(threadId, (thread) => ({ ...thread, running: false }));
-      patchRuntime(threadId, (runtime) => ({ ...runtime, finishedAt: now(), phase: runtime.budget.halted ? "budget_halt" : runtime.phase === "refusal" || runtime.phase === "error" ? runtime.phase : actions?.length ? "awaiting_action" : "idle" }));
+      patchRuntime(threadId, (runtime) => ({ ...runtime, finishedAt: now(), phase: runtime.phase === "vault_locked" ? "vault_locked" : runtime.budget.halted ? "budget_halt" : runtime.phase === "refusal" || runtime.phase === "error" ? runtime.phase : actions?.length ? "awaiting_action" : "idle" }));
     }
   };
 
@@ -249,7 +251,7 @@ export function createChatController(options: ChatControllerOptions = {}): TaoCh
       const threadId = state.activeThreadId ?? controller.createThread();
       const text = (content ?? state.composer.text).trim();
       const runtime = state.runtime[threadId] ?? activeRuntime();
-      if (!text || !options.backend || runtime?.phase === "sending" || runtime?.phase === "streaming" || runtime?.phase === "thinking" || runtime?.phase === "searching" || runtime?.phase === "awaiting_action" || runtime?.phase === "plan_pending" || runtime?.phase === "budget_halt") return false;
+      if (!text || !options.backend || runtime?.phase === "vault_locked" || runtime?.phase === "sending" || runtime?.phase === "streaming" || runtime?.phase === "thinking" || runtime?.phase === "searching" || runtime?.phase === "awaiting_action" || runtime?.phase === "plan_pending" || runtime?.phase === "budget_halt") return false;
       const request: TaoRequest = { threadId, content: text, mode: state.mode, model: state.composer.model, thinking: state.composer.thinking, web: state.composer.web, context: state.context, chips: state.composer.chips };
       const user: TaoMessage = { id: id("tao-user"), role: "user", text, blocks: [], createdAt: now() };
       patchThread(threadId, (thread) => ({ ...thread, messages: [...thread.messages, user], title: thread.messages.length === 0 ? text.slice(0, 48) : thread.title, updatedAt: now(), running: true }));
@@ -281,18 +283,23 @@ export function createChatController(options: ChatControllerOptions = {}): TaoCh
       if (threadId) {
         running.get(threadId)?.abort();
         try { await options.backend?.stop?.(threadId); } catch { /* local abort still makes stop deterministic */ }
-        patchRuntime(threadId, (runtime) => ({ ...runtime, phase: "stopped" }));
+        patchRuntime(threadId, (runtime) => ({ ...runtime, phase: runtime.phase === "vault_locked" ? "vault_locked" : "stopped" }));
         patchThread(threadId, (thread) => ({ ...thread, running: false }));
       }
+    },
+    acknowledgeVaultUnlock(threadId) {
+      if (state.runtime[threadId]?.phase !== "vault_locked" || running.has(threadId)) return;
+      updateAssistant(threadId, (message) => ({ ...message, blocks: message.blocks.filter((block) => block.error?.category !== "vault_locked") }));
+      patchRuntime(threadId, (runtime) => ({ ...runtime, phase: "stopped" }));
     },
     async continueReply() {
       const threadId = state.activeThreadId;
       if (!threadId || !options.backend?.continue) return false;
       const runtime = state.runtime[threadId];
-      if (runtime?.lastRequest?.web || running.has(threadId)) return false;
+      if (runtime?.phase === "vault_locked" || runtime?.lastRequest?.web || running.has(threadId)) return false;
       const abortController = new AbortController();
-      blockOffsets.set(threadId, state.threads[threadId].messages.at(-1)?.blocks.length ?? 0);
       updateAssistant(threadId, (message) => ({ ...message, blocks: message.blocks.filter((block) => block.type !== "error") }));
+      blockOffsets.set(threadId, state.threads[threadId].messages.at(-1)?.blocks.length ?? 0);
       running.set(threadId, abortController);
       patchRuntime(threadId, (current) => ({ ...current, phase: "streaming", startedAt: now(), finishedAt: undefined }));
       try {
@@ -303,7 +310,7 @@ export function createChatController(options: ChatControllerOptions = {}): TaoCh
         }
         return true;
       } catch (error) {
-        if (!abortController.signal.aborted) processEvent(threadId, { type: "error", category: "network", message: String(error) });
+        if (!abortController.signal.aborted) processEvent(threadId, { type: "error", category: classifyError(error), message: String(error) });
         return false;
       } finally {
         running.delete(threadId);
@@ -314,7 +321,7 @@ export function createChatController(options: ChatControllerOptions = {}): TaoCh
     async regenerate() {
       const threadId = state.activeThreadId;
       if (!threadId || !options.backend?.regenerate) return false;
-      if (running.has(threadId)) return false;
+      if (state.runtime[threadId]?.phase === "vault_locked" || running.has(threadId)) return false;
       const abortController = new AbortController();
       blockOffsets.delete(threadId); usageCalls.delete(threadId); usageApplied.delete(threadId);
       ensureAssistant(threadId);
@@ -330,7 +337,7 @@ export function createChatController(options: ChatControllerOptions = {}): TaoCh
         }
         return true;
       } catch (error) {
-        if (!abortController.signal.aborted) processEvent(threadId, { type: "error", category: "network", message: String(error) });
+        if (!abortController.signal.aborted) processEvent(threadId, { type: "error", category: classifyError(error), message: String(error) });
         return false;
       } finally {
         running.delete(threadId);
