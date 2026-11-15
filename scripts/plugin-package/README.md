@@ -42,6 +42,16 @@ repository-owned branch; fork PRs cannot request signatures. It uploads QA
 artifacts only, named `qa-modular-package-<platform>-<invocation-key-or-run-id>`,
 retained for 14 days. It does not create or update a GitHub Release.
 
+The signer uses a fresh compilation without a restored executable cache. The
+official hello manifest and frontend bytes must match the trusted checkout;
+candidate hosts are never executed in the signing job. In reusable workflows,
+`github.workflow_sha` belongs to the caller workflow's revision. Checking out
+`inputs.head` in another job does not change that identity. Before dispatching
+from `main` with a candidate `head`, first merge this workflow and the locked
+signer tool into `main`; the calling platforms/entry wiring must be present in
+that trusted revision too. An older caller revision without these tools fails
+closed. Do not substitute the candidate head as the signer-tooling revision.
+
 `qa-ui-auto-platforms` automatically requests these artifacts for native
 `TC-MODULES-007`. The fixture requires exact source SHA, platform, identity and
 bytes; the production app must still validate the signature through Settings.

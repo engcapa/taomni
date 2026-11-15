@@ -119,10 +119,9 @@ jobs:
           ref: ${{ github.workflow_sha }}
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: scripts/plugin-package -> target
-          shared-key: modular-package-signer
+      # Never restore compiled signer/dependency executables from a cache that
+      # an unsigned candidate job could populate. This graph is small enough
+      # to compile from the trusted, locked source on each fresh signing runner.
       - name: Compile trusted signer without private-key environment
         run: |
           cargo test --manifest-path scripts/plugin-package/Cargo.toml --lib --locked
@@ -151,6 +150,8 @@ jobs:
           files = {p.relative_to(root / 'unsigned-module').as_posix() for p in (root / 'unsigned-module').rglob('*') if p.is_file()}
           assert files == allowed, 'Unexpected files in official QA payload'
           assert not any(p.is_symlink() for p in root.rglob('*'))
+          trusted_frontend = pathlib.Path('src-tauri/plugins/hello-plugin/frontend/index.js').read_bytes()
+          assert (root / 'unsigned-module/frontend/index.js').read_bytes() == trusted_frontend, 'Candidate changed official hello frontend without a trusted release revision'
           PY
       - name: Sign and independently verify against the production pinned public key
         env:

@@ -109,6 +109,7 @@ class OfficialModuleArtifactTests(unittest.TestCase):
         self.assertNotIn("secrets.", json.dumps(jobs["build"]))
         self.assertNotIn("secrets.", json.dumps(jobs["source"]))
         signing = jobs["sign"]["steps"]
+        self.assertFalse(any("cache" in step.get("uses", "").lower() for step in signing))
         checkouts = [step for step in signing if step.get("uses", "").startswith("actions/checkout@")]
         self.assertEqual([step["with"]["ref"] for step in checkouts], ["${{ github.workflow_sha }}"])
         secret_steps = [step for step in signing if "secrets." in json.dumps(step)]
@@ -116,6 +117,8 @@ class OfficialModuleArtifactTests(unittest.TestCase):
         self.assertTrue(secret_steps[0]["run"].startswith("scripts/plugin-package/target/release/taomni-plugin-package"))
         self.assertNotIn("cargo", secret_steps[0]["run"])
         self.assertNotIn("TAURI_SIGNING_PRIVATE_KEY", secret_steps[0]["run"])
+        guard = next(step for step in signing if step.get("name", "").startswith("Restrict QA signing"))
+        self.assertIn("read_bytes() == trusted_frontend", guard["run"])
         self.assertNotIn("release", json.dumps([step for step in signing if "upload-artifact" in step.get("uses", "")]).lower())
 
 
