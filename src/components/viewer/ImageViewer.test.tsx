@@ -68,6 +68,7 @@ describe("image and SVG renderer", () => {
     render(<ImageViewer document={doc()} onError={vi.fn()} />);
     await screen.findByTestId("image-render");
     const image = decoded();
+    expect(image).toHaveAttribute("data-image-ready", "true");
     fireEvent.click(screen.getByTestId("image-zoom-in"));
     expect(image.style.transform).toContain("scale(1.2)");
     fireEvent.click(screen.getByTestId("image-rotate-right"));

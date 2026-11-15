@@ -4,7 +4,7 @@ import { t as tr } from "../../lib/i18n";
 import { sidebarRailGroup } from "../sidebarRailPolicy";
 import { terminalCwdTitlePrefix } from "../../lib/terminalCwd";
 import { getQueryTab } from "../../lib/queryRegistry";
-import { guardViewerClose } from "../../lib/openFile/closeGuard";
+import { consumeDirtyCloseBypass, guardViewerClose } from "../../lib/openFile/closeGuard";
 import { documentPathKey } from "../../lib/openFile/pathIdentity";
 import { useDocumentStore } from "../documentStore";
 import { computeDuplicateTitle, computeNewTerminalTitle, updateDuplicateAutoTitle } from "./tabTitles";
@@ -138,7 +138,7 @@ export const createTabsSlice: StateCreator<AppState, [], [], Pick<AppState, "tab
 
   removeTab: (id) => {
     const path = get().tabs.find((tab) => tab.id === id)?.fileViewer?.path;
-    if (path && useDocumentStore.getState().documents[documentPathKey(path)]?.dirty) {
+    if (path && useDocumentStore.getState().documents[documentPathKey(path)]?.dirty && !consumeDirtyCloseBypass(path)) {
       guardViewerClose([path], () => get().removeTab(id));
       return;
     }
@@ -185,7 +185,7 @@ export const createTabsSlice: StateCreator<AppState, [], [], Pick<AppState, "tab
 
   removeTabs: (ids) => {
     const paths = get().tabs.filter((tab) => ids.includes(tab.id)).flatMap((tab) => tab.fileViewer ? [tab.fileViewer.path] : []);
-    if (paths.some((path) => useDocumentStore.getState().documents[documentPathKey(path)]?.dirty)) {
+    if (paths.some((path) => useDocumentStore.getState().documents[documentPathKey(path)]?.dirty && !consumeDirtyCloseBypass(path))) {
       guardViewerClose(paths, () => get().removeTabs(ids));
       return;
     }

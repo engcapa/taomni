@@ -39,6 +39,27 @@ def download(url, destination, expected):
     partial.replace(destination)
 
 
+def ensure_wsl_runtime(command):
+    """Update WSL when possible, while reusing a healthy hosted installation.
+
+    Windows hosted images can have a working WSL runtime while the
+    ``--web-download`` update endpoint is temporarily unavailable. The
+    ClickHouse fixture imports its own pinned rootfs, so an update is useful
+    maintenance but is not required when ``wsl --version`` is responsive.
+    """
+    try:
+        command(["wsl.exe", "--update", "--web-download"])
+        return
+    except RuntimeError as update_error:
+        try:
+            version = command(["wsl.exe", "--version"])
+        except RuntimeError:
+            raise update_error
+        if not version.strip():
+            raise update_error
+        print("WSL web update unavailable; reusing the installed WSL runtime", flush=True)
+
+
 def install():
     from ci_services import command
     root = Path(os.environ["RUNNER_TEMP"]) / "qa-clickhouse-package"
@@ -49,7 +70,7 @@ def install():
     download(f"{BASE}/{name}", archive, digest)
     if system == "Windows":
         download(ROOTFS_URL, root / "rootfs.tar.gz", ROOTFS_SHA)
-        command(["wsl.exe", "--update", "--web-download"])
+        ensure_wsl_runtime(command)
     elif system == "Darwin":
         archive.chmod(0o755)
     else:

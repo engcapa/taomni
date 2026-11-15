@@ -152,6 +152,7 @@ function ImageViewerContent({ document, onError, workspaceId }: ImageViewerProps
             onPointerMove={transform.pointerMove} onPointerUp={transform.pointerEnd} onPointerCancel={transform.pointerEnd} onLostPointerCapture={transform.pointerEnd}
             onWheel={(event) => transform.wheel(event.nativeEvent)}>
             {resource && !imageError && <img ref={image} key={resource.url} className="image-render" data-testid="image-render" src={resource.url} alt={filename} draggable={false}
+              data-image-ready={ready ? "true" : undefined}
               style={{ transform: `translate(${transform.pan.x}px, ${transform.pan.y}px) scale(${transform.scale}) rotate(${transform.rotation}deg) scaleX(${transform.flipped ? -1 : 1})` }}
               onLoad={() => { markDecoded(); }}
               onError={() => setDecodeError(resource.url)} />}

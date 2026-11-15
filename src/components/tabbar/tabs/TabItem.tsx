@@ -178,10 +178,19 @@ export function TabItem(props: TabItemProps) {
       onKeyDown={(event) => { if (!editing && (event.key === "Enter" || event.key === " ")) { event.preventDefault(); onActivate(tab); } }}
       onMouseDown={(e) => {
         if (editing) return;
+        // Activate on the trusted press as well as click. Some packaged
+        // WebViews can lose the compatibility click while the pointer drag
+        // helper is arming, leaving a clicked tab mounted but inactive.
+        if (e.button === 0) onActivate(tab);
         onMouseDown(e, tab);
       }}
       onPointerDown={(e) => {
         if (editing) return;
+        // WebKit can deliver the pointer press without a compatible mouse
+        // activation when the tab drag helper is armed. Activate on the
+        // pointer itself so a terminal/viewer tab never remains visually
+        // selected while its content stays in the background.
+        if (e.button === 0) onActivate(tab);
         const el = ref.current;
         if (!el) return;
         onStartDrag(e, tab, el);

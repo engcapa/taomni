@@ -1106,7 +1106,7 @@
             { "type": "null" },
             {
               "type": "object",
-              "required": ["expect_exit_confirmation"],
+              "minProperties": 1,
               "additionalProperties": false,
               "properties": {
                 "expect_exit_confirmation": {
@@ -1118,11 +1118,15 @@
                     "message": { "type": "string", "pattern": "\\S" },
                     "confirm_label": { "type": "string", "pattern": "\\S" }
                   }
+                },
+                "preserve_dirty_drafts": {
+                  "const": true,
+                  "description": "Explicitly approve the viewer close dialog's Keep draft action before a native cold restart."
                 }
               }
             }
           ],
-          "description": "Restart the owned isolated native QA process without resetting its profile, sessions, vault or files. Optional expect_exit_confirmation requires the exact visible exit title/message/button label, clicks its confirm button once through session.click and retains evidence; absent or unexpected prompts fail."
+          "description": "Restart the owned isolated native QA process without resetting its profile, sessions, vault or files. Optional expect_exit_confirmation requires the exact visible exit title/message/button label, while preserve_dirty_drafts explicitly clicks the viewer close dialog's Keep draft action so recovery drafts survive; absent or unexpected prompts fail."
         },
         "reload_window": {
           "oneOf": [

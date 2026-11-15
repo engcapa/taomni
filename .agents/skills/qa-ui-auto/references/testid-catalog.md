@@ -1262,6 +1262,7 @@
 - `[data-testid="viewer-close-dialog"]` — display — F-FILEOPEN-1.viewer-close-dialog
 - `[data-testid="viewer-close-save"]` — interactive — F-FILEOPEN-1.viewer-close-save
 - `[data-testid="viewer-close-discard"]` — interactive — F-FILEOPEN-1.viewer-close-discard
+- `[data-testid="viewer-close-keep-draft"]` — interactive — F-FILEOPEN-1.viewer-close-keep-draft
 - `[data-testid="viewer-close-cancel"]` — interactive — F-FILEOPEN-1.viewer-close-cancel
 - `[data-testid="image-viewer"]` — display — F-FILEOPEN-1.image-viewer
 - `[data-testid="image-render"]` — display — F-FILEOPEN-1.image-render
