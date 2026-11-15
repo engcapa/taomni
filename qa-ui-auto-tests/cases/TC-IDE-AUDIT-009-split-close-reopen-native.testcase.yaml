@@ -43,8 +43,9 @@ steps:
     key: taomni.recentWorkspaces.v1
     value: '[{"id":"qa-audit009","name":"qa-audit009","roots":[{"id":"qa-audit009","name":"qa-audit009","path":"${fixture.workspace_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"qa-audit009","path":"notes.txt"},"lastOpenedAt":1756100000000,"isGitRepo":false}]'
 - reload_window: null
-- click: '[data-testid="welcome-history-tab-workspaces"]'
-- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.workspace_root}"]'
+- click: '[data-testid="tao-home-history"]'
+- click: '[data-testid="tao-home-history-tab-workspaces"]'
+- click: '[data-testid="tao-home-history-popover"] [data-testid="tao-home-history-row"][data-workspace-path="${fixture.workspace_root}"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - wait_for:
     selector: '[data-testid="code-workspace-editor-pane"]'
@@ -194,8 +195,9 @@ steps:
       > -1
     expect_truthy: true
 - reload_window: null
-- click: '[data-testid="welcome-history-tab-workspaces"]'
-- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.workspace_root}"]'
+- click: '[data-testid="tao-home-history"]'
+- click: '[data-testid="tao-home-history-tab-workspaces"]'
+- click: '[data-testid="tao-home-history-popover"] [data-testid="tao-home-history-row"][data-workspace-path="${fixture.workspace_root}"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - wait_for:
     selector: '[data-testid="code-workspace-editor"]'
@@ -227,8 +229,9 @@ steps:
     timeout_sec: 30
 - wait: 2
 - reload_window: null
-- click: '[data-testid="welcome-history-tab-workspaces"]'
-- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.workspace_root}"]'
+- click: '[data-testid="tao-home-history"]'
+- click: '[data-testid="tao-home-history-tab-workspaces"]'
+- click: '[data-testid="tao-home-history-popover"] [data-testid="tao-home-history-row"][data-workspace-path="${fixture.workspace_root}"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - assert_text:
     selector: '[data-testid="code-workspace-editor-pane"][data-editor-group-id="primary"] .cm-content'
