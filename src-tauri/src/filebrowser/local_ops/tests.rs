@@ -259,6 +259,33 @@ fn canonical_paths_resolve_directory_aliases_and_reject_files() {
 }
 
 #[test]
+fn canonical_entry_path_resolves_files_symlinks_and_directories() {
+    let root = tempfile::tempdir().unwrap();
+    let dir = root.path().join("actual");
+    fs::create_dir(&dir).unwrap();
+    let file = dir.join("note.md");
+    fs::write(&file, "# hi").unwrap();
+    assert_eq!(
+        paths::canonical_entry_path(&file).unwrap(),
+        fs::canonicalize(&file).unwrap().to_string_lossy()
+    );
+    assert_eq!(
+        paths::canonical_entry_path(&dir.join("..")).unwrap(),
+        fs::canonicalize(root.path()).unwrap().to_string_lossy()
+    );
+    #[cfg(unix)]
+    {
+        let alias = root.path().join("alias.md");
+        std::os::unix::fs::symlink(&file, &alias).unwrap();
+        assert_eq!(
+            paths::canonical_entry_path(&alias).unwrap(),
+            paths::canonical_entry_path(&file).unwrap()
+        );
+    }
+    assert!(paths::canonical_entry_path(&root.path().join("missing")).is_err());
+}
+
+#[test]
 fn cancellation_has_owned_lifetime_and_duplicate_operation_ids_are_rejected() {
     let id = uuid::Uuid::new_v4().to_string();
     let mut operation = operation::Operation::register(Some(id.clone()), None).unwrap();

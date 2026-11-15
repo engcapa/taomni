@@ -3,6 +3,8 @@ import { EditorView } from "@codemirror/view";
 import { undo, redo } from "@codemirror/commands";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ViewerDocument } from "../../../lib/viewer";
+import { viewerReadBytes, viewerSavePastedImage } from "../../../lib/viewer";
+import { readClipboardImageFiles, readNativeClipboardImagePath } from "../../../lib/clipboard";
 import { useDocumentStore } from "../../../stores/documentStore";
 import { MarkdownEditor } from "./MarkdownEditor";
 import { exportMarkdown } from "./markdownExport";
@@ -13,6 +15,16 @@ const markdownStyles = readFileSync("src/components/viewer/markdown/markdown.css
 vi.mock("../viewerLabels", () => ({ useViewerLabels: () => (_zh: string, en: string) => en }));
 vi.mock("./markdownExport", () => ({ exportMarkdown: vi.fn() }));
 vi.mock("../../../lib/explorer/openExplorer", () => ({ openExplorer: vi.fn() }));
+vi.mock("../../../lib/clipboard", async (original) => ({
+  ...await original<typeof import("../../../lib/clipboard")>(),
+  readNativeClipboardImagePath: vi.fn(async () => null),
+  readClipboardImageFiles: vi.fn(async () => []),
+}));
+vi.mock("../../../lib/viewer", async (original) => ({
+  ...await original<typeof import("../../../lib/viewer")>(),
+  viewerReadBytes: vi.fn(),
+  viewerSavePastedImage: vi.fn(),
+}));
 const source = "# Title\n\nA **bold** line\n\n## Details\n\n| A | B |\n| --- | --- |\n| c | d |\n";
 function fixture(): ViewerDocument {
   return { key: "/docs/a.md", path: "/docs/a.md", kind: "markdown", content: source, savedContent: source, savedHash: "hash",
@@ -116,5 +128,45 @@ describe("MarkdownEditor real host lifecycle", () => {
     await waitFor(() => expect(exportMarkdown).toHaveBeenCalledWith("pdf", source, "/docs/a.md", expect.objectContaining({ paper: "Letter" })));
     expect(screen.getByTestId("markdown-export-status")).toHaveAttribute("data-export-state", "print-opened");
     expect(screen.getByTestId("markdown-export-status")).not.toHaveAttribute("data-export-path");
+  });
+
+  it("keeps Mermaid split preview width >= 340px and clamps doc padding on narrow panes", () => {
+    expect(markdownStyles).toContain(".fv-md-doc{max-width:800px;margin:0 auto;padding:30px clamp(16px,4.5%,44px) 120px;");
+    expect(markdownStyles).toContain(".fv-md-mermaid svg{width:max(100%,340px);height:auto;margin:auto}");
+  });
+
+  it("falls back to native clipboard image bytes on WebKitGTK X11 paste without ClipboardItem files", async () => {
+    vi.mocked(readNativeClipboardImagePath).mockResolvedValue("/tmp/x11-clip.png");
+    vi.mocked(viewerReadBytes).mockResolvedValue({ bytes: [137, 80, 78, 71], mime: "image/png", size: 4 });
+    vi.mocked(viewerSavePastedImage).mockResolvedValue({
+      path: "/docs/assets/pasted.png",
+      relativePath: "assets/pasted.png",
+    });
+    const tauriWindow = window as unknown as { __TAURI_INTERNALS__?: unknown };
+    const prevTauri = tauriWindow.__TAURI_INTERNALS__;
+    tauriWindow.__TAURI_INTERNALS__ = {};
+    try {
+      render(<Harness />);
+      fireEvent.click(screen.getByTestId("markdown-mode-source"));
+      const dom = screen.getByTestId("markdown-editor").querySelector<HTMLElement>(".cm-editor")!;
+      const view = EditorView.findFromDOM(dom)!;
+      act(() => view.dispatch({ selection: { anchor: view.state.doc.length } }));
+
+      const pasteEvent = new Event("paste", { bubbles: true, cancelable: true });
+      Object.defineProperty(pasteEvent, "clipboardData", {
+        value: { items: [], getData: () => "" },
+      });
+      act(() => {
+        view.contentDOM.dispatchEvent(pasteEvent);
+      });
+
+      await waitFor(() => expect(view.state.doc.toString()).toContain("![image](assets/pasted.png)"));
+      expect(readNativeClipboardImagePath).toHaveBeenCalledTimes(1);
+      expect(viewerReadBytes).toHaveBeenCalledWith("/tmp/x11-clip.png", expect.any(Number));
+      expect(readClipboardImageFiles).not.toHaveBeenCalled();
+    } finally {
+      if (prevTauri === undefined) delete tauriWindow.__TAURI_INTERNALS__;
+      else tauriWindow.__TAURI_INTERNALS__ = prevTauri;
+    }
   });
 });

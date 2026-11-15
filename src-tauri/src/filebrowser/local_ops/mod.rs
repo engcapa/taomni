@@ -25,7 +25,7 @@ async fn blocking<T: Send + 'static>(
 
 #[tauri::command]
 pub async fn explorer_canonical_path(path: String) -> Result<String, String> {
-    blocking(move || paths::canonical_key(Path::new(&path)).map_err(|e| e.to_string())).await
+    blocking(move || paths::canonical_entry_path(Path::new(&path)).map_err(|e| e.to_string())).await
 }
 
 #[tauri::command]

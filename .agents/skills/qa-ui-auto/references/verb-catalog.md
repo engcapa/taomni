@@ -514,6 +514,14 @@ Native only (Linux/Windows/macOS): `{folder?: INBOX, size_delta?: 0, empty_newes
 
 ### `mobile_service_probe` (native)
 
+`mobile_service_probe: desktop-remote` (TC-MOBILE-021, Linux/Windows) pairs
+against the real isolated listener, confirms screen capture returns 403 until
+enabled via Settings, opens a local HTTP target page in the managed Tauri
+browser window (`tauri:mobile-remote-browser`), clicks the Settings screen
+capture opt-in, verifies PNG captures, delivers OS text/Enter/Backspace input
+into the target window DOM, and drives the embedded Mobile Web `#/desktop` view
+at phone dimensions.
+
 `mobile_service_probe: terminal-query` (TC-MOBILE-018, Linux/Windows/macOS)
 starts a harmless raw Node TUI through normal desktop terminal input. Its resize
 handler issues a cursor query, as Codex TUI does. The real embedded phone bundle
@@ -522,6 +530,11 @@ per query at the phone geometry. Later phone input also queries successfully;
 real desktop typing must reclaim, and desktop queries must still receive replies.
 This requires Node on the native host and a matching isolated QA binary; no
 Codex process/account or cloud request is used.
+
+`mobile_browser_probe: desktop-enable-screen` (TC-MOBILE-020, browser) enables
+`screen_allowed` in the deterministic `mobile_web` fixture state after verifying
+the blocked opt-in state and before exercising live screen capture, display
+switching and auto-refresh controls.
 
 `mobile_browser_probe: terminal-tools` (TC-MOBILE-017, browser)
 operates the real phone bundle on the `mobile_web` fixture. It checks six-second

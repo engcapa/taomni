@@ -18,7 +18,7 @@
 .fv-md-editor-pane{flex:1;min-width:0;min-height:0;position:relative;display:flex;flex-direction:column}
 .fv-md-split>.fv-md-editor-pane,.fv-md-split>.fv-md-preview-pane{flex:1;width:50%}
 .fv-md-preview-pane{min-width:0;min-height:0;overflow:auto;border-left:1px solid var(--divider);position:relative}
-.fv-md-doc{max-width:800px;margin:0 auto;padding:30px 44px 120px;font-size:15px;line-height:1.75;color:var(--text);position:relative}
+.fv-md-doc{max-width:800px;margin:0 auto;padding:30px clamp(16px,4.5%,44px) 120px;font-size:15px;line-height:1.75;color:var(--text);position:relative}
 .fv-md-live-surface .cm-content{font-family:var(--taomni-font-sans,Inter,system-ui,-apple-system,"Segoe UI",sans-serif)!important}
 .fv-md-live-surface .cm-scroller{font-size:15px}
 .fv-md-live-surface .cm-line{white-space:pre-wrap;overflow-wrap:anywhere}
@@ -79,7 +79,7 @@
 .fv-md-math-display{display:block;text-align:center;margin:.8em 0}
 .fv-md-math .katex{font-size:1.05em}
 .fv-md-math-display .katex-display{margin:0}
-.fv-md-mermaid svg{max-width:100%;height:auto;margin:auto}
+.fv-md-mermaid svg{width:max(100%,340px);height:auto;margin:auto}
 .fv-md-render-error,.fv-md-image-error{color:var(--taomni-danger,#dc2626);font-size:12px}
 .fv-md-focus .fv-md-rendered-block,.fv-md-focus .fv-md-table-wrap,.fv-md-focus .fv-md-image,.fv-md-dim{opacity:.35}
 .fv-md-focus .fv-md-rendered-block:hover,.fv-md-focus .fv-md-table-wrap:focus-within,.fv-md-focus .fv-md-image:focus-within{opacity:1}

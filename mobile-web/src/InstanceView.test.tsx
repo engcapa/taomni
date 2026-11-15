@@ -7,6 +7,7 @@ const mock = vi.hoisted(() => ({ request: vi.fn(), open: vi.fn() }));
 vi.mock("./live", () => ({ useLive: () => ({ send: vi.fn(), canRetry: false, retry: vi.fn() }) }));
 vi.mock("./openSession", () => ({ openSession: mock.open }));
 vi.mock("./api", async original => ({ ...await original<typeof import("./api")>(), request: mock.request, loadInstances: () => [], saveInstances: vi.fn() }));
+import { ApiError } from "./api";
 import { InstanceView } from "./InstanceView";
 const instance = { id: "pc", deviceId: "phone", label: "PC", endpoint: "https://pc.example", token: "t" };
 const deferred = <T,>() => { let resolve!: (value: T) => void; let reject!: (error: Error) => void; const promise = new Promise<T>((yes, no) => { resolve = yes; reject = no; }); return { promise, resolve, reject }; };
@@ -189,4 +190,22 @@ it.each(["success", "failure"])("late A cancellation %s cannot abort or clear B"
   expect(screen.getByTestId("mobile-connection-auth")).toHaveTextContent("B challenge");
   expect(screen.getByTestId("mobile-open-status")).not.toHaveTextContent("late A error");
   expect(screen.getByTestId("mobile-open-local")).toBeDisabled();
+});
+
+it("offers the desktop & browser entry when desktop_control is advertised and renders desktop view when active", async () => {
+  const onOpenDesktop = vi.fn();
+  mock.request.mockImplementation(async (_inst, path: string) => {
+    if (path === "/sessions") {
+      return { sessions: [], saved_sessions: [], capabilities: { open_sessions: true, screen_capture: false, desktop_control: true } };
+    }
+    if (path === "/desktop/screen") throw new ApiError("screen_capture_disabled");
+    if (path === "/desktop/windows") return { windows: [], screen_capture_enabled: false };
+    throw new Error(`unexpected ${path}`);
+  });
+  const { rerender } = render(<InstanceView instance={instance} onSelect={vi.fn()} onOpenDesktop={onOpenDesktop} onCloseDesktop={vi.fn()} onCloseSession={vi.fn()} onBack={vi.fn()} />);
+  fireEvent.click(await screen.findByTestId("mobile-open-desktop"));
+  expect(onOpenDesktop).toHaveBeenCalledTimes(1);
+
+  rerender(<InstanceView instance={instance} desktop onSelect={vi.fn()} onOpenDesktop={onOpenDesktop} onCloseDesktop={vi.fn()} onCloseSession={vi.fn()} onBack={vi.fn()} />);
+  expect(await screen.findByTestId("mobile-desktop-view")).toBeInTheDocument();
 });

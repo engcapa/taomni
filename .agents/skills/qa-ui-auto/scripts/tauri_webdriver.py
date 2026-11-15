@@ -1008,7 +1008,7 @@ class NativeSession(WebDriverTransport):
                 "if (!el) return '';"
                 "const mirrored = el.getAttribute('data-terminal-text');"
                 "if (mirrored) return mirrored;"
-                "const direct = el.innerText || el.textContent || '';"
+                "const direct = el instanceof SVGElement ? (el.textContent || '') : (el.innerText || el.textContent || '');"
                 "if (direct) return direct;"
                 "const descendants = el.querySelectorAll ? Array.from(el.querySelectorAll('text, tspan'))"
                 ".map(node => node.textContent || node.innerText || (node.outerHTML || '').replace(/<[^>]*>/g, ' ')).join(' ') : '';"

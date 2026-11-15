@@ -7,7 +7,11 @@ import {
 const session = { token: "abc-123", url: "taomni-preview://localhost/abc-123/report.html" };
 
 describe("HTML preview token-bound local navigation", () => {
-  it.each([session, { token: "abc-123", url: "http://taomni-preview.localhost/abc-123/report.html" }])("handles native protocol platforms %s", (value) => {
+  it.each([
+    session,
+    { token: "abc-123", url: "http://taomni-preview.localhost/abc-123/report.html" },
+    { token: "abc-123", url: "http://127.0.0.1:54321/abc-123/report.html" },
+  ])("handles native protocol platforms %s", (value) => {
     const href = localPreviewHref("assets/second%20page.html?q=1#title", value);
     expect(href).toContain("/abc-123/assets/second%20page.html?q=1#title");
     expect(previewRoute(href!, value)).toBe("assets/second%20page.html?q=1#title");
@@ -31,6 +35,8 @@ describe("HTML preview token-bound local navigation", () => {
     { token: "abc-123", url: "taomni-preview://localhost/other/report.html" },
     { token: "../bad", url: "taomni-preview://localhost/bad/report.html" },
     { token: "abc-123", url: "http://taomni-preview.localhost:9000/abc-123/report.html" },
+    { token: "abc-123", url: "https://127.0.0.1:9000/abc-123/report.html" },
+    { token: "abc-123", url: "http://127.0.0.1/abc-123/report.html" },
   ])("rejects invalid session root %s", (value) => expect(() => previewRoot(value)).toThrow());
 });
 

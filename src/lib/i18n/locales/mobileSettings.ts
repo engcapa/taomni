@@ -19,6 +19,8 @@ export const mobileSettingsEn = {
   disable: "Disable mobile service",
   allowOpenSessions: "Allow paired phones and the Feishu adapter to open saved sessions and create local terminals",
   openSessionsHint: "Opens in this computer's desktop window using saved credentials, proxies and jump hosts. Missing connection credentials can be entered on the phone for this connection only; saved sessions are not modified. The vault master password must only be entered on this computer. Desktop mode only; not supported in headless mode. Feishu requests cannot answer desktop prompts, so finish any authentication on this computer. Turning this off blocks requests not yet accepted; connections already accepted by the desktop continue running.",
+  allowScreenCapture: "Allow paired phones and the Feishu adapter to view the current desktop screen",
+  screenCaptureHint: "Disabled by default. Capturing and refreshing the current desktop screen (including pages opened in the server browser) only succeeds when enabled. Screen capture, window input and server browser opening require desktop mode (not supported in headless mode).",
   running: "Running · {address}",
   stopped: "Disabled · No listening port",
   networkWarning: "LAN HTTP connections are unencrypted and transmit credentials and content. Use HTTPS over the internet. Enter a LAN address reachable from your phone or your own HTTPS endpoint; 0.0.0.0 and 127.0.0.1 are not remote phone addresses.",
@@ -62,6 +64,11 @@ export const mobileSettingsEn = {
     feishu_network_failed_check_proxy: "Cannot connect to Feishu. Check the network and selected proxy.",
     feishu_ws_network_failed_check_proxy: "Cannot establish the Feishu persistent connection. Check the network and selected proxy.",
     vault_cancelled: "The credential vault was not unlocked. The operation was not completed; your inputs have been retained.",
+    mobile_desktop_config_write_failed: "Cannot save desktop remote configuration. Check disk space and file permissions.",
+    screen_capture_disabled: "Screen viewing is disabled in Mobile Service settings.",
+    desktop_screen_permission_required: "Screen recording permission is required to view the current screen.",
+    desktop_input_permission_required: "Accessibility control permission is required to send input to desktop windows.",
+    desktop_screen_capture_failed: "Failed to capture the desktop screen.",
   },
 };
 
@@ -84,6 +91,8 @@ export const mobileSettingsZh: typeof mobileSettingsEn = {
   disable: "关闭移动服务",
   allowOpenSessions: "允许已配对手机和飞书适配器打开已保存会话、新建本地终端",
   openSessionsHint: "在本机桌面窗口中打开，复用已保存的凭据、代理和跳板机；缺少的连接凭据可在手机填写，仅用于本次连接，不修改已保存的会话。保险库主密码仅在本机输入。仅在桌面运行时可用，headless 不支持。飞书无法回答桌面认证提示，需要认证时请在本机完成。关闭此开关阻止尚未受理的请求；桌面已受理的连接继续运行。",
+  allowScreenCapture: "允许已配对手机和飞书适配器查看当前电脑屏幕",
+  screenCaptureHint: "默认关闭。仅在开启后，远程设备才可查看并刷新当前桌面屏幕（含服务端浏览器打开的网页）。屏幕查看、向窗口发送输入与打开服务端浏览器仅在桌面运行时可用（headless 不支持）。",
   running: "运行中 · {address}",
   stopped: "已关闭 · 无监听端口",
   networkWarning: "局域网 HTTP 为明文连接，会传输凭据和内容；互联网请配置 HTTPS。手机请使用可到达的局域网地址或自备 HTTPS endpoint；0.0.0.0 与 127.0.0.1 不能作为远程手机地址。",
@@ -127,6 +136,11 @@ export const mobileSettingsZh: typeof mobileSettingsEn = {
     feishu_network_failed_check_proxy: "无法连接飞书，请检查网络与所选代理。",
     feishu_ws_network_failed_check_proxy: "无法建立飞书长连接，请检查网络与所选代理。",
     vault_cancelled: "未解锁凭据库，操作未完成；输入已保留。",
+    mobile_desktop_config_write_failed: "无法保存桌面远程配置，请检查磁盘空间和文件权限。",
+    screen_capture_disabled: "移动服务设置中未开启屏幕查看。",
+    desktop_screen_permission_required: "缺少系统屏幕录制权限，无法查看当前屏幕。",
+    desktop_input_permission_required: "缺少系统辅助功能权限，无法向桌面窗口发送输入。",
+    desktop_screen_capture_failed: "获取当前桌面截图失败。",
   },
 };
 
@@ -155,7 +169,7 @@ export const feishuSettingsEn = {
   saved: "Settings saved. The secret is never returned.",
   status: "{state} · Delivered {delivered} · Failed {failed} · Rejected {rejected} · Duplicates {duplicates} · Reconnects {reconnects}",
   states: { stopped: "Stopped", connecting: "Connecting", connected: "Connected", reconnecting: "Reconnecting" },
-  commands: "Send /taomni help for commands. Terminals: term (follow output), input, key, saved, open, new. Agent: list, show, send, stop, approve, reject. Terminal output and input need a bound private chat; opening sessions also needs “Allow phone-opened sessions” above. Replies, tails and cards are truncated.",
+  commands: "Send /taomni help for commands. Terminals: term (follow output), input (auto-refreshes card), key, saved, open, new. Desktop: screen (view/refresh screen once enabled above), windows, wininput, winsend, winkey, browser (open URL on server). Agent: list, show, send, stop, approve, reject. Sensitive queries and remote desktop controls need a bound private chat.",
   vaultReason: "Unlock the credential vault to save or use Feishu credentials",
 };
 
@@ -184,6 +198,6 @@ export const feishuSettingsZh: typeof feishuSettingsEn = {
   saved: "设置已保存，密钥不会回传。",
   status: "{state} · 已送达 {delivered} · 发送失败 {failed} · 拒绝 {rejected} · 重复 {duplicates} · 重连 {reconnects}",
   states: { stopped: "已停止", connecting: "连接中", connected: "已连接", reconnecting: "重连中" },
-  commands: "发送 /taomni help 查看命令。终端：term（跟随输出）、input、key、saved、open、new；Agent：list、show、send、stop、approve、reject。终端输出与输入仅限已绑定私聊；打开会话还需在上方开启“允许手机打开会话”。回复、输出与卡片会截断。",
+  commands: "发送 /taomni help 查看命令。终端：term（跟随输出）、input（自动刷新展示）、key、saved、open、new；桌面：screen（开启后查看/刷新屏幕）、windows、wininput、winsend、winkey、browser（服务端打开网页）；Agent：list、show、send、stop、approve、reject。终端、屏幕、窗口输入与服务端浏览器指令仅限已绑定私聊。",
   vaultReason: "保存或使用飞书凭据需要解锁凭据库",
 };

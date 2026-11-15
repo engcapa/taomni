@@ -1,4 +1,4 @@
-use super::{cards, commands, config::Config};
+use super::{cards, commands, config::Config, desktop_actions};
 use crate::mobile::{Core, agent_view, file_view, session_view};
 use base64::{Engine, engine::general_purpose::STANDARD as B64};
 use rusqlite::OptionalExtension;
@@ -28,7 +28,15 @@ pub struct Request {
 pub enum Reply {
     Text(String),
     Card(Value),
-    Terminal { card: Value, term: String },
+    Terminal {
+        card: Value,
+        term: String,
+    },
+    Screen {
+        card: Value,
+        png: Vec<u8>,
+        filename: String,
+    },
 }
 #[cfg(test)]
 impl Reply {
@@ -36,7 +44,16 @@ impl Reply {
     pub fn text(&self) -> String {
         match self {
             Self::Text(text) => text.clone(),
-            Self::Card(card) | Self::Terminal { card, .. } => card.to_string(),
+            Self::Card(card) | Self::Terminal { card, .. } | Self::Screen { card, .. } => {
+                card.to_string()
+            }
+        }
+    }
+    /// Screenshot PNG payload when a screen capture card is returned.
+    pub fn image(&self) -> Option<&[u8]> {
+        match self {
+            Self::Screen { png, .. } => Some(png),
+            _ => None,
         }
     }
 }
@@ -199,10 +216,26 @@ pub async fn execute_request(core: &Core, config: &Config, request: &Request) ->
     let action = request.command.split_whitespace().next().unwrap_or("");
     if matches!(
         action,
-        "show" | "file" | "term" | "term-refresh" | "input" | "key" | "saved" | "open" | "new"
+        "show"
+            | "file"
+            | "term"
+            | "term-refresh"
+            | "input"
+            | "key"
+            | "saved"
+            | "open"
+            | "new"
+            | "screen"
+            | "windows"
+            | "wininput"
+            | "winsend"
+            | "winkey"
+            | "browser"
     ) && !request.private_chat
     {
-        return Reply::Text("操作失败：终端输出、输入与内容查询仅允许已绑定的私聊。".into());
+        return Reply::Text(
+            "操作失败：终端输出、输入、屏幕与桌面窗口控制仅允许已绑定的私聊。".into(),
+        );
     }
     let p2p_chat = request.private_chat.then_some(request.chat.as_str());
     run(
@@ -283,6 +316,10 @@ async fn dispatch(
     let rest = parts.next().unwrap_or("").trim();
     match action {
         "help" => return Ok(Reply::Text(commands::HELP.into())),
+        "screen" | "windows" | "wininput" | "winsend" | "winkey" | "browser" => {
+            return desktop_actions::execute(core, config, action, target, rest, p2p_chat, request)
+                .await;
+        }
         "list" | "term" | "term-refresh" | "term-unfollow" | "show" | "file" | "input" | "key"
         | "saved" | "open" | "new" | "send" | "stop" | "approve" | "reject" => {}
         _ => return Ok(Reply::Text(commands::UNKNOWN.into())),
@@ -506,6 +543,14 @@ async fn terminal_input(
     if !id.starts_with("term:") {
         return Err("agent_only_no_pty_input".into());
     }
+    let raw_id = id.strip_prefix("term:").ok_or("terminal_not_found")?;
+    let mut output_rx = core
+        .state()
+        .mobile
+        .broker
+        .subscribe(raw_id)
+        .ok()
+        .map(|(rx, _)| rx);
     if action == "input" {
         if text.is_empty() {
             return Err("输入内容不能为空。".into());
@@ -515,6 +560,7 @@ async fn terminal_input(
         let bytes = commands::key_bytes(&text).ok_or("unknown_key")?;
         write_terminal(core, &id, bytes, true).await?;
     }
+    settle_terminal_output(output_rx.as_mut()).await;
     if let Some(request) = request {
         core.state()
             .mobile
@@ -525,6 +571,38 @@ async fn terminal_input(
     let chat = request.map(|r| r.chat.as_str());
     let card = cards::terminal(config, &id, &title, &status, &tail, true, chat);
     Ok(Reply::Terminal { card, term: id })
+}
+async fn settle_terminal_output(rx: Option<&mut tokio::sync::broadcast::Receiver<Value>>) {
+    let Some(rx) = rx else {
+        return;
+    };
+    let start = tokio::time::Instant::now();
+    let initial_deadline = start + Duration::from_millis(350);
+    let max_deadline = start + Duration::from_millis(600);
+    let mut got_output = false;
+    loop {
+        let now = tokio::time::Instant::now();
+        let deadline = if got_output {
+            (now + Duration::from_millis(75)).min(max_deadline)
+        } else {
+            initial_deadline
+        };
+        if now >= deadline {
+            break;
+        }
+        match tokio::time::timeout_at(deadline, rx.recv()).await {
+            Ok(Ok(event)) => match event["type"].as_str() {
+                Some("exit") => break,
+                Some("output") => got_output = true,
+                _ => {}
+            },
+            Ok(Err(tokio::sync::broadcast::error::RecvError::Lagged(_))) => {
+                got_output = true;
+            }
+            Ok(Err(tokio::sync::broadcast::error::RecvError::Closed)) => break,
+            Err(_) => break,
+        }
+    }
 }
 async fn write_terminal(core: &Core, id: &str, bytes: &[u8], raw: bool) -> Result<(), String> {
     let raw_id = id.strip_prefix("term:").ok_or("terminal_not_found")?;

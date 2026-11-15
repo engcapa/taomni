@@ -154,9 +154,7 @@ describe("clipboard.writeImagePng", () => {
     clipboardTestMocks.tauri = true;
     clipboardTestMocks.invoke.mockResolvedValue(undefined);
     await writeImagePng(new Blob([Uint8Array.of(1, 2, 3)], { type: "image/png" }));
-    expect(clipboardTestMocks.invoke).toHaveBeenCalledWith("clipboard_write_image_png", {
-      bytes: [1, 2, 3],
-    });
+    expect(clipboardTestMocks.invoke).toHaveBeenCalledWith("clipboard_write_image_png", Uint8Array.of(1, 2, 3));
   });
 
   it("rejects when ClipboardItem unavailable", async () => {
@@ -168,6 +166,34 @@ describe("clipboard.writeImagePng", () => {
     });
     await expect(writeImagePng(new Blob([]))).rejects.toThrow();
     if (original) (globalThis as { ClipboardItem?: unknown }).ClipboardItem = original;
+  });
+
+  it("invokes native clipboard_write_image_png with PNG bytes inside Tauri without Navigator ClipboardItem", async () => {
+    const original = (globalThis as { ClipboardItem?: unknown }).ClipboardItem;
+    delete (globalThis as { ClipboardItem?: unknown }).ClipboardItem;
+    Object.defineProperty(globalThis, "navigator", {
+      value: { clipboard: {} },
+      configurable: true,
+    });
+    clipboardTestMocks.tauri = true;
+    clipboardTestMocks.invoke.mockResolvedValue(undefined);
+    const pngBytes = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+
+    try {
+      await expect(writeImagePng(new Blob([pngBytes], { type: "image/png" }))).resolves.toBeUndefined();
+      expect(clipboardTestMocks.invoke).toHaveBeenCalledTimes(1);
+      const [cmd, payload] = clipboardTestMocks.invoke.mock.calls[0];
+      expect(cmd).toBe("clipboard_write_image_png");
+      expect(Array.from(payload as Uint8Array)).toEqual(Array.from(pngBytes));
+    } finally {
+      if (original) (globalThis as { ClipboardItem?: unknown }).ClipboardItem = original;
+    }
+  });
+
+  it("rejects empty PNG blobs in Tauri before invoking native clipboard", async () => {
+    clipboardTestMocks.tauri = true;
+    await expect(writeImagePng(new Blob([], { type: "image/png" }))).rejects.toThrow("empty");
+    expect(clipboardTestMocks.invoke).not.toHaveBeenCalled();
   });
 });
 

@@ -56,6 +56,9 @@ beforeEach(() => {
     refreshCodes,
   });
   copyCode.mockClear();
+  load.mockClear();
+  refreshCodes.mockClear();
+  refreshCodes.mockImplementation(async () => undefined);
   useAppStore.setState({
     floatingMfa: { open: false, pinned: false, position: { left: 50, bottom: 30 }, searchQuery: "" },
     statusMessage: "",
@@ -132,5 +135,41 @@ describe("MfaFloatingWindow (TASK-04)", () => {
     expect(onExpand).toHaveBeenCalledTimes(1);
     expect(useAppStore.getState().floatingMfa.open).toBe(false);
     expect(useAppStore.getState().activeSideTab).toBe("sessions");
+  });
+
+  it("does not poll mfa_codes while the floating window is closed", () => {
+    vi.useFakeTimers();
+    try {
+      render(<MfaFloatingWindow onExpand={vi.fn()} />);
+      act(() => {
+        vi.advanceTimersByTime(3500);
+      });
+      expect(refreshCodes).not.toHaveBeenCalled();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("swallows interval refreshCodes rejections such as VAULT_LOCKED without unhandledrejection", async () => {
+    vi.useFakeTimers();
+    const unhandled: unknown[] = [];
+    const onUnhandled = (event: PromiseRejectionEvent) => {
+      event.preventDefault();
+      unhandled.push(event.reason);
+    };
+    window.addEventListener("unhandledrejection", onUnhandled);
+    refreshCodes.mockRejectedValue(new Error("VAULT_LOCKED"));
+    try {
+      openWindow();
+      render(<MfaFloatingWindow onExpand={vi.fn()} />);
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1100);
+      });
+      expect(refreshCodes).toHaveBeenCalled();
+      expect(unhandled).toEqual([]);
+    } finally {
+      window.removeEventListener("unhandledrejection", onUnhandled);
+      vi.useRealTimers();
+    }
   });
 });

@@ -46,7 +46,7 @@ describe("settingsSearch groups", () => {
 
   it.each(["en", "zh-CN"] as const)("finds mobile settings through localized visible titles in %s", locale => {
     setLocale(locale);
-    for (const key of ["mobileSettings.title", "mobileSettings.allowOpenSessions", "mobileSettings.hostsTitle", "mobileSettings.allowAllHosts", "feishuSettings.title"]) {
+    for (const key of ["mobileSettings.title", "mobileSettings.allowOpenSessions", "mobileSettings.allowScreenCapture", "mobileSettings.hostsTitle", "mobileSettings.allowAllHosts", "feishuSettings.title"]) {
       expect(matchingIds(translate(key), translate)).toContain("mobile-service");
     }
     expect(groupIdForEntry("mobile-service")).toBe("network");

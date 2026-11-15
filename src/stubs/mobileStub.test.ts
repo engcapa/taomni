@@ -21,3 +21,9 @@ it("does not replace the saved preview policy on invalid hosts or excess entries
   await expect(mobileStub("mobile_listener_save", { config: { allowed_hosts: Array(33).fill("pc.example"), allow_all_hosts: false } })).rejects.toThrow("too_many_mobile_hosts");
   expect(await mobileStub("mobile_listener_get")).toEqual(config);
 });
+
+it("defaults screen capture opt-in to false and persists changes across mobile_status calls", async () => {
+  expect((await mobileStub("mobile_status") as { allow_screen_capture: boolean }).allow_screen_capture).toBe(false);
+  expect(await mobileStub("mobile_set_screen_capture", { enabled: true })).toBe(true);
+  expect((await mobileStub("mobile_status") as { allow_screen_capture: boolean }).allow_screen_capture).toBe(true);
+});

@@ -57,9 +57,15 @@ pub async fn list(state: &AppState) -> Result<Value, String> {
     sessions.sort_by(|a, b| a["id"].as_str().cmp(&b["id"].as_str()));
     let saved: Vec<_> = saved.into_iter().filter(|s| is_terminal_type(&s.session_type))
         .map(|s| json!({"id":s.id,"name":s.name,"session_type":s.session_type,"group_path":s.group_path})).collect();
-    Ok(
-        json!({"sessions":sessions,"saved_sessions":saved,"capabilities":{"open_sessions":super::session_open::available(state)}}),
-    )
+    Ok(json!({
+        "sessions": sessions,
+        "saved_sessions": saved,
+        "capabilities": {
+            "open_sessions": super::session_open::available(state),
+            "screen_capture": state.mobile.desktop.screen_allowed(),
+            "desktop_control": state.mobile.desktop_available.load(std::sync::atomic::Ordering::Relaxed)
+        }
+    }))
 }
 pub async fn detail(state: &AppState, id: &str) -> Result<Value, String> {
     if let Some(id) = id.strip_prefix("term:") {

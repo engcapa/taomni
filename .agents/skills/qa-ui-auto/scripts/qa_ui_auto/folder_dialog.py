@@ -73,14 +73,16 @@ def linux_dialog(ctx, path: Path | None, title: str = TITLE, kind: str = "folder
     # every supported Linux host.
     from PIL import ImageGrab
     ImageGrab.grab(xdisplay=os.environ["DISPLAY"]).save(ctx.case_dir / "native-folder-dialog.png")
+    submit_key = ("alt+c" if cancel_after_path else "alt+s") if kind == "save" else "alt+o"
     if path is None:
         command("xdotool", "key", "--clearmodifiers", "Escape")
     elif kind == "save":
-        # GtkFileChooserNative Save starts with the Name entry selected. Use
-        # the real location entry with the full owned filename, then Save once.
-        command("xdotool", "key", "--clearmodifiers", "ctrl+l")
+        # GtkFileChooserNative Save starts with only the filename stem selected
+        # (e.g. "[live].html"). Select all and clear before typing the full
+        # owned path so the default extension is never left appended.
+        command("xdotool", "key", "--clearmodifiers", "ctrl+l", "ctrl+a", "BackSpace")
         command("xdotool", "type", "--clearmodifiers", "--delay", "15", "--", str(path))
-        command("xdotool", "key", "--clearmodifiers", "alt+c" if cancel_after_path else "alt+s")
+        command("xdotool", "key", "--clearmodifiers", submit_key)
     else:
         # GTK disables Open on Recent until an item is selected. Start from
         # the filesystem view, then submit the location entry directly so
@@ -92,19 +94,19 @@ def linux_dialog(ctx, path: Path | None, title: str = TITLE, kind: str = "folder
         # Activate Open while the location entry still owns the typed path.
         # Enter followed by Open can navigate first, then select its first
         # child directory instead of the requested folder.
-        command("xdotool", "key", "--clearmodifiers", "alt+o")
+        command("xdotool", "key", "--clearmodifiers", submit_key)
     deadline = time.monotonic() + 10
     while window in command("xdotool", "search", "--onlyvisible", "--name", "^" + re.escape(title) + "$", check=False).splitlines():
         if time.monotonic() > deadline:
             ImageGrab.grab(xdisplay=os.environ["DISPLAY"]).save(ctx.case_dir / "native-folder-dialog-timeout.png")
             raise StepError("native_folder_dialog: chooser did not close")
-        # GTK validates a location asynchronously. Open can still be disabled
+        # GTK validates a location asynchronously. Open/Save can still be disabled
         # immediately after typing, especially when Recent contains a folder
-        # removed by a preceding case. Retry the same explicit selection while
-        # this owned chooser remains visible; do not navigate into its children.
+        # removed by a preceding case or when a full save path is typed. Retry
+        # the same explicit response key while this owned chooser remains visible.
         time.sleep(0.25)
-        if kind == "folder" and path is not None and window in command("xdotool", "search", "--onlyvisible", "--name", "^" + re.escape(title) + "$", check=False).splitlines():
-            command("xdotool", "key", "--clearmodifiers", "alt+o")
+        if path is not None and window in command("xdotool", "search", "--onlyvisible", "--name", "^" + re.escape(title) + "$", check=False).splitlines():
+            command("xdotool", "key", "--clearmodifiers", submit_key)
     return {"transport": "X11 OS keyboard", "window": window, "pid": pid, "application": str(application)}
 
 

@@ -3,6 +3,7 @@ import { inspectorStub, inspectorCheckStub } from "../modelInspectorStub";
 import { type InvokeArgs } from "./runtime";
 import { stubSystemRdpStatus } from "./servers";
 import { readFiles, writeFiles, clearFiles } from "../fileClipboard";
+import { rawBytesFromInvokeArgs } from "./files";
 
 export async function invokeApplication<T>(cmd: string, args?: any): Promise<T> {
   switch (cmd) {
@@ -43,6 +44,23 @@ export async function invokeApplication<T>(cmd: string, args?: any): Promise<T> 
         throw new Error("Clipboard write is not available in browser preview.");
       }
       await navigator.clipboard.writeText(text);
+      return undefined as T;
+    }
+
+    case "clipboard_write_image_png": {
+      clearFiles();
+      if (typeof ClipboardItem === "undefined" || !navigator.clipboard?.write) {
+        throw new Error("Image clipboard not supported in this environment");
+      }
+      const bytes = rawBytesFromInvokeArgs(args);
+      if (bytes.byteLength === 0) {
+        throw new Error("Clipboard image payload is empty");
+      }
+      await navigator.clipboard.write([
+        new ClipboardItem({
+          "image/png": new Blob([new Uint8Array(bytes)], { type: "image/png" }),
+        }),
+      ]);
       return undefined as T;
     }
 

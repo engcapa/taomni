@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import base64
 import hashlib
+import html as html_lib
 import io
 import json
 from pathlib import Path
@@ -41,6 +42,18 @@ def png_info(data):
         return {"width": image.width, "height": image.height, "pixelSha256": hashlib.sha256(rgba.tobytes()).hexdigest()}
 
 
+def svg_text(document: str) -> str:
+    """Extract normalized readable text across all embedded SVG diagrams."""
+    blocks = re.findall(r"<svg\b.*?</svg>", document, flags=re.S | re.I)
+    if not blocks:
+        return ""
+    combined = "\n".join(blocks)
+    # Mermaid v11 splits multi-word node labels across sibling <tspan> elements.
+    without_tspans = re.sub(r"</?tspan\b[^>]*>", "", combined, flags=re.I)
+    stripped = re.sub(r"<[^>]+>", " ", without_tspans)
+    return re.sub(r"\s+", " ", html_lib.unescape(stripped))
+
+
 def check_artifact(kind, path, source, manifest):
     text = source.read_text(encoding="utf-8")
     if "# File open Markdown" not in text:
@@ -77,7 +90,8 @@ def check_artifact(kind, path, source, manifest):
         html = data.decode("utf-8")
         if "File open Markdown" not in html or "Rendered bold" not in html:
             raise StepError("HTML export lost fixture content")
-        if manifest.get("diagramLabels") and (not re.search(r"<svg[\s>]", html) or any(label not in html for label in manifest["diagramLabels"]) or "language-mermaid" in html):
+        rendered_svg = svg_text(html)
+        if manifest.get("diagramLabels") and (not rendered_svg or any(label not in rendered_svg for label in manifest["diagramLabels"]) or "language-mermaid" in html):
             raise StepError("HTML export lost the actual rendered Mermaid SVG/labels")
         if "\\(" in html or "\\[" in html or "katex" not in html:
             raise StepError("HTML export lost KaTeX-rendered math")

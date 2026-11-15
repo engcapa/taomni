@@ -54,11 +54,31 @@ impl Network {
             base: "https://open.feishu.cn".into(),
         })
     }
-    async fn post(&self, route: &str, body: &Value, token: Option<&str>) -> Result<Value, String> {
-        let mut req = self.client.post(format!("{}{route}", self.base)).json(body);
+    async fn send_json(
+        &self,
+        method: reqwest::Method,
+        route: &str,
+        body: &Value,
+        token: Option<&str>,
+    ) -> Result<Value, String> {
+        let mut req = self
+            .client
+            .request(method, format!("{}{route}", self.base))
+            .json(body);
         if let Some(token) = token {
             req = req.bearer_auth(token);
         }
+        Self::read_json_response(req).await
+    }
+    async fn post(&self, route: &str, body: &Value, token: Option<&str>) -> Result<Value, String> {
+        self.send_json(reqwest::Method::POST, route, body, token)
+            .await
+    }
+    async fn patch(&self, route: &str, body: &Value, token: Option<&str>) -> Result<Value, String> {
+        self.send_json(reqwest::Method::PATCH, route, body, token)
+            .await
+    }
+    async fn read_json_response(req: reqwest::RequestBuilder) -> Result<Value, String> {
         let mut response = req
             .send()
             .await
@@ -138,8 +158,34 @@ impl Network {
                 .to_owned()
         })
     }
+    /// Uploads a PNG screenshot to Feishu and returns its reusable `image_key`.
+    pub async fn upload_image(&self, bytes: &[u8], filename: &str) -> Result<String, String> {
+        if bytes.is_empty() || bytes.len() > 10 * 1024 * 1024 {
+            return Err("feishu_invalid_image".into());
+        }
+        let token = self.token().await?;
+        let part = reqwest::multipart::Part::bytes(bytes.to_vec())
+            .file_name(filename.to_owned())
+            .mime_str("image/png")
+            .map_err(|_| "feishu_invalid_image".to_string())?;
+        let form = reqwest::multipart::Form::new()
+            .text("image_type", "message")
+            .part("image", part);
+        let req = self
+            .client
+            .post(format!("{}/open-apis/im/v1/images", self.base))
+            .bearer_auth(token.as_str())
+            .multipart(form);
+        let result = Self::read_json_response(req).await;
+        self.expire_token_on_error(&result).await;
+        result?["data"]["image_key"]
+            .as_str()
+            .filter(|v| !v.is_empty())
+            .map(str::to_owned)
+            .ok_or_else(|| "feishu_invalid_image_response".to_string())
+    }
     /// Replaces a sent shared card in place (`update_multi` must be set on both
-    /// the old and new card). Used only for the bounded terminal follow window.
+    /// the old and new card). Used for the bounded terminal follow window.
     pub async fn update_card(&self, message_id: &str, card: &Value) -> Result<(), String> {
         if message_id.is_empty()
             || message_id.len() > 128
@@ -152,7 +198,7 @@ impl Network {
         let token = self.token().await?;
         let route = format!("/open-apis/im/v1/messages/{message_id}");
         let result = self
-            .post(
+            .patch(
                 &route,
                 &json!({"content":card.to_string()}),
                 Some(token.as_str()),

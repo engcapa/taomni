@@ -1,0 +1,61 @@
+id: TC-MOBILE-021
+title: Native mobile listener gates screen capture, opens server browser, and delivers OS input
+covers: [F-MOBILE-1]
+tags: [p0, mobile, desktop-remote, native-boundary]
+modes: [native]
+native_platforms:
+- Linux
+- Windows
+fixtures: [reset_db, mobile_service]
+timeout_sec: 180
+description: >-
+  Launch packaged native Taomni with isolated settings/DB, confirm remote screen capture starts
+  disabled in Settings and HTTP GET /api/v1/desktop/screen returns 403, open a local HTTP target
+  page in the managed Tauri server browser window (tauri:mobile-remote-browser), enable screen
+  capture via the real Settings checkbox and verify PNG capture, send OS keyboard input to the
+  managed browser window and verify DOM keystroke/Enter/Backspace receipt, drive the real embedded
+  Mobile Web bundle at phone dimensions, and confirm Settings persistence across tab reopen.
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-mobile-desktop-master
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: mobile}
+- wait_for: '[data-testid="mobile-settings"]'
+- wait_for: '[data-testid="mobile-settings-screen-capture"]'
+- assert_count: {selector: '[data-testid="mobile-settings-screen-capture"]:checked', equal: 0}
+- fill: {selector: '[data-testid="mobile-settings-port"]', value: '0'}
+- click: '[data-testid="mobile-settings-toggle"]'
+- assert_text: {selector: '[data-testid="mobile-settings-status"]', contains: Running}
+- click: '[data-testid="mobile-settings-pair"]'
+- wait_for: '[data-testid="mobile-settings-code"]'
+- mobile_service_probe: desktop-remote
+- assert_file_contains: {path: '${fixture.mobile_desktop_remote_receipt}', contains: '"passed": true'}
+- click: '[data-testid="tab-item"][data-tab-type="settings"] [data-testid="tab-close"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: mobile}
+- wait_for: '[data-testid="mobile-settings-screen-capture"]'
+- assert_count: {selector: '[data-testid="mobile-settings-screen-capture"]:checked', equal: 1}
+- assert_no_runtime_errors: null
+- screenshot: native-desktop-remote-settings.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Screen capture opt-in defaults off, blocks unpermitted capture, unlocks real PNG capture, server browser window, OS window input, and embedded mobile web view, and persists enabled setting.
+    actions: [3, 4, 8, 9, 11, 13, 15, 16, 17]
+    checkpoints:
+    - {step: 7, expectation: Screen capture setting starts unchecked by default.}
+    - {step: 10, expectation: Native mobile HTTP listener reports Running.}
+    - {step: 13, expectation: 'Native oracle verifies 403 gate when off, external Tauri browser URL load, real PNG screen capture after clicking opt-in checkbox, real OS text/Enter/Backspace keystrokes arriving in the browser DOM, and embedded Mobile Web DesktopView driving input.'}
+    - {step: 14, expectation: Sanitized receipt records all desktop-remote checks passing.}
+    - {step: 19, expectation: Screen capture checkbox remains checked after closing and reopening Settings.}
+    - {step: 20, expectation: No native WebView runtime errors occurred.}
+    results: [7, 10, 13, 14, 19, 20]
+  visual:
+  - check: Settings toggle and phone DesktopView screenshots cleanly show opt-in and captured screen at 390x844.
+    method: automated
+    reason: Embedded Mobile Web phone screenshot and overflow assertion plus sample PNG artifact inspect rendered UI; independent HTTP keystroke events own delivery verification.
+  native:
+  - check: Real Tauri IPC opt-in persistence, xcap OS screen capture, managed WebviewWindow browser creation, and enigo OS window activation/keyboard synthesis on Linux X11 and Windows.
+    method: automated
+    reason: Executes inside packaged Tauri with real OS display/input stack; macOS TCC blocks headless Screen Recording/Accessibility prompts in hosted CI and is covered by platform notes and unit tests.

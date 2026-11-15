@@ -64,3 +64,30 @@ fn clipboard_uri_text_parses_quoted_paths() {
     let double_quoted = clipboard_paths_from_uri_text("\"/tmp/screenshot.png\"");
     assert_eq!(double_quoted, vec!["/tmp/screenshot.png".to_string()]);
 }
+
+#[test]
+fn decode_clipboard_png_accepts_valid_png_and_rejects_empty_or_corrupt_bytes() {
+    let mut encoded = Vec::new();
+    let image = image::RgbaImage::from_pixel(2, 1, image::Rgba([12, 34, 56, 255]));
+    image::DynamicImage::ImageRgba8(image)
+        .write_to(
+            &mut std::io::Cursor::new(&mut encoded),
+            image::ImageFormat::Png,
+        )
+        .expect("encode 2x1 png");
+
+    let decoded = super::clipboard::decode_clipboard_png(&encoded).expect("decode valid png");
+    assert_eq!(decoded.dimensions(), (2, 1));
+    assert_eq!(decoded.get_pixel(0, 0).0, [12, 34, 56, 255]);
+
+    assert!(
+        super::clipboard::decode_clipboard_png(&[])
+            .expect_err("reject empty payload")
+            .contains("empty")
+    );
+    assert!(
+        super::clipboard::decode_clipboard_png(b"not a png")
+            .expect_err("reject corrupt png")
+            .contains("decode clipboard png")
+    );
+}

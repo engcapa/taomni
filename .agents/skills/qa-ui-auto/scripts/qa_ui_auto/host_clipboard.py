@@ -136,6 +136,9 @@ def targets() -> list[str]:
 
 def set_text(text: str) -> None:
     if SYSTEM == "Windows":
+        if not text:
+            clear()
+            return
         _ps("[System.Windows.Forms.Clipboard]::SetText($arg)", text)
     elif SYSTEM == "Darwin":
         _run(["pbcopy"], input_bytes=text.encode("utf-8"), env={"LANG": "en_US.UTF-8"})

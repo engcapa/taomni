@@ -287,3 +287,30 @@ fn terminal_grammar_keeps_verbatim_input_text() {
     assert!(resolve_saved(&saved, "1").is_err());
     assert!(resolve_saved(&saved, "缺失").is_err());
 }
+
+#[test]
+fn desktop_remote_commands_parse_aliases_and_group_prefix_rules() {
+    use super::commands::parse;
+    for (text, expected) in [
+        ("screen", "screen"),
+        ("屏幕", "screen"),
+        ("截屏 disp-1", "screen disp-1"),
+        ("windows", "windows"),
+        ("窗口", "windows"),
+        ("wininput win:1 hello   world", "wininput win:1 hello world"),
+        ("窗口输入 1234 hello world", "wininput 1234 hello world"),
+        ("窗口回车 win:1 ls -la", "winsend win:1 ls -la"),
+        ("窗口按键 win:1 f5", "winkey win:1 f5"),
+        ("浏览器 https://example.com", "browser https://example.com"),
+    ] {
+        assert_eq!(normalize(text, true).as_deref(), Some(expected), "{text:?}");
+        assert_eq!(
+            normalize(text, false),
+            None,
+            "group must require prefix: {text:?}"
+        );
+    }
+    let verbatim = parse("窗口输入 win:9   a   b", true).unwrap();
+    assert_eq!(verbatim.command, "wininput win:9 a b");
+    assert_eq!(verbatim.after_target, "a   b");
+}

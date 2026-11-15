@@ -7,8 +7,8 @@ function listenerConfig(): MobileListenerConfig {
   const raw = localStorage.getItem(listenerKey);
   return raw ? JSON.parse(raw) as MobileListenerConfig : { allowed_hosts: [], allow_all_hosts: false };
 }
-interface Status { enabled: boolean; address: string | null; failed_attempts: number; devices: unknown[]; allow_open_sessions: boolean }
-let status: Status = { enabled: false, address: null, failed_attempts: 0, devices: [], allow_open_sessions: false };
+interface Status { enabled: boolean; address: string | null; failed_attempts: number; devices: unknown[]; allow_open_sessions: boolean; allow_screen_capture: boolean }
+let status: Status = { enabled: false, address: null, failed_attempts: 0, devices: [], allow_open_sessions: false, allow_screen_capture: false };
 export async function mobileStub(command: string, args?: Record<string, unknown>) {
   if (command.startsWith("mobile_feishu_")) return feishuStub(command, args);
   if (command === "mobile_listener_get") return listenerConfig();
@@ -33,6 +33,7 @@ export async function mobileStub(command: string, args?: Record<string, unknown>
   if (command === "mobile_pairing_code") return "preview-only-pairing-code";
   if (command === "mobile_revoke") return;
   if (command === "mobile_set_open_sessions") { status = { ...status, allow_open_sessions: !!args?.enabled }; return status.allow_open_sessions; }
+  if (command === "mobile_set_screen_capture") { status = { ...status, allow_screen_capture: !!args?.enabled }; return status.allow_screen_capture; }
   if (command === "mobile_claim_open_session") return status.enabled && status.allow_open_sessions;
   if (command === "mobile_terminal_title" || command === "mobile_open_session_result") return true;
   return structuredClone(status);

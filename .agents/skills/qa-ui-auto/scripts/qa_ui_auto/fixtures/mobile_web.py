@@ -25,7 +25,41 @@ def setup(ctx):
     receipt.write_text('', encoding='utf-8')
     clients = []
     lock = threading.RLock()
-    state = {'paired': False, 'connection_id': 'fixture-connection', 'holder': 'none', 'seq': 0, 'event_seq': 0, 'task': 'idle', 'open': 0, 'opens': {}, 'direct': ''}
+    import base64 as _b64
+    import struct as _struct
+    import time as _time
+    import zlib as _zlib
+    from urllib.parse import parse_qs as _parse_qs, unquote as _unquote, urlparse as _urlparse
+
+    def png_fixture_b64(width, height, rgb):
+        def chunk(tag, data):
+            body = tag + data
+            return _struct.pack('!I', len(data)) + body + _struct.pack('!I', _zlib.crc32(body) & 0xffffffff)
+        row = b'\x00' + bytes(rgb) * width
+        ihdr = _struct.pack('!IIBBBBB', width, height, 8, 2, 0, 0, 0)
+        png = b'\x89PNG\r\n\x1a\n' + chunk(b'IHDR', ihdr) + chunk(b'IDAT', _zlib.compress(row * height)) + chunk(b'IEND', b'')
+        return _b64.b64encode(png).decode('ascii')
+
+    displays = [
+        {'id': 'display-0', 'name': 'Primary Display', 'width': 1920, 'height': 1080, 'primary': True},
+        {'id': 'display-1', 'name': 'Secondary Display', 'width': 1280, 'height': 720, 'primary': False},
+    ]
+    state = {
+        'paired': False, 'connection_id': 'fixture-connection', 'holder': 'none',
+        'seq': 0, 'event_seq': 0, 'task': 'idle', 'open': 0, 'opens': {}, 'direct': '',
+        'screen_allowed': False, 'screen_rev': 0,
+        'windows': [
+            {
+                'id': 'win-editor', 'title': 'Notes - Taomni', 'app_name': 'Notes', 'pid': 101,
+                'x': 20, 'y': 20, 'width': 960, 'height': 640, 'minimized': False, 'focused': True, 'kind': 'window',
+            },
+            {
+                'id': 'win-term', 'title': 'Terminal', 'app_name': 'Terminal', 'pid': 102,
+                'x': 80, 'y': 80, 'width': 800, 'height': 520, 'minimized': False, 'focused': False, 'kind': 'window',
+            },
+        ],
+    }
+    ctx._mobile_web_state = state
     auth_case = ctx.case_id in ('TC-MOBILE-006', 'TC-MOBILE-009')
     cancel_race = threading.Event()
 
@@ -101,6 +135,45 @@ def setup(ctx):
                         return self.reply(500, {'error': 'next_request_not_observed'})
                     record('CANCEL_RESPONSE ' + request_id)
                 return self.reply(200, {'status': 'cancelled'})
+            if path == '/api/v1/desktop/browser':
+                url = str(body.get('url', '')).strip()
+                if not url.startswith(('http://', 'https://')):
+                    return self.reply(400, {'error': 'invalid_browser_url', 'message': 'Invalid URL'})
+                title = 'Taomni Browser - ' + url
+                for win in state['windows']:
+                    win['focused'] = False
+                browser_win = next((w for w in state['windows'] if w['id'] == 'tauri:mobile-remote-browser'), None)
+                if browser_win is None:
+                    browser_win = {
+                        'id': 'tauri:mobile-remote-browser', 'title': title, 'app_name': 'Taomni', 'pid': 200,
+                        'x': 40, 'y': 40, 'width': 1120, 'height': 760,
+                        'minimized': False, 'focused': True, 'kind': 'tauri_browser',
+                    }
+                    state['windows'].insert(0, browser_win)
+                else:
+                    browser_win['title'] = title
+                    browser_win['focused'] = True
+                state['screen_rev'] += 1
+                record('BROWSER ' + url)
+                return self.reply(200, {
+                    'ok': True, 'url': url, 'window_id': browser_win['id'],
+                    'title': title, 'screen_capture_enabled': state['screen_allowed'],
+                })
+            if path.startswith('/api/v1/desktop/windows/') and path.endswith('/input'):
+                wid = _unquote(path[len('/api/v1/desktop/windows/'):-len('/input')])
+                win = next((w for w in state['windows'] if w['id'] == wid), None)
+                if win is None:
+                    return self.reply(404, {'error': 'window_not_found', 'message': 'Window not found'})
+                text_val = str(body.get('text', ''))
+                key_val = str(body.get('key', '') or '')
+                submit = bool(body.get('submit', False))
+                if not text_val and not key_val and not submit:
+                    return self.reply(400, {'error': 'empty_window_input', 'message': 'Empty window input'})
+                for item in state['windows']:
+                    item['focused'] = item['id'] == wid
+                state['screen_rev'] += 1
+                record(f"WIN_INPUT id={wid} key={key_val or '-'} submit={1 if submit else 0} text={text_val}")
+                return self.reply(200, {'ok': True, 'window_id': wid, 'title': win['title']})
             if path.endswith('/message'):
                 record('AGENT ' + body.get('text', ''))
                 state['task'] = 'running'
@@ -136,8 +209,39 @@ def setup(ctx):
                 else:
                     sessions = [terminal, task]
                     saved = [{'id': 'saved', 'name': 'Build host', 'session_type': 'SSH', 'group_path': 'QA'}]
-                return self.reply(200, {'sessions': sessions, 'saved_sessions': saved,
-                                        'capabilities': {'open_sessions': True}})
+                return self.reply(200, {
+                    'sessions': sessions, 'saved_sessions': saved,
+                    'capabilities': {
+                        'open_sessions': True,
+                        'screen_capture': state['screen_allowed'],
+                        'desktop_control': True,
+                    },
+                })
+            if path == '/api/v1/desktop/screen':
+                if not state['screen_allowed']:
+                    return self.reply(403, {'error': 'screen_capture_disabled', 'message': 'Screen capture is disabled'})
+                q = _parse_qs(urlsplit(self.path).query)
+                did = (q.get('display') or q.get('display_id') or ['display-0'])[0]
+                disp = next((d for d in displays if d['id'] == did), None)
+                if disp is None:
+                    return self.reply(404, {'error': 'display_not_found', 'message': 'Display not found'})
+                state['screen_rev'] += 1
+                color = ((30 + state['screen_rev'] * 40) % 250, 90 if did == 'display-0' else 170, 180)
+                record(f"SCREEN display={did} rev={state['screen_rev']}")
+                return self.reply(200, {
+                    'mime': 'image/png',
+                    'width': 160,
+                    'height': 90,
+                    'screen_width': disp['width'],
+                    'screen_height': disp['height'],
+                    'display_id': disp['id'],
+                    'display_name': disp['name'],
+                    'displays': displays,
+                    'captured_at': int(_time.time()),
+                    'image_b64': png_fixture_b64(160, 90, color),
+                })
+            if path == '/api/v1/desktop/windows':
+                return self.reply(200, {'windows': state['windows'], 'screen_capture_enabled': state['screen_allowed']})
             if path.startswith('/api/v1/open-requests/'):
                 request_id = path.rsplit('/', 1)[1]
                 opened = state['opens'][request_id]
