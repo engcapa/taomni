@@ -2483,6 +2483,7 @@
 - `[data-testid="welcome-open-lanchat"]` — display — F-Modules-1.removed-lanchat-welcome-entry
 - `[data-testid="tao-home-lan-chat"]` — display — F-Modules-1.removed-lanchat-home-card
 - `[data-testid="module-store-panel"]` — display — F-Modules-1.module-store-panel
+- `[data-testid="module-store-core-api"]` — display — F-Modules-1.module-store-core-api
 - `[data-testid="module-store-empty"], [data-testid="module-store-catalog-error"], [data-testid="module-store-loading"]` — display — F-Modules-1.module-store-state
 
 ## network/sockscap (F-Sockscap-1)

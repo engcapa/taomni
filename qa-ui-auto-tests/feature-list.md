@@ -27,6 +27,9 @@ controls:
   - id: module-store-panel
     selector: '[data-testid="module-store-panel"]'
     kind: display
+  - id: module-store-core-api
+    selector: '[data-testid="module-store-core-api"]'
+    kind: display
   - id: module-store-state
     selector: '[data-testid="module-store-empty"], [data-testid="module-store-catalog-error"], [data-testid="module-store-loading"]'
     kind: display
