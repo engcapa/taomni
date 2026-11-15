@@ -39,7 +39,7 @@ steps:
 - assert_count:
     selector: '[data-testid="tao-home-binding-option"]'
     min: 2
-- click: '[data-testid="tao-home-binding-option"] >> nth=0'
+- click: 'xpath=(//*[@data-testid="tao-home-binding-option"])[1]'
 - assert_not_visible: '[role="dialog"]'
 - assert_not_visible: '[data-testid="tao-home-context-chips"]'
 - click: '[data-testid="tao-home-binding-workspace"]'
@@ -47,7 +47,7 @@ steps:
 - assert_not_visible: '[role="dialog"]'
 - assert_visible: '[data-testid="tao-home-context-chips"]'
 - click: '[data-testid="tao-home-binding-workspace"]'
-- click: '[data-testid="tao-home-binding-option"] >> nth=1'
+- click: 'xpath=(//*[@data-testid="tao-home-binding-option"])[2]'
 - assert_not_visible: '[role="dialog"]'
 - assert_not_visible: '[data-testid="tao-home-context-chips"]'
 - click: '[data-testid="tao-home-binding-workspace"]'

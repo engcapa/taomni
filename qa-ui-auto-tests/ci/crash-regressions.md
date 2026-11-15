@@ -25,6 +25,8 @@
 | TC-FILE-OPEN-004 | Markdown 实时/源码/分栏、表格/图片粘贴/操作与导出生命周期 | browser |
 | TC-FILE-OPEN-005 | HTML 协议与本地资源、隔离/网络策略、设备/源码/控制台生命周期 | browser/native |
 | TC-FILE-OPEN-006 | 工作区/全局设置切换、邮件只读副本去重与关闭清理 | browser/native |
+| TC-FILE-OPEN-013 | Markdown Live 默认只读、显式编辑、split 实际拖拽、独立 Mermaid 主题与目录选项；切换后正文保持 | browser/native |
+| TC-TAO-HOME-002 | Tao Messages 原生 IPC、慢流停止后的真实网络关闭、多轮顺序、reload 历史及三种代理路径 | native/release |
 
 本地使用隔离的 QA 配置和测试桌面，不清理个人配置。保持 native 串行、全部本地测试 worker 总数不超过 2。下列命令应通过 `background_job.py` 启动，native 使用匹配当前源码的 QA release 二进制：
 

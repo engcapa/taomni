@@ -48,11 +48,12 @@ class TaoProviderObservationTests(unittest.TestCase):
     def test_assertion_waits_for_real_completion_and_writes_only_fixed_evidence(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)
-            status = root / "status.txt"
+            status = root / "real-provider-status.txt"
             status.write_text("request_prepared\n")
             session = Mock()
             session.execute.side_effect = [snapshot(replyLength=0, running=True), snapshot()]
-            ctx = SimpleNamespace(session=session, case_dir=root, values={"tao_real_provider_status": str(status)})
+            # Match the native verb contract: fixture values are unavailable.
+            ctx = SimpleNamespace(session=session, case_dir=root)
             with patch("qa_ui_auto.tao_provider_observation.time.sleep"):
                 self.assertIn("response-complete", assert_outcome(ctx, {"timeout_sec": 1}))
             self.assertEqual(session.execute.call_count, 2)
@@ -64,7 +65,7 @@ class TaoProviderObservationTests(unittest.TestCase):
     def test_failed_outcome_is_retained_without_claiming_completed(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)
-            ctx = SimpleNamespace(session=Mock(), case_dir=root, values={})
+            ctx = SimpleNamespace(session=Mock(), case_dir=root)
             ctx.session.execute.return_value = snapshot(errorCount=1, errorCategory="network", retryVisible=True)
             with self.assertRaises(StepError):
                 assert_outcome(ctx, {"timeout_sec": 1})

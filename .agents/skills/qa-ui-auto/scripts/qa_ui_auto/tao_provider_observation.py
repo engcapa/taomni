@@ -101,7 +101,9 @@ def assert_outcome(ctx: Any, args: Any) -> str:
         # READ emits only booleans/counts and fixed classifications, never text.
         artifact = {"outcome": outcome, "reason": reason, "state": state}
         (ctx.case_dir / "real-provider-outcome.json").write_text(json.dumps(artifact, indent=2) + "\n", encoding="utf-8")
-        status = ctx.values.get("tao_real_provider_status")
-        if status:
-            with Path(status).open("a", encoding="utf-8") as stream:
+        # Native verbs receive NativeStepContext, not the fixture context.
+        # Both owners share the case directory, but only fixtures have values.
+        status = ctx.case_dir / "real-provider-status.txt"
+        if status.exists():
+            with status.open("a", encoding="utf-8") as stream:
                 stream.write(outcome + "\n")

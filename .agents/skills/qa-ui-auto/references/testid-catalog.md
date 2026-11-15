@@ -3552,6 +3552,7 @@
 - `[data-testid="tao-home-demo-toggle"]` — interactive — F1.11.tao-home-demo-toggle
 - `[data-testid="tao-home-new-chat"]` — interactive — F1.11.tao-home-new-chat
 - `[data-testid="tao-home-more"]` — interactive — F1.11.tao-home-more
+- `[data-testid="tao-home-appearance"]` — interactive — F1.11.tao-home-appearance
 - `[data-testid="tao-home-capabilities"]` — interactive — F1.11.tao-home-capabilities
 - `[data-testid="tao-home-plus"]` — interactive — F1.11.tao-home-plus
 - `[data-testid="tao-home-voice"]` — interactive — F1.11.tao-home-voice
@@ -3562,6 +3563,9 @@
 - `[data-testid="tao-home-speech"]` — display — F1.11.tao-home-speech
 - `[data-testid="tao-home-binding-workspace"]` — interactive — F1.11.tao-home-binding-workspace
 - `[data-testid="tao-home-binding-option"]` — interactive — F1.11.tao-home-binding-option
+  ↳ `xpath=(//*[@data-testid="tao-home-binding-option"])[1]` — alias
+  ↳ `xpath=(//*[@data-testid="tao-home-binding-option"])[2]` — alias
+- `[data-testid="tao-home-context-chips"]` — display — F1.11.tao-home-context-chips
 - `[data-testid="tao-home-binding-cite"]` — interactive — F1.11.tao-home-binding-cite
 - `[data-testid="tao-home-binding-unbind"]` — interactive — F1.11.tao-home-binding-unbind
 - `[role="dialog"]` — display — F1.11.tao-home-popup

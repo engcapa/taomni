@@ -78,10 +78,11 @@ steps:
     selector: '[data-testid="tao-settings"] [data-testid="llm-proxy-mode"]'
     value: app
 - click: '[data-testid="tao-settings-save"]'
+- vault_first_run: qa-tao-home-002
 - assert_text:
     selector: '[data-testid="tao-settings-status"]'
     contains: Saved
-- click: '[data-testid="tab-item"][data-tab-type="welcome"]'
+- click: '[data-testid="nav-mode-home"]'
 - click: '[data-testid="tao-home-new-chat"]'
 - fill:
     selector: '[data-testid="tao-home-composer-input"]'
@@ -100,7 +101,7 @@ steps:
 - assert_text:
     selector: '[data-testid="tao-settings-status"]'
     contains: Saved
-- click: '[data-testid="tab-item"][data-tab-type="welcome"]'
+- click: '[data-testid="nav-mode-home"]'
 - fill:
     selector: '[data-testid="tao-home-composer-input"]'
     value: QA-PROXY-CUSTOM

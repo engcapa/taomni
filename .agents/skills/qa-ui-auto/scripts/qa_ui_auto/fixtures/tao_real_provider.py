@@ -38,10 +38,14 @@ def setup(ctx):
         "runtime": "deepseek-messages",
         "proxy_mode": "manual" if proxy_url else "none",
         "proxy_url": proxy_url or None,
-        "capabilities": {"chat": True, "web_search": True, "file_input": True, "voice": True},
+        "capabilities": {"chat": True, "image_generation": False, "video_generation": False},
     }
     config = {
-        "llm": {"active": "deepseek-app", "providers": {"deepseek-app": provider}},
+        "asr": {"active": "sensevoice-small", "providers": {}, "warm_on_startup": False,
+                "vad": "silero", "language": "auto"},
+        "llm": {"active": "deepseek-app", "providers": {"deepseek-app": provider},
+                "fallback": {"enabled": False, "primary": "deepseek-app", "secondary": "local", "timeout_ms": 30000},
+                "task_routing": {}},
         "deepseek_app": {"enabled": True, "model": "deepseek-flash", "thinking_default": False,
                           "search_default": False, "safety_check_high": True, "title_enabled": False,
                           "voice_provider": "local", "tts_voice": "stella", "cost_confirm_threshold_cny": 0.5},

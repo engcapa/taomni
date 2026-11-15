@@ -219,6 +219,9 @@ controls:
 - id: tao-home-more
   selector: '[data-testid="tao-home-more"]'
   kind: interactive
+- id: tao-home-appearance
+  selector: '[data-testid="tao-home-appearance"]'
+  kind: interactive
 - id: tao-home-capabilities
   selector: '[data-testid="tao-home-capabilities"]'
   kind: interactive
@@ -248,7 +251,13 @@ controls:
   kind: interactive
 - id: tao-home-binding-option
   selector: '[data-testid="tao-home-binding-option"]'
+  aliases:
+  - 'xpath=(//*[@data-testid="tao-home-binding-option"])[1]'
+  - 'xpath=(//*[@data-testid="tao-home-binding-option"])[2]'
   kind: interactive
+- id: tao-home-context-chips
+  selector: '[data-testid="tao-home-context-chips"]'
+  kind: display
 - id: tao-home-binding-cite
   selector: '[data-testid="tao-home-binding-cite"]'
   kind: interactive
