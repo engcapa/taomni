@@ -74,7 +74,8 @@ fn errors_round_trip_with_data_and_stable_code() {
     let error = RpcError::from_code(ErrorCode::RequestTimeout)
         .with_data(serde_json::json!({ "timeoutMs": 5000 }));
     let response = RpcResponse::failure(Some(RequestId::from("a")), error.clone());
-    let decoded: RpcResponse = serde_json::from_value(serde_json::to_value(response).unwrap()).unwrap();
+    let decoded: RpcResponse =
+        serde_json::from_value(serde_json::to_value(response).unwrap()).unwrap();
     assert_eq!(decoded.error, Some(error));
     assert_eq!(decoded.result, None);
 }

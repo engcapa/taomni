@@ -10912,8 +10912,26 @@ dependencies = [
 name = "taomni-plugin-api"
 version = "0.1.0"
 dependencies = [
+ "base64 0.22.1",
  "serde",
  "serde_json",
+ "zeroize",
+]
+
+[[package]]
+name = "taomni-profile-locks"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "tempfile",
+]
+
+[[package]]
+name = "taomni-sqlite-snapshot"
+version = "0.1.0"
+dependencies = [
+ "rusqlite",
+ "tempfile",
 ]
 
 [[package]]

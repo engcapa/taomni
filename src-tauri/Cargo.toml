@@ -19,6 +19,8 @@ members = [
     "crates/taomni-rdp-common",
     "crates/taomni-file-uri",
     "crates/taomni-plugin-api",
+    "crates/taomni-profile-locks",
+    "crates/taomni-sqlite-snapshot",
     "plugins/hello-plugin",
     "vendor/ironrdp-acceptor",
     "vendor/ironrdp-bulk",

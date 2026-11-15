@@ -38,7 +38,7 @@
 | TASK-022 Mobile | 待 M0 决策 | 按 DEC-2 默认暂缓排期；M0 末提供 go/no-go 与公开例外，不能默认为已交付。 |
 | TASK-023 发布验收 | 部分 | 清单生成与上传顺序已有；四目标插件构建/系统签名、包签名、原子清单发布、独立插件更新/回滚、两套回归及性能。 |
 | TASK-024 入口/profile 协同 | 待开始 | re-exec 归属、ModeLease/ProfileLease、还原前宿主静默、headless 模式。 |
-| TASK-025 密钥/一致快照 | 待开始 | slug 作用域 Vault fixed keys、`backup.snapshot` 及启用/禁用/仅保留数据三态备份还原。 |
+| TASK-025 密钥/一致快照 | A/B 基础实施中 | [服务、锁与快照实施方案](taomni-modular-vault-services-plan.md)；typed DTO/lease/SQLite helper 开发中，C–I 生产接线、MFA 迁出与三态备份还原未完成。 |
 
 具体编号与子任务边界仍以设计原表为准；上表合并描述不改变范围或依赖。
 

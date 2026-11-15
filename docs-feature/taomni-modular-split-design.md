@@ -978,6 +978,8 @@ v1.2 没有覆盖“已经在用旧版的用户”。核心 0.6.x 默认包不�
 
 ### 13.5 当前实现与 hosted 验证快照（2026-11-16）
 
+TASK-025 的服务、锁与一致快照实施细化见[Vault 服务实施方案](taomni-modular-vault-services-plan.md)。A/B 基础契约实施中，C–I 及真实 MFA 迁出/三态还原尚未完成；独立小库通过不构成 AC-016 验收。
+
 逐 TASK/AC/G 的状态与剩余工作见[实施与验收台账](taomni-modular-split-progress.md)。核心仍包含待迁出业务；目前唯一独立宿主为 hello-plugin，完整模块化交付尚未完成。
 
 已落地的基础能力包括插件 API/registry、版本目录原语、真实宿主 spawn/stdio/握手/invoke、原生 HTTP 代理/续传/取消/进度、设置页本地 registry 投影和升级预检，以及模块清单生成和发布顺序。生产 `plugin_migration_execute` 只记录安全 pending journal；真实 exporter、可信插件包和密钥服务接通前，不复制旧数据、不建立伪版本、不改变 active 指针。fixture 中的 staging/回滚测试不构成真实单体升级证据。

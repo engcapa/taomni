@@ -9,6 +9,8 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+pub mod services;
+
 /// Version of the core/plugin API shape. Increment this when a shared service
 /// or extension point changes incompatibly.
 pub const API_VERSION: u32 = 1;
@@ -292,14 +294,15 @@ impl HandshakeResponse {
 /// Validate the protocol and API versions advertised by a peer.
 pub fn validate_versions(api_version: u32, protocol_version: u32) -> Result<(), RpcError> {
     if api_version != API_VERSION {
-        return Err(RpcError::from_code(ErrorCode::ApiVersionMismatch).with_data(
-            serde_json::json!({ "expected": API_VERSION, "received": api_version }),
-        ));
+        return Err(RpcError::from_code(ErrorCode::ApiVersionMismatch)
+            .with_data(serde_json::json!({ "expected": API_VERSION, "received": api_version })));
     }
     if protocol_version != PROTOCOL_VERSION {
-        return Err(RpcError::from_code(ErrorCode::ProtocolVersionMismatch).with_data(
-            serde_json::json!({ "expected": PROTOCOL_VERSION, "received": protocol_version }),
-        ));
+        return Err(
+            RpcError::from_code(ErrorCode::ProtocolVersionMismatch).with_data(
+                serde_json::json!({ "expected": PROTOCOL_VERSION, "received": protocol_version }),
+            ),
+        );
     }
     Ok(())
 }

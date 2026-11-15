@@ -1,0 +1,13 @@
+[package]
+name = "taomni-profile-locks"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+description = "Cross-process profile and plugin data ownership for Taomni"
+license = "MIT"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[dev-dependencies]
+tempfile = "3"
