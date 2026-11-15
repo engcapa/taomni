@@ -735,6 +735,17 @@ v1.2 没有覆盖“已经在用旧版的用户”。核心 0.6.x 默认包不�
 
 ---
 
+### 7.5 当前实现的发布落点与新增模块流程（M0/M1 基础设施）
+
+当前分支已经把发布边界固定下来，但还没有把 10 个有效插件全部迁移完成。模块源码和宿主放在同一 monorepo 的 `src-tauri/plugins/<slug>/`；前端入口通过核心注册表动态加载。安装后的每个模块使用独立目录，便于回滚和保留数据：
+
+- `<app data>/plugins/<slug>/versions/<version>/`：已验签并解包的只读版本目录；
+- `<app data>/plugins/<slug>/active.json`：原子切换的当前版本指针；
+- `<app data>/plugins/<slug>/data/`：模块数据，禁用或卸载默认保留；
+- 核心更新仍发布 `latest.json`；插件包发布 `.taomni-plugin`、旁路 `.minisig` 与 `SHA256SUMS`，最后原子发布签名的 `modules.json`。
+
+新增模块时按以下顺序落地：先建立 `module.json`（slug、版本、平台、`coreApiVersion`、权限、数据和 legacy 迁移声明），再加入 workspace/宿主和前端注册表；补齐 registry、安装/回滚、缺失占位页以及 browser/native 用例和 feature-list/testid catalog；在 release workflow 中加入平台构建、签名和 hash；CI 先上传包与签名，所有资产完成后才生成并发布新的 `modules.json`。未通过宿主、签名、升级或受影响功能门禁的模块不得进入首发清单。当前实现的 `ModuleStorePanel` 显示的是核心 registry 投影，空目录和错误状态是明确状态，不能把它称作已经接入真实远端商店。
+
 ## 8. 数据与迁移
 
 ### 8.1 分库原则（沿用已有先例）
@@ -961,6 +972,16 @@ v1.2 没有覆盖“已经在用旧版的用户”。核心 0.6.x 默认包不�
 - v1.2（2026-11-14 20:28 确认后）：第 3 项确认理解正确，§13.2 待确认解释清零。开 PR 前基线更新至最新 main `8233beaca`（Merge PR #808），锚点复核无变化（`lib.rs` 590→591 行、`commands/mod.rs` 807→809 行）。
 - v1.1（2026-11-14 20:22 澄清后）：第 5 项改按客户端 / 服务端两类，RDP / VNC 拆为 4 个插件，插件总数 10→12；第 4 项确认理解正确；新增 §4.1 暂定插件（后续可能移除）。
 - v1.0（2026-11-14 18:22 决策后）：初稿；§13 全部 5 项已决策，§13.2 三处解释待确认。
+
+### 13.5 当前实现与 hosted 验证快照（2026-11-15）
+
+本分支 `refactor/modules-arch` 当前提交为 `663d0fc3991a6ad509bd3847d7d8fc4b656c1a13`。已完成的基础设施包括：LanChat 产品/IPC/Rust active code/窗口/菜单/capability/stub 的彻底删除；0.5.x 单体升级的只读预检、源指纹、journal、staging、active 原子切换、失败回滚和幂等重试；插件 manifest 校验、registry、版本目录安装状态机、enable/disable/install/rollback/uninstall/refresh IPC；Settings 的 Module Store registry 投影、加载/空/错误状态和中英文文案；hello-plugin 的协议握手、token/API/version 校验、启停、ping、确定性 crash/hang fixture；以及 `modules.json` 生成器和 release 上传顺序。真实 HTTP 下载、完整验签/远端商店 IPC、升级向导 UI、三端真实宿主实验和具体业务插件迁移仍是 TASK-010–025 的后续工作。
+
+本地只执行了单元测试和静态检查：hello-plugin `cargo test --locked` 6/6，Taomni plugin Rust focused 34/34，Settings/ModuleStore/IPC/registry Vitest 42/42；`pnpm exec tsc -b`、`pnpm check:refactor`、`cargo fmt --check`、`git diff --check` 及 `qa_ui_auto.lint/audit --gate` 均通过（audit 为 750 个 case、0 lint error、catalog/control coverage gate 通过）。
+
+browser/native hosted 证据来自 GitHub `QA UI Auto Platforms` run [#43707558453](https://github.com/engcapa/taomni/actions/runs/43707558453)，commit `663d0fc39`，选择 `TC-MODULES-001`–`TC-MODULES-004`，三平台 browser/native 并自动包含 crash-regression。执行期间已按 shard 下载并解析 artifact；本地快照位于 `/tmp/taomni-qa-437075/`，包含各平台 browser/native shard 目录及 `summary/ci-summary.json`。六个平台组合中的四个模块用例全部通过，且没有 infrastructure error、capability gap 或 unreviewed case。
+
+该 run 的总体状态为 failure，但失败均与本次模块化无关：`TC-FILE-OPEN-008` 在三平台 browser/native 的欢迎页工作区 testid 缺失；`TC-FILE-OPEN-005` 仅 Windows native 的 document root 未挂载；`TC-FILE-OPEN-011` 仅 macOS native 的 terminal search hit 未出现。按本设计的验收规则，这些既有失败不阻断本次模块化；模块相关 case 不得用总体 run 状态掩盖，后续若修改对应功能仍需单独修复并重跑。
 
 ---
 

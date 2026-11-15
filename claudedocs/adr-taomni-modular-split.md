@@ -6,6 +6,8 @@ Accepted as a design decision; M0 implementation is in progress. v1.6 is the cur
 
 本分支当前已落地插件 API、核心注册表、前端动态加载、单体升级 journal 执行器（含源指纹、staging、原子 active 指针、幂等重试和失败回滚）、宿主协议监督的可测试逻辑、版本目录安装状态机，以及独立 `modules.json` 生成器和 release 上传顺序；下载/代理/断点续传与验签策略也已形成可序列化的 Rust 单元契约，模块商店面板已完成可注入的 renderer 投影。可复现 M0 体积/依赖起点见 [`docs-feature/taomni-modular-split-baseline-20261115.md`](../docs-feature/taomni-modular-split-baseline-20261115.md)。完整的 HTTP 安装服务、`modules.json`/native IPC 接线、升级向导、三端真实宿主实验和具体插件迁移仍未完成，不能将当前基础契约视为完整商店或插件迁移完成。
 
+当前提交 `663d0fc3991a6ad509bd3847d7d8fc4b656c1a13` 已通过本地单元/静态门禁：hello-plugin 6/6、Taomni plugin Rust focused 34/34、Settings/ModuleStore/IPC/registry Vitest 42/42，TypeScript、`check:refactor`、rustfmt、QA catalog/lint/audit 均通过。GitHub `QA UI Auto Platforms` run [#43707558453](https://github.com/engcapa/taomni/actions/runs/43707558453) 对 `TC-MODULES-001`–`004` 执行三平台 browser/native；模块相关 case 在每个平台组合均通过。执行中已按 shard 下载 artifact（本地证据快照 `/tmp/taomni-qa-437075/`），run 总体失败仅由既有 `TC-FILE-OPEN-005/008/011` 问题造成，按设计验收规则不阻断本次模块化。
+
 ## 1. Context
 
 Taomni 是 Tauri 2 + React 19 + Rust 的本地优先桌面工作台。当前发布仍是一个核心包、一个 `latest.json` 和一个 Rust `AppState`：根 `package.json` 为 0.5.9，`src-tauri/src/lib.rs` 593 行、`commands/mod.rs` 823 行，前端 `TabContentRouter` 静态引入多个重型 tab（仅 RDP/VNC 等少数 tab 在 `panels.tsx` 用 `React.lazy`，且仍随核心发布）。历史基线（`7bc498b35`）实测为 `src/` 3,022 个文件、`src-tauri/` 2,165 个文件、Rust 331,079 行、`SessionType` 26 种、`TabKind` 23 种；LanChat 删除后当前分支保留 22 种 `TabKind`。发布包体积尚无可复现基线，必须由 TASK-001 先测量。分支上新增了核心文件查看器（`viewer/`、`taomni-preview` 协议）和移动端桌面远控 / 飞书适配（`mobile/` 达 12,679 行），详见设计文档 §1.10。
@@ -44,6 +46,8 @@ Taomni 是 Tauri 2 + React 19 + Rust 的本地优先桌面工作台。当前发�
 - 核心继续使用 `latest.json`；插件使用独立签名的 `modules.json`。模块清单生成器独立为 `scripts/compose-modules-manifest.mjs`，共享底层签名/资产校验但不改变核心更新清单契约。
 - 代理、下载、断点续传、取消、进度、失败恢复、备份和迁移必须遵循仓库 `AGENTS.md` 的外部网络与数据完整性要求。
 - 从 0.5.x 单体包升级时，核心先只读预检并写原子 `migration/journal.json`，再把插件代码放入 staging 目录；legacy tables 通过核心只读接口迁移，MFA 固定密钥经核心 Vault 的 slug 作用域服务访问。旧 LanChat 数据只在旧数据目录原样保留，不读取、不复制、不移动、不迁移、不删除。迁移项逐项以源指纹和 `committed` 状态记账，插件验签、下载、宿主退出或 Vault 访问失败时只回滚 active 指针并保留旧数据；核心仍可启动，用户可稍后安装缺失插件。完整协议见设计文档 §6.5.1，验证 ID 为 AC-017/V-012。
+
+模块源码继续保存在 monorepo 的 `src-tauri/plugins/<slug>/`，安装时落在 `<app data>/plugins/<slug>/versions/<version>/`，由 `active.json` 原子指向当前版本，`data/` 默认跨禁用/卸载保留。核心发布 `latest.json`；插件发布 `.taomni-plugin`、`.minisig`、`SHA256SUMS`，所有资产上传完成后再原子发布签名的 `modules.json`。新增模块必须先补 `module.json`、宿主/前端注册、安装生命周期、browser/native 用例和 catalog，再接入平台构建/签名矩阵；未通过相关门禁不得进入清单。当前 `ModuleStorePanel` 仍是 native registry projection，空/错误状态不代表已接入真实远端模块商店。
 
 ## 3. Feasibility gates and release rule
 
