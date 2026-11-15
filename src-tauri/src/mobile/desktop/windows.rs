@@ -174,7 +174,7 @@ pub async fn send_window_input(
     let target = resolve_window(&windows, window_id)?.clone();
 
     #[cfg(target_os = "macos")]
-    if !crate::servers::rdp::control_permission_granted() {
+    if !taomni_capture::permissions::control_permission_granted() {
         return Err("desktop_input_permission_required".into());
     }
 

@@ -78,6 +78,7 @@
           "ssh_features_required",
           "x11_session_required",
           "bookmark_assets",
+          "module_offline_archive",
           "vnc_required",
           "ard_required",
           "jdtls_required",

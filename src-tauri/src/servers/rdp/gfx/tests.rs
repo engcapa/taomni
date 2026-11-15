@@ -15,8 +15,8 @@ use super::transport::frame_timestamp_ms;
 
 use std::time::{Duration, Instant};
 
-use crate::servers::rdp::capture::Frame;
 use ironrdp::pdu::gcc::MonitorFlags;
+use taomni_capture::engine::Frame;
 
 #[test]
 fn graphics_path_keeps_only_a_two_frame_ack_window() {

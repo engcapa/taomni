@@ -14,6 +14,8 @@ default-run = "taomni"
 # patch table, while ordinary Cargo commands continue to target Taomni only.
 [workspace]
 members = [
+    "crates/taomni-capture",
+    "crates/taomni-host-gates",
     "crates/taomni-plugin-api",
     "plugins/hello-plugin",
     "vendor/ironrdp-acceptor",
@@ -71,6 +73,7 @@ tauri-plugin-shell = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 taomni-plugin-api = { path = "crates/taomni-plugin-api" }
+taomni-capture = { path = "crates/taomni-capture" }
 toml = "0.9"
 tokio = { version = "1", features = ["full"] }
 uuid = { version = "1", features = ["v4"] }
@@ -80,6 +83,7 @@ tracing-subscriber = "0.3"
 log = "0.4"
 portable-pty = "0.9"
 base64 = "0.22"
+minisign-verify = "0.2.5"
 rusqlite = { version = "0.40", features = ["bundled", "hooks"] }
 chrono = "0.4"
 russh = { version = "0.61", features = ["async-trait", "flate2"] }
@@ -330,6 +334,7 @@ windows = { version = "0.62", features = [
   "Win32_Security",
   "Win32_Security_Cryptography",
   "Win32_System_Threading",
+  "Win32_System_JobObjects",
   "Win32_UI_Shell",
   "Win32_System_DataExchange",
   # Screenshot OCR: the built-in Windows.Media.Ocr engine (no install).
@@ -416,6 +421,7 @@ gtk = "0.18.2"
 
 [dev-dependencies]
 tempfile = "3"
+ed25519-dalek = "2"
 # JPEG encoder for Tight decoder tests only.
 image = { version = "0.25", default-features = false, features = ["png", "jpeg"] }
 

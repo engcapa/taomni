@@ -5,14 +5,14 @@ use super::mailbox::LatestFrameMailbox;
 use super::mailbox::PendingFrames;
 use super::mailbox::PublishResult;
 use super::updates::DisplayUpdatesImpl;
-use crate::servers::rdp::capture::Capturer;
-use crate::servers::rdp::capture::Frame;
 use crate::servers::rdp::metrics::RdpMetrics;
 use ironrdp::server::DesktopSize;
 use ironrdp::server::DisplayUpdate;
 use ironrdp::server::RdpServerDisplayUpdates;
 use std::sync::Arc;
 use std::sync::Mutex;
+use taomni_capture::engine::Capturer;
+use taomni_capture::engine::Frame;
 #[cfg(target_os = "macos")]
 use tokio::sync::oneshot;
 

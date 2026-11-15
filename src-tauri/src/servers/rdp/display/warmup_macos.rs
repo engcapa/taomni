@@ -4,11 +4,11 @@ use super::display::CaptureResizeRequest;
 use super::mailbox::LatestFrameMailbox;
 use super::mailbox::PublishResult;
 use crate::servers::engine::LogEmitter;
-use crate::servers::rdp::capture::create_capturer_for_display;
 use crate::servers::rdp::metrics::RdpMetrics;
 use core::num::NonZeroU16;
 use ironrdp::server::DesktopSize;
 use std::sync::Arc;
+use taomni_capture::engine::create_capturer_for_display;
 
 /// Drive a warmed capture backend until the client disconnects or capture
 /// fails, publishing updates to the display task.
@@ -45,8 +45,11 @@ pub(super) fn start_warmed_macos_capture(
             let worker_mailbox = mailbox.clone();
             move || {
                 let result = (|| {
-                    let mut capturer =
-                        create_capturer_for_display(&log, display_id.as_deref(), false)?;
+                    let mut capturer = create_capturer_for_display(
+                        &log.capture_log(),
+                        display_id.as_deref(),
+                        false,
+                    )?;
                     let supports_client_size = capturer.supports_output_resize();
 
                     // Both ScreenCaptureKit and its legacy fallback retain the

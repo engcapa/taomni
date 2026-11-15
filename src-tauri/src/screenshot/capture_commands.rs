@@ -88,7 +88,7 @@ pub async fn screenshot_capture_region(
 #[tauri::command]
 pub async fn screenshot_probe() -> Result<ScreenshotProbe, String> {
     blocking("probe", || {
-        let base = crate::servers::rdp::capture::probe()?;
+        let base = taomni_capture::engine::probe()?;
         let engine = ocr::engine_name();
         Ok(ScreenshotProbe {
             permission: base.permission,

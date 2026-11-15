@@ -14,6 +14,18 @@ The audio playback case verifies the real loopback with the same installed devic
 
 ## Trigger and select
 
+The modular refactor also uses `qa-modular-upgrade.yml` with an exact `head`.
+It runs the shared capture library checks for the four release targets, real
+X11 capture source tests, and the production host adapter against a real hello
+process on Linux, Windows and macOS. The host tests include cancellation,
+heartbeat/restart and killing the disposable core with live descendants.
+Artifacts named `modular-host-*` and `modular-capture-*` retain these logs.
+These contracts do not establish an actual installed 0.5.x upgrade, operating
+system signing/TCC trust, performance or profile/backup coordination. Those
+remain separate acceptance evidence. Browser/native UI scenarios still run in
+the platforms workflow, including the mandatory crash suite; download each
+completed shard while other shards and builds are running.
+
 After the workflow is on the default branch, use **Actions → QA UI Auto Platforms
 → Run workflow**, or:
 

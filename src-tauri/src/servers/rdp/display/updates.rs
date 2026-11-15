@@ -1,6 +1,5 @@
 use super::mailbox::LatestFrameMailbox;
 use super::mailbox::PendingFrames;
-use crate::servers::rdp::capture::Frame;
 #[cfg(target_os = "macos")]
 use crate::servers::rdp::gfx::EncodedFrame;
 #[cfg(target_os = "macos")]
@@ -22,6 +21,7 @@ use ironrdp::server::PixelFormat;
 use ironrdp::server::RdpServerDisplayUpdates;
 use std::collections::VecDeque;
 use std::sync::Arc;
+use taomni_capture::engine::Frame;
 
 /// Per-client update producer that drains the native capture thread.
 pub(crate) struct DisplayUpdatesImpl {

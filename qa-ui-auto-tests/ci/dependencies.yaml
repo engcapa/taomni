@@ -4,6 +4,7 @@ TC-MODULES-002: []
 TC-MODULES-003: []
 TC-MODULES-004: []
 TC-MODULES-005: []
+TC-MODULES-006: []
 TC-FILE-OPEN-011: []
 # Native artifact/global-entry/security cases own isolated inputs.
 TC-FILE-OPEN-007: []
@@ -243,3 +244,12 @@ TC-MOBILE-011: []
 TC-MOBILE-012: []
 TC-MOBILE-013: []
 TC-NOTES-014: []
+
+# Shared capture retained-behavior cases own fresh per-case inputs; source lifecycle
+# restart/retry assertions run inside each case rather than relying on prior cases.
+TC-104: []
+TC-MFA-007: []
+TC-SHOT-N5: []
+TC-SHOT-N6: []
+TC-SHOT-N15: []
+TC-RDPS-NAT-01-start-connect-display: []

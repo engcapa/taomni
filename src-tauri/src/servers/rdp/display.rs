@@ -2,7 +2,7 @@
 //! clients.
 //!
 //! Real screen capture runs on a dedicated OS thread (native capture backends
-//! hold non-`Send`, thread-affine handles — see [`super::capture`]). That thread
+//! hold non-`Send`, thread-affine handles — see [`taomni_capture::engine`]). That thread
 //! publishes BGRA frames through a latest-frame mailbox;
 //! [`DisplayUpdatesImpl::next_update`] awaits that mailbox without allowing a
 //! slow encoder or network to make the native capture callback retain stale

@@ -8,9 +8,8 @@
 //! default when a module is uninstalled.
 
 use std::fs;
-use std::io;
+use std::io::{self, Write};
 use std::path::{Component, Path, PathBuf};
-use std::time::{SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -25,6 +24,8 @@ pub struct ActivePointer {
 
 #[derive(Debug, Error)]
 pub enum InstallError {
+    #[error(transparent)]
+    Trust(#[from] super::verify::TrustError),
     #[error("invalid module slug: {0}")]
     InvalidSlug(String),
     #[error("invalid module version: {0}")]
@@ -88,10 +89,52 @@ impl ModuleInstaller {
         Ok(pointer)
     }
 
-    /// Copy a verified package into a private staging directory, then rename
-    /// it into the immutable version directory. Existing versions are never
-    /// replaced, which makes a failed update safe to retry.
-    pub fn stage(
+    /// The production staging entry accepts only the private capability made
+    /// by real signature verification. Recheck the private source and copied
+    /// tree before publishing the version, including an existing version on a
+    /// retry. An arbitrary renderer directory cannot reach this operation.
+    pub fn stage_verified(
+        &self,
+        package: &super::verify::VerifiedPackage,
+    ) -> Result<PathBuf, InstallError> {
+        let manifest = package.manifest();
+        let destination = self.version_dir(&manifest.slug, &manifest.version)?;
+        let versions = destination.parent().expect("version parent");
+        for directory in [&self.root, &self.root.join(&manifest.slug), versions] {
+            if let Ok(metadata) = fs::symlink_metadata(directory) {
+                if metadata.file_type().is_symlink() {
+                    return Err(InstallError::InvalidPointer(
+                        "plugin directory must not be a symlink".into(),
+                    ));
+                }
+            }
+        }
+        if fs::symlink_metadata(&destination).is_ok() {
+            package.check_installed_contents(&destination)?;
+            return Ok(destination);
+        }
+        fs::create_dir_all(versions)?;
+        let staging = tempfile::Builder::new()
+            .prefix(".verified-staging-")
+            .tempdir_in(versions)?;
+        package.check_contents(package.directory())?;
+        copy_tree(package.directory(), staging.path())?;
+        package.check_contents(staging.path())?;
+        package.persist_proof(staging.path())?;
+        package.check_installed_contents(staging.path())?;
+        sync_tree(staging.path())?;
+        // `TempDir` removes interrupted/failed staging automatically. Keeping
+        // the directory only after rename avoids leaving an unverified tree.
+        fs::rename(staging.path(), &destination)?;
+        #[cfg(unix)]
+        fs::File::open(versions)?.sync_all()?;
+        Ok(destination)
+    }
+
+    /// Filesystem state-machine fixture. Production code must use
+    /// `stage_verified`; unsigned directory staging is absent from that build.
+    #[cfg(test)]
+    pub(crate) fn stage(
         &self,
         slug: &str,
         version: &str,
@@ -162,6 +205,34 @@ impl ModuleInstaller {
         Ok(pointer)
     }
 
+    /// Restore the exact pre-transaction pointer after an activation or
+    /// registry refresh failure. This is recovery, not an unsigned install:
+    /// every referenced version must already exist under this module root.
+    pub(crate) fn restore_pointer(
+        &self,
+        slug: &str,
+        pointer: &ActivePointer,
+    ) -> Result<(), InstallError> {
+        validate_slug(slug)?;
+        for version in [
+            pointer.active_version.as_deref(),
+            pointer.previous_version.as_deref(),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            let path = self.version_dir(slug, version)?;
+            let metadata = fs::symlink_metadata(path)?;
+            if !metadata.is_dir() || metadata.file_type().is_symlink() {
+                return Err(InstallError::NotStaged {
+                    slug: slug.into(),
+                    version: version.into(),
+                });
+            }
+        }
+        self.write_pointer(slug, pointer)
+    }
+
     /// Deactivate a module while retaining its immutable versions and data.
     /// Data is removed only when `delete_data` is explicitly true.
     pub fn uninstall(&self, slug: &str, delete_data: bool) -> Result<ActivePointer, InstallError> {
@@ -184,20 +255,14 @@ impl ModuleInstaller {
         let directory = self.root.join(slug);
         fs::create_dir_all(&directory)?;
         let path = directory.join("active.json");
-        let nonce = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map(|duration| duration.as_nanos())
-            .unwrap_or_default();
-        let temporary = directory.join(format!(".active.{nonce}.tmp"));
-        fs::write(&temporary, serde_json::to_vec_pretty(pointer)?)?;
-        // `active.json` is replaced only after the complete JSON is on disk.
-        // Unix rename is atomic. On Windows rename of an existing file is not
-        // permitted, so remove the old pointer immediately before rename;
-        // version directories remain untouched and can still be recovered.
-        if cfg!(windows) && path.exists() {
-            fs::remove_file(&path)?;
-        }
-        fs::rename(temporary, path)?;
+        let mut temporary = tempfile::NamedTempFile::new_in(&directory)?;
+        temporary.write_all(&serde_json::to_vec_pretty(pointer)?)?;
+        temporary.as_file().sync_all()?;
+        // tempfile uses replace-existing rename on Windows as well, without
+        // an unlink gap where the last working active pointer disappears.
+        temporary.persist(path).map_err(|error| error.error)?;
+        #[cfg(unix)]
+        fs::File::open(directory)?.sync_all()?;
         Ok(())
     }
 }
@@ -254,6 +319,33 @@ fn copy_tree(source: &Path, destination: &Path) -> Result<(), InstallError> {
         } else if file_type.is_file() {
             fs::copy(entry.path(), target)?;
         }
+    }
+    Ok(())
+}
+
+/// The active pointer may become durable immediately after publication.
+/// Flush copied payload bytes and directory entries before making that
+/// pointer possible, so it cannot reference an incomplete package on restart.
+fn sync_tree(path: &Path) -> io::Result<()> {
+    let metadata = fs::symlink_metadata(path)?;
+    if metadata.file_type().is_symlink() || (!metadata.is_dir() && !metadata.is_file()) {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            "cannot flush linked/special package data",
+        ));
+    }
+    if metadata.is_dir() {
+        for entry in fs::read_dir(path)? {
+            sync_tree(&entry?.path())?;
+        }
+        #[cfg(unix)]
+        fs::File::open(path)?.sync_all()?;
+    } else {
+        fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(path)?
+            .sync_all()?;
     }
     Ok(())
 }
@@ -335,5 +427,37 @@ mod tests {
             installer.active_pointer("mfa"),
             Err(InstallError::InvalidPointer(_))
         ));
+    }
+
+    #[test]
+    fn restores_prior_pointer_after_failed_transaction_and_rejects_missing_versions() {
+        let root = tempdir().unwrap();
+        let package = tempdir().unwrap();
+        fs::write(package.path().join("module.json"), b"{}").unwrap();
+        let installer = ModuleInstaller::new(root.path());
+        installer.stage("mfa", "1.0.0", package.path()).unwrap();
+        installer.stage("mfa", "1.1.0", package.path()).unwrap();
+        let original = installer.activate("mfa", "1.0.0").unwrap();
+        installer.activate("mfa", "1.1.0").unwrap();
+        installer.restore_pointer("mfa", &original).unwrap();
+        assert_eq!(installer.active_pointer("mfa").unwrap(), original);
+        let invalid = ActivePointer {
+            active_version: Some("../outside".into()),
+            previous_version: None,
+        };
+        assert!(installer.restore_pointer("mfa", &invalid).is_err());
+        let missing = ActivePointer {
+            active_version: Some("9.0.0".into()),
+            previous_version: None,
+        };
+        assert!(installer.restore_pointer("mfa", &missing).is_err());
+        assert_eq!(installer.active_pointer("mfa").unwrap(), original);
+        installer
+            .restore_pointer("mfa", &ActivePointer::default())
+            .unwrap();
+        assert_eq!(
+            installer.active_pointer("mfa").unwrap(),
+            ActivePointer::default()
+        );
     }
 }

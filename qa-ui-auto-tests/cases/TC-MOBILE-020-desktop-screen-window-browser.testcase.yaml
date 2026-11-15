@@ -59,6 +59,16 @@ steps:
     expect_truthy: true
 - screenshot: mobile-desktop-screen-live.png
 - assert_no_runtime_errors: null
+- click: '[data-testid="mobile-desktop-auto-refresh"]'
+- assert_attribute: {selector: '[data-testid="mobile-desktop-auto-refresh"]', name: aria-pressed, equals: 'false'}
+- select_option: {selector: '[data-testid="mobile-desktop-display"]', value: display-0}
+- click: '[data-testid="mobile-desktop-refresh"]'
+- assert_text: {selector: '[data-testid="mobile-screen-meta"]', contains: Primary Display}
+- assert_file_contains: {path: '${fixture.mobile_receipt}', contains: 'SCREEN display=display-0'}
+- eval_readonly:
+    expression: document.querySelector('img.desktop-screen-img').complete && document.querySelector('img.desktop-screen-img').naturalWidth > 0
+    expect_truthy: true
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -104,6 +114,16 @@ verification:
     - {step: 44, expectation: Loaded PNG image has positive dimensions and phone layout does not overflow.}
     - {step: 46, expectation: No browser runtime errors occurred.}
     results: [37, 38, 40, 41, 43, 44, 46]
+  - id: R5
+    requirement: Stopping automatic refresh and returning to the primary display keeps manual capture usable after display-source changes.
+    actions: [47, 49, 50]
+    checkpoints:
+    - {step: 48, expectation: Automatic refresh is explicitly off.}
+    - {step: 51, expectation: Metadata returns to the primary display.}
+    - {step: 52, expectation: A primary-display request reaches the host fixture.}
+    - {step: 53, expectation: The refreshed PNG is loaded with positive pixel dimensions.}
+    - {step: 54, expectation: No runtime errors occur after source switching.}
+    results: [48, 51, 52, 53, 54]
   visual:
   - check: Blocked notice, window list, live PNG screen image, display selector and quick-key controls fit within 390x844 without overflow.
     method: automated

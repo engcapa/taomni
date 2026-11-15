@@ -125,8 +125,8 @@ impl RdpMetrics {
     /// deliberate wait to "capture" would just report the frame interval and
     /// hide the real cost.
     ///
-    /// [`Capturer::is_self_paced`]: super::capture::Capturer::is_self_paced
-    /// [`Capturer::is_event_driven`]: super::capture::Capturer::is_event_driven
+    /// [`Capturer::is_self_paced`]: taomni_capture::engine::Capturer::is_self_paced
+    /// [`Capturer::is_event_driven`]: taomni_capture::engine::Capturer::is_event_driven
     pub(crate) fn record_capture(&self, duration: Duration, bytes: usize) {
         if let Ok(mut state) = self.inner.lock() {
             state.captured_frames += 1;

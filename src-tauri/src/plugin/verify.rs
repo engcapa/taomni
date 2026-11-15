@@ -1,13 +1,44 @@
 //! Verification primitives shared by the module downloader and installer.
 //!
-//! These functions deliberately do not read files, invoke minisign, or make
-//! network requests.  Keeping the checks pure makes the security decisions
-//! easy to test before a package can reach `ModuleInstaller`.
+//! Signatures are checked against the public key embedded in the core. Only
+//! this module can construct the trusted catalogue and package capabilities
+//! accepted by the production installer.
+
+mod archive;
+mod catalog;
+mod installed;
+mod package;
+mod signature;
+
+pub use catalog::VerifiedCatalog;
+pub use installed::InstalledTrust;
+pub use package::{VerifiedPackage, host_platform, verify_installed};
+
+#[cfg(test)]
+pub(crate) mod test_support;
+#[cfg(test)]
+mod tests;
 
 use std::cmp::Ordering;
 
 use sha2::{Digest, Sha256};
 use thiserror::Error;
+
+#[derive(Debug, Error)]
+pub enum TrustError {
+    #[error("module signature verification failed: {0}")]
+    Signature(String),
+    #[error("module catalogue verification failed: {0}")]
+    Catalog(String),
+    #[error("module package verification failed: {0}")]
+    Package(String),
+    #[error("module trust I/O failed: {0}")]
+    Io(#[from] std::io::Error),
+    #[error("module trust JSON failed: {0}")]
+    Json(#[from] serde_json::Error),
+    #[error(transparent)]
+    Metadata(#[from] VerifyError),
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TrustedComment<'a> {
@@ -39,6 +70,8 @@ pub enum VerifyError {
     MissingTrustedField(String),
     #[error("trusted comment field {field} does not match the expected value")]
     TrustedFieldMismatch { field: String },
+    #[error("trusted comment field is repeated or malformed: {0}")]
+    InvalidTrustedField(String),
 }
 
 /// Return a lower-case SHA-256 digest without touching the filesystem.
@@ -102,10 +135,7 @@ pub fn verify_trusted_comment(
     comment: &str,
     expected: &TrustedComment<'_>,
 ) -> Result<(), VerifyError> {
-    let fields = comment
-        .split_whitespace()
-        .filter_map(|part| part.split_once('='))
-        .collect::<std::collections::BTreeMap<_, _>>();
+    let fields = trusted_fields(comment)?;
     for (name, value) in [
         ("id", expected.id),
         ("version", expected.version),
@@ -123,6 +153,20 @@ pub fn verify_trusted_comment(
         }
     }
     Ok(())
+}
+
+fn trusted_fields(comment: &str) -> Result<std::collections::BTreeMap<&str, &str>, VerifyError> {
+    let mut fields = std::collections::BTreeMap::new();
+    for part in comment.split_whitespace() {
+        let (key, value) = part
+            .split_once('=')
+            .filter(|(key, value)| !key.is_empty() && !value.is_empty())
+            .ok_or_else(|| VerifyError::InvalidTrustedField(part.to_owned()))?;
+        if fields.insert(key, value).is_some() {
+            return Err(VerifyError::InvalidTrustedField(key.to_owned()));
+        }
+    }
+    Ok(fields)
 }
 
 fn is_sha256(value: &str) -> bool {
@@ -252,7 +296,7 @@ fn valid_numeric_part(value: &str) -> bool {
 }
 
 #[cfg(test)]
-mod tests {
+mod primitive_tests {
     use super::*;
 
     #[test]

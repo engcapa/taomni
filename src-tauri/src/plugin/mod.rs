@@ -5,18 +5,27 @@
 //! deserialized into `AppState`.
 
 pub mod download;
+mod frontend;
 pub mod host;
 pub mod install;
+mod installation;
 pub mod migration;
 pub mod protocol;
+mod runtime;
+mod signed_catalog;
 pub mod verify;
+
+pub(crate) use installation::current_platform;
+pub(crate) use signed_catalog::{fetch_trusted_catalog, package_from_cached_catalog};
 
 use std::collections::{BTreeSet, HashMap};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
+use std::sync::atomic::AtomicBool;
 use std::sync::{Arc, Mutex, RwLock};
 
 use serde::{Deserialize, Serialize};
+#[cfg(test)]
 use serde_json::Value;
 use thiserror::Error;
 
@@ -125,10 +134,14 @@ pub enum PluginError {
     HostUnavailable(String),
     #[error("plugin host request failed: {0}")]
     HostRequest(String),
+    #[error("plugin RPC failed ({code}): {message}")]
+    Rpc { code: i32, message: String },
     #[error("plugin registry I/O failed: {0}")]
     Io(#[from] std::io::Error),
     #[error("plugin registry JSON failed: {0}")]
     Json(#[from] serde_json::Error),
+    #[error("plugin trust verification failed: {0}")]
+    Trust(#[from] verify::TrustError),
     #[error("plugin installation failed: {0}")]
     Install(#[from] install::InstallError),
 }
@@ -138,7 +151,12 @@ pub struct PluginRegistry {
     root: PathBuf,
     core_api_version: String,
     records: Arc<RwLock<HashMap<String, PluginRecord>>>,
-    hosts: Arc<Mutex<HashMap<String, Arc<Mutex<host::HostProcess>>>>>,
+    hosts: Arc<Mutex<HashMap<String, Arc<runtime::RuntimeHost>>>>,
+    lifecycle: Arc<Mutex<()>>,
+    monitor_started: Arc<AtomicBool>,
+    shutting_down: Arc<AtomicBool>,
+    pending_requests: Arc<Mutex<HashMap<(String, String), bool>>>,
+    frontend_trust: Arc<RwLock<HashMap<PathBuf, Arc<verify::InstalledTrust>>>>,
 }
 
 impl PluginRegistry {
@@ -148,6 +166,11 @@ impl PluginRegistry {
             core_api_version: CORE_API_VERSION.to_owned(),
             records: Arc::new(RwLock::new(HashMap::new())),
             hosts: Arc::new(Mutex::new(HashMap::new())),
+            lifecycle: Arc::new(Mutex::new(())),
+            monitor_started: Arc::new(AtomicBool::new(false)),
+            shutting_down: Arc::new(AtomicBool::new(false)),
+            pending_requests: Arc::new(Mutex::new(HashMap::new())),
+            frontend_trust: Arc::new(RwLock::new(HashMap::new())),
         }
     }
 
@@ -156,15 +179,22 @@ impl PluginRegistry {
     }
 
     pub fn scan(&self) -> Result<(), PluginError> {
+        let _lifecycle = self
+            .lifecycle
+            .lock()
+            .expect("plugin lifecycle lock poisoned");
+        self.scan_locked()
+    }
+
+    fn scan_locked(&self) -> Result<(), PluginError> {
         if !self.root.exists() {
             fs::create_dir_all(&self.root)?;
         }
-        let mut records = self.records.write().expect("plugin registry lock poisoned");
-        records.clear();
+        let mut records = HashMap::new();
         for entry in fs::read_dir(&self.root)? {
             let entry = entry?;
             let path = entry.path();
-            if !entry.file_type()?.is_dir() || path.file_name().is_some_and(|n| n == "state.json") {
+            if !entry.file_type()?.is_dir() || !valid_slug(&entry.file_name().to_string_lossy()) {
                 continue;
             }
             let slug = entry.file_name().to_string_lossy().into_owned();
@@ -183,6 +213,29 @@ impl PluginRegistry {
             records.insert(slug, record);
         }
         self.load_enabled_state(&mut records)?;
+        let stale = self
+            .hosts
+            .lock()
+            .expect("plugin host lock poisoned")
+            .keys()
+            .filter(|slug| {
+                records.get(*slug).is_none_or(|record| {
+                    record.state != LifecycleState::Enabled
+                        || self
+                            .get(slug)
+                            .is_none_or(|previous| previous.manifest != record.manifest)
+                })
+            })
+            .cloned()
+            .collect::<Vec<_>>();
+        for slug in stale {
+            self.stop_host(&slug);
+        }
+        *self.records.write().expect("plugin registry lock poisoned") = records;
+        self.frontend_trust
+            .write()
+            .expect("plugin asset lock poisoned")
+            .clear();
         Ok(())
     }
 
@@ -207,7 +260,20 @@ impl PluginRegistry {
     }
 
     pub fn set_enabled(&self, slug: &str, enabled: bool) -> Result<PluginRecord, PluginError> {
+        let _lifecycle = self
+            .lifecycle
+            .lock()
+            .expect("plugin lifecycle lock poisoned");
+        let verified = if enabled {
+            Some(verify::verify_installed(
+                &self.active_directory(slug)?,
+                current_platform(),
+            )?)
+        } else {
+            None
+        };
         let mut records = self.records.write().expect("plugin registry lock poisoned");
+        let before = records.clone();
         let record = records
             .get_mut(slug)
             .ok_or_else(|| PluginError::NotFound(slug.to_owned()))?;
@@ -219,50 +285,28 @@ impl PluginRegistry {
         if record.state == LifecycleState::Uninstalled {
             return Err(PluginError::NotFound(slug.to_owned()));
         }
+        if verified
+            .as_ref()
+            .is_some_and(|manifest| manifest != &record.manifest)
+        {
+            return Err(PluginError::InvalidManifest(
+                "active manifest changed; refresh modules before enabling".into(),
+            ));
+        }
         record.state = if enabled {
             LifecycleState::Enabled
         } else {
             LifecycleState::Disabled
         };
         if !enabled {
-            if let Some(process) = self
-                .hosts
-                .lock()
-                .expect("plugin host lock poisoned")
-                .remove(slug)
-            {
-                process.lock().expect("plugin process lock poisoned").stop();
-            }
+            self.stop_host(slug);
         }
         let snapshot = records.clone();
         drop(records);
-        self.persist_enabled_state(&snapshot)?;
-        self.get(slug)
-            .ok_or_else(|| PluginError::NotFound(slug.to_owned()))
-    }
-
-    /// Install a package directory that has already passed download and
-    /// signature verification. The installer never overwrites an immutable
-    /// version and only activates it after the complete tree is staged.
-    pub fn install_staged(
-        &self,
-        slug: &str,
-        version: &str,
-        package_dir: &Path,
-    ) -> Result<PluginRecord, PluginError> {
-        let source_manifest = read_manifest_file(&package_dir.join("module.json"))?;
-        if source_manifest.slug != slug || source_manifest.version != version {
-            return Err(PluginError::InvalidManifest(
-                "package slug/version does not match install request".into(),
-            ));
+        if let Err(error) = self.persist_enabled_state(&snapshot) {
+            *self.records.write().expect("plugin registry lock poisoned") = before;
+            return Err(error);
         }
-        self.validate_manifest_fields(&source_manifest)?;
-        let installer = install::ModuleInstaller::new(&self.root);
-        let destination = installer.stage(slug, version, package_dir)?;
-        let active_manifest = read_manifest_file(&destination.join("module.json"))?;
-        self.validate_manifest(&active_manifest, &self.root.join(slug))?;
-        installer.activate(slug, version)?;
-        self.scan()?;
         self.get(slug)
             .ok_or_else(|| PluginError::NotFound(slug.to_owned()))
     }
@@ -270,19 +314,36 @@ impl PluginRegistry {
     /// Switch the active immutable version to the previous one and refresh the
     /// registry projection. The host supervisor will re-handshake separately.
     pub fn rollback(&self, slug: &str) -> Result<PluginRecord, PluginError> {
-        self.stop_host(slug);
-        install::ModuleInstaller::new(&self.root).rollback(slug)?;
-        self.scan()?;
-        self.get(slug)
-            .ok_or_else(|| PluginError::NotFound(slug.to_owned()))
+        let _lifecycle = self
+            .lifecycle
+            .lock()
+            .expect("plugin lifecycle lock poisoned");
+        let installer = install::ModuleInstaller::new(&self.root);
+        let pointer = installer.active_pointer(slug)?;
+        let previous = pointer
+            .previous_version
+            .as_ref()
+            .ok_or_else(|| install::InstallError::NoRollback(slug.into()))?;
+        let manifest =
+            verify::verify_installed(&installer.version_dir(slug, previous)?, current_platform())?;
+        if &manifest.version != previous || manifest.slug != slug {
+            return Err(PluginError::InvalidManifest(
+                "rollback version directory does not match its manifest".into(),
+            ));
+        }
+        self.activate_transaction(&manifest, &pointer, || installer.rollback(slug))
     }
 
     /// Deactivate a module. Its versions and data remain unless `delete_data`
     /// is explicitly requested by the caller.
     pub fn uninstall(&self, slug: &str, delete_data: bool) -> Result<PluginRecord, PluginError> {
+        let _lifecycle = self
+            .lifecycle
+            .lock()
+            .expect("plugin lifecycle lock poisoned");
         self.stop_host(slug);
         install::ModuleInstaller::new(&self.root).uninstall(slug, delete_data)?;
-        self.scan()?;
+        self.scan_locked()?;
         // Removing the active pointer makes the record `Uninstalled`; clear
         // its old enablement preference so a later install starts disabled
         // and a restart cannot resurrect the removed module.
@@ -328,116 +389,21 @@ impl PluginRegistry {
                 LifecycleState::Uninstalled,
             )
         };
-        let manifest = read_manifest_file(&manifest_path)?;
+        let manifest = verify::verify_installed(
+            manifest_path
+                .parent()
+                .ok_or_else(|| PluginError::InvalidManifest("manifest has no parent".into()))?,
+            current_platform(),
+        )?;
+        if manifest_path.parent().and_then(Path::file_name)
+            != Some(std::ffi::OsStr::new(&manifest.version))
+        {
+            return Err(PluginError::InvalidManifest(
+                "version directory does not match signed manifest".into(),
+            ));
+        }
         self.validate_manifest(&manifest, plugin_dir)?;
         Ok((manifest, state))
-    }
-
-    pub fn invoke(&self, slug: &str, command: &str, payload: Value) -> Result<Value, PluginError> {
-        let record = self
-            .get(slug)
-            .ok_or_else(|| PluginError::NotFound(slug.to_owned()))?;
-        if record.state != LifecycleState::Enabled {
-            return Err(PluginError::Disabled(slug.to_owned()));
-        }
-        if !record.manifest.commands.contains(command) {
-            return Err(PluginError::CommandDenied {
-                slug: slug.to_owned(),
-                command: command.to_owned(),
-            });
-        }
-        let process = self.host_for(slug, &record)?;
-        let result = process
-            .lock()
-            .expect("plugin process lock poisoned")
-            .invoke(command, Some(payload));
-        match result {
-            Ok(value) => Ok(value),
-            Err(error) => {
-                self.stop_host(slug);
-                Err(match error {
-                    host::HostProcessError::Crashed | host::HostProcessError::Spawn(_) => {
-                        PluginError::HostUnavailable(format!("{slug}: {error}"))
-                    }
-                    host::HostProcessError::Timeout => {
-                        PluginError::HostRequest(format!("{slug}: {error}"))
-                    }
-                    other => PluginError::HostRequest(format!("{slug}: {other}")),
-                })
-            }
-        }
-    }
-
-    fn host_for(
-        &self,
-        slug: &str,
-        record: &PluginRecord,
-    ) -> Result<Arc<Mutex<host::HostProcess>>, PluginError> {
-        let host_name = record
-            .manifest
-            .entry
-            .host
-            .as_deref()
-            .ok_or_else(|| PluginError::HostUnavailable(slug.to_owned()))?;
-        let mut hosts = self.hosts.lock().expect("plugin host lock poisoned");
-        if let Some(process) = hosts.get(slug) {
-            return Ok(process.clone());
-        }
-        let (working_dir, host_path) = self.host_location(slug, host_name)?;
-        let process = host::HostProcess::start(
-            &record.manifest.id,
-            &record.manifest.version,
-            &host_path,
-            &working_dir,
-            &record.manifest.commands.iter().cloned().collect::<Vec<_>>(),
-            &record
-                .manifest
-                .permissions
-                .iter()
-                .cloned()
-                .collect::<Vec<_>>(),
-            host::HostSupervisorConfig::default(),
-        )
-        .map_err(|error| PluginError::HostUnavailable(format!("{slug}: {error}")))?;
-        let process = Arc::new(Mutex::new(process));
-        hosts.insert(slug.to_owned(), process.clone());
-        Ok(process)
-    }
-
-    fn host_location(
-        &self,
-        slug: &str,
-        host_name: &str,
-    ) -> Result<(PathBuf, PathBuf), PluginError> {
-        let plugin_dir = self.root.join(slug);
-        let pointer = install::ModuleInstaller::new(&self.root)
-            .active_pointer(slug)
-            .map_err(PluginError::Install)?;
-        let working_dir = pointer
-            .active_version
-            .map(|version| plugin_dir.join("versions").join(version))
-            .unwrap_or_else(|| plugin_dir.clone());
-        let relative = Path::new(host_name);
-        validate_relative_path(host_name)?;
-        let host_path = working_dir.join(relative);
-        if !host_path.is_file() {
-            return Err(PluginError::HostUnavailable(format!(
-                "host executable is missing: {}",
-                host_path.display()
-            )));
-        }
-        Ok((working_dir, host_path))
-    }
-
-    fn stop_host(&self, slug: &str) {
-        if let Some(process) = self
-            .hosts
-            .lock()
-            .expect("plugin host lock poisoned")
-            .remove(slug)
-        {
-            process.lock().expect("plugin process lock poisoned").stop();
-        }
     }
 
     fn validate_manifest(&self, manifest: &ModuleManifest, dir: &Path) -> Result<(), PluginError> {
@@ -593,181 +559,5 @@ fn placeholder_manifest(slug: &str) -> ModuleManifest {
 }
 
 #[cfg(test)]
-mod tests {
-    use super::*;
-    use tempfile::tempdir;
-
-    fn manifest(slug: &str) -> ModuleManifest {
-        ModuleManifest {
-            id: format!("taomni-plugin-{slug}"),
-            slug: slug.into(),
-            name: slug.into(),
-            version: "1.0.0".into(),
-            core_api_version: CORE_API_VERSION.into(),
-            kind: PluginKind::Auth,
-            status: PluginStatus::Stable,
-            removal_candidate: false,
-            platforms: ["linux-x86_64".into()].into_iter().collect(),
-            entry: PluginEntry {
-                host: Some("bin/host".into()),
-                frontend: Some("frontend/index.js".into()),
-                protocol: 1,
-            },
-            tabs: vec![PluginTab {
-                kind: slug.into(),
-                title: slug.into(),
-            }],
-            commands: ["ping".into()].into(),
-            permissions: ["session.read".into()].into(),
-            data_dir: format!("plugins/{slug}"),
-            backup_paths: vec![format!("plugins/{slug}/data.db")],
-            legacy_tables: vec![],
-            vault_fixed_keys: vec![],
-            snapshot: SnapshotMode::Rpc,
-        }
-    }
-
-    #[test]
-    fn scans_valid_and_retains_invalid_manifests_as_disabled_records() {
-        let dir = tempdir().unwrap();
-        let valid = dir.path().join("mfa");
-        fs::create_dir(&valid).unwrap();
-        fs::write(
-            valid.join("module.json"),
-            serde_json::to_vec(&manifest("mfa")).unwrap(),
-        )
-        .unwrap();
-        let invalid = dir.path().join("invalid");
-        fs::create_dir(&invalid).unwrap();
-        fs::write(invalid.join("module.json"), b"{}").unwrap();
-        let registry = PluginRegistry::new(dir.path());
-        registry.scan().unwrap();
-        assert_eq!(
-            registry.get("mfa").unwrap().state,
-            LifecycleState::Installed
-        );
-        assert!(registry.get("mfa").unwrap().reason.is_none());
-        let invalid_record = registry.get("invalid").unwrap();
-        assert_eq!(invalid_record.state, LifecycleState::Disabled);
-        assert!(invalid_record.reason.is_some());
-    }
-
-    #[test]
-    fn enable_state_is_persisted_and_command_is_allowlisted() {
-        let dir = tempdir().unwrap();
-        let path = dir.path().join("plugins");
-        fs::create_dir(&path).unwrap();
-        let p = path.join("mfa");
-        fs::create_dir(&p).unwrap();
-        fs::write(
-            p.join("module.json"),
-            serde_json::to_vec(&manifest("mfa")).unwrap(),
-        )
-        .unwrap();
-        let registry = PluginRegistry::new(&path);
-        registry.scan().unwrap();
-        registry.set_enabled("mfa", true).unwrap();
-        assert_eq!(
-            registry
-                .invoke("mfa", "unknown", Value::Null)
-                .unwrap_err()
-                .to_string(),
-            "plugin command unknown is not declared by mfa"
-        );
-        let reloaded = PluginRegistry::new(&path);
-        reloaded.scan().unwrap();
-        assert_eq!(reloaded.get("mfa").unwrap().state, LifecycleState::Enabled);
-    }
-
-    #[test]
-    fn rejects_path_traversal() {
-        assert!(validate_relative_path("../data").is_err());
-        assert!(validate_relative_path("/tmp/data").is_err());
-        assert!(validate_relative_path("data/file.db").is_ok());
-    }
-
-    #[test]
-    fn installs_rolls_back_and_uninstalls_through_registry_projection() {
-        let root = tempdir().unwrap();
-        let package_v1 = tempdir().unwrap();
-        let package_v2 = tempdir().unwrap();
-        let write_package = |dir: &Path, version: &str| {
-            let mut value = serde_json::to_value(manifest("mfa")).unwrap();
-            value["version"] = version.into();
-            fs::write(
-                dir.join("module.json"),
-                serde_json::to_vec_pretty(&value).unwrap(),
-            )
-            .unwrap();
-        };
-        write_package(package_v1.path(), "1.0.0");
-        write_package(package_v2.path(), "1.1.0");
-
-        let registry = PluginRegistry::new(root.path());
-        registry.scan().unwrap();
-        let first = registry
-            .install_staged("mfa", "1.0.0", package_v1.path())
-            .unwrap();
-        assert_eq!(first.manifest.version, "1.0.0");
-        let second = registry
-            .install_staged("mfa", "1.1.0", package_v2.path())
-            .unwrap();
-        assert_eq!(second.manifest.version, "1.1.0");
-        let rolled = registry.rollback("mfa").unwrap();
-        assert_eq!(rolled.manifest.version, "1.0.0");
-
-        fs::create_dir_all(root.path().join("mfa/data")).unwrap();
-        fs::write(root.path().join("mfa/data/keep.db"), b"keep").unwrap();
-        let uninstalled = registry.uninstall("mfa", false).unwrap();
-        assert_eq!(uninstalled.state, LifecycleState::Uninstalled);
-        assert!(root.path().join("mfa/data/keep.db").is_file());
-    }
-
-    #[test]
-    fn rejects_install_package_slug_or_version_mismatch() {
-        let root = tempdir().unwrap();
-        let package = tempdir().unwrap();
-        fs::write(
-            package.path().join("module.json"),
-            serde_json::to_vec(&manifest("mfa")).unwrap(),
-        )
-        .unwrap();
-        let registry = PluginRegistry::new(root.path());
-        registry.scan().unwrap();
-        let error = registry
-            .install_staged("mfa", "2.0.0", package.path())
-            .unwrap_err();
-        assert!(error.to_string().contains("slug/version"));
-    }
-
-    #[test]
-    fn uninstall_does_not_restore_enabled_state_from_settings() {
-        let root = tempdir().unwrap();
-        let package = tempdir().unwrap();
-        fs::write(
-            package.path().join("module.json"),
-            serde_json::to_vec(&manifest("mfa")).unwrap(),
-        )
-        .unwrap();
-        let registry = PluginRegistry::new(root.path());
-        registry.scan().unwrap();
-        registry
-            .install_staged("mfa", "1.0.0", package.path())
-            .unwrap();
-        registry.set_enabled("mfa", true).unwrap();
-        let uninstalled = registry.uninstall("mfa", false).unwrap();
-        assert_eq!(uninstalled.state, LifecycleState::Uninstalled);
-
-        let reloaded = PluginRegistry::new(root.path());
-        reloaded.scan().unwrap();
-        assert_eq!(
-            reloaded.get("mfa").expect("uninstalled record").state,
-            LifecycleState::Uninstalled
-        );
-        assert!(
-            !fs::read_to_string(root.path().join("state.json"))
-                .unwrap()
-                .contains("mfa")
-        );
-    }
-}
+#[path = "registry_tests.rs"]
+mod tests;

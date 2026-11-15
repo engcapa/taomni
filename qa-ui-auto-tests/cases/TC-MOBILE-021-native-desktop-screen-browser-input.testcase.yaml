@@ -37,6 +37,13 @@ steps:
 - assert_count: {selector: '[data-testid="mobile-settings-screen-capture"]:checked', equal: 1}
 - assert_no_runtime_errors: null
 - screenshot: native-desktop-remote-settings.png
+- assert_json_file:
+    path: mobile-desktop-remote-receipt.json
+    expect:
+      passed: true
+      display_count: {min: 1}
+      window_count: {min: 1}
+      event_count: {min: 1}
 verification:
   review: reviewed
   requirements:
@@ -51,11 +58,17 @@ verification:
     - {step: 19, expectation: Screen capture checkbox remains checked after closing and reopening Settings.}
     - {step: 20, expectation: No native WebView runtime errors occurred.}
     results: [7, 10, 13, 14, 19, 20]
+  - id: R2
+    requirement: Retained native evidence identifies actual display enumeration, managed windows and independently received OS input rather than only a success marker.
+    actions: [13]
+    checkpoints:
+    - {step: 22, expectation: "The native receipt has at least one real display, one host window and one independently received event, with passed true."}
+    results: [22]
   visual:
   - check: Settings toggle and phone DesktopView screenshots cleanly show opt-in and captured screen at 390x844.
     method: automated
     reason: Embedded Mobile Web phone screenshot and overflow assertion plus sample PNG artifact inspect rendered UI; independent HTTP keystroke events own delivery verification.
   native:
-  - check: Real Tauri IPC opt-in persistence, xcap OS screen capture, managed WebviewWindow browser creation, and enigo OS window activation/keyboard synthesis on Linux X11 and Windows.
+  - check: Real Tauri IPC opt-in persistence, shared core OS screen capture, managed WebviewWindow browser creation, and enigo OS window activation/keyboard synthesis on Linux X11 and Windows.
     method: automated
     reason: Executes inside packaged Tauri with real OS display/input stack; macOS TCC blocks headless Screen Recording/Accessibility prompts in hosted CI and is covered by platform notes and unit tests.

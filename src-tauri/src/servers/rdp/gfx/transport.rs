@@ -7,7 +7,6 @@ use super::flow_control::decode_verdict;
 use super::flow_control::stall_verdict;
 use super::handler::EgfxFactory;
 use crate::servers::engine::LogEmitter;
-use crate::servers::rdp::capture::Frame;
 use ironrdp::dvc::encode_dvc_messages;
 use ironrdp::pdu::gcc::Monitor;
 use ironrdp::pdu::gcc::MonitorFlags;
@@ -23,6 +22,7 @@ use std::sync::atomic::AtomicU32;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::Ordering;
 use std::time::Instant;
+use taomni_capture::engine::Frame;
 use tokio::sync::mpsc::UnboundedSender;
 
 #[derive(Clone)]

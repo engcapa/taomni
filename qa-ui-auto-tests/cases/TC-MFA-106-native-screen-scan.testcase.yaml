@@ -50,6 +50,21 @@ steps:
 - press: Escape
 - assert_not_visible: '[data-testid="mfa-add-dialog"]'
 - screenshot: mfa-106-screen-scan.png
+- native_show_image_window: {path: qa-ui-auto-tests/synthetic-fixtures/mfa/hotp-qa-bank.png}
+- click: '[data-testid="mfa-add"]'
+- click: '[data-testid="mfa-add-mode-screen"]'
+- wait_for: '[data-testid="mfa-add-dialog"][data-mode="screen"]'
+- click: '[data-testid="mfa-screen-scan"]'
+- wait_for: {selector: '[data-testid="mfa-import-preview"]', timeout_sec: 60}
+- assert_items: {selector: '[data-testid="mfa-import-item"]', attribute: data-issuer, equals: [QA Bank]}
+- assert_attribute: {selector: '[data-testid="mfa-import-item"]', name: data-duplicate, equals: 'true'}
+- assert_disabled: '[data-testid="mfa-import-confirm"]'
+- press: Escape
+- assert_not_visible: '[data-testid="mfa-add-dialog"]'
+- native_show_image_window: {action: close}
+- assert_count: {selector: '[data-testid="mfa-account-row"]', equal: 1}
+- assert_text_equals: {selector: '[data-testid="mfa-account-code"]:is([data-issuer="QA Bank"] *)', equals: 755 224}
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -72,6 +87,19 @@ verification:
     - {step: 26, expectation: scan button usable again}
     - {step: 28, expectation: Escape closed the dialog}
     results: [28]
+  - id: R3
+    requirement: After the no-QR result, a fresh real desktop scan can decode again; closing duplicate review restores the dialog owner and leaves stored MFA data untouched.
+    actions: [30, 31, 32, 34, 39, 41]
+    checkpoints:
+    - {step: 35, expectation: A third capture reaches QR review after success and no-QR capture teardown.}
+    - {step: 36, expectation: Fresh real pixels decode QA Bank again.}
+    - {step: 37, expectation: The existing account is recognized as a duplicate.}
+    - {step: 38, expectation: Duplicate-only preview cannot import another account.}
+    - {step: 40, expectation: Escape closes the reopened dialog after native capture.}
+    - {step: 42, expectation: Exactly one stored account remains.}
+    - {step: 43, expectation: Original account counter and secret remain unchanged.}
+    - {step: 44, expectation: No WebView runtime errors occurred.}
+    results: [35, 36, 37, 38, 40, 42, 43, 44]
   visual:
   - check: The window visibly hides during the capture and returns in front.
     method: manual

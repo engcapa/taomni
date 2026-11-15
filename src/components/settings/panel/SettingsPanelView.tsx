@@ -25,6 +25,7 @@ import { EditorAiLanguagePanel } from "../EditorAiLanguagePanel";
 import { FileOpenSettings } from "../FileOpenSettings";
 import { MobileServiceSettings } from "../MobileServiceSettings";
 import { ModuleStorePanel, type ModuleStoreCatalogEntry } from "../ModuleStorePanel";
+import { ModuleOfflineInstall } from "../ModuleOfflineInstall";
 import { LanguageSection } from "../LanguageSection";
 import { LanguageServersSettings } from "../LanguageServersSettings";
 import { LiveTemplatesSettings } from "../LiveTemplatesSettings";
@@ -81,6 +82,7 @@ export interface SettingsPanelViewProps {
   moduleCoreApiVersion: string;
   moduleCatalogLoading: boolean;
   moduleCatalogError: string | null;
+  onModuleRegistryChanged: () => void;
   moduleOnInstall: (entry: ModuleStoreCatalogEntry) => Promise<void>;
   moduleOnEnable: (entry: ModuleStoreCatalogEntry) => Promise<void>;
   moduleOnDisable: (entry: ModuleStoreCatalogEntry) => Promise<void>;
@@ -136,6 +138,7 @@ export function SettingsPanelView(inputs: SettingsPanelViewProps) {
     moduleCoreApiVersion,
     moduleCatalogLoading,
     moduleCatalogError,
+    onModuleRegistryChanged,
     moduleOnInstall,
     moduleOnEnable,
     moduleOnDisable,
@@ -380,6 +383,7 @@ export function SettingsPanelView(inputs: SettingsPanelViewProps) {
               <ScreenshotSettings />
             </SettingsAnchor>
             <SettingsAnchor id="module-store">
+              <ModuleOfflineInstall onRegistryChanged={onModuleRegistryChanged} />
               <ModuleStorePanel
                 catalog={moduleCatalog}
                 coreApiVersion={moduleCoreApiVersion}

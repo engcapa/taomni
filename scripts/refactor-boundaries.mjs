@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import ts from "typescript";
+import { checkModularBoundaries } from "./modular-boundaries.mjs";
 
 const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 // These are implementation modules, not alternate application entry points.
@@ -96,6 +97,7 @@ function resolve(from, specifier) {
     .find((file) => fs.existsSync(file) && fs.statSync(file).isFile()) ?? null;
 }
 const errors = [];
+checkModularBoundaries(root);
 const graph = new Map();
 for (const [directory, facade] of boundaries) {
   for (const file of sources(path.join(root, directory))) {

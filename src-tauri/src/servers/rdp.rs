@@ -41,9 +41,6 @@ mod audio_input;
 
 mod auth;
 
-/// Screen-capture backends (X11 / Wayland).
-pub(crate) mod capture;
-
 mod clipboard;
 
 mod clipboard_formats;
@@ -56,9 +53,6 @@ mod display;
 mod gfx;
 
 mod input;
-
-#[cfg(target_os = "macos")]
-pub(crate) use input::{control_permission_granted, request_control_permission};
 
 #[cfg(test)]
 mod bulk_loopback_tests;

@@ -24,12 +24,14 @@ import { invokeChat } from "./commands/chat";
 import { invokeDatabase } from "./commands/database";
 import { invokeNotes } from "./commands/notes";
 import { invokeScreenshot } from "./commands/screenshot";
+import { invokePlugin } from "./commands/plugin";
 
 const stubCommandRegistry = new CommandRegistry();
 
 if (typeof window !== "undefined") installStubMailQaControl(mailStubSeed);
 
 export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions): Promise<T> {
+  if (cmd.startsWith("plugin_")) return await invokePlugin<T>(cmd);
   if (cmd.startsWith("viewer_")) return await invokeViewer(cmd, args) as T;
   if (cmd.startsWith("mobile_")) return await mobileStub(cmd, args) as T;
   if (cmd === "backup_get_policy") {
@@ -64,33 +66,6 @@ export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions
 for (const command of ["recovery_get","recovery_update","recovery_ready","list_system_fonts","clipboard_read_text","clipboard_write_text","clipboard_write_image_png","clipboard_read_files","clipboard_write_files","git_blame_lines","exit_app","open_sftp_window","close_current_detached_window","open_detached_window","probe_system_rdp","open_system_rdp_settings","mirror_get_config","mirror_set_config","cuda_pack_status","get_opencode_go_catalog","get_provider_models","test_llm_model","test_llm_connection","get_ai_config","save_ai_config","save_ai_api_key"]) {
   stubCommandRegistry.register({ domain: "application", command, handler: (args) => invokeApplication(command, args) });
 }
-
-// The browser preview has no native plugin registry. Return the same explicit
-// empty projection that a fresh native profile reports so Settings can render
-// the empty state without treating an unavailable IPC command as a runtime
-// failure. Lifecycle mutations remain native-only and intentionally fall back
-// to the normal unknown-command warning in browser mode.
-for (const command of ["plugin_list", "plugin_refresh"]) {
-  stubCommandRegistry.register({ domain: "plugin", command, handler: () => [] });
-}
-stubCommandRegistry.register({
-  domain: "plugin",
-  command: "plugin_migration_inspect",
-  handler: () => ({
-    from_version: "0.5.x",
-    database_path: null,
-    database_tables: [],
-    candidates: [],
-    source_fingerprints: {},
-    retained_paths: [],
-    vault: null,
-  }),
-});
-stubCommandRegistry.register({
-  domain: "plugin",
-  command: "plugin_migration_execute",
-  handler: () => ({ status: "complete", committed: [], skipped: [], pending: [], pending_reason: null }),
-});
 
 for (const command of ["attach_terminal_output","detach_terminal_output","detect_x_server","list_local_shells","list_wsl_distros","list_common_local_directories","record_local_directory_use","history_snapshot","history_list","history_read","history_prune","create_local_terminal","create_ssh_terminal","submit_ssh_auth_response","test_ssh_connection","write_terminal","resize_terminal","send_terminal_signal","close_terminal"]) {
   stubCommandRegistry.register({ domain: "terminal", command, handler: (args) => invokeTerminal(command, args) });

@@ -1,19 +1,18 @@
-use std::path::{Path, PathBuf};
+//! Version-bound official plugin assets, including Tauri's WebView2 mapping.
+
+use std::path::Path;
 
 use tauri::Manager;
-use tauri::http::{Method, Request, Response, StatusCode};
-use url::Url;
+use tauri::http::{HeaderMap, Method, Request, Response, StatusCode, Uri};
 
 pub const SCHEME: &str = "taomni-plugin";
 
-/// Register the restricted plugin frontend scheme. Only files below
-/// `<app-data>/plugins/<slug>/frontend` are served, and every request is GET.
 pub(crate) fn register_protocol<R: tauri::Runtime>(
     builder: tauri::Builder<R>,
 ) -> tauri::Builder<R> {
     builder.register_asynchronous_uri_scheme_protocol(SCHEME, |context, request, responder| {
         let app = context.app_handle().clone();
-        tauri::async_runtime::spawn(async move {
+        tauri::async_runtime::spawn_blocking(move || {
             responder.respond(serve(&app, request));
         });
     })
@@ -23,100 +22,152 @@ fn serve<R: tauri::Runtime>(
     app: &tauri::AppHandle<R>,
     request: Request<Vec<u8>>,
 ) -> Response<Vec<u8>> {
+    let dev_origin = if cfg!(debug_assertions) {
+        app.config()
+            .build
+            .dev_url
+            .as_ref()
+            .map(|url| url.origin().ascii_serialization())
+    } else {
+        None
+    };
+    let origin = match cors_origin(request.headers(), dev_origin.as_deref()) {
+        Ok(origin) => origin,
+        Err(error) => {
+            return response(
+                StatusCode::FORBIDDEN,
+                error.as_bytes().to_vec(),
+                "text/plain",
+                None,
+            );
+        }
+    };
     if request.method() != Method::GET {
         return response(
             StatusCode::METHOD_NOT_ALLOWED,
             b"GET only".to_vec(),
             "text/plain",
+            origin,
         );
     }
-    let Ok(url) = Url::parse(&request.uri().to_string()) else {
-        return response(
-            StatusCode::BAD_REQUEST,
-            b"invalid plugin URL".to_vec(),
-            "text/plain",
-        );
+    let asset = match parse_asset_uri(request.uri()) {
+        Ok(asset) => asset,
+        Err(error) => {
+            return response(
+                StatusCode::FORBIDDEN,
+                error.as_bytes().to_vec(),
+                "text/plain",
+                origin,
+            );
+        }
     };
-    let Some(slug) = url.host_str().filter(|value| valid_slug(value)) else {
-        return response(
-            StatusCode::FORBIDDEN,
-            b"invalid plugin slug".to_vec(),
-            "text/plain",
-        );
-    };
-    let segments = url
-        .path_segments()
-        .map(|parts| parts.collect::<Vec<_>>())
-        .unwrap_or_default();
-    if segments.is_empty() || segments.iter().any(|part| *part == ".." || part.is_empty()) {
-        return response(
-            StatusCode::FORBIDDEN,
-            b"invalid plugin path".to_vec(),
-            "text/plain",
-        );
-    }
-    let Ok(app_data) = app.path().app_data_dir() else {
-        return response(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            b"app data unavailable".to_vec(),
-            "text/plain",
-        );
-    };
-    let frontend_root = app_data.join("plugins").join(slug).join("frontend");
-    let relative = segments.iter().fold(PathBuf::new(), |mut path, segment| {
-        path.push(segment);
-        path
-    });
-    let path = frontend_root.join(relative);
-    let Ok(canonical) = path.canonicalize() else {
-        return response(
-            StatusCode::NOT_FOUND,
-            b"plugin asset not found".to_vec(),
-            "text/plain",
-        );
-    };
-    let Ok(root) = frontend_root.canonicalize() else {
-        return response(
-            StatusCode::NOT_FOUND,
-            b"plugin asset not found".to_vec(),
-            "text/plain",
-        );
-    };
-    if !canonical.starts_with(&root)
-        || !canonical.is_file()
-        || has_symlink_component(&frontend_root, &canonical)
+    let state = app.state::<crate::state::AppState>();
+    match state
+        .plugins
+        .frontend_asset(&asset.slug, &asset.version, &asset.relative)
     {
-        return response(
-            StatusCode::FORBIDDEN,
-            b"plugin asset denied".to_vec(),
-            "text/plain",
-        );
-    }
-    let Ok(bytes) = std::fs::read(&canonical) else {
-        return response(
-            StatusCode::INTERNAL_SERVER_ERROR,
-            b"plugin asset read failed".to_vec(),
-            "text/plain",
-        );
-    };
-    response(StatusCode::OK, bytes, mime(&canonical))
-}
-
-fn has_symlink_component(root: &Path, path: &Path) -> bool {
-    let Ok(relative) = path.strip_prefix(root) else {
-        return true;
-    };
-    let mut current = root.to_path_buf();
-    for component in relative.components() {
-        current.push(component);
-        if std::fs::symlink_metadata(&current)
-            .map(|meta| meta.file_type().is_symlink())
-            .unwrap_or(true)
-        {
-            return true;
+        Ok(bytes) => response(
+            StatusCode::OK,
+            bytes,
+            mime(Path::new(&asset.relative)),
+            origin,
+        ),
+        Err(error) => {
+            log::warn!("plugin asset denied for {}: {error}", asset.slug);
+            response(
+                StatusCode::FORBIDDEN,
+                b"plugin asset denied".to_vec(),
+                "text/plain",
+                origin,
+            )
         }
     }
-    false
+}
+
+#[derive(Debug, PartialEq, Eq)]
+struct AssetPath {
+    slug: String,
+    version: String,
+    relative: String,
+}
+
+fn parse_asset_uri(uri: &Uri) -> Result<AssetPath, &'static str> {
+    let scheme = uri.scheme_str().unwrap_or_default();
+    let authority = uri
+        .authority()
+        .map(|authority| authority.as_str())
+        .unwrap_or_default();
+    if !((scheme == SCHEME && authority == "localhost")
+        || (matches!(scheme, "http" | "https") && authority == "taomni-plugin.localhost"))
+        || uri.query().is_some()
+    {
+        return Err("invalid plugin origin");
+    }
+    // Parse the original HTTP URI path, before URL normalization can discard
+    // literal or encoded dot segments. Decode each segment exactly once.
+    let path = uri.path().strip_prefix('/').ok_or("invalid plugin path")?;
+    let segments = path
+        .split('/')
+        .map(decode_segment)
+        .collect::<Result<Vec<_>, _>>()?;
+    if segments.len() < 4 || !valid_slug(&segments[0]) || segments[2] != "frontend" {
+        return Err("invalid plugin asset path");
+    }
+    super::verify::compare_versions(&segments[1], &segments[1])
+        .map_err(|_| "invalid plugin version")?;
+    Ok(AssetPath {
+        slug: segments[0].clone(),
+        version: segments[1].clone(),
+        relative: segments[2..].join("/"),
+    })
+}
+
+fn decode_segment(encoded: &str) -> Result<String, &'static str> {
+    let bytes = encoded.as_bytes();
+    for (index, byte) in bytes.iter().enumerate() {
+        if *byte == b'%'
+            && (index + 2 >= bytes.len()
+                || !bytes[index + 1].is_ascii_hexdigit()
+                || !bytes[index + 2].is_ascii_hexdigit())
+        {
+            return Err("invalid plugin path encoding");
+        }
+    }
+    let decoded = urlencoding::decode(encoded).map_err(|_| "invalid plugin path encoding")?;
+    if decoded.is_empty()
+        || matches!(decoded.as_ref(), "." | "..")
+        || decoded.chars().any(|character| {
+            character.is_control() || matches!(character, '/' | '\\' | ':' | '%' | '?' | '#')
+        })
+    {
+        return Err("unsafe plugin path segment");
+    }
+    Ok(decoded.into_owned())
+}
+
+fn cors_origin<'a>(
+    headers: &'a HeaderMap,
+    dev_origin: Option<&str>,
+) -> Result<Option<&'a str>, &'static str> {
+    let origins = headers.get_all("Origin").iter().collect::<Vec<_>>();
+    if origins.is_empty() {
+        return Ok(None);
+    }
+    if origins.len() != 1 {
+        return Err("invalid plugin request origin");
+    }
+    let origin = origins[0]
+        .to_str()
+        .map_err(|_| "invalid plugin request origin")?;
+    if matches!(
+        origin,
+        "tauri://localhost" | "http://tauri.localhost" | "https://tauri.localhost"
+    ) || dev_origin.is_some_and(|dev| dev == origin)
+    {
+        Ok(Some(origin))
+    } else {
+        Err("plugin request origin denied")
+    }
 }
 
 fn valid_slug(value: &str) -> bool {
@@ -124,14 +175,14 @@ fn valid_slug(value: &str) -> bool {
         && value.split('-').all(|part| {
             !part.is_empty()
                 && part
-                    .chars()
-                    .all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit())
+                    .bytes()
+                    .all(|byte| byte.is_ascii_lowercase() || byte.is_ascii_digit())
         })
 }
 
 fn mime(path: &Path) -> &'static str {
     match path.extension().and_then(|value| value.to_str()) {
-        Some("js") => "text/javascript; charset=utf-8",
+        Some("js" | "mjs") => "text/javascript; charset=utf-8",
         Some("css") => "text/css; charset=utf-8",
         Some("json") => "application/json",
         Some("svg") => "image/svg+xml",
@@ -140,11 +191,24 @@ fn mime(path: &Path) -> &'static str {
     }
 }
 
-fn response(status: StatusCode, body: Vec<u8>, content_type: &str) -> Response<Vec<u8>> {
-    Response::builder()
+fn response(
+    status: StatusCode,
+    body: Vec<u8>,
+    content_type: &str,
+    origin: Option<&str>,
+) -> Response<Vec<u8>> {
+    let mut builder = Response::builder()
         .status(status)
         .header("Content-Type", content_type)
+        .header("X-Content-Type-Options", "nosniff")
         .header("Cache-Control", "no-store")
-        .body(body)
-        .expect("valid plugin protocol response")
+        .header("Vary", "Origin");
+    if let Some(origin) = origin {
+        builder = builder.header("Access-Control-Allow-Origin", origin);
+    }
+    builder.body(body).expect("valid plugin protocol response")
 }
+
+#[cfg(test)]
+#[path = "protocol_tests.rs"]
+mod tests;

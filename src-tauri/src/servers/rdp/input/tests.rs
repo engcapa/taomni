@@ -99,7 +99,7 @@ fn input_mapping_uses_the_latest_negotiated_surface_size() {
 
     let surface_size = Arc::new(AtomicU32::new(packed(3840, 2160)));
     let mapping = MacInputMapping::new(
-        super::super::capture::mac::DisplayBounds {
+        taomni_capture::engine::mac::DisplayBounds {
             x: -1920,
             y: 120,
             width: 1920,

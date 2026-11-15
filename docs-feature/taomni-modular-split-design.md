@@ -975,15 +975,15 @@ v1.2 没有覆盖“已经在用旧版的用户”。核心 0.6.x 默认包不�
 - v1.1（2026-11-14 20:22 澄清后）：第 5 项改按客户端 / 服务端两类，RDP / VNC 拆为 4 个插件，插件总数 10→12；第 4 项确认理解正确；新增 §4.1 暂定插件（后续可能移除）。
 - v1.0（2026-11-14 18:22 决策后）：初稿；§13 全部 5 项已决策，§13.2 三处解释待确认。
 
-### 13.5 当前实现与 hosted 验证快照（2026-11-15）
+### 13.5 当前实现与 hosted 验证快照（2026-11-16）
 
-本分支 `refactor/modules-arch` 当前提交为 `663d0fc3991a6ad509bd3847d7d8fc4b656c1a13`。已完成的基础设施包括：LanChat 产品/IPC/Rust active code/窗口/菜单/capability/stub 的彻底删除；0.5.x 单体升级的只读预检、源指纹、journal、staging、active 原子切换、失败回滚和幂等重试；插件 manifest 校验、registry、版本目录安装状态机、enable/disable/install/rollback/uninstall/refresh IPC；Settings 的 Module Store registry 投影、加载/空/错误状态和中英文文案；hello-plugin 的协议握手、token/API/version 校验、启停、ping、确定性 crash/hang fixture；以及 `modules.json` 生成器和 release 上传顺序。真实 HTTP 下载、完整验签/远端商店 IPC、升级向导 UI、三端真实宿主实验和具体业务插件迁移仍是 TASK-010–025 的后续工作。
+逐 TASK/AC/G 的状态与剩余工作见[实施与验收台账](taomni-modular-split-progress.md)。核心仍包含待迁出业务；目前唯一独立宿主为 hello-plugin，完整模块化交付尚未完成。
 
-本地只执行了单元测试和静态检查：hello-plugin `cargo test --locked` 6/6，Taomni plugin Rust focused 34/34，Settings/ModuleStore/IPC/registry Vitest 42/42；`pnpm exec tsc -b`、`pnpm check:refactor`、`cargo fmt --check`、`git diff --check` 及 `qa_ui_auto.lint/audit --gate` 均通过（audit 为 750 个 case、0 lint error、catalog/control coverage gate 通过）。
+已落地的基础能力包括插件 API/registry、版本目录原语、真实宿主 spawn/stdio/握手/invoke、原生 HTTP 代理/续传/取消/进度、设置页本地 registry 投影和升级预检，以及模块清单生成和发布顺序。生产 `plugin_migration_execute` 只记录安全 pending journal；真实 exporter、可信插件包和密钥服务接通前，不复制旧数据、不建立伪版本、不改变 active 指针。fixture 中的 staging/回滚测试不构成真实单体升级证据。
 
-browser/native hosted 证据来自 GitHub `QA UI Auto Platforms` run [#43707558453](https://github.com/engcapa/taomni/actions/runs/43707558453)，commit `663d0fc39`，选择 `TC-MODULES-001`–`TC-MODULES-004`，三平台 browser/native 并自动包含 crash-regression。执行期间已按 shard 下载并解析 artifact；本地快照位于 `/tmp/taomni-qa-437075/`，包含各平台 browser/native shard 目录及 `summary/ci-summary.json`。六个平台组合中的四个模块用例全部通过，且没有 infrastructure error、capability gap 或 unreviewed case。
+最近已完成的源码身份是 `2a245d52d07680d76a3cfd1f4240a484d2598ed7`：[QA UI Auto Platforms #43732808941](https://github.com/engcapa/taomni/actions/runs/43732808941) 三端 browser 各 22/22、native 各 25/25，包含模块 case 与完整 crash-regression，18 个 shard 已在执行期间采集；[升级契约 #43737735365](https://github.com/engcapa/taomni/actions/runs/43737735365) 三端通过。此后改动需新证据；契约 workflow 尚未覆盖真实安装旧版再升级。
 
-该 run 的总体状态为 failure，但失败均与本次模块化无关：`TC-FILE-OPEN-008` 在三平台 browser/native 的欢迎页工作区 testid 缺失；`TC-FILE-OPEN-005` 仅 Windows native 的 document root 未挂载；`TC-FILE-OPEN-011` 仅 macOS native 的 terminal search hit 未出现。按本设计的验收规则，这些既有失败不阻断本次模块化；模块相关 case 不得用总体 run 状态掩盖，后续若修改对应功能仍需单独修复并重跑。
+本地只运行单元测试与静态检查，browser/native、跨进程和真实安装升级在 GitHub runner 运行。完整签名安装、生产监督、共享能力下沉、实际 tab 动态路由、真实数据升级、具体业务插件、四目标发布与最终性能/回归仍按台账推进。
 
 ---
 

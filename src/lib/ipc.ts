@@ -41,6 +41,8 @@ export { encodeBase64 } from "./ipc/encoding";
 
 export {
   invokePlugin,
+  cancelPluginRequest,
+  installPluginArchive,
   installStagedPlugin,
   listPlugins,
   refreshPlugins,

@@ -125,6 +125,21 @@ export async function installStagedPlugin(slug: string, version: string, package
   return normalizePluginRecord(await invoke<unknown>("plugin_install_staged", { slug, version, packageDir }));
 }
 
+/** Native verifies the signature, platform and complete archive contents. */
+export async function installPluginArchive(
+  archivePath: string,
+  trust: { pluginId: string } | { detachedSignature: string },
+): Promise<PluginRecord> {
+  if (!archivePath) throw new Error("Invalid module archive path");
+  return normalizePluginRecord(await invoke<unknown>("plugin_install_archive", { archivePath, ...trust }));
+}
+
+export function cancelPluginRequest(slug: string, requestId: string): Promise<boolean> {
+  if (!SLUG.test(slug)) return Promise.reject(new Error(`Invalid plugin slug: ${slug}`));
+  if (!requestId) return Promise.reject(new Error("Invalid plugin request id"));
+  return invoke<boolean>("plugin_cancel_request", { slug, requestId });
+}
+
 export async function rollbackPlugin(slug: string): Promise<PluginRecord> {
   if (!SLUG.test(slug)) return Promise.reject(new Error(`Invalid plugin slug: ${slug}`));
   return normalizePluginRecord(await invoke<unknown>("plugin_rollback", { slug }));
@@ -200,7 +215,7 @@ export function invokePlugin<TResult = unknown, TPayload = unknown>(
   options?: PluginInvokeOptions,
 ): Promise<TResult> {
   if (!SLUG.test(slug)) return Promise.reject(new Error(`Invalid plugin slug: ${slug}`));
-  if (!command || command.includes("\0") || command.includes("/")) return Promise.reject(new Error("Invalid plugin command"));
+  if (!/^[a-zA-Z0-9_-]+(?:\/[a-zA-Z0-9_-]+)*$/.test(command)) return Promise.reject(new Error("Invalid plugin command"));
   const request: PluginInvokeRequest<TPayload> = { slug, command };
   if (payload !== undefined) request.payload = payload;
   if (options?.requestId) request.requestId = options.requestId;

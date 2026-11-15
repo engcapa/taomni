@@ -20,6 +20,9 @@ steps:
 - native_screenshot_scenario:
     scenario: scroll-permission-error
 - assert_visible: '[data-testid="system-screenshot"]'
+- native_screenshot_scenario: {scenario: capture}
+- assert_visible: '[data-testid="system-screenshot"]'
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -35,6 +38,14 @@ verification:
     results:
     - 3
     - 4
+  - id: denial-to-still
+    requirement: Denied automatic-scroll input permission does not poison the shared screen-capture service; a subsequent still captures real pixels after the denial owner is released.
+    actions: [3, 5]
+    checkpoints:
+    - {step: 5, expectation: "Full-display native still succeeds after both denied-scroll exits, with nonblank pixels retained."}
+    - {step: 6, expectation: Main screenshot entry returns after the new capture.}
+    - {step: 7, expectation: No runtime errors occurred.}
+    results: [5, 6, 7]
   visual:
   - check: Permission failure surface
     method: automated

@@ -59,11 +59,11 @@ fn capture_display_blocking(
     app: &tauri::AppHandle,
     display_id: Option<&str>,
 ) -> Result<ScreenCapture, String> {
-    let displays = crate::screenshot::capture::list_displays(app)
+    let displays = crate::capture::list_displays(app)
         .map_err(|error| map_capture_error(&error.to_string()))?;
-    let target = crate::screenshot::capture::resolve_display(app, display_id)
+    let target = crate::capture::resolve_display(app, display_id)
         .map_err(|error| map_capture_error(&error.to_string()))?;
-    let image = crate::screenshot::capture::capture_display(app, &target)
+    let image = crate::capture::capture_display(app, &target)
         .map_err(|error| map_capture_error(&error.to_string()))?;
     let (png, width, height, screen_width, screen_height) = encode_screen_png(image)?;
     Ok(ScreenCapture {

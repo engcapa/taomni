@@ -29,6 +29,117 @@ env:
   PYTHONUNBUFFERED: '1'
 
 jobs:
+  host-lifecycle:
+    name: Real host lifecycle (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head || github.sha }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: modular-host-gates
+      - name: Compile production host and real hello fixture
+        run: |
+          mkdir -p modular-evidence
+          set -o pipefail
+          cargo build --manifest-path src-tauri/Cargo.toml -p taomni-hello-plugin --bin taomni-hello-plugin --locked 2>&1 | tee modular-evidence/host-build.log
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-host-gates --lib --locked 2>&1 | tee modular-evidence/host-unit.log
+      - name: Exercise idle heartbeats, cancellation, restart and core-kill cleanup
+        run: |
+          set -o pipefail
+          python - <<'PY' 2>&1 | tee modular-evidence/host-process.log
+          import os
+          import pathlib
+          import subprocess
+          suffix = ".exe" if os.name == "nt" else ""
+          os.environ["TAOMNI_HELLO_PLUGIN_BIN"] = str(pathlib.Path(f"src-tauri/target/debug/taomni-hello-plugin{suffix}").resolve())
+          subprocess.run([
+              "cargo", "test", "--manifest-path", "src-tauri/Cargo.toml",
+              "-p", "taomni-host-gates", "--test", "lifecycle", "--test", "cleanup",
+              "--locked", "--", "--ignored", "--test-threads=1", "--nocapture",
+          ], check=True)
+          PY
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: modular-host-${{ matrix.os }}
+          path: modular-evidence
+          if-no-files-found: error
+
+  capture-contracts:
+    name: Capture contracts (${{ matrix.target }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - os: macos-latest
+            target: aarch64-apple-darwin
+          - os: macos-latest
+            target: x86_64-apple-darwin
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head || github.sha }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: modular-capture-${{ matrix.target }}
+      - name: Linux capture dependencies and real X11 fixture
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libpipewire-0.3-dev libclang-dev libdbus-1-dev xvfb
+      - name: Compile the shared library for the release target
+        run: |
+          mkdir -p modular-evidence
+          set -o pipefail
+          cargo check --manifest-path src-tauri/Cargo.toml -p taomni-capture --target '${{ matrix.target }}' --all-targets --locked 2>&1 | tee modular-evidence/capture-check.log
+      - name: Shared capture unit contracts on the runner architecture
+        run: |
+          set -o pipefail
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-capture --lib --locked 2>&1 | tee modular-evidence/capture-unit.log
+      - name: Native XDamage, MIT-SHM and plain capture behavior
+        if: runner.os == 'Linux'
+        run: |
+          set -o pipefail
+          xvfb-run -a -s '-screen 0 1280x800x24 +extension DAMAGE +extension MIT-SHM' cargo test --manifest-path src-tauri/Cargo.toml -p taomni-capture --lib --locked -- --ignored --test-threads=1 --nocapture 2>&1 | tee modular-evidence/capture-x11.log
+          cargo tree --manifest-path src-tauri/Cargo.toml -p taomni-capture --target x86_64-unknown-linux-gnu --edges normal,build,dev --locked > modular-evidence/capture-linux-tree.txt
+          node scripts/modular-boundaries.mjs --linux-tree modular-evidence/capture-linux-tree.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: modular-capture-${{ matrix.target }}
+          path: modular-evidence
+          if-no-files-found: error
+
   upgrade-contracts:
     name: Upgrade contracts (${{ matrix.os }})
     strategy:
@@ -71,4 +182,5 @@ jobs:
         run: cargo test --manifest-path src-tauri/crates/taomni-plugin-api/Cargo.toml --locked
       - name: 0.5.x migration journal and legacy detection contracts
         if: runner.os == 'Linux'
-        run: cargo test --manifest-path src-tauri/Cargo.toml --lib plugin::migration -- --nocapture
+        run: >-
+          cargo test --manifest-path src-tauri/Cargo.toml --lib plugin:: --locked -- --nocapture

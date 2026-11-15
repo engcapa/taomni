@@ -1,5 +1,7 @@
 import { lazy, type ComponentType, type LazyExoticComponent } from "react";
+import { convertFileSrc } from "@tauri-apps/api/core";
 import type { PluginManifest, PluginRegistry } from "./pluginRegistry";
+import { isTauriRuntime } from "./runtime";
 
 export class PluginLoadError extends Error {
   public constructor(message: string, public readonly slug: string, options?: ErrorOptions) {
@@ -18,10 +20,20 @@ export type PluginImporter = (url: string) => Promise<PluginFrontendModule>;
 
 export function pluginFrontendUrl(manifest: PluginManifest): string {
   if (!manifest.entry.frontend) throw new PluginLoadError(`Plugin ${manifest.slug} has no frontend entry`, manifest.slug);
-  // Encode each segment separately: a slug or entry path can never escape its
-  // module directory, and the custom scheme is handled by the native protocol.
-  const path = manifest.entry.frontend.split("/").map((segment) => encodeURIComponent(segment)).join("/");
-  return `taomni-plugin://${encodeURIComponent(manifest.slug)}/${path}`;
+  const parts = [manifest.slug, manifest.version, ...manifest.entry.frontend.split("/")];
+  if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(manifest.slug)
+    || !/^\d+\.\d+\.\d+(?:-[0-9A-Za-z.-]+)?(?:\+[0-9A-Za-z.-]+)?$/.test(manifest.version)
+    || !manifest.entry.frontend.startsWith("frontend/")
+    || parts.some((part) => !part || part === "." || part === ".." || /[%\\/:\x00-\x1f\x7f?#]/.test(part))) {
+    throw new PluginLoadError(`Plugin ${manifest.slug} has an unsafe frontend path`, manifest.slug);
+  }
+  // Tauri maps custom schemes to http(s)://<scheme>.localhost on WebView2.
+  // Ask its converter only for the origin, then append encoded path segments:
+  // converting the full path encodes '/' and breaks relative ESM chunk URLs.
+  const origin = isTauriRuntime()
+    ? convertFileSrc("", "taomni-plugin").replace(/\/$/, "")
+    : "taomni-plugin://localhost";
+  return `${origin}/${parts.map((part) => encodeURIComponent(part)).join("/")}`;
 }
 
 const defaultImporter: PluginImporter = (url) => import(/* @vite-ignore */ url) as Promise<PluginFrontendModule>;

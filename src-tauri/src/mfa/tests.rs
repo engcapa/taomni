@@ -490,7 +490,7 @@ fn export_uri_requires_the_master_password_and_round_trips_the_account() {
 #[cfg(target_os = "linux")]
 #[test]
 fn x11_zpixmap_luma_handles_both_byte_orders() {
-    use super::capture::linux::zpixmap_to_luma;
+    use taomni_capture::pixels::zpixmap_to_luma;
     // White, black and pure red pixels.
     let bgrx = [255, 255, 255, 0, 0, 0, 0, 0, 0, 0, 255, 0];
     assert_eq!(

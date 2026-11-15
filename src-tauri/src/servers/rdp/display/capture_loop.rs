@@ -3,15 +3,15 @@ use super::display::CaptureResizeRequest;
 use super::mailbox::LatestFrameMailbox;
 use super::mailbox::PublishResult;
 use crate::servers::engine::LogEmitter;
-use crate::servers::rdp::capture::Capturer;
-#[cfg(target_os = "linux")]
-use crate::servers::rdp::capture::PortalInput;
 use crate::servers::rdp::metrics::RdpMetrics;
 use std::sync::Arc;
 #[cfg(target_os = "linux")]
 use std::sync::mpsc::Receiver;
 #[cfg(target_os = "macos")]
 use std::time::Duration;
+use taomni_capture::engine::Capturer;
+#[cfg(target_os = "linux")]
+use taomni_capture::engine::PortalInput;
 
 pub(super) fn drive_capture(
     log: LogEmitter,

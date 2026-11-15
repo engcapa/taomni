@@ -2,15 +2,15 @@ use super::capture_loop::drive_capture;
 use super::mailbox::LatestFrameMailbox;
 use super::mailbox::PublishResult;
 use crate::servers::engine::LogEmitter;
-#[cfg(target_os = "linux")]
-use crate::servers::rdp::capture::PortalInput;
-use crate::servers::rdp::capture::create_capturer_for_display;
 use crate::servers::rdp::metrics::RdpMetrics;
 use core::num::NonZeroU16;
 use ironrdp::server::DesktopSize;
 use std::sync::Arc;
 #[cfg(target_os = "linux")]
 use std::sync::mpsc::SyncSender;
+#[cfg(target_os = "linux")]
+use taomni_capture::engine::PortalInput;
+use taomni_capture::engine::create_capturer_for_display;
 
 /// Start one Linux capture owner before the RDP listener accepts clients.
 /// Wayland portal permissions and the PipeWire stream are tied to the portal
@@ -37,8 +37,11 @@ pub(super) fn start_warmed_linux_capture(
             let worker_mailbox = mailbox.clone();
             move || {
                 let result = (|| {
-                    let mut capturer =
-                        create_capturer_for_display(&log, display_id.as_deref(), request_input)?;
+                    let mut capturer = create_capturer_for_display(
+                        &log.capture_log(),
+                        display_id.as_deref(),
+                        request_input,
+                    )?;
                     let supports_input = request_input && capturer.supports_portal_input();
                     let input_rx = supports_input.then_some(portal_rx);
                     let started = std::time::Instant::now();

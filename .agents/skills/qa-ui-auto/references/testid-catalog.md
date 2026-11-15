@@ -2485,8 +2485,18 @@
 - `[data-testid="tao-home-lan-chat"]` — display — F-Modules-1.removed-lanchat-home-card
 - `[data-testid="module-store-panel"]` — display — F-Modules-1.module-store-panel
 - `[data-testid="module-store-core-api"]` — display — F-Modules-1.module-store-core-api
-- `[data-testid="module-store-empty"], [data-testid="module-store-catalog-error"], [data-testid="module-store-loading"]` — display — F-Modules-1.module-store-state
+- `[data-testid="module-store-empty"]` — display — F-Modules-1.module-store-empty
+- `[data-testid="module-store-catalog-error"]` — display — F-Modules-1.module-store-catalog-error
+- `[data-testid="module-store-loading"]` — display — F-Modules-1.module-store-loading
 - `[data-testid="module-upgrade-status"]` — display — F-Modules-1.module-upgrade-status
+- `[data-testid="module-offline-install"]` — display — F-Modules-1.module-offline-install
+- `[data-testid="module-offline-archive"]` — interactive — F-Modules-1.module-offline-archive
+- `[data-testid="module-offline-choose"]` — interactive — F-Modules-1.module-offline-choose
+- `[data-testid="module-offline-signature"]` — interactive — F-Modules-1.module-offline-signature
+- `[data-testid="module-offline-submit"]` — interactive — F-Modules-1.module-offline-submit
+- `[data-testid="module-offline-error"]` — display — F-Modules-1.module-offline-error
+- `[data-testid="module-offline-status"]` — display — F-Modules-1.module-offline-status
+- `[data-testid="module-offline-refresh-error"]` — display — F-Modules-1.module-offline-refresh-error
 
 ## network/sockscap (F-Sockscap-1)
 

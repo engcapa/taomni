@@ -2,13 +2,13 @@ use super::artifacts::artifact_dir;
 use super::artifacts::ensure_artifact_path;
 use super::artifacts::save_png;
 use super::displays::DisplayInfo;
-use super::pixels::clamp_region;
-use super::pixels::crop;
-use super::pixels::frame_region_to_rgba;
-use super::pixels::frame_to_rgba;
-use super::pixels::map_region;
-use crate::servers::rdp::capture::Frame;
+use crate::capture::pixels::clamp_region;
+use crate::capture::pixels::crop;
+use crate::capture::pixels::frame_region_to_rgba;
+use crate::capture::pixels::frame_to_rgba;
+use crate::capture::pixels::map_region;
 use image::RgbaImage;
+use taomni_capture::engine::Frame;
 
 #[cfg(target_os = "linux")]
 #[test]

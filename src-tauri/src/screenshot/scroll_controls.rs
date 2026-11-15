@@ -29,7 +29,7 @@ pub(super) fn scroll_layout(
         && (rect.h as i64 * 10 >= display.height as i64 * 9);
     if near_full {
         #[cfg(target_os = "linux")]
-        if crate::servers::rdp::capture::wayland::is_wayland_session() {
+        if taomni_capture::engine::wayland::is_wayland_session() {
             let (capture, controls) =
                 surfaces::inside_control_strip(display, rect, scroll::MIN_REGION_HEIGHT as i32)
                     .ok_or_else(|| {

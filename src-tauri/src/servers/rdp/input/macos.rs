@@ -43,7 +43,7 @@ pub(crate) struct MacInputMapping {
 #[cfg(target_os = "macos")]
 impl MacInputMapping {
     pub(crate) fn new(
-        bounds: super::super::capture::mac::DisplayBounds,
+        bounds: taomni_capture::engine::mac::DisplayBounds,
         surface_size: Arc<AtomicU32>,
     ) -> anyhow::Result<Self> {
         if bounds.width == 0 || bounds.height == 0 {

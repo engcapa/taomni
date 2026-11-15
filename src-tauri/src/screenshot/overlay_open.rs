@@ -227,7 +227,7 @@ async fn capture_now(app: &AppHandle, display: &DisplayInfo) -> Result<RgbaImage
     let app = app.clone();
     let display = display.clone();
     blocking("capture", move || {
-        crate::servers::rdp::capture::stage_trace::observe(startup_timing::mark, || {
+        taomni_capture::engine::stage_trace::observe(startup_timing::mark, || {
             capture::capture_display(&app, &display)
         })
     })

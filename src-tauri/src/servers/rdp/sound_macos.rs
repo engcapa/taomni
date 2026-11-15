@@ -30,7 +30,7 @@ use objc2_screen_capture_kit::{
 
 use super::capture::{Ready, Stop};
 use super::{WavePump, WaveSink};
-use crate::servers::rdp::capture::mac::{permission_granted, sck};
+use taomni_capture::engine::mac::{permission_granted, sck};
 
 /// Requested from ScreenCaptureKit; the delivered format is still read from
 /// every sample.

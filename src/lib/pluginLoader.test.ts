@@ -1,4 +1,5 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { clearMocks, mockConvertFileSrc } from "@tauri-apps/api/mocks";
 import { createPluginLazyComponent, loadPluginFrontend, pluginFrontendUrl, verifyPluginSha256 } from "./pluginLoader";
 import { PluginRegistry, type PluginManifest } from "./pluginRegistry";
 
@@ -23,15 +24,41 @@ const validManifest: PluginManifest = {
 };
 
 describe("plugin frontend loading", () => {
+  afterEach(() => clearMocks());
+
   it("uses a restricted taomni-plugin URL and surfaces load failures", async () => {
-    expect(pluginFrontendUrl(validManifest)).toBe("taomni-plugin://demo/frontend/index.js");
+    expect(pluginFrontendUrl(validManifest)).toBe("taomni-plugin://localhost/demo/1.0.0/frontend/index.js");
     const importer = vi.fn().mockResolvedValue({ default: () => null });
     await expect(loadPluginFrontend(validManifest, importer)).resolves.toHaveProperty("default");
-    expect(importer).toHaveBeenCalledWith("taomni-plugin://demo/frontend/index.js");
+    expect(importer).toHaveBeenCalledWith("taomni-plugin://localhost/demo/1.0.0/frontend/index.js");
     await expect(loadPluginFrontend(validManifest, vi.fn().mockRejectedValue(new Error("bad hash")))).rejects.toMatchObject({
       name: "PluginLoadError",
       slug: "demo",
     });
+  });
+
+  it("gives upgraded entry points and relative chunks a different immutable URL", () => {
+    expect(pluginFrontendUrl({ ...validManifest, version: "1.1.0" })).toBe("taomni-plugin://localhost/demo/1.1.0/frontend/index.js");
+    expect(new URL("./chunk.js", pluginFrontendUrl({ ...validManifest, version: "1.1.0" })).href)
+      .toBe("taomni-plugin://localhost/demo/1.1.0/frontend/chunk.js");
+  });
+
+  it.each(["windows", "linux", "macos"] as const)("uses Tauri's %s mapping and preserves versioned relative chunks", (platform) => {
+    mockConvertFileSrc(platform);
+    const base = platform === "windows" ? "http://taomni-plugin.localhost" : "taomni-plugin://localhost";
+    const entry = pluginFrontendUrl({ ...validManifest, version: "1.2.0-rc.1+build.2", entry: { ...validManifest.entry, frontend: "frontend/my entry.js" } });
+    expect(entry).toBe(`${base}/demo/1.2.0-rc.1%2Bbuild.2/frontend/my%20entry.js`);
+    expect(new URL("./assets/chunk.js", entry).href).toBe(`${base}/demo/1.2.0-rc.1%2Bbuild.2/frontend/assets/chunk.js`);
+    expect(entry).not.toBe(pluginFrontendUrl(validManifest));
+  });
+
+  it.each(["../index.js", "frontend/../host", "frontend/%2e%2e/host", "frontend/a\\b.js", "frontend/index.js?other", "frontend//index.js"])("rejects a tampered frontend path: %s", (frontend) => {
+    expect(() => pluginFrontendUrl({ ...validManifest, entry: { ...validManifest.entry, frontend } })).toThrow("unsafe frontend path");
+  });
+
+  it("rejects slug/version tampering before URL construction", () => {
+    expect(() => pluginFrontendUrl({ ...validManifest, slug: "../demo" })).toThrow("unsafe frontend path");
+    expect(() => pluginFrontendUrl({ ...validManifest, version: "1.0.0/../../" })).toThrow("unsafe frontend path");
   });
 
   it("does not create a lazy component for a missing or disabled plugin", async () => {

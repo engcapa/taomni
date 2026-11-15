@@ -54,6 +54,8 @@ export function SettingsPanel() {
   const [moduleCatalog, setModuleCatalog] = useState<ModuleStoreCatalogEntry[]>([]);
   const [moduleCatalogLoading, setModuleCatalogLoading] = useState(true);
   const [moduleCatalogError, setModuleCatalogError] = useState<string | null>(null);
+  const [moduleRefreshRevision, setModuleRefreshRevision] = useState(0);
+  const refreshModuleCatalog = useCallback(() => setModuleRefreshRevision((revision) => revision + 1), []);
   const [migrationSnapshot, setMigrationSnapshot] = useState<LegacyInstallSnapshot | null>(null);
   const [migrationLoading, setMigrationLoading] = useState(true);
   const [migrationError, setMigrationError] = useState<string | null>(null);
@@ -287,7 +289,7 @@ export function SettingsPanel() {
     return () => {
       mounted = false;
     };
-  }, [hydrateModuleStore]);
+  }, [hydrateModuleStore, moduleRefreshRevision]);
 
   useEffect(() => {
     let mounted = true;
@@ -387,6 +389,7 @@ export function SettingsPanel() {
     moduleCoreApiVersion={PLUGIN_CORE_API_VERSION}
     moduleCatalogLoading={moduleCatalogLoading}
     moduleCatalogError={moduleCatalogError}
+    onModuleRegistryChanged={refreshModuleCatalog}
     moduleOnInstall={moduleOnInstall}
     moduleOnEnable={moduleOnEnable}
     moduleOnDisable={moduleOnDisable}

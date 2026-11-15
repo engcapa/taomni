@@ -25,8 +25,6 @@
 
 mod queue;
 
-mod permissions;
-
 mod macos;
 
 mod actor;
@@ -43,12 +41,6 @@ mod scancodes;
 
 #[cfg(test)]
 mod tests;
-
-#[cfg(target_os = "macos")]
-pub(crate) use permissions::control_permission_granted;
-
-#[cfg(target_os = "macos")]
-pub(crate) use permissions::request_control_permission;
 
 #[cfg(target_os = "macos")]
 pub(crate) use macos::MacInputMapping;

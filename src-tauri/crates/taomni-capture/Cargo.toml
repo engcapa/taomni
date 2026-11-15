@@ -1,0 +1,47 @@
+[package]
+name = "taomni-capture"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+description = "Native capture backends shared by Taomni core and plugin hosts"
+license = "MIT"
+
+[dependencies]
+anyhow = "1"
+bytes = "1"
+serde = { version = "1", features = ["derive"] }
+tokio = { version = "1", features = ["rt", "sync", "time", "net", "macros"] }
+tokio-util = { version = "0.7", features = ["rt"] }
+log = "0.4"
+tracing = "0.1"
+image = { version = "0.25", default-features = false, features = ["png"] }
+scopeguard = "1"
+
+[target.'cfg(target_os = "linux")'.dependencies]
+libc = "0.2"
+x11rb = { version = "0.13", features = ["shm", "damage", "randr"] }
+ashpd = { version = "0.12", default-features = false, features = ["tokio"] }
+pipewire = { version = "0.9", features = ["v0_3_49"] }
+
+[target.'cfg(target_os = "macos")'.dependencies]
+xcap = "0.9.6"
+core-foundation = "0.10.1"
+objc2 = "0.6.4"
+block2 = "0.6.2"
+dispatch2 = "0.3.1"
+objc2-foundation = { version = "0.3.2", features = ["NSArray", "NSError", "NSData", "NSDictionary", "NSProcessInfo", "NSString"] }
+objc2-core-media = { version = "0.3.2", features = ["CMSampleBuffer", "objc2-core-video"] }
+objc2-core-video = { version = "0.3.2", features = ["CVBase", "CVBuffer", "CVImageBuffer", "CVPixelBuffer", "CVReturn"] }
+objc2-core-foundation = "0.3.2"
+objc2-core-graphics = { version = "0.3.2", features = ["CGDirectDisplay", "CGEvent", "CGEventSource", "CGEventTypes", "CGWindow"] }
+objc2-screen-capture-kit = { version = "0.3.2", default-features = false, features = ["std", "SCShareableContent", "SCStream", "block2", "dispatch2", "objc2-core-graphics", "objc2-core-media"] }
+
+[target.'cfg(windows)'.dependencies]
+xcap = { version = "0.9.6", features = ["wgc"] }
+windows = { version = "0.62", features = [
+  "Foundation", "Graphics_Capture", "Graphics_DirectX_Direct3D11",
+  "Win32_Graphics_Direct3D", "Win32_Graphics_Direct3D11", "Win32_Graphics_Dxgi",
+  "Win32_System_Performance", "Win32_System_WinRT_Direct3D11",
+  "Win32_System_WinRT_Graphics_Capture", "Win32_Foundation", "Win32_Graphics_Gdi",
+  "Win32_UI_WindowsAndMessaging",
+] }

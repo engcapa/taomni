@@ -3,21 +3,21 @@ use super::injection::apply;
 use super::macos::MacInputMapping;
 #[cfg(target_os = "macos")]
 use super::macos::MacMouse;
-#[cfg(target_os = "macos")]
-use super::permissions::control_permission_granted;
 #[cfg(target_os = "linux")]
 use super::portal::input_cmd_to_portal;
 use super::queue::InputQueue;
 use crate::servers::engine::LogEmitter;
 use crate::servers::rdp::ControlGate;
-#[cfg(target_os = "linux")]
-use crate::servers::rdp::capture::PortalInput;
 use crate::servers::rdp::metrics::RdpMetrics;
 use enigo::Enigo;
 use enigo::Settings;
 use std::sync::Arc;
 use std::sync::mpsc;
 use std::time::Instant;
+#[cfg(target_os = "linux")]
+use taomni_capture::engine::PortalInput;
+#[cfg(target_os = "macos")]
+use taomni_capture::permissions::control_permission_granted;
 
 /// RDP server input handler.
 ///

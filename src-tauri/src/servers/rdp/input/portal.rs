@@ -1,11 +1,11 @@
 use super::queue::InputCmd;
-#[cfg(target_os = "linux")]
-use crate::servers::rdp::capture::PortalInput;
 use enigo::Axis;
 use enigo::Button;
 use enigo::Coordinate;
 use enigo::Direction::Press;
 use enigo::Key;
+#[cfg(target_os = "linux")]
+use taomni_capture::engine::PortalInput;
 
 #[cfg(target_os = "linux")]
 pub(super) fn input_cmd_to_portal(cmd: InputCmd) -> Option<PortalInput> {

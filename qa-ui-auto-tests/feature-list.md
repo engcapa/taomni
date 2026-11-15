@@ -10,6 +10,8 @@ files:
   - src/lib/pluginLoader.ts
   - src/lib/moduleStore.ts
   - src/stores/moduleStore.ts
+  - src/stores/moduleInstallStore.ts
+  - src/components/settings/ModuleOfflineInstall.tsx
   - src-tauri/src/plugin/mod.rs
   - src-tauri/src/plugin/host.rs
   - src-tauri/src/plugin/install.rs
@@ -30,15 +32,45 @@ controls:
   - id: module-store-core-api
     selector: '[data-testid="module-store-core-api"]'
     kind: display
-  - id: module-store-state
-    selector: '[data-testid="module-store-empty"], [data-testid="module-store-catalog-error"], [data-testid="module-store-loading"]'
+  - id: module-store-empty
+    selector: '[data-testid="module-store-empty"]'
+    kind: display
+  - id: module-store-catalog-error
+    selector: '[data-testid="module-store-catalog-error"]'
+    kind: display
+  - id: module-store-loading
+    selector: '[data-testid="module-store-loading"]'
     kind: display
   - id: module-upgrade-status
     selector: '[data-testid="module-upgrade-status"]'
     kind: display
+  - id: module-offline-install
+    selector: '[data-testid="module-offline-install"]'
+    kind: display
+  - id: module-offline-archive
+    selector: '[data-testid="module-offline-archive"]'
+    kind: interactive
+  - id: module-offline-choose
+    selector: '[data-testid="module-offline-choose"]'
+    kind: interactive
+  - id: module-offline-signature
+    selector: '[data-testid="module-offline-signature"]'
+    kind: interactive
+  - id: module-offline-submit
+    selector: '[data-testid="module-offline-submit"]'
+    kind: interactive
+  - id: module-offline-error
+    selector: '[data-testid="module-offline-error"]'
+    kind: display
+  - id: module-offline-status
+    selector: '[data-testid="module-offline-status"]'
+    kind: display
+  - id: module-offline-refresh-error
+    selector: '[data-testid="module-offline-refresh-error"]'
+    kind: display
 -->
 
-模块化运行时的可选插件扫描、manifest 校验、前端 chunk 加载、宿主监督、版本目录安装状态机和单体升级 journal 已建立基础契约；LanChat 已从产品、迁移和备份范围删除，模块商店设置入口已接入 native registry 的明确状态和旧版本升级预检状态，下载服务和具体插件迁移仍按设计文档 M0–M3 逐批交付。核心启动、删除、模块商店与升级预检回归见 `TC-MODULES-001`、`TC-MODULES-002`、`TC-MODULES-003`、`TC-MODULES-004`、`TC-MODULES-005`。
+模块化运行时的可选插件扫描、manifest 校验、前端 chunk 加载、宿主监督、版本目录安装状态机和单体升级 journal 已建立基础契约；LanChat 已从产品、迁移和备份范围删除，模块商店设置入口已接入 native registry 的明确状态和旧版本升级预检状态，下载服务和具体插件迁移仍按设计文档 M0–M3 逐批交付。核心启动、删除、模块商店与升级预检回归见 `TC-MODULES-001`、`TC-MODULES-002`、`TC-MODULES-003`、`TC-MODULES-004`、`TC-MODULES-005`、`TC-MODULES-006`（离线未可信包拒绝与错误恢复）。
 
 > 本文档基于当前仓库代码、稳定 `data-testid` 目录和自动化用例维护，**仅记录已实现并接入主流程的功能**。架构与现状索引见 `DESIGN.md`、`IMPLEMENTATION_PLAN.md`。
 > 标记说明：
@@ -5228,6 +5260,8 @@ status: in-progress
 area: servers/rdp
 components: [RdpSettings, CommonSettings, ServerRow, fields, RdpServerApprovalBridge]
 files:
+  - src-tauri/crates/taomni-capture/src/engine/
+  - src-tauri/crates/taomni-capture/src/permissions.rs
   - src/components/servers/settings/RdpSettings.tsx
   - src/components/servers/CommonSettings.tsx
   - src/components/servers/ServerRow.tsx
@@ -11433,6 +11467,9 @@ status: done
 area: tools/mfa
 components: [MfaAddDialog, MfaSecretForm, MfaImagePane, MfaScreenPane, MfaCameraPane, MfaImportPreview]
 files:
+  - src-tauri/src/capture/service.rs
+  - src-tauri/crates/taomni-capture/src/still/
+  - src-tauri/crates/taomni-capture/src/pixels.rs
   - src-tauri/src/mfa/capture.rs
   - src/lib/mfa/base32.ts
   - src/lib/mfa/otpauth.ts
@@ -12033,6 +12070,10 @@ status: done
 area: screenshot/screen-record
 components: [ScreenshotOverlay, AnnotationCanvas, PinnedImage, PinToolsWindow, RecorderBar, ScrollCaptureBar, ScreenshotMenuButton, ControlBar, screenshot.ts, screenshot (tauri)]
 files:
+  - src-tauri/src/capture/
+  - src-tauri/crates/taomni-capture/src/engine/
+  - src-tauri/crates/taomni-capture/src/still/mac_snapshot.rs
+  - src-tauri/crates/taomni-capture/src/permissions.rs
   - src/components/screenshot/ScreenshotOverlay.tsx
   - src/components/screenshot/AnnotationCanvas.tsx
   - src/components/screenshot/ScreenshotFavorites.tsx
@@ -13908,6 +13949,9 @@ status: partial
 area: mobile/control-plane
 components: [MobileServiceSettings, MobileHostSettings, MobileWeb, MobileRuntime]
 files:
+  - src-tauri/src/mobile/desktop/capture.rs
+  - src-tauri/src/capture/
+  - src-tauri/crates/taomni-capture/src/permissions.rs
   - src/components/settings/MobileServiceSettings.tsx
   - src/components/settings/MobileHostSettings.tsx
   - src/lib/mobileListener.ts

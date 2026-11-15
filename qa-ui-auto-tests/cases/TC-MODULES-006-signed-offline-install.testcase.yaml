@@ -1,0 +1,132 @@
+id: TC-MODULES-006
+title: Offline module installation rejects an untrusted signature and restores its result
+description: >-
+  A report-scoped local archive and an invalid detached signature are submitted
+  through Settings. Native mode must execute the actual file/signature gate;
+  browser preview must reject explicitly. Neither mode may invent an installed
+  module. Closing and reopening Settings retains the draft and failure, and a
+  retry remains safe. Successful trusted installation is a separate native gap.
+covers:
+- F-Modules-1
+tags:
+- p1
+- modules
+- install
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+- module_offline_archive
+timeout_sec: 60
+steps:
+- host_write_file:
+    path: ${fixture.module_untrusted_archive}
+    text: "untrusted module bytes: no signed archive\n"
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: module store
+- wait_for: '[data-testid="module-offline-install"]'
+- click: '[data-testid="module-offline-submit"]'
+- assert_visible: '[data-testid="module-offline-error"]'
+- assert_attribute:
+    selector: '[data-testid="module-offline-install"]'
+    name: data-phase
+    equals: failed
+- fill:
+    selector: '[data-testid="module-offline-archive"]'
+    value: ${fixture.module_untrusted_archive}
+- fill:
+    selector: '[data-testid="module-offline-signature"]'
+    value: ${fixture.module_untrusted_signature}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: '[data-testid="module-offline-install"][data-phase="failed"]'
+- assert_pattern:
+    selector: '[data-testid="module-offline-error"]'
+    regex: '(?i)(signature|public key|verification)'
+- assert_visible: '[data-testid="module-store-empty"]'
+- assert_no_runtime_errors: null
+- click: '[data-testid="tab-item"][data-tab-type="settings"][data-active="true"] [data-testid="tab-close"]'
+- wait_for:
+    selector: '[data-testid="settings-panel"]'
+    state: detached
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: module store
+- wait_for: '[data-testid="module-offline-install"]'
+- assert_attribute:
+    selector: '[data-testid="module-offline-install"]'
+    name: data-phase
+    equals: failed
+- assert_attribute:
+    selector: '[data-testid="module-offline-archive"]'
+    name: value
+    equals: ${fixture.module_untrusted_archive}
+- assert_text:
+    selector: '[data-testid="module-offline-signature"]'
+    contains: 'untrusted comment: negative module installation fixture'
+- assert_pattern:
+    selector: '[data-testid="module-offline-error"]'
+    regex: '(?i)(signature|public key|verification)'
+- assert_visible: '[data-testid="module-store-empty"]'
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: '[data-testid="module-offline-install"][data-phase="failed"]'
+- assert_visible: '[data-testid="module-offline-error"]'
+- assert_visible: '[data-testid="module-store-empty"]'
+- assert_file_contains:
+    path: ${fixture.module_untrusted_archive}
+    contains: 'untrusted module bytes: no signed archive'
+- assert_no_runtime_errors: null
+- screenshot: untrusted-module-rejected.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Required inputs are validated, and an untrusted archive never becomes an installed module.
+    actions: [8, 11, 12, 13, 29]
+    checkpoints:
+    - step: 10
+      expectation: Required inputs produce a failed state without installing a module.
+    - step: 15
+      expectation: The real native signature boundary or explicit browser rejection exposes a signature error.
+    - step: 16
+      expectation: The installed-module projection remains empty.
+    - step: 32
+      expectation: Retrying an untrusted package still leaves the registry empty.
+    - step: 33
+      expectation: The source archive remains intact after both failed attempts.
+    - step: 34
+      expectation: Validation failure, closing Settings and retry produce no unhandled renderer errors.
+    results: [10, 15, 16, 32, 33, 34]
+  - id: R2
+    requirement: Closing Settings preserves the installation draft and error for a safe retry.
+    actions: [18, 20, 22, 29]
+    checkpoints:
+    - step: 24
+      expectation: Reopening Settings restores the failed operation state.
+    - step: 25
+      expectation: The local archive path is retained exactly.
+    - step: 26
+      expectation: The detached signature draft is retained.
+    - step: 27
+      expectation: The signature rejection remains visible after reopening.
+    - step: 31
+      expectation: A repeated installation reports its failure after reopening Settings.
+    results: [24, 25, 26, 27, 31]
+  native:
+  - check: The archive path reaches native disk access and signature verification without changing installed modules.
+    method: automated
+    reason: Browser preview rejects explicitly and cannot validate native file access or signatures.
+  - check: Install an official signed package and verify activation and restart persistence.
+    method: manual
+    reason: No official production-signed test artifact is available; Rust tests cover actual cryptographic success without overriding the UI trust key.
+  visual:
+  - check: Local archive, signature input, error and retry remain readable across desktop WebViews.
+    method: manual
+    reason: The retained rejection screenshot supports layout review; automated assertions establish state behavior.

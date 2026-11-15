@@ -5,7 +5,6 @@ use super::avc::sample_to_avc;
 use super::flow_control::ENCODE_FLUSH_DELAY;
 use super::flow_control::ENCODE_TIMEOUT;
 use super::flow_control::MAX_ENCODER_FRAMES_IN_FLIGHT;
-use crate::servers::rdp::capture::Frame;
 use core::ffi::c_void;
 use objc2_core_foundation::CFBoolean;
 use objc2_core_foundation::CFNumber;
@@ -32,6 +31,7 @@ use std::sync::Mutex;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 use std::time::Instant;
+use taomni_capture::engine::Frame;
 use tokio::sync::mpsc::UnboundedReceiver;
 use tokio::sync::mpsc::UnboundedSender;
 

@@ -69,7 +69,7 @@ pub(super) fn control_permission_granted() -> bool {
     if QA_DENY_CONTROL.load(Ordering::SeqCst) {
         return false;
     }
-    crate::servers::rdp::control_permission_granted()
+    taomni_capture::permissions::control_permission_granted()
 }
 
 pub(in crate::screenshot) fn ensure_control_permission() -> anyhow::Result<()> {

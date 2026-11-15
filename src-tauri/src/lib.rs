@@ -5,6 +5,7 @@ mod appearance;
 mod asr;
 mod atomic_replace;
 pub mod backup;
+pub(crate) mod capture;
 mod chat;
 mod commands;
 mod config;
@@ -475,6 +476,7 @@ pub fn run() {
                 viewer::shutdown();
                 screenshot::shutdown();
                 let state = app_handle.state::<AppState>();
+                state.plugins.shutdown();
                 tauri::async_runtime::block_on(async {
                     let _ = tokio::time::timeout(
                         std::time::Duration::from_secs(5),

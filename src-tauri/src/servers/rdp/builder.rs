@@ -11,7 +11,6 @@ use super::policy::ConnectionPolicy;
 use super::policy::SecurityMode;
 use crate::servers::engine::LogEmitter;
 use crate::servers::rdp::audio_input;
-use crate::servers::rdp::capture;
 use crate::servers::rdp::clipboard::ClipboardFactory;
 use crate::servers::rdp::display;
 use crate::servers::rdp::display::RdpDisplay;
@@ -19,8 +18,6 @@ use crate::servers::rdp::display::RdpDisplay;
 use crate::servers::rdp::gfx;
 use crate::servers::rdp::input;
 use crate::servers::rdp::input::RdpInput;
-#[cfg(target_os = "macos")]
-use crate::servers::rdp::input::control_permission_granted;
 use crate::servers::rdp::metrics;
 use crate::servers::rdp::metrics::RdpMetrics;
 use crate::servers::rdp::sound;
@@ -28,6 +25,9 @@ use ironrdp::server::ConnectionHandler;
 use ironrdp::server::RdpServer;
 use std::sync::Arc;
 use std::sync::Mutex;
+use taomni_capture::engine as capture;
+#[cfg(target_os = "macos")]
+use taomni_capture::permissions::control_permission_granted;
 use tokio_util::sync::CancellationToken;
 
 /// Assemble the [`RdpServer`] for the requested security mode. Each branch
@@ -61,7 +61,7 @@ pub(super) fn build_server(
         .with_network_rtt(Arc::clone(&network_rtt))
         .with_encoder_stats(Arc::clone(&encoder_stats));
     #[cfg(target_os = "macos")]
-    if !params.view_only && !input::control_permission_granted() {
+    if !params.view_only && !control_permission_granted() {
         anyhow::bail!(
             "Accessibility permission is required for RDP keyboard and mouse control. Open RDP Server settings, grant permission, then start the server again."
         );

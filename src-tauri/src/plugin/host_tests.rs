@@ -139,3 +139,39 @@ fn request_message_registers_before_encoding() {
     assert!(matches!(message, RpcMessage::Request(_)));
     assert_eq!(supervisor.pending_count(), 1);
 }
+
+#[test]
+fn peer_clock_cannot_extend_the_local_heartbeat_deadline() {
+    let mut supervisor = supervisor();
+    let request = HandshakeRequest::new("taomni-plugin-mfa", "1", "secret", vec![], vec![]);
+    assert!(supervisor.accept_handshake(&request, "secret", 0).accepted);
+    assert!(supervisor.record_heartbeat(
+        &Heartbeat {
+            timestamp_ms: u64::MAX
+        },
+        20
+    ));
+    assert_eq!(supervisor.last_heartbeat_ms(), Some(20));
+    assert!(matches!(
+        supervisor.poll(120).as_slice(),
+        [SupervisorEvent::HeartbeatTimeout { elapsed_ms: 100 }]
+    ));
+}
+
+#[test]
+fn a_later_crash_window_can_recover_after_the_restart_budget_expires() {
+    let mut supervisor = supervisor();
+    assert!(matches!(
+        supervisor.host_exited(0),
+        RestartAction::Restart { attempt: 1, .. }
+    ));
+    assert!(matches!(
+        supervisor.host_exited(1),
+        RestartAction::Restart { attempt: 2, .. }
+    ));
+    assert_eq!(supervisor.host_exited(2), RestartAction::Exhausted);
+    assert!(matches!(
+        supervisor.host_exited(1_002),
+        RestartAction::Restart { attempt: 1, .. }
+    ));
+}

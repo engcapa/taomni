@@ -56,6 +56,11 @@ impl LogEmitter {
         }
     }
 
+    pub(crate) fn capture_log(&self) -> taomni_capture::CaptureLogger {
+        let server = self.clone();
+        taomni_capture::CaptureLogger::new(move |message| server.line(message))
+    }
+
     /// Emit one timestamped log line to the frontend and keep it in the
     /// registry's history.
     pub fn line(&self, msg: impl Into<String>) {

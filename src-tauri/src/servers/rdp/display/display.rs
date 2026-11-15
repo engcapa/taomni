@@ -7,8 +7,6 @@ use super::warmup_macos::start_warmed_macos_capture;
 #[cfg(target_os = "windows")]
 use super::warmup_windows::start_warmed_windows_capture;
 use crate::servers::engine::LogEmitter;
-#[cfg(target_os = "linux")]
-use crate::servers::rdp::capture::PortalInput;
 #[cfg(target_os = "macos")]
 use crate::servers::rdp::gfx::GfxTransport;
 use crate::servers::rdp::metrics::RdpMetrics;
@@ -25,6 +23,8 @@ use std::sync::atomic::Ordering;
 use std::sync::mpsc::SyncSender;
 #[cfg(target_os = "macos")]
 use std::time::Duration;
+#[cfg(target_os = "linux")]
+use taomni_capture::engine::PortalInput;
 #[cfg(target_os = "macos")]
 use tokio::sync::oneshot;
 

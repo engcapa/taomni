@@ -4,6 +4,8 @@ const invokeMock = vi.hoisted(() => vi.fn());
 vi.mock("@tauri-apps/api/core", () => ({ invoke: invokeMock }));
 
 import {
+  cancelPluginRequest,
+  installPluginArchive,
   installStagedPlugin,
   invokePlugin,
   listPlugins,
@@ -31,6 +33,12 @@ describe("invokePlugin", () => {
     await expect(invokePlugin("../rdp", "connect")).rejects.toThrow("Invalid plugin slug");
     await expect(invokePlugin("rdp", "../connect")).rejects.toThrow("Invalid plugin command");
     expect(invokeMock).not.toHaveBeenCalled();
+  });
+
+  it("allows the declared protocol namespace in plugin commands", async () => {
+    invokeMock.mockResolvedValueOnce({ pong: true });
+    await expect(invokePlugin("hello-plugin", "hello/ping")).resolves.toEqual({ pong: true });
+    expect(invokeMock).toHaveBeenCalledWith("plugin_invoke", { slug: "hello-plugin", command: "hello/ping" });
   });
 
   it("exposes lifecycle operations through the same typed IPC boundary", async () => {
@@ -69,6 +77,24 @@ describe("invokePlugin", () => {
     await expect(rollbackPlugin("Hello")).rejects.toThrow("Invalid plugin slug");
     await expect(uninstallPlugin("hello/plugin")).rejects.toThrow("Invalid plugin slug");
     expect(invokeMock).not.toHaveBeenCalled();
+  });
+
+  it("preserves the native signature boundary for offline and catalog archives", async () => {
+    invokeMock.mockResolvedValue({ state: "installed" });
+    await installPluginArchive("/tmp/module.taomni-plugin", { pluginId: "taomni-plugin-mfa" });
+    expect(invokeMock).toHaveBeenLastCalledWith("plugin_install_archive", {
+      archivePath: "/tmp/module.taomni-plugin", pluginId: "taomni-plugin-mfa",
+    });
+    await installPluginArchive("/tmp/offline.taomni-plugin", { detachedSignature: "signature bytes" });
+    expect(invokeMock).toHaveBeenLastCalledWith("plugin_install_archive", {
+      archivePath: "/tmp/offline.taomni-plugin", detachedSignature: "signature bytes",
+    });
+  });
+
+  it("cancels the correlated request without resending its command", async () => {
+    invokeMock.mockResolvedValueOnce(true);
+    await expect(cancelPluginRequest("mfa", "request-1")).resolves.toBe(true);
+    expect(invokeMock).toHaveBeenCalledExactlyOnceWith("plugin_cancel_request", { slug: "mfa", requestId: "request-1" });
   });
 });
 

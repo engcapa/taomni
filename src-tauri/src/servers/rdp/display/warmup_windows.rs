@@ -2,11 +2,11 @@ use super::capture_loop::drive_capture;
 use super::mailbox::LatestFrameMailbox;
 use super::mailbox::PublishResult;
 use crate::servers::engine::LogEmitter;
-use crate::servers::rdp::capture::create_capturer_for_display;
 use crate::servers::rdp::metrics::RdpMetrics;
 use core::num::NonZeroU16;
 use ironrdp::server::DesktopSize;
 use std::sync::Arc;
+use taomni_capture::engine::create_capturer_for_display;
 
 /// Start one Windows WGC capture owner before the RDP listener accepts clients.
 /// Graphics Capture is tied to the interactive console and can be
@@ -26,8 +26,11 @@ pub(super) fn start_warmed_windows_capture(
             let worker_mailbox = mailbox.clone();
             move || {
                 let result = (|| {
-                    let mut capturer =
-                        create_capturer_for_display(&log, display_id.as_deref(), false)?;
+                    let mut capturer = create_capturer_for_display(
+                        &log.capture_log(),
+                        display_id.as_deref(),
+                        false,
+                    )?;
                     let started = std::time::Instant::now();
                     let mut initial = capturer.capture()?;
                     let width = NonZeroU16::new(initial.width)

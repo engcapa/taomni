@@ -4,7 +4,7 @@ use std::thread;
 
 use serde_json::Value;
 use taomni_hello_plugin::{DispatchOutcome, HANDSHAKE_METHOD, HelloPlugin, PluginFailure};
-use taomni_plugin_api::{ErrorCode, HandshakeRequest, RpcError, RpcMessage, RpcResponse};
+use taomni_plugin_api::{ErrorCode, HandshakeRequest, Heartbeat, RpcError, RpcMessage, RpcResponse};
 
 fn error_response(id: Option<taomni_plugin_api::RequestId>, code: ErrorCode) -> RpcMessage {
     RpcMessage::Response(RpcResponse::failure(
@@ -42,8 +42,21 @@ fn run() -> io::Result<i32> {
                 continue;
             }
         };
-        let RpcMessage::Request(request) = message else {
-            continue;
+        let request = match message {
+            RpcMessage::Notification(notification) if notification.method == Heartbeat::METHOD => {
+                // Echo the typed heartbeat after protocol validation. The core
+                // measures liveness with its own monotonic receive clock.
+                if let Some(params) = notification.params {
+                    if serde_json::from_value::<Heartbeat>(params.clone()).is_ok() {
+                        write_message(&mut stdout, &RpcMessage::Notification(
+                            taomni_plugin_api::RpcNotification::new(Heartbeat::METHOD, Some(params)),
+                        ))?;
+                    }
+                }
+                continue;
+            }
+            RpcMessage::Request(request) => request,
+            _ => continue,
         };
 
         if request.method == HANDSHAKE_METHOD {

@@ -1,6 +1,6 @@
-use crate::servers::rdp::capture::Frame;
 use std::collections::VecDeque;
 use std::sync::Mutex;
+use taomni_capture::engine::Frame;
 use tokio::sync::Notify;
 
 /// Cross-thread latest-frame mailbox. Unlike `mpsc::channel(1)` plus

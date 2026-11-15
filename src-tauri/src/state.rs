@@ -133,6 +133,7 @@ impl AppState {
         // A malformed optional plugin must never prevent the core from
         // starting. Invalid manifests remain visible as disabled records.
         let _ = plugins.scan();
+        plugins.start_supervision();
         let sdk = Arc::new(SdkManager::load(crate::sdk::default_sdk_registry_path()));
         // Build the LSP manager first so the DAP manager can register the Java
         // debug adapter (D2), which drives jdtls via this handle.

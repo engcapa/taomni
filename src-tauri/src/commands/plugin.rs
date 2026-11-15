@@ -71,20 +71,22 @@ pub fn plugin_list(state: State<'_, AppState>) -> Result<Vec<PluginRecord>, Stri
 }
 
 #[tauri::command]
-pub fn plugin_set_enabled(
+pub async fn plugin_set_enabled(
     slug: String,
     enabled: bool,
     state: State<'_, AppState>,
 ) -> Result<PluginRecord, String> {
-    state
-        .plugins
-        .set_enabled(&slug, enabled)
-        .map_err(|error| error.to_string())
+    let registry = state.plugins.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        registry
+            .set_enabled(&slug, enabled)
+            .map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
-/// Install a package directory after the download/verification layer has
-/// completed. The native installer stages an immutable version and atomically
-/// activates it before refreshing the registry projection.
+/// Compatibility entry point: unsigned renderer directories are rejected.
 #[tauri::command]
 pub fn plugin_install_staged(
     slug: String,
@@ -98,47 +100,133 @@ pub fn plugin_install_staged(
         .map_err(|error| error.to_string())
 }
 
+/// Install a signed offline archive, or an artifact bound to the last verified
+/// remote catalog. Neither caller-provided platform nor a verification flag is
+/// accepted as proof of trust.
 #[tauri::command]
-pub fn plugin_rollback(slug: String, state: State<'_, AppState>) -> Result<PluginRecord, String> {
-    state
-        .plugins
-        .rollback(&slug)
-        .map_err(|error| error.to_string())
+pub async fn plugin_install_archive(
+    archive_path: String,
+    detached_signature: Option<String>,
+    plugin_id: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<PluginRecord, String> {
+    let registry = state.plugins.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        let path = PathBuf::from(archive_path);
+        let package = match (plugin_id, detached_signature) {
+            (Some(id), None) => {
+                crate::plugin::package_from_cached_catalog(&path, registry.root(), &id)
+                    .map_err(|error| error.to_string())?
+            }
+            (None, Some(signature)) => crate::plugin::verify::VerifiedPackage::from_offline(
+                &path,
+                &signature,
+                crate::plugin::current_platform(),
+            )
+            .map_err(|error| error.to_string())?,
+            _ => {
+                return Err(
+                    "provide either a catalog plugin id or an offline detached signature".into(),
+                );
+            }
+        };
+        registry
+            .install_verified(&package)
+            .map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
-pub fn plugin_uninstall(
+pub async fn plugin_rollback(
+    slug: String,
+    state: State<'_, AppState>,
+) -> Result<PluginRecord, String> {
+    let registry = state.plugins.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        registry.rollback(&slug).map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+pub async fn plugin_uninstall(
     slug: String,
     delete_data: Option<bool>,
     state: State<'_, AppState>,
 ) -> Result<PluginRecord, String> {
-    state
-        .plugins
-        .uninstall(&slug, delete_data.unwrap_or(false))
-        .map_err(|error| error.to_string())
+    let registry = state.plugins.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        registry
+            .uninstall(&slug, delete_data.unwrap_or(false))
+            .map_err(|error| error.to_string())
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
-pub fn plugin_refresh(state: State<'_, AppState>) -> Result<Vec<PluginRecord>, String> {
-    state.plugins.scan().map_err(|error| error.to_string())?;
-    Ok(state.plugins.list())
+pub async fn plugin_refresh(state: State<'_, AppState>) -> Result<Vec<PluginRecord>, String> {
+    let registry = state.plugins.clone();
+    tauri::async_runtime::spawn_blocking(move || {
+        registry.scan().map_err(|error| error.to_string())?;
+        Ok(registry.list())
+    })
+    .await
+    .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
-pub fn plugin_invoke(
+pub async fn plugin_invoke(
     slug: String,
     command: String,
     payload: Option<Value>,
     request_id: Option<String>,
     state: State<'_, AppState>,
-) -> Result<Value, String> {
-    // request_id is accepted at the IPC boundary for cancellation/retry
-    // correlation while the host supervisor is rolled out.
-    let _request_id = request_id;
-    state
-        .plugins
-        .invoke(&slug, &command, payload.unwrap_or(Value::Null))
-        .map_err(|error| error.to_string())
+) -> Result<Value, taomni_plugin_api::RpcError> {
+    let registry = state.plugins.clone();
+    let request_id = request_id.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
+    tauri::async_runtime::spawn_blocking(move || {
+        registry
+            .invoke_with_id(&slug, &command, payload.unwrap_or(Value::Null), &request_id)
+            .map_err(|error| match error {
+                crate::plugin::PluginError::Rpc { code, message } => taomni_plugin_api::RpcError {
+                    code,
+                    message,
+                    data: None,
+                },
+                error => taomni_plugin_api::RpcError::new(
+                    match error {
+                        crate::plugin::PluginError::CommandDenied { .. } => {
+                            taomni_plugin_api::ErrorCode::MethodNotFound
+                        }
+                        crate::plugin::PluginError::PermissionDenied { .. } => {
+                            taomni_plugin_api::ErrorCode::PermissionDenied
+                        }
+                        crate::plugin::PluginError::NotFound(_)
+                        | crate::plugin::PluginError::Disabled(_) => {
+                            taomni_plugin_api::ErrorCode::InvalidState
+                        }
+                        _ => taomni_plugin_api::ErrorCode::InternalError,
+                    },
+                    error.to_string(),
+                ),
+            })
+    })
+    .await
+    .map_err(|error| {
+        taomni_plugin_api::RpcError::new(
+            taomni_plugin_api::ErrorCode::InternalError,
+            error.to_string(),
+        )
+    })?
+}
+
+#[tauri::command]
+pub fn plugin_cancel_request(slug: String, request_id: String, state: State<'_, AppState>) -> bool {
+    state.plugins.cancel_request(&slug, &request_id)
 }
 
 /// Start a resumable module package download. The task remains owned by the
@@ -211,23 +299,20 @@ pub async fn plugin_download_forget(id: String, state: State<'_, AppState>) -> R
     Ok(())
 }
 
-/// Fetch the signed-catalog payload over the selected proxy route. Detached
-/// signature verification remains an installation gate; this command never
-/// installs artifacts and only returns structurally validated metadata.
+/// Fetch and authenticate the catalog and its detached signature over the
+/// same selected proxy. Persist the verified bytes for subsequent installs.
 #[tauri::command]
 pub async fn plugin_catalog_fetch(
     url: String,
     proxy_mode: String,
     application_proxy: Option<PluginDownloadProxyEndpoint>,
     feature_proxy: Option<PluginDownloadProxyEndpoint>,
+    state: State<'_, AppState>,
 ) -> Result<ModuleCatalog, String> {
     let route = resolve_download_route(proxy_mode, application_proxy, feature_proxy)?;
     let service = crate::plugin::download::HttpDownloadService::new(&route)
         .map_err(|error| error.to_string())?;
-    service
-        .fetch_catalog(&url, crate::plugin::CORE_API_VERSION)
-        .await
-        .map_err(|error| error.to_string())
+    crate::plugin::fetch_trusted_catalog(&service, &url, state.plugins.root()).await
 }
 
 /// Read the installed 0.5.x profile before any upgrade writes occur. The
@@ -274,10 +359,12 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         crate::commands::plugin::plugin_list,
         crate::commands::plugin::plugin_set_enabled,
         crate::commands::plugin::plugin_install_staged,
+        crate::commands::plugin::plugin_install_archive,
         crate::commands::plugin::plugin_rollback,
         crate::commands::plugin::plugin_uninstall,
         crate::commands::plugin::plugin_refresh,
         crate::commands::plugin::plugin_invoke,
+        crate::commands::plugin::plugin_cancel_request,
         crate::commands::plugin::plugin_download_start,
         crate::commands::plugin::plugin_download_status,
         crate::commands::plugin::plugin_download_cancel,
