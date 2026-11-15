@@ -1,0 +1,9 @@
+[package]
+name = "taomni-file-uri"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+description = "Protocol-independent file URI list conversion shared by Taomni consumers"
+license = "MIT"
+
+[dependencies]

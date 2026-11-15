@@ -8,7 +8,7 @@
 
 生产升级 IPC 当前只记录只读预检、源指纹与 pending journal。缺少可信插件包和真实 exporter 时，不复制旧数据、不创建伪插件版本、不改变 active 指针。测试 fixture 的 staging/回滚原语不能算真实旧版升级验收。
 
-当前批次的签名安装门、宿主生产监督和共享采集下沉已集成到工作树，正在收尾验证；尚未提交或获得本批 hosted 证据。随后按设计依赖闭合核心状态、数据服务与真实插件。G1–G11 未通过前，不将具体业务插件迁移标为完成。
+签名安装门、宿主生产监督和共享采集下沉已由 `0f4cdf82f` 提交，正在 GitHub 验证；宿主与采集已有下述部分通过证据，UI 和升级核心单元仍在运行。TASK-004 的公共库、核心 URI 接线与依赖门已集成到下一批隔离提交，尚待该提交的 hosted 结果。随后按设计依赖闭合核心状态、数据服务与真实插件。G1–G11 未通过前，不将具体业务插件迁移标为完成。
 
 ## 任务状态
 
@@ -16,12 +16,12 @@
 |---|---|---|
 | TASK-001 基线 | 部分 | 四个发布目标的真实安装包尺寸、启动/内存/吞吐原始样本；源码与依赖起点已有记录。 |
 | TASK-002 契约 | 部分 | API、manifest/schema、registry、RPC 已有；待真实插件与 G 门验证后冻结。 |
-| TASK-003 共享采集 | 代码已集成，验证中 | 引擎/权限/像素/一次性采集已下沉 `taomni-capture`，核心 `capture/` 持有显示器/帧源/窗口生命周期；仅保留 headless 建表例外。待本批 unit 与 GitHub 四目标依赖、真实截图/MFA/Mobile/RDP/性能结果；`capture.still` 宿主大载荷 RPC 仍依赖 TASK-002。见下方测试设计。 |
-| TASK-004 RDP 公共库 | 隔离实现完成，尚未集成 | `taomni-rdp-common` 与无协议依赖的文件 URI 库；客户端与服务端共享能力只经库依赖。隔离提交 `2becd15b1` 完整功能单元 39/39、关闭 bitmap 30/30 及独立复核通过；待合入 Cargo/config 接线与受影响 hosted 验证。 |
+| TASK-003 共享采集 | 已提交，hosted 验证中 | 引擎/权限/像素/一次性采集已下沉 `taomni-capture`，核心 `capture/` 持有显示器/帧源/窗口生命周期；仅保留 headless 建表例外。四目标 check、三平台库 unit 与 Linux 三个真实 X11 测试已通过，真实截图/MFA/Mobile/RDP/性能及完整 UI shard 仍待结果；`capture.still` 宿主大载荷 RPC 仍依赖 TASK-002。见下方测试设计。 |
+| TASK-004 RDP 公共库 | 代码已集成，待 hosted 验证 | `taomni-rdp-common` 与零依赖的 `taomni-file-uri`；客户端与服务端共享能力只经库依赖，config 直接用通用 URI 库。基于 `0f4cdf82f` 的集成单元完整功能 39/39、关闭 bitmap 30/30 及边界检查通过；四目标/三平台和精确保留场景待本提交 hosted 证据。见下方 TASK-004 记录。 |
 | TASK-005 核心状态 | 待开始 | CoreState、PluginRegistry 与宿主业务状态分离。 |
 | TASK-006 核心依赖闭包 | 待开始 | Cargo 默认 features、bundle/resources、平台依赖与核心前端 chunk 真正移除已迁移业务。 |
 | TASK-007 前端注册和路由 | 部分 | loader/helper 已有；接入主窗口/分离窗口实际 tab、完整性校验、缺失/禁用/坏 chunk 与卸载清理。 |
-| TASK-008 宿主监督 | 代码已集成，验证中 | 主动心跳、重启预算、请求取消及三平台进程树回收已接入；待 GitHub 真实进程验证，双向核心服务与 profile 协同仍待后续任务。 |
+| TASK-008 宿主监督 | 已提交，部分 hosted 通过 | 主动心跳、重启预算、请求取消及三平台进程树回收已接入；GitHub 三平台各 14 项 unit 与 7 项真实进程测试通过，双向核心服务与 profile 协同仍待后续任务。 |
 | TASK-009 生命周期 | 部分 | 版本目录、active 指针与生命周期 IPC 已有；接可信安装门、运行中切换/回滚、无重启生命周期。 |
 | TASK-010 商店/下载 | 部分 | 原生 HTTP、代理、续传、取消/进度 IPC 已有；接远端商店、代理设置、后台恢复、离线安装与错误恢复。 |
 | TASK-011 验签安装 | 代码已集成，验证中 | pinned key 的真实 minisign 校验、清单防回滚、安全解包、内容绑定及安装入口强制验签已接入；待官方签名 artifact 成功路径和多端原生证据。 |
@@ -42,7 +42,7 @@
 
 具体编号与子任务边界仍以设计原表为准；上表合并描述不改变范围或依赖。
 
-## 当前开发批次（尚待 hosted 验证）
+## 当前开发批次（`0f4cdf82f` 已提交，hosted 验证中）
 
 - 验签路径采用与核心 updater 相同的固定公钥，校验真实 Minisign 签名、清单 sequence/内容、平台/版本/API、包 SHA-256 与内部精确文件清单。任意目录安装入口拒绝，版本目录保存签名原包供扫描、启用、启动、回滚和自动重启重新认证。离线安装入口已接入设置页；官方签名包的成功 UI 安装尚缺真实 artifact 验证。
 - 安装失败恢复旧 active 指针和 registry 投影；卸载后普通安装也拒绝降级。前端 URL 包含不可变版本，逐资源返回经过签名文件 hash 核验的实际字节；实际业务 tab 的动态插件路由仍未完成。
@@ -52,12 +52,16 @@
 
 安装保留一份压缩原包作为可重验凭据，会增加数据目录空间占用。大于 32 MiB 的包必须使用 Minisign ED 预哈希签名；单个前端资源读取上限 256 MiB。Catalog 发布中断时不降低安全水位，重新获取同一或更高序号的签名清单可恢复安装。上述约束应纳入最终包构建、空间预检和发布演练。
 
-本批单元/静态结果：采集库 21 passed、3 个真实 X11 测试仅 hosted opt-in；模块/设置/离线安装前端 55 passed；模块边界脚本 4 passed；Rust registry/验签/宿主单元 81 passed。其后的多端插件 URL 修复有 loader 单元 14 passed，新增 4 项 Rust 协议单元待运行。最终审计及 hosted 结果待本批稳定提交后回填，不能复用上一提交的成功冒充本批证据。
+`0f4cdf82f` 最终本地 Rust 受影响单元 139 passed（plugin 85、host 14、screenshot 11、MFA 13、mobile 6、RDP display 10），fmt、完整 QA audit 与 check:refactor 通过。此前模块/设置/离线安装前端 55 passed、URL loader 14 passed；采集库 21 passed，3 个真实 X11 测试仅 hosted opt-in。TASK-004 集成后的新增公共库和边界检查结果单列在下方，不混计为旧批次证据。
+
+[QA Modular Upgrade Contracts #43774556826](https://github.com/engcapa/taomni/actions/runs/43774556826) 已取得并即时下载三平台宿主 artifacts：每端 14 项 unit 与 7 项真实进程测试通过。四个 capture 发布目标 check 通过；Windows 12、macOS 18、Linux 21 项库 unit 通过，Linux 另有 3 项真实 X11 测试通过。该 run 的 Linux 核心升级单元仍在执行。原始 artifacts 位于 `qa-ui-auto-report/github/43774556826/upgrade-live/`。
+
+[QA UI Auto Platforms #43774557089](https://github.com/engcapa/taomni/actions/runs/43774557089) 的 22 个预期 shard 正在运行，已在其他构建/用例执行期间取得 Linux browser shard 2 的 `TC-008` pass。这只是一个已下载 case 的结果，不能视为整 shard、三端 UI、完整 crash-regression 或本批整体通过。
 
 ## 接下来的执行顺序
 
-1. 收尾当前批次：完成 URL 协议单元与控件审计，提交验签、宿主、采集和离线安装改动；运行 GitHub 三端 browser/native、完整 crash-regression、宿主进程与四目标采集验证。完成的 shard 立即下载分析，修复本次回归后重跑。远程 main 已重新拉取，当前分支已包含 `e8e3afc0f`，无新增合并冲突。
-2. 合入 TASK-004 公共库，接着拆 CoreState、宿主业务状态与核心依赖闭包；完成双向核心服务 RPC 和大帧数据通道，随后闭合 TASK-024/025。
+1. 继续监控 `0f4cdf82f` 的 GitHub 三端 browser/native、完整 crash-regression、升级核心单元与采集验证，完成的 shard 立即下载分析，修复本次回归后重跑。远程 main 已重新拉取，当前分支已包含 `e8e3afc0f`，无新增合并冲突。
+2. 完成 TASK-004 公共库、四目标/三平台契约及下述精确保留场景的 GitHub 验证，接着拆 CoreState、宿主业务状态与核心依赖闭包；完成双向核心服务 RPC 和大帧数据通道，随后闭合 TASK-024/025。
 3. TASK-025 必须保持旧固定密钥 ID `mfa.data-key-v1` 和已有密文缺密钥时的错误语义。反向 RPC 从已认证会话取得宿主身份，并同时限制固定条目归属、manifest 声明和权限；不能接受宿主自报 slug。锁 Vault 时须阻止新调用、取消在途调用、撤销宿主密钥，未确认清零则终止宿主。
 4. 备份/还原须建立跨进程写入屏障并保持 MFA → Vault 锁序；同实例禁用或未运行不能作为文件可直接复制的依据。文件回退必须取得插件数据独占锁，并处理 SQLite WAL；运行中、已禁用、卸载保留数据三态都要验证还原后重启、解锁和真实账户解密，另测取消、崩溃和跨实例写入。
 5. 完成远端商店、三种代理、后台下载/重启续传、实际 Tab 动态路由和无重启生命周期；实现真实旧版 exporter、可信包激活及失败回滚，取得已安装单体版本升级证据。当前 pending 不等于已完成迁移。
@@ -95,7 +99,7 @@ G1–G11 均待完整原生实验闭合，不能以纯单测替代。V-001–V-0
 
 本批保持设计 §4.2.1 的六项行为约束：Linux capture 库不引入 xcap；macOS 静态/录制继续用一次性快照而 RDP 保留 SCK/显示流；Wayland ScreenCast、指定显示器流和 MFA Screenshot portal 保持不同授权流程；BGRA/stride/帧时间戳及 MFA TQF1/灰度顺序不变；窗口隐藏、取消和源回收可重入。截图日志改为核心 `taomni::capture`，真正 RDP 流仍由服务器注入日志；已检索现有 YAML/Vitest，没有依赖旧截图 RDP 日志的断言。
 
-改前依据为 `2a245d52d07680d76a3cfd1f4240a484d2598ed7` 的生产实现与既有用例。该 SHA 的历史模块/crash 测试通过不能当作这批真实采集的改前运行基线；本批特定 still/record/scroll/MFA/Mobile/RDP 改前性能比较尚无同条件原始样本。以下新增步骤全部追加，保留原有像素、错误分支、延迟和吞吐预算，不放宽失败条件。所有 browser/native 运行结果当前仍为 **未执行**；本地 `node --test scripts/modular-boundaries.test.mjs` 4/4、边界 CLI、9 个修改 case 的 schema/behavior contract、完整 `qa_ui_auto.audit --gate` 与 `git diff --check` 通过。静态 selected plan 已验证 25 个目标/保留 case 加 crash-regression、三端 browser/native 与 Linux Xvfb/Wayland、release native 共 22 个预期 shard，`gaps=[]`；该 plan 绑定当时未提交工作树，只供最终 SHA 重新规划参考，不能当运行证据。
+改前依据为 `2a245d52d07680d76a3cfd1f4240a484d2598ed7` 的生产实现与既有用例。该 SHA 的历史模块/crash 测试通过不能当作这批真实采集的改前运行基线；本批特定 still/record/scroll/MFA/Mobile/RDP 改前性能比较尚无同条件原始样本。以下新增步骤全部追加，保留原有像素、错误分支、延迟和吞吐预算，不放宽失败条件。`0f4cdf82f` 的 browser/native 正在执行，已取得的部分 case 与采集契约证据见上方 run 记录，尚无完整 UI/crash 通过结论。本地采集边界测试 4/4、边界 CLI、9 个修改 case 的 schema/behavior contract、完整 `qa_ui_auto.audit --gate` 与 `git diff --check` 通过。静态 selected plan 已验证 25 个目标/保留 case 加 crash-regression、三端 browser/native 与 Linux Xvfb/Wayland、release native 共 22 个预期 shard，`gaps=[]`；当时的未提交 plan 不能当运行证据，实际运行必须关联最终源码身份与新 selection。
 
 | AC / V | 场景与保留合同 | 用例、步骤和预期结果 | 层 / fixture / native 原因 |
 |---|---|---|---|
@@ -109,6 +113,30 @@ G1–G11 均待完整原生实验闭合，不能以纯单测替代。V-001–V-0
 
 本批最小选择是上述目标和保留行为的去重并集，额外包含：`TC-SHOT-N1`（真实 still/OCR/clipboard）、`TC-SHOT-N2/N9/N16/N22`（自动/手动/重复滚动、停止输入与完整像素）、`TC-SHOT-N27/N28/N30`（启动计时、真实窗口隐藏隔离、resident 源生命周期）；browser 保留 `TC-SHOT-003/008/020/027/029/030/031`（滚动预览与导出、录制取消/保存、权限错误/手动模式）。还必须加入完整 `crash-regression` tag。使用现有 policy 已注册 ID，不新增用例编号；依赖表为新增生命周期断言补显式无前置条目，不依赖旧 case 的隐含进程状态。
 
-GitHub 另外在 Xvfb 的真实 X11 display 上 opt-in 执行 `cargo test --manifest-path src-tauri/Cargo.toml -p taomni-capture --lib -- --ignored` 的 3 个源测试。它们现在要求 DISPLAY、MIT-SHM/XDamage fixture 真正可用，缺失即失败；普通本地 unit 不触屏且不会把无 display 的早退计为 native 成功。四发布目标的 cargo check/library unit、Linux tree 与三平台 case 原始 artifacts 均待本轮 workflow 归档，执行期间按已完成 shard 即时下载。
+GitHub 另外在 Xvfb 的真实 X11 display 上 opt-in 执行 `cargo test --manifest-path src-tauri/Cargo.toml -p taomni-capture --lib -- --ignored` 的 3 个源测试。它们现在要求 DISPLAY、MIT-SHM/XDamage fixture 真正可用，缺失即失败；普通本地 unit 不触屏且不会把无 display 的早退计为 native 成功。`43774556826` 已通过四目标 check、各 runner 架构 unit、Linux tree 与 3 项真实 X11 测试并下载 artifacts；对应 UI/native case 仍随 `43774557089` 执行，按已完成 shard 即时下载。
 
 局限继续显式保留：`capture.still` 大帧 RPC 尚未接入；macOS MFA 屏幕录制归属、Linux Wayland 三授权流程和 RDP 性能需要对应真实 runner；本地 schema/audit、较小文件或成功编译均不证明这些行为等价。
+
+## TASK-004 RDP 公共库边界与保留行为
+
+改前材料是 `2a245d52d` 的客户端/服务端实现；集成基础为已包含远程 main 修复及 host/capture 的 `0f4cdf82f`。`taomni-rdp-common` 负责 CLIPRDR 编解码、CF_HTML/DIB/DIBV5 与策略值、7 个有界文件操作 helper，以及可选 `bitmap` 能力协商。`taomni-file-uri` 仅以标准库提供既有宽容 URI-list 编解码，核心 `config::paths` 直接依赖它，关闭 RDP 业务也不必引入协议依赖。RDP 旧 facade 保留兼容导出；服务端和 loopback 测试直接用共享库，不再调用客户端实现。bitmap 使用同一个 `ironrdp-pdu 0.9.0`，QOI/QOIZ 与原客户端解码 feature 一起保留。
+
+配额、请求/stream 关联、取消、staging 的 Drop/Once 清理、延迟剪贴板发布和 session 生命周期仍归原客户端/服务端持有。逐函数复核确认 7 个文件 helper、URI、CLIPRDR 与 HTML/DIB 的原逻辑和错误文本保持不变。单元补足 UTF-16 长度、路径穿越/盘符/ADS、偏移读写与 16 MiB 上限、私有目录、Unix 符号链接不修改目标、Unicode/非法百分号 URI 和 bitmap offer。新文件最大 427 行，测试按协议/格式/文件行为独立拆分。
+
+本任务只改变实现归属与依赖，没有新增 UI 流程或改变协议/持久化，所以复用下列已注册、已断言真实结果的用例，不新增仅断言内部模块名或重复现有步骤的 YAML。完整 ID 与模式如下；这是目标和受影响保留行为的去重集合，不是已通过的执行结果。
+
+| AC / V 与保留行为 | 已有用例及真实断言 | 执行边界 |
+|---|---|---|
+| AC-009/010；V-003：产品客户端/服务端能力配对 | `TC-RDPJ-01-client-server-loopback`：真实客户端显示宿主桌面、点击改变独立宿主 target、全屏连接栏与断开后服务端再次接受 probe。 | 三端 native；browser 不含 IronRDP 会话解码/OS 输入，独立 probe 不能代替产品双方配对。 |
+| AC-010/012；V-003：富格式与图像编解码 | `TC-RDPS-NAT-02-clipboard-rich`：真实主机剪贴板与外部 CLIPRDR probe 的 Unicode、HTML 和图像双向传输，保留原格式/内容断言。 | 三端 native，真实 OS 剪贴板；不由 stub 成功替代。 |
+| AC-010/012；V-003：文件路径、内容和 staging 发布 | `TC-RDPS-NAT-03-clipboard-files`：双向 Unicode 多层目录，主机发布的 staging 树与客户端下载的每个相对路径和 SHA-256 相同。 | 三端 native，真实文件与剪贴板；安全拒绝/大小上限的组合由共享库 unit 另行覆盖。 |
+| AC-010/012；V-003：策略依旧限制两个方向 | `TC-RDPS-NAT-09-clipboard-policy`：text-only 不发布 HTML/图像/文件，禁用反向后不请求客户端数据且主机剪贴板不变。 | 三端 native；UI 保存本身不证明策略执行。 |
+| AC-010/012；V-003：同机双方没有回声 | `TC-RDPJ-02-joint-clipboard-no-echo`：产品双方同机、主机内容正确、日志计数与 quiet period 保留，断开后服务仍可用。 | 三端 native，真实共享系统剪贴板和变更计数。 |
+| AC-010/012；V-003：延迟发布仍只转发一次 | `TC-RDPJ-03-deferred-clipboard-publication`：macOS AppKit 先声明类型、1.2 秒后同 token 发布文本，保留内容、公告次数、六秒静默与退出断言。 | macOS native 专项；其他平台按现有 capability/policy 选择，不能计为已执行。 |
+| AC-010；V-003：配置控件与持久化保持 | `TC-RDPS-UI-03-rdp-media-clipboard-settings`：默认值、双向策略、文件限制条件显示、Apply 后重开恢复。 | **仅 browser**；该 case 未声明 native，原生策略证据由 NAT-09 提供。 |
+
+六个 native case 为 RDPJ-01/02/03 与 NAT-02/03/09；browser 额外是 UI-03。按平台能力执行实际子集，不把 macOS 专项扩报为三端通过。下一次 `qa-ui-auto-platforms` selection 与 TASK-003 的 NAT-01/性能、模块场景和完整 `crash-regression` 取去重并集；平台 workflow 原有 RDP/dual-display contract 继续开启，不再在升级 workflow 重复全量 RDP。
+
+基于 `0f4cdf82f` 的 Linux 本地集成验证已完成：`cargo metadata --locked`，两库 `--all-features` 39/39、common `--no-default-features` 30/30、模块边界脚本 6/6、`pnpm check:refactor`（799 命令、274 facade exports、29 events）均通过；这不是其他平台或真实 UI/剪贴板证据。Windows 不编译 Unix symlink 测试，预期数量相应少一项。common 的 minimal normal/build tree 仅自身、`libc` 和 URI 库，URI tree 仅自身；静态门禁止 servers/config 导入客户端、共享库导入核心/Tauri/Wry，以及 URI 库增加 runtime/build 依赖。
+
+`qa-modular-upgrade.yml` 新增四发布目标 shared-library `cargo check --all-targets --all-features`、三个 runner 架构的完整/minimal 纯 unit 和严格 normal/build tree allowlist。原 host/capture job 保留；Linux 升级 job 仅追加 `rdp::session::tests::input_and_channels`、`servers::rdp::clipboard::tests`、`config::tests` 三组原调用方单元过滤。日志分别归档为 `modular-rdp-check-*`、`modular-rdp-unit-*`、`modular-retained-rdp-core-linux`。本提交的这些 hosted job 与上表 UI/native 尚待执行，不能用 `0f4cdf82f` 或 `2a245d52d` 的成功代替。

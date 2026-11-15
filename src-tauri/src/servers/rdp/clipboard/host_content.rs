@@ -1,12 +1,12 @@
 use super::policy::unicode_payload_within_limit;
-use crate::servers::rdp::clipboard_formats::ClipboardLevel;
-use crate::servers::rdp::clipboard_formats::MAX_HTML_BYTES;
-use crate::servers::rdp::clipboard_formats::RgbaImage;
 use ironrdp::core::IntoOwned as _;
 use std::hash::Hash;
 use std::hash::Hasher;
 use std::path::PathBuf;
 use std::sync::Arc;
+use taomni_rdp_common::clipboard_formats::ClipboardLevel;
+use taomni_rdp_common::clipboard_formats::MAX_HTML_BYTES;
+use taomni_rdp_common::clipboard_formats::RgbaImage;
 
 /// One clipboard state in transferable form.
 #[derive(Clone, Default)]

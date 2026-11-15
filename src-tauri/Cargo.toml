@@ -16,6 +16,8 @@ default-run = "taomni"
 members = [
     "crates/taomni-capture",
     "crates/taomni-host-gates",
+    "crates/taomni-rdp-common",
+    "crates/taomni-file-uri",
     "crates/taomni-plugin-api",
     "plugins/hello-plugin",
     "vendor/ironrdp-acceptor",
@@ -74,6 +76,8 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 taomni-plugin-api = { path = "crates/taomni-plugin-api" }
 taomni-capture = { path = "crates/taomni-capture" }
+taomni-rdp-common = { path = "crates/taomni-rdp-common", features = ["bitmap"] }
+taomni-file-uri = { path = "crates/taomni-file-uri" }
 toml = "0.9"
 tokio = { version = "1", features = ["full"] }
 uuid = { version = "1", features = ["v4"] }

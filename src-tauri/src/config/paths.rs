@@ -30,7 +30,7 @@ pub(super) fn existing_file_from(current_path: Option<&str>) -> Option<PathBuf> 
 
 pub(super) fn clipboard_paths_from_uri_text(text: &str) -> Vec<String> {
     let mut out = Vec::new();
-    for path in crate::rdp::cliprdr::uri_list_to_paths(text) {
+    for path in taomni_file_uri::uri_list_to_paths(text) {
         let value = path.to_string_lossy().into_owned();
         if !value.is_empty() && !out.contains(&value) {
             out.push(value);

@@ -2,9 +2,9 @@ use crate::rdp::session::StagingDirectory;
 use crate::rdp::session::display;
 use ironrdp::core::IntoOwned;
 use std::fs;
-use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Once;
+use taomni_rdp_common::file_transfer::{ensure_private_directory, process_is_alive};
 
 impl Drop for StagingDirectory {
     fn drop(&mut self) {
@@ -78,29 +78,4 @@ pub(in crate::rdp::session) fn cleanup_stale_clipboard_staging() {
             }
         }
     });
-}
-
-pub(crate) fn ensure_private_directory(path: &Path) -> Result<(), String> {
-    fs::create_dir_all(path)
-        .map_err(|error| format!("create private directory '{}': {error}", path.display()))?;
-    #[cfg(unix)]
-    {
-        use std::os::unix::fs::PermissionsExt;
-        fs::set_permissions(path, fs::Permissions::from_mode(0o700))
-            .map_err(|error| format!("secure directory '{}': {error}", path.display()))?;
-    }
-    Ok(())
-}
-
-#[cfg(unix)]
-pub(crate) fn process_is_alive(pid: u32) -> bool {
-    let result = unsafe { libc::kill(pid as libc::pid_t, 0) };
-    result == 0 || std::io::Error::last_os_error().raw_os_error() == Some(libc::EPERM)
-}
-
-#[cfg(not(unix))]
-pub(crate) fn process_is_alive(_pid: u32) -> bool {
-    // Avoid deleting another process's active transfer on platforms where this
-    // module has no inexpensive process-existence probe.
-    true
 }

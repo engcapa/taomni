@@ -8,10 +8,14 @@ import { modularBoundaryViolations } from "./modular-boundaries.mjs";
 function fixture(t, manifest = "") {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "taomni-capture-boundary-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
-  for (const child of ["src/screenshot", "src/mfa", "src/mobile", "crates/taomni-capture/src"]) {
+  for (const child of ["src/screenshot", "src/mfa", "src/mobile", "src/servers", "src/config",
+    "crates/taomni-capture/src", "crates/taomni-file-uri/src", "crates/taomni-rdp-common/src"]) {
     fs.mkdirSync(path.join(root, "src-tauri", child), { recursive: true });
   }
   fs.writeFileSync(path.join(root, "src-tauri/crates/taomni-capture/Cargo.toml"), manifest);
+  for (const name of ["taomni-file-uri", "taomni-rdp-common"]) {
+    fs.writeFileSync(path.join(root, "src-tauri/crates", name, "Cargo.toml"), "");
+  }
   return root;
 }
 
@@ -51,4 +55,29 @@ test("the hosted Linux tree gate catches forbidden transitive dependencies", (t)
   assert.match(modularBoundaryViolations(root, { linuxTreeFile: tree }).join("\n"), /dependency tree contains xcap/);
   fs.writeFileSync(tree, "taomni-capture v0.1.0\n└── x11rb v0.13.2\n");
   assert.deepEqual(modularBoundaryViolations(root, { linuxTreeFile: tree }), []);
+});
+
+test("server and core path helpers cannot import client-owned RDP modules", (t) => {
+  const root = fixture(t);
+  write(root, "src-tauri/src/servers/clipboard.rs", "use taomni_rdp_common::cliprdr;\n// crate::rdp is intentionally absent\n");
+  write(root, "src-tauri/src/config/paths.rs", "use taomni_file_uri::uri_list_to_paths;\n");
+  assert.deepEqual(modularBoundaryViolations(root), []);
+  write(root, "src-tauri/src/servers/clipboard.rs", "use crate::{\n logging,\n rdp::cliprdr,\n};\n");
+  write(root, "src-tauri/src/config/paths.rs", "    crate::rdp::cliprdr::uri_list_to_paths(text)\n");
+  const errors = modularBoundaryViolations(root).join("\n");
+  assert.match(errors, /servers\/clipboard.rs/);
+  assert.match(errors, /config\/paths.rs/);
+});
+
+test("shared RDP dependencies reject core aliases and URI dependency inflation", (t) => {
+  const root = fixture(t);
+  write(root, "src-tauri/crates/taomni-rdp-common/Cargo.toml", '[dependencies]\ncore = { path = "../.." }\nbridge = { package = "tauri-utils", version = "2" }\n');
+  write(root, "src-tauri/crates/taomni-file-uri/Cargo.toml", '[dependencies]\nurl = "2"\n');
+  const errors = modularBoundaryViolations(root).join("\n");
+  assert.match(errors, /application\/plugin state/);
+  assert.match(errors, /tauri-utils/);
+  assert.match(errors, /zero runtime\/build dependencies/);
+  write(root, "src-tauri/crates/taomni-rdp-common/Cargo.toml", '[dependencies]\ntaomni-file-uri = { path = "../taomni-file-uri" }\n');
+  write(root, "src-tauri/crates/taomni-file-uri/Cargo.toml", '[dev-dependencies]\ntempfile = "3"\n');
+  assert.deepEqual(modularBoundaryViolations(root), []);
 });

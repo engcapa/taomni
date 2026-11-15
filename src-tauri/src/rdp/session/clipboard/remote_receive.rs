@@ -1,6 +1,5 @@
 use super::remote_files::build_remote_file_transfer;
 use super::remote_files::next_remote_file_request;
-use super::remote_files::write_remote_file_chunk;
 use crate::rdp::session::ClipboardAction;
 use crate::rdp::session::ClipboardBridge;
 use crate::rdp::session::MAX_CLIPBOARD_TOTAL_BYTES;
@@ -12,6 +11,7 @@ use ironrdp::cliprdr::pdu::PackedFileList;
 use ironrdp::core::IntoOwned;
 use serde_json::json;
 use std::path::PathBuf;
+use taomni_rdp_common::file_transfer::write_remote_file_chunk;
 
 impl ClipboardBridge {
     pub(in crate::rdp::session) fn start_remote_file_receive(&self, list: PackedFileList) {
@@ -149,7 +149,7 @@ impl ClipboardBridge {
     }
 
     pub(in crate::rdp::session) fn finish_remote_file_receive(&self, paths: Vec<PathBuf>) {
-        let text = crate::rdp::cliprdr::paths_to_uri_list(&paths);
+        let text = taomni_file_uri::paths_to_uri_list(&paths);
         let string_paths: Vec<String> = paths
             .iter()
             .map(|path| path.to_string_lossy().into_owned())

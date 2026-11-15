@@ -1,8 +1,8 @@
 use super::limits::HTML_FORMAT_ID;
 use super::limits::MAX_CLIPBOARD_TEXT_BYTES;
-use crate::servers::rdp::clipboard_formats::ClipboardLevel;
 use ironrdp::cliprdr::pdu::ClipboardFormat;
 use ironrdp::cliprdr::pdu::ClipboardFormatName;
+use taomni_rdp_common::clipboard_formats::ClipboardLevel;
 
 pub(super) fn unicode_payload_within_limit(text: &str) -> bool {
     text.encode_utf16()

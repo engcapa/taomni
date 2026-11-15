@@ -10799,7 +10799,9 @@ dependencies = [
  "sqlx-postgres",
  "subtle",
  "taomni-capture",
+ "taomni-file-uri",
  "taomni-plugin-api",
+ "taomni-rdp-common",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",
@@ -10881,6 +10883,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "taomni-file-uri"
+version = "0.1.0"
+
+[[package]]
 name = "taomni-hello-plugin"
 version = "0.1.0"
 dependencies = [
@@ -10938,6 +10944,16 @@ name = "target-lexicon"
 version = "0.13.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "adb6935a6f5c20170eeceb1a3835a49e12e19d792f6dd344ccc76a985ca5a6ca"
+
+[[package]]
+name = "taomni-rdp-common"
+version = "0.1.0"
+dependencies = [
+ "ironrdp-pdu",
+ "libc",
+ "taomni-file-uri",
+ "tempfile",
+]
 
 [[package]]
 name = "tauri"

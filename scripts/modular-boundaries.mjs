@@ -28,9 +28,49 @@ function cargoDependencies(manifest) {
   return entries;
 }
 
+function sharedRdpViolations(root) {
+  const errors = [];
+  for (const consumer of ["servers", "config"]) {
+    for (const filename of rustFiles(path.join(root, "src-tauri/src", consumer))) {
+      const relative = path.relative(root, filename).split(path.sep).join("/");
+      const source = fs.readFileSync(filename, "utf8").replace(/\/\/[^\n]*/g, "");
+      if (/\bcrate\s*::\s*rdp\b|\buse\s+crate\s*::\s*\{[^;]*\brdp\s*::/.test(source)) {
+        errors.push(`${relative}: ${consumer} must use shared RDP libraries, not the RDP client`);
+      }
+    }
+  }
+  for (const name of ["taomni-file-uri", "taomni-rdp-common"]) {
+    const directory = path.join(root, "src-tauri/crates", name);
+    const manifest = fs.readFileSync(path.join(directory, "Cargo.toml"), "utf8");
+    for (const match of manifest.matchAll(/\bpackage\s*=\s*"(tauri(?:-[^"\s]+)?|wry|taomni|taomni-plugin-[^"\s]+)"/g)) {
+      errors.push(`${name}/Cargo.toml: aliased dependency links application/plugin package ${match[1]}`);
+    }
+    for (const { section, name: dependency, value } of cargoDependencies(manifest)) {
+      const packageName = value.match(/\bpackage\s*=\s*"([^"]+)"/)?.[1] ?? dependency;
+      const dependencyPath = value.match(/\bpath\s*=\s*"([^"]+)"/)?.[1];
+      const resolvedPath = dependencyPath ? path.resolve(directory, dependencyPath) : undefined;
+      if (/^(?:tauri(?:-|$)|wry$|taomni$|taomni-plugin-)/.test(packageName)
+        || resolvedPath === path.join(root, "src-tauri")
+        || resolvedPath?.startsWith(path.join(root, "src-tauri/plugins") + path.sep)) {
+        errors.push(`${name}/Cargo.toml: ${section}.${dependency} links application/plugin state`);
+      }
+      if (name === "taomni-file-uri" && !/(?:^|\.)dev-dependencies$/.test(section)) {
+        errors.push(`${name}/Cargo.toml: URI conversion must have zero runtime/build dependencies`);
+      }
+    }
+    for (const filename of rustFiles(path.join(directory, "src"))) {
+      const source = fs.readFileSync(filename, "utf8").replace(/\/\/[^\n]*/g, "");
+      if (/\b(?:tauri(?:_[\w]+)?|wry|taomni_lib|taomni_plugin_[\w]+)::|\bcrate::(?:state|servers|rdp|config|vault)::/.test(source)) {
+        errors.push(`${path.relative(root, filename)}: shared library must not import application/plugin state`);
+      }
+    }
+  }
+  return errors;
+}
+
 /** Return all violations, so one CI run identifies every broken ownership edge. */
 export function modularBoundaryViolations(root, { linuxTreeFile } = {}) {
-  const errors = [];
+  const errors = sharedRdpViolations(root);
   const consumers = ["screenshot", "mfa", "mobile"];
   for (const consumer of consumers) {
     for (const filename of rustFiles(path.join(root, "src-tauri/src", consumer))) {
@@ -89,7 +129,7 @@ export function checkModularBoundaries(root = repository, options = {}) {
   if (errors.length) {
     throw new Error(`Modular boundary checks failed:\n${errors.map((message) => `- ${message}`).join("\n")}`);
   }
-  console.log(`Modular capture boundaries passed${options.linuxTreeFile ? "; Linux dependency tree checked" : ""}.`);
+  console.log(`Modular capture/RDP boundaries passed${options.linuxTreeFile ? "; Linux dependency tree checked" : ""}.`);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

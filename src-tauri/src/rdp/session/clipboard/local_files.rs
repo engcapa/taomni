@@ -5,12 +5,9 @@ use crate::rdp::session::MAX_CLIPBOARD_TOTAL_BYTES;
 use crate::rdp::session::display;
 use ironrdp::cliprdr::pdu::ClipboardFileAttributes;
 use std::fs;
-use std::fs::OpenOptions;
-use std::io::Read;
-use std::io::Seek;
-use std::io::SeekFrom;
 use std::path::Path;
 use std::path::PathBuf;
+use taomni_rdp_common::file_transfer::clipboard_relative_name;
 
 pub(in crate::rdp::session) fn collect_local_clipboard_files(
     paths: &[String],
@@ -98,51 +95,4 @@ pub(in crate::rdp::session) fn collect_clipboard_path(
         }
     }
     Ok(())
-}
-
-pub(crate) fn clipboard_relative_name(root: &Path, path: &Path) -> Result<String, String> {
-    let rel = path.strip_prefix(root).unwrap_or(path);
-    let name = rel
-        .components()
-        .map(|component| component.as_os_str().to_string_lossy())
-        .collect::<Vec<_>>()
-        .join("\\");
-    if name.is_empty() {
-        return Err(format!(
-            "clipboard path '{}' has no file name",
-            path.display()
-        ));
-    }
-    if name.encode_utf16().count() >= 260 {
-        return Err(format!(
-            "clipboard file name '{}' exceeds 259 UTF-16 code units",
-            name
-        ));
-    }
-    Ok(name)
-}
-
-pub(crate) fn read_clipboard_file_range(
-    path: &Path,
-    position: u64,
-    requested_size: u32,
-) -> Result<Vec<u8>, String> {
-    let mut options = OpenOptions::new();
-    options.read(true);
-    #[cfg(unix)]
-    std::os::unix::fs::OpenOptionsExt::custom_flags(&mut options, libc::O_NOFOLLOW);
-    let mut file = options
-        .open(path)
-        .map_err(|e| format!("open '{}': {}", path.display(), e))?;
-    file.seek(SeekFrom::Start(position))
-        .map_err(|e| format!("seek '{}': {}", path.display(), e))?;
-    let max_chunk = 16 * 1024 * 1024;
-    let size = usize::try_from(requested_size)
-        .unwrap_or(usize::MAX)
-        .min(max_chunk);
-    let mut data = Vec::with_capacity(size);
-    file.take(size as u64)
-        .read_to_end(&mut data)
-        .map_err(|e| format!("read '{}': {}", path.display(), e))?;
-    Ok(data)
 }

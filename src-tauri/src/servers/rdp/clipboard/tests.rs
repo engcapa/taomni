@@ -7,8 +7,6 @@ use super::limits::MAX_CLIPBOARD_TEXT_BYTES;
 use super::policy::ClipboardPolicy;
 use super::policy::unicode_payload_within_limit;
 use super::requests::RequestGate;
-use crate::servers::rdp::clipboard_formats::ClipboardLevel;
-use crate::servers::rdp::clipboard_formats::RgbaImage;
 use ironrdp::cliprdr::pdu::ClipboardFileAttributes;
 use ironrdp::cliprdr::pdu::FileContentsFlags;
 use ironrdp::cliprdr::pdu::FileContentsRequest;
@@ -17,6 +15,8 @@ use ironrdp::cliprdr::pdu::FileDescriptor;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
+use taomni_rdp_common::clipboard_formats::ClipboardLevel;
+use taomni_rdp_common::clipboard_formats::RgbaImage;
 
 #[test]
 fn clipboard_limit_counts_encoded_unicode_payload() {

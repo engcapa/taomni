@@ -1,4 +1,3 @@
-use super::local_files::read_clipboard_file_range;
 use crate::rdp::session::ClipboardBridge;
 use crate::rdp::session::LocalClipboardFile;
 use ironrdp::cliprdr::pdu::FileContentsFlags;
@@ -9,6 +8,7 @@ use ironrdp::cliprdr::pdu::FormatDataResponse;
 use ironrdp::cliprdr::pdu::OwnedFormatDataResponse;
 use ironrdp::cliprdr::pdu::PackedFileList;
 use ironrdp::core::IntoOwned;
+use taomni_rdp_common::file_transfer::read_clipboard_file_range;
 
 impl ClipboardBridge {
     pub(in crate::rdp::session) fn set_local_text(&self, text: String) {

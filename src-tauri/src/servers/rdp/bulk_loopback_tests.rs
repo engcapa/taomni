@@ -178,7 +178,7 @@ impl TestClient {
     ) -> anyhow::Result<Self> {
         let tcp = connect_with_retry(addr).await?;
         let codecs = if proprietary {
-            crate::rdp::session::client_bitmap_codecs()
+            taomni_rdp_common::bitmap::client_bitmap_codecs()
         } else {
             client_codecs_capabilities(&["remotefx", "qoi:off", "qoiz:off"])
                 .map_err(anyhow::Error::msg)?

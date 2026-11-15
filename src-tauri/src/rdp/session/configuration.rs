@@ -1,13 +1,6 @@
 use super::*;
 
-/// Bitmap codecs offered to the server. Every codec in this list must also be
-/// decodable by ironrdp-session; QOI/QOIZ decoding comes from the `qoi`/`qoiz`
-/// features of the `ironrdp` dependency (see Cargo.toml). The servers RDP
-/// loopback tests guard this pairing against Taomni's own server.
-pub(crate) fn client_bitmap_codecs() -> ironrdp::pdu::rdp::capability_sets::BitmapCodecs {
-    ironrdp::pdu::rdp::capability_sets::client_codecs_capabilities(&["remotefx"])
-        .unwrap_or_default()
-}
+pub(crate) use taomni_rdp_common::bitmap::client_bitmap_codecs;
 
 pub(super) fn build_ironrdp_config(cfg: &RdpConnectionSettings) -> connector::Config {
     let mut performance_flags = IronPerformanceFlags::empty();

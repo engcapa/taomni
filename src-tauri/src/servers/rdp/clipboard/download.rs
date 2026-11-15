@@ -3,16 +3,16 @@ use super::files::process_staging_root;
 use super::files::staging_base;
 use super::limits::FILE_CHUNK_BYTES;
 use super::limits::MAX_FILE_ITEMS;
-use crate::rdp::session::ensure_private_directory;
-use crate::rdp::session::remote_clipboard_safe_path;
-use crate::rdp::session::remote_top_level_name;
-use crate::rdp::session::write_remote_file_chunk;
 use ironrdp::cliprdr::pdu::ClipboardFileAttributes;
 use ironrdp::cliprdr::pdu::FileContentsFlags;
 use ironrdp::cliprdr::pdu::FileContentsRequest;
 use ironrdp::cliprdr::pdu::FileContentsResponse;
 use ironrdp::cliprdr::pdu::FileDescriptor;
 use std::path::PathBuf;
+use taomni_rdp_common::file_transfer::ensure_private_directory;
+use taomni_rdp_common::file_transfer::remote_clipboard_safe_path;
+use taomni_rdp_common::file_transfer::remote_top_level_name;
+use taomni_rdp_common::file_transfer::write_remote_file_chunk;
 
 #[derive(Debug)]
 pub(super) struct DownloadEntry {

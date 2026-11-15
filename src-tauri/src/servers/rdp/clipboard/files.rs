@@ -1,12 +1,12 @@
 use super::limits::FILETIME_UNIX_EPOCH;
 use super::limits::MAX_FILE_ITEMS;
-use crate::rdp::session::clipboard_relative_name;
-use crate::rdp::session::process_is_alive;
 use ironrdp::cliprdr::pdu::ClipboardFileAttributes;
 use ironrdp::cliprdr::pdu::FileDescriptor;
 use ironrdp::core::IntoOwned as _;
 use std::path::Path;
 use std::path::PathBuf;
+use taomni_rdp_common::file_transfer::clipboard_relative_name;
+use taomni_rdp_common::file_transfer::process_is_alive;
 
 /// A host file or directory offered to the client, in announcement order
 /// (`FileContentsRequest::index` is a position in this list).

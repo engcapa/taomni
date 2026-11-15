@@ -10,13 +10,6 @@ use super::requests::Incoming;
 use super::requests::RequestGate;
 use super::shared::Command;
 use super::shared::Shared;
-use crate::rdp::session::read_clipboard_file_range;
-use crate::servers::rdp::clipboard_formats::MAX_HTML_BYTES;
-use crate::servers::rdp::clipboard_formats::cf_html_encode;
-use crate::servers::rdp::clipboard_formats::cf_html_fragment;
-use crate::servers::rdp::clipboard_formats::dib_to_rgba;
-use crate::servers::rdp::clipboard_formats::rgba_to_dib;
-use crate::servers::rdp::clipboard_formats::rgba_to_dibv5;
 use ironrdp::cliprdr::backend::ClipboardMessage;
 use ironrdp::cliprdr::backend::CliprdrBackend;
 use ironrdp::cliprdr::pdu::ClipboardFormat;
@@ -35,6 +28,13 @@ use ironrdp::core::IntoOwned as _;
 use std::hash::Hasher;
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
+use taomni_rdp_common::clipboard_formats::MAX_HTML_BYTES;
+use taomni_rdp_common::clipboard_formats::cf_html_encode;
+use taomni_rdp_common::clipboard_formats::cf_html_fragment;
+use taomni_rdp_common::clipboard_formats::dib_to_rgba;
+use taomni_rdp_common::clipboard_formats::rgba_to_dib;
+use taomni_rdp_common::clipboard_formats::rgba_to_dibv5;
+use taomni_rdp_common::file_transfer::read_clipboard_file_range;
 
 pub(super) struct ClipboardBackend {
     pub(super) shared: Arc<Shared>,

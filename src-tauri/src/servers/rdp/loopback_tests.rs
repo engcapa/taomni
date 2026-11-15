@@ -404,7 +404,7 @@ async fn round_trip(codecs: BitmapCodecs, tolerance: u8) {
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 async fn taomni_client_decodes_the_codec_the_server_picks_for_it() {
-    let codecs = crate::rdp::session::client_bitmap_codecs();
+    let codecs = taomni_rdp_common::bitmap::client_bitmap_codecs();
     // The server prefers QOIZ whenever a client offers it, so this exercises
     // the lossless IronRDP codec path end to end.
     assert!(

@@ -1,5 +1,4 @@
 use super::staging::clipboard_process_staging_root;
-use super::staging::ensure_private_directory;
 use crate::rdp::session::MAX_CLIPBOARD_FILE_BYTES;
 use crate::rdp::session::MAX_CLIPBOARD_FILE_ITEMS;
 use crate::rdp::session::MAX_CLIPBOARD_TOTAL_BYTES;
@@ -17,11 +16,10 @@ use std::collections::HashMap;
 use std::collections::HashSet;
 use std::fs;
 use std::fs::OpenOptions;
-use std::io::Seek;
-use std::io::SeekFrom;
-use std::io::Write;
-use std::path::Path;
 use std::path::PathBuf;
+use taomni_rdp_common::file_transfer::{
+    ensure_private_directory, remote_clipboard_safe_path, remote_top_level_name,
+};
 
 pub(in crate::rdp::session) fn build_remote_file_transfer(
     list: PackedFileList,
@@ -140,52 +138,4 @@ pub(in crate::rdp::session) fn next_remote_file_request(
         requested_size,
         data_id: None,
     }
-}
-
-pub(crate) fn remote_clipboard_safe_path(
-    root: &Path,
-    remote_name: &str,
-) -> Result<PathBuf, String> {
-    let mut path = root.to_path_buf();
-    let mut saw_part = false;
-    for part in remote_name.split(['\\', '/']) {
-        let part = part.trim();
-        if part.is_empty() || part == "." {
-            continue;
-        }
-        if part == ".." || part.contains(':') {
-            return Err(format!("remote clipboard path '{}' is unsafe", remote_name));
-        }
-        saw_part = true;
-        path.push(part);
-    }
-    if !saw_part {
-        return Err("remote clipboard file has an empty name".to_string());
-    }
-    Ok(path)
-}
-
-pub(crate) fn remote_top_level_name(remote_name: &str) -> Option<PathBuf> {
-    remote_name
-        .split(['\\', '/'])
-        .find(|part| !part.trim().is_empty() && *part != "." && *part != "..")
-        .map(PathBuf::from)
-}
-
-pub(crate) fn write_remote_file_chunk(
-    path: &Path,
-    position: u64,
-    data: &[u8],
-) -> Result<(), String> {
-    let mut options = OpenOptions::new();
-    options.write(true);
-    #[cfg(unix)]
-    std::os::unix::fs::OpenOptionsExt::custom_flags(&mut options, libc::O_NOFOLLOW);
-    let mut file = options
-        .open(path)
-        .map_err(|e| format!("open '{}': {}", path.display(), e))?;
-    file.seek(SeekFrom::Start(position))
-        .map_err(|e| format!("seek '{}': {}", path.display(), e))?;
-    file.write_all(data)
-        .map_err(|e| format!("write '{}': {}", path.display(), e))
 }
