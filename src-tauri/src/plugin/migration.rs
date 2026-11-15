@@ -81,6 +81,11 @@ pub struct MigrationJournalEntry {
     pub item: MigrationItem,
     pub state: MigrationStepState,
     pub source_fingerprint: String,
+    /// Relative path in the legacy profile that produced this entry. Older
+    /// journals did not record it, so deserialisation remains backwards
+    /// compatible with an empty path.
+    #[serde(default)]
+    pub source_path: PathBuf,
     pub target: PathBuf,
 }
 
@@ -122,15 +127,28 @@ impl MigrationJournal {
         source_fingerprint: String,
         target: PathBuf,
     ) {
+        self.mark_with_source(item, state, source_fingerprint, PathBuf::new(), target);
+    }
+
+    pub fn mark_with_source(
+        &mut self,
+        item: MigrationItem,
+        state: MigrationStepState,
+        source_fingerprint: String,
+        source_path: PathBuf,
+        target: PathBuf,
+    ) {
         if let Some(entry) = self.entries.iter_mut().find(|entry| entry.item == item) {
             entry.state = state;
             entry.source_fingerprint = source_fingerprint;
+            entry.source_path = source_path;
             entry.target = target;
         } else {
             self.entries.push(MigrationJournalEntry {
                 item,
                 state,
                 source_fingerprint,
+                source_path,
                 target,
             });
         }
@@ -160,6 +178,14 @@ pub struct MigrationExecutionResult {
     pub status: MigrationRunState,
     pub committed: Vec<MigrationItem>,
     pub skipped: Vec<MigrationItem>,
+    /// Items that were detected but intentionally left untouched until a
+    /// verified package and its database/Vault exporter are available.
+    #[serde(default)]
+    pub pending: Vec<MigrationItem>,
+    /// Human-readable explanation for pending entries. This is optional so
+    /// older result consumers remain wire-compatible.
+    #[serde(default)]
+    pub pending_reason: Option<String>,
 }
 
 /// Filesystem executor for the 0.5.x → modular upgrade journal.
@@ -208,6 +234,65 @@ impl MigrationExecutor {
 
     pub fn journal_path(&self) -> &Path {
         &self.journal_path
+    }
+
+    /// Record a legacy upgrade preflight without pretending that migration is
+    /// complete. The production upgrade command uses this until a trusted
+    /// package and a core-owned legacy-table exporter are available. It only
+    /// writes the atomic journal; it does not create plugin directories,
+    /// copy source files, or change any active pointer.
+    pub fn record_pending(
+        &self,
+        snapshot: &LegacyInstallSnapshot,
+    ) -> Result<MigrationExecutionResult, String> {
+        let mut journal = MigrationJournal::load(&self.journal_path)?;
+        if journal.from_version.is_empty() {
+            journal.from_version = self.from_version.clone();
+            journal.to_core_api_version = self.core_api_version.clone();
+        }
+        if journal.from_version != self.from_version
+            || journal.to_core_api_version != self.core_api_version
+        {
+            return Err("migration journal version does not match this executor".into());
+        }
+
+        for candidate in &snapshot.candidates {
+            let source_path = pending_source_path(snapshot, candidate)?;
+            let source_key = source_path.to_string_lossy().into_owned();
+            let fingerprint = snapshot
+                .source_fingerprints
+                .get(&source_key)
+                .cloned()
+                .ok_or_else(|| {
+                    format!("missing source fingerprint for {}", source_path.display())
+                })?;
+            journal.mark_with_source(
+                candidate.item,
+                MigrationStepState::Pending,
+                fingerprint,
+                source_path,
+                PathBuf::new(),
+            );
+        }
+        journal.status = if snapshot.candidates.is_empty() {
+            MigrationRunState::Complete
+        } else {
+            MigrationRunState::Pending
+        };
+        journal.save_atomic(&self.journal_path)?;
+        Ok(MigrationExecutionResult {
+            status: journal.status,
+            committed: Vec::new(),
+            skipped: Vec::new(),
+            pending: snapshot
+                .candidates
+                .iter()
+                .map(|candidate| candidate.item)
+                .collect(),
+            pending_reason: (!snapshot.candidates.is_empty()).then(|| {
+                "A verified plugin package and the core-owned legacy data exporter are required before migration can copy data.".to_string()
+            }),
+        })
     }
 
     /// Read source metadata and hashes without changing the filesystem.
@@ -330,6 +415,8 @@ impl MigrationExecutor {
             status: journal.status,
             committed,
             skipped,
+            pending: Vec::new(),
+            pending_reason: None,
         })
     }
 
@@ -438,6 +525,32 @@ impl MigrationExecutor {
             }
         }
     }
+}
+
+fn pending_source_path(
+    snapshot: &LegacyInstallSnapshot,
+    candidate: &MigrationCandidate,
+) -> Result<PathBuf, String> {
+    if let Some(path) = candidate
+        .evidence
+        .iter()
+        .find(|path| snapshot.source_fingerprints.contains_key(path.as_str()))
+    {
+        return Ok(PathBuf::from(path));
+    }
+    if matches!(
+        candidate.item,
+        MigrationItem::RdpVncSessions
+            | MigrationItem::RdpCertificatePins
+            | MigrationItem::ServerConfigs
+    ) && snapshot.source_fingerprints.contains_key("taomni.db")
+    {
+        return Ok(PathBuf::from("taomni.db"));
+    }
+    Err(format!(
+        "migration candidate has no fingerprinted source: {:?}",
+        candidate.item
+    ))
 }
 
 fn validate_slug(slug: &str) -> Result<(), String> {

@@ -45,7 +45,7 @@ Taomni 是 Tauri 2 + React 19 + Rust 的本地优先桌面工作台。当前发�
 - 每个插件有 `module.json`、独立版本、平台 artifact、分离 minisign、SHA-256、`coreApiVersion` 和 `permissions`。安装使用版本目录 + active 指针/原子替换，默认卸载保留数据，显式删除才清理。
 - 核心继续使用 `latest.json`；插件使用独立签名的 `modules.json`。模块清单生成器独立为 `scripts/compose-modules-manifest.mjs`，共享底层签名/资产校验但不改变核心更新清单契约。
 - 代理、下载、断点续传、取消、进度、失败恢复、备份和迁移必须遵循仓库 `AGENTS.md` 的外部网络与数据完整性要求。
-- 从 0.5.x 单体包升级时，核心先只读预检并写原子 `migration/journal.json`，再把插件代码放入 staging 目录；legacy tables 通过核心只读接口迁移，MFA 固定密钥经核心 Vault 的 slug 作用域服务访问。旧 LanChat 数据只在旧数据目录原样保留，不读取、不复制、不移动、不迁移、不删除。迁移项逐项以源指纹和 `committed` 状态记账，插件验签、下载、宿主退出或 Vault 访问失败时只回滚 active 指针并保留旧数据；核心仍可启动，用户可稍后安装缺失插件。完整协议见设计文档 §6.5.1，验证 ID 为 AC-017/V-012。
+- 从 0.5.x 单体包升级时，核心先只读预检并写原子 `migration/journal.json`。当前 M0 的 `plugin_migration_execute` 在可信插件包、签名安装门和核心 legacy-table/Vault exporter 尚未接入前，只记录候选的 `pending` 状态及缺少前置条件的原因，不复制旧文件、不创建伪插件版本目录、不修改 `active.json`；旧 LanChat 数据只在旧数据目录原样保留，不读取、不复制、不移动、不迁移、不删除。接入完整安装门后，再把插件代码放入 staging 目录；legacy tables 通过核心只读接口迁移，MFA 固定密钥经核心 Vault 的 slug 作用域服务访问。迁移项逐项以源指纹和 `committed` 状态记账，插件验签、下载、宿主退出或 Vault 访问失败时只回滚 active 指针并保留旧数据；核心仍可启动，用户可稍后安装缺失插件。完整协议见设计文档 §6.5.1，验证 ID 为 AC-017/V-012。
 
 模块源码继续保存在 monorepo 的 `src-tauri/plugins/<slug>/`，安装时落在 `<app data>/plugins/<slug>/versions/<version>/`，由 `active.json` 原子指向当前版本，`data/` 默认跨禁用/卸载保留。核心发布 `latest.json`；插件发布 `.taomni-plugin`、`.minisig`、`SHA256SUMS`，所有资产上传完成后再原子发布签名的 `modules.json`。新增模块必须先补 `module.json`、宿主/前端注册、安装生命周期、browser/native 用例和 catalog，再接入平台构建/签名矩阵；未通过相关门禁不得进入清单。当前 `ModuleStorePanel` 仍是 native registry projection，空/错误状态不代表已接入真实远端模块商店。
 

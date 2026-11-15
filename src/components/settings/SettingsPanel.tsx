@@ -4,7 +4,7 @@ import { applyCodeViewProfile, loadCodeViewProfile, saveCodeViewProfile, type Co
 import { useT } from "../../lib/i18n";
 import { useAppThemeI18nLabel } from "../../lib/i18n/labels";
 import { executePluginMigration, inspectLegacyInstall, installStagedPlugin, listPlugins, rollbackPlugin, setPluginEnabled, uninstallPlugin } from "../../lib/ipc";
-import type { LegacyInstallSnapshot } from "../../lib/ipc";
+import type { LegacyInstallSnapshot, MigrationExecutionResult } from "../../lib/ipc";
 import { PLUGIN_CORE_API_VERSION, type PluginRecord } from "../../lib/pluginRegistry";
 import { clearPendingSettingsSection, consumePendingSettingsSection, OPEN_SETTINGS_SECTION_EVENT, type OpenSettingsSectionDetail } from "../../lib/settingsNavigation";
 import { useSystemFonts } from "../../lib/systemFonts";
@@ -57,6 +57,7 @@ export function SettingsPanel() {
   const [migrationSnapshot, setMigrationSnapshot] = useState<LegacyInstallSnapshot | null>(null);
   const [migrationLoading, setMigrationLoading] = useState(true);
   const [migrationError, setMigrationError] = useState<string | null>(null);
+  const [migrationResult, setMigrationResult] = useState<MigrationExecutionResult | null>(null);
   const t = useT();
   const themeLabel = useAppThemeI18nLabel();
 
@@ -295,6 +296,7 @@ export function SettingsPanel() {
       .then((snapshot) => {
         if (mounted) {
           setMigrationSnapshot(snapshot);
+          setMigrationResult(null);
           setMigrationError(null);
         }
       })
@@ -330,7 +332,8 @@ export function SettingsPanel() {
   }, []);
   const moduleOnMigrationExecute = useCallback(async () => {
     try {
-      await executePluginMigration(migrationSnapshot?.from_version);
+      const result = await executePluginMigration(migrationSnapshot?.from_version);
+      setMigrationResult(result);
       const refreshed = await inspectLegacyInstall(migrationSnapshot?.from_version);
       setMigrationSnapshot(refreshed);
       setMigrationError(null);
@@ -392,6 +395,7 @@ export function SettingsPanel() {
     migrationSnapshot={migrationSnapshot}
     migrationLoading={migrationLoading}
     migrationError={migrationError}
+    migrationResult={migrationResult}
     onMigrationExecute={moduleOnMigrationExecute}
   />;
 }

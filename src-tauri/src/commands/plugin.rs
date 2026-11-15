@@ -244,10 +244,10 @@ pub fn plugin_migration_inspect(
     )
 }
 
-/// Execute the file based portion of an upgrade journal after the user has
-/// reviewed the preflight result. Database tables remain owned by the core
-/// data service and are intentionally not copied wholesale by this command.
-/// The journal and staging paths are profile-local and safe to retry.
+/// Record the upgrade preflight while the signed package installer and the
+/// core-owned legacy-table exporter are still being rolled out. Database and
+/// file candidates remain pending; this command deliberately does not copy
+/// source data, create a pseudo plugin version, or change an active pointer.
 #[tauri::command]
 pub fn plugin_migration_execute(
     from_version: Option<String>,
@@ -258,19 +258,15 @@ pub fn plugin_migration_execute(
         &source_root,
         legacy_version(from_version),
     )?;
-    let specs =
-        crate::plugin::migration::build_file_migration_specs(&source_root, &snapshot.candidates)?;
     let journal_path = source_root.join("migration").join("journal.json");
     let executor = crate::plugin::migration::MigrationExecutor::new(
         source_root,
         state.plugins.root().to_path_buf(),
         journal_path,
-        snapshot.from_version,
+        snapshot.from_version.clone(),
         crate::plugin::CORE_API_VERSION,
     )?;
-    let result = executor.execute(&specs)?;
-    state.plugins.scan().map_err(|error| error.to_string())?;
-    Ok(result)
+    executor.record_pending(&snapshot)
 }
 
 pub(super) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {

@@ -1,7 +1,7 @@
 import { Bot, ChevronDown, ChevronUp, History, RotateCcw, Search, Terminal, Type, Undo } from "lucide-react";
 import { DEFAULT_CODE_VIEW_PROFILE, type CodeViewProfile } from "../../../lib/codeViewProfile";
 import { useT } from "../../../lib/i18n";
-import type { LegacyInstallSnapshot } from "../../../lib/ipc";
+import type { LegacyInstallSnapshot, MigrationExecutionResult } from "../../../lib/ipc";
 import { useAppThemeI18nLabel } from "../../../lib/i18n/labels";
 import { useSystemFonts } from "../../../lib/systemFonts";
 import { DEFAULT_TERMINAL_PROFILE, type TerminalProfile } from "../../../lib/terminalProfile";
@@ -89,6 +89,7 @@ export interface SettingsPanelViewProps {
   migrationSnapshot: LegacyInstallSnapshot | null;
   migrationLoading: boolean;
   migrationError: string | null;
+  migrationResult: MigrationExecutionResult | null;
   onMigrationExecute: () => Promise<void>;
 }
 
@@ -143,6 +144,7 @@ export function SettingsPanelView(inputs: SettingsPanelViewProps) {
     migrationSnapshot,
     migrationLoading,
     migrationError,
+    migrationResult,
     onMigrationExecute,
   } = inputs;
   return ((
@@ -391,6 +393,7 @@ export function SettingsPanelView(inputs: SettingsPanelViewProps) {
                 migrationSnapshot={migrationSnapshot}
                 migrationLoading={migrationLoading}
                 migrationError={migrationError}
+                migrationResult={migrationResult}
                 onMigrationExecute={onMigrationExecute}
               />
             </SettingsAnchor>

@@ -89,7 +89,7 @@ stubCommandRegistry.register({
 stubCommandRegistry.register({
   domain: "plugin",
   command: "plugin_migration_execute",
-  handler: () => ({ status: "complete", committed: [], skipped: [] }),
+  handler: () => ({ status: "complete", committed: [], skipped: [], pending: [], pending_reason: null }),
 });
 
 for (const command of ["attach_terminal_output","detach_terminal_output","detect_x_server","list_local_shells","list_wsl_distros","list_common_local_directories","record_local_directory_use","history_snapshot","history_list","history_read","history_prune","create_local_terminal","create_ssh_terminal","submit_ssh_auth_response","test_ssh_connection","write_terminal","resize_terminal","send_terminal_signal","close_terminal"]) {

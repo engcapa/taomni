@@ -84,6 +84,29 @@ describe("ModuleStorePanel", () => {
     expect(screen.queryByTestId("module-upgrade-migrate")).not.toBeInTheDocument();
   });
 
+  it("explains when migration remains pending for trusted package/exporter gates", () => {
+    const snapshot: LegacyInstallSnapshot = {
+      from_version: "0.5.9",
+      database_path: "/profile/taomni.db",
+      database_tables: ["sessions"],
+      candidates: [{ item: "rdp-vnc-sessions", evidence: ["session records"], plugin_slug: "rdp-client" }],
+      source_fingerprints: { "taomni.db": "sha256:test:bytes:1" },
+      retained_paths: [],
+      vault: null,
+    };
+    render(<ModuleStorePanel
+      migrationSnapshot={snapshot}
+      migrationResult={{
+        status: "pending",
+        committed: [],
+        skipped: [],
+        pending: ["rdp-vnc-sessions"],
+        pending_reason: "verified package required",
+      }}
+    />);
+    expect(screen.getByTestId("module-upgrade-pending")).toHaveTextContent("verified package required");
+  });
+
   it("surfaces migration preflight errors without implying a completed scan", () => {
     render(<ModuleStorePanel migrationError="legacy profile is unreadable" />);
     expect(screen.getByTestId("module-upgrade-status")).toHaveAttribute("data-state", "error");

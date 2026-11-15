@@ -2716,6 +2716,7 @@ export const zhCN: DeepPartial<typeof en> = {
     moduleUpgradeNone: "未检测到需要迁移的旧模块数据。",
     moduleUpgradeMigrate: "迁移检测到的数据",
     moduleUpgradeWorking: "正在迁移…",
+    moduleUpgradePending: "迁移仍在等待：请先安装已验签的插件包并启用核心提供的旧数据导出器，再复制数据。",
     appThemeTitle: "应用主题",
     appThemeCurrent: "当前外观：{mode}（{resolved}）",
     appProxyTitle: "应用代理",

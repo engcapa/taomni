@@ -2739,6 +2739,7 @@ const dict = {
     moduleUpgradeNone: "No legacy module data needs migration.",
     moduleUpgradeMigrate: "Migrate detected data",
     moduleUpgradeWorking: "Migrating…",
+    moduleUpgradePending: "Migration is pending: install a verified plugin package and enable the core-owned legacy data exporter before copying data.",
     appThemeTitle: "Application Theme",
     appThemeCurrent: "Current appearance: {mode} ({resolved})",
     appProxyTitle: "Application Proxy",

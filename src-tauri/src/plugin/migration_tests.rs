@@ -272,3 +272,78 @@ fn missing_legacy_directory_is_an_empty_read_only_snapshot() {
     assert!(snapshot.candidates.is_empty());
     assert!(!data.exists());
 }
+
+#[test]
+fn records_db_only_candidates_as_pending_without_a_pseudo_plugin_version() {
+    let dir = tempdir().unwrap();
+    let source_root = dir.path().join("legacy");
+    let plugin_root = dir.path().join("plugins");
+    let journal_path = dir.path().join("migration/journal.json");
+    fs::create_dir_all(&source_root).unwrap();
+    let db = rusqlite::Connection::open(source_root.join("taomni.db")).unwrap();
+    db.execute_batch("CREATE TABLE sessions (id TEXT);")
+        .unwrap();
+    drop(db);
+
+    let snapshot = inspect_legacy_install(&source_root, "0.5.9").unwrap();
+    assert_eq!(snapshot.candidates.len(), 1);
+    let executor =
+        MigrationExecutor::new(&source_root, &plugin_root, &journal_path, "0.5.9", "1").unwrap();
+
+    let first = executor.record_pending(&snapshot).unwrap();
+    assert_eq!(first.status, MigrationRunState::Pending);
+    assert_eq!(first.pending, vec![MigrationItem::RdpVncSessions]);
+    assert!(first.committed.is_empty());
+    assert!(!plugin_root.exists());
+
+    let journal = MigrationJournal::load(&journal_path).unwrap();
+    assert_eq!(journal.status, MigrationRunState::Pending);
+    assert_eq!(journal.entries.len(), 1);
+    assert_eq!(journal.entries[0].state, MigrationStepState::Pending);
+    assert_eq!(journal.entries[0].source_path, PathBuf::from("taomni.db"));
+    assert_eq!(
+        journal.entries[0].source_fingerprint,
+        snapshot.source_fingerprints["taomni.db"]
+    );
+    assert!(journal.entries[0].target.as_os_str().is_empty());
+
+    // Repeating preflight updates the same journal entry and does not create a
+    // second record or any destination/version directory.
+    let second = executor.record_pending(&snapshot).unwrap();
+    assert_eq!(second.status, MigrationRunState::Pending);
+    assert_eq!(second.pending, vec![MigrationItem::RdpVncSessions]);
+    let retried = MigrationJournal::load(&journal_path).unwrap();
+    assert_eq!(retried.entries.len(), 1);
+    assert!(!plugin_root.exists());
+}
+
+#[test]
+fn pending_preflight_preserves_an_existing_active_pointer_and_source_hash() {
+    let dir = tempdir().unwrap();
+    let source_root = dir.path().join("legacy");
+    let plugin_root = dir.path().join("plugins");
+    let journal_path = dir.path().join("migration/journal.json");
+    fs::create_dir_all(&source_root).unwrap();
+    fs::write(source_root.join("mfa.db"), b"legacy-mfa").unwrap();
+    fs::create_dir_all(plugin_root.join("mfa")).unwrap();
+    let pointer_path = plugin_root.join("mfa/active.json");
+    let pointer = br#"{"activeVersion":"1.2.3","previousVersion":"1.2.2"}"#;
+    fs::write(&pointer_path, pointer).unwrap();
+
+    let snapshot = inspect_legacy_install(&source_root, "0.5.9").unwrap();
+    let executor =
+        MigrationExecutor::new(&source_root, &plugin_root, &journal_path, "0.5.9", "1").unwrap();
+    let result = executor.record_pending(&snapshot).unwrap();
+    assert_eq!(result.status, MigrationRunState::Pending);
+    assert_eq!(result.pending, vec![MigrationItem::Mfa]);
+    assert_eq!(fs::read(&pointer_path).unwrap(), pointer);
+    assert_eq!(fs::read(source_root.join("mfa.db")).unwrap(), b"legacy-mfa");
+    assert!(!plugin_root.join("mfa/versions").exists());
+
+    let journal = MigrationJournal::load(&journal_path).unwrap();
+    assert_eq!(journal.entries[0].source_path, PathBuf::from("mfa.db"));
+    assert_eq!(
+        journal.entries[0].source_fingerprint,
+        snapshot.source_fingerprints["mfa.db"]
+    );
+}

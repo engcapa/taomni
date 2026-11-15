@@ -1,7 +1,7 @@
 import { CheckCircle2, Download, Loader2, Package, RotateCcw, ToggleLeft, ToggleRight, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useT } from "../../lib/i18n";
-import type { LegacyInstallSnapshot } from "../../lib/ipc";
+import type { LegacyInstallSnapshot, MigrationExecutionResult } from "../../lib/ipc";
 import { type ModuleRecord, type ModuleTransition } from "../../lib/moduleStore";
 import { useModuleStore } from "../../stores/moduleStore";
 
@@ -42,6 +42,7 @@ export interface ModuleStorePanelProps {
   migrationSnapshot?: LegacyInstallSnapshot | null;
   migrationLoading?: boolean;
   migrationError?: string | null;
+  migrationResult?: MigrationExecutionResult | null;
   onMigrationExecute?: () => Promise<void> | void;
 }
 
@@ -94,6 +95,7 @@ export function ModuleStorePanel({
   migrationSnapshot = null,
   migrationLoading = false,
   migrationError = null,
+  migrationResult = null,
   onMigrationExecute,
 }: ModuleStorePanelProps) {
   const t = useT();
@@ -193,6 +195,11 @@ export function ModuleStorePanel({
               {t("settings.moduleUpgradeRetained", { count: migrationSnapshot.retained_paths.length })}
             </div>
           )}
+          {migrationResult?.pending.length ? (
+            <div data-testid="module-upgrade-pending" className="mt-2 rounded border border-amber-500/30 bg-amber-500/10 p-2 text-[12px] text-amber-800 dark:text-amber-200">
+              {migrationResult.pending_reason || t("settings.moduleUpgradePending")}
+            </div>
+          ) : null}
           {migrationError && <div role="alert" data-testid="module-upgrade-error" className="mt-2 text-[12px] text-red-700 dark:text-red-300">{migrationError}</div>}
           {migrationSnapshot.candidates.length > 0 && (
             <button

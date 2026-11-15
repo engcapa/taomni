@@ -95,6 +95,8 @@ export interface MigrationExecutionResult {
   status: "pending" | "staged" | "complete" | "failed" | "rolled-back";
   committed: LegacyMigrationItem[];
   skipped: LegacyMigrationItem[];
+  pending: LegacyMigrationItem[];
+  pending_reason?: string | null;
 }
 
 const SLUG = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
