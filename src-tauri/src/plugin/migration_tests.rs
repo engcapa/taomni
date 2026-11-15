@@ -262,6 +262,13 @@ fn preflight_records_vault_fixed_key_without_reading_plaintext() {
     let evidence = snapshot.vault.expect("vault evidence");
     assert!(evidence.fixed_key_present);
     assert_eq!(evidence.path, data.join("vault.db"));
+    assert!(
+        snapshot
+            .candidates
+            .iter()
+            .any(|candidate| candidate.item == MigrationItem::Mfa)
+    );
+    assert!(snapshot.source_fingerprints.contains_key("vault.db"));
 }
 
 #[test]

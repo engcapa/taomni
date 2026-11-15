@@ -111,7 +111,33 @@ pub fn inspect_legacy_install(
         .iter()
         .map(String::as_str)
         .collect::<Vec<_>>();
-    let candidates = detect_legacy_install(&data_dir, &table_refs);
+    let mut candidates = detect_legacy_install(&data_dir, &table_refs);
+
+    let vault_path = data_dir.join("vault.db");
+    let vault = if vault_path.is_file() {
+        Some(LegacyVaultEvidence {
+            path: vault_path.clone(),
+            fixed_key_present: read_vault_fixed_key_presence(&vault_path)?,
+        })
+    } else {
+        None
+    };
+    // A fixed MFA data key is migration evidence even when the old database
+    // file is absent. It still remains pending until the core Vault service and
+    // a trusted MFA package can perform the scoped key handoff.
+    if vault
+        .as_ref()
+        .is_some_and(|evidence| evidence.fixed_key_present)
+        && !candidates
+            .iter()
+            .any(|candidate| candidate.item == MigrationItem::Mfa)
+    {
+        candidates.push(MigrationCandidate {
+            item: MigrationItem::Mfa,
+            evidence: vec!["vault.db".into()],
+            plugin_slug: "mfa".into(),
+        });
+    }
 
     let mut source_fingerprints = BTreeMap::new();
     if let Some(path) = database_path.as_deref() {
@@ -136,15 +162,6 @@ pub fn inspect_legacy_install(
         .filter(|path| path.exists())
         .collect::<Vec<_>>();
 
-    let vault_path = data_dir.join("vault.db");
-    let vault = if vault_path.is_file() {
-        Some(LegacyVaultEvidence {
-            path: vault_path.clone(),
-            fixed_key_present: read_vault_fixed_key_presence(&vault_path)?,
-        })
-    } else {
-        None
-    };
     Ok(LegacyInstallSnapshot {
         from_version,
         database_path,
