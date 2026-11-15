@@ -8,7 +8,7 @@
 
 生产升级 IPC 当前只记录只读预检、源指纹与 pending journal。缺少可信插件包和真实 exporter 时，不复制旧数据、不创建伪插件版本、不改变 active 指针。测试 fixture 的 staging/回滚原语不能算真实旧版升级验收。
 
-签名安装门、宿主生产监督和共享采集下沉已由 `0f4cdf82f` 提交，正在 GitHub 验证；宿主与采集已有下述部分通过证据，UI 和升级核心单元仍在运行。TASK-004 的公共库、核心 URI 接线与依赖门已集成到下一批隔离提交，尚待该提交的 hosted 结果。随后按设计依赖闭合核心状态、数据服务与真实插件。G1–G11 未通过前，不将具体业务插件迁移标为完成。
+签名安装门、宿主生产监督和共享采集下沉已由 `0f4cdf82f` 提交，对应 GitHub 契约工作流已全部通过，UI/native 回归仍在运行。TASK-004 公共库已由 `8807f3de2` 集成，尚待该提交的 hosted 结果。CoreState/启动退出协同正在独立工作树实施；Vault DTO、跨进程锁与 SQLite 快照基础库已集成，尚未接入生产服务。官方签名包构建与成功安装用例已集成，待 GitHub 原生验证。G1–G11 未通过前，不将具体业务插件迁移标为完成。
 
 ## 任务状态
 
@@ -18,13 +18,13 @@
 | TASK-002 契约 | 部分 | API、manifest/schema、registry、RPC 已有；待真实插件与 G 门验证后冻结。 |
 | TASK-003 共享采集 | 已提交，hosted 验证中 | 引擎/权限/像素/一次性采集已下沉 `taomni-capture`，核心 `capture/` 持有显示器/帧源/窗口生命周期；仅保留 headless 建表例外。四目标 check、三平台库 unit 与 Linux 三个真实 X11 测试已通过，真实截图/MFA/Mobile/RDP/性能及完整 UI shard 仍待结果；`capture.still` 宿主大载荷 RPC 仍依赖 TASK-002。见下方测试设计。 |
 | TASK-004 RDP 公共库 | 代码已集成，待 hosted 验证 | `taomni-rdp-common` 与零依赖的 `taomni-file-uri`；客户端与服务端共享能力只经库依赖，config 直接用通用 URI 库。基于 `0f4cdf82f` 的集成单元完整功能 39/39、关闭 bitmap 30/30 及边界检查通过；四目标/三平台和精确保留场景待本提交 hosted 证据。见下方 TASK-004 记录。 |
-| TASK-005 核心状态 | 待开始 | CoreState、PluginRegistry 与宿主业务状态分离。 |
+| TASK-005 核心状态 | 005-A 实施中 | CoreState、LegacyFeatureRuntime、统一 bootstrap 与退出清理正在独立工作树实现；005-B 的真实业务状态迁出仍未完成。 |
 | TASK-006 核心依赖闭包 | 待开始 | Cargo 默认 features、bundle/resources、平台依赖与核心前端 chunk 真正移除已迁移业务。 |
 | TASK-007 前端注册和路由 | 部分 | loader/helper 已有；接入主窗口/分离窗口实际 tab、完整性校验、缺失/禁用/坏 chunk 与卸载清理。 |
 | TASK-008 宿主监督 | 已提交，部分 hosted 通过 | 主动心跳、重启预算、请求取消及三平台进程树回收已接入；GitHub 三平台各 14 项 unit 与 7 项真实进程测试通过，双向核心服务与 profile 协同仍待后续任务。 |
 | TASK-009 生命周期 | 部分 | 版本目录、active 指针与生命周期 IPC 已有；接可信安装门、运行中切换/回滚、无重启生命周期。 |
 | TASK-010 商店/下载 | 部分 | 原生 HTTP、代理、续传、取消/进度 IPC 已有；接远端商店、代理设置、后台恢复、离线安装与错误恢复。 |
-| TASK-011 验签安装 | 代码已集成，验证中 | pinned key 的真实 minisign 校验、清单防回滚、安全解包、内容绑定及安装入口强制验签已接入；待官方签名 artifact 成功路径和多端原生证据。 |
+| TASK-011 验签安装 | 代码已集成，验证中 | pinned key 的真实 minisign 校验、清单防回滚、安全解包、内容绑定及安装入口强制验签已接入；四目标官方签名包 QA workflow 与 TC-MODULES-007 已集成，待成功安装/重启/篡改拒绝的多端原生证据。 |
 | TASK-012 单体升级 | 部分 | 从安全 pending 进入真实 legacy exporter、可信包 staging、Vault 交接、激活、恢复/回滚；真实安装升级证据。 |
 | TASK-013 原型与 G 门 | 部分 | hello fixture 已有；真实 MFA 原型和 G1–G11 多端实验与原始证据。 |
 | TASK-014 MFA | 待前置闭合 | 完整迁出、数据密钥与备份恢复、功能等价。 |
@@ -37,8 +37,8 @@
 | TASK-021 本地语音 | 待前置闭合 | 本地 ASR/FIM 引擎和模型插件；云 ASR/麦克风保持核心归属。 |
 | TASK-022 Mobile | 待 M0 决策 | 按 DEC-2 默认暂缓排期；M0 末提供 go/no-go 与公开例外，不能默认为已交付。 |
 | TASK-023 发布验收 | 部分 | 清单生成与上传顺序已有；四目标插件构建/系统签名、包签名、原子清单发布、独立插件更新/回滚、两套回归及性能。 |
-| TASK-024 入口/profile 协同 | 待开始 | re-exec 归属、ModeLease/ProfileLease、还原前宿主静默、headless 模式。 |
-| TASK-025 密钥/一致快照 | A/B 基础实施中 | [服务、锁与快照实施方案](taomni-modular-vault-services-plan.md)；typed DTO/lease/SQLite helper 开发中，C–I 生产接线、MFA 迁出与三态备份还原未完成。 |
+| TASK-024 入口/profile 协同 | 随 005-A 实施中 | 统一 GUI/headless bootstrap、ModeLease、可重试退出与任务回收正在实现；跨宿主 profile lease、还原静默和真实多进程证据仍待完成。 |
+| TASK-025 密钥/一致快照 | A/B 基础库已集成，C 实施中 | [服务、锁与快照实施方案](taomni-modular-vault-services-plan.md)；typed DTO/lease/SQLite helper 的 32 项纯单元通过，三端真实进程 gate 已接 workflow；C–I 生产接线、MFA 迁出与三态备份还原未完成。 |
 
 具体编号与子任务边界仍以设计原表为准；上表合并描述不改变范围或依赖。
 
@@ -54,13 +54,13 @@
 
 `0f4cdf82f` 最终本地 Rust 受影响单元 139 passed（plugin 85、host 14、screenshot 11、MFA 13、mobile 6、RDP display 10），fmt、完整 QA audit 与 check:refactor 通过。此前模块/设置/离线安装前端 55 passed、URL loader 14 passed；采集库 21 passed，3 个真实 X11 测试仅 hosted opt-in。TASK-004 集成后的新增公共库和边界检查结果单列在下方，不混计为旧批次证据。
 
-[QA Modular Upgrade Contracts #43774556826](https://github.com/engcapa/taomni/actions/runs/43774556826) 已取得并即时下载三平台宿主 artifacts：每端 14 项 unit 与 7 项真实进程测试通过。四个 capture 发布目标 check 通过；Windows 12、macOS 18、Linux 21 项库 unit 通过，Linux 另有 3 项真实 X11 测试通过。该 run 的 Linux 核心升级单元仍在执行。原始 artifacts 位于 `qa-ui-auto-report/github/43774556826/upgrade-live/`。
+[QA Modular Upgrade Contracts #43774556826](https://github.com/engcapa/taomni/actions/runs/43774556826) 已全部通过，并取得执行期间下载的三平台宿主 artifacts：每端 14 项 unit 与 7 项真实进程测试通过。四个 capture 发布目标 check 通过；Windows 12、macOS 18、Linux 21 项库 unit 通过，Linux 另有 3 项真实 X11 测试通过，Linux 核心 plugin 单元 85 项通过。原始 artifacts 位于 `qa-ui-auto-report/github/43774556826/upgrade-live/`，完整 run 身份与日志位于同目录上级的 `run-final.json` / `workflow.log`。该 run 不包含之后新增的 RDP 公共库、Vault 基础库或官方签名成功链。
 
-[QA UI Auto Platforms #43774557089](https://github.com/engcapa/taomni/actions/runs/43774557089) 的 22 个预期 shard 正在运行，已在其他构建/用例执行期间取得 Linux browser shard 2 的 `TC-008` pass。这只是一个已下载 case 的结果，不能视为整 shard、三端 UI、完整 crash-regression 或本批整体通过。
+[QA UI Auto Platforms #43774557089](https://github.com/engcapa/taomni/actions/runs/43774557089) 的 22 个预期 shard 正在运行，已在 native 构建期间取得三端全部 6 个 browser shard。三端 `TC-MODULES-006` 在关闭 Settings 后等待卸载时失败，属于本批相关问题，不能忽略。trace 显示 close 图标的 mousedown 冒泡先激活 tab，侧栏布局恢复后移动目标，使随后 click 未关闭。`54f7735c7` 阻止该冒泡并补完整指针手势单元回归；相关 15 项 Vitest 和 check:refactor 通过，case 仍断言真正移除 tab/panel 后重开恢复错误，待新 SHA hosted 重跑。其他 browser 结果与 native/crash 完整结果继续逐 shard 收集，不将 job 自身 success 误作 case 全通过。
 
 ## 接下来的执行顺序
 
-1. 继续监控 `0f4cdf82f` 的 GitHub 三端 browser/native、完整 crash-regression、升级核心单元与采集验证，完成的 shard 立即下载分析，修复本次回归后重跑。远程 main 已重新拉取，当前分支已包含 `e8e3afc0f`，无新增合并冲突。
+1. 继续监控 `0f4cdf82f` 的 GitHub 三端 native、完整 crash-regression 与采集验证，完成的 shard 立即下载分析；新 SHA 重跑 TC-MODULES-006 修复、TC-MODULES-007 官方签名成功链、RDP 保留场景及完整 crash-regression。契约 run 已全过，但不替代 UI 或真实已安装升级。远程 main 已重新拉取，当前分支已包含 `e8e3afc0f`，无新增合并冲突。
 2. 完成 TASK-004 公共库、四目标/三平台契约及下述精确保留场景的 GitHub 验证，接着拆 CoreState、宿主业务状态与核心依赖闭包；完成双向核心服务 RPC 和大帧数据通道，随后闭合 TASK-024/025。
 3. TASK-025 必须保持旧固定密钥 ID `mfa.data-key-v1` 和已有密文缺密钥时的错误语义。反向 RPC 从已认证会话取得宿主身份，并同时限制固定条目归属、manifest 声明和权限；不能接受宿主自报 slug。锁 Vault 时须阻止新调用、取消在途调用、撤销宿主密钥，未确认清零则终止宿主。
 4. 备份/还原须建立跨进程写入屏障并保持 MFA → Vault 锁序；同实例禁用或未运行不能作为文件可直接复制的依据。文件回退必须取得插件数据独占锁，并处理 SQLite WAL；运行中、已禁用、卸载保留数据三态都要验证还原后重启、解锁和真实账户解密，另测取消、崩溃和跨实例写入。

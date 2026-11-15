@@ -29,6 +29,43 @@ env:
   PYTHONUNBUFFERED: '1'
 
 jobs:
+  vault-foundations:
+    name: Vault foundations (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head || github.sha }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: modular-vault-foundations
+      - name: Service contracts and SQLite WAL snapshot units
+        run: |
+          mkdir -p modular-evidence
+          set -o pipefail
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-api -p taomni-profile-locks -p taomni-sqlite-snapshot --lib --locked 2>&1 | tee modular-evidence/vault-foundation-unit.log
+      - name: Real process profile and writer leases with crash release
+        run: |
+          set -o pipefail
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-profile-locks --test process_locks --locked -- --ignored --test-threads=1 --exact surviving_host_excludes_restore_writer_and_rekey_until_a_crash_releases_them --nocapture 2>&1 | tee modular-evidence/profile-process.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: modular-vault-foundations-${{ matrix.os }}
+          path: modular-evidence
+          if-no-files-found: error
+
   host-lifecycle:
     name: Real host lifecycle (${{ matrix.os }})
     strategy:
