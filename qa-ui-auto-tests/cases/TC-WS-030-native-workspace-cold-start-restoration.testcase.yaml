@@ -134,7 +134,8 @@ steps:
     - README.md
     - qa-restore-ssh
     - qa-restore-sftp
-- native_restart_app: null
+- native_restart_app:
+    preserve_dirty_drafts: true
 - wait_for: '[data-testid="vault-unlock-dialog"]'
 - fill:
     selector: '[data-testid="vault-unlock-pw"]'
@@ -237,7 +238,8 @@ steps:
     selector: '[data-testid="file-viewer"][data-path$="README.md"]'
     name: data-dirty
     equals: 'true'
-- native_restart_app: null
+- native_restart_app:
+    preserve_dirty_drafts: true
 - wait_for: '[data-testid="vault-unlock-dialog"]'
 - fill:
     selector: '[data-testid="vault-unlock-pw"]'

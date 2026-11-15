@@ -69,6 +69,14 @@ export const filesystem = new Map<string, FileEntry[]>();
 export const TAB = "explorer-shell-test";
 let shellWidth = 1200;
 const observers: Array<{ callback: ResizeObserverCallback; targets: Set<Element> }> = [];
+const animationFrames = new Map<number, FrameRequestCallback>();
+let nextAnimationFrame = 1;
+
+function flushAnimationFrames() {
+  const pending = [...animationFrames.entries()];
+  animationFrames.clear();
+  for (const [, callback] of pending) callback(performance.now());
+}
 
 export function file(name: string, extra: Partial<FileEntry> = {}, parent = "/fixture"): FileEntry {
   return { name, path: `${parent}/${name}`, size: 10, mtime: 1, mode: 0o644, fileType: "file", isHidden: name.startsWith("."), ...extra };
@@ -96,6 +104,10 @@ export function setWidth(width: number) {
     for (const observer of observers) {
       observer.callback(Array.from(observer.targets, (target) => ({ target, borderBoxSize: [{ blockSize: 400, inlineSize: width }] } as unknown as ResizeObserverEntry)), {} as ResizeObserver);
     }
+    // Production measurements run in the next animation frame. Flush the
+    // deterministic frame queue here so geometry assertions remain synchronous
+    // while still exercising the post-ResizeObserver boundary.
+    flushAnimationFrames();
   });
 }
 export async function mountShell(overrides: Partial<ExplorerShellProps> = {}) {
@@ -112,6 +124,8 @@ export function installShellHarness() {
     native.platform = "linux";
     shellWidth = 1200;
     observers.length = 0;
+    animationFrames.clear();
+    nextAnimationFrame = 1;
     filesystem.clear(); filesystem.set("/fixture", defaultEntries()); filesystem.set("/fixture/folder", [file("child.txt", {}, "/fixture/folder")]);
     useSftpStore.setState({ sessions: {} });
     sessionRefCounts.clear(); inFlightLocalAttaches.clear(); inFlightAttaches.clear();
@@ -125,6 +139,12 @@ export function installShellHarness() {
       unobserve(target: Element) { this.record.targets.delete(target); }
       disconnect() { this.record.targets.clear(); }
     });
+    vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => {
+      const id = nextAnimationFrame++;
+      animationFrames.set(id, callback);
+      return id;
+    });
+    vi.stubGlobal("cancelAnimationFrame", (id: number) => { animationFrames.delete(id); });
     vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockImplementation(function (this: HTMLElement) { return this.dataset.testid === "explorer-tab" ? shellWidth : 600; });
     vi.spyOn(HTMLElement.prototype, "offsetWidth", "get").mockReturnValue(600);
     vi.spyOn(HTMLElement.prototype, "offsetHeight", "get").mockImplementation(function (this: HTMLElement) { return this.dataset.testid === "explorer-file-list" ? 280 : 28; });

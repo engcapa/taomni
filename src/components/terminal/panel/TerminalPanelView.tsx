@@ -200,6 +200,7 @@ export function TerminalPanelView(props: TerminalPanelViewProps) {
             <div
               key={`${highlight.row}-${highlight.col}-${highlight.active ? "active" : "match"}`}
               className={highlight.active ? "terminal-search-hit terminal-search-hit-active" : "terminal-search-hit"}
+              {...(highlight.active ? { "data-testid": "terminal-search-hit-active", "data-terminal-search-hit": "active" } : {})}
               style={{
                 left: highlight.left,
                 top: highlight.top,

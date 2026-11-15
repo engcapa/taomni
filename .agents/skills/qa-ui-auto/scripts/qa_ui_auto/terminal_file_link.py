@@ -13,7 +13,7 @@ def validate(args):
     return args["selector"]
 
 
-GEOMETRY = """const pane=document.querySelector(arguments[0]);const hit=pane?.querySelector('.terminal-search-hit-active');
+GEOMETRY = """const pane=document.querySelector(arguments[0]);const hit=pane?.querySelector('[data-terminal-search-hit="active"]') ?? pane?.querySelector('.terminal-search-hit-active');
 if(!hit)return null;const rect=hit.getBoundingClientRect();const screen=pane.querySelector('.xterm-screen');
 if(!screen || rect.width<=0 || rect.height<=0)return null;const target=screen.getBoundingClientRect();
 const x=rect.left+Math.min(rect.width/2,24), y=rect.top+rect.height/2;

@@ -23,6 +23,7 @@ class ExitConfirmation(TypedDict):
 
 
 CONFIRM_SELECTOR = '[data-testid="confirm-dialog"] [data-testid="confirm-dialog-confirm"]'
+KEEP_DRAFT_SELECTOR = '[data-testid="viewer-close-dialog"] [data-testid="viewer-close-keep-draft"]'
 EXIT_DIALOG_OBSERVATION = """
 const visible = el => {
   if (!el) return false;
@@ -43,6 +44,28 @@ return {
   confirm_count: buttons.length,
   confirm_visible: visible(button),
   confirm_enabled: !!button && !button.disabled && button.getAttribute('aria-disabled') !== 'true'
+};
+"""
+VIEWER_CLOSE_DIALOG_OBSERVATION = """
+const visible = el => {
+  if (!el) return false;
+  const rect = el.getBoundingClientRect(), style = getComputedStyle(el);
+  return rect.width > 0 && rect.height > 0 && style.display !== 'none'
+    && style.visibility !== 'hidden' && style.visibility !== 'collapse' && Number(style.opacity) !== 0;
+};
+const dialogs = [...document.querySelectorAll('[data-testid="viewer-close-dialog"]')].filter(visible);
+if (!dialogs.length) return null;
+const dialog = dialogs[0];
+const buttons = dialog.querySelectorAll('[data-testid="viewer-close-keep-draft"]');
+const button = buttons[0];
+return {
+  count: dialogs.length,
+  title: dialog.getAttribute('aria-label') ?? '',
+  paths: [...dialog.querySelectorAll('p span')].map((node) => node.textContent?.trim() ?? ''),
+  keep_count: buttons.length,
+  keep_label: button?.textContent?.trim() ?? '',
+  keep_visible: visible(button),
+  keep_enabled: !!button && !button.disabled && button.getAttribute('aria-disabled') !== 'true'
 };
 """
 
@@ -81,7 +104,8 @@ def uses_x11_window_close() -> bool:
 
 def close_application_window(session, timeout: float = 15,
                              processes: dict[int, str] | None = None, *,
-                             expect_exit_confirmation: ExitConfirmation | None = None) -> dict | None:
+                             expect_exit_confirmation: ExitConfirmation | None = None,
+                             preserve_dirty_drafts: bool = False) -> dict | None:
     """Use the production close path before releasing the owned driver tree.
 
     DELETE-session/kill is teardown, not a normal application close. In
@@ -98,6 +122,7 @@ def close_application_window(session, timeout: float = 15,
             or any(message in str(error).lower() for message in closed_messages)
 
     confirmation = None
+    draft_confirmation = None
     if expect_exit_confirmation is not None:
         expected = validate_exit_confirmation(expect_exit_confirmation)
         confirmation = {"expected": expected, "selector": CONFIRM_SELECTOR,
@@ -111,12 +136,29 @@ def close_application_window(session, timeout: float = 15,
         confirmation["before_close"] = session.execute(EXIT_DIALOG_OBSERVATION)
         if confirmation["before_close"] is not None:
             raise RuntimeError("QA application exit confirmation was already open before the close request")
+    if preserve_dirty_drafts:
+        draft_confirmation = {"selector": KEEP_DRAFT_SELECTOR,
+                              "input": "session.click", "click_attempted": False,
+                              "click_returned": False, "closed_after_confirmation": False,
+                              "status": "waiting"}
+        if not isinstance(getattr(session, "application_restart_observation", None), dict):
+            session.application_restart_observation = {}
+        session.application_restart_observation["viewer_close"] = draft_confirmation
+        # A pre-existing viewer close prompt belongs to an earlier action and
+        # must never be approved as part of this restart request.
+        draft_confirmation["before_close"] = session.execute(VIEWER_CLOSE_DIALOG_OBSERVATION)
+        if draft_confirmation["before_close"] is not None:
+            raise RuntimeError("QA viewer close dialog was already open before the close request")
 
     def observed_close():
         if confirmation is not None:
             if not confirmation["click_attempted"]:
                 raise RuntimeError("QA application closed without the expected exit confirmation")
             confirmation.update(closed_after_confirmation=True, status="closed")
+        if draft_confirmation is not None:
+            if not draft_confirmation["click_attempted"]:
+                raise RuntimeError("QA application closed without preserving dirty drafts")
+            draft_confirmation.update(closed_after_confirmation=True, status="closed")
         return observation
 
     observation = None
@@ -143,8 +185,21 @@ def close_application_window(session, timeout: float = 15,
         if native_x11 and observation is not None and x11_window_closed(observation):
             return observed_close()
         try:
-            dialog = session.execute(EXIT_DIALOG_OBSERVATION if confirmation is not None else
-                'return document.querySelector("[data-testid=confirm-dialog]")?.textContent ?? null;')
+            kind = None
+            dialog = None
+            if confirmation is not None:
+                dialog = session.execute(EXIT_DIALOG_OBSERVATION)
+                if dialog:
+                    kind = "exit"
+            if not dialog and draft_confirmation is not None:
+                dialog = session.execute(VIEWER_CLOSE_DIALOG_OBSERVATION)
+                if dialog:
+                    kind = "viewer"
+            if not dialog and confirmation is None:
+                unexpected = session.execute('return document.querySelector("[data-testid=confirm-dialog]")?.textContent ?? null;')
+                if unexpected:
+                    kind = "unexpected"
+                    dialog = unexpected
         except (WebDriverError, OSError) as error:
             if native_x11 and observation is not None:
                 # No transport error proves closure. Observe this exact XID
@@ -156,25 +211,36 @@ def close_application_window(session, timeout: float = 15,
                 return observed_close()
             raise
         if dialog:
-            if confirmation is None:
+            if kind == "unexpected":
                 raise RuntimeError("QA application close needs confirmation; declare expect_exit_confirmation explicitly before restarting")
-            confirmation["observed"] = dialog
-            if confirmation["click_attempted"]:
+            record = confirmation if kind == "exit" else draft_confirmation
+            if record is None:
+                raise RuntimeError("QA application close produced an unsupported confirmation dialog")
+            record["observed"] = dialog
+            if record["click_attempted"]:
                 # It may still be the clicked dialog while React commits; only
                 # observe it. Any replacement prompt must fail without a click.
-                if confirmation.get("dialog_dismissed") or dialog != confirmation["clicked_dialog"]:
+                if record.get("dialog_dismissed") or dialog != record["clicked_dialog"]:
                     raise RuntimeError("QA application showed another confirmation after the exit confirmation")
             else:
-                if not isinstance(dialog, dict) or any(dialog.get(key) != value for key, value in expected.items()):
-                    raise RuntimeError("QA application exit confirmation did not match the expected title, message and confirm label")
-                if (dialog.get("count") != 1 or dialog.get("confirm_count") != 1
-                        or dialog.get("confirm_visible") is not True or dialog.get("confirm_enabled") is not True):
-                    raise RuntimeError("QA application exit confirmation must have one visible enabled confirm button")
-                confirmation.update(click_attempted=True, clicked_dialog=dict(dialog), status="clicking")
+                if kind == "exit":
+                    if not isinstance(dialog, dict) or any(dialog.get(key) != value for key, value in expected.items()):
+                        raise RuntimeError("QA application exit confirmation did not match the expected title, message and confirm label")
+                    if (dialog.get("count") != 1 or dialog.get("confirm_count") != 1
+                            or dialog.get("confirm_visible") is not True or dialog.get("confirm_enabled") is not True):
+                        raise RuntimeError("QA application exit confirmation must have one visible enabled confirm button")
+                    selector = CONFIRM_SELECTOR
+                else:
+                    if (not isinstance(dialog, dict) or dialog.get("count") != 1
+                            or dialog.get("keep_count") != 1 or dialog.get("keep_visible") is not True
+                            or dialog.get("keep_enabled") is not True):
+                        raise RuntimeError("QA viewer close dialog must have one visible enabled keep-draft button")
+                    selector = KEEP_DRAFT_SELECTOR
+                record.update(click_attempted=True, clicked_dialog=dict(dialog), status="clicking")
                 try:
-                    session.click(CONFIRM_SELECTOR)
+                    session.click(selector)
                 except (WebDriverError, OSError) as error:
-                    confirmation["click_error"] = str(error)
+                    record["click_error"] = str(error)
                     request = getattr(session, "last_request", {})
                     action_attempted = (request.get("method") in {"POST", "DELETE"}
                                         and str(request.get("path", "")).endswith("/actions")
@@ -187,18 +253,22 @@ def close_application_window(session, timeout: float = 15,
                     # WebView closes. A lost preparation read is not input proof.
                     # Never replay it; still require closure and normal shutdown.
                 else:
-                    confirmation["click_returned"] = True
+                    record["click_returned"] = True
                 finally:
-                    confirmation["click_request"] = dict(getattr(session, "last_request", {}))
-                confirmation["status"] = "waiting-for-close"
-        elif confirmation is not None and confirmation["click_attempted"]:
-            confirmation["dialog_dismissed"] = True
+                    record["click_request"] = dict(getattr(session, "last_request", {}))
+                record["status"] = "waiting-for-close"
+        else:
+            if confirmation is not None and confirmation["click_attempted"]:
+                confirmation["dialog_dismissed"] = True
+            if draft_confirmation is not None and draft_confirmation["click_attempted"]:
+                draft_confirmation["dialog_dismissed"] = True
         time.sleep(0.05)
     raise RuntimeError("QA application did not close through its window control")
 
 
 def restart_owned_application(driver, session, *,
-                              expect_exit_confirmation: ExitConfirmation | None = None) -> dict:
+                              expect_exit_confirmation: ExitConfirmation | None = None,
+                              preserve_dirty_drafts: bool = False) -> dict:
     deadline = session.deadline
     before = session.session_id
     macos_bridge = session.transport == "macOS WKWebView bridge"
@@ -211,7 +281,8 @@ def restart_owned_application(driver, session, *,
     primary_error = None
     try:
         close_observation = close_application_window(session, processes=processes,
-            expect_exit_confirmation=expect_exit_confirmation)
+            expect_exit_confirmation=expect_exit_confirmation,
+            preserve_dirty_drafts=preserve_dirty_drafts)
         observation["native_close"] = close_observation
         # The WebView has closed normally. Release transport/ownership without
         # sending DELETE to an already closed browsing context.
@@ -264,11 +335,14 @@ def restart_owned_application(driver, session, *,
     observation["stage"] = "complete"
     if "exit_confirmation" in observation:
         observation["exit_confirmation"]["status"] = "verified"
+    if "viewer_close" in observation:
+        observation["viewer_close"]["status"] = "verified"
     return {"application": application, "before_session": before,
             "after_session": session.session_id, "profile_retained": True,
             "shutdown": "application-window-close",
             "native_shutdown": observation["native_shutdown"],
             **({"exit_confirmation": observation["exit_confirmation"]} if "exit_confirmation" in observation else {}),
+            **({"viewer_close": observation["viewer_close"]} if "viewer_close" in observation else {}),
             **({"driver_port_release": observation["driver_port_release"]} if observation["driver_port_release"] else {}),
             **({"before_owner_pid": before_owner, "after_owner_pid": after_owner} if macos_bridge else {}),
             **({"native_close": close_observation} if close_observation else {})}

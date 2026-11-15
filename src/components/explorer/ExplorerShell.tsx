@@ -19,6 +19,7 @@ import { useExplorerOperations } from "./useExplorerOperations";
 import { useExplorerDirectory } from "./useExplorerDirectory";
 import { useExplorerDrop } from "./useExplorerDrop";
 import { useExplorerLabels } from "./explorerLabels";
+import { useElementResizeFrame } from "../../hooks/useElementResizeFrame";
 import "./explorer.css";
 
 export interface ExplorerShellProps {
@@ -46,11 +47,14 @@ export function ExplorerShell({ tabId, initialPath, workspaceId, active = true, 
   useEffect(() => {
     let disposed = false;
     void sftpLocalHome().then((value) => { if (!disposed) setHome(value); }).catch((error) => operations.notify(String(error), true));
-    const element = root.current;
-    const observer = new ResizeObserver(() => { if (element) setWidth(element.clientWidth); });
-    if (element) { observer.observe(element); setWidth(element.clientWidth); }
-    return () => { disposed = true; observer.disconnect(); resizeCleanup.current?.(); };
+    return () => { disposed = true; resizeCleanup.current?.(); };
   }, [operations.notify]);
+  useElementResizeFrame(root, () => {
+    const element = root.current;
+    if (!element) return;
+    const next = element.clientWidth;
+    setWidth((current) => current === next ? current : next);
+  });
   useEffect(() => { setFilter(""); setPreviewOverlay(false); }, [pane?.path]);
   useEffect(() => {
     if (!pane) return;
