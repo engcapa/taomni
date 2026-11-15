@@ -2,7 +2,7 @@
 
 - 文档版本：v1.6（设计稿，非实现记录；本版在 v1.4 基础上针对分支新增代码重新取证，更正过期结论并补齐新增耦合，修订明细见 §13.4）
 - 日期：2026-11-15（北京时间；v1.4 为 2026-11-14）
-- 对象仓库：`engcapa/taomni`，当前工作分支 `refactor/modules-arch`，基线 HEAD `7bc498b35`（Merge PR #813）。v1.4 的取证基线 `1d2f5748`（PR #810）之后又进入 36 个非合并提交、402 个文件（约 +41k 行），主要是全局文件打开/查看器、移动端桌面远控与飞书适配，见 §1.10。代码锚点以本版审查日实测为准（`SessionType` 26 种、`TabKind` 23 种、`lib.rs` 593 行、`commands/mod.rs` 823 行、`package.json` 0.5.9）；M0 插件契约、注册表、迁移原语和 LanChat 删除已在本分支落地，后续插件批次仍按 §10.1 推进
+- 对象仓库：`engcapa/taomni`，当前工作分支 `refactor/modules-arch`，基线 HEAD `7bc498b35`（Merge PR #813）。v1.4 的取证基线 `1d2f5748`（PR #810）之后又进入 36 个非合并提交、402 个文件（约 +41k 行），主要是全局文件打开/查看器、移动端桌面远控与飞书适配，见 §1.10。代码锚点以本版审查日实测为准（`SessionType` 26 种、当前 `TabKind` 22 种；删除 LanChat 前的历史基线为 23 种、`lib.rs` 593 行、`commands/mod.rs` 823 行、`package.json` 0.5.9）；M0 插件契约、注册表、迁移原语和 LanChat 删除已在本分支落地，后续插件批次仍按 §10.1 推进
 - 落点：本仓库 `docs-feature/taomni-modular-split-design.md`（v1.6），随同 ADR `claudedocs/adr-taomni-modular-split.md`
 - 目标读者：Taomni 维护者 / 实现者 / 评审者
 - 状态：部分可实施。§13.1 的用户决策有效；M0 基线、契约冻结、宿主验证和共享能力下沉可立即开始，M2 插件迁移必须等待 §5.0 的 G1–G11 全部通过。v1.4 修正了过期基线、插件数量表述、核心依赖隔离遗漏、前端安全边界、数据迁移幂等性和发布例外规则，并新增 TASK-001–TASK-023、AC-001–AC-014、V-001–V-010。v1.5 按新代码更正 MFA 采集、前端 lazy 现状等结论，补充文件查看器、移动端桌面远控与 headless、re-exec 入口、插件数据密钥与备份快照、crash-regression 插件依赖等遗漏，新增 S11–S15、G11、TASK-024/025、AC-015/016、V-011。
@@ -126,7 +126,7 @@
 ### 1.6 关键概念：session 类型 ≠ 客户端实现（本设计的分界依据）
 
 - `SessionType` 是 `src-tauri/src/session/models.rs:27` 的枚举，共 26 种（见 §3.3 全表）。
-- `TabKind` 是 `src/types/index.ts:9` 的 23 种 tab（v1.5 新增 `file-viewer`）。
+- `TabKind` 是 `src/types/index.ts:9` 的 22 种 tab（v1.5 新增 `file-viewer`；LanChat 删除后减少 1 种）。
 - 两者映射在 `src/lib/welcomeSessionResume.ts` 的 `primaryViewTypeForEntry` 与 `ELIGIBLE_SAVED_SESSION_TYPES`（25 种可恢复，Browser 不可恢复）。
 - 一个 session 类型要“能用”，需要三层：会话记录（建 / 改 / 删 / 导入）、会话管理（树、分组、Vault 密码、跳转）、客户端实现（打开 tab 后的协议 + UI）。用户选的是读法 B：**24 种的客户端实现全部留核心**，不是只留记录（§13.1）。这个选择直接决定了 §3 与 §4 的分界，也决定了瘦身上限（见 §1.7）。
 

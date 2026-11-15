@@ -6,7 +6,7 @@ Accepted as a design decision; M0 implementation is in progress. v1.6 is the cur
 
 ## 1. Context
 
-Taomni 是 Tauri 2 + React 19 + Rust 的本地优先桌面工作台。当前发布仍是一个核心包、一个 `latest.json` 和一个 Rust `AppState`：根 `package.json` 为 0.5.9，`src-tauri/src/lib.rs` 593 行、`commands/mod.rs` 823 行，前端 `TabContentRouter` 静态引入多个重型 tab（仅 RDP/VNC 等少数 tab 在 `panels.tsx` 用 `React.lazy`，且仍随核心发布）。当前基线（`7bc498b35`）实测为 `src/` 3,022 个文件、`src-tauri/` 2,165 个文件、Rust 331,079 行、`SessionType` 26 种、`TabKind` 23 种；发布包体积尚无可复现基线，必须由 TASK-001 先测量。分支上新增了核心文件查看器（`viewer/`、`taomni-preview` 协议）和移动端桌面远控 / 飞书适配（`mobile/` 达 12,679 行），详见设计文档 §1.10。
+Taomni 是 Tauri 2 + React 19 + Rust 的本地优先桌面工作台。当前发布仍是一个核心包、一个 `latest.json` 和一个 Rust `AppState`：根 `package.json` 为 0.5.9，`src-tauri/src/lib.rs` 593 行、`commands/mod.rs` 823 行，前端 `TabContentRouter` 静态引入多个重型 tab（仅 RDP/VNC 等少数 tab 在 `panels.tsx` 用 `React.lazy`，且仍随核心发布）。历史基线（`7bc498b35`）实测为 `src/` 3,022 个文件、`src-tauri/` 2,165 个文件、Rust 331,079 行、`SessionType` 26 种、`TabKind` 23 种；LanChat 删除后当前分支保留 22 种 `TabKind`。发布包体积尚无可复现基线，必须由 TASK-001 先测量。分支上新增了核心文件查看器（`viewer/`、`taomni-preview` 协议）和移动端桌面远控 / 飞书适配（`mobile/` 达 12,679 行），详见设计文档 §1.10。
 
 用户要求核心默认安装、其它能力独立发布，并在第一版交付真实插件运行时和模块商店。首批目标是全部有效非核心模块；实现仍在同一 monorepo，插件以独立 artifact 发布。
 
