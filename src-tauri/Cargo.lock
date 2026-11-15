@@ -10801,6 +10801,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "taomni-hello-plugin"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "taomni-plugin-api",
+]
+
+[[package]]
 name = "taomni-plugin-api"
 version = "0.1.0"
 dependencies = [

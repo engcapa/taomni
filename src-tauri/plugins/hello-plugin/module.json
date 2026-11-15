@@ -1,0 +1,36 @@
+{
+  "id": "taomni-plugin-hello-plugin",
+  "slug": "hello-plugin",
+  "name": "Hello Plugin",
+  "version": "0.1.0",
+  "coreApiVersion": "1",
+  "kind": "collaboration",
+  "status": "provisional",
+  "platforms": [
+    "windows-x86_64",
+    "darwin-aarch64",
+    "darwin-x86_64",
+    "linux-x86_64"
+  ],
+  "entry": {
+    "host": "taomni-hello-plugin",
+    "frontend": "frontend/index.js",
+    "protocol": 1
+  },
+  "tabs": [
+    { "kind": "hello-plugin", "title": "Hello Plugin" }
+  ],
+  "commands": [
+    "hello/ping",
+    "hello/crash",
+    "hello/hang",
+    "plugin/enable",
+    "plugin/disable"
+  ],
+  "permissions": [],
+  "dataDir": "plugins/hello-plugin",
+  "backupPaths": [],
+  "legacyTables": [],
+  "vaultFixedKeys": [],
+  "snapshot": "file"
+}

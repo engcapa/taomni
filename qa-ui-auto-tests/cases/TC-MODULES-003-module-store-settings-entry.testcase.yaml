@@ -1,0 +1,59 @@
+id: TC-MODULES-003
+title: Module Store is reachable from Settings with an explicit registry state
+description: >-
+  The modular runtime exposes the signed module registry through Settings. The
+  browser and packaged app must show the Module Store panel and an explicit
+  loading, empty, or registry-error state without runtime errors.
+covers:
+- F-Modules-1
+tags:
+- p1
+- modules
+- settings
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+timeout_sec: 45
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: module store
+- wait_for: '[data-testid="module-store-panel"]'
+- assert_visible: '[data-testid="module-store-panel"]'
+- assert_count:
+    selector: '[data-testid="module-store-empty"], [data-testid="module-store-catalog-error"], [data-testid="module-store-loading"]'
+    min: 1
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Settings exposes the module store and reports a truthful registry state.
+    actions:
+    - 3
+    - 5
+    checkpoints:
+    - step: 7
+      expectation: '{"assert_visible": "[data-testid=\"module-store-panel\"]"}'
+    - step: 8
+      expectation: '{"assert_count": {"selector": "[data-testid=\"module-store-empty\"], [data-testid=\"module-store-catalog-error\"], [data-testid=\"module-store-loading\"]", "min": 1}}'
+    - step: 9
+      expectation: '{"assert_no_runtime_errors": null}'
+    results:
+    - 7
+    - 8
+    - 9
+  native:
+  - check: Native mode confirms the installed registry IPC can render the same panel and state.
+    method: automated
+    reason: Browser stubs do not execute the native plugin registry.
+  visual:
+  - check: Module Store remains readable in the expanded General settings group with a clear state boundary.
+    method: manual
+    reason: Automated checks cover presence and state selectors; spacing and narrow viewport layout require screenshot review.

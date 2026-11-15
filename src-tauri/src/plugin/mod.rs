@@ -127,6 +127,8 @@ pub enum PluginError {
     Io(#[from] std::io::Error),
     #[error("plugin registry JSON failed: {0}")]
     Json(#[from] serde_json::Error),
+    #[error("plugin installation failed: {0}")]
+    Install(#[from] install::InstallError),
 }
 
 #[derive(Debug, Clone)]
@@ -162,17 +164,10 @@ impl PluginRegistry {
                 continue;
             }
             let slug = entry.file_name().to_string_lossy().into_owned();
-            let manifest_path = path.join("module.json");
-            let record = match fs::read_to_string(&manifest_path)
-                .map_err(PluginError::from)
-                .and_then(|raw| {
-                    serde_json::from_str::<ModuleManifest>(&raw).map_err(PluginError::from)
-                })
-                .and_then(|manifest| self.validate_manifest(&manifest, &path).map(|_| manifest))
-            {
-                Ok(manifest) => PluginRecord {
+            let record = match self.read_manifest(&path, &slug) {
+                Ok((manifest, state)) => PluginRecord {
                     manifest,
-                    state: LifecycleState::Installed,
+                    state,
                     reason: None,
                 },
                 Err(error) => PluginRecord {
@@ -217,6 +212,9 @@ impl PluginRegistry {
                 record.reason.clone().unwrap_or_default(),
             ));
         }
+        if record.state == LifecycleState::Uninstalled {
+            return Err(PluginError::NotFound(slug.to_owned()));
+        }
         record.state = if enabled {
             LifecycleState::Enabled
         } else {
@@ -227,6 +225,96 @@ impl PluginRegistry {
         self.persist_enabled_state(&snapshot)?;
         self.get(slug)
             .ok_or_else(|| PluginError::NotFound(slug.to_owned()))
+    }
+
+    /// Install a package directory that has already passed download and
+    /// signature verification. The installer never overwrites an immutable
+    /// version and only activates it after the complete tree is staged.
+    pub fn install_staged(
+        &self,
+        slug: &str,
+        version: &str,
+        package_dir: &Path,
+    ) -> Result<PluginRecord, PluginError> {
+        let source_manifest = read_manifest_file(&package_dir.join("module.json"))?;
+        if source_manifest.slug != slug || source_manifest.version != version {
+            return Err(PluginError::InvalidManifest(
+                "package slug/version does not match install request".into(),
+            ));
+        }
+        self.validate_manifest_fields(&source_manifest)?;
+        let installer = install::ModuleInstaller::new(&self.root);
+        let destination = installer.stage(slug, version, package_dir)?;
+        let active_manifest = read_manifest_file(&destination.join("module.json"))?;
+        self.validate_manifest(&active_manifest, &self.root.join(slug))?;
+        installer.activate(slug, version)?;
+        self.scan()?;
+        self.get(slug)
+            .ok_or_else(|| PluginError::NotFound(slug.to_owned()))
+    }
+
+    /// Switch the active immutable version to the previous one and refresh the
+    /// registry projection. The host supervisor will re-handshake separately.
+    pub fn rollback(&self, slug: &str) -> Result<PluginRecord, PluginError> {
+        install::ModuleInstaller::new(&self.root).rollback(slug)?;
+        self.scan()?;
+        self.get(slug)
+            .ok_or_else(|| PluginError::NotFound(slug.to_owned()))
+    }
+
+    /// Deactivate a module. Its versions and data remain unless `delete_data`
+    /// is explicitly requested by the caller.
+    pub fn uninstall(&self, slug: &str, delete_data: bool) -> Result<PluginRecord, PluginError> {
+        install::ModuleInstaller::new(&self.root).uninstall(slug, delete_data)?;
+        self.scan()?;
+        // Removing the active pointer makes the record `Uninstalled`; clear
+        // its old enablement preference so a later install starts disabled
+        // and a restart cannot resurrect the removed module.
+        let snapshot = self
+            .records
+            .read()
+            .expect("plugin registry lock poisoned")
+            .clone();
+        self.persist_enabled_state(&snapshot)?;
+        self.get(slug)
+            .ok_or_else(|| PluginError::NotFound(slug.to_owned()))
+    }
+
+    fn read_manifest(
+        &self,
+        plugin_dir: &Path,
+        slug: &str,
+    ) -> Result<(ModuleManifest, LifecycleState), PluginError> {
+        let pointer = install::ModuleInstaller::new(&self.root).active_pointer(slug)?;
+        let (manifest_path, state) = if let Some(active) = pointer.active_version {
+            (
+                plugin_dir.join("versions").join(active).join("module.json"),
+                LifecycleState::Installed,
+            )
+        } else if plugin_dir.join("module.json").is_file() {
+            (plugin_dir.join("module.json"), LifecycleState::Installed)
+        } else {
+            let versions = plugin_dir.join("versions");
+            let mut candidates = fs::read_dir(&versions)
+                .ok()
+                .into_iter()
+                .flatten()
+                .filter_map(Result::ok)
+                .filter(|entry| entry.file_type().ok().is_some_and(|kind| kind.is_dir()))
+                .map(|entry| entry.path().join("module.json"))
+                .filter(|path| path.is_file())
+                .collect::<Vec<_>>();
+            candidates.sort();
+            (
+                candidates
+                    .pop()
+                    .ok_or_else(|| PluginError::NotFound(slug.to_owned()))?,
+                LifecycleState::Uninstalled,
+            )
+        };
+        let manifest = read_manifest_file(&manifest_path)?;
+        self.validate_manifest(&manifest, plugin_dir)?;
+        Ok((manifest, state))
     }
 
     pub fn invoke(&self, slug: &str, command: &str, _payload: Value) -> Result<Value, PluginError> {
@@ -249,6 +337,19 @@ impl PluginRegistry {
     }
 
     fn validate_manifest(&self, manifest: &ModuleManifest, dir: &Path) -> Result<(), PluginError> {
+        self.validate_manifest_fields(manifest)?;
+        if dir
+            .file_name()
+            .is_none_or(|name| name != std::ffi::OsStr::new(&manifest.slug))
+        {
+            return Err(PluginError::InvalidManifest(
+                "directory does not match slug".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn validate_manifest_fields(&self, manifest: &ModuleManifest) -> Result<(), PluginError> {
         if !valid_slug(&manifest.slug) || manifest.id != format!("taomni-plugin-{}", manifest.slug)
         {
             return Err(PluginError::InvalidManifest("id/slug is invalid".into()));
@@ -261,14 +362,6 @@ impl PluginRegistry {
         }
         if manifest.name.trim().is_empty() {
             return Err(PluginError::InvalidManifest("name is required".into()));
-        }
-        if dir
-            .file_name()
-            .is_none_or(|name| name != std::ffi::OsStr::new(&manifest.slug))
-        {
-            return Err(PluginError::InvalidManifest(
-                "directory does not match slug".into(),
-            ));
         }
         validate_relative_path(&manifest.data_dir)?;
         if manifest.data_dir != format!("plugins/{}", manifest.slug) {
@@ -297,7 +390,7 @@ impl PluginRegistry {
         let enabled: HashMap<String, bool> = serde_json::from_str(&fs::read_to_string(path)?)?;
         for (slug, is_enabled) in enabled {
             if let Some(record) = records.get_mut(&slug) {
-                if record.reason.is_none() {
+                if record.reason.is_none() && record.state != LifecycleState::Uninstalled {
                     record.state = if is_enabled {
                         LifecycleState::Enabled
                     } else {
@@ -315,7 +408,9 @@ impl PluginRegistry {
     ) -> Result<(), PluginError> {
         let state = records
             .iter()
-            .filter(|(_, record)| record.reason.is_none())
+            .filter(|(_, record)| {
+                record.reason.is_none() && record.state != LifecycleState::Uninstalled
+            })
             .map(|(slug, record)| (slug.clone(), record.state == LifecycleState::Enabled))
             .collect::<HashMap<_, _>>();
         let tmp = self.root.join("state.json.tmp");
@@ -333,6 +428,11 @@ fn valid_slug(value: &str) -> bool {
                     .chars()
                     .all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit())
         })
+}
+
+fn read_manifest_file(path: &Path) -> Result<ModuleManifest, PluginError> {
+    let raw = fs::read_to_string(path).map_err(PluginError::from)?;
+    serde_json::from_str::<ModuleManifest>(&raw).map_err(PluginError::from)
 }
 
 fn validate_relative_path(value: &str) -> Result<(), PluginError> {
@@ -472,5 +572,90 @@ mod tests {
         assert!(validate_relative_path("../data").is_err());
         assert!(validate_relative_path("/tmp/data").is_err());
         assert!(validate_relative_path("data/file.db").is_ok());
+    }
+
+    #[test]
+    fn installs_rolls_back_and_uninstalls_through_registry_projection() {
+        let root = tempdir().unwrap();
+        let package_v1 = tempdir().unwrap();
+        let package_v2 = tempdir().unwrap();
+        let write_package = |dir: &Path, version: &str| {
+            let mut value = serde_json::to_value(manifest("mfa")).unwrap();
+            value["version"] = version.into();
+            fs::write(
+                dir.join("module.json"),
+                serde_json::to_vec_pretty(&value).unwrap(),
+            )
+            .unwrap();
+        };
+        write_package(package_v1.path(), "1.0.0");
+        write_package(package_v2.path(), "1.1.0");
+
+        let registry = PluginRegistry::new(root.path());
+        registry.scan().unwrap();
+        let first = registry
+            .install_staged("mfa", "1.0.0", package_v1.path())
+            .unwrap();
+        assert_eq!(first.manifest.version, "1.0.0");
+        let second = registry
+            .install_staged("mfa", "1.1.0", package_v2.path())
+            .unwrap();
+        assert_eq!(second.manifest.version, "1.1.0");
+        let rolled = registry.rollback("mfa").unwrap();
+        assert_eq!(rolled.manifest.version, "1.0.0");
+
+        fs::create_dir_all(root.path().join("mfa/data")).unwrap();
+        fs::write(root.path().join("mfa/data/keep.db"), b"keep").unwrap();
+        let uninstalled = registry.uninstall("mfa", false).unwrap();
+        assert_eq!(uninstalled.state, LifecycleState::Uninstalled);
+        assert!(root.path().join("mfa/data/keep.db").is_file());
+    }
+
+    #[test]
+    fn rejects_install_package_slug_or_version_mismatch() {
+        let root = tempdir().unwrap();
+        let package = tempdir().unwrap();
+        fs::write(
+            package.path().join("module.json"),
+            serde_json::to_vec(&manifest("mfa")).unwrap(),
+        )
+        .unwrap();
+        let registry = PluginRegistry::new(root.path());
+        registry.scan().unwrap();
+        let error = registry
+            .install_staged("mfa", "2.0.0", package.path())
+            .unwrap_err();
+        assert!(error.to_string().contains("slug/version"));
+    }
+
+    #[test]
+    fn uninstall_does_not_restore_enabled_state_from_settings() {
+        let root = tempdir().unwrap();
+        let package = tempdir().unwrap();
+        fs::write(
+            package.path().join("module.json"),
+            serde_json::to_vec(&manifest("mfa")).unwrap(),
+        )
+        .unwrap();
+        let registry = PluginRegistry::new(root.path());
+        registry.scan().unwrap();
+        registry
+            .install_staged("mfa", "1.0.0", package.path())
+            .unwrap();
+        registry.set_enabled("mfa", true).unwrap();
+        let uninstalled = registry.uninstall("mfa", false).unwrap();
+        assert_eq!(uninstalled.state, LifecycleState::Uninstalled);
+
+        let reloaded = PluginRegistry::new(root.path());
+        reloaded.scan().unwrap();
+        assert_eq!(
+            reloaded.get("mfa").expect("uninstalled record").state,
+            LifecycleState::Uninstalled
+        );
+        assert!(
+            !fs::read_to_string(root.path().join("state.json"))
+                .unwrap()
+                .contains("mfa")
+        );
     }
 }

@@ -15,6 +15,7 @@ default-run = "taomni"
 [workspace]
 members = [
     "crates/taomni-plugin-api",
+    "plugins/hello-plugin",
     "vendor/ironrdp-acceptor",
     "vendor/ironrdp-bulk",
     "vendor/ironrdp-server",

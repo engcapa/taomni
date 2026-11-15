@@ -1,0 +1,116 @@
+name: QA Modular Plugin Host Gates
+
+on:
+  workflow_dispatch:
+    inputs:
+      head:
+        description: Commit or ref to test (empty = workflow ref)
+        type: string
+        required: false
+        default: ''
+  workflow_call:
+    inputs:
+      head:
+        description: Commit or ref to test
+        type: string
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: modular-plugin-host-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  hello-plugin:
+    name: hello-plugin (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head || github.sha }}
+          persist-credentials: false
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Linux build prerequisites
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y pkg-config libssl-dev
+
+      - name: Run hello-plugin unit and process contracts
+        shell: bash
+        run: |
+          mkdir -p qa-modular-plugin-host
+          cargo test --manifest-path src-tauri/plugins/hello-plugin/Cargo.toml --locked \
+            2>&1 | tee qa-modular-plugin-host/cargo-test.log
+
+      - name: Exercise newline JSON-RPC host contract
+        shell: bash
+        env:
+          TAOMNI_PLUGIN_TOKEN: hosted-gate-token
+        run: |
+          set -euo pipefail
+          cargo build --manifest-path src-tauri/plugins/hello-plugin/Cargo.toml --locked --bin taomni-hello-plugin
+          bin="src-tauri/target/debug/taomni-hello-plugin"
+          if [[ "$RUNNER_OS" == "Windows" ]]; then bin="${bin}.exe"; fi
+          python - "$bin" <<'PY'
+          import json
+          import os
+          import subprocess
+          import sys
+
+          binary = sys.argv[1]
+          token = os.environ["TAOMNI_PLUGIN_TOKEN"]
+          handshake = {
+              "jsonrpc": "2.0",
+              "id": "hosted-handshake",
+              "method": "plugin/handshake",
+              "params": {
+                  "apiVersion": 1,
+                  "protocolVersion": 1,
+                  "pluginId": "taomni-plugin-hello-plugin",
+                  "pluginVersion": "0.1.0",
+                  "token": token,
+                  "commands": ["hello/ping", "plugin/enable", "plugin/disable"],
+                  "permissions": [],
+              },
+          }
+          ping = {"jsonrpc": "2.0", "id": "hosted-ping", "method": "hello/ping"}
+          proc = subprocess.Popen(
+              [binary],
+              stdin=subprocess.PIPE,
+              stdout=subprocess.PIPE,
+              stderr=subprocess.PIPE,
+              text=True,
+              env=os.environ,
+          )
+          try:
+              for request in (handshake, ping):
+                  proc.stdin.write(json.dumps(request) + "\n")
+                  proc.stdin.flush()
+                  response = json.loads(proc.stdout.readline())
+                  assert response.get("result"), response
+              proc.stdin.close()
+              assert proc.wait(timeout=5) == 0
+          finally:
+              if proc.poll() is None:
+                  proc.kill()
+                  proc.wait()
+          PY
+
+      - name: Upload host gate receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: modular-plugin-host-${{ matrix.os }}
+          path: qa-modular-plugin-host
+          if-no-files-found: ignore

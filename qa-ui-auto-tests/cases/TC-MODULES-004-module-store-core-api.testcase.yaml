@@ -1,0 +1,59 @@
+id: TC-MODULES-004
+title: Module Store reports the core API compatibility boundary
+description: >-
+  The Module Store must expose the core API version that module manifests are
+  checked against. Browser preview and packaged native mode both show the same
+  compatibility boundary while the registry is empty.
+covers:
+- F-Modules-1
+tags:
+- p1
+- modules
+- settings
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+timeout_sec: 45
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: module store
+- wait_for: '[data-testid="module-store-panel"]'
+- assert_visible: '[data-testid="module-store-core-api"]'
+- assert_count:
+    selector: '[data-testid="module-store-empty"], [data-testid="module-store-catalog-error"], [data-testid="module-store-loading"]'
+    min: 1
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Browser and native Module Store surfaces expose the core API compatibility boundary.
+    actions:
+    - 3
+    - 5
+    checkpoints:
+    - step: 7
+      expectation: '{"assert_visible": "[data-testid=\"module-store-panel\"]"}'
+    - step: 8
+      expectation: '{"assert_visible": "[data-testid=\"module-store-core-api\"]"}'
+    - step: 9
+      expectation: '{"assert_no_runtime_errors": null}'
+    results:
+    - 7
+    - 8
+    - 9
+  native:
+  - check: Native mode confirms the registry projection and core API marker are rendered by the packaged app.
+    method: automated
+    reason: Browser stubs do not execute the native plugin registry.
+  visual:
+  - check: The compatibility marker remains readable beside the Module Store heading.
+    method: manual
+    reason: Automated checks cover presence; spacing and narrow viewport layout require screenshot review.

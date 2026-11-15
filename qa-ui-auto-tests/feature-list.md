@@ -24,9 +24,15 @@ controls:
   - id: removed-lanchat-home-card
     selector: '[data-testid="tao-home-lan-chat"]'
     kind: display
+  - id: module-store-panel
+    selector: '[data-testid="module-store-panel"]'
+    kind: display
+  - id: module-store-state
+    selector: '[data-testid="module-store-empty"], [data-testid="module-store-catalog-error"], [data-testid="module-store-loading"]'
+    kind: display
 -->
 
-模块化运行时的可选插件扫描、manifest 校验、前端 chunk 加载、宿主监督、版本目录安装状态机和单体升级 journal 已建立基础契约；LanChat 已从产品、迁移和备份范围删除，模块商店 UI、下载服务和具体插件迁移仍按设计文档 M0–M3 逐批交付。核心启动与删除回归见 `TC-MODULES-001`、`TC-MODULES-002`。
+模块化运行时的可选插件扫描、manifest 校验、前端 chunk 加载、宿主监督、版本目录安装状态机和单体升级 journal 已建立基础契约；LanChat 已从产品、迁移和备份范围删除，模块商店设置入口已接入 native registry 的明确状态，下载服务和具体插件迁移仍按设计文档 M0–M3 逐批交付。核心启动、删除与模块商店回归见 `TC-MODULES-001`、`TC-MODULES-002`、`TC-MODULES-003`、`TC-MODULES-004`。
 
 > 本文档基于当前仓库代码、稳定 `data-testid` 目录和自动化用例维护，**仅记录已实现并接入主流程的功能**。架构与现状索引见 `DESIGN.md`、`IMPLEMENTATION_PLAN.md`。
 > 标记说明：

@@ -35,6 +35,8 @@ pub enum InstallError {
     NoRollback(String),
     #[error("module filesystem operation failed: {0}")]
     Io(#[from] io::Error),
+    #[error("module active pointer is invalid: {0}")]
+    InvalidPointer(String),
     #[error("module state JSON failed: {0}")]
     Json(#[from] serde_json::Error),
 }
@@ -65,7 +67,25 @@ impl ModuleInstaller {
         if !path.exists() {
             return Ok(ActivePointer::default());
         }
-        Ok(serde_json::from_slice(&fs::read(path)?)?)
+        let metadata = fs::symlink_metadata(&path)?;
+        if metadata.file_type().is_symlink() {
+            return Err(InstallError::InvalidPointer(
+                "active.json must not be a symlink".into(),
+            ));
+        }
+        let pointer: ActivePointer = serde_json::from_slice(&fs::read(path)?)?;
+        for version in [
+            pointer.active_version.as_deref(),
+            pointer.previous_version.as_deref(),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            validate_version(version).map_err(|error| {
+                InstallError::InvalidPointer(format!("invalid version {version}: {error}"))
+            })?;
+        }
+        Ok(pointer)
     }
 
     /// Copy a verified package into a private staging directory, then rename
@@ -297,6 +317,23 @@ mod tests {
         assert!(matches!(
             installer.activate("mfa", "1.0.0"),
             Err(InstallError::NotStaged { .. })
+        ));
+    }
+
+    #[test]
+    fn rejects_tampered_active_pointer_paths() {
+        let root = tempdir().unwrap();
+        let plugin = root.path().join("mfa");
+        fs::create_dir_all(&plugin).unwrap();
+        fs::write(
+            plugin.join("active.json"),
+            br#"{"activeVersion":"../outside","previousVersion":null}"#,
+        )
+        .unwrap();
+        let installer = ModuleInstaller::new(root.path());
+        assert!(matches!(
+            installer.active_pointer("mfa"),
+            Err(InstallError::InvalidPointer(_))
         ));
     }
 }
