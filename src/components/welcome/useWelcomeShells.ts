@@ -8,10 +8,14 @@ export interface UseWelcomeShellsContext {
   setStatusMessage: (message: string) => void;
   t: import("../../lib/i18n").TranslateFn;
   active: boolean;
+  /** Tao Home only renders WSL when discovery returns a usable distro; a
+   * missing WSL installation is an expected absence there, so avoid an
+   * installation-style status toast while preserving Welcome diagnostics. */
+  suppressWslErrors?: boolean;
 }
 
 export function useWelcomeShells(context: UseWelcomeShellsContext) {
-  const { setStatusMessage, t, active } = context;
+  const { setStatusMessage, t, active, suppressWslErrors = false } = context;
 
   const [localShells, setLocalShells] = useState<LocalShellOption[]>([]);
   const [selectedShellId, setSelectedShellId] = useState("");
@@ -50,7 +54,7 @@ export function useWelcomeShells(context: UseWelcomeShellsContext) {
         .catch((error) => {
           if (cancelled) return;
           setWslStatus("error");
-          setStatusMessage(t("welcome.wslDetectFailed", { error: String(error) }));
+          if (!suppressWslErrors) setStatusMessage(t("welcome.wslDetectFailed", { error: String(error) }));
         });
     } else {
       setWslStatus("unsupported");

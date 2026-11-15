@@ -554,6 +554,7 @@ pub async fn vault_unlock(
 #[tauri::command]
 pub async fn vault_lock(state: State<'_, AppState>) -> Result<(), String> {
     state.vault.lock()?;
+    crate::deepseek_app::cancel_all();
     // After lock, providers backed by vault refs can no longer authenticate;
     // rebuild so calls fail closed with VAULT_LOCKED instead of using stale
     // plaintext that was decrypted earlier.

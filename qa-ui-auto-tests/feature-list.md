@@ -171,6 +171,9 @@ controls:
 - id: tao-home-history-tab-workspaces
   selector: '[data-testid="tao-home-history-tab-workspaces"]'
   kind: interactive
+- id: tao-home-history-tab-directories
+  selector: '[data-testid="tao-home-history-tab-directories"]'
+  kind: interactive
 - id: tao-home-history-search
   selector: '.tao-home-history-search input'
   kind: interactive
@@ -179,7 +182,11 @@ controls:
   kind: interactive
 - id: tao-home-wsl
   selector: '[data-testid="tao-home-wsl"]'
-  kind: interactive
+  # Conditional native control: when WSL is unavailable the required behavior
+  # is absence, so the availability case covers it as a display control. A
+  # platform fixture with a real distro can promote this to an interaction
+  # check without making unsupported browser runs claim a click.
+  kind: display
   optional: true
 - id: tao-home-new-session
   selector: '[data-testid="tao-home-new-session"]'
@@ -206,9 +213,162 @@ controls:
 - id: tao-home-demo-toggle
   selector: '[data-testid="tao-home-demo-toggle"]'
   kind: interactive
+- id: tao-home-new-chat
+  selector: '[data-testid="tao-home-new-chat"]'
+  kind: interactive
+- id: tao-home-more
+  selector: '[data-testid="tao-home-more"]'
+  kind: interactive
+- id: tao-home-capabilities
+  selector: '[data-testid="tao-home-capabilities"]'
+  kind: interactive
+- id: tao-home-plus
+  selector: '[data-testid="tao-home-plus"]'
+  kind: interactive
+- id: tao-home-voice
+  selector: '[data-testid="tao-home-voice"]'
+  kind: interactive
+- id: tao-home-shell-menu
+  selector: '[data-testid="tao-home-shell-menu"]'
+  kind: interactive
+- id: tao-home-side-panel
+  selector: '[data-testid="tao-home-side-panel"]'
+  kind: display
+- id: tao-home-files
+  selector: '[data-testid="tao-home-files"]'
+  kind: display
+- id: tao-home-workflows
+  selector: '[data-testid="tao-home-workflows"]'
+  kind: display
+- id: tao-home-speech
+  selector: '[data-testid="tao-home-speech"]'
+  kind: display
+- id: tao-home-binding-workspace
+  selector: '[data-testid="tao-home-binding-workspace"]'
+  kind: interactive
+- id: tao-home-binding-option
+  selector: '[data-testid="tao-home-binding-option"]'
+  kind: interactive
+- id: tao-home-binding-cite
+  selector: '[data-testid="tao-home-binding-cite"]'
+  kind: interactive
+- id: tao-home-binding-unbind
+  selector: '[data-testid="tao-home-binding-unbind"]'
+  kind: interactive
+- id: tao-home-popup
+  selector: '[role="dialog"]'
+  kind: display
+- id: tao-home-popup-attach-file
+  selector: '[role="dialog"] button:has-text("Attach file")'
+  kind: interactive
+- id: tao-home-popup-workflows
+  selector: '[role="dialog"] button:has-text("Skills / workflows")'
+  kind: interactive
+- id: tao-home-popup-thinking
+  selector: '[role="dialog"] button:has-text("Thinking")'
+  kind: interactive
+- id: tao-home-popup-web
+  selector: '[role="dialog"] button:has-text("Web")'
+  kind: interactive
+- id: tao-home-popup-shell-select
+  selector: '[role="dialog"] select[aria-label="Choose shell"]'
+  kind: interactive
+- id: tao-home-send
+  selector: '[data-testid="tao-home-send"]'
+  kind: interactive
+- id: tao-home-stop
+  selector: '[data-testid="tao-home-stop"]'
+  kind: interactive
+- id: tao-home-message-list
+  selector: '[data-testid="tao-home-message-list"]'
+  kind: display
+- id: tao-home-message-assistant
+  selector: '[data-testid="tao-home-message-assistant"]'
+  kind: display
+- id: tao-home-message-edit
+  selector: '[data-testid="tao-home-message-edit"]'
+  kind: interactive
+- id: tao-home-message-regenerate
+  selector: '[data-testid="tao-home-message-regenerate"]'
+  kind: interactive
+- id: tao-home-message-branch
+  selector: '[data-testid="tao-home-message-branch"]'
+  kind: interactive
+- id: tao-home-error-state
+  selector: '[data-testid="tao-home-error-state"]'
+  kind: display
+- id: tao-home-retry
+  selector: '[data-testid="tao-home-retry"]'
+  kind: interactive
+- id: tao-home-settings
+  selector: '[data-testid="tao-home-settings"]'
+  kind: interactive
+- id: tao-settings
+  selector: '[data-testid="tao-settings"]'
+  kind: display
+- id: tao-settings-save
+  selector: '[data-testid="tao-settings-save"]'
+  kind: interactive
+- id: tao-settings-status
+  selector: '[data-testid="tao-settings-status"]'
+  kind: display
+- id: tao-settings-proxy
+  selector: '[data-testid="tao-settings"] [data-testid="llm-proxy-mode"]'
+  kind: interactive
+- id: tao-home-more-dialog
+  selector: '[role="dialog"][aria-label="Tao 更多"]'
+  kind: display
+- id: tao-home-capabilities-dialog
+  selector: '[role="dialog"][aria-label="模型与能力"]'
+  kind: display
+- id: tao-home-capability-model-v4
+  selector: '[role="dialog"][aria-label="模型与能力"] button:has-text("deepseek-v4-pro")'
+  kind: interactive
+- id: tao-home-history-row
+  selector: '[data-testid="tao-home-history-row"]'
+  kind: interactive
 - id: tao-home-context-preview
   selector: '.tao-home-context-preview'
   kind: display
+- id: tao-home-capability-model-deepseek-v4-pro
+  selector: '[data-testid="tao-home-capability-model-deepseek-v4-pro"]'
+  kind: interactive
+- id: tao-home-capability-thinking
+  selector: '[data-testid="tao-home-capability-thinking"]'
+  kind: interactive
+- id: tao-home-capability-web
+  selector: '[data-testid="tao-home-capability-web"]'
+  kind: interactive
+- id: tao-home-context-attach
+  selector: '[data-testid="tao-home-context-attach"]'
+  kind: interactive
+- id: tao-home-context-workflows
+  selector: '[data-testid="tao-home-context-workflows"]'
+  kind: interactive
+- id: tao-home-suggestions
+  selector: '[data-testid="tao-home-suggestions"]'
+  kind: display
+- id: tao-home-side-tab-sources
+  selector: '[data-testid="tao-home-side-tab-sources"]'
+  kind: interactive
+- id: tao-home-side-tab-files
+  selector: '[data-testid="tao-home-side-tab-files"]'
+  kind: interactive
+- id: tao-home-side-tab-artifacts
+  selector: '[data-testid="tao-home-side-tab-artifacts"]'
+  kind: interactive
+- id: tao-home-side-tab-workflows
+  selector: '[data-testid="tao-home-side-tab-workflows"]'
+  kind: interactive
+- id: tao-home-side-tab-voice
+  selector: '[data-testid="tao-home-side-tab-voice"]'
+  kind: interactive
+- id: tao-home-side-tab-archive
+  selector: '[data-testid="tao-home-side-tab-archive"]'
+  kind: interactive
+- id: tao-home-side-resize
+  selector: '[data-testid="tao-home-side-resize"]'
+  kind: interactive
 -->
 
 Tao Home 将问、做、深研三种模式、绑定栏、Composer、消息状态、历史快捷行与本地资料搜索组合为独立宿主；首页入口移除 LAN 聊天，WSL 只在检测到可用发行版时显示。用例 `TC-TAO-HOME-001` 覆盖无 Key 空态、模式切换、历史三页签、搜索快捷键和托管 WebView smoke。
@@ -15202,12 +15362,24 @@ controls:
   - id: markdown-focus
     selector: '[data-testid="markdown-focus"]'
     kind: interactive
+  - id: markdown-format-bold
+    selector: '[data-testid="markdown-format-bold"]'
+    kind: interactive
   - id: markdown-outline
     selector: '[data-testid="markdown-outline"]'
     kind: interactive
   - id: markdown-preview
     selector: '[data-testid="markdown-preview"]'
     kind: display
+  - id: markdown-live-edit
+    selector: '[data-testid="markdown-live-edit"]'
+    kind: interactive
+  - id: markdown-split-resize
+    selector: '[data-testid="markdown-split-resize"]'
+    kind: interactive
+  - id: markdown-preview-appearance
+    selector: '[data-testid="markdown-preview-appearance"]'
+    kind: interactive
   - id: markdown-table-widget
     selector: '[data-testid="markdown-table-widget"]'
     kind: interactive
@@ -15250,6 +15422,9 @@ controls:
   - id: markdown-export-settings
     selector: '[data-testid="markdown-export-settings"]'
     kind: display
+  - id: markdown-export-toc
+    selector: '[data-testid="markdown-export-toc"]'
+    kind: interactive
   - id: markdown-export-confirm
     selector: '[data-testid="markdown-export-confirm"]'
     kind: interactive

@@ -1,0 +1,102 @@
+id: TC-TAO-HOME-007
+title: Tao Home side-panel icons, resize, collapse and close controls
+description: >-
+  Verify the Tao Home companion panel keeps semantic icon tabs discoverable through
+  labels/tooltips, exposes a visible resize handle, and supports reversible
+  collapse and close actions in the browser and native WebViews.
+modes:
+- browser
+- native
+covers:
+- F1.11
+tags:
+- p0
+- tao-home
+- ui
+- regression
+fixtures:
+- reset_db
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-tao-home-007
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- wait_for: '[data-testid="tao-home-host"]'
+- click: '[data-testid="tao-home-plus"]'
+- click: '[data-testid="tao-home-context-attach"]'
+- wait_for: '[data-testid="tao-home-side-panel"]'
+- assert_visible: '[data-testid="tao-home-side-tab-sources"]'
+- click: '[data-testid="tao-home-side-tab-sources"]'
+- assert_attribute:
+    selector: '[data-testid="tao-home-side-tab-sources"]'
+    name: class
+    equals: active
+- assert_visible: '[data-testid="tao-home-side-tab-files"]'
+- click: '[data-testid="tao-home-side-tab-files"]'
+- assert_attribute:
+    selector: '[data-testid="tao-home-side-tab-files"]'
+    name: class
+    equals: active
+- assert_visible: '[data-testid="tao-home-side-tab-artifacts"]'
+- click: '[data-testid="tao-home-side-tab-artifacts"]'
+- assert_attribute:
+    selector: '[data-testid="tao-home-side-tab-artifacts"]'
+    name: class
+    equals: active
+- assert_visible: '[data-testid="tao-home-side-tab-workflows"]'
+- click: '[data-testid="tao-home-side-tab-workflows"]'
+- assert_attribute:
+    selector: '[data-testid="tao-home-side-tab-workflows"]'
+    name: class
+    equals: active
+- assert_visible: '[data-testid="tao-home-side-tab-voice"]'
+- click: '[data-testid="tao-home-side-tab-voice"]'
+- assert_attribute:
+    selector: '[data-testid="tao-home-side-tab-voice"]'
+    name: class
+    equals: active
+- assert_visible: '[data-testid="tao-home-side-tab-archive"]'
+- click: '[data-testid="tao-home-side-tab-archive"]'
+- assert_attribute:
+    selector: '[data-testid="tao-home-side-tab-archive"]'
+    name: class
+    equals: active
+- assert_text_equals:
+    selector: '[data-testid="tao-home-side-tab-archive"]'
+    equals: ''
+- assert_attribute:
+    selector: '[data-testid="tao-home-side-tab-sources"]'
+    name: aria-label
+    equals: Sources
+- assert_attribute:
+    selector: '[data-testid="tao-home-side-tab-sources"]'
+    name: title
+    equals: Sources
+- assert_attribute:
+    selector: '[data-testid="tao-home-side-resize"]'
+    name: aria-label
+    equals: Resize sidebar
+- eval_readonly:
+    expression: '!(document.querySelector(".tao-home-side-panel").getBoundingClientRect().width < 300)'
+    expect_truthy: true
+- drag_to:
+    from: '[data-testid="tao-home-side-resize"]'
+    by: {dx: -60, dy: 0, steps: 8}
+- eval_readonly:
+    expression: document.querySelector(".tao-home-side-panel").getBoundingClientRect().width > 340
+    expect_truthy: true
+- click: '[data-testid="tao-home-side-panel"] button[aria-label="Collapse sidebar"]'
+- assert_attribute:
+    selector: '[data-testid="tao-home-side-panel"]'
+    name: data-collapsed
+    equals: 'true'
+- click: '[data-testid="tao-home-side-panel"] button[aria-label="Expand sidebar"]'
+- assert_attribute:
+    selector: '[data-testid="tao-home-side-panel"]'
+    name: data-collapsed
+    equals: 'false'
+- click: '[data-testid="tao-home-side-panel"] button[aria-label="Close sidebar"]'
+- assert_not_visible: '[data-testid="tao-home-side-panel"]'
+- assert_no_runtime_errors: null
+- screenshot: tao-home-side-panel-controls.png

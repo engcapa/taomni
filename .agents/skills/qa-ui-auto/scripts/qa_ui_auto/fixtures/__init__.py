@@ -102,6 +102,8 @@ from . import path_completion
 from . import java_real_project
 from . import dual_display_required
 from . import rdp_deferred_clipboard
+from . import tao_messages
+from . import tao_real_provider
 
 
 class FixtureContext(Protocol):
@@ -119,6 +121,8 @@ class Fixture:
 
 
 REGISTRY: dict[str, Fixture] = {
+    "tao_messages": Fixture("tao_messages", tao_messages.setup, tao_messages.teardown),
+    "tao_real_provider": Fixture("tao_real_provider", tao_real_provider.setup, tao_real_provider.teardown),
     "mobile_web": Fixture("mobile_web", mobile_web.setup, mobile_web.teardown),
     "mobile_openssh": Fixture("mobile_openssh", mobile_openssh.setup, mobile_openssh.teardown),
     "mobile_service": Fixture("mobile_service", mobile_service.setup, mobile_service.teardown),

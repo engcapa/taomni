@@ -21,6 +21,7 @@ import type { RegionFoldingProvenance } from "./workspaceEditorCommands";
 import { useWorkspaceHost } from "./workspaceHostIntegration";
 import { selectCodeWorkspaceUi, useCodeWorkspaceStore } from "../../../stores/codeWorkspaceStore";
 import { fileKey, lspPresetIdForPath } from "./codeWorkspaceModel";
+import { MarkdownSplit } from "../../viewer/markdown/MarkdownSplit";
 
 /**
  * Single editor group: tab strip + active buffer chrome + CodeMirror/markdown.
@@ -460,12 +461,9 @@ export function EditorGroup({
                 {isMarkdownPath(activeFile.languagePath) && activeMarkdownMode === "preview" ? (
                   renderMarkdownPreview(activeFile, onOpenMarkdownHref, { actionHost: workspaceActionHost, groupId, standalone: true })
                 ) : isMarkdownPath(activeFile.languagePath) && activeMarkdownMode === "split" ? (
-                  <div className="h-full min-h-0 grid grid-cols-2 relative">
-                    <StickyLinesOverlay
-                      stickyLines={stickyLines}
-                      onSelectLine={(line) => onRevealTargetLine?.(line + 1)}
-                    />
-                    <div className="min-w-0 min-h-0 border-r border-[var(--taomni-code-border)]">
+                  <MarkdownSplit className="h-full min-h-0 relative">
+                    <div className="min-w-0 min-h-0 relative border-r border-[var(--taomni-code-border)]">
+                      <StickyLinesOverlay stickyLines={stickyLines} onSelectLine={(line) => onRevealTargetLine?.(line + 1)} />
                       <EditorMountBoundary>
                         <CodeMirrorHost
                           fileKey={activeFile.key}
@@ -547,7 +545,7 @@ export function EditorGroup({
                       </EditorMountBoundary>
                     </div>
                     {renderMarkdownPreview(activeFile, onOpenMarkdownHref, { actionHost: workspaceActionHost, groupId, standalone: false })}
-                  </div>
+                  </MarkdownSplit>
                 ) : (
                   <div className="h-full min-h-0 relative">
                     <StickyLinesOverlay

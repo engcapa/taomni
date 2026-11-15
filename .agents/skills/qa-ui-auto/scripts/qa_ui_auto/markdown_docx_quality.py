@@ -1,0 +1,88 @@
+"""Inspect the media actually referenced by DOCX drawings, not unrelated images."""
+from __future__ import annotations
+
+import io
+import posixpath
+import xml.etree.ElementTree as ET
+
+from .steps import StepError
+
+NS = {
+    "w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
+    "wp": "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing",
+    "a": "http://schemas.openxmlformats.org/drawingml/2006/main",
+    "r": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
+}
+
+
+def inspect_diagrams(archive, minimum_dpi=285):
+    """Check diagram sampling and layout and return raw measurements for review.
+
+    Raster density and OOXML geometry establish the packaging contract. They do
+    not prove actual Word typography, display scaling or visual clarity.
+    """
+    from PIL import Image
+
+    document = ET.fromstring(archive.read("word/document.xml"))
+    relationships = ET.fromstring(archive.read("word/_rels/document.xml.rels"))
+    targets = {item.get("Id"): item for item in relationships}
+    section = document.find(".//w:sectPr", NS)
+    page = section.find("w:pgSz", NS) if section is not None else None
+    margins = section.find("w:pgMar", NS) if section is not None else None
+    available_width_emu = None
+    if page is not None and margins is not None:
+        get = lambda item, name: int(item.get(f"{{{NS['w']}}}{name}", "0"))
+        available_width_emu = (get(page, "w") - get(margins, "left") - get(margins, "right")) * 635
+    measurements = []
+    for drawing in document.findall(".//w:drawing", NS):
+        properties = drawing.find(".//wp:docPr", NS)
+        if properties is None or properties.get("title", "").lower() != "diagram":
+            continue
+        extent = drawing.find(".//wp:extent", NS)
+        blip = drawing.find(".//a:blip", NS)
+        if extent is None or blip is None:
+            raise StepError("DOCX diagram has no drawing extent or image relationship")
+        width, height = int(extent.get("cx", "0")), int(extent.get("cy", "0"))
+        if min(width, height) <= 0:
+            raise StepError("DOCX diagram has an empty physical display size")
+        if available_width_emu is not None and width > available_width_emu + 9525:
+            raise StepError("DOCX diagram exceeds the page content width")
+        relationship = targets.get(blip.get(f"{{{NS['r']}}}embed"))
+        if relationship is None or relationship.get("TargetMode") == "External":
+            raise StepError("DOCX diagram does not reference embedded media")
+        media = posixpath.normpath(posixpath.join("word", relationship.get("Target", "")))
+        if not media.startswith("word/media/"):
+            raise StepError("DOCX diagram media escapes the document media directory")
+        data = archive.read(media)
+        vector_media = []
+        for vector in drawing.iter():
+            if vector.tag.rsplit("}", 1)[-1] != "svgBlip":
+                continue
+            vector_relationship = targets.get(vector.get(f"{{{NS['r']}}}embed"))
+            if vector_relationship is None or vector_relationship.get("TargetMode") == "External":
+                raise StepError("DOCX SVG extension has no embedded vector relationship")
+            vector_path = posixpath.normpath(posixpath.join("word", vector_relationship.get("Target", "")))
+            if not vector_path.startswith("word/media/") or not vector_path.endswith(".svg"):
+                raise StepError("DOCX SVG extension references invalid media")
+            vector_root = ET.fromstring(archive.read(vector_path))
+            if vector_root.tag.rsplit("}", 1)[-1] != "svg":
+                raise StepError("DOCX vector media is not an SVG document")
+            vector_media.append(vector_path)
+        if media.endswith(".svg"):
+            measurements.append({"media": media, "vector": True, "widthEmu": width, "heightEmu": height})
+            continue
+        with Image.open(io.BytesIO(data)) as image:
+            pixels_w, pixels_h = image.size
+        dpi_x, dpi_y = pixels_w / (width / 914400), pixels_h / (height / 914400)
+        aspect_error = abs((pixels_w / pixels_h) / (width / height) - 1)
+        if min(dpi_x, dpi_y) < minimum_dpi:
+            raise StepError(f"DOCX diagram sampling too low: {dpi_x:.1f}x{dpi_y:.1f} DPI")
+        if aspect_error > .02:
+            raise StepError("DOCX diagram media and drawing aspect ratios differ")
+        measurements.append({"media": media, "vector": False, "widthEmu": width, "heightEmu": height,
+                             "pixelWidth": pixels_w, "pixelHeight": pixels_h,
+                             "dpiX": dpi_x, "dpiY": dpi_y, "aspectError": aspect_error,
+                             "vectorMedia": vector_media})
+    if not measurements:
+        raise StepError("DOCX contains no identifiable Mermaid diagram drawing")
+    return measurements

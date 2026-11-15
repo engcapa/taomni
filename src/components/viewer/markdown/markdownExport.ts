@@ -4,6 +4,7 @@ import { getAppPlatform, isTauriRuntime } from "../../../lib/runtime";
 import { notifyClipboardWritten } from "../../../lib/clipboardOwnership";
 import { exportMarkdownFolder, saveExportBlob } from "./exportFiles";
 import { markdownExportCss, prepareMarkdownExport, type MarkdownExportKind, type MarkdownExportSettings } from "./exportModel";
+import type { MarkdownAssets } from "./markdownOwner";
 
 export interface MarkdownExportResult { path?: string; status: "saved" | "copied" | "print-opened" | "cancelled" }
 
@@ -64,12 +65,14 @@ export async function exportMarkdown(
   content: string,
   docPath: string,
   settings: MarkdownExportSettings,
+  assets?: MarkdownAssets,
+  sourceIsFile = true,
 ): Promise<MarkdownExportResult> {
   if (kind === "markdown") {
-    const path = await exportMarkdownFolder(content, docPath);
+    const path = await exportMarkdownFolder(content, docPath, assets);
     return path ? { status: "saved", path } : { status: "cancelled" };
   }
-  const prepared = await prepareMarkdownExport(content, docPath, settings);
+  const prepared = await prepareMarkdownExport(content, docPath, settings, assets);
   const stem = markdownBasename(docPath).replace(/\.(md|markdown)$/i, "");
   if (kind === "print" || kind === "pdf") {
     await printMarkdownHtml(prepared.html);
@@ -99,6 +102,6 @@ export async function exportMarkdown(
   if (kind === "png") blob = await exportPng(prepared.root, settings, prepared.title);
   else if (kind === "docx") blob = await (await import("./exportDocx")).markdownDocx(prepared.root, prepared.title, settings);
   else blob = new Blob([prepared.html], { type: "text/html;charset=utf-8" });
-  const path = await saveExportBlob(`${stem}.${kind}`, blob, docPath);
+  const path = await saveExportBlob(`${stem}.${kind}`, blob, sourceIsFile ? docPath : undefined);
   return path ? { status: "saved", path } : { status: "cancelled" };
 }

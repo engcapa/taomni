@@ -57,6 +57,10 @@ export function usePlatformShortcuts(): void {
         return;
       }
       if (mod && !event.shiftKey && !event.altKey && key === "k") {
+        // Tao stays mounted when another tab is active. Only its visible host
+        // owns this chord; its listener will open Tao Search once.
+        const home = document.querySelector<HTMLElement>('[data-testid="tao-ai-chat"][data-tao-active="true"]');
+        if (home && home.getClientRects().length > 0) return;
         event.preventDefault();
         useWorkspaceUiStore.getState().openGlobalSearch();
         return;

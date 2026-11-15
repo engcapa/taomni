@@ -4,7 +4,7 @@
 use std::path::{Path, PathBuf};
 
 pub(crate) fn directory(identifier: &str, data_root: Option<&Path>) -> Option<PathBuf> {
-    if !cfg!(debug_assertions) || identifier != crate::QA_APP_ID {
+    if identifier != crate::QA_APP_ID {
         return None;
     }
     data_root.map(|root| root.join(crate::QA_APP_ID).join("logs"))

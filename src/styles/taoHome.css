@@ -5,3 +5,68 @@
 /* Popovers must escape the dock's horizontal scroller so keyboard and pointer
    activation remain reachable above the Composer. */
 .tao-home-dock-row{overflow:visible}
+/* Portal owners keep popovers clear of overflow containers. */
+.tao-home-popup{background:var(--taomni-card-bg);border:1px solid var(--taomni-card-border);border-radius:9px;box-shadow:0 12px 30px #0004;max-width:calc(100vw - 16px);max-height:calc(100vh - 16px);overflow:auto;color:var(--taomni-text);font-size:12px}
+.tao-home-popup-items{display:flex;flex-direction:column;gap:4px;min-width:220px;max-width:360px;padding:10px}
+.tao-home-popup-items button,.tao-home-popup-items select{display:flex;gap:6px;align-items:center;border:0;border-radius:5px;background:transparent;color:inherit;padding:7px;text-align:left;cursor:pointer}
+.tao-home-popup-items button:hover{background:var(--taomni-hover)}
+.tao-home-popup-items p{font-size:11px;color:var(--taomni-text-muted);white-space:pre-wrap}
+.tao-home-history-popup{width:min(520px,calc(100vw - 16px))}.tao-home-history-content{display:flex;flex-direction:column;max-height:min(550px,80vh)}.tao-home-directory-history{padding:10px;overflow:auto}.tao-home-history-content>select{margin:0 10px 6px;background:var(--taomni-input-bg);color:var(--taomni-text);border:1px solid var(--taomni-divider);border-radius:5px;padding:4px}
+.tao-home-binding-bar{overflow:visible;margin:0;max-width:none;flex-wrap:wrap}.tao-home-footer{display:flex;justify-content:space-between;gap:12px;padding:5px 18px;color:var(--taomni-text-muted);font-size:10px}.tao-home-new-chat{white-space:nowrap}.tao-home-send-button{border-radius:50%}.tao-home-launch-status{font-size:11px;color:var(--taomni-warning);max-width:740px;margin:2px auto}.tao-home-launch-status button{margin-left:8px}
+.tao-home-main.empty{display:flex;flex-direction:column;justify-content:center;overflow:auto}.tao-home-main.empty .tao-home-feed{flex:0 0 auto;overflow:visible}.tao-home-main.empty .tao-home-empty-stage{padding:18px 20px;flex:0 0 auto}.tao-home-main.empty .tao-home-composer-dock{padding-top:0;padding-bottom:30px;background:transparent}.tao-home-composer,.tao-home-dock-row,.tao-home-suggestion-row{max-width:740px}.tao-home-no-key-card{width:min(740px,calc(100% - 24px));padding:14px}.tao-home-main.empty .tao-home-composer textarea{height:55px;min-height:55px}.tao-home-main.has-messages .tao-home-suggestion-row{padding:3px 0}.tao-home-composer-footer{padding-bottom:6px}.tao-home-main.empty .tao-home-greeting{margin-bottom:0}
+.tao-home-suggestion-row{display:flex;flex-wrap:wrap;justify-content:center;overflow:visible;min-width:0;padding-inline:4px}.tao-home-suggestion-row button{max-width:100%;white-space:normal;text-align:left;overflow-wrap:anywhere}.tao-home-suggestion-label{flex:0 0 auto}
+@media(max-width:900px){.tao-home-topbar{flex-wrap:wrap;height:auto;min-height:44px;padding:5px 8px;gap:5px}.tao-home-topbar-leading{order:3;width:100%}.tao-home-topbar-actions{gap:1px}.tao-home-new-chat{font-size:11px}.tao-home-icon-button kbd{display:none}}
+@media(max-height:650px){.tao-home-main.empty .tao-home-greeting p{display:none}.tao-home-main.empty .tao-home-empty-stage{padding:8px 16px}.tao-home-main.empty .tao-home-composer-dock{padding-bottom:8px}.tao-home-no-key-card{padding:10px}.tao-home-no-key-card small{display:none}}
+
+/* Tao Home side panel controls: keep resize and collapse actions discoverable. */
+.tao-home-side-panel {
+  min-width: 260px;
+  max-width: min(560px, calc(100% - 18px));
+  /* A drag must track the pointer directly; width animation lags each move. */
+  transition: none;
+}
+.tao-home-side-panel[data-collapsed="true"] { min-width: 44px; }
+.tao-home-side-tabs button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+.tao-home-side-collapse { margin-left: auto; }
+.tao-home-side-close { color: var(--taomni-text); }
+.tao-home-side-panel[data-collapsed="true"] .tao-home-side-tabs {
+  justify-content: center;
+  padding-inline: 3px;
+}
+.tao-home-side-panel[data-collapsed="true"] .tao-home-side-collapse { margin-left: 0; }
+.tao-home-side-resize {
+  position: absolute;
+  left: -10px;
+  top: 0;
+  bottom: 0;
+  width: 20px;
+  border: 0;
+  background: transparent;
+  color: var(--taomni-text-muted);
+  padding: 0;
+  cursor: col-resize;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  z-index: 2;
+}
+.tao-home-side-resize:hover,
+.tao-home-side-resize:focus-visible {
+  opacity: 1;
+  background: var(--taomni-selected);
+}
+.tao-home-side-tabs { flex-wrap: wrap; }
+.tao-home-side-tabs .tao-home-side-collapse,
+.tao-home-side-tabs .tao-home-side-close { margin-left: auto; }
+.tao-home-side-panel[data-collapsed="true"] .tao-home-side-tabs {
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+.tao-home-side-panel[data-collapsed="true"] .tao-home-side-tabs .tao-home-side-close { margin-left: 0; }

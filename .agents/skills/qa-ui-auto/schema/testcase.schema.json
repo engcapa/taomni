@@ -68,6 +68,8 @@
           "backup_policy",
           "backup_cloud",
           "model_inspector_gateway",
+          "tao_messages",
+          "tao_real_provider",
           "credential_store",
           "path_completion",
           "ssh_required",
@@ -564,6 +566,8 @@
         "assert_markdown_artifact": {"type": "object","additionalProperties": false,"required": ["kind","path","source"],"properties": {"kind": {"enum": ["source","pasted-image","html","png","docx","markdown","absent"]},"path": {"type": "string","minLength": 1},"source": {"type": "string","minLength": 1},"timeout_sec": {"type": "number","minimum": 0,"maximum": 60}}},
         "html_preview_click": {"type": "object","additionalProperties": false,"required": ["target"],"properties": {"target": {"enum": ["next","external","spoof-invalid","spoof-valid","slow","security"]}}},
         "assert_html_network": {"type": "object","additionalProperties": false,"required": ["state"],"properties": {"state": {"enum": ["blocked","app","custom","none","invalid","slow-started","cancelled","external-cancelled","scripts-off"]}}},
+        "observe_tao_provider": {"type": "null", "description": "Native-only forwarding observation of deepseek_app_send callback completion; never reads request or response bodies."},
+        "assert_tao_provider_outcome": {"type": "object", "additionalProperties": false, "properties": {"timeout_sec": {"type": "number", "exclusiveMinimum": 0, "maximum": 150}}, "description": "Native-only completed invocation plus nonempty assistant text/no error; only HTTP 401/403 or explicit key expiration with enabled retry is credential-invalid pass."},
         "terminal_file_link": {"type": "object","additionalProperties": false,"required": ["selector"],"properties": {"selector": {"$ref": "#/$defs/selector"}}},
         "assert_file_open_bytes": {
           "type": "object", "additionalProperties": false,

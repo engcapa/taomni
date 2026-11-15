@@ -52,6 +52,8 @@ describe("MarkdownEditor real host lifecycle", () => {
     const view = EditorView.findFromDOM(dom)!;
     expect(screen.getByTestId("markdown-outline")).toHaveTextContent("Details");
     expect(dom.querySelector("strong")?.textContent).toBe("bold");
+    expect(view.state.readOnly).toBe(true);
+    fireEvent.click(screen.getByTestId("markdown-live-edit"));
     act(() => { view.dispatch({ changes: { from: 0, to: 7, insert: "# Changed" } }); });
     expect(useDocumentStore.getState().documents["/docs/a.md"].dirty).toBe(true);
     fireEvent.click(screen.getByTestId("markdown-mode-source"));
@@ -70,6 +72,7 @@ describe("MarkdownEditor real host lifecycle", () => {
     render(<Harness />);
     const dom = screen.getByTestId("markdown-editor").querySelector<HTMLElement>(".cm-editor")!;
     const view = EditorView.findFromDOM(dom)!;
+    fireEvent.click(screen.getByTestId("markdown-live-edit"));
     const marker = dom.querySelector<HTMLElement>(".fv-md-source-marker")!;
     expect(marker.textContent).toBe("# ");
     expect(getComputedStyle(marker).fontSize).toBe("0.8em");
@@ -105,6 +108,45 @@ describe("MarkdownEditor real host lifecycle", () => {
     act(() => { expect(redo(view)).toBe(true); });
     expect(view.state.doc.toString()).toContain("| Alpha | 1 |");
     expect(useDocumentStore.getState().documents["/docs/a.md"].content).toBe(view.state.doc.toString());
+  });
+  it("starts Live in browse mode, gates all writes and restores browse after mode changes", () => {
+    render(<Harness />);
+    const dom = screen.getByTestId("markdown-editor").querySelector<HTMLElement>(".cm-editor")!;
+    const view = EditorView.findFromDOM(dom)!;
+    expect(view.state.readOnly).toBe(true);
+    act(() => view.dispatch({ changes: { from: 0, insert: "blocked" } }));
+    expect(view.state.doc.toString()).toBe(source);
+    expect(useDocumentStore.getState().documents["/docs/a.md"].dirty).toBe(false);
+    expect(screen.getByTestId("markdown-format-bold")).toBeDisabled();
+    fireEvent.click(screen.getByTestId("markdown-live-edit"));
+    expect(view.state.readOnly).toBe(false);
+    expect(useDocumentStore.getState().documents["/docs/a.md"].dirty).toBe(false);
+    act(() => view.dispatch({ changes: { from: 0, insert: "allowed\n" } }));
+    fireEvent.click(screen.getByTestId("markdown-mode-source"));
+    expect(view.state.readOnly).toBe(false);
+    fireEvent.click(screen.getByTestId("markdown-mode-live"));
+    expect(view.state.readOnly).toBe(true);
+    expect(view.state.doc.toString()).toContain("allowed");
+    fireEvent.click(screen.getByTestId("markdown-live-edit"));
+    act(() => { expect(undo(view)).toBe(true); });
+    expect(view.state.doc.toString()).toBe(source);
+  });
+  it("keeps hard read-only sources protected and local preview appearance independent from the app", async () => {
+    useDocumentStore.setState({ documents: { "/docs/a.md": { ...fixture(), readOnly: true } } });
+    render(<Harness />);
+    expect(screen.getByTestId("markdown-live-edit")).toBeDisabled();
+    const sourceTheme = document.documentElement.dataset.appTheme;
+    fireEvent.change(screen.getByTestId("markdown-preview-appearance"), { target: { value: "dark" } });
+    expect(document.querySelector(".fv-md-live-pane")).toHaveAttribute("data-preview-theme", "dark");
+    expect(document.documentElement.dataset.appTheme).toBe(sourceTheme);
+    fireEvent.click(screen.getByTestId("markdown-mode-split"));
+    expect(screen.getByTestId("markdown-preview")).toHaveAttribute("data-preview-theme", "dark");
+    const separator = screen.getByTestId("markdown-split-resize");
+    fireEvent.keyDown(separator, { key: "ArrowRight" });
+    expect(separator).toHaveAttribute("aria-valuenow", "55");
+    const view = EditorView.findFromDOM(screen.getByTestId("viewer-editor").querySelector<HTMLElement>(".cm-editor")!)!;
+    expect(view.state.readOnly).toBe(true);
+    expect(useDocumentStore.getState().documents["/docs/a.md"].dirty).toBe(false);
   });
   it("exports actual unsaved content and distinguishes completion, cancellation and errors", async () => {
     vi.mocked(exportMarkdown).mockResolvedValue({ status: "saved", path: "/exports/a.html" });

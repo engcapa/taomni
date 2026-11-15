@@ -2,7 +2,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TaoRequest {
+    #[serde(alias = "thread_id")]
     pub thread_id: String,
     pub content: String,
     pub mode: String,
@@ -13,6 +15,8 @@ pub struct TaoRequest {
     pub web: bool,
     #[serde(default)]
     pub context: serde_json::Map<String, Value>,
+    #[serde(default)]
+    pub chips: Vec<Value>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

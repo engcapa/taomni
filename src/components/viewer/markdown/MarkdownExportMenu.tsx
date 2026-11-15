@@ -6,8 +6,9 @@ import { markdownBasename, markdownDirectory } from "../../../lib/markdownAssets
 import { sftpOpenPath } from "../../../lib/sftp";
 import { exportMarkdown } from "./markdownExport";
 import { DEFAULT_EXPORT_SETTINGS, type MarkdownExportKind, type MarkdownExportSettings } from "./exportModel";
+import type { MarkdownDocumentOwner } from "./markdownOwner";
 
-export function MarkdownExportMenu({ document: current, onError, printRequest = 0 }: { document: ViewerDocument; onError: (message: string) => void; printRequest?: number }) {
+export function MarkdownExportMenu({ document: current, onError, printRequest = 0, onExport }: { document: ViewerDocument; onError: (message: string) => void; printRequest?: number; onExport?: MarkdownDocumentOwner["onExport"] }) {
   const label = useViewerLabels();
   const [open, setOpen] = useState(false);
   const [dialog, setDialog] = useState<MarkdownExportKind | null>(null);
@@ -34,7 +35,7 @@ export function MarkdownExportMenu({ document: current, onError, printRequest = 
     setOpen(false); setDialog(null); setBusy(true); setSaved(null); setExportState("busy");
     setNotice(label("正在导出…", "Exporting…"));
     try {
-      const result = await exportMarkdown(kind, current.content, current.path, settings);
+      const result = await (onExport ? onExport(kind, current.content, settings) : exportMarkdown(kind, current.content, current.path, settings));
       if (!alive.current) return;
       setExportState(result.status);
       if (result.status === "saved") { setSaved(result.path || null); setNotice(label("导出完成", "Export completed")); }
@@ -87,7 +88,7 @@ function ExportSettings({ kind, filename, settings, onChange, onCancel, onConfir
   const root = useRef<HTMLDivElement>(null);
   useEffect(() => { root.current?.querySelector<HTMLSelectElement>("select")?.focus(); }, []);
   const patch = (value: Partial<MarkdownExportSettings>) => onChange({ ...settings, ...value });
-  const check = (field: "toc" | "pageNumbers" | "fileHeader" | "wrapCode" | "highlight", zh: string, en: string) => <label className="fv-md-setting-check"><input type="checkbox" checked={settings[field]} onChange={(event) => patch({ [field]: event.target.checked })} />{label(zh, en)}</label>;
+  const check = (field: "toc" | "pageNumbers" | "fileHeader" | "wrapCode" | "highlight", zh: string, en: string) => <label className="fv-md-setting-check"><input type="checkbox" data-testid={`markdown-export-${field}`} checked={settings[field]} onChange={(event) => patch({ [field]: event.target.checked })} />{label(zh, en)}</label>;
   return <div className="fv-modal-bg" onMouseDown={(event) => { if (event.target === event.currentTarget) onCancel(); }}><div ref={root} className="fv-modal fv-md-export-settings" role="dialog" aria-modal="true" aria-labelledby="fv-md-export-title" data-testid="markdown-export-settings" onKeyDown={(event) => {
     if (event.key === "Escape") { event.preventDefault(); onCancel(); }
     if (event.key === "Tab") {

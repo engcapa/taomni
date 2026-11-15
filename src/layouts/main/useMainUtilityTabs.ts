@@ -11,6 +11,7 @@ import { useMainLayoutState } from "./useMainLayoutState";
 import { useMainSessionActions } from "./useMainSessionActions";
 import { useMainTerminalIntegration } from "./useMainTerminalIntegration";
 import { useMainWorkspaceOpening } from "./useMainWorkspaceOpening";
+import { useAppStore } from "../../stores/appStore";
 
 
 export interface UseMainUtilityTabsContext {
@@ -35,7 +36,11 @@ export function useMainUtilityTabs(context: UseMainUtilityTabsContext) {
   }, [layout.addTab]);
 
   const openSettingsTab = useCallback(() => {
-    const existing = layout.tabsRef.current.find((tab) => tab.type === "settings");
+    // `openSettingsSection` dispatches synchronously before callers invoke
+    // this callback. The layout ref is refreshed in an effect, so consult the
+    // store as well to avoid creating two Settings tabs during that same tick.
+    const existing = useAppStore.getState().tabs.find((tab) => tab.type === "settings")
+      ?? layout.tabsRef.current.find((tab) => tab.type === "settings");
     if (existing) {
       layout.setActiveTab(existing.id);
       return;

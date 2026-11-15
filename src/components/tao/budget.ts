@@ -39,6 +39,6 @@ export function mergeUsage(budget: TaoBudget | undefined, usage?: Partial<TaoUsa
   if (!budget || !usage) return budget;
   const usedTokens = (usage.inputTokens ?? 0) + (usage.outputTokens ?? 0);
   if (usedTokens === 0 && budget.usedTokens === 0) return budget;
-  const next = Math.max(budget.usedTokens, usedTokens);
+  const next = budget.usedTokens + usedTokens;
   return { ...budget, usedTokens: next, warning: getBudgetWarning(next, budget.limitTokens), halted: next >= budget.limitTokens };
 }

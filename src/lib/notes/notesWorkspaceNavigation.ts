@@ -5,6 +5,7 @@ import { useAppStore } from "../../stores/appStore";
 import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
 import { useNotesWorkspaceViewStore } from "../../stores/notesWorkspaceViewStore";
 import { useNotesStore } from "../../stores/notesStore";
+import { useNotesContentStore } from "../../stores/notesContentStore";
 import { useChatStore } from "../../stores/chatStore";
 import { useTaoHubStore } from "../../stores/taoHubStore";
 import { NOTES_WORKSPACE_ID } from "../../stores/workspaceNotes";
@@ -25,7 +26,7 @@ async function navigateWorkspace(request: NotesWorkspaceRequest, note?: NoteItem
   }
   const platform = useWorkspacePlatformStore.getState();
   if (note) {
-    noteWorkspaceModes.set(note.id, request.mode ?? "edit");
+    noteWorkspaceModes.set(note.id, request.mode ?? "preview");
     platform.openNoteInWorkspace(note.id, note.title);
   } else platform.setActiveWorkspace(NOTES_WORKSPACE_ID);
   const app = useAppStore.getState();
@@ -40,14 +41,20 @@ export function openNotesWorkspace(): Promise<void> {
 }
 
 /** The stable note ID is the document identity, independent of its title. */
-export async function openNoteWorkspace(note: NoteItem, mode: NoteWorkspaceMode = "edit"): Promise<void> {
+export async function openNoteWorkspace(note: NoteItem, mode: NoteWorkspaceMode = "preview"): Promise<void> {
   await navigateWorkspace({ noteId: note.id, mode }, note);
 }
 
 export async function createAndOpenWorkspaceNote(): Promise<void> {
   try {
     useNotesWorkspaceViewStore.getState().resetForCreate();
-    await openNoteWorkspace(await createNote());
+    // Seed the shared Markdown buffer before navigation. The workspace can
+    // render and accept title/body edits immediately while the authoritative
+    // refresh performs its IPC round trip; this also keeps native WebView
+    // focus deterministic for a newly created note.
+    const note = await createNote();
+    useNotesContentStore.getState().adopt(note);
+    await openNoteWorkspace(note);
   }
   catch (error) { useAppStore.getState().setStatusMessage(String(error)); }
 }

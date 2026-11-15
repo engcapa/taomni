@@ -1298,8 +1298,12 @@
 - `[data-testid="markdown-mode-source"]` — interactive — F-FILEOPEN-1.markdown-mode-source
 - `[data-testid="markdown-mode-split"]` — interactive — F-FILEOPEN-1.markdown-mode-split
 - `[data-testid="markdown-focus"]` — interactive — F-FILEOPEN-1.markdown-focus
+- `[data-testid="markdown-format-bold"]` — interactive — F-FILEOPEN-1.markdown-format-bold
 - `[data-testid="markdown-outline"]` — interactive — F-FILEOPEN-1.markdown-outline
 - `[data-testid="markdown-preview"]` — display — F-FILEOPEN-1.markdown-preview
+- `[data-testid="markdown-live-edit"]` — interactive — F-FILEOPEN-1.markdown-live-edit
+- `[data-testid="markdown-split-resize"]` — interactive — F-FILEOPEN-1.markdown-split-resize
+- `[data-testid="markdown-preview-appearance"]` — interactive — F-FILEOPEN-1.markdown-preview-appearance
 - `[data-testid="markdown-table-widget"]` — interactive — F-FILEOPEN-1.markdown-table-widget
 - `[data-testid="markdown-image-widget"]` — interactive — F-FILEOPEN-1.markdown-image-widget
 - `[data-testid="markdown-paste-status"]` — display — F-FILEOPEN-1.markdown-paste-status
@@ -1314,6 +1318,7 @@
 - `[data-testid="markdown-export-html-source"]` — interactive — F-FILEOPEN-1.markdown-export-html-source
 - `[data-testid="markdown-export-print"]` — interactive — F-FILEOPEN-1.markdown-export-print
 - `[data-testid="markdown-export-settings"]` — display — F-FILEOPEN-1.markdown-export-settings
+- `[data-testid="markdown-export-toc"]` — interactive — F-FILEOPEN-1.markdown-export-toc
 - `[data-testid="markdown-export-confirm"]` — interactive — F-FILEOPEN-1.markdown-export-confirm
 - `[data-testid="markdown-export-status"]` — display — F-FILEOPEN-1.markdown-export-status
 - `[data-testid="html-external-dialog"]` — display — F-FILEOPEN-1.html-external-dialog
@@ -3533,9 +3538,10 @@
 - `[data-testid="tao-home-history-tab-chat"]` — interactive — F1.11.tao-home-history-tab-chat
 - `[data-testid="tao-home-history-tab-sessions"]` — interactive — F1.11.tao-home-history-tab-sessions
 - `[data-testid="tao-home-history-tab-workspaces"]` — interactive — F1.11.tao-home-history-tab-workspaces
+- `[data-testid="tao-home-history-tab-directories"]` — interactive — F1.11.tao-home-history-tab-directories
 - `.tao-home-history-search input` — interactive — F1.11.tao-home-history-search
 - `[data-testid="tao-home-local-terminal"]` — interactive — F1.11.tao-home-local-terminal
-- `[data-testid="tao-home-wsl"]` — interactive [optional] — F1.11.tao-home-wsl
+- `[data-testid="tao-home-wsl"]` — display [optional] — F1.11.tao-home-wsl
 - `[data-testid="tao-home-new-session"]` — interactive — F1.11.tao-home-new-session
 - `[data-testid="tao-home-new-workspace"]` — interactive — F1.11.tao-home-new-workspace
 - `[data-testid="tao-home-dock-more"]` — interactive — F1.11.tao-home-dock-more
@@ -3544,7 +3550,58 @@
 - `[data-testid="tao-home-search-panel"]` — display — F1.11.tao-home-search-panel
 - `[data-testid="tao-home-search-input"]` — interactive — F1.11.tao-home-search-input
 - `[data-testid="tao-home-demo-toggle"]` — interactive — F1.11.tao-home-demo-toggle
+- `[data-testid="tao-home-new-chat"]` — interactive — F1.11.tao-home-new-chat
+- `[data-testid="tao-home-more"]` — interactive — F1.11.tao-home-more
+- `[data-testid="tao-home-capabilities"]` — interactive — F1.11.tao-home-capabilities
+- `[data-testid="tao-home-plus"]` — interactive — F1.11.tao-home-plus
+- `[data-testid="tao-home-voice"]` — interactive — F1.11.tao-home-voice
+- `[data-testid="tao-home-shell-menu"]` — interactive — F1.11.tao-home-shell-menu
+- `[data-testid="tao-home-side-panel"]` — display — F1.11.tao-home-side-panel
+- `[data-testid="tao-home-files"]` — display — F1.11.tao-home-files
+- `[data-testid="tao-home-workflows"]` — display — F1.11.tao-home-workflows
+- `[data-testid="tao-home-speech"]` — display — F1.11.tao-home-speech
+- `[data-testid="tao-home-binding-workspace"]` — interactive — F1.11.tao-home-binding-workspace
+- `[data-testid="tao-home-binding-option"]` — interactive — F1.11.tao-home-binding-option
+- `[data-testid="tao-home-binding-cite"]` — interactive — F1.11.tao-home-binding-cite
+- `[data-testid="tao-home-binding-unbind"]` — interactive — F1.11.tao-home-binding-unbind
+- `[role="dialog"]` — display — F1.11.tao-home-popup
+- `[role="dialog"] button:has-text("Attach file")` — interactive — F1.11.tao-home-popup-attach-file
+- `[role="dialog"] button:has-text("Skills / workflows")` — interactive — F1.11.tao-home-popup-workflows
+- `[role="dialog"] button:has-text("Thinking")` — interactive — F1.11.tao-home-popup-thinking
+- `[role="dialog"] button:has-text("Web")` — interactive — F1.11.tao-home-popup-web
+- `[role="dialog"] select[aria-label="Choose shell"]` — interactive — F1.11.tao-home-popup-shell-select
+- `[data-testid="tao-home-send"]` — interactive — F1.11.tao-home-send
+- `[data-testid="tao-home-stop"]` — interactive — F1.11.tao-home-stop
+- `[data-testid="tao-home-message-list"]` — display — F1.11.tao-home-message-list
+- `[data-testid="tao-home-message-assistant"]` — display — F1.11.tao-home-message-assistant
+- `[data-testid="tao-home-message-edit"]` — interactive — F1.11.tao-home-message-edit
+- `[data-testid="tao-home-message-regenerate"]` — interactive — F1.11.tao-home-message-regenerate
+- `[data-testid="tao-home-message-branch"]` — interactive — F1.11.tao-home-message-branch
+- `[data-testid="tao-home-error-state"]` — display — F1.11.tao-home-error-state
+- `[data-testid="tao-home-retry"]` — interactive — F1.11.tao-home-retry
+- `[data-testid="tao-home-settings"]` — interactive — F1.11.tao-home-settings
+- `[data-testid="tao-settings"]` — display — F1.11.tao-settings
+- `[data-testid="tao-settings-save"]` — interactive — F1.11.tao-settings-save
+- `[data-testid="tao-settings-status"]` — display — F1.11.tao-settings-status
+- `[data-testid="tao-settings"] [data-testid="llm-proxy-mode"]` — interactive — F1.11.tao-settings-proxy
+- `[role="dialog"][aria-label="Tao 更多"]` — display — F1.11.tao-home-more-dialog
+- `[role="dialog"][aria-label="模型与能力"]` — display — F1.11.tao-home-capabilities-dialog
+- `[role="dialog"][aria-label="模型与能力"] button:has-text("deepseek-v4-pro")` — interactive — F1.11.tao-home-capability-model-v4
+- `[data-testid="tao-home-history-row"]` — interactive — F1.11.tao-home-history-row
 - `.tao-home-context-preview` — display — F1.11.tao-home-context-preview
+- `[data-testid="tao-home-capability-model-deepseek-v4-pro"]` — interactive — F1.11.tao-home-capability-model-deepseek-v4-pro
+- `[data-testid="tao-home-capability-thinking"]` — interactive — F1.11.tao-home-capability-thinking
+- `[data-testid="tao-home-capability-web"]` — interactive — F1.11.tao-home-capability-web
+- `[data-testid="tao-home-context-attach"]` — interactive — F1.11.tao-home-context-attach
+- `[data-testid="tao-home-context-workflows"]` — interactive — F1.11.tao-home-context-workflows
+- `[data-testid="tao-home-suggestions"]` — display — F1.11.tao-home-suggestions
+- `[data-testid="tao-home-side-tab-sources"]` — interactive — F1.11.tao-home-side-tab-sources
+- `[data-testid="tao-home-side-tab-files"]` — interactive — F1.11.tao-home-side-tab-files
+- `[data-testid="tao-home-side-tab-artifacts"]` — interactive — F1.11.tao-home-side-tab-artifacts
+- `[data-testid="tao-home-side-tab-workflows"]` — interactive — F1.11.tao-home-side-tab-workflows
+- `[data-testid="tao-home-side-tab-voice"]` — interactive — F1.11.tao-home-side-tab-voice
+- `[data-testid="tao-home-side-tab-archive"]` — interactive — F1.11.tao-home-side-tab-archive
+- `[data-testid="tao-home-side-resize"]` — interactive — F1.11.tao-home-side-resize
 
 ## terminal/appearance (F5.2)
 

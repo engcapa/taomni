@@ -1,0 +1,113 @@
+id: TC-TAO-HOME-002
+title: Native Tao Messages contract, streaming cancellation, history and proxy modes
+description: >-
+  A disposable loopback Messages service captures real HTTP requests from native
+  Tauri IPC. Verify camelCase request dispatch, first reply, ordered multi-turn
+  history without prior thinking, partial content before stop, real socket closure,
+  reload persistence and independent application/custom/direct proxy routing.
+  This fixture does not certify the live commercial provider.
+modes: [native]
+covers: [F1.11]
+tags: [p0, tao-home, regression, crash-regression]
+fixtures: [reset_db, tao_messages]
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-tao-home-002
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- wait_for: '[data-testid="tao-home-composer-input"]:enabled'
+- fill:
+    selector: '[data-testid="tao-home-composer-input"]'
+    value: QA-FIRST
+- press:
+    selector: '[data-testid="tao-home-composer-input"]'
+    key: Control+Enter
+    macos_key: Meta+Enter
+- assert_text:
+    selector: '[data-testid="tao-home-message-assistant"]'
+    contains: First reply
+- assert_not_visible: '[data-testid="tao-home-stop"]'
+- assert_file_contains:
+    path: ${fixture.tao_messages_log}
+    contains: direct POST /anthropic/v1/messages model=deepseek-flash thinking=false web=false messages=1
+- fill:
+    selector: '[data-testid="tao-home-composer-input"]'
+    value: QA-SECOND
+- click: '[data-testid="tao-home-send"]'
+- assert_text:
+    selector: '[data-testid="tao-home-message-assistant"]:last-of-type'
+    contains: Second reply
+- assert_not_visible: '[data-testid="tao-home-stop"]'
+- assert_file_contains:
+    path: ${fixture.tao_messages_log}
+    contains: second-history greeting=True reply=True thinking=False
+- fill:
+    selector: '[data-testid="tao-home-composer-input"]'
+    value: QA-SLOW
+- click: '[data-testid="tao-home-send"]'
+- assert_text:
+    selector: '[data-testid="tao-home-message-assistant"]:last-of-type'
+    contains: Partial reply
+- assert_visible: '[data-testid="tao-home-stop"]'
+- click: '[data-testid="tao-home-stop"]'
+- assert_file_contains:
+    path: ${fixture.tao_messages_log}
+    contains: slow-network-cancelled
+    timeout_sec: 10
+- assert_text:
+    selector: '[data-testid="tao-home-message-list"]'
+    contains: Partial reply
+- screenshot: tao-native-partial-stopped.png
+- wait: 1
+- reload_window: null
+- wait_for: '[data-testid="tao-home-history"]'
+- click: '[data-testid="tao-home-history"]'
+- click: '[data-testid="tao-home-history-row"][data-title="QA Tao Greeting"]'
+- assert_not_visible: '[data-testid="tao-home-history-popover"]'
+- assert_text:
+    selector: '[data-testid="tao-home-message-list"]'
+    contains: First reply
+- assert_text:
+    selector: '[data-testid="tao-home-message-list"]'
+    contains: Partial reply
+- click: '[data-testid="tao-home-more"]'
+- click: '[data-testid="tao-home-settings"]'
+- wait_for: '[data-testid="tao-settings"]'
+- select_option:
+    selector: '[data-testid="tao-settings"] [data-testid="llm-proxy-mode"]'
+    value: app
+- click: '[data-testid="tao-settings-save"]'
+- assert_text:
+    selector: '[data-testid="tao-settings-status"]'
+    contains: Saved
+- click: '[data-testid="tab-item"][data-tab-type="welcome"]'
+- click: '[data-testid="tao-home-new-chat"]'
+- fill:
+    selector: '[data-testid="tao-home-composer-input"]'
+    value: QA-PROXY-APP
+- click: '[data-testid="tao-home-send"]'
+- assert_file_contains:
+    path: ${fixture.tao_messages_log}
+    contains: app POST /anthropic/v1/messages
+- assert_not_visible: '[data-testid="tao-home-stop"]'
+- click: '[data-testid="tao-home-more"]'
+- click: '[data-testid="tao-home-settings"]'
+- select_option:
+    selector: '[data-testid="tao-settings"] [data-testid="llm-proxy-mode"]'
+    value: custom
+- click: '[data-testid="tao-settings-save"]'
+- assert_text:
+    selector: '[data-testid="tao-settings-status"]'
+    contains: Saved
+- click: '[data-testid="tab-item"][data-tab-type="welcome"]'
+- fill:
+    selector: '[data-testid="tao-home-composer-input"]'
+    value: QA-PROXY-CUSTOM
+- click: '[data-testid="tao-home-send"]'
+- assert_file_contains:
+    path: ${fixture.tao_messages_log}
+    contains: custom POST /anthropic/v1/messages
+- assert_not_visible: '[data-testid="tao-home-stop"]'
+- assert_no_runtime_errors: null
+- screenshot: tao-native-messages-proxy.png

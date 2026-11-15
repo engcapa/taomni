@@ -8,7 +8,7 @@ import { recentWorkspaceIdFromParts, useAppStore } from "../../../stores/appStor
 import { useSessionStore } from "../../../stores/sessionStore";
 import { useWorkspacePlatformStore } from "../../../stores/workspacePlatformStore";
 import { MainLayout } from "../../MainLayout";
-import { controlBarMock, setNavigatorPlatform, sftpSidebarMock, terminalLifecycle, terminalPanelMock } from "./harness";
+import { controlBarMock, setNavigatorPlatform, sidebarMock, sftpSidebarMock, terminalLifecycle, terminalPanelMock } from "./harness";
 
 export function registerMainLayoutLifecycle2Cases() {
 
@@ -109,6 +109,20 @@ export function registerMainLayoutLifecycle2Cases() {
     fireEvent.click(screen.getByTestId("ribbon-settings"));
 
     expect(screen.getByTestId("settings-panel")).toBeInTheDocument();
+    expect(useAppStore.getState().activeTabId).toBe("settings");
+  });
+
+  it("deduplicates a synchronous Tao settings deep-link and tab command", () => {
+    render(<MainLayout />);
+    const onOpenSettings = sidebarMock.props.at(-1)?.onOpenSettings;
+    expect(onOpenSettings).toEqual(expect.any(Function));
+
+    act(() => {
+      window.dispatchEvent(new CustomEvent("taomni:open-settings-section", { detail: { id: "ai-tao" } }));
+      onOpenSettings?.();
+    });
+
+    expect(useAppStore.getState().tabs.filter((tab) => tab.type === "settings")).toHaveLength(1);
     expect(useAppStore.getState().activeTabId).toBe("settings");
   });
 

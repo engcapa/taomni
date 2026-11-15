@@ -67,6 +67,10 @@ describe("live Markdown decorations and standard-source widgets", () => {
     fireEvent.click(checkbox!);
     expect(view.state.doc.toString()).toContain("- [x] todo");
     undo(view); expect(view.state.doc.toString()).toBe(source);
+    fireEvent.click(view.dom.querySelectorAll<HTMLButtonElement>("[role='checkbox']")[1]);
+    expect(view.state.doc.toString()).toContain("- [ ] done");
+    expect(view.state.doc.toString()).toContain("- [ ] todo");
+    undo(view); expect(view.state.doc.toString()).toBe(source);
   });
   it("edits table cells into standard GFM and updates the same live cell", () => {
     const source = "# Table\n\n| A | B |\n| --- | --- |\n| c | d |\n";

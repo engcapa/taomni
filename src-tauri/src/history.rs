@@ -28,6 +28,7 @@ pub async fn history_append(
         return Ok(());
     }
 
+    let (command, redactions) = crate::chat::redact::redact(trimmed);
     let cap = clamp_cap(max);
     let ts = now_secs();
 
@@ -35,12 +36,13 @@ pub async fn history_append(
     let tx = db.transaction().map_err(|e| e.to_string())?;
 
     tx.execute(
-        "INSERT INTO command_history (host_key, command, last_used_at, use_count)
-         VALUES (?1, ?2, ?3, 1)
+        "INSERT INTO command_history (host_key, command, last_used_at, use_count, redacted)
+         VALUES (?1, ?2, ?3, 1, ?4)
          ON CONFLICT(host_key, command)
          DO UPDATE SET last_used_at = excluded.last_used_at,
-                       use_count = use_count + 1",
-        params![host_key, trimmed, ts],
+                       use_count = use_count + 1,
+                       redacted = MAX(redacted, excluded.redacted)",
+        params![host_key, command, ts, i64::from(redactions > 0)],
     )
     .map_err(|e| e.to_string())?;
 

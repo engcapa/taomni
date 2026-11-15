@@ -1,4 +1,4 @@
-import { StateField, type EditorState, type Extension, type Range } from "@codemirror/state";
+import { StateField, Transaction, type EditorState, type Extension, type Range } from "@codemirror/state";
 import { Decoration, EditorView, WidgetType, type DecorationSet } from "@codemirror/view";
 import type { Tokens } from "marked";
 import { openExternalUrl } from "../../../lib/sftp";
@@ -22,7 +22,7 @@ class RenderedBlock extends WidgetType {
     owners.set(root, owner);
     // Start image resolution while detached; it strips network/path src values
     // synchronously before the node is inserted by CodeMirror.
-    void enhanceMarkdown(root, { docPath: this.context.docPath, cancelled: () => owner.cancelled,
+    void enhanceMarkdown(root, { docPath: this.context.docPath, theme: this.context.theme, readImage: this.context.readImage, cancelled: () => owner.cancelled,
       onResize: () => { if (!owner.cancelled) view.requestMeasure(); } }).catch((error: unknown) => {
       if (!owner.cancelled) this.context.onError(String(error));
     });
@@ -37,7 +37,11 @@ class RenderedBlock extends WidgetType {
       const text = this.raw.slice((task.index ?? 0) + task[0].length).split("\n")[0].trim().replace(/[*_`]/g, "");
       const labelContent = item.cloneNode(true) as HTMLElement;
       labelContent.querySelectorAll(".fv-md-task-state,ul,ol").forEach((node) => node.remove());
-      if (!(labelContent.textContent || "").trim().startsWith(text)) return;
+      // restoreMarkdownTasks prefixes passive list items with a checkbox glyph;
+      // ignore that presentation marker when matching the source task to its
+      // rendered list item.
+      const renderedText = (labelContent.textContent || "").trim().replace(/^[☐☑]\s*/, "");
+      if (!renderedText.startsWith(text)) return;
       taskIndex++;
       const toggle = document.createElement("button");
       const checked = task[2].toLowerCase() === "x";
@@ -48,10 +52,46 @@ class RenderedBlock extends WidgetType {
       toggle.setAttribute("aria-checked", String(checked));
       toggle.setAttribute("aria-label", text);
       toggle.disabled = this.context.readOnly;
-      toggle.onclick = (event) => {
+      let handledByPointer = false;
+      const toggleTask = (event: Event) => {
         event.stopPropagation(); event.preventDefault();
+        const source = view.state.doc.toString();
+        const taskStart = source.indexOf(task[0], Math.max(0, this.from - 128));
         const index = (task.index ?? 0) + task[1].length + 1;
-        replaceWidgetSource(view, this.from, this.raw, this.raw.slice(0, index) + (checked ? " " : "x") + this.raw.slice(index + 1));
+        const marker = checked ? "[x]" : "[ ]";
+        // `task.index` is relative to this rendered block, so prefer its
+        // exact document position. Searching from the block start can select
+        // an earlier task when several checklist items share one list block.
+        const expectedMarker = this.from + (task.index ?? 0) + task[1].length + 1;
+        const expectedStart = expectedMarker - 1;
+        const markerStart = source.slice(expectedStart, expectedStart + marker.length) === marker
+          ? expectedStart
+          : source.indexOf(marker, Math.max(0, this.from - 128));
+        const absolute = markerStart >= 0 ? markerStart + 1 : taskStart >= 0 ? taskStart + task[1].length + 1 : this.from + index;
+        if (absolute >= 0 && absolute < view.state.doc.length) {
+          const next = source.slice(0, absolute) + (checked ? " " : "x") + source.slice(absolute + 1);
+          this.context.onChange?.(next);
+          view.dispatch({ changes: { from: absolute, to: absolute + 1, insert: checked ? " " : "x" }, annotations: Transaction.userEvent.of("input") });
+        } else {
+          // Keep compatibility with block tokenizers that include separator
+          // newlines in raw while CodeMirror stores them in the next block.
+          replaceWidgetSource(view, this.from, this.raw, this.raw.slice(0, index) + (checked ? " " : "x") + this.raw.slice(index + 1));
+        }
+      };
+      // Handle pointer down before CodeMirror moves the caret and replaces the
+      // widget DOM. A click listener can otherwise lose its target during the
+      // live decoration update.
+      toggle.onmousedown = (event) => {
+        handledByPointer = true;
+        toggleTask(event);
+      };
+      toggle.onclick = (event) => {
+        // Browser pointer activation normally reaches mousedown first. Tests,
+        // keyboard activation, and assistive technologies may dispatch click
+        // directly, so retain click as a fallback without toggling twice.
+        if (!handledByPointer) toggleTask(event);
+        handledByPointer = false;
+        event.preventDefault();
       };
       item.classList.add("fv-md-task-item");
       if (checked) item.classList.add("is-checked");
@@ -67,6 +107,7 @@ class RenderedBlock extends WidgetType {
       if (/^(https?:|mailto:)/i.test(href)) void openExternalUrl(href).catch((error: unknown) => this.context.onError(String(error)));
     };
     root.onmousedown = (event) => {
+      if (this.context.readOnly) return;
       if ((event.target as Element).closest("button,a")) return;
       event.preventDefault();
       const text = (event.target as Element).textContent?.trim() || "";
@@ -87,7 +128,12 @@ function decorations(state: EditorState, context: MarkdownWidgetContext, focus: 
     if (!block.raw.trim()) continue;
     const end = block.to - (block.raw.endsWith("\n") ? 1 : 0);
     if (end <= block.from) continue;
-    const active = state.selection.ranges.some((range) => range.from <= end && range.to >= block.from);
+    const taskList = block.token.type === "list" && /^\s*[-+*]\s+\[[ xX]\]/m.test(block.raw);
+    // Task lists keep their live checkbox while editing. Clicking the text
+    // still reveals the source through RenderedBlock.onmousedown, while the
+    // checkbox remains directly actionable instead of disappearing as soon as
+    // the caret enters that list block.
+    const active = !context.readOnly && !taskList && state.selection.ranges.some((range) => range.from <= end && range.to >= block.from);
     const image = standaloneImage(block.token);
     let widget: WidgetType | null = null;
     if (block.token.type === "table") widget = new TableWidget(block.from, block.raw, tableFromToken(block.token as Tokens.Table), context);

@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createChatController } from "./controller";
 import { TaoAiChat } from "./TaoAiChat";
 import type { ChatBackend, ChatProfile } from "./ports";
+import { setLocale } from "../../../lib/i18n";
 
 const profile: ChatProfile = {
   modes: [
@@ -17,7 +18,7 @@ const profile: ChatProfile = {
 };
 
 describe("TaoAiChat", () => {
-  afterEach(() => cleanup());
+  afterEach(() => { cleanup(); setLocale("en"); });
   it("renders the host shell, sends with Ctrl+Enter, and exposes search shortcut", async () => {
     const backend: ChatBackend = {
       send: vi.fn<ChatBackend["send"]>(async () => [
@@ -63,13 +64,53 @@ describe("TaoAiChat", () => {
     await waitFor(() => expect(controller.getState().runtime[controller.getState().activeThreadId!].phase).toBe("sending"));
     await controller.stop();
     expect(screen.getByTestId("tao-home-stopped-state")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "预览 构建日志" }));
-    expect(screen.getByRole("dialog", { name: "构建日志 的脱敏预览" })).toHaveTextContent("[REDACTED]");
+    fireEvent.click(screen.getByRole("button", { name: /Preview.*构建日志|预览.*构建日志/ }));
+    expect(screen.getByRole("dialog", { name: /构建日志/ })).toHaveTextContent("[REDACTED]");
     // Let the aborted transport settle before requesting continuation. The
     // controller keeps one transport owner per thread until its finally block.
     release();
     await pending;
-    fireEvent.click(screen.getByRole("button", { name: "继续生成" }));
+    fireEvent.click(screen.getByRole("button", { name: /继续生成|Continue/ }));
     await waitFor(() => expect(backend.continue).toHaveBeenCalled());
+  });
+
+  it("switches Tao chrome language without recreating controller or losing draft", async () => {
+    const controller = createChatController({ profile });
+    controller.setComposerText("draft");
+    render(<TaoAiChat controller={controller} profile={profile} />);
+    const id = controller.getState().activeThreadId;
+    expect(screen.getByTestId("tao-home-new-chat")).toHaveTextContent("New Tao chat");
+    setLocale("zh-CN");
+    await waitFor(() => expect(screen.getByTestId("tao-home-new-chat")).toHaveTextContent("新 Tao 对话"));
+    expect(controller.getState().activeThreadId).toBe(id);
+    expect(controller.getState().composer.text).toBe("draft");
+  });
+
+  it("shows an accessible side-panel toolbar with collapse, close, and resize controls", async () => {
+    const controller = createChatController({ profile });
+    render(<TaoAiChat controller={controller} profile={profile} />);
+    controller.setSidePanel("来源");
+
+    const panel = await screen.findByTestId("tao-home-side-panel");
+    expect(panel).toHaveAttribute("data-collapsed", "false");
+    expect(screen.getByTestId("tao-home-side-tab-sources")).toHaveAttribute("title", "Sources");
+    expect(screen.getByTestId("tao-home-side-tab-sources").textContent).toBe("");
+    expect(screen.getByTestId("tao-home-side-tab-sources").querySelector("svg")).toBeInTheDocument();
+    expect(screen.getByTestId("tao-home-side-resize")).toHaveAttribute("aria-label", "Resize sidebar");
+    expect(panel).toHaveStyle({ width: "340px" });
+
+    fireEvent.mouseDown(screen.getByTestId("tao-home-side-resize"), { clientX: 100 });
+    fireEvent.mouseMove(window, { clientX: 40 });
+    fireEvent.mouseUp(window);
+    expect(panel).toHaveStyle({ width: "400px" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Collapse sidebar" }));
+    expect(panel).toHaveAttribute("data-collapsed", "true");
+    expect(screen.getByRole("button", { name: "Close sidebar" })).toBeInTheDocument();
+    expect(screen.queryByTestId("tao-home-sources")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Expand sidebar" }));
+    expect(panel).toHaveAttribute("data-collapsed", "false");
+    fireEvent.click(screen.getByRole("button", { name: "Close sidebar" }));
+    expect(screen.queryByTestId("tao-home-side-panel")).not.toBeInTheDocument();
   });
 });

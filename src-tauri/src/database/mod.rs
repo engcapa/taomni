@@ -75,7 +75,7 @@ mod catalog_helpers;
 
 mod model;
 
-mod query_commands;
+pub(crate) mod query_commands;
 
 mod session;
 

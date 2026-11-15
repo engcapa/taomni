@@ -1,0 +1,89 @@
+id: TC-TAO-HOME-003
+title: Tao Home context, capability and side-panel interactions remain reachable and dismissible
+description: >-
+  Exercise the high-fidelity Home shell controls beyond the empty-state smoke:
+  context menu routing, capability toggles, voice and side panels, binding
+  empty states, shell choices, and outside/Escape dismissal in browser and
+  native WebViews. The case does not require a commercial provider response.
+modes:
+- browser
+- native
+covers:
+- F1.11
+tags:
+- p0
+- tao-home
+- ui
+- regression
+fixtures:
+- reset_db
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-tao-home-003
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- wait_for: '[data-testid="tao-home-host"]'
+- click: '[data-testid="tao-home-plus"]'
+- wait_for: '[role="dialog"]'
+- assert_text:
+    selector: '[role="dialog"]'
+    contains: Attach file
+- click: '[data-testid="tao-home-context-attach"]'
+- wait_for: '[data-testid="tao-home-files"]'
+- assert_text:
+    selector: '[data-testid="tao-home-files"]'
+    contains: Choose or drop a PDF/image.
+- click: '[data-testid="tao-home-side-panel"] button[aria-label="Close sidebar"]'
+- assert_not_visible: '[data-testid="tao-home-side-panel"]'
+- click: '[data-testid="tao-home-plus"]'
+- click: '[data-testid="tao-home-context-workflows"]'
+- wait_for: '[data-testid="tao-home-workflows"]'
+- assert_text:
+    selector: '[data-testid="tao-home-workflows"]'
+    contains: Each step requires confirmation
+- click: '[data-testid="tao-home-side-panel"] button[aria-label="Close sidebar"]'
+- click: '[data-testid="tao-home-voice"]'
+- wait_for: '[data-testid="tao-home-speech"]'
+- assert_text:
+    selector: '[data-testid="tao-home-speech"]'
+    contains: Local dictation only fills the draft
+- click: '[data-testid="tao-home-side-panel"] button[aria-label="Close sidebar"]'
+- click: '[data-testid="tao-home-capabilities"]'
+- wait_for: '[role="dialog"]'
+- click: '[data-testid="tao-home-capability-thinking"]'
+- click: '[data-testid="tao-home-capabilities"]'
+- wait_for: '[role="dialog"]'
+- click: '[data-testid="tao-home-capability-web"]'
+- assert_text:
+    selector: '[data-testid="tao-home-capabilities"]'
+    contains: Web
+- press: Escape
+- assert_not_visible: '[role="dialog"]'
+- click: '[data-testid="tao-home-binding-workspace"]'
+- wait_for: '[role="dialog"]'
+- assert_text:
+    selector: '[role="dialog"]'
+    contains: No Workspace available
+- press: Escape
+- assert_not_visible: '[role="dialog"]'
+- click: '[data-testid="tao-home-shell-menu"]'
+- wait_for: '[role="dialog"]'
+- assert_visible: '[role="dialog"] select[aria-label="Choose shell"]'
+- press: Escape
+- assert_not_visible: '[role="dialog"]'
+- click: '[data-testid="tao-home-appearance"]'
+- wait_for: '[data-testid="settings-panel"]'
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="settings"]'
+    equal: 1
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="tao-home-more"]'
+- click: '[data-testid="tao-home-settings"]'
+- wait_for: '[data-testid="tao-settings"]'
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="settings"]'
+    equal: 1
+- click: '[data-testid="nav-mode-home"]'
+- assert_no_runtime_errors: null
+- screenshot: tao-home-interaction-surface.png

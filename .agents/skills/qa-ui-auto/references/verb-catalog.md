@@ -17,6 +17,15 @@ Placeholders: `${cfg.x.y}` resolves from `qa-ui-auto.config.yaml`; `${env.X}` fr
 
 ## Navigation & timing
 
+`observe_tao_provider: null` and `assert_tao_provider_outcome: {timeout_sec: 120}`
+are native-only real-provider checks. Install before clicking Send. The observer
+forwards the real Tauri transport and callbacks unchanged and does not read
+request bodies, keys or response bodies. The assertion waits for invoke
+completion and stopped generation; a nonempty rendered assistant reply without
+errors passes. Only HTTP 401/403 or explicit key expiration plus a visible enabled
+retry passes as `credential-invalid`; other errors fail. The outcome artifact
+retains only counts, booleans, fixed categories and completion status.
+
 `reveal_project_tree_row: '[data-testid="code-workspace-tree-dir"][data-path="folder"]'` scrolls the real tree viewport until a lazy row is visible, without selection or activation, and saves raw offsets. File-open probes do the same preparation before the first measured pointer event.
 
 `measure_workspace_file_open: {selector, expected, event: click|dblclick, label, require_highlight?: boolean, require_editor_reuse?: boolean}`

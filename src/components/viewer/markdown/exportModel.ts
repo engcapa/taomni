@@ -1,5 +1,6 @@
 import { markdownBasename } from "../../../lib/markdownAssets";
 import { enhanceMarkdown, markdownFragment } from "./markdownRender";
+import type { MarkdownAssets } from "./markdownOwner";
 
 export type MarkdownExportKind = "html" | "pdf" | "png" | "docx" | "markdown" | "richtext" | "html-source" | "print";
 export interface MarkdownExportSettings {
@@ -15,7 +16,7 @@ export interface MarkdownExportSettings {
 }
 export const DEFAULT_EXPORT_SETTINGS: MarkdownExportSettings = {
   theme: "light", paper: "A4", orientation: "portrait", margins: "normal",
-  toc: true, pageNumbers: true, fileHeader: false, wrapCode: true, highlight: true,
+  toc: false, pageNumbers: true, fileHeader: false, wrapCode: true, highlight: true,
 };
 export function escapeHtml(text: string): string {
   return text.replace(/[&<>"']/g, (char) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[char]!);
@@ -32,10 +33,11 @@ export async function prepareMarkdownExport(
   content: string,
   docPath: string,
   settings: MarkdownExportSettings,
+  assets?: MarkdownAssets,
 ): Promise<{ root: HTMLElement; html: string; title: string }> {
   const root = markdownFragment(content);
   root.className = "fv-md-export";
-  await enhanceMarkdown(root, { docPath, cancelled: () => false }, true);
+  await enhanceMarkdown(root, { docPath, theme: settings.theme, readImage: assets?.readImage, cancelled: () => false }, true);
   if (!settings.highlight) root.querySelectorAll("pre code span").forEach((span) => span.replaceWith(span.textContent || ""));
   // markdownFragment restores passive task symbols after shared sanitization;
   // exports preserve completion state without introducing active form controls.
