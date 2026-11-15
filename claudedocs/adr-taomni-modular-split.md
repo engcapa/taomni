@@ -30,9 +30,9 @@ Taomni 是 Tauri 2 + React 19 + Rust 的本地优先桌面工作台。当前发�
 ### 2.3 v1.5 补充决定与待确认项
 
 - 新增共享能力下沉项 S11–S15：主二进制 re-exec 入口按归属迁移（核心只保留 `--ssh-stdio-forward`、`--screenshot-scroll-input`）；插件加密数据密钥（`mfa.data-key-v1`、`lanchat.message-key-v1`）经核心 Vault 的 slug 作用域受限服务访问；运行中的插件库经 `backup.snapshot` 备份，还原前宿主全部静默；移动端控制面与 `--headless` 先定义扩展点再拆。
-- 更正：MFA 屏幕采集是自带实现（现有三套采集实现，TASK-003 盘点后决定合并或并存）；宿主 crate 不得依赖 `tauri` / `wry` / `tauri-utils`；插件前端协议须与 `taomni-preview` 合并 CSP，且分离窗口入口同样初始化插件注册表。
+- 更正：MFA 屏幕采集是自带实现（现有采集实现分三处，已决定合并，见设计文档 §4.2.1）；宿主 crate 不得依赖 `tauri` / `wry` / `tauri-utils`；插件前端协议须与 `taomni-preview` 合并 CSP，且分离窗口入口同样初始化插件注册表。
 - `crash-regression` 集合含依赖插件的用例（`TC-MOBILE-012/013`）：核心-only 与全量两套报告并列，缺失不得记为通过。
-- 用户已于 2026-11-15 确认：在 M0 末对 `plugin-mobile` 做 go/no-go，排期默认按 DEC-2 暂缓；采用 DEC-8–DEC-10 作为实施约束。三套采集实现是否合并仍由 TASK-003 盘点后提出。
+- 用户已于 2026-11-15 确认：在 M0 末对 `plugin-mobile` 做 go/no-go，排期默认按 DEC-2 暂缓；采用 DEC-8–DEC-10 作为实施约束。屏幕采集（现有实现分三处）已决定合并：库 crate `taomni-capture` + 核心 `capture/`，方案见设计文档 §4.2.1，由 TASK-003 实施。
 
 ### 2.4 运行时、数据与发布
 

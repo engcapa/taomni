@@ -147,7 +147,7 @@
 | `sockscap`（24,839 行） | 仅 `commands/sockscap.rs`、`state.rs` | `terminal` 15、`session` 14、`vault` 5、`module_lock` 4 | 反向依赖少，但对核心 `terminal` / `session` 依赖多，需要稳定的核心接口 |
 | `lanchat`（9,341 行） | `commands/lanchat.rs`、`state.rs`、`mobile/headless.rs` | `servers` 8（采集、日志）、`backup` 4、`vault` 7 | 依赖 `servers` 的采集引擎，见上 |
 | `screenshot`（21,995 行） | `commands/screenshot.rs`、`webview_recovery` | `servers` 37 | 其中 `qa/` 8,091 行是 QA 夹具；真正的 OCR + 录制只有约 2.3k 行（见 §4.3） |
-| `mfa`（2,268 行） | `commands/mfa.rs`、`state.rs`、`backup/tests.rs`、`mobile/headless.rs` | `vault` 10（含固定条目 `mfa.data-key-v1`）、`backup` 3（`snapshot_context::hot_backup_conn`）；屏幕采集是 `mfa/capture.rs` 自带实现（xcap / Linux portal / macOS），**不引用 `servers::`** | 代码耦合干净、体积小；但数据密钥在核心 Vault、热备份在进程内（S12、S13）。v1.4 写的“MFA 屏幕扫描走核心 `capture/`”与源码不符：这是第三套采集实现（S1） |
+| `mfa`（2,268 行） | `commands/mfa.rs`、`state.rs`、`backup/tests.rs`、`mobile/headless.rs` | `vault` 10（含固定条目 `mfa.data-key-v1`）、`backup` 3（`snapshot_context::hot_backup_conn`）；屏幕采集是 `mfa/capture.rs` 自带实现（xcap / Linux portal / macOS），**不引用 `servers::`** | 代码耦合干净、体积小；但数据密钥在核心 Vault、热备份在进程内（S12、S13）。v1.4 写的“MFA 屏幕扫描走核心 `capture/`”与源码不符：这是独立于流式引擎的采集实现，已决定并入统一采集层（S1、§4.2.1） |
 | `proxy`（473 行） | **被 `agent` 三个桥接、`ai/config`、`asr`、`llm/opencode_go`、`objectstorage`、`terminal/network`、`voice`、`backup`、`mobile/im_adapter` 引用** | `vault`、`session` | **是核心网络基础设施（应用代理解析），不能进插件**；v1.2 把它划给 `plugin-nettools` 是错的（§4.4） |
 | `asr` + `voice`（约 5k 行） | `ai/config/asr.rs`、`ai/mod.rs`、`llm/mod.rs`、`ai/commands.rs`、`webview_recovery` | `models`、`proxy` | `voice/streaming/` 里有云端 ASR（`cloud.rs`、`routing.rs`、`providers.rs`、Deepgram 等），不是“本地”；`voice/capture.rs`（`cpal` 麦克风采集）云端 ASR 也要用（§4.4） |
 | `mobile`（12,679 行） | **核心终端热路径**：`terminal/authentication.rs`、`terminal/io_commands.rs`（`state.mobile.broker`）、`terminal/output.rs`、`terminal/ssh_start*.rs`、`terminal/local_start.rs`；`chat/stream/*`、`chat/acp/*`、`chat/thread_commands.rs`；`agent/cc_bridge/mcp_*`；`state.rs`；`lib.rs`（`ModeLease`、`state.mobile.stop()`、`config_root`）；`main.rs`（`--headless`） | `terminal` 20、`chat` 18、`state` 14、`ai` 9、`agent` 7、`session` 4、`proxy` 4、`screenshot` 3（`mobile/desktop/capture.rs`）、`servers`/`rdp`（`headless.rs` 建表、`windows.rs` 权限）、`webview_environment`、`migrate` | **与核心双向深度耦合**：观察方向（输出广播）+ 控制方向（写终端、resize、开会话、聊天流、ACP 桥接）+ 独立 headless 入口 + 桌面远控（采集、窗口输入、受管浏览器窗口）；是有效插件里最难拆的一个（§4.5） |
@@ -391,7 +391,7 @@ v1.4 取证于 `1d2f5748`；当前 `7bc498b35` 之间的变更对本设计的影
 | 6 | `taomni-plugin-sockscap` | SocksCap | Rust `src-tauri/src/sockscap/`（24,839 行）+ 前端 `src/components/sockscap/`（35 个文件）+ `src-tauri/resources/sockscap/` + 提权 helper（`src/bin/sockscap-helper/`） | WinDivert / xray-core + 提权 helper；平台差异最大、风险最高 | 插件自有库；规则与捕获状态不进核心库 |
 | 7 | `taomni-plugin-lanchat` | LanChat（暂定，后续可能移除，见 §4.1） | Rust `src-tauri/src/lanchat/`（9,341 行）+ 前端 `src/components/lanchat/`（24 个文件） | mDNS 发现、P2P、原生音视频（Opus / H.264，`native-av` feature 默认关闭，仅 Linux 发布包开启）；`native-av` 是该插件自己的编译特性，不拆成第二个插件，Linux 插件包带它、其它平台不带；屏幕共享依赖核心 `capture/`（§4.2） | 已独立：`lanchat.sqlite`，直接划归插件，不迁移；消息密钥是核心 Vault 固定条目 `lanchat.message-key-v1`（S12） |
 | 8 | `taomni-plugin-screenshot` | 截图 OCR / 录制引擎 | 只含 OCR（`screenshot/ocr.rs`、`ocr_windows.rs`、前端 `screenshotOcr.ts`）与录制编码（`screenshot/record/`、`recording_commands.rs`、`RecorderBar`）；Overlay、标注、贴图、收藏、滚动截图（DEC-4 已定核心）、`capture/`、`shortcut`、`qa/` 全部留核心。整个 `screenshot/` 目录 21,995 行，其中 `qa/` 8,091 行是 QA 夹具，OCR + 录制仅约 2.3k 行 | `tesseract.js + chi_sim / eng` 语言包（`package.json` 里的 `@tesseract.js-data/*`）+ `openh264 / mp4 / gif` 编码器；入口留核心（§3.7），引擎做插件。Linux 包的 `recommends: tesseract-ocr` 迁到插件的安装提示 | 截图文件仍在用户指定的持久目录，不随插件卸载删除 |
-| 9 | `taomni-plugin-mfa` | MFA 验证器 | Rust `src-tauri/src/mfa/`（2,268 行）+ 前端 `src/components/mfa/`（18 个文件）+ 左下角悬浮窗 | TOTP / HOTP、二维码导出、截图 / 屏幕扫描添加账户（屏幕扫描采集是 `mfa/capture.rs` 自带实现，不依赖截图插件，也不引用 `servers::`；是否并入核心 `capture/` 见 S1；SSH 登录弹窗 `MfaPrompt` 留核心，§3.8） | 已独立：`mfa.db`（懒加载），直接划归插件；加密密钥是核心 Vault 固定条目 `mfa.data-key-v1`（S12） |
+| 9 | `taomni-plugin-mfa` | MFA 验证器 | Rust `src-tauri/src/mfa/`（2,268 行）+ 前端 `src/components/mfa/`（18 个文件）+ 左下角悬浮窗 | TOTP / HOTP、二维码导出、截图 / 屏幕扫描添加账户（屏幕扫描采集是 `mfa/capture.rs` 自带实现，不依赖截图插件，也不引用 `servers::`；并入 `taomni-capture` / 核心 `capture/`（S1、§4.2.1）；SSH 登录弹窗 `MfaPrompt` 留核心，§3.8） | 已独立：`mfa.db`（懒加载），直接划归插件；加密密钥是核心 Vault 固定条目 `mfa.data-key-v1`（S12） |
 | 10 | ~~`taomni-plugin-nettools`~~（已取消，DEC-3） | 用户 2026-11-14 决定取消该插件；此行只保留审计记录，不进入首发集合 | 实测 `src/components/proxy/ProxyTestTab.tsx` 只是核心代理测试 UI；`src-tauri/src/proxy/`、`test_proxy_connection` 和 `TabKind "nettools"` 的隧道管理器仍是核心能力，不迁、不删除 | — | — |
 | 11 | `taomni-plugin-ai-voice-local` | 本地语音 / 本地模型 | **只含本地推理部分**：Rust `src-tauri/src/asr/`（2,242 行，Whisper / Sherpa / SenseVoice 模型管理）、`voice/streaming/local.rs`、`src-tauri/src/tab/fim_engine*.rs`（`llama-cpp-2`，`local-llm-fim` 特性）。`voice/` 里的云端 ASR（`streaming/cloud.rs`、`routing.rs`、`providers.rs`，如 Deepgram）、`voice/capture.rs`（`cpal` 麦克风采集）、`cleanup`、`vocabulary` 云端与本地共用，留核心（§4.4）。前端 `src/components/voice/`（5 个文件）按同样口径拆 | `whisper-rs、sherpa-onnx、llama-cpp-2` 与模型二进制；`asr-whisper、asr-sherpa`（现为默认特性）移出核心默认特性；终端 FIM 补全经核心“本地补全”扩展点调用插件，未装时降级为云端 / 无补全（§5.6） | 模型文件在模型目录，不进数据库；ASR 配置在核心设置里只存“用哪个引擎”，不存模型 |
 | 12 | `taomni-plugin-mobile` | 移动端远程控制面 | Rust `src-tauri/src/mobile/`（12,679 行，含桌面远控 `desktop/`、飞书适配 `im_adapter/`、`headless.rs`）+ `mobile-web/`（56 个文件，经 `build.rs` 内嵌为 `resources/mobile-web`）+ 前端设置页（`MobileHostSettings`、`MobileServiceSettings`、`FeishuAdapterSettings`、`FeishuSetupGuide`）与 `useMobileBridge` 等桥接 | 独立 Mobile Web + 实例移动服务；是另一条产物线，不跟桌面模块混版本号。**与核心双向深度耦合**：核心终端热路径直接调用 `state.mobile.broker`（`terminal/io_commands.rs`、`output.rs`、`authentication.rs`、`ssh_start*.rs`、`local_start.rs`），`chat/stream`、`chat/acp`、`agent/cc_bridge/mcp_*` 也引用它；它自己引用 `terminal` 20 处、`chat` 18 处、`agent` 7 处，并反向驱动终端写入、resize、聊天流与 ACP；拥有 `taomni --headless` 独立入口；桌面远控使用 `screenshot::capture` 与 macOS 输入权限。必须先定义观察者、控制面、headless、桌面远控四类扩展点（§4.5、§5.6）才能拆 | 插件自有库（`mobile_feishu_events` 等）；`mobile-desktop-remote.json` 策略文件；移动端 Cookie / 网关 / 飞书配置随插件走 |
@@ -412,7 +412,7 @@ v1.4 取证于 `1d2f5748`；当前 `7bc498b35` 之间的变更对本设计的影
 
 | # | 要下沉的东西 | 现位置 | 谁在用 | 目标位置 | 验收 |
 |---|---|---|---|---|---|
-| S1 | 屏幕采集引擎（`Frame`、`Capturer`、`create_capturer*`、Wayland 检测、`stage_trace`、macOS 屏幕录制授权）。**现有三套实现**：`servers/rdp/capture/`（截图入口 37 处、LanChat 屏幕共享、RDP 服务端使用）、`screenshot/capture/`（截图入口自身及 `mobile/desktop/capture.rs` 使用）、`mfa/capture.rs`（MFA 自带，不引用 `servers::`） | `servers/rdp/capture/`、`screenshot/capture/`、`mfa/capture.rs` | 截图入口、LanChat 屏幕共享、RDP 服务端、移动端桌面远控、MFA 屏幕扫描 | 核心 `src-tauri/src/capture/`：先下沉 `servers/rdp/capture/`（阻塞项）；`screenshot/capture/` 与 `mfa/capture.rs` 是否合并由 TASK-003 的盘点结论决定，并写入修订记录（不合并时三者各自留在其所属边界内，但都不得再引用 `servers::`） | 核心-only 构建里截图入口、移动端桌面远控、屏幕共享不再引用 `servers::`；MFA 采集随 `plugin-mfa` 或核心 `capture/` 的结论保持行为等价 |
+| S1 | 屏幕采集引擎（`Frame`、`Capturer`、`create_capturer*`、Wayland 检测、`stage_trace`、macOS 屏幕录制授权）。**现有实现分三处（一个引擎加两个层，§4.2.1）**：`servers/rdp/capture/`（截图入口 37 处、LanChat 屏幕共享、RDP 服务端使用）、`screenshot/capture/`（截图入口自身及 `mobile/desktop/capture.rs` 使用）、`mfa/capture.rs`（MFA 自带，不引用 `servers::`） | `servers/rdp/capture/`、`screenshot/capture/`、`mfa/capture.rs` | 截图入口、LanChat 屏幕共享、RDP 服务端、移动端桌面远控、MFA 屏幕扫描 | **已决定合并（用户 2026-11-15）**：库 crate `taomni-capture`（流式引擎、`CaptureLog`、权限、一次性采集策略）+ 核心 `src-tauri/src/capture/`（显示器模型、通用 `FrameSource`、`capture.still` 服务），方案与保持行为约束见 §4.2.1 | 核心-only 构建里截图入口、MFA、移动端桌面远控、屏幕共享不再引用 `servers::`；MFA 与 LanChat 的重复后端删除且行为等价（§4.2.1） |
 | S2 | `LogEmitter`、`control_permission_granted`（macOS 辅助功能 / 输入授权）、`ServerType::Rdp` 中被截图 / LanChat 使用的部分 | `servers/engine`、`servers/rdp/input/permissions.rs`、`servers/mod.rs` | 截图（含 `screenshot/scroll/input.rs`）、LanChat、移动端窗口输入（`mobile/desktop/windows.rs`，v1.5 新增） | 核心里的小接口（`plugin/`、`capture/` 或新增 `platform_permissions/`） | 同上 |
 | S3 | RDP 剪贴板 / 文件传输安全路径、位图编解码辅助（`rdp::session::{client_bitmap_codecs, read_clipboard_file_range, write_remote_file_chunk, remote_clipboard_safe_path, clipboard_relative_name, ensure_private_directory, process_is_alive, remote_top_level_name}`、`rdp::cliprdr`） | `rdp/session*`、`rdp/cliprdr.rs` | RDP 客户端、RDP 服务端（`servers/rdp/clipboard/*`）、`config/paths.rs` | 库 crate `taomni-rdp-common`（两个 RDP 插件各自静态链接）；`config/paths.rs` 用到的 `uri_list_to_paths` 搬进核心通用工具 | 两个 RDP 插件互不引用对方 crate；核心不引用 `rdp::` |
 | S4 | RDP 信任表初始化（`rdp::tls::init_trust_table`） | `rdp/tls.rs` | `mobile/headless.rs` | 随 S6 的扩展点处理，或由 RDP 客户端插件在启用时自行初始化 | `mobile/` 不再直接引用 `rdp::` |
@@ -429,6 +429,65 @@ v1.4 取证于 `1d2f5748`；当前 `7bc498b35` 之间的变更对本设计的影
 | S15 | `--headless` 与 `ModeLease`：独立无 GUI 运行 mobile 服务 / 飞书适配，初始化完整 `AppState`（`mobile::headless::initialize`） | `mobile/headless.rs`、`mobile/headless_ops.rs`、`main.rs`、`lib.rs` | `plugin-mobile` | 先决策归属：（a）`--headless` 留核心，仅启动 `CoreState` 并拉起已安装的 `plugin-mobile` 宿主，未安装则明确报错退出；（b）整体随 mobile 暂缓留核心（DEC-2）。无论哪种，`ModeLease` 与 `ProfileLease` 的语义不变 | headless 与 GUI 同一 profile 的互斥 / 共享租约行为与现状一致；`Core::Headless` 路径有测试 |
 
 约束：S1–S3、S5、S10 是 M0 阻塞项（不做完不能开始任何一个插件迁移）；S12、S13 必须在第一批（`plugin-mfa`、`plugin-lanchat`）数据迁移前完成（TASK-013 的 MFA 实验可只验证进程、信任和生命周期，不读写加密库）；S11 在 VNC / SocksCap / mobile 批前完成；S4、S6–S9、S14、S15 随对应插件所在批次（§10）完成，但必须在该批次开始前有接口评审。
+
+### 4.2.1 屏幕采集合并方案（S1 的落地设计，TASK-003 交付；用户 2026-11-15 决定合并）
+
+**现状复核（`7bc498b35`）**：三者不是对等的三套引擎，而是一个流式引擎加两个层：
+
+| 层 | 位置 | 实际内容 | 外部依赖 |
+|---|---|---|---|
+| E 流式引擎 | `servers/rdp/capture/**`（约 4.6k 行：`Frame`、`Capturer`、`create_capturer*`、`PortalInput`、X11 SHM+XDamage、Wayland PipeWire/portal、macOS 显示流/SCK、Windows WGC+GDI、`xcap_backend`、`stage_trace`） | 仅依赖 `LogEmitter`（只调用 `line()` 与 `clone()`）和 `control_permission_granted`；无 `tauri` 类型 | `x11rb`、`ashpd`/PipeWire、`objc2*`、`windows`、`xcap` |
+| S 截图层 | `screenshot/capture/**`（约 1.5k 行） | Tauri 显示器模型 `DisplayInfo`、单帧 `capture_display`、录制/滚动用的 `FrameSource`、macOS CoreGraphics 一次性快照（`mac_snapshot.rs`，刻意避开显示流以规避 macOS 14 WindowServer 崩溃）、隐藏窗口后截图 `overlap.rs`、临时产物 `artifacts.rs`；Linux 与 Windows 录制建立在 E 之上，Windows/macOS 静态图直接用 `xcap` | E、`xcap`、Tauri |
+| M MFA 采集 | `mfa/capture.rs`（341 行） | 独立实现：非 Linux 用 `xcap::Monitor::all()`；Linux X11 用 `x11rb` RandR 逐显示器读取；Wayland 用 `ashpd` 的 Screenshot portal（一次性，由桌面自身弹窗）；macOS 用 `CGPreflight/CGRequestScreenCaptureAccess`；另含灰度转换与剪贴板图片读取 | `xcap`、`x11rb`、`ashpd`、`objc2_core_graphics` |
+| L LanChat | `lanchat/transfer.rs`、`lanchat/media/video.rs`、`lanchat/commands/images.rs` | Linux 调 E；非 Linux 由 `screen-capture` feature 门控的 `xcap` 重复实现 `capture_screenshot`；日志借用 `LogEmitter::new(app, ServerType::Rdp)`（把采集日志写进 Servers/RDP 日志面板，是借用而非设计） | E、`xcap` |
+
+> `sockscap/capture/` 是网络流量捕获，与屏幕采集无关，不在合并范围，仅需避免命名混淆。
+
+**目标结构**
+
+1. **库 crate `taomni-capture`**（`src-tauri/crates/taomni-capture/`，workspace 成员，不依赖 `tauri` / `wry` / 核心 crate）：
+   - `engine`：由 E 原样迁入（`git mv` 保留历史），含全部平台后端与 `stage_trace`。
+   - `CaptureLog` trait：`fn line(&self, msg: String)`，取代签名里的 `&LogEmitter`；可 `Clone`（`Arc<dyn CaptureLog>`）。这也让 `x11/tests.rs` 不再需要“没有 AppHandle 的变通”。
+   - `permissions`：macOS 屏幕录制授权（`mac::permission_granted/request_permission`，与 M 的 `CGPreflight/CGRequest` 合并为同一实现；“授权重启后生效”的错误码映射仍由调用方持有）和辅助功能 / 输入授权 `control_permission_granted` / `request_control_permission`（自 `servers/rdp/input/permissions.rs`）。
+   - `still`：一次性采集 API，策略显式化：`PersistentStream`（E 的 `Capturer`）、`PortalScreenshot`（Wayland 一次性 portal，保留 M 的“桌面自带弹窗、不留 ScreenCast 共享指示”行为）、`X11RandR`（M 的逐显示器读取，与 E 的 X11 后端共用连接与 RandR 解析）、`MacSnapshot`（S 的 CoreGraphics 一次性快照，**不得并入显示流路径**）、`Xcap`（仅 Windows/macOS，维持现有 cfg 门控）。`pixels` 转换（BGRA↔RGBA↔灰度）集中在此。
+2. **核心模块 `src-tauri/src/capture/`**（依赖 Tauri）：`displays`（`DisplayInfo`、`list_displays`、`resolve_display`，自 `screenshot/capture/displays.rs`，供截图与 `mobile/desktop/capture.rs` 共用）、`source`（通用 `FrameSource`）、`log`（`CaptureLog` 的核心实现：写 `log` crate 并按需发 Tauri 事件，**不再冒充 `ServerType::Rdp`**）、`service`（插件宿主用的 `capture.still` RPC 服务，见下）、QA 注入点（`QA_DENY_CAPTURE` 等）。
+3. **各调用方的归位**：
+
+| 现代码 | 合并后 |
+|---|---|
+| `servers/rdp/capture/**` | `taomni-capture::engine`；`servers/rdp/*`（display、gfx、input、sound、probes）改为直接依赖 `taomni_capture`，RDP 服务端宿主静态链接该 crate |
+| `screenshot/capture/{displays,source,frames,snapshot,pixels,permissions}.rs` | 通用部分迁入核心 `capture/`；`overlap.rs`、`artifacts.rs`、`display_at_cursor`、`display_for_window`、滚动截图专用 `for_scroll` / `portal_scroll` 留在 `screenshot/`，只依赖 `capture/` |
+| `mfa/capture.rs` | 删除全部后端（`capture_x11`、`capture_portal`、xcap 分支、`ensure_screen_permission`），改调 `still`；MFA 只保留灰度编码 `encode_frames`、`read_clipboard_image` 和二维码扫描逻辑；隐藏 Taomni 窗口再采集（`capture_screens_hiding`）属 Tauri 窗口操作，留在核心 |
+| `lanchat/{transfer,media/video,commands/images}.rs` | 全平台改用 `taomni_capture::create_capturer`，删除 `screen-capture` feature 门控的 `xcap` 副本；日志改用 `CaptureLog`；`plugin-lanchat` 宿主静态链接 `taomni-capture` |
+| `mobile/desktop/capture.rs` | 路径改为 `crate::capture::displays/still`，行为不变 |
+| `screenshot/scroll/input.rs`、`mobile/desktop/windows.rs` | `control_permission_granted` 改指 `taomni_capture::permissions`（S2） |
+
+**与插件形态的关系（G2 / G5）**
+
+- 采集若发生在宿主进程，macOS 的屏幕录制与辅助功能授权归属宿主（G2）。因此默认路径是：**截图入口、MFA 扫描、移动端桌面远控在核心内采集**，`plugin-mfa` 通过 RPC `capture.still`（权限 `capture.screen`）取灰度帧，不携带任何采集后端，也就不触发 G2。该服务需要 TASK-002 的协议支持大二进制载荷旁路（帧不走 JSON stdio）。
+- 流式热路径（`plugin-rdp-server`、`plugin-lanchat` 屏幕共享）不能走 RPC 逐帧转发，宿主静态链接 `taomni-capture` 直接采集。若 G2 在 macOS 失败，则这两类宿主改为请求核心 `capture.stream`（loopback WS + 一次性 token，沿用 §5.0 的数据通道模式），`Capturer` 接口不变，故合并后的接口两种部署都能承载；该例外按 DEC-2 记录。
+- 因此合并不改变“核心与插件互不依赖”：核心与宿主共同依赖的是库 crate（与 `taomni-rdp-common` 同类），不是彼此。
+
+**保持行为的约束（TASK-003 必须逐项验证，不能只靠编译通过）**
+
+1. Linux 不得因合并引入 `xcap` / libgbm / EGL 依赖（`mfa/capture.rs` 注释明确要避免）；`cargo tree --target x86_64-unknown-linux-gnu` 中 `taomni-capture` 不含 `xcap`，Windows / macOS 保持原 cfg 门控。
+2. macOS 静态图与录制继续用一次性 CoreGraphics 快照，不得改走显示流；RDP 服务端继续用显示流 / SCK。
+3. Wayland 三条路径各自保留：E 的 PipeWire ScreenCast（流式）、截图的指定显示器流（`try_new_for_monitor`）、M 的 Screenshot portal（一次性）；每条都有对应测试，不得合并成其中一条而改变弹窗次数和授权提示。
+4. 日志不再写入 Servers/RDP 日志面板：先 `grep` 现有 Vitest / QA 用例是否断言这些行，有则更新，并在修订记录写明这是有意的行为变化。
+5. `Frame` 的 BGRA、自顶向下、紧密 `stride` 约定不变；RDP 服务端 `BitmapUpdate` 零转换路径不退化（`rdp-probe` / `TC-RDPS-PERF-01` 预算内，AC-013）。
+6. MFA 灰度帧的尺寸、顺序和 `ERR_*` 错误码不变；QA 的 hosted scan 保留路径（`retain_hosted_qa_scan`）不变。
+
+**实施顺序（每步单独提交、单独可回退）**
+
+1. 引入 `CaptureLog` 并改引擎签名（不搬文件）；补不依赖 `AppHandle` 的单测。
+2. 建 `taomni-capture` crate，`git mv` 引擎；在 `servers::rdp::capture` 保留临时 `pub use` 垫片，调用方先不动。
+3. 迁移 `permissions`（含 `control_permission_granted`），`servers/rdp/input` 与 macOS 路径改引用。
+4. 建核心 `capture/`，迁 `displays` / `source` / `pixels`，截图与 `mobile/desktop/capture.rs` 改引用；`overlap` / `artifacts` / 滚动留截图。
+5. MFA 改用 `still`，删除其后端；`LanChat` 改用 `create_capturer`，删除 `xcap` 副本。
+6. 删除垫片；`scripts/refactor-boundaries.mjs` 增加规则：`screenshot/`、`mfa/`、`lanchat/`、`mobile/`（`headless.rs` 的建表除外，由 TASK-018/S15 处理）不得 `use crate::servers`；`taomni-capture` 不得依赖 `tauri` / `wry`。
+7. 回填证据：各步 `cargo test --lib` 过滤结果、三目标 `cargo check`、下表 case。
+
+**验证入口**：静态——`grep -rn "servers::" src-tauri/src/{screenshot,mfa,lanchat,mobile}` 仅余 S15 例外；`cargo tree -p taomni-capture`。单测——随代码迁移的 `x11/tests.rs`、`wayland/tests.rs`、`screenshot/capture/tests.rs`、macOS tests、`mobile/desktop/tests.rs`。UI/native（当前平台实跑，其余平台只做 `cargo check` 并记录未验证）——`TC-104-capture-toolbar`、既有截图 still / 录制 / 滚动截图 case、`TC-MFA-007`、`TC-MFA-106`、`TC-MOBILE-020/021`、`TC-RDPS-NAT-01`、`TC-RDPS-PERF-01`；LanChat 屏幕共享与截图如无现成 case 则新增 `TC-*` 并登记。
 
 ### 4.3 `plugin-screenshot` 的实际边界（v1.3 更正）
 
@@ -735,8 +794,8 @@ v1.2 没有覆盖“已经在用旧版的用户”。核心 0.6.x 默认包不�
 | 任务 | 目标、文件范围与具体产物 | 依赖 | 完成条件 / 验收 / 验证 |
 |---|---|---|---|
 | TASK-001 | 建立 M0 基线：`package.json`、`src-tauri/Cargo.toml`、`tauri.conf.json`、`release.yml`、`dist`、四平台 artifact 采样；生成 `docs-feature/taomni-modular-split-baseline-<date>.md`，记录命令、hash、大小、平台和已知缺口；基线须在 `7bc498b35` 或其后继提交上取得，并单列文件查看器新增的 `docx/katex/html-to-image/mermaid` chunk、vendored `wry`、`resources/mobile-web` 的大小。 | 无 | 体积、`cargo tree`、chunk、资源清单可复现；AC-013/014；V-001。 |
-| TASK-002 | 冻结插件协议：新增 `src-tauri/crates/taomni-plugin-api/`（或等价 workspace crate），定义 `apiVersion`、握手、request id、错误码、取消、事件、心跳和 token 绑定；同步 `module.json` JSON Schema。 | 无 | 协议 fixture 可序列化/反序列化，未知字段和版本错误有明确策略；AC-004/009；V-002。 |
-| TASK-003 | 下沉共享采集与日志：`src-tauri/src/capture/`、`servers/rdp/capture/`、`servers/engine`、`LogEmitter`、`control_permission_granted`；保留跨平台 Wayland/X11/macOS/Windows 分支；先盘点三套采集实现（`servers/rdp/capture`、`screenshot/capture`、`mfa/capture.rs`）与 `control_permission_granted` 的全部调用方（含 `screenshot/scroll/input.rs`、`mobile/desktop/windows.rs`），输出合并 / 并存结论。 | TASK-001 | 核心截图入口、MFA 扫描、LanChat 共享屏幕不再引用 `servers::`；AC-001/010/012；V-003。 |
+| TASK-002 | 冻结插件协议：新增 `src-tauri/crates/taomni-plugin-api/`（或等价 workspace crate），定义 `apiVersion`、握手、request id、错误码、取消、事件、心跳和 token 绑定；同步 `module.json` JSON Schema。 | 无 | 协议 fixture 可序列化/反序列化，未知字段和版本错误有明确策略；支持大二进制载荷旁路（供 `capture.still` 等大帧服务，不经 JSON stdio）；AC-004/009；V-002。 |
+| TASK-003 | 合并并下沉屏幕采集（方案见 §4.2.1，用户已决定合并）：新建 `src-tauri/crates/taomni-capture/`（迁入 `servers/rdp/capture/**`，新增 `CaptureLog`、`permissions`、`still` 采集策略）和核心 `src-tauri/src/capture/`（`displays`、通用 `FrameSource`、`CaptureLog` 核心实现、`capture.still` 服务）；迁移 `control_permission_granted` 及全部调用方（`screenshot/scroll/input.rs`、`mobile/desktop/windows.rs`、`servers/rdp/input`、`servers/probes.rs`）；`mfa/capture.rs` 与 `lanchat` 的重复后端删除并改调统一 API；`servers/engine` 的 `LogEmitter` 不再被采集层引用；按 §4.2.1 七步分提交，保留跨平台 Wayland/X11/macOS/Windows 分支及其保持行为约束；边界脚本新增 `screenshot/`、`mfa/`、`lanchat/`、`mobile/` 不得引用 `servers::`。 | TASK-001、002（大二进制载荷旁路） | 核心截图入口、MFA 扫描、LanChat 共享屏幕、移动端桌面远控不再引用 `servers::`；`taomni-capture` 不含 `tauri`/`wry`，Linux 目标不含 `xcap`；RDP 帧预算不退化；§4.2.1 验证入口全部有原始结果、未验证平台明确记录；AC-001/010/012/013；V-003。 |
 | TASK-004 | 提取 `taomni-rdp-common`，迁移 RDP 剪贴板、文件传输安全路径、编解码和 URI 工具；RDP client/server 只依赖库 crate，不互相依赖。 | TASK-001 | 两端独立构建，核心不再 `use crate::rdp`；AC-009/010；V-003。 |
 | TASK-005 | 拆 `AppState`：修改 `src-tauri/src/state.rs`、`state/domains.rs`、`lib.rs`、`commands/mod.rs`，形成 `CoreState + PluginRegistry`；插件内部状态只留宿主，核心保存元数据、句柄和 RPC client；`main.rs` 与 `ModeLease` / `ProfileLease` 的归属以 TASK-024 的结论为准。 | TASK-002、003、004 | 现有核心命令契约无删除；状态初始化、退出清理和恢复路径有单测；AC-001/002/004；V-002/003。 |
 | TASK-006 | 做依赖闭包迁移：修改 `src-tauri/Cargo.toml`、构建脚本、features、`tauri.conf.json`、Linux 依赖、bundle resources；把 `asr-whisper/asr-sherpa`、RDP、OCR/录制、SocksCap 资源从核心默认产物移出，`voice-capture` 保留核心。 | TASK-001、003、004 | 核心-only `cargo tree`、bundle、`dist` 均不含已迁移项；插件构建可独立解析同一 `[patch.crates-io]`；AC-001/013；V-001/002。 |
@@ -882,11 +941,11 @@ v1.2 没有覆盖“已经在用旧版的用户”。核心 0.6.x 默认包不�
 **P1 不阻塞、发布切线时再定的其它项（v1.5 追加）：**
 
 - `plugin-mobile` 的 go/no-go 在 M0 末按 §4.5 评估，排期默认按 DEC-2 暂缓（用户已于 2026-11-15 确认）。
-- 三套屏幕采集实现是否合并到核心 `capture/`（TASK-003 盘点后提出）。
+- 屏幕采集合并：用户已于 2026-11-15 决定合并，方案见 §4.2.1，由 TASK-003 实施。
 
 ### 13.4 修订记录
 
-- v1.5（2026-11-15，基线 `7bc498b35`）：针对分支新增代码（自 `1d2f5748` 起 36 个非合并提交、402 个文件）重新取证并完善，模块化重构仍未开始执行。更新锚点与规模统计（`lib.rs` 593 行、`commands/mod.rs` 823 行、`TabKind` 23 种、Rust 331,079 行、`mobile/` 12,679 行）；更正三处与源码不符的结论：MFA 屏幕采集是自带实现而非走 `servers/rdp/capture`、`panels.tsx` 已对 RDP/VNC 等使用 `React.lazy`、`mobile` 不止是观察者；新增 §1.8.1 前端耦合实测与 §1.10 基线漂移表；新增 §3.9（文件查看器归核心、`taomni-preview` 协议与 CSP 合并、vendored `wry` 约束）；新增 S11（re-exec 入口）、S12（插件数据密钥）、S13（备份快照与 profile 协同）、S14（mobile 控制面）、S15（`--headless`），并修正 S1（三套采集实现）、S2（`control_permission_granted` 新调用方）；§4.5 扩充 mobile 事实并建议 M0 末 go/no-go；G1–G10 扩为 G1–G11（新增多进程 profile 协同与入口模式，G2 扩大到 mobile / MFA）；`module.json` 补 `legacyTables`、`vaultFixedKeys`、`snapshot` 与 `permissions` 初始取值草案；宿主 crate 禁止依赖 `tauri` / `wry` / `tauri-utils`；新增 TASK-024/025、AC-015/016、V-011，调整相关任务依赖与估算；§11 增加 crash-regression 的 `requires-plugin` 规则与自动化边界项；新增 DEC-8–DEC-10；用户于 2026-11-15 确认采用 DEC-8–DEC-10 以及“M0 末 mobile go/no-go、默认暂缓排期”的建议，三套采集实现是否合并仍由 TASK-003 盘点后提出。
+- v1.5（2026-11-15，基线 `7bc498b35`）：针对分支新增代码（自 `1d2f5748` 起 36 个非合并提交、402 个文件）重新取证并完善，模块化重构仍未开始执行。更新锚点与规模统计（`lib.rs` 593 行、`commands/mod.rs` 823 行、`TabKind` 23 种、Rust 331,079 行、`mobile/` 12,679 行）；更正三处与源码不符的结论：MFA 屏幕采集是自带实现而非走 `servers/rdp/capture`（现有采集实现分三处，已决定合并）、`panels.tsx` 已对 RDP/VNC 等使用 `React.lazy`、`mobile` 不止是观察者；新增 §1.8.1 前端耦合实测与 §1.10 基线漂移表；新增 §3.9（文件查看器归核心、`taomni-preview` 协议与 CSP 合并、vendored `wry` 约束）；新增 S11（re-exec 入口）、S12（插件数据密钥）、S13（备份快照与 profile 协同）、S14（mobile 控制面）、S15（`--headless`），并修正 S1（采集实现分三处，决定合并，方案见 §4.2.1）、S2（`control_permission_granted` 新调用方）；§4.5 扩充 mobile 事实并建议 M0 末 go/no-go；G1–G10 扩为 G1–G11（新增多进程 profile 协同与入口模式，G2 扩大到 mobile / MFA）；`module.json` 补 `legacyTables`、`vaultFixedKeys`、`snapshot` 与 `permissions` 初始取值草案；宿主 crate 禁止依赖 `tauri` / `wry` / `tauri-utils`；新增 TASK-024/025、AC-015/016、V-011，调整相关任务依赖与估算；§11 增加 crash-regression 的 `requires-plugin` 规则与自动化边界项；新增 DEC-8–DEC-10；用户于 2026-11-15 确认采用 DEC-8–DEC-10 以及“M0 末 mobile go/no-go、默认暂缓排期”的建议，用户同日决定合并屏幕采集，方案写入 §4.2.1 并在 TASK-003 明确（`taomni-capture` 库 crate + 核心 `capture/`）。
 - v1.4（2026-11-14，基线 `1d2f5748`）：对 v1.3 设计做实现前审查并完善。更新过期提交锚点和规模统计；把 M0–M3 展开为 TASK-001–TASK-023，补充 AC-001–AC-014、V-001–V-010、依赖顺序、共享文件所有权和交接证据；将 G1–G7 扩为 G1–G10，增加安装篡改/路径安全、核心-only 依赖闭包和 RPC 超时/取消门；明确根 `Cargo.toml` 的依赖隔离是核心-only 瘦身阻塞项；冻结 DEC-3 为“取消插件化但保留核心代理测试能力”；将 DEC-4 从待定改为已决的核心归属；明确宿主进程隔离不等于前端沙箱；规定 11 个有效插件的全量目标与 DEC-2 受控例外的发布门槛；选择独立 modules manifest 生成器和版本目录原子切换作为实施约束。
 - v1.3（2026-11-14 审查后）：以 `f532eb4c3` 的代码实测审查并修订。DEC-1 ~ DEC-4 已由用户答复：宿主进程方案 A、接受受控例外（mobile 与 G2）、取消 nettools 插件（§13.1 第 3 项随之修订）、滚动长截图留核心。主要变更：（1）§5.0 新增可行性审查，推翻 v1.2 “进程内 cdylib Tauri 插件”（Tauri 插件编译期注册、Rust 无稳定 ABI、capability 编译期固定、macOS 库校验、崩溃与卸载问题），推荐宿主进程形态并设 M0 验证门 G1–G7（DEC-1）；（2）§1.8 / §1.9 新增耦合与打包实测，§4.2 新增 10 项共享能力下沉（采集引擎住在 `servers/rdp/capture/`、RDP 服务端复用 RDP 客户端代码、`mobile` 嵌在终端热路径等），v1.2 “插件间依赖零”被证明不是现状；（3）更正插件边界：`plugin-nettools` 实际仅 82 行前端，`proxy/` 是核心基础设施，`TabKind "nettools"` 是隧道管理器（§4.4、DEC-3）；`plugin-screenshot` 实际仅 OCR + 录制约 2.3k 行（§4.3、DEC-4）；`plugin-ai-voice-local` 只含本地推理，云端 ASR 与麦克风采集留核心，且不存在已打包的 llama.cpp sidecar（§4.4）；`plugin-mobile` 可拆性须验收（§4.5、DEC-2）；（4）§5.1 `module.json`：去掉自带公钥的 `signature` 字段、`capabilities` 改为核心强制的 `permissions`、补 `slug`、`backupPaths`、`legacyTables`、平台列表对齐 `release.yml`；（5）§6.5 新增从 0.5.x 升级的迁移向导；§7.2 / §9 增加清单签名、`sequence` 防回滚、签名绑定包内容；§8 更正数据归属（Servers 与 RDP 证书钉扎在 `taomni.db`，SocksCap 是文件目录且有恢复日志特例）与迁移时不直连 `taomni.db`；（6）§10 M0 调整为 3–5 周并加入验证门与前置重构，总估算 6–11 周调为 8–14 周；§11 增加自动化边界检查、宿主进程专项、升级迁移用例；§12 增加 6 项风险；（7）修正交叉引用与编号（原 §4.11 → §4.1；原先指向不存在章节的引用，包括 §3.1 误指 A 窄核心、§3.7 误指 Tao Agent、§4.5 / §4.6、§14.2 / §14.5；“只有这三类”实为五项、`plugins/` 路径与 `[patch.crates-io]` 工作区冲突）。
 - v1.2（2026-11-14 20:28 确认后）：第 3 项确认理解正确，§13.2 待确认解释清零。开 PR 前基线更新至最新 main `8233beaca`（Merge PR #808），锚点复核无变化（`lib.rs` 590→591 行、`commands/mod.rs` 807→809 行）。
