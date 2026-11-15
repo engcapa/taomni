@@ -2689,6 +2689,8 @@ export const zhCN: DeepPartial<typeof en> = {
     moduleStoreSubtitle: "安装和管理已签名的 Taomni 模块，不改变核心应用。",
     moduleStoreCoreApi: "核心 API {version}",
     moduleStoreEmpty: "暂时没有可用模块。",
+    moduleStoreLoading: "正在加载已安装模块…",
+    moduleStoreInstallUnavailable: "模块下载暂不可用，需要已验证的软件包路径。",
     moduleStoreCompatible: "兼容",
     moduleStoreIncompatible: "需要其他核心 API",
     moduleStoreVersion: "版本 {version}",

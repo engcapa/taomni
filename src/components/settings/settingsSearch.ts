@@ -57,6 +57,14 @@ export const SETTINGS_SEARCH_ENTRIES: SettingsSearchEntry[] = [
     terms: ["screenshot", "screen capture", "hotkey", "shortcut", "recording", "截图", "截屏", "快捷键", "热键", "录屏"],
   },
   {
+    id: "module-store",
+    titleKeys: ["settings.moduleStoreTitle", "settings.moduleStoreSubtitle"],
+    terms: [
+      "module", "modules", "plugin", "plugins", "module store", "marketplace", "extension",
+      "模块", "模块商店", "插件", "扩展", "插件商店",
+    ],
+  },
+  {
     id: "code-view-appearance",
     titleKeys: ["settings.codeViewAppearanceTitle"],
     terms: [
@@ -254,7 +262,7 @@ export const SETTINGS_GROUPS: SettingsGroupDef[] = [
   {
     id: "general",
     titleKey: "settings.groupGeneral",
-    entryIds: ["language", "app-theme", "welcome-history", "global-ui", "file-open", "screenshot"],
+    entryIds: ["language", "app-theme", "welcome-history", "global-ui", "file-open", "screenshot", "module-store"],
   },
   {
     id: "code",

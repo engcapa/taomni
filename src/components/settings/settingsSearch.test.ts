@@ -44,6 +44,12 @@ describe("settingsSearch groups", () => {
     expect(groupIdForEntry("sdks")).toBe("code");
   });
 
+  it("finds the module store in both English and Chinese search terms", () => {
+    expect(matchingIds("plugin", t)).toContain("module-store");
+    expect(matchingIds("模块商店", t)).toContain("module-store");
+    expect(groupIdForEntry("module-store")).toBe("general");
+  });
+
   it.each(["en", "zh-CN"] as const)("finds mobile settings through localized visible titles in %s", locale => {
     setLocale(locale);
     for (const key of ["mobileSettings.title", "mobileSettings.allowOpenSessions", "mobileSettings.allowScreenCapture", "mobileSettings.hostsTitle", "mobileSettings.allowAllHosts", "feishuSettings.title"]) {

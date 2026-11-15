@@ -32,6 +32,27 @@ export async function setPluginEnabled(slug: string, enabled: boolean): Promise<
   return normalizePluginRecord(await invoke<unknown>("plugin_set_enabled", { slug, enabled }));
 }
 
+/** Activate a verified package directory that the native download layer staged. */
+export async function installStagedPlugin(slug: string, version: string, packageDir: string): Promise<PluginRecord> {
+  if (!SLUG.test(slug)) return Promise.reject(new Error(`Invalid plugin slug: ${slug}`));
+  return normalizePluginRecord(await invoke<unknown>("plugin_install_staged", { slug, version, packageDir }));
+}
+
+export async function rollbackPlugin(slug: string): Promise<PluginRecord> {
+  if (!SLUG.test(slug)) return Promise.reject(new Error(`Invalid plugin slug: ${slug}`));
+  return normalizePluginRecord(await invoke<unknown>("plugin_rollback", { slug }));
+}
+
+export async function uninstallPlugin(slug: string, deleteData = false): Promise<PluginRecord> {
+  if (!SLUG.test(slug)) return Promise.reject(new Error(`Invalid plugin slug: ${slug}`));
+  return normalizePluginRecord(await invoke<unknown>("plugin_uninstall", { slug, deleteData }));
+}
+
+export async function refreshPlugins(): Promise<PluginRecord[]> {
+  const records = await invoke<unknown[]>("plugin_refresh", {});
+  return records.map(normalizePluginRecord);
+}
+
 /** Route a plugin command through the single core permission boundary. */
 export function invokePlugin<TResult = unknown, TPayload = unknown>(
   slug: string,

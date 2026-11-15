@@ -2712,6 +2712,8 @@ const dict = {
     moduleStoreSubtitle: "Install and manage signed Taomni modules without changing the core application.",
     moduleStoreCoreApi: "Core API {version}",
     moduleStoreEmpty: "No modules are available yet.",
+    moduleStoreLoading: "Loading installed modules…",
+    moduleStoreInstallUnavailable: "Module download is not available yet. The verified package path is required.",
     moduleStoreCompatible: "Compatible",
     moduleStoreIncompatible: "Requires a different core API",
     moduleStoreVersion: "Version {version}",

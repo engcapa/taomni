@@ -3,16 +3,33 @@ import { useAppTheme } from "../../lib/appTheme";
 import { applyCodeViewProfile, loadCodeViewProfile, saveCodeViewProfile, type CodeViewProfile } from "../../lib/codeViewProfile";
 import { useT } from "../../lib/i18n";
 import { useAppThemeI18nLabel } from "../../lib/i18n/labels";
+import { installStagedPlugin, listPlugins, rollbackPlugin, setPluginEnabled, uninstallPlugin } from "../../lib/ipc";
+import { PLUGIN_CORE_API_VERSION, type PluginRecord } from "../../lib/pluginRegistry";
 import { clearPendingSettingsSection, consumePendingSettingsSection, OPEN_SETTINGS_SECTION_EVENT, type OpenSettingsSectionDetail } from "../../lib/settingsNavigation";
 import { useSystemFonts } from "../../lib/systemFonts";
 import { DEFAULT_TERMINAL_DEFAULT_PROFILE, DEFAULT_TERMINAL_PROFILE, loadTerminalDefaultProfile, saveTerminalDefaultProfile, type TerminalProfile } from "../../lib/terminalProfile";
 import { useAiStore } from "../../stores/aiStore";
 import { useAppStore } from "../../stores/appStore";
+import { useModuleStore } from "../../stores/moduleStore";
 import { type FontPickerOption } from "../terminal/FontPickerPanel";
+import { type ModuleStoreCatalogEntry } from "./ModuleStorePanel";
 import { UI_FONTS } from "./panel/fonts";
 import { type SettingsSearchContextValue } from "./panel/search";
 import { SettingsPanelView } from "./panel/SettingsPanelView";
 import { defaultExpandedGroups, groupIdForEntry, matchingGroupIds, matchingIds, SETTINGS_GROUPS } from "./settingsSearch";
+
+function moduleCatalogEntry(record: PluginRecord): ModuleStoreCatalogEntry | null {
+  const manifest = record.manifest;
+  if (!manifest) return null;
+  return {
+    slug: manifest.slug,
+    name: manifest.name,
+    description: `${manifest.kind} module`,
+    version: manifest.version,
+    coreApiVersion: manifest.coreApiVersion,
+    permissions: manifest.permissions,
+  };
+}
 
 export function SettingsPanel() {
   const [codeViewProfile, setCodeViewProfile] = useState<CodeViewProfile>(() => loadCodeViewProfile());
@@ -32,6 +49,10 @@ export function SettingsPanel() {
   const systemFonts = useSystemFonts(fontCatalogRequested);
   const voiceShellEnabled = useAiStore((s) => s.voiceShellEnabled);
   const toggleVoiceShell = useAiStore((s) => s.toggleVoiceShell);
+  const hydrateModuleStore = useModuleStore((s) => s.hydrate);
+  const [moduleCatalog, setModuleCatalog] = useState<ModuleStoreCatalogEntry[]>([]);
+  const [moduleCatalogLoading, setModuleCatalogLoading] = useState(true);
+  const [moduleCatalogError, setModuleCatalogError] = useState<string | null>(null);
   const t = useT();
   const themeLabel = useAppThemeI18nLabel();
 
@@ -233,6 +254,56 @@ export function SettingsPanel() {
     saveTerminalDefaultProfile(DEFAULT_TERMINAL_DEFAULT_PROFILE);
   }, []);
 
+  useEffect(() => {
+    let mounted = true;
+    setModuleCatalogLoading(true);
+    listPlugins()
+      .then((records) => {
+        if (!mounted) return;
+        hydrateModuleStore(records.map((record) => ({
+          slug: record.slug,
+          version: record.manifest?.version ?? "0.0.0",
+          activeVersion: record.lifecycle === "uninstalled" ? undefined : record.manifest?.version,
+          lifecycle: record.lifecycle,
+          dataRetained: true,
+          error: record.reason,
+        })));
+        setModuleCatalog(records.map(moduleCatalogEntry).filter((entry): entry is ModuleStoreCatalogEntry => entry !== null));
+        setModuleCatalogError(null);
+      })
+      .catch((reason) => {
+        if (!mounted) return;
+        setModuleCatalogError(reason instanceof Error ? reason.message : String(reason));
+        hydrateModuleStore([]);
+      })
+      .finally(() => {
+        if (mounted) setModuleCatalogLoading(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [hydrateModuleStore]);
+
+  const moduleOnInstall = useCallback(async (entry: ModuleStoreCatalogEntry) => {
+    // The signed catalog/download bridge will provide a verified staging path.
+    // Until then, fail explicitly instead of advancing only the renderer state.
+    const packageDir = (entry as ModuleStoreCatalogEntry & { packageDir?: string }).packageDir;
+    if (!packageDir) throw new Error(t("settings.moduleStoreInstallUnavailable"));
+    await installStagedPlugin(entry.slug, entry.version, packageDir);
+  }, [t]);
+  const moduleOnEnable = useCallback(async (entry: ModuleStoreCatalogEntry) => {
+    await setPluginEnabled(entry.slug, true);
+  }, []);
+  const moduleOnDisable = useCallback(async (entry: ModuleStoreCatalogEntry) => {
+    await setPluginEnabled(entry.slug, false);
+  }, []);
+  const moduleOnUninstall = useCallback(async (entry: ModuleStoreCatalogEntry, deleteData: boolean) => {
+    await uninstallPlugin(entry.slug, deleteData);
+  }, []);
+  const moduleOnRollback = useCallback(async (entry: ModuleStoreCatalogEntry, _version: string) => {
+    await rollbackPlugin(entry.slug);
+  }, []);
+
   const groupTitle = useCallback((titleKey: string) => t(titleKey), [t]);
 
   return <SettingsPanelView
@@ -273,5 +344,14 @@ export function SettingsPanel() {
     handleTerminalDefaultProfileChange={handleTerminalDefaultProfileChange}
     voiceShellEnabled={voiceShellEnabled}
     toggleVoiceShell={toggleVoiceShell}
+    moduleCatalog={moduleCatalog}
+    moduleCoreApiVersion={PLUGIN_CORE_API_VERSION}
+    moduleCatalogLoading={moduleCatalogLoading}
+    moduleCatalogError={moduleCatalogError}
+    moduleOnInstall={moduleOnInstall}
+    moduleOnEnable={moduleOnEnable}
+    moduleOnDisable={moduleOnDisable}
+    moduleOnUninstall={moduleOnUninstall}
+    moduleOnRollback={moduleOnRollback}
   />;
 }

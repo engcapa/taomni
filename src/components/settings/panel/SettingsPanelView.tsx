@@ -23,6 +23,7 @@ import { CodexCodePanel } from "../CodexCodePanel";
 import { EditorAiLanguagePanel } from "../EditorAiLanguagePanel";
 import { FileOpenSettings } from "../FileOpenSettings";
 import { MobileServiceSettings } from "../MobileServiceSettings";
+import { ModuleStorePanel, type ModuleStoreCatalogEntry } from "../ModuleStorePanel";
 import { LanguageSection } from "../LanguageSection";
 import { LanguageServersSettings } from "../LanguageServersSettings";
 import { LiveTemplatesSettings } from "../LiveTemplatesSettings";
@@ -75,6 +76,15 @@ export interface SettingsPanelViewProps {
   handleTerminalDefaultProfileChange: (profile: TerminalProfile) => void;
   voiceShellEnabled: boolean;
   toggleVoiceShell: () => void;
+  moduleCatalog: readonly ModuleStoreCatalogEntry[];
+  moduleCoreApiVersion: string;
+  moduleCatalogLoading: boolean;
+  moduleCatalogError: string | null;
+  moduleOnInstall: (entry: ModuleStoreCatalogEntry) => Promise<void>;
+  moduleOnEnable: (entry: ModuleStoreCatalogEntry) => Promise<void>;
+  moduleOnDisable: (entry: ModuleStoreCatalogEntry) => Promise<void>;
+  moduleOnUninstall: (entry: ModuleStoreCatalogEntry, deleteData: boolean) => Promise<void>;
+  moduleOnRollback: (entry: ModuleStoreCatalogEntry, version: string) => Promise<void>;
 }
 
 export function SettingsPanelView(inputs: SettingsPanelViewProps) {
@@ -116,6 +126,15 @@ export function SettingsPanelView(inputs: SettingsPanelViewProps) {
     handleTerminalDefaultProfileChange,
     voiceShellEnabled,
     toggleVoiceShell,
+    moduleCatalog,
+    moduleCoreApiVersion,
+    moduleCatalogLoading,
+    moduleCatalogError,
+    moduleOnInstall,
+    moduleOnEnable,
+    moduleOnDisable,
+    moduleOnUninstall,
+    moduleOnRollback,
   } = inputs;
   return ((
     <SettingsSearchContext.Provider value={ctxValue}>
@@ -348,6 +367,19 @@ export function SettingsPanelView(inputs: SettingsPanelViewProps) {
             </SettingsAnchor>
             <SettingsAnchor id="screenshot">
               <ScreenshotSettings />
+            </SettingsAnchor>
+            <SettingsAnchor id="module-store">
+              <ModuleStorePanel
+                catalog={moduleCatalog}
+                coreApiVersion={moduleCoreApiVersion}
+                catalogLoading={moduleCatalogLoading}
+                catalogError={moduleCatalogError}
+                onInstall={moduleOnInstall}
+                onEnable={moduleOnEnable}
+                onDisable={moduleOnDisable}
+                onUninstall={moduleOnUninstall}
+                onRollback={moduleOnRollback}
+              />
             </SettingsAnchor>
           </SettingsGroup>
 

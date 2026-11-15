@@ -27,6 +27,10 @@ export interface ModuleStorePanelProps {
   catalog?: readonly ModuleStoreCatalogEntry[];
   /** Core API negotiated by the native host; used to gate incompatible modules. */
   coreApiVersion?: string;
+  /** Native registry/catalog loading state. */
+  catalogLoading?: boolean;
+  /** A catalog refresh error is kept separate from lifecycle action errors. */
+  catalogError?: string | null;
   /** Native installer/supervisor operations; each runs before the local projection advances. */
   onInstall?: (entry: ModuleStoreCatalogEntry) => Promise<void> | void;
   onEnable?: (entry: ModuleStoreCatalogEntry) => Promise<void> | void;
@@ -79,6 +83,8 @@ export function ModuleStorePanel({
   onDisable,
   onUninstall,
   onRollback,
+  catalogLoading = false,
+  catalogError = null,
 }: ModuleStorePanelProps) {
   const t = useT();
   const records = useModuleStore((state) => state.records);
@@ -150,8 +156,11 @@ export function ModuleStorePanel({
           {t("settings.moduleStoreCoreApi", { version: coreApiVersion })}
         </span>
       </div>
+      {catalogError && <div role="alert" data-testid="module-store-catalog-error" className="mb-3 rounded border border-red-500/30 bg-red-500/10 p-2 text-[12px] text-red-700 dark:text-red-300">{catalogError}</div>}
       {error && <div role="alert" data-testid="module-store-error" className="mb-3 rounded border border-red-500/30 bg-red-500/10 p-2 text-[12px] text-red-700 dark:text-red-300">{error}</div>}
-      {entries.length === 0 ? (
+      {catalogLoading ? (
+        <div data-testid="module-store-loading" className="rounded border border-dashed border-[var(--taomni-divider)] p-4 text-[12px] text-[var(--taomni-text-muted)]">{t("settings.moduleStoreLoading")}</div>
+      ) : entries.length === 0 ? (
         <div data-testid="module-store-empty" className="rounded border border-dashed border-[var(--taomni-divider)] p-4 text-[12px] text-[var(--taomni-text-muted)]">{t("settings.moduleStoreEmpty")}</div>
       ) : (
         <div data-testid="module-store-list" className="space-y-2">
