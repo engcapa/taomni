@@ -394,6 +394,7 @@ jobs:
           import json
           import os
           import pathlib
+          import subprocess
           import time
           import urllib.request
           import zipfile
@@ -421,15 +422,17 @@ jobs:
 
           def download_artifact(artifact):
               name = artifact["name"]
-              request = urllib.request.Request(
-                  artifact["archive_download_url"],
-                  headers={
-                      "Accept": "application/vnd.github+json",
-                      "Authorization": f"Bearer {token}",
-                  },
+              # The REST zip endpoint redirects to artifact storage.  Calling
+              # it through gh preserves the short lived redirect credentials;
+              # urllib drops Authorization when the redirect changes host and
+              # receives a 401 from the blob service.
+              result = subprocess.run(
+                  ["gh", "api", f"repos/{repository}/actions/artifacts/{artifact['id']}/zip"],
+                  check=True,
+                  capture_output=True,
+                  env=os.environ,
               )
-              with urllib.request.urlopen(request, timeout=120) as response:
-                  payload = response.read()
+              payload = result.stdout
               target = destination / name
               target.mkdir(parents=True, exist_ok=True)
               with zipfile.ZipFile(io.BytesIO(payload)) as archive:
