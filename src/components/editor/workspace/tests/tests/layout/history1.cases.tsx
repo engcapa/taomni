@@ -258,7 +258,7 @@ export function registerlayoutHistory1Cases(caseContext: registerlayoutHistory1C
     caseContext.workspaceTestHarness.renderWorkspace(workspace);
     await screen.findAllByTitle("app / src/main.ts");
 
-    const panes = await findEditorPanes();
+    const panes = await findEditorPanes(2);
     const primaryPane = panes.find((pane) => pane.getAttribute("data-editor-group-id") === "primary")!;
     const secondaryPane = panes.find((pane) => pane.getAttribute("data-editor-group-id") === "secondary")!;
     const primaryView = EditorView.findFromDOM(primaryPane.querySelector<HTMLElement>(".cm-editor")!)!;
