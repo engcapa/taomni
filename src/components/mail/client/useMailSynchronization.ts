@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type SetStateAction } from "react";
-import { notifyDesktop } from "../../../lib/lanNotify";
+import { notifyDesktop } from "../../../lib/notifications";
 import { mailListFolders, type MailFolder, type MailMessageHeader, type MailSyncRequestMode } from "../../../lib/mail";
 import { folderLabel } from "../../../lib/mailFolders";
 import { mergeFolderMeta } from "../../../lib/mailSync";

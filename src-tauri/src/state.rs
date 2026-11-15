@@ -15,10 +15,10 @@ use crate::database::DbSession;
 use crate::filebrowser::sftp::ActiveSftp;
 use crate::filebrowser::transfer::TransferHandle;
 use crate::hbase::HBaseSession;
-use crate::lanchat::LanChatState;
 use crate::lsp::LspManager;
 use crate::mail::MailImapPool;
 use crate::objectstorage::ObjectStorageSession;
+use crate::plugin::PluginRegistry;
 use crate::rdp::ws::RdpSession;
 use crate::sdk::SdkManager;
 use crate::servers::ServerRegistry;
@@ -75,6 +75,9 @@ pub enum CcPermissionDecision {
 pub type CcPermissionResponder = tokio::sync::oneshot::Sender<CcPermissionDecision>;
 
 pub struct AppState {
+    /// Installed module metadata and lifecycle state. Plugin implementation
+    /// state remains in the supervised host process.
+    pub plugins: Arc<PluginRegistry>,
     pub tunnels: Arc<TunnelRegistry>,
     /// OS-level SocksCap engine (rules/egress now; capture in later phases).
     pub sockscap: Arc<SocksCapRuntime>,
@@ -93,10 +96,6 @@ pub struct AppState {
     /// Wrapped in RwLock so save_ai_config can hot-rebuild the router.
     pub ai_ctx: Arc<RwLock<AppAiCtx>>,
     pub opencode_go_catalog: Arc<crate::llm::opencode_go::catalog::CatalogService>,
-    /// Decentralized LAN messenger (LanChat) runtime state. Distinct from the
-    /// AI-assistant `chat`/`voice` modules. Holds node identity, peer roster,
-    /// and the lanchat.sqlite path; populated by the lanchat background service.
-    pub lanchat: Arc<LanChatState>,
     pub workspace: WorkspaceRuntime,
     pub mail: MailRuntime,
     pub terminal: TerminalRuntime,
@@ -115,8 +114,15 @@ impl AppState {
         mail_db_dir: PathBuf,
         vault: Arc<Vault>,
         ai_ctx: AppAiCtx,
-        lanchat: Arc<LanChatState>,
     ) -> Self {
+        let plugin_root = mail_db_dir
+            .parent()
+            .unwrap_or(mail_db_dir.as_path())
+            .join("plugins");
+        let plugins = Arc::new(PluginRegistry::new(plugin_root));
+        // A malformed optional plugin must never prevent the core from
+        // starting. Invalid manifests remain visible as disabled records.
+        let _ = plugins.scan();
         let sdk = Arc::new(SdkManager::load(crate::sdk::default_sdk_registry_path()));
         // Build the LSP manager first so the DAP manager can register the Java
         // debug adapter (D2), which drives jdtls via this handle.
@@ -124,6 +130,7 @@ impl AppState {
         let dap = Arc::new(crate::dap::DapManager::with_lsp(lsp.clone()));
         let mobile = Arc::new(crate::mobile::MobileRuntime::default());
         Self {
+            plugins,
             mobile: mobile.clone(),
             tunnels: Arc::new(TunnelRegistry::new()),
             sockscap: Arc::new(SocksCapRuntime::new()),
@@ -136,7 +143,6 @@ impl AppState {
             vault,
             ai_ctx: Arc::new(RwLock::new(ai_ctx)),
             opencode_go_catalog: crate::llm::opencode_go::catalog::shared_catalog(),
-            lanchat,
             workspace: WorkspaceRuntime { lsp, dap, sdk },
             mail: MailRuntime {
                 mail_db_dir,

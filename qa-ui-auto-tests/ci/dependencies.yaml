@@ -1,4 +1,6 @@
 TC-FILE-OPEN-012: []
+TC-MODULES-001: []
+TC-MODULES-002: []
 TC-FILE-OPEN-011: []
 # Native artifact/global-entry/security cases own isolated inputs.
 TC-FILE-OPEN-007: []

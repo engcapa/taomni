@@ -2,7 +2,7 @@
 //!
 //! Secrets are stored AES-256-GCM encrypted. The data key lives in the
 //! credential vault as the fixed entry [`crate::vault::MFA_DATA_KEY_ENTRY_ID`]
-//! (same pattern as the LanChat message key), so every command needs the vault
+//! (same protected-entry pattern as other plugin data keys), so every command needs the vault
 //! unlocked and the renderer only ever receives codes, never stored secrets.
 //! See `docs-feature/mfa-authenticator-design.md`.
 

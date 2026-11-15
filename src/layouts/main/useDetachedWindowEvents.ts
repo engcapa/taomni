@@ -4,7 +4,6 @@ import type { DetachedRdpParams, DetachedVncParams, DetachedTerminalParams, Deta
 import { vncConsumeDetachClaim } from "../../lib/vnc";
 import { deserializeVncViewerOptions } from "../../lib/vncOptions";
 import type { Tab } from "../../types";
-import { useLanChatStore } from "../../stores/lanChatStore";
 import { t as tr } from "../../lib/i18n";
 import { reattachSftp } from "./reattachSftp";
 import type { DetachedSftpParams } from "../../lib/sftpWindowState";
@@ -54,29 +53,6 @@ export function useDetachedWindowEvents(context: UseDetachedWindowEventsContext)
         } catch (error) {
           setStatusMessage(tr("fileBrowser.statusSftpConnectFailed", { error: String(error) }));
         }
-        clearReattachHandoff(msg.kind, msg.id);
-        return;
-      }
-      if (msg.kind === "lan-chat") {
-        const p = msg.payload as { activeConvId?: string; title?: string } | undefined;
-        const convId = p?.activeConvId || msg.id;
-        const existing = tabsRef.current.find((tab) => tab.type === "lan-chat");
-        if (existing) {
-          setActiveTab(existing.id);
-        } else {
-          addTab({
-            id: "lan-chat",
-            type: "lan-chat",
-            title: tr("tabs.lanChat"),
-            closable: true,
-          });
-        }
-        if (convId) {
-          if (convId.startsWith("direct:") || convId.startsWith("group:")) {
-            void useLanChatStore.getState().openConversation(convId);
-          }
-        }
-        setStatusMessage(tr("status.reattached"));
         clearReattachHandoff(msg.kind, msg.id);
         return;
       }

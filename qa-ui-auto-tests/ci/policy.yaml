@@ -30,6 +30,8 @@ smoke:
 - TC-FILE-OPEN-006
 unavailable: {}
 cases:
+- TC-MODULES-001
+- TC-MODULES-002
 - TC-FILE-OPEN-012
 - TC-FILE-OPEN-011
 - TC-FILE-OPEN-007

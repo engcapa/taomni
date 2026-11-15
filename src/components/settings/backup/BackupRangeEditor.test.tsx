@@ -15,7 +15,6 @@ it("opens legacy full with explicit mail exclusion and keeps certificates when e
   render(<Editor initial={{ scope: "full", customOptions: { includeMail: false } }} />);
   expect(screen.queryByRole("combobox")).toBeNull();
   expect(screen.getByTestId("backup-global-include-mail")).not.toBeChecked();
-  expect(screen.getByTestId("backup-global-includeLanchat")).toBeChecked();
   fireEvent.click(screen.getByTestId("backup-global-includeNotes"));
   expect(JSON.parse(screen.getByTestId("value").textContent!)).toMatchObject({ scope: "custom", customOptions: { includeNotes: false, includeMail: false, includeServerCertificates: true } });
 });

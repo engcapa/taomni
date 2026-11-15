@@ -6,9 +6,6 @@ import { CcAgentBridge } from "../../components/agent/CcAgentBridge";
 import { ChatDrawer } from "../../components/chat/ChatDrawer";
 import { ToolWindowRail } from "../../components/editor/workspace/panels/ToolWindowRail";
 import { effectiveStripeWidth } from "../../components/editor/workspace/toolWindowLayout";
-import { CallOverlay } from "../../components/lanchat/CallOverlay";
-import { EdgeDrawer } from "../../components/lanchat/EdgeDrawer";
-import { WhiteboardOverlay } from "../../components/lanchat/whiteboard/WhiteboardOverlay";
 import { FloatingNotesPanel } from "../../components/notes/FloatingNotesPanel";
 import { QuickConnect } from "../../components/quickconnect/QuickConnect";
 import { AuthPrompt } from "../../components/session/AuthPrompt";
@@ -277,7 +274,6 @@ export function MainLayoutView(props: MainLayoutViewProps) {
                     openLocalTab={sessionActions.openLocalTab}
                     handleNewSession={sessionActions.handleNewSession}
                     handleOpenLocalPath={workspaceOpening.handleOpenLocalPath}
-                    openLanChatTab={utilityTabs.openLanChatTab}
                     welcomeRecentSessions={layout.welcomeRecentSessions}
                     welcomeMailSessions={layout.welcomeMailSessions}
                     handleConnectSession={connections.handleConnectSession}
@@ -460,9 +456,6 @@ export function MainLayoutView(props: MainLayoutViewProps) {
 
         {layout.appExitConfirmDialog}
         <ServersTabBlockedDialog />
-        <CallOverlay />
-        <WhiteboardOverlay />
-        <EdgeDrawer />
       </div>
     </TabActionSlotProvider>
   ));

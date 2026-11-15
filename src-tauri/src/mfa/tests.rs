@@ -508,5 +508,4 @@ fn x11_zpixmap_luma_handles_both_byte_orders() {
 #[test]
 fn mfa_data_key_entry_is_protected_from_vault_deletion() {
     assert!(crate::vault::is_protected_entry(MFA_DATA_KEY_ENTRY_ID));
-    assert!(!crate::vault::is_protected_entry("lanchat.message-key-v1"));
 }

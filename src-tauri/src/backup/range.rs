@@ -11,8 +11,6 @@ pub struct BackupCustomOptions {
     #[serde(default)]
     pub include_vault: bool,
     #[serde(default)]
-    pub include_lanchat: bool,
-    #[serde(default)]
     pub include_configs: bool,
     #[serde(default)]
     pub include_mail: bool,
@@ -36,7 +34,6 @@ pub struct BackupScopeFlags {
     pub sessions: bool,
     pub notes: bool,
     pub vault: bool,
-    pub lanchat: bool,
     pub configs: bool,
     pub mail: bool,
     pub mail_originals: bool,
@@ -64,7 +61,6 @@ pub fn resolve_scope_flags(scope: &str, custom: Option<BackupCustomOptions>) -> 
         sessions: true,
         notes: true,
         vault: true,
-        lanchat: false,
         configs: true,
         mail: false,
         mail_originals: false,
@@ -74,17 +70,12 @@ pub fn resolve_scope_flags(scope: &str, custom: Option<BackupCustomOptions>) -> 
         mfa: true,
     };
     let mut flags = match scope {
-        "full" => BackupScopeFlags {
-            lanchat: true,
-            mail: true,
-            ..core
-        },
+        "full" => BackupScopeFlags { mail: true, ..core },
         "custom" => match custom {
             Some(opts) => BackupScopeFlags {
                 sessions: opts.include_sessions,
                 notes: opts.include_notes,
                 vault: opts.include_vault,
-                lanchat: opts.include_lanchat,
                 configs: opts.include_configs,
                 mail: opts.include_mail,
                 mail_originals: false,
@@ -171,7 +162,7 @@ mod tests {
         };
         let full = global(&policy);
         let flags = resolve_scope_flags(&full.scope, full.custom_options);
-        assert!(flags.mail && flags.lanchat && flags.vault && flags.mfa);
+        assert!(flags.mail && flags.vault && flags.mfa);
         assert!(!flags.local_history);
         policy.include_mail = Some(false);
         let range = global(&policy);

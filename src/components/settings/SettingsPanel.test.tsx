@@ -12,7 +12,6 @@ const ipcMocks = vi.hoisted(() => ({
   getAppProxyConfig: vi.fn(),
   listSessions: vi.fn(),
   vaultStatus: vi.fn().mockResolvedValue({ state: "unlocked", entry_count: 0 }),
-  lanchatGetServiceState: vi.fn().mockResolvedValue({ running: false, port: 0, peers_count: 0 }),
   sdkGetRegistry: vi.fn().mockResolvedValue({ version: 1, installations: [] }),
   subscribeSdkRegistryChanged: vi.fn().mockReturnValue(() => {}),
   selectFilePath: vi.fn(),

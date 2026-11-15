@@ -23,7 +23,6 @@ import { CodexCodePanel } from "../CodexCodePanel";
 import { EditorAiLanguagePanel } from "../EditorAiLanguagePanel";
 import { FileOpenSettings } from "../FileOpenSettings";
 import { MobileServiceSettings } from "../MobileServiceSettings";
-import { LanChatSettings } from "../LanChatSettings";
 import { LanguageSection } from "../LanguageSection";
 import { LanguageServersSettings } from "../LanguageServersSettings";
 import { LiveTemplatesSettings } from "../LiveTemplatesSettings";
@@ -509,11 +508,6 @@ export function SettingsPanelView(inputs: SettingsPanelViewProps) {
 
             <SettingsAnchor id="mobile-service"><MobileServiceSettings /></SettingsAnchor>
 
-            <SettingsAnchor id="lanchat">
-              <section className="mb-5 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
-                <LanChatSettings />
-              </section>
-            </SettingsAnchor>
           </SettingsGroup>
 
           {/* —— AI —— */}

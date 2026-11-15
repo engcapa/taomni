@@ -124,7 +124,6 @@ fn destination(app_data: &Path, name: &str) -> Result<PathBuf, String> {
         "databases/notes.db" => app_data.join("notes.db"),
         "databases/vault.db" => app_data.join("vault.db"),
         "databases/mfa.db" => app_data.join("mfa.db"),
-        "databases/lanchat.sqlite" => app_data.join("lanchat.sqlite"),
         "configs/tunnels.json" => app_data.join("tunnels.json"),
         "configs/ai.json" | "configs/proxy.json" | "configs/mirror.json" | "configs/sdk.json" => {
             crate::resolved_config_dir()

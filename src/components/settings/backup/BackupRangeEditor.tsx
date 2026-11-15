@@ -6,7 +6,7 @@ import { rangeOptions, type BackupRange } from "../../../lib/backupSettings";
 export const backupInput = "w-full rounded border border-theme-border bg-theme-bg p-2 text-xs text-theme-text";
 export const backupButton = "rounded border border-theme-border px-3 py-1.5 text-xs text-theme-text hover:border-accent disabled:opacity-50";
 type Key = keyof BackupCustomOptions;
-const fields: Key[] = ["includeSessions", "includeNotes", "includeVault", "includeMfa", "includeConfigs", "includeServerCertificates", "includeLanchat", "includeLocalHistory"];
+const fields: Key[] = ["includeSessions", "includeNotes", "includeVault", "includeMfa", "includeConfigs", "includeServerCertificates", "includeLocalHistory"];
 const mailFields: Key[] = ["includeMail", "includeMailOriginals", "includeMailAttachments"];
 
 function CategoryCheckbox({ mixed = false, ...props }: InputHTMLAttributes<HTMLInputElement> & { mixed?: boolean }) {

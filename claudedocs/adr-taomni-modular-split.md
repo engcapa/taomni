@@ -2,7 +2,7 @@
 
 ## Status
 
-Accepted as a design decision; implementation not started. v1.5 is the current review revision, based on `7bc498b35` (Merge PR #813); it re-audits the code added on the branch since v1.4 (`1d2f5748`, PR #810). M0 tasks are ready to start; plugin migration is blocked until the G1–G11 feasibility gates pass. The executable plan is in `docs-feature/taomni-modular-split-design.md` §10.1.
+Accepted as a design decision; M0 implementation is in progress. v1.6 is the current review revision, based on `7bc498b35` (Merge PR #813); it records the 2026-11-15 decision to remove LanChat completely. Plugin migration remains blocked until the G1–G11 feasibility gates pass. The executable plan is in `docs-feature/taomni-modular-split-design.md` §10.1.
 
 ## 1. Context
 
@@ -16,7 +16,7 @@ Taomni 是 Tauri 2 + React 19 + Rust 的本地优先桌面工作台。当前发�
 
 - 核心保留窄核心（终端、SFTP、Tao 轻聊）、除 RDP/VNC 外的 24 种 session 客户端、Workspace/Code Workspace 全量、Tao Agent 全量、Notes、全局文件打开 / 查看器、截图入口、备份、代理基础设施、共享采集服务和插件基础设施。
 - RDP/VNC 客户端与服务端拆成四个插件：`plugin-rdp-client`、`plugin-vnc-client`、`plugin-rdp-server`、`plugin-vnc-server`。
-- 有效插件共 11 个：上述四个，加 `plugin-servers`、`plugin-sockscap`、暂定的 `plugin-lanchat`、`plugin-screenshot`、`plugin-mfa`、`plugin-ai-voice-local`、`plugin-mobile`。
+- 有效插件共 10 个：上述四个，加 `plugin-servers`、`plugin-sockscap`、`plugin-screenshot`、`plugin-mfa`、`plugin-ai-voice-local`、`plugin-mobile`。LanChat 已彻底删除，不进入插件、迁移、备份或验收范围。
 - nettools 不作为插件。核心 `proxy/`、`test_proxy_connection`、隧道管理器 `TabKind "nettools"` 保留；删除 `ProxyTestTab` 需要另开产品任务。
 
 ### 2.2 原生插件形态
@@ -29,7 +29,7 @@ Taomni 是 Tauri 2 + React 19 + Rust 的本地优先桌面工作台。当前发�
 
 ### 2.3 v1.5 补充决定与待确认项
 
-- 新增共享能力下沉项 S11–S15：主二进制 re-exec 入口按归属迁移（核心只保留 `--ssh-stdio-forward`、`--screenshot-scroll-input`）；插件加密数据密钥（`mfa.data-key-v1`、`lanchat.message-key-v1`）经核心 Vault 的 slug 作用域受限服务访问；运行中的插件库经 `backup.snapshot` 备份，还原前宿主全部静默；移动端控制面与 `--headless` 先定义扩展点再拆。
+- 新增共享能力下沉项 S11–S15：主二进制 re-exec 入口按归属迁移（核心只保留 `--ssh-stdio-forward`、`--screenshot-scroll-input`）；MFA 加密数据密钥（`mfa.data-key-v1`）经核心 Vault 的 slug 作用域受限服务访问；运行中的插件库经 `backup.snapshot` 备份，还原前宿主全部静默；移动端控制面与 `--headless` 先定义扩展点再拆。
 - 更正：MFA 屏幕采集是自带实现（现有采集实现分三处，已决定合并，见设计文档 §4.2.1）；宿主 crate 不得依赖 `tauri` / `wry` / `tauri-utils`；插件前端协议须与 `taomni-preview` 合并 CSP，且分离窗口入口同样初始化插件注册表。
 - `crash-regression` 集合含依赖插件的用例（`TC-MOBILE-012/013`）：核心-only 与全量两套报告并列，缺失不得记为通过。
 - 用户已于 2026-11-15 确认：在 M0 末对 `plugin-mobile` 做 go/no-go，排期默认按 DEC-2 暂缓；采用 DEC-8–DEC-10 作为实施约束。屏幕采集（现有实现分三处）已决定合并：库 crate `taomni-capture` + 核心 `capture/`，方案见设计文档 §4.2.1，由 TASK-003 实施。
@@ -41,6 +41,7 @@ Taomni 是 Tauri 2 + React 19 + Rust 的本地优先桌面工作台。当前发�
 - 每个插件有 `module.json`、独立版本、平台 artifact、分离 minisign、SHA-256、`coreApiVersion` 和 `permissions`。安装使用版本目录 + active 指针/原子替换，默认卸载保留数据，显式删除才清理。
 - 核心继续使用 `latest.json`；插件使用独立签名的 `modules.json`。模块清单生成器独立为 `scripts/compose-modules-manifest.mjs`，共享底层签名/资产校验但不改变核心更新清单契约。
 - 代理、下载、断点续传、取消、进度、失败恢复、备份和迁移必须遵循仓库 `AGENTS.md` 的外部网络与数据完整性要求。
+- 从 0.5.x 单体包升级时，核心先只读预检并写原子 `migration/journal.json`，再把插件代码放入 staging 目录；legacy tables 通过核心只读接口迁移，MFA 固定密钥经核心 Vault 的 slug 作用域服务访问。旧 LanChat 数据只在旧数据目录原样保留，不读取、不复制、不移动、不迁移、不删除。迁移项逐项以源指纹和 `committed` 状态记账，插件验签、下载、宿主退出或 Vault 访问失败时只回滚 active 指针并保留旧数据；核心仍可启动，用户可稍后安装缺失插件。完整协议见设计文档 §6.5.1，验证 ID 为 AC-017/V-012。
 
 ## 3. Feasibility gates and release rule
 
@@ -56,7 +57,7 @@ M0 必须用 hello-plugin 和一个真实原生插件完成 G1–G11：macOS/Win
 
 ## 5. Implementation plan
 
-执行入口是设计文档 §10.1 的 TASK-001–TASK-025：先做基线/协议、共享能力下沉、状态和依赖闭包（含 TASK-024 入口与 profile 协同、TASK-025 插件数据密钥与快照），再做宿主/注册表/下载/验签/迁移，随后按 MFA/LanChat → RDP/VNC → Servers/SocksCap → Screenshot/Local Voice/Mobile 分批迁移，最后执行发布和回归收口。任务完成必须关联 AC-001–AC-016 与 V-001–V-011 的证据。
+执行入口是设计文档 §10.1 的 TASK-001–TASK-025：先做基线/协议、共享能力下沉、状态和依赖闭包（含 TASK-024 入口与 profile 协同、TASK-025 插件数据密钥与快照），再做宿主/注册表/下载/验签/迁移，随后按 MFA → RDP/VNC → Servers/SocksCap → Screenshot/Local Voice/Mobile 分批迁移，最后执行发布和回归收口。TASK-012 必须实现 §6.5.1 的单体升级 journal、预检、staging、回滚和离线 pending 状态。任务完成必须关联 AC-001–AC-017 与 V-001–V-012 的证据。
 
 ## 6. References
 

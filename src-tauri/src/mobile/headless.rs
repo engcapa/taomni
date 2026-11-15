@@ -68,7 +68,6 @@ pub(super) fn initialize_with_config(
         mail,
         vault,
         ai,
-        Arc::new(crate::lanchat::LanChatState::new(data)),
     ))
 }
 fn argument(name: &str) -> Option<String> {

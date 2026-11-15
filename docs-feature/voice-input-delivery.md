@@ -35,7 +35,7 @@ Base/Small/Medium 都是多语言权重，不是 `.en` 英语专用版；全部�
 前端定向命令（使用 `pnpm exec` 直接传过滤文件）：
 
 ```bash
-pnpm exec vitest run src/components/voice/DictationButton.test.tsx src/components/voice/VoiceConsumers.test.tsx src/components/settings/AsrPanel.test.tsx src/components/chat/Composer.test.tsx src/components/lanchat/LanChatConversationUi.test.tsx src/components/window/TitleBarTrayControls.test.tsx src/stores/aiStore.test.ts
+pnpm exec vitest run src/components/voice/DictationButton.test.tsx src/components/voice/VoiceConsumers.test.tsx src/components/settings/AsrPanel.test.tsx src/components/chat/Composer.test.tsx src/components/window/TitleBarTrayControls.test.tsx src/stores/aiStore.test.ts
 pnpm build
 ```
 

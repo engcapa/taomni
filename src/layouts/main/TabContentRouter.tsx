@@ -6,7 +6,6 @@ import { FileBrowser } from "../../components/filebrowser/FileBrowser";
 import { ExplorerTabPane } from "../../components/explorer/ExplorerTabPane";
 import { GitPanel } from "../../components/git/GitPanel";
 import { WorkspaceGitManager } from "../../components/git/WorkspaceGitManager";
-import { LanChatGate } from "../../components/lanchat/LanChatGate";
 import { MailClientTab } from "../../components/mail/MailClientTab";
 import { MailUnifiedTab } from "../../components/mail/MailUnifiedTab";
 import { MfaTab } from "../../components/mfa/MfaTab";
@@ -351,8 +350,6 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
       );
     })}
 
-    {activeTab?.type === "lan-chat" && <LanChatGate />}
-
     {tabs.some((tab) => tab.type === "mail-unified") && (
       <div className="absolute inset-0" style={{ display: activeTab?.type === "mail-unified" ? "block" : "none" }}>
         <MailUnifiedTab
@@ -588,7 +585,6 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
       activeTab.type !== "git" &&
       activeTab.type !== "nettools" &&
       activeTab.type !== "sockscap" &&
-      activeTab.type !== "lan-chat" &&
       activeTab.type !== "mfa" &&
       activeTab.type !== "servers" &&
       activeTab.type !== "proxy-test" && (

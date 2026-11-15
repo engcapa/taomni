@@ -60,35 +60,19 @@ fn put_resolve_roundtrip() {
 fn fixed_entries_roundtrip_and_update() {
     let (_d, v) = fresh_vault();
     v.init(PW).unwrap();
-    assert!(v.get_fixed("lanchat.message-key-v1").unwrap().is_none());
+    assert!(v.get_fixed("test.fixed-v1").unwrap().is_none());
 
-    v.put_fixed(
-        "lanchat.message-key-v1",
-        "lanchat_secret",
-        "LanChat Message Key",
-        "first",
-    )
-    .unwrap();
+    v.put_fixed("test.fixed-v1", "test_secret", "Test Fixed Key", "first")
+        .unwrap();
     assert_eq!(
-        v.get_fixed("lanchat.message-key-v1")
-            .unwrap()
-            .unwrap()
-            .as_str(),
+        v.get_fixed("test.fixed-v1").unwrap().unwrap().as_str(),
         "first"
     );
 
-    v.put_fixed(
-        "lanchat.message-key-v1",
-        "lanchat_secret",
-        "LanChat Message Key",
-        "second",
-    )
-    .unwrap();
+    v.put_fixed("test.fixed-v1", "test_secret", "Test Fixed Key", "second")
+        .unwrap();
     assert_eq!(
-        v.get_fixed("lanchat.message-key-v1")
-            .unwrap()
-            .unwrap()
-            .as_str(),
+        v.get_fixed("test.fixed-v1").unwrap().unwrap().as_str(),
         "second"
     );
 }

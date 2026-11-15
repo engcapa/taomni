@@ -16,9 +16,8 @@ export const RUNTIME_KIND: "tauri" | "browser" =
 
 /**
  * Whether the webview exposes the WebRTC `RTCPeerConnection` API. This is the
- * switch between the two LanChat media stacks: Windows (WebView2) and macOS
- * (WKWebView) expose it; Linux WebKitGTK does NOT (the build does not ship the
- * WebRTC DOM at all — confirmed, not a settings/timing issue), so those nodes
+ * detect optional browser capabilities exposed by the current webview. Linux
+ * WebKitGTK may not ship the WebRTC DOM, so callers must handle absence.
  * fall back to the Rust-native capture/encode/transport stack.
  */
 export function hasWebRtc(): boolean {

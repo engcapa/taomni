@@ -17,12 +17,12 @@
 
 | 位置与符号 | 当前行为 / 契约 | 本次影响 | 依据与确定性 |
 |---|---|---|---|
-| `src/components/tabbar/ControlBar.tsx` `openMainMenu` Tools 子菜单 | Windows/Linux 应用菜单 Tools 含 servers/tunneling/sockscap/git/code-workspace/mail-unified/lan-chat/network-tools | 新增 `context-menu-item-mfa` | 源码 |
+| `src/components/tabbar/ControlBar.tsx` `openMainMenu` Tools 子菜单 | Windows/Linux 应用菜单 Tools 含 servers/tunneling/sockscap/git/code-workspace/mail-unified/network-tools | 新增 `context-menu-item-mfa` | 源码 |
 | `src/lib/nativeAppMenu.ts` `buildAppMenuSpec` | macOS 原生 Tools 菜单（纯数据 spec，有单测） | 新增 `mfa` 项 | 源码 |
 | `src/components/sidebar/Sidebar.tsx` `ToolsPanel` | 侧栏工具面板镜像 Tools 菜单 | 新增 `sidebar-tool-mfa` | 源码注释 “mirror the main menu Tools items” |
 | `src/layouts/MainLayout.tsx` `handleCommand` / 标签渲染 | 工具类标签单实例打开（如 `sockscap`），非已知类型落到 `UnavailablePanel` | 新增 `mfa` 命令、`openMfaTab`、渲染与排除 | 源码 |
 | `src-tauri/src/notes/`、`lib.rs` setup | Notes 使用独立 `notes.db`，启动时打开 | MFA 仿照独立库，但改为懒打开以免损坏库阻断启动 | 源码 |
-| `src-tauri/src/lanchat/mod.rs` `ensure_unlocked` | 随机消息密钥存保险库固定条目 `lanchat.message-key-v1`，消息落库加密 | MFA 采用同一模式：`mfa.data-key-v1` | 源码 |
+| `src-tauri/src/vault/mod.rs` 固定密钥访问模式 | 插件数据密钥由核心 Vault 作用域管理 | MFA 采用固定条目 `mfa.data-key-v1` | 源码 |
 | `src/components/vault/VaultGate.tsx` | 保险库为空→设置对话框；锁定→解锁对话框；取消→占位 | MFA 标签复用；占位补 `vault-gate-placeholder` testid | 源码 |
 | `src-tauri/src/vault/mod.rs` `vault_delete` | 任意条目可删 | 拒绝删除 MFA 数据密钥 | 源码；删除即永久丢失全部 MFA 密钥 |
 | `src-tauri/src/backup/engine.rs` `create_backup` | core/full 打包 taomni/notes/vault 等，无 MFA | 新增 `databases/mfa.db`，`includeMfa` 自定义选项强制带 vault | 源码 |
@@ -30,7 +30,7 @@
 | `src/components/settings/BackupSettingsPanel.tsx` | 仅恢复对话框有 testid | 增加立即备份、历史行、恢复动作、清单文件列表等 testid；范围文案提及 MFA | 源码 |
 | `src-tauri/src/config/mod.rs` `read_file_bytes`、`chat_read_clipboard_image_attachment` | 已有二进制 IPC (`tauri::ipc::Response`) 与 arboard 读取剪贴板图像先例 | MFA 剪贴板/截屏帧沿用二进制响应 | 源码 |
 | `src-tauri/Cargo.toml` | `xcap` 在三端 target 依赖中非可选；`hmac`/`sha1`/`sha2`/`aes-gcm`/`arboard` 已是直接依赖 | 不新增 Rust 依赖 | Cargo.toml / Cargo.lock |
-| `src-tauri/Info.plist`、`Entitlements.plist`、`lib.rs` Linux `with_webview` | 已为 LanChat 声明摄像头用途、开启 WebKitGTK media-stream | 摄像头扫码直接复用；用途文案补 MFA | 源码 |
+| `src-tauri/Info.plist`、`Entitlements.plist`、`lib.rs` Linux `with_webview` | 已有摄像头用途声明并开启 WebKitGTK media-stream | 摄像头扫码直接复用；用途文案补 MFA | 源码 |
 | `tauri.conf.json` CSP | `script-src 'self'`（无 `wasm-unsafe-eval`），`img-src`/`media-src` 允许 `blob:` | 解码器必须是纯 JS；图片与视频预览可用 blob | 源码 |
 | qa-ui-auto | 无 MFA/备份用例；native 不支持 `upload_file`；无图像剪贴板、摄像头、屏幕窗口动词 | 新增用例与 5 个 runner 动词 | `native_steps.py`、`verb-catalog.md` |
 
@@ -181,7 +181,7 @@ MFA 标签布局（DEC-02 已确认线框）：
 ### TASK-01 Rust 核心：OTP、加密与存储
 
 - 职责与文件范围：`src-tauri/src/mfa/{mod,otp,crypto,store}.rs`。
-- 输入与必读：§4 数据流；`vault/crypto.rs`、`lanchat/mod.rs` 数据密钥模式；`notes/db.rs` 风格。
+- 输入与必读：§4 数据流；`vault/crypto.rs` 数据密钥模式；`notes/db.rs` 风格。
 - 依赖：DEC-01/05（已定）。无前置任务。
 - 实施内容：Base32 解码（大小写、空格、`-`、可选 `=`），HOTP/TOTP（SHA1/256/512，6～8 位）；数据密钥确保/校验/创建，AES-GCM 带 AAD，指纹；`MfaStore` 懒打开、`init_db`、CRUD、排序、计数、使用记录、偏好、重置、`backup_to`。
 - 对应验收：AC-03/09/12/13/14/16。
@@ -290,7 +290,7 @@ MFA 标签布局（DEC-02 已确认线框）：
 
 证明边界：browser 用例使用 stub 存储与 WebCrypto，只证明渲染层与解码器；`seed_clipboard_image` 走 Chromium async clipboard；`browser_fake_camera` 用画布 `captureStream` 替代设备，证明扫码循环而非真实摄像头/权限；native 用例证明 Rust 生成码、`mfa.db`、保险库、备份引擎、arboard、xcap 与 WebView 集成。不适用层：Rust integration 套件（无跨模块网络/进程协作，单测已覆盖）。
 
-回归：入口改动影响 Tools 菜单与侧栏既有项（V-10 同时断言既有 Tools 项可见）；`VaultGate` 只增加 testid（LanChat 消费者行为不变，由既有 LanChat 用例保护）；备份范围变化以 V-06/V-07 与 V-21 保护既有 taomni/notes/vault 打包。
+回归：入口改动影响 Tools 菜单与侧栏既有项（V-10 同时断言既有 Tools 项可见）；`VaultGate` 只增加 testid；备份范围变化以 V-06/V-07 与 V-21 保护既有 taomni/notes/vault 打包。
 
 ## 8. 真机验证手册
 

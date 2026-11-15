@@ -2016,8 +2016,6 @@
 - `[data-testid="home-open-mail"]` — interactive — F-WS-1.home-open-mail
 - `[data-testid="home-open-network-tools"]` — interactive — F-WS-1.home-open-network-tools
 - `[data-testid="home-open-mfa"]` — interactive — F-WS-1.home-open-mfa
-- `[data-testid="welcome-open-lanchat"]` — interactive — F-WS-1.welcome-open-lanchat
-- `[data-testid="lanchat-roster-panel"]` — display — F-WS-1.lanchat-roster-panel
 - `[data-testid="platform-toolbar-actions"]` — display — F-WS-1.platform-toolbar-actions
 - `[data-testid="home-toolbar-workspaces"]` — interactive — F-WS-1.home-toolbar-workspaces
 - `[data-testid="home-toolbar-sessions"]` — interactive — F-WS-1.home-toolbar-sessions
@@ -2478,6 +2476,12 @@
 - `[data-testid="feishu-saved"]` — display — F-MOBILE-2.feishu-saved
 - `[data-testid="feishu-status"]` — display — F-MOBILE-2.feishu-status
 - `[data-testid="feishu-error"]` — display — F-MOBILE-2.feishu-error
+
+## modules/core-startup (F-Modules-1)
+
+- `[data-testid="context-menu-item-lan-chat"]` — display — F-Modules-1.removed-lanchat-context-entry
+- `[data-testid="welcome-open-lanchat"]` — display — F-Modules-1.removed-lanchat-welcome-entry
+- `[data-testid="tao-home-lan-chat"]` — display — F-Modules-1.removed-lanchat-home-card
 
 ## network/sockscap (F-Sockscap-1)
 
@@ -3269,7 +3273,6 @@
 - `[data-testid="backup-global-includeMfa"]` — interactive — F-BACKUP-1.backup-global-includeMfa
 - `[data-testid="backup-global-includeConfigs"]` — interactive — F-BACKUP-1.backup-global-includeConfigs
 - `[data-testid="backup-global-includeServerCertificates"]` — interactive — F-BACKUP-1.backup-global-includeServerCertificates
-- `[data-testid="backup-global-includeLanchat"]` — interactive — F-BACKUP-1.backup-global-includeLanchat
 - `[data-testid="backup-global-includeMail"]` — interactive — F-BACKUP-1.backup-global-includeMail
 - `[data-testid="backup-global-includeMailOriginals"]` — interactive — F-BACKUP-1.backup-global-includeMailOriginals
 - `[data-testid="backup-global-includeMailAttachments"]` — interactive — F-BACKUP-1.backup-global-includeMailAttachments
@@ -3281,7 +3284,6 @@
 - `[data-testid="backup-local-includeMfa"]` — interactive — F-BACKUP-1.backup-local-includeMfa
 - `[data-testid="backup-local-includeConfigs"]` — interactive — F-BACKUP-1.backup-local-includeConfigs
 - `[data-testid="backup-local-includeServerCertificates"]` — interactive — F-BACKUP-1.backup-local-includeServerCertificates
-- `[data-testid="backup-local-includeLanchat"]` — interactive — F-BACKUP-1.backup-local-includeLanchat
 - `[data-testid="backup-local-includeLocalHistory"]` — interactive — F-BACKUP-1.backup-local-includeLocalHistory
 - `[data-testid="backup-local-includeMail"]` — interactive — F-BACKUP-1.backup-local-includeMail
 - `[data-testid="backup-local-includeMailOriginals"]` — interactive — F-BACKUP-1.backup-local-includeMailOriginals
@@ -3353,7 +3355,6 @@
 - `[data-testid="backup-cloud-includeMfa"]` — interactive — F-BACKUP-2.backup-cloud-includeMfa
 - `[data-testid="backup-cloud-includeConfigs"]` — interactive — F-BACKUP-2.backup-cloud-includeConfigs
 - `[data-testid="backup-cloud-includeServerCertificates"]` — interactive — F-BACKUP-2.backup-cloud-includeServerCertificates
-- `[data-testid="backup-cloud-includeLanchat"]` — interactive — F-BACKUP-2.backup-cloud-includeLanchat
 - `[data-testid="backup-cloud-includeLocalHistory"]` — interactive — F-BACKUP-2.backup-cloud-includeLocalHistory
 - `[data-testid="backup-cloud-includeMail"]` — interactive — F-BACKUP-2.backup-cloud-includeMail
 - `[data-testid="backup-cloud-includeMailOriginals"]` — interactive — F-BACKUP-2.backup-cloud-includeMailOriginals
@@ -3538,7 +3539,6 @@
 - `[data-testid="tao-home-new-session"]` — interactive — F1.11.tao-home-new-session
 - `[data-testid="tao-home-new-workspace"]` — interactive — F1.11.tao-home-new-workspace
 - `[data-testid="tao-home-dock-more"]` — interactive — F1.11.tao-home-dock-more
-- `[data-testid="tao-home-lan-chat"]` — display [optional] — F1.11.tao-home-lan-chat
 - `[data-testid="tao-home-search"]` — interactive — F1.11.tao-home-search
 - `[data-testid="tao-home-search-panel"]` — display — F1.11.tao-home-search-panel
 - `[data-testid="tao-home-search-input"]` — interactive — F1.11.tao-home-search-input

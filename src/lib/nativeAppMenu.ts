@@ -109,7 +109,6 @@ export function buildAppMenuSpec(params: BuildAppMenuParams): AppMenuSpec {
     { type: "item", id: "code-workspace", label: t("menu.codeWorkspace"), action: "code-workspace" },
     { type: "item", id: "file-explorer", label: t("menu.fileExplorer"), action: "file-explorer" },
     { type: "item", id: "mail-unified", label: t("tabs.mailUnified"), action: "mail-unified" },
-    { type: "item", id: "lan-chat", label: t("tabs.lanChat"), action: "lan-chat" },
     { type: "item", id: "mfa", label: t("menu.mfa"), action: "mfa" },
     { type: "item", id: "network-tools", label: t("menu.networkTools"), action: "tools" },
     { type: "separator" },

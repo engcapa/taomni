@@ -18,7 +18,6 @@ export const RECOVERY_LIMITATIONS: Record<TabKind, string> = {
   "hbase-shell": "HBase 是 HTTP REST 客户端，不是 PTY；不重发 put、delete 或查询。",
   "proxy-test": "检测结果可能丢失；不自动重复测速或外部网络请求。",
   "object-storage": "上传和下载可能仍在后台运行；进度与目标文件结果需核对，不重启或取消任务。",
-  "lan-chat": "已落盘的消息和文件保留；通话、采集和传输控制状态需核对，不重复发送或重录。",
   git: "工作区已保存文件保留；不重做 commit、push、pull、安装或任务命令。",
   mail: "发件箱自动发送已暂停；请核对发送结果与已保存草稿，避免重复发送。",
   "mail-unified": "发件箱自动发送已暂停；请逐账户核对发送结果与已保存草稿，避免重复发送。",

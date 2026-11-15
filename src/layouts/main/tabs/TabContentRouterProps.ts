@@ -16,7 +16,6 @@ export interface TabContentRouterProps {
   openLocalTab: (title?: string, sessionId?: string, terminalProfile?: TerminalProfile, localShell?: LocalShellSelection, initialCwd?: string, chatTabId?: string) => Promise<LocalLaunchOutcome>;
   handleNewSession: (groupPath?: string | null) => void;
   handleOpenLocalPath: (target: string, opts?: { embedFolder?: boolean; title?: string; sessionId?: string; }) => Promise<void>;
-  openLanChatTab: () => void;
   welcomeRecentSessions: SessionConfig[];
   recentWorkspaces?: RecentWorkspace[];
   welcomeMailSessions: SessionConfig[];

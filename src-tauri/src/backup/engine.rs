@@ -278,18 +278,7 @@ fn create_backup_locked(
         }
     }
 
-    // 4. lanchat.sqlite
-    context.check()?;
-    if flags.lanchat {
-        let snap_dest = temp_staging_dir.join("lanchat.sqlite");
-        state.lanchat.backup_to_with_context(&snap_dest, context)?;
-        staged_files.push(StagedFile {
-            archive_path: "databases/lanchat.sqlite".into(),
-            disk_path: snap_dest,
-        });
-    }
-
-    // 5. Config files
+    // 4. Config files
     context.check()?;
     if flags.configs {
         if let Some(cfg_base) = dirs::config_dir() {

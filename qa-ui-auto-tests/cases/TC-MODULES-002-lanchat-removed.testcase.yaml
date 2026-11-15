@@ -1,0 +1,61 @@
+id: TC-MODULES-002
+title: Removed LanChat has no browser or native entry point
+description: >-
+  LanChat is removed from the product. Browser preview and the packaged native
+  app must start normally without exposing the former welcome or context-menu
+  entry points.
+covers:
+- F-Modules-1
+tags:
+- p1
+- modules
+- removal
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+timeout_sec: 45
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="welcome-panel"]'
+- assert_count:
+    selector: '[data-testid="context-menu-item-lan-chat"]'
+    equal: 0
+- assert_count:
+    selector: '[data-testid="welcome-open-lanchat"]'
+    equal: 0
+- assert_visible: '[data-testid="welcome-panel"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Removed LanChat has no renderer entry and does not affect core startup.
+    actions:
+    - 2
+    - 3
+    - 4
+    - 5
+    checkpoints:
+    - step: 3
+      expectation: '{"assert_count": {"selector": "[data-testid=\"context-menu-item-lan-chat\"]", "equal": 0}}'
+    - step: 4
+      expectation: '{"assert_count": {"selector": "[data-testid=\"welcome-open-lanchat\"]", "equal": 0}}'
+    - step: 5
+      expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"]"}'
+    - step: 6
+      expectation: '{"assert_no_runtime_errors": null}'
+    results:
+    - 3
+    - 4
+    - 5
+    - 6
+  visual:
+  - check: 核心欢迎页无旧 LanChat 入口或空白占位；截图只作为人工评审证据。
+    method: manual
+    reason: 删除入口的自动断言已覆盖存在性，视觉仍需结合截图检查布局。
+  native:
+  - check: Native mode confirms the packaged app has no LanChat entry and still reaches the core welcome surface.
+    method: automated
+    reason: Hosted native run executes the packaged Tauri application.

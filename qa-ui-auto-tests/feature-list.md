@@ -1,5 +1,29 @@
 # Taomni 已完成功能清单
 
+<!-- feature
+id: F-Modules-1
+status: partial
+area: modules/core-startup
+components: [PluginRegistry, MigrationJournal]
+files:
+  - src/lib/pluginRegistry.ts
+  - src/lib/pluginLoader.ts
+  - src-tauri/src/plugin/mod.rs
+  - src-tauri/src/plugin/migration.rs
+controls:
+  - id: removed-lanchat-context-entry
+    selector: '[data-testid="context-menu-item-lan-chat"]'
+    kind: display
+  - id: removed-lanchat-welcome-entry
+    selector: '[data-testid="welcome-open-lanchat"]'
+    kind: display
+  - id: removed-lanchat-home-card
+    selector: '[data-testid="tao-home-lan-chat"]'
+    kind: display
+-->
+
+模块化运行时的可选插件扫描、manifest 校验、前端 chunk 加载和单体升级 journal 已建立基础契约；LanChat 已从产品、迁移和备份范围删除，插件宿主迁移与模块商店仍按设计文档 M0–M3 逐批交付。核心启动与删除回归见 `TC-MODULES-001`、`TC-MODULES-002`。
+
 > 本文档基于当前仓库代码、稳定 `data-testid` 目录和自动化用例维护，**仅记录已实现并接入主流程的功能**。架构与现状索引见 `DESIGN.md`、`IMPLEMENTATION_PLAN.md`。
 > 标记说明：
 > - ✅ 已完成
@@ -190,10 +214,6 @@ controls:
 - id: tao-home-dock-more
   selector: '[data-testid="tao-home-dock-more"]'
   kind: interactive
-- id: tao-home-lan-chat
-  selector: '[data-testid="tao-home-lan-chat"]'
-  kind: display
-  optional: true
 - id: tao-home-search
   selector: '[data-testid="tao-home-search"]'
   kind: interactive
@@ -11792,9 +11812,6 @@ controls:
 - id: backup-cloud-includeServerCertificates
   selector: '[data-testid="backup-cloud-includeServerCertificates"]'
   kind: interactive
-- id: backup-cloud-includeLanchat
-  selector: '[data-testid="backup-cloud-includeLanchat"]'
-  kind: interactive
 - id: backup-cloud-includeLocalHistory
   selector: '[data-testid="backup-cloud-includeLocalHistory"]'
   kind: interactive
@@ -11926,9 +11943,6 @@ controls:
 - id: backup-global-includeServerCertificates
   selector: '[data-testid="backup-global-includeServerCertificates"]'
   kind: interactive
-- id: backup-global-includeLanchat
-  selector: '[data-testid="backup-global-includeLanchat"]'
-  kind: interactive
 - id: backup-global-includeMail
   selector: '[data-testid="backup-global-includeMail"]'
   kind: interactive
@@ -11961,9 +11975,6 @@ controls:
   kind: interactive
 - id: backup-local-includeServerCertificates
   selector: '[data-testid="backup-local-includeServerCertificates"]'
-  kind: interactive
-- id: backup-local-includeLanchat
-  selector: '[data-testid="backup-local-includeLanchat"]'
   kind: interactive
 - id: backup-local-includeLocalHistory
   selector: '[data-testid="backup-local-includeLocalHistory"]'
@@ -12964,12 +12975,6 @@ controls:
 - id: home-open-mfa
   selector: '[data-testid="home-open-mfa"]'
   kind: interactive
-- id: welcome-open-lanchat
-  selector: '[data-testid="welcome-open-lanchat"]'
-  kind: interactive
-- id: lanchat-roster-panel
-  selector: '[data-testid="lanchat-roster-panel"]'
-  kind: display
 - id: platform-toolbar-actions
   selector: '[data-testid="platform-toolbar-actions"]'
   kind: display

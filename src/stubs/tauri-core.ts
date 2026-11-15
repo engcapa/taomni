@@ -22,7 +22,6 @@ import { invokeSockscap } from "./commands/sockscap";
 import { invokeTunnel } from "./commands/tunnel";
 import { invokeChat } from "./commands/chat";
 import { invokeDatabase } from "./commands/database";
-import { invokeLanchat } from "./commands/lanchat";
 import { invokeNotes } from "./commands/notes";
 import { invokeScreenshot } from "./commands/screenshot";
 
@@ -126,9 +125,6 @@ for (const command of ["db_append_history","db_list_history","db_delete_history"
   stubCommandRegistry.register({ domain: "database", command, handler: (args) => invokeDatabase(command, args) });
 }
 
-for (const command of ["lanchat_status","lanchat_list_peers","lanchat_get_profile","lanchat_list_conversations","lanchat_list_groups","lanchat_list_messages","lanchat_mark_read","lanchat_open_path","lanchat_send_text","lanchat_send_group_text","lanchat_resend_message","lanchat_update_profile","lanchat_create_group","lanchat_leave_group","lanchat_send_file","lanchat_send_group_file","lanchat_send_dir","lanchat_accept_file","lanchat_reject_file","lanchat_transfer_control","lanchat_send_screenshot","lanchat_send_clipboard_image","lanchat_send_signal","lanchat_signal_group"]) {
-  stubCommandRegistry.register({ domain: "lanchat", command, handler: (args) => invokeLanchat(command, args) });
-}
 
 for (const command of ["notes_list","notes_get","notes_create","notes_update","notes_update_metadata","notes_save_content","notes_delete","notes_toggle_complete","notes_archive","notes_list_tags","notes_upsert_tags","notes_set_steps","notes_get_prefs","notes_set_prefs","notes_list_alerts","notes_ack_alert"]) {
   stubCommandRegistry.register({ domain: "notes", command, handler: (args) => invokeNotes(command, args) });

@@ -6,7 +6,6 @@ export interface BackupCustomOptions {
   includeSessions?: boolean;
   includeNotes?: boolean;
   includeVault?: boolean;
-  includeLanchat?: boolean;
   includeConfigs?: boolean;
   includeMail?: boolean;
   includeMailOriginals?: boolean;

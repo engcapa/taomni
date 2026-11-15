@@ -356,15 +356,14 @@ fn test_scope_flags_include_mfa_with_its_vault_key() {
         );
     }
     let core = resolve_scope_flags("core", None);
-    assert!(!core.lanchat && !core.mail && !core.local_history);
+    assert!(!core.mail && !core.local_history);
     let full = resolve_scope_flags("full", None);
-    assert!(full.lanchat && full.mail && !full.local_history);
+    assert!(full.mail && !full.local_history);
 
     let mfa_only = BackupCustomOptions {
         include_sessions: false,
         include_notes: false,
         include_vault: false,
-        include_lanchat: false,
         include_configs: false,
         include_mail: false,
         include_local_history: false,
@@ -536,7 +535,6 @@ fn mail_backup_choice_overrides_core_and_full_without_losing_other_scope_flags()
             && include.configs
             && include.mfa
     );
-    assert!(!include.lanchat);
     let exclude = resolve_scope_flags(
         "full",
         Some(BackupCustomOptions {
@@ -545,7 +543,7 @@ fn mail_backup_choice_overrides_core_and_full_without_losing_other_scope_flags()
         }),
     );
     assert!(!exclude.mail);
-    assert!(exclude.lanchat && exclude.sessions && exclude.mfa);
+    assert!(exclude.sessions && exclude.mfa);
     assert!(resolve_scope_flags("full", None).mail);
     assert!(!resolve_scope_flags("core", None).mail);
 }

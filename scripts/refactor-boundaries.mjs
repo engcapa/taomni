@@ -15,7 +15,6 @@ const boundaries = [
   ["src/components/editor/workspace/panels/run", "src/components/editor/workspace/panels/RunPanel.tsx"],
   ["src/components/editor/workspace/panels/debug/breakpoints", "src/components/editor/workspace/panels/debug/BreakpointsView.tsx"],
   ["src/components/git/changes", "src/components/git/WorkspaceChangesView.tsx"],
-  ["src/components/lanchat/panel", "src/components/lanchat/LanChatPanel.tsx"],
   ["src/components/settings/backup", "src/components/settings/BackupSettingsPanel.tsx"],
   ["src/components/settings/languageServers", "src/components/settings/LanguageServersSettings.tsx"],
   ["src/components/settings/panel", "src/components/settings/SettingsPanel.tsx"],

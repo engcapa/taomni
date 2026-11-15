@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type SetStateAction } from "react";
-import { notifyDesktop } from "../../../lib/lanNotify";
+import { notifyDesktop } from "../../../lib/notifications";
 import { mailGetInvite, type MailInvite, type MailInviteReply, type MailMessageHeader } from "../../../lib/mail";
 import { agendaKey, agendaTimeLabel, dueReminders, mailCalDavSync, mailListAgenda, type MailAgendaEvent } from "../../../lib/mailCalendar";
 import { hasCalendarPart } from "../../../lib/mailInvite";

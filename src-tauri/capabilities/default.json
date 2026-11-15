@@ -8,7 +8,6 @@
     "rdp-*",
     "vnc-*",
     "terminal-*",
-    "lan-chat-*",
     "notes-*",
     "screenshot-overlay",
     "screenshot-recorder",

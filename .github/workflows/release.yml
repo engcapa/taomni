@@ -82,7 +82,7 @@ jobs:
           # spa_video_info_raw.flags); we install a newer PipeWire from source
           # for build only (see "Install PipeWire 1.x for libspa" step).
           - platform: ubuntu-22.04
-            args: "--features native-av"
+            args: ""
             rust-targets: ""
           - platform: windows-latest
             args: ""

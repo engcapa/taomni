@@ -19,7 +19,6 @@ mod history;
 mod java_bundles;
 mod java_debug_adapter;
 mod java_test;
-mod lanchat;
 pub mod llm;
 mod local_history;
 mod lsp;
@@ -32,6 +31,7 @@ mod nettools;
 mod notes;
 mod objectstorage;
 pub mod perf;
+mod plugin;
 mod proxy;
 mod qa_driver;
 mod qa_logging;
@@ -168,7 +168,8 @@ pub fn run() {
     let context = tauri::generate_context!();
     #[cfg(target_os = "linux")]
     screenshot::shortcut::prepare_portal_identity(&context.config().identifier);
-    let builder = viewer::register_protocol(tauri::Builder::default());
+    let builder =
+        plugin::protocol::register_protocol(viewer::register_protocol(tauri::Builder::default()));
     #[cfg(target_os = "macos")]
     let builder = builder.on_web_content_process_terminate(|webview| {
         webview_recovery::terminated(webview.app_handle(), webview.label(), "renderer-exited");
@@ -187,16 +188,21 @@ pub fn run() {
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .setup(|app| {
             screenshot::init(app.handle());
-            let app_data = resolved_app_data_dir(app.handle())
-                .expect("failed to resolve app data dir");
+            let app_data =
+                resolved_app_data_dir(app.handle()).expect("failed to resolve app data dir");
 
             // One-time migration from the legacy Taomni identity (see migrate.rs).
             // Runs before the app-data dir is created so the directory rename
             // targets a non-existent destination on every platform.
             migrate::run(&app_data);
-            app.manage(mobile::headless::ModeLease::acquire(&app_data, false).map_err(std::io::Error::other)?);
-            app.manage(backup::coordination::ProfileLease::prepare(&app_data)
-                .map_err(std::io::Error::other)?);
+            app.manage(
+                mobile::headless::ModeLease::acquire(&app_data, false)
+                    .map_err(std::io::Error::other)?,
+            );
+            app.manage(
+                backup::coordination::ProfileLease::prepare(&app_data)
+                    .map_err(std::io::Error::other)?,
+            );
 
             std::fs::create_dir_all(&app_data).ok();
 
@@ -234,9 +240,6 @@ pub fn run() {
             let ai_ctx =
                 ai::AppAiCtx::from_config_with_proxy_db(ai_config, vault_arc.clone(), Some(&conn));
 
-            // Decentralized LAN messenger state (separate lanchat.sqlite).
-            let lanchat_state = Arc::new(lanchat::LanChatState::new(&app_data));
-
             app.manage(AppState::new(
                 conn,
                 notes_conn,
@@ -244,12 +247,14 @@ pub fn run() {
                 mail_db_dir,
                 vault_arc,
                 ai_ctx,
-                lanchat_state,
             ));
             let go_catalog = app.state::<AppState>().opencode_go_catalog.clone();
-            tauri::async_runtime::spawn(async move { go_catalog.refresh(true).await; });
+            tauri::async_runtime::spawn(async move {
+                go_catalog.refresh(true).await;
+            });
             app.state::<AppState>()
-                .workspace.lsp
+                .workspace
+                .lsp
                 .attach_app(app.handle().clone());
             app.manage(workspace_search::WorkspaceSearchState::default());
             app.manage(structural_search::StructuralSearchState::default());
@@ -336,30 +341,6 @@ pub fn run() {
                 }
             });
 
-            // Start the LanChat background service only if the user opted into
-            // "start on launch". Otherwise it stays dark (no mDNS/beacon/listen)
-            // until the user opens the chat and confirms enabling it. The state
-            // (DB/identity/TLS) is always constructed above so the service can
-            // be started on demand later.
-            let app_for_lanchat = app.handle().clone();
-            tauri::async_runtime::spawn(async move {
-                let lanchat = app_for_lanchat
-                    .state::<AppState>()
-                    .lanchat
-                    .clone();
-                let start_on_launch = lanchat
-                    .store
-                    .get_start_on_launch()
-                    .unwrap_or(false);
-                if start_on_launch {
-                    if let Err(error) = lanchat::start_service(app_for_lanchat).await {
-                        log::warn!("lanchat: autostart skipped: {error}");
-                    }
-                } else {
-                    log::info!("lanchat: start_on_launch disabled; service idle until enabled");
-                }
-            });
-
             // Auto-start any tunnels with autostart=true.
             let app_for_autostart = app.handle().clone();
             tauri::async_runtime::spawn(async move {
@@ -393,7 +374,9 @@ pub fn run() {
             if cfg!(debug_assertions) {
                 let mut logger = tauri_plugin_log::Builder::default().level(log::LevelFilter::Info);
                 let qa_data = std::env::var_os("NEWMOB_DATA_DIR").map(std::path::PathBuf::from);
-                if let Some(path) = qa_logging::directory(&app.config().identifier, qa_data.as_deref()) {
+                if let Some(path) =
+                    qa_logging::directory(&app.config().identifier, qa_data.as_deref())
+                {
                     logger = logger.targets([
                         tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),
                         tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Folder {
@@ -406,7 +389,8 @@ pub fn run() {
                     && std::env::var("TAOMNI_QA_RDP_TRACE").as_deref() == Ok("1")
                 {
                     #[cfg(debug_assertions)]
-                    if let Err(error) = rdp::qa_graphics_capture::enable(&app.path().app_log_dir()?) {
+                    if let Err(error) = rdp::qa_graphics_capture::enable(&app.path().app_log_dir()?)
+                    {
                         eprintln!("QA RDP packet capture unavailable: {error}");
                     }
                     logger = logger
@@ -421,10 +405,11 @@ pub fn run() {
 
             if let Some(main_window_config) = app.config().app.windows.first().cloned() {
                 #[allow(unused_mut)]
-                let mut builder = WebviewWindowBuilder::from_config(app.handle(), &main_window_config)?
-                    // Required on Linux/Windows for navigator.clipboard.readText().
-                    // Terminal right-click paste and Shift+Insert use that API.
-                    .enable_clipboard_access();
+                let mut builder =
+                    WebviewWindowBuilder::from_config(app.handle(), &main_window_config)?
+                        // Required on Linux/Windows for navigator.clipboard.readText().
+                        // Terminal right-click paste and Shift+Insert use that API.
+                        .enable_clipboard_access();
                 builder = webview_environment::configure(app.handle(), builder);
                 // On macOS use the native traffic-light controls with an overlay
                 // title bar so the window feels native (the frontend reserves a
@@ -472,62 +457,6 @@ pub fn run() {
                 // exposes the same small W3C surface from inside this exact
                 // QA window.  Normal launches never set this environment
                 // variable and therefore never start a local HTTP server.
-                // On Linux the webview is webkit2gtk, which ships with the
-                // media-stream / WebRTC settings OFF — so getUserMedia and
-                // getDisplayMedia reject and LanChat calls can't be answered or
-                // screen-shared (Windows/WebView2 has them on by default). Flip
-                // the settings and auto-allow UserMedia permission requests for
-                // the main window (where the call overlay is mounted).
-                //
-                // Diagnostics: keep the builder's window handle (no re-lookup),
-                // surface with_webview / settings() failures via log::warn!, and
-                // read the flags back after setting them so we can tell "the
-                // setting never applied" apart from "this WebKitGTK build has no
-                // WebRTC backend" (settings stick but RTCPeerConnection stays
-                // undefined).
-                #[cfg(target_os = "linux")]
-                {
-                    let webview_result = main_window.with_webview(|webview| {
-                        use webkit2gtk::glib::object::Cast;
-                        use webkit2gtk::{
-                            PermissionRequestExt, SettingsExt, UserMediaPermissionRequest,
-                            WebViewExt,
-                        };
-                        let wv = webview.inner();
-                        match WebViewExt::settings(&wv) {
-                            Some(settings) => {
-                                settings.set_enable_media_stream(true);
-                                settings.set_enable_mediasource(true);
-                                settings.set_enable_webrtc(true);
-                                log::info!(
-                                    "lanchat: webview media settings after set — media_stream={} mediasource={} webrtc={}",
-                                    settings.enables_media_stream(),
-                                    settings.enables_mediasource(),
-                                    settings.enables_webrtc(),
-                                );
-                            }
-                            None => log::warn!(
-                                "lanchat: WebView settings() returned None — media-stream/WebRTC left disabled"
-                            ),
-                        }
-                        // LAN-local app: grant mic/camera/screen capture. Other
-                        // permission kinds fall through to the default handler.
-                        wv.connect_permission_request(|_, req| {
-                            if req.downcast_ref::<UserMediaPermissionRequest>().is_some() {
-                                req.allow();
-                                true
-                            } else {
-                                false
-                            }
-                        });
-                    });
-                    if let Err(e) = webview_result {
-                        log::warn!(
-                            "lanchat: with_webview failed — WebRTC/media-stream not enabled: {e}"
-                        );
-                    }
-                }
-                #[cfg(not(target_os = "linux"))]
                 let _ = main_window;
             }
             Ok(())
@@ -547,7 +476,11 @@ pub fn run() {
                 screenshot::shutdown();
                 let state = app_handle.state::<AppState>();
                 tauri::async_runtime::block_on(async {
-                    let _ = tokio::time::timeout(std::time::Duration::from_secs(5), state.mobile.stop()).await;
+                    let _ = tokio::time::timeout(
+                        std::time::Duration::from_secs(5),
+                        state.mobile.stop(),
+                    )
+                    .await;
                 });
                 sockscap::shutdown_on_exit(app_handle, &state);
             }

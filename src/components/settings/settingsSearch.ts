@@ -169,11 +169,6 @@ export const SETTINGS_SEARCH_ENTRIES: SettingsSearchEntry[] = [
     terms: ["mobile", "remote", "pairing", "headless", "host", "domain", "reverse proxy", "allowlist", "screen", "window", "browser", "移动服务", "手机", "配对", "远程控制", "域名", "白名单", "反向代理", "屏幕", "窗口", "浏览器", "feishu", "飞书", "机器人", "bot"],
   },
   {
-    id: "lanchat",
-    titleKeys: ["settings.lanChatSection"],
-    terms: ["lanchat", "lan", "messenger", "chat", "broadcast", "局域网", "内网", "通讯", "聊天", "广播", "消息"],
-  },
-  {
     id: "ai-master",
     titleKeys: ["settings.aiSection", "settings.aiMaster"],
     terms: ["ai", "artificial intelligence", "master switch", "assistant", "人工智能", "智能", "主开关", "助手"],
@@ -289,7 +284,7 @@ export const SETTINGS_GROUPS: SettingsGroupDef[] = [
   {
     id: "network",
     titleKey: "settings.groupNetwork",
-    entryIds: ["app-proxy", "mobile-service", "lanchat"],
+    entryIds: ["app-proxy", "mobile-service"],
   },
   {
     id: "ai",

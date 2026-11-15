@@ -102,7 +102,6 @@ export interface HandleCommandContext {
   openGitRepository: (path?: string | null) => Promise<void>;
   openEmptyCodeWorkspaceTab: () => void;
   openSettingsTab: () => void;
-  openLanChatTab: () => void;
   openUnifiedMailTab: () => void;
   openMfaTab: () => void;
   setShowAbout: import("react").Dispatch<import("react").SetStateAction<boolean>>;
@@ -201,9 +200,6 @@ export function createHandleCommand(controllerContext: HandleCommandContext): (c
         break;
       case "settings":
         controllerContext.openSettingsTab();
-        break;
-      case "lan-chat":
-        controllerContext.openLanChatTab();
         break;
       case "mail-unified":
         controllerContext.openUnifiedMailTab();

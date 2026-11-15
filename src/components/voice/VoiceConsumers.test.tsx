@@ -2,10 +2,8 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { Composer } from "../chat/Composer";
 import { AiRewriteOverlay } from "../terminal/AiRewriteOverlay";
-import { MessageInput } from "../lanchat/MessageInput";
 import { useAiStore } from "../../stores/aiStore";
 import { useChatStore } from "../../stores/chatStore";
-import { useLanChatStore } from "../../stores/lanChatStore";
 const ipc = vi.hoisted(() => vi.fn());
 vi.mock("@tauri-apps/api/core", () => ({ invoke: ipc }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn().mockResolvedValue(() => {}) }));
@@ -33,12 +31,6 @@ it("terminal rewrite receives an instruction without generating or executing a c
   await waitFor(() => expect(screen.getByRole("textbox")).toHaveValue("检查日志"));
   expect(accept).not.toHaveBeenCalled();
   expect(ipc.mock.calls.some(([c]) => c === "tab_rewrite_command")).toBe(false);
-});
-it("LAN messenger receives a draft without sending it", async () => {
-  const send = vi.fn(); useLanChatStore.setState({ activeConvId: "peer:a", sendCurrent: send });
-  render(<MessageInput />); await dictate("lanchat-voice-button");
-  await waitFor(() => expect(screen.getByTestId("lanchat-composer-textarea")).toHaveValue("检查日志"));
-  expect(send).not.toHaveBeenCalled();
 });
 it("sending the Chat draft discards a pending transcription", async () => {
   let resolve!: (result: { transcript: string }) => void;

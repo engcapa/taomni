@@ -36,7 +36,7 @@ steps:
     name: aria-checked
     equals: 'false'
 - assert_attribute:
-    selector: '[data-testid="backup-global-includeLanchat"]'
+    selector: '[data-testid="backup-global-includeMfa"]'
     name: aria-checked
     equals: 'true'
 - assert_attribute:
@@ -53,7 +53,7 @@ steps:
     name: value
     equals: custom
 - assert_attribute:
-    selector: '[data-testid="backup-cloud-includeLanchat"]'
+    selector: '[data-testid="backup-cloud-includeMfa"]'
     name: aria-checked
     equals: 'false'
 - set_check:
@@ -87,7 +87,7 @@ steps:
     selector: '[data-testid="backup-cloud-includeServerCertificates"]'
     checked: true
 - set_check:
-    selector: '[data-testid="backup-cloud-includeLanchat"]'
+    selector: '[data-testid="backup-cloud-includeMfa"]'
     checked: true
 - set_check:
     selector: '[data-testid="backup-cloud-includeLocalHistory"]'
@@ -113,7 +113,7 @@ steps:
     value: inherit
 - assert_text:
     selector: '[data-testid="backup-cloud-destination"] [data-testid="backup-range-summary"]'
-    contains: LAN chat
+    contains: MFA
 - set_check:
     selector: '[data-testid="backup-global-include-mail"]'
     checked: true
@@ -169,10 +169,10 @@ steps:
     selector: '[data-testid="backup-global-includeServerCertificates"]'
     checked: true
 - set_check:
-    selector: '[data-testid="backup-global-includeLanchat"]'
+    selector: '[data-testid="backup-global-includeMfa"]'
     checked: false
 - set_check:
-    selector: '[data-testid="backup-global-includeLanchat"]'
+    selector: '[data-testid="backup-global-includeMfa"]'
     checked: true
 - set_check:
     selector: '[data-testid="backup-global-includeMfa"]'
@@ -208,7 +208,7 @@ steps:
     selector: '[data-testid="backup-local-includeServerCertificates"]'
     checked: false
 - set_check:
-    selector: '[data-testid="backup-local-includeLanchat"]'
+    selector: '[data-testid="backup-local-includeMfa"]'
     checked: false
 - set_check:
     selector: '[data-testid="backup-local-include-mail"]'
@@ -289,7 +289,7 @@ verification:
     - step: 8
       expectation: Mail remains excluded
     - step: 9
-      expectation: LAN chat retained
+      expectation: MFA retained
     - step: 10
       expectation: Certificates retained
     - step: 11
@@ -297,7 +297,7 @@ verification:
     - step: 13
       expectation: Old target stays custom
     - step: 14
-      expectation: Old target core excludes LAN chat
+      expectation: Old target core excludes MFA
     results:
     - 7
     - 8

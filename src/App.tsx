@@ -6,7 +6,6 @@ import {
   detectDetachedSftpRoute,
 } from "./components/filebrowser/SftpDetachedWindow";
 import DetachedSessionWindow from "./components/detached/DetachedSessionWindow";
-import LanChatDetachedWindow from "./components/detached/LanChatDetachedWindow";
 import { NotesDetachedWindow } from "./components/notes/NotesDetachedWindow";
 import { RdpServerApprovalBridge } from "./components/servers/RdpServerApprovalBridge";
 import { detectDetachedRoute } from "./lib/detachedSession";
@@ -163,9 +162,7 @@ function App() {
     content = <SftpDetachedWindow sessionId={detachedSftpId} />;
   } else {
     const detachedRoute = detectDetachedRoute();
-    if (detachedRoute?.kind === "lan-chat") {
-      content = <LanChatDetachedWindow id={detachedRoute.id} />;
-    } else if (detachedRoute?.kind === "notes") {
+    if (detachedRoute?.kind === "notes") {
       content = <NotesDetachedWindow />;
     } else {
       hostsRdpApprovals = !detachedRoute;

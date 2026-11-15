@@ -912,146 +912,6 @@
       "handler": "agent::search::key_storage::keyring_put"
     },
     {
-      "name": "lanchat_accept_file",
-      "handler": "lanchat::commands::lanchat_accept_file"
-    },
-    {
-      "name": "lanchat_clear_all_history",
-      "handler": "lanchat::commands::lanchat_clear_all_history"
-    },
-    {
-      "name": "lanchat_clear_conversation",
-      "handler": "lanchat::commands::lanchat_clear_conversation"
-    },
-    {
-      "name": "lanchat_create_group",
-      "handler": "lanchat::commands::lanchat_create_group"
-    },
-    {
-      "name": "lanchat_delete_message",
-      "handler": "lanchat::commands::lanchat_delete_message"
-    },
-    {
-      "name": "lanchat_get_profile",
-      "handler": "lanchat::commands::lanchat_get_profile"
-    },
-    {
-      "name": "lanchat_get_retention",
-      "handler": "lanchat::commands::lanchat_get_retention"
-    },
-    {
-      "name": "lanchat_get_service_state",
-      "handler": "lanchat::commands::lanchat_get_service_state"
-    },
-    {
-      "name": "lanchat_leave_group",
-      "handler": "lanchat::commands::lanchat_leave_group"
-    },
-    {
-      "name": "lanchat_list_conversations",
-      "handler": "lanchat::commands::lanchat_list_conversations"
-    },
-    {
-      "name": "lanchat_list_groups",
-      "handler": "lanchat::commands::lanchat_list_groups"
-    },
-    {
-      "name": "lanchat_list_messages",
-      "handler": "lanchat::commands::lanchat_list_messages"
-    },
-    {
-      "name": "lanchat_list_peers",
-      "handler": "lanchat::commands::lanchat_list_peers"
-    },
-    {
-      "name": "lanchat_list_pinned",
-      "handler": "lanchat::commands::lanchat_list_pinned"
-    },
-    {
-      "name": "lanchat_mark_read",
-      "handler": "lanchat::commands::lanchat_mark_read"
-    },
-    {
-      "name": "lanchat_open_path",
-      "handler": "lanchat::commands::lanchat_open_path"
-    },
-    {
-      "name": "lanchat_reject_file",
-      "handler": "lanchat::commands::lanchat_reject_file"
-    },
-    {
-      "name": "lanchat_resend_message",
-      "handler": "lanchat::commands::lanchat_resend_message"
-    },
-    {
-      "name": "lanchat_retrust_peer",
-      "handler": "lanchat::commands::lanchat_retrust_peer"
-    },
-    {
-      "name": "lanchat_send_clipboard_image",
-      "handler": "lanchat::commands::lanchat_send_clipboard_image"
-    },
-    {
-      "name": "lanchat_send_dir",
-      "handler": "lanchat::commands::lanchat_send_dir"
-    },
-    {
-      "name": "lanchat_send_file",
-      "handler": "lanchat::commands::lanchat_send_file"
-    },
-    {
-      "name": "lanchat_send_group_file",
-      "handler": "lanchat::commands::lanchat_send_group_file"
-    },
-    {
-      "name": "lanchat_send_group_text",
-      "handler": "lanchat::commands::lanchat_send_group_text"
-    },
-    {
-      "name": "lanchat_send_image_bytes",
-      "handler": "lanchat::commands::lanchat_send_image_bytes"
-    },
-    {
-      "name": "lanchat_send_screenshot",
-      "handler": "lanchat::commands::lanchat_send_screenshot"
-    },
-    {
-      "name": "lanchat_send_signal",
-      "handler": "lanchat::commands::lanchat_send_signal"
-    },
-    {
-      "name": "lanchat_send_text",
-      "handler": "lanchat::commands::lanchat_send_text"
-    },
-    {
-      "name": "lanchat_set_retention",
-      "handler": "lanchat::commands::lanchat_set_retention"
-    },
-    {
-      "name": "lanchat_set_start_on_launch",
-      "handler": "lanchat::commands::lanchat_set_start_on_launch"
-    },
-    {
-      "name": "lanchat_signal_group",
-      "handler": "lanchat::commands::lanchat_signal_group"
-    },
-    {
-      "name": "lanchat_start_service",
-      "handler": "lanchat::commands::lanchat_start_service"
-    },
-    {
-      "name": "lanchat_status",
-      "handler": "lanchat::commands::lanchat_status"
-    },
-    {
-      "name": "lanchat_transfer_control",
-      "handler": "lanchat::commands::lanchat_transfer_control"
-    },
-    {
-      "name": "lanchat_update_profile",
-      "handler": "lanchat::commands::lanchat_update_profile"
-    },
-    {
       "name": "list_common_local_directories",
       "handler": "terminal::list_common_local_directories"
     },
@@ -1698,42 +1558,6 @@
     {
       "name": "models_verify",
       "handler": "models::models_verify"
-    },
-    {
-      "name": "nmedia_add_peer",
-      "handler": "lanchat::commands::nmedia_add_peer"
-    },
-    {
-      "name": "nmedia_peer_state",
-      "handler": "lanchat::commands::nmedia_peer_state"
-    },
-    {
-      "name": "nmedia_remove_peer",
-      "handler": "lanchat::commands::nmedia_remove_peer"
-    },
-    {
-      "name": "nmedia_start",
-      "handler": "lanchat::commands::nmedia_start"
-    },
-    {
-      "name": "nmedia_stop",
-      "handler": "lanchat::commands::nmedia_stop"
-    },
-    {
-      "name": "nmedia_toggle_cam",
-      "handler": "lanchat::commands::nmedia_toggle_cam"
-    },
-    {
-      "name": "nmedia_toggle_mic",
-      "handler": "lanchat::commands::nmedia_toggle_mic"
-    },
-    {
-      "name": "nmedia_toggle_screen",
-      "handler": "lanchat::commands::nmedia_toggle_screen"
-    },
-    {
-      "name": "nmedia_ws_port",
-      "handler": "lanchat::commands::nmedia_ws_port"
     },
     {
       "name": "notes_ack_alert",
@@ -3210,71 +3034,17 @@
       "isVaultLockedError",
       "isVaultReference",
       "keychainLookupBatch",
-      "lanchatAcceptFile",
-      "lanchatClearAllHistory",
-      "lanchatClearConversation",
-      "lanchatCreateGroup",
-      "lanchatDeleteMessage",
-      "lanchatGetProfile",
-      "lanchatGetRetention",
-      "lanchatGetServiceState",
-      "lanchatLeaveGroup",
-      "lanchatListConversations",
-      "lanchatListGroups",
-      "lanchatListMessages",
-      "lanchatListPeers",
-      "lanchatListPinned",
-      "lanchatMarkRead",
-      "lanchatOpenPath",
-      "lanchatRejectFile",
-      "lanchatResendMessage",
-      "lanchatRetrustPeer",
-      "lanchatSendClipboardImage",
-      "lanchatSendDir",
-      "lanchatSendFile",
-      "lanchatSendGroupFile",
-      "lanchatSendGroupText",
-      "lanchatSendImageBytes",
-      "lanchatSendScreenshot",
-      "lanchatSendSignal",
-      "lanchatSendText",
-      "lanchatSetRetention",
-      "lanchatSetStartOnLaunch",
-      "lanchatSignalGroup",
-      "lanchatStartService",
-      "lanchatStatus",
-      "lanchatTransferControl",
-      "lanchatUpdateProfile",
       "listCommonLocalDirectories",
       "listLocalShells",
       "listSessionGroups",
       "listSessions",
       "listSystemFonts",
       "listWslDistros",
-      "listenLanChatConversation",
-      "listenLanChatFileOffer",
-      "listenLanChatGroup",
-      "listenLanChatMessage",
-      "listenLanChatRoster",
-      "listenLanChatSecurity",
-      "listenLanChatService",
-      "listenLanChatSignal",
-      "listenLanChatTransfer",
-      "listenLanChatWb",
       "listenSshAuthPrompt",
       "listenTerminalExit",
       "listenTerminalForwardError",
       "listenWelcomeDirectoriesChanged",
       "markSessionConnected",
-      "nmediaAddPeer",
-      "nmediaPeerState",
-      "nmediaRemovePeer",
-      "nmediaStart",
-      "nmediaStop",
-      "nmediaToggleCam",
-      "nmediaToggleMic",
-      "nmediaToggleScreen",
-      "nmediaWsPort",
       "openLocalPath",
       "openLocalShellAsAdministrator",
       "readDbeaverCredentialsForDataSources",
@@ -3400,16 +3170,6 @@
     "backup-job-progress",
     "cc-test-settings-stream",
     "codex-test-config-stream",
-    "lanchat://conversation",
-    "lanchat://file-offer",
-    "lanchat://group",
-    "lanchat://message",
-    "lanchat://roster",
-    "lanchat://security",
-    "lanchat://service",
-    "lanchat://signal",
-    "lanchat://transfer",
-    "lanchat://wb",
     "lsp://external-file-change",
     "lsp://workspace-apply-edit",
     "mail-sent-copy",
