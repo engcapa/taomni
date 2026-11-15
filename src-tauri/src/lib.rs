@@ -31,7 +31,7 @@ mod nettools;
 mod notes;
 mod objectstorage;
 pub mod perf;
-mod plugin;
+pub mod plugin;
 mod proxy;
 mod qa_driver;
 mod qa_logging;

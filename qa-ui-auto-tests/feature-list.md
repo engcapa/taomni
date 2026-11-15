@@ -8,7 +8,11 @@ components: [PluginRegistry, MigrationJournal]
 files:
   - src/lib/pluginRegistry.ts
   - src/lib/pluginLoader.ts
+  - src/lib/moduleStore.ts
+  - src/stores/moduleStore.ts
   - src-tauri/src/plugin/mod.rs
+  - src-tauri/src/plugin/host.rs
+  - src-tauri/src/plugin/install.rs
   - src-tauri/src/plugin/migration.rs
 controls:
   - id: removed-lanchat-context-entry
@@ -22,7 +26,7 @@ controls:
     kind: display
 -->
 
-模块化运行时的可选插件扫描、manifest 校验、前端 chunk 加载和单体升级 journal 已建立基础契约；LanChat 已从产品、迁移和备份范围删除，插件宿主迁移与模块商店仍按设计文档 M0–M3 逐批交付。核心启动与删除回归见 `TC-MODULES-001`、`TC-MODULES-002`。
+模块化运行时的可选插件扫描、manifest 校验、前端 chunk 加载、宿主监督、版本目录安装状态机和单体升级 journal 已建立基础契约；LanChat 已从产品、迁移和备份范围删除，模块商店 UI、下载服务和具体插件迁移仍按设计文档 M0–M3 逐批交付。核心启动与删除回归见 `TC-MODULES-001`、`TC-MODULES-002`。
 
 > 本文档基于当前仓库代码、稳定 `data-testid` 目录和自动化用例维护，**仅记录已实现并接入主流程的功能**。架构与现状索引见 `DESIGN.md`、`IMPLEMENTATION_PLAN.md`。
 > 标记说明：

@@ -4,6 +4,8 @@
 
 Accepted as a design decision; M0 implementation is in progress. v1.6 is the current review revision, based on `7bc498b35` (Merge PR #813); it records the 2026-11-15 decision to remove LanChat completely. Plugin migration remains blocked until the G1–G11 feasibility gates pass. The executable plan is in `docs-feature/taomni-modular-split-design.md` §10.1.
 
+本分支当前已落地插件 API、核心注册表、前端动态加载、单体升级 journal、宿主协议监督的可测试逻辑、版本目录安装状态机，以及独立 `modules.json` 生成器和 release 上传顺序；可复现 M0 体积/依赖起点见 [`docs-feature/taomni-modular-split-baseline-20261115.md`](../docs-feature/taomni-modular-split-baseline-20261115.md)。模块商店 UI、真实下载/代理/断点续传、签名验证运行时和三端真实宿主实验仍未完成，不能将当前基础状态机视为完整商店或插件迁移完成。
+
 ## 1. Context
 
 Taomni 是 Tauri 2 + React 19 + Rust 的本地优先桌面工作台。当前发布仍是一个核心包、一个 `latest.json` 和一个 Rust `AppState`：根 `package.json` 为 0.5.9，`src-tauri/src/lib.rs` 593 行、`commands/mod.rs` 823 行，前端 `TabContentRouter` 静态引入多个重型 tab（仅 RDP/VNC 等少数 tab 在 `panels.tsx` 用 `React.lazy`，且仍随核心发布）。历史基线（`7bc498b35`）实测为 `src/` 3,022 个文件、`src-tauri/` 2,165 个文件、Rust 331,079 行、`SessionType` 26 种、`TabKind` 23 种；LanChat 删除后当前分支保留 22 种 `TabKind`。发布包体积尚无可复现基线，必须由 TASK-001 先测量。分支上新增了核心文件查看器（`viewer/`、`taomni-preview` 协议）和移动端桌面远控 / 飞书适配（`mobile/` 达 12,679 行），详见设计文档 §1.10。

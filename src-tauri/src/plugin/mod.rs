@@ -4,6 +4,11 @@
 //! implementation state belongs to a supervised host process and is never
 //! deserialized into `AppState`.
 
+pub mod host;
+pub mod install;
+pub mod migration;
+pub mod protocol;
+
 use std::collections::{BTreeSet, HashMap};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
@@ -372,9 +377,6 @@ fn placeholder_manifest(slug: &str) -> ModuleManifest {
         snapshot: SnapshotMode::File,
     }
 }
-
-pub mod migration;
-pub mod protocol;
 
 #[cfg(test)]
 mod tests {

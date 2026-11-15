@@ -548,8 +548,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Updater manifest unit contracts
-        run: node --test scripts/compose-updater-manifest.test.mjs scripts/verify-updater-signatures.test.mjs scripts/release-workflow.test.mjs
+      - name: Updater and plugin manifest unit contracts
+        run: node --test scripts/compose-updater-manifest.test.mjs scripts/compose-modules-manifest.test.mjs scripts/verify-updater-signatures.test.mjs scripts/release-workflow.test.mjs
       - name: Download workflow artifacts
         if: needs.plan.outputs.tag != ''
         uses: actions/download-artifact@v4
@@ -567,6 +567,18 @@ jobs:
           set -euo pipefail
           node scripts/compose-updater-manifest.mjs artifacts updater-assets
           node scripts/verify-updater-signatures.mjs updater-assets
+
+          # Plugin builders upload .taomni-plugin artifacts independently of
+          # the core matrix. When present, compose and stage modules.json in
+          # the same release while leaving latest.json untouched. The detached
+          # catalogue signature is produced by the release signing job and is
+          # required before any module asset is published.
+          if find artifacts -type f -name '*.taomni-plugin' -print -quit | grep -q .; then
+            module_signature="$(find artifacts -type f -name 'modules.json.minisig' -print -quit)"
+            test -n "$module_signature"
+            MODULES_REQUIRE_SIGNATURE=1 MODULES_MANIFEST_SIGNATURE="$module_signature" \
+              node scripts/compose-modules-manifest.mjs artifacts module-assets
+          fi
 
           # No release mutation until every platform/signature gate has passed.
           # Preserve an existing release's title/body; create one for tag pushes
@@ -599,6 +611,17 @@ jobs:
           while IFS= read -r asset; do
             gh release upload "$TAG" "$asset" --clobber
           done < <(find updater-assets -maxdepth 1 -type f ! -name latest.json | sort)
+
+          if [ -d module-assets ]; then
+            # Publish packages and detached signatures first. The signed
+            # catalogue is uploaded last so clients never observe references
+            # to assets that are not present yet.
+            while IFS= read -r asset; do
+              gh release upload "$TAG" "$asset" --clobber
+            done < <(find module-assets -maxdepth 1 -type f ! -name modules.json ! -name modules.json.minisig | sort)
+            gh release upload "$TAG" module-assets/modules.json.minisig --clobber
+            gh release upload "$TAG" module-assets/modules.json --clobber
+          fi
 
           # Publish the complete manifest only after every referenced asset exists.
           gh release upload "$TAG" updater-assets/latest.json --clobber
