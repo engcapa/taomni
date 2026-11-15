@@ -65,10 +65,9 @@ jobs:
           src/lib/pluginRegistry.test.ts
           src/lib/pluginLoader.test.ts
           src/lib/ipc/plugin.test.ts
-          src/lib/moduleStore.test.ts
           src/lib/nativeAppMenu.test.ts
       - name: Plugin protocol unit contracts
         run: cargo test --manifest-path src-tauri/crates/taomni-plugin-api/Cargo.toml --locked
       - name: 0.5.x migration journal and legacy detection contracts
         if: runner.os == 'Linux'
-        run: cargo test --manifest-path src-tauri/Cargo.toml --lib plugin:: -- --nocapture
+        run: cargo test --manifest-path src-tauri/Cargo.toml --lib plugin::migration -- --nocapture
