@@ -4,10 +4,12 @@
 //! implementation state belongs to a supervised host process and is never
 //! deserialized into `AppState`.
 
+pub mod download;
 pub mod host;
 pub mod install;
 pub mod migration;
 pub mod protocol;
+pub mod verify;
 
 use std::collections::{BTreeSet, HashMap};
 use std::fs;
