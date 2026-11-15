@@ -42,4 +42,14 @@ describe("shared viewer lifecycle and close guard", () => {
     fireEvent.click(screen.getByTestId("viewer-close-discard"));
     expect(useAppStore.getState().tabs).toHaveLength(0); expect(useDocumentStore.getState().documents[path].dirty).toBe(false);
   });
+  it("keeps a recovery draft while closing without writing the host file", async () => {
+    render(<><ViewerShell viewer={viewer} /><ViewerCloseDialog /></>);
+    await screen.findByTestId("viewer-editor");
+    act(() => { useDocumentStore.getState().edit(path, "draft"); useAppStore.getState().removeTab("viewer"); });
+    fireEvent.click(screen.getByTestId("viewer-close-keep-draft"));
+    await act(async () => { await Promise.resolve(); });
+    expect(useAppStore.getState().tabs).toHaveLength(0);
+    expect(localStorage.getItem("taomni.viewer.drafts.v1")).toContain("draft");
+    expect(viewerWriteText).not.toHaveBeenCalled();
+  });
 });

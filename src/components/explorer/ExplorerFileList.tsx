@@ -13,6 +13,7 @@ import { useExplorerLabels } from "./explorerLabels";
 import { ExplorerRenameInput } from "./ExplorerRenameInput";
 import { useExplorerClipboard } from "./explorerClipboard";
 import { EXPLORER_DRAG_MIME, type ExplorerDragPayload } from "./useExplorerDrop";
+import { useElementResizeFrame } from "../../hooks/useElementResizeFrame";
 
 interface Rubber { left: number; top: number; width: number; height: number }
 /** Explorer presentation; FilePanel still owns sorting, filtering and pane selection. */
@@ -37,14 +38,12 @@ export function ExplorerFileList(inputs: FilePanelViewProps) {
     count: Math.ceil(entries.length / columns), getScrollElement: () => scroll.current,
     estimateSize: () => rowHeight, overscan: 8, observeElementOffset: observeElementOffsetClean,
   });
-  useEffect(() => {
+  useElementResizeFrame(scroll, () => {
     const element = scroll.current;
     if (!element) return;
-    const observer = new ResizeObserver(() => setWidth(element.clientWidth));
-    observer.observe(element);
-    setWidth(element.clientWidth);
-    return () => observer.disconnect();
-  }, []);
+    const next = element.clientWidth;
+    setWidth((current) => current === next ? current : next);
+  });
   useEffect(() => { virtual.measure(); }, [rowHeight, columns, virtual, entries.length]);
   useEffect(() => {
     // A first render with no rows can leave TanStack's estimate at zero in a

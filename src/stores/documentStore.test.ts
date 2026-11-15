@@ -51,6 +51,18 @@ describe("shared document owner", () => {
     await get().checkExternal(path);
     expect(document().content).toBe("external"); expect(document().dirty).toBe(false);
   });
+  it("keeps an initial read error visible until the user explicitly retries", async () => {
+    vi.mocked(viewerReadText).mockRejectedValueOnce(new Error("binary: Binary file"));
+    await get().open(path);
+    expect(document().error).toContain("binary");
+    vi.mocked(viewerReadText).mockResolvedValue(disk("repaired", "repaired-hash"));
+    await get().checkExternal(path);
+    expect(viewerReadText).toHaveBeenCalledTimes(1);
+    expect(document().error).toContain("binary");
+    await get().open(path);
+    expect(document().content).toBe("repaired");
+    expect(document().error).toBeUndefined();
+  });
   it("restores drafts and exposes disk conflict rather than overwriting", async () => {
     await get().open(path); get().edit(path, "draft");
     get().release(path);

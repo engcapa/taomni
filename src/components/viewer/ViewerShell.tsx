@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect, useState } from "react";
-import { getAppPlatform } from "../../lib/runtime";
+import { getAppPlatform, isTauriRuntime } from "../../lib/runtime";
 import { AlertCircle, FolderOpen, RefreshCw, Save, Shield } from "lucide-react";
 import { useDocumentStore } from "../../stores/documentStore";
 import { documentPathKey } from "../../lib/openFile/pathIdentity";
@@ -36,10 +36,18 @@ export function ViewerShell({ viewer, active = true, workspaceId }: { viewer: Fi
     if (!active) return;
     const refresh = () => { void useDocumentStore.getState().checkExternal(viewer.path); };
     refresh();
+    // Native host writes do not necessarily move focus or change WebView
+    // visibility. Poll the active document so a dirty buffer surfaces the
+    // conflict banner before the next save, including after a cold restart.
+    const poll = isTauriRuntime() ? window.setInterval(refresh, 500) : undefined;
     window.addEventListener("focus", refresh);
     const visible = () => { if (globalThis.document.visibilityState === "visible") refresh(); };
     globalThis.document.addEventListener("visibilitychange", visible);
-    return () => { window.removeEventListener("focus", refresh); globalThis.document.removeEventListener("visibilitychange", visible); };
+    return () => {
+      if (poll !== undefined) window.clearInterval(poll);
+      window.removeEventListener("focus", refresh);
+      globalThis.document.removeEventListener("visibilitychange", visible);
+    };
   }, [active, viewer.path]);
   const run = (action: () => Promise<unknown>) => { setError(null); void action().catch((failure) => setError(String(failure))); };
   const toLocal = async () => {

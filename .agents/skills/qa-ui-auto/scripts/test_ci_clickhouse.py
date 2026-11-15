@@ -5,7 +5,7 @@ import unittest
 from unittest.mock import patch
 import xml.etree.ElementTree as ET
 
-from ci_clickhouse import download, server_config
+from ci_clickhouse import download, ensure_wsl_runtime, server_config
 from qa_ui_auto.fixtures import clickhouse_required
 
 
@@ -46,6 +46,28 @@ class ClickHouseFixtureTests(unittest.TestCase):
         with patch.dict(sys.modules, {"clickhouse_driver": SimpleNamespace(Client=object)}), patch.dict("os.environ", {}, clear=True):
             with self.assertRaisesRegex(RuntimeError, "requires"):
                 clickhouse_required.setup(SimpleNamespace(cfg={}, env={}))
+
+    def test_wsl_update_failure_reuses_healthy_runtime(self):
+        calls = []
+
+        def command(argv):
+            calls.append(argv)
+            if argv[1:3] == ["--update", "--web-download"]:
+                raise RuntimeError("wsl update unavailable")
+            return "WSL version: 2.5.1"
+
+        ensure_wsl_runtime(command)
+        self.assertEqual(calls, [
+            ["wsl.exe", "--update", "--web-download"],
+            ["wsl.exe", "--version"],
+        ])
+
+    def test_wsl_update_failure_stays_fatal_without_runtime(self):
+        def command(argv):
+            raise RuntimeError(f"failed: {argv}")
+
+        with self.assertRaisesRegex(RuntimeError, "failed"):
+            ensure_wsl_runtime(command)
 
 
 if __name__ == "__main__":

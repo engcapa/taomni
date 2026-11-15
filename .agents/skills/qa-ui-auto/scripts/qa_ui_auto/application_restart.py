@@ -10,19 +10,31 @@ from .steps import StepError
 @_verb("native_restart_app")
 def restart_application(ctx, args):
     expected = None
+    preserve_dirty_drafts = False
     if args is not None:
-        if not isinstance(args, dict) or set(args) != {"expect_exit_confirmation"}:
-            raise StepError("native_restart_app: use null or {expect_exit_confirmation: {title, message, confirm_label}}")
-        try:
-            expected = validate_exit_confirmation(args["expect_exit_confirmation"])
-        except ValueError as error:
-            raise StepError(f"native_restart_app: {error}") from error
+        if not isinstance(args, dict) or not args or not set(args) <= {"expect_exit_confirmation", "preserve_dirty_drafts"}:
+            raise StepError("native_restart_app: use null, preserve_dirty_drafts: true, or an explicit exit confirmation")
+        if "preserve_dirty_drafts" in args:
+            if args["preserve_dirty_drafts"] is not True:
+                raise StepError("native_restart_app: preserve_dirty_drafts must be true when present")
+            preserve_dirty_drafts = True
+        if "expect_exit_confirmation" in args:
+            try:
+                expected = validate_exit_confirmation(args["expect_exit_confirmation"])
+            except ValueError as error:
+                raise StepError(f"native_restart_app: {error}") from error
     restart = getattr(ctx.session, "application_restarter", None)
     if not callable(restart):
         raise StepError("native_restart_app: this session has no owned application launcher")
     try:
         # Keep no-argument launchers/cases compatible; opt-in is never implicit.
-        result = restart() if expected is None else restart(expect_exit_confirmation=expected)
+        if expected is None and not preserve_dirty_drafts:
+            result = restart()
+        else:
+            options = {"expect_exit_confirmation": expected} if expected is not None else {}
+            if preserve_dirty_drafts:
+                options["preserve_dirty_drafts"] = True
+            result = restart(**options)
     except Exception as error:
         result = {**getattr(ctx.session, "application_restart_observation", {}),
                   "status": "failed", "error": str(error),

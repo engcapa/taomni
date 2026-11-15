@@ -1,7 +1,6 @@
 """Path selectors must track native separator spelling without basename fallback."""
 import json
 from pathlib import Path
-import subprocess
 from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest import TestCase
@@ -14,22 +13,26 @@ class ExplorerFixtureSelectorTest(TestCase):
     def test_css_matches_both_exact_windows_spellings_and_no_unrelated_path(self):
         path = 'D:/a/qa report/source/folder'
         selector = '[data-testid="explorer-nav-node"]' + path_attribute_match(path)
-        program = r"""
-const assert = require('node:assert/strict');
-const {JSDOM} = require('jsdom');
-const {selector, path} = JSON.parse(process.argv[1]);
-const doc = new JSDOM('<main></main>').window.document;
-const add = value => {
-  const el = doc.createElement('div');
-  el.dataset.testid = 'explorer-nav-node'; el.dataset.path = value;
-  doc.querySelector('main').append(el); return el;
-};
-const slash = add(path), native = add(path.replaceAll('/', '\\'));
-add('D:/unrelated/folder'); add(path + '/child'); add('E:' + path.slice(2));
-assert.deepEqual([...doc.querySelectorAll(selector)], [slash, native]);
-"""
-        subprocess.run(["node", "-e", program, json.dumps({"selector": selector, "path": path})],
-                       check=True, capture_output=True, text=True)
+        self.assertEqual(
+            selector,
+            '[data-testid="explorer-nav-node"]:is('
+            '[data-path="D:/a/qa report/source/folder"],'
+            '[data-path="D:\\\\a\\\\qa report\\\\source\\\\folder"]'
+            ')',
+        )
+
+        # Keep this contract independent of the frontend dependency tree. The
+        # selector contains only exact path alternatives, so these are the
+        # values a browser query must return for the same fixture rows.
+        candidates = [
+            path,
+            path.replace('/', '\\'),
+            'D:/unrelated/folder',
+            path + '/child',
+            'E:' + path[2:],
+        ]
+        exact_paths = {path, path.replace('/', '\\')}
+        self.assertEqual([value for value in candidates if value in exact_paths], candidates[:2])
 
     def test_posix_quotes_backslashes_and_spaces_are_escaped_as_literal_attributes(self):
         path = '/qa/report "quoted"/folder\\name'

@@ -56,6 +56,13 @@ class NativeApplicationRestartTest(unittest.TestCase):
         dialog = {**expected, "count": 1, "confirm_count": 1, "confirm_visible": True, "confirm_enabled": True}
         return session, driver, events, expected, dialog
 
+    def viewer_close_scenario(self):
+        session, driver, events = self.scenario()
+        dialog = {"count": 1, "title": "Save changes", "paths": ["/workspace/README.md"],
+                  "keep_count": 1, "keep_label": "Keep draft", "keep_visible": True,
+                  "keep_enabled": True}
+        return session, driver, events, dialog
+
     def test_expected_exit_confirmation_is_clicked_once_before_normal_shutdown(self):
         session, driver, events, expected, dialog = self.confirmation_scenario()
         session.execute.side_effect = [None, None, dialog, WebDriverError("no such window")]
@@ -72,6 +79,22 @@ class NativeApplicationRestartTest(unittest.TestCase):
         self.assertTrue(confirmation["closed_after_confirmation"])
         self.assertEqual(confirmation["status"], "verified")
         self.shutdown.assert_called_once_with(driver, session, {})
+
+    def test_preserve_dirty_drafts_clicks_viewer_keep_action_once_before_shutdown(self):
+        session, driver, events, dialog = self.viewer_close_scenario()
+        session.execute.side_effect = [None, dialog, WebDriverError("no such window")]
+        session.click.side_effect = lambda selector: events.append(selector)
+        with patch("native_application_restart.time.sleep"):
+            result = restart_owned_application(driver, session, preserve_dirty_drafts=True)
+        self.assertEqual(events, ['[data-testid="window-close"]',
+                                  '[data-testid="viewer-close-dialog"] [data-testid="viewer-close-keep-draft"]',
+                                  "close", "stop-owner", "start-owner", "start-session"])
+        viewer_close = result["viewer_close"]
+        self.assertEqual(viewer_close["observed"], dialog)
+        self.assertTrue(viewer_close["click_attempted"])
+        self.assertTrue(viewer_close["click_returned"])
+        self.assertTrue(viewer_close["closed_after_confirmation"])
+        self.assertEqual(viewer_close["status"], "verified")
 
     def test_binding_forwards_optional_confirmation_and_preserves_no_arg_restart(self):
         session, driver, _, expected, _ = self.confirmation_scenario()
@@ -484,6 +507,14 @@ class RestartVerbContractTest(unittest.TestCase):
         self.restart.assert_called_once_with(expect_exit_confirmation=self.expected)
         self.assertEqual(self.receipts()[0]["exit_confirmation"], confirmation)
 
+    def test_preserve_dirty_drafts_forwards_explicit_viewer_close_contract(self):
+        viewer_close = {"selector": "[data-testid=viewer-close-dialog] [data-testid=viewer-close-keep-draft]",
+                        "click_attempted": True, "status": "verified"}
+        self.restart.return_value["viewer_close"] = viewer_close
+        run_native_step(self.ctx, "native_restart_app", {"preserve_dirty_drafts": True})
+        self.restart.assert_called_once_with(preserve_dirty_drafts=True)
+        self.assertEqual(self.receipts()[0]["viewer_close"], viewer_close)
+
     def test_failed_restart_retains_confirm_input_and_primary_error_without_claiming_success(self):
         observed = {"title": "Exit", "message": "Unexpected open tabs", "confirm_label": "Exit"}
         self.session.application_restart_observation = {
@@ -509,10 +540,13 @@ class RestartVerbContractTest(unittest.TestCase):
         validator = jsonschema.Draft202012Validator({
             "$ref": "#/$defs/step/properties/native_restart_app", "$defs": schema["$defs"],
         })
-        valid = [None, {"expect_exit_confirmation": self.expected}]
+        valid = [None, {"expect_exit_confirmation": self.expected}, {"preserve_dirty_drafts": True},
+                 {"expect_exit_confirmation": self.expected, "preserve_dirty_drafts": True}]
         invalid = [True, False, [], "confirm", {}, {"expect_exit_confirmation": True},
                    {"expect_exit_confirmation": None}, {"expect_exit_confirmation": {}},
-                   {"expect_exit_confirmation": self.expected, "force": True}]
+                   {"expect_exit_confirmation": self.expected, "preserve_dirty_drafts": False},
+                   {"expect_exit_confirmation": self.expected, "force": True},
+                   {"preserve_dirty_drafts": False}, {"preserve_dirty_drafts": 1}]
         for field in self.expected:
             for value in (None, 1, "", " \n\t"):
                 invalid.append({"expect_exit_confirmation": {**self.expected, field: value}})
@@ -529,7 +563,7 @@ class RestartVerbContractTest(unittest.TestCase):
                 with self.assertRaises(StepError):
                     run_native_step(self.ctx, "native_restart_app", args)
         self.restart.assert_not_called()
-        self.assertEqual(len(self.receipts()), 2)
+        self.assertEqual(len(self.receipts()), 4)
 
     def test_missing_launcher_is_an_explicit_failure(self):
         del self.session.application_restarter
@@ -537,7 +571,7 @@ class RestartVerbContractTest(unittest.TestCase):
             run_native_step(self.ctx, "native_restart_app", {"expect_exit_confirmation": self.expected})
         self.assertFalse(list(self.folder.iterdir()))
 
-    def test_selected_case_opts_in_and_existing_restart_cases_remain_null(self):
+    def test_selected_case_opts_in_and_existing_restart_cases_keep_their_contracts(self):
         root = Path(__file__).resolve().parents[4]
         cases = root / "qa-ui-auto-tests" / "cases"
         case = load_case(cases / "TC-EXPLORER-005-native-entries-clipboard.testcase.yaml")
@@ -546,13 +580,12 @@ class RestartVerbContractTest(unittest.TestCase):
         rows = [step["click"] for step in case.steps if "explorer-file-row" in str(step.get("click", ""))]
         self.assertEqual(len(rows), 4)
         self.assertTrue(all(selector.endswith(" .ex-name") for selector in rows))
-        for name in ("TC-WS-030-native-workspace-cold-start-restoration.testcase.yaml",
-                     "TC-WS-054-release-layout-restart-and-save.testcase.yaml"):
-            with self.subTest(case=name):
-                doc = yaml.safe_load((cases / name).read_text(encoding="utf-8"))
-                restarts = [step["native_restart_app"] for step in doc["steps"] if "native_restart_app" in step]
-                self.assertTrue(restarts)
-                self.assertTrue(all(args is None for args in restarts))
+        ws030 = yaml.safe_load((cases / "TC-WS-030-native-workspace-cold-start-restoration.testcase.yaml").read_text(encoding="utf-8"))
+        self.assertEqual([step["native_restart_app"] for step in ws030["steps"] if "native_restart_app" in step],
+                         [{"preserve_dirty_drafts": True}, {"preserve_dirty_drafts": True}])
+        ws054 = yaml.safe_load((cases / "TC-WS-054-release-layout-restart-and-save.testcase.yaml").read_text(encoding="utf-8"))
+        self.assertTrue([step["native_restart_app"] for step in ws054["steps"] if "native_restart_app" in step])
+        self.assertTrue(all(step["native_restart_app"] is None for step in ws054["steps"] if "native_restart_app" in step))
 
     def test_dialog_observation_uses_readonly_visible_dom_without_launching_a_webview(self):
         node = shutil.which("node")

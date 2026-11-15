@@ -11,7 +11,7 @@
 import { create } from "zustand";
 import type { SessionConfig } from "../lib/ipc/session";
 import { createWorkspaceTabActions } from "./workspacePlatformTabActions";
-import { guardViewerClose } from "../lib/openFile/closeGuard";
+import { consumeDirtyCloseBypass, guardViewerClose } from "../lib/openFile/closeGuard";
 import { documentPathKey } from "../lib/openFile/pathIdentity";
 import { useDocumentStore } from "./documentStore";
 import { createWorkspaceExplorerActions } from "./workspaceExplorerActions";
@@ -400,7 +400,7 @@ export const useWorkspacePlatformStore = create<WorkspacePlatformState>((set, ge
     const target = state.workspaces.find((workspace) => workspace.id === workspaceId);
     if (!target || target.isDefault || target.id === DEFAULT_WORKSPACE_ID || target.id === NOTES_WORKSPACE_ID) return false;
     const paths = target.openTabs.flatMap((tab) => tab.fileViewer ? [tab.fileViewer.path] : []);
-    if (paths.some((path) => useDocumentStore.getState().documents[documentPathKey(path)]?.dirty)) {
+    if (paths.some((path) => useDocumentStore.getState().documents[documentPathKey(path)]?.dirty && !consumeDirtyCloseBypass(path))) {
       guardViewerClose(paths, () => get().deleteWorkspace(workspaceId));
       return false;
     }

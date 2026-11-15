@@ -243,6 +243,27 @@ class NativeSessionTransportTest(TestCase):
                 self.assertIn("document.readyState", session.execute.call_args_list[0].args[0])
                 session.install_console_hook.assert_called_once_with()
 
+    def test_windows_blank_webview_is_navigated_to_the_tauri_document(self):
+        session = NativeSession("http://driver.invalid", Path("/tmp/taomni"))
+        session.request = Mock(side_effect=[
+            {"sessionId": "session-1"},
+            "about:blank",
+            None,
+        ])
+        session.execute = Mock(side_effect=[False, True])
+        session.install_console_hook = Mock()
+        session.activate_linux_window = Mock()
+        with patch("tauri_webdriver.platform.system", return_value="Windows"), \
+             patch.dict(os.environ, {"NEWMOB_DATA_DIR": "/qa/run/native-appdata"}), \
+             patch("tauri_webdriver.time.sleep"):
+            session.start()
+
+        self.assertEqual(session.request.call_args_list[1:], [
+            call("GET", "/session/session-1/url"),
+            call("POST", "/session/session-1/url", {"url": "http://tauri.localhost/"}),
+        ])
+        session.install_console_hook.assert_called_once_with()
+
     def test_failed_session_readiness_deletes_session_so_app_exits(self):
         # An undeleted session leaves the app running with the run-owned
         # profile locked, so every later case's reset_db fails (WinError 32).

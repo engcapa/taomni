@@ -15112,6 +15112,9 @@ controls:
   - id: viewer-close-discard
     selector: '[data-testid="viewer-close-discard"]'
     kind: interactive
+  - id: viewer-close-keep-draft
+    selector: '[data-testid="viewer-close-keep-draft"]'
+    kind: interactive
   - id: viewer-close-cancel
     selector: '[data-testid="viewer-close-cancel"]'
     kind: interactive
