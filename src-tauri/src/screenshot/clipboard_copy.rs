@@ -42,7 +42,7 @@ fn retry_occupied<T>(
 
 /// Used from a blocking worker. Retain the same decoded image over retries;
 /// release the application's mutex before sleeping so other owners can finish.
-pub(super) fn publish(
+pub(crate) fn publish(
     clipboard: &Mutex<Option<Clipboard>>,
     image: &RgbaImage,
 ) -> anyhow::Result<()> {

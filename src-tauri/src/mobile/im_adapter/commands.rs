@@ -4,11 +4,11 @@ use serde_json::Value;
 const PREFIX: &str = "/taomni";
 const MIN_SHORT_ID: usize = 4;
 const CANDIDATES: usize = 5;
-const ACTIONS: [&str; 14] = [
+const ACTIONS: [&str; 20] = [
     "help", "list", "term", "show", "file", "input", "key", "saved", "open", "new", "send", "stop",
-    "approve", "reject",
+    "approve", "reject", "screen", "windows", "wininput", "winsend", "winkey", "browser",
 ];
-const ALIASES: [(&str, &str); 20] = [
+const ALIASES: [(&str, &str); 35] = [
     ("帮助", "help"),
     ("列表", "list"),
     ("终端", "term"),
@@ -29,12 +29,33 @@ const ALIASES: [(&str, &str); 20] = [
     ("拒绝", "reject"),
     ("查看终端", "term"),
     ("输入文本", "input"),
+    ("屏幕", "screen"),
+    ("截屏", "screen"),
+    ("截图", "screen"),
+    ("看屏", "screen"),
+    ("查看屏幕", "screen"),
+    ("窗口", "windows"),
+    ("窗口列表", "windows"),
+    ("窗口输入", "wininput"),
+    ("输入窗口", "wininput"),
+    ("窗口回车", "winsend"),
+    ("窗口按键", "winkey"),
+    ("窗口键", "winkey"),
+    ("浏览器", "browser"),
+    ("打开网页", "browser"),
+    ("网页", "browser"),
 ];
 pub const HELP: &str = "Taomni 指令（私聊可省略 /taomni，群聊需加前缀）：
 终端 / term <id>：查看终端输出并自动跟随刷新（仅私聊）
-输入 / input <文本>：向当前终端发送文本并回车
+输入 / input <文本>：向当前终端发送文本并回车（自动刷新终端展示）
 输入 <id> <文本>：向指定终端发送
 按键 / key <按键>：向当前终端发送 Enter、Ctrl-C、Tab、Esc 或方向键
+屏幕 / screen：查看并刷新当前桌面屏幕（需在设置开启，仅私聊）
+窗口 / windows：列出当前桌面窗口与序号、id（仅私聊）
+窗口输入 / wininput <序号/id/标题> <文本>：向指定窗口发送文本
+窗口回车 / winsend <序号/id/标题> <文本>：向指定窗口发送文本并回车
+窗口按键 / winkey <序号/id/标题> <按键>：向指定窗口发送按键（如 Enter、Tab、Esc、Ctrl-C、F5）
+浏览器 / browser <网址>：在服务端打开浏览器页面；开启屏幕查看后可直接看图刷新
 保存 / saved：列出可远程打开的已保存会话
 打开 / open <id 或名称>：在桌面打开已保存会话并返回新终端
 新建 / new：在桌面新建本地终端
@@ -48,7 +69,7 @@ pub const HELP: &str = "Taomni 指令（私聊可省略 /taomni，群聊需加�
 帮助 / help（或单独 /taomni）
 <id> 可用完整 id、thread:<前缀>、term:<前缀>，或至少 4 字符的裸前缀。
 终端与 Agent 都显示前 8 字符短 id；有歧义时多输入几位，不接受列表序号。
-终端相关内容（输出、输入、打开会话）仅限已绑定私聊。";
+终端、屏幕、窗口输入与服务端浏览器指令仅限已绑定私聊。";
 pub const UNKNOWN: &str = "未识别的指令。发送“帮助”查看可用指令（群聊请发送 /taomni 帮助）。";
 
 #[derive(Debug, PartialEq)]
@@ -148,9 +169,22 @@ pub fn usage(action: &str) -> String {
         "send" => "发送 <短id> <指令>",
         "stop" => "停止 <短id>",
         "approve" => "同意 <短id> <确认id>",
+        "screen" => "屏幕 [显示器id]",
+        "windows" => "窗口",
+        "wininput" => "窗口输入 <窗口序号/id/标题> <文本>",
+        "winsend" => "窗口回车 <窗口序号/id/标题> <文本>",
+        "winkey" => "窗口按键 <窗口序号/id/标题> <Enter|Tab|Esc|Ctrl-C|F5>",
+        "browser" => "浏览器 <网址>",
         _ => "拒绝 <短id> <确认id>",
     };
-    format!("缺少会话 id。用法：{form}；发送“列表”或“帮助”查看更多。")
+    if matches!(
+        action,
+        "screen" | "windows" | "wininput" | "winsend" | "winkey" | "browser"
+    ) {
+        format!("参数不完整。用法：{form}；发送“窗口”查看窗口列表，或“帮助”查看全部指令。")
+    } else {
+        format!("缺少会话 id。用法：{form}；发送“列表”或“帮助”查看更多。")
+    }
 }
 
 pub fn raw(id: &str) -> &str {

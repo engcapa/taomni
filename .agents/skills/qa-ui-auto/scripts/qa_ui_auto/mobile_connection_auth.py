@@ -50,6 +50,7 @@ def run(ctx, endpoint, pairing_code):
 
                 def open_saved(name):
                     receipt['phase'] = name
+                    page.get_by_test_id('mobile-saved-search').fill(name)
                     with page.expect_response(lambda r: r.url == endpoint + '/api/v1/open-requests' and r.request.method == 'POST') as started:
                         page.get_by_test_id('mobile-saved-session').filter(has_text=name).get_by_test_id('mobile-saved-open').click()
                     value = started.value.json()

@@ -4,6 +4,7 @@ mod chunks;
 mod filesystem;
 mod html;
 mod html_document;
+mod html_loopback;
 mod network;
 mod network_rewrite;
 mod paths;

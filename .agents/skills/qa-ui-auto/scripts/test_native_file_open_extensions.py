@@ -65,6 +65,28 @@ class NativeFileDialogTests(unittest.TestCase):
             receipt=json.loads((ctx.case_dir/'native-paste.jsonl').read_text())
             self.assertTrue(receipt['passed']);self.assertFalse(receipt['syntheticClipboardEvent'])
 
+    def test_windows_native_paste_qualifies_system_threading_thread_sleep(self):
+        self.assertIn('System.Threading.Thread.Sleep(', native_paste.WIN)
+
+    def test_windows_file_dialog_supports_save_as_directui_combobox_and_diagnostics(self):
+        script=(Path(file_dialog.__file__).parent/'folder_dialog_windows.ps1').read_text(encoding='utf-8')
+        self.assertIn('FloatNotifySink',script)
+        self.assertIn('DUIViewWndClassName',script)
+        self.assertIn('HasAncestorControlId(window, dialog, 1148)',script)
+        self.assertIn('UniversalSearchBand',script)
+        self.assertIn('SendControlMessage(edit, 0x00B1',script)
+
+    def test_native_session_text_uses_textcontent_for_svg_elements(self):
+        from tauri_webdriver import NativeSession
+        session=NativeSession('http://driver.invalid',Path('/qa/taomni'))
+        session.execute=Mock(return_value='Markdown Source')
+        session.find=Mock()
+        self.assertEqual(session.text('svg.flowchart'),'Markdown Source')
+        script=session.execute.call_args.args[0]
+        self.assertIn('SVGElement',script)
+        self.assertIn('textContent',script)
+        session.find.assert_not_called()
+
 
 class GlobalEntryContracts(unittest.TestCase):
     def test_native_terminal_click_uses_one_synchronized_pointer_with_modifier_and_release(self):
@@ -80,6 +102,18 @@ class GlobalEntryContracts(unittest.TestCase):
             self.assertEqual([item['type'] for item in pointer['actions']].count('pointerDown'),1)
             self.assertEqual(keyboard['actions'][-1],{'type':'keyUp','value':''})
             self.assertEqual(calls[-1].args,('DELETE','/actions'))
+
+    def test_native_terminal_click_parks_on_distinct_cell_before_hover(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            session=SimpleNamespace(execute=Mock(return_value={'x':20,'y':40,'parkX':780,'parkY':380,'width':800,'height':400,'hit':True}),request=Mock(),endpoint=lambda path:path)
+            ctx=SimpleNamespace(case_dir=Path(tmp),session=session)
+            with patch.object(terminal_file_link.platform,'system',return_value='Windows'),patch('qa_ui_auto.deadline.budget_time.sleep'):
+                terminal_file_link.native(ctx,{'selector':'#terminal'})
+            posts=[call.args[2]['actions'] for call in session.request.call_args_list if call.args[0]=='POST' and call.args[1]=='/actions']
+            self.assertEqual(len(posts),3)
+            self.assertEqual(posts[0][0]['actions'][0],{'type':'pointerMove','origin':'viewport','x':780,'y':380,'duration':0})
+            self.assertEqual(posts[1][0]['actions'][0],{'type':'pointerMove','origin':'viewport','x':20,'y':40,'duration':0})
+            self.assertEqual(len(posts[2]),2)
 
     def test_file_link_transition_asserts_automatic_chat_hide_without_clicking_hidden_control(self):
         import yaml
@@ -159,11 +193,57 @@ class MarkdownNativeArtifactsTests(unittest.TestCase):
         (directory/'assets/b.png').unlink()
         with self.assertRaises(StepError):artifacts.check_artifact('markdown',directory,self.source,self.manifest)
 
+    def test_html_export_accepts_mermaid_v11_split_tspan_labels(self):
+        image = base64.b64encode(self.clipboard.read_bytes()).decode()
+        mermaid_v11_svg = (
+            '<svg xmlns="http://www.w3.org/2000/svg" width="540" height="80">'
+            '<g class="nodes">'
+            '<g class="node"><text><tspan class="text-outer-tspan"><tspan class="text-inner-tspan">Markdown</tspan>'
+            '<tspan class="text-inner-tspan"> Source</tspan></tspan></text></g>'
+            '<g class="node"><text><tspan class="text-outer-tspan"><tspan class="text-inner-tspan">Live</tspan>'
+            '<tspan class="text-inner-tspan"> Diagram</tspan></tspan></text></g>'
+            '<g class="node"><text><tspan class="text-outer-tspan"><tspan class="text-inner-tspan">Export</tspan>'
+            '<tspan class="text-inner-tspan"> Artifact</tspan></tspan></text></g>'
+            '</g></svg>'
+        )
+        html = self.exports / 'native.html'
+        html.write_text(
+            '<h1>File open Markdown</h1><strong>Rendered bold</strong><span class="katex">x^2</span>'
+            + f'<img src="data:image/png;base64,{image}">' * 2
+            + mermaid_v11_svg,
+            encoding='utf-8',
+        )
+        artifacts.check_artifact('html', html, self.source, self.manifest)
+        # Diagram text outside SVG must not satisfy the SVG check if SVG lacks the labels.
+        html.write_text(
+            '<h1>File open Markdown</h1><strong>Rendered bold</strong><span class="katex">x^2</span>'
+            + '<p>Markdown Source Live Diagram Export Artifact</p>'
+            + f'<img src="data:image/png;base64,{image}">' * 2
+            + '<svg xmlns="http://www.w3.org/2000/svg"></svg>',
+            encoding='utf-8',
+        )
+        with self.assertRaises(StepError):
+            artifacts.check_artifact('html', html, self.source, self.manifest)
+
     def test_clipboard_fixture_cleanup_restores_text_and_records_format_boundary(self):
         with patch('qa_ui_auto.host_clipboard.set_text') as restore,patch('qa_ui_auto.host_clipboard.clear') as clear:
             markdown_native.teardown(self.ctx)
         restore.assert_called_once_with('previous clipboard');clear.assert_not_called()
-        self.assertTrue(json.loads((self.ctx.case_dir/'markdown-clipboard-cleanup.json').read_text())['nonTextPreviousFormatsNotRestored'])
+        receipt = json.loads((self.ctx.case_dir/'markdown-clipboard-cleanup.json').read_text())
+        self.assertTrue(receipt['textRestored'])
+        self.assertTrue(receipt['nonTextPreviousFormatsNotRestored'])
+        self.ctx._markdown_clipboard_before = ''
+        with patch('qa_ui_auto.host_clipboard.set_text') as restore,patch('qa_ui_auto.host_clipboard.clear') as clear:
+            markdown_native.teardown(self.ctx)
+        restore.assert_not_called();clear.assert_called_once_with()
+        receipt = json.loads((self.ctx.case_dir/'markdown-clipboard-cleanup.json').read_text())
+        self.assertFalse(receipt['textRestored'])
+        self.assertTrue(receipt['nonTextPreviousFormatsNotRestored'])
+
+    def test_linux_x11_save_dialog_clears_unselected_extension_before_typing_path(self):
+        from qa_ui_auto import folder_dialog
+        folder_src = Path(folder_dialog.__file__).read_text(encoding='utf-8')
+        self.assertIn('"ctrl+l", "ctrl+a", "BackSpace"', folder_src)
 
     def test_png_cancel_and_failed_receipts(self):
         from PIL import Image, ImageDraw
@@ -177,6 +257,28 @@ class MarkdownNativeArtifactsTests(unittest.TestCase):
         with self.assertRaises(StepError):artifacts.run(self.ctx,{'kind':'html','path':str(self.exports/'missing.html'),'source':str(self.source),'timeout_sec':0})
         records=[json.loads(line) for line in (self.ctx.case_dir/'markdown-artifacts.jsonl').read_text().splitlines()]
         self.assertEqual([record['passed'] for record in records],[True,False])
+
+    def test_windows_native_paste_foreground_activation_handles_empty_fg_and_lock(self):
+        from qa_ui_auto import native_paste
+        self.assertIn('EnumWindows', native_paste.WIN)
+        self.assertIn('attachedTarget', native_paste.WIN)
+        self.assertIn('keybd_event(0x12,0,0,UIntPtr.Zero)', native_paste.WIN)
+        self.assertIn('fgPid=', native_paste.WIN)
+
+        ctx = SimpleNamespace(
+            case_dir=self.root / 'win-case',
+            dry_run=False,
+            session=SimpleNamespace(application='/tmp/taomni.exe', execute=lambda _script: True),
+        )
+        ctx.case_dir.mkdir(parents=True, exist_ok=True)
+        fake_completed = SimpleNamespace(returncode=0, stdout='{"pid":42,"window":99,"transport":"Windows OS Ctrl+V"}', stderr='')
+        with patch('qa_ui_auto.native_paste.platform.system', return_value='Windows'), \
+             patch('qa_ui_auto.native_paste.subprocess.run', return_value=fake_completed) as run_mock:
+            result = native_paste.run(ctx, {'selector': '[data-testid="markdown-editor"] .cm-content'})
+        self.assertIn('native OS paste chord', result)
+        run_mock.assert_called_once()
+        records = [json.loads(line) for line in (ctx.case_dir / 'native-paste.jsonl').read_text().splitlines()]
+        self.assertEqual(records, [{'selector': '[data-testid="markdown-editor"] .cm-content', 'syntheticClipboardEvent': False, 'passed': True, 'pid': 42, 'window': 99, 'transport': 'Windows OS Ctrl+V'}])
 
 
 if __name__=='__main__':unittest.main()

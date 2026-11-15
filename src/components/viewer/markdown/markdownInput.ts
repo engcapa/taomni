@@ -1,10 +1,10 @@
 import { EditorSelection, Transaction, type Extension } from "@codemirror/state";
 import { EditorView, ViewPlugin, type ViewUpdate } from "@codemirror/view";
 import { isolateHistory } from "@codemirror/commands";
+import { readClipboardImageFiles, readNativeClipboardImagePath } from "../../../lib/clipboard";
 import { saveMarkdownImage } from "../../../lib/markdownAssets";
-import { readNativeClipboardImagePath } from "../../../lib/clipboard";
-import { viewerReadBytes } from "../../../lib/viewer";
 import { isTauriRuntime } from "../../../lib/runtime";
+import { VIEWER_IMAGE_LIMIT, viewerReadBytes } from "../../../lib/viewer";
 import { convertTablePaste } from "./markdownModel";
 
 interface InputOptions {
@@ -17,7 +17,6 @@ interface InputOptions {
 interface Pending { from: number; to: number; cancelled: boolean }
 interface Owner { pending: Set<Pending>; alive: boolean; options: InputOptions }
 const owners = new WeakMap<EditorView, Owner>();
-const MAX_NATIVE_CLIPBOARD_IMAGE_BYTES = 20 * 1024 * 1024;
 
 export async function insertMarkdownImages(view: EditorView, files: Blob[], range?: { from: number; to: number }): Promise<void> {
   const owner = owners.get(view);
@@ -44,6 +43,32 @@ export async function insertMarkdownImages(view: EditorView, files: Blob[], rang
       options.onError(error instanceof Error ? error.message : String(error));
     }
   } finally { owner.pending.delete(pending); }
+}
+
+async function pasteNativeClipboardImages(view: EditorView): Promise<void> {
+  const owner = owners.get(view);
+  if (!owner || !owner.alive || view.state.readOnly) return;
+  try {
+    const nativePath = await readNativeClipboardImagePath();
+    if (!owner.alive || view.state.readOnly) return;
+    if (nativePath) {
+      const payload = await viewerReadBytes(nativePath, VIEWER_IMAGE_LIMIT);
+      if (!owner.alive || view.state.readOnly || !payload.bytes.length) return;
+      const mime = payload.mime?.startsWith("image/") ? payload.mime : "image/png";
+      const ext = mime === "image/jpeg" ? "jpg" : mime.split("/")[1] || "png";
+      const file = new File([new Uint8Array(payload.bytes)], `clipboard-image.${ext}`, { type: mime });
+      await insertMarkdownImages(view, [file]);
+      return;
+    }
+    const files = await readClipboardImageFiles();
+    if (!owner.alive || view.state.readOnly || !files.length) return;
+    await insertMarkdownImages(view, files);
+  } catch (error) {
+    if (owner.alive) {
+      owner.options.onStatus("");
+      owner.options.onError(error instanceof Error ? error.message : String(error));
+    }
+  }
 }
 
 export function markdownInput(options: InputOptions): Extension {
@@ -77,41 +102,10 @@ export function markdownInput(options: InputOptions): Extension {
       // use the standards-backed files list without synthesizing an event.
       const images = itemImages.length ? itemImages : Array.from(data.files ?? []).filter((file) => file.type.startsWith("image/"));
       if (images.length) { event.preventDefault(); void insertMarkdownImages(view, images); return true; }
-      // A regular text clipboard already exposes a payload synchronously;
-      // avoid an unnecessary native image probe (which may round-trip X11).
-      if (data.types?.includes("text/plain") && data.getData("text/plain")) {
-        const handled = pasteMarkdownText(view, data, options);
-        if (handled) event.preventDefault();
-        return handled;
-      }
-      // WebKitGTK can omit both DataTransfer.items and DataTransfer.files for
-      // an image owned by another native process. Keep the paste gesture
-      // inside the editor while we ask the native clipboard bridge for the
-      // temporary PNG that arboard produced. If the clipboard actually holds
-      // text, continue through the same table/plain-text path below.
-      if (isTauriRuntime()) {
+      const hasTextOrHtml = Boolean(data.getData("text/plain") || data.getData("text/html"));
+      if (!hasTextOrHtml && isTauriRuntime()) {
         event.preventDefault();
-        void (async () => {
-          try {
-            const path = await readNativeClipboardImagePath();
-            if (path) {
-              const result = await viewerReadBytes(path, MAX_NATIVE_CLIPBOARD_IMAGE_BYTES);
-              const blob = new Blob([new Uint8Array(result.bytes)], { type: result.mime || "image/png" });
-              await insertMarkdownImages(view, [blob]);
-              return;
-            }
-            if (!pasteMarkdownText(view, data, options)) {
-              // The native event was consumed while probing the clipboard;
-              // preserve ordinary text paste when no image was available.
-              const plain = data.getData("text/plain").replace(/\r\n?/g, "\n");
-              if (plain) view.dispatch({ changes: { from: view.state.selection.main.from, to: view.state.selection.main.to, insert: plain },
-                selection: EditorSelection.cursor(view.state.selection.main.from + plain.length),
-                annotations: [Transaction.userEvent.of("input.paste"), isolateHistory.of("full")] });
-            }
-          } catch (error) {
-            options.onError(error instanceof Error ? error.message : String(error));
-          }
-        })();
+        void pasteNativeClipboardImages(view);
         return true;
       }
       const handled = pasteMarkdownText(view, data, options);

@@ -177,6 +177,8 @@ def _selectors_in_step(verb: str, args: Any) -> list[str]:
         )]
     if verb == "mobile_browser_probe" and args == "touch-scroll":
         return ['[data-testid="mobile-terminal-screen"]', '[data-testid="mobile-terminal-latest"]']
+    if verb == "mobile_browser_probe" and args == "desktop-enable-screen":
+        return []
     if verb == "mobile_browser_probe" and args == "recovery":
         return [f'[data-testid="{name}"]' for name in (
             'mobile-session', 'mobile-control-warning', 'mobile-terminal-retry',
@@ -247,6 +249,21 @@ def _touches_for_case(case) -> list[Touch]:  # case: TestCase
                     "mobile-terminal-command", "mobile-terminal-command-send", "mobile-terminal-back",
                 )
                 observed += ("mobile-terminal-screen", "mobile-terminal-status")
+            for names, kind in ((interacted, "interactive"), (observed, "display")):
+                out.extend(Touch(case_id=case.id, selector=f'[data-testid="{name}"]', kind=kind) for name in names)
+            continue
+        if verb == "mobile_service_probe" and args == "desktop-remote":
+            interacted = (
+                "mobile-settings-screen-capture", "mobile-settings-pair",
+                "mobile-first-instance", "mobile-endpoint", "mobile-label",
+                "mobile-pair-code", "mobile-pair-submit", "mobile-open-desktop",
+                "mobile-desktop-refresh", "mobile-window-select",
+                "mobile-window-input", "mobile-window-send",
+            )
+            observed = (
+                "mobile-settings-code", "mobile-desktop-view",
+                "mobile-screen-image", "mobile-window-result",
+            )
             for names, kind in ((interacted, "interactive"), (observed, "display")):
                 out.extend(Touch(case_id=case.id, selector=f'[data-testid="{name}"]', kind=kind) for name in names)
             continue

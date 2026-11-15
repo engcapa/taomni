@@ -38,10 +38,12 @@
         return decoded !== ".." && !/[\\\0:]/.test(decoded) && !decoded.includes("/");
       });
     } catch { /* malformed percent escape */ }
+    const host = url.hostname.toLowerCase().replace(/\.$/, "");
     if (url.href.startsWith(root) && safe) {
       send("navigate", { href: url.href });
     } else if ((url.protocol === "https:" || url.protocol === "http:")
-      && url.hostname !== "taomni-preview.localhost" && !url.hostname.endsWith(".localhost")) {
+      && host !== "taomni-preview.localhost" && host !== "localhost" && !host.endsWith(".localhost")
+      && !/^127\./.test(host) && host !== "[::1]" && !/^\[::ffff:7f[\da-f]{2}:/i.test(host)) {
       send("external", { href: url.href });
     } else {
       send("blocked", { message: "Link is outside the preview root", href: url.href });

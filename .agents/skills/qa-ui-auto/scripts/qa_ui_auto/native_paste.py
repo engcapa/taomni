@@ -33,11 +33,72 @@ using System.Runtime.InteropServices;
 public static class QaPaste {
  [DllImport("user32.dll")] static extern bool SetForegroundWindow(IntPtr hwnd);
  [DllImport("user32.dll")] static extern IntPtr GetForegroundWindow();
+ [DllImport("user32.dll")] static extern bool BringWindowToTop(IntPtr hwnd);
+ [DllImport("user32.dll")] static extern bool ShowWindow(IntPtr hwnd,int cmd);
+ [DllImport("user32.dll")] static extern bool IsIconic(IntPtr hwnd);
+ [DllImport("user32.dll")] static extern bool IsWindowVisible(IntPtr hwnd);
+ [DllImport("user32.dll")] static extern IntPtr GetWindow(IntPtr hwnd,uint cmd);
+ [DllImport("user32.dll")] static extern uint GetWindowThreadProcessId(IntPtr hwnd,out uint processId);
+ [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
+ [DllImport("user32.dll")] static extern bool AttachThreadInput(uint attach,uint attachTo,bool fAttach);
  [DllImport("user32.dll")] static extern void keybd_event(byte key,byte scan,uint flags,UIntPtr extra);
+ delegate bool EnumWindowsProc(IntPtr hwnd,IntPtr lParam);
+ [DllImport("user32.dll")] static extern bool EnumWindows(EnumWindowsProc proc,IntPtr lParam);
+ static IntPtr FindTargetWindow(Process process) {
+  var main=process.MainWindowHandle;
+  if(main!=IntPtr.Zero && IsWindowVisible(main)) return main;
+  IntPtr found=IntPtr.Zero;
+  uint targetPid=(uint)process.Id;
+  EnumWindows((h, _) => {
+   uint pid=0;
+   GetWindowThreadProcessId(h,out pid);
+   if(pid!=targetPid || !IsWindowVisible(h)) return true;
+   if(GetWindow(h,4)==IntPtr.Zero) { found=h; return false; }
+   if(found==IntPtr.Zero) found=h;
+   return true;
+  }, IntPtr.Zero);
+  return found!=IntPtr.Zero ? found : main;
+ }
+ static bool EnsureForeground(IntPtr hwnd) {
+  if(IsIconic(hwnd)) ShowWindow(hwnd,9);
+  uint ignored;
+  uint targetThread=GetWindowThreadProcessId(hwnd,out ignored);
+  uint currentThread=GetCurrentThreadId();
+  for(int attempt=0; attempt<5; attempt++) {
+   var fg=GetForegroundWindow();
+   if(fg==hwnd) return true;
+   SetForegroundWindow(hwnd);
+   BringWindowToTop(hwnd);
+   if(GetForegroundWindow()==hwnd) return true;
+   uint fgThread=fg!=IntPtr.Zero ? GetWindowThreadProcessId(fg,out ignored) : 0;
+   bool attachedFg=fgThread!=0 && fgThread!=currentThread && AttachThreadInput(currentThread,fgThread,true);
+   bool attachedTarget=targetThread!=0 && targetThread!=currentThread && targetThread!=fgThread && AttachThreadInput(currentThread,targetThread,true);
+   try {
+    if(attempt>=1) {
+     keybd_event(0x12,0,0,UIntPtr.Zero);
+     keybd_event(0x12,0,2,UIntPtr.Zero);
+    }
+    SetForegroundWindow(hwnd);
+    BringWindowToTop(hwnd);
+   } finally {
+    if(attachedTarget) AttachThreadInput(currentThread,targetThread,false);
+    if(attachedFg) AttachThreadInput(currentThread,fgThread,false);
+   }
+   System.Threading.Thread.Sleep(50);
+   if(GetForegroundWindow()==hwnd) return true;
+  }
+  return false;
+ }
  public static long Run(int pid) {
   using(var process=Process.GetProcessById(pid)) {
-   var hwnd=process.MainWindowHandle;
-   if(hwnd==IntPtr.Zero || !SetForegroundWindow(hwnd) || GetForegroundWindow()!=hwnd) throw new Exception("QA window not foreground");
+   var hwnd=FindTargetWindow(process);
+   if(hwnd==IntPtr.Zero) throw new Exception("QA window handle missing");
+   if(!EnsureForeground(hwnd)) {
+    var fg=GetForegroundWindow();
+    uint fgPid=0;
+    if(fg!=IntPtr.Zero) GetWindowThreadProcessId(fg,out fgPid);
+    throw new Exception("QA window not foreground (target=" + hwnd.ToInt64() + ", fg=" + fg.ToInt64() + ", fgPid=" + fgPid + ")");
+   }
    keybd_event(0x11,0,0,UIntPtr.Zero);
    try { keybd_event(0x56,0,0,UIntPtr.Zero); keybd_event(0x56,0,2,UIntPtr.Zero); }
    finally { keybd_event(0x11,0,2,UIntPtr.Zero); }

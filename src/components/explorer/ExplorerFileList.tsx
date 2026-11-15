@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { startCustomDrag } from "../../lib/customDnD";
+import { observeElementOffsetClean } from "../../lib/virtualOffsetObserver";
 import { effectiveFileType, formatBytes } from "../../lib/sftp";
 import { getAppPlatform } from "../../lib/runtime";
 import { useSftpStore } from "../../stores/sftpStore";
@@ -34,7 +35,7 @@ export function ExplorerFileList(inputs: FilePanelViewProps) {
   const rowHeight = icons ? 96 : preferences.view === "list" ? 24 : 28;
   const virtual = useVirtualizer({
     count: Math.ceil(entries.length / columns), getScrollElement: () => scroll.current,
-    estimateSize: () => rowHeight, overscan: 8,
+    estimateSize: () => rowHeight, overscan: 8, observeElementOffset: observeElementOffsetClean,
   });
   useEffect(() => {
     const element = scroll.current;

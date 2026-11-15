@@ -29,6 +29,9 @@ public static class QaFolderDialog {
     [DllImport("user32.dll", EntryPoint = "SendMessageTimeoutW", CharSet = CharSet.Unicode, SetLastError = true)]
     static extern IntPtr ReadTextMessage(IntPtr window, uint message, UIntPtr capacity, StringBuilder text,
                                         uint flags, uint timeout, out UIntPtr result);
+    [DllImport("user32.dll", EntryPoint = "SendMessageTimeoutW", CharSet = CharSet.Unicode, SetLastError = true)]
+    static extern IntPtr SendControlMessage(IntPtr window, uint message, UIntPtr wParam, IntPtr lParam,
+                                            uint flags, uint timeout, out UIntPtr result);
     [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
     [StructLayout(LayoutKind.Sequential)] struct MouseInput {
         public int x, y; public uint data, flags, time; public UIntPtr extra;
@@ -89,16 +92,59 @@ public static class QaFolderDialog {
         return found[0];
     }
 
-    private static IntPtr FilenameControl(IntPtr dialog) {
-        // Common Item Dialogs may wrap filename Edit in ComboBoxEx32/ComboBox
-        // with id1148; the search field is a separate Edit and must never win.
-        var found = new List<IntPtr>();
-        foreach (var window in Windows(dialog)) {
-            if (Class(window) != "Edit" || !IsWindowVisible(window) || !IsWindowEnabled(window)) continue;
-            var parent = GetParent(window);
-            if (GetDlgCtrlID(window) == 1152 || (parent != IntPtr.Zero && GetDlgCtrlID(parent) == 1148)) found.Add(window);
+    private static bool HasAncestorClass(IntPtr window, IntPtr root, string className) {
+        var current = GetParent(window);
+        while (current != IntPtr.Zero && current != root) {
+            if (Class(current) == className) return true;
+            current = GetParent(current);
         }
-        if (found.Count != 1) throw new InvalidOperationException("No unique owned filename Edit: " + found.Count);
+        return false;
+    }
+
+    private static bool HasAncestorControlId(IntPtr window, IntPtr root, int id) {
+        var current = GetParent(window);
+        while (current != IntPtr.Zero && current != root) {
+            if (GetDlgCtrlID(current) == id) return true;
+            current = GetParent(current);
+        }
+        return false;
+    }
+
+    private static IntPtr FilenameControl(IntPtr dialog) {
+        // Common Item Dialogs use Edit id1152 (folder picker), ComboBoxEx32
+        // id1148 (Open/Save), or DUIViewWndClassName/FloatNotifySink ->
+        // ComboBox -> Edit (Windows 10/11/Server 2025 Save As). Exclude the
+        // address bar and search box (ReBarWindow32 / UniversalSearchBand /
+        // SearchEditBoxWrapperClass).
+        var found = new List<IntPtr>();
+        var details = new StringBuilder();
+        foreach (var window in Windows(dialog)) {
+            var windowClass = Class(window);
+            var controlId = GetDlgCtrlID(window);
+            var visible = IsWindowVisible(window);
+            var enabled = IsWindowEnabled(window);
+            var parent = GetParent(window);
+            var parentClass = parent != IntPtr.Zero ? Class(parent) : "";
+            var parentId = parent != IntPtr.Zero ? GetDlgCtrlID(parent) : 0;
+            details.AppendFormat("id={0},class={1},parent={2}/{3},vis={4},en={5}; ",
+                                 controlId, windowClass, parentId, parentClass, visible, enabled);
+            if (windowClass != "Edit" || !visible || !enabled) continue;
+            if (HasAncestorClass(window, dialog, "ReBarWindow32")
+                || HasAncestorClass(window, dialog, "UniversalSearchBand")
+                || HasAncestorClass(window, dialog, "SearchEditBoxWrapperClass")
+                || HasAncestorClass(window, dialog, "Address Band Root")) {
+                continue;
+            }
+            bool isFilenameCombo = parentClass == "ComboBox"
+                && (HasAncestorClass(window, dialog, "FloatNotifySink")
+                    || HasAncestorClass(window, dialog, "DUIViewWndClassName"));
+            if (controlId == 1152 || HasAncestorControlId(window, dialog, 1148) || isFilenameCombo) {
+                found.Add(window);
+            }
+        }
+        if (found.Count != 1) {
+            throw new InvalidOperationException("No unique owned filename Edit (" + found.Count + "): " + details);
+        }
         return found[0];
     }
 
@@ -149,7 +195,9 @@ public static class QaFolderDialog {
         } finally { AttachThreadInput(currentThread, ownerThread, false); }
         // Real keyboard input is required: WM_SETTEXT changes the rendered
         // Edit text but leaves IFileDialog's internal selection unchanged.
-        var inputs = new List<Input> { Key(0x11), Key(0x41), Key(0x41, 0, 2), Key(0x11, 0, 2) };
+        UIntPtr selectResult;
+        SendControlMessage(edit, 0x00B1, UIntPtr.Zero, new IntPtr(-1), 2, 1000, out selectResult);
+        var inputs = new List<Input> { Key(0x08), Key(0x08, 0, 2) };
         foreach (char character in path) {
             inputs.Add(Key(0, character, 4));
             inputs.Add(Key(0, character, 6));

@@ -25,9 +25,13 @@ export function previewRoot(session: HtmlPreviewSession): URL {
   const url = new URL(session.url);
   if (url.username || url.password || !session.token || !/^[\w-]+$/.test(session.token)) throw new Error("Invalid HTML preview session");
   const protocol = url.protocol;
-  if (!(protocol === "taomni-preview:" && url.hostname === "localhost") &&
-    !((protocol === "http:" || protocol === "https:") && url.hostname === "taomni-preview.localhost")) throw new Error("Invalid HTML preview protocol");
-  if (url.port || !url.pathname.startsWith(`/${session.token}/`)) throw new Error("Invalid HTML preview token root");
+  const loopback = protocol === "http:" && url.hostname === "127.0.0.1" && Boolean(url.port);
+  if (
+    !(protocol === "taomni-preview:" && url.hostname === "localhost") &&
+    !((protocol === "http:" || protocol === "https:") && url.hostname === "taomni-preview.localhost") &&
+    !loopback
+  ) throw new Error("Invalid HTML preview protocol");
+  if ((!loopback && url.port) || !url.pathname.startsWith(`/${session.token}/`)) throw new Error("Invalid HTML preview token root");
   return new URL(`/${session.token}/`, url);
 }
 

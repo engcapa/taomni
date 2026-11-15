@@ -24,7 +24,7 @@ THEME_CASE = ROOT / "qa-ui-auto-tests/cases/TC-FILE-OPEN-007-native-markdown-art
 
 # Each key is an ORIGINAL 1-based step after which new steps were inserted.
 # Removing only these anchored ranges must reproduce the frozen original case.
-INSERTIONS = {21: 5, 24: 2, 33: 1, 34: 22, 55: 1, 59: 13, 66: 2}
+INSERTIONS = {21: 5, 24: 2, 33: 1, 34: 22, 55: 1, 59: 13, 66: 2, 113: 2}
 ORIGINAL_STEPS_SHA256 = "bf1cd07509e59fb7e69ef38de934162307d33cc285743eefdd733d48bad6c9d1"
 ORIGINAL_REQUIREMENTS_SHA256 = "d8a08d4a459a318c43cbd343b82723396867b77f561a57e8746e037f27f622c0"
 
@@ -70,7 +70,7 @@ class MarkdownCaseContractTests(unittest.TestCase):
         document = read_case()
         self.assertEqual(validate_doc(document, source=str(CASE_PATH)), [])
         self.assertEqual(validate_contract(document, require_review=True), [])
-        self.assertEqual(len(load_case(CASE_PATH).steps), 166)
+        self.assertEqual(len(load_case(CASE_PATH).steps), 168)
         self.assertEqual(document["modes"], ["browser"])
         self.assertEqual(document["fixtures"], ["reset_db", "file_open_files"])
         self.assertEqual(document["covers"], ["F-FILEOPEN-1", "F-EXPLORER-1"])
@@ -163,6 +163,10 @@ class MarkdownCaseContractTests(unittest.TestCase):
         # Entire theme detour is before the original source mode / first edit.
         self.assertEqual(document["steps"][mapping[35] - 1], click("markdown-mode-source"))
         self.assertEqual(mapping[35] - mapping[34], len(theme) + 1)
+        self.assertEqual(additions[113], [
+            {"click": '[data-testid="tab-item"][data-tab-type="file-browser"]'},
+            attribute('[data-testid="tab-item"][data-tab-type="file-browser"]', "data-active", "true"),
+        ])
 
     def test_late_task_edit_exports_actual_checked_state_then_reverts_before_old_edit(self):
         document = read_case()

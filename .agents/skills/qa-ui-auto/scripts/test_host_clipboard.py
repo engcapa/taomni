@@ -114,3 +114,9 @@ class WaylandTextClipboardTests(unittest.TestCase):
             host_clipboard.set_text("new clipboard")
         read.assert_called_once_with("UTF8_STRING")
         write.assert_called_once_with("UTF8_STRING", b"new clipboard")
+
+    def test_windows_empty_text_clears_clipboard_instead_of_throwing_argument_null(self):
+        with patch.object(host_clipboard, "SYSTEM", "Windows"), \
+                patch.object(host_clipboard, "_ps") as ps:
+            host_clipboard.set_text("")
+        ps.assert_called_once_with("[System.Windows.Forms.Clipboard]::Clear()")

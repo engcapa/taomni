@@ -35,20 +35,17 @@ async function dispatchQaActions(sources, emitKey, modifiers, resolveOrigin, tar
         continue;
       }
       if (source.type === "wheel") {
-        // The macOS QA bridge owns WebDriver actions inside WKWebView, so it
-        // must translate wheel sources into the same cancellable DOM input a
-        // native WebView receives. Previously wheel sources fell through the
-        // pointer-only path and returned success without dispatching input.
-        const [x, y] = resolveOrigin(action.origin, Number(action.x) || 0, Number(action.y) || 0);
-        const target = targetAtPoint(x, y);
-        target.dispatchEvent(new WheelEvent("wheel", {
-          bubbles: true, cancelable: true, composed: true,
-          clientX: x, clientY: y,
-          deltaX: Number(action.deltaX) || 0,
-          deltaY: Number(action.deltaY) || 0,
-          deltaZ: Number(action.deltaZ) || 0,
-          deltaMode: Number(action.deltaMode) || 0,
-        }));
+        if (action.type === "scroll") {
+          const [wx, wy] = resolveOrigin(action.origin || "viewport", Number(action.x) || 0, Number(action.y) || 0);
+          const target = targetAtPoint(wx, wy);
+          target.dispatchEvent(new WheelEvent("wheel", {
+            bubbles: true, cancelable: true, composed: true,
+            clientX: wx, clientY: wy,
+            deltaX: Number(action.deltaX) || 0, deltaY: Number(action.deltaY) || 0,
+            deltaZ: Number(action.deltaZ) || 0, deltaMode: Number(action.deltaMode) || 0,
+            ctrlKey: modifiers.Control, shiftKey: modifiers.Shift, altKey: modifiers.Alt, metaKey: modifiers.Meta,
+          }));
+        }
         continue;
       }
       if (source.type !== "pointer") continue;

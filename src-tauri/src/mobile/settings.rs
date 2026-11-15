@@ -9,6 +9,7 @@ async fn status(runtime: &MobileRuntime) -> Result<Value, String> {
     Ok(
         json!({"enabled":running.as_ref().is_some_and(|r| !r.task.is_finished()),
         "allow_open_sessions":runtime.open_requests.allowed(),
+        "allow_screen_capture":runtime.desktop.screen_allowed(),
         "address":running.as_ref().map(|r| &r.address), "failed_attempts":auth.failed_attempts,
         "devices":auth.devices.iter().map(|d| json!({"device_id":d.device_id,"label":d.label,"origin":d.origin,"created_at":d.created_at,"last_used_at":d.last_used_at})).collect::<Vec<_>>() }),
     )
@@ -18,11 +19,22 @@ pub async fn mobile_status(
     app: tauri::AppHandle,
     state: State<'_, AppState>,
 ) -> Result<Value, String> {
-    // Settings shows the open-sessions opt-in before the service ever starts.
+    // Settings shows the opt-ins before the service ever starts.
     if let Ok(data) = crate::resolved_app_data_dir(&app) {
         state.mobile.open_requests.ensure_loaded(&data);
+        state.mobile.desktop.ensure_loaded(&data);
     }
     status(&state.mobile).await
+}
+#[tauri::command]
+pub fn mobile_set_screen_capture(
+    enabled: bool,
+    app: tauri::AppHandle,
+    state: State<'_, AppState>,
+) -> Result<bool, String> {
+    let data = crate::resolved_app_data_dir(&app)?;
+    state.mobile.desktop.set_screen_allowed(&data, enabled)?;
+    Ok(enabled)
 }
 #[tauri::command]
 pub async fn mobile_start(

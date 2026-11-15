@@ -76,9 +76,10 @@ def linux_dialog(ctx, path: Path | None, title: str = TITLE, kind: str = "folder
     if path is None:
         command("xdotool", "key", "--clearmodifiers", "Escape")
     elif kind == "save":
-        # GtkFileChooserNative Save starts with the Name entry selected. Use
-        # the real location entry with the full owned filename, then Save once.
-        command("xdotool", "key", "--clearmodifiers", "ctrl+l")
+        # GtkFileChooserNative Save starts with only the filename stem selected
+        # (e.g. "[live].html"). Select all and clear before typing the full
+        # owned path so the default extension is never left appended.
+        command("xdotool", "key", "--clearmodifiers", "ctrl+l", "ctrl+a", "BackSpace")
         command("xdotool", "type", "--clearmodifiers", "--delay", "15", "--", str(path))
         command("xdotool", "key", "--clearmodifiers", "alt+c" if cancel_after_path else "alt+s")
     else:

@@ -49,12 +49,12 @@ export function MfaFloatingWindow({ onExpand }: { onExpand: () => void }) {
   }, [refreshVault]);
 
   useEffect(() => {
-    if (vaultState !== "unlocked") return;
+    if (!floating.open || vaultState !== "unlocked") return;
     const store = useMfaStore.getState();
-    if (store.status === "idle") void store.load();
-    const refresh = window.setInterval(() => void store.refreshCodes(), 1000);
+    if (store.status === "idle") void store.load().catch(() => undefined);
+    const refresh = window.setInterval(() => void store.refreshCodes().catch(() => undefined), 1000);
     return () => window.clearInterval(refresh);
-  }, [vaultState]);
+  }, [floating.open, vaultState]);
 
   useEffect(() => {
     if (!floating.open) return;

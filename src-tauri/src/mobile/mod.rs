@@ -1,5 +1,6 @@
 //! Opt-in, instance-owned mobile control plane. No listener exists by default.
 mod agent_view;
+pub mod desktop;
 pub mod im_adapter;
 pub use im_adapter::*;
 pub mod auth;
@@ -86,6 +87,7 @@ pub struct MobileRuntime {
     pub desktop_available: std::sync::atomic::AtomicBool,
     pub devices_changed: tokio::sync::Notify,
     pub open_requests: session_open::OpenRequests,
+    pub desktop: desktop::DesktopState,
 }
 pub struct Running {
     pub address: String,
@@ -113,6 +115,7 @@ impl Default for MobileRuntime {
             roots_changed: tokio::sync::Notify::new(),
             desktop_available: std::sync::atomic::AtomicBool::new(false),
             open_requests: session_open::OpenRequests::default(),
+            desktop: desktop::DesktopState::default(),
         }
     }
 }
@@ -182,6 +185,7 @@ impl MobileRuntime {
         *self.profile_data.lock().unwrap_or_else(|e| e.into_inner()) =
             Some(data.canonicalize().unwrap_or_else(|_| data.clone()));
         self.open_requests.ensure_loaded(&data);
+        self.desktop.ensure_loaded(&data);
         self.auth
             .lock()
             .map_err(|_| "auth_unavailable")?

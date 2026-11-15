@@ -42,6 +42,21 @@ class WaylandFolderDialogTests(TestCase):
                                   ("text", {"text": "/qa/project with spaces"}),
                                   ("keys", {"chords": [[0xffe9, ord("o")]]})])
 
+    @patch.object(helper.time, "sleep")
+    @patch.object(helper.wayland, "command")
+    def test_save_clears_default_extension_before_entering_full_path(self, command, sleep):
+        def respond(name, **args):
+            if name == "geometry":
+                if command.call_count == 1:
+                    return self.window
+                raise RuntimeError("found 0")
+        command.side_effect = respond
+        helper.operate(self.ctx, Path("/qa/exports/native.html"), "Save as", kind="save")
+        inputs = [(c.args[0], c.kwargs) for c in command.call_args_list if c.args[0] in {"text", "keys"}]
+        self.assertEqual(inputs, [("keys", {"chords": [[0xffe3, ord("l")], [0xffe3, ord("a")], [0xff08]]}),
+                                  ("text", {"text": "/qa/exports/native.html"}),
+                                  ("keys", {"chords": [[0xffe9, ord("s")]]})])
+
     @patch.object(helper.wayland, "command", side_effect=RuntimeError("found 2"))
     def test_ambiguous_ownership_never_injects_input(self, command):
         with self.assertRaisesRegex(RuntimeError, "found 2"):

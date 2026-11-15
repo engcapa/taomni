@@ -84,3 +84,40 @@ for (const [modifier, raw] of [["Control", ""], ["Alt", ""], ["Meta", "
     assert.equal(actual[1].buttons, 1);
   });
 }
+
+test("wheel scroll actions dispatch a native WheelEvent at the resolved target", async () => {
+  const events = [];
+  const target = {
+    dispatchEvent: (event) => { events.push(event); return true; },
+    closest: () => null,
+  };
+  class SyntheticEvent {
+    constructor(type, init) { Object.assign(this, init, { type, defaultPrevented: false }); }
+  }
+  const dispatch = runInNewContext(`${script}\ndispatchQaActions`, {
+    PointerEvent: SyntheticEvent,
+    MouseEvent: SyntheticEvent,
+    WheelEvent: SyntheticEvent,
+    setTimeout,
+  });
+  const sources = [{
+    type: "wheel",
+    id: "raster-wheel",
+    actions: [
+      { type: "pause", duration: 1 },
+      { type: "scroll", origin: "viewport", x: 320, y: 240, deltaX: 0, deltaY: -180, deltaZ: 3, deltaMode: 1, duration: 1 },
+    ],
+  }];
+  await dispatch(sources, () => {}, { ...modifiers(), Control: true, Meta: true }, (_origin, x, y) => [x, y], () => target);
+  assert.equal(events.length, 1);
+  assert.equal(events[0].type, "wheel");
+  assert.equal(events[0].clientX, 320);
+  assert.equal(events[0].clientY, 240);
+  assert.equal(events[0].deltaX, 0);
+  assert.equal(events[0].deltaY, -180);
+  assert.equal(events[0].deltaZ, 3);
+  assert.equal(events[0].deltaMode, 1);
+  assert.equal(events[0].ctrlKey, true);
+  assert.equal(events[0].metaKey, true);
+  assert.equal(events[0].cancelable, true);
+});

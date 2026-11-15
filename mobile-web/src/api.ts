@@ -17,7 +17,46 @@ export interface Session {
   last_activity_at?: number;
 }
 export interface SavedSession { id: string; name: string; session_type: string; group_path: string | null }
-export interface SessionList { sessions: Session[]; saved_sessions: SavedSession[]; capabilities?: { open_sessions?: boolean } }
+export interface SessionList {
+  sessions: Session[];
+  saved_sessions: SavedSession[];
+  capabilities?: { open_sessions?: boolean; screen_capture?: boolean; desktop_control?: boolean };
+}
+export interface DisplaySummary { id: string; name: string; width: number; height: number; primary: boolean }
+export interface ScreenCapture {
+  mime: string;
+  width: number;
+  height: number;
+  screen_width: number;
+  screen_height: number;
+  display_id: string;
+  display_name: string;
+  displays: DisplaySummary[];
+  captured_at: number;
+  image_b64: string;
+}
+export interface DesktopWindow {
+  id: string;
+  title: string;
+  app_name: string;
+  pid: number;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  minimized: boolean;
+  focused: boolean;
+  kind: string;
+}
+export interface DesktopWindowsResponse { windows: DesktopWindow[]; screen_capture_enabled: boolean }
+export interface WindowInputResponse { ok: boolean; window_id: string; title: string }
+export interface BrowserOpenResponse {
+  ok: boolean;
+  url: string;
+  window_id: string;
+  title: string;
+  screen_capture_enabled: boolean;
+}
 export interface Confirmation { id: string; tool: string; supported: boolean }
 export interface Detail extends Session { holder?: string; confirmations?: Confirmation[]; context_notice?: string; tools?: { id: string; name: string; status: string }[] }
 export interface Changes { changes: { path: string; change_kind: string; diff_available: boolean }[]; truncated?: boolean }
@@ -96,6 +135,19 @@ export function errorText(error: unknown): string {
     open_request_not_found: "打开请求已过期，请重试。",
     invalid_open_request: "打开请求无效。",
     desktop_size_unavailable: "已释放输入；桌面未记录终端尺寸，未能恢复桌面尺寸。",
+    screen_capture_disabled: "实例未开启远程查看屏幕：请在桌面 设置 → 移动服务 中开启“允许在手机 Web 和飞书查看当前屏幕”。",
+    desktop_screen_permission_required: "桌面系统缺少屏幕录制权限，请在系统设置中授权 Taomni 后重试。",
+    desktop_screen_capture_failed: "屏幕截图失败，请稍后重试。",
+    desktop_input_permission_required: "桌面系统缺少辅助功能或输入控制权限，请在系统设置中授权 Taomni 后重试。",
+    window_list_failed: "获取桌面窗口列表失败，请重试。",
+    window_not_found: "目标窗口已关闭或不存在，请刷新窗口列表。",
+    window_focus_failed: "无法激活目标窗口，请确认窗口未被系统锁定。",
+    window_input_failed: "向目标窗口发送输入失败，请重试。",
+    invalid_window_key: "不支持的窗口按键名称，请检查后重试。",
+    empty_window_input: "请先输入要发送的文本，或选择要发送的按键。",
+    input_too_large: "窗口输入内容过长，请分段发送。",
+    invalid_browser_url: "请输入有效的 http:// 或 https:// 网址，或域名/localhost 地址。",
+    desktop_browser_open_failed: "在服务端打开浏览器窗口失败，请重试。",
   } as Record<string, string>)[code] || `操作失败（${code}），请重试。`;
 }
 const STORAGE = "taomni.mobile.instances.v1";

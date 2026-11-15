@@ -171,6 +171,7 @@ steps:
     selector: '[data-testid="html-console"]'
     contains: HTML_QA SECURITY DONE
 - click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="tab-item"][data-tab-type="file-browser"]'
 - wait_for: '[data-testid="explorer-file-row"][data-name="slow.html"]'
 - dblclick: '[data-testid="explorer-file-row"][data-name="slow.html"]'
 - wait_for: '[data-testid="html-preview"][data-loaded="true"]'
@@ -266,19 +267,20 @@ verification:
   - id: R4
     requirement: Closing an HTML viewer invalidates the token and promptly cancels its active native HTTP stream.
     actions:
-    - 88
-    - 90
-    checkpoints:
-    - step: 89
-      expectation: The independent origin records the started real HTTP stream before closure.
-    - step: 91
-      expectation: Origin sees the peer close rather than waiting for download completion or timeout.
-    - step: 92
-      expectation: Viewer/protocol lifecycle leaves the app runtime healthy.
-    results:
+    - 82
     - 89
     - 91
+    checkpoints:
+    - step: 90
+      expectation: The independent origin records the started real HTTP stream before closure.
+    - step: 92
+      expectation: Origin sees the peer close rather than waiting for download completion or timeout.
+    - step: 93
+      expectation: Viewer/protocol lifecycle leaves the app runtime healthy.
+    results:
+    - 90
     - 92
+    - 93
   visual:
   - check: Native frame and console visible
     method: automated

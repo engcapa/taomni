@@ -17,7 +17,8 @@ GEOMETRY = """const pane=document.querySelector(arguments[0]);const hit=pane?.qu
 if(!hit)return null;const rect=hit.getBoundingClientRect();const screen=pane.querySelector('.xterm-screen');
 if(!screen || rect.width<=0 || rect.height<=0)return null;const target=screen.getBoundingClientRect();
 const x=rect.left+Math.min(rect.width/2,24), y=rect.top+rect.height/2;
-return {x,y,width:target.width,height:target.height,hit:screen.contains(document.elementFromPoint(x,y))};"""
+const park=[[target.left+8,target.bottom-8],[target.right-8,target.bottom-8],[target.left+8,target.top+8]].find(([cx,cy])=>Math.hypot(cx-x,cy-y)>24 && screen.contains(document.elementFromPoint(cx,cy))) || null;
+return {x,y,parkX:park?park[0]:null,parkY:park?park[1]:null,width:target.width,height:target.height,hit:screen.contains(document.elementFromPoint(x,y))};"""
 
 
 def run(ctx, args, mode):
@@ -36,13 +37,21 @@ def run(ctx, args, mode):
     try:
         # Search selects terminal text; hover/move must let xterm's link provider
         # resolve the path before the one click. Never replay that click.
+        # Move off-cell inside .xterm-screen first because xterm's mouseleave
+        # clears _currentLink without clearing _lastBufferCell.
         from .deadline import budget_time as time
         if mode == "browser":
+            if point.get("parkX") is not None and point.get("parkY") is not None:
+                ctx.page.mouse.move(point["parkX"], point["parkY"])
+                time.sleep(.05)
             ctx.page.mouse.move(point["x"], point["y"])
-            time.sleep(.15)
+            time.sleep(.2)
         else:
+            if point.get("parkX") is not None and point.get("parkY") is not None:
+                ctx.session.request("POST", ctx.session.endpoint("/actions"), {"actions": [{"type": "pointer", "id": "mouse", "parameters": {"pointerType": "mouse"}, "actions": [{"type": "pointerMove", "origin": "viewport", "x": round(point["parkX"]), "y": round(point["parkY"]), "duration": 0}]}]})
+                time.sleep(.05)
             ctx.session.request("POST", ctx.session.endpoint("/actions"), {"actions": [{"type": "pointer", "id": "mouse", "parameters": {"pointerType": "mouse"}, "actions": [{"type": "pointerMove", "origin": "viewport", "x": round(point["x"]), "y": round(point["y"]), "duration": 0}]}]})
-            time.sleep(.15)
+            time.sleep(.2)
         if mode == "browser":
             ctx.page.keyboard.down(modifier)
             try:
