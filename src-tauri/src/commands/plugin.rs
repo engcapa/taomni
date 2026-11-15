@@ -8,11 +8,26 @@ use crate::{
         PluginRecord,
         download::{
             DownloadProgress, DownloadRequest, ModuleCatalog, ProxyEndpoint, ProxyRoute,
-            parse_proxy_mode, resolve_proxy_route,
+            parse_proxy_mode, resolve_proxy_route, validate_download_paths_within_root,
         },
     },
     state::AppState,
 };
+
+fn legacy_profile_root(state: &AppState) -> PathBuf {
+    state
+        .plugins
+        .root()
+        .parent()
+        .unwrap_or_else(|| state.plugins.root())
+        .to_path_buf()
+}
+
+fn legacy_version(value: Option<String>) -> String {
+    value
+        .filter(|version| !version.trim().is_empty())
+        .unwrap_or_else(|| "0.5.x".to_owned())
+}
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
@@ -143,11 +158,18 @@ pub async fn plugin_download_start(
     state: State<'_, AppState>,
 ) -> Result<DownloadProgress, String> {
     let route = resolve_download_route(proxy_mode, application_proxy, feature_proxy)?;
+    let download_root = state.plugins.root().join(".downloads");
+    std::fs::create_dir_all(&download_root)
+        .map_err(|error| format!("create module download staging root: {error}"))?;
+    let partial_path = PathBuf::from(partial_path);
+    let completed_path = PathBuf::from(completed_path);
+    validate_download_paths_within_root(&partial_path, &completed_path, &download_root)
+        .map_err(|error| error.to_string())?;
     let request = DownloadRequest {
         id: id.clone(),
         url,
-        partial_path: PathBuf::from(partial_path),
-        completed_path: PathBuf::from(completed_path),
+        partial_path,
+        completed_path,
         expected_total,
         proxy: route.clone(),
     };
@@ -198,7 +220,6 @@ pub async fn plugin_catalog_fetch(
     proxy_mode: String,
     application_proxy: Option<PluginDownloadProxyEndpoint>,
     feature_proxy: Option<PluginDownloadProxyEndpoint>,
-    state: State<'_, AppState>,
 ) -> Result<ModuleCatalog, String> {
     let route = resolve_download_route(proxy_mode, application_proxy, feature_proxy)?;
     let service = crate::plugin::download::HttpDownloadService::new(&route)
@@ -207,6 +228,49 @@ pub async fn plugin_catalog_fetch(
         .fetch_catalog(&url, crate::plugin::CORE_API_VERSION)
         .await
         .map_err(|error| error.to_string())
+}
+
+/// Read the installed 0.5.x profile before any upgrade writes occur. The
+/// command deliberately derives the profile root from the native registry so
+/// a renderer cannot make the migration scanner read an arbitrary directory.
+#[tauri::command]
+pub fn plugin_migration_inspect(
+    from_version: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<crate::plugin::migration::LegacyInstallSnapshot, String> {
+    crate::plugin::migration::inspect_legacy_install(
+        &legacy_profile_root(&state),
+        legacy_version(from_version),
+    )
+}
+
+/// Execute the file based portion of an upgrade journal after the user has
+/// reviewed the preflight result. Database tables remain owned by the core
+/// data service and are intentionally not copied wholesale by this command.
+/// The journal and staging paths are profile-local and safe to retry.
+#[tauri::command]
+pub fn plugin_migration_execute(
+    from_version: Option<String>,
+    state: State<'_, AppState>,
+) -> Result<crate::plugin::migration::MigrationExecutionResult, String> {
+    let source_root = legacy_profile_root(&state);
+    let snapshot = crate::plugin::migration::inspect_legacy_install(
+        &source_root,
+        legacy_version(from_version),
+    )?;
+    let specs =
+        crate::plugin::migration::build_file_migration_specs(&source_root, &snapshot.candidates)?;
+    let journal_path = source_root.join("migration").join("journal.json");
+    let executor = crate::plugin::migration::MigrationExecutor::new(
+        source_root,
+        state.plugins.root().to_path_buf(),
+        journal_path,
+        snapshot.from_version,
+        crate::plugin::CORE_API_VERSION,
+    )?;
+    let result = executor.execute(&specs)?;
+    state.plugins.scan().map_err(|error| error.to_string())?;
+    Ok(result)
 }
 
 pub(super) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
@@ -223,6 +287,8 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         crate::commands::plugin::plugin_download_cancel,
         crate::commands::plugin::plugin_download_forget,
         crate::commands::plugin::plugin_catalog_fetch,
+        crate::commands::plugin::plugin_migration_inspect,
+        crate::commands::plugin::plugin_migration_execute,
     ];
     handler(invoke)
 }

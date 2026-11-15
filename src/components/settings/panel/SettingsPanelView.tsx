@@ -1,6 +1,7 @@
 import { Bot, ChevronDown, ChevronUp, History, RotateCcw, Search, Terminal, Type, Undo } from "lucide-react";
 import { DEFAULT_CODE_VIEW_PROFILE, type CodeViewProfile } from "../../../lib/codeViewProfile";
 import { useT } from "../../../lib/i18n";
+import type { LegacyInstallSnapshot } from "../../../lib/ipc";
 import { useAppThemeI18nLabel } from "../../../lib/i18n/labels";
 import { useSystemFonts } from "../../../lib/systemFonts";
 import { DEFAULT_TERMINAL_PROFILE, type TerminalProfile } from "../../../lib/terminalProfile";
@@ -85,6 +86,10 @@ export interface SettingsPanelViewProps {
   moduleOnDisable: (entry: ModuleStoreCatalogEntry) => Promise<void>;
   moduleOnUninstall: (entry: ModuleStoreCatalogEntry, deleteData: boolean) => Promise<void>;
   moduleOnRollback: (entry: ModuleStoreCatalogEntry, version: string) => Promise<void>;
+  migrationSnapshot: LegacyInstallSnapshot | null;
+  migrationLoading: boolean;
+  migrationError: string | null;
+  onMigrationExecute: () => Promise<void>;
 }
 
 export function SettingsPanelView(inputs: SettingsPanelViewProps) {
@@ -135,6 +140,10 @@ export function SettingsPanelView(inputs: SettingsPanelViewProps) {
     moduleOnDisable,
     moduleOnUninstall,
     moduleOnRollback,
+    migrationSnapshot,
+    migrationLoading,
+    migrationError,
+    onMigrationExecute,
   } = inputs;
   return ((
     <SettingsSearchContext.Provider value={ctxValue}>
@@ -379,6 +388,10 @@ export function SettingsPanelView(inputs: SettingsPanelViewProps) {
                 onDisable={moduleOnDisable}
                 onUninstall={moduleOnUninstall}
                 onRollback={moduleOnRollback}
+                migrationSnapshot={migrationSnapshot}
+                migrationLoading={migrationLoading}
+                migrationError={migrationError}
+                onMigrationExecute={onMigrationExecute}
               />
             </SettingsAnchor>
           </SettingsGroup>

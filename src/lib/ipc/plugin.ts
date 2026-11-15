@@ -62,6 +62,41 @@ export interface ModuleCatalog {
   plugins: Record<string, ModuleCatalogPlugin>;
 }
 
+export type LegacyMigrationItem =
+  | "rdp-vnc-sessions"
+  | "rdp-certificate-pins"
+  | "server-configs"
+  | "mfa"
+  | "socks-cap"
+  | "mobile";
+
+export interface LegacyMigrationCandidate {
+  item: LegacyMigrationItem;
+  evidence: string[];
+  plugin_slug: string;
+}
+
+export interface LegacyVaultEvidence {
+  path: string;
+  fixed_key_present: boolean;
+}
+
+export interface LegacyInstallSnapshot {
+  from_version: string;
+  database_path: string | null;
+  database_tables: string[];
+  candidates: LegacyMigrationCandidate[];
+  source_fingerprints: Record<string, string>;
+  retained_paths: string[];
+  vault: LegacyVaultEvidence | null;
+}
+
+export interface MigrationExecutionResult {
+  status: "pending" | "staged" | "complete" | "failed" | "rolled-back";
+  committed: LegacyMigrationItem[];
+  skipped: LegacyMigrationItem[];
+}
+
 const SLUG = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
 
 function normalizePluginRecord(value: unknown): PluginRecord {
@@ -145,6 +180,14 @@ export function fetchModuleCatalog(
     applicationProxy: options.applicationProxy,
     featureProxy: options.featureProxy,
   });
+}
+
+export function inspectLegacyInstall(fromVersion?: string): Promise<LegacyInstallSnapshot> {
+  return invoke<LegacyInstallSnapshot>("plugin_migration_inspect", { fromVersion });
+}
+
+export function executePluginMigration(fromVersion?: string): Promise<MigrationExecutionResult> {
+  return invoke<MigrationExecutionResult>("plugin_migration_execute", { fromVersion });
 }
 
 /** Route a plugin command through the single core permission boundary. */

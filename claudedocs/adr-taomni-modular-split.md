@@ -4,9 +4,9 @@
 
 Accepted as a design decision; M0 implementation is in progress. v1.6 is the current review revision, based on `7bc498b35` (Merge PR #813); it records the 2026-11-15 decision to remove LanChat completely. Plugin migration remains blocked until the G1–G11 feasibility gates pass. The executable plan is in `docs-feature/taomni-modular-split-design.md` §10.1.
 
-本分支当前已落地插件 API、核心注册表、前端动态加载、单体升级 journal 执行器（含源指纹、staging、原子 active 指针、幂等重试和失败回滚）、宿主协议监督的可测试逻辑、版本目录安装状态机，以及独立 `modules.json` 生成器和 release 上传顺序；下载/代理/断点续传与验签策略也已形成可序列化的 Rust 单元契约，模块商店面板已完成可注入的 renderer 投影。可复现 M0 体积/依赖起点见 [`docs-feature/taomni-modular-split-baseline-20261115.md`](../docs-feature/taomni-modular-split-baseline-20261115.md)。完整的 HTTP 安装服务、`modules.json`/native IPC 接线、升级向导、三端真实宿主实验和具体插件迁移仍未完成，不能将当前基础契约视为完整商店或插件迁移完成。
+本分支当前已落地插件 API、核心注册表、前端动态加载、单体升级 journal 执行器（含源指纹、staging、原子 active 指针、幂等重试和失败回滚）、宿主协议监督的可测试逻辑、版本目录安装状态机，以及独立 `modules.json` 生成器和 release 上传顺序；原生 HTTP 下载、代理/断点续传/取消进度、目录结构校验、下载/目录 native IPC 和设置页升级预检已接入，模块商店面板继续保持可注入的核心 registry 投影。可复现 M0 体积/依赖起点见 [`docs-feature/taomni-modular-split-baseline-20261115.md`](../docs-feature/taomni-modular-split-baseline-20261115.md)。完整签名安装门、远端目录的 renderer 接线、真实旧版数据导出、三端真实宿主实验和具体插件迁移仍未完成，不能将当前基础契约视为完整商店或插件迁移完成。
 
-当前提交 `663d0fc3991a6ad509bd3847d7d8fc4b656c1a13` 已通过本地单元/静态门禁：hello-plugin 6/6、Taomni plugin Rust focused 34/34、Settings/ModuleStore/IPC/registry Vitest 42/42，TypeScript、`check:refactor`、rustfmt、QA catalog/lint/audit 均通过。GitHub `QA UI Auto Platforms` run [#43707558453](https://github.com/engcapa/taomni/actions/runs/43707558453) 对 `TC-MODULES-001`–`004` 执行三平台 browser/native；模块相关 case 在每个平台组合均通过。执行中已按 shard 下载 artifact（本地证据快照 `/tmp/taomni-qa-437075/`），run 总体失败仅由既有 `TC-FILE-OPEN-005/008/011` 问题造成，按设计验收规则不阻断本次模块化。
+本轮代码在本地通过完整 Rust library 单测（2158 passed, 25 ignored）、插件 focused 单测（44 passed）、Settings/ModuleStore Vitest（28 passed）、TypeScript、`check:refactor`、rustfmt 和 QA catalog/audit 门禁；GitHub 多端结果以本轮提交对应的 hosted run 和逐 shard artifact 为准，历史 run 的无关 `TC-FILE-OPEN-*` 失败不作为模块化失败依据。
 
 ## 1. Context
 

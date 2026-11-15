@@ -408,6 +408,8 @@ pub struct DownloadRequest {
 
 pub mod catalog;
 pub use catalog::{ModuleCatalog, ModuleCatalogAsset, ModuleCatalogPlugin};
+mod paths;
+pub use paths::validate_download_paths_within_root;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct DownloadResult {
@@ -705,6 +707,10 @@ impl DownloadManager {
     }
 
     pub async fn cancel(&self, id: &str) -> Result<DownloadProgress, DownloadError> {
+        let task =
+            self.tasks.lock().await.get(id).cloned().ok_or_else(|| {
+                DownloadError::InvalidPath(format!("unknown download task: {id}"))
+            })?;
         let token = self
             .cancellations
             .lock()
@@ -713,9 +719,11 @@ impl DownloadManager {
             .cloned()
             .ok_or_else(|| DownloadError::InvalidPath(format!("unknown download task: {id}")))?;
         token.cancel();
-        self.snapshot(id)
-            .await
-            .ok_or_else(|| DownloadError::InvalidPath(format!("unknown download task: {id}")))
+        // Publish cancellation synchronously so the IPC caller observes the
+        // terminal state even when the worker has not reached its next
+        // cancellation checkpoint yet.
+        task.lock().await.cancel();
+        Ok(task.lock().await.snapshot().clone())
     }
 }
 

@@ -66,9 +66,19 @@ impl ModuleCatalog {
                 )));
             }
             for asset in plugin.platforms.values() {
-                reqwest::Url::parse(&asset.url)
+                let url = reqwest::Url::parse(&asset.url)
                     .map_err(|error| DownloadError::InvalidUrl(error.to_string()))?;
-                if asset.signature.trim().is_empty() || asset.sha256.len() != 64 {
+                if !matches!(url.scheme(), "http" | "https") {
+                    return Err(DownloadError::InvalidCatalog(format!(
+                        "plugin {} has unsupported asset URL scheme {}",
+                        plugin.slug,
+                        url.scheme()
+                    )));
+                }
+                if asset.signature.trim().is_empty()
+                    || asset.sha256.len() != 64
+                    || !asset.sha256.bytes().all(|byte| byte.is_ascii_hexdigit())
+                {
                     return Err(DownloadError::InvalidCatalog(format!(
                         "plugin {} has invalid asset integrity metadata",
                         plugin.slug

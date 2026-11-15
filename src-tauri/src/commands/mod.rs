@@ -784,7 +784,9 @@ pub(crate) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         | "plugin_download_status"
         | "plugin_download_cancel"
         | "plugin_download_forget"
-        | "plugin_catalog_fetch" => plugin::handle(invoke),
+        | "plugin_catalog_fetch"
+        | "plugin_migration_inspect"
+        | "plugin_migration_execute" => plugin::handle(invoke),
         "exit_app" => application::handle(invoke),
         _ => false,
     }

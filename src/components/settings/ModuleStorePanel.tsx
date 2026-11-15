@@ -1,6 +1,7 @@
 import { CheckCircle2, Download, Loader2, Package, RotateCcw, ToggleLeft, ToggleRight, Trash2 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useT } from "../../lib/i18n";
+import type { LegacyInstallSnapshot } from "../../lib/ipc";
 import { type ModuleRecord, type ModuleTransition } from "../../lib/moduleStore";
 import { useModuleStore } from "../../stores/moduleStore";
 
@@ -37,6 +38,11 @@ export interface ModuleStorePanelProps {
   onDisable?: (entry: ModuleStoreCatalogEntry) => Promise<void> | void;
   onUninstall?: (entry: ModuleStoreCatalogEntry, deleteData: boolean) => Promise<void> | void;
   onRollback?: (entry: ModuleStoreCatalogEntry, version: string) => Promise<void> | void;
+  /** Legacy 0.5.x preflight shown before any migration writes occur. */
+  migrationSnapshot?: LegacyInstallSnapshot | null;
+  migrationLoading?: boolean;
+  migrationError?: string | null;
+  onMigrationExecute?: () => Promise<void> | void;
 }
 
 const DEFAULT_CORE_API_VERSION = "1";
@@ -85,6 +91,10 @@ export function ModuleStorePanel({
   onRollback,
   catalogLoading = false,
   catalogError = null,
+  migrationSnapshot = null,
+  migrationLoading = false,
+  migrationError = null,
+  onMigrationExecute,
 }: ModuleStorePanelProps) {
   const t = useT();
   const records = useModuleStore((state) => state.records);
@@ -92,6 +102,7 @@ export function ModuleStorePanel({
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deleteData, setDeleteData] = useState<Record<string, boolean>>({});
+  const [migrationBusy, setMigrationBusy] = useState(false);
 
   const entries = useMemo(() => [...catalog].sort((left, right) => left.name.localeCompare(right.name)), [catalog]);
 
@@ -156,6 +167,58 @@ export function ModuleStorePanel({
           {t("settings.moduleStoreCoreApi", { version: coreApiVersion })}
         </span>
       </div>
+      {migrationSnapshot && (
+        <div
+          data-testid="module-upgrade-status"
+          data-state={migrationSnapshot.candidates.length > 0 ? "candidates" : "empty"}
+          className="mb-3 rounded border border-blue-500/30 bg-blue-500/10 p-3"
+        >
+          <div className="text-[13px] font-semibold">{t("settings.moduleUpgradeTitle")}</div>
+          <div className="mt-1 text-[12px] text-[var(--taomni-text-muted)]">
+            {t("settings.moduleUpgradeSubtitle", { version: migrationSnapshot.from_version })}
+          </div>
+          {migrationSnapshot.candidates.length > 0 ? (
+            <ul data-testid="module-upgrade-candidates" className="mt-2 list-disc pl-5 text-[12px]">
+              {migrationSnapshot.candidates.map((candidate) => (
+                <li key={`${candidate.plugin_slug}:${candidate.item}`}>{candidate.plugin_slug}</li>
+              ))}
+            </ul>
+          ) : (
+            <div data-testid="module-upgrade-empty" className="mt-2 text-[12px] text-[var(--taomni-text-muted)]">
+              {t("settings.moduleUpgradeNone")}
+            </div>
+          )}
+          {migrationSnapshot.retained_paths.length > 0 && (
+            <div data-testid="module-upgrade-retained" className="mt-2 text-[11px] text-[var(--taomni-text-muted)]">
+              {t("settings.moduleUpgradeRetained", { count: migrationSnapshot.retained_paths.length })}
+            </div>
+          )}
+          {migrationError && <div role="alert" data-testid="module-upgrade-error" className="mt-2 text-[12px] text-red-700 dark:text-red-300">{migrationError}</div>}
+          {migrationSnapshot.candidates.length > 0 && (
+            <button
+              type="button"
+              data-testid="module-upgrade-migrate"
+              className="taomni-btn mt-3 h-7 px-2.5 text-[11px]"
+              disabled={migrationLoading || migrationBusy || !onMigrationExecute}
+              onClick={() => {
+                if (!onMigrationExecute) return;
+                setMigrationBusy(true);
+                void Promise.resolve(onMigrationExecute())
+                  .catch(() => undefined)
+                  .finally(() => setMigrationBusy(false));
+              }}
+            >
+              {migrationLoading || migrationBusy ? t("settings.moduleUpgradeWorking") : t("settings.moduleUpgradeMigrate")}
+            </button>
+          )}
+        </div>
+      )}
+      {migrationError && !migrationSnapshot && (
+        <div data-testid="module-upgrade-status" data-state="error" className="mb-3 rounded border border-red-500/30 bg-red-500/10 p-3">
+          <div className="text-[13px] font-semibold">{t("settings.moduleUpgradeTitle")}</div>
+          <div role="alert" data-testid="module-upgrade-error" className="mt-1 text-[12px] text-red-700 dark:text-red-300">{migrationError}</div>
+        </div>
+      )}
       {catalogError && <div role="alert" data-testid="module-store-catalog-error" className="mb-3 rounded border border-red-500/30 bg-red-500/10 p-2 text-[12px] text-red-700 dark:text-red-300">{catalogError}</div>}
       {error && <div role="alert" data-testid="module-store-error" className="mb-3 rounded border border-red-500/30 bg-red-500/10 p-2 text-[12px] text-red-700 dark:text-red-300">{error}</div>}
       {catalogLoading ? (

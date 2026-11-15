@@ -1,5 +1,6 @@
-
 use super::*;
+use std::collections::BTreeMap;
+use std::path::Path;
 use std::sync::Arc;
 use tempfile::tempdir;
 use tokio::sync::Mutex;
@@ -11,6 +12,126 @@ fn endpoint() -> ProxyEndpoint {
         host: "proxy.example".into(),
         port: 8080,
     }
+}
+
+fn valid_catalog() -> ModuleCatalog {
+    let mut platforms = BTreeMap::new();
+    platforms.insert(
+        "linux-x86_64".into(),
+        ModuleCatalogAsset {
+            url: "https://cdn.example.test/module.tar.zst".into(),
+            signature: "untrusted-comment signature".into(),
+            sha256: "a".repeat(64),
+            size: 42,
+        },
+    );
+    let plugin = ModuleCatalogPlugin {
+        id: "taomni-plugin-demo".into(),
+        slug: "demo".into(),
+        name: "Demo".into(),
+        version: "1.0.0".into(),
+        core_api_version: "1".into(),
+        platforms,
+    };
+    ModuleCatalog {
+        core_api_version: "1".into(),
+        sequence: 1,
+        updated_at: "2026-11-15T00:00:00Z".into(),
+        plugins: BTreeMap::from([("taomni-plugin-demo".into(), plugin)]),
+    }
+}
+
+#[test]
+fn catalog_validation_accepts_signed_metadata_shape() {
+    valid_catalog().validate("1").unwrap();
+}
+
+#[test]
+fn catalog_validation_rejects_incompatible_core_and_empty_platforms() {
+    let mut catalog = valid_catalog();
+    catalog.core_api_version = "2".into();
+    assert!(matches!(
+        catalog.validate("1"),
+        Err(DownloadError::InvalidCatalog(message)) if message.contains("incompatible")
+    ));
+
+    let mut catalog = valid_catalog();
+    catalog
+        .plugins
+        .get_mut("taomni-plugin-demo")
+        .unwrap()
+        .platforms
+        .clear();
+    assert!(matches!(
+        catalog.validate("1"),
+        Err(DownloadError::InvalidCatalog(message)) if message.contains("no platform assets")
+    ));
+}
+
+#[test]
+fn catalog_validation_rejects_bad_url_hash_and_signature() {
+    let mut catalog = valid_catalog();
+    catalog
+        .plugins
+        .get_mut("taomni-plugin-demo")
+        .unwrap()
+        .platforms
+        .get_mut("linux-x86_64")
+        .unwrap()
+        .url = "file:///tmp/module.tar.zst".into();
+    assert!(matches!(
+        catalog.validate("1"),
+        Err(DownloadError::InvalidCatalog(message)) if message.contains("URL scheme")
+    ));
+
+    let mut catalog = valid_catalog();
+    catalog
+        .plugins
+        .get_mut("taomni-plugin-demo")
+        .unwrap()
+        .platforms
+        .get_mut("linux-x86_64")
+        .unwrap()
+        .sha256 = "z".repeat(64);
+    assert!(matches!(
+        catalog.validate("1"),
+        Err(DownloadError::InvalidCatalog(message)) if message.contains("integrity")
+    ));
+    let asset = catalog
+        .plugins
+        .get_mut("taomni-plugin-demo")
+        .unwrap()
+        .platforms
+        .get_mut("linux-x86_64")
+        .unwrap();
+    asset.sha256 = "a".repeat(64);
+    asset.signature.clear();
+    drop(asset);
+    assert!(matches!(
+        catalog.validate("1"),
+        Err(DownloadError::InvalidCatalog(message)) if message.contains("integrity")
+    ));
+}
+
+#[test]
+fn download_paths_are_confined_to_profile_staging() {
+    let root = tempdir().unwrap();
+    let staging = root.path().join(".downloads");
+    std::fs::create_dir_all(&staging).unwrap();
+    let partial = staging.join("demo.pkg.part");
+    let complete = staging.join("demo.pkg");
+    validate_download_paths_within_root(&partial, &complete, &staging).unwrap();
+
+    let outside = root.path().join("outside.pkg");
+    assert!(matches!(
+        validate_download_paths_within_root(&outside, &complete, &staging),
+        Err(DownloadError::InvalidPath(message)) if message.contains("outside")
+    ));
+    let traversal = Path::new(&format!("{}/../outside.pkg", staging.display())).to_path_buf();
+    assert!(matches!(
+        validate_download_paths_within_root(&traversal, &complete, &staging),
+        Err(DownloadError::InvalidPath(message)) if message.contains("parent traversal")
+    ));
 }
 
 #[test]
@@ -241,4 +362,32 @@ async fn native_http_service_resumes_partial_file_only_after_range_validation() 
     server.await.unwrap();
     assert!(result.resumed);
     assert_eq!(std::fs::read(result.path).unwrap(), body);
+}
+
+#[tokio::test]
+async fn manager_cancel_publishes_terminal_state_immediately() {
+    let dir = tempdir().unwrap();
+    let service = HttpDownloadService::new(&ProxyRoute::NoProxy).unwrap();
+    let manager = DownloadManager::new(service);
+    let handle = manager
+        .start(DownloadRequest {
+            id: "module-cancel".into(),
+            url: "http://127.0.0.1:1/module.pkg".into(),
+            partial_path: dir.path().join("module.pkg.part"),
+            completed_path: dir.path().join("module.pkg"),
+            expected_total: None,
+            proxy: ProxyRoute::NoProxy,
+        })
+        .await
+        .unwrap();
+    let snapshot = manager.cancel("module-cancel").await.unwrap();
+    assert_eq!(snapshot.phase, DownloadPhase::Cancelled);
+    assert_eq!(
+        manager.snapshot("module-cancel").await.unwrap().phase,
+        DownloadPhase::Cancelled
+    );
+    assert!(matches!(
+        handle.wait().await,
+        Err(DownloadError::Cancelled | DownloadError::Http(_))
+    ));
 }

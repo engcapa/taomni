@@ -155,7 +155,7 @@ pub struct MigrationSpec {
     pub target: PathBuf,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct MigrationExecutionResult {
     pub status: MigrationRunState,
     pub committed: Vec<MigrationItem>,

@@ -52,6 +52,8 @@ export {
   cancelPluginDownload,
   forgetPluginDownload,
   fetchModuleCatalog,
+  inspectLegacyInstall,
+  executePluginMigration,
   type PluginInvokeOptions,
   type PluginInvokeRequest,
   type ModuleDownloadPhase,
@@ -61,6 +63,11 @@ export {
   type ModuleCatalogAsset,
   type ModuleCatalogPlugin,
   type ModuleCatalog,
+  type LegacyInstallSnapshot,
+  type LegacyMigrationCandidate,
+  type LegacyMigrationItem,
+  type LegacyVaultEvidence,
+  type MigrationExecutionResult,
 } from "./ipc/plugin";
 
 export {

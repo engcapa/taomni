@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setLocale } from "../../lib/i18n";
 import { type ModuleRecord } from "../../lib/moduleStore";
+import type { LegacyInstallSnapshot } from "../../lib/ipc";
 import { useModuleStore } from "../../stores/moduleStore";
 import { ModuleStorePanel, type ModuleStoreCatalogEntry } from "./ModuleStorePanel";
 
@@ -45,6 +46,48 @@ describe("ModuleStorePanel", () => {
     expect(screen.getByTestId("module-store-panel")).toBeInTheDocument();
     expect(screen.getByTestId("module-store-empty")).toHaveTextContent("No modules are available yet.");
     expect(screen.getByTestId("module-store-core-api")).toHaveTextContent("Core API 1");
+  });
+
+  it("shows the legacy upgrade preflight and runs migration explicitly", async () => {
+    const user = userEvent.setup();
+    const snapshot: LegacyInstallSnapshot = {
+      from_version: "0.5.9",
+      database_path: "/profile/taomni.db",
+      database_tables: ["sessions"],
+      candidates: [{ item: "rdp-vnc-sessions", evidence: ["session records"], plugin_slug: "rdp-client" }],
+      source_fingerprints: { "taomni.db": "sha256:test:bytes:1" },
+      retained_paths: ["/profile/lanchat.sqlite"],
+      vault: null,
+    };
+    const onMigrationExecute = vi.fn().mockResolvedValue(undefined);
+    render(<ModuleStorePanel migrationSnapshot={snapshot} onMigrationExecute={onMigrationExecute} />);
+    expect(screen.getByTestId("module-upgrade-status")).toHaveTextContent("0.5.9");
+    expect(screen.getByTestId("module-upgrade-candidates")).toHaveTextContent("rdp-client");
+    expect(screen.getByTestId("module-upgrade-retained")).toHaveTextContent("1");
+    await user.click(screen.getByTestId("module-upgrade-migrate"));
+    await waitFor(() => expect(onMigrationExecute).toHaveBeenCalledOnce());
+  });
+
+  it("shows a truthful empty migration status when the profile is already modular", () => {
+    const snapshot: LegacyInstallSnapshot = {
+      from_version: "0.5.x",
+      database_path: null,
+      database_tables: [],
+      candidates: [],
+      source_fingerprints: {},
+      retained_paths: [],
+      vault: null,
+    };
+    render(<ModuleStorePanel migrationSnapshot={snapshot} />);
+    expect(screen.getByTestId("module-upgrade-status")).toHaveAttribute("data-state", "empty");
+    expect(screen.getByTestId("module-upgrade-empty")).toHaveTextContent("No legacy module data needs migration.");
+    expect(screen.queryByTestId("module-upgrade-migrate")).not.toBeInTheDocument();
+  });
+
+  it("surfaces migration preflight errors without implying a completed scan", () => {
+    render(<ModuleStorePanel migrationError="legacy profile is unreadable" />);
+    expect(screen.getByTestId("module-upgrade-status")).toHaveAttribute("data-state", "error");
+    expect(screen.getByTestId("module-upgrade-error")).toHaveTextContent("legacy profile is unreadable");
   });
 
   it("distinguishes catalog loading and refresh errors from an empty catalog", () => {

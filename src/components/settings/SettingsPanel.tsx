@@ -3,7 +3,8 @@ import { useAppTheme } from "../../lib/appTheme";
 import { applyCodeViewProfile, loadCodeViewProfile, saveCodeViewProfile, type CodeViewProfile } from "../../lib/codeViewProfile";
 import { useT } from "../../lib/i18n";
 import { useAppThemeI18nLabel } from "../../lib/i18n/labels";
-import { installStagedPlugin, listPlugins, rollbackPlugin, setPluginEnabled, uninstallPlugin } from "../../lib/ipc";
+import { executePluginMigration, inspectLegacyInstall, installStagedPlugin, listPlugins, rollbackPlugin, setPluginEnabled, uninstallPlugin } from "../../lib/ipc";
+import type { LegacyInstallSnapshot } from "../../lib/ipc";
 import { PLUGIN_CORE_API_VERSION, type PluginRecord } from "../../lib/pluginRegistry";
 import { clearPendingSettingsSection, consumePendingSettingsSection, OPEN_SETTINGS_SECTION_EVENT, type OpenSettingsSectionDetail } from "../../lib/settingsNavigation";
 import { useSystemFonts } from "../../lib/systemFonts";
@@ -53,6 +54,9 @@ export function SettingsPanel() {
   const [moduleCatalog, setModuleCatalog] = useState<ModuleStoreCatalogEntry[]>([]);
   const [moduleCatalogLoading, setModuleCatalogLoading] = useState(true);
   const [moduleCatalogError, setModuleCatalogError] = useState<string | null>(null);
+  const [migrationSnapshot, setMigrationSnapshot] = useState<LegacyInstallSnapshot | null>(null);
+  const [migrationLoading, setMigrationLoading] = useState(true);
+  const [migrationError, setMigrationError] = useState<string | null>(null);
   const t = useT();
   const themeLabel = useAppThemeI18nLabel();
 
@@ -284,6 +288,27 @@ export function SettingsPanel() {
     };
   }, [hydrateModuleStore]);
 
+  useEffect(() => {
+    let mounted = true;
+    setMigrationLoading(true);
+    inspectLegacyInstall()
+      .then((snapshot) => {
+        if (mounted) {
+          setMigrationSnapshot(snapshot);
+          setMigrationError(null);
+        }
+      })
+      .catch((reason) => {
+        if (mounted) setMigrationError(reason instanceof Error ? reason.message : String(reason));
+      })
+      .finally(() => {
+        if (mounted) setMigrationLoading(false);
+      });
+    return () => {
+      mounted = false;
+    };
+  }, []);
+
   const moduleOnInstall = useCallback(async (entry: ModuleStoreCatalogEntry) => {
     // The signed catalog/download bridge will provide a verified staging path.
     // Until then, fail explicitly instead of advancing only the renderer state.
@@ -303,6 +328,17 @@ export function SettingsPanel() {
   const moduleOnRollback = useCallback(async (entry: ModuleStoreCatalogEntry, _version: string) => {
     await rollbackPlugin(entry.slug);
   }, []);
+  const moduleOnMigrationExecute = useCallback(async () => {
+    try {
+      await executePluginMigration(migrationSnapshot?.from_version);
+      const refreshed = await inspectLegacyInstall(migrationSnapshot?.from_version);
+      setMigrationSnapshot(refreshed);
+      setMigrationError(null);
+    } catch (reason) {
+      setMigrationError(reason instanceof Error ? reason.message : String(reason));
+      throw reason;
+    }
+  }, [migrationSnapshot?.from_version]);
 
   const groupTitle = useCallback((titleKey: string) => t(titleKey), [t]);
 
@@ -353,5 +389,9 @@ export function SettingsPanel() {
     moduleOnDisable={moduleOnDisable}
     moduleOnUninstall={moduleOnUninstall}
     moduleOnRollback={moduleOnRollback}
+    migrationSnapshot={migrationSnapshot}
+    migrationLoading={migrationLoading}
+    migrationError={migrationError}
+    onMigrationExecute={moduleOnMigrationExecute}
   />;
 }

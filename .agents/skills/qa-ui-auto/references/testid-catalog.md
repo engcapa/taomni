@@ -2486,6 +2486,7 @@
 - `[data-testid="module-store-panel"]` — display — F-Modules-1.module-store-panel
 - `[data-testid="module-store-core-api"]` — display — F-Modules-1.module-store-core-api
 - `[data-testid="module-store-empty"], [data-testid="module-store-catalog-error"], [data-testid="module-store-loading"]` — display — F-Modules-1.module-store-state
+- `[data-testid="module-upgrade-status"]` — display — F-Modules-1.module-upgrade-status
 
 ## network/sockscap (F-Sockscap-1)
 

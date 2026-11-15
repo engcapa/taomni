@@ -10,7 +10,6 @@ use std::io::Read;
 use std::path::{Path, PathBuf};
 
 use rusqlite::{Connection, OpenFlags};
-use sha2::{Digest, Sha256};
 
 use super::{
     LegacyInstallSnapshot, LegacyVaultEvidence, MigrationCandidate, MigrationItem, MigrationSpec,

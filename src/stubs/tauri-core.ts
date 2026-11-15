@@ -73,6 +73,24 @@ for (const command of ["recovery_get","recovery_update","recovery_ready","list_s
 for (const command of ["plugin_list", "plugin_refresh"]) {
   stubCommandRegistry.register({ domain: "plugin", command, handler: () => [] });
 }
+stubCommandRegistry.register({
+  domain: "plugin",
+  command: "plugin_migration_inspect",
+  handler: () => ({
+    from_version: "0.5.x",
+    database_path: null,
+    database_tables: [],
+    candidates: [],
+    source_fingerprints: {},
+    retained_paths: [],
+    vault: null,
+  }),
+});
+stubCommandRegistry.register({
+  domain: "plugin",
+  command: "plugin_migration_execute",
+  handler: () => ({ status: "complete", committed: [], skipped: [] }),
+});
 
 for (const command of ["attach_terminal_output","detach_terminal_output","detect_x_server","list_local_shells","list_wsl_distros","list_common_local_directories","record_local_directory_use","history_snapshot","history_list","history_read","history_prune","create_local_terminal","create_ssh_terminal","submit_ssh_auth_response","test_ssh_connection","write_terminal","resize_terminal","send_terminal_signal","close_terminal"]) {
   stubCommandRegistry.register({ domain: "terminal", command, handler: (args) => invokeTerminal(command, args) });

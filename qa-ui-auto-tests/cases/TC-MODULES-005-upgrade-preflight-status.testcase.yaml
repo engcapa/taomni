@@ -1,0 +1,68 @@
+id: TC-MODULES-005
+title: Module Store exposes the legacy install upgrade preflight status
+description: >-
+  The module store must make the 0.5.x upgrade preflight observable before any
+  migration write. A fresh isolated profile reports an explicit empty status;
+  when a legacy candidate is present the same status boundary exposes the
+  candidate list, retained files, and migration action. Browser and native
+  runs assert the stable status boundary and absence of renderer errors.
+covers:
+- F-Modules-1
+tags:
+- p1
+- modules
+- upgrade
+modes:
+- browser
+- native
+fixtures:
+- reset_db
+timeout_sec: 45
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: module store
+- wait_for: '[data-testid="module-store-panel"]'
+- wait_for: '[data-testid="module-upgrade-status"]'
+- assert_visible: '[data-testid="module-upgrade-status"]'
+- assert_attribute:
+    selector: '[data-testid="module-upgrade-status"]'
+    name: data-state
+    matches: '^(empty|candidates|error)$'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: The Module Store reports a truthful legacy upgrade preflight state before migration writes.
+    actions:
+    - 3
+    - 5
+    checkpoints:
+    - step: 7
+      expectation: '{"wait_for": "[data-testid=\"module-upgrade-status\"]"}'
+    - step: 8
+      expectation: '{"assert_visible": "[data-testid=\"module-upgrade-status\"]"}'
+    - step: 9
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"module-upgrade-status\"]", "name": "data-state", "matches": "^(empty|candidates|error)$"}}'
+    - step: 10
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 10
+      expectation: '{"assert_no_runtime_errors": null}'
+    results:
+    - 7
+    - 8
+    - 9
+    - 10
+  native:
+  - check: Native mode confirms the migration preflight IPC is projected into the packaged Module Store UI.
+    method: automated
+    reason: Browser stubs validate the renderer boundary; only native mode executes the profile scan and migration IPC.
+  visual:
+  - check: The preflight state is readable and does not imply that migration has already written files.
+    method: manual
+    reason: Automated checks cover state semantics; spacing and candidate-list layout require screenshot review when a legacy fixture is available.
