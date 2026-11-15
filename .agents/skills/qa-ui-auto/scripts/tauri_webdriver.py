@@ -459,9 +459,30 @@ class NativeSession(WebDriverTransport):
         """Wait until the QA WebView has a mounted application root."""
         end = time.monotonic() + timeout
         last_error = ""
+        navigation_checked = platform.system() != "Windows"
         while time.monotonic() < end:
             if self.deadline:
                 self.deadline.remaining()
+            if not navigation_checked:
+                # EdgeDriver can hand back a WebView2 session before Tauri's
+                # custom protocol document has replaced the initial blank
+                # page.  A blank document has no localStorage and never gets
+                # React's root, so explicitly request the app URL once before
+                # continuing the normal readiness poll.
+                try:
+                    current_url = self.request("GET", self.endpoint("/url"))
+                except (WebDriverError, urllib.error.URLError, OSError, json.JSONDecodeError) as exc:
+                    last_error = str(exc)
+                else:
+                    if isinstance(current_url, str) and current_url.strip().lower() == "about:blank":
+                        try:
+                            self.request("POST", self.endpoint("/url"), {"url": "http://tauri.localhost/"})
+                        except (WebDriverError, urllib.error.URLError, OSError, json.JSONDecodeError) as exc:
+                            last_error = str(exc)
+                        else:
+                            navigation_checked = True
+                    else:
+                        navigation_checked = True
             try:
                 ready = self.execute(
                     "return document.readyState === 'complete' && "

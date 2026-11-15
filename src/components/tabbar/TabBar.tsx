@@ -418,7 +418,6 @@ export function TabBar({
   ) => {
     if (editingTabId === tab.id) return;
     if (e.button !== 0) return;
-    e.preventDefault();
     startCustomDrag({
       event: e,
       data: { mime: TAB_DRAG_MIME, payload: { tabId: tab.id } },
