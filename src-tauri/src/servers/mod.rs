@@ -69,6 +69,8 @@ mod persistence;
 
 mod autostart;
 
+mod tab_lock;
+
 #[cfg(test)]
 mod tests;
 
@@ -125,3 +127,10 @@ pub(crate) use persistence::{
 pub use autostart::autostart_servers;
 
 use autostart::rdp_autostart_allowed;
+
+pub use tab_lock::{HeldServersTabLock, ServersTabClaim, claim_servers_tab, release_servers_tab};
+
+pub(crate) use tab_lock::{
+    __cmd__claim_servers_tab, __cmd__release_servers_tab, __tauri_command_name_claim_servers_tab,
+    __tauri_command_name_release_servers_tab, release_tab_lock_for_window,
+};

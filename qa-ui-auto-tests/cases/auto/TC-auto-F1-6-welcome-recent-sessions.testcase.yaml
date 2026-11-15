@@ -30,7 +30,7 @@ steps:
 - wait_for: '[data-testid="welcome-panel"]'
 - assert_visible: '[data-testid="welcome-recent-sessions"]'
 - assert_visible: '[data-testid="welcome-recent-empty"]'
-- click: '[data-testid="welcome-new-session"]'
+- click: '[data-testid="welcome-panel"] [data-testid="tao-home-new-session"]'
 - wait_for: '[data-testid="session-editor"]'
 - click: '[data-testid="session-proto-shell"]'
 - click: '[data-testid="session-section-bookmark"]'

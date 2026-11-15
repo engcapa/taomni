@@ -10,6 +10,7 @@ mod commands;
 mod config;
 mod dap;
 mod database;
+mod deepseek_app;
 mod dependency_index;
 mod filebrowser;
 mod git;

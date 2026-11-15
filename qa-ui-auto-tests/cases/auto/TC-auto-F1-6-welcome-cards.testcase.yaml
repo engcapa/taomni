@@ -30,7 +30,7 @@ steps:
 - assert_not_visible: '[data-testid="welcome-panel"] >> text="Refresh sessions"'
 - assert_visible: '[data-testid="welcome-open-home-folder"]'
 - assert_visible: text="Tips"
-- click: '[data-testid="welcome-new-session"]'
+- click: '[data-testid="welcome-panel"] [data-testid="tao-home-new-session"]'
 - wait_for: '[data-testid="session-editor"]'
 - press: Escape
 - wait_for:

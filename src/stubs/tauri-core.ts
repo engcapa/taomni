@@ -102,7 +102,7 @@ for (const command of ["vnc_connect","vnc_test_connection","vnc_disconnect","vnc
   stubCommandRegistry.register({ domain: "remoteDesktop", command, handler: (args) => invokeRemoteDesktop(command, args) });
 }
 
-for (const command of ["load_server_configs","save_server_config","list_server_statuses","list_server_logs","clear_server_log","get_server_status","stop_local_server","start_local_server"]) {
+for (const command of ["load_server_configs","save_server_config","list_server_statuses","list_server_logs","clear_server_log","get_server_status","stop_local_server","start_local_server","claim_servers_tab","release_servers_tab"]) {
   stubCommandRegistry.register({ domain: "servers", command, handler: (args) => invokeServers(command, args) });
 }
 
@@ -114,7 +114,7 @@ for (const command of ["list_tunnels","upsert_tunnel","delete_tunnel","start_tun
   stubCommandRegistry.register({ domain: "tunnel", command, handler: (args) => invokeTunnel(command, args) });
 }
 
-for (const command of ["chat_list_threads","chat_new_thread","chat_list_messages","chat_set_thread_provider","chat_set_thread_llm_model","chat_set_thread_cc_model","chat_set_thread_output_format","chat_delete_thread","chat_purge_old","chat_stop_stream","acp_probe_profile","chat_stat_attachment_paths","chat_read_clipboard_image_attachment","chat_send","chat_generate_media"]) {
+for (const command of ["chat_list_threads","chat_new_thread","chat_list_messages","chat_set_thread_provider","chat_set_thread_llm_model","chat_set_thread_cc_model","chat_set_thread_output_format","chat_delete_thread","chat_purge_old","chat_stop_stream","acp_probe_profile","chat_stat_attachment_paths","chat_read_clipboard_image_attachment","chat_send","chat_generate_media","deepseek_app_send","deepseek_app_stop"]) {
   stubCommandRegistry.register({ domain: "chat", command, handler: (args) => invokeChat(command, args) });
 }
 

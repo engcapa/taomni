@@ -1,5 +1,5 @@
 import { showAgentsComingSoon } from "../agents/comingSoon";
-import { Bot, Boxes, ChevronDown, GitBranch, KeyRound, MessageCircle, Monitor, Plus, Upload, Wrench } from "lucide-react";
+import { Bot, Boxes, ChevronDown, GitBranch, Monitor, Plus, Upload, Wrench } from "lucide-react";
 import { useContextMenu } from "../ContextMenu";
 import { useSessionImportExport } from "../menubar/useSessionImportExport";
 import { useT } from "../../lib/i18n";
@@ -7,9 +7,8 @@ import { useAppStore } from "../../stores/appStore";
 import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
 
 /** Launch actions share the existing import, workspace and utility owners. */
-export function PlatformLaunchCards({ onNewSession, onOpenLanChat, onOpenNewWorkspace }: {
+export function PlatformLaunchCards({ onNewSession, onOpenNewWorkspace }: {
   onNewSession: () => void;
-  onOpenLanChat?: () => void;
   onOpenNewWorkspace?: () => void;
 }) {
   const t = useT();
@@ -51,15 +50,14 @@ export function PlatformLaunchCards({ onNewSession, onOpenLanChat, onOpenNewWork
         <div className="taomni-home-card-footer"><button type="button" data-testid="home-open-agents" onClick={showAgentsComingSoon}><Bot />{t("platform.agents")}</button></div>
       </section>
       <section className="taomni-home-launch-card">
-        <div className="taomni-home-card-heading"><MessageCircle /><strong>{t("platform.tools")}</strong><kbd>LAN / Mail</kbd></div>
-        <p>{t("welcome.lanChatDesc")}</p>
+        <div className="taomni-home-card-heading"><Wrench /><strong>{t("platform.tools")}</strong></div>
+        <p>{t("platform.homeHint")}</p>
         <div className="taomni-home-card-actions">
-          {onOpenLanChat && <button type="button" data-testid="welcome-open-lanchat" className="taomni-btn" onClick={onOpenLanChat}>{t("welcome.lanChatTitle")}</button>}
           <button type="button" data-testid="home-open-mail" className="taomni-btn" onClick={() => command("mail-unified")}>{t("tabs.mailUnified")}</button>
+          <button type="button" data-testid="home-open-network-tools" className="taomni-btn" onClick={() => command("tools")}>{t("menu.networkTools")}</button>
         </div>
         <div className="taomni-home-card-footer">
-          <button type="button" data-testid="home-open-network-tools" onClick={() => command("tools")}><Wrench />{t("menu.networkTools")}</button>
-          <button type="button" data-testid="home-open-mfa" onClick={() => command("mfa")}><KeyRound />MFA</button>
+          <button type="button" data-testid="home-open-mfa" onClick={() => command("mfa")}>MFA</button>
         </div>
       </section>
     </>

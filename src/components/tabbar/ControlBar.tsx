@@ -101,7 +101,7 @@ export function ControlBar({
   const ctx = useContextMenu();
   const menuHost = useMainRailHostStore((s) => s.menuHost);
   const activeSideTab = useAppStore((state) => state.activeSideTab);
-  const hasExplorerTabs = useAppStore((state) => state.tabs.some((tab) => tab.type === "file-browser"));
+  const hasToolsSurfaceTabs = useAppStore((state) => state.tabs.some((tab) => tab.type === "file-browser" || tab.type === "servers"));
   const t = useT();
   const {
     hasSessions,
@@ -255,7 +255,7 @@ export function ControlBar({
           <div className="flex h-full min-w-0 items-center gap-1">
             <WorkspaceTabStrip />
           </div>
-        ) : activeSideTab === "home" || activeSideTab === "agents" || (activeSideTab === "tools" && !hasExplorerTabs) ? (
+        ) : activeSideTab === "home" || activeSideTab === "agents" || (activeSideTab === "tools" && !hasToolsSurfaceTabs) ? (
           <div className="flex h-full items-center gap-2 px-2 text-[12px] font-semibold" data-testid="platform-mode-title">
             {t(activeSideTab === "home" ? "platform.homeTitle" : activeSideTab === "tools" ? "platform.tools" : "platform.agentsTitle")}
           </div>

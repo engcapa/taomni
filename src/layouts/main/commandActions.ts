@@ -1,6 +1,6 @@
 import type { AppCommand } from "../../components/menubar/commands";
 import type { Tab } from "../../types";
-import { useServersStore } from "../../stores/serversStore";
+import { openServersTab } from "../../lib/serversTab";
 import { useAppStore } from "../../stores/appStore";
 import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
 import { openExplorer } from "../../lib/explorer/openExplorer";
@@ -145,7 +145,7 @@ export function createHandleCommand(controllerContext: HandleCommandContext): (c
         controllerContext.toggleQuickConnectVisible();
         break;
       case "servers":
-        useServersStore.getState().openDialog(tr("servers.dialogTitle"));
+        void openServersTab({ title: tr("servers.dialogTitle") });
         break;
       case "sessions":
         controllerContext.setSidebarCollapsed(false);

@@ -1,0 +1,786 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tao Home 高保真原型 v0.3（Taomni）</title>
+<style>
+:root{
+  --bg:#fafbfd;--chrome:#f3f5f9;--chrome2:#eaeef4;--card:#fff;--card-b:#e6eaf0;--accent:#2b4fd8;--accent-soft:#5b7cf0;
+  --sel:#e8eefc;--sel-b:#b9c9f7;--text:#111827;--muted:#6b7280;--div:#edf0f5;--input-b:#d5dbe5;
+  --warn:#92400e;--warn-bg:#fef3c7;--warn-b:#fcd34d;--danger:#b91c1c;--danger-bg:#fee2e2;--danger-b:#fca5a5;
+  --ok:#15803d;--ok-bg:#dcfce7;--code-bg:#f3f5f9;--think:#f4f6fb;--mark:#fff3bf;
+  --shadow:0 12px 40px rgba(17,24,39,.14);--shadow-s:0 2px 12px rgba(17,24,39,.06);--fs:13px;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+}
+.dark{
+  --bg:#1c1d20;--chrome:#17181a;--chrome2:#131416;--card:#25272c;--card-b:#34373e;--accent:#7aa5fa;--accent-soft:#7aa5fa;
+  --sel:#27364f;--sel-b:#4a74b8;--text:#e8ebf0;--muted:#98a0ac;--div:#2b2e34;--input-b:#3e424b;
+  --warn:#fcd34d;--warn-bg:#3a2f12;--warn-b:#6b5416;--danger:#fca5a5;--danger-bg:#3b1d1d;--danger-b:#7f2d2d;
+  --ok:#86efac;--ok-bg:#14301f;--code-bg:#1a1c20;--think:#22252b;--mark:#5a4a12;
+  --shadow:0 12px 40px rgba(0,0,0,.55);--shadow-s:0 2px 12px rgba(0,0,0,.3);
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{font:var(--fs)/1.5 -apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:#0b0c0e;color:var(--text);display:flex;flex-direction:column}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible,textarea:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round;flex:none}
+kbd{font:11px var(--mono);background:var(--chrome);border:1px solid var(--card-b);border-bottom-width:2px;border-radius:5px;padding:0 5px;color:var(--muted)}
+
+/* prototype bar */
+.pbar{height:38px;background:#111214;color:#c9ced6;display:flex;align-items:center;gap:10px;padding:0 12px;font-size:12px;border-bottom:1px solid #2a2c31;flex:none;position:relative;z-index:80}
+.pbar b{color:#fff;font-weight:600}.pbar .sp{flex:1}.pbar .note{opacity:.6}
+.pbar button,.pbar select{background:#1c1e22;border:1px solid #33363d;color:#d8dce3;border-radius:6px;padding:3px 9px;font-size:12px}
+.pbar button:hover{background:#262930}
+.smenu{position:absolute;top:36px;left:200px;background:#1c1e22;border:1px solid #33363d;border-radius:8px;padding:6px;width:330px;max-height:78vh;overflow:auto;display:none;box-shadow:0 12px 30px rgba(0,0,0,.5)}
+.smenu.open{display:block}.smenu h6{margin:8px 8px 3px;color:#7d8590;font-size:11px;font-weight:600}
+.smenu button{display:flex;gap:8px;width:100%;text-align:left;background:none;border:0;padding:4px 8px;border-radius:5px}
+.smenu button:hover{background:#2a2d34}.smenu i{font-style:normal;color:#7da7f5;width:34px;flex:none;font-family:var(--mono)}
+.stagewrap{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;background:#0b0c0e}
+.app{width:100%;height:100%;display:flex;flex-direction:column;background:var(--bg);color:var(--text);overflow:hidden;position:relative}
+.mobile .stagewrap{padding:14px}
+.mobile .app{width:390px;height:min(100%,800px);border-radius:22px;border:6px solid #2a2c31}
+
+/* shell */
+.titlebar{height:32px;background:var(--chrome2);border-bottom:1px solid var(--div);display:flex;align-items:center;gap:8px;padding:0 10px;font-size:12px;flex:none}
+.titlebar .logo{width:17px;height:17px;border-radius:5px;background:var(--accent);color:#fff;display:grid;place-items:center;font-weight:700;font-size:10px}
+.dark .titlebar .logo{color:#0b1220}
+.titlebar .sp{flex:1}.titlebar .wc{display:flex;gap:14px;color:var(--muted)}
+.body{flex:1;min-height:0;display:flex}
+.rail{width:46px;background:var(--chrome);border-right:1px solid var(--div);display:flex;flex-direction:column;align-items:center;gap:4px;padding:8px 0;flex:none}
+.rail button{width:34px;height:34px;border:0;background:none;border-radius:9px;color:var(--muted);display:grid;place-items:center}
+.rail button:hover{background:var(--sel)}.rail button.on{background:var(--sel);color:var(--accent)}.rail .sp{flex:1}
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.tabbar{height:33px;background:var(--chrome);border-bottom:1px solid var(--div);display:flex;align-items:flex-end;padding:0 6px;gap:2px;flex:none}
+.tab{padding:6px 12px;border-radius:8px 8px 0 0;font-size:12px;color:var(--muted);display:flex;gap:6px;align-items:center;border:1px solid transparent;border-bottom:0}
+.tab.on{background:var(--bg);color:var(--text);border-color:var(--div);position:relative;top:1px}
+.ribbon{width:24px;background:var(--chrome);border-left:1px solid var(--div);display:flex;flex-direction:column;align-items:center;padding-top:10px;gap:10px;flex:none;color:var(--muted)}
+.ribbon .t{writing-mode:vertical-rl;font-size:11px;letter-spacing:1px}.ribbon .dot{width:6px;height:6px;border-radius:50%;background:var(--accent-soft)}
+.statusbar{height:24px;background:var(--chrome2);border-top:1px solid var(--div);display:flex;align-items:center;gap:14px;padding:0 10px;font-size:11px;color:var(--muted);flex:none}
+.statusbar .sp{flex:1}.statusbar .ph{font-family:var(--mono);color:var(--accent)}.statusbar span{white-space:nowrap}
+.compact .rail,.compact .ribbon,.compact .titlebar .wc,.compact .statusbar span:nth-child(2){display:none}
+
+/* home */
+.home{flex:1;min-height:0;display:flex;position:relative}
+.col{flex:1;min-width:0;display:flex;flex-direction:column;position:relative}
+.topbar{height:48px;display:flex;align-items:center;gap:8px;padding:0 12px;flex:none}
+.seg{display:flex;background:var(--chrome);border-radius:10px;padding:3px}
+.seg button{border:0;background:none;padding:4px 15px;border-radius:8px;color:var(--muted);font-weight:500}
+.seg button.on{background:var(--card);color:var(--text);box-shadow:0 1px 3px rgba(0,0,0,.12)}
+.bind{display:flex;gap:6px;align-items:center}
+.chip{display:inline-flex;align-items:center;gap:5px;border:0;background:var(--chrome);border-radius:999px;padding:0 10px;font-size:12px;height:26px;white-space:nowrap;color:var(--text)}
+.chip.ghost{background:none;color:var(--muted);border:1px dashed var(--input-b)}
+.chip.ctx{background:var(--sel)}.chip.loc{background:var(--ok-bg);color:var(--ok)}.chip.skill{background:var(--warn-bg);color:var(--warn)}
+.chip .x{border:0;background:none;color:inherit;opacity:.6;padding:0 0 0 2px;font-size:14px;line-height:1}
+.chip:hover{filter:brightness(.97)}
+.chip .bar{width:46px;height:4px;border-radius:3px;background:rgba(0,0,0,.12);overflow:hidden}.chip .bar i{display:block;height:100%;background:var(--accent);width:0}
+.tsp{flex:1}
+.sbtn{display:flex;align-items:center;gap:8px;height:30px;padding:0 10px 0 9px;border:1px solid var(--card-b);background:var(--card);border-radius:9px;color:var(--muted)}
+.sbtn:hover{border-color:var(--sel-b);color:var(--text)}
+.ibtn{width:30px;height:30px;border:0;background:none;border-radius:9px;display:grid;place-items:center;color:var(--muted)}
+.ibtn:hover{background:var(--chrome);color:var(--text)}.ibtn.on{color:var(--accent);background:var(--sel)}
+.utxt{font-size:12px;color:var(--muted);background:none;border:0;padding:3px 8px;border-radius:7px}
+.utxt:hover{background:var(--chrome)}.utxt.warn{color:var(--warn)}.utxt.danger{color:var(--danger)}
+.pop{position:absolute;z-index:30;background:var(--card);border:1px solid var(--card-b);border-radius:12px;box-shadow:var(--shadow);padding:6px;min-width:240px;display:none}
+.pop.open{display:block}
+.pop h6{margin:6px 10px 3px;font-size:11px;font-weight:600;color:var(--muted)}
+.pop .it{display:flex;width:100%;gap:9px;align-items:center;text-align:left;border:0;background:none;padding:7px 10px;border-radius:8px}
+.pop .it:hover,.pop .it.hl{background:var(--sel)}.pop .it small{color:var(--muted);margin-left:auto;padding-left:10px}
+.pop .sep{height:1px;background:var(--div);margin:5px 4px}
+.pop input.q{width:calc(100% - 12px);margin:4px 6px;padding:6px 9px;border:1px solid var(--input-b);background:var(--bg);color:var(--text);border-radius:8px}
+.sw{position:relative;width:34px;height:19px;border-radius:999px;background:var(--input-b);border:0;padding:0;flex:none;transition:.15s;margin-left:auto}
+.sw::after{content:"";position:absolute;left:2px;top:2px;width:15px;height:15px;border-radius:50%;background:#fff;transition:.15s}
+.sw.on{background:var(--accent)}.sw.on::after{left:17px}
+.pop .row2{display:flex;align-items:center;gap:9px;padding:7px 10px}
+.pop .row2 small{display:block;color:var(--muted);font-size:11px}
+
+.stage{flex:1;min-height:0;display:flex;flex-direction:column;overflow:auto;padding:0 20px}
+.stage.empty{justify-content:center}
+.stage .inner{width:100%;max-width:740px;margin:0 auto;display:flex;flex-direction:column}
+.stage.chat .inner{flex:1;min-height:0}
+.hero{text-align:center;margin:0 0 18px}
+.hero h1{margin:0;font-size:26px;font-weight:600;letter-spacing:-.3px}.hero p{margin:6px 0 0;color:var(--muted);font-size:14px}
+.tall-hide .hero p{display:none}.xtall-hide .hero{display:none}
+.chat .hero,.chat .foot{display:none}
+.feed{flex:1;min-height:0;overflow:auto;padding:12px 0 6px;display:none;flex-direction:column;gap:22px}
+.chat .feed{display:flex}
+.msg.user{align-self:flex-end;max-width:84%;position:relative}
+.msg.user .bub{background:var(--sel);border-radius:16px 16px 4px 16px;padding:8px 14px}
+.msg.user .att{margin-top:6px;display:flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.msg.user .edit{position:absolute;left:-30px;top:6px;opacity:0}.msg.user:hover .edit{opacity:1}
+.msg.user textarea{width:420px;max-width:100%;border:1px solid var(--accent);border-radius:12px;background:var(--card);color:var(--text);padding:8px 12px;font:inherit}
+.msg.ai{display:flex;flex-direction:column;gap:9px}
+.ai .who{display:flex;align-items:center;gap:7px;font-weight:600;font-size:12px}
+.ai .who .mk{width:20px;height:20px;border-radius:7px;background:linear-gradient(135deg,var(--accent),var(--accent-soft));color:#fff;display:grid;place-items:center;font-size:10px}
+.ai .who em{font-style:normal;font-weight:400;color:var(--muted)}
+.ai .who .acts{margin-left:auto;display:flex;gap:2px;opacity:0;transition:opacity .15s}
+.msg.ai:hover .acts,.compact .msg.ai .acts{opacity:1}
+.acts button{border:0;background:none;color:var(--muted);padding:3px 7px;border-radius:7px;font-size:12px}
+.acts button:hover{background:var(--chrome);color:var(--text)}
+.txt{font-size:14.5px;line-height:1.75;word-break:break-word}
+.txt code{font-family:var(--mono);background:var(--code-bg);border-radius:5px;padding:1px 5px;font-size:12.5px}
+.txt ul{margin:4px 0;padding-left:20px}
+.cite{display:inline-grid;place-items:center;min-width:16px;height:16px;border-radius:5px;background:var(--sel);color:var(--accent);font-size:10px;font-weight:600;cursor:pointer;margin:0 1px;vertical-align:1px;padding:0 3px}
+.cite.local{background:var(--ok-bg);color:var(--ok)}
+.cursor{display:inline-block;width:7px;height:15px;background:var(--accent);vertical-align:-2px;margin-left:2px;animation:blink 1s steps(2) infinite}
+@keyframes blink{50%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.cursor,.spin,.vbar{animation:none!important}}
+.fold{color:var(--muted);font-size:12.5px}
+.fold>button{display:flex;gap:6px;align-items:center;border:0;background:none;color:var(--muted);padding:2px 0}
+.fold>button:hover{color:var(--text)}.fold .car{transition:.15s;display:inline-block}
+.fold .fb{display:none;margin:4px 0 0;padding:8px 12px;border-left:2px solid var(--sel-b);background:var(--think);border-radius:0 8px 8px 0;white-space:pre-wrap;line-height:1.65}
+.fold.open .fb{display:block}.fold.open .car{transform:rotate(90deg)}
+.steps .st{display:flex;gap:7px;align-items:center;padding:1px 0}.steps .st.done{color:var(--text)}
+.dot8{width:7px;height:7px;border-radius:50%;background:var(--muted);flex:none}
+.done>.dot8{background:var(--ok)}.run>.dot8{background:var(--accent);animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.3}}
+.src{display:flex;gap:8px;flex-wrap:wrap}
+.srccard{background:var(--chrome);border-radius:10px;padding:7px 11px;width:calc(33.3% - 6px);min-width:150px;font-size:12px;cursor:pointer}
+.srccard b{display:block;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.srccard span{color:var(--muted)}
+.srccard:hover{background:var(--sel)}
+.usage{font-size:11.5px;color:var(--muted);display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.usage .tag{background:var(--chrome);border-radius:999px;padding:0 8px}
+.card{border-radius:14px;padding:13px 15px;background:var(--card);border:1px solid var(--card-b);box-shadow:var(--shadow-s)}
+.card.warn{background:color-mix(in srgb,var(--warn-bg) 55%,var(--card));border-color:var(--warn-b)}
+.card.danger{background:color-mix(in srgb,var(--danger-bg) 45%,var(--card));border-color:var(--danger-b)}
+.card.local{background:color-mix(in srgb,var(--ok-bg) 45%,var(--card));border-color:#86efac}
+.card h4{margin:0 0 4px;font-size:13px;display:flex;gap:7px;align-items:center}
+.card p{margin:2px 0 8px;color:var(--muted);font-size:12.5px}
+.btn{border:1px solid var(--input-b);background:var(--card);border-radius:9px;padding:5px 14px}
+.btn:hover{background:var(--sel)}.btn.sm{padding:1px 9px;font-size:11.5px}
+.btn.pri{background:var(--accent);border-color:var(--accent);color:#fff}.dark .btn.pri{color:#0b1220}
+.btn.pri:hover{filter:brightness(1.08)}
+.btn.dng{background:var(--danger);border-color:var(--danger);color:#fff}.dark .btn.dng{color:#1b0b0b}
+.btn[disabled]{opacity:.45;cursor:not-allowed}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.lv{font-size:11px;border-radius:5px;padding:0 6px;font-weight:600}
+.lv.l1{background:var(--warn-bg);color:var(--warn)}.lv.l2{background:var(--danger-bg);color:var(--danger)}
+pre.code{margin:6px 0;background:var(--code-bg);border-radius:9px;padding:9px 11px;font:12px/1.55 var(--mono);overflow:auto;white-space:pre-wrap}
+.kv{display:grid;grid-template-columns:48px 1fr;gap:2px 8px;font-size:12px;color:var(--muted)}.kv b{color:var(--text);font-weight:500}
+.plan li{list-style:none;display:flex;gap:8px;align-items:center;padding:3px 0}.plan ul{margin:6px 0;padding:0}
+.plan .st-i{width:16px;text-align:center}.skipped{text-decoration:line-through;opacity:.5}
+.lres{list-style:none;margin:6px 0;padding:0;display:flex;flex-direction:column;gap:4px}
+.lres label{display:flex;gap:8px;align-items:flex-start;font-size:12px;background:var(--card);border-radius:9px;padding:6px 9px}
+.lres b{font-weight:500;display:block}.lres small{color:var(--muted)}
+.spin{display:inline-block;width:12px;height:12px;border:2px solid var(--sel-b);border-top-color:var(--accent);border-radius:50%;animation:rot .8s linear infinite}
+@keyframes rot{to{transform:rotate(360deg)}}
+
+.composerWrap{padding:4px 0}
+.stage.chat .composerWrap{position:sticky;bottom:0;background:linear-gradient(transparent,var(--bg) 16%);padding-top:14px}
+.composer{border:1px solid var(--input-b);background:var(--card);border-radius:20px;box-shadow:var(--shadow-s);transition:border-color .15s,box-shadow .15s;position:relative}
+.composer:focus-within{border-color:var(--accent);box-shadow:0 4px 22px color-mix(in srgb,var(--accent) 14%,transparent)}
+.composer.off{opacity:.55;pointer-events:none}
+.chips{display:flex;gap:6px;flex-wrap:wrap;padding:10px 12px 0}.chips:empty{display:none}
+.composer textarea{display:block;width:100%;border:0;background:none;color:var(--text);resize:none;padding:13px 16px 4px;font:15px/1.55 inherit;min-height:54px;max-height:200px;outline:0}
+.ctool{display:flex;align-items:center;gap:4px;padding:2px 8px 8px}
+.cap{display:inline-flex;gap:6px;align-items:center;border:0;background:none;border-radius:999px;padding:0 10px;height:30px;color:var(--muted);font-size:12px}
+.cap:hover{background:var(--chrome);color:var(--text)}
+.cap b{color:var(--text);font-weight:500}
+.send{width:34px;height:34px;border-radius:50%;border:0;background:var(--accent);color:#fff;display:grid;place-items:center;margin-left:4px}
+.dark .send{color:#0b1220}.send[disabled]{opacity:.28;cursor:not-allowed}.send.stop{background:var(--danger)}
+.voice{position:absolute;inset:0;background:var(--card);border-radius:20px;display:none;align-items:center;gap:12px;padding:0 16px;z-index:3}
+.voice.on{display:flex}
+.vbars{display:flex;gap:3px;align-items:center;height:30px;flex:1}
+.vbar{width:3px;border-radius:2px;background:var(--accent);height:8px;animation:vb .9s ease-in-out infinite}
+@keyframes vb{50%{height:26px}}
+.chint{font-size:11.5px;color:var(--muted);padding:6px 8px 0;display:flex;gap:12px;flex-wrap:wrap;min-height:22px}
+.chint a{color:var(--accent);cursor:pointer}
+.extras{margin-top:14px}
+.sug{display:flex;gap:8px;flex-wrap:wrap;justify-content:center}
+.sug button{border:0;background:var(--chrome);border-radius:999px;padding:6px 14px;display:flex;gap:7px;align-items:center;color:var(--text)}
+.sug button:hover{background:var(--sel)}.sug small{color:var(--muted);font-size:11px}
+.chat .dock{justify-content:flex-start}
+.chat .sug{justify-content:flex-start;flex-wrap:nowrap;overflow-x:auto;padding-bottom:2px}.chat .sug button{flex:none;padding:3px 11px}.chat .sug small{display:none}
+.dock{display:flex;gap:2px;justify-content:center;align-items:center;margin-top:6px}
+.dbtn{display:flex;gap:6px;align-items:center;border:0;background:none;border-radius:9px;padding:4px 10px;color:var(--muted);font-size:12px;white-space:nowrap}
+.dbtn:hover,.dbtn.on{background:var(--chrome);color:var(--text)}.dbtn svg{width:15px;height:15px}
+.dbtn.first{color:var(--text)}.dsep{width:1px;height:16px;background:var(--div);margin:0 4px;flex:none}
+.foot{margin:18px 0 10px;text-align:center;font-size:11px;color:var(--muted);display:flex;gap:8px;justify-content:center}
+.foot a{color:var(--accent);cursor:pointer}
+
+.side{width:340px;border-left:1px solid var(--div);background:var(--chrome);display:none;flex-direction:column;flex:none}
+.side.open{display:flex}
+.side .tabs{display:flex;border-bottom:1px solid var(--div);padding:0 6px;align-items:center}
+.side .tabs button{border:0;background:none;padding:11px 10px;color:var(--muted);border-bottom:2px solid transparent}
+.side .tabs button.on{color:var(--accent);border-color:var(--accent)}.side .tabs .cl{margin-left:auto;font-size:16px}
+.side .pane{flex:1;overflow:auto;padding:10px;display:none;flex-direction:column;gap:8px}.side .pane.on{display:flex}
+.side .empty{color:var(--muted);text-align:center;margin-top:30px;font-size:12px}
+.sitem{background:var(--card);border-radius:11px;padding:9px 11px;font-size:12px}
+.sitem.hl{box-shadow:0 0 0 2px var(--accent)}.sitem b{display:block}.sitem span{color:var(--muted)}.sitem .row{margin-top:5px}
+.compact .side{position:absolute;right:0;top:48px;bottom:0;width:min(340px,92%);z-index:20;box-shadow:var(--shadow)}
+
+.mask{position:absolute;inset:0;background:color-mix(in srgb,var(--bg) 80%,transparent);backdrop-filter:blur(3px);display:none;align-items:center;justify-content:center;z-index:25}
+.mask.open{display:flex}.mask .card{width:340px;text-align:center}
+.ptabs{display:flex;gap:2px;padding:2px 4px 6px}
+.ptabs button{border:0;background:none;padding:4px 11px;border-radius:8px;color:var(--muted)}
+.ptabs button.on{background:var(--sel);color:var(--accent)}
+.plist{max-height:min(300px,40vh);overflow:auto;display:none}.plist.on{display:block}
+.plist .it span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.plist h6{margin:8px 10px 2px}
+
+.modal{position:absolute;inset:0;background:rgba(8,10,16,.45);display:none;align-items:flex-start;justify-content:center;z-index:50;padding:16px}
+.modal.open{display:flex}.modal.mid{align-items:center}
+.dlg{width:min(860px,100%);height:min(580px,100%);background:var(--bg);border:1px solid var(--card-b);border-radius:16px;box-shadow:var(--shadow);display:flex;overflow:hidden}
+.dlg nav{width:170px;background:var(--chrome);padding:12px 8px;display:flex;flex-direction:column;gap:2px;flex:none}
+.dlg nav h5{margin:4px 8px 8px;font-size:13px}
+.dlg nav button{border:0;background:none;text-align:left;padding:7px 10px;border-radius:8px;color:var(--muted)}
+.dlg nav button.on{background:var(--sel);color:var(--accent)}
+.dlg .cnt{flex:1;overflow:auto;padding:18px 22px;display:flex;flex-direction:column;gap:12px;min-width:0}
+.dlg .cnt h3{margin:0;font-size:15px}
+.compact .dlg{flex-direction:column}.compact .dlg nav{width:auto;flex-direction:row;overflow:auto}
+.field{display:flex;flex-direction:column;gap:4px}.field label{font-size:12px;color:var(--muted)}
+.field input,.field select,.field textarea{border:1px solid var(--input-b);background:var(--card);color:var(--text);border-radius:9px;padding:7px 10px;font:inherit}
+.tbl{width:100%;border-collapse:collapse;font-size:12px}.tbl td,.tbl th{border-bottom:1px solid var(--div);padding:7px 8px;text-align:left}
+.tbl th{color:var(--muted);font-weight:500}.tbl .sw{margin:0}
+.note2{font-size:12px;color:var(--muted);background:var(--chrome);border-radius:10px;padding:9px 12px}
+.progress{height:6px;background:var(--chrome);border-radius:4px;overflow:hidden}.progress i{display:block;height:100%;background:var(--accent);width:0;transition:width .3s}
+.steps2{display:flex;gap:6px;margin-bottom:4px}.steps2 i{flex:1;height:4px;border-radius:3px;background:var(--chrome)}.steps2 i.on{background:var(--accent)}
+
+/* search palette */
+.pal{width:min(780px,100%);background:var(--card);border:1px solid var(--card-b);border-radius:16px;box-shadow:var(--shadow);overflow:hidden;margin-top:9vh;display:flex;flex-direction:column;max-height:min(560px,86%)}
+.pal .qrow{display:flex;gap:10px;align-items:center;padding:12px 16px;border-bottom:1px solid var(--div)}
+.pal .qrow input{flex:1;border:0;background:none;color:var(--text);font:16px inherit;outline:0}
+.pal .filters{display:flex;gap:6px;padding:8px 16px;border-bottom:1px solid var(--div);flex-wrap:wrap}
+.pal .filters button{border:0;background:var(--chrome);border-radius:999px;padding:2px 11px;color:var(--muted);font-size:12px}
+.pal .filters button.on{background:var(--sel);color:var(--accent)}
+.pal .pbody{display:flex;min-height:230px;flex:1;min-height:0}
+.pal .rl{flex:1;overflow:auto;padding:6px;min-width:0}
+.pal .pv{width:260px;border-left:1px solid var(--div);padding:12px 14px;overflow:auto;font-size:12px;background:var(--bg)}
+.compact .pal .pv{display:none}
+.pal .r{display:flex;gap:10px;align-items:flex-start;width:100%;text-align:left;border:0;background:none;border-radius:10px;padding:8px 10px}
+.pal .r.hl{background:var(--sel)}.pal .r .ic{width:26px;height:26px;border-radius:8px;background:var(--chrome);display:grid;place-items:center;font-size:12px;flex:none}
+.pal .r b{display:block;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pal .r small{color:var(--muted)}
+.pal .r .m{margin-left:auto;color:var(--muted);font-size:11px;white-space:nowrap}
+.pal .r>div{min-width:0;flex:1}
+mark{background:var(--mark);color:inherit;border-radius:3px;padding:0 1px}
+.pal .foot2{display:flex;gap:14px;padding:8px 16px;border-top:1px solid var(--div);font-size:11.5px;color:var(--muted);align-items:center;flex-wrap:wrap}
+.pal .foot2 .sp{flex:1}
+.pv h5{margin:0 0 4px;font-size:13px}.pv pre{margin:8px 0;white-space:pre-wrap;font:12px/1.55 var(--mono);background:var(--code-bg);border-radius:9px;padding:8px 10px}
+.pv .row{margin-top:10px}
+.toast{position:absolute;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:#111214;color:#f1f3f6;padding:8px 15px;border-radius:10px;font-size:12px;opacity:0;pointer-events:none;transition:.25s;z-index:90;max-width:80%}
+.toast.show{opacity:1;transform:translateX(-50%)}
+.compact .topbar{padding:0 8px}.compact .sbtn span,.compact .bind .chip.ghost{display:none}.compact .tsp{display:block}
+.compact .srccard{width:100%}.compact .dock{overflow-x:auto;justify-content:flex-start}
+</style>
+</head>
+<body>
+<div class="pbar">
+  <b>Tao Home 原型 v0.3</b><span class="note">模拟数据 · 无网络请求</span>
+  <span class="sp"></span>
+  <button id="bState">状态与界面 ▾</button>
+  <button id="bTheme">浅色 / 暗色</button>
+  <button id="bView">桌面 / 窄屏</button>
+  <label title="底部快捷行：未检测到 WSL 时不显示"><input type="checkbox" id="wslChk" checked> 系统有 WSL</label>
+  <label title="同一个 TaoAiChat 组件换宿主：只换绑定栏 / 模式 / 底部行 / 侧栏页签（示意，非 orchestrator 设计）">宿主 <select id="hostSel"><option value="home">首页</option><option value="dev">开发 Agent（示意）</option></select></label>
+  <label>速度 <select id="speed"><option value="1">正常</option><option value="3">快 ×3</option><option value="0.5">慢 ×0.5</option></select></label>
+  <div class="smenu" id="smenu"></div>
+</div>
+<div class="stagewrap" id="stagewrap">
+<div class="app" id="app">
+  <div class="titlebar"><div class="logo">T</div><b>Taomni</b><span class="sp"></span><span class="wc"><span>—</span><span>▢</span><span>✕</span></span></div>
+  <div class="body">
+    <div class="rail" aria-label="主导航">
+      <button class="on" title="首页 / Tao"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8M5 10v10h14V10"/></svg></button>
+      <button title="终端"><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4zM7 9l3 3-3 3M12 15h5"/></svg></button>
+      <button title="会话"><svg viewBox="0 0 24 24"><path d="M4 6h16M4 12h16M4 18h10"/></svg></button>
+      <button title="数据库"><svg viewBox="0 0 24 24"><ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v12c0 1.7 3 3 7 3s7-1.3 7-3V6M5 12c0 1.7 3 3 7 3s7-1.3 7-3"/></svg></button>
+      <button title="邮件"><svg viewBox="0 0 24 24"><path d="M3 6h18v12H3zM3 7l9 7 9-7"/></svg></button>
+      <button title="笔记"><svg viewBox="0 0 24 24"><path d="M6 3h9l4 4v14H6zM9 12h7M9 16h5"/></svg></button>
+      <span class="sp"></span>
+      <button id="rSet" title="设置"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="3"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3M5.6 5.6l2.1 2.1M16.3 16.3l2.1 2.1M18.4 5.6l-2.1 2.1M7.7 16.3l-2.1 2.1"/></svg></button>
+    </div>
+    <div class="main">
+      <div class="tabbar"><div class="tab on"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8M5 10v10h14V10"/></svg>首页</div><div class="tab">本地终端 1</div><div class="tab">u80 · PostgreSQL</div></div>
+      <div class="home" id="home">
+        <div class="col" id="col">
+          <div class="topbar" id="topbar">
+            <div class="seg" id="modeSeg" role="tablist" aria-label="Tao 模式"><button data-m="ask" class="on" role="tab">问</button><button data-m="do" role="tab">做</button><button data-m="research" role="tab">深研</button></div>
+            <div class="bind" id="bind"></div>
+            <span class="tsp"></span>
+            <button class="utxt" id="usageTxt" style="display:none" title="本轮用量与预算"></button>
+            <button class="sbtn" id="bSearch" title="搜索 Taomni 本地资料"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg><span>搜索本地资料</span><kbd>Ctrl K</kbd></button>
+            <button class="ibtn" id="bMore" title="更多"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></svg></button>
+          </div>
+          <div class="stage empty" id="stage">
+            <div class="inner">
+              <div class="feed" id="feed" aria-live="polite"></div>
+              <div class="hero" id="hero"><h1 id="greet">早上好，Tao 在这里</h1><p>你的 Develop Buddy，今天想先做什么？</p></div>
+              <div id="nokey" style="display:none;margin-bottom:12px" class="card"><h4>连接 DeepSeek · 全家桶</h4><p>需要一把 API Key，保存在本地 Vault，不会进入前端。</p><div class="row"><button class="btn pri" id="goSet">去设置</button><button class="btn" id="reuseKey">沿用旧 tao-chat 的 Key</button><span style="color:var(--muted);font-size:12px">只复制 Vault 引用；不做连通性测试，首次发送失败会明确提示</span></div></div>
+              <div class="composerWrap">
+                <div class="composer" id="composer">
+                  <div class="chips" id="chips"></div>
+                  <textarea id="input" rows="1" placeholder="问 Tao 任何事…" aria-label="消息输入"></textarea>
+                  <div class="ctool">
+                    <button class="ibtn" id="bPlus" title="添加：文件 / 上下文 / 技能 / 工作流"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg></button>
+                    <button class="cap" id="bCap" title="思考 / 联网 / 模型"><b id="capLbl">flash</b></button>
+                    <span class="tsp"></span>
+                    <button class="ibtn" id="bMic" title="语音输入（默认本地 Whisper）"><svg viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="12" rx="3"/><path d="M5 11a7 7 0 0014 0M12 18v3"/></svg></button>
+                    <button class="send" id="send" title="发送" disabled><svg viewBox="0 0 24 24" id="sendIco"><path d="M12 19V5M5 12l7-7 7 7"/></svg></button>
+                  </div>
+                  <div class="voice" id="voice"><span style="color:var(--danger)">●</span><span id="vtime">0:00</span><div class="vbars" id="vbars"></div><button class="btn" id="vcancel">取消</button><button class="btn pri" id="vdone">完成</button></div>
+                </div>
+                <div class="chint" id="chint"></div>
+                <div class="dock" id="dock" aria-label="快捷操作">
+                  <button class="dbtn first" id="lHist" data-pop="1" title="历史：Tao 对话 / 最近会话 / 最近工作区"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="8"/><path d="M12 7v5l3 2"/></svg>历史</button>
+                  <i class="dsep"></i>
+                  <button class="dbtn" id="lTerm"><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4zM7 9l3 3-3 3M12 15h5"/></svg>本地终端</button>
+                  <button class="dbtn" id="lWsl"><svg viewBox="0 0 24 24"><path d="M4 5h16v14H4zM8 10h8M8 14h5"/></svg>WSL</button>
+                  <button class="dbtn" id="lSess"><svg viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>新会话</button>
+                  <button class="dbtn" id="lWs"><svg viewBox="0 0 24 24"><path d="M3 7h7l2 2h9v10H3z"/></svg>新工作区</button>
+                  <button class="dbtn" id="lMore" data-pop="1"><svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.2"/><circle cx="12" cy="12" r="1.2"/><circle cx="19" cy="12" r="1.2"/></svg>更多</button>
+                </div>
+              </div>
+              <div class="extras">
+                <div class="sug" id="sug"></div>
+              </div>
+              <div class="foot" id="foot"><span>Taomni v2.8.0</span></div>
+            </div>
+          </div>
+          <div class="pop" id="pop"></div>
+          <div class="mask" id="mask"><div class="card"><h4 style="justify-content:center">Vault 已锁定</h4><p>进行中的流式请求已中断，已收到的内容已保留。解锁后可重新发起。</p><button class="btn pri" id="unlock">输入主密码解锁</button></div></div>
+        </div>
+        <aside class="side" id="side" aria-label="侧栏">
+          <div class="tabs"><button data-p="sources" class="on">来源</button><button data-p="files">文件</button><button data-p="artifacts">生成物</button><button data-p="workflow">工作流</button><button class="cl" id="sideClose" title="收起">×</button></div>
+          <div class="pane on" id="p-sources"></div><div class="pane" id="p-files"></div><div class="pane" id="p-artifacts"></div><div class="pane" id="p-workflow"></div>
+        </aside>
+      </div>
+    </div>
+    <div class="ribbon"><span class="dot"></span><span class="t">Tao · 抽屉</span></div>
+  </div>
+  <div class="statusbar"><span>● 代理：系统</span><span>出口 allowlist：api.deepseek.com</span><span class="sp"></span><span><span id="hostNote"></span> 状态 <span class="ph" id="phase">S1 空态就绪</span></span></div>
+  <div class="modal" id="modal"><div id="dlgwrap" style="display:contents"></div></div>
+  <div class="toast" id="toast"></div>
+</div>
+</div>
+
+<script>
+const $=s=>document.querySelector(s), $$=s=>[...document.querySelectorAll(s)];
+const S={tok:0,mode:'ask',think:false,web:false,model:'deepseek-flash',demo:false,hasKey:true,busy:false,
+  bind:{ws:'taomni',term:'本地终端 1',db:null,proj:'taomni',branch:'feat/development-orchestrator'},host:'home',wsl:true,chips:[],tokens:0,cost:0,stopped:false,speed:1,branch:1,last:null,thr:'new'};
+const BIND={ws:{label:'工作区',icon:'📁',items:['taomni','chat-demo','docs-site','infra-notes']},term:{label:'终端',icon:'⌨',items:['本地终端 1','u80（SSH）','WSL · Ubuntu','build-box（SSH）']},db:{label:'数据库',icon:'🗄',items:['u80 · PostgreSQL','analytics · ClickHouse','cache · Redis']}};
+const BIND_DEV={proj:{label:'项目',icon:'📁',items:['taomni','chat-demo','docs-site']},branch:{label:'分支',icon:'⎇',items:['feat/development-orchestrator','main','feat/tao-home']}};
+function curBind(){return S.host==='dev'?BIND_DEV:BIND}
+const MODE_DEF={ask:{think:false,web:false},do:{think:true,web:false},research:{think:true,web:true}};
+const el=(t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e};
+const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const sleep=ms=>new Promise(r=>setTimeout(r,ms/S.speed));
+const fmtTok=n=>n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(1)+'K':String(n);
+function toast(t){const x=$('#toast');x.textContent=t;x.classList.add('show');clearTimeout(toast.t);toast.t=setTimeout(()=>x.classList.remove('show'),2400)}
+function setPhase(t){$('#phase').textContent=t}
+const isPeak=()=>{const d=new Date(),u=d.getUTCHours(),w=d.getUTCDay();return w>0&&w<6&&((u>=1&&u<4)||(u>=6&&u<10))};
+
+/* ---------- markdown-lite ---------- */
+function md(t){const lines=esc(t).split('\n');let out='',ul=false;
+  for(const l of lines){if(/^- /.test(l)){if(!ul){out+='<ul>';ul=true}out+='<li>'+l.slice(2)+'</li>'}
+    else{if(ul){out+='</ul>';ul=false}out+=(/^## /.test(l)?'<b style="font-size:15px">'+l.slice(3)+'</b>':l)+'<br>'}}
+  if(ul)out+='</ul>';
+  return out.replace(/\*\*(.+?)\*\*/g,'<b>$1</b>').replace(/`([^`]+)`/g,'<code>$1</code>').replace(/\[(本)?(\d)\]/g,(m,l,n)=>`<span class="cite${l?' local':''}" data-n="${l?'本':''}${n}" role="button" tabindex="0">${l?'本':''}${n}</span>`).replace(/(<br>)+$/,'')}
+
+/* ---------- mock local data (for Tao Search) ---------- */
+const DOCS=[
+ {id:1,src:'cmd',t:'rsync -avz ./dist/ u80:/srv/app/',b:'命令历史 · 主机 u80 · 使用 14 次',host:'u80',ago:2,w:3},
+ {id:2,src:'cmd',t:'docker compose logs -f --tail=200 api',b:'命令历史 · 主机 build-box · 使用 31 次',host:'build-box',ago:1,w:3},
+ {id:3,src:'cmd',t:'journalctl --disk-usage',b:'命令历史 · 主机 u80 · 使用 2 次',host:'u80',ago:0,w:1},
+ {id:4,src:'cmd',t:'curl https://api.deepseek.com/v1/models -H "Authorization: ‹已脱敏›"',b:'命令历史 · 本地 · 已脱敏 1 处',host:'local',ago:7,w:1,red:1},
+ {id:5,src:'cmd',t:'du -sh /var/log/* | sort -rh | head',b:'命令历史 · 主机 u80 · 使用 5 次',host:'u80',ago:0,w:2},
+ {id:6,src:'sql',t:'SELECT date_trunc(\'day\',created_at) d, count(*) FROM orders GROUP BY 1 ORDER BY 1 DESC LIMIT 7;',b:'SQL 历史 · u80 · PostgreSQL · 耗时 38 ms · 7 行',host:'u80',ago:6,w:2},
+ {id:7,src:'sql',t:'EXPLAIN ANALYZE SELECT * FROM orders WHERE user_id = 42;',b:'SQL 历史 · u80 · PostgreSQL · 耗时 12 ms',host:'u80',ago:12,w:1},
+ {id:8,src:'sql',t:'订单日报（保存的查询）',b:'保存的查询 · analytics · ClickHouse',host:'analytics',ago:20,w:2},
+ {id:9,src:'note',t:'生产发布步骤（笔记）',b:'1. 合并 release 分支 2. 在 build-box 打包 3. rsync 到 u80 4. 重启服务并检查日志 …',host:'',ago:9,w:3},
+ {id:10,src:'note',t:'PostgreSQL 连不上的排查清单',b:'先看 pg_hba.conf 与监听地址，再检查防火墙与连接数 max_connections …',host:'',ago:15,w:2},
+ {id:11,src:'note',t:'DeepSeek 应用 API 调研要点',b:'服务端搜索按查询计费；读链接按成功页计费；不能和其它工具同时声明 …',host:'',ago:1,w:2},
+ {id:12,src:'thread',t:'Tao · 解释 EADDRINUSE 报错',b:'聊天线程 · DeepSeek · 全家桶 · 昨天',host:'',ago:1,w:1},
+ {id:13,src:'thread',t:'Tao · 迁移脚本评审',b:'聊天线程 · 旧 tao-chat · 3 天前',host:'',ago:3,w:1},
+ {id:14,src:'sess',t:'u80 · 生产数据库',b:'会话配置 · SSH · 10.0.3.80:22 · 分组 生产 / 数据库',host:'u80',ago:30,w:2},
+ {id:15,src:'sess',t:'build-box',b:'会话配置 · SSH · 10.0.3.12:22 · 分组 构建',host:'build-box',ago:30,w:1},
+ {id:16,src:'sess',t:'analytics · ClickHouse',b:'会话配置 · ClickHouse · 10.0.4.7:9000',host:'analytics',ago:30,w:1},
+ {id:17,src:'file',t:'/srv/app/nginx.conf（快照）',b:'文件快照 · 保存前 · 仅路径与时间（内容索引默认关）',host:'u80',ago:2,w:1},
+ {id:18,src:'tool',t:'search_history（命令历史搜索）',b:'Agent 工具 · 最多 20 条 · 只读',host:'',ago:60,w:1}];
+const SRC_L={cmd:'命令',sql:'SQL',note:'笔记',thread:'对话',sess:'会话',file:'文件',tool:'工具'};
+const SRC_I={cmd:'⌘',sql:'⛁',note:'✎',thread:'💬',sess:'🖧',file:'📄',tool:'⚙'};
+function parseQ(q){const f={src:null,host:null,since:null};let rest=q.replace(/\b(source|host|since):(\S+)/g,(m,k,v)=>{if(k==='source')f.src=Object.keys(SRC_L).find(x=>x===v||SRC_L[x]===v)||v;if(k==='host')f.host=v;if(k==='since')f.since=parseInt(v)||null;return''}).trim();return{f,rest}}
+function doSearch(q,filt){const {f,rest}=parseQ(q);const term=rest.toLowerCase();const t0=performance.now();
+  let out=DOCS.filter(d=>(!filt||filt==='all'||d.src===filt)&&(!f.src||d.src===f.src)&&(!f.host||d.host===f.host)&&(!f.since||d.ago<=f.since));
+  if(term){out=out.map(d=>{const ti=d.t.toLowerCase().indexOf(term),bi=d.b.toLowerCase().indexOf(term);let sc=0;if(ti>=0)sc+=10;if(bi>=0)sc+=3;return{d,sc}}).filter(x=>x.sc>0)}
+  else out=out.map(d=>({d,sc:0}));
+  out.forEach(x=>x.sc+=x.d.w*1.5-Math.min(x.d.ago,30)*0.12);
+  out.sort((a,b)=>b.sc-a.sc);
+  return{res:out.map(x=>x.d),term:rest,short:term.length>0&&term.length<3,ms:Math.max(3,Math.round(performance.now()-t0+6+Math.random()*10)),f}}
+function hi(s,t){if(!t)return esc(s);const i=s.toLowerCase().indexOf(t.toLowerCase());if(i<0)return esc(s);return esc(s.slice(0,i))+'<mark>'+esc(s.slice(i,i+t.length))+'</mark>'+esc(s.slice(i+t.length))}
+
+/* ---------- scenarios ---------- */
+const SRC=[{t:'The full DeepSeek App experience, now via API',s:'api-docs.deepseek.com',d:'2026-11-13：Messages / Responses / Chat Completions 均可启用服务端搜索与读链接，客户端不执行任何工具。'},
+ {t:'deepseek-ai/chat-demo（GitHub）',s:'github.com',d:'开源前端演示，支持导入 DeepSeek 对话历史。'},
+ {t:'Models & Pricing',s:'api-docs.deepseek.com',d:'搜索与读链接各 $0.75 / 千次；deepseek-flash 上下文 1M；高峰时段价格为非高峰的 2 倍。'}];
+const LOCSRC=[{t:'生产发布步骤（笔记）',s:'本地 · 笔记',d:'1. 合并 release 分支 2. 在 build-box 打包 3. rsync 到 u80 …'},{t:'rsync -avz ./dist/ u80:/srv/app/',s:'本地 · 命令历史',d:'u80 · 使用 14 次 · 2 天前'}];
+const SC={
+ ask:{think:'用户贴了一段 EADDRINUSE 报错，需要解释原因并给出只读排查顺序。',thinkSec:2.4,
+  text:'`EADDRINUSE: address already in use :::5173` 表示 **5173 端口已有进程在监听**，新进程无法绑定。\n\n常见原因：\n- 上一次 `pnpm dev` 没有退出（终端关了但子进程还在）\n- 另一个项目也在用 Vite 默认端口\n\n建议先**只读排查**，不要直接 kill：\n- `lsof -i :5173` 查看占用进程\n- 确认是自己的开发服务后，再决定停止还是换端口\n\n需要的话切到“做”模式，我会在你确认后在已绑定的终端执行这一步。',usage:{i:812,o:436,s:0,f:0,c:0.0006}},
+ local:{think:'用户问上次的发布流程，已取得 2 条用户确认引用的本地资料，可直接回答。',thinkSec:1.8,
+  text:'按你笔记里的**生产发布步骤**[本1]，流程是：\n- 合并 release 分支\n- 在 build-box 打包\n- rsync 到 u80\n- 重启服务并检查日志\n\n你 2 天前在 u80 上执行过的同步命令是 `rsync -avz ./dist/ u80:/srv/app/`[本2]，可以直接复用。',sources:null,usage:{i:1630,o:320,s:0,f:0,c:0.0005,red:1,loc:2}},
+ askWeb:{think:'需要查今天的模型动态；先搜索官方更新日志，再读 chat-demo 仓库说明。',thinkSec:3.1,
+  steps:['搜索 2 个查询','找到 6 个来源','阅读 api-docs.deepseek.com','阅读 github.com/deepseek-ai/chat-demo'],
+  text:'DeepSeek 在 2026-11-13 发布了应用 API 全家桶：服务端**联网搜索、读链接、文件输入、安全校验、ASR/TTS**，在 Messages、Responses、Chat Completions 三种协议下都可启用[1]。同日开源 `chat-demo`，支持导入 DeepSeek 对话历史[2]。\n\n计费上，搜索与读链接各约 $0.75 / 千次，`deepseek-flash` 上下文为 1M，高峰时段 token 价格为非高峰的 2 倍[3]。',
+  sources:SRC,usage:{i:6480,o:702,s:2,f:2,c:0.004}},
+ do:{think:'磁盘告警，先找占用最大的目录。只读命令，仍需确认；目标限定在已绑定终端与 cwd。',thinkSec:2.8,
+  text:'磁盘使用率 94%，最可能是 `/var/log` 增长。我提议一条**只读**命令统计各目录大小，你确认后才会在已绑定的终端执行：',
+  action:{title:'统计 /var/log 下占用最高的目录',level:'L2',kind:'run_command',term:'u80（SSH）',cwd:'/var/log',cmd:'du -sh * 2>/dev/null | sort -rh | head -5',why:'日志目录最可能占满磁盘；只读，不改任何文件。',
+   out:'18G\tjournal\n2.1G\tnginx\n640M\tapt\n212M\tsyslog.1\n96M\tauth.log',after:'占用最大的是 `journal`（18G）。下一步建议 `journalctl --disk-usage` 确认，再决定是否按时间清理；清理属于 L2 动作，会再次请你确认。'},
+  usage:{i:2210,o:388,s:0,f:0,c:0.0007}},
+ research:{think:'深研任务：先出计划，让用户确认预计工具费和步骤，再并行搜索与读链接。',thinkSec:2.2,
+  plan:['搜索：DeepSeek 应用 API 能力与限制','并行读链接（3 路）：官方文档 / chat-demo / 定价页','交叉验证来源差异','生成结构化报告（可导出笔记）'],
+  est:'预计搜索约 12–30 个查询、读链接约 6–12 页，工具费约 $0.014–$0.032（按 $0.75/千次估算，不含 token）',
+  text:'## 结论\n应用 API 把**服务端搜索、读链接、文件与语音**放进同一套协议[1][2]。对 Taomni 的含义：\n- Key 与请求留在 Rust 后端，前端不直连\n- 声明联网工具时**不能同时声明其它工具**，所以“做”模式必须用动作提议块\n- 计费以 `usage.server_tool_use` 中的 billed 字段为准[3]\n\n## 来源分歧\n暂无实质分歧；上下文窗口已由定价页确认为 1M。\n\n本地笔记[本1]与上述结论一致。',
+  sources:SRC,usage:{i:48200,o:3105,s:21,f:9,c:0.034}}};
+const WF=[
+ {id:'deep_research',n:'深研',d:'搜索 → 读链接 → 交叉验证 → 报告',mode:'research'},
+ {id:'code_review',n:'代码 review',d:'读文件 → 跑测试 → 出报告',steps:['读取变更文件（绑定工作区）','运行测试 / 静态检查（只读命令，需确认）','汇总问题并按严重度排序','生成 review 报告'],mode:'do'},
+ {id:'sql_investigate',n:'SQL 排查',d:'看表结构 → 写 SQL → 确认后执行',steps:['读取表结构（@db）','生成候选 SQL','确认后执行（二次确认）','汇总结果并解释'],mode:'do'},
+ {id:'troubleshoot',n:'故障排查',d:'读终端日志 → 定位 → 修复 → 验证',steps:['读取终端最近输出（已脱敏）','定位可疑原因','提议修复命令（需确认）','验证并总结'],mode:'do'},
+ {id:'file_organize',n:'文件整理',d:'扫描 → 分类计划 → 确认 → 执行',steps:['扫描目录树','生成分类计划','确认后移动文件（可撤销）','输出整理清单'],mode:'do'}];
+const THREADS=[['今天',[['解释 EADDRINUSE 报错','ds',0],['磁盘告警排查','ds',1],['迁移脚本评审（旧 tao-chat）','old',0]]],['昨天',[['DeepSeek 应用 API 调研','ds',0],['u80 上 rsync 参数','ds',0]]],['更早',[['README 草稿','old',0],['ClickHouse 慢查询','ds',0]]]];
+function chooseSc(){if(S.localUsed)return 'local';return S.mode==='ask'?(S.web?'askWeb':'ask'):S.mode==='do'?'do':'research'}
+
+/* ---------- DOM builders ---------- */
+function toChat(){$('#stage').classList.remove('empty');$('#stage').classList.add('chat')}
+function toEmpty(){$('#stage').classList.add('empty');$('#stage').classList.remove('chat');$('#feed').innerHTML=''}
+function scrollEnd(){const f=$('#feed');f.scrollTop=f.scrollHeight;requestAnimationFrame(()=>f.scrollTop=f.scrollHeight)}
+function addUser(text,note){toChat();const m=el('div','msg user');m.innerHTML='<button class="ibtn edit" title="编辑并重发"><svg viewBox="0 0 24 24"><path d="M4 20h4L19 9l-4-4L4 16zM13 7l4 4"/></svg></button><div class="bub">'+esc(text)+'</div>';
+  const att=[...S.chips.map(c=>'<span class="chip '+c.k+'">'+esc(c.l)+'</span>'),note?'<span class="chip loc">'+esc(note)+'</span>':''].join('');
+  if(att.replace(/<[^>]+>/g,'').trim())m.appendChild(el('div','att',att));
+  m.querySelector('.edit').onclick=()=>editUser(m,text);
+  $('#feed').appendChild(m);scrollEnd();return m}
+function editUser(m,text){const b=m.querySelector('.bub');b.innerHTML='<textarea rows="2">'+esc(text)+'</textarea><div class="row" style="margin-top:6px;justify-content:flex-end"><button class="btn sm" data-c>取消</button><button class="btn sm pri" data-s>保存并重发</button></div>';
+  b.querySelector('[data-c]').onclick=()=>{b.innerHTML=esc(text)};
+  b.querySelector('[data-s]').onclick=async()=>{const nt=b.querySelector('textarea').value.trim()||text;b.innerHTML=esc(nt);let n=m.nextSibling;while(n){const x=n.nextSibling;n.remove();n=x}
+    S.branch=2;toast('已创建分支 2/2（原回复保留，可在回复下方切换）');busy();resetPill(0,0);await playReply(chooseSc(),{branch:true})}}
+function newAI(){const m=el('div','msg ai');m.innerHTML='<div class="who"><span class="mk">T</span>Tao<em>'+S.model.replace('deepseek-','')+'</em><span class="acts"></span></div>';$('#feed').appendChild(m);scrollEnd();return m}
+function addActs(m,sc,o){const web=!!(sc&&(sc.steps||sc.sources));const a=m.querySelector('.acts');
+  a.innerHTML='<button>复制</button><button>朗读</button><button data-rg>重新生成</button><button data-br>'+(o&&o.branch?'‹ 2/2 ›':'‹ 1/1 ›')+'</button><button data-cc>交给 CC / Codex</button>';
+  a.querySelector('[data-rg]').onclick=async()=>{if(S.busy)return;S.branch++;m.remove();busy();await playReply(chooseSc(),{branch:true})};
+  a.querySelector('[data-br]').onclick=()=>toast('原型：切换分支');a.querySelector('[data-cc]').onclick=()=>toast('原型：把当前线程上下文转交给 CC / Codex（主入口）');
+  a.querySelectorAll('button:not([data-rg]):not([data-br]):not([data-cc])').forEach(b=>b.onclick=()=>toast('原型：'+b.textContent))}
+function foldBlock(m,labelOpen){const b=el('div','fold open');b.innerHTML='<button><span class="car">▸</span><span class="hl">'+labelOpen+'</span></button><div class="fb"></div>';b.firstChild.onclick=()=>{b.classList.toggle('open');b.dataset.touched=1};m.appendChild(b);return b}
+function finishThink(b,sec){b.querySelector('.hl').textContent='已思考 '+sec+' 秒';if(!b.dataset.touched)setTimeout(()=>b.classList.remove('open'),600/S.speed)}
+function stepsBlock(m){const b=el('div','fold steps open');b.innerHTML='<button><span class="car">▸</span><span class="hl">联网中…</span></button><div class="fb" style="background:none;border-left-color:var(--div);padding:4px 10px"></div>';b.firstChild.onclick=()=>b.classList.toggle('open');m.appendChild(b);return b}
+function addStep(b,t,state){const s=el('div','st '+state);s.innerHTML='<span class="dot8"></span>'+esc(t);b.querySelector('.fb').appendChild(s);scrollEnd();return s}
+function usageLine(m,u){const d=el('div','usage');
+  d.innerHTML=`<span>输入 ${fmtTok(u.i)} · 输出 ${fmtTok(u.o)}${u.s||u.f?` · 搜索 ${u.s} · 抓取 ${u.f}`:''} · 约 $${u.c.toFixed(4)}（估算）</span>`+(u.red?`<span class="tag">已脱敏 ${u.red} 处</span>`:'')+(u.loc?`<span class="tag" style="color:var(--ok)">引用本地 ${u.loc} 条</span>`:'');m.appendChild(d);scrollEnd()}
+function srcCards(m,list){const w=el('div','src');list.forEach((s,i)=>{const c=el('div','srccard',`<b>${i+1}. ${esc(s.t)}</b><span>${esc(s.s)}</span>`);c.onclick=()=>openSources(String(i+1));w.appendChild(c)});m.appendChild(w)}
+async function stream(box,text,o={}){const t=o.partial?text.slice(0,Math.floor(text.length*o.partial)):text;
+  if(o.instant){box.innerHTML=md(t)+(o.partial?'<span class="cursor"></span>':'');return}
+  const tk=S.tok;let i=0;while(i<t.length){if(tk!==S.tok)throw 'stale';if(S.stopped)throw 'abort';i+=3+Math.floor(Math.random()*4);box.innerHTML=md(t.slice(0,i))+'<span class="cursor"></span>';scrollEnd();await sleep(24)}box.innerHTML=md(t)}
+function addTokens(n,c){S.tokens+=n;S.cost+=c;updPill()}
+function updPill(){const b=$('#usageTxt'),pct=S.tokens/10e6;b.style.display=S.tokens>0?'':'none';b.textContent=`${fmtTok(S.tokens)} / 10M · $${S.cost.toFixed(3)}`;b.className='utxt'+(pct>=1?' danger':pct>=.8?' warn':'');
+  if(pct>=.5&&pct<.8&&!updPill.a){updPill.a=1;toast('本轮已用预算的 50%')}if(pct>=.8&&pct<1&&!updPill.b){updPill.b=1;toast('本轮已用预算的 80%，可随时停止')}}
+function resetPill(t,c){S.tokens=t||0;S.cost=c||0;updPill.a=updPill.b=0;updPill()}
+$('#usageTxt').onclick=e=>{const pct=Math.min(100,S.tokens/10e6*100);const pk=isPeak();
+  openPop(e.currentTarget,`<h6>本轮用量</h6><div style="padding:4px 10px 8px;min-width:260px"><div class="progress"><i style="width:${Math.max(2,pct)}%"></i></div><div style="display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-top:4px"><span>${fmtTok(S.tokens)} / 10M token</span><span>$${S.cost.toFixed(3)}（估算）</span></div></div><div class="sep"></div>
+  <div class="row2"><span style="flex:1">当前时段<small>${pk?'高峰：token 价格为非高峰的 2 倍':'非高峰：价格为高峰的一半'}（UTC 工作日 01–04、06–10 为高峰）</small></span></div>
+  <div class="row2"><span style="flex:1">工具费<small>搜索按查询、读链接按成功页计费；以 usage 中的 billed 字段为准</small></span></div><div class="sep"></div>
+  <button class="it" data-a="b">提高本轮预算…<small>续跑不重跑</small></button>`,{right:true,onMount:p=>p.querySelector('[data-a=b]').onclick=()=>{closePop();toast('原型：预算提高到 20M')}})};
+
+/* ---------- popups ---------- */
+function closePop(){$('#pop').classList.remove('open')}
+function openPop(anchor,html,o={}){const p=$('#pop');p.innerHTML=html;p.style.left=p.style.right=p.style.top=p.style.bottom='';p.style.width=o.w?o.w+'px':'';
+  const r=anchor.getBoundingClientRect(),cr=$('#col').getBoundingClientRect();
+  if(o.right){p.style.right=Math.max(8,cr.right-r.right)+'px'}else p.style.left=Math.max(8,Math.min(r.left-cr.left,cr.width-(o.w||260)-8))+'px';
+  if(o.up){p.style.bottom=(cr.bottom-r.top+6)+'px';p.style.maxHeight=Math.max(160,r.top-cr.top-14)+'px'}else{p.style.top=(r.bottom-cr.top+6)+'px';p.style.maxHeight=Math.max(160,cr.bottom-r.bottom-14)+'px'}p.style.overflowY='auto';
+  p.classList.add('open');o.onMount&&o.onMount(p);return p}
+document.addEventListener('click',e=>{if(!e.target.closest('#pop')&&!e.target.closest('[data-pop]')&&!e.target.closest('.chip')&&!e.target.closest('.cap')&&!e.target.closest('#bPlus')&&!e.target.closest('#bMore')&&!e.target.closest('#usageTxt')&&!e.target.closest('#lMore'))closePop();
+  const c=e.target.closest('.cite');if(c){openSources(c.dataset.n);return}
+  if(e.target.id==='swk'){toast('提示仅出现一次；默认发送键设置未被修改');e.target.parentNode.remove();return}
+  if(!e.target.closest('.smenu')&&e.target.id!=='bState')$('#smenu').classList.remove('open')});
+
+/* ---------- binding ---------- */
+function renderBind(){const b=$('#bind');b.innerHTML='';let any=false;
+  for(const k of Object.keys(curBind())){const d=curBind()[k],v=S.bind[k];if(!v)continue;any=true;
+    const c=el('button','chip ctx',`${d.icon} ${esc(S.demo?d.label+' 1':v)}<span class="x" data-x="${k}" title="解绑">×</span>`);c.dataset.pop=1;
+    c.title=d.label+'：'+(k==='term'?'仅在你 @ 引用时发送最近 N 行（已脱敏）':k==='db'?'仅发送表结构；执行 SQL 前二次确认':'只读摘要，不全文上传')+'。绑定本身不发送内容。';
+    c.onclick=e=>{if(e.target.dataset.x){S.bind[k]=null;renderBind();return}bindPop(c,k)};b.appendChild(c)}
+  const g=el('button','chip ghost','+ 上下文');g.dataset.pop=1;g.onclick=()=>bindPop(g,null);b.appendChild(g)}
+function bindPop(anchor,only){const ks=only?[only]:Object.keys(curBind());
+  const html=ks.map(k=>{const d=curBind()[k];return `<h6>${d.label}</h6>`+d.items.slice(0,3).map(i=>`<button class="it" data-k="${k}" data-v="${esc(i)}">${d.icon} ${esc(i)}<small>${S.bind[k]===i?'已绑定':''}</small></button>`).join('')}).join('')+'<div class="sep"></div><button class="it" style="color:var(--accent)">浏览全部…</button>';
+  openPop(anchor,html,{onMount:p=>p.querySelectorAll('[data-v]').forEach(b=>b.onclick=()=>{S.bind[b.dataset.k]=b.dataset.v;closePop();renderBind();toast('已绑定'+curBind()[b.dataset.k].label+'：'+b.dataset.v)})})}
+
+/* ---------- composer ---------- */
+function renderChips(){const c=$('#chips');c.innerHTML='';
+  S.chips.forEach((x,i)=>{const e=el('span','chip '+x.k,esc(x.l)+(x.p!=null?'<span class="bar"><i style="width:'+x.p+'%"></i></span>':'')+'<button class="x" aria-label="移除">×</button>');
+    e.querySelector('.x').onclick=ev=>{ev.stopPropagation();if(x.iv)clearInterval(x.iv);S.chips.splice(i,1);renderChips()};
+    e.onclick=()=>x.k==='loc'?toast('将发送（脱敏后）：ssh u80 -p ‹已脱敏› …'):toast('将发送（脱敏后）：$ npm run dev ⏎ Error: listen EADDRINUSE :::5173');c.appendChild(e)});
+  const n=S.chips.filter(c=>c.k==='loc').length;$('#chint').innerHTML=hintHtml(n)}
+function hintHtml(n){let h=S.hintShown?'':'<span>Ctrl+Enter 发送 · Enter 换行 <a id="swk">知道了</a></span>';
+  if(S.web)h+='<span>联网按查询计费，约 $0.75 / 千次</span>';if(n)h+=`<span>本次将发送：正文 + ${n} 条本地资料</span>`;return h}
+function syncCap(){const parts=[S.model.replace('deepseek-',''),S.think?'思考':null,S.web?'联网':null].filter(Boolean);$('#capLbl').textContent=parts.join(' · ');$('#chint').innerHTML=hintHtml(S.chips.filter(c=>c.k==='loc').length)}
+$('#bCap').onclick=e=>{const html=`<h6>能力</h6>
+ <div class="row2"><span style="flex:1">思考<small>多步推理，更慢更贵</small></span><button class="sw ${S.think?'on':''}" data-t="think" aria-label="思考"></button></div>
+ <div class="row2"><span style="flex:1">联网<small>服务端搜索 + 读链接，按次计费</small></span><button class="sw ${S.web?'on':''}" data-t="web" aria-label="联网"></button></div><div class="sep"></div><h6>模型</h6>
+ <button class="it" data-m="deepseek-flash">deepseek-flash<small>${S.model==='deepseek-flash'?'✓ 默认':''}</small></button>
+ <button class="it" data-m="deepseek-v4-pro">deepseek-v4-pro<small>${S.model==='deepseek-v4-pro'?'✓ 更强 · 不支持图片':'更强 · 不支持图片'}</small></button>`;
+  openPop(e.currentTarget,html,{up:true,onMount:p=>{p.querySelectorAll('[data-t]').forEach(b=>b.onclick=()=>{S[b.dataset.t]=!S[b.dataset.t];b.classList.toggle('on');syncCap()});p.querySelectorAll('[data-m]').forEach(b=>b.onclick=()=>{S.model=b.dataset.m;closePop();syncCap();if(S.model.includes('pro'))toast('v4-pro 不支持图片：图片附件将被禁用')})}})};
+$('#bPlus').onclick=e=>{openPop(e.currentTarget,`<h6>添加</h6>
+ <button class="it" data-a="doc">📎 上传文档（PDF / Office）<small>按页计费</small></button>
+ <button class="it" data-a="img">🖼 上传图片<small>仅 flash</small></button>
+ <button class="it" data-a="at">@ 引用上下文<small>终端 / 文件 / 工作区 / 库</small></button>
+ <button class="it" data-a="search">🔍 从本地资料中选择…<small>Ctrl K</small></button><div class="sep"></div><h6>技能与工作流</h6>
+ <button class="it" data-a="sk" data-v="/review">/review　代码评审</button><button class="it" data-a="sk" data-v="/sql">/sql　生成并排查 SQL</button><button class="it" data-a="sk" data-v="/doc">/doc　生成文档</button>
+ <button class="it" data-a="wf">▶ 内置工作流…<small>5 个</small></button>`,{up:true,onMount:p=>p.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{const a=b.dataset.a;closePop();
+   if(a==='doc'||a==='img')attach(a);else if(a==='at'){$('#input').value+='@';$('#input').focus();$('#input').dispatchEvent(new Event('input'))}
+   else if(a==='search')openSearch('');else if(a==='sk'){addChip({k:'skill',l:b.dataset.v})}else wfPop()})})};
+function addChip(c){S.chips.push(c);renderChips()}
+function attach(kind){if(kind==='img'&&S.model.includes('pro')){toast('deepseek-v4-pro 不支持图片，请切换到 flash');return}
+  const c={k:'ctx',l:kind==='img'?'🖼 screenshot.png':'📎 design.pdf · 12 页',p:0};S.chips.push(c);renderChips();
+  c.iv=setInterval(()=>{c.p+=12*S.speed;if(c.p>=100){c.p=100;clearInterval(c.iv);c.l+=' ✓';toast('已上传，file_id 可复用')}renderChips()},260)}
+function wfPop(){const b=$('#bPlus');openPop(b,'<h6>内置工作流（模板随版本发布，不可编辑；可跳过步骤）</h6>'+WF.map(w=>`<button class="it" data-w="${w.id}"><b style="font-weight:500">${w.n}</b><small>${w.d}</small></button>`).join(''),{up:true,onMount:p=>p.querySelectorAll('[data-w]').forEach(x=>x.onclick=()=>{closePop();runWorkflow(x.dataset.w)})})}
+async function runWorkflow(id){const w=WF.find(x=>x.id===id);setMode(w.mode);toChat();addUser('运行工作流：'+w.n);busy();
+  const sc=w.id==='deep_research'?SC.research:{...SC.research,think:'选择内置工作流“'+w.n+'”，先给出计划供确认。',plan:w.steps,est:'预计无联网工具费；token 用量约 20–60K',text:'## '+w.n+' 完成\n已按计划完成各步骤，报告见右侧“生成物”。动作类步骤均经你确认并记入审计。',sources:null,usage:{i:21800,o:1650,s:0,f:0,c:0.0045}};
+  SC._tmp=sc;await playReply('_tmp')}
+$('#input').addEventListener('input',e=>{const t=e.target;t.style.height='auto';t.style.height=Math.min(t.scrollHeight,200)+'px';syncSend();hideAt();const v=t.value;
+  if(/(^|\s)@$/.test(v)){const m=el('div','pop open','<h6>引用上下文（选后以 chip 加入本轮）</h6>'+[['terminal:last-30','终端最近 30 行'],['file','文件摘要'],['workspace','工作区文件树'],['db','表结构'],['note','笔记']].map(x=>`<button class="it" data-k="${x[0]}">@${x[0]}<small>${x[1]}</small></button>`).join(''));
+    m.id='atmenu';m.style.left='12px';m.style.bottom='100%';m.style.marginBottom='6px';$('#composer').appendChild(m);
+    m.querySelectorAll('.it').forEach(b=>b.onclick=()=>{S.chips.push({k:'ctx',l:'@'+b.dataset.k});t.value=v.replace(/@$/,'');hideAt();renderChips();t.focus()})}
+  if(/^\/$/.test(v)){const m=el('div','pop open','<h6>技能</h6>'+['/review　代码评审','/sql　生成并排查 SQL','/doc　生成文档'].map(x=>`<button class="it" data-k="${x.split('　')[0]}">${x}</button>`).join(''));m.id='atmenu';m.style.left='12px';m.style.bottom='100%';m.style.marginBottom='6px';$('#composer').appendChild(m);
+    m.querySelectorAll('.it').forEach(b=>b.onclick=()=>{S.chips.push({k:'skill',l:b.dataset.k});t.value='';hideAt();renderChips();t.focus()})}});
+function hideAt(){const m=$('#atmenu');if(m)m.remove()}
+$('#input').addEventListener('keydown',e=>{if(e.key==='Enter'&&(e.ctrlKey||e.metaKey)){e.preventDefault();send()}if(e.key==='Escape'){hideAt();if(S.busy)S.stopped=true}});
+document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key.toLowerCase()==='k'){e.preventDefault();openSearch('')}});
+function setComposer(on,ph){const c=$('#composer');c.classList.toggle('off',!on);$('#input').placeholder=ph||({ask:'问 Tao 任何事…',do:'告诉 Tao 要做什么（每个动作都会先请你确认）…',research:'描述要深入研究的问题（会先给计划与预计费用）…'})[S.mode];$('#input').disabled=!on;if(on)setTimeout(()=>$('#input').focus(),50)}
+function setMode(m){S.mode=m;$$('#modeSeg button').forEach(b=>b.classList.toggle('on',b.dataset.m===m));const d=MODE_DEF[m];S.think=d.think;S.web=d.web;syncCap();if(!$('#composer').classList.contains('off'))setComposer(true)}
+$('#modeSeg').onclick=e=>{const b=e.target.closest('button');if(b)setMode(b.dataset.m)};
+/* voice */
+let vIv;function voiceOn(){const v=$('#voice');v.classList.add('on');const bars=$('#vbars');bars.innerHTML='';for(let i=0;i<34;i++){const b=el('i','vbar');b.style.animationDelay=(i*53%900)+'ms';b.style.animationDuration=(600+i*37%500)+'ms';bars.appendChild(b)}
+  let s=0;$('#vtime').textContent='0:00';vIv=setInterval(()=>{s++;$('#vtime').textContent='0:'+String(s).padStart(2,'0')},1000)}
+function voiceOff(txt){clearInterval(vIv);$('#voice').classList.remove('on');if(txt){$('#input').value=txt;$('#input').dispatchEvent(new Event('input'))}}
+$('#bMic').onclick=voiceOn;$('#vcancel').onclick=()=>voiceOff();$('#vdone').onclick=()=>{voiceOff('帮我看看 u80 上磁盘占用最高的目录');toast('本地 Whisper 转写完成（可编辑后发送）')};
+
+/* ---------- reply player ---------- */
+async function playReply(key,o={}){const sc=key==='_tmp'?SC._tmp:SC[key],m=newAI(),stopAt=o.stopAt,inst=o.instant;S.last=sc;
+  if(sc.plan&&!o.skipPlan)return planFlow(m,sc,o);
+  let tb;if(sc.think){setPhase('S3 思考中');tb=foldBlock(m,'思考中…');const box=tb.querySelector('.fb');
+    if(inst)box.textContent=stopAt==='think'?sc.think.slice(0,30)+'…':sc.think;
+    else{const tk=S.tok;for(let i=0;i<sc.think.length;i+=4){if(tk!==S.tok)throw 'stale';if(S.stopped)throw 'abort';box.textContent=sc.think.slice(0,i);await sleep(20)}box.textContent=sc.think}
+    if(stopAt==='think')return m;finishThink(tb,sc.thinkSec)}
+  if(sc.steps){setPhase('S4 搜索 / 读链接中');const sb=stepsBlock(m);
+    for(let i=0;i<sc.steps.length;i++){const last=i===sc.steps.length-1;addStep(sb,sc.steps[i],(stopAt==='search'&&last)?'run':'done');if(stopAt==='search'&&last)return m;if(!inst)await sleep(480)}
+    sb.querySelector('.hl').textContent='搜索 2 次 · 阅读 2 页';sb.classList.remove('open')}
+  setPhase('S5 正文流式');const tx=el('div','txt');m.appendChild(tx);
+  await stream(tx,sc.text,{instant:inst,partial:stopAt==='text'?.55:0});if(stopAt==='text')return m;
+  const srcs=sc.sources||(S.localUsed?LOCSRC:null);
+  if(srcs){if(sc.sources)srcCards(m,sc.sources);fillSources(sc.sources||[],S.localUsed?LOCSRC:[])}
+  if(sc.action)return actionFlow(m,sc,o);
+  finish(m,sc,o);return m}
+function finish(m,sc,o){usageLine(m,sc.usage);addTokens(sc.usage.i+sc.usage.o,sc.usage.c);addActs(m,sc,o);setPhase('S6 完成');unbusy()}
+async function actionFlow(m,sc,o){const a=sc.action,c=el('div','card danger');
+  c.innerHTML=`<h4>动作提议 <span class="lv ${a.level.toLowerCase()}">${a.level} 执行</span><span style="margin-left:auto;font-weight:400;color:var(--muted);font-size:12px">${a.kind}</span></h4>
+   <div class="kv"><span>标题</span><b>${esc(a.title)}</b><span>目标</span><b>${esc(a.term)} · ${esc(a.cwd)}</b><span>理由</span><b>${esc(a.why)}</b></div>
+   <pre class="code" contenteditable="true" spellcheck="false" aria-label="可编辑命令">${esc(a.cmd)}</pre>
+   <div class="row"><label style="font-size:12px;color:var(--muted)"><input type="checkbox" class="ack"> 我已确认命令内容</label><span style="flex:1"></span><button class="btn rej">拒绝</button><button class="btn dng exe" disabled>执行</button></div>
+   <div style="font-size:11.5px;color:var(--muted);margin-top:6px">级别由 Rust 按 shell_safety 重新计算，模型声明的级别不能降级；目标限定在已绑定终端。</div>`;
+  m.appendChild(c);scrollEnd();setPhase('S10 等待动作确认');setComposer(false,'请先处理上面的动作提议…');
+  const ack=c.querySelector('.ack'),exe=c.querySelector('.exe');ack.onchange=()=>exe.disabled=!ack.checked;
+  c.querySelector('.rej').onclick=()=>{c.innerHTML='<h4>已拒绝该动作</h4><p>未执行任何命令。</p>';finish(m,sc,{});setComposer(true)};
+  exe.onclick=async()=>{c.className='card';c.innerHTML='<h4><span class="spin"></span> 正在执行…</h4>';await sleep(900);
+    c.innerHTML=`<h4>✓ 已执行 <span style="font-weight:400;color:var(--muted);font-size:12px">退出码 0 · 0.42 秒 · 输出已脱敏并截断</span></h4><pre class="code">$ ${esc(a.cmd)}\n${esc(a.out)}</pre><div class="row"><button class="btn sm" data-t>在终端中查看</button></div>`;c.querySelector('[data-t]').onclick=()=>toast('原型：跳转到终端标签');
+    const tx=el('div','txt');m.appendChild(tx);await stream(tx,a.after,{});finish(m,sc,{});setComposer(true)};return m}
+async function planFlow(m,sc,o){setPhase('S11 工作流计划待批');const c=el('div','card plan');
+  c.innerHTML=`<h4>计划 <span style="font-weight:400;font-size:11px;color:var(--muted)">内置工作流 · 模板不可编辑，可跳过步骤</span></h4>
+   <ul>${sc.plan.map((p,i)=>`<li><input type="checkbox" checked aria-label="执行此步骤"><span class="st-i">○</span><span>${esc(p)}</span></li>`).join('')}</ul>
+   <div class="note2" style="margin:6px 0 8px">${esc(sc.est)}。确认计划即确认上述工具费；运行中累计实际费用超过预计上界 1.5 倍时才会再问一次。</div>
+   <div class="row"><button class="btn pri go">开始</button><button class="btn cancel">取消</button><span style="color:var(--muted);font-size:12px">并行度 3 · 可随时停止，已完成步骤保留</span></div>`;
+  m.appendChild(c);scrollEnd();setComposer(false,'计划待确认…');
+  c.querySelector('.cancel').onclick=()=>{c.innerHTML='<h4>已取消计划</h4><p>未产生任何工具费用。</p>';setPhase('S6 完成');unbusy();setComposer(true)};
+  c.querySelectorAll('input').forEach(i=>i.onchange=()=>i.parentNode.classList.toggle('skipped',!i.checked));
+  const run=async frozen=>{c.querySelectorAll('input').forEach(i=>i.disabled=true);c.querySelector('.row').innerHTML='<button class="btn stopw">停止</button><span style="color:var(--muted);font-size:12px">运行中…</span>';
+    c.querySelector('.stopw').onclick=()=>{S.stopped=true};setPhase('S12 工作流运行');openSide('workflow');
+    const wf=$('#p-workflow');wf.innerHTML='';const items=[...c.querySelectorAll('li')];
+    items.forEach((li,i)=>{const w=el('div','sitem',`<b>${i+1}. ${esc(sc.plan[i])}</b><span class="wst">等待</span>`);wf.appendChild(w)});const tk=S.tok;
+    try{for(let i=0;i<items.length;i++){if(tk!==S.tok)throw 'stale';const li=items[i],w=wf.children[i];
+      if(li.classList.contains('skipped')){li.querySelector('.st-i').textContent='⤼';w.querySelector('.wst').textContent='已跳过';continue}
+      li.querySelector('.st-i').innerHTML='<span class="spin"></span>';w.querySelector('.wst').textContent='进行中';if(frozen&&i===frozen)return;
+      if(S.stopped)throw 'abort';if(!frozen)await sleep(1000);if(tk!==S.tok)throw 'stale';
+      if(i===1&&sc.sources)fillSources(SRC,[]);li.querySelector('.st-i').textContent='✓';w.querySelector('.wst').textContent='已完成 · '+(1+i*.7).toFixed(1)+' 秒';addTokens(i===1?31000:8000,.002);
+      w.appendChild(el('div','row','<button class="btn sm">重试此步</button>'))}
+    c.querySelector('.row').innerHTML='<span style="color:var(--ok)">✓ 计划已完成</span>';
+    setPhase('S5 正文流式');const tx=el('div','txt');m.appendChild(tx);await stream(tx,sc.text,{});if(sc.sources)srcCards(m,SRC);
+    const art=$('#p-artifacts');art.innerHTML='';art.appendChild(el('div','sitem','<b>报告.md</b><span>结构化报告 · 约 1.2K 字</span><div class="row"><button class="btn sm">复制</button><button class="btn sm">导出为笔记</button><button class="btn sm">下载</button></div>'));
+    finish(m,sc,{});setComposer(true)}catch(e){if(e==='stale')return;if(e!=='abort')throw e;S.stopped=false;c.querySelector('.row').innerHTML='<span style="color:var(--warn)">已停止</span><button class="btn go2">继续（不重跑已完成步骤）</button>';setPhase('S7 已停止 / 可继续');unbusy();setComposer(true)}};
+  c.querySelector('.go').onclick=()=>run(0);if(o.runWorkflow)await run(o.runWorkflow);return m}
+
+/* ---------- send / stop ---------- */
+function unbusy(){S.busy=false;S.stopped=false;$('#send').classList.remove('stop');$('#sendIco').innerHTML='<path d="M12 19V5M5 12l7-7 7 7"/>';syncSend()}
+function busy(){S.busy=true;$('#send').classList.add('stop');$('#sendIco').innerHTML='<rect x="7" y="7" width="10" height="10" rx="2"/>';$('#send').disabled=false}
+function syncSend(){$('#send').disabled=!S.busy&&!$('#input').value.trim()}
+async function send(){if(!S.hasKey)return;if(S.busy){S.stopped=true;return}
+  const t=$('#input').value.trim();if(!t)return;$('#input').value='';$('#input').style.height='auto';S.localUsed=false;S.branch=1;
+  const wantLocal=/上次|上周|之前|历史|那条|发布流程/.test(t);const um=addUser(t);S.chips=[];renderChips();busy();resetPill(0,0);S.hintShown=true;
+  try{await sleep(400);if(wantLocal&&S.mode!=='research'){await localConfirm(um)}else await playReply(chooseSc())}catch(e){if(e==='stale')return;if(e!=='abort')throw e;stoppedCard()}}
+async function localConfirm(um){setPhase('S17 本地检索确认');const m=newAI();const r=doSearch('发布').res.slice(0,0);const picks=[DOCS[8],DOCS[0],DOCS[4]];
+  const c=el('div','card local');c.innerHTML=`<h4>找到 ${picks.length} 条相关的本地资料</h4><p>检索在本机完成，未发送给模型。勾选后才会以脱敏文本随本轮发送。</p>
+   <ul class="lres">${picks.map((d,i)=>`<li><label><input type="checkbox" ${i<2?'checked':''}><span><b>${SRC_I[d.src]} ${esc(d.t)}</b><small>${esc(d.b)}</small></span></label></li>`).join('')}</ul>
+   <div class="row"><button class="btn pri ok">引用并发送</button><button class="btn no">不引用，直接问</button><span style="font-size:12px;color:var(--muted)">已脱敏 1 处 · 发送内容约 0.3K token</span></div>`;m.appendChild(c);scrollEnd();
+  const go=async use=>{const n=use?c.querySelectorAll('input:checked').length:0;c.innerHTML=`<h4>${use?'已引用 '+n+' 条本地资料':'未引用本地资料'}</h4>`;S.localUsed=use&&n>0;if(S.localUsed)um.appendChild(el('div','att','<span class="chip loc">引用本地资料 '+n+' 条</span>'));m.remove();await playReply(chooseSc())};
+  c.querySelector('.ok').onclick=()=>go(true).catch(e=>{if(e!=='abort'&&e!=='stale')throw e});c.querySelector('.no').onclick=()=>go(false).catch(e=>{if(e!=='abort'&&e!=='stale')throw e})}
+function stoppedCard(){const m=$('#feed .msg.ai:last-child');const web=S.last&&(S.last.steps||S.last.sources);
+  if(m){m.appendChild(el('div','row','<span style="color:var(--warn);font-size:12px">已停止，已收到的内容已保留</span>'+(web?'<button class="btn sm" id="cont">重新生成（联网回复无法续写，将重新计费）</button>':'<button class="btn sm" id="cont">继续生成</button>')));
+    m.querySelector('#cont').onclick=()=>toast(web?'原型：带联网工具的回复不能 continue，需重发上一请求':'原型：继续生成')}
+  setPhase('S7 已停止 / 可继续');unbusy()}
+$('#send').onclick=send;
+
+/* ---------- suggestions ---------- */
+const SUGS=[['解释这段报错','终端最近一条 · 已脱敏','Error: listen EADDRINUSE :::5173 —— 解释并给排查步骤'],['写 README','工作区 taomni','阅读 taomni 的目录结构，给出 README 草稿'],['查最近 7 天订单','u80 · PostgreSQL','基于 orders 表结构，写一条查询最近 7 天订单数的 SQL'],['继续迁移脚本评审','上次未完成','继续上次的迁移脚本评审']];
+function renderSug(){const s=$('#sug');s.innerHTML='';s.style.display=S.demo?'none':'';SUGS.forEach(x=>{const b=el('button','',`${x[0]}<small>${x[1]}</small>`);b.onclick=()=>{$('#input').value=x[2];$('#input').focus();$('#input').dispatchEvent(new Event('input'))};s.appendChild(b)})}
+$('#lMore').onclick=e=>openPop(e.currentTarget,'<button class="it">邮件会话</button><button class="it">数据库会话</button><button class="it">VNC / RDP</button><button class="it">本地目录</button>',{up:true});
+$$('#dock .dbtn').forEach(b=>{if(!['lHist','lMore'].includes(b.id))b.onclick=()=>toast('原型：'+b.textContent.trim()+'（打开对应标签，与聊天线程无关）')});
+function applyWsl(){$('#lWsl').style.display=S.wsl?'':'none'}
+$('#wslChk').onchange=e=>{S.wsl=e.target.checked;applyWsl()};
+
+/* ---------- side panel ---------- */
+function openSide(p){$('#side').classList.add('open');$$('#side .tabs button[data-p]').forEach(b=>b.classList.toggle('on',b.dataset.p===p));$$('#side .pane').forEach(x=>x.classList.toggle('on',x.id==='p-'+p))}
+$$('#side .tabs button[data-p]').forEach(b=>b.onclick=()=>openSide(b.dataset.p));
+$('#sideClose').onclick=()=>$('#side').classList.remove('open');
+function fillSources(web,loc){const p=$('#p-sources');p.innerHTML='';web.forEach((s,i)=>{const d=el('div','sitem',`<b>${i+1}. ${esc(s.t)}</b><span>${esc(s.s)}</span><div style="margin-top:4px">${esc(s.d)}</div><div class="row"><button class="btn sm">在系统浏览器打开</button></div>`);d.id='src'+(i+1);p.appendChild(d)});
+  const L=loc&&loc.length?loc:(web===SRC?[LOCSRC[0]]:[]);L.forEach((s,i)=>{const d=el('div','sitem',`<b>本${i+1}. ${esc(s.t)}</b><span>${esc(s.s)} · 已脱敏</span><div style="margin-top:4px">${esc(s.d)}</div><div class="row"><button class="btn sm">打开原记录</button></div>`);d.id='src本'+(i+1);p.appendChild(d)})}
+function openSources(n){openSide('sources');$$('.sitem.hl').forEach(i=>i.classList.remove('hl'));const x=$('#src'+n);if(x){x.classList.add('hl');x.scrollIntoView({block:'nearest'})}}
+function resetSide(){$('#side').classList.remove('open');const E={sources:'本轮没有来源',files:'本轮没有上传或引用的文件',artifacts:'代码 / SQL / 文档成品会出现在这里',workflow:'没有进行中的工作流'};for(const k in E)$('#p-'+k).innerHTML='<div class="empty">'+E[k]+'</div>'}
+
+/* ---------- more menu ---------- */
+$('#bMore').onclick=e=>openPop(e.currentTarget,`<button class="it" data-a="side">▤ 侧栏（来源 / 文件 / 生成物）</button><button class="it" data-a="demo">👁 演示模式<small>${S.demo?'已开启':'关'}</small></button><div class="sep"></div>
+ <button class="it" data-a="imp">⇩ 导入 DeepSeek 对话历史…</button><button class="it" data-a="mem">🧠 记忆与技能</button><button class="it" data-a="set">⚙ Tao 设置</button><button class="it" data-a="key">⌨ 快捷键<small>?</small></button>`,{right:true,onMount:p=>p.querySelectorAll('[data-a]').forEach(b=>b.onclick=()=>{const a=b.dataset.a;closePop();
+  if(a==='side')$('#side').classList.contains('open')?$('#sideClose').click():openSide('sources');else if(a==='demo'){S.demo=!S.demo;renderBind();renderSug();toast(S.demo?'演示模式开：隐藏建议、真实绑定名':'演示模式关')}
+  else if(a==='imp')openImport();else if(a==='mem')openSettings('mem');else if(a==='set')openSettings('conn');else toast('Ctrl K 搜索 · Ctrl+Enter 发送 · Esc 停止 · @ 引用 · / 技能')})});
+['#rSet'].forEach(s=>$(s).onclick=()=>openSettings('conn'));$('#goSet').onclick=()=>openSettings('conn');
+$('#reuseKey').onclick=()=>{S.hasKey=true;applyKey();toast('已沿用 Vault 引用；未做连通性测试，如 Key 不适用将在首次发送时提示')};
+$('#unlock').onclick=()=>{$('#mask').classList.remove('open');toast('已解锁')};
+function applyKey(){$('#nokey').style.display=S.hasKey?'none':'';$('#hero').style.display=S.hasKey?'':'none';setComposer(S.hasKey,S.hasKey?undefined:'请先连接 DeepSeek · 全家桶')}
+
+/* ---------- history popover (dock first item) ---------- */
+const RECENT_S=[['u80 · 生产数据库','SSH · 10 分钟前'],['build-box','SSH · 昨天'],['analytics · ClickHouse','ClickHouse · 2 天前'],['本地终端 1','本地 · 3 天前']];
+const RECENT_W=[['taomni','~/code/taomni · 今天'],['chat-demo','~/code/chat-demo · 昨天'],['docs-site','~/code/docs-site · 5 天前']];
+function openHistory(tab){tab=tab||'chat';const nm=(n,i,p)=>S.demo?p+' '+(i+1):esc(n);
+  const chat=THREADS.map(([g,items])=>`<h6>${g}</h6>`+items.map(i=>`<button class="it" data-thr="${esc(i[0])}">${i[1]==='ds'?'●':'○'} <span>${esc(i[0])}</span><small>${i[1]==='ds'?'':'旧 tao-chat'}</small></button>`).join('')).join('');
+  const sess=RECENT_S.map((x,i)=>`<button class="it" data-sess="${i}">🖧 <span>${nm(x[0],i,'会话')}</span><small>${esc(x[1])}</small></button>`).join('');
+  const ws=RECENT_W.map((x,i)=>`<button class="it" data-ws="${i}">📁 <span>${nm(x[0],i,'工作区')}</span><small>${S.demo?'':esc(x[1])}</small></button>`).join('');
+  const tabs=[['chat','Tao 对话'],['sess','最近会话'],['ws','最近工作区']];
+  openPop($('#lHist'),`<div class="ptabs">${tabs.map(t=>`<button data-t="${t[0]}" class="${t[0]===tab?'on':''}">${t[1]}</button>`).join('')}</div>
+   <input class="q" id="hq" placeholder="搜索…" aria-label="搜索历史">
+   <div class="plist ${tab==='chat'?'on':''}" data-l="chat">${chat}</div><div class="plist ${tab==='sess'?'on':''}" data-l="sess">${sess}</div><div class="plist ${tab==='ws'?'on':''}" data-l="ws">${ws}</div>
+   <div class="sep"></div><button class="it" id="hNew">＋ 新 Tao 对话</button><button class="it" id="hResume">↺ 恢复上次会话<small>3 个标签</small></button>
+   ${S.demo?'<div class="note2" style="margin:4px 6px">演示模式：已隐藏会话与工作区名称</div>':''}
+   <div style="padding:4px 10px 2px;font-size:11px;color:var(--muted)">● DeepSeek · 全家桶　○ 旧 tao-chat（同一份线程数据）</div>`,{up:true,w:380,onMount:p=>{
+    const q=p.querySelector('#hq');q.placeholder=tab==='chat'?'搜索对话标题…':tab==='sess'?'搜索最近会话…':'搜索最近工作区…';
+    p.querySelectorAll('.ptabs button').forEach(b=>b.onclick=()=>{p.querySelectorAll('.ptabs button').forEach(x=>x.classList.toggle('on',x===b));p.querySelectorAll('.plist').forEach(l=>l.classList.toggle('on',l.dataset.l===b.dataset.t));q.value='';q.dispatchEvent(new Event('input'));q.focus()});
+    q.oninput=()=>{const v=q.value.trim();p.querySelectorAll('.plist .it').forEach(b=>b.style.display=!v||b.textContent.includes(v)?'':'none')};
+    p.querySelectorAll('[data-thr]').forEach(b=>b.onclick=async()=>{const name=b.dataset.thr;closePop();clearAll();S.thrName=name;toChat();addUser(name);await playReply('ask',{instant:true});scrollEnd()});
+    p.querySelectorAll('[data-sess]').forEach(b=>b.onclick=()=>{closePop();toast('原型：打开会话“'+RECENT_S[b.dataset.sess][0]+'”（在会话标签中打开，不进入聊天）')});
+    p.querySelectorAll('[data-ws]').forEach(b=>b.onclick=()=>{closePop();toast('原型：打开工作区“'+RECENT_W[b.dataset.ws][0]+'”')});
+    p.querySelector('#hNew').onclick=()=>{closePop();clearAll()};p.querySelector('#hResume').onclick=()=>{closePop();toast('原型：恢复上次会话（3 个标签）')}}})}
+$('#lHist').onclick=()=>openHistory();
+
+/* ---------- modal helpers ---------- */
+function openDlg(html,mid){const m=$('#modal');$('#dlgwrap').innerHTML=html;m.classList.toggle('mid',!!mid);m.classList.add('open');m.onmousedown=e=>{if(e.target===m)closeDlg()};return m}
+function closeDlg(){$('#modal').classList.remove('open')}
+
+/* ---------- Tao Search palette ---------- */
+function openSearch(q0){let filt='all',sel=0,res=[];
+  openDlg(`<div class="pal" role="dialog" aria-label="搜索 Taomni 本地资料"><div class="qrow"><svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="M16 16l4.5 4.5"/></svg><input id="pq" placeholder="搜索命令、SQL、笔记、对话、会话…  支持 source:cmd host:u80 since:7d" autocomplete="off" aria-label="搜索"><kbd>Esc</kbd></div>
+   <div class="filters" id="pf">${[['all','全部'],['cmd','命令'],['sql','SQL'],['note','笔记'],['thread','对话'],['sess','会话'],['file','文件']].map(x=>`<button data-f="${x[0]}" class="${x[0]==='all'?'on':''}">${x[1]}</button>`).join('')}</div>
+   <div class="pbody"><div class="rl" id="pr" role="listbox"></div><div class="pv" id="pv"></div></div>
+   <div class="foot2" id="pfoot"></div></div>`);
+  const q=$('#pq');q.value=q0||'';
+  const draw=()=>{const r=doSearch(q.value,filt);res=r.res;if(sel>=res.length)sel=0;const L=$('#pr');L.innerHTML='';
+    if(!res.length){L.innerHTML='<div style="padding:30px;text-align:center;color:var(--muted)">本地没有找到相关资料<br><span style="font-size:12px">换个关键词，或去掉过滤条件。Tao 不会凭空编造本地资料。</span></div>'}
+    res.slice(0,30).forEach((d,i)=>{const b=el('button','r'+(i===sel?' hl':''),`<span class="ic">${SRC_I[d.src]}</span><div><b>${hi(d.t,r.term)}</b><small>${hi(d.b,r.term).slice(0,120)}</small></div><span class="m">${SRC_L[d.src]}${d.host?' · '+esc(d.host):''} · ${d.ago?d.ago+' 天前':'今天'}</span>`);b.setAttribute('role','option');b.onclick=()=>{sel=i;draw()};b.ondblclick=()=>use(d);L.appendChild(b)});
+    const d=res[sel];$('#pv').innerHTML=d?`<h5>${SRC_I[d.src]} ${esc(d.t.slice(0,60))}</h5><div style="color:var(--muted)">${SRC_L[d.src]} · ${d.host||'本地'} · ${d.ago?d.ago+' 天前':'今天'}</div><pre>${esc(d.t)}\n${esc(d.b)}</pre>${d.red?'<div class="note2">已脱敏 '+d.red+' 处；原值不存在于索引中。</div>':''}
+      <div class="row"><button class="btn sm pri" id="pvUse">加入上下文</button><button class="btn sm" id="pvAsk">问 Tao</button><button class="btn sm" id="pvOpen">打开原记录</button></div>`:'<div style="color:var(--muted)">选择左侧结果查看预览</div>';
+    if(d){$('#pvUse').onclick=()=>use(d);$('#pvAsk').onclick=()=>{closeDlg();$('#input').value='关于“'+d.t.slice(0,24)+'”，';$('#input').focus()};$('#pvOpen').onclick=()=>toast('原型：在对应模块打开原记录（本地，不发模型）')}
+    $('#pfoot').innerHTML=`<span>${res.length} 条结果</span><span>本机检索 · 0 token · ${r.ms} ms（示例）</span>${r.short?'<span style="color:var(--warn)">关键词不足 3 字，已改用精确匹配（trigram 限制）</span>':''}<span class="sp"></span><span><kbd>↑</kbd><kbd>↓</kbd> 选择 <kbd>Enter</kbd> 加入上下文</span>`};
+  const use=d=>{S.chips.push({k:'loc',l:(SRC_L[d.src])+'：'+d.t.slice(0,18)+(d.t.length>18?'…':'')});renderChips();closeDlg();toast('已加入上下文（脱敏后随本轮发送，可在输入框上方移除）')};
+  q.oninput=()=>{sel=0;draw()};$('#pf').onclick=e=>{const b=e.target.closest('button');if(!b)return;filt=b.dataset.f;$$('#pf button').forEach(x=>x.classList.toggle('on',x===b));sel=0;draw()};
+  q.onkeydown=e=>{if(e.key==='ArrowDown'){sel=Math.min(res.length-1,sel+1);draw();e.preventDefault()}else if(e.key==='ArrowUp'){sel=Math.max(0,sel-1);draw();e.preventDefault()}else if(e.key==='Enter'&&res[sel])use(res[sel]);else if(e.key==='Escape')closeDlg()};
+  draw();setTimeout(()=>q.focus(),30)}
+$('#bSearch').onclick=()=>openSearch('');
+
+/* ---------- import wizard ---------- */
+function openImport(step0){let step=step0||1;
+  const draw=()=>{const bodies={
+   1:`<h3>导入 DeepSeek 对话历史</h3><p style="margin:0;color:var(--muted)">选择在 DeepSeek App 中导出的 ZIP（export_format_version: 3）。只导入为 Tao 的新线程，不会替换已有数据。</p><div class="card" style="text-align:center;border-style:dashed;padding:30px"><div style="font-size:26px">⇩</div>拖入 ZIP 或 <a style="color:var(--accent);cursor:pointer" id="pick">选择文件</a></div>`,
+   2:`<h3>预览</h3><div class="note2">已解析 <b>deepseek_export_2026-11-13.zip</b>（4.2 MB）· 全部在本地完成</div><table class="tbl"><tr><th>项目</th><th>数量</th><th>处理</th></tr><tr><td>对话</td><td>128</td><td>导入为新线程</td></tr><tr><td>消息</td><td>3,402</td><td>含思考块与引用</td></tr><tr><td>附件</td><td>57</td><td>仅元数据（文件名、大小），不导入原件</td></tr><tr><td>含敏感模式的片段</td><td>9</td><td>写入前脱敏</td></tr></table><div class="row"><label><input type="checkbox" checked> 导入后建立本地检索索引</label></div>`,
+   3:`<h3>正在导入…</h3><div class="progress"><i id="ip" style="width:0"></i></div><div id="it" style="font-size:12px;color:var(--muted)">写入线程 0 / 128</div>`,
+   4:`<h3>✓ 导入完成</h3><p style="margin:0">已新建 128 个线程（标记为“导入”），已脱敏 9 处；附件仅保留元数据。</p><div class="row"><button class="btn pri" id="gh">在历史中查看</button></div>`};
+   $('#dlgwrap').innerHTML=`<div class="dlg" style="width:min(560px,100%);height:auto;max-height:90%;flex-direction:column"><div class="cnt"><div class="steps2">${[1,2,3,4].map(i=>`<i class="${i<=step?'on':''}"></i>`).join('')}</div>${bodies[step]}<div class="row" style="justify-content:flex-end;margin-top:6px"><button class="btn" id="dc">${step===4?'关闭':'取消'}</button>${step===2?'<button class="btn pri" id="dn">开始导入</button>':''}</div></div></div>`;
+   $('#dc').onclick=closeDlg;if(step===1)$('#pick').onclick=()=>{step=2;draw()};if(step===2)$('#dn').onclick=()=>{step=3;draw()};
+   if(step===3){let p=0;const iv=setInterval(()=>{p+=9*S.speed;if(p>=100){clearInterval(iv);step=4;draw();return}$('#ip').style.width=p+'%';$('#it').textContent='写入线程 '+Math.round(p*1.28)+' / 128'},180)}
+   if(step===4)$('#gh').onclick=()=>{closeDlg();openHistory()}};
+  openDlg('<div id="dlgwrap2"></div>',true);$('#modal').classList.add('mid');draw()}
+
+/* ---------- settings ---------- */
+const REDACT=[['密码',/(password|passwd|pwd)\s*[=:]\s*\S+/gi],['token',/(token|api[_-]?key|secret|auth)\s*[=:]\s*\S+/gi],['Bearer',/Bearer\s+[A-Za-z0-9\-._~+\/]+=*/g],['AWS Key',/AKIA[0-9A-Z]{16}/g],['GitHub token',/gh[pous]_[A-Za-z0-9]{20,}|github_pat_\w+/g],['JWT',/eyJ[\w-]+\.[\w-]+\.[\w-]+/g],['连接串',/(postgres|mysql|mongodb):\/\/[^:\s]+:[^@\s]+@\S+/gi]];
+const SRCS=[['会话配置（名 / 主机 / 分组）',1,'1,204'],['命令历史',1,'9,871'],['SQL 历史',1,'3,310'],['保存的查询 / 书签',1,'96'],['笔记',1,'412'],['聊天线程历史',1,'1,839'],['文件快照内容',0,'—'],['工作区文件内容（绑定时）',0,'—'],['邮件（默认仅主题与发件人）',0,'—'],['语音转写',0,'—']];
+const SEC={
+ conn:()=>`<h3>连接 · DeepSeek · 全家桶</h3><div class="field"><label>API Key（保存到 Vault，前端不可读）</label><input type="password" placeholder="sk-…（保存后只显示 Vault 引用）"></div><div class="row"><button class="btn pri" data-t="已保存到 Vault（不做连通性测试，失败会在首次发送时明确提示）">保存</button><button class="btn" data-t="已复制 Vault 引用，未复制明文">沿用旧 tao-chat 的 Key</button></div><div class="note2">出口 allowlist 默认只有 <b>api.deepseek.com</b>；代理失败显性报错，不静默直连。请求日志只记元数据，不记请求与响应体。</div>`,
+ model:()=>`<h3>模型与模式</h3><div class="field"><label>默认模型</label><select><option>deepseek-flash（默认）</option><option>deepseek-v4-pro</option></select></div><table class="tbl"><tr><th>模式</th><th>思考</th><th>联网</th></tr><tr><td>问</td><td>关</td><td>关</td></tr><tr><td>做</td><td>开</td><td>关</td></tr><tr><td>深研</td><td>开</td><td>开</td></tr></table><div class="field"><label>每轮 token 预算（输入 + 输出累计）</label><input value="10000000"></div><div class="field"><label>单轮工具费确认阈值（美元；0 = 每次都确认）</label><input value="0.07"></div><div class="note2">联网工具开启后 temperature / top_p 等采样参数由服务端决定，界面不提供这些选项。价格表随版本发布（含币种与日期）。</div>`,
+ local:()=>`<h3>本地资料（Tao 可检索的范围）</h3><div class="note2"><b>索引状态</b>　已索引 <b>16,732</b> 条 · 约 61 MB · 最近更新 2 分钟前 · 查询 p95 18 ms（示例）　<button class="btn sm" data-t="原型：重建索引（后台进行，可继续使用）">重建索引</button></div><table class="tbl"><tr><th>资料源</th><th>条数</th><th></th></tr>${SRCS.map(s=>`<tr><td>${s[0]}</td><td>${s[2]}</td><td style="width:50px"><button class="sw ${s[1]?'on':''}" data-sw aria-label="${s[0]}"></button></td></tr>`).join('')}</table><div class="note2">默认开启的是“元数据 + 已脱敏文本”，默认关闭的是“全文内容”。关闭后该源索引在 1 分钟内清除。写入时脱敏迁移未完成前，本页开关不可用。</div>`,
+ red:()=>`<h3>脱敏规则</h3><div class="note2">内置规则 ${REDACT.length} 类；迁移结果：<b>已清理 128 条</b>含敏感信息的历史记录（只显示数量）。</div><div class="field"><label>在线测试（只在本页内运行）</label><textarea id="rtest" rows="3">curl -H "Authorization: Bearer abc.def.ghi" postgres://root:hunter2@db:5432/app password=Secr3t AKIAABCDEFGHIJKLMNOP</textarea></div><pre class="code" id="rout"></pre><div class="field"><label>自定义正则（默认空，只存本地）</label><input placeholder="例如 corp-[a-z0-9]{8}"></div>`,
+ mem:()=>`<h3>记忆与技能</h3><div class="field"><label>身份（SOUL）— Tao 如何称呼你、哪些事不要擅自做</label><textarea rows="3">我在维护 Taomni 与几台 Linux 服务器。回答简洁；涉及删除、覆盖、重启一律先确认。</textarea></div><div class="row"><button class="btn sm pri" data-t="已保存身份文本">保存</button><button class="btn sm" data-t="已导出为 Markdown">导出</button></div>
+  <h3 style="margin-top:6px">记忆（只在你点“记住”后写入）</h3><table class="tbl" id="mt">${['用户常用 pnpm 而不是 npm','生产库是 u80 上的 PostgreSQL','发布前要先在 build-box 打包'].map(x=>`<tr><td>${x}</td><td style="width:56px"><button class="btn sm" data-del>删除</button></td></tr>`).join('')}</table>
+  <h3 style="margin-top:6px">技能（触发词 + 提示词 + 允许的工具；触发的工作流模板不可改）</h3><table class="tbl"><tr><td><b>/review</b></td><td>代码评审</td><td>读文件、只读命令</td></tr><tr><td><b>/sql</b></td><td>SQL 生成与排查</td><td>@db</td></tr><tr><td><b>/doc</b></td><td>生成文档</td><td>读文件、写笔记</td></tr></table>`,
+ voice:()=>`<h3>语音</h3><div class="field"><label>语音识别 ASR</label><select><option>本地 Whisper（默认）</option><option>DeepSeek ASR（可选，约 $0.116 / 小时音频）</option></select></div><div class="field"><label>朗读 TTS 音色</label><select><option>stella</option><option>tide</option></select></div><div class="note2">默认仍为本地 Whisper，不改离线与首次下载流程。TTS 约 $0.45 / 万字符（限时 5 折）。</div>`,
+ data:()=>`<h3>导入与导出</h3><div class="card"><h4>导入 DeepSeek 对话历史</h4><p>ZIP v3，只导入为新线程；附件仅元数据。</p><button class="btn" data-imp>选择文件…</button></div><div class="card"><h4>导出 Tao 线程</h4><p>与 DeepSeek 导出同一格式。</p><button class="btn" data-t="已导出（原型）">导出全部</button></div><div class="note2">备份默认排除本地检索索引（可重建）与文件快照；备份包可用 Vault 主密码加密。</div>`,
+ sec:()=>`<h3>安全中心</h3><div class="field"><label>Vault 闲置自动锁定</label><select><option>15 分钟（默认）</option><option>5 分钟</option><option>60 分钟</option></select></div><div class="note2">流式任务运行期间闲置计时暂停；仅手动锁定或锁屏会中断请求。</div><table class="tbl"><tr><th>时间</th><th>动作</th><th>目标</th><th>结果</th></tr><tr><td>10:42</td><td>send</td><td>线程 #12</td><td>ok · 脱敏 2</td></tr><tr><td>10:43</td><td>cmd_exec</td><td>u80 · du -sh</td><td>exit 0</td></tr><tr><td>10:50</td><td>injection_block</td><td>笔记 #7</td><td>已丢弃</td></tr></table><div class="row"><button class="btn" data-t="已导出审计日志（原型）">导出</button><button class="btn" data-t="已清空审计日志（原型）">清空</button><button class="btn dng" data-t="需二次确认（原型）">清除全部 Tao 历史…</button></div><div class="note2">本地数据库依赖操作系统账户与磁盘加密保护，未做应用级整库加密。</div>`};
+function openSettings(tab){const NAV=[['conn','连接'],['model','模型与模式'],['local','本地资料'],['red','脱敏'],['mem','记忆与技能'],['voice','语音'],['data','导入导出'],['sec','安全中心']];
+  openDlg('<div class="dlg" id="dlg"><nav><h5>Tao 设置</h5>'+NAV.map(x=>`<button data-s="${x[0]}">${x[1]}</button>`).join('')+'<span style="flex:1"></span><button id="mclose">关闭</button></nav><div class="cnt" id="scnt"></div></div>',true);
+  const show=k=>{$$('#dlg nav button[data-s]').forEach(b=>b.classList.toggle('on',b.dataset.s===k));$('#scnt').innerHTML=SEC[k]();
+    $$('#scnt [data-t]').forEach(b=>b.onclick=()=>toast(b.dataset.t));$$('#scnt [data-sw]').forEach(b=>b.onclick=()=>{b.classList.toggle('on');toast('立即生效；关闭的源将在 1 分钟内清除索引')});
+    $$('#scnt [data-del]').forEach(b=>b.onclick=()=>{b.closest('tr').remove();toast('记忆已删除')});$$('#scnt [data-imp]').forEach(b=>b.onclick=()=>openImport());
+    const rt=$('#rtest');if(rt){const f=()=>{let t=rt.value,n={};REDACT.forEach(r=>{t=t.replace(r[1],()=>{n[r[0]]=(n[r[0]]||0)+1;return '‹已脱敏:'+r[0]+'›'})});$('#rout').textContent=t+'\n\n命中：'+(Object.entries(n).map(e=>e[0]+' '+e[1]).join('、')||'无')};rt.oninput=f;f()}};
+  $$('#dlg nav button[data-s]').forEach(b=>b.onclick=()=>show(b.dataset.s));$('#mclose').onclick=closeDlg;show(tab||'conn')}
+
+/* ---------- host profile (TaoAiChat is hosted; host fills slots) ---------- */
+const HOSTS={home:{modes:['问','做','深研'],tabs:['来源','文件','生成物','工作流'],dock:true,tag:''},dev:{modes:['开发','规划','审阅'],tabs:['上下文','变更','候选','任务'],dock:false,tag:' · 宿主=开发 Agent（示意）'}};
+function setHost(h){S.host=h;const H=HOSTS[h];$('#hostSel').value=h;$$('#modeSeg button').forEach((b,i)=>b.textContent=H.modes[i]);
+  ['sources','files','artifacts','workflow'].forEach((k,i)=>{const b=document.querySelector('#side .tabs button[data-p='+k+']');if(b)b.textContent=H.tabs[i]});
+  $('#dock').style.display=H.dock?'':'none';$('#bSearch').title=h==='home'?'搜索 Taomni 本地资料':'搜索（同一个 Tao Search，由宿主决定是否提供）';renderBind();
+  $('#hostNote').textContent=H.tag}
+$('#hostSel').onchange=e=>{const h=e.target.value;clearAll();setHost(h)};
+
+/* ---------- states ---------- */
+function clearAll(){voiceOff();S.tok++;S.stopped=true;toEmpty();S.busy=false;S.stopped=false;S.hasKey=true;S.chips=[];S.localUsed=false;S.thrName=null;setHost('home');renderChips();resetPill(0,0);
+  $('#mask').classList.remove('open');closeDlg();closePop();resetSide();applyKey();unbusy();setMode('ask');setComposer(true);setPhase('S1 空态就绪')}
+const STATES=[['基础状态'],
+ ['S0','无 Key',()=>{S.hasKey=false;applyKey();setPhase('S0 无 Key')}],['S1','空态就绪',()=>{}],
+ ['S2','发送中',async()=>{addUser('解释 EADDRINUSE 报错');busy();const m=newAI();m.appendChild(el('div','usage','<span class="spin"></span>&nbsp;等待响应…（同一线程串行，新消息会排队）'));setPhase('S2 发送中')}],
+ ['S3','思考中',async()=>{addUser('解释 EADDRINUSE 报错');busy();await playReply('ask',{instant:true,stopAt:'think'})}],
+ ['S4','搜索 / 读链接中',async()=>{S.web=true;syncCap();addUser('查今天 DeepSeek 的模型动态');busy();await playReply('askWeb',{instant:true,stopAt:'search'})}],
+ ['S5','正文流式',async()=>{addUser('解释 EADDRINUSE 报错');busy();await playReply('ask',{instant:true,stopAt:'text'})}],
+ ['S6','完成（引用 / 来源 / 用量）',async()=>{S.web=true;syncCap();addUser('查今天 DeepSeek 的模型动态');await playReply('askWeb',{instant:true});openSide('sources')}],
+ ['S7','已停止（联网回复只能重新生成）',async()=>{S.web=true;addUser('查今天 DeepSeek 的模型动态');S.last=SC.askWeb;await playReply('ask',{instant:true,stopAt:'text'});stoppedCard()}],
+ ['S8','拒答（丢弃思考与正文）',async()=>{addUser('（触发安全校验的请求）');const m=newAI();m.appendChild(el('div','card warn','<h4>安全校验未通过本次回复</h4><p>思考与正文已丢弃，未保存到线程。可改写问题后重试。</p><div class="row"><button class="btn sm">编辑并重发</button></div>'));setPhase('S8 拒答')}],
+ ['S9','错误（可重试，保留已收块）',async()=>{addUser('解释 EADDRINUSE 报错');await playReply('ask',{instant:true,stopAt:'text'});$('#feed .msg.ai:last-child').appendChild(el('div','card danger','<h4>流中断（interrupted）</h4><p>在收到 message_stop 之前连接结束；已收到的内容已保留，不推测断流原因。</p><div class="row"><button class="btn pri sm">重试</button></div>'));setPhase('S9 错误')}],
+ ['S10','等待动作确认（做）',async()=>{setMode('do');addUser('磁盘快满了，帮我看看哪里占得最多');busy();await playReply('do',{instant:true})}],
+ ['S11','工作流计划待批（深研）',async()=>{setMode('research');addUser('深入研究 DeepSeek 应用 API 对 Taomni 的影响');busy();await playReply('research',{instant:true})}],
+ ['S12','工作流运行中',async()=>{setMode('research');addUser('深入研究 DeepSeek 应用 API 对 Taomni 的影响');busy();await playReply('research',{instant:true,runWorkflow:1})}],
+ ['S13','预算 80%（橙色提示）',async()=>{S.web=true;syncCap();addUser('查今天 DeepSeek 的模型动态');await playReply('askWeb',{instant:true});resetPill(8.3e6,1.2)}],
+ ['S14','预算 100%（停下，可续跑）',async()=>{setMode('research');addUser('深入研究 DeepSeek 应用 API 对 Taomni 的影响');const m=newAI();resetPill(10e6,2.4);m.appendChild(el('div','card danger','<h4>本轮 token 预算已用完（10M）</h4><p>已完成：搜索、并行读链接、交叉验证。未完成：生成报告。续跑不会重跑已完成步骤。</p><div class="row"><button class="btn pri sm">提高预算到 20M 并继续</button><button class="btn sm">仅保留摘要</button></div>'));setPhase('S14 预算 100%')}],
+ ['S15','Vault 已锁定',async()=>{addUser('解释 EADDRINUSE 报错');await playReply('ask',{instant:true,stopAt:'text'});$('#mask').classList.add('open');setPhase('S15 Vault 已锁')}],
+ ['S16','离线 / 代理失败',async()=>{addUser('解释 EADDRINUSE 报错');const m=newAI();m.appendChild(el('div','card danger','<h4>网络不可用（network）</h4><p>代理“系统”连接失败。不会静默直连；请检查代理设置后重试。</p><div class="row"><button class="btn pri sm">重试</button><button class="btn sm">打开代理设置</button></div>'));setPhase('S16 离线 / 代理失败')}],
+ ['S17','本地资料确认卡（先检索，再选择是否发送）',async()=>{$('#input').value='上次的发布流程是什么？';S.web=false;await send();await sleep(900)}],
+ ['新增界面'],
+ ['U1','Tao Search（Ctrl K）',()=>openSearch('rsync')],['U2','Tao Search · 过滤语法',()=>openSearch('source:sql since:14 orders')],['U3','Tao Search · 2 字关键词回退',()=>openSearch('发布')],
+ ['U4','历史（底部行第一项）· Tao 对话',()=>openHistory('chat')],['U4b','历史 · 最近会话',()=>openHistory('sess')],['U4c','历史 · 最近工作区',()=>openHistory('ws')],['U5','语音录制',()=>voiceOn()],['U6','+ 菜单（文件 / 技能 / 工作流）',()=>$('#bPlus').click()],['U7','能力菜单（思考 / 联网 / 模型）',()=>$('#bCap').click()],
+ ['U8','工作流库 → 代码 review',()=>runWorkflow('code_review')],['U9','导入 DeepSeek 历史（向导）',()=>openImport()],['U10','设置 · 本地资料与索引',()=>openSettings('local')],['U11','设置 · 记忆与技能',()=>openSettings('mem')],
+ ['U13','系统无 WSL：底部行不显示 WSL',()=>{S.wsl=false;$('#wslChk').checked=false;applyWsl()}],['U14','宿主示意：开发 Agent（同一组件换槽位）',()=>{setHost('dev');addUser('把 Tao 聊天组件接到开发 Agent 的项目任务里');$('#feed').appendChild(el('div','card','<h4>宿主示意</h4><p>TaoAiChat 不变；换掉的只有绑定栏（项目 / 分支）、模式标签、底部快捷行（隐藏）和侧栏页签。</p>'));setPhase('U14 宿主示意')}],
+ ['U12','用量与预算浮层',async()=>{S.web=true;syncCap();addUser('查今天 DeepSeek 的模型动态');await playReply('askWeb',{instant:true});$('#usageTxt').click()}]];
+const sm=$('#smenu');STATES.forEach(s=>{if(s.length===1){sm.appendChild(el('h6','',s[0]));return}const b=el('button','',`<i>${s[0]}</i><span>${s[1]}</span>`);b.onclick=async()=>{sm.classList.remove('open');clearAll();await s[2]();scrollEnd()};sm.appendChild(b)});
+$('#bState').onclick=e=>{e.stopPropagation();sm.classList.toggle('open')};
+$('#bTheme').onclick=()=>$('#app').classList.toggle('dark');
+$('#bView').onclick=()=>{document.body.classList.toggle('mobile');fit()};
+$('#speed').onchange=e=>S.speed=+e.target.value;
+function fit(){const a=$('#app'),w=a.clientWidth,h=a.clientHeight;a.classList.toggle('compact',w<760);const st=$('#stage');st.classList.toggle('tall-hide',h<600);st.classList.toggle('xtall-hide',h<520)}
+new ResizeObserver(fit).observe($('#app'));
+window.addEventListener('unhandledrejection',e=>{if(e.reason==='stale'||e.reason==='abort')e.preventDefault()});
+(function(){const h=new Date().getHours();$('#greet').textContent=(h<12?'早上好':h<18?'下午好':'晚上好')+'，Tao 在这里'})();
+renderBind();renderSug();renderChips();syncCap();applyKey();applyWsl();setHost('home');fit();
+</script>
+</body>
+</html>

@@ -13,6 +13,7 @@ TC-FILE-OPEN-004: []
 TC-FILE-OPEN-005: []
 TC-FILE-OPEN-006: []
 # Explorer cases own isolated input/byte fixtures and do not depend on another case's state.
+TC-TAO-HOME-001: []
 TC-EXPLORER-001: []
 TC-EXPLORER-002: []
 TC-EXPLORER-003: []

@@ -1,5 +1,5 @@
 import { showAgentsComingSoon } from "../agents/comingSoon";
-import { Boxes, FileText, KeyRound, MonitorSmartphone, Search, Settings, Terminal, Wrench } from "lucide-react";
+import { Boxes, FileText, KeyRound, MonitorSmartphone, Search, Server, Settings, Terminal, Wrench } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useT } from "../../lib/i18n";
 import { useAppStore } from "../../stores/appStore";
@@ -103,6 +103,14 @@ function OpenGlobalCommandModal() {
       detail: t("platform.commandTool"),
       icon: <Settings className="h-3.5 w-3.5" />,
       run: () => window.dispatchEvent(new CustomEvent("taomni:command", { detail: "settings" })),
+    });
+    list.push({
+      id: "servers",
+      kind: "tool",
+      title: t("servers.dialogTitle"),
+      detail: t("platform.commandTool"),
+      icon: <Server className="h-3.5 w-3.5" />,
+      run: () => window.dispatchEvent(new CustomEvent("taomni:command", { detail: "servers" })),
     });
 
     for (const workspace of workspaces) {

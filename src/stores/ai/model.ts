@@ -83,6 +83,20 @@ export interface AiConfig {
   chat_output_format?: string;
   /** Composer send shortcut: "ctrl_enter" (default) | "enter". */
   chat_send_shortcut?: string;
+  /** Tao Home DeepSeek Messages track settings. Kept optional for old configs. */
+  deepseek_app?: DeepSeekAppConfig;
+}
+
+export interface DeepSeekAppConfig {
+  enabled: boolean;
+  model: "deepseek-flash" | "deepseek-v4-pro" | string;
+  thinking_default: boolean;
+  search_default: boolean;
+  safety_check_high: boolean;
+  title_enabled: boolean;
+  voice_provider: "local" | "deepseek" | string;
+  tts_voice: "stella" | "tide" | string;
+  cost_confirm_threshold_cny: number;
 }
 
 export interface CcCustomSettingsProfile {

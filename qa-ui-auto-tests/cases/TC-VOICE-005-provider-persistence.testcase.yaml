@@ -14,7 +14,7 @@ fixtures:
 timeout_sec: 75
 steps:
 - open: ${cfg.app.base_url}/?voiceFixture=1
-- click: '[data-testid="welcome-open-local-terminal"]'
+- click: '[data-testid="tao-home-local-terminal"]'
 - click: '[data-testid="rail-chat-button"]'
 - wait_for: '[data-testid="chat-voice-button"]'
 - click: '[data-testid="chat-voice-button"]'

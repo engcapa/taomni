@@ -6,12 +6,19 @@ pub(crate) fn configure<'a>(
     app: &AppHandle,
     mut builder: WebviewWindowBuilder<'a, tauri::Wry, AppHandle>,
 ) -> WebviewWindowBuilder<'a, tauri::Wry, AppHandle> {
+    let qa_webview_override = std::env::var("TAOMNI_QA_WEBVIEW_DIR")
+        .ok()
+        .map(|raw| std::path::PathBuf::from(raw.trim()))
+        .filter(|path| path.is_absolute());
     if cfg!(debug_assertions)
         && app.config().identifier == crate::QA_APP_ID
-        && std::env::var_os("NEWMOB_DATA_DIR").is_some()
+        && (std::env::var_os("NEWMOB_DATA_DIR").is_some() || qa_webview_override.is_some())
     {
-        if let Ok(data_dir) = crate::resolved_app_data_dir(app) {
-            let directory = data_dir.join("webview");
+        if let Some(directory) = qa_webview_override.or_else(|| {
+            crate::resolved_app_data_dir(app)
+                .ok()
+                .map(|dir| dir.join("webview"))
+        }) {
             let _ = std::fs::create_dir_all(&directory);
             builder = builder.data_directory(directory);
         }

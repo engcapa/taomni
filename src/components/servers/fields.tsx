@@ -1,4 +1,4 @@
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { selectFolderPath, selectFilePath } from "../../lib/ipc";
 
 /**
@@ -26,10 +26,10 @@ export function FormRow({ label, children }: { label: string; children: ReactNod
   );
 }
 
-export interface NumberFieldProps {
-  label: string;
+export interface NumberInputProps {
   value: number;
   onChange: (value: number) => void;
+  ariaLabel?: string;
   min?: number;
   max?: number;
   step?: number;
@@ -40,10 +40,15 @@ export interface NumberFieldProps {
   width?: number;
 }
 
-export function NumberField({
-  label,
+/**
+ * Controlled integer `<input type="number">` that keeps an empty draft while
+ * the user is clearing/retyping digits instead of snapping back to `0` on `""`
+ * (which causes subsequent keystrokes like `2229` to turn into `02229`).
+ */
+export function NumberInput({
   value,
   onChange,
+  ariaLabel,
   min,
   max,
   step,
@@ -51,26 +56,67 @@ export function NumberField({
   disabled,
   testId,
   width = 90,
+}: NumberInputProps) {
+  const [draft, setDraft] = useState<string>(() =>
+    Number.isFinite(value) ? String(value) : "",
+  );
+  const prevValueRef = useRef(value);
+
+  useEffect(() => {
+    if (prevValueRef.current !== value) {
+      prevValueRef.current = value;
+      setDraft((current) => {
+        const parsed = parseInt(current, 10);
+        if (current !== "" && !Number.isNaN(parsed) && parsed === value) {
+          return current;
+        }
+        return Number.isFinite(value) ? String(value) : "";
+      });
+    }
+  }, [value]);
+
+  return (
+    <input
+      type="number"
+      className="taomni-input"
+      data-testid={testId}
+      aria-label={ariaLabel}
+      style={{ width }}
+      value={draft}
+      min={min}
+      max={max}
+      step={step}
+      placeholder={placeholder}
+      disabled={disabled}
+      onChange={(e) => {
+        const nextRaw = e.target.value;
+        setDraft(nextRaw);
+        if (nextRaw.trim() === "") {
+          return;
+        }
+        const parsed = parseInt(nextRaw, 10);
+        if (!Number.isNaN(parsed)) {
+          onChange(parsed);
+        }
+      }}
+      onBlur={() => {
+        setDraft(Number.isFinite(value) ? String(value) : "");
+      }}
+    />
+  );
+}
+
+export interface NumberFieldProps extends Omit<NumberInputProps, "ariaLabel"> {
+  label: string;
+}
+
+export function NumberField({
+  label,
+  ...inputProps
 }: NumberFieldProps) {
   return (
     <FormRow label={label}>
-      <input
-        type="number"
-        className="taomni-input"
-        data-testid={testId}
-        aria-label={label}
-        style={{ width }}
-        value={Number.isFinite(value) ? value : ""}
-        min={min}
-        max={max}
-        step={step}
-        placeholder={placeholder}
-        disabled={disabled}
-        onChange={(e) => {
-          const parsed = parseInt(e.target.value || "0", 10);
-          onChange(Number.isNaN(parsed) ? 0 : parsed);
-        }}
-      />
+      <NumberInput ariaLabel={label} {...inputProps} />
     </FormRow>
   );
 }

@@ -1,0 +1,257 @@
+id: TC-SERVERS-002-tab-singleton-native
+title: Native Local servers enforces single tab in main window and across OS processes
+description: >-
+  Native boundary required: verifies real Tauri ModuleLock filesystem/handle lock
+  semantics across two concurrent packaged Taomni processes sharing the app data
+  root (Linux, Windows, macOS). Proves Tools sidebar and Global Command Palette
+  open Local servers in a single main-window tab (no detached OS window, no
+  ?servers=main navigation), disable tab Duplicate, preserve unsaved edits across
+  tab switches and revert them on Discard, block competing OS instances
+  symmetrically with servers-blocked-dialog until release or exit, and release cleanly
+  across ?servers=main and / route navigation.
+covers:
+- F-Servers-1
+tags:
+- servers
+- regression
+modes:
+- native
+native_platforms:
+- Linux
+- Windows
+- macOS
+fixtures:
+- reset_db
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- wait_for:
+    selector: '[data-testid="welcome-panel"]'
+    timeout_sec: 30
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tool-servers"]'
+- click: '[data-testid="sidebar-tool-servers"]'
+- wait_for:
+    selector: '[data-testid="servers-dialog"]'
+    timeout_sec: 20
+- assert_visible: '[data-testid="tab-bar"]'
+- assert_visible: '[data-testid="servers-tab-panel"]'
+- eval_readonly:
+    expression: "document.querySelectorAll('[data-tab-type'+String.fromCharCode(61)+'\"servers\"]').length === 1 && !window.location.search.includes('servers')"
+    expect_truthy: true
+- right_click: '[data-testid="tab-item"][data-tab-type="servers"]'
+- wait_for: '[data-testid="tab-context-duplicate"]'
+- assert_disabled: '[data-testid="tab-context-duplicate"]'
+- press: Escape
+- wait_for:
+    selector: '[data-testid="tab-context-duplicate"]'
+    state: detached
+    timeout_sec: 5
+- click: '[data-testid="nav-mode-home"]'
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tool-servers"]'
+- click: '[data-testid="sidebar-tool-servers"]'
+- wait_for: '[data-testid="servers-dialog"]'
+- eval_readonly:
+    expression: "document.querySelectorAll('[data-tab-type'+String.fromCharCode(61)+'\"servers\"]').length === 1"
+    expect_truthy: true
+- click: '[data-testid="nav-mode-home"]'
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="global-search-trigger"]'
+- wait_for: '[data-testid="global-search-modal"]'
+- fill:
+    selector: '[data-testid="global-search-input"]'
+    value: Local servers
+- click: '[data-testid="global-search-result"][data-result-id="servers"]'
+- wait_for: '[data-testid="servers-dialog"]'
+- eval_readonly:
+    expression: "document.querySelectorAll('[data-tab-type'+String.fromCharCode(61)+'\"servers\"]').length === 1"
+    expect_truthy: true
+- click: '[data-testid="server-row-ssh"]'
+- wait_for: '[data-testid="server-field-port"]'
+- fill:
+    selector: '[data-testid="server-field-port"]'
+    value: '2229'
+- click: '[data-testid="nav-mode-home"]'
+- wait_for: '[data-testid="welcome-panel"]'
+- assert_not_visible: '[data-testid="servers-dialog"]'
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="tab-bar"]'
+- click: '[data-testid="tab-item"][data-tab-type="servers"]'
+- wait_for: '[data-testid="servers-dialog"]'
+- assert_attribute:
+    selector: '[data-testid="server-field-port"]'
+    name: value
+    equals: '2229'
+- click: '[data-testid="servers-dialog-cancel"]'
+- wait_for: '[data-testid="confirm-dialog"]'
+- click: '[data-testid="confirm-dialog-cancel"]'
+- assert_visible: '[data-testid="servers-dialog"]'
+- assert_attribute:
+    selector: '[data-testid="server-field-port"]'
+    name: value
+    equals: '2229'
+- click: '[data-testid="servers-dialog-cancel"]'
+- wait_for: '[data-testid="confirm-dialog"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for:
+    selector: '[data-testid="servers-dialog"]'
+    state: detached
+    timeout_sec: 10
+- assert_visible: '[data-testid="sessions-empty-state"]'
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tool-servers"]'
+- click: '[data-testid="sidebar-tool-servers"]'
+- wait_for: '[data-testid="servers-dialog"]'
+- click: '[data-testid="server-row-ssh"]'
+- assert_attribute:
+    selector: '[data-testid="server-field-port"]'
+    name: value
+    equals: '22'
+- servers_multi_instance_probe: {}
+- open_route: ?servers=main
+- wait_for:
+    selector: '[data-testid="servers-dialog"]'
+    timeout_sec: 30
+- assert_visible: '[data-testid="servers-tab-panel"]'
+- eval_readonly:
+    expression: "document.querySelectorAll('[data-tab-type'+String.fromCharCode(61)+'\"servers\"]').length === 1"
+    expect_truthy: true
+- open_route: /
+- wait_for:
+    selector: '[data-testid="welcome-panel"]'
+    timeout_sec: 30
+- eval_readonly:
+    expression: "document.querySelectorAll('[data-tab-type'+String.fromCharCode(61)+'\"servers\"]').length === 0"
+    expect_truthy: true
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tool-servers"]'
+- click: '[data-testid="sidebar-tool-servers"]'
+- wait_for:
+    selector: '[data-testid="servers-dialog"]'
+    timeout_sec: 20
+- assert_not_visible: '[data-testid="servers-blocked-dialog"]'
+- eval_readonly:
+    expression: "document.querySelectorAll('[data-tab-type'+String.fromCharCode(61)+'\"servers\"]').length === 1"
+    expect_truthy: true
+- click: '[data-testid="servers-dialog-cancel"]'
+- wait_for:
+    selector: '[data-testid="servers-dialog"]'
+    state: detached
+    timeout_sec: 10
+- assert_visible: '[data-testid="tools-empty-state"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Tools sidebar and Global Command Palette open and reuse one in-window Local servers tab with tab-bar visible, Duplicate disabled, and unsaved edits retained across tab switches until discarded.
+    actions:
+    - 3
+    - 5
+    - 10
+    - 15
+    - 17
+    - 19
+    - 22
+    - 24
+    - 26
+    - 27
+    - 30
+    - 32
+    - 33
+    - 36
+    - 38
+    - 41
+    - 43
+    - 46
+    - 48
+    - 51
+    - 53
+    - 55
+    checkpoints:
+    - step: 6
+      expectation: '{"wait_for": {"selector": "[data-testid=\"servers-dialog\"]", "timeout_sec": 20}}'
+    - step: 7
+      expectation: '{"assert_visible": "[data-testid=\"tab-bar\"]"}'
+    - step: 8
+      expectation: '{"assert_visible": "[data-testid=\"servers-tab-panel\"]"}'
+    - step: 9
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''[data-tab-type''+String.fromCharCode(61)+''\"servers\"]'').length === 1 && !window.location.search.includes(''servers'')", "expect_truthy": true}}'
+    - step: 12
+      expectation: '{"assert_disabled": "[data-testid=\"tab-context-duplicate\"]"}'
+    - step: 21
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''[data-tab-type''+String.fromCharCode(61)+''\"servers\"]'').length === 1", "expect_truthy": true}}'
+    - step: 29
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''[data-tab-type''+String.fromCharCode(61)+''\"servers\"]'').length === 1", "expect_truthy": true}}'
+    - step: 35
+      expectation: '{"assert_not_visible": "[data-testid=\"servers-dialog\"]"}'
+    - step: 40
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"server-field-port\"]", "name": "value", "equals": "2229"}}'
+    - step: 45
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"server-field-port\"]", "name": "value", "equals": "2229"}}'
+    - step: 50
+      expectation: '{"assert_visible": "[data-testid=\"sessions-empty-state\"]"}'
+    - step: 56
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"server-field-port\"]", "name": "value", "equals": "22"}}'
+    results:
+    - 7
+    - 8
+    - 9
+    - 12
+    - 21
+    - 29
+    - 35
+    - 40
+    - 45
+    - 50
+    - 56
+  - id: R2
+    requirement: Cross-process OS ModuleLock blocks competing Taomni instances symmetrically until release or termination, and ?servers=main then / route navigation releases cleanly for immediate reopen.
+    actions:
+    - 58
+    - 62
+    - 65
+    - 67
+    - 71
+    checkpoints:
+    - step: 57
+      expectation: '{"servers_multi_instance_probe": {}}'
+    - step: 59
+      expectation: '{"wait_for": {"selector": "[data-testid=\"servers-dialog\"]", "timeout_sec": 30}}'
+    - step: 60
+      expectation: '{"assert_visible": "[data-testid=\"servers-tab-panel\"]"}'
+    - step: 61
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''[data-tab-type''+String.fromCharCode(61)+''\"servers\"]'').length === 1", "expect_truthy": true}}'
+    - step: 63
+      expectation: '{"wait_for": {"selector": "[data-testid=\"welcome-panel\"]", "timeout_sec": 30}}'
+    - step: 64
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''[data-tab-type''+String.fromCharCode(61)+''\"servers\"]'').length === 0", "expect_truthy": true}}'
+    - step: 68
+      expectation: '{"wait_for": {"selector": "[data-testid=\"servers-dialog\"]", "timeout_sec": 20}}'
+    - step: 69
+      expectation: '{"assert_not_visible": "[data-testid=\"servers-blocked-dialog\"]"}'
+    - step: 70
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''[data-tab-type''+String.fromCharCode(61)+''\"servers\"]'').length === 1", "expect_truthy": true}}'
+    - step: 73
+      expectation: '{"assert_visible": "[data-testid=\"tools-empty-state\"]"}'
+    - step: 74
+      expectation: '{"assert_no_runtime_errors": null}'
+    results:
+    - 57
+    - 60
+    - 61
+    - 64
+    - 69
+    - 70
+    - 73
+    - 74
+  visual:
+  - check: Tab bar, servers tab panel, and native blocked dialog render in the main WebView on Linux, Windows, and macOS.
+    method: not-applicable
+    reason: UI placement is checked live across both native processes by DOM and layout visibility assertions rather than baseline image diffing.
+  native:
+  - check: Two concurrent QA Taomni processes share the isolated app data root with separate WebView profiles so ModuleLock OS handle contention and crash recovery run on Linux, Windows, and macOS.
+    method: automated
+    reason: Executed natively by servers_multi_instance_probe against two live packaged Taomni instances on each platform.

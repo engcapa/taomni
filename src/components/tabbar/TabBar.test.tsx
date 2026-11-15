@@ -424,4 +424,23 @@ describe("TabBar overflow navigation", () => {
     expect(payload).toContain("Backend session: runtime-1");
     expect(useAppStore.getState().statusMessage).toBe("Tab session info copied");
   });
+
+  it("disables Duplicate in the tab context menu for the singleton Local servers tab", () => {
+    useAppStore.setState({
+      tabs: [
+        { id: "welcome", type: "welcome", title: "Welcome", closable: false },
+        { id: "servers", type: "servers", title: "Local servers", closable: true },
+      ],
+      activeTabId: "servers",
+    });
+    renderTabBar();
+
+    const serversTab = screen
+      .getAllByTestId("tab-item")
+      .find((el) => el.getAttribute("data-tab-type") === "servers");
+    expect(serversTab).toBeTruthy();
+    fireEvent.contextMenu(serversTab!);
+
+    expect(screen.getByTestId("tab-context-duplicate")).toBeDisabled();
+  });
 });

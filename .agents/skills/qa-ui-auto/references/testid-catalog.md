@@ -1868,6 +1868,7 @@
 
 - `[data-testid="tab-bar"]` — display — F1.5.tab-bar
 - `[data-testid="tab-item"]` — interactive — F1.5.tab-item
+  ↳ `[data-testid="tab-item"][data-tab-type="welcome"]` — alias
   ↳ `:nth-match([data-testid="tab-item"][data-tab-type="file-browser"], 1)` — alias
   ↳ `:nth-match([data-testid="tab-item"][data-tab-type="file-browser"], 2)` — alias
   ↳ `:nth-match([data-testid="tab-item"][data-tab-type="file-browser"], 3)` — alias
@@ -1922,12 +1923,12 @@
 ## main/welcome (F1.6)
 
 - `[data-testid="welcome-panel"]` — display — F1.6.panel-root
-- `[data-testid="welcome-open-local-terminal"]` — interactive — F1.6.open-local-terminal
+- `[data-testid="welcome-panel"] [data-testid="tao-home-local-terminal"]` — interactive — F1.6.open-local-terminal
 - `select[aria-label="Terminal shell"]` — interactive [optional] — F1.6.shell-select
 - `[data-testid="welcome-open-home-folder"]` — interactive [optional] — F1.6.open-home-folder
 - `button[aria-label="Open as administrator"]` — interactive [optional] — F1.6.open-as-administrator
 - `text="New session…"` — display — F1.6.new-session-card
-- `[data-testid="welcome-new-session"]` — interactive — F1.6.new-session-card-testid
+- `[data-testid="welcome-panel"] [data-testid="tao-home-new-session"]` — interactive — F1.6.new-session-card-testid
 - `[data-testid="welcome-recent-sessions"]` — display — F1.6.recent-sessions-panel
 - `[data-testid="welcome-recent-filter"]` — interactive — F1.6.recent-filter
 - `[data-testid="welcome-recent-type-filter"]` — interactive — F1.6.recent-type-filter
@@ -2890,6 +2891,14 @@
 
 ## servers (F-Servers-1)
 
+- `[data-testid="sidebar-tool-servers"]` — interactive [optional] — F-Servers-1.sidebar-tool-servers
+- `[data-testid="servers-tab-panel"]` — display [optional] — F-Servers-1.servers-tab-panel
+- `[data-testid="tab-item"][data-tab-type="servers"]` — display [optional] — F-Servers-1.tab-servers
+- `[data-testid="tab-item"][data-tab-type="servers"] [data-testid="tab-close"]` — interactive [optional] — F-Servers-1.tab-close-servers
+- `[data-testid="tab-context-duplicate"]` — display [optional] — F-Servers-1.tab-context-duplicate
+- `[data-testid="servers-blocked-dialog"]` — display [optional] — F-Servers-1.servers-blocked-dialog
+- `[data-testid="servers-blocked-message"]` — display [optional] — F-Servers-1.servers-blocked-message
+- `[data-testid="servers-blocked-ok"]` — display [optional] — F-Servers-1.servers-blocked-ok
 - `[data-testid="servers-dialog"]` — display [optional] — F-Servers-1.dialog
 - `[data-testid="servers-dialog-cancel"]` — interactive [optional] — F-Servers-1.dialog-cancel
 - `[data-testid="servers-dialog-apply"]` — interactive [optional] — F-Servers-1.dialog-apply
@@ -2901,10 +2910,12 @@
 - `[data-testid="server-row-ssh-start"]` — interactive [optional] — F-Servers-1.server-row-ssh-start
 - `[data-testid="server-row-ssh-stop"]` — interactive [optional] — F-Servers-1.server-row-ssh-stop
 - `[data-testid="server-row-ssh-settings"]` — interactive [optional] — F-Servers-1.server-row-ssh-settings
+- `[data-testid="server-row-http-start"]` — interactive [optional] — F-Servers-1.server-row-http-start
+- `[data-testid="server-row-http-stop"]` — interactive [optional] — F-Servers-1.server-row-http-stop
 - `[data-testid="server-settings"]` — display [optional] — F-Servers-1.server-settings
 - `[data-testid="server-log"]` — display [optional] — F-Servers-1.server-log
 - `[data-testid="server-log-autoscroll"]` — interactive [optional] — F-Servers-1.server-log-autoscroll
-- `[data-testid="server-log-clear"]` — display [optional] — F-Servers-1.server-log-clear
+- `[data-testid="server-log-clear"]` — interactive [optional] — F-Servers-1.server-log-clear
 
 ## servers/rdp (F-RdpServer-1)
 
@@ -3482,6 +3493,37 @@
 - `[aria-label="Permissions"]` — display — F7.5.chmod-dialog
 - `#chmod-octal` — interactive — F7.5.chmod-octal
 - `role=button[name="Apply"]` — interactive — F7.5.chmod-apply
+
+## tao/home (F1.11)
+
+- `[data-testid="tao-home-host"]` — display — F1.11.tao-home-host
+- `[data-testid="tao-home-topbar"]` — display — F1.11.tao-home-topbar
+- `[data-testid="tao-home-mode-ask"]` — interactive — F1.11.tao-home-mode-ask
+- `[data-testid="tao-home-mode-do"]` — interactive — F1.11.tao-home-mode-do
+- `[data-testid="tao-home-mode-research"]` — interactive — F1.11.tao-home-mode-research
+- `[data-testid="tao-home-connect-card"]` — display — F1.11.tao-home-connect-card
+- `[data-testid="tao-home-open-settings"]` — interactive — F1.11.tao-home-open-settings
+- `[data-testid="tao-home-composer"]` — display — F1.11.tao-home-composer
+- `[data-testid="tao-home-composer-input"]` — interactive — F1.11.tao-home-composer-input
+- `[data-testid="tao-home-binding-bar"]` — display — F1.11.tao-home-binding-bar
+- `[data-testid="tao-home-dock-row"]` — display — F1.11.tao-home-dock-row
+- `[data-testid="tao-home-history"]` — interactive — F1.11.tao-home-history
+- `[data-testid="tao-home-history-popover"]` — display — F1.11.tao-home-history-popover
+- `[data-testid="tao-home-history-tab-chat"]` — interactive — F1.11.tao-home-history-tab-chat
+- `[data-testid="tao-home-history-tab-sessions"]` — interactive — F1.11.tao-home-history-tab-sessions
+- `[data-testid="tao-home-history-tab-workspaces"]` — interactive — F1.11.tao-home-history-tab-workspaces
+- `.tao-home-history-search input` — interactive — F1.11.tao-home-history-search
+- `[data-testid="tao-home-local-terminal"]` — interactive — F1.11.tao-home-local-terminal
+- `[data-testid="tao-home-wsl"]` — interactive [optional] — F1.11.tao-home-wsl
+- `[data-testid="tao-home-new-session"]` — interactive — F1.11.tao-home-new-session
+- `[data-testid="tao-home-new-workspace"]` — interactive — F1.11.tao-home-new-workspace
+- `[data-testid="tao-home-dock-more"]` — interactive — F1.11.tao-home-dock-more
+- `[data-testid="tao-home-lan-chat"]` — display [optional] — F1.11.tao-home-lan-chat
+- `[data-testid="tao-home-search"]` — interactive — F1.11.tao-home-search
+- `[data-testid="tao-home-search-panel"]` — display — F1.11.tao-home-search-panel
+- `[data-testid="tao-home-search-input"]` — interactive — F1.11.tao-home-search-input
+- `[data-testid="tao-home-demo-toggle"]` — interactive — F1.11.tao-home-demo-toggle
+- `.tao-home-context-preview` — display — F1.11.tao-home-context-preview
 
 ## terminal/appearance (F5.2)
 

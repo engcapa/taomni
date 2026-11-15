@@ -193,25 +193,28 @@ export function defaultConfig(type: ServerType): ServerConfig {
   }
 }
 
-// --- Window / IPC wrappers ------------------------------------------------
+// --- Tab lock / IPC wrappers ------------------------------------------------
 
-/** Singleton id for the local-servers OS window (`#servers=main`). */
-export const SERVERS_WINDOW_ID = "main";
+export interface ServersTabClaim {
+  acquired: boolean;
+  holder: string | null;
+}
 
 /**
- * Open (or focus) the Local servers manager as a native OS window with system
- * chrome. Reuses the generic detached-window path; the label is fixed so a
- * second open focuses the existing window instead of spawning a duplicate.
+ * Claim exclusive ownership of the Local servers tab across windows and
+ * running Taomni instances.
  */
-export async function openServersWindow(title?: string): Promise<void> {
-  const { openDetachedWindow } = await import("./detachWindowing");
-  return openDetachedWindow({
-    kind: "servers",
-    sessionId: SERVERS_WINDOW_ID,
-    title,
-    width: 720,
-    height: 520,
-  });
+export async function claimServersTabLock(): Promise<ServersTabClaim> {
+  const result = await invoke<ServersTabClaim | undefined>("claim_servers_tab");
+  if (result && typeof result.acquired === "boolean") {
+    return { acquired: result.acquired, holder: result.holder ?? null };
+  }
+  return { acquired: true, holder: null };
+}
+
+/** Release the Local servers tab lock owned by the current window. */
+export async function releaseServersTabLock(): Promise<void> {
+  await invoke<void>("release_servers_tab");
 }
 
 export async function startLocalServer(

@@ -1,8 +1,14 @@
 import { useBookmarkWindows } from "./useBookmarkWindows";
 import { useNotesWorkspaceNavigation } from "./useNotesWorkspaceNavigation";
-import { useCallback, useEffect, useLayoutEffect } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef } from "react";
 import { t as tr } from "../../lib/i18n";
 import { setActiveQueryTab } from "../../lib/queryRegistry";
+import {
+  hasServersRouteParam,
+  hasServersTabClaimMarker,
+  openServersTab,
+  releaseServersTabLockSafe,
+} from "../../lib/serversTab";
 import { setActiveTerminalTab } from "../../lib/terminal/terminalRegistry";
 import { useAiStore } from "../../stores/aiStore";
 import { useAppStore } from "../../stores/appStore";
@@ -148,7 +154,7 @@ export function useMainWindowLifecycle(context: UseMainWindowLifecycleContext) {
     const handler = (event: KeyboardEvent) => {
       if (event.ctrlKey && event.shiftKey && event.key.toLowerCase() === "s") {
         event.preventDefault();
-        useServersStore.getState().openDialog(tr("servers.dialogTitle"));
+        void openServersTab({ title: tr("servers.dialogTitle") });
         return;
       }
       const primary = event.ctrlKey || event.metaKey;
@@ -169,11 +175,56 @@ export function useMainWindowLifecycle(context: UseMainWindowLifecycleContext) {
     return () => window.removeEventListener("keydown", handler);
   }, [layout.toggleTabChat]);
 
-  // Hydrate server configs + statuses once on mount so the servers dialog
-  // opens with persisted settings and live run state.
+  // Hydrate server configs + statuses once on mount so the servers panel
+  // opens with persisted settings and live run state. Also honor `?servers=main`
+  // or `#servers=main` launch routes inside the main window tab bar (both on
+  // initial mount and on in-window `#servers=main` hash navigation).
   useEffect(() => {
     void useServersStore.getState().loadAll();
+    const openServersIfRouted = () => {
+      if (hasServersRouteParam()) {
+        void openServersTab({ title: tr("servers.dialogTitle") });
+        return true;
+      }
+      return false;
+    };
+    if (
+      !openServersIfRouted() &&
+      hasServersTabClaimMarker() &&
+      !useAppStore.getState().tabs.some((tab) => tab.type === "servers")
+    ) {
+      void releaseServersTabLockSafe();
+    }
+    const handleHashChange = () => {
+      openServersIfRouted();
+    };
+    window.addEventListener("hashchange", handleHashChange);
+    return () => window.removeEventListener("hashchange", handleHashChange);
   }, []);
+
+  const hasServersTab = layout.tabs.some((tab) => tab.type === "servers");
+  const hadServersTabRef = useRef(hasServersTab);
+  useEffect(() => {
+    if (!hasServersTab) {
+      if (hadServersTabRef.current) {
+        hadServersTabRef.current = false;
+        useServersStore.getState().clearDirty();
+        void useServersStore.getState().loadAll();
+        void releaseServersTabLockSafe();
+      }
+      return undefined;
+    }
+    hadServersTabRef.current = true;
+    const handleUnload = () => {
+      void releaseServersTabLockSafe();
+    };
+    window.addEventListener("pagehide", handleUnload);
+    window.addEventListener("beforeunload", handleUnload);
+    return () => {
+      window.removeEventListener("pagehide", handleUnload);
+      window.removeEventListener("beforeunload", handleUnload);
+    };
+  }, [hasServersTab]);
   return {
     openDetachedSftp,
     handleDetachActiveTab,

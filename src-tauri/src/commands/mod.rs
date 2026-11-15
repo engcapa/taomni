@@ -11,6 +11,7 @@ mod chat;
 mod config;
 mod dap;
 mod database;
+mod deepseek_app;
 mod dependency_index;
 mod filebrowser;
 mod git;
@@ -378,7 +379,9 @@ pub(crate) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         | "probe_system_rdp"
         | "open_system_rdp_settings"
         | "save_server_config"
-        | "load_server_configs" => servers::handle(invoke),
+        | "load_server_configs"
+        | "claim_servers_tab"
+        | "release_servers_tab" => servers::handle(invoke),
         "vnc_connect"
         | "vnc_disconnect"
         | "vnc_test_connection"
@@ -610,6 +613,7 @@ pub(crate) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         | "chat_stream"
         | "chat_stop_stream"
         | "inline_qq_stream" => chat::handle(invoke),
+        "deepseek_app_send" | "deepseek_app_stop" => deepseek_app::handle(invoke),
         "models_list"
         | "models_download"
         | "models_delete"

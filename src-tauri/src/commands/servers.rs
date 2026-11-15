@@ -12,6 +12,8 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         crate::servers::open_system_rdp_settings,
         crate::servers::save_server_config,
         crate::servers::load_server_configs,
+        crate::servers::claim_servers_tab,
+        crate::servers::release_servers_tab,
     ];
     handler(invoke)
 }

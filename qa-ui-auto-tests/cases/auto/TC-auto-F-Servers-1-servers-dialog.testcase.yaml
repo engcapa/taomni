@@ -1,36 +1,11 @@
 id: TC-auto-F-Servers-1-servers-dialog
-title: Local servers window opens, selects a server, shows settings and console
-description: 'Coverage smoke for F-Servers-1 (Local servers manager). The manager lives in a
-
-  standalone OS window (Tauri) / popup (browser) opened via open_detached_window
-
-  with kind "servers". This case navigates directly to the detached route
-
-  (`?servers=main`) so browser smoke can exercise the shell without relying on
-
-  popup-switch support.
-
-
-  Verifies the chrome (server list + settings pane + output console), selects a
-
-  couple of server rows, and confirms the per-row Start/Stop/Settings actions
-
-  and the live console controls are mounted.
-
-
-  Actually starting/stopping a server binds a real port or spawns a system
-
-  binary (x11vnc / nfsd / iperf3) — a side-effecting action that browser
-
-  smoke cannot do safely — so this case does NOT click Start. It only
-
-  verifies the dialog routes correctly and the controls exist, then closes
-
-  via Cancel (non-destructive). Real start/stop is left to native/manual
-
-  regression with the relevant tools installed.
-
-  '
+title: Local servers tab opens via route, selects a server, shows settings/console, and closes on Cancel
+description: >-
+  Coverage smoke for F-Servers-1 (Local servers manager). Migrated from the old
+  detached OS window to an in-app single-instance tab (`tab-item[data-tab-type="servers"]`
+  rendering `servers-tab-panel` / `servers-dialog`). Navigating `?servers=main`
+  opens the tab inside the main workspace and Cancel closes the tab cleanly to
+  the sessions empty state.
 covers:
 - F-Servers-1
 tags:
@@ -49,6 +24,11 @@ steps:
 - wait_for:
     selector: '[data-testid="servers-dialog"]'
     timeout_sec: 30
+- assert_visible: '[data-testid="servers-tab-panel"]'
+- assert_visible: '[data-testid="tab-item"][data-tab-type="servers"]'
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="servers"]'
+    equal: 1
 - assert_visible: '[data-testid="server-list"]'
 - assert_visible: '[data-testid="server-settings"]'
 - assert_visible: '[data-testid="server-row-ssh"]'
@@ -69,49 +49,79 @@ steps:
 - screenshot: servers-1-dialog.png
 - assert_visible: '[data-testid="servers-dialog-cancel"]'
 - click: '[data-testid="servers-dialog-cancel"]'
+- wait_for:
+    selector: '[data-testid="servers-dialog"]'
+    state: detached
+    timeout_sec: 10
+- assert_visible: '[data-testid="sessions-empty-state"]'
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="servers"]'
+    equal: 0
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Local servers window opens, selects a server, shows settings and console：按步骤执行后，所有声明的可观察结果均满足。
+    requirement: Local servers opens inside a single main-window tab via ?servers=main, selects server configs/logs, and closes cleanly to the sessions empty state on Cancel without runtime errors.
     actions:
     - 1
-    - 6
-    - 8
-    - 10
+    - 9
+    - 11
     - 13
-    - 18
+    - 16
+    - 21
+    - 25
     checkpoints:
     - step: 2
       expectation: '{"wait_for": {"selector": "[data-testid=\"servers-dialog\"]", "timeout_sec": 30}}'
     - step: 3
-      expectation: '{"assert_visible": "[data-testid=\"server-list\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"servers-tab-panel\"]"}'
     - step: 4
-      expectation: '{"assert_visible": "[data-testid=\"server-settings\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"tab-item\"][data-tab-type=\"servers\"]"}'
     - step: 5
-      expectation: '{"assert_visible": "[data-testid=\"server-row-ssh\"]"}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"servers\"]", "equal": 1}}'
+    - step: 6
+      expectation: '{"assert_visible": "[data-testid=\"server-list\"]"}'
     - step: 7
-      expectation: '{"assert_visible": "[data-testid=\"server-row-ssh-start\"]"}'
-    - step: 12
       expectation: '{"assert_visible": "[data-testid=\"server-settings\"]"}'
+    - step: 8
+      expectation: '{"assert_visible": "[data-testid=\"server-row-ssh\"]"}'
+    - step: 10
+      expectation: '{"assert_visible": "[data-testid=\"server-row-ssh-start\"]"}'
     - step: 15
       expectation: '{"assert_visible": "[data-testid=\"server-settings\"]"}'
-    - step: 16
-      expectation: '{"assert_visible": "[data-testid=\"server-log\"]"}'
-    - step: 17
-      expectation: '{"assert_visible": "[data-testid=\"server-log-autoscroll\"]"}'
+    - step: 18
+      expectation: '{"assert_visible": "[data-testid=\"server-settings\"]"}'
     - step: 19
+      expectation: '{"assert_visible": "[data-testid=\"server-log\"]"}'
+    - step: 20
+      expectation: '{"assert_visible": "[data-testid=\"server-log-autoscroll\"]"}'
+    - step: 22
       expectation: '{"assert_visible": "[data-testid=\"server-log-clear\"]"}'
-    - step: 21
+    - step: 24
       expectation: '{"assert_visible": "[data-testid=\"servers-dialog-cancel\"]"}'
+    - step: 26
+      expectation: '{"wait_for": {"selector": "[data-testid=\"servers-dialog\"]", "state": "detached", "timeout_sec": 10}}'
+    - step: 27
+      expectation: '{"assert_visible": "[data-testid=\"sessions-empty-state\"]"}'
+    - step: 28
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"servers\"]", "equal": 0}}'
+    - step: 29
+      expectation: '{"assert_no_runtime_errors": null}'
     results:
-    - 19
-    - 21
+    - 3
+    - 4
+    - 5
+    - 22
+    - 26
+    - 27
+    - 28
+    - 29
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual
     reason: 像素与原生窗口边界不能由 DOM 断言代替。
   native:
-  - check: 仅在用例声明的执行模式中采集证据；browser 证据不替代 native，Linux 结果不外推到 Windows/macOS。
+  - check: Real Tauri ModuleLock cross-process Local servers singleton and native WebView tab migration.
     method: external
-    reason: 明确记录执行边界和未验证平台。
+    reason: Covered on real desktop binaries in TC-SERVERS-002-tab-singleton-native.

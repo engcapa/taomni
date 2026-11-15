@@ -1077,6 +1077,7 @@ export const zhCN: DeepPartial<typeof en> = {
     welcome: "欢迎",
     settings: "设置",
     lanChat: "内网通讯",
+    servers: "本地服务器",
     mailUnified: "统一邮件",
     mfa: "MFA 验证器",
     sshTunnels: "SSH 隧道",
@@ -2002,6 +2003,9 @@ export const zhCN: DeepPartial<typeof en> = {
   servers: {
     title: "服务器",
     dialogTitle: "本地服务器",
+    tabAlreadyOpenTitle: "本地服务器已打开",
+    tabAlreadyOpenMessage: "同一时间仅允许打开一个本地服务器标签页（包括多个 Taomni 实例同时运行）。请先关闭已打开的本地服务器标签页。",
+    tabAlreadyOpenHolder: "本地服务器已在 {holder} 中打开。同时只能打开一个本地服务器标签页，请先关闭后再试。",
     apply: "应用",
     cancel: "取消",
     start: "启动",

@@ -30,8 +30,6 @@ fn default_size(kind: &str) -> (f64, f64, f64, f64) {
         // SFTP keeps its historical default so existing user layouts
         // don't shift after the migration.
         "sftp" => (1200.0, 760.0, 720.0, 420.0),
-        // Local servers manager (singleton tool window).
-        "servers" => (720.0, 520.0, 600.0, 420.0),
         _ => (1100.0, 720.0, 640.0, 360.0),
     }
 }
@@ -46,9 +44,7 @@ fn label_for(kind: &str, session_id: &str) -> String {
 
 fn validate_kind(kind: &str) -> Result<(), String> {
     match kind {
-        "sftp" | "rdp" | "vnc" | "terminal" | "database" | "lan-chat" | "notes" | "servers" => {
-            Ok(())
-        }
+        "sftp" | "rdp" | "vnc" | "terminal" | "database" | "lan-chat" | "notes" => Ok(()),
         other => Err(format!("unsupported detached window kind: {}", other)),
     }
 }
@@ -100,7 +96,6 @@ pub async fn open_detached_window(
         "database" => format!("Database — {}", session_id),
         "lan-chat" => "内网通讯".to_string(),
         "notes" => "便签".to_string(),
-        "servers" => "Local servers".to_string(),
         _ => session_id.clone(),
     });
     let (default_w, default_h, min_w, min_h) = default_size(&kind);

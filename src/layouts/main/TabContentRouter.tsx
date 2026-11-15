@@ -12,10 +12,12 @@ import { MailUnifiedTab } from "../../components/mail/MailUnifiedTab";
 import { MfaTab } from "../../components/mfa/MfaTab";
 import { ObjectStorageBrowser } from "../../components/objectstorage/ObjectStorageBrowser";
 import { SettingsPanel } from "../../components/settings/SettingsPanel";
+import { ServersPanel } from "../../components/servers/ServersPanel";
 import { SocksCapPanel } from "../../components/sockscap/SocksCapPanel";
 import { TunnelManager } from "../../components/tunnel/TunnelManager";
-import { WelcomePanel } from "../../components/WelcomePanel";
+import { TaoHomeHost } from "../../components/tao/home/TaoHomeHost";
 import { t as tr } from "../../lib/i18n";
+import { useAppStore } from "../../stores/appStore";
 import {
   DbClientTab,
   DbLoadingPanel,
@@ -32,6 +34,7 @@ import { type TabContentRouterProps } from "./tabs/TabContentRouterProps";
 import { TerminalTabContents } from "./tabs/TerminalTabContents";
 
 export function TabContentRouter(viewProps: TabContentRouterProps) {
+  const storeRecentWorkspaces = useAppStore((state) => state.recentWorkspaces);
   const {
     activeTab,
     activeTabId,
@@ -69,7 +72,6 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
     openDetachedTerminal,
     openDetachedVnc,
     openGitRepository,
-    openLanChatTab,
     openLocalTab,
     openMailAccountById,
     openNewCodeWorkspaceFromWelcome,
@@ -95,6 +97,7 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
     setStatusMessage,
     setTerminalSplitLayout,
     settingsTabs,
+    serversTabs,
     sftpTabs,
     splitGridColumnTemplate,
     splitGridColumnWeightsForLayout,
@@ -143,7 +146,7 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
       className="absolute inset-0"
       style={{ display: (viewProps.showHome ?? (activeTab?.type === "welcome" || !activeTab)) ? "block" : "none" }}
     >
-      <WelcomePanel
+      <TaoHomeHost
         active={viewProps.showHome ?? (activeTab?.type === "welcome" || !activeTab)}
         restore={{
           view: welcomeRestore.view,
@@ -156,9 +159,8 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
         onStartLocalTerminal={(localShell, cwd) => openLocalTab(localShell?.name ?? tr("tabs.localTerminal"), undefined, undefined, localShell, cwd)}
         onNewSession={handleNewSession}
         onOpenLocalPath={(path, opts) => void handleOpenLocalPath(path, opts)}
-        onOpenLanChat={openLanChatTab}
         recentSessions={welcomeRecentSessions}
-        recentWorkspaces={recentWorkspaces}
+        recentWorkspaces={recentWorkspaces ?? storeRecentWorkspaces}
         mailSessions={welcomeMailSessions}
         onOpenMailSession={handleConnectSession}
         onOpenRecentSession={handleConnectSession}
@@ -279,6 +281,20 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
           style={{ display: isActive ? "block" : "none" }}
         >
           <SettingsPanel />
+        </div>
+      );
+    })}
+
+    {serversTabs.map((tab) => {
+      const isActive = activeTabId === tab.id;
+      return (
+        <div
+          key={tab.id}
+          data-testid="servers-tab-panel"
+          className="absolute inset-0 flex flex-col min-h-0"
+          style={{ display: isActive ? "flex" : "none" }}
+        >
+          <ServersPanel onClose={() => removeTab(tab.id)} />
         </div>
       );
     })}
@@ -574,6 +590,7 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
       activeTab.type !== "sockscap" &&
       activeTab.type !== "lan-chat" &&
       activeTab.type !== "mfa" &&
+      activeTab.type !== "servers" &&
       activeTab.type !== "proxy-test" && (
         <UnavailablePanel title={activeTab.title} message={activeTab.message} />
       )}

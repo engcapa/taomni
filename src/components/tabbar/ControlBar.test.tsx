@@ -159,6 +159,19 @@ describe("ControlBar settings button", () => {
     expect(screen.getByTestId("platform-mode-title")).toHaveTextContent("Tools");
   });
 
+  it("keeps the tab strip visible in Tools mode while the Local servers tab is open", () => {
+    useAppStore.setState({
+      activeSideTab: "tools",
+      tabs: [{ id: "servers", type: "servers", title: "Local servers", closable: true }],
+      activeTabId: "servers",
+    });
+    renderControlBar(vi.fn());
+    expect(screen.getByTestId("tab-bar")).toBeInTheDocument();
+    expect(screen.queryByTestId("platform-mode-title")).not.toBeInTheDocument();
+    act(() => useAppStore.setState({ tabs: [{ id: "welcome", type: "welcome", title: "Welcome", closable: false }], activeTabId: "welcome" }));
+    expect(screen.getByTestId("platform-mode-title")).toHaveTextContent("Tools");
+  });
+
   it("opens the large overview and removes the small hover-preview button", () => {
     renderControlBar(vi.fn());
     expect(screen.queryByTestId("tab-details-hover")).not.toBeInTheDocument();

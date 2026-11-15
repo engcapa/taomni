@@ -21,7 +21,7 @@ steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-ws-26
 - native_folder_dialog:
-    trigger: '[data-testid="home-open-workspace"]'
+    trigger: '[data-testid="tao-home-new-workspace"]'
     action: choose
     path: ${fixture.platform_workspace_root}
 - wait_for: '[data-testid="code-workspace-tab"]'

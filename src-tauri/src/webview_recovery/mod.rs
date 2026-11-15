@@ -330,7 +330,9 @@ pub fn terminated(app: &AppHandle, label: &str, reason: &'static str) {
         }
         drop(windows);
         // Stop delivery to the dead renderer, not its PTY/SSH or other windows.
-        crate::terminal::revoke_window_outputs(&handle.state::<crate::state::AppState>(), &label);
+        let app_state = handle.state::<crate::state::AppState>();
+        crate::terminal::revoke_window_outputs(&app_state, &label);
+        crate::servers::release_tab_lock_for_window(&app_state, &label);
         record(&handle, &label, "terminated", reason);
         if capture_control {
             crate::screenshot::stop_orphaned_capture_controls(&handle);
@@ -533,6 +535,7 @@ pub fn install(window: &WebviewWindow) {
             });
         }
         tauri::WindowEvent::Destroyed => {
+            crate::servers::release_tab_lock_for_window(&close_app.state::<crate::state::AppState>(), &close_label);
             if let Ok(mut windows) = close_app.state::<Recovery>().windows.lock() { windows.remove(&close_label); }
         }
         _ => {}

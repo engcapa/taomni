@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useRef } from "react";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import {
   SERVER_ORDER,
   saveServerConfig,
@@ -10,8 +9,6 @@ import {
 import { useServersStore } from "../../stores/serversStore";
 import { useT } from "../../lib/i18n";
 import { confirmAppDialog } from "../../lib/appDialogs";
-import { closeCurrentDetachedWindow } from "../../lib/detachWindowing";
-import { isTauriRuntime } from "../../lib/runtime";
 import { ensureVaultReady } from "../../lib/vaultGate";
 import { ServerList } from "./ServerList";
 import { ServerSettings } from "./ServerSettings";
@@ -26,14 +23,12 @@ function timestampLine(line: string): string {
 }
 
 /**
- * Local servers manager — intended to run as a **standalone OS window** with
- * native title bar / borders (opened via `open_detached_window` kind
- * `"servers"`). The shell fills the webview; move/resize come from the OS.
+ * Local servers manager tab panel.
  *
  * Subscribes to output + status events for every server type while mounted,
- * hydrates configs from the backend, and confirms discard on close when dirty.
+ * hydrates configs from the backend, and confirms discard on Cancel when dirty.
  */
-export function ServersDialog() {
+export function ServersPanel({ onClose }: { onClose?: () => void }) {
   const t = useT();
   const appendLog = useServersStore((s) => s.appendLog);
   const clearDirty = useServersStore((s) => s.clearDirty);
@@ -42,10 +37,6 @@ export function ServersDialog() {
   // Snapshot of the port each server was last saved with, so Apply can warn
   // when a running server's port changed (it won't take effect until restart).
   const appliedPorts = useRef<Partial<Record<ServerType, number>>>({});
-
-  useEffect(() => {
-    document.title = t("servers.dialogTitle");
-  }, [t]);
 
   // Hydrate configs + live statuses when the window mounts.
   useEffect(() => {
@@ -84,65 +75,17 @@ export function ServersDialog() {
     };
   }, []);
 
-  const closeWindow = useCallback(() => {
-    void closeCurrentDetachedWindow().catch(() => {
-      window.close();
-    });
-  }, []);
-
   const attemptClose = useCallback(async () => {
     if (useServersStore.getState().dirty) {
       const confirmed = await confirmAppDialog({
         message: t("servers.confirmDiscard"),
       });
       if (!confirmed) return;
+      clearDirty();
+      await loadAll();
     }
-    clearDirty();
-    closeWindow();
-  }, [clearDirty, closeWindow, t]);
-
-  // Escape closes (confirming when there are unsaved edits).
-  useEffect(() => {
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") {
-        e.preventDefault();
-        void attemptClose();
-      }
-    };
-    window.addEventListener("keydown", handler);
-    return () => window.removeEventListener("keydown", handler);
-  }, [attemptClose]);
-
-  // OS title-bar close: same discard confirm as Cancel.
-  useEffect(() => {
-    if (!isTauriRuntime()) return undefined;
-    let disposed = false;
-    let unlisten: (() => void) | null = null;
-    void getCurrentWindow()
-      .onCloseRequested((event) => {
-        if (!useServersStore.getState().dirty) return;
-        event.preventDefault();
-        void (async () => {
-          const confirmed = await confirmAppDialog({
-            message: t("servers.confirmDiscard"),
-          });
-          if (!confirmed) return;
-          clearDirty();
-          closeWindow();
-        })();
-      })
-      .then((next) => {
-        if (disposed) next();
-        else unlisten = next;
-      })
-      .catch(() => {
-        /* close hook unavailable in some stubs */
-      });
-    return () => {
-      disposed = true;
-      unlisten?.();
-    };
-  }, [clearDirty, closeWindow, t]);
+    onClose?.();
+  }, [clearDirty, loadAll, onClose, t]);
 
   const handleApply = async () => {
     const { configs, runtimes } = useServersStore.getState();
@@ -180,10 +123,10 @@ export function ServersDialog() {
 
   return (
     <div
-      role="dialog"
+      role="region"
       aria-labelledby="servers-dialog-title"
       data-testid="servers-dialog"
-      className="h-screen min-h-0 w-screen flex flex-col overflow-hidden"
+      className="h-full min-h-0 w-full flex-1 flex flex-col overflow-hidden"
       style={{
         background: "var(--taomni-panel-bg)",
         color: "var(--taomni-text)",

@@ -6,7 +6,6 @@ import {
   loadServerConfigs,
   listServerLogs,
   listServerStatuses,
-  openServersWindow,
   saveServerConfig,
   startLocalServer,
   stopLocalServer,
@@ -35,9 +34,10 @@ interface ServersStore {
   loaded: boolean;
   /** True when configs have unsaved edits since the last Apply / load. */
   dirty: boolean;
+  /** Non-null when opening the Local servers tab was blocked because another instance holds it. */
+  tabBlockedMessage: string | null;
 
-  /** Open (or focus) the Local servers OS window. Optional localized title. */
-  openDialog: (title?: string) => void;
+  setTabBlockedMessage: (message: string | null) => void;
   selectServer: (t: ServerType) => void;
   setConfig: (t: ServerType, cfg: ServerConfig) => void;
   patchConfig: (t: ServerType, patch: Partial<ServerConfig>) => void;
@@ -94,12 +94,9 @@ export const useServersStore = create<ServersStore>((set, get) => ({
   runtimes: initialRuntimes(),
   loaded: false,
   dirty: false,
+  tabBlockedMessage: null,
 
-  openDialog: (title) => {
-    void openServersWindow(title).catch((err) => {
-      console.error("[servers] failed to open Local servers window", err);
-    });
-  },
+  setTabBlockedMessage: (message) => set({ tabBlockedMessage: message }),
   selectServer: (t) => set({ selectedServer: t }),
 
   setConfig: (t, cfg) =>

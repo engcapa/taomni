@@ -22,7 +22,6 @@ export const WelcomePanel = memo(function WelcomePanel({
   onStartLocalTerminal,
   onNewSession,
   onOpenLocalPath,
-  onOpenLanChat,
   recentSessions = EMPTY_RECENT_SESSIONS,
   recentWorkspaces: providedRecentWorkspaces,
   mailSessions = EMPTY_RECENT_SESSIONS,
@@ -166,7 +165,7 @@ export const WelcomePanel = memo(function WelcomePanel({
               }}
             />
           )}
-          <PlatformLaunchCards onNewSession={onNewSession} onOpenLanChat={onOpenLanChat} onOpenNewWorkspace={onOpenNewWorkspace} />
+          <PlatformLaunchCards onNewSession={onNewSession} onOpenNewWorkspace={onOpenNewWorkspace} />
           {mailSessions.length > 0 ? (
             <MailSessionsCard
               translate={t}

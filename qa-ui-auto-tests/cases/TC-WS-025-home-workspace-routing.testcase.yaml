@@ -20,7 +20,7 @@ timeout_sec: 240
 steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-ws-25
-- click: '[data-testid="home-open-workspace"]'
+- click: '[data-testid="tao-home-new-workspace"]'
 - wait_for: '[data-testid="text-input-dialog"]'
 - fill:
     selector: '[data-testid="text-input-dialog-input"]'
