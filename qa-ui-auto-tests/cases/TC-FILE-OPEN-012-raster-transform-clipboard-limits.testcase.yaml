@@ -32,7 +32,7 @@ steps:
 - show_explorer_preview: null
 - wait_for: '[data-testid="explorer-preview"][data-preview-kind="image"]'
 - click: '[data-testid="explorer-preview-open"]'
-- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-render"]'
+- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-render"][data-image-ready="true"]'
 - assert_enabled: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-zoom-actual"]'
 - eval_readonly:
     expression: document.querySelector(".fv-active .image-render").naturalWidth === 640 && document.querySelector(".fv-active .image-render").naturalHeight === 360
@@ -101,25 +101,25 @@ steps:
     path: ${fixture.raster_png}
     sha256: ${fixture.raster_png_sha}
 - click: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-next"]'
-- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-render"][alt="02-photo.jpg"]'
+- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-render"][alt="02-photo.jpg"][data-image-ready="true"]'
 - assert_enabled: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-zoom-actual"]'
 - eval_readonly:
     expression: document.querySelector(".fv-active .image-render").naturalWidth === 640 && document.querySelector(".fv-active .image-render").naturalHeight === 360
     expect_truthy: true
 - click: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-filmstrip"] button[aria-label="03-lossless.webp"]'
-- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-render"][alt="03-lossless.webp"]'
+- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-render"][alt="03-lossless.webp"][data-image-ready="true"]'
 - assert_enabled: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-zoom-actual"]'
 - eval_readonly:
     expression: document.querySelector(".fv-active .image-render").naturalWidth === 640 && document.querySelector(".fv-active .image-render").naturalHeight === 360
     expect_truthy: true
 - click: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-filmstrip"] button[aria-label="04-palette.gif"]'
-- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-render"][alt="04-palette.gif"]'
+- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-render"][alt="04-palette.gif"][data-image-ready="true"]'
 - assert_enabled: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-zoom-actual"]'
 - eval_readonly:
     expression: document.querySelector(".fv-active .image-render").naturalWidth === 640 && document.querySelector(".fv-active .image-render").naturalHeight === 360
     expect_truthy: true
 - click: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-prev"]'
-- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-render"][alt="03-lossless.webp"]'
+- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-render"][alt="03-lossless.webp"][data-image-ready="true"]'
 - assert_file_open_bytes:
     path: ${fixture.raster_root}/02-photo.jpg
     sha256: ${fixture.raster_jpeg_sha}
@@ -149,7 +149,7 @@ steps:
     selector: '[data-testid="explorer-preview"]'
     contains: preview limit (20 MB)
 - click: '[data-testid="explorer-preview-open"]'
-- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-render"][alt="91-preview-limit.png"]'
+- wait_for: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-render"][alt="91-preview-limit.png"][data-image-ready="true"]'
 - assert_enabled: '[data-testid="file-viewer"][data-active="true"] [data-testid="image-zoom-actual"]'
 - eval_readonly:
     expression: document.querySelector(".fv-active .image-render").naturalWidth === 640

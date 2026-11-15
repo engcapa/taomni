@@ -186,6 +186,11 @@ export function TabItem(props: TabItemProps) {
       }}
       onPointerDown={(e) => {
         if (editing) return;
+        // WebKit can deliver the pointer press without a compatible mouse
+        // activation when the tab drag helper is armed. Activate on the
+        // pointer itself so a terminal/viewer tab never remains visually
+        // selected while its content stays in the background.
+        if (e.button === 0) onActivate(tab);
         const el = ref.current;
         if (!el) return;
         onStartDrag(e, tab, el);

@@ -167,7 +167,12 @@ export const useDocumentStore = create<DocumentState>((set, get) => {
       const key = documentPathKey(path);
       const snapshot = get().documents[key];
       const generation = generations.get(key) ?? 0;
-      if (!snapshot || snapshot.loading || snapshot.saving || snapshot.kind === "image" || snapshot.large || checking.get(key) === generation) return;
+      // A failed first read is an explicit recovery state. Do not let the
+      // native conflict poller turn a repaired file into a successful open
+      // behind the user's back: keep Retry/System app visible until the user
+      // chooses to retry the original open operation.
+      const initialReadFailed = !!snapshot?.error && !snapshot.savedHash && !snapshot.content;
+      if (!snapshot || snapshot.loading || snapshot.saving || snapshot.kind === "image" || snapshot.large || initialReadFailed || checking.get(key) === generation) return;
       checking.set(key, generation);
       try {
         // Always verify hash: timestamps can retain coarse precision or be restored.

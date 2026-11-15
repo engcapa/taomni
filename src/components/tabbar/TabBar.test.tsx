@@ -137,6 +137,14 @@ describe("TabBar overflow navigation", () => {
 
     expect(useAppStore.getState().activeTabId).toBe("tab-1");
   });
+  it("activates a tab on the pointer press before compatibility click delivery", () => {
+    renderTabBar();
+    const target = screen.getAllByTestId("tab-item")[1];
+
+    fireEvent.pointerDown(target, { button: 0, clientX: 20, clientY: 20, pointerId: 1 });
+
+    expect(useAppStore.getState().activeTabId).toBe("tab-1");
+  });
   beforeEach(() => {
     useSessionStore.setState({ sessions: [] });
     useAppStore.setState({
