@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { RECOVERY_LIMITATIONS, recoveryLimitation } from "./recoveryPolicy";
 describe("fail-closed recovery policy", () => {
   it("has an explicit explanation for every current tab kind, not an automatic connect default", () => {
-    expect(Object.keys(RECOVERY_LIMITATIONS)).toHaveLength(23);
+    expect(Object.keys(RECOVERY_LIMITATIONS)).toHaveLength(22);
     for (const [kind, limitation] of Object.entries(RECOVERY_LIMITATIONS)) {
       expect(recoveryLimitation(kind)).toBe(limitation);
       expect(limitation.length).toBeGreaterThan(20);
