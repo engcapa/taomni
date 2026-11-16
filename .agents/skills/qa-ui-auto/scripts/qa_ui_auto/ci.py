@@ -22,6 +22,7 @@ from .verification import browser_support, native_support, plan as impact_plan
 PLATFORMS = {"linux": ("Linux", "ubuntu-24.04", "X64"),
              "windows": ("Windows", "windows-2025", "X64"),
              "macos": ("macOS", "macos-15", "ARM64")}
+MACOS_RUNNERS = {"macos-15": "ARM64", "macos-15-intel": "X64"}
 POLICY = Path("qa-ui-auto-tests/ci/policy.yaml")
 DEPENDENCIES = Path("qa-ui-auto-tests/ci/dependencies.yaml")
 
@@ -165,6 +166,9 @@ def make_plan(args) -> dict:
         raise ValueError("platforms must contain linux, windows and/or macos")
     if not modes or set(modes) - {"browser", "native"}:
         raise ValueError("modes must contain browser and/or native")
+    macos_runner = getattr(args, "macos_runner", "") or "macos-15"
+    if macos_runner not in MACOS_RUNNERS:
+        raise ValueError("macos_runner must contain: " + ", ".join(MACOS_RUNNERS))
     linux_profiles = csv(getattr(args, "linux_profiles", "") or DEFAULT_LINUX_PROFILE)
     if not linux_profiles or set(linux_profiles) - LINUX_PROFILES.keys():
         raise ValueError("linux_profiles must contain: " + ", ".join(LINUX_PROFILES))
@@ -217,6 +221,8 @@ def make_plan(args) -> dict:
     entries, gaps, not_applicable, reachable = [], [], [], set()
     for platform_key in platforms:
         target, default_runner, arch = PLATFORMS[platform_key]
+        if platform_key == "macos":
+            default_runner, arch = macos_runner, MACOS_RUNNERS[macos_runner]
         for mode in modes:
             # Only native desktops expand: browser retains its existing runner.
             profiles = linux_profiles if platform_key == "linux" and mode == "native" else [""]
@@ -313,7 +319,8 @@ def make_plan(args) -> dict:
     entries, groups, builds = schedule(entries, by_id, dependencies, scope=args.scope,
         shards=getattr(args, "shards", "auto"), browser_workers=getattr(args, "browser_workers", 2))
     return {"schema": "qa-ui-auto.ci-selection.v1", "groups": groups, "builds": builds, "head": head, "base": base,
-            "linux_profiles": linux_profiles, "native_release": bool(getattr(args, "native_release", False)),
+            "linux_profiles": linux_profiles, "macos_runner": macos_runner,
+            "native_release": bool(getattr(args, "native_release", False)),
             "merge_base": ancestor, "scope": args.scope, "changed_paths": changed,
             "identity": execution_identity(Path.cwd()), "reasons": reasons, "impact": impact,
             "entries": entries, "gaps": gaps, "no_relevant_changes": not entries,
@@ -473,7 +480,7 @@ def main(argv=None):
     plan = subs.add_parser("plan")
     for name, default in [("scope", "smoke"), ("head", ""), ("base", ""),
                           ("platforms", "linux,windows,macos"), ("modes", "browser,native"),
-                          ("linux_profiles", DEFAULT_LINUX_PROFILE), ("shards", "auto"),
+                          ("linux_profiles", DEFAULT_LINUX_PROFILE), ("macos_runner", "macos-15"), ("shards", "auto"),
                           ("case_ids", ""), ("features", ""), ("tags", "")]:
         plan.add_argument("--" + name.replace("_", "-"), default=os.environ.get("QA_" + name.upper()) or default)
     plan.add_argument("--browser-workers", type=int, default=int(os.environ.get("QA_BROWSER_WORKERS") or 2))

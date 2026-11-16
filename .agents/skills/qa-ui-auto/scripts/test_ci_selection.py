@@ -17,6 +17,28 @@ def args(**overrides):
         'case_ids': '', 'features': '', 'tags': '', 'shards': '1'} | overrides))
 
 
+class MacosRunnerSelectionTests(unittest.TestCase):
+    def test_macos_intel_keeps_cases_and_separates_native_build_architecture(self):
+        selected = dict(scope="selected", platforms="macos", modes="browser,native",
+                        case_ids="TC-MODULES-022,TC-MODULES-023", native_release=True)
+        arm = make_plan(args(**selected))
+        intel = make_plan(args(**selected, macos_runner="macos-15-intel"))
+        self.assertEqual(arm["groups"], intel["groups"])
+        self.assertEqual(intel["gaps"], [])
+        self.assertEqual(intel["macos_runner"], "macos-15-intel")
+        self.assertEqual({entry["runner"] for entry in intel["entries"]}, {"macos-15-intel"})
+        self.assertEqual({entry["arch"] for entry in intel["entries"]}, {"X64"})
+        self.assertEqual(arm["builds"][0]["id"], "native-build-macos-arm64-release")
+        self.assertEqual(intel["builds"][0]["id"], "native-build-macos-x64-release")
+        for before, after in zip(arm["entries"], intel["entries"]):
+            self.assertEqual(before["case_digests"], after["case_digests"])
+            self.assertEqual(before["capabilities"], after["capabilities"])
+
+    def test_macos_runner_rejects_unapproved_host_and_architecture_labels(self):
+        with self.assertRaisesRegex(ValueError, "macos_runner"):
+            make_plan(args(macos_runner="self-hosted"))
+
+
 class SelectionTests(unittest.TestCase):
     def test_workspace_file_clipboard_selects_only_exact_modes_without_network_services(self):
         plan = make_plan(args(scope="selected", case_ids="TC-WS-089,TC-WS-090"))

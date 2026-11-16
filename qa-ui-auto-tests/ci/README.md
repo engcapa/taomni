@@ -65,6 +65,18 @@ temporary branch-specific caller; do not merge that temporary push trigger.
 
 ### Shards and reusable native builds
 
+`macos_runner=macos-15-intel` explicitly selects the macOS 15 Intel hosted
+runner when ARM64 capacity is unavailable. The default remains `macos-15`
+(ARM64). The selection, native build ID, runtime provenance and package platform
+all retain the chosen architecture; an Intel pass does not count as an ARM64
+pass. For example, append `-f macos_runner=macos-15-intel` to a platforms run.
+The allowed labels are fixed; arbitrary or self-hosted runners are rejected.
+
+Linux package installation refreshes indexes and retries the exact requested
+package set once after apt exit 100 (for example, a removed package version
+referenced by a stale mirror index). A failed refresh or second installation
+failure still blocks execution; tests are not skipped.
+
 `shards=auto` schedules up to four runners per platform/mode/Linux desktop
 profile. Dependencies remain together in their original order. Full suites use
 recorded case times from `durations.json` (main run 38133668943) to balance work;

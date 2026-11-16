@@ -37,6 +37,18 @@ update_package_index() {
 }
 
 install_packages() {
+  local install_status
+  if _install_packages_once "$@"; then return 0; else install_status=$?; fi
+  if [[ "$install_status" != 100 ]]; then return "$install_status"; fi
+  # A hosted image or a mirror publication race can leave an index pointing
+  # at removed .deb versions. Refresh once and retain the exact package set;
+  # a second failure still blocks the job.
+  echo 'Package installation failed; refreshing indexes once before retry.' >&2
+  update_package_index || return
+  _install_packages_once "$@"
+}
+
+_install_packages_once() {
   # The fixtures explicitly declare their desktop/IME/audio packages. Suggested
   # applications (Qt WebEngine, modem services, display managers) are unrelated.
   sudo env DEBIAN_FRONTEND=noninteractive apt-get \
