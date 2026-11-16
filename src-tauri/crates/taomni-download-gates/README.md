@@ -25,6 +25,10 @@ duplicate canonical paths and content, explicit no-proxy, both configured proxy
 sources failing closed, encoded responses, the 4 GiB header limit, active reads
 exceeding 30 seconds and an idle-read timeout. Pure
 units additionally cover hard-link no-clobber publication and panic cleanup.
+The owner must call `DownloadManager::shutdown_and_wait()` before releasing its
+profile lock; it rejects new transfers, cancels active work and waits for actual
+worker completion while retaining partial data. A pure synthetic-worker test
+protects this ordering without opening a socket.
 
 These gates do **not** establish persistence of tasks across application
 restarts, signed catalogue trust, the remote module-store UI, or download UI

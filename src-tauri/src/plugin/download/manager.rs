@@ -5,11 +5,13 @@ use std::future::Future;
 use std::panic::AssertUnwindSafe;
 
 use futures::FutureExt;
+use tokio::sync::Notify;
 
 use super::*;
 
 #[derive(Default)]
 struct ManagerState {
+    shutting_down: bool,
     tasks: HashMap<String, Arc<Mutex<DownloadTask>>>,
     cancellations: HashMap<String, CancellationToken>,
     paths: HashMap<PathBuf, String>,
@@ -21,6 +23,9 @@ impl ManagerState {
         &mut self,
         request: &DownloadRequest,
     ) -> Result<(Arc<Mutex<DownloadTask>>, CancellationToken), DownloadError> {
+        if self.shutting_down {
+            return Err(DownloadError::ShuttingDown);
+        }
         if self.cancellations.contains_key(&request.id) {
             return Err(DownloadError::AlreadyActive(request.id.clone()));
         }
@@ -74,6 +79,7 @@ fn artifact_keys(request: &DownloadRequest) -> Result<Vec<String>, DownloadError
 pub struct DownloadManager {
     service: HttpDownloadService,
     state: Arc<Mutex<ManagerState>>,
+    workers_changed: Arc<Notify>,
 }
 
 impl DownloadManager {
@@ -81,6 +87,7 @@ impl DownloadManager {
         Self {
             service,
             state: Arc::new(Mutex::new(ManagerState::default())),
+            workers_changed: Arc::new(Notify::new()),
         }
     }
 
@@ -138,11 +145,48 @@ impl DownloadManager {
             .await
             .unwrap_or_else(|_| Err(DownloadError::Http("download worker panicked".into())));
         if let Err(error) = &result {
-            let downloaded = task.lock().await.snapshot().downloaded;
-            fail_task(task, downloaded, error).await;
+            if matches!(error, DownloadError::Cancelled) {
+                cancel_task(task).await;
+            } else {
+                let downloaded = task.lock().await.snapshot().downloaded;
+                fail_task(task, downloaded, error).await;
+            }
         }
         self.state.lock().await.release(id);
+        self.workers_changed.notify_waiters();
         result
+    }
+
+    /// Stop accepting work and wait until every worker has stopped its network
+    /// and file operations. Partial data remains on disk for a future runtime.
+    /// Call before releasing the profile lock or closing its owning runtime.
+    pub async fn shutdown_and_wait(&self) {
+        let tasks = {
+            let mut state = self.state.lock().await;
+            state.shutting_down = true;
+            for token in state.cancellations.values() {
+                token.cancel();
+            }
+            state
+                .cancellations
+                .keys()
+                .filter_map(|id| state.tasks.get(id).cloned())
+                .collect::<Vec<_>>()
+        };
+        for task in tasks {
+            task.lock().await.cancel();
+        }
+        loop {
+            // Register before checking state to avoid missing the final worker
+            // notification, and support concurrent shutdown callers.
+            let changed = self.workers_changed.notified();
+            tokio::pin!(changed);
+            changed.as_mut().enable();
+            if self.state.lock().await.cancellations.is_empty() {
+                return;
+            }
+            changed.await;
+        }
     }
 
     pub async fn snapshot(&self, id: &str) -> Option<DownloadProgress> {

@@ -87,6 +87,8 @@ pub enum DownloadError {
     OutputExists(String),
     #[error("module download task is already active: {0}")]
     AlreadyActive(String),
+    #[error("module downloads are shutting down")]
+    ShuttingDown,
     #[error("module download integrity check failed: {0}")]
     Integrity(String),
     #[error("module download path is invalid: {0}")]
