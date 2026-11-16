@@ -10,7 +10,7 @@
 - 冲突文件：`src/components/terminal/panel/fileLinks.ts`、`src/components/terminal/panel/fileLinks.test.ts`。
 - 实现处理：保留当前分支由共享 `openFile` 一次负责身份、去重与激活的实现。main 虽删除 1000/3000ms 重试，仍有 50/250ms 的延迟激活；重新引入它们会覆盖用户立即切回终端的选择。保留 main 的修复意图，而不是重新加回短延迟抢焦点。
 - 测试处理：合并 main 的可调整 workspace mock、完整 viewer fixture 和初始 store 重置，保留当前分支的 fake timers / 清理；增加 `0ms` 与 `350ms` 两种用户切回时机，每种同时验证首次与重复链接打开。确认打开会展示 viewer，随后用户手动回终端，在 3.5 秒后仍保持终端。
-- 已执行：`fileLinks.test.ts` 与 `openFile.test.ts` **2 files / 12 tests passed**；`pnpm check:refactor` 与 `git diff --check` 通过。合并后匹配构建及真实终端 modifier-click 保留回归待本轮 native 执行，单元结果不替代该原生证据。
+- 合并提交：`1d8f1bcdc`。已执行：`fileLinks.test.ts` 与 `openFile.test.ts` **2 files / 12 tests passed**；`pnpm check:refactor` 与 `git diff --check` 通过。合并后匹配构建及真实终端 modifier-click 保留回归待本轮 native 执行，单元结果不替代该原生证据。
 
 ## 2. 原生扩测范围与结果口径
 
@@ -25,3 +25,34 @@
 | 辅助功能 | 设置、演示模式、归档导出、记忆/技能/工作流与语音入口的可达/取消/错误恢复 | 待核查并执行；依赖设备/模型/系统权限的未执行部分明确记录 |
 
 所有商业请求必须从真实桌面 UI 经 Tauri 后端到 DeepSeek；自动化观察只转发原调用/回调并记录白名单元数据，不替换 provider、响应或内部状态。每个新 case 登记 policy/dependencies、明确动作与结果断言。图片/代码实际能力、失败与修复、请求数、已知 usage、截图、源码/runner/build 身份及 browser/native 保留回归将追加在本文件。既有完整跨平台结果见 [上一批回执](verification-2026-11-16.md)，不能冒充本批新源码执行。
+
+## 3. 本轮新增可执行用例与已发现问题
+
+新增 `TC-TAO-HOME-014..023`，均为临时 Key 显式启用的 native 商业流程。014/020/021/022 使用真实 Windows Common Item Dialog；015/016/017/018/019/023 为跨平台 native 实现，但本轮商业凭据仅留本机，其他平台的商业执行仍不由 Windows 结果推定。
+
+| ID | 新增断言与请求上限 |
+|---|---|
+| 014 | PNG/JPEG/WebP 文件选择取消/上传、完成进度、真实识别图片内未在提示词/文件名透露的随机数字与颜色；3 |
+| 015 | Python bug 修复的独立 AST 算术校验、真实系统 Copy、TypeScript/SQL、Mermaid SVG、中文参数化 SQL；4 |
+| 016 | Flash/Pro、问/做/深研、思考块、真实 usage、搜索来源与读链接抓取次数；5 |
+| 017 | 隔离工作区绑定不自动发送、显式引用的实际模型回忆、拒绝/批准动作、精确磁盘字节与撤销；3 |
+| 018 | 编辑建立原生分支、原对话不变、真实 Stop/Continue 且保留复制得到的原始 Markdown 前缀；4 |
+| 019 | 正常关闭/重启同一 native profile、解锁后恢复真实消息及草稿、再次商业回复回忆旧内容；2 |
+| 020 | 上传复用/去重、移除引用、真实 Files 删除、不支持类型失败后有效图片恢复并实际问答；1 |
+| 021 | Python/PDF 文件内随机 token 与计算内容经真实上传被模型读取；2 |
+| 022 | 真实回复的 Markdown 精确导出、ZIP v3 磁盘内容、导入恢复、工作流创建/重开、记忆/技能/语音 Stop；1 |
+| 023 | 第一线程仍在真实流式输出时另开线程发送、两路独立完成、返回保留原草稿且不串线；2 |
+
+单次完整新集合最多 **27 次聊天调用**（019 两阶段各一次）；已有 005/011/013 合计最多 8 次。调用上限限制由 runner 执行，重试批次单独记录；2M 是全轮预算上限。已知 usage 与中止时未知 usage 分开统计。Python 代码只由限定 AST 解释器检查纯算术，不直接执行模型生成的程序。
+
+13:30 的诊断批次 `C:/tmp/tqa-deepseek-expanded-1116/run-20261116-133025-528326700` 中 014/015 均通过，7 次商业调用：图片记录 840 tokens，代码记录 1004 tokens。它证明基线能力，后续产品修改后的最终验收需要新回执。首轮脚本失败保留：`error` 观察字段与 WebDriver 传输封装重名，及 Windows 剪贴板换行归一化；均修正观察方法，不替换响应或降低图片/代码内容断言。
+
+13:37 诊断批次 `run-20261116-133733-801468600`（执行中源码调整，`identity_stable: false`，**仅作诊断**）发现：
+
+- 真实上传不支持文件后，有效 PNG 上传已成功但 FilesPanel 的组件错误未清除；020 按失败记录。增加 `FilesPanel.test.tsx`，在修复前复现 1 failed / 1 passed，修复后 FilesPanel 与 TaoAiChat **2 files / 9 tests passed**。成功上传清除旧组件错误，同时文件选择过滤器列出后端支持的文档、图片、Office、文本与代码类型。
+- 真实 web_search 确实返回来源与 `Search 1`；读链接请求仍出现模型称无可用工具、`Read URL 0`，未记通过。继续用确切服务端工具名复核，不用普通文本回答替代抓取证据。
+- 018 的原生编辑分支与 Stop/Continue 已通过；前一次用渲染后的 textContent 比原始 Markdown 前缀不可靠，现改由真实 Copy 按钮及独立 OS 剪贴板读取验证原文。
+- 019 初始测试文本误用了 `token: ...`，被产品既有凭据脱敏规则正确遮盖，现改用不构成凭据字段的合成测试词；不修改脱敏规则。
+- 017 一次 WebView2 session 创建失败保留为环境失败，没有自动变成跳过/成功；待重新执行。
+
+新增/保留 Tao runner 单元 **29 tests passed**，`pnpm check:refactor` 通过。最终 matching QA binary、完整 Windows crash-regression、跨平台 workflow 与新商业集合回执待追加。真实麦克风/ASR/TTS 播放、外部 Codex/Claude 的收费交接、工作流逐步执行、长文件上传取消/重启后恢复尚不能由上述入口/停止/创建检查宣称完成，继续保留原待办边界。

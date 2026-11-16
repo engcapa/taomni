@@ -1,0 +1,41 @@
+id: TC-TAO-HOME-014
+title: Real DeepSeek recognizes PNG JPEG and WebP chosen through the native file dialog
+description: >-
+  Actual system file chooser, native Files API and commercial vision replies.
+  Synthetic images contain unpredictable digits not supplied in the prompt or filename.
+  Cancel must not upload. Completion requires 100 percent progress and a reference chip.
+  At most three chat requests. Only explicit invalid credentials may finish early.
+modes: [native]
+native_platforms: [Windows]
+covers: [F1.11]
+tags: [p1, tao-home, native, real-provider, regression]
+fixtures: [reset_db, tao_real_provider]
+timeout_sec: 600
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-tao-home-014-real-images
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- wait_for: '[data-testid="tao-home-composer-input"]:enabled'
+- observe_tao_provider: null
+- tao_real_provider_expanded: {scenario: images}
+- assert_no_runtime_errors: null
+- screenshot: tao-home-real-images-final.png
+verification:
+  review: reviewed
+  requirements:
+  - id: REAL-IMAGE
+    requirement: Native file selection uploads actual PNG/JPEG/WebP bytes and DeepSeek recognizes fresh image content.
+    actions: [1, 2, 3, 4, 5, 6]
+    checkpoints:
+    - {step: 7, expectation: "Cancel sends no upload. Each native upload completes with a chip and 100 percent progress; the actual reply recognizes its unpredictable four digits and square color. Explicit invalid credentials are logged with remaining stages unverified."}
+    - {step: 8, expectation: No unhandled runtime errors.}
+    results: [7, 8]
+  native:
+  - check: Real Windows chooser, Files API and vision messages
+    method: automated
+    reason: Real dialog input and forwarding-only native completion observation; no provider replacement. Exact Chinese OS dialog title currently limits this case to the Windows QA host.
+  visual:
+  - check: Uploaded image references and actual reply
+    method: manual
+    reason: Screenshots retain UI; semantic assertions establish content rather than full prototype fidelity.

@@ -17,6 +17,30 @@ Placeholders: `${cfg.x.y}` resolves from `qa-ui-auto.config.yaml`; `${env.X}` fr
 
 ## Navigation & timing
 
+`tao_real_provider_expanded: {scenario: images}` is native-only and requires
+`tao_real_provider` plus `observe_tao_provider`. It drives actual Windows file
+selection (cancel and choose), uploads synthetic PNG/JPEG/WebP, then requires the
+real provider to read unpredictable digits and colors absent from the prompt.
+At most three chat requests; upload errors other than explicit expired/401/403
+credentials fail. Inputs, completion metadata, sanitized stages and screenshots
+remain under the run root. Only the local Windows chooser title is supported.
+
+The same verb accepts `code` (4 requests; safe independent Python oracle,
+TypeScript/SQL, actual OS Copy, Mermaid, Chinese code), `options` (5; model/mode,
+thinking, usage, actual web and read-url sources), `actions` (3; explicit local
+citation, reject/approve, exact disk bytes and undo), `lifecycle` (4; edit branch,
+Stop/Continue with raw copied prefix), `persistence-prepare` and
+`persistence-verify` (1 each, around YAML's normal native restart/unlock),
+`attachments` (1; chooser/reuse/remove/delete/invalid-file recovery),
+`document-files` (2; real code/PDF-only random content), `archive` (1; native
+Markdown/ZIP bytes, import and ancillary panel lifecycle), and `concurrency` (2;
+actual background stream plus independent draft). Each preserves failure traces,
+usage by request and sanitized stages. Cancelled/failed usage may be unknown.
+No model code is executed: Python arithmetic uses a restricted AST interpreter.
+All scenarios require the real native fixture/observer, enforce their request
+limit and allow early success only for explicit invalid credentials. Windows
+chooser scenarios declare their platform boundary in YAML.
+
 `observe_tao_provider: null` and `assert_tao_provider_outcome: {timeout_sec: 120}`
 are native-only real-provider checks. Install before clicking Send. The observer
 forwards the real Tauri transport and callbacks unchanged and does not read

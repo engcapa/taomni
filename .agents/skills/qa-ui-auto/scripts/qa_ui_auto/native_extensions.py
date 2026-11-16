@@ -53,3 +53,5 @@ def register(register_verb: RegisterVerb, verbs: dict[str, NativeVerb]) -> None:
     register_verb("tao_real_provider_scenarios")(tao_real_provider_scenarios)
     from .tao_real_documents import run as tao_real_provider_documents
     register_verb("tao_real_provider_documents")(tao_real_provider_documents)
+    from .tao_real_expanded import run as tao_real_provider_expanded
+    register_verb("tao_real_provider_expanded")(tao_real_provider_expanded)

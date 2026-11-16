@@ -22,7 +22,7 @@ def is_check(step: dict) -> bool:
         return args.get("action") == "assert"
     if verb == "system_file_paste":
         return True  # Real action plus independent exact target byte/tree check.
-    if verb in {"tao_real_provider_scenarios", "tao_real_provider_documents"}:
+    if verb in {"tao_real_provider_scenarios", "tao_real_provider_documents", "tao_real_provider_expanded"}:
         return True  # UI actions plus native completion/context/draft/Stop oracles.
     if verb == "terminal_rendering_probe":
         return True

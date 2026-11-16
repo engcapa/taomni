@@ -40,7 +40,7 @@ const english: Record<string, string> = {
   "搜索 Taomni 本地资料": "Search local Taomni records", "Tao 更多": "More Tao options", "导入 / 导出历史": "Import / export history",
   "演示模式": "Presentation mode", "界面设置": "Appearance settings", "给 Tao 的消息": "Message Tao", "请先连接 DeepSeek · 全家桶": "Connect DeepSeek App first",
   "问 Tao 任何开发问题…（{key} 发送）": "Ask Tao a development question… ({key} to send)", "添加附件": "Add attachment", "添加上下文": "Add context",
-  "引用文件": "Attach file", "技能 / 工作流": "Skills / workflows", "本地资料": "Local records", "模型与能力": "Model and capabilities", "思考": "Thinking", "联网": "Web",
+  "引用文件": "Attach file", "技能 / 工作流": "Skills / workflows", "本地资料": "Local records", "模型与能力": "Model and capabilities", "思考": "Thinking", "联网": "Web", "文档、图片和代码": "Documents, images and code",
   "录音": "Record audio", "停止生成": "Stop generating", "发送": "Send", "{key} 发送": "{key} to send", "联网会产生费用（估算）": "Web tools may incur costs (estimated)",
   "本次将发送：正文 + {count} 条本地资料": "Sending: message + {count} local excerpts", "请先处理上方动作提议": "Review the action proposal above first",
   "预览 {label}": "Preview {label}", "移除 {label}": "Remove {label}", "{label} 的脱敏预览": "Redacted preview of {label}",

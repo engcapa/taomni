@@ -15,6 +15,7 @@ export function FilesPanel({ controller }: { controller: TaoChatController }) {
     for (const path of paths) {
       try {
         const file = await taoFiles.upload(threadId, path);
+        setError("");
         // A completed upload belongs to its original thread, even if the user switched.
         if (controller.getState().activeThreadId === threadId) {
           const chip = fileChip(file);
@@ -32,7 +33,7 @@ export function FilesPanel({ controller }: { controller: TaoChatController }) {
   }, [threadId]);
   const choose = async () => {
     try {
-      const paths = await open({ multiple: true, filters: [{ name: "PDF / Images", extensions: ["pdf", "png", "jpg", "jpeg", "webp"] }] });
+      const paths = await open({ multiple: true, filters: [{ name: tr("文档、图片和代码"), extensions: ["pdf", "png", "jpg", "jpeg", "webp", "gif", "docx", "pptx", "txt", "md", "csv", "json", "xml", "html", "ts", "tsx", "js", "rs", "py", "java", "sql", "yaml", "yml"] }] });
       if (paths) await add(Array.isArray(paths) ? paths : [paths]);
     } catch (cause) { setError(String(cause)); }
   };

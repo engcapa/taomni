@@ -12,6 +12,8 @@
   const calls = [];
   const stops = [];
   const operations = [];
+  const files = [];
+  const actions = [];
   const probe = { observed: false, status: "pending" };
   let failure = null;
   const fail = (value) => { failure ??= value; };
@@ -25,11 +27,13 @@
   };
   function fetch(resource, options, ...rest) {
     const command = commandFor(resource);
-    if (["deepseek_app_send", "deepseek_app_regenerate", "deepseek_app_continue", "deepseek_app_stop", "deepseek_app_clone_thread", "plugin:app|name"].includes(command)) {
+    if (["deepseek_app_send", "deepseek_app_regenerate", "deepseek_app_continue", "deepseek_app_stop", "deepseek_app_clone_thread", "deepseek_app_upload_file", "deepseek_app_delete_file", "deepseek_app_execute_action", "deepseek_app_undo_action", "plugin:app|name"].includes(command)) {
       const event = command === "plugin:app|name" ? probe : { command, status: "pending" };
       if (event === probe) probe.observed = true;
       else if (command === "deepseek_app_stop") stops.push(event);
       else if (command === "deepseek_app_clone_thread") operations.push(event);
+      else if (["deepseek_app_upload_file", "deepseek_app_delete_file"].includes(command)) files.push(event);
+      else if (["deepseek_app_execute_action", "deepseek_app_undo_action"].includes(command)) actions.push(event);
       else calls.push(event);
       try {
         const headers = new Headers(options?.headers ?? resource.headers);
@@ -57,7 +61,8 @@
   window.__taomniQaTaoProvider = {
     observe: () => ({ valid: !failure && window.fetch === fetch && target.callbacks === callbacks
       && probe.observed && probe.status === "fulfilled", failure,
-      calls: calls.map((call) => ({ ...call })), stops: stops.map((call) => ({ ...call })), operations: operations.map((call) => ({ ...call })) }),
+      calls: calls.map((call) => ({ ...call })), stops: stops.map((call) => ({ ...call })), operations: operations.map((call) => ({ ...call })),
+      files: files.map((call) => ({ ...call })), actions: actions.map((call) => ({ ...call })) }),
     restore: () => {
       for (const [id, entry] of wrapped) if (callbacks.get(id) === entry.callback) callbacks.set(id, entry.original);
       if (window.fetch === fetch) Reflect.set(window, "fetch", originalFetch);
