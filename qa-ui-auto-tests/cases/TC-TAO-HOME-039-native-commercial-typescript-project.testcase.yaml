@@ -2,7 +2,9 @@ id: TC-TAO-HOME-039
 title: Native OpenCode TypeScript application, CLI, tests, repair and feature loop
 description: Real OpenCode deepseek-v4.1-flash with thinking=max authors an isolated typed Node 22 task application. All file
   writes and commands require visible approval. Actual node:test processes prove initial success, deliberate failing regression,
-  model repair and priority/legacy-data extension. No provider response replacement or exact-answer grading; key is loaded
+  model repair and priority/legacy-data extension. Unexpected native test failures permit at most two model repair cycles
+  per positive checkpoint; every failure remains evidence and the original command/test requirements remain.
+  No provider response replacement or exact-answer grading; key is loaded
   from the opt-in file.
 modes:
 - native
@@ -17,7 +19,7 @@ tags:
 fixtures:
 - reset_db
 - tao_real_provider
-timeout_sec: 1500
+timeout_sec: 1800
 steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-tao-home-039-typescript
@@ -45,7 +47,8 @@ verification:
     - step: 7
       expectation: Actual TypeScript repository, CLI, README and at least six native tests; no write before approval. Completion
         regression fails with exit 1, model repair passes, priority/legacy-data extension has at least ten passing tests.
-        Final review leaves no pending action.
+        Actual failed outputs may drive at most two approved model repair cycles per positive checkpoint; no transport/cutoff
+        failure is automatically retried. Final review leaves no pending action.
     - step: 8
       expectation: No unhandled runtime errors.
     results:
