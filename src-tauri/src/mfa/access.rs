@@ -90,7 +90,7 @@ pub(crate) fn export_with_password(
     let result = mfa.with_conn(|conn| {
         current(&permit)?;
         let key = crypto::prepare_key(conn, &keys)?.ok_or(super::ERR_NOT_FOUND)?;
-        super::commands::export_uri(conn, &key, id)
+        taomni_mfa_engine::operations::export_uri(conn, &key, id)
     });
     current(&permit)?;
     result

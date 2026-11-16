@@ -11,7 +11,7 @@ pub mod capture;
 pub mod commands;
 pub mod crypto;
 mod key_provider;
-pub mod otp;
+pub use taomni_mfa_engine::otp;
 pub mod store;
 
 #[cfg(test)]
@@ -21,19 +21,13 @@ mod test_keys;
 #[cfg(test)]
 mod tests;
 
-/// Error codes surfaced to the frontend verbatim (prefix match on the string).
-pub const ERR_KEY_MISSING: &str = "MFA_KEY_MISSING";
-pub const ERR_KEY_MISMATCH: &str = "MFA_KEY_MISMATCH";
-pub const ERR_INVALID_INPUT: &str = "MFA_INVALID_INPUT";
-pub const ERR_NOT_FOUND: &str = "MFA_NOT_FOUND";
+/// Stable business errors are shared with the standalone engine.
+pub use taomni_mfa_engine::{
+    ERR_INVALID_INPUT, ERR_KEY_MISMATCH, ERR_KEY_MISSING, ERR_NOT_FOUND, now_ms,
+};
 pub const ERR_CLIPBOARD_NO_IMAGE: &str = "MFA_CLIPBOARD_NO_IMAGE";
 /// Only macOS gates screen capture behind a preflightable permission.
 #[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 pub const ERR_SCREEN_PERMISSION: &str = "MFA_SCREEN_PERMISSION";
 pub const ERR_NO_DISPLAY: &str = "MFA_NO_DISPLAY";
 pub const ERR_CAPTURE_FAILED: &str = "MFA_CAPTURE_FAILED";
-
-/// Current Unix time in milliseconds; all MFA timestamps use this unit.
-pub fn now_ms() -> i64 {
-    chrono::Utc::now().timestamp_millis()
-}

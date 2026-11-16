@@ -315,6 +315,8 @@ TASK-025完成不等于TASK-014完成；后者必须真正移除core的MfaStore/
 
 ## 10. 分文件实施顺序与所有权
 
+2026-11-16 MFA engine 增量：纯业务迁至 `crates/taomni-mfa-engine`（models/validation/otp/crypto/keys/operations 与 store schema/accounts/mutations/preferences），不依赖 Tauri、Vault、SDK、网络或采集。核心 `mfa/store.rs` 暂时保留 lazy connection 与 snapshot adapter，`mfa/access.rs` 保持 outer permit、独占初始化/reset、导出口令和 stale-result 校验；Tauri commands 委托同一 engine。本步为 H 的准备，不满足“仅 host 持业务”和“core-only 不引用 MFA”的完成条件。纯 OTP/校验测试移入 engine，真实 Vault/备份/口令断言保留；TC-MFA-015 补真实命令层的 metadata/偏好/重复拒绝/删除持久化。固定 v1 AES-GCM 向量验证旧 schema/AAD/key-check 格式。matching GitHub 执行和后续 SDK owner/actor、可信迁移/安装及动态 UI 完成前，不标 H/I 或 TASK-014 完成；以实施台账记录实际结果。
+
 所有拟新增手写源/测试文件目标200–500行、硬上限800行；超过则按表中责任继续拆，不能压缩格式。根共享文件只由集成负责人指定owner修改。A/B 已获授权在独立 worktree 开始；C/D及共享源码接线仍由集成负责人协调原owner，在冻结结束后推进。
 
 | 子任务 | 依赖/owner责任 | 文件落点与边界（拟新增除标existing） | 完成条件 |

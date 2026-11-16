@@ -4,11 +4,7 @@ use crate::vault::{MfaKeyAction, Vault};
 use taomni_plugin_services::CoreOperationPermit;
 use zeroize::Zeroizing;
 
-pub(super) trait KeyProvider {
-    fn load(&self) -> Result<Option<DataKey>, String>;
-    fn initialize_empty(&self) -> Result<DataKey, String>;
-    fn repair_after_reset(&self) -> Result<DataKey, String>;
-}
+pub(super) use taomni_mfa_engine::keys::KeyProvider;
 
 pub(super) struct CoreKeyProvider<'a> {
     pub vault: &'a Vault,

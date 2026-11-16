@@ -10800,6 +10800,7 @@ dependencies = [
  "subtle",
  "taomni-capture",
  "taomni-file-uri",
+ "taomni-mfa-engine",
  "taomni-plugin-api",
  "taomni-plugin-services",
  "taomni-profile-locks",
@@ -10932,6 +10933,24 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.20",
  "windows 0.62.2",
+]
+
+[[package]]
+name = "taomni-mfa-engine"
+version = "0.1.0"
+dependencies = [
+ "aes-gcm 0.10.3",
+ "chrono",
+ "hex",
+ "hmac 0.13.0",
+ "rand 0.10.2",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "sha1 0.11.0",
+ "sha2 0.11.0",
+ "uuid",
+ "zeroize",
 ]
 
 [[package]]

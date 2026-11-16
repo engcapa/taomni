@@ -89,9 +89,45 @@ function coreStateViolations(root) {
   return errors;
 }
 
+function mfaEngineViolations(root, treeFile) {
+  const errors = [];
+  const directory = path.join(root, "src-tauri/crates/taomni-mfa-engine");
+  if (!fs.existsSync(directory)) return errors;
+  const manifest = fs.readFileSync(path.join(directory, "Cargo.toml"), "utf8");
+  const forbidden = /^(?:tauri(?:-|$)|wry$|taomni$|taomni-plugin-|xcap$|reqwest$)/;
+  for (const match of manifest.matchAll(/\bpackage\s*=\s*"([^"]+)"/g)) {
+    if (forbidden.test(match[1])) errors.push(`taomni-mfa-engine/Cargo.toml: aliased dependency links ${match[1]}`);
+  }
+  for (const { section, name, value } of cargoDependencies(manifest)) {
+    const packageName = value.match(/\bpackage\s*=\s*"([^"]+)"/)?.[1] ?? name;
+    const dependencyPath = value.match(/\bpath\s*=\s*"([^"]+)"/)?.[1];
+    const resolved = dependencyPath ? path.resolve(directory, dependencyPath) : undefined;
+    if (forbidden.test(packageName)
+      || resolved === path.join(root, "src-tauri")
+      || resolved?.startsWith(path.join(root, "src-tauri/plugins") + path.sep)) {
+      errors.push(`taomni-mfa-engine/Cargo.toml: ${section}.${name} links runtime, capture or network ownership`);
+    }
+  }
+  for (const filename of rustFiles(path.join(directory, "src"))) {
+    const source = fs.readFileSync(filename, "utf8").replace(/\/\/[^\n]*/g, "");
+    if (/\b(?:tauri(?:_[\w]+)?|wry|taomni_lib|taomni_plugin_[\w]+|reqwest|xcap)::|\bcrate::(?:state|vault|backup|capture)::/.test(source)) {
+      errors.push(`${path.relative(root, filename)}: MFA engine must not import application services`);
+    }
+  }
+  if (treeFile) {
+    const tree = fs.readFileSync(treeFile, "utf8");
+    if (!/^taomni-mfa-engine v/m.test(tree)) errors.push("MFA cargo tree does not identify taomni-mfa-engine as its root");
+    for (const line of tree.split(/\r?\n/)) {
+      const packageName = line.trim().split(/\s+/)[0];
+      if (forbidden.test(packageName)) errors.push(`MFA engine dependency tree contains ${packageName}`);
+    }
+  }
+  return errors;
+}
+
 /** Return all violations, so one CI run identifies every broken ownership edge. */
-export function modularBoundaryViolations(root, { linuxTreeFile } = {}) {
-  const errors = [...sharedRdpViolations(root), ...coreStateViolations(root)];
+export function modularBoundaryViolations(root, { linuxTreeFile, mfaTreeFile } = {}) {
+  const errors = [...sharedRdpViolations(root), ...coreStateViolations(root), ...mfaEngineViolations(root, mfaTreeFile)];
   const consumers = ["screenshot", "mfa", "mobile"];
   for (const consumer of consumers) {
     for (const filename of rustFiles(path.join(root, "src-tauri/src", consumer))) {
@@ -147,14 +183,19 @@ export function checkModularBoundaries(root = repository, options = {}) {
   if (errors.length) {
     throw new Error(`Modular boundary checks failed:\n${errors.map((message) => `- ${message}`).join("\n")}`);
   }
-  console.log(`Modular capture/RDP boundaries passed${options.linuxTreeFile ? "; Linux dependency tree checked" : ""}.`);
+  console.log(`Modular capture/RDP/MFA boundaries passed${options.linuxTreeFile ? "; Linux dependency tree checked" : ""}${options.mfaTreeFile ? "; MFA dependency tree checked" : ""}.`);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const treeIndex = process.argv.indexOf("--linux-tree");
+  const mfaTreeIndex = process.argv.indexOf("--mfa-tree");
   try {
     if (treeIndex >= 0 && !process.argv[treeIndex + 1]) throw new Error("--linux-tree requires a cargo tree output path");
-    checkModularBoundaries(repository, { linuxTreeFile: treeIndex >= 0 ? process.argv[treeIndex + 1] : undefined });
+    if (mfaTreeIndex >= 0 && !process.argv[mfaTreeIndex + 1]) throw new Error("--mfa-tree requires a cargo tree output path");
+    checkModularBoundaries(repository, {
+      linuxTreeFile: treeIndex >= 0 ? process.argv[treeIndex + 1] : undefined,
+      mfaTreeFile: mfaTreeIndex >= 0 ? process.argv[mfaTreeIndex + 1] : undefined,
+    });
   } catch (error) {
     console.error(error.message);
     process.exitCode = 1;

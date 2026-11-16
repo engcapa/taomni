@@ -19,6 +19,7 @@ members = [
     "crates/taomni-host-gates",
     "crates/taomni-rdp-common",
     "crates/taomni-file-uri",
+    "crates/taomni-mfa-engine",
     "crates/taomni-plugin-api",
     "crates/taomni-plugin-services",
     "crates/taomni-plugin-sdk",
@@ -86,6 +87,7 @@ taomni-sqlite-snapshot = { path = "crates/taomni-sqlite-snapshot" }
 taomni-capture = { path = "crates/taomni-capture" }
 taomni-rdp-common = { path = "crates/taomni-rdp-common", features = ["bitmap"] }
 taomni-file-uri = { path = "crates/taomni-file-uri" }
+taomni-mfa-engine = { path = "crates/taomni-mfa-engine" }
 toml = "0.9"
 tokio = { version = "1", features = ["full"] }
 uuid = { version = "1", features = ["v4"] }

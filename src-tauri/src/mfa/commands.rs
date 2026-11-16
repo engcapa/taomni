@@ -5,39 +5,17 @@
 //! immediately stops code generation. The outer admission/OS lease precedes
 //! the MFA connection, then Vault; Vault never calls back into MFA.
 
-use serde::Serialize;
+use taomni_mfa_engine::operations;
 use tauri::State;
 use tauri::ipc::Response;
 
 use super::crypto::DataKey;
-use super::otp;
-use super::store::{self, MfaAccount, MfaAccountInput, MfaAccountPatch, MfaCode, MfaPrefs};
-use super::{ERR_NOT_FOUND, capture, now_ms};
+use super::store::{MfaAccount, MfaAccountInput, MfaAccountPatch, MfaCode, MfaPrefs};
+use super::{capture, now_ms};
 use crate::state::AppState;
 use taomni_plugin_services::OperationKind;
 
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MfaSnapshot {
-    pub accounts: Vec<MfaAccount>,
-    pub prefs: MfaPrefs,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MfaInspectItem {
-    pub ok: bool,
-    pub error: Option<String>,
-    pub duplicate_of: Option<String>,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MfaAddResult {
-    pub added: Vec<MfaAccount>,
-    /// Input indexes skipped because an identical account already exists.
-    pub duplicates: Vec<usize>,
-}
+pub use taomni_mfa_engine::models::{MfaAddResult, MfaInspectItem, MfaSnapshot};
 
 fn with_key<T>(
     state: &AppState,
@@ -53,17 +31,10 @@ fn with_key<T>(
     )
 }
 
-fn not_found() -> String {
-    ERR_NOT_FOUND.to_string()
-}
-
 #[tauri::command]
 pub async fn mfa_list(state: State<'_, AppState>) -> Result<MfaSnapshot, String> {
     with_key(&state, OperationKind::ReadData, |conn, _| {
-        Ok(MfaSnapshot {
-            accounts: store::list_accounts(conn)?,
-            prefs: store::get_prefs(conn)?,
-        })
+        operations::list(conn)
     })
 }
 
@@ -74,18 +45,7 @@ pub async fn mfa_codes(
 ) -> Result<Vec<MfaCode>, String> {
     let now = now_ms();
     with_key(&state, OperationKind::ReadData, |conn, key| {
-        let mut codes = Vec::new();
-        for sealed in store::list_sealed(conn)? {
-            if ids
-                .as_ref()
-                .is_some_and(|wanted| !wanted.contains(&sealed.account.id))
-            {
-                continue;
-            }
-            let secret = store::open_secret(key, &sealed)?;
-            codes.push(store::code_for(&sealed.account, &secret, now));
-        }
-        Ok(codes)
+        operations::codes(conn, key, ids.as_deref(), now)
     })
 }
 
@@ -95,21 +55,7 @@ pub async fn mfa_inspect(
     state: State<'_, AppState>,
 ) -> Result<Vec<MfaInspectItem>, String> {
     with_key(&state, OperationKind::ReadData, |conn, key| {
-        inputs
-            .iter()
-            .map(|input| match store::validate_input(input) {
-                Ok(valid) => Ok(MfaInspectItem {
-                    ok: true,
-                    error: None,
-                    duplicate_of: store::find_duplicate(conn, &store::fingerprint_of(key, &valid))?,
-                }),
-                Err(error) => Ok(MfaInspectItem {
-                    ok: false,
-                    error: Some(error),
-                    duplicate_of: None,
-                }),
-            })
-            .collect()
+        operations::inspect(conn, key, &inputs)
     })
 }
 
@@ -121,33 +67,7 @@ pub async fn mfa_add(
     state: State<'_, AppState>,
 ) -> Result<MfaAddResult, String> {
     with_key(&state, OperationKind::WriteData, |conn, key| {
-        let valid = inputs
-            .iter()
-            .map(store::validate_input)
-            .collect::<Result<Vec<_>, _>>()?;
-        let tx = conn
-            .transaction()
-            .map_err(|e| format!("mfa database: {e}"))?;
-        let mut result = MfaAddResult {
-            added: Vec::new(),
-            duplicates: Vec::new(),
-        };
-        for (index, account) in valid.iter().enumerate() {
-            let fingerprint = store::fingerprint_of(key, account);
-            if store::find_duplicate(&tx, &fingerprint)?.is_some() {
-                if skip_duplicates {
-                    result.duplicates.push(index);
-                    continue;
-                }
-                return Err(format!(
-                    "{}: secret: account already exists",
-                    super::ERR_INVALID_INPUT
-                ));
-            }
-            result.added.push(store::insert_account(&tx, key, account)?);
-        }
-        tx.commit().map_err(|e| format!("mfa database: {e}"))?;
-        Ok(result)
+        operations::add(conn, key, &inputs, skip_duplicates)
     })
 }
 
@@ -158,51 +78,42 @@ pub async fn mfa_update(
     state: State<'_, AppState>,
 ) -> Result<MfaAccount, String> {
     with_key(&state, OperationKind::WriteData, |conn, _| {
-        store::update_account(conn, &id, &patch)?.ok_or_else(not_found)
+        operations::update(conn, &id, &patch)
     })
 }
 
 #[tauri::command]
 pub async fn mfa_delete(id: String, state: State<'_, AppState>) -> Result<(), String> {
     with_key(&state, OperationKind::WriteData, |conn, _| {
-        if store::delete_account(conn, &id)? {
-            Ok(())
-        } else {
-            Err(not_found())
-        }
+        operations::delete(conn, &id)
     })
 }
 
 #[tauri::command]
 pub async fn mfa_reorder(ids: Vec<String>, state: State<'_, AppState>) -> Result<(), String> {
     with_key(&state, OperationKind::WriteData, |conn, _| {
-        store::reorder(conn, &ids)
+        operations::reorder(conn, &ids)
     })
 }
 
 #[tauri::command]
 pub async fn mfa_hotp_next(id: String, state: State<'_, AppState>) -> Result<MfaCode, String> {
     with_key(&state, OperationKind::WriteData, |conn, key| {
-        if !store::increment_counter(conn, &id)? {
-            return Err(not_found());
-        }
-        let sealed = store::get_sealed(conn, &id)?.ok_or_else(not_found)?;
-        let secret = store::open_secret(key, &sealed)?;
-        Ok(store::code_for(&sealed.account, &secret, now_ms()))
+        operations::hotp_next(conn, key, &id)
     })
 }
 
 #[tauri::command]
 pub async fn mfa_mark_used(id: String, state: State<'_, AppState>) -> Result<MfaAccount, String> {
     with_key(&state, OperationKind::WriteData, |conn, _| {
-        store::mark_used(conn, &id)?.ok_or_else(not_found)
+        operations::mark_used(conn, &id)
     })
 }
 
 #[tauri::command]
 pub async fn mfa_set_prefs(prefs: MfaPrefs, state: State<'_, AppState>) -> Result<(), String> {
     with_key(&state, OperationKind::WriteData, |conn, _| {
-        store::set_prefs(conn, &prefs)
+        operations::set_prefs(conn, &prefs)
     })
 }
 
@@ -227,26 +138,6 @@ pub async fn mfa_export_uri(
 }
 
 pub(crate) use super::access::export_with_password;
-
-pub(super) fn export_uri(
-    conn: &rusqlite::Connection,
-    key: &DataKey,
-    id: &str,
-) -> Result<String, String> {
-    let sealed = store::get_sealed(conn, id)?.ok_or_else(not_found)?;
-    let secret = store::open_secret(key, &sealed)?;
-    let account = &sealed.account;
-    Ok(otp::otpauth_uri(&otp::OtpauthFields {
-        kind: account.kind,
-        issuer: &account.issuer,
-        account_name: &account.account_name,
-        secret: &secret,
-        algorithm: account.algorithm,
-        digits: account.digits,
-        period: account.period,
-        counter: account.counter,
-    }))
-}
 
 /// Destructive recovery when the vault no longer holds the key for `mfa.db`:
 /// wipes every account and re-binds the empty store. The UI confirms twice.

@@ -12,6 +12,11 @@
 
 ## 2026-11-16 最新 runner 证据（持续采集中）
 
+- 三态还原源码 `df46031e53c05974fe2a9f87c10b393f9980e2cd` 的[契约 #43848520091](https://github.com/engcapa/taomni/actions/runs/43848520091) 已全部成功，24 份 artifact 在执行期间收齐。Linux 核心 receipt 的 24 个过滤器共选中 338 项、全部 exit=0；三端宿主 services 各 8/8、snapshot 各 4/4，观察工具 Linux/macOS 各 32 项、Windows 31 项通过/1 项平台跳过。对应 [UI #43848528270](https://github.com/engcapa/taomni/actions/runs/43848528270) 六个 browser shard 已即时下载：三端各 **21/21**，含新还原确认与完整 browser crash-regression；native 构建仍在执行，不记 TC-MODULES-013–015 或完整三态还原通过。旧 #43844254356 的 macOS 第二个 browser shard 已取消、缺 1 项结果；Linux/Windows 各 50/50、macOS 已收 49/49，不将取消项记为通过，native 仍待收证。
+- #43844254356 已即时下载 Linux Xvfb 三个 native shard（39/39），其余仍待结果；Wayland 四个 shard 已齐，**48/52**。两种 profile 的 TC-MODULES-011/012 全部通过，live observations 确认两次不同备份 job、同 generation、独立 ZIP/hash/SQLite 内容和正常重启后 writer OS lease 仍被真实持有。Wayland 四个失败与已记录 baseline 相同：SERVERS-002、FILE-OPEN-006、WS-030 为非左键输入仅支持 owned X11；FILE-OPEN-008 为已有路径 chip hit-test。按用户指示单列忽略且不计通过，原始失败保留；Windows/macOS native 未收齐不外推。
+- 当前 MFA 引擎拆分批次：新增 `taomni-mfa-engine`，按 DTO、输入校验、OTP、AES-GCM、key-check、账户查询/写入/偏好和业务操作拆分。现有 Tauri 命令委托 engine；核心仅保留过渡连接 owner、Vault 准入/授权、备份和共享采集适配。保留 IPC、schema v1、AAD、固定 key ID、错误码、UUID/毫秒时间戳与原有 Vault 集成断言；不把本批标为 MFA 独立宿主交付，核心仍依赖 engine。下一边界是正式 SDK 的 operation-scoped KeyProvider、MFA store actor/snapshot、可信包/迁移及动态 UI；其 G 门按设计先闭合。
+- 本批拆分前原有 MFA **19/19** 单元基线通过；五项纯 OTP/校验断言原样迁到 engine，真实 Vault、备份、capture、导出口令与 protected-entry 断言留在核心。engine 当前 **13/13** 单元通过，新增原子批量导入/重复回滚、metadata/偏好、无密钥首次探测、缺失/错误 key 拒绝、显式 reset 与独立 AES-GCM 固定 v1 密文解密。边界单元 **9/9**、真实依赖树无 Tauri/Vault/SDK/runtime、actionlint、case schema/reviewed contract 与 `check:refactor` 通过；拆分后的核心 MFA 集成单元 **14/14**、受影响 protected snapshot/MFA 还原单元 **7/7** 通过；完整 QA audit gates 通过（766 cases/766 IDs、0 errors，保留原 baseline）；尚未取得本批 matching hosted 证据。
+- 新 `TC-MFA-015`（91 步，browser/native）：从 UI 创建并递增 RFC HOTP，拒绝别名重复且保持 counter=1，保存编辑/备注/置顶/排序/分组，WebView reload 后核对原验证码与偏好；取消删除保留账户，确认删除再次 reload 仍为空且无 runtime errors。该用例使用真实 native IPC/存储，但不等同正常进程重启或 MFA 独立宿主。policy/dependencies/feature-list 同步；升级 workflow 新增四发布目标的 engine check、runner 架构 unit 与 runtime/build cargo tree 边界，执行结果待提交后 GitHub 收证。
 - 超时修复源码 `4c060a939702cea5045f1b3b6a2acc3e7ea8580a` 的[契约 #43844240041](https://github.com/engcapa/taomni/actions/runs/43844240041) 已 **23/23 jobs 成功**，24 份 artifact 在执行期间收齐。三端 services 各 **8/8**、snapshot 各 **4/4**；Windows 原超时竞态、终止凭据与 writer OS 锁释放断言通过。匹配源码 [UI #43844254356](https://github.com/engcapa/taomni/actions/runs/43844254356) 已开始执行、即时采集器已工作，Linux browser **50/50**；其余未收齐的分片不外推。旧 UI #43841954615 已由 REST cancel 终止，避免为已替代源码重复构建；原失败和已完成证据保留。
 - 下一批补充 `TC-MODULES-013/014/015`：分别在运行、禁用、卸载保留数据时取得精确手工 v2 档案，之后经真实业务修改 hello、递增 HOTP 并修改 Vault 主密码；固定生产 IPC 验证错密码不留下 pending，再正常关闭/冷启动应用，断言原数据、原密码/755224、新 generation、原启用状态和代码指针，第二次正常重启保持新 generation。尚未 hosted 执行，不算真实还原通过，也不代替 MFA 独立宿主后的 TC-MODULES-020–022。
 - 新 `TC-BACKUP-RESTORE-001` 验证浏览器还原确认的空密码、错密码、成功暂存和禁止重复确认。补稳定控件标识与明确的 preview archive/stage model；正确恢复和原生加密均不由该 model 模拟。预期密码拒绝展示现有界面错误，不再作为 runtime console error；未知错误保留日志。native 三态用固定生产 stage IPC 配合现有正常重启，**不声称已经验证确认按钮自动 relaunch 的原生接管**；该入口仍为发布前待办。
@@ -102,7 +107,7 @@
 | TASK-011 验签安装 | 基础闭环四种 native profile 通过 | pinned key 的真实 minisign 校验、清单防回滚、安全解包、内容绑定及安装入口强制验签已接入；#43804951477 的 TC-MODULES-007 在四种 native profile 全部 52 步通过，覆盖官方签名安装、启禁、正常重启和篡改拒绝。业务包、更新/回滚与最终发布仍需后续证据。 |
 | TASK-012 单体升级 | 部分 | 从安全 pending 进入真实 legacy exporter、可信包 staging、Vault 交接、激活、恢复/回滚；真实安装升级证据。 |
 | TASK-013 原型与 G 门 | 部分 | hello fixture 已有；真实 MFA 原型和 G1–G11 多端实验与原始证据。 |
-| TASK-014 MFA | 待前置闭合 | 完整迁出、数据密钥与备份恢复、功能等价。 |
+| TASK-014 MFA | engine 边界开发中，宿主迁出未完成 | 已拆不依赖核心服务的业务 engine，现有 facade 委托 engine；核心仍持连接/依赖。待相关 G 门、正式 SDK 宿主、可信包/真实迁移、动态 UI 和三态还原。 |
 | TASK-015 | 已取消 | 历史设计 `7bc498b35` 中为 LanChat 迁移，已由用户明确删除决定取消；主设计已保留编号并清理前置依赖。旧库保持原位，不读取、迁移或删除，不创建替代插件。 |
 | TASK-016 RDP/VNC 客户端 | 待前置闭合 | 两个插件宿主与前端、证书钉扎、剪贴板/输入、保留会话及特定按键辅助入口。 |
 | TASK-017 RDP/VNC 服务端 | 待前置闭合 | 两个插件宿主、共享采集/公共库、系统权限和平台边界。 |

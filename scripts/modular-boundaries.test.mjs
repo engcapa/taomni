@@ -9,11 +9,12 @@ function fixture(t, manifest = "") {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), "taomni-capture-boundary-"));
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   for (const child of ["src/screenshot", "src/mfa", "src/mobile", "src/servers", "src/config",
-    "crates/taomni-capture/src", "crates/taomni-file-uri/src", "crates/taomni-rdp-common/src"]) {
+    "crates/taomni-capture/src", "crates/taomni-file-uri/src", "crates/taomni-rdp-common/src",
+    "crates/taomni-mfa-engine/src"]) {
     fs.mkdirSync(path.join(root, "src-tauri", child), { recursive: true });
   }
   fs.writeFileSync(path.join(root, "src-tauri/crates/taomni-capture/Cargo.toml"), manifest);
-  for (const name of ["taomni-file-uri", "taomni-rdp-common"]) {
+  for (const name of ["taomni-file-uri", "taomni-rdp-common", "taomni-mfa-engine"]) {
     fs.writeFileSync(path.join(root, "src-tauri/crates", name, "Cargo.toml"), "");
   }
   return root;
@@ -94,4 +95,30 @@ test("core state rejects feature owners and implicit composition forwarding", (t
   const errors = modularBoundaryViolations(root).join("\n");
   assert.match(errors, /cannot own optional feature/);
   assert.match(errors, /must not use Deref/);
+});
+
+test("MFA engine rejects runtime dependencies, core paths and application services", (t) => {
+  const root = fixture(t);
+  write(root, "src-tauri/crates/taomni-mfa-engine/Cargo.toml", '[dependencies]\nbridge = { package = "tauri-utils", version = "2" }\ncore = { path = "../.." }\n');
+  write(root, "src-tauri/crates/taomni-mfa-engine/src/keys.rs", "use crate::vault::Vault;\n");
+  const errors = modularBoundaryViolations(root).join("\n");
+  assert.match(errors, /tauri-utils/);
+  assert.match(errors, /core links runtime/);
+  assert.match(errors, /keys.rs: MFA engine must not import application services/);
+  write(root, "src-tauri/crates/taomni-mfa-engine/Cargo.toml", '[dependencies]\nrusqlite = "0.40"\n');
+  write(root, "src-tauri/crates/taomni-mfa-engine/src/keys.rs", "use crate::crypto::DataKey;\n");
+  assert.deepEqual(modularBoundaryViolations(root), []);
+});
+
+test("MFA runtime cargo tree rejects transitive core/SDK and network ownership", (t) => {
+  const root = fixture(t);
+  const tree = path.join(root, "mfa-tree.txt");
+  fs.writeFileSync(tree, "taomni-mfa-engine v0.1.0\nwrapper v1.0.0\ntaomni-plugin-sdk v0.1.0\nreqwest v0.13.0\n");
+  const errors = modularBoundaryViolations(root, { mfaTreeFile: tree }).join("\n");
+  assert.match(errors, /tree contains taomni-plugin-sdk/);
+  assert.match(errors, /tree contains reqwest/);
+  fs.writeFileSync(tree, "taomni-mfa-engine v0.1.0\nrusqlite v0.40.0\n");
+  assert.deepEqual(modularBoundaryViolations(root, { mfaTreeFile: tree }), []);
+  fs.writeFileSync(tree, "wrong-root v0.1.0\n");
+  assert.match(modularBoundaryViolations(root, { mfaTreeFile: tree }).join("\n"), /does not identify/);
 });

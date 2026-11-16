@@ -34,6 +34,60 @@ jobs:
     with:
       head: ${{ inputs.head || github.sha }}
 
+  mfa-engine-contracts:
+    name: MFA engine (${{ matrix.target }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - os: windows-latest
+            target: x86_64-pc-windows-msvc
+          - os: macos-latest
+            target: aarch64-apple-darwin
+          - os: macos-latest
+            target: x86_64-apple-darwin
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head || github.sha }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: modular-mfa-engine-${{ matrix.target }}
+      - name: Compile MFA engine for the release target and run business units
+        run: |
+          mkdir -p modular-evidence
+          git rev-parse HEAD > modular-evidence/source-sha.txt
+          rustc --version > modular-evidence/rustc-version.txt
+          set -o pipefail
+          cargo check --manifest-path src-tauri/Cargo.toml -p taomni-mfa-engine --target '${{ matrix.target }}' --all-targets --locked 2>&1 | tee modular-evidence/mfa-engine-check.log
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-mfa-engine --lib --locked 2>&1 | tee modular-evidence/mfa-engine-unit.log
+      - name: Verify the MFA engine has no application or IPC runtime dependencies
+        run: |
+          set -o pipefail
+          cargo tree --manifest-path src-tauri/Cargo.toml -p taomni-mfa-engine --target '${{ matrix.target }}' --edges normal,build --prefix none --format '{p}' --locked > modular-evidence/mfa-engine-tree.txt
+          node scripts/modular-boundaries.mjs --mfa-tree modular-evidence/mfa-engine-tree.txt 2>&1 | tee modular-evidence/mfa-engine-boundary.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: modular-mfa-engine-${{ matrix.target }}
+          path: modular-evidence
+          if-no-files-found: error
+
   vault-foundations:
     name: Vault foundations (${{ matrix.os }})
     strategy:
