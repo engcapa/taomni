@@ -7,6 +7,10 @@ on:
         description: Commit or ref to test (empty = workflow ref)
         type: string
         default: ''
+      download_only:
+        description: Run only the three-platform native downloader and restart contracts
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       head:
@@ -14,12 +18,16 @@ on:
         type: string
         required: false
         default: ''
+      download_only:
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
 
 concurrency:
-  group: modular-upgrade-${{ github.ref }}
+  group: modular-upgrade-${{ github.ref }}-${{ inputs.download_only || false }}
   cancel-in-progress: true
 
 env:
@@ -35,12 +43,14 @@ jobs:
       head: ${{ inputs.head || github.sha }}
 
   signed-mfa-install:
+    if: ${{ !inputs.download_only }}
     uses: ./.github/workflows/qa-modular-mfa-install.yml
     with:
       head: ${{ inputs.head || github.sha }}
     secrets: inherit
 
   mfa-engine-contracts:
+    if: ${{ !inputs.download_only }}
     name: MFA engine and host (${{ matrix.target }})
     strategy:
       fail-fast: false
@@ -96,6 +106,7 @@ jobs:
           if-no-files-found: error
 
   vault-foundations:
+    if: ${{ !inputs.download_only }}
     name: Vault foundations (${{ matrix.os }})
     strategy:
       fail-fast: false
@@ -133,6 +144,7 @@ jobs:
           if-no-files-found: error
 
   host-lifecycle:
+    if: ${{ !inputs.download_only }}
     name: Real host lifecycle (${{ matrix.os }})
     strategy:
       fail-fast: false
@@ -196,6 +208,7 @@ jobs:
           if-no-files-found: error
 
   capture-contracts:
+    if: ${{ !inputs.download_only }}
     name: Capture contracts (${{ matrix.target }})
     strategy:
       fail-fast: false
@@ -258,6 +271,7 @@ jobs:
           if-no-files-found: error
 
   rdp-shared-check:
+    if: ${{ !inputs.download_only }}
     name: Shared RDP check (${{ matrix.target }})
     strategy:
       fail-fast: false
@@ -301,6 +315,7 @@ jobs:
           if-no-files-found: error
 
   rdp-shared-unit:
+    if: ${{ !inputs.download_only }}
     name: Shared RDP units (${{ matrix.os }})
     strategy:
       fail-fast: false
@@ -359,6 +374,7 @@ jobs:
           if-no-files-found: error
 
   upgrade-contracts:
+    if: ${{ !inputs.download_only }}
     name: Upgrade contracts (${{ matrix.os }})
     strategy:
       fail-fast: false
