@@ -1,0 +1,40 @@
+id: TC-TAO-HOME-020
+title: Real attachment reuse, removal, deletion and unsupported-file recovery
+description: >-
+  Use the actual Windows chooser and native Files API to upload/reuse a real
+  image, remove its reference and delete it, reject an unsupported file, then
+  recover with a valid upload and complete an actual provider image question.
+modes: [native]
+native_platforms: [Windows, Linux]
+covers: [F1.11]
+tags: [p1, tao-home, native, real-provider, regression]
+fixtures: [reset_db, tao_real_provider]
+timeout_sec: 600
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-tao-home-020-real-attachments
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- wait_for: '[data-testid="tao-home-composer-input"]:enabled'
+- observe_tao_provider: null
+- tao_real_provider_expanded: {scenario: attachments}
+- assert_no_runtime_errors: null
+- screenshot: tao-home-real-attachments-final.png
+verification:
+  review: reviewed
+  requirements:
+  - id: REAL-ATTACHMENT-LIFECYCLE
+    requirement: Native attachment reuse/removal/delete and invalid-file recovery yield the actual usable provider image.
+    actions: [1, 2, 3, 4, 5, 6]
+    checkpoints:
+    - {step: 7, expectation: "Repeated upload adds no duplicate task or chip. Removal clears the reference; real delete succeeds. Unsupported file visibly rejects with no chip; valid retry clears the error and its actual image-question reply completes; recognition is recorded without exact-answer grading. Only explicit invalid credentials may finish early."}
+    - {step: 8, expectation: No unhandled runtime errors.}
+    results: [7, 8]
+  native:
+  - check: Windows chooser and real Files API reuse/delete
+    method: automated
+    reason: Actual native upload/delete callbacks, UI counts and a commercial image reply establish behavior. Owned GTK and Windows dialogs exercise selection without replacing plugin results.
+  visual:
+  - check: Actual failure/recovery references
+    method: manual
+    reason: Semantic progress/error/chip assertions and retained screenshots do not certify full prototype fidelity.

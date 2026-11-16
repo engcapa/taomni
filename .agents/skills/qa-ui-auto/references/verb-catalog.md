@@ -17,6 +17,59 @@ Placeholders: `${cfg.x.y}` resolves from `qa-ui-auto.config.yaml`; `${env.X}` fr
 
 ## Navigation & timing
 
+`tao_real_provider_expanded: {scenario: images}` is native-only and requires
+`tao_real_provider` plus `observe_tao_provider`. It drives actual Windows file
+selection (cancel and choose), uploads synthetic PNG/JPEG/WebP, then requires the
+real provider to read unpredictable digits and colors absent from the prompt.
+At most three chat requests; upload errors other than explicit expired/401/403
+credentials fail. Inputs, completion metadata, sanitized stages and screenshots
+remain under the run root. Only the local Windows chooser title is supported.
+
+The same verb accepts `code` (4 requests; safe independent Python oracle,
+TypeScript/SQL, actual OS Copy, Mermaid, Chinese code), `options` (5; model/mode,
+thinking, usage, actual web and read-url sources), `actions` (3; explicit local
+citation, reject/approve, exact disk bytes and undo), `lifecycle` (4; edit branch,
+Stop/Continue with raw copied prefix), `persistence-prepare` and
+`persistence-verify` (1 each, around YAML's normal native restart/unlock),
+`attachments` (1; chooser/reuse/remove/delete/invalid-file recovery),
+`document-files` (2; real code/PDF-only random content), `archive` (1; native
+Markdown/ZIP bytes, import and ancillary panel lifecycle), and `concurrency` (2;
+actual background stream plus independent draft). Each preserves failure traces,
+usage by request and sanitized stages. Cancelled/failed usage may be unknown.
+No model code is executed: Python arithmetic uses a restricted AST interpreter.
+All scenarios require the real native fixture/observer, enforce their request
+limit and allow early success only for explicit invalid credentials. Windows
+chooser scenarios declare their platform boundary in YAML.
+
+`observe_tao_provider: null` and `assert_tao_provider_outcome: {timeout_sec: 120}`
+are native-only real-provider checks. Install before clicking Send. The observer
+forwards the real Tauri transport and callbacks unchanged and does not read
+request bodies, keys or response bodies. The assertion waits for invoke
+completion and stopped generation; a nonempty rendered assistant reply without
+errors passes. Only HTTP 401/403 or explicit key expiration plus a visible enabled
+retry passes as `credential-invalid`; other errors fail. The outcome artifact
+retains only counts, booleans, fixed categories and completion status.
+
+`tao_real_provider_scenarios: null` drives real native UI after
+`observe_tao_provider`: two turns recall a fresh synthetic token, locale changes
+retain an unsent draft, regeneration retains the transcript, a new chat starts
+empty, and Stop retains a partial commercial response without automatic retry.
+It makes at most four paid requests, writes sanitized stage snapshots and native
+screenshots, and ends early with an explicit `credential-invalid` result only
+for the same 401/403/expired-key rule. Other failures remain failures. It observes
+send/regenerate/continue/stop callback metadata without reading transport bodies
+or replacing callbacks' arguments. Client Stop completion does not independently
+prove server socket closure; loopback native cases own that assertion.
+
+`tao_real_provider_documents: null` drives three real native requests after
+`observe_tao_provider`. It checks an actual heading/table/fenced-code reply,
+waits for the real native branch-clone callback and verifies context recall in
+that branch, then checks independent original/branch history and drafts after
+creating a separate conversation. The observer records clone command/status
+metadata only. The same explicit credential-invalid rule applies; model-output,
+clone, network and UI failures fail. History restoration here stays in the same
+process; TC-TAO-HOME-004 owns restart persistence.
+
 `reveal_project_tree_row: '[data-testid="code-workspace-tree-dir"][data-path="folder"]'` scrolls the real tree viewport until a lazy row is visible, without selection or activation, and saves raw offsets. File-open probes do the same preparation before the first measured pointer event.
 
 `measure_workspace_file_open: {selector, expected, event: click|dblclick, label, require_highlight?: boolean, require_editor_reuse?: boolean}`
@@ -117,7 +170,7 @@ activation is still sent exactly once and all original frame budgets apply.
 |------|------|-------|
 | `assert_visible` | selector | Browser/native. Waits for a nonzero layout box and visible CSS visibility; attachment alone is insufficient. |
 | `assert_file_open_bytes` | `{path?\|selector?, remember?, equals?\|sha256?\|absent?, timeout_sec?}` | Browser/native. Requires `file_open_files`; exact UTF-8/SHA256/absence read-only oracle confined to its root or a DOM-observed controlled viewer temp. `remember` retains that observed path for post-close absence. Browser reads IndexedDB VFS; native independently reads host bytes, never viewer IPC. Retains file-open-byte-observations.jsonl. |
-| `assert_download` | `{trigger, filename, contains?: string[]}` | Browser only. Clicks the real export control once, waits for an actual Playwright download, retains the file, asserts filename/nonempty/required bytes and records SHA256. Not native disk/dialog evidence. |
+| `assert_download` | `{trigger, filename, contains?: string[], artifact?: pdf|docx}` | Browser only. Clicks the real export control once, waits for an actual Playwright download, retains the file, asserts filename/nonempty/required bytes and records SHA256. Optional artifact independently checks complete 300DPI PDF pages or portable SVG/600DPI Word media. Not native disk/dialog evidence. |
 | `assert_no_runtime_errors` | `null` | Browser/native, all platforms. Fails on uncaught exceptions, unhandled promise rejections, the production React root error diagnostic or `[data-testid="app-crash"]`. Ordinary console warnings and handled service errors remain diagnostic. Browser observations span the case including reloads; native observes the current document, so place a checkpoint before and after reload/navigation. Missing monitoring fails. Saves raw observations in `runtime-errors.jsonl` before asserting, including failures. Does not establish OS process survival by itself; retain functional postconditions and native lifecycle assertions. |
 | `assert_not_visible` | selector | Browser/native. Waits until hidden or absent, including mounted nodes with `display:none` or `visibility:hidden`. Use `wait_for` with `state: detached` when DOM removal is required. |
 | `assert_text` | `{selector, contains, timeout_sec?}` | Polls `text_content` and `data-terminal-text` (xterm canvas fallback). |
@@ -652,3 +705,5 @@ interoperability. The fixture restores PATH and never alters a user executable.
 TC-MOBILE-007 also authenticates through real SSH direct-tcpip jump channels (OTP
 and encrypted key), and HTTP/SOCKS5/application/independent proxies after locking
 the vault through desktop Settings; the peer independently records routing.
+
+| `assert_export_quality` | `{path, kind: pdf\|docx}` | Native only. Independently parses the retained real PDF/DOCX file: complete A4 pages at 300 DPI, or readable explicit SVG labels, 600 DPI fallback, original raster dimensions and disabled compression. No print API or renderer state substitution. |

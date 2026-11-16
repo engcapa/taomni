@@ -78,7 +78,7 @@ export async function readMarkdownImage(docPath: string, reference: string): Pro
   return bytesDataUrl(bytes, blob.type);
 }
 
-async function asPng(file: Blob): Promise<Uint8Array> {
+export async function markdownImageBytes(file: Blob): Promise<Uint8Array> {
   if (file.size > MAX_IMAGE_BYTES) throw new Error("Image exceeds the 20 MB limit");
   if (file.type === "image/png") return new Uint8Array(await file.arrayBuffer());
   const url = URL.createObjectURL(file);
@@ -111,7 +111,7 @@ export async function saveMarkdownImage(
   preferences: { markdownImageDir: string; markdownImageTemplate: string },
 ): Promise<{ path: string; relativePath: string; markdown: string }> {
   if (!docPath || !markdownDirectory(docPath)) throw new Error("Save the document to a folder before inserting images");
-  const bytes = await asPng(file);
+  const bytes = await markdownImageBytes(file);
   const result = await viewerSavePastedImage({
     docPath,
     dir: preferences.markdownImageDir,

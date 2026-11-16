@@ -1,0 +1,39 @@
+id: TC-TAO-HOME-015
+title: Real configured provider code debugging, multiple languages, Mermaid and native Copy
+description: >-
+  Four bounded commercial requests exercise generated Python, actual OS
+  clipboard copy, two code languages,
+  Mermaid SVG nodes and a Chinese parameterized-SQL explanation.
+modes: [native]
+covers: [F1.11]
+tags: [p1, tao-home, native, real-provider, regression]
+fixtures: [reset_db, tao_real_provider]
+timeout_sec: 600
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-tao-home-015-real-code
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- wait_for: '[data-testid="tao-home-composer-input"]:enabled'
+- observe_tao_provider: null
+- tao_real_provider_expanded: {scenario: code}
+- assert_no_runtime_errors: null
+- screenshot: tao-home-real-code-final.png
+verification:
+  review: reviewed
+  requirements:
+  - id: REAL-CODE
+    requirement: Real code reasoning and shared Markdown render Python, TypeScript, SQL and Mermaid correctly, and Copy writes real OS text.
+    actions: [1, 2, 3, 4, 5, 6]
+    checkpoints:
+    - {step: 7, expectation: "Generated Python is rendered and syntax validity is recorded without exact-answer grading; OS clipboard contains fenced Markdown; multiple code blocks render; reading/copying an earlier reply does not prevent the next question from following into view; Mermaid renders three visible nodes; Chinese reply retains parameterized SQL and synthetic token. Only explicit invalid credentials may finish early."}
+    - {step: 8, expectation: No unhandled runtime errors.}
+    results: [7, 8]
+  native:
+  - check: Real native provider and OS clipboard
+    method: automated
+    reason: Forwarding-only completion observation plus independent OS clipboard read; prior clipboard text is restored, non-text clipboard formats are outside restoration.
+  visual:
+  - check: Real Markdown and Mermaid
+    method: manual
+    reason: Semantic code/SVG assertions and retained screenshots do not certify full visual prototype alignment.

@@ -2,17 +2,34 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct TaoRequest {
+    #[serde(alias = "thread_id")]
     pub thread_id: String,
     pub content: String,
     pub mode: String,
     pub model: String,
+    #[serde(default = "default_provider")]
+    pub provider: String,
+    #[serde(default = "default_effort")]
+    pub reasoning_effort: String,
     #[serde(default)]
     pub thinking: bool,
     #[serde(default)]
     pub web: bool,
     #[serde(default)]
     pub context: serde_json::Map<String, Value>,
+    #[serde(default)]
+    pub chips: Vec<Value>,
+    #[serde(default)]
+    pub action_feedback: Vec<Value>,
+}
+
+fn default_provider() -> String {
+    "deepseek-app".into()
+}
+fn default_effort() -> String {
+    "high".into()
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

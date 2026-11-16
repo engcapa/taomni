@@ -337,15 +337,22 @@ def step_vault_first_run(ctx: StepContext, args: Any) -> None:
     setup = page.locator("[data-testid='vault-setup-dialog']")
     unlock = page.locator("[data-testid='vault-unlock-dialog']")
     welcome = page.locator("[data-testid='welcome-panel']")
-    deadline = 20.0
     try:
-        setup.wait_for(state="visible", timeout=deadline * 1000)
+        page.wait_for_selector(
+            "[data-testid='vault-setup-dialog']:visible, "
+            "[data-testid='vault-unlock-dialog']:visible, "
+            "[data-testid='welcome-panel']:visible",
+            state="visible", timeout=20_000,
+        )
     except Exception:  # noqa: BLE001
+        raise StepError("vault_first_run: neither vault dialog nor welcome-panel appeared") from None
+    # A dialog takes precedence over the already-mounted page behind it.
+    if not (setup.count() and setup.first.is_visible()):
         if unlock.count() and unlock.first.is_visible():
             raise StepError(
                 "vault_first_run: vault is LOCKED with an unknown master password"
             )
-        if welcome.count():
+        if welcome.count() and welcome.first.is_visible():
             return  # already unlocked
         raise StepError("vault_first_run: neither vault dialog nor welcome-panel appeared")
     setup.locator("[data-testid='vault-setup-pw1']").fill(password)

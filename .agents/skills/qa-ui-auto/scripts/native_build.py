@@ -213,9 +213,9 @@ def build_qa(*, release: bool = False, force: bool = False) -> Path:
         command.append("--debug")
     else:
         # Measurement builds keep release optimisation but also debug
-        # assertions: the app only honours the isolated-profile overrides
-        # (NEWMOB_*) and QA hooks under `cfg!(debug_assertions)`, so a plain
-        # release binary would write into the real QA profile instead.
+        # assertions for diagnostics. Isolated NEWMOB_* roots are guarded by
+        # the explicit com.taomni.app.qa identifier in the native app, so they
+        # remain effective for release QA without redirecting production.
         env["CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS"] = "true"
     # Cargo may otherwise rewrite the lockfile while resolving the QA overlay
     # on a newer toolchain. The provenance snapshot must describe the exact

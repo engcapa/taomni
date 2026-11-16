@@ -1,0 +1,43 @@
+id: TC-TAO-HOME-014
+title: Real configured provider handles PNG JPEG and WebP chosen through the native file dialog
+description: >-
+  Actual system file chooser, native Files API and commercial vision replies.
+  Synthetic images contain unpredictable digits not supplied in the prompt or filename.
+  Cancel must not prepare a file. DeepSeek uploads require 100 percent progress;
+  OpenCode local staging requires actual name/bytes and a truthful send-time preview.
+  Both require one reference chip and correct recognition of the generated digits and color.
+  At most three chat requests. Only explicit invalid credentials may finish early.
+modes: [native]
+native_platforms: [Windows, Linux]
+covers: [F1.11]
+tags: [p1, tao-home, native, real-provider, regression]
+fixtures: [reset_db, tao_real_provider]
+timeout_sec: 600
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-tao-home-014-real-images
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- wait_for: '[data-testid="tao-home-composer-input"]:enabled'
+- observe_tao_provider: null
+- tao_real_provider_expanded: {scenario: images}
+- assert_no_runtime_errors: null
+- screenshot: tao-home-real-images-final.png
+verification:
+  review: reviewed
+  requirements:
+  - id: REAL-IMAGE
+    requirement: Native file selection prepares actual PNG/JPEG/WebP bytes and the configured provider correctly reads each image.
+    actions: [1, 2, 3, 4, 5, 6]
+    checkpoints:
+    - {step: 7, expectation: "Cancel prepares no file. Each image has one chip; DeepSeek shows completed upload progress, OpenCode shows local name/bytes and send-time preview. All three replies identify the fresh digits and correct color. Explicit invalid credentials leave remaining stages unverified."}
+    - {step: 8, expectation: No unhandled runtime errors.}
+    results: [7, 8]
+  native:
+  - check: Real Windows/GTK chooser, Files API and vision messages
+    method: automated
+    reason: Real dialog input and forwarding-only native completion observation; no provider replacement. The chooser uses the rfd GTK title on Linux and the localized title on the Windows QA host.
+  visual:
+  - check: Uploaded image references and actual reply
+    method: manual
+    reason: Screenshots retain UI; flow assertions establish completion; answer quality and full prototype fidelity remain separate.

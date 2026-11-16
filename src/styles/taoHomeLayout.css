@@ -1,0 +1,245 @@
+.tao-home-body {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.tao-home-main {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  flex: 1;
+  min-width: 0;
+  min-height: 0;
+  position: relative;
+  container-type: inline-size;
+}
+
+.tao-home-feed {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: auto;
+}
+
+.tao-home-feed-content {
+  display: flex;
+  flex: 1 0 auto;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.tao-home-empty-stage {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 0;
+  gap: 16px;
+  padding: 28px 24px 10px;
+}
+
+.tao-home-main.empty {
+  display: flex;
+  flex-direction: column;
+  justify-content: safe center;
+  overflow: auto;
+}
+
+.tao-home-main.empty .tao-home-feed {
+  flex: 0 0 auto;
+  overflow: visible;
+}
+
+.tao-home-main.empty .tao-home-empty-stage {
+  padding: 18px 20px;
+  flex: 0 0 auto;
+}
+
+.tao-home-suggestion-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  width: 100%;
+  max-width: 740px;
+  min-width: 0;
+  margin: 8px auto 3px;
+  padding: 2px 0;
+}
+
+.tao-home-suggestion-label {
+  display: flex;
+  align-items: center;
+  flex: none;
+  gap: 4px;
+  color: var(--taomni-text-muted);
+  font-size: 10px;
+  white-space: nowrap;
+}
+
+.tao-home-suggestion-row button {
+  display: inline-flex;
+  flex: 0 1 auto;
+  align-items: center;
+  min-width: 0;
+  gap: 4px;
+  border: 1px solid var(--taomni-divider);
+  border-radius: 999px;
+  background: var(--taomni-card-bg);
+  color: var(--taomni-text-muted);
+  padding: 5px 8px;
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.tao-home-suggestion-row button span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.tao-home-suggestion-row svg { flex-shrink: 0; }
+.tao-home-suggestion-row button:hover {
+  color: var(--taomni-accent);
+  border-color: var(--taomni-selected-border);
+}
+
+.tao-home-dock-row { justify-content: center; flex-wrap: wrap; }
+.tao-home-composer-dock { padding-inline: clamp(12px, 5%, 88px); }
+
+.tao-home-side-panel {
+  position: relative;
+  display: flex;
+  flex: none;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  max-width: min(560px, max(50%, calc(100% - 320px)));
+  background: var(--taomni-card-bg);
+  border-left: 1px solid var(--taomni-divider);
+}
+
+.tao-home-side-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  border-bottom: 1px solid var(--taomni-divider);
+  padding: 8px;
+}
+
+.tao-home-side-tabs button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--taomni-text-muted);
+  cursor: pointer;
+}
+
+.tao-home-side-tabs button.active {
+  color: var(--taomni-accent);
+  background: var(--taomni-selected);
+}
+
+.tao-home-side-tabs button:hover { background: var(--taomni-hover); }
+.tao-home-side-content {
+  flex: 1;
+  min-height: 0;
+  padding: 14px;
+  font-size: 12px;
+  color: var(--taomni-text-muted);
+  overflow: auto;
+  overflow-wrap: anywhere;
+}
+
+.tao-home-side-resize {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -5px;
+  width: 10px;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--taomni-text-muted);
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.tao-home-side-resize svg { opacity: 0; }
+.tao-home-side-resize:hover,
+.tao-home-side-resize:focus-visible,
+.tao-home-side-panel[data-resizing="true"] .tao-home-side-resize { background: var(--taomni-selected); }
+.tao-home-side-resize:hover svg,
+.tao-home-side-resize:focus-visible svg,
+.tao-home-side-panel[data-resizing="true"] .tao-home-side-resize svg { opacity: 1; }
+.tao-home-body:has([data-resizing="true"]) { user-select: none; cursor: col-resize; }
+.tao-home-icon-button[aria-pressed="true"],
+.tao-home-icon-button[aria-expanded="true"] { color: var(--taomni-accent); background: var(--taomni-selected); }
+
+@media (max-height: 650px) {
+  .tao-home-main.empty .tao-home-empty-stage { padding: 8px 16px; }
+  .tao-home-main.empty .tao-home-composer-dock { padding-bottom: 4px; }
+}
+
+@container (max-width: 540px) {
+  .tao-home-empty-stage { gap: 10px; }
+  .tao-home-empty-stage > p { margin: 0; font-size: 12px; }
+  .tao-home-no-key-card { width: 100%; padding: 12px; }
+  .tao-home-no-key-card h2 { font-size: 15px; }
+  .tao-home-no-key-card p { font-size: 12px; margin-bottom: 8px; }
+  .tao-home-dock-button { font-size: 0; gap: 0; }
+}
+.tao-home-topbar-leading {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.tao-home-topbar-actions {
+  flex-shrink: 0;
+}
+
+.tao-home-usage-pill {
+  white-space: nowrap;
+}
+
+.tao-home-binding-bar {
+  width: 100%;
+  min-width: 0;
+  flex-wrap: nowrap;
+}
+
+.tao-home-binding-item {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.tao-home-binding-chip {
+  max-width: 100%;
+  white-space: nowrap;
+}
+
+.tao-home-binding-chip svg {
+  flex-shrink: 0;
+}
+
+.tao-home-binding-chip span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

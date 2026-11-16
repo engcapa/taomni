@@ -3,6 +3,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { createChatController } from "./controller";
 import { TaoAiChat } from "./TaoAiChat";
 import type { ChatBackend, ChatProfile } from "./ports";
+import { setLocale } from "../../../lib/i18n";
 
 const profile: ChatProfile = {
   modes: [
@@ -17,7 +18,7 @@ const profile: ChatProfile = {
 };
 
 describe("TaoAiChat", () => {
-  afterEach(() => cleanup());
+  afterEach(() => { cleanup(); setLocale("en"); });
   it("renders the host shell, sends with Ctrl+Enter, and exposes search shortcut", async () => {
     const backend: ChatBackend = {
       send: vi.fn<ChatBackend["send"]>(async () => [
@@ -53,7 +54,7 @@ describe("TaoAiChat", () => {
     let release!: () => void;
     const backend: ChatBackend = {
       send: vi.fn<ChatBackend["send"]>(() => new Promise<Iterable<never>>((resolve) => { release = () => resolve([]); })),
-      continue: vi.fn<NonNullable<ChatBackend["continue"]>>(async () => []),
+      regenerate: vi.fn<NonNullable<ChatBackend["regenerate"]>>(async () => []),
     };
     const controller = createChatController({ backend, profile });
     controller.setChips([{ id: "local-1", kind: "local", label: "构建日志", preview: "token=[REDACTED]", removable: true }]);
@@ -63,13 +64,106 @@ describe("TaoAiChat", () => {
     await waitFor(() => expect(controller.getState().runtime[controller.getState().activeThreadId!].phase).toBe("sending"));
     await controller.stop();
     expect(screen.getByTestId("tao-home-stopped-state")).toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "预览 构建日志" }));
-    expect(screen.getByRole("dialog", { name: "构建日志 的脱敏预览" })).toHaveTextContent("[REDACTED]");
+    fireEvent.click(screen.getByRole("button", { name: /Preview.*构建日志|预览.*构建日志/ }));
+    expect(screen.getByRole("dialog", { name: /构建日志/ })).toHaveTextContent("[REDACTED]");
     // Let the aborted transport settle before requesting continuation. The
     // controller keeps one transport owner per thread until its finally block.
     release();
     await pending;
-    fireEvent.click(screen.getByRole("button", { name: "继续生成" }));
-    await waitFor(() => expect(backend.continue).toHaveBeenCalled());
+    expect(screen.getByTestId("tao-home-stopped-state")).toHaveTextContent("No reply was received");
+    fireEvent.click(screen.getByTestId("tao-home-regenerate"));
+    await waitFor(() => expect(backend.regenerate).toHaveBeenCalled());
+  });
+
+  it("switches Tao chrome language without recreating controller or losing draft", async () => {
+    const controller = createChatController({ profile });
+    controller.setComposerText("draft");
+    render(<TaoAiChat controller={controller} profile={profile} />);
+    const id = controller.getState().activeThreadId;
+    expect(screen.getByTestId("tao-home-new-chat")).toHaveTextContent("New Tao chat");
+    setLocale("zh-CN");
+    await waitFor(() => expect(screen.getByTestId("tao-home-new-chat")).toHaveTextContent("新 Tao 对话"));
+    expect(controller.getState().activeThreadId).toBe(id);
+    expect(controller.getState().composer.text).toBe("draft");
+  });
+
+  it("toggles the sidebar from the header and restores its selected view, width and draft", async () => {
+    const controller = createChatController({ profile });
+    controller.setComposerText("keep this draft");
+    render(<TaoAiChat controller={controller} profile={profile} />);
+    fireEvent.click(screen.getByTestId("tao-home-side-toggle"));
+
+    const panel = await screen.findByTestId("tao-home-side-panel");
+    expect(screen.getByTestId("tao-home-side-toggle")).toHaveAttribute("aria-expanded", "true");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(screen.getByTestId("tao-home-side-tab-sources")).toHaveAttribute("title", "Sources");
+    expect(screen.getByTestId("tao-home-side-tab-sources").textContent).toBe("");
+    expect(screen.getByTestId("tao-home-side-tab-sources").querySelector("svg")).toBeInTheDocument();
+    expect(screen.getByTestId("tao-home-side-resize")).toHaveAttribute("aria-label", "Resize sidebar");
+    expect(panel).toHaveStyle({ width: "340px" });
+
+    fireEvent.mouseDown(screen.getByTestId("tao-home-side-resize"), { clientX: 100 });
+    fireEvent.mouseMove(window, { clientX: 40 });
+    fireEvent.mouseUp(window);
+    expect(panel).toHaveStyle({ width: "400px" });
+    fireEvent.mouseMove(window, { clientX: 20 });
+    expect(panel).toHaveStyle({ width: "400px" });
+
+    fireEvent.click(screen.getByTestId("tao-home-side-tab-files"));
+    expect(screen.getByTestId("tao-home-files")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("tao-home-side-toggle"));
+    expect(screen.queryByTestId("tao-home-side-panel")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("tao-home-sources")).not.toBeInTheDocument();
+    expect(screen.getByTestId("tao-home-side-toggle")).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(screen.getByTestId("tao-home-side-toggle"));
+    expect(screen.getByTestId("tao-home-side-panel")).toHaveStyle({ width: "400px" });
+    expect(screen.getByTestId("tao-home-side-tab-files")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("tao-home-files")).toBeInTheDocument();
+    expect(screen.getByTestId("tao-home-composer-input")).toHaveValue("keep this draft");
+    expect(screen.queryByTestId("tao-home-side-close")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("tao-home-side-collapse")).not.toBeInTheDocument();
+  });
+
+  it("bounds keyboard resizing, resets the width and releases a cancelled drag", async () => {
+    const controller = createChatController({ profile });
+    render(<TaoAiChat controller={controller} profile={profile} />);
+    fireEvent.click(screen.getByTestId("tao-home-side-toggle"));
+    const handle = await screen.findByTestId("tao-home-side-resize");
+    fireEvent.keyDown(handle, { key: "End" });
+    expect(handle).toHaveAttribute("aria-valuenow", "560");
+    fireEvent.keyDown(handle, { key: "Home" });
+    expect(handle).toHaveAttribute("aria-valuenow", "260");
+    fireEvent.keyDown(handle, { key: "ArrowLeft" });
+    expect(handle).toHaveAttribute("aria-valuenow", "280");
+    fireEvent.doubleClick(handle);
+    expect(handle).toHaveAttribute("aria-valuenow", "340");
+    fireEvent.mouseDown(handle, { clientX: 100 });
+    fireEvent.pointerCancel(window);
+    fireEvent.mouseMove(window, { clientX: 40 });
+    expect(handle).toHaveAttribute("aria-valuenow", "340");
+    expect(screen.getByTestId("tao-home-side-panel")).toHaveAttribute("data-resizing", "false");
+  });
+
+  it("keeps memory and skills icons distinct with demo before the final sidebar toggle", async () => {
+    const controller = createChatController({ profile });
+    const onOpenSettings = vi.fn();
+    const onOpenAppearance = vi.fn();
+    render(<TaoAiChat controller={controller} profile={{ ...profile, sidePanels: ["记忆", "技能"] }} onOpenSettings={onOpenSettings} onOpenAppearance={onOpenAppearance} />);
+    fireEvent.click(screen.getByTestId("tao-home-side-toggle"));
+    const memory = await screen.findByTestId("tao-home-side-tab-memory");
+    const skills = screen.getByTestId("tao-home-side-tab-skills");
+    expect(memory.querySelector("svg")?.innerHTML).not.toBe(skills.querySelector("svg")?.innerHTML);
+    expect(skills).toHaveAttribute("title", "Skills");
+    expect(screen.queryByTestId("tao-home-settings")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("tao-home-appearance")).not.toBeInTheDocument();
+    const buttons = [...screen.getByTestId("tao-home-topbar").querySelectorAll("button")];
+    expect(buttons.at(-2)).toBe(screen.getByTestId("tao-home-demo-toggle"));
+    expect(buttons.at(-1)).toBe(screen.getByTestId("tao-home-side-toggle"));
+    expect(onOpenSettings).not.toHaveBeenCalled();
+    expect(onOpenAppearance).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByTestId("tao-home-demo-toggle"));
+    expect(controller.getState().ui.demoMode).toBe(true);
+    fireEvent.click(screen.getByTestId("tao-home-demo-toggle"));
+    expect(controller.getState().ui.demoMode).toBe(false);
   });
 });

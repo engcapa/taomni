@@ -1,23 +1,7 @@
 import type { Paragraph, ParagraphChild, Table, RunOptions } from "./docxRuntime.js";
 import type { MarkdownExportSettings } from "./exportModel";
-
-async function imageData(source: string): Promise<{ bytes: Uint8Array; width: number; height: number }> {
-  const image = new Image();
-  await new Promise<void>((resolve, reject) => {
-    image.onload = () => resolve(); image.onerror = () => reject(new Error("Cannot decode an exported image")); image.src = source;
-  });
-  const width = image.naturalWidth || 640, height = image.naturalHeight || 360;
-  if (width * height > 40_000_000) throw new Error("An image exceeds the safe Word conversion size");
-  const canvas = document.createElement("canvas");
-  canvas.width = width; canvas.height = height;
-  const context = canvas.getContext("2d");
-  if (!context) throw new Error("Image conversion is unavailable");
-  context.drawImage(image, 0, 0);
-  const data = canvas.toDataURL("image/png").split(",")[1];
-  const binary = atob(data);
-  const ratio = Math.min(1, 600 / width);
-  return { bytes: Uint8Array.from(binary, (char) => char.charCodeAt(0)), width: Math.round(width * ratio), height: Math.round(height * ratio) };
-}
+import { wordImageData, wordPageLayout } from "./docxImages";
+import { wordEquation } from "./docxMath";
 
 /** Convert the already-sanitized, image-embedded rendering, not a second
  * Markdown parse. The document library is fetched only on the Word path. */
@@ -26,12 +10,13 @@ export async function markdownDocx(root: HTMLElement, title: string, settings: M
   const inline = async (node: Node, style: RunOptions = {}): Promise<ParagraphChild[]> => {
     if (node.nodeType === Node.TEXT_NODE) return [new d.TextRun({ ...style, text: node.textContent || "" })];
     if (!(node instanceof Element)) return [];
+    const equation = wordEquation(node, d, style);
+    if (equation) return [equation];
     const tag = node.tagName.toLowerCase();
     if (tag === "br") return [new d.TextRun({ break: 1 })];
     if (tag === "img" || tag === "svg") {
-      const src = tag === "img" ? node.getAttribute("src") || "" : `data:image/svg+xml;charset=utf-8,${encodeURIComponent(new XMLSerializer().serializeToString(node))}`;
-      const image = await imageData(src);
-      return [new d.ImageRun({ type: "png", data: image.bytes, transformation: { width: image.width, height: image.height },
+      const image = await wordImageData(node, settings);
+      return [new d.ImageRun({ ...(image.svg ? { type: "svg" as const, data: image.svg, fallback: { type: "png" as const, data: image.bytes } } : { type: image.type ?? "png", data: image.bytes }), transformation: { width: image.width, height: image.height },
         altText: { title: node.getAttribute("alt") || "Diagram", description: node.getAttribute("alt") || "", name: "Image" } })];
     }
     const next: RunOptions = { ...style, bold: style.bold || tag === "strong" || tag === "b",
@@ -86,7 +71,7 @@ export async function markdownDocx(root: HTMLElement, title: string, settings: M
     }
     return result;
   };
-  const margin = settings.margins === "narrow" ? 680 : settings.margins === "wide" ? 1814 : 1134;
+  const { margin } = wordPageLayout(settings);
   const doc = new d.Document({ title, numbering: { config: [{ reference: "markdown-numbering", levels: Array.from({ length: 9 }, (_, level) => ({ level, format: d.LevelFormat.DECIMAL, text: `%${level + 1}.`, alignment: d.AlignmentType.START,
     style: { paragraph: { indent: { left: (level + 1) * 360, hanging: 260 } } } })) }] },
     sections: [{ properties: { page: { size: { width: settings.paper === "A4" ? 11906 : 12240, height: settings.paper === "A4" ? 16838 : 15840,
@@ -96,5 +81,6 @@ export async function markdownDocx(root: HTMLElement, title: string, settings: M
     ...(settings.pageNumbers ? { footers: { default: new d.Footer({ children: [new d.Paragraph({ alignment: d.AlignmentType.CENTER, children: [new d.TextRun({ children: [d.PageNumber.CURRENT] })] })] }) } } : {}),
     children: await blocks(root) }],
   });
+  doc.Settings.addChildElement(new d.XmlComponent("w:doNotAutoCompressPictures"));
   return d.Packer.toBlob(doc);
 }

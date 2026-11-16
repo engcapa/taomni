@@ -1,4 +1,7 @@
-import { useEffect, useMemo, useRef, useSyncExternalStore } from "react";
+import { taoText as tr } from "../i18n";
+import { useTaoText } from "../i18n";
+import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { isTauriRuntime } from "../../../lib/runtime";
 import { useAiStore } from "../../../stores/aiStore";
 import type { WelcomePanelProps } from "../../welcome/types";
 import { createChatController, deepSeekAppBackend, TaoAiChat, type ContextPorts, type ChatProfile, type TaoSearchResult } from "../ai-chat";
@@ -8,6 +11,9 @@ import { DockRow } from "./DockRow";
 import { SuggestionRow } from "./SuggestionRow";
 import { SearchPanel } from "../search/SearchPanel";
 import { redactText } from "../redact";
+import { openSettingsSection } from "../../../lib/settingsNavigation";
+import { createNativeActionPorts } from "../ai-chat/nativeCapabilities";
+import { useThreadHistory } from "./useThreadHistory";
 
 const PROFILE: ChatProfile = {
   modes: [
@@ -15,7 +21,7 @@ const PROFILE: ChatProfile = {
     { id: "do", label: "做", description: "提出动作并等待你的确认" },
     { id: "research", label: "深研", description: "生成计划并多轮研究" },
   ],
-  sidePanels: ["来源", "文件", "生成物", "工作流"],
+  sidePanels: ["来源", "文件", "生成物", "工作流", "语音", "导入导出", "记忆", "技能"],
   defaultModel: "deepseek-flash",
   defaultThinking: false,
   defaultWeb: false,
@@ -23,21 +29,29 @@ const PROFILE: ChatProfile = {
 };
 
 export function TaoHomeHost(props: WelcomePanelProps) {
+  useTaoText();
+  const [storageError, setStorageError] = useState("");
   const controllerRef = useRef<ReturnType<typeof createChatController> | null>(null);
-  if (!controllerRef.current) controllerRef.current = createChatController({ backend: deepSeekAppBackend, profile: PROFILE });
+  if (!controllerRef.current) controllerRef.current = createChatController({ backend: deepSeekAppBackend, profile: PROFILE, actionPorts: createNativeActionPorts("tao-action") });
   const controller = controllerRef.current;
+  const history = useThreadHistory(controller);
   const aiConfig = useAiStore((state) => state.config);
   const loadAiConfig = useAiStore((state) => state.loadConfig);
   const saveConfig = useAiStore((state) => state.saveConfig);
   const updateProvider = useAiStore((state) => state.updateLlmProvider);
   const state = useSyncExternalStore(controller.subscribe, controller.getState, controller.getState);
   const demoMode = state.ui.demoMode;
+  useEffect(() => {
+    const config = aiConfig?.deepseek_app;
+    if (config) controller.setDefaults({ defaultModel: config.model === "deepseek-v4-pro" ? config.model : config.provider === "opencode-go" ? "deepseek-v4.1-flash" : "deepseek-flash", defaultProvider: config.provider ?? "deepseek-app", defaultReasoningEffort: config.reasoning_effort ?? "high", defaultThinking: config.thinking_default, defaultWeb: config.search_default });
+  }, [aiConfig?.deepseek_app, controller]);
   useEffect(() => { if (!aiConfig) void loadAiConfig().catch(() => undefined); }, [aiConfig, loadAiConfig]);
   const oldKey = aiConfig?.llm.providers.deepseek?.api_key ?? "";
-  const taoProvider = aiConfig?.llm.providers["deepseek-app"];
+  const providerId = state.composer.provider ?? "deepseek-app";
+  const taoProvider = aiConfig?.llm.providers[providerId];
   const taoKey = taoProvider?.api_key ?? "";
   const hasTaoKey = Boolean(taoKey || taoProvider?.api_keys?.some((key) => key.trim()));
-  const canReuse = Boolean(oldKey && !taoKey);
+  const canReuse = providerId === "deepseek-app" && Boolean(oldKey && !taoKey);
   const contextPorts = useMemo<ContextPorts>(() => ({
     search: async (query: string): Promise<TaoSearchResult[]> => {
       const current = controller.getState();
@@ -62,15 +76,35 @@ export function TaoHomeHost(props: WelcomePanelProps) {
       return records;
     },
   }), [controller, props.recentSessions, props.recentWorkspaces]);
-  const threads = Object.values(state.threads).sort((a, b) => b.updatedAt - a.updatedAt);
+  const threads = Object.values(state.threads).map((thread) => ({ ...thread, running: thread.running || state.runtime[thread.id]?.deleting || state.runtime[thread.id]?.actionBusy })).sort((a, b) => b.updatedAt - a.updatedAt);
   const handleReuse = () => {
     if (!aiConfig || !oldKey) return;
     const old = aiConfig.llm.providers.deepseek;
     if (!old) return;
     const next = { ...old, base_url: "https://api.deepseek.com", model: "deepseek-flash", runtime: "deepseek-messages" };
-    updateProvider("deepseek-app", next);
-    void saveConfig({ ...aiConfig, llm: { ...aiConfig.llm, providers: { ...aiConfig.llm.providers, "deepseek-app": next } } }).catch(() => undefined);
+    void saveConfig({ ...aiConfig, llm: { ...aiConfig.llm, providers: { ...aiConfig.llm.providers, "deepseek-app": next } } }).then(() => updateProvider("deepseek-app", next)).catch((error) => setStorageError(tr("保存 Key 失败：{error}", { error: String(error) })));
   };
-  const openSettings = props.onOpenSettings;
-  return <div className="tao-home-host" data-testid="tao-home-host" data-tao-home-host="true"><div className="tao-home-legacy-panel" data-testid="welcome-panel"><TaoAiChat controller={controller} profile={PROFILE} disabled={!hasTaoKey} onOpenSettings={openSettings} slots={{ composerContext: <BindingBar controller={controller} context={state.context} />, emptyState: <>{!hasTaoKey ? <NoKeyCard onOpenSettings={canReuse ? handleReuse : openSettings} canReuse={canReuse} /> : <SuggestionRow controller={controller} hidden={demoMode} />}</>, belowComposer: <DockRow controller={controller} threads={threads} sessions={props.recentSessions ?? []} workspaces={props.recentWorkspaces ?? []} demoMode={demoMode} onStartLocalTerminal={(shell) => void props.onStartLocalTerminal(shell)} onNewSession={props.onNewSession} onOpenNewWorkspace={props.onOpenNewWorkspace} onOpenRecentSession={props.onOpenRecentSession} onOpenRecentWorkspace={props.onOpenRecentWorkspace} onRestore={props.restore?.onStartRestore} onOpenSettings={openSettings} />, sidePanels: <div className="tao-home-side-placeholder">来源与本地资料会显示在这里。</div> }} />{state.ui.searchOpen ? <SearchPanel controller={controller} contextPorts={contextPorts} onClose={() => controller.setSearchOpen(false)} /> : null}<button type="button" className="tao-home-demo-toggle" data-testid="tao-home-demo-toggle" aria-pressed={demoMode} onClick={() => controller.setDemoMode(!demoMode)}>演示模式</button>{canReuse ? <button type="button" className="tao-home-reuse-key" hidden onClick={handleReuse}>沿用已有 Key</button> : null}</div></div>;
+  const openSettings = () => { openSettingsSection("ai-tao"); props.onOpenSettings?.(); };
+  const openAppearance = () => { openSettingsSection("app-theme"); props.onOpenSettings?.(); };
+  return <div className="tao-home-host" data-testid="tao-home-host" data-tao-home-host="true">
+    <div className="tao-home-legacy-panel" data-testid="welcome-panel">
+      <TaoAiChat controller={controller} profile={PROFILE}
+        disabled={history.loading || !hasTaoKey || !isTauriRuntime() || aiConfig?.deepseek_app?.enabled === false}
+        active={props.active !== false} onOpenSettings={openSettings} onOpenAppearance={openAppearance}
+        slots={{
+          headerTrailing: <BindingBar controller={controller} context={state.context} />,
+          emptyState: <>
+            {!isTauriRuntime() ? <p data-testid="tao-home-browser-unavailable">{tr("浏览器预览不提供 DeepSeek 原生对话，请在桌面应用中使用。")}</p> : null}
+            {!hasTaoKey ? <NoKeyCard onOpenSettings={openSettings} onReuse={handleReuse} canReuse={canReuse} /> : null}
+            {storageError || history.error ? <p role="alert">{storageError || history.error}</p> : null}
+          </>,
+          belowComposer: <>
+            <SuggestionRow controller={controller} hidden={demoMode} />
+            <DockRow {...props} onOpenSettings={openSettings} controller={controller} threads={threads}
+              demoMode={demoMode} historyLoading={history.loading} historyError={history.error} onRefreshHistory={history.refresh} onDeleteThread={history.loading ? undefined : history.remove} />
+          </>,
+        }} />
+      {state.ui.searchOpen && props.active !== false ? <SearchPanel controller={controller} contextPorts={contextPorts} onClose={() => controller.setSearchOpen(false)} /> : null}
+    </div>
+  </div>;
 }

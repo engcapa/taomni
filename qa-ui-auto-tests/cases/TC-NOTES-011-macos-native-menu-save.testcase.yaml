@@ -34,13 +34,13 @@ steps:
 - native_menu:
     action: workspace-command:notes.save
     enabled: false
-- click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-mode-edit"]'
+- click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="markdown-mode-source"]'
 - press:
-    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"]
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="viewer-editor"]
       .cm-content'
     key: Mod+A
 - type:
-    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"]
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="viewer-editor"]
       .cm-content'
     text: '# AppKit saved'
 - native_menu:

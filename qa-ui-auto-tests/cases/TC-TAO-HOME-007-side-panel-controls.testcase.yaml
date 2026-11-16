@@ -1,0 +1,261 @@
+id: TC-TAO-HOME-007
+title: Tao Home sidebar reflows chat and toggles from one semantic header control
+description: Verify the Tao Home companion panel keeps semantic icon tabs discoverable through labels/tooltips. Native pointer
+  dragging must resize the actual chat column, with one header toggle restoring the last view and width. The packaged WebViews
+  must deliver separator drag and keyboard input without an overlay.
+modes:
+- browser
+- native
+covers:
+- F1.11
+tags:
+- p0
+- tao-home
+- ui
+- regression
+fixtures:
+- reset_db
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-tao-home-007
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- wait_for: '[data-testid="tao-home-host"]'
+- click: '[data-testid="tao-home-side-toggle"]'
+- wait_for: '[data-testid="tao-home-side-panel"]'
+- assert_visible: '[data-testid="tao-home-side-tab-sources"]'
+- click: '[data-testid="tao-home-side-tab-sources"]'
+- assert_attribute:
+    selector: '[data-testid="tao-home-side-tab-sources"]'
+    name: class
+    equals: active
+- assert_visible: '[data-testid="tao-home-side-tab-files"]'
+- click: '[data-testid="tao-home-side-tab-files"]'
+- assert_attribute:
+    selector: '[data-testid="tao-home-side-tab-files"]'
+    name: class
+    equals: active
+- assert_visible: '[data-testid="tao-home-side-tab-artifacts"]'
+- click: '[data-testid="tao-home-side-tab-artifacts"]'
+- assert_attribute:
+    selector: '[data-testid="tao-home-side-tab-artifacts"]'
+    name: class
+    equals: active
+- assert_visible: '[data-testid="tao-home-side-tab-workflows"]'
+- click: '[data-testid="tao-home-side-tab-workflows"]'
+- assert_attribute:
+    selector: '[data-testid="tao-home-side-tab-workflows"]'
+    name: class
+    equals: active
+- assert_visible: '[data-testid="tao-home-side-tab-voice"]'
+- click: '[data-testid="tao-home-side-tab-voice"]'
+- assert_attribute:
+    selector: '[data-testid="tao-home-side-tab-voice"]'
+    name: class
+    equals: active
+- assert_visible: '[data-testid="tao-home-side-tab-archive"]'
+- click: '[data-testid="tao-home-side-tab-archive"]'
+- assert_attribute:
+    selector: '[data-testid="tao-home-side-tab-archive"]'
+    name: class
+    equals: active
+- assert_text_equals:
+    selector: '[data-testid="tao-home-side-tab-archive"]'
+    equals: ''
+- assert_attribute:
+    selector: '[data-testid="tao-home-side-tab-sources"]'
+    name: aria-label
+    equals: Sources
+- assert_attribute:
+    selector: '[data-testid="tao-home-side-tab-sources"]'
+    name: title
+    equals: Sources
+- assert_attribute:
+    selector: '[data-testid="tao-home-side-resize"]'
+    name: aria-label
+    equals: Resize sidebar
+- eval_readonly:
+    expression: '!(document.querySelector(".tao-home-side-panel").getBoundingClientRect().width < 300)'
+    expect_truthy: true
+- drag_to:
+    from: '[data-testid="tao-home-side-resize"]'
+    by:
+      dx: -60
+      dy: 0
+      steps: 8
+- eval_readonly:
+    expression: document.querySelector(".tao-home-side-panel").getBoundingClientRect().width > 340
+    expect_truthy: true
+- eval_readonly:
+    expression: document.querySelector('.tao-home-main').getBoundingClientRect().right <= document.querySelector('.tao-home-side-panel').getBoundingClientRect().left
+      + 1
+    expect_truthy: true
+- eval_readonly:
+    expression: Math.abs(document.querySelector('.tao-home-main').clientWidth + document.querySelector('.tao-home-side-panel').getBoundingClientRect().width
+      - document.querySelector('.tao-home-body').clientWidth) < 2
+    expect_truthy: true
+- press:
+    selector: '[data-testid="tao-home-side-resize"]'
+    key: ArrowLeft
+- eval_readonly:
+    expression: Number(document.querySelector('.tao-home-side-resize').getAttribute('aria-valuenow')) >= 419
+    expect_truthy: true
+- click: '[data-testid="tao-home-side-tab-memory"]'
+- assert_attribute:
+    selector: '[data-testid="tao-home-side-tab-memory"]'
+    name: aria-selected
+    equals: 'true'
+- click: '[data-testid="tao-home-side-tab-skills"]'
+- assert_attribute:
+    selector: '[data-testid="tao-home-side-tab-skills"]'
+    name: aria-selected
+    equals: 'true'
+- eval_readonly:
+    expression: document.querySelector('.tao-home-side-tabs button:nth-child(7) svg').innerHTML !== document.querySelector('.tao-home-side-tabs
+      button:nth-child(8) svg').innerHTML
+    expect_truthy: true
+- assert_attribute:
+    selector: '[data-testid="tao-home-side-tab-skills"]'
+    name: title
+    equals: Skills
+- assert_count:
+    selector: '[data-testid="tao-home-side-panel"] [role="tab"]'
+    equal: 8
+- eval_readonly:
+    expression: '!document.querySelector(".tao-home-side-close")'
+    expect_truthy: true
+- eval_readonly:
+    expression: '!document.querySelector(".tao-home-side-collapse")'
+    expect_truthy: true
+- screenshot: tao-home-resized-chat-sidebar.png
+- click: '[data-testid="tao-home-side-toggle"]'
+- assert_not_visible: '[data-testid="tao-home-side-panel"]'
+- assert_attribute:
+    selector: '[data-testid="tao-home-side-toggle"]'
+    name: aria-expanded
+    equals: 'false'
+- eval_readonly:
+    expression: Math.abs(document.querySelector('.tao-home-main').clientWidth - document.querySelector('.tao-home-body').clientWidth)
+      < 2
+    expect_truthy: true
+- click: '[data-testid="tao-home-side-toggle"]'
+- assert_attribute:
+    selector: '[data-testid="tao-home-side-tab-skills"]'
+    name: aria-selected
+    equals: 'true'
+- eval_readonly:
+    expression: document.querySelector('.tao-home-side-panel').getBoundingClientRect().width >= 419
+    expect_truthy: true
+- assert_not_visible: '[role="dialog"]'
+- click: '[data-testid="tao-home-side-toggle"]'
+- assert_not_visible: '[data-testid="tao-home-side-panel"]'
+- assert_no_runtime_errors: null
+- screenshot: tao-home-side-panel-controls.png
+- assert_not_visible: '[data-testid="tao-home-settings"]'
+- assert_not_visible: '[data-testid="tao-home-appearance"]'
+- eval_readonly:
+    expression: document.querySelector(".tao-home-topbar-actions>button:last-child").dataset.testid === "tao-home-side-toggle"
+      && document.querySelector(".tao-home-topbar-actions>button:nth-last-child(2)").dataset.testid === "tao-home-demo-toggle"
+    expect_truthy: true
+- screenshot: tao-home-compact-header-actions.png
+verification:
+  review: reviewed
+  requirements:
+  - id: SIDEBAR-REFLOW
+    requirement: Actual pointer and keyboard resizing changes the chat column without overlap, and closing returns the available
+      width.
+    actions:
+    - 6
+    - 31
+    - 35
+    - 47
+    - 51
+    - 55
+    checkpoints:
+    - step: 32
+      expectation: A 60px pointer drag expands the rendered panel beyond its original width.
+    - step: 33
+      expectation: Chat and sidebar occupy disjoint rectangles.
+    - step: 34
+      expectation: Their combined width fills the body with no overlay.
+    - step: 36
+      expectation: ArrowLeft expands the panel by a further 20px.
+    - step: 50
+      expectation: Closing restores the full chat column.
+    - step: 53
+      expectation: Reopening preserves the resized width.
+    - step: 56
+      expectation: A second toggle hides the panel completely.
+    results:
+    - 32
+    - 33
+    - 34
+    - 36
+    - 50
+    - 53
+    - 56
+  - id: SIDEBAR-ICONS
+    requirement: Eight semantic icon tabs expose labels and tooltips; one header toggle restores the last view without duplicate
+      close controls or a menu.
+    actions:
+    - 6
+    - 9
+    - 12
+    - 15
+    - 18
+    - 21
+    - 24
+    - 37
+    - 39
+    - 47
+    - 51
+    - 55
+    checkpoints:
+    - step: 41
+      expectation: Memory and skills use different icon drawings.
+    - step: 43
+      expectation: Exactly eight tab buttons exist.
+    - step: 44
+      expectation: The redundant close button is absent.
+    - step: 45
+      expectation: The redundant collapse button is absent.
+    - step: 52
+      expectation: Reopening restores the selected Skills tab.
+    - step: 54
+      expectation: Opening uses the sidebar directly without a popup.
+    - step: 57
+      expectation: No runtime errors occurred through repeated toggles.
+    results:
+    - 41
+    - 43
+    - 44
+    - 45
+    - 52
+    - 54
+    - 57
+  - id: HOME-COMPACT-HEADER
+    requirement: The user-requested header removes Tao settings and appearance, with demo immediately before the final sidebar
+      toggle.
+    actions:
+    - 6
+    checkpoints:
+    - step: 59
+      expectation: No Tao settings shortcut remains in the header.
+    - step: 60
+      expectation: No appearance shortcut remains in the header.
+    - step: 61
+      expectation: The final visible buttons are demo then sidebar, in actual left-to-right geometry.
+    results:
+    - 59
+    - 60
+    - 61
+  visual:
+  - check: Sidebar and chat remain adjacent through resize and repeated toggles
+    method: automated
+    reason: Independent DOM rectangles and widths check actual layout; screenshots retain expanded and closed states.
+  native:
+  - check: Separator pointer and keyboard dispatch in the packaged WebViews
+    method: automated
+    reason: The native runner must deliver the drag and ArrowLeft, then actual geometry changes. The macOS bridge is WebView
+      input, not physical OS input evidence.

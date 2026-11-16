@@ -33,6 +33,7 @@ import { LanguageSection } from "../LanguageSection";
 import { LanguageServersSettings } from "../LanguageServersSettings";
 import { LiveTemplatesSettings } from "../LiveTemplatesSettings";
 import { LlmProvidersPanel } from "../LlmProvidersPanel";
+import { TaoSettingsPanel } from "../TaoSettingsPanel";
 import { ModelsAdvancedPanel } from "../ModelsAdvancedPanel";
 import { PrivacyToggle } from "../PrivacyToggle";
 import { ScreenshotSettings } from "../ScreenshotSettings";
@@ -176,6 +177,7 @@ export function SettingsPanelView(inputs: SettingsPanelViewProps) {
                 <Search className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[var(--taomni-text-muted)]" />
                 <input
                   ref={searchInputRef}
+                  id="settings-search-input"
                   data-testid="settings-search-input"
                   type="search"
                   className="taomni-input h-8 w-full"
@@ -253,7 +255,7 @@ export function SettingsPanelView(inputs: SettingsPanelViewProps) {
               <section className="mb-5 rounded-md border border-[var(--taomni-divider)] bg-[var(--taomni-panel-bg)] p-3">
                 <div className="mb-2 flex items-center gap-3">
                   <div>
-                    <div className="text-[14px] font-semibold">{t("settings.appThemeTitle")}</div>
+                    <h3 id="settings-theme-heading" className="text-[14px] font-semibold">{t("settings.appThemeTitle")}</h3>
                     <div className="text-[12px] text-[var(--taomni-text-muted)]">
                       {t("settings.appThemeCurrent", { mode: themeLabel(mode), resolved: resolvedTheme })}
                     </div>
@@ -613,6 +615,7 @@ export function SettingsPanelView(inputs: SettingsPanelViewProps) {
                   <LlmProvidersPanel />
                 </SettingsAnchor>
               </div>
+              <SettingsAnchor id="ai-tao"><TaoSettingsPanel /></SettingsAnchor>
               <SettingsAnchor id="ai-websearch">
                 <div className="pt-3 border-t border-[var(--taomni-divider)]">
                   <WebSearchPanel />

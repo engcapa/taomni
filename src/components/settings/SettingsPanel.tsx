@@ -18,6 +18,7 @@ import { type ModuleStoreCatalogEntry } from "./ModuleStorePanel";
 import { UI_FONTS } from "./panel/fonts";
 import { type SettingsSearchContextValue } from "./panel/search";
 import { SettingsPanelView } from "./panel/SettingsPanelView";
+import { revealSettingsSection } from "./panel/sectionReveal";
 import { defaultExpandedGroups, groupIdForEntry, matchingGroupIds, matchingIds, SETTINGS_GROUPS } from "./settingsSearch";
 
 function moduleCatalogEntry(record: PluginRecord): ModuleStoreCatalogEntry | null {
@@ -74,6 +75,12 @@ export function SettingsPanel() {
   const anchorRefs = useRef<Map<string, HTMLElement>>(new Map());
   const searchInputRef = useRef<HTMLInputElement>(null);
   const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>(defaultExpandedGroups);
+  const sectionReveal = useRef<(() => void) | undefined>(undefined);
+  const stopSectionReveal = useCallback(() => {
+    sectionReveal.current?.();
+    sectionReveal.current = undefined;
+  }, []);
+  useEffect(() => stopSectionReveal, [stopSectionReveal]);
 
   const register = useCallback((id: string, el: HTMLElement | null) => {
     if (el) anchorRefs.current.set(id, el);
@@ -92,48 +99,33 @@ export function SettingsPanel() {
 
   const scrollToId = useCallback((id: string | undefined) => {
     if (!id) return;
+    stopSectionReveal();
     ensureGroupExpanded(id);
-    // Expand may reflow; wait a frame so hidden=false is applied before scroll.
-    window.requestAnimationFrame(() => {
-      anchorRefs.current.get(id)?.scrollIntoView?.({ block: "center", behavior: "smooth" });
+    // Search can expand asynchronous controls above the match. Keep the same
+    // layout ownership as deep links until the next query or user input.
+    sectionReveal.current = revealSettingsSection({
+      resolveAnchor: () => anchorRefs.current.get(id),
+      maintainLayout: true,
+      onReveal: () => {},
     });
-  }, [ensureGroupExpanded]);
+  }, [ensureGroupExpanded, stopSectionReveal]);
 
   const focusSection = useCallback((detail: OpenSettingsSectionDetail) => {
+    stopSectionReveal();
     ensureGroupExpanded(detail.id);
-    let attempts = 0;
-    let frame = 0;
-    const run = () => {
-      const anchor = anchorRefs.current.get(detail.id);
-      if (anchor) {
-        // Group body may still be `hidden` on the first frame after expand.
-        const groupId = groupIdForEntry(detail.id);
-        const body = groupId
-          ? document.querySelector(`[data-testid="settings-group-body-${groupId}"]`)
-          : null;
-        if (body instanceof HTMLElement && body.hidden) {
-          attempts += 1;
-          if (attempts < 48) frame = window.requestAnimationFrame(run);
-          return;
-        }
-        anchor.scrollIntoView({
-          block: detail.presetId ? "start" : "center",
-          behavior: attempts === 0 ? "auto" : "smooth",
-        });
-        if (!detail.presetId) clearPendingSettingsSection();
-        return;
-      }
-      attempts += 1;
-      if (attempts < 48) frame = window.requestAnimationFrame(run);
-    };
-    frame = window.requestAnimationFrame(run);
-    return () => window.cancelAnimationFrame(frame);
-  }, [ensureGroupExpanded]);
+    const dispose = revealSettingsSection({
+      resolveAnchor: () => anchorRefs.current.get(detail.id),
+      maintainLayout: !detail.presetId,
+      onReveal: () => { if (!detail.presetId) clearPendingSettingsSection(); },
+    });
+    sectionReveal.current = dispose;
+    return dispose;
+  }, [ensureGroupExpanded, stopSectionReveal]);
 
   // New query → expand matching groups, jump to the first match.
   useEffect(() => {
     setActiveIndex(0);
-    if (matchIds.length === 0) return;
+    if (matchIds.length === 0) { stopSectionReveal(); return; }
     const groups = matchingGroupIds(matchIds);
     setExpandedGroups((prev) => {
       const next = { ...prev };
@@ -146,7 +138,7 @@ export function SettingsPanel() {
     });
     scrollToId(matchIds[0]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [matchKey]);
+  }, [matchKey, query]);
 
   // Status bar / deep links: open Settings and scroll to a section.
   useEffect(() => {

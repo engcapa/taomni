@@ -1,0 +1,120 @@
+id: TC-TAO-HOME-035
+title: Home history deletion requires confirmation and leaves a usable conversation
+description: Exercise the new row action without a model request. Cancel via the button
+  and Escape, then confirm deletion of the active conversation and the last remaining
+  one. Check row counts, confirmation ownership and continued Home actions. Native
+  checks the packaged WebView and real history delete IPC; durable Home and legacy
+  records are covered by 036.
+modes:
+- browser
+- native
+covers:
+- F1.11
+tags:
+- p0
+- tao-home
+- regression
+fixtures:
+- reset_db
+timeout_sec: 90
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="tao-home-new-chat"]'
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- click: '[data-testid="tao-home-new-chat"]'
+- click: '[data-testid="tao-home-history"]'
+- wait_for: '[data-testid="tao-home-history-delete"]'
+- assert_count:
+    selector: '[data-testid="tao-home-history-row"]'
+    equal: 2
+- click: '[data-testid="tao-home-history-popover"] .tao-home-history-chat-row:first-child
+    [data-testid="tao-home-history-delete"]'
+- assert_visible: '[data-testid="confirm-dialog"]'
+- assert_text:
+    selector: '[data-testid="confirm-dialog-message"]'
+    contains: cannot be undone
+- screenshot: tao-history-delete-confirmation-open.png
+- click: '[data-testid="confirm-dialog-cancel"]'
+- assert_not_visible: '[data-testid="confirm-dialog"]'
+- assert_count:
+    selector: '[data-testid="tao-home-history-row"]'
+    equal: 2
+- click: '[data-testid="tao-home-history-popover"] .tao-home-history-chat-row:first-child
+    [data-testid="tao-home-history-delete"]'
+- press:
+    selector: '[data-testid="confirm-dialog-cancel"]'
+    key: Escape
+- assert_not_visible: '[data-testid="confirm-dialog"]'
+- assert_visible: '[data-testid="tao-home-history-popover"]'
+- assert_count:
+    selector: '[data-testid="tao-home-history-row"]'
+    equal: 2
+- click: '[data-testid="tao-home-history-popover"] .tao-home-history-chat-row:first-child
+    [data-testid="tao-home-history-delete"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-testid="tao-home-history-delete"]:enabled'
+- assert_count:
+    selector: '[data-testid="tao-home-history-row"]'
+    equal: 1
+- click: '[data-testid="tao-home-history-delete"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-testid="tao-home-history-delete"]:enabled'
+- assert_count:
+    selector: '[data-testid="tao-home-history-row"]'
+    equal: 1
+- press: Escape
+- click: '[data-testid="tao-home-new-chat"]'
+- click: '[data-testid="tao-home-history"]'
+- assert_count:
+    selector: '[data-testid="tao-home-history-row"]'
+    equal: 2
+- assert_no_runtime_errors: null
+- screenshot: tao-history-delete-confirmation.png
+verification:
+  review: reviewed
+  requirements:
+  - id: HISTORY-DELETE-CONFIRMATION
+    requirement: Cancel and Escape preserve history; confirmed deletion changes the
+      list and deleting the last thread leaves Home usable.
+    actions:
+    - 9
+    - 13
+    - 16
+    - 17
+    - 21
+    - 22
+    - 25
+    - 26
+    - 29
+    - 30
+    - 31
+    checkpoints:
+    - step: 15
+      expectation: Cancel preserves both conversations.
+    - step: 20
+      expectation: Escape dismisses only confirmation and preserves both conversations.
+    - step: 24
+      expectation: Confirm removes exactly the selected conversation.
+    - step: 28
+      expectation: Removing the final conversation leaves one fresh thread.
+    - step: 32
+      expectation: Home can still create and list another conversation.
+    - step: 33
+      expectation: '{''assert_no_runtime_errors'': None}'
+    results:
+    - 15
+    - 20
+    - 24
+    - 28
+    - 32
+    - 33
+  native:
+  - check: Packaged history action and actual delete IPC
+    method: automated
+    reason: Browser has no native Tao snapshot storage or packaged WebView.
+  visual:
+  - check: Confirmation, retained content and final action layout
+    method: manual
+    reason: Inspect the recorded screenshot; DOM assertions do not certify prototype
+      or OS window fidelity.

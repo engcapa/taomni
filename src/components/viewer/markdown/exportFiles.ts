@@ -6,6 +6,7 @@ import { selectSaveDirectory, selectSaveFilePath, writeStreamAbort, writeStreamA
 import { markdownBasename, readMarkdownImage, resolveMarkdownAsset, encodeMarkdownPath } from "../../../lib/markdownAssets";
 import { isTauriRuntime } from "../../../lib/runtime";
 import { sftpMkdir } from "../../../lib/sftp";
+import type { MarkdownAssets } from "./markdownOwner";
 
 export async function writeExportBytes(path: string, bytes: Uint8Array): Promise<void> {
   let handle: string | null = null;
@@ -19,24 +20,28 @@ export async function writeExportBytes(path: string, bytes: Uint8Array): Promise
   }
 }
 
-export async function saveExportBlob(filename: string, blob: Blob, sourcePath: string): Promise<string | null> {
+export async function saveExportBlob(filename: string, output: Blob | (() => Promise<Blob>), sourcePath?: string): Promise<string | null> {
+  const generate = () => typeof output === "function" ? output() : output;
   if (isTauriRuntime()) {
     const path = await selectSaveFilePath(filename, sourcePath);
     if (!path) return null;
     // Native streams truncate when opened. Reject the source and canonical
     // aliases/symlinks before touching the selected output, even after overwrite
     // confirmation in the native chooser.
-    const source = explorerPathKey(await explorerCanonicalPath(sourcePath));
+    const source = sourcePath ? explorerPathKey(await explorerCanonicalPath(sourcePath)) : null;
     let target: string;
     try { target = explorerPathKey(await explorerCanonicalPath(path)); }
     catch { target = explorerPathKey(path); }
-    if (source === target || explorerPathKey(sourcePath) === target) {
+    if (sourcePath && (source === target || explorerPathKey(sourcePath) === target)) {
       throw new Error("Choose a different output file; the Markdown source is never overwritten");
     }
+    // Choose and validate before costly rasterization. Only open the output
+    // stream after generation succeeds, so cancellation/errors cannot truncate it.
+    const blob = await generate();
     await writeExportBytes(path, new Uint8Array(await blob.arrayBuffer()));
     return path;
   }
-  const url = URL.createObjectURL(blob);
+  const url = URL.createObjectURL(await generate());
   const anchor = document.createElement("a");
   anchor.href = url; anchor.download = filename;
   document.body.append(anchor); anchor.click(); anchor.remove();
@@ -60,18 +65,18 @@ export function markdownImageReferences(content: string): ExportImageReference[]
 }
 
 export interface MarkdownFolderPlan { content: string; files: Array<{ name: string; bytes: Uint8Array }> }
-export async function planMarkdownFolder(content: string, docPath: string): Promise<MarkdownFolderPlan> {
+export async function planMarkdownFolder(content: string, docPath: string, assets?: MarkdownAssets): Promise<MarkdownFolderPlan> {
   const references = markdownImageReferences(content);
   const files: MarkdownFolderPlan["files"] = [];
   const destinations = new Map<string, string>();
   let rewritten = content;
   for (const reference of [...references].reverse()) {
-    if (!resolveMarkdownAsset(docPath, reference.href) && !reference.href.startsWith("data:image/")) {
+    if (!assets?.readImage && !resolveMarkdownAsset(docPath, reference.href) && !reference.href.startsWith("data:image/")) {
       throw new Error(`Remote image cannot be bundled. Save it locally first: ${reference.href}`);
     }
     let name = destinations.get(reference.href);
     if (!name) {
-      const data = await readMarkdownImage(docPath, reference.href);
+      const data = assets?.readImage ? await assets.readImage(reference.href) : await readMarkdownImage(docPath, reference.href);
       const match = /^data:(image\/[\w.+-]+);base64,([\s\S]+)$/.exec(data);
       if (!match) throw new Error(`Image data is not supported: ${reference.href}`);
       const extension = ({ "image/png": "png", "image/jpeg": "jpg", "image/svg+xml": "svg", "image/webp": "webp", "image/gif": "gif", "image/bmp": "bmp" } as Record<string, string>)[match[1]] || "img";
@@ -87,11 +92,11 @@ export async function planMarkdownFolder(content: string, docPath: string): Prom
   return { content: rewritten, files };
 }
 
-export async function exportMarkdownFolder(content: string, docPath: string): Promise<string | null> {
+export async function exportMarkdownFolder(content: string, docPath: string, assets?: MarkdownAssets): Promise<string | null> {
   if (!isTauriRuntime()) throw new Error("Markdown + image folder export requires the desktop app");
   const parent = await selectSaveDirectory();
   if (!parent) return null;
-  const plan = await planMarkdownFolder(content, docPath);
+  const plan = await planMarkdownFolder(content, docPath, assets);
   const filename = markdownBasename(docPath);
   // localCreateEntry atomically numbers collisions. Never overwrite an
   // existing folder, source document, or previously exported image.

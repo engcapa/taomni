@@ -1,0 +1,109 @@
+id: TC-TAO-HOME-012
+title: Home suggestions stay centered on one line while sidebar reflows the chat
+description: >-
+  Check desktop and 800x600 layouts in both languages. All four suggested prompts
+  remain on one centered line with tooltips and ellipsis, without a scroller.
+  Opening and resizing the sidebar must preserve their position inside the chat.
+  TC-TAO-HOME-007 independently verifies actual native drag delivery.
+modes: [browser]
+covers: [F1.11]
+tags: [p1, tao-home, ui, regression]
+fixtures: [reset_db]
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-tao-home-012
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- set_viewport: {width: 1366, height: 768}
+- wait_for: '[data-testid="tao-home-suggestions"]'
+- assert_count: {selector: '[data-testid="tao-home-suggestions"] button:visible', equal: 4}
+- eval_readonly:
+    expression: document.querySelector('.tao-home-suggestion-row').scrollWidth <= document.querySelector('.tao-home-suggestion-row').clientWidth
+    expect_truthy: true
+- eval_readonly:
+    expression: Math.abs(document.querySelector('.tao-home-suggestion-row').getBoundingClientRect().left - document.querySelector('.tao-home-composer').getBoundingClientRect().left) < 2
+    expect_truthy: true
+- eval_readonly:
+    expression: document.querySelector('.tao-home-suggestion-row button:first-of-type').offsetTop === document.querySelector('.tao-home-suggestion-row button:last-of-type').offsetTop
+    expect_truthy: true
+- click: '[data-testid="tao-home-side-toggle"]'
+- wait_for: '[data-testid="tao-home-side-panel"]'
+- eval_readonly:
+    expression: document.querySelector('.tao-home-composer').getBoundingClientRect().right < document.querySelector('.tao-home-side-panel').getBoundingClientRect().left
+    expect_truthy: true
+- screenshot: home-suggestions-sidebar-desktop.png
+- set_viewport: {width: 800, height: 600}
+- assert_count: {selector: '[data-testid="tao-home-suggestions"] button:visible', equal: 4}
+- eval_readonly:
+    expression: document.querySelector('.tao-home-suggestion-row').scrollWidth <= document.querySelector('.tao-home-suggestion-row').clientWidth
+    expect_truthy: true
+- eval_readonly:
+    expression: document.querySelector('.tao-home-suggestion-row button:first-of-type').offsetTop === document.querySelector('.tao-home-suggestion-row button:last-of-type').offsetTop
+    expect_truthy: true
+- eval_readonly:
+    expression: Math.abs(document.querySelector('.tao-home-suggestion-row').getBoundingClientRect().left - document.querySelector('.tao-home-composer').getBoundingClientRect().left) < 2
+    expect_truthy: true
+- eval_readonly:
+    expression: document.querySelector('.tao-home-suggestion-row button span').scrollWidth > document.querySelector('.tao-home-suggestion-row button span').clientWidth
+    expect_truthy: true
+- assert_attribute:
+    selector: '[data-testid="tao-home-suggestions"] button:first-of-type'
+    name: title
+    equals: Explain a terminal error
+- eval_readonly:
+    expression: document.querySelector('.tao-home-main').clientWidth >= 320 && document.querySelector('.tao-home-main').getBoundingClientRect().right <= document.querySelector('.tao-home-side-panel').getBoundingClientRect().left + 1
+    expect_truthy: true
+- screenshot: home-suggestions-sidebar-compact-en.png
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-zh-CN"]'
+- assert_count: {selector: '[data-testid="tao-home-suggestions"] button:visible', equal: 4}
+- assert_attribute:
+    selector: '[data-testid="tao-home-suggestions"] button:first-of-type'
+    name: title
+    equals: 解释一个终端报错
+- eval_readonly:
+    expression: document.querySelector('.tao-home-suggestion-row button:first-of-type').offsetTop === document.querySelector('.tao-home-suggestion-row button:last-of-type').offsetTop && document.querySelector('.tao-home-suggestion-row').scrollWidth <= document.querySelector('.tao-home-suggestion-row').clientWidth
+    expect_truthy: true
+- screenshot: home-suggestions-sidebar-compact-zh.png
+- click: '[data-testid="tao-home-side-toggle"]'
+- assert_not_visible: '[data-testid="tao-home-side-panel"]'
+- eval_readonly:
+    expression: Math.abs(document.querySelector('.tao-home-main').clientWidth - document.querySelector('.tao-home-body').clientWidth) < 2
+    expect_truthy: true
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: SUGGESTIONS-LAYOUT
+    requirement: All four suggestions stay on one centered line without a horizontal scroller at desktop and compact sizes, including an open sidebar and both locales.
+    actions: [5, 11, 15, 24, 25]
+    checkpoints:
+    - {step: 9, expectation: Desktop suggestions align with the centered composer.}
+    - {step: 10, expectation: All desktop suggestions share one line.}
+    - {step: 17, expectation: Compact suggestions do not overflow horizontally.}
+    - {step: 18, expectation: Compact suggestions do not wrap or disappear.}
+    - {step: 19, expectation: Compact suggestions align with the composer.}
+    - {step: 20, expectation: Long visible labels truncate inside their buttons.}
+    - {step: 21, expectation: The tooltip retains the full English prompt.}
+    - {step: 27, expectation: The tooltip follows the selected Chinese language.}
+    - {step: 28, expectation: All Chinese suggestions remain on one line without overflow.}
+    results: [9, 10, 17, 18, 19, 20, 21, 27, 28]
+  - id: COMPACT-CHAT
+    requirement: An open sidebar occupies layout space and closing restores the full width at 800x600.
+    actions: [11, 15, 30]
+    checkpoints:
+    - {step: 13, expectation: The desktop composer lies entirely beside the sidebar.}
+    - {step: 22, expectation: The compact chat retains at least 320px and does not overlap the sidebar.}
+    - {step: 31, expectation: The panel is fully hidden after a second click.}
+    - {step: 32, expectation: Closing restores the full chat width.}
+    - {step: 33, expectation: Locale and layout transitions raise no runtime errors.}
+    results: [13, 22, 31, 32, 33]
+  visual:
+  - check: Centering, single line, overflow and sidebar bounds at both sizes and locales
+    method: automated
+    reason: Actual DOM rectangles, offsets, scroll sizes and ellipsis content widths are independently checked; screenshots retain each state.
+  native:
+  - check: Native drag delivery and chat layout
+    method: not-applicable
+    reason: TC-TAO-HOME-007 owns packaged pointer and keyboard resize assertions. This case owns explicit browser viewport and locale combinations.

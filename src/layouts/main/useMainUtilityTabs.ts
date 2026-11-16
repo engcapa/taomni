@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useMemo } from "react";
 import { useSessionStore } from "../../stores/sessionStore";
-import { useAppStore } from "../../stores/appStore";
 import type { MailTabInfo } from "../../types";
 import { passwordRefFromOptions } from "./authentication";
 import { mailSmtpPasswordRefFromOptions, sessionToMailTabInfo } from "./mailSession";
@@ -10,6 +9,7 @@ import { useMainLayoutState } from "./useMainLayoutState";
 import { useMainSessionActions } from "./useMainSessionActions";
 import { useMainTerminalIntegration } from "./useMainTerminalIntegration";
 import { useMainWorkspaceOpening } from "./useMainWorkspaceOpening";
+import { useAppStore } from "../../stores/appStore";
 
 
 export interface UseMainUtilityTabsContext {
@@ -34,9 +34,11 @@ export function useMainUtilityTabs(context: UseMainUtilityTabsContext) {
   }, [layout.addTab]);
 
   const openSettingsTab = useCallback(() => {
-    // Section navigation and an entry callback can dispatch in the same
-    // event, before React refreshes tabsRef. Read the synchronous owner.
-    const existing = useAppStore.getState().tabs.find((tab) => tab.type === "settings");
+    // `openSettingsSection` dispatches synchronously before callers invoke
+    // this callback. The layout ref is refreshed in an effect, so consult the
+    // store as well to avoid creating two Settings tabs during that same tick.
+    const existing = useAppStore.getState().tabs.find((tab) => tab.type === "settings")
+      ?? layout.tabsRef.current.find((tab) => tab.type === "settings");
     if (existing) {
       layout.setActiveTab(existing.id);
       return;

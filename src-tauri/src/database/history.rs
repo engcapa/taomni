@@ -89,6 +89,12 @@ pub fn init_history_tables(conn: &Connection) -> SqlResult<()> {
     if !columns.iter().any(|column| column == "tab_name") {
         conn.execute("ALTER TABLE sql_history ADD COLUMN tab_name TEXT", [])?;
     }
+    if !columns.iter().any(|column| column == "redacted") {
+        conn.execute(
+            "ALTER TABLE sql_history ADD COLUMN redacted INTEGER NOT NULL DEFAULT 0",
+            [],
+        )?;
+    }
     conn.execute(
         "CREATE INDEX IF NOT EXISTS idx_sql_history_session_panel
             ON sql_history(saved_session_id, panel_id)",
@@ -98,12 +104,17 @@ pub fn init_history_tables(conn: &Connection) -> SqlResult<()> {
 }
 
 pub fn append_history(conn: &Connection, entry: &DbHistoryEntry) -> SqlResult<()> {
+    let (sql_content, sql_redactions) = crate::chat::redact::redact(&entry.sql_content);
+    let (error, error_redactions) = entry.error.as_deref().map_or((None, 0), |value| {
+        let (text, count) = crate::chat::redact::redact(value);
+        (Some(text), count)
+    });
     conn.execute(
         "INSERT OR REPLACE INTO sql_history
          (id, saved_session_id, engine, host, port, catalog, database_name, schema_name,
           sql_content, started_at, duration_ms, rows_affected, row_count, has_result_set,
-          error, created_at, panel_id, tab_name)
-         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18)",
+          error, created_at, panel_id, tab_name, redacted)
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19)",
         params![
             entry.id,
             entry.saved_session_id,
@@ -113,16 +124,17 @@ pub fn append_history(conn: &Connection, entry: &DbHistoryEntry) -> SqlResult<()
             entry.catalog,
             entry.database_name,
             entry.schema_name,
-            entry.sql_content,
+            sql_content,
             entry.started_at,
             entry.duration_ms,
             entry.rows_affected,
             entry.row_count,
             if entry.has_result_set { 1 } else { 0 },
-            entry.error,
+            error,
             entry.created_at,
             entry.panel_id,
             entry.tab_name,
+            i64::from(sql_redactions + error_redactions > 0),
         ],
     )?;
     Ok(())

@@ -14,8 +14,7 @@ pub(crate) fn configure<'a>(
         .ok()
         .map(|raw| std::path::PathBuf::from(raw.trim()))
         .filter(|path| path.is_absolute());
-    if cfg!(debug_assertions)
-        && app.config().identifier == crate::QA_APP_ID
+    if app.config().identifier == crate::QA_APP_ID
         && (std::env::var_os("NEWMOB_DATA_DIR").is_some() || qa_webview_override.is_some())
     {
         if let Some(directory) = qa_webview_override.or_else(|| {

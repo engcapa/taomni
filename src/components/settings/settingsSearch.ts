@@ -202,6 +202,11 @@ export const SETTINGS_SEARCH_ENTRIES: SettingsSearchEntry[] = [
     terms: ["llm", "provider", "model", "openai", "anthropic", "api key", "endpoint", "大模型", "模型", "服务商", "密钥", "接口"],
   },
   {
+    id: "ai-tao",
+    titleKeys: [],
+    terms: ["tao", "deepseek", "messages", "本地资料", "脱敏", "全家桶", "语音", "费用"],
+  },
+  {
     id: "ai-websearch",
     titleKeys: ["settings.webSearchSection"],
     terms: ["web search", "search", "internet", "browse", "网页搜索", "联网", "搜索", "浏览"],
@@ -303,6 +308,7 @@ export const SETTINGS_GROUPS: SettingsGroupDef[] = [
       "ai-shell",
       "ai-asr",
       "ai-llm",
+      "ai-tao",
       "ai-websearch",
       "ai-claude",
       "ai-codex",

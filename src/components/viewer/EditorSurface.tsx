@@ -14,6 +14,8 @@ export interface EditorSurfaceProps {
   onView?: (view: EditorView | null) => void;
   onCursorChange?: (cursor: { line: number; column: number }) => void;
   className?: string;
+  onChange?: (content: string) => void;
+  onSave?: () => Promise<unknown> | void;
 }
 const EMPTY_EXTENSIONS: Extension[] = [];
 const theme = EditorView.theme({
@@ -43,12 +45,14 @@ async function language(path: string): Promise<Extension> {
 
 /** The view owns selection and history; shared store owns document text. Remote
  * store updates never recreate the editor or echo themselves back as user edits. */
-export function EditorSurface({ document: current, extensions = EMPTY_EXTENSIONS, onView, onCursorChange, className = "" }: EditorSurfaceProps) {
+export function EditorSurface({ document: current, extensions = EMPTY_EXTENSIONS, onView, onCursorChange, className = "", onChange, onSave }: EditorSurfaceProps) {
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
   const currentRef = useRef(current);
   const onViewRef = useRef(onView);
   const onCursorRef = useRef(onCursorChange);
+  const callbacks = useRef({ onChange, onSave });
+  callbacks.current = { onChange, onSave };
   const preferences = useFileOpenPreferences();
   const compartments = useRef({ editable: new Compartment(), wrap: new Compartment(), extra: new Compartment(), language: new Compartment() });
   const external = useRef(false);
@@ -61,14 +65,23 @@ export function EditorSurface({ document: current, extensions = EMPTY_EXTENSIONS
     const parts = compartments.current;
     const editor = new EditorView({ parent: host.current, state: EditorState.create({ doc: currentRef.current.content,
       extensions: [lineNumbers(), highlightActiveLineGutter(), drawSelection(), history(), indentOnInput(), bracketMatching(),
+        EditorState.transactionFilter.of((transaction) => transaction.docChanged && transaction.startState.readOnly && !external.current ? [] : transaction),
         syntaxHighlighting(defaultHighlightStyle, { fallback: true }), highlightActiveLine(), search({ top: true }), highlightSelectionMatches(),
-        keymap.of([{ key: "Mod-s", run: () => { void useDocumentStore.getState().save(currentRef.current.path).catch(() => {}); return true; } },
+        keymap.of([{ key: "Mod-s", run: () => { void Promise.resolve(callbacks.current.onSave ? callbacks.current.onSave() : useDocumentStore.getState().save(currentRef.current.path)).catch(() => {}); return true; } },
           ...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab]),
         parts.editable.of([EditorState.readOnly.of(currentRef.current.readOnly), EditorView.editable.of(!currentRef.current.readOnly)]),
         parts.wrap.of(settings.wrap ? EditorView.lineWrapping : []), parts.extra.of(extensions), parts.language.of([]), theme,
         EditorView.contentAttributes.of({ "data-testid": "viewer-editor-content", "aria-label": "File content" }),
         EditorView.updateListener.of((update) => {
-          if (update.docChanged && !external.current) useDocumentStore.getState().edit(currentRef.current.path, update.state.doc.toString());
+          // CodeMirror paints the active line above the selection layer. While
+          // a range is selected that fill can hide the final selected line in
+          // dark themes, so expose the state on the host for the shared CSS
+          // rule to suppress the occluder until the range collapses.
+          host.current?.classList.toggle("fv-selection-active", update.state.selection.ranges.some((range) => !range.empty));
+          if (update.docChanged && !external.current) {
+            if (callbacks.current.onChange) callbacks.current.onChange(update.state.doc.toString());
+            else useDocumentStore.getState().edit(currentRef.current.path, update.state.doc.toString());
+          }
           if (update.docChanged || update.selectionSet) {
             const head = update.state.selection.main.head;
             const line = update.state.doc.lineAt(head);

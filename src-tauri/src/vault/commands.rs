@@ -67,6 +67,7 @@ pub async fn vault_unlock(
 #[tauri::command]
 pub async fn vault_lock(state: State<'_, AppState>) -> Result<(), String> {
     transition(&state, |plugins, vault| plugins.lock_vault(vault)).await?;
+    crate::deepseek_app::cancel_all();
     rebuild_router(&state).await
 }
 

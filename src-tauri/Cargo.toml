@@ -99,6 +99,7 @@ log = "0.4"
 portable-pty = "0.9"
 base64 = "0.22"
 minisign-verify = "0.2.5"
+pdf-extract = "0.10"
 rusqlite = { version = "0.40", features = ["bundled", "hooks"] }
 chrono = "0.4"
 russh = { version = "0.61", features = ["async-trait", "flate2"] }

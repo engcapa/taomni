@@ -292,3 +292,13 @@ pub(super) async fn get_session(
         .cloned()
         .ok_or_else(|| format!("No active database connection for session {session_id}"))
 }
+
+pub(crate) async fn get_session_inner(
+    state: &AppState,
+    session_id: &str,
+) -> Result<Arc<DbSession>, String> {
+    let map = state.core.database.db_connections.read().await;
+    map.get(session_id)
+        .cloned()
+        .ok_or_else(|| format!("No active database connection for session {session_id}"))
+}

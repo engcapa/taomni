@@ -24,13 +24,13 @@ def assert_download(ctx: StepContext, args: Any) -> None:
     from pathlib import Path
     import hashlib
     import json
-    if not isinstance(args, dict) or set(args) - {"trigger", "filename", "contains"} or not args.get("trigger") or not args.get("filename"):
+    if not isinstance(args, dict) or set(args) - {"trigger", "filename", "contains", "artifact"} or not args.get("trigger") or not args.get("filename"):
         raise StepError("assert_download: expected trigger, filename and optional contains")
     if ctx.dry_run:
         return
     record = {"mode": "browser", "trigger": args["trigger"], "passed": False}
     try:
-        with ctx.page.expect_download(timeout=30000) as pending:
+        with ctx.page.expect_download(timeout=90000) as pending:
             ctx.page.locator(args["trigger"]).click()
         download = pending.value
         if download.suggested_filename != args["filename"]:
@@ -42,6 +42,9 @@ def assert_download(ctx: StepContext, args: Any) -> None:
         data = target.read_bytes()
         if not data or any(text.encode("utf-8") not in data for text in args.get("contains", [])):
             raise StepError("assert_download: empty download or missing required bytes")
+        if args.get("artifact"):
+            from ..export_quality import inspect_quality
+            record["quality"] = inspect_quality(target, args["artifact"])
         record.update(passed=True, path=str(target), size=len(data), sha256=hashlib.sha256(data).hexdigest())
     finally:
         with (ctx.case_dir / "file-open-downloads.jsonl").open("a", encoding="utf-8") as stream:

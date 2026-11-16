@@ -11,8 +11,8 @@ describe("Tao budget accounting", () => {
 
   it("keeps cumulative usage monotonic and estimates token/tool cost", () => {
     const current = budgetMeter(5_000, 10_000);
-    expect(mergeUsage(current, { inputTokens: 2_000, outputTokens: 4_000 })?.usedTokens).toBe(6_000);
-    expect(mergeUsage(current, { inputTokens: 1_000, outputTokens: 1_000 })?.usedTokens).toBe(5_000);
+    expect(mergeUsage(current, { inputTokens: 2_000, outputTokens: 4_000 })?.usedTokens).toBe(11_000);
+    expect(mergeUsage(current, { inputTokens: 1_000, outputTokens: 1_000 })?.usedTokens).toBe(7_000);
     expect(estimateCost({ inputTokens: 1_000_000, outputTokens: 500_000, searchCalls: 2, fetchCalls: 1 })).toBeCloseTo(6.015);
   });
 });

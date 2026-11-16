@@ -1,0 +1,192 @@
+id: TC-TAO-HOME-034
+title: Native nonempty memory and skill edits, deletion and export persist across panel reloads
+description: Seed three approved records before startup. Use the visible inline editor to cancel with its button and Escape,
+  save memory and skill edits, reopen their panels, export through the actual OS save dialog and delete only the selected
+  record. Verify native persistence after reload.
+modes:
+- native
+covers:
+- F1.11
+tags:
+- p1
+- tao-home
+- native
+- regression
+fixtures:
+- reset_db
+- tao_memory
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-tao-memory-034
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- click: '[data-testid="tao-home-side-toggle"]'
+- click: '[data-testid="tao-home-side-tab-memory"]'
+- wait_for: '[data-testid="tao-home-memory-entry"][data-memory-id="qa-soul"]'
+- assert_count:
+    selector: '[data-testid="tao-home-memory-entry"]'
+    equal: 3
+- click: '[data-testid="tao-home-memory-edit"]:is([data-memory-id="qa-memory"] *)'
+- fill:
+    selector: '[data-testid="tao-home-memory-content"]'
+    value: Discarded edit
+- click: '[data-testid="tao-home-memory-cancel"]'
+- assert_text_equals:
+    selector: '[data-testid="tao-home-memory-entry"][data-memory-id="qa-memory"] p'
+    equals: Original saved preference
+- click: '[data-testid="tao-home-memory-edit"]:is([data-memory-id="qa-memory"] *)'
+- fill:
+    selector: '[data-testid="tao-home-memory-content"]'
+    value: Escape edit
+- press:
+    selector: '[data-testid="tao-home-memory-content"]'
+    key: Escape
+- assert_text_equals:
+    selector: '[data-testid="tao-home-memory-entry"][data-memory-id="qa-memory"] p'
+    equals: Original saved preference
+- click: '[data-testid="tao-home-memory-edit"]:is([data-memory-id="qa-memory"] *)'
+- fill:
+    selector: '[data-testid="tao-home-memory-content"]'
+    value: Updated saved preference
+- click: '[data-testid="tao-home-memory-save"]'
+- assert_text_equals:
+    selector: '[data-testid="tao-home-memory-entry"][data-memory-id="qa-memory"] p'
+    equals: Updated saved preference
+- click: '[data-testid="tao-home-side-tab-skills"]'
+- click: '[data-testid="tao-home-memory-edit"]:is([data-memory-id="qa-skill"] *)'
+- fill:
+    selector: '[data-testid="tao-home-memory-content"]'
+    value: Updated saved review skill
+- click: '[data-testid="tao-home-memory-save"]'
+- assert_text_equals:
+    selector: '[data-testid="tao-home-memory-entry"][data-memory-id="qa-skill"] p'
+    equals: Updated saved review skill
+- click: '[data-testid="tao-home-side-toggle"]'
+- click: '[data-testid="tao-home-side-toggle"]'
+- assert_text:
+    selector: '[data-testid="tao-home-memory-entry"][data-memory-id="qa-memory"] p'
+    contains: Updated saved preference
+- assert_text:
+    selector: '[data-testid="tao-home-memory-entry"][data-memory-id="qa-skill"] p'
+    contains: Updated saved review skill
+- native_file_dialog:
+    kind: save
+    action: choose
+    path: ${fixture.tao_memory_export}
+    trigger: '[data-testid="tao-home-memory-export"]'
+- assert_file_contains:
+    path: ${fixture.tao_memory_export}
+    contains: Updated saved preference
+- assert_file_contains:
+    path: ${fixture.tao_memory_export}
+    contains: Updated saved review skill
+- assert_file_contains:
+    path: ${fixture.tao_memory_export}
+    contains: Preserve this approved identity
+- click: '[data-testid="tao-home-memory-delete"]:is([data-memory-id="qa-memory"] *)'
+- assert_not_visible: '[data-testid="tao-home-memory-entry"][data-memory-id="qa-memory"]'
+- assert_count:
+    selector: '[data-testid="tao-home-memory-entry"]'
+    equal: 2
+- reload_window: null
+- wait_for: '[data-testid="tao-home-host"]'
+- click: '[data-testid="tao-home-side-toggle"]'
+- click: '[data-testid="tao-home-side-tab-memory"]'
+- wait_for: '[data-testid="tao-home-memory-entry"][data-memory-id="qa-skill"]'
+- assert_count:
+    selector: '[data-testid="tao-home-memory-entry"]'
+    equal: 2
+- assert_not_visible: '[data-testid="tao-home-memory-entry"][data-memory-id="qa-memory"]'
+- assert_text:
+    selector: '[data-testid="tao-home-memory-entry"][data-memory-id="qa-skill"] p'
+    contains: Updated saved review skill
+- assert_text:
+    selector: '[data-testid="tao-home-memory-entry"][data-memory-id="qa-soul"] p'
+    contains: Preserve this approved identity
+- assert_no_runtime_errors: null
+- screenshot: tao-home-approved-memory-actions.png
+verification:
+  review: reviewed
+  requirements:
+  - id: HOME-MEMORY-ACTIONS
+    requirement: Nonempty memory and skill controls update native storage, export the saved content and delete only the selected
+      record.
+    actions:
+    - 6
+    - 9
+    - 10
+    - 11
+    - 13
+    - 14
+    - 15
+    - 17
+    - 18
+    - 19
+    - 21
+    - 22
+    - 23
+    - 24
+    - 26
+    - 27
+    - 30
+    - 34
+    - 37
+    - 39
+    - 40
+    checkpoints:
+    - step: 8
+      expectation: All three approved kinds are present.
+    - step: 12
+      expectation: Cancel retains original content.
+    - step: 16
+      expectation: Escape retains original content.
+    - step: 20
+      expectation: Memory Save publishes the edited content.
+    - step: 25
+      expectation: Skill Save publishes the edited content.
+    - step: 28
+      expectation: Reopening retains saved memory.
+    - step: 29
+      expectation: Reopening retains saved skill.
+    - step: 31
+      expectation: Export contains edited memory.
+    - step: 32
+      expectation: Export contains edited skill.
+    - step: 33
+      expectation: Export retains identity.
+    - step: 42
+      expectation: Two records remain after reload.
+    - step: 43
+      expectation: Deleted memory is absent after reload.
+    - step: 44
+      expectation: Skill edit persists after reload.
+    - step: 45
+      expectation: Unrelated identity remains unchanged.
+    - step: 46
+      expectation: No runtime errors occur.
+    results:
+    - 8
+    - 12
+    - 16
+    - 20
+    - 25
+    - 28
+    - 29
+    - 31
+    - 32
+    - 33
+    - 42
+    - 43
+    - 44
+    - 45
+    - 46
+  native:
+  - check: Persisted memory/skill mutations and JSON export through the real save dialog
+    method: automated
+    reason: Browser disables these controls. Actual inline edit/Save/Cancel actions exercise native persistence; the actual
+      OS dialog and disk bytes establish JSON export.
+  visual:
+  - check: Populated memory and skill panels
+    method: manual
+    reason: Screenshot retains final content for review.

@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
 
 export type TaoMode = "ask" | "do" | "research";
-export type TaoModel = "deepseek-flash" | "deepseek-v4-pro";
+export type TaoProvider = "deepseek-app" | "opencode-go";
+export type TaoModel = "deepseek-flash" | "deepseek-v4-pro" | "deepseek-v4.1-flash";
+export type TaoReasoningEffort = "low" | "medium" | "high" | "max";
 export type TaoPhase =
   | "idle"
   | "sending"
@@ -16,7 +18,7 @@ export type TaoPhase =
   | "running_workflow"
   | "budget_halt"
   | "vault_locked";
-export type TaoErrorCategory = "http" | "stream" | "network" | "interrupted" | "protocol";
+export type TaoErrorCategory = "http" | "stream" | "network" | "interrupted" | "protocol" | "configuration" | "disabled" | "vault_locked";
 
 export interface ContextChip {
   id: string;
@@ -24,6 +26,13 @@ export interface ContextChip {
   label: string;
   preview?: string;
   removable?: boolean;
+  fileId?: string;
+  mime?: string;
+  body?: string;
+  source?: string;
+  reference?: string;
+  timestamp?: number;
+  provider?: TaoProvider;
 }
 
 export interface TaoUsage {
@@ -59,6 +68,7 @@ export type ActionLevel = "L1" | "L2";
 
 export interface ActionProposal {
   id: string;
+  executionId?: string;
   kind: ActionKind;
   level: ActionLevel;
   title: string;
@@ -66,8 +76,8 @@ export interface ActionProposal {
   payload: { command?: string; sql?: string; path?: string; content?: string; tabType?: string };
   reason?: string;
   expects?: "read_only" | "write" | "external";
-  status?: "pending" | "approved" | "rejected" | "completed" | "invalid";
-  result?: { exitCode?: number; output?: string; durationMs?: number };
+  status?: "pending" | "approved" | "rejected" | "completed" | "invalid" | "undone" | "cancelled";
+  result?: { status?: "completed" | "failed" | "cancelled"; exitCode?: number; output?: string; durationMs?: number; actionId?: string; undoAvailable?: boolean };
 }
 
 export interface TaoBlock {
@@ -79,9 +89,11 @@ export interface TaoBlock {
   sources?: TaoSource[];
   action?: ActionProposal;
   usage?: TaoUsage;
-  error?: { category: "http" | "stream" | "network" | "interrupted" | "protocol"; message: string };
+  error?: { category: TaoErrorCategory; message: string };
   steps?: Array<{ id: string; label: string; status: "pending" | "running" | "complete" | "skipped" | "failed" }>;
   manuallyExpanded?: boolean;
+  rawBlock?: unknown;
+  rawDeltas?: unknown[];
 }
 
 export interface TaoMessage {
@@ -90,6 +102,7 @@ export interface TaoMessage {
   text: string;
   blocks: TaoBlock[];
   createdAt: number;
+  stopReason?: "end_turn" | "max_tokens" | "refusal" | "tool_use" | "stopped";
 }
 
 export interface TaoThread {
@@ -99,6 +112,8 @@ export interface TaoThread {
   updatedAt: number;
   source?: "tao" | "legacy" | "imported";
   running?: boolean;
+  handoffs?: Array<{ messageId: string; targetThreadId: string; provider: string; createdAt: number }>;
+  preferences?: { mode: TaoMode; context: Record<string, string | undefined>; composer: TaoChatState["composer"] };
 }
 
 export interface TaoRequest {
@@ -106,16 +121,19 @@ export interface TaoRequest {
   content: string;
   mode: TaoMode;
   model: TaoModel;
+  provider?: TaoProvider;
+  reasoningEffort?: TaoReasoningEffort;
   thinking: boolean;
   web: boolean;
   context: Record<string, string | undefined>;
   chips: ContextChip[];
+  actionFeedback?: Array<{ id: string; title: string; status: string; result?: ActionProposal["result"] }>;
 }
 
 export type TaoEvent =
   | { type: "message_start"; messageId?: string; model?: string; usage?: Partial<TaoUsage> }
-  | { type: "block_start"; index: number; block: Partial<TaoBlock> & Pick<TaoBlock, "type"> }
-  | { type: "block_delta"; index: number; delta: { text?: string; query?: string; status?: TaoBlock["status"]; sources?: TaoSource[] } }
+  | { type: "block_start"; index: number; block: Partial<TaoBlock> & Pick<TaoBlock, "type">; rawBlock?: unknown }
+  | { type: "block_delta"; index: number; delta: { text?: string; query?: string; status?: TaoBlock["status"]; sources?: TaoSource[] }; rawDelta?: unknown }
   | { type: "block_stop"; index: number }
   | { type: "message_delta"; stopReason?: "end_turn" | "max_tokens" | "refusal" | "tool_use"; title?: string; usage?: Partial<TaoUsage> }
   | { type: "message_stop" }
@@ -126,6 +144,7 @@ export interface ChatBackend {
   stop?(threadId: string): Promise<void>;
   regenerate?(threadId: string): Promise<AsyncIterable<TaoEvent> | Iterable<TaoEvent>>;
   continue?(threadId: string): Promise<AsyncIterable<TaoEvent> | Iterable<TaoEvent>>;
+  clone?(sourceThreadId: string, targetThreadId: string, throughMessageIndex?: number): Promise<void>;
 }
 
 export interface ContextPorts {
@@ -146,9 +165,9 @@ export interface TaoSearchResult {
 }
 
 export interface ActionPorts {
-  execute?(action: ActionProposal): Promise<ActionProposal["result"]>;
+  execute?(action: ActionProposal, threadId?: string): Promise<ActionProposal["result"]>;
   reject?(action: ActionProposal): Promise<void>;
-  undo?(action: ActionProposal): Promise<void>;
+  undo?(action: ActionProposal, threadId?: string): Promise<void>;
 }
 
 export interface BudgetPort {
@@ -163,6 +182,8 @@ export interface ChatProfile {
   defaultModel: TaoModel;
   defaultThinking: boolean;
   defaultWeb: boolean;
+  defaultProvider?: TaoProvider;
+  defaultReasoningEffort?: TaoReasoningEffort;
   budget?: Partial<BudgetPort>;
 }
 
@@ -180,14 +201,19 @@ export interface TaoChatState {
   threads: Record<string, TaoThread>;
   mode: TaoMode;
   context: Record<string, string | undefined>;
-  composer: { text: string; chips: ContextChip[]; thinking: boolean; web: boolean; model: TaoModel };
+  composer: { text: string; chips: ContextChip[]; thinking: boolean; web: boolean; model: TaoModel; provider?: TaoProvider; reasoningEffort?: TaoReasoningEffort };
   runtime: Record<string, {
     phase: TaoPhase;
     budget: TaoBudget;
     pendingAction?: ActionProposal;
     vaultLocked?: boolean;
+    vaultPromptDismissed?: boolean;
+    deleting?: boolean;
+    actionBusy?: boolean;
+    startedAt?: number;
+    finishedAt?: number;
     /** Request options retained for safe continuation and retry decisions. */
-    lastRequest?: Pick<TaoRequest, "web" | "mode" | "model" | "thinking" | "chips" | "context">;
+    lastRequest?: Pick<TaoRequest, "web" | "mode" | "model" | "thinking" | "chips" | "context" | "provider" | "reasoningEffort">;
   }>;
   ui: { sidePanel: string | null; demoMode: boolean; searchOpen: boolean };
 }
@@ -199,18 +225,30 @@ export interface TaoChatController {
   setComposerText(text: string): void;
   setComposerOption(option: "thinking" | "web", value: boolean): void;
   setModel(model: TaoModel): void;
+  setProvider(provider: TaoProvider): void;
+  setReasoningEffort(effort: TaoReasoningEffort): void;
   setContext(context: Record<string, string | undefined>): void;
   setChips(chips: ContextChip[]): void;
   setSidePanel(panel: string | null): void;
   setDemoMode(enabled: boolean): void;
   setSearchOpen(open: boolean): void;
   createThread(title?: string): string;
+  deleteThread(threadId: string, persist?: (thread: TaoThread) => Promise<void>): Promise<boolean>;
   setActiveThread(threadId: string): void;
   send(content?: string): Promise<boolean>;
   stop(): Promise<void>;
+  /** Call only after an explicit, successful Vault gate; never retries a request. */
+  acknowledgeVaultUnlock(threadId: string): void;
+  dismissVaultPrompt(threadId: string): void;
   continueReply(): Promise<boolean>;
   regenerate(): Promise<boolean>;
   approveAction(action: ActionProposal): Promise<void>;
   rejectAction(action: ActionProposal): Promise<void>;
+  undoAction(action: ActionProposal): Promise<void>;
   removeChip(id: string): void;
+  hydrateThreads(threads: TaoThread[], options?: { merge: boolean }): void;
+  increaseBudget(limitTokens: number): void;
+  setDefaults(defaults: Pick<ChatProfile, "defaultModel" | "defaultThinking" | "defaultWeb" | "defaultProvider" | "defaultReasoningEffort">): void;
+  branchAt(messageId: string, replacement?: string): string | undefined;
+  recordHandoff(threadId: string, handoff: NonNullable<TaoThread["handoffs"]>[number]): void;
 }

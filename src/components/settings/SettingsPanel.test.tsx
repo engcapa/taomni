@@ -5,7 +5,7 @@ import { setAppThemeMode } from "../../lib/appTheme";
 import { useAppStore } from "../../stores/appStore";
 import { SettingsPanel } from "./SettingsPanel";
 import { resetSystemFontCacheForTests } from "../../lib/systemFonts";
-import { openSettingsSection } from "../../lib/settingsNavigation";
+import { clearPendingSettingsSection, openSettingsSection } from "../../lib/settingsNavigation";
 
 const ipcMocks = vi.hoisted(() => ({
   listSystemFonts: vi.fn(),
@@ -44,6 +44,7 @@ const TERMINAL_DEFAULT_STORAGE_KEY = "taomni.terminalDefaultProfile.v1";
 
 describe("SettingsPanel", () => {
   beforeEach(() => {
+    clearPendingSettingsSection();
     resetSystemFontCacheForTests();
     ipcMocks.listSystemFonts.mockReset();
     ipcMocks.listSystemFonts.mockResolvedValue(["Consolas", "JetBrains Mono", "Source Code Pro"]);
@@ -375,6 +376,45 @@ describe("SettingsPanel", () => {
     await waitFor(() => {
       expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
     });
+  });
+
+  it("reveals a section from its heading when first opened and when navigating an existing Settings tab", async () => {
+    openSettingsSection("ai-tao");
+    const { container } = render(<SettingsPanel />);
+    const scroll = vi.mocked(Element.prototype.scrollIntoView);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("settings-group-ai")).toHaveAttribute("data-expanded", "true");
+      expect(scroll.mock.instances).toContain(container.querySelector('[data-search-id="ai-tao"]'));
+      expect(scroll).toHaveBeenLastCalledWith(expect.objectContaining({ block: "start" }));
+    });
+
+    scroll.mockClear();
+    fireEvent(window, new CustomEvent("taomni:open-settings-section", { detail: { id: "app-theme" } }));
+    await waitFor(() => {
+      expect(screen.getByTestId("settings-group-general")).toHaveAttribute("data-expanded", "true");
+      expect(scroll.mock.instances).toContain(container.querySelector('[data-search-id="app-theme"]'));
+      expect(scroll).toHaveBeenLastCalledWith(expect.objectContaining({ block: "start" }));
+    });
+  });
+
+  it("searches a retained deep-linked panel from the new match and releases it when cleared", async () => {
+    openSettingsSection("ai-tao");
+    const { container } = render(<SettingsPanel />);
+    const scroll = vi.mocked(Element.prototype.scrollIntoView);
+    const tao = container.querySelector('[data-search-id="ai-tao"]');
+    await waitFor(() => expect(scroll.mock.instances).toContain(tao));
+    scroll.mockClear();
+
+    fireEvent.change(screen.getByTestId("settings-search-input"), { target: { value: "theme" } });
+    const theme = container.querySelector('[data-search-id="app-theme"]');
+    await waitFor(() => expect(scroll.mock.instances).toContain(theme));
+    expect(scroll).toHaveBeenLastCalledWith({ block: "start", behavior: "auto" });
+    expect(scroll.mock.instances).not.toContain(tao);
+
+    fireEvent.keyDown(screen.getByTestId("settings-search-input"), { key: "Escape" });
+    expect(screen.getByTestId("settings-search-input")).toHaveValue("");
+    expect(theme).not.toHaveAttribute("data-search-match");
   });
 
   it("shows an empty state when no setting matches", async () => {

@@ -215,6 +215,14 @@ def _remove_native_profile(target: Path, timeout_sec: float = 10.0) -> None:
     chrome_debug.log. Retrying the same already-validated profile keeps case
     isolation deterministic without broadening the cleanup boundary.
     """
+    # Native Rust can write mail-cache paths longer than MAX_PATH even when
+    # Python's normal Win32 namespace cannot address those files. Keep the
+    # validated target unchanged and use its verbatim equivalent for cleanup.
+    if os.name == "nt":
+        raw = os.path.abspath(target)
+        if not raw.startswith("\\\\?\\"):
+            raw = "\\\\?\\UNC\\" + raw[2:] if raw.startswith("\\\\") else "\\\\?\\" + raw
+        target = Path(raw)
     deadline = time.monotonic() + timeout_sec
     while target.exists():
         try:

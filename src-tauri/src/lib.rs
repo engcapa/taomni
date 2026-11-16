@@ -17,6 +17,7 @@ mod filebrowser;
 mod git;
 mod hbase;
 mod history;
+mod history_privacy;
 mod java_bundles;
 mod java_debug_adapter;
 mod java_test;
@@ -74,9 +75,25 @@ pub mod workspace_tooling;
 mod wsl;
 
 use state::AppState;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::{AppHandle, Manager, State, WebviewWindowBuilder};
 
 pub(crate) const QA_APP_ID: &str = "com.taomni.app.qa";
+static QA_PROFILE_ACTIVE: AtomicBool = AtomicBool::new(false);
+
+fn is_qa_identifier(identifier: &str) -> bool {
+    identifier == QA_APP_ID
+}
+
+fn activate_qa_profile(identifier: &str) {
+    if is_qa_identifier(identifier) {
+        QA_PROFILE_ACTIVE.store(true, Ordering::Release);
+    }
+}
+
+fn qa_profile_active() -> bool {
+    QA_PROFILE_ACTIVE.load(Ordering::Acquire)
+}
 
 fn qa_override_path(raw: &str) -> Option<std::path::PathBuf> {
     let path = std::path::PathBuf::from(raw.trim());
@@ -90,13 +107,14 @@ fn qa_override_path(raw: &str) -> Option<std::path::PathBuf> {
     }
 }
 
-/// Resolve the app data root, honoring the debug-only QA override used by
+/// Resolve the app data root, honoring the explicit QA override used by
 /// native tests. Windows' `dirs::data_dir()` uses the Known Folder API and
 /// ignores `APPDATA`, so the explicit override is required for isolation.
 pub fn resolved_app_data_dir<R: tauri::Runtime>(
     app: &AppHandle<R>,
 ) -> Result<std::path::PathBuf, String> {
-    if cfg!(debug_assertions) {
+    activate_qa_profile(&app.config().identifier);
+    if qa_profile_active() {
         if let Ok(raw) = std::env::var("NEWMOB_DATA_DIR") {
             if let Some(path) = qa_override_path(&raw) {
                 return Ok(path);
@@ -110,12 +128,12 @@ pub fn resolved_app_data_dir<R: tauri::Runtime>(
 
 /// Resolve named user roots while keeping the QA run inside its own report
 /// directory on macOS.  `dirs` does not honor XDG variables there, so native
-/// QA supplies explicit debug-only overrides instead of changing HOME.
+/// QA supplies explicit identifier-gated overrides instead of changing HOME.
 pub fn resolved_config_dir() -> Option<std::path::PathBuf> {
     if let Some(root) = runtime::paths::config_root() {
         return Some(root);
     }
-    if cfg!(debug_assertions) {
+    if qa_profile_active() {
         if let Ok(raw) = std::env::var("NEWMOB_CONFIG_DIR") {
             if let Some(path) = qa_override_path(&raw) {
                 return Some(path);
@@ -126,7 +144,7 @@ pub fn resolved_config_dir() -> Option<std::path::PathBuf> {
 }
 
 pub fn resolved_cache_dir() -> Option<std::path::PathBuf> {
-    if cfg!(debug_assertions) {
+    if qa_profile_active() {
         if let Ok(raw) = std::env::var("NEWMOB_CACHE_DIR") {
             if let Some(path) = qa_override_path(&raw) {
                 return Some(path);
@@ -166,13 +184,17 @@ pub fn run() {
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .setup(|app| {
+            // Set the process-wide gate before any config/cache-backed service
+            // is initialized. Production identifiers never activate it, so a
+            // stray NEWMOB_* environment cannot redirect a normal install.
+            activate_qa_profile(&app.config().identifier);
             screenshot::init(app.handle());
             let boot = runtime::bootstrap::desktop(app.handle()).map_err(std::io::Error::other)?;
             app.manage(boot.state);
             app.manage(boot.runtime);
             runtime::desktop::attach(app.handle()).map_err(std::io::Error::other)?;
 
-            if cfg!(debug_assertions) {
+            if cfg!(debug_assertions) || qa_profile_active() {
                 let mut logger = tauri_plugin_log::Builder::default().level(log::LevelFilter::Info);
                 let qa_data = std::env::var_os("NEWMOB_DATA_DIR").map(std::path::PathBuf::from);
                 if let Some(path) =
@@ -274,4 +296,32 @@ pub fn run() {
                 runtime::shutdown::final_exit(app_handle);
             }
         });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn qa_override_requires_the_exact_isolated_application_identifier() {
+        assert!(is_qa_identifier(QA_APP_ID));
+        assert!(!is_qa_identifier("com.taomni.app"));
+        assert!(!is_qa_identifier("com.taomni.app.qa-other"));
+    }
+
+    #[test]
+    fn qa_override_path_appends_the_profile_identifier_once() {
+        let root = if cfg!(windows) {
+            std::path::PathBuf::from(r"C:\qa\run")
+        } else {
+            std::path::PathBuf::from("/qa/run")
+        };
+        let root_text = root.to_string_lossy();
+        assert_eq!(qa_override_path(&root_text), Some(root.join(QA_APP_ID)));
+        assert_eq!(
+            qa_override_path(&root.join(QA_APP_ID).to_string_lossy()),
+            Some(root.join(QA_APP_ID))
+        );
+        assert_eq!(qa_override_path("relative"), None);
+    }
 }

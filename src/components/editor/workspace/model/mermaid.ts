@@ -26,6 +26,46 @@ export async function ensureMermaidReady(): Promise<MermaidApi> {
   return mermaid;
 }
 
+export type MermaidTheme = "light" | "dark";
+let renderQueue: Promise<unknown> = Promise.resolve();
+
+/** Mermaid has mutable module configuration. Own initialization and rendering
+ * in one queue; another document/export must never change a render's theme. */
+export function renderMermaid(id: string, source: string, theme: MermaidTheme = "light"): ReturnType<MermaidApi["render"]> {
+  const job = renderQueue.catch(() => undefined).then(async () => {
+    const mermaid = await loadMermaid();
+    mermaid.initialize({ startOnLoad: false, securityLevel: "strict", theme: "base", htmlLabels: false,
+      flowchart: { htmlLabels: false },
+      themeVariables: theme === "dark" ? {
+        darkMode: true, background: "#191c22", textColor: "#f1f5f9", lineColor: "#cbd5e1",
+        primaryColor: "#24364f", primaryTextColor: "#f8fafc", primaryBorderColor: "#93c5fd",
+        secondaryColor: "#3b3155", secondaryTextColor: "#f8fafc", secondaryBorderColor: "#c4b5fd",
+        tertiaryColor: "#203e35", tertiaryTextColor: "#f8fafc", tertiaryBorderColor: "#86efac",
+        clusterBkg: "#242934", clusterBorder: "#94a3b8", titleColor: "#f1f5f9",
+        edgeLabelBackground: "#242934", actorBkg: "#24364f", actorBorder: "#93c5fd", actorTextColor: "#f8fafc",
+        actorLineColor: "#cbd5e1", signalColor: "#e2e8f0", signalTextColor: "#f1f5f9",
+        noteBkgColor: "#3b3155", noteBorderColor: "#c4b5fd", noteTextColor: "#f8fafc",
+        labelBoxBkgColor: "#24364f", labelBoxBorderColor: "#93c5fd", labelTextColor: "#f8fafc",
+      } : {
+        darkMode: false, background: "#ffffff", textColor: "#1f2937", lineColor: "#475569",
+        primaryColor: "#dbeafe", primaryTextColor: "#172554", primaryBorderColor: "#2563eb",
+        secondaryColor: "#ede9fe", secondaryTextColor: "#2e1065", secondaryBorderColor: "#7c3aed",
+        tertiaryColor: "#dcfce7", tertiaryTextColor: "#14532d", tertiaryBorderColor: "#15803d",
+        clusterBkg: "#f6f8fa", clusterBorder: "#64748b", titleColor: "#1f2937",
+        edgeLabelBackground: "#ffffff", actorBkg: "#dbeafe", actorBorder: "#2563eb", actorTextColor: "#172554",
+        actorLineColor: "#475569", signalColor: "#334155", signalTextColor: "#1f2937",
+        noteBkgColor: "#ede9fe", noteBorderColor: "#7c3aed", noteTextColor: "#2e1065",
+      },
+    });
+    mermaidReady = true;
+    // Keep labels as text: foreignObject cannot be embedded reliably into
+    // Word or sanitized SVG. This directive affects only this rendered copy.
+    return mermaid.render(id, `${source}\n%%{init: {"htmlLabels": false, "flowchart": {"htmlLabels": false}}}%%`);
+  });
+  renderQueue = job;
+  return job;
+}
+
 export function downloadBlob(blob: Blob, fileName: string): void {
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");

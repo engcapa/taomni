@@ -67,7 +67,7 @@ export function ViewerShell({ viewer, active = true, workspaceId }: { viewer: Fi
     await openFile({ path }, { context: "viewer-save-as", workspaceId });
   };
   const showError = !document || !!document.error && !document.savedHash && !document.content;
-  return <section className={`fv${active ? " fv-active" : ""}`} data-testid="file-viewer" data-path={viewer.path} data-kind={viewer.kind} data-active={active} data-dirty={document?.dirty || undefined} data-readonly={document?.readOnly || undefined} onKeyDown={(event) => {
+  return <section className={`fv${active ? " fv-active" : ""}`} data-testid="file-viewer" data-path={viewer.path} data-kind={viewer.kind} data-active={active} data-dirty={document?.dirty ?? false} data-readonly={document?.readOnly || undefined} onKeyDown={(event) => {
       if (event.defaultPrevented || event.nativeEvent.isComposing || !active || event.altKey || event.shiftKey) return;
       const mod = getAppPlatform() === "macos" ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
       if (mod && event.key.toLowerCase() === "s") {

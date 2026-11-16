@@ -12,6 +12,7 @@ import { openExternalUrl } from "../../lib/sftp";
 
 const PROVIDER_LABELS: Record<string, string> = {
   "opencode-go": "OpenCode Go",
+  "deepseek-app": "Tao · DeepSeek",
   deepseek:    "DeepSeek",
   agnes:       "Agnes",
   glm:         "GLM-4-Flash (Free)",

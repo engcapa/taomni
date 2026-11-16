@@ -615,7 +615,36 @@ pub(crate) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         | "chat_stream"
         | "chat_stop_stream"
         | "inline_qq_stream" => chat::handle(invoke),
-        "deepseek_app_send" | "deepseek_app_stop" => deepseek_app::handle(invoke),
+        "deepseek_app_send"
+        | "deepseek_app_stop"
+        | "deepseek_app_regenerate"
+        | "deepseek_app_continue"
+        | "deepseek_app_load_threads"
+        | "deepseek_app_save_thread"
+        | "deepseek_app_delete_thread"
+        | "history_privacy_summary"
+        | "deepseek_app_upload_file"
+        | "deepseek_app_delete_file"
+        | "deepseek_app_file_tasks"
+        | "deepseek_app_asr"
+        | "deepseek_app_tts"
+        | "deepseek_app_search"
+        | "deepseek_app_search_sources"
+        | "deepseek_app_set_search_sources"
+        | "deepseek_app_export_archive"
+        | "deepseek_app_import_archive"
+        | "deepseek_app_memory_list"
+        | "deepseek_app_memory_save"
+        | "deepseek_app_memory_delete"
+        | "deepseek_app_memory_export"
+        | "deepseek_app_execute_action" => deepseek_app::handle(invoke),
+        "deepseek_app_clone_thread" => deepseek_app::handle(invoke),
+        "deepseek_app_undo_action" => deepseek_app::handle(invoke),
+        "deepseek_app_workflows"
+        | "deepseek_app_create_workflow"
+        | "deepseek_app_workflow_runs"
+        | "deepseek_app_advance_workflow"
+        | "deepseek_app_cancel_workflow" => deepseek_app::handle(invoke),
         "models_list"
         | "models_download"
         | "models_delete"

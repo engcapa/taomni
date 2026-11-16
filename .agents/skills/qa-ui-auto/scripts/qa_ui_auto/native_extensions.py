@@ -49,6 +49,8 @@ def register(register_verb: RegisterVerb, verbs: dict[str, NativeVerb]) -> None:
     register_verb("assert_file_open_bytes")(assert_file_open_bytes)
     from .file_dialog import run as native_file_dialog
     from .native_paste import run as native_paste
+    from .export_quality import native as assert_export_quality
+    register_verb("assert_export_quality")(assert_export_quality)
     from .markdown_export_observation import run as assert_markdown_artifact
     from .terminal_file_link import native as terminal_file_link
     from .html_preview_observation import native_click, native_observe
@@ -62,3 +64,12 @@ def register(register_verb: RegisterVerb, verbs: dict[str, NativeVerb]) -> None:
     register_verb("show_explorer_preview")(show_explorer_preview)
     from .viewer_raster import native as viewer_raster
     register_verb("viewer_raster")(viewer_raster)
+    from .tao_provider_observation import observe as observe_tao_provider, assert_outcome
+    register_verb("observe_tao_provider")(observe_tao_provider)
+    register_verb("assert_tao_provider_outcome")(assert_outcome)
+    from .tao_real_scenarios import run as tao_real_provider_scenarios
+    register_verb("tao_real_provider_scenarios")(tao_real_provider_scenarios)
+    from .tao_real_documents import run as tao_real_provider_documents
+    register_verb("tao_real_provider_documents")(tao_real_provider_documents)
+    from .tao_real_expanded import run as tao_real_provider_expanded
+    register_verb("tao_real_provider_expanded")(tao_real_provider_expanded)

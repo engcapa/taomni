@@ -3,9 +3,12 @@ import { prepareMarkdownExport, DEFAULT_EXPORT_SETTINGS, markdownExportCss } fro
 import { exportMarkdown } from "./markdownExport";
 import { readMarkdownImage } from "../../../lib/markdownAssets";
 import { saveExportBlob } from "./exportFiles";
+import { markdownPdf } from "./exportPdf";
 
 vi.mock("../../../lib/markdownAssets", async (original) => ({ ...await original<typeof import("../../../lib/markdownAssets")>(), readMarkdownImage: vi.fn() }));
 vi.mock("./exportFiles", () => ({ saveExportBlob: vi.fn(), exportMarkdownFolder: vi.fn() }));
+vi.mock("./exportPdf", () => ({ markdownPdf: vi.fn() }));
+vi.mock("./mathExportCss", () => ({ mathExportCss: async () => ".katex{font-family:KaTeX_Main}" }));
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(readMarkdownImage).mockResolvedValue("data:image/png;base64,AQID");
@@ -13,6 +16,20 @@ beforeEach(() => {
 });
 
 describe("self-contained sanitized Markdown output", () => {
+  it("saves independently generated PDF bytes through the normal chooser without invoking printing", async () => {
+    const blob = new Blob(["%PDF-1.7\n"], { type: "application/pdf" });
+    vi.mocked(markdownPdf).mockResolvedValue(blob);
+    vi.mocked(saveExportBlob).mockImplementationOnce(async (_name, output) => {
+      expect(await (typeof output === "function" ? output() : output)).toBe(blob);
+      return "/out/a.pdf";
+    }).mockResolvedValueOnce(null);
+    expect(await exportMarkdown("pdf", "# PDF", "/docs/a.md", DEFAULT_EXPORT_SETTINGS)).toEqual({ status: "saved", path: "/out/a.pdf" });
+    expect(saveExportBlob).toHaveBeenCalledWith("a.pdf", expect.any(Function), "/docs/a.md");
+    expect(markdownPdf).toHaveBeenCalledOnce();
+    expect(document.querySelector("iframe")).toBeNull();
+    expect(await exportMarkdown("pdf", "# PDF", "/docs/a.md", DEFAULT_EXPORT_SETTINGS)).toEqual({ status: "cancelled" });
+    expect(markdownPdf).toHaveBeenCalledOnce();
+  });
   it("shares the existing renderer and embeds actual local image data with no resource fetch", async () => {
     const source = '# Doc\n\n**bold** ![local](assets/a.png)\n\n<script>alert(1)</script>\n';
     const result = await prepareMarkdownExport(source, "/docs/a.md", DEFAULT_EXPORT_SETTINGS);
@@ -22,9 +39,17 @@ describe("self-contained sanitized Markdown output", () => {
     expect(result.html).toContain("img-src data:");
     expect(result.html).not.toContain("<script");
     expect(result.html).not.toContain('src="assets/');
-    expect(result.html).toContain('aria-label="Table of contents"');
+    expect(result.html).not.toContain('aria-label="Table of contents"');
     expect(readMarkdownImage).toHaveBeenCalledWith("/docs/a.md", "assets/a.png");
     expect(source).toContain("<script>alert(1)</script>");
+  });
+  it("generates a linked TOC only when explicitly enabled without deleting author content", async () => {
+    const content = "# Title\n\nAuthor contents: [Details](#details)\n\n## Details\n";
+    const result = await prepareMarkdownExport(content, "/docs/a.md", { ...DEFAULT_EXPORT_SETTINGS, toc: true });
+    expect(result.root.querySelector("nav")?.getAttribute("aria-label")).toBe("Table of contents");
+    expect(result.root.querySelector("nav a")?.getAttribute("href")).toBe("#heading-1");
+    expect(result.root.textContent).toContain("Author contents");
+    expect(content).toContain("[Details](#details)");
   });
   it("fails rather than publishing an HTML file with missing images", async () => {
     vi.mocked(readMarkdownImage).mockRejectedValue(new Error("permission denied"));

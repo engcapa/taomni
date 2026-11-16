@@ -43,6 +43,10 @@ pub struct AiConfig {
 pub struct DeepSeekAppConfig {
     #[serde(default = "default_true")]
     pub enabled: bool,
+    #[serde(default = "default_tao_provider")]
+    pub provider: String,
+    #[serde(default = "default_reasoning_effort")]
+    pub reasoning_effort: String,
     #[serde(default = "default_deepseek_model")]
     pub model: String,
     #[serde(default)]
@@ -67,6 +71,12 @@ fn default_true() -> bool {
 fn default_deepseek_model() -> String {
     "deepseek-flash".into()
 }
+fn default_tao_provider() -> String {
+    "deepseek-app".into()
+}
+fn default_reasoning_effort() -> String {
+    "high".into()
+}
 fn default_voice_provider() -> String {
     "local".into()
 }
@@ -81,6 +91,8 @@ impl Default for DeepSeekAppConfig {
     fn default() -> Self {
         Self {
             enabled: true,
+            provider: default_tao_provider(),
+            reasoning_effort: default_reasoning_effort(),
             model: default_deepseek_model(),
             thinking_default: false,
             search_default: false,

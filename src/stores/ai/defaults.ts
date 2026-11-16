@@ -121,6 +121,8 @@ export const DEFAULT_CONFIG: AiConfig = {
   chat_send_shortcut: "ctrl_enter",
   deepseek_app: {
     enabled: true,
+    provider: "deepseek-app",
+    reasoning_effort: "high",
     model: "deepseek-flash",
     thinking_default: false,
     search_default: false,

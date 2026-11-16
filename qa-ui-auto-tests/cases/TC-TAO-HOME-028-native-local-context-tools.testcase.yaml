@@ -1,0 +1,42 @@
+id: TC-TAO-HOME-028
+title: Native local context tools with persisted notes and bound files
+description: >-
+  Save a real note through Notes UI, reopen it, search its redacted content in
+  native Tao and explicitly add it as context. In Ask mode the provider calls
+  bound-workspace list/read tools and retrieves Taomni capability metadata;
+  actual returned sources are visible. Continue with local-only research.
+  Reply wording is not graded. This does not certify the separate research
+  execution-plan state machine or external search services.
+modes: [native]
+covers: [F1.11]
+tags: [p0, tao-home, native, regression]
+fixtures: [reset_db, tao_agent]
+timeout_sec: 600
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-tao-context-28
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- wait_for: '[data-testid="tao-home-composer-input"]:enabled'
+- observe_tao_provider: null
+- tao_real_provider_expanded: {scenario: context}
+- assert_no_runtime_errors: null
+- screenshot: tao-agent-local-context-final.png
+verification:
+  review: reviewed
+  requirements:
+  - id: AGENT-NATIVE-CONTEXT
+    requirement: Saved redacted note and actual bound file/capability results participate in the native conversation.
+    actions: [1, 2, 3, 4, 5, 6]
+    checkpoints:
+    - {step: 7, expectation: "The saved note is reopened, searchable and redacted; a selected chip is visible; native workspace and capability sources accompany the completed Ask reply; local research continues without mutations. Explicit invalid credentials leave later stages unverified."}
+    - {step: 8, expectation: No unhandled runtime errors.}
+    results: [7, 8]
+  native:
+  - check: Notes persistence, local FTS retrieval and provider-driven native workspace reads
+    method: automated
+    reason: Browser stubs do not establish real stored notes, filesystem boundaries or native tool execution.
+  visual:
+  - check: Selected local context and actual source readability
+    method: manual
+    reason: Retained screenshots support review; full prototype parity is separate.

@@ -210,7 +210,7 @@ jobs:
         run: node --test scripts/compose-updater-manifest.test.mjs .agents/skills/qa-ui-auto/scripts/test_ci_macos_consent.cjs
       - name: Browser and native language startup observer contracts
         if: inputs.scope != 'selected'
-        run: node --test .agents/skills/qa-ui-auto/scripts/test_language_startup_observer.mjs .agents/skills/qa-ui-auto/scripts/test_native_language_startup_observer.mjs .agents/skills/qa-ui-auto/scripts/test_sdk_action_trace.mjs .agents/skills/qa-ui-auto/scripts/test_file_open_probe.mjs .agents/skills/qa-ui-auto/scripts/test_native_paced_input.mjs
+        run: node --test .agents/skills/qa-ui-auto/scripts/test_language_startup_observer.mjs .agents/skills/qa-ui-auto/scripts/test_native_language_startup_observer.mjs .agents/skills/qa-ui-auto/scripts/test_sdk_action_trace.mjs .agents/skills/qa-ui-auto/scripts/test_file_open_probe.mjs .agents/skills/qa-ui-auto/scripts/test_native_paced_input.mjs .agents/skills/qa-ui-auto/scripts/test_native_pointer_activation.mjs
       - name: Wayland automation contracts
         if: inputs.scope != 'selected'
         run: python -m unittest test_wayland_tools test_multi_display test_ci_wayland_startup test_ci_wayland_capture test_screenshot_flash_sampler

@@ -1,0 +1,60 @@
+id: TC-TAO-HOME-018
+title: Real configured provider edit branch isolation and stopped response continuation
+description: Four real requests exercise edit cloning, independent original history, actual streaming Stop and native
+  Continue with the retained prefix.
+modes:
+- native
+covers:
+- F1.11
+tags:
+- p1
+- tao-home
+- native
+- real-provider
+- regression
+fixtures:
+- reset_db
+- tao_real_provider
+timeout_sec: 600
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-tao-home-018-real-lifecycle
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- wait_for: '[data-testid="tao-home-composer-input"]:enabled'
+- observe_tao_provider: null
+- tao_real_provider_expanded:
+    scenario: lifecycle
+- assert_no_runtime_errors: null
+- screenshot: tao-home-real-lifecycle-final.png
+verification:
+  review: reviewed
+  requirements:
+  - id: REAL-LIFECYCLE
+    requirement: Real configured provider edit branch isolation and stopped response continuation
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    checkpoints:
+    - step: 7
+      expectation: Edit clones native context, retains the original draft and keeps the original conversation unchanged.
+        Stop preserves real partial output; Continue appends without losing the prefix or duplicating message pairs.
+        Only explicit 401/403 or expired credentials may finish early; remaining stages are unverified.
+    - step: 8
+      expectation: No unhandled runtime errors.
+    results:
+    - 7
+    - 8
+  native:
+  - check: Actual native IPC, provider and relevant disk boundaries
+    method: automated
+    reason: Four real requests exercise edit cloning, independent original history, actual streaming Stop and native
+      Continue with the retained prefix. Browser stubs cannot establish these results.
+  visual:
+  - check: Real native transcript and companion panels
+    method: manual
+    reason: Screenshots retain relevant UI; semantic assertions do not certify full prototype alignment.

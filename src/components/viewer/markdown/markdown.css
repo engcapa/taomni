@@ -1,6 +1,6 @@
 .fv-markdown{flex:1;min-height:0;min-width:0;display:flex;flex-direction:column;position:relative;background:var(--bg);color:var(--text)}
-.fv-md-toolbar{flex-wrap:nowrap;overflow:visible;gap:4px}
-.fv-md-format{display:flex;align-items:center;gap:1px;flex-wrap:nowrap;min-width:0;overflow-x:auto;scrollbar-width:thin}
+.fv-bar.fv-md-toolbar{flex-wrap:wrap;overflow:visible;gap:4px}
+.fv-md-format{display:flex;align-items:center;gap:1px;flex-wrap:wrap;min-width:0;overflow:visible}
 .fv-md-format .fv-icon-button{flex:none}
 .fv-md-heading-select{position:relative;min-width:74px;flex:none;padding:0 5px!important}
 .fv-md-heading-select select{appearance:none;background:transparent;color:inherit;border:0;outline:0;padding:0 16px 0 4px;width:100%;height:26px;font-size:12px;cursor:pointer}
@@ -16,7 +16,15 @@
 .fv-md-empty-outline{font-size:12px;color:var(--muted);padding:4px 6px}
 .fv-md-main{flex:1;min-width:0;min-height:0;display:flex;position:relative;background:var(--bg);user-select:text}
 .fv-md-editor-pane{flex:1;min-width:0;min-height:0;position:relative;display:flex;flex-direction:column}
-.fv-md-split>.fv-md-editor-pane,.fv-md-split>.fv-md-preview-pane{flex:1;width:50%}
+.fv-md-resizable{display:flex;flex:1;min-width:0;min-height:0;position:relative;height:100%;width:100%}
+.fv-md-resizable.is-split{display:grid}
+.fv-md-resize-handle{background:var(--divider,var(--taomni-divider));cursor:col-resize;touch-action:none;position:relative;z-index:2;outline:none;user-select:none}
+.fv-md-resize-handle:hover,.fv-md-resize-handle:focus-visible{background:var(--accent-s,var(--taomni-accent))}
+.fv-md-resize-handle[hidden]{display:none}
+.fv-md-appearance{display:flex;align-items:center;white-space:nowrap;flex:none;font-size:11px;gap:3px;color:var(--muted)}
+.fv-md-live-pane{background:var(--bg);color:var(--text)}
+.fv-selection-active .cm-activeLine,.fv-selection-active .cm-activeLineGutter{background-color:transparent!important}
+.fv-md-preview-pane{background:var(--bg);color:var(--text)}
 .fv-md-preview-pane{min-width:0;min-height:0;overflow:auto;border-left:1px solid var(--divider);position:relative}
 .fv-md-doc{max-width:800px;margin:0 auto;padding:30px clamp(16px,4.5%,44px) 120px;font-size:15px;line-height:1.75;color:var(--text);position:relative}
 .fv-md-live-surface .cm-content{font-family:var(--taomni-font-sans,Inter,system-ui,-apple-system,"Segoe UI",sans-serif)!important}
@@ -85,7 +93,7 @@
 .fv-md-focus .fv-md-rendered-block:hover,.fv-md-focus .fv-md-table-wrap:focus-within,.fv-md-focus .fv-md-image:focus-within{opacity:1}
 .fv-md-insert-menu{position:absolute;left:44px;bottom:28px;z-index:20;min-width:200px}
 .fv-md-export-control{position:relative;flex:none}
-.fv-md-export-menu{position:absolute;right:0;top:calc(100% + 6px);min-width:270px;z-index:30}
+.fv-md-export-menu{min-width:min(270px,calc(100vw - 16px));max-width:calc(100vw - 16px);max-height:calc(100vh - 16px);overflow:auto;z-index:1100}
 .fv-md-export-menu>button,.fv-md-insert-menu>button{display:flex;align-items:center;text-align:left;gap:8px;width:100%;padding:6px 10px;font-size:12px;border-radius:5px;white-space:nowrap}
 .fv-md-export-menu>button:hover,.fv-md-export-menu>button:focus,.fv-md-insert-menu>button:hover,.fv-md-insert-menu>button:focus{background:var(--hover);outline:none}
 .fv-md-export-menu svg,.fv-md-insert-menu svg{width:15px;height:15px;flex:none}

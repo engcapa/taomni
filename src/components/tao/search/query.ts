@@ -8,6 +8,10 @@ export interface SearchQuery {
   fallbackLike: boolean;
 }
 
+export function canonicalSearchSource(source: string): string {
+  return ({ session: "sessions", command: "commands", note: "notes", thread: "tao", workspace: "workspaces", tool: "capabilities" } as Record<string, string>)[source] ?? source;
+}
+
 export function parseSearchQuery(raw: string, now = Date.now()): SearchQuery {
   let text = raw.trim();
   let source: string | undefined;
@@ -26,7 +30,7 @@ export function searchResults(results: TaoSearchResult[], rawQuery: string, now 
   const terms = query.text.toLocaleLowerCase();
   const since = query.sinceDays ? now - query.sinceDays * 86_400_000 : undefined;
   const filtered = results.filter((result) => {
-    if (query.source && result.source !== query.source) return false;
+    if (query.source && canonicalSearchSource(result.source) !== canonicalSearchSource(query.source)) return false;
     if (query.host && result.host !== query.host) return false;
     if (since && result.ts && result.ts < since) return false;
     if (!terms) return true;

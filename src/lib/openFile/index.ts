@@ -94,17 +94,7 @@ export function openFile(target: OpenFileTarget | string, options: OpenFileOptio
     // cannot steal focus from the already-open main viewer.
     if (options.context === "terminal-link") {
       const linked = existingViewer(key, options.workspaceId) ?? existingViewer(key);
-      if (linked) {
-        // A native terminal link is activated from an xterm pointer event. The
-        // terminal can restore its own tab focus during that same event after
-        // this async operation resolves, so repeat the main-tab activation on
-        // the next task to make repeated links deterministically focus the
-        // existing viewer.
-        if (!options.workspaceId && useAppStore.getState().tabs.some((tab) => tab.id === linked)) {
-          window.setTimeout(() => activateMain(linked), 0);
-        }
-        return linked;
-      }
+      if (linked) return linked;
     }
     // A remote copy must never enter the independent source editor as writable.
     if (!readOnlyReason && (mode === "workspace" || kind === "source")) {

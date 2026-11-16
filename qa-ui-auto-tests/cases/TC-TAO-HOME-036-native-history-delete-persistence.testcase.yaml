@@ -1,0 +1,139 @@
+id: TC-TAO-HOME-036
+title: Native Home history deletes Home and legacy transcripts from their original
+  stores
+description: Start with two synthetic saved Home transcripts and one legacy tao-chat
+  transcript in the isolated QA database. Cancel preserves the selected legacy record;
+  confirming removes it. Delete the active Home record, retain the other transcript,
+  navigate and reload, and confirm neither removed record returns. No commercial provider
+  or response wording is involved.
+modes:
+- native
+covers:
+- F1.11
+tags:
+- p0
+- tao-home
+- regression
+- persistence
+fixtures:
+- reset_db
+- tao_history
+timeout_sec: 120
+steps:
+- open: ${cfg.app.base_url}
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- wait_for: '[data-testid="tao-home-message-assistant"]'
+- click: '[data-testid="tao-home-history"]'
+- wait_for: '[data-testid="tao-home-history-row"][data-title="QA legacy delete"]'
+- assert_count:
+    selector: '[data-testid="tao-home-history-row"]'
+    equal: 3
+- click: '[data-testid="tao-home-history-popover"] [data-thread-id="qa-legacy-delete"] [data-testid="tao-home-history-delete"]'
+- assert_text:
+    selector: '[data-testid="confirm-dialog-message"]'
+    contains: QA legacy delete
+- click: '[data-testid="confirm-dialog-cancel"]'
+- assert_visible: '[data-testid="tao-home-history-popover"] [data-thread-id="qa-legacy-delete"]'
+- click: '[data-testid="tao-home-history-popover"] [data-thread-id="qa-legacy-delete"] [data-testid="tao-home-history-delete"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for:
+    selector: '[data-testid="tao-home-history-popover"] [data-thread-id="qa-legacy-delete"]'
+    state: hidden
+- assert_count:
+    selector: '[data-testid="tao-home-history-row"]'
+    equal: 2
+- click: '[data-testid="tao-home-history-popover"] [data-thread-id="qa-home-delete"] [data-testid="tao-home-history-delete"]'
+- assert_text:
+    selector: '[data-testid="confirm-dialog-message"]'
+    contains: QA Home delete
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for:
+    selector: '[data-testid="tao-home-history-popover"] [data-thread-id="qa-home-delete"]'
+    state: hidden
+- assert_count:
+    selector: '[data-testid="tao-home-history-row"]'
+    equal: 1
+- press: Escape
+- assert_text:
+    selector: '[data-testid="tao-home-message-assistant"]'
+    contains: Retain this Home transcript
+- click: '[data-testid="tao-home-dock-more"]'
+- click: '[data-testid="tao-home-dock-settings"]'
+- wait_for: '[data-testid="tao-settings"]'
+- click: '[data-testid="nav-mode-home"]'
+- reload_window: null
+- wait_for: '[data-testid="tao-home-message-assistant"]'
+- assert_text:
+    selector: '[data-testid="tao-home-message-assistant"]'
+    contains: Retain this Home transcript
+- click: '[data-testid="tao-home-history"]'
+- wait_for: '[data-testid="tao-home-history-popover"] [data-thread-id="qa-home-keep"]'
+- assert_count:
+    selector: '[data-testid="tao-home-history-row"]'
+    equal: 1
+- assert_not_visible: '[data-testid="tao-home-history-popover"] [data-thread-id="qa-legacy-delete"]'
+- assert_not_visible: '[data-testid="tao-home-history-popover"] [data-thread-id="qa-home-delete"]'
+- assert_no_runtime_errors: null
+- screenshot: tao-history-delete-retained-after-reload.png
+verification:
+  review: reviewed
+  requirements:
+  - id: HISTORY-DURABLE-DELETE
+    requirement: Both storage owners delete the confirmed transcript; cancel and unrelated
+      transcripts survive.
+    actions:
+    - 8
+    - 10
+    - 12
+    - 13
+    - 16
+    - 18
+    - 23
+    - 24
+    - 26
+    - 27
+    - 30
+    checkpoints:
+    - step: 11
+      expectation: Cancelling legacy deletion preserves that record.
+    - step: 15
+      expectation: Legacy deletion removes only one row.
+    - step: 22
+      expectation: Active Home deletion selects the remaining saved transcript.
+    - step: 34
+      expectation: Reload proves Home and legacy deletion persisted without removing
+        the retained conversation.
+    - step: 20
+      expectation: '{''assert_count'': {''selector'': ''[data-testid="tao-home-history-row"]'',
+        ''equal'': 1}}'
+    - step: 29
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="tao-home-message-assistant"]'',
+        ''contains'': ''Retain this Home transcript''}}'
+    - step: 32
+      expectation: '{''assert_count'': {''selector'': ''[data-testid="tao-home-history-row"]'',
+        ''equal'': 1}}'
+    - step: 33
+      expectation: '{''assert_not_visible'': ''[data-testid="tao-home-history-popover"] [data-thread-id="qa-legacy-delete"]''}'
+    - step: 35
+      expectation: '{''assert_no_runtime_errors'': None}'
+    results:
+    - 11
+    - 15
+    - 20
+    - 22
+    - 29
+    - 32
+    - 33
+    - 34
+    - 35
+  native:
+  - check: Real Home snapshot and legacy tao-chat SQLite deletion
+    method: automated
+    reason: Browser stubs do not establish native IPC, original storage ownership
+      or reload persistence.
+  visual:
+  - check: Confirmation, retained content and final action layout
+    method: manual
+    reason: Inspect the recorded screenshot; DOM assertions do not certify prototype
+      or OS window fidelity.

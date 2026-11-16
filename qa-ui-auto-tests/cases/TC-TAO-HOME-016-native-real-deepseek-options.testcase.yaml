@@ -1,0 +1,60 @@
+id: TC-TAO-HOME-016
+title: Real configured provider models, modes, thinking, web search, read URL and usage
+description: Five commercial requests exercise the configured model, Ask/Act/Research, thinking, web_search and read_url through
+  the native Home UI.
+modes:
+- native
+covers:
+- F1.11
+tags:
+- p1
+- tao-home
+- native
+- real-provider
+- regression
+fixtures:
+- reset_db
+- tao_real_provider
+timeout_sec: 600
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-tao-home-016-real-options
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- wait_for: '[data-testid="tao-home-composer-input"]:enabled'
+- observe_tao_provider: null
+- tao_real_provider_expanded:
+    scenario: options
+- assert_no_runtime_errors: null
+- screenshot: tao-home-real-options-final.png
+verification:
+  review: reviewed
+  requirements:
+  - id: REAL-OPTIONS
+    requirement: Real configured provider models, modes, thinking, web search, read URL and usage
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    checkpoints:
+    - step: 7
+      expectation: Selected mode/model must persist in the UI, real thinking blocks and usage must appear, web search
+        must emit actual sources when configured. The isolated OpenCode profile has no search service; verify no invented sources and record successful search as unverified. read_url must increment actual fetch usage. Only explicit 401/403 or expired credentials
+        may finish early; remaining stages are unverified.
+    - step: 8
+      expectation: No unhandled runtime errors.
+    results:
+    - 7
+    - 8
+  native:
+  - check: Actual native IPC, provider and relevant disk boundaries
+    method: automated
+    reason: Five commercial requests exercise the configured model, Ask/Act/Research, thinking, web_search and read_url through
+      the native Home UI. Browser stubs cannot establish these results.
+  visual:
+  - check: Real native transcript and companion panels
+    method: manual
+    reason: Screenshots retain relevant UI; semantic assertions do not certify full prototype alignment.

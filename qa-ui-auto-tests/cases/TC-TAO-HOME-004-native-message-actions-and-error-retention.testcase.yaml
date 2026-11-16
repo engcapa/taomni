@@ -1,0 +1,75 @@
+id: TC-TAO-HOME-004
+title: Native Tao message actions preserve history and retain failed-turn context
+description: >-
+  Use the disposable native Messages fixture to verify the production Home
+  message surface: streamed Markdown reply, edit and branch affordances,
+  regeneration entry, and an authentication failure that keeps the prior
+  completed turn visible. The fixture is loopback-only and does not certify a
+  commercial DeepSeek account.
+modes: [native]
+covers:
+- F1.11
+tags:
+- p0
+- tao-home
+- native
+- regression
+fixtures:
+- reset_db
+- tao_messages
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-tao-home-004
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- wait_for: '[data-testid="tao-home-composer-input"]:enabled'
+- fill:
+    selector: '[data-testid="tao-home-composer-input"]'
+    value: QA-FIRST
+- click: '[data-testid="tao-home-send"]'
+- assert_text:
+    selector: '[data-testid="tao-home-message-assistant"]'
+    contains: First reply
+- assert_not_visible: '[data-testid="tao-home-stop"]'
+- assert_visible: '[data-testid="tao-home-message-edit"]'
+- assert_visible: '[data-testid="tao-home-message-regenerate"]'
+- assert_visible: '[data-testid="tao-home-message-branch"]'
+- click: '[data-testid="tao-home-message-branch"]'
+- assert_text:
+    selector: '[data-testid="tao-home-message-list"]'
+    contains: First reply
+- fill:
+    selector: '[data-testid="tao-home-composer-input"]'
+    value: QA-FAIL
+- click: '[data-testid="tao-home-send"]'
+- wait_for: '[data-testid="tao-home-error-state"]'
+- assert_text:
+    selector: '[data-testid="tao-home-error-state"]'
+    contains: Tao could not complete this request
+- assert_text:
+    selector: '[data-testid="tao-home-error-state"]'
+    contains: DeepSeek returned HTTP 401
+- assert_text:
+    selector: '[data-testid="tao-home-message-list"]'
+    contains: First reply
+- click: '[data-testid="tao-home-retry"]'
+- wait_for: '[data-testid="tao-home-error-state"]'
+- assert_text:
+    selector: '[data-testid="tao-home-error-state"]'
+    contains: Tao could not complete this request
+- assert_count:
+    selector: '[data-testid="tao-home-error-state"]'
+    equal: 1
+- assert_text:
+    selector: '[data-testid="tao-home-message-list"]'
+    contains: First reply
+- click: '[data-testid="tao-home-history"]'
+- click: '[data-testid="tao-home-history-row"][data-title="QA Tao Greeting"]'
+- click: '[data-testid="tao-home-message-edit"]'
+- assert_attribute:
+    selector: '[data-testid="tao-home-composer-input"]'
+    name: value
+    equals: QA-FIRST
+- assert_no_runtime_errors: null
+- screenshot: tao-native-message-actions-error.png

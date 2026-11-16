@@ -1,0 +1,41 @@
+id: TC-TAO-HOME-021
+title: Real configured provider reads actual Python and PDF documents selected through native UI
+description: >-
+  Two actual commercial requests read code and PDF contents containing a fresh
+  token absent from the prompt/filename and calculate from the document data.
+  The owned OS chooser enters explicit file paths; picker filters advertise
+  the backend-supported document, image, text and code extensions.
+modes: [native]
+native_platforms: [Windows, Linux]
+covers: [F1.11]
+tags: [p1, tao-home, native, real-provider, regression]
+fixtures: [reset_db, tao_real_provider]
+timeout_sec: 600
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-tao-home-021-real-document-files
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- wait_for: '[data-testid="tao-home-composer-input"]:enabled'
+- observe_tao_provider: null
+- tao_real_provider_expanded: {scenario: document-files}
+- assert_no_runtime_errors: null
+- screenshot: tao-home-real-document-files-final.png
+verification:
+  review: reviewed
+  requirements:
+  - id: REAL-DOCUMENT-FILES
+    requirement: Native file upload transmits real code/PDF contents that the actual provider reads and reasons about.
+    actions: [1, 2, 3, 4, 5, 6]
+    checkpoints:
+    - {step: 7, expectation: "Actual Python/PDF uploads complete with one chip and each commercial document question completes. Token recall and arithmetic observations are recorded without exact-answer grading. Explicit invalid credentials alone may finish early, leaving later stages unverified."}
+    - {step: 8, expectation: No unhandled runtime errors.}
+    results: [7, 8]
+  native:
+  - check: Real Windows/GTK chooser and Files API document inputs
+    method: automated
+    reason: Retained synthetic files, native upload callbacks and commercial content recall establish the boundary. GTK and Windows dialog owners are checked before sending OS input.
+  visual:
+  - check: Actual document references and reply
+    method: manual
+    reason: Screenshots and content assertions do not certify full prototype fidelity.

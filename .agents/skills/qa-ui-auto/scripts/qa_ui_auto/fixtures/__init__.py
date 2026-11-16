@@ -110,6 +110,12 @@ from . import module_download
 from . import module_download_preview
 from . import module_marketplace, module_marketplace_preview
 from . import module_execution
+from . import tao_messages
+from . import tao_real_provider
+from . import tao_agent
+from . import tao_memory
+from . import tao_history
+from . import markdown_quality
 
 
 class FixtureContext(Protocol):
@@ -136,6 +142,12 @@ REGISTRY: dict[str, Fixture] = {
     "module_backup_data": Fixture("module_backup_data", module_backup_data.setup, module_backup_data.teardown),
     "module_signed_archive": Fixture("module_signed_archive", module_signed_archive.setup),
     "module_execution": Fixture("module_execution", module_execution.setup, module_execution.teardown),
+    "markdown_quality": Fixture("markdown_quality", markdown_quality.setup, markdown_quality.teardown),
+    "tao_messages": Fixture("tao_messages", tao_messages.setup, tao_messages.teardown),
+    "tao_real_provider": Fixture("tao_real_provider", tao_real_provider.setup, tao_real_provider.teardown),
+    "tao_agent": Fixture("tao_agent", tao_agent.setup, tao_agent.teardown),
+    "tao_memory": Fixture("tao_memory", tao_memory.setup),
+    "tao_history": Fixture("tao_history", tao_history.setup),
     "mobile_web": Fixture("mobile_web", mobile_web.setup, mobile_web.teardown),
     "mobile_openssh": Fixture("mobile_openssh", mobile_openssh.setup, mobile_openssh.teardown),
     "mobile_service": Fixture("mobile_service", mobile_service.setup, mobile_service.teardown),

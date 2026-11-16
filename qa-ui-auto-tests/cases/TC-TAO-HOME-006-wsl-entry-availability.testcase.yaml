@@ -1,0 +1,32 @@
+id: TC-TAO-HOME-006
+title: Tao Home hides WSL entry when no distro is available
+description: Browser preview cannot discover a Windows WSL distribution. Tao Home must not show an installation prompt or a WSL launch button when discovery is unsupported or empty.
+modes:
+- browser
+covers:
+- F1.11
+tags:
+- p1
+- tao-home
+- wsl
+fixtures:
+- reset_db
+timeout_sec: 90
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-tao-home-006
+- wait_for: '[data-testid="tao-home-host"]'
+- assert_not_visible: '[data-testid="tao-home-wsl"]'
+- eval_readonly:
+    expression: document.body.innerText.indexOf("Install WSL") === -1
+    expect_truthy: true
+- eval_readonly:
+    expression: document.body.innerText.indexOf("WSL not installed") === -1
+    expect_truthy: true
+- eval_readonly:
+    expression: '!document.querySelector(".tao-home-suggestion-row") || !(document.querySelector(".tao-home-suggestion-row").scrollWidth > document.querySelector(".tao-home-suggestion-row").clientWidth)'
+    expect_truthy: true
+- eval_readonly:
+    expression: '!document.querySelector(".tao-home-suggestion-row") || !document.querySelector(".tao-home-dock-row") || !!(document.querySelector(".tao-home-suggestion-row").compareDocumentPosition(document.querySelector(".tao-home-dock-row")) & Node.DOCUMENT_POSITION_FOLLOWING)'
+    expect_truthy: true
+- assert_no_runtime_errors: null

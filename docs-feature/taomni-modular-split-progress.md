@@ -12,6 +12,7 @@
 
 ## 2026-11-17 最新结果与后续验证
 
+- 已按用户追加要求拉取并合并远程 main `cb448d174`（PR #823 等 Tao Home / Markdown 修复）。10 处冲突保留双方所需行为：main 的完整 Tao Home 和新请求生命周期接回本分支 CoreState/LegacyFeatureRuntime；主窗仍保留模块商店按钮和同一 Settings owner；Vault 命令继续使用模块准入/撤销协调，同时保留成功锁定后取消 Tao 请求。重生成 QA 控件目录并合并两侧 fixture/policy 注册，依赖锁保留双方新依赖。main 提示词里重新出现的 LanChat 能力描述已移除，不恢复功能或读取旧库。TypeScript、前端定向 14 项与设置 31 项、纯 QA 工具 18 项、完整 audit、rustfmt/actionlint 与 refactor 边界均通过；Rust 测试程序只编译，实际应用/网络/宿主行为留待合并源码的 GitHub runner。
 - 源码 `6497fb47e95bcfa32639b0fc09c4b9a754a57fe4` 的[完整升级契约 #43936364643](https://github.com/engcapa/taomni/actions/runs/43936364643) 已成功结束，39 份 artifact 均在运行期间收取。三端宿主 activation 3、cleanup 2、lifecycle 7、MFA 5、MFA snapshot 2、profile 5、services 8、snapshot 4 项全部通过；三端真实下载 3+9+2+1 场景、正式签名 MFA 安装各 3 项、Settings/Vault/HTTP 代理各 2 项通过。四目标编译、Linux 核心过滤器、真实 Vault/SDK 和 X11 门均成功。每份证据保留实际 source/hash/选择身份；这仍不是生产 MFA facade 迁出或真实单体升级。
 - 相同源码的[三端 UI #43936173592](https://github.com/engcapa/taomni/actions/runs/43936173592) 已收齐 22 个 shard：browser 三端各 **46/47**；native Xvfb **57/58**、Wayland **55/58**、Windows **54/55**、macOS ARM64 **53/54**。共同相关失败只有 TC-MODULES-003 step 11。原始 HTML 证明按钮已存在，但 `welcome-tab-panel` 为 `display:none`：打开 Settings 会进入 Sessions 模式，关闭最后标签后仍是 Sessions 空态。用例补显式 `nav-mode-home` 点击，原 21 步和全部结果断言保留，变为 22 步；不是修改产品以破坏模式隔离。修订用例须在 GitHub browser/native 复验。
 - 新增 noexec 原生 TC-MODULES-024 **完整 50 步在 Xvfb/Wayland 均通过**。三端 TC-MODULES-016 **100 步**和 TC-MODULES-022 **58 步**全部通过；模块主窗/分离窗、正式远端商店验证已有 matching WebView 证据。Wayland 的 FILE-OPEN-006/008 仍是已记录的 X11 非左键限制/跨行 chip 命中失败，按用户指示忽略且不计通过。

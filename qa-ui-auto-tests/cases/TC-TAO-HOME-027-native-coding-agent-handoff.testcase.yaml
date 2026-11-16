@@ -1,0 +1,44 @@
+id: TC-TAO-HOME-027
+title: Native Tao context handoff to existing ACP and reviewed return
+description: >-
+  A loopback Go protocol gateway supplies a Tao development plan. Review and
+  cancel the handoff without launching an agent, then confirm it through the
+  existing ACP bridge and an actual subprocess. Verify the reviewed goal and
+  history arrive without an unsent draft. Bring the completed result back as
+  a removable context chip and explicitly continue the original Tao thread.
+  The completed reply must stay visible despite initial history loading, and
+  both sides of the native turn must be present in isolated persistent storage.
+  This deterministic case needs no cloud credentials and runs on hosted platforms.
+modes: [native]
+covers: [F1.11]
+tags: [p0, tao-home, native, regression]
+fixtures: [reset_db, tao_agent]
+timeout_sec: 600
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-tao-home-027-agent
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- wait_for: '[data-testid="tao-home-composer-input"]:enabled'
+- observe_tao_provider: null
+- tao_real_provider_expanded: {scenario: handoff}
+- assert_no_runtime_errors: null
+- screenshot: tao-agent-handoff-final.png
+verification:
+  review: reviewed
+  requirements:
+  - id: AGENT-HANDOFF
+    requirement: Reviewed Tao context reaches the existing native ACP bridge and its result can continue the source thread.
+    actions: [1, 2, 3, 4, 5, 6]
+    checkpoints:
+    - {step: 7, expectation: "Preview includes goal/history and excludes unsent draft; cancel starts no process; confirmation uses an actual ACP subprocess, renders its completed reply and persists both roles; late history loading must not clear the reply; result returns as a reviewable chip and only an explicit send continues Tao."}
+    - {step: 8, expectation: No unhandled runtime errors.}
+    results: [7, 8]
+  native:
+  - check: Native Tao streaming, ACP subprocess request/reply and thread result persistence
+    method: automated
+    reason: Browser stubs cannot establish the existing native ACP bridge, actual process or persisted agent reply.
+  visual:
+  - check: Handoff preview, completed agent reply and returned context readability
+    method: manual
+    reason: Retained screenshots support review; text/exit checks do not certify full prototype fidelity.

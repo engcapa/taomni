@@ -1,0 +1,60 @@
+id: TC-TAO-HOME-017
+title: Real configured provider local citation and confirmed file action with native undo
+description: 'Three real requests: cite an isolated workspace, then reject and approve actual assistant file proposals.
+  Independent disk bytes and native undo are required.'
+modes:
+- native
+covers:
+- F1.11
+tags:
+- p1
+- tao-home
+- native
+- real-provider
+- regression
+fixtures:
+- reset_db
+- tao_real_provider
+timeout_sec: 600
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-tao-home-017-real-actions
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- wait_for: '[data-testid="tao-home-composer-input"]:enabled'
+- observe_tao_provider: null
+- tao_real_provider_expanded:
+    scenario: actions
+- assert_no_runtime_errors: null
+- screenshot: tao-home-real-actions-final.png
+verification:
+  review: reviewed
+  requirements:
+  - id: REAL-ACTIONS
+    requirement: Real configured provider local citation and confirmed file action with native undo
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    checkpoints:
+    - step: 7
+      expectation: Binding alone sends nothing. Explicit citation reaches the commercial reply. Pending/rejected
+        proposals do not write disk. Approval writes exact bytes once; native undo removes the newly created file.
+        Only explicit 401/403 or expired credentials may finish early; remaining stages are unverified.
+    - step: 8
+      expectation: No unhandled runtime errors.
+    results:
+    - 7
+    - 8
+  native:
+  - check: Actual native IPC, provider and relevant disk boundaries
+    method: automated
+    reason: 'Three real requests: cite an isolated workspace, then reject and approve actual assistant file proposals.
+      Independent disk bytes and native undo are required. Browser stubs cannot establish these results.'
+  visual:
+  - check: Real native transcript and companion panels
+    method: manual
+    reason: Screenshots retain relevant UI; semantic assertions do not certify full prototype alignment.

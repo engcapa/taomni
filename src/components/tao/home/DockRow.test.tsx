@@ -5,7 +5,7 @@ import type { TaoChatController } from "../ai-chat";
 import { DockRow } from "./DockRow";
 
 vi.mock("../../welcome/useWelcomeShells", () => ({
-  useWelcomeShells: () => ({ shellStatus: "ready", selectedShell: undefined, wslDistros: [], wslStatus: "ready" }),
+  useWelcomeShells: () => ({ shellStatus: "ready", selectedShell: undefined, wslDistros: [], wslStatus: "ready", localDirectories: [], mergedShells: [] }),
 }));
 
 afterEach(() => { cleanup(); clearPendingSettingsSection(); });
@@ -15,7 +15,7 @@ describe("Tao Home module navigation", () => {
     const onOpenSettings = vi.fn(() => {
       expect(consumePendingSettingsSection()).toEqual({ id: "module-store", presetId: null });
     });
-    render(<DockRow controller={{} as TaoChatController} threads={[]} sessions={[]} workspaces={[]}
+    render(<DockRow controller={{} as TaoChatController} threads={[]} recentSessions={[]} recentWorkspaces={[]}
       demoMode={false} onStartLocalTerminal={vi.fn()} onNewSession={vi.fn()} onOpenSettings={onOpenSettings} />);
     fireEvent.click(screen.getByTestId("welcome-browse-modules"));
     expect(onOpenSettings).toHaveBeenCalledTimes(1);

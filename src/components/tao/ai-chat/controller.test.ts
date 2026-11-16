@@ -47,6 +47,7 @@ describe("Tao chat controller", () => {
     const actionText = ["先说明", "```tao-action", JSON.stringify({ id: "a1", kind: "run_command", title: "查看", payload: { command: "ls" } }), "```"].join("\n");
     const actions: ChatBackend = { send: vi.fn<ChatBackend["send"]>(async () => answer(actionText)) };
     const withAction = createChatController({ backend: actions, profile });
+    withAction.setMode("do");
     await withAction.send("do it");
     const actionState = withAction.getState();
     const actionThread = actionState.threads[actionState.activeThreadId!];
@@ -91,5 +92,30 @@ describe("Tao chat controller", () => {
     const thread = state.threads[state.activeThreadId!];
     expect(state.runtime[thread.id].phase).toBe("budget_halt");
     expect(thread.messages[1].text).toBe("partial");
+  });
+
+  it("deduplicates repeated usage events, accumulates message calls, and branches without mutating source", async () => {
+    let call = 0;
+    const backend: ChatBackend = { send: vi.fn<ChatBackend["send"]>(async () => {
+      call += 1;
+      return call === 1 ? [
+        { type: "message_start", messageId: "turn-1" },
+        { type: "block_start", index: 0, block: { type: "text" } },
+        { type: "block_delta", index: 0, delta: { text: "first" } },
+        { type: "message_delta", usage: { inputTokens: 2, outputTokens: 3 } },
+        { type: "message_delta", usage: { inputTokens: 2, outputTokens: 3 } },
+        { type: "message_stop" },
+      ] : answer("second");
+    }) };
+    const controller = createChatController({ backend, profile });
+    await controller.send("prompt");
+    const source = controller.getState().threads[controller.getState().activeThreadId!];
+    expect(controller.getState().runtime[source.id].budget.usedTokens).toBe(5);
+    const branched = controller.branchAt(source.messages[0].id, "edited");
+    expect(branched).toBeTruthy();
+    const branch = controller.getState().threads[branched!];
+    expect(branch.messages).toHaveLength(0);
+    expect(controller.getState().composer.text).toBe("edited");
+    expect(source.messages).toHaveLength(2);
   });
 });
