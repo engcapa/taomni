@@ -1,8 +1,8 @@
 id: TC-TAO-HOME-041
 title: Native approved README retains nested Markdown fences and following actions
-description: A loopback Go reply contains JSON file payloads with fenced shell and action examples. Exactly
-  the two outer file proposals remain reviewable. Actual native writes require separate approval, preserve
-  exact bytes and restore completed results after reload.
+description: A loopback Go reply contains JSON file payloads with fenced shell and action examples. Exactly the
+  two outer file proposals remain reviewable. Actual native writes require separate approval, preserve exact bytes
+  and restore completed results after reload.
 modes:
 - native
 covers:
@@ -37,19 +37,21 @@ steps:
 - click: '[data-testid="tao-home-mode-do"]'
 - fill:
     selector: '[data-testid="tao-home-composer-input"]'
-    value: 'QA_ACTION_NESTED_FENCES: Propose the README and status file, preserving all nested code blocks.
-      Wait for approval.'
+    value: 'QA_ACTION_NESTED_FENCES: Propose the README and status file, preserving all nested code blocks. Wait
+      for approval.'
 - click: '[data-testid="tao-home-send"]'
+- wait_for: '[data-testid="tao-home-action-card"]'
 - assert_count:
     selector: '[data-testid="tao-home-action-card"]'
     equal: 2
 - assert_text:
-    selector: '[data-testid="tao-home-action-card"]:first-of-type [data-testid="tao-home-action-content"]'
+    selector: '[data-testid="tao-home-action-content"]'
     contains: python -m unittest
 - assert_file_sha256:
     path: ${fixture.platform_workspace_root}/README.md
     equals: 6ca435cf0d8229dbdf644e898118d87017d6da85701851dcdcdaaf7d384ace82
 - click: '[data-testid="tao-home-action-card"] .tao-home-action-buttons button:first-child'
+- wait_for: '[data-testid="tao-home-action-result"]'
 - assert_count:
     selector: '[data-testid="tao-home-action-result"]'
     equal: 1
@@ -60,6 +62,7 @@ steps:
     selector: '[data-testid="tao-home-action-card"]'
     equal: 1
 - click: '[data-testid="tao-home-action-card"] .tao-home-action-buttons button:first-child'
+- wait_for: '[data-testid="tao-home-action-result"] ~ [data-testid="tao-home-action-result"]'
 - assert_count:
     selector: '[data-testid="tao-home-action-result"]'
     equal: 2
@@ -68,6 +71,7 @@ steps:
     contains: Ready
 - reload_window: null
 - wait_for: '[data-testid="tao-home-composer-input"]:enabled'
+- wait_for: '[data-testid="tao-home-action-result"] ~ [data-testid="tao-home-action-result"]'
 - assert_count:
     selector: '[data-testid="tao-home-action-result"]'
     equal: 2
@@ -81,8 +85,8 @@ verification:
   review: reviewed
   requirements:
   - id: AGENT-NESTED-FILE-CONTENT
-    requirement: Fences inside JSON file content remain file bytes, with complete proposals, explicit
-      approval and durable results.
+    requirement: Fences inside JSON file content remain file bytes, with complete proposals, explicit approval and
+      durable results.
     actions:
     - 1
     - 2
@@ -99,49 +103,52 @@ verification:
     - 15
     - 16
     - 17
-    - 21
-    - 25
-    - 28
-    checkpoints:
-    - step: 18
-      expectation: Exactly two reviewable files; the fenced action example inside README is never an executable
-        card.
-    - step: 19
-      expectation: The complete Markdown file is reviewable before approval.
-    - step: 20
-      expectation: The original disk bytes remain unchanged before approval.
-    - step: 22
-      expectation: Only the explicitly approved first file has a native result.
-    - step: 23
-      expectation: Native README bytes retain quotes, backslashes, code fences and the literal action
-        example exactly.
-    - step: 24
-      expectation: The following file stays pending after the first approval.
-    - step: 26
-      expectation: The second approval produces its own result.
-    - step: 27
-      expectation: The following action writes the actual second file.
-    - step: 30
-      expectation: Both native action results survive reload.
-    - step: 31
-      expectation: Reload does not restore executed proposals as pending actions.
-    - step: 32
-      expectation: Reload preserves the exact generated file bytes.
-    - step: 33
-      expectation: No unhandled runtime errors.
-    results:
     - 18
-    - 19
-    - 20
     - 22
     - 23
-    - 24
-    - 26
     - 27
-    - 30
+    - 28
     - 31
-    - 32
     - 33
+    checkpoints:
+    - step: 19
+      expectation: Exactly two reviewable files; the fenced action example inside README is never an executable
+        card.
+    - step: 20
+      expectation: The complete Markdown file is reviewable before approval.
+    - step: 21
+      expectation: The original disk bytes remain unchanged before approval.
+    - step: 24
+      expectation: Only the explicitly approved first file has a native result.
+    - step: 25
+      expectation: Native README bytes retain quotes, backslashes, code fences and the literal action example exactly.
+    - step: 26
+      expectation: The following file stays pending after the first approval.
+    - step: 29
+      expectation: The second approval produces its own result.
+    - step: 30
+      expectation: The following action writes the actual second file.
+    - step: 34
+      expectation: Both native action results survive reload.
+    - step: 35
+      expectation: Reload does not restore executed proposals as pending actions.
+    - step: 36
+      expectation: Reload preserves the exact generated file bytes.
+    - step: 37
+      expectation: No unhandled runtime errors.
+    results:
+    - 19
+    - 20
+    - 21
+    - 24
+    - 25
+    - 26
+    - 29
+    - 30
+    - 34
+    - 35
+    - 36
+    - 37
   native:
   - check: Actual native SSE, approval, disk bytes and SQLite action restoration
     method: automated
