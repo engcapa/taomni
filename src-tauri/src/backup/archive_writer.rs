@@ -42,6 +42,28 @@ pub(crate) fn pack_staged_archive_with_provenance(
     provenance: Option<super::model::Provenance>,
     context: &SnapshotContext,
 ) -> Result<(BackupManifest, u64), String> {
+    pack_staged_archive_with_plugins(
+        staged_files,
+        app_version,
+        scope,
+        password,
+        out_file_path,
+        provenance,
+        Vec::new(),
+        context,
+    )
+}
+
+pub(crate) fn pack_staged_archive_with_plugins(
+    staged_files: &[StagedFile],
+    app_version: &str,
+    scope: &str,
+    password: Option<&str>,
+    out_file_path: &Path,
+    provenance: Option<super::model::Provenance>,
+    datasets: Vec<super::plugins::contracts::PluginDataSet>,
+    context: &SnapshotContext,
+) -> Result<(BackupManifest, u64), String> {
     let total = staged_files
         .iter()
         .try_fold(0u64, |sum, f| {
@@ -54,6 +76,10 @@ pub(crate) fn pack_staged_archive_with_provenance(
     let mut manifest =
         BackupManifest::new(app_version.to_string(), scope.to_string(), is_encrypted);
     manifest.provenance = provenance;
+    if !datasets.is_empty() {
+        manifest.format_version = super::plugins::contracts::MODULAR_FORMAT_VERSION;
+        manifest.plugin_datasets = datasets;
+    }
 
     let parent = out_file_path.parent().ok_or("Invalid backup destination")?;
     std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
@@ -100,6 +126,7 @@ pub(crate) fn pack_staged_archive_with_provenance(
         }
 
         // Add manifest.json to the zip archive
+        super::plugins::contracts::validate_manifest(&manifest)?;
         let manifest_bytes = manifest
             .to_json_bytes()
             .map_err(|e| format!("serialize manifest: {e}"))?;

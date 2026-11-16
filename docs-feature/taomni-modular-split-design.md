@@ -979,7 +979,7 @@ v1.2 没有覆盖“已经在用旧版的用户”。核心 0.6.x 默认包不�
 
 ### 13.5 当前实现与 hosted 验证快照（2026-11-16）
 
-TASK-025 的服务、锁与一致快照实施细化见[Vault 服务实施方案](taomni-modular-vault-services-plan.md)。A/B 基础契约实施中，C–I 及真实 MFA 迁出/三态还原尚未完成；独立小库通过不构成 AC-016 验收。
+TASK-025 的服务、锁与一致快照实施细化见[Vault 服务实施方案](taomni-modular-vault-services-plan.md)。A–E 已接入生产服务，最新契约和 UI 结果见实施台账；F/G 的模块离线 v2 备份/还原实现待匹配源码 hosted 验证，运行中宿主快照、真实 MFA 迁出/三态重启还原及完整验收尚未完成。独立小库或离线路径通过不构成 AC-016 验收。
 
 逐 TASK/AC/G 的状态与剩余工作见[实施与验收台账](taomni-modular-split-progress.md)。核心仍包含待迁出业务；目前唯一独立宿主为 hello-plugin，完整模块化交付尚未完成。
 

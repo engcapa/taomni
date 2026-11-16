@@ -14,6 +14,8 @@ export interface BackupCustomOptions {
   includeLocalHistory?: boolean;
   /** MFA accounts (mfa.db); the backend also includes vault.db, which holds their key. */
   includeMfa?: boolean;
+  /** Installed, disabled and uninstalled retained module data; includes the vault dependency. */
+  includePlugins?: boolean;
 }
 
 export interface BackupResult {
@@ -49,6 +51,14 @@ export interface BackupManifest {
   backupScope: string;
   encrypted: boolean;
   files: BackupFileEntry[];
+  pluginDatasets?: Array<{
+    slug: string;
+    dataSchemaVersion: number;
+    requiresVault: boolean;
+    job: string;
+    profileGeneration: string;
+    files: Array<{ path: string; kind: "file" | "sqlite" }>;
+  }>;
 }
 
 export interface StageRestoreResult {

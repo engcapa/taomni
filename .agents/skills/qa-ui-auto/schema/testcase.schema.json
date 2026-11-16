@@ -81,6 +81,7 @@
           "bookmark_assets",
           "module_offline_archive",
           "module_signed_archive",
+          "module_backup_data",
           "vnc_required",
           "ard_required",
           "jdtls_required",
@@ -901,6 +902,15 @@
               "items": {"$ref": "#/$defs/point"}
             }
           }
+        },
+        "module_backup_probe": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["phase"],
+          "properties": {
+            "phase": {"enum": ["seed", "disabled-archive", "retained-archive", "unchanged"]}
+          },
+          "description": "Native only: fixed inactive hello data input or independent current-job v2 ZIP/SQLite/source-byte observation; no YAML-selected commands, paths or registry mutations."
         },
         "module_signed_probe": {
           "type": "object",

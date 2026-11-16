@@ -16,6 +16,8 @@ import yaml
 
 def is_check(step: dict) -> bool:
     verb, args = next(iter(step.items()))
+    if verb == "module_backup_probe":
+        return isinstance(args, dict) and args.get("phase") in {"disabled-archive", "retained-archive", "unchanged"}
     if verb == "module_signed_probe":
         return isinstance(args, dict) and args.get("phase") in {"installed", "enabled", "disabled", "invalid", "uninstalled", "retained", "installed-data", "deleted"}
     if verb == "viewer_raster":

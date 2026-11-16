@@ -8,10 +8,12 @@
 
 生产升级 IPC 当前只记录只读预检、源指纹与 pending journal。缺少可信插件包和真实 exporter 时，不复制旧数据、不创建伪插件版本、不改变 active 指针。测试 fixture 的 staging/回滚原语不能算真实旧版升级验收。
 
-签名安装门、宿主生产监督、共享采集/RDP 公共库、CoreState/统一 bootstrap、正常退出与可逆静默已集成。生产工厂、scoped 入口、持久 profile generation、Vault IPC 协调、普通凭据消费者与 MFA facade 已接入；最新契约 #43809632572 已 23/23 jobs 成功。UI #43804951477 的 TC-MODULES-007 在四种 native profile 全部通过；Windows TC-MODULES-009 的 Notes 遮挡修复与本批 Vault/MFA 原生 UI 仍待新 run 收齐。业务状态仍在 LegacyFeatureRuntime；当前核心一致快照已有单元证据，插件三态快照/还原、远端商店、重启下载恢复、业务宿主迁出与真实升级尚未完成。G1–G11 未通过前，不将具体业务插件迁移标为完成。
+签名安装门、宿主生产监督、共享采集/RDP 公共库、CoreState/统一 bootstrap、正常退出与可逆静默已集成。生产工厂、scoped 入口、持久 profile generation、Vault IPC 协调、普通凭据消费者与 MFA facade 已接入；源码 `fdd05d232` 的最新契约 #43819768258 已 23/23 jobs 成功。其 UI #43819770975 正在执行，已收三端 browser 各 50/50、macOS native 47/47，其他 native 结果待齐。本批新增插件离线 v2 备份/还原，尚待匹配源码 hosted 证据。业务状态仍在 LegacyFeatureRuntime；运行中插件快照、三态真实重启还原、远端商店、重启下载恢复、业务宿主迁出与真实升级尚未完成。G1–G11 未通过前，不将具体业务插件迁移标为完成。
 
 ## 2026-11-16 最新 runner 证据（持续采集中）
 
+- 源码 `fdd05d232b27a1857fa58a08588de3ab2bfdfe49` 的[升级契约 #43819768258](https://github.com/engcapa/taomni/actions/runs/43819768258) 已 **23/23 jobs 成功**。执行期间下载的 Linux `core-unit-receipt.json` 确认 21 个过滤器均非空且 exit=0，三端观察工具单元通过。相同源码的[UI #43819770975](https://github.com/engcapa/taomni/actions/runs/43819770975) 持续按完成 shard 下载；三端 browser 各 **50/50**、macOS native **47/47**（包括新增 53 步 TC-MODULES-010）通过，Linux/Windows native 尚未收齐。这些结果均不覆盖之后工作区新增的离线模块备份/还原。
+- 源码 `c5c42bbb2` 的 [UI #43815220663](https://github.com/engcapa/taomni/actions/runs/43815220663) 已收齐 22 个 shard：三端 browser 各 **50/50**，Linux Xvfb native **49/49**、Windows native **47/47**、macOS native **46/46**。Wayland native **45/49**；SERVERS-002、FILE-OPEN-006、WS-030 因既有非左键输入仅支持 owned X11，FILE-OPEN-008 因已有跨行路径 chip 命中失败，按用户指示单列忽略且不计通过。TC-WS-051 此轮通过。TC-MODULES-009 与 Vault/MFA 013/014/102/103 的结果以该源码实际用例报告为准，不再沿用更早批次的“待重跑”状态。
 - 最新待验源码 `c5c42bbb2` 已推送，包含核心 permit 生命周期修复 `be14572e3` 和 TC-MODULES-009 的隐藏状态断言修复；[升级契约 #43815221797](https://github.com/engcapa/taomni/actions/runs/43815221797)与[UI #43815220663](https://github.com/engcapa/taomni/actions/runs/43815220663)已启动即时采集器。当前批次完整 QA audit 的所有 gates、check:refactor、rustfmt、case schema/reviewed contract 与 dev_contract 均通过；这些检查不代替 hosted 执行。
 - `cf0fb2033` 的 UI #43813458259 已在执行期间收齐六个 browser shard，Linux/Windows/macOS 各 **50/50**，含 TC-BACKUP-SETTINGS-001 的相关修复和完整 browser crash-regression。其 native 构建仍在进行；该 run 的 TC-MODULES-009 尚为旧断言，最终以新源码重跑为准。相同源码的升级契约 #43813432137 为 22 个 job 成功、Linux 核心 job 被新一轮 concurrency 取消；收取的 receipt 最后完成 `vault::plugin_access::tests`，下一过滤器为存在前述同步竞态的 `vault::data_access_tests`。未完成的过滤器不计通过，整轮不记为成功。
 - 一致快照和前端门禁修复源码 `cf0fb2033` 已提交并推送，启动[升级契约 #43813432137](https://github.com/engcapa/taomni/actions/runs/43813432137)与[UI #43813458259](https://github.com/engcapa/taomni/actions/runs/43813458259)。两套即时采集器已启动；完成的三端 foundation 日志均确认 services 35 项通过，三端真实 host activation/cleanup/lifecycle/SDK 分别为 3/2/7/8 项通过。整轮仍在执行，不包含之后工作区的 core permit 生命周期修复。
@@ -28,7 +30,16 @@
 - 旧 UI #43800287415 的 Windows TC-MODULES-009 在正常关闭前失败。即时下载的 `native-restart-failures/*/close-target.json` 与画面一致：窗口关闭按钮中心上层是仍打开的 `ai-chat-drawer-hide`，不是退出清理或数据损坏。用例保存 Notes 后先真实关闭并断言移除 drawer，再走原生正常退出；重启后仍重新打开 Notes 验证原内容与 generation，随后关闭 drawer 后进入 Settings。没有绕过指针命中、强杀或放宽持久化断言，该修复待新 SHA hosted 验证。
 - #43804951477 的最新逐 shard 结果：三端 browser 各 24/24；Linux Xvfb native 29/29，macOS native 29/29，Windows native 28/29（仅同一 TC-MODULES-009 overlay 命中失败），Wayland native 27/29（仅两个已列明的无关 FILE-OPEN 失败）。TC-MODULES-007 在四种 native profile 全部 52 步通过。上述结果对应 `900ed0146`，不包含之后的 TC-MODULES-009 修复或 Vault/MFA 改动。
 
-### Vault/MFA 协调与保留行为批次（开发中，待匹配源码 hosted 验证）
+### 插件离线备份与还原批次（待匹配源码 hosted 验证）
+
+- TASK-025-F/G 的离线路径已接入真实备份引擎：在同一 Vault snapshot barrier 与 job/profile generation 下，扫描安装、禁用和卸载保留数据的严格 owner 子树，取得 PluginDataLease，重新枚举实际文件。普通文件通过普通文件句柄复制；SQLite 使用只读 online snapshot，保留已提交 WAL 内容且不打包 sidecars，不初始化业务库或 key。已知 SQLite 头部损坏明确失败，不降级为普通文件。
+- 有插件数据才生成 format 2 `pluginDatasets`；没有插件数据继续生成 format 1。数据集精确绑定 payload、owner、schema、job、generation 和核心推导的 Vault 依赖，拒绝大小写/文件目录冲突、越界路径、sidecars 与 metadata 扩权。读取器独立比对 SQLite 头部和声明类型，并在 staging 检查数据库。旧版读取器不支持模块 v2 档案，不能用于还原该档案。
+- 还原在 stage 与启动 apply 前都检查 Vault/MFA 依赖；整套模块旧文件、过期 sidecars、重建的 retained locator、核心库共用兼容 journal。支持文件/目录互换；代码、active 指针、权限和信任不由数据档案恢复。回滚在删除新文件前确认所有旧安全副本可读且哈希正确，副本缺失/损坏保留现有可读数据和 journal，允许修复后重试，generation 不回退。
+- 设置页默认包含模块数据，选中时强制包含 Vault；旧 custom 未指定模块项继续排除。增强 94 步 browser TC-BACKUP-SETTINGS-001，新增 58 步 native TC-MODULES-011：真实签名安装、启用再禁用、禁用/卸载后分别创建不同手工 job，独立核验 ZIP/SQLite/WAL/原始字节，生产归档读取与取消不留下还原 intent，正常重启保持卸载状态。用例在打开历史归档前核对精确 job 文件名，不能用旧任务成功满足新任务断言。
+- 当前最终 Rust harness 已编译通过；前端范围/编辑器/持久化 3 文件 **19/19** 通过；插件备份 15、既有备份 14、兼容档案 2、核心成对快照 5、旧快照 7、generation 1、范围 2，合计 **46 项单元通过**。SQLite snapshot 小库 **10/10**、QA 工具 **12/12** 通过。两份 case 的 schema/reviewed contracts、三端/四种 native profile 静态选择、TypeScript、check:refactor、25 个变更 Rust 文件的 rustfmt 与完整 QA audit gate 通过，coverage baseline 未修改。本节不将计划或本地单元计为 hosted 用例通过。
+- 尚未完成：运行中宿主 prepare/snapshot/release（当前明确拒绝，不静默读文件）、真实宿主持 profile lease、GUI/headless 完整协同、三态正常重启 apply 与真实解密，以及 MFA 迁出后的 v1 legacy alias 映射。TC-MODULES-011 只证明离线快照和读取/取消，不证明 applied native restore；TASK-025-F/G/H/I 均不标完成。
+
+### Vault/MFA 协调与保留行为批次（历史开发记录，最新结果见上方）
 
 - `plugin/vault_lifecycle.rs` 将 init、unlock、lock、change-master 与恢复前主密码验证接入同一 coordinator：transition → registry lifecycle 的有界锁顺序，关闭准入、取消、撤销/确认宿主退出、drain 后才处理 root。失败保留 revocation；重试加入同一次撤销并保留已确认成员。核心退出也排空 permit 后清 root；嵌套 quiescence 只在最后一个 guard 释放且 root 仍有效时恢复服务。
 - `vault/{passwords,commands,data_access,core_access}.rs` 按密码生命周期、IPC、普通凭据访问和 typed MFA 固定密钥拆分。所有既有普通 `put/update/put_fixed/get_fixed/resolve` 消费者经共享准入和外层 lease；不把 registry/host 反向引用放入 Vault。metadata revision 失配清 root 并关闭 epoch，reverse key 服务也使用同一失配处理。非敏感列表与普通删除的锁定行为保留；受保护 MFA key 拒绝通用 update/delete。
@@ -77,7 +88,7 @@
 | TASK-022 Mobile | 待 M0 决策 | 按 DEC-2 默认暂缓排期；M0 末提供 go/no-go 与公开例外，不能默认为已交付。 |
 | TASK-023 发布验收 | 部分 | 清单生成与上传顺序已有；四目标插件构建/系统签名、包签名、原子清单发布、独立插件更新/回滚、两套回归及性能。 |
 | TASK-024 入口/profile 协同 | 随 005-A 已集成一部分 | GUI/headless bootstrap、ModeLease、可重试退出和任务回收已集成；跨宿主 profile lease、还原静默与完整多进程证据仍待完成。 |
-| TASK-025 密钥/一致快照 | A/B/C 已集成；D/E 接线契约通过，native UI 待齐 | [服务、锁与快照实施方案](taomni-modular-vault-services-plan.md)；Vault IPC、普通消费者与 MFA facade/撤销/reset 屏障的契约 run #43809632572 已 23/23 成功，三端 browser 新增 013/014 通过，native UI 待齐。当前核心成对快照单元通过、待 hosted；F–I 的插件跨库快照、三态还原、独立 MFA 宿主及完整验收未完成。 |
+| TASK-025 密钥/一致快照 | A–E 已集成；F/G 离线实现待验证 | [服务、锁与快照实施方案](taomni-modular-vault-services-plan.md)；`fdd05d232` 契约 #43819768258 已 23/23 成功，UI 结果见上方。本批离线 v2 快照/还原仍待 hosted；F–I 的运行中宿主协议、三态真实重启还原、独立 MFA 宿主及完整验收未完成。 |
 
 具体编号与子任务边界仍以设计原表为准；上表合并描述不改变范围或依赖。
 

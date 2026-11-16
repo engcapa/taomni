@@ -25,6 +25,9 @@ pub struct BackupCustomOptions {
     pub include_local_history: bool,
     #[serde(default)]
     pub include_mfa: bool,
+    /// Includes installed, disabled and uninstalled retained module data.
+    #[serde(default)]
+    pub include_plugins: bool,
 }
 
 /// What a backup scope stages. MFA secrets are sealed with a data key held in
@@ -41,6 +44,7 @@ pub struct BackupScopeFlags {
     pub server_certificates: bool,
     pub local_history: bool,
     pub mfa: bool,
+    pub plugins: bool,
 }
 
 pub fn resolve_scope_flags(scope: &str, custom: Option<BackupCustomOptions>) -> BackupScopeFlags {
@@ -68,6 +72,7 @@ pub fn resolve_scope_flags(scope: &str, custom: Option<BackupCustomOptions>) -> 
         server_certificates: certificates,
         local_history: false,
         mfa: true,
+        plugins: true,
     };
     let mut flags = match scope {
         "full" => BackupScopeFlags { mail: true, ..core },
@@ -83,6 +88,7 @@ pub fn resolve_scope_flags(scope: &str, custom: Option<BackupCustomOptions>) -> 
                 server_certificates: certificates,
                 local_history: opts.include_local_history,
                 mfa: opts.include_mfa,
+                plugins: opts.include_plugins,
             },
             None => core,
         },
@@ -93,7 +99,7 @@ pub fn resolve_scope_flags(scope: &str, custom: Option<BackupCustomOptions>) -> 
             flags.mail = mail;
         }
     }
-    if flags.mfa {
+    if flags.mfa || flags.plugins {
         flags.vault = true;
     }
     flags.mail_originals = flags.mail && originals;

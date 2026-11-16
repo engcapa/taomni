@@ -104,7 +104,7 @@ from . import java_real_project
 from . import dual_display_required
 from . import rdp_deferred_clipboard
 from . import module_offline_archive
-from . import module_signed_archive
+from . import module_signed_archive, module_backup_data
 
 
 class FixtureContext(Protocol):
@@ -123,6 +123,7 @@ class Fixture:
 
 REGISTRY: dict[str, Fixture] = {
     "module_offline_archive": Fixture("module_offline_archive", module_offline_archive.setup),
+    "module_backup_data": Fixture("module_backup_data", module_backup_data.setup, module_backup_data.teardown),
     "module_signed_archive": Fixture("module_signed_archive", module_signed_archive.setup),
     "mobile_web": Fixture("mobile_web", mobile_web.setup, mobile_web.teardown),
     "mobile_openssh": Fixture("mobile_openssh", mobile_openssh.setup, mobile_openssh.teardown),

@@ -3294,6 +3294,7 @@
 - `[data-testid="backup-global-includeSessions"]` — interactive — F-BACKUP-1.backup-global-includeSessions
 - `[data-testid="backup-global-includeNotes"]` — interactive — F-BACKUP-1.backup-global-includeNotes
 - `[data-testid="backup-global-includeMfa"]` — interactive — F-BACKUP-1.backup-global-includeMfa
+- `[data-testid="backup-global-includePlugins"]` — interactive — F-BACKUP-1.backup-global-includePlugins
 - `[data-testid="backup-global-includeConfigs"]` — interactive — F-BACKUP-1.backup-global-includeConfigs
 - `[data-testid="backup-global-includeServerCertificates"]` — interactive — F-BACKUP-1.backup-global-includeServerCertificates
 - `[data-testid="backup-global-includeMail"]` — interactive — F-BACKUP-1.backup-global-includeMail
@@ -3305,6 +3306,7 @@
 - `[data-testid="backup-local-includeNotes"]` — interactive — F-BACKUP-1.backup-local-includeNotes
 - `[data-testid="backup-local-includeVault"]` — interactive — F-BACKUP-1.backup-local-includeVault
 - `[data-testid="backup-local-includeMfa"]` — interactive — F-BACKUP-1.backup-local-includeMfa
+- `[data-testid="backup-local-includePlugins"]` — interactive — F-BACKUP-1.backup-local-includePlugins
 - `[data-testid="backup-local-includeConfigs"]` — interactive — F-BACKUP-1.backup-local-includeConfigs
 - `[data-testid="backup-local-includeServerCertificates"]` — interactive — F-BACKUP-1.backup-local-includeServerCertificates
 - `[data-testid="backup-local-includeLocalHistory"]` — interactive — F-BACKUP-1.backup-local-includeLocalHistory
@@ -3376,6 +3378,7 @@
 - `[data-testid="backup-cloud-includeNotes"]` — interactive — F-BACKUP-2.backup-cloud-includeNotes
 - `[data-testid="backup-cloud-includeVault"]` — interactive — F-BACKUP-2.backup-cloud-includeVault
 - `[data-testid="backup-cloud-includeMfa"]` — interactive — F-BACKUP-2.backup-cloud-includeMfa
+- `[data-testid="backup-cloud-includePlugins"]` — interactive — F-BACKUP-2.backup-cloud-includePlugins
 - `[data-testid="backup-cloud-includeConfigs"]` — interactive — F-BACKUP-2.backup-cloud-includeConfigs
 - `[data-testid="backup-cloud-includeServerCertificates"]` — interactive — F-BACKUP-2.backup-cloud-includeServerCertificates
 - `[data-testid="backup-cloud-includeLocalHistory"]` — interactive — F-BACKUP-2.backup-cloud-includeLocalHistory

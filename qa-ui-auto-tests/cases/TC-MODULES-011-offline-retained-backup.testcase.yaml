@@ -1,0 +1,201 @@
+id: TC-MODULES-011
+title: Disabled and uninstalled retained modules produce real v2 SQLite and file backups without activation
+description: Install the current-source official signed hello package through Settings. Supply fixed opaque and SQLite WAL
+  business input while inactive. Enable then disable the real host. Create exact manual local backups when disabled and after
+  default uninstall. Independently validate ZIP inventories, all hashes, snapshot generation, retained schema, original file
+  bytes and committed WAL rows; inspect the archive through the production restore reader and cancel. Normal restart preserves
+  the uninstalled state and source bytes. This case does not claim live-host prepare/snapshot/release or applied native restore.
+covers:
+- F-Modules-1
+- F-BACKUP-1
+tags:
+- p1
+- modules
+- backup
+- native-boundary
+- persistence
+modes:
+- native
+fixtures:
+- reset_db
+- module_signed_archive
+- module_backup_data
+timeout_sec: 360
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: module store
+- wait_for: '[data-testid="module-offline-install"]'
+- fill:
+    selector: '[data-testid="module-offline-archive"]'
+    value: ${fixture.module_signed_archive}
+- fill:
+    selector: '[data-testid="module-offline-signature"]'
+    value: ${fixture.module_signed_signature}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: '[data-testid="module-offline-install"][data-phase="completed"]'
+- module_signed_probe:
+    phase: installed
+- module_backup_probe:
+    phase: seed
+- click: '[data-testid="module-action-enable-hello-plugin"]'
+- wait_for: '[data-testid="module-action-disable-hello-plugin"]'
+- module_signed_probe:
+    phase: enabled
+- click: '[data-testid="module-action-disable-hello-plugin"]'
+- wait_for: '[data-testid="module-action-enable-hello-plugin"]'
+- module_signed_probe:
+    phase: disabled
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: backup
+- wait_for: '[data-testid="backup-global-includePlugins"]'
+- assert_attribute:
+    selector: '[data-testid="backup-global-includePlugins"]'
+    name: aria-checked
+    equals: 'true'
+- assert_attribute:
+    selector: '[data-testid="backup-global-includeVault"]'
+    name: disabled
+    equals: ''
+- set_check:
+    selector: '[data-testid="backup-local-select"]'
+    checked: true
+- click: '[data-testid="backup-selected-start"]'
+- wait_for:
+    selector: '[data-testid="backup-action-success"]'
+    timeout_sec: 90
+- wait_for: '[data-testid="backup-manual-result"][data-target-id="local"][data-job-id]'
+- &id001
+  eval_readonly:
+    expression: '!!document.querySelector(''[data-job-id''+String.fromCharCode(61)+''"''+document.querySelector(''[data-testid''+String.fromCharCode(61)+''"backup-manual-result"][data-target-id''+String.fromCharCode(61)+''"local"]'').getAttribute(''data-job-id'')+''"][data-phase''+String.fromCharCode(61)+''"completed"]'')'
+    expect_truthy: true
+    timeout_sec: 90
+- module_backup_probe:
+    phase: disabled-archive
+- click: '[data-testid="backup-history-refresh"]'
+- eval_readonly:
+    expression: document.querySelector('[data-job-id'+String.fromCharCode(61)+'"'+document.querySelector('[data-testid'+String.fromCharCode(61)+'"backup-manual-result"][data-target-id'+String.fromCharCode(61)+'"local"]').getAttribute('data-job-id')+'"][data-phase]').textContent.includes(document.querySelector('[data-testid'+String.fromCharCode(61)+'"backup-history-row"]').getAttribute('data-file-name'))
+    expect_truthy: true
+    timeout_sec: 30
+- click: '[data-testid="backup-history-row"]:first-child [data-testid="backup-history-restore"]'
+- wait_for: '[data-testid="backup-restore-files"]'
+- assert_text:
+    selector: '[data-testid="backup-restore-files"]'
+    contains: plugins/hello-plugin/data/qa-snapshot.opaque
+- assert_text:
+    selector: '[data-testid="backup-restore-files"]'
+    contains: plugins/hello-plugin/data/qa-snapshot.txt
+- screenshot: module-backup-v2-archive.png
+- click: '[data-testid="backup-restore-cancel"]'
+- assert_not_visible: '[data-testid="backup-restore-dialog"]'
+- module_backup_probe:
+    phase: unchanged
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: module store
+- wait_for: '[data-testid="module-action-uninstall-hello-plugin"]'
+- click: '[data-testid="module-action-uninstall-hello-plugin"]'
+- wait_for: '[data-testid="confirm-dialog"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
+- wait_for: '[data-testid="module-action-install-hello-plugin"]'
+- module_signed_probe:
+    phase: uninstalled
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: backup
+- wait_for: '[data-testid="backup-selected-start"]'
+- click: '[data-testid="backup-selected-start"]'
+- wait_for:
+    selector: '[data-testid="backup-action-success"]'
+    timeout_sec: 90
+- wait_for: '[data-testid="backup-manual-result"][data-target-id="local"][data-job-id]'
+- *id001
+- module_backup_probe:
+    phase: retained-archive
+- native_restart_app:
+    expect_exit_confirmation:
+      title: Exit
+      message: There is 1 open tab. Exit Taomni and close it?
+      confirm_label: Exit
+- wait_for: '[data-testid="status-bar"]'
+- module_signed_probe:
+    phase: uninstalled
+- module_backup_probe:
+    phase: unchanged
+- assert_no_runtime_errors: null
+- screenshot: module-disabled-retained-backup.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: The default module range includes Vault; a disabled real host is backed up offline without changing its state
+      or its committed source WAL.
+    actions:
+    - 12
+    - 13
+    - 16
+    - 24
+    checkpoints:
+    - step: 18
+      expectation: The real signed host was disabled before offline snapshot.
+    - step: 28
+      expectation: The exact completed manual job contains one v2 module dataset, committed SQLite WAL rows and original opaque
+        bytes; source main and WAL hashes remain unchanged.
+    results:
+    - 28
+  - id: R2
+    requirement: The production archive reader recognizes plugin payloads; cancelling inspection stages no restore.
+    actions:
+    - 31
+    - 36
+    checkpoints:
+    - step: 30
+      expectation: The first history row names the exact completed manual job's local archive before inspecting it.
+    - step: 33
+      expectation: The real archive reader lists the module SQLite/opaque payload or the cancelled dialog closes.
+    - step: 34
+      expectation: The real archive reader lists the module SQLite/opaque payload or the cancelled dialog closes.
+    - step: 37
+      expectation: The real archive reader lists the module SQLite/opaque payload or the cancelled dialog closes.
+    - step: 38
+      expectation: Cancelling inspection leaves original business bytes unchanged and no restore intent, journal or pending
+        directory.
+    results:
+    - 30
+    - 33
+    - 34
+    - 37
+    - 38
+  - id: R3
+    requirement: Default uninstall retains discoverable data that backs up without loading the host, and normal restart preserves
+      inactivity and original source bytes.
+    actions:
+    - 41
+    - 43
+    - 53
+    checkpoints:
+    - step: 52
+      expectation: A distinct completed job contains the uninstalled retained module dataset and committed WAL data without
+        source mutation.
+    - step: 56
+      expectation: A normal new application process still has uninstalled state and unchanged business database, WAL and file
+        bytes.
+    - step: 57
+      expectation: Lifecycle, snapshots, archive inspection and normal restart produce no runtime errors.
+    results:
+    - 52
+    - 56
+    - 57
+  native:
+  - check: Real signature trust, host stop, backup jobs, v2 ZIP and SQLite WAL snapshots and normal restart.
+    method: automated
+    reason: Browser stubs cannot establish process ownership, native SQLite or on-disk archive contents.
+  visual:
+  - check: Module category and v2 archive file list remain readable in native Settings.
+    method: manual
+    reason: Review module-backup-v2-archive.png alongside the browser category translation screenshot.

@@ -14,6 +14,8 @@ RegisterVerb = Callable[[str], Callable[[NativeVerb], NativeVerb]]
 def register(register_verb: RegisterVerb, verbs: dict[str, NativeVerb]) -> None:
     from .core_profile_observation import run as assert_core_profile_generation
     register_verb("assert_core_profile_generation")(assert_core_profile_generation)
+    from .module_backup_observation import run as module_backup_probe
+    register_verb("module_backup_probe")(module_backup_probe)
     from .module_signed_observation import run as module_signed_probe
     register_verb("module_signed_probe")(module_signed_probe)
     from .native_editor_probes import register as editor_probes

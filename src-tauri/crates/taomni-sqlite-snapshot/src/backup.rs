@@ -50,7 +50,9 @@ pub fn snapshot_existing(
     }
     let source = Connection::open_with_flags(
         source,
-        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+        OpenFlags::SQLITE_OPEN_READ_ONLY
+            | OpenFlags::SQLITE_OPEN_NO_MUTEX
+            | OpenFlags::SQLITE_OPEN_NOFOLLOW,
     )?;
     source.busy_timeout(std::time::Duration::ZERO)?;
     snapshot_connection(&source, target, options, control).map(SnapshotOutcome::Created)

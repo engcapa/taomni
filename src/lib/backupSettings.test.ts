@@ -8,6 +8,7 @@ describe("backup category compatibility", () => {
     const before = JSON.stringify(policy);
     const options = rangeOptions(globalRange(policy));
     expect(options.includeSessions).toBe(true);
+    expect(options.includePlugins).toBe(true);
     expect(options.includeMail).toBe(scope === "full");
     expect(options.includeMailOriginals).toBe(scope === "full");
     expect(options.includeMailAttachments).toBe(scope === "full");
@@ -21,7 +22,12 @@ describe("backup category compatibility", () => {
     }
     const legacy = rangeOptions({ scope: "custom", customOptions: { includeMail: true } });
     expect(legacy.includeMailOriginals && legacy.includeMailAttachments).toBe(true);
-    expect(legacy.includeSessions || legacy.includeServerCertificates).toBe(false);
+    expect(legacy.includeSessions || legacy.includeServerCertificates || legacy.includePlugins).toBe(false);
+  });
+  it("requires Vault for selected plugin data without changing other custom categories", () => {
+    expect(rangeOptions({ scope: "custom", customOptions: { includePlugins: true, includeVault: false } })).toMatchObject({
+      includePlugins: true, includeVault: true, includeMfa: false, includeSessions: false,
+    });
   });
   it("preserves separate mail children and MFA dependency", () => {
     const range: BackupRange = { scope: "custom", customOptions: { includeMail: true, includeMailOriginals: false, includeMailAttachments: true, includeMfa: true } };

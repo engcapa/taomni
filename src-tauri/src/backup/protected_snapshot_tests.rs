@@ -15,7 +15,7 @@ use std::{
 use taomni_plugin_services::{AdmissionState, OperationKind};
 use zeroize::Zeroizing;
 
-fn seed_hotp(h: &VaultHarness, mfa: &MfaStore) -> Vec<u8> {
+pub(super) fn seed_hotp(h: &VaultHarness, mfa: &MfaStore) -> Vec<u8> {
     let permit = h
         .registry
         .admit_core_operation(

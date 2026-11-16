@@ -225,14 +225,15 @@ fn create_backup_locked(
 
     // The global Vault lease precedes mail/store mutexes. Release this short
     // barrier before ordinary snapshots, packing, encryption and upload.
-    staged_files.extend(super::protected_snapshot::stage(
+    let protected = super::protected_snapshot::stage_with_plugins(
         &state.plugins,
         &state.core.vault,
         &state.legacy.mfa,
         &temp_staging_dir,
         flags,
         context,
-    )?);
+    )?;
+    staged_files.extend(protected.files);
 
     let mail_paths = if flags.mail {
         Some(context.lock(&state.core.mail.mail_archive.changes)?)
@@ -400,13 +401,14 @@ fn create_backup_locked(
         source_kind: "taomni".into(),
         source_schema_version: 1,
     };
-    let (manifest, file_size) = super::archive_writer::pack_staged_archive_with_provenance(
+    let (manifest, file_size) = super::archive_writer::pack_staged_archive_with_plugins(
         &staged_files,
         &app_version,
         scope,
         password.as_deref(),
         &out_file_path,
         Some(provenance),
+        protected.datasets,
         context,
     )?;
 

@@ -6,6 +6,16 @@ use taomni_plugin_services::AdmissionState;
 use taomni_profile_locks::{VaultOperationLease, WaitControl};
 
 impl PluginRegistry {
+    /// Inspect ownership only; backup must never start a host to read data.
+    /// Called with the lifecycle guard held by with_vault_snapshot.
+    pub(crate) fn owns_snapshot_host(&self, slug: &str) -> Result<bool, String> {
+        Ok(self
+            .hosts
+            .lock()
+            .map_err(|e| e.to_string())?
+            .contains_key(slug))
+    }
+
     /// The callback may lock stores, but must not take another operation
     /// lease or call ordinary Vault APIs. Pending requests wait outside their
     /// store mutexes; completed snapshots do not invalidate renderer epochs.

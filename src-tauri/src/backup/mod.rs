@@ -16,6 +16,7 @@ mod mail_snapshot;
 pub mod manifest;
 pub mod model;
 pub mod network;
+pub mod plugins;
 pub mod policy;
 mod protected_snapshot;
 pub mod provider;
