@@ -15,6 +15,20 @@ from qa_ui_auto.fixtures import tao_agent, tao_real_provider
 
 
 class AgentFixtureTests(unittest.TestCase):
+    def test_readme_fixture_preserves_nested_fences_and_following_file(self):
+        import hashlib
+        reply = tao_agent.scripted_reply("QA_ACTION_NESTED_FENCES")
+        first = reply.split("```tao-action\n", 1)[1]
+        readme, end = json.JSONDecoder().raw_decode(first)
+        self.assertEqual(readme["payload"]["path"], "README.md")
+        self.assertEqual(hashlib.sha256(readme["payload"]["content"].encode()).hexdigest(),
+                         "02d07b8ac10038bd4986c312fc0c7b73b44a1e53717790cb2bf7a160714a05a2")
+        self.assertIn("```sh\npython -m unittest\n```", readme["payload"]["content"])
+        following = first[end:].removeprefix("\n```\n```tao-action\n")
+        status, end = json.JSONDecoder().raw_decode(following)
+        self.assertEqual(status["payload"], {"path": "status.txt", "content": "Ready\n"})
+        self.assertEqual(following[end:], "\n```")
+
     def context(self, root):
         case = root / "case"
         case.mkdir()

@@ -18,6 +18,7 @@ from . import tao_real_provider
 
 GOOD = "def add(a, b):\n    return a + b\n\ndef multiply(a, b):\n    return a * b\n"
 BAD = GOOD.replace("return a + b", "return a - b")
+NESTED_README = '# Nested fences\n\n```sh\npython -m unittest\n```\n\nQuotes "value"; path C:\\work\\tasks.\n\n```tao-action\n{"id":"example-only","kind":"run_command","title":"Example","payload":{"command":"echo example"}}\n```\n'
 DIVIDE = "\ndef divide(a, b):\n    if b == 0:\n        raise ValueError('zero divisor')\n    return a / b\n"
 TESTS = """import unittest
 from calculator import add, multiply
@@ -46,7 +47,9 @@ def scripted_reply(prompt):
         # Deliberately reuse model proposal IDs across repair rounds. The app
         # must distinguish proposal instances and never return an old write.
         return dict(id=name, kind="write_file", title="Write " + name, payload=dict(path=name, content=content))
-    if "QA_ACTION_CONTROLS\n" in prompt:
+    if "QA_ACTION_NESTED_FENCES" in prompt:
+        actions = [file("README.md", NESTED_README), file("status.txt", "Ready\n")]
+    elif "QA_ACTION_CONTROLS\n" in prompt:
         encoded = prompt.split("QA_ACTION_CONTROLS\n", 1)[1].split("\nQA_END_ACTION", 1)[0]
         actions = [json.loads(encoded)]
     elif "test command in the bound workspace" in prompt:

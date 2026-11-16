@@ -17,12 +17,14 @@ def run(ctx):
     command = executable + " --experimental-strip-types --test task_repository.test.ts"
     contract = " Use write_file tao-action fences, one per file, at most five. All paths stay in the bound workspace. No shell commands in this reply; wait for explicit approval."
     files = {"task_repository.ts", "task_cli.ts", "task_repository.test.ts", "README.md"}
+    allowed = files | {"package.json"}
+    contract += " The four named files are required; an optional package.json declaring type=module is also permitted. No external dependencies."
     with flow.evidence():
         open_workspace(flow, root)
         flow.send("Design and implement a usable TypeScript task-tracking application from scratch with only Node.js 22 standard modules. Use ESM imports with explicit .ts extensions and erasable TypeScript types; no build step, npm packages or network. Create task_repository.ts, task_cli.ts, task_repository.test.ts and README.md. Export TaskRepository(jsonPath) with synchronous create(title), listTasks(), complete(taskId), delete(taskId); persist every mutation as JSON. Reject empty titles and missing IDs. The CLI accepts --data FILE and create/list/complete/delete, returns JSON and nonzero exit on invalid input. Use node:test and node:assert/strict with isolated temporary directories and cleanup. At least six real tests: create/reload, complete/reload, delete, empty input, missing ID and actual CLI subprocess. Explain design and how to run using node --experimental-strip-types. subprocess CLI execution must use process.execPath and --experimental-strip-types." + contract)
         flow.reply("typescript-design-and-implementation", 1, seconds=450)
         flow.require(not any((root / name).exists() for name in files), "Files were written before approval")
-        approve_files(flow, root, files)
+        approve_files(flow, root, allowed)
         flow.require(all((root / name).is_file() for name in files), "The typed application, CLI, tests and README are incomplete")
         test_project(flow, command, 2, "typescript-initial-tests", minimum=6)
 
@@ -38,11 +40,11 @@ def run(ctx):
 
         flow.send("Extend the existing typed task application with priority low/normal/high, default normal. create accepts priority, listTasks can filter priority, CLI create/list support --priority. Old JSON data without priority must load as normal. Reject invalid priorities. Preserve current API compatibility and all existing tests. Update repository, CLI, README and tests for persistence, filtering, invalid input, legacy JSON and CLI priority." + contract)
         flow.reply("typescript-feature-extension", 7, seconds=450)
-        approve_files(flow, root, files)
+        approve_files(flow, root, allowed)
         test_project(flow, command, 8, "typescript-feature-tests", minimum=10)
         flow.send("Review the actual project and confirmed test results. Explain implementation, the observed failure and repair, priority and old-data compatibility, and remaining risks. Do not propose actions or claim unexecuted validation.")
         flow.reply("typescript-final-review", 9)
         flow.require(not flow.read(CARDS), "Final review unexpectedly proposes more actions")
-        flow.record("typescript-delivered-files", dict(files=sorted(name for name in files if (root / name).is_file()), realDisk=True, realTestProcesses=True))
+        flow.record("typescript-delivered-files", dict(files=sorted(name for name in allowed if (root / name).is_file()), realDisk=True, realTestProcesses=True))
         flow.screenshot("typescript-project-final")
     return "Native TypeScript engineering project: " + flow.outcome
