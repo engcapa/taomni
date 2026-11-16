@@ -1,5 +1,6 @@
 pub mod crypto;
 pub mod db;
+pub mod plugin_access;
 
 #[cfg(test)]
 mod tests;

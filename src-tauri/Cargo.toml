@@ -20,6 +20,7 @@ members = [
     "crates/taomni-rdp-common",
     "crates/taomni-file-uri",
     "crates/taomni-plugin-api",
+    "crates/taomni-plugin-services",
     "crates/taomni-profile-locks",
     "crates/taomni-sqlite-snapshot",
     "plugins/hello-plugin",
@@ -78,6 +79,8 @@ tauri-plugin-shell = "2"
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 taomni-plugin-api = { path = "crates/taomni-plugin-api" }
+taomni-plugin-services = { path = "crates/taomni-plugin-services" }
+taomni-profile-locks = { path = "crates/taomni-profile-locks" }
 taomni-capture = { path = "crates/taomni-capture" }
 taomni-rdp-common = { path = "crates/taomni-rdp-common", features = ["bitmap"] }
 taomni-file-uri = { path = "crates/taomni-file-uri" }

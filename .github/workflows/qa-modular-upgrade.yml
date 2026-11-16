@@ -29,6 +29,11 @@ env:
   PYTHONUNBUFFERED: '1'
 
 jobs:
+  download-contracts:
+    uses: ./.github/workflows/qa-modular-download.yml
+    with:
+      head: ${{ inputs.head || github.sha }}
+
   vault-foundations:
     name: Vault foundations (${{ matrix.os }})
     strategy:
@@ -54,7 +59,7 @@ jobs:
         run: |
           mkdir -p modular-evidence
           set -o pipefail
-          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-api -p taomni-profile-locks -p taomni-sqlite-snapshot --lib --locked 2>&1 | tee modular-evidence/vault-foundation-unit.log
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-api -p taomni-plugin-services -p taomni-profile-locks -p taomni-sqlite-snapshot --lib --locked 2>&1 | tee modular-evidence/vault-foundation-unit.log
       - name: Real process profile and writer leases with crash release
         run: |
           set -o pipefail
@@ -316,21 +321,76 @@ jobs:
           src/lib/pluginLoader.test.ts
           src/lib/ipc/plugin.test.ts
           src/lib/nativeAppMenu.test.ts
+          src/lib/updateService.test.ts
+          src/components/tabbar/tabs/TabItem.test.tsx
+          src/components/tabbar/TabBar.test.tsx
       - name: Plugin protocol unit contracts
         run: cargo test --manifest-path src-tauri/crates/taomni-plugin-api/Cargo.toml --locked
-      - name: 0.5.x migration journal and legacy detection contracts
-        if: runner.os == 'Linux'
-        run: >-
-          cargo test --manifest-path src-tauri/Cargo.toml --lib plugin:: --locked -- --nocapture
-      - name: Retained core RDP configuration and clipboard unit contracts
+      - name: Core migration, retained RDP, Vault and application lifecycle unit contracts
         if: runner.os == 'Linux'
         shell: bash
         run: |
           mkdir -p modular-evidence
-          set -o pipefail
-          cargo test --manifest-path src-tauri/Cargo.toml --lib rdp::session::tests::input_and_channels --locked -- --nocapture 2>&1 | tee modular-evidence/retained-rdp-session-unit.log
-          cargo test --manifest-path src-tauri/Cargo.toml --lib servers::rdp::clipboard::tests --locked -- --nocapture 2>&1 | tee modular-evidence/retained-rdp-clipboard-unit.log
-          cargo test --manifest-path src-tauri/Cargo.toml --lib config::tests --locked -- --nocapture 2>&1 | tee modular-evidence/retained-config-unit.log
+          # Keep all filters bound to one compiled harness; do not rebuild the
+          # core between filters when build-script inputs are refreshed.
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni --lib --no-run --locked --message-format=json > modular-evidence/core-build.jsonl
+          python - <<'PY'
+          import hashlib
+          import json
+          from pathlib import Path
+          import subprocess
+
+          root = Path("modular-evidence")
+          artifacts = [json.loads(line) for line in (root / "core-build.jsonl").read_text().splitlines()]
+          executables = {
+              row["executable"] for row in artifacts
+              if row.get("reason") == "compiler-artifact"
+              and row.get("target", {}).get("name") == "taomni_lib"
+              and row.get("profile", {}).get("test") is True
+              and row.get("executable")
+          }
+          if len(executables) != 1:
+              raise SystemExit(f"Expected one freshly built core unit harness, got {len(executables)}")
+          executable = Path(executables.pop()).resolve()
+          filters = [
+              "plugin::",
+              "rdp::session::tests::input_and_channels",
+              "servers::rdp::clipboard::tests",
+              "config::tests",
+              "vault::plugin_access::tests",
+              "runtime::bootstrap::tests",
+              "runtime::tasks::tests",
+              "runtime::paths::tests",
+              "runtime::reaper::tests",
+              "app_exit::tests",
+              "terminal::observation::tests",
+              "backup::scheduler::tests",
+          ]
+          receipt = {
+              "head": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
+              "executable": str(executable),
+              "sha256": hashlib.file_digest(executable.open("rb"), "sha256").hexdigest(),
+              "filters": [],
+          }
+          failures = []
+          for selected in filters:
+              listing = subprocess.check_output([str(executable), selected, "--list"], text=True)
+              count = sum(line.endswith(": test") for line in listing.splitlines())
+              if count == 0:
+                  raise SystemExit(f"Required core unit filter selected no tests: {selected}")
+              result = subprocess.run(
+                  [str(executable), selected, "--test-threads=1", "--nocapture"],
+                  text=True, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+              )
+              (root / f"{selected.replace('::', '-')}.log").write_text(result.stdout)
+              print(result.stdout, flush=True)
+              receipt["filters"].append({"filter": selected, "selected": count, "exit_code": result.returncode})
+              (root / "core-unit-receipt.json").write_text(json.dumps(receipt, indent=2) + "\n")
+              if result.returncode:
+                  failures.append(selected)
+          if failures:
+              raise SystemExit(f"Core unit filters failed: {', '.join(failures)}")
+          PY
       - uses: actions/upload-artifact@v4
         if: always() && runner.os == 'Linux'
         with:

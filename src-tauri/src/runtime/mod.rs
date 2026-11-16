@@ -31,6 +31,10 @@ impl ApplicationRuntime {
     pub(crate) fn start(&self) {
         if !self.started.swap(true, Ordering::AcqRel) && !self.stopped.load(Ordering::Acquire) {
             self.plugins.start_supervision();
+            self.tasks.spawn_blocking(
+                "lsp-cache-prune",
+                crate::lsp::LspManager::prune_stale_caches,
+            );
         }
     }
     pub(crate) async fn shutdown(&self, state: &AppState) {
@@ -38,6 +42,7 @@ impl ApplicationRuntime {
             return;
         }
         self.plugins.shutdown();
+        state.plugin_downloads.shutdown_and_wait().await;
         self.tasks.shutdown().await;
         shutdown::stop_business_runtimes(state).await;
     }

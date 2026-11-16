@@ -10801,6 +10801,8 @@ dependencies = [
  "taomni-capture",
  "taomni-file-uri",
  "taomni-plugin-api",
+ "taomni-plugin-services",
+ "taomni-profile-locks",
  "taomni-rdp-common",
  "tauri",
  "tauri-build",
@@ -10919,6 +10921,7 @@ dependencies = [
  "serde",
  "serde_json",
  "taomni-plugin-api",
+ "taomni-plugin-services",
  "tempfile",
  "thiserror 2.0.20",
  "windows 0.62.2",
@@ -10935,18 +10938,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "taomni-plugin-services"
+version = "0.1.0"
+dependencies = [
+ "serde_json",
+ "taomni-plugin-api",
+ "taomni-profile-locks",
+ "tempfile",
+ "zeroize",
+]
+
+[[package]]
 name = "taomni-profile-locks"
 version = "0.1.0"
 dependencies = [
  "libc",
- "tempfile",
-]
-
-[[package]]
-name = "taomni-sqlite-snapshot"
-version = "0.1.0"
-dependencies = [
- "rusqlite",
  "tempfile",
 ]
 
@@ -10957,6 +10963,14 @@ dependencies = [
  "ironrdp-pdu",
  "libc",
  "taomni-file-uri",
+ "tempfile",
+]
+
+[[package]]
+name = "taomni-sqlite-snapshot"
+version = "0.1.0"
+dependencies = [
+ "rusqlite",
  "tempfile",
 ]
 

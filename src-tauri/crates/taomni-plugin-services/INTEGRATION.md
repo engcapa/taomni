@@ -32,10 +32,11 @@ taomni-profile-locks = { path = "crates/taomni-profile-locks" }
 pub mod plugin_access;
 ```
 
-Regenerate the root Cargo.lock after adding the crate. Root Cargo changes are
-intentionally left to the integrator so concurrent bootstrap/host work is not
-overwritten. The adapter's four actual-Vault tests are compiled and selected
-only after the module declaration and direct dependencies above exist.
+The root integrator has added these dependencies, regenerated Cargo.lock and
+declared the production adapter module. Its four actual-Vault unit tests now
+compile and pass against the integrated core. Production dispatcher and
+Vault/lifecycle coordination remain required; a declared adapter alone does
+not expose the service to a running host.
 
 The root host owner implements TASK-025-D against these files:
 
@@ -63,10 +64,11 @@ revocation waits until the write is completed/discarded and the host has
 acknowledged erasure or been terminated. A returned success after revoke is
 invalid even if its worker completed before the epoch changed.
 
-Local in-process checks (current tree): API 15/15 and services 11/11 passed;
-clippy `--all-targets -- -D warnings` passed. The four actual Vault adapter
-tests are **not run** until integration; existing root tests cannot discover
-an undeclared module. No browser/native or process gate has been run locally.
+Local in-process checks: API 15/15 and services 11/11 passed; clippy
+`--all-targets -- -D warnings` passed in the foundation tree. The integrated
+core now also passes all four actual Vault adapter units. No browser/native
+or process gate has been run locally; hosted evidence remains pending for
+this integration.
 
 Hosted exact commands after integration:
 

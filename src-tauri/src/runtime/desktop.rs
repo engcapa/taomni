@@ -22,10 +22,6 @@ pub(crate) fn attach(app: &tauri::AppHandle) -> Result<(), String> {
 pub(crate) fn start(app: &tauri::AppHandle) {
     let runtime = app.state::<ApplicationRuntime>();
     runtime.start();
-    runtime.tasks.spawn_blocking(
-        "lsp-cache-prune",
-        crate::lsp::LspManager::prune_stale_caches,
-    );
     let cancel = runtime.tasks.cancellation();
     crate::backup::scheduler::start(app, cancel.clone());
     let catalog = app.state::<AppState>().core.opencode_go_catalog.clone();
