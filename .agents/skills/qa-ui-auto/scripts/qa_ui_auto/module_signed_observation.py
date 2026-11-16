@@ -39,7 +39,10 @@ def invoke(session, command, args=None):
     end = time.monotonic() + 15
     try:
         while time.monotonic() < end:
-            state = session.execute(f"return window[{slot}] || null;")
+            # A top-level `error` in a W3C result is a driver failure. Keep
+            # the observed application rejection inside its own envelope.
+            envelope = session.execute(f"return {{observation: window[{slot}] || null}};")
+            state = envelope.get("observation") if isinstance(envelope, dict) else None
             if isinstance(state, dict) and state.get("done"):
                 return state
             time.sleep(.05)

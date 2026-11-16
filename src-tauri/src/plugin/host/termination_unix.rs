@@ -5,6 +5,12 @@ use std::{
     time::{Duration, Instant},
 };
 
+#[cfg(target_os = "macos")]
+#[path = "termination_macos.rs"]
+mod macos;
+#[cfg(target_os = "macos")]
+use macos::group_has_live_processes;
+
 pub(super) fn wait(
     child: &mut Child,
     group: Option<libc::pid_t>,
@@ -57,17 +63,4 @@ fn group_has_live_processes(group: libc::pid_t) -> io::Result<bool> {
         }
     }
     Ok(false)
-}
-
-#[cfg(target_os = "macos")]
-fn group_has_live_processes(group: libc::pid_t) -> io::Result<bool> {
-    if unsafe { libc::kill(-group, 0) } == 0 {
-        return Ok(true);
-    }
-    let error = io::Error::last_os_error();
-    if error.raw_os_error() == Some(libc::ESRCH) {
-        Ok(false)
-    } else {
-        Err(error)
-    }
 }

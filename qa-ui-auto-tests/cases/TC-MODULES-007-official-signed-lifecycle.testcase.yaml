@@ -3,7 +3,8 @@ title: Official signed offline module survives lifecycle and rejects installed t
 description: >-
   Install the current-source official hello package through Settings, using the
   unmodified production pinned public key. Verify the native registry version,
-  real host ping, disable/enable, Settings reopening and graceful app restart.
+  inactive invoke rejection before enabling, real host ping after enabling,
+  disable/enable, Settings reopening and graceful app restart.
   Change only the isolated signed frontend externally and restart: the real
   startup verifier must disable it. Restore the original signed bytes, restart,
   then uninstall through Settings and prove another restart cannot resurrect it.
@@ -92,7 +93,7 @@ verification:
     - step: 11
       expectation: The module card displays the signed 0.1.0 version.
     - step: 12
-      expectation: Native registry, active pointer and retained signed original all match the official artifact.
+      expectation: Native registry, active pointer and retained signed original match the official artifact; the installed but not enabled module rejects invoke with InvalidState.
     - step: 15
       expectation: hello/ping is served by the real isolated host with the correct plugin ID, version and enabled state.
     results: [10, 11, 12, 15]
