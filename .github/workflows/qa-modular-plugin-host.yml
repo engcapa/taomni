@@ -24,6 +24,40 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  macos-system-execution:
+    name: macOS ad-hoc hardened runtime and quarantined hosts
+    runs-on: macos-15-intel
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    env:
+      PYTHONPATH: .agents/skills/qa-ui-auto/scripts
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head || github.sha }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: modular-system-execution-intel
+      - name: System experiment tool unit contracts
+        run: python -m unittest test_module_system_execution
+      # This experiment uses an ad-hoc identity only. No signing credential or
+      # private key is available to candidate compilation or native execution.
+      - name: Build the actual hello and MFA hosts without signing credentials
+        run: cargo build --manifest-path src-tauri/Cargo.toml -p taomni-hello-plugin -p taomni-plugin-mfa --bins --locked
+      - name: Sign the experiment with hardened runtime and observe quarantined host execution
+        run: python scripts/run-module-system-execution-gates.py --evidence qa-modular-system-execution
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: modular-system-execution-macos-intel
+          path: qa-modular-system-execution
+          if-no-files-found: error
+
   hello-plugin:
     name: hello-plugin (${{ matrix.os }})
     strategy:
