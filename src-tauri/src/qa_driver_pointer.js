@@ -17,6 +17,16 @@ function dispatchQaElementClick(el) {
   return true;
 }
 
+function qaClickTarget(down, up) {
+  // Removing a control during mousedown must not activate its replacement on
+  // mouseup. Connected, different targets activate their common ancestor.
+  if (!down?.isConnected || !up?.isConnected) return null;
+  for (let node = down; node; node = node.parentElement) {
+    if (node === up || node.contains(up)) return node;
+  }
+  return null;
+}
+
 async function dispatchQaActions(sources, emitKey, modifiers, resolveOrigin, targetAtPoint, cancelled = () => false) {
   const states = sources.map(() => ({ x: 0, y: 0, buttons: 0, down: null, dragged: false, clicks: 0, suppressMouse: false }));
   const ticks = Math.max(0, ...sources.map((source) => (source.actions || []).length));
@@ -65,6 +75,7 @@ async function dispatchQaActions(sources, emitKey, modifiers, resolveOrigin, tar
         continue;
       }
       const target = targetAtPoint(state.x, state.y);
+      if (action.type === "pointerDown") state.down.target = target;
       const init = {
         bubbles: true, cancelable: true, clientX: state.x, clientY: state.y,
         button, buttons: state.buttons, detail: action.type === "pointerMove" ? 0 : state.clicks + 1,
@@ -100,9 +111,12 @@ async function dispatchQaActions(sources, emitKey, modifiers, resolveOrigin, tar
         } else if (button === 1 && state.down && !state.dragged) {
           target.dispatchEvent(new MouseEvent("auxclick", init));
         } else if (state.down && !state.dragged) {
-          target.dispatchEvent(new MouseEvent("click", init));
-          state.clicks++;
-          if (state.clicks === 2) target.dispatchEvent(new MouseEvent("dblclick", init));
+          const clickTarget = qaClickTarget(state.down.target, target);
+          if (clickTarget) {
+            clickTarget.dispatchEvent(new MouseEvent("click", init));
+            state.clicks++;
+            if (state.clicks === 2) clickTarget.dispatchEvent(new MouseEvent("dblclick", init));
+          }
         }
         state.down = null;
         state.suppressMouse = false;
