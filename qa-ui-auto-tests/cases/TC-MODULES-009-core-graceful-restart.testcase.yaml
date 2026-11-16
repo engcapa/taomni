@@ -19,7 +19,8 @@ description: Save a note through the production Notes UI, close the run-owned QA
   The native restart receipt must show normal shutdown and a new owned application process. Reopen Notes and Module Store to prove core store/profile ownership
   and registry setup recover. No kill or fixture reset is a successful shutdown. Read the actual core-owned profile generation before and after restart;
   it must remain identical without a restore. The fixture registers the owned path; asserting probes read the file after application readiness and never
-  write it. Close the saved Notes overlay before using window chrome; an open drawer may cover the Windows close button.
+  write it. Hide the saved Notes overlay before using window chrome; an open drawer may cover the Windows close button. The closed drawer remains
+  mounted to retain its content, so verify that it is hidden rather than requiring DOM removal.
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="status-bar"]'
@@ -42,9 +43,9 @@ steps:
 - &id001
   click: '[data-testid="ai-chat-drawer-hide"]'
 - &id002
-  assert_count:
+  wait_for:
     selector: '[data-testid="ai-chat-drawer"]'
-    equal: 0
+    state: hidden
 - native_restart_app: null
 - wait_for: '[data-testid="status-bar"]'
 - click: '[data-testid="rail-chat-button"]'
