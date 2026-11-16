@@ -29,7 +29,7 @@ steps:
 - click: '[data-testid="module-action-enable-hello-plugin"]'
 - wait_for: '[data-testid="module-action-open-hello-plugin-hello-plugin"]'
 - click: '[data-testid="module-action-open-hello-plugin-hello-plugin"]'
-- wait_for: '[data-testid="hello-plugin-values"]'
+- wait_for: '[data-testid="hello-plugin-values"][data-state="empty"] [data-testid="hello-plugin-empty"]'
 - assert_count: {selector: '[data-testid="tab-item"][data-tab-type="plugin"]', equal: 1}
 - fill: {selector: '[data-testid="hello-plugin-value"]', value: native module message}
 - click: '[data-testid="hello-plugin-save"]'

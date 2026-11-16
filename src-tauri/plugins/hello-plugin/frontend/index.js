@@ -46,6 +46,9 @@ export default function HelloPlugin({ api, active }) {
       h("button", { type: "submit", "data-testid": "hello-plugin-save", className: "taomni-btn", disabled: busy || !value.trim(),
         style: { padding: "4px 12px" } }, busy ? labels.saving : labels.save)),
     error && h("p", { role: "alert", "data-testid": "hello-plugin-error" }, error),
-    values === null ? h("p", { role: "status" }, labels.loading) : h("ul", { "data-testid": "hello-plugin-values" },
-      ...values.map((entry, index) => h("li", { key: index, "data-testid": "hello-plugin-entry" }, entry))));
+    values === null ? h("p", { role: "status" }, labels.loading) : h("ul", {
+      "data-testid": "hello-plugin-values", "data-state": values.length === 0 ? "empty" : "populated",
+    }, values.length === 0
+      ? h("li", { "data-testid": "hello-plugin-empty", style: { color: "var(--taomni-text-muted)" } }, labels.empty)
+      : values.map((entry, index) => h("li", { key: index, "data-testid": "hello-plugin-entry" }, entry))));
 }

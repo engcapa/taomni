@@ -133,6 +133,9 @@ controls:
   - id: hello-plugin-values
     selector: '[data-testid="hello-plugin-values"]'
     kind: display
+  - id: hello-plugin-empty
+    selector: '[data-testid="hello-plugin-empty"]'
+    kind: display
   - id: hello-plugin-entry
     selector: '[data-testid="hello-plugin-entry"]'
     kind: display
