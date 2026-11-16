@@ -12,7 +12,8 @@ description: >-
   process. Reopen Notes and Module Store to prove core store/profile ownership
   and registry setup recover. No kill or fixture reset is a successful shutdown.
   Read the actual core-owned profile generation before and after restart; it
-  must remain identical without a restore. The fixture never writes this file.
+  must remain identical without a restore. The fixture registers the owned path;
+  asserting probes read the file after application readiness and never write it.
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="status-bar"]'
@@ -25,7 +26,7 @@ steps:
 - click: '[data-testid="note-editor-back"]'
 - assert_text: {selector: '[data-testid="notes-list"]', contains: QA CoreState normal restart}
 - assert_no_runtime_errors: null
-- assert_file_contains: {path: '${fixture.core_profile_state_path}', contains: '${fixture.core_profile_generation}'}
+- assert_core_profile_generation: {phase: capture, path: '${fixture.core_profile_state_path}'}
 - native_restart_app: null
 - wait_for: '[data-testid="status-bar"]'
 - click: '[data-testid="rail-chat-button"]'
@@ -37,7 +38,7 @@ steps:
 - assert_visible: '[data-testid="module-store-core-api"]'
 - assert_visible: '[data-testid="module-upgrade-status"]'
 - assert_no_runtime_errors: null
-- assert_file_contains: {path: '${fixture.core_profile_state_path}', contains: '${fixture.core_profile_generation}'}
+- assert_core_profile_generation: {phase: unchanged, path: '${fixture.core_profile_state_path}'}
 verification:
   review: reviewed
   requirements:

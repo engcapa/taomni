@@ -1113,6 +1113,16 @@
           "properties": {"selector": {"type": "string", "minLength": 1}, "timeout_sec": {"type": "number", "minimum": 1}, "close_with": {"type": "string", "minLength": 1}},
           "description": "Switch to a real app-created browser page/native WebView with the matching CSS selector."
         },
+        "assert_core_profile_generation": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["phase", "path"],
+          "properties": {
+            "phase": {"enum": ["capture", "unchanged"]},
+            "path": {"type": "string", "minLength": 1}
+          },
+          "description": "Read canonical core metadata after readiness, capture once and assert the same generation after a normal native restart; never seed profile state."
+        },
         "native_restart_app": {
           "oneOf": [
             { "type": "null" },

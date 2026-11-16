@@ -13,6 +13,7 @@ from typing import TypedDict
 from native_process_group import wait_for_driver_ports
 from native_application_shutdown import linux_storage_processes, wait_for_application_shutdown
 from native_webdriver_transport import WebDriverError
+from native_restart_failure import capture as capture_restart_failure
 from native_window_close_x11 import close_x11_application_window, x11_window_closed
 
 
@@ -294,6 +295,9 @@ def restart_owned_application(driver, session, *,
         observation["error_stage"] = observation["stage"]
         observation["close_error"] = str(error)
         observation["close_request"] = dict(getattr(session, "last_request", {}))
+        # Session deletion/driver.stop removes the failed window. Capture it
+        # now so the runner can diagnose a blocked close without losing DOM.
+        capture_restart_failure(session, observation)
         raise
     finally:
         observation["stage"] = "release-owner"

@@ -109,20 +109,21 @@ jobs:
           os.environ["TAOMNI_HELLO_PLUGIN_BIN"] = str(pathlib.Path(f"src-tauri/target/debug/taomni-hello-plugin{suffix}").resolve())
           subprocess.run([
               "cargo", "test", "--manifest-path", "src-tauri/Cargo.toml",
-              "-p", "taomni-host-gates", "--test", "lifecycle", "--test", "cleanup", "--test", "services",
+              "-p", "taomni-host-gates", "--test", "lifecycle", "--test", "activation", "--test", "cleanup", "--test", "services",
               "--locked", "--", "--ignored", "--test-threads=1", "--nocapture",
           ], check=True)
           PY
-      - name: Record actual SDK service gate selection
+      - name: Record actual hosted process scenario selections
         run: |
           python - <<'PY' > modular-evidence/service-selection.txt
           import subprocess
-          listing = subprocess.check_output([
-              "cargo", "test", "--manifest-path", "src-tauri/Cargo.toml", "-p", "taomni-host-gates",
-              "--test", "services", "--locked", "--", "--ignored", "--list",
-          ], text=True)
-          print(listing)
-          assert sum(line.endswith(": test") for line in listing.splitlines()) == 8, "Missing production pump/SDK process scenarios"
+          for target, expected in {"services": 8, "lifecycle": 7, "activation": 3, "cleanup": 2}.items():
+              listing = subprocess.check_output([
+                  "cargo", "test", "--manifest-path", "src-tauri/Cargo.toml", "-p", "taomni-host-gates",
+                  "--test", target, "--locked", "--", "--ignored", "--list",
+              ], text=True)
+              print(target, listing)
+              assert sum(line.endswith(": test") for line in listing.splitlines()) == expected, f"Missing {target} process scenarios"
           PY
       - uses: actions/upload-artifact@v4
         if: always()
@@ -337,6 +338,8 @@ jobs:
           src/components/tabbar/TabBar.test.tsx
       - name: Plugin protocol unit contracts
         run: cargo test --manifest-path src-tauri/crates/taomni-plugin-api/Cargo.toml --locked
+      - name: Native observation unit regressions
+        run: python -m unittest qa_ui_auto.test_core_profile_state test_module_signed_observation test_native_restart_failure
       - name: Core migration, retained RDP, Vault and application lifecycle unit contracts
         if: runner.os == 'Linux'
         shell: bash

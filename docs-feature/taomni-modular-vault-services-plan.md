@@ -1,7 +1,7 @@
 # TASK-025：宿主 Vault 服务、一致快照与 profile 协同实施方案
 
 - 日期：2026-11-16。
-- 状态：TASK-025-A/B/C 已集成，三端基础/真实锁与 Linux 真实 Vault gate 通过。D 的双向 pump、敏感 writer、有界 dispatcher、独立读循环 SDK 与真实 Vault backend 已实现；`4a67992d6` 的三端 SDK stdio/Linux Vault gate 已通过。`00ac480d8` 已接 registry/bootstrap 生产工厂、外层 scoped 入口及持久 profile generation，契约 run 22/23 jobs 成功，macOS 崩溃宿主终止确认待修复重跑。Vault IPC 生命周期协调与真实 MFA 调用方尚未接通；D–I 和主 TASK-025 未完成。
+- 状态：TASK-025-A/B/C 已集成，三端基础/真实锁与 Linux 真实 Vault gate 通过。D 的双向 pump、敏感 writer、有界 dispatcher、独立读循环 SDK 与真实 Vault backend 已实现；`00ac480d8` 已接 registry/bootstrap 生产工厂、外层 scoped 入口及持久 profile generation。macOS 崩溃宿主终止确认已在 `5d49b9abc` 的契约 run #43793976461 通过（全 run 23/23 jobs 成功）。后续正在补核心 operation permit、历史 transport 终止凭据及可重试 registry 清理；Vault IPC 生命周期协调与真实 MFA 调用方仍未接通。D–I 和主 TASK-025 未完成，新增代码需各自匹配源码的 hosted 证据。
 - 来源：`docs-feature/taomni-modular-split-design.md` S12/S13、DEC-8–DEC-10、TASK-024/025、AC-011/015/016、V-006/011；`claudedocs/adr-taomni-modular-split.md`。
 - 调研提交：首次调查为 `2a245d52d`，继续调查时 HEAD 为 `0f4cdf82ffbd519b4217eb56477d0e548e974bce`。签名安装、宿主监督、共享采集这一批仍在集成/验证；本文件没有修改或假设这些共享源码已经冻结合并。
 - 文档位置：`docs-feature/taomni-modular-vault-services-plan.md`，关联主设计和 progress 台账。所有项目路径均为仓库相对路径。

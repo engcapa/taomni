@@ -8,7 +8,7 @@
 
 生产升级 IPC 当前只记录只读预检、源指纹与 pending journal。缺少可信插件包和真实 exporter 时，不复制旧数据、不创建伪插件版本、不改变 active 指针。测试 fixture 的 staging/回滚原语不能算真实旧版升级验收。
 
-签名安装门、宿主生产监督、共享采集/RDP 公共库、CoreState/统一 bootstrap、正常退出与可逆静默已集成。源码 `4a67992d6` 的升级契约 workflow 23/23 jobs 已通过，三端 browser 各 35/35；native 尚在执行，macOS 的 TC-MODULES-007 已发现业务拒绝结果与 W3C 驱动错误字段冲突，修复待重跑。生产工厂、scoped 入口和持久 profile generation 已在 `00ac480d8` 接入；该源码契约 run 为 22/23 jobs 成功，macOS 的崩溃宿主终止确认失败，不能算全通过。业务状态仍在 LegacyFeatureRuntime；Vault IPC 协同、远端商店、重启下载恢复、业务宿主迁出与真实升级尚未完成。G1–G11 未通过前，不将具体业务插件迁移标为完成。
+签名安装门、宿主生产监督、共享采集/RDP 公共库、CoreState/统一 bootstrap、正常退出与可逆静默已集成。生产工厂、scoped 入口和持久 profile generation 已在 `00ac480d8` 接入，其 macOS 崩溃宿主终止确认失败已由 `5d49b9abc` 修复；该新源码的升级契约 [#43793976461](https://github.com/engcapa/taomni/actions/runs/43793976461) 已 23/23 jobs 成功。相同新源码的 UI [#43794006016](https://github.com/engcapa/taomni/actions/runs/43794006016) 仍在执行，已即时收齐三端 browser 各 24/24；Windows/macOS native 各 27/29，相关失败为 TC-MODULES-007 宿主未启用与 TC-MODULES-009 fixture 过早读取 metadata，Linux native 尚在构建。业务状态仍在 LegacyFeatureRuntime；Vault IPC 协同、远端商店、重启下载恢复、业务宿主迁出与真实升级尚未完成。G1–G11 未通过前，不将具体业务插件迁移标为完成。
 
 ## 任务状态
 
@@ -84,7 +84,7 @@ Wayland `TC-FILE-OPEN-008` 在已有 AI 路径 chip 点击处失败：失败截�
 
 ### 当前待办（按依赖顺序）
 
-1. **收敛当前相关失败并取得新源码证据**：修复 macOS 崩溃宿主终止确认与 TC-MODULES-007 的原生观察结果传递；继续即时收取既有 run 的剩余 native shard。修复后在 GitHub 重跑，新增 generation 断言也必须使用匹配的新 QA binary；旧源码的 browser 通过不能替代。
+1. **收敛当前相关失败并取得新源码证据**：macOS 崩溃宿主终止确认已在 `5d49b9abc` 的契约 run 通过。新 native 证据表明 TC-MODULES-007 探针修复后暴露真实宿主启用缺失，TC-MODULES-009 在首次启动前读取尚不存在的 generation；两处已写修复，待新 SHA 验证。旧 run 的 Windows TC-MODULES-009 关闭前 hit-test 失败仍需排查，已补释放 driver 前的采证。继续逐 shard 收取结果，不能用旧源码或仅 browser 的通过替代。
 2. **闭合 Vault、profile 与一致快照（TASK-024/025）**：init/unlock/lock/rekey 接入统一 coordinator，完成关闭准入、取消、撤销/确认退出、drain、清 root 的屏障；保留历史宿主终止 receipt。真实 MFA 领取作用域 permit、密码导出/reset grant，旧固定 ID 和错误语义不变。补运行中、禁用、卸载留数据三态的备份/正常重启还原与真实解密，以及多实例占用、取消和崩溃恢复。
 3. **迁出真实业务（TASK-005-B、013/014、016–022）**：先完成真实 MFA 原型与相关 G 门，再依赖序推进 RDP/VNC 客户端与服务端、Servers、SocksCap、OCR/录制、本地语音的宿主、前端、状态与迁移。Mobile 按 DEC-2 留下明确 go/no-go 结论和公开例外，不能默认为交付；LanChat 任务已取消，不新增替代插件。
 4. **裁剪核心依赖闭包（TASK-006）**：随业务迁出，从核心 Cargo 默认 features、原生依赖、bundle/resources/helper 和前端 chunk 中实际移除相应实现。保存 cargo tree、资源与产物证据；把状态改名或放入 LegacyFeatureRuntime 不等于瘦身完成。
@@ -92,12 +92,29 @@ Wayland `TC-FILE-OPEN-008` 在已有 AI 路径 chip 点击处失败：失败截�
 6. **验证真实旧单体升级（TASK-012）**：从已发布、已安装的 0.5.x 取得真实数据，经 legacy exporter、可信包 staging、Vault 交接和原子激活；覆盖升级中断、失败、重试和回滚，并证明原数据未损坏。现有只读预检/pending journal 与合成 fixture 都不算该验收；旧 LanChat 库保持原位且不读取。
 7. **完成生产发布验收（TASK-001/002/023）**：闭合 G1–G11、冻结真实插件契约；完成四发布目标的宿主系统签名/包签名、原子 modules 清单、模块独立更新/回滚。核心-only 与实际全插件集合分别完成受影响用例及完整 crash-regression，并归档包体积、启动、内存、帧吞吐的匹配基线与原始样本。
 
+### 2026-11-16 启用与原生观察修复批次（开发中）
+
+- 已即时下载 Windows/macOS 全部 native shard，两端均为 27/29；TC-MODULES-007 第 15 步返回真实 `enabled=false`，TC-MODULES-009 第 0 步读取不到尚未 bootstrap 的 `.profile-state.json`。本轮未发现这两类以外的相关失败，Linux native 尚在构建。
+- 宿主首次启动和预算重启共用 `host/launch.rs`：认证握手后，只对可信 manifest 声明了 `plugin/enable` 的宿主调用启用钩子，并等成功才返回；握手与启用共享一个启动 deadline。未声明钩子的 v1 服务宿主保持兼容；不把 hello 的默认状态改成启用，也不放宽真实 identity 断言。新增 hello 首次启用与重启状态断言，另有拒绝、超时/实际进程回收、无钩子三个 hosted 场景；workflow 明确选择全部场景。本地只编译这些真实进程测试。
+- generation fixture 改为首次启动前仅登记路径，在应用就绪后由 `assert_core_profile_generation` capture 真实 canonical UUID，正常重启后比较同一路径与值；禁止二次 capture 掩盖变化。不创建、不覆盖产品 metadata，独立保存观察 evidence，TC-MODULES-009 保持 24 步与原 checkpoint 索引。
+- 正常重启失败时，在释放 driver 前以独立 3 秒预算保存 WebView screenshot、HTML 和关闭按钮的真实命中层；采证失败不替换原异常。这是为 Windows 旧 hit-test 失败补诊断，不代表问题已修复。
+- 观察/重启/官方包工具 60 项纯单元通过；新源码核心精确过滤器 117 passed、3 个真实进程场景 ignored，小 crate services 28 / host 14 passed（host 与核心有重复，不混加）。真实 hosted 20 场景仅编译。两个原生用例 schema、reviewed contract 和 verb 注册、完整 QA audit（756 cases、0 errors、catalog current）、check:refactor、rustfmt、actionlint、diff 检查通过；三端静态选择为 22 shards、3 个 release QA 构建、gaps=[]。新的宿主行为、metadata 与退出凭据仍待匹配新源码的 GitHub runner 证据。
+
+### 2026-11-16 核心操作与宿主退出凭据批次（开发中）
+
+- 新增 `CoreOperationPermit`，使仍在核心的受保护业务与宿主共用 epoch/generation、限额、跨进程 lease 和排空计数；没有 HostInstance/wire context，不能借它执行 reverse RPC。核心业务调用方尚未接通，不能据此报告真实 MFA 已适配。
+- `AuthorizedHost` 的克隆共享一次实例的终止标记；只有实际 transport 的内核进程树确认成功才记录。崩溃 transport 在 session 释放后仍保留对应身份与 dispatcher；历史 operation/敏感 frame 的 lease 仍要实际释放才能完成撤销。相同 revocation 的确认可重试，错误 epoch/generation/实例仍被拒绝。
+- registry 的 scan、禁用、卸载、版本切换、静默和退出改为确认成功后才移除 runtime；失败保留所有权并返回错误，不提前删除数据或更新 active 指针。GUI 退出准备持有可逆静默屏障到提交，headless 也传播确认失败；这批行为待匹配新源码的 hosted native 证据。
+- 当前纯进程内 services 单元 28 passed（新增核心操作 5 项、终止凭据 4 项）；生产 host 单元 14 passed，真实 SDK 场景只编译，未在本机执行。核心 registry/退出新增单元与最终静态检查已通过，详见上方启用修复批次。Vault init/unlock/lock/rekey coordinator、MFA 的外层 permit 和一致快照仍未接入。
+
 ### 2026-11-16 即时收取的相关失败与修复
+
+- 修复源码 `5d49b9abca67ee5276839067f8e193f9a16ec83b` 的 [契约 #43793976461](https://github.com/engcapa/taomni/actions/runs/43793976461) 已 23/23 jobs 成功，21 份 artifact 在执行期间收齐；macOS 实际日志中的 17 项 unit、2 个 cleanup、6 个 lifecycle、8 个 SDK 场景全部通过。相同源码的 [UI #43794006016](https://github.com/engcapa/taomni/actions/runs/43794006016) 已即时收齐六个 browser shard，三端每端 24/24、identity stable；native 仍在构建/执行，不计为已通过。该证据不包含上述后续开发中的退出凭据批次。
 
 - 源码 `00ac480d81522f3497b3d6804de389cfa77bf0ca` 的 [契约 #43791785215](https://github.com/engcapa/taomni/actions/runs/43791785215) 已结束，22/23 jobs 成功，21 份 artifacts 已在执行期间收齐。Linux/Windows 的 2 个 cleanup、6 个 lifecycle 和 8 个 SDK 真实进程场景均通过；macOS 的 cleanup 2/2、lifecycle 6/6、SDK 7/8。失败为 `confirmed_stop_keeps_crashed_transport_ownership_until_termination_is_observed`，终止查询返回 EPERM，不能忽略或伪造确认。
 - Darwin 的负进程组信号探测会过滤僵尸成员，可能对仅余僵尸的组返回 EPERM（XNU `bsd/kern/kern_sig.c` 的 `killpg1`）。修复改为 libproc 枚举所属组并检查每个成员的当前 group/status；只有没有存活成员才确认，查询权限/截断/不完整返回仍失败。真实进程回归沿用上述已失败场景与子孙树退出场景，新增三项纯状态判断单元；macOS 实际结果仍待新 SHA hosted 执行。
 - [UI #43787465425](https://github.com/engcapa/taomni/actions/runs/43787465425) 的 macOS native shard 2/4 已边运行边下载。shard 4 为 13/13；shard 2 为 11/12，TC-MODULES-007 在第 12 步失败，其余包括真实 RDP loopback、性能与 crash 场景通过。原生 registry 确实为 `installed`；用例本来就断言未启用调用返回 InvalidState，但观察结果根对象含 `error`，被 W3C transport 误认成驱动失败。新单元已用真实 transport decoder、模拟响应复现相同异常；修复仅包裹观察值，不放宽拒绝断言或启用后的真实 host identity。重跑前不计该 case 通过，其余 shard 继续执行。
-- 随后收齐该 run 的 macOS 四个 native shard（47/48）和 Linux Xvfb 四个 native shard（47/48）；两端唯一失败均为同一 TC-MODULES-007 探针。Wayland 四个 native shard 为 45/49：同一探针、既有 TC-FILE-OPEN-008 路径 chip 命中问题，以及 TC-FILE-OPEN-006 的非左键输入需要 X11、TC-MOBILE-021 的 OS 文本输入仅到达 `77` 而缺少 `QA_DESK_`。后两项原生指针工具和 `deliver_keyboard_input`/probe 路径均与 main 相同；Mobile 真实屏幕 PNG、权限开关与浏览器打开已通过，失败发生在未改动的 Enigo 文本输入。按用户指示把这些 Wayland 工具/输入缺口单列，不改断言、不记通过，不阻塞本批模块化修复；Windows native 尚未收齐。
+- 该旧 run 已结束，22 个 shard artifact 全部收齐。macOS 四个 native shard 为 47/48，Linux Xvfb 为 47/48，两端唯一失败均为同一 TC-MODULES-007 探针；Windows native 为 48/50，另有 TC-MODULES-009 关闭前的指针 hit-test 失败，尚待排查，不能忽略。按最终逐 case summary 复核，Wayland 为 44/48：同一探针、既有 TC-FILE-OPEN-008 路径 chip 命中问题，以及 TC-FILE-OPEN-006 的非左键输入需要 X11、TC-MOBILE-021 的 OS 文本输入仅到达 `77` 而缺少 `QA_DESK_`。后两项原生指针工具和 `deliver_keyboard_input`/probe 路径均与 main 相同；Mobile 真实屏幕 PNG、权限开关与浏览器打开已通过，失败发生在未改动的 Enigo 文本输入。按用户指示把这些 Wayland 工具/输入缺口单列，不改断言、不记通过，不阻塞本批模块化修复。
 - 本批本地纯单元：Python 原生观察/官方包契约 9 passed，宿主既有 unit 14 passed；完整 QA audit、check:refactor、rustfmt、actionlint、diff 检查及模块场景加完整 crash-regression 的三端静态选择通过（22 shards）。macOS 新 kernel 状态判断的三个 unit 和真实进程/native case 留在 GitHub 执行，静态选择不算执行证据。
 
 ### 2026-11-16 生产工厂与 profile generation 批次
