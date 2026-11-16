@@ -82,7 +82,7 @@ Windows native 首批 **39/41**：目录 `tao-transcript-full-native-1116/run-20
 
 修正后的 Windows 定向 native **2/2**，`tao-transcript-diagnostics-fixed-1116/run-20261116-193036-048818800/`：010 沿用原 case 和输入动作通过，未修改产品设置行为或放宽断言；027 通过原 UI 流程、真实子进程、两方持久化及带回后显式继续。该修正仅改变 runner，产品 source 与 QA release binary 保持上文身份。
 
-Linux/macOS 批次 [43854389472](https://github.com/engcapa/taomni/actions/runs/43854389472) 固定 `3fa9de750` 对应完整 SHA，包含上述尚未修正的诊断。其构建/测试报告按实际结果保留；最终 runner 与目标/crash 用例需要新回执，不把该批排队、构建成功或仅 UI 通过当成整体验收通过。
+Linux/macOS 批次 [43854389472](https://github.com/engcapa/taomni/actions/runs/43854389472) 固定 `3fa9de750` 对应完整 SHA，包含上述尚未修正的诊断。等待 Linux/macOS 构建与 Rust 合同均成功后，主动取消其后续测试以释放最终批次资源，运行结论为 cancelled。已收集的 Linux native shard 2 为 9/10：027 已通过原来的回复可见检查，失败在旧工具访问不存在的 `report_root` 属性；原始失败继续保留。取消的整批不作为完整验收通过，最终 runner 与目标/crash 用例使用新回执。
 
 ## 2d8d0ff5b 最终 Windows 验证
 
@@ -94,4 +94,12 @@ Linux/macOS 批次 [43854389472](https://github.com/engcapa/taomni/actions/runs/
 - 已评审范围 browser **31/31**、native **40/40** 的 `status --gate` 为 `ok=true`、0 gaps、0 rejected reports；记录 `status-tao-transcript-windows-reviewed-1116.json`。额外旧 F12 的执行通过仍与其评审元数据待办区分，未偷偷移除 `needs-review`。
 - 对应产品的 frontend 定向单测 **4 files / 80 tests**、目录读取工具单测 **3/3**，QA release 的 TypeScript/frontend/native 构建、最终 `check:refactor`、development case contract、静态 `audit --gate` 均通过；未把静态检查或规划当作执行证据。
 
-最终 Linux/macOS browser/native release 批次为 [43858855264](https://github.com/engcapa/taomni/actions/runs/43858855264)，使用 `2d8d0ff5b` 对应完整提交 SHA，包含全部适用 crash。已下载的 Linux browser 20 项、macOS browser 10 项全部通过且原始回执/产物/输入核对无误；当前只是分片结果，其余分片及 native 尚待最终收集。旧 runner 批次的成功构建和合同日志保留，准备结束其后续测试以释放最终批次资源；取消不算通过。
+最终 Linux/macOS browser/native release 批次为 [43858855264](https://github.com/engcapa/taomni/actions/runs/43858855264)，使用完整提交 `2d8d0ff5b544669767238253493da48d78187bf5`，包含全部适用 crash。Linux browser **31/31**、native **41/41** 已完整收集，原始回执签名、全部绑定产物哈希、source/runner/case/native build 身份核对无误；记录 `qa-ui-auto-report/_local/h43858855264/independent-feedback-verification.json`。
+
+Linux 027 的真实 ACP 子进程交接、抽屉回复可见、user/assistant 两方持久化、结果带回 Tao 及显式继续均通过；最终截图已检查。macOS native shard 1/2 实际 **20/20**，包含 027/036/037；027 通过相同全流程，最终截图也已检查。
+
+macOS browser shard 3 在排队后以 cancelled 结束，未执行且没有报告。[该 job](https://github.com/engcapa/taomni/actions/runs/43858855264/job/133272595930) 的 GitHub 检查记录为 `The job was not acquired by Runner of type hosted even after multiple attempts`，同时明确提示 macOS arm64 runner 容量不足。其余 browser 21 项的通过保留；缺少的 10 项使用相同完整 SHA 在 [43864993650](https://github.com/engcapa/taomni/actions/runs/43864993650) 补跑，并自动加入完整适用 crash。补跑最终 **23/23**，workflow 成功；签名、全部绑定产物及 source/runner/case 独立核对无误。两批合并覆盖全部 **31/31** 个不同 browser 用例，包含完整适用 crash **18/18**；重复执行的 crash 不重复计数。记录 `qa-ui-auto-report/_local/h43864993650/independent-feedback-verification.json`。
+
+原批次剩余两个 macOS native 分片持续排队，未获得 runner。保留全部已完成报告及成功构建后，主动取消该批次，将尚未执行的 21 项转入 [43869363473](https://github.com/engcapa/taomni/actions/runs/43869363473) 的单分片 native release 补跑，仍使用上述完整 SHA，并自动加入完整适用 crash。按 runbook 复用 43858855264 的当前源码、工具链和 release 条件下成功的 Rust 合同结果，补跑设置 `run_rdp_unit_contracts=false`；没有跳过选中的原生用例。补跑尚待执行结果，原批次取消不作为整批通过。
+
+Windows/Linux 已完成平台的合并 `status --gate` 为 `ok=true`、0 gaps、0 rejected reports；每个平台已评审 browser **31/31**、native **40/40**，另有旧 F12 的实际通过与评审元数据待办。记录 `qa-ui-auto-report/_local/status-tao-transcript-windows-linux-reviewed-1116.json`。导入时先核对归档配置的 conditions 指纹；同名旧导入副本按内容哈希备份后激活本批配置，原始报告、回执及归档配置均未改写，映射记录在 hosted 根目录 `activated-config-provenance.json`。
