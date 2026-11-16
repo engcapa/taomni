@@ -15,7 +15,9 @@ from .steps import StepError
 class CoreProfileStateTest(TestCase):
     def test_fixture_before_first_start_only_registers_path_and_probe_reads_after_bootstrap(self):
         with tempfile.TemporaryDirectory() as folder:
-            root = Path(folder)
+            # macOS temporary directories may use /var -> /private/var.
+            # Match the fixture's canonical run root without weakening the probe.
+            root = Path(folder).resolve()
             profile = root / "native-appdata/profile"
             case = root / "TC-MODULES-009"
             case.mkdir()
@@ -44,7 +46,7 @@ class CoreProfileStateTest(TestCase):
 
     def test_changed_generation_cannot_be_hidden_by_recapturing_or_a_different_path(self):
         with tempfile.TemporaryDirectory() as folder:
-            root = Path(folder)
+            root = Path(folder).resolve()
             case, profile = root / "case", root / "profile"
             case.mkdir()
             profile.mkdir()
@@ -71,7 +73,7 @@ class CoreProfileStateTest(TestCase):
                    json.dumps({"formatVersion": 2, "generation": str(uuid.uuid4())}).encode(),
                    json.dumps({"formatVersion": 1, "generation": "A1234567-1234-1234-1234-123456789ABC"}).encode()]
         with tempfile.TemporaryDirectory() as folder:
-            root = Path(folder)
+            root = Path(folder).resolve()
             path = root / ".profile-state.json"
             with self.assertRaises(RuntimeError):
                 core_profile_state.read_generation(path)

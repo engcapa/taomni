@@ -92,9 +92,11 @@ Wayland `TC-FILE-OPEN-008` 在已有 AI 路径 chip 点击处失败：失败截�
 6. **验证真实旧单体升级（TASK-012）**：从已发布、已安装的 0.5.x 取得真实数据，经 legacy exporter、可信包 staging、Vault 交接和原子激活；覆盖升级中断、失败、重试和回滚，并证明原数据未损坏。现有只读预检/pending journal 与合成 fixture 都不算该验收；旧 LanChat 库保持原位且不读取。
 7. **完成生产发布验收（TASK-001/002/023）**：闭合 G1–G11、冻结真实插件契约；完成四发布目标的宿主系统签名/包签名、原子 modules 清单、模块独立更新/回滚。核心-only 与实际全插件集合分别完成受影响用例及完整 crash-regression，并归档包体积、启动、内存、帧吞吐的匹配基线与原始样本。
 
-### 2026-11-16 启用与原生观察修复批次（开发中）
+### 2026-11-16 启用与原生观察修复批次（`911f411b2` 已提交，hosted 验证中）
 
-- 已即时下载 Windows/macOS 全部 native shard，两端均为 27/29；TC-MODULES-007 第 15 步返回真实 `enabled=false`，TC-MODULES-009 第 0 步读取不到尚未 bootstrap 的 `.profile-state.json`。本轮未发现这两类以外的相关失败，Linux native 尚在构建。
+- 源码 `5d49b9abc` 的旧 UI run 已结束，22 个 shard 在运行期间收齐。三端 browser 各 24/24；Linux Xvfb、Windows、macOS native 各 27/29，相关失败均为 TC-MODULES-007 第 15 步真实 `enabled=false` 和 TC-MODULES-009 第 0 步 metadata 尚未 bootstrap。Wayland 为 25/29，另外两个既有 FILE-OPEN-008/006 失败按前述 main 对比依据单列，不计为通过。
+- 修复以 `88f59ba79` / `911f411b2` 提交并推送；新[契约 #43800283024](https://github.com/engcapa/taomni/actions/runs/43800283024)和 [UI #43800287415](https://github.com/engcapa/taomni/actions/runs/43800287415) 已启动，两套即时采集器均工作。三端真实宿主日志已即时核验：每端 activation 3/3、cleanup 2/2、lifecycle 7/7、SDK 8/8；这不替代原生 UI 用例。
+- 新契约的 macOS observation unit 暴露测试临时目录 `/var` 与 `/private/var` 的别名差异。已通过 job logs API 立即取回失败日志（不等整个 run 结束），修复测试使用 canonical root，产品探针的路径限制不放宽；workflow 新增三端失败也上传该单元日志。该工具修复仍需新 SHA hosted 重跑。
 - 宿主首次启动和预算重启共用 `host/launch.rs`：认证握手后，只对可信 manifest 声明了 `plugin/enable` 的宿主调用启用钩子，并等成功才返回；握手与启用共享一个启动 deadline。未声明钩子的 v1 服务宿主保持兼容；不把 hello 的默认状态改成启用，也不放宽真实 identity 断言。新增 hello 首次启用与重启状态断言，另有拒绝、超时/实际进程回收、无钩子三个 hosted 场景；workflow 明确选择全部场景。本地只编译这些真实进程测试。
 - generation fixture 改为首次启动前仅登记路径，在应用就绪后由 `assert_core_profile_generation` capture 真实 canonical UUID，正常重启后比较同一路径与值；禁止二次 capture 掩盖变化。不创建、不覆盖产品 metadata，独立保存观察 evidence，TC-MODULES-009 保持 24 步与原 checkpoint 索引。
 - 正常重启失败时，在释放 driver 前以独立 3 秒预算保存 WebView screenshot、HTML 和关闭按钮的真实命中层；采证失败不替换原异常。这是为 Windows 旧 hit-test 失败补诊断，不代表问题已修复。

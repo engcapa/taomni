@@ -339,7 +339,18 @@ jobs:
       - name: Plugin protocol unit contracts
         run: cargo test --manifest-path src-tauri/crates/taomni-plugin-api/Cargo.toml --locked
       - name: Native observation unit regressions
-        run: python -m unittest qa_ui_auto.test_core_profile_state test_module_signed_observation test_native_restart_failure
+        shell: bash
+        run: |
+          mkdir -p modular-evidence
+          set -o pipefail
+          python -m unittest qa_ui_auto.test_core_profile_state test_module_signed_observation test_native_restart_failure 2>&1 | tee modular-evidence/native-observation-unit.log
+      - name: Preserve native observation evidence on every platform
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: modular-native-observation-${{ matrix.os }}
+          path: modular-evidence/native-observation-unit.log
+          if-no-files-found: warn
       - name: Core migration, retained RDP, Vault and application lifecycle unit contracts
         if: runner.os == 'Linux'
         shell: bash
