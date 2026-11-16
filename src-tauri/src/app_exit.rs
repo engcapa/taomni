@@ -8,11 +8,18 @@ use std::{
 pub(crate) struct ExitGate {
     active: AtomicBool,
     committed: AtomicBool,
+    exit_allowed: AtomicBool,
 }
 
 impl ExitGate {
     pub(crate) fn is_committed(&self) -> bool {
         self.committed.load(Ordering::Acquire)
+    }
+    pub(crate) fn allow_platform_exit(&self) {
+        self.exit_allowed.store(true, Ordering::Release);
+    }
+    pub(crate) fn platform_exit_allowed(&self) -> bool {
+        self.exit_allowed.load(Ordering::Acquire)
     }
     pub async fn run(
         &self,
@@ -82,6 +89,9 @@ mod tests {
         );
         assert_eq!(*effects.borrow(), ["cleanup", "exit"]);
         assert!(gate.is_committed());
+        assert!(!gate.platform_exit_allowed());
+        gate.allow_platform_exit();
+        assert!(gate.platform_exit_allowed());
         assert!(
             ready(gate.run(async { panic!("duplicate cleanup") }, || panic!(
                 "duplicate exit"

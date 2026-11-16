@@ -18,17 +18,24 @@ pub(crate) async fn request(app: tauri::AppHandle, action: ExitAction) -> Result
                 crate::backup::scheduler::prepare_exit(&app, action == ExitAction::Restart).await;
                 crate::sockscap::prepare_for_exit(&app, app.state::<AppState>()).await?;
                 crate::screenshot::wait_for_recovery_recording().await?;
-                app.state::<ApplicationRuntime>()
-                    .shutdown(&app.state::<AppState>())
-                    .await;
                 Ok(())
             },
             || {
-                crate::webview_recovery::closing_all(&app);
-                match action {
-                    ExitAction::Quit => app.exit(0),
-                    ExitAction::Restart => app.restart(),
-                }
+                // Commit owns teardown independently of the caller's IPC future.
+                // A renderer reload/cancellation cannot reset a partly stopped app.
+                let app = app.clone();
+                tauri::async_runtime::spawn(async move {
+                    app.state::<ApplicationRuntime>()
+                        .shutdown(&app.state::<AppState>())
+                        .await;
+                    crate::webview_recovery::closing_all(&app);
+                    app.state::<crate::app_exit::ExitGate>()
+                        .allow_platform_exit();
+                    match action {
+                        ExitAction::Quit => app.exit(0),
+                        ExitAction::Restart => app.restart(),
+                    }
+                });
             },
         )
         .await
@@ -39,7 +46,14 @@ pub(crate) fn handle_exit_requested(
     code: Option<i32>,
     api: &tauri::ExitRequestApi,
 ) {
-    if app.state::<crate::app_exit::ExitGate>().is_committed() {
+    let Some(gate) = app.try_state::<crate::app_exit::ExitGate>() else {
+        return;
+    };
+    if gate.platform_exit_allowed() {
+        return;
+    }
+    if gate.is_committed() {
+        api.prevent_exit();
         return;
     }
     // Tauri cannot prevent its restart exit code; the backend restart command
