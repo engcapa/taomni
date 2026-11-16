@@ -2,6 +2,7 @@
 import hashlib
 import json
 from contextlib import closing
+import os
 from pathlib import Path
 import sqlite3
 import tempfile
@@ -44,6 +45,18 @@ class ModuleBackupObservationTests(unittest.TestCase):
             result = check_archive(self.artifact(root), root, GENERATION)
             self.assertEqual(result["formatVersion"], 2)
             self.assertEqual(result["dataset"]["slug"], "hello-plugin")
+
+    def test_native_relative_case_directory_is_resolved_before_opening_sqlite_uri(self):
+        # GitHub Windows uses C: for TEMP and D: for checkout. Keep this
+        # fixture on the checkout drive so it represents a relative case path.
+        with tempfile.TemporaryDirectory(prefix=".qa-unit-module-", dir=Path.cwd()) as tmp:
+            root = Path(tmp).resolve()
+            relative = Path(os.path.relpath(root))
+            self.assertFalse(relative.is_absolute())
+            result = check_archive(self.artifact(root), relative, GENERATION)
+            self.assertEqual(result["dataset"]["slug"], "hello-plugin")
+            # The reader must close the connection, including on Windows.
+            (root / "backup-module.sqlite").unlink()
 
     def test_sidecars_changed_bytes_wrong_generation_and_plausible_empty_db_fail(self):
         for options in [{"extra": True}, {"blob": b"changed"}, {"generation": "018f6811-b7b1-7000-8000-000000000003"}, {"marker": "different row"}]:

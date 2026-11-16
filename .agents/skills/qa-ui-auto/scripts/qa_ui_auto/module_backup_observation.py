@@ -92,7 +92,9 @@ def check_archive(path: Path, work: Path, generation: str):
                 raise StepError("Native archive digest/size differs from actual bytes")
         if archive.read(prefix + BLOB) != PAYLOAD:
             raise StepError("Module backup changed opaque business bytes")
-        snapshot = work / (path.stem + "-module.sqlite")
+        # Native case directories are relative to the runner workspace; SQLite
+        # file URIs require an absolute path on every target platform.
+        snapshot = work.resolve(strict=True) / (path.stem + "-module.sqlite")
         snapshot.write_bytes(archive.read(prefix + DATABASE))
     with closing(sqlite3.connect(f"{snapshot.as_uri()}?mode=ro", uri=True)) as database:
         if database.execute("PRAGMA quick_check").fetchone() != ("ok",):
