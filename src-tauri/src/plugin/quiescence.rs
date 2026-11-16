@@ -39,6 +39,56 @@ impl Drop for QuiescenceGuard {
 #[cfg(test)]
 mod tests {
     use super::*;
+    fn registry_with_enabled_metadata(root: &std::path::Path) -> PluginRegistry {
+        let registry = PluginRegistry::new(root);
+        let manifest = serde_json::from_value(serde_json::json!({
+            "id":"taomni-plugin-mfa", "slug":"mfa", "name":"MFA", "version":"1.0.0",
+            "coreApiVersion":"1", "kind":"auth", "status":"stable", "removalCandidate":false,
+            "platforms":[super::super::current_platform()],
+            "entry":{"host":"must-never-be-spawned", "protocol":1},
+            "tabs":[], "commands":["ping"], "permissions":[], "dataDir":"plugins/mfa",
+            "backupPaths":[], "legacyTables":[], "vaultFixedKeys":[], "snapshot":"file"
+        }))
+        .unwrap();
+        registry.records.write().unwrap().insert(
+            "mfa".into(),
+            super::super::PluginRecord {
+                manifest,
+                state: super::super::LifecycleState::Enabled,
+                reason: None,
+            },
+        );
+        registry
+    }
+
+    #[test]
+    fn quiescence_rejects_declared_calls_without_spawning_or_disabling_the_module() {
+        let root = tempfile::tempdir().unwrap();
+        let registry = registry_with_enabled_metadata(root.path());
+        let first = registry.quiesce().unwrap();
+        let second = registry.quiesce().unwrap();
+        for guard in [first, second] {
+            assert!(matches!(
+                registry.invoke("mfa", "ping", serde_json::Value::Null),
+                Err(PluginError::HostUnavailable(_))
+            ));
+            assert!(registry.hosts.lock().unwrap().is_empty());
+            assert!(registry.pending_requests.lock().unwrap().is_empty());
+            drop(guard);
+        }
+        // Caller cancellation leaves metadata enabled and accepts fresh calls
+        // into the normal allowlist; it does not replay the cancelled operation.
+        assert_eq!(
+            registry.get("mfa").unwrap().state,
+            super::super::LifecycleState::Enabled
+        );
+        assert!(matches!(
+            registry.invoke("mfa", "unknown", serde_json::Value::Null),
+            Err(PluginError::CommandDenied { .. })
+        ));
+        assert!(registry.hosts.lock().unwrap().is_empty());
+    }
+
     #[test]
     fn nested_or_cancelled_mutations_resume_without_permanent_shutdown() {
         let root = tempfile::tempdir().unwrap();
