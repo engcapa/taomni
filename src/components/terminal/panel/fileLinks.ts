@@ -6,8 +6,6 @@ import { effectiveFileType, sftpStat } from "../../../lib/sftp";
 import { getLocale } from "../../../lib/i18n";
 import { getAppPlatform } from "../../../lib/runtime";
 import { normalizeLocalStartCwd } from "../../../lib/terminalCwd";
-import { documentPathKey } from "../../../lib/openFile/pathIdentity";
-import { useAppStore } from "../../../stores/appStore";
 import type { TerminalSessionLifecycleContext } from "./sessionContracts";
 
 /** xterm provider lifetime follows its terminal, not the current visible tab. */
@@ -45,29 +43,9 @@ export function installTerminalFileLinks(term: Terminal, context: TerminalSessio
           void (async () => {
             if (effectiveFileType(await sftpStat("", path, "local")) === "dir") return;
             const workspaceId = fileOpenWorkspaceForTab(context.tabId);
-            const opened = await openFile({ path }, { context: "terminal-link", workspaceId, line: link.line });
-            // xterm may restore the terminal tab after the async link handler
-            // completes. Re-assert the main viewer on later tasks as well as
-            // the immediate activation performed by openFile, so a repeated
-            // link click cannot leave an existing viewer hidden behind its
-            // source terminal.
-            if (!workspaceId) {
-              const key = documentPathKey(path);
-              const activate = () => {
-                const app = useAppStore.getState();
-                const id = typeof opened === "string" && app.tabs.some((tab) => tab.id === opened && tab.type === "file-viewer")
-                  ? opened
-                  : app.tabs.find((tab) => tab.type === "file-viewer" && tab.fileViewer && documentPathKey(tab.fileViewer.path) === key)?.id;
-                if (!id) return;
-                app.setActiveSideTab("sessions");
-                app.setActiveTab(id);
-              };
-              activate();
-              window.setTimeout(activate, 50);
-              window.setTimeout(activate, 250);
-              window.setTimeout(activate, 1000);
-              window.setTimeout(activate, 3000);
-            }
+            // The shared opening service owns identity and activation. Later
+            // retries would override a user's subsequent tab selection.
+            await openFile({ path }, { context: "terminal-link", workspaceId, line: link.line });
           })().catch((error) => context.setStatusMessage(error instanceof Error ? error.message : String(error)));
         },
       }));

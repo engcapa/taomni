@@ -15697,4 +15697,4 @@ TC-FILE-OPEN-001..006 是可执行行为用例并纳入 crash-regression；当�
 | AC-16/17/20 | TC-FILE-OPEN-009 native | loopback origin/proxy 独立日志；app/custom/none、代理失败不回落、取消停止、越界与符号链接拒绝 | 不以 browser stub 认证 native 网络 |
 | AC-16/17/22 | TC-FILE-OPEN-010 browser/native | 真实 iframe 目标指针；脚本禁用、外链父页面确认/取消、伪造 token/消息拒绝、焦点恢复 | macOS opaque frame 需 OS Accessibility/CoreGraphics 权限，拒绝时失败不伪证 |
 
-| AC-18 | TC-FILE-OPEN-011 native | 本地真实 PTY 输出路径 → Ctrl/Cmd+点击 → 正确文本/只一标签/磁盘不变；关闭查看器后 shell 独立锚定输出仍工作 | 不以 browser stub 或 handler 调用代替；hosted执行待证据 |
+| AC-18 | TC-FILE-OPEN-011 native | 本地真实 PTY 输出路径 → Ctrl/Cmd+点击 → 正确文本/只一标签/磁盘不变；手动切回终端超过 3 秒仍保持选中，重复打开去重，关闭查看器后 shell 独立锚定输出仍工作 | 不以 browser stub 或 handler 调用代替；hosted执行待证据 |

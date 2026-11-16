@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { openFile } from "./index";
 import { useAppStore } from "../../stores/appStore";
 import { useWorkspacePlatformStore, DEFAULT_WORKSPACE_ID } from "../../stores/workspacePlatformStore";
@@ -16,12 +16,26 @@ beforeEach(() => {
   useDocumentStore.setState({ documents: {}, closeRequest: undefined });
   vi.mocked(explorerCanonicalPath).mockImplementation(async (path) => path);
 });
+afterEach(() => vi.useRealTimers());
 describe("global open file routing", () => {
   it("deduplicates racing alias paths and activates the main viewer", async () => {
     vi.mocked(explorerCanonicalPath).mockResolvedValue("/real/document.md");
     const ids = await Promise.all([openFile({ path: "/alias/a.md" }, { context: "explorer" }), openFile({ path: "/real/document.md" }, { context: "mail" })]);
     expect(ids[0]).toBe(ids[1]); expect(useAppStore.getState().tabs).toHaveLength(1);
     expect(useAppStore.getState().activeSideTab).toBe("sessions");
+  });
+  it("deduplicates repeated terminal links without overriding later tab navigation", async () => {
+    vi.useFakeTimers();
+    useAppStore.setState({ tabs: [{ id: "terminal", type: "terminal", title: "Shell", closable: true }], activeTabId: "terminal" });
+    const first = await openFile("/docs/a.txt", { context: "terminal-link" });
+    useAppStore.getState().setActiveTab("terminal");
+    const second = await openFile("/docs/a.txt", { context: "terminal-link" });
+    expect(second).toBe(first);
+    expect(useAppStore.getState().activeTabId).toBe(first);
+    expect(useAppStore.getState().tabs).toHaveLength(2);
+    useAppStore.getState().setActiveTab("terminal");
+    await vi.runAllTimersAsync();
+    expect(useAppStore.getState().activeTabId).toBe("terminal");
   });
   it("keeps workspace scope distinct without creating two document keys", async () => {
     const main = await openFile({ path: "/docs/a.txt" }, { context: "explorer" });
