@@ -9,6 +9,7 @@ import json
 import os
 import sys
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -47,6 +48,11 @@ def scripted_reply(prompt):
         # Deliberately reuse model proposal IDs across repair rounds. The app
         # must distinguish proposal instances and never return an old write.
         return dict(id=name, kind="write_file", title="Write " + name, payload=dict(path=name, content=content))
+    if "QA_FEED_FOLLOWING" in prompt:
+        return "## Streamed document\n\n" + "\n\n".join(
+            f"Paragraph {index}: Read the complete streamed document, including its delayed layout and final result."
+            for index in range(1, 15)
+        ) + "\n\n| Expression | Result |\n| --- | --- |\n| 2 + 3 | 5 |\n\n```python\nprint(5)\n```\n\nQA_FEED_COMPLETE"
     if "QA_ACTION_NESTED_FENCES" in prompt:
         actions = [file("README.md", NESTED_README), file("status.txt", "Ready\n")]
     elif "QA_ACTION_CONTROLS\n" in prompt:
@@ -102,6 +108,10 @@ def setup(ctx):
             frames = [dict(choices=[dict(index=0, delta=dict(role="assistant", reasoning_content="Review actual results and propose the next step."), finish_reason=None)]),
                       dict(choices=[dict(index=0, delta=dict(tool_calls=calls) if calls else dict(content=text), finish_reason=None)]),
                       dict(choices=[dict(index=0, delta={}, finish_reason="tool_calls" if calls else "stop")], usage=dict(prompt_tokens=100, completion_tokens=50))]
+            streaming_document = "QA_FEED_FOLLOWING" in prompt
+            if streaming_document:
+                frames[1:2] = [dict(choices=[dict(index=0, delta=dict(content=text[start:start + 48]), finish_reason=None)])
+                               for start in range(0, len(text), 48)]
             for marker in ("QA_OUTPUT_LIMIT_THINKING", "QA_OUTPUT_LIMIT_ACTION"):
                 if marker not in prompt:
                     continue
@@ -116,6 +126,9 @@ def setup(ctx):
             try:
                 for frame in frames:
                     self.wfile.write(("data: " + json.dumps(frame) + "\n\n").encode())
+                    if streaming_document:
+                        self.wfile.flush()
+                        time.sleep(.035)
                 self.wfile.write(b"data: [DONE]\n\n")
                 self.wfile.flush()
             except (BrokenPipeError, ConnectionResetError):

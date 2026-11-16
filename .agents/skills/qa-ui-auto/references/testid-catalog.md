@@ -3552,6 +3552,11 @@
 - `[data-testid="tao-home-open-settings"]` — interactive — F1.11.tao-home-open-settings
 - `#tao-settings-heading` — display — F1.11.tao-settings-heading
 - `[data-testid="tao-home-composer"]` — display — F1.11.tao-home-composer
+- `[data-testid="tao-home-feed"]` — display — F1.11.tao-home-feed
+- `[data-testid="tao-home-markdown-reply"]` — display [optional] — F1.11.tao-home-markdown-reply
+  ↳ `.tao-home-message.assistant:nth-child(4) .tao-home-message-markdown` — alias
+- `[data-testid="tao-home-markdown-reply"] h2` — display [optional] — F1.11.tao-home-markdown-heading
+- `[data-testid="tao-home-message-user"]` — display [optional] — F1.11.tao-home-message-user
 - `[data-testid="tao-home-composer-input"]` — interactive — F1.11.tao-home-composer-input
 - `[data-testid="tao-home-binding-bar"]` — display — F1.11.tao-home-binding-bar
 - `[data-testid="tao-home-dock-row"]` — display — F1.11.tao-home-dock-row

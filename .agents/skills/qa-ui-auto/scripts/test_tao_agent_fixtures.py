@@ -145,6 +145,29 @@ class AgentFixtureTests(unittest.TestCase):
             self.assertEqual(frames[-1]["result"]["stopReason"], "end_turn")
             self.assertEqual(json.loads(log.read_text()), dict(received=True, hasGoal=True, hasHistory=True, hasUnsavedDraft=False))
 
+    def test_document_fixture_serves_multiple_actual_sse_content_chunks(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp).resolve()
+            ctx = self.context(root)
+            with patch.dict(os.environ, native_isolation_env(root), clear=True):
+                tao_agent.setup(ctx)
+            try:
+                config = json.loads(Path(ctx.values["tao_real_provider_config"]).read_text())
+                url = config["llm"]["providers"]["opencode-go"]["base_url"] + "/chat/completions"
+                body = dict(model="deepseek-v4.1-flash", messages=[dict(role="user", content="QA_FEED_FOLLOWING")])
+                req = Request(url, data=json.dumps(body).encode(), headers={"Content-Type": "application/json"})
+                with build_opener(ProxyHandler({})).open(req, timeout=5) as response:
+                    frames = [json.loads(line[6:]) for line in response.read().decode().splitlines()
+                              if line.startswith("data: ") and line != "data: [DONE]"]
+                chunks = [frame["choices"][0]["delta"]["content"] for frame in frames
+                          if "content" in frame["choices"][0]["delta"]]
+                self.assertGreater(len(chunks), 20)
+                self.assertEqual("".join(chunks), tao_agent.scripted_reply("QA_FEED_FOLLOWING"))
+                self.assertTrue("".join(chunks).endswith("QA_FEED_COMPLETE"))
+                self.assertEqual(frames[-1]["choices"][0]["finish_reason"], "stop")
+            finally:
+                tao_agent.teardown(ctx)
+
 
 if __name__ == "__main__":
     unittest.main()

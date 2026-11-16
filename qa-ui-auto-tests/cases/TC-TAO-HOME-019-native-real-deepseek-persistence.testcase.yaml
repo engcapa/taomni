@@ -35,7 +35,11 @@ steps:
 - observe_tao_provider: null
 - tao_real_provider_expanded:
     scenario: persistence-prepare
-- native_restart_app: null
+- native_restart_app:
+    expect_exit_confirmation:
+      title: Exit
+      message: There is 1 open tab. Exit Taomni and close it?
+      confirm_label: Exit
 - wait_for: '[data-testid="vault-unlock-dialog"]'
 - fill:
     selector: '[data-testid="vault-unlock-pw"]'

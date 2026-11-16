@@ -1,0 +1,89 @@
+id: TC-TAO-HOME-042
+title: Native streamed Markdown follows the reply tail and resumes after reading earlier content
+description: Actual native Go SSE delivers a long document in delayed chunks. Check the final paragraph stays above
+  the composer, read an earlier heading, and send another long question to re-enable following without a manual scroll.
+modes: [native]
+covers: [F1.11]
+tags: [p0, tao-home, native, regression]
+fixtures: [reset_db, tao_agent]
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-tao-home-042-following
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- wait_for: '[data-testid="tao-home-composer-input"]:enabled'
+- fill:
+    selector: '[data-testid="tao-home-composer-input"]'
+    value: |
+      QA_FEED_FOLLOWING first document
+      Include all the following acceptance points in the conversation:
+      1. A useful heading and a readable paragraph.
+      2. A table that can finish rendering after earlier text.
+      3. Fenced code that changes the document height.
+      4. The final result must remain visible above the composer.
+      5. Reading earlier text must remain possible.
+      6. A new question must restore following.
+- click: '[data-testid="tao-home-send"]'
+- assert_text:
+    selector: '[data-testid="tao-home-markdown-reply"]'
+    contains: QA_FEED_COMPLETE
+- assert_visible: '[data-testid="tao-home-message-regenerate"]'
+- eval_readonly:
+    expression: >-
+      document.querySelector('.tao-home-feed').scrollHeight - document.querySelector('.tao-home-feed').clientHeight - document.querySelector('.tao-home-feed').scrollTop <= 2
+      && document.querySelector('.tao-home-message-markdown p:last-child').getBoundingClientRect().bottom <= document.querySelector('.tao-home-feed').getBoundingClientRect().bottom + 1
+    expect_truthy: true
+    timeout_sec: 5
+- eval_readonly:
+    expression: document.querySelector('.tao-home-feed').scrollTop > 100
+    expect_truthy: true
+    timeout_sec: 5
+- screenshot: native-streamed-document-tail.png
+- click: '[data-testid="tao-home-markdown-reply"] h2'
+- eval_readonly:
+    expression: >-
+      document.querySelector('.tao-home-feed').scrollHeight - document.querySelector('.tao-home-feed').clientHeight - document.querySelector('.tao-home-feed').scrollTop > 100
+    expect_truthy: true
+    timeout_sec: 5
+- fill:
+    selector: '[data-testid="tao-home-composer-input"]'
+    value: QA_FEED_FOLLOWING second document after reading earlier content
+- click: '[data-testid="tao-home-send"]'
+- wait_for: '.tao-home-message.assistant:nth-child(4) .tao-home-message-markdown'
+- assert_count: {selector: '[data-testid="tao-home-markdown-reply"]', equal: 2}
+- assert_text:
+    selector: '[data-testid="tao-home-message-assistant"]:last-child [data-testid="tao-home-markdown-reply"]'
+    contains: QA_FEED_COMPLETE
+- assert_visible: '[data-testid="tao-home-message-assistant"]:last-child [data-testid="tao-home-message-regenerate"]'
+- eval_readonly:
+    expression: >-
+      document.querySelector('.tao-home-feed').scrollHeight - document.querySelector('.tao-home-feed').clientHeight - document.querySelector('.tao-home-feed').scrollTop <= 2
+      && document.querySelectorAll('.tao-home-message-markdown p:last-child')[1].getBoundingClientRect().bottom <= document.querySelector('.tao-home-feed').getBoundingClientRect().bottom + 1
+    expect_truthy: true
+    timeout_sec: 5
+- assert_count: {selector: '[data-testid="tao-home-message-user"]', equal: 2}
+- assert_no_runtime_errors: null
+- screenshot: native-streamed-document-following-resumed.png
+verification:
+  review: reviewed
+  requirements:
+  - id: STREAM-FOLLOWING
+    requirement: Delayed Markdown layout and scroll events keep the final result visible, and a new send resumes following.
+    actions: [1, 2, 3, 4, 5, 6, 7, 13, 15, 16]
+    checkpoints:
+    - {step: 10, expectation: The native document ends within two pixels of the feed bottom and the final paragraph clears the composer.}
+    - {step: 11, expectation: The document genuinely overflows with more than 100 pixels of actual scroll offset.}
+    - {step: 14, expectation: The reader can reveal the earlier heading without being pulled back to the bottom.}
+    - {step: 21, expectation: A second streamed reply follows its final paragraph into the viewport after reading earlier content.}
+    - {step: 22, expectation: Exactly two user messages were sent.}
+    - {step: 23, expectation: No unhandled runtime errors.}
+    results: [10, 11, 14, 21, 22, 23]
+  native:
+  - check: Packaged WebView stream, rendered geometry and native HTTP
+    method: automated
+    reason: The loopback service streams independent chunks through production Go IPC. No scroll position or application state is assigned by the test.
+  visual:
+  - check: Stream tail clears the composer
+    method: manual
+    reason: Retained screenshots support document and surrounding UI review; numeric rectangles establish visibility.

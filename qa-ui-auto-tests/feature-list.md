@@ -229,6 +229,22 @@ controls:
 - id: tao-home-composer
   selector: '[data-testid="tao-home-composer"]'
   kind: display
+- id: tao-home-feed
+  selector: '[data-testid="tao-home-feed"]'
+  kind: display
+- id: tao-home-markdown-reply
+  selector: '[data-testid="tao-home-markdown-reply"]'
+  aliases: ['.tao-home-message.assistant:nth-child(4) .tao-home-message-markdown']
+  kind: display
+  optional: true
+- id: tao-home-markdown-heading
+  selector: '[data-testid="tao-home-markdown-reply"] h2'
+  kind: display
+  optional: true
+- id: tao-home-message-user
+  selector: '[data-testid="tao-home-message-user"]'
+  kind: display
+  optional: true
 - id: tao-home-composer-input
   selector: '[data-testid="tao-home-composer-input"]'
   kind: interactive

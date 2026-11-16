@@ -15,6 +15,7 @@ function Harness({ thread = "first", value = "reply", active = true, user = "que
 describe("chat feed following", () => {
   const frames = new Map<number, FrameRequestCallback>();
   const observers: { notify: () => void; disconnect: ReturnType<typeof vi.fn> }[] = [];
+  const mutations: { notify: () => void; disconnect: ReturnType<typeof vi.fn> }[] = [];
   let next = 0;
   const flush = () => { const pending = [...frames.values()]; frames.clear(); pending.forEach((callback) => callback(0)); };
   const dimensions = (feed: HTMLElement) => {
@@ -28,12 +29,17 @@ describe("chat feed following", () => {
     return (value: number) => { height = value; };
   };
   beforeEach(() => {
-    frames.clear(); observers.length = 0; next = 0;
+    frames.clear(); observers.length = 0; mutations.length = 0; next = 0;
     vi.stubGlobal("requestAnimationFrame", (callback: FrameRequestCallback) => { frames.set(++next, callback); return next; });
     vi.stubGlobal("cancelAnimationFrame", (id: number) => frames.delete(id));
     vi.stubGlobal("ResizeObserver", class {
       disconnect = vi.fn();
       constructor(notify: () => void) { observers.push({ notify, disconnect: this.disconnect }); }
+      observe() {}
+    });
+    vi.stubGlobal("MutationObserver", class {
+      disconnect = vi.fn();
+      constructor(notify: () => void) { mutations.push({ notify, disconnect: this.disconnect }); }
       observe() {}
     });
   });
@@ -73,6 +79,52 @@ describe("chat feed following", () => {
     observers[0].notify();
     flush();
     expect(feed.scrollTop).toBe(1400);
+  });
+
+  it("keeps following when a queued scroll event arrives after the next stream layout grows", () => {
+    const view = render(<Harness />);
+    const feed = screen.getByTestId("feed");
+    const grow = dimensions(feed);
+    flush();
+    expect(feed.scrollTop).toBe(600);
+
+    grow(1400);
+    view.rerender(<Harness value="heading, table and fenced code" />);
+    // WebKit can deliver the previous programmatic scroll after DOM growth,
+    // before the new animation frame. The reader has not moved upwards.
+    fireEvent.scroll(feed);
+    flush();
+    expect(feed.scrollTop).toBe(1000);
+
+    grow(1600);
+    fireEvent.scroll(feed);
+    observers[0].notify();
+    flush();
+    expect(feed.scrollTop).toBe(1200);
+  });
+
+  it("follows asynchronous Markdown DOM updates while preserving a reader's position and cleanup", () => {
+    const view = render(<Harness />);
+    const feed = screen.getByTestId("feed");
+    const grow = dimensions(feed);
+    flush();
+    grow(1400);
+    // The Markdown renderer replaces its DOM after the React scroll frame.
+    mutations[0]?.notify();
+    flush();
+    expect(feed.scrollTop).toBe(1000);
+
+    feed.scrollTop = 80;
+    fireEvent.scroll(feed);
+    grow(1800);
+    mutations[0].notify();
+    flush();
+    expect(feed.scrollTop).toBe(80);
+
+    view.unmount();
+    expect(mutations[0].disconnect).toHaveBeenCalledOnce();
+    mutations[0].notify();
+    expect(frames.size).toBe(0);
   });
 
   it("follows a newly sent question after reading earlier replies, including delayed diagram rendering", () => {
