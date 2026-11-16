@@ -221,6 +221,7 @@ fn restart_gets_new_authenticated_identity_and_rejects_old_transport_operation()
 #[ignore = "real stdio core/SDK gate: GitHub runners only"]
 fn expired_operation_terminates_transport_before_a_late_key_can_be_published() {
     let mut harness = Harness::new(Duration::from_secs(3));
+    let host = harness.process.authorized_host().unwrap().clone();
     let permit = harness.permit(Duration::from_millis(150));
     assert_eq!(
         harness
@@ -231,6 +232,15 @@ fn expired_operation_terminates_transport_before_a_late_key_can_be_published() {
         -32007
     );
     assert_ne!(harness.process.state(), HostState::Running);
+    assert!(harness.process.authorized_host().is_none());
+    harness
+        .process
+        .stop_confirmed(Instant::now() + Duration::from_secs(2))
+        .unwrap();
+    assert!(host.termination_confirmed());
+    assert!(
+        PluginDataLease::try_acquire(&harness.root, &PluginSlug::parse("mfa").unwrap()).is_ok()
+    );
     support::wait_for(
         || VaultOperationLease::try_write(&harness.root).is_ok(),
         "timed out reverse worker releases lease",

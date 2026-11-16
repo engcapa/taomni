@@ -297,7 +297,15 @@ impl HostProcess {
         let response = match result {
             Ok(response) => response,
             Err(error @ (HostProcessError::Cancelled | HostProcessError::Timeout)) => {
-                self.cancel_in_host(&id, &error.to_string());
+                if matches!(error, HostProcessError::Timeout) && self.active_operation.is_some() {
+                    // An expired key operation retires its authenticated
+                    // transport even if the SDK could acknowledge cancel.
+                    // Timer scheduling must not choose whether old key
+                    // authority survives the core-owned deadline.
+                    self.schedule_restart();
+                } else {
+                    self.cancel_in_host(&id, &error.to_string());
+                }
                 return Err(error);
             }
             Err(error) => {
