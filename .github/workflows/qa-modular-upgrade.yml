@@ -19,6 +19,10 @@ on:
         description: Run only the macOS and Windows system host execution experiments
         type: boolean
         default: false
+      protocol_only:
+        description: Run only the three-platform plugin wire and binary descriptor contracts
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       head:
@@ -38,12 +42,16 @@ on:
         type: boolean
         required: false
         default: false
+      protocol_only:
+        type: boolean
+        required: false
+        default: false
 
 permissions:
   contents: read
 
 concurrency:
-  group: modular-upgrade-${{ github.ref }}-${{ inputs.system_execution_only && 'system-execution' || (inputs.network_only && 'network' || (inputs.download_only || false)) }}
+  group: modular-upgrade-${{ github.ref }}-${{ inputs.protocol_only && 'protocol' || (inputs.system_execution_only && 'system-execution' || (inputs.network_only && 'network' || (inputs.download_only || false))) }}
   cancel-in-progress: true
 
 env:
@@ -53,21 +61,27 @@ env:
   PYTHONUNBUFFERED: '1'
 
 jobs:
+  protocol-contracts:
+    if: ${{ inputs.protocol_only }}
+    uses: ./.github/workflows/qa-modular-protocol.yml
+    with:
+      head: ${{ inputs.head || github.sha }}
+
   system-execution:
-    if: ${{ inputs.system_execution_only }}
+    if: ${{ !inputs.protocol_only && inputs.system_execution_only }}
     uses: ./.github/workflows/qa-modular-plugin-host.yml
     with:
       head: ${{ inputs.head || github.sha }}
       system_execution_only: true
 
   download-contracts:
-    if: ${{ !inputs.system_execution_only }}
+    if: ${{ !inputs.protocol_only && !inputs.system_execution_only }}
     uses: ./.github/workflows/qa-modular-download.yml
     with:
       head: ${{ inputs.head || github.sha }}
 
   signed-mfa-install:
-    if: ${{ !inputs.system_execution_only && (inputs.network_only || !inputs.download_only) }}
+    if: ${{ !inputs.protocol_only && !inputs.system_execution_only && (inputs.network_only || !inputs.download_only) }}
     uses: ./.github/workflows/qa-modular-mfa-install.yml
     with:
       head: ${{ inputs.head || github.sha }}
@@ -75,7 +89,7 @@ jobs:
     secrets: inherit
 
   mfa-engine-contracts:
-    if: ${{ !inputs.system_execution_only && !inputs.download_only && !inputs.network_only }}
+    if: ${{ !inputs.protocol_only && !inputs.system_execution_only && !inputs.download_only && !inputs.network_only }}
     name: MFA engine and host (${{ matrix.target }})
     strategy:
       fail-fast: false
@@ -131,7 +145,7 @@ jobs:
           if-no-files-found: error
 
   vault-foundations:
-    if: ${{ !inputs.system_execution_only && !inputs.download_only && !inputs.network_only }}
+    if: ${{ !inputs.protocol_only && !inputs.system_execution_only && !inputs.download_only && !inputs.network_only }}
     name: Vault foundations (${{ matrix.os }})
     strategy:
       fail-fast: false
@@ -169,7 +183,7 @@ jobs:
           if-no-files-found: error
 
   host-lifecycle:
-    if: ${{ !inputs.system_execution_only && !inputs.download_only && !inputs.network_only }}
+    if: ${{ !inputs.protocol_only && !inputs.system_execution_only && !inputs.download_only && !inputs.network_only }}
     name: Real host lifecycle (${{ matrix.os }})
     strategy:
       fail-fast: false
@@ -236,7 +250,7 @@ jobs:
           if-no-files-found: error
 
   capture-contracts:
-    if: ${{ !inputs.system_execution_only && !inputs.download_only && !inputs.network_only }}
+    if: ${{ !inputs.protocol_only && !inputs.system_execution_only && !inputs.download_only && !inputs.network_only }}
     name: Capture contracts (${{ matrix.target }})
     strategy:
       fail-fast: false
@@ -299,7 +313,7 @@ jobs:
           if-no-files-found: error
 
   rdp-shared-check:
-    if: ${{ !inputs.system_execution_only && !inputs.download_only && !inputs.network_only }}
+    if: ${{ !inputs.protocol_only && !inputs.system_execution_only && !inputs.download_only && !inputs.network_only }}
     name: Shared RDP check (${{ matrix.target }})
     strategy:
       fail-fast: false
@@ -343,7 +357,7 @@ jobs:
           if-no-files-found: error
 
   rdp-shared-unit:
-    if: ${{ !inputs.system_execution_only && !inputs.download_only && !inputs.network_only }}
+    if: ${{ !inputs.protocol_only && !inputs.system_execution_only && !inputs.download_only && !inputs.network_only }}
     name: Shared RDP units (${{ matrix.os }})
     strategy:
       fail-fast: false
@@ -402,7 +416,7 @@ jobs:
           if-no-files-found: error
 
   upgrade-contracts:
-    if: ${{ !inputs.system_execution_only && !inputs.download_only && !inputs.network_only }}
+    if: ${{ !inputs.protocol_only && !inputs.system_execution_only && !inputs.download_only && !inputs.network_only }}
     name: Upgrade contracts (${{ matrix.os }})
     strategy:
       fail-fast: false

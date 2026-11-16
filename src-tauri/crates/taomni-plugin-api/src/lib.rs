@@ -9,6 +9,8 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+mod binary_ref;
+pub use binary_ref::BinaryRef;
 mod metadata;
 pub mod services;
 pub use metadata::PluginKind;
@@ -439,37 +441,8 @@ impl PluginEvent {
     }
 }
 
-/// Reference to a high-bandwidth payload transferred over the authenticated
-/// loopback WebSocket. The JSON-RPC response only carries this small descriptor.
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct BinaryRef {
-    pub stream_url: String,
-    pub token: String,
-    pub content_type: String,
-    pub byte_len: u64,
-    pub sha256: String,
-}
-
-impl BinaryRef {
-    pub fn validate(&self) -> Result<(), RpcError> {
-        if !self.stream_url.starts_with("ws://127.0.0.1:")
-            && !self.stream_url.starts_with("wss://127.0.0.1:")
-        {
-            return Err(RpcError::new(
-                ErrorCode::InvalidParams,
-                "Binary stream must use the loopback WebSocket",
-            ));
-        }
-        if self.token.is_empty() || self.sha256.len() != 64 {
-            return Err(RpcError::new(
-                ErrorCode::InvalidParams,
-                "Binary stream token and SHA-256 are required",
-            ));
-        }
-        Ok(())
-    }
-}
-
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod binary_ref_tests;

@@ -104,4 +104,20 @@ SmartScreen reputation measurement. Those boundaries stay `unverified` in
 the receipt even when both scenarios pass. No new product UI is introduced;
 the retained UI coverage is TC-MODULES-007/016/022 plus the complete crash
 suite. Local tool unit tests mock every process; real Windows execution is
-restricted to disposable GitHub runners and is pending for this source.
+restricted to disposable GitHub runners; source-specific results follow below.
+
+Hosted run [#43978651360](https://github.com/engcapa/taomni/actions/runs/43978651360),
+source `237e35f5f31db0aa392c8a92fea820d2e6b8ca30`, passed both Windows
+scenarios on Windows build `10.0.26100` AMD64. All three executables were
+actually `NotSigned`; both hosts retained the exact Internet-zone ADS and
+original hash after execution. The runner reported Defender's service and
+antivirus enabled, but real-time, behavior and IOAV protection **disabled**
+both before and after; the three observed SmartScreen registry values were
+unavailable. This is therefore not evidence of execution under active
+real-time protection or SmartScreen policy. No protection setting was changed.
+The same source's two macOS Intel scenarios also passed with ad-hoc hardened
+runtime and read-back quarantine; `spctl` again returned **3 / rejected**.
+
+Both completed artifacts were downloaded during execution into
+`qa-ui-auto-report/github/43978651360/live-contracts/`. G1/G3 distribution and
+full release-package boundaries remain open.

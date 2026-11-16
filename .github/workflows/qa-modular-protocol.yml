@@ -1,0 +1,47 @@
+name: QA Modular Protocol Contracts
+
+on:
+  workflow_call:
+    inputs:
+      head:
+        type: string
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  protocol:
+    name: Plugin wire contracts (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: modular-protocol-${{ runner.os }}-${{ runner.arch }}
+      - name: Verify the current-source API and binary descriptor wire contracts
+        run: |
+          mkdir -p modular-protocol-evidence
+          git rev-parse HEAD > modular-protocol-evidence/source-sha.txt
+          rustc --version > modular-protocol-evidence/rustc-version.txt
+          set -o pipefail
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-api --locked 2>&1 | tee modular-protocol-evidence/protocol-unit.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: modular-protocol-${{ runner.os }}-${{ runner.arch }}
+          path: modular-protocol-evidence
+          if-no-files-found: error
