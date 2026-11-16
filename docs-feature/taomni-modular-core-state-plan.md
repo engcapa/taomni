@@ -138,3 +138,36 @@ Hosted GitHub only:
 - Fetch each completed shard's case/report/log artifact while other shards are still running. Attribute failures against changed behavior, fix relevant cases/code and rerun; record unrelated failures separately as user-authorized ignores. Do not wait for the summary job to inspect failures.
 
 Review evidence labels must distinguish 005-A structural/lifecycle completion from 005-B plugin-state migration and G1–G11 gates. No claim of full TASK-005 / core-only purity until all required work passes or an authorized DEC-2 exception is recorded.
+
+### Local evidence snapshot (2026-11-16)
+
+The final Rust unit harness was rebuilt successfully by `cargo test --manifest-path src-tauri/Cargo.toml --lib runtime::paths::tests --locked` at source commit `e9b65d99b2a879eb00a8362db6725d83bd1f5097`. All sources were stable before that compilation. The same harness then ran the following exact filter union serially, without recompiling or launching an application, host, network fixture, browser, or native session:
+
+| Rust unit filter | Passed | Behavior established |
+| --- | ---: | --- |
+| `app_exit::tests` | 3 | Prepare ordering, once-only commit, cleanup failure/retry, concurrent attempts and cancellation before commit. |
+| `runtime::bootstrap::tests` | 3 | Lazy optional data and mail owner identity; desktop/headless core schema and profile lease lifetime; startup failure releases mode/profile ownership. The fixture also verifies unchanged LanChat bytes. |
+| `runtime::paths::tests` | 1 | Explicit plugin root independent of mail-cache location. |
+| `runtime::tasks::tests` | 1 | Owned work cancels and joins, shutdown is repeatable, and late work is refused. |
+| `runtime::reaper::tests` | 1 | Active turns survive the idle-window predicate. |
+| `terminal::observation::tests` | 2 | Weak registrations do not retain the feature runtime; callbacks run outside the observer-registry lock. |
+| `plugin::quiescence::tests` | 3 | Declared calls are refused without starting/disabling the module; nested/cancelled mutations recover acceptance; a dropped guard cannot undo permanent shutdown. |
+| `backup::scheduler::tests` | 4 | Cancelled exit-backup retries do not rerun a completed backup; due schedules, enabled frequencies and clock rollback retain their behavior. |
+
+Result: **18 passed, 0 failed, 0 ignored**, 2,170 unrelated tests filtered out. The local raw log is `/tmp/taomni-005a-final-unit.log`; `/tmp/taomni-005a-final-unit.json` records the exact filters, source commit and harness SHA-256 `27cdb67a98db2174d12974288445ab685ad7899605ceb1601528c06872488912`. These temporary files are local supporting evidence, not hosted execution receipts or release artifacts.
+
+Other completed checks:
+
+| Check | Result |
+| --- | --- |
+| `src/lib/updateService.test.ts` | 8 passed. |
+| Focused existing MainLayout exit tests | 3 passed: application menu exit, cleanup failure/retry, and titlebar close. Other tests were deliberately filtered. |
+| Modular boundary script unit tests | 7 passed. |
+| `pnpm exec tsc -b --pretty false` | Passed. |
+| `pnpm check:refactor` | Passed: 800 native commands, 274 facade exports and 29 literal events preserved; module boundaries and source sizes pass. |
+| `cargo fmt --manifest-path src-tauri/Cargo.toml -- --check` | Passed after the cancellation fix. |
+| QA catalog audit `--gate` and exact selection plan for `TC-MODULES-008`/`009` | Passed. These are static catalog/selection checks, not executed case evidence. |
+
+The earlier production `cargo check --lib --locked` passed before the final cancellation fix; the final Rust test-harness compilation above covers that fix. This snapshot does not cover later root-branch service/admission/download integration.
+
+The committed teardown handoff is synchronous before `ExitGate::run` returns, but the current pure tests do not directly hold teardown pending after commit, drop its IPC caller, and assert continued cleanup or repeated native-exit prevention. Those remain explicit acceptance gaps alongside the pending hosted cases, crash-regression, real host/service, restore and old-monolith upgrade evidence. 005-A and complete TASK-005 therefore remain **in progress**.
