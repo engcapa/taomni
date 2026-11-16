@@ -10,6 +10,14 @@
 
 签名安装门、宿主生产监督、共享采集/RDP 公共库、CoreState/统一 bootstrap、正常退出与可逆静默已集成。生产工厂、scoped 入口和持久 profile generation 已在 `00ac480d8` 接入，其 macOS 崩溃宿主终止确认失败已由 `5d49b9abc` 修复；该新源码的升级契约 [#43793976461](https://github.com/engcapa/taomni/actions/runs/43793976461) 已 23/23 jobs 成功。相同新源码的 UI [#43794006016](https://github.com/engcapa/taomni/actions/runs/43794006016) 仍在执行，已即时收齐三端 browser 各 24/24；Windows/macOS native 各 27/29，相关失败为 TC-MODULES-007 宿主未启用与 TC-MODULES-009 fixture 过早读取 metadata，Linux native 尚在构建。业务状态仍在 LegacyFeatureRuntime；Vault IPC 协同、远端商店、重启下载恢复、业务宿主迁出与真实升级尚未完成。G1–G11 未通过前，不将具体业务插件迁移标为完成。
 
+## 2026-11-16 最新 runner 证据（持续采集中）
+
+- 源码 `064a12662` 的[升级契约 #43801588646](https://github.com/engcapa/taomni/actions/runs/43801588646) 已 **23/23 jobs 成功**。三端 observation 各 8 项通过，确认 canonical 临时目录修复；artifacts 在执行期间下载至 `qa-ui-auto-report/github/43801588646/live-contracts/`。该 run 不含当前工作区未提交的 Vault/MFA 协调器开发。
+- 源码 `911f411b2` 的[UI #43800287415](https://github.com/engcapa/taomni/actions/runs/43800287415) 仍在运行。已即时收齐三端 browser 各 24/24；Linux Xvfb native 28/29，Wayland 26/29，两种 Linux 的 TC-MODULES-009 均通过。TC-MODULES-007 已通过首次启用、禁用/再启用与 Settings 重开，在第一次正常重启时触发仍打开的一个 Settings tab 所需退出确认；macOS 已完成的对应 shard 也是同一步失败。
+- TC-MODULES-007 的失败前 HTML 与 restart receipt 已核验：标题 `Exit`、消息 `There is 1 open tab. Exit Taomni and close it?`、确认按钮 `Exit`。用例仅在已知 Settings 仍打开的首次和卸载后重启声明精确确认，沿用现有单次真实点击、正常退出与进程身份检查；不允许通用弹窗兜底或强杀当作成功。该 case 修复尚待新 SHA hosted 重跑。
+- Wayland 的 FILE-OPEN-008 跨行路径命中和 FILE-OPEN-006 非左键输入仅支持 X11 的两个既有失败继续按 main 对比依据单列，不计通过。Windows/macOS 尚未完成的 shard 不外推为通过。
+- 当前 Vault/MFA 开发开始接入真实 core operation permit、revision 校验、可重试撤销和显式 reset 屏障；其它核心 Vault 消费者、统一 snapshot/restore 和业务宿主迁出仍未闭合，不把这一开发状态记为 TASK-025-D/E 已完成。
+
 ## 任务状态
 
 | 任务 | 状态 | 尚需交付的结果 |

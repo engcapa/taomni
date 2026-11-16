@@ -4,7 +4,9 @@ description: >-
   Install the current-source official hello package through Settings, using the
   unmodified production pinned public key. Verify the native registry version,
   inactive invoke rejection before enabling, real host ping after enabling,
-  disable/enable, Settings reopening and graceful app restart.
+  disable/enable, Settings reopening and graceful app restart. When Settings
+  remains open, approve only the exact one-tab Exit confirmation; verify the
+  normal process shutdown before creating another native session.
   Change only the isolated signed frontend externally and restart: the real
   startup verifier must disable it. Restore the original signed bytes, restart,
   then uninstall through Settings and prove another restart cannot resurrect it.
@@ -55,7 +57,11 @@ steps:
     value: module store
 - wait_for: '[data-testid="module-action-disable-hello-plugin"]'
 - module_signed_probe: {phase: enabled}
-- native_restart_app: null
+- native_restart_app:
+    expect_exit_confirmation:
+      title: Exit
+      message: There is 1 open tab. Exit Taomni and close it?
+      confirm_label: Exit
 - wait_for: '[data-testid="status-bar"]'
 - module_signed_probe: {phase: enabled}
 - module_signed_probe: {phase: tamper-frontend}
@@ -76,7 +82,11 @@ steps:
 - click: '[data-testid="module-action-uninstall-hello-plugin"]'
 - wait_for: '[data-testid="module-action-install-hello-plugin"]'
 - module_signed_probe: {phase: uninstalled}
-- native_restart_app: null
+- native_restart_app:
+    expect_exit_confirmation:
+      title: Exit
+      message: There is 1 open tab. Exit Taomni and close it?
+      confirm_label: Exit
 - wait_for: '[data-testid="status-bar"]'
 - module_signed_probe: {phase: uninstalled}
 - assert_no_runtime_errors: null
@@ -108,7 +118,7 @@ verification:
     - step: 28
       expectation: Reopened Settings retains the actual enabled module.
     - step: 31
-      expectation: A new native app process revalidates retained signed bytes and invokes the expected host.
+      expectation: The exact one-tab Exit confirmation is accepted once, normal shutdown completes, and a new native process revalidates retained signed bytes and invokes the expected host.
     results: [18, 21, 28, 31]
   - id: R3
     requirement: Installed frontend tampering fails startup trust, and restoring exact signed bytes permits safe recovery.
@@ -126,7 +136,7 @@ verification:
     - step: 47
       expectation: Native registry is uninstalled, activeVersion is null, and invocation rejects with InvalidState.
     - step: 50
-      expectation: The same uninstalled state persists in a newly started native process.
+      expectation: After the exact one-tab Exit confirmation and normal shutdown, the same uninstalled state persists in a newly started native process.
     - step: 51
       expectation: Installation, lifecycle, recovery and uninstall produce no unhandled renderer error.
     results: [47, 50, 51]
