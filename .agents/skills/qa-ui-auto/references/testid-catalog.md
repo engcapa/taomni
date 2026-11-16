@@ -2485,6 +2485,23 @@
 
 ## modules/core-startup (F-Modules-1)
 
+- `[data-testid="module-marketplace"]` — display — F-Modules-1.module-marketplace
+- `[data-testid="module-marketplace-search"]` — interactive — F-Modules-1.module-marketplace-search
+- `[data-testid="module-marketplace-refresh"]` — interactive — F-Modules-1.module-marketplace-refresh
+- `[data-testid="module-marketplace-source-toggle"]` — interactive — F-Modules-1.module-marketplace-source-toggle
+- `[data-testid="module-marketplace-source"]` — interactive — F-Modules-1.module-marketplace-source
+- `[data-testid="module-marketplace-loading"]` — display [optional] — F-Modules-1.module-marketplace-loading
+- `[data-testid="module-marketplace-error"]` — display — F-Modules-1.module-marketplace-error
+- `[data-testid="module-marketplace-checked"]` — display — F-Modules-1.module-marketplace-checked
+- `[data-testid="module-marketplace-empty"]` — display — F-Modules-1.module-marketplace-empty
+- `[data-testid="module-marketplace-card"]` — display — F-Modules-1.module-marketplace-card
+- `[data-testid="module-marketplace-installed"]` — display — F-Modules-1.module-marketplace-installed
+- `[data-testid="module-marketplace-unavailable"]` — display [optional] — F-Modules-1.module-marketplace-unavailable
+- `[data-testid="module-marketplace-task"]` — display — F-Modules-1.module-marketplace-task
+- `[data-testid="module-marketplace-action-error"]` — display [optional] — F-Modules-1.module-marketplace-action-error
+- `[data-testid="module-marketplace-current"]` — display — F-Modules-1.module-marketplace-current
+- `[data-testid="module-marketplace-review"]` — interactive — F-Modules-1.module-marketplace-review
+- `[data-testid="module-marketplace-download"]` — interactive — F-Modules-1.module-marketplace-download
 - `[data-testid="module-network-settings"]` — display — F-Modules-1.module-network-settings
 - `[data-testid="module-network-mode"]` — interactive — F-Modules-1.module-network-mode
 - `[data-testid="module-network-custom"]` — display — F-Modules-1.module-network-custom

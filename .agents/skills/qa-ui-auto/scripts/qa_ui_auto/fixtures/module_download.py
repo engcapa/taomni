@@ -34,7 +34,11 @@ def range_offset(value, size):
 
 
 def plugin_root(ctx):
-    isolation = native_isolation_env(Path(ctx.report_root))
+    owner = getattr(ctx, "fixture_context", None) or ctx
+    report_root = getattr(owner, "report_root", None)
+    if report_root is None:
+        raise StepError("Module download observation requires its run-owned fixture context")
+    isolation = native_isolation_env(Path(report_root))
     if any(os.environ.get(key) != value for key, value in isolation.items()):
         raise StepError("Module download case requires its verified isolated QA profile")
     data = Path(isolation.get("NEWMOB_DATA_DIR") or isolation["XDG_DATA_HOME"]) / QA_APP_ID

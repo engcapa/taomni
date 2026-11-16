@@ -10,6 +10,7 @@ mod frontend;
 pub mod host;
 pub mod install;
 mod installation;
+pub(crate) mod marketplace;
 pub mod migration;
 pub(crate) mod network;
 pub mod protocol;

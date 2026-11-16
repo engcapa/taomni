@@ -107,3 +107,20 @@ test("rejects a missing package signature", (t) => {
   assert.throws(() => composeModulesManifest({ artifactsDir: f.artifacts, outputDir: f.output, tag: "v0.6.0", repository: "engcapa/taomni" }), /Missing plugin signature/);
 });
 
+test("publishes reviewed category and sorted permissions consistently across platforms", (t) => {
+  const f = fixture(t);
+  f.add("linux-x86_64", "linux", moduleManifest({ permissions: ["window.open", "capture.screen"] }));
+  f.add("windows-x86_64", "windows", moduleManifest({ permissions: ["capture.screen", "window.open"] }));
+  const result = composeModulesManifest({ artifactsDir: f.artifacts, outputDir: f.output, tag: "v0.6.0", repository: "engcapa/taomni" });
+  assert.equal(result.manifest.plugins["taomni-plugin-hello"].kind, "media");
+  assert.deepEqual(result.manifest.plugins["taomni-plugin-hello"].permissions, ["capture.screen", "window.open"]);
+  assert.deepEqual(JSON.parse(readFileSync(join(f.output, "modules.json"), "utf8")), result.manifest);
+});
+
+test("rejects platform payloads that disagree about the permissions shown before download", (t) => {
+  const f = fixture(t);
+  f.add("linux-x86_64", "linux", moduleManifest({ permissions: [] }));
+  f.add("windows-x86_64", "windows", moduleManifest({ permissions: ["capture.screen"] }));
+  assert.throws(() => composeModulesManifest({ artifactsDir: f.artifacts, outputDir: f.output, tag: "v0.6.0", repository: "engcapa/taomni" }), /inconsistent metadata/);
+});
+

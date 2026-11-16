@@ -80,7 +80,9 @@ pub fn package_from_cached_catalog(
     )?)
 }
 
-fn read_cached_catalog(plugin_root: &Path) -> Result<verify::VerifiedCatalog, PluginError> {
+pub(super) fn read_cached_catalog(
+    plugin_root: &Path,
+) -> Result<verify::VerifiedCatalog, PluginError> {
     let cache = plugin_root.join(".catalog-trust");
     let _publication = lock_publication(plugin_root, &cache)?;
     let path = cache.join("catalog.json");

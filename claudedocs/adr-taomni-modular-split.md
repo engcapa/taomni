@@ -4,7 +4,7 @@
 
 Accepted as a design decision; M0 implementation is in progress. v1.6 is the current review revision, based on `7bc498b35` (Merge PR #813); it records the 2026-11-15 decision to remove LanChat completely. Plugin migration remains blocked until the G1–G11 feasibility gates pass. The executable plan is in `docs-feature/taomni-modular-split-design.md` §10.1.
 
-本分支已集成插件 API/registry、真实验签安装、宿主监督、共享采集与 RDP 公共库、原生下载、离线安装和升级预检，以及独立清单生成器；各批验证仍须按实际覆盖范围验收。生产升级当前只记录安全 pending journal；fixture 的 staging/回滚原语不代表真实旧版升级。核心仍包含待迁出业务，目前唯一独立宿主是 hello-plugin。核心状态和依赖闭包、远端商店和实际 tab 接线、真实 exporter/密钥/快照、业务迁移与最终发布验收仍未完成；逐任务状态与对应 hosted 证据见[实施与验收台账](../docs-feature/taomni-modular-split-progress.md)，不能把基础契约通过视为完整交付。
+本分支已集成插件 API/registry、真实验签安装、宿主监督、共享采集与 RDP 公共库、原生下载、离线安装和升级预检，以及独立清单生成器；官方签名远端商店正在接入，各批验证仍须按实际覆盖范围验收。生产升级当前只记录安全 pending journal；fixture 的 staging/回滚原语不代表真实旧版升级。核心仍包含待迁出业务，hello-plugin 与 MFA 引擎宿主已有原型，生产 MFA facade 尚在核心。核心状态和依赖闭包、真实 exporter、业务迁移与最终发布验收仍未完成；逐任务状态与对应 hosted 证据见[实施与验收台账](../docs-feature/taomni-modular-split-progress.md)，不能把基础契约通过视为完整交付。
 
 验证按源码提交、用例、平台与构建身份记录在台账及原始 artifact 中。历史整库单测和旧 hosted run 不能替代后续修改的验证；无关失败须有具体依据才能单列忽略，本次引入的回归必须修复重跑。
 
@@ -44,10 +44,11 @@ Taomni 是 Tauri 2 + React 19 + Rust 的本地优先桌面工作台。当前发�
 - 核心拆为 `CoreState + PluginRegistry`。插件内部状态保存在宿主；核心只保存元数据、宿主句柄、RPC client、安装状态和共享服务扩展点。
 - 每个插件有 `module.json`、独立版本、平台 artifact、分离 minisign、SHA-256、`coreApiVersion` 和 `permissions`。安装使用版本目录 + active 指针/原子替换，默认卸载保留数据，显式删除才清理。
 - 核心继续使用 `latest.json`；插件使用独立签名的 `modules.json`。模块清单生成器独立为 `scripts/compose-modules-manifest.mjs`，共享底层签名/资产校验但不改变核心更新清单契约。
+- 商店允许保存官方目录镜像传输地址，所有来源仍由同一固定官方公钥、精确字节和持久 sequence 验证；不新增信任锚。renderer 仅发送插件 ID、版本和包 hash，native 重新验签目录并选择本机资产、固定内容路径，下载完成后审查实际包权限与数据目录，安装确认后再次验签。目录声明的分类与权限必须匹配实际包；失败保留原已验证目录与已安装版本。具体接线与 QA 目录边界见设计 §6.1–6.2。
 - 代理、下载、断点续传、取消、进度、失败恢复、备份和迁移必须遵循仓库 `AGENTS.md` 的外部网络与数据完整性要求。
 - 从 0.5.x 单体包升级时，核心先只读预检并写原子 `migration/journal.json`。当前 M0 的 `plugin_migration_execute` 在可信插件包、签名安装门和核心 legacy-table/Vault exporter 尚未接入前，只记录候选的 `pending` 状态及缺少前置条件的原因，不复制旧文件、不创建伪插件版本目录、不修改 `active.json`；旧 LanChat 数据只在旧数据目录原样保留，不读取、不复制、不移动、不迁移、不删除。接入完整安装门后，再把插件代码放入 staging 目录；legacy tables 通过核心只读接口迁移，MFA 固定密钥经核心 Vault 的 slug 作用域服务访问。迁移项逐项以源指纹和 `committed` 状态记账，插件验签、下载、宿主退出或 Vault 访问失败时只回滚 active 指针并保留旧数据；核心仍可启动，用户可稍后安装缺失插件。完整协议见设计文档 §6.5.1，验证 ID 为 AC-017/V-012。
 
-模块源码继续保存在 monorepo 的 `src-tauri/plugins/<slug>/`，安装时落在 `<app data>/plugins/<slug>/versions/<version>/`，由 `active.json` 原子指向当前版本，`data/` 默认跨禁用/卸载保留。核心发布 `latest.json`；插件发布 `.taomni-plugin`、`.minisig`、`SHA256SUMS`，所有资产上传完成后再原子发布签名的 `modules.json`。新增模块必须先补 `module.json`、宿主/前端注册、安装生命周期、browser/native 用例和 catalog，再接入平台构建/签名矩阵；未通过相关门禁不得进入清单。当前 `ModuleStorePanel` 仍是 native registry projection，空/错误状态不代表已接入真实远端模块商店。
+模块源码继续保存在 monorepo 的 `src-tauri/plugins/<slug>/`，安装时落在 `<app data>/plugins/<slug>/versions/<version>/`，由 `active.json` 原子指向当前版本，`data/` 默认跨禁用/卸载保留。核心发布 `latest.json`；插件发布 `.taomni-plugin`、`.minisig`、`SHA256SUMS`，所有资产上传完成后再原子发布签名的 `modules.json`。新增模块必须先补 `module.json`、宿主/前端注册、安装生命周期、browser/native 用例和 catalog，再接入平台构建/签名矩阵；未通过相关门禁不得进入清单。设置页的 registry 管理与远端商店共用 native 注册表和安装门，QA 官方签名目录及 browser 模型均不代表正式目录已经发布。
 
 ## 3. Feasibility gates and release rule
 

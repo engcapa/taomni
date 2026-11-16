@@ -108,6 +108,7 @@ from . import module_signed_archive, module_backup_data
 from . import module_preview
 from . import module_download
 from . import module_download_preview
+from . import module_marketplace, module_marketplace_preview
 
 
 class FixtureContext(Protocol):
@@ -128,6 +129,8 @@ REGISTRY: dict[str, Fixture] = {
     "module_preview": Fixture("module_preview", module_preview.setup),
     "module_download": Fixture("module_download", module_download.setup, module_download.teardown),
     "module_download_preview": Fixture("module_download_preview", module_download_preview.setup),
+    "module_marketplace": Fixture("module_marketplace", module_marketplace.setup, module_marketplace.teardown),
+    "module_marketplace_preview": Fixture("module_marketplace_preview", module_marketplace_preview.setup),
     "module_offline_archive": Fixture("module_offline_archive", module_offline_archive.setup),
     "module_backup_data": Fixture("module_backup_data", module_backup_data.setup, module_backup_data.teardown),
     "module_signed_archive": Fixture("module_signed_archive", module_signed_archive.setup),

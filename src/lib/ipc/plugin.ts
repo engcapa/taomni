@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import type { PluginRecord } from "../pluginRegistry";
+import type { PluginManifest, PluginRecord } from "../pluginRegistry";
 import { signalPluginRegistryChanged } from "../pluginRegistryEvents";
 import type { AppProxyConfig } from "./proxy";
 
@@ -79,6 +79,9 @@ export interface ModuleCatalogPlugin {
   name: string;
   version: string;
   coreApiVersion: string;
+  kind?: PluginManifest["kind"] | null;
+  permissions?: PluginManifest["permissions"] | null;
+  description?: string;
   platforms: Record<string, ModuleCatalogAsset>;
 }
 
@@ -87,6 +90,40 @@ export interface ModuleCatalog {
   sequence: number;
   updatedAt: string;
   plugins: Record<string, ModuleCatalogPlugin>;
+}
+
+export interface ModuleCatalogSelection {
+  pluginId: string;
+  version: string;
+  sha256: string;
+}
+
+export interface ModuleMarketplaceCatalog {
+  catalog: ModuleCatalog;
+  platform: string;
+}
+
+export interface ModuleInstallReview {
+  manifest: PluginManifest;
+  dataDirectory: string;
+  downloadId: string;
+}
+
+/** Every source uses the native pinned signature and anti-rollback verifier. */
+export function fetchMarketplaceCatalog(url?: string): Promise<ModuleMarketplaceCatalog> {
+  return invoke("plugin_marketplace_catalog", { url });
+}
+
+export function downloadMarketplaceModule(selection: ModuleCatalogSelection): Promise<ModuleDownloadInfo> {
+  return invoke("plugin_marketplace_download", { selection });
+}
+
+export function reviewMarketplaceModule(selection: ModuleCatalogSelection): Promise<ModuleInstallReview> {
+  return invoke("plugin_marketplace_review", { selection });
+}
+
+export async function installMarketplaceModule(selection: ModuleCatalogSelection): Promise<PluginRecord> {
+  return mutationResult(await invoke("plugin_marketplace_install", { selection }));
 }
 
 export type LegacyMigrationItem =

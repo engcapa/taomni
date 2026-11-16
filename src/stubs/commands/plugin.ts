@@ -3,9 +3,15 @@
 import { invokeModulePreview } from "../modulePreview";
 import { invokeModuleDownloadPreview } from "../moduleDownloadPreview";
 import type { ModuleNetworkConfig } from "../../lib/ipc/plugin";
+import { invokeMarketplacePreview } from "../moduleMarketplacePreview";
 
 export async function invokePlugin<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   switch (command) {
+    case "plugin_marketplace_catalog":
+    case "plugin_marketplace_download":
+    case "plugin_marketplace_review":
+    case "plugin_marketplace_install":
+      return invokeMarketplacePreview(command, args) as T;
     case "plugin_download_list":
     case "plugin_download_cancel":
     case "plugin_download_resume":

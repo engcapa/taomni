@@ -28,6 +28,7 @@ import { ModuleStorePanel, type ModuleStoreCatalogEntry } from "../ModuleStorePa
 import { ModuleOfflineInstall } from "../ModuleOfflineInstall";
 import { ModuleNetworkSettings } from "../ModuleNetworkSettings";
 import { ModuleDownloads } from "../ModuleDownloads";
+import { ModuleMarketplace } from "../ModuleMarketplace";
 import { LanguageSection } from "../LanguageSection";
 import { LanguageServersSettings } from "../LanguageServersSettings";
 import { LiveTemplatesSettings } from "../LiveTemplatesSettings";
@@ -387,6 +388,7 @@ export function SettingsPanelView(inputs: SettingsPanelViewProps) {
             <SettingsAnchor id="module-store">
               <ModuleNetworkSettings />
               <ModuleDownloads />
+              <ModuleMarketplace />
               <ModuleOfflineInstall onRegistryChanged={onModuleRegistryChanged} />
               <ModuleStorePanel
                 catalog={moduleCatalog}

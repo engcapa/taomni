@@ -7,6 +7,11 @@ area: modules/core-startup
 components: [PluginRegistry, MigrationJournal]
 files:
   - src/lib/pluginRegistry.ts
+  - src/components/settings/ModuleMarketplace.tsx
+  - src/stores/moduleMarketplaceStore.ts
+  - src/lib/ipc/plugin.ts
+  - src-tauri/src/commands/plugin_marketplace.rs
+  - src-tauri/src/plugin/marketplace.rs
   - src/lib/pluginDataContract.ts
   - src/lib/pluginLoader.ts
   - src/lib/pluginFrontendHost.ts
@@ -33,6 +38,60 @@ files:
   - src-tauri/src/plugin/uninstallation.rs
   - src-tauri/src/plugin/migration.rs
 controls:
+  - id: module-marketplace
+    selector: '[data-testid="module-marketplace"]'
+    kind: display
+  - id: module-marketplace-search
+    selector: '[data-testid="module-marketplace-search"]'
+    kind: interactive
+  - id: module-marketplace-refresh
+    selector: '[data-testid="module-marketplace-refresh"]'
+    kind: interactive
+  - id: module-marketplace-source-toggle
+    selector: '[data-testid="module-marketplace-source-toggle"]'
+    kind: interactive
+  - id: module-marketplace-source
+    selector: '[data-testid="module-marketplace-source"]'
+    kind: interactive
+  - id: module-marketplace-loading
+    selector: '[data-testid="module-marketplace-loading"]'
+    kind: display
+    optional: true # transient catalog request; mounted ownership tests verify pending state
+  - id: module-marketplace-error
+    selector: '[data-testid="module-marketplace-error"]'
+    kind: display
+  - id: module-marketplace-checked
+    selector: '[data-testid="module-marketplace-checked"]'
+    kind: display
+  - id: module-marketplace-empty
+    selector: '[data-testid="module-marketplace-empty"]'
+    kind: display
+  - id: module-marketplace-card
+    selector: '[data-testid="module-marketplace-card"]'
+    kind: display
+  - id: module-marketplace-installed
+    selector: '[data-testid="module-marketplace-installed"]'
+    kind: display
+  - id: module-marketplace-unavailable
+    selector: '[data-testid="module-marketplace-unavailable"]'
+    kind: display
+    optional: true # native platform support depends on the signed feed; mounted unit covers missing platform assets
+  - id: module-marketplace-task
+    selector: '[data-testid="module-marketplace-task"]'
+    kind: display
+  - id: module-marketplace-action-error
+    selector: '[data-testid="module-marketplace-action-error"]'
+    kind: display
+    optional: true # native command failure is covered by store unit; UI tamper flow also covers catalog errors
+  - id: module-marketplace-current
+    selector: '[data-testid="module-marketplace-current"]'
+    kind: display
+  - id: module-marketplace-review
+    selector: '[data-testid="module-marketplace-review"]'
+    kind: interactive
+  - id: module-marketplace-download
+    selector: '[data-testid="module-marketplace-download"]'
+    kind: interactive
   - id: module-network-settings
     selector: '[data-testid="module-network-settings"]'
     kind: display

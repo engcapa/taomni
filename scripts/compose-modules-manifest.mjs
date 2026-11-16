@@ -75,7 +75,13 @@ function validateModuleManifest(input, coreApiVersion) {
   if (!Array.isArray(input.platforms) || input.platforms.length === 0 || input.platforms.some((platform) => !PLATFORM_SET.has(platform))) {
     throw new Error(`module ${slug} has invalid platforms`);
   }
-  return { id, slug, version, name: typeof input.name === "string" ? input.name : slug, coreApiVersion, platforms: input.platforms };
+  const kinds = ["remote-client", "local-server", "collaboration", "media", "auth", "ai-local", "mobile"];
+  if (input.kind !== undefined && !kinds.includes(input.kind)) throw new Error(`module ${slug} has an invalid kind`);
+  if (input.permissions !== undefined && (!Array.isArray(input.permissions) || input.permissions.some((permission) => typeof permission !== "string"))) {
+    throw new Error(`module ${slug} has invalid permissions`);
+  }
+  return { id, slug, version, name: typeof input.name === "string" ? input.name : slug, coreApiVersion, platforms: input.platforms,
+    kind: input.kind, permissions: input.permissions?.slice().sort() };
 }
 
 function packagePlatform(packagePath, manifest) {
@@ -163,9 +169,14 @@ export function composeModulesManifest({
       name: manifest.name,
       version: manifest.version,
       coreApiVersion: manifest.coreApiVersion,
+      ...(manifest.kind !== undefined ? { kind: manifest.kind } : {}),
+      ...(manifest.permissions !== undefined ? { permissions: manifest.permissions } : {}),
       platforms: {},
     };
     if (plugin.version !== manifest.version) throw new Error(`Plugin ${manifest.slug} has multiple versions in one release`);
+    if (plugin.name !== manifest.name || plugin.kind !== manifest.kind || JSON.stringify(plugin.permissions) !== JSON.stringify(manifest.permissions)) {
+      throw new Error(`Plugin ${manifest.slug} has inconsistent metadata across platforms`);
+    }
     if (plugin.platforms[platform]) throw new Error(`Duplicate plugin target: ${manifest.id}/${platform}`);
     plugin.platforms[platform] = {
       url: `${baseUrl}/${encodeURIComponent(assetName)}`,

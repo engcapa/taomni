@@ -30,6 +30,7 @@ mod notes;
 mod objectstorage;
 mod perf;
 mod plugin;
+mod plugin_marketplace;
 mod plugin_network;
 mod proxy;
 mod rdp;

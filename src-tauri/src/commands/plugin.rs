@@ -24,7 +24,7 @@ fn legacy_version(value: Option<String>) -> String {
         .unwrap_or_else(|| "0.5.x".to_owned())
 }
 
-fn publish_registry_change(app: &AppHandle, result: &Result<PluginRecord, String>) {
+pub(super) fn publish_registry_change(app: &AppHandle, result: &Result<PluginRecord, String>) {
     // Only invalidate renderer projections. Every WebView must re-read the
     // registry, never accept an event payload as installation/activation proof.
     let slug = result
@@ -404,6 +404,10 @@ pub(super) fn handles(command: &str) -> bool {
             | "plugin_catalog_fetch"
             | "plugin_network_get"
             | "plugin_network_save"
+            | "plugin_marketplace_catalog"
+            | "plugin_marketplace_download"
+            | "plugin_marketplace_review"
+            | "plugin_marketplace_install"
             | "plugin_migration_inspect"
             | "plugin_migration_execute"
     )
@@ -429,6 +433,10 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         crate::commands::plugin::plugin_catalog_fetch,
         crate::commands::plugin_network::plugin_network_get,
         crate::commands::plugin_network::plugin_network_save,
+        crate::commands::plugin_marketplace::plugin_marketplace_catalog,
+        crate::commands::plugin_marketplace::plugin_marketplace_download,
+        crate::commands::plugin_marketplace::plugin_marketplace_review,
+        crate::commands::plugin_marketplace::plugin_marketplace_install,
         crate::commands::plugin::plugin_migration_inspect,
         crate::commands::plugin::plugin_migration_execute,
     ];

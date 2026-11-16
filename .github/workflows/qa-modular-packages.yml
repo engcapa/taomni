@@ -192,6 +192,7 @@ jobs:
           scripts/plugin-package/target/release/taomni-plugin-package
           --payload candidate/unsigned-module --platform "$MODULE_PLATFORM"
           --output signed-module --source-sha "$MODULE_SOURCE_SHA"
+          --qa-catalog true
       - uses: actions/upload-artifact@v4
         with:
           name: qa-modular-package-${{ matrix.platform }}-${{ inputs.artifact_key || github.run_id }}

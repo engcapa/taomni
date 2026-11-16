@@ -7,7 +7,7 @@
 - 目标读者：Taomni 维护者 / 实现者 / 评审者
 - 状态：部分可实施。§13.1 的用户决策有效；M0 基线、契约冻结、宿主验证和共享能力下沉可立即开始，M2 插件迁移必须等待 §5.0 的 G1–G11 全部通过。v1.4 修正了过期基线、插件数量表述、核心依赖隔离遗漏、前端安全边界、数据迁移幂等性和发布例外规则，并新增 TASK-001–TASK-023、AC-001–AC-014、V-001–V-010。v1.5 按新代码更正 MFA 采集、前端 lazy 现状等结论，补充文件查看器、移动端桌面远控与 headless、re-exec 入口、插件数据密钥与备份快照、crash-regression 插件依赖等遗漏，新增 S11–S15、G11、TASK-024/025、AC-015/016、V-011。
 
-当前分支实现进度：插件 API/注册表、版本目录、真实签名安装门、宿主监督、原生下载与设置页离线安装已集成；共享采集和 RDP 公共库已下沉，实际验证范围见[实施与验收台账](taomni-modular-split-progress.md)。生产升级当前只记录只读预检、源指纹和安全 pending journal；测试专用 staging/回滚执行器不代表真实旧版升级已实现。实际业务 tab 路由、远端商店、核心状态与依赖闭包、真实 exporter/密钥/一致快照、业务插件迁移和完整发布验收仍按 §10.1 推进。可复现的 TASK-001 起点记录在 `docs-feature/taomni-modular-split-baseline-20261115.md`。
+当前分支实现进度：插件 API/注册表、版本目录、真实签名安装门、宿主监督、原生下载与设置页离线安装已集成；共享采集和 RDP 公共库已下沉，实际验证范围见[实施与验收台账](taomni-modular-split-progress.md)。生产升级当前只记录只读预检、源指纹和安全 pending journal；测试专用 staging/回滚执行器不代表真实旧版升级已实现。官方签名远端商店正在接入，实际业务迁出、核心状态与依赖闭包、真实 exporter、业务插件迁移和完整发布验收仍按 §10.1 推进。可复现的 TASK-001 起点记录在 `docs-feature/taomni-modular-split-baseline-20261115.md`。
 
 > 一句话：Taomni 从“一个安装包打全部功能”改成“核心默认安装 + 插件独立打包发布”。第一版不做 P0 多 profile 打包的过渡态，直接做 P1 真插件 + 模块商店；首发目标是全部有效非核心模块，按受控例外规则发布。
 
@@ -662,6 +662,7 @@ v1.2 的方案是：每个插件是 `crate-type = ["cdylib", "rlib"]` 的 Cargo 
 - 入口：设置页“模块商店” + 欢迎页“浏览模块” + 未安装占位页的“去商店安装”按钮，三处进同一商店页。
 - 浏览：列表按 `kind` 分类（远程桌面 / 本地服务器 / 协作 / 媒体 / 验证 / 网络工具 / 本地 AI / 移动），每项显示名称、简介、版本、大小、兼容性（`coreApiVersion` 是否匹配当前核心）、已安装 / 未安装 / 有更新。
 - 第一版只卖官方插件（§4 的 10 个），不做第三方市场、不做评分评论、不做付费。
+- 官方目录默认地址为 `https://github.com/engcapa/taomni/releases/latest/download/modules.json`。设置页允许独立保存官方目录镜像的 HTTP(S) 传输地址，拒绝 URL 内凭据与 fragment；镜像仍使用同一个核心固定公钥、精确原始字节验签和持久 sequence 防回滚，不授予第三方信任。刷新失败时显示错误及最后一次验证成功的来源，保留原已验证列表，不启动下载。目录新增可选 `kind`、`permissions` 与简介；旧清单没有权限元数据时，先提示下载后查看实际权限，不能当作无权限。
 
 ### 6.2 安装流程
 
@@ -669,6 +670,8 @@ v1.2 的方案是：每个插件是 `crate-type = ["cdylib", "rlib"]` 的 Cargo 
 2. 下载插件包（GitHub Release asset，断点续传，分片校验 SHA256）→ 验 minisign 签名（与核心同一公钥，失败拒绝安装并提示）→ 解压到 `plugins/<slug>/` 临时目录 → 校验 `module.json`（id、版本、`coreApiVersion`、平台，且与已验签的 trusted comment 一致，§9）→ 原子替换（先装新目录、再换指针，失败回滚旧目录）。下载走 AGENTS.md 的外部网络规则：默认用设置里的应用代理，也支持插件独立代理或不使用代理（显式绕过系统 / 环境代理）；显示连接中 / 下载中 / 校验中 / 完成 / 取消 / 失败与字节、百分比，支持取消、断点续传与后台下载，关闭对话框不取消任务，重开恢复进度；失败或取消的包不替换已装好的插件。
 3. 安装完成：按 §5.0 推荐形态，前端 chunk 与宿主进程都可立即启用，不需要重启应用；若 DEC-1 选备选方案 B，则 Rust 部分提示“重启后生效”，用户确认后重启（复用 `tauri-plugin-process` 的重启路径）。需要系统授权的能力（macOS 屏幕录制 / 辅助功能、SocksCap 提权）在首次使用时由对应入口引导，不在安装时静默申请。
 4. 正在下载、安装、授权或等待重启时，重新检查不会替换当前任务；安装阶段不提供取消按钮（复用现有 updater 的取消隔离规则，见 `claudedocs/auto-update-plan.md` 客户端行为第 7–8 条）。
+
+实现边界：renderer 只提交 `{pluginId, version, sha256}`，native 每次从重新验签的缓存目录选择本机平台资产，并推导内容寻址的下载任务及 `.downloads/<sha256>.part` / `<sha256>.taomni-plugin` 路径；不接收 renderer URL、路径、平台或信任标记。下载完成只表示包可供审查，安装确认显示实际验签包的权限与原生数据目录，最终安装再次验签；目录声明的权限与分类必须和包一致。下载任务、代理和跨应用重启发现复用既有 native manager，安装操作不依附设置组件生命周期。测试目录仅由可信 GitHub 签名 job 为相同源码的官方包生成，loopback 地址与 42/41 两个序号固定；不替换生产公钥，不预写注册表或验签结果。
 
 ### 6.3 启用 / 禁用 / 卸载 / 回滚
 
@@ -747,7 +750,7 @@ v1.2 没有覆盖“已经在用旧版的用户”。核心 0.6.x 默认包不�
 - `<app data>/plugins/<slug>/data/`：模块数据，禁用或卸载默认保留；
 - 核心更新仍发布 `latest.json`；插件包发布 `.taomni-plugin`、旁路 `.minisig` 与 `SHA256SUMS`，最后原子发布签名的 `modules.json`。
 
-新增模块时按以下顺序落地：先建立 `module.json`（slug、版本、平台、`coreApiVersion`、权限、数据和 legacy 迁移声明），再加入 workspace/宿主和前端注册表；补齐 registry、安装/回滚、缺失占位页以及 browser/native 用例和 feature-list/testid catalog；在 release workflow 中加入平台构建、签名和 hash；CI 先上传包与签名，所有资产完成后才生成并发布新的 `modules.json`。未通过宿主、签名、升级或受影响功能门禁的模块不得进入首发清单。当前实现的 `ModuleStorePanel` 显示的是核心 registry 投影，空目录和错误状态是明确状态，不能把它称作已经接入真实远端商店。
+新增模块时按以下顺序落地：先建立 `module.json`（slug、版本、平台、`coreApiVersion`、权限、数据和 legacy 迁移声明），再加入 workspace/宿主和前端注册表；补齐 registry、安装/回滚、缺失占位页以及 browser/native 用例和 feature-list/testid catalog；在 release workflow 中加入平台构建、签名和 hash；CI 先上传包与签名，所有资产完成后才生成并发布新的 `modules.json`。未通过宿主、签名、升级或受影响功能门禁的模块不得进入首发清单。`ModuleStorePanel` 负责核心 registry 投影，`ModuleMarketplace` 负责官方签名目录的浏览、下载与安装；接线的 hosted 验证状态和尚未发布的正式目录须在台账明确，不能用 browser 模型或 QA 签名目录代替正式 release 闭环。
 
 ## 8. 数据与迁移
 

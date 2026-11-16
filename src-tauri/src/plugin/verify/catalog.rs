@@ -63,6 +63,15 @@ impl VerifiedCatalog {
                 return Err(TrustError::Catalog("invalid module slug/name".into()));
             }
             compare_versions(&plugin.version, &plugin.version)?;
+            if plugin.permissions.as_ref().is_some_and(|permissions| {
+                permissions.iter().any(|permission| {
+                    !super::package::KNOWN_PERMISSIONS.contains(&permission.as_str())
+                })
+            }) {
+                return Err(TrustError::Catalog(
+                    "catalogue declares unknown module permissions".into(),
+                ));
+            }
             for (platform, asset) in &plugin.platforms {
                 if !PLATFORMS.contains(&platform.as_str()) || asset.size == 0 {
                     return Err(TrustError::Catalog("invalid platform/asset size".into()));

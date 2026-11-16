@@ -1,0 +1,102 @@
+import { useEffect, useMemo, useState } from "react";
+import { useT } from "../../lib/i18n";
+import type { ModuleCatalogPlugin, ModuleCatalogSelection } from "../../lib/ipc/plugin";
+import { PLUGIN_CORE_API_VERSION } from "../../lib/pluginRegistry";
+import { useModuleDownloadStore } from "../../stores/moduleDownloadStore";
+import { useModuleMarketplaceStore } from "../../stores/moduleMarketplaceStore";
+import { useModuleStore } from "../../stores/moduleStore";
+import { ConfirmDialog } from "../sidebar/ConfirmDialog";
+
+export function ModuleMarketplace() {
+  const t = useT();
+  const state = useModuleMarketplaceStore();
+  const records = useModuleStore((owner) => owner.records);
+  const downloads = useModuleDownloadStore((owner) => owner.tasks);
+  const refreshDownloads = useModuleDownloadStore((owner) => owner.refresh);
+  const [source, setSource] = useState(state.source);
+  const [query, setQuery] = useState("");
+  const [download, setDownload] = useState<{ entry: ModuleCatalogPlugin; selection: ModuleCatalogSelection; size: number } | null>(null);
+  useEffect(() => { void state.refresh(); }, [state.refresh]);
+
+  const entries = useMemo(() => Object.values(state.catalog?.catalog.plugins ?? {})
+    .filter((entry) => `${entry.name} ${entry.description ?? ""} ${entry.slug}`.toLowerCase().includes(query.toLowerCase()))
+    .sort((a, b) => (a.kind ?? "").localeCompare(b.kind ?? "") || a.name.localeCompare(b.name)), [state.catalog, query]);
+
+  const selection = (entry: ModuleCatalogPlugin): ModuleCatalogSelection => ({
+    pluginId: entry.id, version: entry.version,
+    sha256: entry.platforms[state.catalog!.platform].sha256,
+  });
+  const permissionLabels = (permissions: readonly string[] | null | undefined) => permissions
+    ? permissions.length ? permissions.map((permission) => t(`plugins.permission.${permission}`)).join("\n") : t("plugins.marketNoPermissions")
+    : t("plugins.marketPermissionsAfterDownload");
+  const displaySize = (size?: number) => size == null ? "—" : `${(size / 1024 / 1024).toFixed(2)} MiB`;
+
+  const review = state.review;
+  return <section data-testid="module-marketplace" className="mb-5 rounded-md border border-[var(--taomni-divider)] p-3">
+    <h3 className="text-[14px] font-semibold">{t("plugins.marketTitle")}</h3>
+    <p className="my-2 text-[12px] text-[var(--taomni-text-muted)]">{t("plugins.marketHint")}</p>
+    <div className="flex gap-2">
+      <input data-testid="module-marketplace-search" aria-label={t("plugins.marketSearch")} value={query}
+        onChange={(event) => setQuery(event.target.value)} className="taomni-input min-w-0 flex-1 text-[12px]" />
+      <button type="button" data-testid="module-marketplace-refresh" className="taomni-btn text-[12px]" disabled={state.loading}
+        onClick={() => { void state.refresh(source); }}>{t("plugins.marketRefresh")}</button>
+    </div>
+    <details className="mt-2 text-[12px]">
+      <summary data-testid="module-marketplace-source-toggle" className="cursor-pointer">{t("plugins.marketSource")}</summary>
+      <p className="my-2 text-[var(--taomni-text-muted)]">{t("plugins.marketSourceHint")}</p>
+      <input data-testid="module-marketplace-source" aria-label={t("plugins.marketSource")} value={source}
+        onChange={(event) => setSource(event.target.value)} className="taomni-input w-full text-[12px]" />
+    </details>
+    {state.loading && <p data-testid="module-marketplace-loading" className="my-2 text-[12px]">{t("plugins.marketLoading")}</p>}
+    {state.error && <p data-testid="module-marketplace-error" role="alert" className="my-2 text-[12px] text-red-500">{state.error}</p>}
+    {state.catalog && <p data-testid="module-marketplace-checked" className="my-2 text-[11px] text-[var(--taomni-text-muted)]">
+      {t("plugins.marketChecked", { date: state.catalog.catalog.updatedAt })}
+      {state.catalogSource && <span className="block break-all">{t("plugins.marketCatalogSource", { source: state.catalogSource })}</span>}
+    </p>}
+    {state.catalog && !entries.length && <p data-testid="module-marketplace-empty" className="my-2 text-[12px]">{t("plugins.marketEmpty")}</p>}
+    <div className="mt-3 space-y-3">
+      {entries.map((entry) => {
+        const asset = entry.platforms[state.catalog!.platform];
+        const id = asset ? `module-${entry.slug}-${asset.sha256.toLowerCase()}` : null;
+        const task = downloads.find((task) => task.id === id);
+        const active = task && ["connecting", "downloading", "verifying"].includes(task.progress.phase);
+        const installed = records[entry.slug]?.activeVersion === entry.version;
+        const compatible = entry.coreApiVersion === PLUGIN_CORE_API_VERSION;
+        const busy = state.busy[entry.id];
+        return <article key={entry.id} data-testid="module-marketplace-card" data-module-id={entry.id}
+          className="rounded border border-[var(--taomni-divider)] p-3 text-[12px]">
+          <div className="flex flex-wrap justify-between gap-2 font-medium"><span>{entry.name}</span>
+            <span>{entry.version} · {displaySize(asset?.size)}</span></div>
+          <p className="mt-1 text-[var(--taomni-text-muted)]">{t(`plugins.category.${entry.kind ?? "other"}`)}</p>
+          {entry.description && <p className="my-1">{entry.description}</p>}
+          {records[entry.slug]?.activeVersion && <p data-testid="module-marketplace-installed">
+            {t("plugins.marketInstalled", { version: records[entry.slug].activeVersion! })}
+          </p>}
+          {(!asset || !compatible) && <p data-testid="module-marketplace-unavailable">{t("plugins.marketUnavailable")}</p>}
+          {task && <p data-testid="module-marketplace-task">{t(`plugins.downloadPhase${task.progress.phase}`)}</p>}
+          {state.errors[entry.id] && <p data-testid="module-marketplace-action-error" role="alert" className="my-2 text-red-500">{state.errors[entry.id]}</p>}
+          <div className="mt-2 flex gap-2">
+            {installed ? <span data-testid="module-marketplace-current">{t("plugins.marketCurrent")}</span>
+              : task?.progress.phase === "completed" ? <button type="button" data-testid="module-marketplace-review" className="taomni-btn"
+                disabled={!!busy || !compatible || !asset} onClick={() => { void state.openReview(selection(entry)); }}>{busy ? t("plugins.marketWorking") : t("plugins.marketReview")}</button>
+                : <button type="button" data-testid="module-marketplace-download" className="taomni-btn"
+                  disabled={!!busy || !asset || !compatible || !!active}
+                  onClick={() => setDownload({ entry, selection: selection(entry), size: asset.size })}>{busy ? t("plugins.marketWorking") : active ? t("plugins.downloadPhasedownloading") : t("plugins.marketDownload")}</button>}
+          </div>
+        </article>;
+      })}
+    </div>
+    {download && <ConfirmDialog title={t("plugins.marketDownloadTitle")} confirmLabel={t("plugins.marketDownload")}
+      message={[`${download.entry.name} ${download.entry.version}`, displaySize(download.size),
+        permissionLabels(download.entry.permissions), `plugins/${download.entry.slug}/data/`, t("plugins.marketAuthorization")].join("\n\n")}
+      onCancel={() => setDownload(null)} onConfirm={() => {
+        const requested = download.selection;
+        setDownload(null);
+        void state.download(requested).then(() => refreshDownloads());
+      }} />}
+    {review && <ConfirmDialog title={t("plugins.marketInstallTitle")} confirmLabel={t("plugins.marketInstall")}
+      message={[`${review.detail.manifest.name} ${review.detail.manifest.version}`, permissionLabels(review.detail.manifest.permissions),
+        review.detail.dataDirectory, t("plugins.marketAuthorization")].join("\n\n")}
+      onCancel={state.dismissReview} onConfirm={() => { void state.install(); state.dismissReview(); }} />}
+  </section>;
+}

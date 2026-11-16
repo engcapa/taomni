@@ -74,7 +74,7 @@ impl ReleaseSigner {
         Ok(signature)
     }
 
-    fn verify(&self, path: &Path, signature: &str, comment: &str) -> Result<()> {
+    pub(crate) fn verify(&self, path: &Path, signature: &str, comment: &str) -> Result<()> {
         use std::io::Read;
         let signature = Signature::decode(signature)?;
         ensure!(

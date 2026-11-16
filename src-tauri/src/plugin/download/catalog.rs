@@ -22,6 +22,12 @@ pub struct ModuleCatalogPlugin {
     pub name: String,
     pub version: String,
     pub core_api_version: String,
+    #[serde(default)]
+    pub kind: Option<crate::plugin::PluginKind>,
+    #[serde(default)]
+    pub permissions: Option<std::collections::BTreeSet<String>>,
+    #[serde(default)]
+    pub description: String,
     pub platforms: std::collections::BTreeMap<String, ModuleCatalogAsset>,
 }
 

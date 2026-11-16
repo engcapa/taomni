@@ -17,7 +17,14 @@ fn run() -> Result<()> {
     let mut values = BTreeMap::new();
     while let Some(flag) = args.next() {
         ensure!(
-            ["--payload", "--platform", "--output", "--source-sha"].contains(&flag.as_str()),
+            [
+                "--payload",
+                "--platform",
+                "--output",
+                "--source-sha",
+                "--qa-catalog"
+            ]
+            .contains(&flag.as_str()),
             "expected --payload DIR --platform PLATFORM --output DIR --source-sha COMMIT"
         );
         let value = args.next().context("missing option value")?;
@@ -32,6 +39,13 @@ fn run() -> Result<()> {
         get("--source-sha")?,
         &signer,
     )?;
+    if let Some(value) = values.get("--qa-catalog") {
+        ensure!(
+            value == "true" && std::env::var("GITHUB_ACTIONS").as_deref() == Ok("true"),
+            "QA catalog signing is restricted to GitHub workflows"
+        );
+        taomni_plugin_package::qa_catalog::write(Path::new(get("--output")?), &receipt, &signer)?;
+    }
     println!("{}", serde_json::to_string_pretty(&receipt)?);
     Ok(())
 }

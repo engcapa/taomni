@@ -1,16 +1,25 @@
 # 模块化实施与验收台账
 
-更新：2026-11-16。范围以[设计 §10.1](taomni-modular-split-design.md#101-可执行任务分解)与 [ADR](../claudedocs/adr-taomni-modular-split.md)为准。基础契约通过不代表业务已迁出或可发布。
+更新：2026-11-17。范围以[设计 §10.1](taomni-modular-split-design.md#101-可执行任务分解)与 [ADR](../claudedocs/adr-taomni-modular-split.md)为准。基础契约通过不代表业务已迁出或可发布。
 
 ## 当前结论
 
-核心仍包含 MFA、Servers、SocksCap、远程桌面和本地语音等业务代码、状态与依赖。hello-plugin 已有签名安装验证；MFA engine 与真实 SDK 宿主原型的两处 RPC 修复已由匹配源码的三端真实宿主门及 Linux 真实 Vault 门复验。MFA 四目标签名包已产出，源码 `2a14e5590` 的 Linux、Windows 正式安装门均已通过 3 项实际场景；macOS framework staging 修复正在新 runner 复验；产品 facade 尚未切换。主窗/分离窗动态前端已实现，空列表修复后的 browser 已进入刷新步骤；刷新可见模式和 macOS 跨 scheme ESM 失败已分别修复，须复验 TC-MODULES-016/017/018。LanChat 已删除；历史 `lanchat.sqlite` / `lanchat.db` 保留原位，不读取、不迁移、不删除。
+核心仍包含 MFA、Servers、SocksCap、远程桌面和本地语音等业务代码、状态与依赖。hello-plugin 已有签名安装验证；MFA engine 与真实 SDK 宿主原型的两处 RPC 修复已由匹配源码的三端真实宿主门及 Linux 真实 Vault 门复验。MFA 四目标签名包已产出，源码 `2a14e5590` 的 Linux、Windows 正式安装门均已通过 3 项实际场景；macOS framework staging 修复后的安装门尚缺取得 runner 后的证据，产品 facade 尚未切换。主窗/分离窗动态前端已实现，刷新可见模式、macOS 同源 ESM 和重复 Settings tab 修复正随最新 UI run 验证。LanChat 已删除；历史 `lanchat.sqlite` / `lanchat.db` 保留原位，不读取、不迁移、不删除。
 
 生产升级 IPC 当前只记录只读预检、源指纹与 pending journal。缺少可信插件包和真实 exporter 时，不复制旧数据、不创建伪插件版本、不改变 active 指针。测试 fixture 的 staging/回滚原语不能算真实旧版升级验收。
 
-签名安装门、宿主生产监督、共享采集/RDP 公共库、CoreState/统一 bootstrap、正常退出与可逆静默已集成。生产工厂、scoped 入口、持久 profile generation、Vault IPC 协调、普通凭据消费者与 MFA facade 已接入；源码 `fdd05d232` 的契约 #43819768258 已 23/23 jobs 成功，其 UI #43819770975 的 22 个 shard 已收齐：三端 browser 各 50/50、Linux Xvfb native 50/50、Windows native 48/48、macOS native 47/47；Wayland 46/50，四个既有无关失败按下文单列。离线 v2 备份/还原和运行中宿主快照已实现，`4c060a939` 的三端真实宿主快照及整轮契约通过，匹配源码 UI 仍在执行。业务状态仍在 LegacyFeatureRuntime；三态真实重启还原、远端商店、重启下载恢复、业务宿主迁出与真实升级尚未完成。G1–G11 未通过前，不将具体业务插件迁移标为完成。
+签名安装门、宿主生产监督、共享采集/RDP 公共库、CoreState/统一 bootstrap、正常退出与可逆静默已集成。生产工厂、scoped 入口、持久 profile generation、Vault IPC 协调、普通凭据消费者与 MFA facade 已接入；源码 `fdd05d232` 的契约 #43819768258 已 23/23 jobs 成功，其 UI #43819770975 的 22 个 shard 已收齐：三端 browser 各 50/50、Linux Xvfb native 50/50、Windows native 48/48、macOS native 47/47；Wayland 46/50，四个既有无关失败按下文单列。离线 v2 备份/还原、运行中宿主快照和三态重启还原已逐批验证，下载恢复与真实代理的最新证据见下节。业务状态仍在 LegacyFeatureRuntime；官方远端商店正在接入，业务宿主迁出与真实单体升级尚未完成。G1–G11 未通过前，不将具体业务插件迁移标为完成。
 
-## 2026-11-16 最新 runner 证据（持续采集中）
+## 2026-11-17 最新实现与 runner 证据（持续采集中）
+
+- 源码 `5730042207348c63794dab1184cbaf93841fd08d` 的[网络契约 #43897312300](https://github.com/engcapa/taomni/actions/runs/43897312300) 已全部成功，6 份 artifact 已在运行期间收齐。Linux、Windows、macOS 的真实 Settings/Vault/HTTP 代理各 **2/2**，receipt 均绑定该 SHA、`exitCode=0`、`allSelectedPassed=true`，并使用污染的环境代理验证显式 none 路径；同 run 三端 downloader、跨进程重启/续传和监督通过。原始证据位于 `qa-ui-auto-report/github/43897312300/live-contracts/`。这些证据不包含后续远端商店增量。
+- 相同源码的 [UI #43897360208](https://github.com/engcapa/taomni/actions/runs/43897360208) 正在执行并即时下载完成 shard：Linux、Windows browser 各 **45/45**，macOS browser 主片 **44/44**，新 TC-MODULES-019/020 与 TC-MODULES-017 的重复 Settings 回归通过。Linux release QA 构建与 native contracts 已成功，Linux 两种桌面的 native shard 已开始执行，Windows 仍在构建；未完成项不外推。macOS browser shard 2 与 native build 被 GitHub 取消，job annotations 明确为 **arm64 capacity / runner not acquired**，属于缺失证据而非通过，须补跑。UI 原始证据位于 `qa-ui-auto-report/github/43897360208/live-shards/`。
+- 运行期间已继续收齐该 run 的 8 个 Linux native shard：Xvfb **52/53**，Wayland **50/53**。共同相关失败是 TC-MODULES-021 step 8 在发起下载前抛出 `NativeStepContext.report_root` 不存在；观察工具改为从真实 fixture owner 取 report root，仍逐项核对隔离环境与路径归属。真实上下文类型的单元先复现同一错误，再通过；续传的全部原 58 步断言不变，必须在新源码 runner 重跑。Wayland 的另外两个 FILE-OPEN-006/008 失败与已记录的非左键输入/路径 chip 问题相同，按用户要求单列忽略，不计通过。其余 Linux 模块、实际 ESM、三态还原和完整 crash 的对应通过结果只绑定本次原 SHA。
+- 官方签名远端商店本批接入 native 目录、内容寻址下载、实际包审查和二次验签安装，renderer 不传 URL/路径/平台/信任标记。官方镜像只是传输地址，仍使用固定生产公钥与持久防回滚；失败保留原已验证卡片及来源。权限/分类随目录发布且必须与实际包一致。设置页复用后台下载与安装 owner；下载完成不表示安装。设计 §6.1–6.2 和 ADR 已同步这一边界，正式目录和业务模块 release 仍待后续闭环。
+- 新增 native **TC-MODULES-022（58 步）** 与 browser **TC-MODULES-023（52 步）**：搜索、下载确认取消、下载、实际包确认取消/安装、启用和保存读取、坏签名/已签名旧序号拒绝、renderer reload 后防回滚及恢复。native fixture 只服务相同源码的可信签名 job 产物，不预写信任/注册表；独立 oracle 检查真实单次 HTTP、精确缓存字节、包 hash、active 指针与 sequence 42。browser 明确只提供模型；完整 hosted 验证尚待本批提交后执行。
+- 本地只执行单元与静态检查：新增商店前端/明确 preview **12/12**，受影响 Settings/registry/IPC 五文件 **49/49**；原生 marketplace **6/6**、verify **16/16**、download 纯 unit **10/10**（3 项真实网络保持 ignored）；签名器 **10/10**、目录生成器 **8/8**、platforms mandatory observation/trust unit（含上述上下文回归）**37/37**。上述范围有重叠，不相加。最终核心 harness 编译、TypeScript、两 manifest rustfmt、三 workflow actionlint、两份 schema/reviewed contract、check:refactor（808 commands / 938 implementation modules / 4904 files）与完整 QA audit 全 gates 通过，baseline 未变。受影响用例并集加完整 crash 的静态计划为三端 browser 各 **46**、Linux 两 profile native 各 **54**、Windows **52**、macOS **51**，`gaps=[]`、`unreviewed=[]`；计划不计为执行通过，须绑定提交后的实际 selection。
+
+## 2026-11-16 runner 证据
 
 - 本批最终静态检查：`tsc -b`、rustfmt、actionlint、`pnpm check:refactor`（4,894 files，沿用 4 项声明例外）与 QA audit 全 gates 通过，coverage baseline 未修改。新任务行的 scoped controls aliases 对应实际 DOM 子控件，保留全部数量、状态和字节断言。Rust 核心 harness 编译通过；纯配置 5 项、前端主相关 13 项及 Python 新观察/网络门 7 项通过（相关补充前端 34 项与主集合有重叠，不相加），两个真实网络单元保持 ignored，只由 GitHub 显式选取。
 - 已复核 #43888300225 的取消原因：macOS arm64 任务多次未取得 hosted runner，GitHub annotation 明示容量不足，未执行签名 MFA 安装门。#43889971881 的 macOS QA 构建亦同因取消，不能计通过；Linux 原生契约另有既有 Mobile 双 viewer PTY 等待 WS frame 超时（119 passed / 1 failed），原始日志保留，尚不代表模块用例结果。六个 browser shard 已全部即时收取，三端各 42/43，唯一 case 失败仍为下面已修、待新源码复验的 Settings 重复标签。
@@ -131,7 +140,7 @@
 | TASK-007 前端注册和路由 | 部分 | loader/helper 已有；接入主窗口/分离窗口实际 tab、完整性校验、缺失/禁用/坏 chunk 与卸载清理。 |
 | TASK-008 宿主监督 | 已提交，部分 hosted 通过 | 主动心跳、重启预算、请求取消及三平台进程树回收已接入；GitHub 三平台各 14 项 unit 与 7 项真实进程测试通过，双向核心服务与 profile 协同仍待后续任务。 |
 | TASK-009 生命周期 | 部分 | 版本目录、active 指针与生命周期 IPC 已有；接可信安装门、运行中切换/回滚、无重启生命周期。 |
-| TASK-010 商店/下载 | 部分 | 原生 HTTP、代理、Range/校验、路径与内容去重、退出取消等待、续传和进度 IPC 已有，三端每端 13 个真实网络 gate 已通过；远端商店、代理设置 UI、跨应用重启恢复与完整错误恢复尚待完成。 |
+| TASK-010 商店/下载 | 部分，远端商店待 hosted | native 后台任务、跨重启发现/续传、独立持久代理及共享 Settings/Vault 解析已接入；#43897312300 的三端真实代理/下载/进程门通过，#43897360208 的 UI 仍在执行。官方签名目录、搜索分类、下载确认和实际包审查安装本批实现，TC-MODULES-022/023 待匹配源码 hosted；正式目录发布及更新/回滚完整路径仍待闭合。 |
 | TASK-011 验签安装 | 基础闭环四种 native profile 通过 | pinned key 的真实 minisign 校验、清单防回滚、安全解包、内容绑定及安装入口强制验签已接入；#43804951477 的 TC-MODULES-007 在四种 native profile 全部 52 步通过，覆盖官方签名安装、启禁、正常重启和篡改拒绝。业务包、更新/回滚与最终发布仍需后续证据。 |
 | TASK-012 单体升级 | 部分 | 从安全 pending 进入真实 legacy exporter、可信包 staging、Vault 交接、激活、恢复/回滚；真实安装升级证据。 |
 | TASK-013 原型与 G 门 | 部分 | hello fixture 已有；真实 MFA 原型和 G1–G11 多端实验与原始证据。 |

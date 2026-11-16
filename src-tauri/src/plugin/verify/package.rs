@@ -16,7 +16,7 @@ use crate::plugin::ModuleManifest;
 const MAX_ARCHIVE_BYTES: u64 = 4 * 1024 * 1024 * 1024;
 const MAX_MANIFEST_BYTES: u64 = 2 * 1024 * 1024;
 const TRUST_DIR: &str = ".taomni-trust";
-const KNOWN_PERMISSIONS: [&str; 14] = [
+pub(super) const KNOWN_PERMISSIONS: [&str; 14] = [
     "vault.ref",
     "vault.session-secret",
     "vault.fixed-key",
@@ -68,13 +68,27 @@ impl VerifiedPackage {
             core_api_version: &plugin.core_api_version,
             sha256: &asset.sha256,
         };
-        Self::prepare(
+        let package = Self::prepare(
             archive,
             &asset.signature,
             platform,
             &catalog.verifier,
             Some((&expected, asset.size)),
-        )
+        )?;
+        if plugin
+            .kind
+            .as_ref()
+            .is_some_and(|kind| *kind != package.manifest.kind)
+            || plugin
+                .permissions
+                .as_ref()
+                .is_some_and(|permissions| *permissions != package.manifest.permissions)
+        {
+            return Err(invalid(
+                "package permissions or category differ from the signed catalog",
+            ));
+        }
+        Ok(package)
     }
 
     /// Offline packages pass the same signature, metadata and content checks.
