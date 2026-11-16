@@ -16,6 +16,7 @@ import type { TaoChatController, TaoThread } from "../ai-chat";
 
 interface Props extends WelcomePanelProps {
   controller: TaoChatController; threads: TaoThread[]; demoMode: boolean;
+  onOpenTaoSettings?: () => void;
   onDeleteThread?: (thread: TaoThread) => Promise<void>;
   historyLoading?: boolean; historyError?: string; onRefreshHistory?: () => void;
 }
@@ -79,7 +80,7 @@ export function DockRow(props: Props) {
       <button type="button" className="tao-home-dock-button" data-testid="tao-home-new-workspace" onClick={props.onOpenNewWorkspace}><FolderOpen size={14} />{tr("新工作区")}</button>
       <BrowseModulesButton onOpenSettings={props.onOpenSettings} className="tao-home-dock-button" />
       <button ref={more.triggerRef} type="button" className="tao-home-dock-button" data-testid="tao-home-dock-more" aria-expanded={more.open} onClick={() => more.setOpen(!more.open)}><MoreHorizontal size={14} />{tr("更多")}</button>
-      <TaoPopover owner={more} label={tr("更多启动选项")}><div className="tao-home-popup-items"><button type="button" data-testid="tao-home-dock-directory" onClick={() => command("file-explorer")}>{tr("本地目录")}</button><button type="button" data-testid="tao-home-dock-mail" onClick={() => command("mail-unified")}>{tr("邮件会话")}</button><button type="button" data-testid="tao-home-dock-session" onClick={() => { more.close(false); props.onNewSession(); }}>{tr("数据库 / VNC / RDP 会话")}</button><button type="button" data-testid="tao-home-dock-settings" onClick={() => { more.close(false); props.onOpenSettings?.(); }}>{tr("Tao 设置")}</button></div></TaoPopover>
+      <TaoPopover owner={more} label={tr("更多启动选项")}><div className="tao-home-popup-items"><button type="button" data-testid="tao-home-dock-directory" onClick={() => command("file-explorer")}>{tr("本地目录")}</button><button type="button" data-testid="tao-home-dock-mail" onClick={() => command("mail-unified")}>{tr("邮件会话")}</button><button type="button" data-testid="tao-home-dock-session" onClick={() => { more.close(false); props.onNewSession(); }}>{tr("数据库 / VNC / RDP 会话")}</button><button type="button" data-testid="tao-home-dock-settings" onClick={() => { more.close(false); (props.onOpenTaoSettings ?? props.onOpenSettings)?.(); }}>{tr("Tao 设置")}</button></div></TaoPopover>
     </div>
     {status ? <p className="tao-home-launch-status" role="status">{status}<button type="button" aria-label={tr("关闭启动提示")} onClick={() => setStatus("")}>×</button></p> : null}
   </>;
