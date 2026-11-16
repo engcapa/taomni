@@ -1,0 +1,190 @@
+id: TC-FILE-OPEN-015
+title: Native printer-independent PDF and high-fidelity Word through real save dialogs
+description: Packaged platform WebView rendering, actual OS save chooser and retained PDF/DOCX bytes. No printer or print
+  dialog is invoked. Complete multi-page A4 PDF and sharp portable Word SVG/fallback images are independently parsed; cancelling
+  PDF chooser preserves source. Actual Microsoft Word typography still needs client visual review.
+modes:
+- native
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-export-quality
+- reload_window: null
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-file-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Control+l
+    macos_key: Meta+l
+- fill:
+    selector: '[data-testid="explorer-address"]'
+    value: ${fixture.file_open_root}
+- press:
+    selector: '[data-testid="explorer-address"]'
+    key: Enter
+- dblclick: '[data-testid="explorer-file-row"][data-name="quality.md"]'
+- wait_for: '[data-testid="markdown-editor"]'
+- click: '[data-testid="markdown-export"]'
+- wait_for: '[data-testid="markdown-export-menu"]'
+- assert_element_geometry:
+    selector: '[data-testid="markdown-export-menu"]'
+    min_width: 250
+    min_height: 220
+    viewport_margin: 7
+- eval_readonly:
+    expression: '!document.querySelector(''.fv-md-export-menu'').closest(''.fv-md-toolbar'') && document.querySelector(''.fv-md-export-menu'').getBoundingClientRect().top
+      >= document.querySelector(''.fv-md-export-control>button'').getBoundingClientRect().bottom'
+    expect_truthy: true
+- eval_readonly:
+    expression: document.querySelector('.fv-md-toolbar').scrollHeight <= document.querySelector('.fv-md-toolbar').clientHeight
+      + 1 && document.querySelector('.fv-md-toolbar').scrollWidth <= document.querySelector('.fv-md-toolbar').clientWidth
+      + 1
+    expect_truthy: true
+- eval_readonly:
+    expression: document.querySelector('.fv-md-format').scrollHeight <= document.querySelector('.fv-md-format').clientHeight
+      + 1 && document.querySelector('.fv-md-format').scrollWidth <= document.querySelector('.fv-md-format').clientWidth +
+      1
+    expect_truthy: true
+- press:
+    selector: '[data-testid="markdown-export-html"]'
+    key: End
+- eval_readonly:
+    expression: document.activeElement?.getAttribute('data-testid') === 'markdown-export-print'
+    expect_truthy: true
+- press:
+    selector: '[data-testid="markdown-export-print"]'
+    key: Escape
+- assert_not_visible: '[data-testid="markdown-export-menu"]'
+- eval_readonly:
+    expression: document.activeElement?.getAttribute('data-testid') === 'markdown-export'
+    expect_truthy: true
+- click: '[data-testid="markdown-export"]'
+- click: '[data-testid="markdown-export-pdf"]'
+- wait_for: '[data-testid="markdown-export-settings"]'
+- native_file_dialog:
+    kind: save
+    action: choose
+    path: ${fixture.markdown_quality_exports}/quality.pdf
+    trigger: '[data-testid="markdown-export-confirm"]'
+- wait_for: '[data-testid="markdown-export-status"][data-export-state="saved"]'
+- assert_export_quality:
+    path: ${fixture.markdown_quality_exports}/quality.pdf
+    kind: pdf
+- click: '[data-testid="markdown-export"]'
+- click: '[data-testid="markdown-export-docx"]'
+- wait_for: '[data-testid="markdown-export-settings"]'
+- native_file_dialog:
+    kind: save
+    action: choose
+    path: ${fixture.markdown_quality_exports}/quality.docx
+    trigger: '[data-testid="markdown-export-confirm"]'
+- wait_for: '[data-testid="markdown-export-status"][data-export-state="saved"]'
+- assert_export_quality:
+    path: ${fixture.markdown_quality_exports}/quality.docx
+    kind: docx
+- click: '[data-testid="markdown-export"]'
+- click: '[data-testid="markdown-export-pdf"]'
+- native_file_dialog:
+    kind: save
+    action: cancel
+    path: ${fixture.markdown_quality_exports}/cancelled.pdf
+    trigger: '[data-testid="markdown-export-confirm"]'
+- wait_for: '[data-testid="markdown-export-status"][data-export-state="cancelled"]'
+- assert_file_open_bytes:
+    path: ${fixture.markdown_quality_source}
+    sha256: ${fixture.markdown_quality_sha}
+- assert_no_runtime_errors: null
+- screenshot: native-pdf-word-quality.png
+covers:
+- F-FILEOPEN-1
+- F-EXPLORER-1
+tags:
+- p0
+- markdown
+- export
+- regression
+fixtures:
+- reset_db
+- markdown_quality
+timeout_sec: 300
+verification:
+  review: reviewed
+  requirements:
+  - id: DURABLE-RESULT
+    requirement: All desktop platforms save genuine PDF directly, retain readable Chinese/multiline Mermaid labels and SVG
+      image vectors in Word, keep raster resolution, cancel explicitly and preserve source bytes.
+    actions:
+    - 3
+    - 4
+    - 5
+    - 7
+    - 8
+    - 9
+    - 10
+    - 12
+    - 18
+    - 20
+    - 23
+    - 24
+    - 26
+    - 29
+    - 30
+    - 32
+    - 35
+    - 36
+    - 37
+    checkpoints:
+    - step: 14
+      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
+        original source bytes remain exact.
+    - step: 15
+      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
+        original source bytes remain exact.
+    - step: 16
+      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
+        original source bytes remain exact.
+    - step: 17
+      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
+        original source bytes remain exact.
+    - step: 19
+      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
+        original source bytes remain exact.
+    - step: 21
+      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
+        original source bytes remain exact.
+    - step: 22
+      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
+        original source bytes remain exact.
+    - step: 28
+      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
+        original source bytes remain exact.
+    - step: 34
+      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
+        original source bytes remain exact.
+    - step: 39
+      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
+        original source bytes remain exact.
+    - step: 40
+      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
+        original source bytes remain exact.
+    results:
+    - 14
+    - 15
+    - 16
+    - 17
+    - 19
+    - 21
+    - 22
+    - 28
+    - 34
+    - 39
+    - 40
+  visual:
+  - check: Diagram labels, page boundaries and popup placement
+    method: manual
+    reason: Inspect retained screenshots and actual exported documents; structural evidence alone does not establish visual
+      fidelity.
+  native:
+  - check: Real save dialog, filesystem or Home SQLite persistence across WebView reload
+    method: automated
+    reason: Browser stubs cannot establish native IPC, saved bytes, native WebView rendering or persisted snapshots.

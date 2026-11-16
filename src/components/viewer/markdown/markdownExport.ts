@@ -3,17 +3,17 @@ import { writeText, writeMultiFormat } from "../../../lib/clipboard";
 import { getAppPlatform, isTauriRuntime } from "../../../lib/runtime";
 import { notifyClipboardWritten } from "../../../lib/clipboardOwnership";
 import { exportMarkdownFolder, saveExportBlob } from "./exportFiles";
-import { markdownExportCss, prepareMarkdownExport, type MarkdownExportKind, type MarkdownExportSettings } from "./exportModel";
+import { prepareMarkdownExport, type MarkdownExportKind, type MarkdownExportSettings } from "./exportModel";
 import type { MarkdownAssets } from "./markdownOwner";
 
 export interface MarkdownExportResult { path?: string; status: "saved" | "copied" | "print-opened" | "cancelled" }
 
-async function exportPng(root: HTMLElement, settings: MarkdownExportSettings, title: string): Promise<Blob> {
+async function exportPng(root: HTMLElement, settings: MarkdownExportSettings, css: string): Promise<Blob> {
   const host = document.createElement("div");
   host.style.cssText = "position:fixed;left:-100000px;top:0;width:800px;pointer-events:none;z-index:-1";
   const shadow = host.attachShadow({ mode: "open" });
   const style = document.createElement("style");
-  style.textContent = markdownExportCss(settings, title);
+  style.textContent = css;
   const wrapper = document.createElement("div");
   wrapper.style.background = settings.theme === "dark" ? "#191c22" : "#ffffff";
   wrapper.style.color = settings.theme === "dark" ? "#e5e7eb" : "#1f2937";
@@ -74,7 +74,7 @@ export async function exportMarkdown(
   }
   const prepared = await prepareMarkdownExport(content, docPath, settings, assets);
   const stem = markdownBasename(docPath).replace(/\.(md|markdown)$/i, "");
-  if (kind === "print" || kind === "pdf") {
+  if (kind === "print") {
     await printMarkdownHtml(prepared.html);
     return { status: "print-opened" };
   }
@@ -99,7 +99,8 @@ export async function exportMarkdown(
     return { status: "copied" };
   }
   let blob: Blob;
-  if (kind === "png") blob = await exportPng(prepared.root, settings, prepared.title);
+  if (kind === "pdf") blob = await (await import("./exportPdf")).markdownPdf(prepared.root, prepared.title, settings, prepared.css);
+  else if (kind === "png") blob = await exportPng(prepared.root, settings, prepared.css);
   else if (kind === "docx") blob = await (await import("./exportDocx")).markdownDocx(prepared.root, prepared.title, settings);
   else blob = new Blob([prepared.html], { type: "text/html;charset=utf-8" });
   const path = await saveExportBlob(`${stem}.${kind}`, blob, sourceIsFile ? docPath : undefined);

@@ -1,7 +1,7 @@
 """Real attachment reuse/removal/delete and explicit invalid-file recovery."""
 from . import file_dialog
 from .tao_real_flow import CredentialInvalid, RealFlow
-from .tao_real_images import FILES, create_image
+from .tao_real_images import FILES, chooser_title, create_image
 
 
 CHOOSE = '[data-testid="tao-home-file-choose"]'
@@ -20,7 +20,7 @@ def run(ctx):
 
         def upload(path):
             before = len(flow.read(FILES)["transport"]["files"])
-            file_dialog.run(ctx, dict(kind="open", action="choose", path=str(path), title="打开", trigger=CHOOSE))
+            file_dialog.run(ctx, dict(kind="open", action="choose", path=str(path), title=chooser_title(), trigger=CHOOSE))
             observed = flow.wait(lambda: flow.read(FILES),
                                  lambda s: len(s["transport"]["files"]) == before + 1 and s["transport"]["files"][-1]["status"] != "pending",
                                  "Native attachment operation did not complete", 120)

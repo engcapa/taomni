@@ -2,12 +2,18 @@
 from __future__ import annotations
 
 import json
+import platform
 import re
 import secrets
 
 from . import file_dialog
 from .steps import StepError
 from .tao_real_flow import CredentialInvalid, RealFlow
+
+
+def chooser_title():
+    # rfd GTK explicitly defaults to this title; Windows uses the OS locale.
+    return "Open File" if platform.system() == "Linux" else "打开"
 
 
 def create_image(path, digits: str, color: str):
@@ -39,7 +45,7 @@ def run(ctx):
     with flow.evidence():
         flow.click('[data-testid="tao-home-plus"]')
         flow.click('[data-testid="tao-home-context-attach"]')
-        file_dialog.run(ctx, dict(kind="open", action="cancel", title="打开", trigger='[data-testid="tao-home-file-choose"]'))
+        file_dialog.run(ctx, dict(kind="open", action="cancel", title=chooser_title(), trigger='[data-testid="tao-home-file-choose"]'))
         flow.require(not flow.read(FILES)["transport"]["files"], "Cancel triggered a native upload")
         flow.record("chooser-cancel-no-upload", flow.read(FILES))
         for index, (extension, color) in enumerate((("png", "red"), ("jpg", "blue"), ("webp", "green"))):
@@ -51,7 +57,7 @@ def run(ctx):
             path = ctx.case_dir / ("synthetic-picture-" + str(index) + "." + extension)
             create_image(path, digits, color)
             before = len(flow.read(FILES)["transport"]["files"])
-            file_dialog.run(ctx, dict(kind="open", action="choose", path=str(path.resolve()), title="打开", trigger='[data-testid="tao-home-file-choose"]'))
+            file_dialog.run(ctx, dict(kind="open", action="choose", path=str(path.resolve()), title=chooser_title(), trigger='[data-testid="tao-home-file-choose"]'))
             observed = flow.wait(lambda: flow.read(FILES),
                                  lambda s: len(s["transport"]["files"]) == before + 1 and s["transport"]["files"][-1]["status"] != "pending",
                                  "Actual native image upload did not finish", 120)

@@ -6,7 +6,7 @@ description: >-
   Cancel must not upload. Completion requires 100 percent progress and a reference chip.
   At most three chat requests. Only explicit invalid credentials may finish early.
 modes: [native]
-native_platforms: [Windows]
+native_platforms: [Windows, Linux]
 covers: [F1.11]
 tags: [p1, tao-home, native, real-provider, regression]
 fixtures: [reset_db, tao_real_provider]
@@ -32,9 +32,9 @@ verification:
     - {step: 8, expectation: No unhandled runtime errors.}
     results: [7, 8]
   native:
-  - check: Real Windows chooser, Files API and vision messages
+  - check: Real Windows/GTK chooser, Files API and vision messages
     method: automated
-    reason: Real dialog input and forwarding-only native completion observation; no provider replacement. Exact Chinese OS dialog title currently limits this case to the Windows QA host.
+    reason: Real dialog input and forwarding-only native completion observation; no provider replacement. The chooser uses the rfd GTK title on Linux and the localized title on the Windows QA host.
   visual:
   - check: Uploaded image references and actual reply
     method: manual

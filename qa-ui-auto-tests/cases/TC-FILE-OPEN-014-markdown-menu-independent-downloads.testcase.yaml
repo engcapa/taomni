@@ -1,0 +1,230 @@
+id: TC-FILE-OPEN-014
+title: Markdown dropdown without toolbar scrollbars, independent PDF and portable Word downloads
+description: Production Explorer and export UI. Desktop and narrow layout, keyboard navigation/focus, default settings, real
+  printer-independent PDF and Word downloads. Independent host parsing checks A4 pagination at 300DPI, three vector diagrams
+  with explicit label styles and 600DPI Word fallback; original raster stays 1600x800. Browser evidence is not native chooser
+  evidence.
+modes:
+- browser
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-export-quality
+- reload_window: null
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-file-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Control+l
+    macos_key: Meta+l
+- fill:
+    selector: '[data-testid="explorer-address"]'
+    value: ${fixture.file_open_root}
+- press:
+    selector: '[data-testid="explorer-address"]'
+    key: Enter
+- dblclick: '[data-testid="explorer-file-row"][data-name="quality.md"]'
+- wait_for: '[data-testid="markdown-editor"]'
+- click: '[data-testid="markdown-export"]'
+- wait_for: '[data-testid="markdown-export-menu"]'
+- assert_element_geometry:
+    selector: '[data-testid="markdown-export-menu"]'
+    min_width: 250
+    min_height: 220
+    viewport_margin: 7
+- eval_readonly:
+    expression: '!document.querySelector(''.fv-md-export-menu'').closest(''.fv-md-toolbar'') && document.querySelector(''.fv-md-export-menu'').getBoundingClientRect().top
+      >= document.querySelector(''.fv-md-export-control>button'').getBoundingClientRect().bottom'
+    expect_truthy: true
+- eval_readonly:
+    expression: document.querySelector('.fv-md-toolbar').scrollHeight <= document.querySelector('.fv-md-toolbar').clientHeight
+      + 1 && document.querySelector('.fv-md-toolbar').scrollWidth <= document.querySelector('.fv-md-toolbar').clientWidth
+      + 1
+    expect_truthy: true
+- eval_readonly:
+    expression: document.querySelector('.fv-md-format').scrollHeight <= document.querySelector('.fv-md-format').clientHeight
+      + 1 && document.querySelector('.fv-md-format').scrollWidth <= document.querySelector('.fv-md-format').clientWidth +
+      1
+    expect_truthy: true
+- press:
+    selector: '[data-testid="markdown-export-html"]'
+    key: End
+- eval_readonly:
+    expression: document.activeElement?.getAttribute('data-testid') === 'markdown-export-print'
+    expect_truthy: true
+- press:
+    selector: '[data-testid="markdown-export-print"]'
+    key: Escape
+- assert_not_visible: '[data-testid="markdown-export-menu"]'
+- eval_readonly:
+    expression: document.activeElement?.getAttribute('data-testid') === 'markdown-export'
+    expect_truthy: true
+- set_viewport:
+    width: 820
+    height: 700
+- eval_readonly:
+    expression: document.querySelector('.fv-md-toolbar').scrollHeight <= document.querySelector('.fv-md-toolbar').clientHeight
+      + 1 && document.querySelector('.fv-md-toolbar').scrollWidth <= document.querySelector('.fv-md-toolbar').clientWidth
+      + 1
+    expect_truthy: true
+- eval_readonly:
+    expression: document.querySelector('.fv-md-format').scrollHeight <= document.querySelector('.fv-md-format').clientHeight
+      + 1 && document.querySelector('.fv-md-format').scrollWidth <= document.querySelector('.fv-md-format').clientWidth +
+      1
+    expect_truthy: true
+- click: '[data-testid="markdown-export"]'
+- assert_element_geometry:
+    selector: '[data-testid="markdown-export-menu"]'
+    min_width: 250
+    min_height: 220
+    viewport_margin: 7
+- screenshot: export-menu-narrow.png
+- press: Escape
+- set_viewport:
+    width: 1366
+    height: 900
+- click: '[data-testid="markdown-export"]'
+- click: '[data-testid="markdown-export-pdf"]'
+- wait_for: '[data-testid="markdown-export-settings"]'
+- eval_readonly:
+    expression: '!document.querySelector(''.fv-md-setting-check input'').checked'
+    expect_truthy: true
+- click: '[data-testid="markdown-export-fileHeader"]'
+- assert_download:
+    trigger: '[data-testid="markdown-export-confirm"]'
+    filename: quality.pdf
+    artifact: pdf
+- wait_for: '[data-testid="markdown-export-status"][data-export-state="saved"]'
+- click: '[data-testid="markdown-export"]'
+- click: '[data-testid="markdown-export-docx"]'
+- wait_for: '[data-testid="markdown-export-settings"]'
+- eval_readonly:
+    expression: '!document.querySelector(''.fv-md-setting-check input'').checked'
+    expect_truthy: true
+- click: '[data-testid="markdown-export-fileHeader"]'
+- assert_download:
+    trigger: '[data-testid="markdown-export-confirm"]'
+    filename: quality.docx
+    artifact: docx
+- wait_for: '[data-testid="markdown-export-status"][data-export-state="saved"]'
+- assert_file_open_bytes:
+    path: ${fixture.markdown_quality_source}
+    sha256: ${fixture.markdown_quality_sha}
+- assert_no_runtime_errors: null
+- screenshot: export-independent-pdf-word.png
+covers:
+- F-FILEOPEN-1
+- F-EXPLORER-1
+tags:
+- p0
+- markdown
+- export
+- regression
+fixtures:
+- reset_db
+- markdown_quality
+timeout_sec: 300
+verification:
+  review: reviewed
+  requirements:
+  - id: DURABLE-RESULT
+    requirement: Export dropdown escapes clipping surfaces with no toolbar scrollbars, supports keyboard dismissal and narrow
+      windows, and produces complete high-fidelity PDF/DOCX artifacts while retaining source bytes.
+    actions:
+    - 3
+    - 4
+    - 5
+    - 7
+    - 8
+    - 9
+    - 10
+    - 12
+    - 18
+    - 20
+    - 23
+    - 26
+    - 29
+    - 30
+    - 31
+    - 32
+    - 35
+    - 36
+    - 38
+    - 39
+    - 42
+    - 43
+    checkpoints:
+    - step: 14
+      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
+        original source bytes remain exact.
+    - step: 15
+      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
+        original source bytes remain exact.
+    - step: 16
+      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
+        original source bytes remain exact.
+    - step: 17
+      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
+        original source bytes remain exact.
+    - step: 19
+      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
+        original source bytes remain exact.
+    - step: 21
+      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
+        original source bytes remain exact.
+    - step: 22
+      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
+        original source bytes remain exact.
+    - step: 24
+      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
+        original source bytes remain exact.
+    - step: 25
+      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
+        original source bytes remain exact.
+    - step: 27
+      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
+        original source bytes remain exact.
+    - step: 34
+      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
+        original source bytes remain exact.
+    - step: 36
+      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
+        original source bytes remain exact.
+    - step: 41
+      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
+        original source bytes remain exact.
+    - step: 43
+      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
+        original source bytes remain exact.
+    - step: 45
+      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
+        original source bytes remain exact.
+    - step: 46
+      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
+        original source bytes remain exact.
+    results:
+    - 14
+    - 15
+    - 16
+    - 17
+    - 19
+    - 21
+    - 22
+    - 24
+    - 25
+    - 27
+    - 34
+    - 36
+    - 41
+    - 43
+    - 45
+    - 46
+  visual:
+  - check: Diagram labels, page boundaries and popup placement
+    method: manual
+    reason: Inspect retained screenshots and actual exported documents; structural evidence alone does not establish visual
+      fidelity.
+  native:
+  - check: Real save chooser and desktop WebView output
+    method: external
+    reason: Covered by TC-FILE-OPEN-015; browser downloads alone do not establish native disk/chooser behavior.

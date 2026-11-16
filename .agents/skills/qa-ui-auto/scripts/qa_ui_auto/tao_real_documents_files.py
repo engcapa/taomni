@@ -3,7 +3,7 @@ import secrets
 
 from . import file_dialog
 from .tao_real_flow import CredentialInvalid, RealFlow
-from .tao_real_images import FILES
+from .tao_real_images import FILES, chooser_title
 
 
 def run(ctx):
@@ -31,7 +31,7 @@ def run(ctx):
             flow.click('[data-testid="tao-home-plus"]')
             flow.click('[data-testid="tao-home-context-attach"]')
             before = len(flow.read(FILES)["transport"]["files"])
-            file_dialog.run(ctx, dict(kind="open", action="choose", path=str(path), title="打开", trigger='[data-testid="tao-home-file-choose"]'))
+            file_dialog.run(ctx, dict(kind="open", action="choose", path=str(path), title=chooser_title(), trigger='[data-testid="tao-home-file-choose"]'))
             uploaded = flow.wait(lambda: flow.read(FILES),
                                  lambda s: len(s["transport"]["files"]) == before + 1 and s["transport"]["files"][-1]["status"] != "pending",
                                  "Actual document upload did not complete", 120)

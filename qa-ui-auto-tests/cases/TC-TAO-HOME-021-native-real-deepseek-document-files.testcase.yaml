@@ -3,10 +3,10 @@ title: Real configured provider reads actual Python and PDF documents selected t
 description: >-
   Two actual commercial requests read code and PDF contents containing a fresh
   token absent from the prompt/filename and calculate from the document data.
-  The Windows chooser enters explicit file paths; picker filters advertise
+  The owned OS chooser enters explicit file paths; picker filters advertise
   the backend-supported document, image, text and code extensions.
 modes: [native]
-native_platforms: [Windows]
+native_platforms: [Windows, Linux]
 covers: [F1.11]
 tags: [p1, tao-home, native, real-provider, regression]
 fixtures: [reset_db, tao_real_provider]
@@ -32,9 +32,9 @@ verification:
     - {step: 8, expectation: No unhandled runtime errors.}
     results: [7, 8]
   native:
-  - check: Real Windows chooser and Files API document inputs
+  - check: Real Windows/GTK chooser and Files API document inputs
     method: automated
-    reason: Retained synthetic files, native upload callbacks and commercial content recall establish the boundary. Current localized dialog title restricts execution to Windows QA.
+    reason: Retained synthetic files, native upload callbacks and commercial content recall establish the boundary. GTK and Windows dialog owners are checked before sending OS input.
   visual:
   - check: Actual document references and reply
     method: manual

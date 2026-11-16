@@ -33,7 +33,7 @@ def setup(ctx: Any) -> None:
         page = getattr(ctx, "page", None)
         if page is None:
             raise RuntimeError("platform_workspace_root needs a browser page")
-        page.goto(cfg["app"]["base_url"], wait_until="commit")
+        page.goto(cfg["app"]["base_url"], wait_until="domcontentloaded")
         page.evaluate(
             """async ({root, files}) => {
               const vfs = await import('/src/stubs/localVfs.ts');

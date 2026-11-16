@@ -3,9 +3,12 @@ import { prepareMarkdownExport, DEFAULT_EXPORT_SETTINGS, markdownExportCss } fro
 import { exportMarkdown } from "./markdownExport";
 import { readMarkdownImage } from "../../../lib/markdownAssets";
 import { saveExportBlob } from "./exportFiles";
+import { markdownPdf } from "./exportPdf";
 
 vi.mock("../../../lib/markdownAssets", async (original) => ({ ...await original<typeof import("../../../lib/markdownAssets")>(), readMarkdownImage: vi.fn() }));
 vi.mock("./exportFiles", () => ({ saveExportBlob: vi.fn(), exportMarkdownFolder: vi.fn() }));
+vi.mock("./exportPdf", () => ({ markdownPdf: vi.fn() }));
+vi.mock("./mathExportCss", () => ({ mathExportCss: async () => ".katex{font-family:KaTeX_Main}" }));
 beforeEach(() => {
   vi.clearAllMocks();
   vi.mocked(readMarkdownImage).mockResolvedValue("data:image/png;base64,AQID");
@@ -13,6 +16,15 @@ beforeEach(() => {
 });
 
 describe("self-contained sanitized Markdown output", () => {
+  it("saves independently generated PDF bytes through the normal chooser without invoking printing", async () => {
+    const blob = new Blob(["%PDF-1.7\n"], { type: "application/pdf" });
+    vi.mocked(markdownPdf).mockResolvedValue(blob);
+    vi.mocked(saveExportBlob).mockResolvedValueOnce("/out/a.pdf").mockResolvedValueOnce(null);
+    expect(await exportMarkdown("pdf", "# PDF", "/docs/a.md", DEFAULT_EXPORT_SETTINGS)).toEqual({ status: "saved", path: "/out/a.pdf" });
+    expect(saveExportBlob).toHaveBeenCalledWith("a.pdf", blob, "/docs/a.md");
+    expect(document.querySelector("iframe")).toBeNull();
+    expect(await exportMarkdown("pdf", "# PDF", "/docs/a.md", DEFAULT_EXPORT_SETTINGS)).toEqual({ status: "cancelled" });
+  });
   it("shares the existing renderer and embeds actual local image data with no resource fetch", async () => {
     const source = '# Doc\n\n**bold** ![local](assets/a.png)\n\n<script>alert(1)</script>\n';
     const result = await prepareMarkdownExport(source, "/docs/a.md", DEFAULT_EXPORT_SETTINGS);

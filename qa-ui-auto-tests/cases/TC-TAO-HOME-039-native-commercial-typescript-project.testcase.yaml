@@ -1,0 +1,61 @@
+id: TC-TAO-HOME-039
+title: Native OpenCode TypeScript application, CLI, tests, repair and feature loop
+description: Real OpenCode deepseek-v4.1-flash with thinking=max authors an isolated typed Node 22 task application. All file
+  writes and commands require visible approval. Actual node:test processes prove initial success, deliberate failing regression,
+  model repair and priority/legacy-data extension. No provider response replacement or exact-answer grading; key is loaded
+  from the opt-in file.
+modes:
+- native
+covers:
+- F1.11
+tags:
+- p0
+- tao-home
+- native
+- real-provider
+- regression
+fixtures:
+- reset_db
+- tao_real_provider
+timeout_sec: 1500
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-tao-home-039-typescript
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- wait_for: '[data-testid="tao-home-composer-input"]:enabled'
+- observe_tao_provider: null
+- tao_real_provider_expanded:
+    scenario: project-typescript
+- assert_no_runtime_errors: null
+- screenshot: tao-typescript-project-final.png
+verification:
+  review: reviewed
+  requirements:
+  - id: AGENT-TYPESCRIPT-ENGINEERING
+    requirement: Approved real files and native test exits drive the next development round.
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    checkpoints:
+    - step: 7
+      expectation: Actual TypeScript repository, CLI, README and at least six native tests; no write before approval. Completion
+        regression fails with exit 1, model repair passes, priority/legacy-data extension has at least ten passing tests.
+        Final review leaves no pending action.
+    - step: 8
+      expectation: No unhandled runtime errors.
+    results:
+    - 7
+    - 8
+  native:
+  - check: Commercial inference, filesystem changes and actual child process exit statuses
+    method: automated
+    reason: Browser stubs cannot establish native provider, approved disk effects or real tests.
+  visual:
+  - check: Action review cards and result readability
+    method: manual
+    reason: Retained screenshots support review; text/exit checks do not certify full prototype fidelity.

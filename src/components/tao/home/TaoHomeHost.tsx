@@ -101,7 +101,7 @@ export function TaoHomeHost(props: WelcomePanelProps) {
           belowComposer: <>
             <SuggestionRow controller={controller} hidden={demoMode} />
             <DockRow {...props} onOpenSettings={openSettings} controller={controller} threads={threads}
-              demoMode={demoMode} onDeleteThread={history.loading ? undefined : history.remove} />
+              demoMode={demoMode} historyLoading={history.loading} historyError={history.error} onRefreshHistory={history.refresh} onDeleteThread={history.loading ? undefined : history.remove} />
           </>,
         }} />
       {state.ui.searchOpen && props.active !== false ? <SearchPanel controller={controller} contextPorts={contextPorts} onClose={() => controller.setSearchOpen(false)} /> : null}

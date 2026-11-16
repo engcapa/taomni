@@ -1,6 +1,7 @@
 import type { MarkdownExportSettings } from "./exportModel";
+import { embeddedSvg, portableWordSvg } from "./wordSvg";
 
-export const WORD_IMAGE_DPI = 300;
+export const WORD_IMAGE_DPI = 600;
 const MAX_PIXELS = 40_000_000;
 export function wordPageLayout(settings: MarkdownExportSettings) {
   const margin = settings.margins === "narrow" ? 680 : settings.margins === "wide" ? 1814 : 1134;
@@ -37,24 +38,15 @@ export function svgGeometry(svg: Element): { width: number; height: number } {
 }
 
 export async function wordImageData(node: Element, settings: MarkdownExportSettings): Promise<{
-  bytes: Uint8Array; svg?: Uint8Array; width: number; height: number;
+  bytes: Uint8Array; svg?: Uint8Array; type?: "png" | "jpg"; width: number; height: number;
 }> {
-  const vector = node.tagName.toLowerCase() === "svg";
+  const svg = embeddedSvg(node);
+  const vector = Boolean(svg);
   let geometry: { width: number; height: number } | undefined;
   let svgText: string | undefined;
-  if (vector) {
-    geometry = svgGeometry(node);
-    const copy = node.cloneNode(true) as Element;
-    copy.setAttribute("xmlns", "http://www.w3.org/2000/svg");
-    copy.setAttribute("width", String(geometry.width)); copy.setAttribute("height", String(geometry.height));
-    copy.removeAttribute("style");
-    const viewBox = copy.getAttribute("viewBox")?.trim().split(/[ ,]+/).map(Number);
-    const background = document.createElementNS("http://www.w3.org/2000/svg", "rect");
-    background.setAttribute("x", String(viewBox?.[0] || 0)); background.setAttribute("y", String(viewBox?.[1] || 0));
-    background.setAttribute("width", String(geometry.width)); background.setAttribute("height", String(geometry.height));
-    background.setAttribute("fill", settings.theme === "dark" ? "#191c22" : "#ffffff");
-    copy.prepend(background);
-    svgText = new XMLSerializer().serializeToString(copy);
+  if (svg) {
+    geometry = svgGeometry(svg);
+    svgText = await portableWordSvg(svg, geometry.width, geometry.height, settings.theme === "dark");
   }
   const source = svgText ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svgText)}` : node.getAttribute("src") || "";
   const image = new Image();
@@ -63,6 +55,9 @@ export async function wordImageData(node: Element, settings: MarkdownExportSetti
   });
   geometry ??= { width: image.naturalWidth, height: image.naturalHeight };
   const layout = wordImageLayout(geometry.width, geometry.height, settings, vector);
+  const original = !vector && /^data:image\/(png|jpe?g);base64,([\s\S]+)$/i.exec(source);
+  if (original) return { bytes: Uint8Array.from(atob(original[2]), (char) => char.charCodeAt(0)),
+    type: original[1].toLowerCase() === "png" ? "png" : "jpg", width: layout.width, height: layout.height };
   const canvas = document.createElement("canvas");
   canvas.width = layout.pixelWidth; canvas.height = layout.pixelHeight;
   const context = canvas.getContext("2d");

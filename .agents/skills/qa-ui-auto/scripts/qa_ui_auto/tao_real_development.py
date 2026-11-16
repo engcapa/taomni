@@ -62,6 +62,8 @@ def test_project(flow, command, users, stage, failed=False, minimum=1):
     results = flow.wait(lambda: flow.read(RESULTS), lambda r: len(r) == before + 1, "Native test process did not settle", 90)
     output = results[-1]
     count = re.search(r"Ran\s+(\d+)\s+tests?", output)
+    if not count:
+        count = re.search(r"(?:#|ℹ)\s*tests\s+(\d+)", output)
     flow.require(bool(count) and int(count[1]) >= minimum, "The native test process did not execute the required tests")
     flow.require(("Execution failed" in output and "exit 1" in output) if failed else ("Completed" in output and "exit 0" in output),
                  "Actual test process did not have the expected exit state")

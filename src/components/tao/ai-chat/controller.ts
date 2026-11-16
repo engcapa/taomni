@@ -389,13 +389,29 @@ export function createChatController(options: ChatControllerOptions = {}): TaoCh
     },
     ...createActionLifecycle({ getState: () => state, patchThread, patchRuntime, ports: options.actionPorts }),
     removeChip(chipId) { patch({ composer: { ...state.composer, chips: state.composer.chips.filter((chip) => chip.id !== chipId) } }); },
-    hydrateThreads(threads) {
+    hydrateThreads(threads, options) {
       const valid = threads.filter((thread) => thread && typeof thread.id === "string" && Array.isArray(thread.messages));
-      if (!valid.length) return;
-      const ordered = [...valid].sort((a, b) => b.updatedAt - a.updatedAt).map((thread) => ({ ...thread, messages: thread.messages.map((message) => ({ ...message, blocks: message.blocks.map((block) => block.action?.status === "approved" ? { ...block, action: { ...block.action, status: "invalid" as const, result: { output: tr("执行已中断，请检查实际结果后重新提议。") } } } : block) })) }));
+      if (!valid.length) {
+        if (options?.merge) patch({ threads: Object.fromEntries(Object.entries(state.threads).filter(([, thread]) => thread.source !== "legacy")) });
+        return;
+      }
+      const ordered = [...valid].sort((a, b) => b.updatedAt - a.updatedAt).map((thread) => ({ ...thread, messages: thread.messages.map((message) => ({ ...message, blocks: (message.blocks ?? []).map((block) => block.action?.status === "approved" ? { ...block, action: { ...block.action, status: "invalid" as const, result: { output: tr("执行已中断，请检查实际结果后重新提议。") } } } : block) })) }));
       const runtime = Object.fromEntries(ordered.map((thread) => [thread.id, { phase: thread.messages.some((m) => m.blocks.some((b) => b.action && actionPending(b.action))) ? "awaiting_action" as const : "idle" as const, budget: { usedTokens: 0, limitTokens: budget.limitTokens, halted: false } }]));
-      patch({ threads: Object.fromEntries(ordered.map((thread) => [thread.id, { ...thread, running: false }])), runtime, activeThreadId: ordered[0].id });
-      controller.setActiveThread(ordered[0].id);
+      const incoming = Object.fromEntries(ordered.map((thread) => [thread.id, { ...thread, running: false }]));
+      if (options?.merge) {
+        // Refresh legacy summaries from their owner, while current Home threads
+        // retain drafts, active streams, action approvals and cancellation owners.
+        const current = Object.fromEntries(Object.entries(state.threads).filter(([, thread]) => thread.source !== "legacy"));
+        patch({ threads: { ...incoming, ...current }, runtime: { ...runtime, ...state.runtime } });
+        return;
+      }
+      const active = ordered.find((thread) => thread.source !== "legacy");
+      if (!active) {
+        patch({ threads: { ...incoming, ...state.threads }, runtime: { ...runtime, ...state.runtime } });
+        return;
+      }
+      patch({ threads: incoming, runtime, activeThreadId: active.id });
+      controller.setActiveThread(active.id);
     },
     increaseBudget(limitTokens) {
       const threadId = state.activeThreadId;

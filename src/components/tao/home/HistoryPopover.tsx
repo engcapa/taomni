@@ -11,6 +11,7 @@ import type { TaoThread } from "../ai-chat";
 interface Props {
   threads: TaoThread[]; sessions: SessionConfig[]; workspaces: RecentWorkspace[]; demoMode: boolean;
   directories?: ReactNode;
+  loading?: boolean; error?: string; onRefresh?: () => void;
   onSelectThread: (thread: TaoThread) => void;
   onDeleteThread?: (thread: TaoThread) => Promise<void>;
   onOpenSession?: (session: SessionConfig) => void;
@@ -59,6 +60,9 @@ export function HistoryPopover(props: Props) {
   const filteredWorkspaces = useMemo(() => workspaces.filter((workspace) => !needle || workspace.name.toLocaleLowerCase().includes(needle)).sort((a, b) => b.lastOpenedAt - a.lastOpenedAt), [workspaces, needle]);
   const closeAfter = (action: () => void) => { action(); onClose(); };
   return <div ref={root} className="tao-home-history-content" data-testid="tao-home-history-popover">
+    {props.loading ? <p role="status" data-testid="tao-home-history-loading">{tr("正在读取历史…")}</p> : null}
+    {props.error ? <p role="alert" data-testid="tao-home-history-error">{props.error}</p> : null}
+    {props.onRefresh ? <button type="button" data-testid="tao-home-history-refresh" disabled={props.loading} onClick={props.onRefresh}>{tr("刷新历史")}</button> : null}
     <div className="tao-home-history-header"><strong><Clock3 size={14} />{tr("历史")}</strong><button type="button" aria-label={tr("关闭历史")} onClick={onClose}><X size={14} /></button></div>
     <div className="tao-home-history-tabs" role="tablist">{(["chat", "sessions", "workspaces", "directories"] as const).map((item) => <button type="button" role="tab" aria-selected={tab === item} data-testid={`tao-home-history-tab-${item}`} key={item} className={tab === item ? "active" : ""} onClick={() => { setTab(item); setQuery(""); }}>{tr(({ chat: "Tao 对话", sessions: "最近会话", workspaces: "最近工作区", directories: "最近目录" })[item])}</button>)}</div>
     {tab === "directories" ? <div className="tao-home-directory-history">{props.directories}</div> : <>
@@ -78,7 +82,7 @@ export function HistoryPopover(props: Props) {
         </div>) : null}
         {tab === "sessions" ? filteredSessions.map((session, index) => <button type="button" className="tao-home-history-row" key={session.id} onClick={() => closeAfter(() => props.onOpenSession?.(session))}><span>{title(session.name || session.host || tr("会话"), index, "会话")}</span><small>{session.session_type}</small></button>) : null}
         {tab === "workspaces" ? filteredWorkspaces.map((workspace, index) => <button type="button" className="tao-home-history-row" data-testid="tao-home-history-row" data-workspace-id={workspace.id} data-title={workspace.name} key={workspace.id} onClick={() => closeAfter(() => props.onOpenWorkspace?.(workspace))}><span>{title(workspace.name, index, "工作区")}</span>{!demoMode ? <small>{workspace.roots[0]?.path ?? ""}</small> : null}</button>) : null}
-        {(tab === "chat" ? filteredThreads : tab === "sessions" ? filteredSessions : filteredWorkspaces).length === 0 ? <p className="tao-home-history-empty">{tr("暂无记录")}</p> : null}
+        {(tab === "chat" ? filteredThreads : tab === "sessions" ? filteredSessions : filteredWorkspaces).length === 0 && !props.loading && !props.error ? <p className="tao-home-history-empty">{tr("暂无记录")}</p> : null}
       </div>
     </>}
     {deleteError ? <p role="alert">{deleteError}</p> : null}

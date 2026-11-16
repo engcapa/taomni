@@ -107,6 +107,7 @@ from . import tao_real_provider
 from . import tao_agent
 from . import tao_memory
 from . import tao_history
+from . import markdown_quality
 
 
 class FixtureContext(Protocol):
@@ -124,6 +125,7 @@ class Fixture:
 
 
 REGISTRY: dict[str, Fixture] = {
+    "markdown_quality": Fixture("markdown_quality", markdown_quality.setup, markdown_quality.teardown),
     "tao_messages": Fixture("tao_messages", tao_messages.setup, tao_messages.teardown),
     "tao_real_provider": Fixture("tao_real_provider", tao_real_provider.setup, tao_real_provider.teardown),
     "tao_agent": Fixture("tao_agent", tao_agent.setup, tao_agent.teardown),

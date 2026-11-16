@@ -10,7 +10,7 @@ export interface RunOptions {
   children?: Array<string | number>;
 }
 export class TextRun { constructor(options: string | RunOptions); readonly kind: "run" }
-export class ImageRun { constructor(options: ({ type: "png"; data: Uint8Array } | { type: "svg"; data: Uint8Array; fallback: { type: "png"; data: Uint8Array } }) & { transformation: { width: number; height: number }; altText?: { title: string; description: string; name: string } }); readonly kind: "image" }
+export class ImageRun { constructor(options: ({ type: "png" | "jpg"; data: Uint8Array } | { type: "svg"; data: Uint8Array; fallback: { type: "png"; data: Uint8Array } }) & { transformation: { width: number; height: number }; altText?: { title: string; description: string; name: string } }); readonly kind: "image" }
 export class ExternalHyperlink { constructor(options: { link: string; children: ParagraphChild[] }); readonly kind: "hyperlink" }
 export type MathComponent = MathRun | MathFraction | MathSuperScript | MathSubScript | MathSubSuperScript | MathRadical;
 export class Math { constructor(options: { children: MathComponent[] }); readonly kind: "math" }
@@ -48,7 +48,8 @@ export interface DocumentOptions {
     children: Array<Paragraph | Table>;
   }>;
 }
-export class Document { constructor(options: DocumentOptions); readonly kind: "document" }
+export class XmlComponent { constructor(name: string); }
+export class Document { constructor(options: DocumentOptions); readonly kind: "document"; readonly Settings: { addChildElement(child: XmlComponent): unknown } }
 export const Packer: { toBlob(document: Document): Promise<Blob> };
 export const PageNumber: { CURRENT: string };
 export const WidthType: { PERCENTAGE: string };

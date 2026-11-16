@@ -9,6 +9,8 @@ def run(ctx, args):
         from .tao_action_controls import run as probe
     elif args["scenario"] == "project":
         from .tao_real_project import run as probe
+    elif args["scenario"] == "project-typescript":
+        from .tao_real_typescript import run as probe
     elif args["scenario"] == "context":
         from .tao_real_context import run as probe
     elif args["scenario"] == "handoff":

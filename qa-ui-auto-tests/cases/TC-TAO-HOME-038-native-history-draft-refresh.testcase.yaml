@@ -1,0 +1,148 @@
+id: TC-TAO-HOME-038
+title: Home history refresh preserves transcript, draft and selection across reload
+description: Synthetic saved Home and legacy histories exercise real SQLite IPC. Edit a draft, switch transcripts, restore
+  the draft, reload the WebView and refresh repeatedly. History remains positioned and complete; navigating to Settings closes
+  its portal. No provider key or inferred response wording.
+modes:
+- native
+covers:
+- F1.11
+tags:
+- p0
+- tao-home
+- regression
+- persistence
+fixtures:
+- reset_db
+- tao_messages
+- tao_history
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- wait_for: '[data-testid="tao-home-message-assistant"]'
+- assert_text:
+    selector: '[data-testid="tao-home-message-assistant"]'
+    contains: Delete this Home transcript
+- fill:
+    selector: '[data-testid="tao-home-composer-input"]'
+    value: Draft survives selection and reload 中文
+- click: '[data-testid="tao-home-history"]'
+- wait_for: '[data-testid="tao-home-history-refresh"]:enabled'
+- assert_count:
+    selector: '[data-testid="tao-home-history-row"]'
+    equal: 3
+- click: '[data-testid="tao-home-history-row"][data-title="QA Home keep"]'
+- assert_text:
+    selector: '[data-testid="tao-home-message-assistant"]'
+    contains: Retain this Home transcript
+- click: '[data-testid="tao-home-history"]'
+- wait_for: '[data-testid="tao-home-history-refresh"]:enabled'
+- click: '[data-testid="tao-home-history-row"][data-title="QA Home delete"]'
+- eval_readonly:
+    expression: document.querySelector(".tao-home-composer textarea").value === "Draft survives selection and reload 中文"
+    expect_truthy: true
+- reload_window: null
+- wait_for: '[data-testid="tao-home-message-assistant"]'
+- eval_readonly:
+    expression: document.querySelector(".tao-home-composer textarea").value === "Draft survives selection and reload 中文"
+    expect_truthy: true
+- click: '[data-testid="tao-home-history"]'
+- wait_for: '[data-testid="tao-home-history-refresh"]:enabled'
+- click: '[data-testid="tao-home-history-refresh"]'
+- wait_for: '[data-testid="tao-home-history-refresh"]:enabled'
+- assert_count:
+    selector: '[data-testid="tao-home-history-row"]'
+    equal: 3
+- assert_element_geometry:
+    selector: '[data-testid="tao-home-history-popover"]'
+    min_width: 350
+    min_height: 180
+    viewport_margin: 7
+- press: Escape
+- click: '[data-testid="tao-home-dock-more"]'
+- click: '[data-testid="tao-home-dock-settings"]'
+- wait_for: '[data-testid="tao-settings"]'
+- assert_not_visible: '[data-testid="tao-home-history-popover"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="tao-home-history"]'
+- wait_for: '[data-testid="tao-home-history-refresh"]:enabled'
+- assert_count:
+    selector: '[data-testid="tao-home-history-row"]'
+    equal: 3
+- assert_no_runtime_errors: null
+- screenshot: native-history-draft-restored.png
+verification:
+  review: reviewed
+  requirements:
+  - id: DURABLE-RESULT
+    requirement: Saved Home and legacy records remain consistently accessible; draft preferences persist through thread selection
+      and WebView reload, refresh retains local state and inactive Home does not leave an orphan popup.
+    actions:
+    - 2
+    - 3
+    - 6
+    - 7
+    - 10
+    - 12
+    - 14
+    - 16
+    - 19
+    - 21
+    - 25
+    - 26
+    - 27
+    - 30
+    - 31
+    checkpoints:
+    - step: 5
+      expectation: The preceding production UI action retains its required geometry, complete saved artifact or durable transcript/draft,
+        as specified by the assertion.
+    - step: 9
+      expectation: The preceding production UI action retains its required geometry, complete saved artifact or durable transcript/draft,
+        as specified by the assertion.
+    - step: 11
+      expectation: The preceding production UI action retains its required geometry, complete saved artifact or durable transcript/draft,
+        as specified by the assertion.
+    - step: 15
+      expectation: The preceding production UI action retains its required geometry, complete saved artifact or durable transcript/draft,
+        as specified by the assertion.
+    - step: 18
+      expectation: The preceding production UI action retains its required geometry, complete saved artifact or durable transcript/draft,
+        as specified by the assertion.
+    - step: 23
+      expectation: The preceding production UI action retains its required geometry, complete saved artifact or durable transcript/draft,
+        as specified by the assertion.
+    - step: 24
+      expectation: The preceding production UI action retains its required geometry, complete saved artifact or durable transcript/draft,
+        as specified by the assertion.
+    - step: 29
+      expectation: The preceding production UI action retains its required geometry, complete saved artifact or durable transcript/draft,
+        as specified by the assertion.
+    - step: 33
+      expectation: The preceding production UI action retains its required geometry, complete saved artifact or durable transcript/draft,
+        as specified by the assertion.
+    - step: 34
+      expectation: The preceding production UI action retains its required geometry, complete saved artifact or durable transcript/draft,
+        as specified by the assertion.
+    results:
+    - 5
+    - 9
+    - 11
+    - 15
+    - 18
+    - 23
+    - 24
+    - 29
+    - 33
+    - 34
+  visual:
+  - check: Diagram labels, page boundaries and popup placement
+    method: manual
+    reason: Inspect retained screenshots and actual exported documents; structural evidence alone does not establish visual
+      fidelity.
+  native:
+  - check: Real save dialog, filesystem or Home SQLite persistence across WebView reload
+    method: automated
+    reason: Browser stubs cannot establish native IPC, saved bytes, native WebView rendering or persisted snapshots.
