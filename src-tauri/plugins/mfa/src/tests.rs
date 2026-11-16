@@ -2,6 +2,34 @@ use super::*;
 use serde_json::json;
 
 #[test]
+fn engine_key_adapter_preserves_stable_core_service_error_codes() {
+    for error in [
+        CoreServiceError::PermissionDenied,
+        CoreServiceError::DuplicateRequest,
+        CoreServiceError::VaultLocked,
+        CoreServiceError::VaultBadPassword,
+        CoreServiceError::VaultPasswordRequired,
+        CoreServiceError::MfaKeyMissing,
+        CoreServiceError::MfaKeyMismatch,
+        CoreServiceError::StalePluginContext,
+        CoreServiceError::PluginProfileInUse,
+        CoreServiceError::CoreServiceBusy,
+        CoreServiceError::Cancelled,
+        CoreServiceError::TimedOut,
+    ] {
+        assert_eq!(business_error(error.kind()), error.into_rpc_error());
+    }
+    assert_eq!(
+        business_error("MFA_INVALID_INPUT: invalid account").code,
+        ErrorCode::InvalidParams.as_i32()
+    );
+    assert_eq!(
+        business_error(INITIALIZATION_REQUIRED).code,
+        ErrorCode::InvalidState.as_i32()
+    );
+}
+
+#[test]
 fn manifest_and_compiled_host_have_the_same_identity_and_service_contract() {
     let manifest: serde_json::Value = serde_json::from_str(include_str!("../module.json")).unwrap();
     let config = host_config();

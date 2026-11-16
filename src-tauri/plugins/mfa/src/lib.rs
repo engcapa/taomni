@@ -87,6 +87,27 @@ impl PluginHandler for Handler {
 
 pub(crate) fn business_error(message: impl Into<String>) -> RpcError {
     let message = message.into();
+    // The engine's platform-neutral KeyProvider carries failures as strings.
+    // Restore only exact, typed service kinds at this transport boundary so a
+    // denied key request, cancellation or timeout retains its stable RPC code.
+    for service in [
+        CoreServiceError::PermissionDenied,
+        CoreServiceError::DuplicateRequest,
+        CoreServiceError::VaultLocked,
+        CoreServiceError::VaultBadPassword,
+        CoreServiceError::VaultPasswordRequired,
+        CoreServiceError::MfaKeyMissing,
+        CoreServiceError::MfaKeyMismatch,
+        CoreServiceError::StalePluginContext,
+        CoreServiceError::PluginProfileInUse,
+        CoreServiceError::CoreServiceBusy,
+        CoreServiceError::Cancelled,
+        CoreServiceError::TimedOut,
+    ] {
+        if message == service.kind() {
+            return service.into_rpc_error();
+        }
+    }
     let code = if message.starts_with(taomni_mfa_engine::ERR_INVALID_INPUT) {
         ErrorCode::InvalidParams
     } else {
