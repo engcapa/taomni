@@ -347,6 +347,9 @@ controls:
 - id: tao-home-popup-shell-select
   selector: '[role="dialog"] select[aria-label="Choose shell"]'
   kind: interactive
+- id: tao-home-popup-shell-home
+  selector: 'xpath=//*[@role="dialog"]//button[normalize-space(.)="Open home directory"]'
+  kind: interactive
 - id: tao-home-send
   selector: '[data-testid="tao-home-send"]'
   kind: interactive

@@ -39,13 +39,32 @@
 
 ## 当前阶段回执
 
-- Tao frontend：19 files / 69 tests 通过；绑定显示更新后单独复跑相关组件，1 file / 2 tests 通过。
-- Tao Rust：33 passed，使用 Windows 无默认 whisper 的既有 unit recipe；日志 `qa-ui-auto-report/_local/tao-agent-rust-stable-1116.log`。release QA 使用完整默认功能。
-- Python 工具：33 passed，覆盖 live Go Key 文件、隔离清理、真实 HTTP 网关和真实 NDJSON ACP 子进程，以及旧商业流程工具契约。
-- Refactor：契约、依赖边界与 800 行检查通过（4738 files）；Rust fmt 继续按当前源码核验。
-- Windows native 探针：027 和 028 已通过；025 保留失败，等待修复后的匹配 release 复跑。
-- Windows browser 最新稳定输入 **26/26** 通过（含全部18项适用 crash），`identity_stable=true`；原始 summary/receipt 位于 `qa-ui-auto-report/_local/tao-agent-browser-1116/run-20261116-153018-180544500/`。
-- 当前 QA release 正在重建；商业 native、完整 Windows native crash 及 Linux/macOS hosted 均待本批实际回执，不能据本节标为完成。
+本节覆盖早期探针的状态，以按钮补充批次 `7ca662c53` / `dc1288a4c` 的实际输入为准；旧失败目录保留。
+
+- 原 Agent frontend：19 files / 69 tests 通过，另有绑定显示组件 2 tests。按钮批次追加 MemoryPanel、TaoAiChat、SettingsPanel 与 sectionReveal 共 **4 files / 37 tests** 通过，日志 `qa-ui-auto-report/_local/tao-buttons-memory-units-r2-1116.log`。
+- Tao Rust：**33/33** 通过，使用 Windows 无默认 whisper 的既有 unit recipe，日志 `qa-ui-auto-report/_local/tao-buttons-retained-rust-1116.log`。原生取消回归另有 **6/6** capture 测试通过，日志 `qa-ui-auto-report/_local/tao-capture-rust-fix-r2-1116.log`；覆盖正常/失败退出、嵌套子进程取消及 future 被丢弃后的清理。release QA 使用完整默认功能。
+- Python Tao 工具：**35/35** 通过，覆盖隔离配置与清理、HTTP 网关、真实 NDJSON ACP 子进程、记忆 fixture 及既有商业工具契约。
+- `pnpm check:refactor`、Rust fmt、development case contract 与静态 `audit --gate` 通过。追加 Shell/Home 动作后静态 F1.11 为 **101/111**；其余旧文本 selector 或自定义原生 probe 未归因与实际缺口分别按覆盖矩阵记录，静态比值不等于功能完成率。最终日志 `qa-ui-auto-report/_local/tao-buttons-recovery-audit-final-1116.log`。
+- Windows browser 按最新有效回执合并 **27/27** 通过，含完整 **18/18** 适用 crash；原始整批 summary/receipt：`qa-ui-auto-report/_local/tao-agent-browser-1116/run-20261116-162201-641536600/`，扩展后 031 的最终回执为 `qa-ui-auto-report/_local/tao-buttons-browser-launcher-r2-1116/run-20261116-165728-319642900/`。实际截图已核对最新顶栏顺序、居中的四项快捷问答及无 WSL 安装提示。
+- 匹配最终源码的 QA release 已构建成功：`src-tauri/target/qa-ui-auto/release/taomni.exe`，日志 `qa-ui-auto-report/_local/tao-buttons-stable-qa-build-1116.log`。构建中源码变化的早期产物被身份检查拒绝，未用作当前证据。
+- Windows native 首轮 **34/36**，无跳过，source/build 身份稳定；报告 `qa-ui-auto-report/_local/tao-agent-native-1116/run-20261116-163043-910949100/`。034 在异步载入前立即检查数量得到 0，失败截图随后已出现三条正确资料；补充按条目身份等待，并在删除完成和 reload 数据就绪后再核对数量。MOBILE013 的辅助 Chromium 使用隔离后的 LOCALAPPDATA 寻找安装而失败；复跑进程通过 `PLAYWRIGHT_BROWSERS_PATH` 指定既有安装，不修改产品或个人应用数据。
+- 两项失败在 `qa-ui-auto-report/_local/tao-buttons-native-recovery-1116/run-20261116-165309-255688400/` 均通过。扩展 031 曾误用旧 SFTP 路径控件及 Playwright 专用 selector，实际产品已打开正确 Explorer；现使用两种 runner 均支持的按钮 XPath，严格检查活动 Explorer 的真实绝对路径与 Home 选中状态。最终 native 031 在 `qa-ui-auto-report/_local/tao-buttons-native-launcher-r2-1116/run-20261116-165725-568968900/` 通过。
+- Windows 最终为 **browser 27/27、native 36/36** 个具名用例的当前有效证据，包含全部适用 crash **18/18、22/22**。独立 `status --gate` 合并上述原始回执，结果 `ok=true`、0 gaps、0 rejected reports；记录 `qa-ui-auto-report/_local/status-tao-buttons-windows-final-1116.json`。这是逐条取最新匹配回执后的验收，不把首轮 34/36 改写为整批一次全绿。
+- GitHub [43831374934](https://github.com/engcapa/taomni/actions/runs/43831374934) 使用 `dc1288a4c` 执行 Linux/macOS browser/native release。Linux、macOS browser 均 **27/27**，raw receipt 签名、逐项文件哈希、该批 source/runner/case 与稳定性核对通过；结果位于 `qa-ui-auto-report/_local/hosted-tao-buttons-43831374934/independent-feedback-verification.json`。扩展后的 031 与异步就绪修正后的 034 需要 hosted 定向补跑，旧回执不替代新 case 输入；native 构建/执行仍待回执。
+
+当前 browser/source 指纹为 `2fd0845b1048fb308dde828e319cbbd299e5d404edcb4839c5f5a749d99bc02f`。覆盖映射见 [按钮与 Action 补充](button-action-coverage.md)，未执行或条件能力继续保留缺口。
+
+## 按钮补充与本轮发现的回归
+
+复用并扩展 001/002/003/007/009/010，新增 031～034，分别覆盖 launcher 实际目标、审核编辑与真实取消、原生工作区目录选择、非空记忆/技能的取消/保存/导出/删除与 reload 持久化。最新用户反馈删除顶栏设置/外观，末尾顺序为演示、侧栏；设置继续从 Dock More 进入。
+
+032 原生回归发现取消外层 shell 后 Python 后代仍存活，现 Windows 使用 kill-on-close Job Object、Unix 使用独立进程组，取消和 future drop 都清理整个捕获任务。010 发现已打开 Tao 设置后搜索 theme 仍停在旧区域，已复用异步标题定位及用户接管释放。033 早期失败源于误用通用 tab selector，现断言专用 workspace tab、唯一数量与实际 root path，未修改产品打开目录行为。MemoryPanel 的原生 prompt 改为侧栏受控编辑表单；取消/Escape 不保存，保存失败保留草稿，重复请求和卸载后的过期结果受到保护。
+
+## 商业 OpenCode 执行限制
+
+本轮携带临时 Key 文件路径、启动 OpenCode Go native 测试的 detached 命令被自动审批明确拒绝，仅返回 `blocked by policy`，未提供更具体原因。该商业进程未启动，本次未发出商业请求；没有通过改名、复制 Key 或更换启动路径绕过拒绝。此项记为**未执行**，不能按用户对“API Key 失效”的例外记成功。
+
+早期商业探针的 HTTP 403 / Cloudflare error 1010 也未确认凭据失效（`credential_invalid=false`）；WAF、代理/网络和审批拒绝均不属于失效。025/027/028/032 使用 loopback 模型，证明实际 native IPC、文件、检索、子进程与工作流流转，不代表商业推理或 CC/Codex 模型能力。
 
 ## 尚未关闭的设计边界
 

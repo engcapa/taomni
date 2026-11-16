@@ -3589,6 +3589,7 @@
 - `[role="dialog"] button:has-text("Thinking")` — interactive — F1.11.tao-home-popup-thinking
 - `[role="dialog"] button:has-text("Web")` — interactive — F1.11.tao-home-popup-web
 - `[role="dialog"] select[aria-label="Choose shell"]` — interactive — F1.11.tao-home-popup-shell-select
+- `xpath=//*[@role="dialog"]//button[normalize-space(.)="Open home directory"]` — interactive — F1.11.tao-home-popup-shell-home
 - `[data-testid="tao-home-send"]` — interactive — F1.11.tao-home-send
 - `[data-testid="tao-home-stop"]` — interactive — F1.11.tao-home-stop
 - `[data-testid="tao-home-message-list"]` — display — F1.11.tao-home-message-list
