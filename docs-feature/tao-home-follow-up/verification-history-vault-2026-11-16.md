@@ -44,4 +44,20 @@ Windows 首个匹配构建的新增原生批次为 **6/6**，无跳过：`qa-ui-
 
 复用 WELCOME-RS-02 的历史分类切换场景：目录→最近会话仍保留恢复入口，恢复实际文件夹且重复操作不新增 tab。新 restore browser 已通过；保留 F1.6 语义 aliases 并补实际交互，不降低覆盖基线。
 
-最终 source 的 Windows browser 31 项与 native 41 项（含所有适用 crash）正在执行/准备执行；静态 audit、最终构建和 GitHub Linux/macOS 回执按实际结果继续更新。原生 reload 两项与 history fixture 两项 Python 单测均通过。`pnpm check:refactor` 在本批抽取后通过：855 commands、328 facade exports、39 literal events，944 implementation modules 无逆向依赖或内部循环，4747 files 符合文件大小规则。
+最终 source 的 Windows browser 31 项与 native 41 项（含所有适用 crash）已执行完成，准确回执与评审口径见下节；GitHub Linux/macOS 回执按实际结果继续更新。原生 reload 两项与 history fixture 两项 Python 单测均通过。`pnpm check:refactor` 在本批抽取后通过：855 commands、328 facade exports、39 literal events，944 implementation modules 无逆向依赖或内部循环，4747 files 符合文件大小规则。
+
+## e7e73cc01 当前输入的执行记录
+
+本轮输入身份：source `85c9edbb9fc5da39aa5ab25b843698ea052c1624f3a6724f963188918fbb2404`，runner `5c090ce8646aa0c10010b06f4cdff6ee7a65381d07602d3cc1247c39aae25fed`。Windows QA release 的 binary SHA-256 为 `f9844915f2d7a29d8a7a6b7504b5f9e2bae216221c8c13f7b413389641d964b9`，应用 ID `com.taomni.app.qa`，隔离数据目录。
+
+- Windows browser **31/31**，含完整适用 crash **18/18**；目录 `qa-ui-auto-report/_local/tao-history-full-browser-1116/run-20261116-174731-946306800/`。恢复入口 scoped selector 最终调整后另 **1/1**，目录 `tao-history-restore-browser-r2-1116/run-20261116-175101-245328200/`。两批 source/runner 均稳定。
+- Windows native **41/41**，含完整适用 crash **22/22**，无失败或跳过；目录 `qa-ui-auto-report/_local/tao-history-full-native-1116/run-20261116-175434-677299700/`。035～037、009、008、027 及真实 Shell 恢复均通过。全部原始 receipt 签名、逐项产物哈希、source/runner/case/build 身份独立核对通过；记录 `tao-history-full-native-1116/independent-feedback-verification.json`。本批 035 确认框与 037 最终显式解锁截图已检查。
+- frontend 22 files / 123 tests、后续焦点/startup 2 files / 12 tests、ribbon/ChatDrawer/handoff 3 files / 39 tests 均通过；批次有重叠，不相加成独立测试总数。Python reload 与历史 fixture 共 4/4；TypeScript、最终 QA release 构建、refactor、development case contract 和最终静态 `audit --gate` 通过。audit 日志 `tao-history-audit-final-r5-1116.log`；原 F1.6 控制覆盖基线保留。
+- GitHub [43844045720](https://github.com/engcapa/taomni/actions/runs/43844045720) 在 checkout 阶段把缩写提交号当作分支名而失败，未执行测试。已改为完整 SHA，重新发起 [43844434828](https://github.com/engcapa/taomni/actions/runs/43844434828)，规划成功，Linux/macOS browser/native release 正在执行；显式选定当前 Tao 确定性集、035～037、历史恢复及 Vault 保留用例，并自动合入完整适用 crash。
+
+43836152729 的历史定向批次已独立核对：Linux/macOS browser 各 19/19、native 各 24/24，receipt 签名、逐项产物、历史 Git source/runner/case 均匹配。此结果仅用于该历史批次，不覆盖上述新输入。
+
+
+Windows 逐条合并最新匹配回执：已评审场景为 **browser 31/31、native 40/40**，包含全部适用 crash；`status --gate` 为 `ok=true`、0 gaps、0 rejected reports，记录 `qa-ui-auto-report/_local/status-tao-history-windows-reviewed-1116.json`。browser 使用 17:47 整批以及 17:51 恢复用例的新回执，单项旧 case hash 不充当当前通过。
+
+额外执行的旧 `TC-auto-F12-1-vault-setup-and-lock` 实际通过，但其 `verification.review: reviewed` 与 `needs-review` tag 冲突。含该旧用例的全量 Windows status 因一项评审元数据缺口未过 gate（没有执行失败，0 rejected reports）；原记录 `status-tao-history-windows-final-1116.json` 保留。**测试待办**：复核该旧用例的状态等待、需求契约与截图，统一评审元数据并以新 case 指纹重新执行。此次新增 037 已覆盖初始化、锁定、取消及再次解锁的真实用户流程；不通过删除旧 tag 将旧结果直接变成当前验收。
