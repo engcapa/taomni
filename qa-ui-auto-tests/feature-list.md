@@ -479,6 +479,21 @@ controls:
 - id: tao-home-memory-delete
   selector: '[data-testid="tao-home-memory-delete"]'
   kind: interactive
+- id: tao-home-history-empty
+  selector: '.tao-home-history-empty'
+  kind: display
+- id: tao-home-history-new-chat
+  selector: '.tao-home-history-footer button:first-child'
+  kind: interactive
+- id: tao-home-history-close
+  selector: '.tao-home-history-header button'
+  kind: interactive
+- id: tao-home-search-close
+  selector: '.tao-home-search-title button'
+  kind: interactive
+- id: tao-home-launched-terminal-content
+  selector: '.xterm-screen'
+  kind: display
 - id: tao-home-dock-directory
   selector: '[data-testid="tao-home-dock-directory"]'
   kind: interactive

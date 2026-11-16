@@ -3633,6 +3633,11 @@
 - `[data-testid="tao-home-memory-cancel"]` — interactive — F1.11.tao-home-memory-cancel
 - `[data-testid="tao-home-memory-edit"]` — interactive — F1.11.tao-home-memory-edit
 - `[data-testid="tao-home-memory-delete"]` — interactive — F1.11.tao-home-memory-delete
+- `.tao-home-history-empty` — display — F1.11.tao-home-history-empty
+- `.tao-home-history-footer button:first-child` — interactive — F1.11.tao-home-history-new-chat
+- `.tao-home-history-header button` — interactive — F1.11.tao-home-history-close
+- `.tao-home-search-title button` — interactive — F1.11.tao-home-search-close
+- `.xterm-screen` — display — F1.11.tao-home-launched-terminal-content
 - `[data-testid="tao-home-dock-directory"]` — interactive — F1.11.tao-home-dock-directory
 - `[data-testid="tao-home-dock-mail"]` — interactive — F1.11.tao-home-dock-mail
 - `[data-testid="tao-home-dock-session"]` — interactive — F1.11.tao-home-dock-session

@@ -26,15 +26,15 @@ steps:
 - assert_count:
     selector: '[data-testid="tao-home-memory-entry"]'
     equal: 3
-- click: '[data-memory-id="qa-memory"] [data-testid="tao-home-memory-edit"]'
+- click: '[data-testid="tao-home-memory-edit"]:is([data-memory-id="qa-memory"] *)'
 - fill:
     selector: '[data-testid="tao-home-memory-content"]'
     value: Discarded edit
 - click: '[data-testid="tao-home-memory-cancel"]'
 - assert_text_equals:
-    selector: '[data-memory-id="qa-memory"] p'
+    selector: '[data-testid="tao-home-memory-entry"][data-memory-id="qa-memory"] p'
     equals: Original saved preference
-- click: '[data-memory-id="qa-memory"] [data-testid="tao-home-memory-edit"]'
+- click: '[data-testid="tao-home-memory-edit"]:is([data-memory-id="qa-memory"] *)'
 - fill:
     selector: '[data-testid="tao-home-memory-content"]'
     value: Escape edit
@@ -42,32 +42,32 @@ steps:
     selector: '[data-testid="tao-home-memory-content"]'
     key: Escape
 - assert_text_equals:
-    selector: '[data-memory-id="qa-memory"] p'
+    selector: '[data-testid="tao-home-memory-entry"][data-memory-id="qa-memory"] p'
     equals: Original saved preference
-- click: '[data-memory-id="qa-memory"] [data-testid="tao-home-memory-edit"]'
+- click: '[data-testid="tao-home-memory-edit"]:is([data-memory-id="qa-memory"] *)'
 - fill:
     selector: '[data-testid="tao-home-memory-content"]'
     value: Updated saved preference
 - click: '[data-testid="tao-home-memory-save"]'
 - assert_text_equals:
-    selector: '[data-memory-id="qa-memory"] p'
+    selector: '[data-testid="tao-home-memory-entry"][data-memory-id="qa-memory"] p'
     equals: Updated saved preference
 - click: '[data-testid="tao-home-side-tab-skills"]'
-- click: '[data-memory-id="qa-skill"] [data-testid="tao-home-memory-edit"]'
+- click: '[data-testid="tao-home-memory-edit"]:is([data-memory-id="qa-skill"] *)'
 - fill:
     selector: '[data-testid="tao-home-memory-content"]'
     value: Updated saved review skill
 - click: '[data-testid="tao-home-memory-save"]'
 - assert_text_equals:
-    selector: '[data-memory-id="qa-skill"] p'
+    selector: '[data-testid="tao-home-memory-entry"][data-memory-id="qa-skill"] p'
     equals: Updated saved review skill
 - click: '[data-testid="tao-home-side-toggle"]'
 - click: '[data-testid="tao-home-side-toggle"]'
 - assert_text:
-    selector: '[data-memory-id="qa-memory"] p'
+    selector: '[data-testid="tao-home-memory-entry"][data-memory-id="qa-memory"] p'
     contains: Updated saved preference
 - assert_text:
-    selector: '[data-memory-id="qa-skill"] p'
+    selector: '[data-testid="tao-home-memory-entry"][data-memory-id="qa-skill"] p'
     contains: Updated saved review skill
 - native_file_dialog:
     kind: save
@@ -83,11 +83,11 @@ steps:
 - assert_file_contains:
     path: ${fixture.tao_memory_export}
     contains: Preserve this approved identity
-- click: '[data-memory-id="qa-memory"] [data-testid="tao-home-memory-delete"]'
+- click: '[data-testid="tao-home-memory-delete"]:is([data-memory-id="qa-memory"] *)'
 - assert_count:
     selector: '[data-testid="tao-home-memory-entry"]'
     equal: 2
-- assert_not_visible: '[data-memory-id="qa-memory"]'
+- assert_not_visible: '[data-testid="tao-home-memory-entry"][data-memory-id="qa-memory"]'
 - reload_window: null
 - wait_for: '[data-testid="tao-home-host"]'
 - click: '[data-testid="tao-home-side-toggle"]'
@@ -95,12 +95,12 @@ steps:
 - assert_count:
     selector: '[data-testid="tao-home-memory-entry"]'
     equal: 2
-- assert_not_visible: '[data-memory-id="qa-memory"]'
+- assert_not_visible: '[data-testid="tao-home-memory-entry"][data-memory-id="qa-memory"]'
 - assert_text:
-    selector: '[data-memory-id="qa-skill"] p'
+    selector: '[data-testid="tao-home-memory-entry"][data-memory-id="qa-skill"] p'
     contains: Updated saved review skill
 - assert_text:
-    selector: '[data-memory-id="qa-soul"] p'
+    selector: '[data-testid="tao-home-memory-entry"][data-memory-id="qa-soul"] p'
     contains: Preserve this approved identity
 - assert_no_runtime_errors: null
 - screenshot: tao-home-approved-memory-actions.png
