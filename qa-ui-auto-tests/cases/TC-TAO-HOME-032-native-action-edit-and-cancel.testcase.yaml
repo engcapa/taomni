@@ -1,0 +1,40 @@
+id: TC-TAO-HOME-032
+title: Native action review edits recompute risk and cancellation stops the actual child
+description: >-
+  Supplement the existing reject/approve/Undo and development cases with Ask
+  read-only handling, regeneration blocked by a pending proposal, command edits,
+  L2 approval gating, and cancellation of an independently observed real child
+  process. The loopback provider supplies proposals, never executor results.
+modes: [native]
+covers: [F1.11]
+tags: [p0, tao-home, native, regression]
+fixtures: [reset_db, tao_agent]
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-tao-action-032
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- wait_for: '[data-testid="tao-home-composer-input"]:enabled'
+- observe_tao_provider: null
+- tao_real_provider_expanded: {scenario: action-controls}
+- assert_no_runtime_errors: null
+- screenshot: tao-home-action-edit-and-cancel.png
+verification:
+  review: reviewed
+  requirements:
+  - id: HOME-ACTION-EDIT-CANCEL
+    requirement: Review gates govern the exact command executed and cancellation terminates its actual process.
+    actions: [1, 2, 3, 4, 6]
+    checkpoints:
+    - {step: 7, expectation: "Ask exposes no executable proposal; regeneration leaves the pending review intact; a dangerous edit disables execution without confirmation; the safe reviewed edit is the only executed command. A live child publishes its PID, Cancel stops it and the delayed file is never written."}
+    - {step: 8, expectation: No runtime errors remain.}
+    results: [7, 8]
+  native:
+  - check: Confirmed command execution and real descendant process cancellation
+    method: automated
+    reason: Browser stubs cannot establish actual command bytes, process exit or delayed disk effects.
+  visual:
+  - check: Edited review and cancelled result visibility
+    method: manual
+    reason: Screenshots retain the actual cards; full prototype fidelity remains separate.

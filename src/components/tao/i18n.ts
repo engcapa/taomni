@@ -4,8 +4,20 @@ import { getLocale, subscribeLocale } from "../../lib/i18n";
 /** Tao uses the application's locale subscription. Strings are kept here so
  * switching language never replaces the chat controller or its drafts. */
 const english: Record<string, string> = {
+  "删除对话": "Delete conversation",
+  "确定删除对话“{title}”及其消息吗？此操作无法撤销。": "Delete the conversation “{title}” and its messages? This cannot be undone.",
+  "删除对话失败：{error}": "Could not delete conversation: {error}",
+  "请先停止对话后再删除。": "Stop the conversation before deleting it.",
+  "暂时跳过": "Skip for now",
+  "保存": "Save",
+  "目标 Agent 仍在执行，请完成后再带回。": "The coding agent is still running. Bring back its result after it finishes.",
+  "执行已中断，请检查实际结果后重新提议。": "Execution was interrupted. Check the actual result before proposing it again.",
+  "请在设置中启用对应编码 Agent": "Enable this coding agent in Settings", "交接编码任务": "Hand off coding task", "将发送当前对话、已选资料和执行结果；请先核对上下文。": "Review the conversation, selected excerpts and execution results before handing off.", "确认交接": "Confirm handoff", "带回 Tao": "Bring back to Tao", "编码 Agent 结果": "Coding agent result", "目标 Agent 尚无可带回的回复。": "The target agent has no reply to bring back yet.", "原 Tao 对话已关闭。": "The source Tao conversation is closed.", "请根据编码 Agent 的结果继续验证和完善任务。": "Continue verifying and improving the task using the coding agent's result.", "交接请求未进入队列，请在目标对话重试。": "The handoff was not queued. Retry in the target conversation.",
+  "文件将在发送时提交：{bytes} 字节": "File will be sent with the message: {bytes} bytes",
+  "请先配置 Tao 服务提供方": "Configure a Tao provider first", "配置 Tao 服务提供方": "Configure a Tao provider", "服务提供方": "Provider", "思考强度": "Reasoning effort",
   "请根据所选资料回答我的问题：": "Please answer my question using the selected records:", "命令": "Commands", "笔记": "Notes",
   "thread": "Chat", "session": "Session", "workspace": "Workspace", "command": "Command", "sql": "SQL", "note": "Note",
+  "sessions": "Sessions", "commands": "Commands", "notes": "Notes", "tao": "Tao chats", "legacy": "Legacy chats", "queries": "Saved queries", "bookmarks": "SQL bookmarks", "capabilities": "Features", "snapshots": "File snapshots", "file_contents": "Snapshot contents", "mail": "Mail metadata", "mail_bodies": "Mail bodies", "groups": "Session groups",
   "问": "Ask", "做": "Act", "深研": "Research", "你": "You", "待处理": "Pending", "跳过": "Skipped",
   "代码 review": "Code review", "SQL 排查": "SQL investigation", "故障排查": "Troubleshooting", "文件整理": "File organization", "done": "Completed", "skipped": "Skipped",
   "解释、总结、回答开发问题": "Explain, summarize and answer development questions",

@@ -1,8 +1,8 @@
 id: TC-TAO-HOME-005
-title: Native Tao Home real DeepSeek Messages smoke with invalid-key evidence
+title: Native Tao Home real configured Tao provider smoke with invalid-key evidence
 description: >-
-  Opt-in native smoke against the real DeepSeek Messages endpoint using a
-  run-scoped temporary key. One short request is kept well below the 1M token
+  Opt-in native smoke against the real configured Tao provider endpoint using a
+  run-scoped temporary key. One short request is kept well below the configured bounded
   test budget. A valid key must produce an assistant reply; an expired or
   rejected key is a completed credential check when the UI preserves the
   provider error and retry entry. The key is never written to reports.
@@ -41,7 +41,7 @@ verification:
       expectation: The native run ends without an unhandled renderer/runtime error.
     results: [9, 10]
   native:
-  - check: Real DeepSeek Messages provider response and temporary-key failure handling
+  - check: Real configured Tao provider provider response and temporary-key failure handling
     method: automated
     reason: Native IPC, isolated configuration and packaged WebView are required; no key is retained in evidence.
   visual:

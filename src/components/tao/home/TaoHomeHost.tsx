@@ -2,7 +2,6 @@ import { taoText as tr } from "../i18n";
 import { useTaoText } from "../i18n";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { isTauriRuntime } from "../../../lib/runtime";
-import { nativeThreadStorage } from "../ai-chat/backend";
 import { useAiStore } from "../../../stores/aiStore";
 import type { WelcomePanelProps } from "../../welcome/types";
 import { createChatController, deepSeekAppBackend, TaoAiChat, type ContextPorts, type ChatProfile, type TaoSearchResult } from "../ai-chat";
@@ -14,6 +13,7 @@ import { SearchPanel } from "../search/SearchPanel";
 import { redactText } from "../redact";
 import { openSettingsSection } from "../../../lib/settingsNavigation";
 import { createNativeActionPorts } from "../ai-chat/nativeCapabilities";
+import { useThreadHistory } from "./useThreadHistory";
 
 const PROFILE: ChatProfile = {
   modes: [
@@ -31,10 +31,10 @@ const PROFILE: ChatProfile = {
 export function TaoHomeHost(props: WelcomePanelProps) {
   useTaoText();
   const [storageError, setStorageError] = useState("");
-  const [loadingHistory, setLoadingHistory] = useState(isTauriRuntime());
   const controllerRef = useRef<ReturnType<typeof createChatController> | null>(null);
   if (!controllerRef.current) controllerRef.current = createChatController({ backend: deepSeekAppBackend, profile: PROFILE, actionPorts: createNativeActionPorts("tao-action") });
   const controller = controllerRef.current;
+  const history = useThreadHistory(controller);
   const aiConfig = useAiStore((state) => state.config);
   const loadAiConfig = useAiStore((state) => state.loadConfig);
   const saveConfig = useAiStore((state) => state.saveConfig);
@@ -43,38 +43,15 @@ export function TaoHomeHost(props: WelcomePanelProps) {
   const demoMode = state.ui.demoMode;
   useEffect(() => {
     const config = aiConfig?.deepseek_app;
-    if (config) controller.setDefaults({ defaultModel: config.model === "deepseek-v4-pro" ? config.model : "deepseek-flash", defaultThinking: config.thinking_default, defaultWeb: config.search_default });
+    if (config) controller.setDefaults({ defaultModel: config.model === "deepseek-v4-pro" ? config.model : config.provider === "opencode-go" ? "deepseek-v4.1-flash" : "deepseek-flash", defaultProvider: config.provider ?? "deepseek-app", defaultReasoningEffort: config.reasoning_effort ?? "high", defaultThinking: config.thinking_default, defaultWeb: config.search_default });
   }, [aiConfig?.deepseek_app, controller]);
-  useEffect(() => {
-    if (!isTauriRuntime()) return;
-    let disposed = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-    let loaded = false;
-    const save = () => {
-      if (!loaded) return;
-      clearTimeout(timer);
-      timer = setTimeout(() => {
-        for (const thread of Object.values(controller.getState().threads)) {
-          // Legacy ChatDrawer rows are read-only history pointers. Keep their
-          // source table authoritative and never migrate them into Tao's store.
-          if (thread.source === "legacy") continue;
-          void nativeThreadStorage.save(thread).catch((error) => { if (!disposed) setStorageError(tr("历史保存失败：{error}", { error: String(error) })); });
-        }
-      }, 180);
-    };
-    const unsubscribe = controller.subscribe(save);
-    void nativeThreadStorage.load().then((threads) => {
-      if (disposed) return;
-      controller.hydrateThreads(threads); loaded = true; setLoadingHistory(false); save();
-    }).catch((error) => { if (!disposed) { setStorageError(tr("历史读取失败：{error}", { error: String(error) })); loaded = true; setLoadingHistory(false); } });
-    return () => { disposed = true; unsubscribe(); clearTimeout(timer); };
-  }, [controller]);
   useEffect(() => { if (!aiConfig) void loadAiConfig().catch(() => undefined); }, [aiConfig, loadAiConfig]);
   const oldKey = aiConfig?.llm.providers.deepseek?.api_key ?? "";
-  const taoProvider = aiConfig?.llm.providers["deepseek-app"];
+  const providerId = state.composer.provider ?? "deepseek-app";
+  const taoProvider = aiConfig?.llm.providers[providerId];
   const taoKey = taoProvider?.api_key ?? "";
   const hasTaoKey = Boolean(taoKey || taoProvider?.api_keys?.some((key) => key.trim()));
-  const canReuse = Boolean(oldKey && !taoKey);
+  const canReuse = providerId === "deepseek-app" && Boolean(oldKey && !taoKey);
   const contextPorts = useMemo<ContextPorts>(() => ({
     search: async (query: string): Promise<TaoSearchResult[]> => {
       const current = controller.getState();
@@ -99,7 +76,7 @@ export function TaoHomeHost(props: WelcomePanelProps) {
       return records;
     },
   }), [controller, props.recentSessions, props.recentWorkspaces]);
-  const threads = Object.values(state.threads).sort((a, b) => b.updatedAt - a.updatedAt);
+  const threads = Object.values(state.threads).map((thread) => ({ ...thread, running: thread.running || state.runtime[thread.id]?.deleting || state.runtime[thread.id]?.actionBusy })).sort((a, b) => b.updatedAt - a.updatedAt);
   const handleReuse = () => {
     if (!aiConfig || !oldKey) return;
     const old = aiConfig.llm.providers.deepseek;
@@ -109,5 +86,25 @@ export function TaoHomeHost(props: WelcomePanelProps) {
   };
   const openSettings = () => { openSettingsSection("ai-tao"); props.onOpenSettings?.(); };
   const openAppearance = () => { openSettingsSection("app-theme"); props.onOpenSettings?.(); };
-  return <div className="tao-home-host" data-testid="tao-home-host" data-tao-home-host="true"><div className="tao-home-legacy-panel" data-testid="welcome-panel"><TaoAiChat controller={controller} profile={PROFILE} disabled={loadingHistory || !hasTaoKey || !isTauriRuntime() || aiConfig?.deepseek_app?.enabled === false} active={props.active !== false} onOpenSettings={openSettings} onOpenAppearance={openAppearance} slots={{ headerTrailing: <BindingBar controller={controller} context={state.context} />, emptyState: <>{!isTauriRuntime() ? <p data-testid="tao-home-browser-unavailable">{tr("浏览器预览不提供 DeepSeek 原生对话，请在桌面应用中使用。")}</p> : null}{!hasTaoKey ? <NoKeyCard onOpenSettings={openSettings} onReuse={handleReuse} canReuse={canReuse} /> : null}{storageError ? <p role="alert">{storageError}</p> : null}</>, belowComposer: <><SuggestionRow controller={controller} hidden={demoMode} /><DockRow {...props} onOpenSettings={openSettings} controller={controller} threads={threads} demoMode={demoMode} /></> }} />{state.ui.searchOpen && props.active !== false ? <SearchPanel controller={controller} contextPorts={contextPorts} onClose={() => controller.setSearchOpen(false)} /> : null}</div></div>;
+  return <div className="tao-home-host" data-testid="tao-home-host" data-tao-home-host="true">
+    <div className="tao-home-legacy-panel" data-testid="welcome-panel">
+      <TaoAiChat controller={controller} profile={PROFILE}
+        disabled={history.loading || !hasTaoKey || !isTauriRuntime() || aiConfig?.deepseek_app?.enabled === false}
+        active={props.active !== false} onOpenSettings={openSettings} onOpenAppearance={openAppearance}
+        slots={{
+          headerTrailing: <BindingBar controller={controller} context={state.context} />,
+          emptyState: <>
+            {!isTauriRuntime() ? <p data-testid="tao-home-browser-unavailable">{tr("浏览器预览不提供 DeepSeek 原生对话，请在桌面应用中使用。")}</p> : null}
+            {!hasTaoKey ? <NoKeyCard onOpenSettings={openSettings} onReuse={handleReuse} canReuse={canReuse} /> : null}
+            {storageError || history.error ? <p role="alert">{storageError || history.error}</p> : null}
+          </>,
+          belowComposer: <>
+            <SuggestionRow controller={controller} hidden={demoMode} />
+            <DockRow {...props} onOpenSettings={openSettings} controller={controller} threads={threads}
+              demoMode={demoMode} onDeleteThread={history.loading ? undefined : history.remove} />
+          </>,
+        }} />
+      {state.ui.searchOpen && props.active !== false ? <SearchPanel controller={controller} contextPorts={contextPorts} onClose={() => controller.setSearchOpen(false)} /> : null}
+    </div>
+  </div>;
 }

@@ -1,5 +1,5 @@
 id: TC-TAO-HOME-023
-title: Real DeepSeek background streaming remains isolated across native conversations
+title: Real configured provider background streaming remains isolated across native conversations
 description: Two actual commercial streams run across a UI thread switch, preserving the background reply and its
   independent unsent draft.
 modes:
@@ -31,7 +31,7 @@ verification:
   review: reviewed
   requirements:
   - id: REAL-CONCURRENCY
-    requirement: Real DeepSeek background streaming remains isolated across native conversations
+    requirement: Real configured provider background streaming remains isolated across native conversations
     actions:
     - 1
     - 2

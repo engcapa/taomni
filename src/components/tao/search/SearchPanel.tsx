@@ -4,7 +4,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { isTauriRuntime } from "../../../lib/runtime";
 import { useTaoText } from "../i18n";
 import type { ContextPorts, TaoChatController, TaoSearchResult } from "../ai-chat";
-import { searchResults } from "./query";
+import { canonicalSearchSource, searchResults } from "./query";
 
 export function SearchPanel({ controller, contextPorts, onClose }: { controller: TaoChatController; contextPorts?: ContextPorts; onClose: () => void }) {
   const tr = useTaoText();
@@ -22,18 +22,19 @@ export function SearchPanel({ controller, contextPorts, onClose }: { controller:
     let disposed = false;
     const timer = setTimeout(() => {
       setLoading(true); setError("");
-      const promise = isTauriRuntime() ? invoke<TaoSearchResult[]>("deepseek_app_search", { query }) : contextPorts?.search?.(query) ?? Promise.resolve([]);
+      const filteredQuery = sourceFilter ? `${query.replace(/(?:^|\s)source:\S+/g, " ")} source:${canonicalSearchSource(sourceFilter)}` : query;
+      const promise = isTauriRuntime() ? invoke<TaoSearchResult[]>("deepseek_app_search", { query: filteredQuery }) : contextPorts?.search?.(filteredQuery) ?? Promise.resolve([]);
       void promise.then((items) => {
         if (disposed) return;
-        const ranked = isTauriRuntime() ? { results: items, fallbackLike: Array.from(query.trim()).length < 3 } : searchResults(items, query);
+        const ranked = isTauriRuntime() ? { results: items, fallbackLike: items.some((item) => (item as TaoSearchResult & { exactMatchFallback?: boolean }).exactMatchFallback) } : searchResults(items, filteredQuery);
         setResults(ranked.results); setFallback(ranked.fallbackLike); setLoading(false); setSelected(0);
       }).catch((cause) => { if (!disposed) { setResults([]); setLoading(false); setError(String(cause)); } });
     }, 120);
     return () => { disposed = true; clearTimeout(timer); };
-  }, [contextPorts, query]);
-  const visible = sourceFilter ? results.filter((result) => result.source === sourceFilter) : results;
+  }, [contextPorts, query, sourceFilter]);
+  const visible = sourceFilter ? results.filter((result) => canonicalSearchSource(result.source) === canonicalSearchSource(sourceFilter)) : results;
   const cite = (result: TaoSearchResult, ask = false) => {
-    const chip = { id: `local-${result.id}`, kind: "local" as const, label: result.title, preview: result.body, removable: true };
+    const chip = { id: `local-${result.id}`, kind: "local" as const, label: result.title, preview: result.body, source: canonicalSearchSource(result.source), reference: result.ref, timestamp: result.ts, removable: true };
     controller.setChips([...controller.getState().composer.chips.filter((item) => item.id !== chip.id), chip]);
     if (ask) controller.setComposerText(tr("请根据所选资料回答我的问题："));
     onClose();

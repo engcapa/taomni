@@ -1,0 +1,49 @@
+id: TC-TAO-HOME-033
+title: Home new workspace supports cancelling and choosing the real native folder dialog
+description: >-
+  Cover the previously display-only Home workspace action through the actual
+  operating-system chooser. Cancellation retains Home and creates no workspace;
+  selecting the isolated folder opens one filesystem-backed workspace tree.
+modes: [native]
+covers: [F1.11]
+tags: [p0, tao-home, native, regression]
+fixtures: [reset_db, platform_workspace_root]
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-tao-workspace-033
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- assert_count: {selector: '[data-testid="workspace-tab"][data-tab-kind="code"]', equal: 0}
+- native_file_dialog: {kind: folder, action: cancel, title: Select folder to open, trigger: '[data-testid="tao-home-new-workspace"]'}
+- assert_count: {selector: '[data-testid="workspace-tab"][data-tab-kind="code"]', equal: 0}
+- assert_visible: '[data-testid="tao-home-host"]'
+- native_file_dialog: {kind: folder, action: choose, path: '${fixture.platform_workspace_root}', title: Select folder to open, trigger: '[data-testid="tao-home-new-workspace"]'}
+- wait_for: '[data-testid="code-workspace-tree"]'
+- assert_count: {selector: '[data-testid="workspace-tab"][data-tab-kind="code"]', equal: 1}
+- eval_readonly:
+    expression: document.querySelector('[data-root-path]').getAttribute('data-root-path').replaceAll('\\', '/') === '${fixture.platform_workspace_root}'
+    expect_truthy: true
+- assert_no_runtime_errors: null
+- screenshot: tao-home-native-workspace-action.png
+verification:
+  review: reviewed
+  requirements:
+  - id: HOME-WORKSPACE-CHOOSER
+    requirement: The Home workspace action respects native chooser cancellation and opens the actual selected folder exactly once.
+    actions: [6, 9]
+    checkpoints:
+    - {step: 7, expectation: Cancel creates no workspace tab.}
+    - {step: 8, expectation: Home remains visible after cancellation.}
+    - {step: 10, expectation: The selected real directory opens its workspace tree.}
+    - {step: 11, expectation: Exactly one workspace tab exists.}
+    - {step: 12, expectation: The real workspace tree belongs to the exact selected directory.}
+    results: [7, 8, 10, 11, 12]
+  native:
+  - check: Actual OS folder chooser and filesystem workspace opening
+    method: automated
+    reason: A browser dialog stub cannot establish native chooser ownership, cancellation or actual directory publication.
+  visual:
+  - check: Selected workspace tree
+    method: manual
+    reason: The screenshot supports review of the opened content.

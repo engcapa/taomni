@@ -1,5 +1,5 @@
 id: TC-TAO-HOME-013
-title: Real DeepSeek Markdown reply survives native branch context and history restoration
+title: Real configured provider Markdown reply survives native branch context and history restoration
 description: >-
   Opt-in commercial test using the temporary local key. Three native requests
   verify an actual Markdown heading/table/code response, native cloned context,
@@ -41,7 +41,7 @@ verification:
   native:
   - check: Commercial replies and native context-clone IPC
     method: automated
-    reason: Forwarding-only callback observation verifies actual native completion, and later real DeepSeek output proves cloned context. History restoration here is in-process; TC-TAO-HOME-004 owns restart persistence.
+    reason: Forwarding-only callback observation verifies actual native completion, and later real configured provider output proves cloned context. History restoration here is in-process; TC-TAO-HOME-004 owns restart persistence.
   visual:
   - check: Native real Markdown and restored transcript
     method: manual

@@ -3,8 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { useChatFeedScroll } from "./useChatFeedScroll";
 import type { TaoMessage } from "./ports";
 
-function Harness({ thread = "first", value = "reply", active = true }: { thread?: string; value?: string; active?: boolean }) {
-  const messages: TaoMessage[] = [{ id: "reply", role: "assistant", text: value, blocks: [], createdAt: 0 }];
+function Harness({ thread = "first", value = "reply", active = true, user = "question" }: { thread?: string; value?: string; active?: boolean; user?: string }) {
+  const messages: TaoMessage[] = [
+    { id: user, role: "user", text: user, blocks: [], createdAt: 0 },
+    { id: "reply", role: "assistant", text: value, blocks: [], createdAt: 0 },
+  ];
   const scroll = useChatFeedScroll(thread, messages, "streaming", active);
   return <div data-testid="feed" ref={scroll.feedRef} onScroll={scroll.onScroll}><div ref={scroll.contentRef}>{value}</div></div>;
 }
@@ -70,6 +73,31 @@ describe("chat feed following", () => {
     observers[0].notify();
     flush();
     expect(feed.scrollTop).toBe(1400);
+  });
+
+  it("follows a newly sent question after reading earlier replies, including delayed diagram rendering", () => {
+    const view = render(<Harness />);
+    const feed = screen.getByTestId("feed");
+    const grow = dimensions(feed);
+    flush();
+    feed.scrollTop = 80;
+    fireEvent.scroll(feed);
+    grow(1400);
+    view.rerender(<Harness user="new question" value="new reply" />);
+    flush();
+    expect(feed.scrollTop).toBe(1000);
+    grow(1800);
+    observers[0].notify();
+    flush();
+    expect(feed.scrollTop).toBe(1400);
+
+    feed.scrollTop = 120;
+    fireEvent.scroll(feed);
+    grow(2000);
+    view.rerender(<Harness user="new question" value="streamed continuation" />);
+    observers[0].notify();
+    flush();
+    expect(feed.scrollTop).toBe(120);
   });
 
   it("reveals another history thread and stops stale work when inactive or unmounted", () => {

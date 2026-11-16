@@ -52,4 +52,4 @@ def run(ctx):
                      "Continue did not use the native continuation path")
         flow.record("continued-prefix-retained", dict(prefixLength=len(prefix), continuedLength=len(continued), userCount=1, assistantCount=1))
         flow.screenshot("continued")
-    return "Real DeepSeek lifecycle: " + flow.outcome
+    return "Real configured provider lifecycle: " + flow.outcome

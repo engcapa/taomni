@@ -5,6 +5,7 @@ import { type ChatMessage, type ChatStore, type ChatThread, type ChatThreadMode 
 import { markThreadMutation, mergeThreadsPreservingLocal, threadMutationRevision } from "./threadRevision";
 
 export function createChatThreadActions(set: StoreApi<ChatStore>["setState"], get: StoreApi<ChatStore>["getState"]): Pick<ChatStore, "loadThreads" | "newThread" | "deleteThread" | "setThreadProvider" | "setThreadLlmModel" | "setThreadCcModel" | "setThreadOutputFormat" | "setActiveThread" | "loadMessages"> {
+  const messageRequests = new Map<string, object>();
   return {
 
     loadThreads: async () => {
@@ -37,6 +38,7 @@ export function createChatThreadActions(set: StoreApi<ChatStore>["setState"], ge
       set((s) => ({
         threads: [thread, ...s.threads],
         activeThreadId: thread.id,
+        messages: { ...s.messages, [thread.id]: [] },
         ...scope,
         tabDrawerOpenByTabId: linkedSessionId
           ? { ...s.tabDrawerOpenByTabId, [linkedSessionId]: true }
@@ -50,6 +52,7 @@ export function createChatThreadActions(set: StoreApi<ChatStore>["setState"], ge
 
     deleteThread: async (threadId: string) => {
       await invoke("chat_delete_thread", { threadId });
+      messageRequests.delete(threadId);
       markThreadMutation();
       const active = get().activeThreadId === threadId;
       set((s) => ({
@@ -126,11 +129,20 @@ export function createChatThreadActions(set: StoreApi<ChatStore>["setState"], ge
     },
 
     loadMessages: async (threadId: string) => {
+      const request = {};
+      const messagesAtRequest = get().messages[threadId];
+      messageRequests.set(threadId, request);
       try {
         const msgs = await invoke<ChatMessage[]>("chat_list_messages", { threadId });
-        set((s) => ({ messages: { ...s.messages, [threadId]: msgs } }));
+        // Native events can finish a quick reply before an older history read
+        // returns. Neither that snapshot nor a superseded read owns the cache.
+        set((s) => messageRequests.get(threadId) === request && s.messages[threadId] === messagesAtRequest
+          ? { messages: { ...s.messages, [threadId]: msgs } }
+          : s);
       } catch (e) {
         console.error("chat_list_messages failed:", e);
+      } finally {
+        if (messageRequests.get(threadId) === request) messageRequests.delete(threadId);
       }
     }
   };

@@ -1,4 +1,7 @@
 const REDACTION_RULES: Array<[string, RegExp]> = [
+  ["quoted-secret", /["'](?:password|passwd|token|api[_-]?key|secret|authorization)["']\s*:\s*["'][^"']*["']/gi],
+  ["api-key", /\bsk-[A-Za-z0-9_-]{12,}\b/g],
+  ["vault-reference", /vault:[A-Za-z0-9:_-]+/g],
   ["password", /\b(password|passwd|pwd)\s*[=:]\s*[^\s]+/gi],
   ["token", /\b(token|api[_-]?key|secret|auth)\s*[=:]\s*[^\s]+/gi],
   ["bearer", /\bBearer\s+[A-Za-z0-9._~+\-/]+=*/g],

@@ -21,6 +21,12 @@ use tokio::sync::Notify;
 
 use super::{CaptureStatus, CaptureWriter};
 
+mod process_tree;
+
+#[cfg(test)]
+#[path = "exec_b/process_tree_tests.rs"]
+mod process_tree_tests;
+
 /// Result of a B-path run.
 pub struct ExecOutcome {
     pub status: CaptureStatus,
@@ -143,8 +149,10 @@ pub async fn run_local(
         .stdout(std::process::Stdio::piped())
         .stderr(std::process::Stdio::piped());
     crate::agent::cc_bridge::no_console_window(&mut cmd);
+    process_tree::configure(&mut cmd);
 
     let mut child = cmd.spawn().map_err(|e| format!("failed to spawn: {e}"))?;
+    let tree = process_tree::ProcessTree::attach(&child)?;
     let mut stdout = child.stdout.take().ok_or("no stdout")?;
     let mut stderr = child.stderr.take().ok_or("no stderr")?;
 
@@ -161,28 +169,38 @@ pub async fn run_local(
         }
         tokio::select! {
             _ = cancel.notified() => {
-                let _ = child.kill().await;
+                tree.terminate()?;
                 status = CaptureStatus::Cancelled;
                 break;
             }
             r = stdout.read(&mut buf_out), if out_open => match r {
                 Ok(0) | Err(_) => out_open = false,
                 Ok(n) => {
-                    if !writer.write_chunk(&buf_out[..n]) { break; }
+                    if !writer.write_chunk(&buf_out[..n]) { tree.terminate()?; break; }
                     progress.maybe(writer.lines(), writer.bytes());
                 }
             },
             r = stderr.read(&mut buf_err), if err_open => match r {
                 Ok(0) | Err(_) => err_open = false,
                 Ok(n) => {
-                    if !writer.write_chunk(&buf_err[..n]) { break; }
+                    if !writer.write_chunk(&buf_err[..n]) { tree.terminate()?; break; }
                     progress.maybe(writer.lines(), writer.bytes());
                 }
             },
         }
     }
 
-    let exit_code = match child.wait().await {
+    // A command may close both streams and continue working. Cancellation
+    // remains active while waiting for its real exit, not only while reading.
+    let exit = tokio::select! {
+        exit = child.wait() => exit,
+        _ = cancel.notified(), if status != CaptureStatus::Cancelled => {
+            tree.terminate()?;
+            status = CaptureStatus::Cancelled;
+            child.wait().await
+        }
+    };
+    let exit_code = match exit {
         Ok(st) => st.code(),
         Err(_) => None,
     };

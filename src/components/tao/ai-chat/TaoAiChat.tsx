@@ -17,6 +17,8 @@ export function TaoAiChat({ controller, profile, slots, disabled = false, active
   const state = useSyncExternalStore(controller.subscribe, controller.getState, controller.getState);
   const thread = state.activeThreadId ? state.threads[state.activeThreadId] : undefined;
   const phase = state.activeThreadId ? state.runtime[state.activeThreadId]?.phase ?? "idle" : "idle";
+  const runtime = state.activeThreadId ? state.runtime[state.activeThreadId] : undefined;
+  const vaultPromptDismissed = Boolean(runtime?.vaultPromptDismissed);
   const feed = useChatFeedScroll(state.activeThreadId, thread?.messages, phase, active);
   const received = Boolean(thread?.messages.at(-1)?.blocks.some((block) => block.type !== "error" && (block.text || block.sources?.length)));
   const previous = useRef({ threadId: state.activeThreadId, phase });
@@ -55,13 +57,14 @@ export function TaoAiChat({ controller, profile, slots, disabled = false, active
           <div ref={feed.contentRef} className="tao-home-feed-content">
           {thread?.messages.length ? <MessageList thread={thread} phase={phase} controller={controller} /> : <div className="tao-home-empty-stage"><div className="tao-home-greeting"><span className="tao-home-logo">T</span><div><h1>{tr("Tao 在这里")}</h1><p>{tr("Develop Buddy · 问、做、深研你的开发问题")}</p></div></div>{slots?.emptyState}</div>}
           <RefusalCard phase={phase} /><BudgetCard phase={phase} controller={controller} /><StoppedCard phase={phase} controller={controller} web={state.activeThreadId ? state.runtime[state.activeThreadId]?.lastRequest?.web ?? state.composer.web : state.composer.web} received={received} />
+          {vaultPromptDismissed ? <VaultLockedMask phase={phase} controller={controller} active={active} compact /> : null}
           </div>
         </div>
-        <div className="tao-home-composer-dock"><div className="tao-home-composer-context">{slots?.composerContext}</div><TaoComposer controller={controller} state={state} disabled={disabled || phase === "vault_locked"} />{slots?.belowComposer}</div>
+        <div className="tao-home-composer-dock"><div className="tao-home-composer-context">{slots?.composerContext}</div><TaoComposer controller={controller} state={state} disabled={disabled || phase === "vault_locked" || runtime?.deleting} />{slots?.belowComposer}</div>
       </div>
       <SidePanel state={state} profile={profile} controller={controller}>{slots?.sidePanels}</SidePanel>
       </div>
-      <VaultLockedMask phase={phase} controller={controller} active={active} />
+      {!vaultPromptDismissed ? <VaultLockedMask phase={phase} controller={controller} active={active} /> : null}
       <footer className="tao-home-footer"><span>T · Taomni</span><span>v{__APP_VERSION__}</span></footer>
       {disabled && !slots?.emptyState ? <BrowserUnavailableCard onOpenSettings={onOpenSettings} /> : null}
     </section>

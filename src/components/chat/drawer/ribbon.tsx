@@ -45,9 +45,10 @@ export function ChatDrawerRibbon() {
     return () => {
       if (hoverOpenTimerRef.current !== null) {
         window.clearTimeout(hoverOpenTimerRef.current);
+        hoverOpenTimerRef.current = null;
       }
     };
-  }, []);
+  }, [drawerOpen, activeTabId, drawerPosition, drawerPinned]);
 
   // Unified Tao alerts (notes due/overdue/reminder + chat ai_done + mail), priority-sorted.
   const taoAlerts = useMemo(
@@ -222,7 +223,9 @@ export function ChatDrawerRibbon() {
       : SIDE_RIBBON_HOVER_OPEN_DELAY_MS;
     hoverOpenTimerRef.current = window.setTimeout(() => {
       hoverOpenTimerRef.current = null;
-      if (!dragRef.current) {
+      // An explicit action (for example a Tao coding handoff) may have opened
+      // another thread since this hover began. Keep that selected conversation.
+      if (!dragRef.current && !useChatStore.getState().drawerOpen) {
         if (hasAlerts) setHubTab("notifications");
         void openTabChat(chatTabId);
       }

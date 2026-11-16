@@ -72,6 +72,7 @@ tracing-subscriber = "0.3"
 log = "0.4"
 portable-pty = "0.9"
 base64 = "0.22"
+pdf-extract = "0.10"
 rusqlite = { version = "0.40", features = ["bundled", "hooks"] }
 chrono = "0.4"
 russh = { version = "0.61", features = ["async-trait", "flate2"] }
@@ -338,6 +339,7 @@ windows = { version = "0.62", features = [
   "Win32_Security",
   "Win32_Security_Cryptography",
   "Win32_System_Threading",
+  "Win32_System_JobObjects",
   "Win32_UI_Shell",
   "Win32_System_DataExchange",
   # Screenshot OCR: the built-in Windows.Media.Ocr engine (no install).

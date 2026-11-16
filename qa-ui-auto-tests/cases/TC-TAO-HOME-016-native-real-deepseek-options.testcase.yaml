@@ -1,6 +1,6 @@
 id: TC-TAO-HOME-016
-title: Real DeepSeek models, modes, thinking, web search, read URL and usage
-description: Five commercial requests exercise Flash/Pro, Ask/Act/Research, thinking, web_search and read_url through
+title: Real configured provider models, modes, thinking, web search, read URL and usage
+description: Five commercial requests exercise the configured model, Ask/Act/Research, thinking, web_search and read_url through
   the native Home UI.
 modes:
 - native
@@ -31,7 +31,7 @@ verification:
   review: reviewed
   requirements:
   - id: REAL-OPTIONS
-    requirement: Real DeepSeek models, modes, thinking, web search, read URL and usage
+    requirement: Real configured provider models, modes, thinking, web search, read URL and usage
     actions:
     - 1
     - 2
@@ -42,7 +42,7 @@ verification:
     checkpoints:
     - step: 7
       expectation: Selected mode/model must persist in the UI, real thinking blocks and usage must appear, web search
-        must emit actual sources and read_url must increment fetch usage. Only explicit 401/403 or expired credentials
+        must emit actual sources when configured. The isolated OpenCode profile has no search service; verify no invented sources and record successful search as unverified. read_url must increment actual fetch usage. Only explicit 401/403 or expired credentials
         may finish early; remaining stages are unverified.
     - step: 8
       expectation: No unhandled runtime errors.
@@ -52,7 +52,7 @@ verification:
   native:
   - check: Actual native IPC, provider and relevant disk boundaries
     method: automated
-    reason: Five commercial requests exercise Flash/Pro, Ask/Act/Research, thinking, web_search and read_url through
+    reason: Five commercial requests exercise the configured model, Ask/Act/Research, thinking, web_search and read_url through
       the native Home UI. Browser stubs cannot establish these results.
   visual:
   - check: Real native transcript and companion panels

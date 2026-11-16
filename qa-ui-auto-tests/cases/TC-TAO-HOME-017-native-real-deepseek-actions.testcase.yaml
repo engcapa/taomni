@@ -1,5 +1,5 @@
 id: TC-TAO-HOME-017
-title: Real DeepSeek local citation and confirmed file action with native undo
+title: Real configured provider local citation and confirmed file action with native undo
 description: 'Three real requests: cite an isolated workspace, then reject and approve actual assistant file proposals.
   Independent disk bytes and native undo are required.'
 modes:
@@ -31,7 +31,7 @@ verification:
   review: reviewed
   requirements:
   - id: REAL-ACTIONS
-    requirement: Real DeepSeek local citation and confirmed file action with native undo
+    requirement: Real configured provider local citation and confirmed file action with native undo
     actions:
     - 1
     - 2

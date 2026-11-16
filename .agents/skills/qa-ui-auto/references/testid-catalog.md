@@ -1956,10 +1956,12 @@
 - `[data-testid="welcome-recent-workspace-filter"]` — interactive [optional] — F1.6.recent-workspace-filter
 - `[data-testid="welcome-history-tab-workspaces"]` — interactive [optional] — F1.6.history-tab-workspaces
 - `[data-testid="welcome-history-tab-sessions"]` — interactive — F1.6.history-tab-sessions
+  ↳ `[data-testid="tao-home-history-popover"] [data-testid="tao-home-history-tab-sessions"]` — alias
 - `[data-testid="welcome-history-tab-directories"]` — interactive — F1.6.history-tab-directories
 - `[data-testid="welcome-local-directories"]` — display — F1.6.local-directories
 - `[data-testid="welcome-local-directory-filter"]` — interactive — F1.6.local-directory-filter
 - `[data-testid="welcome-restore-row"]` — display — F1.6.restore-row
+  ↳ `.tao-home-history-footer` — alias
 - `[data-testid="welcome-local-directory"]` — interactive [optional] — F1.6.local-directory-row
 - `[data-testid="welcome-local-directory-unavailable"]` — display [optional] — F1.6.local-directory-unavailable
 - `[data-testid="welcome-directory-retry"]` — interactive [optional] — F1.6.directory-retry
@@ -3523,6 +3525,20 @@
 
 ## tao/home (F1.11)
 
+- `[data-testid="tao-home-provider"]` — interactive — F1.11.tao-home-provider
+- `[data-testid="tao-home-reasoning-effort"]` — interactive [optional] — F1.11.tao-home-reasoning-effort
+- `[data-testid="tao-home-capability-model-deepseek-flash"]` — interactive [optional] — F1.11.tao-home-capability-model-deepseek-flash
+- `[data-testid="tao-home-capability-model-deepseek-v4.1-flash"]` — interactive [optional] — F1.11.tao-home-capability-model-deepseek-v4.1-flash
+- `[data-testid="tao-home-handoff-confirm"]` — interactive [optional] — F1.11.tao-home-handoff-confirm
+- `[data-testid="tao-home-handoff-return"]` — interactive [optional] — F1.11.tao-home-handoff-return
+- `[data-testid="tao-home-message-codex"]` — interactive [optional] — F1.11.tao-home-message-codex
+- `[data-testid="tao-home-message-claude"]` — interactive [optional] — F1.11.tao-home-message-claude
+- `[data-testid="tao-home-message-acp"]` — interactive [optional] — F1.11.tao-home-message-acp
+- `[data-testid="tao-home-action-card"]` — interactive [optional] — F1.11.tao-home-action-card
+- `[data-testid="tao-home-action-result"]` — display [optional] — F1.11.tao-home-action-result
+- `[data-testid="tao-home-action-content"]` — display [optional] — F1.11.tao-home-action-content
+- `[data-testid="tao-home-action-undo"]` — interactive [optional] — F1.11.tao-home-action-undo
+- `[data-testid="tao-home-action-stop"]` — interactive [optional] — F1.11.tao-home-action-stop
 - `[data-testid="tao-home-host"]` — display — F1.11.tao-home-host
 - `[data-testid="tao-home-topbar"]` — display — F1.11.tao-home-topbar
 - `[data-testid="tao-home-mode-ask"]` — interactive — F1.11.tao-home-mode-ask
@@ -3537,6 +3553,8 @@
 - `[data-testid="tao-home-dock-row"]` — display — F1.11.tao-home-dock-row
 - `[data-testid="tao-home-history"]` — interactive — F1.11.tao-home-history
 - `[data-testid="tao-home-history-popover"]` — display — F1.11.tao-home-history-popover
+- `[data-testid="tao-home-history-delete"]` — interactive — F1.11.tao-home-history-delete
+- `[data-testid="tao-home-history-restore"]` — interactive — F1.11.tao-home-history-restore
 - `[data-testid="tao-home-history-tab-chat"]` — interactive — F1.11.tao-home-history-tab-chat
 - `[data-testid="tao-home-history-tab-sessions"]` — interactive — F1.11.tao-home-history-tab-sessions
 - `[data-testid="tao-home-history-tab-workspaces"]` — interactive — F1.11.tao-home-history-tab-workspaces
@@ -3554,7 +3572,6 @@
 - `[data-testid="tao-home-demo-toggle"]` — interactive — F1.11.tao-home-demo-toggle
 - `[data-testid="tao-home-new-chat"]` — interactive — F1.11.tao-home-new-chat
 - `[data-testid="tao-home-side-toggle"]` — interactive — F1.11.tao-home-side-toggle
-- `[data-testid="tao-home-appearance"]` — interactive — F1.11.tao-home-appearance
 - `[data-testid="tao-home-capabilities"]` — interactive — F1.11.tao-home-capabilities
 - `[data-testid="tao-home-plus"]` — interactive — F1.11.tao-home-plus
 - `[data-testid="tao-home-voice"]` — interactive — F1.11.tao-home-voice
@@ -3576,6 +3593,7 @@
 - `[role="dialog"] button:has-text("Thinking")` — interactive — F1.11.tao-home-popup-thinking
 - `[role="dialog"] button:has-text("Web")` — interactive — F1.11.tao-home-popup-web
 - `[role="dialog"] select[aria-label="Choose shell"]` — interactive — F1.11.tao-home-popup-shell-select
+- `xpath=//*[@role="dialog"]//button[normalize-space(.)="Open home directory"]` — interactive — F1.11.tao-home-popup-shell-home
 - `[data-testid="tao-home-send"]` — interactive — F1.11.tao-home-send
 - `[data-testid="tao-home-stop"]` — interactive — F1.11.tao-home-stop
 - `[data-testid="tao-home-message-list"]` — display — F1.11.tao-home-message-list
@@ -3585,8 +3603,9 @@
 - `[data-testid="tao-home-message-branch"]` — interactive — F1.11.tao-home-message-branch
 - `[data-testid="tao-home-error-state"]` — display — F1.11.tao-home-error-state
 - `[data-testid="tao-home-retry"]` — interactive — F1.11.tao-home-retry
-- `[data-testid="tao-home-settings"]` — interactive — F1.11.tao-home-settings
 - `[data-testid="tao-home-vault-locked"]` — display — F1.11.tao-home-vault-locked
+- `[data-testid="tao-home-vault-dismiss"]` — interactive — F1.11.tao-home-vault-dismiss
+- `[data-testid="tao-home-vault-notice"]` — display — F1.11.tao-home-vault-notice
 - `[data-testid="tao-home-vault-unlock"]` — interactive — F1.11.tao-home-vault-unlock
 - `[data-testid="tao-home-continue"]` — interactive — F1.11.tao-home-continue
 - `[data-testid="tao-settings"]` — display — F1.11.tao-settings
@@ -3614,6 +3633,30 @@
 - `[data-testid="tao-home-side-resize"]` — interactive — F1.11.tao-home-side-resize
 - `[data-testid="tao-home-chat-column"]` — display — F1.11.tao-home-chat-column
 - `[data-testid="tao-home-body"]` — display — F1.11.tao-home-body
+- `[data-testid="tao-home-memory-export"]` — interactive — F1.11.tao-home-memory-export
+- `[data-testid="tao-home-memory-entry"]` — display — F1.11.tao-home-memory-entry
+- `[data-testid="tao-home-memory-content"]` — interactive — F1.11.tao-home-memory-content
+- `[data-testid="tao-home-memory-save"]` — interactive — F1.11.tao-home-memory-save
+- `[data-testid="tao-home-memory-cancel"]` — interactive — F1.11.tao-home-memory-cancel
+- `[data-testid="tao-home-memory-edit"]` — interactive — F1.11.tao-home-memory-edit
+- `[data-testid="tao-home-memory-delete"]` — interactive — F1.11.tao-home-memory-delete
+- `.tao-home-history-empty` — display — F1.11.tao-home-history-empty
+- `.tao-home-history-footer button:first-child` — interactive — F1.11.tao-home-history-new-chat
+- `.tao-home-history-header button` — interactive — F1.11.tao-home-history-close
+- `.tao-home-search-title button` — interactive — F1.11.tao-home-search-close
+- `.xterm-screen` — display — F1.11.tao-home-launched-terminal-content
+- `[data-testid="tao-home-dock-directory"]` — interactive — F1.11.tao-home-dock-directory
+- `[data-testid="tao-home-dock-mail"]` — interactive — F1.11.tao-home-dock-mail
+- `[data-testid="tao-home-dock-session"]` — interactive — F1.11.tao-home-dock-session
+- `[data-testid="tao-home-dock-settings"]` — interactive — F1.11.tao-home-dock-settings
+- `[data-testid="tao-home-context-local"]` — interactive — F1.11.tao-home-context-local
+- `[data-testid="tao-home-search-filter-all"]` — interactive — F1.11.tao-home-search-filter-all
+- `[data-testid="tao-home-search-filter-session"]` — interactive — F1.11.tao-home-search-filter-session
+- `[data-testid="tao-home-search-filter-workspace"]` — interactive — F1.11.tao-home-search-filter-workspace
+- `[data-testid="tao-home-search-filter-thread"]` — interactive — F1.11.tao-home-search-filter-thread
+- `[data-testid="tao-home-search-filter-command"]` — interactive — F1.11.tao-home-search-filter-command
+- `[data-testid="tao-home-search-filter-sql"]` — interactive — F1.11.tao-home-search-filter-sql
+- `[data-testid="tao-home-search-filter-note"]` — interactive — F1.11.tao-home-search-filter-note
 
 ## terminal/appearance (F5.2)
 
@@ -3999,6 +4042,7 @@
 - `[data-testid="vault-setup-too-short"]` — display [optional] — F12.1.setup-too-short
 - `[data-testid="vault-setup-mismatch"]` — display [optional] — F12.1.setup-mismatch
 - `[data-testid="vault-setup-error"]` — display [optional] — F12.1.setup-error
+- `[data-testid="startup-vault-check-cancel"]` — interactive [optional] — F12.1.startup-vault-check-cancel
 - `[data-testid="vault-unlock-dialog"]` — display [optional] — F12.1.unlock-dialog
 - `[data-testid="vault-unlock-pw"]` — interactive [optional] — F12.1.unlock-pw
 - `[data-testid="vault-unlock-reason"]` — display [optional] — F12.1.unlock-reason

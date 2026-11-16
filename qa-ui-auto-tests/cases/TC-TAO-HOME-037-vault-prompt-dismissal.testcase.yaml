@@ -1,0 +1,198 @@
+id: TC-TAO-HOME-037
+title: Vault setup and startup unlock can be cancelled without blocking Home
+description: A fresh profile can use Home without configuring a master password. Open
+  and cancel Vault setup by button and Escape, then initialize and lock via Settings.
+  Reload with startup mode and cancel the unlock overlay. Home remains usable while
+  the Vault stays locked and MFA still requires explicit unlock. Verify a later explicit
+  unlock succeeds. Native establishes actual vault state and reload; browser verifies
+  matching renderer transitions with its vault stub.
+modes:
+- browser
+- native
+covers:
+- F1.11
+- F12.1
+- F-MFA-1
+tags:
+- p0
+- tao-home
+- regression
+- vault
+fixtures:
+- reset_db
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="tao-home-new-chat"]'
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- assert_not_visible: '[data-testid="vault-setup-dialog"]'
+- click: '[data-testid="tao-home-new-chat"]'
+- click: '[data-testid="tao-home-history"]'
+- wait_for: '[data-testid="tao-home-history-popover"]'
+- press: Escape
+- click: '[data-testid="ribbon-settings"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: vault
+- wait_for: '[data-testid="vault-init-button"]'
+- assert_text:
+    selector: '[data-testid="vault-state-badge"]'
+    contains: empty
+- click: '[data-testid="vault-init-button"]'
+- click: '[data-testid="vault-setup-cancel"]'
+- assert_not_visible: '[data-testid="vault-setup-dialog"]'
+- assert_text:
+    selector: '[data-testid="vault-state-badge"]'
+    contains: empty
+- click: '[data-testid="vault-init-button"]'
+- press:
+    selector: '[data-testid="vault-setup-pw1"]'
+    key: Escape
+- assert_not_visible: '[data-testid="vault-setup-dialog"]'
+- assert_text:
+    selector: '[data-testid="vault-state-badge"]'
+    contains: empty
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="tao-home-dock-more"]'
+- assert_visible: '[data-testid="tao-home-dock-settings"]'
+- press: Escape
+- click: '[data-testid="ribbon-settings"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: vault
+- click: '[data-testid="vault-init-button"]'
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: qa-home-vault-037
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: qa-home-vault-037
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for: '[data-testid="vault-lock-button"]'
+- click: '[data-testid="vault-unlock-mode-startup"]'
+- click: '[data-testid="vault-lock-button"]'
+- assert_text:
+    selector: '[data-testid="vault-state-badge"]'
+    contains: locked
+- reload_window: null
+- wait_for: '[data-testid="vault-unlock-dialog"]'
+- assert_visible: '[data-testid="vault-unlock-cancel"]'
+- click: '[data-testid="vault-unlock-cancel"]'
+- assert_not_visible: '[data-testid="vault-unlock-dialog"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="tao-home-history"]'
+- assert_visible: '[data-testid="tao-home-history-popover"]'
+- press: Escape
+- click: '[data-testid="ribbon-settings"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: vault
+- assert_text:
+    selector: '[data-testid="vault-state-badge"]'
+    contains: locked
+- assert_localstorage:
+    key: taomni.vaultUnlockMode
+    equals: startup
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-mfa"]'
+- wait_for: '[data-testid="vault-unlock-dialog"]'
+- assert_not_visible: '[data-testid="mfa-panel"]'
+- click: '[data-testid="vault-unlock-cancel"]'
+- wait_for: '[data-testid="vault-gate-placeholder"]'
+- assert_not_visible: '[data-testid="vault-unlock-dialog"]'
+- assert_not_visible: '[data-testid="mfa-panel"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="tao-home-search"]'
+- wait_for: '[data-testid="tao-home-search-panel"]'
+- press: Escape
+- click: '[data-testid="ribbon-settings"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: vault
+- click: '[data-testid="vault-unlock-button"]'
+- fill:
+    selector: '[data-testid="vault-unlock-pw"]'
+    value: qa-home-vault-037
+- click: '[data-testid="vault-unlock-confirm"]'
+- wait_for: '[data-testid="vault-lock-button"]'
+- assert_text:
+    selector: '[data-testid="vault-state-badge"]'
+    contains: unlocked
+- assert_no_runtime_errors: null
+- screenshot: tao-vault-dismissal-explicit-unlock.png
+verification:
+  review: reviewed
+  requirements:
+  - id: VAULT-CANCEL-LEAVES-HOME-USABLE
+    requirement: Setup and startup unlock can be cancelled; this leaves Vault locked,
+      retains the selected prompt mode and still gates protected features.
+    actions:
+    - 6
+    - 7
+    - 14
+    - 15
+    - 18
+    - 19
+    - 28
+    - 31
+    - 33
+    - 34
+    - 36
+    - 39
+    - 42
+    - 49
+    - 50
+    - 53
+    - 57
+    - 58
+    - 63
+    - 65
+    checkpoints:
+    - step: 17
+      expectation: Setup Cancel leaves an empty Vault.
+    - step: 21
+      expectation: Setup Escape leaves an empty Vault.
+    - step: 43
+      expectation: Home history is usable after cancelling startup unlock.
+    - step: 48
+      expectation: Vault remains locked and startup mode remains selected.
+    - step: 56
+      expectation: Cancelling protected-feature unlock leaves its content unavailable.
+    - step: 67
+      expectation: A later explicit unlock succeeds.
+    - step: 24
+      expectation: '{''assert_visible'': ''[data-testid="tao-home-dock-settings"]''}'
+    - step: 47
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="vault-state-badge"]'',
+        ''contains'': ''locked''}}'
+    - step: 52
+      expectation: '{''assert_not_visible'': ''[data-testid="mfa-panel"]''}'
+    - step: 54
+      expectation: '{''wait_for'': ''[data-testid="vault-gate-placeholder"]''}'
+    - step: 59
+      expectation: '{''wait_for'': ''[data-testid="tao-home-search-panel"]''}'
+    - step: 68
+      expectation: '{''assert_no_runtime_errors'': None}'
+    results:
+    - 17
+    - 21
+    - 24
+    - 43
+    - 47
+    - 48
+    - 52
+    - 54
+    - 56
+    - 59
+    - 67
+    - 68
+  native:
+  - check: Native empty/setup/locked state and explicit unlock after reload
+    method: automated
+    reason: Renderer stubs cannot establish the backend Vault lock or credential protection.
+  visual:
+  - check: Confirmation, retained content and final action layout
+    method: manual
+    reason: Inspect the recorded screenshot; DOM assertions do not certify prototype
+      or OS window fidelity.

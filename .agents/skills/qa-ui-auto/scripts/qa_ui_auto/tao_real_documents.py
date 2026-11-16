@@ -81,7 +81,7 @@ def run(ctx: Any, args: Any) -> str:
         send(prompt)
         if not wait_reply("markdown-reply", 1, 1):
             outcome = "credential-invalid"
-            return "DeepSeek key invalid; Markdown, branch and history checks were not completed"
+            return "Provider key invalid; Markdown, branch and history checks were not completed"
         record("markdown-structure", document())
         record("markdown-in-viewport", assert_tail_visible(ctx, '[data-testid="tao-home-markdown-reply"]'))
         ctx.session.screenshot(ctx.case_dir / "real-markdown.png")
@@ -104,7 +104,7 @@ def run(ctx: Any, args: Any) -> str:
         send("Reply only with the synthetic test token from my first message. Do not include any other text.")
         if not wait_reply("branch-context-recall", 2, 2):
             outcome = "credential-invalid"
-            return "DeepSeek key invalid on branch reply; remaining history checks were not completed"
+            return "Provider key invalid on branch reply; remaining history checks were not completed"
         draft = "QA branch draft 保留草稿"
         ctx.session.fill(INPUT, draft)
         ctx.session.screenshot(ctx.case_dir / "real-branch.png")
@@ -113,7 +113,7 @@ def run(ctx: Any, args: Any) -> str:
         send(f"This is a separate synthetic conversation. Reply exactly with {other}, no other text.")
         if not wait_reply("separate-conversation", 3, 1, other):
             outcome = "credential-invalid"
-            return "DeepSeek key invalid in separate chat; remaining history checks were not completed"
+            return "Provider key invalid in separate chat; remaining history checks were not completed"
 
         select_history(title)
         observed = state()
@@ -133,9 +133,10 @@ def run(ctx: Any, args: Any) -> str:
         record("history-no-automatic-request", observed)
         ctx.session.screenshot(ctx.case_dir / "real-history-restored.png")
         outcome = "documents-complete"
-        return "Real DeepSeek Markdown, native branch context, original/branch history and draft isolation passed (3 requests)"
+        return "Real configured provider Markdown, native branch context, original/branch history and draft isolation passed (3 requests)"
     finally:
-        artifact = {"outcome": outcome, "maximumRequests": 3, "stages": stages,
+        config = json.loads((ctx.case_dir / "real-provider-config.json").read_text(encoding="utf-8"))
+        artifact = {"outcome": outcome, **config, "maximumRequests": 3, "stages": stages,
                     "boundary": "Actual commercial replies and native context clone; history reopening in the same process. Restart persistence is covered by TC-TAO-HOME-004."}
         (ctx.case_dir / "real-provider-documents.json").write_text(json.dumps(artifact, indent=2) + "\n", encoding="utf-8")
         with (ctx.case_dir / "real-provider-status.txt").open("a", encoding="utf-8") as stream:

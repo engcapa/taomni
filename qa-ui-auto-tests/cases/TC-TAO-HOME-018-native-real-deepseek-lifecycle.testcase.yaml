@@ -1,5 +1,5 @@
 id: TC-TAO-HOME-018
-title: Real DeepSeek edit branch isolation and stopped response continuation
+title: Real configured provider edit branch isolation and stopped response continuation
 description: Four real requests exercise edit cloning, independent original history, actual streaming Stop and native
   Continue with the retained prefix.
 modes:
@@ -31,7 +31,7 @@ verification:
   review: reviewed
   requirements:
   - id: REAL-LIFECYCLE
-    requirement: Real DeepSeek edit branch isolation and stopped response continuation
+    requirement: Real configured provider edit branch isolation and stopped response continuation
     actions:
     - 1
     - 2

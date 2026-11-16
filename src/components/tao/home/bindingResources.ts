@@ -32,7 +32,7 @@ export function resolveBindingChip(resource: BindingResource): ContextChip {
     if (!context) throw new Error(tr("工作区已经关闭，请重新绑定。"));
     content = [`${tr("工作区")}: ${context.repoRoot}`, `${tr("活动文件")}: ${context.activePath ?? tr("无")}`, ...context.openPaths.slice(0, 20).map((path) => `${tr("打开")}: ${path}`)].join("\n");
   }
-  const preview = redactText(content).text.slice(0, 8000);
+  const preview = Array.from(redactText(content).text).slice(0, 800).join("");
   if (!preview.trim()) throw new Error(tr("当前资源没有可引用的内容。"));
   return { id: `binding:${resource.kind}:${resource.id}`, kind: resource.kind, label: resource.label, preview, removable: true };
 }

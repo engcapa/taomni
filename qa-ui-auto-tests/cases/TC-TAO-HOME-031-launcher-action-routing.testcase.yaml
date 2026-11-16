@@ -1,0 +1,114 @@
+id: TC-TAO-HOME-031
+title: Home launcher actions open the intended pane and preserve a single Settings tab
+description: >-
+  Cover previously display-only dock actions: direct and More session creation,
+  actual local terminal launch, local directory and unified mail routing, and
+  the retained Tao settings entry. Cancel the session editor and dismiss More
+  without losing Home. Native establishes real shell creation and native directory
+  publication; browser provides the same renderer transitions through its stubs.
+  Also select the first detected shell, reopen its menu to check retention, and
+  open the actual Home directory as an embedded filesystem pane.
+modes: [browser, native]
+covers: [F1.11, F11.1, F-EXPLORER-1]
+tags: [p0, tao-home, regression]
+fixtures: [reset_db]
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-tao-launch-031
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- click: '[data-testid="tao-home-new-session"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-cancel"]'
+- assert_not_visible: '[data-testid="session-editor"]'
+- click: '[data-testid="tao-home-dock-more"]'
+- assert_attribute: {selector: '[data-testid="tao-home-dock-more"]', name: aria-expanded, equals: 'true'}
+- press: Escape
+- assert_attribute: {selector: '[data-testid="tao-home-dock-more"]', name: aria-expanded, equals: 'false'}
+- click: '[data-testid="tao-home-dock-more"]'
+- click: '[data-testid="tao-home-dock-session"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-cancel"]'
+- assert_not_visible: '[data-testid="session-editor"]'
+- click: '[data-testid="tao-home-dock-more"]'
+- click: '[data-testid="tao-home-dock-directory"]'
+- wait_for: '[data-testid="explorer-tab"]'
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="file-browser"]', equal: 1}
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="tao-home-dock-more"]'
+- click: '[data-testid="tao-home-dock-mail"]'
+- wait_for: '[data-testid="tab-item"][data-tab-type="mail-unified"]'
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="mail-unified"]', equal: 1}
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="tao-home-local-terminal"]'
+- wait_for: '.xterm-screen'
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="terminal"]', equal: 1}
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="tao-home-dock-more"]'
+- click: '[data-testid="tao-home-dock-settings"]'
+- wait_for: '[data-testid="tao-settings"]'
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="settings"]', equal: 1}
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="tao-home-dock-more"]'
+- click: '[data-testid="tao-home-dock-settings"]'
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="settings"]', equal: 1}
+- click: '[data-testid="nav-mode-home"]'
+- assert_not_visible: '[data-testid="tao-home-settings"]'
+- assert_not_visible: '[data-testid="tao-home-appearance"]'
+- click: '[data-testid="tao-home-shell-menu"]'
+- wait_for: '[role="dialog"] select[aria-label="Choose shell"]:enabled'
+- press: {selector: '[role="dialog"] select[aria-label="Choose shell"]', key: Home}
+- press: Escape
+- click: '[data-testid="tao-home-shell-menu"]'
+- eval_readonly:
+    expression: document.querySelector('.tao-home-popup-items select').selectedIndex === 0
+    expect_truthy: true
+    timeout_sec: 5
+- click: 'xpath=//*[@role="dialog"]//button[normalize-space(.)="Open home directory"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-nav-shortcut"][aria-selected="true"]:nth-child(2)'
+- assert_attribute:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    name: data-path
+    matches: '^(?:[A-Za-z]:[\\/]|/).+'
+- assert_attribute:
+    selector: '[data-testid="explorer-nav-shortcut"]:nth-child(2):is([data-testid="explorer-tab"][data-active="true"] *)'
+    name: aria-selected
+    equals: 'true'
+- click: '[data-testid="nav-mode-home"]'
+- assert_no_runtime_errors: null
+- screenshot: tao-home-launcher-actions.png
+verification:
+  review: reviewed
+  requirements:
+  - id: HOME-LAUNCHER-ACTIONS
+    requirement: Each previously display-only dock action reaches its intended content and cancellations return Home.
+    actions: [5, 7, 9, 11, 14, 16, 19, 24, 28, 33, 38]
+    checkpoints:
+    - {step: 8, expectation: Cancelling the direct new-session action closes the editor.}
+    - {step: 12, expectation: Escape closes More and updates its expanded state.}
+    - {step: 17, expectation: Cancelling More session creation also closes the editor.}
+    - {step: 21, expectation: Local directory opens exactly one real explorer pane/tab.}
+    - {step: 26, expectation: Unified mail opens exactly one tab of the requested kind.}
+    - {step: 30, expectation: Local terminal opens exactly one terminal pane/tab.}
+    - {step: 39, expectation: Repeated Home dock settings navigation reuses one Settings tab.}
+    - {step: 54, expectation: All routes return without runtime errors.}
+    results: [8, 12, 17, 21, 26, 30, 39, 54]
+  - id: HOME-SHELL-OPTIONS
+    requirement: Shell selection survives menu dismissal and Home directory opens an embedded filesystem pane.
+    actions: [43, 45, 46, 47, 49, 53]
+    checkpoints:
+    - {step: 48, expectation: Reopening retains the first detected shell; hosts with only one shell retain that sole option.}
+    - {step: 50, expectation: The Home action opens the active Explorer pane with its Home shortcut selected.}
+    - {step: 51, expectation: The active Explorer pane carries an absolute host or browser VFS directory path.}
+    - {step: 52, expectation: The selected Home shortcut confirms the directory reached by the action.}
+    - {step: 54, expectation: Returning Home leaves no runtime errors.}
+    results: [48, 50, 51, 52, 54]
+  native:
+  - check: Native local shell launch and filesystem explorer publication
+    method: automated
+    reason: Browser stubs cannot establish a real shell or native filesystem-backed pane.
+  visual:
+  - check: Final Home launcher and compact header
+    method: manual
+    reason: The screenshot supports layout review; route assertions do not certify full prototype parity.

@@ -33,4 +33,4 @@ def run(ctx):
                      "Background reply/draft was lost, crossed threads, duplicated or automatically resent")
         flow.record("background-completed-with-independent-draft", restored)
         flow.screenshot("background-restored")
-    return "Real DeepSeek concurrent threads: " + flow.outcome
+    return "Real configured provider concurrent threads: " + flow.outcome

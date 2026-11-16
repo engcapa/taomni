@@ -1,10 +1,8 @@
 id: TC-TAO-HOME-003
 title: Tao Home context, capability and side-panel interactions remain reachable and dismissible
-description: >-
-  Exercise the high-fidelity Home shell controls beyond the empty-state smoke:
-  context menu routing, capability toggles, voice and side panels, binding
-  empty states, shell choices, and outside/Escape dismissal in browser and
-  native WebViews. The case does not require a commercial provider response.
+description: 'Exercise the high-fidelity Home shell controls beyond the empty-state smoke: context menu routing, capability
+  toggles, voice and side panels, binding empty states, shell choices, and outside/Escape dismissal in browser and native
+  WebViews. The case does not require a commercial provider response.'
 modes:
 - browser
 - native
@@ -75,16 +73,18 @@ steps:
 - assert_visible: '[role="dialog"] select[aria-label="Choose shell"]'
 - press: Escape
 - assert_not_visible: '[role="dialog"]'
-- click: '[data-testid="tao-home-appearance"]'
+- click: '[data-testid="ribbon-settings"]'
 - wait_for: '[data-testid="settings-panel"]'
 - assert_count:
     selector: '[data-testid="tab-item"][data-tab-type="settings"]'
     equal: 1
 - click: '[data-testid="nav-mode-home"]'
-- click: '[data-testid="tao-home-settings"]'
+- click: '[data-testid="tao-home-dock-more"]'
+- click: '[data-testid="tao-home-dock-settings"]'
 - wait_for: '[data-testid="tao-settings"]'
 - eval_readonly:
-    expression: document.getElementById('tao-settings-heading').getBoundingClientRect().top >= document.getElementById('settings-search-input').getBoundingClientRect().bottom + 12 && document.getElementById('tao-settings-heading').getBoundingClientRect().bottom <= document.getElementById('tao-settings-heading').closest('.overflow-auto').getBoundingClientRect().bottom
+    expression: document.getElementById('tao-settings-heading').getBoundingClientRect().top >= document.getElementById('settings-search-input').getBoundingClientRect().bottom
+      + 12 && document.getElementById('tao-settings-heading').getBoundingClientRect().bottom <= document.getElementById('tao-settings-heading').closest('.overflow-auto').getBoundingClientRect().bottom
     expect_truthy: true
     timeout_sec: 5
 - assert_element_geometry:
@@ -104,41 +104,100 @@ verification:
   visual:
   - check: Tao section heading placement and one visible Settings tab
     method: automated
-    reason: Actual heading, toolbar and viewport rectangles plus tab counts are asserted; a screenshot retains the revealed section.
+    reason: Actual heading, toolbar and viewport rectangles plus tab counts are asserted; a screenshot retains the revealed
+      section.
   native:
   - check: Packaged WebView settings navigation after asynchronous AI group expansion
     method: automated
-    reason: The native mode exercises the real Settings and ASR lifecycle and checks final heading geometry; no OS menu clicking or hardware keyboard delivery is claimed.
+    reason: The native mode exercises the real Settings and ASR lifecycle and checks final heading geometry; no OS menu clicking
+      or hardware keyboard delivery is claimed.
   requirements:
   - id: HOME-POPOVERS
-    requirement: Capability, workspace binding and shell menus remain reachable and dismiss with Escape without hiding the Home controls.
-    actions: [25, 27, 28, 30, 32, 34, 37, 39, 42]
+    requirement: Capability, workspace binding and shell menus remain reachable and dismiss with Escape without hiding the
+      Home controls.
+    actions:
+    - 25
+    - 27
+    - 28
+    - 30
+    - 32
+    - 34
+    - 37
+    - 39
+    - 42
     checkpoints:
-    - {step: 31, expectation: The selected Web capability is visible on its control.}
-    - {step: 33, expectation: Escape dismisses the capability popover.}
-    - {step: 36, expectation: Workspace binding reports the actual empty resource list.}
-    - {step: 38, expectation: Escape dismisses the binding popover.}
-    - {step: 41, expectation: The native shell choice select is reachable.}
-    - {step: 43, expectation: Escape dismisses the shell popover.}
-    results: [31, 33, 36, 38, 41, 43]
+    - step: 31
+      expectation: The selected Web capability is visible on its control.
+    - step: 33
+      expectation: Escape dismisses the capability popover.
+    - step: 36
+      expectation: Workspace binding reports the actual empty resource list.
+    - step: 38
+      expectation: Escape dismisses the binding popover.
+    - step: 41
+      expectation: The native shell choice select is reachable.
+    - step: 43
+      expectation: Escape dismisses the shell popover.
+    results:
+    - 31
+    - 33
+    - 36
+    - 38
+    - 41
+    - 43
   - id: HOME-COMPANION-PANELS
-    requirement: Attach, workflow and voice controls open their corresponding side-panel content and the shared top toggle closes the panel.
-    actions: [6, 9, 12, 14, 15, 18, 20, 23]
+    requirement: Attach, workflow and voice controls open their corresponding side-panel content and the shared top toggle
+      closes the panel.
+    actions:
+    - 6
+    - 9
+    - 12
+    - 14
+    - 15
+    - 18
+    - 20
+    - 23
     checkpoints:
-    - {step: 11, expectation: Attach opens the file panel and reports its supported input.}
-    - {step: 13, expectation: The top sidebar toggle fully closes the file panel.}
-    - {step: 17, expectation: Workflows open their confirmation guidance.}
-    - {step: 19, expectation: The top sidebar toggle fully closes the workflow panel.}
-    - {step: 22, expectation: Voice opens the local draft dictation guidance.}
-    - {step: 24, expectation: The top sidebar toggle fully closes the voice panel.}
-    results: [11, 13, 17, 19, 22, 24]
+    - step: 11
+      expectation: Attach opens the file panel and reports its supported input.
+    - step: 13
+      expectation: The top sidebar toggle fully closes the file panel.
+    - step: 17
+      expectation: Workflows open their confirmation guidance.
+    - step: 19
+      expectation: The top sidebar toggle fully closes the workflow panel.
+    - step: 22
+      expectation: Voice opens the local draft dictation guidance.
+    - step: 24
+      expectation: The top sidebar toggle fully closes the voice panel.
+    results:
+    - 11
+    - 13
+    - 17
+    - 19
+    - 22
+    - 24
   - id: HOME-SETTINGS-NAVIGATION
-    requirement: Appearance and Tao settings reuse one Settings tab and reveal the Tao heading below the sticky search toolbar after the AI group expands.
-    actions: [44, 47, 48]
+    requirement: Global Settings and Home dock Tao settings reuse one Settings tab and reveal the Tao heading below the sticky
+      search toolbar after the AI group expands.
+    actions:
+    - 44
+    - 47
+    - 49
     checkpoints:
-    - {step: 46, expectation: Opening Appearance creates one visible Settings tab.}
-    - {step: 50, expectation: The Tao heading clears the search toolbar by at least 12 pixels and remains inside the settings viewport.}
-    - {step: 51, expectation: The heading has usable dimensions and is fully in the window viewport.}
-    - {step: 53, expectation: Opening Tao settings reuses the existing single Settings tab.}
-    - {step: 55, expectation: Returning Home leaves no runtime errors.}
-    results: [46, 50, 51, 53, 55]
+    - step: 46
+      expectation: Opening global Settings creates one visible Settings tab.
+    - step: 51
+      expectation: The Tao heading clears the search toolbar by at least 12 pixels and remains inside the settings viewport.
+    - step: 52
+      expectation: The heading has usable dimensions and is fully in the window viewport.
+    - step: 54
+      expectation: Opening Tao settings reuses the existing single Settings tab.
+    - step: 56
+      expectation: Returning Home leaves no runtime errors.
+    results:
+    - 46
+    - 51
+    - 52
+    - 54
+    - 56

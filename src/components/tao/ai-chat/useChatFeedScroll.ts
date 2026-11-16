@@ -7,6 +7,8 @@ export function useChatFeedScroll(threadId: string | null, messages: TaoMessage[
   const contentRef = useRef<HTMLDivElement>(null);
   const pinned = useRef(true);
   const previousThread = useRef(threadId);
+  const lastUserId = messages?.filter((message) => message.role === "user").at(-1)?.id;
+  const previousUser = useRef(lastUserId);
   const frame = useRef<number | undefined>(undefined);
 
   const schedule = useCallback(() => {
@@ -34,12 +36,13 @@ export function useChatFeedScroll(threadId: string | null, messages: TaoMessage[
   }, [threadId, active, schedule]);
 
   useLayoutEffect(() => {
-    if (previousThread.current !== threadId) {
+    if (previousThread.current !== threadId || (lastUserId && previousUser.current !== lastUserId)) {
       pinned.current = true;
-      previousThread.current = threadId;
     }
+    previousThread.current = threadId;
+    previousUser.current = lastUserId;
     schedule();
-  }, [threadId, messages, phase, schedule]);
+  }, [threadId, lastUserId, messages, phase, schedule]);
 
   const onScroll = () => {
     const feed = feedRef.current;

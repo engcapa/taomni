@@ -1,0 +1,100 @@
+//! Opt-in L2 stores. File snapshot metadata is L1; contents and mail stay off by default.
+use super::connectors::{Entry, collect as rows};
+use crate::state::AppState;
+use rusqlite::{Connection, OpenFlags};
+use std::{collections::BTreeMap, path::Path};
+
+pub fn collect(state: &AppState, enabled: &BTreeMap<String, bool>) -> Result<Vec<Entry>, String> {
+    let mut result = Vec::new();
+    let on = |source: &str| enabled.get(source) == Some(&true);
+    if on("snapshots") || on("file_contents") {
+        // mail-cache and local-history are siblings in this app's isolated data
+        // directory. Never scan the user's home or read arbitrary source paths.
+        if let Some(data) = state.mail_cache_root().parent() {
+            result.extend(snapshot_entries(
+                &data.join("local-history"),
+                on("snapshots"),
+                on("file_contents"),
+            )?);
+        }
+    }
+    if on("mail") || on("mail_bodies") {
+        let accounts = {
+            let db = state.db.lock().map_err(|_| "database unavailable")?;
+            rows(
+                &db,
+                "mail",
+                "SELECT id,name,'','',0,1 FROM sessions WHERE session_type='Mail'",
+            )?
+        };
+        for account in accounts {
+            let handle = state.mail_db(&account.reference)?;
+            let db = handle.lock_for_snapshot(&tokio_util::sync::CancellationToken::new())?;
+            if on("mail") {
+                result.extend(rows(&db, "mail", "SELECT account_id||':'||folder||':'||uid,subject,'from:'||COALESCE(from_name,'')||' '||COALESCE(from_addr,'')||' folder:'||folder,'',COALESCE(date_ts,updated_at),1 FROM mail_messages ORDER BY COALESCE(date_ts,updated_at) DESC LIMIT 5000")?);
+            }
+            if on("mail_bodies") {
+                result.extend(rows(&db, "mail_bodies", "SELECT account_id||':'||folder||':'||uid,subject,COALESCE(body_text,''),'',COALESCE(date_ts,updated_at),1 FROM mail_messages WHERE body_text IS NOT NULL ORDER BY COALESCE(date_ts,updated_at) DESC LIMIT 5000")?);
+                result.extend(rows(&db, "mail_bodies", "SELECT account_id||':draft:'||id,subject,text_body,'',updated_at,1 FROM mail_drafts")?);
+            }
+        }
+    }
+    Ok(result)
+}
+
+pub fn snapshot_entries(root: &Path, metadata: bool, contents: bool) -> Result<Vec<Entry>, String> {
+    let path = root.join("history.db");
+    if !path.is_file() {
+        return Ok(vec![]);
+    }
+    let db = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)
+        .map_err(|_| "search: snapshot database unavailable")?;
+    let entries = rows(
+        &db,
+        "snapshots",
+        "SELECT CAST(id AS TEXT),path,reason||' bytes:'||byte_len,'',created_at,1 FROM local_history ORDER BY created_at DESC LIMIT 5000",
+    )?;
+    let mut result = Vec::new();
+    for entry in entries {
+        if contents && !sensitive_path(&entry.title) {
+            let hash: String = db
+                .query_row(
+                    "SELECT content_hash FROM local_history WHERE id=?1",
+                    [&entry.reference],
+                    |r| r.get(0),
+                )
+                .map_err(|_| "search: snapshot missing")?;
+            if hash.len() != 64 || !hash.bytes().all(|b| b.is_ascii_hexdigit()) {
+                return Err("search: invalid snapshot hash".into());
+            }
+            let blob = root.join("blobs").join(&hash[..2]).join(&hash);
+            if let Ok(text) = std::fs::read_to_string(blob) {
+                result.push(Entry {
+                    source: "file_contents".into(),
+                    reference: entry.reference.clone(),
+                    title: entry.title.clone(),
+                    body: text,
+                    host: String::new(),
+                    ts: entry.ts,
+                    uses: 1,
+                });
+            }
+        }
+        if metadata {
+            result.push(entry);
+        }
+    }
+    Ok(result)
+}
+
+pub fn sensitive_path(path: &str) -> bool {
+    let normalized = path.replace('\\', "/").to_ascii_lowercase();
+    let name = normalized.rsplit('/').next().unwrap_or("");
+    name == ".env"
+        || name.starts_with(".env.")
+        || name.ends_with(".pem")
+        || name.ends_with(".key")
+        || ["id_rsa", "id_ed25519", "credentials", "vault.db"].contains(&name)
+        || normalized.contains("/.ssh/")
+        || normalized.contains("/.aws/")
+}

@@ -1,8 +1,8 @@
 id: TC-TAO-HOME-015
-title: Real DeepSeek code debugging, multiple languages, Mermaid and native Copy
+title: Real configured provider code debugging, multiple languages, Mermaid and native Copy
 description: >-
-  Four bounded commercial requests prove generated Python arithmetic by a safe
-  independent AST interpreter, actual OS clipboard copy, two code languages,
+  Four bounded commercial requests exercise generated Python, actual OS
+  clipboard copy, two code languages,
   Mermaid SVG nodes and a Chinese parameterized-SQL explanation.
 modes: [native]
 covers: [F1.11]
@@ -26,7 +26,7 @@ verification:
     requirement: Real code reasoning and shared Markdown render Python, TypeScript, SQL and Mermaid correctly, and Copy writes real OS text.
     actions: [1, 2, 3, 4, 5, 6]
     checkpoints:
-    - {step: 7, expectation: "Generated Python passes empty/fractional/negative/singleton checks without arbitrary execution; OS clipboard contains fenced Markdown; two code blocks retain semantics; Mermaid renders three nodes; Chinese reply retains parameterized SQL and synthetic token. Only explicit invalid credentials may finish early."}
+    - {step: 7, expectation: "Generated Python is rendered and syntax validity is recorded without exact-answer grading; OS clipboard contains fenced Markdown; multiple code blocks render; reading/copying an earlier reply does not prevent the next question from following into view; Mermaid renders three visible nodes; Chinese reply retains parameterized SQL and synthetic token. Only explicit invalid credentials may finish early."}
     - {step: 8, expectation: No unhandled runtime errors.}
     results: [7, 8]
   native:

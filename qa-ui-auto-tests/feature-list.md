@@ -118,6 +118,8 @@ files:
 - src/components/tao/home/TaoHomeHost.tsx
 - src/components/tao/home/DockRow.tsx
 - src/components/tao/home/HistoryPopover.tsx
+- src/components/tao/home/threadHistoryStorage.ts
+- src/components/tao/home/useThreadHistory.ts
 - src/components/tao/ai-chat/TaoAiChat.tsx
 - src/components/tao/ai-chat/Composer.tsx
 - src/components/tao/ai-chat/TopBar.tsx
@@ -125,11 +127,70 @@ files:
 - src/components/tao/ai-chat/sidePanelTabs.tsx
 - src/components/tao/ai-chat/useSidePanelResize.ts
 - src/components/tao/ai-chat/useChatFeedScroll.ts
+- src/components/tao/ai-chat/actionLifecycle.ts
+- src/components/tao/ai-chat/HandoffControls.tsx
+- src/components/tao/ai-chat/handoff.ts
 - src/components/tao/home/SuggestionRow.tsx
 - src/components/tao/search/SearchPanel.tsx
 - src/styles/taoHome.css
 - src/styles/taoHomeLayout.css
+- src/styles/taoHistory.css
 controls:
+- id: tao-home-provider
+  selector: '[data-testid="tao-home-provider"]'
+  kind: interactive
+- id: tao-home-reasoning-effort
+  selector: '[data-testid="tao-home-reasoning-effort"]'
+  kind: interactive
+  optional: true
+- id: tao-home-capability-model-deepseek-flash
+  selector: '[data-testid="tao-home-capability-model-deepseek-flash"]'
+  kind: interactive
+  optional: true
+- id: tao-home-capability-model-deepseek-v4.1-flash
+  selector: '[data-testid="tao-home-capability-model-deepseek-v4.1-flash"]'
+  kind: interactive
+  optional: true
+- id: tao-home-handoff-confirm
+  selector: '[data-testid="tao-home-handoff-confirm"]'
+  kind: interactive
+  optional: true
+- id: tao-home-handoff-return
+  selector: '[data-testid="tao-home-handoff-return"]'
+  kind: interactive
+  optional: true
+- id: tao-home-message-codex
+  selector: '[data-testid="tao-home-message-codex"]'
+  kind: interactive
+  optional: true
+- id: tao-home-message-claude
+  selector: '[data-testid="tao-home-message-claude"]'
+  kind: interactive
+  optional: true
+- id: tao-home-message-acp
+  selector: '[data-testid="tao-home-message-acp"]'
+  kind: interactive
+  optional: true
+- id: tao-home-action-card
+  selector: '[data-testid="tao-home-action-card"]'
+  kind: interactive
+  optional: true
+- id: tao-home-action-result
+  selector: '[data-testid="tao-home-action-result"]'
+  kind: display
+  optional: true
+- id: tao-home-action-content
+  selector: '[data-testid="tao-home-action-content"]'
+  kind: display
+  optional: true
+- id: tao-home-action-undo
+  selector: '[data-testid="tao-home-action-undo"]'
+  kind: interactive
+  optional: true
+- id: tao-home-action-stop
+  selector: '[data-testid="tao-home-action-stop"]'
+  kind: interactive
+  optional: true
 - id: tao-home-host
   selector: '[data-testid="tao-home-host"]'
   kind: display
@@ -172,6 +233,12 @@ controls:
 - id: tao-home-history-popover
   selector: '[data-testid="tao-home-history-popover"]'
   kind: display
+- id: tao-home-history-delete
+  selector: '[data-testid="tao-home-history-delete"]'
+  kind: interactive
+- id: tao-home-history-restore
+  selector: '[data-testid="tao-home-history-restore"]'
+  kind: interactive
 - id: tao-home-history-tab-chat
   selector: '[data-testid="tao-home-history-tab-chat"]'
   kind: interactive
@@ -228,9 +295,6 @@ controls:
   kind: interactive
 - id: tao-home-side-toggle
   selector: '[data-testid="tao-home-side-toggle"]'
-  kind: interactive
-- id: tao-home-appearance
-  selector: '[data-testid="tao-home-appearance"]'
   kind: interactive
 - id: tao-home-capabilities
   selector: '[data-testid="tao-home-capabilities"]'
@@ -292,6 +356,9 @@ controls:
 - id: tao-home-popup-shell-select
   selector: '[role="dialog"] select[aria-label="Choose shell"]'
   kind: interactive
+- id: tao-home-popup-shell-home
+  selector: 'xpath=//*[@role="dialog"]//button[normalize-space(.)="Open home directory"]'
+  kind: interactive
 - id: tao-home-send
   selector: '[data-testid="tao-home-send"]'
   kind: interactive
@@ -319,11 +386,14 @@ controls:
 - id: tao-home-retry
   selector: '[data-testid="tao-home-retry"]'
   kind: interactive
-- id: tao-home-settings
-  selector: '[data-testid="tao-home-settings"]'
-  kind: interactive
 - id: tao-home-vault-locked
   selector: '[data-testid="tao-home-vault-locked"]'
+  kind: display
+- id: tao-home-vault-dismiss
+  selector: '[data-testid="tao-home-vault-dismiss"]'
+  kind: interactive
+- id: tao-home-vault-notice
+  selector: '[data-testid="tao-home-vault-notice"]'
   kind: display
 - id: tao-home-vault-unlock
   selector: '[data-testid="tao-home-vault-unlock"]'
@@ -406,6 +476,78 @@ controls:
 - id: tao-home-body
   selector: '[data-testid="tao-home-body"]'
   kind: display
+- id: tao-home-memory-export
+  selector: '[data-testid="tao-home-memory-export"]'
+  kind: interactive
+- id: tao-home-memory-entry
+  selector: '[data-testid="tao-home-memory-entry"]'
+  kind: display
+- id: tao-home-memory-content
+  selector: '[data-testid="tao-home-memory-content"]'
+  kind: interactive
+- id: tao-home-memory-save
+  selector: '[data-testid="tao-home-memory-save"]'
+  kind: interactive
+- id: tao-home-memory-cancel
+  selector: '[data-testid="tao-home-memory-cancel"]'
+  kind: interactive
+- id: tao-home-memory-edit
+  selector: '[data-testid="tao-home-memory-edit"]'
+  kind: interactive
+- id: tao-home-memory-delete
+  selector: '[data-testid="tao-home-memory-delete"]'
+  kind: interactive
+- id: tao-home-history-empty
+  selector: '.tao-home-history-empty'
+  kind: display
+- id: tao-home-history-new-chat
+  selector: '.tao-home-history-footer button:first-child'
+  kind: interactive
+- id: tao-home-history-close
+  selector: '.tao-home-history-header button'
+  kind: interactive
+- id: tao-home-search-close
+  selector: '.tao-home-search-title button'
+  kind: interactive
+- id: tao-home-launched-terminal-content
+  selector: '.xterm-screen'
+  kind: display
+- id: tao-home-dock-directory
+  selector: '[data-testid="tao-home-dock-directory"]'
+  kind: interactive
+- id: tao-home-dock-mail
+  selector: '[data-testid="tao-home-dock-mail"]'
+  kind: interactive
+- id: tao-home-dock-session
+  selector: '[data-testid="tao-home-dock-session"]'
+  kind: interactive
+- id: tao-home-dock-settings
+  selector: '[data-testid="tao-home-dock-settings"]'
+  kind: interactive
+- id: tao-home-context-local
+  selector: '[data-testid="tao-home-context-local"]'
+  kind: interactive
+- id: tao-home-search-filter-all
+  selector: '[data-testid="tao-home-search-filter-all"]'
+  kind: interactive
+- id: tao-home-search-filter-session
+  selector: '[data-testid="tao-home-search-filter-session"]'
+  kind: interactive
+- id: tao-home-search-filter-workspace
+  selector: '[data-testid="tao-home-search-filter-workspace"]'
+  kind: interactive
+- id: tao-home-search-filter-thread
+  selector: '[data-testid="tao-home-search-filter-thread"]'
+  kind: interactive
+- id: tao-home-search-filter-command
+  selector: '[data-testid="tao-home-search-filter-command"]'
+  kind: interactive
+- id: tao-home-search-filter-sql
+  selector: '[data-testid="tao-home-search-filter-sql"]'
+  kind: interactive
+- id: tao-home-search-filter-note
+  selector: '[data-testid="tao-home-search-filter-note"]'
+  kind: interactive
 -->
 
 Tao Home 将问、做、深研三种模式、绑定栏、Composer、消息状态、历史快捷行与本地资料搜索组合为独立宿主；首页入口移除 LAN 聊天，WSL 只在检测到可用发行版时显示。用例 `TC-TAO-HOME-001` 覆盖无 Key 空态、模式切换、历史三页签、搜索快捷键和托管 WebView smoke。
@@ -851,6 +993,7 @@ controls:
     optional: true       # template testid welcome-history-tab-${tab.id}; sessions|workspaces|directories
   - id: history-tab-sessions
     selector: '[data-testid="welcome-history-tab-sessions"]'
+    aliases: ['[data-testid="tao-home-history-popover"] [data-testid="tao-home-history-tab-sessions"]']
     kind: interactive
   - id: history-tab-directories
     selector: '[data-testid="welcome-history-tab-directories"]'
@@ -865,6 +1008,7 @@ controls:
   # docs-feature/welcome-recents-session-restore-design.md §4.1/§4.2).
   - id: restore-row
     selector: '[data-testid="welcome-restore-row"]'
+    aliases: ['.tao-home-history-footer']
     kind: display
   - id: local-directory-row
     selector: '[data-testid="welcome-local-directory"]'
@@ -4021,6 +4165,10 @@ controls:
     kind: display
     optional: true       # only on submit error
   # VaultUnlockDialog
+  - id: startup-vault-check-cancel
+    selector: '[data-testid="startup-vault-check-cancel"]'
+    kind: interactive
+    optional: true
   - id: unlock-dialog
     selector: '[data-testid="vault-unlock-dialog"]'
     kind: display

@@ -1,0 +1,41 @@
+.tao-home-history-chat-row {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  gap: 2px;
+}
+
+.tao-home-history-chat-row .tao-home-history-row {
+  flex: 1;
+  min-width: 0;
+}
+
+.tao-home-history-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  padding: 7px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--taomni-text-muted);
+  cursor: pointer;
+}
+
+.tao-home-history-delete:hover:not(:disabled) {
+  background: var(--taomni-hover);
+  color: var(--taomni-error, #c33);
+}
+
+.tao-home-history-delete:disabled {
+  opacity: .4;
+  cursor: not-allowed;
+}
+
+.tao-home-vault-notice {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  width: auto;
+}

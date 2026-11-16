@@ -47,6 +47,7 @@ describe("Tao chat controller", () => {
     const actionText = ["先说明", "```tao-action", JSON.stringify({ id: "a1", kind: "run_command", title: "查看", payload: { command: "ls" } }), "```"].join("\n");
     const actions: ChatBackend = { send: vi.fn<ChatBackend["send"]>(async () => answer(actionText)) };
     const withAction = createChatController({ backend: actions, profile });
+    withAction.setMode("do");
     await withAction.send("do it");
     const actionState = withAction.getState();
     const actionThread = actionState.threads[actionState.activeThreadId!];

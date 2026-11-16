@@ -119,7 +119,7 @@ def run(ctx: Any, args: Any) -> str:
         send(f"This is a synthetic UI test. Remember the test token {marker}. Reply with exactly that token, no other text.")
         if not wait_reply("first-turn", 1, 1):
             outcome = "credential-invalid"
-            return "Real DeepSeek key invalid; no subsequent paid request was attempted"
+            return "Real configured provider key invalid; no subsequent paid request was attempted"
 
         draft = "QA draft 保留草稿"
         ctx.session.fill(INPUT, draft)
@@ -134,12 +134,12 @@ def run(ctx: Any, args: Any) -> str:
         send("Return only the synthetic test token from my previous message. Do not invent a different token.")
         if not wait_reply("context-recall", 2, 2):
             outcome = "credential-invalid"
-            return "Real DeepSeek key invalid during context recall; later requests were not attempted"
+            return "Real configured provider key invalid during context recall; later requests were not attempted"
 
         ctx.session.click('.tao-home-message.assistant:last-child [data-testid="tao-home-message-regenerate"]')
         if not wait_reply("regenerate", 3, 2):
             outcome = "credential-invalid"
-            return "Real DeepSeek key invalid during regeneration; later requests were not attempted"
+            return "Real configured provider key invalid during regeneration; later requests were not attempted"
 
         ctx.session.click('[data-testid="tao-home-new-chat"]')
         state = snapshot(ctx, marker)
@@ -160,7 +160,7 @@ def run(ctx: Any, args: Any) -> str:
             if result == "credential-invalid":
                 record("streaming-before-stop", state, result)
                 outcome = result
-                return "Real DeepSeek key invalid before stop; no retry was attempted"
+                return "Real configured provider key invalid before stop; no retry was attempted"
             if result:
                 raise StepError("Real reply finished before Stop could be exercised")
             time.sleep(.05)
@@ -192,9 +192,10 @@ def run(ctx: Any, args: Any) -> str:
         record("stopped-control-visible", assert_tail_visible(ctx, '[data-testid="tao-home-stopped-state"]'))
         ctx.session.screenshot(ctx.case_dir / "real-stopped.png")
         outcome = "scenarios-complete"
-        return "Real DeepSeek: context recall, locale/draft retention, regeneration, new chat and Stop passed (4 requests)"
+        return "Real configured provider: context recall, locale/draft retention, regeneration, new chat and Stop passed (4 requests)"
     finally:
-        artifact = {"outcome": outcome, "tokenBudget": 1_000_000, "maximumRequests": 4,
+        config = json.loads((ctx.case_dir / "real-provider-config.json").read_text(encoding="utf-8"))
+        artifact = {"outcome": outcome, **config, "maximumRequests": 4,
                     "stages": stages,
                     "boundary": "Native IPC/renderer Stop completion; independent server socket-close evidence belongs to the loopback cases."}
         (ctx.case_dir / "real-provider-scenarios.json").write_text(json.dumps(artifact, indent=2) + "\n", encoding="utf-8")

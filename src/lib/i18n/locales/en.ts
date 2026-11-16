@@ -3551,7 +3551,7 @@ const dict = {
     unlockModeDescription: "Choose when Taomni asks for the master password after the app starts.",
     unlockModeStartup: "At startup",
     unlockModeOnDemand: "On demand",
-    unlockModeStartupHint: "Default. If the vault is locked, Taomni blocks startup until the master password is entered.",
+    unlockModeStartupHint: "Default. If the vault is locked, Taomni prompts at startup. Cancel to continue without saved credentials.",
     unlockModeOnDemandHint: "Taomni waits until a saved credential is needed, then prompts to unlock.",
     setMasterPassword: "Set master password",
     unlock: "Unlock",

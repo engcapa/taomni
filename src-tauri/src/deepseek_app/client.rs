@@ -11,6 +11,13 @@ pub struct MessagesClient {
 
 impl MessagesClient {
     pub async fn resolve(state: &AppState) -> Result<Self, String> {
+        Self::resolve_provider(state, "deepseek-app").await
+    }
+
+    pub async fn resolve_provider(state: &AppState, provider_id: &str) -> Result<Self, String> {
+        if !matches!(provider_id, "deepseek-app" | "opencode-go") {
+            return Err("configuration: unsupported Tao provider".into());
+        }
         let config = state.ai_ctx.read().await.config.clone();
         if config.fully_disabled {
             return Err("disabled: AI is disabled in Settings".into());
@@ -21,8 +28,8 @@ impl MessagesClient {
         let provider = config
             .llm
             .providers
-            .get("deepseek-app")
-            .ok_or("configuration: configure DeepSeek · 全家桶 in Settings")?;
+            .get(provider_id)
+            .ok_or("configuration: configure the Tao provider in Settings")?;
         let base_url = provider.base_url.trim_end_matches('/');
         let url =
             reqwest::Url::parse(base_url).map_err(|_| "configuration: invalid DeepSeek URL")?;
@@ -49,10 +56,20 @@ impl MessagesClient {
                 .db
                 .lock()
                 .map_err(|_| "session database unavailable")?;
-            crate::ai::config::resolve_provider_proxy_url(provider, Some(&db), Some(&state.vault))?
+            if provider_id == "opencode-go" {
+                crate::ai::config::resolve_go_proxy_url(provider, Some(&db), Some(&state.vault))?
+            } else {
+                crate::ai::config::resolve_provider_proxy_url(
+                    provider,
+                    Some(&db),
+                    Some(&state.vault),
+                )?
+            }
         };
         let mut builder = Client::builder()
             .no_proxy()
+            .redirect(reqwest::redirect::Policy::none())
+            .user_agent(concat!("taomni/", env!("CARGO_PKG_VERSION")))
             .connect_timeout(std::time::Duration::from_secs(20))
             .timeout(std::time::Duration::from_secs(600));
         if let Some(proxy) = proxy {

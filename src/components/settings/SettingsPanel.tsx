@@ -69,9 +69,12 @@ export function SettingsPanel() {
     if (!id) return;
     stopSectionReveal();
     ensureGroupExpanded(id);
-    // Expand may reflow; wait a frame so hidden=false is applied before scroll.
-    window.requestAnimationFrame(() => {
-      anchorRefs.current.get(id)?.scrollIntoView?.({ block: "start", behavior: "smooth" });
+    // Search can expand asynchronous controls above the match. Keep the same
+    // layout ownership as deep links until the next query or user input.
+    sectionReveal.current = revealSettingsSection({
+      resolveAnchor: () => anchorRefs.current.get(id),
+      maintainLayout: true,
+      onReveal: () => {},
     });
   }, [ensureGroupExpanded, stopSectionReveal]);
 
@@ -90,7 +93,7 @@ export function SettingsPanel() {
   // New query → expand matching groups, jump to the first match.
   useEffect(() => {
     setActiveIndex(0);
-    if (matchIds.length === 0) return;
+    if (matchIds.length === 0) { stopSectionReveal(); return; }
     const groups = matchingGroupIds(matchIds);
     setExpandedGroups((prev) => {
       const next = { ...prev };
@@ -103,7 +106,7 @@ export function SettingsPanel() {
     });
     scrollToId(matchIds[0]);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [matchKey]);
+  }, [matchKey, query]);
 
   // Status bar / deep links: open Settings and scroll to a section.
   useEffect(() => {

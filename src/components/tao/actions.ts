@@ -39,12 +39,12 @@ export function validateActionProposal(action: ActionProposal, context: Record<s
   if (target?.databaseId && (!context.database || target.databaseId !== context.database)) {
     return { ok: false, action: { ...action, level, status: "invalid" }, reason: "动作越界：目标数据库不是当前绑定数据库" };
   }
-  const path = action.payload.path ?? target?.cwd;
+  const paths = [action.payload.path, target?.cwd, target?.workspacePath].filter((value): value is string => Boolean(value));
   const root = context.workspace;
-  if (path && (!root || !isWithinPath(path, root))) {
+  if (paths.some((path) => !root || !isWithinPath(path, root))) {
     return { ok: false, action: { ...action, level, status: "invalid" }, reason: "动作越界：路径不在当前绑定工作区内" };
   }
-  if ((action.kind === "write_file" || action.kind === "write_note") && !path) {
+  if (action.kind === "write_file" && !action.payload.path) {
     return { ok: false, action: { ...action, level, status: "invalid" }, reason: "动作缺少工作区路径" };
   }
   return { ok: true, action: { ...action, level, status: "pending" } };
@@ -64,7 +64,8 @@ function isWithinPath(candidate: string, root: string): boolean {
     }
     return `${drive}${prefix}${stack.join("/")}`.replace(/\/+$/, "").toLowerCase() || "/";
   };
-  const normalizedCandidate = normalize(candidate);
+  const absolute = /^(?:[a-z]:|[/\\])/i.test(candidate);
+  const normalizedCandidate = normalize(absolute ? candidate : `${root}/${candidate}`);
   const normalizedRoot = normalize(root);
   return normalizedCandidate === normalizedRoot || normalizedCandidate.startsWith(`${normalizedRoot}/`);
 }

@@ -114,9 +114,11 @@ class RealFlow:
         finally:
             observed = snapshot(self.ctx, "")
             count = len((observed.get("transport") or {}).get("calls", []))
-            artifact = dict(outcome=self.outcome, tokenBudget=2_000_000, maximumRequests=self.maximum,
-                            actualRequests=count, usageByRequest=self.usage, stages=self.stages,
-                            boundary="Real desktop UI, native IPC and commercial DeepSeek. No provider/state replacement; cancelled stream usage may be absent.")
+            config_path = self.ctx.case_dir / "real-provider-config.json"
+            config = json.loads(config_path.read_text(encoding="utf-8")) if config_path.exists() else {}
+            artifact = dict(outcome=self.outcome, provider=config.get("provider", "deepseek-app"), model=config.get("model"), tokenBudget=config.get("tokenBudget", 2_000_000), maximumRequests=self.maximum,
+                            reasoningEffort=config.get("reasoningEffort"), actualRequests=count, usageByRequest=self.usage, stages=self.stages,
+                            boundary="Loopback scripted provider with real desktop/native actions and processes" if config.get("transport") == "loopback" else "Real desktop UI, native IPC and configured commercial provider. No provider/state replacement; cancelled stream usage may be absent.")
             (self.ctx.case_dir / ("real-expanded-" + self.scenario + ".json")).write_text(json.dumps(artifact, indent=2) + "\n", encoding="utf-8")
             with (self.ctx.case_dir / "real-provider-status.txt").open("a", encoding="utf-8") as stream:
                 stream.write(self.outcome + "\n")

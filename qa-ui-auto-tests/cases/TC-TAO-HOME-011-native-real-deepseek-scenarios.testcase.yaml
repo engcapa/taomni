@@ -1,7 +1,7 @@
 id: TC-TAO-HOME-011
-title: Real DeepSeek native conversation recalls context and retains drafts through locale and Stop
+title: Real configured provider native conversation recalls context and retains drafts through locale and Stop
 description: >-
-  Opt-in commercial DeepSeek test with the user's temporary key. Drive the actual
+  Opt-in commercial configured provider test with the user's temporary key. Drive the actual
   desktop UI through two-turn context recall, Chinese/English draft retention,
   regeneration, empty new chat and stopping a real streaming response. At most
   four requests are made, each using the product's 8192 output-token ceiling;

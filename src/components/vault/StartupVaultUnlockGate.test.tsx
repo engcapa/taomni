@@ -54,7 +54,7 @@ describe("StartupVaultUnlockGate", () => {
 
     expect(await screen.findByTestId("vault-unlock-dialog")).toBeInTheDocument();
     expect(screen.getByText("app")).toBeInTheDocument();
-    expect(screen.queryByTestId("vault-unlock-cancel")).not.toBeInTheDocument();
+    expect(screen.getByTestId("vault-unlock-cancel")).toBeEnabled();
     expect(screen.getByTestId("vault-unlock-reason")).toHaveTextContent(
       /saved passwords available/i,
     );
@@ -78,6 +78,41 @@ describe("StartupVaultUnlockGate", () => {
     expect(vaultMock.refresh).not.toHaveBeenCalled();
     expect(screen.queryByTestId("vault-unlock-dialog")).not.toBeInTheDocument();
     expect(screen.getByText("app")).toBeInTheDocument();
+  });
+
+  it("dismisses the startup prompt without unlocking or changing the configured mode", async () => {
+    vaultMock.state = "locked";
+    const user = userEvent.setup();
+    render(<StartupVaultUnlockGate><button>Use Home</button></StartupVaultUnlockGate>);
+    await user.click(await screen.findByTestId("vault-unlock-cancel"));
+    expect(screen.queryByTestId("vault-unlock-dialog")).not.toBeInTheDocument();
+    await user.click(screen.getByText("Use Home"));
+    expect(vaultMock.unlock).not.toHaveBeenCalled();
+    expect(vaultMock.state).toBe("locked");
+    expect(appMock.vaultUnlockMode).toBe("startup");
+  });
+
+  it("allows Escape on the startup prompt", async () => {
+    vaultMock.state = "locked";
+    const user = userEvent.setup();
+    render(<StartupVaultUnlockGate>app</StartupVaultUnlockGate>);
+    await screen.findByTestId("vault-unlock-dialog");
+    await user.keyboard("{Escape}");
+    expect(screen.queryByTestId("vault-unlock-dialog")).not.toBeInTheDocument();
+    expect(vaultMock.unlock).not.toHaveBeenCalled();
+  });
+
+  it("ignores a late locked refresh after cancelling the status overlay", async () => {
+    vaultMock.state = "locked";
+    let resolve!: () => void;
+    vaultMock.refresh.mockImplementation(() => new Promise<undefined>((done) => { resolve = () => done(undefined); }));
+    const user = userEvent.setup();
+    render(<StartupVaultUnlockGate>app</StartupVaultUnlockGate>);
+    await user.click(screen.getByTestId("startup-vault-check-cancel"));
+    resolve();
+    await waitFor(() => expect(screen.queryByTestId("startup-vault-check")).not.toBeInTheDocument());
+    expect(screen.queryByTestId("vault-unlock-dialog")).not.toBeInTheDocument();
+    expect(vaultMock.unlock).not.toHaveBeenCalled();
   });
 
   it("does not force first-time setup when the vault is empty", async () => {

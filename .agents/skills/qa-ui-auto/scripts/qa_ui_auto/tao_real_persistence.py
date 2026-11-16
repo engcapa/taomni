@@ -43,4 +43,4 @@ def run(ctx, stage):
             flow.send("Return only the synthetic restart token from my earlier message.")
             flow.reply("commercial-context-after-restart", 2, expected["marker"], check_marker=True)
             flow.screenshot("restart-after")
-    return "Real DeepSeek native persistence: " + flow.outcome
+    return "Real configured provider native persistence: " + flow.outcome

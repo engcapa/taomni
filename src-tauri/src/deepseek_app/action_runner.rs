@@ -1,7 +1,8 @@
 //! Confirmed Tao action execution. Every completed result comes from the real
 //! executor; an approval alone never marks an action successful.
 use super::{
-    actions::{self, ActionKind, ActionProposal},
+    action_authorization::safe_path,
+    actions::{ActionKind, ActionProposal},
     runtime::RunGuard,
     store,
 };
@@ -49,31 +50,6 @@ fn workspace(action: &ActionProposal) -> Option<PathBuf> {
         .and_then(|t| t.workspace_path.clone())
         .map(PathBuf::from)
 }
-fn safe_path(path: &Path, root: &Path) -> Result<PathBuf, String> {
-    let root = std::fs::canonicalize(root).map_err(|_| "action: workspace is unavailable")?;
-    let candidate = if path.is_absolute() {
-        path.to_path_buf()
-    } else {
-        root.join(path)
-    };
-    let mut parent = if candidate.exists() {
-        candidate.clone()
-    } else {
-        candidate.parent().unwrap_or(&candidate).to_path_buf()
-    };
-    while !parent.exists() {
-        let next = parent
-            .parent()
-            .ok_or("action: target parent is unavailable")?;
-        parent = next.to_path_buf();
-    }
-    let canonical_parent =
-        std::fs::canonicalize(parent).map_err(|_| "action: target parent is unavailable")?;
-    if !canonical_parent.starts_with(&root) {
-        return Err("action: target escapes workspace".into());
-    }
-    Ok(candidate)
-}
 fn output_value(
     id: &str,
     status: &str,
@@ -81,45 +57,70 @@ fn output_value(
     output: String,
     exit: Option<i32>,
 ) -> Value {
-    json!({"actionId":id,"status":status,"durationMs":started.elapsed().as_millis(),"output":output,"exitCode":exit})
+    json!({"actionId":id,"status":status,"durationMs":started.elapsed().as_millis(),"output":output,"exitCode":exit,"undoAvailable":false})
+}
+
+fn refresh_undo_availability(db: &rusqlite::Connection, id: &str, result: &mut Value) {
+    // Expose only a durable undo record. Recheck cached results too, because
+    // the record may already have been consumed by a previous undo.
+    let available: bool = db
+        .query_row(
+            "SELECT EXISTS(SELECT 1 FROM tao_action_undo WHERE action_id=?1)",
+            [id],
+            |row| row.get(0),
+        )
+        .unwrap_or(false);
+    result["undoAvailable"] = json!(available);
 }
 
 #[tauri::command]
 pub async fn deepseek_app_execute_action(
-    request: ActionRequest,
+    mut request: ActionRequest,
     state: State<'_, AppState>,
 ) -> Result<Value, String> {
     if !request.confirmed {
         return Err("confirmation: action requires explicit approval".into());
     }
-    let bound_workspace = workspace(&request.action);
-    let level = actions::validate_action(
-        &request.action,
-        None,
-        bound_workspace.as_deref().and_then(|path| path.to_str()),
-    )?;
+    if matches!(
+        state.vault.status()?.state,
+        crate::vault::VaultStateKind::Locked
+    ) {
+        return Err("vault_locked: unlock Vault before executing actions".into());
+    }
+    let saved = {
+        let db = state.db.lock().map_err(|_| "database unavailable")?;
+        store::last_request(&db, &request.thread_id)?
+    };
+    let level = super::action_authorization::authorize(&mut request.action, &saved)?;
     if level == "L2" && request.confirmed_level.as_deref() != Some("L2") {
         return Err("confirmation: dangerous action requires L2 approval".into());
     }
     let started = Instant::now();
-    let id = request.action.id.clone();
+    // Model proposal IDs often repeat (e.g. write-main). Scope every durable
+    // result and undo record to the originating thread before looking up caches.
+    let id = format!("{}:{}", request.thread_id, request.action.id);
     {
         let db = state.db.lock().map_err(|_| "database unavailable")?;
         init_undo(&db)?;
         let prior: Option<String> = db
             .query_row(
-                "SELECT result FROM tao_action_results WHERE action_id=?1 AND status='completed'",
+                "SELECT result FROM tao_action_results WHERE action_id=?1",
                 [&id],
                 |r| r.get(0),
             )
             .optional()
             .map_err(|e| e.to_string())?;
         if let Some(prior) = prior {
-            return serde_json::from_str(&prior).map_err(|e| e.to_string());
+            let mut result: Value = serde_json::from_str(&prior).map_err(|e| e.to_string())?;
+            if result["status"] == "undone" {
+                return Err("action: this proposal was undone; request a new proposal".into());
+            }
+            refresh_undo_availability(&db, &id, &mut result);
+            return Ok(result);
         }
     }
     let run = RunGuard::begin(&format!("action:{}:{}", request.thread_id, id))?;
-    let result = match request.action.kind {
+    let mut result = match request.action.kind {
         ActionKind::WriteFile => {
             let (path, old, hash) = write_file(&request.action)?;
             let db = state.db.lock().map_err(|_| "database unavailable")?;
@@ -142,9 +143,11 @@ pub async fn deepseek_app_execute_action(
         }
     };
     drop(run);
-    if let Ok(ref value) = result {
+    if let Ok(ref mut value) = result {
+        value["actionId"] = json!(id);
         if let Ok(db) = state.db.lock() {
-            let _ = db.execute("INSERT OR REPLACE INTO tao_action_results(action_id,status,result,created_at) VALUES(?1,'completed',?2,?3)", rusqlite::params![id, value.to_string(), store::now()]);
+            refresh_undo_availability(&db, &id, value);
+            db.execute("INSERT OR REPLACE INTO tao_action_results(action_id,status,result,created_at) VALUES(?1,?2,?3,?4)", rusqlite::params![id, value["status"].as_str().unwrap_or("failed"), value.to_string(), store::now()]).map_err(|e| e.to_string())?;
         }
     }
     result
@@ -204,6 +207,7 @@ pub fn deepseek_app_undo_action(
         [&action_id],
     )
     .map_err(|e| e.to_string())?;
+    db.execute("UPDATE tao_action_results SET status='undone',result=json_set(result,'$.status','undone','$.undoAvailable',json('false')) WHERE action_id=?1", [&action_id]).map_err(|e|e.to_string())?;
     Ok(json!({"actionId":action_id,"status":"completed","undone":true}))
 }
 
@@ -229,13 +233,28 @@ fn write_file(action: &ActionProposal) -> Result<(PathBuf, Option<Vec<u8>>, Stri
         std::fs::create_dir_all(parent).map_err(|_| "action: cannot create target directory")?;
     }
     let tmp = path.with_extension(format!("tao-tmp-{}", uuid::Uuid::new_v4()));
-    std::fs::write(&tmp, content).map_err(|_| "action: cannot write target")?;
+    // Complete and flush our own handle before publishing. Reopening the
+    // published file races Windows indexers and other workspace writers; it
+    // could report failure after a successful mutation or record somebody
+    // else's bytes as the hash that Undo is allowed to replace.
+    let prepared = (|| -> std::io::Result<()> {
+        use std::io::Write;
+        let mut file = std::fs::OpenOptions::new()
+            .write(true)
+            .create_new(true)
+            .open(&tmp)?;
+        file.write_all(content.as_bytes())?;
+        file.sync_all()
+    })();
+    if prepared.is_err() {
+        let _ = std::fs::remove_file(&tmp);
+        return Err("action: cannot write target".into());
+    }
     if let Err(error) = std::fs::rename(&tmp, &path) {
         let _ = std::fs::remove_file(&tmp);
         return Err(format!("action: publish failed: {error}"));
     }
-    let written = std::fs::read(&path).map_err(|_| "action: cannot verify target")?;
-    Ok((path, old, digest(written)))
+    Ok((path, old, digest(content.as_bytes())))
 }
 fn write_note(action: &ActionProposal, state: &AppState) -> Result<String, String> {
     let content = action
@@ -294,7 +313,7 @@ async fn run_command(
     let token = run.cancel.clone();
     let forward = tokio::spawn(async move {
         token.cancelled().await;
-        cancel_forward.notify_waiters();
+        cancel_forward.notify_one();
     });
     let outcome = exec_b::run_local(command, Some(cwd), &writer, cancel, |_, _| {}).await;
     forward.abort();
@@ -302,7 +321,9 @@ async fn run_command(
     let text = std::fs::read_to_string(writer.path()).unwrap_or_default();
     Ok(output_value(
         &request.action.id,
-        if outcome.exit_code == Some(0) {
+        if matches!(outcome.status, capture::CaptureStatus::Cancelled) {
+            "cancelled"
+        } else if outcome.exit_code == Some(0) {
             "completed"
         } else {
             "failed"
@@ -312,6 +333,10 @@ async fn run_command(
         outcome.exit_code,
     ))
 }
+
+#[cfg(test)]
+#[path = "action_runner_tests.rs"]
+mod tests;
 async fn run_sql(
     request: &ActionRequest,
     state: &AppState,

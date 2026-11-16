@@ -73,6 +73,29 @@ describe("Tao Vault recovery UI", () => {
     await waitFor(() => expect(backend.continue).toHaveBeenCalledTimes(1));
   });
 
+  it("dismisses the mask while retaining the locked thread and explicit unlock entry", async () => {
+    const { controller, backend } = await lockedChat();
+    const threadId = controller.getState().activeThreadId!;
+    fireEvent.click(screen.getByTestId("tao-home-vault-dismiss"));
+    expect(screen.queryByTestId("tao-home-vault-locked")).not.toBeInTheDocument();
+    expect(screen.getByTestId("tao-home-vault-notice")).toBeVisible();
+    expect(screen.getByText("Preserved answer")).toBeInTheDocument();
+    expect(controller.getState().runtime[threadId].phase).toBe("vault_locked");
+    expect(controller.getState().composer.text).toBe("Preserved draft");
+    expect(await controller.send()).toBe(false);
+    expect(await controller.continueReply()).toBe(false);
+    expect(await controller.regenerate()).toBe(false);
+    act(() => { controller.createThread("Unblocked Home"); controller.setActiveThread(threadId); });
+    expect(screen.queryByTestId("tao-home-vault-locked")).not.toBeInTheDocument();
+    expect(screen.getByTestId("tao-home-vault-unlock")).toBeEnabled();
+    vault.ready.mockResolvedValue(true);
+    fireEvent.click(screen.getByTestId("tao-home-vault-unlock"));
+    expect(await screen.findByTestId("tao-home-continue")).toBeEnabled();
+    expect(backend.send).toHaveBeenCalledTimes(1);
+    expect(backend.continue).not.toHaveBeenCalled();
+    expect(backend.regenerate).not.toHaveBeenCalled();
+  });
+
   it("shows refresh errors and allows another explicit unlock attempt", async () => {
     vault.refresh.mockRejectedValueOnce(new Error("status unavailable"));
     await lockedChat();

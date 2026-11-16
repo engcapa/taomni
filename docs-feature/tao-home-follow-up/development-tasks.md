@@ -411,3 +411,27 @@ Windows 保存对话框的全局模拟送键丢字已用原生控件逐字输入
 `704f7aa79` 最终 Windows browser **30/30**、native **36/36**（全部 18/22 适用 crash）；商业 DeepSeek 三项、八次真实请求正常完成，没有走失效 Key 分支。Linux/macOS browser **30/30 / 31/31** 的 raw/receipt/产物身份校验通过。后续 macOS 设置定位回归补异步布局保护和用户接管，新增 8 项单元；完整 Settings/Workspace 单元 286 项、导航单元 3 项通过，新 source 的原生/hosted 结果以[验证记录](verification-2026-11-16.md)为准，不提前关闭 TH-011/032 或全部原型 AC。
 
 `e57779493`（含设置异步布局保护）的 Windows browser **30/30**、匹配 QA release 的 native **36/36**，独立回执校验无拒绝，完整适用 crash **18/18 / 22/22** 均通过。新批商业 DeepSeek TC005/011/013 共八次真实 native 请求正常完成，无 Key 失效分支；Stop、Markdown 和恢复历史尾部均实际可见。GitHub [43796588906](https://github.com/engcapa/taomni/actions/runs/43796588906) 已成功结束：Linux browser/native **30/30 / 33/33**、macOS browser/native **31/31 / 35/35**，全部原始回执独立验签及逐项产物校验通过，各平台完整选择无遗漏/重复、全部 18/22 适用 crash 通过。FILE011/013 与 TH003 的原生保留回归均通过；完整 frontend **7011 passed / 1 条件跳过 / 0 failed**、Linux native Rust 契约 **120/120**。详见[当前源码验证批次](verification-2026-11-16.md#e57779493-当前源码的最终验证批次)；本批反馈和具名回归已验证，未覆盖的完整 AC 与全面原型对齐继续保留待办。
+
+## 9. 2026-11-16 Agent 开发闭环与上下文批次
+
+用户确认做模式支持“开发 → 测试 → 失败反馈 → 修复 → 补功能”，复杂编码复用 CC / Codex / ACP。范围与任务契约见 [三模式与本地上下文补强](agent-context-alignment.md)，实际结果持续记录于 [开发闭环验证记录](verification-agent-loop-2026-11-16.md)。
+
+- 已实现逐项确认、完整文件预览、真实执行结果回传、线程隔离、拒绝/失败/取消/Undo 反馈及原生授权；待确认期间阻断新的发送与重复执行。原生探针发现的 Windows 相对路径和既有文件 canonical 尾分隔符问题已有复现单测与修复，等待匹配构建复验。
+- 已实现三种编码 Agent 的预览交接、原有队列调度和显式结果带回；三入口组件测试通过，原生 ACP 使用实际子进程确定性 peer，不冒充商业 CC/Codex 推理验收。
+- 新增 TC-TAO-HOME-024～030：商业/loopback 开发闭环、provider/模式选项、原生 ACP 交接、真实笔记/工作区上下文和商业持久化应用工程。旧商业用例转为配置的 OpenCode Go / deepseek-v4.1-flash / max，Key 仅在 Windows 本机隔离读取，不上传 hosted。
+- 当前 frontend 69 tests、补充绑定组件2 tests、Rust33、Python33 和 refactor/静态 gate 通过；最新 Windows browser26/26（18项 crash）通过。完整 native、商业流程与 Linux/macOS hosted 仍须以本批实际回执验收；旧源码通过不关闭新批次。
+- 深研真实阶段状态机、独立增量索引、全量来源/执行器组合和全面原型视觉对齐继续保留待办，不能以模式切换或普通 Research 多轮对话通过关闭。
+
+## 10. 2026-11-16 Home 按钮与 Action 补充
+
+用户要求已有覆盖复用、只补缺失的 browser/native 场景。具体入口、保留用例、预期结果和原生边界见 [按钮覆盖矩阵](button-action-coverage.md)，最新执行与失败保留见 [开发闭环验证](verification-agent-loop-2026-11-16.md)。扩展 001/002/003/007/009/010，新增 031～034；原生目录选择、非空记忆/技能的编辑/取消/导出/删除、动作审核编辑与实际子进程取消均按 UI 和实际副作用验收。
+
+顶栏以最新反馈为准：删除设置、外观按钮，末尾顺序为演示、侧栏；设置保留 Dock More 入口。本批用例发现并修复整棵子进程树取消、设置搜索旧区域定位和原生记忆 prompt 不适合侧栏编辑的问题。最新源码、匹配二进制与各平台回执必须对应后才计通过；商业 OpenCode 启动遭自动审批拒绝仍为未执行，不能记作凭据失效或用 loopback 通过替代。深研阶段执行、真实语音、管理员提升和完整原型验收继续按前文保留待办。
+
+## 11. 2026-11-16 历史删除与 Vault 遮罩取消
+
+用户新增两项反馈已随 `e7e73cc01` 实现：History 每条 Tao 对话提供删除按钮及确认弹窗；启动 Vault 检查、解锁和 Tao 锁定遮罩均可取消，保留受保护操作的显式解锁要求。Home 与旧 tao-chat 分别走原存储删除；串行化自动保存和删除，防重载复活。
+
+新增 035/036/037，扩展 009，并复用原有文件夹/本地 Shell 恢复用例从 History 入口验证。Windows browser 31/31、native 41/41 已执行通过（完整 crash 18/18、22/22）；其中额外旧 Vault 用例保留一项评审元数据待办，已评审用例的 status gate 通过。GitHub Linux/macOS 当前源码回执持续更新于 [历史与 Vault 验证](verification-history-vault-2026-11-16.md)。本节完成实现记录，最终各平台验收以该记录的实际状态为准。
+
+后续 `3fa9de750` 修复 ACP 交接的旧历史覆盖新回复竞态，`2d8d0ff5b` 修正原生步骤的只读持久化诊断。最终匹配输入的 Windows 与 Linux browser 均 **31/31**、native 均 **41/41** 通过；完整适用 crash 均通过，两平台已评审范围合并 status gate 为 0 gaps / 0 rejected。修复前失败批次继续保留。GitHub 批次为 [43858855264](https://github.com/engcapa/taomni/actions/runs/43858855264)；macOS browser 缺失分片在 [43864993650](https://github.com/engcapa/taomni/actions/runs/43864993650) 补跑 **23/23** 并通过签名/产物/输入核验，合并覆盖 **31/31** 及全部 browser crash。macOS native 当前 **20/41**，027/036/037 已执行通过；原批次两个分片持续受 ARM runner 容量限制，保留报告后取消，剩余 21 项在 [43869363473](https://github.com/engcapa/taomni/actions/runs/43869363473) 单分片 native release 补跑，未执行结果不提前计通过。
