@@ -102,6 +102,7 @@ export interface TaoMessage {
   text: string;
   blocks: TaoBlock[];
   createdAt: number;
+  stopReason?: "end_turn" | "max_tokens" | "refusal" | "tool_use" | "stopped";
 }
 
 export interface TaoThread {
@@ -245,7 +246,7 @@ export interface TaoChatController {
   rejectAction(action: ActionProposal): Promise<void>;
   undoAction(action: ActionProposal): Promise<void>;
   removeChip(id: string): void;
-  hydrateThreads(threads: TaoThread[]): void;
+  hydrateThreads(threads: TaoThread[], options?: { merge: boolean }): void;
   increaseBudget(limitTokens: number): void;
   setDefaults(defaults: Pick<ChatProfile, "defaultModel" | "defaultThinking" | "defaultWeb" | "defaultProvider" | "defaultReasoningEffort">): void;
   branchAt(messageId: string, replacement?: string): string | undefined;

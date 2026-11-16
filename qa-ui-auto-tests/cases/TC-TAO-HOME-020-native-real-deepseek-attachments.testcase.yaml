@@ -5,7 +5,7 @@ description: >-
   image, remove its reference and delete it, reject an unsupported file, then
   recover with a valid upload and complete an actual provider image question.
 modes: [native]
-native_platforms: [Windows]
+native_platforms: [Windows, Linux]
 covers: [F1.11]
 tags: [p1, tao-home, native, real-provider, regression]
 fixtures: [reset_db, tao_real_provider]
@@ -33,7 +33,7 @@ verification:
   native:
   - check: Windows chooser and real Files API reuse/delete
     method: automated
-    reason: Actual native upload/delete callbacks, UI counts and a commercial image reply establish behavior. The current OS dialog title limits execution to the Windows QA host.
+    reason: Actual native upload/delete callbacks, UI counts and a commercial image reply establish behavior. Owned GTK and Windows dialogs exercise selection without replacing plugin results.
   visual:
   - check: Actual failure/recovery references
     method: manual

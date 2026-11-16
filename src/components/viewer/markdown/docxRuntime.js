@@ -4,7 +4,7 @@
 export {
   Document, Paragraph, TextRun, ImageRun, ExternalHyperlink, Table, TableRow,
   TableCell, Header, Footer, Packer, PageNumber, WidthType, HeadingLevel,
-  BorderStyle, LevelFormat, AlignmentType, PageOrientation,
+  BorderStyle, LevelFormat, AlignmentType, PageOrientation, XmlComponent,
   Math, MathRun, MathFraction, MathSuperScript, MathSubScript,
   MathSubSuperScript, MathRadical,
 } from "docx";

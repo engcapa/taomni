@@ -55,17 +55,21 @@ class RealFlow:
         self.calls += 1
         self.click(SEND)
 
-    def reply(self, stage: str, users: int, marker="", *, check_marker=False):
+    def reply(self, stage: str, users: int, marker="", *, check_marker=False, seconds=150):
         def complete(observed):
+            calls = (observed.get("transport") or {}).get("calls", [])
+            if observed.get("stopped") and not observed.get("running") and calls and calls[-1].get("status") == "fulfilled":
+                return "output-incomplete"
             return checkpoint(observed, self.calls, users, marker=check_marker)
         observed = self.wait(lambda: snapshot(self.ctx, marker), complete,
-                             "Real-provider " + stage + " did not complete", 150)
+                             "Real-provider " + stage + " did not complete", seconds)
         result = complete(observed)
         self.record(stage, observed, result)
         if result == "credential-invalid":
             raise CredentialInvalid()
         if observed.get("usage"):
             self.usage[self.calls] = observed["usage"]
+        self.require(not observed.get("stopped"), "The provider stopped before completing " + stage)
         return observed
 
     def last_text(self):

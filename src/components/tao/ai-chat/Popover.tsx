@@ -1,5 +1,6 @@
-import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { useElementResizeFrame } from "../../../hooks/useElementResizeFrame";
 
 /** One popup owner, rendered outside scrolling/clipping surfaces. */
 export function useTaoPopover() {
@@ -39,22 +40,22 @@ export function useTaoPopover() {
 
 export function TaoPopover({ owner, children, className = "", label }: { owner: ReturnType<typeof useTaoPopover>; children: ReactNode; className?: string; label: string }) {
   const [position, setPosition] = useState({ left: 12, top: 12 });
+  const update = useCallback(() => {
+    const anchor = owner.triggerRef.current?.getBoundingClientRect();
+    const content = owner.contentRef.current?.getBoundingClientRect();
+    if (!anchor || !content) return;
+    const left = Math.max(8, Math.min(anchor.left, window.innerWidth - content.width - 8));
+    const above = anchor.top - content.height - 6;
+    const top = Math.max(8, above >= 8 ? above : Math.min(anchor.bottom + 6, window.innerHeight - content.height - 8));
+    setPosition((previous) => previous.left === left && previous.top === top ? previous : { left, top });
+  }, [owner.contentRef, owner.triggerRef]);
+  const schedule = useElementResizeFrame(owner.contentRef, update);
   useLayoutEffect(() => {
     if (!owner.open) return;
-    const update = () => {
-      const anchor = owner.triggerRef.current?.getBoundingClientRect();
-      const content = owner.contentRef.current?.getBoundingClientRect();
-      if (!anchor || !content) return;
-      const left = Math.max(8, Math.min(anchor.left, window.innerWidth - content.width - 8));
-      const above = anchor.top - content.height - 6;
-      setPosition({ left, top: Math.max(8, above >= 8 ? above : Math.min(anchor.bottom + 6, window.innerHeight - content.height - 8)) });
-    };
     update();
-    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(update);
-    if (owner.contentRef.current) observer?.observe(owner.contentRef.current);
-    window.addEventListener("resize", update); window.addEventListener("scroll", update, true);
-    return () => { observer?.disconnect(); window.removeEventListener("resize", update); window.removeEventListener("scroll", update, true); };
-  }, [owner.open, owner.contentRef, owner.triggerRef]);
+    window.addEventListener("scroll", schedule, true);
+    return () => window.removeEventListener("scroll", schedule, true);
+  }, [owner.open, update, schedule]);
   if (!owner.open) return null;
   return createPortal(<div ref={owner.contentRef} className={`tao-home-popup ${className}`} role="dialog" aria-label={label} style={{ position: "fixed", zIndex: 1000, ...position }}>{children}</div>, document.body);
 }

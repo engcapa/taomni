@@ -20,11 +20,11 @@ export function BudgetCard({ phase, controller }: { phase: TaoPhase; controller:
   return <div className="tao-home-state-card warning" data-testid="tao-home-budget-state"><strong>{tr("本轮 token 预算已用完")}</strong><p>{tr("已完成步骤已保存，续跑不会重做。")}</p><button type="button" data-testid="tao-home-continue" onClick={() => { const state = controller.getState(); const runtime = state.activeThreadId ? state.runtime[state.activeThreadId] : undefined; if (runtime) controller.increaseBudget(runtime.budget.limitTokens * 2); void controller.continueReply(); }}>{tr("提高预算并继续")}</button></div>;
 }
 
-export function StoppedCard({ phase, controller, web, received = true }: { phase: TaoPhase; controller: TaoChatController; web: boolean; received?: boolean }) {
+export function StoppedCard({ phase, controller, web, received = true, truncated = false }: { phase: TaoPhase; controller: TaoChatController; web: boolean; received?: boolean; truncated?: boolean }) {
   if (phase !== "stopped") return null;
   const regenerate = web || !received;
   const continueLabel = web ? "重新生成（联网回复无法续写）" : received ? "继续生成" : "重新生成";
-  return <div className="tao-home-state-card warning" data-testid="tao-home-stopped-state"><AlertTriangle size={20} /><div><strong>{tr("已停止生成")}</strong><p>{tr(received ? "已收到的内容已保留，可以从当前位置继续。" : "本轮尚未收到回复，可重新生成。")}</p><button type="button" data-testid={regenerate ? "tao-home-regenerate" : "tao-home-continue"} onClick={() => void (regenerate ? controller.regenerate() : controller.continueReply())}>{tr(continueLabel)}</button></div></div>;
+  return <div className="tao-home-state-card warning" data-testid="tao-home-stopped-state"><AlertTriangle size={20} /><div><strong>{tr(truncated ? "回复达到输出上限" : "已停止生成")}</strong><p>{tr(truncated && regenerate ? "已收到的内容已保留。请重新生成，或将任务拆成较小步骤。" : received ? "已收到的内容已保留，可以从当前位置继续。" : "本轮尚未收到回复，可重新生成。")}</p><button type="button" data-testid={regenerate ? "tao-home-regenerate" : "tao-home-continue"} onClick={() => void (regenerate ? controller.regenerate() : controller.continueReply())}>{tr(continueLabel)}</button></div></div>;
 }
 
 export function VaultLockedMask({ phase, controller, active = true, compact = false }: { phase: TaoPhase; controller: TaoChatController; active?: boolean; compact?: boolean }) {

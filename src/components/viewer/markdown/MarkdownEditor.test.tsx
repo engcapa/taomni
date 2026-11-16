@@ -160,16 +160,27 @@ describe("MarkdownEditor real host lifecycle", () => {
     fireEvent.click(screen.getByTestId("markdown-export")); fireEvent.click(screen.getByTestId("markdown-export-html"));
     await waitFor(() => expect(screen.getByTestId("markdown-export-status")).toHaveAttribute("data-export-state", "cancelled"));
   });
-  it("uses actual PDF page settings and calls the print/PDF route without claiming a saved file", async () => {
-    vi.mocked(exportMarkdown).mockResolvedValue({ status: "print-opened" });
+  it("uses actual PDF page settings and reports the independently saved PDF", async () => {
+    vi.mocked(exportMarkdown).mockResolvedValue({ status: "saved", path: "/exports/a.pdf" });
     render(<Harness />);
     fireEvent.click(screen.getByTestId("markdown-export")); fireEvent.click(screen.getByTestId("markdown-export-pdf"));
     expect(screen.getByTestId("markdown-export-settings")).toHaveTextContent("A4");
     fireEvent.change(screen.getByLabelText("Paper"), { target: { value: "Letter" } });
     fireEvent.click(screen.getByTestId("markdown-export-confirm"));
     await waitFor(() => expect(exportMarkdown).toHaveBeenCalledWith("pdf", source, "/docs/a.md", expect.objectContaining({ paper: "Letter" })));
-    expect(screen.getByTestId("markdown-export-status")).toHaveAttribute("data-export-state", "print-opened");
-    expect(screen.getByTestId("markdown-export-status")).not.toHaveAttribute("data-export-path");
+    expect(screen.getByTestId("markdown-export-status")).toHaveAttribute("data-export-state", "saved");
+    expect(screen.getByTestId("markdown-export-status")).toHaveAttribute("data-export-path", "/exports/a.pdf");
+  });
+
+  it("opens the export menu outside the toolbar clipping surface and restores focus on Escape", () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByTestId("markdown-export"));
+    const menu = screen.getByTestId("markdown-export-menu");
+    expect(menu.closest(".fv-md-toolbar")).toBeNull();
+    expect(screen.getByTestId("markdown-export-html")).toHaveFocus();
+    fireEvent.keyDown(menu, { key: "Escape" });
+    expect(screen.queryByTestId("markdown-export-menu")).toBeNull();
+    expect(screen.getByTestId("markdown-export")).toHaveFocus();
   });
 
   it("keeps Mermaid split preview width >= 340px and clamps doc padding on narrow panes", () => {

@@ -1,6 +1,7 @@
 import { markdownBasename } from "../../../lib/markdownAssets";
 import { enhanceMarkdown, markdownFragment } from "./markdownRender";
 import type { MarkdownAssets } from "./markdownOwner";
+import { mathExportCss } from "./mathExportCss";
 
 export type MarkdownExportKind = "html" | "pdf" | "png" | "docx" | "markdown" | "richtext" | "html-source" | "print";
 export interface MarkdownExportSettings {
@@ -34,7 +35,7 @@ export async function prepareMarkdownExport(
   docPath: string,
   settings: MarkdownExportSettings,
   assets?: MarkdownAssets,
-): Promise<{ root: HTMLElement; html: string; title: string }> {
+): Promise<{ root: HTMLElement; html: string; title: string; css: string }> {
   const root = markdownFragment(content);
   root.className = "fv-md-export";
   await enhanceMarkdown(root, { docPath, theme: settings.theme, readImage: assets?.readImage, cancelled: () => false }, true);
@@ -56,6 +57,7 @@ export async function prepareMarkdownExport(
     root.prepend(nav);
   }
   const title = markdownBasename(docPath);
-  const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:"><title>${escapeHtml(title)}</title><style>${markdownExportCss(settings, title)}</style></head><body>${root.outerHTML}</body></html>`;
-  return { root, html, title };
+  const css = markdownExportCss(settings, title) + await mathExportCss(root);
+  const html = `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta http-equiv="Content-Security-Policy" content="default-src 'none'; img-src data:; style-src 'unsafe-inline'; font-src data:"><title>${escapeHtml(title)}</title><style>${css}</style></head><body>${root.outerHTML}</body></html>`;
+  return { root, html, title, css };
 }

@@ -1,5 +1,7 @@
 # Home 历史删除与可取消的 Vault 提示
 
+2026-11-16 最新补跑：macOS native [43886401191](https://github.com/engcapa/taomni/actions/runs/43886401191) **32/32** 通过，原缺失全部 21 项及完整 22 项 native crash 已执行。下文保留历史失败和 runner 容量阻塞，最新签名/产物/输入核对见末节；全 follow-up 完成度见[逐项复核](completion-audit-2026-11-16.md)。
+
 本批继续使用 `feat/tao-home-follow-up`，承接按钮覆盖补充；用户最新反馈优先于原型。新增两项：历史中的 Tao Home / 旧 tao-chat 对话可删除且需确认；未设置密码或未解锁时可取消遮罩并继续使用其他功能。
 
 ## 行为与边界
@@ -100,6 +102,38 @@ Linux 027 的真实 ACP 子进程交接、抽屉回复可见、user/assistant �
 
 macOS browser shard 3 在排队后以 cancelled 结束，未执行且没有报告。[该 job](https://github.com/engcapa/taomni/actions/runs/43858855264/job/133272595930) 的 GitHub 检查记录为 `The job was not acquired by Runner of type hosted even after multiple attempts`，同时明确提示 macOS arm64 runner 容量不足。其余 browser 21 项的通过保留；缺少的 10 项使用相同完整 SHA 在 [43864993650](https://github.com/engcapa/taomni/actions/runs/43864993650) 补跑，并自动加入完整适用 crash。补跑最终 **23/23**，workflow 成功；签名、全部绑定产物及 source/runner/case 独立核对无误。两批合并覆盖全部 **31/31** 个不同 browser 用例，包含完整适用 crash **18/18**；重复执行的 crash 不重复计数。记录 `qa-ui-auto-report/_local/h43864993650/independent-feedback-verification.json`。
 
-原批次剩余两个 macOS native 分片持续排队，未获得 runner。保留全部已完成报告及成功构建后，主动取消该批次，将尚未执行的 21 项转入 [43869363473](https://github.com/engcapa/taomni/actions/runs/43869363473) 的单分片 native release 补跑，仍使用上述完整 SHA，并自动加入完整适用 crash。按 runbook 复用 43858855264 的当前源码、工具链和 release 条件下成功的 Rust 合同结果，补跑设置 `run_rdp_unit_contracts=false`；没有跳过选中的原生用例。补跑尚待执行结果，原批次取消不作为整批通过。
+原批次剩余两个 macOS native 分片持续排队，未获得 runner。保留全部已完成报告及成功构建后，主动取消该批次，将尚未执行的 21 项转入 [43869363473](https://github.com/engcapa/taomni/actions/runs/43869363473) 的单分片 native release 补跑，仍使用上述完整 SHA，并自动加入完整适用 crash，共选择 32 项。按 runbook 复用 43858855264 的当前源码、工具链和 release 条件下成功的 Rust 合同结果，补跑设置 `run_rdp_unit_contracts=false`；没有跳过选中的原生用例。
+
+补跑 producer 的原生缓存未命中，重新构建和上传 QA release runtime 均成功；日志 `qa-ui-auto-report/_local/macos-native-recovery-build-1116.log`。随后[单个执行 job](https://github.com/engcapa/taomni/actions/runs/43869363473/job/133325946037) 再次未获 runner 并被取消，GitHub 检查记录同样为 `The job was not acquired by Runner of type hosted even after multiple attempts`，并提示 macOS arm64 容量限制。该批最终 workflow 为 failure，**没有执行任何 native 用例**，没有新的 native summary/receipt；构建成功不计为用例通过。原始检查记录与 workflow 结果保存在 `qa-ui-auto-report/_local/h43869363473/`。
 
 Windows/Linux 已完成平台的合并 `status --gate` 为 `ok=true`、0 gaps、0 rejected reports；每个平台已评审 browser **31/31**、native **40/40**，另有旧 F12 的实际通过与评审元数据待办。记录 `qa-ui-auto-report/_local/status-tao-transcript-windows-linux-reviewed-1116.json`。导入时先核对归档配置的 conditions 指纹；同名旧导入副本按内容哈希备份后激活本批配置，原始报告、回执及归档配置均未改写，映射记录在 hosted 根目录 `activated-config-provenance.json`。
+
+## 平台分工与当前验收阻塞
+
+本节记录再次补跑前的状态；原未执行项现已补齐，见末节。旧 gate 文件和失败原因按原样保留。
+
+按用户要求，Windows browser/native 在本机执行，GitHub 只选择 Linux/macOS；两次补跑均只选 macOS。三批 GitHub 原始 selection 的 group 分别是 `linux-browser/linux-native/macos-browser/macos-native`、`macos-browser`、`macos-native`，没有 Windows group。
+
+| 平台与执行位置 | Browser | Native | Browser crash | Native crash |
+|---|---:|---:|---:|---:|
+| Windows，本机 | 31/31 | 41/41 | 18/18 | 22/22 |
+| Linux，GitHub | 31/31 | 41/41 | 18/18 | 22/22 |
+| macOS ARM64，GitHub | 31/31 | 20/41 | 18/18 | 11/22 |
+
+上表按不同用例计数；macOS browser 合并原批次及补跑的有效回执。执行过的用例均通过，剩余 **21 项 macOS native 未执行、未验收**：FILE-OPEN 的 005/006/009/010/013，MOBILE-013，TAO-HOME 的 003/004/009/025/028/031/034/035，WELCOME-RS-N-04，以及 WS 的 038/039/052/053/057、旧 `TC-auto-F12-1-vault-setup-and-lock`。
+
+完整三平台已评审范围的普通 `status --gate` 如实返回 **exit 1 / `ok=false`**，包含 **20 个 `native:macOS` 未执行缺口、0 rejected reports**；旧 F12 继续保留为范围外的评审元数据待办及 macOS 未执行项。记录 `qa-ui-auto-report/_local/status-tao-transcript-three-platforms-pending-1116.json`，逐组选择与缺口核对见 `h43858855264/selection-gap-verification.json`。**macOS 原生验收被 GitHub 托管 runner 容量阻塞，三平台验收尚未完成。**
+
+本阶段仅更新执行证据及阻塞状态，保留 027、035～037 和原有恢复/完整 crash 用例；没有新增产品行为或改动用例预期，因此不创建重复用例。
+
+## 43886401191 macOS native 最终补跑
+
+用户再次要求补跑后，[43886401191](https://github.com/engcapa/taomni/actions/runs/43886401191) 已成功完成。测试提交仍为 `2d8d0ff5b544669767238253493da48d78187bf5`，只选择 macOS native release 单分片，并复用前批 Rust contracts。实际执行 **32 passed / 0 failed / 0 skipped**，覆盖上述原缺失全部 **21 项**，包含完整适用 **22/22 native crash-regression**，执行期间输入稳定。
+
+取证保存在 `qa-ui-auto-report/_local/h43886401191/`，原始 summary 为 `qa-macos-native-4dbb3d9d4b8345978fd069b4a1745fd2/run-20261116-151552-389236000/summary.json`。独立核对结果为该根目录 `independent-feedback-verification.json`：回执签名有效，687 个绑定产物的字节数和 SHA-256 全部匹配，32 项实际 ID 与 selection 全量相等；source/runner 与当前 checkout 相同，每个 case、归档 config、QA build/native 身份均匹配。真实历史删除确认框及 Markdown 深色 Mermaid 代表截图已查看。
+
+source `b48dea9e9aee3ac8981e03cded1e6bc5cc6674e9fd65565264adb06783755cf3`，runner `05ea30cecb11dedbc74f98d32689872d7b6993ab11e2fda9ae60ccdd42b12283`。Darwin / release / `com.taomni.app.qa` 的 binary SHA-256 为 `4c12e0ae53b4d9c4f18d4a6d6bbdddc5033235ade38fb7ed55b9894ecc6805ec`。
+
+因此，前述 ARM runner 容量阻塞已解除，原定 macOS 41 项执行缺口已补齐。旧 F12 本次实际通过，但 ci-summary 的 `unreviewed` 仍包含该用例，review/tag 冲突未被修改或自动关闭。本次没有重新下载全部早期 Windows/Linux/macOS 回执，也未重新运行三平台合并 `status --gate`；上节旧的失败 gate 继续作为历史记录，不能改写为本次成功结果。
+
+本轮仅更新任务复核及已结束 workflow 的实际取证，没有新的产品/用例变更。商业 Go 测试、完整原型与其它设计 AC 的待办见[完成度复核](completion-audit-2026-11-16.md)，不由本批 32 项通过推定全部完成。

@@ -1,4 +1,5 @@
 import type { ActionProposal, TaoBlock } from "./ai-chat/ports";
+import { actionFences } from "./actionFences";
 
 const ACTION_KINDS = new Set<ActionProposal["kind"]>(["run_command", "run_sql", "write_file", "write_note", "open_tab"]);
 const DANGEROUS_COMMANDS = /(?:\brm\b|\bdel\b|\bformat(?:\.com)?\b|\bshutdown\b|\breboot\b|\bkill(?:all)?\b|\btruncate\b|\bdrop\b|\bdelete\b|\bremove-item\b)/i;
@@ -71,11 +72,16 @@ function isWithinPath(candidate: string, root: string): boolean {
 }
 
 export function parseActionProposals(text: string): ActionProposal[] {
+  return parseActionReply(text).actions;
+}
+
+export function parseActionReply(text: string): { actions: ActionProposal[]; text: string } {
   const actions: ActionProposal[] = [];
-  const re = /```tao-action\s*([\s\S]*?)```/gi;
-  for (const match of text.matchAll(re)) {
+  const removed: Array<{ from: number; to: number }> = [];
+  for (const fence of actionFences(text)) {
     try {
-      const raw = JSON.parse(match[1]) as Partial<ActionProposal>;
+      const raw = JSON.parse(fence.body) as Partial<ActionProposal> | null;
+      if (!raw || typeof raw !== "object") continue;
       if (typeof raw.id !== "string" || typeof raw.kind !== "string" || typeof raw.title !== "string") continue;
       if (!ACTION_KINDS.has(raw.kind as ActionProposal["kind"])) continue;
       actions.push({
@@ -89,11 +95,13 @@ export function parseActionProposals(text: string): ActionProposal[] {
         expects: raw.expects,
         status: "pending",
       });
+      removed.push(fence);
     } catch {
       // A malformed fenced block remains visible as ordinary assistant text.
     }
   }
-  return actions;
+  for (const span of removed.reverse()) text = text.slice(0, span.from) + text.slice(span.to);
+  return { actions, text: text.trim() };
 }
 
 export function actionBlocks(actions: ActionProposal[]): TaoBlock[] {

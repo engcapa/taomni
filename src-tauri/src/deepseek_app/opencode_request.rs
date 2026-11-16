@@ -51,7 +51,9 @@ pub async fn body(
     }
     Ok(
         json!({"model":request.model,"messages":messages,"stream":true,"stream_options":{"include_usage":true},
-        "max_tokens":8192,"reasoning_effort":request.reasoning_effort,"thinking":{"type":if request.thinking {"enabled"} else {"disabled"}},
+        // Go counts reasoning against the same output allowance as the answer.
+        // Max-effort engineering exhausted 8192 before emitting any file actions.
+        "max_tokens":if request.thinking {65_536} else {8192},"reasoning_effort":request.reasoning_effort,"thinking":{"type":if request.thinking {"enabled"} else {"disabled"}},
         "tools":super::opencode_tools::descriptors(request)}),
     )
 }

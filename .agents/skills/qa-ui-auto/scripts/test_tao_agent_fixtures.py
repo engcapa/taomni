@@ -15,6 +15,20 @@ from qa_ui_auto.fixtures import tao_agent, tao_real_provider
 
 
 class AgentFixtureTests(unittest.TestCase):
+    def test_readme_fixture_preserves_nested_fences_and_following_file(self):
+        import hashlib
+        reply = tao_agent.scripted_reply("QA_ACTION_NESTED_FENCES")
+        first = reply.split("```tao-action\n", 1)[1]
+        readme, end = json.JSONDecoder().raw_decode(first)
+        self.assertEqual(readme["payload"]["path"], "README.md")
+        self.assertEqual(hashlib.sha256(readme["payload"]["content"].encode()).hexdigest(),
+                         "02d07b8ac10038bd4986c312fc0c7b73b44a1e53717790cb2bf7a160714a05a2")
+        self.assertIn("```sh\npython -m unittest\n```", readme["payload"]["content"])
+        following = first[end:].removeprefix("\n```\n```tao-action\n")
+        status, end = json.JSONDecoder().raw_decode(following)
+        self.assertEqual(status["payload"], {"path": "status.txt", "content": "Ready\n"})
+        self.assertEqual(following[end:], "\n```")
+
     def context(self, root):
         case = root / "case"
         case.mkdir()
@@ -98,6 +112,21 @@ class AgentFixtureTests(unittest.TestCase):
                 proposal = frames[1]["choices"][0]["delta"]["content"]
                 self.assertIn("tao-action", proposal)
                 self.assertEqual(json.loads(proposal.split("```tao-action\n", 1)[1].split("\n```", 1)[0]), action)
+                for marker in ("QA_OUTPUT_LIMIT_THINKING", "QA_OUTPUT_LIMIT_ACTION"):
+                    body["messages"] = [dict(role="user", content=marker)]
+                    for attempt in range(2):
+                        req = Request(url, data=json.dumps(body).encode(), headers={"Content-Type": "application/json"})
+                        with build_opener(ProxyHandler({})).open(req, timeout=5) as response:
+                            frames = [json.loads(line[6:]) for line in response.read().decode().splitlines()
+                                      if line.startswith("data: ") and line != "data: [DONE]"]
+                        self.assertEqual(frames[-1]["choices"][0]["finish_reason"], "length" if attempt == 0 else "stop")
+                        content = frames[1]["choices"][0]["delta"]["content"]
+                        if attempt == 1:
+                            self.assertIn("Explicit regeneration", content)
+                        elif marker.endswith("THINKING"):
+                            self.assertEqual(content, "")
+                        else:
+                            self.assertIn("tao-action", content)
             finally:
                 tao_agent.teardown(ctx)
 
@@ -115,6 +144,29 @@ class AgentFixtureTests(unittest.TestCase):
             self.assertTrue(any(frame.get("method") == "session/update" for frame in frames))
             self.assertEqual(frames[-1]["result"]["stopReason"], "end_turn")
             self.assertEqual(json.loads(log.read_text()), dict(received=True, hasGoal=True, hasHistory=True, hasUnsavedDraft=False))
+
+    def test_document_fixture_serves_multiple_actual_sse_content_chunks(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp).resolve()
+            ctx = self.context(root)
+            with patch.dict(os.environ, native_isolation_env(root), clear=True):
+                tao_agent.setup(ctx)
+            try:
+                config = json.loads(Path(ctx.values["tao_real_provider_config"]).read_text())
+                url = config["llm"]["providers"]["opencode-go"]["base_url"] + "/chat/completions"
+                body = dict(model="deepseek-v4.1-flash", messages=[dict(role="user", content="QA_FEED_FOLLOWING")])
+                req = Request(url, data=json.dumps(body).encode(), headers={"Content-Type": "application/json"})
+                with build_opener(ProxyHandler({})).open(req, timeout=5) as response:
+                    frames = [json.loads(line[6:]) for line in response.read().decode().splitlines()
+                              if line.startswith("data: ") and line != "data: [DONE]"]
+                chunks = [frame["choices"][0]["delta"]["content"] for frame in frames
+                          if "content" in frame["choices"][0]["delta"]]
+                self.assertGreater(len(chunks), 20)
+                self.assertEqual("".join(chunks), tao_agent.scripted_reply("QA_FEED_FOLLOWING"))
+                self.assertTrue("".join(chunks).endswith("QA_FEED_COMPLETE"))
+                self.assertEqual(frames[-1]["choices"][0]["finish_reason"], "stop")
+            finally:
+                tao_agent.teardown(ctx)
 
 
 if __name__ == "__main__":

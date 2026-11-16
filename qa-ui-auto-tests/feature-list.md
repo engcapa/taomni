@@ -136,6 +136,17 @@ files:
 - src/styles/taoHomeLayout.css
 - src/styles/taoHistory.css
 controls:
+- id: tao-home-history-refresh
+  selector: '[data-testid="tao-home-history-refresh"]'
+  kind: interactive
+- id: tao-home-history-loading
+  selector: '[data-testid="tao-home-history-loading"]'
+  kind: display
+  optional: true
+- id: tao-home-history-error
+  selector: '[data-testid="tao-home-history-error"]'
+  kind: display
+  optional: true
 - id: tao-home-provider
   selector: '[data-testid="tao-home-provider"]'
   kind: interactive
@@ -218,6 +229,22 @@ controls:
 - id: tao-home-composer
   selector: '[data-testid="tao-home-composer"]'
   kind: display
+- id: tao-home-feed
+  selector: '[data-testid="tao-home-feed"]'
+  kind: display
+- id: tao-home-markdown-reply
+  selector: '[data-testid="tao-home-markdown-reply"]'
+  aliases: ['.tao-home-message.assistant:nth-child(4) .tao-home-message-markdown']
+  kind: display
+  optional: true
+- id: tao-home-markdown-heading
+  selector: '[data-testid="tao-home-markdown-reply"] h2'
+  kind: display
+  optional: true
+- id: tao-home-message-user
+  selector: '[data-testid="tao-home-message-user"]'
+  kind: display
+  optional: true
 - id: tao-home-composer-input
   selector: '[data-testid="tao-home-composer-input"]'
   kind: interactive
@@ -401,6 +428,14 @@ controls:
 - id: tao-home-continue
   selector: '[data-testid="tao-home-continue"]'
   kind: interactive
+- id: tao-home-regenerate
+  selector: '[data-testid="tao-home-regenerate"]'
+  kind: interactive
+  optional: true
+- id: tao-home-stopped-state
+  selector: '[data-testid="tao-home-stopped-state"]'
+  kind: display
+  optional: true
 - id: tao-settings
   selector: '[data-testid="tao-settings"]'
   kind: display
@@ -15367,6 +15402,12 @@ files:
   - src/components/viewer/HtmlPreviewExternalLinkDialog.tsx
   - src/components/viewer/markdown/MarkdownEditor.tsx
   - src/components/viewer/markdown/MarkdownExportMenu.tsx
+  - src/components/viewer/markdown/mathExportCss.ts
+  - src/components/viewer/markdown/exportPdf.ts
+  - src/components/viewer/markdown/pdfPages.ts
+  - src/components/viewer/markdown/wordSvg.ts
+  - src/components/viewer/markdown/docxImages.ts
+  - src/components/viewer/markdown/exportDocx.ts
   - src-tauri/src/viewer/mod.rs
 controls:
   - id: file-viewer
@@ -15591,6 +15632,9 @@ controls:
   - id: markdown-paste-status
     selector: '[data-testid="markdown-paste-status"]'
     kind: display
+  - id: markdown-export-fileHeader
+    selector: '[data-testid="markdown-export-fileHeader"]'
+    kind: interactive
   - id: markdown-export
     selector: '[data-testid="markdown-export"]'
     kind: interactive

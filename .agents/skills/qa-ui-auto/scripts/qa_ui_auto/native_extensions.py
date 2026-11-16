@@ -33,6 +33,8 @@ def register(register_verb: RegisterVerb, verbs: dict[str, NativeVerb]) -> None:
     register_verb("assert_file_open_bytes")(assert_file_open_bytes)
     from .file_dialog import run as native_file_dialog
     from .native_paste import run as native_paste
+    from .export_quality import native as assert_export_quality
+    register_verb("assert_export_quality")(assert_export_quality)
     from .markdown_export_observation import run as assert_markdown_artifact
     from .terminal_file_link import native as terminal_file_link
     from .html_preview_observation import native_click, native_observe

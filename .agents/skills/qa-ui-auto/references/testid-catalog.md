@@ -1307,6 +1307,7 @@
 - `[data-testid="markdown-table-widget"]` — interactive — F-FILEOPEN-1.markdown-table-widget
 - `[data-testid="markdown-image-widget"]` — interactive — F-FILEOPEN-1.markdown-image-widget
 - `[data-testid="markdown-paste-status"]` — display — F-FILEOPEN-1.markdown-paste-status
+- `[data-testid="markdown-export-fileHeader"]` — interactive — F-FILEOPEN-1.markdown-export-fileHeader
 - `[data-testid="markdown-export"]` — interactive — F-FILEOPEN-1.markdown-export
 - `[data-testid="markdown-export-menu"]` — display — F-FILEOPEN-1.markdown-export-menu
 - `[data-testid="markdown-export-html"]` — interactive — F-FILEOPEN-1.markdown-export-html
@@ -3525,6 +3526,9 @@
 
 ## tao/home (F1.11)
 
+- `[data-testid="tao-home-history-refresh"]` — interactive — F1.11.tao-home-history-refresh
+- `[data-testid="tao-home-history-loading"]` — display [optional] — F1.11.tao-home-history-loading
+- `[data-testid="tao-home-history-error"]` — display [optional] — F1.11.tao-home-history-error
 - `[data-testid="tao-home-provider"]` — interactive — F1.11.tao-home-provider
 - `[data-testid="tao-home-reasoning-effort"]` — interactive [optional] — F1.11.tao-home-reasoning-effort
 - `[data-testid="tao-home-capability-model-deepseek-flash"]` — interactive [optional] — F1.11.tao-home-capability-model-deepseek-flash
@@ -3548,6 +3552,11 @@
 - `[data-testid="tao-home-open-settings"]` — interactive — F1.11.tao-home-open-settings
 - `#tao-settings-heading` — display — F1.11.tao-settings-heading
 - `[data-testid="tao-home-composer"]` — display — F1.11.tao-home-composer
+- `[data-testid="tao-home-feed"]` — display — F1.11.tao-home-feed
+- `[data-testid="tao-home-markdown-reply"]` — display [optional] — F1.11.tao-home-markdown-reply
+  ↳ `.tao-home-message.assistant:nth-child(4) .tao-home-message-markdown` — alias
+- `[data-testid="tao-home-markdown-reply"] h2` — display [optional] — F1.11.tao-home-markdown-heading
+- `[data-testid="tao-home-message-user"]` — display [optional] — F1.11.tao-home-message-user
 - `[data-testid="tao-home-composer-input"]` — interactive — F1.11.tao-home-composer-input
 - `[data-testid="tao-home-binding-bar"]` — display — F1.11.tao-home-binding-bar
 - `[data-testid="tao-home-dock-row"]` — display — F1.11.tao-home-dock-row
@@ -3608,6 +3617,8 @@
 - `[data-testid="tao-home-vault-notice"]` — display — F1.11.tao-home-vault-notice
 - `[data-testid="tao-home-vault-unlock"]` — interactive — F1.11.tao-home-vault-unlock
 - `[data-testid="tao-home-continue"]` — interactive — F1.11.tao-home-continue
+- `[data-testid="tao-home-regenerate"]` — interactive [optional] — F1.11.tao-home-regenerate
+- `[data-testid="tao-home-stopped-state"]` — display [optional] — F1.11.tao-home-stopped-state
 - `[data-testid="tao-settings"]` — display — F1.11.tao-settings
 - `[data-testid="tao-settings-save"]` — interactive — F1.11.tao-settings-save
 - `[data-testid="tao-settings-status"]` — display — F1.11.tao-settings-status

@@ -20,7 +20,8 @@ export async function writeExportBytes(path: string, bytes: Uint8Array): Promise
   }
 }
 
-export async function saveExportBlob(filename: string, blob: Blob, sourcePath?: string): Promise<string | null> {
+export async function saveExportBlob(filename: string, output: Blob | (() => Promise<Blob>), sourcePath?: string): Promise<string | null> {
+  const generate = () => typeof output === "function" ? output() : output;
   if (isTauriRuntime()) {
     const path = await selectSaveFilePath(filename, sourcePath);
     if (!path) return null;
@@ -34,10 +35,13 @@ export async function saveExportBlob(filename: string, blob: Blob, sourcePath?: 
     if (sourcePath && (source === target || explorerPathKey(sourcePath) === target)) {
       throw new Error("Choose a different output file; the Markdown source is never overwritten");
     }
+    // Choose and validate before costly rasterization. Only open the output
+    // stream after generation succeeds, so cancellation/errors cannot truncate it.
+    const blob = await generate();
     await writeExportBytes(path, new Uint8Array(await blob.arrayBuffer()));
     return path;
   }
-  const url = URL.createObjectURL(blob);
+  const url = URL.createObjectURL(await generate());
   const anchor = document.createElement("a");
   anchor.href = url; anchor.download = filename;
   document.body.append(anchor); anchor.click(); anchor.remove();

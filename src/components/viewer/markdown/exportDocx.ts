@@ -16,7 +16,7 @@ export async function markdownDocx(root: HTMLElement, title: string, settings: M
     if (tag === "br") return [new d.TextRun({ break: 1 })];
     if (tag === "img" || tag === "svg") {
       const image = await wordImageData(node, settings);
-      return [new d.ImageRun({ ...(image.svg ? { type: "svg" as const, data: image.svg, fallback: { type: "png" as const, data: image.bytes } } : { type: "png" as const, data: image.bytes }), transformation: { width: image.width, height: image.height },
+      return [new d.ImageRun({ ...(image.svg ? { type: "svg" as const, data: image.svg, fallback: { type: "png" as const, data: image.bytes } } : { type: image.type ?? "png", data: image.bytes }), transformation: { width: image.width, height: image.height },
         altText: { title: node.getAttribute("alt") || "Diagram", description: node.getAttribute("alt") || "", name: "Image" } })];
     }
     const next: RunOptions = { ...style, bold: style.bold || tag === "strong" || tag === "b",
@@ -81,5 +81,6 @@ export async function markdownDocx(root: HTMLElement, title: string, settings: M
     ...(settings.pageNumbers ? { footers: { default: new d.Footer({ children: [new d.Paragraph({ alignment: d.AlignmentType.CENTER, children: [new d.TextRun({ children: [d.PageNumber.CURRENT] })] })] }) } } : {}),
     children: await blocks(root) }],
   });
+  doc.Settings.addChildElement(new d.XmlComponent("w:doNotAutoCompressPictures"));
   return d.Packer.toBlob(doc);
 }

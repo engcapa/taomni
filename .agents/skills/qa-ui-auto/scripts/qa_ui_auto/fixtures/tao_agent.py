@@ -9,6 +9,7 @@ import json
 import os
 import sys
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 
@@ -18,6 +19,7 @@ from . import tao_real_provider
 
 GOOD = "def add(a, b):\n    return a + b\n\ndef multiply(a, b):\n    return a * b\n"
 BAD = GOOD.replace("return a + b", "return a - b")
+NESTED_README = '# Nested fences\n\n```sh\npython -m unittest\n```\n\nQuotes "value"; path C:\\work\\tasks.\n\n```tao-action\n{"id":"example-only","kind":"run_command","title":"Example","payload":{"command":"echo example"}}\n```\n'
 DIVIDE = "\ndef divide(a, b):\n    if b == 0:\n        raise ValueError('zero divisor')\n    return a / b\n"
 TESTS = """import unittest
 from calculator import add, multiply
@@ -46,7 +48,14 @@ def scripted_reply(prompt):
         # Deliberately reuse model proposal IDs across repair rounds. The app
         # must distinguish proposal instances and never return an old write.
         return dict(id=name, kind="write_file", title="Write " + name, payload=dict(path=name, content=content))
-    if "QA_ACTION_CONTROLS\n" in prompt:
+    if "QA_FEED_FOLLOWING" in prompt:
+        return "## Streamed document\n\n" + "\n\n".join(
+            f"Paragraph {index}: Read the complete streamed document, including its delayed layout and final result."
+            for index in range(1, 15)
+        ) + "\n\n| Expression | Result |\n| --- | --- |\n| 2 + 3 | 5 |\n\n```python\nprint(5)\n```\n\nQA_FEED_COMPLETE"
+    if "QA_ACTION_NESTED_FENCES" in prompt:
+        actions = [file("README.md", NESTED_README), file("status.txt", "Ready\n")]
+    elif "QA_ACTION_CONTROLS\n" in prompt:
         encoded = prompt.split("QA_ACTION_CONTROLS\n", 1)[1].split("\nQA_END_ACTION", 1)[0]
         actions = [json.loads(encoded)]
     elif "test command in the bound workspace" in prompt:
@@ -71,6 +80,7 @@ def setup(ctx):
     if any(os.environ.get(key) != value for key, value in isolated.items()):
         raise RuntimeError("tao_agent requires the current isolated QA profile")
     log = ctx.case_dir / "agent-gateway.jsonl"
+    limit_attempts = {}
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args):
@@ -82,7 +92,7 @@ def setup(ctx):
             blocks = user["content"]
             prompt = "\n".join(part.get("text", "") for part in blocks) if isinstance(blocks, list) else blocks
             with log.open("a", encoding="utf-8") as stream:
-                stream.write(json.dumps(dict(model=body["model"], effort=body.get("reasoning_effort"), thinking=body.get("thinking"), messages=len(body["messages"]), feedback="untrusted_action_results" in prompt, failure="test failed" in prompt or "FAILED" in prompt, boundary="loopback scripted response; real native executor")) + "\n")
+                stream.write(json.dumps(dict(model=body["model"], effort=body.get("reasoning_effort"), thinking=body.get("thinking"), max_tokens=body.get("max_tokens"), messages=len(body["messages"]), feedback="untrusted_action_results" in prompt, failure="test failed" in prompt or "FAILED" in prompt, boundary="loopback scripted response; real native executor")) + "\n")
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
             self.send_header("Connection", "close")
@@ -98,9 +108,27 @@ def setup(ctx):
             frames = [dict(choices=[dict(index=0, delta=dict(role="assistant", reasoning_content="Review actual results and propose the next step."), finish_reason=None)]),
                       dict(choices=[dict(index=0, delta=dict(tool_calls=calls) if calls else dict(content=text), finish_reason=None)]),
                       dict(choices=[dict(index=0, delta={}, finish_reason="tool_calls" if calls else "stop")], usage=dict(prompt_tokens=100, completion_tokens=50))]
+            streaming_document = "QA_FEED_FOLLOWING" in prompt
+            if streaming_document:
+                frames[1:2] = [dict(choices=[dict(index=0, delta=dict(content=text[start:start + 48]), finish_reason=None)])
+                               for start in range(0, len(text), 48)]
+            for marker in ("QA_OUTPUT_LIMIT_THINKING", "QA_OUTPUT_LIMIT_ACTION"):
+                if marker not in prompt:
+                    continue
+                limit_attempts[marker] = limit_attempts.get(marker, 0) + 1
+                if limit_attempts[marker] == 1:
+                    partial = "" if marker.endswith("THINKING") else scripted_reply("minimal Python calculator") + "\nIncomplete next file:"
+                    frames[1]["choices"][0]["delta"] = dict(content=partial)
+                    frames[2]["choices"][0]["finish_reason"] = "length"
+                else:
+                    frames[1]["choices"][0]["delta"] = dict(content="Explicit regeneration completed with a usable response.")
+                break
             try:
                 for frame in frames:
                     self.wfile.write(("data: " + json.dumps(frame) + "\n\n").encode())
+                    if streaming_document:
+                        self.wfile.flush()
+                        time.sleep(.035)
                 self.wfile.write(b"data: [DONE]\n\n")
                 self.wfile.flush()
             except (BrokenPipeError, ConnectionResetError):

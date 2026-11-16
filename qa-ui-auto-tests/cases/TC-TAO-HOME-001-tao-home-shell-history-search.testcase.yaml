@@ -135,7 +135,7 @@ steps:
     selector: .tao-home-history-search input
     value: no-such-history-qa
 - assert_visible: .tao-home-history-empty
-- click: .tao-home-history-header button
+- click: '.tao-home-history-header button[aria-label="Close history"]'
 - assert_not_visible: '[data-testid="tao-home-history-popover"]'
 - click: '[data-testid="tao-home-history"]'
 - click: .tao-home-history-footer button:first-child

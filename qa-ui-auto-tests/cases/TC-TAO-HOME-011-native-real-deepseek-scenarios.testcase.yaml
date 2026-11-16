@@ -4,8 +4,9 @@ description: >-
   Opt-in commercial configured provider test with the user's temporary key. Drive the actual
   desktop UI through two-turn context recall, Chinese/English draft retention,
   regeneration, empty new chat and stopping a real streaming response. At most
-  four requests are made, each using the product's 8192 output-token ceiling;
-  short synthetic prompts and context remain within the 1M token budget.
+  four requests are made using the configured provider's output-token ceiling
+  (65,536 for thinking-enabled OpenCode Go). Usage counts toward the aggregate
+  commercial test budget; starting another case does not renew that budget.
   Only explicit invalid/expired credentials end early as a successful credential
   check with that outcome logged. No network/protocol/runtime failure is waived.
 modes: [native]

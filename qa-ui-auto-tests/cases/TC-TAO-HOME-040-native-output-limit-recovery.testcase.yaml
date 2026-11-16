@@ -1,0 +1,81 @@
+id: TC-TAO-HOME-040
+title: Native max thinking output exhaustion is visible, durable and recoverable
+description: A loopback Go SSE service ends reasoning-only and incomplete action batches with finish_reason length. Actual
+  native HTTP and persisted history must retain the cutoff, avoid executable partial actions and permit explicit regeneration.
+modes: [native]
+covers: [F1.11]
+tags: [p0, tao-home, native, regression]
+fixtures: [reset_db, tao_agent]
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-tao-home-040-limit
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- wait_for: '[data-testid="tao-home-composer-input"]:enabled'
+- fill:
+    selector: '[data-testid="tao-home-composer-input"]'
+    value: QA_OUTPUT_LIMIT_THINKING
+- click: '[data-testid="tao-home-send"]'
+- assert_text:
+    selector: '[data-testid="tao-home-stopped-state"]'
+    contains: Response reached the output limit
+- assert_not_visible: '[data-testid="tao-home-continue"]'
+- assert_file_contains:
+    path: ${fixture.tao_agent_log}
+    contains: '"max_tokens": 65536'
+- assert_file_contains:
+    path: ${fixture.tao_agent_log}
+    contains: '"effort": "max"'
+- screenshot: native-thinking-output-limit.png
+- reload_window: null
+- wait_for: '[data-testid="tao-home-stopped-state"]'
+- assert_text:
+    selector: '[data-testid="tao-home-stopped-state"]'
+    contains: Response reached the output limit
+- click: '[data-testid="tao-home-regenerate"]'
+- assert_text:
+    selector: '[data-testid="tao-home-message-assistant"]:last-of-type'
+    contains: Explicit regeneration completed with a usable response
+- assert_not_visible: '[data-testid="tao-home-stopped-state"]'
+- click: '[data-testid="tao-home-mode-do"]'
+- fill:
+    selector: '[data-testid="tao-home-composer-input"]'
+    value: QA_OUTPUT_LIMIT_ACTION
+- click: '[data-testid="tao-home-send"]'
+- assert_text:
+    selector: '[data-testid="tao-home-stopped-state"]'
+    contains: Response reached the output limit
+- assert_not_visible: '[data-testid="tao-home-action-card"]'
+- click: '[data-testid="tao-home-message-assistant"]:last-of-type [data-testid="tao-home-message-regenerate"]'
+- assert_text:
+    selector: '[data-testid="tao-home-message-assistant"]:last-of-type'
+    contains: Explicit regeneration completed with a usable response
+- assert_not_visible: '[data-testid="tao-home-stopped-state"]'
+- assert_not_visible: '[data-testid="tao-home-action-card"]'
+- assert_no_runtime_errors: null
+- screenshot: native-output-limit-recovered.png
+verification:
+  review: reviewed
+  requirements:
+  - id: AGENT-OUTPUT-LIMIT
+    requirement: Max thinking has a useful output allowance and exhausted responses remain visibly incomplete.
+    actions: [1, 2, 3, 4, 5, 6, 7]
+    checkpoints:
+    - {step: 8, expectation: Reasoning-only exhaustion displays a cutoff state rather than a successful empty answer.}
+    - {step: 10, expectation: The real native Go request allows 65536 output tokens while preserving max thinking effort.}
+    - {step: 11, expectation: The gateway receives max reasoning effort.}
+    - {step: 15, expectation: The persisted cutoff remains visible after a native WebView reload.}
+    - {step: 18, expectation: Only explicit regeneration replaces the cutoff with a usable response.}
+    - {step: 23, expectation: An incomplete action batch publishes no executable cards.}
+    - {step: 27, expectation: Regeneration clears the cutoff without leaving pending actions.}
+    - {step: 28, expectation: No runtime errors.}
+    results: [8, 10, 11, 15, 18, 23, 27, 28]
+  native:
+  - check: Actual native Go HTTP, finish reason, persisted stop reason and regeneration
+    method: automated
+    reason: Browser stubs do not establish SSE or SQLite state.
+  visual:
+  - check: Cutoff notice and recovery controls remain readable
+    method: manual
+    reason: Retained native screenshots support visual review.
