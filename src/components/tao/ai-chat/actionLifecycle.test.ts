@@ -35,6 +35,7 @@ describe("development action lifecycle", () => {
     controller.setMode("do"); controller.setContext({ workspace: "/qa/project" }); await controller.send("Implement");
     const first = current(controller).id, action = proposed(controller);
     const pending = controller.approveAction(action);
+    expect(await controller.deleteThread(first)).toBe(false);
     const other = controller.createThread();
     finish({ exitCode: 0, undoAvailable: true, actionId: "native-first" }); await pending;
     expect(current(controller).messages).toHaveLength(0);
@@ -45,6 +46,22 @@ describe("development action lifecycle", () => {
     expect(current(controller).messages[1].blocks.find((b) => b.action)?.action?.status).toBe("undone");
     expect(proposed(controller).status).toBe("rejected");
     expect(undo).toHaveBeenCalledWith(expect.objectContaining({ result: expect.objectContaining({ actionId: "native-first" }) }), first);
+  });
+
+  it("keeps a conversation while a real undo is pending", async () => {
+    let finish!: () => void;
+    const controller = createChatController({ backend: { send: async () => response() }, actionPorts: {
+      execute: async () => ({ exitCode: 0, undoAvailable: true }),
+      undo: () => new Promise<void>((resolve) => { finish = resolve; }),
+    } });
+    controller.setMode("do"); controller.setContext({ workspace: "/qa/project" });
+    await controller.send("Implement");
+    const first = current(controller).id, action = proposed(controller);
+    await controller.approveAction(action);
+    const pending = controller.undoAction(action);
+    expect(await controller.deleteThread(first)).toBe(false);
+    finish(); await pending;
+    expect(await controller.deleteThread(first)).toBe(true);
   });
 
   it("recovers pending approvals after restart and marks interrupted execution for review", async () => {

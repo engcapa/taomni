@@ -17,7 +17,13 @@ export const actionKey = (action: ActionProposal) => action.executionId ?? actio
  * late executor replies, undo of older rounds and repeated model proposal IDs. */
 export function createActionLifecycle(owner: ActionOwner): Pick<TaoChatController, "approveAction" | "rejectAction" | "undoAction"> {
   const busy = new Set<string>();
-  const blocked = (threadId: string) => ["sending", "thinking", "searching", "streaming", "vault_locked"].includes(owner.getState().runtime[threadId]?.phase);
+  const busyThreads = new Map<string, string>();
+  const setBusy = (key: string, threadId: string, active: boolean) => {
+    if (active) { busy.add(key); busyThreads.set(key, threadId); }
+    else { busy.delete(key); busyThreads.delete(key); }
+    owner.patchRuntime(threadId, (runtime) => ({ ...runtime, actionBusy: [...busyThreads.values()].includes(threadId) }));
+  };
+  const blocked = (threadId: string) => owner.getState().runtime[threadId]?.deleting || ["sending", "thinking", "searching", "streaming", "vault_locked"].includes(owner.getState().runtime[threadId]?.phase);
   const locate = (action: ActionProposal) => {
     const state = owner.getState();
     const thread = state.activeThreadId ? state.threads[state.activeThreadId] : undefined;
@@ -33,7 +39,7 @@ export function createActionLifecycle(owner: ActionOwner): Pick<TaoChatControlle
   return {
     async approveAction(action) {
       const source = locate(action);
-      if (!source || busy.has(source.key) || !actionPending(source.current) || source.current.status === "approved") return;
+      if (!source || blocked(source.thread.id) || busy.has(source.key) || !actionPending(source.current) || source.current.status === "approved") return;
       const state = owner.getState();
       if (blocked(source.thread.id)) return;
       const checked = validateActionProposal(action, state.runtime[source.thread.id]?.lastRequest?.context ?? state.context);
@@ -41,7 +47,7 @@ export function createActionLifecycle(owner: ActionOwner): Pick<TaoChatControlle
         update(source, { ...checked.action, status: "invalid", result: { output: checked.reason ?? tr("当前宿主没有提供动作执行器。") } });
         return;
       }
-      busy.add(source.key);
+      setBusy(source.key, source.thread.id, true);
       update(source, { ...checked.action, status: "approved" });
       try {
         const result = await owner.ports.execute(checked.action, source.thread.id);
@@ -49,26 +55,26 @@ export function createActionLifecycle(owner: ActionOwner): Pick<TaoChatControlle
         update(source, { ...checked.action, status, result });
       } catch (error) {
         update(source, { ...checked.action, status: "invalid", result: { output: String(error) } });
-      } finally { busy.delete(source.key); }
+      } finally { setBusy(source.key, source.thread.id, false); }
     },
     async rejectAction(action) {
       const source = locate(action);
-      if (!source || busy.has(source.key) || !actionPending(source.current) || source.current.status === "approved") return;
-      busy.add(source.key);
+      if (!source || blocked(source.thread.id) || busy.has(source.key) || !actionPending(source.current) || source.current.status === "approved") return;
+      setBusy(source.key, source.thread.id, true);
       try { await owner.ports?.reject?.(source.current); }
-      finally { update(source, { ...source.current, status: "rejected" }); busy.delete(source.key); }
+      finally { update(source, { ...source.current, status: "rejected" }); setBusy(source.key, source.thread.id, false); }
     },
     async undoAction(action) {
       const source = locate(action);
       if (!source || busy.has(source.key) || source.current.status !== "completed" || !source.current.result?.undoAvailable || !owner.ports?.undo) return;
       if (blocked(source.thread.id)) return;
-      busy.add(source.key);
+      setBusy(source.key, source.thread.id, true);
       try {
         await owner.ports.undo(source.current, source.thread.id);
         update(source, { ...source.current, status: "undone", result: { ...source.current.result, undoAvailable: false, output: tr("已撤销") } });
       } catch (error) {
         update(source, { ...source.current, result: { ...source.current.result, output: String(error) } });
-      } finally { busy.delete(source.key); }
+      } finally { setBusy(source.key, source.thread.id, false); }
     },
   };
 }

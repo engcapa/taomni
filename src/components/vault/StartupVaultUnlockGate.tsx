@@ -1,4 +1,4 @@
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useT } from "../../lib/i18n";
 import { useAppStore } from "../../stores/appStore";
 import { useVaultStore } from "../../stores/vaultStore";
@@ -11,6 +11,7 @@ export function StartupVaultUnlockGate({ children }: { children: ReactNode }) {
   const unlockMode = useAppStore((s) => s.vaultUnlockMode);
   const refresh = useVaultStore((s) => s.refresh);
   const unlock = useVaultStore((s) => s.unlock);
+  const dismissed = useRef(false);
   const [gateState, setGateState] = useState<StartupVaultGateState>(
     unlockMode === "startup" ? "checking" : "ready",
   );
@@ -22,14 +23,15 @@ export function StartupVaultUnlockGate({ children }: { children: ReactNode }) {
     }
 
     setGateState("checking");
+    dismissed.current = false;
     let disposed = false;
     void refresh()
       .then(() => {
-        if (disposed) return;
+        if (disposed || dismissed.current) return;
         setGateState(useVaultStore.getState().state === "locked" ? "locked" : "ready");
       })
       .catch(() => {
-        if (!disposed) setGateState("ready");
+        if (!disposed && !dismissed.current) setGateState("ready");
       });
 
     return () => {
@@ -37,14 +39,19 @@ export function StartupVaultUnlockGate({ children }: { children: ReactNode }) {
     };
   }, [refresh, unlockMode]);
 
+  const dismiss = () => {
+    dismissed.current = true;
+    setGateState("ready");
+  };
+
   return (
     <>
       {children}
-      {gateState === "checking" && <StartupVaultCheckOverlay />}
+      {gateState === "checking" && <StartupVaultCheckOverlay onCancel={dismiss} />}
       {gateState === "locked" && (
         <VaultUnlockDialog
           reason={t("vault.startupUnlockReason")}
-          cancellable={false}
+          onCancel={dismiss}
           zIndex={10001}
           onSubmit={async (pw) => {
             await unlock(pw);
@@ -56,7 +63,7 @@ export function StartupVaultUnlockGate({ children }: { children: ReactNode }) {
   );
 }
 
-function StartupVaultCheckOverlay() {
+function StartupVaultCheckOverlay({ onCancel }: { onCancel: () => void }) {
   const t = useT();
 
   return (
@@ -69,7 +76,12 @@ function StartupVaultCheckOverlay() {
         zIndex: 10001,
       }}
     >
-      <div className="text-[12px]">{t("common.loading")}</div>
+      <div className="flex flex-col items-center gap-3 text-[12px]">
+        <span>{t("common.loading")}</span>
+        <button type="button" data-testid="startup-vault-check-cancel" className="rounded border px-3 py-1" onClick={onCancel}>
+          {t("common.cancel")}
+        </button>
+      </div>
     </div>
   );
 }

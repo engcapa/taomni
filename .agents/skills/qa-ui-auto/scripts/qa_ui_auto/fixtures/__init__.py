@@ -106,6 +106,7 @@ from . import tao_messages
 from . import tao_real_provider
 from . import tao_agent
 from . import tao_memory
+from . import tao_history
 
 
 class FixtureContext(Protocol):
@@ -127,6 +128,7 @@ REGISTRY: dict[str, Fixture] = {
     "tao_real_provider": Fixture("tao_real_provider", tao_real_provider.setup, tao_real_provider.teardown),
     "tao_agent": Fixture("tao_agent", tao_agent.setup, tao_agent.teardown),
     "tao_memory": Fixture("tao_memory", tao_memory.setup),
+    "tao_history": Fixture("tao_history", tao_history.setup),
     "mobile_web": Fixture("mobile_web", mobile_web.setup, mobile_web.teardown),
     "mobile_openssh": Fixture("mobile_openssh", mobile_openssh.setup, mobile_openssh.teardown),
     "mobile_service": Fixture("mobile_service", mobile_service.setup, mobile_service.teardown),

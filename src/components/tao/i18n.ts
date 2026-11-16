@@ -4,6 +4,11 @@ import { getLocale, subscribeLocale } from "../../lib/i18n";
 /** Tao uses the application's locale subscription. Strings are kept here so
  * switching language never replaces the chat controller or its drafts. */
 const english: Record<string, string> = {
+  "删除对话": "Delete conversation",
+  "确定删除对话“{title}”及其消息吗？此操作无法撤销。": "Delete the conversation “{title}” and its messages? This cannot be undone.",
+  "删除对话失败：{error}": "Could not delete conversation: {error}",
+  "请先停止对话后再删除。": "Stop the conversation before deleting it.",
+  "暂时跳过": "Skip for now",
   "保存": "Save",
   "目标 Agent 仍在执行，请完成后再带回。": "The coding agent is still running. Bring back its result after it finishes.",
   "执行已中断，请检查实际结果后重新提议。": "Execution was interrupted. Check the actual result before proposing it again.",

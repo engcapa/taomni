@@ -71,6 +71,7 @@
           "tao_messages",
           "tao_agent",
           "tao_memory",
+          "tao_history",
           "tao_real_provider",
           "credential_store",
           "path_completion",

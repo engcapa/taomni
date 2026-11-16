@@ -1956,10 +1956,12 @@
 - `[data-testid="welcome-recent-workspace-filter"]` — interactive [optional] — F1.6.recent-workspace-filter
 - `[data-testid="welcome-history-tab-workspaces"]` — interactive [optional] — F1.6.history-tab-workspaces
 - `[data-testid="welcome-history-tab-sessions"]` — interactive — F1.6.history-tab-sessions
+  ↳ `[data-testid="tao-home-history-popover"] [data-testid="tao-home-history-tab-sessions"]` — alias
 - `[data-testid="welcome-history-tab-directories"]` — interactive — F1.6.history-tab-directories
 - `[data-testid="welcome-local-directories"]` — display — F1.6.local-directories
 - `[data-testid="welcome-local-directory-filter"]` — interactive — F1.6.local-directory-filter
 - `[data-testid="welcome-restore-row"]` — display — F1.6.restore-row
+  ↳ `.tao-home-history-footer` — alias
 - `[data-testid="welcome-local-directory"]` — interactive [optional] — F1.6.local-directory-row
 - `[data-testid="welcome-local-directory-unavailable"]` — display [optional] — F1.6.local-directory-unavailable
 - `[data-testid="welcome-directory-retry"]` — interactive [optional] — F1.6.directory-retry
@@ -3551,6 +3553,8 @@
 - `[data-testid="tao-home-dock-row"]` — display — F1.11.tao-home-dock-row
 - `[data-testid="tao-home-history"]` — interactive — F1.11.tao-home-history
 - `[data-testid="tao-home-history-popover"]` — display — F1.11.tao-home-history-popover
+- `[data-testid="tao-home-history-delete"]` — interactive — F1.11.tao-home-history-delete
+- `[data-testid="tao-home-history-restore"]` — interactive — F1.11.tao-home-history-restore
 - `[data-testid="tao-home-history-tab-chat"]` — interactive — F1.11.tao-home-history-tab-chat
 - `[data-testid="tao-home-history-tab-sessions"]` — interactive — F1.11.tao-home-history-tab-sessions
 - `[data-testid="tao-home-history-tab-workspaces"]` — interactive — F1.11.tao-home-history-tab-workspaces
@@ -3600,6 +3604,8 @@
 - `[data-testid="tao-home-error-state"]` — display — F1.11.tao-home-error-state
 - `[data-testid="tao-home-retry"]` — interactive — F1.11.tao-home-retry
 - `[data-testid="tao-home-vault-locked"]` — display — F1.11.tao-home-vault-locked
+- `[data-testid="tao-home-vault-dismiss"]` — interactive — F1.11.tao-home-vault-dismiss
+- `[data-testid="tao-home-vault-notice"]` — display — F1.11.tao-home-vault-notice
 - `[data-testid="tao-home-vault-unlock"]` — interactive — F1.11.tao-home-vault-unlock
 - `[data-testid="tao-home-continue"]` — interactive — F1.11.tao-home-continue
 - `[data-testid="tao-settings"]` — display — F1.11.tao-settings
@@ -4036,6 +4042,7 @@
 - `[data-testid="vault-setup-too-short"]` — display [optional] — F12.1.setup-too-short
 - `[data-testid="vault-setup-mismatch"]` — display [optional] — F12.1.setup-mismatch
 - `[data-testid="vault-setup-error"]` — display [optional] — F12.1.setup-error
+- `[data-testid="startup-vault-check-cancel"]` — interactive [optional] — F12.1.startup-vault-check-cancel
 - `[data-testid="vault-unlock-dialog"]` — display [optional] — F12.1.unlock-dialog
 - `[data-testid="vault-unlock-pw"]` — interactive [optional] — F12.1.unlock-pw
 - `[data-testid="vault-unlock-reason"]` — display [optional] — F12.1.unlock-reason

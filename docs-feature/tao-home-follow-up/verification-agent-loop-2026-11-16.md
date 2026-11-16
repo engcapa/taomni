@@ -50,9 +50,10 @@
 - Windows native 首轮 **34/36**，无跳过，source/build 身份稳定；报告 `qa-ui-auto-report/_local/tao-agent-native-1116/run-20261116-163043-910949100/`。034 在异步载入前立即检查数量得到 0，失败截图随后已出现三条正确资料；补充按条目身份等待，并在删除完成和 reload 数据就绪后再核对数量。MOBILE013 的辅助 Chromium 使用隔离后的 LOCALAPPDATA 寻找安装而失败；复跑进程通过 `PLAYWRIGHT_BROWSERS_PATH` 指定既有安装，不修改产品或个人应用数据。
 - 两项失败在 `qa-ui-auto-report/_local/tao-buttons-native-recovery-1116/run-20261116-165309-255688400/` 均通过。扩展 031 曾误用旧 SFTP 路径控件及 Playwright 专用 selector，实际产品已打开正确 Explorer；现使用两种 runner 均支持的按钮 XPath，严格检查活动 Explorer 的真实绝对路径与 Home 选中状态。最终 native 031 在 `qa-ui-auto-report/_local/tao-buttons-native-launcher-r2-1116/run-20261116-165725-568968900/` 通过。
 - Windows 最终为 **browser 27/27、native 36/36** 个具名用例的当前有效证据，包含全部适用 crash **18/18、22/22**。独立 `status --gate` 合并上述原始回执，结果 `ok=true`、0 gaps、0 rejected reports；记录 `qa-ui-auto-report/_local/status-tao-buttons-windows-final-1116.json`。这是逐条取最新匹配回执后的验收，不把首轮 34/36 改写为整批一次全绿。
-- GitHub [43831374934](https://github.com/engcapa/taomni/actions/runs/43831374934) 使用 `dc1288a4c` 执行 Linux/macOS browser/native release。Linux、macOS browser 均 **27/27**，raw receipt 签名、逐项文件哈希、该批 source/runner/case 与稳定性核对通过；结果位于 `qa-ui-auto-report/_local/hosted-tao-buttons-43831374934/independent-feedback-verification.json`。扩展后的 031 与异步就绪修正后的 034 需要 hosted 定向补跑，旧回执不替代新 case 输入；native 构建/执行仍待回执。
+- GitHub [43831374934](https://github.com/engcapa/taomni/actions/runs/43831374934) 使用 `dc1288a4c` 执行 Linux/macOS browser/native release。Linux、macOS browser 均 **27/27**，raw receipt 签名、逐项文件哈希、该批 source/runner/case 与稳定性核对通过；结果位于 `qa-ui-auto-report/_local/hosted-tao-buttons-43831374934/independent-feedback-verification.json`。扩展后的 031 与异步就绪修正后的 034 需要 hosted 定向补跑，旧回执不替代新 case 输入；native 最终为 Linux 35/36、macOS 34/36，027 两平台及 008 macOS 失败；最终 workflow 汇总为失败，后续诊断与修复见 [历史与 Vault 验证](verification-history-vault-2026-11-16.md)。
+- 修正后的 031/034 已随 `1deb0075f` 提交并推送，使用 [43836152729](https://github.com/engcapa/taomni/actions/runs/43836152729) 在 Linux/macOS 定向执行 browser/native release，workflow 自动包含适用 crash。复用上一运行已经成功的 native-contracts（相同 Rust、锁文件、工具链配置与 product source），此定向批次设 `run_rdp_unit_contracts=false`，不删除任何选中 UI/native 用例。43836152729 已结束 success；定向汇总与原始回执仍须核对，旧 source 不替代当前历史/Vault 改动的验证。
 
-当前 browser/source 指纹为 `2fd0845b1048fb308dde828e319cbbd299e5d404edcb4839c5f5a749d99bc02f`。覆盖映射见 [按钮与 Action 补充](button-action-coverage.md)，未执行或条件能力继续保留缺口。
+上述旧批次的 browser/source 指纹为 `2fd0845b1048fb308dde828e319cbbd299e5d404edcb4839c5f5a749d99bc02f`。覆盖映射见 [按钮与 Action 补充](button-action-coverage.md)，未执行或条件能力继续保留缺口。
 
 ## 按钮补充与本轮发现的回归
 

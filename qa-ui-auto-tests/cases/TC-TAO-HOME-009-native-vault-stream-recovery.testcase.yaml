@@ -79,6 +79,23 @@ steps:
     expression: document.activeElement?.getAttribute('data-testid') === 'tao-home-vault-unlock'
     expect_truthy: true
     timeout_sec: 5
+- click: '[data-testid="tao-home-vault-dismiss"]'
+- assert_not_visible: '[data-testid="tao-home-vault-locked"]'
+- assert_visible: '[data-testid="tao-home-vault-notice"]'
+- click: '[data-testid="tao-home-new-chat"]'
+- click: '[data-testid="tao-home-history"]'
+- click: '[data-testid="tao-home-history-row"][data-title="QA-SLOW"]'
+- assert_visible: '[data-testid="tao-home-vault-notice"]'
+- assert_not_visible: '[data-testid="tao-home-vault-locked"]'
+- assert_text:
+    selector: '[data-testid="tao-home-message-list"]'
+    contains: Partial reply
+- assert_json_file:
+    path: ${fixture.tao_messages_counts}
+    expect:
+      requests: 1
+      cancelled: 1
+      completed: 0
 - click: '[data-testid="tao-home-vault-unlock"]'
 - fill:
     selector: '[data-testid="vault-unlock-pw"]'

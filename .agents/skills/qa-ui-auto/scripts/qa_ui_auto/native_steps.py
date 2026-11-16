@@ -2692,15 +2692,8 @@ def _do_seed_storage(ctx: NativeStepContext, args: Any) -> str:
 def _do_reload_window(ctx: NativeStepContext, args: Any) -> str:
     """Reload the webview document; wait for the app shell to return."""
     _ = args
-    ctx.session.execute(
-        "window.setTimeout(() => window.location.reload(), 0); return true;"
-    )
-    time.sleep(2.0)  # document teardown; execute/sync is unavailable during it
-    ctx.session.find("[data-testid='welcome-panel']", timeout=60)
-    ctx.session.activate_linux_window()
-    # The reload dropped the console hook along with the old document.
-    ctx.session.install_console_hook()
-    return "reloaded; welcome-panel visible"
+    from .native_reload import reload_window
+    return reload_window(ctx)
 
 
 @_verb("parity005_native_fault")

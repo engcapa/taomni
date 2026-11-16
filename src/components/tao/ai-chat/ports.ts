@@ -206,6 +206,9 @@ export interface TaoChatState {
     budget: TaoBudget;
     pendingAction?: ActionProposal;
     vaultLocked?: boolean;
+    vaultPromptDismissed?: boolean;
+    deleting?: boolean;
+    actionBusy?: boolean;
     startedAt?: number;
     finishedAt?: number;
     /** Request options retained for safe continuation and retry decisions. */
@@ -229,11 +232,13 @@ export interface TaoChatController {
   setDemoMode(enabled: boolean): void;
   setSearchOpen(open: boolean): void;
   createThread(title?: string): string;
+  deleteThread(threadId: string, persist?: (thread: TaoThread) => Promise<void>): Promise<boolean>;
   setActiveThread(threadId: string): void;
   send(content?: string): Promise<boolean>;
   stop(): Promise<void>;
   /** Call only after an explicit, successful Vault gate; never retries a request. */
   acknowledgeVaultUnlock(threadId: string): void;
+  dismissVaultPrompt(threadId: string): void;
   continueReply(): Promise<boolean>;
   regenerate(): Promise<boolean>;
   approveAction(action: ActionProposal): Promise<void>;

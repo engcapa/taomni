@@ -15,6 +15,7 @@ import type { TaoChatController, TaoThread } from "../ai-chat";
 
 interface Props extends WelcomePanelProps {
   controller: TaoChatController; threads: TaoThread[]; demoMode: boolean;
+  onDeleteThread?: (thread: TaoThread) => Promise<void>;
 }
 
 export function shouldShowWslEntry(status: "loading" | "ready" | "error" | "unsupported", distroCount: number): boolean {
@@ -32,6 +33,7 @@ export function DockRow(props: Props) {
   const shellMenu = useTaoPopover();
   const shells = useWelcomeShells({ setStatusMessage: setStatus, t, active: props.active !== false, suppressWslErrors: true });
   const hasWsl = shouldShowWslEntry(shells.wslStatus, shells.wslDistros.length);
+  const canRestore = props.restore && ["available", "succeeded", "partial", "failed"].includes(props.restore.view.state);
   const startInDirectory = async (directory: LocalDirectoryShortcut) => {
     const key = directory.directoryId || `${directory.kind}:${directory.path}`;
     if (pendingRef.current.has(key)) return;
@@ -61,7 +63,7 @@ export function DockRow(props: Props) {
   return <>
     <div className="tao-home-dock-row" data-testid="tao-home-dock-row">
       <button ref={history.triggerRef} type="button" className="tao-home-dock-button history" data-testid="tao-home-history" aria-expanded={history.open} onClick={() => history.setOpen(!history.open)}><History size={14} />{tr("历史")}<ChevronUp size={12} /></button>
-      <TaoPopover owner={history} className="tao-home-history-popup" label={tr("历史")}><HistoryPopover threads={threads} sessions={props.recentSessions ?? []} workspaces={props.recentWorkspaces ?? []} demoMode={demoMode} onSelectThread={(thread) => void openHistoryThread(thread)} onOpenSession={props.onOpenRecentSession} onOpenWorkspace={props.onOpenRecentWorkspace} onNewThread={() => controller.createThread()} onRestore={props.restore?.onStartRestore} onClose={() => history.close()} directories={<LocalDirectoriesPanel translate={t} directories={directories} pendingDirectoryIds={pending} loadStatus={shells.directoriesStatus} loadError={shells.directoriesError} onRetry={shells.reloadDirectories} onStartInDirectory={(directory) => {
+      <TaoPopover owner={history} className="tao-home-history-popup" label={tr("历史")}><HistoryPopover threads={threads} sessions={props.recentSessions ?? []} workspaces={props.recentWorkspaces ?? []} demoMode={demoMode} onSelectThread={(thread) => void openHistoryThread(thread)} onDeleteThread={props.onDeleteThread} onOpenSession={props.onOpenRecentSession} onOpenWorkspace={props.onOpenRecentWorkspace} onNewThread={() => controller.createThread()} onRestore={canRestore ? props.restore?.onStartRestore : undefined} onClose={() => history.close()} directories={<LocalDirectoriesPanel translate={t} directories={directories} pendingDirectoryIds={pending} loadStatus={shells.directoriesStatus} loadError={shells.directoriesError} onRetry={shells.reloadDirectories} onStartInDirectory={(directory) => {
         const actual = demoMode ? shells.localDirectories.find((item) => item.directoryId === directory.directoryId) : directory;
         if (actual) return startInDirectory(actual);
       }} />} /></TaoPopover>

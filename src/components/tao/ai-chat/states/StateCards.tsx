@@ -27,14 +27,14 @@ export function StoppedCard({ phase, controller, web, received = true }: { phase
   return <div className="tao-home-state-card warning" data-testid="tao-home-stopped-state"><AlertTriangle size={20} /><div><strong>{tr("已停止生成")}</strong><p>{tr(received ? "已收到的内容已保留，可以从当前位置继续。" : "本轮尚未收到回复，可重新生成。")}</p><button type="button" data-testid={regenerate ? "tao-home-regenerate" : "tao-home-continue"} onClick={() => void (regenerate ? controller.regenerate() : controller.continueReply())}>{tr(continueLabel)}</button></div></div>;
 }
 
-export function VaultLockedMask({ phase, controller, active = true }: { phase: TaoPhase; controller: TaoChatController; active?: boolean }) {
+export function VaultLockedMask({ phase, controller, active = true, compact = false }: { phase: TaoPhase; controller: TaoChatController; active?: boolean; compact?: boolean }) {
   const ensureVaultReady = useVaultGate();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const button = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    if (active && phase === "vault_locked" && !busy) button.current?.focus();
-  }, [active, phase, busy]);
+    if (active && phase === "vault_locked" && !busy && !compact) button.current?.focus();
+  }, [active, phase, busy, compact]);
   if (phase !== "vault_locked") return null;
   const unlock = async () => {
     const threadId = controller.getState().activeThreadId;
@@ -52,7 +52,12 @@ export function VaultLockedMask({ phase, controller, active = true }: { phase: T
       setBusy(false);
     }
   };
-  return <div className="tao-home-vault-mask" data-testid="tao-home-vault-locked" role="status"><LockKeyhole size={22} /><strong>{tr("Vault 已锁定")}</strong><span>{tr("解锁后可从已收到的位置继续")}</span><button ref={button} type="button" data-testid="tao-home-vault-unlock" disabled={busy} onClick={() => void unlock()}>{tr("解锁 Vault")}</button>{error && <p role="alert">{error}</p>}</div>;
+  return <div className={compact ? "tao-home-state-card warning tao-home-vault-notice" : "tao-home-vault-mask"} data-testid={compact ? "tao-home-vault-notice" : "tao-home-vault-locked"} role="status">
+    <LockKeyhole size={22} /><strong>{tr("Vault 已锁定")}</strong><span>{tr("解锁后可从已收到的位置继续")}</span>
+    <button ref={button} type="button" data-testid="tao-home-vault-unlock" disabled={busy} onClick={() => void unlock()}>{tr("解锁 Vault")}</button>
+    {!compact ? <button type="button" data-testid="tao-home-vault-dismiss" disabled={busy} onClick={() => { const id = controller.getState().activeThreadId; if (id) controller.dismissVaultPrompt(id); }}>{tr("暂时跳过")}</button> : null}
+    {error && <p role="alert">{error}</p>}
+  </div>;
 }
 
 export function BrowserUnavailableCard({ onOpenSettings }: { onOpenSettings?: () => void }) {

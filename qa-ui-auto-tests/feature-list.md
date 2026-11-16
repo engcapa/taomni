@@ -118,6 +118,8 @@ files:
 - src/components/tao/home/TaoHomeHost.tsx
 - src/components/tao/home/DockRow.tsx
 - src/components/tao/home/HistoryPopover.tsx
+- src/components/tao/home/threadHistoryStorage.ts
+- src/components/tao/home/useThreadHistory.ts
 - src/components/tao/ai-chat/TaoAiChat.tsx
 - src/components/tao/ai-chat/Composer.tsx
 - src/components/tao/ai-chat/TopBar.tsx
@@ -132,6 +134,7 @@ files:
 - src/components/tao/search/SearchPanel.tsx
 - src/styles/taoHome.css
 - src/styles/taoHomeLayout.css
+- src/styles/taoHistory.css
 controls:
 - id: tao-home-provider
   selector: '[data-testid="tao-home-provider"]'
@@ -230,6 +233,12 @@ controls:
 - id: tao-home-history-popover
   selector: '[data-testid="tao-home-history-popover"]'
   kind: display
+- id: tao-home-history-delete
+  selector: '[data-testid="tao-home-history-delete"]'
+  kind: interactive
+- id: tao-home-history-restore
+  selector: '[data-testid="tao-home-history-restore"]'
+  kind: interactive
 - id: tao-home-history-tab-chat
   selector: '[data-testid="tao-home-history-tab-chat"]'
   kind: interactive
@@ -379,6 +388,12 @@ controls:
   kind: interactive
 - id: tao-home-vault-locked
   selector: '[data-testid="tao-home-vault-locked"]'
+  kind: display
+- id: tao-home-vault-dismiss
+  selector: '[data-testid="tao-home-vault-dismiss"]'
+  kind: interactive
+- id: tao-home-vault-notice
+  selector: '[data-testid="tao-home-vault-notice"]'
   kind: display
 - id: tao-home-vault-unlock
   selector: '[data-testid="tao-home-vault-unlock"]'
@@ -978,6 +993,7 @@ controls:
     optional: true       # template testid welcome-history-tab-${tab.id}; sessions|workspaces|directories
   - id: history-tab-sessions
     selector: '[data-testid="welcome-history-tab-sessions"]'
+    aliases: ['[data-testid="tao-home-history-popover"] [data-testid="tao-home-history-tab-sessions"]']
     kind: interactive
   - id: history-tab-directories
     selector: '[data-testid="welcome-history-tab-directories"]'
@@ -992,6 +1008,7 @@ controls:
   # docs-feature/welcome-recents-session-restore-design.md §4.1/§4.2).
   - id: restore-row
     selector: '[data-testid="welcome-restore-row"]'
+    aliases: ['.tao-home-history-footer']
     kind: display
   - id: local-directory-row
     selector: '[data-testid="welcome-local-directory"]'
@@ -4148,6 +4165,10 @@ controls:
     kind: display
     optional: true       # only on submit error
   # VaultUnlockDialog
+  - id: startup-vault-check-cancel
+    selector: '[data-testid="startup-vault-check-cancel"]'
+    kind: interactive
+    optional: true
   - id: unlock-dialog
     selector: '[data-testid="vault-unlock-dialog"]'
     kind: display

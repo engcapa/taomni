@@ -101,6 +101,7 @@ export function createChatController(options: ChatControllerOptions = {}): TaoCh
     patch({ threads: { ...state.threads, [threadId]: updater(thread) } });
   };
   const patchRuntime = (threadId: string, updater: (runtime: TaoChatState["runtime"][string]) => TaoChatState["runtime"][string]) => {
+    if (!state.threads[threadId]) return;
     const runtime = state.runtime[threadId] ?? { phase: "idle" as const, budget: { usedTokens: 0, limitTokens: budget.limitTokens, halted: false } };
     patch({ runtime: { ...state.runtime, [threadId]: updater(runtime) } });
   };
@@ -145,6 +146,7 @@ export function createChatController(options: ChatControllerOptions = {}): TaoCh
   };
 
   const processEvent = (threadId: string, event: TaoEvent) => {
+    if (!state.threads[threadId]) return;
     if (event.type === "block_start" || event.type === "block_delta" || event.type === "block_stop") event = { ...event, index: event.index + (blockOffsets.get(threadId) ?? 0) };
     if (event.type === "message_start") {
       const ledger = usageCalls.get(threadId) ?? { current: "", calls: new Map<string, Partial<TaoUsage>>() };
@@ -205,7 +207,7 @@ export function createChatController(options: ChatControllerOptions = {}): TaoCh
     }
     if (event.type === "error") {
       updateAssistant(threadId, (message) => ({ ...message, blocks: [...message.blocks.filter((block) => block.type !== "error"), { id: id("tao-error"), type: "error", error: { category: event.category, message: event.message } }] }));
-      patchRuntime(threadId, (runtime) => ({ ...runtime, phase: event.category === "vault_locked" ? "vault_locked" : "error" }));
+      patchRuntime(threadId, (runtime) => ({ ...runtime, phase: event.category === "vault_locked" ? "vault_locked" : "error", vaultPromptDismissed: false }));
       return;
     }
     if (event.type === "message_stop") {
@@ -251,6 +253,29 @@ export function createChatController(options: ChatControllerOptions = {}): TaoCh
       });
       return threadId;
     },
+    async deleteThread(threadId, persist) {
+      const thread = state.threads[threadId];
+      if (!thread || running.has(threadId) || thread.running || state.runtime[threadId]?.deleting || state.runtime[threadId]?.actionBusy || thread.messages.some((message) => message.blocks.some((block) => block.action?.status === "approved"))) return false;
+      patchRuntime(threadId, (runtime) => ({ ...runtime, deleting: true }));
+      try {
+        await persist?.(thread);
+      } catch (error) {
+        patchRuntime(threadId, (runtime) => ({ ...runtime, deleting: false }));
+        throw error;
+      }
+      const threads = { ...state.threads };
+      const runtime = { ...state.runtime };
+      delete threads[threadId]; delete runtime[threadId];
+      usageCalls.delete(threadId); usageApplied.delete(threadId); blockOffsets.delete(threadId);
+      const active = state.activeThreadId === threadId;
+      patch({ threads, runtime, ...(active ? { activeThreadId: null } : {}) });
+      if (active) {
+        const next = Object.values(threads).filter((item) => item.source !== "legacy").sort((a, b) => b.updatedAt - a.updatedAt)[0];
+        if (next) controller.setActiveThread(next.id);
+        else controller.createThread();
+      }
+      return true;
+    },
     setActiveThread(threadId) {
       if (!state.threads[threadId]) return;
       const preferences = state.threads[threadId].preferences;
@@ -261,7 +286,7 @@ export function createChatController(options: ChatControllerOptions = {}): TaoCh
       const threadId = state.activeThreadId ?? controller.createThread();
       const text = (content ?? state.composer.text).trim();
       const runtime = state.runtime[threadId] ?? activeRuntime();
-      if (!text || !options.backend || runtime?.phase === "vault_locked" || runtime?.phase === "sending" || runtime?.phase === "streaming" || runtime?.phase === "thinking" || runtime?.phase === "searching" || runtime?.phase === "awaiting_action" || runtime?.phase === "plan_pending" || runtime?.phase === "budget_halt") return false;
+      if (!text || !options.backend || runtime?.deleting || runtime?.phase === "vault_locked" || runtime?.phase === "sending" || runtime?.phase === "streaming" || runtime?.phase === "thinking" || runtime?.phase === "searching" || runtime?.phase === "awaiting_action" || runtime?.phase === "plan_pending" || runtime?.phase === "budget_halt") return false;
       if (state.threads[threadId].messages.some((m) => m.blocks.some((b) => b.action && actionPending(b.action)))) return false;
       const actionFeedback = state.threads[threadId].messages.flatMap((message) => message.blocks.flatMap((block) => block.action && !actionPending(block.action) ? [{ id: actionKey(block.action), title: block.action.title, status: block.action.status!, result: block.action.result }] : [])).slice(-20);
       const request: TaoRequest = { threadId, content: text, mode: state.mode, model: state.composer.model, provider: state.composer.provider ?? "deepseek-app", reasoningEffort: state.composer.reasoningEffort ?? "high", thinking: state.composer.thinking, web: state.composer.web, context: state.context, chips: state.composer.chips, actionFeedback };
@@ -304,11 +329,14 @@ export function createChatController(options: ChatControllerOptions = {}): TaoCh
       updateAssistant(threadId, (message) => ({ ...message, blocks: message.blocks.filter((block) => block.error?.category !== "vault_locked") }));
       patchRuntime(threadId, (runtime) => ({ ...runtime, phase: "stopped" }));
     },
+    dismissVaultPrompt(threadId) {
+      if (state.runtime[threadId]?.phase === "vault_locked") patchRuntime(threadId, (runtime) => ({ ...runtime, vaultPromptDismissed: true }));
+    },
     async continueReply() {
       const threadId = state.activeThreadId;
       if (!threadId || !options.backend?.continue) return false;
       const runtime = state.runtime[threadId];
-      if (runtime?.phase === "vault_locked" || runtime?.lastRequest?.web || running.has(threadId)) return false;
+      if (runtime?.deleting || runtime?.phase === "vault_locked" || runtime?.lastRequest?.web || running.has(threadId)) return false;
       if (state.threads[threadId].messages.some((m) => m.blocks.some((b) => b.action && actionPending(b.action)))) return false;
       const abortController = new AbortController();
       updateAssistant(threadId, (message) => ({ ...message, blocks: message.blocks.filter((block) => block.type !== "error") }));
@@ -334,7 +362,7 @@ export function createChatController(options: ChatControllerOptions = {}): TaoCh
     async regenerate() {
       const threadId = state.activeThreadId;
       if (!threadId || !options.backend?.regenerate) return false;
-      if (state.runtime[threadId]?.phase === "vault_locked" || running.has(threadId)) return false;
+      if (state.runtime[threadId]?.deleting || state.runtime[threadId]?.phase === "vault_locked" || running.has(threadId)) return false;
       if (state.threads[threadId].messages.some((m) => m.blocks.some((b) => b.action && actionPending(b.action)))) return false;
       const abortController = new AbortController();
       blockOffsets.delete(threadId); usageCalls.delete(threadId); usageApplied.delete(threadId);
@@ -386,7 +414,7 @@ export function createChatController(options: ChatControllerOptions = {}): TaoCh
     branchAt(messageId, replacement) {
       const source = state.activeThreadId ? state.threads[state.activeThreadId] : undefined;
       const index = source?.messages.findIndex((message) => message.id === messageId) ?? -1;
-      if (!source || index < 0 || running.has(source.id)) return undefined;
+      if (!source || index < 0 || running.has(source.id) || state.runtime[source.id]?.deleting) return undefined;
       const threadId = controller.createThread(`${source.title} · ${tr("分支")}`);
       const messages = source.messages.slice(0, replacement === undefined ? index + 1 : index);
       patchThread(threadId, (thread) => ({ ...thread, messages: structuredClone(messages), preferences: source.preferences }));

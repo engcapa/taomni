@@ -21,6 +21,8 @@ export function useTaoPopover() {
     };
     const key = (event: KeyboardEvent) => {
       if (event.key !== "Escape" || event.isComposing) return;
+      // An inner confirmation owns Escape until it is dismissed.
+      if (contentRef.current?.querySelector('[aria-modal="true"]')) return;
       event.preventDefault(); event.stopPropagation(); close();
     };
     window.addEventListener("tao:popover-open", otherOpened);

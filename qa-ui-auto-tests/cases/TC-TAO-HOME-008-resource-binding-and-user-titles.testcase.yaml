@@ -18,7 +18,13 @@ steps:
 - seed_storage:
     key: taomni.recentWorkspaces.v1
     value: '[{"id":"qa-source-title","name":"来源","roots":[{"id":"root-a","name":"来源","path":"${fixture.platform_workspace_root}","kind":"folder"}],"looseFiles":[],"lastOpenedAt":1756100000000,"isGitRepo":false},{"id":"qa-file-title","name":"文件","roots":[{"id":"root-b","name":"文件","path":"${fixture.platform_workspace_root}/src","kind":"folder"}],"looseFiles":[],"lastOpenedAt":1756000000000,"isGitRepo":false}]'
+- assert_localstorage:
+    key: taomni.recentWorkspaces.v1
+    contains: 来源
 - reload_window: null
+- assert_localstorage:
+    key: taomni.recentWorkspaces.v1
+    contains: 来源
 - click: '[data-testid="tao-home-history"]'
 - click: '[data-testid="tao-home-history-tab-workspaces"]'
 - assert_text:
