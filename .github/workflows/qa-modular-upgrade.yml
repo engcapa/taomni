@@ -357,7 +357,7 @@ jobs:
         run: |
           mkdir -p modular-evidence
           set -o pipefail
-          python -m unittest qa_ui_auto.test_core_profile_state test_module_signed_observation test_native_restart_failure 2>&1 | tee modular-evidence/native-observation-unit.log
+          python -m unittest qa_ui_auto.test_core_profile_state test_module_signed_observation test_module_retained_observation test_native_restart_failure 2>&1 | tee modular-evidence/native-observation-unit.log
       - name: Preserve native observation evidence on every platform
         uses: actions/upload-artifact@v4
         if: always()

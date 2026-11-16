@@ -8,6 +8,8 @@
  * the desktop WebView the same failure behaviour.
  */
 
+import { pluginDataErrors } from "./pluginDataContract";
+
 export const PLUGIN_CORE_API_VERSION = "1";
 
 export const PLUGIN_PERMISSION_NAMES = [
@@ -59,6 +61,7 @@ export interface PluginManifest {
   commands: string[];
   permissions: PluginPermission[];
   dataDir: string;
+  dataSchemaVersion?: number;
   backupPaths: string[];
   legacyTables: string[];
   vaultFixedKeys: string[];
@@ -82,6 +85,7 @@ export interface PluginRecord {
   lifecycle: PluginLifecycle;
   /** A human readable reason is retained for the disabled/invalid view. */
   reason?: string;
+  dataRetained?: boolean;
 }
 
 const SLUG = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
@@ -102,7 +106,7 @@ function isSafeRelativePath(value: unknown): value is string {
 
 const MANIFEST_FIELDS = new Set([
   "id", "slug", "name", "version", "coreApiVersion", "kind", "status", "removalCandidate", "platforms",
-  "entry", "tabs", "commands", "permissions", "dataDir", "backupPaths", "legacyTables", "vaultFixedKeys", "snapshot",
+  "entry", "tabs", "commands", "permissions", "dataDir", "dataSchemaVersion", "backupPaths", "legacyTables", "vaultFixedKeys", "snapshot",
 ]);
 
 function asStringArray(value: unknown): value is string[] {
@@ -151,10 +155,11 @@ export function validatePluginManifest(
   if (!asStringArray(input.permissions) || input.permissions.some((permission) => !PERMISSIONS.has(permission))) {
     errors.push("permissions contains an unsupported value");
   }
-  if (typeof input.dataDir !== "string" || !/^plugins\/[a-z0-9]+(?:-[a-z0-9]+)*$/.test(input.dataDir)) errors.push("dataDir must be plugins/<slug>");
+  if (input.dataDir !== `plugins/${slug}`) errors.push("dataDir must be plugins/<slug>");
   for (const field of ["backupPaths", "legacyTables", "vaultFixedKeys"] as const) {
     if (!asStringArray(input[field])) errors.push(`${field} must be a string array`);
   }
+  errors.push(...pluginDataErrors(slug, input.dataSchemaVersion, input.backupPaths));
   if (input.snapshot !== "rpc" && input.snapshot !== "file") errors.push("snapshot must be rpc or file");
 
   if (errors.length > 0) return { ok: false, errors };
@@ -176,6 +181,7 @@ export function validatePluginManifest(
       commands: input.commands as string[],
       permissions: input.permissions as PluginPermission[],
       dataDir: input.dataDir as string,
+      dataSchemaVersion: input.dataSchemaVersion === undefined ? 1 : input.dataSchemaVersion as number,
       backupPaths: input.backupPaths as string[],
       legacyTables: input.legacyTables as string[],
       vaultFixedKeys: input.vaultFixedKeys as string[],

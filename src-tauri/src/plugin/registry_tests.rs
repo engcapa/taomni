@@ -24,7 +24,8 @@ fn manifest(slug: &str) -> ModuleManifest {
         commands: ["ping".into()].into(),
         permissions: ["session.read".into()].into(),
         data_dir: format!("plugins/{slug}"),
-        backup_paths: vec![format!("plugins/{slug}/data.db")],
+        data_schema_version: 1,
+        backup_paths: vec![format!("plugins/{slug}/data/data.db")],
         legacy_tables: vec![],
         vault_fixed_keys: vec![],
         snapshot: SnapshotMode::Rpc,
@@ -86,7 +87,8 @@ fn rejects_path_traversal() {
 #[test]
 fn installs_rolls_back_and_uninstalls_through_registry_projection() {
     let root = tempdir().unwrap();
-    let registry = PluginRegistry::new(root.path());
+    let plugins = root.path().join("plugins");
+    let registry = PluginRegistry::new(&plugins);
     let package_v1 = verify::test_support::verified_package(&manifest("mfa"));
     let first = registry.install_verified(&package_v1).unwrap();
     assert_eq!(first.manifest.version, "1.0.0");
@@ -98,11 +100,14 @@ fn installs_rolls_back_and_uninstalls_through_registry_projection() {
     let rolled = registry.rollback("mfa").unwrap();
     assert_eq!(rolled.manifest.version, "1.0.0");
 
-    fs::create_dir_all(root.path().join("mfa/data")).unwrap();
-    fs::write(root.path().join("mfa/data/keep.db"), b"keep").unwrap();
+    fs::create_dir_all(plugins.join("mfa/data")).unwrap();
+    fs::write(plugins.join("mfa/data/keep.db"), b"keep").unwrap();
     let uninstalled = registry.uninstall("mfa", false).unwrap();
     assert_eq!(uninstalled.state, LifecycleState::Uninstalled);
-    assert!(root.path().join("mfa/data/keep.db").is_file());
+    assert!(plugins.join("mfa/data/keep.db").is_file());
+    let retained = retained_data::load(&plugins, "mfa").unwrap().unwrap();
+    assert_eq!(retained.files[0].path, "keep.db");
+    assert!(retained.requires_vault());
 }
 
 #[test]
@@ -126,13 +131,14 @@ fn rejects_unsigned_directory_without_activating() {
 #[test]
 fn uninstall_does_not_restore_enabled_state_from_settings() {
     let root = tempdir().unwrap();
+    let plugins = root.path().join("plugins");
     let package = tempdir().unwrap();
     fs::write(
         package.path().join("module.json"),
         serde_json::to_vec(&manifest("mfa")).unwrap(),
     )
     .unwrap();
-    let registry = PluginRegistry::new(root.path());
+    let registry = PluginRegistry::new(&plugins);
     registry.scan().unwrap();
     registry
         .install_verified(&verify::test_support::verified_package(&manifest("mfa")))
@@ -141,14 +147,14 @@ fn uninstall_does_not_restore_enabled_state_from_settings() {
     let uninstalled = registry.uninstall("mfa", false).unwrap();
     assert_eq!(uninstalled.state, LifecycleState::Uninstalled);
 
-    let reloaded = PluginRegistry::new(root.path());
+    let reloaded = PluginRegistry::new(&plugins);
     reloaded.scan().unwrap();
     assert_eq!(
         reloaded.get("mfa").expect("uninstalled record").state,
         LifecycleState::Uninstalled
     );
     assert!(
-        !fs::read_to_string(root.path().join("state.json"))
+        !fs::read_to_string(plugins.join("state.json"))
             .unwrap()
             .contains("mfa")
     );
@@ -191,7 +197,8 @@ fn frontend_serves_signed_bytes_and_rejects_tampering_or_disabled_state() {
 #[test]
 fn uninstall_does_not_allow_an_offline_downgrade() {
     let root = tempdir().unwrap();
-    let registry = PluginRegistry::new(root.path());
+    let plugins = root.path().join("plugins");
+    let registry = PluginRegistry::new(&plugins);
     let mut latest = manifest("mfa");
     latest.version = "2.0.0".into();
     registry
@@ -203,7 +210,7 @@ fn uninstall_does_not_allow_an_offline_downgrade() {
         .unwrap_err();
     assert!(error.to_string().contains("older than installed"));
     assert_eq!(
-        install::ModuleInstaller::new(root.path())
+        install::ModuleInstaller::new(&plugins)
             .active_pointer("mfa")
             .unwrap()
             .previous_version

@@ -4,6 +4,7 @@ import { useT } from "../../lib/i18n";
 import type { LegacyInstallSnapshot, MigrationExecutionResult } from "../../lib/ipc";
 import { type ModuleRecord, type ModuleTransition } from "../../lib/moduleStore";
 import { useModuleStore } from "../../stores/moduleStore";
+import { ConfirmDialog } from "../sidebar/ConfirmDialog";
 
 /**
  * The settings surface deliberately owns no catalog or native IPC concerns.
@@ -104,6 +105,7 @@ export function ModuleStorePanel({
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deleteData, setDeleteData] = useState<Record<string, boolean>>({});
+  const [pendingUninstall, setPendingUninstall] = useState<ModuleStoreCatalogEntry | null>(null);
   const [migrationBusy, setMigrationBusy] = useState(false);
 
   const entries = useMemo(() => [...catalog].sort((left, right) => left.name.localeCompare(right.name)), [catalog]);
@@ -132,10 +134,15 @@ export function ModuleStorePanel({
   const install = (entry: ModuleStoreCatalogEntry) => run(entry, "install", onInstall ? () => onInstall(entry) : undefined, { type: "install", version: entry.version });
   const enable = (entry: ModuleStoreCatalogEntry) => run(entry, "enable", onEnable ? () => onEnable(entry) : undefined, { type: "enable" });
   const disable = (entry: ModuleStoreCatalogEntry) => run(entry, "disable", onDisable ? () => onDisable(entry) : undefined, { type: "disable" });
+  const performUninstall = (entry: ModuleStoreCatalogEntry, removeData: boolean) =>
+    run(entry, "uninstall", onUninstall ? () => onUninstall(entry, removeData) : undefined, { type: "uninstall", deleteData: removeData });
   const uninstall = (entry: ModuleStoreCatalogEntry) => {
     const removeData = deleteData[entry.slug] === true;
-    if (!removeData && typeof window !== "undefined" && !window.confirm(t("settings.moduleStoreUninstallConfirm", { name: entry.name }))) return;
-    return run(entry, "uninstall", onUninstall ? () => onUninstall(entry, removeData) : undefined, { type: "uninstall", deleteData: removeData });
+    if (!removeData) {
+      setPendingUninstall(entry);
+      return;
+    }
+    return performUninstall(entry, true);
   };
   const rollback = (entry: ModuleStoreCatalogEntry, record: ModuleRecord) => {
     if (!record.previousVersion) return;
@@ -256,7 +263,7 @@ export function ModuleStorePanel({
                   <span data-testid={`module-version-${entry.slug}`}>{t("settings.moduleStoreVersion", { version: entry.version })}</span>
                   <span>{formatSize(entry.sizeBytes, t("settings.moduleStoreSizeUnknown"))}</span>
                   <span className={compatible ? "" : "text-amber-700 dark:text-amber-400"}>{compatible ? t("settings.moduleStoreCompatible") : t("settings.moduleStoreIncompatible")}</span>
-                  {record?.dataRetained && record.lifecycle === "uninstalled" && <span>{t("settings.moduleStoreDataRetained")}</span>}
+                  {record?.dataRetained && record.lifecycle === "uninstalled" && <span data-testid={`module-data-retained-${entry.slug}`}>{t("settings.moduleStoreDataRetained")}</span>}
                 </div>
                 {entry.permissions && entry.permissions.length > 0 && <div data-testid={`module-permissions-${entry.slug}`} className="mt-2 text-[11px] text-[var(--taomni-text-muted)]">{t("settings.moduleStorePermissions", { permissions: entry.permissions.join(", ") })}</div>}
                 <div className="mt-3 flex flex-wrap items-center gap-2">
@@ -280,6 +287,17 @@ export function ModuleStorePanel({
           })}
         </div>
       )}
+      {pendingUninstall && <ConfirmDialog
+        title={t("settings.moduleStoreUninstall")}
+        message={t("settings.moduleStoreUninstallConfirm", { name: pendingUninstall.name })}
+        confirmLabel={t("settings.moduleStoreUninstall")}
+        onCancel={() => setPendingUninstall(null)}
+        onConfirm={() => {
+          const entry = pendingUninstall;
+          setPendingUninstall(null);
+          void performUninstall(entry, false);
+        }}
+      />}
     </section>
   );
 }

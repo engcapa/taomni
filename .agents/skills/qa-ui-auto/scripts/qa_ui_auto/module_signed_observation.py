@@ -14,8 +14,10 @@ import uuid
 
 from .deadline import budget_time as time
 from .steps import StepError
+from .module_retained_observation import observe as observe_data
 
-PHASES = {"installed", "enabled", "disabled", "invalid", "uninstalled", "tamper-frontend", "restore-frontend"}
+PHASES = {"installed", "enabled", "disabled", "invalid", "uninstalled", "tamper-frontend", "restore-frontend",
+          "seed-data", "retained", "installed-data", "deleted"}
 
 
 def validate(args):
@@ -101,7 +103,9 @@ def run(ctx, args):
             record = matching[0]
             ping = invoke(ctx.session, "plugin_invoke", {"slug": "hello-plugin", "command": "hello/ping"})
             observation["ping"] = ping
-            check(record, ping, "disabled" if phase == "invalid" else phase)
+            expected_state = {"invalid": "disabled", "seed-data": "installed", "installed-data": "installed",
+                              "retained": "uninstalled", "deleted": "uninstalled"}.get(phase, phase)
+            check(record, ping, expected_state)
             if phase == "invalid":
                 if not record.get("reason"):
                     raise StepError("A changed signed frontend was not rejected on startup")
@@ -115,9 +119,11 @@ def run(ctx, args):
             pointer = json.loads((root / "hello-plugin/active.json").read_text(encoding="utf-8"))
             observation["activePointer"] = pointer
             # Pointers use snake_case on disk; the UI never writes them.
-            expected_version = None if phase == "uninstalled" else "0.1.0"
+            expected_version = None if expected_state == "uninstalled" else "0.1.0"
             if pointer.get("activeVersion", pointer.get("active_version")) != expected_version:
                 raise StepError("Native active pointer differs from lifecycle state")
+            if phase in {"seed-data", "retained", "installed-data", "deleted"}:
+                observation["data"] = observe_data(root, phase, record)
         observation["passed"] = True
         return "official module " + phase + " verified"
     finally:

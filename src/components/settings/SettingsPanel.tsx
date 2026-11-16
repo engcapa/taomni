@@ -272,7 +272,7 @@ export function SettingsPanel() {
           version: record.manifest?.version ?? "0.0.0",
           activeVersion: record.lifecycle === "uninstalled" ? undefined : record.manifest?.version,
           lifecycle: record.lifecycle,
-          dataRetained: true,
+          dataRetained: record.dataRetained === true,
           error: record.reason,
         })));
         setModuleCatalog(records.map(moduleCatalogEntry).filter((entry): entry is ModuleStoreCatalogEntry => entry !== null));

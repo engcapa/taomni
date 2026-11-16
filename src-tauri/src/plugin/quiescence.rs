@@ -111,6 +111,7 @@ mod tests {
                 manifest,
                 state: super::super::LifecycleState::Enabled,
                 reason: None,
+                data_retained: false,
             },
         );
         registry

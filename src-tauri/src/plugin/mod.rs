@@ -17,11 +17,14 @@ mod runtime;
 pub(crate) mod services;
 pub use quiescence::QuiescenceGuard;
 mod core_access;
+pub(crate) mod data_contract;
+pub(crate) mod retained_data;
 mod signed_catalog;
 mod snapshot_barrier;
 mod stopping;
 #[cfg(test)]
 pub(crate) mod test_services;
+mod uninstallation;
 mod vault_lifecycle;
 pub mod verify;
 
@@ -95,6 +98,8 @@ pub struct ModuleManifest {
     pub permissions: BTreeSet<String>,
     #[serde(rename = "dataDir")]
     pub data_dir: String,
+    #[serde(default = "default_data_schema_version", rename = "dataSchemaVersion")]
+    pub data_schema_version: u32,
     #[serde(rename = "backupPaths")]
     pub backup_paths: Vec<String>,
     #[serde(rename = "legacyTables")]
@@ -112,6 +117,10 @@ pub enum SnapshotMode {
     Rpc,
 }
 
+fn default_data_schema_version() -> u32 {
+    1
+}
+
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub enum LifecycleState {
@@ -126,6 +135,8 @@ pub struct PluginRecord {
     pub manifest: ModuleManifest,
     pub state: LifecycleState,
     pub reason: Option<String>,
+    #[serde(default, rename = "dataRetained")]
+    pub data_retained: bool,
 }
 
 #[derive(Debug, Error)]
@@ -224,16 +235,20 @@ impl PluginRegistry {
                 continue;
             }
             let slug = entry.file_name().to_string_lossy().into_owned();
+            let data_retained = fs::symlink_metadata(path.join("data"))
+                .is_ok_and(|metadata| metadata.is_dir() && !data_contract::is_link(&metadata));
             let record = match self.read_manifest(&path, &slug) {
                 Ok((manifest, state)) => PluginRecord {
                     manifest,
                     state,
                     reason: None,
+                    data_retained,
                 },
                 Err(error) => PluginRecord {
                     manifest: placeholder_manifest(&slug),
                     state: LifecycleState::Disabled,
                     reason: Some(error.to_string()),
+                    data_retained,
                 },
             };
             records.insert(slug, record);
@@ -360,29 +375,6 @@ impl PluginRegistry {
         self.activate_transaction(&manifest, &pointer, || installer.rollback(slug))
     }
 
-    /// Deactivate a module. Its versions and data remain unless `delete_data`
-    /// is explicitly requested by the caller.
-    pub fn uninstall(&self, slug: &str, delete_data: bool) -> Result<PluginRecord, PluginError> {
-        let _lifecycle = self
-            .lifecycle
-            .lock()
-            .expect("plugin lifecycle lock poisoned");
-        self.stop_host(slug)?;
-        install::ModuleInstaller::new(&self.root).uninstall(slug, delete_data)?;
-        self.scan_locked()?;
-        // Removing the active pointer makes the record `Uninstalled`; clear
-        // its old enablement preference so a later install starts disabled
-        // and a restart cannot resurrect the removed module.
-        let snapshot = self
-            .records
-            .read()
-            .expect("plugin registry lock poisoned")
-            .clone();
-        self.persist_enabled_state(&snapshot)?;
-        self.get(slug)
-            .ok_or_else(|| PluginError::NotFound(slug.to_owned()))
-    }
-
     fn read_manifest(
         &self,
         plugin_dir: &Path,
@@ -466,9 +458,7 @@ impl PluginRegistry {
                 "dataDir must be plugins/<slug>".into(),
             ));
         }
-        for path in manifest.backup_paths.iter() {
-            validate_relative_path(path)?;
-        }
+        data_contract::validate_manifest(manifest)?;
         if let Some(host) = manifest.entry.host.as_deref() {
             validate_relative_path(host)?;
         }
@@ -578,6 +568,7 @@ fn placeholder_manifest(slug: &str) -> ModuleManifest {
         commands: BTreeSet::new(),
         permissions: BTreeSet::new(),
         data_dir: format!("plugins/{slug}"),
+        data_schema_version: 1,
         backup_paths: Vec::new(),
         legacy_tables: Vec::new(),
         vault_fixed_keys: Vec::new(),

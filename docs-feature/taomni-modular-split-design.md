@@ -583,7 +583,8 @@ v1.2 的方案是：每个插件是 `crate-type = ["cdylib", "rlib"]` 的 Cargo 
   "commands": ["connect", "disconnect"],
   "permissions": ["vault.ref", "session.read", "network.egress", "fs.dataDir", "window.open"],
   "dataDir": "plugins/rdp-client",
-  "backupPaths": ["plugins/rdp-client/data.db"],
+  "dataSchemaVersion": 1,
+  "backupPaths": ["plugins/rdp-client/data/data.db"],
   "legacyTables": ["rdp_certificate_pins"],
   "vaultFixedKeys": [],
   "snapshot": "rpc"
@@ -597,7 +598,7 @@ v1.2 的方案是：每个插件是 `crate-type = ["cdylib", "rlib"]` 的 Cargo 
 - `kind` 取值 `remote-client / local-server / collaboration / media / auth / ai-local / mobile`，仅用于商店分类与权限模板，不做运行时分发。
 - `permissions` 是**核心自己定义并在 `plugin_invoke` 与 RPC 处强制的权限集**（不是 Tauri capability，见 §5.0 第 3 条）；取值范围由核心维护，插件不得自声明集合之外的值，新增取值需评审；商店安装确认页把它展开成人话（§6.2）。
 - `platforms` 与 `release.yml` 的实际矩阵一致（目前 `windows-x86_64`、`darwin-aarch64`、`darwin-x86_64`、`linux-x86_64`；v1.2 示例里的 `windows-aarch64` 当前不存在）。
-- `dataDir` 是插件唯一可写的数据目录，核心不代写；`backupPaths` 供核心备份读取（§4.2 S9）。
+- `dataDir` 标识 `plugins/<slug>` 命名空间；宿主只写其 `data/` 子树，`versions/`、active 指针、信任和控制记录由核心管理。`dataSchemaVersion` 为正整数，旧 manifest 缺省为 1；`backupPaths` 只能是该 owner 的 `plugins/<slug>/data` 或其后代，不接受核心路径、其他 owner、代码/指针、链接/reparse、路径穿越及重复大小写路径。它只声明数据位置，不授予执行或 Vault 权限。卸载保留数据时先在核心控制的 `plugins/.retained-data/<slug>.json` 原子记录数据 schema 和受限文件分类，再移除 active 指针；备份必须独立于代码安装状态发现这些数据，详见 [TASK-025 §8–9](taomni-modular-vault-services-plan.md)。
 - `legacyTables`（v1.3 起写入 §8.2，v1.5 补进示例）：声明旧版留在 `taomni.db` 的表，核心经只读 RPC `legacy.read` 供迁移；`vaultFixedKeys`：插件作用域的 Vault 固定条目（S12，如 `mfa.data-key-v1`）；`snapshot`：`rpc`（运行中的宿主经 `backup.snapshot` 产出一致快照）或 `file`（直接拷贝文件，S13）。
 - `permissions` 初始取值草案（核心维护，新增需评审）：`vault.ref`、`vault.session-secret`（连接时一次性明文）、`vault.fixed-key`（S12）、`session.read`、`network.egress`、`fs.dataDir`、`window.open`、`capture.screen`、`terminal.observe`、`terminal.control`、`chat.observe`、`chat.control`、`desktop.input`、`backup.snapshot`；后八项主要由 `plugin-mobile`、`plugin-mfa`、截图相关插件使用（S6、S14）。
 - `status` 取 `stable / provisional`；为 `provisional` 并附 `removalCandidate`（§4.1）。

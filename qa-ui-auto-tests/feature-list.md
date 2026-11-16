@@ -7,6 +7,7 @@ area: modules/core-startup
 components: [PluginRegistry, MigrationJournal]
 files:
   - src/lib/pluginRegistry.ts
+  - src/lib/pluginDataContract.ts
   - src/lib/pluginLoader.ts
   - src/lib/moduleStore.ts
   - src/stores/moduleStore.ts
@@ -15,6 +16,9 @@ files:
   - src-tauri/src/plugin/mod.rs
   - src-tauri/src/plugin/host.rs
   - src-tauri/src/plugin/install.rs
+  - src-tauri/src/plugin/data_contract.rs
+  - src-tauri/src/plugin/retained_data.rs
+  - src-tauri/src/plugin/uninstallation.rs
   - src-tauri/src/plugin/migration.rs
 controls:
   - id: removed-lanchat-context-entry
@@ -86,9 +90,12 @@ controls:
   - id: module-delete-data-hello-plugin
     selector: '[data-testid="module-delete-data-hello-plugin"]'
     kind: interactive
+  - id: module-data-retained-hello-plugin
+    selector: '[data-testid="module-data-retained-hello-plugin"]'
+    kind: display
 -->
 
-模块化运行时的可选插件扫描、manifest 校验、前端 chunk 加载、宿主监督、版本目录安装状态机和单体升级 journal 已建立基础契约；LanChat 已从产品、迁移和备份范围删除，模块商店设置入口已接入 native registry 的明确状态和旧版本升级预检状态，下载服务和具体插件迁移仍按设计文档 M0–M3 逐批交付。核心启动、删除、模块商店与升级预检回归见 `TC-MODULES-001`–`TC-MODULES-005`；`TC-MODULES-006` 保留 browser/native 未可信离线包拒绝，`TC-MODULES-007` 用生产固定公钥和 GitHub 官方签名 artifact 验证真实安装、宿主调用、启禁、重开、重启重验、篡改拒绝与卸载；`TC-MODULES-008` 验证核心便签跨 renderer reload 与 registry 同时可用，`TC-MODULES-009` 验证 native 正常退出重启后便签和 registry 恢复，并只读真实 profile metadata，断言正常重启保留同一 generation。新用例未执行前不代表成功证据。
+模块化运行时的可选插件扫描、manifest 校验、前端 chunk 加载、宿主监督、版本目录安装状态机和单体升级 journal 已建立基础契约；LanChat 已从产品、迁移和备份范围删除，模块商店设置入口已接入 native registry 的明确状态和旧版本升级预检状态，下载服务和具体插件迁移仍按设计文档 M0–M3 逐批交付。核心启动、删除、模块商店与升级预检回归见 `TC-MODULES-001`–`TC-MODULES-005`；`TC-MODULES-006` 保留 browser/native 未可信离线包拒绝，`TC-MODULES-007` 用生产固定公钥和 GitHub 官方签名 artifact 验证真实安装、宿主调用、启禁、重开、重启重验、篡改拒绝与卸载；`TC-MODULES-008` 验证核心便签跨 renderer reload 与 registry 同时可用，`TC-MODULES-009` 验证 native 正常退出重启后便签和 registry 恢复，并只读真实 profile metadata，断言正常重启保留同一 generation。`TC-MODULES-010` 覆盖默认卸载取消/确认、原始数据和定位记录跨正常重启保留、可信重装不改数据、显式删除及重开设置后的真实状态；定位记录不授予执行/密钥权限，备份路径只能位于自身 data 子树。新用例未执行前不代表成功证据。
 
 > 本文档基于当前仓库代码、稳定 `data-testid` 目录和自动化用例维护，**仅记录已实现并接入主流程的功能**。架构与现状索引见 `DESIGN.md`、`IMPLEMENTATION_PLAN.md`。
 > 标记说明：

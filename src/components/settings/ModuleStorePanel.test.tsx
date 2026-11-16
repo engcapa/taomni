@@ -162,14 +162,17 @@ describe("ModuleStorePanel", () => {
     const view = render(<ModuleStorePanel catalog={[entry]} onUninstall={onUninstall} />);
 
     await user.click(screen.getByTestId("module-action-uninstall-database-tools"));
-    expect(confirm).toHaveBeenCalledOnce();
+    expect(screen.getByTestId("confirm-dialog")).toHaveTextContent("Database Tools");
+    expect(confirm).not.toHaveBeenCalled();
+    await user.click(screen.getByTestId("confirm-dialog-cancel"));
     expect(onUninstall).not.toHaveBeenCalled();
     expect(useModuleStore.getState().records[entry.slug].lifecycle).toBe("enabled");
 
-    confirm.mockReturnValue(true);
     await user.click(screen.getByTestId("module-action-uninstall-database-tools"));
+    await user.click(screen.getByTestId("confirm-dialog-confirm"));
     await waitFor(() => expect(onUninstall).toHaveBeenCalledWith(entry, false));
     expect(useModuleStore.getState().records[entry.slug]).toMatchObject({ lifecycle: "uninstalled", dataRetained: true });
+    expect(screen.getByTestId("module-data-retained-database-tools")).toBeVisible();
 
     view.unmount();
     useModuleStore.getState().hydrate([record({ lifecycle: "enabled" })]);
@@ -180,7 +183,8 @@ describe("ModuleStorePanel", () => {
     await user.click(screen.getByTestId("module-action-uninstall-database-tools"));
     await waitFor(() => expect(secondUninstall).toHaveBeenCalledWith(entry, true));
     expect(useModuleStore.getState().records[entry.slug].dataRetained).toBe(false);
-    expect(confirm).toHaveBeenCalledTimes(2);
+    expect(screen.queryByTestId("module-data-retained-database-tools")).not.toBeInTheDocument();
+    expect(confirm).not.toHaveBeenCalled();
   });
 
   it("rolls back to the previous version and restores a usable lifecycle", async () => {

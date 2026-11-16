@@ -123,6 +123,12 @@ Wayland `TC-FILE-OPEN-008` 在已有 AI 路径 chip 点击处失败：失败截�
 
 ### 当前待办（按依赖顺序）
 
+最新契约 #43815221797（源码 `c5c42bbb2`）已 **23/23 jobs 成功**；已下载 Linux receipt，21 个要求的过滤器均非空且 exit=0，包含 Vault 数据访问 4 项、当前核心成对快照 5 项和 plugin 121 项（其中 3 个真实网络项仍由专用 hosted gate 执行）。UI #43815220663 的六个 browser shard 已即时下载，三端各 **50/50**；native 尚在构建，不能外推通过。
+
+当前开发批次开始接入 TASK-025-F 的 retained locator：数据路径强制锚定 `plugins/<slug>/data/`，`dataSchemaVersion` 缺省为 1；卸载在本地宿主停稳后取得跨进程 PluginDataLease，再原子记录数据文件分类，最后移除 active 指针。记录不包含代码、命令、权限或 key grant；MFA 的 Vault 依赖由核心 owner policy 推导。拒绝链接/reparse、硬链接、跨 owner/核心/版本路径及重复大小写路径；记录失败或锁占用不删除数据、不清 activation。显式删除成功后清 locator；设置页改为显示原生 registry 的实际 `dataRetained`，不再对全部模块写死 true。新增 TC-MODULES-010 和增强 browser/native TC-MODULES-006，待匹配源码 runner 验证。此批尚未接入插件 backup engine、v2 档案、运行中 prepare/snapshot/release 或三态还原，TASK-025-F/G 不标完成。
+
+默认卸载确认改用既有应用内 ConfirmDialog；原 `window.confirm` 在 macOS WKWebView 被忽略，不能完成默认保留数据卸载。TC-MODULES-010 的 53 步通过实际取消/确认按钮继续流程，不使用脚本预答或替换 registry 状态。本地最终 Rust 编译通过，plugin 纯单元 **126 passed / 3 ignored**（真实网络仍交 hosted 专项），包含新增 8 项数据边界/定位/卸载回归；前端五文件 **57/57**，测试工具 **12/12**。这些单元不替代实际三端重启与文件行为，native 用例待 hosted 验证。
+
 1. **收敛当前相关失败并取得新源码证据**：TC-MODULES-007 在 #43804951477 的四种 native profile 已全部通过；Windows TC-MODULES-009 的 Notes drawer 遮挡修复已提交 `ea9c5636f`，待重跑。本批 Vault/MFA 接线、013/014 新用例和增强 102 同跑多端 browser/native 与完整 crash-regression，逐 shard 收取并修复相关失败。两个有 main 对比依据的 Wayland FILE-OPEN 失败单列忽略，不计通过。
 2. **闭合 Vault、profile 与一致快照（TASK-024/025）**：统一 coordinator、普通 Vault 消费者和 typed MFA facade 已接通，契约通过，native UI 待齐；当前核心成对快照已提交 `cf0fb2033`，等待匹配源码 runner。再补运行中、禁用、卸载留数据三态的跨库一致备份/正常重启还原与真实解密，以及多实例占用、取消和崩溃恢复。完成可信 core 操作生命周期修复的验证，随后处理真实宿主的长期 ledger/counter，保留防重放保护。
 3. **迁出真实业务（TASK-005-B、013/014、016–022）**：先完成真实 MFA 原型与相关 G 门，再依赖序推进 RDP/VNC 客户端与服务端、Servers、SocksCap、OCR/录制、本地语音的宿主、前端、状态与迁移。Mobile 按 DEC-2 留下明确 go/no-go 结论和公开例外，不能默认为交付；LanChat 任务已取消，不新增替代插件。

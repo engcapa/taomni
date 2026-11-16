@@ -259,9 +259,8 @@ impl VerifiedPackage {
                 return Err(invalid("module entry is absent from the signed file tree"));
             }
         }
-        for entry in &manifest.backup_paths {
-            archive::validate_path(entry)?;
-        }
+        crate::plugin::data_contract::validate_manifest(&manifest)
+            .map_err(|error| invalid(&error.to_string()))?;
         Ok(Self {
             directory,
             archive: snapshot,

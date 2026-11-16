@@ -42,7 +42,7 @@ pub(crate) fn manifest() -> ModuleManifest {
         "platforms":["linux-x86_64", "windows-x86_64", "darwin-x86_64", "darwin-aarch64"],
         "entry":{"host":"host", "frontend":"frontend/index.js", "protocol":1},
         "tabs":[], "commands":["ping"], "permissions":[], "dataDir":"plugins/mfa",
-        "backupPaths":["data.db"], "legacyTables":[], "vaultFixedKeys":[], "snapshot":"file"
+        "backupPaths":["plugins/mfa/data/data.db"], "legacyTables":[], "vaultFixedKeys":[], "snapshot":"file"
     }))
     .unwrap()
 }

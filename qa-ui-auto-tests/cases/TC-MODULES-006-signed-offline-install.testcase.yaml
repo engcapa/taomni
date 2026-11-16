@@ -84,6 +84,9 @@ steps:
     contains: 'untrusted module bytes: no signed archive'
 - assert_no_runtime_errors: null
 - screenshot: untrusted-module-rejected.png
+- assert_count:
+    selector: '[data-testid="module-action-uninstall-hello-plugin"], [data-testid="module-delete-data-hello-plugin"], [data-testid="module-data-retained-hello-plugin"]'
+    equal: 0
 verification:
   review: reviewed
   requirements:
@@ -121,6 +124,13 @@ verification:
     - step: 31
       expectation: A repeated installation reports its failure after reopening Settings.
     results: [19, 24, 25, 26, 27, 31]
+  - id: R3
+    requirement: Untrusted input cannot create module data-management controls or a retained-data status.
+    actions: [13, 29]
+    checkpoints:
+    - step: 36
+      expectation: Browser and native Settings expose neither uninstall/delete controls nor a retained-data label for the rejected hello module.
+    results: [36]
   native:
   - check: The archive path reaches native disk access and signature verification without changing installed modules.
     method: automated

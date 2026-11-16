@@ -15,7 +15,7 @@ const manifest = (overrides: Record<string, unknown> = {}) => ({
   commands: ["connect", "disconnect"],
   permissions: ["session.read", "network.egress"],
   dataDir: "plugins/rdp-client",
-  backupPaths: ["plugins/rdp-client/data.db"],
+  backupPaths: ["plugins/rdp-client/data/data.db"],
   legacyTables: ["rdp_certificate_pins"],
   vaultFixedKeys: [],
   snapshot: "rpc",
@@ -41,6 +41,21 @@ describe("plugin manifest validation", () => {
       expect.stringContaining("platform"),
       expect.stringContaining("permissions"),
     ]));
+  });
+
+  it("confines data paths to their owner and preserves the default schema for older manifests", () => {
+    expect(validatePluginManifest(manifest()).manifest?.dataSchemaVersion).toBe(1);
+    expect(validatePluginManifest(manifest({ dataSchemaVersion: 7 })).manifest?.dataSchemaVersion).toBe(7);
+    for (const path of ["vault.db", "plugins/other/data/mfa.db", "plugins/rdp-client/active.json",
+      "plugins/rdp-client/data/../active.json", "plugins/rdp-client/data/CON.db",
+      "plugins/rdp-client/data/a:stream", "plugins/rdp-client/data/a?b", "plugins/rdp-client/data/trailing."]) {
+      expect(validatePluginManifest(manifest({ backupPaths: [path] })).ok, path).toBe(false);
+    }
+    expect(validatePluginManifest(manifest({ dataDir: "plugins/other" })).ok).toBe(false);
+    expect(validatePluginManifest(manifest({ backupPaths: ["plugins/rdp-client/data/A.db", "plugins/rdp-client/data/a.db"] })).ok).toBe(false);
+    for (const dataSchemaVersion of [0, -1, 1.5, 0x100000000, "1", null]) {
+      expect(validatePluginManifest(manifest({ dataSchemaVersion })).ok).toBe(false);
+    }
   });
 });
 
