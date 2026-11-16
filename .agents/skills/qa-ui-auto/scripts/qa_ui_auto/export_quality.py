@@ -8,6 +8,18 @@ import zipfile
 from .steps import StepError
 
 
+def raster_grid_pixels(image):
+    # The fixture's original bitmap has red/blue grid lines. Diagram outlines
+    # and a nonblank page alone cannot prove that this separate image survived.
+    width = min(800, image.width)
+    sample = image.resize((width, max(1, round(image.height * width / image.width))))
+    red = blue = 0
+    for r, g, b in sample.getdata():
+        red += r > g + 50 and r > b + 70 and g < 160
+        blue += b > r + 60 and b > g + 30 and g < 160
+    return {"red": red, "blue": blue}
+
+
 def inspect_quality(path, kind):
     data = Path(path).read_bytes()
     if kind == "pdf":
@@ -28,7 +40,9 @@ def inspect_quality(path, kind):
             dpi = min(image.width / (width / 72), image.height / (height / 72))
             if dpi < 299 or max(ImageStat.Stat(image).stddev) < 3:
                 raise StepError("PDF page is blank or below 300 DPI")
-            pages.append(dict(width=image.width, height=image.height, dpi=dpi))
+            pages.append(dict(width=image.width, height=image.height, dpi=dpi, rasterGridPixels=raster_grid_pixels(image)))
+        if any(sum(page["rasterGridPixels"][color] for page in pages) < 250 for color in ("red", "blue")):
+            raise StepError("PDF lost the original raster grid pixels")
         return dict(pages=pages, pageCount=len(pages), printerIndependentArtifact=True)
     if kind != "docx":
         raise StepError("Expected PDF or DOCX quality artifact")

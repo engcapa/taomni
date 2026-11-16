@@ -1,7 +1,7 @@
 id: TC-FILE-OPEN-015
 title: Native printer-independent PDF and high-fidelity Word through real save dialogs
 description: Packaged platform WebView rendering, actual OS save chooser and retained PDF/DOCX bytes. No printer or print
-  dialog is invoked. Complete multi-page A4 PDF and sharp portable Word SVG/fallback images are independently parsed; cancelling
+  dialog is invoked. Complete multi-page A4 PDF, original red/blue raster pixels and sharp portable Word SVG/fallback images are independently parsed; cancelling
   PDF chooser preserves source. Actual Microsoft Word typography still needs client visual review.
 modes:
 - native
@@ -160,8 +160,8 @@ verification:
       expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
         original source bytes remain exact.
     - step: 28
-      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
-        original source bytes remain exact.
+      expectation: Independently decoded 300DPI A4 pages retain the original bitmap's red and blue grid pixels;
+        nonblank diagrams alone cannot satisfy the image check.
     - step: 34
       expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
         original source bytes remain exact.

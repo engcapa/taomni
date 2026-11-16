@@ -1,5 +1,6 @@
 import { markdownExportCss, type MarkdownExportSettings } from "./exportModel";
 import { paginatePdf, pdfFragments, pdfPageLayout } from "./pdfPages";
+import { paintPdfImages, preparePdfImages } from "./pdfImages";
 
 /** Printer-independent, offline PDF. Each page is rendered at 300 DPI with the
  * same browser typography/math/diagrams as HTML. No OS print API is invoked.
@@ -22,6 +23,7 @@ export async function markdownPdf(source: HTMLElement, title: string, settings: 
   try {
     await Promise.all(Array.from(root.querySelectorAll("img")).map((image) => image.decode()));
     await document.fonts?.ready;
+    const images = preparePdfImages(root);
     const height = root.getBoundingClientRect().height;
     const pages = paginatePdf(Math.max(1, height), layout.contentHeight, pdfFragments(root));
     const pdf = new jsPDF({ orientation: settings.orientation, unit: "mm", format: [layout.width, layout.height], compress: true });
@@ -40,6 +42,7 @@ export async function markdownPdf(source: HTMLElement, title: string, settings: 
       footer.textContent = `${index + 1} / ${pages.length}`;
       const canvas = await capture.toCanvas(page, { pixelRatio: 300 / 96, fontEmbedCSS,
         width: layout.pixelWidth, height: layout.pixelHeight, backgroundColor: background });
+      paintPdfImages(images, canvas, page, viewport);
       pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, layout.width, layout.height, undefined, "FAST");
       canvas.width = 0; canvas.height = 0;
     }

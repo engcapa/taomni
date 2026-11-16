@@ -6,12 +6,24 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
-from qa_ui_auto.export_quality import native
+from qa_ui_auto.export_quality import native, raster_grid_pixels
 from qa_ui_auto.native_steps import NativeStepContext
 from qa_ui_auto.steps import StepError
 
 
 class NativeExportQualityTest(unittest.TestCase):
+    def test_blank_or_monochrome_diagrams_cannot_stand_in_for_original_image(self):
+        from PIL import Image, ImageDraw
+        page = Image.new("RGB", (1600, 2200), "white")
+        draw = ImageDraw.Draw(page)
+        draw.rectangle((80, 80, 1400, 600), outline="black", width=12)
+        self.assertEqual(raster_grid_pixels(page), {"red": 0, "blue": 0})
+        draw.rectangle((100, 800, 800, 820), fill="red")
+        draw.rectangle((100, 900, 800, 920), fill="blue")
+        counts = raster_grid_pixels(page)
+        self.assertGreater(counts["red"], 250)
+        self.assertGreater(counts["blue"], 250)
+
     def test_inspects_and_records_from_actual_native_context(self):
         with tempfile.TemporaryDirectory() as directory:
             case = Path(directory) / "TC-EXPORT"
