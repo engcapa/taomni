@@ -127,6 +127,44 @@ describe("chat feed following", () => {
     expect(frames.size).toBe(0);
   });
 
+  it("keeps following when native Markdown reflow moves the scroll anchor backwards", () => {
+    render(<Harness />);
+    const feed = screen.getByTestId("feed");
+    const grow = dimensions(feed);
+    grow(814);
+    flush();
+    expect(feed.scrollTop).toBe(414);
+    // WebKit replaced the streamed paragraph with a table/code block. Content
+    // grew, but its native scroll anchor moved backwards before our next frame.
+    grow(844);
+    feed.scrollTop = 391;
+    mutations[0].notify();
+    fireEvent.scroll(feed);
+    flush();
+    expect(feed.scrollTop).toBe(444);
+  });
+
+  it.each(["wheel", "keyboard", "touch", "scrollbar"])("respects %s reading input during a pending layout frame", (input) => {
+    render(<Harness />);
+    const feed = screen.getByTestId("feed");
+    const grow = dimensions(feed);
+    flush();
+    grow(1400);
+    mutations[0].notify();
+    if (input === "wheel") fireEvent.wheel(feed, { deltaY: -200 });
+    if (input === "keyboard") fireEvent.keyDown(feed, { key: "PageUp" });
+    if (input === "touch") {
+      fireEvent.touchStart(feed, { touches: [{ clientY: 100 }] });
+      fireEvent.touchMove(feed, { touches: [{ clientY: 200 }] });
+    }
+    if (input === "scrollbar") fireEvent.pointerDown(feed);
+    feed.scrollTop = 80;
+    fireEvent.scroll(feed);
+    flush();
+    expect(feed.scrollTop).toBe(80);
+    fireEvent.pointerUp(window);
+  });
+
   it("follows a newly sent question after reading earlier replies, including delayed diagram rendering", () => {
     const view = render(<Harness />);
     const feed = screen.getByTestId("feed");

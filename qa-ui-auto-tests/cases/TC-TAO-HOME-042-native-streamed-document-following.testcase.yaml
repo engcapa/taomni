@@ -1,7 +1,8 @@
 id: TC-TAO-HOME-042
 title: Native streamed Markdown follows the reply tail and resumes after reading earlier content
-description: Actual native Go SSE delivers a long document in delayed chunks. Check the final paragraph stays above
-  the composer, read an earlier heading, and send another long question to re-enable following without a manual scroll.
+description: Actual native Go SSE delivers a long document in delayed chunks. Its final table/code replacement can
+  move WebKit's scroll anchor backwards while the content grows. Check the feed still reaches the bottom and the
+  final paragraph stays above the composer, read an earlier heading, then send again to re-enable following.
 modes: [native]
 covers: [F1.11]
 tags: [p0, tao-home, native, regression]
@@ -69,7 +70,7 @@ verification:
   review: reviewed
   requirements:
   - id: STREAM-FOLLOWING
-    requirement: Delayed Markdown layout and scroll events keep the final result visible, and a new send resumes following.
+    requirement: Delayed Markdown layout, backwards native anchoring and scroll events keep the final result visible, and a new send resumes following.
     actions: [1, 2, 3, 4, 5, 6, 7, 13, 15, 16]
     checkpoints:
     - {step: 10, expectation: The native document ends within two pixels of the feed bottom and the final paragraph clears the composer.}
