@@ -109,6 +109,7 @@ from . import module_preview
 from . import module_download
 from . import module_download_preview
 from . import module_marketplace, module_marketplace_preview
+from . import module_execution
 
 
 class FixtureContext(Protocol):
@@ -134,6 +135,7 @@ REGISTRY: dict[str, Fixture] = {
     "module_offline_archive": Fixture("module_offline_archive", module_offline_archive.setup),
     "module_backup_data": Fixture("module_backup_data", module_backup_data.setup, module_backup_data.teardown),
     "module_signed_archive": Fixture("module_signed_archive", module_signed_archive.setup),
+    "module_execution": Fixture("module_execution", module_execution.setup, module_execution.teardown),
     "mobile_web": Fixture("mobile_web", mobile_web.setup, mobile_web.teardown),
     "mobile_openssh": Fixture("mobile_openssh", mobile_openssh.setup, mobile_openssh.teardown),
     "mobile_service": Fixture("mobile_service", mobile_service.setup, mobile_service.teardown),

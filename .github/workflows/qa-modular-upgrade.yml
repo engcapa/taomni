@@ -197,6 +197,9 @@ jobs:
               "--locked", "--", "--ignored", "--test-threads=1", "--nocapture",
           ], check=True)
           PY
+      - name: Exercise actual Linux noexec mounts and executable alternatives
+        if: runner.os == 'Linux'
+        run: python scripts/run-module-execution-gates.py --evidence modular-evidence
       - name: Record actual hosted process scenario selections
         run: |
           python - <<'PY' > modular-evidence/service-selection.txt
@@ -425,6 +428,8 @@ jobs:
           pnpm exec vitest run
           src/lib/pluginRegistry.test.ts
           src/lib/pluginLoader.test.ts
+          src/lib/pluginFrontendHost.test.ts
+          src/lib/helloPluginFrontend.test.tsx
           src/lib/ipc/plugin.test.ts
           src/stores/moduleNetworkStore.test.ts
           src/stores/moduleDownloadStore.test.ts
@@ -434,6 +439,9 @@ jobs:
           src/components/settings/ModuleDownloads.test.tsx
           src/components/settings/AppProxyPanel.test.tsx
           src/layouts/main/useMainUtilityTabs.test.tsx
+          src/components/tao/home/DockRow.test.tsx
+          src/components/welcome/__tests__/HomeModeWelcomePanel.test.tsx
+          src/components/welcome/__tests__/WelcomePanel.background.test.tsx
           src/stubs/moduleDownloadPreview.test.ts
           src/stubs/moduleMarketplacePreview.test.ts
           src/lib/nativeAppMenu.test.ts

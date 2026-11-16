@@ -277,6 +277,10 @@ controls:
   - id: hello-plugin-empty
     selector: '[data-testid="hello-plugin-empty"]'
     kind: display
+  - id: hello-plugin-error
+    selector: '[data-testid="hello-plugin-error"]'
+    kind: display
+    optional: true # shown only when an actual module request fails
   - id: hello-plugin-entry
     selector: '[data-testid="hello-plugin-entry"]'
     kind: display
@@ -829,6 +833,8 @@ components: [WelcomePanel]
 files:
   - src/components/WelcomePanel.tsx
   - src/components/welcome/LaunchCards.tsx
+  - src/components/welcome/BrowseModulesButton.tsx
+  - src/components/tao/home/DockRow.tsx
 controls:
   - id: panel-root
     selector: '[data-testid="welcome-panel"]'

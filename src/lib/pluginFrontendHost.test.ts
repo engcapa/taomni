@@ -57,4 +57,17 @@ describe("shared module host and activation-scoped requests", () => {
     api.dispose();
     expect(mocks.cancel).toHaveBeenCalledTimes(1);
   });
+
+  it("retains structured native RPC codes and readable recovery advice, then permits a fresh request", async () => {
+    const rejection = { code: -32004, message: "MODULE_HOST_NOEXEC: choose an executable XDG_DATA_HOME", data: { retryable: true } };
+    mocks.invoke.mockRejectedValueOnce(rejection).mockResolvedValueOnce({ values: ["preserved"] });
+    const api = createPluginFrontendApi("hello-plugin", () => true);
+    const result = api.invoke("hello/read");
+    await expect(result).rejects.toMatchObject({ code: -32004, message: rejection.message, data: rejection.data, cause: rejection });
+    await expect(result.catch((error) => error.cause)).resolves.toBe(rejection);
+    await expect(result.catch(String)).resolves.toContain("MODULE_HOST_NOEXEC");
+    await expect(api.invoke("hello/read")).resolves.toEqual({ values: ["preserved"] });
+    api.dispose();
+    expect(mocks.cancel).not.toHaveBeenCalled();
+  });
 });

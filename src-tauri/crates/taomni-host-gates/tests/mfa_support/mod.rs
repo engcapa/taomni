@@ -86,6 +86,14 @@ pub struct Harness {
 }
 impl Harness {
     pub fn new() -> Self {
+        let path = PathBuf::from(
+            std::env::var_os("TAOMNI_MFA_PLUGIN_BIN")
+                .expect("GitHub gate requires the actual MFA executable"),
+        );
+        Self::with_executable(&path)
+    }
+
+    pub fn with_executable(path: &std::path::Path) -> Self {
         let dir = tempfile::tempdir().unwrap();
         let root = ProfileRoot::prepare(dir.path()).unwrap();
         std::fs::write(
@@ -105,7 +113,7 @@ impl Harness {
             VaultEpoch::new(1).unwrap(),
             false,
         );
-        let process = Self::start(&root, admission.clone(), backend.clone());
+        let process = Self::start_at(&root, admission.clone(), backend.clone(), path);
         Self {
             process,
             backend,
@@ -125,6 +133,15 @@ impl Harness {
             std::env::var_os("TAOMNI_MFA_PLUGIN_BIN")
                 .expect("GitHub gate requires the actual MFA executable"),
         );
+        Self::start_at(root, admission, backend, &path)
+    }
+
+    fn start_at(
+        root: &ProfileRoot,
+        admission: OperationAdmission,
+        backend: Arc<Backend>,
+        path: &std::path::Path,
+    ) -> HostProcess {
         assert!(path.is_absolute() && path.is_file());
         let dispatcher = Arc::new(
             CoreServiceDispatcher::new(admission, backend, DispatcherConfig::default()).unwrap(),
@@ -144,7 +161,7 @@ impl Harness {
             ),
             &config.plugin_id,
             &config.plugin_version,
-            &path,
+            path,
             path.parent().unwrap(),
             &config.commands.into_iter().collect::<Vec<_>>(),
             &config.permissions.into_iter().collect::<Vec<_>>(),

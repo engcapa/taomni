@@ -562,6 +562,8 @@ v1.2 的方案是：每个插件是 `crate-type = ["cdylib", "rlib"]` 的 Cargo 
 | G10 | RPC 契约、超时、取消和重复请求 | 握手版本不兼容、未声明命令、未授权权限、超时、宿主崩溃、重复 request id 均得到稳定错误码；取消后宿主和 loopback WS 不再持有该请求资源 |
 | G11 | 多进程 profile 协同与入口模式（v1.5） | 宿主与 `ProfileLease` / `ModeLease` 协同：备份还原前所有宿主静默并释放文件锁；`--headless` 与 GUI 共享 profile 时宿主不重复启动或有明确错误；迁出的 re-exec 入口（`--vnc-special-key-hook`、`--sockscap-redirector-bridge`）由宿主二进制承载且核心-only 二进制不再含其代码（S11、S13、S15） |
 
+G4 的 Linux 恢复策略：每次启动/监督重启前检查已验签宿主所在文件系统的实际 `ST_NOEXEC`。拒绝时返回 `MODULE_HOST_NOEXEC` 与协议 `PermissionDenied`，UI 展示具体路径及可执行数据目录建议；不启动进程、不修改已安装包/active 版本/业务数据，也不自动复制到临时目录或重挂载用户文件系统。用户可在正常退出并备份当前受支持的 profile 数据后，将这些数据复制到允许执行、归当前用户所有的文件系统，保留原应用标识目录结构，再以新的 `XDG_DATA_HOME` 启动；原 profile 保留以便恢复。已退出产品范围的 `lanchat.sqlite` / `lanchat.db` 必须留在原位置，工具不读取、不复制、不迁移、不删除这些历史库。核心的 deb/rpm/AppImage 启动器均遵循同一 Linux 数据目录规则，实际三种格式及完整 profile 搬迁仍须分别取得安装证据，不能用隔离 QA 二进制代替。`TC-MODULES-024` 只对 run-owned 的已验签 hello 版本施加/移除 noexec bind fault，验证可诊断拒绝、字节不变和恢复后原数据可读写；轻量 host gate 另外验证 hello 与真实 MFA 的相同字节在显式可执行替代目录可用，测试不自动把 G4 标为完成。
+
 **备选方案（DEC-1 选项 B）**：进程内 cdylib，但边界收窄为 `extern "C"` 的单入口 `taomni_plugin_call(json) -> json` + 事件回调，加 `libloading` 手写加载器、macOS 加 `disable-library-validation` 并确认签名身份一致、插件禁用 / 升级一律重启应用。它保留了低延迟与单进程，但保留了崩溃拖垮核心、无法热卸载的缺点，并要把 `Entitlements.plist` 放宽（安全面扩大）。v1.3 不推荐，仅在 G5 不通过时回到这里重议。
 
 **安全边界（必须写入实现和发布说明）**：宿主进程隔离的是原生崩溃、资源生命周期和特权 helper；插件前端 chunk 仍在主 WebView 内运行，和核心前端拥有同等 Tauri 调用能力。`permissions` 是核心对宿主 RPC 的 allowlist，不是前端沙箱，也不能阻止官方插件前端直接调用已暴露的核心命令。P1 因此只发布经过签名的官方插件；第三方插件、iframe / 独立 WebView 沙箱、细粒度前端 capability 均不在本版范围。实现任务必须增加“官方包签名 + chunk hash 与包 hash 绑定 + 不加载未注册 slug”的检查，避免把签名误解为运行时权限隔离。

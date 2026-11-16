@@ -30,6 +30,7 @@ impl HostProcess {
 
     fn spawn_and_handshake(&mut self, deadline: Instant) -> Result<(), HostProcessError> {
         self.discard_services();
+        super::execution::check(&self.launch.host)?;
         self.token = process_token();
         let mut command = Command::new(&self.launch.host);
         command

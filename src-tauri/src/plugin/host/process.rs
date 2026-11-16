@@ -17,6 +17,8 @@ use super::{
 
 #[path = "cancellation.rs"]
 mod cancellation;
+#[path = "execution.rs"]
+mod execution;
 #[path = "launch.rs"]
 mod launch;
 #[path = "profile.rs"]
@@ -43,6 +45,8 @@ use transport::Transport;
 pub enum HostProcessError {
     #[error("failed to spawn plugin host: {0}")]
     Spawn(#[source] io::Error),
+    #[error("MODULE_HOST_NOEXEC: plugin host {} is on a noexec filesystem. Close Taomni, copy its active data profile to an executable user-owned filesystem, and restart with XDG_DATA_HOME set to that data parent.", .0.display())]
+    NoExec(PathBuf),
     #[error("plugin host I/O failed: {0}")]
     Io(#[source] io::Error),
     #[error("plugin host frame failed: {0}")]
@@ -67,6 +71,7 @@ impl HostProcessError {
             Self::Rpc { code, .. } => *code,
             Self::Timeout => ErrorCode::RequestTimeout.as_i32(),
             Self::Cancelled => ErrorCode::RequestCancelled.as_i32(),
+            Self::NoExec(_) => ErrorCode::PermissionDenied.as_i32(),
             Self::Handshake(_) => ErrorCode::InvalidState.as_i32(),
             Self::Spawn(_) | Self::Io(_) | Self::Crashed => ErrorCode::PluginCrashed.as_i32(),
             Self::Frame(_) | Self::UnexpectedResponse => ErrorCode::InvalidRequest.as_i32(),

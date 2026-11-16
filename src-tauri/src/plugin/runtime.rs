@@ -169,7 +169,13 @@ impl PluginRegistry {
             host::HostSupervisorConfig::default(),
             services,
         )
-        .map_err(|error| PluginError::HostUnavailable(format!("{slug}: {error}")))?;
+        .map_err(|error| match error {
+            host::HostProcessError::NoExec(_) => PluginError::Rpc {
+                code: error.rpc_code(),
+                message: format!("{slug}: {error}"),
+            },
+            _ => PluginError::HostUnavailable(format!("{slug}: {error}")),
+        })?;
         let runtime = Arc::new(RuntimeHost {
             identity: RwLock::new(process.authorized_host().cloned()),
             cancellation: process.cancellation_handle(),

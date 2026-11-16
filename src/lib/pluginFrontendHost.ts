@@ -19,6 +19,27 @@ export interface PluginFrontendProps {
   api: PluginFrontendApi;
 }
 
+type NativeRpcError = { code: number; message: string; data?: unknown };
+
+function isNativeRpcError(error: unknown): error is NativeRpcError {
+  return !(error instanceof Error) && !(error instanceof DOMException) && !!error && typeof error === "object"
+    && "code" in error && typeof error.code === "number"
+    && "message" in error && typeof error.message === "string";
+}
+
+/** Tauri rejects structured RPC errors as plain objects; preserve their code and visible message. */
+export class PluginRequestError extends Error {
+  readonly code: number;
+  readonly data: unknown;
+
+  constructor(error: NativeRpcError) {
+    super(error.message, { cause: error });
+    this.name = "PluginRequestError";
+    this.code = error.code;
+    this.data = error.data;
+  }
+}
+
 /** Each mounted tab owns cancellation; callbacks from an old activation fail closed. */
 export function createPluginFrontendApi(slug: string, isCurrent: () => boolean): PluginFrontendApi {
   const requests = new Map<string, () => void>();
@@ -39,6 +60,11 @@ export function createPluginFrontendApi(slug: string, isCurrent: () => boolean):
         const result = await Promise.race([invokePlugin<T>(slug, command, payload, { requestId: id }), cancelled]);
         if (disposed || !isCurrent()) throw new DOMException("Module activation changed", "AbortError");
         return result;
+      } catch (error) {
+        if (isNativeRpcError(error)) {
+          throw new PluginRequestError(error);
+        }
+        throw error;
       } finally {
         requests.delete(id);
         signal?.removeEventListener("abort", abort);

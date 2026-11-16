@@ -2572,6 +2572,7 @@
 - `[data-testid="hello-plugin-save"]` — interactive — F-Modules-1.hello-plugin-save
 - `[data-testid="hello-plugin-values"]` — display — F-Modules-1.hello-plugin-values
 - `[data-testid="hello-plugin-empty"]` — display — F-Modules-1.hello-plugin-empty
+- `[data-testid="hello-plugin-error"]` — display [optional] — F-Modules-1.hello-plugin-error
 - `[data-testid="hello-plugin-entry"]` — display — F-Modules-1.hello-plugin-entry
 
 ## network/sockscap (F-Sockscap-1)
