@@ -2,6 +2,8 @@
 
 日期：2026-11-15。状态：**本轮已实现并验证一组 P0/P1 修复；其余任务按下方状态继续跟踪**。本文件汇总[实现核对报告](../tao-home-implementation-audit-2026-11-15.md)的发现与用户追加要求，作为后续排期、开发和验收入口。
 
+2026-11-16 完成度复核：**39 个原任务尚未全部按完整 AC 关闭**。早期未勾选状态与后续追加回执存在不同步，逐项实现/验收状态见[当前完成度复核](completion-audit-2026-11-16.md)。最新 macOS native 补跑 [43886401191](https://github.com/engcapa/taomni/actions/runs/43886401191) 已 **32/32** 通过，覆盖原缺失全部 21 项及完整 22 项 native crash，签名/产物/当前输入独立核对通过；旧 F12 评审元数据与其余设计/商业验收待办仍保留。
+
 2026-11-16 最新批次：`e57779493` 的 Windows browser/native **30/30 / 36/36**、Linux browser/native **30/30 / 33/33**、macOS browser/native **31/31 / 35/35** 均通过，零失败、零跳过，含各平台全部适用 crash-regression（browser **18/18**、native **22/22**）和 Windows 八次真实商业 DeepSeek 请求。完整 frontend **7011 passed / 1 条件跳过 / 0 failed**，120 项 native Rust 契约通过。最新身份、原始回执及边界见[当前源码验证批次](verification-2026-11-16.md#e57779493-当前源码的最终验证批次)；此前失败与修复过程保留在同文件较早章节。Word 16 已确认代表流程图与两条公式的实际排版、100%/200% 清晰。以下较早表格中的“native 待验证”以最新具名断言为准，完整 AC 未由局部通过自动关闭。
 
 基线：[主设计 v1.3](../tao-home-design.md)、[细化设计 v0.3](../tao-home-detailed-design.md)、[高保真原型 v0.3](../tao-home-prototype.html)；代码核查基线为 `6170f095ff3de7e555d43a183446437c29dca6e5`。源码位置是本次定位线索，实施前需复核最新代码。
@@ -437,3 +439,9 @@ Windows 保存对话框的全局模拟送键丢字已用原生控件逐字输入
 后续 `3fa9de750` 修复 ACP 交接的旧历史覆盖新回复竞态，`2d8d0ff5b` 修正原生步骤的只读持久化诊断。最终匹配输入的 Windows 本机与 Linux GitHub browser 均 **31/31**、native 均 **41/41** 通过；完整适用 crash 均通过，两平台已评审范围合并 status gate 为 0 gaps / 0 rejected。修复前失败批次继续保留。GitHub 主批次 [43858855264](https://github.com/engcapa/taomni/actions/runs/43858855264) 只选择 Linux/macOS；两次补跑仅选择 macOS。macOS browser 缺失分片在 [43864993650](https://github.com/engcapa/taomni/actions/runs/43864993650) 补跑 **23/23** 并通过签名/产物/输入核验，合并覆盖 **31/31** 及全部 browser crash。
 
 macOS native 当前 **20/41**，027/036/037 已执行通过，完整适用 native crash 为 **11/22**。剩余 21 项在 [43869363473](https://github.com/engcapa/taomni/actions/runs/43869363473) 单分片 native release 补跑中选择 32 项（含自动 crash）；producer 构建/上传成功，但执行 job 再次因 ARM runner 容量限制而未执行并被取消，workflow 最终 failure。**阻塞待办：补齐 21 项 macOS native 执行和完整原生 crash 验收**；具体 ID 见[当前验收范围与阻塞](verification-history-vault-2026-11-16.md#平台分工与当前验收阻塞)。三平台已评审范围 status gate 为 `ok=false`、20 个 macOS native 缺口、0 rejected；另保留旧 F12 的评审元数据及未执行待办。没有将构建成功或 runner 取消记作通过。
+
+## 12. 2026-11-16 完成度复核与 macOS 补跑收敛
+
+上节末尾为再次补跑前的历史状态。用户随后要求再次触发的 [43886401191](https://github.com/engcapa/taomni/actions/runs/43886401191) 已完成 **32/32 native**，0 failed / 0 skipped，包含原缺失全部 21 项和完整 22 项 crash。回执签名、687 个产物、selection/case/source/runner/config/build 身份均已独立核对。原定 macOS 41 项执行缺口已补齐，旧 F12 本次实际通过，评审元数据冲突仍待复核；没有重写先前 gate 或伪造新的三平台合并 gate。
+
+本批用户反馈的实现及具名回归已具备证据，但整个 follow-up 尚未完成。深研真实状态机/工作流执行、持久预算与费用确认、独立增量检索及本地记录打开、完整审计/安全中心、商业 Go native、真实语音/管理员条件能力及完整原型和 Markdown/Word 验收矩阵仍须推进。39 项逐项状态、源码依据与各文件的历史口径见[完成度复核](completion-audit-2026-11-16.md)。
