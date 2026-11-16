@@ -25,6 +25,9 @@ from native_build import QA_APP_ID
 from tauri_webdriver import WebDriverError, native_isolation_env
 
 LOCAL_STORAGE_KEYS = [
+    "taomni.preview.modules.v1",
+    "taomni.plugin-tabs.v1",
+    "taomni.plugin-registry-revision.v1",
     "qa.recovery.bootstrap",
     "taomni.qa.backup.v1",
     "taomni.backup.policy",

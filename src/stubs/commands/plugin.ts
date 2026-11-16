@@ -1,10 +1,12 @@
 /** Preview has no native signature verifier or installed plugin registry.
  * Mutations must reject explicitly; returning undefined would fake success. */
-export async function invokePlugin<T>(command: string): Promise<T> {
+import { invokeModulePreview } from "../modulePreview";
+
+export async function invokePlugin<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   switch (command) {
     case "plugin_list":
     case "plugin_refresh":
-      return [] as T;
+      return invokeModulePreview(command, args) as T;
     case "plugin_migration_inspect":
       return {
         from_version: "0.5.x", database_path: null, database_tables: [], candidates: [],
@@ -18,6 +20,6 @@ export async function invokePlugin<T>(command: string): Promise<T> {
     case "plugin_cancel_request":
       return false as T;
     default:
-      throw new Error(`Module operation requires the desktop app: ${command}`);
+      return invokeModulePreview(command, args) as T;
   }
 }

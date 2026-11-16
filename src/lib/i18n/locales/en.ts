@@ -4,11 +4,13 @@
 import { modelInspectorEn } from "./modelInspector";
 import { notesWorkspaceEn } from "./notesWorkspace";
 import { feishuSettingsEn, mobileSettingsEn } from "./mobileSettings";
+import { moduleFrontendEn } from "./moduleFrontend";
 type Dict = {
   [key: string]: string | Dict;
 };
 
 const dict = {
+  plugins: moduleFrontendEn,
   backupUnified: {
     "categories": "Backup categories",
     "mailCache": "Mail lists, settings and cache",

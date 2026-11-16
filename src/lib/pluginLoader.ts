@@ -2,6 +2,7 @@ import { lazy, type ComponentType, type LazyExoticComponent } from "react";
 import { convertFileSrc } from "@tauri-apps/api/core";
 import type { PluginManifest, PluginRegistry } from "./pluginRegistry";
 import { isTauriRuntime } from "./runtime";
+import type { PluginFrontendProps } from "./pluginFrontendHost";
 
 export class PluginLoadError extends Error {
   public constructor(message: string, public readonly slug: string, options?: ErrorOptions) {
@@ -11,8 +12,8 @@ export class PluginLoadError extends Error {
 }
 
 export interface PluginFrontendModule {
-  default?: ComponentType<Record<string, unknown>>;
-  component?: ComponentType<Record<string, unknown>>;
+  default?: ComponentType<PluginFrontendProps>;
+  component?: ComponentType<PluginFrontendProps>;
   [key: string]: unknown;
 }
 
@@ -38,13 +39,30 @@ export function pluginFrontendUrl(manifest: PluginManifest): string {
 
 const defaultImporter: PluginImporter = (url) => import(/* @vite-ignore */ url) as Promise<PluginFrontendModule>;
 
+function isComponentExport(value: unknown): value is ComponentType<PluginFrontendProps> {
+  if (typeof value === "function") return true;
+  if (!value || typeof value !== "object") return false;
+  const marker = (value as { $$typeof?: unknown }).$$typeof;
+  return marker === Symbol.for("react.memo") || marker === Symbol.for("react.forward_ref");
+}
+
 export async function loadPluginFrontend(
   manifest: PluginManifest,
   importer: PluginImporter = defaultImporter,
+  activation?: string,
 ): Promise<PluginFrontendModule> {
   try {
-    const module = await importer(pluginFrontendUrl(manifest));
-    if (!module || (typeof module.default !== "function" && typeof module.component !== "function")) {
+    let url = pluginFrontendUrl(manifest);
+    // Preview serves repository sources, with no claim of native package trust.
+    // Native builds only load the immutable, verified custom-protocol URL.
+    if (importer === defaultImporter && import.meta.env.DEV && !isTauriRuntime() && manifest.slug === "hello-plugin") {
+      url = "/src-tauri/plugins/hello-plugin/frontend/index.js";
+    }
+    // A fragment changes ESM identity for retry/reactivation without changing
+    // the signed resource path or allowing a query through the native protocol.
+    if (activation) url += `#${encodeURIComponent(activation)}`;
+    const module = await importer(url);
+    if (!module || !isComponentExport(module.default ?? module.component)) {
       throw new Error("frontend module has no component export");
     }
     return module;
@@ -58,7 +76,7 @@ export function createPluginLazyComponent(
   registry: PluginRegistry,
   slug: string,
   importer: PluginImporter = defaultImporter,
-): LazyExoticComponent<ComponentType<Record<string, unknown>>> {
+): LazyExoticComponent<ComponentType<PluginFrontendProps>> {
   return lazy(async () => {
     const record = registry.get(slug);
     if (!record?.manifest || record.lifecycle !== "enabled") {

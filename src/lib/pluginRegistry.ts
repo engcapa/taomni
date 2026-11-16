@@ -100,8 +100,8 @@ function isRecord(value: unknown): value is Record<string, unknown> {
 }
 
 function isSafeRelativePath(value: unknown): value is string {
-  return typeof value === "string" && value.length > 0 && !value.startsWith("/") && !value.includes("\\") &&
-    !value.split("/").includes("..") && !value.includes("\0");
+  return typeof value === "string" && value.length > 0
+    && value.split("/").every((part) => part && part !== "." && part !== ".." && !/[%\\:\x00-\x1f\x7f?#]/.test(part));
 }
 
 const MANIFEST_FIELDS = new Set([
@@ -145,10 +145,18 @@ export function validatePluginManifest(
   }
 
   const entry = input.entry;
-  if (!isRecord(entry) || (entry.frontend !== undefined && !isSafeRelativePath(entry.frontend)) || typeof entry.protocol !== "number" || !Number.isInteger(entry.protocol) || entry.protocol < 1) {
-    errors.push("entry must contain a safe frontend path (when present) and positive protocol number");
+  if (!isRecord(entry) || Object.keys(entry).some((key) => !["host", "frontend", "protocol"].includes(key))
+    || (entry.host === undefined && entry.frontend === undefined)
+    || (entry.host !== undefined && !isSafeRelativePath(entry.host))
+    || (entry.frontend !== undefined && (!isSafeRelativePath(entry.frontend) || !entry.frontend.startsWith("frontend/")))
+    || entry.protocol !== 1) {
+    errors.push("entry must contain a safe host or frontend path and protocol 1");
   }
-  if (!Array.isArray(input.tabs) || input.tabs.some((tab) => !isRecord(tab) || typeof tab.kind !== "string" || typeof tab.title !== "string")) {
+  if (!Array.isArray(input.tabs) || input.tabs.some((tab) => !isRecord(tab)
+    || Object.keys(tab).some((key) => !["kind", "title"].includes(key))
+    || typeof tab.kind !== "string" || !/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(tab.kind)
+    || typeof tab.title !== "string" || !tab.title.trim() || tab.title.length > 256)
+    || new Set(input.tabs.map((tab) => isRecord(tab) ? tab.kind : undefined)).size !== input.tabs.length) {
     errors.push("tabs must be an array of {kind,title}");
   }
   if (!asStringArray(input.commands)) errors.push("commands must be a string array");

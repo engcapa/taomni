@@ -80,6 +80,7 @@
           "x11_session_required",
           "bookmark_assets",
           "module_offline_archive",
+          "module_preview",
           "module_signed_archive",
           "module_backup_data",
           "vnc_required",

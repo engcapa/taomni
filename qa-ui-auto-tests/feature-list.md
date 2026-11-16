@@ -9,6 +9,12 @@ files:
   - src/lib/pluginRegistry.ts
   - src/lib/pluginDataContract.ts
   - src/lib/pluginLoader.ts
+  - src/lib/pluginFrontendHost.ts
+  - src/lib/pluginTabs.ts
+  - src/lib/pluginTabPersistence.ts
+  - src/stores/pluginFrontendStore.ts
+  - src/components/plugins/PluginTabPane.tsx
+  - src/components/plugins/ModuleTabActions.tsx
   - src/lib/moduleStore.ts
   - src/stores/moduleStore.ts
   - src/stores/moduleInstallStore.ts
@@ -93,9 +99,48 @@ controls:
   - id: module-data-retained-hello-plugin
     selector: '[data-testid="module-data-retained-hello-plugin"]'
     kind: display
+  - id: module-action-open-hello-plugin
+    selector: '[data-testid="module-action-open-hello-plugin-hello-plugin"]'
+    kind: interactive
+  - id: plugin-tab-panel
+    selector: '[data-testid="plugin-tab-panel"]'
+    kind: display
+  - id: plugin-tab-unavailable
+    selector: '[data-testid="plugin-tab-unavailable"]'
+    kind: display
+  - id: plugin-tab-error
+    selector: '[data-testid="plugin-tab-error"]'
+    kind: display
+  - id: plugin-tab-retry
+    selector: '[data-testid="plugin-tab-retry"]'
+    kind: interactive
+  - id: plugin-tab-settings
+    selector: '[data-testid="plugin-tab-settings"]'
+    kind: interactive
+  - id: plugin-tab-loading
+    selector: '[data-testid="plugin-tab-loading"]'
+    kind: display
+    optional: true # transient while the independent ESM is being fetched
+  - id: hello-plugin-view
+    selector: '[data-testid="hello-plugin-view"]'
+    kind: display
+  - id: hello-plugin-value
+    selector: '[data-testid="hello-plugin-value"]'
+    kind: interactive
+  - id: hello-plugin-save
+    selector: '[data-testid="hello-plugin-save"]'
+    kind: interactive
+  - id: hello-plugin-values
+    selector: '[data-testid="hello-plugin-values"]'
+    kind: display
+  - id: hello-plugin-entry
+    selector: '[data-testid="hello-plugin-entry"]'
+    kind: display
 -->
 
 模块化运行时的可选插件扫描、manifest 校验、前端 chunk 加载、宿主监督、版本目录安装状态机和单体升级 journal 已建立基础契约；LanChat 已从产品、迁移和备份范围删除，模块商店设置入口已接入 native registry 的明确状态和旧版本升级预检状态，下载服务和具体插件迁移仍按设计文档 M0–M3 逐批交付。核心启动、删除、模块商店与升级预检回归见 `TC-MODULES-001`–`TC-MODULES-005`；`TC-MODULES-006` 保留 browser/native 未可信离线包拒绝，`TC-MODULES-007` 用生产固定公钥和 GitHub 官方签名 artifact 验证真实安装、宿主调用、启禁、重开、重启重验、篡改拒绝与卸载，并用独立 OS 非阻塞锁检查真实宿主 writer lease 的持有/释放；core 退出后 profile lease 的归属由三端真实进程 gate 另行证明。`TC-MODULES-008` 验证核心便签跨 renderer reload 与 registry 同时可用，`TC-MODULES-009` 验证 native 正常退出重启后便签和 registry 恢复，并只读真实 profile metadata，断言正常重启保留同一 generation。`TC-MODULES-010` 覆盖默认卸载取消/确认、原始数据和定位记录跨正常重启保留、可信重装不改数据、显式删除及重开设置后的真实状态；定位记录不授予执行/密钥权限，备份路径只能位于自身 data 子树。`TC-MODULES-011` 通过真实禁用和卸载后的手工任务，独立核验 v2 模块归档、SQLite WAL、源数据不变及正常重启；它不代表运行中 snapshot 协议或三态原生还原通过。`TC-MODULES-012` 验证官方签名 SDK 宿主真实写入、持有 writer 锁时的两次运行中快照、释放后继续写入与正常重启后的数据；独立核验归档 SQLite/WAL、hash、generation 与源字节，仍不代表真实 MFA 迁出或 applied restore。新用例未执行前不代表成功证据。
+
+动态前端基础接入主窗和独立 WebView：共享 React SDK、owner-scoped IPC、仅 locator 的保存恢复、启禁撤销、缺失占位和重试。`TC-MODULES-016` 验证官方签名 ESM/相对资源、真实 host 写入、非活动草稿、reload、分离窗启禁同步和回挂；`TC-MODULES-017` 以明确 browser-only model 覆盖同类 renderer 流程，不代表验签或原生存储；`TC-MODULES-018` 独立篡改已安装前端，验证原生协议拒绝、错误隔离及恢复原字节后重试。它们尚待 matching runner，不将 MFA 产品入口迁出或 TASK-007 全部验收记为完成。
 
 > 本文档基于当前仓库代码、稳定 `data-testid` 目录和自动化用例维护，**仅记录已实现并接入主流程的功能**。架构与现状索引见 `DESIGN.md`、`IMPLEMENTATION_PLAN.md`。
 > 标记说明：
@@ -5048,6 +5093,9 @@ area: main/detach
 components: [DetachedSessionWindow, TerminalPanel, VncPanel, RdpPanel, MainLayout]
 files:
   - src/components/detached/DetachedSessionWindow.tsx
+  - src/components/plugins/PluginDetachedWindow.tsx
+  - src/components/plugins/PluginTabPanels.tsx
+  - src/lib/pluginTabWindow.ts
   - src/lib/detachWindowing.ts
   - src/lib/detachedSession.ts
 controls:
@@ -5081,6 +5129,19 @@ controls:
     selector: '[data-testid="detached-os-fullscreen"]'
     kind: interactive
     optional: true
+  - id: plugin-tab-detach
+    selector: '[data-testid="plugin-tab-detach"]'
+    kind: interactive
+  - id: plugin-detached-window
+    selector: '[data-testid="plugin-detached-window"]'
+    kind: display
+  - id: plugin-tab-reattach
+    selector: '[data-testid="plugin-tab-reattach"]'
+    kind: interactive
+  - id: plugin-tab-returned
+    selector: '[data-testid="plugin-tab-returned"]'
+    kind: display
+    optional: true # only visible if a returned window has not closed yet
 -->
 
 - 终端 / VNC / RDP 标签的浮动工具条均提供「分离到独立窗口」按钮（`terminal-detach` / `vnc-detach` / `rdp-detach`）
@@ -5088,6 +5149,7 @@ controls:
 - 终端分离保留后端 PTY/SSH 会话（`preserveSessionOnUnmountRef` + detach-pending 标志跳过 `closeTerminal`），新窗口通过 `consumeDetachedHandoff` adopt 既有连接而非重新拨号
 - 分离窗口由 `DetachedSessionWindow` 承载：镜像主窗口主题 / 字体副作用，提供 `detached-reattach`（把会话送回主窗口）与 `detached-os-fullscreen`
 - 终端面板另提供 `terminal-maximize`（在非分屏模式下最大化/还原当前终端 pane）
+- 模块窗口只传递清理后的 locator；原生 close-request 与返回按钮共用幂等回挂，回挂后立即卸载原模块，即使窗口关闭失败也不保留第二个可操作副本。browser reload 不触发回挂，preview 通过显式按钮返回；浏览器 OS 关闭自动回挂仍未覆盖。
 - **e2e 测试限制**：分离会 spawn 新窗口并销毁源标签，属破坏性操作，用例只在最后一步点击（参照 TC-043/TC-111）；reattach / detached-window 内部控件需真实分离窗口或 Tauri 环境，浏览器冒烟无法挂载，留待 native/手动回归
 
 ---

@@ -1,4 +1,4 @@
-import { Braces, Database as DatabaseIcon, Folder, GitBranch, KeyRound, Monitor, Network as NetworkIcon, Server, Terminal as TerminalIcon, X } from "lucide-react";
+import { Braces, Database as DatabaseIcon, Folder, GitBranch, KeyRound, Monitor, Network as NetworkIcon, Package, Server, Terminal as TerminalIcon, X } from "lucide-react";
 import { useEffect, useRef } from "react";
 import { useCustomDropTarget, type CustomDragData } from "../../../lib/customDnD";
 import type { Tab } from "../../../types";
@@ -66,6 +66,8 @@ export function TabIcon({ tab }: { tab: Tab; }) {
       return <KeyRound className="w-3 h-3" style={{ color: "#c98a00" }} />;
     case "servers":
       return <Server className="w-3 h-3" style={{ color: "#2b7de9" }} />;
+    case "plugin":
+      return <Package className="w-3 h-3" />;
     case "file-browser":
       return <ExplorerTabIcon />;
     case "file-viewer":

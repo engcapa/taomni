@@ -165,14 +165,19 @@ jobs:
           if os.environ['MODULE_PLATFORM'].startswith('windows'):
               expected['entry']['host'] += '.exe'
           actual = json.loads((root / 'unsigned-module/module.json').read_text(encoding='utf-8'))
+          assert not any(p.is_symlink() for p in root.rglob('*'))
           assert actual == expected, 'Candidate metadata differs from the trusted official contract'
           assert actual['id'] == 'taomni-plugin-' + module and actual['version'] == '0.1.0'
           allowed = {'module.json', expected['entry']['host']}
           frontend = expected['entry'].get('frontend')
           if frontend:
-              allowed.add(frontend)
-              trusted_frontend = (trusted_source / frontend).read_bytes()
-              assert (root / 'unsigned-module' / frontend).read_bytes() == trusted_frontend, 'Candidate changed official frontend without a trusted revision'
+              assert (trusted_source / frontend).is_file()
+              for source in (trusted_source / 'frontend').rglob('*'):
+                  assert not source.is_symlink()
+                  if source.is_file():
+                      relative = source.relative_to(trusted_source).as_posix()
+                      allowed.add(relative)
+                      assert (root / 'unsigned-module' / relative).read_bytes() == source.read_bytes(), 'Candidate changed official frontend without a trusted revision'
           files = {p.relative_to(root / 'unsigned-module').as_posix() for p in (root / 'unsigned-module').rglob('*') if p.is_file()}
           assert files == allowed, 'Unexpected files in official QA payload'
           assert not any(p.is_symlink() for p in root.rglob('*'))

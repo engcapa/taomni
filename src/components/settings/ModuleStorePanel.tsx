@@ -5,6 +5,7 @@ import type { LegacyInstallSnapshot, MigrationExecutionResult } from "../../lib/
 import { type ModuleRecord, type ModuleTransition } from "../../lib/moduleStore";
 import { useModuleStore } from "../../stores/moduleStore";
 import { ConfirmDialog } from "../sidebar/ConfirmDialog";
+import { ModuleTabActions } from "../plugins/ModuleTabActions";
 
 /**
  * The settings surface deliberately owns no catalog or native IPC concerns.
@@ -267,6 +268,7 @@ export function ModuleStorePanel({
                 </div>
                 {entry.permissions && entry.permissions.length > 0 && <div data-testid={`module-permissions-${entry.slug}`} className="mt-2 text-[11px] text-[var(--taomni-text-muted)]">{t("settings.moduleStorePermissions", { permissions: entry.permissions.join(", ") })}</div>}
                 <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <ModuleTabActions slug={entry.slug} disabled={isBusy} />
                   {!record || record.lifecycle === "uninstalled" ? (
                     <button type="button" data-testid={`module-action-install-${entry.slug}`} className="taomni-btn inline-flex h-7 items-center gap-1 px-2.5 text-[11px]" disabled={!compatible || isBusy} onClick={() => void install(entry)}>
                       {isBusy ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Download className="h-3.5 w-3.5" />} {t("settings.moduleStoreInstall")}

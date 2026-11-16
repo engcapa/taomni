@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::path::PathBuf;
-use tauri::State;
+use tauri::{AppHandle, Emitter, State};
 
 use crate::{
     plugin::{
@@ -22,6 +22,19 @@ fn legacy_version(value: Option<String>) -> String {
     value
         .filter(|version| !version.trim().is_empty())
         .unwrap_or_else(|| "0.5.x".to_owned())
+}
+
+fn publish_registry_change(app: &AppHandle, result: &Result<PluginRecord, String>) {
+    // Only invalidate renderer projections. Every WebView must re-read the
+    // registry, never accept an event payload as installation/activation proof.
+    let slug = result
+        .as_ref()
+        .ok()
+        .map(|record| record.manifest.slug.as_str());
+    let _ = app.emit(
+        "plugin-registry-changed",
+        serde_json::json!({ "slug": slug }),
+    );
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -70,15 +83,18 @@ pub async fn plugin_set_enabled(
     slug: String,
     enabled: bool,
     state: State<'_, AppState>,
+    app: AppHandle,
 ) -> Result<PluginRecord, String> {
     let registry = state.plugins.clone();
-    tauri::async_runtime::spawn_blocking(move || {
+    let result = tauri::async_runtime::spawn_blocking(move || {
         registry
             .set_enabled(&slug, enabled)
             .map_err(|error| error.to_string())
     })
     .await
-    .map_err(|error| error.to_string())?
+    .map_err(|error| error.to_string())?;
+    publish_registry_change(&app, &result);
+    result
 }
 
 /// Compatibility entry point: unsigned renderer directories are rejected.
@@ -88,11 +104,14 @@ pub fn plugin_install_staged(
     version: String,
     package_dir: String,
     state: State<'_, AppState>,
+    app: AppHandle,
 ) -> Result<PluginRecord, String> {
-    state
+    let result = state
         .plugins
         .install_staged(&slug, &version, &PathBuf::from(package_dir))
-        .map_err(|error| error.to_string())
+        .map_err(|error| error.to_string());
+    publish_registry_change(&app, &result);
+    result
 }
 
 /// Install a signed offline archive, or an artifact bound to the last verified
@@ -104,9 +123,10 @@ pub async fn plugin_install_archive(
     detached_signature: Option<String>,
     plugin_id: Option<String>,
     state: State<'_, AppState>,
+    app: AppHandle,
 ) -> Result<PluginRecord, String> {
     let registry = state.plugins.clone();
-    tauri::async_runtime::spawn_blocking(move || {
+    let result = tauri::async_runtime::spawn_blocking(move || {
         let path = PathBuf::from(archive_path);
         let package = match (plugin_id, detached_signature) {
             (Some(id), None) => {
@@ -130,20 +150,25 @@ pub async fn plugin_install_archive(
             .map_err(|error| error.to_string())
     })
     .await
-    .map_err(|error| error.to_string())?
+    .map_err(|error| error.to_string())?;
+    publish_registry_change(&app, &result);
+    result
 }
 
 #[tauri::command]
 pub async fn plugin_rollback(
     slug: String,
     state: State<'_, AppState>,
+    app: AppHandle,
 ) -> Result<PluginRecord, String> {
     let registry = state.plugins.clone();
-    tauri::async_runtime::spawn_blocking(move || {
+    let result = tauri::async_runtime::spawn_blocking(move || {
         registry.rollback(&slug).map_err(|error| error.to_string())
     })
     .await
-    .map_err(|error| error.to_string())?
+    .map_err(|error| error.to_string())?;
+    publish_registry_change(&app, &result);
+    result
 }
 
 #[tauri::command]
@@ -151,26 +176,37 @@ pub async fn plugin_uninstall(
     slug: String,
     delete_data: Option<bool>,
     state: State<'_, AppState>,
+    app: AppHandle,
 ) -> Result<PluginRecord, String> {
     let registry = state.plugins.clone();
-    tauri::async_runtime::spawn_blocking(move || {
+    let result = tauri::async_runtime::spawn_blocking(move || {
         registry
             .uninstall(&slug, delete_data.unwrap_or(false))
             .map_err(|error| error.to_string())
     })
     .await
-    .map_err(|error| error.to_string())?
+    .map_err(|error| error.to_string())?;
+    publish_registry_change(&app, &result);
+    result
 }
 
 #[tauri::command]
-pub async fn plugin_refresh(state: State<'_, AppState>) -> Result<Vec<PluginRecord>, String> {
+pub async fn plugin_refresh(
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<Vec<PluginRecord>, String> {
     let registry = state.plugins.clone();
-    tauri::async_runtime::spawn_blocking(move || {
+    let result = tauri::async_runtime::spawn_blocking(move || {
         registry.scan().map_err(|error| error.to_string())?;
         Ok(registry.list())
     })
     .await
-    .map_err(|error| error.to_string())?
+    .map_err(|error| error.to_string())?;
+    let _ = app.emit(
+        "plugin-registry-changed",
+        serde_json::json!({ "slug": null }),
+    );
+    result
 }
 
 #[tauri::command]

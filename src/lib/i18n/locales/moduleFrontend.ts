@@ -1,0 +1,33 @@
+export const moduleFrontendEn = {
+  open: "Open {title}",
+  loading: "Loading module…",
+  loadFailed: "This module could not be opened",
+  retry: "Retry",
+  missing: "This module is not installed",
+  disabled: "This module is disabled",
+  unavailable: "This module view is unavailable",
+  retained: "Your tab is retained. Install or enable the module in Settings to reopen it.",
+  settings: "Manage modules",
+  detach: "Open in a separate window",
+  reattach: "Return to main window",
+  returned: "This module tab has returned to the main window.",
+  closeWindow: "Close window",
+  detachedMissing: "The module window could not restore its tab.",
+};
+
+export const moduleFrontendZhCN: typeof moduleFrontendEn = {
+  open: "打开 {title}",
+  loading: "正在加载模块…",
+  loadFailed: "无法打开此模块",
+  retry: "重试",
+  missing: "此模块尚未安装",
+  disabled: "此模块已禁用",
+  unavailable: "此模块视图不可用",
+  retained: "标签页已保留。请在设置中安装或启用模块后重新打开。",
+  settings: "管理模块",
+  detach: "在独立窗口打开",
+  reattach: "返回主窗口",
+  returned: "此模块标签页已返回主窗口。",
+  closeWindow: "关闭窗口",
+  detachedMissing: "模块窗口无法恢复其标签页。",
+};

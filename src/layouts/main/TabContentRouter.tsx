@@ -31,6 +31,7 @@ import {
 } from "./panels";
 import { type TabContentRouterProps } from "./tabs/TabContentRouterProps";
 import { TerminalTabContents } from "./tabs/TerminalTabContents";
+import { PluginTabPanels } from "../../components/plugins/PluginTabPanels";
 
 export function TabContentRouter(viewProps: TabContentRouterProps) {
   const storeRecentWorkspaces = useAppStore((state) => state.recentWorkspaces);
@@ -137,6 +138,7 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
   } = viewProps;
   return (<div className="flex-1 min-h-0 overflow-hidden relative">
     <ViewerCloseDialog />
+    <PluginTabPanels tabs={tabs} activeTabId={activeTabId} onOpenSettings={openSettingsTab} />
     {tabs.filter((tab) => tab.type === "file-viewer" && tab.fileViewer).map((tab) => <div key={tab.id} className="absolute inset-0" style={{ display: activeTabId === tab.id ? "block" : "none" }}><ViewerShell viewer={tab.fileViewer!} active={activeTabId === tab.id} /></div>)}
     {/* Welcome stays mounted so filters, scroll, and shell
                     selections survive switching to another tab. */}
@@ -587,6 +589,7 @@ export function TabContentRouter(viewProps: TabContentRouterProps) {
       activeTab.type !== "sockscap" &&
       activeTab.type !== "mfa" &&
       activeTab.type !== "servers" &&
+      activeTab.type !== "plugin" &&
       activeTab.type !== "proxy-test" && (
         <UnavailablePanel title={activeTab.title} message={activeTab.message} />
       )}

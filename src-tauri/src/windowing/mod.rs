@@ -41,7 +41,7 @@ fn label_for(kind: &str, session_id: &str) -> String {
 
 fn validate_kind(kind: &str) -> Result<(), String> {
     match kind {
-        "sftp" | "rdp" | "vnc" | "terminal" | "database" | "notes" => Ok(()),
+        "sftp" | "rdp" | "vnc" | "terminal" | "database" | "notes" | "plugin" => Ok(()),
         other => Err(format!("unsupported detached window kind: {}", other)),
     }
 }

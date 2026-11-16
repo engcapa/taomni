@@ -123,7 +123,7 @@ interface DetachedChatTab {
 /* ── Component ───────────────────────────────────────────────────────── */
 
 interface DetachedSessionWindowProps {
-  kind: Exclude<DetachedKind, "sftp">;
+  kind: Exclude<DetachedKind, "sftp" | "plugin">;
   id: string;
 }
 
@@ -538,7 +538,7 @@ export default function DetachedSessionWindow({
 }
 
 function chatTabForDetached(
-  kind: Exclude<DetachedKind, "sftp">,
+  kind: Exclude<DetachedKind, "sftp" | "plugin">,
   id: string,
   params: unknown,
   title: string,
@@ -576,7 +576,7 @@ function chatTabForDetached(
 }
 
 function renderInner(
-  kind: Exclude<DetachedKind, "sftp">,
+  kind: Exclude<DetachedKind, "sftp" | "plugin">,
   id: string,
   params: unknown,
   detachedWindowControls: {

@@ -105,6 +105,7 @@ from . import dual_display_required
 from . import rdp_deferred_clipboard
 from . import module_offline_archive
 from . import module_signed_archive, module_backup_data
+from . import module_preview
 
 
 class FixtureContext(Protocol):
@@ -122,6 +123,7 @@ class Fixture:
 
 
 REGISTRY: dict[str, Fixture] = {
+    "module_preview": Fixture("module_preview", module_preview.setup),
     "module_offline_archive": Fixture("module_offline_archive", module_offline_archive.setup),
     "module_backup_data": Fixture("module_backup_data", module_backup_data.setup, module_backup_data.teardown),
     "module_signed_archive": Fixture("module_signed_archive", module_signed_archive.setup),

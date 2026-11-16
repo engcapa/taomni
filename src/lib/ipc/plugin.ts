@@ -1,5 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { PluginRecord } from "../pluginRegistry";
+import { signalPluginRegistryChanged } from "../pluginRegistryEvents";
 
 export interface PluginInvokeRequest<T = unknown> extends Record<string, unknown> {
   slug: string;
@@ -104,14 +105,32 @@ const SLUG = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;
 
 function normalizePluginRecord(value: unknown): PluginRecord {
   const record = value as PluginRecord & { state?: PluginRecord["lifecycle"] };
+  const entry = record.manifest?.entry;
+  // Native serde emits null for an absent Option<String>. Normalize only this
+  // wire representation; module.json validation still rejects explicit nulls.
+  let manifest = record.manifest;
+  if (manifest && entry && typeof entry === "object" && !Array.isArray(entry)) {
+    const { host, frontend, ...fields } = entry;
+    manifest = {
+      ...manifest,
+      entry: { ...fields, ...(host == null ? {} : { host }), ...(frontend == null ? {} : { frontend }) },
+    };
+  }
   // Rust's serde model calls this field `state`; the renderer uses
   // `lifecycle` so it can distinguish an invalid manifest's disabled state
   // from a missing record. Accept both during the M0 wire-contract rollout.
   return {
     ...record,
+    manifest,
     slug: record.slug ?? record.manifest?.slug ?? "unknown",
     lifecycle: record.lifecycle ?? record.state ?? "disabled",
   };
+}
+
+function mutationResult(value: unknown): PluginRecord {
+  const record = normalizePluginRecord(value);
+  signalPluginRegistryChanged(record.slug);
+  return record;
 }
 
 export async function listPlugins(): Promise<PluginRecord[]> {
@@ -121,13 +140,13 @@ export async function listPlugins(): Promise<PluginRecord[]> {
 
 export async function setPluginEnabled(slug: string, enabled: boolean): Promise<PluginRecord> {
   if (!SLUG.test(slug)) return Promise.reject(new Error(`Invalid plugin slug: ${slug}`));
-  return normalizePluginRecord(await invoke<unknown>("plugin_set_enabled", { slug, enabled }));
+  return mutationResult(await invoke<unknown>("plugin_set_enabled", { slug, enabled }));
 }
 
 /** Activate a verified package directory that the native download layer staged. */
 export async function installStagedPlugin(slug: string, version: string, packageDir: string): Promise<PluginRecord> {
   if (!SLUG.test(slug)) return Promise.reject(new Error(`Invalid plugin slug: ${slug}`));
-  return normalizePluginRecord(await invoke<unknown>("plugin_install_staged", { slug, version, packageDir }));
+  return mutationResult(await invoke<unknown>("plugin_install_staged", { slug, version, packageDir }));
 }
 
 /** Native verifies the signature, platform and complete archive contents. */
@@ -136,7 +155,7 @@ export async function installPluginArchive(
   trust: { pluginId: string } | { detachedSignature: string },
 ): Promise<PluginRecord> {
   if (!archivePath) throw new Error("Invalid module archive path");
-  return normalizePluginRecord(await invoke<unknown>("plugin_install_archive", { archivePath, ...trust }));
+  return mutationResult(await invoke<unknown>("plugin_install_archive", { archivePath, ...trust }));
 }
 
 export function cancelPluginRequest(slug: string, requestId: string): Promise<boolean> {
@@ -147,16 +166,17 @@ export function cancelPluginRequest(slug: string, requestId: string): Promise<bo
 
 export async function rollbackPlugin(slug: string): Promise<PluginRecord> {
   if (!SLUG.test(slug)) return Promise.reject(new Error(`Invalid plugin slug: ${slug}`));
-  return normalizePluginRecord(await invoke<unknown>("plugin_rollback", { slug }));
+  return mutationResult(await invoke<unknown>("plugin_rollback", { slug }));
 }
 
 export async function uninstallPlugin(slug: string, deleteData = false): Promise<PluginRecord> {
   if (!SLUG.test(slug)) return Promise.reject(new Error(`Invalid plugin slug: ${slug}`));
-  return normalizePluginRecord(await invoke<unknown>("plugin_uninstall", { slug, deleteData }));
+  return mutationResult(await invoke<unknown>("plugin_uninstall", { slug, deleteData }));
 }
 
 export async function refreshPlugins(): Promise<PluginRecord[]> {
   const records = await invoke<unknown[]>("plugin_refresh", {});
+  signalPluginRegistryChanged();
   return records.map(normalizePluginRecord);
 }
 

@@ -15,6 +15,8 @@ import {
   startPluginDownload,
   uninstallPlugin,
 } from "./plugin";
+import { validatePluginManifest } from "../pluginRegistry";
+import { moduleRecord } from "../tests/pluginFrontendHarness";
 
 describe("invokePlugin", () => {
   beforeEach(() => invokeMock.mockReset());
@@ -92,6 +94,24 @@ describe("invokePlugin", () => {
     await expect(rollbackPlugin("Hello")).rejects.toThrow("Invalid plugin slug");
     await expect(uninstallPlugin("hello/plugin")).rejects.toThrow("Invalid plugin slug");
     expect(invokeMock).not.toHaveBeenCalled();
+  });
+
+  it("normalizes nullable native entry paths without weakening manifest validation", async () => {
+    const manifest = moduleRecord().manifest!;
+    const entries = [
+      { host: "taomni-plugin-host", frontend: null, protocol: 1 },
+      { host: null, frontend: "frontend/index.js", protocol: 1 },
+    ];
+    invokeMock.mockResolvedValueOnce(entries.map((entry) => ({
+      manifest: { ...manifest, entry }, state: "enabled",
+    })));
+    const records = await listPlugins();
+    for (const [index, record] of records.entries()) {
+      expect(validatePluginManifest(record.manifest).ok).toBe(true);
+      expect(validatePluginManifest({ ...manifest, entry: entries[index] }).ok).toBe(false);
+    }
+    expect(records[0].manifest?.entry).toEqual({ host: "taomni-plugin-host", protocol: 1 });
+    expect(records[1].manifest?.entry).toEqual({ frontend: "frontend/index.js", protocol: 1 });
   });
 
   it("preserves the native signature boundary for offline and catalog archives", async () => {

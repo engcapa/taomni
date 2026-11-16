@@ -33,7 +33,7 @@ if (typeof window !== "undefined") installStubMailQaControl(mailStubSeed);
 
 export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions): Promise<T> {
   if (cmd === "backup_inspect" || cmd === "backup_stage_restore") return backupRestoreStub(cmd, args ?? {}) as T;
-  if (cmd.startsWith("plugin_")) return await invokePlugin<T>(cmd);
+  if (cmd.startsWith("plugin_")) return await invokePlugin<T>(cmd, args);
   if (cmd.startsWith("viewer_")) return await invokeViewer(cmd, args) as T;
   if (cmd.startsWith("mobile_")) return await mobileStub(cmd, args) as T;
   if (cmd === "backup_get_policy") {

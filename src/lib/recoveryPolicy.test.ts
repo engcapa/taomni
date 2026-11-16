@@ -2,12 +2,14 @@ import { describe, expect, it } from "vitest";
 import { RECOVERY_LIMITATIONS, recoveryLimitation } from "./recoveryPolicy";
 describe("fail-closed recovery policy", () => {
   it("has an explicit explanation for every current tab kind, not an automatic connect default", () => {
-    expect(Object.keys(RECOVERY_LIMITATIONS)).toHaveLength(22);
+    expect(Object.keys(RECOVERY_LIMITATIONS)).toHaveLength(23);
     for (const [kind, limitation] of Object.entries(RECOVERY_LIMITATIONS)) {
       expect(recoveryLimitation(kind)).toBe(limitation);
       expect(limitation.length).toBeGreaterThan(20);
     }
     expect(recoveryLimitation("servers")).toContain("本地服务器配置");
+    expect(recoveryLimitation("plugin")).toContain("重新校验安装与启用状态");
+    expect(recoveryLimitation("plugin")).toContain("不重放模块命令或未提交操作");
   });
   it("does not mistake HBase REST, proxy tests or placeholders for PTYs", () => {
     expect(recoveryLimitation("hbase-shell")).toContain("不是 PTY");

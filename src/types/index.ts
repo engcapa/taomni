@@ -6,7 +6,13 @@ import type { ObjectStorageConfig } from "./objectStorage";
 import type { LaunchPreparation } from "../lib/sockscap";
 import type { VncViewerOptions } from "../lib/vncOptions";
 
-export type TabKind = "terminal" | "sftp" | "rdp" | "vnc" | "nettools" | "sockscap" | "welcome" | "settings" | "placeholder" | "file-browser" | "database" | "redis" | "hbase-shell" | "proxy-test" | "object-storage" | "git" | "mail" | "mail-unified" | "code-workspace" | "mfa" | "file-viewer" | "servers";
+export type TabKind = "terminal" | "sftp" | "rdp" | "vnc" | "nettools" | "sockscap" | "welcome" | "settings" | "placeholder" | "file-browser" | "database" | "redis" | "hbase-shell" | "proxy-test" | "object-storage" | "git" | "mail" | "mail-unified" | "code-workspace" | "mfa" | "file-viewer" | "servers" | "plugin";
+
+/** A persisted view locator, never native activation or permission evidence. */
+export interface PluginTabInfo {
+  slug: string;
+  kind: string;
+}
 
 /**
  * Connection parameters for a database client tab (MySQL / PostgreSQL /
@@ -336,6 +342,7 @@ export interface Tab {
   mail?: MailTabInfo;
   git?: GitTabInfo;
   codeWorkspace?: CodeWorkspaceTabInfo;
+  plugin?: PluginTabInfo;
   hasNewOutput?: boolean;
   /**
    * Ownership of a terminal tab title. Fresh terminals keep their launch label

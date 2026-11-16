@@ -27,10 +27,8 @@ class OfficialPackageSigningGuardTests(unittest.TestCase):
         (payload / manifest["entry"]["host"]).write_bytes(b"inert unit host; never executed")
         frontend = manifest["entry"].get("frontend")
         if frontend:
-            (trusted / frontend).parent.mkdir(parents=True)
-            shutil.copyfile(ROOT / "src-tauri/plugins" / module / frontend, trusted / frontend)
-            (payload / frontend).parent.mkdir(parents=True)
-            shutil.copyfile(trusted / frontend, payload / frontend)
+            shutil.copytree(ROOT / "src-tauri/plugins" / module / "frontend", trusted / "frontend")
+            shutil.copytree(trusted / "frontend", payload / "frontend")
         (payload / "module.json").write_text(json.dumps(manifest))
         (root / "candidate/candidate-source.json").write_text(json.dumps({
             "sourceSha": "a" * 40, "platform": platform, "module": module,
@@ -56,8 +54,8 @@ class OfficialPackageSigningGuardTests(unittest.TestCase):
                     self.guard(root, module, platform)
 
     def test_source_module_metadata_and_unsigned_file_changes_are_rejected(self):
-        for change in ["source", "module", "permissions", "frontend-entry", "extra-file", "frontend-bytes"]:
-            module = "hello-plugin" if change == "frontend-bytes" else "mfa"
+        for change in ["source", "module", "permissions", "frontend-entry", "extra-file", "frontend-bytes", "secondary-chunk"]:
+            module = "hello-plugin" if change in {"frontend-bytes", "secondary-chunk"} else "mfa"
             with self.subTest(change=change), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 payload = self.seed(root, module, "linux-x86_64")
@@ -74,6 +72,8 @@ class OfficialPackageSigningGuardTests(unittest.TestCase):
                         value["entry"]["frontend"] = "untrusted.js"
                     elif change == "extra-file":
                         (payload / "untrusted.js").write_text("untrusted")
+                    elif change == "secondary-chunk":
+                        (payload / "frontend/messages.js").write_text("changed relative ESM")
                     else:
                         (payload / "frontend/index.js").write_text("changed official frontend")
                 path.write_text(json.dumps(value))

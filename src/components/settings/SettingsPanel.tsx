@@ -12,6 +12,7 @@ import { DEFAULT_TERMINAL_DEFAULT_PROFILE, DEFAULT_TERMINAL_PROFILE, loadTermina
 import { useAiStore } from "../../stores/aiStore";
 import { useAppStore } from "../../stores/appStore";
 import { useModuleStore } from "../../stores/moduleStore";
+import { usePluginFrontendStore } from "../../stores/pluginFrontendStore";
 import { type FontPickerOption } from "../terminal/FontPickerPanel";
 import { type ModuleStoreCatalogEntry } from "./ModuleStorePanel";
 import { UI_FONTS } from "./panel/fonts";
@@ -56,6 +57,9 @@ export function SettingsPanel() {
   const [moduleCatalogError, setModuleCatalogError] = useState<string | null>(null);
   const [moduleRefreshRevision, setModuleRefreshRevision] = useState(0);
   const refreshModuleCatalog = useCallback(() => setModuleRefreshRevision((revision) => revision + 1), []);
+  useEffect(() => usePluginFrontendStore.subscribe((next, previous) => {
+    if (next.records !== previous.records) refreshModuleCatalog();
+  }), [refreshModuleCatalog]);
   const [migrationSnapshot, setMigrationSnapshot] = useState<LegacyInstallSnapshot | null>(null);
   const [migrationLoading, setMigrationLoading] = useState(true);
   const [migrationError, setMigrationError] = useState<string | null>(null);

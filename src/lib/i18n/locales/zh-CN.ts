@@ -2,12 +2,14 @@ import { notesWorkspaceZhCN } from "./notesWorkspace";
 import type { en } from "./en";
 import { modelInspectorZh } from "./modelInspector";
 import { feishuSettingsZh, mobileSettingsZh } from "./mobileSettings";
+import { moduleFrontendZhCN } from "./moduleFrontend";
 
 // Use a deep partial to allow gradual translation while still letting the
 // type system flag obvious shape mismatches against the English dictionary.
 type DeepPartial<T> = T extends object ? { [K in keyof T]?: DeepPartial<T[K]> } : T;
 
 export const zhCN: DeepPartial<typeof en> = {
+  plugins: moduleFrontendZhCN,
   backupUnified: {
     "categories": "备份分类",
     "mailCache": "邮件列表、设置与缓存",

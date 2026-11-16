@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
+import { forwardRef, memo } from "react";
 import { clearMocks, mockConvertFileSrc } from "@tauri-apps/api/mocks";
 import { createPluginLazyComponent, loadPluginFrontend, pluginFrontendUrl, verifyPluginSha256 } from "./pluginLoader";
 import { PluginRegistry, type PluginManifest } from "./pluginRegistry";
@@ -41,6 +42,17 @@ describe("plugin frontend loading", () => {
     expect(pluginFrontendUrl({ ...validManifest, version: "1.1.0" })).toBe("taomni-plugin://localhost/demo/1.1.0/frontend/index.js");
     expect(new URL("./chunk.js", pluginFrontendUrl({ ...validManifest, version: "1.1.0" })).href)
       .toBe("taomni-plugin://localhost/demo/1.1.0/frontend/chunk.js");
+  });
+
+  it("accepts ordinary React memo and forwardRef exports but rejects invalid selected exports", async () => {
+    for (const component of [memo(() => null), forwardRef(() => null)]) {
+      await expect(loadPluginFrontend(validManifest, vi.fn().mockResolvedValue({ default: component })))
+        .resolves.toHaveProperty("default", component);
+    }
+    await expect(loadPluginFrontend(validManifest, vi.fn().mockResolvedValue({ default: {}, component: () => null })))
+      .rejects.toThrow("no component export");
+    await expect(loadPluginFrontend(validManifest, vi.fn().mockResolvedValue({ component: {} })))
+      .rejects.toThrow("no component export");
   });
 
   it.each(["windows", "linux", "macos"] as const)("uses Tauri's %s mapping and preserves versioned relative chunks", (platform) => {

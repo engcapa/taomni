@@ -1812,6 +1812,10 @@
 - `[data-testid="detached-session-window"]` — display [optional] — F-Detach-1.detached-window
 - `[data-testid="detached-reattach"]` — interactive [optional] — F-Detach-1.detached-reattach
 - `[data-testid="detached-os-fullscreen"]` — interactive [optional] — F-Detach-1.detached-os-fullscreen
+- `[data-testid="plugin-tab-detach"]` — interactive — F-Detach-1.plugin-tab-detach
+- `[data-testid="plugin-detached-window"]` — display — F-Detach-1.plugin-detached-window
+- `[data-testid="plugin-tab-reattach"]` — interactive — F-Detach-1.plugin-tab-reattach
+- `[data-testid="plugin-tab-returned"]` — display [optional] — F-Detach-1.plugin-tab-returned
 
 ## main/menubar (F1.8)
 
@@ -2505,6 +2509,18 @@
 - `[data-testid="module-action-install-hello-plugin"]` — interactive — F-Modules-1.module-action-install-hello-plugin
 - `[data-testid="module-delete-data-hello-plugin"]` — interactive — F-Modules-1.module-delete-data-hello-plugin
 - `[data-testid="module-data-retained-hello-plugin"]` — display — F-Modules-1.module-data-retained-hello-plugin
+- `[data-testid="module-action-open-hello-plugin-hello-plugin"]` — interactive — F-Modules-1.module-action-open-hello-plugin
+- `[data-testid="plugin-tab-panel"]` — display — F-Modules-1.plugin-tab-panel
+- `[data-testid="plugin-tab-unavailable"]` — display — F-Modules-1.plugin-tab-unavailable
+- `[data-testid="plugin-tab-error"]` — display — F-Modules-1.plugin-tab-error
+- `[data-testid="plugin-tab-retry"]` — interactive — F-Modules-1.plugin-tab-retry
+- `[data-testid="plugin-tab-settings"]` — interactive — F-Modules-1.plugin-tab-settings
+- `[data-testid="plugin-tab-loading"]` — display [optional] — F-Modules-1.plugin-tab-loading
+- `[data-testid="hello-plugin-view"]` — display — F-Modules-1.hello-plugin-view
+- `[data-testid="hello-plugin-value"]` — interactive — F-Modules-1.hello-plugin-value
+- `[data-testid="hello-plugin-save"]` — interactive — F-Modules-1.hello-plugin-save
+- `[data-testid="hello-plugin-values"]` — display — F-Modules-1.hello-plugin-values
+- `[data-testid="hello-plugin-entry"]` — display — F-Modules-1.hello-plugin-entry
 
 ## network/sockscap (F-Sockscap-1)
 
