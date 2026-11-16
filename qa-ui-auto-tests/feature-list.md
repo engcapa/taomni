@@ -833,6 +833,9 @@ controls:
   - id: panel-root
     selector: '[data-testid="welcome-panel"]'
     kind: display
+  - id: browse-modules
+    selector: '[data-testid="welcome-browse-modules"]'
+    kind: interactive
   - id: open-local-terminal
     selector: '[data-testid="welcome-panel"] [data-testid="tao-home-local-terminal"]'
     kind: interactive

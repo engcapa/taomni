@@ -7,6 +7,7 @@ import { ipcMocks } from "../../tests/welcomePanel/harness";
 import { useAppStore } from "../../../stores/appStore";
 import { useSessionStore } from "../../../stores/sessionStore";
 import type { SessionConfig } from "../../../lib/ipc";
+import { clearPendingSettingsSection, consumePendingSettingsSection } from "../../../lib/settingsNavigation";
 
 function session(id: string, name: string, type: string, host: string): SessionConfig {
   return {
@@ -42,6 +43,7 @@ beforeEach(() => {
 
 afterEach(() => {
   cleanup();
+  clearPendingSettingsSection();
   vi.clearAllMocks();
 });
 
@@ -95,6 +97,16 @@ describe("Home mode welcome panel (TASK-08)", () => {
 
     fireEvent.click(screen.getByTestId("home-nav-sessions"));
     expect(useAppStore.getState().activeSideTab).toBe("sessions");
+  });
+
+  it("opens the module store from Welcome with its section selected before Settings mounts", () => {
+    const onOpenSettings = vi.fn(() => {
+      expect(consumePendingSettingsSection()).toEqual({ id: "module-store", presetId: null });
+    });
+    render(<WelcomePanel onStartLocalTerminal={vi.fn()} onNewSession={vi.fn()} onOpenSettings={onOpenSettings} />);
+    fireEvent.click(screen.getByRole("button", { name: "Browse modules" }));
+    expect(onOpenSettings).toHaveBeenCalledTimes(1);
+    expect(screen.getByTestId("welcome-panel")).toBeInTheDocument();
   });
 
   it("UT-WS-08-03 switches the rail Home button to the Home sidebar without losing Sessions", () => {

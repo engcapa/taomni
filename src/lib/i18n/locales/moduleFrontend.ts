@@ -1,4 +1,5 @@
 export const moduleFrontendEn = {
+  browse: "Browse modules",
   marketTitle: "Official modules",
   marketHint: "Browse signed modules independently of the application update. Downloads run in the background; review permissions before installing the verified package.",
   marketSearch: "Search modules",
@@ -70,6 +71,7 @@ export const moduleFrontendEn = {
 };
 
 export const moduleFrontendZhCN: typeof moduleFrontendEn = {
+  browse: "浏览模块",
   marketTitle: "官方模块",
   marketHint: "模块独立于应用更新。下载可在后台进行；安装前会展示已验证包的权限清单。",
   marketSearch: "搜索模块",

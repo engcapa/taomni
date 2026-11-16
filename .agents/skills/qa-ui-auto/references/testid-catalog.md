@@ -1928,6 +1928,7 @@
 ## main/welcome (F1.6)
 
 - `[data-testid="welcome-panel"]` — display — F1.6.panel-root
+- `[data-testid="welcome-browse-modules"]` — interactive — F1.6.browse-modules
 - `[data-testid="welcome-panel"] [data-testid="tao-home-local-terminal"]` — interactive — F1.6.open-local-terminal
 - `select[aria-label="Terminal shell"]` — interactive [optional] — F1.6.shell-select
 - `[data-testid="welcome-open-home-folder"]` — interactive [optional] — F1.6.open-home-folder
