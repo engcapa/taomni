@@ -6,7 +6,8 @@ description: >-
   shared React hooks to read/write the actual SDK host database. Preserve an
   inactive draft, deduplicate Open, restore the locator after renderer reload,
   revoke the view on disable and restore it on enable. Detach into a real
-  WebView and change lifecycle in the main window; the detached view must follow
+  WebView, preserving completion of first-navigation DOM evaluation on macOS,
+  and change lifecycle in the main window; the detached view must follow
   native notifications and retain real data. Reattach once, close/reopen, then
   uninstall keeping data and retain a missing-module tab through reload.
   This is not OS signature/TCC, a migrated business module, or a process restart.

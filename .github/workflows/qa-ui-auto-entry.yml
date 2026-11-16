@@ -98,6 +98,13 @@ jobs:
         run: bash .agents/skills/qa-ui-auto/scripts/ci_linux_setup.sh
       - uses: dtolnay/rust-toolchain@stable
         if: matrix.mode == 'native'
+      - name: Queued WebView evaluation unit regressions
+        if: runner.os == 'macOS' && inputs.operation == 'build'
+        run: |
+          mkdir -p qa-build-output
+          set -o pipefail
+          rustc --edition 2021 --test src-tauri/vendor/wry/src/wkwebview/pending_scripts.rs --deny warnings -o "$RUNNER_TEMP/wry-pending-scripts-tests"
+          "$RUNNER_TEMP/wry-pending-scripts-tests" 2>&1 | tee qa-build-output/wry-pending-scripts-tests.log
       - name: Install verified fixed protoc
         if: (matrix.mode == 'native') && inputs.operation != 'run'
         run: python .agents/skills/qa-ui-auto/scripts/ci_setup_protoc.py

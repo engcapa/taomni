@@ -1,5 +1,5 @@
 use objc2::DeclaredClass;
-use objc2_foundation::{NSObjectProtocol, NSString};
+use objc2_foundation::NSObjectProtocol;
 use objc2_web_kit::{
   WKNavigation, WKNavigationAction, WKNavigationActionPolicy, WKNavigationResponse,
   WKNavigationResponsePolicy,
@@ -13,6 +13,7 @@ use objc2_web_kit::WKWebView;
 use crate::PageLoadEvent;
 
 use super::class::wry_navigation_delegate::WryNavigationDelegate;
+use super::evaluation::evaluate_script;
 
 pub(crate) fn did_commit_navigation(
   this: &WryNavigationDelegate,
@@ -26,12 +27,9 @@ pub(crate) fn did_commit_navigation(
     }
 
     // Inject scripts
-    let mut pending_scripts = this.ivars().pending_scripts.lock().unwrap();
-    if let Some(scripts) = &*pending_scripts {
-      for script in scripts {
-        webview.evaluateJavaScript_completionHandler(&NSString::from_str(script), None);
-      }
-      *pending_scripts = None;
+    let evaluations = this.ivars().pending_scripts.lock().unwrap().take_initial();
+    for evaluation in evaluations {
+      evaluate_script(webview, evaluation);
     }
   }
 }

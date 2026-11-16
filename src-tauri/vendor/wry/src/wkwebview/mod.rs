@@ -5,7 +5,9 @@
 mod download;
 #[cfg(target_os = "macos")]
 mod drag_drop;
+mod evaluation;
 mod navigation;
+mod pending_scripts;
 #[cfg(feature = "mac-proxy")]
 mod proxy;
 #[cfg(target_os = "macos")]
@@ -46,8 +48,8 @@ use objc2_foundation::{
   ns_string, MainThreadMarker, NSArray, NSBundle, NSDate, NSError, NSHTTPCookie,
   NSHTTPCookieDomain, NSHTTPCookieExpires, NSHTTPCookieMaximumAge, NSHTTPCookieName,
   NSHTTPCookiePath, NSHTTPCookiePropertyKey, NSHTTPCookieSecure, NSHTTPCookieValue,
-  NSHTTPCookieVersion, NSJSONSerialization, NSMutableDictionary, NSMutableURLRequest, NSNumber,
-  NSObjectNSKeyValueCoding, NSObjectProtocol, NSString, NSUTF8StringEncoding, NSURL, NSUUID,
+  NSHTTPCookieVersion, NSMutableDictionary, NSMutableURLRequest, NSNumber,
+  NSObjectNSKeyValueCoding, NSObjectProtocol, NSString, NSURL, NSUUID,
 };
 #[cfg(target_os = "ios")]
 use objc2_ui_kit::{UIScrollView, UIViewAutoresizing};
@@ -103,6 +105,7 @@ use crate::{
 use http::Request;
 
 use crate::util::Counter;
+use pending_scripts::{EvaluationCallback, PendingScripts, ScriptEvaluation};
 
 static COUNTER: Counter = Counter::new();
 
@@ -138,7 +141,7 @@ pub(crate) struct InnerWebView {
   ns_view: Retained<NSView>,
   #[allow(dead_code)]
   is_child: bool,
-  pending_scripts: Arc<Mutex<Option<Vec<String>>>>,
+  pending_scripts: Arc<Mutex<PendingScripts>>,
   // Note that if following functions signatures are changed in the future,
   // all functions pointer declarations in objc callbacks below all need to get updated.
   ipc_handler_delegate: Option<Retained<WryWebViewDelegate>>,
@@ -566,7 +569,7 @@ impl InnerWebView {
           None
         };
 
-      let pending_scripts = Arc::new(Mutex::new(Some(Vec::new())));
+      let pending_scripts = Arc::new(Mutex::new(PendingScripts::default()));
       let has_download_handler = attributes.download_started_handler.is_some();
       // Download handler
       let download_delegate = if attributes.download_started_handler.is_some()
@@ -721,57 +724,17 @@ impl InnerWebView {
   }
 
   pub fn eval(&self, js: &str, callback: Option<impl Fn(String) + Send + 'static>) -> Result<()> {
-    if let Some(scripts) = &mut *self.pending_scripts.lock().unwrap() {
-      scripts.push(js.into());
-    } else {
-      // Safety: objc runtime calls are unsafe
-      unsafe {
-        #[cfg(feature = "tracing")]
-        let span = Mutex::new(Some(tracing::debug_span!("wry::eval").entered()));
-
-        // we need to check if the callback exists outside the handler otherwise it's a segfault
-        if let Some(callback) = callback {
-          let handler = block2::RcBlock::new(move |val: *mut AnyObject, _err: *mut NSError| {
-            #[cfg(feature = "tracing")]
-            span.lock().unwrap().take();
-
-            let mut result = String::new();
-
-            if !val.is_null() {
-              let json_ns_data = NSJSONSerialization::dataWithJSONObject_options_error(
-                &*val,
-                objc2_foundation::NSJSONWritingOptions::FragmentsAllowed,
-              )
-              .unwrap();
-              let json_string = NSString::alloc();
-              let json_string =
-                NSString::initWithData_encoding(json_string, &json_ns_data, NSUTF8StringEncoding)
-                  .unwrap();
-
-              result = json_string.to_string();
-            }
-
-            callback(result);
-          });
-
-          self
-            .webview
-            .evaluateJavaScript_completionHandler(&NSString::from_str(js), Some(&handler));
-        } else {
-          #[cfg(feature = "tracing")]
-          let handler = Some(block2::RcBlock::new(
-            move |_val: *mut AnyObject, _err: *mut NSError| {
-              span.lock().unwrap().take();
-            },
-          ));
-          #[cfg(not(feature = "tracing"))]
-          let handler: Option<block2::RcBlock<dyn Fn(*mut AnyObject, *mut NSError)>> = None;
-
-          self
-            .webview
-            .evaluateJavaScript_completionHandler(&NSString::from_str(js), handler.as_deref());
-        }
-      }
+    let evaluation = ScriptEvaluation {
+      script: js.into(),
+      callback: callback.map(|callback| Box::new(callback) as EvaluationCallback),
+    };
+    let ready = self
+      .pending_scripts
+      .lock()
+      .unwrap()
+      .queue_or_ready(evaluation);
+    if let Some(evaluation) = ready {
+      evaluation::evaluate_script(&self.webview, evaluation);
     }
 
     Ok(())
@@ -1417,6 +1380,10 @@ pub fn platform_webview_version() -> Result<String> {
 impl Drop for InnerWebView {
   fn drop(&mut self) {
     WEBVIEW_STATE.write().unwrap().remove(&self.id);
+    // The native navigation delegate can outlive this owner. Release queued
+    // callback captures now, outside the queue lock, even without a commit.
+    let pending = self.pending_scripts.lock().unwrap().take_initial();
+    drop(pending);
 
     // We need to drop handler closures here
     unsafe {
