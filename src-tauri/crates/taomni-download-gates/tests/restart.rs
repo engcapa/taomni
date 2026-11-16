@@ -95,13 +95,16 @@ async fn killed_process_releases_reservations_and_next_process_discovers_and_res
     worker.0.kill().unwrap();
     assert!(!worker.0.wait().unwrap().success());
     let mut next = [0_u8; 1];
-    assert_eq!(
-        tokio::time::timeout(Duration::from_secs(5), first.read(&mut next))
-            .await
-            .unwrap()
-            .unwrap(),
-        0,
-        "actual process death closes its active network connection"
+    let closed = tokio::time::timeout(Duration::from_secs(5), first.read(&mut next))
+        .await
+        .expect("the killed worker's socket must close within five seconds");
+    // TerminateProcess closes Winsock with WSAECONNRESET (10054), while Unix
+    // reports EOF. Both prove actual peer closure; other errors/bytes fail.
+    assert!(
+        matches!(&closed, Ok(0))
+            || cfg!(windows)
+                && matches!(&closed, Err(error) if error.kind() == std::io::ErrorKind::ConnectionReset),
+        "actual process death must close its active network connection: {closed:?}"
     );
     drop(first);
     drop(other);
