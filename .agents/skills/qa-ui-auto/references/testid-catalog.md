@@ -3553,7 +3553,7 @@
 - `[data-testid="tao-home-search-input"]` — interactive — F1.11.tao-home-search-input
 - `[data-testid="tao-home-demo-toggle"]` — interactive — F1.11.tao-home-demo-toggle
 - `[data-testid="tao-home-new-chat"]` — interactive — F1.11.tao-home-new-chat
-- `[data-testid="tao-home-more"]` — interactive — F1.11.tao-home-more
+- `[data-testid="tao-home-side-toggle"]` — interactive — F1.11.tao-home-side-toggle
 - `[data-testid="tao-home-appearance"]` — interactive — F1.11.tao-home-appearance
 - `[data-testid="tao-home-capabilities"]` — interactive — F1.11.tao-home-capabilities
 - `[data-testid="tao-home-plus"]` — interactive — F1.11.tao-home-plus
@@ -3593,7 +3593,6 @@
 - `[data-testid="tao-settings-save"]` — interactive — F1.11.tao-settings-save
 - `[data-testid="tao-settings-status"]` — display — F1.11.tao-settings-status
 - `[data-testid="tao-settings"] [data-testid="llm-proxy-mode"]` — interactive — F1.11.tao-settings-proxy
-- `[role="dialog"][aria-label="Tao 更多"]` — display — F1.11.tao-home-more-dialog
 - `[role="dialog"][aria-label="模型与能力"]` — display — F1.11.tao-home-capabilities-dialog
 - `[role="dialog"][aria-label="模型与能力"] button:has-text("deepseek-v4-pro")` — interactive — F1.11.tao-home-capability-model-v4
 - `[data-testid="tao-home-history-row"]` — interactive — F1.11.tao-home-history-row
@@ -3610,7 +3609,11 @@
 - `[data-testid="tao-home-side-tab-workflows"]` — interactive — F1.11.tao-home-side-tab-workflows
 - `[data-testid="tao-home-side-tab-voice"]` — interactive — F1.11.tao-home-side-tab-voice
 - `[data-testid="tao-home-side-tab-archive"]` — interactive — F1.11.tao-home-side-tab-archive
+- `[data-testid="tao-home-side-tab-memory"]` — interactive — F1.11.tao-home-side-tab-memory
+- `[data-testid="tao-home-side-tab-skills"]` — interactive — F1.11.tao-home-side-tab-skills
 - `[data-testid="tao-home-side-resize"]` — interactive — F1.11.tao-home-side-resize
+- `[data-testid="tao-home-chat-column"]` — display — F1.11.tao-home-chat-column
+- `[data-testid="tao-home-body"]` — display — F1.11.tao-home-body
 
 ## terminal/appearance (F5.2)
 

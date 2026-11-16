@@ -1,0 +1,48 @@
+id: TC-TAO-HOME-013
+title: Real DeepSeek Markdown reply survives native branch context and history restoration
+description: >-
+  Opt-in commercial test using the temporary local key. Three native requests
+  verify an actual Markdown heading/table/code response, native cloned context,
+  a separate chat, unchanged original history and a branch's independent draft.
+  Only explicit 401/403 or expired credentials may end early as credential-invalid;
+  failed model output, networking, cloning or UI behavior remains a failure.
+modes: [native]
+covers: [F1.11]
+tags: [p1, tao-home, native, real-provider, regression]
+fixtures: [reset_db, tao_real_provider]
+timeout_sec: 450
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-tao-home-013-real-provider
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- wait_for: '[data-testid="tao-home-composer-input"]:enabled'
+- observe_tao_provider: null
+- tao_real_provider_documents: null
+- assert_no_runtime_errors: null
+- screenshot: tao-home-real-documents-final.png
+verification:
+  review: reviewed
+  requirements:
+  - id: REAL-DOCUMENT
+    requirement: Real provider output renders as a heading, table and fenced code in the native shared Markdown renderer.
+    actions: [1, 2, 3, 4, 5, 6]
+    checkpoints:
+    - {step: 7, expectation: "The actual completed reply has semantic h2/table/pre-code elements, expected arithmetic cells and its unpredictable token, and lies inside the feed viewport after the long prompt; explicit invalid credentials log an early credential-invalid result instead."}
+    - {step: 8, expectation: No unhandled runtime error occurred.}
+    results: [7, 8]
+  - id: REAL-BRANCH-HISTORY
+    requirement: A native branch clones prior context, recalls the original token, and restores its own history/draft without changing the original chat or sending again.
+    actions: [1, 2, 3, 4, 5, 6]
+    checkpoints:
+    - {step: 7, expectation: "One fulfilled clone callback, contextual commercial reply, exact original/branch message counts, retained independent draft and exactly three requests are observed through public UI paths."}
+    - {step: 8, expectation: No unhandled runtime error occurred.}
+    results: [7, 8]
+  native:
+  - check: Commercial replies and native context-clone IPC
+    method: automated
+    reason: Forwarding-only callback observation verifies actual native completion, and later real DeepSeek output proves cloned context. History restoration here is in-process; TC-TAO-HOME-004 owns restart persistence.
+  visual:
+  - check: Native real Markdown and restored transcript
+    method: manual
+    reason: Semantic DOM assertions establish rendered structure; screenshots preserve the surrounding UI for inspection without certifying full prototype parity.

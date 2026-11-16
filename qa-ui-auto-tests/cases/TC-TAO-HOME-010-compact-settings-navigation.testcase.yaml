@@ -1,7 +1,7 @@
 id: TC-TAO-HOME-010
 title: Compact Home settings navigation keeps the section heading below sticky search
 description: >-
-  Navigate through the actual no-key card, appearance button and Tao menu, then
+  Navigate through the actual no-key card, appearance button and Tao settings button, then
   search the tall Tao settings section. Check the settled heading against the
   search input at desktop and compact sizes. Native TC-TAO-HOME-003 retains
   packaged Settings-tab and deep-link checks; this case owns renderer resizing.
@@ -21,8 +21,9 @@ steps:
 # A smooth scroll must finish before checking the final position.
 - wait: 0.5
 - eval_readonly:
-    expression: document.getElementById('tao-settings-heading').getBoundingClientRect().top >= document.getElementById('settings-search-input').getBoundingClientRect().bottom + 12
+    expression: document.getElementById('tao-settings-heading').getBoundingClientRect().top >= document.getElementById('settings-search-input').getBoundingClientRect().bottom + 12 && document.getElementById('tao-settings-heading').getBoundingClientRect().bottom <= document.getElementById('tao-settings-heading').closest('.overflow-auto').getBoundingClientRect().bottom
     expect_truthy: true
+    timeout_sec: 5
 - assert_element_geometry:
     selector: '#tao-settings-heading'
     min_width: 100
@@ -38,21 +39,22 @@ steps:
 - wait_for: '#settings-theme-heading'
 - wait: 0.5
 - eval_readonly:
-    expression: document.getElementById('settings-theme-heading').getBoundingClientRect().top >= document.getElementById('settings-search-input').getBoundingClientRect().bottom + 12
+    expression: document.getElementById('settings-theme-heading').getBoundingClientRect().top >= document.getElementById('settings-search-input').getBoundingClientRect().bottom + 12 && document.getElementById('settings-theme-heading').getBoundingClientRect().bottom <= document.getElementById('settings-theme-heading').closest('.overflow-auto').getBoundingClientRect().bottom
     expect_truthy: true
+    timeout_sec: 5
 - assert_element_geometry:
     selector: '#settings-theme-heading'
     min_width: 100
     min_height: 14
     viewport_margin: 0
 - click: '[data-testid="nav-mode-home"]'
-- click: '[data-testid="tao-home-more"]'
 - click: '[data-testid="tao-home-settings"]'
 - wait_for: '[data-testid="tao-settings"]'
 - wait: 0.5
 - eval_readonly:
-    expression: document.getElementById('tao-settings-heading').getBoundingClientRect().top >= document.getElementById('settings-search-input').getBoundingClientRect().bottom + 12
+    expression: document.getElementById('tao-settings-heading').getBoundingClientRect().top >= document.getElementById('settings-search-input').getBoundingClientRect().bottom + 12 && document.getElementById('tao-settings-heading').getBoundingClientRect().bottom <= document.getElementById('tao-settings-heading').closest('.overflow-auto').getBoundingClientRect().bottom
     expect_truthy: true
+    timeout_sec: 5
 - assert_element_geometry:
     selector: '#tao-settings-heading'
     min_width: 100
@@ -64,11 +66,12 @@ steps:
 - screenshot: tao-settings-compact.png
 - fill:
     selector: '[data-testid="settings-search-input"]'
-    value: tao
+    value: deepseek
 - wait: 0.5
 - eval_readonly:
-    expression: document.getElementById('tao-settings-heading').getBoundingClientRect().top >= document.getElementById('settings-search-input').getBoundingClientRect().bottom + 12
+    expression: document.getElementById('tao-settings-heading').getBoundingClientRect().top >= document.getElementById('settings-search-input').getBoundingClientRect().bottom + 12 && document.getElementById('tao-settings-heading').getBoundingClientRect().bottom <= document.getElementById('tao-settings-heading').closest('.overflow-auto').getBoundingClientRect().bottom
     expect_truthy: true
+    timeout_sec: 5
 - assert_element_geometry:
     selector: '#tao-settings-heading'
     min_width: 100
@@ -89,33 +92,72 @@ verification:
   review: reviewed
   requirements:
   - id: SETTINGS-ENTRY
-    requirement: Public Home entry points reveal the correct section heading below search at 1366x768 and 800x600 while reusing a single Settings tab.
-    actions: [5, 6, 13, 14, 15, 20, 21, 22]
+    requirement: Public Home entry points reveal the correct section heading below search at 1366x768 and 800x600 while reusing
+      a single Settings tab.
+    actions:
+    - 5
+    - 6
+    - 13
+    - 14
+    - 15
+    - 20
+    - 21
     checkpoints:
-    - {step: 9, expectation: No-key CTA reveals the Tao heading below the settled sticky search.}
-    - {step: 10, expectation: The Tao heading lies inside the desktop viewport.}
-    - {step: 11, expectation: Only one Settings tab exists.}
-    - {step: 18, expectation: Appearance opens the application theme section below search.}
-    - {step: 19, expectation: The theme heading lies inside the compact viewport.}
-    - {step: 25, expectation: Tao menu navigation reveals its heading below search at compact size.}
-    - {step: 26, expectation: The Tao heading lies inside the compact viewport.}
-    - {step: 27, expectation: Repeated navigation reuses the same single Settings tab.}
-    results: [9, 10, 11, 18, 19, 25, 26, 27]
+    - step: 9
+      expectation: No-key CTA reveals the Tao heading below the settled sticky search.
+    - step: 10
+      expectation: The Tao heading lies inside the desktop viewport.
+    - step: 11
+      expectation: Only one Settings tab exists.
+    - step: 18
+      expectation: Appearance opens the application theme section below search.
+    - step: 19
+      expectation: The theme heading lies inside the compact viewport.
+    - step: 24
+      expectation: Direct Tao settings navigation reveals its heading below search at compact size.
+    - step: 25
+      expectation: The Tao heading lies inside the compact viewport.
+    - step: 26
+      expectation: Repeated navigation reuses the same single Settings tab.
+    results:
+    - 9
+    - 10
+    - 11
+    - 18
+    - 19
+    - 24
+    - 25
+    - 26
   - id: SETTINGS-SEARCH
-    requirement: Searching a tall section preserves its heading and Escape clears the search without duplicating tabs or raising runtime errors.
-    actions: [29, 33]
+    requirement: Searching a tall section preserves its heading and Escape clears the search without duplicating tabs or raising
+      runtime errors.
+    actions:
+    - 28
+    - 32
     checkpoints:
-    - {step: 31, expectation: Settled search leaves the Tao heading below the toolbar.}
-    - {step: 32, expectation: Search leaves the heading inside the viewport.}
-    - {step: 34, expectation: Escape clears the query.}
-    - {step: 35, expectation: The Settings tab remains unique.}
-    - {step: 36, expectation: No runtime errors occurred through entry and search transitions.}
-    results: [31, 32, 34, 35, 36]
+    - step: 30
+      expectation: Settled search leaves the Tao heading below the toolbar.
+    - step: 31
+      expectation: Search leaves the heading inside the viewport.
+    - step: 33
+      expectation: Escape clears the query.
+    - step: 34
+      expectation: The Settings tab remains unique.
+    - step: 35
+      expectation: No runtime errors occurred through entry and search transitions.
+    results:
+    - 30
+    - 31
+    - 33
+    - 34
+    - 35
   visual:
   - check: Settled headings clear the sticky toolbar at desktop and compact sizes
     method: automated
-    reason: Independent heading/search DOM rectangles and viewport bounds verify actual final layout; screenshots retain both sizes.
+    reason: Independent heading/search DOM rectangles and viewport bounds verify actual final layout; screenshots retain both
+      sizes.
   native:
   - check: Native scrolling and public Settings entry routing
     method: not-applicable
-    reason: TC-TAO-HOME-003 retains packaged WebView deep-link geometry and tab checks. This renderer case owns explicit viewport resizing, with no native IPC or OS input assertion.
+    reason: TC-TAO-HOME-003 retains packaged WebView deep-link geometry and tab checks. This renderer case owns explicit viewport
+      resizing, with no native IPC or OS input assertion.

@@ -49,3 +49,7 @@ def register(register_verb: RegisterVerb, verbs: dict[str, NativeVerb]) -> None:
     from .tao_provider_observation import observe as observe_tao_provider, assert_outcome
     register_verb("observe_tao_provider")(observe_tao_provider)
     register_verb("assert_tao_provider_outcome")(assert_outcome)
+    from .tao_real_scenarios import run as tao_real_provider_scenarios
+    register_verb("tao_real_provider_scenarios")(tao_real_provider_scenarios)
+    from .tao_real_documents import run as tao_real_provider_documents
+    register_verb("tao_real_provider_documents")(tao_real_provider_documents)

@@ -87,13 +87,15 @@ describe("TaoAiChat", () => {
     expect(controller.getState().composer.text).toBe("draft");
   });
 
-  it("shows an accessible side-panel toolbar with collapse, close, and resize controls", async () => {
+  it("toggles the sidebar from the header and restores its selected view, width and draft", async () => {
     const controller = createChatController({ profile });
+    controller.setComposerText("keep this draft");
     render(<TaoAiChat controller={controller} profile={profile} />);
-    controller.setSidePanel("来源");
+    fireEvent.click(screen.getByTestId("tao-home-side-toggle"));
 
     const panel = await screen.findByTestId("tao-home-side-panel");
-    expect(panel).toHaveAttribute("data-collapsed", "false");
+    expect(screen.getByTestId("tao-home-side-toggle")).toHaveAttribute("aria-expanded", "true");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(screen.getByTestId("tao-home-side-tab-sources")).toHaveAttribute("title", "Sources");
     expect(screen.getByTestId("tao-home-side-tab-sources").textContent).toBe("");
     expect(screen.getByTestId("tao-home-side-tab-sources").querySelector("svg")).toBeInTheDocument();
@@ -104,14 +106,61 @@ describe("TaoAiChat", () => {
     fireEvent.mouseMove(window, { clientX: 40 });
     fireEvent.mouseUp(window);
     expect(panel).toHaveStyle({ width: "400px" });
+    fireEvent.mouseMove(window, { clientX: 20 });
+    expect(panel).toHaveStyle({ width: "400px" });
 
-    fireEvent.click(screen.getByRole("button", { name: "Collapse sidebar" }));
-    expect(panel).toHaveAttribute("data-collapsed", "true");
-    expect(screen.getByRole("button", { name: "Close sidebar" })).toBeInTheDocument();
-    expect(screen.queryByTestId("tao-home-sources")).not.toBeInTheDocument();
-    fireEvent.click(screen.getByRole("button", { name: "Expand sidebar" }));
-    expect(panel).toHaveAttribute("data-collapsed", "false");
-    fireEvent.click(screen.getByRole("button", { name: "Close sidebar" }));
+    fireEvent.click(screen.getByTestId("tao-home-side-tab-files"));
+    expect(screen.getByTestId("tao-home-files")).toBeInTheDocument();
+    fireEvent.click(screen.getByTestId("tao-home-side-toggle"));
     expect(screen.queryByTestId("tao-home-side-panel")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("tao-home-sources")).not.toBeInTheDocument();
+    expect(screen.getByTestId("tao-home-side-toggle")).toHaveAttribute("aria-expanded", "false");
+    fireEvent.click(screen.getByTestId("tao-home-side-toggle"));
+    expect(screen.getByTestId("tao-home-side-panel")).toHaveStyle({ width: "400px" });
+    expect(screen.getByTestId("tao-home-side-tab-files")).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("tao-home-files")).toBeInTheDocument();
+    expect(screen.getByTestId("tao-home-composer-input")).toHaveValue("keep this draft");
+    expect(screen.queryByTestId("tao-home-side-close")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("tao-home-side-collapse")).not.toBeInTheDocument();
+  });
+
+  it("bounds keyboard resizing, resets the width and releases a cancelled drag", async () => {
+    const controller = createChatController({ profile });
+    render(<TaoAiChat controller={controller} profile={profile} />);
+    fireEvent.click(screen.getByTestId("tao-home-side-toggle"));
+    const handle = await screen.findByTestId("tao-home-side-resize");
+    fireEvent.keyDown(handle, { key: "End" });
+    expect(handle).toHaveAttribute("aria-valuenow", "560");
+    fireEvent.keyDown(handle, { key: "Home" });
+    expect(handle).toHaveAttribute("aria-valuenow", "260");
+    fireEvent.keyDown(handle, { key: "ArrowLeft" });
+    expect(handle).toHaveAttribute("aria-valuenow", "280");
+    fireEvent.doubleClick(handle);
+    expect(handle).toHaveAttribute("aria-valuenow", "340");
+    fireEvent.mouseDown(handle, { clientX: 100 });
+    fireEvent.pointerCancel(window);
+    fireEvent.mouseMove(window, { clientX: 40 });
+    expect(handle).toHaveAttribute("aria-valuenow", "340");
+    expect(screen.getByTestId("tao-home-side-panel")).toHaveAttribute("data-resizing", "false");
+  });
+
+  it("keeps memory and skills icons distinct and routes visible settings controls once", async () => {
+    const controller = createChatController({ profile });
+    const onOpenSettings = vi.fn();
+    const onOpenAppearance = vi.fn();
+    render(<TaoAiChat controller={controller} profile={{ ...profile, sidePanels: ["记忆", "技能"] }} onOpenSettings={onOpenSettings} onOpenAppearance={onOpenAppearance} />);
+    fireEvent.click(screen.getByTestId("tao-home-side-toggle"));
+    const memory = await screen.findByTestId("tao-home-side-tab-memory");
+    const skills = screen.getByTestId("tao-home-side-tab-skills");
+    expect(memory.querySelector("svg")?.innerHTML).not.toBe(skills.querySelector("svg")?.innerHTML);
+    expect(skills).toHaveAttribute("title", "Skills");
+    fireEvent.click(screen.getByTestId("tao-home-settings"));
+    fireEvent.click(screen.getByTestId("tao-home-appearance"));
+    expect(onOpenSettings).toHaveBeenCalledTimes(1);
+    expect(onOpenAppearance).toHaveBeenCalledTimes(1);
+    fireEvent.click(screen.getByTestId("tao-home-demo-toggle"));
+    expect(controller.getState().ui.demoMode).toBe(true);
+    fireEvent.click(screen.getByTestId("tao-home-demo-toggle"));
+    expect(controller.getState().ui.demoMode).toBe(false);
   });
 });

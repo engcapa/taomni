@@ -10,6 +10,8 @@
   const callbacks = target.callbacks;
   const wrapped = new Map();
   const calls = [];
+  const stops = [];
+  const operations = [];
   const probe = { observed: false, status: "pending" };
   let failure = null;
   const fail = (value) => { failure ??= value; };
@@ -23,9 +25,11 @@
   };
   function fetch(resource, options, ...rest) {
     const command = commandFor(resource);
-    if (command === "deepseek_app_send" || command === "plugin:app|name") {
-      const event = command === "deepseek_app_send" ? { status: "pending" } : probe;
+    if (["deepseek_app_send", "deepseek_app_regenerate", "deepseek_app_continue", "deepseek_app_stop", "deepseek_app_clone_thread", "plugin:app|name"].includes(command)) {
+      const event = command === "plugin:app|name" ? probe : { command, status: "pending" };
       if (event === probe) probe.observed = true;
+      else if (command === "deepseek_app_stop") stops.push(event);
+      else if (command === "deepseek_app_clone_thread") operations.push(event);
       else calls.push(event);
       try {
         const headers = new Headers(options?.headers ?? resource.headers);
@@ -52,7 +56,8 @@
   if (!Reflect.set(window, "fetch", fetch) || window.fetch !== fetch) throw new Error("Tao provider observer cannot observe fetch");
   window.__taomniQaTaoProvider = {
     observe: () => ({ valid: !failure && window.fetch === fetch && target.callbacks === callbacks
-      && probe.observed && probe.status === "fulfilled", failure, calls: calls.map((call) => ({ ...call })) }),
+      && probe.observed && probe.status === "fulfilled", failure,
+      calls: calls.map((call) => ({ ...call })), stops: stops.map((call) => ({ ...call })), operations: operations.map((call) => ({ ...call })) }),
     restore: () => {
       for (const [id, entry] of wrapped) if (callbacks.get(id) === entry.callback) callbacks.set(id, entry.original);
       if (window.fetch === fetch) Reflect.set(window, "fetch", originalFetch);

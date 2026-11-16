@@ -1,5 +1,6 @@
 import { taoText as tr } from "../i18n";
-import { MoreHorizontal, Plus, Search, SlidersHorizontal } from "lucide-react";
+import { useEffect, useRef } from "react";
+import { Palette, PanelRightClose, PanelRightOpen, Plus, Presentation, Search, SlidersHorizontal } from "lucide-react";
 import { getAppPlatform } from "../../../lib/runtime";
 import { TaoPopover, useTaoPopover } from "./Popover";
 import type { ChatProfile, TaoChatController, TaoChatState, TaoMode } from "./ports";
@@ -8,8 +9,10 @@ export function TopBar({ state, profile, controller, onMode, onSearch, onOpenSet
   state: TaoChatState; profile: ChatProfile; controller: TaoChatController;
   onMode: (mode: TaoMode) => void; onSearch: () => void; onOpenSettings?: () => void; onOpenAppearance?: () => void; slots?: React.ReactNode;
 }) {
-  const more = useTaoPopover();
   const usage = useTaoPopover();
+  const lastPanel = useRef(profile.sidePanels[0]);
+  useEffect(() => { if (state.ui.sidePanel) lastPanel.current = state.ui.sidePanel; }, [state.ui.sidePanel]);
+  const togglePanel = () => controller.setSidePanel(state.ui.sidePanel ? null : lastPanel.current ?? profile.sidePanels[0] ?? null);
   const runtime = state.activeThreadId ? state.runtime[state.activeThreadId] : undefined;
   const budget = runtime?.budget;
   const thread = state.activeThreadId ? state.threads[state.activeThreadId] : undefined;
@@ -22,9 +25,10 @@ export function TopBar({ state, profile, controller, onMode, onSearch, onOpenSet
       {budget && budget.usedTokens > 0 ? <button ref={usage.triggerRef} type="button" className={`tao-home-usage-pill warning-${budget.warning ?? 0}`} data-testid="tao-home-usage-pill" onClick={() => usage.setOpen(!usage.open)}>{formatTokens(budget.usedTokens)} / {formatTokens(budget.limitTokens)}</button> : null}
       <TaoPopover owner={usage} label={tr("用量与预算")}><div className="tao-home-popup-items"><strong>{tr("用量与预算")}</strong>{totals?.map((item, index) => <p key={index}>{tr("第 {n} 轮", { n: index + 1 })} · {tr("输入")} {item?.inputTokens ?? tr("未知")} / {tr("输出")} {item?.outputTokens ?? tr("未知")}<br />{tr("搜索")} {item?.searchCalls ?? tr("未知")} · {tr("读链接")} {item?.fetchCalls ?? tr("未知")}<br />{item?.estimatedCostCny === undefined ? tr("费用未知") : tr("约 ¥{amount}（估算）", { amount: item.estimatedCostCny.toFixed(4) })}</p>)}<p>{tr("本轮")} {budget?.usedTokens ?? 0} / {budget?.limitTokens ?? 0} tokens</p></div></TaoPopover>
       <button type="button" className="tao-home-icon-button" data-testid="tao-home-search" aria-label={tr("搜索 Taomni 本地资料")} onClick={onSearch}><Search size={15} /><kbd>{getAppPlatform() === "macos" ? "⌘K" : "Ctrl+K"}</kbd></button>
-      <button ref={more.triggerRef} type="button" className="tao-home-icon-button" data-testid="tao-home-more" aria-label={tr("更多")} onClick={() => more.setOpen(!more.open)}><MoreHorizontal size={16} /></button>
-      <TaoPopover owner={more} label={tr("Tao 更多")}><div className="tao-home-popup-items"><button type="button" onClick={() => { controller.setSidePanel("导入导出"); more.close(false); }}>{tr("导入 / 导出历史")}</button><button type="button" data-testid="tao-home-demo-toggle" aria-pressed={state.ui.demoMode} onClick={() => { controller.setDemoMode(!state.ui.demoMode); more.close(); }}>{tr("演示模式")} {state.ui.demoMode ? "✓" : ""} · F9</button>{profile.sidePanels.map((panel) => <button type="button" key={panel} onClick={() => { controller.setSidePanel(panel); more.close(false); }}>{tr(panel)}</button>)}<button type="button" data-testid="tao-home-settings" onClick={() => { more.close(false); onOpenSettings?.(); }}>{tr("Tao 设置")}</button></div></TaoPopover>
-      <button type="button" className="tao-home-icon-button" data-testid="tao-home-appearance" aria-label={tr("界面设置")} onClick={onOpenAppearance ?? onOpenSettings}><SlidersHorizontal size={15} /></button>
+      {profile.sidePanels.length ? <button type="button" className="tao-home-icon-button" data-testid="tao-home-side-toggle" aria-label={tr(state.ui.sidePanel ? "收缩侧栏" : "展开侧栏")} title={tr(state.ui.sidePanel ? "收缩侧栏" : "展开侧栏")} aria-expanded={Boolean(state.ui.sidePanel)} onClick={togglePanel}>{state.ui.sidePanel ? <PanelRightClose size={16} /> : <PanelRightOpen size={16} />}</button> : null}
+      <button type="button" className="tao-home-icon-button" data-testid="tao-home-demo-toggle" aria-label={tr("演示模式")} title={`${tr("演示模式")} · F9`} aria-pressed={state.ui.demoMode} onClick={() => controller.setDemoMode(!state.ui.demoMode)}><Presentation size={15} /></button>
+      <button type="button" className="tao-home-icon-button" data-testid="tao-home-settings" aria-label={tr("Tao 设置")} title={tr("Tao 设置")} onClick={onOpenSettings}><SlidersHorizontal size={15} /></button>
+      <button type="button" className="tao-home-icon-button" data-testid="tao-home-appearance" aria-label={tr("界面设置")} title={tr("界面设置")} onClick={onOpenAppearance ?? onOpenSettings}><Palette size={15} /></button>
     </div>
   </header>;
 }

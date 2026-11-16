@@ -17,7 +17,6 @@ steps:
 - vault_first_run: qa-tao-home-009
 - click: '[data-testid="language-switcher"]'
 - click: '[data-testid="language-option-en"]'
-- click: '[data-testid="tao-home-more"]'
 - click: '[data-testid="tao-home-settings"]'
 - wait_for: '[data-testid="tao-settings"]'
 - click: '[data-testid="tao-settings-save"]'

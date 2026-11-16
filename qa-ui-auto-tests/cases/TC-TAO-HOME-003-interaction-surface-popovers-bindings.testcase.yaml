@@ -35,7 +35,7 @@ steps:
 - assert_text:
     selector: '[data-testid="tao-home-files"]'
     contains: Choose or drop a PDF/image.
-- click: '[data-testid="tao-home-side-panel"] button[aria-label="Close sidebar"]'
+- click: '[data-testid="tao-home-side-toggle"]'
 - assert_not_visible: '[data-testid="tao-home-side-panel"]'
 - click: '[data-testid="tao-home-plus"]'
 - click: '[data-testid="tao-home-context-workflows"]'
@@ -43,13 +43,13 @@ steps:
 - assert_text:
     selector: '[data-testid="tao-home-workflows"]'
     contains: Each step requires confirmation
-- click: '[data-testid="tao-home-side-panel"] button[aria-label="Close sidebar"]'
+- click: '[data-testid="tao-home-side-toggle"]'
 - click: '[data-testid="tao-home-voice"]'
 - wait_for: '[data-testid="tao-home-speech"]'
 - assert_text:
     selector: '[data-testid="tao-home-speech"]'
     contains: Local dictation only fills the draft
-- click: '[data-testid="tao-home-side-panel"] button[aria-label="Close sidebar"]'
+- click: '[data-testid="tao-home-side-toggle"]'
 - click: '[data-testid="tao-home-capabilities"]'
 - wait_for: '[role="dialog"]'
 - click: '[data-testid="tao-home-capability-thinking"]'
@@ -79,11 +79,10 @@ steps:
     selector: '[data-testid="tab-item"][data-tab-type="settings"]'
     equal: 1
 - click: '[data-testid="nav-mode-home"]'
-- click: '[data-testid="tao-home-more"]'
 - click: '[data-testid="tao-home-settings"]'
 - wait_for: '[data-testid="tao-settings"]'
 - eval_readonly:
-    expression: document.getElementById('tao-settings-heading').getBoundingClientRect().top >= document.getElementById('settings-search-input').getBoundingClientRect().bottom + 12
+    expression: document.getElementById('tao-settings-heading').getBoundingClientRect().top >= document.getElementById('settings-search-input').getBoundingClientRect().bottom + 12 && document.getElementById('tao-settings-heading').getBoundingClientRect().bottom <= document.getElementById('tao-settings-heading').closest('.overflow-auto').getBoundingClientRect().bottom
     expect_truthy: true
     timeout_sec: 5
 - assert_element_geometry:

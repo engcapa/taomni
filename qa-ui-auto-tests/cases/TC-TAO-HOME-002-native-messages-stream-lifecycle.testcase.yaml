@@ -71,7 +71,6 @@ steps:
 - assert_text:
     selector: '[data-testid="tao-home-message-list"]'
     contains: Partial reply
-- click: '[data-testid="tao-home-more"]'
 - click: '[data-testid="tao-home-settings"]'
 - wait_for: '[data-testid="tao-settings"]'
 - select_option:
@@ -92,7 +91,6 @@ steps:
     path: ${fixture.tao_messages_log}
     contains: app POST /anthropic/v1/messages
 - assert_not_visible: '[data-testid="tao-home-stop"]'
-- click: '[data-testid="tao-home-more"]'
 - click: '[data-testid="tao-home-settings"]'
 - select_option:
     selector: '[data-testid="tao-settings"] [data-testid="llm-proxy-mode"]'

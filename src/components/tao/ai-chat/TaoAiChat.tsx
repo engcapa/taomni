@@ -7,6 +7,7 @@ import { MessageList } from "./MessageList";
 import { TaoComposer } from "./Composer";
 import { SidePanel } from "./SidePanel";
 import { TopBar } from "./TopBar";
+import { useChatFeedScroll } from "./useChatFeedScroll";
 import { BudgetCard, BrowserUnavailableCard, RefusalCard, StoppedCard, VaultLockedMask } from "./states/StateCards";
 import type { ChatProfile, TaoChatController, TaoChatSlots } from "./ports";
 
@@ -16,6 +17,7 @@ export function TaoAiChat({ controller, profile, slots, disabled = false, active
   const state = useSyncExternalStore(controller.subscribe, controller.getState, controller.getState);
   const thread = state.activeThreadId ? state.threads[state.activeThreadId] : undefined;
   const phase = state.activeThreadId ? state.runtime[state.activeThreadId]?.phase ?? "idle" : "idle";
+  const feed = useChatFeedScroll(state.activeThreadId, thread?.messages, phase, active);
   const received = Boolean(thread?.messages.at(-1)?.blocks.some((block) => block.type !== "error" && (block.text || block.sources?.length)));
   const previous = useRef({ threadId: state.activeThreadId, phase });
   useEffect(() => {
@@ -47,15 +49,19 @@ export function TaoAiChat({ controller, profile, slots, disabled = false, active
   return (
     <section ref={rootRef} className="tao-ai-chat" data-testid="tao-ai-chat" data-tao-active={active}>
       <TopBar state={state} profile={profile} controller={controller} onMode={controller.setMode} onSearch={() => controller.setSearchOpen(true)} onOpenSettings={onOpenSettings} onOpenAppearance={onOpenAppearance} slots={slots?.headerTrailing ?? slots?.headerLeading} />
-      <div className={`tao-home-main ${thread?.messages.length ? "has-messages" : "empty"}`}>
-        <div className="tao-home-feed" data-testid="tao-home-feed">
+      <div className="tao-home-body" data-testid="tao-home-body">
+      <div className={`tao-home-main ${thread?.messages.length ? "has-messages" : "empty"}`} data-testid="tao-home-chat-column">
+        <div ref={feed.feedRef} onScroll={feed.onScroll} className="tao-home-feed" data-testid="tao-home-feed">
+          <div ref={feed.contentRef} className="tao-home-feed-content">
           {thread?.messages.length ? <MessageList thread={thread} phase={phase} controller={controller} /> : <div className="tao-home-empty-stage"><div className="tao-home-greeting"><span className="tao-home-logo">T</span><div><h1>{tr("Tao 在这里")}</h1><p>{tr("Develop Buddy · 问、做、深研你的开发问题")}</p></div></div>{slots?.emptyState}</div>}
           <RefusalCard phase={phase} /><BudgetCard phase={phase} controller={controller} /><StoppedCard phase={phase} controller={controller} web={state.activeThreadId ? state.runtime[state.activeThreadId]?.lastRequest?.web ?? state.composer.web : state.composer.web} received={received} />
+          </div>
         </div>
         <div className="tao-home-composer-dock"><div className="tao-home-composer-context">{slots?.composerContext}</div><TaoComposer controller={controller} state={state} disabled={disabled || phase === "vault_locked"} />{slots?.belowComposer}</div>
       </div>
-      <VaultLockedMask phase={phase} controller={controller} active={active} />
       <SidePanel state={state} profile={profile} controller={controller}>{slots?.sidePanels}</SidePanel>
+      </div>
+      <VaultLockedMask phase={phase} controller={controller} active={active} />
       <footer className="tao-home-footer"><span>T · Taomni</span><span>v{__APP_VERSION__}</span></footer>
       {disabled && !slots?.emptyState ? <BrowserUnavailableCard onOpenSettings={onOpenSettings} /> : null}
     </section>

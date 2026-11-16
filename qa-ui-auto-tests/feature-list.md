@@ -120,8 +120,15 @@ files:
 - src/components/tao/home/HistoryPopover.tsx
 - src/components/tao/ai-chat/TaoAiChat.tsx
 - src/components/tao/ai-chat/Composer.tsx
+- src/components/tao/ai-chat/TopBar.tsx
+- src/components/tao/ai-chat/SidePanel.tsx
+- src/components/tao/ai-chat/sidePanelTabs.tsx
+- src/components/tao/ai-chat/useSidePanelResize.ts
+- src/components/tao/ai-chat/useChatFeedScroll.ts
+- src/components/tao/home/SuggestionRow.tsx
 - src/components/tao/search/SearchPanel.tsx
 - src/styles/taoHome.css
+- src/styles/taoHomeLayout.css
 controls:
 - id: tao-home-host
   selector: '[data-testid="tao-home-host"]'
@@ -219,8 +226,8 @@ controls:
 - id: tao-home-new-chat
   selector: '[data-testid="tao-home-new-chat"]'
   kind: interactive
-- id: tao-home-more
-  selector: '[data-testid="tao-home-more"]'
+- id: tao-home-side-toggle
+  selector: '[data-testid="tao-home-side-toggle"]'
   kind: interactive
 - id: tao-home-appearance
   selector: '[data-testid="tao-home-appearance"]'
@@ -336,9 +343,6 @@ controls:
 - id: tao-settings-proxy
   selector: '[data-testid="tao-settings"] [data-testid="llm-proxy-mode"]'
   kind: interactive
-- id: tao-home-more-dialog
-  selector: '[role="dialog"][aria-label="Tao 更多"]'
-  kind: display
 - id: tao-home-capabilities-dialog
   selector: '[role="dialog"][aria-label="模型与能力"]'
   kind: display
@@ -387,12 +391,32 @@ controls:
 - id: tao-home-side-tab-archive
   selector: '[data-testid="tao-home-side-tab-archive"]'
   kind: interactive
+- id: tao-home-side-tab-memory
+  selector: '[data-testid="tao-home-side-tab-memory"]'
+  kind: interactive
+- id: tao-home-side-tab-skills
+  selector: '[data-testid="tao-home-side-tab-skills"]'
+  kind: interactive
 - id: tao-home-side-resize
   selector: '[data-testid="tao-home-side-resize"]'
   kind: interactive
+- id: tao-home-chat-column
+  selector: '[data-testid="tao-home-chat-column"]'
+  kind: display
+- id: tao-home-body
+  selector: '[data-testid="tao-home-body"]'
+  kind: display
 -->
 
 Tao Home 将问、做、深研三种模式、绑定栏、Composer、消息状态、历史快捷行与本地资料搜索组合为独立宿主；首页入口移除 LAN 聊天，WSL 只在检测到可用发行版时显示。用例 `TC-TAO-HOME-001` 覆盖无 Key 空态、模式切换、历史三页签、搜索快捷键和托管 WebView smoke。
+
+商业 DeepSeek 实测由临时 Key 显式启用：`TC-TAO-HOME-005` 覆盖单轮真实请求，
+`TC-TAO-HOME-011` 从原生 UI 覆盖多轮 token 回忆、语言切换保留草稿、重新生成、新建对话与停止。
+后者最多四次付费请求；仅明确的 401/403/Key 过期可提前记为凭据检查成功，其他错误不豁免。
+`TC-TAO-HOME-013` 最多三次真实请求，验证 Markdown 标题/表格/代码、native 分支上下文、
+原会话与分支的历史和草稿隔离；均仅使用本机临时 Key，不发送到 hosted workflow。
+侧栏以实际左右布局挤压聊天区，顶部单个图标直接开关并记住上次页签/宽度；
+`TC-TAO-HOME-007/012` 覆盖真实拖拽、键盘调整、中英文单行建议与窄窗口布局。
 
 ### 1.2 主窗口三栏布局 ✅
 

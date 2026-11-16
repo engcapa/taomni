@@ -26,6 +26,26 @@ errors passes. Only HTTP 401/403 or explicit key expiration plus a visible enabl
 retry passes as `credential-invalid`; other errors fail. The outcome artifact
 retains only counts, booleans, fixed categories and completion status.
 
+`tao_real_provider_scenarios: null` drives real native UI after
+`observe_tao_provider`: two turns recall a fresh synthetic token, locale changes
+retain an unsent draft, regeneration retains the transcript, a new chat starts
+empty, and Stop retains a partial commercial response without automatic retry.
+It makes at most four paid requests, writes sanitized stage snapshots and native
+screenshots, and ends early with an explicit `credential-invalid` result only
+for the same 401/403/expired-key rule. Other failures remain failures. It observes
+send/regenerate/continue/stop callback metadata without reading transport bodies
+or replacing callbacks' arguments. Client Stop completion does not independently
+prove server socket closure; loopback native cases own that assertion.
+
+`tao_real_provider_documents: null` drives three real native requests after
+`observe_tao_provider`. It checks an actual heading/table/fenced-code reply,
+waits for the real native branch-clone callback and verifies context recall in
+that branch, then checks independent original/branch history and drafts after
+creating a separate conversation. The observer records clone command/status
+metadata only. The same explicit credential-invalid rule applies; model-output,
+clone, network and UI failures fail. History restoration here stays in the same
+process; TC-TAO-HOME-004 owns restart persistence.
+
 `reveal_project_tree_row: '[data-testid="code-workspace-tree-dir"][data-path="folder"]'` scrolls the real tree viewport until a lazy row is visible, without selection or activation, and saves raw offsets. File-open probes do the same preparation before the first measured pointer event.
 
 `measure_workspace_file_open: {selector, expected, event: click|dblclick, label, require_highlight?: boolean, require_editor_reuse?: boolean}`

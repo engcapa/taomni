@@ -113,14 +113,16 @@ steps:
 - click: '[data-testid="tao-home-capabilities"]'
 - press: Escape
 - assert_not_visible: '[role="dialog"][aria-label="模型与能力"]'
-- click: '[data-testid="tao-home-more"]'
 - click: '[data-testid="tao-home-demo-toggle"]'
-- assert_not_visible: '[role="dialog"][aria-label="Tao 更多"]'
-- click: '[data-testid="tao-home-more"]'
 - assert_attribute:
     selector: '[data-testid="tao-home-demo-toggle"]'
     name: aria-pressed
     equals: 'true'
-- press: Escape
+- press: F9
+- assert_attribute:
+    selector: '[data-testid="tao-home-demo-toggle"]'
+    name: aria-pressed
+    equals: 'false'
+- assert_visible: '[data-testid="tao-home-suggestions"]'
 - assert_no_runtime_errors: null
 - screenshot: tao-home-shell-no-key.png

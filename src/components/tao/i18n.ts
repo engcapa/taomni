@@ -47,7 +47,7 @@ const english: Record<string, string> = {
   "演示模式下已隐藏内容": "Content hidden in presentation mode", "该上下文尚无可预览内容。": "No preview is available for this context.", "关闭": "Close",
   "可以这样问": "Try asking", "解释一个终端报错": "Explain a terminal error", "帮我排查最近的构建失败": "Investigate the latest build failure",
   "写一个安全的 SQL 查询": "Write a safe SQL query", "深研一个技术方案": "Research a technical approach",
-  "关闭侧栏": "Close sidebar", "展开侧栏": "Expand sidebar", "收缩侧栏": "Collapse sidebar", "调整侧栏宽度": "Resize sidebar", "选择一条来源或生成物查看详情。": "Select a source or artifact to inspect it.", "暂无来源": "No sources yet", "暂无文件": "No files attached",
+  "Tao 侧栏": "Tao sidebar", "关闭侧栏": "Close sidebar", "展开侧栏": "Expand sidebar", "收缩侧栏": "Collapse sidebar", "调整侧栏宽度": "Resize sidebar", "选择一条来源或生成物查看详情。": "Select a source or artifact to inspect it.", "暂无来源": "No sources yet", "暂无文件": "No files attached",
   "暂无工作流": "No workflows yet", "尚未连接此功能。": "This feature is not connected yet.",
   "复制": "Copy", "重新生成": "Regenerate", "已思考": "Thinking", "· 展开": "· Expanded", "· 点击查看": "· Show details", "正在搜索": "Searching", "已找到来源": "Sources found",
   "网络不可用": "Network unavailable", "流中断": "Stream interrupted", "请求参数无效": "Invalid request parameters", "配置不可用": "Configuration unavailable", "Tao 暂时无法完成": "Tao could not complete this request",
