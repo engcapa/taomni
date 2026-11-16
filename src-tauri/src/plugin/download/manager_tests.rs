@@ -49,7 +49,7 @@ async fn panic_is_terminal_releases_reservations_and_allows_forget_and_retry() {
     let request = request(directory.path(), "panic");
     let manager = DownloadManager::new(HttpDownloadService::new(&ProxyRoute::NoProxy).unwrap());
     let (task, _) = manager.state.lock().await.reserve(&request).unwrap();
-    manager.forget(&request.id).await;
+    manager.forget(&request.id).await.unwrap();
     assert!(manager.snapshot(&request.id).await.is_some());
     let result = manager
         .run_worker(&request.id, &task, async {
@@ -60,7 +60,7 @@ async fn panic_is_terminal_releases_reservations_and_allows_forget_and_retry() {
     let snapshot = manager.snapshot(&request.id).await.unwrap();
     assert_eq!(snapshot.phase, DownloadPhase::Failed);
     assert!(snapshot.error.unwrap().contains("panicked"));
-    manager.forget(&request.id).await;
+    manager.forget(&request.id).await.unwrap();
     assert!(manager.snapshot(&request.id).await.is_none());
     manager.state.lock().await.reserve(&request).unwrap();
 }

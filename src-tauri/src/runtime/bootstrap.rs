@@ -72,11 +72,12 @@ fn construct(
     ));
     // Optional malformed packages are disabled records, never startup failures.
     let _ = plugins.scan();
-    let plugin_downloads = Arc::new(crate::plugin::download::DownloadManager::new(
+    let plugin_downloads = Arc::new(crate::plugin::download::DownloadManager::persistent(
         crate::plugin::download::HttpDownloadService::new(
             &crate::plugin::download::ProxyRoute::NoProxy,
         )
         .map_err(|e| e.to_string())?,
+        paths.plugins.join(".downloads"),
     ));
     let core = Arc::new(CoreState::new(paths, db, notes, vault, leases.clone()));
     let observer: Arc<dyn crate::terminal::observation::TerminalObserver> =

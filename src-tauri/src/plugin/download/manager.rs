@@ -5,7 +5,7 @@ use std::future::Future;
 use std::panic::AssertUnwindSafe;
 
 use futures::FutureExt;
-use tokio::sync::Notify;
+use tokio::sync::{Notify, OnceCell};
 
 use super::*;
 
@@ -13,6 +13,8 @@ use super::*;
 struct ManagerState {
     shutting_down: bool,
     tasks: HashMap<String, Arc<Mutex<DownloadTask>>>,
+    requests: HashMap<String, DownloadRequest>,
+    recovery_errors: Vec<String>,
     cancellations: HashMap<String, CancellationToken>,
     paths: HashMap<PathBuf, String>,
     artifacts: HashMap<String, String>,
@@ -51,6 +53,7 @@ impl ManagerState {
         )));
         let token = CancellationToken::new();
         self.tasks.insert(request.id.clone(), task.clone());
+        self.requests.insert(request.id.clone(), request.clone());
         self.cancellations.insert(request.id.clone(), token.clone());
         Ok((task, token))
     }
@@ -62,7 +65,7 @@ impl ManagerState {
     }
 }
 
-fn artifact_keys(request: &DownloadRequest) -> Result<Vec<String>, DownloadError> {
+pub(super) fn artifact_keys(request: &DownloadRequest) -> Result<Vec<String>, DownloadError> {
     let url = reqwest::Url::parse(&request.url)
         .map_err(|error| DownloadError::InvalidUrl(error.to_string()))?;
     let mut keys = vec![format!("url:{url}")];
@@ -80,6 +83,23 @@ pub struct DownloadManager {
     service: HttpDownloadService,
     state: Arc<Mutex<ManagerState>>,
     workers_changed: Arc<Notify>,
+    journal: Option<Arc<journal::DownloadJournal>>,
+    recovered: Arc<OnceCell<()>>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DownloadInfo {
+    pub id: String,
+    pub completed_path: PathBuf,
+    pub progress: DownloadProgress,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct DownloadListing {
+    pub tasks: Vec<DownloadInfo>,
+    pub recovery_errors: Vec<String>,
 }
 
 impl DownloadManager {
@@ -88,7 +108,35 @@ impl DownloadManager {
             service,
             state: Arc::new(Mutex::new(ManagerState::default())),
             workers_changed: Arc::new(Notify::new()),
+            journal: None,
+            recovered: Arc::new(OnceCell::new()),
         }
+    }
+
+    pub fn persistent(service: HttpDownloadService, root: PathBuf) -> Self {
+        Self {
+            journal: Some(Arc::new(journal::DownloadJournal::new(root))),
+            ..Self::new(service)
+        }
+    }
+
+    async fn recover(&self) {
+        self.recovered
+            .get_or_init(|| async {
+                if let Some(journal) = &self.journal {
+                    let (downloads, errors) = journal.recover().await;
+                    let mut state = self.state.lock().await;
+                    state.recovery_errors = errors;
+                    for download in downloads {
+                        let id = download.request.id.clone();
+                        let mut task = DownloadTask::new(&id, download.request.expected_total);
+                        task.progress = download.progress;
+                        state.requests.insert(id.clone(), download.request);
+                        state.tasks.insert(id, Arc::new(Mutex::new(task)));
+                    }
+                }
+            })
+            .await;
     }
 
     pub async fn start(&self, request: DownloadRequest) -> Result<DownloadHandle, DownloadError> {
@@ -104,21 +152,41 @@ impl DownloadManager {
         self.start_with_service(request, service).await
     }
 
-    async fn start_with_service(
+    pub async fn start_with_service(
         &self,
         mut request: DownloadRequest,
         service: HttpDownloadService,
     ) -> Result<DownloadHandle, DownloadError> {
+        self.recover().await;
         integrity::validate_request(&request)?;
         request.partial_path = paths::canonical_candidate(&request.partial_path)?;
         request.completed_path = paths::canonical_candidate(&request.completed_path)?;
         validate_download_paths(&request.partial_path, &request.completed_path)?;
-        let (task, token) = self.state.lock().await.reserve(&request)?;
+        let mut state = self.state.lock().await;
+        if state.shutting_down {
+            return Err(DownloadError::ShuttingDown);
+        }
+        if state.cancellations.contains_key(&request.id) {
+            return Err(DownloadError::AlreadyActive(request.id.clone()));
+        }
+        let resource_locks = self
+            .journal
+            .as_ref()
+            .map(|journal| journal.reserve(&request))
+            .transpose()?;
+        // Persist before starting network activity. If persistence fails, the
+        // worker does not start and the previous task remains visible.
+        if let Some(journal) = &self.journal {
+            journal.save(&request, None)?;
+        }
+        let (task, token) = state.reserve(&request)?;
+        drop(state);
         let task_for_worker = task.clone();
         let token_for_worker = token.clone();
         let manager = self.clone();
         let id = request.id.clone();
         let join = tokio::spawn(async move {
+            let _resource_locks = resource_locks;
             let transfer = service.download(request, task_for_worker.clone(), token_for_worker);
             manager.run_worker(&id, &task_for_worker, transfer).await
         });
@@ -152,7 +220,19 @@ impl DownloadManager {
                 fail_task(task, downloaded, error).await;
             }
         }
-        self.state.lock().await.release(id);
+        let progress = task.lock().await.snapshot().clone();
+        let mut state = self.state.lock().await;
+        if let Some(journal) = &self.journal {
+            if let Some(request) = state.requests.get(id) {
+                if let Err(error) = journal.save(request, Some(progress)) {
+                    state
+                        .recovery_errors
+                        .push(format!("save module download {id}: {error}"));
+                }
+            }
+        }
+        state.release(id);
+        drop(state);
         self.workers_changed.notify_waiters();
         result
     }
@@ -190,18 +270,77 @@ impl DownloadManager {
     }
 
     pub async fn snapshot(&self, id: &str) -> Option<DownloadProgress> {
+        self.recover().await;
         let task = self.state.lock().await.tasks.get(id).cloned()?;
         Some(task.lock().await.snapshot().clone())
     }
 
-    pub async fn forget(&self, id: &str) {
+    pub async fn forget(&self, id: &str) -> Result<(), DownloadError> {
+        self.recover().await;
         let mut state = self.state.lock().await;
         if !state.cancellations.contains_key(id) {
+            if let Some(journal) = &self.journal {
+                let _locks = state
+                    .requests
+                    .get(id)
+                    .map(|request| journal.reserve(request))
+                    .transpose()?;
+                journal.remove(id)?;
+            }
             state.tasks.remove(id);
+            state.requests.remove(id);
+        }
+        Ok(())
+    }
+
+    pub async fn list(&self) -> DownloadListing {
+        self.recover().await;
+        let state = self.state.lock().await;
+        let mut tasks = Vec::new();
+        for (id, request) in &state.requests {
+            if let Some(task) = state.tasks.get(id) {
+                tasks.push(DownloadInfo {
+                    id: id.clone(),
+                    completed_path: request.completed_path.clone(),
+                    progress: task.lock().await.snapshot().clone(),
+                });
+            }
+        }
+        tasks.sort_by(|left, right| left.id.cmp(&right.id));
+        DownloadListing {
+            tasks,
+            recovery_errors: state.recovery_errors.clone(),
         }
     }
 
+    /// Resume only after the caller resolves the selected current proxy. Saved
+    /// descriptions never persist credentials or make a connection by loading.
+    pub async fn resume_with_service(
+        &self,
+        id: &str,
+        service: HttpDownloadService,
+    ) -> Result<DownloadHandle, DownloadError> {
+        self.recover().await;
+        let request = self
+            .state
+            .lock()
+            .await
+            .requests
+            .get(id)
+            .cloned()
+            .ok_or_else(|| DownloadError::InvalidPath(format!("unknown download task: {id}")))?;
+        if self
+            .snapshot(id)
+            .await
+            .is_some_and(|progress| progress.phase == DownloadPhase::Completed)
+        {
+            return Err(DownloadError::AlreadyComplete);
+        }
+        self.start_with_service(request, service).await
+    }
+
     pub async fn cancel(&self, id: &str) -> Result<DownloadProgress, DownloadError> {
+        self.recover().await;
         let state = self.state.lock().await;
         let task =
             state.tasks.get(id).cloned().ok_or_else(|| {

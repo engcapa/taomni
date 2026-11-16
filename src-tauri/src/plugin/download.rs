@@ -426,7 +426,9 @@ mod integrity;
 
 #[path = "download/manager.rs"]
 mod manager;
-pub use manager::{DownloadHandle, DownloadManager};
+pub use manager::{DownloadHandle, DownloadInfo, DownloadListing, DownloadManager};
+#[path = "download/journal.rs"]
+mod journal;
 
 fn validate_download_paths(partial: &Path, completed: &Path) -> Result<(), DownloadError> {
     if paths::reservation_key(&paths::canonical_candidate(partial)?)

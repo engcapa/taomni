@@ -30,10 +30,19 @@ profile lock; it rejects new transfers, cancels active work and waits for actual
 worker completion while retaining partial data. A pure synthetic-worker test
 protects this ordering without opening a socket.
 
-These gates do **not** establish persistence of tasks across application
-restarts, signed catalogue trust, the remote module-store UI, or download UI
-restoration and retry/cancel actions. Those require separate production work and
-matching browser/native cases. This transport/state change adds no renderer
-download entry; `TC-MODULES-003` and `TC-MODULES-006` remain required for the
+`DownloadManager::persistent()` journals descriptions before starting a worker,
+keeps credentials out of the journal, and recovers actual partial bytes without
+automatically making a connection. Completed files are rehashed during recovery.
+Cross-process file reservations cover task ids, paths, URLs and known hashes;
+forgetting a stopped task removes its description while retaining safe data.
+The hosted `restart` contract kills a real disposable downloader subprocess,
+verifies the active socket closes and a simultaneous process is rejected, then
+reopens the same journal, explicitly resumes the exact URL with Range, and checks
+the completed content after another reopen. Local checks compile this test only.
+
+These gates do **not** establish signed catalogue trust, the remote module-store
+UI, or download UI restoration and retry/cancel actions. Those require separate
+production work and matching browser/native cases. This transport/state change
+adds no renderer download entry; `TC-MODULES-003` and `TC-MODULES-006` remain required for the
 Settings store and offline-install workflows. TCP gates do not replace
 `qa-ui-auto-platforms` or crash regressions.

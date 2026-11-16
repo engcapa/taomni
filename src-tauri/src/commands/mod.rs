@@ -773,22 +773,7 @@ pub(crate) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         | "backup_remote_cancel"
         | "backup_remote_retry"
         | "backup_remote_history_url" => backup::handle(invoke),
-        "plugin_list"
-        | "plugin_set_enabled"
-        | "plugin_install_staged"
-        | "plugin_install_archive"
-        | "plugin_rollback"
-        | "plugin_uninstall"
-        | "plugin_refresh"
-        | "plugin_invoke"
-        | "plugin_cancel_request"
-        | "plugin_download_start"
-        | "plugin_download_status"
-        | "plugin_download_cancel"
-        | "plugin_download_forget"
-        | "plugin_catalog_fetch"
-        | "plugin_migration_inspect"
-        | "plugin_migration_execute" => plugin::handle(invoke),
+        command if plugin::handles(command) => plugin::handle(invoke),
         "exit_app" | "restart_app" => application::handle(invoke),
         _ => false,
     }

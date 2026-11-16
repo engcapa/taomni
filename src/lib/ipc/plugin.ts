@@ -23,6 +23,17 @@ export interface ModuleDownloadProgress {
   error?: string | null;
 }
 
+export interface ModuleDownloadInfo {
+  id: string;
+  completedPath: string;
+  progress: ModuleDownloadProgress;
+}
+
+export interface ModuleDownloadListing {
+  tasks: ModuleDownloadInfo[];
+  recoveryErrors: string[];
+}
+
 export interface ModuleDownloadProxyEndpoint {
   kind: "http" | "socks5";
   host: string;
@@ -200,6 +211,24 @@ export function startPluginDownload(options: ModuleDownloadOptions): Promise<Mod
 export function getPluginDownloadStatus(id: string): Promise<ModuleDownloadProgress | null> {
   if (!id) return Promise.reject(new Error("Invalid module download id"));
   return invoke<ModuleDownloadProgress | null>("plugin_download_status", { id });
+}
+
+export function listPluginDownloads(): Promise<ModuleDownloadListing> {
+  return invoke<ModuleDownloadListing>("plugin_download_list", {});
+}
+
+/** Recovery is passive; resuming explicitly resolves the selected proxy again. */
+export function resumePluginDownload(
+  id: string,
+  options: Pick<ModuleDownloadOptions, "proxyMode" | "applicationProxy" | "featureProxy"> = {},
+): Promise<ModuleDownloadProgress> {
+  if (!id) return Promise.reject(new Error("Invalid module download id"));
+  return invoke<ModuleDownloadProgress>("plugin_download_resume", {
+    id,
+    proxyMode: options.proxyMode ?? "app",
+    applicationProxy: options.applicationProxy,
+    featureProxy: options.featureProxy,
+  });
 }
 
 export function cancelPluginDownload(id: string): Promise<ModuleDownloadProgress> {

@@ -328,8 +328,41 @@ pub async fn plugin_download_cancel(
 
 #[tauri::command]
 pub async fn plugin_download_forget(id: String, state: State<'_, AppState>) -> Result<(), String> {
-    state.plugin_downloads.forget(&id).await;
-    Ok(())
+    state
+        .plugin_downloads
+        .forget(&id)
+        .await
+        .map_err(|error| error.to_string())
+}
+
+#[tauri::command]
+pub async fn plugin_download_list(
+    state: State<'_, AppState>,
+) -> Result<crate::plugin::download::DownloadListing, String> {
+    Ok(state.plugin_downloads.list().await)
+}
+
+#[tauri::command]
+pub async fn plugin_download_resume(
+    id: String,
+    proxy_mode: String,
+    application_proxy: Option<PluginDownloadProxyEndpoint>,
+    feature_proxy: Option<PluginDownloadProxyEndpoint>,
+    state: State<'_, AppState>,
+) -> Result<DownloadProgress, String> {
+    let route = resolve_download_route(proxy_mode, application_proxy, feature_proxy)?;
+    let service = crate::plugin::download::HttpDownloadService::new(&route)
+        .map_err(|error| error.to_string())?;
+    state
+        .plugin_downloads
+        .resume_with_service(&id, service)
+        .await
+        .map_err(|error| error.to_string())?;
+    state
+        .plugin_downloads
+        .snapshot(&id)
+        .await
+        .ok_or_else(|| "module download task was not registered".to_owned())
 }
 
 /// Fetch and authenticate the catalog and its detached signature over the
@@ -387,6 +420,30 @@ pub fn plugin_migration_execute(
     executor.record_pending(&snapshot)
 }
 
+pub(super) fn handles(command: &str) -> bool {
+    matches!(
+        command,
+        "plugin_list"
+            | "plugin_set_enabled"
+            | "plugin_install_staged"
+            | "plugin_install_archive"
+            | "plugin_rollback"
+            | "plugin_uninstall"
+            | "plugin_refresh"
+            | "plugin_invoke"
+            | "plugin_cancel_request"
+            | "plugin_download_start"
+            | "plugin_download_status"
+            | "plugin_download_cancel"
+            | "plugin_download_forget"
+            | "plugin_download_list"
+            | "plugin_download_resume"
+            | "plugin_catalog_fetch"
+            | "plugin_migration_inspect"
+            | "plugin_migration_execute"
+    )
+}
+
 pub(super) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
     let handler: fn(tauri::ipc::Invoke<tauri::Wry>) -> bool = tauri::generate_handler![
         crate::commands::plugin::plugin_list,
@@ -402,6 +459,8 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         crate::commands::plugin::plugin_download_status,
         crate::commands::plugin::plugin_download_cancel,
         crate::commands::plugin::plugin_download_forget,
+        crate::commands::plugin::plugin_download_list,
+        crate::commands::plugin::plugin_download_resume,
         crate::commands::plugin::plugin_catalog_fetch,
         crate::commands::plugin::plugin_migration_inspect,
         crate::commands::plugin::plugin_migration_execute,

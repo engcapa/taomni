@@ -165,6 +165,16 @@ impl HttpDownloadService {
                 "partial file exceeds expected package size".into(),
             ));
         }
+        // The process may have stopped after the last byte but before verify
+        // or publication. Do not request an unsatisfiable Range past EOF.
+        if request.expected_total == Some(existing_len)
+            && request.expected_sha256.is_some()
+            && request.partial_path.exists()
+        {
+            return self
+                .complete(request, task, cancellation, existing_len, true)
+                .await;
+        }
         let mut builder = self
             .client
             .get(&request.url)
@@ -232,43 +242,55 @@ impl HttpDownloadService {
             .await?;
         let mut downloaded = offset;
         let mut body = response.bytes_stream();
-        while let Some(chunk) = tokio::select! {
-            _ = cancellation.cancelled() => {
-                cancel_task(&task).await;
-                return Err(DownloadError::Cancelled);
-            }
-            chunk = body.next() => chunk,
-        } {
-            let chunk = match chunk {
-                Ok(chunk) => chunk,
-                Err(error) => {
-                    let wrapped = DownloadError::Http(error.to_string());
-                    fail_task(&task, downloaded, &wrapped).await;
-                    return Err(wrapped);
+        let transfer_result = async {
+            while let Some(chunk) = tokio::select! {
+                _ = cancellation.cancelled() => {
+                    cancel_task(&task).await;
+                    return Err(DownloadError::Cancelled);
                 }
-            };
-            if cancellation.is_cancelled() {
-                cancel_task(&task).await;
-                return Err(DownloadError::Cancelled);
+                chunk = body.next() => chunk,
+            } {
+                let chunk = match chunk {
+                    Ok(chunk) => chunk,
+                    Err(error) => {
+                        let wrapped = DownloadError::Http(error.to_string());
+                        fail_task(&task, downloaded, &wrapped).await;
+                        return Err(wrapped);
+                    }
+                };
+                if cancellation.is_cancelled() {
+                    cancel_task(&task).await;
+                    return Err(DownloadError::Cancelled);
+                }
+                let next = downloaded
+                    .checked_add(chunk.len() as u64)
+                    .ok_or_else(|| DownloadError::Integrity("package size overflow".into()))?;
+                if next > MAX_PACKAGE_BYTES
+                    || total.is_some_and(|total| next > total)
+                    || response_bytes.is_some_and(|bytes| next - offset > bytes)
+                {
+                    return Err(DownloadError::Integrity(
+                        "response exceeds declared package size".into(),
+                    ));
+                }
+                file.write_all(&chunk).await?;
+                downloaded = next;
+                set_task_phase(&task, DownloadPhase::Downloading, downloaded, None, total).await?;
             }
-            let next = downloaded
-                .checked_add(chunk.len() as u64)
-                .ok_or_else(|| DownloadError::Integrity("package size overflow".into()))?;
-            if next > MAX_PACKAGE_BYTES
-                || total.is_some_and(|total| next > total)
-                || response_bytes.is_some_and(|bytes| next - offset > bytes)
-            {
-                return Err(DownloadError::Integrity(
-                    "response exceeds declared package size".into(),
-                ));
-            }
-            file.write_all(&chunk).await?;
-            downloaded = next;
-            set_task_phase(&task, DownloadPhase::Downloading, downloaded, None, total).await?;
+            Ok::<(), DownloadError>(())
         }
-        file.flush().await?;
-        file.sync_all().await?;
+        .await;
+        // Stop the connection before waiting for disk work. Tokio File writes
+        // can still be running after write_all; drain them even on cancellation
+        // or HTTP failure before the manager releases its reservations.
+        drop(body);
+        let persisted = match file.flush().await {
+            Ok(()) => file.sync_all().await,
+            Err(error) => Err(error),
+        };
         drop(file);
+        transfer_result?;
+        persisted?;
         if response_bytes.is_some_and(|bytes| downloaded - offset != bytes) {
             return Err(DownloadError::Integrity(
                 "response length does not match Content-Range".into(),
@@ -284,7 +306,31 @@ impl HttpDownloadService {
                 return Err(error);
             }
         }
-        set_task_phase(&task, DownloadPhase::Verifying, downloaded, None, total).await?;
+        self.complete(
+            request,
+            task,
+            cancellation,
+            downloaded,
+            matches!(decision, ResumeDecision::Append { .. }),
+        )
+        .await
+    }
+
+    async fn complete(
+        &self,
+        request: &DownloadRequest,
+        task: &Arc<Mutex<DownloadTask>>,
+        cancellation: &CancellationToken,
+        downloaded: u64,
+        resumed: bool,
+    ) -> Result<DownloadResult, DownloadError> {
+        let total = task
+            .lock()
+            .await
+            .snapshot()
+            .total
+            .or(request.expected_total);
+        set_task_phase(task, DownloadPhase::Verifying, downloaded, None, total).await?;
         integrity::verify_file(
             &request.partial_path,
             request.expected_sha256.as_deref(),
@@ -303,7 +349,7 @@ impl HttpDownloadService {
         Ok(DownloadResult {
             path: request.completed_path.clone(),
             bytes: downloaded,
-            resumed: matches!(decision, ResumeDecision::Append { .. }),
+            resumed,
         })
     }
 }

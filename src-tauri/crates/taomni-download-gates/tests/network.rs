@@ -149,7 +149,7 @@ async fn cancellation_stops_connection_forget_waits_for_worker_and_retry_resumes
         manager.cancel(&request.id).await.unwrap().phase,
         DownloadPhase::Cancelled
     );
-    manager.forget(&request.id).await;
+    manager.forget(&request.id).await.unwrap();
     let result = tokio::time::timeout(Duration::from_secs(3), handle.wait())
         .await
         .unwrap();
@@ -161,7 +161,7 @@ async fn cancellation_stops_connection_forget_waits_for_worker_and_retry_resumes
         .unwrap();
     assert_eq!(std::fs::read(&request.partial_path).unwrap(), &BODY[..6]);
     assert!(!request.completed_path.exists());
-    manager.forget(&request.id).await;
+    manager.forget(&request.id).await.unwrap();
     assert!(manager.snapshot(&request.id).await.is_none());
     let retry = support::fixture(Reply::resumed(6)).await;
     request.url = retry.url;
