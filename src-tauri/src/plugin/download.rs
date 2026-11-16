@@ -1,8 +1,4 @@
-//! Pure download policy and progress primitives for module installation.
-//!
-//! The actual HTTP client is intentionally outside this module.  These types
-//! decide which proxy route may be used, whether a response can resume a
-//! partial file, and what progress/cancellation state the UI should observe.
+//! Application-owned module downloads, transport policy, and progress state.
 
 use std::fmt;
 use std::path::{Path, PathBuf};
@@ -91,6 +87,8 @@ pub enum DownloadError {
     OutputExists(String),
     #[error("module download task is already active: {0}")]
     AlreadyActive(String),
+    #[error("module download integrity check failed: {0}")]
+    Integrity(String),
     #[error("module download path is invalid: {0}")]
     InvalidPath(String),
     #[error("module catalogue is invalid: {0}")]
@@ -233,6 +231,11 @@ pub fn validate_resume_response(
 ) -> Result<ResumeDecision, DownloadError> {
     match status {
         200 => {
+            if content_range.is_some() {
+                return Err(DownloadError::InvalidContentRange(
+                    "unexpected Content-Range on a full response".into(),
+                ));
+            }
             if let (Some(expected), Some(length)) = (expected_total, content_length) {
                 if expected != length {
                     return Err(DownloadError::RangeLengthMismatch {
@@ -363,7 +366,7 @@ impl DownloadTask {
             return Err(DownloadError::AlreadyFailed);
         }
         if let (DownloadPhase::Completed, Some(total)) = (phase, self.progress.total) {
-            if downloaded < total {
+            if downloaded != total {
                 return Err(DownloadError::IncompleteCompletion { downloaded, total });
             }
         }
@@ -373,25 +376,20 @@ impl DownloadTask {
 
     fn set(&mut self, phase: DownloadPhase, downloaded: u64, error: Option<String>) {
         self.progress.revision = self.progress.revision.saturating_add(1);
-        self.progress.downloaded = self
-            .progress
-            .total
-            .map_or(downloaded, |total| downloaded.min(total));
+        self.progress.downloaded = downloaded;
         self.progress.phase = phase;
         self.progress.error = error;
     }
 
     fn set_total(&mut self, total: Option<u64>) {
-        if self.progress.total.is_none() {
-            self.progress.total = total;
-        }
+        self.progress.total = total;
     }
 }
 
 /// A verified, resumable module download request.
 ///
 /// `partial_path` and `completed_path` must be separate files.  The service
-/// only renames the partial file after the response has been fully consumed,
+/// only publishes the partial file after the response has been fully consumed,
 /// so an interrupted or cancelled transfer cannot replace a working module.
 #[derive(Debug, Clone)]
 pub struct DownloadRequest {
@@ -400,11 +398,14 @@ pub struct DownloadRequest {
     pub partial_path: PathBuf,
     pub completed_path: PathBuf,
     pub expected_total: Option<u64>,
+    pub expected_sha256: Option<String>,
     pub proxy: ProxyRoute,
 }
 
+#[path = "download/catalog.rs"]
 pub mod catalog;
 pub use catalog::{ModuleCatalog, ModuleCatalogAsset, ModuleCatalogPlugin};
+#[path = "download/paths.rs"]
 mod paths;
 pub use paths::validate_download_paths_within_root;
 
@@ -415,139 +416,20 @@ pub struct DownloadResult {
     pub resumed: bool,
 }
 
+#[path = "download/http.rs"]
 mod http;
 pub use http::HttpDownloadService;
+#[path = "download/integrity.rs"]
+mod integrity;
 
-/// Background task manager used by native commands and future renderer task
-/// restoration.  A task remains in the map after completion so the UI can
-/// reopen its final state; callers can explicitly forget it later.
-#[derive(Clone)]
-pub struct DownloadManager {
-    service: HttpDownloadService,
-    tasks: Arc<Mutex<std::collections::HashMap<String, Arc<Mutex<DownloadTask>>>>>,
-    cancellations: Arc<Mutex<std::collections::HashMap<String, CancellationToken>>>,
-}
-
-impl DownloadManager {
-    pub fn new(service: HttpDownloadService) -> Self {
-        Self {
-            service,
-            tasks: Arc::new(Mutex::new(std::collections::HashMap::new())),
-            cancellations: Arc::new(Mutex::new(std::collections::HashMap::new())),
-        }
-    }
-
-    pub async fn start(&self, request: DownloadRequest) -> Result<DownloadHandle, DownloadError> {
-        self.start_with_service(request, self.service.clone()).await
-    }
-
-    pub async fn start_with_route(
-        &self,
-        request: DownloadRequest,
-        route: ProxyRoute,
-    ) -> Result<DownloadHandle, DownloadError> {
-        let service = HttpDownloadService::new(&route)?;
-        self.start_with_service(request, service).await
-    }
-
-    async fn start_with_service(
-        &self,
-        request: DownloadRequest,
-        service: HttpDownloadService,
-    ) -> Result<DownloadHandle, DownloadError> {
-        let mut tasks = self.tasks.lock().await;
-        if tasks.contains_key(&request.id) {
-            return Err(DownloadError::AlreadyActive(request.id));
-        }
-        let total = request.expected_total;
-        let task = Arc::new(Mutex::new(DownloadTask::new(request.id.clone(), total)));
-        tasks.insert(request.id.clone(), Arc::clone(&task));
-        drop(tasks);
-        let token = CancellationToken::new();
-        self.cancellations
-            .lock()
-            .await
-            .insert(request.id.clone(), token.clone());
-        let task_for_worker = Arc::clone(&task);
-        let token_for_worker = token.clone();
-        let join = tokio::spawn(async move {
-            service
-                .download(request, task_for_worker, token_for_worker)
-                .await
-        });
-        let id = task.lock().await.id.clone();
-        Ok(DownloadHandle {
-            id,
-            task,
-            cancellation: token,
-            join,
-        })
-    }
-
-    pub async fn snapshot(&self, id: &str) -> Option<DownloadProgress> {
-        let task = self.tasks.lock().await.get(id).cloned()?;
-        Some(task.lock().await.snapshot().clone())
-    }
-
-    pub async fn forget(&self, id: &str) {
-        self.tasks.lock().await.remove(id);
-        self.cancellations.lock().await.remove(id);
-    }
-
-    pub async fn cancel(&self, id: &str) -> Result<DownloadProgress, DownloadError> {
-        let task =
-            self.tasks.lock().await.get(id).cloned().ok_or_else(|| {
-                DownloadError::InvalidPath(format!("unknown download task: {id}"))
-            })?;
-        let token = self
-            .cancellations
-            .lock()
-            .await
-            .get(id)
-            .cloned()
-            .ok_or_else(|| DownloadError::InvalidPath(format!("unknown download task: {id}")))?;
-        token.cancel();
-        // Publish cancellation synchronously so the IPC caller observes the
-        // terminal state even when the worker has not reached its next
-        // cancellation checkpoint yet.
-        task.lock().await.cancel();
-        Ok(task.lock().await.snapshot().clone())
-    }
-}
-
-pub struct DownloadHandle {
-    pub id: String,
-    task: Arc<Mutex<DownloadTask>>,
-    cancellation: CancellationToken,
-    join: JoinHandle<Result<DownloadResult, DownloadError>>,
-}
-
-impl DownloadHandle {
-    pub async fn snapshot(&self) -> DownloadProgress {
-        self.task.lock().await.snapshot().clone()
-    }
-
-    pub fn cancel(&self) {
-        self.cancellation.cancel();
-    }
-
-    pub async fn wait(self) -> Result<DownloadResult, DownloadError> {
-        match self.join.await {
-            Ok(result) => result,
-            Err(error) => Err(DownloadError::Http(format!(
-                "download task join failed: {error}"
-            ))),
-        }
-    }
-}
+#[path = "download/manager.rs"]
+mod manager;
+pub use manager::{DownloadHandle, DownloadManager};
 
 fn validate_download_paths(partial: &Path, completed: &Path) -> Result<(), DownloadError> {
-    if partial.as_os_str().is_empty() || completed.as_os_str().is_empty() {
-        return Err(DownloadError::InvalidPath(
-            "download paths must be non-empty".into(),
-        ));
-    }
-    if partial == completed {
+    if paths::reservation_key(&paths::canonical_candidate(partial)?)
+        == paths::reservation_key(&paths::canonical_candidate(completed)?)
+    {
         return Err(DownloadError::InvalidPath(
             "partial and completed paths must differ".into(),
         ));
@@ -563,8 +445,13 @@ async fn set_task_phase(
     total: Option<u64>,
 ) -> Result<(), DownloadError> {
     let mut guard = task.lock().await;
+    let previous_total = guard.snapshot().total;
     guard.set_total(total);
-    guard.update(phase, downloaded, error)
+    let result = guard.update(phase, downloaded, error);
+    if result.is_err() {
+        guard.set_total(previous_total);
+    }
+    result
 }
 
 async fn cancel_task(task: &Arc<Mutex<DownloadTask>>) {

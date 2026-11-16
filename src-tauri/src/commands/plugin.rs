@@ -240,6 +240,7 @@ pub async fn plugin_download_start(
     partial_path: String,
     completed_path: String,
     expected_total: Option<u64>,
+    expected_sha256: Option<String>,
     proxy_mode: String,
     application_proxy: Option<PluginDownloadProxyEndpoint>,
     feature_proxy: Option<PluginDownloadProxyEndpoint>,
@@ -259,6 +260,7 @@ pub async fn plugin_download_start(
         partial_path,
         completed_path,
         expected_total,
+        expected_sha256,
         proxy: route.clone(),
     };
     state

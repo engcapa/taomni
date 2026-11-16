@@ -12,6 +12,7 @@ import {
   refreshPlugins,
   rollbackPlugin,
   setPluginEnabled,
+  startPluginDownload,
   uninstallPlugin,
 } from "./plugin";
 
@@ -109,6 +110,19 @@ describe("invokePlugin", () => {
     invokeMock.mockResolvedValueOnce(true);
     await expect(cancelPluginRequest("mfa", "request-1")).resolves.toBe(true);
     expect(invokeMock).toHaveBeenCalledExactlyOnceWith("plugin_cancel_request", { slug: "mfa", requestId: "request-1" });
+  });
+
+  it("passes the catalogue digest and size to native download verification", async () => {
+    const expectedSha256 = "ab".repeat(32);
+    invokeMock.mockResolvedValueOnce({ phase: "connecting", downloaded: 0 });
+    await startPluginDownload({
+      id: "module-download", url: "https://example.test/module.taomni-plugin",
+      partialPath: "/profile/.downloads/module.part", completedPath: "/profile/.downloads/module.pkg",
+      expectedTotal: 42, expectedSha256, proxyMode: "none",
+    });
+    expect(invokeMock).toHaveBeenCalledWith("plugin_download_start", expect.objectContaining({
+      id: "module-download", expectedTotal: 42, expectedSha256, proxyMode: "none",
+    }));
   });
 });
 

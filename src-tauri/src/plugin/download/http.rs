@@ -1,5 +1,6 @@
 //! HTTP transport and resume policy application.
 
+use super::integrity::{self, MAX_PACKAGE_BYTES};
 use super::*;
 use futures::StreamExt;
 use std::time::Duration;
@@ -19,7 +20,11 @@ impl HttpDownloadService {
     pub fn new(route: &ProxyRoute) -> Result<Self, DownloadError> {
         let mut builder = reqwest::Client::builder()
             .connect_timeout(Duration::from_secs(20))
-            .timeout(Duration::from_secs(30));
+            .read_timeout(Duration::from_secs(30))
+            .no_gzip()
+            .no_brotli()
+            .no_deflate()
+            .no_zstd();
         match route {
             ProxyRoute::NoProxy => {
                 builder = builder.no_proxy();
@@ -75,6 +80,7 @@ impl HttpDownloadService {
         let response = self
             .client
             .get(parsed)
+            .header(reqwest::header::ACCEPT_ENCODING, "identity")
             .send()
             .await
             .map_err(|error| DownloadError::Http(error.to_string()))?;
@@ -82,6 +88,7 @@ impl HttpDownloadService {
         if !status.is_success() {
             return Err(DownloadError::UnexpectedStatus(status.as_u16()));
         }
+        validate_encoding(&response)?;
         if response
             .content_length()
             .is_some_and(|length| length > limit as u64)
@@ -112,6 +119,26 @@ impl HttpDownloadService {
         task: Arc<Mutex<DownloadTask>>,
         cancellation: CancellationToken,
     ) -> Result<DownloadResult, DownloadError> {
+        let result = self.transfer(&request, &task, &cancellation).await;
+        if let Err(error) = &result {
+            if matches!(error, DownloadError::Cancelled) {
+                cancel_task(&task).await;
+            } else {
+                let downloaded = task.lock().await.snapshot().downloaded;
+                fail_task(&task, downloaded, error).await;
+            }
+        }
+        result
+    }
+
+    async fn transfer(
+        &self,
+        request: &DownloadRequest,
+        task: &Arc<Mutex<DownloadTask>>,
+        cancellation: &CancellationToken,
+    ) -> Result<DownloadResult, DownloadError> {
+        integrity::validate_request(request)?;
+        integrity::check_cancelled(cancellation)?;
         validate_download_paths(&request.partial_path, &request.completed_path)?;
         if request.completed_path.exists() {
             return Err(DownloadError::OutputExists(
@@ -129,7 +156,19 @@ impl HttpDownloadService {
             Err(error) if error.kind() == std::io::ErrorKind::NotFound => 0,
             Err(error) => return Err(error.into()),
         };
-        let mut builder = self.client.get(&request.url);
+        if existing_len > MAX_PACKAGE_BYTES
+            || request
+                .expected_total
+                .is_some_and(|total| existing_len > total)
+        {
+            return Err(DownloadError::Integrity(
+                "partial file exceeds expected package size".into(),
+            ));
+        }
+        let mut builder = self
+            .client
+            .get(&request.url)
+            .header(reqwest::header::ACCEPT_ENCODING, "identity");
         if existing_len > 0 {
             builder = builder.header(reqwest::header::RANGE, format!("bytes={existing_len}-"));
         }
@@ -149,6 +188,7 @@ impl HttpDownloadService {
             result = builder.send() => result.map_err(|error| DownloadError::Http(error.to_string()))?,
         };
         let status = response.status().as_u16();
+        validate_encoding(&response)?;
         let content_length = response.content_length();
         let content_range = response
             .headers()
@@ -167,16 +207,20 @@ impl HttpDownloadService {
                 return Err(error);
             }
         };
-        let total = request.expected_total.or_else(|| {
-            content_range
-                .and_then(|header| parse_content_range(header).ok())
-                .and_then(|range| range.total)
-                .or_else(|| content_length.map(|length| existing_len.saturating_add(length)))
-        });
-        let offset = match decision {
-            ResumeDecision::Append { offset } => offset,
-            ResumeDecision::Restart | ResumeDecision::Fresh => 0,
-        };
+        let (offset, total, response_bytes) = integrity::response_sizes(
+            request.expected_total,
+            decision,
+            content_range,
+            content_length,
+        )?;
+        if matches!(decision, ResumeDecision::Append { .. })
+            && total.is_none()
+            && request.expected_sha256.is_none()
+        {
+            return Err(DownloadError::Integrity(
+                "a partial response with unknown total requires the expected SHA-256".into(),
+            ));
+        }
         set_task_phase(&task, DownloadPhase::Downloading, offset, None, total).await?;
         let append = matches!(decision, ResumeDecision::Append { .. });
         let mut file = tokio::fs::OpenOptions::new()
@@ -207,14 +251,31 @@ impl HttpDownloadService {
                 cancel_task(&task).await;
                 return Err(DownloadError::Cancelled);
             }
+            let next = downloaded
+                .checked_add(chunk.len() as u64)
+                .ok_or_else(|| DownloadError::Integrity("package size overflow".into()))?;
+            if next > MAX_PACKAGE_BYTES
+                || total.is_some_and(|total| next > total)
+                || response_bytes.is_some_and(|bytes| next - offset > bytes)
+            {
+                return Err(DownloadError::Integrity(
+                    "response exceeds declared package size".into(),
+                ));
+            }
             file.write_all(&chunk).await?;
-            downloaded = downloaded.saturating_add(chunk.len() as u64);
+            downloaded = next;
             set_task_phase(&task, DownloadPhase::Downloading, downloaded, None, total).await?;
         }
         file.flush().await?;
         file.sync_all().await?;
+        drop(file);
+        if response_bytes.is_some_and(|bytes| downloaded - offset != bytes) {
+            return Err(DownloadError::Integrity(
+                "response length does not match Content-Range".into(),
+            ));
+        }
         if let Some(expected) = total {
-            if downloaded < expected {
+            if downloaded != expected {
                 let error = DownloadError::IncompleteCompletion {
                     downloaded,
                     total: expected,
@@ -224,17 +285,42 @@ impl HttpDownloadService {
             }
         }
         set_task_phase(&task, DownloadPhase::Verifying, downloaded, None, total).await?;
-        if request.completed_path.exists() {
-            return Err(DownloadError::OutputExists(
-                request.completed_path.display().to_string(),
-            ));
+        integrity::verify_file(
+            &request.partial_path,
+            request.expected_sha256.as_deref(),
+            cancellation,
+        )
+        .await?;
+        // Cancellation and publication share the task's terminal-state lock.
+        // A cancel that observes Completed cannot revoke a valid publication.
+        let mut terminal = task.lock().await;
+        integrity::check_cancelled(cancellation)?;
+        if terminal.is_cancelled() {
+            return Err(DownloadError::Cancelled);
         }
-        tokio::fs::rename(&request.partial_path, &request.completed_path).await?;
-        set_task_phase(&task, DownloadPhase::Completed, downloaded, None, total).await?;
+        integrity::publish(&request.partial_path, &request.completed_path).await?;
+        terminal.update(DownloadPhase::Completed, downloaded, None)?;
         Ok(DownloadResult {
-            path: request.completed_path,
+            path: request.completed_path.clone(),
             bytes: downloaded,
             resumed: matches!(decision, ResumeDecision::Append { .. }),
         })
     }
+}
+
+fn validate_encoding(response: &reqwest::Response) -> Result<(), DownloadError> {
+    for value in response
+        .headers()
+        .get_all(reqwest::header::CONTENT_ENCODING)
+    {
+        if !value
+            .to_str()
+            .is_ok_and(|value| value.trim().eq_ignore_ascii_case("identity"))
+        {
+            return Err(DownloadError::Integrity(
+                "encoded package responses cannot be resumed safely".into(),
+            ));
+        }
+    }
+    Ok(())
 }

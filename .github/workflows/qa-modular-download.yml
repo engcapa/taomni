@@ -1,0 +1,80 @@
+name: QA Modular Download Gates
+
+on:
+  workflow_dispatch:
+    inputs:
+      head:
+        description: Commit or ref to test (empty = workflow ref)
+        type: string
+        required: false
+        default: ''
+  workflow_call:
+    inputs:
+      head:
+        description: Commit or ref to test
+        type: string
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+concurrency:
+  group: modular-download-${{ github.workflow }}-${{ github.ref }}-${{ inputs.head }}
+  cancel-in-progress: true
+
+jobs:
+  download:
+    name: production downloader (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head || github.sha }}
+          persist-credentials: false
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Record exact production source revision
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p qa-modular-download
+          git rev-parse HEAD > qa-modular-download/source-sha.txt
+          rustc --version > qa-modular-download/rustc-version.txt
+
+      - name: Run pure downloader unit tests
+        shell: bash
+        run: |
+          set -euo pipefail
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-download-gates --locked --lib \
+            2>&1 | tee qa-modular-download/unit-tests.log
+
+      - name: Run real TCP and filesystem contracts
+        shell: bash
+        env:
+          # Applied only after dependencies were fetched. Direct mode must
+          # bypass these; configured proxies must fail without direct fallback.
+          HTTP_PROXY: http://127.0.0.1:9
+          HTTPS_PROXY: http://127.0.0.1:9
+          ALL_PROXY: http://127.0.0.1:9
+          NO_PROXY: ''
+        run: |
+          set -euo pipefail
+          export http_proxy="$HTTP_PROXY" https_proxy="$HTTPS_PROXY" all_proxy="$ALL_PROXY" no_proxy=
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-download-gates --locked --offline \
+            -- --ignored --test-threads=1 --nocapture \
+            2>&1 | tee qa-modular-download/native-network-tests.log
+
+      - name: Upload downloader receipts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: modular-download-${{ matrix.os }}
+          path: qa-modular-download
+          if-no-files-found: error

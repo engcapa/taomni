@@ -15,6 +15,7 @@ default-run = "taomni"
 [workspace]
 members = [
     "crates/taomni-capture",
+    "crates/taomni-download-gates",
     "crates/taomni-host-gates",
     "crates/taomni-rdp-common",
     "crates/taomni-file-uri",

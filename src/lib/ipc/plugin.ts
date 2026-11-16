@@ -34,6 +34,7 @@ export interface ModuleDownloadOptions {
   partialPath: string;
   completedPath: string;
   expectedTotal?: number;
+  expectedSha256?: string;
   proxyMode?: "app" | "custom" | "none";
   applicationProxy?: ModuleDownloadProxyEndpoint;
   featureProxy?: ModuleDownloadProxyEndpoint;
@@ -169,6 +170,7 @@ export function startPluginDownload(options: ModuleDownloadOptions): Promise<Mod
     partialPath: options.partialPath,
     completedPath: options.completedPath,
     expectedTotal: options.expectedTotal,
+    expectedSha256: options.expectedSha256,
     proxyMode: options.proxyMode ?? "app",
     applicationProxy: options.applicationProxy,
     featureProxy: options.featureProxy,

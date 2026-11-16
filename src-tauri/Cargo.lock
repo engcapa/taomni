@@ -10883,6 +10883,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "taomni-download-gates"
+version = "0.1.0"
+dependencies = [
+ "futures",
+ "log",
+ "reqwest 0.13.5",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "tempfile",
+ "thiserror 2.0.20",
+ "tokio",
+ "tokio-util 0.7.19",
+]
+
+[[package]]
 name = "taomni-file-uri"
 version = "0.1.0"
 
@@ -10935,6 +10951,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "taomni-rdp-common"
+version = "0.1.0"
+dependencies = [
+ "ironrdp-pdu",
+ "libc",
+ "taomni-file-uri",
+ "tempfile",
+]
+
+[[package]]
 name = "tap"
 version = "1.0.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10962,16 +10988,6 @@ name = "target-lexicon"
 version = "0.13.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "adb6935a6f5c20170eeceb1a3835a49e12e19d792f6dd344ccc76a985ca5a6ca"
-
-[[package]]
-name = "taomni-rdp-common"
-version = "0.1.0"
-dependencies = [
- "ironrdp-pdu",
- "libc",
- "taomni-file-uri",
- "tempfile",
-]
 
 [[package]]
 name = "tauri"
