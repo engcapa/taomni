@@ -84,7 +84,14 @@ jobs:
           sudo apt-get install -y \
             libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf \
             libkrb5-dev libasound2-dev libpipewire-0.3-dev libclang-dev \
-            libdbus-1-dev libudev-dev nasm
+            libdbus-1-dev libudev-dev libgbm-dev nasm
+      - name: macOS core dependencies
+        if: runner.os == 'macOS'
+        run: |
+          brew install krb5
+          echo "LIBGSSAPI_IMPL=mit" >> "$GITHUB_ENV"
+          echo "LIBGSSAPI_PREFIX=$(brew --prefix krb5)" >> "$GITHUB_ENV"
+          echo "PKG_CONFIG_PATH=$(brew --prefix krb5)/lib/pkgconfig" >> "$GITHUB_ENV"
       - name: Windows complete Perl
         if: runner.os == 'Windows'
         shell: pwsh
@@ -112,6 +119,30 @@ jobs:
             --features qa-release-trust-gates --no-run \
             --locked --message-format=json > modular-mfa-install/core-build.jsonl \
             2> >(tee modular-mfa-install/core-build.log >&2)
+      - name: Windows harness native runtime
+        if: runner.os == 'Windows'
+        run: |
+          python - <<'PYTHON'
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+
+          evidence = Path("modular-mfa-install")
+          rows = [json.loads(line) for line in (evidence / "core-build.jsonl").read_text().splitlines()]
+          libraries = [Path(value.removeprefix("native=")) for row in rows
+                       if row.get("reason") == "build-script-executed"
+                       and "#sherpa-onnx-sys@" in row.get("package_id", "")
+                       for value in row.get("linked_paths", []) if value.startswith("native=")]
+          assert len(libraries) == 1, f"Expected one compiled sherpa runtime, got {libraries}"
+          library = libraries[0].resolve(strict=True)
+          names = ["sherpa-onnx-c-api.dll", "sherpa-onnx-cxx-api.dll",
+                   "onnxruntime.dll", "onnxruntime_providers_shared.dll"]
+          hashes = {name: hashlib.sha256((library / name).read_bytes()).hexdigest() for name in names}
+          (evidence / "windows-runtime.json").write_text(json.dumps(hashes, indent=2) + "\n", encoding="utf-8")
+          with open(os.environ["GITHUB_PATH"], "a", encoding="utf-8") as output:
+              output.write(str(library) + "\n")
+          PYTHON
       - name: Exercise the installed production registry and persisted Vault
         env:
           TAOMNI_SIGNED_MFA_PACKAGE_DIR: signed-mfa-package
