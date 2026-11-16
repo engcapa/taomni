@@ -3286,6 +3286,10 @@
 - `[data-testid="backup-restore-password"]` — interactive — F-BACKUP-1.restore-password
 - `[data-testid="backup-restore-unlock"]` — interactive — F-BACKUP-1.restore-unlock
 - `[data-testid="backup-restore-dialog"]` — display — F-BACKUP-1.restore-dialog
+- `[data-testid="backup-restore-vault-password"]` — interactive — F-BACKUP-1.restore-vault-password
+- `[data-testid="backup-restore-confirm"]` — interactive — F-BACKUP-1.restore-confirm
+- `[data-testid="backup-restore-error"]` — display — F-BACKUP-1.restore-error
+- `[data-testid="backup-restore-staged"]` — display — F-BACKUP-1.restore-staged
 - `[data-testid="backup-range-summary"]` — display — F-BACKUP-1.range-summary
   ↳ `[data-testid="backup-cloud-destination"]:nth-of-type(1) [data-testid="backup-range-summary"]` — alias
   ↳ `[data-testid="backup-manual"] [data-testid="backup-range-summary"]` — alias

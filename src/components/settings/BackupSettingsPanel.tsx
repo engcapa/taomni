@@ -213,13 +213,13 @@ export function BackupSettingsPanel() {
         }
       }, 1500);
     } catch (e) {
-      console.error("Failed to stage restore", e);
       const msg = e instanceof Error ? e.message : String(e);
       if (msg.includes("VAULT_BAD_PASSWORD")) {
         setInspectError("backupSettings.vaultBadPassword");
       } else if (msg.includes("VAULT_PASSWORD_REQUIRED")) {
         setInspectError("backupSettings.vaultPasswordRequired");
       } else {
+        console.error("Failed to stage restore", e);
         setInspectError(e instanceof Error ? e.message : String(e));
       }
     }

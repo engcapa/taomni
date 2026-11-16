@@ -110,6 +110,7 @@ export function BackupRestoreDialog(inputs: Pick<BackupSettingsViewProps, "t" | 
                     </label>
                     <input
                       type="password"
+                      data-testid="backup-restore-vault-password"
                       value={restoreVaultPassword}
                       onChange={(e) => {
                         setRestoreVaultPassword(e.target.value);
@@ -136,7 +137,7 @@ export function BackupRestoreDialog(inputs: Pick<BackupSettingsViewProps, "t" | 
                 )}
 
                 {inspectError && (
-                  <div className="text-xs text-red-500 bg-red-500/10 p-2.5 rounded border border-red-500/20 flex items-center gap-2">
+                  <div role="alert" data-testid="backup-restore-error" className="text-xs text-red-500 bg-red-500/10 p-2.5 rounded border border-red-500/20 flex items-center gap-2">
                     <AlertTriangle className="h-4 w-4 flex-shrink-0" />
                     <span>{displayError}</span>
                   </div>
@@ -181,6 +182,8 @@ export function BackupRestoreDialog(inputs: Pick<BackupSettingsViewProps, "t" | 
 
             {restoreStaged && (
               <div
+                role="status"
+                data-testid="backup-restore-staged"
                 className="flex items-center gap-2 rounded border p-3 text-xs"
                 style={{
                   background: "var(--taomni-success-bg)",
@@ -213,6 +216,7 @@ export function BackupRestoreDialog(inputs: Pick<BackupSettingsViewProps, "t" | 
               {manifest && (
                 <button
                   type="button"
+                  data-testid="backup-restore-confirm"
                   disabled={restoring || restoreStaged}
                   onClick={handleConfirmRestore}
                   className="flex items-center gap-1.5 rounded bg-red-600 px-4 py-1.5 text-xs font-medium text-white hover:bg-red-700 disabled:opacity-50"

@@ -903,6 +903,15 @@
             }
           }
         },
+        "module_restore_probe": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["phase"],
+          "properties": {
+            "phase": {"enum": ["write-original", "running-archive", "disabled-archive", "retained-archive", "write-mutated", "reject-password", "stage", "staged", "restored", "restart-persisted"]}
+          },
+          "description": "Native only: fixed real-host input, exact UI archive and production restore staging; independently observe applied data, activation and generations across normal cold restarts. No YAML-selected commands, paths, credentials or bytes. Does not automate the restore dialog's automatic relaunch."
+        },
         "module_live_backup_probe": {
           "type": "object",
           "additionalProperties": false,

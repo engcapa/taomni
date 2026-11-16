@@ -25,12 +25,14 @@ import { invokeDatabase } from "./commands/database";
 import { invokeNotes } from "./commands/notes";
 import { invokeScreenshot } from "./commands/screenshot";
 import { invokePlugin } from "./commands/plugin";
+import { backupRestoreStub } from "./backupRestoreStub";
 
 const stubCommandRegistry = new CommandRegistry();
 
 if (typeof window !== "undefined") installStubMailQaControl(mailStubSeed);
 
 export async function invoke<T>(cmd: string, args?: any, options?: InvokeOptions): Promise<T> {
+  if (cmd === "backup_inspect" || cmd === "backup_stage_restore") return backupRestoreStub(cmd, args ?? {}) as T;
   if (cmd.startsWith("plugin_")) return await invokePlugin<T>(cmd);
   if (cmd.startsWith("viewer_")) return await invokeViewer(cmd, args) as T;
   if (cmd.startsWith("mobile_")) return await mobileStub(cmd, args) as T;

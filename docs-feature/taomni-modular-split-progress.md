@@ -8,10 +8,14 @@
 
 生产升级 IPC 当前只记录只读预检、源指纹与 pending journal。缺少可信插件包和真实 exporter 时，不复制旧数据、不创建伪插件版本、不改变 active 指针。测试 fixture 的 staging/回滚原语不能算真实旧版升级验收。
 
-签名安装门、宿主生产监督、共享采集/RDP 公共库、CoreState/统一 bootstrap、正常退出与可逆静默已集成。生产工厂、scoped 入口、持久 profile generation、Vault IPC 协调、普通凭据消费者与 MFA facade 已接入；源码 `fdd05d232` 的契约 #43819768258 已 23/23 jobs 成功，其 UI #43819770975 的 22 个 shard 已收齐：三端 browser 各 50/50、Linux Xvfb native 50/50、Windows native 48/48、macOS native 47/47；Wayland 46/50，四个既有无关失败按下文单列。`fad6a56ab` 已提交插件离线 v2 备份/还原；匹配源码 hosted 执行发现下文三个相关测试问题，尚未闭合。业务状态仍在 LegacyFeatureRuntime；运行中插件快照、三态真实重启还原、远端商店、重启下载恢复、业务宿主迁出与真实升级尚未完成。G1–G11 未通过前，不将具体业务插件迁移标为完成。
+签名安装门、宿主生产监督、共享采集/RDP 公共库、CoreState/统一 bootstrap、正常退出与可逆静默已集成。生产工厂、scoped 入口、持久 profile generation、Vault IPC 协调、普通凭据消费者与 MFA facade 已接入；源码 `fdd05d232` 的契约 #43819768258 已 23/23 jobs 成功，其 UI #43819770975 的 22 个 shard 已收齐：三端 browser 各 50/50、Linux Xvfb native 50/50、Windows native 48/48、macOS native 47/47；Wayland 46/50，四个既有无关失败按下文单列。离线 v2 备份/还原和运行中宿主快照已实现，`4c060a939` 的三端真实宿主快照及整轮契约通过，匹配源码 UI 仍在执行。业务状态仍在 LegacyFeatureRuntime；三态真实重启还原、远端商店、重启下载恢复、业务宿主迁出与真实升级尚未完成。G1–G11 未通过前，不将具体业务插件迁移标为完成。
 
 ## 2026-11-16 最新 runner 证据（持续采集中）
 
+- 超时修复源码 `4c060a939702cea5045f1b3b6a2acc3e7ea8580a` 的[契约 #43844240041](https://github.com/engcapa/taomni/actions/runs/43844240041) 已 **23/23 jobs 成功**，24 份 artifact 在执行期间收齐。三端 services 各 **8/8**、snapshot 各 **4/4**；Windows 原超时竞态、终止凭据与 writer OS 锁释放断言通过。匹配源码 [UI #43844254356](https://github.com/engcapa/taomni/actions/runs/43844254356) 已开始执行、即时采集器已工作，Linux browser **50/50**；其余未收齐的分片不外推。旧 UI #43841954615 已由 REST cancel 终止，避免为已替代源码重复构建；原失败和已完成证据保留。
+- 下一批补充 `TC-MODULES-013/014/015`：分别在运行、禁用、卸载保留数据时取得精确手工 v2 档案，之后经真实业务修改 hello、递增 HOTP 并修改 Vault 主密码；固定生产 IPC 验证错密码不留下 pending，再正常关闭/冷启动应用，断言原数据、原密码/755224、新 generation、原启用状态和代码指针，第二次正常重启保持新 generation。尚未 hosted 执行，不算真实还原通过，也不代替 MFA 独立宿主后的 TC-MODULES-020–022。
+- 新 `TC-BACKUP-RESTORE-001` 验证浏览器还原确认的空密码、错密码、成功暂存和禁止重复确认。补稳定控件标识与明确的 preview archive/stage model；正确恢复和原生加密均不由该 model 模拟。预期密码拒绝展示现有界面错误，不再作为 runtime console error；未知错误保留日志。native 三态用固定生产 stage IPC 配合现有正常重启，**不声称已经验证确认按钮自动 relaunch 的原生接管**；该入口仍为发布前待办。
+- 本批新增还原用例提交前验证：前端相关 **22/22 单元**、还原观察工具 **5/5**、behavior contract **6/6**、既有 live snapshot 观察 **3/3** 通过；TypeScript、actionlint、四份 case schema/reviewed contract 与完整 QA audit gates 通过，未改 coverage baseline。三态 native 用例分别为 94/105/113 步，browser 为 45 步。静态选择为三端 browser 各 21、四种 native profile 各 29，22 shards、3 个 release QA 构建，gaps=[] / unreviewed=[]；仅为计划，执行结果待新源码 GitHub 证据。
 - 运行中快照源码 `a57009a8201e9a6c113a0e74448f1b4f5548db97` 已推送，[契约 #43841946054](https://github.com/engcapa/taomni/actions/runs/43841946054) 与 [UI #43841954615](https://github.com/engcapa/taomni/actions/runs/43841954615) 已启动即时采集。Linux、macOS 新增 snapshot target 各 **4/4 真实进程场景通过**；Windows 在此前的 services target 暴露原超时路径竞态，尚未执行 snapshot target，不能外推通过。UI 当前尚在排队，无新源码 browser/native 结论。
 - #43841946054 的 Windows `expired_operation_terminates_transport_before_a_late_key_can_be_published` 返回正确 -32007，但宿主仍为 Running：core timer 路径收到 SDK cancel ack 后允许复用，permit 先过期的另一条路径却会回收。修复使带密钥 operation 的 core 超时一律 retire 原认证通道，普通请求与显式取消保留已有 ack 语义；原真实 gate 不放宽，并增加旧 host termination receipt 和 writer OS 锁释放断言。宿主适配 15 项纯单元通过，真实门禁待后续修复源码 GitHub 重跑。
 - 真实 Vault/SDK harness 的 profiled 启动修复源码 `6d8e2ab293bfe6dc9e944893c73548445e524b7f`，[契约 #43836198487](https://github.com/engcapa/taomni/actions/runs/43836198487) 已 **23/23 jobs 成功**。该结果闭合前述 #43832212768 的相关失败，包含实际 profile/writer OS 锁占用断言；不覆盖当前未提交的运行中宿主快照增量。短 SHA 误触发的 #43834894177 仅 checkout 失败、没有执行测试，不计作产品验证。
@@ -109,7 +113,7 @@
 | TASK-022 Mobile | 待 M0 决策 | 按 DEC-2 默认暂缓排期；M0 末提供 go/no-go 与公开例外，不能默认为已交付。 |
 | TASK-023 发布验收 | 部分 | 清单生成与上传顺序已有；四目标插件构建/系统签名、包签名、原子清单发布、独立插件更新/回滚、两套回归及性能。 |
 | TASK-024 入口/profile 协同 | 随 005-A 已集成一部分 | GUI/headless bootstrap、ModeLease、可重试退出和任务回收已集成；跨宿主 profile lease、还原静默与完整多进程证据仍待完成。 |
-| TASK-025 密钥/一致快照 | A–E 已集成；F/G 离线实现待验证 | [服务、锁与快照实施方案](taomni-modular-vault-services-plan.md)；`fdd05d232` 契约 #43819768258 已 23/23 成功，UI 结果见上方。本批离线 v2 快照/还原仍待 hosted；F–I 的运行中宿主协议、三态真实重启还原、独立 MFA 宿主及完整验收未完成。 |
+| TASK-025 密钥/一致快照 | A–E 已集成；F/G 的三端 snapshot 契约通过，UI 待完成 | [服务、锁与快照实施方案](taomni-modular-vault-services-plan.md)；`4c060a939` 契约 #43844240041 已 23/23 成功，运行中 snapshot 三端各 4/4。三态真实重启还原的新用例待 hosted，原生确认自动 relaunch、独立 MFA 宿主及完整验收未完成。 |
 
 具体编号与子任务边界仍以设计原表为准；上表合并描述不改变范围或依赖。
 
@@ -157,7 +161,7 @@ Wayland `TC-FILE-OPEN-008` 在已有 AI 路径 chip 点击处失败：失败截�
 
 已完成 retained locator 与离线 v2 备份/还原实现，提交 `fdd05d232` / `fad6a56ab`。前者 hosted 结果已齐，后者的相关失败及修复进度见上方；执行中按 shard 收证，无关失败保留原始记录并不计通过。
 
-真实宿主自持 shared ProfileUseLease / exclusive PluginDataLease 已提交，核心经独立进程环境提供 profile，握手必须确认精确 owner/generation。源码 `6d8e2ab29` 的契约 #43836198487 23/23 jobs 成功；匹配源码的原生用例继续按 shard 收证。当前在补运行中 prepare/snapshot/release，代码、四项真实进程 gate 与 TC-MODULES-012 已准备，待最终单元/编译检查、提交及多端 GitHub 执行，不把尚未执行的协议当作通过。
+真实宿主自持 shared ProfileUseLease / exclusive PluginDataLease 已提交，核心经独立进程环境提供 profile，握手必须确认精确 owner/generation。运行中 prepare/snapshot/release 及超时修复已提交，源码 `4c060a939` 契约 #43844240041 23/23 jobs 成功；匹配源码的 TC-MODULES-011/012 与完整 crash-regression 继续按 shard 收证。本批新增三态真实还原用例及确认界面 browser 用例，待提交和 hosted，不把未执行的 case 当作通过。
 
 1. **收敛当前相关失败并取得新源码证据**：云端模块/Vault 依赖用例、macOS SQLite fixture 路径、Windows SQLite 连接清理与真实 Vault/SDK gate 的 profiled 启动修复已有契约证据。TC-MODULES-011 相对观察路径修复在 Linux Xvfb 58 步通过；当前修复 macOS 卸载按钮的延迟搜索滚动竞态，并提交运行中快照/TC-MODULES-012。逐 shard 收取新源码真实 ZIP/SQLite/WAL 和宿主所有权结果；已完成的旧源码结果不能替代本批证据。
 2. **闭合 Vault、profile 与一致快照（TASK-024/025）**：完成真实宿主持锁与三端进程 gate，再接运行中宿主 prepare/snapshot/release、GUI/headless 同 profile 协同。离线路径已有 v2 档案和兼容 journal，但仍需运行、禁用、卸载保留数据三态的正常重启 apply 与真实解密，覆盖多实例占用、取消和崩溃恢复；MFA 迁出时统一处理 v1 legacy alias。

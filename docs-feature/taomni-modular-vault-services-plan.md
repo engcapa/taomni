@@ -354,6 +354,10 @@ A/B 当前已在独立 worktree 实施。A 不改现有 RpcRequest/Handshake 结
 
 ### 11.2 原生与浏览器 cases
 
+基础设施补充用例 `TC-MODULES-013/014/015` 分别使用 hello 的运行、禁用、卸载保留数据三态，配对仍在核心内的真实 Vault/MFA，验证精确手工归档→真实数据/HOTP/主密码变化→生产 stage IPC→正常关闭/冷启动 apply→原数据/密码/HOTP 恢复与 generation 连续性。只允许固定场景的路径来源和口令，不在 YAML 暴露任意 IPC；不模拟原生数据或解密。它们尚待 hosted，且不能代替下表独立 MFA 迁出后的 020–022。
+
+原生还原确认界面成功后会在 1.5 秒内主动 relaunch；现有 `native_restart_app` 只支持主动正常关窗后重新启动，不接管应用自动重启。三态用例因此明确验证生产 stage/apply 后端边界；新增 `TC-BACKUP-RESTORE-001` 仅以浏览器模型验证确认界面空/错密码、暂存成功和禁止重复确认。原生确认按钮及自动 relaunch 的会话/进程所有权接管仍需独立补齐，不能从这两类证据推导通过。
+
 下面 TC-MODULES-020–025 已由集成负责人为本方案预留，均为计划、尚未登记。TC-MODULES-007 已由签名成功链使用；新增前仍须复查目录冲突；同一change登记policy、必要dependency、feature-list/covers/controls/testid catalog。不要通过skip或available=false规避必须场景。
 
 | case | 模式与真实步骤/断言 |
