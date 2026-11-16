@@ -238,7 +238,7 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           set -o pipefail
-          xvfb-run -a -s '-screen 0 1280x800x24 +extension DAMAGE +extension MIT-SHM' cargo test --manifest-path src-tauri/Cargo.toml -p taomni-capture --lib --locked -- --ignored --test-threads=1 --nocapture 2>&1 | tee modular-evidence/capture-x11.log
+          xvfb-run -a -s '-noreset -screen 0 1280x800x24 +extension DAMAGE +extension MIT-SHM' cargo test --manifest-path src-tauri/Cargo.toml -p taomni-capture --lib --locked -- --ignored --test-threads=1 --nocapture 2>&1 | tee modular-evidence/capture-x11.log
           cargo tree --manifest-path src-tauri/Cargo.toml -p taomni-capture --target x86_64-unknown-linux-gnu --edges normal,build,dev --locked > modular-evidence/capture-linux-tree.txt
           node scripts/modular-boundaries.mjs --linux-tree modular-evidence/capture-linux-tree.txt
       - uses: actions/upload-artifact@v4
@@ -411,7 +411,7 @@ jobs:
         run: |
           mkdir -p modular-evidence
           set -o pipefail
-          python -m unittest qa_ui_auto.test_core_profile_state test_module_signed_observation test_module_retained_observation test_module_backup_observation test_module_live_backup_observation test_module_restore_observation test_module_profile_observation test_native_restart_failure 2>&1 | tee modular-evidence/native-observation-unit.log
+          python -m unittest qa_ui_auto.test_core_profile_state test_module_signed_observation test_module_retained_observation test_module_backup_observation test_module_live_backup_observation test_module_restore_observation test_module_profile_observation test_native_restart_failure test_native_fixture_cleanup 2>&1 | tee modular-evidence/native-observation-unit.log
       - name: Preserve native observation evidence on every platform
         uses: actions/upload-artifact@v4
         if: always()

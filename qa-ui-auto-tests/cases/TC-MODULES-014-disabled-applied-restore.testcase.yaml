@@ -173,9 +173,6 @@ steps:
     phase: disabled
 - module_restore_probe:
     phase: restored
-- click: '[data-testid="side-tab-tools"]'
-- wait_for: '[data-testid="sidebar-tools-panel"]'
-- click: '[data-testid="sidebar-tool-mfa"]'
 - wait_for: '[data-testid="vault-unlock-dialog"]'
 - fill:
     selector: '[data-testid="vault-unlock-pw"]'
@@ -189,6 +186,10 @@ steps:
     selector: '[data-testid="vault-unlock-pw"]'
     value: qa-module-restore-original
 - click: '[data-testid="vault-unlock-confirm"]'
+- assert_not_visible: '[data-testid="vault-unlock-dialog"]'
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-mfa"]'
 - wait_for: '[data-testid="mfa-account-row"][data-issuer="QA Module Restore"]'
 - assert_count:
     selector: '[data-testid="mfa-account-row"]'
@@ -209,14 +210,15 @@ steps:
     phase: disabled
 - module_restore_probe:
     phase: restart-persisted
-- click: '[data-testid="side-tab-tools"]'
-- wait_for: '[data-testid="sidebar-tools-panel"]'
-- click: '[data-testid="sidebar-tool-mfa"]'
 - wait_for: '[data-testid="vault-unlock-dialog"]'
 - fill:
     selector: '[data-testid="vault-unlock-pw"]'
     value: qa-module-restore-original
 - click: '[data-testid="vault-unlock-confirm"]'
+- assert_not_visible: '[data-testid="vault-unlock-dialog"]'
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-mfa"]'
 - assert_text_equals:
     selector: '[data-testid="mfa-account-code"]'
     equals: 755 224
@@ -270,40 +272,40 @@ verification:
       and another restart prove recovery.
     actions:
     - 75
-    - 88
-    - 94
+    - 85
+    - 95
     checkpoints:
     - step: 77
       expectation: The real signed module has the same enabled, disabled or uninstalled state.
     - step: 78
       expectation: Apply removed pending state, restored only original rows, preserved the executable pointer and advanced generation.
-    - step: 85
+    - step: 82
       expectation: The password introduced after backup no longer unlocks the restored Vault.
-    - step: 86
+    - step: 83
       expectation: No code is visible after that rejected unlock.
-    - step: 90
-      expectation: Exactly the original account is restored.
     - step: 91
-      expectation: The original password decrypts the restored real stores and yields 755224.
+      expectation: Exactly the original account is restored.
     - step: 92
+      expectation: The original password decrypts the restored real stores and yields 755224.
+    - step: 93
       expectation: No runtime error occurs during stage/apply/decryption.
-    - step: 97
+    - step: 98
       expectation: A second normal cold start keeps restored data, lifecycle and the same new generation.
-    - step: 104
+    - step: 106
       expectation: The original password still decrypts the original HOTP after the second cold start.
-    - step: 105
+    - step: 107
       expectation: The additional restart produces no runtime errors.
     results:
     - 77
     - 78
-    - 85
-    - 86
-    - 90
+    - 82
+    - 83
     - 91
     - 92
-    - 97
-    - 104
-    - 105
+    - 93
+    - 98
+    - 106
+    - 107
   native:
   - check: Production stage, normal shutdown/apply, SQLite replacement, activation, profile generation and real Vault/MFA decryption.
     method: automated

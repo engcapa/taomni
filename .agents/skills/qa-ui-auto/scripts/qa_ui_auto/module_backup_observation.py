@@ -13,6 +13,7 @@ import uuid
 import zipfile
 
 from .fixtures.backup_journal import read_journal
+from .fixtures.module_backup_data import state as fixture_state
 from .deadline import budget_time as time
 from .module_retained_observation import ordinary
 from .module_signed_observation import invoke
@@ -106,6 +107,7 @@ def check_archive(path: Path, work: Path, generation: str):
 
 def run(ctx, args):
     phase = validate(args)
+    source = fixture_state(ctx)
     fixture = json.loads((Path(ctx.case_dir) / "official-module-fixture.json").read_text(encoding="utf-8"))
     root = Path(fixture["pluginRoot"])
     if root.resolve() != root or not root.is_relative_to(Path(ctx.case_dir).resolve().parent):
@@ -121,7 +123,7 @@ def run(ctx, args):
         if len(matching) != 1 or expected and matching[0].get("state") != expected:
             raise StepError("Native registry state differs from the module backup scenario")
         if phase == "seed":
-            if getattr(ctx, "_module_backup_connection", None) is not None:
+            if source.connection is not None:
                 raise StepError("Module backup input was already seeded")
             data.mkdir(exist_ok=True)
             ordinary(data, directory=True)
@@ -130,7 +132,7 @@ def run(ctx, args):
             if (data / DATABASE).exists():
                 raise StepError("Module SQLite input already exists")
             connection = sqlite3.connect(data / DATABASE)
-            ctx._module_backup_connection = connection
+            source.connection = connection
             connection.executescript("PRAGMA journal_mode=WAL; PRAGMA wal_autocheckpoint=0; CREATE TABLE qa_snapshot_marker(value TEXT);")
             connection.execute("INSERT INTO qa_snapshot_marker VALUES (?)", (MARKER,))
             connection.commit()
@@ -147,7 +149,7 @@ def run(ctx, args):
                 if hashlib.sha256((data / name).read_bytes()).hexdigest() != digest:
                     raise StepError("Native snapshot mutated the source database, WAL or opaque data")
             if phase.endswith("-archive"):
-                seen = getattr(ctx, "_module_backup_seen_jobs", set())
+                seen = source.seen_jobs
                 job_id, job = wait_manual_job(ctx, root.parent, seen)
                 path = Path(job.get("localPath") or "")
                 ordinary(path)
@@ -156,7 +158,6 @@ def run(ctx, args):
                 generation = json.loads((root.parent / ".profile-state.json").read_text(encoding="utf-8"))["generation"]
                 observation["archive"] = check_archive(path, Path(ctx.case_dir), generation)
                 seen.add(job_id)
-                ctx._module_backup_seen_jobs = seen
         observation["passed"] = True
         return "module backup " + phase + " verified"
     finally:

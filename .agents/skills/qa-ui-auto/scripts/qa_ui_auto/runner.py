@@ -470,7 +470,7 @@ def _native_run(cases: list[tc_mod.TestCase], cfg: dict, env: dict, report_root:
                         renderer_reset_sec = reset_case_renderer(ctx_ns, session, c.fixtures, java25_home or cfg.get("app", {}).get("tooling_java_home"))
                         if renderer_reset_sec is not None:
                             r["timings"]["renderer_reset_sec"] = renderer_reset_sec
-                        nctx = NativeStepContext(session, case_dir, cfg)
+                        nctx = NativeStepContext(session, case_dir, cfg, fixture_context=ctx_ns)
                         last_step, last_verb, last_args = 0, "<setup>", None
                         for i, step in enumerate(c.steps, start=1):
                             ctx_ns.step_index = i

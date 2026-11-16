@@ -60,10 +60,11 @@ from .terminal_burst_probe import run as terminal_burst
 class NativeStepContext:
     """Per-case context handed to native verbs (fixture values resolved)."""
 
-    def __init__(self, session: Any, case_dir: Path, cfg: dict):
+    def __init__(self, session: Any, case_dir: Path, cfg: dict, *, fixture_context: Any = None):
         self.session = session
         self.case_dir = case_dir
         self.cfg = cfg
+        self.fixture_context = fixture_context
         self._parity005_trace_positions: dict[tuple[str, str, str], int] = {}
         self._permission_restores: dict[Path, int] = {}
         # External X11 CLIPBOARD owner started by native_clipboard_owner, plus
