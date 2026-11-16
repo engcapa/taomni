@@ -2,7 +2,7 @@
 
 日期：2026-11-15。状态：**本轮已实现并验证一组 P0/P1 修复；其余任务按下方状态继续跟踪**。本文件汇总[实现核对报告](../tao-home-implementation-audit-2026-11-15.md)的发现与用户追加要求，作为后续排期、开发和验收入口。
 
-2026-11-16 更新：[后续验证回执](verification-2026-11-16.md)。Windows Tao 真机 7/7 通过，包含真实 DeepSeek 正常回复、网络取消、多轮与代理；完整 crash suite 和 hosted 跨平台验证继续执行。以下较早表格中的“native 待验证”以新回执的具名断言为准，完整 AC 未由局部通过自动关闭。
+2026-11-16 更新：[后续验证回执](verification-2026-11-16.md)。`586f036a4` Windows 完整适用 crash-regression 加受影响 browser **28/28**、native **34/34** 通过，包含真实 DeepSeek、Vault 中断恢复与 SSH/SFTP；Linux browser **28/28** 通过。Word 16 实际排版已确认代表流程图占满内容宽、100%/200% 清晰，同时发现公式重复导出，新增 MD-007。新修复的整批及 hosted 跨平台验证继续执行。以下较早表格中的“native 待验证”以新回执的具名断言为准，完整 AC 未由局部通过自动关闭。
 
 基线：[主设计 v1.3](../tao-home-design.md)、[细化设计 v0.3](../tao-home-detailed-design.md)、[高保真原型 v0.3](../tao-home-prototype.html)；代码核查基线为 `6170f095ff3de7e555d43a183446437c29dca6e5`。源码位置是本次定位线索，实施前需复核最新代码。
 
@@ -252,7 +252,7 @@
 - 依据：核对报告安全边界；`vault_lock` 仅重建 router，在途请求仍持旧 provider Arc，未接取消或 `vault_locked` 映射。
 - `AC-TH-029`：锁定后在途活动实际停止，后续请求不得继续用旧 Key；显示正确锁定状态/解锁入口，不归类网络故障。解锁恢复遵守用户操作，不自动重复有费用/副作用请求；锁定时不能落明文 Key。
 - 验证：V-03/V-05；依赖 TH-003/011，慢流中锁定、自动锁定例外、保存/重启全链路。
-- 2026-11-16 续作：已复现并修复 `vault_locked → message_stop → idle` 覆盖及流前 Vault IPC 误归类；补充显式解锁 gate、取消/失败/焦点/线程隔离、无自动重试与无内容时重新生成。新增 10 项单元回归连同原 10 项通过；`TC-TAO-HOME-009` 已编写，匹配 QA release 与 native 执行进行中。自动锁定、保存/重启等完整 AC 未由该单场景关闭。
+- 2026-11-16 续作：已复现并修复 `vault_locked → message_stop → idle` 覆盖及流前 Vault IPC 误归类；补充显式解锁 gate、取消/失败/焦点/线程隔离、无自动重试与无内容时重新生成。新增 10 项单元回归连同原 10 项通过；`TC-TAO-HOME-009` 在匹配 QA release 上 **1/1 passed**，真实服务端取消和显式解锁已验证，详见[后续回执](verification-2026-11-16.md)。自动锁定、保存/重启等完整 AC 未由该单场景关闭。
 
 ### TH-030 · 本地资料与动作的分阶段安全门禁
 
@@ -326,6 +326,12 @@
 - 验证：V-04/V-05；补真实 Mermaid 的小图、复杂大图、长中文标签、百分比/viewBox 尺寸与深浅配色 fixture；检查 DOCX ZIP/XML/media、图片像素/比例/有效 DPI、实际 Word 排版和 100%/200% 截图，同源 PDF/HTML/PNG 作为保留回归。扩展 `exportDocx.test.ts`、`TC-FILE-OPEN-007` 和 `markdown_export_observation.py` 的质量断言；“ZIP 可打开/存在图片/宽度达到 200px”不足以关闭任务。本轮未打开用户 DOCX 或 Word 原样复现。依赖 MD-005 的确定主题输出，Notes 经 MD-004 共享同一导出修复。
 
 本轮确认记录：源码核查之外，执行 `pnpm exec vitest run src/components/viewer/markdown/exportDocx.test.ts`，结果 **1 文件 / 1 测试通过**。该 fixture 只有文字、表格、页眉页脚和 ZIP 检查，无图片/Mermaid，不能作为 MD-006 的尺寸/清晰度通过证据。`markdownExport.test.ts` 的 Mermaid 还受 `src/test/setup.ts` 全局 mock 影响。DOCX 有效 DPI 应通过关联实际媒体与 DrawingML 显示尺寸计算：`媒体像素宽 ÷ (wp:extent.cx ÷ 914400)`；当前未缩小显示的 1 倍 PNG 路径通常约 96 DPI，大图压缩显示后可能更高，不能把所有图一概记录为 96 DPI。具体 SVG 解码尺寸和 Word 视觉复现仍待执行。
+
+### MD-007 · Word 公式不得重复导出
+
+- [ ] **部分完成｜中｜Word 客户端实测新发现**。在 MD-006 的 Word 16.0（build 16.0.20527）验证中，Mermaid 已清晰，但 `$x^2$`、`$$\frac{1}{2}$$` 分别输出了 MathML、TeX annotation、视觉 HTML 三份文字。原始错误产物与修复验证路径见 [11-16 回执](verification-2026-11-16.md)。
+- `AC-MD-007`：普通分数、上下标和根式导出为单份可编辑 Office Math，保留相邻正文和原文；不把隐藏 TeX/辅助 HTML 重复写入 Word。不支持的矩阵/重音等结构明确保留一次完整 TeX，不能悄悄压平成丢失结构的文字。本批不声称已支持全部 MathML 类型的 Word 排版。
+- 实现：`docxMath.ts` 在共享 Word 转换入口消费 KaTeX 语义树；仍保持 docx 懒加载，Notes/文件复用同一实现。验证：真实 DOCX ZIP 单元覆盖分数、脚标/根式、矩阵回退及 DOM 不变；browser FILE004 增加实际 Word 下载，native FILE007 增加独立 OOXML 数量/结构/文字检查；修复后的 Word 实际排版与全平台回归待新构建结果。
 
 ## 5. 验证计划与完成口径
 

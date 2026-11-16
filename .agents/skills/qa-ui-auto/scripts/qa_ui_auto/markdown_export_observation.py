@@ -170,6 +170,8 @@ def check_artifact(kind, path, source, manifest):
             if manifest.get("diagramLabels"):
                 from .markdown_docx_quality import inspect_diagrams
                 result["diagrams"] = inspect_diagrams(archive)
+            from .markdown_docx_quality import inspect_equations
+            result["equations"] = inspect_equations(archive)
             result["media"] = media
     elif kind == "markdown":
         # Product creates a collision-safe child named after the source stem.

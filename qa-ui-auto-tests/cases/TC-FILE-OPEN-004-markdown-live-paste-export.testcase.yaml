@@ -2,8 +2,8 @@ id: TC-FILE-OPEN-004
 title: Markdown live widgets preserve source, paste a real table/image and export self-contained HTML
 description: AC11/12/13/15. Real CodeMirror renderer and Chromium clipboard, not simulation buttons. Asserts live/source/split
   rendering, one-step table Undo, stored image bytes/link, export contents and unchanged source bytes. Browser VFS/clipboard
-  and actual browser download are not native OS clipboard/save-dialog evidence. PDF/print, Word/PNG export, native
-  image clipboard formats and dialog failures remain explicit unrun native gaps. Real Mermaid (not mocked) is asserted
+  and actual HTML/Word browser downloads are not native OS clipboard/save-dialog evidence. Final PDF/print, Word client typography,
+  native image clipboard formats and native dialog failures remain explicit gaps. Real Mermaid (not mocked) is asserted
   in live/split and the self-contained HTML artifact. Ctrl+Y is the Linux/Windows standard Redo and Cmd+Shift+Z
   is used on macOS; async clipboard status waits for actual completion. Light screenshots retained; dark prototype
   comparison still requires separate hosted visual evidence. Live now starts read-only; retained task/table edits
@@ -401,6 +401,18 @@ steps:
     regex: assets/image-[^\s)]+\.png
 - assert_no_runtime_errors: null
 - screenshot: markdown-live-paste-export.png
+- click: '[data-testid="markdown-mode-split"]'
+- wait_for: '[data-testid="markdown-preview"] .katex'
+- click: '[data-testid="markdown-export"]'
+- click: '[data-testid="markdown-export-docx"]'
+- wait_for: '[data-testid="markdown-export-settings"]'
+- assert_download:
+    trigger: '[data-testid="markdown-export-confirm"]'
+    filename: live.docx
+    contains:
+    - word/document.xml
+- wait_for: '[data-testid="markdown-export-status"][data-export-state="saved"]'
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -807,6 +819,24 @@ verification:
     - 114
     - 115
     - 164
+  - id: R8
+    requirement: The actual Word export completes through the shared Markdown UI, downloads a DOCX package and leaves runtime clean. Native FILE007 independently verifies editable equations and Mermaid media; browser download alone does not prove Word typography.
+    actions:
+    - 172
+    - 174
+    - 175
+    - 177
+    checkpoints:
+    - step: 177
+      expectation: Actual browser download is live.docx and contains a Word document ZIP entry.
+    - step: 178
+      expectation: Production export reports saved only after the download completes.
+    - step: 179
+      expectation: Word conversion has no unhandled runtime errors.
+    results:
+    - 177
+    - 178
+    - 179
   visual:
   - check: Live/source/split widgets and export menu
     method: manual
@@ -815,6 +845,6 @@ verification:
   - check: Native clipboard image formats, asset disk persistence and OS save dialogs
     method: manual
     reason: Browser Chromium/VFS and browser downloads cannot establish these native effects.
-  - check: PDF/print, DOCX, PNG, Markdown-folder exports and export failure/cancel
+  - check: Final PDF/print, Word client typography, PNG, Markdown-folder outputs and native dialogs
     method: manual
-    reason: Formats are visible but their full outputs/system dialogs are not executed by this case.
+    reason: DOCX is downloaded and its package entry checked; native disk/dialogs and Word client layout require FILE007 and separate client evidence.

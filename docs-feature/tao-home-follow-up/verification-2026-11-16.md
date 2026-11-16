@@ -35,7 +35,7 @@ TC-005 的脱敏状态日志为 `request_prepared → response-complete → fixt
 
 1. Windows 完整 crash-regression browser/native，加受影响 Markdown/Notes、目录与 Tao UI 用例。
 2. Linux/macOS 通过 `qa-ui-auto-platforms.yml` 执行 browser/native，包含自动追加的完整 crash suite。首次 hosted run `43770604009` 在 plan 单元检查失败，未运行产品用例；已补齐 crash suite expected/smoke 集合后重新调度。
-3. 当前 Windows SSH/SFTP 测试服务不可达，Docker daemon 也不可用；相关用例若因缺环境跳过，仍记为验证缺口。尚未将完整 crash suite 标为通过。
+3. Windows SSH/SFTP 服务已恢复；通过用户提供的本机临时凭据完成 POSIX 认证，FILE008 browser/native 补测均已通过，最终整批结果见后文。此前因环境缺失的跳过记录仍保留。
 4. Word 客户端实际放大视觉、macOS 真实菜单/OS 输入、未贯通的工作流/安全/语音等 AC 仍需各自证据；DOCX XML/像素 oracle 与 WKWebView bridge 不替代这些边界。
 
 所有运行产物在 gitignored 的 `qa-ui-auto-report/`，此文记录可定位的本地证据，不承诺它们已上传。
@@ -82,3 +82,59 @@ Hosted run [43772442032](https://github.com/engcapa/taomni/actions/runs/43772442
 Linux native producer 被过期的 crash selection 单测阻断，预期集合已修复。
 macOS native release producer 已成功，四个 native shard 正在执行。
 这些跨平台失败仍需新提交后的 hosted 回执关闭。
+
+## Vault 修复后的完整批次（`586f036a4`）
+
+匹配的 Windows 隔离 QA release 已构建完成，source SHA-256 为
+`5ab82ef5344a0ae7b765fec96fd510ae7aff78eb5f92b4d7ad17b3c5a0f7fa1d`，
+binary SHA-256 为
+`6a388d8c539a4c539c5c548cc90648338eaf4a79f28239a3ba53ce4fdfe41683`。
+
+- Windows browser：`C:/tmp/tqa-final-browser-1116/run-20261116-075218-648556300`，
+  **28 passed / 0 failed / 0 skipped**，743.6 秒，source stable；包含完整适用的
+  crash-regression 与受影响 Tao、Markdown、Notes、目录用例。status 验证接受其 receipt，
+  没有 rejected report。
+- Windows Vault native：`C:/tmp/tqa-vault-1116/run-20261116-075803-131992600`，
+  **1 passed / 0 failed / 0 skipped**，25.0 秒，source stable。TC-TAO-HOME-009
+  经真实 Settings 锁定与解锁，服务端记录取消；部分回复、草稿、取消解锁、焦点恢复及
+  解锁后不自动重发均有独立断言。
+- Windows 完整 native：`C:/tmp/tqa-final-native-1116/run-20261116-080006-117923000`，
+  **34 passed / 0 failed / 0 skipped**，882.2 秒，source stable。包含完整适用
+  crash-regression、受影响功能和上述 Vault 场景；FILE008 为实际 POSIX SSH/SFTP。
+  商业 DeepSeek TC005 本批为 `response-complete`，助手长度 35、IPC fulfilled、
+  生成结束且无错误，脱敏日志 `request_prepared → response-complete → fixture_cleaned`。
+- Linux hosted browser：[43777349601](https://github.com/engcapa/taomni/actions/runs/43777349601)
+  的两个 raw summary 合计 **28 passed / 0 failed / 0 skipped**，均 source stable。
+  Linux/macOS native 与 macOS browser 仍以各自最终报告为准。
+
+上一轮 [43772442032](https://github.com/engcapa/taomni/actions/runs/43772442032)
+完整汇总为 Linux browser 27/28、macOS browser 27/29、macOS native 33/35；
+Linux native 被 producer 阻断。除已修正的 workspace 选择器与 Notes 测量时序外，
+macOS FILE013 的原始事件日志显示：mousedown 更换复选框 DOM 后，桥接器向新控件
+再次发送 click，造成一次操作两次切换。本地最小复现得到 2 次处理，修复候选为 1 次；
+后续需要桥接器单元回归和真实 hosted WKWebView 执行，不能放宽勾选断言。
+
+## Word 客户端排版与新增公式回归
+
+实际打开上批 FILE007 的 `exports/native.docx`：独立隐藏只读的 Microsoft Word 16.0
+（build 16.0.20527），重新分页并由 Word 导出 PDF，再按 96/192 DPI 渲染 100%/200%
+尺寸图。结果在 `output/pdf/tao-home-word-20261116/`（word-client.json、PDF 和两张 PNG）。
+源文件哈希不变；独立 Word 实例结束后退出。此证据是 Word 排版引擎输出，
+不是交互式 Word 缩放 UI 的截图。
+
+实测 Mermaid 使用 SVG（Word InlineShape type 17），显示 482.25×50.25 pt，约等于
+A4 内容宽；PNG fallback 为 2010×210，实际约 300 DPI。两种尺寸下节点文字、边框、
+箭头清楚，代表流程图没有小图/模糊问题。范围限于该图、纸张和 Word 版本，
+不把它推断为所有 Mermaid 类型和 Word 客户端通过。
+
+同一页公式显示 `x2x^2x2` 和 `12\frac{1}{2}21`，因此整页不计视觉通过。新增 MD-007：
+共享 DOCX 转换优先将常见 KaTeX MathML 输出为单份可编辑 Office Math；
+无法表达的结构保留一次完整 TeX。本批新增 6 个真实 ZIP 行为测试，相关 4 文件/
+20 个 frontend tests 通过；Python 30 tests、Node 12 tests 通过，已把辅助工具回归
+加入 hosted producer。FILE004 的真实 Word 下载与 FILE007 的 OOXML 独立检查
+继续随新构建执行。
+
+macOS pointer bridge 的事件序列与 browser 首次 Vault 等待属于 QA 工具修复，
+不改变产品用户流程；复用 FILE013、NOTES008 和既有 Vault/完整 crash 用例验证，
+不为同一行为创建重复产品用例。native bridge 是构建输入，已启动重新构建，
+不会用上批源码身份冒充修复后的通过结果。

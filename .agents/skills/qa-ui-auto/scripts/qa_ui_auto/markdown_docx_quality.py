@@ -8,11 +8,33 @@ import xml.etree.ElementTree as ET
 from .steps import StepError
 
 NS = {
+    "m": "http://schemas.openxmlformats.org/officeDocument/2006/math",
     "w": "http://schemas.openxmlformats.org/wordprocessingml/2006/main",
     "wp": "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing",
     "a": "http://schemas.openxmlformats.org/drawingml/2006/main",
     "r": "http://schemas.openxmlformats.org/officeDocument/2006/relationships",
 }
+
+
+def inspect_equations(archive):
+    """The shared Markdown fixture has x squared and one half, each exactly once.
+
+    Validate semantic OOXML and surrounding prose separately: aggregate itertext
+    alone also accepted the old three-layer KaTeX export with duplicated text.
+    """
+    document = ET.fromstring(archive.read("word/document.xml"))
+    equations = document.findall(".//m:oMath", NS)
+    if len(equations) != 2:
+        raise StepError("DOCX must contain exactly two editable equations")
+    expected = [("sSup", ["x", "2"]), ("f", ["1", "2"])]
+    for equation, (structure, tokens) in zip(equations, expected):
+        if equation.find(f"m:{structure}", NS) is None or [node.text for node in equation.findall(".//m:t", NS)] != tokens:
+            raise StepError("DOCX formula structure or tokens changed")
+    paragraphs = ["".join(node.text or "" for node in paragraph.findall(".//w:t", NS))
+                  for paragraph in document.findall(".//w:p", NS)]
+    if [text for text in paragraphs if text.startswith("Math:")] != ["Math:  and ."]:
+        raise StepError("DOCX math prose contains duplicated visual text or TeX")
+    return {"equationCount": len(equations), "structures": [item[0] for item in expected]}
 
 
 def inspect_diagrams(archive, minimum_dpi=285):

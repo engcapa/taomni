@@ -4,7 +4,7 @@ import zipfile
 
 from PIL import Image
 
-from qa_ui_auto.markdown_docx_quality import inspect_diagrams
+from qa_ui_auto.markdown_docx_quality import inspect_diagrams, inspect_equations
 from qa_ui_auto.steps import StepError
 
 
@@ -64,6 +64,37 @@ class DocxDiagramQualityTest(unittest.TestCase):
         with document(pixel_width=3000, pixel_height=1500, drawing_width=9144000, drawing_height=4572000) as archive:
             with self.assertRaisesRegex(StepError, "content width"):
                 inspect_diagrams(archive)
+
+
+class DocxEquationQualityTest(unittest.TestCase):
+    def inspect(self, *, duplicate="", superscript="sSup", equations=True):
+        math = (f'<m:oMath><m:{superscript}><m:e><m:r><m:t>x</m:t></m:r></m:e><m:sup><m:r><m:t>2</m:t></m:r></m:sup></m:{superscript}></m:oMath>'
+                '<m:oMath><m:f><m:num><m:r><m:t>1</m:t></m:r></m:num><m:den><m:r><m:t>2</m:t></m:r></m:den></m:f></m:oMath>')
+        xml = ('<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" '
+               'xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"><w:body><w:p>'
+               f'<w:r><w:t>Math: {duplicate}</w:t></w:r>{math if equations else ""}<w:r><w:t> and .</w:t></w:r>'
+               '</w:p></w:body></w:document>')
+        output = io.BytesIO()
+        with zipfile.ZipFile(output, "w") as archive:
+            archive.writestr("word/document.xml", xml)
+        with zipfile.ZipFile(output) as archive:
+            return inspect_equations(archive)
+
+    def test_accepts_two_editable_equations_with_exact_prose(self):
+        self.assertEqual(self.inspect(), {"equationCount": 2, "structures": ["sSup", "f"]})
+
+    def test_rejects_legacy_flattened_katex_layers(self):
+        with self.assertRaisesRegex(StepError, "exactly two"):
+            self.inspect(equations=False, duplicate="x2x^2x2")
+
+    def test_rejects_extra_visual_or_source_text_even_with_valid_equations(self):
+        for text in ("x2", "x^2", "\\frac{1}{2}"):
+            with self.subTest(text=text), self.assertRaisesRegex(StepError, "duplicated"):
+                self.inspect(duplicate=text)
+
+    def test_rejects_formula_structure_loss(self):
+        with self.assertRaisesRegex(StepError, "structure or tokens"):
+            self.inspect(superscript="sSub")
 
 
 if __name__ == "__main__":

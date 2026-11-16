@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { markdownDocx } from "./exportDocx";
 import { DEFAULT_EXPORT_SETTINGS } from "./exportModel";
+import { renderKatex } from "./markdownMath";
 // @ts-expect-error Node-only ZIP inspection stays in the unit test.
 import { inflateRawSync } from "node:zlib";
 
@@ -28,6 +29,40 @@ function zipEntries(bytes: Uint8Array): Map<string, Uint8Array> {
 afterEach(() => { vi.unstubAllGlobals(); vi.restoreAllMocks(); });
 
 describe("real lazy Word package", () => {
+  it("exports each KaTeX formula once as editable Word math and keeps surrounding text", async () => {
+    const root = document.createElement("div");
+    root.innerHTML = `<p>Math: <span class="fv-md-math">${renderKatex("x^2", false)}</span> and <span class="fv-md-math">${renderKatex("\\frac{1}{2}", true)}</span>.</p>`;
+    const before = root.innerHTML;
+    const entries = zipEntries(await blobBytes(await markdownDocx(root, "math.md", DEFAULT_EXPORT_SETTINGS)));
+    const xml = new TextDecoder().decode(entries.get("word/document.xml"));
+    const wordDocument = new DOMParser().parseFromString(xml, "application/xml");
+    const ns = "http://schemas.openxmlformats.org/officeDocument/2006/math";
+    expect(wordDocument.getElementsByTagNameNS(ns, "oMath")).toHaveLength(2);
+    expect(wordDocument.getElementsByTagNameNS(ns, "sSup")).toHaveLength(1);
+    expect(wordDocument.getElementsByTagNameNS(ns, "f")).toHaveLength(1);
+    expect(Array.from(wordDocument.getElementsByTagNameNS(ns, "t"), (node) => node.textContent)).toEqual(["x", "2", "1", "2"]);
+    expect(wordDocument.documentElement.textContent).toBe("Math: x2 and 12.");
+    expect(xml).not.toContain("x^2");
+    expect(xml).not.toContain("\\frac");
+    expect(root.innerHTML).toBe(before);
+  });
+  it.each(["x_i", "x_i^2", "\\sqrt{x+1}", "\\sqrt[3]{x}"])("preserves script/root structure for %s", async (source) => {
+    const root = document.createElement("div");
+    root.innerHTML = `<p>${renderKatex(source, false)}</p>`;
+    const entries = zipEntries(await blobBytes(await markdownDocx(root, "math.md", DEFAULT_EXPORT_SETTINGS)));
+    const xml = new TextDecoder().decode(entries.get("word/document.xml"));
+    expect(xml.match(/<m:oMath>/g)).toHaveLength(1);
+    expect(xml).toContain(source.includes("sqrt") ? "<m:rad>" : source.includes("^2") ? "<m:sSubSup>" : "<m:sSub>");
+  });
+  it("retains unsupported equations as one complete TeX source without duplicate HTML or MathML", async () => {
+    const source = "\\begin{pmatrix}a&b\\\\c&d\\end{pmatrix}";
+    const root = document.createElement("div");
+    root.innerHTML = `<p>${renderKatex(source, false)}</p>`;
+    const entries = zipEntries(await blobBytes(await markdownDocx(root, "math.md", DEFAULT_EXPORT_SETTINGS)));
+    const xml = new TextDecoder().decode(entries.get("word/document.xml"));
+    expect(new DOMParser().parseFromString(xml, "application/xml").documentElement.textContent).toBe(source);
+    expect(xml).not.toContain("<m:oMath>");
+  });
   it("emits an actual DOCX ZIP with paragraphs, GFM tables, headers and footer", async () => {
     const root = document.createElement("div");
     root.innerHTML = '<h1>Title</h1><p>A <strong>bold</strong> line <a href="https://example.test">link</a>.</p><table><thead><tr><th>A</th><th>B</th></tr></thead><tbody><tr><td>c</td><td>d</td></tr></tbody></table><ul><li>first</li><li>second</li></ul>';

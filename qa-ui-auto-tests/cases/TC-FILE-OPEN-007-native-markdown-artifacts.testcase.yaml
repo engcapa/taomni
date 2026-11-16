@@ -276,7 +276,7 @@ verification:
     - step: 57
       expectation: Host PNG decodes to a nonblank long document image.
     - step: 63
-      expectation: DOCX ZIP checksums/XML/body/media are independently valid.
+      expectation: DOCX ZIP checksums/XML/body/media are independently valid; x squared and one half are editable Office Math equations exactly once, with no duplicate KaTeX HTML or TeX prose.
     - step: 67
       expectation: Bundled Markdown references resolve to native saved image pixels.
     - step: 68

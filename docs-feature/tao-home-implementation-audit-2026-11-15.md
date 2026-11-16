@@ -13,7 +13,7 @@
 
 这里不提供主观百分比：一个可见按钮、一个通过的组件测试，与一个可用且可恢复的原生流程，不能等权计为“完成”。以下分别列出已符合部分、具体缺口及证据。
 
-审查发现与用户后续追加的目录历史、新对话入口、浮层/绑定、Markdown、Notes Workspace 及 Mermaid 主题/Word 导出要求，已汇总到[后续待办（38 项，全部待办）](tao-home-follow-up/development-tasks.md)。其中用户截图与本报告的发送契约问题合并记录，新增要求不反向冒充原设计既有条目；本报告保持改前核对记录。
+审查发现与用户后续追加的目录历史、新对话入口、浮层/绑定、Markdown、Notes Workspace 及 Mermaid 主题/Word 导出要求，已汇总到[后续待办](tao-home-follow-up/development-tasks.md)。其中用户截图与本报告的发送契约问题合并记录，新增要求不反向冒充原设计既有条目；本报告正文保持改前核对记录，最新实施结果见文末及 [11-16 回执](tao-home-follow-up/verification-2026-11-16.md)。
 
 **核对基线与方法**
 

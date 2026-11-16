@@ -1,6 +1,7 @@
 import type { Paragraph, ParagraphChild, Table, RunOptions } from "./docxRuntime.js";
 import type { MarkdownExportSettings } from "./exportModel";
 import { wordImageData, wordPageLayout } from "./docxImages";
+import { wordEquation } from "./docxMath";
 
 /** Convert the already-sanitized, image-embedded rendering, not a second
  * Markdown parse. The document library is fetched only on the Word path. */
@@ -9,6 +10,8 @@ export async function markdownDocx(root: HTMLElement, title: string, settings: M
   const inline = async (node: Node, style: RunOptions = {}): Promise<ParagraphChild[]> => {
     if (node.nodeType === Node.TEXT_NODE) return [new d.TextRun({ ...style, text: node.textContent || "" })];
     if (!(node instanceof Element)) return [];
+    const equation = wordEquation(node, d, style);
+    if (equation) return [equation];
     const tag = node.tagName.toLowerCase();
     if (tag === "br") return [new d.TextRun({ break: 1 })];
     if (tag === "img" || tag === "svg") {
