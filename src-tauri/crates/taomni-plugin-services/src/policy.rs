@@ -35,6 +35,17 @@ pub struct VerifiedHostGrants {
 }
 
 impl VerifiedHostGrants {
+    pub fn service_capabilities(&self) -> taomni_plugin_api::services::ServiceCapabilities {
+        let mut capabilities = taomni_plugin_api::services::ServiceCapabilities::default();
+        if self.permissions.contains(FIXED_KEY_SERVICE) && !self.fixed_keys.is_empty() {
+            capabilities.0.insert(
+                FIXED_KEY_SERVICE.into(),
+                taomni_plugin_api::services::SERVICE_VERSION,
+            );
+        }
+        capabilities
+    }
+
     pub fn from_verified_manifest(
         slug: PluginSlug,
         permissions: BTreeSet<String>,

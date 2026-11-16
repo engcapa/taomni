@@ -6,19 +6,25 @@
 //! The host never receives this crate's admission permits or OS lease handles.
 
 mod admission;
+mod dispatcher;
 mod grants;
 mod operation;
 mod policy;
 mod revoke;
 mod sensitive_frame;
 mod service_request;
+mod session;
 
 pub use admission::{OperationAdmission, OperationPermit};
+pub use dispatcher::{CoreServiceBackend, CoreServiceDispatcher, DispatcherConfig};
 pub use operation::{BorrowedOperation, OperationKind};
 pub use policy::{AuthorizedHost, FixedKeyOwner, MFA_FIXED_KEY_OWNER, VerifiedHostGrants};
 pub use revoke::{AdmissionState, Revocation};
 pub use sensitive_frame::SensitiveServiceFrame;
 pub use service_request::ReverseRequestPermit;
+pub use session::{ServiceCompletion, ServiceSession};
 
+#[cfg(test)]
+mod dispatcher_tests;
 #[cfg(test)]
 mod tests;

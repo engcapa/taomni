@@ -59,7 +59,7 @@ jobs:
         run: |
           mkdir -p modular-evidence
           set -o pipefail
-          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-api -p taomni-plugin-services -p taomni-profile-locks -p taomni-sqlite-snapshot --lib --locked 2>&1 | tee modular-evidence/vault-foundation-unit.log
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-api -p taomni-plugin-services -p taomni-plugin-sdk -p taomni-profile-locks -p taomni-sqlite-snapshot --lib --locked 2>&1 | tee modular-evidence/vault-foundation-unit.log
       - name: Real process profile and writer leases with crash release
         run: |
           set -o pipefail
@@ -109,9 +109,20 @@ jobs:
           os.environ["TAOMNI_HELLO_PLUGIN_BIN"] = str(pathlib.Path(f"src-tauri/target/debug/taomni-hello-plugin{suffix}").resolve())
           subprocess.run([
               "cargo", "test", "--manifest-path", "src-tauri/Cargo.toml",
-              "-p", "taomni-host-gates", "--test", "lifecycle", "--test", "cleanup",
+              "-p", "taomni-host-gates", "--test", "lifecycle", "--test", "cleanup", "--test", "services",
               "--locked", "--", "--ignored", "--test-threads=1", "--nocapture",
           ], check=True)
+          PY
+      - name: Record actual SDK service gate selection
+        run: |
+          python - <<'PY' > modular-evidence/service-selection.txt
+          import subprocess
+          listing = subprocess.check_output([
+              "cargo", "test", "--manifest-path", "src-tauri/Cargo.toml", "-p", "taomni-host-gates",
+              "--test", "services", "--locked", "--", "--ignored", "--list",
+          ], text=True)
+          print(listing)
+          assert sum(line.endswith(": test") for line in listing.splitlines()) == 6, "Missing production pump/SDK process scenarios"
           PY
       - uses: actions/upload-artifact@v4
         if: always()
@@ -390,6 +401,33 @@ jobs:
                   failures.append(selected)
           if failures:
               raise SystemExit(f"Core unit filters failed: {', '.join(failures)}")
+          PY
+      - name: Exercise production Vault through real SDK stdio
+        if: runner.os == 'Linux'
+        run: |
+          set -o pipefail
+          cargo build --manifest-path src-tauri/Cargo.toml -p taomni-host-gates --bin host-gate-services --locked 2>&1 | tee modular-evidence/vault-sdk-build.log
+          python - <<'PY' 2>&1 | tee modular-evidence/vault-sdk-process.log
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+          root = Path("modular-evidence")
+          core = Path(json.loads((root / "core-unit-receipt.json").read_text())["executable"])
+          fixture = Path("src-tauri/target/debug/host-gate-services").resolve()
+          os.environ["TAOMNI_SERVICE_PLUGIN_BIN"] = str(fixture)
+          selected = "vault::plugin_access::host_tests"
+          listing = subprocess.check_output([str(core), selected, "--ignored", "--list"], text=True)
+          count = sum(line.endswith(": test") for line in listing.splitlines())
+          assert count == 2, f"Expected two real Vault/SDK gates, got {count}"
+          result = subprocess.run([str(core), selected, "--ignored", "--test-threads=1", "--nocapture"])
+          receipt = {"head": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
+                     "selected": count, "exitCode": result.returncode,
+                     "coreSha256": hashlib.file_digest(core.open("rb"), "sha256").hexdigest(),
+                     "sdkFixtureSha256": hashlib.file_digest(fixture.open("rb"), "sha256").hexdigest()}
+          (root / "vault-sdk-receipt.json").write_text(json.dumps(receipt, indent=2) + "\n")
+          raise SystemExit(result.returncode)
           PY
       - uses: actions/upload-artifact@v4
         if: always() && runner.os == 'Linux'

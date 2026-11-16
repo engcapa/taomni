@@ -34,6 +34,9 @@ fn process(backoff: Duration) -> HostProcess {
         started_at: Instant::now(),
         next_heartbeat_ms: 0,
         restart_due: None,
+        service_config: None,
+        services: None,
+        active_operation: None,
     }
 }
 

@@ -1,7 +1,7 @@
 # TASK-025：宿主 Vault 服务、一致快照与 profile 协同实施方案
 
 - 日期：2026-11-16。
-- 状态：TASK-025-A/B/C 基础代码已集成；C 准入 11 项和已接入核心的真实 Vault adapter 4 项纯单元通过，D–I 生产双向服务接线与完整 hosted 验收尚未完成，主 TASK-025 未完成。
+- 状态：TASK-025-A/B/C 已集成，源码 `038b539a4` 的三端基础/真实锁与 Linux 真实 Vault gate 通过。D 的双向 pump、敏感 writer、有界 dispatcher、独立读循环 SDK 与真实 Vault backend 已实现，56 项纯单元通过；新增三端 SDK stdio/Linux Vault 进程 gate 待新 SHA 执行，registry/bootstrap 工厂与 Vault/profile 协调尚未接通。D–I 和主 TASK-025 未完成。
 - 来源：`docs-feature/taomni-modular-split-design.md` S12/S13、DEC-8–DEC-10、TASK-024/025、AC-011/015/016、V-006/011；`claudedocs/adr-taomni-modular-split.md`。
 - 调研提交：首次调查为 `2a245d52d`，继续调查时 HEAD 为 `0f4cdf82ffbd519b4217eb56477d0e548e974bce`。签名安装、宿主监督、共享采集这一批仍在集成/验证；本文件没有修改或假设这些共享源码已经冻结合并。
 - 文档位置：`docs-feature/taomni-modular-vault-services-plan.md`，关联主设计和 progress 台账。所有项目路径均为仓库相对路径。

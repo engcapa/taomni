@@ -32,3 +32,13 @@ group, keeping its group ID reserved until cleanup.
 These gates do not establish platform code-signing trust, macOS TCC ownership,
 Linux noexec behavior, frame throughput, plugin frontend loading, or profile /
 backup coordination. Those remain separate G1–G11 acceptance evidence.
+
+`--test services` adds six GitHub-only scenarios using the production core pump
+and the real `taomni-plugin-sdk` fixture binary: reverse services longer than the
+normal invoke timeout with live heartbeats, cancellation during key wait,
+fresh identities after replacement, operation deadline enforcement, revoke /
+new epoch handling, and rejection of generic renderer context injection. Its
+controlled backend proves transport behavior. The root crate's two ignored
+`vault::plugin_access::host_tests` gates separately link the actual Vault and
+exercise old-key continuity, lock errors and explicit empty-store creation.
+Neither suite proves an installed/signed MFA package or real legacy upgrade.

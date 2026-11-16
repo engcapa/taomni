@@ -70,6 +70,10 @@ pub struct RpcRequest {
     pub method: String,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub params: Option<Value>,
+    /// Correlation only; the core authenticates the transport and live permit.
+    /// Kept outside params so existing command payloads remain wire compatible.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub context: Option<services::OperationContext>,
 }
 
 impl RpcRequest {
@@ -79,6 +83,7 @@ impl RpcRequest {
             id: id.into(),
             method: method.into(),
             params,
+            context: None,
         }
     }
 }
@@ -234,6 +239,13 @@ pub struct HandshakeRequest {
     pub commands: Vec<String>,
     #[serde(default)]
     pub permissions: Vec<String>,
+    #[serde(
+        default,
+        skip_serializing_if = "services::ServiceCapabilities::is_empty"
+    )]
+    pub core_services: services::ServiceCapabilities,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub host_instance: Option<services::HostInstanceId>,
 }
 
 impl HandshakeRequest {
@@ -252,6 +264,8 @@ impl HandshakeRequest {
             token: token.into(),
             commands,
             permissions,
+            core_services: services::ServiceCapabilities::default(),
+            host_instance: None,
         }
     }
 }
@@ -267,6 +281,11 @@ pub struct HandshakeResponse {
     pub error: Option<RpcError>,
     #[serde(default)]
     pub heartbeat_interval_ms: u64,
+    #[serde(
+        default,
+        skip_serializing_if = "services::ServiceCapabilities::is_empty"
+    )]
+    pub core_services: services::ServiceCapabilities,
 }
 
 impl HandshakeResponse {
@@ -277,6 +296,7 @@ impl HandshakeResponse {
             accepted: true,
             error: None,
             heartbeat_interval_ms,
+            core_services: services::ServiceCapabilities::default(),
         }
     }
 
@@ -287,6 +307,7 @@ impl HandshakeResponse {
             accepted: false,
             error: Some(error),
             heartbeat_interval_ms: 0,
+            core_services: services::ServiceCapabilities::default(),
         }
     }
 }

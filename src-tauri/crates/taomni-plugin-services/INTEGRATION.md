@@ -1,10 +1,10 @@
-# TASK-025-C integration boundary
+# TASK-025-C/D integration boundary
 
 This crate implements the core-owned fixed-key allowlist, manifest grant
 validation, operation admission, generation/epoch revocation, in-flight lease
 ownership, request budgets/replay rejection, and single-use reset/export grants.
 It does **not** authenticate package bytes, install a module, unlock Vault,
-launch a host, or provide the bidirectional transport. Only trusted core code
+launch a host, or unlock the application's service admission. Only trusted core code
 may construct `VerifiedHostGrants` from the registry's verified package and bind
 it to the successfully authenticated transport's fresh `HostInstanceId`.
 
@@ -66,9 +66,9 @@ invalid even if its worker completed before the epoch changed.
 
 Local in-process checks: API 15/15 and services 11/11 passed; clippy
 `--all-targets -- -D warnings` passed in the foundation tree. The integrated
-core now also passes all four actual Vault adapter units. No browser/native
-or process gate has been run locally; hosted evidence remains pending for
-this integration.
+core now also passes all four actual Vault adapter units. These foundations,
+three-platform process leases and the Linux real Vault units passed in hosted
+run 43781962402 at source 038b539a4. No browser/native or process gate ran locally.
 
 Hosted exact commands after integration:
 
@@ -77,7 +77,23 @@ cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-api -p taomni-p
 cargo test --manifest-path src-tauri/Cargo.toml -p taomni --lib vault::plugin_access::tests --locked -- --test-threads=1 --nocapture
 ```
 
-This is a C foundation and adapter delivery. It does not establish production
+The D transport batch adds `CoreServiceDispatcher`, `ServiceSession`, explicit
+core-owned `admit_until` deadlines, `HostProcess::start_with_services` and
+`invoke_with_operation`, plus the independent `taomni-plugin-sdk` reader and
+business worker. `Vault` implements `CoreServiceBackend` directly. The writer
+queues the original sensitive frame and retains its permit until flush/drop.
+Core API 16 + services 19 + SDK 7 + host 14 pure units pass. Six SDK stdio and
+two actual Vault/SDK process scenarios are wired into the hosted workflow;
+their new-source execution is still pending.
+
+Production registry/bootstrap must still configure the factory from a freshly
+verified manifest, acquire an outer OS lease before any host mutex, coordinate
+admission with real Vault lock/unlock/rekey and persistent profile generation,
+and own dispatcher shutdown outside host/Vault locks. The renderer's generic
+invoke path cannot construct operation permits or select reset/export grants.
+Do not infer runtime availability from the backend trait implementation.
+
+This delivery does not yet establish production
 revocation, shared capture/backup barriers, three-state restore, GUI/headless
 coordination, or a migrated MFA host. TASK-025 remains incomplete until C–I
 production wiring and corresponding three-platform evidence exist.

@@ -11,7 +11,11 @@ use super::super::containment::ProcessContainment;
 use super::{HostCancellation, HostProcessError, JsonLineCodec, RequestId, RpcMessage};
 
 type ReadResult = Result<RpcMessage, HostProcessError>;
-type WriteTask = (Vec<u8>, Option<SyncSender<io::Result<()>>>);
+type WriteTask = (WireBytes, Option<SyncSender<io::Result<()>>>);
+
+#[path = "wire.rs"]
+mod wire;
+use wire::WireBytes;
 
 #[derive(Debug)]
 pub(super) struct Transport {
@@ -70,7 +74,16 @@ impl Transport {
         thread::spawn(move || {
             let mut stdin = stdin;
             while let Ok((bytes, receipt)) = writes.recv() {
-                let result = stdin.write_all(&bytes).and_then(|()| stdin.flush());
+                let wire = match bytes.current_bytes() {
+                    Ok(wire) => wire,
+                    Err(_) => {
+                        if let Some(receipt) = receipt {
+                            let _ = receipt.send(Err(io::Error::other("stale service reply")));
+                        }
+                        continue;
+                    }
+                };
+                let result = stdin.write_all(wire).and_then(|()| stdin.flush());
                 let failed = result.is_err();
                 if let Some(receipt) = receipt {
                     let _ = receipt.send(result);
@@ -95,6 +108,14 @@ impl Transport {
 
     pub(super) fn notify(&self, message: &RpcMessage) -> Result<(), HostProcessError> {
         self.queue(message, None)
+    }
+
+    pub(super) fn service_reply(
+        &self,
+        frame: taomni_plugin_services::SensitiveServiceFrame,
+    ) -> Result<(), HostProcessError> {
+        frame.current_bytes().map_err(super::service_error)?;
+        self.queue_bytes(WireBytes::Sensitive(frame), None)
     }
 
     pub(super) fn write(
@@ -134,6 +155,14 @@ impl Transport {
                 },
             ));
         }
+        self.queue_bytes(WireBytes::Plain(bytes), receipt)
+    }
+
+    fn queue_bytes(
+        &self,
+        bytes: WireBytes,
+        receipt: Option<SyncSender<io::Result<()>>>,
+    ) -> Result<(), HostProcessError> {
         self.writer
             .try_send((bytes, receipt))
             .map_err(|error| match error {

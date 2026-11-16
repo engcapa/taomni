@@ -10920,8 +10920,11 @@ dependencies = [
  "rand 0.9.5",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "taomni-plugin-api",
+ "taomni-plugin-sdk",
  "taomni-plugin-services",
+ "taomni-profile-locks",
  "tempfile",
  "thiserror 2.0.20",
  "windows 0.62.2",
@@ -10938,9 +10941,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "taomni-plugin-sdk"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "taomni-plugin-api",
+ "zeroize",
+]
+
+[[package]]
 name = "taomni-plugin-services"
 version = "0.1.0"
 dependencies = [
+ "serde",
  "serde_json",
  "taomni-plugin-api",
  "taomni-profile-locks",

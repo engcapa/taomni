@@ -21,6 +21,7 @@ members = [
     "crates/taomni-file-uri",
     "crates/taomni-plugin-api",
     "crates/taomni-plugin-services",
+    "crates/taomni-plugin-sdk",
     "crates/taomni-profile-locks",
     "crates/taomni-sqlite-snapshot",
     "plugins/hello-plugin",

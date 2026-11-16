@@ -221,19 +221,24 @@ impl HostSupervisor {
 
     /// Track a request before writing it to the child stdin.
     pub fn register_request(&mut self, id: RequestId, now_ms: u64) -> Result<(), RpcError> {
+        let timeout_ms = HostSupervisorConfig::millis(self.config.request_timeout);
+        self.register_request_until(id, now_ms.saturating_add(timeout_ms))
+    }
+
+    /// A core-owned lifecycle/snapshot deadline may differ from the ordinary
+    /// invoke timeout. Never use a deadline supplied by host/renderer JSON.
+    pub fn register_request_until(
+        &mut self,
+        id: RequestId,
+        deadline_ms: u64,
+    ) -> Result<(), RpcError> {
         if self.state != HostState::Running {
             return Err(RpcError::from_code(ErrorCode::InvalidState));
         }
         if self.pending.contains_key(&id) {
             return Err(RpcError::from_code(ErrorCode::DuplicateRequest));
         }
-        let timeout_ms = HostSupervisorConfig::millis(self.config.request_timeout);
-        self.pending.insert(
-            id,
-            PendingRequest {
-                deadline_ms: now_ms.saturating_add(timeout_ms),
-            },
-        );
+        self.pending.insert(id, PendingRequest { deadline_ms });
         Ok(())
     }
 
@@ -359,7 +364,7 @@ mod containment;
 #[path = "host/process.rs"]
 mod process;
 
-pub use process::{HostCancellation, HostProcess, HostProcessError, HostTick};
+pub use process::{HostCancellation, HostProcess, HostProcessError, HostServiceConfig, HostTick};
 
 #[cfg(test)]
 #[path = "host_tests.rs"]

@@ -2,6 +2,7 @@ use std::sync::{
     Arc, Mutex, Weak,
     atomic::{AtomicBool, Ordering},
 };
+use std::time::Instant;
 
 use taomni_plugin_api::services::{CoreServiceError, OperationContext};
 use taomni_profile_locks::VaultOperationLease;
@@ -27,6 +28,7 @@ pub(crate) struct ActiveOperation {
     pub context: OperationContext,
     pub host: AuthorizedHost,
     pub kind: OperationKind,
+    pub deadline: Option<Instant>,
     pub cancelled: AtomicBool,
     pub outer_active: AtomicBool,
     pub owner: Weak<AdmissionInner>,
@@ -62,6 +64,13 @@ impl BorrowedOperation {
     }
 
     pub fn check_current(&self) -> Result<(), CoreServiceError> {
+        if self
+            .0
+            .deadline
+            .is_some_and(|deadline| Instant::now() >= deadline)
+        {
+            return Err(CoreServiceError::TimedOut);
+        }
         if self.0.cancelled.load(Ordering::Acquire) || !self.0.outer_active.load(Ordering::Acquire)
         {
             return Err(CoreServiceError::StalePluginContext);

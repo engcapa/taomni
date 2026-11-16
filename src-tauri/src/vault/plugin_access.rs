@@ -16,6 +16,18 @@ use super::{Vault, VaultInner, crypto, db};
 mod error;
 pub use error::PluginKeyError;
 
+impl taomni_plugin_services::CoreServiceBackend for Vault {
+    fn fixed_key(
+        &self,
+        id: RequestId,
+        request: FixedKeyRequest,
+        permit: ReverseRequestPermit,
+    ) -> Result<SensitiveServiceFrame, taomni_plugin_api::RpcError> {
+        self.plugin_fixed_key_frame(id, request, permit)
+            .map_err(PluginKeyError::into_rpc_error)
+    }
+}
+
 impl Vault {
     /// The returned frame retains the operation and its cross-process lease
     /// through the bounded transport write. Never turn it into generic Value.
@@ -143,6 +155,9 @@ fn create_data_key(
     Ok(SecretKey32::new(std::mem::take(&mut *bytes)))
 }
 
+#[cfg(test)]
+#[path = "plugin_host_tests.rs"]
+mod host_tests;
 #[cfg(test)]
 #[path = "plugin_access_tests.rs"]
 mod tests;

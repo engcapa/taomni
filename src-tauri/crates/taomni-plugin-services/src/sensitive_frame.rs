@@ -15,6 +15,22 @@ pub struct SensitiveServiceFrame {
 }
 
 impl SensitiveServiceFrame {
+    /// Grant acknowledgements also retain admission until flush. Their
+    /// non-secret payload uses the same owned frame to prevent stale success.
+    pub(crate) fn export_grant_ack(
+        id: RequestId,
+        permit: ReverseRequestPermit,
+    ) -> Result<Self, CoreServiceError> {
+        permit.check_current()?;
+        if &id != permit.request_id() {
+            return Err(CoreServiceError::StalePluginContext);
+        }
+        let bytes = SensitiveRpcResponse::success(id, true)
+            .encode_line()
+            .map_err(|_| CoreServiceError::StalePluginContext)?;
+        Ok(Self { bytes, permit })
+    }
+
     pub fn encode(
         id: RequestId,
         result: FixedKeyResult,

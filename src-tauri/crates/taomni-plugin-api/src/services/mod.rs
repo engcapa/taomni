@@ -33,13 +33,17 @@ pub const SERVICE_VERSION: u16 = 1;
 pub struct ServiceCapabilities(pub BTreeMap<String, u16>);
 
 impl ServiceCapabilities {
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
     pub fn supports(&self, service: &str, version: u16) -> bool {
         self.0.get(service).copied() == Some(version)
     }
 }
 
-/// A typed request for the future bidirectional dispatcher. This deliberately
-/// does not add fields to the existing RpcRequest or change command params.
+/// A typed service request used internally by the bidirectional dispatcher.
+/// The wire RpcRequest carries context at the top level, leaving params intact.
 #[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ServiceRequest<T> {

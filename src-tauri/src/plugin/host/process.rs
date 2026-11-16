@@ -4,7 +4,6 @@
 use std::io;
 use std::path::{Path, PathBuf};
 use std::process::Command;
-use std::sync::mpsc::TryRecvError;
 use std::time::{Duration, Instant};
 
 use serde_json::Value;
@@ -15,18 +14,24 @@ use taomni_plugin_api::{
 
 use super::{
     FrameError, HostState, HostSupervisor, HostSupervisorConfig, JsonLineCodec, RestartAction,
-    SupervisorEvent, request_message,
+    SupervisorEvent,
 };
 
 #[path = "cancellation.rs"]
 mod cancellation;
 #[path = "pump.rs"]
 mod pump;
+#[path = "service_requests.rs"]
+mod service_requests;
 #[path = "transport.rs"]
 mod transport;
 
 pub use cancellation::HostCancellation;
 use cancellation::RequestGuard;
+use pump::PumpOutcome;
+pub use service_requests::HostServiceConfig;
+use service_requests::{fresh_host_instance, service_error};
+use taomni_plugin_services::{OperationPermit, ServiceSession};
 use transport::Transport;
 
 #[derive(Debug, thiserror::Error)]
@@ -83,7 +88,6 @@ struct LaunchConfig {
     permissions: Vec<String>,
 }
 
-#[derive(Debug)]
 pub struct HostProcess {
     launch: LaunchConfig,
     transport: Option<Transport>,
@@ -95,6 +99,19 @@ pub struct HostProcess {
     started_at: Instant,
     next_heartbeat_ms: u64,
     restart_due: Option<(Instant, u32)>,
+    service_config: Option<HostServiceConfig>,
+    services: Option<ServiceSession>,
+    active_operation: Option<OperationPermit>,
+}
+
+impl std::fmt::Debug for HostProcess {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("HostProcess")
+            .field("launch", &self.launch)
+            .field("state", &self.state())
+            .field("services", &self.services)
+            .finish_non_exhaustive()
+    }
 }
 
 impl HostProcess {
@@ -106,6 +123,28 @@ impl HostProcess {
         commands: &[String],
         permissions: &[String],
         config: HostSupervisorConfig,
+    ) -> Result<Self, HostProcessError> {
+        Self::start_with_services(
+            plugin_id,
+            plugin_version,
+            host,
+            working_dir,
+            commands,
+            permissions,
+            config,
+            None,
+        )
+    }
+
+    pub fn start_with_services(
+        plugin_id: &str,
+        plugin_version: &str,
+        host: &Path,
+        working_dir: &Path,
+        commands: &[String],
+        permissions: &[String],
+        config: HostSupervisorConfig,
+        services: Option<HostServiceConfig>,
     ) -> Result<Self, HostProcessError> {
         let mut process = Self {
             launch: LaunchConfig {
@@ -125,6 +164,9 @@ impl HostProcess {
             started_at: Instant::now(),
             next_heartbeat_ms: 0,
             restart_due: None,
+            service_config: services,
+            services: None,
+            active_operation: None,
         };
         process.spawn_and_handshake()?;
         Ok(process)
@@ -163,12 +205,28 @@ impl HostProcess {
             return Err(HostProcessError::Crashed);
         }
         let now_ms = self.elapsed_ms();
-        let message = request_message(&mut self.supervisor, id.clone(), method, params, now_ms)
+        let deadline = self
+            .active_operation
+            .as_ref()
+            .and_then(OperationPermit::deadline)
+            .unwrap_or_else(|| Instant::now() + self.supervisor.config().request_timeout);
+        let remaining_ms = deadline
+            .saturating_duration_since(Instant::now())
+            .as_millis()
+            .min(u128::from(u64::MAX)) as u64;
+        self.supervisor
+            .register_request_until(id.clone(), now_ms.saturating_add(remaining_ms))
             .map_err(|error| HostProcessError::Rpc {
                 code: error.code,
                 message: error.message,
             })?;
-        let deadline = Instant::now() + self.supervisor.config().request_timeout;
+        let mut message = RpcMessage::Request(RpcRequest::new(id.clone(), method, params));
+        if let RpcMessage::Request(request) = &mut message {
+            request.context = self
+                .active_operation
+                .as_ref()
+                .map(|permit| permit.context().clone());
+        }
         let result = self
             .transport
             .as_ref()
@@ -191,6 +249,12 @@ impl HostProcess {
         }
         if self.cancellation.is_cancelled(&id) {
             return Err(HostProcessError::Cancelled);
+        }
+        if let Some(permit) = &self.active_operation {
+            if let Err(error) = permit.check_current() {
+                self.schedule_restart();
+                return Err(service_error(error));
+            }
         }
         if let Some(error) = response.error {
             return Err(HostProcessError::Rpc {
@@ -223,16 +287,10 @@ impl HostProcess {
         }
         // Bound work per tick even if a host floods stdout.
         for _ in 0..128 {
-            match self
-                .transport
-                .as_ref()
-                .expect("checked transport")
-                .reader
-                .try_recv()
-            {
-                Ok(Ok(message)) => self.accept_notification(message),
-                Err(TryRecvError::Empty) => break,
-                Ok(Err(_)) | Err(TryRecvError::Disconnected) => return self.schedule_restart(),
+            match self.pump_one(None, None) {
+                Ok(PumpOutcome::Idle) => break,
+                Ok(PumpOutcome::Handled) => {}
+                Ok(PumpOutcome::Response(_)) | Err(_) => return self.schedule_restart(),
             }
         }
         let now_ms = self.elapsed_ms();
@@ -268,25 +326,31 @@ impl HostProcess {
     }
 
     pub fn stop(&mut self) {
+        self.discard_services();
         self.supervisor.stop();
         self.restart_due.take();
         self.transport.take();
     }
 
     fn spawn_and_handshake(&mut self) -> Result<(), HostProcessError> {
+        self.discard_services();
         self.token = process_token();
         let mut command = Command::new(&self.launch.host);
         command
             .current_dir(&self.launch.working_dir)
             .env("TAOMNI_PLUGIN_TOKEN", &self.token);
         self.transport = Some(Transport::spawn(command)?);
-        let request = HandshakeRequest::new(
+        let mut request = HandshakeRequest::new(
             &self.launch.plugin_id,
             &self.launch.plugin_version,
             &self.token,
             self.launch.commands.clone(),
             self.launch.permissions.clone(),
         );
+        if let Some(services) = &self.service_config {
+            request.core_services = services.grants.service_capabilities();
+            request.host_instance = Some(fresh_host_instance());
+        }
         let id = self.next_request_id();
         let message = RpcMessage::Request(RpcRequest::new(
             id.clone(),
@@ -314,6 +378,16 @@ impl HostProcess {
                     .unwrap_or_else(|| "host rejected handshake".into()),
             ));
         }
+        if request
+            .core_services
+            .0
+            .iter()
+            .any(|(name, version)| !handshake.core_services.supports(name, *version))
+        {
+            return Err(HostProcessError::Handshake(
+                "required core service was not negotiated".into(),
+            ));
+        }
         let accepted = self
             .supervisor
             .accept_handshake(&request, &self.token, self.elapsed_ms());
@@ -322,11 +396,20 @@ impl HostProcess {
                 "core rejected handshake".into(),
             ));
         }
+        if let Some(config) = &self.service_config {
+            self.services = Some(ServiceSession::new(
+                config.dispatcher.clone(),
+                config.grants.clone().bind_authenticated_transport(
+                    request.host_instance.expect("service transport identity"),
+                ),
+            ));
+        }
         self.next_heartbeat_ms = self.elapsed_ms();
         Ok(())
     }
 
     fn schedule_restart(&mut self) -> HostTick {
+        self.discard_services();
         self.transport.take();
         if self.restart_due.is_some() || self.supervisor.state() == HostState::RestartExhausted {
             return self.tick();
@@ -343,6 +426,9 @@ impl HostProcess {
 
     fn next_request_id(&mut self) -> RequestId {
         self.next_id = self.next_id.saturating_add(1);
+        if let Some(host) = self.authorized_host() {
+            return format!("core/{}/{}", host.instance(), self.next_id).into();
+        }
         format!("taomni-internal-{}-{}", self.id_prefix, self.next_id).into()
     }
 
@@ -351,6 +437,12 @@ impl HostProcess {
             .elapsed()
             .as_millis()
             .min(u128::from(u64::MAX)) as u64
+    }
+}
+
+impl Drop for HostProcess {
+    fn drop(&mut self) {
+        self.stop();
     }
 }
 

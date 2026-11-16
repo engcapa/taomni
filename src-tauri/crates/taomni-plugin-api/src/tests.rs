@@ -39,6 +39,47 @@ fn handshake_and_versions_are_camel_case_and_stable() {
 }
 
 #[test]
+fn service_fields_are_additive_and_leave_legacy_payloads_unchanged() {
+    let old = r#"{"apiVersion":1,"protocolVersion":1,"pluginId":"hello","pluginVersion":"0.1.0","token":"t"}"#;
+    let old: HandshakeRequest = serde_json::from_str(old).unwrap();
+    assert!(old.core_services.is_empty());
+    assert!(
+        serde_json::to_value(old)
+            .unwrap()
+            .get("coreServices")
+            .is_none()
+    );
+    let old: HandshakeResponse =
+        serde_json::from_str(r#"{"apiVersion":1,"protocolVersion":1,"accepted":true}"#).unwrap();
+    assert!(old.core_services.is_empty());
+    let mut request = RpcRequest::new("call", "mfa/list", Some(serde_json::json!({"filter":"a"})));
+    let context: services::OperationContext = serde_json::from_value(serde_json::json!({
+        "hostInstance":"a1234567-1234-1234-1234-123456789abc",
+        "operation":"b1234567-1234-1234-1234-123456789abc",
+        "profileGeneration":"c1234567-1234-1234-1234-123456789abc", "vaultEpoch":1
+    }))
+    .unwrap();
+    request.context = Some(context.clone());
+    let encoded = serde_json::to_value(&request).unwrap();
+    assert_eq!(encoded["params"], serde_json::json!({"filter":"a"}));
+    assert_eq!(
+        serde_json::from_value::<RpcRequest>(encoded)
+            .unwrap()
+            .context,
+        Some(context)
+    );
+    let mut response = HandshakeResponse::accepted(1000);
+    response
+        .core_services
+        .0
+        .insert(services::FIXED_KEY_SERVICE.into(), 1);
+    let value = serde_json::to_value(response).unwrap();
+    assert_eq!(value["coreServices"]["vault.fixed-key"], 1);
+    assert_eq!(API_VERSION, 1);
+    assert_eq!(PROTOCOL_VERSION, 1);
+}
+
+#[test]
 fn token_validation_rejects_wrong_and_short_tokens() {
     assert!(validate_token("token", "token").is_ok());
     assert_eq!(

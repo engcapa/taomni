@@ -8,7 +8,7 @@
 
 生产升级 IPC 当前只记录只读预检、源指纹与 pending journal。缺少可信插件包和真实 exporter 时，不复制旧数据、不创建伪插件版本、不改变 active 指针。测试 fixture 的 staging/回滚原语不能算真实旧版升级验收。
 
-签名安装门、宿主生产监督和共享采集下沉已由 `0f4cdf82f` 提交，对应 GitHub 契约工作流已全部通过，首轮 UI/native 回归已结束，相关修复待新 SHA 重跑。TASK-004 公共库已由 `8807f3de2` 集成，新的 hosted 契约已有 Linux/Windows 通过，macOS 仍待全部结束。CoreState/统一 bootstrap、正常退出与可逆静默已集成；业务状态仍在显式 LegacyFeatureRuntime 中，尚未迁出。Vault DTO、跨进程锁、SQLite 快照与 C 作用域准入/真实 Vault adapter 已集成，生产双向服务与锁定/备份协同仍未接通。下载可靠性和三端真实网络 gate 已集成，重启恢复与远端商店仍待实现。官方签名包构建与成功安装用例已集成，待 GitHub 原生验证。G1–G11 未通过前，不将具体业务插件迁移标为完成。
+签名安装门、宿主生产监督、共享采集/RDP 公共库、CoreState/统一 bootstrap、正常退出与可逆静默已集成。源码 `038b539a4` 的升级契约 workflow 23 个 job 已全部通过，覆盖四目标编译及三端真实下载、宿主和 OS 锁；三端 browser 各 35/35。该轮 Windows 签名前的前端字节校验因 checkout CRLF 失败，全部 native job 被依赖阻断，不能算 native 通过；已定位并修复换行规则，待新 SHA 重跑。业务状态仍在 LegacyFeatureRuntime；远端商店、重启下载恢复、业务宿主迁出与真实升级尚未完成。TASK-025-D 已实现双向 pump、有界 dispatcher 和独立读循环 SDK，仍待 registry/bootstrap 工厂接线、Vault 锁定/备份协调与新 hosted 证据。G1–G11 未通过前，不将具体业务插件迁移标为完成。
 
 ## 任务状态
 
@@ -38,7 +38,7 @@
 | TASK-022 Mobile | 待 M0 决策 | 按 DEC-2 默认暂缓排期；M0 末提供 go/no-go 与公开例外，不能默认为已交付。 |
 | TASK-023 发布验收 | 部分 | 清单生成与上传顺序已有；四目标插件构建/系统签名、包签名、原子清单发布、独立插件更新/回滚、两套回归及性能。 |
 | TASK-024 入口/profile 协同 | 随 005-A 已集成一部分 | GUI/headless bootstrap、ModeLease、可重试退出和任务回收已集成；跨宿主 profile lease、还原静默与完整多进程证据仍待完成。 |
-| TASK-025 密钥/一致快照 | A/B/C 基础代码已集成 | [服务、锁与快照实施方案](taomni-modular-vault-services-plan.md)；typed DTO/lease/SQLite helper 的 32 项纯单元通过，三端真实进程 gate 已接 workflow；C 准入 11 项和已接入核心的真实 Vault adapter 4 项纯单元通过，D–I 生产双向服务、MFA 迁出和三态备份还原未完成。 |
+| TASK-025 密钥/一致快照 | A/B/C 已集成；D 实现中 | [服务、锁与快照实施方案](taomni-modular-vault-services-plan.md)；A/B/C 三端基础/真实锁 gate 通过。D 的双向 pump、独立 SDK、有界 dispatcher 与真实 Vault backend 已实现，纯单元 56 项通过；三端 6 个 SDK 进程场景和 Linux 2 个真实 Vault/SDK 场景已加入 workflow，尚待运行及生产工厂接线。E–I 的 MFA 适配、撤销协调、迁出和三态备份还原未完成。 |
 
 具体编号与子任务边界仍以设计原表为准；上表合并描述不改变范围或依赖。
 
@@ -81,6 +81,16 @@ Wayland `TC-FILE-OPEN-008` 在已有 AI 路径 chip 点击处失败：失败截�
 合并后的本地验证：前端模块/IPC/重启/Tab 50 项、系统 RDP 选择 7 项、API/作用域服务/下载 48 项、真实 Vault adapter 4 项、核心生命周期 18 项、宿主 14 项、runner 配置 6 项均通过；下载原有三个真实网络测试仍 ignored，新增网络用例留在 GitHub 执行。TypeScript、完整 QA audit、check:refactor、rustfmt、actionlint 与 diff 检查通过。新静态选择包含 68 个明确 case 与完整 crash-regression 的并集，22 个 shard、三套 release QA 构建，`gaps=[]`；这是计划，不是执行通过。Linux 核心单元 workflow 改为编译一次真实 harness、逐过滤器检查非空选择并保存日志及源码/二进制身份，避免重复完整编译。
 
 ## 接下来的执行顺序
+
+### 2026-11-16 双向服务批次与最新 runner 证据
+
+- [升级契约 #43781962402](https://github.com/engcapa/taomni/actions/runs/43781962402)，源码 `038b539a413ec44b248f3eb25801c0407c067bc1`，23/23 jobs 成功。21 份 artifact 均在执行期间下载到 `qa-ui-auto-report/github/43781962402/live-contracts/`，已复核实际日志：三端每端 13 个真实下载场景、7 个宿主真实进程场景、1 个 profile/插件写锁崩溃释放场景通过；四目标 capture/RDP 编译、三端公共库单元和 Linux 真实 Vault 4 项/核心生命周期精确过滤器通过。这一 run 尚未包含下面新增的 D 实现。
+- [UI Platforms #43782128064](https://github.com/engcapa/taomni/actions/runs/43782128064)，相同源码，六个 browser shard 已即时采集；Linux/Windows/macOS 每端 35/35，无 case fail/skip。Windows 官方包在签名前拒绝前端字节差异：可信文件 95 bytes/0 CRLF，Windows artifact 99 bytes/4 CRLF，且仅将 CRLF 换为 LF 后逐字节相同。`.gitattributes` 已对该官方前端固定 LF，签名器的严格 `read_bytes()` 比较不放宽。该依赖失败会阻断所有 native jobs，因此结束该轮无法进入 native 的执行，待修复和 D 批次新 SHA 重跑；native 用例未执行，不计通过。
+- 新实现：`RpcRequest.context`、握手 `coreServices`/`hostInstance` 为 v1 可选加法，旧 params 和 hello 保持不变。`CoreServiceDispatcher` 默认 2 workers/16 queued，session 最多 8 个请求，校验方向 ID、已认证实例、context、deadline、owner/manifest 和 replay。`SensitiveServiceFrame` 原样进入 writer 队列，dequeue 重新验证并持有 permit 到 flush/drop。active、idle、cancel grace 使用同一 pump。
+- 新 `taomni-plugin-sdk` 的独立读循环持续响应心跳、取消和 revoke，业务 worker 等待 typed key reply；raw JSON 直接解析为 `FixedKeyResult`，在交付业务 worker 前清零原帧和已消费的 read scratch。密钥 guard 绑定 operation，成功/失败/panic/cancel 清理；不经过通用 Value。核心真实 Vault 已实现 backend trait，仍保持旧固定 ID、缺 key/损坏语义和仅显式初始化/重置可写。
+- 本批 API 16、services 19、SDK 7、host 14，共 56 项进程内纯单元通过。新增 6 个 `taomni-host-gates/tests/services.rs` 场景及 2 个根 `vault::plugin_access::host_tests` 场景只编译、不在本机执行；workflow 已接三端 SDK stdio、慢 reverse 时心跳/独立 deadline、取消、实例替换、revoke/新 epoch 和 renderer 不可扩权，以及 Linux 真实旧 key/空库初始化。它们不是已安装/签名 MFA 插件的升级证据。
+- 本批没有新增用户入口，复用 TC-MODULES-001/006/007/008/009 与完整 crash-regression 保护既有启动、安装、宿主和退出行为；新增协议边界由上述 hosted 原生进程场景验证。真实 MFA UI 迁出仍须注册/执行计划的 TC-MODULES-020–025，不能用 fixture 代替。
+- D 尚需从 verified registry/bootstrap 构造生产 services factory、在 host mutex 前取得外层 permit，并与真实 Vault lock/unlock/rekey、profile generation 和任务退出统一协调；之后再推进 E–I。当前 SDK fixture 不是第二个已交付业务插件。
 
 1. `0f4cdf82f` 的 22 个 shard 已全部收齐；新 SHA 重跑 TC-MODULES-006 修复、TC-MODULES-007 官方签名成功链、TC-MODULES-008/009 核心生命周期、RDP 保留场景及完整 crash-regression，并验证 Wayland 环境修复。契约 run 不替代 UI 或真实已安装升级。远程 main 已重新拉取，当前分支包含其全部提交，无新增合并冲突。
 2. 完成 TASK-004 公共库、四目标/三平台契约及下述精确保留场景的 GitHub 验证，验证已集成 CoreState/统一退出并继续迁出业务状态与核心依赖闭包；完成双向核心服务 RPC 和大帧数据通道，随后闭合 TASK-024/025。

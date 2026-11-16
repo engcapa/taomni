@@ -6,6 +6,7 @@ use std::{
     },
 };
 
+use std::time::Instant;
 use taomni_plugin_api::services::{
     CoreServiceError, HostInstanceId, OperationContext, OperationId, ProfileGeneration, VaultEpoch,
 };
@@ -64,6 +65,33 @@ impl OperationAdmission {
         kind: OperationKind,
         lease: VaultOperationLease,
     ) -> Result<OperationPermit, CoreServiceError> {
+        self.admit_inner(host, operation, kind, lease, None)
+    }
+
+    /// Production RPC operations have a core-owned deadline; a host cannot
+    /// extend it by submitting another reverse request or retrying a busy one.
+    pub fn admit_until(
+        &self,
+        host: &AuthorizedHost,
+        operation: OperationId,
+        kind: OperationKind,
+        lease: VaultOperationLease,
+        deadline: Instant,
+    ) -> Result<OperationPermit, CoreServiceError> {
+        self.admit_inner(host, operation, kind, lease, Some(deadline))
+    }
+
+    fn admit_inner(
+        &self,
+        host: &AuthorizedHost,
+        operation: OperationId,
+        kind: OperationKind,
+        lease: VaultOperationLease,
+        deadline: Option<Instant>,
+    ) -> Result<OperationPermit, CoreServiceError> {
+        if deadline.is_some_and(|deadline| deadline <= Instant::now()) {
+            return Err(CoreServiceError::TimedOut);
+        }
         if kind.requires_exclusive_lease() && !lease.is_exclusive() {
             return Err(CoreServiceError::PermissionDenied);
         }
@@ -87,6 +115,7 @@ impl OperationAdmission {
             context,
             host: host.clone(),
             kind,
+            deadline,
             cancelled: AtomicBool::new(false),
             outer_active: AtomicBool::new(true),
             owner: Arc::downgrade(&self.0),
@@ -137,6 +166,17 @@ impl OperationAdmission {
             .expect("service admission poisoned")
             .mode
     }
+
+    /// Invalidates a replaced/stopped transport without reopening admission or
+    /// acknowledging Vault revocation. Actual process termination is separate.
+    pub fn cancel_host(&self, host: &AuthorizedHost) {
+        let state = self.0.state.lock().expect("service admission poisoned");
+        for operation in state.operations.values() {
+            if operation.host.instance() == host.instance() {
+                operation.cancelled.store(true, Ordering::Release);
+            }
+        }
+    }
 }
 
 pub struct OperationPermit {
@@ -145,6 +185,9 @@ pub struct OperationPermit {
 }
 
 impl OperationPermit {
+    pub fn deadline(&self) -> Option<Instant> {
+        self.record.deadline
+    }
     pub fn context(&self) -> &OperationContext {
         &self.record.context
     }
