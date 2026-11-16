@@ -2,6 +2,7 @@
 import json
 import sqlite3
 from contextlib import closing
+from types import SimpleNamespace
 
 from .fixtures.backup_policy import isolated_data_root
 from .tao_real_flow import RealFlow
@@ -9,7 +10,8 @@ from .tao_real_flow import RealFlow
 
 def persisted_handoff(ctx):
     """Observe real isolated storage without creating or changing transcripts."""
-    path = isolated_data_root(ctx) / "taomni.db"
+    profile = SimpleNamespace(cfg=ctx.cfg, report_root=ctx.case_dir.parent)
+    path = isolated_data_root(profile) / "taomni.db"
     with closing(sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)) as db:
         rows = db.execute("""
             SELECT t.id, m.id, m.role, length(m.content),

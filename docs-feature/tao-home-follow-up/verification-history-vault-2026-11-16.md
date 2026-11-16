@@ -53,7 +53,7 @@ Windows 首个匹配构建的新增原生批次为 **6/6**，无跳过：`qa-ui-
 - Windows browser **31/31**，含完整适用 crash **18/18**；目录 `qa-ui-auto-report/_local/tao-history-full-browser-1116/run-20261116-174731-946306800/`。恢复入口 scoped selector 最终调整后另 **1/1**，目录 `tao-history-restore-browser-r2-1116/run-20261116-175101-245328200/`。两批 source/runner 均稳定。
 - Windows native **41/41**，含完整适用 crash **22/22**，无失败或跳过；目录 `qa-ui-auto-report/_local/tao-history-full-native-1116/run-20261116-175434-677299700/`。035～037、009、008、027 及真实 Shell 恢复均通过。全部原始 receipt 签名、逐项产物哈希、source/runner/case/build 身份独立核对通过；记录 `tao-history-full-native-1116/independent-feedback-verification.json`。本批 035 确认框与 037 最终显式解锁截图已检查。
 - frontend 22 files / 123 tests、后续焦点/startup 2 files / 12 tests、ribbon/ChatDrawer/handoff 3 files / 39 tests 均通过；批次有重叠，不相加成独立测试总数。Python reload 与历史 fixture 共 4/4；TypeScript、最终 QA release 构建、refactor、development case contract 和最终静态 `audit --gate` 通过。audit 日志 `tao-history-audit-final-r5-1116.log`；原 F1.6 控制覆盖基线保留。
-- GitHub [43844045720](https://github.com/engcapa/taomni/actions/runs/43844045720) 在 checkout 阶段把缩写提交号当作分支名而失败，未执行测试。已改为完整 SHA，重新发起 [43844434828](https://github.com/engcapa/taomni/actions/runs/43844434828)，规划成功，Linux/macOS browser/native release 正在执行；显式选定当前 Tao 确定性集、035～037、历史恢复及 Vault 保留用例，并自动合入完整适用 crash。
+- GitHub [43844045720](https://github.com/engcapa/taomni/actions/runs/43844045720) 在 checkout 阶段把缩写提交号当作分支名而失败，未执行测试。改为完整 SHA 的 [43844434828](https://github.com/engcapa/taomni/actions/runs/43844434828) 最终为：Linux/macOS browser 各 **31/31**，native 各 **40/41**，唯一失败均为 ACP 027，新增 035～037、008、历史恢复以及全部适用 crash 均通过。逐项 receipt 签名、产物哈希、历史 Git source/runner/case/native build 身份核对无误；记录 `qa-ui-auto-report/_local/h43844434828/independent-feedback-verification.json`。该批整体失败保留，不能当作完整验收通过。
 
 43836152729 的历史定向批次已独立核对：Linux/macOS browser 各 19/19、native 各 24/24，receipt 签名、逐项产物、历史 Git source/runner/case 均匹配。此结果仅用于该历史批次，不覆盖上述新输入。
 
@@ -64,8 +64,22 @@ Windows 逐条合并最新匹配回执：已评审场景为 **browser 31/31、na
 
 ## ACP 消息加载竞态回归
 
-43844434828 的 macOS 027 仍未通过：真实 peer 收到正确交接内容，抽屉已选中 ACP provider，但正文为空；不能把子进程收件当成用户流程通过。补充只读 SQLite 诊断并在匹配 Windows QA release 上复跑 027 通过；跨平台诊断运行 [43853464081](https://github.com/engcapa/taomni/actions/runs/43853464081) 固定 `c338784d1`，保留修复前产品输入。
+43844434828 的 Linux/macOS 027 仍未通过：真实 peer 收到正确交接内容，抽屉已选中 ACP provider，但正文为空；不能把子进程收件当成用户流程通过。补充只读 SQLite 诊断并在匹配 Windows QA release 上复跑 027 通过。跨平台诊断运行 [43853464081](https://github.com/engcapa/taomni/actions/runs/43853464081) 固定 `c338784d1`、产品输入早于竞态修复；因修复后的完整批次已包含相同诊断，主动取消这项重复的旧版构建以释放执行资源。取消的运行不提供通过证据，原有失败现场完整保留。
 
 受控延迟的 store 回归复现了独立的消息加载竞态，基线 **4 failed / 1 passed**：旧的空历史读取覆盖已完成的真实流式事件、并发旧读取覆盖新读取、删除后旧读取重新写入缓存，新线程也会触发不必要的空历史查询。`threads.ts` 现在为每条加载保留请求所有权并核对消息数组版本；删除释放所有权，新线程初始化空缓存，正常历史刷新仍保留。修复后 chat store、ChatDrawer 与 HandoffControls 共 **4 files / 80 tests** 通过。该竞态与 hosted 症状相符，最终平台因果判断仍等待 native 复验，不用单测替代真机结果。
 
 027 沿用实际 UI→ACP 子进程→带回 Tao→显式继续流程，补充真实隔离库中 user/assistant 两方持久化断言。只读诊断仅记录角色、长度与 fixture 标记，不记录对话正文、凭据或替换 UI 成功断言。产品源码已变化，先前 e7 批次保留其原有输入身份，不能充当此修复的当前通过证据。
+
+## 3fa9de750 修复后输入
+
+source `b48dea9e9aee3ac8981e03cded1e6bc5cc6674e9fd65565264adb06783755cf3`，runner `f098dd476b1f63f3558ddeaa6b4187327fc1cfd2354f4b78f0c34e871cb8b1de`。Windows QA release 构建成功，binary `a07a8198af3034eba2c9475e813be26f95417c07b9c05456e0f855568f072952`，应用 ID `com.taomni.app.qa`；保留完整 TypeScript、frontend 与 native 构建日志 `tao-transcript-build-1116.log`。
+
+Windows browser **31/31**，包含完整适用 crash **18/18**，无失败或跳过。回执 `qa-ui-auto-report/_local/tao-transcript-full-browser-1116/run-20261116-190307-095248500/`，全部原始签名、绑定产物哈希及当前 source/runner/case 核对无误，独立记录在同根 `independent-feedback-verification.json`。
+
+Windows native 首批 **39/41**：目录 `tao-transcript-full-native-1116/run-20261116-190838-886565900/`。027 的 UI 已显示完成回复，但新增诊断错误地把 `NativeStepContext` 当作具有 `report_root` 的 fixture 上下文，导致持久化断言失败；不能写成实际消息未入库。010 点击的实际事件落在设置表格单元格，未切换目标复选框；原现场与失败回执保留。该批 035～037 的确认框及最终显式解锁截图已检查。
+
+诊断改为使用真实步骤的 `case_dir.parent` 构造受隔离环境校验的 profile 上下文；SQLite 继续以只读 URI 打开。新增三项工具单测先复现原错误，修复后 **3/3**：真实步骤上下文读取且不泄漏/改写正文、缺库不创建、错误的实际隔离变量拒绝访问；同时加入 GitHub 的 Python 合同测试组。初次单测误改 Windows 不使用的 XDG 变量已按平台真实变量修正，读取 URI 本身没有兼容性故障。
+
+修正后的 Windows 定向 native **2/2**，`tao-transcript-diagnostics-fixed-1116/run-20261116-193036-048818800/`：010 沿用原 case 和输入动作通过，未修改产品设置行为或放宽断言；027 通过原 UI 流程、真实子进程、两方持久化及带回后显式继续。该修正仅改变 runner，产品 source 与 QA release binary 保持上文身份。
+
+Linux/macOS 批次 [43854389472](https://github.com/engcapa/taomni/actions/runs/43854389472) 固定 `3fa9de750` 对应完整 SHA，包含上述尚未修正的诊断。其构建/测试报告按实际结果保留；最终 runner 与目标/crash 用例需要新回执，不把该批排队、构建成功或仅 UI 通过当成整体验收通过。
