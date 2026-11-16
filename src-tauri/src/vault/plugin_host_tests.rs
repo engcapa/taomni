@@ -1,7 +1,7 @@
 //! Hosted integration links the actual Vault adapter, production host pump and
 //! SDK binary. This is a service gate, not a signed/installed MFA migration.
 use crate::{
-    plugin::host::{HostProcess, HostServiceConfig, HostSupervisorConfig},
+    plugin::host::{HostProcess, HostProfileConfig, HostServiceConfig, HostSupervisorConfig},
     vault::Vault,
 };
 use base64::{Engine as _, engine::general_purpose::STANDARD};
@@ -29,13 +29,11 @@ impl Harness {
     fn new() -> Self {
         let dir = tempfile::tempdir().unwrap();
         let root = ProfileRoot::prepare(dir.path()).unwrap();
+        let generation = crate::runtime::generation::current(root.path()).unwrap();
         let vault = Arc::new(Vault::open(&dir.path().join("vault.db")).unwrap());
         vault.init("host-gate-master").unwrap();
-        let admission = OperationAdmission::new(
-            ProfileGeneration::parse("a1234567-1234-1234-1234-123456789abc").unwrap(),
-            VaultEpoch::new(1).unwrap(),
-            false,
-        );
+        let admission =
+            OperationAdmission::new(generation.clone(), VaultEpoch::new(1).unwrap(), false);
         let dispatcher = Arc::new(
             CoreServiceDispatcher::new(
                 admission.clone(),
@@ -54,7 +52,8 @@ impl Harness {
             std::env::var_os("TAOMNI_SERVICE_PLUGIN_BIN").expect("hosted SDK fixture is required"),
         );
         assert!(host.is_absolute() && host.is_file());
-        let process = HostProcess::start_with_services(
+        let process = HostProcess::start_profiled(
+            HostProfileConfig::new(root.clone(), PluginSlug::parse("mfa").unwrap(), generation),
             "taomni-plugin-mfa",
             "0.1.0",
             &host,
@@ -73,6 +72,8 @@ impl Harness {
             Some(HostServiceConfig { dispatcher, grants }),
         )
         .unwrap();
+        assert!(ProfileRestoreLease::try_acquire(&root).is_err());
+        assert!(PluginDataLease::try_acquire(&root, &PluginSlug::parse("mfa").unwrap()).is_err());
         Self {
             _dir: dir,
             root,

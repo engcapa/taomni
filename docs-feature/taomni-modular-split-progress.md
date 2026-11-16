@@ -12,7 +12,8 @@
 
 ## 2026-11-16 最新 runner 证据（持续采集中）
 
-- 宿主自持锁源码 `1980436f3e0b4dee800d1244fd92588c18498749` 已推送，启动[契约 #43832212768](https://github.com/engcapa/taomni/actions/runs/43832212768)与[UI #43832220984](https://github.com/engcapa/taomni/actions/runs/43832220984)，两套即时采集器已启动；78 个明确 ID 与完整 crash-regression 并集，22 个 shard、三套 release QA binary，静态 gaps/unreviewed 均为空。当前仍执行，不记整体通过。
+- 宿主自持锁源码 `1980436f3e0b4dee800d1244fd92588c18498749` 的[契约 #43832212768](https://github.com/engcapa/taomni/actions/runs/43832212768) 已结束：22/23 jobs 成功。Linux 的两项真实 Vault/SDK gate 沿用无 profile 启动，而新版 fixture 要求在创建 store 前已持有 profile/data 锁，导致握手前退出；修复 harness 通过生产 generation 初始化与 `start_profiled`，并增加实际锁占用断言，保留全部旧密钥字节/授权断言，待新源码 hosted 复验。其[UI #43832220984](https://github.com/engcapa/taomni/actions/runs/43832220984) 仍逐 shard 收证，不记整体通过。
+- `TC-MODULES-011` 相对观察路径修复已以 `44e6f2b80` 推送，[UI #43833397073](https://github.com/engcapa/taomni/actions/runs/43833397073) 已开始执行并启动即时采集器，等待 matching native 结果。运行中宿主快照协议正在开发，未提交和验收。
 - 测试修复源码 `852edd943503343689e3d2f42d12d886ef4df008` 的[契约 #43830091552](https://github.com/engcapa/taomni/actions/runs/43830091552) 已 **23/23 jobs 成功**；macOS SQLite 11 项（含链接路径拒绝）、Windows observation cleanup 已 hosted 复验。其[browser/crash #43830100774](https://github.com/engcapa/taomni/actions/runs/43830100774) 持续即时收证，Linux/macOS 分片的修复用例已通过，整轮尚未完成。
 - `fad6a56ab` 原生 shard 在执行期间发现 TC-MODULES-011 step 28 的观察工具错误：真实任务和 ZIP 清单/hash/文件字节检查已完成，打开独立 SQLite 时 `Path(ctx.case_dir)` 为相对路径，`as_uri()` 拒绝。修复为解析现存绝对 case 目录，并新增相对目录单元（Windows fixture 与 checkout 同盘）；保留全部 SQLite/源 WAL/两次 job/正常重启断言，待新源码 native 复验，不能据此宣布 v2 原生通过。
 - 源码 `fad6a56ab046e5765e98e88bac4fd227d00e1cfc` 的[升级契约 #43826742393](https://github.com/engcapa/taomni/actions/runs/43826742393) 已结束：21/23 jobs 成功，macOS foundation 的两项 SQLite WAL 单元因 `/var` 临时目录别名触发 NOFOLLOW 拒绝，Windows observation unit 因 SQLite 连接未关闭导致临时文件清理失败。两者均属本批相关失败；修复为 canonical 测试根目录和显式连接生命周期，不放宽源路径/归档断言，并补 Unix 链接数据库/父目录拒绝回归，待新源码 hosted 复验。
@@ -152,7 +153,7 @@ Wayland `TC-FILE-OPEN-008` 在已有 AI 路径 chip 点击处失败：失败截�
 
 当前在开发真实宿主自持 shared ProfileUseLease / exclusive PluginDataLease，核心经独立进程环境提供 profile，握手必须确认精确 owner/generation。SDK/API 27 项单元通过，包含 reader EOF 后 worker/store 未退出时不能提前释放锁；核心接线已编译、五个三端真实进程场景已补，匹配源码 process/UI 仍待 GitHub 执行，不将单元结果当作宿主生产验收。运行中 prepare/snapshot/release 尚未实现。
 
-1. **收敛当前相关失败并取得新源码证据**：修复本轮云端模块/Vault 依赖用例、macOS SQLite fixture 路径和 Windows SQLite 连接清理；GitHub 复验。继续即时下载 `fad6a56ab` 的 native shard，检查新增 TC-MODULES-011 的真实 ZIP/SQLite/WAL 结果；已完成的旧源码结果不能替代本批证据。
+1. **收敛当前相关失败并取得新源码证据**：云端模块/Vault 依赖用例、macOS SQLite fixture 路径和 Windows SQLite 连接清理已修复且契约 #43830091552 23/23 jobs 成功；继续验证 TC-MODULES-011 的相对观察路径修复，以及真实 Vault/SDK gate 的 profiled 启动修复。逐 shard 收取真实 ZIP/SQLite/WAL 和宿主所有权结果；已完成的旧源码结果不能替代本批证据。
 2. **闭合 Vault、profile 与一致快照（TASK-024/025）**：完成真实宿主持锁与三端进程 gate，再接运行中宿主 prepare/snapshot/release、GUI/headless 同 profile 协同。离线路径已有 v2 档案和兼容 journal，但仍需运行、禁用、卸载保留数据三态的正常重启 apply 与真实解密，覆盖多实例占用、取消和崩溃恢复；MFA 迁出时统一处理 v1 legacy alias。
 3. **迁出真实业务（TASK-005-B、013/014、016–022）**：先完成真实 MFA 原型与相关 G 门，再依赖序推进 RDP/VNC 客户端与服务端、Servers、SocksCap、OCR/录制、本地语音的宿主、前端、状态与迁移。Mobile 按 DEC-2 留下明确 go/no-go 结论和公开例外，不能默认为交付；LanChat 任务已取消，不新增替代插件。
 4. **裁剪核心依赖闭包（TASK-006）**：随业务迁出，从核心 Cargo 默认 features、原生依赖、bundle/resources/helper 和前端 chunk 中实际移除相应实现。保存 cargo tree、资源与产物证据；把状态改名或放入 LegacyFeatureRuntime 不等于瘦身完成。
