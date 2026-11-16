@@ -2,16 +2,15 @@ import type { ILink, ILinkProvider, Terminal } from "@xterm/xterm";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { openFile } from "../../../lib/openFile";
 import { sftpStat } from "../../../lib/sftp";
+import { fileOpenWorkspaceForTab } from "../../../lib/fileOpenContext";
+import { useAppStore } from "../../../stores/appStore";
 import { installTerminalFileLinks } from "./fileLinks";
 import type { TerminalSessionLifecycleContext } from "./sessionContracts";
-import { useAppStore } from "../../../stores/appStore";
-
-const fileContext = vi.hoisted(() => ({ workspaceId: "workspace" as string | undefined }));
 
 vi.mock("../../../lib/openFile", () => ({ openFile: vi.fn(async () => "viewer") }));
 vi.mock("../../../lib/sftp", () => ({ sftpStat: vi.fn(async () => ({ fileType: "file" })), effectiveFileType: (entry: { fileType: string }) => entry.fileType }));
 vi.mock("../../../lib/runtime", () => ({ getAppPlatform: () => "linux" }));
-vi.mock("../../../lib/fileOpenContext", () => ({ fileOpenWorkspaceForTab: () => fileContext.workspaceId }));
+vi.mock("../../../lib/fileOpenContext", () => ({ fileOpenWorkspaceForTab: vi.fn(() => "workspace") }));
 
 function setup(local = true, mac = false) {
   const text = "  /tmp/report.html:9";
@@ -32,8 +31,9 @@ function setup(local = true, mac = false) {
 
 beforeEach(() => {
   vi.clearAllMocks();
-  fileContext.workspaceId = "workspace";
+  vi.mocked(fileOpenWorkspaceForTab).mockReturnValue("workspace");
   vi.mocked(openFile).mockResolvedValue("viewer");
+  useAppStore.setState({ tabs: [], activeTabId: null, activeSideTab: "sessions" });
 });
 afterEach(() => vi.useRealTimers());
 describe("terminal local file links", () => {
@@ -56,13 +56,13 @@ describe("terminal local file links", () => {
     expect(remote.status).toHaveBeenCalled();
     expect(sftpStat).not.toHaveBeenCalled();
   });
-  it("preserves a user's return to the terminal after opening a main-tab file", async () => {
+  it.each([0, 350])("preserves manual tab selection %d ms after initial and repeated link opens", async (returnAfterMs) => {
     vi.useFakeTimers();
-    fileContext.workspaceId = undefined;
+    vi.mocked(fileOpenWorkspaceForTab).mockReturnValue(undefined);
     useAppStore.setState({
       tabs: [
         { id: "terminal", type: "terminal", title: "Shell", closable: true },
-        { id: "viewer", type: "file-viewer", title: "report.html", closable: true },
+        { id: "viewer", type: "file-viewer", title: "report.html", closable: true, fileViewer: { path: "/tmp/report.html", kind: "html", source: "local" } },
       ],
       activeTabId: "terminal",
       activeSideTab: "sessions",
@@ -72,12 +72,15 @@ describe("terminal local file links", () => {
       return "viewer";
     });
     const { links, registration } = setup();
-    links[0].activate(new MouseEvent("click", { ctrlKey: true }), links[0].text);
-    await vi.advanceTimersByTimeAsync(0);
-    expect(useAppStore.getState().activeTabId).toBe("viewer");
-    useAppStore.getState().setActiveTab("terminal");
-    await vi.advanceTimersByTimeAsync(3500);
-    expect(useAppStore.getState().activeTabId).toBe("terminal");
+    for (const callCount of [1, 2]) {
+      links[0].activate(new MouseEvent("click", { ctrlKey: true }), links[0].text);
+      await vi.advanceTimersByTimeAsync(returnAfterMs);
+      expect(openFile).toHaveBeenCalledTimes(callCount);
+      expect(useAppStore.getState().activeTabId).toBe("viewer");
+      useAppStore.getState().setActiveTab("terminal");
+      await vi.advanceTimersByTimeAsync(3500);
+      expect(useAppStore.getState().activeTabId).toBe("terminal");
+    }
     registration.dispose();
   });
 });
