@@ -26,6 +26,9 @@ pub(crate) struct AdmissionData {
     pub pending_acknowledgements: HashSet<HostInstanceId>,
     pub revocation_hosts: HashSet<HostInstanceId>,
     pub max_in_flight: usize,
+    // Trusted local permits never expose a wire context. Track only their
+    // live IDs, independently of the host's epoch-long replay ledger.
+    pub active_core_operations: HashSet<OperationId>,
     pub seen_operations: HashSet<OperationId>,
 }
 
@@ -54,6 +57,7 @@ impl OperationAdmission {
                 pending_acknowledgements: HashSet::new(),
                 revocation_hosts: HashSet::new(),
                 max_in_flight: 128,
+                active_core_operations: HashSet::new(),
                 seen_operations: HashSet::new(),
             }),
             drained: Condvar::new(),
@@ -111,7 +115,9 @@ impl OperationAdmission {
         if state.paused {
             return Err(CoreServiceError::CoreServiceBusy);
         }
-        if state.seen_operations.contains(&operation) {
+        if state.seen_operations.contains(&operation)
+            || state.active_core_operations.contains(&operation)
+        {
             return Err(CoreServiceError::DuplicateRequest);
         }
         if state.in_flight >= state.max_in_flight || state.seen_operations.len() >= 65_536 {
@@ -179,6 +185,16 @@ impl OperationAdmission {
             .lock()
             .expect("service admission poisoned")
             .mode
+    }
+
+    /// A diagnostic snapshot of registered work, including local permits and
+    /// retained sensitive completions. This is not an authorization token.
+    pub fn in_flight_count(&self) -> usize {
+        self.0
+            .state
+            .lock()
+            .expect("service admission poisoned")
+            .in_flight
     }
 
     /// Invalidates a replaced/stopped transport without reopening admission or

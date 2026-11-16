@@ -50,18 +50,17 @@ fn ordinary_writes_are_admitted_before_the_vault_mutex_and_cannot_outlive_lock()
         std::thread::spawn(move || vault.put("ssh", "late write", "must-not-persist"))
     };
     let deadline = Instant::now() + Duration::from_secs(3);
-    // The real API has taken its outer shared lease before waiting on Vault.
-    loop {
-        match VaultOperationLease::try_write(&root) {
-            Err(_) => break,
-            Ok(lease) => drop(lease),
-        }
+    // Lease acquisition precedes admission. Observing only the file lock
+    // could let revocation win before registration while this test holds the
+    // Vault mutex, so wait for the actual operation too.
+    while h.services.admission.in_flight_count() == 0 {
         assert!(
             Instant::now() < deadline,
-            "credential write never acquired its outer lease"
+            "credential write never registered its outer operation"
         );
         std::thread::yield_now();
     }
+    assert!(VaultOperationLease::try_write(&root).is_err());
     assert!(
         h.registry
             .lock_vault_until(&h.vault, Instant::now() + Duration::from_millis(20))

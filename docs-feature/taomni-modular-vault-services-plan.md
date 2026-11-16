@@ -127,6 +127,8 @@ Tauri 的既有 Result<String> 边界通过一处映射保留已有错误前缀�
 7. host SDK 也需要独立读 pump：MFA worker 等 core key response 时仍接收 heartbeat、cancel、revoke；core 等 snapshot 时 host 也必须继续应答心跳。禁止同步 read-loop 中直接运行整项业务。
 8. snapshot/revoke 的 deadline 使用 core job/lifecycle配置，作为不同 OperationClass 显式传入；不能盲用普通短 invoke timeout，也不能接受 host 自报无穷超时。operation 结束时宿主先清 key，再发送结果；core 注销 permit 后拒绝迟到 service request。取消/超时先标记 epoch/context 无效，宿主未确认取消清理则沿用既有 containment 终止与有预算重启，绝不重放写入。
 
+仍在 core 的可信调用与宿主共用 in-flight/epoch/drain 屏障，但 core permit 不含 HostInstance/wire context，不能授权 reverse RPC；其 ID 只在 permit 存活期间保留，Drop 后释放，避免每秒取码消耗宿主历史重放 ledger。宿主历史 ID 仍拒绝重用，不能借 core permit 或取消后重新授权旧 context。真实宿主迁出前另须闭合 admission、ServiceSession 和 SDK 的长期 ledger/counter 上限，使用有界防重放方案，不以扩大固定额度或删除检查处理。
+
 锁约束：dispatcher 不拿 registry/host mutex；worker 不回调 PluginRegistry；Vault mutex 持有期间不等 host RPC；host DB mutex 持有期间向 core 请求 key是允许路径（MFA→Vault），但屏障/file lease 已由外层 operation 获取，不在这时再排队获取。
 
 ## 5. 固定密钥 owner、创建和重置

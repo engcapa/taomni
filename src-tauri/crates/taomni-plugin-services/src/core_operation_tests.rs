@@ -201,7 +201,7 @@ fn core_admission_rejects_locked_and_expired_work_without_reserving_its_id() {
 }
 
 #[test]
-fn core_permit_shares_host_limits_and_replay_ledger_but_cannot_authorize_reverse_rpc() {
+fn core_permit_shares_host_limits_and_cannot_authorize_reverse_rpc_or_replay_host_ids() {
     use crate::VerifiedHostGrants;
     use std::collections::BTreeSet;
     use taomni_profile_locks::PluginSlug;
@@ -253,6 +253,14 @@ fn core_permit_shares_host_limits_and_replay_ledger_but_cannot_authorize_reverse
         Err(CoreServiceError::CoreServiceBusy)
     ));
     drop(permit);
+    let next = admission
+        .admit_core_until(
+            OperationId::parse(FIRST).unwrap(),
+            OperationKind::ReadData,
+            VaultOperationLease::try_read(&root).unwrap(),
+            deadline(),
+        )
+        .unwrap();
     assert!(matches!(
         admission.admit_core_until(
             OperationId::parse(FIRST).unwrap(),
@@ -262,6 +270,7 @@ fn core_permit_shares_host_limits_and_replay_ledger_but_cannot_authorize_reverse
         ),
         Err(CoreServiceError::DuplicateRequest)
     ));
+    drop(next);
     let host_permit = admission
         .admit(
             &host,
@@ -271,6 +280,56 @@ fn core_permit_shares_host_limits_and_replay_ledger_but_cannot_authorize_reverse
         )
         .unwrap();
     assert!(host_permit.check_current().is_ok());
+    drop(host_permit);
+    assert!(matches!(
+        admission.admit_core_until(
+            OperationId::parse(SECOND).unwrap(),
+            OperationKind::ReadData,
+            VaultOperationLease::try_read(&root).unwrap(),
+            deadline(),
+        ),
+        Err(CoreServiceError::DuplicateRequest)
+    ));
+    assert!(matches!(
+        admission.admit(
+            &host,
+            OperationId::parse(SECOND).unwrap(),
+            OperationKind::ReadData,
+            VaultOperationLease::try_read(&root).unwrap(),
+        ),
+        Err(CoreServiceError::DuplicateRequest)
+    ));
+}
+
+#[test]
+fn sustained_local_polling_outlives_the_host_ledger_budget_and_still_drains() {
+    let (_directory, root) = root();
+    let admission = admission();
+    // Reuse OS ownership across sequential local operations. This keeps the
+    // stress test in-process and tests admission lifetime, not file-lock cost.
+    let mut lease = VaultOperationLease::try_read(&root).unwrap();
+    let until = Instant::now() + Duration::from_secs(30);
+    for index in 0..65_538u32 {
+        let permit = admission
+            .admit_core_until(
+                OperationId::parse(format!("{index:08x}-1234-1234-1234-123456789abc")).unwrap(),
+                OperationKind::ReadData,
+                lease,
+                until,
+            )
+            .unwrap();
+        permit.check_current().unwrap();
+        lease = permit.release_admission();
+    }
+    let revoke = admission.begin_revoke(&[]).unwrap();
+    admission
+        .wait_revoke_drained(deadline(), &|| false)
+        .unwrap();
+    admission.finish_revoke(&revoke).unwrap();
+    assert_eq!(admission.state(), AdmissionState::Locked);
+    assert!(VaultOperationLease::try_write(&root).is_err());
+    drop(lease);
+    assert!(VaultOperationLease::try_write(&root).is_ok());
 }
 
 #[test]

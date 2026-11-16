@@ -12,9 +12,11 @@
 
 ## 2026-11-16 最新 runner 证据（持续采集中）
 
+- 一致快照和前端门禁修复源码 `cf0fb2033` 已提交并推送，启动[升级契约 #43813432137](https://github.com/engcapa/taomni/actions/runs/43813432137)与[UI #43813458259](https://github.com/engcapa/taomni/actions/runs/43813458259)。两套即时采集器已启动；完成的三端 foundation 日志均确认 services 35 项通过，三端真实 host activation/cleanup/lifecycle/SDK 分别为 3/2/7/8 项通过。整轮仍在执行，不包含之后工作区的 core permit 生命周期修复。
 - 源码 `1b5de48d9` 的[升级契约 #43809632572](https://github.com/engcapa/taomni/actions/runs/43809632572) 已 **23/23 jobs 成功**。该批包含 Vault IPC/普通消费者和 MFA facade；Linux 的真实 harness receipt 为所有 19 个过滤器非空且 exit 0，三端 SDK/下载/宿主/observation 与四目标基础检查通过。产物已在执行期间下载至 `qa-ui-auto-report/github/43809632572/live-contracts/`，不包含之后开发的快照 pause。
 - 相同源码的[UI #43809656351](https://github.com/engcapa/taomni/actions/runs/43809656351) 已即时收齐三端 browser 各 49/50；新增 TC-MFA-013/014 及完整 browser crash-regression 通过。唯一相关 browser 失败是 TC-BACKUP-SETTINGS-001 step 14：移除 LanChat 时替换成 MFA 后沿用错误的默认排除断言。既有 `rangeOptions` 的 core 默认包含 MFA，故修正为包含，保留后续自定义排除、Vault 依赖及持久化断言；待新 SHA 重跑。macOS native 已进入执行，Windows 仍在构建。Linux 在全量前端 unit 门禁失败，未进入 native，不外推通过。
 - Linux 构建 job `133109555494` 的日志已在 run 执行期间经 jobs/logs API 收取：相关失败是 MainLayout 测试的 Vault mock 缺少新增的 `subscribe`，已在本地复现并补齐 fixture；另一失败为编辑器双叶 caret 测试只等待至少一个编辑器，却立即读取第二个，修复为 `findEditorPanes(2)`，保留 `[10, 40]` 的精确断言。两项修复以 `f9c160921` 提交，本地定向 unit 55 passed（其余 260 项按过滤器未执行），待匹配源码 hosted 复验。
+- #43809656351 已即时下载 macOS native shard 1/2，分别为 8/8、13/13；其中 TC-MFA-014 改密与 TC-MFA-102 清敏感内容均通过。其余 native shard 未齐，不能据此报告整套 native/crash-regression 通过。
 - 源码 `064a12662` 的[升级契约 #43801588646](https://github.com/engcapa/taomni/actions/runs/43801588646) 已 **23/23 jobs 成功**。三端 observation 各 8 项通过，确认 canonical 临时目录修复；artifacts 在执行期间下载至 `qa-ui-auto-report/github/43801588646/live-contracts/`。该 run 不含当前工作区未提交的 Vault/MFA 协调器开发。
 - 源码 `911f411b2` 的[UI #43800287415](https://github.com/engcapa/taomni/actions/runs/43800287415) 仍在运行。已即时收齐三端 browser 各 24/24；Linux Xvfb native 28/29，Wayland 26/29，两种 Linux 的 TC-MODULES-009 均通过。TC-MODULES-007 已通过首次启用、禁用/再启用与 Settings 重开，在第一次正常重启时触发仍打开的一个 Settings tab 所需退出确认；macOS 已完成的对应 shard 也是同一步失败。
 - TC-MODULES-007 的失败前 HTML 与 restart receipt 已核验：标题 `Exit`、消息 `There is 1 open tab. Exit Taomni and close it?`、确认按钮 `Exit`。用例仅在已知 Settings 仍打开的首次和卸载后重启声明精确确认，沿用现有单次真实点击、正常退出与进程身份检查；不允许通用弹窗兜底或强杀当作成功。该 case 修复尚待新 SHA hosted 重跑。
@@ -33,10 +35,11 @@
 - 新增 browser/native `TC-MFA-013`（标签+悬浮窗锁定/错误口令/原 HOTP 恢复）与 `TC-MFA-014`（真实改密、旧口令拒绝、计数/secret 连续性），增强 `TC-MFA-102` 的全 DOM 敏感内容清除及 runtime 断言。schema/reviewed contracts 已通过，policy/dependencies/feature catalog 同步；尚未取得执行证据，不能由 unit 或 schema 代替 native。
 - Vault 设置页捕获锁定屏障的 busy/超时错误并展示，转换期间禁止重复点击；失败维持 renderer 门禁，允许显式解锁恢复。新增该行为的 1 项单元通过，连同前述测试共覆盖 11 文件 52 项（分批执行，非一次全套执行）。最终 Rust harness：plugin 111 passed / 3 ignored、旧 MFA 13、MFA facade 6、Vault 17、普通 Vault 消费者 4、reverse Vault adapter 4；生命周期 7 项包含于 plugin 结果，不重复累计。services crate 31 项通过。
 - 最终 QA audit gate 通过，未修改 coverage baseline；静态选择 50 个明确 case 与完整 crash-regression 并集，22 个 shard、三套 release QA 构建，`gaps=[]`、`unreviewed=[]`。这些是执行计划和单元证据，不替代新源码的 hosted 测试。
-- 长期运行待办：core permit 与 host 共用 epoch 内 `seen_operations` 的 65,536 上限。MFA 定时取码持续运行可能耗尽配额，须在生产验收前分离可信 core 操作的生命周期或采用有界重放保护，并补长时间等效压力场景；不能简单删除 host 防重放检查或放宽限额当作修复。
+- 长期运行问题：core permit 曾与 host 共用 epoch 内 `seen_operations` 的 65,536 上限。后续工作区已将无 wire context 的可信 core 操作改为仅保留存活 ID、Drop 释放，仍共享全局 in-flight/epoch/取消/drain；不删除 host 的历史 ID、防重放或敏感 completion 保护。65,538 次连续本地取码准入等效压力及撤销场景通过，services crate 36/36 单元通过；最终根 harness 编译成功，plugin 118 passed / 3 ignored、MFA facade 6、普通 Vault 消费者 4、成对快照 5 项通过。该修复的新 SHA hosted 证据仍待取得。未来真实 MFA 宿主仍须处理 host admission、ServiceSession 与 SDK 的长期 ledger/counter 上限，不能只扩大限额。
+- 本批复验发现普通 Vault 写入/锁定 unit 的同步竞态：文件 shared lease 取得在 operation 登记之前，仅观察文件锁可能让锁定先排空后等待测试自己持有的 Vault mutex。测试现先等待真实 `in_flight_count()` 非零，再验证独占锁被阻止并触发锁定；保留锁定超时、root 保留、迟到写入拒绝、解锁后无脏数据的全部断言。修复后上述 4 项通过，原竞态场景另连续复验 5/5；此前挂起的那次执行已终止，不计通过。
 - 尚未闭合：统一 snapshot/restore 跨库一致性、三态真实备份还原、存量 0.5.x exporter/可信 MFA 包、宿主业务迁出与最终 G 门。当前只接通迁出前适配，不能将 TASK-014、025 或生产发布标为完成。
 
-### 当前 Vault/MFA 一致快照批次（开发中）
+### 当前 Vault/MFA 一致快照批次（`cf0fb2033` 已提交，hosted 执行中）
 
 - 提取 `backup/protected_snapshot.rs`，在 mail/store mutex 之前为当前核心 MFA 与 Vault 取得统一屏障，按 MFA → Vault 顺序在同一独占 OS lease 内产快照；释放后再处理普通库、打包、加密和上传。两库在私有 staging 子目录中一起准备，任一失败/取消清理该子目录，归档路径与格式保持不变。
 - 服务层的 RAII pause 阻止新 core/host 准入并等在途响应/敏感 writer 释放，保持 epoch 与已有 permit 有效。等待者在 OS lease 和 store/host mutex 之外等待；失败/取消也解除 pause。实际锁定/rekey 保留原撤销语义，发现外部 rekey 的旧 root 不重新开放。
@@ -119,7 +122,7 @@ Wayland `TC-FILE-OPEN-008` 在已有 AI 路径 chip 点击处失败：失败截�
 ### 当前待办（按依赖顺序）
 
 1. **收敛当前相关失败并取得新源码证据**：TC-MODULES-007 在 #43804951477 的四种 native profile 已全部通过；Windows TC-MODULES-009 的 Notes drawer 遮挡修复已提交 `ea9c5636f`，待重跑。本批 Vault/MFA 接线、013/014 新用例和增强 102 同跑多端 browser/native 与完整 crash-regression，逐 shard 收取并修复相关失败。两个有 main 对比依据的 Wayland FILE-OPEN 失败单列忽略，不计通过。
-2. **闭合 Vault、profile 与一致快照（TASK-024/025）**：统一 coordinator、普通 Vault 消费者和 typed MFA facade 已完成本批开发，先取得匹配源码的 hosted 验证；再补运行中、禁用、卸载留数据三态的跨库一致备份/正常重启还原与真实解密，以及多实例占用、取消和崩溃恢复。修复长期运行操作 ledger 配额耗尽，保留宿主防重放保护。
+2. **闭合 Vault、profile 与一致快照（TASK-024/025）**：统一 coordinator、普通 Vault 消费者和 typed MFA facade 已接通，契约通过，native UI 待齐；当前核心成对快照已提交 `cf0fb2033`，等待匹配源码 runner。再补运行中、禁用、卸载留数据三态的跨库一致备份/正常重启还原与真实解密，以及多实例占用、取消和崩溃恢复。完成可信 core 操作生命周期修复的验证，随后处理真实宿主的长期 ledger/counter，保留防重放保护。
 3. **迁出真实业务（TASK-005-B、013/014、016–022）**：先完成真实 MFA 原型与相关 G 门，再依赖序推进 RDP/VNC 客户端与服务端、Servers、SocksCap、OCR/录制、本地语音的宿主、前端、状态与迁移。Mobile 按 DEC-2 留下明确 go/no-go 结论和公开例外，不能默认为交付；LanChat 任务已取消，不新增替代插件。
 4. **裁剪核心依赖闭包（TASK-006）**：随业务迁出，从核心 Cargo 默认 features、原生依赖、bundle/resources/helper 和前端 chunk 中实际移除相应实现。保存 cargo tree、资源与产物证据；把状态改名或放入 LegacyFeatureRuntime 不等于瘦身完成。
 5. **完成模块使用闭环（TASK-007、009–011）**：远端签名商店、三种代理设置 UI、跨应用重启发现并恢复下载、后台进度及错误恢复；实际主窗/分离窗动态 tab、坏 hash/缺失/禁用占位和清理；安装、启用、禁用、更新、回滚无需重启核心。

@@ -11,6 +11,7 @@ use crate::{AdmissionState, OperationAdmission, OperationKind, Revocation};
 
 pub struct CoreOperationPermit {
     owner: OperationAdmission,
+    operation: OperationId,
     generation: ProfileGeneration,
     epoch: VaultEpoch,
     kind: OperationKind,
@@ -24,7 +25,9 @@ pub struct CoreOperationPermit {
 impl OperationAdmission {
     /// The caller acquires the lease before any business/Vault/host mutex.
     /// A core permit has no HostInstance or wire context and cannot authorize
-    /// a plugin fixed-key/export request.
+    /// a plugin fixed-key/export request. Its core-generated ID is reserved
+    /// only while the permit lives; completed local work consumes no space in
+    /// the host's epoch-long replay ledger.
     pub fn admit_core_until(
         &self,
         operation: OperationId,
@@ -87,16 +90,19 @@ impl OperationAdmission {
         if state.paused {
             return Err(CoreServiceError::CoreServiceBusy);
         }
-        if state.seen_operations.contains(&operation) {
+        if state.seen_operations.contains(&operation)
+            || state.active_core_operations.contains(&operation)
+        {
             return Err(CoreServiceError::DuplicateRequest);
         }
-        if state.in_flight >= state.max_in_flight || state.seen_operations.len() >= 65_536 {
+        if state.in_flight >= state.max_in_flight {
             return Err(CoreServiceError::CoreServiceBusy);
         }
         state.in_flight += 1;
-        state.seen_operations.insert(operation);
+        state.active_core_operations.insert(operation.clone());
         Ok(CoreOperationPermit {
             owner: self.clone(),
+            operation,
             generation: state.generation.clone(),
             epoch: state.epoch,
             kind,
@@ -173,6 +179,7 @@ impl Drop for CoreOperationPermit {
             .lock()
             .expect("service admission poisoned");
         state.in_flight -= 1;
+        state.active_core_operations.remove(&self.operation);
         self.owner.0.drained.notify_all();
     }
 }
