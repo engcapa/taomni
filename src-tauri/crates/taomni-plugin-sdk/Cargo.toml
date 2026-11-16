@@ -7,6 +7,13 @@ publish = false
 
 [dependencies]
 taomni-plugin-api = { path = "../taomni-plugin-api" }
+taomni-profile-locks = { path = "../taomni-profile-locks" }
 serde = { version = "1", features = ["derive"] }
 serde_json = { version = "1", features = ["raw_value"] }
 zeroize = "1"
+
+[target.'cfg(unix)'.dependencies]
+libc = "0.2"
+
+[dev-dependencies]
+tempfile = "3"

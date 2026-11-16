@@ -26,6 +26,16 @@ use crate::RequestId;
 pub const FIXED_KEY_SERVICE: &str = "vault.fixed-key";
 pub const SNAPSHOT_SERVICE: &str = "backup.snapshot";
 pub const SERVICE_VERSION: u16 = 1;
+pub const HOST_PROFILE_ENV: &str = "TAOMNI_PLUGIN_PROFILE";
+
+/// Compiled owner plus persistent profile generation; no data path or grant.
+/// The core supplies paths separately through its per-process environment.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+pub struct HostProfileContext {
+    pub owner: String,
+    pub generation: ProfileGeneration,
+}
 
 /// Negotiated separately from API_VERSION; no service is implicitly granted.
 #[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]

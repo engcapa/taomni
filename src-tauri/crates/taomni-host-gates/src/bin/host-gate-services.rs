@@ -8,7 +8,8 @@ use taomni_plugin_api::{
         ServiceCapabilities,
     },
 };
-use taomni_plugin_sdk::{HostConfig, Operation, PluginHandler, serve_stdio};
+use taomni_plugin_sdk::{HostConfig, Operation, PluginHandler, serve_stdio_with};
+use taomni_profile_locks::{PluginDataLease, PluginSlug, ProfileRestoreLease};
 
 struct Handler;
 impl PluginHandler for Handler {
@@ -64,7 +65,16 @@ fn main() -> std::process::ExitCode {
         )])),
         operation_timeout: Duration::from_secs(10),
     };
-    if serve_stdio(config, Arc::new(Handler)).is_ok() {
+    let result = serve_stdio_with(config, |storage| {
+        let storage = storage.expect("profile must be owned before handler/store initialization");
+        assert!(ProfileRestoreLease::try_acquire(storage.root()).is_err());
+        assert!(
+            PluginDataLease::try_acquire(storage.root(), &PluginSlug::parse("mfa").unwrap())
+                .is_err()
+        );
+        Ok(Arc::new(Handler))
+    });
+    if result.is_ok() {
         std::process::ExitCode::SUCCESS
     } else {
         std::process::ExitCode::FAILURE

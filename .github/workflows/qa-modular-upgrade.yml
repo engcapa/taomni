@@ -109,7 +109,7 @@ jobs:
           os.environ["TAOMNI_HELLO_PLUGIN_BIN"] = str(pathlib.Path(f"src-tauri/target/debug/taomni-hello-plugin{suffix}").resolve())
           subprocess.run([
               "cargo", "test", "--manifest-path", "src-tauri/Cargo.toml",
-              "-p", "taomni-host-gates", "--test", "lifecycle", "--test", "activation", "--test", "cleanup", "--test", "services",
+              "-p", "taomni-host-gates", "--test", "lifecycle", "--test", "activation", "--test", "cleanup", "--test", "services", "--test", "profile",
               "--locked", "--", "--ignored", "--test-threads=1", "--nocapture",
           ], check=True)
           PY
@@ -117,7 +117,7 @@ jobs:
         run: |
           python - <<'PY' > modular-evidence/service-selection.txt
           import subprocess
-          for target, expected in {"services": 8, "lifecycle": 7, "activation": 3, "cleanup": 2}.items():
+          for target, expected in {"services": 8, "lifecycle": 7, "activation": 3, "cleanup": 2, "profile": 5}.items():
               listing = subprocess.check_output([
                   "cargo", "test", "--manifest-path", "src-tauri/Cargo.toml", "-p", "taomni-host-gates",
                   "--test", target, "--locked", "--", "--ignored", "--list",
@@ -357,7 +357,7 @@ jobs:
         run: |
           mkdir -p modular-evidence
           set -o pipefail
-          python -m unittest qa_ui_auto.test_core_profile_state test_module_signed_observation test_module_retained_observation test_module_backup_observation test_native_restart_failure 2>&1 | tee modular-evidence/native-observation-unit.log
+          python -m unittest qa_ui_auto.test_core_profile_state test_module_signed_observation test_module_retained_observation test_module_backup_observation test_module_profile_observation test_native_restart_failure 2>&1 | tee modular-evidence/native-observation-unit.log
       - name: Preserve native observation evidence on every platform
         uses: actions/upload-artifact@v4
         if: always()

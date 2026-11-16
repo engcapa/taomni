@@ -12,6 +12,8 @@
 
 当前实施增量：`fdd05d232` 的升级契约 #43819768258 已 23/23 jobs 成功，多端 UI 持续收证。随后本批实现了 F/G 的离线插件数据集、v2 档案、兼容 journal 与依赖检查，尚待匹配源码 hosted 验证。运行中宿主协议、三态真实重启还原、MFA 宿主迁出仍未完成；下文初始调查和分阶段验收要求保留，实时结果以[实施台账](taomni-modular-split-progress.md)为准。
 
+当前新增宿主所有权接线：production registry 已改用 profiled spawn，hello/SDK 自取 shared ProfileUseLease 和 owner 独占 PluginDataLease，并在创建 store 前取得锁；握手确认当前 generation，reader EOF 后 worker/store 尚存时不能提前释放。新五个真实 process gate 与增强 TC-MODULES-007 的 OS writer-lock 观察已准备，待匹配源码 GitHub 证据。运行中 snapshot、三态实际还原和 MFA 迁出仍未完成；下文初始事实表为历史调查，实时状态见实施台账。
+
 ## 1. 当前事实与缺口
 
 | 位置 | 已有实现 | 待实现/风险 |

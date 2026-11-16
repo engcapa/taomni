@@ -4,11 +4,13 @@
 
 mod client;
 mod operation;
+mod profile;
 mod runtime;
 mod sensitive;
 
 pub use operation::{Operation, OperationKey};
-pub use runtime::{HostConfig, PluginHandler, serve, serve_stdio};
+pub use profile::{HostStorage, confirm_profile_handshake};
+pub use runtime::{HostConfig, PluginHandler, serve, serve_stdio, serve_stdio_with};
 
 #[cfg(test)]
 mod tests;

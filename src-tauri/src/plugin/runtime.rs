@@ -148,7 +148,13 @@ impl PluginRegistry {
             .map(|services| services.host_config(&verified))
             .transpose()?
             .flatten();
-        let process = host::HostProcess::start_with_services(
+        let profile = self.data_profile()?;
+        let generation = crate::runtime::generation::current(profile.path())
+            .map_err(PluginError::HostRequest)?;
+        let owner = taomni_profile_locks::PluginSlug::parse(verified.slug.clone())
+            .map_err(|error| PluginError::HostRequest(error.to_string()))?;
+        let process = host::HostProcess::start_profiled(
+            host::HostProfileConfig::new(profile, owner, generation),
             &record.manifest.id,
             &record.manifest.version,
             &host_path,

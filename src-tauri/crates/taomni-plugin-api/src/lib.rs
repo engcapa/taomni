@@ -246,6 +246,8 @@ pub struct HandshakeRequest {
     pub core_services: services::ServiceCapabilities,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub host_instance: Option<services::HostInstanceId>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub profile: Option<services::HostProfileContext>,
 }
 
 impl HandshakeRequest {
@@ -266,6 +268,7 @@ impl HandshakeRequest {
             permissions,
             core_services: services::ServiceCapabilities::default(),
             host_instance: None,
+            profile: None,
         }
     }
 }
@@ -286,6 +289,9 @@ pub struct HandshakeResponse {
         skip_serializing_if = "services::ServiceCapabilities::is_empty"
     )]
     pub core_services: services::ServiceCapabilities,
+    /// A host acknowledges this only after acquiring its own OS leases.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub profile: Option<services::HostProfileContext>,
 }
 
 impl HandshakeResponse {
@@ -297,6 +303,7 @@ impl HandshakeResponse {
             error: None,
             heartbeat_interval_ms,
             core_services: services::ServiceCapabilities::default(),
+            profile: None,
         }
     }
 
@@ -308,6 +315,7 @@ impl HandshakeResponse {
             error: Some(error),
             heartbeat_interval_ms: 0,
             core_services: services::ServiceCapabilities::default(),
+            profile: None,
         }
     }
 }

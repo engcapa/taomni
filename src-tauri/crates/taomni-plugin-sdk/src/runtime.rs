@@ -1,7 +1,8 @@
 //! Authentication/control stays in the reader; business work runs independently.
 use crate::{
-    Operation,
+    HostStorage, Operation,
     client::ServiceClient,
+    confirm_profile_handshake,
     sensitive::{Envelope, LineReader, invalid_frame},
 };
 use std::{
@@ -50,9 +51,28 @@ pub trait PluginHandler: Send + Sync + 'static {
 pub(crate) type ActiveOperations = Arc<Mutex<HashMap<RequestId, Arc<Operation>>>>;
 
 pub fn serve_stdio(config: HostConfig, handler: Arc<dyn PluginHandler>) -> io::Result<()> {
+    serve_stdio_with(config, |_| Ok(handler))
+}
+
+/// Stateful official hosts must initialize their stores here, after native
+/// ownership is acquired. The preconstructed-handler entry is for stateless
+/// hosts; opening a database before this factory would precede its writer lock.
+pub fn serve_stdio_with(
+    config: HostConfig,
+    initialize: impl FnOnce(Option<&HostStorage>) -> io::Result<Arc<dyn PluginHandler>>,
+) -> io::Result<()> {
     let token = std::env::var("TAOMNI_PLUGIN_TOKEN")
         .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "plugin token required"))?;
-    serve(io::stdin().lock(), io::stdout(), token, config, handler)
+    let storage = HostStorage::from_environment(&config.plugin_id)?.map(Arc::new);
+    let handler = initialize(storage.as_deref())?;
+    serve_owned(
+        io::stdin().lock(),
+        io::stdout(),
+        token,
+        config,
+        handler,
+        storage,
+    )
 }
 
 pub fn serve(
@@ -61,6 +81,17 @@ pub fn serve(
     token: String,
     config: HostConfig,
     handler: Arc<dyn PluginHandler>,
+) -> io::Result<()> {
+    serve_owned(reader, writer, token, config, handler, None)
+}
+
+pub(crate) fn serve_owned(
+    reader: impl Read,
+    writer: impl Write + Send + 'static,
+    token: String,
+    config: HostConfig,
+    handler: Arc<dyn PluginHandler>,
+    storage: Option<Arc<HostStorage>>,
 ) -> io::Result<()> {
     let (output, messages) = mpsc::sync_channel::<RpcMessage>(8);
     let writer_failed = Arc::new(AtomicBool::new(false));
@@ -83,7 +114,7 @@ pub fn serve(
     let client = ServiceClient::new(output);
     let active = Arc::new(Mutex::new(HashMap::new()));
     let _cleanup = CancelOnExit(active.clone());
-    let jobs = worker::start(active.clone(), client.clone(), handler)?;
+    let jobs = worker::start(active.clone(), client.clone(), handler, storage.clone())?;
     let mut reader = LineReader::new(reader);
     let mut authenticated = false;
     let mut host_instance: Option<HostInstanceId> = None;
@@ -137,7 +168,7 @@ pub fn serve(
                     let accepted = if authenticated {
                         Err(RpcError::from_code(ErrorCode::InvalidState))
                     } else {
-                        handshake(&request, &config, &token)
+                        handshake(&request, &config, &token, storage.as_deref())
                     };
                     let response = match accepted {
                         Ok((response, instance)) => {
@@ -161,6 +192,9 @@ pub fn serve(
                     match params {
                         Some(params)
                             if Some(&params.host_instance) == host_instance.as_ref()
+                                && storage.as_ref().is_none_or(|storage| {
+                                    params.profile_generation == storage.context().generation
+                                })
                                 && revoke.is_none()
                                 && revoked_epoch
                                     .is_none_or(|epoch| params.vault_epoch.get() > epoch.get()) =>
@@ -188,6 +222,7 @@ pub fn serve(
                         host_instance.as_ref(),
                         revoked_epoch,
                         revoke.is_some(),
+                        storage.as_ref().map(|storage| storage.context()),
                     ) {
                         send(
                             &client,
@@ -241,12 +276,14 @@ pub(crate) fn handshake(
     request: &RpcRequest,
     config: &HostConfig,
     token: &str,
+    storage: Option<&HostStorage>,
 ) -> Result<(HandshakeResponse, Option<HostInstanceId>), RpcError> {
     let handshake: HandshakeRequest =
         serde_json::from_value(request.params.clone().unwrap_or_default())
             .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
     validate_versions(handshake.api_version, handshake.protocol_version)?;
     validate_token(token, &handshake.token)?;
+    let profile = confirm_profile_handshake(storage, handshake.profile.as_ref())?;
     if handshake.plugin_id != config.plugin_id
         || handshake.plugin_version != config.plugin_version
         || handshake.commands.iter().cloned().collect::<BTreeSet<_>>() != config.commands
@@ -267,6 +304,7 @@ pub(crate) fn handshake(
     }
     let mut response = HandshakeResponse::accepted(1000);
     response.core_services = config.required_services.clone();
+    response.profile = profile;
     Ok((response, handshake.host_instance))
 }
 
@@ -276,6 +314,7 @@ fn validate_command(
     host: Option<&HostInstanceId>,
     revoked: Option<VaultEpoch>,
     revoking: bool,
+    profile: Option<&taomni_plugin_api::services::HostProfileContext>,
 ) -> Option<RpcError> {
     if !config.commands.contains(&request.method) {
         return Some(RpcError::from_code(ErrorCode::MethodNotFound));
@@ -286,6 +325,7 @@ fn validate_command(
     if !config.required_services.is_empty() {
         let valid = request.context.as_ref().is_some_and(|context| Some(&context.host_instance) == host
             && revoked.is_none_or(|epoch| context.vault_epoch.get() > epoch.get())
+            && profile.is_none_or(|profile| profile.generation == context.profile_generation)
             && matches!(&request.id, RequestId::String(id) if id.starts_with(&format!("core/{}/", context.host_instance))));
         if !valid {
             return Some(RpcError::from_code(ErrorCode::InvalidState));

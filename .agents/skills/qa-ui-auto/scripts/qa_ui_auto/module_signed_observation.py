@@ -15,6 +15,7 @@ import uuid
 from .deadline import budget_time as time
 from .steps import StepError
 from .module_retained_observation import observe as observe_data
+from .module_profile_observation import writer_lease
 
 PHASES = {"installed", "enabled", "disabled", "invalid", "uninstalled", "tamper-frontend", "restore-frontend",
           "seed-data", "retained", "installed-data", "deleted"}
@@ -106,6 +107,7 @@ def run(ctx, args):
             expected_state = {"invalid": "disabled", "seed-data": "installed", "installed-data": "installed",
                               "retained": "uninstalled", "deleted": "uninstalled"}.get(phase, phase)
             check(record, ping, expected_state)
+            observation["writerLease"] = writer_lease(root, enabled=expected_state == "enabled")
             if phase == "invalid":
                 if not record.get("reason"):
                     raise StepError("A changed signed frontend was not rejected on startup")

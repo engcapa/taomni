@@ -10,7 +10,7 @@ use std::{
     },
     time::{Duration, Instant},
 };
-use taomni_host_gates::host::{HostProcess, HostServiceConfig, HostState};
+use taomni_host_gates::host::{HostProcess, HostProfileConfig, HostServiceConfig, HostState};
 use taomni_plugin_api::{RequestId, RpcError, services::*};
 use taomni_plugin_services::*;
 use taomni_profile_locks::*;
@@ -58,11 +58,15 @@ impl Harness {
     fn new(delay: Duration) -> Self {
         let dir = tempfile::tempdir().unwrap();
         let root = ProfileRoot::prepare(dir.path()).unwrap();
-        let admission = OperationAdmission::new(
-            ProfileGeneration::parse("a1234567-1234-1234-1234-123456789abc").unwrap(),
-            VaultEpoch::new(1).unwrap(),
-            false,
-        );
+        let generation = ProfileGeneration::parse("a1234567-1234-1234-1234-123456789abc").unwrap();
+        std::fs::write(
+            root.path().join(".profile-state.json"),
+            serde_json::to_vec(&serde_json::json!({"formatVersion":1,"generation":generation}))
+                .unwrap(),
+        )
+        .unwrap();
+        let admission =
+            OperationAdmission::new(generation.clone(), VaultEpoch::new(1).unwrap(), false);
         let backend = Arc::new(Backend {
             delay,
             calls: AtomicUsize::new(0),
@@ -82,7 +86,8 @@ impl Harness {
         )
         .unwrap();
         let host = std::path::Path::new(env!("CARGO_BIN_EXE_host-gate-services"));
-        let process = HostProcess::start_with_services(
+        let process = HostProcess::start_profiled(
+            HostProfileConfig::new(root.clone(), PluginSlug::parse("mfa").unwrap(), generation),
             "taomni-plugin-mfa",
             "0.1.0",
             host,
@@ -97,6 +102,8 @@ impl Harness {
             Some(HostServiceConfig { dispatcher, grants }),
         )
         .unwrap();
+        assert!(ProfileRestoreLease::try_acquire(&root).is_err());
+        assert!(PluginDataLease::try_acquire(&root, &PluginSlug::parse("mfa").unwrap()).is_err());
         Self {
             _dir: dir,
             root,

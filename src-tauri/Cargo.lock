@@ -10911,6 +10911,7 @@ version = "0.1.0"
 dependencies = [
  "serde_json",
  "taomni-plugin-api",
+ "taomni-plugin-sdk",
 ]
 
 [[package]]
@@ -10945,9 +10946,12 @@ dependencies = [
 name = "taomni-plugin-sdk"
 version = "0.1.0"
 dependencies = [
+ "libc",
  "serde",
  "serde_json",
  "taomni-plugin-api",
+ "taomni-profile-locks",
+ "tempfile",
  "zeroize",
 ]
 

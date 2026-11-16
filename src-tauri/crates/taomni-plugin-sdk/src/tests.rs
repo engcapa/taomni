@@ -183,18 +183,18 @@ fn handshake_refuses_missing_service_identity_or_wrong_token_and_preserves_v1() 
             Some(serde_json::to_value(hello).unwrap()),
         )
     };
-    assert!(handshake(&call(&hello), &config, "token").is_err());
+    assert!(handshake(&call(&hello), &config, "token", None).is_err());
     hello.core_services = required;
-    assert!(handshake(&call(&hello), &config, "token").is_err());
+    assert!(handshake(&call(&hello), &config, "token", None).is_err());
     hello.host_instance = Some(HostInstanceId::parse(HOST).unwrap());
     assert_eq!(
-        handshake(&call(&hello), &config, "wrong")
+        handshake(&call(&hello), &config, "wrong", None)
             .err()
             .unwrap()
             .code,
         -32003
     );
-    let (reply, instance) = handshake(&call(&hello), &config, "token").unwrap();
+    let (reply, instance) = handshake(&call(&hello), &config, "token", None).unwrap();
     assert_eq!(instance.unwrap().as_str(), HOST);
     assert!(reply.core_services.supports(FIXED_KEY_SERVICE, 1));
     assert_eq!(reply.api_version, 1);

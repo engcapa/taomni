@@ -4,7 +4,10 @@ use std::thread;
 
 use serde_json::Value;
 use taomni_hello_plugin::{DispatchOutcome, HANDSHAKE_METHOD, HelloPlugin, PluginFailure};
-use taomni_plugin_api::{ErrorCode, HandshakeRequest, Heartbeat, RpcError, RpcMessage, RpcResponse};
+use taomni_plugin_api::{
+    ErrorCode, HandshakeRequest, Heartbeat, RpcError, RpcMessage, RpcResponse,
+};
+use taomni_plugin_sdk::{HostStorage, confirm_profile_handshake};
 
 fn error_response(id: Option<taomni_plugin_api::RequestId>, code: ErrorCode) -> RpcMessage {
     RpcMessage::Response(RpcResponse::failure(
@@ -26,6 +29,7 @@ fn run() -> io::Result<i32> {
             "TAOMNI_PLUGIN_TOKEN is required",
         )
     })?;
+    let storage = HostStorage::from_environment(taomni_hello_plugin::PLUGIN_ID)?;
     let stdin = io::stdin();
     let mut stdout = io::BufWriter::new(io::stdout().lock());
     let mut plugin = HelloPlugin::new();
@@ -48,9 +52,13 @@ fn run() -> io::Result<i32> {
                 // measures liveness with its own monotonic receive clock.
                 if let Some(params) = notification.params {
                     if serde_json::from_value::<Heartbeat>(params.clone()).is_ok() {
-                        write_message(&mut stdout, &RpcMessage::Notification(
-                            taomni_plugin_api::RpcNotification::new(Heartbeat::METHOD, Some(params)),
-                        ))?;
+                        write_message(
+                            &mut stdout,
+                            &RpcMessage::Notification(taomni_plugin_api::RpcNotification::new(
+                                Heartbeat::METHOD,
+                                Some(params),
+                            )),
+                        )?;
                     }
                 }
                 continue;
@@ -63,7 +71,13 @@ fn run() -> io::Result<i32> {
             let params = request.params.unwrap_or(Value::Null);
             let response = serde_json::from_value::<HandshakeRequest>(params)
                 .map_err(|error| RpcError::new(ErrorCode::InvalidParams, error.to_string()))
-                .and_then(|handshake| plugin.accept_handshake(&handshake, &expected_token));
+                .and_then(|handshake| {
+                    let profile =
+                        confirm_profile_handshake(storage.as_ref(), handshake.profile.as_ref())?;
+                    let mut response = plugin.accept_handshake(&handshake, &expected_token)?;
+                    response.profile = profile;
+                    Ok(response)
+                });
             let response = match response {
                 Ok(response) => RpcResponse::success(
                     request.id,

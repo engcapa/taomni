@@ -4,6 +4,7 @@ description: >-
   Install the current-source official hello package through Settings, using the
   unmodified production pinned public key. Verify the native registry version,
   inactive invoke rejection before enabling, real host ping after enabling,
+  an independent OS writer-lock check after each lifecycle observation,
   disable/enable, Settings reopening and graceful app restart. When Settings
   remains open, approve only the exact one-tab Exit confirmation; verify the
   normal process shutdown before creating another native session.
@@ -140,8 +141,23 @@ verification:
     - step: 51
       expectation: Installation, lifecycle, recovery and uninstall produce no unhandled renderer error.
     results: [47, 50, 51]
+  - id: R5
+    requirement: The actual native host owns the writer lease while enabled and releases it when inactive, including after normal restart and integrity rejection.
+    actions: [13, 16, 19, 29, 33, 37, 45, 48]
+    checkpoints:
+    - step: 15
+      expectation: An independent nonblocking OS lock attempt cannot take hello-plugin's writer lease after a successful host ping.
+    - step: 18
+      expectation: After UI disable, the same OS lock can be acquired and immediately released; no file is created or changed by the probe.
+    - step: 31
+      expectation: The newly started native host owns the writer lock after normal application restart.
+    - step: 35
+      expectation: Integrity rejection leaves no host writer lease held.
+    - step: 50
+      expectation: Uninstalled state after restart has no host writer lease held.
+    results: [15, 18, 31, 35, 50]
   native:
-  - check: Official pinned-key installation, host process invocation, native disk persistence and graceful restart re-verification.
+  - check: Official pinned-key installation, host process invocation, independent OS writer-lock ownership/release, native disk persistence and graceful restart re-verification.
     method: automated
     reason: Browser stubs cannot validate real files, signatures, process execution or startup scanning.
   - check: OS signature trust, Gatekeeper/TCC, Linux noexec and production install-location execution.

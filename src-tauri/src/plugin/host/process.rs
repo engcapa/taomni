@@ -19,6 +19,8 @@ use super::{
 mod cancellation;
 #[path = "launch.rs"]
 mod launch;
+#[path = "profile.rs"]
+mod profile;
 #[path = "pump.rs"]
 mod pump;
 #[path = "service_requests.rs"]
@@ -28,6 +30,7 @@ mod transport;
 
 pub use cancellation::HostCancellation;
 use cancellation::RequestGuard;
+pub use profile::HostProfileConfig;
 use pump::PumpOutcome;
 pub use service_requests::HostServiceConfig;
 use service_requests::service_error;
@@ -86,6 +89,7 @@ struct LaunchConfig {
     working_dir: PathBuf,
     commands: Vec<String>,
     permissions: Vec<String>,
+    profile: Option<HostProfileConfig>,
 }
 
 pub struct HostProcess {
@@ -147,18 +151,57 @@ impl HostProcess {
         config: HostSupervisorConfig,
         services: Option<HostServiceConfig>,
     ) -> Result<Self, HostProcessError> {
-        let mut process = Self {
-            launch: LaunchConfig {
+        Self::start_launch(
+            LaunchConfig {
                 plugin_id: plugin_id.to_owned(),
                 plugin_version: plugin_version.to_owned(),
                 host: host.to_owned(),
                 working_dir: working_dir.to_owned(),
                 commands: commands.to_vec(),
                 permissions: permissions.to_vec(),
+                profile: None,
             },
+            config,
+            services,
+        )
+    }
+
+    pub fn start_profiled(
+        profile: HostProfileConfig,
+        plugin_id: &str,
+        plugin_version: &str,
+        host: &Path,
+        working_dir: &Path,
+        commands: &[String],
+        permissions: &[String],
+        config: HostSupervisorConfig,
+        services: Option<HostServiceConfig>,
+    ) -> Result<Self, HostProcessError> {
+        Self::start_launch(
+            LaunchConfig {
+                plugin_id: plugin_id.to_owned(),
+                plugin_version: plugin_version.to_owned(),
+                host: host.to_owned(),
+                working_dir: working_dir.to_owned(),
+                commands: commands.to_vec(),
+                permissions: permissions.to_vec(),
+                profile: Some(profile),
+            },
+            config,
+            services,
+        )
+    }
+
+    fn start_launch(
+        launch: LaunchConfig,
+        config: HostSupervisorConfig,
+        services: Option<HostServiceConfig>,
+    ) -> Result<Self, HostProcessError> {
+        let mut process = Self {
+            supervisor: HostSupervisor::new(&launch.plugin_id, config, 0),
+            launch,
             transport: None,
             retired_transports: Vec::new(),
-            supervisor: HostSupervisor::new(plugin_id, config, 0),
             cancellation: HostCancellation::default(),
             token: String::new(),
             id_prefix: process_token(),

@@ -41,6 +41,15 @@
 - 当前最终 Rust harness 已编译通过；前端范围/编辑器/持久化 3 文件 **19/19** 通过；插件备份 15、既有备份 14、兼容档案 2、核心成对快照 5、旧快照 7、generation 1、范围 2，合计 **46 项单元通过**。SQLite snapshot 小库 **10/10**、QA 工具 **12/12** 通过。两份 case 的 schema/reviewed contracts、三端/四种 native profile 静态选择、TypeScript、check:refactor、25 个变更 Rust 文件的 rustfmt 与完整 QA audit gate 通过，coverage baseline 未修改。本节不将计划或本地单元计为 hosted 用例通过。
 - 尚未完成：运行中宿主 prepare/snapshot/release（当前明确拒绝，不静默读文件）、真实宿主持 profile lease、GUI/headless 完整协同、三态正常重启 apply 与真实解密，以及 MFA 迁出后的 v1 legacy alias 映射。TC-MODULES-011 只证明离线快照和读取/取消，不证明 applied native restore；TASK-025-F/G/H/I 均不标完成。
 
+### 真实宿主 profile/data 所有权批次（已实现，待匹配源码 hosted 验证）
+
+- 生产 registry 总经 `HostProcess::start_profiled` 提供核心确认的 canonical profile、owner 和当前 generation；每次 spawn 清除外部继承的 profile 环境。宿主自身先取 shared ProfileUseLease 与 exclusive PluginDataLease，只读有限 coordination metadata，generation/编译期 identity 不匹配即拒绝；握手必须精确确认，不接受旧宿主缺省 ack 后继续激活。
+- SDK 增加 store 初始化 factory，先取锁再创建 handler/store；工作 reader EOF 后，未完成的业务 worker 继续持锁，handler/store 析构后才能释放最后一份 lease。hello 同步宿主在创建其业务状态前取得并保持同一所有权。旧无 profile 的 stateless/stream 契约保持兼容，生产 registry 不走该入口。
+- 三端 hosted process gates 新增五个真实场景：core 的模拟 shared lease 释放后真实宿主仍阻止 restore/第二 writer；stop/crash 释放与 restart 重新持有；既有 writer 可重试；restore/stale generation 不改数据；缺 profile ack 的旧 host 在 enable hook 前被回收。现有八个反向服务场景也全部改走 profiled SDK factory，初始化时检查实际 OS 锁。
+- TC-MODULES-007 保持原 52 步并增强 reviewed R5：每次 native registry/ping 检查后，独立尝试固定 profile 下的真实 writer OS 锁；启用必须忙、禁用/篡改拒绝/卸载必须可取并立即释放。不创建锁文件、不改业务数据；该 probe 不能识别 profile shared 锁由 core 还是 host 持有，后者只由独立进程 gate 验证。
+- 本地真实根 harness 已编译，plugin 纯单元 **127 passed / 3 ignored**（三个真实网络仍交 hosted）、generation **4/4**、protected snapshot **5/5**；小库 API **16/16**、SDK **11/11**、host adapter **15/15**、hello **4/4**。Python signed/retained/backup/profile 观察工具 **18/18**。真实进程场景只编译、未在本机执行；最终 check:refactor、完整 QA audit 和新源码 browser/native/crash 仍按提交前后分别收证。
+- 这批只闭合宿主持有期的所有权接线，不代表运行中 prepare/snapshot/release、GUI/headless 全协同、三态真实重启还原、MFA 独立业务或 G11 整体通过。
+
 ### Vault/MFA 协调与保留行为批次（历史开发记录，最新结果见上方）
 
 - `plugin/vault_lifecycle.rs` 将 init、unlock、lock、change-master 与恢复前主密码验证接入同一 coordinator：transition → registry lifecycle 的有界锁顺序，关闭准入、取消、撤销/确认宿主退出、drain 后才处理 root。失败保留 revocation；重试加入同一次撤销并保留已确认成员。核心退出也排空 permit 后清 root；嵌套 quiescence 只在最后一个 guard 释放且 root 仍有效时恢复服务。
@@ -138,7 +147,7 @@ Wayland `TC-FILE-OPEN-008` 在已有 AI 路径 chip 点击处失败：失败截�
 
 已完成 retained locator 与离线 v2 备份/还原实现，提交 `fdd05d232` / `fad6a56ab`。前者 hosted 结果已齐，后者的相关失败及修复进度见上方；执行中按 shard 收证，无关失败保留原始记录并不计通过。
 
-当前在开发真实宿主自持 shared ProfileUseLease / exclusive PluginDataLease，核心经独立进程环境提供 profile，握手必须确认精确 owner/generation。SDK/API 27 项单元通过，包含 reader EOF 后 worker/store 未退出时不能提前释放锁；核心接线、三端真实进程 gate 和匹配源码 UI 仍待编译/执行，不将单元结果当作宿主生产验收。运行中 prepare/snapshot/release 尚未实现。
+当前在开发真实宿主自持 shared ProfileUseLease / exclusive PluginDataLease，核心经独立进程环境提供 profile，握手必须确认精确 owner/generation。SDK/API 27 项单元通过，包含 reader EOF 后 worker/store 未退出时不能提前释放锁；核心接线已编译、五个三端真实进程场景已补，匹配源码 process/UI 仍待 GitHub 执行，不将单元结果当作宿主生产验收。运行中 prepare/snapshot/release 尚未实现。
 
 1. **收敛当前相关失败并取得新源码证据**：修复本轮云端模块/Vault 依赖用例、macOS SQLite fixture 路径和 Windows SQLite 连接清理；GitHub 复验。继续即时下载 `fad6a56ab` 的 native shard，检查新增 TC-MODULES-011 的真实 ZIP/SQLite/WAL 结果；已完成的旧源码结果不能替代本批证据。
 2. **闭合 Vault、profile 与一致快照（TASK-024/025）**：完成真实宿主持锁与三端进程 gate，再接运行中宿主 prepare/snapshot/release、GUI/headless 同 profile 协同。离线路径已有 v2 档案和兼容 journal，但仍需运行、禁用、卸载保留数据三态的正常重启 apply 与真实解密，覆盖多实例占用、取消和崩溃恢复；MFA 迁出时统一处理 v1 legacy alias。

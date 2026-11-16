@@ -364,7 +364,9 @@ mod containment;
 #[path = "host/process.rs"]
 mod process;
 
-pub use process::{HostCancellation, HostProcess, HostProcessError, HostServiceConfig, HostTick};
+pub use process::{
+    HostCancellation, HostProcess, HostProcessError, HostProfileConfig, HostServiceConfig, HostTick,
+};
 
 #[cfg(test)]
 #[path = "host_tests.rs"]

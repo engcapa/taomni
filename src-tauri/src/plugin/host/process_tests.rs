@@ -35,6 +35,7 @@ fn process(backoff: Duration) -> HostProcess {
             working_dir: PathBuf::new(),
             commands: vec![],
             permissions: vec![],
+            profile: None,
         },
         transport: None,
         retired_transports: Vec::new(),

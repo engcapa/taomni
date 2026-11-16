@@ -1,5 +1,5 @@
 use super::ActiveOperations;
-use crate::{Operation, PluginHandler, client::ServiceClient};
+use crate::{HostStorage, Operation, PluginHandler, client::ServiceClient};
 use std::{
     io,
     panic::{AssertUnwindSafe, catch_unwind},
@@ -15,20 +15,36 @@ pub(super) struct Job {
     pub operation: Arc<Operation>,
 }
 
+struct WorkerResources {
+    // Handler-owned stores close before its final profile/data leases drop.
+    handler: Arc<dyn PluginHandler>,
+    _storage: Option<Arc<HostStorage>>,
+}
+
 pub(super) fn start(
     active: ActiveOperations,
     client: Arc<ServiceClient>,
     handler: Arc<dyn PluginHandler>,
+    storage: Option<Arc<HostStorage>>,
 ) -> io::Result<SyncSender<Job>> {
     let (jobs, receiver) = mpsc::sync_channel::<Job>(1);
+    let resources = WorkerResources {
+        handler,
+        _storage: storage,
+    };
     std::thread::Builder::new()
         .name("plugin-sdk-business".into())
         .spawn(move || {
+            // Capture the whole owner, including its Drop order, rather than
+            // allowing precise closure capture to retain only the handler.
+            let resources = resources;
             while let Ok(job) = receiver.recv() {
                 let Job { request, operation } = job;
                 let result = catch_unwind(AssertUnwindSafe(|| {
                     operation.check_current()?;
-                    handler.invoke(&operation, &request.method, request.params)
+                    resources
+                        .handler
+                        .invoke(&operation, &request.method, request.params)
                 }))
                 .unwrap_or_else(|_| {
                     Err(RpcError::new(

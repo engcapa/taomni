@@ -1,6 +1,7 @@
 //! A host becomes usable only after authenticated handshake and its declared
 //! activation hook have completed. Replacements follow the same path; requests
 //! from the previous process are never replayed.
+use super::profile::validate_profile_ack;
 use super::service_requests::fresh_host_instance;
 use super::{HostProcess, HostProcessError, Transport, process_token};
 use std::{process::Command, time::Instant};
@@ -33,7 +34,11 @@ impl HostProcess {
         let mut command = Command::new(&self.launch.host);
         command
             .current_dir(&self.launch.working_dir)
-            .env("TAOMNI_PLUGIN_TOKEN", &self.token);
+            .env("TAOMNI_PLUGIN_TOKEN", &self.token)
+            .env_remove(taomni_plugin_api::services::HOST_PROFILE_ENV);
+        if let Some(profile) = &self.launch.profile {
+            profile.configure(&mut command, &self.launch.plugin_id)?;
+        }
         self.transport = Some(Transport::spawn(command)?);
         let mut request = HandshakeRequest::new(
             &self.launch.plugin_id,
@@ -42,6 +47,11 @@ impl HostProcess {
             self.launch.commands.clone(),
             self.launch.permissions.clone(),
         );
+        request.profile = self
+            .launch
+            .profile
+            .as_ref()
+            .map(|profile| profile.context().clone());
         if let Some(services) = &self.service_config {
             request.core_services = services.grants.service_capabilities();
             request.host_instance = Some(fresh_host_instance());
@@ -72,6 +82,7 @@ impl HostProcess {
                     .unwrap_or_else(|| "host rejected handshake".into()),
             ));
         }
+        validate_profile_ack(request.profile.as_ref(), handshake.profile.as_ref())?;
         if request
             .core_services
             .0
