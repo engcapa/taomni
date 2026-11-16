@@ -94,6 +94,9 @@ jobs:
           echo "LIBGSSAPI_IMPL=mit" >> "$GITHUB_ENV"
           echo "LIBGSSAPI_PREFIX=$(brew --prefix krb5)" >> "$GITHUB_ENV"
           echo "PKG_CONFIG_PATH=$(brew --prefix krb5)/lib/pkgconfig" >> "$GITHUB_ENV"
+          # tauri_build validates configured framework files even for a unit
+          # harness. Match the production pre-compile staging step.
+          bash scripts/bundle-krb5-macos.sh stage
       - name: Windows complete Perl
         if: runner.os == 'Windows'
         shell: pwsh
