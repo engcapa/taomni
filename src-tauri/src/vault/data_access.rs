@@ -33,24 +33,41 @@ impl VaultDataAccess {
             return Err(ERR_VAULT_LOCKED.into());
         }
         let cancelled = || self.unavailable();
-        let wait = WaitControl::new(Instant::now() + Duration::from_secs(10), &cancelled);
-        VaultOperationLease::read(&self.root, &wait).map_err(|e| e.to_string())
+        let deadline = Instant::now() + Duration::from_secs(10);
+        loop {
+            self.admission
+                .wait_while_paused(deadline, &cancelled)
+                .map_err(access_error)?;
+            let wait = WaitControl::new(deadline, &cancelled);
+            let lease = VaultOperationLease::read(&self.root, &wait).map_err(|e| e.to_string())?;
+            if !self.admission.is_paused() {
+                return Ok(lease);
+            }
+            drop(lease);
+        }
     }
 
     fn admit(&self, kind: OperationKind) -> Result<CoreOperationPermit, String> {
         if self.admission.state() != AdmissionState::Open {
             return Err(ERR_VAULT_LOCKED.into());
         }
-        let lease = self.read_lease()?;
-        let permit = self
-            .admission
-            .admit_core_until(
+        let deadline = Instant::now() + Duration::from_secs(10);
+        let permit = loop {
+            self.admission
+                .wait_while_paused(deadline, &|| self.unavailable())
+                .map_err(access_error)?;
+            let lease = self.read_lease()?;
+            match self.admission.admit_core_until(
                 OperationId::parse(uuid::Uuid::new_v4().to_string()).expect("canonical UUID"),
                 kind,
                 lease,
-                Instant::now() + Duration::from_secs(10),
-            )
-            .map_err(access_error)?;
+                deadline,
+            ) {
+                Ok(permit) => break permit,
+                Err(CoreServiceError::CoreServiceBusy) if self.admission.is_paused() => (),
+                Err(error) => return Err(access_error(error)),
+            }
+        };
         if self.unavailable() {
             return Err(ERR_VAULT_LOCKED.into());
         }

@@ -84,6 +84,9 @@ impl OperationAdmission {
         } else if state.mode != AdmissionState::Open {
             return Err(CoreServiceError::VaultLocked);
         }
+        if state.paused {
+            return Err(CoreServiceError::CoreServiceBusy);
+        }
         if state.seen_operations.contains(&operation) {
             return Err(CoreServiceError::DuplicateRequest);
         }

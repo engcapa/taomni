@@ -11704,6 +11704,7 @@ controls:
 -->
 
 - 轻量核心与完整备份都包含 `databases/mfa.db`；自定义范围勾选 MFA 时强制同时包含 `vault.db`（数据密钥在保险库中）。从未使用 MFA 的配置不生成 `mfa.db`。
+- 当前核心中的 Vault/MFA 快照在同一独占 lease 下完成，后台快照只暂缓新请求，不改变 Vault 锁定状态或安全 epoch；未打开的 MFA 库只读快照，不因备份初始化 schema。`TC-MFA-103` 在 native 验证锁定后备份、归档同时含两库，以及显式解锁后的原账户恢复；单元验证重包后的 key、key_check 和 RFC HOTP 连续性。
 - 恢复时替换 `mfa.db` 并为原文件保留安全副本；恢复后若保险库与 `mfa.db` 不匹配，MFA 标签提示并提供清空重建入口。
 
 ### 27.4a 云端备份连接（开发中）

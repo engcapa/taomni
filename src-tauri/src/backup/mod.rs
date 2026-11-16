@@ -17,6 +17,7 @@ pub mod manifest;
 pub mod model;
 pub mod network;
 pub mod policy;
+mod protected_snapshot;
 pub mod provider;
 pub mod qa;
 pub mod range;
@@ -33,6 +34,8 @@ pub mod worker;
 mod compat_tests;
 #[cfg(test)]
 mod generation_tests;
+#[cfg(test)]
+mod protected_snapshot_tests;
 #[cfg(test)]
 mod snapshot_tests;
 #[cfg(test)]

@@ -15,6 +15,7 @@ mod revoke;
 mod sensitive_frame;
 mod service_request;
 mod session;
+mod snapshot_pause;
 
 pub use admission::{OperationAdmission, OperationPermit};
 pub use core_operation::CoreOperationPermit;
@@ -25,6 +26,7 @@ pub use revoke::{AdmissionState, Revocation};
 pub use sensitive_frame::SensitiveServiceFrame;
 pub use service_request::ReverseRequestPermit;
 pub use session::{ServiceCompletion, ServiceSession};
+pub use snapshot_pause::AdmissionPause;
 
 #[cfg(test)]
 mod dispatcher_tests;

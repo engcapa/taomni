@@ -8,10 +8,13 @@
 
 生产升级 IPC 当前只记录只读预检、源指纹与 pending journal。缺少可信插件包和真实 exporter 时，不复制旧数据、不创建伪插件版本、不改变 active 指针。测试 fixture 的 staging/回滚原语不能算真实旧版升级验收。
 
-签名安装门、宿主生产监督、共享采集/RDP 公共库、CoreState/统一 bootstrap、正常退出与可逆静默已集成。生产工厂、scoped 入口和持久 profile generation 已接入；最新契约 #43801588646 已 23/23 jobs 成功。UI #43804951477 的 TC-MODULES-007 在四种 native profile 全部通过，Windows TC-MODULES-009 的 Notes 遮挡修复仍待重跑。当前开发批次已接 Vault IPC 协调、普通凭据消费者与 MFA facade，尚无该批源码的 hosted 证据。业务状态仍在 LegacyFeatureRuntime；跨库一致快照/还原、远端商店、重启下载恢复、业务宿主迁出与真实升级尚未完成。G1–G11 未通过前，不将具体业务插件迁移标为完成。
+签名安装门、宿主生产监督、共享采集/RDP 公共库、CoreState/统一 bootstrap、正常退出与可逆静默已集成。生产工厂、scoped 入口、持久 profile generation、Vault IPC 协调、普通凭据消费者与 MFA facade 已接入；最新契约 #43809632572 已 23/23 jobs 成功。UI #43804951477 的 TC-MODULES-007 在四种 native profile 全部通过；Windows TC-MODULES-009 的 Notes 遮挡修复与本批 Vault/MFA 原生 UI 仍待新 run 收齐。业务状态仍在 LegacyFeatureRuntime；当前核心一致快照已有单元证据，插件三态快照/还原、远端商店、重启下载恢复、业务宿主迁出与真实升级尚未完成。G1–G11 未通过前，不将具体业务插件迁移标为完成。
 
 ## 2026-11-16 最新 runner 证据（持续采集中）
 
+- 源码 `1b5de48d9` 的[升级契约 #43809632572](https://github.com/engcapa/taomni/actions/runs/43809632572) 已 **23/23 jobs 成功**。该批包含 Vault IPC/普通消费者和 MFA facade；Linux 的真实 harness receipt 为所有 19 个过滤器非空且 exit 0，三端 SDK/下载/宿主/observation 与四目标基础检查通过。产物已在执行期间下载至 `qa-ui-auto-report/github/43809632572/live-contracts/`，不包含之后开发的快照 pause。
+- 相同源码的[UI #43809656351](https://github.com/engcapa/taomni/actions/runs/43809656351) 已即时收齐三端 browser 各 49/50；新增 TC-MFA-013/014 及完整 browser crash-regression 通过。唯一相关 browser 失败是 TC-BACKUP-SETTINGS-001 step 14：移除 LanChat 时替换成 MFA 后沿用错误的默认排除断言。既有 `rangeOptions` 的 core 默认包含 MFA，故修正为包含，保留后续自定义排除、Vault 依赖及持久化断言；待新 SHA 重跑。macOS native 已进入执行，Windows 仍在构建。Linux 在全量前端 unit 门禁失败，未进入 native，不外推通过。
+- Linux 构建 job `133109555494` 的日志已在 run 执行期间经 jobs/logs API 收取：相关失败是 MainLayout 测试的 Vault mock 缺少新增的 `subscribe`，已在本地复现并补齐 fixture；另一失败为编辑器双叶 caret 测试只等待至少一个编辑器，却立即读取第二个，修复为 `findEditorPanes(2)`，保留 `[10, 40]` 的精确断言。两项修复以 `f9c160921` 提交，本地定向 unit 55 passed（其余 260 项按过滤器未执行），待匹配源码 hosted 复验。
 - 源码 `064a12662` 的[升级契约 #43801588646](https://github.com/engcapa/taomni/actions/runs/43801588646) 已 **23/23 jobs 成功**。三端 observation 各 8 项通过，确认 canonical 临时目录修复；artifacts 在执行期间下载至 `qa-ui-auto-report/github/43801588646/live-contracts/`。该 run 不含当前工作区未提交的 Vault/MFA 协调器开发。
 - 源码 `911f411b2` 的[UI #43800287415](https://github.com/engcapa/taomni/actions/runs/43800287415) 仍在运行。已即时收齐三端 browser 各 24/24；Linux Xvfb native 28/29，Wayland 26/29，两种 Linux 的 TC-MODULES-009 均通过。TC-MODULES-007 已通过首次启用、禁用/再启用与 Settings 重开，在第一次正常重启时触发仍打开的一个 Settings tab 所需退出确认；macOS 已完成的对应 shard 也是同一步失败。
 - TC-MODULES-007 的失败前 HTML 与 restart receipt 已核验：标题 `Exit`、消息 `There is 1 open tab. Exit Taomni and close it?`、确认按钮 `Exit`。用例仅在已知 Settings 仍打开的首次和卸载后重启声明精确确认，沿用现有单次真实点击、正常退出与进程身份检查；不允许通用弹窗兜底或强杀当作成功。该 case 修复尚待新 SHA hosted 重跑。
@@ -32,6 +35,14 @@
 - 最终 QA audit gate 通过，未修改 coverage baseline；静态选择 50 个明确 case 与完整 crash-regression 并集，22 个 shard、三套 release QA 构建，`gaps=[]`、`unreviewed=[]`。这些是执行计划和单元证据，不替代新源码的 hosted 测试。
 - 长期运行待办：core permit 与 host 共用 epoch 内 `seen_operations` 的 65,536 上限。MFA 定时取码持续运行可能耗尽配额，须在生产验收前分离可信 core 操作的生命周期或采用有界重放保护，并补长时间等效压力场景；不能简单删除 host 防重放检查或放宽限额当作修复。
 - 尚未闭合：统一 snapshot/restore 跨库一致性、三态真实备份还原、存量 0.5.x exporter/可信 MFA 包、宿主业务迁出与最终 G 门。当前只接通迁出前适配，不能将 TASK-014、025 或生产发布标为完成。
+
+### 当前 Vault/MFA 一致快照批次（开发中）
+
+- 提取 `backup/protected_snapshot.rs`，在 mail/store mutex 之前为当前核心 MFA 与 Vault 取得统一屏障，按 MFA → Vault 顺序在同一独占 OS lease 内产快照；释放后再处理普通库、打包、加密和上传。两库在私有 staging 子目录中一起准备，任一失败/取消清理该子目录，归档路径与格式保持不变。
+- 服务层的 RAII pause 阻止新 core/host 准入并等在途响应/敏感 writer 释放，保持 epoch 与已有 permit 有效。等待者在 OS lease 和 store/host mutex 之外等待；失败/取消也解除 pause。实际锁定/rekey 保留原撤销语义，发现外部 rekey 的旧 root 不重新开放。
+- Vault/MFA 使用已有 SQLite online backup helper，目的地校验并原子发布；未打开的 MFA 文件只读打开、包含已提交 WAL，不创建/迁移源 schema。旧 VACUUM INTO 消费者和测试保留。新的 services 单元 35/35、备份范围/面板前端 3 文件 17 项通过；当前 Rust 源码的核心 harness 已编译成功，plugin 118 passed / 3 ignored（含屏障 7 项）、成对快照 5、旧快照 7、MFA 还原安全副本 1、MFA facade 6、普通 Vault 消费者 4、Vault 17、MFA 13 项均通过。3 项真实进程测试未在本地执行。完整 QA audit 的全部 gates 通过，coverage baseline 未修改。
+- 增强 TC-MFA-103：锁定后创建精确手工 job 的归档，核验两库、保持 locked、显式解锁后重新读取原账户与 runtime 断言。与修正的 TC-BACKUP-SETTINGS-001 均已通过 schema/reviewed contract；执行证据仍待新 SHA GitHub。
+- 这批只保护仍在核心内的真实 MFA/Vault。插件 prepare/snapshot/release、禁用/卸载 retained locator、三态还原与真实 0.5.x 升级仍未实现，TASK-025-F/G/H/I 不标完成。
 
 ## 任务状态
 
@@ -61,7 +72,7 @@
 | TASK-022 Mobile | 待 M0 决策 | 按 DEC-2 默认暂缓排期；M0 末提供 go/no-go 与公开例外，不能默认为已交付。 |
 | TASK-023 发布验收 | 部分 | 清单生成与上传顺序已有；四目标插件构建/系统签名、包签名、原子清单发布、独立插件更新/回滚、两套回归及性能。 |
 | TASK-024 入口/profile 协同 | 随 005-A 已集成一部分 | GUI/headless bootstrap、ModeLease、可重试退出和任务回收已集成；跨宿主 profile lease、还原静默与完整多进程证据仍待完成。 |
-| TASK-025 密钥/一致快照 | A/B/C 已集成；D/E 本批待 hosted | [服务、锁与快照实施方案](taomni-modular-vault-services-plan.md)；双向 pump、SDK、真实 Vault backend、生产工厂/generation 的契约 run #43801588646 已通过。本批已接 Vault IPC、普通消费者与 MFA facade/撤销/reset 屏障，单元通过、hosted 待执行。F–I 的跨库快照、三态还原、独立 MFA 宿主及完整验收未完成。 |
+| TASK-025 密钥/一致快照 | A/B/C 已集成；D/E 接线契约通过，native UI 待齐 | [服务、锁与快照实施方案](taomni-modular-vault-services-plan.md)；Vault IPC、普通消费者与 MFA facade/撤销/reset 屏障的契约 run #43809632572 已 23/23 成功，三端 browser 新增 013/014 通过，native UI 待齐。当前核心成对快照单元通过、待 hosted；F–I 的插件跨库快照、三态还原、独立 MFA 宿主及完整验收未完成。 |
 
 具体编号与子任务边界仍以设计原表为准；上表合并描述不改变范围或依赖。
 

@@ -55,7 +55,7 @@ steps:
 - assert_attribute:
     selector: '[data-testid="backup-cloud-includeMfa"]'
     name: aria-checked
-    equals: 'false'
+    equals: 'true'
 - set_check:
     selector: '[data-testid="backup-cloud-includeMailOriginals"]'
     checked: true
@@ -297,7 +297,7 @@ verification:
     - step: 13
       expectation: Old target stays custom
     - step: 14
-      expectation: Old target core excludes MFA
+      expectation: The legacy target retains core's MFA inclusion; explicit custom exclusion is exercised below.
     results:
     - 7
     - 8

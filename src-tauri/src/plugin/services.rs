@@ -128,28 +128,35 @@ impl PluginCoreServices {
         if self.admission.state() != AdmissionState::Open {
             return Err(service_error(CoreServiceError::VaultLocked));
         }
-        let wait = WaitControl::new(deadline, cancelled);
-        let lease = if kind.requires_exclusive_lease() {
-            VaultOperationLease::write(&self.root, &wait)
-        } else {
-            VaultOperationLease::read(&self.root, &wait)
-        }
-        .map_err(|error| {
-            service_error(match error {
-                taomni_profile_locks::LeaseError::Cancelled => CoreServiceError::Cancelled,
-                taomni_profile_locks::LeaseError::TimedOut => CoreServiceError::TimedOut,
-                _ => CoreServiceError::PluginProfileInUse,
-            })
-        })?;
-        self.admission
-            .admit_until(
+        loop {
+            self.admission
+                .wait_while_paused(deadline, cancelled)
+                .map_err(service_error)?;
+            let wait = WaitControl::new(deadline, cancelled);
+            let lease = if kind.requires_exclusive_lease() {
+                VaultOperationLease::write(&self.root, &wait)
+            } else {
+                VaultOperationLease::read(&self.root, &wait)
+            }
+            .map_err(|error| {
+                service_error(match error {
+                    taomni_profile_locks::LeaseError::Cancelled => CoreServiceError::Cancelled,
+                    taomni_profile_locks::LeaseError::TimedOut => CoreServiceError::TimedOut,
+                    _ => CoreServiceError::PluginProfileInUse,
+                })
+            })?;
+            match self.admission.admit_until(
                 host,
                 OperationId::parse(uuid::Uuid::new_v4().to_string()).expect("canonical UUID"),
                 kind,
                 lease,
                 deadline,
-            )
-            .map_err(service_error)
+            ) {
+                Ok(permit) => return Ok(permit),
+                Err(CoreServiceError::CoreServiceBusy) if self.admission.is_paused() => (),
+                Err(error) => return Err(service_error(error)),
+            }
+        }
     }
 }
 

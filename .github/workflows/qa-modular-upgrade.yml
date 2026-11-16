@@ -347,6 +347,9 @@ jobs:
           src/components/vault/VaultSetupDialog.test.tsx
           src/components/vault/VaultUnlockDialog.test.tsx
           src/components/vault/StartupVaultUnlockGate.test.tsx
+          src/lib/backupSettings.test.ts
+          src/components/settings/backup/BackupRangeEditor.test.tsx
+          src/components/settings/BackupSettingsPanel.test.tsx
       - name: Plugin protocol unit contracts
         run: cargo test --manifest-path src-tauri/crates/taomni-plugin-api/Cargo.toml --locked
       - name: Native observation unit regressions
@@ -401,6 +404,8 @@ jobs:
               "runtime::bootstrap::tests",
               "runtime::generation::tests",
               "backup::generation_tests",
+              "backup::protected_snapshot_tests",
+              "backup::snapshot_tests",
               "backup::tests::test_backup_restore_replaces_mfa_db_and_keeps_safety_copy",
               "runtime::tasks::tests",
               "runtime::paths::tests",

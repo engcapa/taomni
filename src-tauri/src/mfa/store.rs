@@ -63,19 +63,15 @@ impl MfaStore {
         dest: &Path,
         context: &crate::backup::snapshot_context::SnapshotContext,
     ) -> Result<bool, String> {
-        let mut guard = context.lock(&self.conn)?;
-        if guard.is_none() && !self.path.is_file() {
-            return Ok(false);
+        let guard = context.lock(&self.conn)?;
+        if let Some(conn) = guard.as_ref() {
+            context.snapshot_connection(conn, dest)?;
+            Ok(true)
+        } else {
+            // Backup must not open/migrate a business store or create an
+            // unused database/key. Read-only backup includes committed WAL.
+            context.snapshot_existing(&self.path, dest)
         }
-        if guard.is_none() {
-            *guard = Some(open_db(&self.path)?);
-        }
-        crate::backup::snapshot_context::hot_backup_conn(
-            guard.as_ref().expect("MFA connection initialized"),
-            dest,
-            context,
-        )?;
-        Ok(true)
     }
 }
 

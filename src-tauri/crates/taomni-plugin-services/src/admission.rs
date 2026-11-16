@@ -22,6 +22,7 @@ pub(crate) struct AdmissionData {
     pub generation: ProfileGeneration,
     pub operations: HashMap<OperationId, Arc<ActiveOperation>>,
     pub in_flight: usize,
+    pub paused: bool,
     pub pending_acknowledgements: HashSet<HostInstanceId>,
     pub revocation_hosts: HashSet<HostInstanceId>,
     pub max_in_flight: usize,
@@ -49,6 +50,7 @@ impl OperationAdmission {
                 generation,
                 operations: HashMap::new(),
                 in_flight: 0,
+                paused: false,
                 pending_acknowledgements: HashSet::new(),
                 revocation_hosts: HashSet::new(),
                 max_in_flight: 128,
@@ -105,6 +107,9 @@ impl OperationAdmission {
         }
         if state.mode != AdmissionState::Open {
             return Err(CoreServiceError::VaultLocked);
+        }
+        if state.paused {
+            return Err(CoreServiceError::CoreServiceBusy);
         }
         if state.seen_operations.contains(&operation) {
             return Err(CoreServiceError::DuplicateRequest);

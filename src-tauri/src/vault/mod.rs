@@ -141,7 +141,7 @@ impl Vault {
         context: &crate::backup::snapshot_context::SnapshotContext,
     ) -> Result<(), String> {
         let inner = context.lock(&self.inner)?;
-        crate::backup::snapshot_context::hot_backup_conn(&inner.conn, dest_path, context)
+        context.snapshot_connection(&inner.conn, dest_path)
     }
 
     /// Check if the vault has been initialized (i.e. master password has been set).

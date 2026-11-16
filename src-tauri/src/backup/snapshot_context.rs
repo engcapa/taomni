@@ -30,6 +30,49 @@ impl Default for SnapshotContext {
 }
 
 impl SnapshotContext {
+    /// Snapshot the encrypted database through the shared online-backup
+    /// helper. Keep VACUUM INTO available for its existing consumers/tests.
+    pub(crate) fn snapshot_connection(
+        &self,
+        source: &rusqlite::Connection,
+        target: &Path,
+    ) -> Result<(), String> {
+        taomni_sqlite_snapshot::snapshot_connection(
+            source,
+            target,
+            &Default::default(),
+            &self.snapshot_control(),
+        )
+        .map(|_| ())
+        .map_err(|e| self.snapshot_error(e))
+    }
+
+    pub(crate) fn snapshot_existing(&self, source: &Path, target: &Path) -> Result<bool, String> {
+        taomni_sqlite_snapshot::snapshot_existing(
+            source,
+            target,
+            &Default::default(),
+            &self.snapshot_control(),
+        )
+        .map(|outcome| matches!(outcome, taomni_sqlite_snapshot::SnapshotOutcome::Created(_)))
+        .map_err(|e| self.snapshot_error(e))
+    }
+
+    fn snapshot_control(&self) -> taomni_sqlite_snapshot::SnapshotControl {
+        taomni_sqlite_snapshot::SnapshotControl::new(
+            Instant::now() + Duration::from_secs(300),
+            Arc::new(self.clone()),
+        )
+    }
+
+    fn snapshot_error(&self, error: taomni_sqlite_snapshot::SnapshotError) -> String {
+        if self.cancel.is_cancelled() {
+            "BACKUP_CANCELLED".into()
+        } else {
+            format!("SQLite snapshot: {error}")
+        }
+    }
+
     pub fn hash(&self, path: &Path) -> io::Result<String> {
         use sha2::{Digest, Sha256};
         let mut reader = self.reader(File::open(path)?);
@@ -147,6 +190,12 @@ impl SnapshotContext {
         let result = operation();
         self.check()?;
         result
+    }
+}
+
+impl taomni_sqlite_snapshot::SnapshotObserver for SnapshotContext {
+    fn is_cancelled(&self) -> bool {
+        self.cancel.is_cancelled()
     }
 }
 

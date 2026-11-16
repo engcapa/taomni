@@ -18,7 +18,10 @@ pub(crate) mod services;
 pub use quiescence::QuiescenceGuard;
 mod core_access;
 mod signed_catalog;
+mod snapshot_barrier;
 mod stopping;
+#[cfg(test)]
+pub(crate) mod test_services;
 mod vault_lifecycle;
 pub mod verify;
 

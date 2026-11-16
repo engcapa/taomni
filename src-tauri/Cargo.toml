@@ -82,6 +82,7 @@ serde_json = "1"
 taomni-plugin-api = { path = "crates/taomni-plugin-api" }
 taomni-plugin-services = { path = "crates/taomni-plugin-services" }
 taomni-profile-locks = { path = "crates/taomni-profile-locks" }
+taomni-sqlite-snapshot = { path = "crates/taomni-sqlite-snapshot" }
 taomni-capture = { path = "crates/taomni-capture" }
 taomni-rdp-common = { path = "crates/taomni-rdp-common", features = ["bitmap"] }
 taomni-file-uri = { path = "crates/taomni-file-uri" }

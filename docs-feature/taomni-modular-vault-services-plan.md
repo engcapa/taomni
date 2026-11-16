@@ -260,7 +260,7 @@ host 在认证的 `backup/prepare` 内收到 core 生成的 SnapshotDestinationG
 一次 snapshot：
 
 1. 固定本次 selected dependency closure。选择 MFA 自动选择 Vault；未用过的 MFA 不新建库或 key。
-2. 关闭 affected本地 admission并排空，然后取得 VaultOperationLease exclusive。任何未结束请求取消失败均中止，不发布 archive。
+2. 暂缓 affected 本地的新 admission 并排空，然后取得 VaultOperationLease exclusive。快照的短暂 pause 保留 epoch 和已准入请求，让其正常完成；新请求在取得 OS lease、store/host mutex 之前等待，取消或 drain/ownership 超时中止且不发布 archive。Vault 锁定/改密仍使用撤销/取消屏障，不能把后台快照误报成 Vault 锁定。真实插件后台 writer 的 prepare 协议仍按第 3 步关闭写入。
 3. 本地运行宿主 `backup/prepare`：关闭业务写入门，排空 in-flight和后台 writer，创建 job-scoped barrier token；等待取消/心跳的 pump仍活跃。不把 mutex guard跨 wire或跨 await 保存，而由宿主 store actor/gate持状态。
 4. `backup/snapshot` 在 host连接内产 standalone SQLite快照；core Vault在同一全局 exclusive lease期间产快照。顺序不依赖拿两个 mutex，但统一使用 host DB后 Vault，不违反 MFA→Vault。
 5. core检查完整结果和Vault依赖后 `backup/release`；宿主只接受 matching job/instance/barrier的release，重复release幂等。`Drop`/error/cancel必须release，host或core死则进程/lease清理；旧job不能解开新job的屏障。

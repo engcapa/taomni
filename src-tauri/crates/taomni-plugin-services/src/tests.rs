@@ -12,6 +12,8 @@ const SECOND: &str = "b1234567-1234-1234-1234-123456789abc";
 
 #[path = "revoke_retry_tests.rs"]
 mod revoke_retry_tests;
+#[path = "snapshot_pause_tests.rs"]
+mod snapshot_pause_tests;
 #[path = "termination_tests.rs"]
 mod termination_tests;
 

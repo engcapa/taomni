@@ -223,6 +223,17 @@ fn create_backup_locked(
     // Determine what to include based on scope
     let flags = resolve_scope_flags(scope, custom_options);
 
+    // The global Vault lease precedes mail/store mutexes. Release this short
+    // barrier before ordinary snapshots, packing, encryption and upload.
+    staged_files.extend(super::protected_snapshot::stage(
+        &state.plugins,
+        &state.core.vault,
+        &state.legacy.mfa,
+        &temp_staging_dir,
+        flags,
+        context,
+    )?);
+
     let mail_paths = if flags.mail {
         Some(context.lock(&state.core.mail.mail_archive.changes)?)
     } else {
@@ -253,36 +264,6 @@ fn create_backup_locked(
             archive_path: "databases/notes.db".into(),
             disk_path: snap_dest,
         });
-    }
-
-    // 3. vault.db
-    context.check()?;
-    if flags.vault {
-        let snap_dest = temp_staging_dir.join("vault.db");
-        state
-            .core
-            .vault
-            .backup_to_with_context(&snap_dest, context)?;
-        staged_files.push(StagedFile {
-            archive_path: "databases/vault.db".into(),
-            disk_path: snap_dest,
-        });
-    }
-
-    // 3b. mfa.db (skipped when MFA was never used on this profile)
-    context.check()?;
-    if flags.mfa {
-        let snap_dest = temp_staging_dir.join("mfa.db");
-        if state
-            .legacy
-            .mfa
-            .backup_to_with_context(&snap_dest, context)?
-        {
-            staged_files.push(StagedFile {
-                archive_path: "databases/mfa.db".into(),
-                disk_path: snap_dest,
-            });
-        }
     }
 
     // 4. Config files
