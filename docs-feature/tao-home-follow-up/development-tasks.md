@@ -124,6 +124,7 @@
 - 依据：核对报告问题 10；`home/TaoHomeHost.tsx:65` 在有旧 Key 时两个按钮共用 reuse，保存异常吞掉；`LlmProvidersPanel.tsx:122` 显示内部 id，宿主 PROFILE 默认值写死。
 - `AC-TH-011`：去设置只导航定位，沿用只在显式选择后执行；Vault 锁定/保存失败正确呈现，不丢草稿。provider 使用产品名称；模式、模型、思考/联网、语音、阈值、本地资料/安全中心配置按设计阶段接通，线程覆盖与全局默认优先级明确且可恢复。遵守细化设计 D-14，不擅加自动连通性测试。
 - 验证：V-02/V-03/V-05；复用设置保存与 Vault 路径回归；依赖配置持久化及各能力任务。
+- 2026-11-16 视觉补测：Home 两个设置入口在 1366×768/800×600 截图中仅保留一个 Settings tab，重复标题问题已覆盖；深链到 Tao 设置时，节标题/首行仍会被粘性搜索栏遮住。后续补定位偏移和标题可见性断言，证据为 `output/playwright/tao-feedback-1116/tao-settings-1366.png`，不降低原验收要求。
 
 ### TH-012 · 发送键、平台文案、国际化与浏览器降级
 
@@ -331,7 +332,7 @@
 
 - [ ] **部分完成｜中｜Word 客户端实测新发现**。在 MD-006 的 Word 16.0（build 16.0.20527）验证中，Mermaid 已清晰，但 `$x^2$`、`$$\frac{1}{2}$$` 分别输出了 MathML、TeX annotation、视觉 HTML 三份文字。原始错误产物与修复验证路径见 [11-16 回执](verification-2026-11-16.md)。
 - `AC-MD-007`：普通分数、上下标和根式导出为单份可编辑 Office Math，保留相邻正文和原文；不把隐藏 TeX/辅助 HTML 重复写入 Word。不支持的矩阵/重音等结构明确保留一次完整 TeX，不能悄悄压平成丢失结构的文字。本批不声称已支持全部 MathML 类型的 Word 排版。
-- 实现：`docxMath.ts` 在共享 Word 转换入口消费 KaTeX 语义树；仍保持 docx 懒加载，Notes/文件复用同一实现。验证：真实 DOCX ZIP 单元覆盖分数、脚标/根式、矩阵回退及 DOM 不变；browser FILE004 增加实际 Word 下载，native FILE007 增加独立 OOXML 数量/结构/文字检查；修复后的 Word 实际排版与全平台回归待新构建结果。
+- 实现：`docxMath.ts` 在共享 Word 转换入口消费 KaTeX 语义树；仍保持 docx 懒加载，Notes/文件复用同一实现。验证：真实 DOCX ZIP 单元覆盖分数、脚标/根式、矩阵回退及 DOM 不变；browser FILE004 增加实际 Word 下载，native FILE007 增加独立 OOXML 数量/结构/文字检查。`c460283a3` Windows browser 28/28、native 34/34 通过；Word 16 确认两条可编辑公式，100%/200% 实际排版图单次、清晰。Linux/macOS native 待本轮 workflow 回执，详见 [11-16 回执](verification-2026-11-16.md)。
 
 ## 5. 验证计划与完成口径
 
@@ -381,8 +382,27 @@
 | TH-007 | 已实现核心交互，真实资源边界仍需 native | workspace/terminal/database 资源选择、显式引用、解绑和重绑清理旧 chip；TC-TAO-HOME-003/008 |
 | TH-001/002/003/004 | 已实现协议/流式/取消/线程存储核心，商业服务和 Vault 边界待 native | Messages DTO camelCase/alias、Channel 分片、停止、continue/regenerate、SQLite snapshot/context；TC-TAO-HOME-002/004/005 |
 | MD-001～006 | 共享实现已落地，Word 客户端视觉仍未宣称通过 | TOC 默认关闭、split 拖拽、Live 只读→编辑、Notes Markdown owner、Mermaid 独立预览主题、DOCX 高清采样；TC-FILE-OPEN-004/013、TC-NOTES-008/009/012/014、focused Vitest |
-| WSL/SidePanel | 已实现并验证 | WSL 无 distro 时无按钮/安装提示；SidePanel 图标、tooltip、拖拽、收缩/展开、X 关闭；TC-TAO-HOME-006/007 |
+| WSL/SidePanel | 已实现；最新截图交互验证见下节 | WSL 无 distro 时无按钮/安装提示；最新反馈用顶部单图标直接开关替代原 X/收缩按钮，拖拽须同步改变聊天区；TC-TAO-HOME-006/007/012 |
 
 最新本地验证：13 个 frontend focused test files / 39 tests 通过；Tao Rust focused suite（关闭 whisper 默认 feature 以绕过既有 Windows MD/MT 链接冲突）17 tests 通过；`cargo check --lib`、`cargo fmt -- --check`、`tsc -b --force`、`pnpm build` 通过；`qa_ui_auto audit --gate` 通过（global shallow 与基线相同）。Windows browser 受影响批次除一次旧 Vite 服务失效造成的重跑外均通过，TC-TAO-HOME-007 最新 run 通过；TC-TAO-HOME-003/008 在稳定 Vite 上的最终回执和 native 回执写入本节后再关闭。
 
 完整 AC 仍按原表保留“部分/待办”口径：真实商业 DeepSeek、Vault/代理故障、Word 客户端 100%/200% 视觉、macOS AppKit 菜单以及 Linux/macOS hosted browser/native 尚未以回执关闭。临时 DeepSeek key 只从 `C:\tmp\ds-key-tmp.txt` 读取，fixture 在 teardown 删除隔离 `ai.json`；401/403 或明确过期只记 `credential-invalid` 成功并保留脱敏原因，其他错误仍失败。
+
+## 8. 2026-11-16 追加截图与真实服务验证
+
+本节记录后续用户反馈，覆盖早期侧栏“折叠条 + X 关闭”的交互预期。
+
+- TH-009/014：快捷问答在聊天列内居中，四项保持单行；空间不足时文案省略，tooltip 保留全文，不能隐藏后两项或引入横向滚动条。侧栏使用实际并排布局，拖拽同步缩放聊天列；原更多按钮改为侧栏图标，点击直接打开、再次点击完全收起，并记住上次页签及宽度。移除面板内部重复的收缩/关闭行；记忆与技能使用不同语义图标。设置、外观、演示模式保留可见独立入口。
+- 保留行为：聊天内容、未发送草稿和既有 provider 调用不被侧栏开关改变；八个原面板入口、导入导出、演示模式/F9、两种 Settings 导航继续可达。关闭恢复完整聊天宽度；拖拽取消/失焦/关闭后释放监听，键盘调整及窗口缩小时保留可用聊天宽度。
+- TH-001/003/004/016：商业 DeepSeek 测试由 TC005 扩展至 TC011/013；合计一次整批最多八次真实请求，使用用户临时 Key，遵守总预算 1M tokens。TC011 验证真实多轮、草稿多语言、重新生成、新建隔离、流式侧栏布局和 Stop；TC013 验证实际 Markdown、native 分支上下文及原会话/分支历史和草稿。不可用 loopback 服务替代这些商业场景。
+- 已执行：最新 Windows browser **30/30**（完整适用 crash 18 项），匹配 QA release 的商业 native TC011/013 **2/2**（七次真实请求）通过，分别为 `scenarios-complete` / `documents-complete`，未命中失效 Key 分支。旧截图中发现回复未滚入视口，已增加 feed 跟随与读者向上浏览保护；新回执独立检查 Stop 卡片、Markdown 回复和历史尾部实际可见。完整 Windows native 36 项及最新 Linux/macOS hosted 整批继续执行，详见验证记录。
+
+macOS FILE013 已定位为 QA bridge 未模拟应用请求的 pointer capture，拖拽离开 7px separator 后事件落到预览区，ratio 保持 50。补充 bridge 捕获路由及取消/异常恢复单元，保留原几何断言；真实 hosted WKWebView 通过前不关闭该缺口。原型全面视觉对齐继续排在本批反馈和待办之后。
+
+提交：`89a0ed2e2` 为 QA pointer capture，`801a4132c` 为本批 Home 布局、feed 跟随及商业回归扩展。代码已推送，Linux/macOS 使用 [43789929072](https://github.com/engcapa/taomni/actions/runs/43789929072) 的 browser/native release 测试；商业 Key 仅在 Windows 本机读取执行。上一源码 `38623c5f3` 的 Linux native 为 31/32，其中 TH003 在平滑滚动中提前检查标题；本批增强等待为“标题完整进入设置视口且避开搜索栏”，没有降低最终几何要求。
+
+TH-032 保留回归补充：`801a4132c` 的 Linux/macOS browser 已分别 30/30、31/31 通过；Windows native 为 35/36，FILE007 原生选择器的路径输入不完整仍须复跑。旧 macOS FILE011 另确认文件链接打开后的多次延迟激活会覆盖用户已切回终端的选择，新增两项 unit 均先复现失败，再删除延迟抢焦点；相关 34 unit tests 通过。FILE011 增强“切回后超过 3 秒仍活动”的真实 native 断言，新的匹配构建与最终整批执行前不关闭此项。
+
+焦点修复提交为 `ed351a7c9`：Windows browser 已重跑 **30/30**，新的匹配 QA release 构建和静态 audit 通过，后续 native 回执以[验证记录](verification-2026-11-16.md)为准。当前源码的 Linux/macOS 工作流为 [43791999859](https://github.com/engcapa/taomni/actions/runs/43791999859)。
+
+Windows 保存对话框的全局模拟送键丢字已用原生控件逐字输入及读回确认修正；最后 FILE007/011 native probe **2/2**、30 项对话框工具单元和 refactor 检查通过，实际四种导出及取消结果均保留原要求。完整 Windows browser/native 与新 runner 的 hosted 回执继续执行，不将 probe 结果等同于完整 TH-032 验收。具体失败保留、输入边界及匹配构建身份见[验证记录](verification-2026-11-16.md)。

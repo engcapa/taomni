@@ -25,25 +25,13 @@ public static class QaFolderDialog {
     [DllImport("user32.dll")] static extern IntPtr GetFocus();
     [DllImport("user32.dll")] static extern bool AttachThreadInput(uint from, uint to, bool attach);
     [DllImport("kernel32.dll")] static extern uint GetCurrentThreadId();
-    [DllImport("user32.dll", SetLastError = true)] static extern uint SendInput(uint count, Input[] inputs, int size);
     [DllImport("user32.dll", EntryPoint = "SendMessageTimeoutW", CharSet = CharSet.Unicode, SetLastError = true)]
     static extern IntPtr ReadTextMessage(IntPtr window, uint message, UIntPtr capacity, StringBuilder text,
                                         uint flags, uint timeout, out UIntPtr result);
     [DllImport("user32.dll", EntryPoint = "SendMessageTimeoutW", CharSet = CharSet.Unicode, SetLastError = true)]
     static extern IntPtr SendControlMessage(IntPtr window, uint message, UIntPtr wParam, IntPtr lParam,
                                             uint flags, uint timeout, out UIntPtr result);
-    [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
-    [StructLayout(LayoutKind.Sequential)] struct MouseInput {
-        public int x, y; public uint data, flags, time; public UIntPtr extra;
-    }
-    [StructLayout(LayoutKind.Sequential)] struct KeyInput {
-        public ushort key, scan; public uint flags, time; public UIntPtr extra;
-    }
-    [StructLayout(LayoutKind.Explicit)] struct InputData {
-        [FieldOffset(0)] public MouseInput mouse;
-        [FieldOffset(0)] public KeyInput keyboard;
-    }
-    [StructLayout(LayoutKind.Sequential)] struct Input { public uint type; public InputData data; }
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern bool PostMessage(IntPtr window, uint message, IntPtr wParam, IntPtr lParam);
     public static string Text(IntPtr window) {
         var value = new StringBuilder(32768); GetWindowText(window, value, value.Capacity); return value.ToString();
     }
@@ -164,10 +152,6 @@ public static class QaFolderDialog {
         return true;
     }
 
-    private static Input Key(ushort key, ushort scan = 0, uint flags = 0) {
-        return new Input { type = 1, data = new InputData { keyboard = new KeyInput { key = key, scan = scan, flags = flags } } };
-    }
-
     private static string EditText(IntPtr edit) {
         // GetWindowText cannot read another process's Edit contents. WM_GETTEXT
         // is marshalled by Windows and observes the actual native field value.
@@ -177,6 +161,22 @@ public static class QaFolderDialog {
             throw new InvalidOperationException("Owned chooser folder field did not respond to WM_GETTEXT");
         }
         return value.ToString();
+    }
+
+    private static void WaitForText(IntPtr dialog, IntPtr edit, string expected) {
+        var deadline = DateTime.UtcNow.AddSeconds(2);
+        string actual;
+        do {
+            if (!Open(dialog) || GetForegroundWindow() != dialog || GetFocus() != edit) {
+                throw new InvalidOperationException("Owned chooser lost foreground during path input");
+            }
+            actual = EditText(edit);
+            if (actual == expected) return;
+            Thread.Sleep(10);
+        } while (DateTime.UtcNow < deadline);
+        // Never replay an unacknowledged keystroke: a delayed character could
+        // otherwise be duplicated, or input could reach another application.
+        throw new InvalidOperationException("Chooser did not acknowledge path input. Expected: " + expected + "; actual: " + actual);
     }
 
     private static void EnterPath(IntPtr dialog, IntPtr edit, string path) {
@@ -192,27 +192,35 @@ public static class QaFolderDialog {
             if (GetForegroundWindow() != dialog || GetFocus() != edit) {
                 throw new InvalidOperationException("Owned chooser folder field did not receive native focus");
             }
+            TypePath(dialog, edit, path);
         } finally { AttachThreadInput(currentThread, ownerThread, false); }
-        // Real keyboard input is required: WM_SETTEXT changes the rendered
-        // Edit text but leaves IFileDialog's internal selection unchanged.
+    }
+
+    private static void TypePath(IntPtr dialog, IntPtr edit, string path) {
+        // Send native character events to the verified owned Edit. WM_SETTEXT
+        // only changes its appearance; WM_CHAR also updates IFileDialog's
+        // internal selection. Do not route text through a global keyboard
+        // queue, where the shell's autocomplete can discard queued keys.
         UIntPtr selectResult;
-        SendControlMessage(edit, 0x00B1, UIntPtr.Zero, new IntPtr(-1), 2, 1000, out selectResult);
-        var clear = new Input[] { Key(0x08), Key(0x08, 0, 2) };
-        if (SendInput(2, clear, Marshal.SizeOf(typeof(Input))) != 2) {
+        if (SendControlMessage(edit, 0x00B1, UIntPtr.Zero, new IntPtr(-1), 2, 1000, out selectResult) == IntPtr.Zero) {
+            throw new InvalidOperationException("Native chooser could not select the filename");
+        }
+        if (!PostMessage(edit, 0x0102, new IntPtr(0x08), new IntPtr(1))) {
             throw new InvalidOperationException("Native chooser could not clear the filename");
         }
-        Thread.Sleep(50);
+        WaitForText(dialog, edit, "");
+        var expected = new StringBuilder();
         foreach (char character in path) {
             if (GetForegroundWindow() != dialog) {
                 throw new InvalidOperationException("Owned chooser lost foreground during path input");
             }
-            var values = new Input[] { Key(0, character, 4), Key(0, character, 6) };
-            if (SendInput(2, values, Marshal.SizeOf(typeof(Input))) != 2) {
-                throw new InvalidOperationException("Native chooser keyboard input was not delivered completely");
+            if (!PostMessage(edit, 0x0102, new IntPtr(character), new IntPtr(1))) {
+                throw new InvalidOperationException("Native chooser could not receive a character event");
             }
-            // Let the shell's filename autocomplete process each character.
-            // A single unpaced array can lose characters in long owned paths.
-            Thread.Sleep(5);
+            // Read back each character before sending another. Never click
+            // Save when the actual field does not match the complete path.
+            expected.Append(character);
+            WaitForText(dialog, edit, expected.ToString());
         }
         var deadline = DateTime.UtcNow.AddSeconds(5);
         while (EditText(edit) != path && DateTime.UtcNow < deadline) Thread.Sleep(50);

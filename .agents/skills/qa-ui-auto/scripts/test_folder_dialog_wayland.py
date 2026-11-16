@@ -1,5 +1,5 @@
 """Owned chooser selection/cancel and failures on the native Wayland transport."""
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from types import SimpleNamespace
 from unittest import TestCase
 from unittest.mock import patch
@@ -23,7 +23,7 @@ class WaylandFolderDialogTests(TestCase):
         result = self.operate()
         self.assertEqual(result["pid"], 123)
         self.assertEqual(command.call_args_list[1].kwargs,
-                         {"application": "/qa/taomni", "title": "Select folder to open"})
+                         {"application": str(Path(self.ctx.session.application).resolve()), "title": "Select folder to open"})
         self.assertEqual(command.call_args_list[2].kwargs, {"chords": [[0xff1b]]})
 
     @patch.object(helper.time, "sleep")
@@ -35,7 +35,7 @@ class WaylandFolderDialogTests(TestCase):
                     return self.window
                 raise RuntimeError("found 0")
         command.side_effect = respond
-        self.operate(Path("/qa/project with spaces"))
+        self.operate(PurePosixPath("/qa/project with spaces"))
         inputs = [(c.args[0], c.kwargs) for c in command.call_args_list if c.args[0] in {"text", "keys"}]
         self.assertEqual(inputs, [("keys", {"chords": [[0xffe9, 0xff50]]}),
                                   ("keys", {"chords": [[0xffe3, ord("l")]]}),
@@ -55,7 +55,7 @@ class WaylandFolderDialogTests(TestCase):
                     return self.window
                 raise RuntimeError("found 0")
         command.side_effect = respond
-        helper.operate(self.ctx, Path("/qa/exports/native.html"), "Save as", kind="save")
+        helper.operate(self.ctx, PurePosixPath("/qa/exports/native.html"), "Save as", kind="save")
         inputs = [(c.args[0], c.kwargs) for c in command.call_args_list if c.args[0] in {"text", "keys"}]
         self.assertEqual(inputs, [("keys", {"chords": [[0xffe3, ord("l")], [0xffe3, ord("a")], [0xff08]]}),
                                   ("text", {"text": "/qa/exports/native.html"}),

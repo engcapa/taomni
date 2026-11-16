@@ -138,3 +138,135 @@ macOS pointer bridge 的事件序列与 browser 首次 Vault 等待属于 QA 工
 不改变产品用户流程；复用 FILE013、NOTES008 和既有 Vault/完整 crash 用例验证，
 不为同一行为创建重复产品用例。native bridge 是构建输入，已启动重新构建，
 不会用上批源码身份冒充修复后的通过结果。
+
+## `c460283a3` 最终 Windows 与 Word 结果
+
+本批为 `658d6e363`（QA pointer/Vault 等待）和 `c460283a3`（Word 公式），均已推送。
+新的隔离 QA release source SHA-256 为
+`bbd09b48d7dfd23071f6c8b1b8d4b8ceb638fb4f508499446e37c34155441741`，
+binary SHA-256 为
+`ec792c66860ae0d3b9d0236f8e33dac1065aa9274576ebb07d5cc421fba989d2`。
+Node 22.23.5/pnpm 10；生产 frontend build、refactor 边界检查和 native release 构建通过。
+
+| 平台/模式 | 实际结果与报告 |
+|---|---|
+| Windows browser | **28 passed / 0 failed / 0 skipped**，239.3 秒；`C:/tmp/tqa-final-browser-1116/run-20261116-082719-425733400` |
+| Windows native | **34 passed / 0 failed / 0 skipped**，889.4 秒；`C:/tmp/tqa-final-native-1116/run-20261116-083020-686697700` |
+| Linux browser | hosted `43780650689` 两个 raw summary 合计 **28 passed / 0 failed / 0 skipped** |
+| macOS browser | 同 run 两个 raw summary 合计 **29 passed / 0 failed / 0 skipped**，包括 MAC003 |
+| Linux/macOS native | 同 run 的匹配 release/执行仍在进行，以后续 raw summary 和完整汇总为准 |
+
+以上已完成的四组均 source stable、同一 source SHA。Windows status 独立验收接受
+28 个 browser 与 34 个 native 回执，没有 rejected report；含全部适用 crash-regression
+（browser 18 项，native 22 项）及受影响特性。首轮重跑遇到已停止的 Vite 服务，
+在页面打开阶段连接失败并停止；该日志/目录保留，恢复并确认 Node 22 Vite 服务当前
+checkout 后才获得本表最终结果，不把环境失败算成通过。
+
+商业 DeepSeek TC005 正常完成，助手长度 35、一个 fulfilled IPC、无错误、停止生成；
+脱敏日志 `request_prepared → response-complete → fixture_cleaned`。本批没有命中
+credential-invalid 成功分支。临时 key 及 SSH 密码均从用户指定本机文件内存读取。
+FILE007 原生产物具有 **2 个 Office Math 公式**（sSup/f），明确检查文本没有重复层；
+Mermaid SVG 引用及约 300 DPI 回退不变。FILE004 真实 browser DOCX 另经 ZIP/公式
+独立检查，也为两份单次语义公式；不以 ZIP 文件名代替该检查。
+
+重新在 Word 16.0.20527 打开本批 native DOCX，Word 确认 `OMaths.Count = 2`。
+实际分页/PDF 排版及 100%/200% 图已检查：上标和分数只出现一次，节点、细框、箭头
+清晰；SVG 显示 482.25×50.25 pt，无正文裁切或图像拉伸。证据在
+`output/pdf/tao-home-word-math-20261116/`；源文件 SHA-256
+`30578d130eff37f46e489f87e6bc442f9ab05b1cbcca38a47afa5de6be3b016e`
+保持不变，独立 Word 已退出。仍限于代表流程图/A4/该 Word 版本的排版，未据此关闭
+MD-006 的全部长图/中文/class/ER/纸张组合。
+
+补充浏览器视觉证据在 `output/playwright/tao-feedback-1116/`：实际从 Home 界面设置
+和更多菜单的 Tao 设置进入，1366×768 与 800×600 均只有一个可见 Settings tab。
+Home 小窗 host 的 client/scroll 尺寸均为 750×534，无滚动溢出，建议不出现滚动条，
+未显示 WSL 安装提示。没有与高保真原型做本轮全状态对齐验收。
+另外定位到 TH-011 的保留缺口：Tao 设置的深链跳转会把节标题/首行置于粘性搜索栏后方，
+已保留截图和待办；不能把单 tab 通过扩大为设置页全部视觉通过。
+
+GitHub 当前执行：[43780650689](https://github.com/engcapa/taomni/actions/runs/43780650689)，
+head `c460283a35951bab958c990c9c19c498627a7e07`，明确选择 Linux/macOS browser/native、
+release、受影响案例及自动附带的完整 crash suite；MAC001/002/003 也纳入，
+商业 key 用例只在 Windows 实机执行。macOS native 的桥接事件、AppKit 菜单对象与
+OS 全局按键/菜单点击仍按既有边界分别记录。
+
+## 商业 DeepSeek 扩展与最新截图反馈
+
+TC-TAO-HOME-011 首批真实 Windows native 执行：
+`C:/tmp/tqa-real-deepseek-scenarios-1116/run-20261116-092006-516896100`，
+**1 passed / 0 failed / 0 skipped**，source stable，source SHA-256
+`51287d182a49864190f746cc7368fc4774cab493863a177855b9f4c7dd53b3bf`。
+脱敏产物 `real-provider-scenarios.json` 为 `scenarios-complete`，四次真实商业请求均 fulfilled：
+
+- 随机 token 首轮回复、第二轮仅凭上一轮上下文回忆及重新生成均正确，消息数保持 2/2。
+- 中文/英文切换保留未发送草稿，期间没有新增付费调用；新会话消息与草稿为空。
+- 第四次真实流式调用收到部分正文后停止，一个 Stop IPC 完成，保留 305 字符部分回复，
+  后续 1 秒内容及调用数稳定，未自动重发。前三次完整回复分别报告 98/132/132 tokens；
+  被停止请求未返回 usage，不能把已知合计 362 当成该轮总用量。
+- Key 未失效；日志为 `request_prepared → scenarios-complete → fixture_cleaned`。
+  此批尚无侧栏布局步骤和 TC013，不能冒充其通过证据；真实服务端 socket 关闭继续由
+  loopback native TC002/009 的独立观察补充。
+
+用户最新截图指出四项建议换行、侧栏覆盖聊天区、重复图标与重复关闭行。
+已把侧栏从 absolute 覆盖改为并排布局，拖拽同步改变聊天列；更多弹层改为顶部单图标
+直接开关，保留上次页签/宽度，删除面板内重复关闭/收缩行。记忆与技能图标分开；
+Tao 设置、外观和演示模式为独立入口。建议行按 Composer 居中，四项同排，长文字省略，
+保留完整中英文 tooltip；不再按窗口高度隐藏后两项。
+
+Windows browser focused：
+`C:/tmp/tqa-sidebar-browser-1116/run-20261116-093702-414879600`，
+**6 passed / 0 failed / 0 skipped**，source stable。
+TC001/003/006/007/010/012 验证模式/历史/搜索/演示、设置复用、WSL、八个语义页签、
+真实指针与键盘调整、聊天与侧栏不重叠和总宽度守恒、重复开关恢复，以及 1366×768/
+800×600、中英文四项建议同排与长文省略。新增 frontend 两文件 12 tests、Python
+29 tests 与 pointer activation Node 8 tests 通过。工具 schema/契约首次拒绝的日志保留；
+修正只读选择器及检查点映射后才获得本批执行结果，不将静态预检算成执行通过。
+
+38623 的 hosted browser 原始汇总已下载核对：run
+[43784592897](https://github.com/engcapa/taomni/actions/runs/43784592897)，
+Linux **29/29**、macOS **30/30**，source stable；该批不包含最新侧栏产品改动。
+Linux/macOS native 继续等待各自原始报告。此前 c460 的 macOS FILE013 事件原件显示
+ratio 为 50，pointerdown 后的 move 落到 preview 而非应用捕获的 separator。QA bridge
+增加仅限当前 action 序列的 capture 路由，并在取消/异常时恢复原 API；Node 单元通过
+仍不能代替新的真实 WKWebView 回执。新 UI 的匹配 release、TC011 新流式侧栏步骤、
+TC013 商业 Markdown/分支/历史，以及最后输入的完整 crash/受影响跨平台整批待继续执行。
+
+## 最新截图修复与真实回复的视口验收
+
+本批提交 `89a0ed2e2`（QA pointer capture）及 `801a4132c`（Home 布局、feed 跟随、商业用例），已推送到 `feat/tao-home-follow-up`。匹配 Windows QA release 的 source SHA-256 为 `55a25f84ff52b931098cafe2f68a453db045e7746b1b20767ef80d69eed093dd`，binary SHA-256 为 `f825ebf639725e92a9428965b35021378fdfeaec0d2061689e5a68144f686a00`，应用 ID 为 `com.taomni.app.qa`。
+
+| 执行范围 | 实际结果 |
+|---|---|
+| Windows browser 完整适用 crash 与受影响功能 | **30 passed / 0 failed / 0 skipped**，111.9 秒，source stable；`C:/tmp/tqa-feedback-final-browser-1116/run-20261116-095846-710927700`，含全部 18 项适用 crash，用独立 status 验收接受 30 个 browser 回执，无 rejected report |
+| Windows native 商业扩展 TC011/013 | **2 passed / 0 failed / 0 skipped**，72.7 秒，source stable；`C:/tmp/tqa-real-deepseek-follow-1116/run-20261116-100143-542800400`，七次实际商业请求均完成，无失效 Key 分支 |
+| Windows native 本批整批 | **35 passed / 1 failed / 0 skipped**，944.0 秒，source stable；`C:/tmp/tqa-feedback-final-native-1116/run-20261116-100410-454938300`。全部 Tao（含 TC005/011/013）及 SSH/SFTP 通过；FILE007 的原生保存选择器输入将 `C:` 变为 `C`，完整字符串保护正确拒绝继续，保留失败原件，后续复跑，整批不计全通过 |
+| Linux/macOS browser | [43789929072](https://github.com/engcapa/taomni/actions/runs/43789929072)，head `801a4132c`；Linux **30/30**、macOS **31/31**，原始 summary、receipt、全部所列产物哈希、源码/runner/case 身份独立校验一致 |
+| Linux/macOS native release | 同 run 的两平台构建/执行仍在进行；未据 browser 通过或绿色 job 关闭 native |
+
+实际 native 截图先暴露了长 prompt 后的回复/Stop 卡片留在屏幕外的问题，旧图保留。新增 feed owner 跟随流式正文、Markdown 后续排版和侧栏宽度；读者向上翻阅时停止跟随，回到末尾恢复，切历史显示尾部，inactive/unmount 释放 observer/帧。新 TC011/013 不主动滚动，通过实际 feed 高度、尾部间距与目标上下边界检查：Stop 卡片、Markdown 回复、恢复历史的尾回复均完整进入视口，三个观测点 gap 都为 0。已人工查看新 `real-stopped.png` 和 `real-markdown.png`，侧栏并排、卡片与回复可见，四项建议保持单行省略，没有底部横向滚动条。
+
+商业场景进一步确认中英文切换保留草稿、不额外调用，重新生成不重复消息，新建隔离，native clone 后分支能回忆不可预知 token，返回原会话和分支各自恢复正确消息数与草稿，历史操作没有自动发送。TC013 首次失败是 CSS selector 把分支标题的 `·` 编为 JSON 的 `\uXXXX`，修正为实际 Unicode 并补真实 DOM selector 单元；旧失败回执保留。调用为合成短提示，消耗远低于 1M 预算；被停止请求没有完整 usage，不声称掌握本轮累计精确 token。
+
+本批 10 个 frontend test files / 47 tests、Python 31 tests、Node pointer 8 tests、`pnpm check:refactor`、QA audit、生产 frontend 和 QA release 构建通过。静态 audit 为 760 个 case、catalog up to date、无覆盖回退，未将既有全局覆盖缺口或静态检查当作产品执行通过。
+
+上批 `38623c5f3` 的 Linux native 四个原始 summary 为 **31/32**；FILE011 和 Vault TC009 已通过，唯一失败是 TH003 在平滑滚动尚未完成时执行视口断言。原等待仅要求标题在搜索栏下方，屏幕外的标题也可提前满足。本批补充“标题底边在设置视口内”的联合等待条件，保留独立最终几何检查，后续新 Linux native 回执通过前不将此项记为关闭。旧 macOS FILE013 的 capture 问题也继续以新 WKWebView 实际执行为准。
+
+以上为本批反馈与具名场景验收，不扩大为全部 TH/MD AC、全原型视觉或 macOS OS 全局输入/交通灯交互已经完成。
+
+## 回归中发现的终端文件链接焦点问题
+
+旧 macOS FILE011 原始事件显示，用户已经点击终端 tab，随后又显示文件页。生产 `fileLinks.ts` 在一次打开结束后，仍于 50/250/1000/3000ms 强制激活查看器；全局 `openFile` 的重复打开分支也有无条件的下个 task 激活，都会覆盖之后的手动导航。这是产品焦点所有权缺陷，不通过增加点击/等待来规避。
+
+先加入两个 store/链接边界回归，在旧实现上得到 **2 failed / 9 passed**，均证明手动选择 terminal 后又变回 viewer（`terminal-focus-before-1116.log`）。修复删除两处延迟抢焦点，让共享打开服务只在该次打开时负责去重与激活；同一组为 **11/11**，全部 openFile 相关 6 files / **34 tests** 通过。TC-FILE-OPEN-011 增加手动返回后超过原 3 秒窗口仍保持终端活动的独立断言，保留第二次实际 modifier-click、只一 viewer、磁盘字节和关闭后 PTY 仍可执行的检查。新的匹配 QA release、browser 与完整 native/hosted 回执继续跟进；本节之前的 `801a4132c` 证据保留为该源码批次，不能冒充此修复后的当前源码通过。
+
+修复提交为 `ed351a7c9`，已推送。该源码 Windows browser **30/30**、121.0 秒、source stable：`C:/tmp/tqa-terminal-focus-final-browser-1116/run-20261116-102350-880133900`，独立 status 接受全部 30 个 browser 回执且无 rejected report；完整适用 crash 18 项包含在内，QA audit 亦通过。新 QA release 的 source SHA-256 为 `1a7e311db927b39e05cd80731117e636329e93e24825966445f1a6a37dcb5446`、binary SHA-256 为 `efbf4cf3628f4c114ddf0a139229bd90d200572fdf7043520ac0d93674963911`，`com.taomni.app.qa` 身份已由构建工具生成。FILE007/011 定向 native 与之后的完整 native 使用此构建。Linux/macOS 当前源码执行为 [43791999859](https://github.com/engcapa/taomni/actions/runs/43791999859)；未将仍在进行的 `801a4132c` native 构建结果当成本提交执行通过。
+
+## Windows 系统保存对话框输入修正
+
+`ed351a7c9` 的首次 FILE007/011 native probe 为 **1 passed / 1 failed**：FILE011 通过，FILE007 的保存路径由 `C:\tmp` 丢字成 `C:\tp`。报告保留在 `C:/tmp/tqa-terminal-focus-probe-1116/run-20261116-103030-802960700`。逐字确认后仍复现原生全局送键遗漏，后续失败原件为同目录的 `103628-420690300`、`103857-458768400`、`104146-758306800` 各 run；没有放宽完整路径或产物断言。
+
+最终 helper 向经过进程/窗口/控件归属核验的原生 Edit 发送 Unicode `WM_CHAR`，逐字通过 `WM_GETTEXT` 确认；全选清空也读回确认，并在输入期间保留线程焦点归属检查。原生 Save/Cancel 按钮及真实插件返回仍由系统对话框处理；不改写 plugin-dialog 返回、不用 `WM_SETTEXT` 模拟内部选择、不重播未确认字符，也不操作剪贴板。该证据证明实际系统控件与磁盘导出路径，不声称硬件键盘送达。
+
+最终 probe：`C:/tmp/tqa-terminal-focus-probe-1116/run-20261116-104357-778679300`，**2 passed / 0 failed / 0 skipped**，66.1 秒，source stable。FILE007 的五次原生操作（HTML/PNG/DOCX 保存、Markdown 目录选择、输入路径后取消）全部完成，真实媒体/公式/源文件保留断言通过；FILE011 的 modifier-click、重复打开、手动切回后等待 3.2 秒及 live PTY 均通过。产品 source/binary 与上一节相同，`native_build.py --release --check` 确认可复用；runner SHA-256 为 `917de2316d852b65f399c638a7dde615020342cc690b83ed2cf417ba2516fc0d`。
+
+对话框 Python 单元 **30/30**、PowerShell 内嵌 C# 编译、`pnpm check:refactor` 均通过。相关跨平台测试采用显式 POSIX fixture 路径，并在 Windows 无 symlink 权限时使用真实 NTFS junction 验证逃逸拒绝，没有跳过该边界。最终 30 项 browser / 36 项 native 整批已启动；此前同产品 source 的 Linux browser **30/30**、macOS browser **31/31** 回执保留为旧 runner 批次，最新 runner 的最终跨平台回执另记。
