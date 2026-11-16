@@ -15,6 +15,9 @@ on:
         type: string
         required: false
         default: ''
+      system_execution_only:
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -59,6 +62,7 @@ jobs:
           if-no-files-found: error
 
   hello-plugin:
+    if: ${{ !inputs.system_execution_only }}
     name: hello-plugin (${{ matrix.os }})
     strategy:
       fail-fast: false

@@ -45,7 +45,9 @@ needs its matching hosted case result.
 
 ## macOS G1 experiment and release boundary
 
-`QA Modular Plugin Host Gates` now includes a macOS Intel experiment with the
+The registered `QA Modular Upgrade Contracts` workflow exposes
+`system_execution_only=true` and calls `QA Modular Plugin Host Gates` for a
+macOS Intel experiment with the
 actual production process adapter, hello executable and real MFA SDK host.
 The experiment signs its test app and both hosts ad-hoc with hardened runtime
 enabled, verifies the signatures and runtime flags, sets and reads back the
