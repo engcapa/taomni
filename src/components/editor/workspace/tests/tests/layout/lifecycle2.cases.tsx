@@ -282,7 +282,7 @@ end_of_record
 
       fireEvent.click(caseContext.workspaceTestHarness.toolbarControl("code-workspace-split-right"));
       await waitFor(() => expect(screen.getAllByTestId("code-workspace-editor-pane")).toHaveLength(2));
-      const panes = await findEditorPanes();
+      const panes = await findEditorPanes(2);
       const secondView = EditorView.findFromDOM(panes[1]!.querySelector(".cm-editor")!)!;
       act(() => {
         secondView.dispatch({ selection: EditorSelection.cursor(10) });

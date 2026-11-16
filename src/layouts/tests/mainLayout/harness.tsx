@@ -420,7 +420,12 @@ vi.mock("../../../stores/vaultStore", () => ({
         refresh: vaultMock.refresh,
         unlock: vaultMock.unlock,
       }),
-    { getState: () => ({ state: vaultMock.state }) },
+    {
+      getState: () => ({ state: vaultMock.state }),
+      // Shell tests control the gate directly; store subscriptions have their
+      // own behavior tests in vaultStore/mfaStore.
+      subscribe: vi.fn(() => () => undefined),
+    },
   ),
 }));
 
