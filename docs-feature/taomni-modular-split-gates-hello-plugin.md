@@ -80,3 +80,28 @@ hardened runtime for a self-signed certificate because bundled Kerberos dylibs
 lack an Apple Team ID (`scripts/configure-release-signing.mjs`); that difference
 must be resolved and tested on the actual release bundle before closing G1.
 The experiment neither imports a private key nor changes system trust/TCC.
+
+## Windows G3 execution experiment
+
+The same registered `system_execution_only=true` entry now also runs a
+Windows experiment. It builds the actual production process adapter harness
+and hello/MFA executables, copies them into a run-owned directory under real
+`LOCALAPPDATA`, and writes and independently reads back an Internet-zone
+`Zone.Identifier` ADS on each host. PowerShell records each executable's
+actual Authenticode status and the runner's Defender/SmartScreen configuration
+before and after execution. Missing protection APIs or registry values remain
+explicitly unavailable; the experiment never changes protection settings.
+
+Both actual Rust scenarios must pass: hello handshake/ping and confirmed exit,
+and MFA initialization/add/HOTP `755224` and confirmed exit through the real
+SDK. The evidence checks that executable hashes and download marks remain
+unchanged. Failure and timeout logs and the unsuccessful receipt are retained.
+The artifact is `modular-system-execution-windows`.
+
+This is an unsigned process experiment with a synthetic Internet-zone ADS,
+not a browser download, full installed release, Authenticode trust or a
+SmartScreen reputation measurement. Those boundaries stay `unverified` in
+the receipt even when both scenarios pass. No new product UI is introduced;
+the retained UI coverage is TC-MODULES-007/016/022 plus the complete crash
+suite. Local tool unit tests mock every process; real Windows execution is
+restricted to disposable GitHub runners and is pending for this source.

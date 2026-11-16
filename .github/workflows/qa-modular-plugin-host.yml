@@ -27,6 +27,40 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  windows-system-execution:
+    name: Windows unsigned download-marked hosts and protection observations
+    runs-on: windows-latest
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: bash
+    env:
+      PYTHONPATH: .agents/skills/qa-ui-auto/scripts
+      PYTHONUTF8: '1'
+      PYTHONIOENCODING: utf-8
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head || github.sha }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: modular-system-execution-windows
+      - name: System experiment tool unit contracts
+        run: python -m unittest test_module_windows_execution
+      - name: Build the actual hello and MFA hosts without signing credentials
+        run: cargo build --manifest-path src-tauri/Cargo.toml -p taomni-hello-plugin -p taomni-plugin-mfa --bins --locked
+      - name: Observe actual Authenticode and protection state and execute Internet-zone hosts
+        run: python scripts/run-module-windows-execution-gates.py --evidence qa-modular-windows-execution
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: modular-system-execution-windows
+          path: qa-modular-windows-execution
+          if-no-files-found: error
+
   macos-system-execution:
     name: macOS ad-hoc hardened runtime and quarantined hosts
     runs-on: macos-15-intel

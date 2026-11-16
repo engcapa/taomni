@@ -4,11 +4,15 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import sys
 import tempfile
 import unittest
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[4]
+sys.path.insert(0, str(ROOT / "scripts"))
+import module_system_execution as shared
+
 SPEC = importlib.util.spec_from_file_location("module_system_gate", ROOT / "scripts/run-module-system-execution-gates.py")
 gate = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(gate)
@@ -52,12 +56,12 @@ class SystemExecutionGateTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary)
             result = subprocess.CompletedProcess(["inert"], 23, "stdout", "stderr")
-            with patch.object(gate.subprocess, "run", return_value=result) as execute:
+            with patch.object(shared.subprocess, "run", return_value=result) as execute:
                 with self.assertRaisesRegex(RuntimeError, "exit 23"):
                     gate.run_command(["inert"], root, "failed")
                 self.assertEqual((root / "failed.log").read_text(), "stdoutstderr")
                 self.assertEqual(execute.call_count, 1)
-            with patch.object(gate.subprocess, "run", side_effect=subprocess.TimeoutExpired("inert", 1, b"partial", b"error")):
+            with patch.object(shared.subprocess, "run", side_effect=subprocess.TimeoutExpired("inert", 1, b"partial", b"error")):
                 code, output = gate.run_command(["inert"], root, "timeout", check=False)
                 self.assertEqual(code, 124)
                 self.assertIn("partial", output)

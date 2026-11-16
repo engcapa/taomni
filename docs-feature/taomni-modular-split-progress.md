@@ -19,7 +19,8 @@
 - 新增 noexec 原生 TC-MODULES-024 **完整 50 步在 Xvfb/Wayland 均通过**。三端 TC-MODULES-016 **100 步**和 TC-MODULES-022 **58 步**全部通过；模块主窗/分离窗、正式远端商店验证已有 matching WebView 证据。Wayland 的 FILE-OPEN-006/008 仍是已记录的 X11 非左键限制/跨行 chip 命中失败，按用户指示忽略且不计通过。
 - 同源码[macOS Intel #43936286209](https://github.com/engcapa/taomni/actions/runs/43936286209) 已收齐 4 个 shard，**24/27**。TC-MODULES-016/022、SFTP/Notes/终端分离窗口通过；TC-MODULES-003 为同一 Home 导航步骤。FILE-OPEN-011 是前后 Intel 相同的终端搜索无命中；FILE-OPEN-012 在 step 81 等待本地预览限制图片失败，console 为空，本地 raster 实现与 main 无差异、上一 Intel #43926653189 同 case 通过。两项原始失败单列，不删除或放宽安全/图像断言，也不计通过。
 - macOS G1 进程实验 [#43941271749](https://github.com/engcapa/taomni/actions/runs/43941271749)，源码 `04ad3d8361c6cdadad1f22d3e2f9e0d499f51095`，已 **2/2 通过**。macOS 15.7.9 Intel 的实验 app 与 hello/MFA 均有实际 ad-hoc/hardened runtime 签名；host quarantine 写入并读回，真实 adapter 握手、HOTP 和确认退出成功，hash 不变。`spctl` 对三者均 **exit 3/rejected**，不得称系统分发信任通过。完整 Tauri 发布包、固定证书与 TCC 仍未验证，self-signed 发布模式关闭 hardened runtime 的缺口保留。详见[门禁实验记录](taomni-modular-split-gates-hello-plugin.md)。
-- 下一步添加 Windows 下载隔离标记、Authenticode/Defender 原始状态和真实 hello/MFA 执行实验，经已注册的 upgrade 专项入口执行；不关闭系统保护、不导入私钥，不把一次执行通过当作 SmartScreen 概率或完整发布信任结论。
+- Windows G3 进程实验已接入已注册的 upgrade 专项入口：真实 `LOCALAPPDATA` 内放置 unsigned hello/MFA，写入并独立读回 Internet-zone ADS，观察 Authenticode、Defender/SmartScreen 原始状态，再经生产 adapter 执行 hello 握手与 MFA HOTP/确认退出；执行后复核 hash 与 ADS，失败保留日志与未通过 receipt。macOS/Windows 共用 harness 选择和失败日志 helper，保留原 macOS 场景。实际执行待提交后的 GitHub runner；不把 synthetic ADS 或一次执行通过当作真实浏览器下载、SmartScreen 概率或完整发布信任，详见[门禁实验记录](taomni-modular-split-gates-hello-plugin.md)。
+- 以上 Windows 批次本地 11 项 Python 纯单元、rustfmt、actionlint、refactor 边界/文件大小检查通过；所有 subprocess 均由单元 mock，未执行本地 Windows/网络/宿主实验。
 
 ### 本轮实现过程记录（以下 pending 状态以本节最新结果为准）
 

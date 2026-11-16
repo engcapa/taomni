@@ -16,7 +16,7 @@ on:
         type: boolean
         default: false
       system_execution_only:
-        description: Run only the ad-hoc hardened macOS host execution experiment
+        description: Run only the macOS and Windows system host execution experiments
         type: boolean
         default: false
   workflow_call:
