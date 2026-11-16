@@ -100,6 +100,24 @@ Linux 027 的真实 ACP 子进程交接、抽屉回复可见、user/assistant �
 
 macOS browser shard 3 在排队后以 cancelled 结束，未执行且没有报告。[该 job](https://github.com/engcapa/taomni/actions/runs/43858855264/job/133272595930) 的 GitHub 检查记录为 `The job was not acquired by Runner of type hosted even after multiple attempts`，同时明确提示 macOS arm64 runner 容量不足。其余 browser 21 项的通过保留；缺少的 10 项使用相同完整 SHA 在 [43864993650](https://github.com/engcapa/taomni/actions/runs/43864993650) 补跑，并自动加入完整适用 crash。补跑最终 **23/23**，workflow 成功；签名、全部绑定产物及 source/runner/case 独立核对无误。两批合并覆盖全部 **31/31** 个不同 browser 用例，包含完整适用 crash **18/18**；重复执行的 crash 不重复计数。记录 `qa-ui-auto-report/_local/h43864993650/independent-feedback-verification.json`。
 
-原批次剩余两个 macOS native 分片持续排队，未获得 runner。保留全部已完成报告及成功构建后，主动取消该批次，将尚未执行的 21 项转入 [43869363473](https://github.com/engcapa/taomni/actions/runs/43869363473) 的单分片 native release 补跑，仍使用上述完整 SHA，并自动加入完整适用 crash。按 runbook 复用 43858855264 的当前源码、工具链和 release 条件下成功的 Rust 合同结果，补跑设置 `run_rdp_unit_contracts=false`；没有跳过选中的原生用例。补跑尚待执行结果，原批次取消不作为整批通过。
+原批次剩余两个 macOS native 分片持续排队，未获得 runner。保留全部已完成报告及成功构建后，主动取消该批次，将尚未执行的 21 项转入 [43869363473](https://github.com/engcapa/taomni/actions/runs/43869363473) 的单分片 native release 补跑，仍使用上述完整 SHA，并自动加入完整适用 crash，共选择 32 项。按 runbook 复用 43858855264 的当前源码、工具链和 release 条件下成功的 Rust 合同结果，补跑设置 `run_rdp_unit_contracts=false`；没有跳过选中的原生用例。
+
+补跑 producer 的原生缓存未命中，重新构建和上传 QA release runtime 均成功；日志 `qa-ui-auto-report/_local/macos-native-recovery-build-1116.log`。随后[单个执行 job](https://github.com/engcapa/taomni/actions/runs/43869363473/job/133325946037) 再次未获 runner 并被取消，GitHub 检查记录同样为 `The job was not acquired by Runner of type hosted even after multiple attempts`，并提示 macOS arm64 容量限制。该批最终 workflow 为 failure，**没有执行任何 native 用例**，没有新的 native summary/receipt；构建成功不计为用例通过。原始检查记录与 workflow 结果保存在 `qa-ui-auto-report/_local/h43869363473/`。
 
 Windows/Linux 已完成平台的合并 `status --gate` 为 `ok=true`、0 gaps、0 rejected reports；每个平台已评审 browser **31/31**、native **40/40**，另有旧 F12 的实际通过与评审元数据待办。记录 `qa-ui-auto-report/_local/status-tao-transcript-windows-linux-reviewed-1116.json`。导入时先核对归档配置的 conditions 指纹；同名旧导入副本按内容哈希备份后激活本批配置，原始报告、回执及归档配置均未改写，映射记录在 hosted 根目录 `activated-config-provenance.json`。
+
+## 平台分工与当前验收阻塞
+
+按用户要求，Windows browser/native 在本机执行，GitHub 只选择 Linux/macOS；两次补跑均只选 macOS。三批 GitHub 原始 selection 的 group 分别是 `linux-browser/linux-native/macos-browser/macos-native`、`macos-browser`、`macos-native`，没有 Windows group。
+
+| 平台与执行位置 | Browser | Native | Browser crash | Native crash |
+|---|---:|---:|---:|---:|
+| Windows，本机 | 31/31 | 41/41 | 18/18 | 22/22 |
+| Linux，GitHub | 31/31 | 41/41 | 18/18 | 22/22 |
+| macOS ARM64，GitHub | 31/31 | 20/41 | 18/18 | 11/22 |
+
+上表按不同用例计数；macOS browser 合并原批次及补跑的有效回执。执行过的用例均通过，剩余 **21 项 macOS native 未执行、未验收**：FILE-OPEN 的 005/006/009/010/013，MOBILE-013，TAO-HOME 的 003/004/009/025/028/031/034/035，WELCOME-RS-N-04，以及 WS 的 038/039/052/053/057、旧 `TC-auto-F12-1-vault-setup-and-lock`。
+
+完整三平台已评审范围的普通 `status --gate` 如实返回 **exit 1 / `ok=false`**，包含 **20 个 `native:macOS` 未执行缺口、0 rejected reports**；旧 F12 继续保留为范围外的评审元数据待办及 macOS 未执行项。记录 `qa-ui-auto-report/_local/status-tao-transcript-three-platforms-pending-1116.json`，逐组选择与缺口核对见 `h43858855264/selection-gap-verification.json`。**macOS 原生验收被 GitHub 托管 runner 容量阻塞，三平台验收尚未完成。**
+
+本阶段仅更新执行证据及阻塞状态，保留 027、035～037 和原有恢复/完整 crash 用例；没有新增产品行为或改动用例预期，因此不创建重复用例。
