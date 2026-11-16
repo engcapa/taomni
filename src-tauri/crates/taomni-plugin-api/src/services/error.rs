@@ -32,6 +32,7 @@ impl std::error::Error for ContractError {}
 #[serde(rename_all = "SCREAMING_SNAKE_CASE")]
 pub enum CoreServiceError {
     PermissionDenied,
+    DuplicateRequest,
     VaultLocked,
     VaultBadPassword,
     VaultPasswordRequired,
@@ -48,6 +49,7 @@ impl CoreServiceError {
     pub fn kind(self) -> &'static str {
         match self {
             Self::PermissionDenied => "PERMISSION_DENIED",
+            Self::DuplicateRequest => "DUPLICATE_REQUEST",
             Self::VaultLocked => "VAULT_LOCKED",
             Self::VaultBadPassword => "VAULT_BAD_PASSWORD",
             Self::VaultPasswordRequired => "VAULT_PASSWORD_REQUIRED",
@@ -64,6 +66,7 @@ impl CoreServiceError {
     pub fn into_rpc_error(self) -> RpcError {
         let code = match self {
             Self::PermissionDenied => ErrorCode::PermissionDenied,
+            Self::DuplicateRequest => ErrorCode::DuplicateRequest,
             Self::Cancelled => ErrorCode::RequestCancelled,
             Self::TimedOut => ErrorCode::RequestTimeout,
             _ => ErrorCode::InvalidState,

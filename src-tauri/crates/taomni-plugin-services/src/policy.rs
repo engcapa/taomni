@@ -1,0 +1,90 @@
+use std::collections::BTreeSet;
+
+use taomni_plugin_api::services::{
+    CoreServiceError, FIXED_KEY_SERVICE, FixedKeyId, HostInstanceId, MFA_DATA_KEY_ID,
+};
+use taomni_profile_locks::PluginSlug;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct FixedKeyOwner {
+    pub slug: &'static str,
+    pub id: &'static str,
+    pub kind: &'static str,
+    pub label: &'static str,
+}
+
+pub const MFA_FIXED_KEY_OWNER: FixedKeyOwner = FixedKeyOwner {
+    slug: "mfa",
+    id: MFA_DATA_KEY_ID,
+    kind: "mfa_secret",
+    label: "MFA Data Key",
+};
+
+fn owner(key: &str) -> Option<FixedKeyOwner> {
+    (key == MFA_FIXED_KEY_OWNER.id).then_some(MFA_FIXED_KEY_OWNER)
+}
+
+/// This value must be created by trusted core code *after* signature, package
+/// identity and handshake validation. It is deliberately not Deserialize.
+/// Construction validates grants; construction alone authenticates no process.
+#[derive(Clone, Debug)]
+pub struct VerifiedHostGrants {
+    slug: PluginSlug,
+    permissions: BTreeSet<String>,
+    fixed_keys: BTreeSet<String>,
+}
+
+impl VerifiedHostGrants {
+    pub fn from_verified_manifest(
+        slug: PluginSlug,
+        permissions: BTreeSet<String>,
+        fixed_keys: BTreeSet<String>,
+    ) -> Result<Self, CoreServiceError> {
+        for key in &fixed_keys {
+            if !permissions.contains(FIXED_KEY_SERVICE)
+                || owner(key).is_none_or(|owner| owner.slug != slug.as_str())
+            {
+                return Err(CoreServiceError::PermissionDenied);
+            }
+        }
+        Ok(Self {
+            slug,
+            permissions,
+            fixed_keys,
+        })
+    }
+
+    pub fn bind_authenticated_transport(self, instance: HostInstanceId) -> AuthorizedHost {
+        AuthorizedHost {
+            instance,
+            grants: self,
+        }
+    }
+}
+
+/// Identity comes from the core's transport owner, never ServiceRequest data.
+#[derive(Clone, Debug)]
+pub struct AuthorizedHost {
+    instance: HostInstanceId,
+    grants: VerifiedHostGrants,
+}
+
+impl AuthorizedHost {
+    pub fn instance(&self) -> &HostInstanceId {
+        &self.instance
+    }
+    pub fn slug(&self) -> &PluginSlug {
+        &self.grants.slug
+    }
+
+    pub fn fixed_key_owner(&self, key: &FixedKeyId) -> Result<FixedKeyOwner, CoreServiceError> {
+        if !self.grants.permissions.contains(FIXED_KEY_SERVICE)
+            || !self.grants.fixed_keys.contains(key.as_str())
+        {
+            return Err(CoreServiceError::PermissionDenied);
+        }
+        owner(key.as_str())
+            .filter(|owner| owner.slug == self.grants.slug.as_str())
+            .ok_or(CoreServiceError::PermissionDenied)
+    }
+}

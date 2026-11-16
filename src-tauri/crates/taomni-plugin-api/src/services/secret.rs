@@ -80,9 +80,37 @@ impl<T: Serialize> SensitiveRpcResponse<T> {
     }
 
     pub fn encode_line(&self) -> Result<Zeroizing<Vec<u8>>, serde_json::Error> {
-        let mut bytes = Zeroizing::new(Vec::new());
-        serde_json::to_writer(&mut *bytes, self)?;
-        bytes.push(b'\n');
-        Ok(bytes)
+        let mut writer = SensitiveWriter(Zeroizing::new(Vec::with_capacity(512)));
+        serde_json::to_writer(&mut writer, self)?;
+        std::io::Write::write_all(&mut writer, b"\n").map_err(serde_json::Error::io)?;
+        Ok(writer.0)
+    }
+}
+
+/// Vec's ordinary reallocation may free an uncleared allocation containing a
+/// partial JSON secret. Grow by moving to a new buffer only after zeroizing
+/// the previous allocation; normal writes never grow implicitly.
+struct SensitiveWriter(Zeroizing<Vec<u8>>);
+
+impl std::io::Write for SensitiveWriter {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        let needed = self
+            .0
+            .len()
+            .checked_add(bytes.len())
+            .ok_or_else(|| std::io::Error::other("sensitive frame is too large"))?;
+        if needed > self.0.capacity() {
+            let capacity = needed.max(self.0.capacity().saturating_mul(2));
+            let mut replacement = Zeroizing::new(Vec::with_capacity(capacity));
+            replacement.extend_from_slice(self.0.as_slice());
+            self.0.zeroize();
+            self.0 = replacement;
+        }
+        self.0.extend_from_slice(bytes);
+        Ok(bytes.len())
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
     }
 }
