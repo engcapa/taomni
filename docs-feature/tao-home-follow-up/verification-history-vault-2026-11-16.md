@@ -83,3 +83,15 @@ Windows native 首批 **39/41**：目录 `tao-transcript-full-native-1116/run-20
 修正后的 Windows 定向 native **2/2**，`tao-transcript-diagnostics-fixed-1116/run-20261116-193036-048818800/`：010 沿用原 case 和输入动作通过，未修改产品设置行为或放宽断言；027 通过原 UI 流程、真实子进程、两方持久化及带回后显式继续。该修正仅改变 runner，产品 source 与 QA release binary 保持上文身份。
 
 Linux/macOS 批次 [43854389472](https://github.com/engcapa/taomni/actions/runs/43854389472) 固定 `3fa9de750` 对应完整 SHA，包含上述尚未修正的诊断。其构建/测试报告按实际结果保留；最终 runner 与目标/crash 用例需要新回执，不把该批排队、构建成功或仅 UI 通过当成整体验收通过。
+
+## 2d8d0ff5b 最终 Windows 验证
+
+产品 source 仍为 `b48dea9e9aee3ac8981e03cded1e6bc5cc6674e9fd65565264adb06783755cf3`，runner 为 `05ea30cecb11dedbc74f98d32689872d7b6993ab11e2fda9ae60ccdd42b12283`。上文 QA release binary 输入匹配并直接复用，未重写身份记录。
+
+- Windows browser **31/31**，含完整适用 crash **18/18**：`qa-ui-auto-report/_local/tao-transcript-r2-full-browser-1116/run-20261116-193348-330259600/`。
+- Windows native **41/41**，含完整适用 crash **22/22**：`qa-ui-auto-report/_local/tao-transcript-r2-full-native-1116/run-20261116-193348-100372800/`。010、027、035～037 及全部保留场景均通过，无失败或跳过。
+- 两批原始回执签名、全部绑定产物哈希、source/runner/case/native build 独立核对无误；记录分别在两根目录的 `independent-feedback-verification.json`。
+- 已评审范围 browser **31/31**、native **40/40** 的 `status --gate` 为 `ok=true`、0 gaps、0 rejected reports；记录 `status-tao-transcript-windows-reviewed-1116.json`。额外旧 F12 的执行通过仍与其评审元数据待办区分，未偷偷移除 `needs-review`。
+- 对应产品的 frontend 定向单测 **4 files / 80 tests**、目录读取工具单测 **3/3**，QA release 的 TypeScript/frontend/native 构建、最终 `check:refactor`、development case contract、静态 `audit --gate` 均通过；未把静态检查或规划当作执行证据。
+
+最终 Linux/macOS browser/native release 批次为 [43858855264](https://github.com/engcapa/taomni/actions/runs/43858855264)，使用 `2d8d0ff5b` 对应完整提交 SHA，包含全部适用 crash。已下载的 Linux browser 20 项、macOS browser 10 项全部通过且原始回执/产物/输入核对无误；当前只是分片结果，其余分片及 native 尚待最终收集。旧 runner 批次的成功构建和合同日志保留，准备结束其后续测试以释放最终批次资源；取消不算通过。

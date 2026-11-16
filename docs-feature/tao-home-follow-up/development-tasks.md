@@ -433,3 +433,5 @@ Windows 保存对话框的全局模拟送键丢字已用原生控件逐字输入
 用户新增两项反馈已随 `e7e73cc01` 实现：History 每条 Tao 对话提供删除按钮及确认弹窗；启动 Vault 检查、解锁和 Tao 锁定遮罩均可取消，保留受保护操作的显式解锁要求。Home 与旧 tao-chat 分别走原存储删除；串行化自动保存和删除，防重载复活。
 
 新增 035/036/037，扩展 009，并复用原有文件夹/本地 Shell 恢复用例从 History 入口验证。Windows browser 31/31、native 41/41 已执行通过（完整 crash 18/18、22/22）；其中额外旧 Vault 用例保留一项评审元数据待办，已评审用例的 status gate 通过。GitHub Linux/macOS 当前源码回执持续更新于 [历史与 Vault 验证](verification-history-vault-2026-11-16.md)。本节完成实现记录，最终各平台验收以该记录的实际状态为准。
+
+后续 `3fa9de750` 修复 ACP 交接的旧历史覆盖新回复竞态，`2d8d0ff5b` 修正原生步骤的只读持久化诊断。最终匹配输入的 Windows browser **31/31**、native **41/41** 再次通过；完整适用 crash 均通过，已评审范围 status gate 为 0 gaps / 0 rejected。修复前失败批次继续保留。最终 GitHub 批次为 [43858855264](https://github.com/engcapa/taomni/actions/runs/43858855264)，未完成的 Linux/macOS 结果不提前计通过。
