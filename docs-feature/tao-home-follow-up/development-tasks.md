@@ -406,3 +406,5 @@ TH-032 保留回归补充：`801a4132c` 的 Linux/macOS browser 已分别 30/30�
 焦点修复提交为 `ed351a7c9`：Windows browser 已重跑 **30/30**，新的匹配 QA release 构建和静态 audit 通过，后续 native 回执以[验证记录](verification-2026-11-16.md)为准。当前源码的 Linux/macOS 工作流为 [43791999859](https://github.com/engcapa/taomni/actions/runs/43791999859)。
 
 Windows 保存对话框的全局模拟送键丢字已用原生控件逐字输入及读回确认修正；最后 FILE007/011 native probe **2/2**、30 项对话框工具单元和 refactor 检查通过，实际四种导出及取消结果均保留原要求。完整 Windows browser/native 与新 runner 的 hosted 回执继续执行，不将 probe 结果等同于完整 TH-032 验收。具体失败保留、输入边界及匹配构建身份见[验证记录](verification-2026-11-16.md)。
+
+`704f7aa79` 最终 Windows browser **30/30**、native **36/36**（全部 18/22 适用 crash）；商业 DeepSeek 三项、八次真实请求正常完成，没有走失效 Key 分支。Linux/macOS browser **30/30 / 31/31** 的 raw/receipt/产物身份校验通过。后续 macOS 设置定位回归补异步布局保护和用户接管，新增 8 项单元；完整 Settings/Workspace 单元 286 项、导航单元 3 项通过，新 source 的原生/hosted 结果以[验证记录](verification-2026-11-16.md)为准，不提前关闭 TH-011/032 或全部原型 AC。

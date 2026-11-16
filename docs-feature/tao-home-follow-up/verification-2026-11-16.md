@@ -270,3 +270,21 @@ TC013 商业 Markdown/分支/历史，以及最后输入的完整 crash/受影�
 最终 probe：`C:/tmp/tqa-terminal-focus-probe-1116/run-20261116-104357-778679300`，**2 passed / 0 failed / 0 skipped**，66.1 秒，source stable。FILE007 的五次原生操作（HTML/PNG/DOCX 保存、Markdown 目录选择、输入路径后取消）全部完成，真实媒体/公式/源文件保留断言通过；FILE011 的 modifier-click、重复打开、手动切回后等待 3.2 秒及 live PTY 均通过。产品 source/binary 与上一节相同，`native_build.py --release --check` 确认可复用；runner SHA-256 为 `917de2316d852b65f399c638a7dde615020342cc690b83ed2cf417ba2516fc0d`。
 
 对话框 Python 单元 **30/30**、PowerShell 内嵌 C# 编译、`pnpm check:refactor` 均通过。相关跨平台测试采用显式 POSIX fixture 路径，并在 Windows 无 symlink 权限时使用真实 NTFS junction 验证逃逸拒绝，没有跳过该边界。最终 30 项 browser / 36 项 native 整批已启动；此前同产品 source 的 Linux browser **30/30**、macOS browser **31/31** 回执保留为旧 runner 批次，最新 runner 的最终跨平台回执另记。
+
+## `704f7aa79` 整批结果
+
+Windows 当前 source / runner 下，browser `C:/tmp/tqa-terminal-focus-final-browser-1116/run-20261116-104542-420521800` 为 **30/30**、121.2 秒；native `C:/tmp/tqa-terminal-focus-final-native-1116/run-20261116-104540-460894500` 为 **36/36**、961.5 秒。均零失败、零跳过、source stable，包含全部适用 crash-regression（18 browser / 22 native）。source / binary 沿用上节匹配 QA release，runner 为 `917de2316d852b65f399c638a7dde615020342cc690b83ed2cf417ba2516fc0d`。
+
+真实商业 TC005/011/013 的脱敏 outcome 分别为 `response-complete` / `scenarios-complete` / `documents-complete`，共八次实际 native 请求；均正常回复，没有命中失效 Key 分支。已人工检查本轮 `real-stopped.png`、`real-markdown.png`、小窗中文建议截图：侧栏并排、Stop 卡片及 Markdown 尾部在视口内、四项建议单行省略且无横向滚动条。未据此宣称全部原型状态视觉验收。
+
+当前 runner 的 hosted 为 [43794207330](https://github.com/engcapa/taomni/actions/runs/43794207330)，head `704f7aa799a299e2d7b64d20e8404d71d3b9152a`；Linux browser **30/30**、macOS browser **31/31**，已逐一验证 raw summary、receipt 签名、所有产物 hash/size、case/source/runner 及 stable 标记，无完整性问题。Linux/macOS native 仍待本轮结果。旧 `43791999859` 在 producer/cache 已结束后取消剩余重复排队 native：Linux producer 的完整 frontend 为 7002 passed / 1 failed / 1 skipped，唯一失败为 ED-REPAIR-006 mounted test 在 journal commit / Undo command ready 前发送 Ctrl+Z；将补正确前置条件，未把构建失败记为通过。
+
+旧 `801a4132c` 的 macOS native raw 合计 **33/35**：FILE011（已在 `ed351a7c9` 修复）和 TH003 设置定位失败，FILE013 原生 pointer capture 拖拽通过。TH003 截图显示异步 ASR 模型卡展开后 Tao 节标题被推离视口；将补导航期间的布局变化保护和用户滚动接管，保留原可见几何要求。
+
+## 设置布局变化与单元前置条件修正
+
+设置深链的 RAF、布局观察及取消由 `panel/sectionReveal.ts` 统一拥有：目标组展开后定位节标题，并观察整个内容容器和视口，处理目标上方的异步模型卡高度变化。用户 wheel、pointer、touch 或键盘输入立即交还滚动所有权；新导航、搜索和 unmount 清理旧 observer/RAF/监听，隐藏页签不主动滚动。带 LSP preset 的深链只做首次节定位，随后仍由 preset 行接管。没有降低 TH003 的“标题完整在视口内、位于搜索栏下至少 12px”断言。
+
+新增 **8 项** focused 单元覆盖异步前置内容、连续 resize 合并、四种用户接管、折叠等待/取消、preset 与隐藏页签；完整 SettingsPanel / CodeWorkspaceTab 加该模块 **3 files / 286 tests** 通过（108.1 秒），`settingsNavigation.test.ts` 另 **3/3** 通过。CI 中的 ED-REPAIR-006 用例补“journal commit 后 Undo command enabled”前置条件，保留大小写不同两文件的独立写入、实际 Ctrl+Z 确认及精确恢复断言。
+
+TH003 补齐 reviewed 的行为检查映射、工作流/语音面板关闭结果和设置定位截图。第一次新增测试定义被 TypeScript mock 类型和 testcase schema 检查拦下，已修正；对应失败日志 `settings-final-build-1116.log` / `settings-final-browser-1116.log` 保留，未产生产品执行通过记录。最终严格 case loader 和 `pnpm check:refactor` 通过（4715 files / 4 documented exceptions）；新 source 的 QA release、完整 browser/native 及 hosted 验证继续执行，不能复用上节旧 source 的通过结果冒充本修复验收。
