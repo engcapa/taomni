@@ -8,7 +8,7 @@ import { moduleRecord } from "./tests/pluginFrontendHarness";
 const info = { slug: "hello-plugin", kind: "hello-plugin" };
 beforeEach(() => {
   localStorage.clear();
-  useAppStore.setState({ tabs: [{ id: "welcome", type: "welcome", title: "Welcome", closable: false }], activeTabId: "welcome" });
+  useAppStore.setState({ tabs: [{ id: "welcome", type: "welcome", title: "Welcome", closable: false }], activeTabId: "welcome", activeSideTab: "home" });
   const record = moduleRecord();
   usePluginFrontendStore.setState({ records: { [record.slug]: record }, epochs: {}, pending: new Set(), status: "ready", error: null });
 });
@@ -31,12 +31,27 @@ describe("module tab locators and ordinary reload", () => {
     stop();
     const raw = JSON.parse(localStorage.getItem("taomni.plugin-tabs.v1")!);
     expect(raw.tabs[0]).toEqual({ id, type: "plugin", title: "Hello Plugin", closable: true, plugin: info });
-    useAppStore.setState({ tabs: [], activeTabId: "" });
+    useAppStore.setState({ tabs: [], activeTabId: "", activeSideTab: "home" });
     usePluginFrontendStore.setState({ records: {} });
     const stopAgain = attachPluginTabPersistence();
     expect(useAppStore.getState().tabs).toHaveLength(1);
     expect(useAppStore.getState().tabs[0].plugin).toEqual(info);
     expect(useAppStore.getState().activeTabId).toBe(id);
+    expect(useAppStore.getState().activeSideTab).toBe("sessions");
+    stopAgain();
+  });
+
+  it("keeps an inactive locator without stealing Home after reload", () => {
+    const stop = attachPluginTabPersistence();
+    const id = openPluginTab(info);
+    useAppStore.getState().setActiveSideTab("home");
+    stop();
+    const saved = JSON.parse(localStorage.getItem("taomni.plugin-tabs.v1")!);
+    expect(saved.activeTabId).toBeNull();
+    useAppStore.setState({ tabs: [{ id: "welcome", type: "welcome", title: "Welcome", closable: false }], activeTabId: "welcome", activeSideTab: "home" });
+    const stopAgain = attachPluginTabPersistence();
+    expect(useAppStore.getState().tabs.some((tab) => tab.id === id)).toBe(true);
+    expect(useAppStore.getState()).toMatchObject({ activeTabId: "welcome", activeSideTab: "home" });
     stopAgain();
   });
 

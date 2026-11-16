@@ -1,11 +1,66 @@
 //! Version-bound official plugin assets, including Tauri's WebView2 mapping.
 
-use std::path::Path;
+use std::{borrow::Cow, path::Path};
 
 use tauri::Manager;
 use tauri::http::{HeaderMap, Method, Request, Response, StatusCode, Uri};
 
 pub const SCHEME: &str = "taomni-plugin";
+const APP_PATH: &str = "/__taomni_plugins__";
+
+/// Packaged ESM remains on the renderer's own application origin. Tauri's
+/// resource hook is installed on every app WebView, including detached tabs.
+/// Unrelated resources retain Tauri's original body, headers and CSP.
+pub(crate) fn serve_app_resource<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    mut request: Request<Vec<u8>>,
+    current: &mut Response<Cow<'static, [u8]>>,
+) {
+    let target = match app_asset_uri(request.uri()) {
+        Ok(None) => return,
+        Ok(Some(target)) => target,
+        Err(error) => {
+            *current = response(
+                StatusCode::FORBIDDEN,
+                error.as_bytes().to_vec(),
+                "text/plain",
+                None,
+            )
+            .map(Cow::Owned);
+            return;
+        }
+    };
+    *request.uri_mut() = target;
+    *current = serve(app, request).map(Cow::Owned);
+}
+
+fn app_asset_uri(uri: &Uri) -> Result<Option<Uri>, &'static str> {
+    let path = uri.path();
+    if path != APP_PATH && !path.starts_with(&format!("{APP_PATH}/")) {
+        return Ok(None);
+    }
+    let scheme = uri.scheme_str().unwrap_or_default();
+    let authority = uri
+        .authority()
+        .map(|value| value.as_str())
+        .unwrap_or_default();
+    if !((scheme == "tauri" && authority == "localhost")
+        || (matches!(scheme, "http" | "https") && authority == "tauri.localhost"))
+        || uri.query().is_some()
+    {
+        return Err("invalid application plugin origin");
+    }
+    let suffix = path
+        .strip_prefix(APP_PATH)
+        .ok_or("invalid application plugin path")?;
+    let target: Uri = format!("{SCHEME}://localhost{suffix}")
+        .parse()
+        .map_err(|_| "invalid application plugin path")?;
+    // Validate before replacing the SPA fallback; malformed reserved paths
+    // must fail as resources rather than return the application HTML.
+    parse_asset_uri(&target)?;
+    Ok(Some(target))
+}
 
 pub(crate) fn register_protocol<R: tauri::Runtime>(
     builder: tauri::Builder<R>,

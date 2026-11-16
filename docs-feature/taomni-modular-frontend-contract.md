@@ -8,7 +8,7 @@
 - `tabs` 声明 `{kind,title}`；kind 在所属 slug 内唯一，打开时同时保存 slug/kind。原有内置 TabKind 不与模块声明混用。
 - 默认导出 React 组件，或使用命名导出 `component`。普通函数、class、`memo` 和 `forwardRef` 均可；组件内部的懒加载由模块自己的 Suspense 管理。
 - 入口及相对导入文件全部进入官方包和签名 inventory。不能只签入口、额外从远端加载可执行 chunk。
-- 原生只从已启用、当前版本且通过完整性校验的 `taomni-plugin` 协议读取文件。版本目录不可覆盖，升级换版本；重试/重新激活的 fragment 只改变 ESM identity，不改变验签路径。
+- 原生只从已启用、当前版本且通过完整性校验的受限协议读取文件。打包主窗/分离窗使用自身 `tauri://localhost/__taomni_plugins__/<slug>/<version>/frontend/...`（WebView2 为 http(s) 映射），由每个 app WebView 的 Tauri resource hook 交给同一 registry/路径/hash 验证器；其它核心资源的 body、CSP 和 headers 不改。该同源路径避免 WKWebView 跨两个自定义 scheme 导入 ESM 的真实失败，保持官方前端与核心同权的既有边界。外部 dev server 继续使用 `taomni-plugin` 协议，不回退到 Vite SPA 路径。版本目录不可覆盖，升级换版本；重试/重新激活的 fragment 只改变 ESM identity，不改变验签路径。两条路径均不允许任意文件、query、非前端文件或目录穿越；CORS 不增加 `null`、通配 origin 或 credentials。
 - `hello-plugin/frontend/index.js` 与 `messages.js` 是可执行的最小示例。browser 开发预览仅为此示例提供明确的源文件映射，不代表安装或验签。
 
 ## 共享依赖与组件输入
@@ -51,7 +51,7 @@ interface PluginFrontendProps {
 
 ## 保存、分离和返回
 
-主窗 `taomni.plugin-tabs.v1` 仅保存经过清理的 tab ID、标题、slug/kind 和活动 tab ID。没有 manifest、路径、权限、业务 payload 或凭据。恢复 locator 不代表授予执行权限：缺失/禁用的模块展示占位，仍须重新读取 native registry。
+主窗 `taomni.plugin-tabs.v1` 仅保存经过清理的 tab ID、标题、slug/kind 和活动 tab ID。没有 manifest、路径、权限、业务 payload 或凭据。恢复活动模块时经普通 focus action 同时恢复 Sessions 可见区域；若用户已切到 Home/Workspace/Agents，只保留 locator，不保存隐藏模块为活动页。恢复 locator 不代表授予执行权限：缺失/禁用的模块展示占位，仍须重新读取 native registry。
 
 分离窗口使用相同的 locator 契约：先写可读 handoff，成功创建窗口后才移除源 tab；存储失败、弹窗被拦截或 native 创建失败均保留源 tab。新 WebView 独立注册 registry 监听并安装 SDK，不依赖主窗口的 JS 全局对象。
 

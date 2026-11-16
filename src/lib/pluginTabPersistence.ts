@@ -18,23 +18,27 @@ export function attachPluginTabPersistence(storage: Storage = localStorage): () 
         ids.add(tab.id);
         tabs.push(tab);
       }
-      useAppStore.setState((state) => ({
-        tabs: [...state.tabs, ...tabs],
-        ...(tabs.some((tab) => tab.id === saved.activeTabId) ? { activeTabId: saved.activeTabId as string } : {}),
-      }));
+      useAppStore.setState((state) => ({ tabs: [...state.tabs, ...tabs] }));
+      if (tabs.some((tab) => tab.id === saved.activeTabId)) {
+        // Use the ordinary focus action so the restored tab also becomes
+        // visible in Sessions instead of remaining mounted behind Home.
+        useAppStore.getState().setActiveTab(saved.activeTabId as string);
+      }
     }
   } catch { /* Corrupt/blocked browser storage cannot authorize or remove a tab. */ }
   let last = "";
   const save = () => {
     const state = useAppStore.getState();
     const tabs = state.tabs.filter((tab) => tab.type === "plugin").slice(0, 128).map(readPluginTab).filter(Boolean);
-    const raw = JSON.stringify({ version: 1, tabs, activeTabId: state.activeTabId });
+    const activeTabId = ["home", "workspaces", "agents"].includes(state.activeSideTab)
+      ? null : state.activeTabId;
+    const raw = JSON.stringify({ version: 1, tabs, activeTabId });
     if (raw === last) return;
     last = raw;
     try { storage.setItem(KEY, raw); } catch { /* Keep the live tab usable. */ }
   };
   const stop = useAppStore.subscribe((next, old) => {
-    if (next.tabs !== old.tabs || next.activeTabId !== old.activeTabId) save();
+    if (next.tabs !== old.tabs || next.activeTabId !== old.activeTabId || next.activeSideTab !== old.activeSideTab) save();
   });
   save();
   return stop;

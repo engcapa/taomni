@@ -4,7 +4,7 @@
 
 ## 当前结论
 
-核心仍包含 MFA、Servers、SocksCap、远程桌面和本地语音等业务代码、状态与依赖。hello-plugin 已有签名安装验证；MFA engine 与真实 SDK 宿主原型的两处 RPC 修复已由匹配源码的三端真实宿主门及 Linux 真实 Vault 门复验。MFA 四目标签名包已产出，源码 `2a14e5590` 的 Linux、Windows 正式安装门均已通过 3 项实际场景；macOS 构建缺少预暂存的 Kerberos frameworks，修复后须复验；产品 facade 尚未切换。主窗/分离窗动态前端已实现，最新 browser 执行发现 hello 首次空列表没有可见内容，正在修复并复验 TC-MODULES-016/017/018。LanChat 已删除；历史 `lanchat.sqlite` / `lanchat.db` 保留原位，不读取、不迁移、不删除。
+核心仍包含 MFA、Servers、SocksCap、远程桌面和本地语音等业务代码、状态与依赖。hello-plugin 已有签名安装验证；MFA engine 与真实 SDK 宿主原型的两处 RPC 修复已由匹配源码的三端真实宿主门及 Linux 真实 Vault 门复验。MFA 四目标签名包已产出，源码 `2a14e5590` 的 Linux、Windows 正式安装门均已通过 3 项实际场景；macOS framework staging 修复正在新 runner 复验；产品 facade 尚未切换。主窗/分离窗动态前端已实现，空列表修复后的 browser 已进入刷新步骤；刷新可见模式和 macOS 跨 scheme ESM 失败已分别修复，须复验 TC-MODULES-016/017/018。LanChat 已删除；历史 `lanchat.sqlite` / `lanchat.db` 保留原位，不读取、不迁移、不删除。
 
 生产升级 IPC 当前只记录只读预检、源指纹与 pending journal。缺少可信插件包和真实 exporter 时，不复制旧数据、不创建伪插件版本、不改变 active 指针。测试 fixture 的 staging/回滚原语不能算真实旧版升级验收。
 
@@ -12,6 +12,9 @@
 
 ## 2026-11-16 最新 runner 证据（持续采集中）
 
+- 下载恢复提交 `13db526db509529304e222c6517e9a9e07a435f5` 的[契约 #43888300225](https://github.com/engcapa/taomni/actions/runs/43888300225) 正在执行并即时取回结果。Linux/macOS 实际日志各确认原网络 3+9+1 项及新增 restart 2 项通过；Windows 网络 3+9 项、完整 prefix 无请求发布通过，kill 场景在断连观察收到真实 `WSAECONNRESET/10054`，原测试只接受 Unix EOF 导致失败，尚未执行后续恢复部分。修复断言仅在 Windows 接受 ConnectionReset，保留五秒关闭期限、其它错误/字节拒绝及完整重开/Range/hash/再重开断言，须新源码 hosted 复验。当前不能记三端 restart 全通过。
+- browser #43886610157 的 Linux 完成 shard 已下载：空状态、首次保存、inactive draft、重复 Open 均已越过，TC-MODULES-017 在刷新后等可见列表失败。截图为 Home，HTML 的模块仍挂载且 `data-active=false`；生产 locator 恢复只写 activeTabId，未切换可见模式。两项单元先复现后通过：用普通 setActiveTab 恢复 Sessions；用户主动切 Home 时只保存 locator，避免刷新后抢回模块。原用例不放宽可见性等待或保存值断言，仍须新源码复验。macOS 打包 ESM 新增应用同源保留路径，所有主窗/分离窗共用原 registry/逐文件 hash 验证，CSP/CORS 不放宽；路径/origin/穿越/相对 chunk 六项 Rust、前端五文件 41 项单元通过，真实 ESM 等 runner 结果。
+- #43875317089 的最后 macOS shard 3 已于运行中取回，11/11，包含三态的卸载保留还原、真实重启与既有 signed module 生命周期。该 run 共 22/22 shards 收齐；macOS native 为 46/48，只有 TC-MODULES-016/018 的 ESM 导入失败；不再存在未收取的 macOS shard。较早 #43864283226 的 macOS shard 1/2/4 为 cancelled，只有 shard 3 的 12/12，不将取消项计通过。
 - 下载恢复批次已接入生产 bootstrap：`.downloads/.jobs` 原子保存无代理凭据的任务描述，启动后只发现任务、不自动联网；恢复时读取实际 partial 长度并重新校验 completed 的大小/hash。新增 list/resume IPC，显式恢复重新解析当前代理；跨实例的 id/path/URL/hash OS 锁保持到网络与文件工作全部停止，进程崩溃后由系统释放。忘记任务保留安全 partial；损坏记录单列错误且不丢弃其它任务。28 项下载单元通过、3 个原真实网络单元保持 ignored；真实核心 harness 和新增进程门只编译通过，未本地执行。新增两项 hosted 场景验证真实 kill/连接关闭/重开恢复/Range 与最后一段已落盘后的无网络发布，沿用三端 download workflow。尚缺远端商店入口、共享完整代理解析和独立持久代理 UI、renderer 后台任务投影、跨重启 UI 用例，不能据此标 TASK-007/010 或 AC-003 完成。
 - `386473fc2a45050ff3f51723be855cd9f90c5692` 的 [browser #43886610157](https://github.com/engcapa/taomni/actions/runs/43886610157) 正在执行 TC-MODULES-017 与完整 crash-regression，即时 shard 采集器已启动。此前 #43885872571 的 plan 使用短 SHA，checkout 当成 ref 查找失败，没有执行任何 case；本次改用完整 SHA。空列表修复已由实际独立 ESM 单元复现并通过，不将尚未执行完的 UI 计为通过。
 - #43875317089 已收取 21/22 个 shard（另加 selection）。三端 browser 各 42/43；Linux Xvfb 49/51、Windows 47/49，失败均在 hello 空列表的可见性断言，已由 `386473fc2` 修复但须新源码复验。Wayland 47/51，另两项既有 FILE-OPEN-006/008 单列。macOS 已收取的三个 shard 为 10/11、11/11、14/15；TC-MODULES-016/018 的 HTML 显示 `Importing a module script failed`，属于独立 ESM 导入失败，不能归到空列表问题，仍在排查。尚缺 macOS shard 3，不外推该 shard 或整端通过。macOS MFA framework staging 修复已于 `c9fc1f99f` 提交，须新源码正式安装门执行。

@@ -981,7 +981,7 @@ v1.2 没有覆盖“已经在用旧版的用户”。核心 0.6.x 默认包不�
 
 TASK-025 的服务、锁与一致快照实施细化见[Vault 服务实施方案](taomni-modular-vault-services-plan.md)。A–E 已接入生产服务，F/G 的离线 v2 与三端运行中宿主 snapshot 契约已有证据，三态重启还原仍待修复解锁顺序后完整复验。MFA engine 已拆分，`plugins/mfa/` 的 SDK 宿主/store actor/operation-scoped KeyProvider/snapshot 原型和真实进程门正在开发，生产 facade 尚未切换；签名业务包、真实旧库交接、动态 UI、相关 G 门和独立 MFA 后的一致还原尚未完成。最新源码、逐 shard 结果与剩余边界见[实施台账](taomni-modular-split-progress.md)。独立小库或原型通过不构成 AC-016 验收。
 
-逐 TASK/AC/G 的状态与剩余工作见[实施与验收台账](taomni-modular-split-progress.md)。核心仍包含待迁出业务；目前完成正式签名安装验证的独立宿主为 hello-plugin，MFA 宿主原型已有真实进程证据，但产品 facade 尚未切换，完整模块化交付尚未完成。主窗/独立 WebView 的动态模块前端接入、状态清理和验证边界见[前端接入契约](taomni-modular-frontend-contract.md)，新增正常与篡改恢复场景仍须 matching runner 验收。
+逐 TASK/AC/G 的状态与剩余工作见[实施与验收台账](taomni-modular-split-progress.md)。核心仍包含待迁出业务；目前完成正式签名安装验证的独立宿主为 hello-plugin，MFA 宿主原型已有真实进程证据，但产品 facade 尚未切换，完整模块化交付尚未完成。主窗/独立 WebView 的动态模块前端接入、状态清理和验证边界见[前端接入契约](taomni-modular-frontend-contract.md)，新增正常与篡改恢复场景仍须 matching runner 验收。WKWebView 已实测出现跨 `tauri`/`taomni-plugin` scheme 的 ESM 导入失败；打包 renderer 使用应用同源的保留前缀转发到相同 registry/完整性验证器，不放宽 CSP、CORS 或原生文件范围。这是受限资源协议的平台适配，仍须新源码三端真实模块和相对 chunk 验证。
 
 已落地的基础能力包括插件 API/registry、版本目录原语、真实宿主 spawn/stdio/握手/invoke、原生 HTTP 代理/续传/取消/进度、设置页本地 registry 投影和升级预检，以及模块清单生成和发布顺序。生产 `plugin_migration_execute` 只记录安全 pending journal；真实 exporter、可信插件包和密钥服务接通前，不复制旧数据、不建立伪版本、不改变 active 指针。fixture 中的 staging/回滚测试不构成真实单体升级证据。
 

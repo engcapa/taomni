@@ -5,6 +5,53 @@ fn parse(value: &str) -> Result<AssetPath, &'static str> {
 }
 
 #[test]
+fn application_origin_alias_preserves_the_same_versioned_resource_validation() {
+    for root in [
+        "tauri://localhost",
+        "http://tauri.localhost",
+        "https://tauri.localhost",
+    ] {
+        let uri =
+            format!("{root}/__taomni_plugins__/demo/1.2.0-rc.1%2Bbuild.2/frontend/assets/chunk.js")
+                .parse()
+                .unwrap();
+        let target = app_asset_uri(&uri).unwrap().unwrap();
+        assert_eq!(
+            parse_asset_uri(&target).unwrap(),
+            AssetPath {
+                slug: "demo".into(),
+                version: "1.2.0-rc.1+build.2".into(),
+                relative: "frontend/assets/chunk.js".into(),
+            }
+        );
+    }
+    for uri in [
+        "tauri://localhost/index.html",
+        "tauri://localhost/assets/main.js",
+        "tauri://localhost/__taomni_plugins__other/file.js",
+    ] {
+        assert!(app_asset_uri(&uri.parse().unwrap()).unwrap().is_none());
+    }
+}
+
+#[test]
+fn application_alias_denies_reserved_malformed_paths_instead_of_returning_spa_html() {
+    for uri in [
+        "https://evil.example/__taomni_plugins__/demo/1.0.0/frontend/index.js",
+        "tauri://evil/__taomni_plugins__/demo/1.0.0/frontend/index.js",
+        "tauri://localhost:80/__taomni_plugins__/demo/1.0.0/frontend/index.js",
+        "tauri://localhost/__taomni_plugins__",
+        "tauri://localhost/__taomni_plugins__/demo/1.0.0/frontend/index.js?alternate=true",
+        "tauri://localhost/__taomni_plugins__/demo/1.0.0/frontend/%2e%2e/host",
+        "tauri://localhost/__taomni_plugins__/demo/1.0.0/frontend/%252e%252e/host",
+        "tauri://localhost/__taomni_plugins__/demo/1.0.0/frontend/a%2Fb.js",
+        "tauri://localhost/__taomni_plugins__/demo/1.0.0/host",
+    ] {
+        assert!(app_asset_uri(&uri.parse().unwrap()).is_err(), "{uri}");
+    }
+}
+
+#[test]
 fn accepts_native_custom_and_webview2_mapping_without_encoding_path_separators() {
     for root in [
         "taomni-plugin://localhost",

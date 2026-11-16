@@ -64,6 +64,21 @@ describe("plugin frontend loading", () => {
     expect(entry).not.toBe(pluginFrontendUrl(validManifest));
   });
 
+  it.each(["tauri://localhost", "http://tauri.localhost", "https://tauri.localhost"])("keeps packaged ESM and relative chunks on %s", async (origin) => {
+    mockConvertFileSrc(origin.startsWith("http") ? "windows" : "macos");
+    const entry = pluginFrontendUrl(validManifest, `${origin}/index.html?window=plugin#detached`);
+    expect(entry).toBe(`${origin}/__taomni_plugins__/demo/1.0.0/frontend/index.js`);
+    expect(new URL("./messages.js", entry).href).toBe(`${origin}/__taomni_plugins__/demo/1.0.0/frontend/messages.js`);
+    expect(pluginFrontendUrl({ ...validManifest, version: "1.1.0" }, `${origin}/index.html`))
+      .toBe(`${origin}/__taomni_plugins__/demo/1.1.0/frontend/index.js`);
+  });
+
+  it.each(["http://localhost:1980", "https://evil.example", "tauri://other", "http://tauri.localhost.evil", "http://tauri.localhost:8888", "tauri://user@localhost"])("does not use an external or lookalike document as a native asset base: %s", (document) => {
+    mockConvertFileSrc("macos");
+    expect(pluginFrontendUrl(validManifest, `${document}/index.html`))
+      .toBe("taomni-plugin://localhost/demo/1.0.0/frontend/index.js");
+  });
+
   it.each(["../index.js", "frontend/../host", "frontend/%2e%2e/host", "frontend/a\\b.js", "frontend/index.js?other", "frontend//index.js"])("rejects a tampered frontend path: %s", (frontend) => {
     expect(() => pluginFrontendUrl({ ...validManifest, entry: { ...validManifest.entry, frontend } })).toThrow("unsafe frontend path");
   });

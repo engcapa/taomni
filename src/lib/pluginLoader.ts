@@ -19,7 +19,7 @@ export interface PluginFrontendModule {
 
 export type PluginImporter = (url: string) => Promise<PluginFrontendModule>;
 
-export function pluginFrontendUrl(manifest: PluginManifest): string {
+export function pluginFrontendUrl(manifest: PluginManifest, documentUrl = globalThis.location?.href): string {
   if (!manifest.entry.frontend) throw new PluginLoadError(`Plugin ${manifest.slug} has no frontend entry`, manifest.slug);
   const parts = [manifest.slug, manifest.version, ...manifest.entry.frontend.split("/")];
   if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(manifest.slug)
@@ -31,9 +31,21 @@ export function pluginFrontendUrl(manifest: PluginManifest): string {
   // Tauri maps custom schemes to http(s)://<scheme>.localhost on WebView2.
   // Ask its converter only for the origin, then append encoded path segments:
   // converting the full path encodes '/' and breaks relative ESM chunk URLs.
-  const origin = isTauriRuntime()
+  let origin = isTauriRuntime()
     ? convertFileSrc("", "taomni-plugin").replace(/\/$/, "")
     : "taomni-plugin://localhost";
+  // WKWebView cannot reliably import ESM across two custom schemes. Packaged
+  // renderers use a reserved path on their own application origin instead.
+  // Its native handler applies the same installed/version/hash checks. Keep
+  // external dev servers on the dedicated protocol, never on Vite's SPA path.
+  if (isTauriRuntime() && documentUrl) {
+    const document = new URL(documentUrl);
+    const appOrigins = ["tauri://localhost", "http://tauri.localhost", "https://tauri.localhost"];
+    const documentOrigin = `${document.protocol}//${document.host}`;
+    if (appOrigins.includes(documentOrigin) && !document.username && !document.password) {
+      origin = `${documentOrigin}/__taomni_plugins__`;
+    }
+  }
   return `${origin}/${parts.map((part) => encodeURIComponent(part)).join("/")}`;
 }
 
