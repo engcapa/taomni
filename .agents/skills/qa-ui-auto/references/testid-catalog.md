@@ -3229,6 +3229,7 @@
 - `[data-testid="settings-welcome-recent-session-limit"]` — interactive — F11.1.welcome-recent-session-limit
 - `[data-testid="settings-merge-tool-window-rail"]` — interactive [optional] — F11.1.settings-merge-tool-window-rail
 - `[data-testid="settings-search-input"]` — interactive — F11.1.search-input
+- `#settings-theme-heading` — display — F11.1.application-theme-heading
 - `[data-testid="settings-search-count"]` — display — F11.1.search-count
 - `[data-testid="settings-search-empty"]` — display — F11.1.search-empty
 - `[data-testid="settings-reset-code-view-profile"]` — interactive — F11.1.reset-code-view-profile
@@ -3529,6 +3530,7 @@
 - `[data-testid="tao-home-mode-research"]` — interactive — F1.11.tao-home-mode-research
 - `[data-testid="tao-home-connect-card"]` — display — F1.11.tao-home-connect-card
 - `[data-testid="tao-home-open-settings"]` — interactive — F1.11.tao-home-open-settings
+- `#tao-settings-heading` — display — F1.11.tao-settings-heading
 - `[data-testid="tao-home-composer"]` — display — F1.11.tao-home-composer
 - `[data-testid="tao-home-composer-input"]` — interactive — F1.11.tao-home-composer-input
 - `[data-testid="tao-home-binding-bar"]` — display — F1.11.tao-home-binding-bar

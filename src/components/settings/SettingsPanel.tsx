@@ -63,7 +63,7 @@ export function SettingsPanel() {
     ensureGroupExpanded(id);
     // Expand may reflow; wait a frame so hidden=false is applied before scroll.
     window.requestAnimationFrame(() => {
-      anchorRefs.current.get(id)?.scrollIntoView?.({ block: "center", behavior: "smooth" });
+      anchorRefs.current.get(id)?.scrollIntoView?.({ block: "start", behavior: "smooth" });
     });
   }, [ensureGroupExpanded]);
 
@@ -85,7 +85,9 @@ export function SettingsPanel() {
           return;
         }
         anchor.scrollIntoView({
-          block: detail.presetId ? "start" : "center",
+          // Long sections can exceed the viewport. Start at their heading;
+          // SettingsAnchor's scroll margin clears the sticky search toolbar.
+          block: "start",
           behavior: attempts === 0 ? "auto" : "smooth",
         });
         if (!detail.presetId) clearPendingSettingsSection();

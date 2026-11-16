@@ -38,8 +38,8 @@ export function TaoSettingsPanel() {
       setMessage(label("已保存", "Saved"));
     } catch (error) { setMessage(String(error)); }
   };
-  return <div data-testid="tao-settings" className="space-y-3 py-3">
-    <h3 className="text-[14px] font-semibold">Tao · DeepSeek</h3>
+  return <div data-testid="tao-settings" className="space-y-3 py-3" role="region" aria-labelledby="tao-settings-heading">
+    <h3 id="tao-settings-heading" className="text-[14px] font-semibold">Tao · DeepSeek</h3>
     <p className="text-[12px] text-[var(--taomni-text-muted)]">{label("新对话使用以下默认设置；已有对话保留自己的模型和能力选择。", "New chats use these defaults. Existing chats retain their own model and capabilities.")}</p>
     <label className="flex items-center gap-2"><input type="checkbox" data-testid="tao-settings-enabled" checked={options.enabled} onChange={(event) => patch({ enabled: event.target.checked })} />{label("启用 Tao", "Enable Tao")}</label>
     <label className="block">{label("接口地址", "Endpoint")}<input className="taomni-input w-full" data-testid="tao-settings-endpoint" value={provider.base_url} onChange={(event) => setProvider({ ...provider, base_url: event.target.value })} /></label>

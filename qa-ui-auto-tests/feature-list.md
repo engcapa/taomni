@@ -144,6 +144,9 @@ controls:
 - id: tao-home-open-settings
   selector: '[data-testid="tao-home-open-settings"]'
   kind: interactive
+- id: tao-settings-heading
+  selector: '#tao-settings-heading'
+  kind: display
 - id: tao-home-composer
   selector: '[data-testid="tao-home-composer"]'
   kind: display
@@ -3603,6 +3606,10 @@ controls:
 
 ## 11. 应用全局设置 `SettingsPanel` ✅
 
+Tao Home 的无 Key 卡、更多菜单和外观入口复用单个设置标签，并定位到真实的 Tao / 应用主题区域。
+`TC-TAO-HOME-010` 在 1366×768 和 800×600 检查滚动结束后的标题、搜索栏与视口几何，
+覆盖高区块的深链与搜索；`TC-TAO-HOME-003` 保留相同入口的原生 WebView 回归。
+
 <!-- feature
 id: F11.1
 status: done
@@ -3627,6 +3634,9 @@ controls:
   - id: search-input
     selector: '[data-testid="settings-search-input"]'
     kind: interactive
+  - id: application-theme-heading
+    selector: '#settings-theme-heading'
+    kind: display
   - id: search-count
     selector: '[data-testid="settings-search-count"]'
     kind: display

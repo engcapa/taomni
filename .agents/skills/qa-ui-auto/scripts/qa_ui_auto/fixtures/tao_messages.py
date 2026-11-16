@@ -33,9 +33,13 @@ def setup(ctx):
     if root.resolve() != root or not root.is_relative_to(Path(ctx.report_root).resolve()):
         raise RuntimeError("Tao fixture config escaped its run")
     root.mkdir(parents=True, exist_ok=True)
-    log = Path(ctx.case_dir) / "tao-messages-events.txt"
+    # Hosted runs use relative report roots; file assertion verbs resolve their
+    # relative inputs from case_dir. Publish absolute fixture observations so
+    # the report prefix cannot be appended a second time.
+    case_dir = Path(ctx.case_dir).resolve()
+    log = case_dir / "tao-messages-events.txt"
     log.write_text("", encoding="utf-8")
-    observation = Path(ctx.case_dir) / "tao-messages-counts.json"
+    observation = case_dir / "tao-messages-counts.json"
     counts = {"requests": 0, "cancelled": 0, "completed": 0}
     observation.write_text(json.dumps(counts), encoding="utf-8")
     lock, stopping = threading.Lock(), threading.Event()

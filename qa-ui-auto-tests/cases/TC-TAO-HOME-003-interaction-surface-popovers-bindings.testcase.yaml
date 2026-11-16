@@ -10,6 +10,7 @@ modes:
 - native
 covers:
 - F1.11
+- F11.1
 tags:
 - p0
 - tao-home
@@ -81,6 +82,15 @@ steps:
 - click: '[data-testid="tao-home-more"]'
 - click: '[data-testid="tao-home-settings"]'
 - wait_for: '[data-testid="tao-settings"]'
+- eval_readonly:
+    expression: document.getElementById('tao-settings-heading').getBoundingClientRect().top >= document.getElementById('settings-search-input').getBoundingClientRect().bottom + 12
+    expect_truthy: true
+    timeout_sec: 5
+- assert_element_geometry:
+    selector: '[data-testid="tao-settings"] h3'
+    min_width: 100
+    min_height: 14
+    viewport_margin: 0
 - assert_count:
     selector: '[data-testid="tab-item"][data-tab-type="settings"]'
     equal: 1
