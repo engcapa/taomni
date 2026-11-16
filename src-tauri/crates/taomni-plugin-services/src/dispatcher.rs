@@ -72,6 +72,11 @@ impl std::fmt::Debug for CoreServiceDispatcher {
 }
 
 impl CoreServiceDispatcher {
+    /// Called by core transport containment after kernel termination evidence;
+    /// never exposed as a host service method or accepted from wire JSON.
+    pub fn record_host_terminated(&self, host: &crate::AuthorizedHost) {
+        self.admission.record_host_terminated(host);
+    }
     pub fn new(
         admission: OperationAdmission,
         backend: Arc<dyn CoreServiceBackend>,

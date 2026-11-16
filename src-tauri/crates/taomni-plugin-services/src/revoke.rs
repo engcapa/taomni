@@ -57,10 +57,15 @@ impl OperationAdmission {
         if let Some(generation) = generation {
             state.generation = generation;
         }
-        state.pending_acknowledgements = hosts.iter().map(|host| host.instance().clone()).collect();
+        state.pending_acknowledgements = hosts
+            .iter()
+            .filter(|host| !host.termination_confirmed())
+            .map(|host| host.instance().clone())
+            .collect();
         let active_hosts = state
             .operations
             .values()
+            .filter(|operation| !operation.host.termination_confirmed())
             .map(|operation| operation.host.instance().clone())
             .collect::<Vec<_>>();
         state.pending_acknowledgements.extend(active_hosts);
@@ -104,14 +109,38 @@ impl OperationAdmission {
         host: &AuthorizedHost,
         revocation: &Revocation,
     ) -> Result<(), CoreServiceError> {
-        self.acknowledge_revoke(
-            host,
-            &RevokedKeys {
-                host_instance: host.instance().clone(),
-                profile_generation: revocation.generation.clone(),
-                vault_epoch: revocation.epoch,
-            },
-        )
+        let mut state = self.0.state.lock().expect("service admission poisoned");
+        if state.mode != AdmissionState::Revoking
+            || state.epoch != revocation.epoch
+            || state.generation != revocation.generation
+            || !revocation.hosts.contains(host.instance())
+        {
+            return Err(CoreServiceError::StalePluginContext);
+        }
+        // HostProcess may already have delivered the same kernel receipt.
+        // Retry is valid only for this revocation, never an old epoch.
+        Self::record_termination(&mut state, host);
+        self.0.drained.notify_all();
+        Ok(())
+    }
+
+    /// Only the kernel-verified process owner calls this, after the complete
+    /// transport process tree has exited. Valid for every future epoch of this
+    /// same instance, including when its operation outlives registry replacement.
+    pub fn record_host_terminated(&self, host: &AuthorizedHost) {
+        let mut state = self.0.state.lock().expect("service admission poisoned");
+        Self::record_termination(&mut state, host);
+        self.0.drained.notify_all();
+    }
+
+    fn record_termination(state: &mut crate::admission::AdmissionData, host: &AuthorizedHost) {
+        host.mark_terminated();
+        for operation in state.operations.values() {
+            if operation.host.instance() == host.instance() {
+                operation.cancelled.store(true, Ordering::Release);
+            }
+        }
+        state.pending_acknowledgements.remove(host.instance());
     }
 
     pub fn wait_revoke_drained(

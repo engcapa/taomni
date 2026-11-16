@@ -68,7 +68,7 @@ impl PluginRegistry {
             .expect("plugin registry lock poisoned")
             .clone();
         let slug = &manifest.slug;
-        self.stop_host(slug);
+        self.stop_host(slug)?;
         let result = (|| {
             activate()?;
             self.scan_locked()?;

@@ -6,6 +6,7 @@
 //! The host never receives this crate's admission permits or OS lease handles.
 
 mod admission;
+mod core_operation;
 mod dispatcher;
 mod grants;
 mod operation;
@@ -16,6 +17,7 @@ mod service_request;
 mod session;
 
 pub use admission::{OperationAdmission, OperationPermit};
+pub use core_operation::CoreOperationPermit;
 pub use dispatcher::{CoreServiceBackend, CoreServiceDispatcher, DispatcherConfig};
 pub use operation::{BorrowedOperation, OperationKind};
 pub use policy::{AuthorizedHost, FixedKeyOwner, MFA_FIXED_KEY_OWNER, VerifiedHostGrants};

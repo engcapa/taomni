@@ -19,7 +19,10 @@ impl PluginRegistry {
             ));
         }
         self.quiescence.fetch_add(1, Ordering::AcqRel);
-        self.stop_hosts();
+        if let Err(error) = self.stop_hosts() {
+            self.quiescence.fetch_sub(1, Ordering::AcqRel);
+            return Err(error);
+        }
         Ok(QuiescenceGuard {
             registry: self.clone(),
         })
@@ -108,7 +111,7 @@ mod tests {
         let root = tempfile::tempdir().unwrap();
         let registry = PluginRegistry::new(root.path());
         let guard = registry.quiesce().unwrap();
-        registry.shutdown();
+        registry.shutdown().unwrap();
         drop(guard);
         assert!(registry.shutting_down.load(Ordering::Acquire));
         assert!(registry.quiesce().is_err());

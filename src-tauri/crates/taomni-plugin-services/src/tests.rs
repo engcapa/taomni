@@ -10,6 +10,9 @@ use taomni_profile_locks::*;
 const FIRST: &str = "a1234567-1234-1234-1234-123456789abc";
 const SECOND: &str = "b1234567-1234-1234-1234-123456789abc";
 
+#[path = "termination_tests.rs"]
+mod termination_tests;
+
 fn host(id: &str) -> AuthorizedHost {
     VerifiedHostGrants::from_verified_manifest(
         PluginSlug::parse("mfa").unwrap(),

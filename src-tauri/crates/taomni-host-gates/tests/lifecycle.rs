@@ -7,6 +7,20 @@ use taomni_plugin_api::{ErrorCode, RequestId};
 
 #[test]
 #[ignore = "cross-process gate: execute only on GitHub hosted runners"]
+fn startup_waits_for_the_declared_enable_hook_before_returning_the_host() {
+    let mut process = support::start(support::config());
+    let identity = process.invoke("hello/ping", None).unwrap();
+    assert_eq!(identity["pluginId"], "taomni-plugin-hello-plugin");
+    assert_eq!(identity["version"], "0.1.0");
+    assert_eq!(identity["enabled"], true);
+    process
+        .stop_confirmed(Instant::now() + Duration::from_secs(5))
+        .unwrap();
+    assert_eq!(process.state(), HostState::Stopped);
+}
+
+#[test]
+#[ignore = "cross-process gate: execute only on GitHub hosted runners"]
 fn idle_heartbeats_keep_the_real_host_alive_and_stop_is_final() {
     let mut process = support::start(support::config());
     let deadline = Instant::now() + Duration::from_secs(2);
@@ -48,7 +62,7 @@ fn crash_restart_keeps_one_budget_and_never_replays_the_failed_command() {
             Err(HostProcessError::Crashed)
         ));
         support::restart(&mut process);
-        assert!(process.invoke("hello/ping", None).is_ok());
+        assert_eq!(process.invoke("hello/ping", None).unwrap()["enabled"], true);
     }
     assert!(process.invoke("hello/crash", None).is_err());
     assert_eq!(process.tick(), HostTick::RestartExhausted);

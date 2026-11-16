@@ -1,4 +1,15 @@
 use super::*;
+use taomni_plugin_api::HandshakeRequest;
+
+impl HostProcess {
+    /// Registry barrier units own no child or pipe. Kernel/process behavior
+    /// is tested by the hosted lifecycle gates with the production adapter.
+    pub(crate) fn stopped_for_registry_test() -> Self {
+        let mut process = process(Duration::ZERO);
+        process.stop();
+        process
+    }
+}
 
 fn process(backoff: Duration) -> HostProcess {
     let mut supervisor = HostSupervisor::new(

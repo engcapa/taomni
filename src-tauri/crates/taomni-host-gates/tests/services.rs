@@ -196,24 +196,17 @@ fn restart_gets_new_authenticated_identity_and_rejects_old_transport_operation()
         harness.process.authorized_host().unwrap().instance(),
         old_host.instance()
     );
-    let stale = harness
-        .admission
-        .admit_until(
+    assert!(old_host.termination_confirmed());
+    assert!(matches!(
+        harness.admission.admit_until(
             &old_host,
             OperationId::parse("c1234567-1234-1234-1234-123456789abc").unwrap(),
             OperationKind::ReadData,
             VaultOperationLease::try_read(&harness.root).unwrap(),
             Instant::now() + Duration::from_secs(3),
-        )
-        .unwrap();
-    assert_eq!(
-        harness
-            .process
-            .invoke_with_operation(stale, "service/probe", None)
-            .unwrap_err()
-            .rpc_code(),
-        -32009
-    );
+        ),
+        Err(CoreServiceError::StalePluginContext)
+    ));
     assert_eq!(harness.probe()["present"], true);
 }
 
@@ -267,11 +260,23 @@ fn confirmed_stop_drains_a_live_service_host_before_admission_can_lock() {
     let mut harness = Harness::new(Duration::ZERO);
     harness.probe();
     let host = harness.process.authorized_host().unwrap().clone();
-    let revoke = harness.admission.begin_revoke(std::slice::from_ref(&host)).unwrap();
+    let revoke = harness
+        .admission
+        .begin_revoke(std::slice::from_ref(&host))
+        .unwrap();
     let deadline = Instant::now() + Duration::from_secs(5);
     harness.process.stop_confirmed(deadline).unwrap();
-    harness.admission.confirm_host_terminated(&host, &revoke).unwrap();
-    harness.admission.wait_revoke_drained(deadline, &|| false).unwrap();
+    assert!(host.termination_confirmed());
+    // The transport already delivered the kernel receipt; a coordinator retry
+    // for the same revocation remains valid.
+    harness
+        .admission
+        .confirm_host_terminated(&host, &revoke)
+        .unwrap();
+    harness
+        .admission
+        .wait_revoke_drained(deadline, &|| false)
+        .unwrap();
     harness.admission.finish_revoke(&revoke).unwrap();
     assert_eq!(harness.process.state(), HostState::Stopped);
 }
@@ -280,10 +285,53 @@ fn confirmed_stop_drains_a_live_service_host_before_admission_can_lock() {
 #[ignore = "real stdio core/SDK crash termination gate: GitHub runners only"]
 fn confirmed_stop_keeps_crashed_transport_ownership_until_termination_is_observed() {
     let mut harness = Harness::new(Duration::ZERO);
+    let host = harness.process.authorized_host().unwrap().clone();
+    let historical = harness.permit(Duration::from_secs(5));
+    let borrowed = harness
+        .admission
+        .borrow_operation(&host, historical.context())
+        .unwrap();
     let permit = harness.permit(Duration::from_secs(5));
-    assert!(harness.process.invoke_with_operation(permit, "service/crash", None).is_err());
+    assert!(
+        harness
+            .process
+            .invoke_with_operation(permit, "service/crash", None)
+            .is_err()
+    );
     assert!(harness.process.authorized_host().is_none());
-    harness.process.stop_confirmed(Instant::now() + Duration::from_secs(5)).unwrap();
+    assert!(!host.termination_confirmed());
+    harness
+        .process
+        .stop_confirmed(Instant::now() + Duration::from_secs(5))
+        .unwrap();
+    assert!(host.termination_confirmed());
+    let revoke = harness
+        .admission
+        .begin_revoke(std::slice::from_ref(&host))
+        .unwrap();
+    assert!(
+        revoke.hosts.is_empty(),
+        "retired transport must not leave an impossible revoke ack"
+    );
+    assert_eq!(
+        borrowed.check_current(),
+        Err(CoreServiceError::StalePluginContext)
+    );
+    assert_eq!(
+        harness.admission.finish_revoke(&revoke),
+        Err(CoreServiceError::CoreServiceBusy)
+    );
+    drop(historical);
+    assert_eq!(
+        harness.admission.finish_revoke(&revoke),
+        Err(CoreServiceError::CoreServiceBusy)
+    );
+    drop(borrowed);
+    harness
+        .admission
+        .wait_revoke_drained(Instant::now() + Duration::from_secs(5), &|| false)
+        .unwrap();
+    harness.admission.finish_revoke(&revoke).unwrap();
     assert_eq!(harness.process.state(), HostState::Stopped);
     assert!(VaultOperationLease::try_write(&harness.root).is_ok());
 }

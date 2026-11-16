@@ -38,6 +38,8 @@ pub fn start(config: HostSupervisorConfig) -> HostProcess {
             "hello/ping".into(),
             "hello/crash".into(),
             "hello/hang".into(),
+            "plugin/enable".into(),
+            "plugin/disable".into(),
         ],
         &[],
         config,

@@ -3,13 +3,11 @@
 
 use std::io;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::time::{Duration, Instant};
 
 use serde_json::Value;
 use taomni_plugin_api::{
-    CancelRequest, ErrorCode, HandshakeRequest, HandshakeResponse, Heartbeat, RequestId, RpcError,
-    RpcMessage, RpcRequest, RpcResponse, validate_versions,
+    CancelRequest, ErrorCode, Heartbeat, RequestId, RpcError, RpcMessage, RpcRequest, RpcResponse,
 };
 
 use super::{
@@ -19,6 +17,8 @@ use super::{
 
 #[path = "cancellation.rs"]
 mod cancellation;
+#[path = "launch.rs"]
+mod launch;
 #[path = "pump.rs"]
 mod pump;
 #[path = "service_requests.rs"]
@@ -30,7 +30,7 @@ pub use cancellation::HostCancellation;
 use cancellation::RequestGuard;
 use pump::PumpOutcome;
 pub use service_requests::HostServiceConfig;
-use service_requests::{fresh_host_instance, service_error};
+use service_requests::service_error;
 use taomni_plugin_services::{OperationPermit, ServiceSession};
 use transport::Transport;
 
@@ -170,7 +170,7 @@ impl HostProcess {
             services: None,
             active_operation: None,
         };
-        process.spawn_and_handshake()?;
+        process.spawn_and_activate()?;
         Ok(process)
     }
 
@@ -333,7 +333,7 @@ impl HostProcess {
         self.confirm_retired(Instant::now() + Duration::from_secs(5))?;
         self.restart_due.take();
         self.supervisor.mark_restarted(self.elapsed_ms());
-        if let Err(error) = self.spawn_and_handshake() {
+        if let Err(error) = self.spawn_and_activate() {
             self.schedule_restart();
             return Err(error);
         }
@@ -365,82 +365,6 @@ impl HostProcess {
             transport.terminate_confirmed(deadline)?;
         }
         self.retired_transports.clear();
-        Ok(())
-    }
-
-    fn spawn_and_handshake(&mut self) -> Result<(), HostProcessError> {
-        self.discard_services();
-        self.token = process_token();
-        let mut command = Command::new(&self.launch.host);
-        command
-            .current_dir(&self.launch.working_dir)
-            .env("TAOMNI_PLUGIN_TOKEN", &self.token);
-        self.transport = Some(Transport::spawn(command)?);
-        let mut request = HandshakeRequest::new(
-            &self.launch.plugin_id,
-            &self.launch.plugin_version,
-            &self.token,
-            self.launch.commands.clone(),
-            self.launch.permissions.clone(),
-        );
-        if let Some(services) = &self.service_config {
-            request.core_services = services.grants.service_capabilities();
-            request.host_instance = Some(fresh_host_instance());
-        }
-        let id = self.next_request_id();
-        let message = RpcMessage::Request(RpcRequest::new(
-            id.clone(),
-            "plugin/handshake",
-            Some(serde_json::to_value(&request).expect("serializable handshake")),
-        ));
-        let deadline = Instant::now() + self.supervisor.config().request_timeout;
-        self.transport
-            .as_ref()
-            .expect("spawned transport")
-            .write(&message, deadline, None)?;
-        let response = self.receive_response(&id, deadline, false)?;
-        let value = response
-            .result
-            .ok_or_else(|| response_error(response.error))?;
-        let handshake: HandshakeResponse = serde_json::from_value(value)
-            .map_err(|error| HostProcessError::Handshake(error.to_string()))?;
-        validate_versions(handshake.api_version, handshake.protocol_version)
-            .map_err(|error| HostProcessError::Handshake(error.message))?;
-        if !handshake.accepted {
-            return Err(HostProcessError::Handshake(
-                handshake
-                    .error
-                    .map(|error| error.message)
-                    .unwrap_or_else(|| "host rejected handshake".into()),
-            ));
-        }
-        if request
-            .core_services
-            .0
-            .iter()
-            .any(|(name, version)| !handshake.core_services.supports(name, *version))
-        {
-            return Err(HostProcessError::Handshake(
-                "required core service was not negotiated".into(),
-            ));
-        }
-        let accepted = self
-            .supervisor
-            .accept_handshake(&request, &self.token, self.elapsed_ms());
-        if !accepted.accepted {
-            return Err(HostProcessError::Handshake(
-                "core rejected handshake".into(),
-            ));
-        }
-        if let Some(config) = &self.service_config {
-            self.services = Some(ServiceSession::new(
-                config.dispatcher.clone(),
-                config.grants.clone().bind_authenticated_transport(
-                    request.host_instance.expect("service transport identity"),
-                ),
-            ));
-        }
-        self.next_heartbeat_ms = self.elapsed_ms();
         Ok(())
     }
 
@@ -483,15 +407,6 @@ impl Drop for HostProcess {
     fn drop(&mut self) {
         self.stop();
     }
-}
-
-fn response_error(error: Option<RpcError>) -> HostProcessError {
-    error
-        .map(|error| HostProcessError::Rpc {
-            code: error.code,
-            message: error.message,
-        })
-        .unwrap_or_else(|| HostProcessError::Handshake("handshake returned no result".into()))
 }
 
 fn process_token() -> String {

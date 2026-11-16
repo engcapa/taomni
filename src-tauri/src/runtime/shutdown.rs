@@ -10,6 +10,7 @@ pub(crate) enum ExitAction {
 }
 
 pub(crate) async fn request(app: tauri::AppHandle, action: ExitAction) -> Result<(), String> {
+    let quiet = std::sync::Mutex::new(None);
     app.state::<crate::app_exit::ExitGate>()
         .run(
             async {
@@ -18,16 +19,30 @@ pub(crate) async fn request(app: tauri::AppHandle, action: ExitAction) -> Result
                 crate::backup::scheduler::prepare_exit(&app, action == ExitAction::Restart).await;
                 crate::sockscap::prepare_for_exit(&app, app.state::<AppState>()).await?;
                 crate::screenshot::wait_for_recovery_recording().await?;
+                // Keep this reversible barrier through commit. Confirmation
+                // failures reach the existing exit UI before other owners stop.
+                let plugins = app.state::<AppState>().plugins.clone();
+                let guard = tauri::async_runtime::spawn_blocking(move || plugins.quiesce())
+                    .await.map_err(|error| error.to_string())?
+                    .map_err(|error| error.to_string())?;
+                *quiet.lock().expect("exit quiescence poisoned") = Some(guard);
                 Ok(())
             },
             || {
                 // Commit owns teardown independently of the caller's IPC future.
                 // A renderer reload/cancellation cannot reset a partly stopped app.
                 let app = app.clone();
+                let guard = quiet.lock().expect("exit quiescence poisoned").take();
                 tauri::async_runtime::spawn(async move {
-                    app.state::<ApplicationRuntime>()
+                    let _guard = guard;
+                    if let Err(error) = app.state::<ApplicationRuntime>()
                         .shutdown(&app.state::<AppState>())
-                        .await;
+                        .await
+                    {
+                        tracing::warn!(%error, "Application remains open after unconfirmed plugin teardown");
+                        app.state::<crate::app_exit::ExitGate>().refuse_teardown();
+                        return;
+                    }
                     crate::webview_recovery::closing_all(&app);
                     app.state::<crate::app_exit::ExitGate>()
                         .allow_platform_exit();
@@ -77,7 +92,9 @@ pub(crate) fn final_exit(app: &tauri::AppHandle) {
         app.try_state::<ApplicationRuntime>(),
         app.try_state::<AppState>(),
     ) {
-        tauri::async_runtime::block_on(runtime.shutdown(&state));
+        if let Err(error) = tauri::async_runtime::block_on(runtime.shutdown(&state)) {
+            tracing::warn!(%error, "Final plugin termination was not confirmed");
+        }
         crate::sockscap::shutdown_on_exit(app, &state);
     }
 }

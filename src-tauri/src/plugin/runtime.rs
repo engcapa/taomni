@@ -13,6 +13,20 @@ pub(super) struct RuntimeHost {
     directory: PathBuf,
 }
 
+#[cfg(test)]
+impl RuntimeHost {
+    pub(super) fn stopped_for_test(manifest: ModuleManifest) -> Self {
+        let process = host::HostProcess::stopped_for_registry_test();
+        Self {
+            cancellation: process.cancellation_handle(),
+            process: Mutex::new(process),
+            identity: RwLock::new(None),
+            manifest,
+            directory: PathBuf::new(),
+        }
+    }
+}
+
 impl PluginRegistry {
     /// A single weak monitor follows the application-owned registry. It never
     /// holds the hosts map or records lock while invoking a process adapter.
@@ -65,7 +79,9 @@ impl PluginRegistry {
                             .get(slug)
                             .is_some_and(|current| Arc::ptr_eq(current, &runtime))
                     {
-                        process.stop();
+                        if let Err(error) = process.stop_confirmed(stop_deadline()) {
+                            log::warn!("plugin stale-host cleanup unconfirmed: {error}");
+                        }
                         continue;
                     }
                     if matches!(process.tick(), host::HostTick::RestartReady { .. }) {
@@ -73,7 +89,9 @@ impl PluginRegistry {
                             .map_or(true, |manifest| manifest != runtime.manifest)
                         {
                             log::warn!("plugin restart denied: installed package changed");
-                            process.stop();
+                            if let Err(error) = process.stop_confirmed(stop_deadline()) {
+                                log::warn!("plugin untrusted-host cleanup unconfirmed: {error}");
+                            }
                             continue;
                         }
                         // Requests are never replayed. Restart only restores the
@@ -87,48 +105,6 @@ impl PluginRegistry {
                 }
             }
         });
-    }
-
-    pub fn shutdown(&self) {
-        {
-            let _lifecycle = self
-                .lifecycle
-                .lock()
-                .expect("plugin lifecycle lock poisoned");
-            self.shutting_down.store(true, Ordering::Release);
-            self.stop_hosts();
-        }
-        if let Some(services) = &self.services {
-            services.dispatcher.shutdown();
-        }
-    }
-
-    pub(super) fn stop_hosts(&self) {
-        let hosts = self
-            .hosts
-            .lock()
-            .expect("plugin host lock poisoned")
-            .drain()
-            .map(|(_, runtime)| runtime)
-            .collect::<Vec<_>>();
-        for runtime in hosts {
-            let ids = self
-                .pending_requests
-                .lock()
-                .expect("plugin request lock poisoned")
-                .keys()
-                .filter(|(slug, _)| slug == &runtime.manifest.slug)
-                .map(|(_, id)| id.clone())
-                .collect::<Vec<_>>();
-            for id in ids {
-                self.cancel_request(&runtime.manifest.slug, &id);
-            }
-            runtime
-                .process
-                .lock()
-                .expect("plugin process lock poisoned")
-                .stop();
-        }
     }
 
     pub(super) fn host_for(
@@ -235,30 +211,8 @@ impl PluginRegistry {
         }
         Ok((working_dir, host_path, verified))
     }
+}
 
-    pub(super) fn stop_host(&self, slug: &str) {
-        let ids = self
-            .pending_requests
-            .lock()
-            .expect("plugin request lock poisoned")
-            .keys()
-            .filter(|(owner, _)| owner == slug)
-            .map(|(_, id)| id.clone())
-            .collect::<Vec<_>>();
-        for id in ids {
-            self.cancel_request(slug, &id);
-        }
-        let runtime = self
-            .hosts
-            .lock()
-            .expect("plugin host lock poisoned")
-            .remove(slug);
-        if let Some(runtime) = runtime {
-            runtime
-                .process
-                .lock()
-                .expect("plugin process lock poisoned")
-                .stop();
-        }
-    }
+fn stop_deadline() -> std::time::Instant {
+    std::time::Instant::now() + Duration::from_secs(5)
 }

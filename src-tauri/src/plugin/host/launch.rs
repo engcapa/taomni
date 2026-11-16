@@ -1,0 +1,115 @@
+//! A host becomes usable only after authenticated handshake and its declared
+//! activation hook have completed. Replacements follow the same path; requests
+//! from the previous process are never replayed.
+use super::service_requests::fresh_host_instance;
+use super::{HostProcess, HostProcessError, Transport, process_token};
+use std::{process::Command, time::Instant};
+use taomni_plugin_api::{
+    HandshakeRequest, HandshakeResponse, RpcError, RpcMessage, RpcRequest, validate_versions,
+};
+use taomni_plugin_services::ServiceSession;
+
+impl HostProcess {
+    pub(super) fn spawn_and_activate(&mut self) -> Result<(), HostProcessError> {
+        let deadline = Instant::now() + self.supervisor.config().request_timeout;
+        self.spawn_and_handshake(deadline)?;
+        // Lifecycle hooks are optional in protocol v1. Never send a hook that
+        // is absent from the authenticated manifest (e.g. a service-only host).
+        if self
+            .launch
+            .commands
+            .iter()
+            .any(|method| method == "plugin/enable")
+        {
+            let id = self.next_request_id();
+            self.invoke_until(id, "plugin/enable", None, Some(deadline))?;
+        }
+        Ok(())
+    }
+
+    fn spawn_and_handshake(&mut self, deadline: Instant) -> Result<(), HostProcessError> {
+        self.discard_services();
+        self.token = process_token();
+        let mut command = Command::new(&self.launch.host);
+        command
+            .current_dir(&self.launch.working_dir)
+            .env("TAOMNI_PLUGIN_TOKEN", &self.token);
+        self.transport = Some(Transport::spawn(command)?);
+        let mut request = HandshakeRequest::new(
+            &self.launch.plugin_id,
+            &self.launch.plugin_version,
+            &self.token,
+            self.launch.commands.clone(),
+            self.launch.permissions.clone(),
+        );
+        if let Some(services) = &self.service_config {
+            request.core_services = services.grants.service_capabilities();
+            request.host_instance = Some(fresh_host_instance());
+        }
+        let id = self.next_request_id();
+        let message = RpcMessage::Request(RpcRequest::new(
+            id.clone(),
+            "plugin/handshake",
+            Some(serde_json::to_value(&request).expect("serializable handshake")),
+        ));
+        self.transport
+            .as_ref()
+            .expect("spawned transport")
+            .write(&message, deadline, None)?;
+        let response = self.receive_response(&id, deadline, false)?;
+        let value = response
+            .result
+            .ok_or_else(|| response_error(response.error))?;
+        let handshake: HandshakeResponse = serde_json::from_value(value)
+            .map_err(|error| HostProcessError::Handshake(error.to_string()))?;
+        validate_versions(handshake.api_version, handshake.protocol_version)
+            .map_err(|error| HostProcessError::Handshake(error.message))?;
+        if !handshake.accepted {
+            return Err(HostProcessError::Handshake(
+                handshake
+                    .error
+                    .map(|error| error.message)
+                    .unwrap_or_else(|| "host rejected handshake".into()),
+            ));
+        }
+        if request
+            .core_services
+            .0
+            .iter()
+            .any(|(name, version)| !handshake.core_services.supports(name, *version))
+        {
+            return Err(HostProcessError::Handshake(
+                "required core service was not negotiated".into(),
+            ));
+        }
+        let accepted = self
+            .supervisor
+            .accept_handshake(&request, &self.token, self.elapsed_ms());
+        if !accepted.accepted {
+            return Err(HostProcessError::Handshake(
+                "core rejected handshake".into(),
+            ));
+        }
+        if let Some(config) = &self.service_config {
+            let host = config.grants.clone().bind_authenticated_transport(
+                request.host_instance.expect("service transport identity"),
+            );
+            self.transport
+                .as_mut()
+                .expect("handshaken transport")
+                .bind_services(config.dispatcher.clone(), host.clone());
+            self.services = Some(ServiceSession::new(config.dispatcher.clone(), host));
+        }
+        self.next_heartbeat_ms = self.elapsed_ms();
+        Ok(())
+    }
+}
+
+fn response_error(error: Option<RpcError>) -> HostProcessError {
+    error
+        .map(|error| HostProcessError::Rpc {
+            code: error.code,
+            message: error.message,
+        })
+        .unwrap_or_else(|| HostProcessError::Handshake("handshake returned no result".into()))
+}

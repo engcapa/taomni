@@ -68,8 +68,11 @@ async fn serve() -> Result<(), String> {
     let runtime = boot.runtime;
     runtime.start();
     let result = serve_state(&state, &runtime, &data, lan, port).await;
-    runtime.shutdown(&state).await;
-    result
+    let shutdown = runtime.shutdown(&state).await;
+    if let Err(error) = &shutdown {
+        tracing::warn!(%error, "Headless plugin termination was not confirmed");
+    }
+    result.and(shutdown)
 }
 
 async fn serve_state(

@@ -42,6 +42,9 @@ The root host owner implements TASK-025-D against these files:
 
 - `policy.rs`: `VerifiedHostGrants`, `AuthorizedHost`, `fixed_key_owner`.
 - `admission.rs`: outer `OperationPermit` and `borrow_operation`.
+- `core_operation.rs`: in-process `CoreOperationPermit` shares the drain and
+  lease barrier while legacy MFA still lives in core. It has no host identity
+  or wire context and cannot authorize reverse service requests.
 - `operation.rs`: borrowed existing OS lease and context validity checks.
 - `service_request.rs`: bounded reverse requests and remembered IDs.
 - `sensitive_frame.rs`: hold the whole frame through queued/finished/discarded
@@ -51,6 +54,16 @@ The root host owner implements TASK-025-D against these files:
   required before `finish_revoke` can reach `Locked`.
 - `grants.rs`: only core-confirmed reset/password verification issues grants;
   passwords are removed before the host invoke is sent.
+
+The production transport retains its authenticated identity after dropping a
+crashed `ServiceSession`. Only successful kernel confirmation of its complete
+process tree calls `record_host_terminated`; sending kill, dropping transport,
+or cancellation is insufficient. Identity clones share that receipt, so a
+retired operation cannot leave a revoke acknowledgment that is impossible to
+obtain. In-flight operations and sensitive frames still have to release their
+leases before drain succeeds. Confirmation is retryable for the same current
+revocation; stale epoch/generation acknowledgments remain invalid. Registry
+cleanup must retain the runtime on failure rather than remove it before stop.
 
 Acquire `VaultOperationLease` **before** host/DB/Vault mutexes. Normal operations
 hold read, initialization/reset hold write. A reverse request borrows the

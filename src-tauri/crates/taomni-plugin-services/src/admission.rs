@@ -96,6 +96,11 @@ impl OperationAdmission {
             return Err(CoreServiceError::PermissionDenied);
         }
         let mut state = self.0.state.lock().expect("service admission poisoned");
+        // Serialized with record_host_terminated: a transport cannot be
+        // registered after its kernel-verified termination was recorded.
+        if host.termination_confirmed() {
+            return Err(CoreServiceError::StalePluginContext);
+        }
         if state.mode != AdmissionState::Open {
             return Err(CoreServiceError::VaultLocked);
         }
@@ -142,6 +147,7 @@ impl OperationAdmission {
             || state.epoch != context.vault_epoch
             || state.generation != context.profile_generation
             || authenticated_host.instance() != &context.host_instance
+            || authenticated_host.termination_confirmed()
         {
             return Err(CoreServiceError::StalePluginContext);
         }
@@ -150,6 +156,7 @@ impl OperationAdmission {
             .get(&context.operation)
             .ok_or(CoreServiceError::StalePluginContext)?;
         if record.context != *context
+            || record.host.termination_confirmed()
             || record.host.slug() != authenticated_host.slug()
             || record.cancelled.load(Ordering::Acquire)
             || !record.outer_active.load(Ordering::Acquire)

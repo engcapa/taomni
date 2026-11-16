@@ -3,6 +3,7 @@
 
 use std::io::{self, Read, Write};
 use std::process::{Child, Command, Stdio};
+use std::sync::Arc;
 use std::sync::mpsc::{self, Receiver, Sender, SyncSender, TrySendError};
 use std::thread;
 use std::time::{Duration, Instant};
@@ -24,6 +25,12 @@ pub(super) struct Transport {
     containment: ProcessContainment,
     writer: SyncSender<WriteTask>,
     pub(super) reader: Receiver<ReadResult>,
+    // Outlives ServiceSession when a crashed transport is awaiting reaping.
+    // Drop/kill do not constitute evidence that its whole tree has exited.
+    service_owner: Option<(
+        Arc<taomni_plugin_services::CoreServiceDispatcher>,
+        taomni_plugin_services::AuthorizedHost,
+    )>,
 }
 
 impl Transport {
@@ -36,7 +43,23 @@ impl Transport {
     ) -> Result<(), HostProcessError> {
         self.containment
             .terminate_confirmed(&mut self.child, deadline)
-            .map_err(HostProcessError::Io)
+            .map_err(HostProcessError::Io)?;
+        if let Some((dispatcher, host)) = &self.service_owner {
+            dispatcher.record_host_terminated(host);
+        }
+        Ok(())
+    }
+
+    pub(super) fn bind_services(
+        &mut self,
+        dispatcher: Arc<taomni_plugin_services::CoreServiceDispatcher>,
+        host: taomni_plugin_services::AuthorizedHost,
+    ) {
+        assert!(
+            self.service_owner.is_none(),
+            "transport already authenticated"
+        );
+        self.service_owner = Some((dispatcher, host));
     }
     pub(super) fn spawn(mut command: Command) -> Result<Self, HostProcessError> {
         command
@@ -110,6 +133,7 @@ impl Transport {
             containment,
             writer,
             reader,
+            service_owner: None,
         })
     }
 

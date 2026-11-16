@@ -38,19 +38,26 @@ impl ApplicationRuntime {
             );
         }
     }
-    pub(crate) async fn shutdown(&self, state: &AppState) {
+    pub(crate) async fn shutdown(&self, state: &AppState) -> Result<(), String> {
         if self.stopped.swap(true, Ordering::AcqRel) {
-            return;
+            return Ok(());
         }
-        self.plugins.shutdown();
+        if let Err(error) = self.plugins.shutdown() {
+            // No other owner has been torn down yet; keep this cleanup retryable.
+            self.stopped.store(false, Ordering::Release);
+            return Err(error.to_string());
+        }
         state.plugin_downloads.shutdown_and_wait().await;
         self.tasks.shutdown().await;
         shutdown::stop_business_runtimes(state).await;
+        Ok(())
     }
 }
 impl Drop for ApplicationRuntime {
     fn drop(&mut self) {
         // Setup errors and unwinding cannot leave a supervised host running.
-        self.plugins.shutdown();
+        if let Err(error) = self.plugins.shutdown() {
+            tracing::warn!(%error, "Plugin termination remained unconfirmed during runtime drop");
+        }
     }
 }

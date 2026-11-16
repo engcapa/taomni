@@ -84,6 +84,9 @@ impl BorrowedOperation {
         if state.epoch != self.0.context.vault_epoch
             || state.generation != self.0.context.profile_generation
             || state.mode != crate::AdmissionState::Open
+            || self.0.host.termination_confirmed()
+            || self.0.cancelled.load(Ordering::Acquire)
+            || !self.0.outer_active.load(Ordering::Acquire)
         {
             return Err(CoreServiceError::StalePluginContext);
         }

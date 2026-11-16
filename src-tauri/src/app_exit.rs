@@ -21,6 +21,17 @@ impl ExitGate {
     pub(crate) fn platform_exit_allowed(&self) -> bool {
         self.exit_allowed.load(Ordering::Acquire)
     }
+
+    /// Plugin teardown can refuse before downloads/tasks/business owners stop.
+    /// The committed worker calls this only while platform exit is still denied.
+    pub(crate) fn refuse_teardown(&self) {
+        assert!(
+            !self.platform_exit_allowed(),
+            "platform exit already allowed"
+        );
+        self.committed.store(false, Ordering::Release);
+        self.active.store(false, Ordering::Release);
+    }
     pub async fn run(
         &self,
         prepare: impl Future<Output = Result<(), String>>,
@@ -113,6 +124,19 @@ mod tests {
         );
         assert!(!gate.is_committed());
         assert!(ready(gate.run(async { Ok(()) }, || {})).is_ok());
+    }
+
+    #[test]
+    fn unconfirmed_plugin_teardown_does_not_allow_exit_and_can_be_retried() {
+        let gate = ExitGate::default();
+        assert!(ready(gate.run(async { Ok(()) }, || {})).is_ok());
+        assert!(gate.is_committed());
+        assert!(!gate.platform_exit_allowed());
+        gate.refuse_teardown();
+        assert!(!gate.is_committed());
+        assert!(!gate.platform_exit_allowed());
+        assert!(ready(gate.run(async { Ok(()) }, || {})).is_ok());
+        assert!(gate.is_committed());
     }
 
     #[test]

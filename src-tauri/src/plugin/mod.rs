@@ -17,6 +17,7 @@ mod runtime;
 pub(crate) mod services;
 pub use quiescence::QuiescenceGuard;
 mod signed_catalog;
+mod stopping;
 pub mod verify;
 
 pub(crate) use installation::current_platform;
@@ -247,7 +248,7 @@ impl PluginRegistry {
             .cloned()
             .collect::<Vec<_>>();
         for slug in stale {
-            self.stop_host(&slug);
+            self.stop_host(&slug)?;
         }
         *self.records.write().expect("plugin registry lock poisoned") = records;
         self.frontend_trust
@@ -311,14 +312,14 @@ impl PluginRegistry {
                 "active manifest changed; refresh modules before enabling".into(),
             ));
         }
+        if !enabled {
+            self.stop_host(slug)?;
+        }
         record.state = if enabled {
             LifecycleState::Enabled
         } else {
             LifecycleState::Disabled
         };
-        if !enabled {
-            self.stop_host(slug);
-        }
         let snapshot = records.clone();
         drop(records);
         if let Err(error) = self.persist_enabled_state(&snapshot) {
@@ -359,7 +360,7 @@ impl PluginRegistry {
             .lifecycle
             .lock()
             .expect("plugin lifecycle lock poisoned");
-        self.stop_host(slug);
+        self.stop_host(slug)?;
         install::ModuleInstaller::new(&self.root).uninstall(slug, delete_data)?;
         self.scan_locked()?;
         // Removing the active pointer makes the record `Uninstalled`; clear

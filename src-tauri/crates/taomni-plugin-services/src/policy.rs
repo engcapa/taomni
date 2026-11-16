@@ -1,4 +1,8 @@
 use std::collections::BTreeSet;
+use std::sync::{
+    Arc,
+    atomic::{AtomicBool, Ordering},
+};
 
 use taomni_plugin_api::services::{
     CoreServiceError, FIXED_KEY_SERVICE, FixedKeyId, HostInstanceId, MFA_DATA_KEY_ID,
@@ -69,6 +73,7 @@ impl VerifiedHostGrants {
         AuthorizedHost {
             instance,
             grants: self,
+            terminated: Arc::new(AtomicBool::new(false)),
         }
     }
 }
@@ -78,9 +83,18 @@ impl VerifiedHostGrants {
 pub struct AuthorizedHost {
     instance: HostInstanceId,
     grants: VerifiedHostGrants,
+    // Shared by the runtime, queued operations and retired transports. No
+    // unbounded global tombstone table is needed after a transport is reaped.
+    terminated: Arc<AtomicBool>,
 }
 
 impl AuthorizedHost {
+    pub fn termination_confirmed(&self) -> bool {
+        self.terminated.load(Ordering::Acquire)
+    }
+    pub(crate) fn mark_terminated(&self) {
+        self.terminated.store(true, Ordering::Release);
+    }
     pub fn instance(&self) -> &HostInstanceId {
         &self.instance
     }
