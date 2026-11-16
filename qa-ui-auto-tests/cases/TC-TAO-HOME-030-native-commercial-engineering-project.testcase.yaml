@@ -1,0 +1,42 @@
+id: TC-TAO-HOME-030
+title: Native OpenCode task application, CLI, persistence, repair and feature loop
+description: >-
+  The actual model authors an isolated Python persisted task application, CLI, README and tests through Tao
+  Home. Every file and command waits for visible confirmation. Real native test
+  processes cover initial success, an explicit controlled regression, failed
+  feedback, repair, feature extension and successful final tests. Replies are
+  checked by flow and results, not exact wording. This opt-in commercial case
+  uses the configured provider; no secret enters the case or report.
+modes: [native]
+covers: [F1.11]
+tags: [p0, tao-home, native, real-provider, regression]
+fixtures: [reset_db, tao_real_provider]
+timeout_sec: 600
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-tao-home-030-project
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- wait_for: '[data-testid="tao-home-composer-input"]:enabled'
+- observe_tao_provider: null
+- tao_real_provider_expanded: {scenario: project}
+- assert_no_runtime_errors: null
+- screenshot: tao-agent-project-final.png
+verification:
+  review: reviewed
+  requirements:
+  - id: AGENT-ENGINEERING-PROJECT
+    requirement: Approved real files and native test exits drive the next development round.
+    actions: [1, 2, 3, 4, 5, 6]
+    checkpoints:
+    - {step: 7, expectation: "No write before approval; actual task repository, CLI, README and tests; native tests pass, then fail after the explicit regression; the model receives the actual failure, repairs it, extends functionality and tests pass again. The final review adds no unapproved actions. Explicit invalid credentials are recorded separately with later stages unverified."}
+    - {step: 8, expectation: No unhandled runtime errors.}
+    results: [7, 8]
+  native:
+  - check: Commercial inference, filesystem changes and actual child process exit statuses
+    method: automated
+    reason: Browser stubs cannot establish native provider, approved disk effects or real tests.
+  visual:
+  - check: Action review cards and result readability
+    method: manual
+    reason: Retained screenshots support review; text/exit checks do not certify full prototype fidelity.

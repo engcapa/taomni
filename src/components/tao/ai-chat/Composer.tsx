@@ -36,7 +36,7 @@ export function TaoComposer({ controller, state, disabled = false }: { controlle
         aria-label={tr("给 Tao 的消息")}
         value={state.composer.text}
         disabled={disabled}
-        placeholder={disabled ? tr("请先连接 DeepSeek · 全家桶") : tr("问 Tao 任何开发问题…（{key} 发送）", { key: shortcutLabel })}
+        placeholder={disabled ? tr("请先配置 Tao 服务提供方") : tr("问 Tao 任何开发问题…（{key} 发送）", { key: shortcutLabel })}
         onChange={(event) => controller.setComposerText(event.target.value)}
         onKeyDown={(event) => {
           if (event.key === "Escape" && active) { event.preventDefault(); void controller.stop(); return; }
@@ -51,7 +51,13 @@ export function TaoComposer({ controller, state, disabled = false }: { controlle
             <Sparkles size={14} /> {state.composer.model.replace("deepseek-", "")} {state.composer.thinking ? `· ${tr("思考")}` : ""}{state.composer.web ? ` · ${tr("联网")}` : ""}
           </button>
           <TaoPopover owner={plus} label={tr("添加上下文")}><div className="tao-home-popup-items"><button type="button" data-testid="tao-home-context-attach" onClick={() => { controller.setSidePanel("文件"); plus.close(false); }}><Paperclip size={14} />{tr("引用文件")}</button><button type="button" data-testid="tao-home-context-workflows" onClick={() => { controller.setSidePanel("工作流"); plus.close(false); }}>{tr("技能 / 工作流")}</button><button type="button" data-testid="tao-home-context-local" onClick={() => { controller.setSearchOpen(true); plus.close(false); }}>{tr("本地资料")}</button></div></TaoPopover>
-          <TaoPopover owner={capabilities} label={tr("模型与能力")}><div className="tao-home-popup-items"><button type="button" data-testid="tao-home-capability-thinking" onClick={() => { controller.setComposerOption("thinking", !state.composer.thinking); capabilities.close(false); }}>{tr("思考")} {state.composer.thinking ? "✓" : ""}</button><button type="button" data-testid="tao-home-capability-web" onClick={() => { controller.setComposerOption("web", !state.composer.web); capabilities.close(false); }}>{tr("联网")} {state.composer.web ? "✓" : ""}</button>{(["deepseek-flash", "deepseek-v4-pro"] as const).map((model) => <button type="button" data-testid={`tao-home-capability-model-${model}`} key={model} onClick={() => { controller.setModel(model); capabilities.close(false); }}>{model} {state.composer.model === model ? "✓" : ""}</button>)}</div></TaoPopover>
+          <TaoPopover owner={capabilities} label={tr("模型与能力")}><div className="tao-home-popup-items">
+            <label>{tr("服务提供方")}<select data-testid="tao-home-provider" value={state.composer.provider ?? "deepseek-app"} onChange={(event) => controller.setProvider(event.target.value as "deepseek-app" | "opencode-go")}><option value="deepseek-app">DeepSeek App</option><option value="opencode-go">OpenCode Go</option></select></label>
+            <button type="button" data-testid="tao-home-capability-thinking" onClick={() => { controller.setComposerOption("thinking", !state.composer.thinking); capabilities.close(false); }}>{tr("思考")} {state.composer.thinking ? "✓" : ""}</button>
+            {state.composer.provider === "opencode-go" ? <label>{tr("思考强度")}<select data-testid="tao-home-reasoning-effort" value={state.composer.reasoningEffort ?? "high"} onChange={(event) => controller.setReasoningEffort(event.target.value as "low" | "medium" | "high" | "max")}>{["low", "medium", "high", "max"].map((effort) => <option key={effort} value={effort}>{effort}</option>)}</select></label> : null}
+            <button type="button" data-testid="tao-home-capability-web" onClick={() => { controller.setComposerOption("web", !state.composer.web); capabilities.close(false); }}>{tr("联网")} {state.composer.web ? "✓" : ""}</button>
+            {(state.composer.provider === "opencode-go" ? ["deepseek-v4.1-flash", "deepseek-v4-pro"] as const : ["deepseek-flash", "deepseek-v4-pro"] as const).map((model) => <button type="button" data-testid={`tao-home-capability-model-${model}`} key={model} onClick={() => { controller.setModel(model); capabilities.close(false); }}>{model} {state.composer.model === model ? "✓" : ""}</button>)}
+          </div></TaoPopover>
         </div>
         <div className="tao-home-composer-right">
           <button type="button" className="tao-home-tool-button" aria-label={tr("录音")} data-testid="tao-home-voice" onClick={() => controller.setSidePanel("语音")}><Mic size={16} /></button>

@@ -37,9 +37,16 @@ pub async fn deepseek_app_upload_file(
     thread_id: String,
     local_path: String,
     on_event: Channel<Value>,
+    provider: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<Value, String> {
     let path = std::path::PathBuf::from(local_path);
+    if provider.as_deref() == Some("opencode-go") {
+        return super::inline_files::attach(&state, &thread_id, &path).await;
+    }
+    if provider.as_deref().is_some_and(|id| id != "deepseek-app") {
+        return Err("file: unsupported attachment provider".into());
+    }
     let metadata = tokio::fs::metadata(&path)
         .await
         .map_err(|_| "file: selected file cannot be read")?;
@@ -137,6 +144,9 @@ pub async fn deepseek_app_delete_file(
     file_id: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
+    if file_id.starts_with("inline-") {
+        return super::inline_files::remove(&state, &file_id);
+    }
     if !file_id
         .bytes()
         .all(|b| b.is_ascii_alphanumeric() || b == b'_' || b == b'-')
@@ -183,7 +193,7 @@ pub fn deepseek_app_file_tasks(state: State<'_, AppState>) -> Result<Vec<Value>,
         .collect()
 }
 
-fn file_type(name: &str) -> Result<(&'static str, Option<&'static str>), String> {
+pub(super) fn file_type(name: &str) -> Result<(&'static str, Option<&'static str>), String> {
     let extension = name.rsplit('.').next().unwrap_or("").to_ascii_lowercase();
     Ok(match extension.as_str() {
         "png" => ("image/png", None),
@@ -200,7 +210,7 @@ fn file_type(name: &str) -> Result<(&'static str, Option<&'static str>), String>
             Some("rich_layout_recognition"),
         ),
         "txt" | "md" | "csv" | "json" | "xml" | "html" | "ts" | "tsx" | "js" | "rs" | "py"
-        | "java" | "sql" | "yaml" | "yml" => ("text/plain", Some("user_data")),
+        | "java" | "go" | "sql" | "yaml" | "yml" => ("text/plain", Some("user_data")),
         _ => return Err("file: this file type is not supported".into()),
     })
 }

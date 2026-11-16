@@ -49,6 +49,7 @@ def run(ctx):
             flow.require(flow.read("return document.querySelector('[data-testid=\"tao-home-send\"]').disabled;"),
                          "Composer did not wait for the pending action")
 
+        flow.click('[data-testid="tao-home-mode-do"]')
         propose("reject", 2)
         flow.click('[data-testid="tao-home-action-card"] .tao-home-action-buttons button:nth-child(2)')
         flow.wait(lambda: flow.read("return document.querySelector('[data-testid=\"tao-home-action-result\"]')?.textContent??'';"),
@@ -73,4 +74,4 @@ def run(ctx):
                   "Native action undo did not complete")
         flow.record("undo-exact-disk-result", dict(exists=False))
         flow.screenshot("action-undone")
-    return "Real DeepSeek actions: " + flow.outcome
+    return "Real configured provider actions: " + flow.outcome

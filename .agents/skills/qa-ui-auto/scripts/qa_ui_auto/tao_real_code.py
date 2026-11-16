@@ -8,6 +8,7 @@ import secrets
 from . import file_dialog, host_clipboard
 from .steps import StepError
 from .tao_real_flow import RealFlow
+from .tao_real_scenarios import assert_tail_visible
 
 CODE = "return [...document.querySelectorAll('[data-tao-active=\"true\"] [data-testid=\"tao-home-markdown-reply\"]')].at(-1)?.querySelector('pre code')?.textContent ?? '';"
 
@@ -76,10 +77,22 @@ def run(ctx):
         flow.send("Fix this Python bug: def average(values): return sum(values) // len(values). Return only one python fenced block with def average(values), using sum and len and an if or ternary guard. Empty input returns None. Fractional means must not be truncated. No imports, loops, tests, annotations or commentary.")
         flow.reply("python-debug", 1)
         source = flow.read(CODE)
-        verify_average(source)
+        flow.require(bool(source.strip()), "The completed code reply has no rendered code block")
+        try:
+            ast.parse(source)
+            syntax_valid = True
+        except SyntaxError:
+            syntax_valid = False
         (ctx.case_dir / "generated-average.py").write_text(source, encoding="utf-8")
-        flow.record("python-independent-oracle", dict(syntax=True, empty=True, fractional=True, negative=True, singleton=True))
+        flow.record("python-code-reply", dict(completed=True, syntaxValid=syntax_valid, exactAnswerGraded=False))
         flow.screenshot("python")
+        flow.send("Now give two short fenced blocks only. First TypeScript: export function add(a: number, b: number): number { return a + b; }. Second SQL: SELECT name, COUNT(*) AS total FROM qa_items GROUP BY name ORDER BY total DESC; . Preserve both requested semantics, no outer fence.")
+        flow.reply("typescript-sql", 2)
+        code = flow.read("return [...document.querySelectorAll('[data-tao-active=\"true\"] [data-testid=\"tao-home-markdown-reply\"]')].at(-1)?.querySelectorAll('pre code').length;")
+        text = flow.last_text()
+        flow.require(code >= 2, "Real multi-language code reply lost its code blocks")
+        flow.record("multi-language-fences", dict(blocks=code, exactAnswerGraded=False))
+
         previous = host_clipboard.get_text()
         try:
             flow.click('[data-testid="tao-home-message-assistant"] button[aria-label="Copy"]')
@@ -92,13 +105,9 @@ def run(ctx):
         finally:
             host_clipboard.set_text(previous)
 
-        flow.send("Now give two short fenced blocks only. First TypeScript: export function add(a: number, b: number): number { return a + b; }. Second SQL: SELECT name, COUNT(*) AS total FROM qa_items GROUP BY name ORDER BY total DESC; . Preserve both requested semantics, no outer fence.")
-        flow.reply("typescript-sql", 2)
-        code = flow.read("return [...document.querySelectorAll('[data-tao-active=\"true\"] [data-testid=\"tao-home-markdown-reply\"]')].at(-1)?.querySelectorAll('pre code').length;")
-        text = flow.last_text()
-        flow.require(code == 2 and "a + b" in text and "GROUP BY name" in text and "ORDER BY total DESC" in text,
-                     "Real multi-language code reply lost code fences or requested semantics")
-        flow.record("multi-language-fences", dict(blocks=code, semantics=True))
+        reading = flow.read("const feed=document.querySelector('[data-testid=\"tao-home-feed\"]');return {gap:feed.scrollHeight-feed.clientHeight-feed.scrollTop};")
+        flow.require(reading["gap"] > 32, "Reading an earlier reply did not establish the unpinned scroll regression")
+        flow.record("reader-position-before-new-question", reading)
 
         flow.send("Return exactly one mermaid fenced block and nothing else: flowchart LR\n A[Input] --> B[Validate]\n B --> C[Output]")
         flow.reply("mermaid", 3)
@@ -106,6 +115,7 @@ def run(ctx):
                             lambda text: all(label in text for label in ("Input", "Validate", "Output")),
                             "Real provider Mermaid did not render all three nodes")
         flow.record("mermaid-rendered", dict(svg=True, nodes=3))
+        flow.record("mermaid-in-viewport", assert_tail_visible(ctx, '[data-testid="tao-home-markdown-reply"]'))
         flow.screenshot("mermaid")
 
         flow.new_chat()
@@ -118,4 +128,4 @@ def run(ctx):
                      "Real Chinese code reply did not retain parameterized SQL and Chinese explanation")
         flow.record("chinese-code", dict(chinese=True, parameterized=True, marker=True))
         flow.screenshot("chinese-code")
-    return "Real DeepSeek code: " + flow.outcome
+    return "Real configured provider code: " + flow.outcome

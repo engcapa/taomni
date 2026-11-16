@@ -42,7 +42,7 @@ class ExpandedTests(unittest.TestCase):
 
     def test_every_new_case_has_a_valid_reviewed_execution_contract(self):
         root = Path(__file__).resolve().parents[4]
-        for number in range(14, 24):
+        for number in range(14, 31):
             paths = list((root / "qa-ui-auto-tests/cases").glob(f"TC-TAO-HOME-{number:03d}-*.testcase.yaml"))
             self.assertEqual(len(paths), 1)
             doc = yaml.safe_load(paths[0].read_text(encoding="utf-8"))

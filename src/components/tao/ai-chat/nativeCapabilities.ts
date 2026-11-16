@@ -4,8 +4,8 @@ import type { ActionPorts, ActionProposal } from "./ports";
 export function createNativeActionPorts(defaultThreadId = ""): ActionPorts {
   return {
   async execute(action: ActionProposal, threadId?: string) {
-    const result = await invoke<{ status: string; actionId?: string; exitCode?: number; durationMs?: number; output?: string; undoAvailable?: boolean }>("deepseek_app_execute_action", { request: { threadId: threadId || defaultThreadId, action, confirmed: true, confirmedLevel: action.level } });
-    return { actionId: result.actionId, exitCode: result.status === "completed" ? result.exitCode : result.exitCode ?? 1, durationMs: result.durationMs, output: result.output, undoAvailable: result.undoAvailable };
+    const result = await invoke<{ status: "completed" | "failed" | "cancelled"; actionId?: string; exitCode?: number; durationMs?: number; output?: string; undoAvailable?: boolean }>("deepseek_app_execute_action", { request: { threadId: threadId || defaultThreadId, action: { ...action, id: action.executionId ?? action.id }, confirmed: true, confirmedLevel: action.level } });
+    return { status: result.status, actionId: result.actionId, exitCode: result.exitCode, durationMs: result.durationMs, output: result.output, undoAvailable: result.undoAvailable };
   },
   async reject() { return; },
   async undo(action) { await invoke("deepseek_app_undo_action", { actionId: action.result?.actionId ?? action.id, confirmed: true }); },

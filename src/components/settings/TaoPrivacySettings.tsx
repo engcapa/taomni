@@ -7,6 +7,8 @@ interface Summary { version: number; commandsCleaned: number; queriesCleaned: nu
 const NAMES: Record<string, [string, string]> = {
   commands: ["命令历史", "Command history"], sql: ["SQL 历史", "SQL history"], queries: ["保存的查询", "Saved queries"],
   sessions: ["会话元数据", "Session metadata"], notes: ["笔记", "Notes"], tao: ["Tao 对话", "Tao chats"], legacy: ["旧对话", "Legacy chats"],
+  bookmarks: ["SQL 书签", "SQL bookmarks"], groups: ["会话分组", "Session groups"], capabilities: ["功能与工具目录", "Features and tools"], memory: ["已启用记忆/技能", "Enabled memories/skills"], snapshots: ["文件快照元数据", "File snapshot metadata"],
+  file_contents: ["文件快照内容（需授权）", "Snapshot contents (opt in)"], mail: ["邮件主题/发件人（需授权）", "Mail subjects/senders (opt in)"], mail_bodies: ["邮件/草稿正文（需授权）", "Mail/draft bodies (opt in)"], voice: ["语音转写（需授权）", "Voice transcripts (opt in)"],
 };
 
 export function TaoPrivacySettings() {

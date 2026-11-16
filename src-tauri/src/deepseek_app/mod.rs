@@ -1,7 +1,17 @@
+mod action_authorization;
+mod action_feedback;
 pub mod action_runner;
 pub mod actions;
+mod agent_prompt;
 pub mod archive;
 mod client;
+mod inline_files;
+mod local_data;
+mod opencode;
+mod opencode_request;
+mod opencode_stream;
+mod opencode_tools;
+mod opencode_web;
 pub mod search;
 pub use archive::{deepseek_app_export_archive, deepseek_app_import_archive};
 pub use search::{

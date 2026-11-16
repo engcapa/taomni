@@ -411,3 +411,13 @@ Windows 保存对话框的全局模拟送键丢字已用原生控件逐字输入
 `704f7aa79` 最终 Windows browser **30/30**、native **36/36**（全部 18/22 适用 crash）；商业 DeepSeek 三项、八次真实请求正常完成，没有走失效 Key 分支。Linux/macOS browser **30/30 / 31/31** 的 raw/receipt/产物身份校验通过。后续 macOS 设置定位回归补异步布局保护和用户接管，新增 8 项单元；完整 Settings/Workspace 单元 286 项、导航单元 3 项通过，新 source 的原生/hosted 结果以[验证记录](verification-2026-11-16.md)为准，不提前关闭 TH-011/032 或全部原型 AC。
 
 `e57779493`（含设置异步布局保护）的 Windows browser **30/30**、匹配 QA release 的 native **36/36**，独立回执校验无拒绝，完整适用 crash **18/18 / 22/22** 均通过。新批商业 DeepSeek TC005/011/013 共八次真实 native 请求正常完成，无 Key 失效分支；Stop、Markdown 和恢复历史尾部均实际可见。GitHub [43796588906](https://github.com/engcapa/taomni/actions/runs/43796588906) 已成功结束：Linux browser/native **30/30 / 33/33**、macOS browser/native **31/31 / 35/35**，全部原始回执独立验签及逐项产物校验通过，各平台完整选择无遗漏/重复、全部 18/22 适用 crash 通过。FILE011/013 与 TH003 的原生保留回归均通过；完整 frontend **7011 passed / 1 条件跳过 / 0 failed**、Linux native Rust 契约 **120/120**。详见[当前源码验证批次](verification-2026-11-16.md#e57779493-当前源码的最终验证批次)；本批反馈和具名回归已验证，未覆盖的完整 AC 与全面原型对齐继续保留待办。
+
+## 9. 2026-11-16 Agent 开发闭环与上下文批次
+
+用户确认做模式支持“开发 → 测试 → 失败反馈 → 修复 → 补功能”，复杂编码复用 CC / Codex / ACP。范围与任务契约见 [三模式与本地上下文补强](agent-context-alignment.md)，实际结果持续记录于 [开发闭环验证记录](verification-agent-loop-2026-11-16.md)。
+
+- 已实现逐项确认、完整文件预览、真实执行结果回传、线程隔离、拒绝/失败/取消/Undo 反馈及原生授权；待确认期间阻断新的发送与重复执行。原生探针发现的 Windows 相对路径和既有文件 canonical 尾分隔符问题已有复现单测与修复，等待匹配构建复验。
+- 已实现三种编码 Agent 的预览交接、原有队列调度和显式结果带回；三入口组件测试通过，原生 ACP 使用实际子进程确定性 peer，不冒充商业 CC/Codex 推理验收。
+- 新增 TC-TAO-HOME-024～030：商业/loopback 开发闭环、provider/模式选项、原生 ACP 交接、真实笔记/工作区上下文和商业持久化应用工程。旧商业用例转为配置的 OpenCode Go / deepseek-v4.1-flash / max，Key 仅在 Windows 本机隔离读取，不上传 hosted。
+- 当前 frontend 69 tests、补充绑定组件2 tests、Rust33、Python33 和 refactor/静态 gate 通过；最新 Windows browser26/26（18项 crash）通过。完整 native、商业流程与 Linux/macOS hosted 仍须以本批实际回执验收；旧源码通过不关闭新批次。
+- 深研真实阶段状态机、独立增量索引、全量来源/执行器组合和全面原型视觉对齐继续保留待办，不能以模式切换或普通 Research 多轮对话通过关闭。

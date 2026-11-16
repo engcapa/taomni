@@ -43,7 +43,7 @@ export function TaoHomeHost(props: WelcomePanelProps) {
   const demoMode = state.ui.demoMode;
   useEffect(() => {
     const config = aiConfig?.deepseek_app;
-    if (config) controller.setDefaults({ defaultModel: config.model === "deepseek-v4-pro" ? config.model : "deepseek-flash", defaultThinking: config.thinking_default, defaultWeb: config.search_default });
+    if (config) controller.setDefaults({ defaultModel: config.model === "deepseek-v4-pro" ? config.model : config.provider === "opencode-go" ? "deepseek-v4.1-flash" : "deepseek-flash", defaultProvider: config.provider ?? "deepseek-app", defaultReasoningEffort: config.reasoning_effort ?? "high", defaultThinking: config.thinking_default, defaultWeb: config.search_default });
   }, [aiConfig?.deepseek_app, controller]);
   useEffect(() => {
     if (!isTauriRuntime()) return;
@@ -71,10 +71,11 @@ export function TaoHomeHost(props: WelcomePanelProps) {
   }, [controller]);
   useEffect(() => { if (!aiConfig) void loadAiConfig().catch(() => undefined); }, [aiConfig, loadAiConfig]);
   const oldKey = aiConfig?.llm.providers.deepseek?.api_key ?? "";
-  const taoProvider = aiConfig?.llm.providers["deepseek-app"];
+  const providerId = state.composer.provider ?? "deepseek-app";
+  const taoProvider = aiConfig?.llm.providers[providerId];
   const taoKey = taoProvider?.api_key ?? "";
   const hasTaoKey = Boolean(taoKey || taoProvider?.api_keys?.some((key) => key.trim()));
-  const canReuse = Boolean(oldKey && !taoKey);
+  const canReuse = providerId === "deepseek-app" && Boolean(oldKey && !taoKey);
   const contextPorts = useMemo<ContextPorts>(() => ({
     search: async (query: string): Promise<TaoSearchResult[]> => {
       const current = controller.getState();

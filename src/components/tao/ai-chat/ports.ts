@@ -1,7 +1,9 @@
 import type { ReactNode } from "react";
 
 export type TaoMode = "ask" | "do" | "research";
-export type TaoModel = "deepseek-flash" | "deepseek-v4-pro";
+export type TaoProvider = "deepseek-app" | "opencode-go";
+export type TaoModel = "deepseek-flash" | "deepseek-v4-pro" | "deepseek-v4.1-flash";
+export type TaoReasoningEffort = "low" | "medium" | "high" | "max";
 export type TaoPhase =
   | "idle"
   | "sending"
@@ -27,6 +29,10 @@ export interface ContextChip {
   fileId?: string;
   mime?: string;
   body?: string;
+  source?: string;
+  reference?: string;
+  timestamp?: number;
+  provider?: TaoProvider;
 }
 
 export interface TaoUsage {
@@ -62,6 +68,7 @@ export type ActionLevel = "L1" | "L2";
 
 export interface ActionProposal {
   id: string;
+  executionId?: string;
   kind: ActionKind;
   level: ActionLevel;
   title: string;
@@ -69,8 +76,8 @@ export interface ActionProposal {
   payload: { command?: string; sql?: string; path?: string; content?: string; tabType?: string };
   reason?: string;
   expects?: "read_only" | "write" | "external";
-  status?: "pending" | "approved" | "rejected" | "completed" | "invalid" | "undone";
-  result?: { exitCode?: number; output?: string; durationMs?: number; actionId?: string; undoAvailable?: boolean };
+  status?: "pending" | "approved" | "rejected" | "completed" | "invalid" | "undone" | "cancelled";
+  result?: { status?: "completed" | "failed" | "cancelled"; exitCode?: number; output?: string; durationMs?: number; actionId?: string; undoAvailable?: boolean };
 }
 
 export interface TaoBlock {
@@ -104,6 +111,7 @@ export interface TaoThread {
   updatedAt: number;
   source?: "tao" | "legacy" | "imported";
   running?: boolean;
+  handoffs?: Array<{ messageId: string; targetThreadId: string; provider: string; createdAt: number }>;
   preferences?: { mode: TaoMode; context: Record<string, string | undefined>; composer: TaoChatState["composer"] };
 }
 
@@ -112,10 +120,13 @@ export interface TaoRequest {
   content: string;
   mode: TaoMode;
   model: TaoModel;
+  provider?: TaoProvider;
+  reasoningEffort?: TaoReasoningEffort;
   thinking: boolean;
   web: boolean;
   context: Record<string, string | undefined>;
   chips: ContextChip[];
+  actionFeedback?: Array<{ id: string; title: string; status: string; result?: ActionProposal["result"] }>;
 }
 
 export type TaoEvent =
@@ -170,6 +181,8 @@ export interface ChatProfile {
   defaultModel: TaoModel;
   defaultThinking: boolean;
   defaultWeb: boolean;
+  defaultProvider?: TaoProvider;
+  defaultReasoningEffort?: TaoReasoningEffort;
   budget?: Partial<BudgetPort>;
 }
 
@@ -187,7 +200,7 @@ export interface TaoChatState {
   threads: Record<string, TaoThread>;
   mode: TaoMode;
   context: Record<string, string | undefined>;
-  composer: { text: string; chips: ContextChip[]; thinking: boolean; web: boolean; model: TaoModel };
+  composer: { text: string; chips: ContextChip[]; thinking: boolean; web: boolean; model: TaoModel; provider?: TaoProvider; reasoningEffort?: TaoReasoningEffort };
   runtime: Record<string, {
     phase: TaoPhase;
     budget: TaoBudget;
@@ -196,7 +209,7 @@ export interface TaoChatState {
     startedAt?: number;
     finishedAt?: number;
     /** Request options retained for safe continuation and retry decisions. */
-    lastRequest?: Pick<TaoRequest, "web" | "mode" | "model" | "thinking" | "chips" | "context">;
+    lastRequest?: Pick<TaoRequest, "web" | "mode" | "model" | "thinking" | "chips" | "context" | "provider" | "reasoningEffort">;
   }>;
   ui: { sidePanel: string | null; demoMode: boolean; searchOpen: boolean };
 }
@@ -208,6 +221,8 @@ export interface TaoChatController {
   setComposerText(text: string): void;
   setComposerOption(option: "thinking" | "web", value: boolean): void;
   setModel(model: TaoModel): void;
+  setProvider(provider: TaoProvider): void;
+  setReasoningEffort(effort: TaoReasoningEffort): void;
   setContext(context: Record<string, string | undefined>): void;
   setChips(chips: ContextChip[]): void;
   setSidePanel(panel: string | null): void;
@@ -227,6 +242,7 @@ export interface TaoChatController {
   removeChip(id: string): void;
   hydrateThreads(threads: TaoThread[]): void;
   increaseBudget(limitTokens: number): void;
-  setDefaults(defaults: Pick<ChatProfile, "defaultModel" | "defaultThinking" | "defaultWeb">): void;
+  setDefaults(defaults: Pick<ChatProfile, "defaultModel" | "defaultThinking" | "defaultWeb" | "defaultProvider" | "defaultReasoningEffort">): void;
   branchAt(messageId: string, replacement?: string): string | undefined;
+  recordHandoff(threadId: string, handoff: NonNullable<TaoThread["handoffs"]>[number]): void;
 }

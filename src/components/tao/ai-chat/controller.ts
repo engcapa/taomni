@@ -1,5 +1,6 @@
 import { taoText as tr } from "../i18n";
-import { parseActionProposals, validateActionProposal } from "../actions";
+import { parseActionProposals } from "../actions";
+import { actionKey, actionPending, createActionLifecycle } from "./actionLifecycle";
 import { getBudgetWarning, mergeUsage } from "../budget";
 import type {
   ActionPorts,
@@ -60,6 +61,8 @@ function defaultState(profile: Partial<ChatProfile>, budget: Partial<BudgetPort>
       thinking: profile.defaultThinking ?? false,
       web: profile.defaultWeb ?? false,
       model: profile.defaultModel ?? "deepseek-flash",
+      provider: profile.defaultProvider ?? "deepseek-app",
+      reasoningEffort: profile.defaultReasoningEffort ?? "high",
     },
     runtime: { [threadId]: { phase: "idle", budget: { usedTokens: 0, limitTokens, halted: false } } },
     ui: { sidePanel: null, demoMode: false, searchOpen: false },
@@ -72,7 +75,7 @@ function asArray(events: AsyncIterable<TaoEvent> | Iterable<TaoEvent>): AsyncIte
 }
 
 export function createChatController(options: ChatControllerOptions = {}): TaoChatController {
-  const profile: Partial<ChatProfile> = options.profile ?? {};
+  const profile: Partial<ChatProfile> = { ...options.profile };
   const budget: BudgetPort = { ...DEFAULT_BUDGET, ...profile.budget, ...options.budget };
   let state = defaultState(profile, budget);
   /** One transport/cancellation owner per thread.  Switching threads must
@@ -187,7 +190,7 @@ export function createChatController(options: ChatControllerOptions = {}): TaoCh
       const usage = mergeUsage(state.runtime[threadId]?.budget, event.usage ? { inputTokens: deltaTokens, outputTokens: 0 } : undefined);
       if (usage) {
         patchRuntime(threadId, (runtime) => ({ ...runtime, budget: usage, phase: usage.halted ? "budget_halt" : runtime.phase }));
-        if (usage.halted) running.get(threadId)?.abort();
+        if (usage.halted) { running.get(threadId)?.abort(); void options.backend?.stop?.(threadId).catch(() => undefined); }
         if (event.usage) {
           updateAssistant(threadId, (message) => ({
             ...message,
@@ -207,9 +210,9 @@ export function createChatController(options: ChatControllerOptions = {}): TaoCh
     }
     if (event.type === "message_stop") {
       updateAssistant(threadId, (message) => {
-        const actionBlocks = parseActionProposals(message.text);
+        const actionBlocks = state.runtime[threadId]?.lastRequest?.mode === "do" ? parseActionProposals(message.text) : [];
         const blocks = actionBlocks.length > 0
-          ? [...message.blocks.filter((block) => block.type !== "action"), ...actionBlocks.slice(0, 5).map((action) => ({ id: id("tao-action"), type: "action" as const, action }))]
+          ? [...message.blocks.filter((block) => block.type !== "action").map((block) => block.type === "text" ? { ...block, text: block.text?.replace(/```tao-action[\s\S]*?```/gi, "").trim() } : block), ...actionBlocks.slice(0, 5).map((action) => ({ id: id("tao-action"), type: "action" as const, action: { ...action, executionId: id("proposal") } }))]
           : message.blocks;
         return { ...message, text: message.text.replace(/```tao-action[\s\S]*?```/g, "").trim(), blocks };
       });
@@ -222,10 +225,15 @@ export function createChatController(options: ChatControllerOptions = {}): TaoCh
   const controller: TaoChatController = {
     subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },
     getState() { return state; },
+    recordHandoff(threadId, handoff) { patchThread(threadId, (thread) => ({ ...thread, updatedAt: now(), handoffs: [...(thread.handoffs ?? []).filter((item) => item.targetThreadId !== handoff.targetThreadId), handoff] })); },
     setMode(mode) { patch({ mode, composer: { ...state.composer, thinking: mode !== "ask", web: mode === "research" } }); },
     setComposerText(text) { patch({ composer: { ...state.composer, text } }); },
     setComposerOption(option, value) { patch({ composer: { ...state.composer, [option]: value } }); },
     setModel(model) { patch({ composer: { ...state.composer, model } }); },
+    setProvider(provider) {
+      patch({ composer: { ...state.composer, provider, model: provider === "opencode-go" ? "deepseek-v4.1-flash" : "deepseek-flash", chips: state.composer.chips.filter((chip) => !chip.fileId || (chip.provider ?? "deepseek-app") === provider) } });
+    },
+    setReasoningEffort(reasoningEffort) { patch({ composer: { ...state.composer, reasoningEffort } }); },
     setContext(context) { patch({ context }); },
     setChips(chips) { patch({ composer: { ...state.composer, chips } }); },
     setSidePanel(panel) { patch({ ui: { ...state.ui, sidePanel: panel } }); },
@@ -237,7 +245,8 @@ export function createChatController(options: ChatControllerOptions = {}): TaoCh
         activeThreadId: threadId,
         threads: { ...state.threads, [threadId]: { id: threadId, title, messages: [], updatedAt: now(), source: "tao" } },
         runtime: { ...state.runtime, [threadId]: { phase: "idle", budget: { usedTokens: 0, limitTokens: budget.limitTokens, halted: false } } },
-        composer: { ...state.composer, text: "", chips: [], model: profile.defaultModel ?? "deepseek-flash", thinking: profile.defaultThinking ?? false, web: profile.defaultWeb ?? false },
+        mode: "ask",
+        composer: { ...state.composer, text: "", chips: [], model: profile.defaultModel ?? "deepseek-flash", provider: profile.defaultProvider ?? "deepseek-app", reasoningEffort: profile.defaultReasoningEffort ?? "high", thinking: profile.defaultThinking ?? false, web: profile.defaultWeb ?? false },
         context: {},
       });
       return threadId;
@@ -245,14 +254,17 @@ export function createChatController(options: ChatControllerOptions = {}): TaoCh
     setActiveThread(threadId) {
       if (!state.threads[threadId]) return;
       const preferences = state.threads[threadId].preferences;
-      patch({ activeThreadId: threadId, mode: preferences?.mode ?? "ask", context: preferences?.context ?? {}, composer: preferences?.composer ?? { ...state.composer, text: "", chips: [] } });
+      const composer = preferences?.composer ? { ...preferences.composer, provider: preferences.composer.provider ?? "deepseek-app" as const, reasoningEffort: preferences.composer.reasoningEffort ?? "high" as const } : { ...state.composer, text: "", chips: [] };
+      patch({ activeThreadId: threadId, mode: preferences?.mode ?? "ask", context: preferences?.context ?? {}, composer });
     },
     async send(content) {
       const threadId = state.activeThreadId ?? controller.createThread();
       const text = (content ?? state.composer.text).trim();
       const runtime = state.runtime[threadId] ?? activeRuntime();
       if (!text || !options.backend || runtime?.phase === "vault_locked" || runtime?.phase === "sending" || runtime?.phase === "streaming" || runtime?.phase === "thinking" || runtime?.phase === "searching" || runtime?.phase === "awaiting_action" || runtime?.phase === "plan_pending" || runtime?.phase === "budget_halt") return false;
-      const request: TaoRequest = { threadId, content: text, mode: state.mode, model: state.composer.model, thinking: state.composer.thinking, web: state.composer.web, context: state.context, chips: state.composer.chips };
+      if (state.threads[threadId].messages.some((m) => m.blocks.some((b) => b.action && actionPending(b.action)))) return false;
+      const actionFeedback = state.threads[threadId].messages.flatMap((message) => message.blocks.flatMap((block) => block.action && !actionPending(block.action) ? [{ id: actionKey(block.action), title: block.action.title, status: block.action.status!, result: block.action.result }] : [])).slice(-20);
+      const request: TaoRequest = { threadId, content: text, mode: state.mode, model: state.composer.model, provider: state.composer.provider ?? "deepseek-app", reasoningEffort: state.composer.reasoningEffort ?? "high", thinking: state.composer.thinking, web: state.composer.web, context: state.context, chips: state.composer.chips, actionFeedback };
       const user: TaoMessage = { id: id("tao-user"), role: "user", text, blocks: [], createdAt: now() };
       patchThread(threadId, (thread) => ({ ...thread, messages: [...thread.messages, user], title: thread.messages.length === 0 ? text.slice(0, 48) : thread.title, updatedAt: now(), running: true }));
       ensureAssistant(threadId);
@@ -260,7 +272,7 @@ export function createChatController(options: ChatControllerOptions = {}): TaoCh
       const abortController = new AbortController();
       usageCalls.delete(threadId); usageApplied.delete(threadId); blockOffsets.delete(threadId);
       running.set(threadId, abortController);
-      patchRuntime(threadId, (current) => ({ ...current, phase: "sending", startedAt: now(), finishedAt: undefined, budget: { ...current.budget, usedTokens: 0, halted: false }, lastRequest: { web: request.web, mode: request.mode, model: request.model, thinking: request.thinking, chips: request.chips, context: request.context } }));
+      patchRuntime(threadId, (current) => ({ ...current, phase: "sending", startedAt: now(), finishedAt: undefined, budget: { ...current.budget, usedTokens: 0, halted: false }, lastRequest: { web: request.web, mode: request.mode, model: request.model, provider: request.provider, reasoningEffort: request.reasoningEffort, thinking: request.thinking, chips: request.chips, context: request.context } }));
       try {
         const events = await options.backend.send(request, abortController.signal);
         for await (const event of asArray(events)) {
@@ -297,6 +309,7 @@ export function createChatController(options: ChatControllerOptions = {}): TaoCh
       if (!threadId || !options.backend?.continue) return false;
       const runtime = state.runtime[threadId];
       if (runtime?.phase === "vault_locked" || runtime?.lastRequest?.web || running.has(threadId)) return false;
+      if (state.threads[threadId].messages.some((m) => m.blocks.some((b) => b.action && actionPending(b.action)))) return false;
       const abortController = new AbortController();
       updateAssistant(threadId, (message) => ({ ...message, blocks: message.blocks.filter((block) => block.type !== "error") }));
       blockOffsets.set(threadId, state.threads[threadId].messages.at(-1)?.blocks.length ?? 0);
@@ -322,6 +335,7 @@ export function createChatController(options: ChatControllerOptions = {}): TaoCh
       const threadId = state.activeThreadId;
       if (!threadId || !options.backend?.regenerate) return false;
       if (state.runtime[threadId]?.phase === "vault_locked" || running.has(threadId)) return false;
+      if (state.threads[threadId].messages.some((m) => m.blocks.some((b) => b.action && actionPending(b.action)))) return false;
       const abortController = new AbortController();
       blockOffsets.delete(threadId); usageCalls.delete(threadId); usageApplied.delete(threadId);
       ensureAssistant(threadId);
@@ -345,50 +359,13 @@ export function createChatController(options: ChatControllerOptions = {}): TaoCh
         patchRuntime(threadId, (runtime) => ({ ...runtime, finishedAt: now(), phase: ["sending", "streaming", "thinking", "searching"].includes(runtime.phase) ? "idle" : runtime.phase }));
       }
     },
-    async approveAction(action) {
-      const threadId = state.activeThreadId;
-      if (!threadId) return;
-      const checked = validateActionProposal(action, state.context);
-      if (!checked.ok) {
-        patchRuntime(threadId, (runtime) => ({ ...runtime, phase: "error", pendingAction: { ...action, status: "invalid" } }));
-        return;
-      }
-      if (!options.actionPorts?.execute) {
-        updateAssistant(threadId, (message) => ({ ...message, blocks: message.blocks.map((block) => block.action?.id === action.id ? { ...block, action: { ...checked.action, status: "invalid", result: { output: tr("当前宿主没有提供动作执行器。") } } } : block) }));
-        return;
-      }
-      try {
-        const result = await options.actionPorts.execute(checked.action, threadId);
-        updateAssistant(threadId, (message) => ({ ...message, blocks: message.blocks.map((block) => block.action?.id === action.id ? { ...block, action: { ...checked.action, status: result?.exitCode && result.exitCode !== 0 ? "invalid" : "completed", result } } : block) }));
-        patchRuntime(threadId, (runtime) => ({ ...runtime, phase: "idle", pendingAction: undefined }));
-      } catch (error) {
-        updateAssistant(threadId, (message) => ({ ...message, blocks: message.blocks.map((block) => block.action?.id === action.id ? { ...block, action: { ...checked.action, status: "invalid", result: { output: String(error) } } } : block) }));
-      }
-    },
-    async rejectAction(action) {
-      await options.actionPorts?.reject?.(action);
-      const threadId = state.activeThreadId;
-      if (threadId) {
-        updateAssistant(threadId, (message) => ({ ...message, blocks: message.blocks.map((block) => block.action?.id === action.id ? { ...block, action: { ...action, status: "rejected" } } : block) }));
-        patchRuntime(threadId, (runtime) => ({ ...runtime, phase: "idle", pendingAction: undefined }));
-      }
-    },
-    async undoAction(action) {
-      const threadId = state.activeThreadId;
-      if (!threadId || !options.actionPorts?.undo) return;
-      try {
-        await options.actionPorts.undo(action, threadId);
-        updateAssistant(threadId, (message) => ({ ...message, blocks: message.blocks.map((block) => block.action?.id === action.id ? { ...block, action: { ...action, status: "undone", result: { ...action.result, output: tr("已撤销") } } } : block) }));
-      } catch (error) {
-        updateAssistant(threadId, (message) => ({ ...message, blocks: message.blocks.map((block) => block.action?.id === action.id ? { ...block, action: { ...action, result: { ...action.result, output: String(error) } } } : block) }));
-      }
-    },
+    ...createActionLifecycle({ getState: () => state, patchThread, patchRuntime, ports: options.actionPorts }),
     removeChip(chipId) { patch({ composer: { ...state.composer, chips: state.composer.chips.filter((chip) => chip.id !== chipId) } }); },
     hydrateThreads(threads) {
       const valid = threads.filter((thread) => thread && typeof thread.id === "string" && Array.isArray(thread.messages));
       if (!valid.length) return;
-      const ordered = [...valid].sort((a, b) => b.updatedAt - a.updatedAt);
-      const runtime = Object.fromEntries(ordered.map((thread) => [thread.id, { phase: "idle" as const, budget: { usedTokens: 0, limitTokens: budget.limitTokens, halted: false } }]));
+      const ordered = [...valid].sort((a, b) => b.updatedAt - a.updatedAt).map((thread) => ({ ...thread, messages: thread.messages.map((message) => ({ ...message, blocks: message.blocks.map((block) => block.action?.status === "approved" ? { ...block, action: { ...block.action, status: "invalid" as const, result: { output: tr("执行已中断，请检查实际结果后重新提议。") } } } : block) })) }));
+      const runtime = Object.fromEntries(ordered.map((thread) => [thread.id, { phase: thread.messages.some((m) => m.blocks.some((b) => b.action && actionPending(b.action))) ? "awaiting_action" as const : "idle" as const, budget: { usedTokens: 0, limitTokens: budget.limitTokens, halted: false } }]));
       patch({ threads: Object.fromEntries(ordered.map((thread) => [thread.id, { ...thread, running: false }])), runtime, activeThreadId: ordered[0].id });
       controller.setActiveThread(ordered[0].id);
     },
@@ -397,7 +374,15 @@ export function createChatController(options: ChatControllerOptions = {}): TaoCh
       if (!threadId || !Number.isFinite(limitTokens) || limitTokens <= state.runtime[threadId].budget.limitTokens) return;
       patchRuntime(threadId, (runtime) => ({ ...runtime, budget: { ...runtime.budget, limitTokens, halted: false } }));
     },
-    setDefaults(defaults) { Object.assign(profile, defaults); },
+    setDefaults(defaults) {
+      Object.assign(profile, defaults);
+      const thread = state.activeThreadId ? state.threads[state.activeThreadId] : undefined;
+      // Config loads asynchronously. Initialize a pristine conversation, while
+      // preserving existing threads and user choices when settings change.
+      if (thread && !thread.messages.length && !thread.preferences && !state.composer.text) {
+        patch({ composer: { ...state.composer, model: defaults.defaultModel, provider: defaults.defaultProvider ?? "deepseek-app", reasoningEffort: defaults.defaultReasoningEffort ?? "high", thinking: defaults.defaultThinking, web: defaults.defaultWeb } });
+      }
+    },
     branchAt(messageId, replacement) {
       const source = state.activeThreadId ? state.threads[state.activeThreadId] : undefined;
       const index = source?.messages.findIndex((message) => message.id === messageId) ?? -1;

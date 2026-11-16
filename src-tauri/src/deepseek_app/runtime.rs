@@ -69,8 +69,11 @@ impl Drop for RunGuard {
 
 pub fn stop(thread_id: &str) -> Result<(), String> {
     let registry = runs().lock().map_err(|_| "request registry unavailable")?;
-    if let Some(run) = registry.get(thread_id) {
-        run.cancel.cancel();
+    let action_prefix = format!("action:{thread_id}:");
+    for (id, run) in registry.iter() {
+        if id == thread_id || id.starts_with(&action_prefix) {
+            run.cancel.cancel();
+        }
     }
     Ok(())
 }
@@ -106,5 +109,15 @@ mod tests {
         assert!(first.cancel.is_cancelled());
         drop(first);
         assert!(RunGuard::begin(&thread).is_ok());
+    }
+
+    #[test]
+    fn stop_thread_cancels_its_actions_without_touching_another_thread() {
+        let thread = uuid::Uuid::new_v4().to_string();
+        let first = RunGuard::begin(&format!("action:{thread}:one")).unwrap();
+        let other = RunGuard::begin(&format!("action:{thread}-other:one")).unwrap();
+        stop(&thread).unwrap();
+        assert!(first.cancel.is_cancelled());
+        assert!(!other.cancel.is_cancelled());
     }
 }

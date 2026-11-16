@@ -63,4 +63,4 @@ def run(ctx):
         flow.require(len(flow.read("return window.__taomniQaTaoProvider.observe().calls;")) == 1,
                      "Ancillary panels automatically sent another paid request")
         flow.screenshot("archive-ancillary")
-    return "Real DeepSeek archive and panels: " + flow.outcome
+    return "Real configured provider archive and panels: " + flow.outcome

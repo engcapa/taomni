@@ -159,12 +159,15 @@ fn is_within_path(candidate: &str, root: &str) -> bool {
             stack.join("/")
         )
     }
-    let root = normalize(root);
+    // Join relative paths to the original root. Re-normalizing an already
+    // normalized Windows drive used to duplicate its prefix and reject every
+    // relative file proposal (even calculator.py in the bound workspace).
     let candidate = if candidate.starts_with('/') || candidate.get(1..2) == Some(":") {
         normalize(candidate)
     } else {
         normalize(&format!("{root}/{candidate}"))
     };
+    let root = normalize(root);
     candidate == root || candidate.starts_with(&(root + "/"))
 }
 
@@ -198,5 +201,23 @@ mod tests {
             cwd: None,
         });
         assert!(validate_action(&value, None, Some("/work")).is_err());
+    }
+
+    #[test]
+    fn windows_workspace_accepts_relative_files_without_duplicating_drive_prefix() {
+        for path in [
+            "calculator.py",
+            "src/../calculator.py",
+            "D:\\qa\\project\\calculator.py",
+        ] {
+            assert!(is_within_path(path, "D:/qa/project"), "{path}");
+        }
+        for path in [
+            "../outside.py",
+            "D:/qa/project-other/main.py",
+            "C:/qa/project/main.py",
+        ] {
+            assert!(!is_within_path(path, "D:/qa/project"), "{path}");
+        }
     }
 }

@@ -205,3 +205,41 @@
   .tao-home-no-key-card p { font-size: 12px; margin-bottom: 8px; }
   .tao-home-dock-button { font-size: 0; gap: 0; }
 }
+.tao-home-topbar-leading {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.tao-home-topbar-actions {
+  flex-shrink: 0;
+}
+
+.tao-home-usage-pill {
+  white-space: nowrap;
+}
+
+.tao-home-binding-bar {
+  width: 100%;
+  min-width: 0;
+  flex-wrap: nowrap;
+}
+
+.tao-home-binding-item {
+  flex: 1 1 0;
+  min-width: 0;
+}
+
+.tao-home-binding-chip {
+  max-width: 100%;
+  white-space: nowrap;
+}
+
+.tao-home-binding-chip svg {
+  flex-shrink: 0;
+}
+
+.tao-home-binding-chip span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

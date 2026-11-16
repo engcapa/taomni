@@ -1,0 +1,71 @@
+id: TC-TAO-HOME-026
+title: Tao agent provider, max effort and three mode controls
+description: >-
+  Operate the real renderer controls for OpenCode Go, DeepSeek v4.1 Flash and
+  max effort. All three modes remain reachable; Escape dismisses the options,
+  and switching providers updates the model choices without phantom requests.
+  Browser mode proves the UI; native repeats it in the packaged WebView.
+modes: [browser, native]
+covers: [F1.11]
+tags: [p0, tao-home, regression]
+fixtures: [reset_db]
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-tao-home-026
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- click: '[data-testid="tao-home-capabilities"]'
+- select_option: {selector: '[data-testid="tao-home-provider"]', value: opencode-go}
+- select_option: {selector: '[data-testid="tao-home-reasoning-effort"]', value: max}
+- click: '[data-testid="tao-home-capability-model-deepseek-v4.1-flash"]'
+- assert_text: {selector: '[data-testid="tao-home-capabilities"]', contains: v4.1-flash}
+- click: '[data-testid="tao-home-capabilities"]'
+- eval_readonly:
+    expression: "document.querySelector('.tao-home-popup-items label:nth-of-type(2) select').value === 'max'"
+    expect_truthy: true
+- press: Escape
+- assert_not_visible: '[data-testid="tao-home-reasoning-effort"]'
+- click: '[data-testid="tao-home-mode-do"]'
+- assert_attribute: {selector: '[data-testid="tao-home-mode-do"]', name: aria-selected, equals: 'true'}
+- click: '[data-testid="tao-home-mode-research"]'
+- assert_attribute: {selector: '[data-testid="tao-home-mode-research"]', name: aria-selected, equals: 'true'}
+- assert_text: {selector: '[data-testid="tao-home-capabilities"]', contains: Web}
+- click: '[data-testid="tao-home-mode-ask"]'
+- assert_attribute: {selector: '[data-testid="tao-home-mode-ask"]', name: aria-selected, equals: 'true'}
+- click: '[data-testid="tao-home-capabilities"]'
+- select_option: {selector: '[data-testid="tao-home-provider"]', value: deepseek-app}
+- assert_not_visible: '[data-testid="tao-home-reasoning-effort"]'
+- assert_visible: '[data-testid="tao-home-capability-model-deepseek-flash"]'
+- click: '[data-testid="tao-home-capability-model-deepseek-flash"]'
+- assert_text: {selector: '[data-testid="tao-home-capabilities"]', contains: flash}
+- press: Escape
+- assert_no_runtime_errors: null
+- screenshot: tao-agent-mode-controls.png
+verification:
+  review: reviewed
+  requirements:
+  - id: AGENT-PROVIDER-CONTROLS
+    requirement: The provider and max effort controls match available models and retain the three mode interactions.
+    actions: [5, 6, 7, 8, 10, 12, 14, 16, 19, 21, 22, 25, 27]
+    checkpoints:
+    - {step: 9, expectation: The selected Go model is visible.}
+    - {step: 11, expectation: Max effort survives closing and reopening the options.}
+    - {step: 13, expectation: Escape closes the capability popup.}
+    - {step: 15, expectation: Do is selected.}
+    - {step: 17, expectation: Research is selected.}
+    - {step: 18, expectation: Research enables Web.}
+    - {step: 20, expectation: Ask is selected.}
+    - {step: 23, expectation: Direct DeepSeek has no Go effort control.}
+    - {step: 24, expectation: Direct DeepSeek displays its supported Flash model.}
+    - {step: 26, expectation: Selecting the direct provider model updates the capability label and closes the popup.}
+    - {step: 28, expectation: No unhandled runtime errors.}
+    results: [9, 11, 13, 15, 17, 18, 20, 23, 24, 26, 28]
+  native:
+  - check: Packaged WebView options and popup dismissal
+    method: automated
+    reason: Renderer flow is repeated in WebView2, WebKitGTK and WKWebView; commercial inference is covered separately.
+  visual:
+  - check: Agent capability controls
+    method: manual
+    reason: Screenshot supports visual review; geometry and prototype parity remain separate checks.

@@ -89,6 +89,8 @@ export interface AiConfig {
 
 export interface DeepSeekAppConfig {
   enabled: boolean;
+  provider?: "deepseek-app" | "opencode-go";
+  reasoning_effort?: "low" | "medium" | "high" | "max";
   model: "deepseek-flash" | "deepseek-v4-pro" | string;
   thinking_default: boolean;
   search_default: boolean;

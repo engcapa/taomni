@@ -3,7 +3,7 @@ title: Real attachment reuse, removal, deletion and unsupported-file recovery
 description: >-
   Use the actual Windows chooser and native Files API to upload/reuse a real
   image, remove its reference and delete it, reject an unsupported file, then
-  recover with a valid upload and verify actual DeepSeek image recognition.
+  recover with a valid upload and complete an actual provider image question.
 modes: [native]
 native_platforms: [Windows]
 covers: [F1.11]
@@ -27,7 +27,7 @@ verification:
     requirement: Native attachment reuse/removal/delete and invalid-file recovery yield the actual usable provider image.
     actions: [1, 2, 3, 4, 5, 6]
     checkpoints:
-    - {step: 7, expectation: "Repeated upload adds no duplicate task or chip. Removal clears the reference; real delete succeeds. Unsupported file visibly rejects with no chip; valid retry clears the error and its actual reply recognizes the image. Only explicit invalid credentials may finish early."}
+    - {step: 7, expectation: "Repeated upload adds no duplicate task or chip. Removal clears the reference; real delete succeeds. Unsupported file visibly rejects with no chip; valid retry clears the error and its actual image-question reply completes; recognition is recorded without exact-answer grading. Only explicit invalid credentials may finish early."}
     - {step: 8, expectation: No unhandled runtime errors.}
     results: [7, 8]
   native:

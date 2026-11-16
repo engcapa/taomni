@@ -18,7 +18,7 @@ pub async fn run(
     state: &AppState,
 ) -> Result<TaoResponse, String> {
     let run = RunGuard::begin(&request.thread_id)?;
-    let client = MessagesClient::resolve(state).await?;
+    let client = MessagesClient::resolve_provider(state, &request.provider).await?;
     let (body, assistant_id, initial_blocks) = {
         let db = state.db.lock().map_err(|_| "database unavailable")?;
         store::init(&db)?;
@@ -32,6 +32,24 @@ pub async fn run(
             if !extra.is_empty() {
                 let system = body["system"].as_str().unwrap_or_default();
                 body["system"] = Value::String(format!("{system}{extra}"));
+            }
+        }
+        let feedback =
+            super::action_feedback::resolve(&db, &request.thread_id, &request.action_feedback)?;
+        if !feedback.is_empty() {
+            body["messages"].as_array_mut().unwrap().last_mut().unwrap()["content"]
+                .as_array_mut()
+                .unwrap()
+                .insert(0, serde_json::json!({"type":"text","text":feedback}));
+        }
+        let source_switches = super::search::sources(&db)?;
+        for chip in &request.chips {
+            if let Some(source) = chip["source"].as_str() {
+                if source_switches.get(source) != Some(&true) {
+                    return Err(
+                        "protocol: a selected local source is disabled; remove its excerpt".into(),
+                    );
+                }
             }
         }
         store::save_request(&db, &request)?;
@@ -69,7 +87,13 @@ pub async fn run(
     let result = tokio::select! {
         biased;
         _=run.cancel.cancelled()=>Err(format!("{}: request cancelled",run.reason())),
-        result=stream(&client,body,&channel,&mut reply,state,&assistant_id,&previous)=>result,
+        result=async {
+            if request.provider == "opencode-go" {
+                super::opencode::stream(&client,body,&request,&channel,&mut reply,state,&assistant_id,&previous).await
+            } else {
+                stream(&client,body,&channel,&mut reply,state,&assistant_id,&previous).await
+            }
+        }=>result,
     };
     let mut blocks = if reply.stop_reason.as_deref() == Some("refusal") {
         Vec::new()

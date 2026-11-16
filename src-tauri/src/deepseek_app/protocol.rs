@@ -26,6 +26,10 @@ impl SseDecoder {
             if payload.is_empty() {
                 continue;
             }
+            if payload == "[DONE]" {
+                frames.push(json!({"type":"done"}));
+                continue;
+            }
             // Keepalive/malformed non-JSON frames are ignored just like chat-demo.
             if let Ok(value) = serde_json::from_str(&payload) {
                 frames.push(value);
@@ -221,7 +225,7 @@ pub fn ui_block(block: &Value, index: usize) -> Value {
     let kind = match block["type"].as_str().unwrap_or("") {
         "thinking" => "thinking",
         "server_tool_use" => "search",
-        "web_search_tool_result" | "web_fetch_tool_result" => "sources",
+        "web_search_tool_result" | "web_fetch_tool_result" | "local_context_result" => "sources",
         _ => "text",
     };
     json!({"id":format!("block-{index}"),"type":kind,"text": block["text"].as_str().or_else(||block["thinking"].as_str()).unwrap_or(""),
@@ -229,6 +233,9 @@ pub fn ui_block(block: &Value, index: usize) -> Value {
 }
 
 pub fn sources(block: &Value) -> Vec<Value> {
+    if block["type"] == "local_context_result" {
+        return block["content"].as_array().cloned().unwrap_or_default();
+    }
     let values = block.get("citations").or_else(|| block.get("content"));
     values
         .and_then(Value::as_array)

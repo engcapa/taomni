@@ -1,5 +1,5 @@
 id: TC-TAO-HOME-022
-title: Real DeepSeek reply exports Markdown and ZIP and survives native import and panel lifecycle
+title: Real configured provider reply exports Markdown and ZIP and survives native import and panel lifecycle
 description: One actual commercial reply supplies native Markdown and ZIP exports, real ZIP import and native workflow
   creation/reopen, memory/skills and speech Stop panel checks.
 modes:
@@ -31,7 +31,7 @@ verification:
   review: reviewed
   requirements:
   - id: REAL-ARCHIVE
-    requirement: Real DeepSeek reply exports Markdown and ZIP and survives native import and panel lifecycle
+    requirement: Real configured provider reply exports Markdown and ZIP and survives native import and panel lifecycle
     actions:
     - 1
     - 2

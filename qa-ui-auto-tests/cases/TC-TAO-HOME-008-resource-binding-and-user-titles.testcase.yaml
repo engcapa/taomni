@@ -41,6 +41,9 @@ steps:
     min: 2
 - click: 'xpath=(//*[@data-testid="tao-home-binding-option"])[1]'
 - assert_not_visible: '[role="dialog"]'
+- eval_readonly:
+    expression: document.querySelector(".tao-home-binding-bar").scrollHeight <= document.querySelector(".tao-home-topbar").clientHeight
+    expect_truthy: true
 - assert_not_visible: '[data-testid="tao-home-context-chips"]'
 - click: '[data-testid="tao-home-binding-workspace"]'
 - click: '[data-testid="tao-home-binding-cite"]'

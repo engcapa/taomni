@@ -260,6 +260,8 @@ export function normalizeAiConfig(config: AiConfig): AiConfig {
     acp_bridge: normalizeAcpBridge(config.acp_bridge),
     deepseek_app: {
       enabled: config.deepseek_app?.enabled ?? true,
+      provider: config.deepseek_app?.provider === "opencode-go" ? "opencode-go" : "deepseek-app",
+      reasoning_effort: config.deepseek_app?.reasoning_effort ?? "high",
       model: config.deepseek_app?.model ?? "deepseek-flash",
       thinking_default: config.deepseek_app?.thinking_default ?? false,
       search_default: config.deepseek_app?.search_default ?? false,

@@ -125,11 +125,69 @@ files:
 - src/components/tao/ai-chat/sidePanelTabs.tsx
 - src/components/tao/ai-chat/useSidePanelResize.ts
 - src/components/tao/ai-chat/useChatFeedScroll.ts
+- src/components/tao/ai-chat/actionLifecycle.ts
+- src/components/tao/ai-chat/HandoffControls.tsx
+- src/components/tao/ai-chat/handoff.ts
 - src/components/tao/home/SuggestionRow.tsx
 - src/components/tao/search/SearchPanel.tsx
 - src/styles/taoHome.css
 - src/styles/taoHomeLayout.css
 controls:
+- id: tao-home-provider
+  selector: '[data-testid="tao-home-provider"]'
+  kind: interactive
+- id: tao-home-reasoning-effort
+  selector: '[data-testid="tao-home-reasoning-effort"]'
+  kind: interactive
+  optional: true
+- id: tao-home-capability-model-deepseek-flash
+  selector: '[data-testid="tao-home-capability-model-deepseek-flash"]'
+  kind: interactive
+  optional: true
+- id: tao-home-capability-model-deepseek-v4.1-flash
+  selector: '[data-testid="tao-home-capability-model-deepseek-v4.1-flash"]'
+  kind: interactive
+  optional: true
+- id: tao-home-handoff-confirm
+  selector: '[data-testid="tao-home-handoff-confirm"]'
+  kind: interactive
+  optional: true
+- id: tao-home-handoff-return
+  selector: '[data-testid="tao-home-handoff-return"]'
+  kind: interactive
+  optional: true
+- id: tao-home-message-codex
+  selector: '[data-testid="tao-home-message-codex"]'
+  kind: interactive
+  optional: true
+- id: tao-home-message-claude
+  selector: '[data-testid="tao-home-message-claude"]'
+  kind: interactive
+  optional: true
+- id: tao-home-message-acp
+  selector: '[data-testid="tao-home-message-acp"]'
+  kind: interactive
+  optional: true
+- id: tao-home-action-card
+  selector: '[data-testid="tao-home-action-card"]'
+  kind: interactive
+  optional: true
+- id: tao-home-action-result
+  selector: '[data-testid="tao-home-action-result"]'
+  kind: display
+  optional: true
+- id: tao-home-action-content
+  selector: '[data-testid="tao-home-action-content"]'
+  kind: display
+  optional: true
+- id: tao-home-action-undo
+  selector: '[data-testid="tao-home-action-undo"]'
+  kind: interactive
+  optional: true
+- id: tao-home-action-stop
+  selector: '[data-testid="tao-home-action-stop"]'
+  kind: interactive
+  optional: true
 - id: tao-home-host
   selector: '[data-testid="tao-home-host"]'
   kind: display

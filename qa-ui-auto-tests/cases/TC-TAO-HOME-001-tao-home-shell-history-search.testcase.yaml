@@ -24,7 +24,7 @@ steps:
     equals: Ask
 - assert_text:
     selector: '[data-testid="tao-home-connect-card"]'
-    contains: Connect DeepSeek
+    contains: Configure a Tao provider
 - assert_text:
     selector: '[data-testid="tao-home-new-chat"]'
     contains: New Tao chat

@@ -3523,6 +3523,20 @@
 
 ## tao/home (F1.11)
 
+- `[data-testid="tao-home-provider"]` — interactive — F1.11.tao-home-provider
+- `[data-testid="tao-home-reasoning-effort"]` — interactive [optional] — F1.11.tao-home-reasoning-effort
+- `[data-testid="tao-home-capability-model-deepseek-flash"]` — interactive [optional] — F1.11.tao-home-capability-model-deepseek-flash
+- `[data-testid="tao-home-capability-model-deepseek-v4.1-flash"]` — interactive [optional] — F1.11.tao-home-capability-model-deepseek-v4.1-flash
+- `[data-testid="tao-home-handoff-confirm"]` — interactive [optional] — F1.11.tao-home-handoff-confirm
+- `[data-testid="tao-home-handoff-return"]` — interactive [optional] — F1.11.tao-home-handoff-return
+- `[data-testid="tao-home-message-codex"]` — interactive [optional] — F1.11.tao-home-message-codex
+- `[data-testid="tao-home-message-claude"]` — interactive [optional] — F1.11.tao-home-message-claude
+- `[data-testid="tao-home-message-acp"]` — interactive [optional] — F1.11.tao-home-message-acp
+- `[data-testid="tao-home-action-card"]` — interactive [optional] — F1.11.tao-home-action-card
+- `[data-testid="tao-home-action-result"]` — display [optional] — F1.11.tao-home-action-result
+- `[data-testid="tao-home-action-content"]` — display [optional] — F1.11.tao-home-action-content
+- `[data-testid="tao-home-action-undo"]` — interactive [optional] — F1.11.tao-home-action-undo
+- `[data-testid="tao-home-action-stop"]` — interactive [optional] — F1.11.tao-home-action-stop
 - `[data-testid="tao-home-host"]` — display — F1.11.tao-home-host
 - `[data-testid="tao-home-topbar"]` — display — F1.11.tao-home-topbar
 - `[data-testid="tao-home-mode-ask"]` — interactive — F1.11.tao-home-mode-ask

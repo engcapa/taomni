@@ -67,7 +67,7 @@ def observe(ctx: Any, args: Any) -> str:
     while time.monotonic() < end:
         state = ctx.session.execute("return window.__taomniQaTaoProvider?.observe() ?? null;")
         if isinstance(state, dict) and state.get("valid"):
-            return "Verified forwarding-only observer of real DeepSeek native invocation"
+            return "Verified forwarding-only observer of the configured native provider invocation"
         if isinstance(state, dict) and state.get("failure"):
             break
         time.sleep(.05)

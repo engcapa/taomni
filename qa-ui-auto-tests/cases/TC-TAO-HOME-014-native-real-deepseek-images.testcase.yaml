@@ -1,5 +1,5 @@
 id: TC-TAO-HOME-014
-title: Real DeepSeek recognizes PNG JPEG and WebP chosen through the native file dialog
+title: Real configured provider handles PNG JPEG and WebP chosen through the native file dialog
 description: >-
   Actual system file chooser, native Files API and commercial vision replies.
   Synthetic images contain unpredictable digits not supplied in the prompt or filename.
@@ -25,10 +25,10 @@ verification:
   review: reviewed
   requirements:
   - id: REAL-IMAGE
-    requirement: Native file selection uploads actual PNG/JPEG/WebP bytes and DeepSeek recognizes fresh image content.
+    requirement: Native file selection uploads actual PNG/JPEG/WebP bytes and the configured provider completes image questions.
     actions: [1, 2, 3, 4, 5, 6]
     checkpoints:
-    - {step: 7, expectation: "Cancel sends no upload. Each native upload completes with a chip and 100 percent progress; the actual reply recognizes its unpredictable four digits and square color. Explicit invalid credentials are logged with remaining stages unverified."}
+    - {step: 7, expectation: "Cancel sends no upload. Each native upload completes with a chip and 100 percent progress; the actual reply completes. Digit/color observations are recorded without exact-answer grading. Explicit invalid credentials are logged with remaining stages unverified."}
     - {step: 8, expectation: No unhandled runtime errors.}
     results: [7, 8]
   native:
@@ -38,4 +38,4 @@ verification:
   visual:
   - check: Uploaded image references and actual reply
     method: manual
-    reason: Screenshots retain UI; semantic assertions establish content rather than full prototype fidelity.
+    reason: Screenshots retain UI; flow assertions establish completion; answer quality and full prototype fidelity remain separate.

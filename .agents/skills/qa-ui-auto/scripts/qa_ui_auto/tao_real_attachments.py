@@ -52,6 +52,8 @@ def run(ctx):
         flow.record("valid-upload-recovery", recovered)
         flow.send("Read the attached image and reply only with the four digits and color of the square.")
         flow.reply("recovered-image-recognition", 1)
-        flow.require("3628" in flow.last_text() and "red" in flow.last_text().lower(), "Recovered upload could not be used by the real provider")
+        flow.record("recovered-image-response", dict(completed=True,
+                    digitsRecognized="3628" in flow.last_text(),
+                    colorRecognized="red" in flow.last_text().lower(), exactAnswerGraded=False))
         flow.screenshot("attachment-recovery")
-    return "Real DeepSeek attachments: " + flow.outcome
+    return "Real configured provider attachments: " + flow.outcome

@@ -69,6 +69,7 @@
           "backup_cloud",
           "model_inspector_gateway",
           "tao_messages",
+          "tao_agent",
           "tao_real_provider",
           "credential_store",
           "path_completion",
@@ -569,7 +570,7 @@
         "observe_tao_provider": {"type": "null", "description": "Native-only forwarding observation of deepseek_app_send callback completion; never reads request or response bodies."},
         "tao_real_provider_scenarios": {"type": "null", "description": "Opt-in real DeepSeek native UI probe: four requests at most for two-turn memory, locale/draft retention, regeneration, new-chat isolation and Stop; only explicit expired/401/403 credentials may finish successfully before all stages."},
         "tao_real_provider_documents": {"type": "null", "description": "Opt-in real DeepSeek native UI probe: three requests for actual Markdown, cloned branch context and original/branch history/draft isolation. Only explicit expired/401/403 credentials may finish early as credential-invalid."},
-        "tao_real_provider_expanded": {"type": "object", "additionalProperties": false, "required": ["scenario"], "properties": {"scenario": {"enum": ["images", "code", "options", "actions", "lifecycle", "persistence-prepare", "persistence-verify", "attachments", "document-files", "archive", "concurrency"]}}, "description": "Bounded actual DeepSeek native image/code/options/actions/lifecycle scenarios. Only explicit expired/401/403 credentials may finish early."},
+        "tao_real_provider_expanded": {"type": "object", "additionalProperties": false, "required": ["scenario"], "properties": {"scenario": {"enum": ["images", "project", "context", "handoff", "development", "code", "options", "actions", "lifecycle", "persistence-prepare", "persistence-verify", "attachments", "document-files", "archive", "concurrency"]}}, "description": "Bounded native provider scenarios, including confirmed development/test/failure/repair/feature rounds. Only explicit invalid credentials may finish early."},
         "assert_tao_provider_outcome": {"type": "object", "additionalProperties": false, "properties": {"timeout_sec": {"type": "number", "exclusiveMinimum": 0, "maximum": 150}}, "description": "Native-only completed invocation plus nonempty assistant text/no error; only HTTP 401/403 or explicit key expiration with enabled retry is credential-invalid pass."},
         "terminal_file_link": {"type": "object","additionalProperties": false,"required": ["selector"],"properties": {"selector": {"$ref": "#/$defs/selector"}}},
         "assert_file_open_bytes": {
