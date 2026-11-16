@@ -1,5 +1,5 @@
 import { taoText as tr } from "../i18n";
-import { parseActionProposals } from "../actions";
+import { completeReply } from "./replyCompletion";
 import { actionKey, actionPending, createActionLifecycle } from "./actionLifecycle";
 import { getBudgetWarning, mergeUsage } from "../budget";
 import type {
@@ -149,6 +149,7 @@ export function createChatController(options: ChatControllerOptions = {}): TaoCh
     if (!state.threads[threadId]) return;
     if (event.type === "block_start" || event.type === "block_delta" || event.type === "block_stop") event = { ...event, index: event.index + (blockOffsets.get(threadId) ?? 0) };
     if (event.type === "message_start") {
+      updateAssistant(threadId, (message) => ({ ...message, stopReason: undefined }));
       const ledger = usageCalls.get(threadId) ?? { current: "", calls: new Map<string, Partial<TaoUsage>>() };
       ledger.current = event.messageId ?? id("call");
       usageCalls.set(threadId, ledger);
@@ -176,6 +177,8 @@ export function createChatController(options: ChatControllerOptions = {}): TaoCh
       return;
     }
     if (event.type === "message_delta") {
+      if (event.stopReason) updateAssistant(threadId, (message) => ({ ...message, stopReason: event.stopReason }));
+      if (event.stopReason === "max_tokens") patchRuntime(threadId, (runtime) => ({ ...runtime, phase: ["vault_locked", "error", "budget_halt"].includes(runtime.phase) ? runtime.phase : "stopped" }));
       if (event.stopReason === "refusal") {
         updateAssistant(threadId, (message) => ({ ...message, text: "", blocks: [...message.blocks.filter((block) => block.type !== "thinking" && block.type !== "text" && block.type !== "error"), { id: id("tao-refusal"), type: "error", error: { category: "configuration", message: "安全校验未通过本次回复" } }] }));
         patchRuntime(threadId, (runtime) => ({ ...runtime, phase: "refusal" }));
@@ -211,16 +214,10 @@ export function createChatController(options: ChatControllerOptions = {}): TaoCh
       return;
     }
     if (event.type === "message_stop") {
-      updateAssistant(threadId, (message) => {
-        const actionBlocks = state.runtime[threadId]?.lastRequest?.mode === "do" ? parseActionProposals(message.text) : [];
-        const blocks = actionBlocks.length > 0
-          ? [...message.blocks.filter((block) => block.type !== "action").map((block) => block.type === "text" ? { ...block, text: block.text?.replace(/```tao-action[\s\S]*?```/gi, "").trim() } : block), ...actionBlocks.slice(0, 5).map((action) => ({ id: id("tao-action"), type: "action" as const, action: { ...action, executionId: id("proposal") } }))]
-          : message.blocks;
-        return { ...message, text: message.text.replace(/```tao-action[\s\S]*?```/g, "").trim(), blocks };
-      });
+      updateAssistant(threadId, (message) => completeReply(message, state.runtime[threadId]?.lastRequest?.mode === "do", () => id("proposal")));
       const actions = state.threads[threadId]?.messages.at(-1)?.blocks.filter((block) => block.type === "action" && block.action).map((block) => block.action!);
       patchThread(threadId, (thread) => ({ ...thread, running: false }));
-      patchRuntime(threadId, (runtime) => ({ ...runtime, finishedAt: now(), phase: runtime.phase === "vault_locked" ? "vault_locked" : runtime.budget.halted ? "budget_halt" : runtime.phase === "refusal" || runtime.phase === "error" ? runtime.phase : actions?.length ? "awaiting_action" : "idle" }));
+      patchRuntime(threadId, (runtime) => ({ ...runtime, finishedAt: now(), phase: runtime.phase === "vault_locked" ? "vault_locked" : runtime.budget.halted ? "budget_halt" : ["refusal", "error", "stopped"].includes(runtime.phase) ? runtime.phase : actions?.length ? "awaiting_action" : "idle" }));
     }
   };
 
@@ -396,7 +393,7 @@ export function createChatController(options: ChatControllerOptions = {}): TaoCh
         return;
       }
       const ordered = [...valid].sort((a, b) => b.updatedAt - a.updatedAt).map((thread) => ({ ...thread, messages: thread.messages.map((message) => ({ ...message, blocks: (message.blocks ?? []).map((block) => block.action?.status === "approved" ? { ...block, action: { ...block.action, status: "invalid" as const, result: { output: tr("执行已中断，请检查实际结果后重新提议。") } } } : block) })) }));
-      const runtime = Object.fromEntries(ordered.map((thread) => [thread.id, { phase: thread.messages.some((m) => m.blocks.some((b) => b.action && actionPending(b.action))) ? "awaiting_action" as const : "idle" as const, budget: { usedTokens: 0, limitTokens: budget.limitTokens, halted: false } }]));
+      const runtime = Object.fromEntries(ordered.map((thread) => [thread.id, { phase: thread.messages.at(-1)?.stopReason === "max_tokens" ? "stopped" as const : thread.messages.some((m) => m.blocks.some((b) => b.action && actionPending(b.action))) ? "awaiting_action" as const : "idle" as const, budget: { usedTokens: 0, limitTokens: budget.limitTokens, halted: false } }]));
       const incoming = Object.fromEntries(ordered.map((thread) => [thread.id, { ...thread, running: false }]));
       if (options?.merge) {
         // Refresh legacy summaries from their owner, while current Home threads

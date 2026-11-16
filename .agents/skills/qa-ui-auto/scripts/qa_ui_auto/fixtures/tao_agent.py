@@ -71,6 +71,7 @@ def setup(ctx):
     if any(os.environ.get(key) != value for key, value in isolated.items()):
         raise RuntimeError("tao_agent requires the current isolated QA profile")
     log = ctx.case_dir / "agent-gateway.jsonl"
+    limit_attempts = {}
 
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args):
@@ -82,7 +83,7 @@ def setup(ctx):
             blocks = user["content"]
             prompt = "\n".join(part.get("text", "") for part in blocks) if isinstance(blocks, list) else blocks
             with log.open("a", encoding="utf-8") as stream:
-                stream.write(json.dumps(dict(model=body["model"], effort=body.get("reasoning_effort"), thinking=body.get("thinking"), messages=len(body["messages"]), feedback="untrusted_action_results" in prompt, failure="test failed" in prompt or "FAILED" in prompt, boundary="loopback scripted response; real native executor")) + "\n")
+                stream.write(json.dumps(dict(model=body["model"], effort=body.get("reasoning_effort"), thinking=body.get("thinking"), max_tokens=body.get("max_tokens"), messages=len(body["messages"]), feedback="untrusted_action_results" in prompt, failure="test failed" in prompt or "FAILED" in prompt, boundary="loopback scripted response; real native executor")) + "\n")
             self.send_response(200)
             self.send_header("Content-Type", "text/event-stream")
             self.send_header("Connection", "close")
@@ -98,6 +99,17 @@ def setup(ctx):
             frames = [dict(choices=[dict(index=0, delta=dict(role="assistant", reasoning_content="Review actual results and propose the next step."), finish_reason=None)]),
                       dict(choices=[dict(index=0, delta=dict(tool_calls=calls) if calls else dict(content=text), finish_reason=None)]),
                       dict(choices=[dict(index=0, delta={}, finish_reason="tool_calls" if calls else "stop")], usage=dict(prompt_tokens=100, completion_tokens=50))]
+            for marker in ("QA_OUTPUT_LIMIT_THINKING", "QA_OUTPUT_LIMIT_ACTION"):
+                if marker not in prompt:
+                    continue
+                limit_attempts[marker] = limit_attempts.get(marker, 0) + 1
+                if limit_attempts[marker] == 1:
+                    partial = "" if marker.endswith("THINKING") else scripted_reply("minimal Python calculator") + "\nIncomplete next file:"
+                    frames[1]["choices"][0]["delta"] = dict(content=partial)
+                    frames[2]["choices"][0]["finish_reason"] = "length"
+                else:
+                    frames[1]["choices"][0]["delta"] = dict(content="Explicit regeneration completed with a usable response.")
+                break
             try:
                 for frame in frames:
                     self.wfile.write(("data: " + json.dumps(frame) + "\n\n").encode())

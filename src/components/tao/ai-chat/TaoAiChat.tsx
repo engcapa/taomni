@@ -8,6 +8,7 @@ import { TaoComposer } from "./Composer";
 import { SidePanel } from "./SidePanel";
 import { TopBar } from "./TopBar";
 import { useChatFeedScroll } from "./useChatFeedScroll";
+import { canResumeReply } from "./replyCompletion";
 import { BudgetCard, BrowserUnavailableCard, RefusalCard, StoppedCard, VaultLockedMask } from "./states/StateCards";
 import type { ChatProfile, TaoChatController, TaoChatSlots } from "./ports";
 
@@ -20,7 +21,8 @@ export function TaoAiChat({ controller, profile, slots, disabled = false, active
   const runtime = state.activeThreadId ? state.runtime[state.activeThreadId] : undefined;
   const vaultPromptDismissed = Boolean(runtime?.vaultPromptDismissed);
   const feed = useChatFeedScroll(state.activeThreadId, thread?.messages, phase, active);
-  const received = Boolean(thread?.messages.at(-1)?.blocks.some((block) => block.type !== "error" && (block.text || block.sources?.length)));
+  const lastReply = thread?.messages.at(-1);
+  const received = canResumeReply(lastReply);
   const previous = useRef({ threadId: state.activeThreadId, phase });
   useEffect(() => {
     if (active && previous.current.threadId === state.activeThreadId && previous.current.phase === "vault_locked" && phase === "stopped") {
@@ -56,7 +58,7 @@ export function TaoAiChat({ controller, profile, slots, disabled = false, active
         <div ref={feed.feedRef} onScroll={feed.onScroll} className="tao-home-feed" data-testid="tao-home-feed">
           <div ref={feed.contentRef} className="tao-home-feed-content">
           {thread?.messages.length ? <MessageList thread={thread} phase={phase} controller={controller} /> : <div className="tao-home-empty-stage"><div className="tao-home-greeting"><span className="tao-home-logo">T</span><div><h1>{tr("Tao 在这里")}</h1><p>{tr("Develop Buddy · 问、做、深研你的开发问题")}</p></div></div>{slots?.emptyState}</div>}
-          <RefusalCard phase={phase} /><BudgetCard phase={phase} controller={controller} /><StoppedCard phase={phase} controller={controller} web={state.activeThreadId ? state.runtime[state.activeThreadId]?.lastRequest?.web ?? state.composer.web : state.composer.web} received={received} />
+          <RefusalCard phase={phase} /><BudgetCard phase={phase} controller={controller} /><StoppedCard phase={phase} controller={controller} web={state.activeThreadId ? state.runtime[state.activeThreadId]?.lastRequest?.web ?? state.composer.web : state.composer.web} received={received} truncated={lastReply?.stopReason === "max_tokens"} />
           {vaultPromptDismissed ? <VaultLockedMask phase={phase} controller={controller} active={active} compact /> : null}
           </div>
         </div>

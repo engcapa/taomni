@@ -19,11 +19,16 @@ describe("self-contained sanitized Markdown output", () => {
   it("saves independently generated PDF bytes through the normal chooser without invoking printing", async () => {
     const blob = new Blob(["%PDF-1.7\n"], { type: "application/pdf" });
     vi.mocked(markdownPdf).mockResolvedValue(blob);
-    vi.mocked(saveExportBlob).mockResolvedValueOnce("/out/a.pdf").mockResolvedValueOnce(null);
+    vi.mocked(saveExportBlob).mockImplementationOnce(async (_name, output) => {
+      expect(await (typeof output === "function" ? output() : output)).toBe(blob);
+      return "/out/a.pdf";
+    }).mockResolvedValueOnce(null);
     expect(await exportMarkdown("pdf", "# PDF", "/docs/a.md", DEFAULT_EXPORT_SETTINGS)).toEqual({ status: "saved", path: "/out/a.pdf" });
-    expect(saveExportBlob).toHaveBeenCalledWith("a.pdf", blob, "/docs/a.md");
+    expect(saveExportBlob).toHaveBeenCalledWith("a.pdf", expect.any(Function), "/docs/a.md");
+    expect(markdownPdf).toHaveBeenCalledOnce();
     expect(document.querySelector("iframe")).toBeNull();
     expect(await exportMarkdown("pdf", "# PDF", "/docs/a.md", DEFAULT_EXPORT_SETTINGS)).toEqual({ status: "cancelled" });
+    expect(markdownPdf).toHaveBeenCalledOnce();
   });
   it("shares the existing renderer and embeds actual local image data with no resource fetch", async () => {
     const source = '# Doc\n\n**bold** ![local](assets/a.png)\n\n<script>alert(1)</script>\n';

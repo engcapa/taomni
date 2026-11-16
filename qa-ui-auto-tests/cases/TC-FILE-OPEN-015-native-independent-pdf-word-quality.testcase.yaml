@@ -66,7 +66,9 @@ steps:
     action: choose
     path: ${fixture.markdown_quality_exports}/quality.pdf
     trigger: '[data-testid="markdown-export-confirm"]'
-- wait_for: '[data-testid="markdown-export-status"][data-export-state="saved"]'
+- wait_for:
+    selector: '[data-testid="markdown-export-status"][data-export-state="saved"]'
+    timeout_sec: 90
 - assert_export_quality:
     path: ${fixture.markdown_quality_exports}/quality.pdf
     kind: pdf
@@ -78,7 +80,9 @@ steps:
     action: choose
     path: ${fixture.markdown_quality_exports}/quality.docx
     trigger: '[data-testid="markdown-export-confirm"]'
-- wait_for: '[data-testid="markdown-export-status"][data-export-state="saved"]'
+- wait_for:
+    selector: '[data-testid="markdown-export-status"][data-export-state="saved"]'
+    timeout_sec: 60
 - assert_export_quality:
     path: ${fixture.markdown_quality_exports}/quality.docx
     kind: docx

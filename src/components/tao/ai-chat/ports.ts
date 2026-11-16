@@ -102,6 +102,7 @@ export interface TaoMessage {
   text: string;
   blocks: TaoBlock[];
   createdAt: number;
+  stopReason?: "end_turn" | "max_tokens" | "refusal" | "tool_use" | "stopped";
 }
 
 export interface TaoThread {

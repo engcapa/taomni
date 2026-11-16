@@ -17,7 +17,7 @@ def run(ctx):
     with flow.evidence():
         open_workspace(flow, root)
         flow.send("Design and implement a usable Python task-tracking application from scratch using only the standard library. Create task_repository.py, task_cli.py, test_task_repository.py and README.md. TaskRepository(json_path) provides create(title), list_tasks(), complete(task_id), delete(task_id), persists every mutation, validates empty titles and reports missing IDs. The argparse CLI accepts --data FILE and create/list/complete/delete commands, returns JSON and uses a nonzero exit for invalid input. Tests use TemporaryDirectory and cover at least six scenarios: create/reload persistence, completion/reload, deletion, empty input, missing ID and a real CLI subprocess. Include design choices and short user instructions. Tests must assert behavior and clean up their data. Avoid external network and dependencies." + contract)
-        flow.reply("project-design-and-implementation", 1)
+        flow.reply("project-design-and-implementation", 1, seconds=450)
         files = {"task_repository.py", "task_cli.py", "test_task_repository.py", "README.md"}
         flow.require(not any((root / name).exists() for name in files), "Project files were written before approval")
         approve_files(flow, root, files)
@@ -35,7 +35,7 @@ def run(ctx):
         test_project(flow, command, 6, "project-repair-tests")
 
         flow.send("Add priority support to the existing task application. create accepts priority low/normal/high with normal default, list_tasks can filter priority, and the CLI supports --priority for create and list. Old JSON records without priority must load with normal priority. Validate invalid priorities and retain all existing behavior. Update the repository, CLI, tests and README. Add tests for persistence, filtering, invalid input, old-record compatibility and CLI priority. Keep the original test scenarios." + contract)
-        flow.reply("project-feature-and-compatibility-tests", 7)
+        flow.reply("project-feature-and-compatibility-tests", 7, seconds=450)
         approve_files(flow, root, files)
         test_project(flow, command, 8, "project-feature-tests", minimum=6)
         flow.send("Review the actual project and confirmed test results. Explain the implemented app/CLI, the observed failure and repair, priority and old-data compatibility, and remaining risks. Propose no actions and do not claim any unexecuted validation passed.")

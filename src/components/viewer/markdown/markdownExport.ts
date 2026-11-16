@@ -98,11 +98,11 @@ export async function exportMarkdown(
     notifyClipboardWritten();
     return { status: "copied" };
   }
-  let blob: Blob;
-  if (kind === "pdf") blob = await (await import("./exportPdf")).markdownPdf(prepared.root, prepared.title, settings, prepared.css);
-  else if (kind === "png") blob = await exportPng(prepared.root, settings, prepared.css);
-  else if (kind === "docx") blob = await (await import("./exportDocx")).markdownDocx(prepared.root, prepared.title, settings);
-  else blob = new Blob([prepared.html], { type: "text/html;charset=utf-8" });
-  const path = await saveExportBlob(`${stem}.${kind}`, blob, sourceIsFile ? docPath : undefined);
+  const path = await saveExportBlob(`${stem}.${kind}`, async () => {
+    if (kind === "pdf") return (await import("./exportPdf")).markdownPdf(prepared.root, prepared.title, settings, prepared.css);
+    if (kind === "png") return exportPng(prepared.root, settings, prepared.css);
+    if (kind === "docx") return (await import("./exportDocx")).markdownDocx(prepared.root, prepared.title, settings);
+    return new Blob([prepared.html], { type: "text/html;charset=utf-8" });
+  }, sourceIsFile ? docPath : undefined);
   return path ? { status: "saved", path } : { status: "cancelled" };
 }

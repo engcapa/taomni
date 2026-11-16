@@ -98,6 +98,21 @@ class AgentFixtureTests(unittest.TestCase):
                 proposal = frames[1]["choices"][0]["delta"]["content"]
                 self.assertIn("tao-action", proposal)
                 self.assertEqual(json.loads(proposal.split("```tao-action\n", 1)[1].split("\n```", 1)[0]), action)
+                for marker in ("QA_OUTPUT_LIMIT_THINKING", "QA_OUTPUT_LIMIT_ACTION"):
+                    body["messages"] = [dict(role="user", content=marker)]
+                    for attempt in range(2):
+                        req = Request(url, data=json.dumps(body).encode(), headers={"Content-Type": "application/json"})
+                        with build_opener(ProxyHandler({})).open(req, timeout=5) as response:
+                            frames = [json.loads(line[6:]) for line in response.read().decode().splitlines()
+                                      if line.startswith("data: ") and line != "data: [DONE]"]
+                        self.assertEqual(frames[-1]["choices"][0]["finish_reason"], "length" if attempt == 0 else "stop")
+                        content = frames[1]["choices"][0]["delta"]["content"]
+                        if attempt == 1:
+                            self.assertIn("Explicit regeneration", content)
+                        elif marker.endswith("THINKING"):
+                            self.assertEqual(content, "")
+                        else:
+                            self.assertIn("tao-action", content)
             finally:
                 tao_agent.teardown(ctx)
 

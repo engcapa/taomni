@@ -68,6 +68,8 @@ const english: Record<string, string> = {
   "本轮请求没有完成": "This request did not complete", "安全校验未通过本次回复": "This response did not pass the safety check",
   "思考与正文已丢弃，未保存到线程。可以改写问题后重试。": "This turn's thinking and text were discarded. Rephrase the question and try again.",
   "本轮 token 预算已用完": "This turn reached its token budget", "已完成步骤已保存，续跑不会重做。": "Completed steps are retained for continuation.", "提高预算并继续": "Increase budget and continue",
+  "回复达到输出上限": "Response reached the output limit", "已收到的内容已保留。请重新生成，或将任务拆成较小步骤。": "Received content is retained. Regenerate or split the task into smaller steps.",
+  "选择或拖入文件，文件会暂存到当前对话，发送问题时提交给模型。关闭侧栏不会移除附件。": "Choose or drop files to stage them in this conversation. They are submitted to the model when you send. Closing the sidebar keeps the attachments.",
   "重新生成（联网回复无法续写）": "Regenerate (web replies cannot continue)", "继续生成": "Continue", "已停止生成": "Generation stopped", "已收到的内容已保留，可以从当前位置继续。": "Received content is retained. You can continue from here.",
   "Vault 已锁定": "Vault is locked", "解锁后可从已收到的位置继续": "Unlock Vault before continuing", "解锁 Vault": "Unlock Vault", "无法解锁 Vault：{error}": "Could not unlock Vault: {error}", "本轮尚未收到回复，可重新生成。": "No reply was received. You can regenerate this response.", "本机检索 · 不消耗 token": "Local search · No tokens used",
   "关闭搜索": "Close search", "搜索已保存资料（支持 source:sql since:14d）": "Search saved records (source:sql since:14d)", "资料来源": "Record sources", "全部": "All",
