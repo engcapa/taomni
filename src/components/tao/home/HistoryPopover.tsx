@@ -1,5 +1,5 @@
 import { taoText as tr } from "../i18n";
-import { Clock3, MessageSquare, Search, Trash2, X } from "lucide-react";
+import { Clock3, MessageSquare, RefreshCw, Search, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ConfirmDialog } from "../../sidebar/ConfirmDialog";
 import type { SessionConfig } from "../../../lib/ipc";
@@ -60,10 +60,12 @@ export function HistoryPopover(props: Props) {
   const filteredWorkspaces = useMemo(() => workspaces.filter((workspace) => !needle || workspace.name.toLocaleLowerCase().includes(needle)).sort((a, b) => b.lastOpenedAt - a.lastOpenedAt), [workspaces, needle]);
   const closeAfter = (action: () => void) => { action(); onClose(); };
   return <div ref={root} className="tao-home-history-content" data-testid="tao-home-history-popover">
+    <div className="tao-home-history-header"><strong><Clock3 size={14} />{tr("历史")}</strong><span>
+      {props.onRefresh ? <button type="button" data-testid="tao-home-history-refresh" aria-label={tr("刷新历史")} title={tr("刷新历史")} disabled={props.loading} onClick={props.onRefresh}><RefreshCw size={14} /></button> : null}
+      <button type="button" aria-label={tr("关闭历史")} onClick={onClose}><X size={14} /></button>
+    </span></div>
     {props.loading ? <p role="status" data-testid="tao-home-history-loading">{tr("正在读取历史…")}</p> : null}
     {props.error ? <p role="alert" data-testid="tao-home-history-error">{props.error}</p> : null}
-    {props.onRefresh ? <button type="button" data-testid="tao-home-history-refresh" disabled={props.loading} onClick={props.onRefresh}>{tr("刷新历史")}</button> : null}
-    <div className="tao-home-history-header"><strong><Clock3 size={14} />{tr("历史")}</strong><button type="button" aria-label={tr("关闭历史")} onClick={onClose}><X size={14} /></button></div>
     <div className="tao-home-history-tabs" role="tablist">{(["chat", "sessions", "workspaces", "directories"] as const).map((item) => <button type="button" role="tab" aria-selected={tab === item} data-testid={`tao-home-history-tab-${item}`} key={item} className={tab === item ? "active" : ""} onClick={() => { setTab(item); setQuery(""); }}>{tr(({ chat: "Tao 对话", sessions: "最近会话", workspaces: "最近工作区", directories: "最近目录" })[item])}</button>)}</div>
     {tab === "directories" ? <div className="tao-home-directory-history">{props.directories}</div> : <>
       <label className="tao-home-history-search"><Search size={13} /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder={tr("搜索历史")} /></label>

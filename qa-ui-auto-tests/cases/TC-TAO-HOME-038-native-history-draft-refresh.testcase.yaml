@@ -71,6 +71,22 @@ steps:
 - assert_count:
     selector: '[data-testid="tao-home-history-row"]'
     equal: 3
+- eval_readonly:
+    expression: document.querySelector(".tao-home-history-header button").getAttribute("data-testid") === "tao-home-history-refresh"
+    expect_truthy: true
+- click: '[data-testid="tao-home-history-tab-sessions"]'
+- click: '[data-testid="tao-home-history-tab-chat"]'
+- assert_count:
+    selector: '[data-testid="tao-home-history-row"]'
+    equal: 3
+- press: Escape
+- eval_readonly:
+    expression: document.activeElement.getAttribute("data-testid") === "tao-home-history"
+    expect_truthy: true
+- click: '[data-testid="tao-home-history"]'
+- assert_count:
+    selector: '[data-testid="tao-home-history-row"]'
+    equal: 3
 - assert_no_runtime_errors: null
 - screenshot: native-history-draft-restored.png
 verification:
@@ -95,6 +111,10 @@ verification:
     - 27
     - 30
     - 31
+    - 35
+    - 36
+    - 38
+    - 40
     checkpoints:
     - step: 5
       expectation: The preceding production UI action retains its required geometry, complete saved artifact or durable transcript/draft,
@@ -123,9 +143,17 @@ verification:
     - step: 33
       expectation: The preceding production UI action retains its required geometry, complete saved artifact or durable transcript/draft,
         as specified by the assertion.
-    - step: 34
+    - step: 42
       expectation: The preceding production UI action retains its required geometry, complete saved artifact or durable transcript/draft,
         as specified by the assertion.
+    - step: 34
+      expectation: Refresh stays in the history header.
+    - step: 37
+      expectation: Changing tabs and popup height retains all three histories.
+    - step: 39
+      expectation: Escape closes history and restores focus to its dock trigger.
+    - step: 41
+      expectation: Reopening after resize shows all saved histories without ResizeObserver runtime errors.
     results:
     - 5
     - 9
@@ -136,7 +164,11 @@ verification:
     - 24
     - 29
     - 33
+    - 42
     - 34
+    - 37
+    - 39
+    - 41
   visual:
   - check: Diagram labels, page boundaries and popup placement
     method: manual

@@ -51,7 +51,7 @@ class TaoProviderObservationTests(unittest.TestCase):
             status = root / "real-provider-status.txt"
             status.write_text("request_prepared\n")
             session = Mock()
-            session.execute.side_effect = [snapshot(replyLength=0, running=True), snapshot()]
+            session.execute.side_effect = [snapshot(replyLength=0, running=True), snapshot(usage={"inputTokens": 875, "outputTokens": 45})]
             # Match the native verb contract: fixture values are unavailable.
             ctx = SimpleNamespace(session=session, case_dir=root)
             with patch("qa_ui_auto.tao_provider_observation.time.sleep"):
@@ -60,6 +60,7 @@ class TaoProviderObservationTests(unittest.TestCase):
             artifact = json.loads((root / "real-provider-outcome.json").read_text())
             self.assertEqual(artifact["outcome"], "response-complete")
             self.assertNotIn("text", artifact["state"])
+            self.assertEqual(artifact["state"]["usage"], {"inputTokens": 875, "outputTokens": 45})
             self.assertIn("response-complete", status.read_text())
 
     def test_failed_outcome_is_retained_without_claiming_completed(self):

@@ -1,5 +1,6 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
+import { useElementResizeFrame } from "../../../hooks/useElementResizeFrame";
 import { ChevronDown, Copy, Download, FileCode2, FileImage, FileText, FolderDown, Printer, X } from "lucide-react";
 import { useViewerLabels } from "../viewerLabels";
 import type { ViewerDocument } from "../../../lib/viewer";
@@ -33,21 +34,21 @@ export function MarkdownExportMenu({ document: current, onError, printRequest = 
     menu.current?.querySelector<HTMLButtonElement>("[role='menuitem']")?.focus();
     return () => { window.removeEventListener("pointerdown", close); window.removeEventListener("keydown", escape); };
   }, [open]);
+  const update = useCallback(() => {
+    const anchor = trigger.current?.getBoundingClientRect(), popup = menu.current?.getBoundingClientRect();
+    if (!anchor || !popup) return;
+    const below = anchor.bottom + 6;
+    const left = Math.max(8, Math.min(anchor.right - popup.width, window.innerWidth - popup.width - 8));
+    const top = Math.max(8, below + popup.height <= window.innerHeight - 8 ? below : anchor.top - popup.height - 6);
+    setPosition((previous) => previous.left === left && previous.top === top ? previous : { left, top });
+  }, []);
+  const schedule = useElementResizeFrame(menu, update);
   useLayoutEffect(() => {
     if (!open) return;
-    const update = () => {
-      const anchor = trigger.current?.getBoundingClientRect(), popup = menu.current?.getBoundingClientRect();
-      if (!anchor || !popup) return;
-      const below = anchor.bottom + 6;
-      setPosition({ left: Math.max(8, Math.min(anchor.right - popup.width, window.innerWidth - popup.width - 8)),
-        top: Math.max(8, below + popup.height <= window.innerHeight - 8 ? below : anchor.top - popup.height - 6) });
-    };
     update();
-    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(update);
-    if (menu.current) observer?.observe(menu.current);
-    window.addEventListener("resize", update); window.addEventListener("scroll", update, true);
-    return () => { observer?.disconnect(); window.removeEventListener("resize", update); window.removeEventListener("scroll", update, true); };
-  }, [open]);
+    window.addEventListener("scroll", schedule, true);
+    return () => window.removeEventListener("scroll", schedule, true);
+  }, [open, update, schedule]);
   const run = async (kind: MarkdownExportKind) => {
     if (busy) return;
     setOpen(false); setDialog(null); setBusy(true); setSaved(null); setExportState("busy");

@@ -22,6 +22,8 @@ READ = r"""return (() => {
     : /protocol|parameter|请求参数|协议/i.test(text) ? 'protocol'
     : /configuration|config|配置/i.test(text) ? 'configuration' : 'provider';
   const assistants = [...root.querySelectorAll('[data-testid="tao-home-message-assistant"]')];
+  const usageText = assistants.at(-1)?.querySelector('.tao-home-usage-line')?.textContent || '';
+  const input = /Input\s+(\d+)/.exec(usageText), output = /Output\s+(\d+)/.exec(usageText);
   const replyLength = assistants.reduce((n, el) => n + [...el.querySelectorAll('[data-testid="tao-home-markdown-reply"]')]
     .reduce((sum, body) => sum + (body.textContent || '').trim().length, 0), 0);
   const retry = [...root.querySelectorAll('[data-testid="tao-home-retry"]')].some(el => visible(el) && !el.disabled);
@@ -29,7 +31,8 @@ READ = r"""return (() => {
     assistantCount:assistants.length, replyLength, errorCount:errors.length,
     credentialInvalid:credential, errorCategory:category, retryVisible:retry,
     running:visible(root.querySelector('[data-testid="tao-home-stop"]')),
-    noKeyVisible:visible(root.querySelector('[data-testid="tao-home-no-key"]'))};
+    noKeyVisible:visible(root.querySelector('[data-testid="tao-home-no-key"]')),
+    usage:input && output ? {inputTokens:Number(input[1]), outputTokens:Number(output[1])} : null};
 })();"""
 
 

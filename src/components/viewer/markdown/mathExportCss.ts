@@ -14,6 +14,11 @@ async function embedFonts(): Promise<string> {
     if (!source) throw new Error("The bundled math font is unavailable");
     const path = source[1] || source[2] || source[3];
     const url = mathFontUrl(path, document.baseURI);
+    // Vite already embeds smaller fonts. Packaged WebKit can disallow fetching
+    // data URLs even though its CSS font loader accepts the embedded bytes.
+    if (url.protocol === "data:") {
+      return face.replace(/src:[^}]+/, `src:url("${url.href}") format("woff2")`);
+    }
     const response = await fetch(url);
     if (!response.ok) throw new Error("Cannot read the bundled math font");
     const data = await new Promise<string>((resolve, reject) => {
