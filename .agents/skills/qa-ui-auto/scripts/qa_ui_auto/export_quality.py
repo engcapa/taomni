@@ -29,6 +29,7 @@ def inspect_quality(path, kind):
         if len(reader.pages) < 3:
             raise StepError("Quality PDF must retain the complete multi-page document")
         pages = []
+        extracted_pages = []
         for page in reader.pages:
             width, height = float(page.mediabox.width), float(page.mediabox.height)
             if abs(width - 595.28) > 1 or abs(height - 841.89) > 1:
@@ -41,9 +42,17 @@ def inspect_quality(path, kind):
             if dpi < 299 or max(ImageStat.Stat(image).stddev) < 3:
                 raise StepError("PDF page is blank or below 300 DPI")
             pages.append(dict(width=image.width, height=image.height, dpi=dpi, rasterGridPixels=raster_grid_pixels(image)))
+            extracted_pages.append(page.extract_text() or "")
         if any(sum(page["rasterGridPixels"][color] for page in pages) < 250 for color in ("red", "blue")):
             raise StepError("PDF lost the original raster grid pixels")
-        return dict(pages=pages, pageCount=len(pages), printerIndependentArtifact=True)
+        text = "\n".join(extracted_pages)
+        for required in ["Readable text", "中文检索", "café", "é", "😀", "用户 User", "No printer required", "Paragraph 20"]:
+            if required not in text:
+                raise StepError("PDF lost searchable Unicode text: " + required)
+        if text.count("Paragraph 20:") != 1:
+            raise StepError("PDF text layer duplicated the final paragraph across page slices")
+        return dict(pages=pages, pageCount=len(pages), printerIndependentArtifact=True,
+                    searchableUnicode=True, extractedPages=extracted_pages)
     if kind != "docx":
         raise StepError("Expected PDF or DOCX quality artifact")
     with zipfile.ZipFile(io.BytesIO(data)) as archive:

@@ -1,9 +1,12 @@
 import { markdownExportCss, type MarkdownExportSettings } from "./exportModel";
 import { paginatePdf, pdfFragments, pdfPageLayout } from "./pdfPages";
 import { paintPdfImages, preparePdfImages } from "./pdfImages";
+import { createPdfSearchFont } from "./pdfSearchFont";
+import { paintPdfPageLabel, paintPdfText, pdfTextClusters } from "./pdfTextLayer";
 
 /** Printer-independent, offline PDF. Each page is rendered at 300 DPI with the
  * same browser typography/math/diagrams as HTML. No OS print API is invoked.
+ * Original Unicode text is retained in an aligned invisible search layer.
  * Page-sized canvases bound memory independently of total document height. */
 export async function markdownPdf(source: HTMLElement, title: string, settings: MarkdownExportSettings, css = markdownExportCss(settings, title)): Promise<Blob> {
   const [{ jsPDF }, capture] = await Promise.all([import("jspdf"), import("html-to-image")]);
@@ -27,6 +30,8 @@ export async function markdownPdf(source: HTMLElement, title: string, settings: 
     const height = root.getBoundingClientRect().height;
     const pages = paginatePdf(Math.max(1, height), layout.contentHeight, pdfFragments(root));
     const pdf = new jsPDF({ orientation: settings.orientation, unit: "mm", format: [layout.width, layout.height], compress: true });
+    const text = pdfTextClusters(root);
+    const searchFont = createPdfSearchFont(pdf);
     pdf.setProperties({ title, creator: "Taomni" });
     const header = document.createElement("div"), footer = document.createElement("div");
     header.style.cssText = `position:absolute;left:${layout.inset}px;right:${layout.inset}px;top:${Math.max(2, layout.inset / 2 - 7)}px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font:11px system-ui,sans-serif`;
@@ -44,6 +49,9 @@ export async function markdownPdf(source: HTMLElement, title: string, settings: 
         width: layout.pixelWidth, height: layout.pixelHeight, backgroundColor: background });
       paintPdfImages(images, canvas, page, viewport);
       pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, layout.width, layout.height, undefined, "FAST");
+      paintPdfText(searchFont, text, layout, slice);
+      if (settings.fileHeader) paintPdfPageLabel(searchFont, header, page);
+      if (settings.pageNumbers) paintPdfPageLabel(searchFont, footer, page);
       canvas.width = 0; canvas.height = 0;
     }
     return pdf.output("blob");
