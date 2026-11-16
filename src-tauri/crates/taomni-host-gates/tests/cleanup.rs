@@ -3,6 +3,7 @@ mod support;
 use std::io::Write;
 use std::path::PathBuf;
 use std::process::{Child, Command, Stdio};
+use std::time::{Duration, Instant};
 
 struct DisposableCore(Child);
 
@@ -13,10 +14,58 @@ impl Drop for DisposableCore {
     }
 }
 
+struct TreeDirectory(Option<tempfile::TempDir>);
+
+impl TreeDirectory {
+    fn new(prefix: &str) -> Self {
+        let mut builder = tempfile::Builder::new();
+        builder.prefix(prefix);
+        let directory = match std::env::var_os("TAOMNI_GATE_EVIDENCE_DIR") {
+            Some(root) => builder.tempdir_in(root),
+            None => builder.tempdir(),
+        };
+        Self(Some(directory.expect("owned process-tree evidence directory")))
+    }
+
+    fn path(&self) -> &std::path::Path {
+        self.0.as_ref().unwrap().path()
+    }
+}
+
+impl Drop for TreeDirectory {
+    fn drop(&mut self) {
+        if std::thread::panicking() {
+            let path = self.0.take().unwrap().keep();
+            eprintln!("Preserved failed process-tree evidence: {}", path.display());
+        }
+    }
+}
+
+fn wait_for_tree(core: &mut DisposableCore, ready: &std::path::Path, pids: &std::path::Path) {
+    let deadline = Instant::now() + Duration::from_secs(10);
+    loop {
+        assert!(core.0.try_wait().unwrap().is_none(), "core exited before tree readiness");
+        let receipt = support::receipt(pids);
+        if ready.exists()
+            && ["host", "hello", "child", "grandchild"]
+                .iter()
+                .all(|role| receipt.iter().any(|(record, _)| record == role))
+        {
+            return;
+        }
+        assert!(
+            Instant::now() < deadline,
+            "timed out before full tree readiness: core={}, ready={}, receipts={receipt:?}",
+            core.0.id(), ready.exists()
+        );
+        std::thread::sleep(Duration::from_millis(20));
+    }
+}
+
 #[test]
 #[ignore = "cross-process gate: execute only on GitHub hosted runners"]
 fn killing_the_core_cleans_the_real_host_child_and_grandchild() {
-    let directory = tempfile::tempdir().unwrap();
+    let directory = TreeDirectory::new("cleanup-core-kill-");
     let ready = directory.path().join("ready.json");
     let pids = directory.path().join("processes.txt");
     let tree = PathBuf::from(env!("CARGO_BIN_EXE_host-gate-tree"));
@@ -32,20 +81,7 @@ fn killing_the_core_cleans_the_real_host_child_and_grandchild() {
             .spawn()
             .expect("spawn disposable core"),
     );
-    support::wait_for(
-        || {
-            assert!(
-                core.0.try_wait().unwrap().is_none(),
-                "disposable core exited before readiness"
-            );
-            let receipt = support::receipt(&pids);
-            ready.exists()
-                && ["host", "hello", "child", "grandchild"]
-                    .iter()
-                    .all(|role| receipt.iter().any(|(record, _)| record == role))
-        },
-        "core and descendant readiness",
-    );
+    wait_for_tree(&mut core, &ready, &pids);
     let descendants = support::receipt(&pids);
     for (role, pid) in &descendants {
         assert!(
@@ -71,7 +107,7 @@ fn killing_the_core_cleans_the_real_host_child_and_grandchild() {
 #[test]
 #[ignore = "cross-process confirmed termination gate: GitHub hosted runners only"]
 fn confirmed_stop_observes_real_host_child_and_grandchild_exit_before_returning() {
-    let directory = tempfile::tempdir().unwrap();
+    let directory = TreeDirectory::new("cleanup-confirmed-stop-");
     let ready = directory.path().join("ready.json");
     let pids = directory.path().join("processes.txt");
     let mut core = DisposableCore(
@@ -87,20 +123,7 @@ fn confirmed_stop_observes_real_host_child_and_grandchild_exit_before_returning(
             .spawn()
             .unwrap(),
     );
-    support::wait_for(
-        || {
-            assert!(
-                core.0.try_wait().unwrap().is_none(),
-                "core exited before tree readiness"
-            );
-            let receipt = support::receipt(&pids);
-            ready.exists()
-                && ["host", "hello", "child", "grandchild"]
-                    .iter()
-                    .all(|role| receipt.iter().any(|(record, _)| record == role))
-        },
-        "full tree before confirmed stop",
-    );
+    wait_for_tree(&mut core, &ready, &pids);
     let descendants = support::receipt(&pids);
     assert!(
         descendants

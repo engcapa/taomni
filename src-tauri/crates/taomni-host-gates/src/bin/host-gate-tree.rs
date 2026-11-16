@@ -1,19 +1,13 @@
 //! Real process-tree fixture. The hello plugin owns protocol behavior; this
 //! wrapper adds a child and grandchild without relying on a platform shell.
 
-use std::fs::OpenOptions;
-use std::io::Write;
 use std::process::{Command, ExitCode, Stdio};
 use std::time::Duration;
 
 fn record(role: &str, pid: u32) {
     let path = std::env::var_os("TAOMNI_GATE_TREE_PID_FILE").expect("PID receipt path");
-    let mut output = OpenOptions::new()
-        .create(true)
-        .append(true)
-        .open(path)
-        .expect("PID receipt");
-    writeln!(output, "{role} {pid}").expect("write PID receipt");
+    taomni_host_gates::process_receipts::record(std::path::Path::new(&path), role, pid)
+        .expect("publish complete PID receipt");
 }
 
 fn main() -> ExitCode {

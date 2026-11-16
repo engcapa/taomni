@@ -100,12 +100,5 @@ pub fn process_alive(pid: u32) -> bool {
 }
 
 pub fn receipt(path: &std::path::Path) -> Vec<(String, u32)> {
-    std::fs::read_to_string(path)
-        .unwrap_or_default()
-        .lines()
-        .filter_map(|line| {
-            let (role, pid) = line.split_once(' ')?;
-            Some((role.into(), pid.parse().ok()?))
-        })
-        .collect()
+    taomni_host_gates::process_receipts::read(path).expect("read complete process receipts")
 }

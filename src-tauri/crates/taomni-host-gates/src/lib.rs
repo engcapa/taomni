@@ -4,3 +4,5 @@
 
 #[path = "../../../src/plugin/host.rs"]
 pub mod host;
+
+pub mod process_receipts;
