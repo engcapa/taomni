@@ -4,7 +4,7 @@
 
 ## 当前结论
 
-核心仍包含 MFA、Servers、SocksCap、远程桌面和本地语音等业务代码、状态与依赖。目前完成签名安装验证的独立宿主只有 hello-plugin；MFA engine 已拆分，真实 SDK 宿主原型正在开发，产品 facade 尚未切换。LanChat 已删除；历史 `lanchat.sqlite` / `lanchat.db` 保留原位，不读取、不迁移、不删除。
+核心仍包含 MFA、Servers、SocksCap、远程桌面和本地语音等业务代码、状态与依赖。目前完成签名安装验证的独立宿主只有 hello-plugin；MFA engine 与真实 SDK 宿主原型已提交，原型待 hosted，产品 facade 尚未切换。LanChat 已删除；历史 `lanchat.sqlite` / `lanchat.db` 保留原位，不读取、不迁移、不删除。
 
 生产升级 IPC 当前只记录只读预检、源指纹与 pending journal。缺少可信插件包和真实 exporter 时，不复制旧数据、不创建伪插件版本、不改变 active 指针。测试 fixture 的 staging/回滚原语不能算真实旧版升级验收。
 
@@ -12,6 +12,7 @@
 
 ## 2026-11-16 最新 runner 证据（持续采集中）
 
+- 原型源码 `b96d3add155c95675a7b3207f81e657c831d6c65` 已推送，[升级契约 #43858726184](https://github.com/engcapa/taomni/actions/runs/43858726184) 与 [UI #43858733769](https://github.com/engcapa/taomni/actions/runs/43858733769) 已触发，即时采集器已启动；当前排队/构建，未记新增进程门或 UI 修复通过。本批 `check:refactor`、rustfmt、actionlint、真实 MFA 依赖树、QA audit 全 gates（766 IDs、0 errors）、reviewed case contract 与 dev contract 通过；静态选择含受影响 MFA/备份还原、Windows 后续重置用例和完整 crash-regression：browser 三端各 35，Linux 两种 native profile 各 39、Windows 37、macOS 36，22 shards/3 个 release QA 构建，gaps=[]/unreviewed=[]。这些仅为选择/静态结果，不能替代执行。
 - 当前 MFA 宿主原型 `src-tauri/plugins/mfa/` 持有独立 `plugins/mfa/data/mfa.db`，只依赖 engine/API/SDK；使用 operation-scoped 固定 key 服务、核心一次性 export/reset grant、显式独占初始化和零化密钥副本，不接收主密码。串行 actor 的外层事务在取消/错误/panic 时回滚，engine 批次改用可嵌套 savepoint；snapshot 冻结并读取权威连接，普通重启重开旧库，未使用备份不建库、不访问 Vault。新增三端真实进程 5 项、snapshot 2 项及 Linux 真实持久 Vault 3 项，只在本地编译、待 GitHub 执行；engine 13/13、host 9/9、边界 10/10 单元通过，根 unit harness 编译及核心 MFA 14/14 单元通过。没有可信安装包、真实迁移或动态 UI，本批不标 TASK-014/025-H 或相关 G 门完成。
 - 源码 `3620dd60a` 的 [UI #43853090821](https://github.com/engcapa/taomni/actions/runs/43853090821) 持续即时收证，三端 browser 各 **34/34**，含 91 步 TC-MFA-015；native 尚在构建，未收齐不外推。对应[契约 #43853084170](https://github.com/engcapa/taomni/actions/runs/43853084170) 已结束，**26/27 jobs 成功**，28 份 artifact 已即时收齐；唯一失败为 Linux X11 真采集 2/3：顺序测试间 Xvfb reset 导致 `x11rb::connect` 被重置，补 `-noreset`，保留全部采集断言，待新源码 hosted 复验。
 - 三态还原 #43848528270 的 Linux Xvfb 四 shard 已即时收齐，**26/29**；TC-MODULES-013/014/015 的独立 `restored` 观察均确认原数据、新 generation、激活状态与 writer OS lease，但启动 Vault modal 阻挡进入 MFA，不能记完整解密/第二重启通过。调整为两次重启均先解锁再进入 MFA，并增加 modal 关闭断言，保留错密码拒绝、原密码/755224、账户数与全部生命周期断言，用例变为 96/107/115 步。旧快照 UI #43844254356 的 Windows 后续三例被 TC-MODULES-011 遗留 SQLite 连接阻挡；已确认 native 步骤与 fixture 清理使用不同上下文，改由同一 fixture state 持有连接和 job 集合。新单元在成功/步骤失败两条路径先复现再通过，运行中 WAL 断言保留；相关清理/归档 14 项单元通过，Windows 进程锁项留 GitHub；修复已提交 `18a1a61f9`，待多端 rerun。
@@ -110,7 +111,7 @@
 | TASK-011 验签安装 | 基础闭环四种 native profile 通过 | pinned key 的真实 minisign 校验、清单防回滚、安全解包、内容绑定及安装入口强制验签已接入；#43804951477 的 TC-MODULES-007 在四种 native profile 全部 52 步通过，覆盖官方签名安装、启禁、正常重启和篡改拒绝。业务包、更新/回滚与最终发布仍需后续证据。 |
 | TASK-012 单体升级 | 部分 | 从安全 pending 进入真实 legacy exporter、可信包 staging、Vault 交接、激活、恢复/回滚；真实安装升级证据。 |
 | TASK-013 原型与 G 门 | 部分 | hello fixture 已有；真实 MFA 原型和 G1–G11 多端实验与原始证据。 |
-| TASK-014 MFA | engine 已提交；SDK 宿主原型开发中 | engine 与独立 store actor/KeyProvider/snapshot 原型已有，现有 facade 仍在核心内；新增真实进程门待 hosted。可信包/真实迁移、动态 UI、相关 G 门和迁出后的三态还原均未闭合。 |
+| TASK-014 MFA | engine 与 SDK 宿主原型已提交，待 hosted | engine 与独立 store actor/KeyProvider/snapshot 原型已有，现有 facade 仍在核心内；新增真实进程门待 hosted。可信包/真实迁移、动态 UI、相关 G 门和迁出后的三态还原均未闭合。 |
 | TASK-015 | 已取消 | 历史设计 `7bc498b35` 中为 LanChat 迁移，已由用户明确删除决定取消；主设计已保留编号并清理前置依赖。旧库保持原位，不读取、迁移或删除，不创建替代插件。 |
 | TASK-016 RDP/VNC 客户端 | 待前置闭合 | 两个插件宿主与前端、证书钉扎、剪贴板/输入、保留会话及特定按键辅助入口。 |
 | TASK-017 RDP/VNC 服务端 | 待前置闭合 | 两个插件宿主、共享采集/公共库、系统权限和平台边界。 |
@@ -169,7 +170,7 @@ Wayland `TC-FILE-OPEN-008` 在已有 AI 路径 chip 点击处失败：失败截�
 
 已完成 retained locator、离线 v2 备份/还原、宿主自持 ProfileUseLease/PluginDataLease 和运行中 prepare/snapshot/release。`4c060a939` 契约三端快照通过；真实 UI 仍逐 shard 收证。三态 apply 已有原数据/代际/激活的独立观察，解锁顺序失败须新源码复验。已有证据只绑定实际输入，无关失败保留原始记录并不计通过。
 
-1. **收敛当前相关失败并取得新源码证据**：`18a1a61f9` 已修复三态还原后的启动 Vault modal 顺序、Windows TC-MODULES-011 的 fixture 连接所有权和 Xvfb 顺序测试 reset；提交 MFA 宿主原型，执行三端 5+2 个进程场景、Linux 真实 Vault 3 项。用 `qa-ui-auto-platforms` 重跑受影响 MFA/还原/备份及完整 browser/native crash-regression，完成 shard 即下载，不等 summary。
+1. **收敛当前相关失败并取得新源码证据**：`18a1a61f9` 已修复三态还原后的启动 Vault modal 顺序、Windows TC-MODULES-011 的 fixture 连接所有权和 Xvfb 顺序测试 reset；MFA 宿主原型 `b96d3add1` 已提交，待三端 5+2 个进程场景、Linux 真实 Vault 3 项执行证据。用 `qa-ui-auto-platforms` 重跑受影响 MFA/还原/备份及完整 browser/native crash-regression，完成 shard 即下载，不等 summary。
 2. **闭合 Vault、profile 与一致快照（TASK-024/025）**：完成 GUI/headless 同 profile 协同、运行/禁用/卸载保留数据三态正常重启 apply 与真实解密、多实例占用、取消和崩溃恢复；验证原生还原确认入口自动 relaunch 的接管。MFA 迁出时还需 v1 legacy alias 与独立宿主后的三态还原。
 3. **迁出真实业务（TASK-005-B、013/014、016–022）**：先完成真实 MFA 宿主原型的匹配 runner 证据、可信签名安装、相关 G 门、旧库只读迁移与动态 UI，再切换生产 facade 和连接 owner。之后依赖序推进 RDP/VNC 客户端与服务端、Servers、SocksCap、OCR/录制、本地语音的宿主、前端、状态与迁移。Mobile 按 DEC-2 留下明确 go/no-go 结论和公开例外，不能默认为交付；LanChat 任务已取消，不新增替代插件。
 4. **裁剪核心依赖闭包（TASK-006）**：随业务迁出，从核心 Cargo 默认 features、原生依赖、bundle/resources/helper 和前端 chunk 中实际移除相应实现。保存 cargo tree、资源与产物证据；把状态改名或放入 LegacyFeatureRuntime 不等于瘦身完成。
