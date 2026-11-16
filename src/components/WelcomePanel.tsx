@@ -3,7 +3,7 @@ import { useT } from "../lib/i18n";
 import { openLocalShellAsAdministrator, type LocalDirectoryShortcut, type SessionConfig } from "../lib/ipc";
 import { sftpLocalHome } from "../lib/sftp";
 import { useAppStore } from "../stores/appStore";
-import { openSettingsSection } from "../lib/settingsNavigation";
+import { BrowseModulesButton } from "./welcome/BrowseModulesButton";
 import { LocalTerminalCard, MailSessionsCard, WslCard } from "./welcome/LaunchCards";
 import { LocalDirectoriesPanel } from "./welcome/LocalDirectoriesPanel";
 import { RecentSessionsPanel } from "./welcome/RecentSessionsPanel";
@@ -176,17 +176,7 @@ export const WelcomePanel = memo(function WelcomePanel({
           ) : null}
         </div>
         <div className="flex justify-end">
-          <button
-            type="button"
-            data-testid="welcome-browse-modules"
-            className="taomni-btn px-3 py-1 text-[12px]"
-            onClick={() => {
-              openSettingsSection("module-store");
-              onOpenSettings?.();
-            }}
-          >
-            {t("plugins.browse")}
-          </button>
+          <BrowseModulesButton onOpenSettings={onOpenSettings} />
         </div>
         <WelcomeHistoryPanel
           translate={t}

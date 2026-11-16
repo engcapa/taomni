@@ -4,7 +4,8 @@ description: >-
   The modular runtime exposes the signed module registry through Settings. The
   browser and packaged app must show the Module Store panel and an explicit
   loading, empty, or registry-error state without runtime errors. Welcome opens
-  that same section directly; repeated Settings navigation keeps a single tab.
+  that same section directly from the actual application Home (including Tao
+  Home); repeated Settings navigation keeps a single tab.
 covers:
 - F-Modules-1
 - F1.6
