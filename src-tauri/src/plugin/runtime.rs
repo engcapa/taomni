@@ -1,155 +1,19 @@
 //! Registry-owned host lifecycle, supervision and correlated request dispatch.
 
 use super::*;
-use serde_json::Value;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
-use taomni_plugin_api::ErrorCode;
-use taomni_plugin_api::RequestId;
 
 #[derive(Debug)]
 pub(super) struct RuntimeHost {
-    process: Mutex<host::HostProcess>,
-    cancellation: host::HostCancellation,
+    pub(super) process: Mutex<host::HostProcess>,
+    pub(super) identity: RwLock<Option<taomni_plugin_services::AuthorizedHost>>,
+    pub(super) cancellation: host::HostCancellation,
     manifest: ModuleManifest,
     directory: PathBuf,
 }
 
-struct PendingCall<'a> {
-    registry: &'a PluginRegistry,
-    key: (String, String),
-    cancellation: Option<host::HostCancellation>,
-}
-
-impl Drop for PendingCall<'_> {
-    fn drop(&mut self) {
-        if let Some(cancellation) = &self.cancellation {
-            cancellation.finish(&RequestId::from(self.key.1.as_str()));
-        }
-        self.registry
-            .pending_requests
-            .lock()
-            .expect("plugin request lock poisoned")
-            .remove(&self.key);
-    }
-}
-
 impl PluginRegistry {
-    pub fn invoke(&self, slug: &str, command: &str, payload: Value) -> Result<Value, PluginError> {
-        self.invoke_with_id(slug, command, payload, &uuid::Uuid::new_v4().to_string())
-    }
-
-    pub fn invoke_with_id(
-        &self,
-        slug: &str,
-        command: &str,
-        payload: Value,
-        request_id: &str,
-    ) -> Result<Value, PluginError> {
-        if request_id.is_empty()
-            || request_id.len() > 128
-            || !request_id
-                .bytes()
-                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
-        {
-            return Err(PluginError::Rpc {
-                code: ErrorCode::InvalidRequest.as_i32(),
-                message: "invalid request id".into(),
-            });
-        }
-        let record = self
-            .get(slug)
-            .ok_or_else(|| PluginError::NotFound(slug.to_owned()))?;
-        if record.state != LifecycleState::Enabled {
-            return Err(PluginError::Disabled(slug.to_owned()));
-        }
-        if !record.manifest.commands.contains(command) {
-            return Err(PluginError::CommandDenied {
-                slug: slug.to_owned(),
-                command: command.to_owned(),
-            });
-        }
-        let key = (slug.to_owned(), request_id.to_owned());
-        {
-            let mut pending = self
-                .pending_requests
-                .lock()
-                .expect("plugin request lock poisoned");
-            if pending.contains_key(&key) {
-                return Err(PluginError::Rpc {
-                    code: ErrorCode::DuplicateRequest.as_i32(),
-                    message: format!("duplicate request id: {request_id}"),
-                });
-            }
-            pending.insert(key.clone(), false);
-        }
-        let mut pending_guard = PendingCall {
-            registry: self,
-            key: key.clone(),
-            cancellation: None,
-        };
-        let runtime = self.host_for(slug, &record)?;
-        let id = RequestId::from(request_id);
-        runtime.cancellation.register(&id);
-        pending_guard.cancellation = Some(runtime.cancellation.clone());
-        if self
-            .pending_requests
-            .lock()
-            .expect("plugin request lock poisoned")
-            .get(&key)
-            == Some(&true)
-        {
-            runtime.cancellation.cancel(&id);
-        }
-        loop {
-            if (self.shutting_down.load(Ordering::Acquire)
-                || self.quiescence.load(Ordering::Acquire) != 0)
-                || self
-                    .pending_requests
-                    .lock()
-                    .expect("plugin request lock poisoned")
-                    .get(&key)
-                    == Some(&true)
-            {
-                return Err(PluginError::Rpc {
-                    code: ErrorCode::RequestCancelled.as_i32(),
-                    message: "plugin request cancelled".into(),
-                });
-            }
-            if let Ok(mut process) = runtime.process.try_lock() {
-                return process
-                    .invoke_with_id(id, command, Some(payload))
-                    .map_err(|error| PluginError::Rpc {
-                        code: error.rpc_code(),
-                        message: format!("{slug}: {error}"),
-                    });
-            }
-            std::thread::sleep(Duration::from_millis(10));
-        }
-    }
-
-    pub fn cancel_request(&self, slug: &str, request_id: &str) -> bool {
-        {
-            let mut pending = self
-                .pending_requests
-                .lock()
-                .expect("plugin request lock poisoned");
-            let Some(cancelled) = pending.get_mut(&(slug.to_owned(), request_id.to_owned())) else {
-                return false;
-            };
-            *cancelled = true;
-        }
-        if let Some(runtime) = self
-            .hosts
-            .lock()
-            .expect("plugin host lock poisoned")
-            .get(slug)
-        {
-            runtime.cancellation.cancel(&RequestId::from(request_id));
-        }
-        true
-    }
-
     /// A single weak monitor follows the application-owned registry. It never
     /// holds the hosts map or records lock while invoking a process adapter.
     pub fn start_supervision(self: &Arc<Self>) {
@@ -217,6 +81,8 @@ impl PluginRegistry {
                         if let Err(error) = process.restart() {
                             log::warn!("plugin host restart failed: {error}");
                         }
+                        *runtime.identity.write().expect("plugin identity poisoned") =
+                            process.authorized_host().cloned();
                     }
                 }
             }
@@ -224,12 +90,17 @@ impl PluginRegistry {
     }
 
     pub fn shutdown(&self) {
-        let _lifecycle = self
-            .lifecycle
-            .lock()
-            .expect("plugin lifecycle lock poisoned");
-        self.shutting_down.store(true, Ordering::Release);
-        self.stop_hosts();
+        {
+            let _lifecycle = self
+                .lifecycle
+                .lock()
+                .expect("plugin lifecycle lock poisoned");
+            self.shutting_down.store(true, Ordering::Release);
+            self.stop_hosts();
+        }
+        if let Some(services) = &self.services {
+            services.dispatcher.shutdown();
+        }
     }
 
     pub(super) fn stop_hosts(&self) {
@@ -247,10 +118,10 @@ impl PluginRegistry {
                 .expect("plugin request lock poisoned")
                 .keys()
                 .filter(|(slug, _)| slug == &runtime.manifest.slug)
-                .map(|(_, id)| RequestId::from(id.as_str()))
+                .map(|(_, id)| id.clone())
                 .collect::<Vec<_>>();
             for id in ids {
-                runtime.cancellation.cancel(&id);
+                self.cancel_request(&runtime.manifest.slug, &id);
             }
             runtime
                 .process
@@ -260,7 +131,11 @@ impl PluginRegistry {
         }
     }
 
-    fn host_for(&self, slug: &str, record: &PluginRecord) -> Result<Arc<RuntimeHost>, PluginError> {
+    pub(super) fn host_for(
+        &self,
+        slug: &str,
+        record: &PluginRecord,
+    ) -> Result<Arc<RuntimeHost>, PluginError> {
         let _lifecycle = self
             .lifecycle
             .lock()
@@ -290,8 +165,14 @@ impl PluginRegistry {
         {
             return Ok(runtime.clone());
         }
-        let (working_dir, host_path) = self.host_location(slug, host_name)?;
-        let process = host::HostProcess::start(
+        let (working_dir, host_path, verified) = self.host_location(slug, host_name)?;
+        let services = self
+            .services
+            .as_ref()
+            .map(|services| services.host_config(&verified))
+            .transpose()?
+            .flatten();
+        let process = host::HostProcess::start_with_services(
             &record.manifest.id,
             &record.manifest.version,
             &host_path,
@@ -304,9 +185,11 @@ impl PluginRegistry {
                 .cloned()
                 .collect::<Vec<_>>(),
             host::HostSupervisorConfig::default(),
+            services,
         )
         .map_err(|error| PluginError::HostUnavailable(format!("{slug}: {error}")))?;
         let runtime = Arc::new(RuntimeHost {
+            identity: RwLock::new(process.authorized_host().cloned()),
             cancellation: process.cancellation_handle(),
             process: Mutex::new(process),
             manifest: record.manifest.clone(),
@@ -331,7 +214,7 @@ impl PluginRegistry {
         &self,
         slug: &str,
         host_name: &str,
-    ) -> Result<(PathBuf, PathBuf), PluginError> {
+    ) -> Result<(PathBuf, PathBuf, ModuleManifest), PluginError> {
         let working_dir = self.active_directory(slug)?;
         let verified = verify::verify_installed(&working_dir, current_platform())?;
         if self
@@ -350,7 +233,7 @@ impl PluginRegistry {
                 host_path.display()
             )));
         }
-        Ok((working_dir, host_path))
+        Ok((working_dir, host_path, verified))
     }
 
     pub(super) fn stop_host(&self, slug: &str) {

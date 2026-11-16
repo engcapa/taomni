@@ -2,6 +2,8 @@ use std::io;
 use std::os::fd::{AsRawFd, FromRawFd, OwnedFd, RawFd};
 use std::os::unix::process::CommandExt;
 use std::process::{Child, Command};
+#[path = "termination_unix.rs"]
+mod termination;
 
 /// The write end belongs only to the core. A tiny watchdog in the host's
 /// process group waits for EOF and kills that group if the core disappears.
@@ -12,6 +14,7 @@ pub(crate) struct ProcessContainment {
     owner: Option<OwnedFd>,
     reader: Option<OwnedFd>,
     process_group: Option<libc::pid_t>,
+    terminating: bool,
 }
 
 impl ProcessContainment {
@@ -62,6 +65,7 @@ impl ProcessContainment {
             owner: Some(owner),
             reader: Some(reader),
             process_group: None,
+            terminating: false,
         })
     }
 
@@ -72,13 +76,27 @@ impl ProcessContainment {
     }
 
     pub(crate) fn terminate(&mut self) {
-        if let Some(group) = self.process_group.take() {
+        if !self.terminating
+            && let Some(group) = self.process_group
+        {
             // Explicit cleanup is immediate; the ownership pipe covers abrupt
             // core death when this code cannot run.
             unsafe { libc::kill(-group, libc::SIGKILL) };
         }
+        self.terminating = true;
         self.owner.take();
         self.reader.take();
+    }
+
+    pub(crate) fn terminate_confirmed(
+        &mut self,
+        child: &mut Child,
+        deadline: std::time::Instant,
+    ) -> io::Result<()> {
+        self.terminate();
+        termination::wait(child, self.process_group, deadline)?;
+        self.process_group.take();
+        Ok(())
     }
 }
 

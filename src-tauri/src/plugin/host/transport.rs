@@ -27,6 +27,17 @@ pub(super) struct Transport {
 }
 
 impl Transport {
+    pub(super) fn begin_termination(&mut self) {
+        self.containment.terminate();
+    }
+    pub(super) fn terminate_confirmed(
+        &mut self,
+        deadline: Instant,
+    ) -> Result<(), HostProcessError> {
+        self.containment
+            .terminate_confirmed(&mut self.child, deadline)
+            .map_err(HostProcessError::Io)
+    }
     pub(super) fn spawn(mut command: Command) -> Result<Self, HostProcessError> {
         command
             .stdin(Stdio::piped())

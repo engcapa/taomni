@@ -91,6 +91,7 @@ struct LaunchConfig {
 pub struct HostProcess {
     launch: LaunchConfig,
     transport: Option<Transport>,
+    retired_transports: Vec<Transport>,
     supervisor: HostSupervisor,
     cancellation: HostCancellation,
     token: String,
@@ -156,6 +157,7 @@ impl HostProcess {
                 permissions: permissions.to_vec(),
             },
             transport: None,
+            retired_transports: Vec::new(),
             supervisor: HostSupervisor::new(plugin_id, config, 0),
             cancellation: HostCancellation::default(),
             token: String::new(),
@@ -195,6 +197,16 @@ impl HostProcess {
         method: &str,
         params: Option<Value>,
     ) -> Result<Value, HostProcessError> {
+        self.invoke_until(id, method, params, None)
+    }
+
+    fn invoke_until(
+        &mut self,
+        id: RequestId,
+        method: &str,
+        params: Option<Value>,
+        deadline: Option<Instant>,
+    ) -> Result<Value, HostProcessError> {
         let _guard = RequestGuard::new(self.cancellation.clone(), id.clone());
         // A cancellation made while waiting for the owning process mutex must
         // not send the queued command or be overwritten by registration.
@@ -205,10 +217,12 @@ impl HostProcess {
             return Err(HostProcessError::Crashed);
         }
         let now_ms = self.elapsed_ms();
-        let deadline = self
-            .active_operation
-            .as_ref()
-            .and_then(OperationPermit::deadline)
+        let deadline = deadline
+            .or_else(|| {
+                self.active_operation
+                    .as_ref()
+                    .and_then(OperationPermit::deadline)
+            })
             .unwrap_or_else(|| Instant::now() + self.supervisor.config().request_timeout);
         let remaining_ms = deadline
             .saturating_duration_since(Instant::now())
@@ -316,6 +330,7 @@ impl HostProcess {
                 message: "plugin restart is not due".into(),
             });
         }
+        self.confirm_retired(Instant::now() + Duration::from_secs(5))?;
         self.restart_due.take();
         self.supervisor.mark_restarted(self.elapsed_ms());
         if let Err(error) = self.spawn_and_handshake() {
@@ -330,6 +345,27 @@ impl HostProcess {
         self.supervisor.stop();
         self.restart_due.take();
         self.transport.take();
+        self.retired_transports.clear();
+    }
+
+    pub fn stop_confirmed(&mut self, deadline: Instant) -> Result<(), HostProcessError> {
+        self.discard_services();
+        self.supervisor.stop();
+        self.restart_due.take();
+        self.confirm_retired(deadline)?;
+        if let Some(transport) = self.transport.as_mut() {
+            transport.terminate_confirmed(deadline)?;
+        }
+        self.transport.take();
+        Ok(())
+    }
+
+    fn confirm_retired(&mut self, deadline: Instant) -> Result<(), HostProcessError> {
+        for transport in &mut self.retired_transports {
+            transport.terminate_confirmed(deadline)?;
+        }
+        self.retired_transports.clear();
+        Ok(())
     }
 
     fn spawn_and_handshake(&mut self) -> Result<(), HostProcessError> {
@@ -410,7 +446,10 @@ impl HostProcess {
 
     fn schedule_restart(&mut self) -> HostTick {
         self.discard_services();
-        self.transport.take();
+        if let Some(mut transport) = self.transport.take() {
+            transport.begin_termination();
+            self.retired_transports.push(transport);
+        }
         if self.restart_due.is_some() || self.supervisor.state() == HostState::RestartExhausted {
             return self.tick();
         }

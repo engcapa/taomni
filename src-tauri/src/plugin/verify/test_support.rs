@@ -35,7 +35,7 @@ pub(crate) fn sign(bytes: &[u8], comment: &str) -> String {
     )
 }
 
-pub(super) fn manifest() -> ModuleManifest {
+pub(crate) fn manifest() -> ModuleManifest {
     serde_json::from_value(serde_json::json!({
         "id":"taomni-plugin-mfa", "slug":"mfa", "name":"MFA", "version":"1.0.0",
         "coreApiVersion":"1", "kind":"auth", "status":"stable", "removalCandidate":false,
@@ -92,6 +92,12 @@ pub(super) fn package_signature(bytes: &[u8], manifest: &ModuleManifest, platfor
 /// Registry tests can exercise the production staging capability with a real
 /// test signature. The verification key override is compiled only for tests.
 pub(crate) fn verified_package(manifest: &ModuleManifest) -> VerifiedPackage {
+    try_verified_package(manifest).unwrap()
+}
+
+pub(crate) fn try_verified_package(
+    manifest: &ModuleManifest,
+) -> Result<VerifiedPackage, super::TrustError> {
     let bytes = archive(files(manifest));
     let mut file = tempfile::NamedTempFile::new().unwrap();
     file.write_all(&bytes).unwrap();
@@ -102,5 +108,4 @@ pub(crate) fn verified_package(manifest: &ModuleManifest) -> VerifiedPackage {
         &verifier(),
         None,
     )
-    .unwrap()
 }

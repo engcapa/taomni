@@ -36,6 +36,7 @@ impl Drop for ModeLease {
 /// CoreState retains this lease after task/runtime teardown, until its stores close.
 /// Field order drops the profile lock before the mode lock, matching acquisition.
 pub(crate) struct ProfileRuntimeLeases {
+    pub(crate) generation: taomni_plugin_api::services::ProfileGeneration,
     _profile: crate::backup::coordination::ProfileLease,
     _mode: ModeLease,
 }
@@ -44,7 +45,9 @@ impl ProfileRuntimeLeases {
         let mode = ModeLease::acquire(data, mode)?;
         // Applies a pending restore under exclusive ownership before any DB opens.
         let profile = crate::backup::coordination::ProfileLease::prepare(data)?;
+        let generation = super::generation::current(data)?;
         Ok(Self {
+            generation,
             _profile: profile,
             _mode: mode,
         })

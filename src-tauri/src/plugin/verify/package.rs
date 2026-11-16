@@ -248,6 +248,8 @@ impl VerifiedPackage {
                 "module.json declares a permission unknown to this core",
             ));
         }
+        crate::plugin::services::manifest_grants(&manifest)
+            .map_err(|_| invalid("module.json declares an unauthorized fixed-key owner"))?;
         for entry in [&manifest.entry.host, &manifest.entry.frontend]
             .into_iter()
             .flatten()

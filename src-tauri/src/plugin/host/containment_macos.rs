@@ -2,6 +2,8 @@ use std::io;
 use std::mem::{MaybeUninit, size_of};
 use std::os::unix::process::CommandExt;
 use std::process::{Child, Command};
+#[path = "termination_unix.rs"]
+mod termination;
 
 /// kqueue watches the original core process, independent of pipe handles
 /// inherited by unrelated concurrent spawns. A birth-time check closes the
@@ -9,6 +11,7 @@ use std::process::{Child, Command};
 #[derive(Debug, Default)]
 pub(crate) struct ProcessContainment {
     process_group: Option<libc::pid_t>,
+    terminating: bool,
 }
 
 impl ProcessContainment {
@@ -48,9 +51,23 @@ impl ProcessContainment {
     }
 
     pub(crate) fn terminate(&mut self) {
-        if let Some(group) = self.process_group.take() {
+        if !self.terminating
+            && let Some(group) = self.process_group
+        {
             unsafe { libc::kill(-group, libc::SIGKILL) };
         }
+        self.terminating = true;
+    }
+
+    pub(crate) fn terminate_confirmed(
+        &mut self,
+        child: &mut Child,
+        deadline: std::time::Instant,
+    ) -> io::Result<()> {
+        self.terminate();
+        termination::wait(child, self.process_group, deadline)?;
+        self.process_group.take();
+        Ok(())
     }
 }
 

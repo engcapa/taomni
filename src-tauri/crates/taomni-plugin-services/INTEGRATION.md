@@ -86,10 +86,14 @@ Core API 16 + services 19 + SDK 7 + host 14 pure units pass. Six SDK stdio and
 two actual Vault/SDK process scenarios are wired into the hosted workflow;
 their new-source execution is still pending.
 
-Production registry/bootstrap must still configure the factory from a freshly
-verified manifest, acquire an outer OS lease before any host mutex, coordinate
-admission with real Vault lock/unlock/rekey and persistent profile generation,
-and own dispatcher shutdown outside host/Vault locks. The renderer's generic
+Production registry/bootstrap now configures the factory from a freshly
+verified manifest. The core-only scoped entry acquires its outer OS lease
+before the host mutex and maps renderer cancellation to its scoped wire ID.
+Core-owned profile generation persists under a stable state lock and changes
+before restore/rollback. Dispatcher shutdown joins outside host/Vault locks.
+Admission still starts closed: actual Vault init/unlock/lock/rekey coordination
+and the real MFA caller remain to be connected; the factory alone does not
+make data-key operations available to renderer calls. The renderer's generic
 invoke path cannot construct operation permits or select reset/export grants.
 Do not infer runtime availability from the backend trait implementation.
 
@@ -97,3 +101,9 @@ This delivery does not yet establish production
 revocation, shared capture/backup barriers, three-state restore, GUI/headless
 coordination, or a migrated MFA host. TASK-025 remains incomplete until C–I
 production wiring and corresponding three-platform evidence exist.
+
+Source 4a67992d6 passed hosted run 43787463856: three platforms each ran six
+SDK stdio scenarios and Linux ran two actual Vault/SDK scenarios. A later batch
+adds explicit lifecycle revoke deadlines and confirmed tree termination, with
+eight hosted SDK scenarios and the persisted-generation native restart case;
+that later source needs its own matching execution evidence.

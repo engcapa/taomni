@@ -71,6 +71,7 @@ macro_rules! lease {
 
 lease!(ProfileUseLease, ProfileUse, open_profile, true);
 lease!(ProfileRestoreLease, ProfileRestore, open_profile, false);
+lease!(ProfileStateLease, ProfileState, open_state, false);
 
 /// Held by the actual writer host, not solely by its parent core process.
 pub struct PluginDataLease {

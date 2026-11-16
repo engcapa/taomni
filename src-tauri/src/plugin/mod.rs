@@ -4,6 +4,7 @@
 //! implementation state belongs to a supervised host process and is never
 //! deserialized into `AppState`.
 
+mod dispatch;
 pub mod download;
 mod frontend;
 pub mod host;
@@ -13,6 +14,7 @@ pub mod migration;
 pub mod protocol;
 mod quiescence;
 mod runtime;
+pub(crate) mod services;
 pub use quiescence::QuiescenceGuard;
 mod signed_catalog;
 pub mod verify;
@@ -158,8 +160,9 @@ pub struct PluginRegistry {
     monitor_started: Arc<AtomicBool>,
     shutting_down: Arc<AtomicBool>,
     quiescence: Arc<AtomicUsize>,
-    pending_requests: Arc<Mutex<HashMap<(String, String), bool>>>,
+    pending_requests: Arc<Mutex<HashMap<(String, String), dispatch::PendingRequest>>>,
     frontend_trust: Arc<RwLock<HashMap<PathBuf, Arc<verify::InstalledTrust>>>>,
+    services: Option<Arc<services::PluginCoreServices>>,
 }
 
 impl PluginRegistry {
@@ -175,6 +178,17 @@ impl PluginRegistry {
             quiescence: Arc::new(AtomicUsize::new(0)),
             pending_requests: Arc::new(Mutex::new(HashMap::new())),
             frontend_trust: Arc::new(RwLock::new(HashMap::new())),
+            services: None,
+        }
+    }
+
+    pub(crate) fn with_services(
+        root: impl Into<PathBuf>,
+        services: Arc<services::PluginCoreServices>,
+    ) -> Self {
+        Self {
+            services: Some(services),
+            ..Self::new(root)
         }
     }
 
@@ -424,6 +438,7 @@ impl PluginRegistry {
     }
 
     fn validate_manifest_fields(&self, manifest: &ModuleManifest) -> Result<(), PluginError> {
+        services::manifest_grants(manifest)?;
         if !valid_slug(&manifest.slug) || manifest.id != format!("taomni-plugin-{}", manifest.slug)
         {
             return Err(PluginError::InvalidManifest("id/slug is invalid".into()));

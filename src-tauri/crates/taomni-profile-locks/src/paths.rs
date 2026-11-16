@@ -35,6 +35,11 @@ impl ProfileRoot {
         let locks = ensure_directory(&self.0, ".profile-locks")?;
         open_lock(&locks.join("vault-operations.lock"))
     }
+
+    pub(crate) fn open_state(&self) -> Result<File, LeaseError> {
+        let locks = ensure_directory(&self.0, ".profile-locks")?;
+        open_lock(&locks.join("profile-state.lock"))
+    }
 }
 
 /// A single path segment. This never accepts a plugin-supplied data path.

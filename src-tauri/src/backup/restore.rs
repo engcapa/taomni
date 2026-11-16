@@ -353,6 +353,8 @@ struct RollbackEntry {
 struct RestoreJournal {
     entries: Vec<RollbackEntry>,
     committed: bool,
+    #[serde(default)]
+    profile_generation: Option<taomni_plugin_api::services::ProfileGeneration>,
 }
 
 fn no_symlink_ancestors(path: &Path) -> Result<(), String> {
@@ -409,13 +411,18 @@ pub fn apply_pending_restore(app_data: &Path) -> Result<(), String> {
     let journal_path = app_data.join(JOURNAL_FILE);
     let pending = app_data.join(PENDING_RESTORE_DIR);
     if journal_path.exists() {
-        let journal: RestoreJournal =
+        let mut journal: RestoreJournal =
             serde_json::from_slice(&std::fs::read(&journal_path).map_err(|e| e.to_string())?)
                 .map_err(|_| "Invalid restore journal")?;
         let _mail_locks = lock_mail_restore(
             app_data,
             journal.entries.iter().map(|entry| entry.path.clone()),
         )?;
+        journal.profile_generation = Some(crate::runtime::generation::recover_restore(
+            app_data,
+            journal.profile_generation.as_ref(),
+        )?);
+        super::control::write_json(&journal_path, &journal)?;
         if !journal.committed {
             rollback(&journal)?;
         }
@@ -454,6 +461,7 @@ pub fn apply_pending_restore(app_data: &Path) -> Result<(), String> {
     let mut journal = RestoreJournal {
         entries: vec![],
         committed: false,
+        profile_generation: None,
     };
     let mut mappings = vec![];
     for entry in &intent.manifest.files {
@@ -496,6 +504,7 @@ pub fn apply_pending_restore(app_data: &Path) -> Result<(), String> {
         }
         mappings.push((src, dst));
     }
+    journal.profile_generation = Some(crate::runtime::generation::begin_restore(app_data)?);
     super::control::write_json(&journal_path, &journal)?;
     let apply = (|| -> Result<(), String> {
         for (src, dst) in &mappings {

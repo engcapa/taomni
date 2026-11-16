@@ -26,6 +26,7 @@ fn process(backoff: Duration) -> HostProcess {
             permissions: vec![],
         },
         transport: None,
+        retired_transports: Vec::new(),
         supervisor,
         cancellation: HostCancellation::default(),
         token: "secret".into(),

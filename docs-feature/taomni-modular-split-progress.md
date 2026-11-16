@@ -8,7 +8,7 @@
 
 生产升级 IPC 当前只记录只读预检、源指纹与 pending journal。缺少可信插件包和真实 exporter 时，不复制旧数据、不创建伪插件版本、不改变 active 指针。测试 fixture 的 staging/回滚原语不能算真实旧版升级验收。
 
-签名安装门、宿主生产监督、共享采集/RDP 公共库、CoreState/统一 bootstrap、正常退出与可逆静默已集成。源码 `038b539a4` 的升级契约 workflow 23 个 job 已全部通过，覆盖四目标编译及三端真实下载、宿主和 OS 锁；三端 browser 各 35/35。该轮 Windows 签名前的前端字节校验因 checkout CRLF 失败，全部 native job 被依赖阻断，不能算 native 通过；已定位并修复换行规则，待新 SHA 重跑。业务状态仍在 LegacyFeatureRuntime；远端商店、重启下载恢复、业务宿主迁出与真实升级尚未完成。TASK-025-D 已实现双向 pump、有界 dispatcher 和独立读循环 SDK，仍待 registry/bootstrap 工厂接线、Vault 锁定/备份协调与新 hosted 证据。G1–G11 未通过前，不将具体业务插件迁移标为完成。
+签名安装门、宿主生产监督、共享采集/RDP 公共库、CoreState/统一 bootstrap、正常退出与可逆静默已集成。源码 `4a67992d6` 的升级契约 workflow 23/23 jobs 已通过，包含三端真实下载、宿主、OS 锁与新增双向 SDK，Linux 真实 Vault/SDK 两个场景也已通过；三端 browser 各 35/35。Windows 官方包签名链通过，三端 native 仍在构建/执行。业务状态仍在 LegacyFeatureRuntime；远端商店、重启下载恢复、业务宿主迁出与真实升级尚未完成。后续批次已接 production registry/bootstrap 工厂、外层 scoped 入口和持久化 profile generation，仍待该源码的 hosted 证据、Vault 锁定/备份协调与真实 MFA 调用方。G1–G11 未通过前，不将具体业务插件迁移标为完成。
 
 ## 任务状态
 
@@ -23,7 +23,7 @@
 | TASK-007 前端注册和路由 | 部分 | loader/helper 已有；接入主窗口/分离窗口实际 tab、完整性校验、缺失/禁用/坏 chunk 与卸载清理。 |
 | TASK-008 宿主监督 | 已提交，部分 hosted 通过 | 主动心跳、重启预算、请求取消及三平台进程树回收已接入；GitHub 三平台各 14 项 unit 与 7 项真实进程测试通过，双向核心服务与 profile 协同仍待后续任务。 |
 | TASK-009 生命周期 | 部分 | 版本目录、active 指针与生命周期 IPC 已有；接可信安装门、运行中切换/回滚、无重启生命周期。 |
-| TASK-010 商店/下载 | 部分 | 原生 HTTP、代理、Range/校验、路径与内容去重、退出取消等待、续传和进度 IPC 已有，三端真实网络 gate 待执行；远端商店、代理设置 UI、跨应用重启恢复与完整错误恢复尚待完成。 |
+| TASK-010 商店/下载 | 部分 | 原生 HTTP、代理、Range/校验、路径与内容去重、退出取消等待、续传和进度 IPC 已有，三端每端 13 个真实网络 gate 已通过；远端商店、代理设置 UI、跨应用重启恢复与完整错误恢复尚待完成。 |
 | TASK-011 验签安装 | 代码已集成，验证中 | pinned key 的真实 minisign 校验、清单防回滚、安全解包、内容绑定及安装入口强制验签已接入；四目标官方签名包 QA workflow 与 TC-MODULES-007 已集成，待成功安装/重启/篡改拒绝的多端原生证据。 |
 | TASK-012 单体升级 | 部分 | 从安全 pending 进入真实 legacy exporter、可信包 staging、Vault 交接、激活、恢复/回滚；真实安装升级证据。 |
 | TASK-013 原型与 G 门 | 部分 | hello fixture 已有；真实 MFA 原型和 G1–G11 多端实验与原始证据。 |
@@ -38,7 +38,7 @@
 | TASK-022 Mobile | 待 M0 决策 | 按 DEC-2 默认暂缓排期；M0 末提供 go/no-go 与公开例外，不能默认为已交付。 |
 | TASK-023 发布验收 | 部分 | 清单生成与上传顺序已有；四目标插件构建/系统签名、包签名、原子清单发布、独立插件更新/回滚、两套回归及性能。 |
 | TASK-024 入口/profile 协同 | 随 005-A 已集成一部分 | GUI/headless bootstrap、ModeLease、可重试退出和任务回收已集成；跨宿主 profile lease、还原静默与完整多进程证据仍待完成。 |
-| TASK-025 密钥/一致快照 | A/B/C 已集成；D 实现中 | [服务、锁与快照实施方案](taomni-modular-vault-services-plan.md)；A/B/C 三端基础/真实锁 gate 通过。D 的双向 pump、独立 SDK、有界 dispatcher 与真实 Vault backend 已实现，纯单元 56 项通过；三端 6 个 SDK 进程场景和 Linux 2 个真实 Vault/SDK 场景已加入 workflow，尚待运行及生产工厂接线。E–I 的 MFA 适配、撤销协调、迁出和三态备份还原未完成。 |
+| TASK-025 密钥/一致快照 | A/B/C 已集成；D 实现中 | [服务、锁与快照实施方案](taomni-modular-vault-services-plan.md)；A/B/C 三端基础/真实锁 gate 通过。D 的双向 pump、独立 SDK、有界 dispatcher 与真实 Vault backend 已实现，纯单元 56 项通过；三端各 6 个 SDK 进程场景和 Linux 2 个真实 Vault/SDK 场景已通过；后续生产工厂与 generation 批次待 hosted 验证，Vault IPC 协同未接。E–I 的 MFA 适配、撤销协调、迁出和三态备份还原未完成。 |
 
 具体编号与子任务边界仍以设计原表为准；上表合并描述不改变范围或依赖。
 
@@ -81,6 +81,18 @@ Wayland `TC-FILE-OPEN-008` 在已有 AI 路径 chip 点击处失败：失败截�
 合并后的本地验证：前端模块/IPC/重启/Tab 50 项、系统 RDP 选择 7 项、API/作用域服务/下载 48 项、真实 Vault adapter 4 项、核心生命周期 18 项、宿主 14 项、runner 配置 6 项均通过；下载原有三个真实网络测试仍 ignored，新增网络用例留在 GitHub 执行。TypeScript、完整 QA audit、check:refactor、rustfmt、actionlint 与 diff 检查通过。新静态选择包含 68 个明确 case 与完整 crash-regression 的并集，22 个 shard、三套 release QA 构建，`gaps=[]`；这是计划，不是执行通过。Linux 核心单元 workflow 改为编译一次真实 harness、逐过滤器检查非空选择并保存日志及源码/二进制身份，避免重复完整编译。
 
 ## 接下来的执行顺序
+
+### 2026-11-16 生产工厂与 profile generation 批次
+
+- 双向服务源码 `4a67992d6f5f05e1644888aac8371a9dbcb4c479` 的 [升级契约 #43787463856](https://github.com/engcapa/taomni/actions/runs/43787463856) 已 23/23 jobs 成功，21 份 artifact 在执行期间下载。实际日志复核：三端每端 7 个既有宿主进程场景、6 个 SDK 双向 stdio 场景通过；Linux 两个真实 Vault/SDK 场景通过，receipt 绑定该源码及 core/SDK 二进制 hash。原始结果见 `qa-ui-auto-report/github/43787463856/live-contracts/`；仍不属于已安装 MFA 业务迁移证据。
+- 相同源码的 [UI Platforms #43787465425](https://github.com/engcapa/taomni/actions/runs/43787465425) 已即时下载六个 browser shard：Linux/Windows/macOS 每端 35/35，无 fail/skip，identity stable。Windows 官方包签名链通过，确认 LF 修复；三端 native 仍在构建/执行，不能计为通过。
+- 本批生产 registry 由统一 GUI/headless bootstrap 配置 `PluginCoreServices`，真实 Vault 作为独立 backend。host factory 只使用 `host_location` 刚验签的 manifest；安装/扫描/启动共用固定 key owner policy。没有核心服务声明的 hello 继续使用旧 wire。dispatcher 在宿主停止且 registry/lifecycle mutex 释放后关闭并 join，不反持 AppState/registry。
+- `dispatch.rs` 单独承担 renderer correlation 与 core-only scoped invoke。renderer 的 request ID 仍不能带方向前缀，内部 operation class/context 不接受 renderer 参数；核心在宿主 mutex 前获取外层 VaultOperationLease。取消表保存真实 wire target，排队前取消、取消与 attachment 竞态、shutdown 均映射到 scoped request，drop 清理两者。
+- `.profile-state.json` 用稳定 `.profile-locks/profile-state.lock` 协调创建、读取和原子替换。普通重启保留 generation；还原应用前换新 generation 并写 journal，旧 journal 缺字段时补齐，恢复/回滚不使用旧归档 generation。Unix 同步父目录，Windows 沿用已同步临时文件的原子替换且不外推同等 directory fsync。损坏或 symlink state 拒绝启动/写入，不静默重新生成。
+- 新增显式 `revoke_keys(deadline)` 和 `stop_confirmed(deadline)`：Linux 核验实际进程组中的存活进程（僵尸不持地址空间），Windows 核验 Job Object ActiveProcesses，macOS 等待所属进程组退出。崩溃 transport 保留 ownership 到确认，不在失去 receipt 后假称清理完成；替换宿主前先确认旧 transport 终止。两个新 SDK 终止场景只在 hosted 执行，SDK selection 从 6 增至 8。
+- `TC-MODULES-009` 新增真实 `.profile-state.json` 在正常重启前后的同值断言。fixture 只读 run-owned profile，验证 canonical UUID 后提供路径和值，不生成/覆盖 metadata；browser 保留 TC-MODULES-008/001/006，真实 host/network 边界继续由 hosted gates 和 native case 保护。
+- 本批本地只执行纯单元/静态/编译：核心精确过滤器 110 passed、3 个真实进程场景 ignored；小 crate host 14/profile 锁 7 passed（host 断言与核心有重复，不混加为独立场景），QA fixture 单元 2 passed。新增真实 SDK 8 项和进程树 cleanup 2 项仅编译，不在本机执行。完整 QA audit、TC-MODULES-009 三端静态选择、check:refactor、rustfmt、actionlint 和 diff 检查通过。
+- 这一批**尚未把 Vault init/unlock/lock/change-master IPC 接入 admission 状态转换**，服务准入在 bootstrap 默认关闭，真实 MFA facade 也未调用 scoped 入口。因此不能把 factory、SDK 或 metadata 的接线报告为 TASK-025-D/E 完成，更不能报告业务已迁出。后续须统一关闭准入、撤销/确认退出、drain、清 root，保留历史 transport 的确认记录，并让真实 MFA 操作领取作用域/密码导出/reset grant。
 
 ### 2026-11-16 双向服务批次与最新 runner 证据
 

@@ -7,6 +7,7 @@ use std::{
 pub enum LeaseKind {
     ProfileUse,
     ProfileRestore,
+    ProfileState,
     PluginData,
     VaultRead,
     VaultWrite,

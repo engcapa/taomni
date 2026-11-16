@@ -1,6 +1,7 @@
 //! Shared application startup, profile ownership and graceful lifecycle.
 pub(crate) mod bootstrap;
 pub(crate) mod desktop;
+pub(crate) mod generation;
 pub(crate) mod paths;
 pub(crate) mod profile;
 mod reaper;

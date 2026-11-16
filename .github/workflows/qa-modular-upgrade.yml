@@ -122,7 +122,7 @@ jobs:
               "--test", "services", "--locked", "--", "--ignored", "--list",
           ], text=True)
           print(listing)
-          assert sum(line.endswith(": test") for line in listing.splitlines()) == 6, "Missing production pump/SDK process scenarios"
+          assert sum(line.endswith(": test") for line in listing.splitlines()) == 8, "Missing production pump/SDK process scenarios"
           PY
       - uses: actions/upload-artifact@v4
         if: always()
@@ -370,6 +370,9 @@ jobs:
               "config::tests",
               "vault::plugin_access::tests",
               "runtime::bootstrap::tests",
+              "runtime::generation::tests",
+              "backup::generation_tests",
+              "backup::tests::test_backup_restore_replaces_mfa_db_and_keeps_safety_copy",
               "runtime::tasks::tests",
               "runtime::paths::tests",
               "runtime::reaper::tests",

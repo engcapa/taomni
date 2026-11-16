@@ -14,6 +14,27 @@ pub struct HostServiceConfig {
 }
 
 impl HostProcess {
+    /// Lifecycle RPC carries a core deadline and no data-key operation context.
+    pub fn revoke_keys(
+        &mut self,
+        revocation: &taomni_plugin_services::Revocation,
+        deadline: Instant,
+    ) -> Result<taomni_plugin_api::services::RevokedKeys, HostProcessError> {
+        let host = self.authorized_host().ok_or(HostProcessError::Crashed)?;
+        let params = taomni_plugin_api::services::RevokeKeys {
+            host_instance: host.instance().clone(),
+            profile_generation: revocation.generation.clone(),
+            vault_epoch: revocation.epoch,
+        };
+        let id = self.next_request_id();
+        let result = self.invoke_until(
+            id,
+            taomni_plugin_api::services::VAULT_REVOKE_METHOD,
+            Some(serde_json::to_value(params).expect("revoke metadata serializable")),
+            Some(deadline),
+        )?;
+        serde_json::from_value(result).map_err(|_| HostProcessError::UnexpectedResponse)
+    }
     pub fn authorized_host(&self) -> Option<&taomni_plugin_services::AuthorizedHost> {
         self.services.as_ref().map(ServiceSession::host)
     }

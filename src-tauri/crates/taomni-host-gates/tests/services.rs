@@ -249,19 +249,8 @@ fn revoke_acknowledgement_blocks_old_epochs_and_a_new_epoch_can_work() {
         .unwrap();
     let reply = harness
         .process
-        .invoke(
-            VAULT_REVOKE_METHOD,
-            Some(
-                serde_json::to_value(RevokeKeys {
-                    host_instance: host.instance().clone(),
-                    profile_generation: revoke.generation.clone(),
-                    vault_epoch: revoke.epoch,
-                })
-                .unwrap(),
-            ),
-        )
+        .revoke_keys(&revoke, Instant::now() + Duration::from_secs(2))
         .unwrap();
-    let reply: RevokedKeys = serde_json::from_value(reply).unwrap();
     harness.admission.acknowledge_revoke(&host, &reply).unwrap();
     harness
         .admission
@@ -270,6 +259,33 @@ fn revoke_acknowledgement_blocks_old_epochs_and_a_new_epoch_can_work() {
     harness.admission.finish_revoke(&revoke).unwrap();
     harness.admission.after_verified_unlock().unwrap();
     assert_eq!(harness.probe()["present"], true);
+}
+
+#[test]
+#[ignore = "real stdio core/SDK termination gate: GitHub runners only"]
+fn confirmed_stop_drains_a_live_service_host_before_admission_can_lock() {
+    let mut harness = Harness::new(Duration::ZERO);
+    harness.probe();
+    let host = harness.process.authorized_host().unwrap().clone();
+    let revoke = harness.admission.begin_revoke(std::slice::from_ref(&host)).unwrap();
+    let deadline = Instant::now() + Duration::from_secs(5);
+    harness.process.stop_confirmed(deadline).unwrap();
+    harness.admission.confirm_host_terminated(&host, &revoke).unwrap();
+    harness.admission.wait_revoke_drained(deadline, &|| false).unwrap();
+    harness.admission.finish_revoke(&revoke).unwrap();
+    assert_eq!(harness.process.state(), HostState::Stopped);
+}
+
+#[test]
+#[ignore = "real stdio core/SDK crash termination gate: GitHub runners only"]
+fn confirmed_stop_keeps_crashed_transport_ownership_until_termination_is_observed() {
+    let mut harness = Harness::new(Duration::ZERO);
+    let permit = harness.permit(Duration::from_secs(5));
+    assert!(harness.process.invoke_with_operation(permit, "service/crash", None).is_err());
+    assert!(harness.process.authorized_host().is_none());
+    harness.process.stop_confirmed(Instant::now() + Duration::from_secs(5)).unwrap();
+    assert_eq!(harness.process.state(), HostState::Stopped);
+    assert!(VaultOperationLease::try_write(&harness.root).is_ok());
 }
 
 #[test]

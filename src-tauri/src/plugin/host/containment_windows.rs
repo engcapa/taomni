@@ -7,8 +7,9 @@ use std::process::{Child, Command};
 use windows::Win32::Foundation::{CloseHandle, HANDLE};
 use windows::Win32::System::JobObjects::{
     AssignProcessToJobObject, CreateJobObjectW, JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE,
-    JOBOBJECT_EXTENDED_LIMIT_INFORMATION, JobObjectExtendedLimitInformation,
-    SetInformationJobObject, TerminateJobObject,
+    JOBOBJECT_BASIC_ACCOUNTING_INFORMATION, JOBOBJECT_EXTENDED_LIMIT_INFORMATION,
+    JobObjectBasicAccountingInformation, JobObjectExtendedLimitInformation,
+    QueryInformationJobObject, SetInformationJobObject, TerminateJobObject,
 };
 use windows::Win32::System::Threading::CREATE_SUSPENDED;
 
@@ -63,9 +64,46 @@ impl ProcessContainment {
         if !self.job.is_invalid() {
             unsafe {
                 let _ = TerminateJobObject(self.job, 1);
-                let _ = CloseHandle(self.job);
             }
-            self.job = HANDLE::default();
+        }
+    }
+
+    pub(crate) fn terminate_confirmed(
+        &mut self,
+        child: &mut Child,
+        deadline: std::time::Instant,
+    ) -> io::Result<()> {
+        if self.job.is_invalid() {
+            return if child.try_wait()?.is_some() {
+                Ok(())
+            } else {
+                Err(io::Error::other("missing plugin job ownership"))
+            };
+        }
+        unsafe { TerminateJobObject(self.job, 1) }.map_err(io::Error::other)?;
+        loop {
+            let mut accounting = JOBOBJECT_BASIC_ACCOUNTING_INFORMATION::default();
+            unsafe {
+                QueryInformationJobObject(
+                    Some(self.job),
+                    JobObjectBasicAccountingInformation,
+                    (&mut accounting as *mut JOBOBJECT_BASIC_ACCOUNTING_INFORMATION).cast(),
+                    size_of::<JOBOBJECT_BASIC_ACCOUNTING_INFORMATION>() as u32,
+                    None,
+                )
+            }
+            .map_err(io::Error::other)?;
+            if accounting.ActiveProcesses == 0 && child.try_wait()?.is_some() {
+                self.terminate();
+                return Ok(());
+            }
+            if std::time::Instant::now() >= deadline {
+                return Err(io::Error::new(
+                    io::ErrorKind::TimedOut,
+                    "plugin job termination not confirmed",
+                ));
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
         }
     }
 }
@@ -73,5 +111,11 @@ impl ProcessContainment {
 impl Drop for ProcessContainment {
     fn drop(&mut self) {
         self.terminate();
+        if !self.job.is_invalid() {
+            unsafe {
+                let _ = CloseHandle(self.job);
+            }
+            self.job = HANDLE::default();
+        }
     }
 }

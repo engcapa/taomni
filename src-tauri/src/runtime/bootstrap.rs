@@ -61,7 +61,15 @@ fn construct(
     let config = config.unwrap_or_else(|| AiConfig::load(&paths.config.join("taomni/ai.json")));
     let ai_ctx = AppAiCtx::from_config_with_proxy_db(config, vault.clone(), Some(&db));
     let legacy = LegacyFeatureRuntime::new(&paths.data, ai_ctx);
-    let plugins = Arc::new(crate::plugin::PluginRegistry::new(paths.plugins.clone()));
+    let services = Arc::new(crate::plugin::services::PluginCoreServices::new(
+        &paths.data,
+        vault.clone(),
+        leases.clone(),
+    )?);
+    let plugins = Arc::new(crate::plugin::PluginRegistry::with_services(
+        paths.plugins.clone(),
+        services,
+    ));
     // Optional malformed packages are disabled records, never startup failures.
     let _ = plugins.scan();
     let plugin_downloads = Arc::new(crate::plugin::download::DownloadManager::new(

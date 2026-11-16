@@ -390,6 +390,7 @@ fn test_backup_restore_replaces_mfa_db_and_keeps_safety_copy() {
 
     let dir = tempdir().unwrap();
     let app_data = dir.path().to_path_buf();
+    let old_generation = crate::runtime::generation::current(&app_data).unwrap();
     let mfa_path = app_data.join("mfa.db");
     let count = |path: &std::path::Path| -> i64 {
         Connection::open(path)
@@ -430,6 +431,13 @@ fn test_backup_restore_replaces_mfa_db_and_keeps_safety_copy() {
 
     stage_restore_to_dir(&app_data, &archive, None).unwrap();
     apply_pending_restore(&app_data).unwrap();
+    let restored_generation = crate::runtime::generation::current(&app_data).unwrap();
+    assert_ne!(old_generation, restored_generation);
+    apply_pending_restore(&app_data).unwrap();
+    assert_eq!(
+        crate::runtime::generation::current(&app_data).unwrap(),
+        restored_generation
+    );
     assert_eq!(
         count(&mfa_path),
         1,

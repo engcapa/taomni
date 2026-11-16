@@ -95,6 +95,7 @@ from . import rdp_baseline_required
 from . import rdp_audio_required
 from . import xrdp_server_required
 from . import backup_policy
+from . import core_profile_state
 from . import model_inspector_gateway
 from . import backup_cloud
 from . import credential_store
@@ -132,6 +133,7 @@ REGISTRY: dict[str, Fixture] = {
     "dual_display_required": Fixture("dual_display_required", dual_display_required.setup),
     "path_completion": Fixture("path_completion", path_completion.setup),
     "backup_policy": Fixture("backup_policy", backup_policy.setup),
+    "core_profile_state": Fixture("core_profile_state", core_profile_state.setup),
     "backup_cloud": Fixture("backup_cloud", backup_cloud.setup, backup_cloud.teardown),
     "credential_store": Fixture("credential_store", credential_store.setup),
     "project_tree": Fixture("project_tree", project_tree.setup),

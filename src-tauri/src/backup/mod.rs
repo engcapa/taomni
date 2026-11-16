@@ -32,6 +32,8 @@ pub mod worker;
 #[cfg(test)]
 mod compat_tests;
 #[cfg(test)]
+mod generation_tests;
+#[cfg(test)]
 mod snapshot_tests;
 #[cfg(test)]
 mod tests;
