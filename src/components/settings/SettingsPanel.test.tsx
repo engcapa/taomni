@@ -5,7 +5,7 @@ import { setAppThemeMode } from "../../lib/appTheme";
 import { useAppStore } from "../../stores/appStore";
 import { SettingsPanel } from "./SettingsPanel";
 import { resetSystemFontCacheForTests } from "../../lib/systemFonts";
-import { openSettingsSection } from "../../lib/settingsNavigation";
+import { clearPendingSettingsSection, openSettingsSection } from "../../lib/settingsNavigation";
 
 const ipcMocks = vi.hoisted(() => ({
   listSystemFonts: vi.fn(),
@@ -30,6 +30,7 @@ const TERMINAL_DEFAULT_STORAGE_KEY = "taomni.terminalDefaultProfile.v1";
 
 describe("SettingsPanel", () => {
   beforeEach(() => {
+    clearPendingSettingsSection();
     resetSystemFontCacheForTests();
     ipcMocks.listSystemFonts.mockReset();
     ipcMocks.listSystemFonts.mockResolvedValue(["Consolas", "JetBrains Mono", "Source Code Pro"]);
@@ -315,6 +316,26 @@ describe("SettingsPanel", () => {
 
     await waitFor(() => {
       expect(Element.prototype.scrollIntoView).toHaveBeenCalled();
+    });
+  });
+
+  it("reveals a section from its heading when first opened and when navigating an existing Settings tab", async () => {
+    openSettingsSection("ai-tao");
+    const { container } = render(<SettingsPanel />);
+    const scroll = vi.mocked(Element.prototype.scrollIntoView);
+
+    await waitFor(() => {
+      expect(screen.getByTestId("settings-group-ai")).toHaveAttribute("data-expanded", "true");
+      expect(scroll.mock.instances).toContain(container.querySelector('[data-search-id="ai-tao"]'));
+      expect(scroll).toHaveBeenLastCalledWith(expect.objectContaining({ block: "start" }));
+    });
+
+    scroll.mockClear();
+    fireEvent(window, new CustomEvent("taomni:open-settings-section", { detail: { id: "app-theme" } }));
+    await waitFor(() => {
+      expect(screen.getByTestId("settings-group-general")).toHaveAttribute("data-expanded", "true");
+      expect(scroll.mock.instances).toContain(container.querySelector('[data-search-id="app-theme"]'));
+      expect(scroll).toHaveBeenLastCalledWith(expect.objectContaining({ block: "start" }));
     });
   });
 

@@ -1,0 +1,60 @@
+id: TC-TAO-HOME-023
+title: Real DeepSeek background streaming remains isolated across native conversations
+description: Two actual commercial streams run across a UI thread switch, preserving the background reply and its
+  independent unsent draft.
+modes:
+- native
+covers:
+- F1.11
+tags:
+- p1
+- tao-home
+- native
+- real-provider
+- regression
+fixtures:
+- reset_db
+- tao_real_provider
+timeout_sec: 600
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-tao-home-023-real-concurrency
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- wait_for: '[data-testid="tao-home-composer-input"]:enabled'
+- observe_tao_provider: null
+- tao_real_provider_expanded:
+    scenario: concurrency
+- assert_no_runtime_errors: null
+- screenshot: tao-home-real-concurrency-final.png
+verification:
+  review: reviewed
+  requirements:
+  - id: REAL-CONCURRENCY
+    requirement: Real DeepSeek background streaming remains isolated across native conversations
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    checkpoints:
+    - step: 7
+      expectation: Switch while a real stream is active, send in a new thread, wait for both native completions
+        and restore the original. Each conversation retains only its own marker and one message pair; original draft
+        remains exact. Only explicit 401/403 or expired credentials may finish early; remaining stages are unverified.
+    - step: 8
+      expectation: No unhandled runtime errors.
+    results:
+    - 7
+    - 8
+  native:
+  - check: Actual native IPC, provider and relevant disk boundaries
+    method: automated
+    reason: Two actual commercial streams run across a UI thread switch, preserving the background reply and its
+      independent unsent draft. Browser stubs cannot establish these results.
+  visual:
+  - check: Real native transcript and companion panels
+    method: manual
+    reason: Screenshots retain relevant UI; semantic assertions do not certify full prototype alignment.

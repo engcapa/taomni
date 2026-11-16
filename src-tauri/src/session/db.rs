@@ -76,6 +76,7 @@ pub fn init_db(conn: &Connection) -> SqlResult<()> {
     crate::database::history::init_history_tables(conn)?;
     crate::database::query_workspace::init_query_workspace_tables(conn)?;
     crate::database::saved_queries::init_saved_query_tables(conn)?;
+    crate::history_privacy::migrate(conn)?;
 
     Ok(())
 }

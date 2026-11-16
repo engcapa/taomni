@@ -1,0 +1,144 @@
+id: TC-TAO-HOME-003
+title: Tao Home context, capability and side-panel interactions remain reachable and dismissible
+description: >-
+  Exercise the high-fidelity Home shell controls beyond the empty-state smoke:
+  context menu routing, capability toggles, voice and side panels, binding
+  empty states, shell choices, and outside/Escape dismissal in browser and
+  native WebViews. The case does not require a commercial provider response.
+modes:
+- browser
+- native
+covers:
+- F1.11
+- F11.1
+tags:
+- p0
+- tao-home
+- ui
+- regression
+fixtures:
+- reset_db
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-tao-home-003
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- wait_for: '[data-testid="tao-home-host"]'
+- click: '[data-testid="tao-home-plus"]'
+- wait_for: '[role="dialog"]'
+- assert_text:
+    selector: '[role="dialog"]'
+    contains: Attach file
+- click: '[data-testid="tao-home-context-attach"]'
+- wait_for: '[data-testid="tao-home-files"]'
+- assert_text:
+    selector: '[data-testid="tao-home-files"]'
+    contains: Choose or drop a PDF/image.
+- click: '[data-testid="tao-home-side-toggle"]'
+- assert_not_visible: '[data-testid="tao-home-side-panel"]'
+- click: '[data-testid="tao-home-plus"]'
+- click: '[data-testid="tao-home-context-workflows"]'
+- wait_for: '[data-testid="tao-home-workflows"]'
+- assert_text:
+    selector: '[data-testid="tao-home-workflows"]'
+    contains: Each step requires confirmation
+- click: '[data-testid="tao-home-side-toggle"]'
+- assert_not_visible: '[data-testid="tao-home-side-panel"]'
+- click: '[data-testid="tao-home-voice"]'
+- wait_for: '[data-testid="tao-home-speech"]'
+- assert_text:
+    selector: '[data-testid="tao-home-speech"]'
+    contains: Local dictation only fills the draft
+- click: '[data-testid="tao-home-side-toggle"]'
+- assert_not_visible: '[data-testid="tao-home-side-panel"]'
+- click: '[data-testid="tao-home-capabilities"]'
+- wait_for: '[role="dialog"]'
+- click: '[data-testid="tao-home-capability-thinking"]'
+- click: '[data-testid="tao-home-capabilities"]'
+- wait_for: '[role="dialog"]'
+- click: '[data-testid="tao-home-capability-web"]'
+- assert_text:
+    selector: '[data-testid="tao-home-capabilities"]'
+    contains: Web
+- press: Escape
+- assert_not_visible: '[role="dialog"]'
+- click: '[data-testid="tao-home-binding-workspace"]'
+- wait_for: '[role="dialog"]'
+- assert_text:
+    selector: '[role="dialog"]'
+    contains: No Workspace available
+- press: Escape
+- assert_not_visible: '[role="dialog"]'
+- click: '[data-testid="tao-home-shell-menu"]'
+- wait_for: '[role="dialog"]'
+- assert_visible: '[role="dialog"] select[aria-label="Choose shell"]'
+- press: Escape
+- assert_not_visible: '[role="dialog"]'
+- click: '[data-testid="tao-home-appearance"]'
+- wait_for: '[data-testid="settings-panel"]'
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="settings"]'
+    equal: 1
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="tao-home-settings"]'
+- wait_for: '[data-testid="tao-settings"]'
+- eval_readonly:
+    expression: document.getElementById('tao-settings-heading').getBoundingClientRect().top >= document.getElementById('settings-search-input').getBoundingClientRect().bottom + 12 && document.getElementById('tao-settings-heading').getBoundingClientRect().bottom <= document.getElementById('tao-settings-heading').closest('.overflow-auto').getBoundingClientRect().bottom
+    expect_truthy: true
+    timeout_sec: 5
+- assert_element_geometry:
+    selector: '[data-testid="tao-settings"] h3'
+    min_width: 100
+    min_height: 14
+    viewport_margin: 0
+- screenshot: tao-home-settings-section-visible.png
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="settings"]'
+    equal: 1
+- click: '[data-testid="nav-mode-home"]'
+- assert_no_runtime_errors: null
+- screenshot: tao-home-interaction-surface.png
+verification:
+  review: reviewed
+  visual:
+  - check: Tao section heading placement and one visible Settings tab
+    method: automated
+    reason: Actual heading, toolbar and viewport rectangles plus tab counts are asserted; a screenshot retains the revealed section.
+  native:
+  - check: Packaged WebView settings navigation after asynchronous AI group expansion
+    method: automated
+    reason: The native mode exercises the real Settings and ASR lifecycle and checks final heading geometry; no OS menu clicking or hardware keyboard delivery is claimed.
+  requirements:
+  - id: HOME-POPOVERS
+    requirement: Capability, workspace binding and shell menus remain reachable and dismiss with Escape without hiding the Home controls.
+    actions: [25, 27, 28, 30, 32, 34, 37, 39, 42]
+    checkpoints:
+    - {step: 31, expectation: The selected Web capability is visible on its control.}
+    - {step: 33, expectation: Escape dismisses the capability popover.}
+    - {step: 36, expectation: Workspace binding reports the actual empty resource list.}
+    - {step: 38, expectation: Escape dismisses the binding popover.}
+    - {step: 41, expectation: The native shell choice select is reachable.}
+    - {step: 43, expectation: Escape dismisses the shell popover.}
+    results: [31, 33, 36, 38, 41, 43]
+  - id: HOME-COMPANION-PANELS
+    requirement: Attach, workflow and voice controls open their corresponding side-panel content and the shared top toggle closes the panel.
+    actions: [6, 9, 12, 14, 15, 18, 20, 23]
+    checkpoints:
+    - {step: 11, expectation: Attach opens the file panel and reports its supported input.}
+    - {step: 13, expectation: The top sidebar toggle fully closes the file panel.}
+    - {step: 17, expectation: Workflows open their confirmation guidance.}
+    - {step: 19, expectation: The top sidebar toggle fully closes the workflow panel.}
+    - {step: 22, expectation: Voice opens the local draft dictation guidance.}
+    - {step: 24, expectation: The top sidebar toggle fully closes the voice panel.}
+    results: [11, 13, 17, 19, 22, 24]
+  - id: HOME-SETTINGS-NAVIGATION
+    requirement: Appearance and Tao settings reuse one Settings tab and reveal the Tao heading below the sticky search toolbar after the AI group expands.
+    actions: [44, 47, 48]
+    checkpoints:
+    - {step: 46, expectation: Opening Appearance creates one visible Settings tab.}
+    - {step: 50, expectation: The Tao heading clears the search toolbar by at least 12 pixels and remains inside the settings viewport.}
+    - {step: 51, expectation: The heading has usable dimensions and is fully in the window viewport.}
+    - {step: 53, expectation: Opening Tao settings reuses the existing single Settings tab.}
+    - {step: 55, expectation: Returning Home leaves no runtime errors.}
+    results: [46, 50, 51, 53, 55]

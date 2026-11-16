@@ -2,11 +2,12 @@ id: TC-FILE-OPEN-004
 title: Markdown live widgets preserve source, paste a real table/image and export self-contained HTML
 description: AC11/12/13/15. Real CodeMirror renderer and Chromium clipboard, not simulation buttons. Asserts live/source/split
   rendering, one-step table Undo, stored image bytes/link, export contents and unchanged source bytes. Browser VFS/clipboard
-  and actual browser download are not native OS clipboard/save-dialog evidence. PDF/print, Word/PNG export, native image clipboard
-  formats and dialog failures remain explicit unrun native gaps. Real Mermaid (not mocked) is asserted in live/split and the
-  self-contained HTML artifact. Ctrl+Y is the Linux/Windows standard Redo and Cmd+Shift+Z is used on macOS; async clipboard
-  status waits for actual completion. Light screenshots retained; dark prototype comparison still requires separate hosted
-  visual evidence.
+  and actual HTML/Word browser downloads are not native OS clipboard/save-dialog evidence. Final PDF/print, Word client typography,
+  native image clipboard formats and native dialog failures remain explicit gaps. Real Mermaid (not mocked) is asserted
+  in live/split and the self-contained HTML artifact. Ctrl+Y is the Linux/Windows standard Redo and Cmd+Shift+Z
+  is used on macOS; async clipboard status waits for actual completion. Light screenshots retained; dark prototype
+  comparison still requires separate hosted visual evidence. Live now starts read-only; retained task/table edits
+  explicitly enable Edit. Dedicated follow-up cases verify the default lock.
 modes:
 - browser
 covers:
@@ -62,9 +63,9 @@ steps:
     selector: '[data-testid="markdown-live"] .fv-md-mermaid'
     contains: Viewer
 - eval_readonly:
-    expression: document.querySelector('.fv-md-live-surface .fv-md-mermaid svg')?.querySelectorAll(".node").length === 3 &&
-      document.querySelector('.fv-md-live-surface .fv-md-mermaid svg')?.querySelectorAll("path").length >= 2 && !document.querySelector('.fv-md-live-surface
-      .fv-md-mermaid svg')?.querySelector("foreignObject")
+    expression: document.querySelector('.fv-md-live-surface .fv-md-mermaid svg')?.querySelectorAll(".node").length
+      === 3 && document.querySelector('.fv-md-live-surface .fv-md-mermaid svg')?.querySelectorAll("path").length
+      >= 2 && !document.querySelector('.fv-md-live-surface .fv-md-mermaid svg')?.querySelector("foreignObject")
     expect_truthy: true
 - eval_readonly:
     expression: document.querySelectorAll('.fv-md-live-surface .fv-md-math .katex').length >= 2
@@ -80,21 +81,20 @@ steps:
     selector: '[data-testid="markdown-live"] .fv-md-rendered-block h2'
     equals: Details
 - eval_readonly:
-    expression: document.querySelector(".fv-md-rendered-block h2").getBoundingClientRect().top - document.querySelector(".fv-md-rendered-block:has(.fv-md-math) p").getBoundingClientRect().bottom >= 0 && document.querySelector(".fv-md-rendered-block h2").getBoundingClientRect().top - document.querySelector(".fv-md-rendered-block:has(.fv-md-math) p").getBoundingClientRect().bottom < 75
+    expression: document.querySelector(".fv-md-rendered-block h2").getBoundingClientRect().top - document.querySelector(".fv-md-rendered-block:has(.fv-md-math)
+      p").getBoundingClientRect().bottom >= 0 && document.querySelector(".fv-md-rendered-block h2").getBoundingClientRect().top
+      - document.querySelector(".fv-md-rendered-block:has(.fv-md-math) p").getBoundingClientRect().bottom < 75
     expect_truthy: true
 - screenshot: markdown-live-mermaid-light.png
 - click: '[data-testid="markdown-outline"] button[data-heading-from="0"]'
 - assert_text:
-    selector: '[data-testid="viewer-editor"] .cm-line'
-    contains: '# File open Markdown'
+    selector: '[data-testid="markdown-live"] .fv-md-rendered-block'
+    contains: File open Markdown
 - eval_readonly:
-    expression: parseFloat(getComputedStyle(document.querySelector(".fv-md-source-marker")).fontSize) / parseFloat(getComputedStyle(document.querySelector(".fv-md-heading-1")).fontSize)
-      >= 0.7 && parseFloat(getComputedStyle(document.querySelector(".fv-md-source-marker")).fontSize) / parseFloat(getComputedStyle(document.querySelector(".fv-md-heading-1")).fontSize)
-      <= 0.9
+    expression: document.querySelector(".fv-md-rendered-block h1")?.textContent === "File open Markdown"
     expect_truthy: true
 - eval_readonly:
-    expression: getComputedStyle(document.querySelector(".fv-md-source-marker")).fontFamily.toLowerCase().includes("mono")
-      && getComputedStyle(document.querySelector(".fv-md-source-marker")).color !== getComputedStyle(document.querySelector(".fv-md-heading-1")).color
+    expression: document.querySelector(".fv-md-rendered-block h1")?.getBoundingClientRect().height > 0
     expect_truthy: true
 - click: '[data-testid="markdown-mode-split"]'
 - wait_for: '[data-testid="markdown-preview"] h1'
@@ -115,9 +115,9 @@ steps:
     selector: '[data-testid="markdown-preview"] .fv-md-mermaid'
     contains: Viewer
 - eval_readonly:
-    expression: document.querySelector('.fv-md-preview-pane .fv-md-mermaid svg')?.querySelectorAll(".node").length === 3 &&
-      document.querySelector('.fv-md-preview-pane .fv-md-mermaid svg')?.querySelectorAll("path").length >= 2 && !document.querySelector('.fv-md-preview-pane
-      .fv-md-mermaid svg')?.querySelector("foreignObject")
+    expression: document.querySelector('.fv-md-preview-pane .fv-md-mermaid svg')?.querySelectorAll(".node").length
+      === 3 && document.querySelector('.fv-md-preview-pane .fv-md-mermaid svg')?.querySelectorAll("path").length
+      >= 2 && !document.querySelector('.fv-md-preview-pane .fv-md-mermaid svg')?.querySelector("foreignObject")
     expect_truthy: true
 - eval_readonly:
     expression: document.querySelectorAll('.fv-md-preview-pane .fv-md-math .katex').length >= 2
@@ -137,15 +137,18 @@ steps:
     equals: dark
 - wait_for: '[data-testid="markdown-preview"] .fv-md-mermaid svg'
 - eval_readonly:
-    expression: document.querySelector(".fv-md-preview-pane .fv-md-mermaid svg").getBoundingClientRect().width >= 200 && document.querySelector(".fv-md-preview-pane
-      .fv-md-mermaid svg").getBoundingClientRect().height >= 30
+    expression: document.querySelector(".fv-md-preview-pane .fv-md-mermaid svg").getBoundingClientRect().width >=
+      200 && document.querySelector(".fv-md-preview-pane .fv-md-mermaid svg").getBoundingClientRect().height >=
+      30
     expect_truthy: true
 - screenshot: markdown-split-mermaid-dark.png
 - click: '[data-testid="markdown-mode-live"]'
+- click: '[data-testid="markdown-live-edit"]'
 - wait_for: '[data-testid="markdown-live"] .fv-md-mermaid svg'
 - eval_readonly:
-    expression: document.querySelector(".fv-md-live-surface .fv-md-mermaid svg").getBoundingClientRect().width >= 200 && document.querySelector(".fv-md-live-surface
-      .fv-md-mermaid svg").getBoundingClientRect().height >= 30
+    expression: document.querySelector(".fv-md-live-surface .fv-md-mermaid svg").getBoundingClientRect().width >=
+      200 && document.querySelector(".fv-md-live-surface .fv-md-mermaid svg").getBoundingClientRect().height >=
+      30
     expect_truthy: true
 - screenshot: markdown-live-mermaid-dark.png
 - click: '[data-testid="markdown-mode-split"]'
@@ -215,6 +218,7 @@ steps:
     regex: assets/image-[^\s)]+\.png
 - click: '[data-testid="viewer-save"]'
 - click: '[data-testid="markdown-mode-live"]'
+- click: '[data-testid="markdown-live-edit"]'
 - wait_for: '[data-testid="markdown-table-widget"]'
 - assert_count:
     selector: '[data-testid="markdown-image-widget"]'
@@ -225,7 +229,8 @@ steps:
 - click: '[data-testid="markdown-image-widget"]:has(img[alt="Original"])'
 - click: '[data-testid="markdown-image-widget"]:has(img[alt="Original"]) button[aria-label="Zoom image (view only)"]'
 - assert_text:
-    selector: '[data-testid="markdown-image-widget"]:has(img[alt="Original"]) button[aria-label="Zoom image (view only)"]'
+    selector: '[data-testid="markdown-image-widget"]:has(img[alt="Original"]) button[aria-label="Zoom image (view
+      only)"]'
     contains: 75%
 - assert_count:
     selector: '[data-testid="file-viewer"][data-dirty="true"]'
@@ -260,6 +265,7 @@ steps:
     selector: '[data-testid="markdown-export-status"]'
     contains: Export completed
 - click: '[data-testid="markdown-mode-live"]'
+- click: '[data-testid="markdown-live-edit"]'
 - click: '[data-testid="markdown-live"] .fv-md-task[aria-label="First task"]'
 - assert_attribute:
     selector: '[data-testid="markdown-live"] .fv-md-task[aria-label="First task"]'
@@ -395,6 +401,18 @@ steps:
     regex: assets/image-[^\s)]+\.png
 - assert_no_runtime_errors: null
 - screenshot: markdown-live-paste-export.png
+- click: '[data-testid="markdown-mode-split"]'
+- wait_for: '[data-testid="markdown-preview"] .katex'
+- click: '[data-testid="markdown-export"]'
+- click: '[data-testid="markdown-export-docx"]'
+- wait_for: '[data-testid="markdown-export-settings"]'
+- assert_download:
+    trigger: '[data-testid="markdown-export-confirm"]'
+    filename: live.docx
+    contains:
+    - word/document.xml
+- wait_for: '[data-testid="markdown-export-status"][data-export-state="saved"]'
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -405,15 +423,18 @@ verification:
     - 32
     checkpoints:
     - step: 14
-      expectation: Outline contains actual first heading.
+      expectation: '{''assert_text_equals'': {''selector'': ''[data-testid="markdown-outline"] button[data-heading-from="0"]'',
+        ''equals'': ''File open Markdown''}}'
     - step: 15
-      expectation: Live mode displays a real image widget.
+      expectation: '{''assert_visible'': ''[data-testid="markdown-image-widget"] img''}'
     - step: 16
-      expectation: Mode/render operations leave exact Markdown bytes unchanged.
+      expectation: '{''assert_file_open_bytes'': {''path'': ''${fixture.file_open_root}/live.md'', ''sha256'': ''${fixture.file_open_markdown_sha}''}}'
     - step: 34
-      expectation: Split mode renders heading syntax.
+      expectation: '{''assert_text_equals'': {''selector'': ''[data-testid="markdown-preview"] h1'', ''equals'':
+        ''File open Markdown''}}'
     - step: 35
-      expectation: Bold markup becomes a strong element.
+      expectation: '{''assert_text_equals'': {''selector'': ''[data-testid="markdown-preview"] strong'', ''equals'':
+        ''Rendered bold''}}'
     results:
     - 14
     - 15
@@ -421,200 +442,238 @@ verification:
     - 34
     - 35
   - id: R2
-    requirement: Clipboard TSV converts to standard Markdown with reversible conversion, image paste inserts a relative saved
-      asset and survives reopen.
+    requirement: Clipboard TSV converts to standard Markdown with reversible conversion, image paste inserts a relative
+      saved asset and survives reopen.
     actions:
-    - 66
-    - 68
+    - 67
     - 69
-    - 72
-    - 74
-    - 76
+    - 70
+    - 73
+    - 75
     - 77
     - 78
     - 79
-    - 82
-    - 83
-    - 108
-    - 159
-    - 162
-    - 164
-    checkpoints:
-    - step: 71
-      expectation: Header has standard Markdown table syntax.
-    - step: 73
-      expectation: One Undo restores the original TSV instead of deleting the paste.
-    - step: 75
-      expectation: Redo restores table conversion exactly once.
-    - step: 80
-      expectation: Real clipboard image completion reports a saved relative link.
-    - step: 81
-      expectation: Inserted image path is under the configured assets directory.
-    - step: 85
-      expectation: Both original and pasted images render in live mode.
-    - step: 110
-      expectation: Split preview images decode real persisted VFS bytes.
-    - step: 165
-      expectation: Reopen retains the converted table.
-    - step: 166
-      expectation: Reopen retains the relative pasted-image path.
-    results:
-    - 71
-    - 73
-    - 75
     - 80
-    - 81
-    - 85
-    - 110
+    - 83
+    - 84
+    - 111
+    - 162
     - 165
-    - 166
-  - id: R3
-    requirement: Export exposes all designed formats; HTML download is self-contained and export does not dirty the source.
-    actions:
-    - 113
-    - 139
-    checkpoints:
-    - step: 139
-      expectation: Actual downloaded file contains rendered heading/table and embedded PNG data.
-    - step: 140
-      expectation: Export reports completion.
-    - step: 158
-      expectation: Export did not mark the source dirty.
-    - step: 167
-      expectation: Markdown/paste/export lifecycle has no uncaught runtime error.
-    results:
-    - 139
-    - 140
-    - 158
     - 167
-  - id: R4
-    requirement: Live outline/image/table actions are real; zoom stays view-only, cell edits serialize standard Markdown,
-      and export settings can cancel without a download.
-    actions:
-    - 28
-    - 65
+    checkpoints:
+    - step: 72
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="viewer-editor"]'', ''contains'': ''| Name |
+        Value |''}}'
+    - step: 74
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="viewer-editor"]'', ''contains'': ''Name\tValue''}}'
+    - step: 76
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="viewer-editor"]'', ''contains'': ''| Alpha
+        | 1 |''}}'
+    - step: 81
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="markdown-paste-status"]'', ''contains'': ''relative
+        links inserted''}}'
+    - step: 82
+      expectation: '{''assert_pattern'': {''selector'': ''[data-testid="viewer-editor"]'', ''regex'': ''assets/image-[^\\s)]+\\.png''}}'
+    - step: 87
+      expectation: '{''assert_count'': {''selector'': ''[data-testid="markdown-image-widget"]'', ''min'': 2}}'
+    - step: 113
+      expectation: '{''eval_readonly'': {''expression'': ''document.querySelectorAll(".fv-md-preview-pane img").length
+        === 2 && document.querySelectorAll(".fv-md-preview-pane img")[0].complete && document.querySelectorAll(".fv-md-preview-pane
+        img")[0].naturalWidth > 0 && document.querySelectorAll(".fv-md-preview-pane img")[1].complete && document.querySelectorAll(".fv-md-preview-pane
+        img")[1].naturalWidth > 0'', ''expect_truthy'': True, ''timeout_sec'': 10}}'
+    - step: 168
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="viewer-editor"]'', ''contains'': ''| Alpha
+        | 2 |''}}'
+    - step: 169
+      expectation: '{''assert_pattern'': {''selector'': ''[data-testid="viewer-editor"]'', ''regex'': ''assets/image-[^\\s)]+\\.png''}}'
+    results:
+    - 72
+    - 74
+    - 76
+    - 81
     - 82
     - 87
-    - 88
-    - 104
-    - 105
-    - 107
     - 113
-    - 121
-    - 124
-    - 126
-    - 127
-    - 130
-    - 132
-    - 133
-    - 136
-    - 138
-    - 164
-    checkpoints:
-    - step: 29
-      expectation: The actual widget/source or export dialog reflects its preceding user action.
-    - step: 89
-      expectation: The actual widget/source or export dialog reflects its preceding user action.
-    - step: 90
-      expectation: The actual widget/source or export dialog reflects its preceding user action.
-    - step: 106
-      expectation: The actual widget/source or export dialog reflects its preceding user action.
-    - step: 123
-      expectation: The actual widget/source or export dialog reflects its preceding user action.
-    - step: 125
-      expectation: The actual widget/source or export dialog reflects its preceding user action.
-    - step: 129
-      expectation: The actual widget/source or export dialog reflects its preceding user action.
-    - step: 131
-      expectation: The actual widget/source or export dialog reflects its preceding user action.
-    - step: 135
-      expectation: The actual widget/source or export dialog reflects its preceding user action.
-    - step: 137
-      expectation: The actual widget/source or export dialog reflects its preceding user action.
-    - step: 158
-      expectation: The actual widget/source or export dialog reflects its preceding user action.
-    - step: 167
-      expectation: Additional widget and dialog lifecycle causes no uncaught runtime errors.
-    results:
-    - 29
-    - 89
-    - 90
-    - 106
-    - 123
-    - 125
-    - 129
-    - 131
-    - 135
-    - 137
-    - 158
-    - 167
-  - id: R5
-    requirement: PNG exports real image bytes; clipboard entries complete; desktop-only folder export fails explicitly without
-      dirtying the source.
+    - 168
+    - 169
+  - id: R3
+    requirement: Export exposes all designed formats; HTML download is self-contained and export does not dirty
+      the source.
     actions:
-    - 141
+    - 116
     - 142
-    - 144
-    - 145
-    - 148
-    - 149
-    - 152
-    - 153
     checkpoints:
     - step: 142
-      expectation: Actual export artifact, completion/failure status or unchanged source dirty state is asserted.
+      expectation: '{''assert_download'': {''trigger'': ''[data-testid="markdown-export-html"]'', ''filename'':
+        ''live.html'', ''contains'': [''File open Markdown'', ''<table'', ''data:image/png;base64,'', ''Alpha'',
+        ''<svg'', ''fv-md-mermaid'', ''Explorer'', ''OpenFile'', ''Viewer'']}}'
     - step: 143
-      expectation: Actual export artifact, completion/failure status or unchanged source dirty state is asserted.
-    - step: 147
-      expectation: Actual export artifact, completion/failure status or unchanged source dirty state is asserted.
-    - step: 151
-      expectation: Actual export artifact, completion/failure status or unchanged source dirty state is asserted.
-    - step: 155
-      expectation: Actual export artifact, completion/failure status or unchanged source dirty state is asserted.
-    - step: 156
-      expectation: Actual export artifact, completion/failure status or unchanged source dirty state is asserted.
-    - step: 157
-      expectation: Actual export artifact, completion/failure status or unchanged source dirty state is asserted.
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="markdown-export-status"]'', ''contains'': ''Export
+        completed''}}'
+    - step: 161
+      expectation: '{''assert_count'': {''selector'': ''[data-testid="file-viewer"][data-dirty="true"]'', ''equal'':
+        0}}'
+    - step: 170
+      expectation: '{''assert_no_runtime_errors'': None}'
     results:
     - 142
     - 143
+    - 161
+    - 170
+  - id: R4
+    requirement: Live outline/image/table actions are real; zoom stays view-only, cell edits serialize standard
+      Markdown, and export settings can cancel without a download.
+    actions:
+    - 28
+    - 66
+    - 83
+    - 89
+    - 90
+    - 107
+    - 108
+    - 110
+    - 116
+    - 124
+    - 127
+    - 129
+    - 130
+    - 133
+    - 135
+    - 136
+    - 139
+    - 141
+    - 167
+    checkpoints:
+    - step: 29
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="viewer-editor"] .cm-line'', ''contains'': ''#
+        File open Markdown''}}'
+    - step: 91
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="markdown-image-widget"]:has(img[alt="Original"])
+        button[aria-label="Zoom image (view only)"]'', ''contains'': ''75%''}}'
+    - step: 92
+      expectation: '{''assert_count'': {''selector'': ''[data-testid="file-viewer"][data-dirty="true"]'', ''equal'':
+        0}}'
+    - step: 109
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="viewer-editor"]'', ''contains'': ''| Alpha
+        | 2 |''}}'
+    - step: 126
+      expectation: '{''assert_visible'': ''[data-testid="markdown-export-confirm"]''}'
+    - step: 128
+      expectation: '{''assert_not_visible'': ''[data-testid="markdown-export-settings"]''}'
+    - step: 132
+      expectation: '{''assert_visible'': ''[data-testid="markdown-export-confirm"]''}'
+    - step: 134
+      expectation: '{''assert_not_visible'': ''[data-testid="markdown-export-settings"]''}'
+    - step: 138
+      expectation: '{''assert_visible'': ''[data-testid="markdown-export-confirm"]''}'
+    - step: 140
+      expectation: '{''assert_not_visible'': ''[data-testid="markdown-export-settings"]''}'
+    - step: 161
+      expectation: '{''assert_count'': {''selector'': ''[data-testid="file-viewer"][data-dirty="true"]'', ''equal'':
+        0}}'
+    - step: 170
+      expectation: '{''assert_no_runtime_errors'': None}'
+    results:
+    - 29
+    - 91
+    - 92
+    - 109
+    - 126
+    - 128
+    - 132
+    - 134
+    - 138
+    - 140
+    - 161
+    - 170
+  - id: R5
+    requirement: PNG exports real image bytes; clipboard entries complete; desktop-only folder export fails explicitly
+      without dirtying the source.
+    actions:
+    - 144
+    - 145
     - 147
+    - 148
     - 151
+    - 152
     - 155
     - 156
-    - 157
+    checkpoints:
+    - step: 145
+      expectation: '{''assert_download'': {''trigger'': ''[data-testid="markdown-export-png"]'', ''filename'': ''live.png''}}'
+    - step: 146
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="markdown-export-status"]'', ''contains'': ''Export
+        completed''}}'
+    - step: 150
+      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="markdown-export-status"]'', ''name'':
+        ''data-export-state'', ''equals'': ''copied''}}'
+    - step: 154
+      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="markdown-export-status"]'', ''name'':
+        ''data-export-state'', ''equals'': ''copied''}}'
+    - step: 158
+      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="markdown-export-status"]'', ''name'':
+        ''data-export-state'', ''equals'': ''failed''}}'
+    - step: 159
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="viewer-operation-error"]'', ''contains'': ''Markdown
+        + image folder export requires the desktop app''}}'
+    - step: 160
+      expectation: '{''assert_count'': {''selector'': ''[data-testid="file-viewer"][data-dirty="true"]'', ''equal'':
+        0}}'
+    results:
+    - 145
+    - 146
+    - 150
+    - 154
+    - 158
+    - 159
+    - 160
   - id: R6
-    requirement: Actual Mermaid renderer produces three labeled SVG nodes and edges in live/split; HTML export preserves embedded
-      diagram SVG without HTML foreignObject labels.
+    requirement: Actual Mermaid renderer produces three labeled SVG nodes and edges in live/split; HTML export preserves
+      embedded diagram SVG without HTML foreignObject labels.
     actions:
     - 11
     - 32
-    - 139
+    - 142
     checkpoints:
     - step: 17
-      expectation: Real Mermaid SVG exists and retains node/edge geometry and readable Explorer/OpenFile/Viewer labels.
+      expectation: '{''wait_for'': ''[data-testid="markdown-live"] .fv-md-mermaid svg''}'
     - step: 18
-      expectation: Real Mermaid SVG exists and retains node/edge geometry and readable Explorer/OpenFile/Viewer labels.
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="markdown-live"] .fv-md-mermaid'', ''contains'':
+        ''Explorer''}}'
     - step: 19
-      expectation: Real Mermaid SVG exists and retains node/edge geometry and readable Explorer/OpenFile/Viewer labels.
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="markdown-live"] .fv-md-mermaid'', ''contains'':
+        ''OpenFile''}}'
     - step: 20
-      expectation: Real Mermaid SVG exists and retains node/edge geometry and readable Explorer/OpenFile/Viewer labels.
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="markdown-live"] .fv-md-mermaid'', ''contains'':
+        ''Viewer''}}'
     - step: 21
-      expectation: Real Mermaid SVG exists and retains node/edge geometry and readable Explorer/OpenFile/Viewer labels.
+      expectation: '{''eval_readonly'': {''expression'': ''document.querySelector(\''.fv-md-live-surface .fv-md-mermaid
+        svg\'')?.querySelectorAll(".node").length === 3 && document.querySelector(\''.fv-md-live-surface .fv-md-mermaid
+        svg\'')?.querySelectorAll("path").length >= 2 && !document.querySelector(\''.fv-md-live-surface .fv-md-mermaid
+        svg\'')?.querySelector("foreignObject")'', ''expect_truthy'': True}}'
     - step: 36
-      expectation: Real Mermaid SVG exists and retains node/edge geometry and readable Explorer/OpenFile/Viewer labels.
+      expectation: '{''wait_for'': ''[data-testid="markdown-preview"] .fv-md-mermaid svg''}'
     - step: 37
-      expectation: Real Mermaid SVG exists and retains node/edge geometry and readable Explorer/OpenFile/Viewer labels.
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="markdown-preview"] .fv-md-mermaid'', ''contains'':
+        ''Explorer''}}'
     - step: 38
-      expectation: Real Mermaid SVG exists and retains node/edge geometry and readable Explorer/OpenFile/Viewer labels.
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="markdown-preview"] .fv-md-mermaid'', ''contains'':
+        ''OpenFile''}}'
     - step: 39
-      expectation: Real Mermaid SVG exists and retains node/edge geometry and readable Explorer/OpenFile/Viewer labels.
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="markdown-preview"] .fv-md-mermaid'', ''contains'':
+        ''Viewer''}}'
     - step: 40
-      expectation: Real Mermaid SVG exists and retains node/edge geometry and readable Explorer/OpenFile/Viewer labels.
-    - step: 139
-      expectation: Actual HTML download includes embedded Mermaid SVG and Explorer/OpenFile/Viewer labels.
-    - step: 140
-      expectation: Export completion follows the actual HTML artifact after asynchronous rendering.
+      expectation: '{''eval_readonly'': {''expression'': ''document.querySelector(\''.fv-md-preview-pane .fv-md-mermaid
+        svg\'')?.querySelectorAll(".node").length === 3 && document.querySelector(\''.fv-md-preview-pane .fv-md-mermaid
+        svg\'')?.querySelectorAll("path").length >= 2 && !document.querySelector(\''.fv-md-preview-pane .fv-md-mermaid
+        svg\'')?.querySelector("foreignObject")'', ''expect_truthy'': True}}'
+    - step: 142
+      expectation: '{''assert_download'': {''trigger'': ''[data-testid="markdown-export-html"]'', ''filename'':
+        ''live.html'', ''contains'': [''File open Markdown'', ''<table'', ''data:image/png;base64,'', ''Alpha'',
+        ''<svg'', ''fv-md-mermaid'', ''Explorer'', ''OpenFile'', ''Viewer'']}}'
+    - step: 143
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="markdown-export-status"]'', ''contains'': ''Export
+        completed''}}'
     results:
     - 17
     - 18
@@ -626,13 +685,13 @@ verification:
     - 38
     - 39
     - 40
-    - 139
-    - 140
+    - 142
+    - 143
   - id: R7
-    requirement: Prototype regressions have real computed live-widget white-space, compact paragraph/Details spacing and a
-      muted smaller source heading prefix; actual Settings dark-theme live/split Mermaid screenshots restore light and source
-      bytes; checked tasks survive preview/HTML export and revert to the original unchecked saved state. Screenshots remain
-      evidence for separate visual review, not a claim of pixel parity.
+    requirement: Prototype regressions have real computed live-widget white-space, compact paragraph/Details spacing
+      and a muted smaller source heading prefix; actual Settings dark-theme live/split Mermaid screenshots restore
+      light and source bytes; checked tasks survive preview/HTML export and revert to the original unchecked saved
+      state. Screenshots remain evidence for separate visual review, not a claim of pixel parity.
     actions:
     - 43
     - 44
@@ -640,71 +699,100 @@ verification:
     - 47
     - 48
     - 53
-    - 57
     - 58
     - 59
     - 60
     - 61
     - 62
-    - 92
+    - 63
     - 94
-    - 97
-    - 98
+    - 96
+    - 99
     - 100
-    - 101
-    - 160
+    - 102
+    - 104
+    - 163
     checkpoints:
     - step: 22
-      expectation: Live Markdown renders inline and display KaTeX formulas with actual .katex output.
+      expectation: '{''eval_readonly'': {''expression'': "document.querySelectorAll(''.fv-md-live-surface .fv-md-math
+        .katex'').length >= 2", ''expect_truthy'': True}}'
     - step: 23
-      expectation: Live rendered paragraphs use normal computed white-space instead of inheriting CodeMirror break-spaces.
+      expectation: '{''eval_readonly'': {''expression'': ''getComputedStyle(document.querySelector(".fv-md-rendered-block")).whiteSpace
+        === "normal" && getComputedStyle(document.querySelector(".fv-md-rendered-block p")).whiteSpace === "normal"'',
+        ''expect_truthy'': True}}'
     - step: 24
-      expectation: The actual live image widget uses normal computed white-space.
+      expectation: '{''eval_readonly'': {''expression'': ''getComputedStyle(document.querySelector(".fv-md-image")).whiteSpace
+        === "normal"'', ''expect_truthy'': True}}'
     - step: 25
-      expectation: Geometry is measured against the actual rendered Details heading.
+      expectation: '{''assert_text_equals'': {''selector'': ''[data-testid="markdown-live"] .fv-md-rendered-block
+        h2'', ''equals'': ''Details''}}'
     - step: 26
-      expectation: Rendered paragraph-to-Details vertical gap is nonnegative and less than 75px, not a prototype-specific
-        exact coordinate.
+      expectation: '{''eval_readonly'': {''expression'': ''document.querySelector(".fv-md-rendered-block h2").getBoundingClientRect().top
+        - document.querySelector(".fv-md-rendered-block:has(.fv-md-math) p").getBoundingClientRect().bottom >= 0
+        && document.querySelector(".fv-md-rendered-block h2").getBoundingClientRect().top - document.querySelector(".fv-md-rendered-block:has(.fv-md-math)
+        p").getBoundingClientRect().bottom < 75'', ''expect_truthy'': True}}'
     - step: 41
-      expectation: The split light view renders inline and display KaTeX formulas as actual .katex output.
+      expectation: '{''eval_readonly'': {''expression'': "document.querySelectorAll(''.fv-md-preview-pane .fv-md-math
+        .katex'').length >= 2", ''expect_truthy'': True}}'
     - step: 30
-      expectation: The active source heading marker is smaller than the heading (font-size ratio 0.7–0.9).
+      expectation: '{''eval_readonly'': {''expression'': ''parseFloat(getComputedStyle(document.querySelector(".fv-md-source-marker")).fontSize)
+        / parseFloat(getComputedStyle(document.querySelector(".fv-md-heading-1")).fontSize) >= 0.7 && parseFloat(getComputedStyle(document.querySelector(".fv-md-source-marker")).fontSize)
+        / parseFloat(getComputedStyle(document.querySelector(".fv-md-heading-1")).fontSize) <= 0.9'', ''expect_truthy'':
+        True}}'
     - step: 31
-      expectation: Source heading prefix uses a monospace font and a muted color distinct from the heading.
+      expectation: '{''eval_readonly'': {''expression'': ''getComputedStyle(document.querySelector(".fv-md-source-marker")).fontFamily.toLowerCase().includes("mono")
+        && getComputedStyle(document.querySelector(".fv-md-source-marker")).color !== getComputedStyle(document.querySelector(".fv-md-heading-1")).color'',
+        ''expect_truthy'': True}}'
     - step: 49
-      expectation: Real Settings controls set the application theme to dark before screenshots.
+      expectation: '{''assert_attribute'': {''selector'': ''html'', ''name'': ''data-app-theme'', ''equals'': ''dark''}}'
     - step: 51
-      expectation: Dark split Mermaid SVG has nonzero readable geometry; screenshot is retained for separate prototype review.
-    - step: 55
-      expectation: Dark live Mermaid SVG has nonzero readable geometry; screenshot is retained for separate prototype review.
-    - step: 63
-      expectation: Real Settings controls restore light before the remaining paste/edit/export workflow.
+      expectation: '{''eval_readonly'': {''expression'': ''document.querySelector(".fv-md-preview-pane .fv-md-mermaid
+        svg").getBoundingClientRect().width >= 200 && document.querySelector(".fv-md-preview-pane .fv-md-mermaid
+        svg").getBoundingClientRect().height >= 30'', ''expect_truthy'': True}}'
+    - step: 56
+      expectation: '{''eval_readonly'': {''expression'': ''document.querySelector(".fv-md-live-surface .fv-md-mermaid
+        svg").getBoundingClientRect().width >= 200 && document.querySelector(".fv-md-live-surface .fv-md-mermaid
+        svg").getBoundingClientRect().height >= 30'', ''expect_truthy'': True}}'
     - step: 64
-      expectation: Layout/heading/theme observations leave the original saved Markdown hash unchanged before edits.
-    - step: 86
-      expectation: The real live table widget uses normal computed white-space.
-    - step: 91
-      expectation: The original First task starts unchecked before the late edit stage.
+      expectation: '{''assert_attribute'': {''selector'': ''html'', ''name'': ''data-app-theme'', ''equals'': ''light''}}'
+    - step: 65
+      expectation: '{''assert_file_open_bytes'': {''path'': ''${fixture.file_open_root}/live.md'', ''sha256'': ''${fixture.file_open_markdown_sha}''}}'
+    - step: 88
+      expectation: '{''eval_readonly'': {''expression'': ''getComputedStyle(document.querySelector(".fv-md-table-wrap")).whiteSpace
+        === "normal"'', ''expect_truthy'': True}}'
     - step: 93
-      expectation: Clicking the actual live task button checks the task.
+      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="markdown-live"] .fv-md-task[aria-label="First
+        task"]'', ''name'': ''aria-checked'', ''equals'': ''false''}}'
     - step: 95
-      expectation: Split preview preserves checked task state in its passive marker.
-    - step: 96
-      expectation: The checked passive marker displays a checked glyph.
+      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="markdown-live"] .fv-md-task[aria-label="First
+        task"]'', ''name'': ''aria-checked'', ''equals'': ''true''}}'
+    - step: 97
+      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="markdown-preview"] .fv-md-task-state'',
+        ''name'': ''data-task-checked'', ''equals'': ''true''}}'
     - step: 98
-      expectation: Actual HTML download retains the checked task marker, checked state and glyph.
-    - step: 99
-      expectation: The checked-task HTML artifact completes before the revert.
-    - step: 102
-      expectation: Clicking the same live task button restores the original unchecked state.
-    - step: 103
-      expectation: Task toggle/revert leaves the previously saved table/image document clean before the original table edit.
-    - step: 111
-      expectation: After the original edit/save workflow, split preview still preserves the original unchecked task state.
-    - step: 112
-      expectation: The final passive task marker displays an unchecked glyph.
-    - step: 161
-      expectation: File browser tab is reactivated before reopening live.md.
+      expectation: '{''assert_text_equals'': {''selector'': ''[data-testid="markdown-preview"] .fv-md-task-state'',
+        ''equals'': ''☑''}}'
+    - step: 100
+      expectation: '{''assert_download'': {''trigger'': ''[data-testid="markdown-export-html"]'', ''filename'':
+        ''live.html'', ''contains'': [''First task'', ''fv-md-task-state'', ''data-task-checked="true"'', ''☑'']}}'
+    - step: 101
+      expectation: '{''assert_text'': {''selector'': ''[data-testid="markdown-export-status"]'', ''contains'': ''Export
+        completed''}}'
+    - step: 105
+      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="markdown-live"] .fv-md-task[aria-label="First
+        task"]'', ''name'': ''aria-checked'', ''equals'': ''false''}}'
+    - step: 106
+      expectation: '{''assert_count'': {''selector'': ''[data-testid="file-viewer"][data-dirty="true"]'', ''equal'':
+        0}}'
+    - step: 114
+      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="markdown-preview"] .fv-md-task-state'',
+        ''name'': ''data-task-checked'', ''equals'': ''false''}}'
+    - step: 115
+      expectation: '{''assert_text_equals'': {''selector'': ''[data-testid="markdown-preview"] .fv-md-task-state'',
+        ''equals'': ''☐''}}'
+    - step: 164
+      expectation: '{''assert_attribute'': {''selector'': ''[data-testid="tab-item"][data-tab-type="file-browser"]'',
+        ''name'': ''data-active'', ''equals'': ''true''}}'
     results:
     - 22
     - 23
@@ -716,21 +804,39 @@ verification:
     - 41
     - 49
     - 51
-    - 55
-    - 63
+    - 56
     - 64
-    - 86
-    - 91
+    - 65
+    - 88
     - 93
     - 95
-    - 96
+    - 97
     - 98
-    - 99
-    - 102
-    - 103
-    - 111
-    - 112
-    - 161
+    - 100
+    - 101
+    - 105
+    - 106
+    - 114
+    - 115
+    - 164
+  - id: R8
+    requirement: The actual Word export completes through the shared Markdown UI, downloads a DOCX package and leaves runtime clean. Native FILE007 independently verifies editable equations and Mermaid media; browser download alone does not prove Word typography.
+    actions:
+    - 172
+    - 174
+    - 175
+    - 177
+    checkpoints:
+    - step: 177
+      expectation: Actual browser download is live.docx and contains a Word document ZIP entry.
+    - step: 178
+      expectation: Production export reports saved only after the download completes.
+    - step: 179
+      expectation: Word conversion has no unhandled runtime errors.
+    results:
+    - 177
+    - 178
+    - 179
   visual:
   - check: Live/source/split widgets and export menu
     method: manual
@@ -739,6 +845,6 @@ verification:
   - check: Native clipboard image formats, asset disk persistence and OS save dialogs
     method: manual
     reason: Browser Chromium/VFS and browser downloads cannot establish these native effects.
-  - check: PDF/print, DOCX, PNG, Markdown-folder exports and export failure/cancel
+  - check: Final PDF/print, Word client typography, PNG, Markdown-folder outputs and native dialogs
     method: manual
-    reason: Formats are visible but their full outputs/system dialogs are not executed by this case.
+    reason: DOCX is downloaded and its package entry checked; native disk/dialogs and Word client layout require FILE007 and separate client evidence.

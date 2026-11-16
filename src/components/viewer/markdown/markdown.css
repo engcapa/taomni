@@ -16,7 +16,15 @@
 .fv-md-empty-outline{font-size:12px;color:var(--muted);padding:4px 6px}
 .fv-md-main{flex:1;min-width:0;min-height:0;display:flex;position:relative;background:var(--bg);user-select:text}
 .fv-md-editor-pane{flex:1;min-width:0;min-height:0;position:relative;display:flex;flex-direction:column}
-.fv-md-split>.fv-md-editor-pane,.fv-md-split>.fv-md-preview-pane{flex:1;width:50%}
+.fv-md-resizable{display:flex;flex:1;min-width:0;min-height:0;position:relative;height:100%;width:100%}
+.fv-md-resizable.is-split{display:grid}
+.fv-md-resize-handle{background:var(--divider,var(--taomni-divider));cursor:col-resize;touch-action:none;position:relative;z-index:2;outline:none;user-select:none}
+.fv-md-resize-handle:hover,.fv-md-resize-handle:focus-visible{background:var(--accent-s,var(--taomni-accent))}
+.fv-md-resize-handle[hidden]{display:none}
+.fv-md-appearance{display:flex;align-items:center;white-space:nowrap;flex:none;font-size:11px;gap:3px;color:var(--muted)}
+.fv-md-live-pane{background:var(--bg);color:var(--text)}
+.fv-selection-active .cm-activeLine,.fv-selection-active .cm-activeLineGutter{background-color:transparent!important}
+.fv-md-preview-pane{background:var(--bg);color:var(--text)}
 .fv-md-preview-pane{min-width:0;min-height:0;overflow:auto;border-left:1px solid var(--divider);position:relative}
 .fv-md-doc{max-width:800px;margin:0 auto;padding:30px clamp(16px,4.5%,44px) 120px;font-size:15px;line-height:1.75;color:var(--text);position:relative}
 .fv-md-live-surface .cm-content{font-family:var(--taomni-font-sans,Inter,system-ui,-apple-system,"Segoe UI",sans-serif)!important}

@@ -16,7 +16,7 @@ export type TaoPhase =
   | "running_workflow"
   | "budget_halt"
   | "vault_locked";
-export type TaoErrorCategory = "http" | "stream" | "network" | "interrupted" | "protocol";
+export type TaoErrorCategory = "http" | "stream" | "network" | "interrupted" | "protocol" | "configuration" | "disabled" | "vault_locked";
 
 export interface ContextChip {
   id: string;
@@ -24,6 +24,9 @@ export interface ContextChip {
   label: string;
   preview?: string;
   removable?: boolean;
+  fileId?: string;
+  mime?: string;
+  body?: string;
 }
 
 export interface TaoUsage {
@@ -66,8 +69,8 @@ export interface ActionProposal {
   payload: { command?: string; sql?: string; path?: string; content?: string; tabType?: string };
   reason?: string;
   expects?: "read_only" | "write" | "external";
-  status?: "pending" | "approved" | "rejected" | "completed" | "invalid";
-  result?: { exitCode?: number; output?: string; durationMs?: number };
+  status?: "pending" | "approved" | "rejected" | "completed" | "invalid" | "undone";
+  result?: { exitCode?: number; output?: string; durationMs?: number; actionId?: string; undoAvailable?: boolean };
 }
 
 export interface TaoBlock {
@@ -79,9 +82,11 @@ export interface TaoBlock {
   sources?: TaoSource[];
   action?: ActionProposal;
   usage?: TaoUsage;
-  error?: { category: "http" | "stream" | "network" | "interrupted" | "protocol"; message: string };
+  error?: { category: TaoErrorCategory; message: string };
   steps?: Array<{ id: string; label: string; status: "pending" | "running" | "complete" | "skipped" | "failed" }>;
   manuallyExpanded?: boolean;
+  rawBlock?: unknown;
+  rawDeltas?: unknown[];
 }
 
 export interface TaoMessage {
@@ -99,6 +104,7 @@ export interface TaoThread {
   updatedAt: number;
   source?: "tao" | "legacy" | "imported";
   running?: boolean;
+  preferences?: { mode: TaoMode; context: Record<string, string | undefined>; composer: TaoChatState["composer"] };
 }
 
 export interface TaoRequest {
@@ -114,8 +120,8 @@ export interface TaoRequest {
 
 export type TaoEvent =
   | { type: "message_start"; messageId?: string; model?: string; usage?: Partial<TaoUsage> }
-  | { type: "block_start"; index: number; block: Partial<TaoBlock> & Pick<TaoBlock, "type"> }
-  | { type: "block_delta"; index: number; delta: { text?: string; query?: string; status?: TaoBlock["status"]; sources?: TaoSource[] } }
+  | { type: "block_start"; index: number; block: Partial<TaoBlock> & Pick<TaoBlock, "type">; rawBlock?: unknown }
+  | { type: "block_delta"; index: number; delta: { text?: string; query?: string; status?: TaoBlock["status"]; sources?: TaoSource[] }; rawDelta?: unknown }
   | { type: "block_stop"; index: number }
   | { type: "message_delta"; stopReason?: "end_turn" | "max_tokens" | "refusal" | "tool_use"; title?: string; usage?: Partial<TaoUsage> }
   | { type: "message_stop" }
@@ -126,6 +132,7 @@ export interface ChatBackend {
   stop?(threadId: string): Promise<void>;
   regenerate?(threadId: string): Promise<AsyncIterable<TaoEvent> | Iterable<TaoEvent>>;
   continue?(threadId: string): Promise<AsyncIterable<TaoEvent> | Iterable<TaoEvent>>;
+  clone?(sourceThreadId: string, targetThreadId: string, throughMessageIndex?: number): Promise<void>;
 }
 
 export interface ContextPorts {
@@ -146,9 +153,9 @@ export interface TaoSearchResult {
 }
 
 export interface ActionPorts {
-  execute?(action: ActionProposal): Promise<ActionProposal["result"]>;
+  execute?(action: ActionProposal, threadId?: string): Promise<ActionProposal["result"]>;
   reject?(action: ActionProposal): Promise<void>;
-  undo?(action: ActionProposal): Promise<void>;
+  undo?(action: ActionProposal, threadId?: string): Promise<void>;
 }
 
 export interface BudgetPort {
@@ -186,6 +193,8 @@ export interface TaoChatState {
     budget: TaoBudget;
     pendingAction?: ActionProposal;
     vaultLocked?: boolean;
+    startedAt?: number;
+    finishedAt?: number;
     /** Request options retained for safe continuation and retry decisions. */
     lastRequest?: Pick<TaoRequest, "web" | "mode" | "model" | "thinking" | "chips" | "context">;
   }>;
@@ -208,9 +217,16 @@ export interface TaoChatController {
   setActiveThread(threadId: string): void;
   send(content?: string): Promise<boolean>;
   stop(): Promise<void>;
+  /** Call only after an explicit, successful Vault gate; never retries a request. */
+  acknowledgeVaultUnlock(threadId: string): void;
   continueReply(): Promise<boolean>;
   regenerate(): Promise<boolean>;
   approveAction(action: ActionProposal): Promise<void>;
   rejectAction(action: ActionProposal): Promise<void>;
+  undoAction(action: ActionProposal): Promise<void>;
   removeChip(id: string): void;
+  hydrateThreads(threads: TaoThread[]): void;
+  increaseBudget(limitTokens: number): void;
+  setDefaults(defaults: Pick<ChatProfile, "defaultModel" | "defaultThinking" | "defaultWeb">): void;
+  branchAt(messageId: string, replacement?: string): string | undefined;
 }

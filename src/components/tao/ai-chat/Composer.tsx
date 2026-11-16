@@ -1,10 +1,18 @@
-import { Mic, Paperclip, Plus, Radio, Send, Square, Sparkles, X } from "lucide-react";
+import { taoText as tr } from "../i18n";
+import { Mic, Paperclip, Plus, Radio, ArrowUp, Square, Sparkles, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { useAiStore } from "../../../stores/aiStore";
+import { isChatSendKey, normalizeChatSendShortcut } from "../../../lib/chat/sendShortcut";
+import { getAppPlatform } from "../../../lib/runtime";
+import { TaoPopover, useTaoPopover } from "./Popover";
 import type { ContextChip, TaoChatController, TaoChatState } from "./ports";
 
 export function TaoComposer({ controller, state, disabled = false }: { controller: TaoChatController; state: TaoChatState; disabled?: boolean }) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const [menu, setMenu] = useState<"plus" | "capabilities" | null>(null);
+  const plus = useTaoPopover();
+  const capabilities = useTaoPopover();
+  const shortcut = normalizeChatSendShortcut(useAiStore((value) => value.config?.chat_send_shortcut));
+  const shortcutLabel = shortcut === "enter" ? "Enter" : getAppPlatform() === "macos" ? "⌘Enter" : "Ctrl+Enter";
   const threadId = state.activeThreadId;
   const runtime = threadId ? state.runtime[threadId] : undefined;
   const active = runtime?.phase === "sending" || runtime?.phase === "thinking" || runtime?.phase === "searching" || runtime?.phase === "streaming";
@@ -19,48 +27,48 @@ export function TaoComposer({ controller, state, disabled = false }: { controlle
     <div className={`tao-home-composer ${disabled ? "is-disabled" : ""} ${active ? "is-active" : ""}`} data-testid="tao-home-composer">
       {state.composer.chips.length > 0 ? (
         <div className="tao-home-context-chips" data-testid="tao-home-context-chips">
-          {state.composer.chips.map((chip) => <ContextChipView key={chip.id} chip={chip} onRemove={() => controller.removeChip(chip.id)} />)}
+          {state.composer.chips.map((chip) => <ContextChipView key={chip.id} chip={chip} demo={state.ui.demoMode} onRemove={() => controller.removeChip(chip.id)} />)}
         </div>
       ) : null}
       <textarea
         ref={textareaRef}
         data-testid="tao-home-composer-input"
-        aria-label="给 Tao 的消息"
+        aria-label={tr("给 Tao 的消息")}
         value={state.composer.text}
         disabled={disabled}
-        placeholder={disabled ? "请先连接 DeepSeek · 全家桶" : "问 Tao 任何开发问题…（Ctrl+Enter 发送）"}
+        placeholder={disabled ? tr("请先连接 DeepSeek · 全家桶") : tr("问 Tao 任何开发问题…（{key} 发送）", { key: shortcutLabel })}
         onChange={(event) => controller.setComposerText(event.target.value)}
         onKeyDown={(event) => {
           if (event.key === "Escape" && active) { event.preventDefault(); void controller.stop(); return; }
-          if (event.key === "Enter" && (event.ctrlKey || event.metaKey) && !event.nativeEvent.isComposing) { event.preventDefault(); onSubmit(); }
-          if (event.key === "@" && !event.nativeEvent.isComposing) controller.setChips([...state.composer.chips, { id: `chip-${Date.now()}`, kind: "local", label: "本地资料", removable: true }]);
+          if (isChatSendKey({ ...event, isComposing: event.nativeEvent.isComposing }, shortcut)) { event.preventDefault(); onSubmit(); }
+          if (event.key === "@" && !event.nativeEvent.isComposing) controller.setSearchOpen(true);
         }}
       />
       <div className="tao-home-composer-toolbar">
         <div className="tao-home-composer-tools">
-          <button type="button" className="tao-home-tool-button" aria-label="添加附件" data-testid="tao-home-plus" onClick={() => setMenu(menu === "plus" ? null : "plus")}><Plus size={16} /></button>
-          <button type="button" className={`tao-home-capability-button ${state.composer.thinking ? "on" : ""}`} data-testid="tao-home-capabilities" onClick={() => setMenu(menu === "capabilities" ? null : "capabilities")}>
-            <Sparkles size={14} /> {state.composer.model.replace("deepseek-", "")} {state.composer.thinking ? "· 思考" : ""}{state.composer.web ? " · 联网" : ""}
+          <button ref={plus.triggerRef} type="button" className="tao-home-tool-button" aria-label={tr("添加附件")} data-testid="tao-home-plus" onClick={() => plus.setOpen(!plus.open)}><Plus size={16} /></button>
+          <button ref={capabilities.triggerRef} type="button" className={`tao-home-capability-button ${state.composer.thinking ? "on" : ""}`} data-testid="tao-home-capabilities" onClick={() => capabilities.setOpen(!capabilities.open)}>
+            <Sparkles size={14} /> {state.composer.model.replace("deepseek-", "")} {state.composer.thinking ? `· ${tr("思考")}` : ""}{state.composer.web ? ` · ${tr("联网")}` : ""}
           </button>
-          {menu === "plus" ? <div className="tao-home-composer-menu" role="menu"><button type="button" onClick={() => { controller.setChips([...state.composer.chips, { id: `file-${Date.now()}`, kind: "file", label: "文件引用", removable: true }]); setMenu(null); }}><Paperclip size={14} />引用文件</button><button type="button" onClick={() => setMenu(null)}>技能 / 工作流</button></div> : null}
-          {menu === "capabilities" ? <div className="tao-home-composer-menu" role="menu"><button type="button" onClick={() => controller.setComposerOption("thinking", !state.composer.thinking)}>思考 {state.composer.thinking ? "✓" : ""}</button><button type="button" onClick={() => controller.setComposerOption("web", !state.composer.web)}>联网 {state.composer.web ? "✓" : ""}</button><button type="button" onClick={() => controller.setModel(state.composer.model === "deepseek-flash" ? "deepseek-v4-pro" : "deepseek-flash")}>模型：{state.composer.model}</button></div> : null}
+          <TaoPopover owner={plus} label={tr("添加上下文")}><div className="tao-home-popup-items"><button type="button" data-testid="tao-home-context-attach" onClick={() => { controller.setSidePanel("文件"); plus.close(false); }}><Paperclip size={14} />{tr("引用文件")}</button><button type="button" data-testid="tao-home-context-workflows" onClick={() => { controller.setSidePanel("工作流"); plus.close(false); }}>{tr("技能 / 工作流")}</button><button type="button" data-testid="tao-home-context-local" onClick={() => { controller.setSearchOpen(true); plus.close(false); }}>{tr("本地资料")}</button></div></TaoPopover>
+          <TaoPopover owner={capabilities} label={tr("模型与能力")}><div className="tao-home-popup-items"><button type="button" data-testid="tao-home-capability-thinking" onClick={() => { controller.setComposerOption("thinking", !state.composer.thinking); capabilities.close(false); }}>{tr("思考")} {state.composer.thinking ? "✓" : ""}</button><button type="button" data-testid="tao-home-capability-web" onClick={() => { controller.setComposerOption("web", !state.composer.web); capabilities.close(false); }}>{tr("联网")} {state.composer.web ? "✓" : ""}</button>{(["deepseek-flash", "deepseek-v4-pro"] as const).map((model) => <button type="button" data-testid={`tao-home-capability-model-${model}`} key={model} onClick={() => { controller.setModel(model); capabilities.close(false); }}>{model} {state.composer.model === model ? "✓" : ""}</button>)}</div></TaoPopover>
         </div>
         <div className="tao-home-composer-right">
-          <button type="button" className="tao-home-tool-button" aria-label="录音" data-testid="tao-home-voice"><Mic size={16} /></button>
-          {active ? <button type="button" className="tao-home-send-button stop" data-testid="tao-home-stop" aria-label="停止生成" onClick={() => void controller.stop()}><Square size={14} /></button> : <button type="button" className="tao-home-send-button" data-testid="tao-home-send" aria-label="发送" disabled={disabled || actionWaiting || !state.composer.text.trim()} onClick={onSubmit}><Send size={15} /></button>}
+          <button type="button" className="tao-home-tool-button" aria-label={tr("录音")} data-testid="tao-home-voice" onClick={() => controller.setSidePanel("语音")}><Mic size={16} /></button>
+          {active ? <button type="button" className="tao-home-send-button stop" data-testid="tao-home-stop" aria-label={tr("停止生成")} onClick={() => void controller.stop()}><Square size={14} /></button> : <button type="button" className="tao-home-send-button" data-testid="tao-home-send" aria-label={tr("发送")} disabled={disabled || actionWaiting || !state.composer.text.trim()} onClick={onSubmit}><ArrowUp size={17} /></button>}
         </div>
       </div>
       <div className="tao-home-composer-footer">
-        <span data-testid="tao-home-shortcut-hint">Ctrl+Enter 发送</span>
-        {state.composer.web ? <span className="tao-home-cost-hint"><Radio size={11} /> 联网会产生费用（估算）</span> : null}
-        {state.composer.chips.length > 0 ? <span>本次将发送：正文 + {state.composer.chips.length} 条本地资料</span> : null}
-        {actionWaiting ? <span className="tao-home-action-lock">请先处理上方动作提议</span> : null}
+        <span data-testid="tao-home-shortcut-hint">{tr("{key} 发送", { key: shortcutLabel })}</span>
+        {state.composer.web ? <span className="tao-home-cost-hint"><Radio size={11} />{tr("联网会产生费用（估算）")}</span> : null}
+        {state.composer.chips.length > 0 ? <span>{tr("本次将发送：正文 + {count} 条本地资料", { count: state.composer.chips.length })}</span> : null}
+        {actionWaiting ? <span className="tao-home-action-lock">{tr("请先处理上方动作提议")}</span> : null}
       </div>
     </div>
   );
 }
 
-function ContextChipView({ chip, onRemove }: { chip: ContextChip; onRemove: () => void }) {
+function ContextChipView({ chip, onRemove, demo }: { chip: ContextChip; onRemove: () => void; demo: boolean }) {
   const [previewOpen, setPreviewOpen] = useState(false);
-  return <span className="tao-home-context-chip" title={chip.preview ? undefined : "点击预览脱敏内容"}><button type="button" className="tao-home-context-chip-label" aria-label={`预览 ${chip.label}`} onClick={() => setPreviewOpen(!previewOpen)}>@{chip.label}</button>{chip.removable !== false ? <button type="button" aria-label={`移除 ${chip.label}`} onClick={onRemove}><X size={11} /></button> : null}{previewOpen ? <span className="tao-home-context-preview" role="dialog" aria-label={`${chip.label} 的脱敏预览`}>{chip.preview ?? "该上下文尚无可预览内容。"}</span> : null}</span>;
+  return <span className="tao-home-context-chip"><button type="button" className="tao-home-context-chip-label" aria-label={tr("预览 {label}", { label: demo ? chip.kind : chip.label })} onClick={() => setPreviewOpen(!previewOpen)}>@{demo ? chip.kind : chip.label}</button>{chip.removable !== false ? <button type="button" aria-label={tr("移除 {label}", { label: demo ? chip.kind : chip.label })} onClick={onRemove}><X size={11} /></button> : null}{previewOpen ? <span className="tao-home-context-preview" role="dialog" aria-label={tr("{label} 的脱敏预览", { label: demo ? chip.kind : chip.label })}>{demo ? tr("演示模式下已隐藏内容") : chip.preview ?? tr("该上下文尚无可预览内容。")}<button type="button" onClick={() => setPreviewOpen(false)}>{tr("关闭")}</button></span> : null}</span>;
 }

@@ -1,25 +1,80 @@
-import { ChevronUp, FolderOpen, History, Mail, MoreHorizontal, Plus, Terminal, Workflow } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { taoText as tr } from "../i18n";
+import { ChevronUp, FolderOpen, History, MoreHorizontal, Plus, Terminal } from "lucide-react";
+import { useRef, useState } from "react";
 import { useT } from "../../../lib/i18n";
-import type { SessionConfig } from "../../../lib/ipc";
-import type { RecentWorkspace } from "../../../types";
+import { openLocalShellAsAdministrator, type LocalDirectoryShortcut } from "../../../lib/ipc";
+import { sftpLocalHome } from "../../../lib/sftp";
+import { LocalDirectoriesPanel } from "../../welcome/LocalDirectoriesPanel";
+import { localShellSelectionFromOption } from "../../welcome/sessionModel";
+import { useChatStore } from "../../../stores/chatStore";
+import type { WelcomePanelProps } from "../../welcome/types";
 import { useWelcomeShells } from "../../welcome/useWelcomeShells";
 import { HistoryPopover } from "./HistoryPopover";
+import { TaoPopover, useTaoPopover } from "../ai-chat/Popover";
 import type { TaoChatController, TaoThread } from "../ai-chat";
 
-function noopStatusMessage(_message: string): void {
-  // Tao Home keeps shell detection side-effect free; status belongs to the host.
+interface Props extends WelcomePanelProps {
+  controller: TaoChatController; threads: TaoThread[]; demoMode: boolean;
 }
 
-export function DockRow({ controller, threads, sessions, workspaces, demoMode, onStartLocalTerminal, onNewSession, onOpenNewWorkspace, onOpenRecentSession, onOpenRecentWorkspace, onRestore, onOpenSettings }: { controller: TaoChatController; threads: TaoThread[]; sessions: SessionConfig[]; workspaces: RecentWorkspace[]; demoMode: boolean; onStartLocalTerminal: (shell?: { id: string; name: string; args?: string[] }) => void; onNewSession: () => void; onOpenNewWorkspace?: () => void; onOpenRecentSession?: (session: SessionConfig) => void; onOpenRecentWorkspace?: (workspace: RecentWorkspace) => void; onRestore?: () => void; onOpenSettings?: () => void }) {
+export function shouldShowWslEntry(status: "loading" | "ready" | "error" | "unsupported", distroCount: number): boolean {
+  return status === "ready" && distroCount > 0;
+}
+
+export function DockRow(props: Props) {
+  const { controller, threads, demoMode } = props;
   const t = useT();
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
-  const historyRef = useRef<HTMLDivElement>(null);
-  const { selectedShell, shellStatus, wslDistros, wslStatus } = useWelcomeShells({ setStatusMessage: noopStatusMessage, t, active: true });
-  const hasWsl = wslStatus === "ready" && wslDistros.length > 0;
-  useEffect(() => {
-    if (historyOpen) historyRef.current?.querySelector<HTMLElement>("[data-testid='tao-home-history-popover']")?.focus();
-  }, [historyOpen]);
-  return <div className="tao-home-dock-row" data-testid="tao-home-dock-row"><div ref={historyRef} className="tao-home-dock-history-wrap"><button type="button" className="tao-home-dock-button history" data-testid="tao-home-history" onClick={() => setHistoryOpen(!historyOpen)}><History size={14} />历史<ChevronUp size={12} /></button>{historyOpen ? <HistoryPopover threads={threads} sessions={sessions} workspaces={workspaces} demoMode={demoMode} onSelectThread={(thread) => controller.setActiveThread(thread.id)} onOpenSession={onOpenRecentSession} onOpenWorkspace={onOpenRecentWorkspace} onNewThread={() => controller.createThread()} onRestore={onRestore} onClose={() => setHistoryOpen(false)} /> : null}</div><span className="tao-home-dock-divider" />{<button type="button" className="tao-home-dock-button" data-testid="tao-home-local-terminal" data-legacy-testid="welcome-open-local-terminal" disabled={shellStatus === "loading"} onClick={() => onStartLocalTerminal(selectedShell)}><Terminal size={14} />本地终端</button>}{hasWsl ? <button type="button" className="tao-home-dock-button" data-testid="tao-home-wsl" onClick={() => onStartLocalTerminal({ id: `wsl:${wslDistros[0].name}`, name: `WSL: ${wslDistros[0].name}`, args: ["-d", wslDistros[0].name] })}>WSL</button> : null}<button type="button" className="tao-home-dock-button" data-testid="tao-home-new-session" data-legacy-testid="welcome-new-session" onClick={onNewSession}><Plus size={14} />新会话</button><button type="button" className="tao-home-dock-button" data-testid="tao-home-new-workspace" data-legacy-testid="home-open-workspace" onClick={() => onOpenNewWorkspace?.()}><FolderOpen size={14} />新工作区</button><div className="tao-home-dock-more-wrap"><button type="button" className="tao-home-dock-button" data-testid="tao-home-dock-more" onClick={() => setMoreOpen(!moreOpen)}><MoreHorizontal size={14} />更多</button>{moreOpen ? <div className="tao-home-dock-more-menu"><button type="button" onClick={() => window.dispatchEvent(new CustomEvent("taomni:command", { detail: "mail-unified" }))}><Mail size={13} />邮件会话</button><button type="button" onClick={() => window.dispatchEvent(new CustomEvent("taomni:command", { detail: "database" }))}>数据库会话</button><button type="button" onClick={() => window.dispatchEvent(new CustomEvent("taomni:command", { detail: "tools" }))}><Workflow size={13} />网络工具</button><button type="button" onClick={onOpenSettings}>Tao 设置</button></div> : null}</div></div>;
+  const [status, setStatus] = useState("");
+  const [pending, setPending] = useState<string[]>([]);
+  const pendingRef = useRef(new Set<string>());
+  const history = useTaoPopover();
+  const more = useTaoPopover();
+  const shellMenu = useTaoPopover();
+  const shells = useWelcomeShells({ setStatusMessage: setStatus, t, active: props.active !== false, suppressWslErrors: true });
+  const hasWsl = shouldShowWslEntry(shells.wslStatus, shells.wslDistros.length);
+  const startInDirectory = async (directory: LocalDirectoryShortcut) => {
+    const key = directory.directoryId || `${directory.kind}:${directory.path}`;
+    if (pendingRef.current.has(key)) return;
+    pendingRef.current.add(key); setPending([...pendingRef.current]);
+    try {
+      const selected = shells.selectedShell;
+      const outcome = await props.onStartLocalTerminal(localShellSelectionFromOption(selected, directory.path), selected?.id.startsWith("wsl:") ? undefined : directory.path);
+      if (outcome?.status === "failed") setStatus(t("welcome.localDirectoryStartFailed", { path: directory.path, error: outcome.error ?? "" }));
+      else if (outcome?.status === "started") history.close(false);
+    } catch (error) { setStatus(String(error)); }
+    finally { pendingRef.current.delete(key); setPending([...pendingRef.current]); }
+  };
+  const command = (name: string) => { window.dispatchEvent(new CustomEvent("taomni:command", { detail: name })); more.close(false); };
+  const directories = demoMode ? shells.localDirectories.map((directory, index) => ({ ...directory, label: `${tr("目录")} ${index + 1}`, path: tr("已隐藏") })) : shells.localDirectories;
+  const openHistoryThread = async (thread: TaoThread) => {
+    if (thread.source === "legacy") {
+      const chat = useChatStore.getState();
+      if (!chat.threads.some((item) => item.id === thread.id)) await chat.loadThreads();
+      const refreshed = useChatStore.getState();
+      refreshed.setActiveThread(thread.id);
+      await refreshed.loadMessages(thread.id);
+      refreshed.setDrawerOpen(true);
+      return;
+    }
+    controller.setActiveThread(thread.id);
+  };
+  return <>
+    <div className="tao-home-dock-row" data-testid="tao-home-dock-row">
+      <button ref={history.triggerRef} type="button" className="tao-home-dock-button history" data-testid="tao-home-history" aria-expanded={history.open} onClick={() => history.setOpen(!history.open)}><History size={14} />{tr("历史")}<ChevronUp size={12} /></button>
+      <TaoPopover owner={history} className="tao-home-history-popup" label={tr("历史")}><HistoryPopover threads={threads} sessions={props.recentSessions ?? []} workspaces={props.recentWorkspaces ?? []} demoMode={demoMode} onSelectThread={(thread) => void openHistoryThread(thread)} onOpenSession={props.onOpenRecentSession} onOpenWorkspace={props.onOpenRecentWorkspace} onNewThread={() => controller.createThread()} onRestore={props.restore?.onStartRestore} onClose={() => history.close()} directories={<LocalDirectoriesPanel translate={t} directories={directories} pendingDirectoryIds={pending} loadStatus={shells.directoriesStatus} loadError={shells.directoriesError} onRetry={shells.reloadDirectories} onStartInDirectory={(directory) => {
+        const actual = demoMode ? shells.localDirectories.find((item) => item.directoryId === directory.directoryId) : directory;
+        if (actual) return startInDirectory(actual);
+      }} />} /></TaoPopover>
+      <span className="tao-home-dock-divider" />
+      <button type="button" className="tao-home-dock-button" data-testid="tao-home-local-terminal" disabled={shells.shellStatus === "loading"} onClick={() => void props.onStartLocalTerminal(localShellSelectionFromOption(shells.selectedShell))}><Terminal size={14} />{tr("本地终端")}</button>
+      <button ref={shellMenu.triggerRef} type="button" className="tao-home-dock-button" aria-label={tr("选择本地终端")} data-testid="tao-home-shell-menu" onClick={() => shellMenu.setOpen(!shellMenu.open)}><ChevronUp size={12} /></button>
+      <TaoPopover owner={shellMenu} label={tr("本地终端选项")}><div className="tao-home-popup-items"><select aria-label={tr("选择 Shell")} value={shells.selectedShellId} onChange={(event) => shells.setSelectedShellId(event.target.value)}>{shells.mergedShells.map((shell) => <option value={shell.id} key={shell.id}>{shell.name}</option>)}</select><button type="button" disabled={!shells.selectedShell?.canElevate} onClick={() => { shellMenu.close(); void openLocalShellAsAdministrator(shells.selectedShell?.id).catch((error) => setStatus(String(error))); }}>{tr("以管理员身份启动")}</button><button type="button" disabled={!props.onOpenLocalPath} onClick={() => { shellMenu.close(false); void sftpLocalHome().then((home) => { if (home) props.onOpenLocalPath?.(home, { embedFolder: true }); }).catch((error) => setStatus(String(error))); }}>{tr("打开 Home 目录")}</button></div></TaoPopover>
+      {hasWsl ? <button type="button" className="tao-home-dock-button" data-testid="tao-home-wsl" onClick={() => void props.onStartLocalTerminal({ id: "wsl.exe", name: `WSL: ${shells.wslDistros[0].name}`, args: ["-d", shells.wslDistros[0].name] })}>WSL</button> : null}
+      <button type="button" className="tao-home-dock-button" data-testid="tao-home-new-session" onClick={props.onNewSession}><Plus size={14} />{tr("新会话")}</button>
+      <button type="button" className="tao-home-dock-button" data-testid="tao-home-new-workspace" onClick={props.onOpenNewWorkspace}><FolderOpen size={14} />{tr("新工作区")}</button>
+      <button ref={more.triggerRef} type="button" className="tao-home-dock-button" data-testid="tao-home-dock-more" aria-expanded={more.open} onClick={() => more.setOpen(!more.open)}><MoreHorizontal size={14} />{tr("更多")}</button>
+      <TaoPopover owner={more} label={tr("更多启动选项")}><div className="tao-home-popup-items"><button type="button" onClick={() => command("file-explorer")}>{tr("本地目录")}</button><button type="button" onClick={() => command("mail-unified")}>{tr("邮件会话")}</button><button type="button" onClick={() => { more.close(false); props.onNewSession(); }}>{tr("数据库 / VNC / RDP 会话")}</button><button type="button" onClick={() => { more.close(false); props.onOpenSettings?.(); }}>{tr("Tao 设置")}</button></div></TaoPopover>
+    </div>
+    {status ? <p className="tao-home-launch-status" role="status">{status}<button type="button" aria-label={tr("关闭启动提示")} onClick={() => setStatus("")}>×</button></p> : null}
+  </>;
 }

@@ -1,16 +1,26 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import DOMPurify from "dompurify";
 import { renderFormatted } from "../../../lib/chat/renderFormatted";
 import { useMarkdownPreviewSearch, type MarkdownPreviewSearchOwner } from "./useMarkdownPreviewSearch";
 import {
-  ensureMermaidReady,
   errorMessage,
   exportMermaidPng,
   exportMermaidSvg,
   hashString,
-  type MermaidApi,
   type OpenFileState,
 } from "./codeWorkspaceModel";
+import { renderMermaid } from "./model/mermaid";
+import { PreviewAppearanceControl, previewThemeStyle, usePreviewTheme, type PreviewAppearance } from "../../viewer/markdown/PreviewAppearance";
+import "../../viewer/markdown/markdown.css";
+
+type MermaidBlock = {
+  source: string;
+  index: number;
+  wrapper: HTMLDivElement;
+  diagram: HTMLDivElement;
+  svgButton: HTMLButtonElement;
+  pngButton: HTMLButtonElement;
+};
 
 export function MarkdownPreview({
   file,
@@ -24,36 +34,24 @@ export function MarkdownPreview({
   const html = useMemo(() => renderFormatted(file.text, "md") ?? "", [file.text]);
   const rootRef = useRef<HTMLDivElement>(null);
   const contentRef = useRef<HTMLDivElement>(null);
+  const mermaidBlocks = useRef<MermaidBlock[]>([]);
   const search = useMarkdownPreviewSearch(rootRef, contentRef, html, searchOwner);
+  const [appearance, setAppearance] = useState<PreviewAppearance>("auto");
+  const theme = usePreviewTheme(appearance);
 
   useEffect(() => {
-    const root = rootRef.current;
+    const root = contentRef.current;
     if (!root) return;
     const blocks = Array.from(root.querySelectorAll("pre > code.language-mermaid, pre > code.lang-mermaid"));
-    if (blocks.length === 0) return;
     let cancelled = false;
 
-    const renderError = (block: Element, index: number, message: string) => {
-      const pre = block.parentElement;
-      if (!pre) return;
-      const wrapper = document.createElement("div");
-      wrapper.className = "my-3 border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)]";
-      const label = document.createElement("div");
-      label.className = "h-8 flex items-center border-b border-[var(--taomni-code-border)] px-2 text-[11px] font-semibold text-[var(--taomni-code-muted)]";
-      label.textContent = `Mermaid ${index + 1}`;
-      const error = document.createElement("div");
-      error.className = "p-3 text-[12px] text-red-500";
-      error.textContent = message;
-      wrapper.append(label, error);
-      pre.replaceWith(wrapper);
-    };
-
-    const renderBlock = (mermaid: MermaidApi, block: Element, index: number) => {
+    const createBlock = (block: Element, index: number): MermaidBlock | null => {
       const source = block.textContent ?? "";
       const pre = block.parentElement;
-      if (!pre) return;
+      if (!pre) return null;
       const wrapper = document.createElement("div");
       wrapper.className = "my-3 border border-[var(--taomni-code-border)] bg-[var(--taomni-code-bg)]";
+      wrapper.style.cssText = "background:var(--code-bg);color:var(--text);border-color:var(--divider)";
       const toolbar = document.createElement("div");
       toolbar.className = "h-8 flex items-center gap-1 border-b border-[var(--taomni-code-border)] px-2";
       const label = document.createElement("span");
@@ -72,9 +70,16 @@ export function MarkdownPreview({
       toolbar.append(label, svgButton, pngButton);
       wrapper.append(toolbar, diagram);
       pre.replaceWith(wrapper);
-
-      void mermaid
-        .render(`taomni-mermaid-${hashString(file.key)}-${hashString(source)}-${index}`, source)
+      return { source, index, wrapper, diagram, svgButton, pngButton };
+    };
+    // Theme changes replace only completed SVGs. Keep prose/search marks and
+    // the old diagram's geometry while the asynchronous render is pending.
+    mermaidBlocks.current = [
+      ...mermaidBlocks.current.filter(({ wrapper }) => root.contains(wrapper)),
+      ...blocks.map(createBlock).filter((block): block is MermaidBlock => block !== null),
+    ];
+    for (const { source, index, diagram, svgButton, pngButton } of mermaidBlocks.current) {
+      void renderMermaid(`taomni-mermaid-${hashString(file.key)}-${hashString(source)}-${index}`, source, theme)
         .then((result) => {
           if (cancelled) return;
           diagram.innerHTML = DOMPurify.sanitize(result.svg, {
@@ -91,22 +96,12 @@ export function MarkdownPreview({
           diagram.className = "p-3 text-[12px] text-red-500";
           diagram.textContent = errorMessage(err);
         });
-    };
-
-    void ensureMermaidReady()
-      .then((mermaid) => {
-        if (cancelled) return;
-        blocks.forEach((block, index) => renderBlock(mermaid, block, index));
-      })
-      .catch((err) => {
-        if (cancelled) return;
-        blocks.forEach((block, index) => renderError(block, index, errorMessage(err)));
-      });
+    }
 
     return () => {
       cancelled = true;
     };
-  }, [file.key, file.title, html]);
+  }, [file.key, file.title, html, theme]);
 
   return (
     <div
@@ -115,6 +110,8 @@ export function MarkdownPreview({
       onBlurCapture={search.onBlurCapture}
       tabIndex={-1}
       data-testid="code-workspace-markdown-preview"
+      data-preview-theme={theme}
+      style={{ ...previewThemeStyle(theme), background: "var(--bg)", color: "var(--text)" }}
       className="taomni-chat-md h-full min-h-0 overflow-auto bg-[var(--taomni-code-bg)] px-5 py-4 text-[length:var(--taomni-code-font-size)] leading-6 text-[var(--taomni-code-text)] outline-none"
       onClick={(event) => {
         const target = event.target;
@@ -128,6 +125,7 @@ export function MarkdownPreview({
       }}
     >
       {search.toolbar}
+      <PreviewAppearanceControl value={appearance} onChange={setAppearance} />
       <div ref={contentRef} dangerouslySetInnerHTML={{ __html: html }} />
     </div>
   );

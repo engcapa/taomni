@@ -24,12 +24,12 @@ steps:
 - click: '[data-testid="notes-open-workspace"]'
 - click: '[data-testid="notes-workspace-new"]'
 - fill:
-    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-title"]'
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-title"][value=""]:enabled'
     value: Hidden by filters
 - click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-save"]'
 - click: '[data-testid="notes-workspace-new"]'
 - fill:
-    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-title"]'
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-title"][value=""]:enabled'
     value: Active filtered note
 - click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-save"]'
 - click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-properties"]
@@ -47,12 +47,13 @@ steps:
 - assert_text:
     selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-tag"]'
     contains: search-clear-tag
+- click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="markdown-mode-source"]'
 - press:
-    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"]
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="viewer-editor"]
       .cm-content'
     key: Mod+A
 - type:
-    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"]
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="viewer-editor"]
       .cm-content'
     text: '# Unsaved filtered draft'
 - wait_for:
@@ -119,7 +120,7 @@ steps:
     name: data-dirty
     equals: 'true'
 - assert_text_equals:
-    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"]
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="viewer-editor"]
       .cm-content'
     equals: '# Unsaved filtered draft'
 - assert_attribute:
@@ -170,7 +171,7 @@ steps:
     name: data-dirty
     equals: 'true'
 - assert_text_equals:
-    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"]
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="viewer-editor"]
       .cm-content'
     equals: '# Unsaved filtered draft'
 - assert_not_visible: '[data-testid="notes-workspace-search-clear"]'
@@ -197,82 +198,81 @@ verification:
     - 13
     - 15
     - 16
-    - 18
     - 19
-    - 21
+    - 20
     - 22
     - 23
     - 24
     - 25
-    - 31
+    - 26
+    - 32
     checkpoints:
     - step: 14
       expectation: The active note is pinned.
     - step: 17
       expectation: The active note has search-clear-tag.
-    - step: 20
+    - step: 21
       expectation: Both saved notes appear before filtering.
-    - step: 26
-      expectation: The filtered query finishes with one result.
     - step: 27
-      expectation: Exactly one note row remains.
+      expectation: The filtered query finishes with one result.
     - step: 28
-      expectation: The remaining row is Active filtered note.
+      expectation: Exactly one note row remains.
     - step: 29
-      expectation: The tag filter is selected.
+      expectation: The remaining row is Active filtered note.
     - step: 30
+      expectation: The tag filter is selected.
+    - step: 31
       expectation: The selected tag is search-clear-tag.
-    - step: 32
-      expectation: The nonmatching query finishes with zero results.
     - step: 33
-      expectation: No note row is rendered.
+      expectation: The nonmatching query finishes with zero results.
     - step: 34
-      expectation: The clear search button is visible.
+      expectation: No note row is rendered.
     - step: 35
+      expectation: The clear search button is visible.
+    - step: 36
       expectation: The clear button is accessibly named Clear search.
     results:
     - 14
     - 17
-    - 20
-    - 26
+    - 21
     - 27
     - 28
     - 29
     - 30
-    - 32
+    - 31
     - 33
     - 34
     - 35
+    - 36
   - id: R2
     requirement: Clicking Clear search restores the exact filtered result and input focus while retaining the active
       dirty document.
     actions:
-    - 36
+    - 37
     checkpoints:
-    - step: 37
-      expectation: Clearing finishes with one filtered result.
     - step: 38
-      expectation: Exactly one row returns.
+      expectation: Clearing finishes with one filtered result.
     - step: 39
-      expectation: The returning row is Active filtered note.
+      expectation: Exactly one row returns.
     - step: 40
-      expectation: The search input owns DOM focus.
+      expectation: The returning row is Active filtered note.
     - step: 41
-      expectation: The search value is empty.
+      expectation: The search input owns DOM focus.
     - step: 42
-      expectation: The clear button is hidden for an empty query.
+      expectation: The search value is empty.
     - step: 43
-      expectation: The active document remains dirty.
+      expectation: The clear button is hidden for an empty query.
     - step: 44
-      expectation: 'The active editor retains # Unsaved filtered draft.'
+      expectation: The active document remains dirty.
     - step: 45
-      expectation: The active note remains pinned.
+      expectation: 'The active editor retains # Unsaved filtered draft.'
     - step: 46
-      expectation: The status filter remains Pinned only.
+      expectation: The active note remains pinned.
     - step: 47
+      expectation: The status filter remains Pinned only.
+    - step: 48
       expectation: The original tag filter remains selected.
     results:
-    - 37
     - 38
     - 39
     - 40
@@ -283,37 +283,37 @@ verification:
     - 45
     - 46
     - 47
+    - 48
   - id: R3
     requirement: Escape clears a second nonmatching query while preserving focus, filters and the active dirty draft.
     actions:
-    - 48
-    - 50
-    checkpoints:
-    - step: 49
-      expectation: The second nonmatching query finishes with zero results.
-    - step: 51
-      expectation: Escape restores one filtered result.
-    - step: 52
-      expectation: Exactly one note row is rendered.
-    - step: 53
-      expectation: Escape empties the search input.
-    - step: 54
-      expectation: The search input retains DOM focus.
-    - step: 55
-      expectation: The original tag filter remains selected.
-    - step: 56
-      expectation: The status filter remains Pinned only.
-    - step: 57
-      expectation: The active document remains dirty.
-    - step: 58
-      expectation: 'The active editor retains # Unsaved filtered draft.'
-    - step: 59
-      expectation: The clear button is hidden.
-    - step: 60
-      expectation: No runtime errors were recorded.
-    results:
     - 49
     - 51
+    checkpoints:
+    - step: 50
+      expectation: The second nonmatching query finishes with zero results.
+    - step: 52
+      expectation: Escape restores one filtered result.
+    - step: 53
+      expectation: Exactly one note row is rendered.
+    - step: 54
+      expectation: Escape empties the search input.
+    - step: 55
+      expectation: The search input retains DOM focus.
+    - step: 56
+      expectation: The original tag filter remains selected.
+    - step: 57
+      expectation: The status filter remains Pinned only.
+    - step: 58
+      expectation: The active document remains dirty.
+    - step: 59
+      expectation: 'The active editor retains # Unsaved filtered draft.'
+    - step: 60
+      expectation: The clear button is hidden.
+    - step: 61
+      expectation: No runtime errors were recorded.
+    results:
+    - 50
     - 52
     - 53
     - 54
@@ -323,6 +323,7 @@ verification:
     - 58
     - 59
     - 60
+    - 61
   visual:
   - check: Inspect the compact clear control for native-decoration overlap.
     method: manual

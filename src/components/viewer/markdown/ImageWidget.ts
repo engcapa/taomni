@@ -56,7 +56,7 @@ export class ImageWidget extends WidgetType {
       if (event.key === "Escape") { root.classList.remove("is-active"); view.focus(); }
       if (event.key === "Enter" && event.target === root) { event.preventDefault(); revealSource(view, this.from); }
     };
-    void readMarkdownImage(this.context.docPath, this.image.href).then((url) => {
+    void (this.context.readImage ? this.context.readImage(this.image.href) : readMarkdownImage(this.context.docPath, this.image.href)).then((url) => {
       if (owner.cancelled) return;
       image.onload = () => { if (!owner.cancelled) view.requestMeasure(); };
       image.src = url;

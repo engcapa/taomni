@@ -32,7 +32,16 @@ class FolderDialogContracts(unittest.TestCase):
         with TemporaryDirectory() as directory, TemporaryDirectory() as outside:
             root = Path(directory)
             (root / "case").mkdir()
-            (root / "link").symlink_to(outside, target_is_directory=True)
+            link = root / "link"
+            try:
+                link.symlink_to(outside, target_is_directory=True)
+            except OSError as error:
+                if getattr(error, "winerror", None) != 1314:
+                    raise
+                # Junctions exercise the same resolved-path escape on Windows
+                # without granting this test account symlink privileges.
+                import _winapi
+                _winapi.CreateJunction(outside, str(link))
             with self.assertRaises(StepError):
                 folder_dialog.selected_path(SimpleNamespace(case_dir=root / "case"), {"action": "choose", "path": str(root / "link")})
 

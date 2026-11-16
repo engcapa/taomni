@@ -47,13 +47,13 @@ steps:
 - assert_text_equals:
     selector: '[data-testid="notes-workspace-document"][data-active="true"] h1'
     equals: Shared body original
-- click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-mode-edit"]'
+- click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="markdown-mode-source"]'
 - press:
-    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"]
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="viewer-editor"]
       .cm-content'
     key: Mod+A
 - type:
-    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"]
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="viewer-editor"]
       .cm-content'
     text: '# Retained main draft'
 - switch_window:
@@ -68,21 +68,21 @@ steps:
     selector: '[data-testid="note-content-error"][data-error-kind="conflict"]'
     timeout_sec: 10
 - assert_text_equals:
-    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"]
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="viewer-editor"]
       .cm-content'
     equals: '# Retained main draft'
 - click: '[data-testid="note-content-reload"]'
 - click: '[data-testid="confirm-dialog-confirm"]'
 - assert_text_equals:
-    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"]
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="viewer-editor"]
       .cm-content'
     equals: '# Floating committed'
 - press:
-    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"]
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="viewer-editor"]
       .cm-content'
     key: Mod+A
 - type:
-    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-editor"]
+    selector: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="viewer-editor"]
       .cm-content'
     text: '# Saved in main'
 - click: '[data-testid="notes-workspace-document"][data-active="true"] [data-testid="notes-workspace-save"]'
@@ -151,10 +151,10 @@ verification:
         ''timeout_sec'': 10}}'
     - step: 27
       expectation: '{''assert_text_equals'': {''selector'': ''[data-testid="notes-workspace-document"][data-active="true"]
-        [data-testid="notes-workspace-editor"] .cm-content'', ''equals'': ''# Retained main draft''}}'
+        [data-testid="viewer-editor"] .cm-content'', ''equals'': ''# Retained main draft''}}'
     - step: 30
       expectation: '{''assert_text_equals'': {''selector'': ''[data-testid="notes-workspace-document"][data-active="true"]
-        [data-testid="notes-workspace-editor"] .cm-content'', ''equals'': ''# Floating committed''}}'
+        [data-testid="viewer-editor"] .cm-content'', ''equals'': ''# Floating committed''}}'
     results:
     - 26
     - 27

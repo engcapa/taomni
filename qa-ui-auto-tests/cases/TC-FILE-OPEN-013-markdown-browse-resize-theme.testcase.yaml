@@ -1,0 +1,372 @@
+id: TC-FILE-OPEN-013
+title: Markdown browse lock, real split resizing, local Mermaid appearance and optional TOC
+description: >-
+  MD-001/002/003/005. Open through Explorer, attempt a key in default read-only Live,
+  explicitly edit a task, save exact bytes and reopen. Resize with a real pointer
+  drag and keyboard limits. Against an explicitly dark app, inspect real Mermaid
+  node fills, label fills, borders and connectors in local light/dark previews.
+  Default palette text exceeds 4.5:1 and strokes exceed 3:1 for the observed colors;
+  these checks do not override authored classDef/style colors. PDF and Word page
+  setup start without a generated contents list and can be cancelled. Browser
+  asserts isolated VFS bytes; native independently reads host disk bytes after
+  save/reopen and tests the packaged WebView pointer/read-only behavior. macOS
+  WebView input is not a claim of physical OS shortcut or pointer delivery.
+modes: [browser, native]
+covers: [F-FILEOPEN-1, F-EXPLORER-1]
+tags: [p1, file-open, markdown, export, crash-regression]
+fixtures: [reset_db, file_open_files]
+timeout_sec: 210
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-markdown-browse-resize-theme
+- reload_window: null
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-file-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Control+l
+    macos_key: Meta+l
+- fill:
+    selector: '[data-testid="explorer-address"]'
+    value: ${fixture.file_open_root}
+- press:
+    selector: '[data-testid="explorer-address"]'
+    key: Enter
+- dblclick: '[data-testid="explorer-file-row"][data-name="live.md"]'
+- wait_for: '[data-testid="markdown-editor"][data-mode="live"]'
+- assert_attribute:
+    selector: '[data-testid="markdown-editor"]'
+    name: data-editing
+    equals: 'false'
+- assert_disabled: '[data-testid="markdown-format-bold"]'
+- assert_attribute:
+    selector: '[data-testid="markdown-live"] .fv-md-task'
+    name: aria-checked
+    equals: 'false'
+- press:
+    selector: '[data-testid="markdown-live"]'
+    key: x
+- assert_disabled: '[data-testid="markdown-live"] .fv-md-task'
+- assert_attribute:
+    selector: '[data-testid="markdown-live"] .fv-md-task'
+    name: aria-checked
+    equals: 'false'
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/live.md
+    sha256: ${fixture.file_open_markdown_sha}
+- assert_attribute:
+    selector: '[data-testid="file-viewer"]'
+    name: data-dirty
+    equals: 'false'
+- click: '[data-testid="markdown-live-edit"]'
+- assert_attribute:
+    selector: '[data-testid="markdown-live-edit"]'
+    name: aria-pressed
+    equals: 'true'
+- assert_enabled: '[data-testid="markdown-format-bold"]'
+- press:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    key: Control+Home
+    macos_key: Meta+ArrowUp
+- click: '[data-testid="markdown-live"] .fv-md-task'
+- assert_attribute:
+    selector: '[data-testid="markdown-live"] .fv-md-task'
+    name: aria-checked
+    equals: 'true'
+- assert_attribute:
+    selector: '[data-testid="file-viewer"]'
+    name: data-dirty
+    equals: 'true'
+- click: '[data-testid="markdown-mode-split"]'
+- wait_for: '[data-testid="markdown-preview"] .fv-md-mermaid svg'
+- assert_attribute:
+    selector: '[data-testid="markdown-preview"] .fv-md-task-state'
+    name: data-task-checked
+    equals: 'true'
+- assert_attribute:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    name: contenteditable
+    equals: 'true'
+- assert_attribute:
+    selector: '[data-testid="markdown-split-resize"]'
+    name: aria-valuenow
+    equals: '50'
+- drag_to:
+    from: '[data-testid="markdown-split-resize"]'
+    by: {dx: 100, dy: 0, steps: 12}
+- eval_readonly:
+    expression: Number(document.querySelector('.fv-md-resize-handle').getAttribute('aria-valuenow')) > 50 && Number(document.querySelector('.fv-md-resize-handle').getAttribute('aria-valuenow')) < 80
+    expect_truthy: true
+- eval_readonly:
+    expression: document.querySelector('.fv-md-source-pane').getBoundingClientRect().width > document.querySelector('.fv-md-preview-pane').getBoundingClientRect().width
+    expect_truthy: true
+- press:
+    selector: '[data-testid="markdown-split-resize"]'
+    key: End
+- assert_attribute:
+    selector: '[data-testid="markdown-split-resize"]'
+    name: aria-valuenow
+    equals: '80'
+- press:
+    selector: '[data-testid="markdown-split-resize"]'
+    key: Home
+- assert_attribute:
+    selector: '[data-testid="markdown-split-resize"]'
+    name: aria-valuenow
+    equals: '20'
+- dblclick: '[data-testid="markdown-split-resize"]'
+- assert_attribute:
+    selector: '[data-testid="markdown-split-resize"]'
+    name: aria-valuenow
+    equals: '50'
+- click: '[data-testid="markdown-mode-source"]'
+- assert_text:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    contains: '- [x] First task'
+- click: '[data-testid="viewer-save"]'
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/live.md
+    equals: |
+      # File open Markdown
+
+      **Rendered bold** and `inline code`.
+
+      Math: $x^2$ and $$\frac{1}{2}$$.
+
+      ## Details
+
+      ![Original](assets/pixel.png)
+
+      - [x] First task
+
+      ```mermaid
+      flowchart LR
+        Explorer --> OpenFile --> Viewer
+      ```
+- click: '[data-testid="markdown-mode-live"]'
+- assert_attribute:
+    selector: '[data-testid="markdown-editor"]'
+    name: data-editing
+    equals: 'false'
+- assert_attribute:
+    selector: '[data-testid="markdown-live"] .fv-md-task'
+    name: aria-checked
+    equals: 'true'
+- press:
+    selector: '[data-testid="markdown-live"]'
+    key: x
+- assert_attribute:
+    selector: '[data-testid="file-viewer"]'
+    name: data-dirty
+    equals: 'false'
+- click: '[data-testid="ribbon-settings"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: theme
+- wait_for: '[data-testid="app-theme-select"]'
+- click: '[data-testid="app-theme-select"]'
+- click: '[data-testid="app-theme-dark"]'
+- click: '[data-testid="tab-item"][data-tab-type="file-viewer"]'
+- assert_attribute:
+    selector: html
+    name: data-app-theme
+    equals: dark
+- click: '[data-testid="markdown-mode-split"]'
+- select_option:
+    selector: '[data-testid="markdown-preview-appearance"]'
+    value: light
+- eval_readonly:
+    expression: getComputedStyle(document.querySelector('.fv-md-preview-pane svg .node rect')).fill === 'rgb(219, 234, 254)'
+    expect_truthy: true
+    timeout_sec: 20
+- eval_readonly:
+    expression: Math.max(...getComputedStyle(document.querySelector('.fv-md-preview-pane svg .node .label text')).fill.match(/\d+/g).map(Number)) <= 85
+    expect_truthy: true
+- eval_readonly:
+    expression: getComputedStyle(document.querySelector('.fv-md-preview-pane svg .node rect')).stroke === 'rgb(37, 99, 235)'
+    expect_truthy: true
+- eval_readonly:
+    expression: getComputedStyle(document.querySelector('.fv-md-preview-pane svg .flowchart-link')).stroke === 'rgb(71, 85, 105)'
+    expect_truthy: true
+- screenshot: markdown-local-light-on-dark-app.png
+- select_option:
+    selector: '[data-testid="markdown-preview-appearance"]'
+    value: dark
+- eval_readonly:
+    expression: getComputedStyle(document.querySelector('.fv-md-preview-pane svg .node rect')).fill === 'rgb(36, 54, 79)'
+    expect_truthy: true
+    timeout_sec: 20
+- eval_readonly:
+    expression: Math.min(...getComputedStyle(document.querySelector('.fv-md-preview-pane svg .node .label text')).fill.match(/\d+/g).map(Number)) >= 200
+    expect_truthy: true
+- eval_readonly:
+    expression: Math.min(...getComputedStyle(document.querySelector('.fv-md-preview-pane svg .node rect')).stroke.match(/\d+/g).map(Number)) >= 130
+    expect_truthy: true
+- eval_readonly:
+    expression: Math.min(...getComputedStyle(document.querySelector('.fv-md-preview-pane svg .flowchart-link')).stroke.match(/\d+/g).map(Number)) >= 180
+    expect_truthy: true
+- assert_attribute:
+    selector: html
+    name: data-app-theme
+    equals: dark
+- screenshot: markdown-local-dark-mermaid.png
+- select_option:
+    selector: '[data-testid="markdown-preview-appearance"]'
+    value: auto
+- assert_attribute:
+    selector: '[data-testid="markdown-preview"]'
+    name: data-preview-theme
+    equals: dark
+- click: '[data-testid="markdown-export"]'
+- click: '[data-testid="markdown-export-pdf"]'
+- eval_readonly:
+    expression: document.querySelector('.fv-md-export-settings input').checked === false
+    expect_truthy: true
+- click: '[data-testid="markdown-export-toc"]'
+- eval_readonly:
+    expression: document.querySelector('.fv-md-export-settings input').checked === true
+    expect_truthy: true
+- click: '[data-testid="markdown-export-toc"]'
+- eval_readonly:
+    expression: document.querySelector('.fv-md-export-settings input').checked === false
+    expect_truthy: true
+- press:
+    selector: '[data-testid="markdown-export-toc"]'
+    key: Escape
+- assert_count:
+    selector: '[data-testid="markdown-export-settings"]'
+    equal: 0
+- click: '[data-testid="markdown-export"]'
+- click: '[data-testid="markdown-export-docx"]'
+- eval_readonly:
+    expression: document.querySelector('.fv-md-export-settings input').checked === false
+    expect_truthy: true
+- press:
+    selector: '[data-testid="markdown-export-toc"]'
+    key: Escape
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/live.md
+    equals: |
+      # File open Markdown
+
+      **Rendered bold** and `inline code`.
+
+      Math: $x^2$ and $$\frac{1}{2}$$.
+
+      ## Details
+
+      ![Original](assets/pixel.png)
+
+      - [x] First task
+
+      ```mermaid
+      flowchart LR
+        Explorer --> OpenFile --> Viewer
+      ```
+- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="live.md"]'
+- wait_for: '[data-testid="markdown-editor"][data-editing="false"]'
+- click: '[data-testid="markdown-mode-split"]'
+- assert_attribute:
+    selector: '[data-testid="markdown-preview"] .fv-md-task-state'
+    name: data-task-checked
+    equals: 'true'
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/live.md
+    equals: |
+      # File open Markdown
+
+      **Rendered bold** and `inline code`.
+
+      Math: $x^2$ and $$\frac{1}{2}$$.
+
+      ## Details
+
+      ![Original](assets/pixel.png)
+
+      - [x] First task
+
+      ```mermaid
+      flowchart LR
+        Explorer --> OpenFile --> Viewer
+      ```
+- assert_no_runtime_errors: null
+- screenshot: markdown-browse-resize-reopened.png
+verification:
+  review: reviewed
+  requirements:
+  - id: MD-LIVE
+    requirement: Live starts read-only; explicit Edit permits a task mutation; returning to Live and reopening restores browse mode while saved bytes survive.
+    actions: [10, 15, 20, 23, 27, 41, 43, 45, 48, 86, 87, 89]
+    checkpoints:
+    - {step: 12, expectation: Initial Live data-editing is false.}
+    - {step: 13, expectation: Formatting controls are disabled in browse mode.}
+    - {step: 16, expectation: A task button is disabled in browse mode.}
+    - {step: 18, expectation: Attempted key input leaves every original byte unchanged.}
+    - {step: 19, expectation: Browse interaction leaves no dirty draft.}
+    - {step: 21, expectation: Explicit Edit is active.}
+    - {step: 25, expectation: Explicit Edit and task click produce a checked task.}
+    - {step: 26, expectation: Actual mutation makes the document dirty.}
+    - {step: 44, expectation: Save writes all expected UTF-8 bytes independently of the editor UI.}
+    - {step: 46, expectation: Returning from source to Live restores browse.}
+    - {step: 49, expectation: A second key attempt still cannot dirty the document.}
+    - {step: 89, expectation: Closing and reopening starts default Live browse again.}
+    - {step: 91, expectation: Reopened rendered task retains completion.}
+    - {step: 92, expectation: Reopened source retains the complete saved bytes.}
+    results: [12, 16, 18, 19, 25, 26, 44, 46, 49, 89, 91, 92]
+  - id: MD-SPLIT
+    requirement: Pointer dragging changes actual source/preview geometry; keyboard clamps and double-click reset work without losing content.
+    actions: [27, 32, 35, 37, 39]
+    checkpoints:
+    - {step: 30, expectation: Split source remains editable.}
+    - {step: 33, expectation: Real drag increases the ratio within limits.}
+    - {step: 34, expectation: Actual source pane becomes wider than preview.}
+    - {step: 36, expectation: End clamps the ratio at 80 percent.}
+    - {step: 38, expectation: Home clamps the ratio at 20 percent.}
+    - {step: 40, expectation: Double-click resets both panes to 50 percent.}
+    - {step: 44, expectation: Resize operations preserve the expected source bytes.}
+    results: [30, 33, 34, 36, 38, 40, 44]
+  - id: MD-APPEARANCE
+    requirement: Local light/dark and auto render readable Mermaid labels, borders and connectors independently of the dark app theme.
+    actions: [50, 51, 52, 53, 54, 56, 57, 63, 70]
+    checkpoints:
+    - {step: 59, expectation: Light diagram nodes use the expected light background.}
+    - {step: 60, expectation: All label RGB components are dark enough for text contrast above 4.5 to 1.}
+    - {step: 61, expectation: Node borders use blue with contrast above 3 to 1.}
+    - {step: 62, expectation: Connectors are dark and readable on the light canvas.}
+    - {step: 65, expectation: Dark diagram nodes use the expected dark background.}
+    - {step: 66, expectation: Label components are bright enough for text contrast above 4.5 to 1.}
+    - {step: 67, expectation: Node borders are bright enough for contrast above 3 to 1.}
+    - {step: 68, expectation: Connectors are bright and readable on the dark canvas.}
+    - {step: 69, expectation: Local appearance changes leave the app in dark mode.}
+    - {step: 72, expectation: Auto follows the dark app.}
+    results: [59, 60, 61, 62, 65, 66, 67, 68, 69, 72]
+  - id: MD-TOC
+    requirement: Generated TOC starts unchecked in PDF/Word page setup and can be explicitly enabled; cancelling setup preserves the source.
+    actions: [72, 73, 75, 77, 79, 81, 82, 84]
+    checkpoints:
+    - {step: 75, expectation: The default PDF contents checkbox is unchecked.}
+    - {step: 77, expectation: Explicit click enables generated contents.}
+    - {step: 79, expectation: A second click disables generated contents.}
+    - {step: 81, expectation: Escape closes setup.}
+    - {step: 84, expectation: Word setup keeps generated contents unchecked.}
+    - {step: 86, expectation: Cancelled page setups preserve every saved source byte.}
+    results: [75, 77, 79, 81, 84, 86]
+  visual:
+  - check: Split pane widths and real Mermaid fill/stroke/text contrast in both preview themes
+    method: automated
+    reason: Geometry and actual computed SVG colors are checked after the renderer settles; screenshots retain the surrounding UI.
+  - check: Every Mermaid authored classDef/style and every diagram grammar
+    method: manual
+    reason: The controlled flowchart establishes default palette readability; authored styles are preserved and require their own document-specific visual check.
+  native:
+  - check: Read-only/edit/save/reopen preserves exact host disk bytes
+    method: automated
+    reason: Native file_open_files writes real files and assert_file_open_bytes independently reads host bytes after the production Save path.
+  - check: Packaged WebView separator pointer delivery
+    method: automated
+    reason: drag_to sends real pointer actions to the separator and subsequent geometry assertions prove actual layout change; macOS bridge input does not certify physical OS events.
+  - check: Final PDF/Word export artifacts or physical OS shortcut delivery
+    method: not-applicable
+    reason: This case cancels page setup; TC-FILE-OPEN-007 owns native export artifacts and clipboard/OS boundaries.

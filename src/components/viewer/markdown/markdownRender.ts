@@ -1,6 +1,6 @@
 import DOMPurify from "dompurify";
 import { renderFormatted } from "../../../lib/chat/renderFormatted";
-import { ensureMermaidReady } from "../../editor/workspace/model/mermaid";
+import { renderMermaid } from "../../editor/workspace/model/mermaid";
 import { highlightTree, classHighlighter } from "@lezer/highlight";
 import { readMarkdownImage } from "../../../lib/markdownAssets";
 import { restoreMarkdownTasks } from "./markdownTasks";
@@ -14,7 +14,7 @@ export function renderMarkdown(content: string): string {
   return renderFormatted(math.content, "md") ?? "";
 }
 
-export interface RenderOwner { docPath: string; cancelled: () => boolean; onResize?: () => void }
+export interface RenderOwner { docPath: string; cancelled: () => boolean; onResize?: () => void; theme?: "light" | "dark"; readImage?: (reference: string) => Promise<string> }
 let diagramId = 0;
 
 async function highlightCode(block: HTMLElement, language: string): Promise<void> {
@@ -53,7 +53,7 @@ export async function enhanceMarkdown(root: HTMLElement, owner: RenderOwner, str
     // Strip before attaching to the live document: never issue a browser
     // request for a relative path or external URL.
     image.removeAttribute("src");
-    jobs.push(readMarkdownImage(owner.docPath, src).then((url) => {
+    jobs.push((owner.readImage ? owner.readImage(src) : readMarkdownImage(owner.docPath, src)).then((url) => {
       if (owner.cancelled()) return;
       image.src = url;
       image.onload = () => owner.onResize?.();
@@ -73,8 +73,7 @@ export async function enhanceMarkdown(root: HTMLElement, owner: RenderOwner, str
       // and PNG. Mermaid's default HTML labels use foreignObject, which the
       // sanitizer intentionally removes. This is view-only configuration; the
       // document retains its exact standard Mermaid fence/source.
-      const svgSource = `${source}\n%%{init: {"htmlLabels": false, "flowchart": {"htmlLabels": false}}}%%`;
-      jobs.push(ensureMermaidReady().then((mermaid) => mermaid.render(`fv-md-diagram-${++diagramId}`, svgSource)).then((result) => {
+      jobs.push(renderMermaid(`fv-md-diagram-${++diagramId}`, source, owner.theme).then((result) => {
         if (owner.cancelled()) return;
         const diagram = document.createElement("div");
         diagram.className = "fv-md-mermaid";

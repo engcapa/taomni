@@ -235,7 +235,7 @@ export function registerfilesLifecycle4Cases(caseContext: registerfilesLifecycle
     }
 
     it("preserves distinct identities for /repo/app/src/A.java and /repo/app/src/a.java during replace preimages and apply (ED-REPAIR-006-A1, A3)", async () => {
-      const { disk, workspace, onCommandsChange } = setupWorkspace("case-replace", "src/c.ts");
+      const { disk, workspace, onCommandsChange, registrationRef } = setupWorkspace("case-replace", "src/c.ts");
       disk["src/c.ts"] = "hello reader";
       disk["src/A.java"] = "hello UPPER_A";
       disk["src/a.java"] = "hello lower_a";
@@ -263,6 +263,10 @@ export function registerfilesLifecycle4Cases(caseContext: registerfilesLifecycle
       expect(disk["src/a.java"]).toBe("hello replaced_lower");
 
       // Undo restores both distinct files accurately
+      // Disk writes precede the journal commit and the enabled Undo command.
+      await waitFor(() => expect(
+        registrationRef.current?.items.find((item) => item.id === "workspace.undoWorkspaceEdit")?.enabled,
+      ).toBe(true));
       await act(async () => {
         fireEvent.keyDown(window, { key: "z", ctrlKey: true });
       });

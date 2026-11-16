@@ -49,7 +49,7 @@ def native_isolation_env(report_root: Path) -> dict[str, str]:
 
     ``dirs`` honors XDG on Linux and is explicitly overridden on macOS, but on
     Windows it resolves Known Folders and ignores ``APPDATA``; Taomni's
-    debug-only ``NEWMOB_*`` override is the only effective redirection there
+    QA-identifier-gated ``NEWMOB_*`` override is the effective redirection there
     (src-tauri/src/lib.rs documents the same requirement).  Without those keys
     the QA app wrote to the real ``%APPDATA%\\com.taomni.app.qa``, ``reset_db``
     cleaned a path the app never used, and state leaked across cases.

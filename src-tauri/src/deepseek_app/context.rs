@@ -30,13 +30,13 @@ pub fn to_request_messages(
 ) -> Vec<(String, String)> {
     let mut messages = get_context_rounds(history)
         .into_iter()
-        .map(|round| ("user".into(), round.user))
+        .flat_map(|round| {
+            [
+                ("user".into(), round.user),
+                ("assistant".into(), round.assistant),
+            ]
+        })
         .collect::<Vec<_>>();
-    messages.extend(
-        get_context_rounds(history)
-            .into_iter()
-            .map(|round| ("assistant".into(), round.assistant)),
-    );
     if !binding.is_empty() {
         let context = binding
             .iter()

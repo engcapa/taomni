@@ -1,10 +1,10 @@
 id: TC-FILE-OPEN-011
 title: Native local terminal modifier-click opens and dedupes the actual local file
-description: AC18/22. Creates a real local PTY through New Local Terminal, changes into the disposable host folder and types a portable
-  echo of its short relative file path (avoiding terminal-wrap truncation), uses actual terminal Find only to locate the rendered output
-  and trusted Ctrl/Cmd-clicks the real xterm link. Viewer content and independent host bytes prove the target. Repeating through the
-  same terminal activates the only viewer; closing it retains the live PTY. No browser local-terminal stub, provider callback or direct
-  openFile call.
+description: AC18/22. Creates a real local PTY through New Local Terminal, changes into the disposable host folder and types a portable echo of
+  its short relative file path (avoiding terminal-wrap truncation), uses actual terminal Find only to locate the rendered output and trusted Ctrl/Cmd-clicks
+  the real xterm link. Viewer content and independent host bytes prove the target. Repeating through the same terminal activates the only viewer;
+  closing it retains the live PTY. No browser local-terminal stub, provider callback or direct openFile call. Manual tab selection must survive
+  beyond the former delayed activation window.
 modes:
 - native
 covers:
@@ -38,7 +38,7 @@ steps:
     timeout_sec: 20
 - terminal_input:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"] .xterm-helper-textarea'
-    text: echo ./notes.txt
+    text: echo ./notes"."txt
     submit: true
 - assert_pattern:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
@@ -73,6 +73,11 @@ steps:
     equal: 1
 - click: '[data-testid="tab-item"][data-tab-type="terminal"]'
 - wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"] [data-testid="terminal-search-hit-active"]'
+- wait: 3.2
+- assert_attribute:
+    selector: '[data-testid="tab-item"][data-tab-type="terminal"]'
+    name: data-active
+    equals: 'true'
 - terminal_file_link:
     selector: '[data-testid="terminal-pane"][data-terminal-active="true"]'
 - wait_for: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"]'
@@ -133,27 +138,30 @@ verification:
     requirement: Repeated link activation dedupes the same scope and closing its viewer preserves a working native terminal.
     actions:
     - 19
-    - 21
-    - 25
-    - 27
-    - 28
-    checkpoints:
-    - step: 23
-      expectation: The second trusted activation reuses the only viewer.
-    - step: 24
-      expectation: Reused host retains exact file content.
-    - step: 29
-      expectation: Anchored output proves a separate command actually executed after viewer close.
-    - step: 30
-      expectation: Entry and close lifecycle left host file bytes unchanged.
-    - step: 31
-      expectation: No uncaught runtime exception across terminal/viewer activation.
-    results:
     - 23
-    - 24
+    - 27
     - 29
     - 30
+    checkpoints:
+    - step: 22
+      expectation: Manual return to the terminal remains active beyond the former 3-second delayed viewer activation window.
+    - step: 25
+      expectation: The second trusted activation reuses the only viewer.
+    - step: 26
+      expectation: Reused host retains exact file content.
+    - step: 31
+      expectation: Anchored output proves a separate command actually executed after viewer close.
+    - step: 32
+      expectation: Entry and close lifecycle left host file bytes unchanged.
+    - step: 33
+      expectation: No uncaught runtime exception across terminal/viewer activation.
+    results:
+    - 22
+    - 25
+    - 26
     - 31
+    - 32
+    - 33
   visual:
   - check: Terminal link activation and viewer chrome
     method: manual

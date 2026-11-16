@@ -5,4 +5,6 @@ export {
   Document, Paragraph, TextRun, ImageRun, ExternalHyperlink, Table, TableRow,
   TableCell, Header, Footer, Packer, PageNumber, WidthType, HeadingLevel,
   BorderStyle, LevelFormat, AlignmentType, PageOrientation,
+  Math, MathRun, MathFraction, MathSuperScript, MathSubScript,
+  MathSubSuperScript, MathRadical,
 } from "docx";

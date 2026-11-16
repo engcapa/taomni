@@ -1,0 +1,50 @@
+id: TC-TAO-HOME-011
+title: Real DeepSeek native conversation recalls context and retains drafts through locale and Stop
+description: >-
+  Opt-in commercial DeepSeek test with the user's temporary key. Drive the actual
+  desktop UI through two-turn context recall, Chinese/English draft retention,
+  regeneration, empty new chat and stopping a real streaming response. At most
+  four requests are made, each using the product's 8192 output-token ceiling;
+  short synthetic prompts and context remain within the 1M token budget.
+  Only explicit invalid/expired credentials end early as a successful credential
+  check with that outcome logged. No network/protocol/runtime failure is waived.
+modes: [native]
+covers: [F1.11]
+tags: [p1, tao-home, native, real-provider, regression]
+fixtures: [reset_db, tao_real_provider]
+timeout_sec: 600
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-tao-home-011-real-provider
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- wait_for: '[data-testid="tao-home-composer-input"]:enabled'
+- observe_tao_provider: null
+- tao_real_provider_scenarios: null
+- assert_no_runtime_errors: null
+- screenshot: tao-home-real-scenarios-final.png
+verification:
+  review: reviewed
+  requirements:
+  - id: REAL-CONTEXT
+    requirement: Real native replies recall an unpredictable token from an earlier user turn and regenerate it without duplicate messages; locale changes retain a draft without another paid invocation.
+    actions: [1, 2, 3, 4, 5, 6]
+    checkpoints:
+    - {step: 7, expectation: "Per-stage metadata verifies native callback completion, latest reply length and token match, exact user/assistant counts and locale draft equality. Only explicit key invalidation may end early with that result logged."}
+    - {step: 8, expectation: No unhandled runtime error occurred.}
+    results: [7, 8]
+  - id: REAL-STOP
+    requirement: A new chat starts empty; Stop acts on a partially rendered commercial response, completes native cancellation and retains stable text without automatic retry.
+    actions: [1, 2, 3, 4, 5, 6]
+    checkpoints:
+    - {step: 7, expectation: "Empty transcript/draft, pending stream with text, side-by-side chat/companion bounds, one completed Stop invocation, stable partial content/request count and a fully visible stopped card at the feed bottom are independently observed."}
+    - {step: 8, expectation: No unhandled runtime error occurred.}
+    results: [7, 8]
+  native:
+  - check: Actual commercial provider, Tauri IPC, packaged WebView input and cancellation completion
+    method: automated
+    reason: The forwarding observer preserves actual requests and callback arguments. Independent server-side socket close remains covered by TC-TAO-HOME-002/009 loopback assertions.
+  visual:
+  - check: Real multi-turn and stopped response surfaces
+    method: manual
+    reason: Native screenshots retain each completed stage for inspection; token/context/count checks do not certify the full high-fidelity prototype.

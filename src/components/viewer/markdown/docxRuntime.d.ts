@@ -10,9 +10,17 @@ export interface RunOptions {
   children?: Array<string | number>;
 }
 export class TextRun { constructor(options: string | RunOptions); readonly kind: "run" }
-export class ImageRun { constructor(options: { type: "png"; data: Uint8Array; transformation: { width: number; height: number }; altText?: { title: string; description: string; name: string } }); readonly kind: "image" }
+export class ImageRun { constructor(options: ({ type: "png"; data: Uint8Array } | { type: "svg"; data: Uint8Array; fallback: { type: "png"; data: Uint8Array } }) & { transformation: { width: number; height: number }; altText?: { title: string; description: string; name: string } }); readonly kind: "image" }
 export class ExternalHyperlink { constructor(options: { link: string; children: ParagraphChild[] }); readonly kind: "hyperlink" }
-export type ParagraphChild = TextRun | ImageRun | ExternalHyperlink;
+export type MathComponent = MathRun | MathFraction | MathSuperScript | MathSubScript | MathSubSuperScript | MathRadical;
+export class Math { constructor(options: { children: MathComponent[] }); readonly kind: "math" }
+export class MathRun { constructor(text: string); readonly kind: "mathRun" }
+export class MathFraction { constructor(options: { numerator: MathComponent[]; denominator: MathComponent[]; type?: "noBar" }); readonly kind: "fraction" }
+export class MathSuperScript { constructor(options: { children: MathComponent[]; superScript: MathComponent[] }); readonly kind: "superscript" }
+export class MathSubScript { constructor(options: { children: MathComponent[]; subScript: MathComponent[] }); readonly kind: "subscript" }
+export class MathSubSuperScript { constructor(options: { children: MathComponent[]; subScript: MathComponent[]; superScript: MathComponent[] }); readonly kind: "subSuperScript" }
+export class MathRadical { constructor(options: { children: MathComponent[]; degree?: MathComponent[] }); readonly kind: "radical" }
+export type ParagraphChild = TextRun | ImageRun | ExternalHyperlink | Math;
 export interface ParagraphOptions {
   children?: ParagraphChild[];
   heading?: string;

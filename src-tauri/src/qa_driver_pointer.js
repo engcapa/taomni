@@ -17,97 +17,144 @@ function dispatchQaElementClick(el) {
   return true;
 }
 
+function qaClickTarget(down, up) {
+  // Removing a control during mousedown must not activate its replacement on
+  // mouseup. Connected, different targets activate their common ancestor.
+  if (!down?.isConnected || !up?.isConnected) return null;
+  for (let node = down; node; node = node.parentElement) {
+    if (node === up || node.contains(up)) return node;
+  }
+  return null;
+}
+
+function qaPointerCapture(states) {
+  // Synthetic WKWebView pointers have no OS capture. Honor the application's
+  // capture requests while this action sequence owns those pointers, then
+  // restore the WebView APIs even on cancellation or a handler failure.
+  const targets = new Map();
+  const descriptors = new Map();
+  const prototype = typeof Element === "undefined" ? null : Element.prototype;
+  const owns = id => !!states[id - 1]?.down;
+  for (const name of ["setPointerCapture", "hasPointerCapture", "releasePointerCapture"]) {
+    if (!prototype) break;
+    const descriptor = Object.getOwnPropertyDescriptor(prototype, name);
+    descriptors.set(name, descriptor);
+    Object.defineProperty(prototype, name, { configurable: true, writable: true, value(id) {
+      if (!owns(id)) return descriptor?.value?.call(this, id);
+      if (name === "setPointerCapture") { targets.set(id, this); return; }
+      if (name === "hasPointerCapture") return targets.get(id) === this;
+      if (targets.get(id) === this) targets.delete(id);
+    } });
+  }
+  return { targets, restore() {
+    targets.clear();
+    for (const [name, descriptor] of descriptors) {
+      if (descriptor) Object.defineProperty(prototype, name, descriptor);
+      else delete prototype[name];
+    }
+  } };
+}
+
 async function dispatchQaActions(sources, emitKey, modifiers, resolveOrigin, targetAtPoint, cancelled = () => false) {
   const states = sources.map(() => ({ x: 0, y: 0, buttons: 0, down: null, dragged: false, clicks: 0, suppressMouse: false }));
+  const capture = qaPointerCapture(states);
   const ticks = Math.max(0, ...sources.map((source) => (source.actions || []).length));
-  for (let tick = 0; tick < ticks; tick++) {
-    if (cancelled()) return;
-    // A tick runs all sources together, then waits for its longest duration.
-    // In particular a pointer pause must keep down/up in separate event-loop
-    // turns so native protocol consumers observe the declared input timing.
-    const duration = Math.max(0, ...sources.map(source => Number(source.actions?.[tick]?.duration) || 0));
-    for (let index = 0; index < sources.length; index++) {
-      const source = sources[index];
-      const action = source.actions?.[tick];
-      if (!action) continue;
-      if (source.type === "key") {
-        if (action.type === "keyDown" || action.type === "keyUp") emitKey(action.type, action.value);
-        continue;
-      }
-      if (source.type === "wheel") {
-        if (action.type === "scroll") {
-          const [wx, wy] = resolveOrigin(action.origin || "viewport", Number(action.x) || 0, Number(action.y) || 0);
-          const target = targetAtPoint(wx, wy);
-          target.dispatchEvent(new WheelEvent("wheel", {
-            bubbles: true, cancelable: true, composed: true,
-            clientX: wx, clientY: wy,
-            deltaX: Number(action.deltaX) || 0, deltaY: Number(action.deltaY) || 0,
-            deltaZ: Number(action.deltaZ) || 0, deltaMode: Number(action.deltaMode) || 0,
-            ctrlKey: modifiers.Control, shiftKey: modifiers.Shift, altKey: modifiers.Alt, metaKey: modifiers.Meta,
-          }));
+  try {
+    for (let tick = 0; tick < ticks; tick++) {
+      if (cancelled()) return;
+      // A tick runs all sources together, then waits for its longest duration.
+      // In particular a pointer pause must keep down/up in separate event-loop
+      // turns so native protocol consumers observe the declared input timing.
+      const duration = Math.max(0, ...sources.map(source => Number(source.actions?.[tick]?.duration) || 0));
+      for (let index = 0; index < sources.length; index++) {
+        const source = sources[index];
+        const action = source.actions?.[tick];
+        if (!action) continue;
+        if (source.type === "key") {
+          if (action.type === "keyDown" || action.type === "keyUp") emitKey(action.type, action.value);
+          continue;
         }
-        continue;
-      }
-      if (source.type !== "pointer") continue;
-      const state = states[index];
-      const button = action.button || 0;
-      const mask = [1, 4, 2][button] || 0;
-      if (action.type === "pointerMove") {
-        [state.x, state.y] = resolveOrigin(action.origin, Number(action.x) || 0, Number(action.y) || 0);
-        if (state.down && (state.x !== state.down.x || state.y !== state.down.y)) state.dragged = true;
-      } else if (action.type === "pointerDown") {
-        state.buttons |= mask;
-        state.down = { x: state.x, y: state.y };
-        state.dragged = false;
-      } else if (action.type === "pointerUp") {
-        state.buttons &= ~mask;
-      } else {
-        continue;
-      }
-      const target = targetAtPoint(state.x, state.y);
-      const init = {
-        bubbles: true, cancelable: true, clientX: state.x, clientY: state.y,
-        button, buttons: state.buttons, detail: action.type === "pointerMove" ? 0 : state.clicks + 1,
-        pointerId: index + 1, pointerType: "mouse", isPrimary: true,
-        ctrlKey: modifiers.Control, shiftKey: modifiers.Shift, altKey: modifiers.Alt, metaKey: modifiers.Meta,
-      };
-      if (action.type === "pointerMove") {
-        target.dispatchEvent(new PointerEvent("pointermove", init));
-        target.dispatchEvent(new MouseEvent("mouseover", init));
-        if (!state.suppressMouse) target.dispatchEvent(new MouseEvent("mousemove", init));
-      } else if (action.type === "pointerDown") {
-        const event = new PointerEvent("pointerdown", init);
-        target.dispatchEvent(event);
-        state.suppressMouse = event.defaultPrevented;
-        if (!state.suppressMouse) {
-          const mouse = new MouseEvent("mousedown", init);
-          target.dispatchEvent(mouse);
-          // Synthetic mousedown has no browser default focus action. Preserve
-          // cancellation by editors, then focus the actual control (including
-          // buttons reached through an SVG) before click/blur handlers run.
-          if (!mouse.defaultPrevented) {
-            const control = target.closest("button,input,select,textarea,a[href],[tabindex],[contenteditable='true']");
-            if (control && !control.matches(":disabled") && !control.closest("[inert]")) {
-              control.focus({ preventScroll: true });
+        if (source.type === "wheel") {
+          if (action.type === "scroll") {
+            const [wx, wy] = resolveOrigin(action.origin || "viewport", Number(action.x) || 0, Number(action.y) || 0);
+            const target = targetAtPoint(wx, wy);
+            target.dispatchEvent(new WheelEvent("wheel", {
+              bubbles: true, cancelable: true, composed: true,
+              clientX: wx, clientY: wy,
+              deltaX: Number(action.deltaX) || 0, deltaY: Number(action.deltaY) || 0,
+              deltaZ: Number(action.deltaZ) || 0, deltaMode: Number(action.deltaMode) || 0,
+              ctrlKey: modifiers.Control, shiftKey: modifiers.Shift, altKey: modifiers.Alt, metaKey: modifiers.Meta,
+            }));
+          }
+          continue;
+        }
+        if (source.type !== "pointer") continue;
+        const state = states[index];
+        const button = action.button || 0;
+        const mask = [1, 4, 2][button] || 0;
+        if (action.type === "pointerMove") {
+          [state.x, state.y] = resolveOrigin(action.origin, Number(action.x) || 0, Number(action.y) || 0);
+          if (state.down && (state.x !== state.down.x || state.y !== state.down.y)) state.dragged = true;
+        } else if (action.type === "pointerDown") {
+          state.buttons |= mask;
+          state.down = { x: state.x, y: state.y };
+          state.dragged = false;
+        } else if (action.type === "pointerUp") {
+          state.buttons &= ~mask;
+        } else {
+          continue;
+        }
+        const captured = capture.targets.get(index + 1);
+        const target = captured?.isConnected ? captured : targetAtPoint(state.x, state.y);
+        if (action.type === "pointerDown") state.down.target = target;
+        const init = {
+          bubbles: true, cancelable: true, clientX: state.x, clientY: state.y,
+          button, buttons: state.buttons, detail: action.type === "pointerMove" ? 0 : state.clicks + 1,
+          pointerId: index + 1, pointerType: "mouse", isPrimary: true,
+          ctrlKey: modifiers.Control, shiftKey: modifiers.Shift, altKey: modifiers.Alt, metaKey: modifiers.Meta,
+        };
+        if (action.type === "pointerMove") {
+          target.dispatchEvent(new PointerEvent("pointermove", init));
+          target.dispatchEvent(new MouseEvent("mouseover", init));
+          if (!state.suppressMouse) target.dispatchEvent(new MouseEvent("mousemove", init));
+        } else if (action.type === "pointerDown") {
+          const event = new PointerEvent("pointerdown", init);
+          target.dispatchEvent(event);
+          state.suppressMouse = event.defaultPrevented;
+          if (!state.suppressMouse) {
+            const mouse = new MouseEvent("mousedown", init);
+            target.dispatchEvent(mouse);
+            // Synthetic mousedown has no browser default focus action. Preserve
+            // cancellation by editors, then focus the actual control (including
+            // buttons reached through an SVG) before click/blur handlers run.
+            if (!mouse.defaultPrevented) {
+              const control = target.closest("button,input,select,textarea,a[href],[tabindex],[contenteditable='true']");
+              if (control && !control.matches(":disabled") && !control.closest("[inert]")) {
+                control.focus({ preventScroll: true });
+              }
             }
           }
+        } else {
+          target.dispatchEvent(new PointerEvent("pointerup", init));
+          if (!state.suppressMouse) target.dispatchEvent(new MouseEvent("mouseup", init));
+          if (button === 2) {
+            target.dispatchEvent(new MouseEvent("contextmenu", init));
+          } else if (button === 1 && state.down && !state.dragged) {
+            target.dispatchEvent(new MouseEvent("auxclick", init));
+          } else if (state.down && !state.dragged) {
+            const clickTarget = qaClickTarget(state.down.target, target);
+            if (clickTarget) {
+              clickTarget.dispatchEvent(new MouseEvent("click", init));
+              state.clicks++;
+              if (state.clicks === 2) clickTarget.dispatchEvent(new MouseEvent("dblclick", init));
+            }
+          }
+          state.down = null;
+          state.suppressMouse = false;
+          capture.targets.delete(index + 1);
         }
-      } else {
-        target.dispatchEvent(new PointerEvent("pointerup", init));
-        if (!state.suppressMouse) target.dispatchEvent(new MouseEvent("mouseup", init));
-        if (button === 2) {
-          target.dispatchEvent(new MouseEvent("contextmenu", init));
-        } else if (button === 1 && state.down && !state.dragged) {
-          target.dispatchEvent(new MouseEvent("auxclick", init));
-        } else if (state.down && !state.dragged) {
-          target.dispatchEvent(new MouseEvent("click", init));
-          state.clicks++;
-          if (state.clicks === 2) target.dispatchEvent(new MouseEvent("dblclick", init));
-        }
-        state.down = null;
-        state.suppressMouse = false;
       }
+      if (duration > 0) await new Promise(resolve => setTimeout(resolve, duration));
     }
-    if (duration > 0) await new Promise(resolve => setTimeout(resolve, duration));
-  }
+  } finally { capture.restore(); }
 }

@@ -58,7 +58,17 @@ pub async fn db_execute(
     session_id: String,
     sql: String,
 ) -> Result<QueryResult, String> {
-    let session = get_session(&state, &session_id).await?;
+    db_execute_inner(state.inner(), &session_id, &sql).await
+}
+
+/// Shared execution path for confirmed Tao actions. Keeps transaction and
+/// cancellation bookkeeping identical to the native database command.
+pub(crate) async fn db_execute_inner(
+    state: &AppState,
+    session_id: &str,
+    sql: &str,
+) -> Result<QueryResult, String> {
+    let session = super::session::get_session_inner(state, session_id).await?;
     session.tx_before_statement(&sql).await?;
     let token = session.fresh_cancel_token().await;
     let result = match &session.handle {

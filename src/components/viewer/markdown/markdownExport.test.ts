@@ -22,9 +22,17 @@ describe("self-contained sanitized Markdown output", () => {
     expect(result.html).toContain("img-src data:");
     expect(result.html).not.toContain("<script");
     expect(result.html).not.toContain('src="assets/');
-    expect(result.html).toContain('aria-label="Table of contents"');
+    expect(result.html).not.toContain('aria-label="Table of contents"');
     expect(readMarkdownImage).toHaveBeenCalledWith("/docs/a.md", "assets/a.png");
     expect(source).toContain("<script>alert(1)</script>");
+  });
+  it("generates a linked TOC only when explicitly enabled without deleting author content", async () => {
+    const content = "# Title\n\nAuthor contents: [Details](#details)\n\n## Details\n";
+    const result = await prepareMarkdownExport(content, "/docs/a.md", { ...DEFAULT_EXPORT_SETTINGS, toc: true });
+    expect(result.root.querySelector("nav")?.getAttribute("aria-label")).toBe("Table of contents");
+    expect(result.root.querySelector("nav a")?.getAttribute("href")).toBe("#heading-1");
+    expect(result.root.textContent).toContain("Author contents");
+    expect(content).toContain("[Details](#details)");
   });
   it("fails rather than publishing an HTML file with missing images", async () => {
     vi.mocked(readMarkdownImage).mockRejectedValue(new Error("permission denied"));

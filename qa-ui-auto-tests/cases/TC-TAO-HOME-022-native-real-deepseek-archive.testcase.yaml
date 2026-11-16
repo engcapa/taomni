@@ -1,0 +1,62 @@
+id: TC-TAO-HOME-022
+title: Real DeepSeek reply exports Markdown and ZIP and survives native import and panel lifecycle
+description: One actual commercial reply supplies native Markdown and ZIP exports, real ZIP import and native workflow
+  creation/reopen, memory/skills and speech Stop panel checks.
+modes:
+- native
+covers:
+- F1.11
+tags:
+- p1
+- tao-home
+- native
+- real-provider
+- regression
+fixtures:
+- reset_db
+- tao_real_provider
+timeout_sec: 600
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-tao-home-022-real-archive
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- wait_for: '[data-testid="tao-home-composer-input"]:enabled'
+- observe_tao_provider: null
+- tao_real_provider_expanded:
+    scenario: archive
+- assert_no_runtime_errors: null
+- screenshot: tao-home-real-archive-final.png
+verification:
+  review: reviewed
+  requirements:
+  - id: REAL-ARCHIVE
+    requirement: Real DeepSeek reply exports Markdown and ZIP and survives native import and panel lifecycle
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    checkpoints:
+    - step: 7
+      expectation: Markdown bytes equal the copied real reply; ZIP v3 contains one paired conversation, import retains
+        its marker, workflow run persists on panel reopen, memory/skills and speech Stop remain usable without extra
+        paid requests. Only explicit 401/403 or expired credentials may finish early; remaining stages are unverified.
+    - step: 8
+      expectation: No unhandled runtime errors.
+    results:
+    - 7
+    - 8
+  native:
+  - check: Actual native IPC, provider and relevant disk boundaries
+    method: automated
+    reason: One actual commercial reply supplies native Markdown and ZIP exports, real ZIP import and native workflow
+      creation/reopen, memory/skills and speech Stop panel checks. Browser stubs cannot establish these results.
+  visual:
+  - check: Real native transcript and companion panels
+    method: manual
+    reason: Screenshots retain relevant UI; semantic assertions do not certify full prototype alignment.
+native_platforms:
+- Windows

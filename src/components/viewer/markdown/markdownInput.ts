@@ -13,6 +13,7 @@ interface InputOptions {
   onStatus: (message: string) => void;
   onError: (message: string) => void;
   label: (zh: string, en: string) => string;
+  saveImage?: (file: Blob) => Promise<{ markdown: string }>;
 }
 interface Pending { from: number; to: number; cancelled: boolean }
 interface Owner { pending: Set<Pending>; alive: boolean; options: InputOptions }
@@ -29,7 +30,7 @@ export async function insertMarkdownImages(view: EditorView, files: Blob[], rang
     const links: string[] = [];
     for (const file of files) {
       if (!owner.alive || pending.cancelled) return;
-      const result = await saveMarkdownImage(options.docPath, file, options.preferences());
+      const result = options.saveImage ? await options.saveImage(file) : await saveMarkdownImage(options.docPath, file, options.preferences());
       links.push(result.markdown);
     }
     if (!owner.alive || pending.cancelled || view.state.readOnly) return;

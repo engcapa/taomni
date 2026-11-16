@@ -4,7 +4,10 @@ import { Transaction } from "@codemirror/state";
 export interface MarkdownWidgetContext {
   docPath: string;
   readOnly: boolean;
+  theme?: "light" | "dark";
+  readImage?: (reference: string) => Promise<string>;
   label: (zh: string, en: string) => string;
+  onChange?: (content: string) => void;
   onError: (message: string) => void;
   replaceImage: (from: number, to: number) => void;
   revealImage: (reference: string) => void;
