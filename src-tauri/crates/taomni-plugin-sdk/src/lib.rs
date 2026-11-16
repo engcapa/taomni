@@ -7,10 +7,14 @@ mod operation;
 mod profile;
 mod runtime;
 mod sensitive;
+mod snapshot;
+mod snapshot_export;
 
 pub use operation::{Operation, OperationKey};
 pub use profile::{HostStorage, confirm_profile_handshake};
 pub use runtime::{HostConfig, PluginHandler, serve, serve_stdio, serve_stdio_with};
+pub use snapshot::SnapshotProvider;
+pub use snapshot_export::SnapshotExport;
 
 #[cfg(test)]
 mod tests;

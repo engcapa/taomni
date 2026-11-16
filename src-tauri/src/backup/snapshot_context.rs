@@ -21,6 +21,7 @@ pub struct SnapshotContext {
     pub cancel: CancellationToken,
     transfer: Option<TransferContext>,
     progress: Arc<Mutex<Progress>>,
+    deadline: Option<Instant>,
 }
 
 impl Default for SnapshotContext {
@@ -60,7 +61,8 @@ impl SnapshotContext {
 
     fn snapshot_control(&self) -> taomni_sqlite_snapshot::SnapshotControl {
         taomni_sqlite_snapshot::SnapshotControl::new(
-            Instant::now() + Duration::from_secs(300),
+            self.deadline
+                .unwrap_or_else(|| Instant::now() + Duration::from_secs(300)),
             Arc::new(self.clone()),
         )
     }
@@ -100,15 +102,27 @@ impl SnapshotContext {
                 total: None,
                 last_report: Instant::now(),
             })),
+            deadline: None,
         }
     }
 
     pub fn check(&self) -> Result<(), String> {
         if self.cancel.is_cancelled() {
             Err("BACKUP_CANCELLED".into())
+        } else if self
+            .deadline
+            .is_some_and(|deadline| Instant::now() >= deadline)
+        {
+            Err("BACKUP_SNAPSHOT_TIMEOUT".into())
         } else {
             Ok(())
         }
+    }
+
+    pub(crate) fn with_deadline(&self, deadline: Instant) -> Self {
+        let mut context = self.clone();
+        context.deadline = Some(self.deadline.map_or(deadline, |old| old.min(deadline)));
+        context
     }
 
     pub fn begin(&self, phase: &'static str, total: Option<u64>) -> Result<(), String> {
@@ -182,8 +196,14 @@ impl SnapshotContext {
     ) -> Result<T, String> {
         self.check()?;
         let cancel = self.cancel.clone();
-        db.progress_handler(1_000, Some(move || cancel.is_cancelled()))
-            .map_err(|e| e.to_string())?;
+        let deadline = self.deadline;
+        db.progress_handler(
+            1_000,
+            Some(move || {
+                cancel.is_cancelled() || deadline.is_some_and(|deadline| Instant::now() >= deadline)
+            }),
+        )
+        .map_err(|e| e.to_string())?;
         let _cleanup = scopeguard::guard((), |_| {
             let _ = db.progress_handler(0, None::<fn() -> bool>);
         });

@@ -58,11 +58,15 @@ impl Fixture {
             "0.1.0",
             &host,
             host.parent().unwrap(),
-            &[
-                "hello/ping".into(),
-                "hello/crash".into(),
-                "plugin/enable".into(),
-            ],
+            &serde_json::from_str::<serde_json::Value>(include_str!(
+                "../../../plugins/hello-plugin/module.json"
+            ))
+            .unwrap()["commands"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .map(|command| command.as_str().unwrap().to_owned())
+                .collect::<Vec<_>>(),
             &[],
             support::config(),
             None,

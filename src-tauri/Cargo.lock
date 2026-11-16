@@ -10909,6 +10909,7 @@ version = "0.1.0"
 name = "taomni-hello-plugin"
 version = "0.1.0"
 dependencies = [
+ "rusqlite",
  "serde_json",
  "taomni-plugin-api",
  "taomni-plugin-sdk",
@@ -10920,6 +10921,7 @@ version = "0.1.0"
 dependencies = [
  "libc",
  "rand 0.9.5",
+ "rusqlite",
  "serde",
  "serde_json",
  "sha2 0.10.9",
@@ -10947,10 +10949,14 @@ name = "taomni-plugin-sdk"
 version = "0.1.0"
 dependencies = [
  "libc",
+ "rand 0.9.5",
+ "rusqlite",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "taomni-plugin-api",
  "taomni-profile-locks",
+ "taomni-sqlite-snapshot",
  "tempfile",
  "zeroize",
 ]

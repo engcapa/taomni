@@ -25,6 +25,10 @@ pub struct Operation {
 struct KeySlot(Mutex<Option<SecretKey32>>);
 
 impl Operation {
+    pub(crate) fn deadline(&self) -> Instant {
+        self.deadline
+    }
+
     pub(crate) fn new(
         context: Option<OperationContext>,
         deadline: Instant,

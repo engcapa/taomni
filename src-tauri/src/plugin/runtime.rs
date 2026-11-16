@@ -9,8 +9,8 @@ pub(super) struct RuntimeHost {
     pub(super) process: Mutex<host::HostProcess>,
     pub(super) identity: RwLock<Option<taomni_plugin_services::AuthorizedHost>>,
     pub(super) cancellation: host::HostCancellation,
-    manifest: ModuleManifest,
-    directory: PathBuf,
+    pub(super) manifest: ModuleManifest,
+    pub(super) directory: PathBuf,
 }
 
 #[cfg(test)]

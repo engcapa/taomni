@@ -109,7 +109,7 @@ jobs:
           os.environ["TAOMNI_HELLO_PLUGIN_BIN"] = str(pathlib.Path(f"src-tauri/target/debug/taomni-hello-plugin{suffix}").resolve())
           subprocess.run([
               "cargo", "test", "--manifest-path", "src-tauri/Cargo.toml",
-              "-p", "taomni-host-gates", "--test", "lifecycle", "--test", "activation", "--test", "cleanup", "--test", "services", "--test", "profile",
+              "-p", "taomni-host-gates", "--test", "lifecycle", "--test", "activation", "--test", "cleanup", "--test", "services", "--test", "profile", "--test", "snapshot",
               "--locked", "--", "--ignored", "--test-threads=1", "--nocapture",
           ], check=True)
           PY
@@ -117,7 +117,7 @@ jobs:
         run: |
           python - <<'PY' > modular-evidence/service-selection.txt
           import subprocess
-          for target, expected in {"services": 8, "lifecycle": 7, "activation": 3, "cleanup": 2, "profile": 5}.items():
+          for target, expected in {"services": 8, "lifecycle": 7, "activation": 3, "cleanup": 2, "profile": 5, "snapshot": 4}.items():
               listing = subprocess.check_output([
                   "cargo", "test", "--manifest-path", "src-tauri/Cargo.toml", "-p", "taomni-host-gates",
                   "--test", target, "--locked", "--", "--ignored", "--list",

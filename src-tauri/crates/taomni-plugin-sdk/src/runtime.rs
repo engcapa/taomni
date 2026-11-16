@@ -37,9 +37,13 @@ pub struct HostConfig {
     pub permissions: BTreeSet<String>,
     pub required_services: ServiceCapabilities,
     pub operation_timeout: Duration,
+    pub snapshot_timeout: Duration,
 }
 
 pub trait PluginHandler: Send + Sync + 'static {
+    fn snapshot_provider(&self) -> Option<Arc<dyn crate::SnapshotProvider>> {
+        None
+    }
     fn invoke(
         &self,
         operation: &Operation,
@@ -237,12 +241,24 @@ pub(crate) fn serve_owned(
                     }
                     let operation = Arc::new(Operation::new(
                         request.context.clone(),
-                        std::time::Instant::now() + config.operation_timeout,
+                        std::time::Instant::now()
+                            + if crate::snapshot::is_snapshot(&request.method) {
+                                config.snapshot_timeout.min(Duration::from_secs(300))
+                            } else {
+                                config.operation_timeout
+                            },
                         client.clone(),
                     ));
                     running.insert(request.id.clone(), operation.clone());
                     let id = request.id.clone();
-                    if jobs.try_send(worker::Job { request, operation }).is_err() {
+                    if jobs
+                        .try_send(worker::Job {
+                            request,
+                            operation,
+                            host: host_instance.clone(),
+                        })
+                        .is_err()
+                    {
                         running.remove(&id);
                         send_error(&client, id, ErrorCode::InvalidState)?;
                     }
@@ -321,6 +337,10 @@ fn validate_command(
     }
     if revoking {
         return Some(RpcError::from_code(ErrorCode::InvalidState));
+    }
+    if crate::snapshot::is_snapshot(&request.method) {
+        return (profile.is_none() || host.is_none() || request.context.is_some())
+            .then(|| RpcError::from_code(ErrorCode::PermissionDenied));
     }
     if !config.required_services.is_empty() {
         let valid = request.context.as_ref().is_some_and(|context| Some(&context.host_instance) == host

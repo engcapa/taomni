@@ -21,6 +21,8 @@ pub(crate) mod data_contract;
 pub(crate) mod retained_data;
 mod signed_catalog;
 mod snapshot_barrier;
+mod snapshots;
+pub(crate) use snapshots::HostSnapshot;
 mod stopping;
 #[cfg(test)]
 pub(crate) mod test_services;

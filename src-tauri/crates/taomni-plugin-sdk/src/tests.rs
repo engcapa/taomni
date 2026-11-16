@@ -168,6 +168,7 @@ fn handshake_refuses_missing_service_identity_or_wrong_token_and_preserves_v1() 
         permissions: BTreeSet::from([FIXED_KEY_SERVICE.into()]),
         required_services: required.clone(),
         operation_timeout: Duration::from_secs(5),
+        snapshot_timeout: Duration::from_secs(30),
     };
     let mut hello = HandshakeRequest::new(
         &config.plugin_id,

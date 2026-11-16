@@ -50,6 +50,7 @@ fn process(backoff: Duration) -> HostProcess {
         service_config: None,
         services: None,
         active_operation: None,
+        instance: None,
     }
 }
 

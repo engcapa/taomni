@@ -161,6 +161,21 @@ impl PluginRegistry {
     }
 
     fn call_record(&self, slug: &str, command: &str) -> Result<PluginRecord, PluginError> {
+        use taomni_plugin_api::services::{
+            SNAPSHOT_METHOD, SNAPSHOT_PREPARE_METHOD, SNAPSHOT_RELEASE_METHOD, VAULT_REVOKE_METHOD,
+        };
+        if matches!(
+            command,
+            SNAPSHOT_PREPARE_METHOD
+                | SNAPSHOT_METHOD
+                | SNAPSHOT_RELEASE_METHOD
+                | VAULT_REVOKE_METHOD
+        ) {
+            return Err(PluginError::CommandDenied {
+                slug: slug.into(),
+                command: command.into(),
+            });
+        }
         let record = self
             .get(slug)
             .ok_or_else(|| PluginError::NotFound(slug.into()))?;
@@ -264,5 +279,22 @@ mod tests {
             Err(PluginError::Rpc { code: -32600, .. })
         ));
         assert!(registry.begin_call("other", "renderer-1").is_ok());
+    }
+
+    #[test]
+    fn renderer_cannot_choose_a_snapshot_destination_or_lifecycle_context() {
+        let registry = PluginRegistry::new("unused");
+        for method in [
+            "backup/prepare",
+            "backup/snapshot",
+            "backup/release",
+            "vault/revoke",
+        ] {
+            assert!(matches!(
+                registry.invoke("mfa", method, Value::Null),
+                Err(PluginError::CommandDenied { .. })
+            ));
+        }
+        assert!(registry.pending_requests.lock().unwrap().is_empty());
     }
 }

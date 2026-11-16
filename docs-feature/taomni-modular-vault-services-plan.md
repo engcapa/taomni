@@ -14,6 +14,8 @@
 
 当前新增宿主所有权接线：production registry 已改用 profiled spawn，hello/SDK 自取 shared ProfileUseLease 和 owner 独占 PluginDataLease，并在创建 store 前取得锁；握手确认当前 generation，reader EOF 后 worker/store 尚存时不能提前释放。新五个真实 process gate 与增强 TC-MODULES-007 的 OS writer-lock 观察已准备，待匹配源码 GitHub 证据。运行中 snapshot、三态实际还原和 MFA 迁出仍未完成；下文初始事实表为历史调查，实时状态见实施台账。
 
+运行中快照实施增量：宿主所有权接线和修正后的 profiled Vault/SDK harness 已在源码 `6d8e2ab29` 的契约 #43836198487 取得 23/23 jobs 成功。当前增量把 freeze/export/resume 的所有权放在 SDK 串行 actor，prepare 返回一次性 barrier 并绑定 job、generation、宿主实例和核心指定的空 staging；业务 writer gate 保持到 release，超时/取消/失败/EOF 回收，禁止在 snapshot 请求内取得 Vault key。宿主只以自有 SQLite connection 做 online snapshot；核心复核 inventory、hash、大小和 quick_check，从验证过的同一普通文件句柄复制到私有 staging，完成同批 Vault 后再 release，不允许 live 失败降级为 offline。hello 正常启动仅恢复已存在的自有库，未使用的 profile 不创建库。四项三端真实进程 gate 与 TC-MODULES-012 覆盖两次真实写入、两个备份 job、正常重启及 writer OS 锁；协议尚待匹配源码 hosted 验证，三态 applied restore、真实 MFA 解密与 GUI/headless 协同仍是后续验收。
+
 ## 1. 当前事实与缺口
 
 | 位置 | 已有实现 | 待实现/风险 |

@@ -25,6 +25,8 @@ mod profile;
 mod pump;
 #[path = "service_requests.rs"]
 mod service_requests;
+#[path = "snapshot.rs"]
+mod snapshot;
 #[path = "transport.rs"]
 mod transport;
 
@@ -107,6 +109,7 @@ pub struct HostProcess {
     service_config: Option<HostServiceConfig>,
     services: Option<ServiceSession>,
     active_operation: Option<OperationPermit>,
+    instance: Option<taomni_plugin_api::services::HostInstanceId>,
 }
 
 impl std::fmt::Debug for HostProcess {
@@ -212,6 +215,7 @@ impl HostProcess {
             service_config: services,
             services: None,
             active_operation: None,
+            instance: None,
         };
         process.spawn_and_activate()?;
         Ok(process)

@@ -54,6 +54,8 @@ impl HostProcess {
             .map(|profile| profile.context().clone());
         if let Some(services) = &self.service_config {
             request.core_services = services.grants.service_capabilities();
+        }
+        if self.service_config.is_some() || self.launch.profile.is_some() {
             request.host_instance = Some(fresh_host_instance());
         }
         let id = self.next_request_id();
@@ -101,6 +103,7 @@ impl HostProcess {
                 "core rejected handshake".into(),
             ));
         }
+        self.instance = request.host_instance.clone();
         if let Some(config) = &self.service_config {
             let host = config.grants.clone().bind_authenticated_transport(
                 request.host_instance.expect("service transport identity"),

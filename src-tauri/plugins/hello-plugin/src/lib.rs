@@ -6,6 +6,8 @@
 //! for unit and cross-platform runner tests.
 
 use std::time::Duration;
+mod profiled;
+pub use profiled::{commands, serve_profiled};
 
 use serde_json::{Value, json};
 use taomni_plugin_api::{

@@ -25,12 +25,17 @@
     "hello/crash",
     "hello/hang",
     "plugin/enable",
-    "plugin/disable"
+    "plugin/disable",
+    "hello/write",
+    "hello/read",
+    "backup/prepare",
+    "backup/snapshot",
+    "backup/release"
   ],
   "permissions": [],
   "dataDir": "plugins/hello-plugin",
-  "backupPaths": [],
+  "backupPaths": ["plugins/hello-plugin/data"],
   "legacyTables": [],
   "vaultFixedKeys": [],
-  "snapshot": "file"
+  "snapshot": "rpc"
 }

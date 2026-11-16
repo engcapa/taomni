@@ -1,0 +1,126 @@
+id: TC-MODULES-012
+title: A signed running module snapshots its real WAL store and resumes writes before a second backup
+description: Install the current-source official signed hello package through Settings. Commit fixed business input through
+  the actual SDK host, whose writer OS lock remains held. Create two distinct manual backups through Settings with a second
+  real host write in between. Independently inspect v2 ZIP inventories, all hashes, standalone SQLite rows, unchanged source
+  main/WAL bytes and profile generation. Normally restart the app and read both persisted values through the real host.
+  This verifies running-host snapshot/release; encrypted MFA migration and applied restore have separate acceptance gates.
+covers:
+- F-Modules-1
+- F-BACKUP-1
+tags:
+- p1
+- modules
+- backup
+- native-boundary
+- persistence
+modes:
+- native
+fixtures:
+- reset_db
+- module_signed_archive
+timeout_sec: 360
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: module store
+- wait_for: '[data-testid="module-offline-install"]'
+- fill:
+    selector: '[data-testid="module-offline-archive"]'
+    value: ${fixture.module_signed_archive}
+- fill:
+    selector: '[data-testid="module-offline-signature"]'
+    value: ${fixture.module_signed_signature}
+- click: '[data-testid="module-offline-submit"]'
+- wait_for: '[data-testid="module-offline-install"][data-phase="completed"]'
+- module_signed_probe:
+    phase: installed
+- click: '[data-testid="module-action-enable-hello-plugin"]'
+- wait_for: '[data-testid="module-action-disable-hello-plugin"]'
+- module_signed_probe:
+    phase: enabled
+- module_live_backup_probe:
+    phase: write-first
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: backup
+- wait_for: '[data-testid="backup-global-includePlugins"]'
+- assert_attribute:
+    selector: '[data-testid="backup-global-includePlugins"]'
+    name: aria-checked
+    equals: 'true'
+- set_check:
+    selector: '[data-testid="backup-local-select"]'
+    checked: true
+- click: '[data-testid="backup-selected-start"]'
+- wait_for:
+    selector: '[data-testid="backup-action-success"]'
+    timeout_sec: 90
+- wait_for: '[data-testid="backup-manual-result"][data-target-id="local"][data-job-id]'
+- module_live_backup_probe:
+    phase: first-archive
+- module_live_backup_probe:
+    phase: write-second
+- click: '[data-testid="backup-selected-start"]'
+- wait_for:
+    selector: '[data-testid="backup-action-success"]'
+    timeout_sec: 90
+- module_live_backup_probe:
+    phase: second-archive
+- assert_no_runtime_errors: null
+- screenshot: module-live-snapshots-completed.png
+- native_restart_app:
+    expect_exit_confirmation:
+      title: Exit
+      message: There is 1 open tab. Exit Taomni and close it?
+      confirm_label: Exit
+- wait_for: '[data-testid="status-bar"]'
+- module_signed_probe:
+    phase: enabled
+- module_live_backup_probe:
+    phase: after-restart
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: An enabled signed host with an actual writer lease produces a standalone consistent snapshot through Settings.
+    actions: [9, 12, 15, 20]
+    checkpoints:
+    - step: 14
+      expectation: The real installed host returns its identity and holds the exclusive writer OS lock.
+    - step: 23
+      expectation: The exact current manual job contains one v2 hello SQLite dataset with the committed first WAL value,
+        correct hashes/generation, no sidecars, unchanged source bytes and continued host ownership.
+    results: [14, 23]
+  - id: R2
+    requirement: Release resumes business writes and a distinct second backup contains both values without reusing an older job.
+    actions: [24, 25]
+    checkpoints:
+    - step: 27
+      expectation: A new manual job and snapshot job contain both original and newly committed host values while the real
+        host keeps its writer lease; source main/WAL bytes are unchanged by backup.
+    results: [27]
+  - id: R3
+    requirement: Normal application restart preserves enabled state, profile generation and both real business records.
+    actions: [30]
+    checkpoints:
+    - step: 32
+      expectation: A normally restarted application starts the installed trusted host and independently observes its writer lock.
+    - step: 33
+      expectation: The host reads both original values from its persisted SQLite store with the same profile generation.
+    - step: 34
+      expectation: Installation, live snapshots, release and normal restart produced no runtime errors.
+    results: [32, 33, 34]
+  native:
+  - check: Actual signed SDK process, writer OS locks, two live SQLite/WAL snapshots and normal restart.
+    method: automated
+    reason: Browser stubs cannot prove actor barriers, native database connections or archive bytes.
+  visual:
+  - check: Live snapshot completion and both distinct manual tasks remain readable in Settings.
+    method: manual
+    reason: Review module-live-snapshots-completed.png with the current browser backup Settings screenshots.

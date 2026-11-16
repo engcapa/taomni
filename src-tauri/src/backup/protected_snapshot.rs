@@ -20,6 +20,9 @@ pub(super) fn stage_with_plugins(
         return Ok(Default::default());
     }
     context.check()?;
+    let deadline = Instant::now() + Duration::from_secs(300);
+    let bounded = context.with_deadline(deadline);
+    let context = &bounded;
     let pair = tempfile::Builder::new()
         .prefix("protected-")
         .tempdir_in(staging)
@@ -41,6 +44,7 @@ pub(super) fn stage_with_plugins(
                 context,
                 &job,
                 &generation,
+                deadline,
             )?;
             // All ordinary operations are already drained. Both snapshots
             // retain the same external exclusive lease, including rekey.
@@ -60,6 +64,7 @@ pub(super) fn stage_with_plugins(
                 });
             }
             context.check()?;
+            plugins.release_hosts()?;
             Ok(plugins)
         },
     );

@@ -109,6 +109,15 @@ fn run() -> io::Result<i32> {
 }
 
 fn main() -> ExitCode {
+    if std::env::var_os(taomni_plugin_api::services::HOST_PROFILE_ENV).is_some() {
+        return match taomni_hello_plugin::serve_profiled() {
+            Ok(()) => ExitCode::SUCCESS,
+            Err(error) => {
+                eprintln!("hello-plugin: {error}");
+                ExitCode::FAILURE
+            }
+        };
+    }
     match run() {
         Ok(code) => ExitCode::from(code as u8),
         Err(error) => {

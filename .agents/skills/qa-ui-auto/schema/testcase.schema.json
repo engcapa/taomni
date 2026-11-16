@@ -903,6 +903,15 @@
             }
           }
         },
+        "module_live_backup_probe": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["phase"],
+          "properties": {
+            "phase": {"enum": ["write-first", "first-archive", "write-second", "second-archive", "after-restart"]}
+          },
+          "description": "Native only: fixed declared real-host business input and independent live v2 ZIP/WAL/source-byte/writer-lock observations. No YAML-selected commands, paths, contents or registry mutations."
+        },
         "module_backup_probe": {
           "type": "object",
           "additionalProperties": false,

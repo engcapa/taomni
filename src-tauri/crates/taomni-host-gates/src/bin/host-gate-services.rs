@@ -64,6 +64,7 @@ fn main() -> std::process::ExitCode {
             1,
         )])),
         operation_timeout: Duration::from_secs(10),
+        snapshot_timeout: Duration::from_secs(30),
     };
     let result = serve_stdio_with(config, |storage| {
         let storage = storage.expect("profile must be owned before handler/store initialization");

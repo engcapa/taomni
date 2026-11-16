@@ -12,6 +12,10 @@
 
 ## 2026-11-16 最新 runner 证据（持续采集中）
 
+- 真实 Vault/SDK harness 的 profiled 启动修复源码 `6d8e2ab293bfe6dc9e944893c73548445e524b7f`，[契约 #43836198487](https://github.com/engcapa/taomni/actions/runs/43836198487) 已 **23/23 jobs 成功**。该结果闭合前述 #43832212768 的相关失败，包含实际 profile/writer OS 锁占用断言；不覆盖当前未提交的运行中宿主快照增量。短 SHA 误触发的 #43834894177 仅 checkout 失败、没有执行测试，不计作产品验证。
+- `44e6f2b80` 的 [UI #43833397073](https://github.com/engcapa/taomni/actions/runs/43833397073) 在执行期间已下载 Linux Xvfb 四个 native shard，**23/23 cases 通过**，含 TC-MODULES-011 的完整 58 步。macOS TC-MODULES-011 step 41 新失败为设置页搜索延迟滚动将卸载按钮再次移到裁剪区域：截图可见 Settings viewport 底部，按钮矩形仍在 WebView 内但不能命中。修复仅在目标几何变化后重新滚动，仍要求稳定 `elementFromPoint` 命中，不重放按钮输入或合成激活；相同竞态单元先失败再通过，pointer 全部 50 项单元通过，真实 macOS 结果待新源码 runner。Wayland FILE-OPEN-006 的既有非左键输入限制和 FILE-OPEN-008 的路径 chip 失败按用户要求单列忽略，不计通过；其它尚未收齐的 shard 不外推结果。
+- 运行中宿主快照增量正在准备提交：SDK 串行 store actor 持有 prepare/snapshot/release 屏障、绑定 job/generation/host/barrier/staging，失败/取消/过期/EOF 恢复 writer gate；核心冻结所有已运行 owner，核对完整 inventory/hash/SQLite，再从同一个验证句柄复制到私有 staging，在 Vault 完成后显式 release。hello 示例恢复已有库的权威连接，未使用时仍不建库。新增四项三端真实进程 gate 与 34 步 TC-MODULES-012，两次真实写入和不同手工 job、正常重启与 writer OS 锁断言均保留；browser 设置行为沿用 TC-BACKUP-SETTINGS-001。上述协议和 native 用例尚未取得匹配源码 hosted 证据，不记 TASK-025-F/G 完成。
+- 本批本地只执行单元与静态检查：根应用备份 **98 passed**、插件 **128 passed / 3 ignored**；SDK **19**、独立宿主适配 **15**、hello **4** 项通过（宿主适配与根插件包含重复范围，不混加总数）。QA 观察工具 22、pointer 50、行为映射 6 项单元通过；根 unit harness 编译成功，新增 ignored process target 仅编译，真实进程不在本地执行。33 个 Rust 文件格式、actionlint、check:refactor、两份 case schema/reviewed contract 与完整 QA audit gate 通过。静态选择为三端 browser 各 50、Linux 两种 profile native 各 52、Windows native 50、macOS native 49，22 shards / 3 个 release QA 构建，gaps=[]；执行结果待提交后 GitHub 收证。
 - 宿主自持锁源码 `1980436f3e0b4dee800d1244fd92588c18498749` 的[契约 #43832212768](https://github.com/engcapa/taomni/actions/runs/43832212768) 已结束：22/23 jobs 成功。Linux 的两项真实 Vault/SDK gate 沿用无 profile 启动，而新版 fixture 要求在创建 store 前已持有 profile/data 锁，导致握手前退出；修复 harness 通过生产 generation 初始化与 `start_profiled`，并增加实际锁占用断言，保留全部旧密钥字节/授权断言，待新源码 hosted 复验。其[UI #43832220984](https://github.com/engcapa/taomni/actions/runs/43832220984) 仍逐 shard 收证，不记整体通过。
 - `TC-MODULES-011` 相对观察路径修复已以 `44e6f2b80` 推送，[UI #43833397073](https://github.com/engcapa/taomni/actions/runs/43833397073) 已开始执行并启动即时采集器，等待 matching native 结果。运行中宿主快照协议正在开发，未提交和验收。
 - 测试修复源码 `852edd943503343689e3d2f42d12d886ef4df008` 的[契约 #43830091552](https://github.com/engcapa/taomni/actions/runs/43830091552) 已 **23/23 jobs 成功**；macOS SQLite 11 项（含链接路径拒绝）、Windows observation cleanup 已 hosted 复验。其[browser/crash #43830100774](https://github.com/engcapa/taomni/actions/runs/43830100774) 持续即时收证，Linux/macOS 分片的修复用例已通过，整轮尚未完成。
@@ -151,9 +155,9 @@ Wayland `TC-FILE-OPEN-008` 在已有 AI 路径 chip 点击处失败：失败截�
 
 已完成 retained locator 与离线 v2 备份/还原实现，提交 `fdd05d232` / `fad6a56ab`。前者 hosted 结果已齐，后者的相关失败及修复进度见上方；执行中按 shard 收证，无关失败保留原始记录并不计通过。
 
-当前在开发真实宿主自持 shared ProfileUseLease / exclusive PluginDataLease，核心经独立进程环境提供 profile，握手必须确认精确 owner/generation。SDK/API 27 项单元通过，包含 reader EOF 后 worker/store 未退出时不能提前释放锁；核心接线已编译、五个三端真实进程场景已补，匹配源码 process/UI 仍待 GitHub 执行，不将单元结果当作宿主生产验收。运行中 prepare/snapshot/release 尚未实现。
+真实宿主自持 shared ProfileUseLease / exclusive PluginDataLease 已提交，核心经独立进程环境提供 profile，握手必须确认精确 owner/generation。源码 `6d8e2ab29` 的契约 #43836198487 23/23 jobs 成功；匹配源码的原生用例继续按 shard 收证。当前在补运行中 prepare/snapshot/release，代码、四项真实进程 gate 与 TC-MODULES-012 已准备，待最终单元/编译检查、提交及多端 GitHub 执行，不把尚未执行的协议当作通过。
 
-1. **收敛当前相关失败并取得新源码证据**：云端模块/Vault 依赖用例、macOS SQLite fixture 路径和 Windows SQLite 连接清理已修复且契约 #43830091552 23/23 jobs 成功；继续验证 TC-MODULES-011 的相对观察路径修复，以及真实 Vault/SDK gate 的 profiled 启动修复。逐 shard 收取真实 ZIP/SQLite/WAL 和宿主所有权结果；已完成的旧源码结果不能替代本批证据。
+1. **收敛当前相关失败并取得新源码证据**：云端模块/Vault 依赖用例、macOS SQLite fixture 路径、Windows SQLite 连接清理与真实 Vault/SDK gate 的 profiled 启动修复已有契约证据。TC-MODULES-011 相对观察路径修复在 Linux Xvfb 58 步通过；当前修复 macOS 卸载按钮的延迟搜索滚动竞态，并提交运行中快照/TC-MODULES-012。逐 shard 收取新源码真实 ZIP/SQLite/WAL 和宿主所有权结果；已完成的旧源码结果不能替代本批证据。
 2. **闭合 Vault、profile 与一致快照（TASK-024/025）**：完成真实宿主持锁与三端进程 gate，再接运行中宿主 prepare/snapshot/release、GUI/headless 同 profile 协同。离线路径已有 v2 档案和兼容 journal，但仍需运行、禁用、卸载保留数据三态的正常重启 apply 与真实解密，覆盖多实例占用、取消和崩溃恢复；MFA 迁出时统一处理 v1 legacy alias。
 3. **迁出真实业务（TASK-005-B、013/014、016–022）**：先完成真实 MFA 原型与相关 G 门，再依赖序推进 RDP/VNC 客户端与服务端、Servers、SocksCap、OCR/录制、本地语音的宿主、前端、状态与迁移。Mobile 按 DEC-2 留下明确 go/no-go 结论和公开例外，不能默认为交付；LanChat 任务已取消，不新增替代插件。
 4. **裁剪核心依赖闭包（TASK-006）**：随业务迁出，从核心 Cargo 默认 features、原生依赖、bundle/resources/helper 和前端 chunk 中实际移除相应实现。保存 cargo tree、资源与产物证据；把状态改名或放入 LegacyFeatureRuntime 不等于瘦身完成。

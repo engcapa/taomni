@@ -6,13 +6,26 @@ use super::{
     contracts::PluginDataSet,
 };
 use crate::plugin::PluginRegistry;
-use std::path::Path;
+use std::{path::Path, time::Instant};
 use taomni_plugin_api::services::{ProfileGeneration, SnapshotJobId};
 
 #[derive(Debug, Default)]
 pub(crate) struct PluginSnapshots {
     pub(crate) files: Vec<StagedFile>,
     pub(crate) datasets: Vec<PluginDataSet>,
+    active: Vec<super::live::LiveSnapshot>,
+}
+
+impl PluginSnapshots {
+    pub(crate) fn release_hosts(&mut self) -> Result<(), String> {
+        let mut failure = None;
+        for host in self.active.drain(..) {
+            if let Err(error) = host.release() {
+                failure.get_or_insert(error);
+            }
+        }
+        failure.map_or(Ok(()), Err)
+    }
 }
 
 /// The caller holds registry lifecycle and the global Vault snapshot barrier.
@@ -25,6 +38,7 @@ pub(crate) fn stage(
     context: &SnapshotContext,
     job: &SnapshotJobId,
     generation: &ProfileGeneration,
+    deadline: Instant,
 ) -> Result<PluginSnapshots, String> {
     let profile = registry.data_profile().map_err(|e| e.to_string())?;
     let mut result = PluginSnapshots::default();
@@ -33,16 +47,26 @@ pub(crate) fn stage(
             continue;
         }
         context.check()?;
-        if registry.owns_snapshot_host(&slug)? {
-            return Err(format!(
-                "Plugin {slug} is running; its authenticated prepare/snapshot/release protocol is required"
-            ));
-        }
         let schema = registry
             .get(&slug)
             .filter(|record| record.reason.is_none())
             .map(|record| record.manifest.data_schema_version);
-        let snapshot = super::offline::stage(&profile, &slug, schema, staging, context)?;
+        let snapshot = if registry.owns_snapshot_host(&slug)? {
+            let (snapshot, host) = super::live::stage(
+                registry,
+                &slug,
+                schema.ok_or("Running plugin has no trusted data schema")?,
+                staging,
+                context,
+                job,
+                generation,
+                deadline,
+            )?;
+            result.active.push(host);
+            snapshot
+        } else {
+            super::offline::stage(&profile, &slug, schema, staging, context)?
+        };
         if snapshot.inventory.is_empty() {
             continue;
         }

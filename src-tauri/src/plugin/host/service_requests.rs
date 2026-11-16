@@ -75,6 +75,7 @@ impl HostProcess {
     }
 
     pub(super) fn discard_services(&mut self) {
+        self.instance.take();
         if let Some(permit) = self.active_operation.as_ref() {
             permit.cancel();
         }
