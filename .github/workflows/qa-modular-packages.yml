@@ -4,13 +4,19 @@ on:
   workflow_dispatch:
     inputs:
       head:
-        description: Repository commit/ref whose hello-plugin is built (no release is published)
+        description: Repository commit/ref to package (QA artifacts only)
         type: string
         default: ''
+      module:
+        description: Official QA module
+        type: choice
+        options: [hello-plugin, mfa]
+        default: hello-plugin
   workflow_call:
     inputs:
       head: {type: string, default: ''}
       artifact_key: {type: string, default: ''}
+      module: {type: string, default: hello-plugin}
     secrets:
       TAURI_SIGNING_PRIVATE_KEY: {required: true}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: {required: false}
@@ -22,11 +28,15 @@ defaults:
   run:
     shell: bash
 
+env:
+  QA_MODULE: ${{ inputs.module || 'hello-plugin' }}
+
 jobs:
   source:
     runs-on: ubuntu-24.04
     outputs:
       sha: ${{ steps.source.outputs.sha }}
+      host_package: ${{ steps.source.outputs.host_package }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -36,6 +46,11 @@ jobs:
       - id: source
         name: Require a commit reachable from a repository-owned branch
         run: |
+          case "$QA_MODULE" in
+            hello-plugin) echo 'host_package=taomni-hello-plugin' >> "$GITHUB_OUTPUT" ;;
+            mfa) echo 'host_package=taomni-plugin-mfa' >> "$GITHUB_OUTPUT" ;;
+            *) echo 'Unknown official QA module.' >&2; exit 1 ;;
+          esac
           test -n "$(git for-each-ref --format='%(refname)' --contains HEAD refs/remotes/origin/)" || {
             echo 'Refusing to sign a head outside repository-owned branches.' >&2
             exit 1
@@ -43,7 +58,7 @@ jobs:
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
   build:
-    name: Build unsigned hello (${{ matrix.platform }})
+    name: Build unsigned ${{ inputs.module || 'hello-plugin' }} (${{ matrix.platform }})
     needs: source
     strategy:
       fail-fast: false
@@ -66,12 +81,14 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
-          shared-key: modular-official-hello-${{ matrix.target }}
+          shared-key: modular-official-${{ inputs.module || 'hello-plugin' }}-${{ matrix.target }}
       # Candidate code, Cargo build scripts and host binaries never share a
       # runner/job with signing secrets. Nothing from this job is executed by
       # the signing job; it receives only an inert payload directory.
       - name: Build candidate without signing credentials
-        run: cargo build --manifest-path src-tauri/Cargo.toml -p taomni-hello-plugin --bin taomni-hello-plugin --release --target '${{ matrix.target }}' --locked
+        env:
+          MODULE_PACKAGE: ${{ needs.source.outputs.host_package }}
+        run: cargo build --manifest-path src-tauri/Cargo.toml -p "$MODULE_PACKAGE" --bin "$MODULE_PACKAGE" --release --target '${{ matrix.target }}' --locked
       - name: Stage the platform payload
         env:
           MODULE_TARGET: ${{ matrix.target }}
@@ -80,16 +97,17 @@ jobs:
         run: |
           python - <<'PY'
           import json, os, pathlib, shutil
-          source = pathlib.Path('src-tauri/plugins/hello-plugin')
+          source = pathlib.Path('src-tauri/plugins') / os.environ['QA_MODULE']
           output = pathlib.Path('unsigned-module')
           output.mkdir()
           manifest = json.loads((source / 'module.json').read_text(encoding='utf-8'))
-          host = 'taomni-hello-plugin' + ('.exe' if os.environ['MODULE_PLATFORM'].startswith('windows') else '')
+          host = manifest['entry']['host'] + ('.exe' if os.environ['MODULE_PLATFORM'].startswith('windows') else '')
           manifest['entry']['host'] = host
           (output / 'module.json').write_text(json.dumps(manifest, indent=2), encoding='utf-8')
           shutil.copyfile(pathlib.Path('src-tauri/target') / os.environ['MODULE_TARGET'] / 'release' / host, output / host)
-          shutil.copytree(source / 'frontend', output / 'frontend')
-          pathlib.Path('candidate-source.json').write_text(json.dumps({'sourceSha': os.environ['MODULE_SOURCE_SHA'], 'platform': os.environ['MODULE_PLATFORM']}), encoding='utf-8')
+          if manifest['entry'].get('frontend'):
+              shutil.copytree(source / 'frontend', output / 'frontend')
+          pathlib.Path('candidate-source.json').write_text(json.dumps({'sourceSha': os.environ['MODULE_SOURCE_SHA'], 'platform': os.environ['MODULE_PLATFORM'], 'module': os.environ['QA_MODULE']}), encoding='utf-8')
           PY
       - uses: actions/upload-artifact@v4
         with:
@@ -101,7 +119,7 @@ jobs:
           retention-days: 7
 
   sign:
-    name: Sign official hello (${{ matrix.platform }})
+    name: Sign official ${{ inputs.module || 'hello-plugin' }} (${{ matrix.platform }})
     needs: [source, build]
     # Fork pull requests cannot request a production signature. A manual or
     # reusable invocation runs the workflow revision trusted by its operator.
@@ -130,7 +148,7 @@ jobs:
         with:
           name: unsigned-module-${{ matrix.platform }}-${{ inputs.artifact_key || github.run_id }}
           path: candidate
-      - name: Restrict QA signing to the official hello manifest and selected source
+      - name: Restrict QA signing to the official manifest and selected source
         env:
           MODULE_PLATFORM: ${{ matrix.platform }}
           MODULE_SOURCE_SHA: ${{ needs.source.outputs.sha }}
@@ -138,20 +156,26 @@ jobs:
           python - <<'PY'
           import json, os, pathlib
           root = pathlib.Path('candidate')
+          module = os.environ['QA_MODULE']
+          assert module in {'hello-plugin', 'mfa'}, 'Unknown official QA module'
           observed = json.loads((root / 'candidate-source.json').read_text(encoding='utf-8'))
-          assert observed == {'sourceSha': os.environ['MODULE_SOURCE_SHA'], 'platform': os.environ['MODULE_PLATFORM']}
-          expected = json.loads(pathlib.Path('src-tauri/plugins/hello-plugin/module.json').read_text(encoding='utf-8'))
+          assert observed == {'sourceSha': os.environ['MODULE_SOURCE_SHA'], 'platform': os.environ['MODULE_PLATFORM'], 'module': module}
+          trusted_source = pathlib.Path('src-tauri/plugins') / module
+          expected = json.loads((trusted_source / 'module.json').read_text(encoding='utf-8'))
           if os.environ['MODULE_PLATFORM'].startswith('windows'):
               expected['entry']['host'] += '.exe'
           actual = json.loads((root / 'unsigned-module/module.json').read_text(encoding='utf-8'))
-          assert actual == expected, 'Candidate metadata differs from the official hello contract'
-          assert actual['id'] == 'taomni-plugin-hello-plugin' and actual['version'] == '0.1.0'
-          allowed = {'module.json', expected['entry']['host'], 'frontend/index.js'}
+          assert actual == expected, 'Candidate metadata differs from the trusted official contract'
+          assert actual['id'] == 'taomni-plugin-' + module and actual['version'] == '0.1.0'
+          allowed = {'module.json', expected['entry']['host']}
+          frontend = expected['entry'].get('frontend')
+          if frontend:
+              allowed.add(frontend)
+              trusted_frontend = (trusted_source / frontend).read_bytes()
+              assert (root / 'unsigned-module' / frontend).read_bytes() == trusted_frontend, 'Candidate changed official frontend without a trusted revision'
           files = {p.relative_to(root / 'unsigned-module').as_posix() for p in (root / 'unsigned-module').rglob('*') if p.is_file()}
           assert files == allowed, 'Unexpected files in official QA payload'
           assert not any(p.is_symlink() for p in root.rglob('*'))
-          trusted_frontend = pathlib.Path('src-tauri/plugins/hello-plugin/frontend/index.js').read_bytes()
-          assert (root / 'unsigned-module/frontend/index.js').read_bytes() == trusted_frontend, 'Candidate changed official hello frontend without a trusted release revision'
           PY
       - name: Sign and independently verify against the production pinned public key
         env:

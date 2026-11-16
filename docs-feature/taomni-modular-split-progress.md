@@ -4,7 +4,7 @@
 
 ## 当前结论
 
-核心仍包含 MFA、Servers、SocksCap、远程桌面和本地语音等业务代码、状态与依赖。目前完成签名安装验证的独立宿主只有 hello-plugin；MFA engine 与真实 SDK 宿主原型已提交，原型待 hosted，产品 facade 尚未切换。LanChat 已删除；历史 `lanchat.sqlite` / `lanchat.db` 保留原位，不读取、不迁移、不删除。
+核心仍包含 MFA、Servers、SocksCap、远程桌面和本地语音等业务代码、状态与依赖。目前完成签名安装验证的独立宿主只有 hello-plugin；MFA engine 与真实 SDK 宿主原型已提交，GitHub 原型门已暴露两处 RPC 错误，修复待匹配源码复验。MFA 签名包和生产 registry 安装门已补实现，尚未取得执行通过证据；产品 facade 尚未切换。LanChat 已删除；历史 `lanchat.sqlite` / `lanchat.db` 保留原位，不读取、不迁移、不删除。
 
 生产升级 IPC 当前只记录只读预检、源指纹与 pending journal。缺少可信插件包和真实 exporter 时，不复制旧数据、不创建伪插件版本、不改变 active 指针。测试 fixture 的 staging/回滚原语不能算真实旧版升级验收。
 
@@ -12,6 +12,10 @@
 
 ## 2026-11-16 最新 runner 证据（持续采集中）
 
+- `b96d3add1` 的契约 #43858726184 已结束，**23/27 jobs 成功**，28 份 artifact 已在执行期间收齐。三端真实 host 门在 `mfa_initialize_empty` 返回 `UnexpectedResponse`：合法 JSON-RPC `result: null` 被 `Option<Value>` 反序列化为缺失 result。API 修复 `a6a859252` 区分空值与缺失字段，回归单元先失败后通过，保留原进程断言。即时下载的 Linux 真实 Vault 3 项为 **1 passed / 2 failed**：一项同为空结果；另一项发现 MFA 的字符串 KeyProvider adapter 把核心 `PERMISSION_DENIED`（-32004）降为 InvalidState（-32009）。`38dee0a2b` 新增单元复现后在宿主边界恢复精确服务 kind 对应的 RPC code；不修改门禁的期望。Linux 真 X11 采集 **3/3** 已通过，闭合之前 reset 失败；该源码 Linux/Windows browser 各 **35/35** 已即时收齐，其余/native 尚在执行，未记整轮通过。
+- 旧源码 `3620dd60a` 的 UI #43853090821 在执行期间又收齐 Linux/Windows 的 TC-MFA-015 失败：点击 pin 后 immediate attribute 读取 false，随后截图和独立 HTML 均为 true，console 无 runtime error。生产 store 在真实 `mfaUpdate` 返回后才发布 pin，原断言用时 0–1ms；用例新增最多 10 秒的精确 `[data-pinned="true"]` 等待，再执行原属性断言。91 个原步骤全部保留、变为 92 步，reviewed 索引同步；reload 后 pin/偏好/HOTP 和确认删除断言不变。三态旧用例失败仍为此前 modal 顺序/Windows fixture 占用，既有 Wayland 输入/hit-test 失败保留并单列；Windows FILE-OPEN-002 的 setup document 未挂载仍保留原始证据，不计通过。当前修复均须新源码多端复验。
+- 新增 `qa-modular-mfa-install.yml`，由已有升级 workflow 调用：官方打包器支持 host-only/frontend-only（至少声明一项），官方 workflow 仅允许 `hello-plugin`/`mfa`，候选构建无签名凭据，可信独立 runner 校验精确 manifest/inventory 后签名。四目标 MFA 包配合三端安装 gate，使用非默认 `qa-release-trust-gates` harness 在所有线程固定生产公钥，并显式拒绝普通 unit key；实际经过生产 install/enable/scoped invoke/uninstall/reinstall 和 Vault coordinator。三个 ignored 场景覆盖 HOTP/UUID/key 保留、真实 writer lease、启禁/保留数据重装、代码篡改/多余文件拒绝、换密/锁定/解锁。新增门只在本地编译，执行留 GitHub；Intel macOS 安装执行、系统信任、产品 UI、旧版迁移与最终 G 门仍未覆盖。当前产品路径没有新增 UI 行为；沿用 TC-MODULES-007、TC-MFA-001–015、三态还原与完整 crash-regression，不能用 prototype 进程门代替这些用例。
+- 本批本地纯单元：API **17**、SDK **19**、services **36**、host adapter **15**、MFA host **10**，打包器 **9**，原有默认 unit-key 验签 **22**，包/guard/执行记录 Python **16** 全部通过；生产 key feature 的最终 core harness 仅 `--no-run` 编译通过，没有本地执行真实宿主。尝试裁去默认 features 编译时发现既有 voice `Session.capture` cfg 不闭合，已停止该试验并让安装门使用当前产品的完整默认 features；这不是 core-only 交付，TASK-006 仍待闭合。静态 UI 选择扩至全部 TC-MODULES-001–015、受影响 MFA/备份还原及完整 crash-regression：三端 browser 各 **42**，Linux 两种 native profile 各 **49**、Windows **47**、macOS **46**，22 shards、gaps=[]/unreviewed=[]；不是执行通过证据。
 - 原型源码 `b96d3add155c95675a7b3207f81e657c831d6c65` 已推送，[升级契约 #43858726184](https://github.com/engcapa/taomni/actions/runs/43858726184) 与 [UI #43858733769](https://github.com/engcapa/taomni/actions/runs/43858733769) 已触发，即时采集器已启动；当前排队/构建，未记新增进程门或 UI 修复通过。本批 `check:refactor`、rustfmt、actionlint、真实 MFA 依赖树、QA audit 全 gates（766 IDs、0 errors）、reviewed case contract 与 dev contract 通过；静态选择含受影响 MFA/备份还原、Windows 后续重置用例和完整 crash-regression：browser 三端各 35，Linux 两种 native profile 各 39、Windows 37、macOS 36，22 shards/3 个 release QA 构建，gaps=[]/unreviewed=[]。这些仅为选择/静态结果，不能替代执行。
 - 当前 MFA 宿主原型 `src-tauri/plugins/mfa/` 持有独立 `plugins/mfa/data/mfa.db`，只依赖 engine/API/SDK；使用 operation-scoped 固定 key 服务、核心一次性 export/reset grant、显式独占初始化和零化密钥副本，不接收主密码。串行 actor 的外层事务在取消/错误/panic 时回滚，engine 批次改用可嵌套 savepoint；snapshot 冻结并读取权威连接，普通重启重开旧库，未使用备份不建库、不访问 Vault。新增三端真实进程 5 项、snapshot 2 项及 Linux 真实持久 Vault 3 项，只在本地编译、待 GitHub 执行；engine 13/13、host 9/9、边界 10/10 单元通过，根 unit harness 编译及核心 MFA 14/14 单元通过。没有可信安装包、真实迁移或动态 UI，本批不标 TASK-014/025-H 或相关 G 门完成。
 - 源码 `3620dd60a` 的 [UI #43853090821](https://github.com/engcapa/taomni/actions/runs/43853090821) 持续即时收证，三端 browser 各 **34/34**，含 91 步 TC-MFA-015；native 尚在构建，未收齐不外推。对应[契约 #43853084170](https://github.com/engcapa/taomni/actions/runs/43853084170) 已结束，**26/27 jobs 成功**，28 份 artifact 已即时收齐；唯一失败为 Linux X11 真采集 2/3：顺序测试间 Xvfb reset 导致 `x11rb::connect` 被重置，补 `-noreset`，保留全部采集断言，待新源码 hosted 复验。
@@ -170,7 +174,7 @@ Wayland `TC-FILE-OPEN-008` 在已有 AI 路径 chip 点击处失败：失败截�
 
 已完成 retained locator、离线 v2 备份/还原、宿主自持 ProfileUseLease/PluginDataLease 和运行中 prepare/snapshot/release。`4c060a939` 契约三端快照通过；真实 UI 仍逐 shard 收证。三态 apply 已有原数据/代际/激活的独立观察，解锁顺序失败须新源码复验。已有证据只绑定实际输入，无关失败保留原始记录并不计通过。
 
-1. **收敛当前相关失败并取得新源码证据**：`18a1a61f9` 已修复三态还原后的启动 Vault modal 顺序、Windows TC-MODULES-011 的 fixture 连接所有权和 Xvfb 顺序测试 reset；MFA 宿主原型 `b96d3add1` 已提交，待三端 5+2 个进程场景、Linux 真实 Vault 3 项执行证据。用 `qa-ui-auto-platforms` 重跑受影响 MFA/还原/备份及完整 browser/native crash-regression，完成 shard 即下载，不等 summary。
+1. **收敛当前相关失败并取得新源码证据**：`18a1a61f9` 已修复三态还原后的启动 Vault modal 顺序和 Windows TC-MODULES-011 的 fixture 连接所有权；Xvfb reset 修复在 `b96d3add1` 的真 X11 3 项通过。原型进程门发现的空 result 与权限错误码转换待修复源码重跑；补齐三端 5+2 个进程场景、Linux 真实 Vault 3 项及新三端正式签名安装 3 项证据。用 `qa-ui-auto-platforms` 重跑受影响 MFA/还原/备份及完整 browser/native crash-regression，完成 shard 即下载，不等 summary。
 2. **闭合 Vault、profile 与一致快照（TASK-024/025）**：完成 GUI/headless 同 profile 协同、运行/禁用/卸载保留数据三态正常重启 apply 与真实解密、多实例占用、取消和崩溃恢复；验证原生还原确认入口自动 relaunch 的接管。MFA 迁出时还需 v1 legacy alias 与独立宿主后的三态还原。
 3. **迁出真实业务（TASK-005-B、013/014、016–022）**：先完成真实 MFA 宿主原型的匹配 runner 证据、可信签名安装、相关 G 门、旧库只读迁移与动态 UI，再切换生产 facade 和连接 owner。之后依赖序推进 RDP/VNC 客户端与服务端、Servers、SocksCap、OCR/录制、本地语音的宿主、前端、状态与迁移。Mobile 按 DEC-2 留下明确 go/no-go 结论和公开例外，不能默认为交付；LanChat 任务已取消，不新增替代插件。
 4. **裁剪核心依赖闭包（TASK-006）**：随业务迁出，从核心 Cargo 默认 features、原生依赖、bundle/resources/helper 和前端 chunk 中实际移除相应实现。保存 cargo tree、资源与产物证据；把状态改名或放入 LegacyFeatureRuntime 不等于瘦身完成。

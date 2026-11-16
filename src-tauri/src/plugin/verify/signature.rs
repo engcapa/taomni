@@ -18,11 +18,11 @@ pub(super) struct SignatureVerifier {
 
 impl SignatureVerifier {
     pub(super) fn embedded() -> Result<Self, TrustError> {
-        #[cfg(test)]
+        #[cfg(all(test, not(feature = "qa-release-trust-gates")))]
         {
             Ok(super::test_support::verifier())
         }
-        #[cfg(not(test))]
+        #[cfg(any(not(test), feature = "qa-release-trust-gates"))]
         {
             Self::release_key()
         }

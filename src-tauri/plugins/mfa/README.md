@@ -36,8 +36,18 @@ node --test scripts/modular-boundaries.test.mjs
 - Linux `vault::plugin_access::mfa_host_tests` (3), using the persisted
   production Vault, real password verification, restart/rekey/lock and repair.
 
-The process tests are ignored by default and only compiled locally. Their
-receipts are prototype evidence, not signed package installation, whole-app
-rekey coordination, installed-monolith upgrade or the final feasibility gates.
+`qa-modular-mfa-install.yml`, called by the upgrade workflow, adds four-target
+official signing and three native-architecture installed-registry gates. These
+use the production pinned key, install the actual package, invoke scoped
+operations, check persisted HOTP/fixed keys through disable/reinstall and
+coordinated Vault transitions, reject installed-code tampering, and assert the
+host holds/releases its OS data lease. The dedicated core test feature rejects
+the ordinary unit signing key. This new gate still requires matching GitHub
+execution evidence; adding it is not a passing installation result.
+
+The process tests are ignored by default and only compiled locally. Receipts
+remain limited to their selected scenarios. Intel macOS installed execution,
+system signing/notarization, whole-app UI routing, installed-monolith upgrade
+and the final feasibility gates are separate work.
 Until the facade switches, TC-MFA-015 and the retained MFA cases protect the
 existing product path; they do not exercise this host.

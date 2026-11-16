@@ -581,3 +581,6 @@ fn placeholder_manifest(slug: &str) -> ModuleManifest {
 #[cfg(test)]
 #[path = "registry_tests.rs"]
 mod tests;
+
+#[cfg(all(test, feature = "qa-release-trust-gates"))]
+mod signed_mfa_host_tests;

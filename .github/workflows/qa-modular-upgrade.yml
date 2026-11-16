@@ -34,6 +34,12 @@ jobs:
     with:
       head: ${{ inputs.head || github.sha }}
 
+  signed-mfa-install:
+    uses: ./.github/workflows/qa-modular-mfa-install.yml
+    with:
+      head: ${{ inputs.head || github.sha }}
+    secrets: inherit
+
   mfa-engine-contracts:
     name: MFA engine and host (${{ matrix.target }})
     strategy:
@@ -372,6 +378,12 @@ jobs:
       - uses: arduino/setup-protoc@v3
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: Swatinem/rust-cache@v2
+        if: runner.os == 'Linux'
+        with:
+          workspaces: src-tauri -> target
+          shared-key: modular-core-unit-${{ runner.os }}-${{ runner.arch }}
+          cache-on-failure: true
       - name: Linux native dependencies for the core migration unit
         if: runner.os == 'Linux'
         run: |
@@ -414,7 +426,7 @@ jobs:
         run: |
           mkdir -p modular-evidence
           set -o pipefail
-          python -m unittest qa_ui_auto.test_core_profile_state test_module_signed_observation test_module_retained_observation test_module_backup_observation test_module_live_backup_observation test_module_restore_observation test_module_profile_observation test_native_restart_failure test_native_fixture_cleanup 2>&1 | tee modular-evidence/native-observation-unit.log
+          python -m unittest qa_ui_auto.test_core_profile_state test_module_signed_observation test_module_retained_observation test_module_backup_observation test_module_live_backup_observation test_module_restore_observation test_module_profile_observation test_native_restart_failure test_native_fixture_cleanup test_module_signed_archive test_module_package_signing test_module_signed_host_gate 2>&1 | tee modular-evidence/native-observation-unit.log
       - name: Preserve native observation evidence on every platform
         uses: actions/upload-artifact@v4
         if: always()

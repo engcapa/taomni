@@ -1,0 +1,126 @@
+name: QA Signed MFA Installation
+
+on:
+  workflow_dispatch:
+    inputs:
+      head:
+        description: Repository commit/ref to test (QA artifacts only)
+        type: string
+        default: ''
+  workflow_call:
+    inputs:
+      head: {type: string, default: ''}
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: {required: true}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: {required: false}
+
+permissions:
+  contents: read
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  source:
+    runs-on: ubuntu-24.04
+    outputs:
+      sha: ${{ steps.source.outputs.sha }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head || github.sha }}
+          persist-credentials: false
+      - id: source
+        run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+
+  packages:
+    needs: source
+    uses: ./.github/workflows/qa-modular-packages.yml
+    with:
+      head: ${{ needs.source.outputs.sha }}
+      module: mfa
+      artifact_key: mfa-install-${{ github.run_id }}
+    secrets: inherit
+
+  installed-host:
+    name: Installed MFA (${{ matrix.platform }})
+    needs: [source, packages]
+    strategy:
+      fail-fast: false
+      # Intel macOS has a release-target build/signature above. These gates
+      # execute on the three native runner architectures used by the UI suite.
+      matrix:
+        include:
+          - {os: ubuntu-24.04, platform: linux-x86_64}
+          - {os: windows-latest, platform: windows-x86_64}
+          - {os: macos-latest, platform: darwin-aarch64}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 360
+    env:
+      PYTHONUTF8: '1'
+      PYTHONUNBUFFERED: '1'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.source.outputs.sha }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: modular-core-unit-${{ runner.os }}-${{ runner.arch }}
+          cache-on-failure: true
+      - name: Linux core dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf \
+            libkrb5-dev libasound2-dev libpipewire-0.3-dev libclang-dev \
+            libdbus-1-dev libudev-dev nasm
+      - name: Windows complete Perl
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $perl = 'C:\Strawberry\perl\bin\perl.exe'
+          if (-not (Test-Path $perl)) { choco install strawberryperl --yes --no-progress }
+          & $perl -MIPC::Cmd -e 'print "Perl ready"'
+          if ($LASTEXITCODE -ne 0) { throw 'Complete Perl unavailable' }
+          "OPENSSL_SRC_PERL=$perl" >> $env:GITHUB_ENV
+          'C:\Strawberry\perl\bin' >> $env:GITHUB_PATH
+      - uses: actions/download-artifact@v4
+        with:
+          name: qa-modular-package-${{ matrix.platform }}-mfa-install-${{ github.run_id }}
+          path: signed-mfa-package
+      - name: Compile a dedicated harness with the production pinned trust anchor
+        run: |
+          mkdir -p modular-mfa-install
+          git rev-parse HEAD > modular-mfa-install/source-sha.txt
+          rustc --version > modular-mfa-install/rustc-version.txt
+          set -o pipefail
+          # Keep the current product's default feature set. Ordinary
+          # fixture-key tests run separately in qa-modular-upgrade.
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni --lib \
+            --features qa-release-trust-gates --no-run \
+            --locked --message-format=json > modular-mfa-install/core-build.jsonl \
+            2> >(tee modular-mfa-install/core-build.log >&2)
+      - name: Exercise the installed production registry and persisted Vault
+        env:
+          TAOMNI_SIGNED_MFA_PACKAGE_DIR: signed-mfa-package
+          TAOMNI_SIGNED_MFA_SOURCE_SHA: ${{ needs.source.outputs.sha }}
+        run: python scripts/run-signed-mfa-host-gates.py --evidence modular-mfa-install
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: modular-signed-mfa-install-${{ matrix.platform }}
+          path: modular-mfa-install/
+          if-no-files-found: error
+          retention-days: 14

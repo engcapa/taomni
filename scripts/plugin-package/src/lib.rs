@@ -64,18 +64,26 @@ pub fn package(
             .is_some_and(|values| values.iter().any(|v| v == platform)),
         "manifest does not declare platform"
     );
+    let entries = manifest["entry"]
+        .as_object()
+        .context("missing plugin entries")?;
+    let mut declared = Vec::new();
     for entry in ["host", "frontend"] {
-        let name = manifest["entry"][entry]
-            .as_str()
-            .context("missing plugin entry")?;
+        let name = match entries.get(entry) {
+            None | Some(Value::Null) => continue,
+            Some(Value::String(name)) => name,
+            Some(_) => anyhow::bail!("plugin {entry} entry must be a path string"),
+        };
         ensure!(
             files.contains_key(name),
             "plugin entry is absent from payload: {name}"
         );
+        declared.push(name);
     }
-    let host = manifest["entry"]["host"].as_str().unwrap();
+    ensure!(!declared.is_empty(), "module must declare an entry");
+    let host = manifest["entry"]["host"].as_str();
     ensure!(
-        !platform.starts_with("windows") || host.ends_with(".exe"),
+        !platform.starts_with("windows") || host.is_none_or(|host| host.ends_with(".exe")),
         "Windows host entry must name its .exe"
     );
     let sums = files
@@ -92,7 +100,11 @@ pub fn package(
     let archive = staged.path().join(&name);
     let mut zip = ZipWriter::new(File::create(&archive)?);
     for (name, expected_hash) in &files {
-        let mode = if name == host { 0o755 } else { 0o644 };
+        let mode = if Some(name.as_str()) == host {
+            0o755
+        } else {
+            0o644
+        };
         let options = SimpleFileOptions::default()
             .compression_method(CompressionMethod::Deflated)
             .unix_permissions(mode);

@@ -93,6 +93,105 @@ fn rejects_missing_entries_wrong_platform_reserved_paths_and_output_reuse() {
 }
 
 #[test]
+fn host_only_packages_keep_the_executable_and_exact_signed_inventory_on_every_target() {
+    for platform in PLATFORMS {
+        let dir = tempfile::tempdir().unwrap();
+        let input = dir.path().join("payload");
+        payload(&input, platform);
+        let mut manifest: Value =
+            serde_json::from_slice(&fs::read(input.join("module.json")).unwrap()).unwrap();
+        manifest["entry"]
+            .as_object_mut()
+            .unwrap()
+            .remove("frontend");
+        fs::write(
+            input.join("module.json"),
+            serde_json::to_vec(&manifest).unwrap(),
+        )
+        .unwrap();
+        fs::remove_dir_all(input.join("frontend")).unwrap();
+        let output = dir.path().join("out");
+        let receipt = package(
+            &input,
+            platform,
+            &output,
+            &"a".repeat(40),
+            &ReleaseSigner::test_key(),
+        )
+        .unwrap();
+        let mut zip = zip::ZipArchive::new(
+            File::open(output.join(receipt["archive"].as_str().unwrap())).unwrap(),
+        )
+        .unwrap();
+        assert_eq!(zip.len(), 3);
+        let host = manifest["entry"]["host"].as_str().unwrap();
+        assert_eq!(
+            zip.by_name(host).unwrap().unix_mode().unwrap() & 0o777,
+            0o755
+        );
+        assert!(zip.by_name("frontend/index.js").is_err());
+        let mut sums = String::new();
+        zip.by_name("SHA256SUMS")
+            .unwrap()
+            .read_to_string(&mut sums)
+            .unwrap();
+        assert_eq!(sums.lines().count(), 2);
+        assert!(sums.contains(&format!("  {host}\n")));
+    }
+}
+
+#[test]
+fn frontend_only_entry_is_not_marked_executable_and_absent_or_malformed_entries_fail() {
+    let dir = tempfile::tempdir().unwrap();
+    let input = dir.path().join("payload");
+    payload(&input, "windows-x86_64");
+    let mut manifest: Value =
+        serde_json::from_slice(&fs::read(input.join("module.json")).unwrap()).unwrap();
+    manifest["entry"]["host"] = Value::Null;
+    fs::remove_file(input.join("host.exe")).unwrap();
+    fs::write(
+        input.join("module.json"),
+        serde_json::to_vec(&manifest).unwrap(),
+    )
+    .unwrap();
+    let signer = ReleaseSigner::test_key();
+    let output = dir.path().join("out");
+    let source = "b".repeat(40);
+    let receipt = package(&input, "windows-x86_64", &output, &source, &signer).unwrap();
+    let mut zip = zip::ZipArchive::new(
+        File::open(output.join(receipt["archive"].as_str().unwrap())).unwrap(),
+    )
+    .unwrap();
+    assert_eq!(
+        zip.by_name("frontend/index.js")
+            .unwrap()
+            .unix_mode()
+            .unwrap()
+            & 0o777,
+        0o644
+    );
+    for value in [Value::Null, json!(true), json!([]), json!("missing.js")] {
+        manifest["entry"]["frontend"] = value;
+        fs::write(
+            input.join("module.json"),
+            serde_json::to_vec(&manifest).unwrap(),
+        )
+        .unwrap();
+        assert!(
+            package(
+                &input,
+                "windows-x86_64",
+                &dir.path().join("rejected"),
+                &source,
+                &signer
+            )
+            .is_err()
+        );
+        assert!(!dir.path().join("rejected").exists());
+    }
+}
+
+#[test]
 fn portable_paths_cannot_disagree_with_native_archive_validation() {
     for path in [
         "../host",

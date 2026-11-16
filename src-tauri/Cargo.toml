@@ -303,6 +303,9 @@ winscard = { path = "vendor/winscard" }
 
 [features]
 default = ["hbase-kerberos", "rdp-server-audio", "voice-capture", "asr-whisper", "asr-sherpa"]
+# Dedicated hosted test harness: use the production pinned key on every thread
+# instead of the normal unit-fixture key. Production verification is unchanged.
+qa-release-trust-gates = []
 asr-whisper = ["dep:whisper-rs"]
 asr-sherpa = ["dep:sherpa-onnx"]
 # RDP server sound: WASAPI loopback / virtual-microphone playback through cpal
