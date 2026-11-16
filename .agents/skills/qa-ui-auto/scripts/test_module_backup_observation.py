@@ -1,6 +1,7 @@
 """Ensure the independent native archive oracle rejects plausible false passes."""
 import hashlib
 import json
+from contextlib import closing
 from pathlib import Path
 import sqlite3
 import tempfile
@@ -18,7 +19,7 @@ GENERATION = "018f6811-b7b1-7000-8000-000000000002"
 class ModuleBackupObservationTests(unittest.TestCase):
     def artifact(self, root, *, extra=False, blob=PAYLOAD, marker=MARKER, generation=GENERATION):
         database = root / "fixture.sqlite"
-        with sqlite3.connect(database) as db:
+        with closing(sqlite3.connect(database)) as db, db:
             db.execute("CREATE TABLE qa_snapshot_marker(value TEXT)")
             db.execute("INSERT INTO qa_snapshot_marker VALUES (?)", (marker,))
         prefix = "plugins/hello-plugin/data/"

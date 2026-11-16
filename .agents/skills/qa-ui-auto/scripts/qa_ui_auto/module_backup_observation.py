@@ -4,6 +4,7 @@ Only seed creates fixed business input under the run-owned inactive hello data
 subtree. Backup, lifecycle and inspection always use the real Settings UI.
 """
 from __future__ import annotations
+from contextlib import closing
 import hashlib
 import json
 from pathlib import Path
@@ -93,7 +94,7 @@ def check_archive(path: Path, work: Path, generation: str):
             raise StepError("Module backup changed opaque business bytes")
         snapshot = work / (path.stem + "-module.sqlite")
         snapshot.write_bytes(archive.read(prefix + DATABASE))
-    with sqlite3.connect(f"{snapshot.as_uri()}?mode=ro", uri=True) as database:
+    with closing(sqlite3.connect(f"{snapshot.as_uri()}?mode=ro", uri=True)) as database:
         if database.execute("PRAGMA quick_check").fetchone() != ("ok",):
             raise StepError("Module SQLite snapshot failed integrity check")
         if database.execute("SELECT value FROM qa_snapshot_marker").fetchall() != [(MARKER,)]:

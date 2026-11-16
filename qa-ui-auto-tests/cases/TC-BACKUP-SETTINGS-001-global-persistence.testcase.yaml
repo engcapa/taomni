@@ -81,6 +81,13 @@ steps:
 - set_check:
     selector: '[data-testid="backup-cloud-includeMfa"]'
     checked: false
+- assert_attribute:
+    selector: '[data-testid="backup-cloud-includeVault"]'
+    name: disabled
+    equals: ''
+- set_check:
+    selector: '[data-testid="backup-cloud-includePlugins"]'
+    checked: false
 - set_check:
     selector: '[data-testid="backup-cloud-includeVault"]'
     checked: false
@@ -331,87 +338,92 @@ verification:
     requirement: Mail children support mixed state and enforce cache/vault dependencies
     actions:
     - 16
-    - 35
-    - 36
+    - 37
+    - 38
     checkpoints:
     - step: 17
       expectation: Target mixed state
     - step: 18
       expectation: Originals include cache
-    - step: 37
-      expectation: Global mixed state
     - step: 39
+      expectation: Global mixed state
+    - step: 41
       expectation: Cache alone stays selected
-    - step: 42
+    - step: 44
       expectation: Cache cannot be removed while originals need it
-    - step: 59
+    - step: 61
       expectation: MFA retains vault
     results:
     - 17
     - 18
-    - 37
     - 39
-    - 42
-    - 59
+    - 41
+    - 44
+    - 61
   - id: R3
     requirement: Destination overrides remain independent and category edits persist through remount and translations
     actions:
-    - 33
-    - 62
-    - 80
-    - 83
-    - 91
+    - 35
+    - 64
+    - 82
+    - 85
+    - 93
     checkpoints:
-    - step: 34
+    - step: 36
       expectation: Inherited category summary
-    - step: 78
+    - step: 80
       expectation: Local excludes mail
-    - step: 79
-      expectation: Global retains all mail
     - step: 81
+      expectation: Global retains all mail
+    - step: 83
       expectation: Save acknowledged
-    - step: 84
-      expectation: Originals restored
-    - step: 85
-      expectation: Attachments restored
-    - step: 88
-      expectation: Local notes exclusion restored
-    - step: 89
-      expectation: Global notes retained
     - step: 86
+      expectation: Originals restored
+    - step: 87
+      expectation: Attachments restored
+    - step: 90
+      expectation: Local notes exclusion restored
+    - step: 91
+      expectation: Global notes retained
+    - step: 88
       expectation: Manual action uses global categories
-    - step: 92
+    - step: 94
       expectation: Translated child label
     results:
-    - 34
-    - 78
-    - 79
+    - 36
+    - 80
     - 81
-    - 84
-    - 85
-    - 88
-    - 89
+    - 83
     - 86
-    - 92
+    - 87
+    - 90
+    - 91
+    - 88
+    - 94
   - id: R-MODULES
     requirement: Default ranges include retained module data; its Vault dependency persists independently of the
       legacy MFA category, and category selection survives reopening Settings.
     actions:
-    - 52
+    - 24
     - 54
     - 56
-    - 60
+    - 58
+    - 62
     checkpoints:
     - step: 10
       expectation: Legacy default full range includes module data.
-    - step: 55
+    - step: 23
+      expectation: Cloud module data still requires Vault after MFA is unchecked; removing module data permits the
+        explicit Vault exclusion below.
+    - step: 57
       expectation: Vault remains required after MFA is unchecked while module data is selected.
-    - step: 94
+    - step: 96
       expectation: Reopened Settings retains the explicitly selected module category.
     results:
     - 10
-    - 55
-    - 94
+    - 23
+    - 57
+    - 96
   visual:
   - check: Category and task controls remain readable in retained screenshots
     method: manual

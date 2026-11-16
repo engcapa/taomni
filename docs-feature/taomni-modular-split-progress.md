@@ -8,11 +8,13 @@
 
 生产升级 IPC 当前只记录只读预检、源指纹与 pending journal。缺少可信插件包和真实 exporter 时，不复制旧数据、不创建伪插件版本、不改变 active 指针。测试 fixture 的 staging/回滚原语不能算真实旧版升级验收。
 
-签名安装门、宿主生产监督、共享采集/RDP 公共库、CoreState/统一 bootstrap、正常退出与可逆静默已集成。生产工厂、scoped 入口、持久 profile generation、Vault IPC 协调、普通凭据消费者与 MFA facade 已接入；源码 `fdd05d232` 的最新契约 #43819768258 已 23/23 jobs 成功。其 UI #43819770975 正在执行，已收三端 browser 各 50/50、macOS native 47/47，其他 native 结果待齐。本批新增插件离线 v2 备份/还原，尚待匹配源码 hosted 证据。业务状态仍在 LegacyFeatureRuntime；运行中插件快照、三态真实重启还原、远端商店、重启下载恢复、业务宿主迁出与真实升级尚未完成。G1–G11 未通过前，不将具体业务插件迁移标为完成。
+签名安装门、宿主生产监督、共享采集/RDP 公共库、CoreState/统一 bootstrap、正常退出与可逆静默已集成。生产工厂、scoped 入口、持久 profile generation、Vault IPC 协调、普通凭据消费者与 MFA facade 已接入；源码 `fdd05d232` 的契约 #43819768258 已 23/23 jobs 成功，其 UI #43819770975 的 22 个 shard 已收齐：三端 browser 各 50/50、Linux Xvfb native 50/50、Windows native 48/48、macOS native 47/47；Wayland 46/50，四个既有无关失败按下文单列。`fad6a56ab` 已提交插件离线 v2 备份/还原；匹配源码 hosted 执行发现下文三个相关测试问题，尚未闭合。业务状态仍在 LegacyFeatureRuntime；运行中插件快照、三态真实重启还原、远端商店、重启下载恢复、业务宿主迁出与真实升级尚未完成。G1–G11 未通过前，不将具体业务插件迁移标为完成。
 
 ## 2026-11-16 最新 runner 证据（持续采集中）
 
-- 源码 `fdd05d232b27a1857fa58a08588de3ab2bfdfe49` 的[升级契约 #43819768258](https://github.com/engcapa/taomni/actions/runs/43819768258) 已 **23/23 jobs 成功**。执行期间下载的 Linux `core-unit-receipt.json` 确认 21 个过滤器均非空且 exit=0，三端观察工具单元通过。相同源码的[UI #43819770975](https://github.com/engcapa/taomni/actions/runs/43819770975) 持续按完成 shard 下载；三端 browser 各 **50/50**、macOS native **47/47**（包括新增 53 步 TC-MODULES-010）通过，Linux/Windows native 尚未收齐。这些结果均不覆盖之后工作区新增的离线模块备份/还原。
+- 源码 `fad6a56ab046e5765e98e88bac4fd227d00e1cfc` 的[升级契约 #43826742393](https://github.com/engcapa/taomni/actions/runs/43826742393) 已结束：21/23 jobs 成功，macOS foundation 的两项 SQLite WAL 单元因 `/var` 临时目录别名触发 NOFOLLOW 拒绝，Windows observation unit 因 SQLite 连接未关闭导致临时文件清理失败。两者均属本批相关失败；修复为 canonical 测试根目录和显式连接生命周期，不放宽源路径/归档断言，并补 Unix 链接数据库/父目录拒绝回归，待新源码 hosted 复验。
+- 相同源码的[UI #43826748476](https://github.com/engcapa/taomni/actions/runs/43826748476) 持续即时收取完成 shard，三端 browser 各 49/50；共同失败为 TC-BACKUP-SETTINGS-001 云端仍包含模块数据却尝试取消必需 Vault。用例补先断言依赖、再取消云端模块数据，94 → 96 步，保留全部原断言。三端 native 构建仍在进行，新增 TC-MODULES-011 尚无完整通过结论；不取消该轮以保留真实离线备份证据。
+- 源码 `fdd05d232b27a1857fa58a08588de3ab2bfdfe49` 的[升级契约 #43819768258](https://github.com/engcapa/taomni/actions/runs/43819768258) 已 **23/23 jobs 成功**。Linux receipt 确认 21 个过滤器均非空且 exit=0。[UI #43819770975](https://github.com/engcapa/taomni/actions/runs/43819770975) 已收齐 22 个 shard：三端 browser 各 **50/50**、Linux Xvfb native **50/50**、Windows native **48/48**、macOS native **47/47**。Wayland native **46/50**，四个无关失败与下项相同，单列忽略且不计通过。新增 TC-MODULES-010 已覆盖四种 native profile；该结果不覆盖之后的离线模块备份/还原或宿主自持锁。
 - 源码 `c5c42bbb2` 的 [UI #43815220663](https://github.com/engcapa/taomni/actions/runs/43815220663) 已收齐 22 个 shard：三端 browser 各 **50/50**，Linux Xvfb native **49/49**、Windows native **47/47**、macOS native **46/46**。Wayland native **45/49**；SERVERS-002、FILE-OPEN-006、WS-030 因既有非左键输入仅支持 owned X11，FILE-OPEN-008 因已有跨行路径 chip 命中失败，按用户指示单列忽略且不计通过。TC-WS-051 此轮通过。TC-MODULES-009 与 Vault/MFA 013/014/102/103 的结果以该源码实际用例报告为准，不再沿用更早批次的“待重跑”状态。
 - 最新待验源码 `c5c42bbb2` 已推送，包含核心 permit 生命周期修复 `be14572e3` 和 TC-MODULES-009 的隐藏状态断言修复；[升级契约 #43815221797](https://github.com/engcapa/taomni/actions/runs/43815221797)与[UI #43815220663](https://github.com/engcapa/taomni/actions/runs/43815220663)已启动即时采集器。当前批次完整 QA audit 的所有 gates、check:refactor、rustfmt、case schema/reviewed contract 与 dev_contract 均通过；这些检查不代替 hosted 执行。
 - `cf0fb2033` 的 UI #43813458259 已在执行期间收齐六个 browser shard，Linux/Windows/macOS 各 **50/50**，含 TC-BACKUP-SETTINGS-001 的相关修复和完整 browser crash-regression。其 native 构建仍在进行；该 run 的 TC-MODULES-009 尚为旧断言，最终以新源码重跑为准。相同源码的升级契约 #43813432137 为 22 个 job 成功、Linux 核心 job 被新一轮 concurrency 取消；收取的 receipt 最后完成 `vault::plugin_access::tests`，下一过滤器为存在前述同步竞态的 `vault::data_access_tests`。未完成的过滤器不计通过，整轮不记为成功。
@@ -35,7 +37,7 @@
 - TASK-025-F/G 的离线路径已接入真实备份引擎：在同一 Vault snapshot barrier 与 job/profile generation 下，扫描安装、禁用和卸载保留数据的严格 owner 子树，取得 PluginDataLease，重新枚举实际文件。普通文件通过普通文件句柄复制；SQLite 使用只读 online snapshot，保留已提交 WAL 内容且不打包 sidecars，不初始化业务库或 key。已知 SQLite 头部损坏明确失败，不降级为普通文件。
 - 有插件数据才生成 format 2 `pluginDatasets`；没有插件数据继续生成 format 1。数据集精确绑定 payload、owner、schema、job、generation 和核心推导的 Vault 依赖，拒绝大小写/文件目录冲突、越界路径、sidecars 与 metadata 扩权。读取器独立比对 SQLite 头部和声明类型，并在 staging 检查数据库。旧版读取器不支持模块 v2 档案，不能用于还原该档案。
 - 还原在 stage 与启动 apply 前都检查 Vault/MFA 依赖；整套模块旧文件、过期 sidecars、重建的 retained locator、核心库共用兼容 journal。支持文件/目录互换；代码、active 指针、权限和信任不由数据档案恢复。回滚在删除新文件前确认所有旧安全副本可读且哈希正确，副本缺失/损坏保留现有可读数据和 journal，允许修复后重试，generation 不回退。
-- 设置页默认包含模块数据，选中时强制包含 Vault；旧 custom 未指定模块项继续排除。增强 94 步 browser TC-BACKUP-SETTINGS-001，新增 58 步 native TC-MODULES-011：真实签名安装、启用再禁用、禁用/卸载后分别创建不同手工 job，独立核验 ZIP/SQLite/WAL/原始字节，生产归档读取与取消不留下还原 intent，正常重启保持卸载状态。用例在打开历史归档前核对精确 job 文件名，不能用旧任务成功满足新任务断言。
+- 设置页默认包含模块数据，选中时强制包含 Vault；旧 custom 未指定模块项继续排除。增强 browser TC-BACKUP-SETTINGS-001（首次提交 94 步，相关失败修复后 96 步），新增 58 步 native TC-MODULES-011：真实签名安装、启用再禁用、禁用/卸载后分别创建不同手工 job，独立核验 ZIP/SQLite/WAL/原始字节，生产归档读取与取消不留下还原 intent，正常重启保持卸载状态。用例在打开历史归档前核对精确 job 文件名，不能用旧任务成功满足新任务断言。
 - 当前最终 Rust harness 已编译通过；前端范围/编辑器/持久化 3 文件 **19/19** 通过；插件备份 15、既有备份 14、兼容档案 2、核心成对快照 5、旧快照 7、generation 1、范围 2，合计 **46 项单元通过**。SQLite snapshot 小库 **10/10**、QA 工具 **12/12** 通过。两份 case 的 schema/reviewed contracts、三端/四种 native profile 静态选择、TypeScript、check:refactor、25 个变更 Rust 文件的 rustfmt 与完整 QA audit gate 通过，coverage baseline 未修改。本节不将计划或本地单元计为 hosted 用例通过。
 - 尚未完成：运行中宿主 prepare/snapshot/release（当前明确拒绝，不静默读文件）、真实宿主持 profile lease、GUI/headless 完整协同、三态正常重启 apply 与真实解密，以及 MFA 迁出后的 v1 legacy alias 映射。TC-MODULES-011 只证明离线快照和读取/取消，不证明 applied native restore；TASK-025-F/G/H/I 均不标完成。
 
@@ -134,14 +136,12 @@ Wayland `TC-FILE-OPEN-008` 在已有 AI 路径 chip 点击处失败：失败截�
 
 ### 当前待办（按依赖顺序）
 
-最新契约 #43815221797（源码 `c5c42bbb2`）已 **23/23 jobs 成功**；已下载 Linux receipt，21 个要求的过滤器均非空且 exit=0，包含 Vault 数据访问 4 项、当前核心成对快照 5 项和 plugin 121 项（其中 3 个真实网络项仍由专用 hosted gate 执行）。UI #43815220663 的六个 browser shard 已即时下载，三端各 **50/50**；native 尚在构建，不能外推通过。
+已完成 retained locator 与离线 v2 备份/还原实现，提交 `fdd05d232` / `fad6a56ab`。前者 hosted 结果已齐，后者的相关失败及修复进度见上方；执行中按 shard 收证，无关失败保留原始记录并不计通过。
 
-当前开发批次开始接入 TASK-025-F 的 retained locator：数据路径强制锚定 `plugins/<slug>/data/`，`dataSchemaVersion` 缺省为 1；卸载在本地宿主停稳后取得跨进程 PluginDataLease，再原子记录数据文件分类，最后移除 active 指针。记录不包含代码、命令、权限或 key grant；MFA 的 Vault 依赖由核心 owner policy 推导。拒绝链接/reparse、硬链接、跨 owner/核心/版本路径及重复大小写路径；记录失败或锁占用不删除数据、不清 activation。显式删除成功后清 locator；设置页改为显示原生 registry 的实际 `dataRetained`，不再对全部模块写死 true。新增 TC-MODULES-010 和增强 browser/native TC-MODULES-006，待匹配源码 runner 验证。此批尚未接入插件 backup engine、v2 档案、运行中 prepare/snapshot/release 或三态还原，TASK-025-F/G 不标完成。
+当前在开发真实宿主自持 shared ProfileUseLease / exclusive PluginDataLease，核心经独立进程环境提供 profile，握手必须确认精确 owner/generation。SDK/API 27 项单元通过，包含 reader EOF 后 worker/store 未退出时不能提前释放锁；核心接线、三端真实进程 gate 和匹配源码 UI 仍待编译/执行，不将单元结果当作宿主生产验收。运行中 prepare/snapshot/release 尚未实现。
 
-默认卸载确认改用既有应用内 ConfirmDialog；原 `window.confirm` 在 macOS WKWebView 被忽略，不能完成默认保留数据卸载。TC-MODULES-010 的 53 步通过实际取消/确认按钮继续流程，不使用脚本预答或替换 registry 状态。本地最终 Rust 编译通过，plugin 纯单元 **126 passed / 3 ignored**（真实网络仍交 hosted 专项），包含新增 8 项数据边界/定位/卸载回归；前端五文件 **57/57**，测试工具 **12/12**。这些单元不替代实际三端重启与文件行为，native 用例待 hosted 验证。
-
-1. **收敛当前相关失败并取得新源码证据**：TC-MODULES-007 在 #43804951477 的四种 native profile 已全部通过；Windows TC-MODULES-009 的 Notes drawer 遮挡修复已提交 `ea9c5636f`，待重跑。本批 Vault/MFA 接线、013/014 新用例和增强 102 同跑多端 browser/native 与完整 crash-regression，逐 shard 收取并修复相关失败。两个有 main 对比依据的 Wayland FILE-OPEN 失败单列忽略，不计通过。
-2. **闭合 Vault、profile 与一致快照（TASK-024/025）**：统一 coordinator、普通 Vault 消费者和 typed MFA facade 已接通，契约通过，native UI 待齐；当前核心成对快照已提交 `cf0fb2033`，等待匹配源码 runner。再补运行中、禁用、卸载留数据三态的跨库一致备份/正常重启还原与真实解密，以及多实例占用、取消和崩溃恢复。完成可信 core 操作生命周期修复的验证，随后处理真实宿主的长期 ledger/counter，保留防重放保护。
+1. **收敛当前相关失败并取得新源码证据**：修复本轮云端模块/Vault 依赖用例、macOS SQLite fixture 路径和 Windows SQLite 连接清理；GitHub 复验。继续即时下载 `fad6a56ab` 的 native shard，检查新增 TC-MODULES-011 的真实 ZIP/SQLite/WAL 结果；已完成的旧源码结果不能替代本批证据。
+2. **闭合 Vault、profile 与一致快照（TASK-024/025）**：完成真实宿主持锁与三端进程 gate，再接运行中宿主 prepare/snapshot/release、GUI/headless 同 profile 协同。离线路径已有 v2 档案和兼容 journal，但仍需运行、禁用、卸载保留数据三态的正常重启 apply 与真实解密，覆盖多实例占用、取消和崩溃恢复；MFA 迁出时统一处理 v1 legacy alias。
 3. **迁出真实业务（TASK-005-B、013/014、016–022）**：先完成真实 MFA 原型与相关 G 门，再依赖序推进 RDP/VNC 客户端与服务端、Servers、SocksCap、OCR/录制、本地语音的宿主、前端、状态与迁移。Mobile 按 DEC-2 留下明确 go/no-go 结论和公开例外，不能默认为交付；LanChat 任务已取消，不新增替代插件。
 4. **裁剪核心依赖闭包（TASK-006）**：随业务迁出，从核心 Cargo 默认 features、原生依赖、bundle/resources/helper 和前端 chunk 中实际移除相应实现。保存 cargo tree、资源与产物证据；把状态改名或放入 LegacyFeatureRuntime 不等于瘦身完成。
 5. **完成模块使用闭环（TASK-007、009–011）**：远端签名商店、三种代理设置 UI、跨应用重启发现并恢复下载、后台进度及错误恢复；实际主窗/分离窗动态 tab、坏 hash/缺失/禁用占位和清理；安装、启用、禁用、更新、回滚无需重启核心。

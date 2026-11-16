@@ -51,11 +51,49 @@ fn assert_no_partials(root: &Path) {
     }
 }
 
+#[cfg(unix)]
+#[test]
+fn linked_database_or_parent_cannot_bypass_readonly_source_validation() {
+    use std::os::unix::fs::symlink;
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().canonicalize().unwrap();
+    let source = root.join("source.db");
+    Connection::open(&source)
+        .unwrap()
+        .execute_batch("CREATE TABLE entries(value TEXT); INSERT INTO entries VALUES ('original');")
+        .unwrap();
+    let before = fs::read(&source).unwrap();
+    let target = root.join("snapshot.db");
+    fs::write(&target, b"previous-complete-artifact").unwrap();
+    let linked_file = root.join("linked.db");
+    symlink(&source, &linked_file).unwrap();
+    let linked_parent = root.join("linked-parent");
+    symlink(&root, &linked_parent).unwrap();
+    for alias in [linked_file, linked_parent.join("source.db")] {
+        assert!(
+            snapshot_existing(
+                &alias,
+                &target,
+                &SnapshotOptions::default(),
+                &SnapshotControl::with_timeout(Duration::from_secs(5)),
+            )
+            .is_err(),
+            "linked source must remain rejected: {alias:?}"
+        );
+        assert_eq!(fs::read(&source).unwrap(), before);
+        assert_eq!(fs::read(&target).unwrap(), b"previous-complete-artifact");
+        assert_no_partials(&root);
+    }
+}
+
 #[test]
 fn existing_wal_snapshot_contains_committed_pages_without_mutating_the_source() {
     let directory = tempfile::tempdir().unwrap();
-    let source_path = directory.path().join("source.db");
-    let target = directory.path().join("snapshot.db");
+    // SQLite NOFOLLOW rejects ancestor aliases too (macOS /var -> /private/var).
+    // Match the production caller's canonical ProfileRoot, without relaxing it.
+    let root = directory.path().canonicalize().unwrap();
+    let source_path = root.join("source.db");
+    let target = root.join("snapshot.db");
     let source = Connection::open(&source_path).unwrap();
     source
         .execute_batch(
@@ -101,7 +139,8 @@ fn existing_wal_snapshot_contains_committed_pages_without_mutating_the_source() 
 #[test]
 fn uncommitted_wal_transaction_is_excluded() {
     let directory = tempfile::tempdir().unwrap();
-    let path = directory.path().join("source.db");
+    let root = directory.path().canonicalize().unwrap();
+    let path = root.join("source.db");
     let source = Connection::open(&path).unwrap();
     source
         .execute_batch(
@@ -110,7 +149,7 @@ fn uncommitted_wal_transaction_is_excluded() {
         INSERT INTO entries VALUES ('not committed');",
         )
         .unwrap();
-    let target = directory.path().join("snapshot.db");
+    let target = root.join("snapshot.db");
     snapshot_existing(
         &path,
         &target,
