@@ -77,6 +77,8 @@ jobs:
           workspaces: src-tauri -> target
           shared-key: modular-core-unit-${{ runner.os }}-${{ runner.arch }}
           cache-on-failure: true
+      - name: Refresh sherpa native runtime after cache restore
+        run: node scripts/refresh-sherpa-onnx-cache.mjs
       - name: Linux core dependencies
         if: runner.os == 'Linux'
         run: |

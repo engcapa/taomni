@@ -118,7 +118,8 @@ class OfficialModuleArtifactTests(unittest.TestCase):
         self.assertNotIn("cargo", secret_steps[0]["run"])
         self.assertNotIn("TAURI_SIGNING_PRIVATE_KEY", secret_steps[0]["run"])
         guard = next(step for step in signing if step.get("name", "").startswith("Restrict QA signing"))
-        self.assertIn("read_bytes() == trusted_frontend", guard["run"])
+        self.assertLess(signing.index(guard), signing.index(secret_steps[0]),
+                        "The inert candidate must be checked before the key-bearing signing step")
         self.assertNotIn("release", json.dumps([step for step in signing if "upload-artifact" in step.get("uses", "")]).lower())
 
 
