@@ -110,6 +110,24 @@ test("MFA engine rejects runtime dependencies, core paths and application servic
   assert.deepEqual(modularBoundaryViolations(root), []);
 });
 
+test("MFA host requires SDK services and rejects transitive application ownership", (t) => {
+  const root = fixture(t);
+  fs.mkdirSync(path.join(root, "src-tauri/plugins/mfa/src"), { recursive: true });
+  write(root, "src-tauri/plugins/mfa/Cargo.toml", '[dependencies]\nbridge = { package = "tauri-utils", version = "2" }\ncore = { path = "../.." }\n');
+  write(root, "src-tauri/plugins/mfa/src/keys.rs", "use taomni_plugin_services::OperationPermit;\n");
+  const errors = modularBoundaryViolations(root).join("\n");
+  assert.match(errors, /MFA host alias links core-owned package tauri-utils/);
+  assert.match(errors, /core links core-owned services/);
+  assert.match(errors, /MFA host must access core services only through the SDK/);
+  write(root, "src-tauri/plugins/mfa/Cargo.toml", '[dependencies]\ntaomni-plugin-sdk = { path = "../../crates/taomni-plugin-sdk" }\n');
+  write(root, "src-tauri/plugins/mfa/src/keys.rs", "use taomni_plugin_sdk::Operation;\n");
+  const tree = path.join(root, "mfa-host-tree.txt");
+  fs.writeFileSync(tree, "taomni-plugin-mfa v0.1.0\ntaomni-plugin-sdk v0.1.0\n");
+  assert.deepEqual(modularBoundaryViolations(root, { mfaHostTreeFile: tree }), []);
+  fs.appendFileSync(tree, "taomni v0.3.0\n");
+  assert.match(modularBoundaryViolations(root, { mfaHostTreeFile: tree }).join("\n"), /MFA host dependency tree contains taomni/);
+});
+
 test("MFA runtime cargo tree rejects transitive core/SDK and network ownership", (t) => {
   const root = fixture(t);
   const tree = path.join(root, "mfa-tree.txt");

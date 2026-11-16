@@ -73,9 +73,7 @@ pub fn add(
         .iter()
         .map(store::validate_input)
         .collect::<Result<Vec<_>, _>>()?;
-    let tx = conn
-        .transaction()
-        .map_err(|e| format!("mfa database: {e}"))?;
+    let tx = conn.savepoint().map_err(|e| format!("mfa database: {e}"))?;
     let mut result = MfaAddResult {
         added: Vec::new(),
         duplicates: Vec::new(),

@@ -26,6 +26,7 @@ members = [
     "crates/taomni-profile-locks",
     "crates/taomni-sqlite-snapshot",
     "plugins/hello-plugin",
+    "plugins/mfa",
     "vendor/ironrdp-acceptor",
     "vendor/ironrdp-bulk",
     "vendor/ironrdp-server",

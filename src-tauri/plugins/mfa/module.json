@@ -1,0 +1,25 @@
+{
+  "id": "taomni-plugin-mfa",
+  "slug": "mfa",
+  "name": "MFA Authenticator",
+  "version": "0.1.0",
+  "coreApiVersion": "1",
+  "kind": "auth",
+  "status": "provisional",
+  "platforms": ["windows-x86_64", "darwin-aarch64", "darwin-x86_64", "linux-x86_64"],
+  "entry": { "host": "taomni-plugin-mfa", "protocol": 1 },
+  "tabs": [],
+  "commands": [
+    "mfa_list", "mfa_codes", "mfa_inspect", "mfa_add", "mfa_update",
+    "mfa_delete", "mfa_reorder", "mfa_hotp_next", "mfa_mark_used",
+    "mfa_set_prefs", "mfa_export_uri", "mfa_reset_store", "mfa_initialize_empty",
+    "backup/prepare", "backup/snapshot", "backup/release"
+  ],
+  "permissions": ["vault.fixed-key"],
+  "dataDir": "plugins/mfa",
+  "dataSchemaVersion": 1,
+  "backupPaths": ["plugins/mfa/data/mfa.db"],
+  "legacyTables": [],
+  "vaultFixedKeys": ["mfa.data-key-v1"],
+  "snapshot": "rpc"
+}

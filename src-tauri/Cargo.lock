@@ -10926,13 +10926,16 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.10.9",
+ "taomni-mfa-engine",
  "taomni-plugin-api",
+ "taomni-plugin-mfa",
  "taomni-plugin-sdk",
  "taomni-plugin-services",
  "taomni-profile-locks",
  "tempfile",
  "thiserror 2.0.20",
  "windows 0.62.2",
+ "zeroize",
 ]
 
 [[package]]
@@ -10960,6 +10963,20 @@ dependencies = [
  "base64 0.22.1",
  "serde",
  "serde_json",
+ "zeroize",
+]
+
+[[package]]
+name = "taomni-plugin-mfa"
+version = "0.1.0"
+dependencies = [
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "taomni-mfa-engine",
+ "taomni-plugin-api",
+ "taomni-plugin-sdk",
+ "tempfile",
  "zeroize",
 ]
 

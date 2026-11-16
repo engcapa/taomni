@@ -65,7 +65,7 @@ pub fn reorder(conn: &mut Connection, ids: &[String]) -> Result<(), String> {
             ordered.push(id.as_str());
         }
     }
-    let tx = conn.transaction().map_err(sql_err)?;
+    let tx = conn.savepoint().map_err(sql_err)?;
     for (index, id) in ordered.iter().enumerate() {
         tx.execute(
             "UPDATE mfa_accounts SET sort_order = ?2 WHERE id = ?1",

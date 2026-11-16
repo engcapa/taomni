@@ -170,5 +170,8 @@ pub(super) fn create_data_key(
 #[path = "plugin_host_tests.rs"]
 mod host_tests;
 #[cfg(test)]
+#[path = "plugin_mfa_host_tests.rs"]
+mod mfa_host_tests;
+#[cfg(test)]
 #[path = "plugin_access_tests.rs"]
 mod tests;

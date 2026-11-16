@@ -52,7 +52,7 @@ pub fn set_prefs(conn: &mut Connection, prefs: &MfaPrefs) -> Result<(), String> 
         return Err(invalid("sortMode", "unknown sort mode"));
     }
     let group_filter = clean_text(&prefs.group_filter, "groupFilter", MAX_GROUP)?;
-    let tx = conn.transaction().map_err(sql_err)?;
+    let tx = conn.savepoint().map_err(sql_err)?;
     for (key, value) in [
         ("sort_mode", prefs.sort_mode.as_str()),
         ("group_filter", group_filter.as_str()),

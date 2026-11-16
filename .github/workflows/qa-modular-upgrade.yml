@@ -35,7 +35,7 @@ jobs:
       head: ${{ inputs.head || github.sha }}
 
   mfa-engine-contracts:
-    name: MFA engine (${{ matrix.target }})
+    name: MFA engine and host (${{ matrix.target }})
     strategy:
       fail-fast: false
       matrix:
@@ -68,19 +68,20 @@ jobs:
         with:
           workspaces: src-tauri -> target
           shared-key: modular-mfa-engine-${{ matrix.target }}
-      - name: Compile MFA engine for the release target and run business units
+      - name: Compile MFA engine and host for the release target and run business units
         run: |
           mkdir -p modular-evidence
           git rev-parse HEAD > modular-evidence/source-sha.txt
           rustc --version > modular-evidence/rustc-version.txt
           set -o pipefail
-          cargo check --manifest-path src-tauri/Cargo.toml -p taomni-mfa-engine --target '${{ matrix.target }}' --all-targets --locked 2>&1 | tee modular-evidence/mfa-engine-check.log
-          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-mfa-engine --lib --locked 2>&1 | tee modular-evidence/mfa-engine-unit.log
+          cargo check --manifest-path src-tauri/Cargo.toml -p taomni-mfa-engine -p taomni-plugin-mfa --target '${{ matrix.target }}' --all-targets --locked 2>&1 | tee modular-evidence/mfa-engine-check.log
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-mfa-engine -p taomni-plugin-mfa --lib --locked 2>&1 | tee modular-evidence/mfa-engine-unit.log
       - name: Verify the MFA engine has no application or IPC runtime dependencies
         run: |
           set -o pipefail
           cargo tree --manifest-path src-tauri/Cargo.toml -p taomni-mfa-engine --target '${{ matrix.target }}' --edges normal,build --prefix none --format '{p}' --locked > modular-evidence/mfa-engine-tree.txt
-          node scripts/modular-boundaries.mjs --mfa-tree modular-evidence/mfa-engine-tree.txt 2>&1 | tee modular-evidence/mfa-engine-boundary.log
+          cargo tree --manifest-path src-tauri/Cargo.toml -p taomni-plugin-mfa --target '${{ matrix.target }}' --edges normal,build --prefix none --format '{p}' --locked > modular-evidence/mfa-host-tree.txt
+          node scripts/modular-boundaries.mjs --mfa-tree modular-evidence/mfa-engine-tree.txt --mfa-host-tree modular-evidence/mfa-host-tree.txt 2>&1 | tee modular-evidence/mfa-engine-boundary.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -146,11 +147,12 @@ jobs:
         with:
           workspaces: src-tauri -> target
           shared-key: modular-host-gates
-      - name: Compile production host and real hello fixture
+      - name: Compile production host, hello fixture and actual MFA process
         run: |
           mkdir -p modular-evidence
           set -o pipefail
           cargo build --manifest-path src-tauri/Cargo.toml -p taomni-hello-plugin --bin taomni-hello-plugin --locked 2>&1 | tee modular-evidence/host-build.log
+          cargo build --manifest-path src-tauri/Cargo.toml -p taomni-plugin-mfa --bin taomni-plugin-mfa --locked 2>&1 | tee modular-evidence/mfa-host-build.log
           cargo test --manifest-path src-tauri/Cargo.toml -p taomni-host-gates --lib --locked 2>&1 | tee modular-evidence/host-unit.log
       - name: Exercise idle heartbeats, cancellation, restart and core-kill cleanup
         run: |
@@ -161,9 +163,10 @@ jobs:
           import subprocess
           suffix = ".exe" if os.name == "nt" else ""
           os.environ["TAOMNI_HELLO_PLUGIN_BIN"] = str(pathlib.Path(f"src-tauri/target/debug/taomni-hello-plugin{suffix}").resolve())
+          os.environ["TAOMNI_MFA_PLUGIN_BIN"] = str(pathlib.Path(f"src-tauri/target/debug/taomni-plugin-mfa{suffix}").resolve())
           subprocess.run([
               "cargo", "test", "--manifest-path", "src-tauri/Cargo.toml",
-              "-p", "taomni-host-gates", "--test", "lifecycle", "--test", "activation", "--test", "cleanup", "--test", "services", "--test", "profile", "--test", "snapshot",
+              "-p", "taomni-host-gates", "--test", "lifecycle", "--test", "activation", "--test", "cleanup", "--test", "services", "--test", "profile", "--test", "snapshot", "--test", "mfa", "--test", "mfa_snapshot",
               "--locked", "--", "--ignored", "--test-threads=1", "--nocapture",
           ], check=True)
           PY
@@ -171,7 +174,7 @@ jobs:
         run: |
           python - <<'PY' > modular-evidence/service-selection.txt
           import subprocess
-          for target, expected in {"services": 8, "lifecycle": 7, "activation": 3, "cleanup": 2, "profile": 5, "snapshot": 4}.items():
+          for target, expected in {"services": 8, "lifecycle": 7, "activation": 3, "cleanup": 2, "profile": 5, "snapshot": 4, "mfa": 5, "mfa_snapshot": 2}.items():
               listing = subprocess.check_output([
                   "cargo", "test", "--manifest-path", "src-tauri/Cargo.toml", "-p", "taomni-host-gates",
                   "--test", target, "--locked", "--", "--ignored", "--list",
@@ -521,6 +524,33 @@ jobs:
                      "coreSha256": hashlib.file_digest(core.open("rb"), "sha256").hexdigest(),
                      "sdkFixtureSha256": hashlib.file_digest(fixture.open("rb"), "sha256").hexdigest()}
           (root / "vault-sdk-receipt.json").write_text(json.dumps(receipt, indent=2) + "\n")
+          raise SystemExit(result.returncode)
+          PY
+      - name: Exercise actual MFA host with the production persisted Vault
+        if: runner.os == 'Linux'
+        run: |
+          set -o pipefail
+          cargo build --manifest-path src-tauri/Cargo.toml -p taomni-plugin-mfa --bin taomni-plugin-mfa --locked 2>&1 | tee modular-evidence/vault-mfa-host-build.log
+          python - <<'PY' 2>&1 | tee modular-evidence/vault-mfa-host-process.log
+          import hashlib
+          import json
+          import os
+          from pathlib import Path
+          import subprocess
+          root = Path("modular-evidence")
+          core = Path(json.loads((root / "core-unit-receipt.json").read_text())["executable"])
+          fixture = Path("src-tauri/target/debug/taomni-plugin-mfa").resolve()
+          os.environ["TAOMNI_MFA_PLUGIN_BIN"] = str(fixture)
+          selected = "vault::plugin_access::mfa_host_tests"
+          listing = subprocess.check_output([str(core), selected, "--ignored", "--list"], text=True)
+          count = sum(line.endswith(": test") for line in listing.splitlines())
+          assert count == 3, f"Expected three actual Vault/MFA gates, got {count}"
+          result = subprocess.run([str(core), selected, "--ignored", "--test-threads=1", "--nocapture"])
+          receipt = {"head": subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip(),
+                     "selected": count, "exitCode": result.returncode,
+                     "coreSha256": hashlib.file_digest(core.open("rb"), "sha256").hexdigest(),
+                     "mfaHostSha256": hashlib.file_digest(fixture.open("rb"), "sha256").hexdigest()}
+          (root / "vault-mfa-host-receipt.json").write_text(json.dumps(receipt, indent=2) + "\n")
           raise SystemExit(result.returncode)
           PY
       - uses: actions/upload-artifact@v4
