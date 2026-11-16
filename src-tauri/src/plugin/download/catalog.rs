@@ -23,7 +23,7 @@ pub struct ModuleCatalogPlugin {
     pub version: String,
     pub core_api_version: String,
     #[serde(default)]
-    pub kind: Option<crate::plugin::PluginKind>,
+    pub kind: Option<taomni_plugin_api::PluginKind>,
     #[serde(default)]
     pub permissions: Option<std::collections::BTreeSet<String>>,
     #[serde(default)]

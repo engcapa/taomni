@@ -9,7 +9,9 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
+mod metadata;
 pub mod services;
+pub use metadata::PluginKind;
 
 /// Version of the core/plugin API shape. Increment this when a shared service
 /// or extension point changes incompatibly.

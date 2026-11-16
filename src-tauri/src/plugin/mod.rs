@@ -48,17 +48,7 @@ use thiserror::Error;
 
 pub const CORE_API_VERSION: &str = "1";
 
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
-#[serde(rename_all = "kebab-case")]
-pub enum PluginKind {
-    RemoteClient,
-    LocalServer,
-    Collaboration,
-    Media,
-    Auth,
-    AiLocal,
-    Mobile,
-}
+pub use taomni_plugin_api::PluginKind;
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
