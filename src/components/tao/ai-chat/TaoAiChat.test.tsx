@@ -144,7 +144,7 @@ describe("TaoAiChat", () => {
     expect(screen.getByTestId("tao-home-side-panel")).toHaveAttribute("data-resizing", "false");
   });
 
-  it("keeps memory and skills icons distinct and routes visible settings controls once", async () => {
+  it("keeps memory and skills icons distinct with demo before the final sidebar toggle", async () => {
     const controller = createChatController({ profile });
     const onOpenSettings = vi.fn();
     const onOpenAppearance = vi.fn();
@@ -154,10 +154,13 @@ describe("TaoAiChat", () => {
     const skills = screen.getByTestId("tao-home-side-tab-skills");
     expect(memory.querySelector("svg")?.innerHTML).not.toBe(skills.querySelector("svg")?.innerHTML);
     expect(skills).toHaveAttribute("title", "Skills");
-    fireEvent.click(screen.getByTestId("tao-home-settings"));
-    fireEvent.click(screen.getByTestId("tao-home-appearance"));
-    expect(onOpenSettings).toHaveBeenCalledTimes(1);
-    expect(onOpenAppearance).toHaveBeenCalledTimes(1);
+    expect(screen.queryByTestId("tao-home-settings")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("tao-home-appearance")).not.toBeInTheDocument();
+    const buttons = [...screen.getByTestId("tao-home-topbar").querySelectorAll("button")];
+    expect(buttons.at(-2)).toBe(screen.getByTestId("tao-home-demo-toggle"));
+    expect(buttons.at(-1)).toBe(screen.getByTestId("tao-home-side-toggle"));
+    expect(onOpenSettings).not.toHaveBeenCalled();
+    expect(onOpenAppearance).not.toHaveBeenCalled();
     fireEvent.click(screen.getByTestId("tao-home-demo-toggle"));
     expect(controller.getState().ui.demoMode).toBe(true);
     fireEvent.click(screen.getByTestId("tao-home-demo-toggle"));

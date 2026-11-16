@@ -5,7 +5,9 @@ from .steps import StepError
 def run(ctx, args):
     if not isinstance(args, dict) or set(args) != {"scenario"}:
         raise StepError("tao_real_provider_expanded expects scenario only")
-    if args["scenario"] == "project":
+    if args["scenario"] == "action-controls":
+        from .tao_action_controls import run as probe
+    elif args["scenario"] == "project":
         from .tao_real_project import run as probe
     elif args["scenario"] == "context":
         from .tao_real_context import run as probe

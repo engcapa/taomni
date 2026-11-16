@@ -4,6 +4,7 @@ import { getLocale, subscribeLocale } from "../../lib/i18n";
 /** Tao uses the application's locale subscription. Strings are kept here so
  * switching language never replaces the chat controller or its drafts. */
 const english: Record<string, string> = {
+  "保存": "Save",
   "目标 Agent 仍在执行，请完成后再带回。": "The coding agent is still running. Bring back its result after it finishes.",
   "执行已中断，请检查实际结果后重新提议。": "Execution was interrupted. Check the actual result before proposing it again.",
   "请在设置中启用对应编码 Agent": "Enable this coding agent in Settings", "交接编码任务": "Hand off coding task", "将发送当前对话、已选资料和执行结果；请先核对上下文。": "Review the conversation, selected excerpts and execution results before handing off.", "确认交接": "Confirm handoff", "带回 Tao": "Bring back to Tao", "编码 Agent 结果": "Coding agent result", "目标 Agent 尚无可带回的回复。": "The target agent has no reply to bring back yet.", "原 Tao 对话已关闭。": "The source Tao conversation is closed.", "请根据编码 Agent 的结果继续验证和完善任务。": "Continue verifying and improving the task using the coding agent's result.", "交接请求未进入队列，请在目标对话重试。": "The handoff was not queued. Retry in the target conversation.",

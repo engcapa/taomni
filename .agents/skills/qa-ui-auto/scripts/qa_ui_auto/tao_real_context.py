@@ -11,6 +11,12 @@ def run(ctx):
     with flow.evidence():
         flow.click('[data-testid="rail-chat-button"]')
         flow.click('[data-testid="tao-hub-tab-notes"]')
+        # Use the supported pinned layout for this persistence fixture. A
+        # floating drawer dismisses on outside pointer input and is covered by
+        # Notes' own docking cases, rather than being a retrieval precondition.
+        pinned = flow.read("return document.querySelector('[data-testid=\"ai-chat-drawer-pin\"]').getAttribute('aria-pressed');")
+        if pinned != "true":
+            flow.click('[data-testid="ai-chat-drawer-pin"]')
         flow.click('[data-testid="notes-new"]')
         ctx.session.fill('[data-testid="note-editor-title"]', "QAcontextnotes deployment guide")
         ctx.session.fill('[data-testid="note-editor-body"]', "Deploy after tests pass. api_key=qa-synthetic-private-value")

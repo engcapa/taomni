@@ -89,6 +89,15 @@ class AgentFixtureTests(unittest.TestCase):
                 req = Request(url, data=json.dumps(body).encode(), headers={"Content-Type": "application/json"})
                 with build_opener(ProxyHandler({})).open(req, timeout=5) as response:
                     self.assertIn("actual workspace guide", response.read().decode())
+                action = dict(id="same-proposal", kind="run_command", title="Review", payload=dict(command="echo exact reviewed bytes"))
+                body["messages"] = [dict(role="user", content="QA_ACTION_CONTROLS\n" + json.dumps(action) + "\nQA_END_ACTION")]
+                req = Request(url, data=json.dumps(body).encode(), headers={"Content-Type": "application/json"})
+                with build_opener(ProxyHandler({})).open(req, timeout=5) as response:
+                    frames = [json.loads(line[6:]) for line in response.read().decode().splitlines()
+                              if line.startswith("data: ") and line != "data: [DONE]"]
+                proposal = frames[1]["choices"][0]["delta"]["content"]
+                self.assertIn("tao-action", proposal)
+                self.assertEqual(json.loads(proposal.split("```tao-action\n", 1)[1].split("\n```", 1)[0]), action)
             finally:
                 tao_agent.teardown(ctx)
 

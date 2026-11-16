@@ -287,9 +287,6 @@ controls:
 - id: tao-home-side-toggle
   selector: '[data-testid="tao-home-side-toggle"]'
   kind: interactive
-- id: tao-home-appearance
-  selector: '[data-testid="tao-home-appearance"]'
-  kind: interactive
 - id: tao-home-capabilities
   selector: '[data-testid="tao-home-capabilities"]'
   kind: interactive
@@ -377,9 +374,6 @@ controls:
 - id: tao-home-retry
   selector: '[data-testid="tao-home-retry"]'
   kind: interactive
-- id: tao-home-settings
-  selector: '[data-testid="tao-home-settings"]'
-  kind: interactive
 - id: tao-home-vault-locked
   selector: '[data-testid="tao-home-vault-locked"]'
   kind: display
@@ -464,6 +458,63 @@ controls:
 - id: tao-home-body
   selector: '[data-testid="tao-home-body"]'
   kind: display
+- id: tao-home-memory-export
+  selector: '[data-testid="tao-home-memory-export"]'
+  kind: interactive
+- id: tao-home-memory-entry
+  selector: '[data-testid="tao-home-memory-entry"]'
+  kind: display
+- id: tao-home-memory-content
+  selector: '[data-testid="tao-home-memory-content"]'
+  kind: interactive
+- id: tao-home-memory-save
+  selector: '[data-testid="tao-home-memory-save"]'
+  kind: interactive
+- id: tao-home-memory-cancel
+  selector: '[data-testid="tao-home-memory-cancel"]'
+  kind: interactive
+- id: tao-home-memory-edit
+  selector: '[data-testid="tao-home-memory-edit"]'
+  kind: interactive
+- id: tao-home-memory-delete
+  selector: '[data-testid="tao-home-memory-delete"]'
+  kind: interactive
+- id: tao-home-dock-directory
+  selector: '[data-testid="tao-home-dock-directory"]'
+  kind: interactive
+- id: tao-home-dock-mail
+  selector: '[data-testid="tao-home-dock-mail"]'
+  kind: interactive
+- id: tao-home-dock-session
+  selector: '[data-testid="tao-home-dock-session"]'
+  kind: interactive
+- id: tao-home-dock-settings
+  selector: '[data-testid="tao-home-dock-settings"]'
+  kind: interactive
+- id: tao-home-context-local
+  selector: '[data-testid="tao-home-context-local"]'
+  kind: interactive
+- id: tao-home-search-filter-all
+  selector: '[data-testid="tao-home-search-filter-all"]'
+  kind: interactive
+- id: tao-home-search-filter-session
+  selector: '[data-testid="tao-home-search-filter-session"]'
+  kind: interactive
+- id: tao-home-search-filter-workspace
+  selector: '[data-testid="tao-home-search-filter-workspace"]'
+  kind: interactive
+- id: tao-home-search-filter-thread
+  selector: '[data-testid="tao-home-search-filter-thread"]'
+  kind: interactive
+- id: tao-home-search-filter-command
+  selector: '[data-testid="tao-home-search-filter-command"]'
+  kind: interactive
+- id: tao-home-search-filter-sql
+  selector: '[data-testid="tao-home-search-filter-sql"]'
+  kind: interactive
+- id: tao-home-search-filter-note
+  selector: '[data-testid="tao-home-search-filter-note"]'
+  kind: interactive
 -->
 
 Tao Home 将问、做、深研三种模式、绑定栏、Composer、消息状态、历史快捷行与本地资料搜索组合为独立宿主；首页入口移除 LAN 聊天，WSL 只在检测到可用发行版时显示。用例 `TC-TAO-HOME-001` 覆盖无 Key 空态、模式切换、历史三页签、搜索快捷键和托管 WebView smoke。

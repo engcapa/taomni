@@ -46,7 +46,10 @@ def scripted_reply(prompt):
         # Deliberately reuse model proposal IDs across repair rounds. The app
         # must distinguish proposal instances and never return an old write.
         return dict(id=name, kind="write_file", title="Write " + name, payload=dict(path=name, content=content))
-    if "test command in the bound workspace" in prompt:
+    if "QA_ACTION_CONTROLS\n" in prompt:
+        encoded = prompt.split("QA_ACTION_CONTROLS\n", 1)[1].split("\nQA_END_ACTION", 1)[0]
+        actions = [json.loads(encoded)]
+    elif "test command in the bound workspace" in prompt:
         actions = [dict(id="tests", kind="run_command", title="Run tests", payload=dict(command=prompt.rsplit("Command: ", 1)[1]))]
     elif "intentionally wrong" in prompt:
         actions = [file("calculator.py", BAD)]

@@ -3568,7 +3568,6 @@
 - `[data-testid="tao-home-demo-toggle"]` — interactive — F1.11.tao-home-demo-toggle
 - `[data-testid="tao-home-new-chat"]` — interactive — F1.11.tao-home-new-chat
 - `[data-testid="tao-home-side-toggle"]` — interactive — F1.11.tao-home-side-toggle
-- `[data-testid="tao-home-appearance"]` — interactive — F1.11.tao-home-appearance
 - `[data-testid="tao-home-capabilities"]` — interactive — F1.11.tao-home-capabilities
 - `[data-testid="tao-home-plus"]` — interactive — F1.11.tao-home-plus
 - `[data-testid="tao-home-voice"]` — interactive — F1.11.tao-home-voice
@@ -3599,7 +3598,6 @@
 - `[data-testid="tao-home-message-branch"]` — interactive — F1.11.tao-home-message-branch
 - `[data-testid="tao-home-error-state"]` — display — F1.11.tao-home-error-state
 - `[data-testid="tao-home-retry"]` — interactive — F1.11.tao-home-retry
-- `[data-testid="tao-home-settings"]` — interactive — F1.11.tao-home-settings
 - `[data-testid="tao-home-vault-locked"]` — display — F1.11.tao-home-vault-locked
 - `[data-testid="tao-home-vault-unlock"]` — interactive — F1.11.tao-home-vault-unlock
 - `[data-testid="tao-home-continue"]` — interactive — F1.11.tao-home-continue
@@ -3628,6 +3626,25 @@
 - `[data-testid="tao-home-side-resize"]` — interactive — F1.11.tao-home-side-resize
 - `[data-testid="tao-home-chat-column"]` — display — F1.11.tao-home-chat-column
 - `[data-testid="tao-home-body"]` — display — F1.11.tao-home-body
+- `[data-testid="tao-home-memory-export"]` — interactive — F1.11.tao-home-memory-export
+- `[data-testid="tao-home-memory-entry"]` — display — F1.11.tao-home-memory-entry
+- `[data-testid="tao-home-memory-content"]` — interactive — F1.11.tao-home-memory-content
+- `[data-testid="tao-home-memory-save"]` — interactive — F1.11.tao-home-memory-save
+- `[data-testid="tao-home-memory-cancel"]` — interactive — F1.11.tao-home-memory-cancel
+- `[data-testid="tao-home-memory-edit"]` — interactive — F1.11.tao-home-memory-edit
+- `[data-testid="tao-home-memory-delete"]` — interactive — F1.11.tao-home-memory-delete
+- `[data-testid="tao-home-dock-directory"]` — interactive — F1.11.tao-home-dock-directory
+- `[data-testid="tao-home-dock-mail"]` — interactive — F1.11.tao-home-dock-mail
+- `[data-testid="tao-home-dock-session"]` — interactive — F1.11.tao-home-dock-session
+- `[data-testid="tao-home-dock-settings"]` — interactive — F1.11.tao-home-dock-settings
+- `[data-testid="tao-home-context-local"]` — interactive — F1.11.tao-home-context-local
+- `[data-testid="tao-home-search-filter-all"]` — interactive — F1.11.tao-home-search-filter-all
+- `[data-testid="tao-home-search-filter-session"]` — interactive — F1.11.tao-home-search-filter-session
+- `[data-testid="tao-home-search-filter-workspace"]` — interactive — F1.11.tao-home-search-filter-workspace
+- `[data-testid="tao-home-search-filter-thread"]` — interactive — F1.11.tao-home-search-filter-thread
+- `[data-testid="tao-home-search-filter-command"]` — interactive — F1.11.tao-home-search-filter-command
+- `[data-testid="tao-home-search-filter-sql"]` — interactive — F1.11.tao-home-search-filter-sql
+- `[data-testid="tao-home-search-filter-note"]` — interactive — F1.11.tao-home-search-filter-note
 
 ## terminal/appearance (F5.2)
 

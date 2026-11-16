@@ -339,6 +339,25 @@ describe("SettingsPanel", () => {
     });
   });
 
+  it("searches a retained deep-linked panel from the new match and releases it when cleared", async () => {
+    openSettingsSection("ai-tao");
+    const { container } = render(<SettingsPanel />);
+    const scroll = vi.mocked(Element.prototype.scrollIntoView);
+    const tao = container.querySelector('[data-search-id="ai-tao"]');
+    await waitFor(() => expect(scroll.mock.instances).toContain(tao));
+    scroll.mockClear();
+
+    fireEvent.change(screen.getByTestId("settings-search-input"), { target: { value: "theme" } });
+    const theme = container.querySelector('[data-search-id="app-theme"]');
+    await waitFor(() => expect(scroll.mock.instances).toContain(theme));
+    expect(scroll).toHaveBeenLastCalledWith({ block: "start", behavior: "auto" });
+    expect(scroll.mock.instances).not.toContain(tao);
+
+    fireEvent.keyDown(screen.getByTestId("settings-search-input"), { key: "Escape" });
+    expect(screen.getByTestId("settings-search-input")).toHaveValue("");
+    expect(theme).not.toHaveAttribute("data-search-match");
+  });
+
   it("shows an empty state when no setting matches", async () => {
     const user = userEvent.setup();
     render(<SettingsPanel />);
