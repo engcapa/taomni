@@ -37,5 +37,5 @@ export const taoFiles = {
 };
 
 export function fileChip(file: TaoFile): ContextChip {
-  return { id: `file:${file.fileId}`, kind: "file", label: file.filename, fileId: file.fileId, mime: file.mime, provider: file.provider ?? "deepseek-app", preview: tr(file.provider === "opencode-go" ? "文件将在发送时提交：{bytes} 字节" : "文件已上传：{bytes} 字节", { bytes: file.sizeBytes }), removable: true };
+  return { id: `file:${file.fileId}`, kind: "file", label: file.filename, fileId: file.fileId, mime: file.mime, provider: file.provider ?? "deepseek-app", preview: tr(file.provider && file.provider !== "deepseek-app" ? "文件将在发送时提交：{bytes} 字节" : "文件已上传：{bytes} 字节", { bytes: file.sizeBytes }), removable: true };
 }

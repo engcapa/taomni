@@ -1,0 +1,181 @@
+id: TC-TAO-HOME-045
+title: Native ordinary provider attachments are scoped and survive reload
+description: Select a real document with the OS chooser, read it through OpenAI and Anthropic adapters, and reload before reading it
+  again. Switching provider removes chips and omits foreign historical handles while retaining conversation text. Each provider receives
+  only a document selected for it.
+modes:
+- native
+covers:
+- F1.11
+tags:
+- p0
+- tao-home
+- regression
+fixtures:
+- reset_db
+- tao_llm
+timeout_sec: 240
+native_platforms:
+- Windows
+- Linux
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-tao-home-045
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- wait_for: '[data-testid="tao-home-composer-input"]:enabled'
+- click: '[data-testid="tao-home-plus"]'
+- click: '[data-testid="tao-home-context-attach"]'
+- native_file_dialog:
+    kind: open
+    action: choose
+    path: ${fixture.tao_llm_document}
+    title: ${fixture.tao_llm_chooser_title}
+    trigger: '[data-testid="tao-home-file-choose"]'
+- assert_count:
+    selector: .tao-home-context-chip
+    equal: 1
+- fill:
+    selector: '[data-testid="tao-home-composer-input"]'
+    value: QA-LLM-ATTACH first document
+- click: '[data-testid="tao-home-send"]'
+- assert_text:
+    selector: '[data-testid="tao-home-message-list"]'
+    contains: Document value is 73
+- assert_visible: '[data-testid="tao-home-message-regenerate"]'
+- click: '[data-testid="tao-home-capabilities"]'
+- select_option:
+    selector: '[data-testid="tao-home-provider"]'
+    value: qa-anthropic
+- press: Escape
+- assert_count:
+    selector: .tao-home-context-chip
+    equal: 0
+- fill:
+    selector: '[data-testid="tao-home-composer-input"]'
+    value: QA-LLM-SECOND after provider switch
+- click: '[data-testid="tao-home-send"]'
+- assert_count:
+    selector: '[data-testid="tao-home-message-regenerate"]'
+    equal: 2
+- assert_file_contains:
+    path: ${fixture.tao_llm_log}
+    contains: POST /v1/messages model=qa-messages-v1 standard=true
+- native_file_dialog:
+    kind: open
+    action: choose
+    path: ${fixture.tao_llm_document}
+    title: ${fixture.tao_llm_chooser_title}
+    trigger: '[data-testid="tao-home-file-choose"]'
+- assert_count:
+    selector: .tao-home-context-chip
+    equal: 1
+- fill:
+    selector: '[data-testid="tao-home-composer-input"]'
+    value: QA-LLM-ATTACH selected for Anthropic
+- click: '[data-testid="tao-home-send"]'
+- assert_count:
+    selector: '[data-testid="tao-home-message-regenerate"]'
+    equal: 3
+- assert_text:
+    selector: '[data-testid="tao-home-message-assistant"]:last-child'
+    contains: Document value is 73
+- reload_window: null
+- wait_for: '[data-testid="tao-home-composer-input"]:enabled'
+- fill:
+    selector: '[data-testid="tao-home-composer-input"]'
+    value: QA-LLM-ATTACH after reload
+- click: '[data-testid="tao-home-send"]'
+- assert_count:
+    selector: '[data-testid="tao-home-message-regenerate"]'
+    equal: 4
+- assert_text:
+    selector: '[data-testid="tao-home-message-assistant"]:last-child'
+    contains: Document value is 73
+- assert_file_contains:
+    path: ${fixture.tao_llm_log}
+    contains: document-bytes-verified
+- assert_no_runtime_errors: null
+- screenshot: ordinary-attachments-restored.png
+verification:
+  review: reviewed
+  requirements:
+  - id: PROVIDER-045
+    requirement: Actual file selections, provider isolation, protocol-specific document content and restored local-file authorization
+      remain correct across switching and reload.
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 6
+    - 7
+    - 8
+    - 10
+    - 11
+    - 14
+    - 15
+    - 16
+    - 18
+    - 19
+    - 22
+    - 24
+    - 25
+    - 28
+    - 30
+    - 31
+    checkpoints:
+    - step: 5
+      expectation: '[data-testid="tao-home-composer-input"]:enabled'
+    - step: 9
+      expectation: '{''selector'': ''.tao-home-context-chip'', ''equal'': 1}'
+    - step: 12
+      expectation: '{''selector'': ''[data-testid="tao-home-message-list"]'', ''contains'': ''Document value is 73''}'
+    - step: 13
+      expectation: '[data-testid="tao-home-message-regenerate"]'
+    - step: 17
+      expectation: '{''selector'': ''.tao-home-context-chip'', ''equal'': 0}'
+    - step: 20
+      expectation: '{''selector'': ''[data-testid="tao-home-message-regenerate"]'', ''equal'': 2}'
+    - step: 21
+      expectation: '{''path'': ''${fixture.tao_llm_log}'', ''contains'': ''POST /v1/messages model=qa-messages-v1 standard=true''}'
+    - step: 23
+      expectation: '{''selector'': ''.tao-home-context-chip'', ''equal'': 1}'
+    - step: 26
+      expectation: '{''selector'': ''[data-testid="tao-home-message-regenerate"]'', ''equal'': 3}'
+    - step: 27
+      expectation: '{''selector'': ''[data-testid="tao-home-message-assistant"]:last-child'', ''contains'': ''Document value is 73''}'
+    - step: 29
+      expectation: '[data-testid="tao-home-composer-input"]:enabled'
+    - step: 32
+      expectation: '{''selector'': ''[data-testid="tao-home-message-regenerate"]'', ''equal'': 4}'
+    - step: 33
+      expectation: '{''selector'': ''[data-testid="tao-home-message-assistant"]:last-child'', ''contains'': ''Document value is 73''}'
+    - step: 34
+      expectation: '{''path'': ''${fixture.tao_llm_log}'', ''contains'': ''document-bytes-verified''}'
+    - step: 35
+      expectation: None
+    results:
+    - 5
+    - 9
+    - 12
+    - 13
+    - 17
+    - 20
+    - 21
+    - 23
+    - 26
+    - 27
+    - 29
+    - 32
+    - 33
+    - 34
+    - 35
+  native:
+  - check: Real configured provider IPC and persistence
+    method: automated
+    reason: Actual QA binary, isolated profile and normalized Tao stream; loopback protocol success does not certify a commercial model.
+  visual:
+  - check: Combined LLM and chat configuration
+    method: manual
+    reason: Retained screenshot supports review alongside semantic assertions.

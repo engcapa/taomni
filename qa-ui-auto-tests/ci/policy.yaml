@@ -32,6 +32,9 @@ smoke:
 - TC-FILE-OPEN-006
 unavailable: {}
 cases:
+- TC-TAO-HOME-045
+- TC-TAO-HOME-043
+- TC-TAO-HOME-044
 - TC-TAO-HOME-042
 - TC-TAO-HOME-041
 - TC-TAO-HOME-040

@@ -3620,9 +3620,20 @@
 - `[data-testid="tao-home-regenerate"]` — interactive [optional] — F1.11.tao-home-regenerate
 - `[data-testid="tao-home-stopped-state"]` — display [optional] — F1.11.tao-home-stopped-state
 - `[data-testid="tao-settings"]` — display — F1.11.tao-settings
-- `[data-testid="tao-settings-save"]` — interactive — F1.11.tao-settings-save
-- `[data-testid="tao-settings-status"]` — display — F1.11.tao-settings-status
-- `[data-testid="tao-settings"] [data-testid="llm-proxy-mode"]` — interactive — F1.11.tao-settings-proxy
+- `[data-testid="tao-settings-provider"]` — interactive — F1.11.tao-settings-provider
+- `[data-testid="tao-settings-model"]` — interactive — F1.11.tao-settings-model
+- `[data-testid="tao-settings-cost"]` — interactive — F1.11.tao-settings-cost
+- `[data-testid="tao-settings-tts"]` — interactive — F1.11.tao-settings-tts
+- `[data-testid="tao-home-model"]` — interactive — F1.11.tao-home-model
+- `[data-provider="deepseek-app"] [data-testid="llm-proxy-mode"]` — interactive — F1.11.tao-shared-provider-proxy
+- `[data-provider="deepseek-app"] > div` — interactive — F1.11.tao-shared-provider-row
+- `[data-provider="local"] > div` — interactive — F1.11.tao-local-provider-row
+- `[data-provider="local"] [data-testid="llm-provider-model"]` — interactive — F1.11.tao-local-provider-model
+- `[data-testid="tao-home-file-choose"]` — interactive [optional] — F1.11.tao-file-choose
+- `.tao-home-context-chip` — display [optional] — F1.11.tao-file-context-chip
+- `[data-testid="tao-settings-save"]` — interactive [optional] — F1.11.retired-tao-settings-save
+- `[data-testid="tao-settings-key"]` — interactive [optional] — F1.11.retired-tao-settings-key
+- `[data-testid="llm-providers-status"]` — display — F1.11.tao-shared-config-status
 - `[role="dialog"][aria-label="模型与能力"]` — display — F1.11.tao-home-capabilities-dialog
 - `[role="dialog"][aria-label="模型与能力"] button:has-text("deepseek-v4-pro")` — interactive — F1.11.tao-home-capability-model-v4
 - `[data-testid="tao-home-history-row"]` — interactive — F1.11.tao-home-history-row

@@ -43,7 +43,7 @@ def setup(ctx):
         "api_key": key,
         "api_keys": [],
         "model": model,
-        "runtime": "openai-compat" if provider_id == "opencode-go" else "deepseek-messages",
+        "runtime": "opencode-go" if provider_id == "opencode-go" else "deepseek-messages",
         "proxy_mode": "manual" if proxy_url else "none",
         "proxy_url": proxy_url or None,
         "capabilities": {"chat": True, "image_generation": False, "video_generation": False},

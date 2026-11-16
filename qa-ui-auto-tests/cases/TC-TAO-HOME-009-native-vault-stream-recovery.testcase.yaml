@@ -1,9 +1,10 @@
 id: TC-TAO-HOME-009
 title: Native Vault locking cancels Tao HTTP and requires explicit unlock and retry
-description: Save a disposable Messages key through production Settings and Vault, start a real slow native HTTP stream, lock
-  Vault from Settings, and independently verify socket cancellation. Retain the partial reply and draft, cancel and retry
-  the real unlock gate, then require a separate user action before another request. Server-side request counts detect automatic
-  paid retries. This protocol fixture does not certify a commercial provider or OS-level shortcut delivery.
+description: Save a disposable Messages key through production Settings and Vault, start a real slow native HTTP stream, lock Vault
+  from Settings, and independently verify socket cancellation. Retain the partial reply and draft, cancel and retry the real unlock
+  gate, then require a separate user action before another request. Server-side request counts detect automatic paid retries. This protocol
+  fixture does not certify a commercial provider or OS-level shortcut delivery. Provider proxy edits and Tao defaults use the merged
+  LLM settings and its shared Vault-aware save.
 modes:
 - native
 covers:
@@ -25,10 +26,10 @@ steps:
 - click: '[data-testid="tao-home-dock-more"]'
 - click: '[data-testid="tao-home-dock-settings"]'
 - wait_for: '[data-testid="tao-settings"]'
-- click: '[data-testid="tao-settings-save"]'
+- click: '[data-testid="llm-providers-save"]'
 - vault_first_run: qa-tao-home-009
 - assert_text:
-    selector: '[data-testid="tao-settings-status"]'
+    selector: '[data-testid="llm-providers-status"]'
     contains: Saved
 - click: '[data-testid="nav-mode-home"]'
 - fill:

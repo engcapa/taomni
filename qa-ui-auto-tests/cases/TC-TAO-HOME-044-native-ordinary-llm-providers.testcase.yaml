@@ -1,0 +1,216 @@
+id: TC-TAO-HOME-044
+title: Native ordinary OpenAI, Anthropic and local providers preserve history and cancel actual requests
+description: Use three configured non-harness providers through real IPC. Check model and protocol on the wire, successful multi-turn
+  history, ordinary-provider thinking/web gates, actual socket cancellation, HTTP failure and recovery, and persistence after reload.
+  No commercial service is contacted.
+modes:
+- native
+covers:
+- F1.11
+tags:
+- p0
+- tao-home
+- regression
+fixtures:
+- reset_db
+- tao_llm
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-tao-home-044
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- wait_for: '[data-testid="tao-home-composer-input"]:enabled'
+- click: '[data-testid="tao-home-capabilities"]'
+- eval_readonly:
+    expression: document.querySelector('.tao-home-popup-items select').textContent.includes("qa-anthropic") && !/claude-code|qa-media-only/.test(document.querySelector('.tao-home-popup-items
+      select').textContent)
+    expect_truthy: true
+- assert_disabled: '[data-testid="tao-home-capability-thinking"]'
+- press: Escape
+- fill:
+    selector: '[data-testid="tao-home-composer-input"]'
+    value: QA-LLM-FIRST
+- click: '[data-testid="tao-home-send"]'
+- assert_text:
+    selector: '[data-testid="tao-home-message-list"]'
+    contains: Ordinary first reply
+- assert_visible: '[data-testid="tao-home-message-regenerate"]'
+- fill:
+    selector: '[data-testid="tao-home-composer-input"]'
+    value: QA-LLM-SECOND
+- click: '[data-testid="tao-home-send"]'
+- assert_count:
+    selector: '[data-testid="tao-home-message-regenerate"]'
+    equal: 2
+- assert_file_contains:
+    path: ${fixture.tao_llm_log}
+    contains: model=qa-chat-v1 standard=true history=true
+- click: '[data-testid="tao-home-capabilities"]'
+- select_option:
+    selector: '[data-testid="tao-home-provider"]'
+    value: qa-anthropic
+- press: Escape
+- fill:
+    selector: '[data-testid="tao-home-composer-input"]'
+    value: QA-LLM-SECOND Anthropic
+- click: '[data-testid="tao-home-send"]'
+- assert_count:
+    selector: '[data-testid="tao-home-message-regenerate"]'
+    equal: 3
+- assert_file_contains:
+    path: ${fixture.tao_llm_log}
+    contains: POST /v1/messages model=qa-messages-v1 standard=true history=true
+- fill:
+    selector: '[data-testid="tao-home-composer-input"]'
+    value: QA-LLM-SLOW
+- click: '[data-testid="tao-home-send"]'
+- assert_text:
+    selector: '[data-testid="tao-home-message-list"]'
+    contains: Ordinary partial reply
+- click: '[data-testid="tao-home-stop"]'
+- assert_file_contains:
+    path: ${fixture.tao_llm_log}
+    contains: network-cancelled
+- fill:
+    selector: '[data-testid="tao-home-composer-input"]'
+    value: QA-LLM-FAIL
+- click: '[data-testid="tao-home-send"]'
+- assert_text:
+    selector: '[data-testid="tao-home-message-list"]'
+    contains: HTTP 401
+- click: '[data-testid="tao-home-capabilities"]'
+- select_option:
+    selector: '[data-testid="tao-home-provider"]'
+    value: qa-local
+- press: Escape
+- fill:
+    selector: '[data-testid="tao-home-composer-input"]'
+    value: QA-LLM-SECOND recovered locally
+- click: '[data-testid="tao-home-send"]'
+- assert_file_contains:
+    path: ${fixture.tao_llm_log}
+    contains: POST /v1/chat/completions model=qa-local-v1 standard=true history=true
+- wait_for: '[data-testid="tao-home-send"]:disabled'
+- reload_window: null
+- wait_for: '[data-testid="tao-home-composer-input"]:enabled'
+- click: '[data-testid="tao-home-capabilities"]'
+- eval_readonly:
+    expression: document.querySelector('.tao-home-popup-items select').value === "qa-local" && document.querySelector('.tao-home-popup-items
+      input').value === "qa-local-v1"
+    expect_truthy: true
+- press: Escape
+- assert_text:
+    selector: '[data-testid="tao-home-message-list"]'
+    contains: Ordinary first reply
+- assert_text:
+    selector: '[data-testid="tao-home-message-list"]'
+    contains: Ordinary follow-up reply
+- assert_no_runtime_errors: null
+- screenshot: ordinary-providers-history-recovery.png
+verification:
+  review: reviewed
+  requirements:
+  - id: PROVIDER-044
+    requirement: Configured ordinary LLMs use their exact models and API protocols, preserve completed history and per-thread choices,
+      cancel actual network work, surface HTTP failures, and recover with a different provider.
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 6
+    - 9
+    - 10
+    - 11
+    - 14
+    - 15
+    - 18
+    - 19
+    - 20
+    - 21
+    - 22
+    - 25
+    - 26
+    - 28
+    - 30
+    - 31
+    - 33
+    - 34
+    - 35
+    - 36
+    - 37
+    - 40
+    - 42
+    - 44
+    checkpoints:
+    - step: 5
+      expectation: '[data-testid="tao-home-composer-input"]:enabled'
+    - step: 7
+      expectation: '{''expression'': ''document.querySelector(\''.tao-home-popup-items select\'').textContent.includes("qa-anthropic")
+        && !/claude-code|qa-media-only/.test(document.querySelector(\''.tao-home-popup-items select\'').textContent)'', ''expect_truthy'':
+        True}'
+    - step: 8
+      expectation: '[data-testid="tao-home-capability-thinking"]'
+    - step: 12
+      expectation: '{''selector'': ''[data-testid="tao-home-message-list"]'', ''contains'': ''Ordinary first reply''}'
+    - step: 13
+      expectation: '[data-testid="tao-home-message-regenerate"]'
+    - step: 16
+      expectation: '{''selector'': ''[data-testid="tao-home-message-regenerate"]'', ''equal'': 2}'
+    - step: 17
+      expectation: '{''path'': ''${fixture.tao_llm_log}'', ''contains'': ''model=qa-chat-v1 standard=true history=true''}'
+    - step: 23
+      expectation: '{''selector'': ''[data-testid="tao-home-message-regenerate"]'', ''equal'': 3}'
+    - step: 24
+      expectation: '{''path'': ''${fixture.tao_llm_log}'', ''contains'': ''POST /v1/messages model=qa-messages-v1 standard=true history=true''}'
+    - step: 27
+      expectation: '{''selector'': ''[data-testid="tao-home-message-list"]'', ''contains'': ''Ordinary partial reply''}'
+    - step: 29
+      expectation: '{''path'': ''${fixture.tao_llm_log}'', ''contains'': ''network-cancelled''}'
+    - step: 32
+      expectation: '{''selector'': ''[data-testid="tao-home-message-list"]'', ''contains'': ''HTTP 401''}'
+    - step: 38
+      expectation: '{''path'': ''${fixture.tao_llm_log}'', ''contains'': ''POST /v1/chat/completions model=qa-local-v1 standard=true
+        history=true''}'
+    - step: 39
+      expectation: '[data-testid="tao-home-send"]:disabled'
+    - step: 41
+      expectation: '[data-testid="tao-home-composer-input"]:enabled'
+    - step: 43
+      expectation: '{''expression'': ''document.querySelector(\''.tao-home-popup-items select\'').value === "qa-local" && document.querySelector(\''.tao-home-popup-items
+        input\'').value === "qa-local-v1"'', ''expect_truthy'': True}'
+    - step: 45
+      expectation: '{''selector'': ''[data-testid="tao-home-message-list"]'', ''contains'': ''Ordinary first reply''}'
+    - step: 46
+      expectation: '{''selector'': ''[data-testid="tao-home-message-list"]'', ''contains'': ''Ordinary follow-up reply''}'
+    - step: 47
+      expectation: None
+    results:
+    - 5
+    - 7
+    - 8
+    - 12
+    - 13
+    - 16
+    - 17
+    - 23
+    - 24
+    - 27
+    - 29
+    - 32
+    - 38
+    - 39
+    - 41
+    - 43
+    - 45
+    - 46
+    - 47
+  native:
+  - check: Real configured provider IPC and persistence
+    method: automated
+    reason: Actual QA binary, isolated profile and normalized Tao stream; loopback protocol success does not certify a commercial model.
+  visual:
+  - check: Combined LLM and chat configuration
+    method: manual
+    reason: Retained screenshot supports review alongside semantic assertions.

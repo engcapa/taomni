@@ -439,15 +439,52 @@ controls:
 - id: tao-settings
   selector: '[data-testid="tao-settings"]'
   kind: display
-- id: tao-settings-save
+- id: tao-settings-provider
+  selector: '[data-testid="tao-settings-provider"]'
+  kind: interactive
+- id: tao-settings-model
+  selector: '[data-testid="tao-settings-model"]'
+  kind: interactive
+- id: tao-settings-cost
+  selector: '[data-testid="tao-settings-cost"]'
+  kind: interactive
+- id: tao-settings-tts
+  selector: '[data-testid="tao-settings-tts"]'
+  kind: interactive
+- id: tao-home-model
+  selector: '[data-testid="tao-home-model"]'
+  kind: interactive
+- id: tao-shared-provider-proxy
+  selector: '[data-provider="deepseek-app"] [data-testid="llm-proxy-mode"]'
+  kind: interactive
+- id: tao-shared-provider-row
+  selector: '[data-provider="deepseek-app"] > div'
+  kind: interactive
+- id: tao-local-provider-row
+  selector: '[data-provider="local"] > div'
+  kind: interactive
+- id: tao-local-provider-model
+  selector: '[data-provider="local"] [data-testid="llm-provider-model"]'
+  kind: interactive
+- id: tao-file-choose
+  selector: '[data-testid="tao-home-file-choose"]'
+  kind: interactive
+  optional: true
+- id: tao-file-context-chip
+  selector: '.tao-home-context-chip'
+  kind: display
+  optional: true
+- id: retired-tao-settings-save
   selector: '[data-testid="tao-settings-save"]'
   kind: interactive
-- id: tao-settings-status
-  selector: '[data-testid="tao-settings-status"]'
-  kind: display
-- id: tao-settings-proxy
-  selector: '[data-testid="tao-settings"] [data-testid="llm-proxy-mode"]'
+  optional: true
+- id: retired-tao-settings-key
+  selector: '[data-testid="tao-settings-key"]'
   kind: interactive
+  optional: true
+- id: tao-shared-config-status
+  selector: '[data-testid="llm-providers-status"]'
+  kind: display
 - id: tao-home-capabilities-dialog
   selector: '[role="dialog"][aria-label="模型与能力"]'
   kind: display
@@ -15892,3 +15929,10 @@ TC-FILE-OPEN-001..006 是可执行行为用例并纳入 crash-regression；当�
 | AC-16/17/22 | TC-FILE-OPEN-010 browser/native | 真实 iframe 目标指针；脚本禁用、外链父页面确认/取消、伪造 token/消息拒绝、焦点恢复 | macOS opaque frame 需 OS Accessibility/CoreGraphics 权限，拒绝时失败不伪证 |
 
 | AC-18 | TC-FILE-OPEN-011 native | 本地真实 PTY 输出路径 → Ctrl/Cmd+点击 → 正确文本/只一标签/磁盘不变；手动切回终端超过 3 秒仍保持选中，重复打开去重，关闭查看器后 shell 独立锚定输出仍工作 | 不以 browser stub 或 handler 调用代替；hosted执行待证据 |
+
+- TC-TAO-HOME-043: combined LLM and chat/agent defaults, one Vault-aware save, ordinary provider selection, capability gates and reload persistence (F1.11).
+- TC-TAO-HOME-044: actual OpenAI/Anthropic/local Tao IPC, configured model routing, multi-turn history, socket cancellation, HTTP failure/recovery and restored per-thread preferences (F1.11).
+
+- TC-TAO-HOME-045: real OS document selection for ordinary providers, scoped authorization, explicit reselection and reload persistence (F1.11; Linux/Windows native).
+
+The retired Tao-specific key/save selectors are retained as optional absence assertions in HOME043; credentials and saving are owned by the combined LLM panel.

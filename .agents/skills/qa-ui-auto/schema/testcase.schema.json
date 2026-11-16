@@ -69,6 +69,7 @@
           "backup_cloud",
           "model_inspector_gateway",
           "tao_messages",
+          "tao_llm",
           "tao_agent",
           "tao_memory",
           "tao_history",
