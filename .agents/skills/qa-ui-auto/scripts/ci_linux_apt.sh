@@ -19,6 +19,19 @@ prepare_apt_mirrors() {
   fi
 }
 
+configure_playwright_platform() {
+  local profile="$1"
+  if [[ "$profile" == ubuntu-26.04-wayland ]]; then
+    # Playwright 1.55 has no Resolute dependency manifest. Use its Noble
+    # Chromium build and dependency list on this newer x64 Ubuntu runner.
+    # The QA desktop/profile identity remains Ubuntu 26.04 Wayland.
+    export PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=ubuntu24.04-x64
+    if [[ -n "${GITHUB_ENV:-}" ]]; then
+      echo "PLAYWRIGHT_HOST_PLATFORM_OVERRIDE=$PLAYWRIGHT_HOST_PLATFORM_OVERRIDE" >> "$GITHUB_ENV"
+    fi
+  fi
+}
+
 update_package_index() {
   sudo apt-get -o Acquire::Retries=3 -o Acquire::http::Timeout=15 -o Acquire::https::Timeout=15 update
 }

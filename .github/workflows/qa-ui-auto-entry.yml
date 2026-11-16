@@ -56,6 +56,7 @@ jobs:
           if [[ "$RUNNER_OS" == Linux ]]; then
             source .agents/skills/qa-ui-auto/scripts/ci_linux_apt.sh
             prepare_apt_mirrors "${QA_LINUX_PROFILE:-ubuntu-24.04-xvfb}"
+            configure_playwright_platform "${QA_LINUX_PROFILE:-ubuntu-24.04-xvfb}"
           fi
           python -m playwright install --with-deps chromium
           echo "PLAYWRIGHT_BROWSERS_PATH=$PLAYWRIGHT_BROWSERS_PATH" >> "$GITHUB_ENV"
