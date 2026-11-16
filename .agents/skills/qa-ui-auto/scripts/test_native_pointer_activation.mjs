@@ -11,6 +11,14 @@ class InputEvent {
 const dispatch = runInNewContext(`${script}\ndispatchQaActions`, {
   PointerEvent: InputEvent, MouseEvent: InputEvent, setTimeout,
 });
+class CapturingElement {
+  setPointerCapture() { throw new Error("the synthetic pointer has no native capture"); }
+  hasPointerCapture() { return false; }
+  releasePointerCapture() { throw new Error("unexpected native release"); }
+}
+const dispatchCaptured = runInNewContext(`${script}\ndispatchQaActions`, {
+  Element: CapturingElement, PointerEvent: InputEvent, MouseEvent: InputEvent, setTimeout,
+});
 function element(parentElement = null, handler = () => {}) {
   return {
     parentElement, isConnected: true, events: [], focused: false,
@@ -86,4 +94,57 @@ test("prevented pointerdown suppresses compatibility mouse events and retains cl
   assert.deepEqual(types(target).filter((type) => type !== "mouseover" && type !== "mousemove"),
     ["pointermove", "pointerdown", "pointerup", "click"]);
   assert.equal(target.focused, false);
+});
+
+const dragActions = [{ type: "pointer", actions: [
+  { type: "pointerMove", x: 100, y: 100 },
+  { type: "pointerDown", button: 0 },
+  { type: "pointerMove", x: 160, y: 100 },
+  { type: "pointerUp", button: 0 },
+] }];
+function capturing(handler) {
+  return Object.setPrototypeOf(element(null, handler), CapturingElement.prototype);
+}
+const modifiers = { Control: false, Shift: false, Alt: false, Meta: false };
+const origin = (_origin, x, y) => [x, y];
+
+test("a captured Markdown separator keeps receiving moves outside its hit rectangle", async () => {
+  const original = Object.getOwnPropertyDescriptors(CapturingElement.prototype);
+  let ratio = 50;
+  let capturedOnUp = false;
+  const preview = element();
+  const handle = capturing((event, node) => {
+    if (event.type === "pointerdown") { node.setPointerCapture(event.pointerId); event.preventDefault(); }
+    if (event.type === "pointermove" && event.buttons === 1) ratio = event.clientX;
+    if (event.type === "pointerup") {
+      capturedOnUp = node.hasPointerCapture(event.pointerId);
+      node.releasePointerCapture(event.pointerId);
+    }
+  });
+  await dispatchCaptured(dragActions, () => {}, modifiers, origin, x => x === 100 ? handle : preview);
+  assert.equal(ratio, 160, "the actual separator handler must observe the moved pointer");
+  assert.equal(capturedOnUp, true);
+  assert.equal(types(preview).includes("pointermove"), false);
+  assert.deepEqual(Object.getOwnPropertyDescriptors(CapturingElement.prototype), original);
+});
+
+test("capture APIs are restored after a cancelled drag", async () => {
+  const original = Object.getOwnPropertyDescriptors(CapturingElement.prototype);
+  const handle = capturing((event, node) => {
+    if (event.type === "pointerdown") node.setPointerCapture(event.pointerId);
+  });
+  let ticks = 0;
+  await dispatchCaptured(dragActions, () => {}, modifiers, origin, () => handle, () => ++ticks > 2);
+  assert.deepEqual(Object.getOwnPropertyDescriptors(CapturingElement.prototype), original);
+  assert.equal(types(handle).includes("pointerup"), false);
+});
+
+test("a throwing application handler releases capture and restores native methods", async () => {
+  const original = Object.getOwnPropertyDescriptors(CapturingElement.prototype);
+  const handle = capturing((event, node) => {
+    if (event.type === "pointerdown") node.setPointerCapture(event.pointerId);
+    if (event.type === "pointermove" && event.buttons) throw new Error("application failure");
+  });
+  await assert.rejects(dispatchCaptured(dragActions, () => {}, modifiers, origin, () => handle), /application failure/);
+  assert.deepEqual(Object.getOwnPropertyDescriptors(CapturingElement.prototype), original);
 });
