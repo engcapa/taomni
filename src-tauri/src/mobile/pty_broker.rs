@@ -360,3 +360,14 @@ mod tests {
         assert_eq!(broker.resume("terminal", 0)[0]["gap"], true);
     }
 }
+
+// Transitional TASK-022 adapter. Core owns only a Weak typed observation;
+// MobileRuntime remains the sole owner of the broker and its replay state.
+impl crate::terminal::observation::TerminalObserver for Broker {
+    fn output(&self, session_id: &str, bytes: &[u8]) {
+        Broker::output(self, session_id, bytes);
+    }
+    fn exited(&self, session_id: &str, code: Option<u32>) {
+        self.exit_with_code(session_id, code);
+    }
+}

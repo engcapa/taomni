@@ -15,7 +15,7 @@ pub async fn screenshot_copy_image(app: AppHandle, path: String) -> Result<(), S
         let path = capture::ensure_artifact_path(&path)?;
         let image = clipboard_image(&path)?;
         let state = app.state::<AppState>();
-        super::clipboard_copy::publish(&state.clipboard, &image)
+        super::clipboard_copy::publish(&state.core.clipboard, &image)
     })
     .await
 }

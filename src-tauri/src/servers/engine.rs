@@ -67,7 +67,7 @@ impl LogEmitter {
         let ts = chrono::Local::now().format("%H:%M:%S");
         let line = format!("[{}] {}", ts, msg.into());
         if let Some(state) = self.app.try_state::<crate::state::AppState>() {
-            state.servers.record_log(self.server_type, &line);
+            state.legacy.servers.record_log(self.server_type, &line);
         }
         let channel = format!("server://output/{}", self.server_type.as_str());
         let _ = self.app.emit(&channel, line);

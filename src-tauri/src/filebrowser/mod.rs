@@ -76,13 +76,13 @@ pub async fn sftp_attach(
     state: State<'_, AppState>,
     app_handle: AppHandle,
 ) -> Result<AttachResultPayload, String> {
-    let auth = auth_from_with_vault(&auth_method, auth_data, &state.vault)?;
+    let auth = auth_from_with_vault(&auth_method, auth_data, &state.core.vault)?;
     let network =
         crate::terminal::network::NetworkSettings::from_json(network_settings_json.as_deref());
     let network = match network {
         Some(mut n) => {
             crate::terminal::resolve_proxy_session(&state, &mut n)?;
-            n.resolve_proxy_pass(&state.vault)?;
+            n.resolve_proxy_pass(&state.core.vault)?;
             crate::terminal::resolve_jump_credentials(&state, &mut n)?;
             Some(n)
         }
@@ -90,7 +90,7 @@ pub async fn sftp_attach(
     };
     let prompter = build_kbd_prompter(
         app_handle.clone(),
-        state.terminal.ssh_auth_responders.clone(),
+        state.core.terminal.ssh_auth_responders.clone(),
         session_id.clone(),
     );
     let session_result = sftp::open_sftp(
@@ -102,12 +102,12 @@ pub async fn sftp_attach(
         Some(&prompter),
     )
     .await;
-    clear_session_auth_responders(&state.terminal.ssh_auth_responders, &session_id);
+    clear_session_auth_responders(&state.core.terminal.ssh_auth_responders, &session_id);
     let session = session_result?;
     let home = session.home.clone();
 
     {
-        let mut sessions = state.files.sftp_sessions.write().await;
+        let mut sessions = state.core.files.sftp_sessions.write().await;
         sessions.insert(session_id.clone(), Arc::new(session));
     }
 
@@ -118,7 +118,7 @@ pub async fn sftp_attach(
 
 #[tauri::command]
 pub async fn sftp_detach(session_id: String, state: State<'_, AppState>) -> Result<(), String> {
-    let mut sessions = state.files.sftp_sessions.write().await;
+    let mut sessions = state.core.files.sftp_sessions.write().await;
     sessions.remove(&session_id);
     Ok(())
 }
@@ -594,7 +594,7 @@ async fn get_session(
     state: &State<'_, AppState>,
     session_id: &str,
 ) -> Result<Arc<sftp::ActiveSftp>, String> {
-    let sessions = state.files.sftp_sessions.read().await;
+    let sessions = state.core.files.sftp_sessions.read().await;
     sessions
         .get(session_id)
         .cloned()

@@ -78,7 +78,7 @@ pub async fn voice_cleanup_text(
         requests.insert(request_id.clone(), token.clone());
     }
     let result = async {
-        let ai = state.ai_ctx.read().await;
+        let ai = state.legacy.ai_ctx.read().await;
         let mode = ai.config.asr.cleanup.as_str();
         if mode == "off" || ai.config.fully_disabled { return Ok(None); }
         let instruction = if mode == "light" {

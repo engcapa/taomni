@@ -60,7 +60,7 @@ pub(super) async fn start(
             launch.args.push(command.into());
         }
     }
-    let mut terminals = state.terminal.terminals.write().await;
+    let mut terminals = state.core.terminal.terminals.write().await;
     if terminals.contains_key(&session_id) {
         return Err(format!("Terminal {} already exists", session_id));
     }
@@ -84,7 +84,7 @@ pub(super) async fn start(
                 output_generation,
                 || {
                     add_terminal_output_channel(
-                        &state.terminal.terminal_outputs,
+                        &state.core.terminal.terminal_outputs,
                         &session_id,
                         on_output,
                         window_label,
@@ -102,8 +102,12 @@ pub(super) async fn start(
             master: Mutex::new(handle.master),
             child: Mutex::new(handle.child),
         };
-        state.mobile.broker.register(&session_id);
-        state.mobile.broker.desktop(&session_id, Some((cols, rows)));
+        state.legacy.mobile.broker.register(&session_id);
+        state
+            .legacy
+            .mobile
+            .broker
+            .desktop(&session_id, Some((cols, rows)));
         terminals.insert(session_id.clone(), terminal);
         Ok(reader)
     };
@@ -117,7 +121,7 @@ pub(super) async fn start(
     };
     drop(terminals);
     let sid = session_id.clone();
-    let outputs = state.terminal.terminal_outputs.clone();
+    let outputs = state.core.terminal.terminal_outputs.clone();
     std::thread::spawn(move || read_loop_local(reader, sid, app_handle, outputs));
     Ok(session_id)
 }

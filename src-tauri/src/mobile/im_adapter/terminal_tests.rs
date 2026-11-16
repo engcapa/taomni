@@ -21,8 +21,8 @@ impl TestTerminal {
             vec![]
         };
         let (pty, mut reader) = pty::create_command_pty(80, 24, program, &args).unwrap();
-        f.state.mobile.broker.register(id);
-        f.state.terminal.terminals.write().await.insert(
+        f.state.legacy.mobile.broker.register(id);
+        f.state.core.terminal.terminals.write().await.insert(
             id.into(),
             ActiveTerminal::Local {
                 _route: crate::database::forward::ForwardGuard(None),
@@ -31,7 +31,7 @@ impl TestTerminal {
                 child: Mutex::new(pty.child),
             },
         );
-        let broker = f.state.mobile.broker.clone();
+        let broker = f.state.legacy.mobile.broker.clone();
         let reader = std::thread::spawn(move || {
             let mut bytes = [0; 4096];
             while let Ok(n) = reader.read(&mut bytes) {
@@ -51,7 +51,7 @@ impl TestTerminal {
         }
     }
     fn tail(f: &Fixture) -> String {
-        f.state.mobile.broker.terminals.lock().unwrap()["feishu-term"].tail(50, 4000)
+        f.state.legacy.mobile.broker.terminals.lock().unwrap()["feishu-term"].tail(50, 4000)
     }
     async fn stop(mut self, f: &Fixture) {
         let _ = crate::terminal::send_terminal_signal_inner(&f.state, self.id, "SIGKILL").await;

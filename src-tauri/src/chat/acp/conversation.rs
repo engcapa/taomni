@@ -120,6 +120,7 @@ pub(in crate::chat) async fn stream(
                 }
             };
             state
+                .core
                 .agent
                 .acp_processes
                 .lock()
@@ -128,17 +129,22 @@ pub(in crate::chat) async fn stream(
             (process, session_id)
         }
     };
-    if let Ok(db) = state.db.lock() {
+    if let Ok(db) = state.core.db.lock() {
         let _ = store::set_acp_session_id(&db, &req.thread_id, &session_id);
     }
 
     agent_ctx.refresh_runtime_bindings(state).await;
-    state.agent.chat_runs.lock().await.insert(
+    state.core.agent.chat_runs.lock().await.insert(
         req.thread_id.clone(),
         run::ChatRunHandle::bridge_process(thread.provider_id.clone(), process.clone()),
     );
 
-    if state.mobile.turn_cancel(&req.thread_id).is_cancelled() {
+    if state
+        .legacy
+        .mobile
+        .turn_cancel(&req.thread_id)
+        .is_cancelled()
+    {
         process.stop().await;
         emit_error(app, event_name, &assistant_id, "Turn was stopped.".into());
         return Ok(());
@@ -202,7 +208,13 @@ pub(in crate::chat) async fn stream(
             update,
         );
     }
-    state.agent.chat_runs.lock().await.remove(&req.thread_id);
+    state
+        .core
+        .agent
+        .chat_runs
+        .lock()
+        .await
+        .remove(&req.thread_id);
 
     let result = match prompt_result {
         Ok(result) => result,
@@ -257,7 +269,7 @@ pub(in crate::chat) async fn stream(
         attachments: Vec::new(),
     };
     {
-        let db = state.db.lock().map_err(|error| error.to_string())?;
+        let db = state.core.db.lock().map_err(|error| error.to_string())?;
         store::insert_message(&db, &assistant_msg).map_err(|error| error.to_string())?;
         if history.is_empty() {
             let title = clean_content.chars().take(40).collect::<String>();

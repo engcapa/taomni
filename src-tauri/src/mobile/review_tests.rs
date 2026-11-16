@@ -28,6 +28,7 @@ async fn subdirectory_root_paths_stay_local_and_diff_is_literal() {
     std::fs::write(dir.path().join("sub/inside.txt"), "new\n").unwrap();
     let root = dir.path().join("sub");
     f.state
+        .legacy
         .mobile
         .file_roots
         .lock()
@@ -118,7 +119,14 @@ async fn revoked_origin_errors_and_missing_terminal_are_readable_over_the_wire()
     assert!(
         matches!(ws.next().await.unwrap().unwrap(), tokio_tungstenite::tungstenite::Message::Close(Some(close)) if close.code == 4004.into())
     );
-    f.state.mobile.auth.lock().unwrap().revoke(&device).unwrap();
+    f.state
+        .legacy
+        .mobile
+        .auth
+        .lock()
+        .unwrap()
+        .revoke(&device)
+        .unwrap();
     let preflight = f
         .client
         .request(
@@ -213,7 +221,7 @@ async fn desktop_only_gates_are_visible_and_drop_cleans_up() {
     let f = Fixture::new().await;
     let core = Core::Headless(f.state.clone());
     let gate = super::confirmation::DesktopConfirmation::new(
-        &f.state.mobile,
+        &f.state.legacy.mobile,
         "side-effect",
         "t",
         "run_in_terminal",
@@ -233,7 +241,7 @@ async fn desktop_only_gates_are_visible_and_drop_cleans_up() {
             .unwrap_err()
             .contains("TAOMNI_FEISHU_APP_SECRET")
     );
-    f.state.mobile.broker.register("readonly");
+    f.state.legacy.mobile.broker.register("readonly");
     assert_eq!(
         agent_view::stop_as(&core, "term:readonly", Some("reader"))
             .await
@@ -262,6 +270,7 @@ async fn slow_event_consumer_disconnects_and_can_request_a_bounded_resync() {
     // No await in this batch: the service observes a real broadcast Lagged.
     for n in 0..1000 {
         f.state
+            .legacy
             .mobile
             .events
             .publish(json!({"type":"file_changed", "n":n}));
@@ -295,8 +304,8 @@ async fn slow_event_consumer_disconnects_and_can_request_a_bounded_resync() {
 async fn concurrent_desktop_entry_rejects_before_persisting_and_tools_omit_details() {
     let f = Fixture::new().await;
     let thread = serde_json::from_value(json!({"id":"t","title":"Task","provider_id":"local","created_at":1,"updated_at":1,"source":"drawer","mode":"chat","linked_session_id":null})).unwrap();
-    crate::chat::store::create_thread(&f.state.db.lock().unwrap(), &thread).unwrap();
-    let guard = super::turn::TurnGuard::reserve(&f.state.mobile, "t").unwrap();
+    crate::chat::store::create_thread(&f.state.core.db.lock().unwrap(), &thread).unwrap();
+    let guard = super::turn::TurnGuard::reserve(&f.state.legacy.mobile, "t").unwrap();
     let req =
         serde_json::from_value(json!({"thread_id":"t","content":"must not be persisted"})).unwrap();
     assert_eq!(
@@ -306,7 +315,7 @@ async fn concurrent_desktop_entry_rejects_before_persisting_and_tools_omit_detai
         "turn_in_progress"
     );
     assert!(
-        crate::chat::store::list_messages(&f.state.db.lock().unwrap(), "t")
+        crate::chat::store::list_messages(&f.state.core.db.lock().unwrap(), "t")
             .unwrap()
             .is_empty()
     );
@@ -344,24 +353,57 @@ async fn concurrent_desktop_entry_rejects_before_persisting_and_tools_omit_detai
 #[tokio::test]
 async fn desktop_shared_mode_and_headless_exclusive_mode_are_mutually_exclusive() {
     let dir = tempfile::tempdir().unwrap();
-    let desktop = super::headless::ModeLease::acquire(dir.path(), false).unwrap();
-    let other_desktop = super::headless::ModeLease::acquire(dir.path(), false).unwrap();
-    assert!(super::headless::ModeLease::acquire(dir.path(), true).is_err());
+    let desktop = crate::runtime::profile::ModeLease::acquire(
+        dir.path(),
+        crate::runtime::profile::StartupMode::Desktop,
+    )
+    .unwrap();
+    let other_desktop = crate::runtime::profile::ModeLease::acquire(
+        dir.path(),
+        crate::runtime::profile::StartupMode::Desktop,
+    )
+    .unwrap();
+    assert!(
+        crate::runtime::profile::ModeLease::acquire(
+            dir.path(),
+            crate::runtime::profile::StartupMode::Headless
+        )
+        .is_err()
+    );
     drop(desktop);
     drop(other_desktop);
-    let headless = super::headless::ModeLease::acquire(dir.path(), true).unwrap();
-    assert!(super::headless::ModeLease::acquire(dir.path(), false).is_err());
+    let headless = crate::runtime::profile::ModeLease::acquire(
+        dir.path(),
+        crate::runtime::profile::StartupMode::Headless,
+    )
+    .unwrap();
+    assert!(
+        crate::runtime::profile::ModeLease::acquire(
+            dir.path(),
+            crate::runtime::profile::StartupMode::Desktop
+        )
+        .is_err()
+    );
     drop(headless);
 }
 
 #[tokio::test]
 async fn stopping_and_restarting_the_service_invalidates_unused_pairing_codes() {
     let f = Fixture::new().await;
-    let code = f.state.mobile.auth.lock().unwrap().pairing_code();
-    let data = f.state.mobile.profile_data.lock().unwrap().clone().unwrap();
-    f.state.mobile.stop().await;
+    let code = f.state.legacy.mobile.auth.lock().unwrap().pairing_code();
+    let data = f
+        .state
+        .legacy
+        .mobile
+        .profile_data
+        .lock()
+        .unwrap()
+        .clone()
+        .unwrap();
+    f.state.legacy.mobile.stop().await;
     let endpoint = f
         .state
+        .legacy
         .mobile
         .start(Core::Headless(f.state.clone()), data, false, 0)
         .await
@@ -419,9 +461,10 @@ async fn malicious_websocket_origin_is_denied_before_upgrade() {
 async fn session_list_keeps_each_runtime_key_and_projects_exited_state() {
     let f = Fixture::new().await;
     // Runtime keys are opaque: a shared saved-session prefix never merges them.
-    f.state.mobile.broker.register("saved::first");
-    f.state.mobile.broker.register("saved::second");
+    f.state.legacy.mobile.broker.register("saved::first");
+    f.state.legacy.mobile.broker.register("saved::second");
     f.state
+        .legacy
         .mobile
         .broker
         .exit_with_code("saved::first", Some(7));
@@ -432,7 +475,13 @@ async fn session_list_keeps_each_runtime_key_and_projects_exited_state() {
     assert_eq!(sessions[0]["status"], "exited");
     assert_eq!(sessions[1]["id"], "term:saved::second");
     assert_eq!(sessions[1]["status"], "running");
-    let (_, frames) = f.state.mobile.broker.subscribe("saved::first").unwrap();
+    let (_, frames) = f
+        .state
+        .legacy
+        .mobile
+        .broker
+        .subscribe("saved::first")
+        .unwrap();
     assert_eq!(frames.last().unwrap()["code"], 7);
     f.finish().await;
 }

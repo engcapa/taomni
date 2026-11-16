@@ -35,13 +35,30 @@ pub(crate) async fn stop_thread_runtime_inner(
     // and Codex keep persistent per-thread process registries for reuse; remove
     // those entries on explicit stop so the next turn starts from clean bridge
     // processes.
-    state.mobile.turn_cancel(thread_id).cancel();
-    let run = { state.agent.chat_runs.lock().await.remove(thread_id) };
-    let cc_process = { state.agent.cc_processes.lock().await.remove(thread_id) };
-    let codex_process = { state.agent.codex_processes.lock().await.remove(thread_id) };
-    let acp_process = { state.agent.acp_processes.lock().await.remove(thread_id) };
+    state.legacy.mobile.turn_cancel(thread_id).cancel();
+    let run = { state.core.agent.chat_runs.lock().await.remove(thread_id) };
+    let cc_process = { state.core.agent.cc_processes.lock().await.remove(thread_id) };
+    let codex_process = {
+        state
+            .core
+            .agent
+            .codex_processes
+            .lock()
+            .await
+            .remove(thread_id)
+    };
+    let acp_process = {
+        state
+            .core
+            .agent
+            .acp_processes
+            .lock()
+            .await
+            .remove(thread_id)
+    };
     let acp_media_process = {
         state
+            .core
             .agent
             .acp_media_processes
             .lock()
@@ -67,7 +84,7 @@ pub(crate) async fn stop_thread_runtime_inner(
         process.stop().await;
     }
     let confirmation_ids: Vec<_> = {
-        let mut confirmations = state.mobile.confirmations.lock().unwrap();
+        let mut confirmations = state.legacy.mobile.confirmations.lock().unwrap();
         let ids = confirmations
             .iter()
             .filter(|(_, v)| v["thread_id"] == thread_id)
@@ -78,6 +95,7 @@ pub(crate) async fn stop_thread_runtime_inner(
     };
     for id in confirmation_ids {
         state
+            .core
             .agent
             .cc_pending_permissions
             .lock()

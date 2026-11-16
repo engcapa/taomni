@@ -65,7 +65,7 @@ pub(super) async fn stream_codex(turn: StreamTurn<'_>) -> Result<(), String> {
     let resume_session = thread.cc_session_id.clone();
     let runtime = match crate::agent::codex_bridge::config::resolve_custom_runtime(
         &ai_config.codex_bridge,
-        &state.vault,
+        &state.core.vault,
     ) {
         Ok(c) => c,
         Err(e) => {
@@ -79,6 +79,7 @@ pub(super) async fn stream_codex(turn: StreamTurn<'_>) -> Result<(), String> {
 
     let existing = {
         state
+            .core
             .agent
             .codex_processes
             .lock()
@@ -220,7 +221,7 @@ pub(super) async fn stream_codex(turn: StreamTurn<'_>) -> Result<(), String> {
                 return Ok(());
             }
 
-            let mut registry = state.agent.codex_processes.lock().await;
+            let mut registry = state.core.agent.codex_processes.lock().await;
             match registry.get(&req.thread_id) {
                 Some(existing) => existing.clone(),
                 None => {
@@ -233,7 +234,12 @@ pub(super) async fn stream_codex(turn: StreamTurn<'_>) -> Result<(), String> {
 
     agent_ctx.refresh_runtime_bindings(state).await;
 
-    if state.mobile.turn_cancel(&req.thread_id).is_cancelled() {
+    if state
+        .legacy
+        .mobile
+        .turn_cancel(&req.thread_id)
+        .is_cancelled()
+    {
         process.stop().await;
         emit(&StreamEventOut::Error {
             id: assistant_id.clone(),
@@ -389,7 +395,7 @@ pub(super) async fn stream_codex(turn: StreamTurn<'_>) -> Result<(), String> {
         .or_else(|| process.current_thread_id())
         .or(resume_session);
     if let Some(sid) = &session_id {
-        if let Ok(db) = state.db.lock() {
+        if let Ok(db) = state.core.db.lock() {
             let _ = crate::chat::store::set_cc_session_id(&db, &req.thread_id, sid);
         }
     }
@@ -406,7 +412,7 @@ pub(super) async fn stream_codex(turn: StreamTurn<'_>) -> Result<(), String> {
 
     let is_first = history.is_empty();
     {
-        let db = state.db.lock().map_err(|e| e.to_string())?;
+        let db = state.core.db.lock().map_err(|e| e.to_string())?;
         store::insert_message(&db, &assistant_msg).map_err(|e| e.to_string())?;
         if is_first {
             let title = user_msg.content.chars().take(40).collect::<String>();

@@ -40,7 +40,11 @@ pub async fn resolve_rdp_connection_request(
     request_id: String,
     approved: bool,
 ) -> Result<bool, String> {
-    Ok(state.servers.rdp_approvals.resolve(&request_id, approved))
+    Ok(state
+        .legacy
+        .servers
+        .rdp_approvals
+        .resolve(&request_id, approved))
 }
 
 impl ServerRegistry {
@@ -80,13 +84,13 @@ impl ServerRegistry {
 /// Recent log lines of every server that logged since the app started.
 #[tauri::command]
 pub fn list_server_logs(state: State<'_, AppState>) -> HashMap<String, Vec<String>> {
-    state.servers.log_history()
+    state.legacy.servers.log_history()
 }
 
 #[tauri::command]
 pub fn clear_server_log(state: State<'_, AppState>, server_type: String) -> Result<(), String> {
     let st = ServerType::from_str(&server_type)
         .ok_or_else(|| format!("unknown server type: {}", server_type))?;
-    state.servers.clear_log(st);
+    state.legacy.servers.clear_log(st);
     Ok(())
 }

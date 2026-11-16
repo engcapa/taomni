@@ -30,7 +30,7 @@ pub(super) fn resolve_ai_api_key(
         }
         return Ok(api_key.to_string());
     }
-    match state.vault.resolve(api_key) {
+    match state.core.vault.resolve(api_key) {
         Ok(Some(plaintext)) => Ok(plaintext.to_string()),
         Ok(None) => Ok(api_key.to_string()),
         Err(e) => {
@@ -440,10 +440,11 @@ pub(super) fn build_provider_http_client(
 ) -> Result<Client, String> {
     let proxy_url = {
         let db = state
+            .core
             .db
             .lock()
             .map_err(|_| "session database is unavailable".to_string())?;
-        crate::ai::config::resolve_provider_proxy_url(provider, Some(&db), Some(&state.vault))?
+        crate::ai::config::resolve_provider_proxy_url(provider, Some(&db), Some(&state.core.vault))?
     };
     let mut builder = Client::builder().no_proxy().timeout(timeout);
     if let Some(proxy_url) = proxy_url
@@ -476,7 +477,7 @@ pub(super) async fn generate_media_with_provider_keys(
 
     for _ in 0..key_count {
         let key_index = {
-            let ai_ctx = state.ai_ctx.read().await;
+            let ai_ctx = state.legacy.ai_ctx.read().await;
             ai_ctx.llm.next_key_index(provider_id, key_count)
         };
         let Some(api_key_ref) = api_keys.get(key_index).copied() else {
@@ -515,7 +516,7 @@ pub async fn chat_generate_media(
     state: State<'_, AppState>,
 ) -> Result<ChatGenerateMediaResponse, String> {
     {
-        let ai_ctx = state.ai_ctx.read().await;
+        let ai_ctx = state.legacy.ai_ctx.read().await;
         if ai_ctx.config.fully_disabled {
             return Err("AI is fully disabled.".into());
         }
@@ -523,7 +524,7 @@ pub async fn chat_generate_media(
     let kind = MediaGenerationKind::parse(&req.kind)?;
     let attachments = validate_chat_attachments(&req.attachments)?;
     let (thread, history) = {
-        let db = state.db.lock().map_err(|e| e.to_string())?;
+        let db = state.core.db.lock().map_err(|e| e.to_string())?;
         let thread = store::get_thread(&db, &req.thread_id)
             .map_err(|e| e.to_string())?
             .ok_or_else(|| format!("Thread '{}' not found", req.thread_id))?;
@@ -581,7 +582,7 @@ pub async fn chat_generate_media(
     } else if let Some(group_id) = provider_group_id_from_route(&thread.provider_id) {
         let route_id = thread.provider_id.clone();
         let attempt_count = {
-            let ai_ctx = state.ai_ctx.read().await;
+            let ai_ctx = state.legacy.ai_ctx.read().await;
             ai_ctx.llm.provider_group_len(&route_id).unwrap_or(0)
         };
         if attempt_count == 0 {
@@ -595,7 +596,7 @@ pub async fn chat_generate_media(
         let mut generated: Option<GeneratedMediaFile> = None;
         for _ in 0..attempt_count {
             let provider_id = {
-                let ai_ctx = state.ai_ctx.read().await;
+                let ai_ctx = state.legacy.ai_ctx.read().await;
                 ai_ctx.llm.next_provider_in_group(&route_id)
             };
             let Some(provider_id) = provider_id else {
@@ -716,7 +717,7 @@ pub async fn chat_generate_media(
         }],
     };
     {
-        let db = state.db.lock().map_err(|e| e.to_string())?;
+        let db = state.core.db.lock().map_err(|e| e.to_string())?;
         store::insert_message(&db, &user_msg).map_err(|e| e.to_string())?;
         store::insert_message(&db, &assistant_msg).map_err(|e| e.to_string())?;
         if history.is_empty() {

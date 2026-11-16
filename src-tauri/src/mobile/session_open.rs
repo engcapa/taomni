@@ -225,7 +225,12 @@ fn error_code(code: &str) -> String {
 
 /// Whether the phone may ask this instance to open sessions right now.
 pub fn available(state: &AppState) -> bool {
-    state.mobile.open_requests.allowed() && state.mobile.desktop_available.load(Ordering::Relaxed)
+    state.legacy.mobile.open_requests.allowed()
+        && state
+            .legacy
+            .mobile
+            .desktop_available
+            .load(Ordering::Relaxed)
 }
 
 /// Validates the request and hands it to the desktop main window.
@@ -274,7 +279,7 @@ fn start_with(
                 .filter(|id| !id.is_empty() && id.len() <= 128)
                 .ok_or("saved_session_not_found")?;
             let state = core.state();
-            let db = state.db.lock().map_err(|_| "database_unavailable")?;
+            let db = state.core.db.lock().map_err(|_| "database_unavailable")?;
             let session =
                 crate::session::db::get_session(&db, id).map_err(|_| "saved_session_not_found")?;
             if !super::session_view::is_terminal_type(&session.session_type) {
@@ -301,14 +306,19 @@ pub fn mobile_claim_open_session(
     state: State<'_, AppState>,
 ) -> bool {
     window.label() == "main"
-        && state.mobile.open_requests.claim(&request_id, |device| {
-            state
-                .mobile
-                .auth
-                .lock()
-                .unwrap_or_else(|e| e.into_inner())
-                .exists(device)
-        })
+        && state
+            .legacy
+            .mobile
+            .open_requests
+            .claim(&request_id, |device| {
+                state
+                    .legacy
+                    .mobile
+                    .auth
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .exists(device)
+            })
 }
 
 #[tauri::command]
@@ -323,12 +333,16 @@ pub fn mobile_open_session_result(
         return Err("desktop_required".into());
     }
     let outcome = match (terminal_id, error) {
-        (Some(key), _) if state.mobile.broker.gate(&key).is_ok() => Ok(key),
+        (Some(key), _) if state.legacy.mobile.broker.gate(&key).is_ok() => Ok(key),
         (Some(_), _) => Err("open_failed".to_string()),
         (None, Some(code)) => Err(code),
         (None, None) => Err("open_failed".to_string()),
     };
-    Ok(state.mobile.open_requests.resolve(&request_id, outcome))
+    Ok(state
+        .legacy
+        .mobile
+        .open_requests
+        .resolve(&request_id, outcome))
 }
 
 #[tauri::command]
@@ -338,7 +352,11 @@ pub fn mobile_set_open_sessions(
     state: State<'_, AppState>,
 ) -> Result<bool, String> {
     let data = crate::resolved_app_data_dir(&app)?;
-    state.mobile.open_requests.set_allowed(&data, enabled)?;
+    state
+        .legacy
+        .mobile
+        .open_requests
+        .set_allowed(&data, enabled)?;
     Ok(enabled)
 }
 
@@ -349,7 +367,7 @@ pub fn mobile_terminal_title(
     title: String,
     state: State<'_, AppState>,
 ) -> bool {
-    state.mobile.broker.set_title(&session_id, &title)
+    state.legacy.mobile.broker.set_title(&session_id, &title)
 }
 
 #[cfg(test)]

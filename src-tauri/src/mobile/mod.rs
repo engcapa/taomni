@@ -36,24 +36,12 @@ pub enum Core {
     Desktop(tauri::AppHandle),
     Headless(Arc<AppState>),
 }
-pub enum CoreState<'a> {
-    Desktop(tauri::State<'a, AppState>),
-    Headless(&'a AppState),
-}
-impl std::ops::Deref for CoreState<'_> {
-    type Target = AppState;
-    fn deref(&self) -> &AppState {
-        match self {
-            Self::Desktop(s) => s.inner(),
-            Self::Headless(s) => s,
-        }
-    }
-}
 impl Core {
-    pub fn state(&self) -> CoreState<'_> {
+    /// An explicit shared composition reference; no implicit Deref hides ownership.
+    pub fn state(&self) -> &AppState {
         match self {
-            Self::Desktop(app) => CoreState::Desktop(app.state()),
-            Self::Headless(s) => CoreState::Headless(s),
+            Self::Desktop(app) => app.state::<AppState>().inner(),
+            Self::Headless(state) => state.as_ref(),
         }
     }
     pub fn app(&self) -> Option<tauri::AppHandle> {

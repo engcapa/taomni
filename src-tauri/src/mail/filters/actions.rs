@@ -21,7 +21,7 @@ pub(super) async fn raw_bytes(
     }
     let account = resolve_config(state, config.clone())?;
     let handle = tokio::runtime::Handle::current();
-    let pool = std::sync::Arc::clone(&state.mail.mail_imap_pool);
+    let pool = std::sync::Arc::clone(&state.core.mail.mail_imap_pool);
     let folder = folder.to_string();
     tokio::task::spawn_blocking(move || {
         with_imap_session(

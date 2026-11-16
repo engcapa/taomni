@@ -17,10 +17,10 @@ pub async fn sockscap_recover(
     sudo_password: Option<String>,
 ) -> Result<(), String> {
     let mut acquired_recovery_lock = false;
-    if !state.sockscap.has_activation_lock() {
+    if !state.legacy.sockscap.has_activation_lock() {
         let lock =
             ModuleLock::try_acquire_for_app(&app, "sockscap", "global", "SocksCap recovery")?;
-        state.sockscap.install_activation_lock(lock);
+        state.legacy.sockscap.install_activation_lock(lock);
         acquired_recovery_lock = true;
     }
 
@@ -73,16 +73,17 @@ pub async fn sockscap_recover(
                 "Redirector never applied capture while System Extension approval was pending, but its journal could not be cleared: {error}"
             );
             state
+                .legacy
                 .sockscap
                 .orch
                 .write()
                 .await
                 .set_recovery_required("mitmproxy-redirector", message.clone());
-            state.sockscap.release_activation_lock();
+            state.legacy.sockscap.release_activation_lock();
             return Err(message);
         }
-        state.sockscap.orch.write().await.force_idle();
-        state.sockscap.release_activation_lock();
+        state.legacy.sockscap.orch.write().await.force_idle();
+        state.legacy.sockscap.release_activation_lock();
         tracing::info!(
             "sockscap: Recover cleared an aborted first-use approval attempt without starting another launcher"
         );
@@ -101,12 +102,18 @@ pub async fn sockscap_recover(
                     let message = format!(
                         "network recovery succeeded, but the durable recovery journal could not be cleared: {error}"
                     );
-                    state.sockscap.orch.write().await.set_recovery_required(
-                        &capture::capabilities().capture_backend,
-                        message.clone(),
-                    );
+                    state
+                        .legacy
+                        .sockscap
+                        .orch
+                        .write()
+                        .await
+                        .set_recovery_required(
+                            &capture::capabilities().capture_backend,
+                            message.clone(),
+                        );
                     if acquired_recovery_lock {
-                        state.sockscap.release_activation_lock();
+                        state.legacy.sockscap.release_activation_lock();
                     }
                     return Err(message);
                 }
@@ -115,7 +122,7 @@ pub async fn sockscap_recover(
             if let Ok(dir) = data_dir(&app) {
                 let _ = recovery::mark_clean_and_clear(&recovery::journal_path(&dir));
             }
-            state.sockscap.orch.write().await.force_idle();
+            state.legacy.sockscap.orch.write().await.force_idle();
             if let Some(error) = teardown_error {
                 tracing::info!("sockscap: Recover repaired incomplete teardown: {error}");
             }
@@ -125,7 +132,7 @@ pub async fn sockscap_recover(
                     needs_elevation.len()
                 );
             }
-            state.sockscap.release_activation_lock();
+            state.legacy.sockscap.release_activation_lock();
             Ok(())
         }
         Err(recovery_error) => {
@@ -137,6 +144,7 @@ pub async fn sockscap_recover(
             };
             let backend = capture::capabilities().capture_backend;
             state
+                .legacy
                 .sockscap
                 .orch
                 .write()
@@ -147,7 +155,7 @@ pub async fn sockscap_recover(
             // The durable journal remains dirty and another attempt (or the
             // next launch) can safely reacquire the module lock.
             if acquired_recovery_lock {
-                state.sockscap.release_activation_lock();
+                state.legacy.sockscap.release_activation_lock();
             }
             Err(message)
         }

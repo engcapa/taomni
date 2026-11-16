@@ -5,15 +5,21 @@ use std::{
 };
 
 #[derive(Default)]
-pub(crate) struct ExitGate(AtomicBool);
+pub(crate) struct ExitGate {
+    active: AtomicBool,
+    committed: AtomicBool,
+}
 
 impl ExitGate {
+    pub(crate) fn is_committed(&self) -> bool {
+        self.committed.load(Ordering::Acquire)
+    }
     pub async fn run(
         &self,
         prepare: impl Future<Output = Result<(), String>>,
         commit: impl FnOnce(),
     ) -> Result<(), String> {
-        self.0
+        self.active
             .compare_exchange(false, true, Ordering::AcqRel, Ordering::Acquire)
             .map_err(|_| "应用正在安全退出，请等待清理完成。".to_owned())?;
         let mut attempt = Attempt {
@@ -22,8 +28,9 @@ impl ExitGate {
         };
         prepare.await?;
         // No Closing phase or process exit until every required cleanup succeeds.
-        commit();
+        self.committed.store(true, Ordering::Release);
         attempt.committed = true;
+        commit();
         Ok(())
     }
 }
@@ -35,7 +42,7 @@ struct Attempt<'a> {
 impl Drop for Attempt<'_> {
     fn drop(&mut self) {
         if !self.committed {
-            self.gate.0.store(false, Ordering::Release);
+            self.gate.active.store(false, Ordering::Release);
         }
     }
 }
@@ -74,6 +81,7 @@ mod tests {
             .is_ok()
         );
         assert_eq!(*effects.borrow(), ["cleanup", "exit"]);
+        assert!(gate.is_committed());
         assert!(
             ready(gate.run(async { panic!("duplicate cleanup") }, || panic!(
                 "duplicate exit"
@@ -93,6 +101,7 @@ mod tests {
             ),
             Err("network still captured".into())
         );
+        assert!(!gate.is_committed());
         assert!(ready(gate.run(async { Ok(()) }, || {})).is_ok());
     }
 

@@ -224,7 +224,7 @@ fn create_backup_locked(
     let flags = resolve_scope_flags(scope, custom_options);
 
     let mail_paths = if flags.mail {
-        Some(context.lock(&state.mail.mail_archive.changes)?)
+        Some(context.lock(&state.core.mail.mail_archive.changes)?)
     } else {
         None
     };
@@ -233,7 +233,7 @@ fn create_backup_locked(
     context.check()?;
     if flags.sessions {
         let snap_dest = temp_staging_dir.join("taomni.db");
-        let conn = context.lock(&state.db)?;
+        let conn = context.lock(&state.core.db)?;
         super::snapshot_context::hot_backup_conn(&conn, &snap_dest, context)?;
         drop(conn);
         portable_mail_paths(&rusqlite::Connection::open(&snap_dest).map_err(|e| e.to_string())?)?;
@@ -247,7 +247,7 @@ fn create_backup_locked(
     context.check()?;
     if flags.notes {
         let snap_dest = temp_staging_dir.join("notes.db");
-        let conn = context.lock(&state.notes_db)?;
+        let conn = context.lock(&state.core.notes_db)?;
         super::snapshot_context::hot_backup_conn(&conn, &snap_dest, context)?;
         staged_files.push(StagedFile {
             archive_path: "databases/notes.db".into(),
@@ -259,7 +259,10 @@ fn create_backup_locked(
     context.check()?;
     if flags.vault {
         let snap_dest = temp_staging_dir.join("vault.db");
-        state.vault.backup_to_with_context(&snap_dest, context)?;
+        state
+            .core
+            .vault
+            .backup_to_with_context(&snap_dest, context)?;
         staged_files.push(StagedFile {
             archive_path: "databases/vault.db".into(),
             disk_path: snap_dest,
@@ -270,7 +273,11 @@ fn create_backup_locked(
     context.check()?;
     if flags.mfa {
         let snap_dest = temp_staging_dir.join("mfa.db");
-        if state.mfa.backup_to_with_context(&snap_dest, context)? {
+        if state
+            .legacy
+            .mfa
+            .backup_to_with_context(&snap_dest, context)?
+        {
             staged_files.push(StagedFile {
                 archive_path: "databases/mfa.db".into(),
                 disk_path: snap_dest,
@@ -307,7 +314,7 @@ fn create_backup_locked(
     context.check()?;
     if flags.mail {
         let sessions = {
-            let db = context.lock(&state.db)?;
+            let db = context.lock(&state.core.db)?;
             crate::session::db::list_sessions(&db, None).map_err(|e| e.to_string())?
         };
         let mut covered = std::collections::HashSet::new();

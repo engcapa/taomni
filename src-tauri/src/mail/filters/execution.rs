@@ -109,7 +109,7 @@ pub async fn mail_apply_filters(
             }
         } else {
             let account = resolve_config(&state, config.clone())?;
-            let pool = std::sync::Arc::clone(&state.mail.mail_imap_pool);
+            let pool = std::sync::Arc::clone(&state.core.mail.mail_imap_pool);
             let handle = tokio::runtime::Handle::current();
             let folder_for_task = folder.clone();
             let lookup = tokio::task::spawn_blocking(move || {

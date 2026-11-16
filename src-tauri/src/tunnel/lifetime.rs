@@ -26,9 +26,9 @@ pub async fn start_tunnel(
 ) -> Result<TunnelStatusInfo, String> {
     // Ignore duplicate start: return the latest persisted status.
     {
-        let running = state.tunnels.running.lock().await;
+        let running = state.core.tunnels.running.lock().await;
         if running.contains_key(&id) {
-            let s = state.tunnels.statuses.lock().await;
+            let s = state.core.tunnels.statuses.lock().await;
             return Ok(s.get(&id).cloned().unwrap_or(TunnelStatusInfo {
                 id: id.clone(),
                 status: TunnelStatus::Running,
@@ -39,7 +39,7 @@ pub async fn start_tunnel(
     }
 
     let configs = {
-        let _guard = state.tunnels.store_lock.lock().await;
+        let _guard = state.core.tunnels.store_lock.lock().await;
         load_all(&app)?
     };
     let mut config = configs
@@ -47,13 +47,14 @@ pub async fn start_tunnel(
         .find(|t| t.id == id)
         .ok_or_else(|| format!("tunnel {} not found", id))?;
     let session_pwd = state
+        .core
         .tunnels
         .session_passwords
         .lock()
         .await
         .get(&id)
         .cloned();
-    resolve_tunnel_creds(&mut config, &state.vault, session_pwd)?;
+    resolve_tunnel_creds(&mut config, &state.core.vault, session_pwd)?;
 
     // The same persisted tunnel may autostart in several Taomni processes.
     // Own it by tunnel id for the task lifetime; a different tunnel id can run
@@ -67,10 +68,10 @@ pub async fn start_tunnel(
         error: None,
         active_connections: Some(0),
     };
-    set_status(&app, &state.tunnels, starting.clone()).await;
+    set_status(&app, &state.core.tunnels, starting.clone()).await;
 
     // Spawn the actual forwarder. It updates status to Running on success.
-    let registry = state.tunnels.clone();
+    let registry = state.core.tunnels.clone();
     let app_for_task = app.clone();
     let task_id = id.clone();
     let kind = config.kind.clone();
@@ -131,7 +132,7 @@ pub async fn start_tunnel(
         running.remove(&task_id);
     });
 
-    let mut running = state.tunnels.running.lock().await;
+    let mut running = state.core.tunnels.running.lock().await;
     running.insert(id.clone(), ActiveTunnel { task, bridges });
     Ok(starting)
 }
@@ -143,7 +144,7 @@ pub async fn stop_tunnel(
     state: State<'_, AppState>,
 ) -> Result<TunnelStatusInfo, String> {
     {
-        let mut running = state.tunnels.running.lock().await;
+        let mut running = state.core.tunnels.running.lock().await;
         if let Some(active) = running.remove(&id) {
             active.task.abort();
             let bridges = active.bridges.lock().await;
@@ -158,7 +159,7 @@ pub async fn stop_tunnel(
         error: None,
         active_connections: None,
     };
-    set_status(&app, &state.tunnels, info.clone()).await;
+    set_status(&app, &state.core.tunnels, info.clone()).await;
     Ok(info)
 }
 
@@ -168,7 +169,7 @@ pub async fn start_all_tunnels(
     state: State<'_, AppState>,
 ) -> Result<Vec<TunnelStatusInfo>, String> {
     let configs = {
-        let _guard = state.tunnels.store_lock.lock().await;
+        let _guard = state.core.tunnels.store_lock.lock().await;
         load_all(&app)?
     };
     let mut out = Vec::with_capacity(configs.len());
@@ -213,7 +214,7 @@ pub async fn stop_all_tunnels(
     state: State<'_, AppState>,
 ) -> Result<Vec<TunnelStatusInfo>, String> {
     let configs = {
-        let _guard = state.tunnels.store_lock.lock().await;
+        let _guard = state.core.tunnels.store_lock.lock().await;
         load_all(&app)?
     };
     let mut out = Vec::with_capacity(configs.len());

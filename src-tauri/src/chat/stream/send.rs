@@ -28,7 +28,7 @@ pub async fn chat_send(
     state: State<'_, AppState>,
 ) -> Result<ChatSendResponse, String> {
     {
-        let ai_ctx = state.ai_ctx.read().await;
+        let ai_ctx = state.legacy.ai_ctx.read().await;
         if ai_ctx.config.fully_disabled {
             return Err("AI is fully disabled.".into());
         }
@@ -37,7 +37,7 @@ pub async fn chat_send(
 
     // Load thread to get provider.
     let (thread, history) = {
-        let db = state.db.lock().map_err(|e| e.to_string())?;
+        let db = state.core.db.lock().map_err(|e| e.to_string())?;
         let thread = store::get_thread(&db, &req.thread_id)
             .map_err(|e| e.to_string())?
             .ok_or_else(|| format!("Thread '{}' not found", req.thread_id))?;
@@ -100,7 +100,7 @@ pub async fn chat_send(
     };
 
     let resp = {
-        let ai_ctx = state.ai_ctx.read().await;
+        let ai_ctx = state.legacy.ai_ctx.read().await;
         // Prefer the thread's pinned provider when available.
         if let Some(provider) = ai_ctx.llm.provider(&thread.provider_id) {
             provider.chat(llm_req).await.map_err(|e| e.to_string())?
@@ -152,7 +152,7 @@ pub async fn chat_send(
     let is_first = history.is_empty();
 
     {
-        let db = state.db.lock().map_err(|e| e.to_string())?;
+        let db = state.core.db.lock().map_err(|e| e.to_string())?;
         store::insert_message(&db, &user_msg).map_err(|e| e.to_string())?;
         store::insert_message(&db, &assistant_msg).map_err(|e| e.to_string())?;
         if is_first {

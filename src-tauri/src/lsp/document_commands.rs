@@ -12,6 +12,7 @@ pub async fn lsp_document_status(
 ) -> Result<LspDocumentStatus, String> {
     let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
     Ok(state
+        .core
         .workspace
         .lsp
         .document_status(
@@ -36,6 +37,7 @@ pub async fn lsp_execute_command(
 ) -> Result<Value, String> {
     let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
     let session = state
+        .core
         .workspace
         .lsp
         .active_session(
@@ -63,15 +65,20 @@ pub async fn lsp_resolve_workspace_edit(
     failure_reason: Option<String>,
     failed_change: Option<u32>,
 ) -> Result<(), String> {
-    state.workspace.lsp.client_bridge.resolve_workspace_edit(
-        &request_id,
-        &workspace_id,
-        LspWorkspaceApplyEditResponse {
-            applied,
-            failure_reason,
-            failed_change,
-        },
-    )
+    state
+        .core
+        .workspace
+        .lsp
+        .client_bridge
+        .resolve_workspace_edit(
+            &request_id,
+            &workspace_id,
+            LspWorkspaceApplyEditResponse {
+                applied,
+                failure_reason,
+                failed_change,
+            },
+        )
 }
 
 #[tauri::command]
@@ -81,11 +88,11 @@ pub async fn lsp_resolve_show_message_request(
     workspace_id: String,
     action_index: Option<u32>,
 ) -> Result<(), String> {
-    state
-        .workspace
-        .lsp
-        .client_bridge
-        .resolve_show_message(&request_id, &workspace_id, action_index)
+    state.core.workspace.lsp.client_bridge.resolve_show_message(
+        &request_id,
+        &workspace_id,
+        action_index,
+    )
 }
 
 #[tauri::command]
@@ -97,6 +104,7 @@ pub async fn lsp_cancel_work_done_progress(
     token: Value,
 ) -> Result<bool, String> {
     state
+        .core
         .workspace
         .lsp
         .cancel_work_done_progress(&workspace_id, &preset_id, &root_uri, &token)
@@ -116,6 +124,7 @@ pub async fn lsp_workspace_will_file_operation(
         workspace_id
     };
     state
+        .core
         .workspace
         .lsp
         .will_workspace_file_operation(workspace_id, &operation)
@@ -135,6 +144,7 @@ pub async fn lsp_workspace_did_file_operation(
         workspace_id
     };
     Ok(state
+        .core
         .workspace
         .lsp
         .did_workspace_file_operation(workspace_id, &operation)
@@ -168,6 +178,7 @@ pub async fn lsp_workspace_did_change_watched_files(
         }
     }
     Ok(state
+        .core
         .workspace
         .lsp
         .did_change_watched_files(workspace_id, &changes)
@@ -191,6 +202,7 @@ pub async fn lsp_start_workspace_watcher(
     match (directories, watcher_id) {
         (directories, Some(watcher_id)) => {
             state
+                .core
                 .workspace
                 .lsp
                 .start_workspace_watcher_owned(
@@ -203,6 +215,7 @@ pub async fn lsp_start_workspace_watcher(
         }
         (Some(directories), None) => {
             state
+                .core
                 .workspace
                 .lsp
                 .start_workspace_watcher_with_directories(workspace_id, roots, directories)
@@ -210,6 +223,7 @@ pub async fn lsp_start_workspace_watcher(
         }
         (None, None) => {
             state
+                .core
                 .workspace
                 .lsp
                 .start_workspace_watcher(workspace_id, roots)
@@ -229,6 +243,7 @@ pub async fn lsp_stop_workspace_watcher(
         return Err("workspace id is required".into());
     }
     state
+        .core
         .workspace
         .lsp
         .stop_workspace_watcher_owned(workspace_id, watcher_id.as_deref())
@@ -250,6 +265,7 @@ pub async fn lsp_open_document(
 ) -> Result<LspDocumentStatus, String> {
     let document = resolve_document(workspace_id, root_path, file_path, language_id, version)?;
     let session = match state
+        .core
         .workspace
         .lsp
         .ensure_session(
@@ -283,6 +299,7 @@ pub async fn lsp_open_document(
         .await
         .insert(document.uri.clone());
     Ok(state
+        .core
         .workspace
         .lsp
         .document_status(
@@ -308,6 +325,7 @@ pub async fn lsp_change_document(
 ) -> Result<LspDocumentStatus, String> {
     let document = resolve_document(workspace_id, root_path, file_path, language_id, version)?;
     let Some(session) = state
+        .core
         .workspace
         .lsp
         .active_session(
@@ -369,6 +387,7 @@ pub async fn lsp_change_document(
             .await
             .insert(document.uri.clone());
         return Ok(state
+            .core
             .workspace
             .lsp
             .document_status(
@@ -397,6 +416,7 @@ pub async fn lsp_change_document(
         .await
         .map_err(|e| format!("LSP didChange failed: {e}"))?;
     Ok(state
+        .core
         .workspace
         .lsp
         .document_status(
@@ -421,6 +441,7 @@ pub async fn lsp_save_document(
 ) -> Result<LspDocumentStatus, String> {
     let document = resolve_document(workspace_id, root_path, file_path, language_id, version)?;
     if let Some(session) = state
+        .core
         .workspace
         .lsp
         .active_session(
@@ -442,6 +463,7 @@ pub async fn lsp_save_document(
             .map_err(|e| format!("LSP didSave failed: {e}"))?;
     }
     Ok(state
+        .core
         .workspace
         .lsp
         .document_status(
@@ -464,6 +486,7 @@ pub async fn lsp_close_document(
 ) -> Result<LspDocumentStatus, String> {
     let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
     if let Some(session) = state
+        .core
         .workspace
         .lsp
         .active_session(
@@ -496,6 +519,7 @@ pub async fn lsp_close_document(
             .remove(&document.uri);
     }
     Ok(state
+        .core
         .workspace
         .lsp
         .document_status(
@@ -518,11 +542,12 @@ pub async fn lsp_stop_workspace(
     }
     Ok(if preserve_file_watcher.unwrap_or(false) {
         state
+            .core
             .workspace
             .lsp
             .stop_workspace_servers(workspace_id)
             .await
     } else {
-        state.workspace.lsp.stop_workspace(workspace_id).await
+        state.core.workspace.lsp.stop_workspace(workspace_id).await
     })
 }

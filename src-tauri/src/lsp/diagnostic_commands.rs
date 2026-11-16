@@ -12,6 +12,7 @@ pub async fn lsp_get_diagnostics(
 ) -> Result<LspDiagnosticsResult, String> {
     let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
     let diagnostics = match state
+        .core
         .workspace
         .lsp
         .active_session(
@@ -31,6 +32,7 @@ pub async fn lsp_get_diagnostics(
         None => Vec::new(),
     };
     let status = state
+        .core
         .workspace
         .lsp
         .document_status(
@@ -61,6 +63,7 @@ pub async fn lsp_workspace_diagnostics(
         workspace_id
     };
     Ok(state
+        .core
         .workspace
         .lsp
         .workspace_diagnostics(workspace_id)
@@ -117,6 +120,7 @@ pub async fn lsp_build_workspace(
 ) -> Result<LspBuildStatus, String> {
     let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
     let session = state
+        .core
         .workspace
         .lsp
         .active_session(

@@ -102,7 +102,8 @@ impl PluginRegistry {
             runtime.cancellation.cancel(&id);
         }
         loop {
-            if self.shutting_down.load(Ordering::Acquire)
+            if (self.shutting_down.load(Ordering::Acquire)
+                || self.quiescence.load(Ordering::Acquire) != 0)
                 || self
                     .pending_requests
                     .lock()
@@ -165,6 +166,9 @@ impl PluginRegistry {
                 if registry.shutting_down.load(Ordering::Acquire) {
                     break;
                 }
+                if registry.quiescence.load(Ordering::Acquire) != 0 {
+                    continue;
+                }
                 let hosts = registry
                     .hosts
                     .lock()
@@ -176,7 +180,9 @@ impl PluginRegistry {
                     let Ok(_lifecycle) = registry.lifecycle.try_lock() else {
                         continue;
                     };
-                    if registry.shutting_down.load(Ordering::Acquire) {
+                    if registry.shutting_down.load(Ordering::Acquire)
+                        || registry.quiescence.load(Ordering::Acquire) != 0
+                    {
                         break;
                     }
                     let Ok(mut process) = runtime.process.try_lock() else {
@@ -223,6 +229,10 @@ impl PluginRegistry {
             .lock()
             .expect("plugin lifecycle lock poisoned");
         self.shutting_down.store(true, Ordering::Release);
+        self.stop_hosts();
+    }
+
+    pub(super) fn stop_hosts(&self) {
         let hosts = self
             .hosts
             .lock()
@@ -255,7 +265,9 @@ impl PluginRegistry {
             .lifecycle
             .lock()
             .expect("plugin lifecycle lock poisoned");
-        if self.shutting_down.load(Ordering::Acquire) {
+        if (self.shutting_down.load(Ordering::Acquire)
+            || self.quiescence.load(Ordering::Acquire) != 0)
+        {
             return Err(PluginError::HostUnavailable(slug.into()));
         }
         let current = self

@@ -94,6 +94,7 @@ pub async fn backup_stage_restore(
         let _process_operation = coordination::BackupProcessLock::acquire(&app)?;
         let state = app.state::<AppState>();
         state
+            .core
             .vault
             .verify_master_password(vault_password.as_deref())?;
         let p = PathBuf::from(path);

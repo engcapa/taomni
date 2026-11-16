@@ -272,7 +272,7 @@ async fn business(
                     Ok(event) => notifications.deliver(&runtime, &core, &config, &output, &event),
                     Err(broadcast::error::RecvError::Lagged(_)) => {
                         runtime.error("feishu_event_gap_reconciled");
-                        let snapshots: Vec<_> = core.state().mobile.task_summaries.lock()
+                        let snapshots: Vec<_> = core.state().legacy.mobile.task_summaries.lock()
                             .unwrap_or_else(|e| e.into_inner()).values().cloned().collect();
                         for event in snapshots { notifications.deliver(&runtime, &core, &config, &output, &event); }
                     }

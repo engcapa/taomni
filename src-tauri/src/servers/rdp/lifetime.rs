@@ -144,6 +144,7 @@ pub async fn start(ctx: ServerCtx, config: ServerConfig) -> Result<ServerStarted
         approvals: ctx
             .app
             .state::<crate::state::AppState>()
+            .legacy
             .servers
             .rdp_approvals
             .clone(),

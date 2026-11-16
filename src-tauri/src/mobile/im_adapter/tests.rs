@@ -19,7 +19,7 @@ pub(super) fn event(id: &str, text: &str) -> Value {
 }
 pub(super) fn thread(state: &crate::state::AppState) {
     let value=serde_json::from_value(json!({"id":"feishu-task","title":"Feishu QA","provider_id":"local","created_at":1,"updated_at":1,"source":"drawer","mode":"chat","linked_session_id":null})).unwrap();
-    crate::chat::store::create_thread(&state.db.lock().unwrap(), &value).unwrap();
+    crate::chat::store::create_thread(&state.core.db.lock().unwrap(), &value).unwrap();
 }
 #[test]
 fn identity_application_freshness_and_message_id_dedup_keys() {
@@ -112,7 +112,7 @@ async fn real_confirmation_scoping_durable_admission_and_no_pty_commands() {
     assert!(!actions::claim(&core, "first").unwrap());
     actions::prepare(&core).unwrap();
     assert!(!actions::claim(&core, "first").unwrap());
-    f.state.mobile.broker.register("terminal");
+    f.state.legacy.mobile.broker.register("terminal");
     assert!(
         actions::execute(&core, &cfg, "send term:terminal bad")
             .await
@@ -133,17 +133,18 @@ async fn real_confirmation_scoping_durable_admission_and_no_pty_commands() {
     );
     let (tx, rx) = tokio::sync::oneshot::channel();
     f.state
+        .core
         .agent
         .cc_pending_permissions
         .lock()
         .unwrap()
         .insert("cid".into(), tx);
-    f.state.mobile.confirmations.lock().unwrap().insert(
+    f.state.legacy.mobile.confirmations.lock().unwrap().insert(
         "cid".into(),
         json!({"id":"cid","thread_id":"feishu-task","tool":"write_file","supported":true}),
     );
     let wrong = serde_json::from_value(json!({"id":"wrong","title":"Other task","provider_id":"local","created_at":1,"updated_at":1,"source":"drawer","mode":"chat","linked_session_id":null})).unwrap();
-    crate::chat::store::create_thread(&f.state.db.lock().unwrap(), &wrong).unwrap();
+    crate::chat::store::create_thread(&f.state.core.db.lock().unwrap(), &wrong).unwrap();
     assert!(
         actions::execute(&core, &cfg, "approve thread:wrong cid")
             .await
@@ -190,6 +191,7 @@ async fn real_confirmation_scoping_durable_admission_and_no_pty_commands() {
     let root = tempfile::tempdir().unwrap();
     std::fs::write(root.path().join("notes.txt"), "中".repeat(2000)).unwrap();
     f.state
+        .legacy
         .mobile
         .file_roots
         .lock()

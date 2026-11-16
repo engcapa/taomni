@@ -95,7 +95,7 @@ pub async fn web_search_execute(
         Ok(hits) => ("search_allowed", hits.len()),
         Err(_) => ("search_denied", 0),
     };
-    if let Ok(db) = state.db.lock() {
+    if let Ok(db) = state.core.db.lock() {
         let _ = db.execute(
             "INSERT INTO voice_audit (created_at, session_id, transcript, intent_json, outcome, command, risk)
              VALUES (?1, NULL, NULL, ?2, ?3, NULL, NULL)",
@@ -175,7 +175,7 @@ pub async fn probe_searxng_instances() -> Result<Option<String>, String> {
 pub async fn provider_caps(
     state: State<'_, AppState>,
 ) -> Result<crate::llm::openai_compat::ProviderCaps, String> {
-    let ai_ctx = state.ai_ctx.read().await;
+    let ai_ctx = state.legacy.ai_ctx.read().await;
     Ok(crate::llm::openai_compat::ProviderCaps::for_provider(
         &ai_ctx.config.llm.active,
     ))

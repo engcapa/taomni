@@ -1,0 +1,58 @@
+id: TC-MODULES-008
+title: Core notes survive renderer reload with the module registry available
+covers: [F-Modules-1, F-TAO-1]
+tags: [modules, core-only, recovery, p1]
+modes: [browser, native]
+fixtures: [reset_db]
+timeout_sec: 90
+description: >-
+  Create a real core note through Tao Hub, reload the current renderer, and
+  recover the note through its normal list. Then open the module registry.
+  Browser proves the retained renderer workflow; native additionally proves
+  notes.db and module IPC still reach their one shared CoreState owner. Reload
+  is not a process restart and does not prove native process survival by itself.
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="rail-chat-button"]'
+- click: '[data-testid="tao-hub-tab-notes"]'
+- wait_for: '[data-testid="notes-panel"]'
+- click: '[data-testid="notes-new"]'
+- wait_for: '[data-testid="note-editor"]'
+- fill: {selector: '[data-testid="note-editor-title"]', value: QA CoreState retained note}
+- click: '[data-testid="note-editor-back"]'
+- assert_text: {selector: '[data-testid="notes-list"]', contains: QA CoreState retained note}
+- assert_no_runtime_errors: null
+- reload_window: null
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="rail-chat-button"]'
+- wait_for: '[data-testid="notes-panel"]'
+- assert_text: {selector: '[data-testid="notes-list"]', contains: QA CoreState retained note}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- wait_for: '[data-testid="module-store-panel"]'
+- assert_visible: '[data-testid="module-store-core-api"]'
+- assert_visible: '[data-testid="module-upgrade-status"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R-CORE-RELOAD
+    requirement: A core note remains available across renderer reload and module registry IPC remains usable.
+    actions: [3, 4, 6, 8, 9, 12, 14, 17, 18]
+    checkpoints:
+    - {step: 11, expectation: No runtime errors occur before the lifecycle transition.}
+    - {step: 10, expectation: The new core note is visible before renderer reload.}
+    - {step: 16, expectation: The same saved note is recovered without creating another note.}
+    - {step: 20, expectation: The module registry still exposes its core API marker.}
+    - {step: 21, expectation: Legacy upgrade preflight IPC remains observable.}
+    - {step: 22, expectation: No runtime error occurs after reload or shared state access.}
+    results: [10, 11, 16, 20, 21, 22]
+  native:
+  - check: Core note persistence and registry commands use the actual desktop stores after reload.
+    method: automated
+    reason: Browser stubs do not open notes.db or execute registry IPC.
+  visual:
+  - check: This case verifies persisted content and command routing.
+    method: not-applicable
+    reason: No new UI or visual fidelity requirement is introduced by state composition.

@@ -255,7 +255,7 @@ fn apply_stored_certificate_pins(
     port: u16,
     options: &mut RdpOptions,
 ) -> Result<(), String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let db = state.core.db.lock().map_err(|e| e.to_string())?;
     if let Some(pin) = tls::load_pin(&db, host, port).map_err(|e| e.to_string())? {
         options.certificate_fingerprint = Some(pin);
     } else if let Some(pin) = options.certificate_fingerprint.as_deref() {
@@ -286,12 +286,12 @@ pub async fn rdp_connect(
 ) -> Result<RdpConnectResult, String> {
     let session_id = Uuid::new_v4().to_string();
 
-    let resolved_password = resolve_secret(&state.vault, password.as_deref())?;
+    let resolved_password = resolve_secret(&state.core.vault, password.as_deref())?;
     let mut options = RdpOptions::from_json(options_json.as_deref());
     apply_stored_certificate_pins(&state, &host, port, &mut options)?;
     if let Some(g) = options.gateway.as_mut() {
         if let Some(p) = g.password.as_deref() {
-            if let Some(plain) = state.vault.resolve(p)? {
+            if let Some(plain) = state.core.vault.resolve(p)? {
                 g.password = Some((*plain).clone());
             }
         }
@@ -300,7 +300,7 @@ pub async fn rdp_connect(
     let mut network = NetworkSettings::from_json(network_settings_json.as_deref());
     if let Some(n) = network.as_mut() {
         crate::terminal::resolve_proxy_session(&state, n)?;
-        n.resolve_proxy_pass(&state.vault)?;
+        n.resolve_proxy_pass(&state.core.vault)?;
         crate::terminal::resolve_jump_credentials(&state, n)?;
     }
 
@@ -325,21 +325,21 @@ pub async fn rdp_connect(
     // `rdp_disconnect`). Without this the `RdpSession` would linger in the
     // map after its backend worker has already exited.
     let reaper_cancel = session.cancel.clone();
-    let reaper_sessions = state.remote_desktop.rdp_sessions.clone();
+    let reaper_sessions = state.legacy.remote_desktop.rdp_sessions.clone();
     let reaper_id = session_id.clone();
     tokio::spawn(async move {
         reaper_cancel.cancelled().await;
         reaper_sessions.write().await.remove(&reaper_id);
     });
 
-    let mut sessions = state.remote_desktop.rdp_sessions.write().await;
+    let mut sessions = state.legacy.remote_desktop.rdp_sessions.write().await;
     sessions.insert(session_id, session);
     Ok(result)
 }
 
 #[tauri::command]
 pub async fn rdp_disconnect(state: State<'_, AppState>, session_id: String) -> Result<(), String> {
-    let mut sessions = state.remote_desktop.rdp_sessions.write().await;
+    let mut sessions = state.legacy.remote_desktop.rdp_sessions.write().await;
     if let Some(s) = sessions.remove(&session_id) {
         let _ = s.control_tx.send(RdpControl::Disconnect);
         s.cancel.cancel();
@@ -361,7 +361,7 @@ pub async fn rdp_trust_certificate(
     if host.is_empty() || port == 0 {
         return Err("RDP certificate trust requires a valid host and port".to_string());
     }
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let db = state.core.db.lock().map_err(|e| e.to_string())?;
     tls::save_pin(&db, host, port, &fingerprint)
 }
 
@@ -377,12 +377,12 @@ pub async fn rdp_test_connection(
     options_json: Option<String>,
     network_settings_json: Option<String>,
 ) -> Result<String, String> {
-    let resolved_password = resolve_secret(&state.vault, password.as_deref())?;
+    let resolved_password = resolve_secret(&state.core.vault, password.as_deref())?;
     let mut options = RdpOptions::from_json(options_json.as_deref());
     apply_stored_certificate_pins(&state, &host, port, &mut options)?;
     if let Some(g) = options.gateway.as_mut() {
         if let Some(p) = g.password.as_deref() {
-            if let Some(plain) = state.vault.resolve(p)? {
+            if let Some(plain) = state.core.vault.resolve(p)? {
                 g.password = Some((*plain).clone());
             }
         }
@@ -391,7 +391,7 @@ pub async fn rdp_test_connection(
     let mut network = NetworkSettings::from_json(network_settings_json.as_deref());
     if let Some(n) = network.as_mut() {
         crate::terminal::resolve_proxy_session(&state, n)?;
-        n.resolve_proxy_pass(&state.vault)?;
+        n.resolve_proxy_pass(&state.core.vault)?;
         crate::terminal::resolve_jump_credentials(&state, n)?;
     }
 

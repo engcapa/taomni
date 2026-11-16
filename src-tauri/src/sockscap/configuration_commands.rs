@@ -75,7 +75,7 @@ pub async fn sockscap_set_config(
 ) -> Result<(), String> {
     config.validate()?;
     let path = config_path(&app)?;
-    let mut orch = state.sockscap.orch.write().await;
+    let mut orch = state.legacy.sockscap.orch.write().await;
     ensure_configuration_unlocked(&orch)?;
     config.save(&path)?;
     orch.apply_config(config);
@@ -95,7 +95,7 @@ pub async fn sockscap_gfwlist_status(
     app: AppHandle,
     state: State<'_, AppState>,
 ) -> Result<GfwListStatus, String> {
-    let orch = state.sockscap.orch.read().await;
+    let orch = state.legacy.sockscap.orch.read().await;
     if let Some(meta) = orch.gfwlist_meta() {
         return Ok(GfwListStatus {
             loaded: true,
@@ -136,7 +136,7 @@ pub async fn sockscap_refresh_gfwlist(
 ) -> Result<GfwListStatus, String> {
     // Hold the write lock for the complete mutation so Start cannot snapshot
     // the old rules while a refresh is being committed.
-    let mut orch = state.sockscap.orch.write().await;
+    let mut orch = state.legacy.sockscap.orch.write().await;
     ensure_configuration_unlocked(&orch)?;
     let cfg_path = config_path(&app)?;
     let mut cfg = SocksCapConfig::load(&cfg_path);
@@ -195,7 +195,7 @@ pub async fn sockscap_import_rules(
     state: State<'_, AppState>,
     path: String,
 ) -> Result<GfwListStatus, String> {
-    let mut orch = state.sockscap.orch.write().await;
+    let mut orch = state.legacy.sockscap.orch.write().await;
     ensure_configuration_unlocked(&orch)?;
     let dir = rules_dir(&app)?;
     let compiled = rules::source::import_from_path(std::path::Path::new(&path), &dir)?;
@@ -226,7 +226,7 @@ pub async fn sockscap_test_target(
 
     // Ensure rules are loaded into the orchestrator for dry-run.
     {
-        let mut orch = state.sockscap.orch.write().await;
+        let mut orch = state.legacy.sockscap.orch.write().await;
         if orch.rules().is_none() {
             let dir = rules_dir(&app)?;
             if let Some(c) = rules::source::load_cached(&dir) {
@@ -239,7 +239,7 @@ pub async fn sockscap_test_target(
         }
     }
 
-    let orch = state.sockscap.orch.read().await;
+    let orch = state.legacy.sockscap.orch.read().await;
     let cfg = orch
         .config()
         .cloned()

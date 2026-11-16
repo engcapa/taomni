@@ -14,7 +14,7 @@ fn view(config: Config, state: &AppState) -> View {
     let secret_configured = !config.secret_ref.is_empty();
     View {
         config,
-        status: state.mobile.im.snapshot(),
+        status: state.legacy.mobile.im.snapshot(),
         secret_configured,
     }
 }
@@ -35,9 +35,9 @@ pub async fn mobile_feishu_save(
     app: tauri::AppHandle,
     state: State<'_, AppState>,
 ) -> Result<View, String> {
-    let _service = state.mobile.lifecycle.lock().await;
+    let _service = state.legacy.mobile.lifecycle.lock().await;
     let secret = secret.map(Zeroizing::new);
-    if !state.mobile.im.idle().await {
+    if !state.legacy.mobile.im.idle().await {
         return Err("stop_feishu_before_saving".into());
     }
     let data = crate::resolved_app_data_dir(&app)?;
@@ -49,7 +49,7 @@ pub async fn mobile_feishu_save(
         if secret.len() > 1024 {
             return Err("invalid_app_secret".into());
         }
-        state.vault.put_fixed(
+        state.core.vault.put_fixed(
             "mobile.feishu.app-secret",
             "api-key",
             "Taomni Feishu application",
@@ -65,25 +65,27 @@ pub async fn mobile_feishu_start(
     app: tauri::AppHandle,
     state: State<'_, AppState>,
 ) -> Result<Status, String> {
-    let service = state.mobile.lifecycle.lock().await;
+    let service = state.legacy.mobile.lifecycle.lock().await;
     if !service.as_ref().is_some_and(|r| !r.task.is_finished()) {
         return Err("start_mobile_service_first".into());
     }
     let config = Config::load(&crate::resolved_app_data_dir(&app)?)?;
     let secret = state
+        .core
         .vault
         .resolve(&config.secret_ref)?
         .ok_or("configure_app_secret_in_vault")?;
     state
+        .legacy
         .mobile
         .im
         .start(Core::Desktop(app), config, secret)
         .await?;
     drop(service);
-    Ok(state.mobile.im.snapshot())
+    Ok(state.legacy.mobile.im.snapshot())
 }
 #[tauri::command]
 pub async fn mobile_feishu_stop(state: State<'_, AppState>) -> Result<Status, String> {
-    state.mobile.im.stop().await;
-    Ok(state.mobile.im.snapshot())
+    state.legacy.mobile.im.stop().await;
+    Ok(state.legacy.mobile.im.snapshot())
 }

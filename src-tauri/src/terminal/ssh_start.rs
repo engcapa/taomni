@@ -38,6 +38,7 @@ pub(crate) fn resolve_jump_credentials(
     if !network.jump_session_id.trim().is_empty() {
         let jump = {
             let db = state
+                .core
                 .db
                 .lock()
                 .map_err(|_| "session database is unavailable".to_string())?;
@@ -76,7 +77,7 @@ pub(crate) fn resolve_jump_credentials(
 
     // Resolve any `vault:` reference in the (manual or session-derived)
     // password into plaintext.
-    network.resolve_jump_secret(&state.vault)?;
+    network.resolve_jump_secret(&state.core.vault)?;
     Ok(())
 }
 
@@ -99,6 +100,7 @@ pub(crate) fn resolve_proxy_session(
 
     let proxy_session = {
         let db = state
+            .core
             .db
             .lock()
             .map_err(|_| "session database is unavailable".to_string())?;
@@ -165,7 +167,7 @@ pub async fn create_ssh_terminal(
         &session_id,
     )?;
     {
-        let terminals = state.terminal.terminals.read().await;
+        let terminals = state.core.terminal.terminals.read().await;
         if terminals.contains_key(&session_id) {
             return Err(format!("Terminal {} already exists", session_id));
         }
@@ -174,7 +176,7 @@ pub async fn create_ssh_terminal(
     let auth = match auth_method.as_str() {
         "Password" => {
             let raw = auth_data.unwrap_or_default();
-            let resolved = state.vault.resolve(&raw)?;
+            let resolved = state.core.vault.resolve(&raw)?;
             ssh::SshAuth::Password(resolved.map(|z| (*z).clone()).unwrap_or(raw))
         }
         "PrivateKey" => {
@@ -184,7 +186,7 @@ pub async fn create_ssh_terminal(
         "Gssapi" | "None" => ssh::SshAuth::Gssapi,
         _ => {
             let raw = auth_data.unwrap_or_default();
-            let resolved = state.vault.resolve(&raw)?;
+            let resolved = state.core.vault.resolve(&raw)?;
             ssh::SshAuth::Password(resolved.map(|z| (*z).clone()).unwrap_or(raw))
         }
     };
@@ -193,7 +195,7 @@ pub async fn create_ssh_terminal(
     let network = match network {
         Some(mut n) => {
             resolve_proxy_session(&state, &mut n)?;
-            n.resolve_proxy_pass(&state.vault)?;
+            n.resolve_proxy_pass(&state.core.vault)?;
             resolve_jump_credentials(&state, &mut n)?;
             Some(n)
         }
@@ -228,7 +230,7 @@ pub async fn create_ssh_terminal(
     // below once connect resolves (success or error).
     let prompter = build_mobile_kbd_prompter(
         app_handle.clone(),
-        state.terminal.ssh_auth_responders.clone(),
+        state.core.terminal.ssh_auth_responders.clone(),
         session_id.clone(),
         mobile.clone(),
     );
@@ -283,13 +285,13 @@ pub async fn create_ssh_terminal(
             .await;
     // Drop any responder left dangling for this session (e.g. auth failed
     // while a prompt round was still registered) so the map doesn't leak.
-    clear_session_auth_responders(&state.terminal.ssh_auth_responders, &session_id);
+    clear_session_auth_responders(&state.core.terminal.ssh_auth_responders, &session_id);
     let (handle, channel, mut output_rx) = connect_result?;
 
     let handle_arc = Arc::new(handle);
 
     {
-        let mut terminals = state.terminal.terminals.write().await;
+        let mut terminals = state.core.terminal.terminals.write().await;
         if terminals.contains_key(&session_id) {
             return Err(format!("Terminal {} already exists", session_id));
         }
@@ -318,8 +320,12 @@ pub async fn create_ssh_terminal(
                 forwards: AsyncMutex::new(forward_handles),
             };
 
-            state.mobile.broker.register(&session_id);
-            state.mobile.broker.desktop(&session_id, Some((cols, rows)));
+            state.legacy.mobile.broker.register(&session_id);
+            state
+                .legacy
+                .mobile
+                .broker
+                .desktop(&session_id, Some((cols, rows)));
             terminals.insert(session_id.clone(), terminal);
             Ok(())
         };
@@ -339,7 +345,7 @@ pub async fn create_ssh_terminal(
         output_generation,
         || {
             add_terminal_output_channel(
-                &state.terminal.terminal_outputs,
+                &state.core.terminal.terminal_outputs,
                 &session_id,
                 on_output,
                 window.label(),
@@ -349,8 +355,8 @@ pub async fn create_ssh_terminal(
 
     let sid = session_id.clone();
     let app = app_handle.clone();
-    let terminals = state.terminal.terminals.clone();
-    let outputs = state.terminal.terminal_outputs.clone();
+    let terminals = state.core.terminal.terminals.clone();
+    let outputs = state.core.terminal.terminal_outputs.clone();
     tokio::spawn(async move {
         while let Some(data) = output_rx.recv().await {
             send_terminal_output(&outputs, &sid, data);
@@ -375,7 +381,7 @@ pub async fn create_ssh_terminal(
         if let Ok(mut outputs) = outputs.lock() {
             outputs.remove(&sid);
         }
-        outputs.broker.exit(&sid);
+        outputs.observations.exited(&sid, None);
         crate::mobile::events::EventSink::emit(
             &crate::mobile::events::DesktopSink(app),
             &format!("terminal-exit-{}", sid),

@@ -22,6 +22,7 @@ pub async fn list_common_local_directories(
     // probing happens inside `list_directory_shortcuts` without the DB
     // lock held.
     let db = state
+        .core
         .db
         .lock()
         .map_err(|e| format!("session database is unavailable: {e}"))?;
@@ -44,7 +45,7 @@ pub async fn record_local_directory_use(
     // Only live native-local terminals may record use. Async lock: this runs
     // on the Tokio runtime, where `blocking_read` would panic.
     {
-        let terminals = state.terminal.terminals.read().await;
+        let terminals = state.core.terminal.terminals.read().await;
         match terminals.get(&backend_session_id) {
             Some(ActiveTerminal::Local { .. }) => {}
             _ => {
@@ -73,6 +74,7 @@ pub(crate) fn record_local_directory_use_inner(
         return Err(format!("invalid local directory path: {path}"));
     };
     if let Some(last) = state
+        .core
         .terminal
         .local_directory_runtime
         .lock()
@@ -87,7 +89,7 @@ pub(crate) fn record_local_directory_use_inner(
         }
     }
     let now_ms = local_directories::system_now_ms();
-    let mut db = state.db.lock().map_err(|e| e.to_string())?;
+    let mut db = state.core.db.lock().map_err(|e| e.to_string())?;
     local_directories::init_tables(&db).map_err(|e| e.to_string())?;
     let (changed, revision) = local_directories::record_directory_use(
         &mut db,
@@ -95,7 +97,7 @@ pub(crate) fn record_local_directory_use_inner(
         local_directories::SOURCE_LOCAL_CWD,
         now_ms,
     )?;
-    if let Ok(mut runtime) = state.terminal.local_directory_runtime.lock() {
+    if let Ok(mut runtime) = state.core.terminal.local_directory_runtime.lock() {
         runtime.insert(backend_session_id.to_string(), new_key);
     }
     if changed {
@@ -128,7 +130,7 @@ pub(crate) fn record_successful_local_start(
         return None;
     };
     let now_ms = local_directories::system_now_ms();
-    let mut db = match state.db.lock() {
+    let mut db = match state.core.db.lock() {
         Ok(db) => db,
         Err(e) => {
             return Some(format!("local directory history save failed: {e}"));
@@ -140,7 +142,7 @@ pub(crate) fn record_successful_local_start(
         local_directories::SOURCE_LOCAL_START,
         now_ms,
     );
-    if let Ok(mut runtime) = state.terminal.local_directory_runtime.lock() {
+    if let Ok(mut runtime) = state.core.terminal.local_directory_runtime.lock() {
         runtime.insert(backend_session_id.to_string(), new_key);
     }
     match result {

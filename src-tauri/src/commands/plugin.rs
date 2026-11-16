@@ -15,12 +15,7 @@ use crate::{
 };
 
 fn legacy_profile_root(state: &AppState) -> PathBuf {
-    state
-        .plugins
-        .root()
-        .parent()
-        .unwrap_or_else(|| state.plugins.root())
-        .to_path_buf()
+    state.core.paths.data.clone()
 }
 
 fn legacy_version(value: Option<String>) -> String {

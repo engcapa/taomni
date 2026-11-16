@@ -62,7 +62,7 @@ pub async fn hbase_connect(
         inner: session_inner,
         cancel: tokio::sync::Mutex::new(tokio_util::sync::CancellationToken::new()),
     });
-    let mut map = state.database.hbase_sessions.write().await;
+    let mut map = state.core.database.hbase_sessions.write().await;
     map.insert(session_id, session);
     Ok(HBaseConnectResult { ok: true })
 }
@@ -88,6 +88,7 @@ pub async fn hbase_disconnect(
     session_id: String,
 ) -> Result<(), String> {
     state
+        .core
         .database
         .hbase_sessions
         .write()
@@ -279,7 +280,7 @@ fn resolve_secret(
     value: Option<&str>,
 ) -> Result<Option<String>, String> {
     match value {
-        Some(v) if !v.is_empty() => match state.vault.resolve(v)? {
+        Some(v) if !v.is_empty() => match state.core.vault.resolve(v)? {
             Some(z) => Ok(Some((*z).clone())),
             None => Ok(Some(v.to_string())),
         },
@@ -292,6 +293,7 @@ async fn get_session(
     session_id: &str,
 ) -> Result<Arc<HBaseSession>, String> {
     state
+        .core
         .database
         .hbase_sessions
         .read()

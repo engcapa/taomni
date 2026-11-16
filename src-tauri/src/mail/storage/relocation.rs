@@ -54,19 +54,20 @@ pub fn save_mail_session(
 ) -> Result<(), String> {
     let target_root = configured_directory(&config.options_json, state.mail_cache_root())?;
     let _changes = state
+        .core
         .mail
         .mail_archive
         .changes
         .lock()
         .map_err(|e| e.to_string())?;
-    state.mail.mail_archive.stop_account(&config.id)?;
+    state.core.mail.mail_archive.stop_account(&config.id)?;
     let handle = state.mail_db(&config.id)?;
     let mut db = handle.lock().map_err(|e| e.to_string())?;
     let _worker = super::super::coordination::ProcessLock::try_at(
         Path::new(db.path().ok_or("Mail storage has no disk path")?), "archive",
     )?.ok_or("Another Taomni instance is storing this mailbox. Pause full storage and retry saving its settings")?;
     relocate(&mut db, &config.id, &target_root, || {
-        let main_db = state.db.lock().map_err(|e| e.to_string())?;
+        let main_db = state.core.db.lock().map_err(|e| e.to_string())?;
         crate::session::db::save_session(&main_db, config).map_err(|e| e.to_string())
     })
 }

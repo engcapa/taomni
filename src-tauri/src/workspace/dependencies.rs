@@ -246,6 +246,7 @@ pub async fn workspace_dependency_tree(
     // the same JAVA_HOME/PATH the integrated terminal injects. Best-effort — fall
     // back to the inherited environment if resolution fails.
     let sdk_environment = state
+        .core
         .workspace
         .sdk
         .resolve_environment(&root, &root)

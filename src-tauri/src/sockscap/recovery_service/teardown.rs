@@ -30,6 +30,7 @@ pub(in crate::sockscap) async fn full_teardown(
 
     // --- 1) Helper capture_stop (blocking RPC) off the async runtime ----------
     let sess = state
+        .legacy
         .sockscap
         .helper
         .inner
@@ -61,7 +62,7 @@ pub(in crate::sockscap) async fn full_teardown(
     // allowing that during cleanup can repopulate the cgroup after its member
     // snapshot and make rmdir fail with EBUSY.
     #[cfg(target_os = "linux")]
-    if let Some(mgr) = state.sockscap.xray() {
+    if let Some(mgr) = state.legacy.sockscap.xray() {
         mgr.shutdown_all().await;
     }
 
@@ -69,7 +70,7 @@ pub(in crate::sockscap) async fn full_teardown(
     #[cfg(target_os = "linux")]
     let retryable_linux_capture = {
         let mut linux_capture = {
-            let mut orch = state.sockscap.orch.write().await;
+            let mut orch = state.legacy.sockscap.orch.write().await;
             orch.take_linux_capture_for_stop()
         };
         if let Some(capture) = linux_capture.as_mut() {
@@ -102,7 +103,7 @@ pub(in crate::sockscap) async fn full_teardown(
             }
         }
         let macos_capture = {
-            let mut orch = state.sockscap.orch.write().await;
+            let mut orch = state.legacy.sockscap.orch.write().await;
             orch.take_macos_capture_for_stop()
         };
         if let Some(capture) = macos_capture {
@@ -115,7 +116,7 @@ pub(in crate::sockscap) async fn full_teardown(
 
     // --- 3) Take any platform relay without holding write lock during await --
     let relay = {
-        let mut orch = state.sockscap.orch.write().await;
+        let mut orch = state.legacy.sockscap.orch.write().await;
         orch.take_relay_for_stop()
     };
     if let Some(relay) = relay {
@@ -126,13 +127,13 @@ pub(in crate::sockscap) async fn full_teardown(
     // --- 3b) Stop all xray cores (all platforms). Their node connections are
     //         now unnecessary; leaving them would leak processes on Stop.
     #[cfg(not(target_os = "linux"))]
-    if let Some(mgr) = state.sockscap.xray() {
+    if let Some(mgr) = state.legacy.sockscap.xray() {
         mgr.shutdown_all().await;
     }
 
     // --- 4) Finish engine state + DNS + journal ------------------------------
     {
-        let mut orch = state.sockscap.orch.write().await;
+        let mut orch = state.legacy.sockscap.orch.write().await;
         orch.finish_stop();
         if !errors.is_empty() {
             orch.set_recovery_required(&capture::capabilities().capture_backend, errors.join("; "));
@@ -150,10 +151,16 @@ pub(in crate::sockscap) async fn full_teardown(
                     let message = format!(
                         "capture stopped, but the recovery journal could not be cleared: {error}"
                     );
-                    state.sockscap.orch.write().await.set_recovery_required(
-                        &capture::capabilities().capture_backend,
-                        message.clone(),
-                    );
+                    state
+                        .legacy
+                        .sockscap
+                        .orch
+                        .write()
+                        .await
+                        .set_recovery_required(
+                            &capture::capabilities().capture_backend,
+                            message.clone(),
+                        );
                     return Err(message);
                 }
             }
@@ -185,11 +192,12 @@ pub fn shutdown_on_exit(app: &AppHandle, state: &AppState) {
     // Kill any xray-core sidecars first (all platforms). Best-effort, sync:
     // start_kill without reaping, since no async runtime is guaranteed at exit.
     // kill_on_drop is the further backstop for a hard crash.
-    if let Some(mgr) = state.sockscap.xray() {
+    if let Some(mgr) = state.legacy.sockscap.xray() {
         mgr.shutdown_all_blocking();
     }
 
     let sess = state
+        .legacy
         .sockscap
         .helper
         .inner

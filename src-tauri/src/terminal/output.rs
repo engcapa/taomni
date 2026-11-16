@@ -15,13 +15,13 @@ pub struct TerminalOutputSubscriber {
 }
 pub struct TerminalOutputHub {
     desktop: Mutex<HashMap<String, Vec<TerminalOutputSubscriber>>>,
-    pub(crate) broker: Arc<crate::mobile::pty_broker::Broker>,
+    pub(crate) observations: super::observation::TerminalObservations,
 }
 impl TerminalOutputHub {
-    pub(crate) fn new(broker: Arc<crate::mobile::pty_broker::Broker>) -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             desktop: Mutex::new(HashMap::new()),
-            broker,
+            observations: Default::default(),
         }
     }
     pub(crate) fn lock(
@@ -35,7 +35,7 @@ impl TerminalOutputHub {
 pub(crate) type TerminalOutputSubscribers = Arc<TerminalOutputHub>;
 
 pub(crate) fn revoke_window_outputs(state: &AppState, window_label: &str) {
-    if let Ok(mut outputs) = state.terminal.terminal_outputs.lock() {
+    if let Ok(mut outputs) = state.core.terminal.terminal_outputs.lock() {
         for subscribers in outputs.values_mut() {
             subscribers.retain(|subscriber| subscriber.window_label != window_label);
         }
@@ -67,7 +67,7 @@ pub(super) fn send_terminal_output(
     session_id: &str,
     data: Vec<u8>,
 ) {
-    outputs.broker.output(session_id, &data);
+    outputs.observations.output(session_id, &data);
     let Ok(mut outputs) = outputs.lock() else {
         return;
     };
@@ -94,7 +94,7 @@ pub async fn attach_terminal_output(
         crate::webview_recovery::output_generation(window.app_handle(), window.label());
     validate_session_id(&session_id)?;
     {
-        let terminals = state.terminal.terminals.read().await;
+        let terminals = state.core.terminal.terminals.read().await;
         if !terminals.contains_key(&session_id) {
             return Err(format!("Terminal {} not found", session_id));
         }
@@ -105,7 +105,7 @@ pub async fn attach_terminal_output(
         output_generation,
         || {
             add_terminal_output_channel(
-                &state.terminal.terminal_outputs,
+                &state.core.terminal.terminal_outputs,
                 &session_id,
                 on_output,
                 window.label(),
@@ -124,6 +124,7 @@ pub fn detach_terminal_output(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     let mut outputs = state
+        .core
         .terminal
         .terminal_outputs
         .lock()

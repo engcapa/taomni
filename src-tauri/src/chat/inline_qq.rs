@@ -30,7 +30,7 @@ pub async fn inline_qq_stream(
     state: State<'_, AppState>,
 ) -> Result<(), String> {
     {
-        let ai_ctx = state.ai_ctx.read().await;
+        let ai_ctx = state.legacy.ai_ctx.read().await;
         if ai_ctx.config.fully_disabled {
             return Err("AI is fully disabled.".into());
         }
@@ -58,7 +58,7 @@ pub async fn inline_qq_stream(
 
     // Pull provider via the router.
     let stream_result = {
-        let ai_ctx = state.ai_ctx.read().await;
+        let ai_ctx = state.legacy.ai_ctx.read().await;
         let provider_id = ai_ctx.llm.provider_for_task(TaskKind::InlineQq);
         let provider = ai_ctx
             .llm

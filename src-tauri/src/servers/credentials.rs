@@ -99,6 +99,7 @@ pub(super) fn resolve_rdp_password(
         .and_then(|value| value.as_str())
         .ok_or_else(|| "RDP server password is not stored in the credential vault".to_string())?;
     let password = state
+        .core
         .vault
         .resolve(reference)?
         .ok_or_else(|| "invalid RDP server password vault reference".to_string())?;

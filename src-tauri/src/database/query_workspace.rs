@@ -295,7 +295,7 @@ pub async fn db_load_query_workspace(
     workspace_id: String,
     state: State<'_, AppState>,
 ) -> Result<Option<DbQueryWorkspace>, String> {
-    let db = state.db.lock().map_err(|error| error.to_string())?;
+    let db = state.core.db.lock().map_err(|error| error.to_string())?;
     load_query_workspace(&db, &workspace_id).map_err(|error| error.to_string())
 }
 
@@ -304,7 +304,7 @@ pub async fn db_save_query_workspace(
     request: DbSaveQueryWorkspaceRequest,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let mut db = state.db.lock().map_err(|error| error.to_string())?;
+    let mut db = state.core.db.lock().map_err(|error| error.to_string())?;
     save_query_workspace(&mut db, &request).map_err(|error| error.to_string())
 }
 
@@ -315,7 +315,7 @@ pub async fn db_close_query_workspace_tabs(
     closed_at: i64,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let db = state.db.lock().map_err(|error| error.to_string())?;
+    let db = state.core.db.lock().map_err(|error| error.to_string())?;
     close_query_workspace_tabs(&db, &workspace_id, &panel_ids, closed_at)
         .map_err(|error| error.to_string())
 }
@@ -326,7 +326,7 @@ pub async fn db_list_closed_query_workspace_tabs(
     limit: Option<i64>,
     state: State<'_, AppState>,
 ) -> Result<Vec<DbQueryWorkspaceTab>, String> {
-    let db = state.db.lock().map_err(|error| error.to_string())?;
+    let db = state.core.db.lock().map_err(|error| error.to_string())?;
     list_closed_query_workspace_tabs(&db, &workspace_id, limit.unwrap_or(50))
         .map_err(|error| error.to_string())
 }
@@ -339,7 +339,7 @@ pub async fn db_reopen_query_workspace_tab(
     updated_at: i64,
     state: State<'_, AppState>,
 ) -> Result<bool, String> {
-    let db = state.db.lock().map_err(|error| error.to_string())?;
+    let db = state.core.db.lock().map_err(|error| error.to_string())?;
     reopen_query_workspace_tab(&db, &workspace_id, &panel_id, tab_order, updated_at)
         .map_err(|error| error.to_string())
 }

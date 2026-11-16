@@ -40,6 +40,7 @@ pub async fn dap_start_session(
     launch_config: Value,
 ) -> Result<DapStartResult, String> {
     let adapter = state
+        .core
         .workspace
         .dap
         .registry
@@ -75,7 +76,7 @@ pub async fn dap_start_session(
     tokio::spawn(run_reader(
         reader,
         session.clone(),
-        state.workspace.dap.clone(),
+        state.core.workspace.dap.clone(),
         session_id.clone(),
         emit.clone(),
     ));
@@ -127,6 +128,7 @@ pub async fn dap_start_session(
     );
 
     state
+        .core
         .workspace
         .dap
         .insert(session_id.clone(), session)
@@ -149,6 +151,7 @@ pub async fn dap_send_request(
     arguments: Option<Value>,
 ) -> Result<Value, String> {
     let session = state
+        .core
         .workspace
         .dap
         .get(&session_id)
@@ -172,6 +175,7 @@ pub async fn dap_send(
     arguments: Option<Value>,
 ) -> Result<(), String> {
     let session = state
+        .core
         .workspace
         .dap
         .get(&session_id)
@@ -191,7 +195,7 @@ pub async fn dap_terminate(
     state: tauri::State<'_, crate::state::AppState>,
     session_id: String,
 ) -> Result<(), String> {
-    if let Some(session) = state.workspace.dap.remove(&session_id).await {
+    if let Some(session) = state.core.workspace.dap.remove(&session_id).await {
         let graceful = session
             .capabilities
             .lock()

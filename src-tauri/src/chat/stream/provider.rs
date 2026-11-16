@@ -96,7 +96,7 @@ pub(super) async fn stream_provider(turn: StreamTurn<'_>) -> Result<(), String> 
     // Pull the provider via the router so we don't hold the read lock across
     // the long stream/tool lifetime.
     let provider_result: Result<Arc<dyn Llm>, crate::llm::LlmError> = {
-        let ai_ctx = state.ai_ctx.read().await;
+        let ai_ctx = state.legacy.ai_ctx.read().await;
         let pinned = ai_ctx.llm.provider(&thread.provider_id);
         let pinned_blocked = pinned.is_none() && ai_ctx.llm.needs_vault_unlock(&thread.provider_id);
 
@@ -148,8 +148,8 @@ pub(super) async fn stream_provider(turn: StreamTurn<'_>) -> Result<(), String> 
     };
 
     // Create a provider-agnostic cancellation handle for this in-flight turn.
-    let cancel_token = state.mobile.turn_cancel(&req.thread_id);
-    state.agent.chat_runs.lock().await.insert(
+    let cancel_token = state.legacy.mobile.turn_cancel(&req.thread_id);
+    state.core.agent.chat_runs.lock().await.insert(
         req.thread_id.clone(),
         run::ChatRunHandle::direct_llm(cancel_token.clone()),
     );
@@ -181,7 +181,13 @@ pub(super) async fn stream_provider(turn: StreamTurn<'_>) -> Result<(), String> 
                         id: assistant_id,
                         message: e,
                     });
-                    state.agent.chat_runs.lock().await.remove(&req.thread_id);
+                    state
+                        .core
+                        .agent
+                        .chat_runs
+                        .lock()
+                        .await
+                        .remove(&req.thread_id);
                     return Ok(());
                 }
             };
@@ -202,7 +208,13 @@ pub(super) async fn stream_provider(turn: StreamTurn<'_>) -> Result<(), String> 
                             id: assistant_id,
                             message: e,
                         });
-                        state.agent.chat_runs.lock().await.remove(&req.thread_id);
+                        state
+                            .core
+                            .agent
+                            .chat_runs
+                            .lock()
+                            .await
+                            .remove(&req.thread_id);
                         return Ok(());
                     }
                 };
@@ -237,7 +249,13 @@ pub(super) async fn stream_provider(turn: StreamTurn<'_>) -> Result<(), String> 
                                     id: assistant_id,
                                     message: e.to_string(),
                                 });
-                                state.agent.chat_runs.lock().await.remove(&req.thread_id);
+                                state
+                                    .core
+                                    .agent
+                                    .chat_runs
+                                    .lock()
+                                    .await
+                                    .remove(&req.thread_id);
                                 return Ok(());
                             }
                         };
@@ -307,7 +325,13 @@ pub(super) async fn stream_provider(turn: StreamTurn<'_>) -> Result<(), String> 
                             message: "Tool loop ended before the provider returned a final answer"
                                 .into(),
                         });
-                        state.agent.chat_runs.lock().await.remove(&req.thread_id);
+                        state
+                            .core
+                            .agent
+                            .chat_runs
+                            .lock()
+                            .await
+                            .remove(&req.thread_id);
                         return Ok(());
                     }
                 }
@@ -332,7 +356,13 @@ pub(super) async fn stream_provider(turn: StreamTurn<'_>) -> Result<(), String> 
                         id: assistant_id,
                         message: e.to_string(),
                     });
-                    state.agent.chat_runs.lock().await.remove(&req.thread_id);
+                    state
+                        .core
+                        .agent
+                        .chat_runs
+                        .lock()
+                        .await
+                        .remove(&req.thread_id);
                     return Ok(());
                 }
             };
@@ -360,7 +390,7 @@ pub(super) async fn stream_provider(turn: StreamTurn<'_>) -> Result<(), String> 
                                             id: assistant_id,
                                             message,
                                         });
-                                        state.agent.chat_runs.lock().await.remove(&req.thread_id);
+                                        state.core.agent.chat_runs.lock().await.remove(&req.thread_id);
                                         return Ok(());
                                     }
                                     Err(e) => {
@@ -368,7 +398,7 @@ pub(super) async fn stream_provider(turn: StreamTurn<'_>) -> Result<(), String> 
                                             id: assistant_id,
                                             message: e.to_string(),
                                         });
-                                        state.agent.chat_runs.lock().await.remove(&req.thread_id);
+                                        state.core.agent.chat_runs.lock().await.remove(&req.thread_id);
                                         return Ok(());
                                     }
                                 }
@@ -381,7 +411,13 @@ pub(super) async fn stream_provider(turn: StreamTurn<'_>) -> Result<(), String> 
         }
     }
 
-    state.agent.chat_runs.lock().await.remove(&req.thread_id);
+    state
+        .core
+        .agent
+        .chat_runs
+        .lock()
+        .await
+        .remove(&req.thread_id);
 
     if is_cancelled {
         emit(&StreamEventOut::Error {
@@ -404,7 +440,7 @@ pub(super) async fn stream_provider(turn: StreamTurn<'_>) -> Result<(), String> 
 
     let is_first = history.is_empty();
     {
-        let db = state.db.lock().map_err(|e| e.to_string())?;
+        let db = state.core.db.lock().map_err(|e| e.to_string())?;
         store::insert_message(&db, &assistant_msg).map_err(|e| e.to_string())?;
         if is_first {
             let title = user_msg.content.chars().take(40).collect::<String>();

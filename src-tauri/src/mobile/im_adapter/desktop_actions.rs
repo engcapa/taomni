@@ -76,7 +76,7 @@ pub(super) async fn execute(
                 return Err(commands::usage("browser"));
             }
             let opened = desktop::open_browser(core, target).await?;
-            if core.state().mobile.desktop.screen_allowed() {
+            if core.state().legacy.mobile.desktop.screen_allowed() {
                 let note = format!("已在服务端浏览器打开：{}", opened.url);
                 capture_screen_reply(core, config, None, Some(note), p2p_chat).await
             } else {
@@ -98,7 +98,7 @@ async fn after_desktop_action(
     note: String,
     p2p_chat: Option<&str>,
 ) -> Result<Reply, String> {
-    if core.state().mobile.desktop.screen_allowed() {
+    if core.state().legacy.mobile.desktop.screen_allowed() {
         tokio::time::sleep(std::time::Duration::from_millis(120)).await;
         if let Ok(reply) =
             capture_screen_reply(core, config, None, Some(note.clone()), p2p_chat).await

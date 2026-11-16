@@ -18,7 +18,7 @@ pub async fn deepseek_app_send(
     state: State<'_, AppState>,
 ) -> Result<TaoResponse, String> {
     let provider = {
-        let ctx = state.ai_ctx.read().await;
+        let ctx = state.legacy.ai_ctx.read().await;
         if !ctx.config.deepseek_app.enabled {
             return Err("DeepSeek · 全家桶 已在设置中停用".to_string());
         }

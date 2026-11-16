@@ -93,7 +93,7 @@ pub async fn start_local_server(
 
     // Ignore duplicate start: return the current status.
     {
-        let running = state.servers.running.lock().await;
+        let running = state.legacy.servers.running.lock().await;
         if let Some(active) = running.get(&st) {
             return Ok(active.status.clone());
         }
@@ -118,7 +118,7 @@ pub async fn start_local_server(
         started_at: None,
         error: None,
     };
-    set_status(&app, &state.servers, starting).await;
+    set_status(&app, &state.legacy.servers, starting).await;
 
     if st == ServerType::Rdp {
         if let Err(e) = resolve_rdp_password(&state, &mut config) {
@@ -129,7 +129,7 @@ pub async fn start_local_server(
                 started_at: None,
                 error: Some(e.clone()),
             };
-            set_status(&app, &state.servers, info).await;
+            set_status(&app, &state.legacy.servers, info).await;
             return Err(e);
         }
     }
@@ -149,7 +149,7 @@ pub async fn start_local_server(
                 started_at: None,
                 error: Some(e.clone()),
             };
-            set_status(&app, &state.servers, info).await;
+            set_status(&app, &state.legacy.servers, info).await;
             return Err(e);
         }
     };
@@ -166,7 +166,7 @@ pub async fn start_local_server(
     let auto_stop_task = if config.auto_stop {
         Some(spawn_auto_stop(
             app.clone(),
-            state.servers.clone(),
+            state.legacy.servers.clone(),
             st,
             cancel.clone(),
             log,
@@ -177,7 +177,7 @@ pub async fn start_local_server(
     };
 
     {
-        let mut running = state.servers.running.lock().await;
+        let mut running = state.legacy.servers.running.lock().await;
         running.insert(
             st,
             ActiveServer {
@@ -189,7 +189,7 @@ pub async fn start_local_server(
             },
         );
     }
-    set_status(&app, &state.servers, running_status.clone()).await;
+    set_status(&app, &state.legacy.servers, running_status.clone()).await;
     Ok(running_status)
 }
 
@@ -201,7 +201,7 @@ pub async fn stop_local_server(
 ) -> Result<ServerStatus, String> {
     let st = ServerType::from_str(&server_type)
         .ok_or_else(|| format!("unknown server type: {}", server_type))?;
-    Ok(stop_internal(&app, &state.servers, st).await)
+    Ok(stop_internal(&app, &state.legacy.servers, st).await)
 }
 
 #[tauri::command]
@@ -211,7 +211,7 @@ pub async fn get_server_status(
 ) -> Result<ServerStatus, String> {
     let st = ServerType::from_str(&server_type)
         .ok_or_else(|| format!("unknown server type: {}", server_type))?;
-    let s = state.servers.statuses.lock().await;
+    let s = state.legacy.servers.statuses.lock().await;
     Ok(s.get(&st)
         .cloned()
         .unwrap_or_else(|| ServerStatus::stopped(st)))
@@ -219,7 +219,7 @@ pub async fn get_server_status(
 
 #[tauri::command]
 pub async fn list_server_statuses(state: State<'_, AppState>) -> Result<Vec<ServerStatus>, String> {
-    let s = state.servers.statuses.lock().await;
+    let s = state.legacy.servers.statuses.lock().await;
     // Return a status for every known server type so the UI has a complete
     // list even before anything has started.
     let out = ServerType::all()

@@ -45,7 +45,7 @@ impl Default for HelperRegistry {
 /// session) and delete its ready file, so neither a retry nor boot repair can
 /// rediscover a helper we have given up on.
 pub(super) fn discard_helper_session(state: &State<'_, AppState>, sess: &HelperSession) {
-    if let Ok(mut guard) = state.sockscap.helper.inner.lock() {
+    if let Ok(mut guard) = state.legacy.sockscap.helper.inner.lock() {
         if guard.as_ref().map(|s| s.port) == Some(sess.port) {
             *guard = None;
         }

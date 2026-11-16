@@ -153,6 +153,7 @@ pub(in crate::lsp) async fn lsp_location_request(
         _ => CancellationToken::new(),
     };
     let session = match state
+        .core
         .workspace
         .lsp
         .active_session(
@@ -165,6 +166,7 @@ pub(in crate::lsp) async fn lsp_location_request(
         Some(session) => session,
         None => {
             let status = state
+                .core
                 .workspace
                 .lsp
                 .document_status(
@@ -194,6 +196,7 @@ pub(in crate::lsp) async fn lsp_location_request(
     };
     finish_reference_request(cancel_key.as_deref(), request_seq);
     let status = state
+        .core
         .workspace
         .lsp
         .document_status(

@@ -35,11 +35,11 @@ pub async fn capture_screen(
     display_id: Option<&str>,
 ) -> Result<ScreenCapture, String> {
     let state = core.state();
-    if !state.mobile.desktop.screen_allowed() {
+    if !state.legacy.mobile.desktop.screen_allowed() {
         return Err("screen_capture_disabled".into());
     }
     #[cfg(test)]
-    if let Some(driver) = state.mobile.desktop.test_driver() {
+    if let Some(driver) = state.legacy.mobile.desktop.test_driver() {
         return driver.capture_screen(display_id);
     }
     let Core::Desktop(app) = core else {

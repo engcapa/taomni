@@ -67,6 +67,7 @@ impl SqlHandler {
         let conn = self.bound_conn(&scope).await?;
         let selected = self
             .state()
+            .core
             .agent
             .agent_db_selected_objects
             .read()
@@ -144,7 +145,7 @@ impl SqlHandler {
         let scope = self.scope(&ctx)?;
         let conn = self.bound_conn(&scope).await?;
         let selected = self
-            .state()
+            .state().core
             .agent.agent_db_selected_objects
             .read()
             .await
@@ -351,7 +352,7 @@ impl SqlHandler {
         enforce_inline_permission(&self.app, &scope, "run_sql_captured", &args, is_readonly)
             .await?;
         let state = self.state();
-        if state.agent.captures.running_count(&scope.thread_id) >= MAX_RUNNING_CAPTURES {
+        if state.core.agent.captures.running_count(&scope.thread_id) >= MAX_RUNNING_CAPTURES {
             return Err(ErrorData::internal_error(
                 "too many captures already running for this thread; retry shortly".to_string(),
                 None,
@@ -365,8 +366,8 @@ impl SqlHandler {
         let r = res.map_err(err)?;
 
         let state = self.state();
-        let dir = state.agent.captures.thread_dir(&scope.thread_id);
-        let meta = state.agent.captures.begin(
+        let dir = state.core.agent.captures.thread_dir(&scope.thread_id);
+        let meta = state.core.agent.captures.begin(
             &scope.thread_id,
             &p.sql,
             CaptureSource::LocalFile(dir.join("placeholder")),
@@ -377,10 +378,11 @@ impl SqlHandler {
         writer.flush();
         let truncated = writer.truncated();
         state
+            .core
             .agent
             .captures
             .set_source(&meta.id, CaptureSource::LocalFile(writer.path()));
-        state.agent.captures.finish(
+        state.core.agent.captures.finish(
             &meta.id,
             CaptureStatus::Done,
             None,
@@ -427,6 +429,7 @@ impl SqlHandler {
         let scope = self.scope(&ctx)?;
         let meta = self
             .state()
+            .core
             .agent
             .captures
             .get_scoped(&scope.thread_id, &p.capture_id)
@@ -473,6 +476,7 @@ impl SqlHandler {
         }
         let meta = self
             .state()
+            .core
             .agent
             .captures
             .get_scoped(&scope.thread_id, &p.capture_id)

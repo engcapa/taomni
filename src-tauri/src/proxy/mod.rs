@@ -181,7 +181,7 @@ fn resolve_password_with_vault(vault: &Vault, password_ref: &str) -> String {
 }
 
 fn resolve_password(state: &AppState, password_ref: &str) -> String {
-    resolve_password_with_vault(&state.vault, password_ref)
+    resolve_password_with_vault(&state.core.vault, password_ref)
 }
 
 /// Load the persisted config and resolve it into a concrete [`ResolvedProxy`],
@@ -235,10 +235,11 @@ pub fn resolve_session_proxy(
         return Ok(None);
     }
     let db = state
+        .core
         .db
         .lock()
         .map_err(|_| "session database is unavailable".to_string())?;
-    resolve_session_proxy_with_db(&db, &state.vault, id)
+    resolve_session_proxy_with_db(&db, &state.core.vault, id)
 }
 
 /// Resolve a saved `SessionType::Proxy` using explicit database/vault handles.

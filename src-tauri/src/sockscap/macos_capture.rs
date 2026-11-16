@@ -14,7 +14,7 @@ pub(super) async fn start_macos_capture(
     let ctx = match build_unix_relay_context(state, cfg).await {
         Ok(ctx) => ctx,
         Err(error) => {
-            if let Some(manager) = state.sockscap.xray() {
+            if let Some(manager) = state.legacy.sockscap.xray() {
                 manager.shutdown_all().await;
             }
             return Err(error);
@@ -42,11 +42,11 @@ pub(super) async fn start_macos_capture(
     let capture = match capture::macos::start(app, cfg, Arc::clone(&ctx), &session_id).await {
         Ok(capture) => capture,
         Err(start_error) => {
-            if let Some(manager) = state.sockscap.xray() {
+            if let Some(manager) = state.legacy.sockscap.xray() {
                 manager.shutdown_all().await;
             }
             if start_error.recovery_required() {
-                state.sockscap.orch.write().await.set_recovery_required(
+                state.legacy.sockscap.orch.write().await.set_recovery_required(
                     &caps.capture_backend,
                     format!(
                         "macOS Redirector start may have reached the Provider after the dirty journal was written: {}; run Recover before retrying",
@@ -59,6 +59,7 @@ pub(super) async fn start_macos_capture(
                     start_error.message()
                 );
                 state
+                    .legacy
                     .sockscap
                     .orch
                     .write()
@@ -77,12 +78,12 @@ pub(super) async fn start_macos_capture(
     journal.provider_pid = Some(telemetry.provider_pid);
     if let Err(journal_error) = recovery::write_journal_durable(journal_path, &journal) {
         let stop_error = capture.stop().await.err();
-        if let Some(manager) = state.sockscap.xray() {
+        if let Some(manager) = state.legacy.sockscap.xray() {
             manager.shutdown_all().await;
         }
         if stop_error.is_none() {
             if let Err(clear_error) = recovery::mark_clean_and_clear(journal_path) {
-                state.sockscap.orch.write().await.set_recovery_required(
+                state.legacy.sockscap.orch.write().await.set_recovery_required(
                     &caps.capture_backend,
                     format!(
                         "capture stopped after journal update failure, but the recovery journal could not be cleared: {clear_error}"
@@ -90,7 +91,7 @@ pub(super) async fn start_macos_capture(
                 );
             }
         } else {
-            state.sockscap.orch.write().await.set_recovery_required(
+            state.legacy.sockscap.orch.write().await.set_recovery_required(
                 &caps.capture_backend,
                 format!(
                     "activate journal update failed: {journal_error}; Redirector stop also failed: {}",
@@ -102,7 +103,7 @@ pub(super) async fn start_macos_capture(
             "persist active macOS SocksCap journal: {journal_error}"
         ));
     }
-    let mut orch = state.sockscap.orch.write().await;
+    let mut orch = state.legacy.sockscap.orch.write().await;
     let gfw_note = orch
         .gfwlist_meta()
         .map(|meta| format!(", gfw={}", meta.rule_count))

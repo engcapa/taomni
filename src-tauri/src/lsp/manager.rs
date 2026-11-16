@@ -1,3 +1,4 @@
+mod application_lifecycle;
 mod lifetime;
 
 pub(super) mod watcher_registration;

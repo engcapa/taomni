@@ -109,6 +109,7 @@ pub async fn lsp_semantic_tokens(
 ) -> Result<LspSemanticTokensResult, String> {
     let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
     let status = state
+        .core
         .workspace
         .lsp
         .document_status(
@@ -118,6 +119,7 @@ pub async fn lsp_semantic_tokens(
         )
         .await;
     let Some(session) = state
+        .core
         .workspace
         .lsp
         .active_session(
@@ -199,6 +201,7 @@ pub async fn lsp_semantic_tokens(
     let token_modifiers = session.semantic_token_modifiers.read().await.clone();
     let tokens = decode_semantic_token_data(&data, &token_types, &token_modifiers);
     let status = state
+        .core
         .workspace
         .lsp
         .document_status(
@@ -224,6 +227,7 @@ pub(super) async fn lsp_document_feature_request(
     let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
     params["textDocument"] = json!({ "uri": document.uri });
     let result = match state
+        .core
         .workspace
         .lsp
         .active_session(
@@ -237,6 +241,7 @@ pub(super) async fn lsp_document_feature_request(
         None => Value::Null,
     };
     let status = state
+        .core
         .workspace
         .lsp
         .document_status(

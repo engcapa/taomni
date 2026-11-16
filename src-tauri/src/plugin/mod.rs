@@ -11,7 +11,9 @@ pub mod install;
 mod installation;
 pub mod migration;
 pub mod protocol;
+mod quiescence;
 mod runtime;
+pub use quiescence::QuiescenceGuard;
 mod signed_catalog;
 pub mod verify;
 
@@ -21,7 +23,7 @@ pub(crate) use signed_catalog::{fetch_trusted_catalog, package_from_cached_catal
 use std::collections::{BTreeSet, HashMap};
 use std::fs;
 use std::path::{Component, Path, PathBuf};
-use std::sync::atomic::AtomicBool;
+use std::sync::atomic::{AtomicBool, AtomicUsize};
 use std::sync::{Arc, Mutex, RwLock};
 
 use serde::{Deserialize, Serialize};
@@ -155,6 +157,7 @@ pub struct PluginRegistry {
     lifecycle: Arc<Mutex<()>>,
     monitor_started: Arc<AtomicBool>,
     shutting_down: Arc<AtomicBool>,
+    quiescence: Arc<AtomicUsize>,
     pending_requests: Arc<Mutex<HashMap<(String, String), bool>>>,
     frontend_trust: Arc<RwLock<HashMap<PathBuf, Arc<verify::InstalledTrust>>>>,
 }
@@ -169,6 +172,7 @@ impl PluginRegistry {
             lifecycle: Arc::new(Mutex::new(())),
             monitor_started: Arc::new(AtomicBool::new(false)),
             shutting_down: Arc::new(AtomicBool::new(false)),
+            quiescence: Arc::new(AtomicUsize::new(0)),
             pending_requests: Arc::new(Mutex::new(HashMap::new())),
             frontend_trust: Arc::new(RwLock::new(HashMap::new())),
         }

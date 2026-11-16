@@ -65,7 +65,7 @@ pub(in crate::sockscap) fn read_ready_files(dir: &std::path::Path) -> Vec<StaleR
 /// launch, which runs under UAC. Nothing else in the system can do it.
 pub async fn boot_repair(app: &AppHandle, state: &AppState) {
     #[cfg(target_os = "macos")]
-    let _ready = RecoveryReadyGuard(&state.sockscap);
+    let _ready = RecoveryReadyGuard(&state.legacy.sockscap);
 
     // Another live instance may own the dirty journal. Never repair global
     // network state underneath its active capture session.
@@ -185,10 +185,10 @@ pub async fn boot_repair(app: &AppHandle, state: &AppState) {
                 tracing::info!(
                     "sockscap: cleared aborted first-use approval journal; waiting for System Settings approval"
                 );
-                state.sockscap.orch.write().await.force_idle();
+                state.legacy.sockscap.orch.write().await.force_idle();
             }
             Err(error) => {
-                state.sockscap.orch.write().await.set_recovery_required(
+                state.legacy.sockscap.orch.write().await.set_recovery_required(
                     "mitmproxy-redirector",
                     format!(
                         "Redirector never applied capture while System Extension approval was pending, but its journal could not be cleared: {error}"
@@ -215,10 +215,16 @@ pub async fn boot_repair(app: &AppHandle, state: &AppState) {
             tracing::warn!("sockscap: boot recover failed; leaving journal dirty: {e}");
             queue_reap(state, &orphans);
             #[cfg(target_os = "macos")]
-            state.sockscap.orch.write().await.set_recovery_required(
-                "mitmproxy-redirector",
-                format!("macOS Redirector recovery failed: {e}"),
-            );
+            state
+                .legacy
+                .sockscap
+                .orch
+                .write()
+                .await
+                .set_recovery_required(
+                    "mitmproxy-redirector",
+                    format!("macOS Redirector recovery failed: {e}"),
+                );
             return;
         }
     }
@@ -231,12 +237,18 @@ pub async fn boot_repair(app: &AppHandle, state: &AppState) {
             Err(error) => {
                 tracing::warn!("sockscap: recovery journal cleanup failed: {error}");
                 #[cfg(target_os = "macos")]
-                state.sockscap.orch.write().await.set_recovery_required(
-                    "mitmproxy-redirector",
-                    format!(
-                        "macOS network recovery succeeded, but journal cleanup failed: {error}"
-                    ),
-                );
+                state
+                    .legacy
+                    .sockscap
+                    .orch
+                    .write()
+                    .await
+                    .set_recovery_required(
+                        "mitmproxy-redirector",
+                        format!(
+                            "macOS network recovery succeeded, but journal cleanup failed: {error}"
+                        ),
+                    );
             }
         }
         #[cfg(not(target_os = "macos"))]
@@ -255,6 +267,7 @@ pub async fn boot_repair(app: &AppHandle, state: &AppState) {
         );
         tracing::warn!("sockscap: {message}");
         state
+            .legacy
             .sockscap
             .orch
             .write()
@@ -267,7 +280,7 @@ pub(in crate::sockscap) fn queue_reap(state: &AppState, pids: &[u32]) {
     if pids.is_empty() {
         return;
     }
-    if let Ok(mut slot) = state.sockscap.pending_reap.lock() {
+    if let Ok(mut slot) = state.legacy.sockscap.pending_reap.lock() {
         for pid in pids {
             if !slot.contains(pid) {
                 slot.push(*pid);

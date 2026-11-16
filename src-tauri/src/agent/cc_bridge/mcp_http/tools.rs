@@ -50,6 +50,7 @@ impl CcHandler {
         let q = p.query.unwrap_or_default().to_lowercase();
         let state = self.app_state();
         let db = state
+            .core
             .db
             .lock()
             .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;
@@ -90,6 +91,7 @@ impl CcHandler {
         self.scope(&ctx)?;
         let state = self.app_state();
         let db = state
+            .core
             .db
             .lock()
             .map_err(|e| ErrorData::internal_error(e.to_string(), None))?;

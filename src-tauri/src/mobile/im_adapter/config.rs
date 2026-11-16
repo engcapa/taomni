@@ -112,8 +112,8 @@ impl Config {
             },
             _ => return Err("invalid_proxy_mode".into()),
         };
-        let db = state.db.lock().map_err(|_| "database_unavailable")?;
-        crate::proxy::resolve_strict_with_db(&config, Some(&db), Some(&state.vault))
+        let db = state.core.db.lock().map_err(|_| "database_unavailable")?;
+        crate::proxy::resolve_strict_with_db(&config, Some(&db), Some(&state.core.vault))
     }
 }
 fn valid_id(value: &str, prefix: &str) -> bool {

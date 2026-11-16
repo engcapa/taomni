@@ -43,6 +43,7 @@ pub async fn lsp_completion(
     }
     let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
     let session = match state
+        .core
         .workspace
         .lsp
         .active_session(
@@ -55,6 +56,7 @@ pub async fn lsp_completion(
         Some(session) => session,
         None => {
             let status = state
+                .core
                 .workspace
                 .lsp
                 .document_status(
@@ -87,6 +89,7 @@ pub async fn lsp_completion(
         .await
         .unwrap_or(Value::Null);
     let status = state
+        .core
         .workspace
         .lsp
         .document_status(
@@ -117,6 +120,7 @@ pub async fn lsp_completion_resolve(
 ) -> Result<LspCompletionResolveResult, String> {
     let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
     let Some(session) = state
+        .core
         .workspace
         .lsp
         .active_session(
@@ -245,6 +249,7 @@ pub async fn lsp_signature_help(
         _ => CancellationToken::new(),
     };
     let session = match state
+        .core
         .workspace
         .lsp
         .active_session(
@@ -257,6 +262,7 @@ pub async fn lsp_signature_help(
         Some(session) => session,
         None => {
             let status = state
+                .core
                 .workspace
                 .lsp
                 .document_status(
@@ -299,6 +305,7 @@ pub async fn lsp_signature_help(
     finish_reference_request(cancel_key.as_deref(), request_seq);
     let cancelled = cancellation.is_cancelled();
     let status = state
+        .core
         .workspace
         .lsp
         .document_status(

@@ -215,6 +215,7 @@ pub async fn vnc_connect(
 
     let resolved_password = match password.as_deref() {
         Some(p) => state
+            .core
             .vault
             .resolve(p)
             .map_err(structured_error)?
@@ -227,9 +228,9 @@ pub async fn vnc_connect(
         parse_network_settings(network_settings_json.as_deref()).map_err(structured_error)?;
     if let Some(n) = network.as_mut() {
         crate::terminal::resolve_proxy_session(&state, n).map_err(structured_error)?;
-        n.resolve_proxy_pass(&state.vault)
+        n.resolve_proxy_pass(&state.core.vault)
             .map_err(structured_error)?;
-        n.resolve_jump_secret(&state.vault)
+        n.resolve_jump_secret(&state.core.vault)
             .map_err(structured_error)?;
         crate::terminal::resolve_jump_credentials(&state, n).map_err(structured_error)?;
     }
@@ -267,12 +268,13 @@ pub async fn vnc_connect(
 
     let reaper_cancel = session.cancel.clone();
     state
+        .legacy
         .remote_desktop
         .vnc_sessions
         .write()
         .await
         .insert(session_id.clone(), session);
-    let reaper_sessions = state.remote_desktop.vnc_sessions.clone();
+    let reaper_sessions = state.legacy.remote_desktop.vnc_sessions.clone();
     let reaper_id = session_id.clone();
     tokio::spawn(async move {
         reaper_cancel.cancelled().await;
@@ -306,7 +308,7 @@ pub async fn vnc_create_detach_claim(
     claim: VncDetachClaim,
 ) -> Result<VncDetachClaimResult, String> {
     let claim_id = store_detach_claim(
-        &state.remote_desktop.vnc_detach_claims,
+        &state.legacy.remote_desktop.vnc_detach_claims,
         claim,
         DETACH_CLAIM_TTL,
         MAX_DETACH_CLAIMS,
@@ -320,13 +322,14 @@ pub async fn vnc_consume_detach_claim(
     state: State<'_, AppState>,
     claim_id: String,
 ) -> Result<VncDetachClaim, String> {
-    consume_detach_claim(&state.remote_desktop.vnc_detach_claims, &claim_id).await
+    consume_detach_claim(&state.legacy.remote_desktop.vnc_detach_claims, &claim_id).await
 }
 
 /// Disconnect a VNC session.
 #[tauri::command]
 pub async fn vnc_disconnect(state: State<'_, AppState>, session_id: String) -> Result<(), String> {
     let session = state
+        .legacy
         .remote_desktop
         .vnc_sessions
         .write()
@@ -360,6 +363,7 @@ pub async fn vnc_test_connection(
         )?;
         let resolved = match password.as_deref() {
             Some(p) => state
+                .core
                 .vault
                 .resolve(p)?
                 .map(|z| (*z).clone())
@@ -369,8 +373,8 @@ pub async fn vnc_test_connection(
         let mut network = parse_network_settings(network_settings_json.as_deref())?;
         if let Some(settings) = network.as_mut() {
             crate::terminal::resolve_proxy_session(&state, settings)?;
-            settings.resolve_proxy_pass(&state.vault)?;
-            settings.resolve_jump_secret(&state.vault)?;
+            settings.resolve_proxy_pass(&state.core.vault)?;
+            settings.resolve_jump_secret(&state.core.vault)?;
             crate::terminal::resolve_jump_credentials(&state, settings)?;
         }
         let policy = security_policy.unwrap_or_default();

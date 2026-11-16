@@ -514,12 +514,12 @@ impl Vault {
 
 #[tauri::command]
 pub async fn vault_status(state: State<'_, AppState>) -> Result<VaultStatus, String> {
-    state.vault.status()
+    state.core.vault.status()
 }
 
 #[tauri::command]
 pub async fn vault_init(master_password: String, state: State<'_, AppState>) -> Result<(), String> {
-    state.vault.init(&master_password)
+    state.core.vault.init(&master_password)
 }
 
 #[tauri::command]
@@ -527,52 +527,54 @@ pub async fn vault_unlock(
     master_password: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    state.vault.unlock(&master_password)?;
+    state.core.vault.unlock(&master_password)?;
     // Vault transitioned to unlocked — rebuild the LLM router so providers
     // whose api_key is `vault:<id>` start working immediately. Without this
     // the user has to click Save in AI Settings to trigger a rebuild.
     let cfg = {
-        let ai_ctx = state.ai_ctx.read().await;
+        let ai_ctx = state.legacy.ai_ctx.read().await;
         ai_ctx.config.clone()
     };
     let llm = {
         let db = state
+            .core
             .db
             .lock()
             .map_err(|_| "session database is unavailable".to_string())?;
         crate::llm::router::build_router_from_ai_with_proxy_db(
             &cfg,
-            Some(state.vault.as_ref()),
+            Some(state.core.vault.as_ref()),
             Some(&db),
         )
     };
-    let mut ai_ctx = state.ai_ctx.write().await;
+    let mut ai_ctx = state.legacy.ai_ctx.write().await;
     ai_ctx.replace_router(llm);
     Ok(())
 }
 
 #[tauri::command]
 pub async fn vault_lock(state: State<'_, AppState>) -> Result<(), String> {
-    state.vault.lock()?;
+    state.core.vault.lock()?;
     // After lock, providers backed by vault refs can no longer authenticate;
     // rebuild so calls fail closed with VAULT_LOCKED instead of using stale
     // plaintext that was decrypted earlier.
     let cfg = {
-        let ai_ctx = state.ai_ctx.read().await;
+        let ai_ctx = state.legacy.ai_ctx.read().await;
         ai_ctx.config.clone()
     };
     let llm = {
         let db = state
+            .core
             .db
             .lock()
             .map_err(|_| "session database is unavailable".to_string())?;
         crate::llm::router::build_router_from_ai_with_proxy_db(
             &cfg,
-            Some(state.vault.as_ref()),
+            Some(state.core.vault.as_ref()),
             Some(&db),
         )
     };
-    let mut ai_ctx = state.ai_ctx.write().await;
+    let mut ai_ctx = state.legacy.ai_ctx.write().await;
     ai_ctx.replace_router(llm);
     Ok(())
 }
@@ -583,23 +585,27 @@ pub async fn vault_change_master(
     new_password: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    state.vault.change_master(&old_password, &new_password)?;
+    state
+        .core
+        .vault
+        .change_master(&old_password, &new_password)?;
     let cfg = {
-        let ai_ctx = state.ai_ctx.read().await;
+        let ai_ctx = state.legacy.ai_ctx.read().await;
         ai_ctx.config.clone()
     };
     let llm = {
         let db = state
+            .core
             .db
             .lock()
             .map_err(|_| "session database is unavailable".to_string())?;
         crate::llm::router::build_router_from_ai_with_proxy_db(
             &cfg,
-            Some(state.vault.as_ref()),
+            Some(state.core.vault.as_ref()),
             Some(&db),
         )
     };
-    let mut ai_ctx = state.ai_ctx.write().await;
+    let mut ai_ctx = state.legacy.ai_ctx.write().await;
     ai_ctx.replace_router(llm);
     Ok(())
 }
@@ -611,7 +617,7 @@ pub async fn vault_put(
     plaintext: String,
     state: State<'_, AppState>,
 ) -> Result<VaultPutResult, String> {
-    state.vault.put(&kind, &label, &plaintext)
+    state.core.vault.put(&kind, &label, &plaintext)
 }
 
 #[tauri::command]
@@ -620,7 +626,7 @@ pub async fn vault_update(
     plaintext: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    state.vault.update(&id, &plaintext)
+    state.core.vault.update(&id, &plaintext)
 }
 
 #[tauri::command]
@@ -628,12 +634,12 @@ pub async fn vault_delete(id: String, state: State<'_, AppState>) -> Result<(), 
     if is_protected_entry(&id) {
         return Err(ERR_VAULT_ENTRY_PROTECTED.to_string());
     }
-    state.vault.delete(&id)
+    state.core.vault.delete(&id)
 }
 
 #[tauri::command]
 pub async fn vault_list(state: State<'_, AppState>) -> Result<Vec<db::EntrySummary>, String> {
-    state.vault.list()
+    state.core.vault.list()
 }
 
 /// Helper used by setup() to choose the on-disk vault path.

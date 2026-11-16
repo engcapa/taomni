@@ -14,6 +14,7 @@ pub async fn lsp_prepare_rename(
 ) -> Result<LspPrepareRenameResult, String> {
     let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
     let session = match state
+        .core
         .workspace
         .lsp
         .active_session(
@@ -26,6 +27,7 @@ pub async fn lsp_prepare_rename(
         Some(session) => session,
         None => {
             let status = state
+                .core
                 .workspace
                 .lsp
                 .document_status(
@@ -53,6 +55,7 @@ pub async fn lsp_prepare_rename(
         )
         .await;
     let status = state
+        .core
         .workspace
         .lsp
         .document_status(
@@ -115,6 +118,7 @@ pub async fn lsp_rename(
 ) -> Result<LspRenameResult, String> {
     let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
     let session = match state
+        .core
         .workspace
         .lsp
         .active_session(
@@ -127,6 +131,7 @@ pub async fn lsp_rename(
         Some(session) => session,
         None => {
             let status = state
+                .core
                 .workspace
                 .lsp
                 .document_status(
@@ -153,6 +158,7 @@ pub async fn lsp_rename(
         .await
         .unwrap_or(Value::Null);
     let status = state
+        .core
         .workspace
         .lsp
         .document_status(
@@ -185,6 +191,7 @@ pub async fn lsp_code_actions(
 ) -> Result<LspCodeActionsResult, String> {
     let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
     let session = match state
+        .core
         .workspace
         .lsp
         .active_session(
@@ -197,6 +204,7 @@ pub async fn lsp_code_actions(
         Some(session) => session,
         None => {
             let status = state
+                .core
                 .workspace
                 .lsp
                 .document_status(
@@ -228,6 +236,7 @@ pub async fn lsp_code_actions(
             .await,
     )?;
     let status = state
+        .core
         .workspace
         .lsp
         .document_status(
@@ -259,6 +268,7 @@ pub async fn lsp_code_action_resolve(
     }
     let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
     let session = match state
+        .core
         .workspace
         .lsp
         .active_session(
@@ -271,6 +281,7 @@ pub async fn lsp_code_action_resolve(
         Some(session) => session,
         None => {
             let status = state
+                .core
                 .workspace
                 .lsp
                 .document_status(
@@ -302,6 +313,7 @@ pub async fn lsp_code_action_resolve(
     let parsed = parse_code_action(&merged)
         .ok_or_else(|| "codeAction/resolve returned an invalid CodeAction".to_string())?;
     let status = state
+        .core
         .workspace
         .lsp
         .document_status(
@@ -330,6 +342,7 @@ pub async fn lsp_formatting(
 ) -> Result<LspFormattingResult, String> {
     let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
     let session = match state
+        .core
         .workspace
         .lsp
         .active_session(
@@ -342,6 +355,7 @@ pub async fn lsp_formatting(
         Some(session) => session,
         None => {
             let status = state
+                .core
                 .workspace
                 .lsp
                 .document_status(
@@ -370,6 +384,7 @@ pub async fn lsp_formatting(
         .await
         .unwrap_or(Value::Null);
     let status = state
+        .core
         .workspace
         .lsp
         .document_status(
@@ -402,6 +417,7 @@ pub async fn lsp_range_formatting(
 ) -> Result<LspFormattingResult, String> {
     let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
     let session = match state
+        .core
         .workspace
         .lsp
         .active_session(
@@ -414,6 +430,7 @@ pub async fn lsp_range_formatting(
         Some(session) => session,
         None => {
             let status = state
+                .core
                 .workspace
                 .lsp
                 .document_status(
@@ -446,6 +463,7 @@ pub async fn lsp_range_formatting(
         .await
         .unwrap_or(Value::Null);
     let status = state
+        .core
         .workspace
         .lsp
         .document_status(

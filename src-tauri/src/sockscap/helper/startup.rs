@@ -84,6 +84,7 @@ pub async fn sockscap_helper_start(
     // helper RPC — holding it across the network round-trips below would stall
     // every other caller (relay lookups included) for the RPC timeout.
     let existing = state
+        .legacy
         .sockscap
         .helper
         .inner
@@ -106,7 +107,7 @@ pub async fn sockscap_helper_start(
         }
     }
     // Clear dead session slot.
-    if let Ok(mut guard) = state.sockscap.helper.inner.lock() {
+    if let Ok(mut guard) = state.legacy.sockscap.helper.inner.lock() {
         *guard = None;
     }
 
@@ -165,6 +166,7 @@ pub async fn sockscap_helper_start(
         // terminate. This process is not elevated; the helper we are about to
         // launch is, so it is the only thing that can reap them.
         let reap: Vec<u32> = state
+            .legacy
             .sockscap
             .pending_reap
             .lock()
@@ -290,7 +292,7 @@ pub async fn sockscap_helper_start(
             }
         }
 
-        if let Ok(mut guard) = state.sockscap.helper.inner.lock() {
+        if let Ok(mut guard) = state.legacy.sockscap.helper.inner.lock() {
             *guard = Some(sess);
         }
         Ok(st)

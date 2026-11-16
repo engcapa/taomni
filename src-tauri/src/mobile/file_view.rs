@@ -25,6 +25,7 @@ pub fn remember_root(state: &AppState, context: &crate::agent::context::AgentThr
         .and_then(|p| std::fs::canonicalize(p).ok())
         .filter(|p| p.is_dir() && super::file_policy::allowed_root(p));
     let mut roots = state
+        .legacy
         .mobile
         .file_roots
         .lock()
@@ -41,13 +42,14 @@ pub fn remember_root(state: &AppState, context: &crate::agent::context::AgentThr
         // persisted linked_session_id alone is not a new context grant/revoke.
         roots.remove(&context.thread_id);
     }
-    state.mobile.roots_changed.notify_one();
+    state.legacy.mobile.roots_changed.notify_one();
 }
 fn task(id: &str) -> Result<&str, String> {
     id.strip_prefix("thread:").ok_or("diff_unavailable".into())
 }
 fn root(state: &AppState, id: &str) -> Result<PathBuf, String> {
     let root = state
+        .legacy
         .mobile
         .file_roots
         .lock()
@@ -57,6 +59,7 @@ fn root(state: &AppState, id: &str) -> Result<PathBuf, String> {
         .ok_or("diff_unavailable")?;
     if !super::file_policy::allowed_root(&root)
         || state
+            .legacy
             .mobile
             .profile_data
             .lock()

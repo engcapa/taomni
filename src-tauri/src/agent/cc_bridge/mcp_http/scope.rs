@@ -120,7 +120,7 @@ pub(crate) fn scope_from_ctx(
 ///   inject the bound tab id so the effect targets the linked terminal and the
 ///   scope check passes. No-op for a global thread (no bound session).
 /// - Present as the advertised `SessionConfig.id`: rewrite it to the tab id, so
-///   downstream registry / `state.terminal.terminals` lookups (which key on the tab id)
+///   downstream registry / `state.core.terminal.terminals` lookups (which key on the tab id)
 ///   resolve instead of missing. The identity card hands CC the config id, so
 ///   this is the path CC takes when it "helpfully" names the session.
 /// - Present as the tab id already, or as a foreign id: left unchanged (a
@@ -150,17 +150,18 @@ pub(super) fn fill_session_id(args: &mut serde_json::Value, scope: &TokenScope) 
 
 /// Resolve a caller-facing session id (a terminal *tab id* — what the token
 /// scope and `fill_session_id` use) to the *backend terminal session id* that
-/// keys `state.terminal.terminals`. The frontend reports this mapping as terminals
+/// keys `state.core.terminal.terminals`. The frontend reports this mapping as terminals
 /// connect (`cc_track_terminal`). `run_in_terminal` / `read_terminal_tail`
 /// don't need this — they dispatch the tab id to the frontend registry, which
 /// owns the indirection — but the backend-side capture tools (`run_captured` /
-/// `read_capture`) index `state.terminal.terminals` directly and must translate first.
+/// `read_capture`) index `state.core.terminal.terminals` directly and must translate first.
 ///
 /// Falls back to the id unchanged when no mapping exists, so a caller that
 /// already passes a backend session id, or a test/local setup with no tracking,
 /// still resolves (a miss then surfaces as the usual "no live terminal").
 pub(super) fn resolve_backend_session_id(state: &AppState, sid: &str) -> String {
     state
+        .core
         .agent
         .cc_tab_sessions
         .lock()

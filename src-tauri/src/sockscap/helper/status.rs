@@ -9,6 +9,7 @@ use tauri::State;
 pub async fn sockscap_helper_stop(state: State<'_, AppState>) -> Result<(), String> {
     let sess = {
         let mut guard = state
+            .legacy
             .sockscap
             .helper
             .inner
@@ -26,6 +27,7 @@ pub async fn sockscap_helper_stop(state: State<'_, AppState>) -> Result<(), Stri
 #[tauri::command]
 pub async fn sockscap_helper_status(state: State<'_, AppState>) -> Result<HelperStatus, String> {
     let guard = state
+        .legacy
         .sockscap
         .helper
         .inner
@@ -50,6 +52,7 @@ pub async fn sockscap_helper_probe_windivert(
     filter: Option<String>,
 ) -> Result<serde_json::Value, String> {
     let guard = state
+        .legacy
         .sockscap
         .helper
         .inner

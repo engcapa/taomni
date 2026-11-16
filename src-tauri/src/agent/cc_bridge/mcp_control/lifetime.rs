@@ -74,7 +74,7 @@ impl ControlHandler {
         args: Value,
     ) -> Result<CallToolResult, ErrorData> {
         let call_id = Uuid::new_v4().to_string();
-        let mobile = self.app_state().mobile.clone();
+        let mobile = self.app_state().legacy.mobile.clone();
         let _mobile_gate = crate::mobile::confirmation::DesktopConfirmation::new(
             &mobile,
             &call_id,
@@ -85,6 +85,7 @@ impl ControlHandler {
         {
             let state = self.app_state();
             state
+                .core
                 .agent
                 .cc_pending_tool_calls
                 .lock()
@@ -107,6 +108,7 @@ impl ControlHandler {
                     let still_pending = {
                         let state = app.state::<AppState>();
                         state
+                            .core
                             .agent
                             .cc_pending_tool_calls
                             .lock()
@@ -129,6 +131,7 @@ impl ControlHandler {
             _ => {
                 let state = self.app_state();
                 state
+                    .core
                     .agent
                     .cc_pending_tool_calls
                     .lock()

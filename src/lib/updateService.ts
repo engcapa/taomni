@@ -298,6 +298,6 @@ export async function relaunchApp(): Promise<void> {
   // The user can start SocksCap again after installation but before accepting
   // the relaunch prompt, so teardown once more immediately before exit.
   await prepareSocksCapForUpgrade();
-  const { relaunch } = await import("@tauri-apps/plugin-process");
-  await relaunch();
+  const { invoke } = await import("@tauri-apps/api/core");
+  await invoke("restart_app");
 }

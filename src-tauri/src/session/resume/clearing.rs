@@ -13,7 +13,7 @@ pub async fn clear_welcome_run_snapshot(
     expected_revision: Option<i64>,
     state: tauri::State<'_, crate::state::AppState>,
 ) -> Result<(), String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let db = state.core.db.lock().map_err(|e| e.to_string())?;
     let mut db = db;
     clear_run_snapshot(&mut db, expected_revision)
 }

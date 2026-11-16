@@ -68,9 +68,30 @@ function sharedRdpViolations(root) {
   return errors;
 }
 
+function coreStateViolations(root) {
+  const errors = [];
+  const stateRoot = path.join(root, "src-tauri/src/state");
+  if (!fs.existsSync(path.join(stateRoot, "core.rs"))) return errors;
+  for (const name of ["core.rs", "domains.rs"]) {
+    const source = fs.readFileSync(path.join(stateRoot, name), "utf8").replace(/\/\/[^\n]*/g, "");
+    if (/\bcrate\s*::\s*(?:mfa|servers|sockscap|vnc|rdp|mobile|asr)\s*::|\b(?:MfaStore|ServerRegistry|SocksCapRuntime|VncSession|RdpSession|MobileRuntime|AsrManager|AppAiCtx)\b/.test(source)) {
+      errors.push(`src-tauri/src/state/${name}: core state cannot own optional feature implementation types`);
+    }
+  }
+  const composition = fs.readFileSync(path.join(root, "src-tauri/src/state.rs"), "utf8").replace(/\/\/[^\n]*/g, "");
+  if (/\bimpl[^\{]*\bDeref(?:Mut)?\b/.test(composition)) {
+    errors.push("src-tauri/src/state.rs: explicit core/legacy composition must not use Deref forwarding");
+  }
+  const terminalOutput = path.join(root, "src-tauri/src/terminal/output.rs");
+  if (fs.existsSync(terminalOutput) && /\bcrate::mobile::/.test(fs.readFileSync(terminalOutput, "utf8"))) {
+    errors.push("src-tauri/src/terminal/output.rs: output hub must not own the mobile broker");
+  }
+  return errors;
+}
+
 /** Return all violations, so one CI run identifies every broken ownership edge. */
 export function modularBoundaryViolations(root, { linuxTreeFile } = {}) {
-  const errors = sharedRdpViolations(root);
+  const errors = [...sharedRdpViolations(root), ...coreStateViolations(root)];
   const consumers = ["screenshot", "mfa", "mobile"];
   for (const consumer of consumers) {
     for (const filename of rustFiles(path.join(root, "src-tauri/src", consumer))) {
@@ -78,9 +99,6 @@ export function modularBoundaryViolations(root, { linuxTreeFile } = {}) {
       const lines = fs.readFileSync(filename, "utf8").split(/\r?\n/);
       lines.forEach((line, index) => {
         if (!/\b(?:crate::)?servers::/.test(line) || /^\s*\/\//.test(line)) return;
-        // S15: this one legacy table initialization stays until TASK-024.
-        if (relative === "src-tauri/src/mobile/headless.rs"
-          && /^\s*crate::servers::db::init_server_tables\(&db\)\.map_err\(\|e\| e\.to_string\(\)\)\?;$/.test(line)) return;
         errors.push(`${relative}:${index + 1}: ${consumer} must depend on core capture, not Servers`);
       });
     }

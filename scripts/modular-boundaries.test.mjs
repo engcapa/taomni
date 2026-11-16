@@ -23,11 +23,11 @@ function write(root, name, text) {
   fs.writeFileSync(path.join(root, name), text);
 }
 
-test("core consumers may use the capture crate and only the explicit headless table exception", (t) => {
+test("core consumers use shared capture and headless cannot initialize server tables", (t) => {
   const root = fixture(t);
   write(root, "src-tauri/src/mobile/headless.rs", "    crate::servers::db::init_server_tables(&db).map_err(|e| e.to_string())?;\n");
   write(root, "src-tauri/src/mfa/capture.rs", "use taomni_capture::still::LumaFrame;\n");
-  assert.deepEqual(modularBoundaryViolations(root), []);
+  assert.match(modularBoundaryViolations(root).join("\n"), /headless.rs:1/);
   write(root, "src-tauri/src/mobile/headless.rs", "use crate::servers::rdp;\n");
   assert.match(modularBoundaryViolations(root).join("\n"), /headless.rs:1/);
 });
@@ -80,4 +80,18 @@ test("shared RDP dependencies reject core aliases and URI dependency inflation",
   write(root, "src-tauri/crates/taomni-rdp-common/Cargo.toml", '[dependencies]\ntaomni-file-uri = { path = "../taomni-file-uri" }\n');
   write(root, "src-tauri/crates/taomni-file-uri/Cargo.toml", '[dev-dependencies]\ntempfile = "3"\n');
   assert.deepEqual(modularBoundaryViolations(root), []);
+});
+
+test("core state rejects feature owners and implicit composition forwarding", (t) => {
+  const root = fixture(t);
+  fs.mkdirSync(path.join(root, "src-tauri/src/state"));
+  write(root, "src-tauri/src/state.rs", "pub struct AppState { core: Arc<CoreState>, legacy: LegacyFeatureRuntime }\n");
+  write(root, "src-tauri/src/state/core.rs", "pub struct CoreState { db: Mutex<Connection> }\n");
+  write(root, "src-tauri/src/state/domains.rs", "pub struct TerminalRuntime {}\n");
+  assert.deepEqual(modularBoundaryViolations(root), []);
+  write(root, "src-tauri/src/state/core.rs", "use crate::mfa::store::MfaStore;\npub struct CoreState { mfa: Arc<MfaStore> }\n");
+  write(root, "src-tauri/src/state.rs", "impl std::ops::Deref for AppState { }\n");
+  const errors = modularBoundaryViolations(root).join("\n");
+  assert.match(errors, /cannot own optional feature/);
+  assert.match(errors, /must not use Deref/);
 });

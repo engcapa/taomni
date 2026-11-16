@@ -789,7 +789,7 @@ pub(crate) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         | "plugin_catalog_fetch"
         | "plugin_migration_inspect"
         | "plugin_migration_execute" => plugin::handle(invoke),
-        "exit_app" => application::handle(invoke),
+        "exit_app" | "restart_app" => application::handle(invoke),
         _ => false,
     }
 }

@@ -112,13 +112,18 @@ fn headless_and_disabled_instances_refuse_to_open() {
     let core = Core::Headless(state.clone());
     let body = json!({"kind":"local"});
     assert_eq!(
-        start(&core, &state.mobile, "phone", &body).unwrap_err(),
+        start(&core, &state.legacy.mobile, "phone", &body).unwrap_err(),
         "open_sessions_disabled"
     );
     let dir = temp_dir("headless");
-    state.mobile.open_requests.set_allowed(&dir, true).unwrap();
+    state
+        .legacy
+        .mobile
+        .open_requests
+        .set_allowed(&dir, true)
+        .unwrap();
     assert_eq!(
-        start(&core, &state.mobile, "phone", &body).unwrap_err(),
+        start(&core, &state.legacy.mobile, "phone", &body).unwrap_err(),
         "desktop_required"
     );
     let _ = std::fs::remove_dir_all(dir);

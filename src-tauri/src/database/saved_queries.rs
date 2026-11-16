@@ -465,7 +465,7 @@ pub async fn db_list_saved_queries(
     request: DbListSavedQueriesRequest,
     state: State<'_, AppState>,
 ) -> Result<Vec<DbSavedQuery>, String> {
-    let db = state.db.lock().map_err(|error| error.to_string())?;
+    let db = state.core.db.lock().map_err(|error| error.to_string())?;
     list_saved_queries(&db, &request).map_err(|error| error.to_string())
 }
 
@@ -474,7 +474,7 @@ pub async fn db_get_saved_query(
     id: String,
     state: State<'_, AppState>,
 ) -> Result<Option<DbSavedQuery>, String> {
-    let db = state.db.lock().map_err(|error| error.to_string())?;
+    let db = state.core.db.lock().map_err(|error| error.to_string())?;
     get_saved_query(&db, &id).map_err(|error| error.to_string())
 }
 
@@ -483,7 +483,7 @@ pub async fn db_save_saved_query(
     query: DbSavedQuery,
     state: State<'_, AppState>,
 ) -> Result<DbSavedQuery, String> {
-    let mut db = state.db.lock().map_err(|error| error.to_string())?;
+    let mut db = state.core.db.lock().map_err(|error| error.to_string())?;
     save_saved_query(&mut db, &query)
 }
 
@@ -495,13 +495,13 @@ pub async fn db_archive_saved_query(
     updated_at: i64,
     state: State<'_, AppState>,
 ) -> Result<i64, String> {
-    let db = state.db.lock().map_err(|error| error.to_string())?;
+    let db = state.core.db.lock().map_err(|error| error.to_string())?;
     archive_saved_query(&db, &id, revision, archived_at, updated_at)
 }
 
 #[tauri::command]
 pub async fn db_delete_saved_query(id: String, state: State<'_, AppState>) -> Result<bool, String> {
-    let db = state.db.lock().map_err(|error| error.to_string())?;
+    let db = state.core.db.lock().map_err(|error| error.to_string())?;
     delete_saved_query(&db, &id).map_err(|error| error.to_string())
 }
 

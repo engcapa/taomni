@@ -10,7 +10,7 @@ pub async fn sockscap_launch_app(
 ) -> Result<serde_json::Value, String> {
     #[cfg(target_os = "linux")]
     {
-        let mut orch = state.sockscap.orch.write().await;
+        let mut orch = state.legacy.sockscap.orch.write().await;
         if !orch.is_running() {
             return Err("start SocksCap before launching an application".into());
         }
@@ -69,6 +69,7 @@ pub async fn sockscap_launch_terminal_app(
     #[cfg(target_os = "linux")]
     {
         if state
+            .core
             .terminal
             .terminals
             .read()
@@ -78,11 +79,12 @@ pub async fn sockscap_launch_terminal_app(
             return Err(format!("Terminal {} already exists", terminal_session_id));
         }
 
-        let mut orch = state.sockscap.orch.write().await;
+        let mut orch = state.legacy.sockscap.orch.write().await;
         // The frontend may be mounted twice by React StrictMode. Re-check
         // after serializing on the orchestrator lock so concurrent requests
         // with the same stable terminal id cannot both launch a process.
         if state
+            .core
             .terminal
             .terminals
             .read()
@@ -175,7 +177,7 @@ pub async fn sockscap_launched_apps(
 ) -> Result<serde_json::Value, String> {
     #[cfg(target_os = "linux")]
     {
-        let mut orch = state.sockscap.orch.write().await;
+        let mut orch = state.legacy.sockscap.orch.write().await;
         let apps = orch
             .linux_capture_mut()
             .map(|capture| capture.launched_apps())
@@ -197,7 +199,7 @@ pub async fn sockscap_stop_launched_app(
 ) -> Result<(), String> {
     #[cfg(target_os = "linux")]
     {
-        let mut orch = state.sockscap.orch.write().await;
+        let mut orch = state.legacy.sockscap.orch.write().await;
         let capture = orch
             .linux_capture_mut()
             .ok_or_else(|| "Linux capture backend is not active".to_string())?;

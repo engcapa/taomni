@@ -1,6 +1,6 @@
 //! SQLite persistence for per-server configuration.
 //!
-//! Mirrors the `state.db.lock()` pattern used elsewhere (see
+//! Mirrors the `state.core.db.lock()` pattern used elsewhere (see
 //! `session/db.rs`): functions here take a `&Connection` and return
 //! `rusqlite::Result`; the command layer in `mod.rs` owns the lock and maps
 //! errors to `String`.

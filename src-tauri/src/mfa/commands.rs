@@ -42,8 +42,8 @@ fn with_key<T>(
     state: &AppState,
     f: impl FnOnce(&mut rusqlite::Connection, &DataKey) -> Result<T, String>,
 ) -> Result<T, String> {
-    state.mfa.with_conn(|conn| {
-        let key = crypto::ensure_key(conn, &state.vault)?;
+    state.legacy.mfa.with_conn(|conn| {
+        let key = crypto::ensure_key(conn, &state.core.vault)?;
         f(conn, &key)
     })
 }
@@ -207,7 +207,7 @@ pub async fn mfa_export_uri(
     master_password: String,
     state: State<'_, AppState>,
 ) -> Result<String, String> {
-    export_with_password(&state.vault, &state.mfa, &id, &master_password)
+    export_with_password(&state.core.vault, &state.legacy.mfa, &id, &master_password)
 }
 
 pub(crate) fn export_with_password(
@@ -244,14 +244,15 @@ fn export_uri(conn: &rusqlite::Connection, key: &DataKey, id: &str) -> Result<St
 /// wipes every account and re-binds the empty store. The UI confirms twice.
 #[tauri::command]
 pub async fn mfa_reset_store(state: State<'_, AppState>) -> Result<(), String> {
-    state.mfa.with_conn(|conn| {
+    state.legacy.mfa.with_conn(|conn| {
         // Probe the vault first so a locked vault never wipes anything.
         state
+            .core
             .vault
             .get_fixed(crate::vault::MFA_DATA_KEY_ENTRY_ID)
             .map(|_| ())?;
         store::reset(conn)?;
-        crypto::rebind_after_reset(conn, &state.vault).map(|_| ())
+        crypto::rebind_after_reset(conn, &state.core.vault).map(|_| ())
     })
 }
 
@@ -259,7 +260,7 @@ pub async fn mfa_reset_store(state: State<'_, AppState>) -> Result<(), String> {
 /// the main thread: on X11 the owner may be our own WebKitGTK process.
 #[tauri::command]
 pub async fn mfa_read_clipboard_image(state: State<'_, AppState>) -> Result<Response, String> {
-    let clipboard = state.clipboard.clone();
+    let clipboard = state.core.clipboard.clone();
     tauri::async_runtime::spawn_blocking(move || capture::read_clipboard_image(&clipboard))
         .await
         .map_err(|e| format!("clipboard task: {e}"))?

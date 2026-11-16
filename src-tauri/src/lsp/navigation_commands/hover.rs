@@ -37,6 +37,7 @@ pub async fn lsp_hover(
         _ => CancellationToken::new(),
     };
     let session = match state
+        .core
         .workspace
         .lsp
         .active_session(
@@ -49,6 +50,7 @@ pub async fn lsp_hover(
         Some(session) => session,
         None => {
             let status = state
+                .core
                 .workspace
                 .lsp
                 .document_status(
@@ -84,6 +86,7 @@ pub async fn lsp_hover(
         // Cancelled requests report no content; the status snapshot stays
         // fresh so the next hover can proceed immediately.
         let status = state
+            .core
             .workspace
             .lsp
             .document_status(
@@ -99,6 +102,7 @@ pub async fn lsp_hover(
         });
     }
     let status = state
+        .core
         .workspace
         .lsp
         .document_status(

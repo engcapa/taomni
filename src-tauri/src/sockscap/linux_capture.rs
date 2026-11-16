@@ -36,7 +36,7 @@ pub(super) async fn start_linux_capture(
     let relay_port = capture.relay_port();
     let launch_only = capture.is_launch_only();
 
-    let mut orch = state.sockscap.orch.write().await;
+    let mut orch = state.legacy.sockscap.orch.write().await;
     let gfw_note = orch
         .gfwlist_meta()
         .map(|meta| format!(", gfw={}", meta.rule_count))

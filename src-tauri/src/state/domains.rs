@@ -1,4 +1,23 @@
-use super::*;
+use super::{
+    CcPermissionResponder, CcToolResponder, MailDbHandle, ReadStreamHandle, SshAuthResponder,
+    WriteStreamHandle,
+};
+use crate::agent::acp_bridge::{AcpProcess, AcpThreadProcess};
+use crate::agent::cc_bridge::process::CcProcess;
+use crate::agent::codex_bridge::process::CodexAppServer;
+use crate::chat::run::ChatRunRegistry;
+use crate::database::DbSession;
+use crate::filebrowser::{sftp::ActiveSftp, transfer::TransferHandle};
+use crate::hbase::HBaseSession;
+use crate::lsp::LspManager;
+use crate::mail::MailImapPool;
+use crate::objectstorage::ObjectStorageSession;
+use crate::sdk::SdkManager;
+use crate::terminal::ActiveTerminal;
+use std::collections::HashMap;
+use std::path::PathBuf;
+use std::sync::{Arc, Mutex};
+use tokio::sync::RwLock;
 
 /// Runtime ownership for the workspace domain.
 pub struct WorkspaceRuntime {
@@ -48,13 +67,6 @@ pub struct FileRuntime {
     pub oss_sessions: Arc<RwLock<HashMap<String, Arc<ObjectStorageSession>>>>,
     pub read_handles: Arc<Mutex<HashMap<String, ReadStreamHandle>>>,
     pub write_handles: Arc<Mutex<HashMap<String, WriteStreamHandle>>>,
-}
-
-/// Runtime ownership for the remote desktop domain.
-pub struct RemoteDesktopRuntime {
-    pub vnc_sessions: Arc<RwLock<HashMap<String, VncSession>>>,
-    pub vnc_detach_claims: Arc<RwLock<HashMap<String, crate::vnc::VncDetachClaim>>>,
-    pub rdp_sessions: Arc<RwLock<HashMap<String, RdpSession>>>,
 }
 
 /// Runtime ownership for the database domain.

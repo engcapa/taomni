@@ -15,7 +15,14 @@ async fn health(f: &Fixture, host: &str) -> reqwest::Response {
 }
 
 fn profile(f: &Fixture) -> std::path::PathBuf {
-    f.state.mobile.profile_data.lock().unwrap().clone().unwrap()
+    f.state
+        .legacy
+        .mobile
+        .profile_data
+        .lock()
+        .unwrap()
+        .clone()
+        .unwrap()
 }
 
 #[tokio::test]
@@ -29,6 +36,7 @@ async fn domain_settings_apply_live_persist_and_restore_without_stopping_listene
     };
     assert_eq!(
         f.state
+            .legacy
             .mobile
             .save_listener_config(&data, config.clone())
             .await
@@ -69,18 +77,26 @@ async fn domain_settings_apply_live_persist_and_restore_without_stopping_listene
         ..config.clone()
     };
     f.state
+        .legacy
         .mobile
         .save_listener_config(&data, all.clone())
         .await
         .unwrap();
     assert_eq!(health(&f, "other.example:1234").await.status(), 200);
-    assert_eq!(f.state.mobile.listener_config(&data).await.unwrap(), all);
+    assert_eq!(
+        f.state.legacy.mobile.listener_config(&data).await.unwrap(),
+        all
+    );
     assert_eq!(ListenerConfig::load(&data).unwrap(), all);
 
-    f.state.mobile.stop().await;
-    assert_eq!(f.state.mobile.listener_config(&data).await.unwrap(), all);
+    f.state.legacy.mobile.stop().await;
+    assert_eq!(
+        f.state.legacy.mobile.listener_config(&data).await.unwrap(),
+        all
+    );
     let restarted = f
         .state
+        .legacy
         .mobile
         .start(Core::Headless(f.state.clone()), data.clone(), false, 0)
         .await
@@ -94,6 +110,7 @@ async fn domain_settings_apply_live_persist_and_restore_without_stopping_listene
         .unwrap();
     assert_eq!(response.status(), 200);
     f.state
+        .legacy
         .mobile
         .save_listener_config(&data, config.clone())
         .await
@@ -128,6 +145,7 @@ async fn allow_all_hosts_does_not_bypass_bearer_origin_or_one_time_websocket_tic
     let f = Fixture::new().await;
     let data = profile(&f);
     f.state
+        .legacy
         .mobile
         .save_listener_config(
             &data,
@@ -139,7 +157,7 @@ async fn allow_all_hosts_does_not_bypass_bearer_origin_or_one_time_websocket_tic
         .await
         .unwrap();
     let origin = format!("https://{PROXY_HOST}");
-    let code = f.state.mobile.auth.lock().unwrap().pairing_code();
+    let code = f.state.legacy.mobile.auth.lock().unwrap().pairing_code();
     let pair: Value = f
         .client
         .post(format!("{}/api/v1/pair", f.endpoint))
@@ -232,12 +250,14 @@ async fn failed_validation_or_persistence_leaves_live_and_saved_restrictions_unc
         allow_all_hosts: false,
     };
     f.state
+        .legacy
         .mobile
         .save_listener_config(&data, config.clone())
         .await
         .unwrap();
     assert_eq!(
         f.state
+            .legacy
             .mobile
             .save_listener_config(
                 &data,
@@ -256,6 +276,7 @@ async fn failed_validation_or_persistence_leaves_live_and_saved_restrictions_unc
     std::fs::write(&file_as_directory, "obstruct config write").unwrap();
     assert_eq!(
         f.state
+            .legacy
             .mobile
             .save_listener_config(
                 &file_as_directory,
@@ -268,7 +289,10 @@ async fn failed_validation_or_persistence_leaves_live_and_saved_restrictions_unc
             .unwrap_err(),
         "mobile_listener_write_failed"
     );
-    assert_eq!(f.state.mobile.listener_config(&data).await.unwrap(), config);
+    assert_eq!(
+        f.state.legacy.mobile.listener_config(&data).await.unwrap(),
+        config
+    );
     assert_eq!(ListenerConfig::load(&data).unwrap(), config);
     assert_eq!(health(&f, "unlisted.example").await.status(), 403);
     assert_eq!(health(&f, PROXY_HOST).await.status(), 200);

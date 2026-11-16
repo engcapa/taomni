@@ -72,7 +72,15 @@ pub async fn voice_install_model(
                         |_| "MODEL_MISSING: place tokens.txt beside the imported SenseVoice model",
                     )?;
                 } else {
-                    let settings = state.ai_ctx.read().await.config.asr.download_proxy.clone();
+                    let settings = state
+                        .legacy
+                        .ai_ctx
+                        .read()
+                        .await
+                        .config
+                        .asr
+                        .download_proxy
+                        .clone();
                     let proxy = resolve_download_proxy(&state, &settings)?;
                     let client = download_client(proxy.as_ref())?;
                     download_to_part(
@@ -134,7 +142,15 @@ pub async fn voice_install_model(
             }
             output.sync_all().await.map_err(|e| e.to_string())?;
         } else {
-            let settings = state.ai_ctx.read().await.config.asr.download_proxy.clone();
+            let settings = state
+                .legacy
+                .ai_ctx
+                .read()
+                .await
+                .config
+                .asr
+                .download_proxy
+                .clone();
             let proxy = resolve_download_proxy(&state, &settings)?;
             let client = download_client(proxy.as_ref())?;
             download_to_part(
@@ -167,7 +183,7 @@ pub async fn voice_install_model(
         if let Some(old) = previous {
             // Explicit replacement only. Publication and verification precede
             // any config migration or removal of the user's working f16 file.
-            let mut ai = state.ai_ctx.write().await;
+            let mut ai = state.legacy.ai_ctx.write().await;
             if ai.config.asr.active == old.id {
                 let mut updated = ai.config.clone();
                 updated.asr.active = m.id.into();

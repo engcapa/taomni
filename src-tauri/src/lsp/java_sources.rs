@@ -233,6 +233,7 @@ pub async fn lsp_read_uri_contents(
     }
     let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
     let status = state
+        .core
         .workspace
         .lsp
         .document_status(
@@ -291,6 +292,7 @@ pub async fn lsp_read_uri_contents(
     };
 
     let session = state
+        .core
         .workspace
         .lsp
         .active_session(
@@ -380,6 +382,7 @@ pub async fn lsp_download_sources(
         return Err("Download sources is only available for Java class files".into());
     }
     let session = state
+        .core
         .workspace
         .lsp
         .active_session(
@@ -483,6 +486,7 @@ pub async fn lsp_reload_project(
 ) -> Result<(), String> {
     let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
     let session = state
+        .core
         .workspace
         .lsp
         .active_session(
@@ -568,6 +572,7 @@ pub async fn lsp_java_modules(
 ) -> Result<Vec<JavaModule>, String> {
     let document = resolve_document(workspace_id, root_path, file_path, language_id, 0)?;
     let session = state
+        .core
         .workspace
         .lsp
         .active_session(

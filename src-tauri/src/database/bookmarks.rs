@@ -102,7 +102,7 @@ pub async fn db_list_bookmarks(
     engine: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<Vec<DbBookmark>, String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let db = state.core.db.lock().map_err(|e| e.to_string())?;
     list_bookmarks(&db, engine.as_deref()).map_err(|e| e.to_string())
 }
 
@@ -111,12 +111,12 @@ pub async fn db_save_bookmark(
     bookmark: DbBookmark,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let db = state.core.db.lock().map_err(|e| e.to_string())?;
     save_bookmark(&db, &bookmark).map_err(|e| e.to_string())
 }
 
 #[tauri::command]
 pub async fn db_delete_bookmark(id: String, state: State<'_, AppState>) -> Result<(), String> {
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let db = state.core.db.lock().map_err(|e| e.to_string())?;
     delete_bookmark(&db, &id).map_err(|e| e.to_string())
 }

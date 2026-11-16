@@ -39,6 +39,7 @@ pub async fn lsp_set_java_settings(
     // to a live config push — jdtls keeps the ones from initialize.
     let java_settings = get_configured_java_settings().to_java_settings(&[]);
     let notified = state
+        .core
         .workspace
         .lsp
         .notify_all_jdtls(

@@ -9,7 +9,7 @@ pub async fn mail_test_connection(
         return local_cmds::test_connection(&state, config).await;
     }
     let account = resolve_config(&state, config)?;
-    let pool = Arc::clone(&state.mail.mail_imap_pool);
+    let pool = Arc::clone(&state.core.mail.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
     tokio::task::spawn_blocking(move || {
         let folders = with_imap_session(
@@ -149,7 +149,7 @@ pub(super) async fn get_message_body(
 
     let account = resolve_config(&state, config)?;
     let cache_enabled = account.config.cache.enabled;
-    let pool = Arc::clone(&state.mail.mail_imap_pool);
+    let pool = Arc::clone(&state.core.mail.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
     let observed_at = sync::now_ms();
     let mut message = tokio::task::spawn_blocking(move || {
@@ -286,7 +286,7 @@ pub async fn mail_download_attachment(
             .await;
         }
     }
-    let pool = Arc::clone(&state.mail.mail_imap_pool);
+    let pool = Arc::clone(&state.core.mail.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
     let result = tokio::task::spawn_blocking(move || {
         with_imap_session(
@@ -389,7 +389,7 @@ pub(super) async fn send_message(
         None => None,
     };
     let db = state.mail_db(&account_id)?;
-    let pool = Arc::clone(&state.mail.mail_imap_pool);
+    let pool = Arc::clone(&state.core.mail.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
     let (result, pending, account, handle) = tokio::task::spawn_blocking(move || {
         let (result, pending) =
@@ -472,7 +472,7 @@ pub async fn mail_fetch_raw(
         .await;
     }
     let account = resolve_config(&state, config)?;
-    let pool = Arc::clone(&state.mail.mail_imap_pool);
+    let pool = Arc::clone(&state.core.mail.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
     let raw = tokio::task::spawn_blocking(move || {
         with_imap_session(
@@ -529,7 +529,7 @@ pub async fn mail_save_raw(
         });
     }
     let account = resolve_config(&state, config)?;
-    let pool = Arc::clone(&state.mail.mail_imap_pool);
+    let pool = Arc::clone(&state.core.mail.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
     tokio::task::spawn_blocking(move || {
         with_imap_session(

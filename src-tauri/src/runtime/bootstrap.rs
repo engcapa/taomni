@@ -1,0 +1,87 @@
+//! Construction opens stores only after profile recovery and starts no background work.
+use super::{
+    ApplicationRuntime,
+    paths::ProfilePaths,
+    profile::{ProfileRuntimeLeases, StartupMode},
+};
+use crate::{
+    ai::{AppAiCtx, config::AiConfig},
+    state::{AppState, CoreState, LegacyFeatureRuntime},
+};
+use std::sync::Arc;
+#[cfg(test)]
+mod tests;
+
+pub(crate) struct BootstrappedApplication {
+    pub(crate) state: AppState,
+    pub(crate) runtime: ApplicationRuntime,
+}
+
+pub(crate) fn desktop(app: &tauri::AppHandle) -> Result<BootstrappedApplication, String> {
+    let paths = ProfilePaths::desktop(app)?;
+    crate::migrate::run(&paths.data);
+    bootstrap(paths, StartupMode::Desktop, None)
+}
+
+pub(crate) fn bootstrap(
+    paths: ProfilePaths,
+    mode: StartupMode,
+    config: Option<AiConfig>,
+) -> Result<BootstrappedApplication, String> {
+    let leases = Arc::new(ProfileRuntimeLeases::acquire(&paths.data, mode)?);
+    let state = construct(paths, leases, config)?;
+    let runtime = ApplicationRuntime::new(state.plugins.clone());
+    Ok(BootstrappedApplication { state, runtime })
+}
+
+/// Compatibility construction for in-process mobile fixtures. There is no
+/// supervision thread or listener until its caller explicitly starts one.
+pub(crate) fn isolated_state(data: &std::path::Path, config: AiConfig) -> Result<AppState, String> {
+    let paths = ProfilePaths::isolated(data);
+    let leases = Arc::new(ProfileRuntimeLeases::acquire(data, StartupMode::Headless)?);
+    construct(paths, leases, Some(config))
+}
+
+fn construct(
+    paths: ProfilePaths,
+    leases: Arc<ProfileRuntimeLeases>,
+    config: Option<AiConfig>,
+) -> Result<AppState, String> {
+    let db = rusqlite::Connection::open(paths.data.join("taomni.db")).map_err(|e| e.to_string())?;
+    crate::session::db::init_db(&db).map_err(|e| e.to_string())?;
+    crate::terminal::local_directories::init_tables(&db).map_err(|e| e.to_string())?;
+    crate::state::legacy::initialize_legacy_tables(&db)?;
+    let notes =
+        rusqlite::Connection::open(paths.data.join("notes.db")).map_err(|e| e.to_string())?;
+    crate::notes::init_db(&notes).map_err(|e| e.to_string())?;
+    let vault = Arc::new(
+        crate::vault::Vault::open(&paths.data.join("vault.db")).map_err(|e| e.to_string())?,
+    );
+    std::fs::create_dir_all(paths.data.join("mail-cache")).map_err(|e| e.to_string())?;
+    let config = config.unwrap_or_else(|| AiConfig::load(&paths.config.join("taomni/ai.json")));
+    let ai_ctx = AppAiCtx::from_config_with_proxy_db(config, vault.clone(), Some(&db));
+    let legacy = LegacyFeatureRuntime::new(&paths.data, ai_ctx);
+    let plugins = Arc::new(crate::plugin::PluginRegistry::new(paths.plugins.clone()));
+    // Optional malformed packages are disabled records, never startup failures.
+    let _ = plugins.scan();
+    let plugin_downloads = Arc::new(crate::plugin::download::DownloadManager::new(
+        crate::plugin::download::HttpDownloadService::new(
+            &crate::plugin::download::ProxyRoute::NoProxy,
+        )
+        .map_err(|e| e.to_string())?,
+    ));
+    let core = Arc::new(CoreState::new(paths, db, notes, vault, leases.clone()));
+    let observer: Arc<dyn crate::terminal::observation::TerminalObserver> =
+        legacy.mobile.broker.clone();
+    core.terminal
+        .terminal_outputs
+        .observations
+        .subscribe(&observer);
+    Ok(AppState {
+        core,
+        plugins,
+        plugin_downloads,
+        legacy,
+        _profile: leases,
+    })
+}

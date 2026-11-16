@@ -23,7 +23,7 @@ pub async fn mail_mark_read(
     }
     let account = resolve_config(&state, config)?;
     let db = state.mail_db(&account.config.session_id)?;
-    let pool = Arc::clone(&state.mail.mail_imap_pool);
+    let pool = Arc::clone(&state.core.mail.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
     tokio::task::spawn_blocking(move || {
         read_actions::mark_read_cached(
@@ -50,7 +50,7 @@ pub async fn mail_clear_cache(
     })? {
         return Err("This POP3 account keeps its mail only on this computer; clearing the cache would delete it.".into());
     }
-    state.mail.mail_imap_pool.invalidate(&account_id);
+    state.core.mail.mail_imap_pool.invalidate(&account_id);
     with_mail_db(&state, &account_id, |db| {
         db.execute(
             "DELETE FROM mail_messages WHERE account_id = ?1",
@@ -100,7 +100,7 @@ pub async fn mail_set_flags(
     let uids_for_task = target_uids.clone();
     let add_for_task = add.clone();
     let remove_for_task = remove.clone();
-    let pool = Arc::clone(&state.mail.mail_imap_pool);
+    let pool = Arc::clone(&state.core.mail.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
     tokio::task::spawn_blocking(move || {
         with_imap_session(
@@ -282,7 +282,7 @@ pub(super) async fn run_mail_mutation(
 ) -> Result<mutations::Progress, String> {
     let account = resolve_config(&state, config)?;
     let db = state.mail_db(&account.config.session_id)?;
-    let pool = Arc::clone(&state.mail.mail_imap_pool);
+    let pool = Arc::clone(&state.core.mail.mail_imap_pool);
     let runtime = tokio::runtime::Handle::current();
     tokio::task::spawn_blocking(move || {
         mutations::run_cached(
@@ -318,7 +318,7 @@ pub async fn mail_create_folder(
     let account_id = config.session_id.clone();
     let account = resolve_config(&state, config)?;
     let name_for_task = name.clone();
-    let pool = Arc::clone(&state.mail.mail_imap_pool);
+    let pool = Arc::clone(&state.core.mail.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
     let folders = tokio::task::spawn_blocking(move || {
         with_imap_session(
@@ -363,7 +363,7 @@ pub async fn mail_rename_folder(
     let account = resolve_config(&state, config)?;
     let from_for_task = from.clone();
     let to_for_task = to.clone();
-    let pool = Arc::clone(&state.mail.mail_imap_pool);
+    let pool = Arc::clone(&state.core.mail.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
     let folders = tokio::task::spawn_blocking(move || {
         with_imap_session(
@@ -406,7 +406,7 @@ pub async fn mail_delete_folder(
     let account_id = config.session_id.clone();
     let account = resolve_config(&state, config)?;
     let name_for_task = name.clone();
-    let pool = Arc::clone(&state.mail.mail_imap_pool);
+    let pool = Arc::clone(&state.core.mail.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
     let folders = tokio::task::spawn_blocking(move || {
         with_imap_session(

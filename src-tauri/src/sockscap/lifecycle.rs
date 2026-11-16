@@ -16,7 +16,7 @@ pub fn init_xray_manager(app: &AppHandle, state: &AppState) {
         .unwrap_or_else(|_| std::env::temp_dir())
         .join("xray");
     let mgr = Arc::new(core::XrayManager::new(exe, work_dir));
-    let _ = state.sockscap.xray.set(mgr);
+    let _ = state.legacy.sockscap.xray.set(mgr);
 }
 
 /* ---------------------------- lifecycle --------------------------------- */
@@ -24,11 +24,11 @@ pub fn init_xray_manager(app: &AppHandle, state: &AppState) {
 #[tauri::command]
 pub async fn sockscap_status(state: State<'_, AppState>) -> Result<SocksCapStatus, String> {
     #[cfg(target_os = "macos")]
-    let mut orch = state.sockscap.orch.write().await;
+    let mut orch = state.legacy.sockscap.orch.write().await;
     #[cfg(target_os = "macos")]
     orch.refresh_macos_capture_health();
     #[cfg(not(target_os = "macos"))]
-    let orch = state.sockscap.orch.read().await;
+    let orch = state.legacy.sockscap.orch.read().await;
     Ok(orch.status())
 }
 
@@ -38,11 +38,11 @@ pub async fn sockscap_diagnostics(
     state: State<'_, AppState>,
 ) -> Result<SocksCapDiagnostics, String> {
     #[cfg(target_os = "macos")]
-    let mut orch = state.sockscap.orch.write().await;
+    let mut orch = state.legacy.sockscap.orch.write().await;
     #[cfg(target_os = "macos")]
     orch.refresh_macos_capture_health();
     #[cfg(not(target_os = "macos"))]
-    let orch = state.sockscap.orch.read().await;
+    let orch = state.legacy.sockscap.orch.read().await;
 
     #[cfg(target_os = "macos")]
     let redirector = orch
@@ -100,7 +100,7 @@ pub async fn sockscap_start(
     cfg.validate()?;
 
     #[cfg(target_os = "macos")]
-    if !state.sockscap.recovery_ready() {
+    if !state.legacy.sockscap.recovery_ready() {
         return Err(
             "macOS SocksCap startup recovery is still running; wait for it to finish before starting capture"
                 .into(),
@@ -110,7 +110,7 @@ pub async fn sockscap_start(
     // Check the local runtime before attempting to lock again: re-locking the
     // same file from one process has platform-specific semantics.
     {
-        let orch = state.sockscap.orch.read().await;
+        let orch = state.legacy.sockscap.orch.read().await;
         if matches!(
             orch.status().phase,
             orchestrator::EnginePhase::RecoveryRequired
@@ -126,7 +126,7 @@ pub async fn sockscap_start(
 
     let dir = rules_dir(&app)?;
     {
-        let mut orch = state.sockscap.orch.write().await;
+        let mut orch = state.legacy.sockscap.orch.write().await;
         orch.apply_config(cfg.clone());
         orch.set_preparing("starting");
     }
@@ -134,7 +134,7 @@ pub async fn sockscap_start(
     // GFWList mode: require rules (cache or fresh fetch) before capture.
     let mut gfw_start_note = String::new();
     if cfg.requires_gfwlist() {
-        let mut orch = state.sockscap.orch.write().await;
+        let mut orch = state.legacy.sockscap.orch.write().await;
         if orch.rules().is_none() {
             if let Some(c) = rules::source::load_cached(&dir) {
                 gfw_start_note = format!("using cached GFWList ({} rules)", c.meta.rule_count);
@@ -146,10 +146,10 @@ pub async fn sockscap_start(
                     Ok(compiled) => {
                         gfw_start_note =
                             format!("downloaded GFWList ({} rules)", compiled.meta.rule_count);
-                        state.sockscap.orch.write().await.set_rules(compiled);
+                        state.legacy.sockscap.orch.write().await.set_rules(compiled);
                     }
                     Err(e) => {
-                        let mut orch = state.sockscap.orch.write().await;
+                        let mut orch = state.legacy.sockscap.orch.write().await;
                         orch.set_start_failed(format!("GFWList required but not loaded: {e}"));
                         return Err(format!(
                             "GFWList mode needs a ruleset. Refresh GFWList or import a file first. ({e})"
@@ -189,7 +189,7 @@ pub async fn sockscap_start(
 
     #[cfg(all(not(windows), not(target_os = "linux"), not(target_os = "macos")))]
     let status: Result<SocksCapStatus, String> = {
-        let mut orch = state.sockscap.orch.write().await;
+        let mut orch = state.legacy.sockscap.orch.write().await;
         orch.apply_config(cfg.clone());
         let _ = orch.start_stub(&caps);
         Ok(orch.status())
@@ -199,13 +199,14 @@ pub async fn sockscap_start(
     let journal_result = match &status {
         Ok(st) => {
             let helper_port = state
+                .legacy
                 .sockscap
                 .helper
                 .inner
                 .lock()
                 .ok()
                 .and_then(|g| g.as_ref().map(|s| s.port));
-            let relay_port = state.sockscap.orch.read().await.relay_port();
+            let relay_port = state.legacy.sockscap.orch.read().await.relay_port();
             recovery::write_journal(
                 &journal_path,
                 &recovery::RecoveryJournal {
@@ -226,7 +227,7 @@ pub async fn sockscap_start(
             )
         }
         Err(e) => {
-            let mut orch = state.sockscap.orch.write().await;
+            let mut orch = state.legacy.sockscap.orch.write().await;
             orch.set_start_failed(e.clone());
             Ok(())
         }
@@ -237,7 +238,7 @@ pub async fn sockscap_start(
     #[cfg(target_os = "macos")]
     let journal_result: Result<(), String> = {
         if let Err(error) = &status {
-            let mut orch = state.sockscap.orch.write().await;
+            let mut orch = state.legacy.sockscap.orch.write().await;
             if !matches!(
                 orch.status().phase,
                 orchestrator::EnginePhase::RecoveryRequired
@@ -264,6 +265,7 @@ pub async fn sockscap_start(
         };
         if !teardown_failed {
             state
+                .legacy
                 .sockscap
                 .orch
                 .write()
@@ -272,20 +274,26 @@ pub async fn sockscap_start(
         } else {
             // Teardown could not prove the machine-wide state is clean. Keep
             // ownership until Recover succeeds or this process exits.
-            state.sockscap.install_activation_lock(activation_lock);
+            state
+                .legacy
+                .sockscap
+                .install_activation_lock(activation_lock);
         }
         return Err(message);
     }
 
     if status.is_ok() {
-        state.sockscap.install_activation_lock(activation_lock);
+        state
+            .legacy
+            .sockscap
+            .install_activation_lock(activation_lock);
     }
 
     // Start the xray health monitor once capture is up, so a core that crashes
     // mid-session is respawned on its same local port (keeps the relay working).
     // Idempotent; stopped by full_teardown / shutdown_on_exit.
     if status.is_ok() {
-        if let Some(mgr) = state.sockscap.xray() {
+        if let Some(mgr) = state.legacy.sockscap.xray() {
             if mgr.running_count().await > 0 {
                 mgr.start_monitor(std::time::Duration::from_secs(5));
             }

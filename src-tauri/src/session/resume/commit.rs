@@ -29,7 +29,7 @@ pub async fn commit_welcome_run_snapshot(
     state: tauri::State<'_, crate::state::AppState>,
 ) -> Result<CommitRunSnapshotResponse, String> {
     let mut entries = entries;
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let db = state.core.db.lock().map_err(|e| e.to_string())?;
     let mut db = db;
     commit_run_snapshot(
         &mut db,

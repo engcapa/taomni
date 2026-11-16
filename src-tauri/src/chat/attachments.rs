@@ -13,6 +13,7 @@ pub fn chat_read_clipboard_image_attachment(
 ) -> Result<store::ChatAttachment, String> {
     let (width, height, bytes) = {
         let mut guard = state
+            .core
             .clipboard
             .lock()
             .map_err(|e| format!("clipboard lock: {}", e))?;

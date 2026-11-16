@@ -111,7 +111,7 @@ async fn voice_start_capture_inner(
         return Err("Voice support not built".into());
     }
     let engine = {
-        let ai = state.ai_ctx.read().await;
+        let ai = state.legacy.ai_ctx.read().await;
         if ai.config.fully_disabled {
             return Err("AI is fully disabled".into());
         }
@@ -147,7 +147,7 @@ async fn voice_start_capture_inner(
         }
         // Recheck the master switch after model loading (it can take seconds).
         {
-            let ai = state.ai_ctx.read().await;
+            let ai = state.legacy.ai_ctx.read().await;
             if ai.config.fully_disabled
                 || (prepare_engine && !Arc::ptr_eq(&ai.asr, &session.engine))
             {
@@ -200,7 +200,7 @@ pub async fn voice_start_stream(
     }
     // Resolve one configuration snapshot before acquiring the microphone.
     let (active, language, provider_config, full_local_mode, disabled, hotwords) = {
-        let ai = state.ai_ctx.read().await;
+        let ai = state.legacy.ai_ctx.read().await;
         let asr = &ai.config.asr;
         (
             asr.active.clone(),
@@ -246,6 +246,7 @@ pub async fn voice_start_stream(
         };
         let key = if config.api_key.starts_with(crate::vault::VAULT_REF_PREFIX) {
             state
+                .core
                 .vault
                 .resolve(&config.api_key)
                 .map_err(|_| "ASR_CREDENTIAL: unlock the credential vault")?
@@ -276,7 +277,7 @@ pub async fn voice_start_stream(
         .filter(|s| s.id == session_id)
         .ok_or("ASR_CANCELLED: recording expired")?;
     {
-        let ai = state.ai_ctx.read().await;
+        let ai = state.legacy.ai_ctx.read().await;
         if ai.config.asr.active != active
             || ai.config.asr.routed_language() != language
             || ai.config.asr.providers.get(&active) != provider_config.as_ref()
@@ -470,7 +471,7 @@ pub async fn voice_stop_and_transcribe(
             let _ = capture.stop.send(());
             let pcm = capture.result.await.map_err(|e| e.to_string())??;
             if session.cancel.load(Ordering::Relaxed)
-                || state.ai_ctx.read().await.config.fully_disabled
+                || state.legacy.ai_ctx.read().await.config.fully_disabled
             {
                 return Err("Cancelled".into());
             }
@@ -481,7 +482,7 @@ pub async fn voice_stop_and_transcribe(
                 .transcribe(pcm, session.cancel.clone())
                 .await?;
             if session.cancel.load(Ordering::Relaxed)
-                || state.ai_ctx.read().await.config.fully_disabled
+                || state.legacy.ai_ctx.read().await.config.fully_disabled
             {
                 return Err("Cancelled".into());
             }

@@ -18,19 +18,19 @@ pub async fn save_server_config(
         .ok_or_else(|| format!("unknown server type: {}", server_type))?;
     if st == ServerType::Rdp {
         let legacy_password = {
-            let db = state.db.lock().map_err(|e| e.to_string())?;
+            let db = state.core.db.lock().map_err(|e| e.to_string())?;
             db::load_server_config(&db, st.as_str())
                 .map_err(|e| e.to_string())?
                 .and_then(|value| rdp_plaintext_password(&value).map(str::to_owned))
         };
         secure_rdp_config(
-            state.vault.as_ref(),
+            state.core.vault.as_ref(),
             &mut config,
             legacy_password.as_deref(),
         )?;
     }
     let json = serde_json::to_string(&config).map_err(|e| e.to_string())?;
-    let db = state.db.lock().map_err(|e| e.to_string())?;
+    let db = state.core.db.lock().map_err(|e| e.to_string())?;
     db::save_server_config(&db, st.as_str(), &json).map_err(|e| e.to_string())?;
     Ok(config)
 }
@@ -40,17 +40,21 @@ pub async fn load_server_configs(
     state: State<'_, AppState>,
 ) -> Result<HashMap<String, serde_json::Value>, String> {
     let mut configs = {
-        let db = state.db.lock().map_err(|e| e.to_string())?;
+        let db = state.core.db.lock().map_err(|e| e.to_string())?;
         db::load_server_configs(&db).map_err(|e| e.to_string())?
     };
 
     if let Some(config) = configs.get_mut(ServerType::Rdp.as_str()) {
         let legacy_password = rdp_plaintext_password(config).map(str::to_owned);
         if legacy_password.is_some() {
-            match secure_rdp_config(state.vault.as_ref(), config, legacy_password.as_deref()) {
+            match secure_rdp_config(
+                state.core.vault.as_ref(),
+                config,
+                legacy_password.as_deref(),
+            ) {
                 Ok(()) => {
                     let json = serde_json::to_string(config).map_err(|e| e.to_string())?;
-                    let db = state.db.lock().map_err(|e| e.to_string())?;
+                    let db = state.core.db.lock().map_err(|e| e.to_string())?;
                     db::save_server_config(&db, ServerType::Rdp.as_str(), &json)
                         .map_err(|e| e.to_string())?;
                 }

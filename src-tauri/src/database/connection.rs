@@ -27,7 +27,7 @@ pub(super) fn resolve_secret(
     value: Option<&str>,
 ) -> Result<Option<String>, String> {
     match value {
-        Some(v) if !v.is_empty() => match state.vault.resolve(v)? {
+        Some(v) if !v.is_empty() => match state.core.vault.resolve(v)? {
             Some(z) => Ok(Some((*z).clone())),
             None => Ok(Some(v.to_string())),
         },
@@ -94,7 +94,7 @@ pub async fn db_connect(
         tx_state,
     ));
     let previous = {
-        let mut map = state.database.db_connections.write().await;
+        let mut map = state.core.database.db_connections.write().await;
         // If a stale session exists under this id, close it after releasing the map lock.
         map.insert(session_id, session)
     };
@@ -146,7 +146,7 @@ pub(super) async fn prepare_network_forward(
     // Resolve proxy + jump credentials (vault refs → plaintext, session-mode
     // jump host → DB lookup) exactly like the SSH terminal path.
     crate::terminal::resolve_proxy_session(state, &mut net)?;
-    net.resolve_proxy_pass(&state.vault)?;
+    net.resolve_proxy_pass(&state.core.vault)?;
     crate::terminal::resolve_jump_credentials(state, &mut net)?;
 
     let target_host = config.host.clone();
@@ -192,7 +192,7 @@ pub async fn db_ping(state: State<'_, AppState>, session_id: String) -> Result<S
 #[tauri::command]
 pub async fn db_disconnect(state: State<'_, AppState>, session_id: String) -> Result<(), String> {
     let removed = {
-        let mut map = state.database.db_connections.write().await;
+        let mut map = state.core.database.db_connections.write().await;
         map.remove(&session_id)
     };
     if let Some(session) = removed {

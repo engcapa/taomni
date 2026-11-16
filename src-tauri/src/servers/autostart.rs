@@ -27,7 +27,7 @@ pub(super) fn rdp_autostart_allowed(config: &serde_json::Value) -> bool {
 pub async fn autostart_servers(app: AppHandle) {
     let configs = {
         let state: State<AppState> = app.state();
-        let db = match state.db.lock() {
+        let db = match state.core.db.lock() {
             Ok(db) => db,
             Err(e) => {
                 tracing::warn!("autostart servers: db lock: {}", e);

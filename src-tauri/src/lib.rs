@@ -37,6 +37,7 @@ mod proxy;
 mod qa_driver;
 mod qa_logging;
 mod rdp;
+mod runtime;
 mod screenshot;
 #[cfg(windows)]
 pub use screenshot::scroll_input::run_helper as run_screenshot_scroll_input;
@@ -73,12 +74,8 @@ pub mod workspace_tooling;
 mod wsl;
 
 use state::AppState;
-use std::collections::HashSet;
-use std::sync::Arc;
 use tauri::{AppHandle, Manager, State, WebviewWindowBuilder};
 
-const AI_PROCESS_REAPER_INTERVAL_SECS: u64 = 30;
-const AI_PROCESS_IDLE_REAP_SECS: u64 = 300;
 pub(crate) const QA_APP_ID: &str = "com.taomni.app.qa";
 
 fn qa_override_path(raw: &str) -> Option<std::path::PathBuf> {
@@ -115,7 +112,7 @@ pub fn resolved_app_data_dir<R: tauri::Runtime>(
 /// directory on macOS.  `dirs` does not honor XDG variables there, so native
 /// QA supplies explicit debug-only overrides instead of changing HOME.
 pub fn resolved_config_dir() -> Option<std::path::PathBuf> {
-    if let Some(root) = mobile::headless::config_root() {
+    if let Some(root) = runtime::paths::config_root() {
         return Some(root);
     }
     if cfg!(debug_assertions) {
@@ -139,29 +136,10 @@ pub fn resolved_cache_dir() -> Option<std::path::PathBuf> {
     dirs::cache_dir()
 }
 
-fn should_reap_ai_process(
-    chat_turn_active: bool,
-    process_turn_active: bool,
-    idle_secs: u64,
-) -> bool {
-    !chat_turn_active && !process_turn_active && idle_secs >= AI_PROCESS_IDLE_REAP_SECS
-}
-
 #[tauri::command]
 async fn exit_app(app_handle: AppHandle, state: State<'_, AppState>) -> Result<(), String> {
-    app_handle
-        .state::<app_exit::ExitGate>()
-        .run(
-            async {
-                sockscap::prepare_for_exit(&app_handle, state).await?;
-                screenshot::wait_for_recovery_recording().await
-            },
-            || {
-                webview_recovery::closing_all(&app_handle);
-                app_handle.exit(0);
-            },
-        )
-        .await
+    let _ = state;
+    runtime::shutdown::request(app_handle, runtime::shutdown::ExitAction::Quit).await
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -189,188 +167,10 @@ pub fn run() {
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .setup(|app| {
             screenshot::init(app.handle());
-            let app_data =
-                resolved_app_data_dir(app.handle()).expect("failed to resolve app data dir");
-
-            // One-time migration from the legacy Taomni identity (see migrate.rs).
-            // Runs before the app-data dir is created so the directory rename
-            // targets a non-existent destination on every platform.
-            migrate::run(&app_data);
-            app.manage(
-                mobile::headless::ModeLease::acquire(&app_data, false)
-                    .map_err(std::io::Error::other)?,
-            );
-            app.manage(
-                backup::coordination::ProfileLease::prepare(&app_data)
-                    .map_err(std::io::Error::other)?,
-            );
-
-            std::fs::create_dir_all(&app_data).ok();
-
-            let db_path = app_data.join("taomni.db");
-            let conn = rusqlite::Connection::open(&db_path).expect("failed to open database");
-            session::db::init_db(&conn).expect("failed to init database");
-            terminal::local_directories::init_tables(&conn)
-                .expect("failed to init local directory tables");
-            servers::db::init_server_tables(&conn).expect("init server tables");
-            rdp::tls::init_trust_table(&conn).expect("init RDP certificate trust table");
-            let mail_db_dir = app_data.join("mail-cache");
-            std::fs::create_dir_all(&mail_db_dir).expect("failed to create mail cache directory");
-
-            // Tao Notes lives in its own SQLite file (notes.db), deliberately
-            // separate from taomni.db so its data model / backup / encryption can
-            // evolve independently (see tao-notes-feature-plan.md).
-            let notes_db_path = app_data.join("notes.db");
-            let notes_conn =
-                rusqlite::Connection::open(&notes_db_path).expect("failed to open notes database");
-            notes::init_db(&notes_conn).expect("failed to init notes database");
-
-            // The MFA authenticator keeps its own mfa.db, opened lazily on first
-            // use so a damaged file cannot block startup (see mfa/store.rs).
-            let mfa_store = Arc::new(mfa::store::MfaStore::new(app_data.join("mfa.db")));
-
-            let vault_path = vault::default_vault_path(app.handle());
-            let v = vault::Vault::open(&vault_path).expect("failed to open vault");
-            let vault_arc = Arc::new(v);
-
-            // Load AI config and build the AppAiCtx (AsrManager + LlmRouter).
-            // Vault is passed so api_key fields stored as `vault:<id>` get
-            // transparently resolved by the LLM router.
-            let ai_config_path = ai::config::default_ai_config_path();
-            let ai_config = ai::config::AiConfig::load(&ai_config_path);
-            let ai_ctx =
-                ai::AppAiCtx::from_config_with_proxy_db(ai_config, vault_arc.clone(), Some(&conn));
-
-            app.manage(AppState::new(
-                conn,
-                notes_conn,
-                mfa_store,
-                mail_db_dir,
-                vault_arc,
-                ai_ctx,
-            ));
-            let go_catalog = app.state::<AppState>().opencode_go_catalog.clone();
-            tauri::async_runtime::spawn(async move {
-                go_catalog.refresh(true).await;
-            });
-            app.state::<AppState>()
-                .workspace
-                .lsp
-                .attach_app(app.handle().clone());
-            app.manage(workspace_search::WorkspaceSearchState::default());
-            app.manage(structural_search::StructuralSearchState::default());
-            let local_history = local_history::init_local_history(app.handle())
-                .expect("failed to init local history store");
-            app.manage(local_history);
-
-            backup::jobs::initialize(app.handle());
-            backup::qa::initialize(app.handle()).map_err(std::io::Error::other)?;
-            backup::scheduler::start(app.handle());
-
-            let handle_for_reaper = app.handle().clone();
-            tauri::async_runtime::spawn(async move {
-                loop {
-                    tokio::time::sleep(std::time::Duration::from_secs(
-                        AI_PROCESS_REAPER_INTERVAL_SECS,
-                    ))
-                    .await;
-                    let state = handle_for_reaper.state::<AppState>();
-                    let active_chat_threads: HashSet<String> =
-                        state.agent.chat_runs.lock().await.keys().cloned().collect();
-                    let mut registry = state.agent.cc_processes.lock().await;
-                    let now = std::time::Instant::now();
-                    let mut to_remove = Vec::new();
-                    for (thread_id, proc) in registry.iter() {
-                        let last_active = *proc.last_active_at.lock().unwrap();
-                        if should_reap_ai_process(
-                            active_chat_threads.contains(thread_id),
-                            proc.is_turn_active(),
-                            now.duration_since(last_active).as_secs(),
-                        ) {
-                            to_remove.push(thread_id.clone());
-                        }
-                    }
-                    for tid in to_remove {
-                        if let Some(proc) = registry.remove(&tid) {
-                            tokio::spawn(async move {
-                                proc.stop().await;
-                            });
-                        }
-                    }
-                    drop(registry);
-
-                    let mut codex_registry = state.agent.codex_processes.lock().await;
-                    let mut codex_to_remove = Vec::new();
-                    for (thread_id, proc) in codex_registry.iter() {
-                        let last_active = *proc.last_active_at.lock().unwrap();
-                        if should_reap_ai_process(
-                            active_chat_threads.contains(thread_id),
-                            proc.is_turn_active(),
-                            now.duration_since(last_active).as_secs(),
-                        ) {
-                            codex_to_remove.push(thread_id.clone());
-                        }
-                    }
-                    for tid in codex_to_remove {
-                        if let Some(proc) = codex_registry.remove(&tid) {
-                            tokio::spawn(async move {
-                                proc.stop().await;
-                            });
-                        }
-                    }
-                    drop(codex_registry);
-
-                    let mut acp_registry = state.agent.acp_processes.lock().await;
-                    let mut acp_to_remove = Vec::new();
-                    for (thread_id, proc) in acp_registry.iter() {
-                        if should_reap_ai_process(
-                            active_chat_threads.contains(thread_id),
-                            proc.is_turn_active(),
-                            now.saturating_duration_since(proc.last_active_at())
-                                .as_secs(),
-                        ) {
-                            acp_to_remove.push(thread_id.clone());
-                        }
-                    }
-                    for tid in acp_to_remove {
-                        if let Some(proc) = acp_registry.remove(&tid) {
-                            tokio::spawn(async move {
-                                proc.stop().await;
-                            });
-                        }
-                    }
-                }
-            });
-
-            // Auto-start any tunnels with autostart=true.
-            let app_for_autostart = app.handle().clone();
-            tauri::async_runtime::spawn(async move {
-                tunnel::autostart_tunnels(app_for_autostart).await;
-            });
-
-            // SocksCap: repair residual OS capture state from a previous unclean
-            // exit. Needs app state: orphaned elevated helpers can only be
-            // terminated by another elevated process, so their pids are queued
-            // there for the next (UAC-elevated) helper launch to reap.
-            let app_for_sockscap = app.handle().clone();
-            tauri::async_runtime::spawn(async move {
-                let state = app_for_sockscap.state::<AppState>();
-                sockscap::boot_repair(&app_for_sockscap, &state).await;
-            });
-
-            // SocksCap: resolve the bundled xray-core binary and install the
-            // sidecar manager (used by core-backed upstreams: ss/trojan/vmess/
-            // vless/wireguard). Non-fatal if the binary is absent.
-            {
-                let state = app.state::<AppState>();
-                sockscap::init_xray_manager(app.handle(), &state);
-            }
-
-            // Auto-start any local servers with startOnLaunch=true.
-            let app_for_servers = app.handle().clone();
-            tauri::async_runtime::spawn(async move {
-                servers::autostart_servers(app_for_servers).await;
-            });
+            let boot = runtime::bootstrap::desktop(app.handle()).map_err(std::io::Error::other)?;
+            app.manage(boot.state);
+            app.manage(boot.runtime);
+            runtime::desktop::attach(app.handle()).map_err(std::io::Error::other)?;
 
             if cfg!(debug_assertions) {
                 let mut logger = tauri_plugin_log::Builder::default().level(log::LevelFilter::Info);
@@ -460,6 +260,7 @@ pub fn run() {
                 // variable and therefore never start a local HTTP server.
                 let _ = main_window;
             }
+            runtime::desktop::start(app.handle());
             Ok(())
         })
         .invoke_handler(commands::handle)
@@ -467,62 +268,10 @@ pub fn run() {
         .expect("error while running tauri application")
         .run(|app_handle, event| {
             if let tauri::RunEvent::ExitRequested { code, ref api, .. } = event {
-                backup::scheduler::handle_exit_request(app_handle, code, api);
+                runtime::shutdown::handle_exit_requested(app_handle, code, api);
             }
-            // On app exit, cleanly stop the elevated SocksCap helper (and its
-            // WinDivert driver) so no elevated process/driver leaks. The
-            // helper's parent-death watchdog covers crash/kill paths.
             if let tauri::RunEvent::Exit = event {
-                viewer::shutdown();
-                screenshot::shutdown();
-                let state = app_handle.state::<AppState>();
-                state.plugins.shutdown();
-                tauri::async_runtime::block_on(async {
-                    let _ = tokio::time::timeout(
-                        std::time::Duration::from_secs(5),
-                        state.mobile.stop(),
-                    )
-                    .await;
-                });
-                sockscap::shutdown_on_exit(app_handle, &state);
+                runtime::shutdown::final_exit(app_handle);
             }
         });
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn ai_process_reaper_waits_for_completed_turn_idle_window() {
-        assert!(!should_reap_ai_process(
-            false,
-            false,
-            AI_PROCESS_IDLE_REAP_SECS - 1
-        ));
-        assert!(should_reap_ai_process(
-            false,
-            false,
-            AI_PROCESS_IDLE_REAP_SECS
-        ));
-    }
-
-    #[test]
-    fn ai_process_reaper_skips_active_chat_or_process_turn() {
-        assert!(!should_reap_ai_process(
-            true,
-            false,
-            AI_PROCESS_IDLE_REAP_SECS
-        ));
-        assert!(!should_reap_ai_process(
-            false,
-            true,
-            AI_PROCESS_IDLE_REAP_SECS
-        ));
-        assert!(!should_reap_ai_process(
-            true,
-            true,
-            AI_PROCESS_IDLE_REAP_SECS
-        ));
-    }
 }

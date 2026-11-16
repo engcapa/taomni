@@ -342,7 +342,7 @@ fn fill_session_id_noop_for_global_thread() {
 fn config_id_is_in_scope_and_normalized_to_tab_id() {
     // The identity card hands CC the SessionConfig.id; CC then names it as
     // session_id. It must be accepted (scope) and rewritten to the tab id
-    // (fill) so downstream registry / state.terminal.terminals lookups resolve.
+    // (fill) so downstream registry / state.core.terminal.terminals lookups resolve.
     let s = scope_with_config("t1", "ssh-cfg-123", "cfg-uuid");
     let mut args = json!({ "session_id": "cfg-uuid", "command": "free -h" });
     assert!(enforce_session_scope(&s, &args).is_ok());
