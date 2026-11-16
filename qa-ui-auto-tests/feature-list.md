@@ -59,6 +59,8 @@ controls:
     optional: true # transient catalog request; mounted ownership tests verify pending state
   - id: module-marketplace-error
     selector: '[data-testid="module-marketplace-error"]'
+    aliases:
+    - 'xpath=//*[@data-testid="module-marketplace-error"][contains(., "older than the highest seen")]'
     kind: display
   - id: module-marketplace-checked
     selector: '[data-testid="module-marketplace-checked"]'

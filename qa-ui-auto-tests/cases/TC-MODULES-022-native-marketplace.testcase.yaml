@@ -89,7 +89,7 @@ steps:
     value: ${fixture.module_marketplace_older_url}
 - click: '[data-testid="module-marketplace-refresh"]'
 - wait_for: '[data-testid="module-marketplace-error"]'
-- wait_for: '[data-testid="module-marketplace-error"]:has-text("older than the highest seen")'
+- wait_for: 'xpath=//*[@data-testid="module-marketplace-error"][contains(., "older than the highest seen")]'
 - module_marketplace_probe:
     phase: rejected
 - reload_window: null
@@ -98,7 +98,7 @@ steps:
 - fill:
     selector: '[data-testid="settings-search-input"]'
     value: module store
-- wait_for: '[data-testid="module-marketplace-error"]:has-text("older than the highest seen")'
+- wait_for: 'xpath=//*[@data-testid="module-marketplace-error"][contains(., "older than the highest seen")]'
 - click: '[data-testid="module-marketplace-source-toggle"]'
 - fill:
     selector: '[data-testid="module-marketplace-source"]'

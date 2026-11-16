@@ -2492,6 +2492,7 @@
 - `[data-testid="module-marketplace-source"]` — interactive — F-Modules-1.module-marketplace-source
 - `[data-testid="module-marketplace-loading"]` — display [optional] — F-Modules-1.module-marketplace-loading
 - `[data-testid="module-marketplace-error"]` — display — F-Modules-1.module-marketplace-error
+  ↳ `xpath=//*[@data-testid="module-marketplace-error"][contains(., "older than the highest seen")]` — alias
 - `[data-testid="module-marketplace-checked"]` — display — F-Modules-1.module-marketplace-checked
 - `[data-testid="module-marketplace-empty"]` — display — F-Modules-1.module-marketplace-empty
 - `[data-testid="module-marketplace-card"]` — display — F-Modules-1.module-marketplace-card
