@@ -17,6 +17,8 @@
 - TC-MODULES-007 的失败前 HTML 与 restart receipt 已核验：标题 `Exit`、消息 `There is 1 open tab. Exit Taomni and close it?`、确认按钮 `Exit`。用例仅在已知 Settings 仍打开的首次和卸载后重启声明精确确认，沿用现有单次真实点击、正常退出与进程身份检查；不允许通用弹窗兜底或强杀当作成功。该 case 修复尚待新 SHA hosted 重跑。
 - Wayland 的 FILE-OPEN-008 跨行路径命中和 FILE-OPEN-006 非左键输入仅支持 X11 的两个既有失败继续按 main 对比依据单列，不计通过。Windows/macOS 尚未完成的 shard 不外推为通过。
 - 当前 Vault/MFA 开发开始接入真实 core operation permit、revision 校验、可重试撤销和显式 reset 屏障；其它核心 Vault 消费者、统一 snapshot/restore 和业务宿主迁出仍未闭合，不把这一开发状态记为 TASK-025-D/E 已完成。
+- 源码 `900ed0146` 的[UI #43804951477](https://github.com/engcapa/taomni/actions/runs/43804951477) 已即时收齐三端 browser 各 24/24；macOS native shard 2 为 7/7，其中 TC-MODULES-007 的全部 52 步通过。其它 shard 继续采集，不能外推为全部通过。
+- 旧 UI #43800287415 的 Windows TC-MODULES-009 在正常关闭前失败。即时下载的 `native-restart-failures/*/close-target.json` 与画面一致：窗口关闭按钮中心上层是仍打开的 `ai-chat-drawer-hide`，不是退出清理或数据损坏。用例保存 Notes 后先真实关闭并断言移除 drawer，再走原生正常退出；重启后仍重新打开 Notes 验证原内容与 generation，随后关闭 drawer 后进入 Settings。没有绕过指针命中、强杀或放宽持久化断言，该修复待新 SHA hosted 验证。
 
 ## 任务状态
 
