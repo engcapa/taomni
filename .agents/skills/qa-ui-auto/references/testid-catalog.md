@@ -3612,6 +3612,8 @@
 - `[data-testid="tao-home-vault-notice"]` — display — F1.11.tao-home-vault-notice
 - `[data-testid="tao-home-vault-unlock"]` — interactive — F1.11.tao-home-vault-unlock
 - `[data-testid="tao-home-continue"]` — interactive — F1.11.tao-home-continue
+- `[data-testid="tao-home-regenerate"]` — interactive [optional] — F1.11.tao-home-regenerate
+- `[data-testid="tao-home-stopped-state"]` — display [optional] — F1.11.tao-home-stopped-state
 - `[data-testid="tao-settings"]` — display — F1.11.tao-settings
 - `[data-testid="tao-settings-save"]` — interactive — F1.11.tao-settings-save
 - `[data-testid="tao-settings-status"]` — display — F1.11.tao-settings-status

@@ -412,6 +412,14 @@ controls:
 - id: tao-home-continue
   selector: '[data-testid="tao-home-continue"]'
   kind: interactive
+- id: tao-home-regenerate
+  selector: '[data-testid="tao-home-regenerate"]'
+  kind: interactive
+  optional: true
+- id: tao-home-stopped-state
+  selector: '[data-testid="tao-home-stopped-state"]'
+  kind: display
+  optional: true
 - id: tao-settings
   selector: '[data-testid="tao-settings"]'
   kind: display
