@@ -6,6 +6,8 @@ description: >-
   existing ACP bridge and an actual subprocess. Verify the reviewed goal and
   history arrive without an unsent draft. Bring the completed result back as
   a removable context chip and explicitly continue the original Tao thread.
+  The completed reply must stay visible despite initial history loading, and
+  both sides of the native turn must be present in isolated persistent storage.
   This deterministic case needs no cloud credentials and runs on hosted platforms.
 modes: [native]
 covers: [F1.11]
@@ -29,7 +31,7 @@ verification:
     requirement: Reviewed Tao context reaches the existing native ACP bridge and its result can continue the source thread.
     actions: [1, 2, 3, 4, 5, 6]
     checkpoints:
-    - {step: 7, expectation: "Preview includes goal/history and excludes unsent draft; cancel starts no process; confirmation uses an actual ACP subprocess and persists a reply; result returns as a reviewable chip and only an explicit send continues Tao."}
+    - {step: 7, expectation: "Preview includes goal/history and excludes unsent draft; cancel starts no process; confirmation uses an actual ACP subprocess, renders its completed reply and persists both roles; late history loading must not clear the reply; result returns as a reviewable chip and only an explicit send continues Tao."}
     - {step: 8, expectation: No unhandled runtime errors.}
     results: [7, 8]
   native:

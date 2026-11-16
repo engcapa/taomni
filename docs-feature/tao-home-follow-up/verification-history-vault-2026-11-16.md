@@ -61,3 +61,11 @@ Windows 首个匹配构建的新增原生批次为 **6/6**，无跳过：`qa-ui-
 Windows 逐条合并最新匹配回执：已评审场景为 **browser 31/31、native 40/40**，包含全部适用 crash；`status --gate` 为 `ok=true`、0 gaps、0 rejected reports，记录 `qa-ui-auto-report/_local/status-tao-history-windows-reviewed-1116.json`。browser 使用 17:47 整批以及 17:51 恢复用例的新回执，单项旧 case hash 不充当当前通过。
 
 额外执行的旧 `TC-auto-F12-1-vault-setup-and-lock` 实际通过，但其 `verification.review: reviewed` 与 `needs-review` tag 冲突。含该旧用例的全量 Windows status 因一项评审元数据缺口未过 gate（没有执行失败，0 rejected reports）；原记录 `status-tao-history-windows-final-1116.json` 保留。**测试待办**：复核该旧用例的状态等待、需求契约与截图，统一评审元数据并以新 case 指纹重新执行。此次新增 037 已覆盖初始化、锁定、取消及再次解锁的真实用户流程；不通过删除旧 tag 将旧结果直接变成当前验收。
+
+## ACP 消息加载竞态回归
+
+43844434828 的 macOS 027 仍未通过：真实 peer 收到正确交接内容，抽屉已选中 ACP provider，但正文为空；不能把子进程收件当成用户流程通过。补充只读 SQLite 诊断并在匹配 Windows QA release 上复跑 027 通过；跨平台诊断运行 [43853464081](https://github.com/engcapa/taomni/actions/runs/43853464081) 固定 `c338784d1`，保留修复前产品输入。
+
+受控延迟的 store 回归复现了独立的消息加载竞态，基线 **4 failed / 1 passed**：旧的空历史读取覆盖已完成的真实流式事件、并发旧读取覆盖新读取、删除后旧读取重新写入缓存，新线程也会触发不必要的空历史查询。`threads.ts` 现在为每条加载保留请求所有权并核对消息数组版本；删除释放所有权，新线程初始化空缓存，正常历史刷新仍保留。修复后 chat store、ChatDrawer 与 HandoffControls 共 **4 files / 80 tests** 通过。该竞态与 hosted 症状相符，最终平台因果判断仍等待 native 复验，不用单测替代真机结果。
+
+027 沿用实际 UI→ACP 子进程→带回 Tao→显式继续流程，补充真实隔离库中 user/assistant 两方持久化断言。只读诊断仅记录角色、长度与 fixture 标记，不记录对话正文、凭据或替换 UI 成功断言。产品源码已变化，先前 e7 批次保留其原有输入身份，不能充当此修复的当前通过证据。

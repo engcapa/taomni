@@ -37,13 +37,18 @@ def run(ctx):
         flow.click('[data-testid="tao-home-handoff-confirm"]')
         received = flow.wait(lambda: json.loads(log.read_text(encoding="utf-8")) if log.exists() else None, bool, "The native ACP peer did not receive its handoff", 45)
         flow.require(received.get("hasGoal") and received.get("hasHistory") and not received.get("hasUnsavedDraft"), "The actual native ACP request did not preserve the reviewed context")
+        transcript = []
         try:
             flow.wait(lambda: flow.read("return document.querySelector('[data-testid=\"ai-chat-drawer\"]')?.textContent?.includes('QA coding agent result') && !document.querySelector('[data-testid=\"ai-chat-send-button\"] .animate-spin');"), bool, "Native ACP result did not finish in the existing chat drawer")
         finally:
             try:
-                flow.record("persisted-acp-transcript", persisted_handoff(ctx))
+                transcript = persisted_handoff(ctx)
+                flow.record("persisted-acp-transcript", transcript)
             except Exception as error:
                 flow.record("persisted-acp-transcript", dict(error=str(error)), "unverified")
+        flow.require(any(row["role"] == "user" and row["characters"] for row in transcript)
+                     and any(row["role"] == "assistant" and row["hasResult"] for row in transcript),
+                     "Native ACP handoff did not persist both sides of the completed turn")
         flow.record("actual-acp-process", received)
         flow.screenshot("acp-result")
         flow.click('[data-testid="nav-mode-home"]')
