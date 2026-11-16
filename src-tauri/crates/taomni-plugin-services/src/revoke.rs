@@ -24,6 +24,49 @@ pub struct Revocation {
 }
 
 impl OperationAdmission {
+    /// Core-only coordination can join a revocation started by stale-root
+    /// detection. Keep the complete member set, including acknowledged hosts,
+    /// so a retry never turns a prior acknowledgement into another revoke.
+    pub fn begin_or_join_revoke(
+        &self,
+        hosts: &[AuthorizedHost],
+    ) -> Result<Revocation, CoreServiceError> {
+        let mut state = self.0.state.lock().expect("service admission poisoned");
+        if state.mode == AdmissionState::Open {
+            Self::start_revoke(&mut state, hosts, None)?;
+        } else if state.mode == AdmissionState::Revoking {
+            for host in hosts.iter().filter(|host| !host.termination_confirmed()) {
+                if state.revocation_hosts.insert(host.instance().clone()) {
+                    state
+                        .pending_acknowledgements
+                        .insert(host.instance().clone());
+                }
+            }
+        } else {
+            return Err(CoreServiceError::StalePluginContext);
+        }
+        Ok(Self::revocation(&state))
+    }
+
+    /// Core retry orchestration must not resend an already acknowledged
+    /// revocation or replace an acknowledgement with a needless host kill.
+    pub fn host_revoke_pending(
+        &self,
+        host: &AuthorizedHost,
+        revocation: &Revocation,
+    ) -> Result<bool, CoreServiceError> {
+        let state = self.0.state.lock().expect("service admission poisoned");
+        if state.mode != AdmissionState::Revoking
+            || state.epoch != revocation.epoch
+            || state.generation != revocation.generation
+            || !revocation.hosts.contains(host.instance())
+            || !state.revocation_hosts.contains(host.instance())
+        {
+            return Err(CoreServiceError::StalePluginContext);
+        }
+        Ok(state.pending_acknowledgements.contains(host.instance()))
+    }
+
     /// Close admission and invalidate contexts before sending any host RPC.
     pub fn begin_revoke(&self, hosts: &[AuthorizedHost]) -> Result<Revocation, CoreServiceError> {
         self.begin_revoke_with_generation(hosts, None)
@@ -48,6 +91,15 @@ impl OperationAdmission {
         if state.mode != AdmissionState::Open {
             return Err(CoreServiceError::StalePluginContext);
         }
+        Self::start_revoke(&mut state, hosts, generation)?;
+        Ok(Self::revocation(&state))
+    }
+
+    fn start_revoke(
+        state: &mut crate::admission::AdmissionData,
+        hosts: &[AuthorizedHost],
+        generation: Option<ProfileGeneration>,
+    ) -> Result<(), CoreServiceError> {
         let next = state.epoch.next();
         state.mode = AdmissionState::Revoking;
         for operation in state.operations.values() {
@@ -69,17 +121,18 @@ impl OperationAdmission {
             .map(|operation| operation.host.instance().clone())
             .collect::<Vec<_>>();
         state.pending_acknowledgements.extend(active_hosts);
-        let mut instances = state
-            .pending_acknowledgements
-            .iter()
-            .cloned()
-            .collect::<Vec<_>>();
+        state.revocation_hosts = state.pending_acknowledgements.clone();
+        Ok(())
+    }
+
+    fn revocation(state: &crate::admission::AdmissionData) -> Revocation {
+        let mut instances = state.revocation_hosts.iter().cloned().collect::<Vec<_>>();
         instances.sort_by(|a, b| a.as_str().cmp(b.as_str()));
-        Ok(Revocation {
+        Revocation {
             epoch: state.epoch,
             generation: state.generation.clone(),
             hosts: instances,
-        })
+        }
     }
 
     pub fn acknowledge_revoke(

@@ -2,18 +2,19 @@
 //!
 //! Every command that reads or writes accounts first resolves the data key
 //! from the vault (`VAULT_LOCKED` while it is locked), so locking the vault
-//! immediately stops code generation. Lock order is always MFA connection,
-//! then vault; the vault never calls back into MFA.
+//! immediately stops code generation. The outer admission/OS lease precedes
+//! the MFA connection, then Vault; Vault never calls back into MFA.
 
 use serde::Serialize;
 use tauri::State;
 use tauri::ipc::Response;
 
-use super::crypto::{self, DataKey};
+use super::crypto::DataKey;
 use super::otp;
 use super::store::{self, MfaAccount, MfaAccountInput, MfaAccountPatch, MfaCode, MfaPrefs};
 use super::{ERR_NOT_FOUND, capture, now_ms};
 use crate::state::AppState;
+use taomni_plugin_services::OperationKind;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -40,12 +41,16 @@ pub struct MfaAddResult {
 
 fn with_key<T>(
     state: &AppState,
+    kind: OperationKind,
     f: impl FnOnce(&mut rusqlite::Connection, &DataKey) -> Result<T, String>,
 ) -> Result<T, String> {
-    state.legacy.mfa.with_conn(|conn| {
-        let key = crypto::ensure_key(conn, &state.core.vault)?;
-        f(conn, &key)
-    })
+    super::access::with_key(
+        &state.plugins,
+        &state.core.vault,
+        &state.legacy.mfa,
+        kind,
+        f,
+    )
 }
 
 fn not_found() -> String {
@@ -54,7 +59,7 @@ fn not_found() -> String {
 
 #[tauri::command]
 pub async fn mfa_list(state: State<'_, AppState>) -> Result<MfaSnapshot, String> {
-    with_key(&state, |conn, _| {
+    with_key(&state, OperationKind::ReadData, |conn, _| {
         Ok(MfaSnapshot {
             accounts: store::list_accounts(conn)?,
             prefs: store::get_prefs(conn)?,
@@ -68,7 +73,7 @@ pub async fn mfa_codes(
     state: State<'_, AppState>,
 ) -> Result<Vec<MfaCode>, String> {
     let now = now_ms();
-    with_key(&state, |conn, key| {
+    with_key(&state, OperationKind::ReadData, |conn, key| {
         let mut codes = Vec::new();
         for sealed in store::list_sealed(conn)? {
             if ids
@@ -89,7 +94,7 @@ pub async fn mfa_inspect(
     inputs: Vec<MfaAccountInput>,
     state: State<'_, AppState>,
 ) -> Result<Vec<MfaInspectItem>, String> {
-    with_key(&state, |conn, key| {
+    with_key(&state, OperationKind::ReadData, |conn, key| {
         inputs
             .iter()
             .map(|input| match store::validate_input(input) {
@@ -115,7 +120,7 @@ pub async fn mfa_add(
     skip_duplicates: bool,
     state: State<'_, AppState>,
 ) -> Result<MfaAddResult, String> {
-    with_key(&state, |conn, key| {
+    with_key(&state, OperationKind::WriteData, |conn, key| {
         let valid = inputs
             .iter()
             .map(store::validate_input)
@@ -152,14 +157,14 @@ pub async fn mfa_update(
     patch: MfaAccountPatch,
     state: State<'_, AppState>,
 ) -> Result<MfaAccount, String> {
-    with_key(&state, |conn, _| {
+    with_key(&state, OperationKind::WriteData, |conn, _| {
         store::update_account(conn, &id, &patch)?.ok_or_else(not_found)
     })
 }
 
 #[tauri::command]
 pub async fn mfa_delete(id: String, state: State<'_, AppState>) -> Result<(), String> {
-    with_key(&state, |conn, _| {
+    with_key(&state, OperationKind::WriteData, |conn, _| {
         if store::delete_account(conn, &id)? {
             Ok(())
         } else {
@@ -170,12 +175,14 @@ pub async fn mfa_delete(id: String, state: State<'_, AppState>) -> Result<(), St
 
 #[tauri::command]
 pub async fn mfa_reorder(ids: Vec<String>, state: State<'_, AppState>) -> Result<(), String> {
-    with_key(&state, |conn, _| store::reorder(conn, &ids))
+    with_key(&state, OperationKind::WriteData, |conn, _| {
+        store::reorder(conn, &ids)
+    })
 }
 
 #[tauri::command]
 pub async fn mfa_hotp_next(id: String, state: State<'_, AppState>) -> Result<MfaCode, String> {
-    with_key(&state, |conn, key| {
+    with_key(&state, OperationKind::WriteData, |conn, key| {
         if !store::increment_counter(conn, &id)? {
             return Err(not_found());
         }
@@ -187,14 +194,16 @@ pub async fn mfa_hotp_next(id: String, state: State<'_, AppState>) -> Result<Mfa
 
 #[tauri::command]
 pub async fn mfa_mark_used(id: String, state: State<'_, AppState>) -> Result<MfaAccount, String> {
-    with_key(&state, |conn, _| {
+    with_key(&state, OperationKind::WriteData, |conn, _| {
         store::mark_used(conn, &id)?.ok_or_else(not_found)
     })
 }
 
 #[tauri::command]
 pub async fn mfa_set_prefs(prefs: MfaPrefs, state: State<'_, AppState>) -> Result<(), String> {
-    with_key(&state, |conn, _| store::set_prefs(conn, &prefs))
+    with_key(&state, OperationKind::WriteData, |conn, _| {
+        store::set_prefs(conn, &prefs)
+    })
 }
 
 /// `otpauth://` link for one account, rendered as a QR code so another
@@ -207,24 +216,23 @@ pub async fn mfa_export_uri(
     master_password: String,
     state: State<'_, AppState>,
 ) -> Result<String, String> {
-    export_with_password(&state.core.vault, &state.legacy.mfa, &id, &master_password)
+    let password = zeroize::Zeroizing::new(master_password);
+    export_with_password(
+        &state.plugins,
+        &state.core.vault,
+        &state.legacy.mfa,
+        &id,
+        &password,
+    )
 }
 
-pub(crate) fn export_with_password(
-    vault: &crate::vault::Vault,
-    mfa: &store::MfaStore,
+pub(crate) use super::access::export_with_password;
+
+pub(super) fn export_uri(
+    conn: &rusqlite::Connection,
+    key: &DataKey,
     id: &str,
-    master_password: &str,
 ) -> Result<String, String> {
-    // Before touching mfa.db, so the lock order stays MFA connection → vault.
-    vault.verify_master_password(Some(master_password))?;
-    mfa.with_conn(|conn| {
-        let key = crypto::ensure_key(conn, vault)?;
-        export_uri(conn, &key, id)
-    })
-}
-
-fn export_uri(conn: &rusqlite::Connection, key: &DataKey, id: &str) -> Result<String, String> {
     let sealed = store::get_sealed(conn, id)?.ok_or_else(not_found)?;
     let secret = store::open_secret(key, &sealed)?;
     let account = &sealed.account;
@@ -244,16 +252,7 @@ fn export_uri(conn: &rusqlite::Connection, key: &DataKey, id: &str) -> Result<St
 /// wipes every account and re-binds the empty store. The UI confirms twice.
 #[tauri::command]
 pub async fn mfa_reset_store(state: State<'_, AppState>) -> Result<(), String> {
-    state.legacy.mfa.with_conn(|conn| {
-        // Probe the vault first so a locked vault never wipes anything.
-        state
-            .core
-            .vault
-            .get_fixed(crate::vault::MFA_DATA_KEY_ENTRY_ID)
-            .map(|_| ())?;
-        store::reset(conn)?;
-        crypto::rebind_after_reset(conn, &state.core.vault).map(|_| ())
-    })
+    super::access::reset_store(&state.plugins, &state.core.vault, &state.legacy.mfa)
 }
 
 /// Clipboard image as luma frames (see [`capture::encode_frames`]). Runs off

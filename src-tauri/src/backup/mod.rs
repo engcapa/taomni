@@ -90,15 +90,16 @@ pub async fn backup_stage_restore(
     password: Option<String>,
     vault_password: Option<String>,
 ) -> Result<StageRestoreResult, String> {
+    let vault_password = vault_password.map(zeroize::Zeroizing::new);
     tauri::async_runtime::spawn_blocking(move || {
         let coordinator = app.state::<scheduler::BackupCoordinator>();
         let _operation = coordinator.operation.lock().map_err(|e| e.to_string())?;
         let _process_operation = coordination::BackupProcessLock::acquire(&app)?;
         let state = app.state::<AppState>();
-        state
-            .core
-            .vault
-            .verify_master_password(vault_password.as_deref())?;
+        state.plugins.verify_restore_password(
+            &state.core.vault,
+            vault_password.as_deref().map(String::as_str),
+        )?;
         let p = PathBuf::from(path);
         restore::stage_restore(&app, &p, password.as_deref())
     })

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { AlertTriangle, Check, Copy, Eye, EyeOff, Link2 } from "lucide-react";
 import { useT } from "../../lib/i18n";
 import { writeText } from "../../lib/clipboard";
@@ -7,6 +7,7 @@ import { mfaExportUri } from "../../lib/mfa/ipc";
 import { accountLabel, parseOtpauthUri } from "../../lib/mfa/otpauth";
 import { qrSvgModel, type QrSvgModel } from "../../lib/mfa/qrSvg";
 import type { MfaAccount } from "../../lib/mfa/types";
+import { requireVaultUnlock, useVaultStore, vaultSessionIsCurrent } from "../../stores/vaultStore";
 
 const labelStyle = { color: "var(--taomni-text-muted)" };
 
@@ -40,27 +41,62 @@ export function MfaQrDialog({
   const [masked, setMasked] = useState(true);
   const [copiedSecret, setCopiedSecret] = useState(false);
   const [copiedUri, setCopiedUri] = useState(false);
+  const [closed, setClosed] = useState(false);
+  const vaultEpoch = useVaultStore((s) => s.securityEpoch);
+  const vaultReady = useVaultStore((s) => s.state === "unlocked" && !s.transitionPending && !s.requiresUnlock);
+  const openedEpoch = useRef(vaultEpoch);
+  const mounted = useRef(false);
+  const dismissed = useRef(false);
+  const request = useRef(0);
+  const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
   const passwordRef = useRef<HTMLInputElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
+  const close = useCallback(() => {
+    dismissed.current = true;
+    request.current += 1;
+    setClosed(true);
+    setUri(null);
+    setSecret(null);
+    setQr(null);
+    setPassword("");
+    onClose();
+  }, [onClose]);
+
+  const live = () => mounted.current && !dismissed.current && vaultSessionIsCurrent(openedEpoch.current);
+
+  useEffect(() => {
+    mounted.current = true;
+    return () => {
+      mounted.current = false;
+      request.current += 1;
+      timers.current.forEach(clearTimeout);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!closed && (!vaultReady || vaultEpoch !== openedEpoch.current)) close();
+  }, [vaultReady, vaultEpoch, closed, close]);
 
   useEffect(() => {
     passwordRef.current?.focus();
     const onKey = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onClose();
+      if (event.key === "Escape") close();
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  }, [close]);
 
   useEffect(() => {
     if (qr) closeRef.current?.focus();
   }, [qr]);
 
   const copySecretValue = async (rawSecret: string) => {
+    if (!live()) return;
     try {
       await writeText(rawSecret);
+      if (!live()) return;
       setCopiedSecret(true);
-      setTimeout(() => setCopiedSecret(false), 2000);
+      timers.current.push(setTimeout(() => { if (live()) setCopiedSecret(false); }, 2000));
       onCopiedSecret?.(name);
     } catch {
       // ignore
@@ -68,25 +104,29 @@ export function MfaQrDialog({
   };
 
   const copyUriValue = async (rawUri: string) => {
+    if (!live()) return;
     try {
       await writeText(rawUri);
+      if (!live()) return;
       setCopiedUri(true);
-      setTimeout(() => setCopiedUri(false), 2000);
+      timers.current.push(setTimeout(() => { if (live()) setCopiedUri(false); }, 2000));
     } catch {
       // ignore
     }
   };
 
   const reveal = async () => {
-    if (busy) return;
+    if (busy || !live()) return;
     if (!password.trim()) {
       setError(t("mfa.qrPasswordRequired"));
       return;
     }
     setBusy(true);
     setError(null);
+    const token = ++request.current;
     try {
       const exportedUri = await mfaExportUri(account.id, password);
+      if (!live() || token !== request.current) return;
       let rawSecret = "";
       try {
         const parsed = parseOtpauthUri(exportedUri);
@@ -94,26 +134,32 @@ export function MfaQrDialog({
       } catch {
         // fallback
       }
+      const model = await qrSvgModel(exportedUri);
+      if (!live() || token !== request.current) return;
       setUri(exportedUri);
       setSecret(rawSecret);
-      setQr(await qrSvgModel(exportedUri));
+      setQr(model);
       setPassword("");
 
       if (initialAction === "copy-secret" && rawSecret) {
         await copySecretValue(rawSecret);
       }
     } catch (err) {
+      if (!live() || token !== request.current) return;
       const text = errorText(err);
-      if (text.startsWith("VAULT_BAD_PASSWORD")) setError(t("mfa.qrBadPassword"));
+      if (text.startsWith("VAULT_LOCKED")) requireVaultUnlock();
+      else if (text.startsWith("VAULT_BAD_PASSWORD")) setError(t("mfa.qrBadPassword"));
       else if (text.startsWith("VAULT_PASSWORD_REQUIRED")) setError(t("mfa.qrPasswordRequired"));
       else setError(t("mfa.errorPrefix", { error: text }));
     } finally {
-      setBusy(false);
+      if (live() && token === request.current) setBusy(false);
     }
   };
 
+  if (closed || !vaultReady || vaultEpoch !== openedEpoch.current) return null;
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.45)" }} onClick={onClose}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ background: "rgba(0,0,0,0.45)" }} onClick={close}>
       <form
         role="dialog"
         aria-modal="true"
@@ -226,7 +272,7 @@ export function MfaQrDialog({
         )}
         {error ? <div data-testid="mfa-qr-error" role="alert" className="text-[12px]" style={{ color: "var(--taomni-error, #c33)" }}>{error}</div> : null}
         <div className="flex justify-end gap-2 pt-1">
-          <button ref={closeRef} type="button" data-testid="mfa-qr-close" className="px-3.5 py-1.5 text-[12px] rounded-md border font-medium hover:bg-[var(--taomni-hover)] transition-colors" style={{ borderColor: "var(--taomni-input-border)" }} onClick={onClose}>
+          <button ref={closeRef} type="button" data-testid="mfa-qr-close" className="px-3.5 py-1.5 text-[12px] rounded-md border font-medium hover:bg-[var(--taomni-hover)] transition-colors" style={{ borderColor: "var(--taomni-input-border)" }} onClick={close}>
             {t("mfa.close")}
           </button>
           {qr ? null : (

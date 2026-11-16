@@ -1,6 +1,9 @@
 //! Reversible mutation barrier, separate from permanent application shutdown.
+use super::vault_lifecycle::{VAULT_TRANSITION_TIMEOUT, lock_until};
 use super::{PluginError, PluginRegistry};
 use std::sync::atomic::Ordering;
+use std::time::Instant;
+use taomni_plugin_services::AdmissionState;
 
 /// While held, hosts are stopped and new calls/spawns are rejected. Dropping
 /// resumes acceptance only; requests are never replayed or services auto-started.
@@ -9,17 +12,43 @@ pub struct QuiescenceGuard {
 }
 impl PluginRegistry {
     pub fn quiesce(&self) -> Result<QuiescenceGuard, PluginError> {
-        let _lifecycle = self
-            .lifecycle
-            .lock()
-            .expect("plugin lifecycle lock poisoned");
+        let deadline = Instant::now() + VAULT_TRANSITION_TIMEOUT;
+        let mut pending = self
+            .services
+            .as_ref()
+            .map(|services| lock_until(&services.vault_transition, deadline, "Vault transition"))
+            .transpose()
+            .map_err(PluginError::HostUnavailable)?;
+        let _lifecycle = lock_until(&self.lifecycle, deadline, "plugin lifecycle")
+            .map_err(PluginError::HostUnavailable)?;
         if self.shutting_down.load(Ordering::Acquire) {
             return Err(PluginError::HostUnavailable(
                 "application is shutting down".into(),
             ));
         }
-        self.quiescence.fetch_add(1, Ordering::AcqRel);
-        if let Err(error) = self.stop_hosts() {
+        let previous = self.quiescence.fetch_add(1, Ordering::AcqRel);
+        let was_open = self
+            .services
+            .as_ref()
+            .is_some_and(|services| services.admission.state() == AdmissionState::Open);
+        let result = (|| {
+            if let (Some(services), Some(pending)) = (&self.services, pending.as_mut()) {
+                self.drain_vault_operations(services, pending, deadline)
+                    .map_err(PluginError::HostUnavailable)?;
+            }
+            self.stop_hosts()?;
+            if let (Some(services), Some(pending)) = (&self.services, pending.as_mut()) {
+                self.complete_service_barrier(services, pending, deadline, false)
+                    .map_err(PluginError::HostUnavailable)?;
+                if previous == 0 {
+                    services
+                        .resume_after_quiescence
+                        .store(was_open, Ordering::Release);
+                }
+            }
+            Ok(())
+        })();
+        if let Err(error) = result {
             self.quiescence.fetch_sub(1, Ordering::AcqRel);
             return Err(error);
         }
@@ -30,12 +59,35 @@ impl PluginRegistry {
 }
 impl Drop for QuiescenceGuard {
     fn drop(&mut self) {
-        let _lifecycle = self
-            .registry
-            .lifecycle
-            .lock()
-            .expect("plugin lifecycle lock poisoned");
-        self.registry.quiescence.fetch_sub(1, Ordering::AcqRel);
+        let deadline = Instant::now() + VAULT_TRANSITION_TIMEOUT;
+        let mut released = false;
+        let result = (|| -> Result<(), String> {
+            let _transition = self
+                .registry
+                .services
+                .as_ref()
+                .map(|services| {
+                    lock_until(&services.vault_transition, deadline, "Vault transition")
+                })
+                .transpose()?;
+            let _lifecycle = lock_until(&self.registry.lifecycle, deadline, "plugin lifecycle")?;
+            let previous = self.registry.quiescence.fetch_sub(1, Ordering::AcqRel);
+            released = true;
+            if previous == 1 {
+                if let Some(services) = &self.registry.services {
+                    self.registry.resume_core_services(services, deadline)?;
+                }
+            }
+            Ok(())
+        })();
+        if !released {
+            self.registry.quiescence.fetch_sub(1, Ordering::AcqRel);
+        }
+        if let Err(error) = result {
+            log::warn!(
+                "core services remain closed after quiescence: {error}; unlock Vault to retry"
+            );
+        }
     }
 }
 

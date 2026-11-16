@@ -18,10 +18,10 @@ const vaultRefresh = vi.hoisted(() => vi.fn(async () => undefined));
 
 vi.mock("../lib/mfa/ipc", () => ipc);
 vi.mock("../lib/clipboard", () => ({ writeText }));
-vi.mock("./vaultStore", () => ({ useVaultStore: { getState: () => ({ refresh: vaultRefresh }) } }));
 
 import type { MfaAccount } from "../lib/mfa/types";
 import { useMfaStore } from "./mfaStore";
+import { useVaultStore } from "./vaultStore";
 
 const account = (id: string, sortOrder: number): MfaAccount => ({
   id,
@@ -47,6 +47,7 @@ describe("mfaStore", () => {
     Object.values(ipc).forEach((fn) => fn.mockReset());
     writeText.mockClear();
     vaultRefresh.mockClear();
+    useVaultStore.setState({ state: "unlocked", securityEpoch: useVaultStore.getState().securityEpoch + 1, transitionPending: false, requiresUnlock: false, refresh: vaultRefresh });
     useMfaStore.setState({ status: "idle", accounts: [], codes: {}, error: null, errorCode: null, lastCopied: null, query: "" });
   });
 
@@ -67,7 +68,11 @@ describe("mfaStore", () => {
     await useMfaStore.getState().load();
     expect(useMfaStore.getState()).toMatchObject({ status: "error", errorCode: "VAULT_LOCKED" });
     expect(vaultRefresh).toHaveBeenCalled();
+    expect(useVaultStore.getState()).toMatchObject({ state: "locked", requiresUnlock: true });
+    expect(useMfaStore.getState()).toMatchObject({ accounts: [], codes: {} });
+  });
 
+  it("keeps the missing-key error on an unlocked vault without creating a replacement", async () => {
     ipc.mfaList.mockRejectedValue(new Error("MFA_KEY_MISSING"));
     await useMfaStore.getState().load();
     expect(useMfaStore.getState().errorCode).toBe("MFA_KEY_MISSING");

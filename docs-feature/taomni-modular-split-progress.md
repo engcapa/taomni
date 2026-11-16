@@ -8,7 +8,7 @@
 
 生产升级 IPC 当前只记录只读预检、源指纹与 pending journal。缺少可信插件包和真实 exporter 时，不复制旧数据、不创建伪插件版本、不改变 active 指针。测试 fixture 的 staging/回滚原语不能算真实旧版升级验收。
 
-签名安装门、宿主生产监督、共享采集/RDP 公共库、CoreState/统一 bootstrap、正常退出与可逆静默已集成。生产工厂、scoped 入口和持久 profile generation 已在 `00ac480d8` 接入，其 macOS 崩溃宿主终止确认失败已由 `5d49b9abc` 修复；该新源码的升级契约 [#43793976461](https://github.com/engcapa/taomni/actions/runs/43793976461) 已 23/23 jobs 成功。相同新源码的 UI [#43794006016](https://github.com/engcapa/taomni/actions/runs/43794006016) 仍在执行，已即时收齐三端 browser 各 24/24；Windows/macOS native 各 27/29，相关失败为 TC-MODULES-007 宿主未启用与 TC-MODULES-009 fixture 过早读取 metadata，Linux native 尚在构建。业务状态仍在 LegacyFeatureRuntime；Vault IPC 协同、远端商店、重启下载恢复、业务宿主迁出与真实升级尚未完成。G1–G11 未通过前，不将具体业务插件迁移标为完成。
+签名安装门、宿主生产监督、共享采集/RDP 公共库、CoreState/统一 bootstrap、正常退出与可逆静默已集成。生产工厂、scoped 入口和持久 profile generation 已接入；最新契约 #43801588646 已 23/23 jobs 成功。UI #43804951477 的 TC-MODULES-007 在四种 native profile 全部通过，Windows TC-MODULES-009 的 Notes 遮挡修复仍待重跑。当前开发批次已接 Vault IPC 协调、普通凭据消费者与 MFA facade，尚无该批源码的 hosted 证据。业务状态仍在 LegacyFeatureRuntime；跨库一致快照/还原、远端商店、重启下载恢复、业务宿主迁出与真实升级尚未完成。G1–G11 未通过前，不将具体业务插件迁移标为完成。
 
 ## 2026-11-16 最新 runner 证据（持续采集中）
 
@@ -17,8 +17,21 @@
 - TC-MODULES-007 的失败前 HTML 与 restart receipt 已核验：标题 `Exit`、消息 `There is 1 open tab. Exit Taomni and close it?`、确认按钮 `Exit`。用例仅在已知 Settings 仍打开的首次和卸载后重启声明精确确认，沿用现有单次真实点击、正常退出与进程身份检查；不允许通用弹窗兜底或强杀当作成功。该 case 修复尚待新 SHA hosted 重跑。
 - Wayland 的 FILE-OPEN-008 跨行路径命中和 FILE-OPEN-006 非左键输入仅支持 X11 的两个既有失败继续按 main 对比依据单列，不计通过。Windows/macOS 尚未完成的 shard 不外推为通过。
 - 当前 Vault/MFA 开发开始接入真实 core operation permit、revision 校验、可重试撤销和显式 reset 屏障；其它核心 Vault 消费者、统一 snapshot/restore 和业务宿主迁出仍未闭合，不把这一开发状态记为 TASK-025-D/E 已完成。
-- 源码 `900ed0146` 的[UI #43804951477](https://github.com/engcapa/taomni/actions/runs/43804951477) 已即时收齐三端 browser 各 24/24；macOS native shard 2 为 7/7，其中 TC-MODULES-007 的全部 52 步通过。其它 shard 继续采集，不能外推为全部通过。
+- 源码 `900ed0146` 的[UI #43804951477](https://github.com/engcapa/taomni/actions/runs/43804951477) 已 completed/failure；22 个 shard 均在执行期间下载并逐份分析，最终用例结果见下项，不把下载成功算成用例成功。
 - 旧 UI #43800287415 的 Windows TC-MODULES-009 在正常关闭前失败。即时下载的 `native-restart-failures/*/close-target.json` 与画面一致：窗口关闭按钮中心上层是仍打开的 `ai-chat-drawer-hide`，不是退出清理或数据损坏。用例保存 Notes 后先真实关闭并断言移除 drawer，再走原生正常退出；重启后仍重新打开 Notes 验证原内容与 generation，随后关闭 drawer 后进入 Settings。没有绕过指针命中、强杀或放宽持久化断言，该修复待新 SHA hosted 验证。
+- #43804951477 的最新逐 shard 结果：三端 browser 各 24/24；Linux Xvfb native 29/29，macOS native 29/29，Windows native 28/29（仅同一 TC-MODULES-009 overlay 命中失败），Wayland native 27/29（仅两个已列明的无关 FILE-OPEN 失败）。TC-MODULES-007 在四种 native profile 全部 52 步通过。上述结果对应 `900ed0146`，不包含之后的 TC-MODULES-009 修复或 Vault/MFA 改动。
+
+### Vault/MFA 协调与保留行为批次（开发中，待匹配源码 hosted 验证）
+
+- `plugin/vault_lifecycle.rs` 将 init、unlock、lock、change-master 与恢复前主密码验证接入同一 coordinator：transition → registry lifecycle 的有界锁顺序，关闭准入、取消、撤销/确认宿主退出、drain 后才处理 root。失败保留 revocation；重试加入同一次撤销并保留已确认成员。核心退出也排空 permit 后清 root；嵌套 quiescence 只在最后一个 guard 释放且 root 仍有效时恢复服务。
+- `vault/{passwords,commands,data_access,core_access}.rs` 按密码生命周期、IPC、普通凭据访问和 typed MFA 固定密钥拆分。所有既有普通 `put/update/put_fixed/get_fixed/resolve` 消费者经共享准入和外层 lease；不把 registry/host 反向引用放入 Vault。metadata revision 失配清 root 并关闭 epoch，reverse key 服务也使用同一失配处理。非敏感列表与普通删除的锁定行为保留；受保护 MFA key 拒绝通用 update/delete。
+- MFA 的 crypto 只依赖 typed `KeyProvider`，生产 facade 在 MFA DB mutex 之前取得 permit/lease。空库首次建 key 先释放 shared，再取得 exclusive 并重查空库；显式 reset 关闭普通准入并 drain，使用一次性 repair 授权；普通 permit 不能 reset/导出或替换坏 key。导出仅验证主密码，不重开 root 或准入。固定 ID、32 字节 Base64 与旧密文/OTP 格式保留，尚未迁出真实宿主。
+- renderer 的 Vault security epoch 在密码转换/reset 请求时立即清理敏感结果。MFA 标签与悬浮窗、HOTP/排序回滚/usage、QR 编码/导出/自动复制拒绝旧 epoch 的迟到回复；原生返回 VAULT_LOCKED 时先清旧内容，再刷新状态，只有显式验证成功才解除门禁。前端相关 10 文件 51 项 unit 已通过。
+- 新增 browser/native `TC-MFA-013`（标签+悬浮窗锁定/错误口令/原 HOTP 恢复）与 `TC-MFA-014`（真实改密、旧口令拒绝、计数/secret 连续性），增强 `TC-MFA-102` 的全 DOM 敏感内容清除及 runtime 断言。schema/reviewed contracts 已通过，policy/dependencies/feature catalog 同步；尚未取得执行证据，不能由 unit 或 schema 代替 native。
+- Vault 设置页捕获锁定屏障的 busy/超时错误并展示，转换期间禁止重复点击；失败维持 renderer 门禁，允许显式解锁恢复。新增该行为的 1 项单元通过，连同前述测试共覆盖 11 文件 52 项（分批执行，非一次全套执行）。最终 Rust harness：plugin 111 passed / 3 ignored、旧 MFA 13、MFA facade 6、Vault 17、普通 Vault 消费者 4、reverse Vault adapter 4；生命周期 7 项包含于 plugin 结果，不重复累计。services crate 31 项通过。
+- 最终 QA audit gate 通过，未修改 coverage baseline；静态选择 50 个明确 case 与完整 crash-regression 并集，22 个 shard、三套 release QA 构建，`gaps=[]`、`unreviewed=[]`。这些是执行计划和单元证据，不替代新源码的 hosted 测试。
+- 长期运行待办：core permit 与 host 共用 epoch 内 `seen_operations` 的 65,536 上限。MFA 定时取码持续运行可能耗尽配额，须在生产验收前分离可信 core 操作的生命周期或采用有界重放保护，并补长时间等效压力场景；不能简单删除 host 防重放检查或放宽限额当作修复。
+- 尚未闭合：统一 snapshot/restore 跨库一致性、三态真实备份还原、存量 0.5.x exporter/可信 MFA 包、宿主业务迁出与最终 G 门。当前只接通迁出前适配，不能将 TASK-014、025 或生产发布标为完成。
 
 ## 任务状态
 
@@ -34,7 +47,7 @@
 | TASK-008 宿主监督 | 已提交，部分 hosted 通过 | 主动心跳、重启预算、请求取消及三平台进程树回收已接入；GitHub 三平台各 14 项 unit 与 7 项真实进程测试通过，双向核心服务与 profile 协同仍待后续任务。 |
 | TASK-009 生命周期 | 部分 | 版本目录、active 指针与生命周期 IPC 已有；接可信安装门、运行中切换/回滚、无重启生命周期。 |
 | TASK-010 商店/下载 | 部分 | 原生 HTTP、代理、Range/校验、路径与内容去重、退出取消等待、续传和进度 IPC 已有，三端每端 13 个真实网络 gate 已通过；远端商店、代理设置 UI、跨应用重启恢复与完整错误恢复尚待完成。 |
-| TASK-011 验签安装 | 代码已集成，验证中 | pinned key 的真实 minisign 校验、清单防回滚、安全解包、内容绑定及安装入口强制验签已接入；四目标官方签名包 QA workflow 与 TC-MODULES-007 已集成，待成功安装/重启/篡改拒绝的多端原生证据。 |
+| TASK-011 验签安装 | 基础闭环四种 native profile 通过 | pinned key 的真实 minisign 校验、清单防回滚、安全解包、内容绑定及安装入口强制验签已接入；#43804951477 的 TC-MODULES-007 在四种 native profile 全部 52 步通过，覆盖官方签名安装、启禁、正常重启和篡改拒绝。业务包、更新/回滚与最终发布仍需后续证据。 |
 | TASK-012 单体升级 | 部分 | 从安全 pending 进入真实 legacy exporter、可信包 staging、Vault 交接、激活、恢复/回滚；真实安装升级证据。 |
 | TASK-013 原型与 G 门 | 部分 | hello fixture 已有；真实 MFA 原型和 G1–G11 多端实验与原始证据。 |
 | TASK-014 MFA | 待前置闭合 | 完整迁出、数据密钥与备份恢复、功能等价。 |
@@ -48,7 +61,7 @@
 | TASK-022 Mobile | 待 M0 决策 | 按 DEC-2 默认暂缓排期；M0 末提供 go/no-go 与公开例外，不能默认为已交付。 |
 | TASK-023 发布验收 | 部分 | 清单生成与上传顺序已有；四目标插件构建/系统签名、包签名、原子清单发布、独立插件更新/回滚、两套回归及性能。 |
 | TASK-024 入口/profile 协同 | 随 005-A 已集成一部分 | GUI/headless bootstrap、ModeLease、可重试退出和任务回收已集成；跨宿主 profile lease、还原静默与完整多进程证据仍待完成。 |
-| TASK-025 密钥/一致快照 | A/B/C 已集成；D 实现中 | [服务、锁与快照实施方案](taomni-modular-vault-services-plan.md)；A/B/C 三端基础/真实锁 gate 通过。D 的双向 pump、独立 SDK、有界 dispatcher 与真实 Vault backend 已实现，纯单元 56 项通过；三端各 6 个 SDK 进程场景和 Linux 2 个真实 Vault/SDK 场景已通过；后续生产工厂与 generation 批次待 hosted 验证，Vault IPC 协同未接。E–I 的 MFA 适配、撤销协调、迁出和三态备份还原未完成。 |
+| TASK-025 密钥/一致快照 | A/B/C 已集成；D/E 本批待 hosted | [服务、锁与快照实施方案](taomni-modular-vault-services-plan.md)；双向 pump、SDK、真实 Vault backend、生产工厂/generation 的契约 run #43801588646 已通过。本批已接 Vault IPC、普通消费者与 MFA facade/撤销/reset 屏障，单元通过、hosted 待执行。F–I 的跨库快照、三态还原、独立 MFA 宿主及完整验收未完成。 |
 
 具体编号与子任务边界仍以设计原表为准；上表合并描述不改变范围或依赖。
 
@@ -94,8 +107,8 @@ Wayland `TC-FILE-OPEN-008` 在已有 AI 路径 chip 点击处失败：失败截�
 
 ### 当前待办（按依赖顺序）
 
-1. **收敛当前相关失败并取得新源码证据**：macOS 崩溃宿主终止确认已在 `5d49b9abc` 的契约 run 通过。新 native 证据表明 TC-MODULES-007 探针修复后暴露真实宿主启用缺失，TC-MODULES-009 在首次启动前读取尚不存在的 generation；两处已写修复，待新 SHA 验证。旧 run 的 Windows TC-MODULES-009 关闭前 hit-test 失败仍需排查，已补释放 driver 前的采证。继续逐 shard 收取结果，不能用旧源码或仅 browser 的通过替代。
-2. **闭合 Vault、profile 与一致快照（TASK-024/025）**：init/unlock/lock/rekey 接入统一 coordinator，完成关闭准入、取消、撤销/确认退出、drain、清 root 的屏障；保留历史宿主终止 receipt。真实 MFA 领取作用域 permit、密码导出/reset grant，旧固定 ID 和错误语义不变。补运行中、禁用、卸载留数据三态的备份/正常重启还原与真实解密，以及多实例占用、取消和崩溃恢复。
+1. **收敛当前相关失败并取得新源码证据**：TC-MODULES-007 在 #43804951477 的四种 native profile 已全部通过；Windows TC-MODULES-009 的 Notes drawer 遮挡修复已提交 `ea9c5636f`，待重跑。本批 Vault/MFA 接线、013/014 新用例和增强 102 同跑多端 browser/native 与完整 crash-regression，逐 shard 收取并修复相关失败。两个有 main 对比依据的 Wayland FILE-OPEN 失败单列忽略，不计通过。
+2. **闭合 Vault、profile 与一致快照（TASK-024/025）**：统一 coordinator、普通 Vault 消费者和 typed MFA facade 已完成本批开发，先取得匹配源码的 hosted 验证；再补运行中、禁用、卸载留数据三态的跨库一致备份/正常重启还原与真实解密，以及多实例占用、取消和崩溃恢复。修复长期运行操作 ledger 配额耗尽，保留宿主防重放保护。
 3. **迁出真实业务（TASK-005-B、013/014、016–022）**：先完成真实 MFA 原型与相关 G 门，再依赖序推进 RDP/VNC 客户端与服务端、Servers、SocksCap、OCR/录制、本地语音的宿主、前端、状态与迁移。Mobile 按 DEC-2 留下明确 go/no-go 结论和公开例外，不能默认为交付；LanChat 任务已取消，不新增替代插件。
 4. **裁剪核心依赖闭包（TASK-006）**：随业务迁出，从核心 Cargo 默认 features、原生依赖、bundle/resources/helper 和前端 chunk 中实际移除相应实现。保存 cargo tree、资源与产物证据；把状态改名或放入 LegacyFeatureRuntime 不等于瘦身完成。
 5. **完成模块使用闭环（TASK-007、009–011）**：远端签名商店、三种代理设置 UI、跨应用重启发现并恢复下载、后台进度及错误恢复；实际主窗/分离窗动态 tab、坏 hash/缺失/禁用占位和清理；安装、启用、禁用、更新、回滚无需重启核心。

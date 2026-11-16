@@ -9,6 +9,7 @@ import { accountGroups, visibleAccounts } from "../../lib/mfa/sort";
 import { decodeImageFiles, imageFilesFromTransfer } from "../../lib/mfa/sources";
 import { MFA_SORT_MODES, MFA_UNGROUPED, type MfaAccount, type MfaSortMode } from "../../lib/mfa/types";
 import { useMfaStore } from "../../stores/mfaStore";
+import { useVaultStore, vaultSessionIsCurrent } from "../../stores/vaultStore";
 import { MfaAccountRow } from "./MfaAccountRow";
 import { MfaAddDialog, type MfaAddMode } from "./MfaAddDialog";
 import { MfaEditDialog } from "./MfaEditDialog";
@@ -35,6 +36,8 @@ export function MfaPanel({ onStatusMessage }: { onStatusMessage?: (message: stri
   const query = useMfaStore((s) => s.query);
   const lastCopied = useMfaStore((s) => s.lastCopied);
   const store = useMfaStore.getState;
+  const vaultEpoch = useVaultStore((s) => s.securityEpoch);
+  const vaultPending = useVaultStore((s) => s.transitionPending);
   const [now, setNow] = useState(() => Date.now());
   const [announcement, setAnnouncement] = useState("");
   const [addMode, setAddMode] = useState<MfaAddMode | null>(null);
@@ -54,10 +57,13 @@ export function MfaPanel({ onStatusMessage }: { onStatusMessage?: (message: stri
   );
 
   useEffect(() => {
-    void store().load();
+    if (vaultSessionIsCurrent(vaultEpoch)) void store().load();
+  }, [store, vaultEpoch, vaultPending]);
+
+  useEffect(() => {
     const timer = window.setInterval(() => setNow(Date.now()), TICK_MS);
     return () => window.clearInterval(timer);
-  }, [store]);
+  }, []);
 
   // Refresh once any TOTP window has rolled over (at most once per second).
   useEffect(() => {

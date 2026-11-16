@@ -29,6 +29,18 @@ impl taomni_plugin_services::CoreServiceBackend for Vault {
 }
 
 impl Vault {
+    pub(crate) fn cached_root_is_current(&self) -> Result<bool, String> {
+        let mut inner = self.inner.lock().map_err(|_| "Vault is unavailable")?;
+        if inner.root_key.is_none() {
+            return Ok(false);
+        }
+        match verify_current_root(&mut inner) {
+            Ok(()) => Ok(true),
+            Err(PluginKeyError::VaultLocked) => Ok(false),
+            Err(error) => Err(error.to_string()),
+        }
+    }
+
     /// The returned frame retains the operation and its cross-process lease
     /// through the bounded transport write. Never turn it into generic Value.
     pub fn plugin_fixed_key_frame(
@@ -43,7 +55,7 @@ impl Vault {
             // No host or registry mutex is acquired by this service worker.
             let mut inner = self.inner.lock().map_err(|_| PluginKeyError::Unavailable)?;
             permit.check_current()?;
-            verify_current_root(&mut inner)?;
+            self.verify_service_root(&mut inner)?;
             let key = match load_data_key(&inner, owner.id) {
                 Ok(Some(key)) => Some(key),
                 Ok(None) => match request.action {
@@ -75,23 +87,22 @@ impl Vault {
 /// material against current SQLite metadata while holding Vault's mutex and
 /// the already-admitted shared/exclusive cross-process VaultOperationLease.
 /// A stale root is cleared, never used to mint a new encrypted fixed key.
-fn verify_current_root(inner: &mut VaultInner) -> Result<(), PluginKeyError> {
-    let key = inner.root_key.as_ref().ok_or(PluginKeyError::VaultLocked)?;
+pub(super) fn verify_current_root(inner: &mut VaultInner) -> Result<(), PluginKeyError> {
+    inner.root_key.as_ref().ok_or(PluginKeyError::VaultLocked)?;
     let meta = db::get_meta(&inner.conn).map_err(|_| PluginKeyError::Unavailable)?;
-    let current = meta
-        .and_then(|meta| {
-            let nonce: [u8; crypto::NONCE_LEN] = meta.verifier_nonce.as_slice().try_into().ok()?;
-            crypto::aead_decrypt(key, &nonce, &meta.verifier_ciphertext).ok()
-        })
-        .is_some_and(|plaintext| plaintext.as_slice() == crypto::VERIFIER_PLAINTEXT);
+    let current = meta.is_some() && meta == inner.root_revision;
     if !current {
         inner.root_key = None;
+        inner.root_revision = None;
         return Err(PluginKeyError::VaultLocked);
     }
     Ok(())
 }
 
-fn load_data_key(inner: &VaultInner, id: &str) -> Result<Option<SecretKey32>, PluginKeyError> {
+pub(super) fn load_data_key(
+    inner: &VaultInner,
+    id: &str,
+) -> Result<Option<SecretKey32>, PluginKeyError> {
     let root = inner.root_key.as_ref().ok_or(PluginKeyError::VaultLocked)?;
     let Some(entry) = db::get_entry(&inner.conn, id).map_err(|_| PluginKeyError::Unavailable)?
     else {
@@ -116,7 +127,7 @@ fn load_data_key(inner: &VaultInner, id: &str) -> Result<Option<SecretKey32>, Pl
     Ok(Some(SecretKey32::new(std::mem::take(&mut *bytes))))
 }
 
-fn create_data_key(
+pub(super) fn create_data_key(
     inner: &VaultInner,
     owner: FixedKeyOwner,
     repair: bool,

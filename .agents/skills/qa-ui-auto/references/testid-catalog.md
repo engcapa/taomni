@@ -2210,6 +2210,7 @@
 - `[data-testid="mfa-floating-expand-tab"]` — interactive — F-WS-3.mfa-floating-expand-tab
 - `[data-testid="mfa-floating-locked"]` — display — F-WS-3.mfa-floating-locked
 - `[data-testid="mfa-floating-pin"]` — interactive — F-WS-3.mfa-floating-pin
+- `[data-testid="mfa-floating-code"]` — display — F-WS-3.mfa-floating-code
 - `[data-testid="mfa-floating-search"]` — interactive — F-WS-3.mfa-floating-search
 - `[data-testid="mfa-floating-window"]` — display — F-WS-3.mfa-floating-window
 - `[data-testid="rail-bottom-tools"]` — display — F-WS-3.rail-bottom-tools
@@ -3935,6 +3936,7 @@
 - `[data-testid="vault-init-button"]` — interactive [optional] — F12.1.init-button
 - `[data-testid="vault-unlock-button"]` — interactive [optional] — F12.1.unlock-button
 - `[data-testid="vault-lock-button"]` — interactive [optional] — F12.1.lock-button
+- `[data-testid="vault-operation-error"]` — display [optional] — F12.1.operation-error
 - `[data-testid="vault-change-master-button"]` — interactive [optional] — F12.1.change-master-button
 - `[data-testid="vault-change-master-form"]` — display [optional] — F12.1.change-master-form
 - `[data-testid="vault-change-master-old"]` — interactive [optional] — F12.1.change-master-old

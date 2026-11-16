@@ -16,8 +16,10 @@ mod quiescence;
 mod runtime;
 pub(crate) mod services;
 pub use quiescence::QuiescenceGuard;
+mod core_access;
 mod signed_catalog;
 mod stopping;
+mod vault_lifecycle;
 pub mod verify;
 
 pub(crate) use installation::current_platform;
@@ -188,6 +190,8 @@ impl PluginRegistry {
         services: Arc<services::PluginCoreServices>,
     ) -> Self {
         Self {
+            shutting_down: services.shutting_down.clone(),
+            quiescence: services.quiescence.clone(),
             services: Some(services),
             ..Self::new(root)
         }

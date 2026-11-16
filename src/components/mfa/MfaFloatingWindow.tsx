@@ -29,6 +29,8 @@ export function MfaFloatingWindow({ onExpand }: { onExpand: () => void }) {
   const close = useAppStore((s) => s.closeFloatingMfa);
   const setStatusMessage = useAppStore((s) => s.setStatusMessage);
   const vaultState = useVaultStore((s) => s.state);
+  const vaultEpoch = useVaultStore((s) => s.securityEpoch);
+  const vaultPending = useVaultStore((s) => s.transitionPending);
   const refreshVault = useVaultStore((s) => s.refresh);
   const unlockVault = useVaultStore((s) => s.unlock);
   const initVault = useVaultStore((s) => s.init);
@@ -49,12 +51,12 @@ export function MfaFloatingWindow({ onExpand }: { onExpand: () => void }) {
   }, [refreshVault]);
 
   useEffect(() => {
-    if (!floating.open || vaultState !== "unlocked") return;
+    if (!floating.open || vaultState !== "unlocked" || vaultPending) return;
     const store = useMfaStore.getState();
     if (store.status === "idle") void store.load().catch(() => undefined);
     const refresh = window.setInterval(() => void store.refreshCodes().catch(() => undefined), 1000);
     return () => window.clearInterval(refresh);
-  }, [floating.open, vaultState]);
+  }, [floating.open, vaultState, vaultEpoch, vaultPending]);
 
   useEffect(() => {
     if (!floating.open) return;

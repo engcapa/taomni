@@ -1,5 +1,6 @@
 //! Stop ownership is retained until the kernel confirms the entire host tree
 //! exited. Failed cleanup is retried before deleting data or changing versions.
+use super::vault_lifecycle::{VAULT_TRANSITION_TIMEOUT, lock_until};
 use super::{PluginError, PluginRegistry};
 use std::{
     sync::{Arc, TryLockError, atomic::Ordering},
@@ -8,13 +9,36 @@ use std::{
 
 impl PluginRegistry {
     pub fn shutdown(&self) -> Result<(), PluginError> {
+        self.shutdown_until(Instant::now() + VAULT_TRANSITION_TIMEOUT)
+    }
+
+    pub(crate) fn shutdown_until(&self, deadline: Instant) -> Result<(), PluginError> {
         {
-            let _lifecycle = self
-                .lifecycle
-                .lock()
-                .expect("plugin lifecycle lock poisoned");
+            // All service transitions take these two locks in this order.
+            let mut pending = self
+                .services
+                .as_ref()
+                .map(|services| {
+                    lock_until(&services.vault_transition, deadline, "Vault transition")
+                })
+                .transpose()
+                .map_err(PluginError::HostUnavailable)?;
+            let _lifecycle = lock_until(&self.lifecycle, deadline, "plugin lifecycle")
+                .map_err(PluginError::HostUnavailable)?;
             let already_stopping = self.shutting_down.swap(true, Ordering::AcqRel);
-            if let Err(error) = self.stop_hosts() {
+            let result = (|| {
+                if let (Some(services), Some(pending)) = (&self.services, pending.as_mut()) {
+                    self.drain_vault_operations(services, pending, deadline)
+                        .map_err(PluginError::HostUnavailable)?;
+                }
+                self.stop_hosts()?;
+                if let (Some(services), Some(pending)) = (&self.services, pending.as_mut()) {
+                    self.complete_service_barrier(services, pending, deadline, true)
+                        .map_err(PluginError::HostUnavailable)?;
+                }
+                Ok(())
+            })();
+            if let Err(error) = result {
                 if !already_stopping {
                     self.shutting_down.store(false, Ordering::Release);
                 }
@@ -99,7 +123,7 @@ impl PluginRegistry {
         Ok(())
     }
 
-    fn cancel_host_requests(&self, slug: &str) {
+    pub(super) fn cancel_host_requests(&self, slug: &str) {
         let ids = self
             .pending_requests
             .lock()

@@ -84,16 +84,29 @@ fn core_reset_requires_exclusive_ownership_and_cannot_upgrade_a_read_lease() {
     let permit = admission
         .admit_core_until(
             OperationId::parse(FIRST).unwrap(),
-            OperationKind::ResetStore,
+            OperationKind::InitializeEmptyStore,
             VaultOperationLease::try_write(&root).unwrap(),
             deadline(),
         )
         .unwrap();
-    assert_eq!(permit.kind(), OperationKind::ResetStore);
+    assert_eq!(permit.kind(), OperationKind::InitializeEmptyStore);
+    assert_eq!(
+        permit.consume_reset_grant(),
+        Err(CoreServiceError::PermissionDenied)
+    );
     assert!(permit.lease().is_exclusive());
     assert!(VaultOperationLease::try_read(&root).is_err());
     drop(permit);
     assert!(VaultOperationLease::try_read(&root).is_ok());
+    assert!(matches!(
+        admission.admit_core_until(
+            OperationId::parse(SECOND).unwrap(),
+            OperationKind::ResetStore,
+            VaultOperationLease::try_write(&root).unwrap(),
+            deadline(),
+        ),
+        Err(CoreServiceError::PermissionDenied)
+    ));
 }
 
 #[test]
@@ -258,4 +271,65 @@ fn core_permit_shares_host_limits_and_replay_ledger_but_cannot_authorize_reverse
         )
         .unwrap();
     assert!(host_permit.check_current().is_ok());
+}
+
+#[test]
+fn transition_reset_requires_a_drained_current_revocation_and_retains_os_ownership() {
+    let (_directory, root) = root();
+    let admission = admission();
+    let prior = admission
+        .admit_core_until(
+            OperationId::parse(FIRST).unwrap(),
+            OperationKind::ReadData,
+            VaultOperationLease::try_read(&root).unwrap(),
+            deadline(),
+        )
+        .unwrap();
+    let revocation = admission.begin_or_join_revoke(&[]).unwrap();
+    drop(prior);
+    let mut stale = revocation.clone();
+    stale.epoch = VaultEpoch::new(1).unwrap();
+    assert!(matches!(
+        admission.admit_core_reset_after_drain(
+            OperationId::parse(SECOND).unwrap(),
+            &stale,
+            VaultOperationLease::try_write(&root).unwrap(),
+            deadline(),
+        ),
+        Err(CoreServiceError::StalePluginContext)
+    ));
+    assert!(matches!(
+        admission.admit_core_reset_after_drain(
+            OperationId::parse(SECOND).unwrap(),
+            &revocation,
+            VaultOperationLease::try_read(&root).unwrap(),
+            deadline(),
+        ),
+        Err(CoreServiceError::PermissionDenied)
+    ));
+    let permit = admission
+        .admit_core_reset_after_drain(
+            OperationId::parse(SECOND).unwrap(),
+            &revocation,
+            VaultOperationLease::try_write(&root).unwrap(),
+            deadline(),
+        )
+        .unwrap();
+    assert_eq!(permit.kind(), OperationKind::ResetStore);
+    assert!(permit.check_current().is_ok());
+    assert_eq!(permit.consume_reset_grant(), Ok(()));
+    assert_eq!(
+        permit.consume_reset_grant(),
+        Err(CoreServiceError::PermissionDenied)
+    );
+    assert_eq!(
+        admission.finish_revoke(&revocation),
+        Err(CoreServiceError::CoreServiceBusy)
+    );
+    let lease = permit.release_admission();
+    admission.finish_revoke(&revocation).unwrap();
+    admission.after_verified_unlock().unwrap();
+    assert!(VaultOperationLease::try_read(&root).is_err());
+    drop(lease);
+    assert!(VaultOperationLease::try_read(&root).is_ok());
 }

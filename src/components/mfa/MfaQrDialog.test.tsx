@@ -17,6 +17,7 @@ import { stubMfaInvoke, MFA_STUB_STORAGE_KEY } from "../../stubs/mfaStub";
 import type { MfaAccount, MfaAddResult } from "../../lib/mfa/types";
 import { defaultMfaInput } from "../../lib/mfa/types";
 import { MfaQrDialog } from "./MfaQrDialog";
+import { useVaultStore } from "../../stores/vaultStore";
 
 async function seedAccount(): Promise<MfaAccount> {
   const input = { ...defaultMfaInput(), issuer: "QA Bank", accountName: "qa@example.com", secret: "JBSWY3DPEHPK3PXP" };
@@ -29,6 +30,7 @@ describe("MfaQrDialog", () => {
   beforeEach(() => {
     localStorage.removeItem(MFA_STUB_STORAGE_KEY);
     writeText.mockClear();
+    useVaultStore.setState({ state: "unlocked", transitionPending: false, requiresUnlock: false });
   });
 
   it("requires the master password before rendering the QR code and secret", async () => {

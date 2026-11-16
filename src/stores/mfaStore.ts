@@ -25,7 +25,7 @@ import type {
   MfaPrefs,
   MfaSortMode,
 } from "../lib/mfa/types";
-import { useVaultStore } from "./vaultStore";
+import { useVaultStore, vaultSessionIsCurrent as vaultCurrent, invalidateVaultSensitiveResults, requireVaultUnlock } from "./vaultStore";
 
 export type MfaLoadStatus = "idle" | "loading" | "ready" | "error";
 
@@ -73,13 +73,26 @@ function replaceAccount(accounts: MfaAccount[], next: MfaAccount): MfaAccount[] 
   return accounts.map((account) => (account.id === next.id ? next : account));
 }
 
-let codesInFlight: Promise<void> | null = null;
+let resetPending = false;
+function vaultSessionIsCurrent(epoch: number): boolean {
+  return !resetPending && vaultCurrent(epoch);
+}
+
+function requireSession(epoch: number): void {
+  if (!vaultSessionIsCurrent(epoch)) throw new Error("VAULT_LOCKED");
+}
+
+let codesInFlight: { epoch: number; promise: Promise<void> } | null = null;
 export const useMfaStore = create<MfaState>((set, get) => {
   /** Record an IPC failure; a locked vault sends the tab back to its gate. */
-  const fail = (err: unknown): never => {
+  const fail = (err: unknown, epoch: number): never => {
+    if (!vaultSessionIsCurrent(epoch)) throw err;
     const code = mfaErrorCode(err);
-    set({ error: errorText(err), errorCode: code });
-    if (code === "VAULT_LOCKED") void useVaultStore.getState().refresh().catch(() => undefined);
+    if (code === "VAULT_LOCKED") {
+      requireVaultUnlock();
+      set({ status: "error", error: errorText(err), errorCode: code });
+      void useVaultStore.getState().refresh().catch(() => undefined);
+    } else set({ error: errorText(err), errorCode: code });
     throw err;
   };
 
@@ -94,16 +107,21 @@ export const useMfaStore = create<MfaState>((set, get) => {
     lastCopied: null,
 
     load: async () => {
+      const epoch = useVaultStore.getState().securityEpoch;
+      if (!vaultSessionIsCurrent(epoch)) return;
       set({ status: "loading", error: null, errorCode: null });
       try {
         const snapshot = await mfaList();
+        if (!vaultSessionIsCurrent(epoch)) return;
         set({ accounts: snapshot.accounts, prefs: snapshot.prefs ?? DEFAULT_PREFS });
         await get().refreshCodes();
+        if (!vaultSessionIsCurrent(epoch)) return;
         set({ status: "ready" });
       } catch (err) {
+        if (!vaultSessionIsCurrent(epoch)) return;
         set({ status: "error" });
         try {
-          fail(err);
+          fail(err, epoch);
         } catch {
           // Surfaced through state; callers render the error panel.
         }
@@ -111,50 +129,71 @@ export const useMfaStore = create<MfaState>((set, get) => {
     },
 
     refreshCodes: async (ids) => {
-      if (codesInFlight && !ids) return codesInFlight;
+      const epoch = useVaultStore.getState().securityEpoch;
+      if (!vaultSessionIsCurrent(epoch)) return;
+      if (codesInFlight?.epoch === epoch && !ids) return codesInFlight.promise;
       const run = (async () => {
         try {
           const list = await mfaCodes(ids);
+          if (!vaultSessionIsCurrent(epoch)) return;
           set((state) => {
             const codes = ids ? { ...state.codes } : {};
             for (const code of list) codes[code.id] = code;
             return { codes };
           });
         } catch (err) {
-          fail(err);
+          if (vaultSessionIsCurrent(epoch)) fail(err, epoch);
         }
       })();
       if (!ids) {
-        codesInFlight = run.finally(() => {
-          codesInFlight = null;
-        });
-        return codesInFlight;
+        const pending: { epoch: number; promise: Promise<void> } = { epoch, promise: run.finally(() => {
+          if (codesInFlight === pending) codesInFlight = null;
+        }) };
+        codesInFlight = pending;
+        return pending.promise;
       }
       return run;
     },
 
-    inspect: (inputs) => mfaInspect(inputs).catch(fail),
+    inspect: async (inputs) => {
+      const epoch = useVaultStore.getState().securityEpoch;
+      requireSession(epoch);
+      try {
+        const result = await mfaInspect(inputs);
+        requireSession(epoch);
+        return result;
+      } catch (err) {
+        return fail(err, epoch);
+      }
+    },
 
     addAccounts: async (inputs, skipDuplicates) => {
+      const epoch = useVaultStore.getState().securityEpoch;
+      requireSession(epoch);
       try {
         const result = await mfaAdd(inputs, skipDuplicates);
+        requireSession(epoch);
         if (result.added.length > 0) {
           set((state) => ({ accounts: [...state.accounts, ...result.added], error: null, errorCode: null }));
           await get().refreshCodes(result.added.map((account) => account.id));
         }
+        requireSession(epoch);
         return result;
       } catch (err) {
-        return fail(err);
+        return fail(err, epoch);
       }
     },
 
     updateAccount: async (id, patch) => {
+      const epoch = useVaultStore.getState().securityEpoch;
+      requireSession(epoch);
       try {
         const updated = await mfaUpdate(id, patch);
+        requireSession(epoch);
         set((state) => ({ accounts: replaceAccount(state.accounts, updated) }));
         return updated;
       } catch (err) {
-        return fail(err);
+        return fail(err, epoch);
       }
     },
 
@@ -165,19 +204,24 @@ export const useMfaStore = create<MfaState>((set, get) => {
     },
 
     deleteAccount: async (id) => {
+      const epoch = useVaultStore.getState().securityEpoch;
+      requireSession(epoch);
       try {
         await mfaDelete(id);
+        requireSession(epoch);
         set((state) => {
           const codes = { ...state.codes };
           delete codes[id];
           return { accounts: state.accounts.filter((account) => account.id !== id), codes };
         });
       } catch (err) {
-        fail(err);
+        fail(err, epoch);
       }
     },
 
     moveAccount: async (movingId, targetId) => {
+      const epoch = useVaultStore.getState().securityEpoch;
+      requireSession(epoch);
       const order = moveInCustomOrder(get().accounts, movingId, targetId);
       const previous = get().accounts;
       const rank = new Map(order.map((id, index) => [id, index]));
@@ -185,60 +229,89 @@ export const useMfaStore = create<MfaState>((set, get) => {
       try {
         await mfaReorder(order);
       } catch (err) {
-        set({ accounts: previous });
-        fail(err);
+        if (vaultSessionIsCurrent(epoch)) set({ accounts: previous });
+        fail(err, epoch);
       }
     },
 
     hotpNext: async (id) => {
+      const epoch = useVaultStore.getState().securityEpoch;
+      requireSession(epoch);
       try {
         const code = await mfaHotpNext(id);
+        requireSession(epoch);
         set((state) => ({
           codes: { ...state.codes, [id]: code },
           accounts: state.accounts.map((account) => (account.id === id ? { ...account, counter: code.counter } : account)),
         }));
       } catch (err) {
-        fail(err);
+        fail(err, epoch);
       }
     },
 
     copyCode: async (id, which = "current") => {
+      const epoch = useVaultStore.getState().securityEpoch;
+      if (!vaultSessionIsCurrent(epoch)) return null;
       const code = get().codes[id];
       const digits = which === "next" ? code?.nextCode : code?.code;
       if (!digits) return null;
       await writeText(digits);
+      if (!vaultSessionIsCurrent(epoch)) return null;
       set({ lastCopied: { id, at: Date.now() } });
       // Usage feeds the recent/frequent sorts; a failure here must not undo the copy.
       void mfaMarkUsed(id)
-        .then((updated) => set((state) => ({ accounts: replaceAccount(state.accounts, updated) })))
+        .then((updated) => {
+          if (vaultSessionIsCurrent(epoch)) set((state) => ({ accounts: replaceAccount(state.accounts, updated) }));
+        })
         .catch(() => undefined);
       return digits;
     },
 
     setSortMode: async (mode) => {
+      const epoch = useVaultStore.getState().securityEpoch;
+      requireSession(epoch);
       const prefs = { ...get().prefs, sortMode: mode };
       set({ prefs });
-      await mfaSetPrefs(prefs).catch(fail);
+      await mfaSetPrefs(prefs).catch((err: unknown) => fail(err, epoch));
     },
 
     setGroupFilter: async (group) => {
+      const epoch = useVaultStore.getState().securityEpoch;
+      requireSession(epoch);
       const prefs = { ...get().prefs, groupFilter: group };
       set({ prefs });
-      await mfaSetPrefs(prefs).catch(fail);
+      await mfaSetPrefs(prefs).catch((err: unknown) => fail(err, epoch));
     },
 
     setQuery: (query) => set({ query }),
 
     resetStore: async () => {
+      requireSession(useVaultStore.getState().securityEpoch);
+      resetPending = true;
+      const epoch = invalidateVaultSensitiveResults();
+      set({ status: "loading" });
       try {
         await mfaResetStore();
       } catch (err) {
-        fail(err);
+        resetPending = false;
+        if (vaultSessionIsCurrent(epoch)) set({ status: "error" });
+        fail(err, epoch);
+      } finally {
+        resetPending = false;
       }
+      requireSession(epoch);
       set({ accounts: [], codes: {} });
       await get().load();
     },
 
     clearError: () => set({ error: null, errorCode: null }),
   };
+});
+
+// A lock request invalidates all prior async work before its native barrier
+// finishes. Each new epoch has its own code request, including after re-unlock.
+useVaultStore.subscribe((next, previous) => {
+  if (next.securityEpoch === previous.securityEpoch && (next.state === "unlocked" || next.state === previous.state)) return;
+  codesInFlight = null;
+  useMfaStore.setState({ status: "idle", accounts: [], codes: {}, error: null, errorCode: null, lastCopied: null });
 });

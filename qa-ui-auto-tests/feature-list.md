@@ -3831,6 +3831,10 @@ controls:
     selector: '[data-testid="vault-lock-button"]'
     kind: interactive
     optional: true       # only when state=unlocked
+  - id: operation-error
+    selector: '[data-testid="vault-operation-error"]'
+    kind: display
+    optional: true       # only when native lock confirmation failed
   - id: change-master-button
     selector: '[data-testid="vault-change-master-button"]'
     kind: interactive
@@ -11476,6 +11480,8 @@ controls:
 - 搜索（发行方/账户/分组/备注，Enter 复制首个结果，方向键在验证码间移动）、分组筛选（含无分组）、6 种排序（自定义/发行方/账户/最近使用/最常用/最近添加）、置顶、菜单上移/下移与拖拽调整自定义顺序；排序与筛选偏好持久化。
 - 右键或 ⋯ 菜单：编辑（发行方、账户、分组、备注）、显示二维码、置顶、上移/下移、删除（确认后执行）。
 - 显示二维码：重新输入主密码后由后端 `mfa_export_uri` 生成 `otpauth://` 链接并在本地渲染为二维码，供其他验证器扫码迁移；关闭即清除，再次打开需重新验证。
+- 锁定请求立即清除标签页、悬浮窗的验证码和导出弹窗；旧异步结果不能恢复已隐藏内容，解锁后重新读取账户与 HOTP 计数。`TC-MFA-013` 在 browser/native 验证悬浮窗与标签页同步门禁、错误口令拒绝及正确口令后的计数连续性。
+- `TC-MFA-014` 在 browser/native 验证设置页修改主密码后保留同一账户、HOTP 计数与原密钥；旧密码不能解锁或导出，新密码恢复原验证码与 secret。浏览器只证明门禁，实际密钥重包由 native 验证。
 
 ### 27.2 添加账户：密钥、截图、屏幕扫描与摄像头 ✅
 
@@ -13761,6 +13767,9 @@ controls:
   - id: mfa-floating-pin
     selector: '[data-testid="mfa-floating-pin"]'
     kind: interactive
+  - id: mfa-floating-code
+    selector: '[data-testid="mfa-floating-code"]'
+    kind: display
   - id: mfa-floating-search
     selector: '[data-testid="mfa-floating-search"]'
     kind: interactive

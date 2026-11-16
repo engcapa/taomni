@@ -7,16 +7,18 @@ use std::{
 use taomni_plugin_api::services::{CoreServiceError, OperationId, ProfileGeneration, VaultEpoch};
 use taomni_profile_locks::VaultOperationLease;
 
-use crate::{AdmissionState, OperationAdmission, OperationKind};
+use crate::{AdmissionState, OperationAdmission, OperationKind, Revocation};
 
 pub struct CoreOperationPermit {
     owner: OperationAdmission,
     generation: ProfileGeneration,
     epoch: VaultEpoch,
     kind: OperationKind,
+    mode: AdmissionState,
     deadline: Instant,
     cancelled: AtomicBool,
-    lease: VaultOperationLease,
+    reset_grant_used: AtomicBool,
+    lease: Option<VaultOperationLease>,
 }
 
 impl OperationAdmission {
@@ -30,14 +32,56 @@ impl OperationAdmission {
         lease: VaultOperationLease,
         deadline: Instant,
     ) -> Result<CoreOperationPermit, CoreServiceError> {
+        self.admit_core_inner(operation, kind, lease, deadline, None)
+    }
+
+    /// Explicit reset runs with ordinary admission closed, after every old
+    /// operation/host has drained, and retains exclusive OS ownership.
+    pub fn admit_core_reset_after_drain(
+        &self,
+        operation: OperationId,
+        revocation: &Revocation,
+        lease: VaultOperationLease,
+        deadline: Instant,
+    ) -> Result<CoreOperationPermit, CoreServiceError> {
+        self.admit_core_inner(
+            operation,
+            OperationKind::ResetStore,
+            lease,
+            deadline,
+            Some(revocation),
+        )
+    }
+
+    fn admit_core_inner(
+        &self,
+        operation: OperationId,
+        kind: OperationKind,
+        lease: VaultOperationLease,
+        deadline: Instant,
+        revocation: Option<&Revocation>,
+    ) -> Result<CoreOperationPermit, CoreServiceError> {
         if deadline <= Instant::now() {
             return Err(CoreServiceError::TimedOut);
         }
         if kind.requires_exclusive_lease() && !lease.is_exclusive() {
             return Err(CoreServiceError::PermissionDenied);
         }
+        if kind == OperationKind::ResetStore && revocation.is_none() {
+            return Err(CoreServiceError::PermissionDenied);
+        }
         let mut state = self.0.state.lock().expect("service admission poisoned");
-        if state.mode != AdmissionState::Open {
+        if let Some(revocation) = revocation {
+            if state.mode != AdmissionState::Revoking
+                || state.epoch != revocation.epoch
+                || state.generation != revocation.generation
+            {
+                return Err(CoreServiceError::StalePluginContext);
+            }
+            if state.in_flight != 0 || !state.pending_acknowledgements.is_empty() {
+                return Err(CoreServiceError::CoreServiceBusy);
+            }
+        } else if state.mode != AdmissionState::Open {
             return Err(CoreServiceError::VaultLocked);
         }
         if state.seen_operations.contains(&operation) {
@@ -53,22 +97,47 @@ impl OperationAdmission {
             generation: state.generation.clone(),
             epoch: state.epoch,
             kind,
+            mode: state.mode,
             deadline,
             cancelled: AtomicBool::new(false),
-            lease,
+            reset_grant_used: AtomicBool::new(false),
+            lease: Some(lease),
         })
     }
 }
 
 impl CoreOperationPermit {
     pub fn lease(&self) -> &VaultOperationLease {
-        &self.lease
+        self.lease
+            .as_ref()
+            .expect("live permit owns its operation lease")
+    }
+
+    /// Release admission while the coordinator retains OS ownership through
+    /// validation and reopening. Consuming self makes further use impossible.
+    pub fn release_admission(mut self) -> VaultOperationLease {
+        self.lease
+            .take()
+            .expect("live permit owns its operation lease")
     }
     pub fn kind(&self) -> OperationKind {
         self.kind
     }
     pub fn cancel(&self) {
         self.cancelled.store(true, Ordering::Release);
+    }
+
+    /// One explicit repair may follow the coordinator's drained reset. An
+    /// ordinary exclusive operation cannot mint or reuse this authorization.
+    pub fn consume_reset_grant(&self) -> Result<(), CoreServiceError> {
+        self.check_current()?;
+        if self.kind != OperationKind::ResetStore || self.mode != AdmissionState::Revoking {
+            return Err(CoreServiceError::PermissionDenied);
+        }
+        if self.reset_grant_used.swap(true, Ordering::AcqRel) {
+            return Err(CoreServiceError::PermissionDenied);
+        }
+        Ok(())
     }
 
     pub fn check_current(&self) -> Result<(), CoreServiceError> {
@@ -82,7 +151,7 @@ impl CoreOperationPermit {
             .lock()
             .expect("service admission poisoned");
         if self.cancelled.load(Ordering::Acquire)
-            || state.mode != AdmissionState::Open
+            || state.mode != self.mode
             || state.epoch != self.epoch
             || state.generation != self.generation
         {

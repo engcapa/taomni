@@ -10,6 +10,7 @@ vi.mock("@tauri-apps/api/core", async () => {
 
 import { MFA_STUB_STORAGE_KEY } from "../../stubs/mfaStub";
 import { useMfaStore } from "../../stores/mfaStore";
+import { useVaultStore } from "../../stores/vaultStore";
 import { MfaPanel } from "./MfaPanel";
 
 const RFC4226 = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ";
@@ -34,6 +35,7 @@ describe("MfaPanel", () => {
   beforeEach(() => {
     localStorage.removeItem(MFA_STUB_STORAGE_KEY);
     writeText.mockClear();
+    useVaultStore.setState({ state: "unlocked", transitionPending: false, requiresUnlock: false });
     useMfaStore.setState({ status: "idle", accounts: [], codes: {}, query: "", error: null, errorCode: null, lastCopied: null, prefs: { sortMode: "custom", groupFilter: "" } });
   });
 

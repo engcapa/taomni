@@ -10,6 +10,8 @@ use taomni_profile_locks::*;
 const FIRST: &str = "a1234567-1234-1234-1234-123456789abc";
 const SECOND: &str = "b1234567-1234-1234-1234-123456789abc";
 
+#[path = "revoke_retry_tests.rs"]
+mod revoke_retry_tests;
 #[path = "termination_tests.rs"]
 mod termination_tests;
 

@@ -39,7 +39,7 @@ function openWindow(): void {
 
 beforeEach(() => {
   window.localStorage.clear();
-  useVaultStore.setState({ state: "unlocked", entryCount: 2, loading: false, entries: [] });
+  useVaultStore.setState({ state: "unlocked", entryCount: 2, loading: false, entries: [], transitionPending: false, requiresUnlock: false });
   useVaultStore.setState({ refresh: vi.fn(async () => undefined) as never });
   useMfaStore.setState({
     status: "ready",
@@ -57,6 +57,7 @@ beforeEach(() => {
   });
   copyCode.mockClear();
   load.mockClear();
+  load.mockImplementation(async () => undefined);
   refreshCodes.mockClear();
   refreshCodes.mockImplementation(async () => undefined);
   useAppStore.setState({
@@ -80,15 +81,21 @@ describe("MfaFloatingWindow (TASK-04)", () => {
     expect(window.style.position).toBe("fixed");
   });
 
-  it("UT-WS-04-02 gates the token list behind the vault", () => {
+  it("UT-WS-04-02 clears locked tokens and reloads the list after unlock", async () => {
+    const previousCodes = useMfaStore.getState().codes;
+    load.mockImplementationOnce(async () => {
+      useMfaStore.setState({ status: "ready", accounts, codes: previousCodes });
+    });
     useVaultStore.setState({ state: "locked" });
+    expect(useMfaStore.getState()).toMatchObject({ accounts: [], codes: {} });
     openWindow();
     render(<MfaFloatingWindow onExpand={vi.fn()} />);
     expect(screen.getByTestId("mfa-floating-locked")).toBeInTheDocument();
     expect(screen.queryByTestId("mfa-floating-account")).not.toBeInTheDocument();
     expect(screen.queryByTestId("mfa-floating-search")).not.toBeInTheDocument();
 
-    act(() => useVaultStore.setState({ state: "unlocked" }));
+    await act(async () => useVaultStore.setState({ state: "unlocked" }));
+    expect(load).toHaveBeenCalledOnce();
     expect(screen.getAllByTestId("mfa-floating-account")).toHaveLength(2);
     expect(screen.getByTestId("mfa-floating-search")).toBeInTheDocument();
   });

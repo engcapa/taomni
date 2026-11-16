@@ -6,12 +6,18 @@
 //! unlocked and the renderer only ever receives codes, never stored secrets.
 //! See `docs-feature/mfa-authenticator-design.md`.
 
+mod access;
 pub mod capture;
 pub mod commands;
 pub mod crypto;
+mod key_provider;
 pub mod otp;
 pub mod store;
 
+#[cfg(test)]
+mod access_tests;
+#[cfg(test)]
+mod test_keys;
 #[cfg(test)]
 mod tests;
 

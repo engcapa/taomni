@@ -1,19 +1,33 @@
 //! Core service owners never call back into the registry or a host mutex.
-use std::{sync::Arc, time::Instant};
+use std::{
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicBool, AtomicUsize},
+    },
+    time::Instant,
+};
 use taomni_plugin_api::services::{CoreServiceError, OperationId, VaultEpoch};
 use taomni_plugin_services::{
     AdmissionState, AuthorizedHost, CoreServiceDispatcher, DispatcherConfig, OperationAdmission,
-    OperationKind, OperationPermit, VerifiedHostGrants,
+    OperationKind, OperationPermit, Revocation, VerifiedHostGrants,
 };
 use taomni_profile_locks::{PluginSlug, ProfileRoot, VaultOperationLease, WaitControl};
 
 use super::{ModuleManifest, PluginError, host::HostServiceConfig};
-use crate::{runtime::profile::ProfileRuntimeLeases, vault::Vault};
+use crate::{
+    runtime::profile::ProfileRuntimeLeases,
+    vault::{Vault, VaultDataAccess},
+};
 
 pub(crate) struct PluginCoreServices {
     pub(crate) admission: OperationAdmission,
     pub(crate) dispatcher: Arc<CoreServiceDispatcher>,
-    root: ProfileRoot,
+    pub(super) root: ProfileRoot,
+    pub(super) vault_transition: Mutex<Option<Revocation>>,
+    pub(super) vault: Arc<Vault>,
+    pub(super) shutting_down: Arc<AtomicBool>,
+    pub(super) quiescence: Arc<AtomicUsize>,
+    pub(super) resume_after_quiescence: AtomicBool,
     // The backend owns Vault beyond CoreState; keep its profile ownership too.
     _profile: Arc<ProfileRuntimeLeases>,
 }
@@ -58,13 +72,31 @@ impl PluginCoreServices {
             true,
         );
         let dispatcher = Arc::new(
-            CoreServiceDispatcher::new(admission.clone(), vault, DispatcherConfig::default())
-                .map_err(|e| e.to_string())?,
+            CoreServiceDispatcher::new(
+                admission.clone(),
+                vault.clone(),
+                DispatcherConfig::default(),
+            )
+            .map_err(|e| e.to_string())?,
         );
+        let shutting_down = Arc::new(AtomicBool::new(false));
+        let quiescence = Arc::new(AtomicUsize::new(0));
+        vault.bind_data_access(VaultDataAccess {
+            admission: admission.clone(),
+            root: root.clone(),
+            shutting_down: shutting_down.clone(),
+            quiescence: quiescence.clone(),
+            _profile: profile.clone(),
+        })?;
         Ok(Self {
             admission,
             dispatcher,
             root,
+            vault_transition: Mutex::new(None),
+            vault,
+            shutting_down,
+            quiescence,
+            resume_after_quiescence: AtomicBool::new(false),
             _profile: profile,
         })
     }

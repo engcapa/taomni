@@ -19,6 +19,7 @@ export function VaultSettings() {
     lock,
     changeMaster,
     reloadEntries,
+    transitionPending,
   } = useVaultStore();
   const vaultUnlockMode = useAppStore((s) => s.vaultUnlockMode);
   const setVaultUnlockMode = useAppStore((s) => s.setVaultUnlockMode);
@@ -31,6 +32,16 @@ export function VaultSettings() {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
   const [showEntriesDialog, setShowEntriesDialog] = useState(false);
+  const [lockError, setLockError] = useState<string | null>(null);
+
+  const handleLock = async () => {
+    setLockError(null);
+    try {
+      await lock();
+    } catch (error) {
+      setLockError(error instanceof Error ? error.message : String(error));
+    }
+  };
 
   useEffect(() => {
     void refresh().catch(() => undefined);
@@ -167,6 +178,7 @@ export function VaultSettings() {
           <button
             type="button"
             data-testid="vault-unlock-button"
+            disabled={transitionPending}
             className="px-3 py-1 text-[12px] rounded text-white"
             style={{ background: "var(--taomni-accent)" }}
             onClick={() => setAction("unlock")}
@@ -180,7 +192,8 @@ export function VaultSettings() {
               type="button"
               data-testid="vault-lock-button"
               className="px-3 py-1 text-[12px] rounded hover:bg-[var(--taomni-hover)]"
-              onClick={() => void lock()}
+              onClick={() => void handleLock()}
+              disabled={transitionPending}
             >
               {t("vaultSettings.lockNow")}
             </button>
@@ -199,6 +212,12 @@ export function VaultSettings() {
           </>
         )}
       </div>
+
+      {lockError && (
+        <div role="alert" data-testid="vault-operation-error" className="mb-4 text-[12px]" style={{ color: "var(--taomni-error, #c33)" }}>
+          {lockError}
+        </div>
+      )}
 
       {action === "change-master" && (
         <div
@@ -308,6 +327,7 @@ export function VaultSettings() {
         <VaultUnlockDialog
           onCancel={() => setAction(null)}
           onSubmit={async (pw) => {
+            setLockError(null);
             await unlock(pw);
             setAction(null);
           }}

@@ -18,6 +18,7 @@ vi.mock("@tauri-apps/api/core", async () => {
 
 import { MFA_STUB_STORAGE_KEY } from "../../stubs/mfaStub";
 import { useMfaStore } from "../../stores/mfaStore";
+import { useVaultStore } from "../../stores/vaultStore";
 import { MfaAddDialog } from "./MfaAddDialog";
 
 function setMediaDevices(value: unknown) {
@@ -29,6 +30,7 @@ describe("MfaAddDialog import sources", () => {
   beforeEach(() => {
     localStorage.removeItem(MFA_STUB_STORAGE_KEY);
     decodeImageBlob.mockClear();
+    useVaultStore.setState({ state: "unlocked", transitionPending: false, requiresUnlock: false });
     useMfaStore.setState({ accounts: [], codes: {} });
   });
 

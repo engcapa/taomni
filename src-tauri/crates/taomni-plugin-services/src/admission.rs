@@ -23,6 +23,7 @@ pub(crate) struct AdmissionData {
     pub operations: HashMap<OperationId, Arc<ActiveOperation>>,
     pub in_flight: usize,
     pub pending_acknowledgements: HashSet<HostInstanceId>,
+    pub revocation_hosts: HashSet<HostInstanceId>,
     pub max_in_flight: usize,
     pub seen_operations: HashSet<OperationId>,
 }
@@ -49,6 +50,7 @@ impl OperationAdmission {
                 operations: HashMap::new(),
                 in_flight: 0,
                 pending_acknowledgements: HashSet::new(),
+                revocation_hosts: HashSet::new(),
                 max_in_flight: 128,
                 seen_operations: HashSet::new(),
             }),

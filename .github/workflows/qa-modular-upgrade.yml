@@ -336,6 +336,17 @@ jobs:
           src/lib/updateService.test.ts
           src/components/tabbar/tabs/TabItem.test.tsx
           src/components/tabbar/TabBar.test.tsx
+          src/stores/mfaStore.test.ts
+          src/stores/mfaVaultLifecycle.test.ts
+          src/components/mfa/MfaAddDialog.test.tsx
+          src/components/mfa/MfaPanel.test.tsx
+          src/components/mfa/MfaQrDialog.test.tsx
+          src/components/mfa/MfaQrDialog.lifecycle.test.tsx
+          src/components/mfa/__tests__/MfaFloatingWindow.test.tsx
+          src/components/vault/VaultSettings.test.tsx
+          src/components/vault/VaultSetupDialog.test.tsx
+          src/components/vault/VaultUnlockDialog.test.tsx
+          src/components/vault/StartupVaultUnlockGate.test.tsx
       - name: Plugin protocol unit contracts
         run: cargo test --manifest-path src-tauri/crates/taomni-plugin-api/Cargo.toml --locked
       - name: Native observation unit regressions
@@ -383,6 +394,10 @@ jobs:
               "servers::rdp::clipboard::tests",
               "config::tests",
               "vault::plugin_access::tests",
+              "vault::data_access_tests",
+              "vault::tests",
+              "mfa::access_tests",
+              "mfa::tests",
               "runtime::bootstrap::tests",
               "runtime::generation::tests",
               "backup::generation_tests",
