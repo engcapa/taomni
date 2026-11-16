@@ -122,6 +122,25 @@ fn errors_round_trip_with_data_and_stable_code() {
 }
 
 #[test]
+fn successful_null_result_is_distinct_from_a_missing_result_on_the_wire() {
+    let response = RpcResponse::success("mfa-initialize", Value::Null);
+    let wire = serde_json::to_string(&RpcMessage::Response(response.clone())).unwrap();
+    assert!(wire.contains("\"result\":null"));
+    let decoded: RpcMessage = serde_json::from_str(&wire).unwrap();
+    assert_eq!(decoded, RpcMessage::Response(response));
+    let absent: RpcResponse =
+        serde_json::from_str(r#"{"jsonrpc":"2.0","id":"missing-result"}"#).unwrap();
+    assert!(absent.result.is_none());
+    assert!(absent.error.is_none());
+    for invalid in [
+        r#"{"jsonrpc":"2.0","id":"a","error":null}"#,
+        r#"{"jsonrpc":"2.0","id":"a","result":null,"error":null}"#,
+    ] {
+        assert!(serde_json::from_str::<RpcResponse>(invalid).is_err());
+    }
+}
+
+#[test]
 fn binary_ref_is_restricted_to_loopback_and_hash() {
     let valid = BinaryRef {
         stream_url: "ws://127.0.0.1:43521/frame".to_owned(),

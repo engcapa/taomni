@@ -113,10 +113,30 @@ impl RpcNotification {
 pub struct RpcResponse {
     pub jsonrpc: String,
     pub id: Option<RequestId>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "present_response_field",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub result: Option<Value>,
-    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(
+        default,
+        deserialize_with = "present_response_field",
+        skip_serializing_if = "Option::is_none"
+    )]
     pub error: Option<RpcError>,
+}
+
+/// JSON-RPC permits a successful `result: null`. Serde's normal Option decoder
+/// collapses it into an absent field, which makes a completed void operation
+/// look like an invalid response. Missing fields use default None; present
+/// fields decode their actual type (so `error: null` remains invalid).
+fn present_response_field<'de, D, T>(deserializer: D) -> Result<Option<T>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+    T: Deserialize<'de>,
+{
+    T::deserialize(deserializer).map(Some)
 }
 
 impl RpcResponse {
