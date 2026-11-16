@@ -10,7 +10,16 @@
 
 签名安装门、宿主生产监督、共享采集/RDP 公共库、CoreState/统一 bootstrap、正常退出与可逆静默已集成。生产工厂、scoped 入口、持久 profile generation、Vault IPC 协调、普通凭据消费者与 MFA facade 已接入；源码 `fdd05d232` 的契约 #43819768258 已 23/23 jobs 成功，其 UI #43819770975 的 22 个 shard 已收齐：三端 browser 各 50/50、Linux Xvfb native 50/50、Windows native 48/48、macOS native 47/47；Wayland 46/50，四个既有无关失败按下文单列。离线 v2 备份/还原、运行中宿主快照和三态重启还原已逐批验证，下载恢复与真实代理的最新证据见下节。业务状态仍在 LegacyFeatureRuntime；官方远端商店正在接入，业务宿主迁出与真实单体升级尚未完成。G1–G11 未通过前，不将具体业务插件迁移标为完成。
 
-## 2026-11-17 最新实现与 runner 证据（持续采集中）
+## 2026-11-17 最新结果与后续验证
+
+- 源码 `6497fb47e95bcfa32639b0fc09c4b9a754a57fe4` 的[完整升级契约 #43936364643](https://github.com/engcapa/taomni/actions/runs/43936364643) 已成功结束，39 份 artifact 均在运行期间收取。三端宿主 activation 3、cleanup 2、lifecycle 7、MFA 5、MFA snapshot 2、profile 5、services 8、snapshot 4 项全部通过；三端真实下载 3+9+2+1 场景、正式签名 MFA 安装各 3 项、Settings/Vault/HTTP 代理各 2 项通过。四目标编译、Linux 核心过滤器、真实 Vault/SDK 和 X11 门均成功。每份证据保留实际 source/hash/选择身份；这仍不是生产 MFA facade 迁出或真实单体升级。
+- 相同源码的[三端 UI #43936173592](https://github.com/engcapa/taomni/actions/runs/43936173592) 已收齐 22 个 shard：browser 三端各 **46/47**；native Xvfb **57/58**、Wayland **55/58**、Windows **54/55**、macOS ARM64 **53/54**。共同相关失败只有 TC-MODULES-003 step 11。原始 HTML 证明按钮已存在，但 `welcome-tab-panel` 为 `display:none`：打开 Settings 会进入 Sessions 模式，关闭最后标签后仍是 Sessions 空态。用例补显式 `nav-mode-home` 点击，原 21 步和全部结果断言保留，变为 22 步；不是修改产品以破坏模式隔离。修订用例须在 GitHub browser/native 复验。
+- 新增 noexec 原生 TC-MODULES-024 **完整 50 步在 Xvfb/Wayland 均通过**。三端 TC-MODULES-016 **100 步**和 TC-MODULES-022 **58 步**全部通过；模块主窗/分离窗、正式远端商店验证已有 matching WebView 证据。Wayland 的 FILE-OPEN-006/008 仍是已记录的 X11 非左键限制/跨行 chip 命中失败，按用户指示忽略且不计通过。
+- 同源码[macOS Intel #43936286209](https://github.com/engcapa/taomni/actions/runs/43936286209) 已收齐 4 个 shard，**24/27**。TC-MODULES-016/022、SFTP/Notes/终端分离窗口通过；TC-MODULES-003 为同一 Home 导航步骤。FILE-OPEN-011 是前后 Intel 相同的终端搜索无命中；FILE-OPEN-012 在 step 81 等待本地预览限制图片失败，console 为空，本地 raster 实现与 main 无差异、上一 Intel #43926653189 同 case 通过。两项原始失败单列，不删除或放宽安全/图像断言，也不计通过。
+- macOS G1 进程实验 [#43941271749](https://github.com/engcapa/taomni/actions/runs/43941271749)，源码 `04ad3d8361c6cdadad1f22d3e2f9e0d499f51095`，已 **2/2 通过**。macOS 15.7.9 Intel 的实验 app 与 hello/MFA 均有实际 ad-hoc/hardened runtime 签名；host quarantine 写入并读回，真实 adapter 握手、HOTP 和确认退出成功，hash 不变。`spctl` 对三者均 **exit 3/rejected**，不得称系统分发信任通过。完整 Tauri 发布包、固定证书与 TCC 仍未验证，self-signed 发布模式关闭 hardened runtime 的缺口保留。详见[门禁实验记录](taomni-modular-split-gates-hello-plugin.md)。
+- 下一步添加 Windows 下载隔离标记、Authenticode/Defender 原始状态和真实 hello/MFA 执行实验，经已注册的 upgrade 专项入口执行；不关闭系统保护、不导入私钥，不把一次执行通过当作 SmartScreen 概率或完整发布信任结论。
+
+### 本轮实现过程记录（以下 pending 状态以本节最新结果为准）
 
 - 提交 `7565ce645`（实际 Tao Home 入口）与 `6497fb47e`（Linux noexec/RPC）已推送。匹配源码的三端 [UI #43936173592](https://github.com/engcapa/taomni/actions/runs/43936173592)、macOS Intel 专项 [#43936286209](https://github.com/engcapa/taomni/actions/runs/43936286209) 与[升级契约 #43936364643](https://github.com/engcapa/taomni/actions/runs/43936364643) 已启动，三套采集器均从运行期间收取完成 artifact。最终 committed QA audit 与 development contract 全部通过，生成控件目录已同步，coverage baseline 未改。
 - #43936364643 的 Linux 宿主 artifact 已即时下载：**2/2 实际 noexec/替代目录实验通过**，receipt 的 sourceSha 精确匹配 `6497fb47e`，`allSelectedPassed=true`、`fixtureMountRemoved=true`；实际内核 `EACCES`、挂载 ID/标志、hello/MFA hash 与真实 HOTP 结果均已记录。该 job 原有 activation 3、cleanup 2、lifecycle 7、MFA 5、MFA snapshot 2、profile 5、services 8、snapshot 4 项场景均通过，纯宿主单元 **18/18**。原始证据位于 `qa-ui-auto-report/github/43936364643/live-contracts/modular-host-ubuntu-24.04/`；整个 run 和 TC-MODULES-024 仍在执行，G4 的包格式/profile 缺口保持。

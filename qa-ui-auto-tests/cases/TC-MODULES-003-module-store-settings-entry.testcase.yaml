@@ -4,8 +4,9 @@ description: >-
   The modular runtime exposes the signed module registry through Settings. The
   browser and packaged app must show the Module Store panel and an explicit
   loading, empty, or registry-error state without runtime errors. Welcome opens
-  that same section directly from the actual application Home (including Tao
-  Home); repeated Settings navigation keeps a single tab.
+  that same section directly after selecting the actual application Home
+  navigation (including Tao Home); closing Settings alone keeps Sessions mode.
+  Repeated Settings navigation keeps a single tab.
 covers:
 - F-Modules-1
 - F1.6
@@ -34,6 +35,7 @@ steps:
     min: 1
 - assert_no_runtime_errors: null
 - click: '[data-testid="tab-item"][data-tab-type="settings"][data-active="true"] [data-testid="tab-close"]'
+- click: '[data-testid="nav-mode-home"]'
 - wait_for: '[data-testid="welcome-browse-modules"]'
 - click: '[data-testid="welcome-browse-modules"]'
 - wait_for: '[data-testid="settings-panel"]'
@@ -69,25 +71,26 @@ verification:
   - id: R2
     requirement: Welcome opens the same module section directly, and repeated Settings navigation preserves one tab.
     actions:
-    - 12
-    - 18
+    - 11
+    - 13
+    - 19
     checkpoints:
-    - step: 15
-      expectation: Module Store is visible without entering a search query.
     - step: 16
-      expectation: Exactly one Settings tab exists after Welcome navigation.
+      expectation: Module Store is visible without entering a search query.
     - step: 17
+      expectation: Exactly one Settings tab exists after Welcome navigation.
+    - step: 18
       expectation: The real registry reports loading, empty, or an actionable error.
-    - step: 19
+    - step: 20
       expectation: Reopening Settings activates the existing tab without duplicating it.
-    - step: 21
+    - step: 22
       expectation: No runtime errors are reported across both entry workflows.
     results:
-    - 15
     - 16
     - 17
-    - 19
-    - 21
+    - 18
+    - 20
+    - 22
   native:
   - check: Native mode confirms the installed registry IPC can render the same panel and state.
     method: automated

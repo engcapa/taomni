@@ -38,10 +38,13 @@ Source `6497fb47e95bcfa32639b0fc09c4b9a754a57fe4`, hosted upgrade run
 passed. The receipt records the real ext4 bind mount's `noexec` flag, kernel
 `EACCES`, both host hashes, the executable alternative and confirmed mount
 cleanup. The same MFA executable produced HOTP `755224` through the production
-process adapter and SDK. This closes the mount/adapter experiment only;
-deb/rpm/AppImage installation and relocation of the supported profile remain
-unverified. `TC-MODULES-024` adds the production UI/data recovery path and still
-needs its matching hosted case result.
+process adapter and SDK. Matching UI run
+[#43936173592](https://github.com/engcapa/taomni/actions/runs/43936173592)
+passed all 50 steps of `TC-MODULES-024` on both Xvfb and Wayland, including
+signed installation, visible refusal, independent unchanged-data/active/hash
+observations, mount removal, and real read/write recovery. This closes the
+mount/adapter and isolated UI recovery experiments only; deb/rpm/AppImage
+installation and relocation of the supported profile remain unverified.
 
 ## macOS G1 experiment and release boundary
 
@@ -62,8 +65,15 @@ paths remain covered by TC-MODULES-007/016/022 and the complete crash suite.
 Only GitHub executes the native experiment; local Python tests mock every
 process and verify evidence/selection/error handling.
 
-The experiment is **pending hosted execution**, and its receipt identifies the
-core as `production-process-adapter-experiment`. It does not establish that the
+Hosted run [#43941271749](https://github.com/engcapa/taomni/actions/runs/43941271749),
+source `04ad3d8361c6cdadad1f22d3e2f9e0d499f51095`, passed both actual
+scenarios on macOS 15.7.9 Intel. Its receipt records ad-hoc signatures with
+runtime flags `0x10002`, read-back quarantine values, unchanged executable
+hashes, and `spctl` exit **3 / rejected** for the app and both hosts.
+`allSelectedPassed=true` therefore means both process scenarios passed,
+including real MFA HOTP `755224`; it does not mean Gatekeeper trusted them.
+The receipt identifies the core as `production-process-adapter-experiment`.
+It does not establish that the
 complete Tauri release bundle, fixed certificate, Gatekeeper distribution trust
 or TCC ownership works. The current release configuration deliberately disables
 hardened runtime for a self-signed certificate because bundled Kerberos dylibs
