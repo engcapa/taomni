@@ -1,6 +1,20 @@
 import { invoke } from "@tauri-apps/api/core";
 import type { PluginRecord } from "../pluginRegistry";
 import { signalPluginRegistryChanged } from "../pluginRegistryEvents";
+import type { AppProxyConfig } from "./proxy";
+
+export interface ModuleNetworkConfig {
+  mode: "app" | "custom" | "none";
+  custom: AppProxyConfig;
+}
+
+export function getModuleNetworkConfig(): Promise<ModuleNetworkConfig> {
+  return invoke<ModuleNetworkConfig>("plugin_network_get", {});
+}
+
+export function saveModuleNetworkConfig(config: ModuleNetworkConfig): Promise<void> {
+  return invoke<void>("plugin_network_save", { config });
+}
 
 export interface PluginInvokeRequest<T = unknown> extends Record<string, unknown> {
   slug: string;
@@ -202,7 +216,7 @@ export function startPluginDownload(options: ModuleDownloadOptions): Promise<Mod
     completedPath: options.completedPath,
     expectedTotal: options.expectedTotal,
     expectedSha256: options.expectedSha256,
-    proxyMode: options.proxyMode ?? "app",
+    proxyMode: options.proxyMode,
     applicationProxy: options.applicationProxy,
     featureProxy: options.featureProxy,
   });
@@ -225,7 +239,7 @@ export function resumePluginDownload(
   if (!id) return Promise.reject(new Error("Invalid module download id"));
   return invoke<ModuleDownloadProgress>("plugin_download_resume", {
     id,
-    proxyMode: options.proxyMode ?? "app",
+    proxyMode: options.proxyMode,
     applicationProxy: options.applicationProxy,
     featureProxy: options.featureProxy,
   });
@@ -248,7 +262,7 @@ export function fetchModuleCatalog(
   if (!url) return Promise.reject(new Error("Invalid module catalog URL"));
   return invoke<ModuleCatalog>("plugin_catalog_fetch", {
     url,
-    proxyMode: options.proxyMode ?? "app",
+    proxyMode: options.proxyMode,
     applicationProxy: options.applicationProxy,
     featureProxy: options.featureProxy,
   });

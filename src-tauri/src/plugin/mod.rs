@@ -11,6 +11,7 @@ pub mod host;
 pub mod install;
 mod installation;
 pub mod migration;
+pub(crate) mod network;
 pub mod protocol;
 mod quiescence;
 mod runtime;

@@ -18,31 +18,41 @@ pub struct HttpDownloadService {
 
 impl HttpDownloadService {
     pub fn new(route: &ProxyRoute) -> Result<Self, DownloadError> {
-        let mut builder = reqwest::Client::builder()
-            .connect_timeout(Duration::from_secs(20))
-            .read_timeout(Duration::from_secs(30))
-            .no_gzip()
-            .no_brotli()
-            .no_deflate()
-            .no_zstd();
-        match route {
-            ProxyRoute::NoProxy => {
-                builder = builder.no_proxy();
-            }
+        let proxy = match route {
+            ProxyRoute::NoProxy => None,
             ProxyRoute::Application(endpoint) | ProxyRoute::Feature(endpoint) => {
                 validate_endpoint(endpoint)?;
                 let scheme = match endpoint.kind {
                     ProxyKind::Http => "http",
                     ProxyKind::Socks5 => "socks5h",
                 };
-                let proxy = reqwest::Proxy::all(format!(
-                    "{scheme}://{}:{}",
-                    endpoint.host.trim(),
-                    endpoint.port
-                ))
-                .map_err(|error| DownloadError::Http(error.to_string()))?;
-                builder = builder.no_proxy().proxy(proxy);
+                Some(
+                    reqwest::Proxy::all(format!(
+                        "{scheme}://{}:{}",
+                        endpoint.host.trim(),
+                        endpoint.port
+                    ))
+                    .map_err(|error| DownloadError::Http(error.to_string()))?,
+                )
             }
+        };
+        Self::with_explicit_proxy(proxy)
+    }
+
+    /// Settings resolves session/manual credentials in the core. Accept its
+    /// explicit proxy without importing Vault or AppState into the transport.
+    /// An absent proxy always bypasses environment/system proxy discovery.
+    pub fn with_explicit_proxy(proxy: Option<reqwest::Proxy>) -> Result<Self, DownloadError> {
+        let mut builder = reqwest::Client::builder()
+            .no_proxy()
+            .connect_timeout(Duration::from_secs(20))
+            .read_timeout(Duration::from_secs(30))
+            .no_gzip()
+            .no_brotli()
+            .no_deflate()
+            .no_zstd();
+        if let Some(proxy) = proxy {
+            builder = builder.proxy(proxy);
         }
         builder
             .build()

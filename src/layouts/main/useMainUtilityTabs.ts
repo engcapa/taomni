@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo } from "react";
 import { useSessionStore } from "../../stores/sessionStore";
+import { useAppStore } from "../../stores/appStore";
 import type { MailTabInfo } from "../../types";
 import { passwordRefFromOptions } from "./authentication";
 import { mailSmtpPasswordRefFromOptions, sessionToMailTabInfo } from "./mailSession";
@@ -33,7 +34,9 @@ export function useMainUtilityTabs(context: UseMainUtilityTabsContext) {
   }, [layout.addTab]);
 
   const openSettingsTab = useCallback(() => {
-    const existing = layout.tabsRef.current.find((tab) => tab.type === "settings");
+    // Section navigation and an entry callback can dispatch in the same
+    // event, before React refreshes tabsRef. Read the synchronous owner.
+    const existing = useAppStore.getState().tabs.find((tab) => tab.type === "settings");
     if (existing) {
       layout.setActiveTab(existing.id);
       return;

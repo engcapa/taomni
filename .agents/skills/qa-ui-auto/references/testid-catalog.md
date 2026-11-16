@@ -2485,6 +2485,38 @@
 
 ## modules/core-startup (F-Modules-1)
 
+- `[data-testid="module-network-settings"]` — display — F-Modules-1.module-network-settings
+- `[data-testid="module-network-mode"]` — interactive — F-Modules-1.module-network-mode
+- `[data-testid="module-network-custom"]` — display — F-Modules-1.module-network-custom
+- `[data-testid="module-network-save-status"]` — display — F-Modules-1.module-network-save-status
+- `[data-testid="module-network-retry"]` — interactive — F-Modules-1.module-network-retry
+- `[data-testid="module-downloads"]` — display — F-Modules-1.module-downloads
+- `[data-testid="module-downloads-empty"]` — display — F-Modules-1.module-downloads-empty
+- `[data-testid="module-downloads-error"]` — display [optional] — F-Modules-1.module-downloads-error
+- `[data-testid="module-download-recovery-error"]` — display — F-Modules-1.module-download-recovery-error
+- `[data-testid="module-download-task"]` — display — F-Modules-1.module-download-task
+- `[data-testid="module-download-phase"]` — display — F-Modules-1.module-download-phase
+  ↳ `[data-testid="module-download-task"][data-download-id="preview-known"][data-phase="downloading"] [data-testid="module-download-phase"]` — alias
+- `[data-testid="module-download-progress"]` — display — F-Modules-1.module-download-progress
+  ↳ `[data-testid="module-download-task"][data-download-id="preview-known"] [data-testid="module-download-progress"]` — alias
+  ↳ `[data-testid="module-download-task"][data-download-id="preview-unknown"] [data-testid="module-download-progress"]` — alias
+- `[data-testid="module-download-bytes"]` — display — F-Modules-1.module-download-bytes
+  ↳ `[data-testid="module-download-task"][data-download-id="preview-known"] [data-testid="module-download-bytes"]` — alias
+  ↳ `[data-testid="module-download-task"][data-download-id="qa-module-download"] [data-testid="module-download-bytes"]` — alias
+- `[data-testid="module-download-error"]` — display — F-Modules-1.module-download-error
+  ↳ `[data-testid="module-download-task"][data-download-id="preview-unknown"] [data-testid="module-download-error"]` — alias
+  ↳ `[data-testid="module-download-task"][data-download-id="qa-module-download"] [data-testid="module-download-error"]` — alias
+- `[data-testid="module-download-cancel"]` — interactive — F-Modules-1.module-download-cancel
+  ↳ `[data-testid="module-download-task"][data-download-id="preview-known"] [data-testid="module-download-cancel"]` — alias
+  ↳ `[data-testid="module-download-task"][data-download-id="qa-module-download"] [data-testid="module-download-cancel"]` — alias
+- `[data-testid="module-download-resume"]` — interactive — F-Modules-1.module-download-resume
+  ↳ `[data-testid="module-download-task"][data-download-id="preview-known"] [data-testid="module-download-resume"]` — alias
+  ↳ `[data-testid="module-download-task"][data-download-id="preview-unknown"] [data-testid="module-download-resume"]` — alias
+  ↳ `[data-testid="module-download-task"][data-download-id="qa-module-download"] [data-testid="module-download-resume"]` — alias
+- `[data-testid="module-download-forget"]` — interactive — F-Modules-1.module-download-forget
+  ↳ `[data-testid="module-download-task"][data-download-id="preview-known"] [data-testid="module-download-forget"]` — alias
+  ↳ `[data-testid="module-download-task"][data-download-id="preview-unknown"] [data-testid="module-download-forget"]` — alias
+  ↳ `[data-testid="module-download-task"][data-download-id="qa-module-download"] [data-testid="module-download-forget"]` — alias
 - `[data-testid="context-menu-item-lan-chat"]` — display — F-Modules-1.removed-lanchat-context-entry
 - `[data-testid="welcome-open-lanchat"]` — display — F-Modules-1.removed-lanchat-welcome-entry
 - `[data-testid="tao-home-lan-chat"]` — display — F-Modules-1.removed-lanchat-home-card

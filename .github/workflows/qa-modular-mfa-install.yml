@@ -7,9 +7,14 @@ on:
         description: Repository commit/ref to test (QA artifacts only)
         type: string
         default: ''
+      network_only:
+        description: Compile the core and run persisted proxy contracts without signed MFA packages
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       head: {type: string, default: ''}
+      network_only: {type: boolean, default: false}
     secrets:
       TAURI_SIGNING_PRIVATE_KEY: {required: true}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: {required: false}
@@ -35,6 +40,7 @@ jobs:
         run: echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
 
   packages:
+    if: ${{ !inputs.network_only }}
     needs: source
     uses: ./.github/workflows/qa-modular-packages.yml
     with:
@@ -44,8 +50,9 @@ jobs:
     secrets: inherit
 
   installed-host:
-    name: Installed MFA (${{ matrix.platform }})
+    name: ${{ inputs.network_only && 'Core network' || 'Installed MFA' }} (${{ matrix.platform }})
     needs: [source, packages]
+    if: ${{ !cancelled() && needs.source.result == 'success' && (inputs.network_only || needs.packages.result == 'success') }}
     strategy:
       fail-fast: false
       # Intel macOS has a release-target build/signature above. These gates
@@ -109,6 +116,7 @@ jobs:
           "OPENSSL_SRC_PERL=$perl" >> $env:GITHUB_ENV
           'C:\Strawberry\perl\bin' >> $env:GITHUB_PATH
       - uses: actions/download-artifact@v4
+        if: ${{ !inputs.network_only }}
         with:
           name: qa-modular-package-${{ matrix.platform }}-mfa-install-${{ github.run_id }}
           path: signed-mfa-package
@@ -149,14 +157,17 @@ jobs:
               output.write(str(library) + "\n")
           PYTHON
       - name: Exercise the installed production registry and persisted Vault
+        if: ${{ !inputs.network_only }}
         env:
           TAOMNI_SIGNED_MFA_PACKAGE_DIR: signed-mfa-package
           TAOMNI_SIGNED_MFA_SOURCE_SHA: ${{ needs.source.outputs.sha }}
         run: python scripts/run-signed-mfa-host-gates.py --evidence modular-mfa-install
+      - name: Exercise persisted module proxy modes and Vault credentials
+        run: python scripts/run-module-network-gates.py --evidence modular-mfa-install
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: modular-signed-mfa-install-${{ matrix.platform }}
+          name: ${{ inputs.network_only && 'modular-network' || 'modular-signed-mfa-install' }}-${{ matrix.platform }}
           path: modular-mfa-install/
           if-no-files-found: error
           retention-days: 14

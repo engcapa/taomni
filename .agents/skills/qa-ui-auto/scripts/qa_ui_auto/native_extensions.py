@@ -22,6 +22,8 @@ def register(register_verb: RegisterVerb, verbs: dict[str, NativeVerb]) -> None:
     register_verb("module_restore_probe")(module_restore_probe)
     from .module_signed_observation import run as module_signed_probe
     register_verb("module_signed_probe")(module_signed_probe)
+    from .module_download_observation import run as module_download_probe
+    register_verb("module_download_probe")(module_download_probe)
     from .native_editor_probes import register as editor_probes
     from .terminal_rendering_probe import register_native as terminal_rendering
     from .mobile_native import register as mobile

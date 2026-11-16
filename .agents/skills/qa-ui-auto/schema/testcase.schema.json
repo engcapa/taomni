@@ -81,6 +81,8 @@
           "bookmark_assets",
           "module_offline_archive",
           "module_preview",
+          "module_download",
+          "module_download_preview",
           "module_signed_archive",
           "module_backup_data",
           "vnc_required",
@@ -903,6 +905,15 @@
               "items": {"$ref": "#/$defs/point"}
             }
           }
+        },
+        "module_download_probe": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["phase"],
+          "properties": {
+            "phase": {"enum": ["start", "advance-background", "cancelled", "recovered", "proxy-failed", "finish", "completed", "forgotten"]}
+          },
+          "description": "Native only: fixed case-owned loopback transfer through production IPC; independent Range/partial/hash/recovery observations. Cancellation and resume use Settings. No YAML-selected URL, paths or bytes."
         },
         "module_restore_probe": {
           "type": "object",

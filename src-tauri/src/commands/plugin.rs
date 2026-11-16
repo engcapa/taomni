@@ -1,14 +1,14 @@
-use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::path::PathBuf;
 use tauri::{AppHandle, Emitter, State};
 
+pub use super::plugin_network::PluginDownloadProxyEndpoint;
 use crate::{
     plugin::{
         PluginRecord,
         download::{
-            DownloadProgress, DownloadRequest, ModuleCatalog, ProxyEndpoint, ProxyRoute,
-            parse_proxy_mode, resolve_proxy_route, validate_download_paths_within_root,
+            DownloadProgress, DownloadRequest, ModuleCatalog, ProxyRoute,
+            validate_download_paths_within_root,
         },
     },
     state::AppState,
@@ -35,42 +35,6 @@ fn publish_registry_change(app: &AppHandle, result: &Result<PluginRecord, String
         "plugin-registry-changed",
         serde_json::json!({ "slug": slug }),
     );
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct PluginDownloadProxyEndpoint {
-    pub kind: String,
-    pub host: String,
-    pub port: u16,
-}
-
-fn resolve_download_route(
-    proxy_mode: String,
-    application_proxy: Option<PluginDownloadProxyEndpoint>,
-    feature_proxy: Option<PluginDownloadProxyEndpoint>,
-) -> Result<ProxyRoute, String> {
-    let mode = parse_proxy_mode(&proxy_mode).map_err(|error| error.to_string())?;
-    let parse_endpoint =
-        |endpoint: Option<PluginDownloadProxyEndpoint>| -> Result<Option<ProxyEndpoint>, String> {
-            endpoint
-                .map(|value| {
-                    let kind = crate::plugin::download::parse_proxy_kind(&value.kind)
-                        .map_err(|error| error.to_string())?;
-                    Ok(ProxyEndpoint {
-                        kind,
-                        host: value.host,
-                        port: value.port,
-                    })
-                })
-                .transpose()
-        };
-    resolve_proxy_route(
-        mode,
-        parse_endpoint(application_proxy)?,
-        parse_endpoint(feature_proxy)?,
-    )
-    .map_err(|error| error.to_string())
 }
 
 #[tauri::command]
@@ -272,12 +236,13 @@ pub async fn plugin_download_start(
     completed_path: String,
     expected_total: Option<u64>,
     expected_sha256: Option<String>,
-    proxy_mode: String,
+    proxy_mode: Option<String>,
     application_proxy: Option<PluginDownloadProxyEndpoint>,
     feature_proxy: Option<PluginDownloadProxyEndpoint>,
     state: State<'_, AppState>,
 ) -> Result<DownloadProgress, String> {
-    let route = resolve_download_route(proxy_mode, application_proxy, feature_proxy)?;
+    let service =
+        super::plugin_network::service(&state, proxy_mode, application_proxy, feature_proxy)?;
     let download_root = state.plugins.root().join(".downloads");
     std::fs::create_dir_all(&download_root)
         .map_err(|error| format!("create module download staging root: {error}"))?;
@@ -292,11 +257,11 @@ pub async fn plugin_download_start(
         completed_path,
         expected_total,
         expected_sha256,
-        proxy: route.clone(),
+        proxy: ProxyRoute::NoProxy,
     };
     state
         .plugin_downloads
-        .start_with_route(request, route)
+        .start_with_service(request, service)
         .await
         .map_err(|error| error.to_string())?;
     state
@@ -345,14 +310,13 @@ pub async fn plugin_download_list(
 #[tauri::command]
 pub async fn plugin_download_resume(
     id: String,
-    proxy_mode: String,
+    proxy_mode: Option<String>,
     application_proxy: Option<PluginDownloadProxyEndpoint>,
     feature_proxy: Option<PluginDownloadProxyEndpoint>,
     state: State<'_, AppState>,
 ) -> Result<DownloadProgress, String> {
-    let route = resolve_download_route(proxy_mode, application_proxy, feature_proxy)?;
-    let service = crate::plugin::download::HttpDownloadService::new(&route)
-        .map_err(|error| error.to_string())?;
+    let service =
+        super::plugin_network::service(&state, proxy_mode, application_proxy, feature_proxy)?;
     state
         .plugin_downloads
         .resume_with_service(&id, service)
@@ -370,14 +334,13 @@ pub async fn plugin_download_resume(
 #[tauri::command]
 pub async fn plugin_catalog_fetch(
     url: String,
-    proxy_mode: String,
+    proxy_mode: Option<String>,
     application_proxy: Option<PluginDownloadProxyEndpoint>,
     feature_proxy: Option<PluginDownloadProxyEndpoint>,
     state: State<'_, AppState>,
 ) -> Result<ModuleCatalog, String> {
-    let route = resolve_download_route(proxy_mode, application_proxy, feature_proxy)?;
-    let service = crate::plugin::download::HttpDownloadService::new(&route)
-        .map_err(|error| error.to_string())?;
+    let service =
+        super::plugin_network::service(&state, proxy_mode, application_proxy, feature_proxy)?;
     crate::plugin::fetch_trusted_catalog(&service, &url, state.plugins.root()).await
 }
 
@@ -439,6 +402,8 @@ pub(super) fn handles(command: &str) -> bool {
             | "plugin_download_list"
             | "plugin_download_resume"
             | "plugin_catalog_fetch"
+            | "plugin_network_get"
+            | "plugin_network_save"
             | "plugin_migration_inspect"
             | "plugin_migration_execute"
     )
@@ -462,6 +427,8 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         crate::commands::plugin::plugin_download_list,
         crate::commands::plugin::plugin_download_resume,
         crate::commands::plugin::plugin_catalog_fetch,
+        crate::commands::plugin_network::plugin_network_get,
+        crate::commands::plugin_network::plugin_network_save,
         crate::commands::plugin::plugin_migration_inspect,
         crate::commands::plugin::plugin_migration_execute,
     ];

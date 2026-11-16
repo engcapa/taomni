@@ -26,6 +26,8 @@ import { FileOpenSettings } from "../FileOpenSettings";
 import { MobileServiceSettings } from "../MobileServiceSettings";
 import { ModuleStorePanel, type ModuleStoreCatalogEntry } from "../ModuleStorePanel";
 import { ModuleOfflineInstall } from "../ModuleOfflineInstall";
+import { ModuleNetworkSettings } from "../ModuleNetworkSettings";
+import { ModuleDownloads } from "../ModuleDownloads";
 import { LanguageSection } from "../LanguageSection";
 import { LanguageServersSettings } from "../LanguageServersSettings";
 import { LiveTemplatesSettings } from "../LiveTemplatesSettings";
@@ -383,6 +385,8 @@ export function SettingsPanelView(inputs: SettingsPanelViewProps) {
               <ScreenshotSettings />
             </SettingsAnchor>
             <SettingsAnchor id="module-store">
+              <ModuleNetworkSettings />
+              <ModuleDownloads />
               <ModuleOfflineInstall onRegistryChanged={onModuleRegistryChanged} />
               <ModuleStorePanel
                 catalog={moduleCatalog}

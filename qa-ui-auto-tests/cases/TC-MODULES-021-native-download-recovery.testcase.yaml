@@ -1,0 +1,118 @@
+id: TC-MODULES-021
+title: Native module transfer continues in background and resumes verified bytes after restart
+description: >-
+  Start a fixed loopback transfer through production IPC. Real Settings buttons
+  cancel/resume the task; an independent HTTP origin and filesystem oracle prove
+  continued bytes while Settings is closed, stopped network activity, retained
+  partials, passive discovery after normal application restart, configured proxy
+  failure without direct fallback, exact Range resume and SHA-256 publication.
+  Removing the completed task and restarting must retain its completed bytes.
+  This does not establish signed remote catalog browsing or package installation.
+covers: [F-Modules-1]
+tags: [p1, modules, network, lifecycle]
+modes: [native]
+fixtures: [reset_db, module_download]
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- wait_for: '[data-testid="module-network-mode"]'
+- select_option: {selector: '[data-testid="module-network-mode"]', value: none}
+- wait_for: '[data-testid="module-network-save-status"][data-state="saved"]'
+- module_download_probe: {phase: start}
+- wait_for: '[data-testid="module-download-task"][data-download-id="qa-module-download"][data-phase="downloading"][data-downloaded="8192"]'
+- assert_count: {selector: '[data-testid="module-download-task"]', equal: 1}
+- click: '[data-testid="tab-item"][data-tab-type="settings"] [data-testid="tab-close"]'
+- wait_for: {selector: '[data-testid="settings-panel"]', state: detached}
+- module_download_probe: {phase: advance-background}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- wait_for: '[data-testid="module-download-task"][data-download-id="qa-module-download"][data-phase="downloading"][data-downloaded="16384"]'
+- click: '[data-testid="module-download-task"][data-download-id="qa-module-download"] [data-testid="module-download-cancel"]'
+- wait_for: '[data-testid="module-download-task"][data-download-id="qa-module-download"][data-phase="cancelled"][data-downloaded="16384"]'
+- module_download_probe: {phase: cancelled}
+- click: '[data-testid="tab-item"][data-tab-type="settings"] [data-testid="tab-close"]'
+- native_restart_app: null
+- wait_for: '[data-testid="status-bar"]'
+- module_download_probe: {phase: recovered}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- wait_for: '[data-testid="module-download-task"][data-download-id="qa-module-download"][data-phase="cancelled"][data-downloaded="16384"]'
+- select_option: {selector: '[data-testid="module-network-mode"]', value: custom}
+- wait_for: '[data-testid="module-network-custom"]'
+- fill: {selector: '[data-testid="module-network-custom"] input[aria-label="Proxy host"]', value: '127.0.0.1'}
+- fill: {selector: '[data-testid="module-network-custom"] input[aria-label="Port"]', value: '9'}
+- wait_for: '[data-testid="module-network-save-status"][data-state="saved"]'
+- click: '[data-testid="module-download-task"][data-download-id="qa-module-download"] [data-testid="module-download-resume"]'
+- wait_for: '[data-testid="module-download-task"][data-download-id="qa-module-download"][data-phase="failed"]'
+- wait_for: '[data-testid="module-download-task"][data-download-id="qa-module-download"] [data-testid="module-download-error"]'
+- module_download_probe: {phase: proxy-failed}
+- select_option: {selector: '[data-testid="module-network-mode"]', value: none}
+- wait_for: '[data-testid="module-network-save-status"][data-state="saved"]'
+- module_download_probe: {phase: finish}
+- click: '[data-testid="module-download-task"][data-download-id="qa-module-download"] [data-testid="module-download-resume"]'
+- wait_for: '[data-testid="module-download-task"][data-download-id="qa-module-download"][data-phase="completed"]'
+- module_download_probe: {phase: completed}
+- assert_text: {selector: '[data-testid="module-download-task"][data-download-id="qa-module-download"] [data-testid="module-download-bytes"]', contains: '100.0%'}
+- assert_count: {selector: '[data-testid="module-download-task"][data-download-id="qa-module-download"] [data-testid="module-download-cancel"]', equal: 0}
+- click: '[data-testid="module-download-task"][data-download-id="qa-module-download"] [data-testid="module-download-forget"]'
+- wait_for: '[data-testid="module-downloads-empty"]'
+- module_download_probe: {phase: forgotten}
+- select_option: {selector: '[data-testid="module-network-mode"]', value: app}
+- wait_for: '[data-testid="module-network-save-status"][data-state="saved"]'
+- click: '[data-testid="tab-item"][data-tab-type="settings"] [data-testid="tab-close"]'
+- native_restart_app: null
+- wait_for: '[data-testid="status-bar"]'
+- module_download_probe: {phase: forgotten}
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- wait_for: '[data-testid="module-downloads-empty"]'
+- assert_count: {selector: '[data-testid="module-download-task"]', equal: 0}
+- assert_no_runtime_errors: null
+- screenshot: module-native-download-recovered-and-retained.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Closing Settings keeps the native transfer alive; cancellation stops networking and retains the safe prefix.
+    actions: [6, 8, 11, 14, 17]
+    checkpoints:
+    - {step: 9, expectation: Native downloaded the first actual chunk.}
+    - {step: 10, expectation: There is exactly one transfer.}
+    - {step: 13, expectation: More actual bytes arrive after the view is closed.}
+    - {step: 16, expectation: Reopening restores the increased byte count.}
+    - {step: 18, expectation: UI cancellation retains its byte count.}
+    - {step: 19, expectation: Origin disconnect and exact partial bytes are independently confirmed.}
+    results: [9, 10, 13, 16, 18, 19]
+  - id: R2
+    requirement: A normal restart discovers the job passively and a failed configured proxy never opens the origin directly.
+    actions: [20, 21, 24, 27, 29, 30, 32]
+    checkpoints:
+    - {step: 23, expectation: Restart retains the partial without making another origin request.}
+    - {step: 26, expectation: Restarted Settings restores the cancelled task and bytes.}
+    - {step: 33, expectation: Configured proxy failure appears as a failed task.}
+    - {step: 34, expectation: Native failure is actionable in the UI.}
+    - {step: 35, expectation: The origin saw no fallback and its partial is unchanged.}
+    results: [23, 26, 33, 34, 35]
+  - id: R3
+    requirement: Explicit retry uses current settings and an exact Range, verifies and publishes all bytes; forgetting preserves the file across restart.
+    actions: [36, 38, 39, 44, 47, 49, 50, 53]
+    checkpoints:
+    - {step: 41, expectation: 'Independent origin Range, file content and atomic publication all match.'}
+    - {step: 42, expectation: The UI shows one hundred percent.}
+    - {step: 43, expectation: Completed downloads have no cancel action.}
+    - {step: 46, expectation: Removing the job keeps the completed bytes.}
+    - {step: 52, expectation: Another real restart does not resurrect the task or delete the file.}
+    - {step: 56, expectation: The final task list is empty.}
+    - {step: 57, expectation: No unhandled runtime errors occurred.}
+    results: [41, 42, 43, 46, 52, 56, 57]
+  native:
+  - check: Real native HTTP, disk progress, proxy selection, cancellation and process restart.
+    method: external
+    reason: Production IPC plus a run-owned loopback origin and independent byte/Range oracle; browser stubs cannot establish these effects.
+  visual:
+  - check: Restored tasks, errors and final empty state remain readable.
+    method: manual
+    reason: The retained screenshot supports visual review.

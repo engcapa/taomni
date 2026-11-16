@@ -18,7 +18,13 @@ files:
   - src/lib/moduleStore.ts
   - src/stores/moduleStore.ts
   - src/stores/moduleInstallStore.ts
+  - src/stores/moduleNetworkStore.ts
+  - src/stores/moduleDownloadStore.ts
   - src/components/settings/ModuleOfflineInstall.tsx
+  - src/components/settings/ModuleNetworkSettings.tsx
+  - src/components/settings/ModuleDownloads.tsx
+  - src-tauri/src/commands/plugin_network.rs
+  - src-tauri/src/plugin/network.rs
   - src-tauri/src/plugin/mod.rs
   - src-tauri/src/plugin/host.rs
   - src-tauri/src/plugin/install.rs
@@ -27,6 +33,80 @@ files:
   - src-tauri/src/plugin/uninstallation.rs
   - src-tauri/src/plugin/migration.rs
 controls:
+  - id: module-network-settings
+    selector: '[data-testid="module-network-settings"]'
+    kind: display
+  - id: module-network-mode
+    selector: '[data-testid="module-network-mode"]'
+    kind: interactive
+  - id: module-network-custom
+    selector: '[data-testid="module-network-custom"]'
+    kind: display
+  - id: module-network-save-status
+    selector: '[data-testid="module-network-save-status"]'
+    kind: display
+  - id: module-network-retry
+    selector: '[data-testid="module-network-retry"]'
+    kind: interactive
+  - id: module-downloads
+    selector: '[data-testid="module-downloads"]'
+    kind: display
+  - id: module-downloads-empty
+    selector: '[data-testid="module-downloads-empty"]'
+    kind: display
+  - id: module-downloads-error
+    selector: '[data-testid="module-downloads-error"]'
+    kind: display
+    optional: true # transient native IPC failure; retained-task unit regression
+  - id: module-download-recovery-error
+    selector: '[data-testid="module-download-recovery-error"]'
+    kind: display
+  - id: module-download-task
+    selector: '[data-testid="module-download-task"]'
+    kind: display
+  - id: module-download-phase
+    selector: '[data-testid="module-download-phase"]'
+    aliases:
+      - '[data-testid="module-download-task"][data-download-id="preview-known"][data-phase="downloading"] [data-testid="module-download-phase"]'
+    kind: display
+  - id: module-download-progress
+    selector: '[data-testid="module-download-progress"]'
+    aliases:
+      - '[data-testid="module-download-task"][data-download-id="preview-known"] [data-testid="module-download-progress"]'
+      - '[data-testid="module-download-task"][data-download-id="preview-unknown"] [data-testid="module-download-progress"]'
+    kind: display
+  - id: module-download-bytes
+    selector: '[data-testid="module-download-bytes"]'
+    aliases:
+      - '[data-testid="module-download-task"][data-download-id="preview-known"] [data-testid="module-download-bytes"]'
+      - '[data-testid="module-download-task"][data-download-id="qa-module-download"] [data-testid="module-download-bytes"]'
+    kind: display
+  - id: module-download-error
+    selector: '[data-testid="module-download-error"]'
+    aliases:
+      - '[data-testid="module-download-task"][data-download-id="preview-unknown"] [data-testid="module-download-error"]'
+      - '[data-testid="module-download-task"][data-download-id="qa-module-download"] [data-testid="module-download-error"]'
+    kind: display
+  - id: module-download-cancel
+    selector: '[data-testid="module-download-cancel"]'
+    aliases:
+      - '[data-testid="module-download-task"][data-download-id="preview-known"] [data-testid="module-download-cancel"]'
+      - '[data-testid="module-download-task"][data-download-id="qa-module-download"] [data-testid="module-download-cancel"]'
+    kind: interactive
+  - id: module-download-resume
+    selector: '[data-testid="module-download-resume"]'
+    aliases:
+      - '[data-testid="module-download-task"][data-download-id="preview-known"] [data-testid="module-download-resume"]'
+      - '[data-testid="module-download-task"][data-download-id="preview-unknown"] [data-testid="module-download-resume"]'
+      - '[data-testid="module-download-task"][data-download-id="qa-module-download"] [data-testid="module-download-resume"]'
+    kind: interactive
+  - id: module-download-forget
+    selector: '[data-testid="module-download-forget"]'
+    aliases:
+      - '[data-testid="module-download-task"][data-download-id="preview-known"] [data-testid="module-download-forget"]'
+      - '[data-testid="module-download-task"][data-download-id="preview-unknown"] [data-testid="module-download-forget"]'
+      - '[data-testid="module-download-task"][data-download-id="qa-module-download"] [data-testid="module-download-forget"]'
+    kind: interactive
   - id: removed-lanchat-context-entry
     selector: '[data-testid="context-menu-item-lan-chat"]'
     kind: display
