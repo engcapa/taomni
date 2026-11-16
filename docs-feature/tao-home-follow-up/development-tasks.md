@@ -2,7 +2,7 @@
 
 日期：2026-11-15。状态：**本轮已实现并验证一组 P0/P1 修复；其余任务按下方状态继续跟踪**。本文件汇总[实现核对报告](../tao-home-implementation-audit-2026-11-15.md)的发现与用户追加要求，作为后续排期、开发和验收入口。
 
-2026-11-16 更新：[后续验证回执](verification-2026-11-16.md)。`586f036a4` Windows 完整适用 crash-regression 加受影响 browser **28/28**、native **34/34** 通过，包含真实 DeepSeek、Vault 中断恢复与 SSH/SFTP；Linux browser **28/28** 通过。Word 16 实际排版已确认代表流程图占满内容宽、100%/200% 清晰，同时发现公式重复导出，新增 MD-007。新修复的整批及 hosted 跨平台验证继续执行。以下较早表格中的“native 待验证”以新回执的具名断言为准，完整 AC 未由局部通过自动关闭。
+2026-11-16 最新批次：`e57779493` 的 Windows browser/native **30/30 / 36/36**、Linux browser/native **30/30 / 33/33**、macOS browser/native **31/31 / 35/35** 均通过，零失败、零跳过，含各平台全部适用 crash-regression（browser **18/18**、native **22/22**）和 Windows 八次真实商业 DeepSeek 请求。完整 frontend **7011 passed / 1 条件跳过 / 0 failed**，120 项 native Rust 契约通过。最新身份、原始回执及边界见[当前源码验证批次](verification-2026-11-16.md#e57779493-当前源码的最终验证批次)；此前失败与修复过程保留在同文件较早章节。Word 16 已确认代表流程图与两条公式的实际排版、100%/200% 清晰。以下较早表格中的“native 待验证”以最新具名断言为准，完整 AC 未由局部通过自动关闭。
 
 基线：[主设计 v1.3](../tao-home-design.md)、[细化设计 v0.3](../tao-home-detailed-design.md)、[高保真原型 v0.3](../tao-home-prototype.html)；代码核查基线为 `6170f095ff3de7e555d43a183446437c29dca6e5`。源码位置是本次定位线索，实施前需复核最新代码。
 
@@ -408,3 +408,5 @@ TH-032 保留回归补充：`801a4132c` 的 Linux/macOS browser 已分别 30/30�
 Windows 保存对话框的全局模拟送键丢字已用原生控件逐字输入及读回确认修正；最后 FILE007/011 native probe **2/2**、30 项对话框工具单元和 refactor 检查通过，实际四种导出及取消结果均保留原要求。完整 Windows browser/native 与新 runner 的 hosted 回执继续执行，不将 probe 结果等同于完整 TH-032 验收。具体失败保留、输入边界及匹配构建身份见[验证记录](verification-2026-11-16.md)。
 
 `704f7aa79` 最终 Windows browser **30/30**、native **36/36**（全部 18/22 适用 crash）；商业 DeepSeek 三项、八次真实请求正常完成，没有走失效 Key 分支。Linux/macOS browser **30/30 / 31/31** 的 raw/receipt/产物身份校验通过。后续 macOS 设置定位回归补异步布局保护和用户接管，新增 8 项单元；完整 Settings/Workspace 单元 286 项、导航单元 3 项通过，新 source 的原生/hosted 结果以[验证记录](verification-2026-11-16.md)为准，不提前关闭 TH-011/032 或全部原型 AC。
+
+`e57779493`（含设置异步布局保护）的 Windows browser **30/30**、匹配 QA release 的 native **36/36**，独立回执校验无拒绝，完整适用 crash **18/18 / 22/22** 均通过。新批商业 DeepSeek TC005/011/013 共八次真实 native 请求正常完成，无 Key 失效分支；Stop、Markdown 和恢复历史尾部均实际可见。GitHub [43796588906](https://github.com/engcapa/taomni/actions/runs/43796588906) 已成功结束：Linux browser/native **30/30 / 33/33**、macOS browser/native **31/31 / 35/35**，全部原始回执独立验签及逐项产物校验通过，各平台完整选择无遗漏/重复、全部 18/22 适用 crash 通过。FILE011/013 与 TH003 的原生保留回归均通过；完整 frontend **7011 passed / 1 条件跳过 / 0 failed**、Linux native Rust 契约 **120/120**。详见[当前源码验证批次](verification-2026-11-16.md#e57779493-当前源码的最终验证批次)；本批反馈和具名回归已验证，未覆盖的完整 AC 与全面原型对齐继续保留待办。

@@ -2,6 +2,8 @@
 
 分支：`feat/tao-home-follow-up`。本批先完成用户反馈和已实施能力的真实验证，完整原型对齐与未贯通 AC 继续保留在 development-tasks.md。
 
+**最新源码汇总：[e57779493 当前批次](#e57779493-当前源码的最终验证批次)**。下方按时间保留不同源码/runner 的执行与失败记录；历史批次不替代最新源码结果。
+
 ## Windows Tao 真机
 
 匹配的隔离 QA release：`src-tauri/target/qa-ui-auto/release/taomni.exe`，应用 ID `com.taomni.app.qa`。产品源码 hash 为 `332e9bcd8dbf45c91a782d182c821777120d05bcdc47a4c38e38778e9a7b2f88`，二进制 SHA-256 为 `51c1536b36e56611935479367641ec5c2203b4ca365b7e39985d78554dd392c9`。WebView2 与 msedgedriver 均为 `157.0.4341.46`；没有修改个人应用或数据。
@@ -288,3 +290,26 @@ Windows 当前 source / runner 下，browser `C:/tmp/tqa-terminal-focus-final-br
 新增 **8 项** focused 单元覆盖异步前置内容、连续 resize 合并、四种用户接管、折叠等待/取消、preset 与隐藏页签；完整 SettingsPanel / CodeWorkspaceTab 加该模块 **3 files / 286 tests** 通过（108.1 秒），`settingsNavigation.test.ts` 另 **3/3** 通过。CI 中的 ED-REPAIR-006 用例补“journal commit 后 Undo command enabled”前置条件，保留大小写不同两文件的独立写入、实际 Ctrl+Z 确认及精确恢复断言。
 
 TH003 补齐 reviewed 的行为检查映射、工作流/语音面板关闭结果和设置定位截图。第一次新增测试定义被 TypeScript mock 类型和 testcase schema 检查拦下，已修正；对应失败日志 `settings-final-build-1116.log` / `settings-final-browser-1116.log` 保留，未产生产品执行通过记录。最终严格 case loader 和 `pnpm check:refactor` 通过（4715 files / 4 documented exceptions）；新 source 的 QA release、完整 browser/native 及 hosted 验证继续执行，不能复用上节旧 source 的通过结果冒充本修复验收。
+
+## `e57779493` 当前源码的最终验证批次
+
+本节对应包含设置异步布局修复的 `e577794931b427cfb82f4f401189508e68d26974`，后续只更新本节同一批次的结果。source SHA-256 为 `1568ca4a45be5baac71fe7de3e2ac7c4e750438fb502c2428a6c644be96db09e`，runner SHA-256 为 `917de2316d852b65f399c638a7dde615020342cc690b83ed2cf417ba2516fc0d`。Windows QA release 的应用 ID 为 `com.taomni.app.qa`，binary SHA-256 为 `74e0ea5eecb3303956558a554b709988d75aa78c190ea306f7b9c31e94815d49`，构建成功且身份与测试源码一致。
+
+| 平台 / 模式 | 执行结果与证据 |
+|---|---|
+| Windows browser | **30 passed / 0 failed / 0 skipped**，112.1 秒；`C:/tmp/tqa-terminal-focus-final-browser-1116/run-20261116-111021-800883300`，source stable，独立 status 接受全部回执，完整适用 crash **18/18** 无遗漏 |
+| Windows native release | **36 passed / 0 failed / 0 skipped**，960.8 秒；`C:/tmp/tqa-terminal-focus-final-native-1116/run-20261116-111828-811391600`，source stable，独立 status 接受全部 36 个 native 回执、无 rejected report 或 native gap，完整适用 crash **22/22** 无遗漏 |
+| Linux browser | **30 passed / 0 failed / 0 skipped**；下述 GitHub workflow 的两个原始分片，回执签名、summary 绑定、所列全部产物 hash/size、source/runner/case 身份与 stable 标记均独立校验一致 |
+| macOS browser | **31 passed / 0 failed / 0 skipped**；同 workflow 两个原始分片，通过与 Linux 相同的独立校验 |
+| Linux native release | **33 passed / 0 failed / 0 skipped**；四个原始分片与 33 项选择清单一致，无遗漏/重复，完整适用 crash **22/22**，回执签名、全部产物 hash/size、source/runner/case/build 身份及 stable 标记独立校验一致 |
+| macOS native release | **35 passed / 0 failed / 0 skipped**；四个原始分片与 35 项选择清单一致，无遗漏/重复，完整适用 crash **22/22**，通过与 Linux 相同的独立校验 |
+
+GitHub：[43796588906](https://github.com/engcapa/taomni/actions/runs/43796588906)，head 与本节提交一致，使用 `qa-ui-auto-platforms.yml`、Linux/macOS browser/native release 和显式受影响选择，自动包含完整 crash-regression。选择清单分别为 Linux browser/native **30/33**、macOS browser/native **31/35**。Linux native Rust 契约 **120 passed / 0 failed**；完整 frontend **794 files / 7011 passed / 1 skipped / 0 failed**，Vitest 693.96 秒，ED-REPAIR-006 修正已由本轮完整执行确认。唯一跳过来自已有的终端 text-mirror 构建开关条件测试（`clipboard3.cases.tsx` 的互斥 profile 分支），不是 browser/native 场景跳过。完整 producer 日志保留为 `qa-ui-auto-report/_local/e577-linux-producer-complete-1116.log`。商业 Key 用例继续仅在 Windows 本机执行，未上传 Key。旧 `43794207330` 已在 producer/cache 完成后取消重复排队；旧 `43789929072` 当时已完成，取消未生效，不记录为已取消。
+
+该 workflow 最终结论为 **success**。全部 hosted 原始报告保留于 `qa-ui-auto-report/_local/hosted-43796588906/`，独立完整性结果为其中的 `independent-feedback-verification.json`。最终核对四组 selection 与实际 ID 全量相等，零遗漏/额外/重复；Linux/macOS browser 均完整包含 **18/18** crash，native 均 **22/22**，所有执行为通过。Linux 四个分片的 release binary SHA-256 一致为 `e1e26b324c2ee1a6cfee9412c5e17fe6cc34800a95982d6869cfba522d02fcc8`，macOS 四个分片一致为 `c2dda4ad35089273d4e583e3ca024bbeab1a7170a78269596dc0e14acbdb7a26`；两平台均为 `com.taomni.app.qa` 且 source 与本节一致。
+
+本节 Windows native TC005/011/013 outcome 分别为 `response-complete`、`scenarios-complete`、`documents-complete`，**八次真实 DeepSeek 请求全部正常回复，没有 Key 失效成功分支**。覆盖不可预知 token 的多轮回忆与重新生成、语言切换保留草稿而不额外请求、新会话隔离、真实流式侧栏并排与 Stop、实际 Markdown heading/table/code、native context clone、原会话/分支的消息及独立草稿恢复和无自动发送。Stop 卡片、Markdown 回复及恢复历史尾部的独立几何观测均为 `gap = 0` 且目标上下边界可见；已人工查看该批 `real-stopped.png`、`real-markdown.png` 与基础真实回复截图。三个 fixture 都记录 `fixture_cleaned`。被停止请求不保证完整 usage，预算 1M tokens 为上限，不宣称精确累计消耗。
+
+最新浏览器的 800×600 中英文建议、并排拖拽侧栏，以及 Windows/Linux/macOS native 的 Tao 设置定位截图已查看：四项建议保持单行、省略而不折叠，侧栏不覆盖聊天，设置只有一个 tab 且标题在粘性搜索栏下。FILE011（终端文件链接焦点）、FILE013（Markdown 分栏实际拖拽）、TH003（设置异步布局定位）均在本源码的真实 native 测试中通过。`pnpm check:refactor` 最终通过（855 commands、328 facade exports、39 events、944 implementation modules、4715 files / 4 documented exceptions）。
+
+本批用户反馈和具名保留回归已完成验证，完整原型对齐及未覆盖的 TH/MD AC 继续保留待办。Linux 证据限于本轮 Xvfb/WebKitGTK profile，macOS 的 WKWebView/AppKit 对象自动化不等同于 OS 硬件按键送达、真实菜单栏点击或所有 macOS 版本/架构验收；Word 视觉证据仍限于此前记录的 Word 16 代表样例。
