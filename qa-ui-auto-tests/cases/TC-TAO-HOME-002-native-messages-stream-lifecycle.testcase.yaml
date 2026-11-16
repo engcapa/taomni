@@ -101,7 +101,7 @@ steps:
 - assert_not_visible: '[data-testid="tao-home-stop"]'
 - click: '[data-testid="tao-home-dock-more"]'
 - click: '[data-testid="tao-home-dock-settings"]'
-- click: '[data-provider="deepseek-app"] > div'
+- wait_for: '[data-provider="deepseek-app"] [data-testid="llm-proxy-mode"]'
 - select_option:
     selector: '[data-provider="deepseek-app"] [data-testid="llm-proxy-mode"]'
     value: custom
