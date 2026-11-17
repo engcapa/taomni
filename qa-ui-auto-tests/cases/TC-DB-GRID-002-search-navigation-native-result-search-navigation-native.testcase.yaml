@@ -2,7 +2,7 @@ id: TC-DB-GRID-002-search-navigation-native
 title: Native query-result search navigates virtual cells and respects sort/filter order
 description: A real database session returns 240 rows with three distant matching cells. Buttons and actual WebView key events
   navigate, wrap, scroll and preserve row filtering. Cmd/Ctrl+F belongs to the focused results and macOS Cmd+Shift+G moves backward.
-  Native validates real query delivery and WebView virtualization; mounted units cover editable and IME ownership.
+  Sort the visible rightmost label header after horizontal navigation. Native validates real query delivery and WebView virtualization; mounted units cover editable and IME ownership.
 modes:
 - native
 covers:
@@ -123,8 +123,8 @@ steps:
 - assert_text:
     selector: '[data-search-current="true"]'
     contains: Target-240
-- click: '[data-testid="query-result-sort-header"][data-column="id"]'
-- click: '[data-testid="query-result-sort-header"][data-column="id"]'
+- click: '[data-testid="query-result-sort-header"][data-column="label"]'
+- click: '[data-testid="query-result-sort-header"][data-column="label"]'
 - assert_text:
     selector: '[data-testid="query-result-search-count"]'
     contains: 1/3
@@ -309,7 +309,7 @@ verification:
     method: automated
     reason: A real database session returns 240 rows with three distant matching cells. Buttons and actual WebView key events navigate,
       wrap, scroll and preserve row filtering. Cmd/Ctrl+F belongs to the focused results and macOS Cmd+Shift+G moves backward.
-      Native validates real query delivery and WebView virtualization; mounted units cover editable and IME ownership.
+      Sort the visible rightmost label header after horizontal navigation. Native validates real query delivery and WebView virtualization; mounted units cover editable and IME ownership.
   visual:
   - check: Changed controls remain visible and readable in the final retained screenshot
     method: manual
