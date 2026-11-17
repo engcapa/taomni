@@ -1183,6 +1183,14 @@
   ↳ `[data-testid="explorer-nav-node"]${fixture.explorer_source_match} button` — alias
 - `[data-testid="explorer-nav-shortcut"]` — interactive — F-EXPLORER-1.explorer-nav-shortcut
 - `[data-testid="explorer-nav-tree"]` — display — F-EXPLORER-1.explorer-nav-tree
+- `[data-testid="explorer-new-typed-file"]` — interactive — F-EXPLORER-1.explorer-new-typed-file
+- `[data-testid="explorer-context-new-typed-file"]` — interactive — F-EXPLORER-1.explorer-context-new-typed-file
+- `[data-testid="explorer-new-file-dialog"]` — display — F-EXPLORER-1.explorer-new-file-dialog
+- `[data-testid="explorer-new-file-type"]` — interactive — F-EXPLORER-1.explorer-new-file-type
+- `[data-testid="explorer-new-file-name"]` — interactive — F-EXPLORER-1.explorer-new-file-name
+- `[data-testid="explorer-new-file-error"]` — display — F-EXPLORER-1.explorer-new-file-error
+- `[data-testid="explorer-new-file-cancel"]` — interactive — F-EXPLORER-1.explorer-new-file-cancel
+- `[data-testid="explorer-new-file-create"]` — interactive — F-EXPLORER-1.explorer-new-file-create
 - `[data-testid="explorer-new-file"]` — interactive — F-EXPLORER-1.explorer-new-file
 - `[data-testid="explorer-new-folder"]` — interactive — F-EXPLORER-1.explorer-new-folder
 - `[data-testid="explorer-preview"]` — display — F-EXPLORER-1.explorer-preview

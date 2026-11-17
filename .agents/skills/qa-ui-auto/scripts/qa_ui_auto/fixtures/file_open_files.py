@@ -16,6 +16,7 @@ SAVED = "File open saved\nSecond line\n中文\n"
 SVG = '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="80"><script>window.FILE_OPEN_SVG_UNSAFE=true</script><rect width="120" height="80" fill="#2563eb" onload="alert(1)"/><image href="https://example.invalid/tracker.png"/></svg>\n'
 SVG_SAVED = '<svg xmlns="http://www.w3.org/2000/svg" width="160" height="90"><rect width="160" height="90" fill="#16a34a"/></svg>\n'
 MARKDOWN = "# File open Markdown\n\n**Rendered bold** and `inline code`.\n\nMath: $x^2$ and $$\\frac{1}{2}$$.\n\n## Details\n\n![Original](assets/pixel.png)\n\n- [ ] First task\n\n```mermaid\nflowchart LR\n  Explorer --> OpenFile --> Viewer\n```\n"
+MARKDOWN_TABLE = "# Live table\n\n| **Heading** | Link | Safety |\n| :--- | :---: | ---: |\n| **bold** *italic* ~~removed~~ `code` $x^2$ | [safe](https://example.test) | [bad](javascript:alert(1)) <img src=\"assets/pixel.png\" onerror=\"window.TABLE_UNSAFE=true\"> |\n| Keep \\| pipe | <u>underline</u><br>next | untouched |\n"
 HTML = '''<!doctype html><html><head><meta charset="utf-8"><link rel="stylesheet" href="assets/local.css"></head><body><h1>File open HTML</h1><div id="resource">Local resource</div><img id="pixel" src="assets/pixel.png"><a href="next.html">Next local page</a><a href="https://example.invalid/external">External browser</a><script>
 window.addEventListener("load", function () {
   console.log("FILE_OPEN_SCRIPT_OK");
@@ -43,6 +44,7 @@ def setup(ctx: Any) -> None:
     files = {
         "notes.txt": TEXT.encode(), "recovery.txt": b"Recovery disk original\n", "retry.txt": b"Retry original\n",
         "binary.txt": b"\x00\xff\x00binary", "unsafe.svg": SVG.encode(), "live.md": MARKDOWN.encode(),
+        "table.md": MARKDOWN_TABLE.encode(),
         "report.html": HTML.encode(), "next.html": b"<!doctype html><h1>Next local page</h1>",
         "assets/local.css": b"#resource { color: rgb(12, 34, 56); }", "assets/pixel.png": PNG,
         "src/sample.ts": b"export const fileOpenSource = true;\n", "unsupported.bin": b"\x00\xff\x10",
@@ -68,6 +70,7 @@ def setup(ctx: Any) -> None:
         "file_open_svg_original_sha": hashlib.sha256(SVG.encode()).hexdigest(),
         "file_open_svg_saved_sha": hashlib.sha256(SVG_SAVED.encode()).hexdigest(),
         "file_open_markdown_sha": hashlib.sha256(MARKDOWN.encode()).hexdigest(),
+        "file_open_table_sha": hashlib.sha256(MARKDOWN_TABLE.encode()).hexdigest(),
         "file_open_png_sha": hashlib.sha256(PNG).hexdigest(),
         "file_open_html_sha": hashlib.sha256(HTML.encode()).hexdigest(),
     })

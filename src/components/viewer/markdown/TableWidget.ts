@@ -1,14 +1,19 @@
 import { EditorView, WidgetType, runScopeHandlers } from "@codemirror/view";
 import { type MarkdownTable, modifyTable, serializeTable } from "./markdownModel";
 import { replaceWidgetSource, widgetButton, type MarkdownWidgetContext } from "./markdownWidgetContext";
+import { TableCell } from "./TableCell";
 
-interface Runtime { widget: TableWidget }
+interface Runtime { widget: TableWidget; cells: Map<HTMLElement, TableCell> }
 const runtimes = new WeakMap<HTMLElement, Runtime>();
 
 export class TableWidget extends WidgetType {
   constructor(readonly from: number, readonly raw: string, readonly table: MarkdownTable, readonly context: MarkdownWidgetContext) { super(); }
   eq(other: TableWidget): boolean { return this.from === other.from && this.raw === other.raw && this.context === other.context; }
   ignoreEvent(): boolean { return true; }
+  destroy(dom: HTMLElement): void {
+    runtimes.get(dom)?.cells.forEach((cell) => cell.destroy());
+    runtimes.delete(dom);
+  }
 
   updateDOM(dom: HTMLElement): boolean {
     const runtime = runtimes.get(dom);
@@ -16,8 +21,8 @@ export class TableWidget extends WidgetType {
     runtime.widget = this;
     dom.dataset.tableFrom = String(this.from);
     dom.querySelectorAll<HTMLElement>("[data-cell-row]").forEach((cell) => {
-      const row = Number(cell.dataset.cellRow), column = Number(cell.dataset.cellColumn);
-      if (cell.textContent !== this.table.rows[row]?.[column]) cell.textContent = this.table.rows[row]?.[column] ?? "";
+      const column = Number(cell.dataset.cellColumn);
+      runtime.cells.get(cell)?.sync();
       cell.style.textAlign = this.table.align[column] || "left";
     });
     return true;
@@ -28,7 +33,7 @@ export class TableWidget extends WidgetType {
     root.className = "fv-md-table-wrap";
     root.dataset.testid = "markdown-table-widget";
     root.dataset.tableFrom = String(this.from);
-    const runtime: Runtime = { widget: this };
+    const runtime: Runtime = { widget: this, cells: new Map() };
     runtimes.set(root, runtime);
     const label = this.context.label;
     let activeRow = 0, activeColumn = 0;
@@ -69,11 +74,10 @@ export class TableWidget extends WidgetType {
     tools.append(hint);
     const table = document.createElement("table");
     const head = document.createElement("thead"), body = document.createElement("tbody");
-    this.table.rows.forEach((cells, rowIndex) => {
+    this.table.rows.forEach((_, rowIndex) => {
       const row = document.createElement("tr");
       Array.from({ length: this.table.align.length }, (_, columnIndex) => {
         const cell = document.createElement(rowIndex ? "td" : "th");
-        cell.textContent = cells[columnIndex] ?? "";
         cell.setAttribute("contenteditable", this.context.readOnly ? "false" : "true");
         cell.spellcheck = false;
         cell.tabIndex = 0;
@@ -81,36 +85,21 @@ export class TableWidget extends WidgetType {
         cell.dataset.cellColumn = String(columnIndex);
         cell.style.textAlign = this.table.align[columnIndex] || "left";
         cell.setAttribute("aria-label", label(`第 ${rowIndex + 1} 行，第 ${columnIndex + 1} 列`, `Row ${rowIndex + 1}, column ${columnIndex + 1}`));
-        cell.onfocus = () => {
+        const activate = () => {
           activeRow = rowIndex; activeColumn = columnIndex;
           root.querySelectorAll(".is-active").forEach((node) => node.classList.remove("is-active"));
           cell.classList.add("is-active");
           root.classList.add("is-active");
         };
-        let composing = false;
-        const update = () => {
-          if (composing || runtime.widget.context.readOnly) return;
-          const current = runtime.widget.table;
-          const rows = current.rows.map((cells) => [...cells]);
-          rows[rowIndex][columnIndex] = cell.textContent || "";
-          commit({ rows, align: current.align });
-        };
-        cell.addEventListener("compositionstart", () => { composing = true; });
-        cell.addEventListener("compositionend", () => { composing = false; update(); });
-        cell.oninput = update;
-        cell.onpaste = (event) => {
-          event.preventDefault();
-          const text = event.clipboardData?.getData("text/plain") || "";
-          const selection = window.getSelection();
-          const range = selection?.rangeCount ? selection.getRangeAt(0) : null;
-          if (range && cell.contains(range.commonAncestorContainer)) {
-            range.deleteContents();
-            const node = document.createTextNode(text);
-            range.insertNode(node); range.setStartAfter(node); range.collapse(true);
-            selection?.removeAllRanges(); selection?.addRange(range);
-          } else cell.textContent = text;
-          update();
-        };
+        runtime.cells.set(cell, new TableCell(cell, view, { context: this.context, activate,
+          source: () => runtime.widget.table.rows[rowIndex]?.[columnIndex] ?? "",
+          commit: (source) => {
+            const current = runtime.widget.table;
+            const rows = current.rows.map((cells) => [...cells]);
+            if (rows[rowIndex][columnIndex] === source) return;
+            rows[rowIndex][columnIndex] = source;
+            commit({ rows, align: current.align });
+          } }));
         cell.onkeydown = (event) => {
           if (event.isComposing) return;
           if ((event.ctrlKey || event.metaKey) && ["z", "y", "s", "p"].includes(event.key.toLowerCase()) && runScopeHandlers(view, event, "editor")) {

@@ -21,6 +21,7 @@ export function ExplorerCommandBar({ path, workspaceId, selected, operations, on
   const newMenu: MenuItem[] = [
     { label: label("文件夹", "Folder"), icon: <FolderPlus />, testId: "explorer-new-folder", onClick: () => void operations.create(true) },
     { label: label("文本文件", "Text file"), icon: <Plus />, testId: "explorer-new-file", onClick: () => void operations.create(false) },
+    { label: label("其他文件类型…", "Other file types…"), icon: <Plus />, testId: "explorer-new-typed-file", onClick: operations.startNewFile },
     { label: "", separator: true },
     { label: label("从剪贴板粘贴文件", "Paste files from clipboard"), icon: <ClipboardPaste />, onClick: () => void operations.paste() },
   ];

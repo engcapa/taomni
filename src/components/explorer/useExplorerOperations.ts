@@ -12,6 +12,8 @@ import { useSftpStore } from "../../stores/sftpStore";
 import { clipboardMatches, getExplorerClipboard, setExplorerClipboard } from "./explorerClipboard";
 import { useExplorerLabels } from "./explorerLabels";
 import { openFile } from "../../lib/openFile";
+import { newFileNameError, uniqueNewFileName } from "./explorerFileTypes";
+import { setExplorerPreferences } from "./explorerPreferences";
 
 export interface ExplorerToast { message: string; error?: boolean; undo?: () => void }
 export interface DeletePrompt { entries: FileEntry[]; reason?: string }
@@ -23,6 +25,7 @@ export function useExplorerOperations(tabId: string, workspaceId?: string) {
   const [properties, setProperties] = useState<FileEntry[] | null>(null);
   const [progress, setProgress] = useState<ExplorerProgress | null>(null);
   const [busy, setBusy] = useState(false);
+  const [newFile, setNewFile] = useState(false);
   const operation = useRef<string | null>(null);
   const mounted = useRef(true);
   const lock = useRef(false);
@@ -169,20 +172,39 @@ export function useExplorerOperations(tabId: string, workspaceId?: string) {
       return true;
     } catch (error) { notify(String(error), true); return false; }
   }, [notify, refreshAll, tabId]);
-  const create = useCallback((directory: boolean) => run(async () => {
+  const suggestFileName = useCallback((name: string) => uniqueNewFileName(name,
+    useSftpStore.getState().sessions[tabId]?.local.entries.map((entry) => entry.name) ?? []), [tabId]);
+  const createEntry = useCallback(async (name: string, directory: boolean) => {
     const pane = useSftpStore.getState().sessions[tabId]?.local;
-    if (!pane) return;
-    const base = directory ? label("新建文件夹", "New folder") : label("新建文本文档", "New text document");
-    const extension = directory ? "" : ".txt";
-    const existing = new Set(pane.entries.map((entry) => entry.name));
-    let name = `${base}${extension}`;
-    let i = 2;
-    while (existing.has(name)) name = `${base} (${i++})${extension}`;
+    if (!pane) throw new Error(label("目录不可用", "Folder is unavailable"));
     const path = await localCreateEntry(pane.path, name, directory);
+    if (name.startsWith(".")) setExplorerPreferences({ showHidden: true });
     await refreshAll();
     useSftpStore.getState().setSelection(tabId, "local", [path]);
     setRenamePath(path);
-  }), [label, refreshAll, run, tabId]);
+  }, [label, refreshAll, tabId]);
+  const create = useCallback((directory: boolean) => run(async () => {
+    const base = directory ? label("新建文件夹", "New folder") : label("新建文本文档", "New text document");
+    const extension = directory ? "" : ".txt";
+    await createEntry(suggestFileName(`${base}${extension}`), directory);
+  }), [createEntry, label, run, suggestFileName]);
+  const createFile = useCallback(async (name: string) => {
+    let created = false;
+    await run(async () => {
+      setToast(null);
+      const error = newFileNameError(name, label);
+      if (error) throw new Error(error);
+      const entries = useSftpStore.getState().sessions[tabId]?.local.entries ?? [];
+      if (entries.some((entry) => entry.name.toLowerCase() === name.toLowerCase())) {
+        throw new Error(label("该文件已存在，请选择其他名称", "This file already exists; choose another name"));
+      }
+      await createEntry(name, false);
+      setNewFile(false);
+      created = true;
+    });
+    return created;
+  }, [createEntry, label, run, tabId]);
+  const startNewFile = useCallback(() => { setToast(null); setNewFile(true); }, []);
   const copyPath = useCallback(async (paths: string[]) => {
     try { await writeText(paths.join("\n")); notify(label("已复制路径", "Path copied")); }
     catch (error) { notify(String(error), true); }
@@ -195,7 +217,8 @@ export function useExplorerOperations(tabId: string, workspaceId?: string) {
     if (operation.current) void explorerCancelOperation(operation.current).catch((error) => notify(String(error), true));
   }, [notify]);
   return { toast, notify, busy, progress, cancel, open, copy, paste, drop, transfer, remove, permanentDelete,
-    rename, renamePath, setRenamePath, create, copyPath, reveal, deletePrompt, setDeletePrompt, properties, setProperties };
+    rename, renamePath, setRenamePath, create, createFile, suggestFileName, newFile, setNewFile, startNewFile,
+    copyPath, reveal, deletePrompt, setDeletePrompt, properties, setProperties };
 }
 
 export type ExplorerOperations = ReturnType<typeof useExplorerOperations>;

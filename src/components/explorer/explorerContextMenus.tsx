@@ -32,6 +32,7 @@ export function explorerEmptyMenu(path: string, operations: ExplorerOperations, 
   return [
     { label: label("新建文件夹", "New folder"), testId: "explorer-context-new-folder", icon: <FolderPlus />, disabled: operations.busy, onClick: () => void operations.create(true) },
     { label: label("新建文本文件", "New text file"), testId: "explorer-context-new-file", icon: <FilePlus />, disabled: operations.busy, onClick: () => void operations.create(false) },
+    { label: label("新建其他文件…", "New file of another type…"), testId: "explorer-context-new-typed-file", icon: <FilePlus />, disabled: operations.busy, onClick: operations.startNewFile },
     { label: "", separator: true },
     { label: label("粘贴", "Paste"), testId: "explorer-context-paste", icon: <ClipboardPaste />, disabled: operations.busy, onClick: () => void operations.paste() },
     { label: "", separator: true },

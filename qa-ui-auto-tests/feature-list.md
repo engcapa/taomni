@@ -15443,6 +15443,11 @@ area: files/explorer
 components: [ExplorerShell, ExplorerNavTree, ExplorerFileList, ExplorerPreviewPane]
 files:
   - src/components/explorer/ExplorerShell.tsx
+  - src/components/explorer/ExplorerNewFileDialog.tsx
+  - src/components/explorer/explorerFileTypes.ts
+  - src/components/explorer/useExplorerOperations.ts
+  - src/components/explorer/ExplorerCommandBar.tsx
+  - src/components/explorer/explorerContextMenus.tsx
   - src/components/explorer/ExplorerNavTree.tsx
   - src/components/explorer/ExplorerFileList.tsx
   - src/components/explorer/preview/ExplorerPreviewPane.tsx
@@ -15635,6 +15640,30 @@ controls:
   - id: explorer-nav-tree
     selector: '[data-testid="explorer-nav-tree"]'
     kind: display
+  - id: explorer-new-typed-file
+    selector: '[data-testid="explorer-new-typed-file"]'
+    kind: interactive
+  - id: explorer-context-new-typed-file
+    selector: '[data-testid="explorer-context-new-typed-file"]'
+    kind: interactive
+  - id: explorer-new-file-dialog
+    selector: '[data-testid="explorer-new-file-dialog"]'
+    kind: display
+  - id: explorer-new-file-type
+    selector: '[data-testid="explorer-new-file-type"]'
+    kind: interactive
+  - id: explorer-new-file-name
+    selector: '[data-testid="explorer-new-file-name"]'
+    kind: interactive
+  - id: explorer-new-file-error
+    selector: '[data-testid="explorer-new-file-error"]'
+    kind: display
+  - id: explorer-new-file-cancel
+    selector: '[data-testid="explorer-new-file-cancel"]'
+    kind: interactive
+  - id: explorer-new-file-create
+    selector: '[data-testid="explorer-new-file-create"]'
+    kind: interactive
   - id: explorer-new-file
     selector: '[data-testid="explorer-new-file"]'
     kind: interactive
@@ -15804,6 +15833,9 @@ files:
   - src/components/viewer/HtmlPreview.tsx
   - src/components/viewer/HtmlPreviewExternalLinkDialog.tsx
   - src/components/viewer/markdown/MarkdownEditor.tsx
+  - src/components/viewer/markdown/TableWidget.ts
+  - src/components/viewer/markdown/TableCell.ts
+  - src/components/viewer/markdown/markdownRender.ts
   - src/components/viewer/markdown/MarkdownExportMenu.tsx
   - src/components/viewer/markdown/DrawioExportSettings.tsx
   - src/components/viewer/markdown/DrawioImportDialog.tsx
