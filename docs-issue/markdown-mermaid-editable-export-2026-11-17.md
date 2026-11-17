@@ -12,7 +12,7 @@
 - 三种格式使用 FileCode2、FileImage、Workflow 图标，并显示 SVG、PNG、draw.io。保留工具提示、可访问名称和忙碌禁用行为。
 - 分离解析入口、通用几何/视图变换、节点图转换、时序图转换。新增模块均小于 200 行；不向现有大组件添加转换职责。
 - Mermaid 图形的全部元素直接归属图层，没有整体组合。子图轮廓也是独立可编辑形状。第一个元素的 mxGraph user object 保留原始 Mermaid 源码，不承担父容器职责。
-- 使用实际 SVG 的线段、折点与路径。折线保留每个顶点；曲线转换为标准 draw.io 曲线连接并保留采样路径（最多 256 段），不强制直角自动路由。连接仍绑定实际节点，保持箭头、虚线和关系基数。
+- 使用实际 SVG 的线段、折点与路径。折线保留每个顶点；最初的曲线实现保留采样路径（最多 256 段），已由下文 11 月 18 日的原生控制多边形拟合替代。连接不强制直角自动路由，仍绑定实际节点，保持箭头、虚线和关系基数。
 - 旋转、翻转和全文导出的偏移应用于每个元素、连接锚点和控制点。
 - 用户提供的时序图保留独立参与者、生命线、9 条消息、3 条自调用、激活条、循环框和自动编号；文本均可编辑。Actor 用原生椭圆、线段和文字构成。仍不支持的其他图族继续明确回退 SVG。
 - 文本模式导入 draw.io 时，不把时序图编号/参与者标签从图形中抽走。
@@ -53,7 +53,7 @@ Windows/macOS browser 在 [44052981988](https://github.com/engcapa/taomni/action
 
 最终独立核验保存在证据根的 `independent-mermaid-evidence.json/.log`：签名、source/runner、QA release、用例指纹、执行配置和绑定产物大小/SHA-256；实际导出文件另记 `independent-native-export-files.json`。Linux 同一源码的 Agnes 无代理真实请求另有 1/1，不混入上述 33 项。`pnpm check:refactor`、开发用例契约和 case/control audit 均通过。macOS 截图/桥接按键不作为 OS 层送键或其他 macOS 版本/架构的证据，边界见六项 follow-up 记录。
 
-## 真实 testing.md 追加回归（进行中）
+## 真实 testing.md 追加回归
 
 输入为用户原文件 `/home/zhyhang/temp/testing.md`，4510 字节，SHA-256 `c669a35a1cc8ec37aba798b496fa5b6c8c6405118079482bcaec03ee4c27f900`。新增 TC-FILE-OPEN-027/028 保存完全相同的 fixture；本机 native 通过 `TAOMNI_QA_MARKDOWN_SOURCE_FILE` 直接打开原路径，只做浏览和导出，并在前后独立核对哈希。编辑/撤销检查仅在 browser 的隔离副本中执行。
 
@@ -69,4 +69,20 @@ Live 表格原来直接使用 `textContent` 写原始 Markdown。现在使用现
 
 Word 中文追加修复前，本轮 Linux native 完整批次 `run-20261117-222534-951648892` 为 **33/33、完整 22 项 crash-regression**；原文件 028 在 `run-20261117-222408-356048930` 为 **1/1**，42 步全部通过，原文件前后 SHA 一致。有效并集 **34/34**；737/38 个绑定产物的回执签名、源码/runner/QA release、用例、配置与文件散列均独立复核。两图用实际 draw.io Desktop 29.6.6 打开，流程与时序连接正常；PDF 四页逐页检查完整且可搜索。此批是追加字形修复前的验收，不能冒充新产品源码验证。
 
-新增字形布局 7 项单测；完整 Markdown **33 文件 / 182 项通过**。首次有一项既有导入取消测试在按钮恢复启用后立即断言焦点，而产品通过 effect 恢复焦点；保留原失败，把焦点本身作为异步等待条件后完整复跑通过，没有移除焦点断言。独立 draw.io/Word 检查器 **15 项通过**，refactor 契约/边界/source size 通过。新证据独立保存于上述根目录的 `final/`；此段写入时新 QA release 与新源码 browser 正在执行。
+`b7f8252fc` 的追加字形修复已在 Linux 完成：Markdown **182/182**、browser **29/29（18 crash）**、原文件 native **1/1** 加完整 native **33/33（22 crash）**。`final/independent-local-base.json` 独立核验签名、源码/runner/build、用例/配置及 932 个绑定文件；`final/visual-review.json` 记录全部四页 PDF/Word 和 draw.io 两图的实际视觉复核。产物在 `verified-original-final/`。中文标签、线身与时序连接正常；Linux 的 Word 视觉使用 LibreOffice，不扩称 Win11 Microsoft Word 客户端验收。该版本 hosted 为 [44113948966](https://github.com/engcapa/taomni/actions/runs/44113948966)，完成的 shard 持续下载。Agnes 047 单独失败，原响应明确账户余额不足，不能沿用旧成功记录冒充本次通过。
+
+## 曲线控制点追加修复（2026-11-18，验证中）
+
+用户随后报告：draw.io 中线条外观正常，但选中弧线后有密集编辑点。旧代码虽然生成单条 edge，却每约 10px 把 SVG 采样点写入 waypoints；原文件两条长曲线分别产生 87、101 个控制点。之前只检查曲线外观/端点，未覆盖编辑控制点数量。
+
+`drawioMermaidCurves.ts` 按 draw.io 原生 connector 的二次 Bézier 链拟合控制多边形，逐步寻找满足 1.5px 形状目标的最小控制点数，复杂路径最多 12 个；采样仅用于测量。显式保留 `shape=connector;curved=1`、source/target 连接、箭头与虚线，端点不参与拟合；折线继续保留原折点。旋转、翻转、页面偏移及标签仍由原 geometry owner 处理。可编辑优先，超过控制点上限的复杂曲线保留最接近的原生曲线近似。
+
+新增曲线单测覆盖单弧、S 形、自调用、长回路、闭合曲线、平移和退化路径，独立重建 draw.io 曲线验证形状及端点；原 geometry 用例从“需要很多点”改为验证紧凑原生曲线。025/026 实际下载/保存后，独立 XML 检查器拒绝密集控制点，同时保留时序端点与无分组检查。原文件 027/028、其他 Mermaid 家族、Word/PDF、六项近期功能与完整 crash 回归继续运行。
+
+新证据根 `/data-raw-hdd/temp/taomni-curves-columns-20261117`，旧文件拒绝结果为 `baseline-dense-control-points.json`。本段写入时新版完整 browser/native/hosted 尚在验证，最终实际 draw.io Desktop 打开与编辑结果待回填。
+
+本轮受影响 unit **45 文件 / 293 项**、独立 draw.io/Word 检查器 **16 项**、TypeScript 与 refactor 检查通过。Linux browser 完整批次 `run-20261118-001304-369973590` 为 **34/34（18 crash）**；同期 Explorer 006 后续仅修正测试指令和主题检查，单独复验，不将旧 case 指纹冒充新用例结果。
+
+Browser 027 实际导出的文件已用 draw.io Desktop 29.6.6 渲染两张图并目视检查。原文件两条长弧线分别只有 **8、7 个原生控制点**（原来 87、101）；Desktop 实际选中 7 点曲线后，用鼠标拖动一个控制点、撤销，几何恢复且 source/target 仍绑定原节点。证据为 `browser-drawio-review/desktop-selected-curve.json`、`desktop-edit-curve.json` 和选中/拖动截图。匹配 QA release 的 `native/run-20261118-003255-917884230` 已直接打开原文件并实际导出，028 与列宽 006 **2/2 通过**、identity stable，原文件前后 SHA 一致；完整 native 其余 36 项与新版 hosted 结果待回填。
+
+历史字形测试说明：`b7f8252fc` 的 182 项 Markdown 单测首次有一项导入取消测试在按钮启用后立即断言焦点；保留原失败，改为等待焦点恢复后完整通过，没有移除焦点断言。相关 15 项检查器及 `final/` 证据属于前一轮真实文件修复，不与本轮新增曲线结果混用。
