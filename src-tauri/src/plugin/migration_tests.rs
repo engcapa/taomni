@@ -2,17 +2,19 @@ use super::*;
 use tempfile::tempdir;
 
 #[test]
-fn detects_legacy_files_and_tables_without_mutating_data() {
+fn detects_legacy_files_without_mutating_data_or_reading_removed_chat() {
     let dir = tempdir().unwrap();
     fs::write(dir.path().join("mfa.db"), b"legacy").unwrap();
     fs::write(dir.path().join("lanchat.sqlite"), b"legacy-chat").unwrap();
-    let found = detect_legacy_install(dir.path(), &["server_configs", "rdp_certificate_pins"]);
+    let found = inspect_legacy_install(dir.path(), "0.5.9")
+        .unwrap()
+        .candidates;
     assert_eq!(
         found
             .iter()
             .map(|candidate| candidate.plugin_slug.as_str())
             .collect::<Vec<_>>(),
-        vec!["rdp-client", "rdp-client", "servers", "mfa"]
+        vec!["mfa"]
     );
     assert_eq!(fs::read(dir.path().join("mfa.db")).unwrap(), b"legacy");
     assert_eq!(
@@ -196,9 +198,12 @@ fn inspects_real_legacy_sqlite_and_builds_only_file_specs() {
     fs::create_dir_all(data.join("sockscap")).unwrap();
     let db = rusqlite::Connection::open(data.join("taomni.db")).unwrap();
     db.execute_batch(
-        "CREATE TABLE sessions (id TEXT);\
+        "CREATE TABLE sessions (id TEXT, session_type TEXT);\
          CREATE TABLE rdp_certificate_pins (host TEXT);\
-         CREATE TABLE server_configs (id TEXT);",
+         CREATE TABLE server_configs (id TEXT);\
+         INSERT INTO sessions VALUES ('rdp', 'RDP');\
+         INSERT INTO rdp_certificate_pins VALUES ('rdp.example.test');\
+         INSERT INTO server_configs VALUES ('ssh');",
     )
     .unwrap();
     drop(db);
@@ -288,8 +293,11 @@ fn records_db_only_candidates_as_pending_without_a_pseudo_plugin_version() {
     let journal_path = dir.path().join("migration/journal.json");
     fs::create_dir_all(&source_root).unwrap();
     let db = rusqlite::Connection::open(source_root.join("taomni.db")).unwrap();
-    db.execute_batch("CREATE TABLE sessions (id TEXT);")
-        .unwrap();
+    db.execute_batch(
+        "CREATE TABLE sessions (id TEXT, session_type TEXT);\
+        INSERT INTO sessions VALUES ('rdp', 'RDP');",
+    )
+    .unwrap();
     drop(db);
 
     let snapshot = inspect_legacy_install(&source_root, "0.5.9").unwrap();
@@ -353,4 +361,88 @@ fn pending_preflight_preserves_an_existing_active_pointer_and_source_hash() {
         journal.entries[0].source_fingerprint,
         snapshot.source_fingerprints["mfa.db"]
     );
+}
+
+#[test]
+fn pending_rescan_replaces_obsolete_schema_hints_with_the_actual_vnc_owner() {
+    let dir = tempdir().unwrap();
+    let source = dir.path().join("legacy");
+    fs::create_dir_all(&source).unwrap();
+    let database = rusqlite::Connection::open(source.join("taomni.db")).unwrap();
+    database
+        .execute_batch(
+            "CREATE TABLE sessions (id TEXT, session_type TEXT);
+             INSERT INTO sessions VALUES ('vnc', 'VNC');",
+        )
+        .unwrap();
+    drop(database);
+    let path = dir.path().join("migration/journal.json");
+    let mut old = MigrationJournal {
+        from_version: "0.5.9".into(),
+        to_core_api_version: "1".into(),
+        status: MigrationRunState::Pending,
+        entries: vec![],
+    };
+    for item in [MigrationItem::RdpVncSessions, MigrationItem::ServerConfigs] {
+        old.mark_with_source(
+            item,
+            MigrationStepState::Pending,
+            "old-schema-only-fingerprint".into(),
+            "taomni.db".into(),
+            PathBuf::new(),
+        );
+    }
+    old.save_atomic(&path).unwrap();
+    let snapshot = inspect_legacy_install(&source, "0.5.9").unwrap();
+    let executor =
+        MigrationExecutor::new(&source, dir.path().join("plugins"), &path, "0.5.9", "1").unwrap();
+    for _ in 0..2 {
+        let result = executor.record_pending(&snapshot).unwrap();
+        assert_eq!(result.pending, [MigrationItem::VncSessions]);
+        let journal = MigrationJournal::load(&path).unwrap();
+        assert_eq!(journal.entries.len(), 1);
+        assert_eq!(journal.entries[0].item, MigrationItem::VncSessions);
+        assert_eq!(
+            journal.entries[0].source_fingerprint,
+            snapshot.source_fingerprints["taomni.db"]
+        );
+    }
+    assert!(!dir.path().join("plugins").exists());
+}
+
+#[test]
+fn pending_scan_cannot_erase_staged_or_completed_migration_history() {
+    let dir = tempdir().unwrap();
+    let path = dir.path().join("migration/journal.json");
+    let snapshot = inspect_legacy_install(&dir.path().join("absent"), "0.5.9").unwrap();
+    let executor =
+        MigrationExecutor::new(dir.path(), dir.path().join("plugins"), &path, "0.5.9", "1")
+            .unwrap();
+    for state in [
+        MigrationStepState::Staged,
+        MigrationStepState::Committed,
+        MigrationStepState::RolledBack,
+    ] {
+        let mut journal = MigrationJournal {
+            from_version: "0.5.9".into(),
+            to_core_api_version: "1".into(),
+            status: MigrationRunState::Pending,
+            entries: vec![],
+        };
+        journal.mark(
+            MigrationItem::RdpVncSessions,
+            state,
+            "original".into(),
+            "plugins/rdp-client".into(),
+        );
+        journal.save_atomic(&path).unwrap();
+        let before = fs::read(&path).unwrap();
+        assert!(
+            executor
+                .record_pending(&snapshot)
+                .unwrap_err()
+                .contains("explicit recovery")
+        );
+        assert_eq!(fs::read(&path).unwrap(), before);
+    }
 }

@@ -128,6 +128,7 @@ export async function installMarketplaceModule(selection: ModuleCatalogSelection
 
 export type LegacyMigrationItem =
   | "rdp-vnc-sessions"
+  | "vnc-sessions"
   | "rdp-certificate-pins"
   | "server-configs"
   | "mfa"

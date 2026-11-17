@@ -106,6 +106,7 @@ from . import rdp_deferred_clipboard
 from . import module_offline_archive
 from . import module_signed_archive, module_backup_data
 from . import module_preview
+from . import module_upgrade
 from . import module_download
 from . import module_download_preview
 from . import module_marketplace, module_marketplace_preview
@@ -136,6 +137,7 @@ class Fixture:
 
 REGISTRY: dict[str, Fixture] = {
     "module_preview": Fixture("module_preview", module_preview.setup),
+    "module_upgrade": Fixture("module_upgrade", module_upgrade.setup),
     "module_download": Fixture("module_download", module_download.setup, module_download.teardown),
     "module_download_preview": Fixture("module_download_preview", module_download_preview.setup),
     "module_marketplace": Fixture("module_marketplace", module_marketplace.setup, module_marketplace.teardown),

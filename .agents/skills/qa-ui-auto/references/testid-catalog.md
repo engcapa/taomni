@@ -2620,6 +2620,14 @@
 - `[data-testid="module-store-catalog-error"]` — display — F-Modules-1.module-store-catalog-error
 - `[data-testid="module-store-loading"]` — display — F-Modules-1.module-store-loading
 - `[data-testid="module-upgrade-status"]` — display — F-Modules-1.module-upgrade-status
+- `[data-testid="module-upgrade-candidates"]` — display — F-Modules-1.module-upgrade-candidates
+  ↳ `[data-testid="module-upgrade-candidates"] li` — alias
+- `[data-testid="module-upgrade-empty"]` — display — F-Modules-1.module-upgrade-empty
+- `[data-testid="module-upgrade-error"]` — display — F-Modules-1.module-upgrade-error
+- `[data-testid="module-upgrade-migrate"]` — interactive — F-Modules-1.module-upgrade-migrate
+  ↳ `[data-testid="module-upgrade-migrate"]:not([disabled])` — alias
+- `[data-testid="module-upgrade-pending"]` — display — F-Modules-1.module-upgrade-pending
+- `[data-testid="module-upgrade-retained"]` — display — F-Modules-1.module-upgrade-retained
 - `[data-testid="module-offline-install"]` — display — F-Modules-1.module-offline-install
 - `[data-testid="module-offline-archive"]` — interactive — F-Modules-1.module-offline-archive
 - `[data-testid="module-offline-choose"]` — interactive — F-Modules-1.module-offline-choose

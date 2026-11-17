@@ -37,6 +37,8 @@ files:
   - src-tauri/src/plugin/retained_data.rs
   - src-tauri/src/plugin/uninstallation.rs
   - src-tauri/src/plugin/migration.rs
+  - src-tauri/src/plugin/migration_preflight.rs
+  - src-tauri/src/plugin/migration_database.rs
 controls:
   - id: module-marketplace
     selector: '[data-testid="module-marketplace"]'
@@ -195,6 +197,28 @@ controls:
   - id: module-upgrade-status
     selector: '[data-testid="module-upgrade-status"]'
     kind: display
+  - id: module-upgrade-candidates
+    selector: '[data-testid="module-upgrade-candidates"]'
+    aliases:
+      - '[data-testid="module-upgrade-candidates"] li'
+    kind: display
+  - id: module-upgrade-empty
+    selector: '[data-testid="module-upgrade-empty"]'
+    kind: display
+  - id: module-upgrade-error
+    selector: '[data-testid="module-upgrade-error"]'
+    kind: display
+  - id: module-upgrade-migrate
+    selector: '[data-testid="module-upgrade-migrate"]'
+    aliases:
+      - '[data-testid="module-upgrade-migrate"]:not([disabled])'
+    kind: interactive
+  - id: module-upgrade-pending
+    selector: '[data-testid="module-upgrade-pending"]'
+    kind: display
+  - id: module-upgrade-retained
+    selector: '[data-testid="module-upgrade-retained"]'
+    kind: display
   - id: module-offline-install
     selector: '[data-testid="module-offline-install"]'
     kind: display
@@ -286,7 +310,7 @@ controls:
     kind: display
 -->
 
-模块化运行时的可选插件扫描、manifest 校验、前端 chunk 加载、宿主监督、版本目录安装状态机和单体升级 journal 已建立基础契约；LanChat 已从产品、迁移和备份范围删除，模块商店设置入口已接入 native registry 的明确状态和旧版本升级预检状态，下载服务和具体插件迁移仍按设计文档 M0–M3 逐批交付。核心启动、删除、模块商店与升级预检回归见 `TC-MODULES-001`–`TC-MODULES-005`；`TC-MODULES-006` 保留 browser/native 未可信离线包拒绝，`TC-MODULES-007` 用生产固定公钥和 GitHub 官方签名 artifact 验证真实安装、宿主调用、启禁、重开、重启重验、篡改拒绝与卸载，并用独立 OS 非阻塞锁检查真实宿主 writer lease 的持有/释放；core 退出后 profile lease 的归属由三端真实进程 gate 另行证明。`TC-MODULES-008` 验证核心便签跨 renderer reload 与 registry 同时可用，`TC-MODULES-009` 验证 native 正常退出重启后便签和 registry 恢复，并只读真实 profile metadata，断言正常重启保留同一 generation。`TC-MODULES-010` 覆盖默认卸载取消/确认、原始数据和定位记录跨正常重启保留、可信重装不改数据、显式删除及重开设置后的真实状态；定位记录不授予执行/密钥权限，备份路径只能位于自身 data 子树。`TC-MODULES-011` 通过真实禁用和卸载后的手工任务，独立核验 v2 模块归档、SQLite WAL、源数据不变及正常重启；它不代表运行中 snapshot 协议或三态原生还原通过。`TC-MODULES-012` 验证官方签名 SDK 宿主真实写入、持有 writer 锁时的两次运行中快照、释放后继续写入与正常重启后的数据；独立核验归档 SQLite/WAL、hash、generation 与源字节，仍不代表真实 MFA 迁出或 applied restore。新用例未执行前不代表成功证据。
+模块化运行时的可选插件扫描、manifest 校验、前端 chunk 加载、宿主监督、版本目录安装状态机和单体升级 journal 已建立基础契约；LanChat 已从产品、迁移和备份范围删除，模块商店设置入口已接入 native registry 的明确状态和旧版本升级预检状态，下载服务和具体插件迁移仍按设计文档 M0–M3 逐批交付。升级预检按实际记录区分 RDP/VNC/Servers，空表和 SSH 会话不推荐模块；`TC-MODULES-025/026` 分别覆盖真实只读/pending/restart 与明确 browser 模型。核心启动、删除、模块商店与升级预检回归见 `TC-MODULES-001`–`TC-MODULES-005`；`TC-MODULES-006` 保留 browser/native 未可信离线包拒绝，`TC-MODULES-007` 用生产固定公钥和 GitHub 官方签名 artifact 验证真实安装、宿主调用、启禁、重开、重启重验、篡改拒绝与卸载，并用独立 OS 非阻塞锁检查真实宿主 writer lease 的持有/释放；core 退出后 profile lease 的归属由三端真实进程 gate 另行证明。`TC-MODULES-008` 验证核心便签跨 renderer reload 与 registry 同时可用，`TC-MODULES-009` 验证 native 正常退出重启后便签和 registry 恢复，并只读真实 profile metadata，断言正常重启保留同一 generation。`TC-MODULES-010` 覆盖默认卸载取消/确认、原始数据和定位记录跨正常重启保留、可信重装不改数据、显式删除及重开设置后的真实状态；定位记录不授予执行/密钥权限，备份路径只能位于自身 data 子树。`TC-MODULES-011` 通过真实禁用和卸载后的手工任务，独立核验 v2 模块归档、SQLite WAL、源数据不变及正常重启；它不代表运行中 snapshot 协议或三态原生还原通过。`TC-MODULES-012` 验证官方签名 SDK 宿主真实写入、持有 writer 锁时的两次运行中快照、释放后继续写入与正常重启后的数据；独立核验归档 SQLite/WAL、hash、generation 与源字节，仍不代表真实 MFA 迁出或 applied restore。新用例未执行前不代表成功证据。
 
 动态前端基础接入主窗和独立 WebView：共享 React SDK、owner-scoped IPC、仅 locator 的保存恢复、启禁撤销、缺失占位和重试。`TC-MODULES-016` 验证官方签名 ESM/相对资源、真实 host 写入、非活动草稿、reload、分离窗启禁同步和回挂；`TC-MODULES-017` 以明确 browser-only model 覆盖同类 renderer 流程，不代表验签或原生存储；`TC-MODULES-018` 独立篡改已安装前端，验证原生协议拒绝、错误隔离及恢复原字节后重试。它们尚待 matching runner，不将 MFA 产品入口迁出或 TASK-007 全部验收记为完成。
 

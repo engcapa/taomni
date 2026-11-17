@@ -35,13 +35,23 @@ export async function invokePlugin<T>(command: string, args?: Record<string, unk
     case "plugin_list":
     case "plugin_refresh":
       return invokeModulePreview(command, args) as T;
-    case "plugin_migration_inspect":
-      return {
+    case "plugin_migration_inspect": {
+      const preview = localStorage.getItem("taomni.preview.module-upgrade.v1");
+      return (preview ? JSON.parse(preview) : {
         from_version: "0.5.x", database_path: null, database_tables: [], candidates: [],
         source_fingerprints: {}, retained_paths: [], vault: null,
+      }) as T;
+    }
+    case "plugin_migration_execute": {
+      const preview = localStorage.getItem("taomni.preview.module-upgrade.v1");
+      const candidates = preview ? JSON.parse(preview).candidates : [];
+      if (candidates.length) return {
+        status: "pending", committed: [], skipped: [],
+        pending: candidates.map((candidate: { item: string }) => candidate.item),
+        pending_reason: "Browser preview: migration requires a verified module package and a native legacy data exporter.",
       } as T;
-    case "plugin_migration_execute":
       return { status: "complete", committed: [], skipped: [], pending: [], pending_reason: null } as T;
+    }
     case "plugin_install_archive":
     case "plugin_install_staged":
       throw new Error("Unverified module package: browser preview cannot verify native signatures.");

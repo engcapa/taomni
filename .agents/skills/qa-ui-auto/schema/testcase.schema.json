@@ -87,6 +87,7 @@
           "bookmark_assets",
           "module_offline_archive",
           "module_preview",
+          "module_upgrade",
           "module_download",
           "module_download_preview",
           "module_marketplace",
@@ -928,6 +929,11 @@
           "type": "object", "additionalProperties": false, "required": ["phase"],
           "properties": { "phase": { "enum": ["block", "rejected", "restore", "recovered"] } },
           "description": "Hosted Linux native only: owned noexec bind fault on one verified installed hello version, fixed real IPC rejection/recovery, unchanged code/data and native writer lease. No YAML paths, commands or registry mutations. Fault cleanup restores the original mount."
+        },
+        "module_upgrade_probe": {
+          "type": "object", "additionalProperties": false, "required": ["phase"],
+          "properties": { "phase": { "enum": ["preflight", "pending", "repeat"] } },
+          "description": "Native only: read-only observation of the fixed VNC-only legacy fixture, original session records, retained chat bytes, absent module directories and idempotent pending journal. No YAML paths, SQL, commands or product mutations."
         },
         "module_marketplace_probe": {
           "type": "object", "additionalProperties": false, "required": ["phase"],

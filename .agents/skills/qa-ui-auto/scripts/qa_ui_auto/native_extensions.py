@@ -28,6 +28,8 @@ def register(register_verb: RegisterVerb, verbs: dict[str, NativeVerb]) -> None:
     register_verb("module_download_probe")(module_download_probe)
     from .module_marketplace_observation import run as module_marketplace_probe
     register_verb("module_marketplace_probe")(module_marketplace_probe)
+    from .module_upgrade_observation import run as module_upgrade_probe
+    register_verb("module_upgrade_probe")(module_upgrade_probe)
     from .native_editor_probes import register as editor_probes
     from .terminal_rendering_probe import register_native as terminal_rendering
     from .mobile_native import register as mobile

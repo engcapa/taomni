@@ -40,7 +40,9 @@ pub struct LegacyInstallSnapshot {
 #[derive(Debug, Clone, Copy, Serialize, Deserialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub enum MigrationItem {
+    // Keep the existing journal spelling for RDP; VNC now has its own owner.
     RdpVncSessions,
+    VncSessions,
     RdpCertificatePins,
     ServerConfigs,
     Mfa,
@@ -260,6 +262,24 @@ impl MigrationExecutor {
             return Err("migration journal version does not match this executor".into());
         }
 
+        // Older schema-only preflights could record empty feature tables or
+        // attribute VNC to RDP. Reconcile only unperformed placeholders. A
+        // staged/committed transaction needs its actual recovery executor;
+        // rescanning must never erase or reset that history.
+        if journal.entries.iter().any(|entry| {
+            entry.state != MigrationStepState::Pending || !entry.target.as_os_str().is_empty()
+        }) {
+            return Err(
+                "migration journal contains performed work; explicit recovery is required".into(),
+            );
+        }
+        journal.entries.retain(|entry| {
+            snapshot
+                .candidates
+                .iter()
+                .any(|candidate| candidate.item == entry.item)
+        });
+
         for candidate in &snapshot.candidates {
             let source_path = pending_source_path(snapshot, candidate)?;
             let source_key = source_path.to_string_lossy().into_owned();
@@ -314,6 +334,7 @@ fn pending_source_path(
     if matches!(
         candidate.item,
         MigrationItem::RdpVncSessions
+            | MigrationItem::VncSessions
             | MigrationItem::RdpCertificatePins
             | MigrationItem::ServerConfigs
     ) && snapshot.source_fingerprints.contains_key("taomni.db")
@@ -382,7 +403,7 @@ fn hash_tree(path: &Path, digest: &mut Sha256, size: &mut u64) -> Result<(), Str
 
 #[path = "migration_preflight.rs"]
 mod preflight;
-pub use preflight::{build_file_migration_specs, detect_legacy_install, inspect_legacy_install};
+pub use preflight::{build_file_migration_specs, inspect_legacy_install};
 
 #[cfg(test)]
 #[path = "migration_fixture.rs"]

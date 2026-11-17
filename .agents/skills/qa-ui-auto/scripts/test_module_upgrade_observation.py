@@ -1,0 +1,97 @@
+"""Fixture/oracle units use disposable SQLite files; no app or service starts."""
+from contextlib import closing
+import json
+from pathlib import Path
+import sqlite3
+from types import SimpleNamespace
+import tempfile
+import unittest
+
+from qa_ui_auto.fixtures.module_upgrade import CHAT_FILES, input_sessions, preview_snapshot
+from qa_ui_auto.module_upgrade_observation import observe, run
+from qa_ui_auto.steps import StepError
+
+
+class UpgradeObservationTests(unittest.TestCase):
+    def setUp(self):
+        self.directory = tempfile.TemporaryDirectory()
+        self.addCleanup(self.directory.cleanup)
+        self.root = Path(self.directory.name).resolve()
+        self.state = {"root": self.root, "sessions": input_sessions(True), "journal": None}
+        for name, content in CHAT_FILES.items():
+            (self.root / name).write_bytes(content)
+        with closing(sqlite3.connect(self.root / "taomni.db")) as db, db:
+            db.execute("CREATE TABLE sessions (id TEXT, session_type TEXT, options_json TEXT)")
+            db.executemany("INSERT INTO sessions VALUES (?, ?, ?)", [
+                (row["id"], row["session_type"], row["options_json"]) for row in self.state["sessions"]])
+        self.journal = {"status": "pending", "to_core_api_version": "1", "entries": [{
+            "item": "vnc-sessions", "state": "pending", "source_path": "taomni.db", "target": "",
+            "source_fingerprint": "sha256:" + "a" * 64 + ":bytes:4096"}]}
+
+    def write_journal(self):
+        path = self.root / "migration" / "journal.json"
+        path.parent.mkdir(exist_ok=True)
+        path.write_text(json.dumps(self.journal), encoding="utf-8")
+
+    def test_fixed_browser_model_is_explicitly_separate_from_native_evidence(self):
+        self.assertEqual(preview_snapshot(False)["candidates"], [])
+        self.assertEqual(preview_snapshot(True)["candidates"][0]["plugin_slug"], "vnc-client")
+        self.assertEqual([row["session_type"] for row in input_sessions(False)], ["SSH"])
+        for args in [{"phase": "write"}, {"phase": "pending", "path": "/user-data"}, None]:
+            with self.assertRaisesRegex(StepError, "fixed registered phase"):
+                run(None, args)
+        with self.assertRaisesRegex(StepError, "native VNC-only"):
+            run(SimpleNamespace(case_id="TC-MODULES-026"), {"phase": "pending"})
+
+    def test_preflight_is_read_only_and_a_journal_is_a_real_failure(self):
+        self.assertTrue(observe(self.root, self.state, "preflight")["moduleDirectoriesAbsent"])
+        self.write_journal()
+        with self.assertRaisesRegex(StepError, "Read-only preflight wrote"):
+            observe(self.root, self.state, "preflight")
+
+    def test_pending_and_repeat_preserve_exact_journal_without_duplicate_items(self):
+        self.write_journal()
+        observe(self.root, self.state, "pending")
+        observe(self.root, self.state, "repeat")
+        self.journal["entries"].append(dict(self.journal["entries"][0]))
+        self.write_journal()
+        with self.assertRaisesRegex(StepError, "exactly one"):
+            observe(self.root, self.state, "repeat")
+
+    def test_false_completion_wrong_owner_and_changed_fingerprint_are_rejected(self):
+        self.journal["status"] = "complete"
+        self.write_journal()
+        with self.assertRaisesRegex(StepError, "incorrectly marked complete"):
+            observe(self.root, self.state, "pending")
+        self.journal["status"] = "pending"
+        self.journal["entries"][0]["item"] = "rdp-vnc-sessions"
+        self.write_journal()
+        with self.assertRaisesRegex(StepError, "incorrect owner"):
+            observe(self.root, self.state, "pending")
+        self.journal["entries"][0]["item"] = "vnc-sessions"
+        self.write_journal()
+        observe(self.root, self.state, "pending")
+        self.journal["entries"][0]["source_fingerprint"] = "sha256:" + "b" * 64 + ":bytes:4096"
+        self.write_journal()
+        with self.assertRaisesRegex(StepError, "idempotent"):
+            observe(self.root, self.state, "repeat")
+
+    def test_deleted_chat_changed_sessions_and_pseudo_activation_are_rejected(self):
+        path = self.root / "lanchat.db"
+        path.write_bytes(b"changed")
+        with self.assertRaisesRegex(StepError, "retained LanChat"):
+            observe(self.root, self.state, "preflight")
+        path.write_bytes(CHAT_FILES[path.name])
+        with closing(sqlite3.connect(self.root / "taomni.db")) as db, db:
+            db.execute("UPDATE sessions SET session_type = 'RDP' WHERE session_type = 'VNC'")
+        with self.assertRaisesRegex(StepError, "original session"):
+            observe(self.root, self.state, "preflight")
+        with closing(sqlite3.connect(self.root / "taomni.db")) as db, db:
+            db.execute("UPDATE sessions SET session_type = 'VNC' WHERE session_type = 'RDP'")
+        (self.root / "plugins" / "vnc-client").mkdir(parents=True)
+        with self.assertRaisesRegex(StepError, "module owner/code/data"):
+            observe(self.root, self.state, "preflight")
+
+
+if __name__ == "__main__":
+    unittest.main()

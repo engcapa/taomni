@@ -16,30 +16,11 @@ use super::{
     source_fingerprint,
 };
 
-pub fn detect_legacy_install(data_dir: &Path, db_tables: &[&str]) -> Vec<MigrationCandidate> {
+#[path = "migration_database.rs"]
+mod database;
+
+fn detect_legacy_files(data_dir: &Path) -> Vec<MigrationCandidate> {
     let mut candidates = Vec::new();
-    let table = |name: &str| db_tables.iter().any(|value| *value == name);
-    if table("sessions") || table("rdp_certificate_pins") {
-        candidates.push(MigrationCandidate {
-            item: MigrationItem::RdpVncSessions,
-            evidence: vec!["session records".into()],
-            plugin_slug: "rdp-client".into(),
-        });
-    }
-    if table("rdp_certificate_pins") {
-        candidates.push(MigrationCandidate {
-            item: MigrationItem::RdpCertificatePins,
-            evidence: vec!["rdp_certificate_pins".into()],
-            plugin_slug: "rdp-client".into(),
-        });
-    }
-    if table("server_configs") {
-        candidates.push(MigrationCandidate {
-            item: MigrationItem::ServerConfigs,
-            evidence: vec!["server_configs".into()],
-            plugin_slug: "servers".into(),
-        });
-    }
     let files = [
         ("mfa.db", MigrationItem::Mfa, "mfa"),
         ("sockscap/config.json", MigrationItem::SocksCap, "sockscap"),
@@ -64,8 +45,8 @@ pub fn detect_legacy_install(data_dir: &Path, db_tables: &[&str]) -> Vec<Migrati
 /// Inspect a 0.5.x app-data directory without mutating it.
 ///
 /// The old database is opened with `SQLITE_OPEN_READ_ONLY`; the query only
-/// reads `sqlite_master`, and therefore does not run migrations or create a
-/// journal/WAL.  A malformed or unreadable database is surfaced to the caller
+/// reads schema and bounded row-existence queries, without running migrations
+/// or writing application data. A malformed or unreadable database is surfaced to the caller
 /// instead of being treated as an empty installation.  `lanchat.sqlite` is
 /// intentionally only listed in `retained_paths`; it is never opened, copied,
 /// or included in the migration candidates.
@@ -103,15 +84,11 @@ pub fn inspect_legacy_install(
     } else {
         None
     };
-    let database_tables = match database_path.as_deref() {
-        Some(path) => read_legacy_database_tables(path)?,
-        None => Vec::new(),
+    let (database_tables, mut candidates) = match database_path.as_deref() {
+        Some(path) => database::read_legacy_database(path)?,
+        None => (Vec::new(), Vec::new()),
     };
-    let table_refs = database_tables
-        .iter()
-        .map(String::as_str)
-        .collect::<Vec<_>>();
-    let mut candidates = detect_legacy_install(&data_dir, &table_refs);
+    candidates.extend(detect_legacy_files(&data_dir));
 
     let vault_path = data_dir.join("vault.db");
     let vault = if vault_path.is_file() {
@@ -193,6 +170,7 @@ pub fn build_file_migration_specs(
                 PathBuf::from("data/mobile-desktop-remote.json"),
             ),
             MigrationItem::RdpVncSessions
+            | MigrationItem::VncSessions
             | MigrationItem::RdpCertificatePins
             | MigrationItem::ServerConfigs => continue,
         };
@@ -211,21 +189,6 @@ pub fn build_file_migration_specs(
         });
     }
     Ok(specs)
-}
-
-fn read_legacy_database_tables(path: &Path) -> Result<Vec<String>, String> {
-    let connection = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)
-        .map_err(|error| format!("legacy database cannot be opened read-only: {error}"))?;
-    let mut statement = connection
-        .prepare(
-            "SELECT name FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name",
-        )
-        .map_err(|error| format!("legacy database schema cannot be read: {error}"))?;
-    let rows = statement
-        .query_map([], |row| row.get::<_, String>(0))
-        .map_err(|error| format!("legacy database table query failed: {error}"))?;
-    rows.collect::<Result<Vec<_>, _>>()
-        .map_err(|error| format!("legacy database table row failed: {error}"))
 }
 
 fn read_vault_fixed_key_presence(path: &Path) -> Result<bool, String> {

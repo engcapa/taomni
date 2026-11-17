@@ -1,11 +1,8 @@
 id: TC-MODULES-005
-title: Module Store exposes the legacy install upgrade preflight status
-description: >-
-  The module store must make the 0.5.x upgrade preflight observable before any
-  migration write. A fresh isolated profile reports an explicit empty status;
-  when a legacy candidate is present the same status boundary exposes the
-  candidate list, retained files, and migration action. Browser and native
-  runs assert the stable status boundary and absence of renderer errors.
+title: Module upgrade preflight excludes empty feature tables and core-only sessions
+description: A fresh isolated profile with an SSH session and ordinary empty RDP/Servers tables must report exactly empty.
+  Browser uses an explicit empty model; native scans actual SQLite rows. No migration action, candidate list or error
+  may appear.
 covers:
 - F-Modules-1
 tags:
@@ -17,6 +14,7 @@ modes:
 - native
 fixtures:
 - reset_db
+- module_upgrade
 timeout_sec: 45
 steps:
 - open: ${cfg.app.base_url}
@@ -26,43 +24,67 @@ steps:
 - fill:
     selector: '[data-testid="settings-search-input"]'
     value: module store
-- wait_for: '[data-testid="module-store-panel"]'
-- wait_for: '[data-testid="module-upgrade-status"]'
-- assert_visible: '[data-testid="module-upgrade-status"]'
+- wait_for: '[data-testid="module-upgrade-status"][data-state="empty"]'
 - assert_attribute:
     selector: '[data-testid="module-upgrade-status"]'
     name: data-state
-    matches: '^(empty|candidates|error)$'
+    equals: empty
+- assert_visible: '[data-testid="module-upgrade-empty"]'
+- assert_count:
+    selector: '[data-testid="module-upgrade-candidates"]'
+    equal: 0
+- assert_count:
+    selector: '[data-testid="module-upgrade-migrate"]'
+    equal: 0
+- assert_count:
+    selector: '[data-testid="module-upgrade-error"]'
+    equal: 0
 - assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: The Module Store reports a truthful legacy upgrade preflight state before migration writes.
+    requirement: Only actual module data may trigger an upgrade recommendation; core SSH sessions and empty feature tables
+      must not.
     actions:
     - 3
     - 5
     checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"status-bar\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"module-upgrade-status\"][data-state=\"empty\"]"}'
     - step: 7
-      expectation: '{"wait_for": "[data-testid=\"module-upgrade-status\"]"}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"module-upgrade-status\"]", "name": "data-state",
+        "equals": "empty"}}'
     - step: 8
-      expectation: '{"assert_visible": "[data-testid=\"module-upgrade-status\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"module-upgrade-empty\"]"}'
     - step: 9
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"module-upgrade-status\"]", "name": "data-state", "matches": "^(empty|candidates|error)$"}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"module-upgrade-candidates\"]", "equal": 0}}'
     - step: 10
-      expectation: '{"assert_no_runtime_errors": null}'
-    - step: 10
+      expectation: '{"assert_count": {"selector": "[data-testid=\"module-upgrade-migrate\"]", "equal": 0}}'
+    - step: 11
+      expectation: '{"assert_count": {"selector": "[data-testid=\"module-upgrade-error\"]", "equal": 0}}'
+    - step: 12
       expectation: '{"assert_no_runtime_errors": null}'
     results:
+    - 2
+    - 4
+    - 6
     - 7
     - 8
     - 9
     - 10
+    - 11
+    - 12
   native:
-  - check: Native mode confirms the migration preflight IPC is projected into the packaged Module Store UI.
+  - check: Real read-only preflight and pending journal preserve legacy rows and retained files through normal restart.
     method: automated
-    reason: Browser stubs validate the renderer boundary; only native mode executes the profile scan and migration IPC.
+    reason: Native TC-MODULES-025 independently reads host SQLite/files/journal; browser TC-MODULES-026 validates only
+      an explicit renderer model.
   visual:
-  - check: The preflight state is readable and does not imply that migration has already written files.
+  - check: Upgrade state, owner and pending notice remain readable in Module Store.
     method: manual
-    reason: Automated checks cover state semantics; spacing and candidate-list layout require screenshot review when a legacy fixture is available.
+    reason: Screenshots retained for 025/026; runtime assertions establish state semantics, not visual review.
