@@ -26,6 +26,27 @@ remain separate acceptance evidence. Browser/native UI scenarios still run in
 the platforms workflow, including the mandatory crash suite; download each
 completed shard while other shards and builds are running.
 
+For real release-package samples, dispatch that registered workflow with
+`package_run=<Release Bundle run ID>`, `package_source=<exact 40-character
+producer SHA>`, and `package_version=<artifact-only test version>`. `head` selects
+the inspection tooling; its SHA is recorded separately from the package source.
+This exclusive route calls `qa-modular-bundles.yml` on Linux x64, Windows x64,
+macOS ARM64 and macOS Intel. It checks the producer repository/workflow/SHA and
+immutable artifact ID before downloading, then records every actual package's
+size and SHA-256. An uploaded target can be inspected while other builders are
+still running. A missing, expired, duplicate or mismatched artifact fails.
+
+The same jobs read Debian/RPM metadata, administratively extract the actual MSI,
+or mount the actual DMG read-only and inspect its copied app and any updater app.
+macOS preserves the real signature, checks architecture/version and records
+quarantine plus the raw Gatekeeper assessment. Windows records Authenticode
+status. OS rejection is retained as a trust gap, even if inspection succeeds.
+The `modular-bundle-<target>-<producer run>` artifacts contain raw observations
+and `bundle-baseline.json`; collect them as each job finishes. This is a package
+baseline and payload/signature probe, not installed 0.5.x migration, application
+startup/memory, TCC or G1–G11 completion. No new product flow or YAML case is
+introduced; existing modules/MFA and crash-regression cases retain UI coverage.
+
 After the workflow is on the default branch, use **Actions → QA UI Auto Platforms
 → Run workflow**, or:
 

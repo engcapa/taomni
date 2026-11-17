@@ -12,6 +12,12 @@
 
 ## 2026-11-17 最新结果与后续验证
 
+- 已再次拉取远程 `main`（`cb448d174e5629ca74a87e4e72533eafea1a2927`），当前分支已包含该提交，合并返回 `Already up to date`，无新冲突。
+- 总量预算/request 所有权源码 `1eec7eca4ede44e9266d927674c4c7ea5f38ffe1` 的[协议与资源门 #43996562011](https://github.com/engcapa/taomni/actions/runs/43996562011) 已成功：三端各 API 21/21、stream 纯单元 14/14、services 纯单元 39/39，真实传输 10/10、资源析构顺序 1/1、request/OS lease 所有权 7/7，共 **18 个真实资源场景每端全部通过**；Linux selection 25/25。250 ms 操作绝对 deadline 在三端均约 252 ms 回收，没有延长到 5 秒传输预算。四份 artifact 执行期间收齐，`source-sha.txt` 均核对为上述完整 SHA。
+- 同源码[真实宿主 #43996567221](https://github.com/engcapa/taomni/actions/runs/43996567221) 已成功：三端每端 activation 3、cleanup 2、lifecycle 7、MFA 5、MFA snapshot 2、profile 5、services 8、snapshot 4，共 **36/36**。三份 artifact 执行期间收齐，源 SHA 已逐份核对；该门保护真实进程身份/生命周期，不能与进程内 ownership fixture 混称。
+- 同源码[UI #43996571773](https://github.com/engcapa/taomni/actions/runs/43996571773) 的三端 browser 各 **22/22** 已在执行期间收齐；选择受影响模块、MFA/Vault 与完整 crash-regression，native 等待 matching release QA 构建。TC-MODULES-006 的 macOS 修订尚待 native，不能提前称全部通过。
+- 同源码[实际安装包构建 #43997809941](https://github.com/engcapa/taomni/actions/runs/43997809941) 已启动：现有 Release Bundle workflow，空 tag、四目标、artifact-only `test_version=0.6.0`，不创建 tag、不发布 Release、不改变 `package.json`。产物完成即收取至 `qa-ui-auto-report/github/43997809941/live-packages/`。后续记录真实包大小/哈希、安装负载与系统信任，不能用 QA 未打包 binary 或简化 fixture 代替；生产迁移和真实已安装 0.5.x 升级仍未完成。
+- 新增独立 `qa-modular-bundles.yml`，由已注册升级入口的 `package_run/package_source/package_version` 排他路由调用：按不可变 artifact ID 消费真实四目标发布包，先核对仓库、workflow、完整 producer SHA 和版本，再记录包大小/哈希、Debian/RPM 元数据、实际 MSI 行政解包和 DMG/updater app。Windows 记录 Authenticode、真实 PE 架构和版本；macOS 记录实际签名、架构、隔离标记及 `spctl` 原始接受/拒绝结果，拒绝保留为系统信任缺口，不计 G1 通过。工具源码与包生产源码分别记录。本地 9 项纯单元、actionlint 通过；真实解包/签名观察仅在 GitHub，尚待实际产物。该批没有产品流程变化，不新增 UI YAML，受影响模块/MFA 与完整 crash-regression 仍由当前 UI run 保护。
 - TASK-002 增加大载荷的总量预算与操作所有权适配：单个核心 pool 默认限制 8 个 transfer/reservation 与 128 MiB buffer capacity，生产服务须共享其 clone，并在采集/分配前预留；Vec 多余 capacity 不能绕过预算，空载荷仍占端口槽。准备 future/未轮询 task 都持完整资源 owner，实际 socket/listener/payload 先回收，再释放 request permit/OS lease/预算。`TransferScope` 绑定绝对 deadline；操作取消/结束、宿主断开/确认终止、Vault 撤销与 profile generation 替换通知子 token，显式取消单个 transfer 不取消 operation 或 sibling。`offer_binary_for_request` 已连接现有 reverse request 准入；尚无生产 `capture.still` 方法/权限和采集调用，不能据此称服务或 G5 完成。
 - 该适配本地纯单元通道 14/14、services 39/39；新增 8 个 GitHub-only 原生场景（7 个真实 socket/OS lease + 1 个在 lease 析构时独立 bind 检查回收顺序），保留原 10 项真实传输，workflow 核对精确选择数量与全通过日志。新增 harness 仅本地编译，待新源码三端执行；lease 场景的宿主身份/ack 为进程内 fixture，实际宿主认证/退出仍由独立真实 host gate 验证。本批不增加用户入口，不新增无法从 UI 操作的 YAML；TC-MODULES-006/007/008/009、Vault/MFA 与完整 crash-regression 继续保护保留流程，需关联本批 matching source 的新 run。
 - 通道复验 [#43991752403](https://github.com/engcapa/taomni/actions/runs/43991752403)，源码 `c65cf3e358a930f2cb0e8c4311ce9f20d393431f`，已成功；四份 artifact 在运行期间收齐。三端 API 各 21/21、通道纯单元各 6/6、真实通道各 10/10，Linux selection 25/25。Drop 时内核端口可重用分别约 Linux 6 ms、Windows 15 ms、macOS 10 ms；独立 closed-port probe 在 Windows 约 2.01 秒，超过旧总预算 1 秒，Linux/macOS 本轮均小于 1 ms。该证据支持拆分资源释放和 OS 连接拒绝观察，不推断旧 macOS 失败只有一个原因；原失败仍保留。
@@ -186,7 +192,7 @@
 | 任务 | 状态 | 尚需交付的结果 |
 |---|---|---|
 | TASK-001 基线 | 部分 | 四个发布目标的真实安装包尺寸、启动/内存/吞吐原始样本；源码与依赖起点已有记录。 |
-| TASK-002 契约 | 部分 | API、manifest/schema、registry、RPC 与受限 BinaryRef 三端传输已通过；新增总量预算/request 准入所有权待 hosted，生产 capture 权限/采集服务与连续 RDP 通道/吞吐尚待接线，真实插件与 G 门验证后冻结。 |
+| TASK-002 契约 | 部分 | API、manifest/schema、registry、RPC、受限 BinaryRef 与总量预算/request 所有权三端资源门已通过；生产 capture 权限/采集服务与连续 RDP 通道/吞吐尚待接线，真实插件与 G 门验证后冻结。 |
 | TASK-003 共享采集 | 已提交，hosted 验证中 | 引擎/权限/像素/一次性采集已下沉 `taomni-capture`，核心 `capture/` 持有显示器/帧源/窗口生命周期；仅保留 headless 建表例外。四目标 check、三平台库 unit 与 Linux 三个真实 X11 测试已通过，真实截图/MFA/Mobile/RDP/性能及完整 UI shard 仍待结果；`capture.still` 宿主大载荷 RPC 仍依赖 TASK-002。见下方测试设计。 |
 | TASK-004 RDP 公共库 | 代码已集成，待 hosted 验证 | `taomni-rdp-common` 与零依赖的 `taomni-file-uri`；客户端与服务端共享能力只经库依赖，config 直接用通用 URI 库。基于 `0f4cdf82f` 的集成单元完整功能 39/39、关闭 bitmap 30/30 及边界检查通过；四目标/三平台和精确保留场景待本提交 hosted 证据。见下方 TASK-004 记录。 |
 | TASK-005 核心状态 | 005-A 已集成，待 hosted 验证 | CoreState、LegacyFeatureRuntime、统一 bootstrap、弱观察器与退出清理已集成；005-A 尚待服务准入接线及 TC-MODULES-008/009 多端证据，005-B 的真实业务状态迁出仍未完成。 |
@@ -257,7 +263,7 @@ Wayland `TC-FILE-OPEN-008` 在已有 AI 路径 chip 点击处失败：失败截�
 
 已完成 retained locator、离线 v2 备份/还原、宿主自持 ProfileUseLease/PluginDataLease 和运行中 prepare/snapshot/release。`4c060a939` 契约三端快照通过；真实 UI 仍逐 shard 收证。三态 apply 已有原数据/代际/激活的独立观察，解锁顺序失败须新源码复验。已有证据只绑定实际输入，无关失败保留原始记录并不计通过。
 
-1. **收敛当前相关失败并取得新源码证据**：#43988044695 全部 22 个 shard 已收齐，006 在 Windows/Linux 已过、024 两种 Linux native 已过；先复验 006 的 macOS 短窗口修订。BinaryRef 首轮回收测试已由 #43991752403 三端各 10/10 通过；新增总量预算与 request 所有权适配须执行三端 18 个真实传输/资源场景、真实宿主生命周期，以及受影响模块、Vault/MFA/三态还原与完整 browser/native crash-regression。完成 shard 即下载，不等 summary；已记录无关 Wayland 失败保留、不计通过。
+1. **收敛当前相关失败并取得新源码证据**：006 的 macOS 短窗口修订由 #43996571773 复验，三端 browser 各 22/22 已过，native 逐 shard 收证；024 两种 Linux native 已过。总量预算与 request 所有权已由 #43996562011 三端各 18 个真实资源场景通过，#43996567221 三端各 36 个真实宿主生命周期场景通过。继续收齐受影响模块、Vault/MFA/三态还原与完整 browser/native crash-regression，并检查 #43997809941 的真实安装包。完成 shard 即下载，不等 summary；已记录无关 Wayland 失败保留、不计通过。
 2. **闭合 Vault、profile 与一致快照（TASK-024/025）**：完成 GUI/headless 同 profile 协同、运行/禁用/卸载保留数据三态正常重启 apply 与真实解密、多实例占用、取消和崩溃恢复；验证原生还原确认入口自动 relaunch 的接管。MFA 迁出时还需 v1 legacy alias 与独立宿主后的三态还原。
 3. **迁出真实业务（TASK-005-B、013/014、016–022）**：先完成真实 MFA 宿主原型的匹配 runner 证据、可信签名安装、相关 G 门、旧库只读迁移与动态 UI，再切换生产 facade 和连接 owner。之后依赖序推进 RDP/VNC 客户端与服务端、Servers、SocksCap、OCR/录制、本地语音的宿主、前端、状态与迁移。Mobile 按 DEC-2 留下明确 go/no-go 结论和公开例外，不能默认为交付；LanChat 任务已取消，不新增替代插件。
 4. **裁剪核心依赖闭包（TASK-006）**：随业务迁出，从核心 Cargo 默认 features、原生依赖、bundle/resources/helper 和前端 chunk 中实际移除相应实现。保存 cargo tree、资源与产物证据；把状态改名或放入 LegacyFeatureRuntime 不等于瘦身完成。
