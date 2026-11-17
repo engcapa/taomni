@@ -1,7 +1,7 @@
 id: TC-FILE-OPEN-021
 title: Native draw.io exports and imports through real OS save/open dialogs and system clipboard
-description: Production Markdown entry and actual user controls. Retains selected export/import outcomes, editable graph
-  XML, text/table data and original source; browser uses VFS, native uses OS dialogs/disk/clipboard.
+description: Production Markdown entry and actual user controls. Retains selected export/import outcomes, editable graph XML,
+  text/table data and original source; browser uses VFS, native uses OS dialogs/disk/clipboard.
 modes:
 - native
 steps:
@@ -32,6 +32,9 @@ steps:
     path: ${fixture.markdown_quality_exports}/document.drawio
     trigger: '[data-testid="markdown-drawio-save"]'
 - wait_for: '[data-testid="markdown-export-status"][data-export-state="saved"]'
+- eval_readonly:
+    expression: document.querySelector(".fv-md-export-notice").getBoundingClientRect().top >= document.querySelector(".fv-md-toolbar").getBoundingClientRect().bottom
+    expect_truthy: true
 - assert_file_contains:
     path: ${fixture.markdown_quality_exports}/document.drawio
     contains: taomniKind="table"
@@ -106,44 +109,59 @@ verification:
     - 12
     - 13
     - 15
-    - 18
     - 19
-    - 21
-    - 23
-    - 25
+    - 20
+    - 22
+    - 24
     - 26
-    - 28
+    - 27
     - 29
     - 30
+    - 31
+    - 33
+    - 36
+    - 37
+    - 39
+    checkpoints:
+    - step: 18
+      expectation: Actual control state/content or retained file/clipboard matches the explicit assertion; source and cancellation
+        behavior remain intact.
+    - step: 28
+      expectation: Actual control state/content or retained file/clipboard matches the explicit assertion; source and cancellation
+        behavior remain intact.
+    - step: 32
+      expectation: Cancelling the real native chooser leaves no import dialog or document insertion; a later import remains
+        available.
+    - step: 35
+      expectation: Actual control state/content or retained file/clipboard matches the explicit assertion; source and cancellation
+        behavior remain intact.
+    - step: 40
+      expectation: Actual control state/content or retained file/clipboard matches the explicit assertion; source and cancellation
+        behavior remain intact.
+    - step: 41
+      expectation: Actual control state/content or retained file/clipboard matches the explicit assertion; source and cancellation
+        behavior remain intact.
+    results:
+    - 18
+    - 28
     - 32
     - 35
-    - 36
-    - 38
+    - 40
+    - 41
+  - id: EXPORT-NOTICE-WRAPPED-TOOLBAR
+    requirement: Native export result remains below the actual wrapped toolbar so subsequent export actions stay available.
+    actions:
+    - 15
+    - 19
     checkpoints:
     - step: 17
-      expectation: Actual control state/content or retained file/clipboard matches the explicit assertion; source and
-        cancellation behavior remain intact.
-    - step: 27
-      expectation: Actual control state/content or retained file/clipboard matches the explicit assertion; source and
-        cancellation behavior remain intact.
-    - step: 31
-      expectation: Cancelling the real native chooser leaves no import dialog or document insertion; a later import remains available.
-    - step: 34
-      expectation: Actual control state/content or retained file/clipboard matches the explicit assertion; source and
-        cancellation behavior remain intact.
-    - step: 39
-      expectation: Actual control state/content or retained file/clipboard matches the explicit assertion; source and
-        cancellation behavior remain intact.
-    - step: 40
-      expectation: Actual control state/content or retained file/clipboard matches the explicit assertion; source and
-        cancellation behavior remain intact.
+      expectation: Notice starts below the actual toolbar bottom; the subsequent real pointer click reopens Export without
+        dismissing the result.
+    - step: 21
+      expectation: The actual pointer click can reopen draw.io export settings while the previous saved result is still shown.
     results:
     - 17
-    - 27
-    - 31
-    - 34
-    - 39
-    - 40
+    - 21
   native:
   - check: Actual file chooser, draw.io bytes, remembered directory, import and OS clipboard
     method: automated
