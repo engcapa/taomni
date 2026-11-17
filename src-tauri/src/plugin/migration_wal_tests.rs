@@ -6,7 +6,7 @@ use tempfile::{TempDir, tempdir};
 
 fn wal_database(name: &str, schema: &str) -> (TempDir, PathBuf, Connection) {
     let directory = tempdir().unwrap();
-    let path = directory.path().join(name);
+    let path = directory.path().canonicalize().unwrap().join(name);
     let database = Connection::open(&path).unwrap();
     database
         .execute_batch("PRAGMA journal_mode=WAL; PRAGMA wal_autocheckpoint=0;")
@@ -101,10 +101,10 @@ fn a_writer_racing_read_only_discovery_requires_a_retry() {
         );
         Ok(())
     });
+    let error = result.unwrap_err();
     assert!(
-        result
-            .unwrap_err()
-            .contains("changed during upgrade inspection")
+        error.contains("changed during upgrade inspection"),
+        "{error}"
     );
     let (count, _) = source::read_snapshot(&path, |reader| {
         reader

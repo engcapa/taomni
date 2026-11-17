@@ -31,8 +31,12 @@ receipt 的最终数据目标为 `plugins/mfa/data/mfa.db`，不归 `versions/<v
 
 ## 当前执行状态
 
-本地纯内存单元 **8/8**（来源约束 5、散列/WAL/取消 3）通过；生产 exporter 与全部真实文件场景已编译，未在本地执行真实场景。核心完整 `--lib --no-run` 编译及最终静态检查另录；不把编译计作 native 通过。
+本地纯内存单元 **8/8**（来源约束 5、散列/WAL/取消 3）通过；生产 exporter 与全部真实文件场景已编译，未在本地执行真实场景。核心完整 `--lib --no-run` 编译、rustfmt、actionlint 和 check:refactor 已通过；不把编译计作 native 通过。额外尝试的 host-gates 严格 clippy 在未改动的 SDK/host 代码遇到既有 type-complexity、never-loop 等诊断，原日志保留，不宣称整个宿主 lint 已通过。
 
 `.github/workflows/qa-modular-legacy-export.yml` 复用生产源码路径，在 Linux x64、Windows x64、macOS 15 Intel 执行全部原迁移单元、12/11/12 个真实导出场景和单独的真实进程模式锁场景，保存源 SHA、Rust/OS/架构、实际测试 binary hash、准确 selection、原始日志和 receipt。该 workflow 由已注册的 `qa-modular-upgrade.yml` 默认完整调用及 `host_only=true` 调用，无需先合并新 workflow 到 main。ARM64 本批尚未新增结果，不外推。
 
-当前 GitHub 执行待调度，尚不报告真实导出或新版 UI 通过。每个完成 artifact/shard 都在运行期间下载审查；失败保留并按实际来源修复。
+源码 `90f88c33abb6ac6b4a56f9a9cbb58138b5e086fe` 的[首轮契约 #44157139520](https://github.com/engcapa/taomni/actions/runs/44157139520) 已结束，6 份 artifact 均在运行期间收齐。Linux 原迁移单元 34/34、新导出 11/12；唯一新场景失败是测试按小写 cancel 检查既有 `BACKUP_CANCELLED`，尚未执行后续取消/超时/重试断言，不能计完整通过。Windows 原单元 31/33、Mac Intel 31/34，两个 retained/Vault 路径断言误把临时目录别名当 canonical 路径；Mac 的直接 WAL 测试 fixture 也应遵循生产预检的 canonical 输入再调用 NOFOLLOW 读取器。两端尚未进入新增导出场景。现仅修正测试使用 canonical fixture 和精确原错误码，并保留完整路径、真正的 writer race、取消清理和重试断言；需要新 SHA 的真实复验。
+
+同轮原生产宿主三端各 37/37 真实场景、Linux/Mac 25/25 与 Windows 22/22 宿主单元均通过；它们绑定原源码，不填补新增导出失败。所有原始失败、identity/selection 与正例 receipt 保存在 `qa-ui-auto-report/github/44157139520/live-contracts/`。
+
+配对 UI #44157172973 已通过计划（24 shards、3 builds），因为上述测试修订改变严格 source identity，主动取消该被替代轮并保留已有产物；这是 agent 主动取消，不能描述为 GitHub 容量失败。后续先闭合专用契约，再调度 matching UI 及完整 crash-regression。每个完成 artifact/shard 仍在运行期间下载审查，失败不改写成通过。

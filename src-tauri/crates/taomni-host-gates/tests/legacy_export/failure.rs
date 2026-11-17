@@ -10,7 +10,9 @@ use std::{
 use rusqlite::Connection;
 use serde_json::json;
 use taomni_profile_locks::{LegacyUpgradeLease, ProfileRoot, ProfileUseLease};
-use taomni_sqlite_snapshot::{SnapshotControl, SnapshotObserver, SnapshotPhase, SnapshotProgress};
+use taomni_sqlite_snapshot::{
+    SnapshotControl, SnapshotError, SnapshotObserver, SnapshotPhase, SnapshotProgress,
+};
 
 use super::{
     migration::{export::PreparedMfaExport, inspect_legacy_install},
@@ -115,16 +117,16 @@ fn cancellation_and_deadline_release_ownership_and_never_replace_working_data() 
         let error = PreparedMfaExport::prepare(&fixture.root, &fixture.snapshot(), &control)
             .err()
             .unwrap();
-        assert!(error.contains("cancel"), "{error}");
+        assert_eq!(error, SnapshotError::Cancelled.to_string());
         unchanged(&before);
         assert_eq!(fs::read(&existing).unwrap(), b"working-artifact");
         fixture.assert_no_staging();
         let expired = SnapshotControl::with_timeout(Duration::ZERO);
-        assert!(
+        assert_eq!(
             PreparedMfaExport::prepare(&fixture.root, &fixture.snapshot(), &expired)
                 .err()
-                .unwrap()
-                .contains("timed out")
+                .unwrap(),
+            SnapshotError::TimedOut.to_string()
         );
         let prepared = PreparedMfaExport::prepare(
             &fixture.root,

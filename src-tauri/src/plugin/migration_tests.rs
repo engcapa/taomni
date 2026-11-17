@@ -196,6 +196,7 @@ fn inspects_real_legacy_sqlite_and_builds_only_file_specs() {
     let dir = tempdir().unwrap();
     let data = dir.path().join("legacy");
     fs::create_dir_all(data.join("sockscap")).unwrap();
+    let data = data.canonicalize().unwrap();
     let db = rusqlite::Connection::open(data.join("taomni.db")).unwrap();
     db.execute_batch(
         "CREATE TABLE sessions (id TEXT, session_type TEXT);\
@@ -254,6 +255,7 @@ fn preflight_records_vault_fixed_key_without_reading_plaintext() {
     let dir = tempdir().unwrap();
     let data = dir.path().join("legacy");
     fs::create_dir_all(&data).unwrap();
+    let data = data.canonicalize().unwrap();
     let vault = rusqlite::Connection::open(data.join("vault.db")).unwrap();
     vault
         .execute_batch(
