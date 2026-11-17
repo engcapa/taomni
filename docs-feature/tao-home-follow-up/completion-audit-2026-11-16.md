@@ -32,7 +32,15 @@ R16 当前产品为 `dc6de5f80`，在 draw.io、Mermaid 查看、PDF 性能和�
 
 后续优先六项（Git 用 Tao 打开、Workspace 命名/添加目标、导出产物用 Tao 打开、Query Result 搜索导航、Agnes 无代理）及其验收，独立记录在 [workspace-result-follow-up-2026-11-17.md](../workspace-result-follow-up-2026-11-17.md)。新反馈的 Mermaid 保存图标、可编辑时序/原线路由和重复导入按钮，记录在 [修复与验收](../../docs-issue/markdown-mermaid-editable-export-2026-11-17.md)。产品提交 `97e89ead9`、修正用例 `00696cf81`；本机 149 项 Markdown 单测通过，当前源码与用例的有效并集为 Linux/Windows/macOS browser 各 28/28（18 项 crash）、匹配 QA release 的 native 各 33/33（22 项 crash），Linux Agnes 另有 1/1 无代理真实回复。[原批次 44052981988](https://github.com/engcapa/taomni/actions/runs/44052981988) 的 023/026 失败原件保留，[修正后 44057813183](https://github.com/engcapa/taomni/actions/runs/44057813183) 成功结束，Windows/macOS native 各 25/25。签名、身份、配置与绑定文件散列独立复核通过；R16 是历史基线，原 39 项状态统计不因这些追加修复整体关闭。
 
-用户随后用真实 `testing.md` 又报告 Word 流程图线身、draw.io 时序连接点与 Live 表格格式问题；当前追加修复和原文件 QA 验收见 [真实文档回归](../../docs-issue/markdown-mermaid-editable-export-2026-11-17.md#真实-testingmd-追加回归进行中)。上一轮内部渲染检查没有覆盖实际 draw.io Desktop 的默认连接点差异，不能据旧批次宣称该问题已通过。新一轮全部证据尚在执行，原 39 项统计不改变。
+用户随后用真实 `testing.md` 又报告 Word 流程图线身、draw.io 时序连接点与 Live 表格格式问题；追加修复和原文件 QA 验收见 [真实文档回归](../../docs-issue/markdown-mermaid-editable-export-2026-11-17.md#真实-testingmd-追加回归)。`b7f8252fc` 的本机验收及 [44113948966](https://github.com/engcapa/taomni/actions/runs/44113948966) 均已完成：三平台 browser 各 29/29（18 crash）、native 各 34/34（22 crash）。Linux 直接打开原文件，实际 draw.io Desktop 两图和 PDF/Word 逐页视觉已检查；Linux Word 使用 LibreOffice，不扩称 Win11 Microsoft Word 客户端验收。
+
+## 2026-11-18 新增两项
+
+`e07d7823b` 改为紧凑的 draw.io 原生曲线控制多边形；原文件长弧线从 87/101 个点降为 8/7 个，实际 Desktop 鼠标编辑、撤销及节点连接已验证。`839cda93d` 增加 [Explorer 明细列宽](../file-explorer/resizable-details-2026-11-18.md) 的四列拖动、双击适配、键盘调整、横滚对齐和持久化。Node 22.23.4 下受影响 unit 45 文件 / 293 项、独立导出检查器 16 项及 TypeScript/refactor/audit/开发契约均通过。
+
+Linux 当前有效并集为 browser **34/34（18 crash）**、native **37/38（全部 22 crash 通过）**，新 006 与原文件 028 均通过；唯一保留失败为 005 的既有后台终端标签关闭交互。最终本机签名、源码/runner/build、用例/配置和全部绑定文件核验为 `independent-local-node22.json/.log`。Windows/macOS 最终具名补跑 [44153057201](https://github.com/engcapa/taomni/actions/runs/44153057201) 成功结束，两端 browser 各 19/19、native 各 23/23，八片均在 workflow 结束前下载。完整当前有效并集为三平台 browser 各 34/34、Linux/Windows native 各 37/38、macOS native 38/38，全部 crash 18/22 通过；两个 37/38 都仅保留同一个既有 005 失败。48 份报告及其绑定产物独立核验通过，入口为 `independent-three-platform-final.json/.log` 与 `final-selection-matrix.json`；原失败和验证边界统一在列宽专项记录。本次新增两项完成，原 39 项实现缺口及统计不改变。
+
+Agnes 最近一次真实复验因服务端账户配额不足失败，明确返回 `Failed to pre-consume quota`（余额 $0.000814，所需 $0.000870）。该次为 `agnes-2.5-pro-beta` 且无代理；原始失败保留，不以之前成功的请求替代当前结果，也不重复消耗余额。工作流执行、持久预算、增量索引、审计和语音等旧任务仍未整体关闭。
 
 ## 历史变化：macOS native 已补齐原缺失项
 

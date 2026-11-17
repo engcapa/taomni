@@ -1,0 +1,409 @@
+id: TC-EXPLORER-006
+title: Explorer detail columns resize, fit contents and persist with aligned horizontal scrolling
+description: Drag the real header separators in the shared Explorer, keeping selection and sort unchanged. Check all four
+  columns, minimum widths, keyboard ownership, reload and new-tab persistence, automatic fitting and header/body alignment
+  after actual horizontal overflow.
+modes:
+- browser
+- native
+covers:
+- F-EXPLORER-1
+tags:
+- p1
+- explorer
+- columns
+- preferences
+- regression
+fixtures:
+- reset_db
+- explorer_files
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-explorer-columns
+- seed_storage:
+    key: taomni.explorer.view.v1
+    value: '{"view":"details","preview":false,"columnWidths":{"name":260,"mtime":140,"type":96,"size":80}}'
+- reload_window: null
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-file-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Control+l
+    macos_key: Meta+l
+- fill:
+    selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-address"]'
+    value: ${fixture.explorer_previews}
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-address"]'
+    key: Enter
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="notes.txt"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="notes.txt"]'
+- drag_to:
+    from: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-column-resize-name"]'
+    by:
+      dx: 150
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-column-resize-name"]'
+- eval_readonly:
+    expression: document.querySelector('.ex-shell:focus-within .ex-column:nth-child(1)').getBoundingClientRect().width >=
+      409 && document.querySelector('.ex-shell:focus-within .ex-column:nth-child(1)').getBoundingClientRect().width <= 411
+    expect_truthy: true
+- eval_readonly:
+    expression: document.querySelector('.ex-shell:focus-within .ex-frow .ex-name').getBoundingClientRect().width >= 409 &&
+      document.querySelector('.ex-shell:focus-within .ex-frow .ex-name').getBoundingClientRect().width <= 411
+    expect_truthy: true
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-column-resize-size"]'
+- drag_to:
+    from: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-column-resize-mtime"]'
+    by:
+      dx: 80
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-column-resize-name"]'
+- eval_readonly:
+    expression: document.querySelector('.ex-shell:focus-within .ex-column:nth-child(2)').getBoundingClientRect().width >=
+      219 && document.querySelector('.ex-shell:focus-within .ex-column:nth-child(2)').getBoundingClientRect().width <= 221
+    expect_truthy: true
+- eval_readonly:
+    expression: document.querySelector('.ex-shell:focus-within .ex-frow .ex-mod').getBoundingClientRect().width >= 219 &&
+      document.querySelector('.ex-shell:focus-within .ex-frow .ex-mod').getBoundingClientRect().width <= 221
+    expect_truthy: true
+- drag_to:
+    from: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-column-resize-type"]'
+    by:
+      dx: -250
+- assert_attribute:
+    selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-column-resize-type"]'
+    name: aria-valuenow
+    equals: '72'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-column-resize-size"]'
+    key: ArrowRight
+- assert_attribute:
+    selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-column-resize-size"]'
+    name: aria-valuenow
+    equals: '90'
+- assert_attribute:
+    selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="notes.txt"]'
+    name: aria-selected
+    equals: 'true'
+- assert_localstorage:
+    key: taomni.explorer.view.v1
+    contains: '"sortKey":"name"'
+- assert_localstorage:
+    key: taomni.explorer.view.v1
+    contains: '"sortDir":"asc"'
+- assert_localstorage:
+    key: taomni.explorer.view.v1
+    contains: '"name":410'
+- assert_localstorage:
+    key: taomni.explorer.view.v1
+    contains: '"mtime":220'
+- screenshot: explorer-columns-resized.png
+- reload_window: null
+- wait_for: '[data-testid="tab-item"][data-tab-type="file-browser"][data-tab-title="previews"]'
+- click: '[data-testid="tab-item"][data-tab-type="file-browser"][data-tab-title="previews"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="notes.txt"]'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Control+l
+    macos_key: Meta+l
+- fill:
+    selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-address"]'
+    value: ${fixture.explorer_previews}
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-address"]'
+    key: Enter
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="notes.txt"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-column-resize-name"]'
+- eval_readonly:
+    expression: document.querySelector('.ex-shell:focus-within .ex-column:nth-child(1)').getBoundingClientRect().width >=
+      409 && document.querySelector('.ex-shell:focus-within .ex-column:nth-child(1)').getBoundingClientRect().width <= 411
+    expect_truthy: true
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-column-resize-name"]'
+- eval_readonly:
+    expression: document.querySelector('.ex-shell:focus-within .ex-column:nth-child(2)').getBoundingClientRect().width >=
+      219 && document.querySelector('.ex-shell:focus-within .ex-column:nth-child(2)').getBoundingClientRect().width <= 221
+    expect_truthy: true
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-column-resize-size"]'
+- drag_to:
+    from: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-column-resize-name"]'
+    by:
+      dx: 300
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-column-resize-name"]'
+    key: Shift+ArrowRight
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-column-resize-name"]'
+    key: Shift+ArrowRight
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-column-resize-size"]'
+    key: ArrowRight
+- eval_readonly:
+    expression: document.querySelector(".ex-shell:focus-within .ex-fbody").scrollLeft > 0 && Math.abs(document.querySelector(".ex-shell:focus-within
+      .ex-column:last-child").getBoundingClientRect().left - document.querySelector(".ex-shell:focus-within .ex-frow .ex-size").getBoundingClientRect().left)
+      < 1.5
+    expect_truthy: true
+- screenshot: explorer-columns-horizontal-alignment.png
+- dblclick: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-column-resize-name"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-column-resize-name"]'
+- eval_readonly:
+    expression: document.querySelector('.ex-shell:focus-within .ex-column:nth-child(1)').getBoundingClientRect().width >=
+      140 && document.querySelector('.ex-shell:focus-within .ex-column:nth-child(1)').getBoundingClientRect().width <= 409
+    expect_truthy: true
+- eval_readonly:
+    expression: document.querySelector(".ex-shell:focus-within .ex-frow .ex-name > span").scrollWidth <= document.querySelector(".ex-shell:focus-within
+      .ex-frow .ex-name > span").clientWidth + 1
+    expect_truthy: true
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-column-mtime"]'
+- assert_localstorage:
+    key: taomni.explorer.view.v1
+    contains: '"sortKey":"mtime"'
+- assert_localstorage:
+    key: taomni.explorer.view.v1
+    contains: '"mtime":220'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-view"]'
+- click: '[data-testid="explorer-view-icons"]'
+- assert_count:
+    selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid^="explorer-column-resize-"]'
+    equal: 0
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-view"]'
+- click: '[data-testid="explorer-view-list"]'
+- assert_count:
+    selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid^="explorer-column-resize-"]'
+    equal: 0
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-view"]'
+- click: '[data-testid="explorer-view-details"]'
+- assert_count:
+    selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid^="explorer-column-resize-"]'
+    equal: 4
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-column-resize-name"]'
+- eval_readonly:
+    expression: document.querySelector('.ex-shell:focus-within .ex-column:nth-child(2)').getBoundingClientRect().width >=
+      219 && document.querySelector('.ex-shell:focus-within .ex-column:nth-child(2)').getBoundingClientRect().width <= 221
+    expect_truthy: true
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-newtab"]'
+- wait_for: '[data-testid="tab-item"][data-tab-type="file-browser"][data-active="false"] ~ [data-testid="tab-item"][data-tab-type="file-browser"][data-active="true"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="notes.txt"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-column-resize-name"]'
+- eval_readonly:
+    expression: document.querySelector('.ex-shell:focus-within .ex-column:nth-child(2)').getBoundingClientRect().width >=
+      219 && document.querySelector('.ex-shell:focus-within .ex-column:nth-child(2)').getBoundingClientRect().width <= 221
+    expect_truthy: true
+- assert_attribute:
+    selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-column-resize-size"]'
+    name: aria-valuenow
+    equals: '100'
+- assert_no_runtime_errors: null
+- click: button[aria-label="Cycle application theme"]
+- assert_attribute:
+    selector: html
+    name: data-app-theme
+    equals: light
+- screenshot: explorer-columns-light.png
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-column-resize-size"]'
+    key: ArrowLeft
+- eval_readonly:
+    expression: Math.abs(document.querySelector(".ex-shell:focus-within .ex-column:last-child").getBoundingClientRect().left
+      - document.querySelector(".ex-shell:focus-within .ex-frow .ex-size").getBoundingClientRect().left) < 1.5
+    expect_truthy: true
+- assert_no_runtime_errors: null
+- screenshot: explorer-columns-restored.png
+- click: button[aria-label="Cycle application theme"]
+- assert_attribute:
+    selector: html
+    name: data-app-theme
+    equals: dark
+- screenshot: explorer-columns-dark.png
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: EXPLORER-COLUMNS
+    requirement: Details columns resize independently, fit data, preserve sorting/selection and share persistent widths with
+      aligned horizontal scrolling.
+    actions:
+    - 4
+    - 5
+    - 6
+    - 8
+    - 9
+    - 10
+    - 12
+    - 13
+    - 14
+    - 17
+    - 18
+    - 19
+    - 22
+    - 24
+    - 32
+    - 34
+    - 36
+    - 37
+    - 38
+    - 40
+    - 42
+    - 44
+    - 45
+    - 46
+    - 47
+    - 48
+    - 51
+    - 52
+    - 55
+    - 58
+    - 59
+    - 61
+    - 62
+    - 64
+    - 65
+    - 67
+    - 69
+    - 72
+    - 76
+    - 79
+    - 83
+    results:
+    - 15
+    - 16
+    - 20
+    - 21
+    - 23
+    - 25
+    - 26
+    - 27
+    - 28
+    - 29
+    - 30
+    - 35
+    - 41
+    - 43
+    - 49
+    - 53
+    - 54
+    - 56
+    - 57
+    - 60
+    - 63
+    - 66
+    - 68
+    - 70
+    - 71
+    - 73
+    - 74
+    - 75
+    - 77
+    - 80
+    - 81
+    - 84
+    - 86
+    checkpoints:
+    - step: 15
+      expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
+        retain content and sorting.
+    - step: 16
+      expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
+        retain content and sorting.
+    - step: 20
+      expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
+        retain content and sorting.
+    - step: 21
+      expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
+        retain content and sorting.
+    - step: 23
+      expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
+        retain content and sorting.
+    - step: 25
+      expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
+        retain content and sorting.
+    - step: 26
+      expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
+        retain content and sorting.
+    - step: 27
+      expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
+        retain content and sorting.
+    - step: 28
+      expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
+        retain content and sorting.
+    - step: 29
+      expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
+        retain content and sorting.
+    - step: 30
+      expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
+        retain content and sorting.
+    - step: 35
+      expectation: The restored previews tab is active and its real notes.txt row is ready before the post-reload keyboard
+        and persisted-width checks.
+    - step: 41
+      expectation: After the WebView reload, the explicitly restored previews tab and its real notes.txt row are ready; the
+        name column remains 410px.
+    - step: 43
+      expectation: The restored previews tab retains the 220px Date modified column.
+    - step: 49
+      expectation: After a 300px pointer resize and two 50px keyboard increments, focus the last separator to scroll it into
+        view. The content must actually overflow, scrollLeft must be positive, and the Size header and file cells must align
+        within 1.5px.
+    - step: 53
+      expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
+        retain content and sorting.
+    - step: 54
+      expectation: The fitted filename has no intrinsic truncation. Other explicitly sized columns may still require horizontal
+        scrolling in the 1028px native window; horizontal alignment is checked separately.
+    - step: 56
+      expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
+        retain content and sorting.
+    - step: 57
+      expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
+        retain content and sorting.
+    - step: 60
+      expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
+        retain content and sorting.
+    - step: 63
+      expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
+        retain content and sorting.
+    - step: 66
+      expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
+        retain content and sorting.
+    - step: 68
+      expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
+        retain content and sorting.
+    - step: 70
+      expectation: The original Explorer tab is inactive and the second Explorer tab is active before resolving controls in
+        the newly mounted pane.
+    - step: 71
+      expectation: The new active Explorer has loaded its real notes.txt row before checking the shared persisted widths.
+    - step: 73
+      expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
+        retain content and sorting.
+    - step: 74
+      expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
+        retain content and sorting.
+    - step: 75
+      expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
+        retain content and sorting.
+    - step: 77
+      expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
+        retain content and sorting.
+    - step: 80
+      expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
+        retain content and sorting.
+    - step: 81
+      expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
+        retain content and sorting.
+    - step: 84
+      expectation: The application is explicitly dark; resizing separators and aligned rows remain readable in the retained
+        screenshot.
+    - step: 86
+      expectation: The packaged view has no runtime errors after the dark-theme interaction.
+  visual:
+  - check: Visible separators, readable fitted names and aligned rows in both themes/narrow overflow.
+    method: manual
+    reason: Inspect retained resized, horizontal-alignment, restored, explicit light and explicit dark screenshots. Browser
+      TC-EXPLORER-002 additionally checks narrow viewports; native uses the actual packaged window and tests induced horizontal
+      overflow.
+  native:
+  - check: Real disk listing and pointer/keyboard resizing in packaged WebView.
+    method: automated
+    reason: The native mode creates actual files and drives the QA release; macOS bridge keys do not establish OS-global shortcut
+      delivery.

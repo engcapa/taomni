@@ -1155,6 +1155,10 @@
 - `[data-testid="explorer-cmd-view"]` — interactive — F-EXPLORER-1.explorer-cmd-view
 - `[data-testid="explorer-column-mtime"]` — interactive — F-EXPLORER-1.explorer-column-mtime
 - `[data-testid="explorer-column-name"]` — interactive — F-EXPLORER-1.explorer-column-name
+- `[data-testid="explorer-column-resize-name"]` — interactive — F-EXPLORER-1.explorer-column-resize-name
+- `[data-testid="explorer-column-resize-mtime"]` — interactive — F-EXPLORER-1.explorer-column-resize-mtime
+- `[data-testid="explorer-column-resize-type"]` — interactive — F-EXPLORER-1.explorer-column-resize-type
+- `[data-testid="explorer-column-resize-size"]` — interactive — F-EXPLORER-1.explorer-column-resize-size
 - `[data-testid="explorer-column-size"]` — interactive — F-EXPLORER-1.explorer-column-size
 - `[data-testid="explorer-column-type"]` — interactive — F-EXPLORER-1.explorer-column-type
 - `[data-testid="explorer-command-bar"]` — display — F-EXPLORER-1.explorer-command-bar

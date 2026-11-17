@@ -24,7 +24,7 @@ it("retains straight and stepped SVG corners, including compact/relative/exponen
   expect(Array.from(points).map((p) => [p.getAttribute("x"), p.getAttribute("y")])).toEqual([["50", "130"], ["150", "130"]]);
 });
 
-it("writes curved editable connectors using the rendered path instead of routing them as orthogonal edges", () => {
+it("writes a native curved connector with a compact editable polygon", () => {
   const geometry = fixture();
   const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
   path.setAttribute("d", "M0 0 C100 0 100 100 0 100");
@@ -33,7 +33,8 @@ it("writes curved editable connectors using the rendered path instead of routing
   expect(route.curved).toBe(true);
   const edge = geometry.edge({ id: "curve" }, route);
   expect(edge.getAttribute("style")).toContain("curved=1;");
-  expect(edge.querySelectorAll("Array > mxPoint").length).toBeGreaterThan(8);
+  expect(edge.getAttribute("style")).toContain("shape=connector;");
+  expect(edge.querySelectorAll("Array > mxPoint").length).toBeLessThanOrEqual(3);
   expect(edge.querySelector("mxPoint[as='sourcePoint']")?.getAttribute("x")).toBe("50");
   expect(edge.querySelector("mxPoint[as='targetPoint']")?.getAttribute("y")).toBe("180");
 });

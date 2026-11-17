@@ -1,5 +1,6 @@
 import { drawioCell, drawioElement, type DrawioPage } from "./drawioCodec";
 import { diagramBounds, normalizeRotation, type DiagramSnapshot, type DiagramTransform } from "./diagramModel";
+import { compactNativeCurve } from "./drawioMermaidCurves";
 
 export interface MermaidPoint { x: number; y: number }
 export interface MermaidBox extends MermaidPoint { width: number; height: number }
@@ -68,11 +69,12 @@ export class MermaidGeometry {
       // every corner; length sampling would cut across those corners.
       if (!curved) points = linearPathPoints(d);
       else if (path.getTotalLength && path.getPointAtLength) {
-        const length = path.getTotalLength(), count = Math.min(256, Math.max(8, Math.ceil(length / 10)));
-        points = Array.from({ length: count + 1 }, (_, i) => {
+        const length = path.getTotalLength(), count = Math.min(192, Math.max(32, Math.ceil(length / 8)));
+        const samples = Array.from({ length: count + 1 }, (_, i) => {
           const point = path.getPointAtLength(length * i / count);
           return { x: point.x, y: point.y };
         });
+        points = compactNativeCurve(samples);
       }
     }
     return { curved, points: points.map((point) => this.point(element, point)) };
@@ -90,7 +92,7 @@ export class MermaidGeometry {
     };
     const ports = terminals && first && last ? anchor("exit", first, terminals.source, attributes.source) + anchor("entry", last, terminals.target, attributes.target) : "";
     const cell = drawioCell(this.page, { ...attributes, edge: 1,
-      style: `${attributes.style || ""}edgeStyle=none;noEdgeStyle=1;rounded=0;curved=${Number(route.curved)};${ports}` }, { relative: 1 });
+      style: `${attributes.style || ""}shape=connector;edgeStyle=none;noEdgeStyle=1;rounded=0;curved=${Number(route.curved)};${ports}` }, { relative: 1 });
     const geometry = cell.querySelector("mxGeometry")!;
     const pointElement = (point: MermaidPoint, as?: string) => drawioElement(this.page.model.ownerDocument, "mxPoint", { x: round(point.x), y: round(point.y), ...(as ? { as } : {}) });
     if (points.length >= 2) {
