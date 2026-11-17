@@ -71,7 +71,7 @@ Word 中文追加修复前，本轮 Linux native 完整批次 `run-20261117-2225
 
 `b7f8252fc` 的追加字形修复已在 Linux 完成：Markdown **182/182**、browser **29/29（18 crash）**、原文件 native **1/1** 加完整 native **33/33（22 crash）**。`final/independent-local-base.json` 独立核验签名、源码/runner/build、用例/配置及 932 个绑定文件；`final/visual-review.json` 记录全部四页 PDF/Word 和 draw.io 两图的实际视觉复核。产物在 `verified-original-final/`。中文标签、线身与时序连接正常；Linux 的 Word 视觉使用 LibreOffice，不扩称 Win11 Microsoft Word 客户端验收。该版本 hosted 为 [44113948966](https://github.com/engcapa/taomni/actions/runs/44113948966)，完成的 shard 持续下载。Agnes 047 单独失败，原响应明确账户余额不足，不能沿用旧成功记录冒充本次通过。
 
-## 曲线控制点追加修复（2026-11-18，验证中）
+## 曲线控制点追加修复（2026-11-18，已完成）
 
 用户随后报告：draw.io 中线条外观正常，但选中弧线后有密集编辑点。旧代码虽然生成单条 edge，却每约 10px 把 SVG 采样点写入 waypoints；原文件两条长曲线分别产生 87、101 个控制点。之前只检查曲线外观/端点，未覆盖编辑控制点数量。
 
@@ -79,10 +79,30 @@ Word 中文追加修复前，本轮 Linux native 完整批次 `run-20261117-2225
 
 新增曲线单测覆盖单弧、S 形、自调用、长回路、闭合曲线、平移和退化路径，独立重建 draw.io 曲线验证形状及端点；原 geometry 用例从“需要很多点”改为验证紧凑原生曲线。025/026 实际下载/保存后，独立 XML 检查器拒绝密集控制点，同时保留时序端点与无分组检查。原文件 027/028、其他 Mermaid 家族、Word/PDF、六项近期功能与完整 crash 回归继续运行。
 
-新证据根 `/data-raw-hdd/temp/taomni-curves-columns-20261117`，旧文件拒绝结果为 `baseline-dense-control-points.json`。本段写入时新版完整 browser/native/hosted 尚在验证，最终实际 draw.io Desktop 打开与编辑结果待回填。
+新证据根 `/data-raw-hdd/temp/taomni-curves-columns-20261117`，旧文件拒绝结果为 `baseline-dense-control-points.json`。当时的验证过程保留，最终 Desktop 编辑和三平台验收见下文。
 
 本轮受影响 unit **45 文件 / 293 项**、独立 draw.io/Word 检查器 **16 项**、TypeScript 与 refactor 检查通过。Linux browser 完整批次 `run-20261118-001304-369973590` 为 **34/34（18 crash）**；同期 Explorer 006 后续仅修正测试指令和主题检查，单独复验，不将旧 case 指纹冒充新用例结果。
 
-Browser 027 实际导出的文件已用 draw.io Desktop 29.6.6 渲染两张图并目视检查。原文件两条长弧线分别只有 **8、7 个原生控制点**（原来 87、101）；Desktop 实际选中 7 点曲线后，用鼠标拖动一个控制点、撤销，几何恢复且 source/target 仍绑定原节点。证据为 `browser-drawio-review/desktop-selected-curve.json`、`desktop-edit-curve.json` 和选中/拖动截图。匹配 QA release 的 `native/run-20261118-003255-917884230` 已直接打开原文件并实际导出，028 与列宽 006 **2/2 通过**、identity stable，原文件前后 SHA 一致；完整 native 其余 36 项与新版 hosted 结果待回填。
+Browser 027 实际导出的文件已用 draw.io Desktop 29.6.6 渲染两张图并目视检查。原文件两条长弧线分别只有 **8、7 个原生控制点**（原来 87、101）；Desktop 实际选中 7 点曲线后，用鼠标拖动一个控制点、撤销，几何恢复且 source/target 仍绑定原节点。证据为 `browser-drawio-review/desktop-selected-curve.json`、`desktop-edit-curve.json` 和选中/拖动截图。匹配 QA release 的 `native/run-20261118-003255-917884230` 已直接打开原文件并实际导出，028 与列宽 006 **2/2 通过**、identity stable，原文件前后 SHA 一致；最终完整结果见下段。
+
+本轮 Linux 最终有效并集为 browser **34/34（18 crash）**、native **37/38（全部 22 crash 通过）**。native 唯一保留失败为 Explorer 005 的既有后台终端标签关闭交互，与本次列宽和曲线实现无关，诊断及未通过范围见 [列宽记录](../docs-feature/file-explorer/resizable-details-2026-11-18.md)。原失败和补齐依赖后的失败均保留，不将真实粘贴成功当作完整 005 通过。`independent-local-node22.json/.log` 已逐项核对回执签名、稳定身份、QA release、用例/配置和全部绑定产物。
+
+native 实际产物的稳定入口为证据根 `verified-original-final/testing.drawio`（另有 PDF/Word），散列由 `verified-original-final/review-inputs.json` 绑定实际 028 报告。两张 draw.io Desktop 图、PDF 四页及 LibreOffice 渲染的 Word 四页均已逐页查看，见证据根 `visual-review.json`；native 导出长弧线在 Desktop 中选中、拖动与撤销的证据为 `native-drawio-review/desktop-selected-curve.json`、`desktop-edit-curve.json`。这是 Desktop/CDP 操作，不扩大为物理 OS 输入或 Win11 Microsoft Word 客户端验收。
+
+同期 Explorer 006 的窄窗输入、重载恢复和新标签就绪假设分别以 test-only `b47a425ba`、`cb76a51a2`、`8ecf83455` 修正，产品源码和 runner 未再变化；原始失败、runner 容量取消及具名补跑见列宽记录，不把旧 006 指纹算作当前用例通过。
 
 历史字形测试说明：`b7f8252fc` 的 182 项 Markdown 单测首次有一项导入取消测试在按钮启用后立即断言焦点；保留原失败，改为等待焦点恢复后完整通过，没有移除焦点断言。相关 15 项检查器及 `final/` 证据属于前一轮真实文件修复，不与本轮新增曲线结果混用。
+
+## 本轮最终验收
+
+[44153057201](https://github.com/engcapa/taomni/actions/runs/44153057201) **成功结束**，最新两端 browser 各 19/19、native 各 23/23，均含新版列宽 006 和完整 crash 集合；八个执行分片在 workflow 结束前全部下载。合并同产品/runner、当前 case 的完整受影响选择：
+
+| 平台 | browser | native | 完整 crash-regression |
+| --- | --- | --- | --- |
+| Linux | 34/34 | 37/38 | browser 18/18；native 22/22 |
+| Windows | 34/34 | 37/38 | browser 18/18；native 22/22 |
+| macOS ARM hosted | 34/34 | 38/38 | browser 18/18；native 22/22 |
+
+Linux/Windows 唯一保留失败是 TC-EXPLORER-005 的既有后台终端标签关闭交互（step 54 click），与曲线/列宽无关，原失败和未通过范围见列宽记录；不计为通过。全部 18/22 项 crash 通过，无缺失或跳过。Node 22.23.4 下 45 文件 / 293 项 unit、独立导出检查器 16 项、TypeScript、refactor、case/control audit 及开发契约通过。
+
+证据根 `taomni-curves-columns-20261117` 的 `independent-three-platform-final.json/.log` 核验 48 份报告及 37584 个绑定产物条目；`final-selection-matrix.json` 与原选择/完整 crash ID 集合逐项一致。三平台 9 个真实 native draw.io 产物另由 `independent-actual-export-files.json` 检查，原文件曲线最多 8 个控制点，时序端点最大误差 0.312px。稳定可复查文件为 `/data-raw-hdd/temp/taomni-curves-columns-20261117/verified-original-final/testing.drawio`，实际 Desktop 编辑和逐页 PDF/Word 视觉证据保留。Word 的 Linux LibreOffice 边界和 macOS 桥接输入边界不变。

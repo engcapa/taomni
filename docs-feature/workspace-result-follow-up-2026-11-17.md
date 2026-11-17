@@ -42,4 +42,14 @@ DEC-03（agent 自决，平台惯例）：仅结果区域拥有焦点时 Cmd/Ctr
 - 两端 native 用例修正复跑：[44057813183](https://github.com/engcapa/taomni/actions/runs/44057813183) 成功结束；选 023/026/WS085 与完整 crash-regression，Windows/macOS 各 25/25（完整 22 项 crash）。八片均在 workflow 结束前下载并核验，保持原批次和原始失败证据。
 - 本机原始报告、单测日志与失败保存在 `/data-raw-hdd/temp/taomni-six-20261117/`；工作区报告入口为指向该目录的链接。GitHub 证据也使用 HDD，跳过下载原生构建包，避免重复占用 SSD。
 
-最终当前有效并集：Linux/Windows/macOS browser 各 28/28（18 项 crash），native 各 33/33（22 项 crash）；Linux Agnes 另外 1/1。源码/runner/匹配 QA release、用例指纹、配置、回执签名与全部绑定文件大小/散列独立核验见证据根 `independent-mermaid-evidence.json/.log`。后续 Mermaid 追加修复及其 149 项 Markdown 单测、实际 draw.io 文件检查，详见 [修复验收](../docs-issue/markdown-mermaid-editable-export-2026-11-17.md)。本轮六项及追加修复已完成，不将旧 follow-up 全部缺口计入本轮交付。
+该批有效并集：Linux/Windows/macOS browser 各 28/28（18 项 crash），native 各 33/33（22 项 crash）；Linux Agnes 另外 1/1。源码/runner/匹配 QA release、用例指纹、配置、回执签名与全部绑定文件大小/散列独立核验见证据根 `independent-mermaid-evidence.json/.log`。后续 Mermaid 追加修复及其 149 项 Markdown 单测、实际 draw.io 文件检查，详见 [修复验收](../docs-issue/markdown-mermaid-editable-export-2026-11-17.md)。此为六项交付的历史验收范围，不将旧 follow-up 全部缺口计入本轮交付。
+
+## 2026-11-18 后续回归
+
+真实 `testing.md` 的 Word 线身/中文、draw.io 时序端点及 Live 表格修复 `b7f8252fc` 已完成本机和 [44113948966](https://github.com/engcapa/taomni/actions/runs/44113948966) 验收：三平台 browser 各 29/29、native 各 34/34，完整 crash 集合为 18/22；其中继续包含本页 Git、Workspace、导出产物打开、Query Result 以及确定性 Home 回归。
+
+Agnes 的最近独立 native 047 回执 `run-20261117-235302-040757378` 为失败，identity stable，16 个绑定产物已独立核验。服务端明确返回 `Failed to pre-consume quota`，余额 $0.000814、所需 $0.000870；配置仍为 `https://apihub.agnes-ai.com/v1` / `agnes-2.5-pro-beta`、proxy none，外部环境代理不可达。保留原响应，不将此前成功记录改写为当前通过，不再重复消耗余额。
+
+新增曲线控制点及 [Explorer 明细列宽](file-explorer/resizable-details-2026-11-18.md) 为 `e07d7823b` / `839cda93d`。Node 22.23.4 下 293 项受影响 unit 通过，Linux browser **34/34（18 crash）**、native **37/38（全部 22 crash 通过）**，新 006/028 均通过。唯一保留失败是 005 的既有后台标签关闭交互，真实文件管理器粘贴已通过；范围和失败证据见列宽记录。`independent-local-node22.json/.log` 独立复核回执、稳定输入、QA release、配置和全部绑定产物。
+
+最终 Windows/macOS 具名补跑 [44153057201](https://github.com/engcapa/taomni/actions/runs/44153057201) 成功结束，两端 browser 各 19/19、native 各 23/23，八片在 workflow 结束前全部下载。完整当前有效并集为三平台 browser 各 34/34、Linux/Windows native 各 37/38、macOS native 38/38，全部 crash 18/22 通过；两个 37/38 都仅保留既有 005 失败。`independent-three-platform-final.json/.log` 和 `final-selection-matrix.json` 独立核验 48 份报告及绑定产物、选择与完整 crash ID 集合。历史失败、test-only 窄窗/恢复/新标签修正和输入边界统一见列宽专项记录。证据根 `/data-raw-hdd/temp/taomni-curves-columns-20261117`，执行期间持续下载已完成 shard，跳过大型 native runtime。闲置默认 `target/debug` 已清理约 5GiB，匹配 QA release 和回执绑定证据保留。不把 runner 容量取消、绿色上传 job 或历史成功请求当作当前验收通过。
