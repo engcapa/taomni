@@ -36,6 +36,7 @@ export class TableCell {
     });
     cell.oninput = () => { if (!this.composing) this.commit(); };
     cell.onpaste = (event) => this.paste(event);
+    cell.addEventListener("keydown", (event) => this.selectAll(event));
     cell.onmousedown = (event) => {
       // Keep the rendered anchor alive until click instead of focusing the
       // editable cell and replacing it with source on pointer down.
@@ -63,6 +64,18 @@ export class TableCell {
 
   private commit(): void {
     if (!this.options.context.readOnly) this.options.commit(this.cell.textContent || "");
+  }
+
+  private selectAll(event: KeyboardEvent): void {
+    if (this.destroyed || !this.editing || this.options.context.readOnly || this.composing || event.isComposing
+      || document.activeElement !== this.cell || event.altKey || event.shiftKey || event.key.toLowerCase() !== "a") return;
+    const mac = /Mac/i.test(navigator.platform);
+    if (!(mac ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey)) return;
+    const selection = window.getSelection();
+    if (!selection) return;
+    event.preventDefault();
+    event.stopPropagation();
+    selection.selectAllChildren(this.cell);
   }
 
   sync(): void {

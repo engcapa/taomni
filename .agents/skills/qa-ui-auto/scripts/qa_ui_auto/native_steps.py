@@ -1470,6 +1470,9 @@ def _do_right_click(ctx: NativeStepContext, args: Any) -> str:
 def _do_fill(ctx: NativeStepContext, args: Any) -> str:
     if not isinstance(args, dict) or "selector" not in args or "value" not in args:
         raise StepError("fill: expected {selector, value}")
+    from . import fill_paste
+    if fill_paste.requested(args):
+        return fill_paste.native(ctx, args["selector"], args["value"])
     return ctx.session.fill(str(args["selector"]), str(args["value"]))
 
 

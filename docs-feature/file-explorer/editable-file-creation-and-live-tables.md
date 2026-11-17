@@ -22,3 +22,11 @@ Live 表格此前直接使用 `textContent` 展示单元格，导致 `**` 等源
 [#44054414878](https://github.com/engcapa/taomni/actions/runs/44054414878) 按完成片下载，发现三项操作需要适配：006 对列表中心右键命中文件行，改为通过可见目录筛选得到无匹配空白区并右键其空状态，创建后清除筛选；007 刷新后先按既有启动行为切回 Code Workspace，再核验真实 loose 文件和完整字节；旧 004 编辑表格先点击激活源码并断言原值为 `1`，再替换为 `2`，保留保存和导出断言。同步全部 verification 步号，不扩大超时或修改预期数据。Linux native 构建前的四 profile 选择合同另有一份固定 smoke 清单遗漏，同步新两项后通过原失败单元。
 
 已查看该轮 Linux browser 原始截图：新建对话框的类型、名称、取消/创建控件均完整可见，Live 表格显示粗体、斜体、删除线、代码、公式和换行，列对齐正常。截图审查仅对应这两张已执行画面，三端最终结论仍以修订后的 matching runner 结果为准。
+
+修订后的 [#44058015738](https://github.com/engcapa/taomni/actions/runs/44058015738) 绑定 `5cbd077c158cbdfcc4480607bcaf142e5c60edad`，selection `5f73d60ba9084aed9ede82b855441882`。文件功能、模块三态还原/自动 relaunch 和完整 crash-regression 合并执行：三端 browser 各 25 项，Linux Xvfb/Windows native 各 31 项，macOS ARM64 native 34 项；24 shards、3 份 release QA build，gaps=[]/unreviewed=[]。即时下载已在规划时启动。修订后 CI 选择/crash 合同 31/31、还原观察器 6/6、842-case audit 的全部请求 gate 和 check:refactor 通过；未改 coverage baseline。这些是工具/静态结果，应用结果仍须逐片核验。
+
+按片核验 `44058015738` 的 12 个 browser shards：Linux/Windows/macOS 各 25/25，无 skip。原始 artifact 的 bytes/hash、receipt、source/runner/selection/build 身份与实际计数已独立复核，详情保存在 `qa-ui-auto-report/github/44058015738/hosted-evidence-review.json`；该轮 native 尚在执行。
+
+旧 `44054414878` 的 Windows 和 macOS native 首片进一步复现两处问题：完整 HTML 逐字键入触发自动闭合后重复 `</h1>`；Live 表格 Ctrl+A/Command+A 未选中单元格源码，导致替换变成追加。两处均保留原始失败与完整预期数据。产品修复在 TableCell 内限定活动、可编辑、非 IME 单元格的 Select All，Windows/Linux 为 Ctrl+A、macOS 为 Command+A；只选择当前源码，不写文档/历史，不处理 macOS Control+A、Alt/Shift 或只读上下文。没有新增菜单项或 accelerator，沿用原 Edit 菜单路由；单元和 case 检查 WebView 输入，物理 OS Select All、AppKit 菜单点击与真实 IME 仍未由此证明。
+
+完整 HTML 的 case 改为显式 `fill: {method: paste}`，保持自动闭合功能、HTML 字节预期及保存重开断言。工具在 browser 使用 Chromium 剪贴板与普通 Paste 按键，在 native 独立写入/读回 OS 剪贴板后发送一次真实 OS Paste；不通过 DOM、store、IPC 或文件直接灌入，不重放失败输入。为避免异步 Paste 读取到旧剪贴板，隔离 runner 保留 fixture 内容并记录 `fill-paste.jsonl`。Windows 独立文本读回保留首尾空白，避免丢失源码最后换行。补充工具/错误分支及 schema 单元 44/44、表格回归 13/13；最初 Select All 红测 2 项失败已保留。`TC-FILE-OPEN-023` 增加准确选区断言并平移原所有验证步号。HTML 在保存前新增完整行断言以等待真实 Paste 完成，保留原磁盘/重开断言。原 markdownWidgets/MarkdownEditor 21/21、TypeScript 和 check:refactor 通过。上述新改动的三端应用结果须由下一轮 matching source/runner 复验后补录。

@@ -1,9 +1,9 @@
 id: TC-FILE-OPEN-023
 title: Live Markdown tables render inline formatting and preserve standard source through edit, history and reopen
-description: 'User regression: Live showed raw emphasis inside table cells while Split/PDF rendered it. Read-only and inactive editable
-  cells render inline GFM using the shared sanitizer, math and controlled local images. Focus exposes source only for the active editable
-  cell. Verify Live/Split parity, cell edit, Tab, Undo/Redo, escaped pipes, unchanged neighbors, source bytes, Save and reopen. Native
-  asserts real disk bytes and packaged WebView focus/render behavior; synthetic WebView input does not certify physical OS IME.'
+description: 'User regression: Live showed raw emphasis inside table cells while Split/PDF rendered it. Read-only and inactive editable cells
+  render inline GFM using the shared sanitizer, math and controlled local images. Focus exposes source only for the active editable cell. Verify
+  Live/Split parity, cell edit, Tab, Undo/Redo, escaped pipes, unchanged neighbors, source bytes, Save and reopen. Native asserts real disk bytes
+  and packaged WebView focus/render behavior; synthetic WebView input does not certify physical OS IME.'
 modes:
 - browser
 - native
@@ -88,6 +88,14 @@ steps:
 - assert_text_equals:
     selector: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="0"]'
     equals: '**bold** *italic* ~~removed~~ `code` $x^2$'
+- press:
+    selector: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="0"]'
+    key: Control+a
+    macos_key: Meta+a
+- eval_readonly:
+    expression: window.getSelection()?.toString() === "**bold** *italic* ~~removed~~ `code` $x^2$" && document.activeElement?.contains(window.getSelection()?.anchorNode)
+      && document.activeElement?.contains(window.getSelection()?.focusNode)
+    expect_truthy: true
 - fill:
     selector: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="0"]'
     value: '**changed** *italic* ~~removed~~ `code` $x^2$'
@@ -256,93 +264,96 @@ verification:
     - 25
     - 27
   - id: R2
-    requirement: Editable cells expose their raw source only while active; Tab, Undo and Redo preserve neighboring rendered cells and
-      all standard source.
+    requirement: Editable cells expose their raw source only while active; Tab, Undo and Redo preserve neighboring rendered cells and all standard
+      source.
     actions:
     - 28
     - 29
     - 30
     - 32
-    - 33
-    - 36
+    - 34
+    - 35
     - 38
     - 40
+    - 42
     checkpoints:
     - step: 31
       expectation: The active editable cell exposes only its exact raw Markdown.
-    - step: 34
+    - step: 33
+      expectation: Control+A (Windows/Linux) or Command+A (macOS) selects exactly the active cell source, with both selection endpoints inside
+        it.
+    - step: 36
       expectation: Tab renders the edited cell as it moves focus to the next cell.
-    - step: 35
-      expectation: Tab activates the next cell for raw editing.
     - step: 37
-      expectation: Undo restores original rendered cell content.
+      expectation: Tab activates the next cell for raw editing.
     - step: 39
-      expectation: Redo restores the changed formatting without changing its neighbor.
+      expectation: Undo restores original rendered cell content.
     - step: 41
-      expectation: Rendered inline node contains exactly Heading.
-    - step: 42
-      expectation: Rendered inline node contains exactly changed.
+      expectation: Redo restores the changed formatting without changing its neighbor.
     - step: 43
-      expectation: Rendered inline node contains exactly italic.
+      expectation: Rendered inline node contains exactly Heading.
     - step: 44
-      expectation: Rendered inline node contains exactly removed.
+      expectation: Rendered inline node contains exactly changed.
     - step: 45
-      expectation: Rendered inline node contains exactly code.
+      expectation: Rendered inline node contains exactly italic.
     - step: 46
-      expectation: Math uses the existing KaTeX renderer.
+      expectation: Rendered inline node contains exactly removed.
     - step: 47
-      expectation: Escaped source pipes render as literal pipe content.
+      expectation: Rendered inline node contains exactly code.
     - step: 48
+      expectation: Math uses the existing KaTeX renderer.
+    - step: 49
+      expectation: Escaped source pipes render as literal pipe content.
+    - step: 50
       expectation: Leaving edit mode restores the unchanged neighbor link.
     results:
     - 31
-    - 34
-    - 35
+    - 33
+    - 36
     - 37
     - 39
     - 41
-    - 42
     - 43
     - 44
     - 45
     - 46
     - 47
     - 48
+    - 49
+    - 50
   - id: R3
     requirement: Saving and reopening retain exact Markdown source and show the updated formatting in Live.
     actions:
-    - 49
     - 51
     - 53
-    - 54
+    - 55
+    - 56
     checkpoints:
-    - step: 50
-      expectation: The full standard GFM source preserves every neighboring cell, escape and raw HTML reference.
     - step: 52
+      expectation: The full standard GFM source preserves every neighboring cell, escape and raw HTML reference.
+    - step: 54
       expectation: Save writes exactly the edited standard Markdown bytes on native disk or browser VFS.
-    - step: 56
-      expectation: Rendered inline node contains exactly Heading.
-    - step: 57
-      expectation: Rendered inline node contains exactly changed.
     - step: 58
-      expectation: Rendered inline node contains exactly italic.
+      expectation: Rendered inline node contains exactly Heading.
     - step: 59
-      expectation: Rendered inline node contains exactly removed.
+      expectation: Rendered inline node contains exactly changed.
     - step: 60
-      expectation: Rendered inline node contains exactly code.
+      expectation: Rendered inline node contains exactly italic.
     - step: 61
-      expectation: Math uses the existing KaTeX renderer.
+      expectation: Rendered inline node contains exactly removed.
     - step: 62
-      expectation: Escaped source pipes render as literal pipe content.
+      expectation: Rendered inline node contains exactly code.
     - step: 63
-      expectation: Reopen preserves exactly the saved Markdown and re-renders the updated table.
+      expectation: Math uses the existing KaTeX renderer.
     - step: 64
+      expectation: Escaped source pipes render as literal pipe content.
+    - step: 65
+      expectation: Reopen preserves exactly the saved Markdown and re-renders the updated table.
+    - step: 66
       expectation: All preceding creation/edit/lifecycle actions have no uncaught renderer errors.
     results:
-    - 50
     - 52
-    - 56
-    - 57
+    - 54
     - 58
     - 59
     - 60
@@ -350,6 +361,8 @@ verification:
     - 62
     - 63
     - 64
+    - 65
+    - 66
   visual:
   - check: New-file dialog and resulting editor/table layout.
     method: manual
@@ -357,5 +370,5 @@ verification:
   native:
   - check: Packaged WebView Live table rendering, focus/history lifecycle, real disk Save and reopen.
     method: automated
-    reason: Native mode uses real Tauri IPC and independent host bytes; browser mode proves only its isolated VFS. WebView key delivery
-      does not prove physical OS or AppKit accelerator input.
+    reason: Native mode uses real Tauri IPC and independent host bytes; browser mode proves only its isolated VFS. WebView key delivery does not
+      prove physical OS or AppKit accelerator input.

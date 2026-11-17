@@ -33,3 +33,5 @@ Linux WebKitWebDriver 和 Windows WebView2 的自动 relaunch 后接管仍待实
 精确任务选择修正已提交 `56d9a305641f7dc478212d01042e8f5009fe2b11`，[macOS 定向复验 #44050634191](https://github.com/engcapa/taomni/actions/runs/44050634191) 已启动，保留三态普通冷启动与完整 crash-regression；结果继续按完成 shard 收取。
 
 该轮 browser 4 片共 18/18 通过。已完成 native 片中 013/014/034/035 在观察器公布备份 job ID 时抛出 `NativeStepContext.values` 不存在，尚未执行自动 relaunch；同轮 FILE-OPEN-002 另有 ResizeObserver 通知失败，保留原始证据。观察器现通过 native 的 `fixture_context.values` 更新模板变量，browser 继续使用其原 fixture owner；使用实际 `NativeStepContext` 与 browser context 的单元先复现 native 红测，再验证两种上下文均能发布独立核验的任务 ID。密码、真实进程 relaunch、generation 和数据断言保持，修订后须重新在 GitHub 执行。
+
+#44050634191 最终 8/8 shards 均已下载并核验全部 case artifact 的 hash/bytes：browser 18/18；native 21/28，013/014/015/033/034/035 均为上述上下文错误，另有 FILE-OPEN-002 的 ResizeObserver 失败，没有自动重启通过证据。修复提交 `5cbd077c158cbdfcc4480607bcaf142e5c60edad` 已进入 [#44058015738](https://github.com/engcapa/taomni/actions/runs/44058015738)，与文件功能和完整 crash-regression 共用三端 release QA 构建；macOS ARM64 native 明确选择六项还原用例，继续逐完成片收证。

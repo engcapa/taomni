@@ -2237,8 +2237,15 @@
         },
         "value": {
           "type": "string"
+        },
+        "method": {
+          "enum": ["paste"]
         }
-      }
+      },
+      "allOf": [{
+        "if": {"required": ["method"]},
+        "then": {"properties": {"value": {"minLength": 1}}}
+      }]
     },
     "type_arg": {
       "oneOf": [

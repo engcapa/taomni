@@ -23,7 +23,7 @@ function editor(content = source, readOnly = false, context: Partial<MarkdownWid
 function firstCell(view: EditorView) {
   return view.dom.querySelector<HTMLElement>("[data-cell-row='1'][data-cell-column='0']")!;
 }
-afterEach(() => { views.forEach((view) => view.destroy()); views.length = 0; document.body.replaceChildren(); });
+afterEach(() => { views.forEach((view) => view.destroy()); views.length = 0; document.body.replaceChildren(); vi.restoreAllMocks(); });
 
 it("renders inline GFM in read-only Live tables without changing the Markdown source", () => {
   const view = editor(source, true);
@@ -98,6 +98,48 @@ it("opening and leaving an editable cell does not rewrite its source or create a
   expect(view.state.doc.toString()).toBe(source);
   expect(undo(view)).toBe(false);
   expect(firstCell(view).querySelector("strong")?.textContent).toBe("bold");
+});
+
+it.each(["Win32", "Linux x86_64", "MacIntel"])("select-all stays inside the active cell on %s without editing the document", (platform) => {
+  vi.spyOn(navigator, "platform", "get").mockReturnValue(platform);
+  const view = editor();
+  const cell = firstCell(view);
+  cell.focus();
+  const selection = window.getSelection()!;
+  selection.collapse(cell.firstChild, 0);
+  const outside = vi.fn();
+  view.dom.addEventListener("keydown", outside);
+  const chord = platform === "MacIntel" ? { metaKey: true } : { ctrlKey: true };
+  expect(fireEvent.keyDown(cell, { key: "a", ...chord })).toBe(false);
+  expect(selection.toString()).toBe("**bold** *italic* ~~removed~~ `code`");
+  expect(cell.contains(selection.anchorNode)).toBe(true);
+  expect(cell.contains(selection.focusNode)).toBe(true);
+  expect(outside).not.toHaveBeenCalled();
+  expect(view.state.doc.toString()).toBe(source);
+  expect(undo(view)).toBe(false);
+});
+
+it("keeps macOS Control+A, modified chords, composition and read-only selection with their existing owners", () => {
+  vi.spyOn(navigator, "platform", "get").mockReturnValue("MacIntel");
+  const view = editor();
+  const cell = firstCell(view);
+  cell.focus();
+  const selection = window.getSelection()!;
+  selection.collapse(cell.firstChild, 1);
+  for (const chord of [{ ctrlKey: true }, { metaKey: true, ctrlKey: true }, { metaKey: true, altKey: true }, { metaKey: true, shiftKey: true }, { metaKey: true, isComposing: true }]) {
+    expect(fireEvent.keyDown(cell, { key: "a", ...chord })).toBe(true);
+    expect(selection.isCollapsed).toBe(true);
+  }
+  fireEvent.compositionStart(cell);
+  expect(fireEvent.keyDown(cell, { key: "a", metaKey: true })).toBe(true);
+  expect(selection.isCollapsed).toBe(true);
+  fireEvent.compositionEnd(cell);
+  const locked = editor(source, true);
+  const lockedCell = firstCell(locked);
+  lockedCell.focus();
+  expect(fireEvent.keyDown(lockedCell, { key: "a", metaKey: true })).toBe(true);
+  expect(view.state.doc.toString()).toBe(source);
+  expect(locked.state.doc.toString()).toBe(source);
 });
 
 it("opens rendered links externally without replacing them on pointer down or editing source", () => {
