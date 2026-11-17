@@ -1,4 +1,5 @@
 import DOMPurify from "dompurify";
+import { captureWordTextLayout } from "./wordSvgText";
 
 /** Office can interpret Mermaid's zero-length dash patterns as an invisible
  * stroke. SVG defines these as solid; write that meaning explicitly. */
@@ -24,6 +25,7 @@ export async function portableWordSvg(svg: Element, width: number, height: numbe
   shadow.append(copy); document.body.append(host);
   try {
     await document.fonts?.ready;
+    const applyTextLayout = captureWordTextLayout(copy);
     const properties = ["font-family", "font-size", "font-weight", "font-style", "text-anchor", "dominant-baseline",
       "fill", "fill-opacity", "stroke", "stroke-width", "stroke-opacity", "stroke-linecap", "stroke-linejoin",
       "stroke-dasharray", "opacity", "color", "visibility", "letter-spacing", "text-decoration"];
@@ -56,6 +58,7 @@ export async function portableWordSvg(svg: Element, width: number, height: numbe
         if (value) text.setAttribute(property, value);
       }
     });
+    applyTextLayout();
     copy.querySelectorAll("style").forEach((node) => node.remove());
     const box = copy.getAttribute("viewBox")?.trim().split(/[ ,]+/).map(Number);
     const background = document.createElementNS("http://www.w3.org/2000/svg", "rect");
