@@ -12,6 +12,8 @@
 
 ## 2026-11-17 最新结果与后续验证
 
+- #44031228724 现已在 summary 前核验 **22/22** shards：三端 browser 各 **35/35**，Linux Xvfb native **54/54**、Windows **53/53**、macOS ARM64 **50/50**，Wayland **52/54**，仅既有两个非左键输入限制失败。030 在四种 native profile 均通过；不外推为后续 WAL 源码通过。
+- WAL #44036667220 的 root 契约 job `133882554536` 已取回原始日志，**194/194**，明确包含四个真实文件/WAL/并发写入场景及两个指纹单元。Linux build 的新阻断是 main 相同的 `MarkdownDrawioImport.test.tsx` 取消 chooser 后立即检查 effect 恢复焦点（7300 passed / 1 failed / 1 skipped）；和截图清理一样改为条件等待，保留原焦点、取消无插入及再次导入断言。原失败保留，native 032 仍待实际执行。错误 head 的 dispatch #44039443938 在 checkout 阶段结束，未执行 case，不计证据；后续 dispatch 直接从 git 读取完整 SHA。
 - 本轮再次 `git fetch origin main` 并 `git merge --no-edit origin/main`：远程仍为 `1a16cbbb6`，已包含在当前分支，结果为 Already up to date，无新冲突。
 - WAL 修复源码 `5e99861f2bb99795b6ef45d78451a776360812a8` 的 [UI #44036667220](https://github.com/engcapa/taomni/actions/runs/44036667220) 已启动。matching selection 为 browser 三端各 22、四种 native profile 各 28，22 shards/3 builds，gaps=[]/unreviewed=[]；即时收证持续运行，尚未取得 032 和新增 Rust WAL 场景的执行结论，不能把下方本地编译或静态计划写成通过。
 - 合并后 #44034203570 六个 browser shard 已即时收齐，三端各 **36/36**；原始 job 日志确认所选 root 契约 **188/188**。Linux build job `133875222663` 在全量前端单元的 `ScreenshotFavorites.test.tsx` 释放缩略图断言失败（7300 passed / 1 failed / 1 skipped），尚未构建或执行 Linux native。组件与该测试均和 main 相同；测试在列表消失后立即检查异步 effect cleanup，已将断言改为 `waitFor`，保留原期望与超时。相关 **4/4** 本地单元通过，无产品行为变化，沿用既有截图收藏 case；GitHub 拒绝在这一 run 尚未结束时重跑该 job，原失败保留，修订需新 SHA runner 复验。Windows/macOS 构建继续，不计通过。
