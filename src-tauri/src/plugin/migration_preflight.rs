@@ -215,7 +215,7 @@ pub fn build_file_migration_specs(
     Ok(specs)
 }
 
-fn read_vault_fixed_key_presence(connection: &Connection) -> Result<bool, String> {
+pub(super) fn read_vault_fixed_key_presence(connection: &Connection) -> Result<bool, String> {
     let has_table = connection
         .query_row(
             "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='vault_entries')",

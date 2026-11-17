@@ -36,10 +36,10 @@ fn lease_child() {
     let _ = std::io::stdin().read(&mut byte);
 }
 
-fn spawn_host(root: &Path) -> ChildGuard {
+fn spawn_host(root: &Path, fixture: &str) -> ChildGuard {
     let mut child = ChildGuard(
         Command::new(std::env::current_exe().unwrap())
-            .args(["--exact", "lease_child", "--ignored", "--nocapture"])
+            .args(["--exact", fixture, "--ignored", "--nocapture"])
             .env("TAOMNI_PROFILE_LEASE_GATE_ROOT", root)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
@@ -65,7 +65,7 @@ fn surviving_host_excludes_restore_writer_and_rekey_until_a_crash_releases_them(
     let directory = tempfile::tempdir().unwrap();
     let root = ProfileRoot::prepare(directory.path()).unwrap();
     let core = ProfileUseLease::try_acquire(&root).unwrap();
-    let mut host = spawn_host(root.path());
+    let mut host = spawn_host(root.path(), "lease_child");
     drop(core); // The host's own lease still protects the profile.
     assert!(matches!(
         ProfileRestoreLease::try_acquire(&root),
@@ -101,4 +101,58 @@ fn surviving_host_excludes_restore_writer_and_rekey_until_a_crash_releases_them(
     assert!(VaultOperationLease::try_write(&root).is_ok());
     assert!(root.path().join(".profile-use.lock").exists());
     eprintln!("host crash released OS ownership; stable lock files remain");
+}
+
+#[test]
+#[ignore = "helper selected only by the hosted legacy-mode process gate"]
+fn legacy_mode_child() {
+    let Some(root) = std::env::var_os("TAOMNI_PROFILE_LEASE_GATE_ROOT") else {
+        return;
+    };
+    let root = ProfileRoot::prepare(root).unwrap();
+    let mode = fs::OpenOptions::new()
+        .create(true)
+        .truncate(false)
+        .read(true)
+        .write(true)
+        .open(root.path().join(".mobile-mode.lock"))
+        .unwrap();
+    mode.try_lock_shared().unwrap();
+    eprintln!(
+        "legacy-mode fixture {} owns shared mode lease",
+        std::process::id()
+    );
+    fs::write(root.path().join("child-ready"), b"ready").unwrap();
+    let mut byte = [0];
+    let _ = std::io::stdin().read(&mut byte);
+}
+
+#[test]
+#[ignore = "requires the hosted real-process legacy-mode gate"]
+fn legacy_mode_writer_blocks_upgrade_until_a_crash_releases_its_lease() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = ProfileRoot::prepare(directory.path()).unwrap();
+    // A legacy process does not know the newer profile-use lock. Holding it
+    // here distinguishes the required old-mode exclusion from that new lock.
+    let restore = ProfileRestoreLease::try_acquire(&root).unwrap();
+    let mut legacy = spawn_host(root.path(), "legacy_mode_child");
+    assert!(matches!(
+        LegacyUpgradeLease::try_acquire(&root),
+        Err(LeaseError::Busy(LeaseKind::LegacyUpgrade))
+    ));
+    drop(restore);
+    assert!(ProfileRestoreLease::try_acquire(&root).is_ok());
+    assert!(LegacyUpgradeLease::try_acquire(&root).is_err());
+    let pid = legacy.0.id();
+    legacy.0.kill().unwrap();
+    let exit = legacy.0.wait().unwrap();
+    let upgrade = LegacyUpgradeLease::try_acquire(&root).unwrap();
+    let current = ProfileUseLease::try_acquire(&root).unwrap();
+    assert!(ProfileRestoreLease::try_acquire(&root).is_err());
+    drop(current);
+    let _profile = ProfileRestoreLease::try_acquire(&root).unwrap();
+    drop(upgrade);
+    eprintln!(
+        "legacy-mode fixture pid={pid} exit={exit}; old mode released; new profile ownership still independently enforced"
+    );
 }

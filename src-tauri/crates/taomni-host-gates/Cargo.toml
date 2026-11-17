@@ -18,10 +18,12 @@ taomni-profile-locks = { path = "../taomni-profile-locks" }
 sha2 = "0.10"
 
 [dev-dependencies]
+hex = "0.4"
 tempfile = "3"
 rusqlite = { version = "0.40", features = ["bundled"] }
 taomni-plugin-mfa = { path = "../../plugins/mfa" }
 taomni-mfa-engine = { path = "../taomni-mfa-engine" }
+taomni-sqlite-snapshot = { path = "../taomni-sqlite-snapshot" }
 zeroize = "1"
 taomni-plugin-stream = { path = "../taomni-plugin-stream" }
 tokio = { version = "1", features = ["rt-multi-thread", "time", "net"] }

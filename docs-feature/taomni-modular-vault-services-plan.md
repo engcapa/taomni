@@ -326,7 +326,7 @@ TASK-012继续负责真实exporter与安装状态迁移，不能借本方案把�
 - 使用现有 `taomni-sqlite-snapshot::snapshot_existing` 生成独立、已检查的 SQLite staging；保留原加密列、key_check、HOTP counter、metadata 和偏好，不调用 engine 的 `open_db/init_db` 去迁移或初始化旧源。源、sidecar、父目录及目标拒绝链接/重解析点；取消、超时、busy、校验失败和已有目标均不得替换工作库。staging 在完整检查与持久化后才交给后续可信激活事务，数据最终归 `plugins/mfa/data/mfa.db`，不放在只读 `versions/<version>` 代码目录。
 - 预检存在 Vault 固定项但缺少 `mfa.db` 也是现有合法候选。导出器要明确区分“无旧库”和“读取失败”，保留原固定项，不能生成替代密钥或把 key-only 输入错误记为已迁移。旧根 `taomni.db` 的业务记录则必须按归属白名单导出，不能整库复制给宿主；LanChat 历史库不参与扫描内容、导出或清理。
 
-该复核只确定接线约束，未实现 exporter 或改变生产 pending 行为。真实验证需覆盖已提交 WAL-only 记录、源并发变化、取消/busy 与失败重试、链接路径、key-only 输入，以及由同一受限 key 服务验证的真实 MFA/HOTP 数据；真实文件、进程和旧版安装输入均在 GitHub runner 执行。导出成功仍不等于可信包 staging、原子激活或完整升级/回滚验收。
+该复核最初只确定接线约束。现已实现受维护 lease 保护的临时 MFA 一致导出 owner，见[实现与验证](taomni-modular-legacy-mfa-export-verification.md)；尚未接入可信激活事务，生产 pending 行为保持。真实验证需覆盖已提交 WAL-only 记录、源并发变化、取消/busy 与失败重试、链接路径、key-only 输入，以及由同一受限 key 服务验证的真实 MFA/HOTP 数据；真实文件、进程和旧版安装输入均在 GitHub runner 执行。导出成功仍不等于可信包 staging、原子激活或完整升级/回滚验收。
 
 TASK-025完成不等于TASK-014完成；后者必须真正移除core的MfaStore/commands/crypto依赖，动态加载MFA UI，保留SSH登录MfaPrompt在core，跑真实安装与升级。headless初始化不能继续私有创建旧MfaStore来绕过插件服务。核心不直连新MFA业务DB（offline只读备份helper和受限legacy exporter除外）。
 

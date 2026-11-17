@@ -304,6 +304,12 @@ jobs:
           path: modular-evidence
           if-no-files-found: error
 
+  legacy-export-contracts:
+    if: ${{ !inputs.package_run && !inputs.protocol_only && (inputs.host_only || (!inputs.system_execution_only && !inputs.download_only && !inputs.network_only)) }}
+    uses: ./.github/workflows/qa-modular-legacy-export.yml
+    with:
+      head: ${{ inputs.head || github.sha }}
+
   capture-contracts:
     if: ${{ !inputs.package_run && !inputs.protocol_only && !inputs.host_only && !inputs.system_execution_only && !inputs.download_only && !inputs.network_only }}
     name: Capture contracts (${{ matrix.target }})

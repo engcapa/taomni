@@ -10,7 +10,8 @@ mod paths;
 mod wait;
 
 pub use lease::{
-    PluginDataLease, ProfileRestoreLease, ProfileStateLease, ProfileUseLease, VaultOperationLease,
+    LegacyUpgradeLease, PluginDataLease, ProfileRestoreLease, ProfileStateLease, ProfileUseLease,
+    VaultOperationLease,
 };
 pub use paths::{PluginSlug, ProfileRoot};
 pub use wait::{LeaseError, LeaseKind, WaitControl};

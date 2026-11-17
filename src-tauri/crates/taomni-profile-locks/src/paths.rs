@@ -25,6 +25,10 @@ impl ProfileRoot {
         open_lock(&self.0.join(".profile-use.lock"))
     }
 
+    pub(crate) fn open_legacy_upgrade(&self) -> Result<File, LeaseError> {
+        open_lock(&self.0.join(".mobile-mode.lock"))
+    }
+
     pub(crate) fn open_plugin(&self, slug: &PluginSlug) -> Result<File, LeaseError> {
         let locks = ensure_directory(&self.0, ".profile-locks")?;
         let plugins = ensure_directory(&locks, "plugins")?;

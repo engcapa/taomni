@@ -73,6 +73,15 @@ lease!(ProfileUseLease, ProfileUse, open_profile, true);
 lease!(ProfileRestoreLease, ProfileRestore, open_profile, false);
 lease!(ProfileStateLease, ProfileState, open_state, false);
 
+// Old desktop/headless binaries know the mode lock, but not the newer profile
+// lock. An upgrade must hold this exclusive lease AND ProfileRestoreLease.
+lease!(
+    LegacyUpgradeLease,
+    LegacyUpgrade,
+    open_legacy_upgrade,
+    false
+);
+
 /// Held by the actual writer host, not solely by its parent core process.
 pub struct PluginDataLease {
     _lease: FileLease,

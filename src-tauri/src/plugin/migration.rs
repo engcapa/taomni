@@ -4,6 +4,9 @@
 //! Unsigned copy/activation operations exist only in the test fixture; actual
 //! migration waits for verified packages and a core-owned legacy data exporter.
 
+#[path = "migration_export/mod.rs"]
+pub mod export;
+
 use std::collections::BTreeMap;
 use std::fs;
 use std::io::Read;
@@ -413,6 +416,9 @@ pub use preflight::{build_file_migration_specs, inspect_legacy_install};
 
 #[path = "migration_source.rs"]
 mod source;
+
+#[path = "migration_paths.rs"]
+mod paths;
 
 #[cfg(test)]
 #[path = "migration_wal_tests.rs"]

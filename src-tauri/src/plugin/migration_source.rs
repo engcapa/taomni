@@ -1,6 +1,6 @@
 //! Bind read-only discovery to the database and its committed WAL input.
 
-use std::fs::{self, File};
+use std::fs;
 use std::io::{self, Read};
 use std::path::{Path, PathBuf};
 
@@ -18,11 +18,15 @@ impl Fingerprint {
     }
 }
 
-fn fingerprint_reader(mut reader: impl Read) -> Result<Fingerprint, String> {
+fn fingerprint_reader_checked(
+    mut reader: impl Read,
+    check: &dyn Fn() -> Result<(), String>,
+) -> Result<Fingerprint, String> {
     let mut digest = Sha256::new();
     let mut bytes = 0_u64;
     let mut buffer = [0_u8; 64 * 1024];
     loop {
+        check()?;
         let count = reader
             .read(&mut buffer)
             .map_err(|error| error.to_string())?;
@@ -40,7 +44,10 @@ fn fingerprint_reader(mut reader: impl Read) -> Result<Fingerprint, String> {
     })
 }
 
-fn fingerprint_file(path: &Path) -> Result<Fingerprint, String> {
+fn fingerprint_file(
+    path: &Path,
+    check: &dyn Fn() -> Result<(), String>,
+) -> Result<Fingerprint, String> {
     let metadata = fs::symlink_metadata(path).map_err(|error| error.to_string())?;
     if metadata.file_type().is_symlink() || !metadata.is_file() {
         return Err(format!(
@@ -48,7 +55,7 @@ fn fingerprint_file(path: &Path) -> Result<Fingerprint, String> {
             path.display()
         ));
     }
-    fingerprint_reader(File::open(path).map_err(|error| error.to_string())?)
+    fingerprint_reader_checked(super::paths::open_file(path)?, check)
 }
 
 fn with_wal(main: Fingerprint, wal: Option<Fingerprint>) -> Result<Fingerprint, String> {
@@ -73,12 +80,20 @@ fn with_wal(main: Fingerprint, wal: Option<Fingerprint>) -> Result<Fingerprint, 
 }
 
 pub(super) fn database_fingerprint(path: &Path) -> Result<String, String> {
-    let main = fingerprint_file(path)?;
+    database_fingerprint_checked(path, &|| Ok(()))
+}
+
+pub(super) fn database_fingerprint_checked(
+    path: &Path,
+    check: &dyn Fn() -> Result<(), String>,
+) -> Result<String, String> {
+    check()?;
+    let main = fingerprint_file(path, check)?;
     let mut wal_path = path.as_os_str().to_os_string();
     wal_path.push("-wal");
     let wal_path = PathBuf::from(wal_path);
     let wal = match fs::symlink_metadata(&wal_path) {
-        Ok(_) => Some(fingerprint_file(&wal_path)?),
+        Ok(_) => Some(fingerprint_file(&wal_path, check)?),
         Err(error) if error.kind() == io::ErrorKind::NotFound => None,
         Err(error) => return Err(error.to_string()),
     };
@@ -91,16 +106,27 @@ pub(super) fn read_snapshot<T>(
     path: &Path,
     inspect: impl FnOnce(&Connection) -> Result<T, String>,
 ) -> Result<(T, String), String> {
+    read_snapshot_checked(path, inspect, &|| Ok(()))
+}
+
+pub(super) fn read_snapshot_checked<T>(
+    path: &Path,
+    inspect: impl FnOnce(&Connection) -> Result<T, String>,
+    check: &dyn Fn() -> Result<(), String>,
+) -> Result<(T, String), String> {
     // Validate/hash before SQLite opens either file. A second hash while the
     // read transaction is held rejects a writer or checkpoint racing discovery.
-    let before = database_fingerprint(path)?;
-    let connection = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)
-        .map_err(|error| format!("legacy database cannot be opened read-only: {error}"))?;
+    let before = database_fingerprint_checked(path, check)?;
+    let connection = Connection::open_with_flags(
+        path,
+        OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NOFOLLOW,
+    )
+    .map_err(|error| format!("legacy database cannot be opened read-only: {error}"))?;
     let transaction = connection
         .unchecked_transaction()
         .map_err(|error| format!("legacy database snapshot cannot be read: {error}"))?;
     let value = inspect(&transaction)?;
-    if database_fingerprint(path)? != before {
+    if database_fingerprint_checked(path, check)? != before {
         return Err(
             "legacy database changed during upgrade inspection; retry after its writer is idle"
                 .into(),
@@ -123,6 +149,25 @@ pub(super) fn stable_database_fingerprint(path: &Path) -> Result<String, String>
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn fingerprint_reader(reader: impl Read) -> Result<Fingerprint, String> {
+        fingerprint_reader_checked(reader, &|| Ok(()))
+    }
+
+    #[test]
+    fn cancellation_interrupts_source_hashing_before_reading_more_bytes() {
+        let checks = std::cell::Cell::new(0);
+        let input = vec![0x51; 3 * 64 * 1024];
+        let result = fingerprint_reader_checked(&input[..], &|| {
+            checks.set(checks.get() + 1);
+            if checks.get() == 2 {
+                return Err("cancelled".into());
+            }
+            Ok(())
+        });
+        assert_eq!(result.err().unwrap(), "cancelled");
+        assert_eq!(checks.get(), 2);
+    }
 
     #[test]
     fn absent_and_empty_wal_keep_the_existing_main_fingerprint() {

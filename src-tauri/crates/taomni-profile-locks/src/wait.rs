@@ -8,6 +8,7 @@ pub enum LeaseKind {
     ProfileUse,
     ProfileRestore,
     ProfileState,
+    LegacyUpgrade,
     PluginData,
     VaultRead,
     VaultWrite,
