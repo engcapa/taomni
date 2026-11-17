@@ -554,7 +554,7 @@ jobs:
         run: |
           mkdir -p modular-evidence
           set -o pipefail
-          python -m unittest qa_ui_auto.test_core_profile_state test_module_signed_observation test_module_download_observation test_module_marketplace_observation test_module_upgrade_observation test_module_network_gate test_module_retained_observation test_module_backup_observation test_module_live_backup_observation test_module_restore_observation test_module_profile_observation test_native_restart_failure test_native_fixture_cleanup test_module_signed_archive test_module_package_signing test_module_signed_host_gate 2>&1 | tee modular-evidence/native-observation-unit.log
+          python -m unittest qa_ui_auto.test_core_profile_state test_module_signed_observation test_module_download_observation test_module_marketplace_observation test_module_upgrade_observation test_legacy_release test_module_network_gate test_module_retained_observation test_module_backup_observation test_module_live_backup_observation test_module_restore_observation test_module_profile_observation test_native_restart_failure test_native_fixture_cleanup test_module_signed_archive test_module_package_signing test_module_signed_host_gate 2>&1 | tee modular-evidence/native-observation-unit.log
       - name: Preserve native observation evidence on every platform
         uses: actions/upload-artifact@v4
         if: always()

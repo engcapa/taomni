@@ -1,6 +1,7 @@
 """Fixture/oracle units use disposable SQLite files; no app or service starts."""
 from contextlib import closing
 import json
+import hashlib
 from pathlib import Path
 import sqlite3
 from types import SimpleNamespace
@@ -90,6 +91,22 @@ class UpgradeObservationTests(unittest.TestCase):
             db.execute("UPDATE sessions SET session_type = 'VNC' WHERE session_type = 'RDP'")
         (self.root / "plugins" / "vnc-client").mkdir(parents=True)
         with self.assertRaisesRegex(StepError, "module owner/code/data"):
+            observe(self.root, self.state, "preflight")
+
+    def test_installed_old_database_sidecars_and_complete_rows_are_preserved(self):
+        self.state["retained"] = {name: {"sha256": hashlib.sha256(content).hexdigest(), "bytes": len(content)}
+                                  for name, content in CHAT_FILES.items()}
+        with closing(sqlite3.connect(self.root / "taomni.db")) as db:
+            db.row_factory = sqlite3.Row
+            self.state["full_sessions"] = [dict(row) for row in db.execute("SELECT * FROM sessions ORDER BY id")]
+        observe(self.root, self.state, "preflight")
+        (self.root / "lanchat.sqlite-wal").write_bytes(b"unexpected new writer")
+        with self.assertRaisesRegex(StepError, "file set"):
+            observe(self.root, self.state, "preflight")
+        (self.root / "lanchat.sqlite-wal").unlink()
+        with closing(sqlite3.connect(self.root / "taomni.db")) as db, db:
+            db.execute("ALTER TABLE sessions ADD COLUMN extra TEXT")
+        with self.assertRaisesRegex(StepError, "complete old-version"):
             observe(self.root, self.state, "preflight")
 
 

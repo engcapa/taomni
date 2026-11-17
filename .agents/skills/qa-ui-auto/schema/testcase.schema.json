@@ -88,6 +88,7 @@
           "module_offline_archive",
           "module_preview",
           "module_upgrade",
+          "module_legacy_install",
           "module_download",
           "module_download_preview",
           "module_marketplace",
@@ -933,7 +934,7 @@
         "module_upgrade_probe": {
           "type": "object", "additionalProperties": false, "required": ["phase"],
           "properties": { "phase": { "enum": ["preflight", "pending", "repeat"] } },
-          "description": "Native only: read-only observation of the fixed VNC-only legacy fixture, original session records, retained chat bytes, absent module directories and idempotent pending journal. No YAML paths, SQL, commands or product mutations."
+          "description": "Native only: read-only observation of the fixed VNC-only synthetic or installed-0.5.9 fixture, original session records, retained chat bytes/sidecars, absent module directories and idempotent pending journal. No YAML paths, SQL, commands or product mutations."
         },
         "module_marketplace_probe": {
           "type": "object", "additionalProperties": false, "required": ["phase"],

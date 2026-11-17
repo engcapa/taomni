@@ -65,7 +65,11 @@ steps:
     equals: vnc-client
 - module_upgrade_probe:
     phase: pending
-- native_restart_app: null
+- native_restart_app:
+    expect_exit_confirmation:
+      title: Exit
+      message: There is 1 open tab. Exit Taomni and close it?
+      confirm_label: Exit
 - *id001
 - *id002
 - *id003

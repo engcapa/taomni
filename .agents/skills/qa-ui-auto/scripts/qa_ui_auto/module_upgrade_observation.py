@@ -12,15 +12,28 @@ from .steps import StepError
 
 
 def observe(data, state, phase):
-    for name, content in CHAT_FILES.items():
+    retained = state.get("retained") or {
+        name: {"sha256": hashlib.sha256(content).hexdigest(), "bytes": len(content)}
+        for name, content in CHAT_FILES.items()}
+    actual_names = {path.name for path in data.iterdir()
+                    if path.name.startswith(("lanchat.sqlite", "lanchat.db"))}
+    if actual_names != set(retained):
+        raise StepError("Preflight/pending changed the retained LanChat file set")
+    for name, expected in retained.items():
         path = data / name
-        if path.is_symlink() or path.read_bytes() != content:
+        if (path.is_symlink() or not path.is_file() or path.stat().st_size != expected["bytes"]
+                or hashlib.sha256(path.read_bytes()).hexdigest() != expected["sha256"]):
             raise StepError("Preflight/pending changed a retained LanChat file")
     database = data / "taomni.db"
     if database.is_symlink():
         raise StepError("Upgrade observation refuses a linked database")
     with closing(sqlite3.connect(database.as_uri() + "?mode=ro", uri=True)) as connection:
         rows = connection.execute("SELECT id, session_type, options_json FROM sessions ORDER BY id").fetchall()
+        if "full_sessions" in state:
+            connection.row_factory = sqlite3.Row
+            full_rows = [dict(row) for row in connection.execute("SELECT * FROM sessions ORDER BY id")]
+            if full_rows != state["full_sessions"]:
+                raise StepError("Upgrade changed complete old-version session records")
     expected = sorted((row["id"], row["session_type"], row["options_json"]) for row in state["sessions"])
     if rows != expected:
         raise StepError("Upgrade preflight/pending changed the original session records")
@@ -31,7 +44,7 @@ def observe(data, state, phase):
             raise StepError("Pending migration created a module owner/code/data directory")
     journal_path = data / "migration" / "journal.json"
     result = {"sessionTypes": [row[1] for row in rows], "retainedSha256": {
-        name: hashlib.sha256(content).hexdigest() for name, content in CHAT_FILES.items()},
+        name: value["sha256"] for name, value in retained.items()},
         "moduleDirectoriesAbsent": True}
     if phase == "preflight":
         if journal_path.exists():
@@ -63,7 +76,7 @@ def run(ctx, args):
         raise StepError("module_upgrade_probe requires a fixed registered phase")
     owner = getattr(ctx, "fixture_context", None) or ctx
     state = getattr(owner, "module_upgrade", None)
-    if not state or getattr(owner, "case_id", None) != "TC-MODULES-025":
+    if not state or getattr(owner, "case_id", None) not in {"TC-MODULES-025", "TC-MODULES-027"}:
         raise StepError("module_upgrade_probe requires its native VNC-only input fixture")
     data = isolated_data_root(owner)
     if data != state["root"]:

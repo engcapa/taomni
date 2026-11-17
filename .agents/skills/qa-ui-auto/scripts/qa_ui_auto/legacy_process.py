@@ -1,0 +1,71 @@
+"""Bounded real old-app initialization with explicit platform shutdown evidence."""
+import json
+import os
+from pathlib import Path
+import platform
+import re
+import signal
+import subprocess
+import time
+
+
+def sanitized_output(raw):
+    return re.sub(r"(?im)^.*pairing code.*$", "[ephemeral pairing code omitted]", raw)
+
+
+def initialize_profile(executable, data, work, evidence, label):
+    """Use only the old release's documented headless entry, never a QA hook.
+
+    0.5.9's Windows release uses the GUI subsystem and exposes no headless quit
+    endpoint. Its owned process tree is forcibly stopped; this is deliberately
+    recorded as crash/recovery input, never described as a graceful shutdown.
+    Unix must finish its SIGTERM handler with exit=0 or the case fails.
+    """
+    log = Path(work) / (label + ".raw.log")
+    record = {"schema": "taomni.qa.legacy-start.v1", "dataRoot": str(data),
+              "argv": [str(executable), "--headless", "--data-dir", str(data), "--mobile-port", "0"],
+              "ready": False, "forcedCleanup": False}
+    process = None
+    windows = platform.system() == "Windows"
+    try:
+        with log.open("xb", buffering=0) as output:
+            process = subprocess.Popen(record["argv"], stdout=output, stderr=subprocess.STDOUT,
+                                       stdin=subprocess.DEVNULL, start_new_session=not windows)
+            record["pid"] = process.pid
+            deadline = time.monotonic() + 60
+            while time.monotonic() < deadline:
+                if log.stat().st_size > 512 * 1024:
+                    raise RuntimeError("Legacy initialization exceeded its log bound")
+                raw = log.read_text(encoding="utf-8", errors="replace")
+                if re.search(r"Mobile endpoint: (?:http://)?127\.0\.0\.1:[1-9][0-9]*", raw):
+                    record["ready"] = True
+                    break
+                if process.poll() is not None:
+                    raise RuntimeError("Legacy app exited before reporting its loopback endpoint")
+                time.sleep(0.05)
+            if not record["ready"]:
+                raise RuntimeError("Legacy app did not initialize within 60 seconds")
+            if windows:
+                record["shutdown"] = "owned GUI-subsystem process tree forced stop (crash input)"
+                subprocess.run(["taskkill.exe", "/PID", str(process.pid), "/T", "/F"],
+                               capture_output=True, timeout=15, check=True)
+            else:
+                record["shutdown"] = "SIGTERM handler"
+                os.killpg(process.pid, signal.SIGTERM)
+            record["exitCode"] = process.wait(timeout=15)
+            if not windows and record["exitCode"] != 0:
+                raise RuntimeError("Legacy app failed its normal Unix shutdown")
+    finally:
+        if process is not None and process.poll() is None:
+            record["forcedCleanup"] = True
+            if windows:
+                subprocess.run(["taskkill.exe", "/PID", str(process.pid), "/T", "/F"],
+                               capture_output=True, timeout=15)
+            else:
+                os.killpg(process.pid, signal.SIGKILL)
+            process.wait(timeout=15)
+        record["exited"] = process is not None and process.poll() is not None
+        raw = log.read_text(encoding="utf-8", errors="replace") if log.exists() else ""
+        (Path(evidence) / (label + ".log")).write_text(sanitized_output(raw), encoding="utf-8")
+        (Path(evidence) / (label + ".json")).write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
+    return record

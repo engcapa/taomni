@@ -12,7 +12,10 @@
 
 ## 2026-11-17 最新结果与后续验证
 
-- 长期运行的防重放实现采用[Vault/services 方案 §4.1](taomni-modular-vault-services-plan.md#41-长期运行与有界防重放)：握手明确协商单调双向序号、固定 watermark；旧 peer 保留原有限 ledger。生产准入在同一屏障中分配保留 UUID 空间的 88 位不回绕 ID，只保留存活记录，显式 ID/core-local 入口无法重新准入该空间。caller/wire ID 共用取消标记，SDK pending 与待丢弃迟到响应原子关联且合计最多 8，成功历史不耗尽容量。没有切换生产 MFA facade/连接 owner。本地 API **29/29**、SDK **26 passed / 3 个真实 socket 场景 ignored**、services **47/47**、host **25/25**；核心 `cargo check --lib --tests` 与全部 host-gates 的 `--tests --no-run` 编译通过。新增真实子进程门保持同一 HostInstance 完成 70,000 次 stdio echo/生产准入，前后各验证一次真实 reverse key，再核对无存活 operation/OS 租约；这不是 70,000 次真实 key 请求。本地不执行该门。原八项 services 场景全部保留，workflow 精确选择增为九项；新源码需在 GitHub 三端验证后才能闭合这个前置问题。
+- 再次 fetch/merge 远程 main，仍为已包含的 `9c43704483ddf2c7fed36f9912a11152dea4b911`，返回 `Already up to date`，无冲突。当前业务开发与多端收证继续。
+- 本批新增 GitHub-only `TC-MODULES-027`：真实安装固定 SHA-256 的正式 0.5.9 deb/MSI/DMG，由旧 binary 创建 schema 并重开合成 SSH/VNC 行，再让候选核心读取同一 run-owned profile；独立检查完整旧行、真实 chat/WAL 文件集合与字节、精确 VNC pending 和正常候选重启。Windows 旧 GUI-subsystem 进程明确作为强停恢复输入。安装/旧进程/签名证据与大体积临时安装分开保存；不执行生产迁移或伪造激活。纯工具单元 **13/13** 已通过，真实执行待提交后的 GitHub；细节见[验证方案](taomni-modular-installed-upgrade-verification.md)。
+- 即时下载上一轮 macOS native shard 3 后发现 TC-MODULES-025 step 19 在正常关闭时遇到单个 Settings tab 的 Exit 确认。原始 restart receipt 和 HTML 已保留；修正 025/027 为精确匹配 title/message/confirm_label 并确认一次，后续完整行、chat 字节和 journal 一致断言不变。此修复尚待新 SHA hosted 复验，不将原失败记为通过。
+- 长期运行的防重放实现采用[Vault/services 方案 §4.1](taomni-modular-vault-services-plan.md#41-长期运行与有界防重放)：握手明确协商单调双向序号、固定 watermark；旧 peer 保留原有限 ledger。生产准入在同一屏障中分配保留 UUID 空间的 88 位不回绕 ID，只保留存活记录，显式 ID/core-local 入口无法重新准入该空间。caller/wire ID 共用取消标记，SDK pending 与待丢弃迟到响应原子关联且合计最多 8，成功历史不耗尽容量。没有切换生产 MFA facade/连接 owner。本地 API **29/29**、SDK **26 passed / 3 个真实 socket 场景 ignored**、services **47/47**、host **25/25**；核心 `cargo check --lib --tests` 与全部 host-gates 的 `--tests --no-run` 编译通过。新增真实子进程门保持同一 HostInstance 完成 70,000 次 stdio echo/生产准入，前后各验证一次真实 reverse key，再核对无存活 operation/OS 租约；这不是 70,000 次真实 key 请求。本地不执行该门。原八项 services 场景全部保留，workflow 精确选择增为九项；产品源码 `a41b27e72dc1a4ac8f63499cf2da93e4555131f0` 的[协议门 #44020906790](https://github.com/engcapa/taomni/actions/runs/44020906790) 和[真实宿主门 #44020928836](https://github.com/engcapa/taomni/actions/runs/44020928836) 已全部成功，三端宿主各 **37/37**，services 各 **9/9**。7 份 artifact 均在执行期间收齐，source SHA 已核对；同源码 [UI #44020952873](https://github.com/engcapa/taomni/actions/runs/44020952873) 六个 browser shard 已收齐，三端各 **33/33**，native 继续执行，不能由契约门推算 UI native 通过。
 - 本批只改变内部关联 ID、准入和取消 owner，没有新增用户入口/业务 params；不新增只能观察 stub 的协议 YAML。保留模块安装/宿主/退出、运行中备份/三态还原的 TC-MODULES-001–026，MFA-001/007/103/106、main Tao-Home-043–046 与完整 crash-regression，并用上述真实 stdio 门覆盖私有协议。静态三端计划已检查，实际运行仍须关联提交后的 source/case/build 身份。
 - 再次同步 main：已合入 `9c43704483ddf2c7fed36f9912a11152dea4b911`，merge 提交 `3f00c4be1`。解决 QA catalog/fixtures/policy 与 Tao client/inline attachments 五处冲突：保留 main 新 provider 和附件归属检查，数据访问适配到 CoreState/LegacyFeatureRuntime，合并双方用例并重新生成 catalog；LanChat 删除保持。main 新依赖 frozen-lockfile 安装成功，相关前端五文件 **17/17** 单元通过；合并后完整 runner 证据需绑定后续产品 SHA。
 - 升级预检修复源码 `d25a25aa9819225ffba981b9c94da245a097f362` 已推送：从 schema-only 推荐改为同一只读 SQLite snapshot 中的 EXISTS 记录检查，排除空表/核心会话，VNC 独立归属 `vnc-client`，既有 RDP journal 字段不改。重新预检只校正尚未执行的 pending 占位，拒绝重置 staged/committed 等历史。新增 6 项内存 SQLite 单元、journal 回归及 native 025 / browser 026；005 精确断言 empty，不能将 candidates/error 视作正常新 profile。native 用例设计通过真实 Settings/IPC、独立旧会话/两份 LanChat 字节检查和 pending journal 验证重复/正常重启，不伪造安装或迁移完成。这些合成输入不等于真实已安装 0.5.x 升级。[多端 #44017470897](https://github.com/engcapa/taomni/actions/runs/44017470897) 的六个 browser shard 已即时收齐、复核 receipt 与 selection，三端各 **25/25**，含 005/026 和 main provider 保留场景；native 尚在执行。Linux QA build 的全量前端单元唯一失败为 `ScreenshotFavorites.test.tsx:48` 的 blob 清理断言，产品/测试文件与 main 完全相同；保留原日志，属于无关阻断，后续新源码重跑构建，不记 native 通过。
@@ -211,19 +214,19 @@
 | 任务 | 状态 | 尚需交付的结果 |
 |---|---|---|
 | TASK-001 基线 | 三个包目标已采样，Intel 待产出 | Linux/Windows/macOS ARM64 的真实安装包尺寸、哈希与负载已记录；Intel 包及四目标启动/内存/吞吐匹配原始样本未齐。见追加基线。 |
-| TASK-002 契约 | 基础与 still 服务三端门通过，尚未冻结 | API、manifest/schema、RPC、受限 BinaryRef、总量预算/request 所有权和 `capture.still` 接线已有三端原始结果；SDK 取流中取消增量验证中。仍须解决长期有界防重放、连续 RDP 通道/吞吐，完成真实业务/G 门后冻结。 |
+| TASK-002 契约 | 基础与 still 服务三端门通过，尚未冻结 | API、manifest/schema、RPC、受限 BinaryRef、总量预算/request 所有权和 `capture.still` 接线已有三端原始结果；SDK 取流中取消增量验证中。长期有界防重放已有三端契约门，仍须连续 RDP 通道/吞吐和真实业务/G 门后冻结。 |
 | TASK-003 共享采集 | 引擎与私有 still 服务已集成 | 引擎/权限/像素/一次性采集已下沉，核心持有显示器、帧源和窗口生命周期；四目标库 check、真实 X11 与三端 SDK still 场景已有证据。真实 MFA facade 尚未调用新的私有入口；物理屏幕经宿主路径、macOS TCC 与 RDP 性能仍待验证。当前 matching UI/crash 继续收证。 |
 | TASK-004 RDP 公共库 | 已集成，公共库门已有证据 | `taomni-rdp-common` 与零依赖 `taomni-file-uri` 已被原调用方使用。`237e35f5f` 的 #43978893008 已取得四目标 check、三端 full/minimal unit/tree 与 Linux 原调用方单元；整轮其它失败保留，不称全 run 成功。精确保留 UI/剪贴板与发布性能仍按下方场景收口。 |
 | TASK-005 核心状态 | 005-A 已集成验证；005-B 待迁出 | CoreState/LegacyFeatureRuntime、统一 bootstrap、服务准入/Vault 协调、弱观察器与退出清理已有契约和 TC-MODULES-008/009 证据；业务状态和依赖尚在 LegacyFeatureRuntime，005-B 未完成。 |
 | TASK-006 核心依赖闭包 | 待开始 | Cargo 默认 features、bundle/resources、平台依赖与核心前端 chunk 真正移除已迁移业务。 |
 | TASK-007 前端注册和路由 | 运行时已有 native 证据；业务前端待迁出 | 主窗/分离窗真实动态 ESM、共享 SDK、owner 失效/取消、locator 恢复和篡改拒绝已接入，TC-MODULES-016/018 有 matching native 结果；十个业务前端与各独立入口的完整等价验证尚未完成。 |
-| TASK-008 宿主监督 | 生产 adapter 已接入，三端 36 项门通过 | 主动心跳、重启预算、取消/revoke、确认进程树退出、双向服务、profile 与 snapshot 已接入；最新产品源码 #44009587460 三端各 36/36。完整已安装发行包的强杀/下次清扫与业务资源仍按 G6/G11 验证。 |
+| TASK-008 宿主监督 | 生产 adapter 已接入，三端 37 项门通过 | 主动心跳、重启预算、取消/revoke、确认进程树退出、双向服务、profile 与 snapshot 已接入；最新产品源码 #44020928836 三端各 37/37。完整已安装发行包的强杀/下次清扫与业务资源仍按 G6/G11 验证。 |
 | TASK-009 生命周期 | 安装/启禁/保留数据闭环已有证据 | 可信安装门、版本目录/active、正常重启、启禁/卸载保留数据已有真实 native 结果；实际不同版本的运行中更新/回滚链、无重启核心和业务资源释放仍需完整证据。 |
 | TASK-010 商店/下载 | 已接入并有 hosted 证据；正式目录待发布 | 三代理、后台进度、取消/续传、跨重启恢复、目录验签/搜索/确认/包审查安装已接入；TC-MODULES-022 的 58 步三端通过，相关下载与代理门已有原始结果。测试签名目录不能代替正式 release 的目录、独立更新/回滚闭环。 |
 | TASK-011 验签安装 | 基础闭环四种 native profile 通过 | pinned key 的真实 minisign 校验、清单防回滚、安全解包、内容绑定及安装入口强制验签已接入；#43804951477 的 TC-MODULES-007 在四种 native profile 全部 52 步通过，覆盖官方签名安装、启禁、正常重启和篡改拒绝。业务包、更新/回滚与最终发布仍需后续证据。 |
 | TASK-012 单体升级 | 部分 | 从安全 pending 进入真实 legacy exporter、可信包 staging、Vault 交接、激活、恢复/回滚；真实安装升级证据。 |
 | TASK-013 原型与 G 门 | hello/MFA 真宿主与签名包已有证据；G 门未闭合 | 三端实际进程、四目标签名包及三端正式安装门已有结果；G1/G3 系统实验、Linux noexec 已保留通过项与限制。完整安装包、hardened runtime/签名信任、性能、core-only 与真实升级仍有缺口，不能宣布 G1–G11 全过。 |
-| TASK-014 MFA | engine/SDK/store 原型与正式安装门通过；生产未切换 | 独立 store actor、作用域 KeyProvider、snapshot、可信包安装已有三端结果；现有 facade/连接 owner 仍在核心。长期 ledger、真实旧库迁移、capture RPC 业务调用、动态 MFA UI、相关 G 门与迁出后三态还原待闭合。 |
+| TASK-014 MFA | engine/SDK/store 原型与正式安装门通过；生产未切换 | 独立 store actor、作用域 KeyProvider、snapshot、可信包安装已有三端结果；现有 facade/连接 owner 仍在核心。真实旧库迁移、capture RPC 业务调用、动态 MFA UI、相关 G 门与迁出后三态还原待闭合。 |
 | TASK-015 | 已取消 | 历史设计 `7bc498b35` 中为 LanChat 迁移，已由用户明确删除决定取消；主设计已保留编号并清理前置依赖。旧库保持原位，不读取、迁移或删除，不创建替代插件。 |
 | TASK-016 RDP/VNC 客户端 | 待前置闭合 | 两个插件宿主与前端、证书钉扎、剪贴板/输入、保留会话及特定按键辅助入口。 |
 | TASK-017 RDP/VNC 服务端 | 待前置闭合 | 两个插件宿主、共享采集/公共库、系统权限和平台边界。 |
