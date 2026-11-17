@@ -73,8 +73,10 @@ public static class TaomniPackageRuntimeLoader {
     [void][TaomniPackageRuntimeLoader]::FreeLibrary($handle)
   }
   $files = @(Get-ChildItem -LiteralPath $app.DirectoryName -Recurse -File | ForEach-Object {
-    [ordered]@{ path = [IO.Path]::GetRelativePath($app.DirectoryName, $_.FullName); bytes = $_.Length }
+    [pscustomobject][ordered]@{ path = [IO.Path]::GetRelativePath($app.DirectoryName, $_.FullName); bytes = $_.Length }
   })
+  $payloadBytes = ($files | Measure-Object -Property bytes -Sum).Sum
+  if ($null -eq $payloadBytes -or $payloadBytes -le 0) { throw 'MSI payload byte total is unavailable' }
   $result = [ordered]@{
     scope = 'msi-administrative-payload'
     executableSha256 = (Get-FileHash -LiteralPath $app.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
@@ -82,7 +84,7 @@ public static class TaomniPackageRuntimeLoader {
     architecture = 'x86_64'
     isolatedRuntimeLoads = $runtimeFiles
     regularFiles = $files.Count
-    regularFileBytes = ($files | Measure-Object -Property bytes -Sum).Sum
+    regularFileBytes = [long]$payloadBytes
     largestFiles = @($files | Sort-Object -Property bytes -Descending | Select-Object -First 25)
     applicationLaunched = $false
     installedUpgradeEstablished = $false

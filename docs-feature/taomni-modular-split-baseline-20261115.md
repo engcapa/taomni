@@ -1,6 +1,6 @@
 # Taomni 模块化拆分 M0 基线（2026-11-15）
 
-本报告记录 TASK-001 的可复现源码、前端构建和 Rust 依赖基线。当前工作区没有可发布的 Windows/macOS/Linux 安装 artifact，因此安装包体积栏明确标为待 hosted release build；后续每个迁移批次应在相同命令和 runner 上追加增量。
+本报告记录 TASK-001 的可复现源码、前端构建和 Rust 依赖基线。2026-11-15 起点没有真实安装 artifact，保留当时的缺口；2026-11-17 已追加 GitHub 真实 Linux/Windows 发布包采样。后续迁移批次应在相同命令和 runner 上追加增量。
 
 ## 采样身份
 
@@ -33,4 +33,22 @@ find src-tauri/target/release/bundle -type f \( -name '*.AppImage' -o -name '*.d
 ## 解释与限制
 
 这是一份 M0 起点，不是“核心已瘦身”的证明。`target/` 是本地编译缓存，不能作为发布包大小；`dist/` 也不是 Tauri 安装包，不能替代三端 artifact 采样。TASK-023 的 release workflow 必须在 Linux、Windows、macOS runner 生成真实包，并将包大小、SHA-256、平台和构建提交写入后续基线更新。
+
+## 2026-11-17 真实安装包追加采样
+
+生产来源为 [Release Bundle #43997809941](https://github.com/engcapa/taomni/actions/runs/43997809941)，完整产品源码 `1eec7eca4ede44e9266d927674c4c7ea5f38ffe1`，测试版本 `0.6.0`。空 tag 的 artifact-only 构建未创建 tag 或 Release；版本只用于构建，不改变仓库 `package.json`。本表保留各目标产出后的观察，不等待其它 builder；macOS ARM64/Intel 尚待产出，不计完成。
+
+| 平台 / 实际文件 | bytes | SHA-256 |
+| --- | ---: | --- |
+| Linux `Taomni_0.6.0_amd64.deb` | 109723960 | `7a59a7a2f9e37ca5bebe92d756201a26893f942bfa90254c8db6160699068431` |
+| Linux `Taomni-0.6.0-1.x86_64.rpm` | 109721189 | `2bc3e18c868524fcdd6a9c1dda62f0987b2b9773de2ba7b551384a8ca6e23305` |
+| Linux `Taomni_0.6.0_amd64.AppImage` | 177220088 | `2753b495f687431b8e8d40f88fb12dcb080ddb2b8979b77e2322154f7e5bb2c3` |
+| Windows `Taomni_0.6.0_x64-setup.exe` | 71962590 | `b4f157d09153581497c5d1ae716f647b613646e5fc8a24585620521f60704f53` |
+| Windows `Taomni_0.6.0_x64_en-US.msi` | 95920128 | `e40bb65abfc9a1081d91d9700b68801267a58361088b0b4c8a12d924201b453c` |
+
+Linux [采样 #44003740535](https://github.com/engcapa/taomni/actions/runs/44003740535) 使用工具源码 `a6ded7c847aa47d9055213f0e821e385c497ac1b`，消费不可变 artifact `14293785052`。原始结果保存在 `qa-ui-auto-report/github/44003740535/live-samples/modular-bundle-linux-x86_64-43997809941/`：`bundle-baseline.json` 记录各包及 `.sig` 完整大小/哈希，`deb-fields.json`、`deb-executable-header.log`、`rpm-info.log` 和 `linux-payload.json` 保留真实解析/解包结果。deb 内版本 0.6.0、amd64、ELF64 x86-64，19 个 regular files 共 `300466152` bytes，主 executable `248145288` bytes、SHA-256 `943dc505bfe0591227129c73e59530f45b27dfe251c09338fbefe43f3d0c8042`。
+
+Windows [首轮采样 #44004139461](https://github.com/engcapa/taomni/actions/runs/44004139461) 使用同一工具源码，消费不可变 artifact `14293312470`。原始结果保存在对应 `live-samples/modular-bundle-windows-x86_64-43997809941/`。真实 MSI 行政解包确认版本 0.6.0、x86_64 PE，四个 Sherpa/ONNX DLL 从自身目录/System32 隔离加载成功；但 PowerShell Dictionary 聚合使 `regularFileBytes=null`，该 run **不建立完整 Windows 负载基线**，须修复后在 Windows runner 复跑。主 executable SHA-256 为 `d454c4af1b6ac1538aa68d1f47d234facf7863b2d750efa747a247167818e894`。MSI 与 NSIS 的 Authenticode 均为 `NotSigned`，系统信任仍是缺口。
+
+包体积是文件本身的 bytes，不是 Actions zip 大小。产品仍含业务实现，不能据此宣称核心瘦身；本批未启动应用或进行真实已安装升级，不建立启动/内存、legacy exporter、系统分发信任或 G1–G11 通过证据。
 

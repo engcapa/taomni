@@ -130,6 +130,25 @@ def tree_sample(root: Path) -> dict:
             'symlinks': links}
 
 
+def validate_payload(target: str, evidence: dict) -> None:
+    if target not in TARGETS:
+        raise ValueError('unknown bundle target')
+    if target.startswith('darwin') and evidence.get('completed') is not True:
+        raise ValueError('macOS package inspection did not complete')
+    sample = evidence if target == 'windows-x86_64' else evidence.get('payload', {})
+    count, size = sample.get('regularFiles'), sample.get('regularFileBytes')
+    if type(count) is not int or count <= 0 or type(size) is not int or size <= 0:
+        raise ValueError('payload file count and byte total must be positive integers')
+    rows = sample.get('largestFiles', [])
+    if not rows or len(rows) != min(25, count):
+        raise ValueError('payload largest-file samples are missing or incomplete')
+    if any(type(row.get('bytes')) is not int or row['bytes'] < 0 for row in rows):
+        raise ValueError('payload file sizes must be nonnegative integers')
+    selected_bytes = sum(row['bytes'] for row in rows)
+    if selected_bytes > size or (count <= 25 and selected_bytes != size):
+        raise ValueError('payload byte total differs from its file samples')
+
+
 def linux_metadata(directory: Path, output: Path, version: str) -> dict:
     deb = next(directory.glob('*.deb'))
     fields = {}
@@ -167,6 +186,9 @@ def main() -> None:
     plan = commands.add_parser('plan-targets')
     plan.add_argument('--targets', required=True)
     plan.add_argument('--github-output', type=Path, required=True)
+    payload = commands.add_parser('validate-payload')
+    payload.add_argument('--target', required=True)
+    payload.add_argument('--directory', type=Path, required=True)
     validate = commands.add_parser('validate-source')
     for key in ('run', 'artifacts', 'out', 'github-output'):
         validate.add_argument(f'--{key}', type=Path, required=True)
@@ -182,6 +204,10 @@ def main() -> None:
         matrix = plan_targets(args.targets)
         with args.github_output.open('a', encoding='utf-8') as stream:
             stream.write('matrix=' + json.dumps(matrix, separators=(',', ':')) + '\n')
+        return
+    if args.command == 'validate-payload':
+        name = ('macos' if args.target.startswith('darwin') else args.target.split('-')[0]) + '-payload.json'
+        validate_payload(args.target, json.loads((args.directory / name).read_text(encoding='utf-8-sig')))
         return
     if args.command == 'validate-source':
         record = validate_source(

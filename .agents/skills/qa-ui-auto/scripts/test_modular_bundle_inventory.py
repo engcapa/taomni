@@ -8,7 +8,7 @@ import tarfile
 import tempfile
 import unittest
 
-from modular_bundle_inventory import inventory, plan_targets, tree_sample, validate_source
+from modular_bundle_inventory import inventory, plan_targets, tree_sample, validate_payload, validate_source
 from modular_bundle_macos import app_identity, extract_updater
 
 
@@ -144,6 +144,21 @@ class BundleFileTests(unittest.TestCase):
                         (directory / 'Taomni.app.tar.gz').write_bytes(b'archive')
                     with self.assertRaises(ValueError):
                         inventory(directory, {**self.identity, 'target': target})
+
+    def test_payload_samples_require_real_byte_totals_on_every_target(self):
+        sample = {'regularFiles': 2, 'regularFileBytes': 10,
+                  'largestFiles': [{'path': 'app', 'bytes': 6}, {'path': 'runtime', 'bytes': 4}]}
+        for target in ['windows-x86_64', 'linux-x86_64', 'darwin-aarch64', 'darwin-x86_64']:
+            def wrap(value):
+                return value if target.startswith('windows') else {'completed': True, 'payload': value}
+            validate_payload(target, wrap(sample))
+            for patch in [{'regularFileBytes': None}, {'regularFileBytes': 9},
+                          {'regularFileBytes': 11}, {'regularFileBytes': 0},
+                          {'regularFiles': True}, {'largestFiles': []}]:
+                with self.subTest(target=target, patch=patch), self.assertRaises(ValueError):
+                    validate_payload(target, wrap({**sample, **patch}))
+        with self.assertRaises(ValueError):
+            validate_payload('darwin-aarch64', {'completed': False, 'payload': sample})
 
     def test_updater_must_stay_within_the_real_app_root(self):
         for member in ['../escaped', '/absolute', 'Other.app/Contents/MacOS/app']:

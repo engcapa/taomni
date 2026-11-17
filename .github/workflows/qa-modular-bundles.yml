@@ -137,6 +137,10 @@ jobs:
           uname -m > bundle-evidence/runner-architecture.txt
           python .agents/skills/qa-ui-auto/scripts/modular_bundle_macos.py \
             --directory package-input --identity bundle-evidence/bundle-source.json --out bundle-evidence
+      - name: Require complete raw payload samples
+        run: |
+          python .agents/skills/qa-ui-auto/scripts/modular_bundle_inventory.py validate-payload \
+            --target "$SAMPLE_TARGET" --directory bundle-evidence
       - uses: actions/upload-artifact@v4
         if: always()
         with:
