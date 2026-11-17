@@ -32,7 +32,7 @@ impl Turn {
             return Ok(vec![]);
         }
         if value.get("error").is_some() {
-            return Err("stream: OpenCode interrupted the response".into());
+            return Err("stream: provider interrupted the response".into());
         }
         let mut events = Vec::new();
         if let Some(usage) = value.get("usage").filter(|v| v.is_object()) {

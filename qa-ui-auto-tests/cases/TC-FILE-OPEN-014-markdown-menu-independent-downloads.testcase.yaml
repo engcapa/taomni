@@ -1,7 +1,7 @@
 id: TC-FILE-OPEN-014
 title: Markdown dropdown without toolbar scrollbars, independent PDF and portable Word downloads
 description: Production Explorer and export UI. Desktop and narrow layout, keyboard navigation/focus, default settings, real
-  printer-independent PDF and Word downloads. Independent host parsing checks original red/blue raster pixels in the 300DPI A4 PDF, three vector diagrams
+  printer-independent searchable PDF and Word downloads. Independent host parsing checks exact Chinese/English, accents, emoji, final-page text and original red/blue raster pixels in the 300DPI A4 PDF, three vector diagrams
   with explicit label styles and 600DPI Word fallback; original raster stays 1600x800. Browser evidence is not native chooser
   evidence.
 modes:
@@ -129,7 +129,7 @@ verification:
   requirements:
   - id: DURABLE-RESULT
     requirement: Export dropdown escapes clipping surfaces with no toolbar scrollbars, supports keyboard dismissal and narrow
-      windows, and produces complete high-fidelity PDF/DOCX artifacts while retaining source bytes.
+      windows, and produces searchable Unicode PDF and complete high-fidelity DOCX artifacts while retaining source bytes.
     actions:
     - 3
     - 4

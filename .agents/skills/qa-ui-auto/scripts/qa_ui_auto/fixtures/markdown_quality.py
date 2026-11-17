@@ -22,6 +22,8 @@ def setup(ctx):
 
 **Readable text** with [a link](https://example.test), `inline code`, and a checked task.
 
+Searchable Unicode: 中文检索 café é 😀.
+
 - [x] 保留完成状态 Completed
 - [ ] Pending
 

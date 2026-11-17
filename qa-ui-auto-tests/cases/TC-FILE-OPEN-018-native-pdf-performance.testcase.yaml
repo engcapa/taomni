@@ -1,0 +1,456 @@
+id: TC-FILE-OPEN-018
+title: 'Native long PDF export: three retained samples with tables, Mermaid and Unicode'
+description: Repeat the same fifteen-section document and settings in the packaged release WebView. Raw chooser/result
+  step durations include automation overhead; independently inspect the three saved PDFs for complete pages, Unicode
+  search and unchanged image quality. This case is identical for baseline and candidate and does not claim a speedup
+  by itself.
+modes:
+- native
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-pdf-performance
+- reload_window: null
+- host_write_file:
+    path: ${fixture.markdown_quality_source}
+    text: |
+      # Fifteen section performance fixture
+
+      ```mermaid
+      flowchart LR
+      A[加载配置 Load configuration] --> B{权限检查 Access check}
+      B --> C[保存历史 Persist history]
+      ```
+
+      ## Section 1
+
+      PDF 性能与清晰度验证。 Keep all table borders, Unicode text and chart labels crisp and searchable. This paragraph measures the same lossless export path.
+
+      | Item | Status | Details |
+      | --- | --- | --- |
+      | Item 1 中文 | complete | Table text remains searchable |
+      | Item 2 中文 | complete | Table text remains searchable |
+      | Item 3 中文 | complete | Table text remains searchable |
+      | Item 4 中文 | complete | Table text remains searchable |
+      | Item 5 中文 | complete | Table text remains searchable |
+      | Item 6 中文 | complete | Table text remains searchable |
+      | Item 7 中文 | complete | Table text remains searchable |
+      | Item 8 中文 | complete | Table text remains searchable |
+      | Item 9 中文 | complete | Table text remains searchable |
+      | Item 10 中文 | complete | Table text remains searchable |
+      | Item 11 中文 | complete | Table text remains searchable |
+      | Item 12 中文 | complete | Table text remains searchable |
+
+      PDF 性能与清晰度验证。 Keep all table borders, Unicode text and chart labels crisp and searchable. This paragraph measures the same lossless export path.
+
+      ## Section 2
+
+      PDF 性能与清晰度验证。 Keep all table borders, Unicode text and chart labels crisp and searchable. This paragraph measures the same lossless export path.
+
+      | Item | Status | Details |
+      | --- | --- | --- |
+      | Item 1 中文 | complete | Table text remains searchable |
+      | Item 2 中文 | complete | Table text remains searchable |
+      | Item 3 中文 | complete | Table text remains searchable |
+      | Item 4 中文 | complete | Table text remains searchable |
+      | Item 5 中文 | complete | Table text remains searchable |
+      | Item 6 中文 | complete | Table text remains searchable |
+      | Item 7 中文 | complete | Table text remains searchable |
+      | Item 8 中文 | complete | Table text remains searchable |
+      | Item 9 中文 | complete | Table text remains searchable |
+      | Item 10 中文 | complete | Table text remains searchable |
+      | Item 11 中文 | complete | Table text remains searchable |
+      | Item 12 中文 | complete | Table text remains searchable |
+
+      PDF 性能与清晰度验证。 Keep all table borders, Unicode text and chart labels crisp and searchable. This paragraph measures the same lossless export path.
+
+      ## Section 3
+
+      PDF 性能与清晰度验证。 Keep all table borders, Unicode text and chart labels crisp and searchable. This paragraph measures the same lossless export path.
+
+      | Item | Status | Details |
+      | --- | --- | --- |
+      | Item 1 中文 | complete | Table text remains searchable |
+      | Item 2 中文 | complete | Table text remains searchable |
+      | Item 3 中文 | complete | Table text remains searchable |
+      | Item 4 中文 | complete | Table text remains searchable |
+      | Item 5 中文 | complete | Table text remains searchable |
+      | Item 6 中文 | complete | Table text remains searchable |
+      | Item 7 中文 | complete | Table text remains searchable |
+      | Item 8 中文 | complete | Table text remains searchable |
+      | Item 9 中文 | complete | Table text remains searchable |
+      | Item 10 中文 | complete | Table text remains searchable |
+      | Item 11 中文 | complete | Table text remains searchable |
+      | Item 12 中文 | complete | Table text remains searchable |
+
+      PDF 性能与清晰度验证。 Keep all table borders, Unicode text and chart labels crisp and searchable. This paragraph measures the same lossless export path.
+
+      ## Section 4
+
+      PDF 性能与清晰度验证。 Keep all table borders, Unicode text and chart labels crisp and searchable. This paragraph measures the same lossless export path.
+
+      | Item | Status | Details |
+      | --- | --- | --- |
+      | Item 1 中文 | complete | Table text remains searchable |
+      | Item 2 中文 | complete | Table text remains searchable |
+      | Item 3 中文 | complete | Table text remains searchable |
+      | Item 4 中文 | complete | Table text remains searchable |
+      | Item 5 中文 | complete | Table text remains searchable |
+      | Item 6 中文 | complete | Table text remains searchable |
+      | Item 7 中文 | complete | Table text remains searchable |
+      | Item 8 中文 | complete | Table text remains searchable |
+      | Item 9 中文 | complete | Table text remains searchable |
+      | Item 10 中文 | complete | Table text remains searchable |
+      | Item 11 中文 | complete | Table text remains searchable |
+      | Item 12 中文 | complete | Table text remains searchable |
+
+      PDF 性能与清晰度验证。 Keep all table borders, Unicode text and chart labels crisp and searchable. This paragraph measures the same lossless export path.
+
+      ## Section 5
+
+      PDF 性能与清晰度验证。 Keep all table borders, Unicode text and chart labels crisp and searchable. This paragraph measures the same lossless export path.
+
+      | Item | Status | Details |
+      | --- | --- | --- |
+      | Item 1 中文 | complete | Table text remains searchable |
+      | Item 2 中文 | complete | Table text remains searchable |
+      | Item 3 中文 | complete | Table text remains searchable |
+      | Item 4 中文 | complete | Table text remains searchable |
+      | Item 5 中文 | complete | Table text remains searchable |
+      | Item 6 中文 | complete | Table text remains searchable |
+      | Item 7 中文 | complete | Table text remains searchable |
+      | Item 8 中文 | complete | Table text remains searchable |
+      | Item 9 中文 | complete | Table text remains searchable |
+      | Item 10 中文 | complete | Table text remains searchable |
+      | Item 11 中文 | complete | Table text remains searchable |
+      | Item 12 中文 | complete | Table text remains searchable |
+
+      PDF 性能与清晰度验证。 Keep all table borders, Unicode text and chart labels crisp and searchable. This paragraph measures the same lossless export path.
+
+      ## Section 6
+
+      PDF 性能与清晰度验证。 Keep all table borders, Unicode text and chart labels crisp and searchable. This paragraph measures the same lossless export path.
+
+      | Item | Status | Details |
+      | --- | --- | --- |
+      | Item 1 中文 | complete | Table text remains searchable |
+      | Item 2 中文 | complete | Table text remains searchable |
+      | Item 3 中文 | complete | Table text remains searchable |
+      | Item 4 中文 | complete | Table text remains searchable |
+      | Item 5 中文 | complete | Table text remains searchable |
+      | Item 6 中文 | complete | Table text remains searchable |
+      | Item 7 中文 | complete | Table text remains searchable |
+      | Item 8 中文 | complete | Table text remains searchable |
+      | Item 9 中文 | complete | Table text remains searchable |
+      | Item 10 中文 | complete | Table text remains searchable |
+      | Item 11 中文 | complete | Table text remains searchable |
+      | Item 12 中文 | complete | Table text remains searchable |
+
+      PDF 性能与清晰度验证。 Keep all table borders, Unicode text and chart labels crisp and searchable. This paragraph measures the same lossless export path.
+
+      ## Section 7
+
+      PDF 性能与清晰度验证。 Keep all table borders, Unicode text and chart labels crisp and searchable. This paragraph measures the same lossless export path.
+
+      | Item | Status | Details |
+      | --- | --- | --- |
+      | Item 1 中文 | complete | Table text remains searchable |
+      | Item 2 中文 | complete | Table text remains searchable |
+      | Item 3 中文 | complete | Table text remains searchable |
+      | Item 4 中文 | complete | Table text remains searchable |
+      | Item 5 中文 | complete | Table text remains searchable |
+      | Item 6 中文 | complete | Table text remains searchable |
+      | Item 7 中文 | complete | Table text remains searchable |
+      | Item 8 中文 | complete | Table text remains searchable |
+      | Item 9 中文 | complete | Table text remains searchable |
+      | Item 10 中文 | complete | Table text remains searchable |
+      | Item 11 中文 | complete | Table text remains searchable |
+      | Item 12 中文 | complete | Table text remains searchable |
+
+      PDF 性能与清晰度验证。 Keep all table borders, Unicode text and chart labels crisp and searchable. This paragraph measures the same lossless export path.
+
+      ## Section 8
+
+      PDF 性能与清晰度验证。 Keep all table borders, Unicode text and chart labels crisp and searchable. This paragraph measures the same lossless export path.
+
+      | Item | Status | Details |
+      | --- | --- | --- |
+      | Item 1 中文 | complete | Table text remains searchable |
+      | Item 2 中文 | complete | Table text remains searchable |
+      | Item 3 中文 | complete | Table text remains searchable |
+      | Item 4 中文 | complete | Table text remains searchable |
+      | Item 5 中文 | complete | Table text remains searchable |
+      | Item 6 中文 | complete | Table text remains searchable |
+      | Item 7 中文 | complete | Table text remains searchable |
+      | Item 8 中文 | complete | Table text remains searchable |
+      | Item 9 中文 | complete | Table text remains searchable |
+      | Item 10 中文 | complete | Table text remains searchable |
+      | Item 11 中文 | complete | Table text remains searchable |
+      | Item 12 中文 | complete | Table text remains searchable |
+
+      PDF 性能与清晰度验证。 Keep all table borders, Unicode text and chart labels crisp and searchable. This paragraph measures the same lossless export path.
+
+      ## Section 9
+
+      PDF 性能与清晰度验证。 Keep all table borders, Unicode text and chart labels crisp and searchable. This paragraph measures the same lossless export path.
+
+      | Item | Status | Details |
+      | --- | --- | --- |
+      | Item 1 中文 | complete | Table text remains searchable |
+      | Item 2 中文 | complete | Table text remains searchable |
+      | Item 3 中文 | complete | Table text remains searchable |
+      | Item 4 中文 | complete | Table text remains searchable |
+      | Item 5 中文 | complete | Table text remains searchable |
+      | Item 6 中文 | complete | Table text remains searchable |
+      | Item 7 中文 | complete | Table text remains searchable |
+      | Item 8 中文 | complete | Table text remains searchable |
+      | Item 9 中文 | complete | Table text remains searchable |
+      | Item 10 中文 | complete | Table text remains searchable |
+      | Item 11 中文 | complete | Table text remains searchable |
+      | Item 12 中文 | complete | Table text remains searchable |
+
+      PDF 性能与清晰度验证。 Keep all table borders, Unicode text and chart labels crisp and searchable. This paragraph measures the same lossless export path.
+
+      ## Section 10
+
+      PDF 性能与清晰度验证。 Keep all table borders, Unicode text and chart labels crisp and searchable. This paragraph measures the same lossless export path.
+
+      | Item | Status | Details |
+      | --- | --- | --- |
+      | Item 1 中文 | complete | Table text remains searchable |
+      | Item 2 中文 | complete | Table text remains searchable |
+      | Item 3 中文 | complete | Table text remains searchable |
+      | Item 4 中文 | complete | Table text remains searchable |
+      | Item 5 中文 | complete | Table text remains searchable |
+      | Item 6 中文 | complete | Table text remains searchable |
+      | Item 7 中文 | complete | Table text remains searchable |
+      | Item 8 中文 | complete | Table text remains searchable |
+      | Item 9 中文 | complete | Table text remains searchable |
+      | Item 10 中文 | complete | Table text remains searchable |
+      | Item 11 中文 | complete | Table text remains searchable |
+      | Item 12 中文 | complete | Table text remains searchable |
+
+      PDF 性能与清晰度验证。 Keep all table borders, Unicode text and chart labels crisp and searchable. This paragraph measures the same lossless export path.
+
+      ## Section 11
+
+      PDF 性能与清晰度验证。 Keep all table borders, Unicode text and chart labels crisp and searchable. This paragraph measures the same lossless export path.
+
+      | Item | Status | Details |
+      | --- | --- | --- |
+      | Item 1 中文 | complete | Table text remains searchable |
+      | Item 2 中文 | complete | Table text remains searchable |
+      | Item 3 中文 | complete | Table text remains searchable |
+      | Item 4 中文 | complete | Table text remains searchable |
+      | Item 5 中文 | complete | Table text remains searchable |
+      | Item 6 中文 | complete | Table text remains searchable |
+      | Item 7 中文 | complete | Table text remains searchable |
+      | Item 8 中文 | complete | Table text remains searchable |
+      | Item 9 中文 | complete | Table text remains searchable |
+      | Item 10 中文 | complete | Table text remains searchable |
+      | Item 11 中文 | complete | Table text remains searchable |
+      | Item 12 中文 | complete | Table text remains searchable |
+
+      PDF 性能与清晰度验证。 Keep all table borders, Unicode text and chart labels crisp and searchable. This paragraph measures the same lossless export path.
+
+      ## Section 12
+
+      PDF 性能与清晰度验证。 Keep all table borders, Unicode text and chart labels crisp and searchable. This paragraph measures the same lossless export path.
+
+      | Item | Status | Details |
+      | --- | --- | --- |
+      | Item 1 中文 | complete | Table text remains searchable |
+      | Item 2 中文 | complete | Table text remains searchable |
+      | Item 3 中文 | complete | Table text remains searchable |
+      | Item 4 中文 | complete | Table text remains searchable |
+      | Item 5 中文 | complete | Table text remains searchable |
+      | Item 6 中文 | complete | Table text remains searchable |
+      | Item 7 中文 | complete | Table text remains searchable |
+      | Item 8 中文 | complete | Table text remains searchable |
+      | Item 9 中文 | complete | Table text remains searchable |
+      | Item 10 中文 | complete | Table text remains searchable |
+      | Item 11 中文 | complete | Table text remains searchable |
+      | Item 12 中文 | complete | Table text remains searchable |
+
+      PDF 性能与清晰度验证。 Keep all table borders, Unicode text and chart labels crisp and searchable. This paragraph measures the same lossless export path.
+
+      ## Section 13
+
+      PDF 性能与清晰度验证。 Keep all table borders, Unicode text and chart labels crisp and searchable. This paragraph measures the same lossless export path.
+
+      | Item | Status | Details |
+      | --- | --- | --- |
+      | Item 1 中文 | complete | Table text remains searchable |
+      | Item 2 中文 | complete | Table text remains searchable |
+      | Item 3 中文 | complete | Table text remains searchable |
+      | Item 4 中文 | complete | Table text remains searchable |
+      | Item 5 中文 | complete | Table text remains searchable |
+      | Item 6 中文 | complete | Table text remains searchable |
+      | Item 7 中文 | complete | Table text remains searchable |
+      | Item 8 中文 | complete | Table text remains searchable |
+      | Item 9 中文 | complete | Table text remains searchable |
+      | Item 10 中文 | complete | Table text remains searchable |
+      | Item 11 中文 | complete | Table text remains searchable |
+      | Item 12 中文 | complete | Table text remains searchable |
+
+      PDF 性能与清晰度验证。 Keep all table borders, Unicode text and chart labels crisp and searchable. This paragraph measures the same lossless export path.
+
+      ## Section 14
+
+      PDF 性能与清晰度验证。 Keep all table borders, Unicode text and chart labels crisp and searchable. This paragraph measures the same lossless export path.
+
+      | Item | Status | Details |
+      | --- | --- | --- |
+      | Item 1 中文 | complete | Table text remains searchable |
+      | Item 2 中文 | complete | Table text remains searchable |
+      | Item 3 中文 | complete | Table text remains searchable |
+      | Item 4 中文 | complete | Table text remains searchable |
+      | Item 5 中文 | complete | Table text remains searchable |
+      | Item 6 中文 | complete | Table text remains searchable |
+      | Item 7 中文 | complete | Table text remains searchable |
+      | Item 8 中文 | complete | Table text remains searchable |
+      | Item 9 中文 | complete | Table text remains searchable |
+      | Item 10 中文 | complete | Table text remains searchable |
+      | Item 11 中文 | complete | Table text remains searchable |
+      | Item 12 中文 | complete | Table text remains searchable |
+
+      PDF 性能与清晰度验证。 Keep all table borders, Unicode text and chart labels crisp and searchable. This paragraph measures the same lossless export path.
+
+      ## Section 15
+
+      PDF 性能与清晰度验证。 Keep all table borders, Unicode text and chart labels crisp and searchable. This paragraph measures the same lossless export path.
+
+      | Item | Status | Details |
+      | --- | --- | --- |
+      | Item 1 中文 | complete | Table text remains searchable |
+      | Item 2 中文 | complete | Table text remains searchable |
+      | Item 3 中文 | complete | Table text remains searchable |
+      | Item 4 中文 | complete | Table text remains searchable |
+      | Item 5 中文 | complete | Table text remains searchable |
+      | Item 6 中文 | complete | Table text remains searchable |
+      | Item 7 中文 | complete | Table text remains searchable |
+      | Item 8 中文 | complete | Table text remains searchable |
+      | Item 9 中文 | complete | Table text remains searchable |
+      | Item 10 中文 | complete | Table text remains searchable |
+      | Item 11 中文 | complete | Table text remains searchable |
+      | Item 12 中文 | complete | Table text remains searchable |
+
+      PDF 性能与清晰度验证。 Keep all table borders, Unicode text and chart labels crisp and searchable. This paragraph measures the same lossless export path.
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-file-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Control+l
+    macos_key: Meta+l
+- fill:
+    selector: '[data-testid="explorer-address"]'
+    value: ${fixture.file_open_root}
+- press:
+    selector: '[data-testid="explorer-address"]'
+    key: Enter
+- dblclick: '[data-testid="explorer-file-row"][data-name="quality.md"]'
+- wait_for: '[data-testid="markdown-editor"]'
+- click: '[data-testid="markdown-export"]'
+- click: '[data-testid="markdown-export-pdf"]'
+- wait_for: '[data-testid="markdown-export-settings"]'
+- native_file_dialog:
+    kind: save
+    action: choose
+    path: ${fixture.markdown_quality_exports}/performance-1.pdf
+    trigger: '[data-testid="markdown-export-confirm"]'
+- wait_for:
+    selector: '[data-testid="markdown-export-status"][data-export-state="saved"]'
+    timeout_sec: 300
+- assert_file_exists: ${fixture.markdown_quality_exports}/performance-1.pdf
+- click: '[data-testid="markdown-export"]'
+- click: '[data-testid="markdown-export-pdf"]'
+- wait_for: '[data-testid="markdown-export-settings"]'
+- native_file_dialog:
+    kind: save
+    action: choose
+    path: ${fixture.markdown_quality_exports}/performance-2.pdf
+    trigger: '[data-testid="markdown-export-confirm"]'
+- wait_for:
+    selector: '[data-testid="markdown-export-status"][data-export-state="saved"]'
+    timeout_sec: 300
+- assert_file_exists: ${fixture.markdown_quality_exports}/performance-2.pdf
+- click: '[data-testid="markdown-export"]'
+- click: '[data-testid="markdown-export-pdf"]'
+- wait_for: '[data-testid="markdown-export-settings"]'
+- native_file_dialog:
+    kind: save
+    action: choose
+    path: ${fixture.markdown_quality_exports}/performance-3.pdf
+    trigger: '[data-testid="markdown-export-confirm"]'
+- wait_for:
+    selector: '[data-testid="markdown-export-status"][data-export-state="saved"]'
+    timeout_sec: 300
+- assert_file_exists: ${fixture.markdown_quality_exports}/performance-3.pdf
+- assert_file_contains:
+    path: ${fixture.markdown_quality_source}
+    contains: '## Section 15'
+- assert_no_runtime_errors: null
+- screenshot: pdf-performance-complete.png
+covers:
+- F-FILEOPEN-1
+- F-EXPLORER-1
+tags:
+- p1
+- markdown
+- export
+- performance
+fixtures:
+- reset_db
+- markdown_quality
+timeout_sec: 1200
+verification:
+  review: reviewed
+  requirements:
+  - id: PDF-PERF-SAMPLES
+    requirement: Retain three complete independently readable PDF exports from one fixed long Markdown through actual
+      OS save dialogs, with source preserved and no printer API dependency.
+    actions:
+    - 4
+    - 5
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 13
+    - 14
+    - 16
+    - 19
+    - 20
+    - 22
+    - 25
+    - 26
+    - 28
+    checkpoints:
+    - step: 18
+      expectation: Fresh PDF exists after the real save chooser and saved result; retain actual bytes and per-step durations
+        for matched same-platform baseline/candidate comparison, not an inferred universal performance threshold.
+    - step: 24
+      expectation: Fresh PDF exists after the real save chooser and saved result; retain actual bytes and per-step durations
+        for matched same-platform baseline/candidate comparison, not an inferred universal performance threshold.
+    - step: 30
+      expectation: Fresh PDF exists after the real save chooser and saved result; retain actual bytes and per-step durations
+        for matched same-platform baseline/candidate comparison, not an inferred universal performance threshold.
+    - step: 31
+      expectation: Source still contains its final section; exports must not truncate the Markdown document.
+    results:
+    - 18
+    - 24
+    - 30
+    - 31
+  native:
+  - check: Packaged WebView PDF generation and real chooser/disk
+    method: automated
+    reason: Browser Chromium timings cannot establish Windows WebView2 or WKWebView performance. Compare retained same-platform
+      baseline/candidate samples and PDF pixels/text independently.
+  visual:
+  - check: Long PDF pagination, table borders and Mermaid text
+    method: manual
+    reason: Inspect rendered page images for baseline and candidate; timing or nonempty files alone cannot establish
+      fidelity.

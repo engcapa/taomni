@@ -1,5 +1,5 @@
 id: TC-FILE-OPEN-015
-title: Native printer-independent PDF and high-fidelity Word through real save dialogs
+title: Native printer-independent searchable PDF and high-fidelity Word through real save dialogs
 description: Packaged platform WebView rendering, actual OS save chooser and retained PDF/DOCX bytes. No printer or print
   dialog is invoked. Complete multi-page A4 PDF, original red/blue raster pixels and sharp portable Word SVG/fallback images are independently parsed; cancelling
   PDF chooser preserves source. Actual Microsoft Word typography still needs client visual review.

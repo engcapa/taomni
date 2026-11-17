@@ -132,6 +132,10 @@ export const useAiStore = create<AiStore>((set, get) => ({
     }
   },
 
+  updateTaoDefaults: (options) => set((state) => state.config ? ({ config: {
+    ...state.config, deepseek_app: { ...DEFAULT_CONFIG.deepseek_app!, ...state.config.deepseek_app, ...options },
+  } }) : state),
+
   updateLlmProvider: (id: string, provider: LlmProviderConfig) => {
     const config = get().config;
     if (!config) return;

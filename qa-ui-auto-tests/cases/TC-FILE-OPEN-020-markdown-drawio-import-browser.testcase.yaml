@@ -1,0 +1,216 @@
+id: TC-FILE-OPEN-020
+title: 'Markdown draw.io import: explicit mode, compressed sheets, page selection and text/table recovery'
+description: Production Markdown entry and actual user controls. Retains selected export/import outcomes, editable
+  graph XML, text/table data and original source; browser uses VFS, native uses OS dialogs/disk/clipboard.
+modes:
+- browser
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-drawio
+- reload_window: null
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-file-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Control+l
+    macos_key: Meta+l
+- fill:
+    selector: '[data-testid="explorer-address"]'
+    value: ${fixture.file_open_root}
+- press:
+    selector: '[data-testid="explorer-address"]'
+    key: Enter
+- dblclick: '[data-testid="explorer-file-row"][data-name="quality.md"]'
+- wait_for: '[data-testid="markdown-editor"]'
+- assert_disabled: '[data-testid="markdown-import-drawio"]'
+- click: '[data-testid="markdown-live-edit"]'
+- click: '[data-testid="markdown-import-drawio"]'
+- upload_file:
+    selector: '[data-testid="markdown-drawio-input"]'
+    path: ${fixture.drawio_import_file}
+- wait_for: '[data-testid="markdown-drawio-import-dialog"]'
+- assert_count:
+    selector: '[data-testid="markdown-drawio-sheet-check"]'
+    equal: 2
+- assert_disabled: '[data-testid="markdown-drawio-import-confirm"]'
+- assert_text:
+    selector: '[data-testid="markdown-drawio-import-preview"]'
+    contains: Start 开始
+- click: '[data-testid="markdown-drawio-import-diagram"]'
+- click: '[data-testid="markdown-drawio-import-confirm"]'
+- wait_for: .fv-md-drawio svg
+- assert_count:
+    selector: .fv-md-drawio
+    equal: 2
+- click: '[data-testid="markdown-import-drawio"]'
+- upload_file:
+    selector: '[data-testid="markdown-drawio-input"]'
+    path: ${fixture.drawio_import_file}
+- wait_for: '[data-testid="markdown-drawio-import-dialog"]'
+- click: '[data-testid="markdown-drawio-select-all"]'
+- assert_disabled: '[data-testid="markdown-drawio-import-confirm"]'
+- click: '[data-testid="markdown-drawio-select-all"]'
+- click: '[data-testid="markdown-drawio-sheet-check"]:checked >> nth=1'
+- click: '[data-testid="markdown-drawio-import-text"]'
+- click: '[data-testid="markdown-drawio-import-confirm"]'
+- assert_text:
+    selector: '[data-testid="markdown-editor"]'
+    contains: Restored table value
+- wait_for: .fv-md-drawio-source
+- click: '[data-testid="markdown-import-drawio"]'
+- upload_file:
+    selector: '[data-testid="markdown-drawio-input"]'
+    path: ${fixture.drawio_invalid_file}
+- assert_text:
+    selector: '[data-testid="viewer-operation-error"]'
+    contains: Invalid draw.io
+- assert_count:
+    selector: '[data-testid="markdown-drawio-import-dialog"]'
+    equal: 0
+- click: '[data-testid="markdown-import-drawio"]'
+- upload_file:
+    selector: '[data-testid="markdown-drawio-input"]'
+    path: ${fixture.drawio_hostile_file}
+- wait_for: '[data-testid="markdown-drawio-import-dialog"]'
+- assert_text:
+    selector: '[data-testid="markdown-drawio-import-preview"]'
+    contains: external or unsupported image
+- assert_disabled: '[data-testid="markdown-drawio-import-confirm"]'
+- press:
+    selector: '[data-testid="markdown-drawio-import-dialog"]'
+    key: Escape
+- eval_readonly:
+    expression: document.activeElement?.getAttribute("data-testid") === "markdown-import-drawio"
+    expect_truthy: true
+- assert_count:
+    selector: .fv-md-drawio
+    equal: 3
+- click: '[data-testid="viewer-save"]'
+- reload_window: null
+- wait_for: .fv-md-drawio svg
+- assert_count:
+    selector: .fv-md-drawio
+    equal: 3
+- assert_text:
+    selector: '[data-testid="markdown-editor"]'
+    contains: Restored table value
+- assert_no_runtime_errors: null
+- screenshot: drawio-import-both-modes.png
+covers:
+- F-FILEOPEN-1
+- F-EXPLORER-1
+tags:
+- p0
+- markdown
+- drawio
+- regression
+fixtures:
+- reset_db
+- markdown_drawio
+timeout_sec: 300
+verification:
+  review: reviewed
+  requirements:
+  - id: DRAWIO-WORKFLOW
+    requirement: 'Markdown draw.io import: explicit mode, compressed sheets, page selection and text/table recovery;
+      malformed/external-image rejection, cancel focus, save/reload persistence'
+    actions:
+    - 4
+    - 5
+    - 7
+    - 8
+    - 9
+    - 10
+    - 13
+    - 14
+    - 15
+    - 20
+    - 21
+    - 24
+    - 25
+    - 27
+    - 29
+    - 30
+    - 31
+    - 32
+    - 35
+    - 36
+    - 39
+    - 40
+    - 44
+    - 47
+    checkpoints:
+    - step: 12
+      expectation: 'assert_disabled: explicit expected state, content or output in the step must match; retain original
+        source and previous successful imports.'
+    - step: 17
+      expectation: 'assert_count: explicit expected state, content or output in the step must match; retain original
+        source and previous successful imports.'
+    - step: 18
+      expectation: 'assert_disabled: explicit expected state, content or output in the step must match; retain original
+        source and previous successful imports.'
+    - step: 19
+      expectation: 'assert_text: explicit expected state, content or output in the step must match; retain original
+        source and previous successful imports.'
+    - step: 23
+      expectation: 'assert_count: explicit expected state, content or output in the step must match; retain original
+        source and previous successful imports.'
+    - step: 28
+      expectation: 'assert_disabled: explicit expected state, content or output in the step must match; retain original
+        source and previous successful imports.'
+    - step: 33
+      expectation: 'assert_text: explicit expected state, content or output in the step must match; retain original
+        source and previous successful imports.'
+    - step: 37
+      expectation: 'assert_text: explicit expected state, content or output in the step must match; retain original
+        source and previous successful imports.'
+    - step: 38
+      expectation: 'assert_count: explicit expected state, content or output in the step must match; retain original
+        source and previous successful imports.'
+    - step: 42
+      expectation: 'assert_text: explicit expected state, content or output in the step must match; retain original
+        source and previous successful imports.'
+    - step: 43
+      expectation: 'assert_disabled: explicit expected state, content or output in the step must match; retain original
+        source and previous successful imports.'
+    - step: 45
+      expectation: 'eval_readonly: explicit expected state, content or output in the step must match; retain original
+        source and previous successful imports.'
+    - step: 46
+      expectation: 'assert_count: explicit expected state, content or output in the step must match; retain original
+        source and previous successful imports.'
+    - step: 50
+      expectation: 'assert_count: explicit expected state, content or output in the step must match; retain original
+        source and previous successful imports.'
+    - step: 51
+      expectation: 'assert_text: explicit expected state, content or output in the step must match; retain original
+        source and previous successful imports.'
+    - step: 52
+      expectation: 'assert_no_runtime_errors: explicit expected state, content or output in the step must match;
+        retain original source and previous successful imports.'
+    results:
+    - 12
+    - 17
+    - 18
+    - 19
+    - 23
+    - 28
+    - 33
+    - 37
+    - 38
+    - 42
+    - 43
+    - 45
+    - 46
+    - 50
+    - 51
+    - 52
+  native:
+  - check: Native chooser, disk and OS clipboard
+    method: not-applicable
+    reason: Browser only here; TC-FILE-OPEN-021 separately exercises these native boundaries.
+  visual:
+  - check: Sheet previews and Markdown content remain readable
+    method: manual
+    reason: Inspect retained screenshot and SVG/graph artifacts; nonempty files alone do not establish visual fidelity.

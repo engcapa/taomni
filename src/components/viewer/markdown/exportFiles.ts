@@ -7,6 +7,7 @@ import { markdownBasename, readMarkdownImage, resolveMarkdownAsset, encodeMarkdo
 import { isTauriRuntime } from "../../../lib/runtime";
 import { sftpMkdir } from "../../../lib/sftp";
 import type { MarkdownAssets } from "./markdownOwner";
+import { lastMarkdownExportDirectory, rememberMarkdownExportDirectory } from "./exportDirectory";
 
 export async function writeExportBytes(path: string, bytes: Uint8Array): Promise<void> {
   let handle: string | null = null;
@@ -23,7 +24,7 @@ export async function writeExportBytes(path: string, bytes: Uint8Array): Promise
 export async function saveExportBlob(filename: string, output: Blob | (() => Promise<Blob>), sourcePath?: string): Promise<string | null> {
   const generate = () => typeof output === "function" ? output() : output;
   if (isTauriRuntime()) {
-    const path = await selectSaveFilePath(filename, sourcePath);
+    const path = await selectSaveFilePath(filename, lastMarkdownExportDirectory() ?? sourcePath);
     if (!path) return null;
     // Native streams truncate when opened. Reject the source and canonical
     // aliases/symlinks before touching the selected output, even after overwrite
@@ -39,6 +40,7 @@ export async function saveExportBlob(filename: string, output: Blob | (() => Pro
     // stream after generation succeeds, so cancellation/errors cannot truncate it.
     const blob = await generate();
     await writeExportBytes(path, new Uint8Array(await blob.arrayBuffer()));
+    rememberMarkdownExportDirectory(path);
     return path;
   }
   const url = URL.createObjectURL(await generate());
@@ -94,7 +96,7 @@ export async function planMarkdownFolder(content: string, docPath: string, asset
 
 export async function exportMarkdownFolder(content: string, docPath: string, assets?: MarkdownAssets): Promise<string | null> {
   if (!isTauriRuntime()) throw new Error("Markdown + image folder export requires the desktop app");
-  const parent = await selectSaveDirectory();
+  const parent = await selectSaveDirectory(lastMarkdownExportDirectory());
   if (!parent) return null;
   const plan = await planMarkdownFolder(content, docPath, assets);
   const filename = markdownBasename(docPath);
@@ -107,6 +109,7 @@ export async function exportMarkdownFolder(content: string, docPath: string, ass
       for (const file of plan.files) await writeExportBytes(`${folder}/assets/${file.name}`, file.bytes);
     }
     await writeExportBytes(`${folder}/${filename}`, new TextEncoder().encode(plan.content));
+    rememberMarkdownExportDirectory(parent, true);
     return folder;
   } catch (error) {
     throw new Error(`Export failed; partial output is retained at ${folder}. ${error instanceof Error ? error.message : String(error)}`);

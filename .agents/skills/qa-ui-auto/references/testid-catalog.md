@@ -1321,6 +1321,73 @@
 - `[data-testid="markdown-export-settings"]` — display — F-FILEOPEN-1.markdown-export-settings
 - `[data-testid="markdown-export-toc"]` — interactive — F-FILEOPEN-1.markdown-export-toc
 - `[data-testid="markdown-export-confirm"]` — interactive — F-FILEOPEN-1.markdown-export-confirm
+- `.fv-md-mermaid` — interactive — F-FILEOPEN-1.markdown-rendered-mermaid
+- `.fv-md-drawio` — display — F-FILEOPEN-1.markdown-rendered-drawio
+- `.fv-md-drawio-source` — display — F-FILEOPEN-1.markdown-original-drawio
+- `[data-testid="markdown-export-drawio"]` — interactive — F-FILEOPEN-1.markdown-export-drawio
+- `[data-testid="markdown-import-drawio"]` — interactive — F-FILEOPEN-1.markdown-import-drawio
+- `[data-testid="markdown-drawio-input"]` — interactive — F-FILEOPEN-1.markdown-drawio-input
+- `[data-testid="markdown-drawio-export-settings"]` — display — F-FILEOPEN-1.markdown-drawio-export-settings
+- `[data-testid="markdown-drawio-import-dialog"]` — display — F-FILEOPEN-1.markdown-drawio-import-dialog
+- `[data-testid="markdown-drawio-import-preview"]` — display — F-FILEOPEN-1.markdown-drawio-import-preview
+- `[data-testid="markdown-drawio-scope"]` — interactive — F-FILEOPEN-1.markdown-drawio-scope
+- `[data-testid="markdown-drawio-layout"]` — interactive — F-FILEOPEN-1.markdown-drawio-layout
+- `[data-testid="markdown-drawio-save"]` — interactive — F-FILEOPEN-1.markdown-drawio-save
+- `[data-testid="markdown-drawio-copy-link"]` — interactive — F-FILEOPEN-1.markdown-drawio-copy-link
+- `[data-testid="markdown-drawio-open-link"]` — interactive — F-FILEOPEN-1.markdown-drawio-open-link
+- `[data-testid="markdown-drawio-select-all"]` — interactive — F-FILEOPEN-1.markdown-drawio-select-all
+- `[data-testid="markdown-drawio-sheet-check"]` — interactive — F-FILEOPEN-1.markdown-drawio-sheet-check
+- `[data-testid="markdown-drawio-sheet-preview"]` — interactive — F-FILEOPEN-1.markdown-drawio-sheet-preview
+- `[data-testid="markdown-drawio-import-diagram"]` — interactive — F-FILEOPEN-1.markdown-drawio-import-diagram
+- `[data-testid="markdown-drawio-import-text"]` — interactive — F-FILEOPEN-1.markdown-drawio-import-text
+- `[data-testid="markdown-drawio-import-confirm"]` — interactive — F-FILEOPEN-1.markdown-drawio-import-confirm
+- `[data-testid="markdown-diagram-viewer"]` — display — F-FILEOPEN-1.markdown-diagram-viewer
+- `[data-testid="markdown-diagram-tools"]` — display — F-FILEOPEN-1.markdown-diagram-tools
+- `[data-testid="markdown-diagram-menu"]` — display — F-FILEOPEN-1.markdown-diagram-menu
+- `[data-testid="markdown-diagram-more"]` — interactive — F-FILEOPEN-1.markdown-diagram-more
+- `[data-testid="markdown-diagram-close"]` — interactive — F-FILEOPEN-1.markdown-diagram-close
+- `[data-testid="markdown-diagram-background"]` — interactive — F-FILEOPEN-1.markdown-diagram-background
+- `[data-testid="markdown-diagram-stage"]` — interactive — F-FILEOPEN-1.markdown-diagram-stage
+- `[data-testid="markdown-diagram-zoom"]` — display — F-FILEOPEN-1.markdown-diagram-zoom
+- `[data-testid="markdown-diagram-status"]` — display — F-FILEOPEN-1.markdown-diagram-status
+- `[data-testid="markdown-diagram-menu-open"]` — interactive — F-FILEOPEN-1.markdown-diagram-menu-open
+- `[data-testid="markdown-diagram-menu-zoom-in"]` — interactive — F-FILEOPEN-1.markdown-diagram-menu-zoom-in
+- `[data-testid="markdown-diagram-view-zoom-in"]` — interactive — F-FILEOPEN-1.markdown-diagram-view-zoom-in
+- `[data-testid="markdown-diagram-menu-zoom-out"]` — interactive — F-FILEOPEN-1.markdown-diagram-menu-zoom-out
+- `[data-testid="markdown-diagram-view-zoom-out"]` — interactive — F-FILEOPEN-1.markdown-diagram-view-zoom-out
+- `[data-testid="markdown-diagram-menu-actual"]` — interactive — F-FILEOPEN-1.markdown-diagram-menu-actual
+- `[data-testid="markdown-diagram-view-actual"]` — interactive — F-FILEOPEN-1.markdown-diagram-view-actual
+- `[data-testid="markdown-diagram-menu-fit"]` — interactive — F-FILEOPEN-1.markdown-diagram-menu-fit
+- `[data-testid="markdown-diagram-view-fit"]` — interactive — F-FILEOPEN-1.markdown-diagram-view-fit
+- `[data-testid="markdown-diagram-menu-width"]` — interactive — F-FILEOPEN-1.markdown-diagram-menu-width
+- `[data-testid="markdown-diagram-view-width"]` — interactive — F-FILEOPEN-1.markdown-diagram-view-width
+- `[data-testid="markdown-diagram-menu-rotate-left"]` — interactive — F-FILEOPEN-1.markdown-diagram-menu-rotate-left
+- `[data-testid="markdown-diagram-view-rotate-left"]` — interactive — F-FILEOPEN-1.markdown-diagram-view-rotate-left
+- `[data-testid="markdown-diagram-menu-rotate-right"]` — interactive — F-FILEOPEN-1.markdown-diagram-menu-rotate-right
+- `[data-testid="markdown-diagram-view-rotate-right"]` — interactive — F-FILEOPEN-1.markdown-diagram-view-rotate-right
+- `[data-testid="markdown-diagram-menu-flip-h"]` — interactive — F-FILEOPEN-1.markdown-diagram-menu-flip-h
+- `[data-testid="markdown-diagram-view-flip-h"]` — interactive — F-FILEOPEN-1.markdown-diagram-view-flip-h
+- `[data-testid="markdown-diagram-menu-flip-v"]` — interactive — F-FILEOPEN-1.markdown-diagram-menu-flip-v
+- `[data-testid="markdown-diagram-view-flip-v"]` — interactive — F-FILEOPEN-1.markdown-diagram-view-flip-v
+- `[data-testid="markdown-diagram-menu-reset"]` — interactive — F-FILEOPEN-1.markdown-diagram-menu-reset
+- `[data-testid="markdown-diagram-view-reset"]` — interactive — F-FILEOPEN-1.markdown-diagram-view-reset
+- `[data-testid="markdown-diagram-menu-save-svg"]` — interactive — F-FILEOPEN-1.markdown-diagram-menu-save-svg
+- `[data-testid="markdown-diagram-view-save-svg"]` — interactive — F-FILEOPEN-1.markdown-diagram-view-save-svg
+- `[data-testid="markdown-diagram-menu-save-png"]` — interactive — F-FILEOPEN-1.markdown-diagram-menu-save-png
+- `[data-testid="markdown-diagram-view-save-png"]` — interactive — F-FILEOPEN-1.markdown-diagram-view-save-png
+- `[data-testid="markdown-diagram-menu-save-drawio"]` — interactive — F-FILEOPEN-1.markdown-diagram-menu-save-drawio
+- `[data-testid="markdown-diagram-view-save-drawio"]` — interactive — F-FILEOPEN-1.markdown-diagram-view-save-drawio
+- `[data-testid="markdown-diagram-menu-copy-drawio-link"]` — interactive — F-FILEOPEN-1.markdown-diagram-menu-copy-drawio-link
+- `[data-testid="markdown-diagram-view-copy-drawio-link"]` — interactive — F-FILEOPEN-1.markdown-diagram-view-copy-drawio-link
+- `[data-testid="markdown-diagram-menu-copy-image"]` — interactive — F-FILEOPEN-1.markdown-diagram-menu-copy-image
+- `[data-testid="markdown-diagram-view-copy-image"]` — interactive — F-FILEOPEN-1.markdown-diagram-view-copy-image
+- `[data-testid="markdown-diagram-menu-copy-text"]` — interactive — F-FILEOPEN-1.markdown-diagram-menu-copy-text
+- `[data-testid="markdown-diagram-view-copy-text"]` — interactive — F-FILEOPEN-1.markdown-diagram-view-copy-text
+- `[data-testid="markdown-diagram-menu-copy-source"]` — interactive — F-FILEOPEN-1.markdown-diagram-menu-copy-source
+- `[data-testid="markdown-diagram-view-copy-source"]` — interactive — F-FILEOPEN-1.markdown-diagram-view-copy-source
+- `[data-testid="markdown-diagram-open"]` — interactive — F-FILEOPEN-1.markdown-diagram-open
+- `[data-testid="markdown-diagram-save-svg"]` — interactive — F-FILEOPEN-1.markdown-diagram-save-svg
+- `[data-testid="markdown-diagram-copy-text"]` — interactive — F-FILEOPEN-1.markdown-diagram-copy-text
 - `[data-testid="markdown-export-status"]` — display — F-FILEOPEN-1.markdown-export-status
 - `[data-testid="html-external-dialog"]` — display — F-FILEOPEN-1.html-external-dialog
 - `[data-testid="html-external-origin"]` — display — F-FILEOPEN-1.html-external-origin
@@ -3620,9 +3687,20 @@
 - `[data-testid="tao-home-regenerate"]` — interactive [optional] — F1.11.tao-home-regenerate
 - `[data-testid="tao-home-stopped-state"]` — display [optional] — F1.11.tao-home-stopped-state
 - `[data-testid="tao-settings"]` — display — F1.11.tao-settings
-- `[data-testid="tao-settings-save"]` — interactive — F1.11.tao-settings-save
-- `[data-testid="tao-settings-status"]` — display — F1.11.tao-settings-status
-- `[data-testid="tao-settings"] [data-testid="llm-proxy-mode"]` — interactive — F1.11.tao-settings-proxy
+- `[data-testid="tao-settings-provider"]` — interactive — F1.11.tao-settings-provider
+- `[data-testid="tao-settings-model"]` — interactive — F1.11.tao-settings-model
+- `[data-testid="tao-settings-cost"]` — interactive — F1.11.tao-settings-cost
+- `[data-testid="tao-settings-tts"]` — interactive — F1.11.tao-settings-tts
+- `[data-testid="tao-home-model"]` — interactive — F1.11.tao-home-model
+- `[data-provider="deepseek-app"] [data-testid="llm-proxy-mode"]` — interactive — F1.11.tao-shared-provider-proxy
+- `[data-provider="deepseek-app"] > div` — interactive — F1.11.tao-shared-provider-row
+- `[data-provider="local"] > div` — interactive — F1.11.tao-local-provider-row
+- `[data-provider="local"] [data-testid="llm-provider-model"]` — interactive — F1.11.tao-local-provider-model
+- `[data-testid="tao-home-file-choose"]` — interactive [optional] — F1.11.tao-file-choose
+- `.tao-home-context-chip` — display [optional] — F1.11.tao-file-context-chip
+- `[data-testid="tao-settings-save"]` — interactive [optional] — F1.11.retired-tao-settings-save
+- `[data-testid="tao-settings-key"]` — interactive [optional] — F1.11.retired-tao-settings-key
+- `[data-testid="llm-providers-status"]` — display — F1.11.tao-shared-config-status
 - `[role="dialog"][aria-label="模型与能力"]` — display — F1.11.tao-home-capabilities-dialog
 - `[role="dialog"][aria-label="模型与能力"] button:has-text("deepseek-v4-pro")` — interactive — F1.11.tao-home-capability-model-v4
 - `[data-testid="tao-home-history-row"]` — interactive — F1.11.tao-home-history-row

@@ -127,7 +127,12 @@ pub async fn stream(
     }
 }
 
-fn checkpoint(state: &AppState, id: &str, reply: &Reply, previous: &[Value]) -> Result<(), String> {
+pub(super) fn checkpoint(
+    state: &AppState,
+    id: &str,
+    reply: &Reply,
+    previous: &[Value],
+) -> Result<(), String> {
     let mut blocks = previous.to_vec();
     blocks.extend(reply.blocks.iter().filter(|b| !b.is_null()).cloned());
     let db = state.db.lock().map_err(|_| "database unavailable")?;

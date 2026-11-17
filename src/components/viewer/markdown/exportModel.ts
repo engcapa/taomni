@@ -2,8 +2,9 @@ import { markdownBasename } from "../../../lib/markdownAssets";
 import { enhanceMarkdown, markdownFragment } from "./markdownRender";
 import type { MarkdownAssets } from "./markdownOwner";
 import { mathExportCss } from "./mathExportCss";
+import type { DrawioExportOptions } from "./drawioExport";
 
-export type MarkdownExportKind = "html" | "pdf" | "png" | "docx" | "markdown" | "richtext" | "html-source" | "print";
+export type MarkdownExportKind = "html" | "pdf" | "png" | "docx" | "markdown" | "richtext" | "html-source" | "print" | "drawio" | "drawio-link" | "drawio-open";
 export interface MarkdownExportSettings {
   theme: "light" | "dark";
   paper: "A4" | "Letter";
@@ -14,6 +15,7 @@ export interface MarkdownExportSettings {
   fileHeader: boolean;
   wrapCode: boolean;
   highlight: boolean;
+  drawio?: DrawioExportOptions;
 }
 export const DEFAULT_EXPORT_SETTINGS: MarkdownExportSettings = {
   theme: "light", paper: "A4", orientation: "portrait", margins: "normal",

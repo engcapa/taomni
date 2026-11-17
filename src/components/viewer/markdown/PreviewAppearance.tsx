@@ -34,8 +34,8 @@ export function previewThemeStyle(theme: PreviewTheme): CSSProperties & Record<`
 
 export function PreviewAppearanceControl({ value, onChange }: { value: PreviewAppearance; onChange: (value: PreviewAppearance) => void }) {
   const label = useViewerLabels();
-  return <label className="fv-md-appearance"><span>{label("预览外观", "Preview appearance")}</span>
-    <select className="fv-select" data-testid="markdown-preview-appearance" aria-label={label("预览外观", "Preview appearance")} value={value}
+  return <label className="fv-md-appearance" title={label("预览外观", "Preview appearance")}>
+    <select className="fv-select" data-testid="markdown-preview-appearance" aria-label={label("预览外观", "Preview appearance")} title={label("预览外观", "Preview appearance")} value={value}
       onChange={(event) => onChange(event.target.value as PreviewAppearance)}>
       <option value="auto">{label("跟随应用", "Follow app")}</option><option value="light">{label("浅色", "Light")}</option><option value="dark">{label("深色", "Dark")}</option>
     </select></label>;

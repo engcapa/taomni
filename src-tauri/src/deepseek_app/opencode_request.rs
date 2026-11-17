@@ -14,6 +14,21 @@ pub async fn body(
     ) {
         return Err("protocol: invalid reasoning effort".into());
     }
+    let messages = messages(canonical, request, state).await?;
+    Ok(
+        json!({"model":request.model,"messages":messages,"stream":true,"stream_options":{"include_usage":true},
+        // Go counts reasoning against the same output allowance as the answer.
+        // Max-effort engineering exhausted 8192 before emitting any file actions.
+        "max_tokens":if request.thinking {65_536} else {8192},"reasoning_effort":request.reasoning_effort,"thinking":{"type":if request.thinking {"enabled"} else {"disabled"}},
+        "tools":super::opencode_tools::descriptors(request)}),
+    )
+}
+
+pub async fn messages(
+    canonical: &Value,
+    request: &TaoRequest,
+    state: &AppState,
+) -> Result<Vec<Value>, String> {
     let mut messages = vec![json!({"role":"system","content":canonical["system"]})];
     for message in canonical["messages"]
         .as_array()
@@ -34,8 +49,15 @@ pub async fn body(
                     let id = block["source"]["file_id"]
                         .as_str()
                         .ok_or("protocol: attachment ID missing")?;
-                    content
-                        .push(super::inline_files::resolve(state, &request.thread_id, id).await?);
+                    content.push(
+                        super::inline_files::resolve(
+                            state,
+                            &request.thread_id,
+                            &request.provider,
+                            id,
+                        )
+                        .await?,
+                    );
                 }
                 _ => (),
             }
@@ -49,13 +71,7 @@ pub async fn body(
         }
         messages.push(wire);
     }
-    Ok(
-        json!({"model":request.model,"messages":messages,"stream":true,"stream_options":{"include_usage":true},
-        // Go counts reasoning against the same output allowance as the answer.
-        // Max-effort engineering exhausted 8192 before emitting any file actions.
-        "max_tokens":if request.thinking {65_536} else {8192},"reasoning_effort":request.reasoning_effort,"thinking":{"type":if request.thinking {"enabled"} else {"disabled"}},
-        "tools":super::opencode_tools::descriptors(request)}),
-    )
+    Ok(messages)
 }
 
 #[cfg(test)]

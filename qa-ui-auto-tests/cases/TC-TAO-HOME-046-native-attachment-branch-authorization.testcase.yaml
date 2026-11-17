@@ -1,0 +1,180 @@
+id: TC-TAO-HOME-046
+title: Native attachment branches retain scoped authorization across reload and preserve the source
+description: Select a real document, read its content, create a branch and read the inherited attachment without selecting it again. Reload the branch and
+  read again; the original conversation keeps its own messages and attachment access. No commercial service is contacted.
+modes:
+- native
+covers:
+- F1.11
+tags:
+- p0
+- tao-home
+- regression
+fixtures:
+- reset_db
+- tao_llm
+timeout_sec: 240
+native_platforms:
+- Windows
+- Linux
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-tao-home-045
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- wait_for: '[data-testid="tao-home-composer-input"]:enabled'
+- click: '[data-testid="tao-home-plus"]'
+- click: '[data-testid="tao-home-context-attach"]'
+- native_file_dialog:
+    kind: open
+    action: choose
+    path: ${fixture.tao_llm_document}
+    title: ${fixture.tao_llm_chooser_title}
+    trigger: '[data-testid="tao-home-file-choose"]'
+- wait_for: .tao-home-context-chip
+- assert_count:
+    selector: .tao-home-context-chip
+    equal: 1
+- fill:
+    selector: '[data-testid="tao-home-composer-input"]'
+    value: QA-LLM-ATTACH original for branch
+- click: '[data-testid="tao-home-send"]'
+- assert_text:
+    selector: '[data-testid="tao-home-message-list"]'
+    contains: Document value is 73
+- assert_visible: '[data-testid="tao-home-message-regenerate"]'
+- click: '[data-testid="tao-home-message-branch"]'
+- assert_count:
+    selector: '[data-testid="tao-home-message-user"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="tao-home-message-assistant"]'
+    equal: 1
+- fill:
+    selector: '[data-testid="tao-home-composer-input"]'
+    value: QA-LLM-ATTACH copied branch
+- click: '[data-testid="tao-home-send"]'
+- assert_text:
+    selector: '[data-testid="tao-home-message-assistant"]:last-child'
+    contains: Document value is 73
+- assert_count:
+    selector: '[data-testid="tao-home-message-regenerate"]'
+    equal: 2
+- reload_window: null
+- wait_for: '[data-testid="tao-home-composer-input"]:enabled'
+- fill:
+    selector: '[data-testid="tao-home-composer-input"]'
+    value: QA-LLM-ATTACH restored branch
+- click: '[data-testid="tao-home-send"]'
+- assert_text:
+    selector: '[data-testid="tao-home-message-assistant"]:last-child'
+    contains: Document value is 73
+- assert_count:
+    selector: '[data-testid="tao-home-message-regenerate"]'
+    equal: 3
+- click: '[data-testid="tao-home-history"]'
+- click: '[data-testid="tao-home-history-row"][data-title="QA-LLM-ATTACH original for branch"]'
+- assert_count:
+    selector: '[data-testid="tao-home-message-user"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="tao-home-message-assistant"]'
+    equal: 1
+- fill:
+    selector: '[data-testid="tao-home-composer-input"]'
+    value: QA-LLM-ATTACH original remains authorized
+- click: '[data-testid="tao-home-send"]'
+- assert_text:
+    selector: '[data-testid="tao-home-message-assistant"]:last-child'
+    contains: Document value is 73
+- assert_count:
+    selector: '[data-testid="tao-home-message-regenerate"]'
+    equal: 2
+- assert_no_runtime_errors: null
+- screenshot: ordinary-attachment-branch-restored.png
+verification:
+  review: reviewed
+  requirements:
+  - id: ATTACHMENT-BRANCH-046
+    requirement: An explicit branch inherits only its source attachment authorization, persists it across reload, and leaves the original conversation intact.
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 6
+    - 7
+    - 8
+    - 11
+    - 12
+    - 15
+    - 18
+    - 19
+    - 22
+    - 24
+    - 25
+    - 28
+    - 29
+    - 32
+    - 33
+    checkpoints:
+    - step: 5
+      expectation: '[data-testid="tao-home-composer-input"]:enabled'
+    - step: 9
+      expectation: The asynchronously prepared attachment chip is visible before its exact count is checked.
+    - step: 10
+      expectation: '{''selector'': ''.tao-home-context-chip'', ''equal'': 1}'
+    - step: 13
+      expectation: '{''selector'': ''[data-testid="tao-home-message-list"]'', ''contains'': ''Document value is 73''}'
+    - step: 14
+      expectation: '[data-testid="tao-home-message-regenerate"]'
+    - step: 16
+      expectation: '{''selector'': ''[data-testid="tao-home-message-user"]'', ''equal'': 1}'
+    - step: 17
+      expectation: '{''selector'': ''[data-testid="tao-home-message-assistant"]'', ''equal'': 1}'
+    - step: 20
+      expectation: '{''selector'': ''[data-testid="tao-home-message-assistant"]:last-child'', ''contains'': ''Document value is 73''}'
+    - step: 21
+      expectation: '{''selector'': ''[data-testid="tao-home-message-regenerate"]'', ''equal'': 2}'
+    - step: 23
+      expectation: '[data-testid="tao-home-composer-input"]:enabled'
+    - step: 26
+      expectation: '{''selector'': ''[data-testid="tao-home-message-assistant"]:last-child'', ''contains'': ''Document value is 73''}'
+    - step: 27
+      expectation: '{''selector'': ''[data-testid="tao-home-message-regenerate"]'', ''equal'': 3}'
+    - step: 30
+      expectation: '{''selector'': ''[data-testid="tao-home-message-user"]'', ''equal'': 1}'
+    - step: 31
+      expectation: '{''selector'': ''[data-testid="tao-home-message-assistant"]'', ''equal'': 1}'
+    - step: 34
+      expectation: '{''selector'': ''[data-testid="tao-home-message-assistant"]:last-child'', ''contains'': ''Document value is 73''}'
+    - step: 35
+      expectation: '{''selector'': ''[data-testid="tao-home-message-regenerate"]'', ''equal'': 2}'
+    - step: 36
+      expectation: None
+    results:
+    - 5
+    - 9
+    - 10
+    - 13
+    - 14
+    - 16
+    - 17
+    - 20
+    - 21
+    - 23
+    - 26
+    - 27
+    - 30
+    - 31
+    - 34
+    - 35
+    - 36
+  native:
+  - check: Actual OS document selection, native branch IPC and real provider wire bytes
+    method: automated
+    reason: Independent loopback service answers only when actual document bytes reach it; all mutations use public UI controls.
+  visual:
+  - check: Restored source transcript and attachment reply
+    method: manual
+    reason: Retained screenshot supports transcript review; native provider wire bytes and exact message counts establish behavior.

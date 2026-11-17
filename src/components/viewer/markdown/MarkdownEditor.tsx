@@ -20,6 +20,8 @@ import type { MarkdownWidgetContext } from "./markdownWidgetContext";
 import type { MarkdownDocumentOwner } from "./markdownOwner";
 import { MarkdownSplit } from "./MarkdownSplit";
 import { PreviewAppearanceControl, previewThemeStyle, usePreviewTheme, type PreviewAppearance } from "./PreviewAppearance";
+import { MarkdownDiagramActions } from "./MarkdownDiagramActions";
+import { MarkdownDrawioImport } from "./MarkdownDrawioImport";
 import "./markdown.css";
 
 export function MarkdownEditor({ document: current, onError, owner, requestedMode, onModeChange }: {
@@ -107,8 +109,9 @@ export function MarkdownEditor({ document: current, onError, owner, requestedMod
         onMode={changeMode} onFocus={() => setFocus(!focus)} onOutline={() => setOutline(!outline)} onImage={chooseImage} />
       {mode === "live" && <button className="fv-button outline" data-testid="markdown-live-edit" aria-pressed={editing} disabled={current.readOnly || current.truncated}
         onClick={() => setEditing(!editing)}>{editing ? label("完成编辑", "Done editing") : label("编辑", "Edit")}</button>}
+      <MarkdownDrawioImport key={current.key} view={() => editor.current} readOnly={effectiveReadOnly} onError={report} />
       <PreviewAppearanceControl value={appearance} onChange={setAppearance} />
-      <MarkdownExportMenu document={current} onError={report} printRequest={printRequest} onExport={owner?.onExport} />
+      <MarkdownExportMenu key={current.key} document={current} onError={report} printRequest={printRequest} onExport={owner?.onExport} />
     </div>
     <div className="fv-md-wrap">
       {outline && <aside className="fv-md-outline" data-testid="markdown-outline" aria-label={label("大纲", "Outline")}>
@@ -133,6 +136,7 @@ export function MarkdownEditor({ document: current, onError, owner, requestedMod
       </MarkdownSplit>
       </div>
     </div>
+    <MarkdownDiagramActions key={current.key} root={root} docPath={current.path} sourceOnDisk={!owner} onError={report} />
     {pasteStatus && <div className="fv-md-paste-status" role="status" data-testid="markdown-paste-status">{pasteStatus}<button aria-label={label("关闭提示", "Dismiss")} onClick={() => setPasteStatus("")}>×</button></div>}
     <input ref={imageInput} type="file" accept="image/*" hidden data-testid="markdown-image-input" multiple onChange={(event) => {
       const files = Array.from(event.target.files || []);

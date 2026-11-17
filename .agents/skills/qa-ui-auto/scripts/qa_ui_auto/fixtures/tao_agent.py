@@ -146,7 +146,7 @@ def setup(ctx):
     root.mkdir(parents=True, exist_ok=True)
     config = dict(
         asr=dict(active="sensevoice-small", providers={}, warm_on_startup=False, vad="silero", language="auto"),
-        llm=dict(active="opencode-go", providers={"opencode-go":dict(base_url=f"http://127.0.0.1:{server.server_port}", api_key="qa-loopback-only", model="deepseek-v4.1-flash", runtime="openai-compat", proxy_mode="none")},
+        llm=dict(active="opencode-go", providers={"opencode-go":dict(base_url=f"http://127.0.0.1:{server.server_port}", api_key="qa-loopback-only", model="deepseek-v4.1-flash", runtime="opencode-go", proxy_mode="none")},
                  fallback=dict(enabled=False, primary="opencode-go", secondary="local", timeout_ms=30000), task_routing={}),
         deepseek_app=dict(enabled=True, provider="opencode-go", model="deepseek-v4.1-flash", reasoning_effort="max", thinking_default=True, search_default=False, title_enabled=False),
         full_local_mode=False, fully_disabled=False)

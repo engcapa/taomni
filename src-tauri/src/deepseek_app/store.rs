@@ -44,10 +44,15 @@ pub fn save_thread(conn: &Connection, mut thread: Value) -> Result<(), String> {
     if serialized.len() > 16 * 1024 * 1024 {
         return Err("protocol: conversation exceeds storage limit".into());
     }
+    // Branching owns an outer transaction; participate in it so copied
+    // snapshots, canonical messages and attachment grants settle together.
     let tx = conn
-        .unchecked_transaction()
+        .is_autocommit()
+        .then(|| conn.unchecked_transaction())
+        .transpose()
         .map_err(|error| error.to_string())?;
-    tx.execute(
+    let db = tx.as_deref().unwrap_or(conn);
+    db.execute(
         "INSERT INTO ai_chat_threads (id,title,provider_id,created_at,updated_at,source)
         VALUES (?1,?2,'deepseek-app',?3,?3,'home') ON CONFLICT(id) DO UPDATE SET
         title=CASE WHEN excluded.updated_at >= updated_at THEN excluded.title ELSE title END,
@@ -55,14 +60,14 @@ pub fn save_thread(conn: &Connection, mut thread: Value) -> Result<(), String> {
         params![id, title, updated / 1000],
     )
     .map_err(|error| error.to_string())?;
-    tx.execute(
+    db.execute(
         "INSERT INTO ds_app_threads(id,snapshot,updated_at) VALUES (?1,?2,?3)
         ON CONFLICT(id) DO UPDATE SET snapshot=excluded.snapshot,updated_at=excluded.updated_at
         WHERE excluded.updated_at >= ds_app_threads.updated_at",
         params![id, serialized, updated],
     )
     .map_err(|error| error.to_string())?;
-    tx.commit().map_err(|error| error.to_string())
+    tx.map_or(Ok(()), |tx| tx.commit().map_err(|error| error.to_string()))
 }
 
 pub fn load_threads(conn: &Connection) -> Result<Vec<Value>, String> {
@@ -169,6 +174,7 @@ pub fn delete_thread(conn: &Connection, id: &str) -> Result<(), String> {
         [id],
     )
     .map_err(|error| error.to_string())?;
+    super::inline_files::forget_thread(&tx, id)?;
     tx.commit().map_err(|error| error.to_string())
 }
 
@@ -199,20 +205,33 @@ pub fn clone_thread(
     snapshot["id"] = Value::String(target_id.to_string());
     snapshot["source"] = Value::String("branch".into());
     snapshot["updatedAt"] = json!(now());
-    save_thread(conn, snapshot.clone())?;
     let source = messages(conn, source_id)?;
     let limit = through_message_index
         .map(|index| index.saturating_add(1))
         .unwrap_or(source.len());
+    let tx = conn.unchecked_transaction().map_err(|e| e.to_string())?;
+    save_thread(&tx, snapshot.clone())?;
+    super::inline_files::inherit(
+        &tx,
+        source_id,
+        target_id,
+        &snapshot,
+        source
+            .iter()
+            .take(limit)
+            .filter(|message| message.role == "user")
+            .flat_map(|message| message.blocks.iter()),
+    )?;
     for message in source.into_iter().take(limit) {
-        conn.execute("INSERT INTO ds_app_messages(id,thread_id,role,blocks,status,stop_reason,created_at,position) VALUES(?1,?2,?3,?4,?5,?6,?7,?8)", params![
+        tx.execute("INSERT INTO ds_app_messages(id,thread_id,role,blocks,status,stop_reason,created_at,position) VALUES(?1,?2,?3,?4,?5,?6,?7,?8)", params![
             uuid::Uuid::new_v4().to_string(), target_id, message.role,
             serde_json::to_string(&message.blocks).map_err(|e|e.to_string())?, message.status,
             message.stop_reason, message.created_at,
-            conn.query_row("SELECT COALESCE(MAX(position)+1,0) FROM ds_app_messages WHERE thread_id=?1", [target_id], |r|r.get::<_,i64>(0)).map_err(|e|e.to_string())?
+            tx.query_row("SELECT COALESCE(MAX(position)+1,0) FROM ds_app_messages WHERE thread_id=?1", [target_id], |r|r.get::<_,i64>(0)).map_err(|e|e.to_string())?
         ]).map_err(|e|e.to_string())?;
     }
-    sync_snapshot(conn, target_id, None)?;
+    sync_snapshot(&tx, target_id, None)?;
+    tx.commit().map_err(|e| e.to_string())?;
     Ok(snapshot)
 }
 

@@ -2,6 +2,7 @@ import { taoText as tr } from "../i18n";
 import { useTaoText } from "../i18n";
 import { useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { isTauriRuntime } from "../../../lib/runtime";
+import { taoDefaults, taoProviderOptions } from "../../../stores/ai/taoProviders";
 import { useAiStore } from "../../../stores/aiStore";
 import type { WelcomePanelProps } from "../../welcome/types";
 import { createChatController, deepSeekAppBackend, TaoAiChat, type ContextPorts, type ChatProfile, type TaoSearchResult } from "../ai-chat";
@@ -42,15 +43,14 @@ export function TaoHomeHost(props: WelcomePanelProps) {
   const state = useSyncExternalStore(controller.subscribe, controller.getState, controller.getState);
   const demoMode = state.ui.demoMode;
   useEffect(() => {
-    const config = aiConfig?.deepseek_app;
-    if (config) controller.setDefaults({ defaultModel: config.model === "deepseek-v4-pro" ? config.model : config.provider === "opencode-go" ? "deepseek-v4.1-flash" : "deepseek-flash", defaultProvider: config.provider ?? "deepseek-app", defaultReasoningEffort: config.reasoning_effort ?? "high", defaultThinking: config.thinking_default, defaultWeb: config.search_default });
-  }, [aiConfig?.deepseek_app, controller]);
+    if (aiConfig) controller.setDefaults(taoDefaults(aiConfig));
+  }, [aiConfig, controller]);
   useEffect(() => { if (!aiConfig) void loadAiConfig().catch(() => undefined); }, [aiConfig, loadAiConfig]);
   const oldKey = aiConfig?.llm.providers.deepseek?.api_key ?? "";
   const providerId = state.composer.provider ?? "deepseek-app";
   const taoProvider = aiConfig?.llm.providers[providerId];
   const taoKey = taoProvider?.api_key ?? "";
-  const hasTaoKey = Boolean(taoKey || taoProvider?.api_keys?.some((key) => key.trim()));
+  const hasTaoKey = taoProviderOptions(aiConfig).find((option) => option.id === providerId)?.ready ?? false;
   const canReuse = providerId === "deepseek-app" && Boolean(oldKey && !taoKey);
   const contextPorts = useMemo<ContextPorts>(() => ({
     search: async (query: string): Promise<TaoSearchResult[]> => {
@@ -94,7 +94,7 @@ export function TaoHomeHost(props: WelcomePanelProps) {
         slots={{
           headerTrailing: <BindingBar controller={controller} context={state.context} />,
           emptyState: <>
-            {!isTauriRuntime() ? <p data-testid="tao-home-browser-unavailable">{tr("浏览器预览不提供 DeepSeek 原生对话，请在桌面应用中使用。")}</p> : null}
+            {!isTauriRuntime() ? <p data-testid="tao-home-browser-unavailable">{tr("浏览器预览不提供原生 AI 对话，请在桌面应用中使用。")}</p> : null}
             {!hasTaoKey ? <NoKeyCard onOpenSettings={openSettings} onReuse={handleReuse} canReuse={canReuse} /> : null}
             {storageError || history.error ? <p role="alert">{storageError || history.error}</p> : null}
           </>,
