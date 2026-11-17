@@ -26,7 +26,8 @@ it("cancels the native chooser without inserting, then allows a fresh import", a
   fireEvent.click(button);
   expect(button).toBeDisabled();
   await waitFor(() => expect(button).toBeEnabled());
-  expect(button).toHaveFocus(); expect(screen.queryByRole("dialog")).toBeNull();
+  await waitFor(() => expect(button).toHaveFocus());
+  expect(screen.queryByRole("dialog")).toBeNull();
   expect(readDrawioFile).not.toHaveBeenCalled(); expect(owner.dispatch).not.toHaveBeenCalled();
   fireEvent.click(button);
   await screen.findByTestId("markdown-drawio-import-dialog");

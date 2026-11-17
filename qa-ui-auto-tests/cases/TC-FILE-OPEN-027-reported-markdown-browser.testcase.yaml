@@ -3,7 +3,7 @@ title: 'Reported testing.md: Live table formatting, Word line bodies, editable s
 description: Use the exact 4510-byte user document (SHA c669a35a1cc8ec37aba798b496fa5b6c8c6405118079482bcaec03ee4c27f900).
   Local native can open the original path via TAOMNI_QA_MARKDOWN_SOURCE_FILE; hosted uses the identical committed
   source. Preserve source hash, render Live bold cells, export both diagram vectors and 600DPI fallbacks, reject
-  Office-invisible solid dash patterns and independently check draw.io legacy anchors. Native exercises packaged
+  Office-invisible solid dash patterns, require measured CJK glyph positions and independently check draw.io legacy anchors. Native exercises packaged
   WebView, real save chooser and disk bytes.
 modes:
 - browser
@@ -129,7 +129,7 @@ verification:
   requirements:
   - id: REPORTED-MARKDOWN
     requirement: Original user Markdown stays unchanged; Live renders all three bold table cells, both Word diagram
-      vectors retain visible line bodies, all sequence endpoints follow Mermaid coordinates in draw.io, PDF remains
+      vectors retain visible line bodies and measured CJK glyph positions, all sequence endpoints follow Mermaid coordinates in draw.io, PDF remains
       searchable.
     actions:
     - 1

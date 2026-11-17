@@ -64,3 +64,9 @@ Windows/macOS browser 在 [44052981988](https://github.com/engcapa/taomni/action
 Live 表格原来直接使用 `textContent` 写原始 Markdown。现在使用现有 marked GFM 解析器与共享 sanitizer 渲染单元格内联格式；可编辑格聚焦时显示原始标记，失焦恢复格式，只读格聚焦仍保留格式。保留 IME 延迟提交、单元格 DOM 身份、Tab/Enter、表格操作与撤销/重做。表格中的图片暂显示 alt，避免引入无所有权的图片请求；链接沿用显式外部打开。
 
 本轮验证选择：完整 Markdown 单测（首次 174 项通过，时序旋转参数化后具名 14 项补测通过），独立 draw.io 检查器 9 项和 Word 线身检查器 3 项；受影响 004/013/014/015/019/020/021/022/025/026/027/028，保留六项近期交付及完整 crash-regression browser 18 / native 22。匹配 QA release 原生验证是用户明确要求，覆盖 WebKitGTK 中的原文件读取、真实导出和 OS chooser；Windows/macOS 通过 qa-ui-auto-platforms 运行。新的证据根 `/data-raw-hdd/temp/taomni-testing-20261117`。此段写入时本机与 hosted 完整验收尚未结束，不把探针或 dry-run 计作通过。
+
+追加人工检查发现：默认字体下 LibreOffice 会截断流程图 SVG 的部分中文，文件内 600 DPI fallback 文字完整。单纯调整字体列表、去除单位、合并 tspan 或添加坐标列表都不能可靠解决。独立实验确认逐字固定中文的浏览器实际位置能够保留原字体、文字内容和矢量清晰度；连续英文仍保留为文本段，以保留字偶距和连字。新增 `wordSvgText.ts` 在冻结样式前读取布局，在写入 presentation attributes 后应用；复杂文字塑形、textPath 或不可用的度量保留原始 SVG，不丢失文字。独立导出检查加入字形位置及三处曾被截断的完整标签；最终仍需匹配 QA release 重新打开原文件验收。
+
+Word 中文追加修复前，本轮 Linux native 完整批次 `run-20261117-222534-951648892` 为 **33/33、完整 22 项 crash-regression**；原文件 028 在 `run-20261117-222408-356048930` 为 **1/1**，42 步全部通过，原文件前后 SHA 一致。有效并集 **34/34**；737/38 个绑定产物的回执签名、源码/runner/QA release、用例、配置与文件散列均独立复核。两图用实际 draw.io Desktop 29.6.6 打开，流程与时序连接正常；PDF 四页逐页检查完整且可搜索。此批是追加字形修复前的验收，不能冒充新产品源码验证。
+
+新增字形布局 7 项单测；完整 Markdown **33 文件 / 182 项通过**。首次有一项既有导入取消测试在按钮恢复启用后立即断言焦点，而产品通过 effect 恢复焦点；保留原失败，把焦点本身作为异步等待条件后完整复跑通过，没有移除焦点断言。独立 draw.io/Word 检查器 **15 项通过**，refactor 契约/边界/source size 通过。新证据独立保存于上述根目录的 `final/`；此段写入时新 QA release 与新源码 browser 正在执行。
