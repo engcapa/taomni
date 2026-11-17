@@ -33,7 +33,7 @@ export function WorkspaceSwitcher({ onAddFolder }: WorkspaceSwitcherProps) {
 
   if (!active) return null;
 
-  const workspaceMenu = (workspace: PlatformWorkspace) => workspace.id === DEFAULT_WORKSPACE_ID || workspace.id === NOTES_WORKSPACE_ID
+  const workspaceMenu = (workspace: PlatformWorkspace) => workspace.id === NOTES_WORKSPACE_ID
     ? []
     : [
         {
@@ -49,7 +49,7 @@ export function WorkspaceSwitcher({ onAddFolder }: WorkspaceSwitcherProps) {
             });
           },
         },
-        { label: "", separator: true, onClick: () => undefined },
+        ...(workspace.id === DEFAULT_WORKSPACE_ID ? [] : [{ label: "", separator: true, onClick: () => undefined },
         {
           label: t("platform.deleteWorkspace"),
           testId: "workspace-switcher-menu-delete",
@@ -59,7 +59,7 @@ export function WorkspaceSwitcher({ onAddFolder }: WorkspaceSwitcherProps) {
               window.alert(t("platform.defaultWorkspaceLocked"));
             }
           },
-        },
+        }]),
       ];
 
   return (
@@ -142,8 +142,9 @@ export function WorkspaceSwitcher({ onAddFolder }: WorkspaceSwitcherProps) {
               label: t("platform.newWorkspace"),
               testId: "workspace-switcher-new",
               onClick: () => {
-                const name = window.prompt(t("platform.workspaceName"), "Workspace");
-                if (name?.trim()) createWorkspace({ name });
+                void dialogs.prompt({ title: t("platform.newWorkspace"), label: t("platform.workspaceName"), initialValue: "Workspace" }).then((name) => {
+                  if (name?.trim()) createWorkspace({ name });
+                });
               },
             },
             {

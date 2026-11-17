@@ -999,6 +999,13 @@
 
 ## database/sql (F-DB-1)
 
+- `[data-search-current="true"]` — display [optional] — F-DB-1.query-result-current-match
+- `[data-testid="query-result-grid-scroll"]` — interactive [optional] — F-DB-1.query-result-grid-scroll
+- `[data-testid="query-result-search"]` — display [optional] — F-DB-1.query-result-search
+- `input[aria-label="Search result set"]` — interactive [optional] — F-DB-1.query-result-search-input
+- `[data-testid="query-result-search-next"]` — interactive [optional] — F-DB-1.query-result-search-next
+- `[data-testid="query-result-search-previous"]` — interactive [optional] — F-DB-1.query-result-search-previous
+- `[data-testid="query-result-search-count"]` — display [optional] — F-DB-1.query-result-search-count
 - `[data-testid="session-database-section"]` — display [optional] — F-DB-1.database-section
 - `[data-testid="database-settings"]` — display [optional] — F-DB-1.database-settings
 - `input[aria-label="Database username"]` — interactive [optional] — F-DB-1.db-username
@@ -1233,6 +1240,8 @@
 
 ## files/viewer (F-FILEOPEN-1)
 
+- `[data-testid="markdown-export-open-tao"]` — interactive [optional] — F-FILEOPEN-1.markdown-export-open-tao
+- `[data-testid="markdown-export-show-system"]` — interactive [optional] — F-FILEOPEN-1.markdown-export-show-system
 - `[data-testid="file-viewer"]` — display — F-FILEOPEN-1.file-viewer
 - `[data-testid="viewer-editor"]` — interactive — F-FILEOPEN-1.viewer-editor
 - `[data-testid="viewer-save"]` — interactive — F-FILEOPEN-1.viewer-save
@@ -2112,9 +2121,15 @@
 - `[data-testid="workspace-create-button"]` — interactive [optional] — F-WS-1.workspace-create-button
 - `[data-testid^="open-tabs-tab-"]:not([data-testid^="open-tabs-tab-checkbox-"])` — interactive [optional] — F-WS-1.open-tabs-search-result
 - `[data-testid^="workspace-switcher-option-"]:not([data-testid="workspace-switcher-option-default-workspace"])` — interactive [optional] — F-WS-1.workspace-custom-switcher-option
+  ↳ `xpath=//*[@data-testid="workspace-switcher-menu"]//*[text()="Sample project"]` — alias
 
 ## main/workspace-platform (F-WS-2)
 
+- `[data-testid="workspace-switcher-menu-delete"]` — interactive [optional] — F-WS-2.workspace-switcher-menu-delete
+- `[data-testid="workspace-root-current"]` — interactive [optional] — F-WS-2.workspace-root-current
+- `[data-testid="workspace-root-new"]` — interactive [optional] — F-WS-2.workspace-root-new
+- `[data-testid="workspace-root-name"]` — interactive [optional] — F-WS-2.workspace-root-name
+- `[data-testid="workspace-switcher-menu-rename"]` — interactive [optional] — F-WS-2.workspace-switcher-menu-rename
 - `[data-testid="code-workspace-tree-viewport"]` — display [optional] — F-WS-2.code-workspace-tree-viewport
 - `[data-testid="code-workspace-tree-view-all-files"]` — interactive — F-WS-2.code-workspace-tree-view-all-files
 - `[data-testid="code-workspace-tree-search"]` — interactive — F-WS-2.code-workspace-tree-search

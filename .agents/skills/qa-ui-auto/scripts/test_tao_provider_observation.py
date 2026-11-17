@@ -74,6 +74,36 @@ class TaoProviderObservationTests(unittest.TestCase):
             self.assertEqual(record["outcome"], "failed")
             self.assertIn("network", record["reason"])
 
+    def test_strict_success_rejects_403_and_preserves_failed_evidence(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            ctx = SimpleNamespace(session=Mock(), case_dir=root)
+            ctx.session.execute.return_value = snapshot(errorCount=1, credentialInvalid=True, retryVisible=True)
+            with self.assertRaisesRegex(StepError, "credentials were rejected"):
+                assert_outcome(ctx, {"timeout_sec": 1, "require_success": True})
+            self.assertEqual(json.loads((root / "real-provider-outcome.json").read_text())["outcome"], "failed")
+
+    def test_agnes_fixture_uses_requested_model_and_removes_key(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            case = root / "case"
+            case.mkdir()
+            key = root / "key.txt"
+            key.write_text("unit-agnes-secret")
+            ctx = SimpleNamespace(cfg={"app": {"mode": "native"}}, report_root=root, case_dir=case, values={})
+            with patch.dict(os.environ, {"TAOMNI_QA_TAO_PROVIDER": "agnes", "TAOMNI_QA_AGNES_KEY_FILE": str(key), "TAOMNI_QA_TAO_PROXY": "http://127.0.0.1:3228"}), \
+                    patch.object(tao_real_provider, "native_isolation_env", return_value={"NEWMOB_CONFIG_DIR": str(root / "profile")}):
+                tao_real_provider.setup(ctx)
+            config_path = Path(ctx.values["tao_real_provider_config"])
+            config = json.loads(config_path.read_text())
+            provider = config["llm"]["providers"]["agnes"]
+            self.assertEqual((provider["model"], provider["runtime"], provider["api_key"]),
+                             ("agnes-2.5-pro-beta", "openai-compat", "unit-agnes-secret"))
+            self.assertFalse(config["deepseek_app"]["thinking_default"])
+            tao_real_provider.teardown(ctx)
+            self.assertFalse(config_path.exists())
+            self.assertNotIn("unit-agnes-secret", "".join(p.read_text() for p in case.glob("*")))
+
     def test_fixture_cleans_secret_config_even_without_an_outcome(self):
         with TemporaryDirectory() as directory:
             root = Path(directory)

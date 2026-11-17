@@ -233,3 +233,35 @@ it("opens folders, ordinary files and sort controls while code and Git discovery
   expect(screen.getByTestId("code-workspace-tree-empty")).toBeVisible();
   expect(useWorkspacePlatformStore.getState().getWorkspace()!.rootFolders).toEqual([]);
 });
+
+it("renames the default workspace without changing its roots, ID or deletion protection and persists it", async () => {
+  render(<Shell />);
+  fireEvent.click(screen.getByTestId("workspace-switcher-button"));
+  expect(screen.queryByTestId("workspace-switcher-menu-delete")).not.toBeInTheDocument();
+  fireEvent.click(screen.getByTestId("workspace-switcher-menu-rename"));
+  fireEvent.change(await screen.findByTestId("text-input-dialog-input"), { target: { value: " Team workspace " } });
+  fireEvent.click(screen.getByTestId("text-input-dialog-confirm"));
+  await waitFor(() => expect(screen.getByTestId("workspace-switcher-button")).toHaveTextContent("Team workspace"));
+  expect(useWorkspacePlatformStore.getState().getWorkspace(DEFAULT_WORKSPACE_ID)?.rootFolders[0].path).toBe("/preview");
+  act(() => { window.dispatchEvent(new Event("pagehide")); useWorkspacePlatformStore.getState().reloadFromStorage(); });
+  expect(useWorkspacePlatformStore.getState().getWorkspace(DEFAULT_WORKSPACE_ID)?.name).toBe("Team workspace");
+  expect(useWorkspacePlatformStore.getState().deleteWorkspace(DEFAULT_WORKSPACE_ID)).toBe(false);
+});
+
+it("creates and activates a named workspace from Add folder while retaining the previous workspace", async () => {
+  render(<Shell />);
+  const original = useWorkspacePlatformStore.getState().getWorkspace(DEFAULT_WORKSPACE_ID)!;
+  act(() => useWorkspaceUiStore.getState().openFsModal({ kind: "root", directory: "" }));
+  fireEvent.change(screen.getByTestId("workspace-fs-modal-input"), { target: { value: "/repo/project" } });
+  fireEvent.click(screen.getByTestId("workspace-root-new"));
+  expect(screen.getByTestId("workspace-root-name")).toHaveValue("project");
+  fireEvent.change(screen.getByTestId("workspace-root-name"), { target: { value: "Project A" } });
+  fireEvent.click(screen.getByTestId("workspace-fs-modal-confirm"));
+  await waitFor(() => expect(screen.queryByTestId("workspace-fs-modal")).not.toBeInTheDocument());
+  const store = useWorkspacePlatformStore.getState();
+  const created = store.getWorkspace()!;
+  expect(created).toMatchObject({ name: "Project A", isDefault: false, rootFolders: [{ path: "/repo/project", name: "project" }] });
+  expect(store.getWorkspace(original.id)).toEqual(original);
+  act(() => { window.dispatchEvent(new Event("pagehide")); store.reloadFromStorage(); });
+  expect(useWorkspacePlatformStore.getState().getWorkspace()?.name).toBe("Project A");
+});

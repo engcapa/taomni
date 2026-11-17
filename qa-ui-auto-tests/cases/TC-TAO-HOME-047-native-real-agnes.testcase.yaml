@@ -1,0 +1,50 @@
+id: TC-TAO-HOME-047
+title: Native Tao Home Agnes configured model returns a successful reply
+description: >-
+  Opt-in native smoke against the real configured Tao provider endpoint using a
+  run-scoped temporary key. One short request is kept well below the configured bounded
+  test budget. A configured Agnes key and agnes-2.5-pro-beta must produce a nonempty
+  assistant reply; HTTP 401/403 cannot pass this regression. The key is never written to reports.
+modes: [native]
+covers: [F1.11]
+tags: [p0, tao-home, native, real-provider, regression]
+fixtures: [reset_db, tao_real_provider]
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-tao-home-047-real-provider
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- wait_for: '[data-testid="tao-home-composer-input"]:enabled'
+- observe_tao_provider: null
+- fill:
+    selector: '[data-testid="tao-home-composer-input"]'
+    value: 'Reply with one short sentence: native Tao smoke test.'
+- click: '[data-testid="tao-home-send"]'
+- assert_tao_provider_outcome:
+    timeout_sec: 120
+    require_success: true
+- assert_no_runtime_errors: null
+- screenshot: tao-home-real-provider-smoke.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A real native request completes with a nonempty assistant response and no error; HTTP 401/403, expired credentials and empty placeholders fail. Other errors fail. The temporary secret config is removed before report upload.
+    actions: [1, 2, 3, 4, 5, 6, 7, 8]
+    checkpoints:
+    - step: 9
+      expectation: The real deepseek_app_send callback completed, generation stopped, and the assistant reply is nonempty without errors; an empty assistant placeholder cannot pass.
+    - step: 9
+      expectation: Only a successful nonempty response passes. HTTP 401/403, network, protocol and configuration errors fail.
+    - step: 10
+      expectation: The native run ends without an unhandled renderer/runtime error.
+    results: [9, 10]
+  native:
+  - check: Real configured Tao provider provider response and temporary-key failure handling
+    method: automated
+    reason: Native IPC, isolated configuration and packaged WebView are required; no key is retained in evidence.
+  visual:
+  - check: Real-provider response or credential-error card remains readable in the Tao Home message surface.
+    method: manual
+    reason: Provider output is environment-dependent; the retained screenshot is reviewed without exposing the key.
