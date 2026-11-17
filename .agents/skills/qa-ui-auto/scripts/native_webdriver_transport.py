@@ -90,7 +90,9 @@ class WebDriverTransport:
             try:
                 parsed = json.loads(data)
                 value = parsed.get("value", parsed)
-                if isinstance(value, dict) and "error" in value:
+                # execute/sync may return an application observation whose
+                # optional error is null. W3C errors carry a nonempty code.
+                if isinstance(value, dict) and isinstance(value.get("error"), str) and value["error"]:
                     raise WebDriverError(value.get("message") or value["error"])
             except Exception as e:
                 observation["error_type"] = type(e).__name__

@@ -112,6 +112,18 @@ class NativeCleanupTransportTest(TestCase):
         self.assert_released()
         self.assertEqual(self.session.cleanup_diagnostics["delete_request"]["phase"], "decode_response")
 
+    def test_execute_preserves_a_successful_restore_observation_with_null_error(self):
+        state = {"dialog": True, "count": 1, "enabled": True, "visible": True, "staged": False, "error": None}
+        self.session._local_endpoint = None
+        response = Mock()
+        response.__enter__ = Mock(return_value=response)
+        response.__exit__ = Mock(return_value=False)
+        response.read.return_value = json.dumps({"value": state}).encode()
+        self.session._open = Mock(return_value=response)
+        self.assertEqual(self.session.execute("return {error: null};"), state)
+        self.assertEqual(self.session.last_request["phase"], "complete")
+        self.assertNotIn("error_type", self.session.last_request)
+
     def test_owner_failure_remains_an_error_after_successful_delete(self):
         self.owner.side_effect = RuntimeError("owned process survives")
         with self.assertRaisesRegex(RuntimeError, "owned process survives"):
