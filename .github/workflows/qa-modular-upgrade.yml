@@ -20,7 +20,7 @@ on:
         type: boolean
         default: false
       protocol_only:
-        description: Run only the three-platform plugin wire and binary descriptor contracts
+        description: Run only the plugin wire and QA selection unit contracts
         type: boolean
         default: false
       host_only:

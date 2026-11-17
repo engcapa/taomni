@@ -1,4 +1,5 @@
 import argparse
+from contextlib import ExitStack
 import os
 from pathlib import Path
 import subprocess
@@ -7,8 +8,15 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import patch
 
+from ci_plan_test_support import repository_plan_snapshot
 from qa_ui_auto.ci import capabilities, dependency_order, diff_paths, make_plan, selection_entry, write_json
 from qa_ui_auto.linux_profiles import DEFAULT_LINUX_PROFILE, LINUX_PROFILES
+
+
+def setUpModule():
+    inputs = ExitStack()
+    unittest.addModuleCleanup(inputs.close)
+    inputs.enter_context(repository_plan_snapshot(Path.cwd()))
 
 
 def args(**overrides):
