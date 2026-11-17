@@ -9,9 +9,10 @@ interface DiagramDb { getData?: () => MermaidGraph }
 const arrowMarkers: Record<string, string> = { none: "none", extension: "block", aggregation: "diamond", composition: "diamond", only_one: "ERmandOne", zero_or_one: "ERzeroToOne", one_or_more: "ERoneToMany", zero_or_more: "ERzeroToMany" };
 const arrow = (type?: string) => arrowMarkers[type || ""] || (/circle/.test(type || "") ? "oval" : /cross/.test(type || "") ? "cross" : "classic");
 const plain = (value: string) => {
-  const node = document.createElement("div");
+  // A template remains inert even if a Mermaid label contains image markup.
+  const node = document.createElement("template");
   node.innerHTML = value.replace(/<br\s*\/?\s*>/gi, "\n");
-  return node.textContent || "";
+  return node.content.textContent || "";
 };
 
 function nodeStyle(shape = ""): string {
