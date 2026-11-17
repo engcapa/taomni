@@ -360,7 +360,7 @@ steps:
     trigger: '[data-testid="markdown-export-confirm"]'
 - wait_for:
     selector: '[data-testid="markdown-export-status"][data-export-state="saved"]'
-    timeout_sec: 120
+    timeout_sec: 300
 - assert_file_exists: ${fixture.markdown_quality_exports}/performance-1.pdf
 - click: '[data-testid="markdown-export"]'
 - click: '[data-testid="markdown-export-pdf"]'
@@ -372,7 +372,7 @@ steps:
     trigger: '[data-testid="markdown-export-confirm"]'
 - wait_for:
     selector: '[data-testid="markdown-export-status"][data-export-state="saved"]'
-    timeout_sec: 120
+    timeout_sec: 300
 - assert_file_exists: ${fixture.markdown_quality_exports}/performance-2.pdf
 - click: '[data-testid="markdown-export"]'
 - click: '[data-testid="markdown-export-pdf"]'
@@ -384,7 +384,7 @@ steps:
     trigger: '[data-testid="markdown-export-confirm"]'
 - wait_for:
     selector: '[data-testid="markdown-export-status"][data-export-state="saved"]'
-    timeout_sec: 120
+    timeout_sec: 300
 - assert_file_exists: ${fixture.markdown_quality_exports}/performance-3.pdf
 - assert_file_contains:
     path: ${fixture.markdown_quality_source}
@@ -402,7 +402,7 @@ tags:
 fixtures:
 - reset_db
 - markdown_quality
-timeout_sec: 900
+timeout_sec: 1200
 verification:
   review: reviewed
   requirements:

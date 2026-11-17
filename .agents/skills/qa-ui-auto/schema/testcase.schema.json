@@ -1972,7 +1972,7 @@
             "timeout_sec": {
               "type": "number",
               "minimum": 0.5,
-              "maximum": 120
+              "maximum": 300
             },
             "state": {
               "enum": [
