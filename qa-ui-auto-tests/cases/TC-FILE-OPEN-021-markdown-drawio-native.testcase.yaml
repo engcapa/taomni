@@ -1,0 +1,143 @@
+id: TC-FILE-OPEN-021
+title: Native draw.io exports and imports through real OS save/open dialogs and system clipboard
+description: Production Markdown entry and actual user controls. Retains selected export/import outcomes, editable graph
+  XML, text/table data and original source; browser uses VFS, native uses OS dialogs/disk/clipboard.
+modes:
+- native
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-drawio
+- reload_window: null
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-file-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Control+l
+    macos_key: Meta+l
+- fill:
+    selector: '[data-testid="explorer-address"]'
+    value: ${fixture.file_open_root}
+- press:
+    selector: '[data-testid="explorer-address"]'
+    key: Enter
+- dblclick: '[data-testid="explorer-file-row"][data-name="quality.md"]'
+- wait_for: '[data-testid="markdown-editor"]'
+- click: '[data-testid="markdown-export"]'
+- click: '[data-testid="markdown-export-drawio"]'
+- wait_for: '[data-testid="markdown-drawio-export-settings"]'
+- native_file_dialog:
+    kind: save
+    action: choose
+    path: ${fixture.markdown_quality_exports}/document.drawio
+    trigger: '[data-testid="markdown-drawio-save"]'
+- wait_for: '[data-testid="markdown-export-status"][data-export-state="saved"]'
+- assert_file_contains:
+    path: ${fixture.markdown_quality_exports}/document.drawio
+    contains: taomniKind="table"
+- click: '[data-testid="markdown-export"]'
+- click: '[data-testid="markdown-export-drawio"]'
+- wait_for: '[data-testid="markdown-drawio-export-settings"]'
+- click: '[data-testid="markdown-drawio-copy-link"]'
+- host_clipboard:
+    action: assert
+    kind: text
+    contains: https://app.diagrams.net/?client=1#R
+- dblclick: .fv-md-mermaid
+- wait_for: '[data-testid="markdown-diagram-viewer"]'
+- click: '[data-testid="markdown-diagram-view-rotate-right"]'
+- native_file_dialog:
+    kind: save
+    action: choose
+    path: ${fixture.markdown_quality_exports}/diagram.drawio
+    trigger: '[data-testid="markdown-diagram-view-save-drawio"]'
+- assert_file_contains:
+    path: ${fixture.markdown_quality_exports}/diagram.drawio
+    contains: edge="1"
+- click: '[data-testid="markdown-diagram-close"]'
+- click: '[data-testid="markdown-live-edit"]'
+- native_file_dialog:
+    kind: open
+    action: choose
+    path: ${fixture.drawio_import_file}
+    trigger: '[data-testid="markdown-import-drawio"]'
+- wait_for: '[data-testid="markdown-drawio-import-dialog"]'
+- assert_disabled: '[data-testid="markdown-drawio-import-confirm"]'
+- click: '[data-testid="markdown-drawio-import-diagram"]'
+- click: '[data-testid="markdown-drawio-import-confirm"]'
+- wait_for: .fv-md-drawio svg
+- click: '[data-testid="viewer-save"]'
+- assert_file_contains:
+    path: ${fixture.markdown_quality_source}
+    contains: '```drawio'
+- assert_no_runtime_errors: null
+- screenshot: drawio-native-save-import.png
+covers:
+- F-FILEOPEN-1
+- F-EXPLORER-1
+tags:
+- p0
+- markdown
+- drawio
+- regression
+fixtures:
+- reset_db
+- markdown_drawio
+timeout_sec: 300
+verification:
+  review: reviewed
+  requirements:
+  - id: DRAWIO-WORKFLOW
+    requirement: Native draw.io exports and imports through real OS save/open dialogs and system clipboard
+    actions:
+    - 4
+    - 5
+    - 7
+    - 8
+    - 9
+    - 10
+    - 12
+    - 13
+    - 15
+    - 18
+    - 19
+    - 21
+    - 23
+    - 25
+    - 26
+    - 28
+    - 29
+    - 30
+    - 33
+    - 34
+    - 36
+    checkpoints:
+    - step: 17
+      expectation: Actual control state/content or retained file/clipboard matches the explicit assertion; source and
+        cancellation behavior remain intact.
+    - step: 27
+      expectation: Actual control state/content or retained file/clipboard matches the explicit assertion; source and
+        cancellation behavior remain intact.
+    - step: 32
+      expectation: Actual control state/content or retained file/clipboard matches the explicit assertion; source and
+        cancellation behavior remain intact.
+    - step: 37
+      expectation: Actual control state/content or retained file/clipboard matches the explicit assertion; source and
+        cancellation behavior remain intact.
+    - step: 38
+      expectation: Actual control state/content or retained file/clipboard matches the explicit assertion; source and
+        cancellation behavior remain intact.
+    results:
+    - 17
+    - 27
+    - 32
+    - 37
+    - 38
+  native:
+  - check: Actual file chooser, draw.io bytes, remembered directory, import and OS clipboard
+    method: automated
+    reason: Browser VFS/downloads cannot prove Tauri chooser, host bytes or system clipboard.
+  visual:
+  - check: Sheet previews and Markdown content remain readable
+    method: manual
+    reason: Inspect retained screenshot and SVG/graph artifacts; nonempty files alone do not establish visual fidelity.

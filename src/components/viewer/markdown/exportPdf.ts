@@ -3,6 +3,8 @@ import { paginatePdf, pdfFragments, pdfPageLayout } from "./pdfPages";
 import { paintPdfImages, preparePdfImages } from "./pdfImages";
 import { createPdfSearchFont } from "./pdfSearchFont";
 import { paintPdfPageLabel, paintPdfText, pdfTextClusters } from "./pdfTextLayer";
+import { createPdfCapture } from "./pdfCapture";
+import { compressedPdfRgb, registerPdfRgb } from "./pdfRgb";
 
 /** Printer-independent, offline PDF. Each page is rendered at 300 DPI with the
  * same browser typography/math/diagrams as HTML. No OS print API is invoked.
@@ -29,6 +31,7 @@ export async function markdownPdf(source: HTMLElement, title: string, settings: 
     const images = preparePdfImages(root);
     const height = root.getBoundingClientRect().height;
     const pages = paginatePdf(Math.max(1, height), layout.contentHeight, pdfFragments(root));
+    registerPdfRgb(jsPDF);
     const pdf = new jsPDF({ orientation: settings.orientation, unit: "mm", format: [layout.width, layout.height], compress: true });
     const text = pdfTextClusters(root);
     const searchFont = createPdfSearchFont(pdf);
@@ -38,21 +41,23 @@ export async function markdownPdf(source: HTMLElement, title: string, settings: 
     footer.style.cssText = `position:absolute;left:0;right:0;bottom:${Math.max(2, layout.inset / 2 - 7)}px;text-align:center;font:11px system-ui,sans-serif`;
     if (settings.fileHeader) { header.textContent = title; page.append(header); }
     if (settings.pageNumbers) page.append(footer);
-    // Embed the fonts used by the document once, including KaTeX's local fonts.
-    const fontEmbedCSS = await capture.getFontEmbedCSS(page);
+    viewport.style.height = `${pages[0].bottom - pages[0].top}px`;
+    root.style.transform = "translateY(0px)";
+    footer.textContent = `1 / ${pages.length}`;
+    const renderPage = await createPdfCapture(capture, page, root, viewport, footer, layout, background);
     for (const [index, slice] of pages.entries()) {
       if (index > 0) pdf.addPage([layout.width, layout.height], settings.orientation);
       viewport.style.height = `${slice.bottom - slice.top}px`;
       root.style.transform = `translateY(-${slice.top}px)`;
       footer.textContent = `${index + 1} / ${pages.length}`;
-      const canvas = await capture.toCanvas(page, { pixelRatio: 300 / 96, fontEmbedCSS,
-        width: layout.pixelWidth, height: layout.pixelHeight, backgroundColor: background });
-      paintPdfImages(images, canvas, page, viewport);
-      pdf.addImage(canvas.toDataURL("image/png"), "PNG", 0, 0, layout.width, layout.height, undefined, "FAST");
-      paintPdfText(searchFont, text, layout, slice);
-      if (settings.fileHeader) paintPdfPageLabel(searchFont, header, page);
-      if (settings.pageNumbers) paintPdfPageLabel(searchFont, footer, page);
-      canvas.width = 0; canvas.height = 0;
+      const canvas = await renderPage(slice, footer.textContent);
+      try {
+        paintPdfImages(images, canvas, page, viewport);
+        pdf.addImage(await compressedPdfRgb(canvas), "TAOMNIRGB", 0, 0, layout.width, layout.height, `page-${index}`, "NONE");
+        paintPdfText(searchFont, text, layout, slice);
+        if (settings.fileHeader) paintPdfPageLabel(searchFont, header, page);
+        if (settings.pageNumbers) paintPdfPageLabel(searchFont, footer, page);
+      } finally { canvas.width = 0; canvas.height = 0; }
     }
     return pdf.output("blob");
   } finally { host.remove(); }

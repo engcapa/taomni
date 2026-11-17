@@ -101,6 +101,7 @@
           "explorer_files",
           "file_open_files",
           "markdown_quality",
+          "markdown_drawio",
           "file_open_mail",
           "html_network_test",
           "file_open_entries",

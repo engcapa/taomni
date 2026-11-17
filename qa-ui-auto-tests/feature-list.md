@@ -15439,6 +15439,23 @@ files:
   - src/components/viewer/HtmlPreviewExternalLinkDialog.tsx
   - src/components/viewer/markdown/MarkdownEditor.tsx
   - src/components/viewer/markdown/MarkdownExportMenu.tsx
+  - src/components/viewer/markdown/DrawioExportSettings.tsx
+  - src/components/viewer/markdown/DrawioImportDialog.tsx
+  - src/components/viewer/markdown/MarkdownDrawioImport.tsx
+  - src/components/viewer/markdown/MarkdownDiagramActions.tsx
+  - src/components/viewer/markdown/MarkdownDiagramViewer.tsx
+  - src/components/viewer/markdown/drawioCodec.ts
+  - src/components/viewer/markdown/drawioExport.ts
+  - src/components/viewer/markdown/drawioImport.ts
+  - src/components/viewer/markdown/drawioRender.ts
+  - src/components/viewer/markdown/drawioMermaid.ts
+  - src/components/viewer/markdown/diagramActions.tsx
+  - src/components/viewer/markdown/diagramExport.ts
+  - src/components/viewer/markdown/diagramModel.ts
+  - src/components/viewer/markdown/useDiagramView.ts
+  - src/components/viewer/markdown/exportDirectory.ts
+  - src/components/viewer/markdown/pdfCapture.ts
+  - src/components/viewer/markdown/pdfRgb.ts
   - src/components/viewer/markdown/mathExportCss.ts
   - src/components/viewer/markdown/exportPdf.ts
   - src/components/viewer/markdown/pdfPages.ts
@@ -15710,6 +15727,207 @@ controls:
     kind: interactive
   - id: markdown-export-confirm
     selector: '[data-testid="markdown-export-confirm"]'
+    kind: interactive
+  - id: markdown-rendered-mermaid
+    selector: '.fv-md-mermaid'
+    kind: interactive
+  - id: markdown-rendered-drawio
+    selector: '.fv-md-drawio'
+    kind: display
+  - id: markdown-original-drawio
+    selector: '.fv-md-drawio-source'
+    kind: display
+  - id: markdown-export-drawio
+    selector: '[data-testid="markdown-export-drawio"]'
+    kind: interactive
+  - id: markdown-import-drawio
+    selector: '[data-testid="markdown-import-drawio"]'
+    kind: interactive
+  - id: markdown-drawio-input
+    selector: '[data-testid="markdown-drawio-input"]'
+    kind: interactive
+  - id: markdown-drawio-export-settings
+    selector: '[data-testid="markdown-drawio-export-settings"]'
+    kind: display
+  - id: markdown-drawio-import-dialog
+    selector: '[data-testid="markdown-drawio-import-dialog"]'
+    kind: display
+  - id: markdown-drawio-import-preview
+    selector: '[data-testid="markdown-drawio-import-preview"]'
+    kind: display
+  - id: markdown-drawio-scope
+    selector: '[data-testid="markdown-drawio-scope"]'
+    kind: interactive
+  - id: markdown-drawio-layout
+    selector: '[data-testid="markdown-drawio-layout"]'
+    kind: interactive
+  - id: markdown-drawio-save
+    selector: '[data-testid="markdown-drawio-save"]'
+    kind: interactive
+  - id: markdown-drawio-copy-link
+    selector: '[data-testid="markdown-drawio-copy-link"]'
+    kind: interactive
+  - id: markdown-drawio-open-link
+    selector: '[data-testid="markdown-drawio-open-link"]'
+    kind: interactive
+  - id: markdown-drawio-select-all
+    selector: '[data-testid="markdown-drawio-select-all"]'
+    kind: interactive
+  - id: markdown-drawio-sheet-check
+    selector: '[data-testid="markdown-drawio-sheet-check"]'
+    kind: interactive
+  - id: markdown-drawio-sheet-preview
+    selector: '[data-testid="markdown-drawio-sheet-preview"]'
+    kind: interactive
+  - id: markdown-drawio-import-diagram
+    selector: '[data-testid="markdown-drawio-import-diagram"]'
+    kind: interactive
+  - id: markdown-drawio-import-text
+    selector: '[data-testid="markdown-drawio-import-text"]'
+    kind: interactive
+  - id: markdown-drawio-import-confirm
+    selector: '[data-testid="markdown-drawio-import-confirm"]'
+    kind: interactive
+  - id: markdown-diagram-viewer
+    selector: '[data-testid="markdown-diagram-viewer"]'
+    kind: display
+  - id: markdown-diagram-tools
+    selector: '[data-testid="markdown-diagram-tools"]'
+    kind: display
+  - id: markdown-diagram-menu
+    selector: '[data-testid="markdown-diagram-menu"]'
+    kind: display
+  - id: markdown-diagram-more
+    selector: '[data-testid="markdown-diagram-more"]'
+    kind: interactive
+  - id: markdown-diagram-close
+    selector: '[data-testid="markdown-diagram-close"]'
+    kind: interactive
+  - id: markdown-diagram-background
+    selector: '[data-testid="markdown-diagram-background"]'
+    kind: interactive
+  - id: markdown-diagram-stage
+    selector: '[data-testid="markdown-diagram-stage"]'
+    kind: interactive
+  - id: markdown-diagram-zoom
+    selector: '[data-testid="markdown-diagram-zoom"]'
+    kind: display
+  - id: markdown-diagram-status
+    selector: '[data-testid="markdown-diagram-status"]'
+    kind: display
+  - id: markdown-diagram-menu-open
+    selector: '[data-testid="markdown-diagram-menu-open"]'
+    kind: interactive
+  - id: markdown-diagram-menu-zoom-in
+    selector: '[data-testid="markdown-diagram-menu-zoom-in"]'
+    kind: interactive
+  - id: markdown-diagram-view-zoom-in
+    selector: '[data-testid="markdown-diagram-view-zoom-in"]'
+    kind: interactive
+  - id: markdown-diagram-menu-zoom-out
+    selector: '[data-testid="markdown-diagram-menu-zoom-out"]'
+    kind: interactive
+  - id: markdown-diagram-view-zoom-out
+    selector: '[data-testid="markdown-diagram-view-zoom-out"]'
+    kind: interactive
+  - id: markdown-diagram-menu-actual
+    selector: '[data-testid="markdown-diagram-menu-actual"]'
+    kind: interactive
+  - id: markdown-diagram-view-actual
+    selector: '[data-testid="markdown-diagram-view-actual"]'
+    kind: interactive
+  - id: markdown-diagram-menu-fit
+    selector: '[data-testid="markdown-diagram-menu-fit"]'
+    kind: interactive
+  - id: markdown-diagram-view-fit
+    selector: '[data-testid="markdown-diagram-view-fit"]'
+    kind: interactive
+  - id: markdown-diagram-menu-width
+    selector: '[data-testid="markdown-diagram-menu-width"]'
+    kind: interactive
+  - id: markdown-diagram-view-width
+    selector: '[data-testid="markdown-diagram-view-width"]'
+    kind: interactive
+  - id: markdown-diagram-menu-rotate-left
+    selector: '[data-testid="markdown-diagram-menu-rotate-left"]'
+    kind: interactive
+  - id: markdown-diagram-view-rotate-left
+    selector: '[data-testid="markdown-diagram-view-rotate-left"]'
+    kind: interactive
+  - id: markdown-diagram-menu-rotate-right
+    selector: '[data-testid="markdown-diagram-menu-rotate-right"]'
+    kind: interactive
+  - id: markdown-diagram-view-rotate-right
+    selector: '[data-testid="markdown-diagram-view-rotate-right"]'
+    kind: interactive
+  - id: markdown-diagram-menu-flip-h
+    selector: '[data-testid="markdown-diagram-menu-flip-h"]'
+    kind: interactive
+  - id: markdown-diagram-view-flip-h
+    selector: '[data-testid="markdown-diagram-view-flip-h"]'
+    kind: interactive
+  - id: markdown-diagram-menu-flip-v
+    selector: '[data-testid="markdown-diagram-menu-flip-v"]'
+    kind: interactive
+  - id: markdown-diagram-view-flip-v
+    selector: '[data-testid="markdown-diagram-view-flip-v"]'
+    kind: interactive
+  - id: markdown-diagram-menu-reset
+    selector: '[data-testid="markdown-diagram-menu-reset"]'
+    kind: interactive
+  - id: markdown-diagram-view-reset
+    selector: '[data-testid="markdown-diagram-view-reset"]'
+    kind: interactive
+  - id: markdown-diagram-menu-save-svg
+    selector: '[data-testid="markdown-diagram-menu-save-svg"]'
+    kind: interactive
+  - id: markdown-diagram-view-save-svg
+    selector: '[data-testid="markdown-diagram-view-save-svg"]'
+    kind: interactive
+  - id: markdown-diagram-menu-save-png
+    selector: '[data-testid="markdown-diagram-menu-save-png"]'
+    kind: interactive
+  - id: markdown-diagram-view-save-png
+    selector: '[data-testid="markdown-diagram-view-save-png"]'
+    kind: interactive
+  - id: markdown-diagram-menu-save-drawio
+    selector: '[data-testid="markdown-diagram-menu-save-drawio"]'
+    kind: interactive
+  - id: markdown-diagram-view-save-drawio
+    selector: '[data-testid="markdown-diagram-view-save-drawio"]'
+    kind: interactive
+  - id: markdown-diagram-menu-copy-drawio-link
+    selector: '[data-testid="markdown-diagram-menu-copy-drawio-link"]'
+    kind: interactive
+  - id: markdown-diagram-view-copy-drawio-link
+    selector: '[data-testid="markdown-diagram-view-copy-drawio-link"]'
+    kind: interactive
+  - id: markdown-diagram-menu-copy-image
+    selector: '[data-testid="markdown-diagram-menu-copy-image"]'
+    kind: interactive
+  - id: markdown-diagram-view-copy-image
+    selector: '[data-testid="markdown-diagram-view-copy-image"]'
+    kind: interactive
+  - id: markdown-diagram-menu-copy-text
+    selector: '[data-testid="markdown-diagram-menu-copy-text"]'
+    kind: interactive
+  - id: markdown-diagram-view-copy-text
+    selector: '[data-testid="markdown-diagram-view-copy-text"]'
+    kind: interactive
+  - id: markdown-diagram-menu-copy-source
+    selector: '[data-testid="markdown-diagram-menu-copy-source"]'
+    kind: interactive
+  - id: markdown-diagram-view-copy-source
+    selector: '[data-testid="markdown-diagram-view-copy-source"]'
+    kind: interactive
+  - id: markdown-diagram-open
+    selector: '[data-testid="markdown-diagram-open"]'
+    kind: interactive
+  - id: markdown-diagram-save-svg
+    selector: '[data-testid="markdown-diagram-save-svg"]'
+    kind: interactive
+  - id: markdown-diagram-copy-text
+    selector: '[data-testid="markdown-diagram-copy-text"]'
     kind: interactive
   - id: markdown-export-status
     selector: '[data-testid="markdown-export-status"]'

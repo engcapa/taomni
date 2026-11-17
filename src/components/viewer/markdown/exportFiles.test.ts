@@ -15,6 +15,7 @@ vi.mock("../../../lib/ipc", () => ({ selectSaveDirectory: vi.fn(), selectSaveFil
 
 beforeEach(() => {
   vi.clearAllMocks();
+  localStorage.clear();
   vi.mocked(isTauriRuntime).mockReturnValue(true);
   vi.mocked(readMarkdownImage).mockResolvedValue("data:image/png;base64,AQID");
   vi.mocked(writeStreamOpen).mockResolvedValue("stream");

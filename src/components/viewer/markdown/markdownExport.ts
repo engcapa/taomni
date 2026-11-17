@@ -5,8 +5,11 @@ import { notifyClipboardWritten } from "../../../lib/clipboardOwnership";
 import { exportMarkdownFolder, saveExportBlob } from "./exportFiles";
 import { prepareMarkdownExport, type MarkdownExportKind, type MarkdownExportSettings } from "./exportModel";
 import type { MarkdownAssets } from "./markdownOwner";
+import { DEFAULT_DRAWIO_OPTIONS, markdownDrawio, type DrawioExportDocument } from "./drawioExport";
+import { drawioLink } from "./drawioCodec";
+import { openExternalUrl } from "../../../lib/sftp";
 
-export interface MarkdownExportResult { path?: string; status: "saved" | "copied" | "print-opened" | "cancelled" }
+export interface MarkdownExportResult { path?: string; status: "saved" | "copied" | "print-opened" | "cancelled" | "opened"; drawio?: Omit<DrawioExportDocument, "xml"> }
 
 async function exportPng(root: HTMLElement, settings: MarkdownExportSettings, css: string): Promise<Blob> {
   const host = document.createElement("div");
@@ -74,6 +77,22 @@ export async function exportMarkdown(
   }
   const prepared = await prepareMarkdownExport(content, docPath, settings, assets);
   const stem = markdownBasename(docPath).replace(/\.(md|markdown)$/i, "");
+  if (kind.startsWith("drawio")) {
+    let output: DrawioExportDocument | undefined;
+    const generate = async () => {
+      output = await markdownDrawio(prepared.root, prepared.title, settings.drawio || DEFAULT_DRAWIO_OPTIONS);
+      return new Blob([output.xml], { type: "application/xml;charset=utf-8" });
+    };
+    if (kind === "drawio") {
+      const path = await saveExportBlob(`${stem}.drawio`, generate, sourceIsFile ? docPath : undefined);
+      return path ? { status: "saved", path, drawio: output && { pages: output.pages, nativeDiagrams: output.nativeDiagrams, fallbackDiagrams: output.fallbackDiagrams } } : { status: "cancelled" };
+    }
+    await generate();
+    const link = drawioLink(output!.xml);
+    if (kind === "drawio-open") await openExternalUrl(link);
+    else await writeText(link);
+    return { status: kind === "drawio-open" ? "opened" : "copied", drawio: { pages: output!.pages, nativeDiagrams: output!.nativeDiagrams, fallbackDiagrams: output!.fallbackDiagrams } };
+  }
   if (kind === "print") {
     await printMarkdownHtml(prepared.html);
     return { status: "print-opened" };

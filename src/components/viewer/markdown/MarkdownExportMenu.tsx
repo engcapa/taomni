@@ -9,6 +9,7 @@ import { sftpOpenPath } from "../../../lib/sftp";
 import { exportMarkdown } from "./markdownExport";
 import { DEFAULT_EXPORT_SETTINGS, type MarkdownExportKind, type MarkdownExportSettings } from "./exportModel";
 import type { MarkdownDocumentOwner } from "./markdownOwner";
+import { DrawioExportSettings } from "./DrawioExportSettings";
 
 export function MarkdownExportMenu({ document: current, onError, printRequest = 0, onExport }: { document: ViewerDocument; onError: (message: string) => void; printRequest?: number; onExport?: MarkdownDocumentOwner["onExport"] }) {
   const label = useViewerLabels();
@@ -59,8 +60,13 @@ export function MarkdownExportMenu({ document: current, onError, printRequest = 
       setExportState(result.status);
       if (result.status === "saved") { setSaved(result.path || null); setNotice(label("导出完成", "Export completed")); }
       else if (result.status === "copied") setNotice(label("已复制到剪贴板", "Copied to clipboard"));
+      else if (result.status === "opened") setNotice(label("已在系统浏览器打开", "Opened in system browser"));
       else if (result.status === "print-opened") setNotice(label("已请求系统打印，请在系统窗口中完成打印。", "System printing requested. Complete printing in the system dialog."));
       else setNotice(label("已取消导出", "Export cancelled"));
+      if (result.drawio) {
+        const { pages, nativeDiagrams, fallbackDiagrams } = result.drawio;
+        setNotice(label(`draw.io：${pages} 个 Sheet，${nativeDiagrams} 个可编辑图表，${fallbackDiagrams} 个 SVG 回退`, `draw.io: ${pages} sheets, ${nativeDiagrams} editable diagrams, ${fallbackDiagrams} SVG fallbacks`));
+      }
     } catch (error) {
       if (!alive.current) return;
       setExportState("failed");
@@ -72,6 +78,7 @@ export function MarkdownExportMenu({ document: current, onError, printRequest = 
     ["html", "HTML（自包含，内嵌图片）", "HTML (self-contained, embedded images)", FileCode2],
     ["pdf", "PDF", "PDF", FileText], ["png", "PNG 长图", "PNG long image", FileImage],
     ["docx", "Word（.docx）", "Word (.docx)", FileText],
+    ["drawio", "draw.io（全文档 / 全部图片）", "draw.io (document / all images)", FileImage],
     ["markdown", "Markdown + 图片文件夹", "Markdown + image folder", FolderDown],
     ["richtext", "复制为富文本（粘贴到邮件/文档）", "Copy rich text (paste into mail/docs)", Copy],
     ["html-source", "复制为 HTML 源码", "Copy HTML source", Copy], ["print", "打印…", "Print…", Printer],
@@ -88,15 +95,15 @@ export function MarkdownExportMenu({ document: current, onError, printRequest = 
         buttons[event.key === "Home" ? 0 : event.key === "End" ? buttons.length - 1 : (index + (event.key === "ArrowDown" ? 1 : -1) + buttons.length) % buttons.length]?.focus();
       }}>
         <div className="fv-md-menu-title">{label("导出为", "Export as")}</div>
-        {entries.map(([kind, zh, en, Icon], index) => <button key={kind} role="menuitem" className={index === 5 ? "fv-md-menu-divider" : ""} data-testid={`markdown-export-${kind}`} onClick={() => {
+        {entries.map(([kind, zh, en, Icon]) => <button key={kind} role="menuitem" className={kind === "richtext" ? "fv-md-menu-divider" : ""} data-testid={`markdown-export-${kind}`} onClick={() => {
           setOpen(false);
-          if (kind === "pdf" || kind === "print" || kind === "docx") setDialog(kind);
+          if (kind === "pdf" || kind === "print" || kind === "docx" || kind === "drawio") setDialog(kind);
           else void run(kind);
         }}><Icon /><span>{label(zh, en)}</span>{kind === "pdf" && <small>{label("页面设置", "Page setup")}</small>}{kind === "print" && <small>{/Mac/i.test(navigator.platform) ? "⌘P" : "Ctrl+P"}</small>}</button>)}
       </div></div>, window.document.body)}
     </div>
-    {notice && <div className="fv-md-export-notice" role="status" data-testid="markdown-export-status" data-export-state={exportState} data-export-path={saved || undefined}><span>{notice}</span>{saved && <button className="fv-button" onClick={() => void sftpOpenPath(/\.(html|docx|png|pdf)$/i.test(saved) ? markdownDirectory(saved) : saved).catch((error: unknown) => onError(String(error)))}>{label("在文件管理器中显示", "Show in file manager")}</button>}<button className="fv-icon-button" aria-label={label("关闭提示", "Dismiss")} onClick={() => setNotice("")}><X /></button></div>}
-    {dialog && createPortal(<div className="fv" style={{ display: "contents" }}><ExportSettings kind={dialog} filename={markdownBasename(current.path)} settings={settings} onChange={setSettings} onCancel={() => { setDialog(null); trigger.current?.focus(); }} onConfirm={() => void run(dialog)} /></div>, window.document.body)}
+    {notice && <div className="fv-md-export-notice" role="status" data-testid="markdown-export-status" data-export-state={exportState} data-export-path={saved || undefined}><span>{notice}</span>{saved && <button className="fv-button" onClick={() => void sftpOpenPath(/\.(html|docx|png|pdf|drawio)$/i.test(saved) ? markdownDirectory(saved) : saved).catch((error: unknown) => onError(String(error)))}>{label("在文件管理器中显示", "Show in file manager")}</button>}<button className="fv-icon-button" aria-label={label("关闭提示", "Dismiss")} onClick={() => setNotice("")}><X /></button></div>}
+    {dialog && createPortal(<div className="fv" style={{ display: "contents" }}>{dialog === "drawio" ? <DrawioExportSettings settings={settings} onChange={setSettings} onCancel={() => { setDialog(null); trigger.current?.focus(); }} onConfirm={(kind) => void run(kind)} /> : <ExportSettings kind={dialog} filename={markdownBasename(current.path)} settings={settings} onChange={setSettings} onCancel={() => { setDialog(null); trigger.current?.focus(); }} onConfirm={() => void run(dialog)} />}</div>, window.document.body)}
   </>;
 }
 
