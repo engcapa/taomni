@@ -71,6 +71,17 @@ jobs:
           rustc --version > modular-protocol-evidence/rustc-version.txt
           set -o pipefail
           cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-api --locked 2>&1 | tee modular-protocol-evidence/protocol-unit.log
+      - name: Verify bounded binary stream units
+        run: |
+          set -o pipefail
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-stream --lib --locked 2>&1 | tee modular-protocol-evidence/stream-unit.log
+      - name: Verify all real loopback and child-process scenarios
+        run: |
+          set -o pipefail
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-stream --test transfer --locked -- --ignored --list > modular-protocol-evidence/stream-selection.txt
+          python -c 'from pathlib import Path; lines=Path("modular-protocol-evidence/stream-selection.txt").read_text().splitlines(); assert sum(line.endswith(": test") for line in lines) == 10, "Expected all ten binary transport scenarios"'
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-stream --test transfer --locked -- --ignored --test-threads=1 --nocapture 2>&1 | tee modular-protocol-evidence/stream-native.log
+          python -c 'from pathlib import Path; assert "10 passed; 0 failed; 0 ignored" in Path("modular-protocol-evidence/stream-native.log").read_text(), "Missing full native stream evidence"'
       - uses: actions/upload-artifact@v4
         if: always()
         with:

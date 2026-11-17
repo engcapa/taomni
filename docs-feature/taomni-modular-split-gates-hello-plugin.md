@@ -30,6 +30,30 @@ The fixture deliberately does not claim G1–G11 completion. TASK-013 remains
 open until the signed artifact and platform-specific host experiments produce
 runner receipts for the applicable gates.
 
+## TASK-002 binary transport experiment
+
+`taomni-plugin-stream` now implements bounded one-use `BinaryRef` transfer over
+native loopback WebSockets. The registered upgrade `protocol_only=true` entry
+runs six pure unit tests and all ten ignored real socket/process scenarios on
+each desktop OS, retaining source identity, the nonempty selection and raw
+logs in `modular-protocol-*`. Local work only runs pure tests and compiles the
+native harness. See the [transport contract](../src-tauri/crates/taomni-plugin-stream/README.md).
+
+The actual child receives and independently hashes empty, multichunk and full-HD
+payloads through its private descriptor pipe. The other scenarios establish
+wrong-token/Origin refusal without consuming an offer, stalled handshake
+recovery, one-use replay refusal, cancellation/deadline listener cleanup,
+connected socket closure, checksum/size/message/truncation refusal and owner
+drop cleanup. There is no new product UI entry in this batch; the existing
+module UI cases and complete crash suite remain under hosted verification.
+
+These are transport foundation contracts, not G5 performance acceptance or
+complete G10 service ownership. Production capture/admission must still retain
+and cancel each offer, cap live resources and avoid exposing descriptors after
+revocation. Continuous RDP flow control and a matched real `rdp-probe` baseline
+with raw frame/latency/throughput samples remain open. Passing the library's
+small payload checks cannot close those gates.
+
 ## Linux G4 execution experiment
 
 Source `6497fb47e95bcfa32639b0fc09c4b9a754a57fe4`, hosted upgrade run

@@ -12,6 +12,8 @@
 
 ## 2026-11-17 最新结果与后续验证
 
+- TASK-002 新增独立 `taomni-plugin-stream` 库，承载现有 `BinaryRef` 的一次性原生 loopback WS 大载荷：随机 256-bit bearer/独立路径、固定 Host、拒绝 Origin、常量时间鉴权、64 MiB 上限、64 KiB 分块/有界发送、完整 deadline、SHA-256/长度校验和显式取消后确认资源回收。连接仅用数字 loopback，不依赖 DNS、应用/环境代理，也不接受 `wss` 降级。本地纯单元 6/6，真实 socket/进程 harness 只编译；GitHub 轻量协议入口新增十项真实场景及非空选择检查，待提交后执行。该库尚未接入 production capture/admission owner，也不是持续 RDP 通道或 G5 性能结果；没有新增用户入口，原生 Rust 场景保护本批，既有模块 UI/完整 crash suite 由 #43978896463 和 #43988044695 继续验证。
+- 用例修订源码 `ba82f083e55565e5b5a57500575a1ba51ffb3984` 的 [三端复验 #43988044695](https://github.com/engcapa/taomni/actions/runs/43988044695) 已启动，选择 TC-MODULES-006/024 与完整 crash-regression，Linux Xvfb/Wayland 均包含；collector 执行期间收片。只修改用例，RDP Rust 单元复用 #43978896463 已成功的 matching product inputs；完整 QA audit 和提交前 refactor checks 均通过，coverage baseline 未改。
 - 最新拉取远程 `main` 仍为 `cb448d174e5629ca74a87e4e72533eafea1a2927`，已是当前分支祖先，`git merge --no-edit origin/main` 返回 `Already up to date`。工具批次 `7ffff94c6` 的 [#43985551747](https://github.com/engcapa/taomni/actions/runs/43985551747) 已成功：三端 API 各 21/21、Linux 完整 selection 单元 25/25，四份 artifact 执行期间收齐。
 - #43978896463 即时收证发现两项相关 Linux Xvfb 用例竞态：TC-MODULES-006 尚未进入验签，空表单按钮在持续搜索定位期间被面板底部裁切；补真实点击可见的空 archive 字段，让用户输入接管搜索定位，再按原断言验证必填拒绝。TC-MODULES-024 在点击异步 Save 后立即计数，46 步只读到原来一条；改为先等待真实新文本出现，再保留两条精确计数与独立原生 probe，断言不减少。原始失败保留，等待 matching case 复验。Wayland 文件查看器两项非左键/X11 能力失败与本批无关，保留为失败，不计通过。
 - 合并源码 #43978896463 的三端 browser 已在执行期间收齐六片，每端 **51/51**，包括 TC-MODULES-003 的全部 33 步、Tao Home 003/010 与完整 browser crash-regression；16 个 native shard 仍等三套 matching release QA 构建。旧源码 #43972739950 的三端 browser 各 20/20、Windows native 22/22 已保留；其余已被合并源码替代的任务主动取消，不将缺失 native 项计为通过。
@@ -178,7 +180,7 @@
 | 任务 | 状态 | 尚需交付的结果 |
 |---|---|---|
 | TASK-001 基线 | 部分 | 四个发布目标的真实安装包尺寸、启动/内存/吞吐原始样本；源码与依赖起点已有记录。 |
-| TASK-002 契约 | 部分 | API、manifest/schema、registry、RPC 已有；待真实插件与 G 门验证后冻结。 |
+| TASK-002 契约 | 部分 | API、manifest/schema、registry、RPC 与受限 BinaryRef 传输库已有；传输真实场景待 hosted，capture/admission 所有权与连续 RDP 通道/吞吐尚待接线，真实插件与 G 门验证后冻结。 |
 | TASK-003 共享采集 | 已提交，hosted 验证中 | 引擎/权限/像素/一次性采集已下沉 `taomni-capture`，核心 `capture/` 持有显示器/帧源/窗口生命周期；仅保留 headless 建表例外。四目标 check、三平台库 unit 与 Linux 三个真实 X11 测试已通过，真实截图/MFA/Mobile/RDP/性能及完整 UI shard 仍待结果；`capture.still` 宿主大载荷 RPC 仍依赖 TASK-002。见下方测试设计。 |
 | TASK-004 RDP 公共库 | 代码已集成，待 hosted 验证 | `taomni-rdp-common` 与零依赖的 `taomni-file-uri`；客户端与服务端共享能力只经库依赖，config 直接用通用 URI 库。基于 `0f4cdf82f` 的集成单元完整功能 39/39、关闭 bitmap 30/30 及边界检查通过；四目标/三平台和精确保留场景待本提交 hosted 证据。见下方 TASK-004 记录。 |
 | TASK-005 核心状态 | 005-A 已集成，待 hosted 验证 | CoreState、LegacyFeatureRuntime、统一 bootstrap、弱观察器与退出清理已集成；005-A 尚待服务准入接线及 TC-MODULES-008/009 多端证据，005-B 的真实业务状态迁出仍未完成。 |

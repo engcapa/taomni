@@ -23,6 +23,7 @@ members = [
     "crates/taomni-plugin-api",
     "crates/taomni-plugin-services",
     "crates/taomni-plugin-sdk",
+    "crates/taomni-plugin-stream",
     "crates/taomni-profile-locks",
     "crates/taomni-sqlite-snapshot",
     "plugins/hello-plugin",

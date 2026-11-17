@@ -11144,6 +11144,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "taomni-plugin-stream"
+version = "0.1.0"
+dependencies = [
+ "futures-util",
+ "rand 0.9.5",
+ "serde_json",
+ "sha2 0.10.9",
+ "subtle",
+ "taomni-plugin-api",
+ "tokio",
+ "tokio-tungstenite",
+ "tokio-util 0.7.19",
+]
+
+[[package]]
 name = "taomni-profile-locks"
 version = "0.1.0"
 dependencies = [
