@@ -15937,3 +15937,5 @@ TC-FILE-OPEN-001..006 是可执行行为用例并纳入 crash-regression；当�
 - TC-TAO-HOME-046: actual attachment bytes in an explicit conversation branch, persistent branch authorization after reload, and intact source messages/authorization (F1.11; Linux/Windows native).
 
 The retired Tao-specific key/save selectors are retained as optional absence assertions in HOME043; credentials and saving are owned by the combined LLM panel.
+
+- TC-FILE-OPEN-018: native release PDF performance comparison, three identical long-table/Mermaid/Unicode samples through actual save dialogs. Raw durations and PDF artifacts are reviewed against a fixed baseline; no speedup is inferred from pass status.
