@@ -87,7 +87,11 @@ steps:
 - assert_file_open_bytes:
     path: ${fixture.file_open_root}/New file.md
     absent: true
-- right_click: '[data-testid="explorer-file-list"]'
+- fill:
+    selector: '[data-testid="explorer-filter"]'
+    value: New file.md
+- wait_for: '[data-testid="explorer-file-list"] .ex-empty'
+- right_click: '[data-testid="explorer-file-list"] .ex-empty'
 - click: '[data-testid="explorer-context-new-typed-file"]'
 - fill:
     selector: '[data-testid="explorer-new-file-name"]'
@@ -131,6 +135,9 @@ steps:
 - assert_file_open_bytes:
     path: ${fixture.file_open_root}/notes.txt
     sha256: ${fixture.file_open_original_sha}
+- fill:
+    selector: '[data-testid="explorer-filter"]'
+    value: ''
 - click: '[data-testid="explorer-cmd-new"]'
 - click: '[data-testid="explorer-new-typed-file"]'
 - wait_for: '[data-testid="explorer-new-file-dialog"]'
@@ -322,11 +329,12 @@ verification:
     - 12
     - 29
     - 31
-    - 32
     - 33
     - 34
+    - 35
     - 36
-    - 37
+    - 38
+    - 39
     checkpoints:
     - step: 15
       expectation: Type selector includes the editable md type.
@@ -358,11 +366,13 @@ verification:
       expectation: Preview-only or unsupported bin is excluded.
     - step: 30
       expectation: Cancel creates no Markdown file.
-    - step: 35
+    - step: 32
+      expectation: The visible directory filter leaves an actual blank-area target, with no file row beneath the right click.
+    - step: 37
       expectation: Parent-path names are rejected in the dialog.
-    - step: 38
+    - step: 40
       expectation: Preview-only names are rejected without a file write.
-    - step: 39
+    - step: 41
       expectation: Rejected image creation has no disk/VFS side effect.
     results:
     - 15
@@ -380,159 +390,161 @@ verification:
     - 27
     - 28
     - 30
-    - 35
-    - 38
-    - 39
+    - 32
+    - 37
+    - 40
+    - 41
   - id: R2
     requirement: An actual existing-file conflict preserves original bytes and permits a corrected retry.
     actions:
-    - 40
-    - 41
-    - 44
-    - 45
-    - 46
-    - 49
-    checkpoints:
-    - step: 42
-      expectation: The create dialog refuses the existing filename and keeps the dialog retryable.
-    - step: 43
-      expectation: Existing text retains exactly its original bytes.
-    - step: 48
-      expectation: Retry creates only the corrected empty Markdown file.
-    - step: 50
-      expectation: Completing the retry leaves the existing conflicting file untouched.
-    results:
     - 42
     - 43
+    - 46
+    - 47
     - 48
+    - 51
+    checkpoints:
+    - step: 44
+      expectation: The create dialog refuses the existing filename and keeps the dialog retryable.
+    - step: 45
+      expectation: Existing text retains exactly its original bytes.
+    - step: 50
+      expectation: Retry creates only the corrected empty Markdown file.
+    - step: 52
+      expectation: Completing the retry leaves the existing conflicting file untouched.
+    results:
+    - 44
+    - 45
     - 50
+    - 52
   - id: R3
     requirement: The chosen editable types create selected empty files with their extensions; repeated Markdown creation suggests a
       distinct name.
     actions:
-    - 51
-    - 52
+    - 53
+    - 54
     - 55
     - 58
-    - 59
-    - 60
+    - 61
     - 62
     - 63
-    - 64
-    - 68
-    - 69
-    - 70
-    - 72
-    - 73
-    - 74
-    - 78
-    - 79
-    - 80
-    - 82
-    - 83
-    - 84
-    - 88
-    - 89
-    - 90
-    - 92
-    - 93
-    - 94
-    - 98
-    - 99
-    - 100
-    - 102
-    - 103
-    - 104
-    - 108
-    - 109
-    - 110
-    - 112
-    - 113
-    - 114
-    - 118
-    - 119
-    - 120
-    - 122
-    - 123
-    - 124
-    - 128
-    - 129
-    - 130
-    - 132
-    - 133
-    - 134
-    - 138
-    - 139
-    - 140
-    - 142
-    - 143
-    - 144
-    - 147
-    checkpoints:
-    - step: 54
-      expectation: Same-extension collision is numbered before the extension.
-    - step: 57
-      expectation: Numbered Markdown is a distinct empty file.
-    - step: 66
-      expectation: Successful creation closes the dialog.
-    - step: 67
-      expectation: created.html exists with exactly zero bytes, independently read from VFS or native disk.
-    - step: 76
-      expectation: Successful creation closes the dialog.
-    - step: 77
-      expectation: created.svg exists with exactly zero bytes, independently read from VFS or native disk.
-    - step: 86
-      expectation: Successful creation closes the dialog.
-    - step: 87
-      expectation: created.json exists with exactly zero bytes, independently read from VFS or native disk.
-    - step: 96
-      expectation: Successful creation closes the dialog.
-    - step: 97
-      expectation: created.yaml exists with exactly zero bytes, independently read from VFS or native disk.
-    - step: 106
-      expectation: Successful creation closes the dialog.
-    - step: 107
-      expectation: created.xml exists with exactly zero bytes, independently read from VFS or native disk.
-    - step: 116
-      expectation: Successful creation closes the dialog.
-    - step: 117
-      expectation: created.csv exists with exactly zero bytes, independently read from VFS or native disk.
-    - step: 126
-      expectation: Successful creation closes the dialog.
-    - step: 127
-      expectation: created.py exists with exactly zero bytes, independently read from VFS or native disk.
-    - step: 136
-      expectation: Successful creation closes the dialog.
-    - step: 137
-      expectation: dockerfile exists with exactly zero bytes, independently read from VFS or native disk.
-    - step: 146
-      expectation: Creating a hidden configuration file reveals and selects it for renaming, and independent bytes are exactly empty.
-    - step: 148
-      expectation: Later creations leave the first same-type file unchanged.
-    - step: 149
-      expectation: All preceding creation/edit/lifecycle actions have no uncaught renderer errors.
-    results:
-    - 54
-    - 57
+    - 65
     - 66
     - 67
+    - 71
+    - 72
+    - 73
+    - 75
     - 76
     - 77
+    - 81
+    - 82
+    - 83
+    - 85
     - 86
     - 87
+    - 91
+    - 92
+    - 93
+    - 95
     - 96
     - 97
+    - 101
+    - 102
+    - 103
+    - 105
     - 106
     - 107
+    - 111
+    - 112
+    - 113
+    - 115
     - 116
     - 117
+    - 121
+    - 122
+    - 123
+    - 125
     - 126
     - 127
+    - 131
+    - 132
+    - 133
+    - 135
     - 136
     - 137
+    - 141
+    - 142
+    - 143
+    - 145
     - 146
-    - 148
+    - 147
+    - 150
+    checkpoints:
+    - step: 57
+      expectation: Same-extension collision is numbered before the extension.
+    - step: 60
+      expectation: Numbered Markdown is a distinct empty file.
+    - step: 69
+      expectation: Successful creation closes the dialog.
+    - step: 70
+      expectation: created.html exists with exactly zero bytes, independently read from VFS or native disk.
+    - step: 79
+      expectation: Successful creation closes the dialog.
+    - step: 80
+      expectation: created.svg exists with exactly zero bytes, independently read from VFS or native disk.
+    - step: 89
+      expectation: Successful creation closes the dialog.
+    - step: 90
+      expectation: created.json exists with exactly zero bytes, independently read from VFS or native disk.
+    - step: 99
+      expectation: Successful creation closes the dialog.
+    - step: 100
+      expectation: created.yaml exists with exactly zero bytes, independently read from VFS or native disk.
+    - step: 109
+      expectation: Successful creation closes the dialog.
+    - step: 110
+      expectation: created.xml exists with exactly zero bytes, independently read from VFS or native disk.
+    - step: 119
+      expectation: Successful creation closes the dialog.
+    - step: 120
+      expectation: created.csv exists with exactly zero bytes, independently read from VFS or native disk.
+    - step: 129
+      expectation: Successful creation closes the dialog.
+    - step: 130
+      expectation: created.py exists with exactly zero bytes, independently read from VFS or native disk.
+    - step: 139
+      expectation: Successful creation closes the dialog.
+    - step: 140
+      expectation: dockerfile exists with exactly zero bytes, independently read from VFS or native disk.
+    - step: 149
+      expectation: Creating a hidden configuration file reveals and selects it for renaming, and independent bytes are exactly empty.
+    - step: 151
+      expectation: Later creations leave the first same-type file unchanged.
+    - step: 152
+      expectation: All preceding creation/edit/lifecycle actions have no uncaught renderer errors.
+    results:
+    - 57
+    - 60
+    - 69
+    - 70
+    - 79
+    - 80
+    - 89
+    - 90
+    - 99
+    - 100
+    - 109
+    - 110
+    - 119
+    - 120
+    - 129
+    - 130
+    - 139
+    - 140
     - 149
+    - 151
+    - 152
   visual:
   - check: New-file dialog and resulting editor/table layout.
     method: manual

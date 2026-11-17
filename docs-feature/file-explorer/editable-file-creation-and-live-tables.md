@@ -18,3 +18,7 @@ Live 表格此前直接使用 `textContent` 展示单元格，导致 `**` 等源
 真实 UI 和 native 磁盘/进程验证全部在 GitHub `qa-ui-auto-platforms` 执行，三端 browser/native、匹配 release QA binary，完成一个 shard 即下载检查。当前新增用例执行结果未出前不得记为通过。WebView 按键与 composition 单元不等于物理 IME、AppKit 菜单或 OS 快捷键证据；未改这些绑定。截图仅是保留证据，需要另外查看画面。
 
 首次 [#44053218016](https://github.com/engcapa/taomni/actions/runs/44053218016) 在规划阶段的 `test_crash_regressions` 失败：新增两项 crash-regression 未同步固定 EXPECTED 清单和 smoke 注册，没有执行应用用例。补齐两项注册与专项说明，保留全部原集合和断言，修订后重新执行三端 browser/native。
+
+[#44054414878](https://github.com/engcapa/taomni/actions/runs/44054414878) 按完成片下载，发现三项操作需要适配：006 对列表中心右键命中文件行，改为通过可见目录筛选得到无匹配空白区并右键其空状态，创建后清除筛选；007 刷新后先按既有启动行为切回 Code Workspace，再核验真实 loose 文件和完整字节；旧 004 编辑表格先点击激活源码并断言原值为 `1`，再替换为 `2`，保留保存和导出断言。同步全部 verification 步号，不扩大超时或修改预期数据。Linux native 构建前的四 profile 选择合同另有一份固定 smoke 清单遗漏，同步新两项后通过原失败单元。
+
+已查看该轮 Linux browser 原始截图：新建对话框的类型、名称、取消/创建控件均完整可见，Live 表格显示粗体、斜体、删除线、代码、公式和换行，列对齐正常。截图审查仅对应这两张已执行画面，三端最终结论仍以修订后的 matching runner 结果为准。

@@ -287,6 +287,7 @@ steps:
 
       '
 - reload_window: null
+- click: '[data-testid="nav-mode-workspaces"]'
 - wait_for: '[data-testid="code-workspace-editor"] .cm-content'
 - assert_items:
     selector: '[data-testid="code-workspace-editor"] .cm-line'
@@ -447,6 +448,7 @@ verification:
     - 121
     - 122
     - 124
+    - 125
     checkpoints:
     - step: 116
       expectation: Successful creation closes the dialog.
@@ -454,19 +456,19 @@ verification:
       expectation: authored.ts exists with exactly zero bytes, independently read from VFS or native disk.
     - step: 123
       expectation: Code Workspace save writes all authored TypeScript bytes to the created file.
-    - step: 126
-      expectation: Reload recovers the actual loose source file and exact saved text.
     - step: 127
-      expectation: Code recovery does not replace or truncate the saved source.
+      expectation: Reload recovers the actual loose source file and exact saved text.
     - step: 128
+      expectation: Code recovery does not replace or truncate the saved source.
+    - step: 129
       expectation: All preceding creation/edit/lifecycle actions have no uncaught renderer errors.
     results:
     - 116
     - 117
     - 123
-    - 126
     - 127
     - 128
+    - 129
   visual:
   - check: New-file dialog and resulting editor/table layout.
     method: manual
