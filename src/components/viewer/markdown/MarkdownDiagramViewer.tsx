@@ -50,8 +50,8 @@ export function MarkdownDiagramViewer({ snapshot, initialAction, label, busy, no
       }}>
       <div className="fv-md-diagram-heading"><strong>{snapshot.filename}</strong><button type="button" className="fv-icon-button" data-testid="markdown-diagram-close" title={label("关闭 (Esc)", "Close (Esc)")} aria-label={label("关闭图片查看器", "Close image viewer")} onClick={onClose}><X /></button></div>
       <div className="fv-md-diagram-controls" role="toolbar" aria-label={label("图片查看操作", "Image viewing actions")}>
-        {viewActions.map(({ id, title, Icon }) => <button key={id} type="button" className="fv-icon-button" data-testid={`markdown-diagram-view-${id}`} title={title} aria-label={title}
-          disabled={busy && /^(save|copy)-/.test(id)} aria-pressed={id === "flip-h" ? view.flipX : id === "flip-v" ? view.flipY : undefined} onClick={() => action(id)}><Icon /></button>)}
+        {viewActions.map(({ id, title, Icon, format }) => <button key={id} type="button" className={`fv-icon-button${format ? " fv-md-diagram-save" : ""}`} data-testid={`markdown-diagram-view-${id}`} title={title} aria-label={title}
+          disabled={busy && /^(save|copy)-/.test(id)} aria-pressed={id === "flip-h" ? view.flipX : id === "flip-v" ? view.flipY : undefined} onClick={() => action(id)}><Icon />{format && <span aria-hidden="true">{format}</span>}</button>)}
         <output data-testid="markdown-diagram-zoom">{Math.round(scale * 100)}%</output>
         <select className="fv-select" data-testid="markdown-diagram-background" aria-label={label("查看器背景", "Viewer background")} value={background} onChange={(event) => setBackground(event.target.value)}>
           <option value="checker">{label("棋盘背景", "Checker background")}</option><option value="light">{label("浅色背景", "Light background")}</option><option value="dark">{label("深色背景", "Dark background")}</option>

@@ -51,7 +51,7 @@ steps:
 - wait_for: '[data-testid="html-preview"][data-loaded="true"]'
 - assert_file_contains:
     path: ${fixture.markdown_native_exports}/report.html
-    contains: Markdown Source
+    contains: File open Markdown
 - assert_count:
     selector: '[data-testid="tab-item"][data-tab-type="file-viewer"]'
     equal: 2
@@ -127,7 +127,7 @@ verification:
     - step: 19
       expectation: 'wait_for: ''[data-testid="html-preview"][data-loaded="true"]'''
     - step: 20
-      expectation: "assert_file_contains:\n  contains: Markdown Source\n  path: ${fixture.markdown_native_exports}/report.html"
+      expectation: "assert_file_contains:\n  contains: File open Markdown\n  path: ${fixture.markdown_native_exports}/report.html"
     - step: 21
       expectation: "assert_count:\n  equal: 2\n  selector: '[data-testid=\"tab-item\"][data-tab-type=\"file-viewer\"]'"
     - step: 23

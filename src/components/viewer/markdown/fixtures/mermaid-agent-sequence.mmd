@@ -1,0 +1,21 @@
+sequenceDiagram
+autonumber
+actor User as 用户 (User)
+participant Agent as Agent 核心引擎 (LLM Brain)
+participant MCP as MCP 协议客户端/服务端
+participant Environment as 外部系统/环境 (文件/Git/API)
+User->>Agent: 输入任务目标 (如: 修复代码并提交)
+activate Agent
+Agent->>Agent: 推理分析任务，生成多步执行计划
+loop 工具调用与自适应循环
+Agent->>MCP: 发起 tools/call 请求 (如: read_file)
+activate MCP
+MCP->>Environment: 执行具体 I/O 或系统操作
+Environment-->>MCP: 返回原始数据或执行状态
+MCP-->>Agent: 返回标准化工具结果 (Content/Text)
+deactivate MCP
+Agent->>Agent: 评估观察结果 (Observation) 与反思
+end
+Agent->>Agent: 聚合上下文，生成最终总结报告
+Agent-->>User: 交付最终结果与变更说明
+deactivate Agent

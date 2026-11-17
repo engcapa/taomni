@@ -32,6 +32,8 @@ smoke:
 - TC-FILE-OPEN-006
 unavailable: {}
 cases:
+- TC-FILE-OPEN-025
+- TC-FILE-OPEN-026
 - TC-FILE-OPEN-024
 - TC-WS-096
 - TC-WS-097

@@ -21,6 +21,9 @@ def raster_grid_pixels(image):
 
 
 def inspect_quality(path, kind):
+    if kind == "drawio":
+        from .drawio_export_quality import inspect_drawio
+        return inspect_drawio(path)
     data = Path(path).read_bytes()
     if kind == "pdf":
         from pypdf import PdfReader
@@ -93,8 +96,8 @@ def inspect_quality(path, kind):
 
 
 def native(ctx, args):
-    if not isinstance(args, dict) or set(args) != {"path", "kind"} or args["kind"] not in {"pdf", "docx"}:
-        raise StepError("assert_export_quality expects path and pdf/docx kind")
+    if not isinstance(args, dict) or set(args) != {"path", "kind"} or args["kind"] not in {"pdf", "docx", "drawio"}:
+        raise StepError("assert_export_quality expects path and pdf/docx/drawio kind")
     if getattr(ctx, "dry_run", False):
         return "dry-run export quality"
     path = Path(args["path"]).resolve()

@@ -57,7 +57,9 @@ it("converts parsed Mermaid nodes and real connected edges into editable native 
   const output = await singleDiagramDrawio(snapshotDiagram(element, "flow"), DEFAULT_DIAGRAM_VIEW);
   const model = parseDrawio(output.xml)[0].model;
   const edge = model.querySelector("mxCell[edge='1']")!;
-  expect(model.querySelectorAll("mxCell[vertex='1']")).toHaveLength(3);
+  expect(model.querySelectorAll("mxCell[vertex='1']")).toHaveLength(2);
+  expect(model.querySelectorAll("mxCell[vertex='1'],mxCell[edge='1']")).toSatisfy((cells: NodeListOf<Element>) => Array.from(cells).every((cell) => cell.getAttribute("parent") === "1"));
+  expect(model.querySelector("mxCell[style^='group;']")).toBeNull();
   expect(edge.getAttribute("source")).toBe("mermaid-node-0"); expect(edge.getAttribute("target")).toBe("mermaid-node-1");
   expect(edge.querySelector("mxGeometry")?.getAttribute("relative")).toBe("1");
   expect(model.querySelector("object")?.getAttribute("mermaidSource")).toContain("flowchart LR");
