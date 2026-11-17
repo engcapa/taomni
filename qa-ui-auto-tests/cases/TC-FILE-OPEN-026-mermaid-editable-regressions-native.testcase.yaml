@@ -108,12 +108,12 @@ steps:
     action: choose
     path: ${fixture.markdown_quality_exports}/sequence.drawio
     trigger: '[data-testid="markdown-diagram-view-save-drawio"]'
-- assert_export_quality:
-    kind: drawio
-    path: ${fixture.markdown_quality_exports}/sequence.drawio
 - assert_file_contains:
     path: ${fixture.markdown_quality_exports}/sequence.drawio
     contains: rotation=90;flipH=1;
+- assert_export_quality:
+    kind: drawio
+    path: ${fixture.markdown_quality_exports}/sequence.drawio
 - click: '[data-testid="markdown-diagram-close"]'
 - click: '[data-testid="markdown-export"]'
 - click: '[data-testid="markdown-export-drawio"]'
@@ -126,10 +126,10 @@ steps:
     action: choose
     path: ${fixture.markdown_quality_exports}/mermaid-regressions.drawio
     trigger: '[data-testid="markdown-drawio-save"]'
+- wait_for: '[data-testid="markdown-export-status"][data-export-state="saved"]'
 - assert_export_quality:
     kind: drawio
     path: ${fixture.markdown_quality_exports}/mermaid-regressions.drawio
-- wait_for: '[data-testid="markdown-export-status"][data-export-state="saved"]'
 - eval_readonly:
     expression: /(?:4.*editable diagrams|4.*可编辑图表).*0.*SVG/.test(document.querySelector(".fv-md-export-notice").textContent)
     expect_truthy: true
@@ -196,77 +196,56 @@ verification:
     - 52
     checkpoints:
     - step: 6
-      expectation: 'wait_for: match the explicit count, visible control, saved XML or independent artifact assertions; preserve
-        the original Markdown.'
+      expectation: 'wait_for: ''[data-testid="explorer-tab"][data-active="true"]'''
     - step: 11
-      expectation: 'wait_for: match the explicit count, visible control, saved XML or independent artifact assertions; preserve
-        the original Markdown.'
+      expectation: 'wait_for: ''[data-testid="markdown-editor"]'''
     - step: 14
-      expectation: 'assert_count: match the explicit count, visible control, saved XML or independent artifact assertions;
-        preserve the original Markdown.'
+      expectation: "assert_count:\n  equal: 1\n  selector: '[data-testid=\"markdown-import-drawio\"]'"
     - step: 16
-      expectation: 'assert_count: match the explicit count, visible control, saved XML or independent artifact assertions;
-        preserve the original Markdown.'
+      expectation: "assert_count:\n  equal: 1\n  selector: '[data-testid=\"markdown-import-drawio\"]'"
     - step: 18
-      expectation: 'assert_count: match the explicit count, visible control, saved XML or independent artifact assertions;
-        preserve the original Markdown.'
+      expectation: "assert_count:\n  equal: 1\n  selector: '[data-testid=\"markdown-import-drawio\"]'"
     - step: 20
-      expectation: 'assert_count: match the explicit count, visible control, saved XML or independent artifact assertions;
-        preserve the original Markdown.'
+      expectation: "assert_count:\n  equal: 1\n  selector: '[data-testid=\"markdown-import-drawio\"]'"
     - step: 22
-      expectation: 'assert_count: match the explicit count, visible control, saved XML or independent artifact assertions;
-        preserve the original Markdown.'
+      expectation: "assert_count:\n  equal: 1\n  selector: '[data-testid=\"markdown-import-drawio\"]'"
     - step: 24
-      expectation: 'assert_count: match the explicit count, visible control, saved XML or independent artifact assertions;
-        preserve the original Markdown.'
+      expectation: "assert_count:\n  equal: 1\n  selector: '[data-testid=\"markdown-import-drawio\"]'"
     - step: 25
-      expectation: 'assert_count: match the explicit count, visible control, saved XML or independent artifact assertions;
-        preserve the original Markdown.'
+      expectation: "assert_count:\n  equal: 1\n  selector: '[data-testid=\"markdown-export\"]'"
     - step: 28
-      expectation: 'wait_for: match the explicit count, visible control, saved XML or independent artifact assertions; preserve
-        the original Markdown.'
+      expectation: "wait_for: '[data-testid=\"markdown-preview\"] .fv-md-doc > .fv-md-mermaid:nth-child(2)\n  svg'"
     - step: 29
-      expectation: 'assert_count: match the explicit count, visible control, saved XML or independent artifact assertions;
-        preserve the original Markdown.'
+      expectation: "assert_count:\n  equal: 1\n  selector: '[data-testid=\"markdown-import-drawio\"]'"
     - step: 31
-      expectation: 'wait_for: match the explicit count, visible control, saved XML or independent artifact assertions; preserve
-        the original Markdown.'
+      expectation: 'wait_for: ''[data-testid="markdown-diagram-viewer"]'''
     - step: 32
-      expectation: 'assert_text: match the explicit count, visible control, saved XML or independent artifact assertions;
-        preserve the original Markdown.'
+      expectation: "assert_text:\n  contains: SVG\n  selector: '[data-testid=\"markdown-diagram-view-save-svg\"]'"
     - step: 33
-      expectation: 'assert_text: match the explicit count, visible control, saved XML or independent artifact assertions;
-        preserve the original Markdown.'
+      expectation: "assert_text:\n  contains: PNG\n  selector: '[data-testid=\"markdown-diagram-view-save-png\"]'"
     - step: 34
-      expectation: 'assert_text: match the explicit count, visible control, saved XML or independent artifact assertions;
-        preserve the original Markdown.'
+      expectation: "assert_text:\n  contains: draw.io\n  selector: '[data-testid=\"markdown-diagram-view-save-drawio\"]'"
     - step: 35
-      expectation: 'eval_readonly: match the explicit count, visible control, saved XML or independent artifact assertions;
-        preserve the original Markdown.'
+      expectation: "eval_readonly:\n  expect_truthy: true\n  expression: document.querySelector(\".fv-md-diagram-save .lucide-file-code-2\"\
+        ) !==\n    null && document.querySelector(\".fv-md-diagram-save .lucide-file-image\") !== null\n    && document.querySelector(\"\
+        .fv-md-diagram-save .lucide-workflow\") !== null"
     - step: 40
-      expectation: 'assert_export_quality: match the explicit count, visible control, saved XML or independent artifact assertions;
-        preserve the original Markdown.'
+      expectation: "assert_file_contains:\n  contains: rotation=90;flipH=1;\n  path: ${fixture.markdown_quality_exports}/sequence.drawio"
     - step: 41
-      expectation: 'assert_file_contains: match the explicit count, visible control, saved XML or independent artifact assertions;
-        preserve the original Markdown.'
+      expectation: "assert_export_quality:\n  kind: drawio\n  path: ${fixture.markdown_quality_exports}/sequence.drawio"
     - step: 45
-      expectation: 'wait_for: match the explicit count, visible control, saved XML or independent artifact assertions; preserve
-        the original Markdown.'
+      expectation: 'wait_for: ''[data-testid="markdown-drawio-export-settings"]'''
     - step: 48
-      expectation: 'assert_export_quality: match the explicit count, visible control, saved XML or independent artifact assertions;
-        preserve the original Markdown.'
+      expectation: 'wait_for: ''[data-testid="markdown-export-status"][data-export-state="saved"]'''
     - step: 49
-      expectation: 'wait_for: match the explicit count, visible control, saved XML or independent artifact assertions; preserve
-        the original Markdown.'
+      expectation: "assert_export_quality:\n  kind: drawio\n  path: ${fixture.markdown_quality_exports}/mermaid-regressions.drawio"
     - step: 50
-      expectation: 'eval_readonly: match the explicit count, visible control, saved XML or independent artifact assertions;
-        preserve the original Markdown.'
+      expectation: "eval_readonly:\n  expect_truthy: true\n  expression: /(?:4.*editable diagrams|4.*可编辑图表).*0.*SVG/.test(document.querySelector(\"\
+        .fv-md-export-notice\").textContent)"
     - step: 51
-      expectation: 'assert_count: match the explicit count, visible control, saved XML or independent artifact assertions;
-        preserve the original Markdown.'
+      expectation: "assert_count:\n  equal: 1\n  selector: '[data-testid=\"markdown-import-drawio\"]'"
     - step: 52
-      expectation: 'assert_no_runtime_errors: match the explicit count, visible control, saved XML or independent artifact
-        assertions; preserve the original Markdown.'
+      expectation: 'assert_no_runtime_errors: null'
   native:
   - check: Real draw.io save dialog and retained file bytes
     method: automated
