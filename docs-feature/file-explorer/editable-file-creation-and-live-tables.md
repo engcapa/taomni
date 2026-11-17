@@ -6,6 +6,8 @@ Live 表格此前直接使用 `textContent` 展示单元格，导致 `**` 等源
 
 ## 当前验收
 
+再次合并远程 main `677ec4d77` 后，保留双方 Markdown 修复和实际编辑器回归测试；本页 Live 表格场景改为 `TC-FILE-OPEN-029`，main 的 native 导出操作场景继续使用 `TC-FILE-OPEN-023`。下列旧 run 与 171 项结论绑定合并前的产品源码指纹；合并后的匹配 browser/native 与完整 crash-regression 须另行记录。旧 SHA 的单作业 #44110689605 已在应用用例开始前结束，其未执行项不计通过。
+
 修正 035 探针后的 [Intel #44095029967](https://github.com/engcapa/taomni/actions/runs/44095029967)（`0dfdfb159caa31b65ba239fd80917c79acee02e0`、selection `563142a953e24addbe9a5089798eec0f`）已成功结束，4/4 分片在 summary 前收齐，34/34、零失败/skip，含完整 24 项 crash-regression。全部 artifact 的 hash/bytes、receipt、source/runner/selection、实际 case digest/计数与 release QA 身份已核验，详见 `qa-ui-auto-report/github/44095029967/hosted-evidence-review.json`。与下述已核验的 137 项共同覆盖三端 browser/native，目前共 171 项通过；macOS native 此结论限定 Intel macOS 15，ARM64 不能由此记为通过。
 
 ARM64 [#44095086934](https://github.com/engcapa/taomni/actions/runs/44095086934) 仅一片实际执行，8/8 通过；其余三片在任何步骤前因 GitHub 无法分配 hosted runner 而取消，原始容量注释保存在该 run 的 `runner-capacity-annotations.json`。按用户允许临时使用更高版本的要求，workflow 增加官方 `macos-26` ARM64 选项，保留原用例/digest、完整 crash 集合和准确 release 架构；不由新版外推 macOS 15 ARM64 兼容性。
@@ -28,7 +30,7 @@ Intel 4/4 分片已收齐，33/34 通过：文件新建/编辑/保存、Live 表
 | `TableWidget.test.ts`、原 markdownWidgets/MarkdownEditor 等单元 | 改前四项失败已复现；格式/安全/公式、焦点不写源码、单元格编辑与历史、IME/并发和迟到图片清理 |
 | `TC-EXPLORER-006` browser/native | 两入口、类型菜单、取消/错误/冲突/重试、代表类型空文件（含隐藏配置）、重复 Markdown 命名、独立 VFS/host 字节 |
 | `TC-EXPLORER-007` browser/native | 新建 Markdown/HTML/SVG/JSON/TS 的实际路由、编辑、保存、关闭重开/代码恢复，独立完整字节；包含 crash-regression |
-| `TC-FILE-OPEN-023` browser/native | Live/Split 格式一致、HTML 清理/本地图片/公式、只读、编辑/Tab/Undo/Redo、未改单元格与完整 GFM 保存重开；包含 crash-regression |
+| `TC-FILE-OPEN-029` browser/native（合并前编号 023） | Live/Split 格式一致、HTML 清理/本地图片/公式、只读、编辑/Tab/Undo/Redo、未改单元格与完整 GFM 保存重开；包含 crash-regression |
 | 保留用例 | Explorer001–005；FILE-OPEN001/003/004/007/013，覆盖旧文本/文件夹/操作、SVG与Markdown原合同和 native 导出；workflow 合并完整 crash-regression |
 
 真实 UI 和 native 磁盘/进程验证全部在 GitHub `qa-ui-auto-platforms` 执行，三端 browser/native、匹配 release QA binary，完成一个 shard 即下载检查。未执行的用例不得记为通过。WebView 按键与 composition 单元不等于物理 IME、AppKit 菜单或 OS 快捷键证据；单元格 Select All 的平台、焦点与菜单边界见下方记录。截图仅是保留证据，需要另外查看画面。

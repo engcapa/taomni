@@ -78,8 +78,10 @@ def observe(ctx: Any, args: Any) -> str:
 
 
 def assert_outcome(ctx: Any, args: Any) -> str:
-    if not isinstance(args, dict) or set(args) - {"timeout_sec"}:
-        raise StepError("assert_tao_provider_outcome expects timeout_sec only")
+    if not isinstance(args, dict) or set(args) - {"timeout_sec", "require_success"}:
+        raise StepError("assert_tao_provider_outcome expects timeout_sec and optional require_success")
+    if not isinstance(args.get("require_success", False), bool):
+        raise StepError("require_success must be a boolean")
     timeout = float(args.get("timeout_sec", 120))
     if not 0 < timeout <= 150:
         raise StepError("assert_tao_provider_outcome timeout must be in (0,150]")
@@ -92,9 +94,11 @@ def assert_outcome(ctx: Any, args: Any) -> str:
             state = ctx.session.execute(READ)
             classified = classify(state)
             if classified:
+                if args.get("require_success") and classified != "response-complete":
+                    raise StepError("Tao real-provider requires a successful reply; credentials were rejected")
                 outcome = classified
                 reason = "visible enabled retry" if outcome == "credential-invalid" else "nonempty assistant reply without error"
-                return f"Real DeepSeek outcome: {outcome}; {reason}"
+                return f"Real provider outcome: {outcome}; {reason}"
             time.sleep(.1)
         raise StepError("Tao real-provider request did not complete before the outcome deadline")
     except StepError as error:

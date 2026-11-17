@@ -120,6 +120,7 @@ from . import tao_memory
 from . import tao_history
 from . import markdown_quality
 from . import markdown_drawio
+from . import markdown_testing
 
 
 class FixtureContext(Protocol):
@@ -148,6 +149,7 @@ REGISTRY: dict[str, Fixture] = {
     "module_backup_data": Fixture("module_backup_data", module_backup_data.setup, module_backup_data.teardown),
     "module_signed_archive": Fixture("module_signed_archive", module_signed_archive.setup),
     "module_execution": Fixture("module_execution", module_execution.setup, module_execution.teardown),
+    "markdown_testing": Fixture("markdown_testing", markdown_testing.setup, markdown_testing.teardown),
     "markdown_quality": Fixture("markdown_quality", markdown_quality.setup, markdown_quality.teardown),
     "markdown_drawio": Fixture("markdown_drawio", markdown_drawio.setup, markdown_drawio.teardown),
     "tao_llm": Fixture("tao_llm", tao_llm.setup, tao_llm.teardown),

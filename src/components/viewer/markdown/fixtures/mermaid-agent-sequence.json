@@ -1,0 +1,231 @@
+{
+  "actors": [
+    [
+      "User",
+      {
+        "box": null,
+        "name": "User",
+        "description": "用户 (User)",
+        "wrap": false,
+        "prevActor": null,
+        "links": {},
+        "properties": {},
+        "actorCnt": null,
+        "rectData": null,
+        "type": "actor",
+        "nextActor": "Agent"
+      }
+    ],
+    [
+      "Agent",
+      {
+        "box": null,
+        "name": "Agent",
+        "description": "Agent 核心引擎 (LLM Brain)",
+        "wrap": false,
+        "prevActor": "User",
+        "links": {},
+        "properties": {},
+        "actorCnt": null,
+        "rectData": null,
+        "type": "participant",
+        "nextActor": "MCP"
+      }
+    ],
+    [
+      "MCP",
+      {
+        "box": null,
+        "name": "MCP",
+        "description": "MCP 协议客户端/服务端",
+        "wrap": false,
+        "prevActor": "Agent",
+        "links": {},
+        "properties": {},
+        "actorCnt": null,
+        "rectData": null,
+        "type": "participant",
+        "nextActor": "Environment"
+      }
+    ],
+    [
+      "Environment",
+      {
+        "box": null,
+        "name": "Environment",
+        "description": "外部系统/环境 (文件/Git/API)",
+        "wrap": false,
+        "prevActor": "MCP",
+        "links": {},
+        "properties": {},
+        "actorCnt": null,
+        "rectData": null,
+        "type": "participant"
+      }
+    ]
+  ],
+  "messages": [
+    {
+      "id": "0",
+      "from": null,
+      "to": null,
+      "message": {
+        "start": null,
+        "step": null,
+        "visible": true
+      },
+      "wrap": false,
+      "type": 26
+    },
+    {
+      "id": "1",
+      "from": "User",
+      "to": "Agent",
+      "message": "输入任务目标 (如: 修复代码并提交)",
+      "wrap": false,
+      "type": 0,
+      "activate": false,
+      "centralConnection": 0
+    },
+    {
+      "id": "2",
+      "from": "Agent",
+      "to": null,
+      "message": "",
+      "wrap": false,
+      "type": 17,
+      "activate": false,
+      "centralConnection": 0
+    },
+    {
+      "id": "3",
+      "from": "Agent",
+      "to": "Agent",
+      "message": "推理分析任务，生成多步执行计划",
+      "wrap": false,
+      "type": 0,
+      "activate": false,
+      "centralConnection": 0
+    },
+    {
+      "id": "4",
+      "from": null,
+      "to": null,
+      "message": "工具调用与自适应循环",
+      "wrap": false,
+      "type": 10,
+      "activate": false,
+      "centralConnection": 0
+    },
+    {
+      "id": "5",
+      "from": "Agent",
+      "to": "MCP",
+      "message": "发起 tools/call 请求 (如: read_file)",
+      "wrap": false,
+      "type": 0,
+      "activate": false,
+      "centralConnection": 0
+    },
+    {
+      "id": "6",
+      "from": "MCP",
+      "to": null,
+      "message": "",
+      "wrap": false,
+      "type": 17,
+      "activate": false,
+      "centralConnection": 0
+    },
+    {
+      "id": "7",
+      "from": "MCP",
+      "to": "Environment",
+      "message": "执行具体 I/O 或系统操作",
+      "wrap": false,
+      "type": 0,
+      "activate": false,
+      "centralConnection": 0
+    },
+    {
+      "id": "8",
+      "from": "Environment",
+      "to": "MCP",
+      "message": "返回原始数据或执行状态",
+      "wrap": false,
+      "type": 1,
+      "activate": false,
+      "centralConnection": 0
+    },
+    {
+      "id": "9",
+      "from": "MCP",
+      "to": "Agent",
+      "message": "返回标准化工具结果 (Content/Text)",
+      "wrap": false,
+      "type": 1,
+      "activate": false,
+      "centralConnection": 0
+    },
+    {
+      "id": "10",
+      "from": "MCP",
+      "to": null,
+      "message": "",
+      "wrap": false,
+      "type": 18,
+      "activate": false,
+      "centralConnection": 0
+    },
+    {
+      "id": "11",
+      "from": "Agent",
+      "to": "Agent",
+      "message": "评估观察结果 (Observation) 与反思",
+      "wrap": false,
+      "type": 0,
+      "activate": false,
+      "centralConnection": 0
+    },
+    {
+      "id": "12",
+      "from": null,
+      "to": null,
+      "message": "",
+      "wrap": false,
+      "type": 11,
+      "activate": false,
+      "centralConnection": 0
+    },
+    {
+      "id": "13",
+      "from": "Agent",
+      "to": "Agent",
+      "message": "聚合上下文，生成最终总结报告",
+      "wrap": false,
+      "type": 0,
+      "activate": false,
+      "centralConnection": 0
+    },
+    {
+      "id": "14",
+      "from": "Agent",
+      "to": "User",
+      "message": "交付最终结果与变更说明",
+      "wrap": false,
+      "type": 1,
+      "activate": false,
+      "centralConnection": 0
+    },
+    {
+      "id": "15",
+      "from": "Agent",
+      "to": null,
+      "message": "",
+      "wrap": false,
+      "type": 18,
+      "activate": false,
+      "centralConnection": 0
+    }
+  ]
+}

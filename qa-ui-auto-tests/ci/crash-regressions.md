@@ -27,7 +27,7 @@
 | TC-FILE-OPEN-006 | 工作区/全局设置切换、邮件只读副本去重与关闭清理 | browser/native |
 | TC-FILE-OPEN-013 | Markdown Live 默认只读、显式编辑、split 实际拖拽、独立 Mermaid 主题与目录选项；切换后正文保持 | browser/native |
 | TC-EXPLORER-007 | 新建 Markdown/HTML/SVG/JSON/TypeScript，进入实际编辑器、保存与关闭重开；独立文件字节和代码工作区 reload 恢复 | browser/native |
-| TC-FILE-OPEN-023 | Live 表格格式与 Split 一致，源码编辑/Tab/Undo/Redo 后格式及邻居保留；完整 GFM 保存与重开、受控图片及 HTML 清理 | browser/native |
+| TC-FILE-OPEN-029 | Live 表格格式与 Split 一致，源码编辑/Tab/Undo/Redo 后格式及邻居保留；完整 GFM 保存与重开、受控图片及 HTML 清理 | browser/native |
 | TC-TAO-HOME-002 | Tao Messages 原生 IPC、慢流停止后的真实网络关闭、多轮顺序、reload 历史及三种代理路径 | native/release |
 
 本地使用隔离的 QA 配置和测试桌面，不清理个人配置。保持 native 串行、全部本地测试 worker 总数不超过 2。下列命令应通过 `background_job.py` 启动，native 使用匹配当前源码的 QA release 二进制：

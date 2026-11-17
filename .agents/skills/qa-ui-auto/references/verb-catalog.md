@@ -42,6 +42,7 @@ limit and allow early success only for explicit invalid credentials. Windows
 chooser scenarios declare their platform boundary in YAML.
 
 `observe_tao_provider: null` and `assert_tao_provider_outcome: {timeout_sec: 120}`
+(optionally `require_success: true` rejects credential-invalid; required for the Agnes regression)
 are native-only real-provider checks. Install before clicking Send. The observer
 forwards the real Tauri transport and callbacks unchanged and does not read
 request bodies, keys or response bodies. The assertion waits for invoke
@@ -710,4 +711,4 @@ TC-MOBILE-007 also authenticates through real SSH direct-tcpip jump channels (OT
 and encrypted key), and HTTP/SOCKS5/application/independent proxies after locking
 the vault through desktop Settings; the peer independently records routing.
 
-| `assert_export_quality` | `{path, kind: pdf\|docx}` | Native only. Independently parses the retained real PDF/DOCX file: complete A4 pages at 300 DPI, or readable explicit SVG labels, 600 DPI fallback, original raster dimensions and disabled compression. No print API or renderer state substitution. |
+| `assert_export_quality` | `{path, kind: pdf\|docx\|drawio\|testing-pdf\|testing-docx}` | Native only. `testing-*` checks the exact reported user Markdown including solid flowchart line bodies. Independently parses the retained real PDF/DOCX file: complete A4 pages at 300 DPI, or readable explicit SVG labels, 600 DPI fallback, original raster dimensions and disabled compression. No print API or renderer state substitution. |

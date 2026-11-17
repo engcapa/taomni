@@ -79,3 +79,33 @@ describe("Workspace folder selection", () => {
     expect(screen.queryByTestId("workspace-fs-modal-browse")).not.toBeInTheDocument();
   });
 });
+
+it("offers a new workspace named from the selected folder and preserves a custom name", async () => {
+  const onSubmit = vi.fn();
+  render(<WorkspaceFsModals request={rootRequest} onCancel={vi.fn()} onSubmit={onSubmit} />);
+  fireEvent.change(screen.getByTestId("workspace-fs-modal-input"), { target: { value: "C:\\projects\\my app\\" } });
+  fireEvent.click(screen.getByTestId("workspace-root-new"));
+  expect(screen.getByTestId("workspace-root-name")).toHaveValue("my app");
+  fireEvent.change(screen.getByTestId("workspace-fs-modal-input"), { target: { value: "/projects/other/" } });
+  expect(screen.getByTestId("workspace-root-name")).toHaveValue("other");
+  fireEvent.change(screen.getByTestId("workspace-root-name"), { target: { value: " Team A " } });
+  fireEvent.change(screen.getByTestId("workspace-fs-modal-input"), { target: { value: "/projects/third" } });
+  expect(screen.getByTestId("workspace-root-name")).toHaveValue(" Team A ");
+  fireEvent.click(screen.getByTestId("workspace-fs-modal-confirm"));
+  await waitFor(() => expect(onSubmit).toHaveBeenCalledWith("/projects/third", { newWorkspaceName: "Team A" }));
+});
+
+it("rejects empty workspace names and IME Enter, while cancellation has no mutation", () => {
+  const onSubmit = vi.fn(), onCancel = vi.fn();
+  render(<WorkspaceFsModals request={rootRequest} onCancel={onCancel} onSubmit={onSubmit} />);
+  fireEvent.change(screen.getByTestId("workspace-fs-modal-input"), { target: { value: "/repo/project" } });
+  fireEvent.click(screen.getByTestId("workspace-root-new"));
+  const name = screen.getByTestId("workspace-root-name");
+  fireEvent.keyDown(name, { key: "Enter", isComposing: true });
+  expect(onSubmit).not.toHaveBeenCalled();
+  fireEvent.change(name, { target: { value: "  " } });
+  expect(screen.getByTestId("workspace-fs-modal-confirm")).toBeDisabled();
+  fireEvent.click(screen.getByTestId("workspace-fs-modal-cancel"));
+  expect(onSubmit).not.toHaveBeenCalled();
+  expect(onCancel).toHaveBeenCalledOnce();
+});

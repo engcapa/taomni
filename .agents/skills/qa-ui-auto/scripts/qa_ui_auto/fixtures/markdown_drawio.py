@@ -63,13 +63,33 @@ erDiagram
 ```
 '''
     root = ctx.values["file_open_root"]
+    sequence = (Path(__file__).resolve().parents[6] / "src/components/viewer/markdown/fixtures/mermaid-agent-sequence.mmd").read_text(encoding="utf-8")
+    regression = "# Mermaid export regressions\n\n```mermaid\n" + sequence + "\n```\n"
+    for curve in ("linear", "stepBefore", "basis"):
+        regression += f'''\n## {curve} connectors
+```mermaid
+---
+config:
+  flowchart:
+    curve: {curve}
+---
+flowchart TD
+    A[开始] --> B{{检查}}
+    B -->|通过| C[保存]
+    B -->|失败| D[重试]
+    D --> B
+```
+'''
+    files = {"graph-types.md": graphs, "mermaid-regressions.md": regression}
     if ctx.cfg["app"]["mode"] == "native":
-        (Path(root) / "graph-types.md").write_text(graphs, encoding="utf-8")
+        for name, text in files.items():
+            (Path(root) / name).write_text(text, encoding="utf-8")
     else:
-        ctx.page.evaluate("""async ({path, text}) => {
-          const vfs = await import('/src/stubs/localVfs.ts');
-          await vfs.vfsWriteBytes(path, new TextEncoder().encode(text).buffer);
-        }""", {"path": root + "/graph-types.md", "text": graphs})
+        for name, text in files.items():
+            ctx.page.evaluate("""async ({path, text}) => {
+              const vfs = await import('/src/stubs/localVfs.ts');
+              await vfs.vfsWriteBytes(path, new TextEncoder().encode(text).buffer);
+            }""", {"path": root + "/" + name, "text": text})
 
 
 def teardown(ctx):

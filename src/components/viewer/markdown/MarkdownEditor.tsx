@@ -109,9 +109,9 @@ export function MarkdownEditor({ document: current, onError, owner, requestedMod
         onMode={changeMode} onFocus={() => setFocus(!focus)} onOutline={() => setOutline(!outline)} onImage={chooseImage} />
       {mode === "live" && <button className="fv-button outline" data-testid="markdown-live-edit" aria-pressed={editing} disabled={current.readOnly || current.truncated}
         onClick={() => setEditing(!editing)}>{editing ? label("完成编辑", "Done editing") : label("编辑", "Edit")}</button>}
-      <MarkdownDrawioImport key={current.key} view={() => editor.current} readOnly={effectiveReadOnly} onError={report} />
+      <MarkdownDrawioImport key={`drawio-import:${current.key}`} view={() => editor.current} readOnly={effectiveReadOnly} onError={report} />
       <PreviewAppearanceControl value={appearance} onChange={setAppearance} />
-      <MarkdownExportMenu key={current.key} document={current} onError={report} printRequest={printRequest} onExport={owner?.onExport} />
+      <MarkdownExportMenu key={`export:${current.key}`} document={current} onError={report} printRequest={printRequest} onExport={owner?.onExport} />
     </div>
     <div className="fv-md-wrap">
       {outline && <aside className="fv-md-outline" data-testid="markdown-outline" aria-label={label("大纲", "Outline")}>

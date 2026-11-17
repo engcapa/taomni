@@ -12,6 +12,7 @@
 .fv-md-diagram-heading strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fv-md-diagram-controls{display:flex;align-items:center;flex-wrap:wrap;gap:3px;padding:6px 10px;border-bottom:1px solid var(--divider);flex:none}
 .fv-md-diagram-controls .fv-icon-button{width:30px;height:28px}
+.fv-md-diagram-controls .fv-md-diagram-save{width:auto;min-width:58px;padding:0 6px;gap:4px;font-size:11px}
 .fv-md-diagram-controls output{font-size:12px;font-variant-numeric:tabular-nums;min-width:48px;text-align:center}
 .fv-md-diagram-controls select{margin-left:auto;max-width:100%}
 .fv-md-diagram-stage{position:relative;flex:1;min-width:0;min-height:80px;overflow:hidden;touch-action:none;cursor:grab;outline-offset:-3px;user-select:none}

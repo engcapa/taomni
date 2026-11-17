@@ -24,6 +24,8 @@ Linux WebKitWebDriver 和 Windows WebView2 的自动 relaunch 后接管仍待实
 
 ## 执行状态
 
+用户再次要求同步 main 后已合并 `677ec4d77`；下述 Intel 全量与 ARM64 部分证据仍绑定其原始 SHA。旧 SHA 的单作业 #44110689605 在执行应用用例前结束，合并后的匹配构建和三态还原需要新的 hosted 结果，不将旧源码结果转为新源码通过。
+
 本地仅执行工具单元和 schema/behavior contract、catalog/refactor 静态检查。真实应用、进程、文件还原和三态自动 relaunch 全部留 GitHub `qa-ui-auto-platforms`，包含完整 crash-regression，并在运行中下载完成的 shard。
 
 [Intel #44095029967](https://github.com/engcapa/taomni/actions/runs/44095029967)（`0dfdfb159caa31b65ba239fd80917c79acee02e0`）已成功结束，4/4 分片即时下载，34/34、零 skip，包含 033/034/035 的完整 93/104/112 步和完整 native crash-regression。全部 artifact hash/bytes、receipt、身份及 case digest/计数已核验。三态原始记录均为单次确认、staged/禁重复、旧 HTTP 连接关闭、原进程 exit=0 和成功接管同一二进制/隔离环境的新 PID：

@@ -9,7 +9,7 @@ import { DEFAULT_DRAWIO_OPTIONS, markdownDrawio, type DrawioExportDocument } fro
 import { drawioLink } from "./drawioCodec";
 import { openExternalUrl } from "../../../lib/sftp";
 
-export interface MarkdownExportResult { path?: string; status: "saved" | "copied" | "print-opened" | "cancelled" | "opened"; drawio?: Omit<DrawioExportDocument, "xml"> }
+export interface MarkdownExportResult { path?: string; openPath?: string; status: "saved" | "copied" | "print-opened" | "cancelled" | "opened"; drawio?: Omit<DrawioExportDocument, "xml"> }
 
 async function exportPng(root: HTMLElement, settings: MarkdownExportSettings, css: string): Promise<Blob> {
   const host = document.createElement("div");
@@ -73,7 +73,7 @@ export async function exportMarkdown(
 ): Promise<MarkdownExportResult> {
   if (kind === "markdown") {
     const path = await exportMarkdownFolder(content, docPath, assets);
-    return path ? { status: "saved", path } : { status: "cancelled" };
+    return path ? { status: "saved", path, openPath: `${path}/${markdownBasename(docPath)}` } : { status: "cancelled" };
   }
   const prepared = await prepareMarkdownExport(content, docPath, settings, assets);
   const stem = markdownBasename(docPath).replace(/\.(md|markdown)$/i, "");

@@ -6107,6 +6107,8 @@ status: done
 area: database/sql
 components: [DbClientTab, SchemaTree, SqlEditorPanel, QueryResultGrid, SessionEditor]
 files:
+  - src/components/database/grid/useGridSearch.ts
+  - src/components/database/grid/GridSearchBar.tsx
   - src/components/database/DbClientTab.tsx
   - src/components/database/SchemaTree.tsx
   - src/components/database/SqlEditorPanel.tsx
@@ -6128,6 +6130,34 @@ files:
   - src-tauri/src/database/history.rs
   - src/components/session/SessionEditor.tsx
 controls:
+  - id: query-result-current-match
+    selector: '[data-search-current="true"]'
+    kind: display
+    optional: true
+  - id: query-result-grid-scroll
+    selector: '[data-testid="query-result-grid-scroll"]'
+    kind: interactive
+    optional: true
+  - id: query-result-search
+    selector: '[data-testid="query-result-search"]'
+    kind: display
+    optional: true
+  - id: query-result-search-input
+    selector: 'input[aria-label="Search result set"]'
+    kind: interactive
+    optional: true
+  - id: query-result-search-next
+    selector: '[data-testid="query-result-search-next"]'
+    kind: interactive
+    optional: true
+  - id: query-result-search-previous
+    selector: '[data-testid="query-result-search-previous"]'
+    kind: interactive
+    optional: true
+  - id: query-result-search-count
+    selector: '[data-testid="query-result-search-count"]'
+    kind: display
+    optional: true
   # SQL DB session form body inside SessionEditor (proto + section TAB selectors are
   # owned by F6.3). These mount in browser mode and are the smoke-testable surface;
   # the live tab below only mounts on a successful desktop connection.
@@ -13827,6 +13857,8 @@ controls:
   optional: true
 - id: workspace-custom-switcher-option
   selector: '[data-testid^="workspace-switcher-option-"]:not([data-testid="workspace-switcher-option-default-workspace"])'
+  aliases:
+  - 'xpath=//*[@data-testid="workspace-switcher-menu"]//*[text()="Sample project"]'
   kind: interactive
   optional: true
 -->
@@ -13887,6 +13919,26 @@ files:
 - src/components/workspace/WorkspaceTabsFilter.tsx
 - src/lib/workspaceTabFilter.ts
 controls:
+- id: workspace-switcher-menu-delete
+  selector: '[data-testid="workspace-switcher-menu-delete"]'
+  kind: interactive
+  optional: true
+- id: workspace-root-current
+  selector: '[data-testid="workspace-root-current"]'
+  kind: interactive
+  optional: true
+- id: workspace-root-new
+  selector: '[data-testid="workspace-root-new"]'
+  kind: interactive
+  optional: true
+- id: workspace-root-name
+  selector: '[data-testid="workspace-root-name"]'
+  kind: interactive
+  optional: true
+- id: workspace-switcher-menu-rename
+  selector: '[data-testid="workspace-switcher-menu-rename"]'
+  kind: interactive
+  optional: true
 - id: code-workspace-tree-viewport
   selector: '[data-testid="code-workspace-tree-viewport"]'
   kind: display
@@ -15817,6 +15869,7 @@ status: implemented
 area: files/viewer
 components: [ViewerShell, TextEditor, ImageViewer, MarkdownEditor, HtmlPreview, FileOpenSettings]
 files:
+  - src/components/viewer/markdown/MarkdownExportResultActions.tsx
   - src/lib/openFile/index.ts
   - src/lib/openFile/preferences.ts
   - src/lib/fileOpenTemp.ts
@@ -15857,11 +15910,22 @@ files:
   - src/components/viewer/markdown/mathExportCss.ts
   - src/components/viewer/markdown/exportPdf.ts
   - src/components/viewer/markdown/pdfPages.ts
+  - src/components/viewer/markdown/TableWidget.ts
+  - src/components/viewer/markdown/tableCellContent.ts
+  - src/components/viewer/markdown/drawioMermaidGeometry.ts
   - src/components/viewer/markdown/wordSvg.ts
   - src/components/viewer/markdown/docxImages.ts
   - src/components/viewer/markdown/exportDocx.ts
   - src-tauri/src/viewer/mod.rs
 controls:
+  - id: markdown-export-open-tao
+    selector: '[data-testid="markdown-export-open-tao"]'
+    kind: interactive
+    optional: true
+  - id: markdown-export-show-system
+    selector: '[data-testid="markdown-export-show-system"]'
+    kind: interactive
+    optional: true
   - id: file-viewer
     selector: '[data-testid="file-viewer"]'
     kind: display
@@ -16555,3 +16619,5 @@ TC-FILE-OPEN-001..006 是可执行行为用例并纳入 crash-regression；当�
 The retired Tao-specific key/save selectors are retained as optional absence assertions in HOME043; credentials and saving are owned by the combined LLM panel.
 
 - TC-FILE-OPEN-018: native release PDF performance comparison, three identical long-table/Mermaid/Unicode samples through actual save dialogs. Raw durations and PDF artifacts are reviewed against a fixed baseline; no speedup is inferred from pass status.
+
+真实用户 testing.md 回归由 TC-FILE-OPEN-027/028 验证 Live 表格内联格式、Word 流程图线身、draw.io 时序连接点和可搜索 PDF，并核对原文 SHA。实际 draw.io Desktop / LibreOffice 视觉证据另行留存；不将内部 maxGraph 预览当作外部编辑器验收。

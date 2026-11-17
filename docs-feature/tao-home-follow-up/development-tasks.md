@@ -445,3 +445,11 @@ macOS native 当前 **20/41**，027/036/037 已执行通过，完整适用 nativ
 上节末尾为再次补跑前的历史状态。用户随后要求再次触发的 [43886401191](https://github.com/engcapa/taomni/actions/runs/43886401191) 已完成 **32/32 native**，0 failed / 0 skipped，包含原缺失全部 21 项和完整 22 项 crash。回执签名、687 个产物、selection/case/source/runner/config/build 身份均已独立核对。原定 macOS 41 项执行缺口已补齐，旧 F12 本次实际通过，评审元数据冲突仍待复核；没有重写先前 gate 或伪造新的三平台合并 gate。
 
 本批用户反馈的实现及具名回归已具备证据，但整个 follow-up 尚未完成。深研真实状态机/工作流执行、持久预算与费用确认、独立增量检索及本地记录打开、完整审计/安全中心、商业 Go native、真实语音/管理员条件能力及完整原型和 Markdown/Word 验收矩阵仍须推进。39 项逐项状态、源码依据与各文件的历史口径见[完成度复核](completion-audit-2026-11-16.md)。
+
+## 13. 2026-11-17 导出、draw.io、历史与共享 AI 设置
+
+最新产品 `dc6de5f80` 已完成本批受影响回归：单测 **60 文件 / 273 项**，browser 三平台各 **46/46**，匹配 QA release native 为 Linux **54/54**、Windows **54/54**（主批加补跑）、macOS **52/52**，全部包含完整适用 **18/22 项 crash-regression**。原始失败、输入身份与独立产物核验保留在 [R16 验证记录](verification-md-history-agent-2026-11-17.md#r16-wrapped-export-notice-and-fast-reply-history)。此前各节的“待执行”按其当时版本阅读。
+
+本批交付包括独立可搜索 PDF 及性能优化、Word 图形清晰度、导出菜单/目录记忆/预览主题文案、Mermaid 查看与旋转/复制、可编辑 draw.io 互通、Home 历史/附件分支修复，以及合并 AI 配置和受支持普通聊天 provider。指定 OpenCode 模型/max 的简单、多轮、图片/文档和 Python/TypeScript 实际开发闭环已有商业 QA release 证据；具体版本、九轮执行和 16/15 项最终测试见同一验证记录，不由 loopback 回归替代。
+
+原始 39 项复核仍分为 **13 项具名范围已交付、11 项部分实现、15 项整体验收未齐**；本批新增功能不重复计入原表。未完成的实际执行器、预算/费用接线、增量检索/本地导航、审计、长任务恢复，以及 Word 客户端和少数平台条件验收，见 [当前范围与统计口径](completion-audit-2026-11-16.md#当前范围与统计口径)。本节不批量勾选尚未满足完整 AC 的原任务。

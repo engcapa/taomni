@@ -1,0 +1,263 @@
+id: TC-FILE-OPEN-027
+title: 'Reported testing.md: Live table formatting, Word line bodies, editable sequence and PDF (browser)'
+description: Use the exact 4510-byte user document (SHA c669a35a1cc8ec37aba798b496fa5b6c8c6405118079482bcaec03ee4c27f900).
+  Local native can open the original path via TAOMNI_QA_MARKDOWN_SOURCE_FILE; hosted uses the identical committed
+  source. Preserve source hash, render Live bold cells, export both diagram vectors and 600DPI fallbacks, reject
+  Office-invisible solid dash patterns, require measured CJK glyph positions and independently check draw.io legacy anchors. Native exercises packaged
+  WebView, real save chooser and disk bytes.
+modes:
+- browser
+covers:
+- F-FILEOPEN-1
+- F-EXPLORER-1
+tags:
+- p0
+- markdown
+- drawio
+- regression
+fixtures:
+- reset_db
+- markdown_testing
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-reported-markdown
+- reload_window: null
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-file-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Control+l
+    macos_key: Meta+l
+- fill:
+    selector: '[data-testid="explorer-address"]'
+    value: ${fixture.markdown_testing_directory}
+- press:
+    selector: '[data-testid="explorer-address"]'
+    key: Enter
+- dblclick: '[data-testid="explorer-file-row"][data-name="${fixture.markdown_testing_filename}"]'
+- wait_for: '[data-testid="markdown-editor"]'
+- click: '[data-testid="markdown-outline"] button:last-child'
+- wait_for: '[data-testid="markdown-table-widget"] strong'
+- click: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="0"]'
+- assert_text:
+    selector: '[data-testid="markdown-table-widget"]'
+    contains: 死循环防护
+- eval_readonly:
+    expression: document.querySelectorAll(".fv-md-table-wrap strong").length === 3 && document.querySelectorAll(".fv-md-table-wrap
+      strong")[0].textContent === "死循环防护" && document.querySelectorAll(".fv-md-table-wrap strong")[1].textContent
+      === "人机协同 (HITL)" && document.querySelectorAll(".fv-md-table-wrap strong")[2].textContent === "幂等性控制"
+    expect_truthy: true
+- screenshot: reported-markdown-live-table.png
+- click: '[data-testid="markdown-mode-source"]'
+- assert_text:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    contains: '**死循环防护**'
+- click: '[data-testid="markdown-mode-split"]'
+- wait_for: '[data-testid="markdown-preview"] .fv-md-mermaid svg'
+- assert_count:
+    selector: '[data-testid="markdown-preview"] .fv-md-mermaid svg'
+    equal: 2
+- click: '[data-testid="markdown-export"]'
+- click: '[data-testid="markdown-export-pdf"]'
+- wait_for: '[data-testid="markdown-export-settings"]'
+- assert_download:
+    trigger: '[data-testid="markdown-export-confirm"]'
+    filename: testing.pdf
+    artifact: testing-pdf
+- wait_for:
+    selector: '[data-testid="markdown-export-status"][data-export-state="saved"]'
+    timeout_sec: 90
+- click: '[data-testid="markdown-export"]'
+- click: '[data-testid="markdown-export-docx"]'
+- wait_for: '[data-testid="markdown-export-settings"]'
+- assert_download:
+    trigger: '[data-testid="markdown-export-confirm"]'
+    filename: testing.docx
+    artifact: testing-docx
+- wait_for:
+    selector: '[data-testid="markdown-export-status"][data-export-state="saved"]'
+    timeout_sec: 90
+- click: '[data-testid="markdown-export"]'
+- click: '[data-testid="markdown-export-drawio"]'
+- wait_for: '[data-testid="markdown-drawio-export-settings"]'
+- assert_download:
+    trigger: '[data-testid="markdown-drawio-save"]'
+    filename: testing.drawio
+    artifact: drawio
+    contains:
+    - sequence-message
+    - anchorPointDirection=0;
+- wait_for: '[data-testid="markdown-export-status"][data-export-state="saved"]'
+- eval_readonly:
+    expression: /(?:2.*editable diagrams|2.*可编辑图表).*0.*SVG/.test(document.querySelector(".fv-md-export-notice").textContent)
+    expect_truthy: true
+- click: '[data-testid="markdown-mode-live"]'
+- click: '[data-testid="markdown-live-edit"]'
+- press:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    key: Control+End
+    macos_key: Meta+ArrowDown
+- fill:
+    selector: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="0"]'
+    value: '**安全上限**'
+- press:
+    selector: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="0"]'
+    key: Tab
+- assert_text:
+    selector: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="0"] strong'
+    contains: 安全上限
+- press:
+    selector: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="1"]'
+    key: Control+z
+    macos_key: Meta+z
+- assert_text:
+    selector: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="0"] strong'
+    contains: 死循环防护
+- click: '[data-testid="markdown-live-edit"]'
+- assert_text:
+    selector: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="0"] strong'
+    contains: 死循环防护
+- assert_file_open_bytes:
+    path: ${fixture.markdown_testing_source}
+    sha256: ${fixture.markdown_testing_sha}
+- assert_no_runtime_errors: null
+- screenshot: reported-markdown-export-complete.png
+verification:
+  review: reviewed
+  requirements:
+  - id: REPORTED-MARKDOWN
+    requirement: Original user Markdown stays unchanged; Live renders all three bold table cells, both Word diagram
+      vectors retain visible line bodies and measured CJK glyph positions, all sequence endpoints follow Mermaid coordinates in draw.io, PDF remains
+      searchable.
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 7
+    - 8
+    - 9
+    - 10
+    - 12
+    - 14
+    - 18
+    - 20
+    - 23
+    - 24
+    - 28
+    - 29
+    - 33
+    - 34
+    - 39
+    - 40
+    - 41
+    - 42
+    - 43
+    - 45
+    - 47
+    results:
+    - 6
+    - 11
+    - 13
+    - 15
+    - 16
+    - 19
+    - 21
+    - 22
+    - 25
+    - 26
+    - 27
+    - 30
+    - 31
+    - 32
+    - 35
+    - 36
+    - 37
+    - 38
+    - 44
+    - 46
+    - 48
+    - 49
+    - 50
+    checkpoints:
+    - step: 6
+      expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
+        source or independent export assertion.
+    - step: 11
+      expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
+        source or independent export assertion.
+    - step: 13
+      expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
+        source or independent export assertion.
+    - step: 15
+      expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
+        source or independent export assertion.
+    - step: 16
+      expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
+        source or independent export assertion.
+    - step: 19
+      expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
+        source or independent export assertion.
+    - step: 21
+      expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
+        source or independent export assertion.
+    - step: 22
+      expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
+        source or independent export assertion.
+    - step: 25
+      expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
+        source or independent export assertion.
+    - step: 26
+      expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
+        source or independent export assertion.
+    - step: 27
+      expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
+        source or independent export assertion.
+    - step: 30
+      expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
+        source or independent export assertion.
+    - step: 31
+      expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
+        source or independent export assertion.
+    - step: 32
+      expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
+        source or independent export assertion.
+    - step: 35
+      expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
+        source or independent export assertion.
+    - step: 36
+      expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
+        source or independent export assertion.
+    - step: 37
+      expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
+        source or independent export assertion.
+    - step: 38
+      expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
+        source or independent export assertion.
+    - step: 44
+      expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
+        source or independent export assertion.
+    - step: 46
+      expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
+        source or independent export assertion.
+    - step: 48
+      expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
+        source or independent export assertion.
+    - step: 49
+      expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
+        source or independent export assertion.
+    - step: 50
+      expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
+        source or independent export assertion.
+  visual:
+  - check: Actual exported flowchart and sequence in Word/draw.io
+    method: manual
+    reason: Inspect exports using actual draw.io Desktop and LibreOffice; Microsoft Word on Win11 remains a separate
+      client verification boundary.
+  native:
+  - check: Packaged WebView, original local source and real saved file bytes
+    method: not-applicable
+    reason: Browser covers renderer downloads only; native opens source and saves through OS choosers.

@@ -2,6 +2,12 @@
 
 当前分支 `feat/tao-home-follow-up`，调研起点 `731d5ce9f`。Windows、macOS、Linux Tauri 桌面共用实现；浏览器用于辅助验证。设计决定已确定，实现与验收分别记录。本轮同时保留此前未提交的 PDF 性能优化、目录记忆、Mermaid 查看和主题文案调整。
 
+## 当前交付状态
+
+产品 `dc6de5f80` 的受影响单测、三平台 browser 和匹配 QA release native 验证已完成；最终执行覆盖为 browser 各 **46/46**、native Linux **54/54**、Windows **54/54**（主批与补跑合并）、macOS **52/52**，均包含完整适用 crash-regression。原始失败不作改写；源码、构建、用例、配置、回执和产物已独立核验，详见 [R16 最终验证](../tao-home-follow-up/verification-md-history-agent-2026-11-17.md#r16-wrapped-export-notice-and-fast-reply-history)。下文执行记录按当时输入保留，其中“待验证”不代表当前仍未执行。
+
+draw.io 原生节点转换限定流程图、状态图、类图和 ER 图，其他 Mermaid 类型有明确 SVG/源码回退。PDF 最新三平台结果见 [性能记录](pdf-performance-2026-11-17.md)。当前 Microsoft Word 客户端视觉、完整原型/版式矩阵和原 Tao follow-up 的其他设计缺口仍另行跟踪。
+
 ## 决策与有效图稿
 
 当前图稿：[V2 可编辑示意图](options-v2.drawio)。V1 已被本次用户反馈替代。

@@ -114,6 +114,7 @@
           "file_open_files",
           "markdown_quality",
           "markdown_drawio",
+          "markdown_testing",
           "file_open_mail",
           "html_network_test",
           "file_open_entries",
@@ -588,7 +589,7 @@
         "tao_real_provider_scenarios": {"type": "null", "description": "Opt-in real DeepSeek native UI probe: four requests at most for two-turn memory, locale/draft retention, regeneration, new-chat isolation and Stop; only explicit expired/401/403 credentials may finish successfully before all stages."},
         "tao_real_provider_documents": {"type": "null", "description": "Opt-in real DeepSeek native UI probe: three requests for actual Markdown, cloned branch context and original/branch history/draft isolation. Only explicit expired/401/403 credentials may finish early as credential-invalid."},
         "tao_real_provider_expanded": {"type": "object", "additionalProperties": false, "required": ["scenario"], "properties": {"scenario": {"enum": ["images", "action-controls", "project", "project-typescript", "context", "handoff", "development", "code", "options", "actions", "lifecycle", "persistence-prepare", "persistence-verify", "attachments", "document-files", "archive", "concurrency"]}}, "description": "Bounded native provider scenarios, including confirmed development/test/failure/repair/feature rounds. Only explicit invalid credentials may finish early."},
-        "assert_tao_provider_outcome": {"type": "object", "additionalProperties": false, "properties": {"timeout_sec": {"type": "number", "exclusiveMinimum": 0, "maximum": 150}}, "description": "Native-only completed invocation plus nonempty assistant text/no error; only HTTP 401/403 or explicit key expiration with enabled retry is credential-invalid pass."},
+        "assert_tao_provider_outcome": {"type": "object", "additionalProperties": false, "properties": {"require_success": {"type": "boolean", "default": false}, "timeout_sec": {"type": "number", "exclusiveMinimum": 0, "maximum": 150}}, "description": "Native-only completed invocation plus nonempty assistant text/no error; only HTTP 401/403 or explicit key expiration with enabled retry is credential-invalid pass."},
         "terminal_file_link": {"type": "object","additionalProperties": false,"required": ["selector"],"properties": {"selector": {"$ref": "#/$defs/selector"}}},
         "assert_file_open_bytes": {
           "type": "object", "additionalProperties": false,
@@ -603,13 +604,13 @@
           },
           "description": "Independent exact UTF-8/SHA256/absence oracle inside file_open_files fixture or a DOM-observed controlled viewer temp. remember stores the observed path for post-close absence checks. Browser reads VFS only; native reads real host bytes."
         },
-        "assert_export_quality": {"type":"object","additionalProperties":false,"required":["path","kind"],"properties":{"path":{"type":"string","minLength":1},"kind":{"enum":["pdf","docx"]}}},
+        "assert_export_quality": {"type":"object","additionalProperties":false,"required":["path","kind"],"properties":{"path":{"type":"string","minLength":1},"kind":{"enum":["pdf","docx","drawio","testing-pdf","testing-docx"]}}},
         "assert_download": {
           "type": "object", "additionalProperties": false, "required": ["trigger", "filename"],
           "properties": {
             "trigger": {"$ref": "#/$defs/selector"},
             "filename": {"type": "string", "minLength": 1},
-            "artifact": {"enum": ["pdf", "docx"]},
+            "artifact": {"enum": ["pdf", "docx", "drawio", "testing-pdf", "testing-docx"]},
             "contains": {"type": "array", "items": {"type": "string"}}
           },
           "description": "Browser only: click the real export control, wait for actual Playwright download, retain artifact and assert filename/nonempty/content bytes. Not native disk or dialog evidence."
