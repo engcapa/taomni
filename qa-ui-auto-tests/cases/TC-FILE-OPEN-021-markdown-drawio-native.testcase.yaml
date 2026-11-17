@@ -58,6 +58,13 @@ steps:
 - click: '[data-testid="markdown-live-edit"]'
 - native_file_dialog:
     kind: open
+    action: cancel
+    trigger: '[data-testid="markdown-import-drawio"]'
+- assert_count:
+    selector: '[data-testid="markdown-drawio-import-dialog"]'
+    equal: 0
+- native_file_dialog:
+    kind: open
     action: choose
     path: ${fixture.drawio_import_file}
     trigger: '[data-testid="markdown-import-drawio"]'
@@ -108,9 +115,10 @@ verification:
     - 28
     - 29
     - 30
-    - 33
-    - 34
+    - 32
+    - 35
     - 36
+    - 38
     checkpoints:
     - step: 17
       expectation: Actual control state/content or retained file/clipboard matches the explicit assertion; source and
@@ -118,21 +126,24 @@ verification:
     - step: 27
       expectation: Actual control state/content or retained file/clipboard matches the explicit assertion; source and
         cancellation behavior remain intact.
-    - step: 32
+    - step: 31
+      expectation: Cancelling the real native chooser leaves no import dialog or document insertion; a later import remains available.
+    - step: 34
       expectation: Actual control state/content or retained file/clipboard matches the explicit assertion; source and
         cancellation behavior remain intact.
-    - step: 37
+    - step: 39
       expectation: Actual control state/content or retained file/clipboard matches the explicit assertion; source and
         cancellation behavior remain intact.
-    - step: 38
+    - step: 40
       expectation: Actual control state/content or retained file/clipboard matches the explicit assertion; source and
         cancellation behavior remain intact.
     results:
     - 17
     - 27
-    - 32
-    - 37
-    - 38
+    - 31
+    - 34
+    - 39
+    - 40
   native:
   - check: Actual file chooser, draw.io bytes, remembered directory, import and OS clipboard
     method: automated

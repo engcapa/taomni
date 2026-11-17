@@ -63,3 +63,10 @@
 - 修复实际浏览器右键的 CodeMirror mouseup/caret 生命周期问题，FILE019/020 稳定源码首轮 2/2 通过。后续扩展 FILE020 异常输入、取消焦点、保存重开及 FILE022 四种图形均实际通过，但该轮末尾发生类型检查修正，`identity_stable=false`，只保留诊断价值；当前 46 项 browser 回归重新验证最终输入。
 - 独立 draw.io Desktop 渲染导出的流程图、状态图、类图、ER 图；节点位置读取稳定 DB 标识，忽略 render 前缀和解析计数器变化，多行 tspan 不丢换行。ER 使用实际类型 `er`，保留 cardinality；class 保留空心继承箭头。图像证据：`qa-ui-auto-report/_local/markdown-drawio/drawio-visual/`。
 - 完整 browser/native crash suite 并入保留的 R14 验证场景，选集见本地 `local-selection.json`；正式 native candidate 和 hosted Windows/macOS 验证未完成，不标通过。
+
+### 原生导入预检与 PDF 性能实测
+
+- `0c8c037e1` 的 Linux browser **46/46** 通过，含全部 **18** 项 crash regression；Windows/macOS hosted browser 也各 **46/46**。独立核对源代码、runner、case、条件、回执和产物 SHA，均匹配当轮输入。
+- Linux QA release 对同一 FILE018 长文档执行三次。选择位置后的完成等待由 **128.193 / 138.462 / 145.253 s** 降为 **12.258 / 12.197 / 12.588 s**，中位数快 **11.30 倍**。包含自动化保存框操作的对应中位数 **142.796 → 15.814 s**，快 **9.03 倍**。三份各 12 页的全部像素和搜索文字一致，体积 **5,486,223 → 4,292,248 bytes**。详见 [性能记录](pdf-performance-2026-11-17.md)。Windows/macOS native 尚未据此标通过。
+- FILE021 预检实际保存文件和系统剪贴板通过；首次运行的导入 fixture 使用相对路径，修正为始终输出绝对路径。随后 WebKit 自动化会话未显示 HTML input 的系统文件选择器。桌面导入改用应用已有的原生选择器，并以有上限的本地流读取显式选择的文件；browser 保留 HTML input。用例继续验证真实 OS 取消/重新打开/选择，不用模拟文件选择结果代替。
+- 新增 8 项 unit 覆盖原生取消与再次导入、卸载后的迟到结果、导入期间文档变化、分块 Unicode、20 MB 限制、文件增长和异常关闭流；均通过。新的最终输入将重新执行 browser/native 与完整 crash suite；旧轮结果仅对应其记录的源码。

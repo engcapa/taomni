@@ -21,7 +21,7 @@ def setup(ctx):
     compressor = zlib.compressobj(wbits=-15)
     compressed = base64.b64encode(compressor.compress(urllib.parse.quote(second, safe="~()*!.'-").encode()) + compressor.flush()).decode()
     xml = f'<mxfile><diagram id="one" name="Text and diagram">{first}</diagram><diagram id="two" name="Compressed second sheet">{compressed}</diagram></mxfile>'
-    fixture_dir = ctx.case_dir / "drawio-inputs"
+    fixture_dir = (ctx.case_dir / "drawio-inputs").resolve()
     fixture_dir.mkdir(parents=True, exist_ok=True)
     source = fixture_dir / "multi.drawio"; source.write_text(xml, encoding="utf-8")
     invalid = fixture_dir / "invalid.drawio"; invalid.write_text("<mxfile><broken>", encoding="utf-8")
