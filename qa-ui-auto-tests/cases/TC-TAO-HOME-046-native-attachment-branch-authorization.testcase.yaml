@@ -1,7 +1,7 @@
 id: TC-TAO-HOME-046
 title: Native attachment branches retain scoped authorization across reload and preserve the source
-description: Select a real document, read its content, create a branch and read the inherited attachment without selecting it again. Reload the
-  branch and read again; the original conversation keeps its own messages and attachment access. No commercial service is contacted.
+description: Select a real document, read its content, create a branch and read the inherited attachment without selecting it again. Reload the branch and
+  read again; the original conversation keeps its own messages and attachment access. No commercial service is contacted.
 modes:
 - native
 covers:
@@ -31,6 +31,7 @@ steps:
     path: ${fixture.tao_llm_document}
     title: ${fixture.tao_llm_chooser_title}
     trigger: '[data-testid="tao-home-file-choose"]'
+- wait_for: .tao-home-context-chip
 - assert_count:
     selector: .tao-home-context-chip
     equal: 1
@@ -95,8 +96,7 @@ verification:
   review: reviewed
   requirements:
   - id: ATTACHMENT-BRANCH-046
-    requirement: An explicit branch inherits only its source attachment authorization, persists it across reload, and leaves the original conversation
-      intact.
+    requirement: An explicit branch inherits only its source attachment authorization, persists it across reload, and leaves the original conversation intact.
     actions:
     - 1
     - 2
@@ -105,68 +105,71 @@ verification:
     - 6
     - 7
     - 8
-    - 10
     - 11
-    - 14
-    - 17
+    - 12
+    - 15
     - 18
-    - 21
-    - 23
+    - 19
+    - 22
     - 24
-    - 27
+    - 25
     - 28
-    - 31
+    - 29
     - 32
+    - 33
     checkpoints:
     - step: 5
       expectation: '[data-testid="tao-home-composer-input"]:enabled'
     - step: 9
+      expectation: The asynchronously prepared attachment chip is visible before its exact count is checked.
+    - step: 10
       expectation: '{''selector'': ''.tao-home-context-chip'', ''equal'': 1}'
-    - step: 12
-      expectation: '{''selector'': ''[data-testid="tao-home-message-list"]'', ''contains'': ''Document value is 73''}'
     - step: 13
+      expectation: '{''selector'': ''[data-testid="tao-home-message-list"]'', ''contains'': ''Document value is 73''}'
+    - step: 14
       expectation: '[data-testid="tao-home-message-regenerate"]'
-    - step: 15
-      expectation: '{''selector'': ''[data-testid="tao-home-message-user"]'', ''equal'': 1}'
     - step: 16
-      expectation: '{''selector'': ''[data-testid="tao-home-message-assistant"]'', ''equal'': 1}'
-    - step: 19
-      expectation: '{''selector'': ''[data-testid="tao-home-message-assistant"]:last-child'', ''contains'': ''Document value is 73''}'
-    - step: 20
-      expectation: '{''selector'': ''[data-testid="tao-home-message-regenerate"]'', ''equal'': 2}'
-    - step: 22
-      expectation: '[data-testid="tao-home-composer-input"]:enabled'
-    - step: 25
-      expectation: '{''selector'': ''[data-testid="tao-home-message-assistant"]:last-child'', ''contains'': ''Document value is 73''}'
-    - step: 26
-      expectation: '{''selector'': ''[data-testid="tao-home-message-regenerate"]'', ''equal'': 3}'
-    - step: 29
       expectation: '{''selector'': ''[data-testid="tao-home-message-user"]'', ''equal'': 1}'
-    - step: 30
+    - step: 17
       expectation: '{''selector'': ''[data-testid="tao-home-message-assistant"]'', ''equal'': 1}'
-    - step: 33
+    - step: 20
       expectation: '{''selector'': ''[data-testid="tao-home-message-assistant"]:last-child'', ''contains'': ''Document value is 73''}'
-    - step: 34
+    - step: 21
       expectation: '{''selector'': ''[data-testid="tao-home-message-regenerate"]'', ''equal'': 2}'
+    - step: 23
+      expectation: '[data-testid="tao-home-composer-input"]:enabled'
+    - step: 26
+      expectation: '{''selector'': ''[data-testid="tao-home-message-assistant"]:last-child'', ''contains'': ''Document value is 73''}'
+    - step: 27
+      expectation: '{''selector'': ''[data-testid="tao-home-message-regenerate"]'', ''equal'': 3}'
+    - step: 30
+      expectation: '{''selector'': ''[data-testid="tao-home-message-user"]'', ''equal'': 1}'
+    - step: 31
+      expectation: '{''selector'': ''[data-testid="tao-home-message-assistant"]'', ''equal'': 1}'
+    - step: 34
+      expectation: '{''selector'': ''[data-testid="tao-home-message-assistant"]:last-child'', ''contains'': ''Document value is 73''}'
     - step: 35
+      expectation: '{''selector'': ''[data-testid="tao-home-message-regenerate"]'', ''equal'': 2}'
+    - step: 36
       expectation: None
     results:
     - 5
     - 9
-    - 12
+    - 10
     - 13
-    - 15
+    - 14
     - 16
-    - 19
+    - 17
     - 20
-    - 22
-    - 25
+    - 21
+    - 23
     - 26
-    - 29
+    - 27
     - 30
-    - 33
+    - 31
     - 34
     - 35
+    - 36
   native:
   - check: Actual OS document selection, native branch IPC and real provider wire bytes
     method: automated
