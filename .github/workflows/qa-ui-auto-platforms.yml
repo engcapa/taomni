@@ -295,6 +295,7 @@ jobs:
       head: ${{ needs.plan.outputs.head }}
       artifact_key: ${{ needs.plan.outputs.artifact_key }}
       macos_runner: ${{ inputs.macos_runner || 'macos-15' }}
+      native_builds: ${{ needs.plan.outputs.build_matrix }}
     secrets:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}

@@ -128,6 +128,14 @@ label before scheduling either Darwin package build; each build retains its
 explicit ARM64 or Intel Rust target. This allows the available Intel or macOS 26
 image to build the module packages needed by a focused native run.
 
+The platforms caller also supplies its planned native build matrix. Module
+packages are built and signed only for selected platform/architecture pairs
+that require `signed-module`; duplicate desktop profiles share one package.
+A Linux/Windows run therefore does not wait for a macOS package builder. The
+standalone package workflow and callers that omit `native_builds` still build
+all four release targets. Both paths retain the same candidate restrictions,
+trusted signing checkout and package provenance checks.
+
 Linux package installation refreshes indexes and retries the exact requested
 package set once after apt exit 100 (for example, a removed package version
 referenced by a stale mirror index). A failed refresh or second installation
