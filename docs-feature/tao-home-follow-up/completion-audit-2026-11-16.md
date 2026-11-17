@@ -4,6 +4,14 @@
 
 **结论：尚未全部完成。** 最近一批用户反馈已有实现和具名测试，但原设计还存在实现缺口、商业 provider 未执行项及完整 AC 未覆盖的边界。主表 39 个任务均保留早期未勾选状态，与后续追加回执没有逐项收敛；不能据此认为 39 项都未开发，也不能由某个测试批次通过推定全部任务完成。
 
+## 2026-11-17 本轮覆盖说明
+
+用户随后优先要求修复 Markdown 导出和 Home 历史，并追加真实 OpenCode Agent 深测；本批进展与当前回执统一记录在 [verification-md-history-agent-2026-11-17.md](verification-md-history-agent-2026-11-17.md)。本页下面的版本、测试和商业请求状态均为 **11 月 16 日的历史审计基线**，不能替代新源码的验收。
+
+本轮已实际发起 OpenCode Go / `deepseek-v4.1-flash` / thinking=max 商业请求，图片数字与颜色、文档问答已有真实成功证据。R13 Python 与 TypeScript 工程均完成九轮真实模型调用，实际交付代码、运行测试、注入故障、模型修复和功能扩展；最终分别 16/15 项测试通过，独立补充检查也通过，未手工修补生成工程。随后 HOME046 在真实 native 中复现分支会话丢失附件授权，`c4925d0a3` 已修复；R14 Linux 50 项 deterministic native 及 macOS 50 项 native 均已通过；Windows 52 项中 HOME045/046 因附件控件遮挡失败。附件控件、导出提示布局和快速回复历史保存均已继续修复，当前源码验收见下段 R16，不用 R13 或 R14 代替。本次授权为全任务累计 **100M tokens**，覆盖旧 50M 计划；R13 后已知完成用量累计 **1,097,910 tokens**，取消或缺失用量仍未知。旧审批拒绝与“未发起新请求”不再是当前阻塞。真实费用/预算持久化、工作流执行器、增量索引、安全审计和语音等原有设计缺口仍按本表跟踪，不能随本批修复一并标为完成。
+
+R16 当前产品为 `dc6de5f80`，在 draw.io、Mermaid 查看、PDF 性能和共享 AI 设置之外，继续修复换行工具栏的导出提示遮挡和普通 provider 快速回复后的历史标题/配置保存。本地受影响单测 **60 文件 / 273 项通过**；三平台 browser 均 **46/46**，各含全部 **18 项 crash-regression**。匹配的 QA release 原生用例最终为 **Linux 54/54、Windows 54/54、macOS 52/52 通过**，各含全部 **22 项 crash-regression**。源码/构建/用例/配置/回执、产物及选集完整并集均已独立核验，索引为 `history-final-execution-coverage.json`。Windows 主批 **53/54** 中 AI009 在执行步骤前发生文档根节点准备超时；相同源码/用例的 AI009 加完整 crash 集合补跑 [44025575103](https://github.com/engcapa/taomni/actions/runs/44025575103) **23/23 通过**，未放宽超时或断言。Windows 最终 54 项为主批与补跑合并结果，原始失败及未明确归因的间歇启动问题均保留，不把原失败 workflow 改为通过。HOME045/046 当前仅声明 Linux/Windows native，不扩称 macOS 附件分支验收。原任务表的实现缺口和未验收范围继续保留。
+
 ## 最新变化：macOS native 已补齐原缺失项
 
 [43886401191](https://github.com/engcapa/taomni/actions/runs/43886401191) 已成功结束。只选择 macOS native release，实际 **32 passed / 0 failed / 0 skipped**，包含此前缺失的全部 **21 项**及完整适用 **22 项 native crash-regression**。
@@ -79,7 +87,7 @@
 | TASK-DEV01 | loopback 的真实本机文件/进程开发闭环已通过；024/030 等商业模型从 0 到 1 工程流程未执行完成。 |
 | TASK-DEV02 | 原生 ACP 真实子进程、持久化、返回 Tao/显式继续已验；商业 CC/Codex 模型执行仍未验证。 |
 
-商业 OpenCode 当前不能标完成：`verification-agent-loop-2026-11-16.md` 的最后记录是当时 native 商业启动被审批拒绝；早期 403 是 WAF，并非已确认失效 Key。本轮未发起新的商业请求，也未推定旧 Windows 临时 Key 在 Linux 可用。50M 是用户测试预算，不是本产品已完成的预算状态机。
+上表与以下源码缺口保留 11 月 16 日复核时的范围；其中商业执行状态已由 11 月 17 日的实测更新：TASK-GO01 的指定 provider/model/max、TASK-GO02 的代表图片/文档路径，以及 TASK-DEV01 的 Python/TypeScript 开发闭环均已有真实 QA release 证据，详见本页“本轮覆盖说明”和 [11 月 17 日验证记录](verification-md-history-agent-2026-11-17.md)。完整长任务矩阵、CC/Codex 商业执行和未列举的设计 AC 仍未全部验收。旧记录中的审批拒绝不再是当前阻塞；当前授权为累计 100M tokens，也不等同于产品已实现持久预算状态机。
 
 ## 关键实现缺口的源码依据
 
@@ -98,7 +106,7 @@
 1. 深研及五类工作流的实际执行器、真实阶段结果、取消/失败/重启检查点（TH-026、TASK-MODE02）。
 2. 预算/费用阈值的真实确认与持久续跑，设置到执行的接线（TH-011/021/022）。
 3. 独立增量索引、本地原记录导航、全部存储来源，以及完整审计/安全中心（TH-023/028/030）。
-4. OpenCode Go / deepseek-v4.1-flash / max 的商业 native 全集复跑，包括旧 DeepSeek 场景、图片/文档和开发工程；真实 CC/Codex、语音、管理员/WSL 条件分支按各自边界验收。
+4. 在已有 OpenCode Go / deepseek-v4.1-flash / max 图片、文档和 Python/TypeScript 工程实测基础上，按具名 AC 补齐尚未覆盖的商业长任务路径；真实 CC/Codex、语音、管理员/WSL 条件分支按各自边界验收。
 5. 文件长任务进度与重启恢复；完整原型状态/窗口/主题和 Markdown/Notes/Word 矩阵。
 6. 复核旧 F12 的评审元数据并按新 case 身份执行；恢复所需原始历史报告后再做三平台合并 gate，不改写旧失败/阻塞证据。
 
@@ -112,4 +120,4 @@
 
 历史证据迁移另有缺失：原 Windows `_local` 回执/日志未随代码带入，主表原有 `evidence/user-feedback-2026-11-15.png` 链接在当前 Linux checkout 也不存在。本轮只新增的链接均已校验，不把缺失的历史图片当作当前可查看证据。
 
-本轮校验为文档/源码/既有回执复核，未运行产品测试或重新构建。新增的是完成度记录，原用例及需求预期没有变更，因此不新建重复 QA case。
+11 月 16 日首次复核仅检查文档、源码和既有回执；11 月 17 日补充已实际构建、运行并独立核验产品证据，新增回归及最新输入范围见 [11 月 17 日验证记录](verification-md-history-agent-2026-11-17.md)。历史失败和未完成需求均保留。
