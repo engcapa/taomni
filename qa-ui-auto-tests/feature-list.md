@@ -15911,7 +15911,6 @@ files:
   - src/components/viewer/markdown/exportPdf.ts
   - src/components/viewer/markdown/pdfPages.ts
   - src/components/viewer/markdown/TableWidget.ts
-  - src/components/viewer/markdown/tableCellContent.ts
   - src/components/viewer/markdown/drawioMermaidGeometry.ts
   - src/components/viewer/markdown/wordSvg.ts
   - src/components/viewer/markdown/docxImages.ts

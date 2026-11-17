@@ -8,6 +8,8 @@ Live 表格此前直接使用 `textContent` 展示单元格，导致 `**` 等源
 
 再次合并远程 main `677ec4d77` 后，保留双方 Markdown 修复和实际编辑器回归测试；本页 Live 表格场景改为 `TC-FILE-OPEN-029`，main 的 native 导出操作场景继续使用 `TC-FILE-OPEN-023`。下列旧 run 与 171 项结论绑定合并前的产品源码指纹；合并后的匹配 browser/native 与完整 crash-regression 须另行记录。旧 SHA 的单作业 #44110689605 已在应用用例开始前结束，其未执行项不计通过。
 
+合并后相关前端单元 40 文件 **274/274**、QA 工具 **68/68**、TypeScript、catalog、check:refactor 及 852 个唯一用例的完整 audit gate 已通过。新增 Workspace 场景 WS-096 补充切回当前目录的真实点击、唯一 radio 选中和名称输入框隐藏断言，未修改 coverage baseline。上述属于本地单元与静态验证，新的真实多端结果另行记录。
+
 修正 035 探针后的 [Intel #44095029967](https://github.com/engcapa/taomni/actions/runs/44095029967)（`0dfdfb159caa31b65ba239fd80917c79acee02e0`、selection `563142a953e24addbe9a5089798eec0f`）已成功结束，4/4 分片在 summary 前收齐，34/34、零失败/skip，含完整 24 项 crash-regression。全部 artifact 的 hash/bytes、receipt、source/runner/selection、实际 case digest/计数与 release QA 身份已核验，详见 `qa-ui-auto-report/github/44095029967/hosted-evidence-review.json`。与下述已核验的 137 项共同覆盖三端 browser/native，目前共 171 项通过；macOS native 此结论限定 Intel macOS 15，ARM64 不能由此记为通过。
 
 ARM64 [#44095086934](https://github.com/engcapa/taomni/actions/runs/44095086934) 仅一片实际执行，8/8 通过；其余三片在任何步骤前因 GitHub 无法分配 hosted runner 而取消，原始容量注释保存在该 run 的 `runner-capacity-annotations.json`。按用户允许临时使用更高版本的要求，workflow 增加官方 `macos-26` ARM64 选项，保留原用例/digest、完整 crash 集合和准确 release 架构；不由新版外推 macOS 15 ARM64 兼容性。
