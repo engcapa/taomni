@@ -374,14 +374,41 @@ async fn dropping_the_operation_owner_aborts_its_offer() {
         .await
         .unwrap();
     let endpoint = address(pending.descriptor());
+    let dropped_at = std::time::Instant::now();
     drop(pending);
-    // Abort schedules task destruction. Poll only the independent observation;
-    // a single yield does not guarantee executor task order on every platform.
-    timeout(Duration::from_secs(1), async {
-        while TcpStream::connect(endpoint).await.is_ok() {
-            tokio::task::yield_now().await;
+    // First observe actual kernel port ownership, without making a connection
+    // against a listener whose task destruction has merely been scheduled.
+    // A closed-port TCP probe can itself spend a platform-specific retry delay.
+    timeout(limits().timeout, async {
+        loop {
+            match std::net::TcpListener::bind(endpoint) {
+                Ok(rebound) => {
+                    drop(rebound);
+                    break;
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::AddrInUse => {
+                    tokio::time::sleep(Duration::from_millis(5)).await;
+                }
+                Err(error) => panic!("cannot independently observe released port: {error}"),
+            }
         }
     })
     .await
-    .expect("dropped offer must reclaim its actual listener");
+    .expect("dropped offer must release its actual kernel port");
+    println!(
+        "dropped owner: kernel port reusable after {:?}",
+        dropped_at.elapsed()
+    );
+    let probed_at = std::time::Instant::now();
+    let refused = timeout(limits().timeout, TcpStream::connect(endpoint))
+        .await
+        .expect("closed-port probe must complete within the transfer budget");
+    assert!(
+        refused.is_err(),
+        "dropped offer must not accept another connection"
+    );
+    println!(
+        "dropped owner: independent closed-port probe refused after {:?}",
+        probed_at.elapsed()
+    );
 }
