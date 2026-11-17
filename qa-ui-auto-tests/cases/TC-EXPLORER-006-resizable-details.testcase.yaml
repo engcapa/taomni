@@ -50,8 +50,8 @@ steps:
       409 && document.querySelector('.ex-shell:focus-within .ex-column:nth-child(1)').getBoundingClientRect().width <= 411
     expect_truthy: true
 - eval_readonly:
-    expression: document.querySelector('.ex-shell:focus-within .ex-frow .ex-name').getBoundingClientRect().width >= 409
-      && document.querySelector('.ex-shell:focus-within .ex-frow .ex-name').getBoundingClientRect().width <= 411
+    expression: document.querySelector('.ex-shell:focus-within .ex-frow .ex-name').getBoundingClientRect().width >= 409 &&
+      document.querySelector('.ex-shell:focus-within .ex-frow .ex-name').getBoundingClientRect().width <= 411
     expect_truthy: true
 - click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-column-resize-size"]'
 - drag_to:
@@ -100,9 +100,9 @@ steps:
     contains: '"mtime":220'
 - screenshot: explorer-columns-resized.png
 - reload_window: null
-- click: '[data-testid="side-tab-tools"]'
-- click: '[data-testid="sidebar-tool-file-explorer"]'
-- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- wait_for: '[data-testid="tab-item"][data-tab-type="file-browser"][data-tab-title="previews"]'
+- click: '[data-testid="tab-item"][data-tab-type="file-browser"][data-tab-title="previews"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="notes.txt"]'
 - press:
     selector: '[data-testid="explorer-tab"][data-active="true"]'
     key: Control+l
@@ -129,6 +129,12 @@ steps:
     from: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-column-resize-name"]'
     by:
       dx: 300
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-column-resize-name"]'
+    key: Shift+ArrowRight
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-column-resize-name"]'
+    key: Shift+ArrowRight
 - press:
     selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-column-resize-size"]'
     key: ArrowRight
@@ -215,8 +221,8 @@ verification:
   review: reviewed
   requirements:
   - id: EXPLORER-COLUMNS
-    requirement: Details columns resize independently, fit data, preserve sorting/selection and share persistent widths
-      with aligned horizontal scrolling.
+    requirement: Details columns resize independently, fit data, preserve sorting/selection and share persistent widths with
+      aligned horizontal scrolling.
     actions:
     - 4
     - 5
@@ -233,7 +239,6 @@ verification:
     - 22
     - 24
     - 32
-    - 33
     - 34
     - 36
     - 37
@@ -243,22 +248,24 @@ verification:
     - 44
     - 45
     - 46
-    - 49
-    - 50
-    - 53
-    - 56
-    - 57
+    - 47
+    - 48
+    - 51
+    - 52
+    - 55
+    - 58
     - 59
-    - 60
+    - 61
     - 62
-    - 63
+    - 64
     - 65
     - 67
-    - 68
     - 69
-    - 73
-    - 76
-    - 80
+    - 70
+    - 71
+    - 75
+    - 78
+    - 82
     results:
     - 15
     - 16
@@ -271,25 +278,26 @@ verification:
     - 28
     - 29
     - 30
+    - 35
     - 41
     - 43
-    - 47
-    - 51
-    - 52
+    - 49
+    - 53
     - 54
-    - 55
-    - 58
-    - 61
-    - 64
+    - 56
+    - 57
+    - 60
+    - 63
     - 66
-    - 70
-    - 71
+    - 68
     - 72
+    - 73
     - 74
-    - 77
-    - 78
-    - 81
+    - 76
+    - 79
+    - 80
     - 83
+    - 85
     checkpoints:
     - step: 15
       expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
@@ -324,61 +332,64 @@ verification:
     - step: 30
       expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
         retain content and sorting.
+    - step: 35
+      expectation: The restored previews tab is active and its real notes.txt row is ready before the post-reload keyboard
+        and persisted-width checks.
     - step: 41
-      expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
-        retain content and sorting.
+      expectation: After the WebView reload, the explicitly restored previews tab and its real notes.txt row are ready; the
+        name column remains 410px.
     - step: 43
+      expectation: The restored previews tab retains the 220px Date modified column.
+    - step: 49
+      expectation: After a 300px pointer resize and two 50px keyboard increments, focus the last separator to scroll it into
+        view. The content must actually overflow, scrollLeft must be positive, and the Size header and file cells must align
+        within 1.5px.
+    - step: 53
       expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
         retain content and sorting.
-    - step: 47
-      expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
-        retain content and sorting.
-    - step: 51
-      expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
-        retain content and sorting.
-    - step: 52
+    - step: 54
       expectation: The fitted filename has no intrinsic truncation. Other explicitly sized columns may still require horizontal
         scrolling in the 1028px native window; horizontal alignment is checked separately.
-    - step: 54
+    - step: 56
       expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
         retain content and sorting.
-    - step: 55
+    - step: 57
       expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
         retain content and sorting.
-    - step: 58
+    - step: 60
       expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
         retain content and sorting.
-    - step: 61
-      expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
-        retain content and sorting.
-    - step: 64
+    - step: 63
       expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
         retain content and sorting.
     - step: 66
       expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
         retain content and sorting.
-    - step: 70
-      expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
-        retain content and sorting.
-    - step: 71
+    - step: 68
       expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
         retain content and sorting.
     - step: 72
       expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
         retain content and sorting.
+    - step: 73
+      expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
+        retain content and sorting.
     - step: 74
       expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
         retain content and sorting.
-    - step: 77
+    - step: 76
       expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
         retain content and sorting.
-    - step: 78
+    - step: 79
       expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
         retain content and sorting.
-    - step: 81
+    - step: 80
+      expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
+        retain content and sorting.
+    - step: 83
       expectation: The application is explicitly dark; resizing separators and aligned rows remain readable in the retained
         screenshot.
-    - step: 83
+    - step: 85
       expectation: The packaged view has no runtime errors after the dark-theme interaction.
   visual:
   - check: Visible separators, readable fitted names and aligned rows in both themes/narrow overflow.
@@ -389,5 +400,5 @@ verification:
   native:
   - check: Real disk listing and pointer/keyboard resizing in packaged WebView.
     method: automated
-    reason: The native mode creates actual files and drives the QA release; macOS bridge keys do not establish OS-global
-      shortcut delivery.
+    reason: The native mode creates actual files and drives the QA release; macOS bridge keys do not establish OS-global shortcut
+      delivery.
