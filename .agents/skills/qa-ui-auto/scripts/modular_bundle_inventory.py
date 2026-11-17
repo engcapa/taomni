@@ -21,6 +21,16 @@ TARGETS = {
     'darwin-x86_64': ('macos-x86_64', ('.dmg',)),
 }
 
+RUNNERS = {'linux-x86_64': 'ubuntu-22.04', 'windows-x86_64': 'windows-latest',
+           'darwin-aarch64': 'macos-15', 'darwin-x86_64': 'macos-15-intel'}
+
+
+def plan_targets(value: str) -> dict:
+    targets = list(TARGETS) if value == 'all' else [part.strip() for part in value.split(',')]
+    if not targets or len(set(targets)) != len(targets) or any(target not in TARGETS for target in targets):
+        raise ValueError('select all or unique supported package targets')
+    return {'include': [{'os': RUNNERS[target], 'target': target} for target in targets]}
+
 
 def write_json(path: Path, value) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -154,6 +164,9 @@ def linux_metadata(directory: Path, output: Path, version: str) -> dict:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     commands = parser.add_subparsers(dest='command', required=True)
+    plan = commands.add_parser('plan-targets')
+    plan.add_argument('--targets', required=True)
+    plan.add_argument('--github-output', type=Path, required=True)
     validate = commands.add_parser('validate-source')
     for key in ('run', 'artifacts', 'out', 'github-output'):
         validate.add_argument(f'--{key}', type=Path, required=True)
@@ -165,6 +178,11 @@ def main() -> None:
     collect.add_argument('--tooling-source', required=True)
     collect.add_argument('--linux-metadata', action='store_true')
     args = parser.parse_args()
+    if args.command == 'plan-targets':
+        matrix = plan_targets(args.targets)
+        with args.github_output.open('a', encoding='utf-8') as stream:
+            stream.write('matrix=' + json.dumps(matrix, separators=(',', ':')) + '\n')
+        return
     if args.command == 'validate-source':
         record = validate_source(
             json.loads(args.run.read_text(encoding='utf-8')),

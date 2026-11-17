@@ -15,28 +15,44 @@ on:
       package_version:
         type: string
         required: true
+      package_targets:
+        type: string
+        required: false
+        default: all
 
 permissions:
   contents: read
   actions: read
 
 jobs:
+  plan:
+    runs-on: ubuntu-22.04
+    outputs:
+      matrix: ${{ steps.targets.outputs.matrix }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head }}
+          persist-credentials: false
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Select only supported completed package targets
+        id: targets
+        env:
+          SAMPLE_TARGETS: ${{ inputs.package_targets }}
+        run: |
+          python .agents/skills/qa-ui-auto/scripts/modular_bundle_inventory.py plan-targets \
+            --targets "$SAMPLE_TARGETS" --github-output "$GITHUB_OUTPUT"
+
   bundle-samples:
+    needs: plan
     name: Real release bundle (${{ matrix.target }})
     runs-on: ${{ matrix.os }}
     timeout-minutes: 25
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - os: ubuntu-22.04
-            target: linux-x86_64
-          - os: windows-latest
-            target: windows-x86_64
-          - os: macos-15
-            target: darwin-aarch64
-          - os: macos-15-intel
-            target: darwin-x86_64
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
     defaults:
       run:
         shell: bash

@@ -8,7 +8,7 @@ import tarfile
 import tempfile
 import unittest
 
-from modular_bundle_inventory import inventory, tree_sample, validate_source
+from modular_bundle_inventory import inventory, plan_targets, tree_sample, validate_source
 from modular_bundle_macos import app_identity, extract_updater
 
 
@@ -32,6 +32,16 @@ def validate(run, artifacts):
 
 
 class BundleSourceTests(unittest.TestCase):
+    def test_only_explicit_supported_targets_are_scheduled(self):
+        self.assertEqual(plan_targets('linux-x86_64'),
+                         {'include': [{'os': 'ubuntu-22.04', 'target': 'linux-x86_64'}]})
+        self.assertEqual(len(plan_targets('all')['include']), 4)
+        self.assertEqual([row['target'] for row in plan_targets('darwin-x86_64, windows-x86_64')['include']],
+                         ['darwin-x86_64', 'windows-x86_64'])
+        for value in ['', 'all,linux-x86_64', 'linux-x86_64,linux-x86_64', 'self-hosted', 'windows-arm64']:
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                plan_targets(value)
+
     def test_completed_artifact_can_be_sampled_before_the_other_builders_finish(self):
         run, artifacts = source_fixture()
         result = validate(run, artifacts)

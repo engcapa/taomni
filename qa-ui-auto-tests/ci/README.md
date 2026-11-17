@@ -35,6 +35,9 @@ macOS ARM64 and macOS Intel. It checks the producer repository/workflow/SHA and
 immutable artifact ID before downloading, then records every actual package's
 size and SHA-256. An uploaded target can be inspected while other builders are
 still running. A missing, expired, duplicate or mismatched artifact fails.
+Set `package_targets=linux-x86_64` (or a comma-separated subset of the four
+release targets) to inspect completed uploads without waiting for other builds;
+the default is `all`. Each target selection has its own concurrency group.
 
 The same jobs read Debian/RPM metadata, administratively extract the actual MSI,
 or mount the actual DMG read-only and inspect its copied app and any updater app.
