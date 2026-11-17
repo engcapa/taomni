@@ -85,6 +85,24 @@ class FillPasteTest(unittest.TestCase):
             step_fill(ctx, ARGS)
         ctx.page.locator.return_value.first.press.assert_called_once_with("ControlOrMeta+a")
 
+    def test_windows_chromium_clipboard_uses_os_crlf_without_losing_source_whitespace(self):
+        ctx = SimpleNamespace(page=Mock(), dry_run=False)
+        ctx.page.evaluate.return_value = SOURCE.replace("\n", "\r\n")
+        with patch("platform.system", return_value="Windows"):
+            step_fill(ctx, ARGS)
+        self.assertEqual(ctx.page.evaluate.call_args.args[1], SOURCE)
+        self.assertEqual([c.args[0] for c in ctx.page.locator.return_value.first.press.call_args_list],
+                         ["ControlOrMeta+a", "ControlOrMeta+v"])
+
+    def test_other_platforms_do_not_accept_an_unexpected_clipboard_newline_change(self):
+        for system in ["Linux", "Darwin"]:
+            with self.subTest(system=system), patch("platform.system", return_value=system):
+                ctx = SimpleNamespace(page=Mock(), dry_run=False)
+                ctx.page.evaluate.return_value = SOURCE.replace("\n", "\r\n")
+                with self.assertRaisesRegex(StepError, "read-back differs"):
+                    step_fill(ctx, ARGS)
+                ctx.page.locator.return_value.first.press.assert_called_once_with("ControlOrMeta+a")
+
     def test_dry_run_has_no_input_or_clipboard_side_effects(self):
         for execute in [step_fill, _do_fill]:
             with self.subTest(execute=execute.__name__):

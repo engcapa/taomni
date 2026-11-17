@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import platform
 
 from .steps import StepError
 
@@ -30,7 +31,10 @@ def browser(ctx, selector: str, text: str) -> None:
       await navigator.clipboard.writeText(text);
       return await navigator.clipboard.readText();
     }""", text)
-    if observed != text:
+    # Chromium serializes text/plain to Windows clipboard CRLF. Keep all
+    # characters and whitespace; the case still asserts exact editor/disk LF.
+    windows_text = text.replace("\r\n", "\n").replace("\n", "\r\n") if platform.system() == "Windows" else text
+    if observed != text and observed != windows_text:
         raise StepError("fill with method paste: browser clipboard read-back differs from the requested text")
     loc.press("ControlOrMeta+v")
 
