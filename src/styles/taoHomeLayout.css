@@ -8,6 +8,7 @@
 
 .tao-home-main {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: minmax(0, 1fr) auto;
   flex: 1;
   min-width: 0;
@@ -109,7 +110,11 @@
 }
 
 .tao-home-dock-row { justify-content: center; flex-wrap: wrap; }
-.tao-home-composer-dock { padding-inline: clamp(12px, 5%, 88px); }
+.tao-home-composer-dock { min-width: 0; padding-inline: clamp(12px, 5%, 88px); }
+.tao-home-composer-toolbar { min-width: 0; gap: 8px; }
+.tao-home-composer-tools { min-width: 0; }
+.tao-home-capability-button { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tao-home-composer-right { flex: none; }
 
 .tao-home-side-panel {
   position: relative;
