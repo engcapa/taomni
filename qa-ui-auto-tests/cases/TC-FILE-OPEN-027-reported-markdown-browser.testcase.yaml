@@ -38,11 +38,9 @@ steps:
     key: Enter
 - dblclick: '[data-testid="explorer-file-row"][data-name="${fixture.markdown_testing_filename}"]'
 - wait_for: '[data-testid="markdown-editor"]'
-- press:
-    selector: '[data-testid="viewer-editor"] .cm-content'
-    key: Control+End
-    macos_key: Meta+ArrowDown
+- click: '[data-testid="markdown-outline"] button:last-child'
 - wait_for: '[data-testid="markdown-table-widget"] strong'
+- click: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="0"]'
 - assert_text:
     selector: '[data-testid="markdown-table-widget"]'
     contains: 死循环防护
@@ -144,45 +142,46 @@ verification:
     - 9
     - 10
     - 12
-    - 17
-    - 19
-    - 22
+    - 14
+    - 18
+    - 20
     - 23
-    - 27
+    - 24
     - 28
-    - 32
+    - 29
     - 33
-    - 38
+    - 34
     - 39
     - 40
     - 41
     - 42
-    - 44
-    - 46
+    - 43
+    - 45
+    - 47
     results:
     - 6
     - 11
     - 13
-    - 14
     - 15
-    - 18
-    - 20
+    - 16
+    - 19
     - 21
-    - 24
+    - 22
     - 25
     - 26
-    - 29
+    - 27
     - 30
     - 31
-    - 34
+    - 32
     - 35
     - 36
     - 37
-    - 43
-    - 45
-    - 47
+    - 38
+    - 44
+    - 46
     - 48
     - 49
+    - 50
     checkpoints:
     - step: 6
       expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
@@ -193,22 +192,19 @@ verification:
     - step: 13
       expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
         source or independent export assertion.
-    - step: 14
-      expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
-        source or independent export assertion.
     - step: 15
       expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
         source or independent export assertion.
-    - step: 18
+    - step: 16
       expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
         source or independent export assertion.
-    - step: 20
+    - step: 19
       expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
         source or independent export assertion.
     - step: 21
       expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
         source or independent export assertion.
-    - step: 24
+    - step: 22
       expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
         source or independent export assertion.
     - step: 25
@@ -217,7 +213,7 @@ verification:
     - step: 26
       expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
         source or independent export assertion.
-    - step: 29
+    - step: 27
       expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
         source or independent export assertion.
     - step: 30
@@ -226,7 +222,7 @@ verification:
     - step: 31
       expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
         source or independent export assertion.
-    - step: 34
+    - step: 32
       expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
         source or independent export assertion.
     - step: 35
@@ -238,19 +234,22 @@ verification:
     - step: 37
       expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
         source or independent export assertion.
-    - step: 43
+    - step: 38
       expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
         source or independent export assertion.
-    - step: 45
+    - step: 44
       expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
         source or independent export assertion.
-    - step: 47
+    - step: 46
       expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
         source or independent export assertion.
     - step: 48
       expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
         source or independent export assertion.
     - step: 49
+      expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
+        source or independent export assertion.
+    - step: 50
       expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
         source or independent export assertion.
   visual:

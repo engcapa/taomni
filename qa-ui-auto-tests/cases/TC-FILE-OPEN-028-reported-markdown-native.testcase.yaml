@@ -38,10 +38,7 @@ steps:
     key: Enter
 - dblclick: '[data-testid="explorer-file-row"][data-name="${fixture.markdown_testing_filename}"]'
 - wait_for: '[data-testid="markdown-editor"]'
-- press:
-    selector: '[data-testid="viewer-editor"] .cm-content'
-    key: Control+End
-    macos_key: Meta+ArrowDown
+- click: '[data-testid="markdown-outline"] button:last-child'
 - wait_for: '[data-testid="markdown-table-widget"] strong'
 - click: '[data-testid="markdown-table-widget"] [data-cell-row="1"][data-cell-column="0"]'
 - assert_text:
@@ -159,62 +156,62 @@ verification:
     - 42
     checkpoints:
     - step: 6
-      expectation: Observe the exact formatted user document, completed native save or independent artifact check.
-        Source SHA stays unchanged.
+      expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
+        source or independent export assertion.
     - step: 11
-      expectation: Observe the exact formatted user document, completed native save or independent artifact check.
-        Source SHA stays unchanged.
+      expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
+        source or independent export assertion.
     - step: 13
-      expectation: Observe the exact formatted user document, completed native save or independent artifact check.
-        Source SHA stays unchanged.
+      expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
+        source or independent export assertion.
     - step: 15
-      expectation: Observe the exact formatted user document, completed native save or independent artifact check.
-        Source SHA stays unchanged.
+      expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
+        source or independent export assertion.
     - step: 16
-      expectation: Observe the exact formatted user document, completed native save or independent artifact check.
-        Source SHA stays unchanged.
+      expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
+        source or independent export assertion.
     - step: 19
-      expectation: Observe the exact formatted user document, completed native save or independent artifact check.
-        Source SHA stays unchanged.
+      expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
+        source or independent export assertion.
     - step: 21
-      expectation: Observe the exact formatted user document, completed native save or independent artifact check.
-        Source SHA stays unchanged.
+      expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
+        source or independent export assertion.
     - step: 22
-      expectation: Observe the exact formatted user document, completed native save or independent artifact check.
-        Source SHA stays unchanged.
+      expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
+        source or independent export assertion.
     - step: 25
-      expectation: Observe the exact formatted user document, completed native save or independent artifact check.
-        Source SHA stays unchanged.
+      expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
+        source or independent export assertion.
     - step: 27
-      expectation: Observe the exact formatted user document, completed native save or independent artifact check.
-        Source SHA stays unchanged.
+      expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
+        source or independent export assertion.
     - step: 28
-      expectation: Observe the exact formatted user document, completed native save or independent artifact check.
-        Source SHA stays unchanged.
+      expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
+        source or independent export assertion.
     - step: 31
-      expectation: Observe the exact formatted user document, completed native save or independent artifact check.
-        Source SHA stays unchanged.
+      expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
+        source or independent export assertion.
     - step: 33
-      expectation: Observe the exact formatted user document, completed native save or independent artifact check.
-        Source SHA stays unchanged.
+      expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
+        source or independent export assertion.
     - step: 34
-      expectation: Observe the exact formatted user document, completed native save or independent artifact check.
-        Source SHA stays unchanged.
+      expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
+        source or independent export assertion.
     - step: 37
-      expectation: Observe the exact formatted user document, completed native save or independent artifact check.
-        Source SHA stays unchanged.
+      expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
+        source or independent export assertion.
     - step: 39
-      expectation: Observe the exact formatted user document, completed native save or independent artifact check.
-        Source SHA stays unchanged.
+      expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
+        source or independent export assertion.
     - step: 40
-      expectation: Observe the exact formatted user document, completed native save or independent artifact check.
-        Source SHA stays unchanged.
+      expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
+        source or independent export assertion.
     - step: 41
-      expectation: Observe the exact formatted user document, completed native save or independent artifact check.
-        Source SHA stays unchanged.
+      expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
+        source or independent export assertion.
     - step: 42
-      expectation: Observe the exact formatted user document, completed native save or independent artifact check.
-        Source SHA stays unchanged.
+      expectation: Observe the specified rendered content, edited raw Markdown, restored undo result, unchanged
+        source or independent export assertion.
   visual:
   - check: Actual exported flowchart and sequence in Word/draw.io
     method: manual
