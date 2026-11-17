@@ -11055,9 +11055,12 @@ dependencies = [
 name = "taomni-host-gates"
 version = "0.1.0"
 dependencies = [
+ "aes-gcm 0.10.3",
+ "argon2 0.5.3",
+ "base64 0.22.1",
  "hex",
  "libc",
- "rand 0.9.5",
+ "rand 0.10.2",
  "rusqlite",
  "serde",
  "serde_json",

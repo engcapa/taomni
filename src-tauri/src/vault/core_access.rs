@@ -1,6 +1,6 @@
 //! Typed key access for the MFA facade before its business moves to a host.
 //! A core permit cannot authorize reverse RPC or select another fixed key.
-use super::{StoredKdfParams, Vault, crypto, db, plugin_access};
+use super::{Vault, db, password_key, plugin_access};
 use taomni_plugin_api::services::SecretKey32;
 use taomni_plugin_services::{CoreOperationPermit, MFA_FIXED_KEY_OWNER, OperationKind};
 
@@ -77,29 +77,7 @@ impl Vault {
         let meta = db::get_meta(&inner.conn)
             .map_err(|e| e.to_string())?
             .ok_or(super::ERR_VAULT_EMPTY)?;
-        if meta.kdf != "argon2id" {
-            return Err(format!("unsupported kdf: {}", meta.kdf));
-        }
-        let params: StoredKdfParams =
-            serde_json::from_str(&meta.kdf_params).map_err(|e| e.to_string())?;
-        let root = crypto::derive_root_key(
-            password,
-            &meta.kdf_salt,
-            params.m_cost,
-            params.t_cost,
-            params.p_cost,
-        )
-        .map_err(|e| e.to_string())?;
-        let nonce: [u8; crypto::NONCE_LEN] = meta
-            .verifier_nonce
-            .as_slice()
-            .try_into()
-            .map_err(|_| "verifier nonce shape")?;
-        let plaintext = crypto::aead_decrypt(&root, &nonce, &meta.verifier_ciphertext)
-            .map_err(|_| super::ERR_VAULT_BAD_PASSWORD)?;
-        if plaintext.as_slice() != crypto::VERIFIER_PLAINTEXT {
-            return Err(super::ERR_VAULT_BAD_PASSWORD.into());
-        }
+        drop(password_key::verify(&meta, password)?);
         permit.check_current().map_err(|e| e.kind().to_string())
     }
 }

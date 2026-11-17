@@ -21,3 +21,9 @@
 本地另通过 engine 生产库 clippy、两个受影响 crate 的 rustfmt、workflow actionlint、Node 22/pnpm 10 的 `check:refactor` 与 diff 空白检查。额外的全 workspace rustfmt 检查被未修改的 vendor 格式差异阻断，engine all-targets 严格 clippy 被原有 `tests/operations.rs` 两处 `cloned_ref_to_slice_refs` 阻断；保留原失败日志，未改无关源码或放宽 lint。
 
 没有新的用户流程，不能从 UI 触发未接线的 helper，因此不增加假 browser 入口。保留 browser 026/029/031、native 025/027/028/030/032 以及完整 crash-regression；各轮证据按实际 source/case/runner/build 归属保存，不把旧 SHA 的 UI 通过改写为本 helper 已接线。
+
+## Vault 读取接线
+
+`PreparedMfaExport::verify_key` 在已有排他维护 lease 下绑定事先记录的 Vault 主文件与 WAL 指纹。它在只读事务内验证原主密码、读取唯一的 `mfa.data-key-v1`，将零化密钥交给同一次调用中的 engine 校验。密码保留原始字节，兼容首尾包括空格的原主密码。固定项解码器与现有 Vault 服务共用，口令验证也由现有 MFA 导出口令路径复用。返回值只包含数据库校验结果或 key-only 标记，调用前后会重新检查源文件和 staging。已有 key-only Vault 继续保留，空库可在没有密钥时返回 Unused，已有密文缺少密钥时失败。
+
+验证包括 4 项纯内存单元，以及 4 项 GitHub 专用场景。后者通过生产 Vault schema/密码验证/解码器和真实加密文件执行正确及错误口令、缺失及损坏密钥、已有/无 key-check、key-only、取消和 Vault WAL 变化后的重试，检查源与 staging 字节、HOTP、维护锁及清理。它们使用合成旧数据。下一步在受信任的升级事务中消费此结果，发布数据和 active 状态并加入崩溃恢复，最后用正式旧版安装程序验证升级。

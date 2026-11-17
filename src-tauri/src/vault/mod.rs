@@ -3,6 +3,9 @@ mod core_access;
 pub mod crypto;
 mod data_access;
 pub mod db;
+mod fixed_key_read;
+pub(crate) mod migration_check;
+mod password_key;
 mod passwords;
 pub mod plugin_access;
 pub use commands::*;
@@ -14,6 +17,7 @@ mod data_access_tests;
 #[cfg(test)]
 mod tests;
 
+use password_key::StoredKdfParams;
 use rusqlite::Connection;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
@@ -57,13 +61,6 @@ pub struct VaultStatus {
 pub struct VaultPutResult {
     pub id: String,
     pub reference: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct StoredKdfParams {
-    m_cost: u32,
-    t_cost: u32,
-    p_cost: u32,
 }
 
 /// Owns the on-disk vault SQLite connection plus the in-memory unlock state.

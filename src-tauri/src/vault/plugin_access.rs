@@ -104,27 +104,7 @@ pub(super) fn load_data_key(
     id: &str,
 ) -> Result<Option<SecretKey32>, PluginKeyError> {
     let root = inner.root_key.as_ref().ok_or(PluginKeyError::VaultLocked)?;
-    let Some(entry) = db::get_entry(&inner.conn, id).map_err(|_| PluginKeyError::Unavailable)?
-    else {
-        return Ok(None);
-    };
-    let nonce: [u8; crypto::NONCE_LEN] = entry
-        .nonce
-        .as_slice()
-        .try_into()
-        .map_err(|_| PluginKeyError::KeyMismatch)?;
-    let plaintext = crypto::aead_decrypt(root, &nonce, &entry.ciphertext)
-        .map_err(|_| PluginKeyError::KeyMismatch)?;
-    let encoded =
-        std::str::from_utf8(plaintext.as_slice()).map_err(|_| PluginKeyError::KeyMismatch)?;
-    let mut bytes = Zeroizing::new([0u8; 32]);
-    let count = STANDARD
-        .decode_slice(encoded.trim(), bytes.as_mut_slice())
-        .map_err(|_| PluginKeyError::KeyMismatch)?;
-    if count != 32 {
-        return Err(PluginKeyError::KeyMismatch);
-    }
-    Ok(Some(SecretKey32::new(std::mem::take(&mut *bytes))))
+    super::fixed_key_read::load(&inner.conn, root, id)
 }
 
 pub(super) fn create_data_key(

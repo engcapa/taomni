@@ -4,7 +4,9 @@
 //! snapshot is kept separate from code versions, active data and the pending
 //! journal. The future trusted transaction must retain this owner, revalidate
 //! it and perform the scoped key check before committing anything.
+mod key_sources;
 mod sources;
+pub(crate) use key_sources::MfaKeySources;
 
 use std::{
     collections::BTreeMap,

@@ -114,9 +114,21 @@ pub(super) fn read_snapshot_checked<T>(
     inspect: impl FnOnce(&Connection) -> Result<T, String>,
     check: &dyn Fn() -> Result<(), String>,
 ) -> Result<(T, String), String> {
+    read_bound_snapshot_checked(path, None, inspect, check)
+}
+
+pub(super) fn read_bound_snapshot_checked<T>(
+    path: &Path,
+    expected: Option<&str>,
+    inspect: impl FnOnce(&Connection) -> Result<T, String>,
+    check: &dyn Fn() -> Result<(), String>,
+) -> Result<(T, String), String> {
     // Validate/hash before SQLite opens either file. A second hash while the
     // read transaction is held rejects a writer or checkpoint racing discovery.
     let before = database_fingerprint_checked(path, check)?;
+    if expected.is_some_and(|expected| expected != before) {
+        return Err("legacy database source changed; refresh the upgrade preflight".into());
+    }
     let connection = Connection::open_with_flags(
         path,
         OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NOFOLLOW,
@@ -125,14 +137,14 @@ pub(super) fn read_snapshot_checked<T>(
     let transaction = connection
         .unchecked_transaction()
         .map_err(|error| format!("legacy database snapshot cannot be read: {error}"))?;
-    let value = inspect(&transaction)?;
+    let value = inspect(&transaction);
     if database_fingerprint_checked(path, check)? != before {
         return Err(
             "legacy database changed during upgrade inspection; retry after its writer is idle"
                 .into(),
         );
     }
-    Ok((value, before))
+    value.map(|value| (value, before))
 }
 
 pub(super) fn stable_database_fingerprint(path: &Path) -> Result<String, String> {

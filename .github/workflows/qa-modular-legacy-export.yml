@@ -89,6 +89,14 @@ jobs:
           set -o pipefail
           cargo test --manifest-path src-tauri/Cargo.toml -p taomni-mfa-engine --lib --locked -- --test-threads=1 --nocapture 2>&1 | tee modular-export-evidence/mfa-engine-unit.log
           python -c 'from pathlib import Path; assert "21 passed; 0 failed; 0 ignored" in Path("modular-export-evidence/mfa-engine-unit.log").read_text(), "Missing actual read-only and retained MFA engine contracts"'
+      - name: Verify legacy exports with the original read-only Vault key
+        env:
+          TAOMNI_GATE_EVIDENCE_DIR: ${{ github.workspace }}/modular-export-evidence
+        run: |
+          set -o pipefail
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-host-gates --test legacy_key_service --locked -- vault:: --test-threads=1 --nocapture 2>&1 | tee modular-export-evidence/vault-key-unit.log
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-host-gates --test legacy_key_service --locked -- native:: --ignored --test-threads=1 --nocapture 2>&1 | tee modular-export-evidence/vault-key-native.log
+          python -c 'from pathlib import Path; root = Path("modular-export-evidence"); assert all("4 passed; 0 failed; 0 ignored" in (root / name).read_text() for name in ("vault-key-unit.log", "vault-key-native.log")), "Missing actual Vault key contracts"'
       - name: Verify old-mode exclusion and crash release across real processes
         run: |
           set -o pipefail

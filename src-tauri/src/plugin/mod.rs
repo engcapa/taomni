@@ -12,6 +12,7 @@ pub mod install;
 mod installation;
 pub(crate) mod marketplace;
 pub mod migration;
+mod migration_key_check;
 pub(crate) mod network;
 pub mod protocol;
 mod quiescence;
