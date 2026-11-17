@@ -8,7 +8,10 @@ from types import SimpleNamespace
 import tempfile
 import unittest
 
-from qa_ui_auto.fixtures.module_upgrade import CHAT_FILES, SERVER_ITEMS, SERVER_ROWS, input_sessions, preview_snapshot, preview_server_snapshot
+from qa_ui_auto.fixtures.module_upgrade import (
+    CHAT_FILES, CLIENT_ITEMS, PIN_ROWS, SERVER_ITEMS, SERVER_ROWS, client_sessions,
+    input_sessions, preview_client_snapshot, preview_snapshot, preview_server_snapshot,
+)
 from qa_ui_auto.module_upgrade_observation import observe, run
 from qa_ui_auto.steps import StepError
 
@@ -127,6 +130,27 @@ class UpgradeObservationTests(unittest.TestCase):
         with closing(sqlite3.connect(self.root / "taomni.db")) as db, db:
             db.execute("UPDATE server_configs SET config_json = '{}' WHERE server_type = 'rdp'")
         with self.assertRaisesRegex(StepError, "original server configurations"):
+            observe(self.root, self.state, "preflight")
+
+    def test_combined_rdp_sources_keep_every_pending_item_and_original_pin(self):
+        self.assertEqual([row["plugin_slug"] for row in preview_client_snapshot()["candidates"]],
+                         ["rdp-client", "vnc-client", "rdp-client"])
+        self.assertEqual([row["session_type"] for row in client_sessions()], ["SSH", "VNC", "RDP"])
+        self.state.update(expected_items=CLIENT_ITEMS, certificate_pins=PIN_ROWS)
+        with closing(sqlite3.connect(self.root / "taomni.db")) as db, db:
+            db.execute("CREATE TABLE rdp_certificate_pins (endpoint TEXT, fingerprint TEXT, updated_at INTEGER)")
+            db.executemany("INSERT INTO rdp_certificate_pins VALUES (?, ?, ?)", PIN_ROWS)
+        self.journal["entries"] = [{**self.journal["entries"][0], "item": item} for item in CLIENT_ITEMS]
+        self.write_journal()
+        observe(self.root, self.state, "pending")
+        observe(self.root, self.state, "repeat")
+        self.journal["entries"].pop()
+        self.write_journal()
+        with self.assertRaisesRegex(StepError, "exactly one"):
+            observe(self.root, self.state, "repeat")
+        with closing(sqlite3.connect(self.root / "taomni.db")) as db, db:
+            db.execute("UPDATE rdp_certificate_pins SET fingerprint = ?", ["cd" * 32])
+        with self.assertRaisesRegex(StepError, "original RDP certificate pins"):
             observe(self.root, self.state, "preflight")
 
 

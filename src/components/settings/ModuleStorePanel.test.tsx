@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { setLocale } from "../../lib/i18n";
@@ -82,6 +82,30 @@ describe("ModuleStorePanel", () => {
     expect(screen.getByTestId("module-upgrade-status")).toHaveAttribute("data-state", "empty");
     expect(screen.getByTestId("module-upgrade-empty")).toHaveTextContent("No legacy module data needs migration.");
     expect(screen.queryByTestId("module-upgrade-migrate")).not.toBeInTheDocument();
+  });
+
+  it("recommends each module once while preserving all independent migration items", async () => {
+    const snapshot: LegacyInstallSnapshot = {
+      from_version: "0.5.9",
+      database_path: "/profile/taomni.db",
+      database_tables: ["sessions", "rdp_certificate_pins"],
+      candidates: [
+        { item: "rdp-vnc-sessions", evidence: ["taomni.db"], plugin_slug: "rdp-client" },
+        { item: "vnc-sessions", evidence: ["taomni.db"], plugin_slug: "vnc-client" },
+        { item: "rdp-certificate-pins", evidence: ["taomni.db"], plugin_slug: "rdp-client" },
+      ],
+      source_fingerprints: { "taomni.db": "sha256:test:bytes:1" },
+      retained_paths: [],
+      vault: null,
+    };
+    const before = JSON.stringify(snapshot);
+    const onMigrationExecute = vi.fn();
+    render(<ModuleStorePanel migrationSnapshot={snapshot} onMigrationExecute={onMigrationExecute} />);
+    expect(within(screen.getByTestId("module-upgrade-candidates")).getAllByRole("listitem")
+      .map((item) => item.textContent)).toEqual(["rdp-client", "vnc-client"]);
+    await userEvent.click(screen.getByTestId("module-upgrade-migrate"));
+    expect(onMigrationExecute).toHaveBeenCalledOnce();
+    expect(JSON.stringify(snapshot)).toBe(before);
   });
 
   it("explains when migration remains pending for trusted package/exporter gates", () => {

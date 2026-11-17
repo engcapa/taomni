@@ -1,0 +1,223 @@
+id: TC-MODULES-030
+title: Native RDP sessions and certificate pins recommend one RDP module without losing pending items
+description: Seeds synthetic SSH/RDP/VNC sessions and one RDP certificate pin. Real Settings/IPC must list rdp-client and
+  vnc-client exactly once while preserving three independent pending journal items, original session/options and pin bytes,
+  and retained chat files through repeat and normal restart. This does not export data or activate modules.
+covers:
+- F-Modules-1
+tags:
+- p1
+- modules
+- upgrade
+- lifecycle
+modes:
+- native
+fixtures:
+- reset_db
+- module_upgrade
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: module store
+- wait_for: '[data-testid="module-upgrade-status"][data-state="candidates"]'
+- assert_count:
+    selector: '[data-testid="module-upgrade-candidates"] li'
+    equal: 2
+- assert_text_equals:
+    selector: '[data-testid="module-upgrade-candidates"] li:nth-child(1)'
+    equals: rdp-client
+- assert_text_equals:
+    selector: '[data-testid="module-upgrade-candidates"] li:nth-child(2)'
+    equals: vnc-client
+- assert_visible: '[data-testid="module-upgrade-retained"]'
+- assert_text:
+    selector: '[data-testid="module-upgrade-retained"]'
+    contains: '2'
+- assert_count:
+    selector: '[data-testid="module-upgrade-error"]'
+    equal: 0
+- module_upgrade_probe:
+    phase: preflight
+- click: '[data-testid="module-upgrade-migrate"]'
+- wait_for: '[data-testid="module-upgrade-pending"]'
+- assert_attribute:
+    selector: '[data-testid="module-upgrade-status"]'
+    name: data-state
+    equals: candidates
+- assert_text:
+    selector: '[data-testid="module-upgrade-pending"]'
+    contains: verified
+- assert_text_equals:
+    selector: '[data-testid="module-upgrade-candidates"] li:nth-child(1)'
+    equals: rdp-client
+- assert_text_equals:
+    selector: '[data-testid="module-upgrade-candidates"] li:nth-child(2)'
+    equals: vnc-client
+- module_upgrade_probe:
+    phase: pending
+- native_restart_app:
+    expect_exit_confirmation:
+      title: Exit
+      message: There is 1 open tab. Exit Taomni and close it?
+      confirm_label: Exit
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: module store
+- wait_for: '[data-testid="module-upgrade-status"][data-state="candidates"]'
+- assert_count:
+    selector: '[data-testid="module-upgrade-candidates"] li'
+    equal: 2
+- assert_text_equals:
+    selector: '[data-testid="module-upgrade-candidates"] li:nth-child(1)'
+    equals: rdp-client
+- assert_text_equals:
+    selector: '[data-testid="module-upgrade-candidates"] li:nth-child(2)'
+    equals: vnc-client
+- assert_visible: '[data-testid="module-upgrade-retained"]'
+- assert_text:
+    selector: '[data-testid="module-upgrade-retained"]'
+    contains: '2'
+- assert_count:
+    selector: '[data-testid="module-upgrade-error"]'
+    equal: 0
+- module_upgrade_probe:
+    phase: repeat
+- click: '[data-testid="module-upgrade-migrate"]'
+- wait_for: '[data-testid="module-upgrade-pending"]'
+- wait_for: '[data-testid="module-upgrade-migrate"]:not([disabled])'
+- module_upgrade_probe:
+    phase: repeat
+- assert_no_runtime_errors: null
+- screenshot: client-upgrade-native.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Seeds synthetic SSH/RDP/VNC sessions and one RDP certificate pin. Real Settings/IPC must list rdp-client
+      and vnc-client exactly once while preserving three independent pending journal items, original session/options and pin
+      bytes, and retained chat files through repeat and normal restart. This does not export data or activate modules.
+    actions:
+    - 3
+    - 5
+    - 14
+    - 21
+    - 23
+    - 25
+    - 34
+    checkpoints:
+    - step: 2
+      expectation: '{"wait_for": "[data-testid=\"status-bar\"]"}'
+    - step: 4
+      expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
+    - step: 6
+      expectation: '{"wait_for": "[data-testid=\"module-upgrade-status\"][data-state=\"candidates\"]"}'
+    - step: 7
+      expectation: '{"assert_count": {"selector": "[data-testid=\"module-upgrade-candidates\"] li", "equal": 2}}'
+    - step: 8
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"module-upgrade-candidates\"] li:nth-child(1)", "equals":
+        "rdp-client"}}'
+    - step: 9
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"module-upgrade-candidates\"] li:nth-child(2)", "equals":
+        "vnc-client"}}'
+    - step: 10
+      expectation: '{"assert_visible": "[data-testid=\"module-upgrade-retained\"]"}'
+    - step: 11
+      expectation: '{"assert_text": {"selector": "[data-testid=\"module-upgrade-retained\"]", "contains": "2"}}'
+    - step: 12
+      expectation: '{"assert_count": {"selector": "[data-testid=\"module-upgrade-error\"]", "equal": 0}}'
+    - step: 13
+      expectation: '{"module_upgrade_probe": {"phase": "preflight"}}'
+    - step: 15
+      expectation: '{"wait_for": "[data-testid=\"module-upgrade-pending\"]"}'
+    - step: 16
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"module-upgrade-status\"]", "name": "data-state", "equals":
+        "candidates"}}'
+    - step: 17
+      expectation: '{"assert_text": {"selector": "[data-testid=\"module-upgrade-pending\"]", "contains": "verified"}}'
+    - step: 18
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"module-upgrade-candidates\"] li:nth-child(1)", "equals":
+        "rdp-client"}}'
+    - step: 19
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"module-upgrade-candidates\"] li:nth-child(2)", "equals":
+        "vnc-client"}}'
+    - step: 20
+      expectation: '{"module_upgrade_probe": {"phase": "pending"}}'
+    - step: 22
+      expectation: '{"wait_for": "[data-testid=\"status-bar\"]"}'
+    - step: 24
+      expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
+    - step: 26
+      expectation: '{"wait_for": "[data-testid=\"module-upgrade-status\"][data-state=\"candidates\"]"}'
+    - step: 27
+      expectation: '{"assert_count": {"selector": "[data-testid=\"module-upgrade-candidates\"] li", "equal": 2}}'
+    - step: 28
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"module-upgrade-candidates\"] li:nth-child(1)", "equals":
+        "rdp-client"}}'
+    - step: 29
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"module-upgrade-candidates\"] li:nth-child(2)", "equals":
+        "vnc-client"}}'
+    - step: 30
+      expectation: '{"assert_visible": "[data-testid=\"module-upgrade-retained\"]"}'
+    - step: 31
+      expectation: '{"assert_text": {"selector": "[data-testid=\"module-upgrade-retained\"]", "contains": "2"}}'
+    - step: 32
+      expectation: '{"assert_count": {"selector": "[data-testid=\"module-upgrade-error\"]", "equal": 0}}'
+    - step: 33
+      expectation: '{"module_upgrade_probe": {"phase": "repeat"}}'
+    - step: 35
+      expectation: '{"wait_for": "[data-testid=\"module-upgrade-pending\"]"}'
+    - step: 36
+      expectation: '{"wait_for": "[data-testid=\"module-upgrade-migrate\"]:not([disabled])"}'
+    - step: 37
+      expectation: '{"module_upgrade_probe": {"phase": "repeat"}}'
+    - step: 38
+      expectation: '{"assert_no_runtime_errors": null}'
+    results:
+    - 2
+    - 4
+    - 6
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+    - 15
+    - 16
+    - 17
+    - 18
+    - 19
+    - 20
+    - 22
+    - 24
+    - 26
+    - 27
+    - 28
+    - 29
+    - 30
+    - 31
+    - 32
+    - 33
+    - 35
+    - 36
+    - 37
+    - 38
+  native:
+  - check: Two remote desktop module recommendations retain all three pending items, original sessions and certificate pin
+      through normal restart.
+    method: automated
+    reason: Native 030 independently observes actual SQLite/IPC and exact pending journal entries; browser 031 covers renderer
+      behavior.
+  visual:
+  - check: Both distinct module recommendations and the pending notice remain readable.
+    method: manual
+    reason: Retained screenshot supports review; exact count and text assertions establish state semantics, not visual fidelity.

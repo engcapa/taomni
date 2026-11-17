@@ -14,6 +14,8 @@ SERVER_ITEMS = ["server-configs", "rdp-server-configs", "vnc-server-configs"]
 SERVER_ROWS = [(name, json.dumps({"autoStart": False, "fixture": "qa-legacy-" + name,
                                 "passwordRef": "vault:qa-unused"}), 1)
                for name in ["http", "rdp", "vnc"]]
+CLIENT_ITEMS = ["rdp-vnc-sessions", "vnc-sessions", "rdp-certificate-pins"]
+PIN_ROWS = [("qa-upgrade.invalid:3389", "ab" * 32, 1)]
 
 
 def input_sessions(vnc):
@@ -45,24 +47,45 @@ def preview_server_snapshot():
     return snapshot
 
 
+def client_sessions():
+    rows = input_sessions(True)
+    rdp = ssh_session("qa-upgrade-rdp", {"readOnly": True}, port=3389)
+    rdp["session_type"] = "RDP"
+    return rows + [rdp]
+
+
+def preview_client_snapshot():
+    snapshot = preview_snapshot(True)
+    snapshot["candidates"] = [
+        {"item": item, "plugin_slug": slug, "evidence": ["taomni.db"]}
+        for item, slug in zip(CLIENT_ITEMS, ["rdp-client", "vnc-client", "rdp-client"])]
+    return snapshot
+
+
 def setup(ctx):
-    if ctx.case_id not in {"TC-MODULES-005", "TC-MODULES-025", "TC-MODULES-026", "TC-MODULES-028", "TC-MODULES-029"}:
+    if ctx.case_id not in {"TC-MODULES-005", "TC-MODULES-025", "TC-MODULES-026", "TC-MODULES-028", "TC-MODULES-029", "TC-MODULES-030", "TC-MODULES-031"}:
         raise RuntimeError("module_upgrade requires a registered fixed-input case")
     server_profile = ctx.case_id in {"TC-MODULES-028", "TC-MODULES-029"}
+    client_profile = ctx.case_id in {"TC-MODULES-030", "TC-MODULES-031"}
     vnc = ctx.case_id != "TC-MODULES-005" and not server_profile
     if (ctx.cfg.get("app") or {}).get("mode", "browser") == "browser":
         ctx.page.goto(ctx.cfg["app"]["base_url"])
-        ctx.page.evaluate("value => localStorage.setItem('" + PREVIEW_KEY + "', value)",
-                          json.dumps(preview_server_snapshot() if server_profile else preview_snapshot(vnc)))
+        snapshot = preview_client_snapshot() if client_profile else preview_server_snapshot() if server_profile else preview_snapshot(vnc)
+        ctx.page.evaluate("value => localStorage.setItem('" + PREVIEW_KEY + "', value)", json.dumps(snapshot))
         return
     data = isolated_data_root(ctx)
-    rows = input_sessions(vnc)
+    rows = client_sessions() if client_profile else input_sessions(vnc)
     seed_sessions(ctx, rows)
     if vnc or server_profile:
         for name, content in CHAT_FILES.items():
             with (data / name).open("xb") as stream:
                 stream.write(content)
     ctx.module_upgrade = {"root": data, "sessions": rows, "journal": None}
+    if client_profile:
+        with closing(sqlite3.connect(data / "taomni.db")) as db, db:
+            db.execute("CREATE TABLE rdp_certificate_pins (endpoint TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, updated_at INTEGER NOT NULL)")
+            db.executemany("INSERT INTO rdp_certificate_pins VALUES (?, ?, ?)", PIN_ROWS)
+        ctx.module_upgrade.update(expected_items=CLIENT_ITEMS, certificate_pins=PIN_ROWS)
     if server_profile:
         with closing(sqlite3.connect(data / "taomni.db")) as db, db:
             db.execute("CREATE TABLE server_configs (server_type TEXT PRIMARY KEY, config_json TEXT NOT NULL, updated_at INTEGER NOT NULL)")
@@ -73,4 +96,5 @@ def setup(ctx):
         "dataRoot": str(data), "sessionTypes": [row["session_type"] for row in rows],
         "retainedFiles": list(CHAT_FILES) if vnc or server_profile else [],
         "serverTypes": [row[0] for row in SERVER_ROWS] if server_profile else [],
+        "certificatePinCount": len(PIN_ROWS) if client_profile else 0,
     }, indent=2) + "\n", encoding="utf-8")

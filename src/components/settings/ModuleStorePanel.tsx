@@ -110,6 +110,7 @@ export function ModuleStorePanel({
   const [migrationBusy, setMigrationBusy] = useState(false);
 
   const entries = useMemo(() => [...catalog].sort((left, right) => left.name.localeCompare(right.name)), [catalog]);
+  const migrationModules = [...new Set(migrationSnapshot?.candidates.map((candidate) => candidate.plugin_slug))];
 
   const run = async (
     entry: ModuleStoreCatalogEntry,
@@ -189,8 +190,8 @@ export function ModuleStorePanel({
           </div>
           {migrationSnapshot.candidates.length > 0 ? (
             <ul data-testid="module-upgrade-candidates" className="mt-2 list-disc pl-5 text-[12px]">
-              {migrationSnapshot.candidates.map((candidate) => (
-                <li key={`${candidate.plugin_slug}:${candidate.item}`}>{candidate.plugin_slug}</li>
+              {migrationModules.map((slug) => (
+                <li key={slug}>{slug}</li>
               ))}
             </ul>
           ) : (

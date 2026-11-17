@@ -934,7 +934,7 @@
         "module_upgrade_probe": {
           "type": "object", "additionalProperties": false, "required": ["phase"],
           "properties": { "phase": { "enum": ["preflight", "pending", "repeat"] } },
-          "description": "Native only: read-only observation of registered VNC or mixed-server legacy inputs, including installed-0.5.9 input. Checks original session/config records, retained chat bytes/sidecars, absent module directories and distinct idempotent pending items. No YAML paths, SQL, commands or product mutations."
+          "description": "Native only: read-only observation of registered VNC, combined RDP/VNC/pin or mixed-server legacy inputs, including installed-0.5.9 input. Checks original session/config/certificate-pin records, retained chat bytes/sidecars, absent module directories and distinct idempotent pending items. No YAML paths, SQL, commands or product mutations."
         },
         "module_marketplace_probe": {
           "type": "object", "additionalProperties": false, "required": ["phase"],

@@ -29,6 +29,10 @@ def observe(data, state, phase):
         raise StepError("Upgrade observation refuses a linked database")
     with closing(sqlite3.connect(database.as_uri() + "?mode=ro", uri=True)) as connection:
         rows = connection.execute("SELECT id, session_type, options_json FROM sessions ORDER BY id").fetchall()
+        if "certificate_pins" in state:
+            pins = connection.execute("SELECT endpoint, fingerprint, updated_at FROM rdp_certificate_pins ORDER BY endpoint").fetchall()
+            if pins != state["certificate_pins"]:
+                raise StepError("Upgrade preflight/pending changed the original RDP certificate pins")
         if "server_configs" in state:
             servers = connection.execute("SELECT server_type, config_json, updated_at FROM server_configs ORDER BY server_type").fetchall()
             if servers != state["server_configs"]:
@@ -82,7 +86,7 @@ def run(ctx, args):
         raise StepError("module_upgrade_probe requires a fixed registered phase")
     owner = getattr(ctx, "fixture_context", None) or ctx
     state = getattr(owner, "module_upgrade", None)
-    if not state or getattr(owner, "case_id", None) not in {"TC-MODULES-025", "TC-MODULES-027", "TC-MODULES-028"}:
+    if not state or getattr(owner, "case_id", None) not in {"TC-MODULES-025", "TC-MODULES-027", "TC-MODULES-028", "TC-MODULES-030"}:
         raise StepError("module_upgrade_probe requires its registered native legacy input fixture")
     data = isolated_data_root(owner)
     if data != state["root"]:
