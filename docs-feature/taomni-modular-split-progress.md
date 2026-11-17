@@ -1,5 +1,7 @@
 # 模块化实施与验收台账
 
+2026-11-17 收证更新：完整 UI [#44040286838](https://github.com/engcapa/taomni/actions/runs/44040286838)（`b6b5379f50ca161940ee114ef1b29036aa3d01ba`、selection `fcb5bc65dc2b4a7984ee756661fdf629`）22/22 shards 已在执行期间收齐并核验 receipt/summary/source/build：三端 browser 各 36/36，Linux Xvfb native 56/56、Windows native 55/55、macOS ARM64 native 52/52。Windows TC-MODULES-015 原安装等待失败本轮通过，没有扩大等待预算；Wayland 54/56，FILE-OPEN-006/008 的既有非左键/X11 限制按用户授权单列忽略，仍保留原始失败。证据 `qa-ui-auto-report/github/44040286838/shard-case-totals.json`。自动 relaunch 新增三态用例首轮停在错误备份任务选择，已定位并准备定向复验，详见 `taomni-modular-restore-relaunch-verification.md`。模块化整体迁出和真实安装升级仍未完成。
+
 更新：2026-11-17。范围以[设计 §10.1](taomni-modular-split-design.md#101-可执行任务分解)与 [ADR](../claudedocs/adr-taomni-modular-split.md)为准。基础契约通过不代表业务已迁出或可发布。
 
 ## 当前结论

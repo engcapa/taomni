@@ -27,3 +27,5 @@ Linux WebKitWebDriver 和 Windows WebView2 的自动 relaunch 后接管仍待实
 本地仅执行工具单元和 schema/behavior contract、catalog/refactor 静态检查。真实应用、进程、文件还原和三态自动 relaunch 全部留 GitHub `qa-ui-auto-platforms`，包含完整 crash-regression，并在运行中下载完成的 shard。
 
 [matching UI #44043206496](https://github.com/engcapa/taomni/actions/runs/44043206496) 绑定 `fa17261e4582f84c645bf41658949592767547ec`，selection 为 `f0c687845e4a473da0bcdd72862947d6`。实际计划含 macOS ARM64 native 32 项（包含 033/034/035），browser 三端各 19 项，Linux Xvfb/Wayland 与 Windows native 各 29 项；gaps=[]/unreviewed=[]。已启动即时收证，新增用例尚待 matching runner 结果；不能把静态审查或工具模拟写成原生通过。
+
+2026-11-17：#44043206496 的 macOS 033/034/035 原始失败均停在备份清单断言，尚未执行自动 relaunch。原失败 DOM 有多份真实本地任务；未限定任务的 selector 点击了另一份自动备份。修正 oracle 仅在独立核验准确手工 job、ZIP/全部 hash、原 HOTP counter 和配对 Vault/MFA 后公开该 job ID，三项用例通过对应 `backup-cloud-job[data-job-id]` 打开原任务。保留全部后续密码、staged、exit=0、新 PID/generation 和业务断言；增加工具单元同时检查三项用例的精确 UI 选择。修正后的真实自动重启仍待新 GitHub 结果，原失败不改写为通过。

@@ -7,17 +7,52 @@ import sqlite3
 import tempfile
 from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 import zipfile
 
 from qa_ui_auto.behavior_contract import is_check
 from qa_ui_auto.module_restore_observation import check_core_snapshots, check_generation, check_staging, stage, validate
 from qa_ui_auto.steps import StepError
+from qa_ui_auto import module_restore_observation as observation
 
 BEFORE = "a1234567-1234-1234-1234-123456789abc"
 AFTER = "b1234567-1234-1234-1234-123456789abc"
 
 
 class RestoreObservationTests(unittest.TestCase):
+    def test_ui_selects_only_the_independently_verified_manual_backup_job(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            work = root / "case"
+            work.mkdir()
+            profile = root / "profile"
+            profile.mkdir()
+            plugins = profile / "plugins"
+            plugins.mkdir()
+            (profile / ".profile-state.json").write_text(json.dumps({"generation": BEFORE}))
+            (work / "official-module-fixture.json").write_text(json.dumps({"pluginRoot": str(plugins)}))
+            (work / "module-restore-state.json").write_text(json.dumps({"generation": BEFORE, "step": "original"}))
+            archive = self.paired_archive(profile, 0)
+            digest = hashlib.sha256(archive.read_bytes()).hexdigest()
+            ctx = SimpleNamespace(case_dir=work, values={"module_restore_job_id": "older-automatic-job"})
+            with patch.object(observation, "record", return_value={"state": "disabled"}), \
+                 patch.object(observation, "wait_manual_job", return_value=(AFTER, {"localPath": str(archive)})), \
+                 patch.object(observation, "check_archive", return_value={"sha256": digest}), \
+                 patch.object(observation, "writer_lease", return_value={"held": False}):
+                observation.run(ctx, {"phase": "disabled-archive"})
+            state = json.loads((work / "module-restore-state.json").read_text())
+            self.assertEqual(state["jobId"], AFTER)
+            self.assertEqual(state["archiveSha256"], digest)
+            self.assertEqual(ctx.values["module_restore_job_id"], AFTER)
+            # The UI targets the exact checked job even if automatic backups
+            # were inserted earlier/later in the same history list.
+            for case in ("033", "034", "035"):
+                path = next(Path("qa-ui-auto-tests/cases").glob(f"TC-MODULES-{case}-*.testcase.yaml"))
+                import yaml
+                steps = yaml.safe_load(path.read_text(encoding="utf-8"))["steps"]
+                actions = [step["click"] for step in steps if isinstance(step.get("click"), str) and "backup-local-restore" in step["click"]]
+                self.assertEqual(actions, ['[data-testid="backup-cloud-job"][data-job-id="${fixture.module_restore_job_id}"] [data-testid="backup-local-restore"]'])
+
     def test_apply_must_change_generation_and_ordinary_restart_must_keep_it(self):
         state = {"generation": BEFORE, "restoredGeneration": AFTER}
         check_generation(state, AFTER)
