@@ -1,6 +1,6 @@
 import { act, cleanup, renderHook } from "@testing-library/react";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { createChatController, type TaoThread } from "../ai-chat";
+import { createChatController, type TaoEvent, type TaoThread } from "../ai-chat";
 import { nativeThreadStorage } from "../ai-chat/backend";
 import { useThreadHistory } from "./useThreadHistory";
 
@@ -56,4 +56,61 @@ it("retries a failed read and refreshes legacy summaries without resetting the a
   act(() => hook.result.current.refresh()); await settle();
   expect(controller.getState().threads.legacy.title).toBe("New ChatDrawer history");
   expect(controller.getState().composer.text).toBe("Retain across refresh");
+});
+
+it.each(["send", "continue", "regenerate"] as const)("restores title, provider and draft after native %s settlement", async (operation) => {
+  vi.setSystemTime(1_000);
+  let disk: TaoThread[] = [];
+  vi.mocked(nativeThreadStorage.load).mockImplementation(async () => structuredClone(disk));
+  vi.mocked(nativeThreadStorage.save).mockImplementation(async (thread) => {
+    const stored = disk.find((item) => item.id === thread.id);
+    if (!stored || thread.updatedAt >= stored.updatedAt) {
+      disk = [...disk.filter((item) => item.id !== thread.id), structuredClone(thread)];
+    }
+  });
+  let controller!: ReturnType<typeof createChatController>;
+  const reply = async function* (threadId: string): AsyncGenerator<TaoEvent> {
+    const stored = disk.find((thread) => thread.id === threadId);
+    yield { type: "block_start", index: 0, block: { type: "text" } };
+    yield { type: "block_delta", index: 0, delta: { text: "Document value is 73" } };
+    yield { type: "message_stop" };
+    // Native settlement writes its canonical transcript after sending the
+    // last event. Its timestamp must not reject the final UI preferences.
+    vi.setSystemTime(Date.now() + 10);
+    disk = [{ ...structuredClone(controller.getState().threads[threadId]),
+      title: stored?.title ?? "New Tao chat", preferences: stored?.preferences, updatedAt: Date.now() }];
+    vi.setSystemTime(Date.now() + 10);
+  };
+  controller = createChatController({ backend: {
+    send: async (request) => reply(request.threadId),
+    continue: async (threadId) => reply(threadId),
+    regenerate: async (threadId) => reply(threadId),
+  } });
+  const hook = renderHook(() => useThreadHistory(controller));
+  await settle();
+  act(() => {
+    controller.setProvider("ordinary-documents", { model: "qa-chat" });
+    controller.setComposerText("Original conversation before branch");
+  });
+  await act(async () => { await controller.send(); });
+  await act(async () => { await vi.advanceTimersByTimeAsync(180); });
+  const draft = operation === "send" ? "" : `Draft before ${operation}`;
+  if (operation !== "send") {
+    act(() => controller.setComposerText(draft));
+    await act(async () => { await controller[operation === "continue" ? "continueReply" : "regenerate"](); });
+    await act(async () => { await vi.advanceTimersByTimeAsync(180); });
+  }
+  hook.unmount(); await settle();
+
+  const restored = createChatController();
+  renderHook(() => useThreadHistory(restored)); await settle();
+  const state = restored.getState();
+  expect(state.threads[state.activeThreadId!].title).toBe("Original conversation before branch");
+  expect(state.composer.provider).toBe("ordinary-documents");
+  expect(state.composer.model).toBe("qa-chat");
+  expect(state.composer.text).toBe(draft);
+  const messages = state.threads[state.activeThreadId!].messages;
+  expect(messages).toHaveLength(2);
+  expect(messages[0].text).toBe("Original conversation before branch");
+  expect(messages[1].text).toContain("Document value is 73");
 });
