@@ -182,9 +182,8 @@ steps:
       219 && document.querySelector('.ex-shell:focus-within .ex-column:nth-child(2)').getBoundingClientRect().width <= 221
     expect_truthy: true
 - click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-newtab"]'
-- press:
-    selector: '[data-testid="explorer-tab"][data-active="true"]'
-    key: Tab
+- wait_for: '[data-testid="tab-item"][data-tab-type="file-browser"][data-active="false"] ~ [data-testid="tab-item"][data-tab-type="file-browser"][data-active="true"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="notes.txt"]'
 - click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-column-resize-name"]'
 - eval_readonly:
     expression: document.querySelector('.ex-shell:focus-within .ex-column:nth-child(2)').getBoundingClientRect().width >=
@@ -261,11 +260,10 @@ verification:
     - 65
     - 67
     - 69
-    - 70
-    - 71
-    - 75
-    - 78
-    - 82
+    - 72
+    - 76
+    - 79
+    - 83
     results:
     - 15
     - 16
@@ -290,14 +288,16 @@ verification:
     - 63
     - 66
     - 68
-    - 72
+    - 70
+    - 71
     - 73
     - 74
-    - 76
-    - 79
+    - 75
+    - 77
     - 80
-    - 83
-    - 85
+    - 81
+    - 84
+    - 86
     checkpoints:
     - step: 15
       expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
@@ -368,28 +368,33 @@ verification:
     - step: 68
       expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
         retain content and sorting.
-    - step: 72
-      expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
-        retain content and sorting.
+    - step: 70
+      expectation: The original Explorer tab is inactive and the second Explorer tab is active before resolving controls in
+        the newly mounted pane.
+    - step: 71
+      expectation: The new active Explorer has loaded its real notes.txt row before checking the shared persisted widths.
     - step: 73
       expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
         retain content and sorting.
     - step: 74
       expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
         retain content and sorting.
-    - step: 76
+    - step: 75
       expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
         retain content and sorting.
-    - step: 79
+    - step: 77
       expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
         retain content and sorting.
     - step: 80
       expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
         retain content and sorting.
-    - step: 83
+    - step: 81
+      expectation: Visible dimensions, horizontal alignment, selection and persisted preferences match the preceding action;
+        retain content and sorting.
+    - step: 84
       expectation: The application is explicitly dark; resizing separators and aligned rows remain readable in the retained
         screenshot.
-    - step: 85
+    - step: 86
       expectation: The packaged view has no runtime errors after the dark-theme interaction.
   visual:
   - check: Visible separators, readable fitted names and aligned rows in both themes/narrow overflow.
