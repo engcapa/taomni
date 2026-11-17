@@ -15,6 +15,7 @@ import json
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 import sys
 
 SCRIPTS_DIR = Path(__file__).resolve().parent
@@ -194,6 +195,19 @@ class TestRunnerReceipt(unittest.TestCase):
         verif = verify_runner_receipt(forged, self.registry, "2026-08-29T12:00:00Z")
         self.assertFalse(verif["valid"])
         self.assertEqual(verif["reason"], "signature-mismatch")
+
+    def test_report_on_another_volume_uses_explicit_checkout_for_identity(self):
+        with tempfile.TemporaryDirectory() as tmpdir:
+            root = Path(tmpdir)
+            report = root / "separate-volume" / "run"
+            report.mkdir(parents=True)
+            checkout = root / "checkout"
+            checkout.mkdir()
+            with patch("qa_ui_auto.bundle_identity.inspect_repository_identities", return_value={}) as inspect:
+                emit_runner_receipt(report, "browser", ["python", "qa"],
+                    "2026-08-29T10:00:00Z", "2026-08-29T10:00:01Z", 1, 0,
+                    repository_root=checkout)
+            inspect.assert_called_once_with(checkout.resolve(), mode="browser")
 
     def test_emit_runner_receipt_end_to_end(self):
         """ED-REL-001-A1: emit_runner_receipt produces valid runner_receipt.json in report directory."""

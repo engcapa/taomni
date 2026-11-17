@@ -42,6 +42,7 @@ limit and allow early success only for explicit invalid credentials. Windows
 chooser scenarios declare their platform boundary in YAML.
 
 `observe_tao_provider: null` and `assert_tao_provider_outcome: {timeout_sec: 120}`
+(optionally `require_success: true` rejects credential-invalid; required for the Agnes regression)
 are native-only real-provider checks. Install before clicking Send. The observer
 forwards the real Tauri transport and callbacks unchanged and does not read
 request bodies, keys or response bodies. The assertion waits for invoke

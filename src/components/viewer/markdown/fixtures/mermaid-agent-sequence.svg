@@ -1,0 +1,125 @@
+<svg xmlns="http://www.w3.org/2000/svg" id="tao-sequence-probe" width="100%" viewBox="-50 -10 1181 815" role="graphics-document document" aria-roledescription="sequence">
+  <g>
+    <rect x="856" y="729" fill="#eaeaea" stroke="#666" width="225" height="65" name="Environment" rx="3" ry="3" class="actor actor-bottom" />
+    <text x="968.5" y="761.5" dominant-baseline="central" alignment-baseline="central" class="actor actor-box">
+      <tspan x="968.5" dy="0">外部系统/环境 (文件/Git/API)</tspan>
+    </text>
+  </g>
+  <g>
+    <rect x="614" y="729" fill="#eaeaea" stroke="#666" width="192" height="65" name="MCP" rx="3" ry="3" class="actor actor-bottom" />
+    <text x="710" y="761.5" dominant-baseline="central" alignment-baseline="central" class="actor actor-box">
+      <tspan x="710" dy="0">MCP 协议客户端/服务端</tspan>
+    </text>
+  </g>
+  <g>
+    <rect x="283.5" y="729" fill="#eaeaea" stroke="#666" width="215" height="65" name="Agent" rx="3" ry="3" class="actor actor-bottom" />
+    <text x="391" y="761.5" dominant-baseline="central" alignment-baseline="central" class="actor actor-box">
+      <tspan x="391" dy="0">Agent 核心引擎 (LLM Brain)</tspan>
+    </text>
+  </g>
+  <g />
+  <g>
+    <line id="actor3" x1="968.5" y1="65" x2="968.5" y2="729" class="actor-line 200" stroke-width="0.5px" stroke="#999" name="Environment" data-et="life-line" data-id="Environment" />
+    <g id="root-3" data-et="participant" data-type="participant" data-id="Environment">
+      <rect x="856" y="0" fill="#eaeaea" stroke="#666" width="225" height="65" name="Environment" rx="3" ry="3" class="actor actor-top" />
+      <text x="968.5" y="32.5" dominant-baseline="central" alignment-baseline="central" class="actor actor-box">
+        <tspan x="968.5" dy="0">外部系统/环境 (文件/Git/API)</tspan>
+      </text>
+    </g>
+  </g>
+  <g>
+    <line id="actor2" x1="710" y1="65" x2="710" y2="729" class="actor-line 200" stroke-width="0.5px" stroke="#999" name="MCP" data-et="life-line" data-id="MCP" />
+    <g id="root-2" data-et="participant" data-type="participant" data-id="MCP">
+      <rect x="614" y="0" fill="#eaeaea" stroke="#666" width="192" height="65" name="MCP" rx="3" ry="3" class="actor actor-top" />
+      <text x="710" y="32.5" dominant-baseline="central" alignment-baseline="central" class="actor actor-box">
+        <tspan x="710" dy="0">MCP 协议客户端/服务端</tspan>
+      </text>
+    </g>
+  </g>
+  <g>
+    <line id="actor1" x1="391" y1="65" x2="391" y2="729" class="actor-line 200" stroke-width="0.5px" stroke="#999" name="Agent" data-et="life-line" data-id="Agent" />
+    <g id="root-1" data-et="participant" data-type="participant" data-id="Agent">
+      <rect x="283.5" y="0" fill="#eaeaea" stroke="#666" width="215" height="65" name="Agent" rx="3" ry="3" class="actor actor-top" />
+      <text x="391" y="32.5" dominant-baseline="central" alignment-baseline="central" class="actor actor-box">
+        <tspan x="391" dy="0">Agent 核心引擎 (LLM Brain)</tspan>
+      </text>
+    </g>
+  </g>
+  <g>
+    <line id="actor0" x1="75" y1="80" x2="75" y2="729" class="actor-line 200" stroke-width="0.5px" stroke="#999" name="User" data-et="life-line" data-id="User" />
+  </g>
+  <g />
+  <g>
+    <rect x="386" y="117" fill="#EDF2AE" stroke="#666" width="10" height="592" class="activation0" />
+  </g>
+  <g>
+    <rect x="705" y="299" fill="#EDF2AE" stroke="#666" width="10" height="154" class="activation0" />
+  </g>
+  <g data-et="control-structure" data-id="i12">
+    <line x1="262" y1="209" x2="979.5" y2="209" class="loopLine" />
+    <line x1="979.5" y1="209" x2="979.5" y2="575" class="loopLine" />
+    <line x1="262" y1="575" x2="979.5" y2="575" class="loopLine" />
+    <line x1="262" y1="209" x2="262" y2="575" class="loopLine" />
+    <polygon points="262,209 312,209 312,222 303.6,229 262,229" class="labelBox" />
+    <text x="287" y="222" text-anchor="middle" dominant-baseline="middle" alignment-baseline="middle" class="labelText">loop</text>
+    <text x="645.75" y="227" text-anchor="middle" class="loopText">
+      <tspan x="645.75">[工具调用与自适应循环]</tspan>
+    </text>
+  </g>
+  <g class="actor-man actor-top" name="User" data-et="participant" data-type="actor" data-id="User">
+    <line id="actor-man-torso0" x1="75" y1="25" x2="75" y2="45" />
+    <line id="actor-man-arms0" x1="57" y1="33" x2="93" y2="33" />
+    <line x1="57" y1="60" x2="75" y2="45" />
+    <line x1="75" y1="45" x2="91" y2="60" />
+    <circle cx="75" cy="10" r="15" width="150" height="65" />
+    <text x="75" y="67.5" dominant-baseline="central" alignment-baseline="central" class="actor actor-man">
+      <tspan x="75" dy="0">用户 (User)</tspan>
+    </text>
+  </g>
+  <text x="232" y="80" text-anchor="middle" dominant-baseline="middle" alignment-baseline="middle" class="messageText" dy="1em">输入任务目标 (如: 修复代码并提交)</text>
+  <line x1="82" y1="117" x2="387" y2="117" class="messageLine0" data-et="message" data-id="i1" data-from="User" data-to="Agent" stroke-width="2" stroke="none" marker-end="url(#tao-sequence-probe-arrowhead)" />
+  <line x1="75" y1="117" x2="75" y2="117" stroke-width="0" marker-start="url(#tao-sequence-probe-sequencenumber)" />
+  <text x="75" y="121" font-family="sans-serif" font-size="12px" text-anchor="middle" class="sequenceNumber">1</text>
+  <text x="396" y="132" text-anchor="middle" dominant-baseline="middle" alignment-baseline="middle" class="messageText" dy="1em">推理分析任务，生成多步执行计划</text>
+  <path d="M 396,169 C 456,159 456,199 396,189" class="messageLine0" data-et="message" data-id="i3" data-from="Agent" data-to="Agent" stroke-width="2" stroke="none" marker-end="url(#tao-sequence-probe-arrowhead)" x1="402" />
+  <line x1="387" y1="169" x2="387" y2="169" stroke-width="0" marker-start="url(#tao-sequence-probe-sequencenumber)" />
+  <text x="387" y="173" font-family="sans-serif" font-size="12px" text-anchor="middle" class="sequenceNumber">2</text>
+  <text x="551" y="260" text-anchor="middle" dominant-baseline="middle" alignment-baseline="middle" class="messageText" dy="1em">发起 tools/call 请求 (如: read_file)</text>
+  <line x1="402" y1="297" x2="706" y2="297" class="messageLine0" data-et="message" data-id="i5" data-from="Agent" data-to="MCP" stroke-width="2" stroke="none" marker-end="url(#tao-sequence-probe-arrowhead)" />
+  <line x1="387" y1="297" x2="387" y2="297" stroke-width="0" marker-start="url(#tao-sequence-probe-sequencenumber)" />
+  <text x="387" y="301" font-family="sans-serif" font-size="12px" text-anchor="middle" class="sequenceNumber">3</text>
+  <text x="840" y="312" text-anchor="middle" dominant-baseline="middle" alignment-baseline="middle" class="messageText" dy="1em">执行具体 I/O 或系统操作</text>
+  <line x1="721" y1="349" x2="964.5" y2="349" class="messageLine0" data-et="message" data-id="i7" data-from="MCP" data-to="Environment" stroke-width="2" stroke="none" marker-end="url(#tao-sequence-probe-arrowhead)" />
+  <line x1="706" y1="349" x2="706" y2="349" stroke-width="0" marker-start="url(#tao-sequence-probe-sequencenumber)" />
+  <text x="706" y="353" font-family="sans-serif" font-size="12px" text-anchor="middle" class="sequenceNumber">4</text>
+  <text x="843" y="364" text-anchor="middle" dominant-baseline="middle" alignment-baseline="middle" class="messageText" dy="1em">返回原始数据或执行状态</text>
+  <line x1="973.5" y1="401" x2="718" y2="401" class="messageLine1" data-et="message" data-id="i8" data-from="Environment" data-to="MCP" stroke-width="2" stroke="none" marker-end="url(#tao-sequence-probe-arrowhead)" />
+  <line x1="968.5" y1="401" x2="968.5" y2="401" stroke-width="0" marker-start="url(#tao-sequence-probe-sequencenumber)" />
+  <text x="968.5" y="405" font-family="sans-serif" font-size="12px" text-anchor="middle" class="sequenceNumber">5</text>
+  <text x="552" y="416" text-anchor="middle" dominant-baseline="middle" alignment-baseline="middle" class="messageText" dy="1em">返回标准化工具结果 (Content/Text)</text>
+  <line x1="711" y1="453" x2="399" y2="453" class="messageLine1" data-et="message" data-id="i9" data-from="MCP" data-to="Agent" stroke-width="2" stroke="none" marker-end="url(#tao-sequence-probe-arrowhead)" />
+  <line x1="714" y1="453" x2="714" y2="453" stroke-width="0" marker-start="url(#tao-sequence-probe-sequencenumber)" />
+  <text x="714" y="457" font-family="sans-serif" font-size="12px" text-anchor="middle" class="sequenceNumber">6</text>
+  <text x="396" y="468" text-anchor="middle" dominant-baseline="middle" alignment-baseline="middle" class="messageText" dy="1em">评估观察结果 (Observation) 与反思</text>
+  <path d="M 396,505 C 456,495 456,535 396,525" class="messageLine0" data-et="message" data-id="i11" data-from="Agent" data-to="Agent" stroke-width="2" stroke="none" marker-end="url(#tao-sequence-probe-arrowhead)" x1="402" />
+  <line x1="387" y1="505" x2="387" y2="505" stroke-width="0" marker-start="url(#tao-sequence-probe-sequencenumber)" />
+  <text x="387" y="509" font-family="sans-serif" font-size="12px" text-anchor="middle" class="sequenceNumber">7</text>
+  <text x="396" y="590" text-anchor="middle" dominant-baseline="middle" alignment-baseline="middle" class="messageText" dy="1em">聚合上下文，生成最终总结报告</text>
+  <path d="M 396,627 C 456,617 456,657 396,647" class="messageLine0" data-et="message" data-id="i13" data-from="Agent" data-to="Agent" stroke-width="2" stroke="none" marker-end="url(#tao-sequence-probe-arrowhead)" x1="402" />
+  <line x1="387" y1="627" x2="387" y2="627" stroke-width="0" marker-start="url(#tao-sequence-probe-sequencenumber)" />
+  <text x="387" y="631" font-family="sans-serif" font-size="12px" text-anchor="middle" class="sequenceNumber">8</text>
+  <text x="233" y="672" text-anchor="middle" dominant-baseline="middle" alignment-baseline="middle" class="messageText" dy="1em">交付最终结果与变更说明</text>
+  <line x1="392" y1="709" x2="79" y2="709" class="messageLine1" data-et="message" data-id="i14" data-from="Agent" data-to="User" stroke-width="2" stroke="none" marker-end="url(#tao-sequence-probe-arrowhead)" />
+  <line x1="395" y1="709" x2="395" y2="709" stroke-width="0" marker-start="url(#tao-sequence-probe-sequencenumber)" />
+  <text x="395" y="713" font-family="sans-serif" font-size="12px" text-anchor="middle" class="sequenceNumber">9</text>
+  <g class="actor-man actor-bottom" name="User">
+    <line id="actor-man-torso3" x1="75" y1="754" x2="75" y2="774" />
+    <line id="actor-man-arms3" x1="57" y1="762" x2="93" y2="762" />
+    <line x1="57" y1="789" x2="75" y2="774" />
+    <line x1="75" y1="774" x2="91" y2="789" />
+    <circle cx="75" cy="739" r="15" width="150" height="65" />
+    <text x="75" y="796.5" dominant-baseline="central" alignment-baseline="central" class="actor actor-man">
+      <tspan x="75" dy="0">用户 (User)</tspan>
+    </text>
+  </g>
+</svg>

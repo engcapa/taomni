@@ -55,6 +55,19 @@ it("rotates, flips, fits and resets a viewer copy then restores diagram focus on
   await waitFor(() => expect(URL.revokeObjectURL).toHaveBeenCalledWith("blob:diagram"));
 });
 
+it("distinguishes save formats with different icons, visible labels and accessible names", () => {
+  render(<Harness />);
+  fireEvent.doubleClick(diagram());
+  const formats = [["save-svg", "SVG", "Save SVG"], ["save-png", "PNG", "Save high-resolution PNG"], ["save-drawio", "draw.io", "Save draw.io file"]];
+  const icons = formats.map(([id, format, name]) => {
+    const button = screen.getByTestId(`markdown-diagram-view-${id}`);
+    expect(button).toHaveTextContent(format);
+    expect(button).toHaveAccessibleName(name);
+    return button.querySelector("svg")!.innerHTML;
+  });
+  expect(new Set(icons).size).toBe(3);
+});
+
 it("supports keyboard menu dismissal and never generates or writes an image after save cancellation", async () => {
   vi.mocked(saveExportBlob).mockResolvedValue(null);
   render(<Harness />); diagram().focus(); fireEvent.keyDown(diagram(), { key: "F10", shiftKey: true });

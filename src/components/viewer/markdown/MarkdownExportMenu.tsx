@@ -4,8 +4,8 @@ import { useElementResizeFrame } from "../../../hooks/useElementResizeFrame";
 import { ChevronDown, Copy, Download, FileCode2, FileImage, FileText, FolderDown, Printer, X } from "lucide-react";
 import { useViewerLabels } from "../viewerLabels";
 import type { ViewerDocument } from "../../../lib/viewer";
-import { markdownBasename, markdownDirectory } from "../../../lib/markdownAssets";
-import { sftpOpenPath } from "../../../lib/sftp";
+import { markdownBasename } from "../../../lib/markdownAssets";
+import { MarkdownExportResultActions, exportWorkspaceId } from "./MarkdownExportResultActions";
 import { exportMarkdown } from "./markdownExport";
 import { DEFAULT_EXPORT_SETTINGS, type MarkdownExportKind, type MarkdownExportSettings } from "./exportModel";
 import type { MarkdownDocumentOwner } from "./markdownOwner";
@@ -19,6 +19,11 @@ export function MarkdownExportMenu({ document: current, onError, printRequest = 
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [saved, setSaved] = useState<string | null>(null);
+  const [savedFile, setSavedFile] = useState<string | null>(null);
+  const [savedWorkspace, setSavedWorkspace] = useState<string>();
+  const identity = useRef(current.key);
+  identity.current = current.key;
+  useEffect(() => { setNotice(""); setSaved(null); setSavedFile(null); setBusy(false); }, [current.key]);
   const [exportState, setExportState] = useState("idle");
   useEffect(() => { if (printRequest) { setOpen(false); setDialog("print"); } }, [printRequest]);
   const root = useRef<HTMLDivElement>(null);
@@ -52,13 +57,15 @@ export function MarkdownExportMenu({ document: current, onError, printRequest = 
   }, [open, update, schedule]);
   const run = async (kind: MarkdownExportKind) => {
     if (busy) return;
+    const documentKey = current.key;
+    const workspaceId = exportWorkspaceId();
     setOpen(false); setDialog(null); setBusy(true); setSaved(null); setExportState("busy");
     setNotice(label("正在导出…", "Exporting…"));
     try {
       const result = await (onExport ? onExport(kind, current.content, settings) : exportMarkdown(kind, current.content, current.path, settings));
-      if (!alive.current) return;
+      if (!alive.current || identity.current !== documentKey) return;
       setExportState(result.status);
-      if (result.status === "saved") { setSaved(result.path || null); setNotice(label("导出完成", "Export completed")); }
+      if (result.status === "saved") { setSaved(result.path || null); setSavedFile(result.openPath ?? result.path ?? null); setSavedWorkspace(workspaceId); setNotice(label("导出完成", "Export completed")); }
       else if (result.status === "copied") setNotice(label("已复制到剪贴板", "Copied to clipboard"));
       else if (result.status === "opened") setNotice(label("已在系统浏览器打开", "Opened in system browser"));
       else if (result.status === "print-opened") setNotice(label("已请求系统打印，请在系统窗口中完成打印。", "System printing requested. Complete printing in the system dialog."));
@@ -68,11 +75,11 @@ export function MarkdownExportMenu({ document: current, onError, printRequest = 
         setNotice(label(`draw.io：${pages} 个 Sheet，${nativeDiagrams} 个可编辑图表，${fallbackDiagrams} 个 SVG 回退`, `draw.io: ${pages} sheets, ${nativeDiagrams} editable diagrams, ${fallbackDiagrams} SVG fallbacks`));
       }
     } catch (error) {
-      if (!alive.current) return;
+      if (!alive.current || identity.current !== documentKey) return;
       setExportState("failed");
       setNotice(label("导出失败，源文件未更改", "Export failed; source file unchanged"));
       onError(error instanceof Error ? error.message : String(error));
-    } finally { if (alive.current) { setBusy(false); trigger.current?.focus(); } }
+    } finally { if (alive.current && identity.current === documentKey) { setBusy(false); trigger.current?.focus(); } }
   };
   const entries: Array<[MarkdownExportKind, string, string, typeof Download]> = [
     ["html", "HTML（自包含，内嵌图片）", "HTML (self-contained, embedded images)", FileCode2],
@@ -102,7 +109,7 @@ export function MarkdownExportMenu({ document: current, onError, printRequest = 
         }}><Icon /><span>{label(zh, en)}</span>{kind === "pdf" && <small>{label("页面设置", "Page setup")}</small>}{kind === "print" && <small>{/Mac/i.test(navigator.platform) ? "⌘P" : "Ctrl+P"}</small>}</button>)}
       </div></div>, window.document.body)}
     </div>
-    {notice && <div className="fv-md-export-notice" role="status" data-testid="markdown-export-status" data-export-state={exportState} data-export-path={saved || undefined}><span>{notice}</span>{saved && <button className="fv-button" onClick={() => void sftpOpenPath(/\.(html|docx|png|pdf|drawio)$/i.test(saved) ? markdownDirectory(saved) : saved).catch((error: unknown) => onError(String(error)))}>{label("在文件管理器中显示", "Show in file manager")}</button>}<button className="fv-icon-button" aria-label={label("关闭提示", "Dismiss")} onClick={() => setNotice("")}><X /></button></div>}
+    {notice && <div className="fv-md-export-notice" role="status" data-testid="markdown-export-status" data-export-state={exportState} data-export-path={saved || undefined}><span>{notice}</span>{saved && savedFile && <MarkdownExportResultActions path={saved} filePath={savedFile} workspaceId={savedWorkspace} onError={onError} />}<button className="fv-icon-button" aria-label={label("关闭提示", "Dismiss")} onClick={() => setNotice("")}><X /></button></div>}
     {dialog && createPortal(<div className="fv" style={{ display: "contents" }}>{dialog === "drawio" ? <DrawioExportSettings settings={settings} onChange={setSettings} onCancel={() => { setDialog(null); trigger.current?.focus(); }} onConfirm={(kind) => void run(kind)} /> : <ExportSettings kind={dialog} filename={markdownBasename(current.path)} settings={settings} onChange={setSettings} onCancel={() => { setDialog(null); trigger.current?.focus(); }} onConfirm={() => void run(dialog)} />}</div>, window.document.body)}
   </>;
 }

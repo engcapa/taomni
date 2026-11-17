@@ -1,0 +1,153 @@
+id: TC-FILE-OPEN-023
+title: Native exported HTML opens in Tao and Word is shown in Tao Explorer
+description: Use real OS save dialogs, actual saved files and packaged viewers. HTML opens as a separate Tao tab; the source
+  tab survives; unsupported Word is shown in Tao Explorer with both export files visible. The primary action precedes the
+  system file-manager action.
+modes:
+- native
+covers:
+- F-FILEOPEN-1
+- F-EXPLORER-1
+tags:
+- p1
+- regression
+- native
+fixtures:
+- reset_db
+- markdown_native
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-export-quality
+- reload_window: null
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-file-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Control+l
+    macos_key: Meta+l
+- fill:
+    selector: '[data-testid="explorer-address"]'
+    value: ${fixture.file_open_root}
+- press:
+    selector: '[data-testid="explorer-address"]'
+    key: Enter
+- dblclick: '[data-testid="explorer-file-row"][data-name="live.md"]'
+- wait_for: '[data-testid="markdown-editor"]'
+- click: '[data-testid="markdown-export"]'
+- native_file_dialog:
+    kind: save
+    action: choose
+    path: ${fixture.markdown_native_exports}/report.html
+    trigger: '[data-testid="markdown-export-html"]'
+- wait_for: '[data-testid="markdown-export-status"][data-export-state="saved"]'
+- assert_enabled: '[data-testid="markdown-export-open-tao"]'
+- eval_readonly:
+    expression: document.querySelector(".fv-md-export-notice button").dataset.testid === "markdown-export-open-tao"
+    expect_truthy: true
+- click: '[data-testid="markdown-export-open-tao"]'
+- wait_for: '[data-testid="file-viewer"][data-kind="html"]'
+- wait_for: '[data-testid="html-preview"][data-loaded="true"]'
+- assert_file_contains:
+    path: ${fixture.markdown_native_exports}/report.html
+    contains: File open Markdown
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="file-viewer"]'
+    equal: 2
+- click: '[data-testid="tab-item"][data-tab-type="file-viewer"][data-active="true"] [data-testid="tab-close"]'
+- wait_for: '[data-testid="markdown-editor"]'
+- click: '[data-testid="markdown-export"]'
+- click: '[data-testid="markdown-export-docx"]'
+- native_file_dialog:
+    kind: save
+    action: choose
+    path: ${fixture.markdown_native_exports}/report.docx
+    trigger: '[data-testid="markdown-export-confirm"]'
+- wait_for: '[data-testid="markdown-export-status"][data-export-state="saved"]'
+- click: '[data-testid="markdown-export-open-tao"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="report.docx"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="report.html"]'
+- assert_file_contains:
+    path: ${fixture.markdown_native_source}
+    contains: '# File open Markdown'
+- assert_no_runtime_errors: null
+- screenshot: native-export-open-tao.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Native exported HTML opens in Tao and Word is shown in Tao Explorer
+    actions:
+    - 4
+    - 5
+    - 7
+    - 8
+    - 9
+    - 10
+    - 12
+    - 13
+    - 17
+    - 22
+    - 24
+    - 25
+    - 26
+    - 28
+    results:
+    - 6
+    - 11
+    - 14
+    - 15
+    - 16
+    - 18
+    - 19
+    - 20
+    - 21
+    - 23
+    - 27
+    - 29
+    - 30
+    - 31
+    - 32
+    checkpoints:
+    - step: 6
+      expectation: 'wait_for: ''[data-testid="explorer-tab"][data-active="true"]'''
+    - step: 11
+      expectation: 'wait_for: ''[data-testid="markdown-editor"]'''
+    - step: 14
+      expectation: 'wait_for: ''[data-testid="markdown-export-status"][data-export-state="saved"]'''
+    - step: 15
+      expectation: 'assert_enabled: ''[data-testid="markdown-export-open-tao"]'''
+    - step: 16
+      expectation: "eval_readonly:\n  expect_truthy: true\n  expression: document.querySelector(\".fv-md-export-notice button\"\
+        ).dataset.testid\n    === \"markdown-export-open-tao\""
+    - step: 18
+      expectation: 'wait_for: ''[data-testid="file-viewer"][data-kind="html"]'''
+    - step: 19
+      expectation: 'wait_for: ''[data-testid="html-preview"][data-loaded="true"]'''
+    - step: 20
+      expectation: "assert_file_contains:\n  contains: File open Markdown\n  path: ${fixture.markdown_native_exports}/report.html"
+    - step: 21
+      expectation: "assert_count:\n  equal: 2\n  selector: '[data-testid=\"tab-item\"][data-tab-type=\"file-viewer\"]'"
+    - step: 23
+      expectation: 'wait_for: ''[data-testid="markdown-editor"]'''
+    - step: 27
+      expectation: 'wait_for: ''[data-testid="markdown-export-status"][data-export-state="saved"]'''
+    - step: 29
+      expectation: 'wait_for: ''[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="report.docx"]'''
+    - step: 30
+      expectation: 'wait_for: ''[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="report.html"]'''
+    - step: 31
+      expectation: "assert_file_contains:\n  contains: '# File open Markdown'\n  path: ${fixture.markdown_native_source}"
+    - step: 32
+      expectation: 'assert_no_runtime_errors: null'
+  native:
+  - check: Native exported HTML opens in Tao and Word is shown in Tao Explorer
+    method: automated
+    reason: Use real OS save dialogs, actual saved files and packaged viewers. HTML opens as a separate Tao tab; the source
+      tab survives; unsupported Word is shown in Tao Explorer with both export files visible. The primary action precedes
+      the system file-manager action.
+  visual:
+  - check: Changed controls remain visible and readable in the final retained screenshot
+    method: manual
+    reason: Review the saved packaged/browser image; assertions establish behavior, not visual fidelity.

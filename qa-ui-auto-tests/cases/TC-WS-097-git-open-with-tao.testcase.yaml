@@ -1,0 +1,169 @@
+id: TC-WS-097
+title: Git Changes and Logs open the clicked repository file in Tao
+description: Two repositories contain same.txt with distinct bytes. The clicked repo-b worktree opens through both context menus
+  in its owning workspace; closing the viewer returns to Git and preserves the source. Native proves real worktree reads, browser
+  proves routing.
+modes:
+- browser
+- native
+covers:
+- F-WS-4
+- F26.1
+- F-FILEOPEN-1
+tags:
+- p1
+- regression
+- git
+fixtures:
+- reset_db
+- parity008_git
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-workspace-git-actions-TC-WS-084
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.platformWorkspaces.v1
+    value: '{"version":1,"activeWorkspaceId":"default-workspace","createdNodes":[],"workspaces":[{"id":"default-workspace","name":"Default
+      Workspace","description":"","isDefault":true,"rootFolders":[{"id":"root-1","name":"parity008","path":"${fixture.parity008_root}","addedAt":1}],"pinnedSessionIds":[],"activeLeftToolWindow":"project","bottomDock":{"open":false,"activeTool":"terminal","heightPx":220},"openTabs":[],"activeTabId":""}]}'
+- reload_window: null
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="session-tree"]'
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="workspace-sidebar-panel"]'
+- assert_count:
+    selector: '[data-testid="sidebar-rail"] [data-testid="code-workspace-tool-rail-git"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="code-workspace-bottom-tab-git"]'
+    equal: 0
+- click: '[data-testid="code-workspace-tool-rail-git"]'
+- wait_for: '[data-testid="workspace-git-manager"]'
+- wait_for: '[data-testid="workspace-change-row"][data-repo-root$="repo-b"][data-path="same.txt"]'
+- wait_for: '[data-testid="workspace-change-row"][data-repo-root$="repo-b"][data-path="same.txt"]'
+- right_click: '[data-testid="workspace-change-row"][data-repo-root$="repo-b"][data-path="same.txt"]'
+- assert_enabled: '[data-testid="git-file-preview"]'
+- click: '[data-testid="git-file-preview"]'
+- wait_for: '[data-testid="workspace-tab"][data-tab-kind="viewer"][data-active="true"]'
+- assert_text:
+    selector: '[data-testid="workspace-canvas-pane"] [data-testid="viewer-editor"] .cm-content'
+    contains: repo-b WORKTREE
+- assert_count:
+    selector: '[data-testid="workspace-tab"][data-tab-kind="viewer"]'
+    equal: 1
+- click: '[data-testid="workspace-tab"][data-tab-kind="viewer"] [data-testid="workspace-tab-close"]'
+- wait_for: '[data-testid="workspace-git-panel"]'
+- click: '[data-testid="git-log-tab"]'
+- wait_for: '[data-testid="git-log-commit"][data-repo-root$="repo-b"]'
+- click: '[data-testid="git-log-commit"][data-repo-root$="repo-b"]'
+- wait_for: '[data-testid="git-log-file"][data-path="same.txt"]'
+- right_click: '[data-testid="git-log-file"][data-path="same.txt"]'
+- assert_enabled: '[data-testid="git-file-preview"]'
+- click: '[data-testid="git-file-preview"]'
+- wait_for: '[data-testid="workspace-tab"][data-tab-kind="viewer"][data-active="true"]'
+- assert_text:
+    selector: '[data-testid="workspace-canvas-pane"] [data-testid="viewer-editor"] .cm-content'
+    contains: repo-b WORKTREE
+- assert_count:
+    selector: '[data-testid="workspace-tab"][data-tab-kind="viewer"]'
+    equal: 1
+- click: '[data-testid="workspace-tab"][data-tab-kind="viewer"] [data-testid="workspace-tab-close"]'
+- wait_for: '[data-testid="workspace-git-panel"]'
+- assert_no_runtime_errors: null
+- screenshot: git-open-with-tao.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Git Changes and Logs open the clicked repository file in Tao
+    actions:
+    - 5
+    - 6
+    - 8
+    - 12
+    - 16
+    - 18
+    - 22
+    - 24
+    - 26
+    - 28
+    - 30
+    - 34
+    results:
+    - 3
+    - 7
+    - 9
+    - 10
+    - 11
+    - 13
+    - 14
+    - 15
+    - 17
+    - 19
+    - 20
+    - 21
+    - 23
+    - 25
+    - 27
+    - 29
+    - 31
+    - 32
+    - 33
+    - 35
+    - 36
+    checkpoints:
+    - step: 3
+      expectation: 'wait_for: ''[data-testid="welcome-panel"]'''
+    - step: 7
+      expectation: 'wait_for: ''[data-testid="session-tree"]'''
+    - step: 9
+      expectation: 'wait_for: ''[data-testid="workspace-sidebar-panel"]'''
+    - step: 10
+      expectation: "assert_count:\n  equal: 1\n  selector: '[data-testid=\"sidebar-rail\"] [data-testid=\"code-workspace-tool-rail-git\"\
+        ]'"
+    - step: 11
+      expectation: "assert_count:\n  equal: 0\n  selector: '[data-testid=\"code-workspace-bottom-tab-git\"]'"
+    - step: 13
+      expectation: 'wait_for: ''[data-testid="workspace-git-manager"]'''
+    - step: 14
+      expectation: 'wait_for: ''[data-testid="workspace-change-row"][data-repo-root$="repo-b"][data-path="same.txt"]'''
+    - step: 15
+      expectation: 'wait_for: ''[data-testid="workspace-change-row"][data-repo-root$="repo-b"][data-path="same.txt"]'''
+    - step: 17
+      expectation: 'assert_enabled: ''[data-testid="git-file-preview"]'''
+    - step: 19
+      expectation: 'wait_for: ''[data-testid="workspace-tab"][data-tab-kind="viewer"][data-active="true"]'''
+    - step: 20
+      expectation: "assert_text:\n  contains: repo-b WORKTREE\n  selector: '[data-testid=\"workspace-canvas-pane\"] [data-testid=\"\
+        viewer-editor\"] .cm-content'"
+    - step: 21
+      expectation: "assert_count:\n  equal: 1\n  selector: '[data-testid=\"workspace-tab\"][data-tab-kind=\"viewer\"]'"
+    - step: 23
+      expectation: 'wait_for: ''[data-testid="workspace-git-panel"]'''
+    - step: 25
+      expectation: 'wait_for: ''[data-testid="git-log-commit"][data-repo-root$="repo-b"]'''
+    - step: 27
+      expectation: 'wait_for: ''[data-testid="git-log-file"][data-path="same.txt"]'''
+    - step: 29
+      expectation: 'assert_enabled: ''[data-testid="git-file-preview"]'''
+    - step: 31
+      expectation: 'wait_for: ''[data-testid="workspace-tab"][data-tab-kind="viewer"][data-active="true"]'''
+    - step: 32
+      expectation: "assert_text:\n  contains: repo-b WORKTREE\n  selector: '[data-testid=\"workspace-canvas-pane\"] [data-testid=\"\
+        viewer-editor\"] .cm-content'"
+    - step: 33
+      expectation: "assert_count:\n  equal: 1\n  selector: '[data-testid=\"workspace-tab\"][data-tab-kind=\"viewer\"]'"
+    - step: 35
+      expectation: 'wait_for: ''[data-testid="workspace-git-panel"]'''
+    - step: 36
+      expectation: 'assert_no_runtime_errors: null'
+  native:
+  - check: Git Changes and Logs open the clicked repository file in Tao
+    method: automated
+    reason: Two repositories contain same.txt with distinct bytes. The clicked repo-b worktree opens through both context menus
+      in its owning workspace; closing the viewer returns to Git and preserves the source. Native proves real worktree reads, browser
+      proves routing.
+  visual:
+  - check: Changed controls remain visible and readable in the final retained screenshot
+    method: manual
+    reason: Review the saved packaged/browser image; assertions establish behavior, not visual fidelity.

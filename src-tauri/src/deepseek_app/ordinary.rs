@@ -39,10 +39,7 @@ pub async fn stream(
         .await
         .map_err(|_| "network: provider connection or configured proxy failed")?;
     if !response.status().is_success() {
-        return Err(format!(
-            "http: provider returned HTTP {}",
-            response.status().as_u16()
-        ));
+        return Err(super::provider_error::describe(response, &client.api_key).await);
     }
     if !anthropic {
         let _ = channel.send(TaoEvent::new("message_start").with("model", request.model.clone()));

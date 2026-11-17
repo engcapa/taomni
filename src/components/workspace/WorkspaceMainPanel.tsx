@@ -10,7 +10,7 @@ import {
   type WorkspaceBottomTool,
 } from "../../stores/workspacePlatformStore";
 import { createWorkspaceFileNode, createWorkspaceFolderNode } from "./workspaceFs";
-import { WorkspaceFsModals } from "./WorkspaceFsModals";
+import { WorkspaceFsModals, type WorkspaceRootDestination } from "./WorkspaceFsModals";
 import { WorkspaceGitPanel } from "./WorkspaceGitPanel";
 import { WorkspaceSessionPane } from "./WorkspaceSessionPane";
 import { WorkspaceSessionPickerModal } from "./WorkspaceSessionPickerModal";
@@ -33,6 +33,7 @@ type CommandProps = Pick<WorkspaceCodeEditorProps, "onCommandsChange"> & { onEdi
 export const WorkspaceMainPanel = memo(function WorkspaceMainPanel({ visible = true, onCommandsChange, onEditSession }: { visible?: boolean } & CommandProps) {
   const workspaces = useWorkspacePlatformStore((s) => s.workspaces);
   const activeId = useWorkspacePlatformStore((s) => s.activeWorkspaceId);
+  useEffect(() => { useWorkspaceUiStore.getState().closeFsModal(); }, [activeId]);
   return (
     <div data-testid="workspace-main-panel" className="relative flex min-h-0 flex-1 flex-col">
       {workspaces.map((workspace) => (
@@ -73,12 +74,20 @@ function WorkspaceCanvasContents({ workspaceId, visible, onCommandsChange, onEdi
   const paneVisible = (id: string) => visible && paneIds.has(id);
   const paneStyle = (id: string) => ({ display: paneIds.has(id) ? "block" : "none", minWidth: 0, overflow: "hidden" as const });
 
-  const submitFsModal = async (value: string) => {
+  const submitFsModal = async (value: string, destination?: WorkspaceRootDestination) => {
+    if (useWorkspaceUiStore.getState().fsModal !== fsModal || !visible) return;
     const root = (fsModal?.rootFolderId
       ? workspace.rootFolders.find((folder) => folder.id === fsModal.rootFolderId)
       : undefined) ?? workspace.rootFolders[0];
     try {
       if (fsModal?.kind === "root") {
+        if (destination) {
+          const created = useWorkspacePlatformStore.getState().createWorkspace({ name: destination.newWorkspaceName, rootPath: value });
+          if (created.rootFolders[0]) revealWorkspaceFolder(created.id, created.rootFolders[0].id);
+          setStatusMessage(`${value} added to ${created.name}`);
+          closeFsModal();
+          return;
+        }
         const added = useWorkspacePlatformStore.getState().addRootFolder(workspace.id, { path: value });
         if (!added) return;
         revealWorkspaceFolder(workspace.id, added.id);
@@ -95,7 +104,7 @@ function WorkspaceCanvasContents({ workspaceId, visible, onCommandsChange, onEdi
         }
         setStatusMessage(`Created ${relative}`);
       }
-      closeFsModal();
+      if (useWorkspaceUiStore.getState().fsModal === fsModal) closeFsModal();
     } catch (error) {
       setStatusMessage(error instanceof Error ? error.message : String(error));
     }

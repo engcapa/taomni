@@ -1,8 +1,9 @@
 id: TC-WS-085
 title: Workspace Git rail and Changes/Log file actions (native)
-description: Two repositories with the same filename detect wrong-repository dispatch. Independent OS clipboard checks require exact absolute and relative
-  paths. Real file-manager IPC and PTY cwd verify native effects. Browser TC-WS-084 verifies renderer copy/paste; this case makes no AppKit paste or OS
-  keyboard-delivery claim.
+description: Two repositories with the same filename detect wrong-repository dispatch. Independent OS clipboard checks require
+  exact absolute and relative paths. Real file-manager IPC and PTY cwd verify native effects. Browser TC-WS-084 verifies renderer
+  copy/paste; this case makes no AppKit paste or OS keyboard-delivery claim. After opening the system file manager, click
+  the current Git tab to return to Tao before the next right-click; preserve the X11 ownership/focus guard.
 modes:
 - native
 covers:
@@ -23,7 +24,8 @@ steps:
 - wait_for: '[data-testid="welcome-panel"]'
 - seed_storage:
     key: taomni.platformWorkspaces.v1
-    value: '{"version":1,"activeWorkspaceId":"default-workspace","createdNodes":[],"workspaces":[{"id":"default-workspace","name":"Default Workspace","description":"","isDefault":true,"rootFolders":[{"id":"root-1","name":"parity008","path":"${fixture.parity008_root}","addedAt":1}],"pinnedSessionIds":[],"activeLeftToolWindow":"project","bottomDock":{"open":false,"activeTool":"terminal","heightPx":220},"openTabs":[],"activeTabId":""}]}'
+    value: '{"version":1,"activeWorkspaceId":"default-workspace","createdNodes":[],"workspaces":[{"id":"default-workspace","name":"Default
+      Workspace","description":"","isDefault":true,"rootFolders":[{"id":"root-1","name":"parity008","path":"${fixture.parity008_root}","addedAt":1}],"pinnedSessionIds":[],"activeLeftToolWindow":"project","bottomDock":{"open":false,"activeTool":"terminal","heightPx":220},"openTabs":[],"activeTabId":""}]}'
 - reload_window: null
 - click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="session-tree"]'
@@ -68,6 +70,7 @@ steps:
 - assert_text:
     selector: '[data-testid="status-bar-message"]'
     contains: 'Opened '
+- click: '[data-testid="git-changes-tab"]'
 - right_click: '[data-testid="workspace-change-row"][data-repo-root$="repo-b"][data-path="same.txt"]'
 - click: '[data-testid="git-file-open-terminal"]'
 - wait_for: '[data-testid="workspace-tab"][data-tab-kind="terminal"][data-active="true"]'
@@ -123,6 +126,7 @@ steps:
 - assert_text:
     selector: '[data-testid="status-bar-message"]'
     contains: 'Opened '
+- click: '[data-testid="git-log-tab"]'
 - right_click: '[data-testid="git-log-file"][data-path="same.txt"]'
 - screenshot: tc-ws-085-git-log-file-menu.png
 - click: '[data-testid="git-file-open-terminal"]'
@@ -149,7 +153,8 @@ verification:
     - 12
     checkpoints:
     - step: 10
-      expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-rail\"] [data-testid=\"code-workspace-tool-rail-git\"]", "equal": 1}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-rail\"] [data-testid=\"code-workspace-tool-rail-git\"]",
+        "equal": 1}}'
     - step: 11
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-bottom-tab-git\"]", "equal": 0}}'
     - step: 14
@@ -167,7 +172,8 @@ verification:
     - 21
     checkpoints:
     - step: 16
-      expectation: '{"assert_menu_items": ["Stage", "Unstage", "Copy Path", "Copy Relative Path", "Reveal in Explorer", "Open in Terminal"]}'
+      expectation: '{"assert_menu_items": ["Stage", "Unstage", "Copy Path", "Copy Relative Path", "Reveal in Explorer", "Open
+        in Terminal"]}'
     - step: 19
       expectation: '{"host_clipboard": {"action": "assert", "kind": "text", "equals": "${fixture.parity008_repo_b_file_native}"}}'
     - step: 23
@@ -177,62 +183,66 @@ verification:
     - 19
     - 23
   - id: R3
-    requirement: Changes opens the containing directory (or reports the explicit browser limitation) and a terminal at repo-b, then returns to Git.
+    requirement: Changes opens the containing directory (or reports the explicit browser limitation) and a terminal at repo-b,
+      then returns to Git.
     actions:
     - 24
     - 25
     - 27
     - 28
+    - 29
     checkpoints:
     - step: 26
       expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "Opened "}}'
-    - step: 29
+    - step: 30
       expectation: '{"wait_for": "[data-testid=\"workspace-tab\"][data-tab-kind=\"terminal\"][data-active=\"true\"]"}'
-    - step: 32
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]", "regex": "(?m)^[^\\r\\n]*[/\\\\]repo-b\\s*$",
-        "timeout_sec": 20}}'
+    - step: 33
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]", "regex":
+        "(?m)^[^\\r\\n]*[/\\\\]repo-b\\s*$", "timeout_sec": 20}}'
     results:
     - 26
-    - 29
-    - 32
+    - 30
+    - 33
   - id: R4
-    requirement: Git Log file actions resolve the selected commit repository and expose all four operations, including a real local PTY in native mode.
+    requirement: Git Log file actions resolve the selected commit repository and expose all four operations, including a real
+      local PTY in native mode.
     actions:
-    - 35
-    - 42
-    - 44
-    - 50
+    - 36
+    - 43
+    - 45
     - 51
-    - 57
+    - 52
     - 58
-    - 62
+    - 59
+    - 61
+    - 64
     checkpoints:
-    - step: 43
+    - step: 44
       expectation: '{"assert_menu_items": ["Copy Path", "Copy Relative Path", "Reveal in Explorer", "Open in Terminal"]}'
-    - step: 46
+    - step: 47
       expectation: '{"host_clipboard": {"action": "assert", "kind": "text", "equals": "${fixture.parity008_repo_b_file_native}"}}'
-    - step: 53
+    - step: 54
       expectation: '{"host_clipboard": {"action": "assert", "kind": "text", "equals": "same.txt"}}'
-    - step: 59
+    - step: 60
       expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "Opened "}}'
-    - step: 63
+    - step: 65
       expectation: '{"wait_for": "[data-testid=\"workspace-tab\"][data-tab-kind=\"terminal\"][data-active=\"true\"]"}'
-    - step: 66
-      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]", "regex": "(?m)^[^\\r\\n]*[/\\\\]repo-b\\s*$",
-        "timeout_sec": 20}}'
     - step: 68
+      expectation: '{"assert_pattern": {"selector": "[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]", "regex":
+        "(?m)^[^\\r\\n]*[/\\\\]repo-b\\s*$", "timeout_sec": 20}}'
+    - step: 70
       expectation: '{"wait_for": "[data-testid=\"workspace-git-panel\"]"}'
-    - step: 69
+    - step: 71
       expectation: '{"assert_no_runtime_errors": null}'
     results:
-    - 43
-    - 46
-    - 53
-    - 59
-    - 63
-    - 66
+    - 44
+    - 47
+    - 54
+    - 60
+    - 65
     - 68
-    - 69
+    - 70
+    - 71
   visual:
   - check: Context-menu layout and one Git rail entry
     method: manual
@@ -240,4 +250,5 @@ verification:
   native:
   - check: OS clipboard, containing-directory open, and terminal cwd
     method: automated
-    reason: Host clipboard oracle and git output from the real PTY; file-manager IPC must succeed. OS window appearance remains a manual boundary.
+    reason: Host clipboard oracle and git output from the real PTY; file-manager IPC must succeed. OS window appearance remains
+      a manual boundary.

@@ -32,6 +32,14 @@ smoke:
 - TC-FILE-OPEN-006
 unavailable: {}
 cases:
+- TC-FILE-OPEN-025
+- TC-FILE-OPEN-026
+- TC-FILE-OPEN-024
+- TC-WS-096
+- TC-WS-097
+- TC-FILE-OPEN-023
+- TC-DB-GRID-002-search-navigation-native
+- TC-TAO-HOME-047
 - TC-FILE-OPEN-019
 - TC-FILE-OPEN-020
 - TC-FILE-OPEN-021

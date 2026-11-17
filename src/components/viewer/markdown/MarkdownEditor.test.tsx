@@ -46,6 +46,23 @@ beforeEach(() => {
 afterEach(() => { cleanup(); style.remove(); useDocumentStore.setState({ documents: {} }); });
 
 describe("MarkdownEditor real host lifecycle", () => {
+  it("keeps exactly one import/export control while actual editor selections and modes change", () => {
+    render(<Harness />);
+    fireEvent.click(screen.getByTestId("markdown-live-edit"));
+    const view = EditorView.findFromDOM(screen.getByTestId("viewer-editor").querySelector<HTMLElement>(".cm-editor")!)!;
+    for (const mode of ["live", "source", "split", "live"] as const) {
+      fireEvent.click(screen.getByTestId(`markdown-mode-${mode}`));
+      for (const anchor of [source.indexOf("Details"), 0, source.indexOf("bold"), source.length, 3]) {
+        act(() => view.dispatch({ selection: { anchor, head: Math.min(source.length, anchor + 3) } }));
+        expect(screen.getAllByTestId("markdown-import-drawio")).toHaveLength(1);
+        expect(screen.getAllByTestId("markdown-export")).toHaveLength(1);
+      }
+    }
+    expect(view.state.doc.toString()).toBe(source);
+    expect(useDocumentStore.getState().documents["/docs/a.md"].dirty).toBe(false);
+    fireEvent.click(screen.getByTestId("markdown-export"));
+    expect(screen.getByTestId("markdown-export-menu")).toBeInTheDocument();
+  });
   it("keeps one source/history across live/source/split/focus switches, with outline navigation", async () => {
     render(<Harness />);
     const dom = screen.getByTestId("markdown-editor").querySelector<HTMLElement>(".cm-editor")!;
