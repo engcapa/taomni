@@ -50,6 +50,28 @@ try {
   } finally {
     $reader.Dispose()
   }
+  Add-Type @'
+using System;
+using System.Runtime.InteropServices;
+public static class TaomniPackageRuntimeLoader {
+  [DllImport("kernel32.dll", CharSet = CharSet.Unicode, SetLastError = true)]
+  public static extern IntPtr LoadLibraryEx(string path, IntPtr file, uint flags);
+  [DllImport("kernel32.dll")]
+  public static extern bool FreeLibrary(IntPtr module);
+}
+'@
+  $runtimeFiles = @('sherpa-onnx-c-api.dll', 'sherpa-onnx-cxx-api.dll', 'onnxruntime.dll', 'onnxruntime_providers_shared.dll')
+  foreach ($name in $runtimeFiles) {
+    $path = Join-Path $app.DirectoryName $name
+    if (-not (Test-Path -LiteralPath $path -PathType Leaf)) { throw "Missing packaged runtime: $name" }
+    # Exclude PATH/Cargo caches: dependencies must resolve beside the extracted
+    # runtime DLL or in System32, as in the existing release producer gate.
+    $handle = [TaomniPackageRuntimeLoader]::LoadLibraryEx($path, [IntPtr]::Zero, 0x900)
+    if ($handle -eq [IntPtr]::Zero) {
+      throw "Cannot load packaged $name (Win32 error $([Runtime.InteropServices.Marshal]::GetLastWin32Error()))"
+    }
+    [void][TaomniPackageRuntimeLoader]::FreeLibrary($handle)
+  }
   $files = @(Get-ChildItem -LiteralPath $app.DirectoryName -Recurse -File | ForEach-Object {
     [ordered]@{ path = [IO.Path]::GetRelativePath($app.DirectoryName, $_.FullName); bytes = $_.Length }
   })
@@ -58,6 +80,7 @@ try {
     executableSha256 = (Get-FileHash -LiteralPath $app.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
     productVersion = $app.VersionInfo.ProductVersion
     architecture = 'x86_64'
+    isolatedRuntimeLoads = $runtimeFiles
     regularFiles = $files.Count
     regularFileBytes = ($files | Measure-Object -Property bytes -Sum).Sum
     largestFiles = @($files | Sort-Object -Property bytes -Descending | Select-Object -First 25)

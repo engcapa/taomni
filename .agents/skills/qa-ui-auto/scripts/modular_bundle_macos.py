@@ -96,6 +96,9 @@ def inspect(directory: Path, identity: dict, output: Path) -> None:
         evidence['observations'].append(run(
             ['codesign', '-d', '--verbose=4', '-r-', str(app)],
             output / 'dmg-codesign-details.log'))
+        runtime_check = Path(__file__).resolve().parents[4] / 'scripts/verify-macos-runtime-paths.sh'
+        evidence['observations'].append(run(
+            ['bash', str(runtime_check), str(app)], output / 'dmg-runtime-paths.log'))
         archives = list(directory.glob('*.app.tar.gz'))
         evidence['updaterArchivePresent'] = bool(archives)
         if archives:

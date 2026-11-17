@@ -11,6 +11,7 @@ import json
 from pathlib import Path
 import re
 import subprocess
+import tempfile
 
 
 TARGETS = {
@@ -134,6 +135,19 @@ def linux_metadata(directory: Path, output: Path, version: str) -> dict:
     with (output / 'rpm-info.log').open('w', encoding='utf-8') as stream:
         subprocess.run(['rpm', '-qip', str(rpm)], stdout=stream,
                        stderr=subprocess.STDOUT, check=True)
+    with tempfile.TemporaryDirectory(prefix='taomni-deb-payload-') as work:
+        payload = Path(work)
+        subprocess.run(['dpkg-deb', '--extract', str(deb), str(payload)], check=True)
+        binary = payload / 'usr/bin/taomni'
+        if not binary.is_file() or binary.is_symlink():
+            raise ValueError('expected an actual taomni executable in Debian payload')
+        write_json(output / 'linux-payload.json', {
+            'scope': 'deb-extracted-payload', 'executableSha256': digest(binary),
+            'payload': tree_sample(payload), 'applicationLaunched': False,
+            'installedUpgradeEstablished': False, 'systemTrustEstablished': False,
+        })
+        with (output / 'deb-executable-header.log').open('w', encoding='utf-8') as stream:
+            subprocess.run(['readelf', '--file-header', str(binary)], stdout=stream, check=True)
     return fields
 
 

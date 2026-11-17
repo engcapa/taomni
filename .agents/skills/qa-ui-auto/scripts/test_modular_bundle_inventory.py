@@ -112,6 +112,29 @@ class BundleFileTests(unittest.TestCase):
         self.assertEqual(result['regularFileBytes'], 6)
         self.assertEqual(result['largestFiles'][0]['bytes'], 3)
 
+    def test_macos_and_windows_use_their_actual_package_families(self):
+        targets = {
+            'windows-x86_64': ['Taomni_0.6.0_x64_en-US.msi', 'Taomni_0.6.0_x64-setup.exe'],
+            'darwin-aarch64': ['Taomni_0.6.0_aarch64.dmg'],
+            'darwin-x86_64': ['Taomni_0.6.0_x64.dmg', 'Taomni.app.tar.gz'],
+        }
+        for target, names in targets.items():
+            with self.subTest(target=target):
+                directory = self.root / target
+                directory.mkdir()
+                for name in names:
+                    (directory / name).write_bytes(b'package')
+                result = inventory(directory, {**self.identity, 'target': target})
+                self.assertEqual(len(result['files']), len(names))
+                self.assertEqual(result['totalArtifactFileBytes'], 7 * len(names))
+                if target.startswith('darwin'):
+                    duplicate = directory / 'other.app.tar.gz'
+                    duplicate.write_bytes(b'archive')
+                    if 'Taomni.app.tar.gz' not in names:
+                        (directory / 'Taomni.app.tar.gz').write_bytes(b'archive')
+                    with self.assertRaises(ValueError):
+                        inventory(directory, {**self.identity, 'target': target})
+
     def test_updater_must_stay_within_the_real_app_root(self):
         for member in ['../escaped', '/absolute', 'Other.app/Contents/MacOS/app']:
             with self.subTest(member=member):
