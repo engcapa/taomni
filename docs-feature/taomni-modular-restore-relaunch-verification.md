@@ -24,9 +24,11 @@ Linux WebKitWebDriver 和 Windows WebView2 的自动 relaunch 后接管仍待实
 
 ## 执行状态
 
-合并后的 `750f6f417528c25fb813bdd547c36c69239e7079` 已启动 [macOS 15 Intel #44119238192](https://github.com/engcapa/taomni/actions/runs/44119238192) 与 [macOS 26 ARM64 #44119201895](https://github.com/engcapa/taomni/actions/runs/44119201895)，各计划 44 项 native，均含 013/014/015、033/034/035 和完整 crash-regression。ARM64 改为单 shard 减少 hosted 容量占用；两轮按完成片即时下载，仍需实际结果，不将下面旧 SHA 的通过结论转移到当前源码。
+2026-11-18 再次 fetch/merge main，远程仍为 `677ec4d77`，已包含，无冲突。当前产品源码指纹为 `c35b48e6018a22744215dcd62f63f41f3e60313e810e3ea06be53f1c97f186bf`；[macOS 15 Intel #44128351358](https://github.com/engcapa/taomni/actions/runs/44128351358) 绑定 `396b7bb294e0c4ccbc17871ac71eca246d5cfc0d`，release QA 与 scoped 签名包已完成，44 项 native（含 013/014/015、033/034/035 及完整 crash-regression）正在执行，完成片即下载核验。[macOS 26 ARM64 #44128388069](https://github.com/engcapa/taomni/actions/runs/44128388069) 的 producer 没有执行任何步骤，被 GitHub 以 hosted runner 未获配/ARM64 容量不足取消；无应用用例结果，原始 annotations 保留。
 
-用户再次要求同步 main 后已合并 `677ec4d77`；下述 Intel 全量与 ARM64 部分证据仍绑定其原始 SHA。旧 SHA 的单作业 #44110689605 在执行应用用例前结束，合并后的匹配构建和三态还原需要新的 hosted 结果，不将旧源码结果转为新源码通过。
+同产品源码、较早 runner 的 [Intel #44124347927](https://github.com/engcapa/taomni/actions/runs/44124347927) 绑定 `daa1fc0bd4ccd22d24247a19f0c75d41e0ed72bf`。已在运行期间收齐并核验前两片 **22/22**，其中 035 全 112 步通过：原 PID **12295 → 12859**，单次确认、staged/禁重复、旧进程 **exit=0**、旧 HTTP 连接关闭，核对同一二进制/精确隔离环境后接管完成。卸载/retained locator、完整 SQLite 字节、generation/active、released writer lease、原密码和 HOTP 755224 的原断言均通过。033/034 和其余两片仍待完成；此结果不能改写为最新 runner 或 ARM64 通过。
+
+首轮 `750f6f417528c25fb813bdd547c36c69239e7079` 的 [Intel #44119238192](https://github.com/engcapa/taomni/actions/runs/44119238192) 虽完成 release QA build，但旧四目标模块包被无关 ARM64 容量阻断，native 未执行；[ARM64 #44119201895](https://github.com/engcapa/taomni/actions/runs/44119201895) 同样未取得 runner。下述旧 Intel 全量与 ARM64 部分证据仍绑定各自原始 SHA。旧 SHA 的单作业 #44110689605 在执行应用用例前结束，不将历史结果转为新源码通过。
 
 本地仅执行工具单元和 schema/behavior contract、catalog/refactor 静态检查。真实应用、进程、文件还原和三态自动 relaunch 全部留 GitHub `qa-ui-auto-platforms`，包含完整 crash-regression，并在运行中下载完成的 shard。
 

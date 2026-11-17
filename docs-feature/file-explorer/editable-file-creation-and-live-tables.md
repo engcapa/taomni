@@ -6,23 +6,42 @@ Live 表格此前直接使用 `textContent` 展示单元格，导致 `**` 等源
 
 ## 当前验收
 
-合并后提交 `750f6f417528c25fb813bdd547c36c69239e7079` 已启动新的 hosted 验证，产品源码指纹为 `c35b48e6018a22744215dcd62f63f41f3e60313e810e3ea06be53f1c97f186bf`、runner 指纹为 `bccd320420dc81388adea1107b3de937643ebf4309ea659fd7d16367d3ad7eb2`。三轮均选择 release QA native binary，开启 Rust contracts，并在规划时启动即时收证。三轮 GitHub plan 均已通过，selection 已下载；下表为确认后的计划，实际通过数待原始结果补录，不等同于用例已经执行。
+当前复验绑定 `396b7bb294e0c4ccbc17871ac71eca246d5cfc0d`，产品源码指纹为 `c35b48e6018a22744215dcd62f63f41f3e60313e810e3ea06be53f1c97f186bf`、runner 指纹为 `10bb03145a467fbea7f9e9ea784d5e226469d9613a95acba250fd7f4974ce8a8`。下表四轮 plan 均已通过并下载 selection，全部保留完整 crash-regression、gaps=[]/unreviewed=[]；native 使用 release QA。完成 shard 即下载，逐份核验原始 receipt、完整 artifacts、case digest、selection/run/source 和 native build 身份；没有用计划数或缺失结果代替通过。
 
-| GitHub run | 平台与模式 | 计划用例 / shard |
+| GitHub run | 范围 | 计划用例 / shard | 状态 |
+|---|---|---|---|
+| [44128316716](https://github.com/engcapa/taomni/actions/runs/44128316716) | Linux Xvfb、Windows native | 各 43，合计 8 shards | 8/8 片已核验：Linux 43/43；Windows 42/43；两端完整 crash 各 24/24，Windows 外部 Shell Paste 超时另列 |
+| [44128351358](https://github.com/engcapa/taomni/actions/runs/44128351358) | macOS 15 Intel native | 44，1 shard | release QA 构建与仅 darwin-x86_64 签名包已完成，实际 native 用例执行中 |
+| [44128388069](https://github.com/engcapa/taomni/actions/runs/44128388069) | macOS 26 ARM64 native | 44，1 shard | GitHub 容量取消，producer 没有任何执行步骤；无应用用例结果 |
+| [44130389617](https://github.com/engcapa/taomni/actions/runs/44130389617) | macOS 15 Intel browser | 35，1 shard | 整轮成功，35/35、完整 crash 20/20，Explorer002 全部 152 步通过 |
+
+最新 Linux/Windows native 的 006（153 步）、007（131 步）、029（68 步）均通过；已查看两端新建对话框及 Live 表格原始截图，类型/名称/取消/创建控件完整，粗体、斜体、删除线、代码、公式、换行、列对齐与 escaped pipe 正常。macOS browser 的同三项及修订后的 Explorer002 均通过，也已查看对应表格与窄窗口预览画面；browser 画面不代替 AppKit/OS 输入证据。两端 native 的模块 013/014/015 均通过。
+
+Windows 唯一失败 `TC-EXPLORER-005` 停在第 25 步外部 Windows Shell `InvokeVerb('paste')` 的原有 30 秒 PowerShell 超时。第 24 步及 Paste 前的独立读取已验证准确 CF_HDROP 路径；实际剪贴板写入、解析和 Paste 脚本均与 main 相同。`host_clipboard._ps` 的新增参数保持该调用原默认值、命令和超时；Explorer `copy` 分支未改。保留原始失败、截图、`system-file-paste.jsonl` 与逐文件对照 `windows-explorer-005-unrelated-failure.json`，按用户授权作为本次改动无关的外部自动化失败单列，仍计失败，不声称已完成 main 复现或确定唯一 OS 根因。同 SHA 的[定向复验 #44142742009](https://github.com/engcapa/taomni/actions/runs/44142742009) 已通过 plan，25 项/4 片，保留完整 24 项 crash 集合，实际结果另录。
+
+最新 ARM64 producer 的原始 check annotations 已保存为 `runner-capacity-annotations.json`：明确报告 hosted runner 未获配及 macOS ARM64 capacity constraints，`steps=[]`。这是未执行的覆盖缺口，不能由 Intel 或旧 ARM64 部分通过替代。
+
+较早恢复轮 [44124269305](https://github.com/engcapa/taomni/actions/runs/44124269305) 绑定 `daa1fc0bd4ccd22d24247a19f0c75d41e0ed72bf`、runner `dc27dfdbdb09b317ba3e1c6af8c8a591e40acc03b4aa1882dbe33682e5a4b6a8`，产品源码与当前相同：Linux/Windows native 各 43/43、各完整 crash 24/24，8/8 片全部核验，整轮成功。该结果保留原 SHA，不能回写为最新 runner 通过。同一旧 runner 的 [Intel 44124347927](https://github.com/engcapa/taomni/actions/runs/44124347927) 已收齐前两片 22/22，含 035 的自动 relaunch；其余两片仍待执行。
+
+browser 的首次补跑 #44128421025 因输入误带 native 专用 ID，被规划器明确拒绝，未执行任何应用用例；已按首轮实际 macOS browser 的准确 35 项集合重新调度为上表 #44130389617，完整 crash 集合保持。原规划失败日志保存在对应 run 的 `plan-failure.log`。
+
+同产品源码的首轮 `750f6f417528c25fb813bdd547c36c69239e7079` 使用 runner `bccd320420dc81388adea1107b3de937643ebf4309ea659fd7d16367d3ad7eb2`，原始计划和结果保留如下，不能把未执行项记为通过：
+
+| GitHub run | 平台与模式 | 实际结果 |
 |---|---|---|
-| [44119120276](https://github.com/engcapa/taomni/actions/runs/44119120276) | Linux Xvfb、Windows，browser/native | 各 35 browser + 43 native，合计 16 shards |
-| [44119238192](https://github.com/engcapa/taomni/actions/runs/44119238192) | macOS 15 Intel，browser/native | 35 browser + 44 native，8 shards |
-| [44119201895](https://github.com/engcapa/taomni/actions/runs/44119201895) | macOS 26 ARM64，native | 44 native，1 shard |
+| [44119120276](https://github.com/engcapa/taomni/actions/runs/44119120276) | Linux Xvfb、Windows，browser/native | browser 各 35/35；两份 release QA build 成功，但未选中的 ARM64 模块 builder 因容量取消，native 8 片未执行 |
+| [44119238192](https://github.com/engcapa/taomni/actions/runs/44119238192) | macOS 15 Intel，browser/native | browser 34/35、完整 20 项 crash 全过；release QA build 成功，但旧四目标签名包被 ARM64 容量取消阻断，native 未执行 |
+| [44119201895](https://github.com/engcapa/taomni/actions/runs/44119201895) | macOS 26 ARM64，native | 未执行应用用例；native producer 未获配 runner 后被 GitHub 容量取消 |
 
-三轮均合并完整 crash-regression；额外覆盖 Explorer001–007、Live 表格029、保留 Markdown 和 main 新增的导出/格式回归、Workspace085/096/097、真实 MySQL 结果搜索与 Tao 配置/provider 用例。Tao045/046 现有 case 只声明 Linux/Windows native，由首轮执行，不外推 macOS。静态计划 gaps=[]/unreviewed=[]；全部真实结果必须另核验 receipt、完整 artifacts、case/selection/source/build 身份与截图。
+三轮计划均合并完整 crash-regression；额外覆盖 Explorer001–007、Live 表格029、保留 Markdown 和 main 新增的导出/格式回归、Workspace085/096/097、真实 MySQL 结果搜索与 Tao 配置/provider 用例。Tao045/046 现有 case 只声明 Linux/Windows native，保留在恢复批次中，不外推 macOS。静态计划 gaps=[]/unreviewed=[]；全部真实结果必须另核验 receipt、完整 artifacts、case/selection/source/build 身份与截图。
 
-首轮运行期间已下载并逐份核验 8 个完成的 browser shards：Linux、Windows 各 **35/35**，各含完整 20 项 crash-regression，零失败/skip；全部 artifact hash/bytes、receipt、case digest 与 CI outcome 的 source/selection/run 绑定均通过。记录为 `qa-ui-auto-report/github/44119120276/hosted-evidence-review.json` 和 `post-main-review.json`。已查看 Linux 新建对话框、029 Live 表格与用户 testing.md 的实际截图，控件和格式正常。Native 构建及其它结果仍待完成。
+首轮运行期间已下载并逐份核验 8 个完成的 browser shards：Linux、Windows 各 **35/35**，各含完整 20 项 crash-regression，零失败/skip；全部 artifact hash/bytes、receipt、case digest 与 CI outcome 的 source/selection/run 绑定均通过。记录为 `qa-ui-auto-report/github/44119120276/hosted-evidence-review.json` 和 `post-main-review.json`。已查看 Linux 新建对话框、029 Live 表格与用户 testing.md 的实际截图，控件和格式正常。该轮全量前端单元 **7399 passed / 1 skipped，869 files passed**、Linux Rust contracts **197/197** 和 Windows helper contracts **26/26** 的原始 producer 日志也已在运行期间下载至 `live-producers/`；两份 release QA build 成功不代替尚未执行的 native UI。
 
 模块打包的 Darwin 构建仍固定 `macos-latest`，排队超过十分钟后阻挡了所有依赖签名模块的 native shard。补充 `qa-modular-packages.yml` 的 hosted macOS runner 选择和平台 workflow 转发；source job 先校验固定允许清单，再调度两个明确 Rust target，保持包平台与签名审查。纯工具/工作流单元 **29/29** 和 actionlint 已通过；实际恢复批次另行补录。此修改不改变产品源码和用例预期。
 
-2026-11-18 再次 fetch/merge main，远程仍为 `677ec4d77`，无冲突。进一步确认旧四目标模块打包会让 Linux/Windows 聚焦验证等待未选中的 macOS builder；platforms 现传递计划的 native build matrix，仅为需要 `signed-module` 的实际平台/架构构建和签名，多个 Linux profile 去重。独立打包及未传该参数的升级调用仍保留四目标，签名 job 的可信工具 checkout、凭证隔离和清单审查保持。相关工具/工作流单元 **37/37** 已通过，新的 GitHub 执行结果待补录。
+2026-11-18 再次 fetch/merge main，远程仍为 `677ec4d77`，无冲突。进一步确认旧四目标模块打包会让 Linux/Windows 聚焦验证等待未选中的 macOS builder；platforms 现传递计划的 native build matrix，仅为需要 `signed-module` 的实际平台/架构构建和签名，多个 Linux profile 去重。独立打包及未传该参数的升级调用仍保留四目标，签名 job 的可信工具 checkout、凭证隔离和清单审查保持。相关工具/工作流单元 **37/37** 已通过；最新 Linux/Windows run 已实际只构建和签名选中的两个目标并进入应用用例。
 
-Intel browser 首轮为 **34/35**，唯一 `TC-EXPLORER-002` 在恢复宽窗口后紧接 Alt+P 时未隐藏预览。trace 显示两者相隔约 50 ms；预览实现与 main 相同，尚未确认事件根因或建立 main 复现。本轮仅在原快捷键前断言窄窗口 overlay 已退出，作为宽布局操作的前置条件，保留后续隐藏/重开、创建、拖动和删除全部断言，reviewed 步号同步为 152 步。该修订须完整 browser 重跑，旧失败保留、不记通过。
+Intel browser 首轮为 **34/35**，唯一 `TC-EXPLORER-002` 在恢复宽窗口后紧接 Alt+P 时未隐藏预览。trace 显示两者相隔约 50 ms；预览实现与 main 相同，尚未确认事件根因或建立 main 复现。本轮仅在原快捷键前断言窄窗口 overlay 已退出，作为宽布局操作的前置条件，保留后续隐藏/重开、创建、拖动和删除全部断言，reviewed 步号同步为 152 步。上述 #44130389617 已完整重跑通过 152 步及 35 项集合，旧失败保留。
 
 首轮 Linux GitHub native Rust contracts 已通过 **197/197**，包含实际非空的 `deepseek_app`、迁移及 Workspace 过滤；原始日志位于 `qa-ui-auto-report/github/44119120276/live-contracts/contracts.log`。这不代替 native UI 运行。
 

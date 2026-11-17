@@ -987,17 +987,17 @@ v1.2 没有覆盖“已经在用旧版的用户”。核心 0.6.x 默认包不�
 - v1.1（2026-11-14 20:22 澄清后）：第 5 项改按客户端 / 服务端两类，RDP / VNC 拆为 4 个插件，插件总数 10→12；第 4 项确认理解正确；新增 §4.1 暂定插件（后续可能移除）。
 - v1.0（2026-11-14 18:22 决策后）：初稿；§13 全部 5 项已决策，§13.2 三处解释待确认。
 
-### 13.5 当前实现与 hosted 验证快照（2026-11-16）
+### 13.5 当前实现与 hosted 验证快照（2026-11-18）
 
-TASK-025 的服务、锁与一致快照实施细化见[Vault 服务实施方案](taomni-modular-vault-services-plan.md)。A–E 已接入生产服务，F/G 的离线 v2 与三端运行中宿主 snapshot 契约已有证据，三态重启还原仍待修复解锁顺序后完整复验。MFA engine 已拆分，`plugins/mfa/` 的 SDK 宿主/store actor/operation-scoped KeyProvider/snapshot 原型和真实进程门正在开发，生产 facade 尚未切换；签名业务包、真实旧库交接、动态 UI、相关 G 门和独立 MFA 后的一致还原尚未完成。最新源码、逐 shard 结果与剩余边界见[实施台账](taomni-modular-split-progress.md)。独立小库或原型通过不构成 AC-016 验收。
+插件 API/registry、验签安装、生产宿主监督、共享采集/RDP 公共库、CoreState/统一 bootstrap、作用域 Vault、profile generation 与静默快照已集成。原生下载支持三代理、后台进度、取消、续传及重启恢复；远端商店已接入并取得测试签名目录的三端 native 证据，正式目录、独立业务更新/回滚和四目标正式发布仍待完成。各批结果只保护对应源码与场景，逐 TASK/AC/G 的身份、原始结果和缺口见[实施台账](taomni-modular-split-progress.md)。
 
-逐 TASK/AC/G 的状态与剩余工作见[实施与验收台账](taomni-modular-split-progress.md)。核心仍包含待迁出业务；目前完成正式签名安装验证的独立宿主为 hello-plugin，MFA 宿主原型已有真实进程证据，但产品 facade 尚未切换，完整模块化交付尚未完成。主窗/独立 WebView 的动态模块前端接入、状态清理和验证边界见[前端接入契约](taomni-modular-frontend-contract.md)，新增正常与篡改恢复场景仍须 matching runner 验收。WKWebView 已实测出现跨 `tauri`/`taomni-plugin` scheme 的 ESM 导入失败；打包 renderer 使用应用同源的保留前缀转发到相同 registry/完整性验证器，不放宽 CSP、CORS 或原生文件范围。这是受限资源协议的平台适配，仍须新源码三端真实模块和相对 chunk 验证。
+TASK-025 A–G 的服务、锁、一致快照、离线 v2 和三态正常重启已逐批取得契约/native 证据。macOS 15 Intel 的真实确认自动 relaunch 三态已在历史批次通过；ARM64 部分证据和 Linux/Windows 自动接管限制见[还原入口验证](taomni-modular-restore-relaunch-verification.md)。这些 UI 仍使用核心 MFA。MFA engine、SDK 宿主/store actor/operation-scoped KeyProvider/snapshot 原型已有真实进程门、四目标签名包与三端正式安装门证据；生产 facade、真实旧库交接、动态 MFA UI、相关 G 门及独立 MFA 后的三态还原仍未完成。详见[Vault 服务方案](taomni-modular-vault-services-plan.md)；上述准备不构成 TASK-014 或 AC-016 全部验收。
 
-已落地的基础能力包括插件 API/registry、版本目录原语、真实宿主 spawn/stdio/握手/invoke、原生 HTTP 代理/续传/取消/进度、设置页本地 registry 投影和升级预检，以及模块清单生成和发布顺序。生产 `plugin_migration_execute` 只记录安全 pending journal；真实 exporter、可信插件包和密钥服务接通前，不复制旧数据、不建立伪版本、不改变 active 指针。fixture 中的 staging/回滚测试不构成真实单体升级证据。
+主窗/独立 WebView 的动态模块 ESM、状态清理、locator 恢复与篡改拒绝已有 native 证据，具体业务前端仍待迁出。WKWebView 的跨 `tauri`/`taomni-plugin` scheme 导入问题使用应用同源保留前缀转发到相同 registry/完整性验证器解决，不放宽 CSP、CORS 或原生文件范围；契约与验证边界见[前端接入方案](taomni-modular-frontend-contract.md)。
 
-最近已完成的源码身份是 `2a245d52d07680d76a3cfd1f4240a484d2598ed7`：[QA UI Auto Platforms #43732808941](https://github.com/engcapa/taomni/actions/runs/43732808941) 三端 browser 各 22/22、native 各 25/25，包含模块 case 与完整 crash-regression，18 个 shard 已在执行期间采集；[升级契约 #43737735365](https://github.com/engcapa/taomni/actions/runs/43737735365) 三端通过。此后改动需新证据；契约 workflow 尚未覆盖真实安装旧版再升级。
+生产 `plugin_migration_execute` 仍只记录安全 pending journal。已有[真实已安装 0.5.9 输入验证](taomni-modular-installed-upgrade-verification.md)，覆盖正式 deb/MSI/DMG、旧 binary 创建数据、只读预检、重复 pending、候选正常重启及原数据保持；Windows 旧 GUI 进程强停如实记为 crash 输入。此证据不代表候选安装程序替换、生产 legacy exporter、可信数据 staging、激活/中断/回滚已交付。旧源和已删除 LanChat 的历史库保持原位，产品不读取、复制、迁移或删除历史 chat 数据；fixture 的事务原语不算真实升级完成。
 
-本地只运行单元测试与静态检查，browser/native、跨进程和真实安装升级在 GitHub runner 运行。完整签名安装、生产监督、共享能力下沉、实际 tab 动态路由、真实数据升级、具体业务插件、四目标发布与最终性能/回归仍按台账推进。
+远程 main `677ec4d77` 已合并；File Explorer 可编辑类型新建与 Markdown Live 表格的合并后复验见[专项验收](file-explorer/editable-file-creation-and-live-tables.md)，包含最新 selection、源码/runner 指纹、逐 shard 结果与完整 crash-regression。G1–G11、核心业务 owner 迁出、core-only 依赖裁剪、真实升级及正式发布/性能仍待收口；TASK-015 已按用户决定取消，LanChat 不创建替代插件。原型或历史通过项不能当作全部完成。本地仅单元与静态检查，browser/native、跨进程和真实安装升级均在 GitHub runner 执行，完成 shard 即下载并核验。
 
 ---
 

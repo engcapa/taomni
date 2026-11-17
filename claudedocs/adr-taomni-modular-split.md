@@ -4,13 +4,13 @@
 
 Accepted as a design decision; M0 implementation is in progress. v1.6 is the current review revision, based on `7bc498b35` (Merge PR #813); it records the 2026-11-15 decision to remove LanChat completely. Plugin migration remains blocked until the G1–G11 feasibility gates pass. The executable plan is in `docs-feature/taomni-modular-split-design.md` §10.1.
 
-本分支已集成插件 API/registry、真实验签安装、宿主监督、共享采集与 RDP 公共库、原生下载、离线安装和升级预检，以及独立清单生成器；官方签名远端商店正在接入，各批验证仍须按实际覆盖范围验收。生产升级当前只记录安全 pending journal；fixture 的 staging/回滚原语不代表真实旧版升级。核心仍包含待迁出业务，hello-plugin 与 MFA 引擎宿主已有原型，生产 MFA facade 尚在核心。核心状态和依赖闭包、真实 exporter、业务迁移与最终发布验收仍未完成；逐任务状态与对应 hosted 证据见[实施与验收台账](../docs-feature/taomni-modular-split-progress.md)，不能把基础契约通过视为完整交付。
+2026-11-18 实施快照：本分支已集成插件 API/registry、真实验签安装、生产宿主监督、共享采集与 RDP 公共库、CoreState/统一 bootstrap、原生后台下载、作用域 Vault/快照和升级预检，以及独立清单生成器。官方签名远端商店已接入并有测试目录的三端 native 证据，正式目录和独立业务更新/回滚尚未发布。hello-plugin 与 MFA SDK 宿主已有签名包/真实安装门证据，生产 MFA facade 和其他业务 owner 仍在核心。生产升级仍只记录安全 pending journal；真实 0.5.9 deb/MSI/DMG 输入的预检/保持数据已有证据，尚不代表生产 exporter、候选安装替换、staging/激活/回滚已完成。核心业务迁出、依赖闭包和最终发布门继续按[实施与验收台账](../docs-feature/taomni-modular-split-progress.md)推进，不能把基础契约通过视为完整交付。
 
 验证按源码提交、用例、平台与构建身份记录在台账及原始 artifact 中。历史整库单测和旧 hosted run 不能替代后续修改的验证；无关失败须有具体依据才能单列忽略，本次引入的回归必须修复重跑。
 
 ## 1. Context
 
-Taomni 是 Tauri 2 + React 19 + Rust 的本地优先桌面工作台。当前发布仍是一个核心包、一个 `latest.json` 和一个 Rust `AppState`：根 `package.json` 为 0.5.9，`src-tauri/src/lib.rs` 593 行、`commands/mod.rs` 823 行，前端 `TabContentRouter` 静态引入多个重型 tab（仅 RDP/VNC 等少数 tab 在 `panels.tsx` 用 `React.lazy`，且仍随核心发布）。历史基线（`7bc498b35`）实测为 `src/` 3,022 个文件、`src-tauri/` 2,165 个文件、Rust 331,079 行、`SessionType` 26 种、`TabKind` 23 种；LanChat 删除后当前分支保留 22 种 `TabKind`。发布包体积尚无可复现基线，必须由 TASK-001 先测量。分支上新增了核心文件查看器（`viewer/`、`taomni-preview` 协议）和移动端桌面远控 / 飞书适配（`mobile/` 达 12,679 行），详见设计文档 §1.10。
+Taomni 是 Tauri 2 + React 19 + Rust 的本地优先桌面工作台。重构前发布为一个核心包、一个 `latest.json` 和一个 Rust `AppState`：基线 `package.json` 为 0.5.9，`src-tauri/src/lib.rs` 593 行、`commands/mod.rs` 823 行，前端 `TabContentRouter` 静态引入多个重型 tab（仅 RDP/VNC 等少数 tab 在 `panels.tsx` 用 `React.lazy`，且仍随核心发布）。历史基线（`7bc498b35`）实测为 `src/` 3,022 个文件、`src-tauri/` 2,165 个文件、Rust 331,079 行、`SessionType` 26 种、`TabKind` 23 种；LanChat 删除后当前分支保留 22 种 `TabKind`。TASK-001 已采样四发布目标的真实包体积、哈希和负载，运行性能与系统信任缺口见[追加基线](../docs-feature/taomni-modular-split-baseline-20261115.md)。该基线含核心文件查看器（`viewer/`、`taomni-preview` 协议）和移动端桌面远控 / 飞书适配（当时 `mobile/` 为 12,679 行），详见设计文档 §1.10。
 
 用户要求核心默认安装、其它能力独立发布，并在第一版交付真实插件运行时和模块商店。首批目标是全部有效非核心模块；实现仍在同一 monorepo，插件以独立 artifact 发布。
 
