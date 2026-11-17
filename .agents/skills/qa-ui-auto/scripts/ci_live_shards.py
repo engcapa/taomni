@@ -19,12 +19,29 @@ class GitHubArtifacts:
         self.run_id = run_id
 
     def listing(self, resource: str) -> list[dict]:
+        # Explicit pages also work with older authenticated gh installations
+        # that do not support api --slurp. A failed page remains a retryable
+        # observation error; never return an incomplete listing as success.
+        items = []
+        page = 1
+        while True:
+            result = subprocess.run(
+                ["gh", "api", f"repos/{self.repository}/actions/runs/{self.run_id}/"
+                 f"{resource}?per_page=100&page={page}"],
+                check=True, capture_output=True, timeout=120,
+            )
+            current = json.loads(result.stdout)[resource]
+            items.extend(current)
+            if len(current) < 100:
+                return items
+            page += 1
+
+    def run_status(self) -> str:
         result = subprocess.run(
-            ["gh", "api", "--paginate", "--slurp",
-             f"repos/{self.repository}/actions/runs/{self.run_id}/{resource}?per_page=100"],
+            ["gh", "api", f"repos/{self.repository}/actions/runs/{self.run_id}"],
             check=True, capture_output=True, timeout=120,
         )
-        return [item for page in json.loads(result.stdout) for item in page[resource]]
+        return json.loads(result.stdout)["status"]
 
     def download(self, artifact: dict, target: Path) -> None:
         # gh handles the REST archive endpoint's signed storage redirect. Do not

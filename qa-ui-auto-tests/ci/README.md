@@ -26,6 +26,31 @@ remain separate acceptance evidence. Browser/native UI scenarios still run in
 the platforms workflow, including the mandatory crash suite; download each
 completed shard while other shards and builds are running.
 
+The workflow's collector starts after planning and prints each completed
+shard's raw case results. From a local checkout, start the same collector while
+planning or execution is still running. It uses the authenticated `gh` CLI,
+including older versions without `api --slurp`, and inherits proxy variables:
+
+```sh
+python .agents/skills/qa-ui-auto/scripts/background_job.py start \
+  --name qa-live-RUN_ID --log /tmp/qa-live-RUN_ID.log \
+  --env HTTPS_PROXY=http://10.1.0.80:3228 \
+  --env HTTP_PROXY=http://10.1.0.80:3228 \
+  --env ALL_PROXY=http://10.1.0.80:3228 \
+  -- python .agents/skills/qa-ui-auto/scripts/ci_live_monitor.py \
+  --repository engcapa/taomni --run-id RUN_ID
+```
+
+Replace `RUN_ID` with the actual numeric run ID. Selection discovery is automatic;
+if a rerun has multiple selection artifacts, specify the intended `--artifact-key`.
+Artifacts go to `qa-ui-auto-report/github/RUN_ID/live-shards/`, without waiting
+for the summary job. Existing report evidence is never overwritten: when
+starting another monitor for that run, choose a new `--destination` directory.
+The collection index records missing/blocked shards and timeout. Raw failed
+cases stay failed; downloading every artifact is not a passing test result.
+Review the original receipts, source/build identity and exact selected cases
+before claiming coverage.
+
 For real release-package samples, dispatch that registered workflow with
 `package_run=<Release Bundle run ID>`, `package_source=<exact 40-character
 producer SHA>`, and `package_version=<artifact-only test version>`. `head` selects

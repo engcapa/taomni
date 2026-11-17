@@ -410,6 +410,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          python -m unittest test_ci_live_monitor
           mkdir -p live-shards
           python .agents/skills/qa-ui-auto/scripts/ci_live_shards.py
       - uses: actions/upload-artifact@v4
