@@ -20,6 +20,8 @@ def register(register_verb: RegisterVerb, verbs: dict[str, NativeVerb]) -> None:
     register_verb("module_live_backup_probe")(module_live_backup_probe)
     from .module_restore_observation import run as module_restore_probe
     register_verb("module_restore_probe")(module_restore_probe)
+    from .restore_relaunch import run as native_confirm_restore_relaunch
+    register_verb("native_confirm_restore_relaunch")(native_confirm_restore_relaunch)
     from .module_signed_observation import run as module_signed_probe
     register_verb("module_signed_probe")(module_signed_probe)
     from .module_execution_observation import run as module_execution_probe

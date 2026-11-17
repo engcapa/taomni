@@ -1,10 +1,12 @@
-"""Real module restore through fixed production staging and normal cold restart.
+"""Independent module restore observations for cold starts and UI relaunches.
 
 YAML cannot choose commands, credentials, paths or file contents. The Settings
-UI installs packages, changes lifecycle and creates the archive. Staging uses
+UI installs packages, changes lifecycle and creates the archive. The original staging phases use
 the production IPC without its UI's automatic relaunch; native_restart_app then
 proves normal shutdown and apply with the retained profile. This deliberately
 does not claim native coverage of the restore dialog's automatic relaunch.
+The separate ui-ready/ui-restored phases require the real confirmation and
+native process observation supplied by native_confirm_restore_relaunch.
 """
 from contextlib import closing
 import hashlib
@@ -25,7 +27,7 @@ from .steps import StepError
 MASTER_PASSWORD = "qa-module-restore-original"
 CHANGED_PASSWORD = "qa-module-restore-changed"
 ARCHIVE_STATES = {"running-archive": "enabled", "disabled-archive": "disabled", "retained-archive": "uninstalled"}
-PHASES = {"write-original", "write-mutated", "reject-password", "stage", "staged", "restored", "restart-persisted"} | set(ARCHIVE_STATES)
+PHASES = {"write-original", "write-mutated", "reject-password", "stage", "staged", "restored", "restart-persisted", "ui-ready", "ui-restored"} | set(ARCHIVE_STATES)
 RESTORE_PATHS = ("restore_intent.json", "restore_journal.json", ".pending_restore")
 
 
@@ -213,9 +215,24 @@ def run(ctx, args):
                 if state["step"] != "staged" or native_state != state["registryState"] or rows(data) != VALUES:
                     raise StepError("Independent staged observation found early apply or changed lifecycle")
                 check_staging(profile, state, Path(state["archive"]))
-            elif phase in {"restored", "restart-persisted"}:
-                if state["step"] != ("staged" if phase == "restored" else "restored"):
+            elif phase == "ui-ready":
+                if state["step"] != "mutated" or native_state != state["registryState"] or rows(data) != VALUES:
+                    raise StepError("UI restore requires unchanged mutated data and original module lifecycle")
+                require_clean(profile)
+                if not state.get("passwordRejected") or current != state["generation"]:
+                    raise StepError("UI restore requires rejected old credentials and unchanged generation")
+                if hashlib.sha256(Path(state["archive"]).read_bytes()).hexdigest() != state["archiveSha256"]:
+                    raise StepError("UI restore archive changed after independent verification")
+                state["activePointerSha256"] = hashlib.sha256((root / "hello-plugin/active.json").read_bytes()).hexdigest()
+                state["step"] = "ui-prepared"
+            elif phase in {"restored", "restart-persisted", "ui-restored"}:
+                expected_step = {"restored": "staged", "restart-persisted": "restored", "ui-restored": "ui-prepared"}[phase]
+                if state["step"] != expected_step:
                     raise StepError("Restore restart observations were requested out of sequence")
+                if phase == "ui-restored":
+                    relaunch = getattr(ctx.session, "restore_relaunch_observation", {})
+                    if relaunch.get("passed") is not True or relaunch.get("manual_launch") is not False:
+                        raise StepError("UI restore requires its actually observed automatic relaunch")
                 require_clean(profile)
                 check_generation(state, current, persisted=phase == "restart-persisted")
                 if native_state != state["registryState"] or rows(data) != VALUES[:1]:

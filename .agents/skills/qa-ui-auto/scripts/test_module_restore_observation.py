@@ -107,9 +107,9 @@ class RestoreObservationTests(unittest.TestCase):
                         stage(ctx, Path("/owned/original.taobak"), reject=reject)
 
     def test_only_observations_are_checks_and_yaml_cannot_select_restore_inputs(self):
-        for phase in ("running-archive", "disabled-archive", "retained-archive", "staged", "restored", "restart-persisted", "reject-password"):
+        for phase in ("running-archive", "disabled-archive", "retained-archive", "staged", "restored", "restart-persisted", "reject-password", "ui-restored"):
             self.assertTrue(is_check({"module_restore_probe": {"phase": phase}}))
-        for phase in ("write-original", "write-mutated", "stage"):
+        for phase in ("write-original", "write-mutated", "stage", "ui-ready"):
             self.assertFalse(is_check({"module_restore_probe": {"phase": phase}}))
         for args in (None, {}, {"phase": "anything"}, {"phase": "stage", "password": "arbitrary"},
                      {"phase": "stage", "path": "/other"}, {"phase": "stage", "command": "anything"}):

@@ -955,9 +955,13 @@
           "additionalProperties": false,
           "required": ["phase"],
           "properties": {
-            "phase": {"enum": ["write-original", "running-archive", "disabled-archive", "retained-archive", "write-mutated", "reject-password", "stage", "staged", "restored", "restart-persisted"]}
+            "phase": {"enum": ["write-original", "running-archive", "disabled-archive", "retained-archive", "write-mutated", "reject-password", "stage", "staged", "restored", "restart-persisted", "ui-ready", "ui-restored"]}
           },
-          "description": "Native only: fixed real-host input, exact UI archive and production restore staging; independently observe applied data, activation and generations across normal cold restarts. No YAML-selected commands, paths, credentials or bytes. Does not automate the restore dialog's automatic relaunch."
+          "description": "Native only: fixed real-host input, exact UI archive and production restore staging; independently observe applied data, activation and generations. ui-ready only checks inputs; ui-restored additionally requires native_confirm_restore_relaunch evidence. No YAML-selected commands, paths, credentials or bytes."
+        },
+        "native_confirm_restore_relaunch": {
+          "type": "null",
+          "description": "macOS native only: click the exact restore-confirm button once, observe staged success and original exit=0, validate a different kernel PID/start-time with the same executable and isolated QA environment, then attach to its already running WKWebView bridge. Never launches an application, invokes restore/restart IPC or uses native_restart_app. Saves process/reattachment evidence; Linux/Windows attachment remains unverified."
         },
         "module_live_backup_probe": {
           "type": "object",
