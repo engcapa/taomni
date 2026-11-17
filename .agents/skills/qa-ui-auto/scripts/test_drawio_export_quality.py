@@ -36,6 +36,15 @@ class DrawioExportQualityTests(unittest.TestCase):
         result = self.check(sample())
         self.assertEqual(result["independentCells"], 3)
         self.assertEqual(result["curvedEdges"], 1)
+        self.assertEqual(result["maximumCurveControlPoints"], 1)
+
+    def test_dense_svg_samples_cannot_be_exported_as_editable_curve_handles(self):
+        file = sample()
+        points = file.find(".//mxCell[@edge='1']/mxGeometry/Array")
+        for index in range(20):
+            ET.SubElement(points, "mxPoint", x=str(index * 10), y="50")
+        with self.assertRaisesRegex(StepError, "compact native draw.io connector"):
+            self.check(file)
 
     def test_group_and_image_fallbacks_fail(self):
         for style, parent in (("group;", "1"), ("shape=image;", "1"), ("rounded=0;", "diagram-group")):

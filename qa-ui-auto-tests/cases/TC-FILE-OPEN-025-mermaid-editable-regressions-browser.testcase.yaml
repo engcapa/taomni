@@ -2,7 +2,8 @@ id: TC-FILE-OPEN-025
 title: Mermaid selection controls, distinct download formats and editable sequence/path exports (browser)
 description: Repeat actual CodeMirror selections and view changes without adding import controls. Download the reported Chinese
   agent sequence and all four diagrams; independently parse XML for editable ungrouped cells, connected messages, activation/loop/numbering,
-  straight/stepped/curved paths and viewer transforms. Native additionally validates real chooser and host bytes.
+  straight/stepped/curved paths and viewer transforms. Native additionally validates real chooser and host bytes. Curved edges
+  use compact native draw.io connector controls; independent saved-artifact checks reject dense SVG sample handles.
 modes:
 - browser
 covers:
@@ -147,7 +148,7 @@ verification:
   requirements:
   - id: MERMAID-REGRESSIONS
     requirement: Unique controls, visible format distinctions and independent editable diagram elements retain the rendered
-      line type and source.
+      line type and source. Curved connectors retain a bounded native control polygon.
     actions:
     - 4
     - 5

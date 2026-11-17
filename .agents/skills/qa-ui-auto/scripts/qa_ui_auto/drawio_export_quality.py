@@ -18,7 +18,7 @@ def inspect_drawio(path):
     models = document.findall("./diagram/mxGraphModel")
     if document.tag != "mxfile" or not models:
         raise StepError("draw.io export has no editable graph sheets")
-    result = dict(sheets=len(models), independentCells=0, curvedEdges=0, straightEdges=0, sequences=0, sources=[], checkedSequenceEndpoints=0, maximumEndpointError=0)
+    result = dict(sheets=len(models), independentCells=0, curvedEdges=0, straightEdges=0, sequences=0, sources=[], checkedSequenceEndpoints=0, maximumEndpointError=0, maximumCurveControlPoints=0)
     for model in models:
         root = model.find("root")
         if root is None:
@@ -65,6 +65,11 @@ def inspect_drawio(path):
                 raise StepError("Mermaid connector was rerouted instead of retaining its original path")
             if geometry.find("mxPoint[@as='sourcePoint']") is None or geometry.find("mxPoint[@as='targetPoint']") is None:
                 raise StepError("Mermaid connector lost its original endpoints")
+            if style.get("curved") == "1":
+                controls = len(geometry.findall("Array[@as='points']/mxPoint"))
+                if controls > 12 or style.get("shape", "connector") != "connector":
+                    raise StepError("Mermaid curve is not a compact native draw.io connector")
+                result["maximumCurveControlPoints"] = max(result["maximumCurveControlPoints"], controls)
             result["curvedEdges" if style.get("curved") == "1" else "straightEdges"] += 1
         connections = inspect_sequence_connections(cells)
         result["checkedSequenceEndpoints"] += connections["checkedSequenceEndpoints"]

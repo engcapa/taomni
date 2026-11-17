@@ -15592,6 +15592,18 @@ controls:
   - id: explorer-column-name
     selector: '[data-testid="explorer-column-name"]'
     kind: interactive
+  - id: explorer-column-resize-name
+    selector: '[data-testid="explorer-column-resize-name"]'
+    kind: interactive
+  - id: explorer-column-resize-mtime
+    selector: '[data-testid="explorer-column-resize-mtime"]'
+    kind: interactive
+  - id: explorer-column-resize-type
+    selector: '[data-testid="explorer-column-resize-type"]'
+    kind: interactive
+  - id: explorer-column-resize-size
+    selector: '[data-testid="explorer-column-resize-size"]'
+    kind: interactive
   - id: explorer-column-size
     selector: '[data-testid="explorer-column-size"]'
     kind: interactive
