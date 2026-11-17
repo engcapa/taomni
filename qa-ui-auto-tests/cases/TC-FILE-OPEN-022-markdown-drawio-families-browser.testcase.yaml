@@ -1,0 +1,97 @@
+id: TC-FILE-OPEN-022
+title: Editable Mermaid flowchart, state, class and ER exports retain node labels and relationship semantics
+description: Production Markdown entry and actual user controls. Retains selected export/import outcomes, editable
+  graph XML, text/table data and original source; browser uses VFS, native uses OS dialogs/disk/clipboard.
+modes:
+- browser
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-drawio
+- reload_window: null
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-file-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Control+l
+    macos_key: Meta+l
+- fill:
+    selector: '[data-testid="explorer-address"]'
+    value: ${fixture.file_open_root}
+- press:
+    selector: '[data-testid="explorer-address"]'
+    key: Enter
+- dblclick: '[data-testid="explorer-file-row"][data-name="graph-types.md"]'
+- wait_for: '[data-testid="markdown-editor"]'
+- click: '[data-testid="markdown-export"]'
+- click: '[data-testid="markdown-export-drawio"]'
+- wait_for: '[data-testid="markdown-drawio-export-settings"]'
+- select_option:
+    selector: '[data-testid="markdown-drawio-scope"]'
+    value: images
+- assert_download:
+    trigger: '[data-testid="markdown-drawio-save"]'
+    filename: graph-types.drawio
+    contains:
+    - <mxfile
+    - mermaidSource=
+    - startArrow=block
+    - endArrow=ERzeroToMany
+    - +String name
+    - Start 开始
+    - Load 加载
+    - Configuration 配置
+- eval_readonly:
+    expression: /(?:4.*editable diagrams|4.*可编辑图表).*0.*SVG/.test(document.querySelector(".fv-md-export-notice").textContent)
+    expect_truthy: true
+- assert_no_runtime_errors: null
+- screenshot: editable-mermaid-families.png
+covers:
+- F-FILEOPEN-1
+- F-EXPLORER-1
+tags:
+- p0
+- markdown
+- drawio
+- regression
+fixtures:
+- reset_db
+- markdown_drawio
+timeout_sec: 300
+verification:
+  review: reviewed
+  requirements:
+  - id: DRAWIO-NATIVE-CELLS
+    requirement: Editable Mermaid flowchart, state, class and ER exports retain node labels and relationship semantics
+    actions:
+    - 4
+    - 5
+    - 7
+    - 8
+    - 9
+    - 10
+    - 12
+    - 13
+    - 15
+    checkpoints:
+    - step: 16
+      expectation: 'assert_download: explicit expected state, content or output in the step must match; retain original
+        source and previous successful imports.'
+    - step: 17
+      expectation: 'eval_readonly: explicit expected state, content or output in the step must match; retain original
+        source and previous successful imports.'
+    - step: 18
+      expectation: 'assert_no_runtime_errors: explicit expected state, content or output in the step must match;
+        retain original source and previous successful imports.'
+    results:
+    - 16
+    - 17
+    - 18
+  native:
+  - check: Native chooser, disk and OS clipboard
+    method: not-applicable
+    reason: Browser only here; TC-FILE-OPEN-021 separately exercises these native boundaries.
+  visual:
+  - check: Editable document pages and Mermaid viewer
+    method: manual
+    reason: Inspect retained exports with an independent graph renderer plus viewer screenshot.

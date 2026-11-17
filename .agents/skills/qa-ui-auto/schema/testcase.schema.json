@@ -70,6 +70,7 @@
           "backup_cloud",
           "model_inspector_gateway",
           "tao_messages",
+          "tao_llm",
           "tao_agent",
           "tao_memory",
           "tao_history",
@@ -110,6 +111,7 @@
           "explorer_files",
           "file_open_files",
           "markdown_quality",
+          "markdown_drawio",
           "file_open_mail",
           "html_network_test",
           "file_open_entries",
@@ -2046,7 +2048,7 @@
             "timeout_sec": {
               "type": "number",
               "minimum": 0.5,
-              "maximum": 120
+              "maximum": 300
             },
             "state": {
               "enum": [

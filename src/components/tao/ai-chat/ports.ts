@@ -1,8 +1,8 @@
 import type { ReactNode } from "react";
 
 export type TaoMode = "ask" | "do" | "research";
-export type TaoProvider = "deepseek-app" | "opencode-go";
-export type TaoModel = "deepseek-flash" | "deepseek-v4-pro" | "deepseek-v4.1-flash";
+export type TaoProvider = string;
+export type TaoModel = string;
 export type TaoReasoningEffort = "low" | "medium" | "high" | "max";
 export type TaoPhase =
   | "idle"
@@ -184,6 +184,7 @@ export interface ChatProfile {
   defaultWeb: boolean;
   defaultProvider?: TaoProvider;
   defaultReasoningEffort?: TaoReasoningEffort;
+  defaultCapabilities?: { thinking: boolean; web: boolean };
   budget?: Partial<BudgetPort>;
 }
 
@@ -201,7 +202,7 @@ export interface TaoChatState {
   threads: Record<string, TaoThread>;
   mode: TaoMode;
   context: Record<string, string | undefined>;
-  composer: { text: string; chips: ContextChip[]; thinking: boolean; web: boolean; model: TaoModel; provider?: TaoProvider; reasoningEffort?: TaoReasoningEffort };
+  composer: { text: string; chips: ContextChip[]; thinking: boolean; web: boolean; model: TaoModel; provider?: TaoProvider; reasoningEffort?: TaoReasoningEffort; capabilities?: { thinking: boolean; web: boolean } };
   runtime: Record<string, {
     phase: TaoPhase;
     budget: TaoBudget;
@@ -225,7 +226,7 @@ export interface TaoChatController {
   setComposerText(text: string): void;
   setComposerOption(option: "thinking" | "web", value: boolean): void;
   setModel(model: TaoModel): void;
-  setProvider(provider: TaoProvider): void;
+  setProvider(provider: TaoProvider, options?: { model: string; thinking?: boolean; web?: boolean }): void;
   setReasoningEffort(effort: TaoReasoningEffort): void;
   setContext(context: Record<string, string | undefined>): void;
   setChips(chips: ContextChip[]): void;
@@ -248,7 +249,7 @@ export interface TaoChatController {
   removeChip(id: string): void;
   hydrateThreads(threads: TaoThread[], options?: { merge: boolean }): void;
   increaseBudget(limitTokens: number): void;
-  setDefaults(defaults: Pick<ChatProfile, "defaultModel" | "defaultThinking" | "defaultWeb" | "defaultProvider" | "defaultReasoningEffort">): void;
+  setDefaults(defaults: Pick<ChatProfile, "defaultModel" | "defaultThinking" | "defaultWeb" | "defaultProvider" | "defaultReasoningEffort" | "defaultCapabilities">): void;
   branchAt(messageId: string, replacement?: string): string | undefined;
   recordHandoff(threadId: string, handoff: NonNullable<TaoThread["handoffs"]>[number]): void;
 }

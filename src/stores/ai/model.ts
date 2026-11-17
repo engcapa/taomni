@@ -89,7 +89,7 @@ export interface AiConfig {
 
 export interface DeepSeekAppConfig {
   enabled: boolean;
-  provider?: "deepseek-app" | "opencode-go";
+  provider?: string;
   reasoning_effort?: "low" | "medium" | "high" | "max";
   model: "deepseek-flash" | "deepseek-v4-pro" | string;
   thinking_default: boolean;
@@ -218,6 +218,7 @@ export interface AiStore {
   loadConfig: () => Promise<void>;
   saveConfig: (config: AiConfig) => Promise<void>;
   updateLlmProvider: (id: string, provider: LlmProviderConfig) => void;
+  updateTaoDefaults: (options: Partial<DeepSeekAppConfig>) => void;
   updateLlmProviderGroup: (id: string, group: LlmProviderGroupConfig) => void;
   removeLlmProviderGroup: (id: string) => void;
   setActiveLlmProvider: (id: string) => void;

@@ -29,6 +29,17 @@ export async function ensureMermaidReady(): Promise<MermaidApi> {
 export type MermaidTheme = "light" | "dark";
 let renderQueue: Promise<unknown> = Promise.resolve();
 
+/** Parsing also changes Mermaid's shared database; inspect it in the same
+ * queue as rendering, before another document can replace that database. */
+export function inspectMermaidDiagram<T>(source: string, inspect: (diagram: { type: string; db: unknown }) => T): Promise<T> {
+  const job = renderQueue.catch(() => undefined).then(async () => {
+    const mermaid = await ensureMermaidReady();
+    return inspect(await mermaid.mermaidAPI.getDiagramFromText(source));
+  });
+  renderQueue = job;
+  return job;
+}
+
 /** Mermaid has mutable module configuration. Own initialization and rendering
  * in one queue; another document/export must never change a render's theme. */
 export function renderMermaid(id: string, source: string, theme: MermaidTheme = "light"): ReturnType<MermaidApi["render"]> {

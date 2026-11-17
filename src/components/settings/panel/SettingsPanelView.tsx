@@ -33,7 +33,6 @@ import { LanguageSection } from "../LanguageSection";
 import { LanguageServersSettings } from "../LanguageServersSettings";
 import { LiveTemplatesSettings } from "../LiveTemplatesSettings";
 import { LlmProvidersPanel } from "../LlmProvidersPanel";
-import { TaoSettingsPanel } from "../TaoSettingsPanel";
 import { ModelsAdvancedPanel } from "../ModelsAdvancedPanel";
 import { PrivacyToggle } from "../PrivacyToggle";
 import { ScreenshotSettings } from "../ScreenshotSettings";
@@ -611,11 +610,10 @@ export function SettingsPanelView(inputs: SettingsPanelViewProps) {
                 <SettingsAnchor id="ai-asr">
                   <AsrPanel />
                 </SettingsAnchor>
-                <SettingsAnchor id="ai-llm">
+                <SettingsAnchor id="ai-llm" childIds={["ai-tao"]}>
                   <LlmProvidersPanel />
                 </SettingsAnchor>
               </div>
-              <SettingsAnchor id="ai-tao"><TaoSettingsPanel /></SettingsAnchor>
               <SettingsAnchor id="ai-websearch">
                 <div className="pt-3 border-t border-[var(--taomni-divider)]">
                   <WebSearchPanel />

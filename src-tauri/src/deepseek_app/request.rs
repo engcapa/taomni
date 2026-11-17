@@ -20,16 +20,11 @@ pub fn body(
     if !matches!(request.mode.as_str(), "ask" | "do" | "research") {
         return Err("protocol: invalid Tao mode".into());
     }
-    let valid_model = match request.provider.as_str() {
-        "deepseek-app" => matches!(request.model.as_str(), "deepseek-flash" | "deepseek-v4-pro"),
-        "opencode-go" => matches!(
-            request.model.as_str(),
-            "deepseek-v4.1-flash" | "deepseek-v4-pro"
-        ),
-        _ => false,
-    };
-    if !valid_model {
-        return Err("protocol: unsupported Tao model".into());
+    if request.model.trim().is_empty()
+        || request.model.len() > 256
+        || request.model.chars().any(char::is_control)
+    {
+        return Err("protocol: a valid configured model is required".into());
     }
     let included_history = if operation == Operation::Regenerate || operation == Operation::Continue
     {
@@ -42,6 +37,25 @@ pub fn body(
         history
     };
     let mut messages = history_messages(included_history);
+    // Switching provider transfers conversation text, never another provider's
+    // attachment handle. A new explicit selection authorizes its own local file.
+    for message in &mut messages {
+        for block in message["content"].as_array_mut().unwrap() {
+            if let Some(id) = block["source"]["file_id"].as_str() {
+                let owner =
+                    block["source"]["provider"]
+                        .as_str()
+                        .unwrap_or(if id.starts_with("inline-") {
+                            "opencode-go"
+                        } else {
+                            "deepseek-app"
+                        });
+                if owner != request.provider {
+                    *block = json!({"type":"text","text":"[Earlier attachment belongs to another provider and is omitted. Ask the user to attach it again if needed.]"});
+                }
+            }
+        }
+    }
     let question = user_blocks(request)?;
     if operation == Operation::Continue {
         let last = history.last().ok_or("protocol: no reply to continue")?;
@@ -65,6 +79,22 @@ pub fn body(
         "messages":messages,"tools":tools,"thinking":{"type":if request.thinking {"enabled"} else {"disabled"}},
         "safety_check":{"level":"high"},"title":{"enabled":title}}),
     )
+}
+
+/// Attachment ownership is local metadata, never a Messages API source field.
+pub fn without_attachment_owners(mut body: Value) -> Value {
+    if let Some(messages) = body["messages"].as_array_mut() {
+        for message in messages {
+            if let Some(blocks) = message["content"].as_array_mut() {
+                for block in blocks {
+                    if let Some(source) = block["source"].as_object_mut() {
+                        source.remove("provider");
+                    }
+                }
+            }
+        }
+    }
+    body
 }
 
 pub fn user_blocks(request: &TaoRequest) -> Result<Vec<Value>, String> {
@@ -106,7 +136,7 @@ pub fn user_blocks(request: &TaoRequest) -> Result<Vec<Value>, String> {
                         .into(),
                 );
             }
-            blocks.push(json!({"type":if image {"image"} else {"document"},"source":{"type":"file","file_id":file_id}}));
+            blocks.push(json!({"type":if image {"image"} else {"document"},"source":{"type":"file","file_id":file_id,"provider":request.provider}}));
             continue;
         }
         let content = chip
@@ -213,6 +243,7 @@ fn can_continue_for(message: &Message, provider: &str) -> bool {
         && message.blocks.iter().all(|block| {
             matches!(block["type"].as_str(), Some("text" | "thinking"))
                 && (provider == "opencode-go"
+                    || provider != "deepseek-app"
                     || block["type"] != "thinking"
                     || block["signature"].as_str().is_some_and(|s| !s.is_empty()))
         })
@@ -221,7 +252,7 @@ fn can_continue_for(message: &Message, provider: &str) -> bool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    fn message(role: &str, text: &str) -> Message {
+    pub(super) fn message(role: &str, text: &str) -> Message {
         Message {
             id: uuid::Uuid::new_v4().to_string(),
             role: role.into(),
@@ -267,5 +298,45 @@ mod tests {
         assert_eq!(value["tools"].as_array().unwrap().len(), 2);
         assert_eq!(value["safety_check"]["level"], "high");
         assert!(!value.to_string().contains("Not Sent"));
+    }
+}
+
+#[cfg(test)]
+mod provider_history_tests {
+    use super::*;
+    #[test]
+    fn switching_provider_retains_text_but_never_sends_another_providers_attachment_handle() {
+        let request: TaoRequest = serde_json::from_value(json!({"threadId":"t","content":"Follow up","mode":"ask","model":"configured-model","provider":"ordinary"})).unwrap();
+        let mut user = super::tests::message("user", "Earlier question");
+        user.blocks.push(json!({"type":"document","source":{"type":"file","file_id":"inline-original", "provider":"opencode-go"}}));
+        let history = vec![user, super::tests::message("assistant", "Earlier answer")];
+        let body = body(&request, &history, Operation::Send, false).unwrap();
+        assert_eq!(
+            body["messages"][0]["content"][0]["text"],
+            "Earlier question"
+        );
+        assert!(
+            body["messages"][0]["content"][1]["text"]
+                .as_str()
+                .unwrap()
+                .contains("omitted")
+        );
+        assert!(!body.to_string().contains("inline-original"));
+        assert!(history[0].blocks[1]["source"]["file_id"] == "inline-original");
+    }
+}
+
+#[cfg(test)]
+mod wire_metadata_tests {
+    use super::*;
+    #[test]
+    fn messages_wire_keeps_file_id_but_removes_local_provider_metadata() {
+        let body = json!({"model":"deepseek-flash","messages":[{"role":"user","content":[{"type":"document","source":{"type":"file","file_id":"file-one","provider":"deepseek-app"}}]}]});
+        let wire = without_attachment_owners(body);
+        assert_eq!(
+            wire["messages"][0]["content"][0]["source"],
+            json!({"type":"file","file_id":"file-one"})
+        );
+        assert_eq!(wire["model"], "deepseek-flash");
     }
 }

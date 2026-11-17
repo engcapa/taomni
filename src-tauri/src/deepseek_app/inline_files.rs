@@ -1,8 +1,7 @@
-//! OpenCode attachments stay local until send. Persist only authorized paths and
+//! LLM attachments stay local until send. Persist only authorized paths and
 //! hashes, never base64 images, document bodies or provider credentials.
 use crate::state::AppState;
 use base64::Engine;
-use rusqlite::{Connection, OptionalExtension, params};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
@@ -10,15 +9,19 @@ use std::{
     path::Path,
 };
 
-fn init(db: &Connection) -> Result<(), String> {
-    db.execute_batch("CREATE TABLE IF NOT EXISTS tao_inline_files(id TEXT PRIMARY KEY,thread_id TEXT NOT NULL,path TEXT NOT NULL,hash TEXT NOT NULL,filename TEXT NOT NULL,mime TEXT NOT NULL,size INTEGER NOT NULL)").map_err(|e| e.to_string())
-}
+mod storage;
+pub(super) use storage::{forget_thread, inherit};
 
 fn digest(data: &[u8]) -> String {
     hex::encode(Sha256::digest(data))
 }
 
-pub async fn attach(state: &AppState, thread: &str, path: &Path) -> Result<Value, String> {
+pub async fn attach(
+    state: &AppState,
+    thread: &str,
+    provider: &str,
+    path: &Path,
+) -> Result<Value, String> {
     if super::search::sensitive_path(&path.to_string_lossy()) {
         return Err("file: secret/configuration files cannot be attached".into());
     }
@@ -47,71 +50,57 @@ pub async fn attach(state: &AppState, thread: &str, path: &Path) -> Result<Value
         .await
         .map_err(|_| "file: document preparation interrupted")??;
     let hash = digest(&data);
-    let id = format!("inline-{}", digest(format!("{thread}:{hash}").as_bytes()));
+    let id = format!(
+        "inline-{}",
+        digest(format!("{thread}:{provider}:{hash}").as_bytes())
+    );
     let db = state.core.db.lock().map_err(|_| "database unavailable")?;
-    init(&db)?;
-    let reused: bool = db
-        .query_row(
-            "SELECT EXISTS(SELECT 1 FROM tao_inline_files WHERE id=?1)",
-            [&id],
-            |r| r.get(0),
-        )
-        .map_err(|e| e.to_string())?;
-    db.execute(
-        "INSERT OR REPLACE INTO tao_inline_files VALUES(?1,?2,?3,?4,?5,?6,?7)",
-        params![
-            id,
-            thread,
-            path.to_string_lossy(),
+    let reused = storage::remember(
+        &db,
+        &id,
+        thread,
+        provider,
+        &storage::StoredFile {
+            path: path.to_string_lossy().into_owned(),
             hash,
-            filename,
-            mime,
-            data.len() as i64
-        ],
-    )
-    .map_err(|e| e.to_string())?;
+            filename: filename.clone(),
+            mime: mime.into(),
+        },
+        data.len(),
+    )?;
     Ok(
-        json!({"fileId":id,"filename":filename,"mime":mime,"sizeBytes":data.len(),"reused":reused,"threadId":thread,"provider":"opencode-go"}),
+        json!({"fileId":id,"filename":filename,"mime":mime,"sizeBytes":data.len(),"reused":reused,"threadId":thread,"provider":provider}),
     )
 }
 
-pub async fn resolve(state: &AppState, thread: &str, id: &str) -> Result<Value, String> {
-    let (path, expected, filename, mime) = {
+pub async fn resolve(
+    state: &AppState,
+    thread: &str,
+    provider: &str,
+    id: &str,
+) -> Result<Value, String> {
+    let file = {
         let db = state.core.db.lock().map_err(|_| "database unavailable")?;
-        init(&db)?;
-        db.query_row(
-            "SELECT path,hash,filename,mime FROM tao_inline_files WHERE id=?1 AND thread_id=?2",
-            params![id, thread],
-            |r| {
-                Ok((
-                    r.get::<_, String>(0)?,
-                    r.get::<_, String>(1)?,
-                    r.get::<_, String>(2)?,
-                    r.get::<_, String>(3)?,
-                ))
-            },
-        )
-        .optional()
-        .map_err(|e| e.to_string())?
-        .ok_or("file: attachment removed or belongs to a different conversation")?
+        storage::lookup(&db, thread, provider, id)?
     };
-    let bytes = tokio::fs::read(&path)
+    read_part(file).await
+}
+
+async fn read_part(file: storage::StoredFile) -> Result<Value, String> {
+    let bytes = tokio::fs::read(&file.path)
         .await
         .map_err(|_| "file: attachment is unavailable; select it again")?;
-    if bytes.len() > 32 * 1024 * 1024 || digest(&bytes) != expected {
+    if bytes.len() > 32 * 1024 * 1024 || digest(&bytes) != file.hash {
         return Err("file: attachment changed; select it again before sending".into());
     }
-    tokio::task::spawn_blocking(move || part(&filename, &mime, &bytes))
+    tokio::task::spawn_blocking(move || part(&file.filename, &file.mime, &bytes))
         .await
         .map_err(|_| "file: document preparation interrupted")?
 }
 
 pub fn remove(state: &AppState, id: &str) -> Result<(), String> {
     let db = state.core.db.lock().map_err(|_| "database unavailable")?;
-    init(&db)?;
-    db.execute("DELETE FROM tao_inline_files WHERE id=?1", [id])
-        .map_err(|e| e.to_string())?;
-    Ok(())
+    storage::remove(&db, id)
 }
 
 fn part(filename: &str, mime: &str, bytes: &[u8]) -> Result<Value, String> {
@@ -205,5 +194,28 @@ mod tests {
         assert!(part("broken.pdf", "application/pdf", b"invalid").is_err());
         assert!(part("broken.docx", "application/zip", b"invalid").is_err());
         assert!(part("empty.txt", "text/plain", b"  ").is_err());
+    }
+}
+
+#[cfg(test)]
+mod migration_tests {
+    use super::storage::init;
+    use rusqlite::Connection;
+    #[test]
+    fn legacy_file_ownership_migrates_idempotently_and_new_providers_stay_scoped() {
+        let db = Connection::open_in_memory().unwrap();
+        db.execute_batch("CREATE TABLE tao_inline_files(id TEXT PRIMARY KEY,thread_id TEXT NOT NULL,path TEXT NOT NULL,hash TEXT NOT NULL,filename TEXT NOT NULL,mime TEXT NOT NULL,size INTEGER NOT NULL); INSERT INTO tao_inline_files VALUES('old','thread','/qa/file','hash','doc.txt','text/plain',3)").unwrap();
+        init(&db).unwrap();
+        init(&db).unwrap();
+        let provider: String = db
+            .query_row(
+                "SELECT provider FROM tao_inline_files WHERE id='old'",
+                [],
+                |row| row.get(0),
+            )
+            .unwrap();
+        assert_eq!(provider, "opencode-go");
+        let available: bool = db.query_row("SELECT EXISTS(SELECT 1 FROM tao_inline_files WHERE id='old' AND thread_id='thread' AND provider='other')", [], |row| row.get(0)).unwrap();
+        assert!(!available);
     }
 }

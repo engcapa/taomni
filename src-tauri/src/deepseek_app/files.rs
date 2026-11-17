@@ -41,11 +41,11 @@ pub async fn deepseek_app_upload_file(
     state: State<'_, AppState>,
 ) -> Result<Value, String> {
     let path = std::path::PathBuf::from(local_path);
-    if provider.as_deref() == Some("opencode-go") {
-        return super::inline_files::attach(&state, &thread_id, &path).await;
-    }
-    if provider.as_deref().is_some_and(|id| id != "deepseek-app") {
-        return Err("file: unsupported attachment provider".into());
+    let provider_id = provider.as_deref().unwrap_or("deepseek-app");
+    let config = state.legacy.ai_ctx.read().await.config.clone();
+    let configured = super::client::provider_config(&config, provider_id)?;
+    if configured.runtime != "deepseek-messages" {
+        return super::inline_files::attach(&state, &thread_id, provider_id, &path).await;
     }
     let metadata = tokio::fs::metadata(&path)
         .await

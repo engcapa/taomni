@@ -19,6 +19,7 @@ pub async fn run(
 ) -> Result<TaoResponse, String> {
     let run = RunGuard::begin(&request.thread_id)?;
     let client = MessagesClient::resolve_provider(state, &request.provider).await?;
+    super::client::validate_request(&client.provider, &request)?;
     let (body, assistant_id, initial_blocks) = {
         let db = state.core.db.lock().map_err(|_| "database unavailable")?;
         store::init(&db)?;
@@ -88,10 +89,12 @@ pub async fn run(
         biased;
         _=run.cancel.cancelled()=>Err(format!("{}: request cancelled",run.reason())),
         result=async {
-            if request.provider == "opencode-go" {
+            if client.provider.runtime == "opencode-go" {
                 super::opencode::stream(&client,body,&request,&channel,&mut reply,state,&assistant_id,&previous).await
-            } else {
+            } else if client.provider.runtime == "deepseek-messages" {
                 stream(&client,body,&channel,&mut reply,state,&assistant_id,&previous).await
+            } else {
+                super::ordinary::stream(&client,body,&request,&channel,&mut reply,state,&assistant_id,&previous).await
             }
         }=>result,
     };
@@ -136,6 +139,7 @@ async fn stream(
     assistant_id: &str,
     previous: &[Value],
 ) -> Result<(), String> {
+    let body = super::request::without_attachment_owners(body);
     let response = client
         .post("/anthropic/v1/messages")
         .json(&body)

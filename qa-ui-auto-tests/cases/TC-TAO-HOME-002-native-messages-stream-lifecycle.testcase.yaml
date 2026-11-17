@@ -1,9 +1,9 @@
 id: TC-TAO-HOME-002
 title: Native Tao Messages contract, streaming cancellation, history and proxy modes
-description: A disposable loopback Messages service captures real HTTP requests from native Tauri IPC. Verify camelCase request
-  dispatch, first reply, ordered multi-turn history without prior thinking, partial content before stop, real socket closure,
-  reload persistence and independent application/custom/direct proxy routing. This fixture does not certify the live commercial
-  provider.
+description: A disposable loopback Messages service captures real HTTP requests from native Tauri IPC. Verify camelCase request dispatch,
+  first reply, ordered multi-turn history without prior thinking, partial content before stop, real socket closure, reload persistence
+  and independent application/custom/direct proxy routing. This fixture does not certify the live commercial provider. Provider proxy
+  edits and Tao defaults use the merged LLM settings and its shared Vault-aware save.
 modes:
 - native
 covers:
@@ -80,13 +80,14 @@ steps:
 - click: '[data-testid="tao-home-dock-more"]'
 - click: '[data-testid="tao-home-dock-settings"]'
 - wait_for: '[data-testid="tao-settings"]'
+- click: '[data-provider="deepseek-app"] > div'
 - select_option:
-    selector: '[data-testid="tao-settings"] [data-testid="llm-proxy-mode"]'
+    selector: '[data-provider="deepseek-app"] [data-testid="llm-proxy-mode"]'
     value: app
-- click: '[data-testid="tao-settings-save"]'
+- click: '[data-testid="llm-providers-save"]'
 - vault_first_run: qa-tao-home-002
 - assert_text:
-    selector: '[data-testid="tao-settings-status"]'
+    selector: '[data-testid="llm-providers-status"]'
     contains: Saved
 - click: '[data-testid="nav-mode-home"]'
 - click: '[data-testid="tao-home-new-chat"]'
@@ -100,12 +101,13 @@ steps:
 - assert_not_visible: '[data-testid="tao-home-stop"]'
 - click: '[data-testid="tao-home-dock-more"]'
 - click: '[data-testid="tao-home-dock-settings"]'
+- wait_for: '[data-provider="deepseek-app"] [data-testid="llm-proxy-mode"]'
 - select_option:
-    selector: '[data-testid="tao-settings"] [data-testid="llm-proxy-mode"]'
+    selector: '[data-provider="deepseek-app"] [data-testid="llm-proxy-mode"]'
     value: custom
-- click: '[data-testid="tao-settings-save"]'
+- click: '[data-testid="llm-providers-save"]'
 - assert_text:
-    selector: '[data-testid="tao-settings-status"]'
+    selector: '[data-testid="llm-providers-status"]'
     contains: Saved
 - click: '[data-testid="nav-mode-home"]'
 - fill:

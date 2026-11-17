@@ -5,6 +5,10 @@ import { highlightTree, classHighlighter } from "@lezer/highlight";
 import { readMarkdownImage } from "../../../lib/markdownAssets";
 import { restoreMarkdownTasks } from "./markdownTasks";
 import { enhanceMarkdownMath, replaceMarkdownMath } from "./markdownMath";
+import { rememberDiagram } from "./diagramModel";
+import { parseDrawio } from "./drawioCodec";
+import { rememberDrawio, renderDrawioPage } from "./drawioRender";
+import "./drawio.css";
 import "katex/dist/katex.min.css";
 
 // This is presentation enhancement of the existing shared renderer, not a
@@ -67,7 +71,29 @@ export async function enhanceMarkdown(root: HTMLElement, owner: RenderOwner, str
   });
   root.querySelectorAll<HTMLElement>("pre > code").forEach((block) => {
     const language = /(?:language|lang)-([\w-]+)/.exec(block.className)?.[1] || "";
-    if (language === "mermaid") {
+    if (language === "drawio-source") {
+      const details = document.createElement("details"); details.className = "fv-md-drawio-source";
+      const summary = document.createElement("summary"); summary.textContent = "draw.io · Original source";
+      block.parentElement?.replaceWith(details); details.append(summary, block.parentElement || block);
+    } else if (language === "drawio") {
+      jobs.push((async () => {
+        const pages = parseDrawio(block.textContent || "");
+        const container = document.createElement("div");
+        for (const page of pages) {
+          const preview = await renderDrawioPage(page);
+          if (owner.cancelled()) return;
+          const diagram = document.createElement("div"); diagram.className = "fv-md-drawio";
+          diagram.setAttribute("aria-label", page.name);
+          diagram.innerHTML = preview.svg;
+          rememberDrawio(diagram, page); container.append(diagram);
+        }
+        if (!owner.cancelled()) { block.parentElement?.replaceWith(container); owner.onResize?.(); }
+      })().catch((error: unknown) => {
+        if (strict) throw error;
+        if (owner.cancelled()) return;
+        const message = document.createElement("div"); message.className = "fv-md-render-error"; message.textContent = String(error); block.parentElement?.append(message);
+      }));
+    } else if (language === "mermaid") {
       const source = block.textContent || "";
       // SVG text labels survive our SVG-only sanitizer and rasterize into Word
       // and PNG. Mermaid's default HTML labels use foreignObject, which the
@@ -78,6 +104,7 @@ export async function enhanceMarkdown(root: HTMLElement, owner: RenderOwner, str
         const diagram = document.createElement("div");
         diagram.className = "fv-md-mermaid";
         diagram.innerHTML = DOMPurify.sanitize(result.svg, { USE_PROFILES: { svg: true, svgFilters: true } }) as string;
+        rememberDiagram(diagram, { source, theme: owner.theme ?? "light" });
         block.parentElement?.replaceWith(diagram);
         owner.onResize?.();
       }).catch((error: unknown) => {

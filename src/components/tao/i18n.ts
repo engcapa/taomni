@@ -4,6 +4,11 @@ import { getLocale, subscribeLocale } from "../../lib/i18n";
 /** Tao uses the application's locale subscription. Strings are kept here so
  * switching language never replaces the chat controller or its drafts. */
 const english: Record<string, string> = {
+  "切换服务会移除附件引用；需要时请重新添加。": "Switching providers removes attachment references. Attach them again if needed.",
+  "不可用": "Unavailable", "模型": "Model",
+  "该服务未提供可切换的思考能力": "This provider does not expose Tao thinking controls",
+  "该服务未提供 Tao 联网能力": "This provider does not expose Tao web controls",
+  "浏览器预览不提供原生 AI 对话，请在桌面应用中使用。": "Browser preview does not provide native AI chat. Use the desktop app.",
   "删除对话": "Delete conversation",
   "确定删除对话“{title}”及其消息吗？此操作无法撤销。": "Delete the conversation “{title}” and its messages? This cannot be undone.",
   "删除对话失败：{error}": "Could not delete conversation: {error}",

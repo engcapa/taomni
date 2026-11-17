@@ -18,10 +18,12 @@ export const SettingsGroupExpandedContext = createContext(true);
 export function SettingsAnchor({
   id,
   className,
+  childIds = [],
   children,
 }: {
   id: string;
   className?: string;
+  childIds?: readonly string[];
   children: React.ReactNode;
 }) {
   const ctx = useContext(SettingsSearchContext);
@@ -49,7 +51,7 @@ export function SettingsAnchor({
         outline: matched ? `${active ? 2 : 1}px solid var(--taomni-accent)` : undefined,
         outlineOffset: matched ? 3 : undefined,
         boxShadow: active ? "0 0 0 3px var(--taomni-selected)" : undefined,
-        opacity: searching && !matched ? 0.4 : 1,
+        opacity: searching && !matched && !childIds.some((child) => ctx?.matchedSet.has(child)) ? 0.4 : 1,
         transition: "opacity 120ms ease",
       }}
     >

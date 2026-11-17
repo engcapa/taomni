@@ -107,6 +107,8 @@ activation is still sent exactly once and all original frame budgets apply.
 | `wait` | seconds (number or `"3s"`) | Hard sleep; use sparingly. |
 | `switch_window` | `{selector, timeout_sec?, close_with?}` | Browser/native. Enumerates real app-created pages/WebViews and selects the one containing the CSS selector. Optional `close_with` clicks a control once in the source window and requires that window to disappear before selecting the target; a native `no such window` response is accepted only with this observed closure. Never creates a synthetic window or replays an uncertain click. |
 | `wait_for` | selector string **or** `{selector, timeout_sec?, state?}` | `state` ∈ `attached/detached/visible/hidden`, default `visible`. |
+
+`wait_for.timeout_sec` supports 0.5–300 seconds for observable long-running work (for example PDF performance baselines); it never resets or extends the case wall-clock budget.
 | `screenshot` | filename string **or** `{path, selector?, full_page?}` | Saved under `qa-ui-auto-report/<run>/<TC-id>/`. |
 
 ## Mouse

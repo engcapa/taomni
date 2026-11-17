@@ -13,7 +13,12 @@ const owners = new WeakMap<HTMLElement, { cancelled: boolean }>();
 class RenderedBlock extends WidgetType {
   constructor(readonly from: number, readonly raw: string, readonly context: MarkdownWidgetContext) { super(); }
   eq(other: RenderedBlock): boolean { return this.from === other.from && this.raw === other.raw && this.context === other.context; }
-  ignoreEvent(): boolean { return false; }
+  ignoreEvent(event: Event): boolean {
+    // Diagram actions own their pointer/keyboard lifecycle. Letting CodeMirror
+    // handle right-button mouseup moves the caret into this block and removes
+    // the widget while its portal menu is receiving focus.
+    return event.target instanceof Element && Boolean(event.target.closest(".fv-md-mermaid,.fv-md-drawio,.fv-md-drawio-source"));
+  }
   destroy(dom: HTMLElement): void { const owner = owners.get(dom); if (owner) owner.cancelled = true; }
   toDOM(view: EditorView): HTMLElement {
     const root = markdownFragment(this.raw);
@@ -108,7 +113,7 @@ class RenderedBlock extends WidgetType {
     };
     root.onmousedown = (event) => {
       if (this.context.readOnly) return;
-      if ((event.target as Element).closest("button,a")) return;
+      if ((event.target as Element).closest("button,a,.fv-md-mermaid,.fv-md-drawio,.fv-md-drawio-source")) return;
       event.preventDefault();
       const text = (event.target as Element).textContent?.trim() || "";
       const index = text ? this.raw.indexOf(text) : -1;

@@ -1,0 +1,167 @@
+id: TC-FILE-OPEN-019
+title: 'Markdown draw.io exports: editable nodes, text/tables, image scopes, sheets and Mermaid viewing'
+description: Production Markdown entry and actual user controls. Retains selected export/import outcomes, editable graph
+  XML, text/table data and original source; browser uses VFS, native uses OS dialogs/disk/clipboard.
+modes:
+- browser
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-drawio
+- reload_window: null
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-file-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Control+l
+    macos_key: Meta+l
+- fill:
+    selector: '[data-testid="explorer-address"]'
+    value: ${fixture.file_open_root}
+- press:
+    selector: '[data-testid="explorer-address"]'
+    key: Enter
+- dblclick: '[data-testid="explorer-file-row"][data-name="quality.md"]'
+- wait_for: '[data-testid="markdown-editor"]'
+- click: '[data-testid="markdown-export"]'
+- click: '[data-testid="markdown-export-drawio"]'
+- wait_for: '[data-testid="markdown-drawio-export-settings"]'
+- assert_download:
+    trigger: '[data-testid="markdown-drawio-save"]'
+    filename: quality.drawio
+    contains:
+    - <mxfile
+    - taomniKind="table"
+    - mermaidSource=
+    - source="diagram-1-node-
+    - image=data:image/
+- wait_for: '[data-testid="markdown-export-status"][data-export-state="saved"]'
+- click: '[data-testid="markdown-export"]'
+- click: '[data-testid="markdown-export-drawio"]'
+- wait_for: '[data-testid="markdown-drawio-export-settings"]'
+- select_option:
+    selector: '[data-testid="markdown-drawio-scope"]'
+    value: images
+- select_option:
+    selector: '[data-testid="markdown-drawio-layout"]'
+    value: single
+- assert_download:
+    trigger: '[data-testid="markdown-drawio-save"]'
+    filename: quality.drawio
+    contains:
+    - <mxfile
+    - mermaidSource=
+    - edge="1"
+- assert_text:
+    selector: '[data-testid="markdown-export-status"]'
+    contains: SVG
+- dblclick: .fv-md-mermaid
+- wait_for: '[data-testid="markdown-diagram-viewer"]'
+- click: '[data-testid="markdown-diagram-view-rotate-right"]'
+- eval_readonly:
+    expression: document.querySelector(".fv-md-diagram-stage").getAttribute("data-rotation") === "90"
+    expect_truthy: true
+- click: '[data-testid="markdown-diagram-view-flip-h"]'
+- click: '[data-testid="markdown-diagram-view-actual"]'
+- click: '[data-testid="markdown-diagram-view-fit"]'
+- click: '[data-testid="markdown-diagram-view-width"]'
+- click: '[data-testid="markdown-diagram-view-zoom-in"]'
+- click: '[data-testid="markdown-diagram-view-zoom-out"]'
+- select_option:
+    selector: '[data-testid="markdown-diagram-background"]'
+    value: dark
+- click: '[data-testid="markdown-diagram-view-reset"]'
+- click: '[data-testid="markdown-diagram-close"]'
+- right_click: .fv-md-mermaid
+- assert_download:
+    trigger: '[data-testid="markdown-diagram-menu-save-drawio"]'
+    filename: quality-diagram-1.drawio
+    contains:
+    - <mxfile
+    - mermaidSource=
+    - edge="1"
+- assert_file_open_bytes:
+    path: ${fixture.markdown_quality_source}
+    sha256: ${fixture.markdown_quality_sha}
+- assert_no_runtime_errors: null
+- screenshot: drawio-export-viewer.png
+covers:
+- F-FILEOPEN-1
+- F-EXPLORER-1
+tags:
+- p0
+- markdown
+- drawio
+- regression
+fixtures:
+- reset_db
+- markdown_drawio
+timeout_sec: 300
+verification:
+  review: reviewed
+  requirements:
+  - id: DRAWIO-WORKFLOW
+    requirement: 'Markdown draw.io exports: editable nodes, text/tables, image scopes, sheets and Mermaid viewing'
+    actions:
+    - 4
+    - 5
+    - 7
+    - 8
+    - 9
+    - 10
+    - 12
+    - 13
+    - 17
+    - 18
+    - 20
+    - 21
+    - 24
+    - 26
+    - 28
+    - 29
+    - 30
+    - 31
+    - 32
+    - 33
+    - 34
+    - 35
+    - 36
+    - 37
+    checkpoints:
+    - step: 15
+      expectation: Actual control state/content or retained file/clipboard matches the explicit assertion; source and
+        cancellation behavior remain intact.
+    - step: 22
+      expectation: Actual control state/content or retained file/clipboard matches the explicit assertion; source and
+        cancellation behavior remain intact.
+    - step: 23
+      expectation: Actual control state/content or retained file/clipboard matches the explicit assertion; source and
+        cancellation behavior remain intact.
+    - step: 27
+      expectation: Actual control state/content or retained file/clipboard matches the explicit assertion; source and
+        cancellation behavior remain intact.
+    - step: 38
+      expectation: Actual control state/content or retained file/clipboard matches the explicit assertion; source and
+        cancellation behavior remain intact.
+    - step: 39
+      expectation: Actual control state/content or retained file/clipboard matches the explicit assertion; source and
+        cancellation behavior remain intact.
+    - step: 40
+      expectation: Actual control state/content or retained file/clipboard matches the explicit assertion; source and
+        cancellation behavior remain intact.
+    results:
+    - 15
+    - 22
+    - 23
+    - 27
+    - 38
+    - 39
+    - 40
+  native:
+  - check: Native chooser, disk and OS clipboard
+    method: not-applicable
+    reason: Browser only here; TC-FILE-OPEN-021 separately exercises these native boundaries.
+  visual:
+  - check: Editable document pages and Mermaid viewer
+    method: manual
+    reason: Inspect retained exports with an independent graph renderer plus viewer screenshot.

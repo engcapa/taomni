@@ -62,7 +62,7 @@ function defaultState(profile: Partial<ChatProfile>, budget: Partial<BudgetPort>
       web: profile.defaultWeb ?? false,
       model: profile.defaultModel ?? "deepseek-flash",
       provider: profile.defaultProvider ?? "deepseek-app",
-      reasoningEffort: profile.defaultReasoningEffort ?? "high",
+      reasoningEffort: profile.defaultReasoningEffort ?? "high", capabilities: profile.defaultCapabilities,
     },
     runtime: { [threadId]: { phase: "idle", budget: { usedTokens: 0, limitTokens, halted: false } } },
     ui: { sidePanel: null, demoMode: false, searchOpen: false },
@@ -225,12 +225,13 @@ export function createChatController(options: ChatControllerOptions = {}): TaoCh
     subscribe(listener) { listeners.add(listener); return () => listeners.delete(listener); },
     getState() { return state; },
     recordHandoff(threadId, handoff) { patchThread(threadId, (thread) => ({ ...thread, updatedAt: now(), handoffs: [...(thread.handoffs ?? []).filter((item) => item.targetThreadId !== handoff.targetThreadId), handoff] })); },
-    setMode(mode) { patch({ mode, composer: { ...state.composer, thinking: mode !== "ask", web: mode === "research" } }); },
+    setMode(mode) { patch({ mode, composer: { ...state.composer, thinking: state.composer.capabilities?.thinking !== false && mode !== "ask", web: state.composer.capabilities?.web !== false && mode === "research" } }); },
     setComposerText(text) { patch({ composer: { ...state.composer, text } }); },
-    setComposerOption(option, value) { patch({ composer: { ...state.composer, [option]: value } }); },
+    setComposerOption(option, value) { if (value && state.composer.capabilities?.[option] === false) return; patch({ composer: { ...state.composer, [option]: value } }); },
     setModel(model) { patch({ composer: { ...state.composer, model } }); },
-    setProvider(provider) {
-      patch({ composer: { ...state.composer, provider, model: provider === "opencode-go" ? "deepseek-v4.1-flash" : "deepseek-flash", chips: state.composer.chips.filter((chip) => !chip.fileId || (chip.provider ?? "deepseek-app") === provider) } });
+    setProvider(provider, options) {
+      const capabilities = { thinking: options?.thinking ?? ["deepseek-app", "opencode-go"].includes(provider), web: options?.web ?? ["deepseek-app", "opencode-go"].includes(provider) };
+      patch({ composer: { ...state.composer, provider, model: options?.model ?? (provider === "opencode-go" ? "deepseek-v4.1-flash" : provider === "deepseek-app" ? "deepseek-flash" : ""), capabilities, thinking: capabilities.thinking && state.composer.thinking, web: capabilities.web && state.composer.web, chips: state.composer.chips.filter((chip) => !chip.fileId || (chip.provider ?? "deepseek-app") === provider) } });
     },
     setReasoningEffort(reasoningEffort) { patch({ composer: { ...state.composer, reasoningEffort } }); },
     setContext(context) { patch({ context }); },
@@ -245,7 +246,7 @@ export function createChatController(options: ChatControllerOptions = {}): TaoCh
         threads: { ...state.threads, [threadId]: { id: threadId, title, messages: [], updatedAt: now(), source: "tao" } },
         runtime: { ...state.runtime, [threadId]: { phase: "idle", budget: { usedTokens: 0, limitTokens: budget.limitTokens, halted: false } } },
         mode: "ask",
-        composer: { ...state.composer, text: "", chips: [], model: profile.defaultModel ?? "deepseek-flash", provider: profile.defaultProvider ?? "deepseek-app", reasoningEffort: profile.defaultReasoningEffort ?? "high", thinking: profile.defaultThinking ?? false, web: profile.defaultWeb ?? false },
+        composer: { ...state.composer, text: "", chips: [], model: profile.defaultModel ?? "deepseek-flash", provider: profile.defaultProvider ?? "deepseek-app", reasoningEffort: profile.defaultReasoningEffort ?? "high", capabilities: profile.defaultCapabilities, thinking: profile.defaultThinking ?? false, web: profile.defaultWeb ?? false },
         context: {},
       });
       return threadId;
@@ -421,7 +422,7 @@ export function createChatController(options: ChatControllerOptions = {}): TaoCh
       // Config loads asynchronously. Initialize a pristine conversation, while
       // preserving existing threads and user choices when settings change.
       if (thread && !thread.messages.length && !thread.preferences && !state.composer.text) {
-        patch({ composer: { ...state.composer, model: defaults.defaultModel, provider: defaults.defaultProvider ?? "deepseek-app", reasoningEffort: defaults.defaultReasoningEffort ?? "high", thinking: defaults.defaultThinking, web: defaults.defaultWeb } });
+        patch({ composer: { ...state.composer, model: defaults.defaultModel, provider: defaults.defaultProvider ?? "deepseek-app", reasoningEffort: defaults.defaultReasoningEffort ?? "high", capabilities: defaults.defaultCapabilities, thinking: defaults.defaultThinking, web: defaults.defaultWeb } });
       }
     },
     branchAt(messageId, replacement) {

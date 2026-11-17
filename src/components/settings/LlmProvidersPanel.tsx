@@ -1,301 +1,14 @@
 import { useEffect, useRef, useState } from "react";
-import { AlertTriangle, CheckCircle, XCircle, Loader2, ChevronDown, ChevronRight, Plus, Trash2 } from "lucide-react";
+import { AlertTriangle, CheckCircle, Plus, Trash2 } from "lucide-react";
 import { useAiStore, type AiConfig, type LlmProviderConfig, type LlmProviderGroupConfig } from "../../stores/aiStore";
 import { useVaultStore } from "../../stores/vaultStore";
 import { isVaultLockedError } from "../../lib/ipc";
 import { ensureVaultReady } from "../../lib/vaultGate";
-import { useT, type TranslateFn } from "../../lib/i18n";
-import { GoProxyFields } from "./GoProxyFields";
-import { GoProviderFields } from "./GoProviderFields";
-import { ModelInspectorPanel } from "./ModelInspectorPanel";
-import { openExternalUrl } from "../../lib/sftp";
-
-const PROVIDER_LABELS: Record<string, string> = {
-  "opencode-go": "OpenCode Go",
-  "deepseek-app": "Tao · DeepSeek",
-  deepseek:    "DeepSeek",
-  agnes:       "Agnes",
-  glm:         "GLM-4-Flash (Free)",
-  siliconflow: "SiliconFlow",
-  groq:        "Groq",
-  local:       "Local (llama-server)",
-  anthropic:   "Anthropic (Claude)",
-};
-
-const PROVIDER_NOTES: Record<string, string> = {
-  deepseek:    "~¥1 per million input tokens, strong Chinese support",
-  agnes:       "Text, image, and video generation via Agnes AI",
-  glm:         "Completely free, top pick in China",
-  siliconflow: "One key, many models; many small models free",
-  groq:        "Ultra-fast inference ~500 tok/s, free tier",
-  local:       "Zero cost, requires downloading a model (~1.4 GB)",
-  anthropic:   "claude-sonnet-4-5, pay-as-you-go",
-};
-
-function providerApiKeys(provider: LlmProviderConfig): string[] {
-  const keys = (provider.api_keys ?? []).map((key) => key ?? "");
-  return keys.length > 0 ? keys : [provider.api_key ?? ""];
-}
-
-function withProviderApiKeys(provider: LlmProviderConfig, apiKeys: string[]): LlmProviderConfig {
-  const keys = apiKeys.length > 0 ? apiKeys : [""];
-  return {
-    ...provider,
-    api_key: keys[0] ?? "",
-    api_keys: keys,
-  };
-}
-
-function hasPlaintextVaultableKey(provider: LlmProviderConfig): boolean {
-  return providerApiKeys(provider).some(
-    (key) =>
-      key.length > 0 &&
-      !key.startsWith("vault:") &&
-      provider.runtime !== "llama-server" &&
-      key !== "local",
-  );
-}
-
-interface ProviderRowProps {
-  id: string;
-  provider: LlmProviderConfig;
-  isActive: boolean;
-  onActivate: () => void;
-  onChange: (p: LlmProviderConfig) => void;
-  onTest: () => void;
-  testResult: { ok: boolean; message: string; latency_ms: number } | null;
-  testing: boolean;
-  t: TranslateFn;
-}
-
-function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, testResult, testing, t }: ProviderRowProps) {
-  const blocked = useAiStore((s) => !!(s.config?.full_local_mode || s.config?.fully_disabled));
-  const [expanded, setExpanded] = useState(false);
-  const [inspecting, setInspecting] = useState(false);
-  const inspectorButton = useRef<HTMLButtonElement>(null);
-  const apiKeys = providerApiKeys(provider);
-  const capabilities = {
-    chat: provider.capabilities?.chat !== false,
-    image_generation: provider.capabilities?.image_generation === true,
-    video_generation: provider.capabilities?.video_generation === true,
-  };
-  const setCapability = (key: keyof typeof capabilities, value: boolean) => {
-    onChange({
-      ...provider,
-      capabilities: {
-        ...capabilities,
-        [key]: value,
-      },
-    });
-  };
-
-  return (
-    <div
-      data-testid={id === "opencode-go" ? "go-provider-row" : "llm-provider-row"}
-      data-provider={id}
-      className={`rounded border transition-colors ${
-        isActive
-          ? "border-[var(--taomni-accent)] bg-[var(--taomni-accent)]/5"
-          : "border-[var(--taomni-divider)] bg-[var(--taomni-bg)]"
-      }`}
-    >
-      <div
-        className="flex items-center gap-2 px-3 py-2 cursor-pointer select-none"
-        onClick={() => setExpanded((e) => !e)}
-      >
-        {expanded ? (
-          <ChevronDown className="w-3.5 h-3.5 text-[var(--taomni-text-muted)] shrink-0" />
-        ) : (
-          <ChevronRight className="w-3.5 h-3.5 text-[var(--taomni-text-muted)] shrink-0" />
-        )}
-
-        <div className="flex-1 min-w-0">
-          <div className="text-[13px] font-medium">{PROVIDER_LABELS[id] ?? id}</div>
-          <div className="text-[11px] text-[var(--taomni-text-muted)] truncate">
-            {id === "opencode-go" ? t("opencodeGo.subscription") : PROVIDER_NOTES[id] ?? provider.base_url}
-          </div>
-        </div>
-
-        {testResult && (
-          <span className={`text-[11px] ${testResult.ok ? "text-green-400" : "text-red-400"}`}>
-            {testResult.ok ? `✓ ${testResult.latency_ms}ms` : t("aiSettings.llmFailed")}
-          </span>
-        )}
-
-        <button
-          type="button"
-          className={`taomni-btn h-6 px-2 text-[11px] shrink-0 ${isActive ? "opacity-50 cursor-default" : ""}`}
-          onClick={(e) => { e.stopPropagation(); if (!isActive) onActivate(); }}
-          disabled={isActive}
-        >
-          {isActive ? t("aiSettings.llmActive") : t("aiSettings.llmUse")}
-        </button>
-      </div>
-
-      {expanded && (
-        <div className="px-3 pb-3 border-t border-[var(--taomni-divider)] pt-2 space-y-2">
-          {id !== "local" && (
-            <div>
-              <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.llmApiKey")}</label>
-              <div className="space-y-1.5">
-                {apiKeys.map((key, index) => (
-                  <div key={index} className="flex items-center gap-1.5">
-                    <input
-                      type="password"
-                      data-testid="llm-provider-key"
-                      className="taomni-input h-7 flex-1 min-w-0 text-[12px]"
-                      placeholder={`${t("aiSettings.llmApiKeyPlaceholder")} #${index + 1}`}
-                      value={key}
-                      onChange={(e) => {
-                        const next = [...apiKeys];
-                        next[index] = e.target.value;
-                        onChange(withProviderApiKeys(provider, next));
-                      }}
-                    />
-                    <button
-                      type="button"
-                      className="taomni-btn h-7 w-7 p-0 inline-flex items-center justify-center"
-                      title="Remove API key"
-                      aria-label="Remove API key"
-                      disabled={apiKeys.length <= 1}
-                      onClick={() => {
-                        const next = apiKeys.filter((_, i) => i !== index);
-                        onChange(withProviderApiKeys(provider, next));
-                      }}
-                    >
-                      <Trash2 className="w-3.5 h-3.5" />
-                    </button>
-                  </div>
-                ))}
-                <button
-                  type="button"
-                  className="taomni-btn h-7 px-2 text-[12px] inline-flex items-center gap-1.5"
-                  onClick={() => onChange(withProviderApiKeys(provider, [...apiKeys, ""]))}
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  Add key
-                </button>
-              </div>
-            </div>
-          )}
-          <div>
-            <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.llmModel")}</label>
-            {id === "opencode-go" ? <>
-              <a href="https://opencode.ai/console" data-testid="go-console" className="text-[11px] underline"
-                onClick={(e) => { e.preventDefault(); void openExternalUrl("https://opencode.ai/console"); }}>{t("opencodeGo.console")}</a>
-              <GoProviderFields provider={provider} onChange={onChange} blocked={blocked} />
-            </> : <input
-              type="text"
-              data-testid="llm-provider-model"
-              className="taomni-input h-7 w-full text-[12px]"
-              value={provider.model}
-              onChange={(e) => onChange({ ...provider, model: e.target.value })}
-            />}
-          </div>
-          <div>
-            <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.llmCapabilities")}</label>
-            <div className="flex flex-wrap gap-3 text-[11px] text-[var(--taomni-text-muted)]">
-              <label className="inline-flex items-center gap-1.5">
-                <input
-                  type="checkbox"
-                  checked={capabilities.chat}
-                  disabled={id === "opencode-go"}
-                  onChange={(e) => setCapability("chat", e.target.checked)}
-                />
-                {t("aiSettings.llmCapabilityChat")}
-              </label>
-              <label className="inline-flex items-center gap-1.5">
-                <input
-                  type="checkbox"
-                  checked={capabilities.image_generation}
-                  disabled={id === "opencode-go"}
-                  onChange={(e) => setCapability("image_generation", e.target.checked)}
-                />
-                {t("aiSettings.llmCapabilityImage")}
-              </label>
-              <label className="inline-flex items-center gap-1.5">
-                <input
-                  type="checkbox"
-                  checked={capabilities.video_generation}
-                  disabled={id === "opencode-go"}
-                  onChange={(e) => setCapability("video_generation", e.target.checked)}
-                />
-                {t("aiSettings.llmCapabilityVideo")}
-              </label>
-            </div>
-          </div>
-          {capabilities.image_generation && (
-            <div>
-              <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.llmImageModel")}</label>
-              <input
-                type="text"
-                className="taomni-input h-7 w-full text-[12px]"
-                value={provider.image_model ?? ""}
-                onChange={(e) => onChange({ ...provider, image_model: e.target.value })}
-              />
-            </div>
-          )}
-          {capabilities.video_generation && (
-            <div>
-              <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.llmVideoModel")}</label>
-              <input
-                type="text"
-                className="taomni-input h-7 w-full text-[12px]"
-                value={provider.video_model ?? ""}
-                onChange={(e) => onChange({ ...provider, video_model: e.target.value })}
-              />
-            </div>
-          )}
-          <div>
-            <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.llmBaseUrl")}</label>
-            <input
-              type="text"
-              className="taomni-input h-7 w-full text-[12px]"
-              data-testid="llm-provider-base-url"
-              value={provider.base_url}
-              onChange={(e) => onChange({ ...provider, base_url: e.target.value })}
-            />
-          </div>
-          <div>
-            <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.codexProxyTitle")}</label>
-            <GoProxyFields provider={provider} onChange={onChange} />
-          </div>
-          <div className="flex items-center gap-2 pt-1">
-            <button ref={inspectorButton} type="button" data-testid="model-inspector-open" data-provider={id}
-              className="taomni-btn h-7 px-3 text-[12px]" aria-expanded={inspecting}
-              onClick={() => setInspecting((open) => !open)}>{t("modelInspector.title")}</button>
-            <button
-              type="button"
-              className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5"
-              onClick={onTest}
-              data-testid="llm-provider-test"
-              disabled={testing || (id === "opencode-go" && blocked)}
-            >
-              {testing ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                t("aiSettings.llmTestConnection")
-              )}
-            </button>
-            {testResult && (
-              <span className={`text-[12px] flex items-center gap-1 ${testResult.ok ? "text-green-400" : "text-red-400"}`}>
-                {testResult.ok ? (
-                  <><CheckCircle className="w-3.5 h-3.5" /> {t("aiSettings.llmConnected", { ms: testResult.latency_ms })}</>
-                ) : (
-                  <><XCircle className="w-3.5 h-3.5" /> {testResult.message.slice(0, 60)}</>
-                )}
-              </span>
-            )}
-          </div>
-          {inspecting && <ModelInspectorPanel providerId={id} currentModel={provider.model}
-            blocked={blocked && (provider.runtime !== "llama-server" && provider.runtime !== "ollama"
-              || !!useAiStore.getState().config?.fully_disabled)}
-            onClose={() => { setInspecting(false); inspectorButton.current?.focus(); }} />}
-        </div>
-      )}
-    </div>
-  );
-}
+import { useT } from "../../lib/i18n";
+import { ProviderRow } from "./LlmProviderRow";
+import { PROVIDER_LABELS, hasPlaintextVaultableKey } from "./llmProviderFields";
+import { TaoSettingsPanel } from "./TaoSettingsPanel";
+import { SettingsAnchor } from "./panel/search";
 
 interface ProviderGroupRowProps {
   id: string;
@@ -434,7 +147,7 @@ export function LlmProvidersPanel() {
     const pending = pendingVaultSaveRef.current;
     if (!pending) return;
     pendingVaultSaveRef.current = null;
-    void runSave(pending);
+    void runSave(useAiStore.getState().config ?? pending);
   }, [vaultState]);
 
   if (loading || !config) {
@@ -462,7 +175,7 @@ export function LlmProvidersPanel() {
         return;
       }
     }
-    void runSave(config);
+    void runSave(useAiStore.getState().config ?? config);
   };
 
   const providerGroups = config.llm.provider_groups ?? {};
@@ -483,7 +196,7 @@ export function LlmProvidersPanel() {
   };
 
   return (
-    <div className="space-y-2">
+    <fieldset className="space-y-2 min-w-0" disabled={saving} data-testid="ai-llm-settings">
       <div className="flex items-center justify-between mb-1">
         <div>
           <div className="text-[13px] font-semibold">{t("aiSettings.llmTitle")}</div>
@@ -528,6 +241,7 @@ export function LlmProvidersPanel() {
       {saveOk && !saveError && (
         <div
           role="status"
+          data-testid="llm-providers-status"
           className="flex items-center gap-2 text-[12px] rounded px-2.5 py-2"
           style={{
             background: "var(--taomni-success-bg)",
@@ -542,6 +256,8 @@ export function LlmProvidersPanel() {
           <span>{t("aiSettings.llmSaved")}</span>
         </div>
       )}
+
+      <SettingsAnchor id="ai-tao"><TaoSettingsPanel /></SettingsAnchor>
 
       {!fullyDisabled && Object.entries(config.llm.providers).map(([id, provider]) => (
         <ProviderRow
@@ -587,6 +303,6 @@ export function LlmProvidersPanel() {
           ))
         )}
       </div>}
-    </div>
+    </fieldset>
   );
 }

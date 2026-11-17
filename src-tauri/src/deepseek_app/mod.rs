@@ -12,6 +12,7 @@ mod opencode_request;
 mod opencode_stream;
 mod opencode_tools;
 mod opencode_web;
+mod ordinary;
 pub mod search;
 pub use archive::{deepseek_app_export_archive, deepseek_app_import_archive};
 pub use search::{

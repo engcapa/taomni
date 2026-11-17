@@ -1,0 +1,196 @@
+id: TC-TAO-HOME-043
+title: Combined LLM and Tao configuration uses one save and ordinary provider defaults
+description: Configure the old LLM model and Tao voice/cost/model defaults together. A new chat selects the ordinary local provider,
+  keeps unsupported switches off in Research, and restores both sets of settings after a WebView reload. Saving never sends inference.
+modes:
+- browser
+- native
+covers:
+- F1.11
+tags:
+- p0
+- tao-home
+- regression
+fixtures:
+- reset_db
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-tao-home-043
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- click: '[data-testid="tao-home-dock-more"]'
+- click: '[data-testid="tao-home-dock-settings"]'
+- wait_for: '[data-testid="tao-settings"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: tao
+- eval_readonly:
+    expression: getComputedStyle(document.getElementById('tao-settings-heading').closest('[data-search-id]').parentElement.closest('[data-search-id]')).opacity
+      === '1'
+    expect_truthy: true
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: ''
+- assert_count:
+    selector: '[data-testid="llm-providers-save"]'
+    equal: 1
+- assert_not_visible: '[data-testid="tao-settings-save"]'
+- assert_not_visible: '[data-testid="tao-settings-key"]'
+- select_option:
+    selector: '[data-testid="tao-settings-provider"]'
+    value: local
+- fill:
+    selector: '[data-testid="tao-settings-model"]'
+    value: qa-chat-default
+- select_option:
+    selector: '[data-testid="tao-settings-tts"]'
+    value: tide
+- fill:
+    selector: '[data-testid="tao-settings-cost"]'
+    value: '2.5'
+- click: '[data-provider="local"] > div'
+- fill:
+    selector: '[data-provider="local"] [data-testid="llm-provider-model"]'
+    value: qa-provider-model
+- click: '[data-testid="llm-providers-save"]'
+- wait_for: '[data-testid="llm-providers-status"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="tao-home-new-chat"]'
+- assert_text:
+    selector: '[data-testid="tao-home-capabilities"]'
+    contains: qa-chat-default
+- click: '[data-testid="tao-home-capabilities"]'
+- eval_readonly:
+    expression: document.querySelector('.tao-home-popup-items select').value === "local"
+    expect_truthy: true
+- assert_disabled: '[data-testid="tao-home-capability-thinking"]'
+- assert_disabled: '[data-testid="tao-home-capability-web"]'
+- press: Escape
+- click: '[data-testid="tao-home-mode-research"]'
+- eval_readonly:
+    expression: '!document.querySelector(''.tao-home-capability-button'').textContent.includes("Web")'
+    expect_truthy: true
+- reload_window: null
+- wait_for: '[data-testid="tao-home-host"]'
+- click: '[data-testid="tao-home-dock-more"]'
+- click: '[data-testid="tao-home-dock-settings"]'
+- wait_for: '[data-testid="tao-settings"]'
+- assert_attribute:
+    selector: '[data-testid="tao-settings-model"]'
+    name: value
+    equals: qa-chat-default
+- eval_readonly:
+    expression: document.querySelector('#tao-settings-heading').parentElement.querySelectorAll('select')[2].value === 'tide'
+    expect_truthy: true
+- assert_attribute:
+    selector: '[data-testid="tao-settings-cost"]'
+    name: value
+    equals: '2.5'
+- click: '[data-provider="local"] > div'
+- assert_attribute:
+    selector: '[data-provider="local"] [data-testid="llm-provider-model"]'
+    name: value
+    equals: qa-provider-model
+- assert_no_runtime_errors: null
+- screenshot: combined-ai-settings.png
+verification:
+  review: reviewed
+  requirements:
+  - id: PROVIDER-043
+    requirement: One shared save retains provider settings and all Tao defaults through reload; ordinary providers remain selectable
+      without enabling unsupported capabilities.
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 8
+    - 10
+    - 14
+    - 15
+    - 16
+    - 17
+    - 18
+    - 19
+    - 20
+    - 22
+    - 23
+    - 25
+    - 29
+    - 30
+    - 32
+    - 34
+    - 35
+    - 40
+    checkpoints:
+    - step: 7
+      expectation: '[data-testid="tao-settings"]'
+    - step: 9
+      expectation: '{''expression'': "getComputedStyle(document.getElementById(''tao-settings-heading'').closest(''[data-search-id]'').parentElement.closest(''[data-search-id]'')).opacity
+        === ''1''", ''expect_truthy'': True}'
+    - step: 11
+      expectation: '{''selector'': ''[data-testid="llm-providers-save"]'', ''equal'': 1}'
+    - step: 12
+      expectation: '[data-testid="tao-settings-save"]'
+    - step: 13
+      expectation: '[data-testid="tao-settings-key"]'
+    - step: 21
+      expectation: '[data-testid="llm-providers-status"]'
+    - step: 24
+      expectation: '{''selector'': ''[data-testid="tao-home-capabilities"]'', ''contains'': ''qa-chat-default''}'
+    - step: 26
+      expectation: '{''expression'': ''document.querySelector(\''.tao-home-popup-items select\'').value === "local"'', ''expect_truthy'':
+        True}'
+    - step: 27
+      expectation: '[data-testid="tao-home-capability-thinking"]'
+    - step: 28
+      expectation: '[data-testid="tao-home-capability-web"]'
+    - step: 31
+      expectation: '{''expression'': ''!document.querySelector(\''.tao-home-capability-button\'').textContent.includes("Web")'', ''expect_truthy'':
+        True}'
+    - step: 33
+      expectation: '[data-testid="tao-home-host"]'
+    - step: 36
+      expectation: '[data-testid="tao-settings"]'
+    - step: 37
+      expectation: '{''selector'': ''[data-testid="tao-settings-model"]'', ''name'': ''value'', ''equals'': ''qa-chat-default''}'
+    - step: 38
+      expectation: '{''expression'': "document.querySelector(''#tao-settings-heading'').parentElement.querySelectorAll(''select'')[2].value
+        === ''tide''", ''expect_truthy'': True}'
+    - step: 39
+      expectation: '{''selector'': ''[data-testid="tao-settings-cost"]'', ''name'': ''value'', ''equals'': ''2.5''}'
+    - step: 41
+      expectation: '{''selector'': ''[data-provider="local"] [data-testid="llm-provider-model"]'', ''name'': ''value'', ''equals'':
+        ''qa-provider-model''}'
+    - step: 42
+      expectation: None
+    results:
+    - 7
+    - 9
+    - 11
+    - 12
+    - 13
+    - 21
+    - 24
+    - 26
+    - 27
+    - 28
+    - 31
+    - 33
+    - 36
+    - 37
+    - 38
+    - 39
+    - 41
+    - 42
+  native:
+  - check: Packaged settings and chat controls
+    method: automated
+    reason: Actual QA binary, isolated profile and normalized Tao stream; loopback protocol success does not certify a commercial model.
+  visual:
+  - check: Combined LLM and chat configuration
+    method: manual
+    reason: Retained screenshot supports review alongside semantic assertions.

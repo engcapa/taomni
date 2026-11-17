@@ -15,6 +15,7 @@ vi.mock("../../../lib/ipc", () => ({ selectSaveFilePath: vi.fn(), selectSaveDire
 
 beforeEach(() => {
   vi.clearAllMocks();
+  localStorage.clear();
   vi.mocked(prepareMarkdownExport).mockResolvedValue({ root: document.createElement("div"), title: "a.md", css: "", html: "<p>Document</p>" });
   vi.mocked(explorerCanonicalPath).mockImplementation(async (path) => path);
   vi.mocked(writeStreamOpen).mockResolvedValue("stream");
