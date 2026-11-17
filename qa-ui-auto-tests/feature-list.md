@@ -39,6 +39,7 @@ files:
   - src-tauri/src/plugin/migration.rs
   - src-tauri/src/plugin/migration_preflight.rs
   - src-tauri/src/plugin/migration_database.rs
+  - src-tauri/src/plugin/migration_source.rs
 controls:
   - id: module-marketplace
     selector: '[data-testid="module-marketplace"]'

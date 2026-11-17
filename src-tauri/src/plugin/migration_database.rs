@@ -1,20 +1,24 @@
 //! Discover actual legacy module records, without loading session credentials.
 use std::path::Path;
 
-use rusqlite::{Connection, OpenFlags};
+use rusqlite::Connection;
 
 use super::{MigrationCandidate, MigrationItem};
 
-pub(super) fn read_legacy_database(
-    path: &Path,
-) -> Result<(Vec<String>, Vec<MigrationCandidate>), String> {
-    let connection = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)
-        .map_err(|error| format!("legacy database cannot be opened read-only: {error}"))?;
-    // Schema and row classification must describe the same SQLite snapshot.
-    let transaction = connection
-        .unchecked_transaction()
-        .map_err(|error| format!("legacy database snapshot cannot be read: {error}"))?;
-    inspect_database(&transaction)
+pub(super) struct LegacyDatabaseSnapshot {
+    pub tables: Vec<String>,
+    pub candidates: Vec<MigrationCandidate>,
+    pub fingerprint: String,
+}
+
+pub(super) fn read_legacy_database(path: &Path) -> Result<LegacyDatabaseSnapshot, String> {
+    let ((tables, candidates), fingerprint) =
+        super::super::source::read_snapshot(path, inspect_database)?;
+    Ok(LegacyDatabaseSnapshot {
+        tables,
+        candidates,
+        fingerprint,
+    })
 }
 
 fn inspect_database(

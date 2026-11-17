@@ -1,5 +1,6 @@
 """Disposable previous-version session input; never seeds migration results."""
 import json
+import hashlib
 from contextlib import closing
 from pathlib import Path
 import sqlite3
@@ -63,7 +64,7 @@ def preview_client_snapshot():
 
 
 def setup(ctx):
-    if ctx.case_id not in {"TC-MODULES-005", "TC-MODULES-025", "TC-MODULES-026", "TC-MODULES-028", "TC-MODULES-029", "TC-MODULES-030", "TC-MODULES-031"}:
+    if ctx.case_id not in {"TC-MODULES-005", "TC-MODULES-025", "TC-MODULES-026", "TC-MODULES-028", "TC-MODULES-029", "TC-MODULES-030", "TC-MODULES-031", "TC-MODULES-032"}:
         raise RuntimeError("module_upgrade requires a registered fixed-input case")
     server_profile = ctx.case_id in {"TC-MODULES-028", "TC-MODULES-029"}
     client_profile = ctx.case_id in {"TC-MODULES-030", "TC-MODULES-031"}
@@ -81,6 +82,8 @@ def setup(ctx):
             with (data / name).open("xb") as stream:
                 stream.write(content)
     ctx.module_upgrade = {"root": data, "sessions": rows, "journal": None}
+    if ctx.case_id == "TC-MODULES-032":
+        _seed_wal_input(ctx, data, rows)
     if client_profile:
         with closing(sqlite3.connect(data / "taomni.db")) as db, db:
             db.execute("CREATE TABLE rdp_certificate_pins (endpoint TEXT PRIMARY KEY, fingerprint TEXT NOT NULL, updated_at INTEGER NOT NULL)")
@@ -98,3 +101,32 @@ def setup(ctx):
         "serverTypes": [row[0] for row in SERVER_ROWS] if server_profile else [],
         "certificatePinCount": len(PIN_ROWS) if client_profile else 0,
     }, indent=2) + "\n", encoding="utf-8")
+
+
+def _seed_wal_input(ctx, data, rows):
+    """Keep the real writer open so candidate restarts cannot hide the WAL input."""
+    path = data / "taomni.db"
+    connection = sqlite3.connect(path)
+    try:
+        if connection.execute("PRAGMA journal_mode=WAL").fetchone()[0] != "wal":
+            raise RuntimeError("Upgrade WAL fixture requires actual SQLite WAL mode")
+        connection.execute("PRAGMA wal_autocheckpoint=0")
+        connection.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchall()
+        main_sha256 = hashlib.sha256(path.read_bytes()).hexdigest()
+        vnc = next(row for row in rows if row["session_type"] == "VNC")
+        vnc["options_json"] = json.dumps({**json.loads(vnc["options_json"]), "upgradeWal": "committed-v1"})
+        connection.execute("UPDATE sessions SET options_json = ? WHERE id = ?", [vnc["options_json"], vnc["id"]])
+        connection.commit()
+        if hashlib.sha256(path.read_bytes()).hexdigest() != main_sha256:
+            raise RuntimeError("Upgrade WAL fixture unexpectedly checkpointed its committed input")
+        ctx.module_upgrade.update(wal_connection=connection, wal_main_sha256=main_sha256)
+    except BaseException:
+        connection.close()
+        raise
+
+
+def teardown(ctx):
+    state = getattr(ctx, "module_upgrade", None) or {}
+    connection = state.pop("wal_connection", None)
+    if connection is not None:
+        connection.close()

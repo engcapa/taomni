@@ -26,6 +26,8 @@ pub struct LegacyVaultEvidence {
 /// a journal, or removes the old installation.  `source_fingerprints` is
 /// keyed by relative path and is retained in the journal/audit record so a
 /// changed source cannot be silently copied on a retry.
+/// SQLite entries also bind the corresponding nonempty WAL; transient SHM
+/// bookkeeping is excluded. No checkpoint is performed by the preflight.
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
 pub struct LegacyInstallSnapshot {
     pub from_version: String,
@@ -408,6 +410,13 @@ fn hash_tree(path: &Path, digest: &mut Sha256, size: &mut u64) -> Result<(), Str
 #[path = "migration_preflight.rs"]
 mod preflight;
 pub use preflight::{build_file_migration_specs, inspect_legacy_install};
+
+#[path = "migration_source.rs"]
+mod source;
+
+#[cfg(test)]
+#[path = "migration_wal_tests.rs"]
+mod wal_tests;
 
 #[cfg(test)]
 #[path = "migration_server_tests.rs"]

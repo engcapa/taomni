@@ -34,6 +34,12 @@ macOS 保留原始 `codesign` 与 `spctl` 结果。直接 CLI 启动、没有浏
 
 新增 fixture 不改变生产 IPC 或 UI，browser 026 保护现有 renderer 流程。纯单元验证固定资产替换拒绝、宿主环境限制、配对码脱敏、不伪造旧 schema、不覆盖既有业务行，以及完整旧行/chat sidecar oracle 的拒绝路径；单元成功不算真实安装成功。
 
-源码 `c89a3bfd21ca8ac46c99a25265077bc777adcdb8` 的 [#44024044217](https://github.com/engcapa/taomni/actions/runs/44024044217) 已在执行期间收齐 Linux Xvfb 和 Ubuntu 26.04 Wayland 的 027 shard，两组本用例均通过。实际 `apt-get install` / dpkg 记录为 `0.5.9 amd64`，安装的 `/usr/bin/taomni` SHA-256 为 `c0adc7fc3c0cc299af87cd9f17246b3e434b8c3b4bf1815826f8022cd50acd33`；两次旧进程均 ready、SIGTERM handler exit=0、没有强制清理。四个 preflight/pending/repeat 观察通过，case 的 23/24 份文件均逐份核对 runner receipt 中的 hash/bytes 绑定。Windows/macOS 尚待收证；这些 Linux 结果只覆盖本方案所述预检输入与 pending，不替代下述生产升级事务。
+源码 `c89a3bfd21ca8ac46c99a25265077bc777adcdb8` 的 [#44024044217](https://github.com/engcapa/taomni/actions/runs/44024044217) 已在执行期间下载并核对 Linux Xvfb、Ubuntu 26.04 Wayland、macOS ARM64 和 Windows 的 027 shard，本用例在四种 native profile 均通过。
+
+- Linux 实际 `apt-get install` / dpkg 记录为 `0.5.9 amd64`，安装的 `/usr/bin/taomni` SHA-256 为 `c0adc7fc3c0cc299af87cd9f17246b3e434b8c3b4bf1815826f8022cd50acd33`；两次旧进程均 ready、SIGTERM handler exit=0、没有强制清理。23/24 份 case 文件均逐份核对 runner receipt 的 hash/bytes 绑定。
+- macOS ARM64 实际 DMG drag-install 的 bundle version 为 `0.5.9`，旧 binary SHA-256 为 `ca1ddc81de8953919a443fcfe9d19eb41ec263e1a91548ddc9486993369570bb`；两次旧进程均 ready、SIGTERM handler exit=0、没有强制清理。28 份 case 文件与 receipt 绑定通过。Gatekeeper exit 3 如实保留，CLI 启动不记为系统信任通过。
+- Windows 实际 `msiexec /i` exit=0，exe/product version 均为 `0.5.9`，旧 binary SHA-256 为 `d625cc1ca5c3198f0fb82dc8f80e4673ef6779038e0ce395fb3ac4f518fcbea8`，Authenticode 为 `NotSigned`。两次旧进程均 ready，按预定方案强停 owned GUI-subsystem 进程树，exit=1；这是明确记录的 crash 输入，不能称正常旧版退出。18 份 case 文件的 receipt hash/bytes 绑定通过，核验时规范化 Windows 路径分隔符。
+
+四组均完成 preflight/pending/repeat/repeat 四次独立观察、完整旧行与历史 chat/WAL 字节保持，以及候选正常重启。上述结果只覆盖本方案所述真实安装输入与 pending，不替代下述生产升级事务，也不覆盖未执行的 macOS Intel 输入。
 
 本批通过后，下一步仍是核心可信 exporter 与验证包 staging 的生产事务，以及候选安装程序对真实已安装版本的替换/中断/回滚。G1–G11 未闭合前不得切换 MFA 或其它业务 owner。

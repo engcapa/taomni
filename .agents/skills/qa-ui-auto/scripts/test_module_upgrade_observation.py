@@ -12,7 +12,7 @@ from qa_ui_auto.fixtures.module_upgrade import (
     CHAT_FILES, CLIENT_ITEMS, PIN_ROWS, SERVER_ITEMS, SERVER_ROWS, client_sessions,
     input_sessions, preview_client_snapshot, preview_snapshot, preview_server_snapshot,
 )
-from qa_ui_auto.module_upgrade_observation import observe, run
+from qa_ui_auto.module_upgrade_observation import observe, run, wal_fingerprint
 from qa_ui_auto.steps import StepError
 
 
@@ -152,6 +152,34 @@ class UpgradeObservationTests(unittest.TestCase):
             db.execute("UPDATE rdp_certificate_pins SET fingerprint = ?", ["cd" * 32])
         with self.assertRaisesRegex(StepError, "original RDP certificate pins"):
             observe(self.root, self.state, "preflight")
+
+    def test_wal_oracle_rejects_a_main_only_journal_for_committed_data(self):
+        database = self.root / "taomni.db"
+        connection = sqlite3.connect(database)
+        self.addCleanup(connection.close)
+        connection.execute("PRAGMA journal_mode=WAL").fetchall()
+        connection.execute("PRAGMA wal_autocheckpoint=0")
+        connection.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchall()
+        main_bytes = database.read_bytes()
+        self.state["wal_main_sha256"] = hashlib.sha256(main_bytes).hexdigest()
+        vnc = next(row for row in self.state["sessions"] if row["session_type"] == "VNC")
+        vnc["options_json"] = json.dumps({"upgradeWal": "committed-v1"})
+        connection.execute("UPDATE sessions SET options_json = ? WHERE session_type = 'VNC'", [vnc["options_json"]])
+        connection.commit()
+        self.assertEqual(database.read_bytes(), main_bytes)
+        self.journal["entries"][0]["source_fingerprint"] = f"sha256:{self.state['wal_main_sha256']}:bytes:{len(main_bytes)}"
+        self.write_journal()
+        with self.assertRaisesRegex(StepError, "does not bind the committed WAL"):
+            observe(self.root, self.state, "pending")
+        fingerprint, evidence = wal_fingerprint(self.root, self.state)
+        self.assertGreater(evidence["walBytes"], 32)
+        self.journal["entries"][0]["source_fingerprint"] = fingerprint
+        self.write_journal()
+        self.assertEqual(observe(self.root, self.state, "pending")["walInput"], evidence)
+        observe(self.root, self.state, "repeat")
+        connection.execute("PRAGMA wal_checkpoint(TRUNCATE)").fetchall()
+        with self.assertRaisesRegex(StepError, "missing or was checkpointed"):
+            observe(self.root, self.state, "repeat")
 
 
 if __name__ == "__main__":

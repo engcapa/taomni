@@ -1,0 +1,169 @@
+//! Bind read-only discovery to the database and its committed WAL input.
+
+use std::fs::{self, File};
+use std::io::{self, Read};
+use std::path::{Path, PathBuf};
+
+use rusqlite::{Connection, OpenFlags};
+use sha2::{Digest, Sha256};
+
+struct Fingerprint {
+    digest: [u8; 32],
+    bytes: u64,
+}
+
+impl Fingerprint {
+    fn display(&self) -> String {
+        format!("sha256:{}:bytes:{}", hex::encode(self.digest), self.bytes)
+    }
+}
+
+fn fingerprint_reader(mut reader: impl Read) -> Result<Fingerprint, String> {
+    let mut digest = Sha256::new();
+    let mut bytes = 0_u64;
+    let mut buffer = [0_u8; 64 * 1024];
+    loop {
+        let count = reader
+            .read(&mut buffer)
+            .map_err(|error| error.to_string())?;
+        if count == 0 {
+            break;
+        }
+        digest.update(&buffer[..count]);
+        bytes = bytes
+            .checked_add(count as u64)
+            .ok_or("legacy source size overflow")?;
+    }
+    Ok(Fingerprint {
+        digest: digest.finalize().into(),
+        bytes,
+    })
+}
+
+fn fingerprint_file(path: &Path) -> Result<Fingerprint, String> {
+    let metadata = fs::symlink_metadata(path).map_err(|error| error.to_string())?;
+    if metadata.file_type().is_symlink() || !metadata.is_file() {
+        return Err(format!(
+            "legacy database source must be a regular file: {}",
+            path.display()
+        ));
+    }
+    fingerprint_reader(File::open(path).map_err(|error| error.to_string())?)
+}
+
+fn with_wal(main: Fingerprint, wal: Option<Fingerprint>) -> Result<Fingerprint, String> {
+    // An empty WAL contains no committed records. Preserve the existing raw
+    // main-file fingerprint for rollback journals and absent/empty WAL files.
+    let Some(wal) = wal.filter(|wal| wal.bytes != 0) else {
+        return Ok(main);
+    };
+    let mut digest = Sha256::new();
+    digest.update(b"taomni.legacy.sqlite-with-wal.v1\0");
+    digest.update(main.digest);
+    digest.update(main.bytes.to_le_bytes());
+    digest.update(wal.digest);
+    digest.update(wal.bytes.to_le_bytes());
+    Ok(Fingerprint {
+        digest: digest.finalize().into(),
+        bytes: main
+            .bytes
+            .checked_add(wal.bytes)
+            .ok_or("legacy SQLite source size overflow")?,
+    })
+}
+
+pub(super) fn database_fingerprint(path: &Path) -> Result<String, String> {
+    let main = fingerprint_file(path)?;
+    let mut wal_path = path.as_os_str().to_os_string();
+    wal_path.push("-wal");
+    let wal_path = PathBuf::from(wal_path);
+    let wal = match fs::symlink_metadata(&wal_path) {
+        Ok(_) => Some(fingerprint_file(&wal_path)?),
+        Err(error) if error.kind() == io::ErrorKind::NotFound => None,
+        Err(error) => return Err(error.to_string()),
+    };
+    // SHM is transient reader/lock bookkeeping, not a data source. In
+    // particular, inspecting a WAL database must not invalidate its own hash.
+    with_wal(main, wal).map(|fingerprint| fingerprint.display())
+}
+
+pub(super) fn read_snapshot<T>(
+    path: &Path,
+    inspect: impl FnOnce(&Connection) -> Result<T, String>,
+) -> Result<(T, String), String> {
+    // Validate/hash before SQLite opens either file. A second hash while the
+    // read transaction is held rejects a writer or checkpoint racing discovery.
+    let before = database_fingerprint(path)?;
+    let connection = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)
+        .map_err(|error| format!("legacy database cannot be opened read-only: {error}"))?;
+    let transaction = connection
+        .unchecked_transaction()
+        .map_err(|error| format!("legacy database snapshot cannot be read: {error}"))?;
+    let value = inspect(&transaction)?;
+    if database_fingerprint(path)? != before {
+        return Err(
+            "legacy database changed during upgrade inspection; retry after its writer is idle"
+                .into(),
+        );
+    }
+    Ok((value, before))
+}
+
+pub(super) fn stable_database_fingerprint(path: &Path) -> Result<String, String> {
+    let before = database_fingerprint(path)?;
+    if database_fingerprint(path)? != before {
+        return Err(
+            "legacy database changed during upgrade inspection; retry after its writer is idle"
+                .into(),
+        );
+    }
+    Ok(before)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn absent_and_empty_wal_keep_the_existing_main_fingerprint() {
+        let raw = fingerprint_reader(&b"database bytes"[..])
+            .unwrap()
+            .display();
+        assert_eq!(
+            with_wal(fingerprint_reader(&b"database bytes"[..]).unwrap(), None)
+                .unwrap()
+                .display(),
+            raw
+        );
+        assert_eq!(
+            with_wal(
+                fingerprint_reader(&b"database bytes"[..]).unwrap(),
+                Some(fingerprint_reader(&b""[..]).unwrap())
+            )
+            .unwrap()
+            .display(),
+            raw
+        );
+    }
+
+    #[test]
+    fn wal_bytes_and_file_boundaries_change_the_source_fingerprint() {
+        let fingerprint = |main: &[u8], wal: &[u8]| {
+            with_wal(
+                fingerprint_reader(main).unwrap(),
+                Some(fingerprint_reader(wal).unwrap()),
+            )
+            .unwrap()
+            .display()
+        };
+        assert_ne!(
+            fingerprint(b"main", b"wal-A"),
+            fingerprint(b"main", b"wal-B")
+        );
+        assert_ne!(
+            fingerprint(b"main", b"wal-A"),
+            fingerprint(b"mainw", b"al-A")
+        );
+        assert!(fingerprint(b"main", b"wal-A").ends_with(":bytes:9"));
+    }
+}

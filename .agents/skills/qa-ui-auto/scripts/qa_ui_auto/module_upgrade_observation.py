@@ -11,6 +11,22 @@ from .fixtures.module_upgrade import CHAT_FILES
 from .steps import StepError
 
 
+def wal_fingerprint(data, state):
+    main = data / "taomni.db"
+    wal = data / "taomni.db-wal"
+    if wal.is_symlink() or not wal.is_file() or wal.stat().st_size <= 32:
+        raise StepError("Upgrade WAL input is missing or was checkpointed")
+    main_bytes, wal_bytes = main.read_bytes(), wal.read_bytes()
+    main_digest, wal_digest = hashlib.sha256(main_bytes).digest(), hashlib.sha256(wal_bytes).digest()
+    if main_digest.hex() != state["wal_main_sha256"]:
+        raise StepError("Upgrade preflight checkpointed or changed its original main database")
+    framed = (b"taomni.legacy.sqlite-with-wal.v1\0" + main_digest + len(main_bytes).to_bytes(8, "little")
+              + wal_digest + len(wal_bytes).to_bytes(8, "little"))
+    fingerprint = f"sha256:{hashlib.sha256(framed).hexdigest()}:bytes:{len(main_bytes) + len(wal_bytes)}"
+    return fingerprint, {"mainSha256": main_digest.hex(), "walSha256": wal_digest.hex(),
+                         "mainBytes": len(main_bytes), "walBytes": len(wal_bytes)}
+
+
 def observe(data, state, phase):
     retained = state.get("retained") or {
         name: {"sha256": hashlib.sha256(content).hexdigest(), "bytes": len(content)}
@@ -54,6 +70,9 @@ def observe(data, state, phase):
     result = {"sessionTypes": [row[1] for row in rows], "retainedSha256": {
         name: value["sha256"] for name, value in retained.items()},
         "moduleDirectoriesAbsent": True}
+    expected_fingerprint = None
+    if "wal_main_sha256" in state:
+        expected_fingerprint, result["walInput"] = wal_fingerprint(data, state)
     if phase == "preflight":
         if journal_path.exists():
             raise StepError("Read-only preflight wrote a migration journal")
@@ -74,6 +93,8 @@ def observe(data, state, phase):
                 raise StepError("Pending migration has an incorrect owner/source/state/target")
             if not re.fullmatch(r"sha256:[0-9a-f]{64}:bytes:[0-9]+", entry.get("source_fingerprint", "")):
                 raise StepError("Pending migration lacks its actual source fingerprint")
+            if expected_fingerprint and entry["source_fingerprint"] != expected_fingerprint:
+                raise StepError("Pending migration fingerprint does not bind the committed WAL input")
         if phase == "repeat" and journal != state.get("journal"):
             raise StepError("Repeated pending migration changed its journal instead of remaining idempotent")
         state["journal"] = journal
@@ -86,7 +107,7 @@ def run(ctx, args):
         raise StepError("module_upgrade_probe requires a fixed registered phase")
     owner = getattr(ctx, "fixture_context", None) or ctx
     state = getattr(owner, "module_upgrade", None)
-    if not state or getattr(owner, "case_id", None) not in {"TC-MODULES-025", "TC-MODULES-027", "TC-MODULES-028", "TC-MODULES-030"}:
+    if not state or getattr(owner, "case_id", None) not in {"TC-MODULES-025", "TC-MODULES-027", "TC-MODULES-028", "TC-MODULES-030", "TC-MODULES-032"}:
         raise StepError("module_upgrade_probe requires its registered native legacy input fixture")
     data = isolated_data_root(owner)
     if data != state["root"]:

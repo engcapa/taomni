@@ -6,14 +6,13 @@
 
 use std::collections::BTreeMap;
 use std::fs;
-use std::io::Read;
 use std::path::{Path, PathBuf};
 
-use rusqlite::{Connection, OpenFlags};
+use rusqlite::Connection;
 
 use super::{
     LegacyInstallSnapshot, LegacyVaultEvidence, MigrationCandidate, MigrationItem, MigrationSpec,
-    source_fingerprint,
+    source, source_fingerprint,
 };
 
 #[path = "migration_database.rs"]
@@ -84,20 +83,32 @@ pub fn inspect_legacy_install(
     } else {
         None
     };
-    let (database_tables, mut candidates) = match database_path.as_deref() {
-        Some(path) => database::read_legacy_database(path)?,
-        None => (Vec::new(), Vec::new()),
+    let (database_tables, mut candidates, database_fingerprint) = match database_path.as_deref() {
+        Some(path) => {
+            let snapshot = database::read_legacy_database(path)?;
+            (
+                snapshot.tables,
+                snapshot.candidates,
+                Some(snapshot.fingerprint),
+            )
+        }
+        None => (Vec::new(), Vec::new(), None),
     };
     candidates.extend(detect_legacy_files(&data_dir));
 
     let vault_path = data_dir.join("vault.db");
-    let vault = if vault_path.is_file() {
-        Some(LegacyVaultEvidence {
-            path: vault_path.clone(),
-            fixed_key_present: read_vault_fixed_key_presence(&vault_path)?,
-        })
+    let (vault, vault_fingerprint) = if vault_path.is_file() {
+        let (fixed_key_present, fingerprint) =
+            source::read_snapshot(&vault_path, read_vault_fixed_key_presence)?;
+        (
+            Some(LegacyVaultEvidence {
+                path: vault_path.clone(),
+                fixed_key_present,
+            }),
+            Some(fingerprint),
+        )
     } else {
-        None
+        (None, None)
     };
     // A fixed MFA data key is migration evidence even when the old database
     // file is absent. It still remains pending until the core Vault service and
@@ -117,16 +128,27 @@ pub fn inspect_legacy_install(
     }
 
     let mut source_fingerprints = BTreeMap::new();
-    if let Some(path) = database_path.as_deref() {
-        source_fingerprints.insert(relative_display(&data_dir, path), source_fingerprint(path)?);
+    if let Some(fingerprint) = database_fingerprint {
+        source_fingerprints.insert("taomni.db".into(), fingerprint);
+    }
+    if let Some(fingerprint) = vault_fingerprint
+        && candidates
+            .iter()
+            .any(|candidate| candidate.item == MigrationItem::Mfa)
+    {
+        source_fingerprints.insert("vault.db".into(), fingerprint);
     }
     for candidate in &candidates {
         for evidence in &candidate.evidence {
             let path = data_dir.join(evidence);
-            if path.is_file() || path.is_dir() {
-                source_fingerprints
-                    .entry(relative_display(&data_dir, &path))
-                    .or_insert(source_fingerprint(&path)?);
+            let relative = relative_display(&data_dir, &path);
+            if (path.is_file() || path.is_dir()) && !source_fingerprints.contains_key(&relative) {
+                let fingerprint = if evidence.ends_with(".db") {
+                    source::stable_database_fingerprint(&path)?
+                } else {
+                    source_fingerprint(&path)?
+                };
+                source_fingerprints.insert(relative, fingerprint);
             }
         }
     }
@@ -193,9 +215,7 @@ pub fn build_file_migration_specs(
     Ok(specs)
 }
 
-fn read_vault_fixed_key_presence(path: &Path) -> Result<bool, String> {
-    let connection = Connection::open_with_flags(path, OpenFlags::SQLITE_OPEN_READ_ONLY)
-        .map_err(|error| format!("legacy Vault cannot be opened read-only: {error}"))?;
+fn read_vault_fixed_key_presence(connection: &Connection) -> Result<bool, String> {
     let has_table = connection
         .query_row(
             "SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='vault_entries')",
