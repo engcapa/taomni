@@ -7,19 +7,28 @@
 //! This library does not itself grant a plugin permission to capture or read.
 
 mod handshake;
+mod pool;
 mod receiver;
 mod sender;
 
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use taomni_plugin_api::{ErrorCode, RpcError};
 pub use tokio_util::sync::CancellationToken;
 
+pub use pool::{TransferPool, TransferPoolLimits, TransferReservation, TransferUsage};
 pub use receiver::receive;
 pub use sender::{BinaryOffer, offer};
 
 pub const MAX_PAYLOAD_BYTES: usize = 64 * 1024 * 1024;
 pub const CHUNK_BYTES: usize = 64 * 1024;
+
+/// The outer operation supplies an absolute deadline that preparing/hashing
+/// the payload and retrying a connection can never extend.
+pub struct TransferScope {
+    pub cancelled: CancellationToken,
+    pub deadline: Instant,
+}
 
 #[derive(Clone, Copy)]
 pub struct TransferLimits {

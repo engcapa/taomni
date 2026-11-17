@@ -11138,8 +11138,11 @@ dependencies = [
  "serde",
  "serde_json",
  "taomni-plugin-api",
+ "taomni-plugin-stream",
  "taomni-profile-locks",
  "tempfile",
+ "tokio",
+ "tokio-util 0.7.19",
  "zeroize",
 ]
 

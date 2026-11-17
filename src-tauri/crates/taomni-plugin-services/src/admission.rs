@@ -134,7 +134,7 @@ impl OperationAdmission {
             host: host.clone(),
             kind,
             deadline,
-            cancelled: AtomicBool::new(false),
+            cancelled: tokio_util::sync::CancellationToken::new(),
             outer_active: AtomicBool::new(true),
             owner: Arc::downgrade(&self.0),
             _lease: lease,
@@ -171,7 +171,7 @@ impl OperationAdmission {
         if record.context != *context
             || record.host.termination_confirmed()
             || record.host.slug() != authenticated_host.slug()
-            || record.cancelled.load(Ordering::Acquire)
+            || record.cancelled.is_cancelled()
             || !record.outer_active.load(Ordering::Acquire)
         {
             return Err(CoreServiceError::StalePluginContext);
@@ -203,7 +203,7 @@ impl OperationAdmission {
         let state = self.0.state.lock().expect("service admission poisoned");
         for operation in state.operations.values() {
             if operation.host.instance() == host.instance() {
-                operation.cancelled.store(true, Ordering::Release);
+                operation.cancelled.cancel();
             }
         }
     }
@@ -223,7 +223,7 @@ impl OperationPermit {
     }
 
     pub fn cancel(&self) {
-        self.record.cancelled.store(true, Ordering::Release);
+        self.record.cancelled.cancel();
     }
 
     /// Also check before forwarding the host's final result to renderer. A
@@ -240,6 +240,7 @@ impl OperationPermit {
 impl Drop for OperationPermit {
     fn drop(&mut self) {
         self.record.outer_active.store(false, Ordering::Release);
+        self.record.cancelled.cancel();
         let removed = self
             .owner
             .0

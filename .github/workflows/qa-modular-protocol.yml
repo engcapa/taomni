@@ -75,6 +75,10 @@ jobs:
         run: |
           set -o pipefail
           cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-stream --lib --locked 2>&1 | tee modular-protocol-evidence/stream-unit.log
+      - name: Verify operation cancellation and retained service contracts
+        run: |
+          set -o pipefail
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-services --lib --locked 2>&1 | tee modular-protocol-evidence/services-unit.log
       - name: Verify all real loopback and child-process scenarios
         run: |
           set -o pipefail
@@ -82,6 +86,27 @@ jobs:
           python -c 'from pathlib import Path; lines=Path("modular-protocol-evidence/stream-selection.txt").read_text().splitlines(); assert sum(line.endswith(": test") for line in lines) == 10, "Expected all ten binary transport scenarios"'
           cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-stream --test transfer --locked -- --ignored --test-threads=1 --nocapture 2>&1 | tee modular-protocol-evidence/stream-native.log
           python -c 'from pathlib import Path; assert "10 passed; 0 failed; 0 ignored" in Path("modular-protocol-evidence/stream-native.log").read_text(), "Missing full native stream evidence"'
+      - name: Verify actual lease and aggregate transfer ownership
+        run: |
+          set -o pipefail
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-stream --test owner_cleanup --locked -- --ignored --list > modular-protocol-evidence/owner-selection.txt
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-services --test binary_ownership --locked -- --ignored --list > modular-protocol-evidence/services-binary-selection.txt
+          python - <<'PY'
+          from pathlib import Path
+          expected = {"owner-selection.txt": 1, "services-binary-selection.txt": 7}
+          for name, count in expected.items():
+              lines = Path("modular-protocol-evidence", name).read_text().splitlines()
+              assert sum(line.endswith(": test") for line in lines) == count, name
+          PY
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-stream --test owner_cleanup --locked -- --ignored --test-threads=1 --nocapture 2>&1 | tee modular-protocol-evidence/owner-native.log
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-services --test binary_ownership --locked -- --ignored --test-threads=1 --nocapture 2>&1 | tee modular-protocol-evidence/services-binary-native.log
+          python - <<'PY'
+          from pathlib import Path
+          expected = {"owner-native.log": 1, "services-binary-native.log": 7}
+          for name, count in expected.items():
+              log = Path("modular-protocol-evidence", name).read_text()
+              assert f"{count} passed; 0 failed; 0 ignored" in log, name
+          PY
       - uses: actions/upload-artifact@v4
         if: always()
         with:

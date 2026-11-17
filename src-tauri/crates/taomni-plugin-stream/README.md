@@ -27,14 +27,40 @@ not own this handle. `Drop` is an abort fallback; the explicit method awaits
 listener/socket/payload reclamation. This library does not grant capture or
 file permissions and has not yet been wired into production capture services.
 
+Service workers share one core-owned `TransferPool`. Its default budget is eight
+live/reserved transfers and 128 MiB of payload capacity, in addition to each
+transfer's 64 MiB limit. Reserve before capturing/allocating. Buffer capacity,
+including unused Vec capacity, must fit the reservation; saturation returns
+`BINARY_TRANSFER_BUSY` without queueing more payloads. A zero-byte transfer still
+uses a listener slot. Pool clones share the budget; separate pools do not.
+
+`offer_with_owner` moves the reservation and caller's lease into the real network
+task. Both the preparing future and the unpolled task retain complete resource
+owners whose buffers/listeners are destroyed before their leases. `TransferScope`
+provides the parent's cancellation token and absolute deadline; preparing and
+hashing cannot renew that deadline. Explicit offer cancellation affects its
+child token, preserving the outer operation and sibling transfers.
+
+`taomni-plugin-services::offer_binary_for_request` binds this transport to an
+existing reverse request. Retirement, cancellation, host disconnect/termination,
+Vault revocation and profile replacement notify the child without polling. The
+actual network task retains the same admission/OS lease until cleanup; an ack
+alone cannot let revocation drain past a live transfer. The caller must still
+check signed service permissions before capturing and retain the returned offer.
+This adapter is not yet exposed as a production `capture.still` service.
+
 Local verification runs only the pure library tests and compiles the ignored
 integration harness. GitHub's registered upgrade `protocol_only=true` entry
-runs all ten real socket/process scenarios on Linux, Windows and macOS. The
+runs all ten original socket/process scenarios, a kernel resource-order scenario
+and seven request/OS-lease scenarios on Linux, Windows and macOS. The
 child receives its descriptor through a private stdin pipe, verifies empty,
 multichunk and full-HD payloads and reports only length/hash. The remaining
 scenarios cover failed authorization, stalled handshake, replay refusal,
 deadline/cancellation and malicious payloads. Source identity, selected names
-and raw logs are always retained in `modular-protocol-*` artifacts.
+and raw logs are always retained in `modular-protocol-*` artifacts. The lease
+scenarios exercise real admission, sockets and OS locks with an in-process
+authenticated identity/ack fixture; the separate real-host gate verifies the
+transport's actual process authentication and revoke lifecycle.
 
 Future closure: connect live operation/admission ownership to capture services,
 add continuous stream flow control and compare the actual RDP path with its

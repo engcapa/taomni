@@ -18,7 +18,9 @@ fn joining_stale_root_revocation_retains_acknowledgements_and_adds_missing_hosts
     let admission = admission();
     let first = host(FIRST);
     let second = host(SECOND);
-    let initial = admission.begin_or_join_revoke(&[first.clone()]).unwrap();
+    let initial = admission
+        .begin_or_join_revoke(std::slice::from_ref(&first))
+        .unwrap();
     assert!(admission.host_revoke_pending(&first, &initial).unwrap());
     acknowledge(&admission, &first, &initial);
     assert!(!admission.host_revoke_pending(&first, &initial).unwrap());
@@ -48,7 +50,9 @@ fn pending_query_rejects_foreign_hosts_epochs_and_generations() {
     let admission = admission();
     let first = host(FIRST);
     let foreign = host(SECOND);
-    let revocation = admission.begin_revoke(&[first.clone()]).unwrap();
+    let revocation = admission
+        .begin_revoke(std::slice::from_ref(&first))
+        .unwrap();
     assert_eq!(
         admission.host_revoke_pending(&foreign, &revocation),
         Err(CoreServiceError::StalePluginContext)
@@ -70,7 +74,9 @@ fn pending_query_rejects_foreign_hosts_epochs_and_generations() {
     assert!(admission.begin_or_join_revoke(&[]).is_err());
     assert!(admission.host_revoke_pending(&first, &revocation).is_err());
     admission.after_verified_unlock().unwrap();
-    let next = admission.begin_or_join_revoke(&[first.clone()]).unwrap();
+    let next = admission
+        .begin_or_join_revoke(std::slice::from_ref(&first))
+        .unwrap();
     assert_ne!(next.epoch, revocation.epoch);
     assert!(admission.host_revoke_pending(&first, &next).unwrap());
 }

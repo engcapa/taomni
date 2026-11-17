@@ -6,6 +6,7 @@
 //! The host never receives this crate's admission permits or OS lease handles.
 
 mod admission;
+mod binary_transfer;
 mod core_operation;
 mod dispatcher;
 mod grants;
@@ -18,6 +19,7 @@ mod session;
 mod snapshot_pause;
 
 pub use admission::{OperationAdmission, OperationPermit};
+pub use binary_transfer::offer_binary_for_request;
 pub use core_operation::CoreOperationPermit;
 pub use dispatcher::{CoreServiceBackend, CoreServiceDispatcher, DispatcherConfig};
 pub use operation::{BorrowedOperation, OperationKind};

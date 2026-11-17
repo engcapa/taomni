@@ -6,6 +6,7 @@ use std::time::Instant;
 
 use taomni_plugin_api::services::{CoreServiceError, OperationContext};
 use taomni_profile_locks::VaultOperationLease;
+use tokio_util::sync::CancellationToken;
 
 use crate::{AuthorizedHost, admission::AdmissionInner};
 
@@ -29,7 +30,7 @@ pub(crate) struct ActiveOperation {
     pub host: AuthorizedHost,
     pub kind: OperationKind,
     pub deadline: Option<Instant>,
-    pub cancelled: AtomicBool,
+    pub cancelled: CancellationToken,
     pub outer_active: AtomicBool,
     pub owner: Weak<AdmissionInner>,
     pub _lease: VaultOperationLease,
@@ -63,6 +64,16 @@ impl BorrowedOperation {
         self.0.kind
     }
 
+    pub fn deadline(&self) -> Option<Instant> {
+        self.0.deadline
+    }
+
+    /// Children observe operation cancellation/retirement/revocation without
+    /// polling. Cancelling a child never cancels its operation or siblings.
+    pub fn cancellation_token(&self) -> CancellationToken {
+        self.0.cancelled.child_token()
+    }
+
     pub fn check_current(&self) -> Result<(), CoreServiceError> {
         if self
             .0
@@ -71,8 +82,7 @@ impl BorrowedOperation {
         {
             return Err(CoreServiceError::TimedOut);
         }
-        if self.0.cancelled.load(Ordering::Acquire) || !self.0.outer_active.load(Ordering::Acquire)
-        {
+        if self.0.cancelled.is_cancelled() || !self.0.outer_active.load(Ordering::Acquire) {
             return Err(CoreServiceError::StalePluginContext);
         }
         let owner = self
@@ -85,7 +95,7 @@ impl BorrowedOperation {
             || state.generation != self.0.context.profile_generation
             || state.mode != crate::AdmissionState::Open
             || self.0.host.termination_confirmed()
-            || self.0.cancelled.load(Ordering::Acquire)
+            || self.0.cancelled.is_cancelled()
             || !self.0.outer_active.load(Ordering::Acquire)
         {
             return Err(CoreServiceError::StalePluginContext);

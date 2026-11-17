@@ -1,7 +1,4 @@
-use std::{
-    sync::atomic::Ordering,
-    time::{Duration, Instant},
-};
+use std::time::{Duration, Instant};
 
 use taomni_plugin_api::services::{
     CoreServiceError, HostInstanceId, ProfileGeneration, RevokedKeys, VaultEpoch,
@@ -103,7 +100,7 @@ impl OperationAdmission {
         let next = state.epoch.next();
         state.mode = AdmissionState::Revoking;
         for operation in state.operations.values() {
-            operation.cancelled.store(true, Ordering::Release);
+            operation.cancelled.cancel();
         }
         state.epoch = next.map_err(|_| CoreServiceError::StalePluginContext)?;
         if let Some(generation) = generation {
@@ -190,7 +187,7 @@ impl OperationAdmission {
         host.mark_terminated();
         for operation in state.operations.values() {
             if operation.host.instance() == host.instance() {
-                operation.cancelled.store(true, Ordering::Release);
+                operation.cancelled.cancel();
             }
         }
         state.pending_acknowledgements.remove(host.instance());
