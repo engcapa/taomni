@@ -4,6 +4,7 @@ import re
 import xml.etree.ElementTree as ET
 from pathlib import Path
 from .steps import StepError
+from .drawio_connection_quality import inspect_sequence_connections
 
 
 def inspect_drawio(path):
@@ -17,7 +18,7 @@ def inspect_drawio(path):
     models = document.findall("./diagram/mxGraphModel")
     if document.tag != "mxfile" or not models:
         raise StepError("draw.io export has no editable graph sheets")
-    result = dict(sheets=len(models), independentCells=0, curvedEdges=0, straightEdges=0, sequences=0, sources=[])
+    result = dict(sheets=len(models), independentCells=0, curvedEdges=0, straightEdges=0, sequences=0, sources=[], checkedSequenceEndpoints=0, maximumEndpointError=0)
     for model in models:
         root = model.find("root")
         if root is None:
@@ -65,6 +66,9 @@ def inspect_drawio(path):
             if geometry.find("mxPoint[@as='sourcePoint']") is None or geometry.find("mxPoint[@as='targetPoint']") is None:
                 raise StepError("Mermaid connector lost its original endpoints")
             result["curvedEdges" if style.get("curved") == "1" else "straightEdges"] += 1
+        connections = inspect_sequence_connections(cells)
+        result["checkedSequenceEndpoints"] += connections["checkedSequenceEndpoints"]
+        result["maximumEndpointError"] = max(result["maximumEndpointError"], connections["maximumEndpointError"])
         for first_id, source in sources:
             if "sequenceDiagram" in source:
                 result["sequences"] += 1

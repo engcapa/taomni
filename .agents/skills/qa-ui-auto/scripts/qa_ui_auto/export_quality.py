@@ -21,6 +21,9 @@ def raster_grid_pixels(image):
 
 
 def inspect_quality(path, kind):
+    if kind in {"testing-pdf", "testing-docx"}:
+        from .markdown_testing_quality import inspect_testing
+        return inspect_testing(path, kind)
     if kind == "drawio":
         from .drawio_export_quality import inspect_drawio
         return inspect_drawio(path)
@@ -96,7 +99,7 @@ def inspect_quality(path, kind):
 
 
 def native(ctx, args):
-    if not isinstance(args, dict) or set(args) != {"path", "kind"} or args["kind"] not in {"pdf", "docx", "drawio"}:
+    if not isinstance(args, dict) or set(args) != {"path", "kind"} or args["kind"] not in {"pdf", "docx", "drawio", "testing-pdf", "testing-docx"}:
         raise StepError("assert_export_quality expects path and pdf/docx/drawio kind")
     if getattr(ctx, "dry_run", False):
         return "dry-run export quality"

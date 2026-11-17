@@ -52,3 +52,15 @@ Windows/macOS browser 在 [44052981988](https://github.com/engcapa/taomni/action
 | macOS ARM hosted | 28/28 | 33/33 | browser 18 / native 22 |
 
 最终独立核验保存在证据根的 `independent-mermaid-evidence.json/.log`：签名、source/runner、QA release、用例指纹、执行配置和绑定产物大小/SHA-256；实际导出文件另记 `independent-native-export-files.json`。Linux 同一源码的 Agnes 无代理真实请求另有 1/1，不混入上述 33 项。`pnpm check:refactor`、开发用例契约和 case/control audit 均通过。macOS 截图/桥接按键不作为 OS 层送键或其他 macOS 版本/架构的证据，边界见六项 follow-up 记录。
+
+## 真实 testing.md 追加回归（进行中）
+
+输入为用户原文件 `/home/zhyhang/temp/testing.md`，4510 字节，SHA-256 `c669a35a1cc8ec37aba798b496fa5b6c8c6405118079482bcaec03ee4c27f900`。新增 TC-FILE-OPEN-027/028 保存完全相同的 fixture；本机 native 通过 `TAOMNI_QA_MARKDOWN_SOURCE_FILE` 直接打开原路径，只做浏览和导出，并在前后独立核对哈希。编辑/撤销检查仅在 browser 的隔离副本中执行。
+
+本次实际使用 draw.io Desktop 29.6.6 复现了下方时序图连接点被拉远的问题。上一轮 XML 和应用内 maxGraph 渲染通过，**未证明真实 draw.io 的连接点正确**；上方历史结果只保留其实际验证范围，不能当作本次修复验收。draw.io 的 `anchorPointDirection` 默认为 1，maxGraph 默认为 false；生命线的 `direction=south` 因此重复旋转端口。当前导出显式固定 anchor 语义，并补偿 legacy 对垂直形状 flip 轴的交换。4 种旋转 × 4 种翻转的 16 项端点测试在修复前全部失败，修复后通过。独立 Python 检查器还对实际 XML 按 draw.io 的规则计算全部消息端点，误差不得大于 1.5px。旋转的消息文字改为独立可编辑文字元素，避免 draw.io 仍水平显示边标签而相互覆盖。
+
+真实文件的 Word 流程图含 13 条 `stroke-dasharray="0px"` 线身，箭头另用 marker 绘制。导出明确把 SVG 中无间隙的描边写为 `none` 实线，真正虚线保留数值间隔；不修改预览和原始 SVG。Word 保留两幅矢量图与 600 DPI fallback。新增独立检查器拒绝带箭头但线身为零间隙 dash 的原导出，接受当前实际导出。LibreOffice 可建立本机排版/线条证据，不能替代 Win11 Microsoft Word 的客户端验收。
+
+Live 表格原来直接使用 `textContent` 写原始 Markdown。现在使用现有 marked GFM 解析器与共享 sanitizer 渲染单元格内联格式；可编辑格聚焦时显示原始标记，失焦恢复格式，只读格聚焦仍保留格式。保留 IME 延迟提交、单元格 DOM 身份、Tab/Enter、表格操作与撤销/重做。表格中的图片暂显示 alt，避免引入无所有权的图片请求；链接沿用显式外部打开。
+
+本轮验证选择：完整 Markdown 单测（首次 174 项通过，时序旋转参数化后具名 14 项补测通过），独立 draw.io 检查器 9 项和 Word 线身检查器 3 项；受影响 004/013/014/015/019/020/021/022/025/026/027/028，保留六项近期交付及完整 crash-regression browser 18 / native 22。匹配 QA release 原生验证是用户明确要求，覆盖 WebKitGTK 中的原文件读取、真实导出和 OS chooser；Windows/macOS 通过 qa-ui-auto-platforms 运行。新的证据根 `/data-raw-hdd/temp/taomni-testing-20261117`。此段写入时本机与 hosted 完整验收尚未结束，不把探针或 dry-run 计作通过。

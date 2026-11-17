@@ -15512,6 +15512,9 @@ files:
   - src/components/viewer/markdown/mathExportCss.ts
   - src/components/viewer/markdown/exportPdf.ts
   - src/components/viewer/markdown/pdfPages.ts
+  - src/components/viewer/markdown/TableWidget.ts
+  - src/components/viewer/markdown/tableCellContent.ts
+  - src/components/viewer/markdown/drawioMermaidGeometry.ts
   - src/components/viewer/markdown/wordSvg.ts
   - src/components/viewer/markdown/docxImages.ts
   - src/components/viewer/markdown/exportDocx.ts
@@ -16218,3 +16221,5 @@ TC-FILE-OPEN-001..006 是可执行行为用例并纳入 crash-regression；当�
 The retired Tao-specific key/save selectors are retained as optional absence assertions in HOME043; credentials and saving are owned by the combined LLM panel.
 
 - TC-FILE-OPEN-018: native release PDF performance comparison, three identical long-table/Mermaid/Unicode samples through actual save dialogs. Raw durations and PDF artifacts are reviewed against a fixed baseline; no speedup is inferred from pass status.
+
+真实用户 testing.md 回归由 TC-FILE-OPEN-027/028 验证 Live 表格内联格式、Word 流程图线身、draw.io 时序连接点和可搜索 PDF，并核对原文 SHA。实际 draw.io Desktop / LibreOffice 视觉证据另行留存；不将内部 maxGraph 预览当作外部编辑器验收。

@@ -1,5 +1,16 @@
 import DOMPurify from "dompurify";
 
+/** Office can interpret Mermaid's zero-length dash patterns as an invisible
+ * stroke. SVG defines these as solid; write that meaning explicitly. */
+function wordDashPattern(value: string): string {
+  const parts = value.trim().split(/[ ,]+/);
+  if (!parts.length || !parts.every(part => /^(?:\d*\.)?\d+(?:px)?$/.test(part))) return value;
+  let lengths = parts.map(Number.parseFloat);
+  if (lengths.length % 2) lengths = [...lengths, ...lengths];
+  return lengths.every((length, index) => index % 2 === 0 || length === 0) || lengths.every(length => length === 0)
+    ? "none" : parts.map(part => String(Number.parseFloat(part))).join(" ");
+}
+
 /** Office's SVG renderer supports presentation attributes more consistently
  * than Mermaid's scoped CSS, inherited fonts and relative tspan coordinates. */
 export async function portableWordSvg(svg: Element, width: number, height: number, dark: boolean): Promise<string> {
@@ -24,7 +35,7 @@ export async function portableWordSvg(svg: Element, width: number, height: numbe
     });
     nodes.forEach((node, index) => {
       node.removeAttribute("style");
-      for (const [property, value] of styles[index]) if (value) node.setAttribute(property, value);
+      for (const [property, value] of styles[index]) if (value) node.setAttribute(property, property === "stroke-dasharray" ? wordDashPattern(value) : value);
       const fontSize = Number.parseFloat(node.getAttribute("font-size") || "16");
       if (["text", "tspan"].includes(node.tagName.toLowerCase())) {
         for (const name of ["x", "y", "dx", "dy"]) {

@@ -62,10 +62,14 @@ export function mermaidSequenceCells(data: MermaidSequence, geometry: MermaidGeo
     const route = geometry.route(line);
     if (route.points.length < 2) throw new Error("Cannot read Mermaid sequence message path");
     const label = labels[index], labelBox = label ? geometry.box(label) : undefined;
+    // Edge labels in draw.io stay horizontal even when the diagram's path is
+    // rotated. An independent editable text cell follows the view transform.
+    const rotatedLabel = geometry.transform.rotation % 360 !== 0 && label;
+    if (rotatedLabel) text(label, "sequence-message-label");
     const marker = line.getAttribute("marker-end") || "";
     const endArrow = /crosshead/.test(marker) ? "cross" : /filled/.test(marker) ? "block" : marker ? "classic" : "open";
     cells.push(geometry.edge({ id: id("message"), ...(source && target ? { source: source.id, target: target.id } : {}),
-      value: typeof message?.message === "string" ? mermaidPlainText(message.message) : label ? diagramLabelText(label) : "",
+      value: rotatedLabel ? "" : typeof message?.message === "string" ? mermaidPlainText(message.message) : label ? diagramLabelText(label) : "",
       style: `${BORDER}fontSize=16;endArrow=${endArrow};startArrow=${line.hasAttribute("marker-start") ? endArrow : "none"};dashed=${Number(line.classList.contains("messageLine1"))};labelBackgroundColor=#ffffff;`,
       taomniKind: "sequence-message", from: sourceId, to: targetId }, route,
     source && target ? { source: source.box, target: target.box } : undefined,
