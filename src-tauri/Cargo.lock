@@ -11133,6 +11133,7 @@ dependencies = [
  "taomni-sqlite-snapshot",
  "tempfile",
  "tokio",
+ "tokio-tungstenite",
  "zeroize",
 ]
 

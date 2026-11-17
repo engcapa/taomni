@@ -83,6 +83,13 @@ media type and cancellation. Four ignored-by-default `taomni-host-gates` tests
 exercise a real SDK child, the production pump/dispatcher, exact multi-display
 bytes, missing grant, deadline/drain and session-drop socket reclamation on
 GitHub. Their controlled pixels do not establish native capture or TCC behavior.
+Three additional ignored SDK socket tests hold a real WebSocket after its first
+TQF1 prefix: explicit operation cancellation and the original absolute deadline
+must close the actual client connection, independently observed by the peer;
+a hash-valid, normally closed but malformed TQF1 container must never reach
+business code. These tests are only compiled locally and executed on GitHub.
+The additional WebSocket dependency is test-only; production dependencies and
+runtime code remain those of `21d768144da0d8835d262705571bf8fddc59929c`.
 TC-MFA-007 and TC-MFA-106 retain the browser boundary and actual core screen scan;
 the latter's macOS permission gap stays explicit. This service adds no UI entry,
 so there is no new YAML flow that can truthfully invoke it before MFA migration.
@@ -93,6 +100,19 @@ Production MFA has not switched to a host. Synchronous OS capture cannot be
 preempted: cancellation keeps its lease until capture returns and the window is
 restored, then discards late bytes. Physical capture through an installed MFA
 host, source-specific TCC, G5 throughput and the other G1–G11 gates remain open.
+
+For source `21d768144da0d8835d262705571bf8fddc59929c`, hosted
+[protocol run #44009531599](https://github.com/engcapa/taomni/actions/runs/44009531599)
+passed on Linux X64, Windows X64 and macOS ARM64. Each platform passed all four
+SDK child capture tests and the original 18 resource/transport scenarios.
+The API (25), services (42), stream (14) and SDK (21 on Unix / 19 on Windows)
+pure units also passed; Linux selection passed 25. All four artifacts were
+downloaded during execution and their exact source SHA checked. The same
+source's [host run #44009587460](https://github.com/engcapa/taomni/actions/runs/44009587460)
+passed all 36 process/lifecycle scenarios per platform, with all three raw
+artifacts downloaded during execution. Raw evidence is under
+`qa-ui-auto-report/github/<run>/live-contracts/`. These results precede the
+three additional SDK socket tests, which still need their own matching run.
 
 ## Linux G4 execution experiment
 

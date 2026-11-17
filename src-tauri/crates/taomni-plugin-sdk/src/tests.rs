@@ -1,4 +1,6 @@
-//! Unit-only streams and typed replies; real stdio processes run on GitHub.
+//! Pure units by default; ignored socket and real stdio tests run on GitHub.
+#[path = "capture_native_tests.rs"]
+mod capture_native_tests;
 #[path = "capture_tests.rs"]
 mod capture_tests;
 use crate::{

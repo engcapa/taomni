@@ -80,6 +80,13 @@ jobs:
           set -o pipefail
           cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-services --lib --locked 2>&1 | tee modular-protocol-evidence/services-unit.log
           cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-sdk --lib --locked 2>&1 | tee modular-protocol-evidence/sdk-unit.log
+      - name: Verify SDK cancellation and deadline during actual pixel reception
+        run: |
+          set -o pipefail
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-sdk --lib capture_native_tests --locked -- --ignored --list > modular-protocol-evidence/sdk-capture-selection.txt
+          python -c 'from pathlib import Path; lines=Path("modular-protocol-evidence/sdk-capture-selection.txt").read_text().splitlines(); assert sum(line.endswith(": test") for line in lines) == 3, "Expected all three SDK receive scenarios"'
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-sdk --lib capture_native_tests --locked -- --ignored --test-threads=1 --nocapture 2>&1 | tee modular-protocol-evidence/sdk-capture-native.log
+          python -c 'from pathlib import Path; assert "3 passed; 0 failed; 0 ignored" in Path("modular-protocol-evidence/sdk-capture-native.log").read_text(), "Missing SDK mid-receive cancellation evidence"'
       - name: Verify real SDK still capture and descriptor ownership
         run: |
           set -o pipefail

@@ -12,6 +12,8 @@
 
 ## 2026-11-17 最新结果与后续验证
 
+- `capture.still` 产品源码 `21d768144da0d8835d262705571bf8fddc59929c` 已推送，[协议门 #44009531599](https://github.com/engcapa/taomni/actions/runs/44009531599) 与[宿主门 #44009587460](https://github.com/engcapa/taomni/actions/runs/44009587460) 均成功：三端每端 **4/4** 新采集进程场景、**18/18** 原传输/资源场景与 **36/36** 宿主生命周期通过。Unix SDK **21/21**、Windows SDK **19/19**（保留平台限定的既有用例），API **25/25**、services **42/42**、stream **14/14**；Linux selection **25/25**。7 份 artifact 全部在执行期间收取并核对完整 source SHA；[UI #44009634781](https://github.com/engcapa/taomni/actions/runs/44009634781) 的 Linux browser 两片 **22/22** 已收齐，三端 native 等待 matching release QA 构建，不提前记通过。
+- 覆盖复核补充三个 GitHub-only SDK 真实 socket 场景：收到首段像素后取消、取流沿用原 operation deadline，以及 hash 完整/正常关闭但非法 TQF1 的拒绝。对端独立观察 TCP 已关闭，超时不会算清理通过。本地只做 `--no-run` 编译；测试与 workflow 增量未改变 `21d768144` 的生产代码，WebSocket 仅为 SDK dev-dependency，后续专项 run 单独记录。
 - 继续按用户要求拉取远程 `main` 并执行合并：仍为已包含的 `cb448d174e5629ca74a87e4e72533eafea1a2927`，返回 `Already up to date`，没有冲突。未提交的采集服务实现保留并继续开发。
 - `capture.still` 的 additive v1 API、SDK 和 dispatcher 已接线：签名 permission `capture.screen` 只允许协商服务，实际采集还须可信核心 facade 为单次 operation 附加窗口源；host/renderer 无法通过 JSON 指定窗口、显示器、策略或预算。核心复用现有隐藏/恢复和系统授权边界，在 OS 采集前预留 luma/encoded 各 64 MiB 传输预算；TQF1 检查几何、截断、尾部数据与总量。同步 OS capture 尚不可抢占，取消后保留真实 lease 到采集返回、恢复窗口并丢弃迟到数据。
 - descriptor 与真实 binary task 分别持有 operation，session 在 writer flush/drop 后继续拥有未完成的 offer，完成后裁去 handle，session drop 取消未领取 stream。SDK 的 operation deadline/cancellation 同时覆盖 reverse RPC 和实际取流。新增三端 GitHub-only 4 项真实子进程/SDK/loopback 门，覆盖精确多显示器数据与连续采集、无核心 grant 拒绝、deadline/drain、descriptor flush 后 session 退出清理；像素为受控 fixture，不能当物理屏幕、TCC 或已签安装包证据。
