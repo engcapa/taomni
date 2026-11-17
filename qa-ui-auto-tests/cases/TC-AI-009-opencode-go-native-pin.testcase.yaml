@@ -6,7 +6,7 @@ description: Native only because model writes/readback cross Tauri IPC and SQLit
   Renderer reload is not process restart; N-GO-03 separately tests cold restart.
   Opening tab chat creates the fresh thread after reset_db; wait for its Go
   picker after switching providers before pinning the model. No key needed,
-  no messages sent.
+  no messages sent. Restore the prior terminal through Home History after reload.
 covers: [F-AI-2.4]
 tags: [ai, opencode-go, p1]
 modes: [native]
@@ -39,8 +39,9 @@ steps:
 - wait: 5
 - reload: {}
 - wait_for: '[data-testid="status-bar"]'
-- wait_for: '[data-testid="welcome-restore-last-session"]'
-- click: '[data-testid="welcome-restore-last-session"]'
+- click: '[data-testid="tao-home-history"]'
+- wait_for: '[data-testid="tao-home-history-restore"]:enabled'
+- click: '[data-testid="tao-home-history-restore"]'
 - wait_for:
     selector: '[data-testid="terminal-pane"]'
     timeout_sec: 30
@@ -59,16 +60,17 @@ steps:
     name: value
     equals: ''
 verification:
-  review: pending
+  review: reviewed
   requirements:
   - id: R1
     requirement: Real IPC writes llm_model; renderer reload reads it back, and explicit clear is available.
-    actions: [3, 5, 7, 9, 13, 16, 19, 21]
+    actions: [3, 5, 7, 9, 13, 15, 17, 19, 22]
     checkpoints:
     - {step: 11, expectation: Pin is selected after IPC save.}
-    - {step: 20, expectation: SQLite-backed pin is read after renderer reload.}
-    - {step: 23, expectation: Explicit clear restores inherited selection.}
-    results: [11, 20, 23]
+    - {step: 18, expectation: Home History restores the actual prior terminal.}
+    - {step: 21, expectation: SQLite-backed pin is read after renderer reload.}
+    - {step: 24, expectation: Explicit clear restores inherited selection.}
+    results: [11, 18, 21, 24]
   visual:
   - {check: Native select keyboard/focus behavior., method: manual, reason: DOM selection does not establish OS keyboard/focus behavior.}
   native:
