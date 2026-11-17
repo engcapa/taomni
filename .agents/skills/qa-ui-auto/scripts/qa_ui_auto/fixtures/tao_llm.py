@@ -127,7 +127,10 @@ def setup(ctx):
     (root / "ai.json").write_text(json.dumps(config), encoding="utf-8")
     document = Path(ctx.case_dir).resolve() / "ordinary-document.txt"
     document.write_text("QA_ATTACHMENT_VALUE=73\n", encoding="utf-8")
-    ctx.values.update(tao_llm_log=str(log), tao_llm_document=str(document), tao_llm_chooser_title="Open File" if platform.system() == "Linux" else "打开")
+    # The hosted Windows image uses an English Common Item Dialog. Keep its
+    # exact title and executable ownership checks; local OS locales may opt in.
+    chooser_title = os.environ.get("TAOMNI_QA_FILE_DIALOG_TITLE") or ("Open File" if platform.system() == "Linux" else "Open")
+    ctx.values.update(tao_llm_log=str(log), tao_llm_document=str(document), tao_llm_chooser_title=chooser_title)
 
 
 def teardown(ctx):

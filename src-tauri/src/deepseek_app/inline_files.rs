@@ -2,7 +2,6 @@
 //! hashes, never base64 images, document bodies or provider credentials.
 use crate::state::AppState;
 use base64::Engine;
-use rusqlite::{Connection, OptionalExtension, params};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::{
@@ -10,25 +9,8 @@ use std::{
     path::Path,
 };
 
-fn init(db: &Connection) -> Result<(), String> {
-    db.execute_batch("CREATE TABLE IF NOT EXISTS tao_inline_files(id TEXT PRIMARY KEY,thread_id TEXT NOT NULL,path TEXT NOT NULL,hash TEXT NOT NULL,filename TEXT NOT NULL,mime TEXT NOT NULL,size INTEGER NOT NULL)").map_err(|e| e.to_string())?;
-    let has_provider = db
-        .prepare("PRAGMA table_info(tao_inline_files)")
-        .map_err(|e| e.to_string())?
-        .query_map([], |row| row.get::<_, String>(1))
-        .map_err(|e| e.to_string())?
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|e| e.to_string())?
-        .iter()
-        .any(|column| column == "provider");
-    if !has_provider {
-        db.execute_batch(
-            "ALTER TABLE tao_inline_files ADD COLUMN provider TEXT NOT NULL DEFAULT 'opencode-go'",
-        )
-        .map_err(|e| e.to_string())?;
-    }
-    Ok(())
-}
+mod storage;
+pub(super) use storage::{forget_thread, inherit};
 
 fn digest(data: &[u8]) -> String {
     hex::encode(Sha256::digest(data))
@@ -73,28 +55,19 @@ pub async fn attach(
         digest(format!("{thread}:{provider}:{hash}").as_bytes())
     );
     let db = state.db.lock().map_err(|_| "database unavailable")?;
-    init(&db)?;
-    let reused: bool = db
-        .query_row(
-            "SELECT EXISTS(SELECT 1 FROM tao_inline_files WHERE id=?1)",
-            [&id],
-            |r| r.get(0),
-        )
-        .map_err(|e| e.to_string())?;
-    db.execute(
-        "INSERT OR REPLACE INTO tao_inline_files(id,thread_id,path,hash,filename,mime,size,provider) VALUES(?1,?2,?3,?4,?5,?6,?7,?8)",
-        params![
-            id,
-            thread,
-            path.to_string_lossy(),
+    let reused = storage::remember(
+        &db,
+        &id,
+        thread,
+        provider,
+        &storage::StoredFile {
+            path: path.to_string_lossy().into_owned(),
             hash,
-            filename,
-            mime,
-            data.len() as i64,
-            provider
-        ],
-    )
-    .map_err(|e| e.to_string())?;
+            filename: filename.clone(),
+            mime: mime.into(),
+        },
+        data.len(),
+    )?;
     Ok(
         json!({"fileId":id,"filename":filename,"mime":mime,"sizeBytes":data.len(),"reused":reused,"threadId":thread,"provider":provider}),
     )
@@ -106,42 +79,28 @@ pub async fn resolve(
     provider: &str,
     id: &str,
 ) -> Result<Value, String> {
-    let (path, expected, filename, mime) = {
+    let file = {
         let db = state.db.lock().map_err(|_| "database unavailable")?;
-        init(&db)?;
-        db.query_row(
-            "SELECT path,hash,filename,mime FROM tao_inline_files WHERE id=?1 AND thread_id=?2 AND provider=?3",
-            params![id, thread, provider],
-            |r| {
-                Ok((
-                    r.get::<_, String>(0)?,
-                    r.get::<_, String>(1)?,
-                    r.get::<_, String>(2)?,
-                    r.get::<_, String>(3)?,
-                ))
-            },
-        )
-        .optional()
-        .map_err(|e| e.to_string())?
-        .ok_or("file: attachment removed or belongs to a different conversation/provider")?
+        storage::lookup(&db, thread, provider, id)?
     };
-    let bytes = tokio::fs::read(&path)
+    read_part(file).await
+}
+
+async fn read_part(file: storage::StoredFile) -> Result<Value, String> {
+    let bytes = tokio::fs::read(&file.path)
         .await
         .map_err(|_| "file: attachment is unavailable; select it again")?;
-    if bytes.len() > 32 * 1024 * 1024 || digest(&bytes) != expected {
+    if bytes.len() > 32 * 1024 * 1024 || digest(&bytes) != file.hash {
         return Err("file: attachment changed; select it again before sending".into());
     }
-    tokio::task::spawn_blocking(move || part(&filename, &mime, &bytes))
+    tokio::task::spawn_blocking(move || part(&file.filename, &file.mime, &bytes))
         .await
         .map_err(|_| "file: document preparation interrupted")?
 }
 
 pub fn remove(state: &AppState, id: &str) -> Result<(), String> {
     let db = state.db.lock().map_err(|_| "database unavailable")?;
-    init(&db)?;
-    db.execute("DELETE FROM tao_inline_files WHERE id=?1", [id])
-        .map_err(|e| e.to_string())?;
-    Ok(())
+    storage::remove(&db, id)
 }
 
 fn part(filename: &str, mime: &str, bytes: &[u8]) -> Result<Value, String> {
@@ -240,7 +199,8 @@ mod tests {
 
 #[cfg(test)]
 mod migration_tests {
-    use super::*;
+    use super::storage::init;
+    use rusqlite::Connection;
     #[test]
     fn legacy_file_ownership_migrates_idempotently_and_new_providers_stay_scoped() {
         let db = Connection::open_in_memory().unwrap();

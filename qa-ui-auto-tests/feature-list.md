@@ -15934,5 +15934,6 @@ TC-FILE-OPEN-001..006 是可执行行为用例并纳入 crash-regression；当�
 - TC-TAO-HOME-044: actual OpenAI/Anthropic/local Tao IPC, configured model routing, multi-turn history, socket cancellation, HTTP failure/recovery and restored per-thread preferences (F1.11).
 
 - TC-TAO-HOME-045: real OS document selection for ordinary providers, scoped authorization, explicit reselection and reload persistence (F1.11; Linux/Windows native).
+- TC-TAO-HOME-046: actual attachment bytes in an explicit conversation branch, persistent branch authorization after reload, and intact source messages/authorization (F1.11; Linux/Windows native).
 
 The retired Tao-specific key/save selectors are retained as optional absence assertions in HOME043; credentials and saving are owned by the combined LLM panel.
