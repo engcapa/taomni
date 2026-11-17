@@ -54,6 +54,46 @@ revocation. Continuous RDP flow control and a matched real `rdp-probe` baseline
 with raw frame/latency/throughput samples remain open. Passing the library's
 small payload checks cannot close those gates.
 
+## `capture.still` service integration (2026-11-17, verification pending)
+
+The additive v1 service is `core/capture.still`, advertised as `capture.still`
+only when the verified manifest grants `capture.screen`. Its empty request
+rejects host-selected windows, displays and capture policies. A trusted core
+facade must additionally attach the invoking `WebviewWindow` to one admitted
+operation with `invoke_scoped_capture`; the generic renderer plugin API cannot
+construct that grant. A permission without that grant returns PermissionDenied.
+
+`WindowStillCapture` uses the existing core hide/permission/restore owner. It
+reserves luma and encoded buffers from the single core transfer pool before
+capture. Bounded native paths preflight geometry; the existing unlimited entry
+retains its old policy. Native OS/RGBA decoder scratch is separate from these
+transport reservations. The wire remains the existing TQF1 luma layout, bounded
+to 64 MiB and checked for overflow, truncation, trailing bytes and bad geometry.
+
+The descriptor frame is zeroizing and retains its own operation reference. Its
+offer transfers to the authenticated ServiceSession before the writer flushes;
+dropping the descriptor must not cancel a receiver that is starting. Finished
+handles are pruned, at most eight remain, and session drop aborts unclaimed
+streams. Actual network tasks keep their request/OS lease until resource cleanup.
+SDK cancellation and its original operation deadline also cover receiving and
+verifying bytes, independently of the business worker/read-pump lifetime.
+
+New pure units cover permission/origin rejection, replay, descriptor context,
+media type and cancellation. Four ignored-by-default `taomni-host-gates` tests
+exercise a real SDK child, the production pump/dispatcher, exact multi-display
+bytes, missing grant, deadline/drain and session-drop socket reclamation on
+GitHub. Their controlled pixels do not establish native capture or TCC behavior.
+TC-MFA-007 and TC-MFA-106 retain the browser boundary and actual core screen scan;
+the latter's macOS permission gap stays explicit. This service adds no UI entry,
+so there is no new YAML flow that can truthfully invoke it before MFA migration.
+The retained cases plus complete browser/native crash-regression must run for
+the new source, while the new native gate verifies its private service path.
+
+Production MFA has not switched to a host. Synchronous OS capture cannot be
+preempted: cancellation keeps its lease until capture returns and the window is
+restored, then discards late bytes. Physical capture through an installed MFA
+host, source-specific TCC, G5 throughput and the other G1–G11 gates remain open.
+
 ## Linux G4 execution experiment
 
 Source `6497fb47e95bcfa32639b0fc09c4b9a754a57fe4`, hosted upgrade run

@@ -1,9 +1,6 @@
 use crate::client::{Reply, ReplyKind, ServiceClient};
 use std::{
-    sync::{
-        Arc, Mutex,
-        atomic::{AtomicBool, Ordering},
-    },
+    sync::{Arc, Mutex},
     time::Instant,
 };
 use taomni_plugin_api::{
@@ -14,10 +11,13 @@ use taomni_plugin_api::{
     },
 };
 
+#[path = "capture_still.rs"]
+mod capture_still;
+
 pub struct Operation {
     context: Option<OperationContext>,
     deadline: Instant,
-    cancelled: AtomicBool,
+    cancelled: taomni_plugin_stream::CancellationToken,
     client: Arc<ServiceClient>,
     keys: Mutex<Vec<Arc<KeySlot>>>,
 }
@@ -37,7 +37,7 @@ impl Operation {
         Self {
             context,
             deadline,
-            cancelled: AtomicBool::new(false),
+            cancelled: taomni_plugin_stream::CancellationToken::new(),
             client,
             keys: Mutex::new(Vec::new()),
         }
@@ -48,7 +48,7 @@ impl Operation {
     }
 
     pub fn check_current(&self) -> Result<(), RpcError> {
-        if self.cancelled.load(Ordering::Acquire) {
+        if self.cancelled.is_cancelled() {
             return Err(CoreServiceError::Cancelled.into_rpc_error());
         }
         if Instant::now() >= self.deadline {
@@ -60,7 +60,7 @@ impl Operation {
     /// Cancellation is nonblocking in the read pump. The business worker clears
     /// keys and finishes before it sends its cancellation/revocation response.
     pub(crate) fn cancel(&self) {
-        self.cancelled.store(true, Ordering::Release);
+        self.cancelled.cancel();
     }
 
     pub fn fixed_key(

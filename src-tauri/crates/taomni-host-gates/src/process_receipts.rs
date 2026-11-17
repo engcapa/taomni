@@ -11,7 +11,10 @@ fn directory(base: &Path) -> PathBuf {
 
 pub fn record(base: &Path, role: &str, pid: u32) -> io::Result<()> {
     if !matches!(role, "host" | "hello" | "child" | "grandchild") || pid == 0 {
-        return Err(io::Error::new(io::ErrorKind::InvalidInput, "invalid process identity"));
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "invalid process identity",
+        ));
     }
     let directory = directory(base);
     fs::create_dir_all(&directory)?;
@@ -43,7 +46,10 @@ pub fn read(base: &Path) -> io::Result<Vec<(String, u32)>> {
             .then(|| (role.to_owned(), pid))
         });
         receipts.push(parsed.ok_or_else(|| {
-            io::Error::new(io::ErrorKind::InvalidData, format!("invalid PID receipt: {}", path.display()))
+            io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!("invalid PID receipt: {}", path.display()),
+            )
         })?);
     }
     receipts.sort();

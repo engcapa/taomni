@@ -25,6 +25,7 @@ pub(crate) struct PluginCoreServices {
     pub(super) root: ProfileRoot,
     pub(super) vault_transition: Mutex<Option<Revocation>>,
     pub(super) vault: Arc<Vault>,
+    pub(super) capture_pool: taomni_plugin_stream::TransferPool,
     pub(super) shutting_down: Arc<AtomicBool>,
     pub(super) quiescence: Arc<AtomicUsize>,
     pub(super) resume_after_quiescence: AtomicBool,
@@ -94,6 +95,8 @@ impl PluginCoreServices {
             root,
             vault_transition: Mutex::new(None),
             vault,
+            capture_pool: taomni_plugin_stream::TransferPool::new(Default::default())
+                .map_err(|e| e.message)?,
             shutting_down,
             quiescence,
             resume_after_quiescence: AtomicBool::new(false),

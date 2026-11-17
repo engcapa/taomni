@@ -21,6 +21,13 @@ pub(crate) enum StillServiceError {
 pub(crate) fn capture_luma_hiding<R: tauri::Runtime>(
     window: &tauri::WebviewWindow<R>,
 ) -> Result<Vec<LumaFrame>, StillServiceError> {
+    capture_luma_hiding_bounded(window, usize::MAX)
+}
+
+pub(crate) fn capture_luma_hiding_bounded<R: tauri::Runtime>(
+    window: &tauri::WebviewWindow<R>,
+    max_luma_bytes: usize,
+) -> Result<Vec<LumaFrame>, StillServiceError> {
     #[cfg(target_os = "macos")]
     if !taomni_capture::permissions::screen_permission_granted() {
         let _ = taomni_capture::permissions::request_screen_permission();
@@ -36,8 +43,9 @@ pub(crate) fn capture_luma_hiding<R: tauri::Runtime>(
             .map_err(|error| StillServiceError::Focus(error.to_string()))?;
         std::thread::sleep(HIDE_SETTLE);
         drop(
-            taomni_capture::still::capture_luma(
+            taomni_capture::still::capture_luma_bounded(
                 taomni_capture::still::StillPolicy::PortalScreenshot,
+                max_luma_bytes,
             )
             .map_err(StillServiceError::Capture)?,
         );
@@ -52,7 +60,8 @@ pub(crate) fn capture_luma_hiding<R: tauri::Runtime>(
             let _ = window.set_focus();
         }
     });
-    let frames = taomni_capture::still::capture_all_luma().map_err(StillServiceError::Capture);
+    let frames = taomni_capture::still::capture_all_luma_bounded(max_luma_bytes)
+        .map_err(StillServiceError::Capture);
     drop(restore);
     frames
 }

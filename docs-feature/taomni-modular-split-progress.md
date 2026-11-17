@@ -12,7 +12,12 @@
 
 ## 2026-11-17 最新结果与后续验证
 
-- 已再次拉取远程 `main`（`cb448d174e5629ca74a87e4e72533eafea1a2927`），当前分支已包含该提交，合并返回 `Already up to date`，无新冲突。
+- 继续按用户要求拉取远程 `main` 并执行合并：仍为已包含的 `cb448d174e5629ca74a87e4e72533eafea1a2927`，返回 `Already up to date`，没有冲突。未提交的采集服务实现保留并继续开发。
+- `capture.still` 的 additive v1 API、SDK 和 dispatcher 已接线：签名 permission `capture.screen` 只允许协商服务，实际采集还须可信核心 facade 为单次 operation 附加窗口源；host/renderer 无法通过 JSON 指定窗口、显示器、策略或预算。核心复用现有隐藏/恢复和系统授权边界，在 OS 采集前预留 luma/encoded 各 64 MiB 传输预算；TQF1 检查几何、截断、尾部数据与总量。同步 OS capture 尚不可抢占，取消后保留真实 lease 到采集返回、恢复窗口并丢弃迟到数据。
+- descriptor 与真实 binary task 分别持有 operation，session 在 writer flush/drop 后继续拥有未完成的 offer，完成后裁去 handle，session drop 取消未领取 stream。SDK 的 operation deadline/cancellation 同时覆盖 reverse RPC 和实际取流。新增三端 GitHub-only 4 项真实子进程/SDK/loopback 门，覆盖精确多显示器数据与连续采集、无核心 grant 拒绝、deadline/drain、descriptor flush 后 session 退出清理；像素为受控 fixture，不能当物理屏幕、TCC 或已签安装包证据。
+- 本批本地 API **25/25**、services **42/42**、SDK **21/21** 纯单元及 capture budget **1/1** 通过，核心 `cargo check --lib` 和新增 4 项 native gate 的 `--no-run` 编译通过。静态选择包含受影响模块/MFA 和完整 crash-regression：三端 browser 各 **22**，Linux 两种 native profile 与 Windows 各 **29**，macOS ARM64 native **28**，**22 shards / 3 release QA builds，gaps=[] / unreviewed=[]**。TC-MFA-106 的 TC-BACKUP-AUTH-715 前置已纳入；macOS 的 MFA TCC 仍需独立验证。尚无本批 matching GitHub 执行结论，原生 gate 只在 GitHub 执行。
+- 本批未新增用户入口，保留 TC-MFA-007 browser 错误恢复、TC-MFA-106 native 真采集、TC-MODULES-001/006/007/009 与完整 crash-regression；没有用无法触发私有服务的 YAML 冒充 RPC 覆盖。生产 MFA facade 尚未调用 `invoke_scoped_capture`，旧业务路径保持；该入口的 dead-code warning 明确保留为后续接线待办，不能将本批记为 MFA 迁出、G5/G10/TCC 或 TASK-003 全部完成。
+- 修复版 [Windows 包采样 #44005219331](https://github.com/engcapa/taomni/actions/runs/44005219331) 成功，实际 MSI 负载 **22 个文件 / 244526386 bytes**、四个 Sherpa/ONNX DLL 隔离加载通过；Authenticode 仍 `NotSigned`。随后已即时下载并核实 [macOS ARM64 包采样 #44007458035](https://github.com/engcapa/taomni/actions/runs/44007458035)：DMG **98372970 bytes**、updater **100228062 bytes**，app 负载 **24 个文件 / 254517950 bytes**，签名完整性/运行库路径通过，但本地证书无 TeamIdentifier，quarantine 后 Gatekeeper exit 3 / rejected。系统信任仍是缺口；完整 SHA/哈希、原始证据与局限见[追加基线](taomni-modular-split-baseline-20261115.md#2026-11-17-真实安装包追加采样)。Intel 仍在构建，Windows crash 复验尚待完成 shard。
 - 总量预算/request 所有权源码 `1eec7eca4ede44e9266d927674c4c7ea5f38ffe1` 的[协议与资源门 #43996562011](https://github.com/engcapa/taomni/actions/runs/43996562011) 已成功：三端各 API 21/21、stream 纯单元 14/14、services 纯单元 39/39，真实传输 10/10、资源析构顺序 1/1、request/OS lease 所有权 7/7，共 **18 个真实资源场景每端全部通过**；Linux selection 25/25。250 ms 操作绝对 deadline 在三端均约 252 ms 回收，没有延长到 5 秒传输预算。四份 artifact 执行期间收齐，`source-sha.txt` 均核对为上述完整 SHA。
 - 同源码[真实宿主 #43996567221](https://github.com/engcapa/taomni/actions/runs/43996567221) 已成功：三端每端 activation 3、cleanup 2、lifecycle 7、MFA 5、MFA snapshot 2、profile 5、services 8、snapshot 4，共 **36/36**。三份 artifact 执行期间收齐，源 SHA 已逐份核对；该门保护真实进程身份/生命周期，不能与进程内 ownership fixture 混称。
 - 同源码[UI #43996571773](https://github.com/engcapa/taomni/actions/runs/43996571773) 的 **22 个 shard 已全部在 summary 前收齐**：三端 browser 各 **22/22**，Linux Xvfb native **35/35**，macOS ARM64 native **34/34**，Windows native **33/34**，Linux Wayland native **33/35**。TC-MODULES-006 三端及 Linux 两种 profile 均通过，macOS 完整 38 步通过。Windows 的 TC-WS-057 setup 失败单独复验；Wayland 的 TC-FILE-OPEN-006/008 非左键/X11 失败沿用既有无关问题分类，保留失败、不计通过。逐 case 汇总保存在 `qa-ui-auto-report/github/43996571773/shard-case-totals.json`。
@@ -268,7 +273,7 @@ Wayland `TC-FILE-OPEN-008` 在已有 AI 路径 chip 点击处失败：失败截�
 
 已完成 retained locator、离线 v2 备份/还原、宿主自持 ProfileUseLease/PluginDataLease 和运行中 prepare/snapshot/release。`4c060a939` 契约三端快照通过；真实 UI 仍逐 shard 收证。三态 apply 已有原数据/代际/激活的独立观察，解锁顺序失败须新源码复验。已有证据只绑定实际输入，无关失败保留原始记录并不计通过。
 
-1. **收敛当前相关失败并取得新源码证据**：006 的 macOS 短窗口修订由 #43996571773 的 38 步 native 场景通过，22 片已收齐；Windows TC-WS-057 的 WebDriver setup 失败由 #44002005683 复验，原 case 与完整 crash-regression 保留。总量预算与 request 所有权已由 #43996562011 三端各 18 个真实资源场景通过，#43996567221 三端各 36 个真实宿主生命周期场景通过。Linux 实际包采样已完成，Windows 聚合字段修复待复验，#43997809941 的 macOS ARM64/Intel 包待产出后分别验证。完成 shard 即下载，不等 summary；已记录无关 Wayland 失败保留、不计通过。
+1. **收敛当前相关失败并取得新源码证据**：006 的 macOS 短窗口修订由 #43996571773 的 38 步 native 场景通过，22 片已收齐；Windows TC-WS-057 的 WebDriver setup 失败由 #44002005683 复验，原 case 与完整 crash-regression 保留。旧源码的总量预算/request 所有权三端各 18 项、真实宿主三端各 36 项通过；本批 `capture.still` 接线、SDK cancellation 和新增 4 项 native gate 须新完整 SHA 复验。Linux、Windows 修复版与 macOS ARM64 的实际包采样已完成，系统信任缺口保留；#43997809941 的 Intel 包待产出后单独验证。完成 shard 即下载，不等 summary；已记录无关 Wayland 失败保留、不计通过。
 2. **闭合 Vault、profile 与一致快照（TASK-024/025）**：完成 GUI/headless 同 profile 协同、运行/禁用/卸载保留数据三态正常重启 apply 与真实解密、多实例占用、取消和崩溃恢复；验证原生还原确认入口自动 relaunch 的接管。MFA 迁出时还需 v1 legacy alias 与独立宿主后的三态还原。
 3. **迁出真实业务（TASK-005-B、013/014、016–022）**：先完成真实 MFA 宿主原型的匹配 runner 证据、可信签名安装、相关 G 门、旧库只读迁移与动态 UI，再切换生产 facade 和连接 owner。之后依赖序推进 RDP/VNC 客户端与服务端、Servers、SocksCap、OCR/录制、本地语音的宿主、前端、状态与迁移。Mobile 按 DEC-2 留下明确 go/no-go 结论和公开例外，不能默认为交付；LanChat 任务已取消，不新增替代插件。
 4. **裁剪核心依赖闭包（TASK-006）**：随业务迁出，从核心 Cargo 默认 features、原生依赖、bundle/resources/helper 和前端 chunk 中实际移除相应实现。保存 cargo tree、资源与产物证据；把状态改名或放入 LegacyFeatureRuntime 不等于瘦身完成。
@@ -375,7 +380,7 @@ G1–G11 均待完整原生实验闭合，不能以纯单测替代。V-001–V-0
 
 GitHub 另外在 Xvfb 的真实 X11 display 上 opt-in 执行 `cargo test --manifest-path src-tauri/Cargo.toml -p taomni-capture --lib -- --ignored` 的 3 个源测试。它们现在要求 DISPLAY、MIT-SHM/XDamage fixture 真正可用，缺失即失败；普通本地 unit 不触屏且不会把无 display 的早退计为 native 成功。`43774556826` 已通过四目标 check、各 runner 架构 unit、Linux tree 与 3 项真实 X11 测试并下载 artifacts；对应 UI/native case 仍随 `43774557089` 执行，按已完成 shard 即时下载。
 
-局限继续显式保留：`capture.still` 大帧 RPC 尚未接入；macOS MFA 屏幕录制归属、Linux Wayland 三授权流程和 RDP 性能需要对应真实 runner；本地 schema/audit、较小文件或成功编译均不证明这些行为等价。
+局限继续显式保留：`capture.still` 大帧 RPC 的 API/SDK 接线进展见上方 2026-11-17 记录，生产 MFA 调用仍未切换；macOS MFA 屏幕录制归属、Linux Wayland 三授权流程和 RDP 性能需要对应真实 runner；本地 schema/audit、较小文件或成功编译均不证明这些行为等价。
 
 ## TASK-004 RDP 公共库边界与保留行为
 

@@ -23,6 +23,8 @@ rusqlite = { version = "0.40", features = ["bundled"] }
 taomni-plugin-mfa = { path = "../../plugins/mfa" }
 taomni-mfa-engine = { path = "../taomni-mfa-engine" }
 zeroize = "1"
+taomni-plugin-stream = { path = "../taomni-plugin-stream" }
+tokio = { version = "1", features = ["rt-multi-thread", "time", "net"] }
 
 [target.'cfg(windows)'.dependencies]
 windows = { version = "0.62", features = [

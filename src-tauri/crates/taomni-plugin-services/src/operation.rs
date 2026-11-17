@@ -36,6 +36,7 @@ pub(crate) struct ActiveOperation {
     pub _lease: VaultOperationLease,
     pub service_requests: Mutex<crate::service_request::RequestLedger>,
     pub grants: Mutex<crate::grants::OperationGrants>,
+    pub capture_source: Mutex<Option<Arc<dyn crate::StillCaptureService>>>,
 }
 
 impl Drop for ActiveOperation {

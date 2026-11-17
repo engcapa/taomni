@@ -7,6 +7,7 @@
 
 mod admission;
 mod binary_transfer;
+mod capture_still;
 mod core_operation;
 mod dispatcher;
 mod grants;
@@ -20,6 +21,7 @@ mod snapshot_pause;
 
 pub use admission::{OperationAdmission, OperationPermit};
 pub use binary_transfer::offer_binary_for_request;
+pub use capture_still::StillCaptureService;
 pub use core_operation::CoreOperationPermit;
 pub use dispatcher::{CoreServiceBackend, CoreServiceDispatcher, DispatcherConfig};
 pub use operation::{BorrowedOperation, OperationKind};

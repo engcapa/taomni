@@ -7,6 +7,8 @@ publish = false
 
 [dependencies]
 taomni-plugin-api = { path = "../taomni-plugin-api" }
+taomni-plugin-stream = { path = "../taomni-plugin-stream" }
+tokio = { version = "1", features = ["rt", "time", "net"] }
 taomni-profile-locks = { path = "../taomni-profile-locks" }
 taomni-sqlite-snapshot = { path = "../taomni-sqlite-snapshot" }
 rusqlite = { version = "0.40", features = ["backup", "bundled", "hooks"] }

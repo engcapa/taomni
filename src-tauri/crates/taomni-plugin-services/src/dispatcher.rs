@@ -48,6 +48,7 @@ impl Default for DispatcherConfig {
 pub(crate) enum ServiceCall {
     FixedKey(FixedKeyRequest),
     ExportGrant(ExportGrantRequest),
+    CaptureStill,
 }
 
 pub(crate) struct ServiceJob {
@@ -155,6 +156,7 @@ fn worker(receiver: Arc<Mutex<Receiver<ServiceJob>>>, backend: Arc<dyn CoreServi
                 .map_err(CoreServiceError::into_rpc_error)?;
             match call {
                 ServiceCall::FixedKey(request) => backend.fixed_key(id.clone(), request, permit),
+                ServiceCall::CaptureStill => crate::capture_still::capture(permit),
                 ServiceCall::ExportGrant(request) => {
                     permit
                         .consume_export_grant(&request.grant)

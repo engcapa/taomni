@@ -1,6 +1,6 @@
 # Taomni 模块化拆分 M0 基线（2026-11-15）
 
-本报告记录 TASK-001 的可复现源码、前端构建和 Rust 依赖基线。2026-11-15 起点没有真实安装 artifact，保留当时的缺口；2026-11-17 已追加 GitHub 真实 Linux/Windows 发布包采样。后续迁移批次应在相同命令和 runner 上追加增量。
+本报告记录 TASK-001 的可复现源码、前端构建和 Rust 依赖基线。2026-11-15 起点没有真实安装 artifact，保留当时的缺口；2026-11-17 已追加 GitHub 真实 Linux/Windows/macOS ARM64 发布包采样。后续迁移批次应在相同命令和 runner 上追加增量。
 
 ## 采样身份
 
@@ -36,7 +36,7 @@ find src-tauri/target/release/bundle -type f \( -name '*.AppImage' -o -name '*.d
 
 ## 2026-11-17 真实安装包追加采样
 
-生产来源为 [Release Bundle #43997809941](https://github.com/engcapa/taomni/actions/runs/43997809941)，完整产品源码 `1eec7eca4ede44e9266d927674c4c7ea5f38ffe1`，测试版本 `0.6.0`。空 tag 的 artifact-only 构建未创建 tag 或 Release；版本只用于构建，不改变仓库 `package.json`。本表保留各目标产出后的观察，不等待其它 builder；macOS ARM64/Intel 尚待产出，不计完成。
+生产来源为 [Release Bundle #43997809941](https://github.com/engcapa/taomni/actions/runs/43997809941)，完整产品源码 `1eec7eca4ede44e9266d927674c4c7ea5f38ffe1`，测试版本 `0.6.0`。空 tag 的 artifact-only 构建未创建 tag 或 Release；版本只用于构建，不改变仓库 `package.json`。本表保留各目标产出后的观察，不等待其它 builder；macOS Intel 尚待产出，不计完成。
 
 | 平台 / 实际文件 | bytes | SHA-256 |
 | --- | ---: | --- |
@@ -45,10 +45,16 @@ find src-tauri/target/release/bundle -type f \( -name '*.AppImage' -o -name '*.d
 | Linux `Taomni_0.6.0_amd64.AppImage` | 177220088 | `2753b495f687431b8e8d40f88fb12dcb080ddb2b8979b77e2322154f7e5bb2c3` |
 | Windows `Taomni_0.6.0_x64-setup.exe` | 71962590 | `b4f157d09153581497c5d1ae716f647b613646e5fc8a24585620521f60704f53` |
 | Windows `Taomni_0.6.0_x64_en-US.msi` | 95920128 | `e40bb65abfc9a1081d91d9700b68801267a58361088b0b4c8a12d924201b453c` |
+| macOS ARM64 `Taomni_0.6.0_aarch64.dmg` | 98372970 | `5f7178abb8e3e406a3078c559a17f29f8bda08dc9d46fb1582066c4670df079e` |
+| macOS ARM64 `Taomni.app.tar.gz` | 100228062 | `7141a9b0b96306ea800eb8f614af7bf3af7eca9d90e8815cae77455a5a7a56f9` |
 
 Linux [采样 #44003740535](https://github.com/engcapa/taomni/actions/runs/44003740535) 使用工具源码 `a6ded7c847aa47d9055213f0e821e385c497ac1b`，消费不可变 artifact `14293785052`。原始结果保存在 `qa-ui-auto-report/github/44003740535/live-samples/modular-bundle-linux-x86_64-43997809941/`：`bundle-baseline.json` 记录各包及 `.sig` 完整大小/哈希，`deb-fields.json`、`deb-executable-header.log`、`rpm-info.log` 和 `linux-payload.json` 保留真实解析/解包结果。deb 内版本 0.6.0、amd64、ELF64 x86-64，19 个 regular files 共 `300466152` bytes，主 executable `248145288` bytes、SHA-256 `943dc505bfe0591227129c73e59530f45b27dfe251c09338fbefe43f3d0c8042`。
 
 Windows [首轮采样 #44004139461](https://github.com/engcapa/taomni/actions/runs/44004139461) 使用同一工具源码，消费不可变 artifact `14293312470`。原始结果保存在对应 `live-samples/modular-bundle-windows-x86_64-43997809941/`。真实 MSI 行政解包确认版本 0.6.0、x86_64 PE，四个 Sherpa/ONNX DLL 从自身目录/System32 隔离加载成功；但 PowerShell Dictionary 聚合使 `regularFileBytes=null`，该 run **不建立完整 Windows 负载基线**，须修复后在 Windows runner 复跑。主 executable SHA-256 为 `d454c4af1b6ac1538aa68d1f47d234facf7863b2d750efa747a247167818e894`。MSI 与 NSIS 的 Authenticode 均为 `NotSigned`，系统信任仍是缺口。
+
+修复版 [Windows 采样 #44005219331](https://github.com/engcapa/taomni/actions/runs/44005219331) 已成功，工具源码 `c387ec1b5ce31ade501c211d70f781c10cc8b535`，仍消费上述同一 artifact / 产品源码。`windows-payload.json` 确认 **22 个 regular files、244526386 bytes**，最大文件为 `taomni.exe`（`172381696` bytes）；四 DLL 隔离加载和所有包/主 executable 哈希均与首轮一致。新的完整性 guard 在 runner 上通过。修复后的原始文件保存在 `qa-ui-auto-report/github/44005219331/live-samples/modular-bundle-windows-x86_64-43997809941/`，首轮 null 字段证据仍保留。Authenticode 仍为 `NotSigned`。
+
+[macOS ARM64 采样 #44007458035](https://github.com/engcapa/taomni/actions/runs/44007458035) 已成功，工具源码同为 `c387ec1b5ce31ade501c211d70f781c10cc8b535`，消费不可变 artifact `14294272883`。实际 DMG app 为 `com.taomni.app` / `0.6.0` / `arm64`，**24 个 regular files、254517950 bytes**；主 executable 为 `197316832` bytes，SHA-256 `d4ce1bb4bcacced895ec04c9743ffd03e60ceba81fa513a9f46c97cb9182c921`。DMG/updater app 的 executable 哈希一致，二者 `codesign --verify --deep --strict` 和 DMG runtime paths 通过。实际证书 `Taomni Local Code Signing`、TeamIdentifier 未设置；加隔离标记后的 `spctl --assess` exit 3、`rejected`，**系统信任不成立**。原始签名、quarantine、Gatekeeper 和负载结果保存在 `qa-ui-auto-report/github/44007458035/live-samples/modular-bundle-darwin-aarch64-43997809941/`，不能将采样 job 成功记为 G1 通过。
 
 包体积是文件本身的 bytes，不是 Actions zip 大小。产品仍含业务实现，不能据此宣称核心瘦身；本批未启动应用或进行真实已安装升级，不建立启动/内存、legacy exporter、系统分发信任或 G1–G11 通过证据。
 

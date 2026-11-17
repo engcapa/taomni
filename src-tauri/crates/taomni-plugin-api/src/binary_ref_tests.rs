@@ -73,7 +73,12 @@ fn binary_stream_requires_a_real_hex_digest_and_token() {
     let mut value = descriptor();
     value.sha256 = "0123456789aBcDeF".repeat(4);
     assert!(value.validate().is_ok());
-    for digest in ["g".repeat(64), "0".repeat(63), "0".repeat(65), "é".repeat(32)] {
+    for digest in [
+        "g".repeat(64),
+        "0".repeat(63),
+        "0".repeat(65),
+        "é".repeat(32),
+    ] {
         value.sha256 = digest;
         assert_eq!(
             value.validate().unwrap_err().code,

@@ -118,6 +118,49 @@ impl PluginRegistry {
         kind: OperationKind,
         deadline: Instant,
     ) -> Result<Value, PluginError> {
+        self.invoke_scoped_inner(slug, command, payload, request_id, kind, deadline, None)
+    }
+
+    /// The invoking window is supplied by a typed core facade. It never comes
+    /// from the renderer's plugin_invoke payload or a reverse service request.
+    pub(crate) fn invoke_scoped_capture(
+        &self,
+        window: tauri::WebviewWindow,
+        slug: &str,
+        command: &str,
+        payload: Value,
+        request_id: &str,
+        deadline: Instant,
+    ) -> Result<Value, PluginError> {
+        let services = self
+            .services
+            .as_ref()
+            .ok_or_else(|| PluginError::HostUnavailable(slug.into()))?;
+        let source = std::sync::Arc::new(crate::capture::plugin_service::WindowStillCapture {
+            window,
+            pool: services.capture_pool.clone(),
+        });
+        self.invoke_scoped_inner(
+            slug,
+            command,
+            payload,
+            request_id,
+            OperationKind::ReadData,
+            deadline,
+            Some(source),
+        )
+    }
+
+    fn invoke_scoped_inner(
+        &self,
+        slug: &str,
+        command: &str,
+        payload: Value,
+        request_id: &str,
+        kind: OperationKind,
+        deadline: Instant,
+        capture: Option<std::sync::Arc<dyn taomni_plugin_services::StillCaptureService>>,
+    ) -> Result<Value, PluginError> {
         let record = self.call_record(slug, command)?;
         let pending = self.begin_call(slug, request_id)?;
         if pending.cancelled() {
@@ -134,7 +177,12 @@ impl PluginRegistry {
             .services
             .as_ref()
             .ok_or_else(|| PluginError::HostUnavailable(slug.into()))?;
-        let permit = services.admit(&identity, kind, deadline, &|| pending.cancelled())?;
+        let mut permit = services.admit(&identity, kind, deadline, &|| pending.cancelled())?;
+        if let Some(source) = capture {
+            permit
+                .grant_still_capture(source)
+                .map_err(services::service_error)?;
+        }
         let wire_id = format!(
             "core/{}/{}",
             permit.context().host_instance,

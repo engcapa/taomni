@@ -5,6 +5,7 @@ pub(crate) mod displays;
 mod frames;
 pub(crate) mod log;
 pub(crate) mod permissions;
+pub(crate) mod plugin_service;
 pub(crate) mod service;
 pub(crate) mod snapshot;
 pub(crate) mod source;

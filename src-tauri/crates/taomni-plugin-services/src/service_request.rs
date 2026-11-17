@@ -28,6 +28,12 @@ impl ReverseRequestPermit {
     pub fn check_current(&self) -> Result<(), CoreServiceError> {
         self.operation.check_current()
     }
+
+    /// The descriptor writer and the actual network task independently retain
+    /// the same operation. Neither can release the other's OS lease early.
+    pub fn retain_operation(&self) -> BorrowedOperation {
+        BorrowedOperation(self.operation.0.clone())
+    }
 }
 
 impl Drop for ReverseRequestPermit {

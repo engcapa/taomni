@@ -10936,6 +10936,7 @@ dependencies = [
  "taomni-mfa-engine",
  "taomni-plugin-api",
  "taomni-plugin-services",
+ "taomni-plugin-stream",
  "taomni-profile-locks",
  "taomni-rdp-common",
  "taomni-sqlite-snapshot",
@@ -11065,9 +11066,11 @@ dependencies = [
  "taomni-plugin-mfa",
  "taomni-plugin-sdk",
  "taomni-plugin-services",
+ "taomni-plugin-stream",
  "taomni-profile-locks",
  "tempfile",
  "thiserror 2.0.20",
+ "tokio",
  "windows 0.62.2",
  "zeroize",
 ]
@@ -11125,9 +11128,11 @@ dependencies = [
  "serde_json",
  "sha2 0.10.9",
  "taomni-plugin-api",
+ "taomni-plugin-stream",
  "taomni-profile-locks",
  "taomni-sqlite-snapshot",
  "tempfile",
+ "tokio",
  "zeroize",
 ]
 

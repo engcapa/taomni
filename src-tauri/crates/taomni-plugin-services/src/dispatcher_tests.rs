@@ -1,4 +1,6 @@
 //! In-memory worker/queue tests; no subprocesses or network fixtures.
+#[path = "capture_tests.rs"]
+mod capture_tests;
 use crate::*;
 use std::{
     collections::BTreeSet,

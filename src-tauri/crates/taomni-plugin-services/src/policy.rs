@@ -5,7 +5,8 @@ use std::sync::{
 };
 
 use taomni_plugin_api::services::{
-    CoreServiceError, FIXED_KEY_SERVICE, FixedKeyId, HostInstanceId, MFA_DATA_KEY_ID,
+    CAPTURE_SCREEN_PERMISSION, CAPTURE_STILL_SERVICE, CoreServiceError, FIXED_KEY_SERVICE,
+    FixedKeyId, HostInstanceId, MFA_DATA_KEY_ID,
 };
 use taomni_profile_locks::PluginSlug;
 
@@ -44,6 +45,12 @@ impl VerifiedHostGrants {
         if self.permissions.contains(FIXED_KEY_SERVICE) && !self.fixed_keys.is_empty() {
             capabilities.0.insert(
                 FIXED_KEY_SERVICE.into(),
+                taomni_plugin_api::services::SERVICE_VERSION,
+            );
+        }
+        if self.permissions.contains(CAPTURE_SCREEN_PERMISSION) {
+            capabilities.0.insert(
+                CAPTURE_STILL_SERVICE.into(),
                 taomni_plugin_api::services::SERVICE_VERSION,
             );
         }
@@ -100,6 +107,14 @@ impl AuthorizedHost {
     }
     pub fn slug(&self) -> &PluginSlug {
         &self.grants.slug
+    }
+
+    pub fn authorize_screen_capture(&self) -> Result<(), CoreServiceError> {
+        if self.grants.permissions.contains(CAPTURE_SCREEN_PERMISSION) {
+            Ok(())
+        } else {
+            Err(CoreServiceError::PermissionDenied)
+        }
     }
 
     pub fn fixed_key_owner(&self, key: &FixedKeyId) -> Result<FixedKeyOwner, CoreServiceError> {

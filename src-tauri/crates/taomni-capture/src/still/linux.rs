@@ -1,12 +1,12 @@
 //! X11 RandR and one-shot portal policies. Neither starts a ScreenCast stream.
 
-use super::{LumaFrame, StillError};
+use super::{LumaBudget, LumaFrame, StillError};
 use crate::pixels::{rgba_to_luma, zpixmap_to_luma};
 use x11rb::connection::Connection as _;
 use x11rb::protocol::randr::ConnectionExt as _;
 use x11rb::protocol::xproto::{ConnectionExt as _, ImageFormat, ImageOrder};
 
-pub(super) fn capture_x11() -> Result<Vec<LumaFrame>, StillError> {
+pub(super) fn capture_x11(budget: &mut LumaBudget) -> Result<Vec<LumaFrame>, StillError> {
     let (conn, screen_num) =
         x11rb::connect(None).map_err(|e| StillError::NoDisplay(e.to_string()))?;
     let setup = conn.setup();
@@ -45,6 +45,7 @@ pub(super) fn capture_x11() -> Result<Vec<LumaFrame>, StillError> {
     let mut frames = Vec::with_capacity(rects.len());
     let mut failures = Vec::new();
     for (x, y, w, h) in rects {
+        budget.check(u32::from(w), u32::from(h))?;
         let reply = conn
             .get_image(ImageFormat::Z_PIXMAP, screen.root, x, y, w, h, !0)
             .map_err(|e| e.to_string())
@@ -53,11 +54,14 @@ pub(super) fn capture_x11() -> Result<Vec<LumaFrame>, StillError> {
             zpixmap_to_luma(&image.data, u32::from(w), u32::from(h), lsb_first)
                 .map_err(|e| e.to_string())
         }) {
-            Ok(luma) => frames.push(LumaFrame {
-                width: u32::from(w),
-                height: u32::from(h),
-                luma,
-            }),
+            Ok(luma) => {
+                budget.account(u32::from(w), u32::from(h))?;
+                frames.push(LumaFrame {
+                    width: u32::from(w),
+                    height: u32::from(h),
+                    luma,
+                });
+            }
             Err(error) => failures.push(error),
         }
     }
@@ -67,7 +71,7 @@ pub(super) fn capture_x11() -> Result<Vec<LumaFrame>, StillError> {
     Ok(frames)
 }
 
-pub(super) fn capture_portal() -> Result<Vec<LumaFrame>, StillError> {
+pub(super) fn capture_portal(budget: &mut LumaBudget) -> Result<Vec<LumaFrame>, StillError> {
     let runtime = tokio::runtime::Builder::new_current_thread()
         .enable_all()
         .build()
@@ -87,8 +91,14 @@ pub(super) fn capture_portal() -> Result<Vec<LumaFrame>, StillError> {
     let path = uri
         .to_file_path()
         .map_err(|_| StillError::Failed(format!("portal returned {uri}")))?;
-    let decoded =
-        image::open(&path).map_err(|e| StillError::Failed(format!("portal screenshot: {e}")));
+    let decoded = (|| {
+        if budget.is_bounded() {
+            let (width, height) = image::image_dimensions(&path)
+                .map_err(|e| StillError::Failed(format!("portal screenshot: {e}")))?;
+            budget.check(width, height)?;
+        }
+        image::open(&path).map_err(|e| StillError::Failed(format!("portal screenshot: {e}")))
+    })();
     // Portals write the capture to a temporary file; never touch user folders.
     let temporary = [
         std::env::temp_dir(),
@@ -104,6 +114,7 @@ pub(super) fn capture_portal() -> Result<Vec<LumaFrame>, StillError> {
     }
     let rgba = decoded?.to_rgba8();
     let (width, height) = rgba.dimensions();
+    budget.account(width, height)?;
     Ok(vec![LumaFrame {
         width,
         height,

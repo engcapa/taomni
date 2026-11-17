@@ -1,4 +1,6 @@
 //! Unit-only streams and typed replies; real stdio processes run on GitHub.
+#[path = "capture_tests.rs"]
+mod capture_tests;
 use crate::{
     client::ServiceClient,
     operation::Operation,

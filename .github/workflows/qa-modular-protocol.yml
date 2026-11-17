@@ -79,6 +79,14 @@ jobs:
         run: |
           set -o pipefail
           cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-services --lib --locked 2>&1 | tee modular-protocol-evidence/services-unit.log
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-sdk --lib --locked 2>&1 | tee modular-protocol-evidence/sdk-unit.log
+      - name: Verify real SDK still capture and descriptor ownership
+        run: |
+          set -o pipefail
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-host-gates --test capture_still --locked -- --ignored --list > modular-protocol-evidence/capture-selection.txt
+          python -c 'from pathlib import Path; lines=Path("modular-protocol-evidence/capture-selection.txt").read_text().splitlines(); assert sum(line.endswith(": test") for line in lines) == 4, "Expected all four core/SDK capture scenarios"'
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-host-gates --test capture_still --locked -- --ignored --test-threads=1 --nocapture 2>&1 | tee modular-protocol-evidence/capture-native.log
+          python -c 'from pathlib import Path; assert "4 passed; 0 failed; 0 ignored" in Path("modular-protocol-evidence/capture-native.log").read_text(), "Missing complete still capture ownership evidence"'
       - name: Verify all real loopback and child-process scenarios
         run: |
           set -o pipefail

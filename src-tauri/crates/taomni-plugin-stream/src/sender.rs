@@ -29,6 +29,12 @@ impl BinaryOffer {
         &self.descriptor
     }
 
+    /// Lets a session discard completed handles without retaining every past
+    /// transfer. Result/integrity errors still reach the actual receiver.
+    pub fn is_finished(&self) -> bool {
+        self.task.is_finished()
+    }
+
     /// Cancellation becomes observable after `finish` or `cancel_and_wait`.
     pub fn cancel(&self) {
         self.cancellation.cancel();

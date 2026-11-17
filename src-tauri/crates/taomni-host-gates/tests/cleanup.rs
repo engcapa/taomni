@@ -24,7 +24,9 @@ impl TreeDirectory {
             Some(root) => builder.tempdir_in(root),
             None => builder.tempdir(),
         };
-        Self(Some(directory.expect("owned process-tree evidence directory")))
+        Self(Some(
+            directory.expect("owned process-tree evidence directory"),
+        ))
     }
 
     fn path(&self) -> &std::path::Path {
@@ -44,7 +46,10 @@ impl Drop for TreeDirectory {
 fn wait_for_tree(core: &mut DisposableCore, ready: &std::path::Path, pids: &std::path::Path) {
     let deadline = Instant::now() + Duration::from_secs(10);
     loop {
-        assert!(core.0.try_wait().unwrap().is_none(), "core exited before tree readiness");
+        assert!(
+            core.0.try_wait().unwrap().is_none(),
+            "core exited before tree readiness"
+        );
         let receipt = support::receipt(pids);
         if ready.exists()
             && ["host", "hello", "child", "grandchild"]
@@ -56,7 +61,8 @@ fn wait_for_tree(core: &mut DisposableCore, ready: &std::path::Path, pids: &std:
         assert!(
             Instant::now() < deadline,
             "timed out before full tree readiness: core={}, ready={}, receipts={receipt:?}",
-            core.0.id(), ready.exists()
+            core.0.id(),
+            ready.exists()
         );
         std::thread::sleep(Duration::from_millis(20));
     }

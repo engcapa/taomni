@@ -4,16 +4,20 @@
 //! Authentication, authorization, admission and lease ownership belong to the
 //! core dispatcher. Deserializing a context never authenticates a host.
 
+mod capture;
 mod context;
 mod error;
 mod fixed_key;
+mod luma_frames;
 mod secret;
 mod snapshot;
 mod value;
 
+pub use capture::*;
 pub use context::*;
 pub use error::*;
 pub use fixed_key::*;
+pub use luma_frames::*;
 pub use secret::*;
 pub use snapshot::*;
 pub use value::*;

@@ -9,7 +9,7 @@ use std::{
 };
 use taomni_plugin_api::{
     ErrorCode, RequestId, RpcError, RpcMessage, RpcRequest,
-    services::{CoreServiceError, FixedKeyResult, OperationContext},
+    services::{CaptureStillResult, CoreServiceError, FixedKeyResult, OperationContext},
 };
 
 use crate::{Operation, sensitive::Envelope};
@@ -18,11 +18,13 @@ use zeroize::{Zeroize, Zeroizing};
 pub(crate) enum Reply {
     Key(FixedKeyResult),
     Export(bool),
+    Capture(CaptureStillResult),
 }
 #[derive(Clone, Copy)]
 pub(crate) enum ReplyKind {
     Key,
     Export,
+    Capture,
 }
 
 struct Pending {
@@ -166,6 +168,12 @@ impl ServiceClient {
                     }),
                 ReplyKind::Export => serde_json::from_str::<bool>(raw.get()).map(Reply::Export)
                     .map_err(|_| RpcError::from_code(ErrorCode::InvalidRequest)),
+                ReplyKind::Capture => serde_json::from_str::<CaptureStillResult>(raw.get())
+                    .map_err(|_| RpcError::from_code(ErrorCode::InvalidRequest))
+                    .and_then(|result| {
+                        result.validate(&pending.context)?;
+                        Ok(Reply::Capture(result))
+                    }),
             }
         } else if let (None, Some(raw)) = (envelope.result, envelope.error) {
             Err(serde_json::from_str(raw.get())

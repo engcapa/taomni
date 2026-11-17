@@ -13,8 +13,8 @@ use std::{
 use taomni_plugin_api::{
     ErrorCode, RequestId, RpcError, RpcRequest,
     services::{
-        CoreServiceError, EXPORT_GRANT_METHOD, ExportGrantRequest, FIXED_KEY_METHOD,
-        FixedKeyRequest, OperationContext,
+        CAPTURE_STILL_METHOD, CaptureStillRequest, CoreServiceError, EXPORT_GRANT_METHOD,
+        ExportGrantRequest, FIXED_KEY_METHOD, FixedKeyRequest, OperationContext,
     },
 };
 
@@ -37,6 +37,7 @@ pub struct ServiceSession {
     completion: SyncSender<ServiceCompletion>,
     receiver: Receiver<ServiceCompletion>,
     failed: Arc<AtomicBool>,
+    transfers: Vec<taomni_plugin_stream::BinaryOffer>,
 }
 
 impl std::fmt::Debug for ServiceSession {
@@ -59,6 +60,7 @@ impl ServiceSession {
             completion,
             receiver,
             failed: Arc::new(AtomicBool::new(false)),
+            transfers: Vec::new(),
         }
     }
 
@@ -99,6 +101,14 @@ impl ServiceSession {
             .params
             .ok_or_else(|| RpcError::from_code(ErrorCode::InvalidParams))?;
         let call = match request.method.as_str() {
+            CAPTURE_STILL_METHOD => {
+                self.host
+                    .authorize_screen_capture()
+                    .map_err(CoreServiceError::into_rpc_error)?;
+                serde_json::from_value::<CaptureStillRequest>(params)
+                    .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
+                ServiceCall::CaptureStill
+            }
             FIXED_KEY_METHOD => {
                 let key: FixedKeyRequest = serde_json::from_value(params)
                     .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
@@ -140,6 +150,7 @@ impl ServiceSession {
     /// Only this session's pump can drain its completion queue. Validation is
     /// repeated after worker completion and by the writer immediately preflush.
     pub fn try_completion(&mut self) -> Result<Option<ServiceCompletion>, CoreServiceError> {
+        self.transfers.retain(|offer| !offer.is_finished());
         if self.failed.load(Ordering::Acquire) {
             return Err(CoreServiceError::CoreServiceBusy);
         }
@@ -157,6 +168,18 @@ impl ServiceSession {
                     .and_then(|operation| operation.check_current())
                 {
                     reply.result = Err(error.into_rpc_error());
+                }
+                if let Ok(frame) = &mut reply.result
+                    && let Some(offer) = frame.take_binary_offer()
+                {
+                    // The payload task retains its request permit. A flushed
+                    // descriptor must not abort it by dropping its handle.
+                    if self.transfers.len() >= 8 {
+                        drop(offer);
+                        reply.result = Err(CoreServiceError::CoreServiceBusy.into_rpc_error());
+                    } else {
+                        self.transfers.push(offer);
+                    }
                 }
                 Ok(Some(reply))
             }

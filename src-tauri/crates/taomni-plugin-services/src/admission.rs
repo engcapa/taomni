@@ -140,6 +140,7 @@ impl OperationAdmission {
             _lease: lease,
             service_requests: Mutex::new(Default::default()),
             grants: Mutex::new(Default::default()),
+            capture_source: Mutex::new(None),
         });
         state.in_flight += 1;
         state.seen_operations.insert(operation.clone());
