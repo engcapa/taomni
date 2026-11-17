@@ -20,6 +20,12 @@ Live 表格此前直接使用 `textContent` 展示单元格，导致 `**` 等源
 
 模块打包的 Darwin 构建仍固定 `macos-latest`，排队超过十分钟后阻挡了所有依赖签名模块的 native shard。补充 `qa-modular-packages.yml` 的 hosted macOS runner 选择和平台 workflow 转发；source job 先校验固定允许清单，再调度两个明确 Rust target，保持包平台与签名审查。纯工具/工作流单元 **29/29** 和 actionlint 已通过；实际恢复批次另行补录。此修改不改变产品源码和用例预期。
 
+2026-11-18 再次 fetch/merge main，远程仍为 `677ec4d77`，无冲突。进一步确认旧四目标模块打包会让 Linux/Windows 聚焦验证等待未选中的 macOS builder；platforms 现传递计划的 native build matrix，仅为需要 `signed-module` 的实际平台/架构构建和签名，多个 Linux profile 去重。独立打包及未传该参数的升级调用仍保留四目标，签名 job 的可信工具 checkout、凭证隔离和清单审查保持。相关工具/工作流单元 **37/37** 已通过，新的 GitHub 执行结果待补录。
+
+Intel browser 首轮为 **34/35**，唯一 `TC-EXPLORER-002` 在恢复宽窗口后紧接 Alt+P 时未隐藏预览。trace 显示两者相隔约 50 ms；预览实现与 main 相同，尚未确认事件根因或建立 main 复现。本轮仅在原快捷键前断言窄窗口 overlay 已退出，作为宽布局操作的前置条件，保留后续隐藏/重开、创建、拖动和删除全部断言，reviewed 步号同步为 152 步。该修订须完整 browser 重跑，旧失败保留、不记通过。
+
+首轮 Linux GitHub native Rust contracts 已通过 **197/197**，包含实际非空的 `deepseek_app`、迁移及 Workspace 过滤；原始日志位于 `qa-ui-auto-report/github/44119120276/live-contracts/contracts.log`。这不代替 native UI 运行。
+
 再次合并远程 main `677ec4d77` 后，保留双方 Markdown 修复和实际编辑器回归测试；本页 Live 表格场景改为 `TC-FILE-OPEN-029`，main 的 native 导出操作场景继续使用 `TC-FILE-OPEN-023`。下列旧 run 与 171 项结论绑定合并前的产品源码指纹；合并后的匹配 browser/native 与完整 crash-regression 须另行记录。旧 SHA 的单作业 #44110689605 已在应用用例开始前结束，其未执行项不计通过。
 
 合并后相关前端单元 40 文件 **274/274**、QA 工具 **68/68**、TypeScript、catalog、check:refactor 及 852 个唯一用例的完整 audit gate 已通过。新增 Workspace 场景 WS-096 补充切回当前目录的真实点击、唯一 radio 选中和名称输入框隐藏断言，未修改 coverage baseline。上述属于本地单元与静态验证，新的真实多端结果另行记录。

@@ -1,5 +1,7 @@
 # 模块化实施与验收台账
 
+2026-11-18 继续：再次 fetch/merge main，`677ec4d77` 已包含，无冲突。聚焦 native 验证改为从实际 build selection 选择签名模块目标，避免 Linux/Windows 等待未选中的 macOS 包；独立打包/升级调用仍默认四目标，签名信任边界不变。相关工具单元 **37/37**；已有 GitHub Linux 核心 Rust contracts **197/197**（包括非空 `deepseek_app` 和 Workspace 过滤）。Intel browser 原轮 **34/35**，Explorer002 的宽布局快捷键前补 overlay 退出断言，全部原行为保留，等待完整重跑；尚未把 native 排队/构建或修订后的用例记为通过。详见[文件功能验收](file-explorer/editable-file-creation-and-live-tables.md)。
+
 2026-11-18：合并后的 `750f6f417` 已在 GitHub 收齐 Linux/Windows browser 各 **35/35**，各含完整 20 项 crash-regression；8 片均在整轮结束前下载并核验原始 artifacts、receipt、case digest 和 CI outcome。Native 构建和两轮 macOS 仍在执行。发现模块打包 Darwin builder 固定 `macos-latest` 长时间排队，补充固定 hosted runner 清单与 platforms 输入转发，使 Intel/macOS 26 选择覆盖签名模块生产前的构建；四目标及签名边界保持。29 项相关工具单元和 actionlint 已通过，实际新 runner 执行另录。详见[文件功能验收](file-explorer/editable-file-creation-and-live-tables.md)。
 
 2026-11-17 再次同步 main：远程从 `1a16cbbb67fac804afc39211b0f6ff6878847451` 更新到 `677ec4d77`（PR #826–828），合并提交为 `9f99caa80`；再次 fetch/merge 确认没有后续 main 提交。五处冲突已解决，保留双方 Mermaid、Word CJK、导出、Workspace 与结果搜索修复，以及 fixture/策略/依赖和 LF 规则。表格由已有 `TableCell` owner 承接格式、链接、图片、IME、输入及历史，保留 main 的实际编辑器回归测试，移除无调用方的重复 helper。main 已使用 `TC-FILE-OPEN-023`，本分支 Live 表格场景改为 `TC-FILE-OPEN-029`，历史证据保持原编号。相关前端 **274/274**、QA 工具 **68/68**、TypeScript、catalog、check:refactor 和 **852 个唯一用例的完整 audit gate** 均通过。WS-096 补充切回当前工作区的真实交互、唯一选中与名称输入框隐藏断言，修复合并引入的 shallow 覆盖增量；未修改 baseline。合并改变产品源码，下面 171 项及 Mac26 部分结果属于合并前证据；旧 SHA 的单作业 #44110689605 在应用用例开始前结束，后续需匹配合并提交重新执行三端 browser/native 和完整 crash-regression。
