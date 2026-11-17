@@ -10,9 +10,11 @@ Live 表格此前直接使用 `textContent` 展示单元格，导致 `**` 等源
 |---|---|
 | `ExplorerShell.newFile.test.tsx` 与原 Explorer 单元 | 完整类型清单、两入口、取消、选择/重命名/打开、扩展名编号、输入校验、冲突和失败重试；浏览器 DOM/mock，不代表 native 文件效果 |
 | `TableWidget.test.ts`、原 markdownWidgets/MarkdownEditor 等单元 | 改前四项失败已复现；格式/安全/公式、焦点不写源码、单元格编辑与历史、IME/并发和迟到图片清理 |
-| `TC-EXPLORER-006` browser/native | 两入口、类型菜单、取消/错误/冲突/重试、九类空文件（含隐藏配置）、重复 Markdown 命名、独立 VFS/host 字节 |
+| `TC-EXPLORER-006` browser/native | 两入口、类型菜单、取消/错误/冲突/重试、代表类型空文件（含隐藏配置）、重复 Markdown 命名、独立 VFS/host 字节 |
 | `TC-EXPLORER-007` browser/native | 新建 Markdown/HTML/SVG/JSON/TS 的实际路由、编辑、保存、关闭重开/代码恢复，独立完整字节；包含 crash-regression |
 | `TC-FILE-OPEN-023` browser/native | Live/Split 格式一致、HTML 清理/本地图片/公式、只读、编辑/Tab/Undo/Redo、未改单元格与完整 GFM 保存重开；包含 crash-regression |
 | 保留用例 | Explorer001–005；FILE-OPEN001/003/004/007/013，覆盖旧文本/文件夹/操作、SVG与Markdown原合同和 native 导出；workflow 合并完整 crash-regression |
 
 真实 UI 和 native 磁盘/进程验证全部在 GitHub `qa-ui-auto-platforms` 执行，三端 browser/native、匹配 release QA binary，完成一个 shard 即下载检查。当前新增用例执行结果未出前不得记为通过。WebView 按键与 composition 单元不等于物理 IME、AppKit 菜单或 OS 快捷键证据；未改这些绑定。截图仅是保留证据，需要另外查看画面。
+
+首次 [#44053218016](https://github.com/engcapa/taomni/actions/runs/44053218016) 在规划阶段的 `test_crash_regressions` 失败：新增两项 crash-regression 未同步固定 EXPECTED 清单和 smoke 注册，没有执行应用用例。补齐两项注册与专项说明，保留全部原集合和断言，修订后重新执行三端 browser/native。
