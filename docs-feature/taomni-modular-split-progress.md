@@ -2,7 +2,7 @@
 
 2026-11-17 最新：修正 035 数据探针后的 [macOS 15 Intel #44095029967](https://github.com/engcapa/taomni/actions/runs/44095029967) 已成功结束，34/34（含完整 crash-regression），4/4 片在 summary 前收齐并核验全部原始 artifact/receipt/身份/计数。033/034/035 三态的真实确认自动 relaunch、旧进程 exit=0、新 PID 接管、正确 lease 和原密码/HOTP 755224 全部通过，035 额外验证准确 retained locator 和完整 SQLite 字节。连同同产品源码的三端 browser、Linux/Windows native 共 171 项通过。macOS 15 ARM64 新轮因 hosted runner 容量取消了尚未开始的片，不记通过；按用户允许更高版本的要求增加官方 `macos-26` ARM64 临时恢复入口，仍保留原 34 项和完整 crash 集合，待真实结果。详见下方文件功能与确认还原验证文档；模块化整体业务迁出和真实安装升级待办保持。
 
-2026-11-17 文件功能与自动还原补充：File Explorer 新建可编辑类型和 Markdown Live 表格格式/逐字输入/历史修复已提交。三端 browser 各 25/25、Linux Xvfb/Windows native 各 31/31，共 137 项原始证据已核验；Intel native 4/4 片即时收齐，33/34，其中新建、表格及完整 crash-regression 全部通过。033/034 已完成真实确认自动 relaunch 与后续数据解密；035 已接管真实新进程，但随后误用另一场景的固定文本探针，原失败保留。现改为准确 SQLite/locator/完整字节 oracle 并补充先红后绿单元，相关工具 71/71、QA audit、actionlint/check:refactor 通过，仍待修订后的 matching native 复验。详见[文件功能](file-explorer/editable-file-creation-and-live-tables.md)与[真实还原入口](taomni-modular-restore-relaunch-verification.md)。本批不改变下列业务迁出、真实单体升级和正式发布待办。
+2026-11-17 文件功能与自动还原补充：File Explorer 新建可编辑类型和 Markdown Live 表格格式/逐字输入/历史修复已提交。旧 Intel 批次 035 误用固定文本探针的失败保留，修订后已由上述新 Intel 批次完整通过。macOS 15 ARM64 #44095086934 仅一片 8/8，其余三片在任何步骤前因容量取消。临时使用更高系统的 [macOS 26 ARM64 #44102464430](https://github.com/engcapa/taomni/actions/runs/44102464430) 已确认实际 26.7.2 ARM64 release 身份，首片 8/9、033 完整自动 relaunch 通过；旧 HTML 导出的 OS Save chooser 识别失败与 main 相同实现，按用户要求单列无关失败，不计通过或完整 macOS 26 crash 验证。另三片约 15 分钟未分配 runner，已调度相同 34 项/digest 的[单作业补跑 #44110689605](https://github.com/engcapa/taomni/actions/runs/44110689605) 后取消旧轮。新 selection `86b156b3d84e40519ebc0500fcbef709`、同产品/工具指纹、1 shard、release QA、gaps=[]/unreviewed=[]，即时收证已启动，实际结果待完成。详见[文件功能](file-explorer/editable-file-creation-and-live-tables.md)与[真实还原入口](taomni-modular-restore-relaunch-verification.md)。本批不改变下列业务迁出、真实单体升级和正式发布待办。
 
 2026-11-17 收证更新：完整 UI [#44040286838](https://github.com/engcapa/taomni/actions/runs/44040286838)（`b6b5379f50ca161940ee114ef1b29036aa3d01ba`、selection `fcb5bc65dc2b4a7984ee756661fdf629`）22/22 shards 已在执行期间收齐并核验 receipt/summary/source/build：三端 browser 各 36/36，Linux Xvfb native 56/56、Windows native 55/55、macOS ARM64 native 52/52。Windows TC-MODULES-015 原安装等待失败本轮通过，没有扩大等待预算；Wayland 54/56，FILE-OPEN-006/008 的既有非左键/X11 限制按用户授权单列忽略，仍保留原始失败。证据 `qa-ui-auto-report/github/44040286838/shard-case-totals.json`。自动 relaunch 新增三态用例首轮停在错误备份任务选择，已定位并准备定向复验，详见 `taomni-modular-restore-relaunch-verification.md`。模块化整体迁出和真实安装升级仍未完成。
 
@@ -246,7 +246,7 @@
 
 | 任务 | 状态 | 尚需交付的结果 |
 |---|---|---|
-| TASK-001 基线 | 三个包目标已采样，Intel 待产出 | Linux/Windows/macOS ARM64 的真实安装包尺寸、哈希与负载已记录；Intel 包及四目标启动/内存/吞吐匹配原始样本未齐。见追加基线。 |
+| TASK-001 基线 | 四个发布包目标已采样，运行性能待齐 | Linux/Windows/macOS ARM64/Intel 的真实安装包尺寸、哈希与负载已记录，Intel 采样 #44012918046 已通过；系统信任缺口与四目标启动/内存/吞吐匹配原始样本仍待闭合。见追加基线。 |
 | TASK-002 契约 | 基础与 still 服务三端门通过，尚未冻结 | API、manifest/schema、RPC、受限 BinaryRef、总量预算/request 所有权和 `capture.still` 接线已有三端原始结果；SDK 取流中取消增量验证中。长期有界防重放已有三端契约门，仍须连续 RDP 通道/吞吐和真实业务/G 门后冻结。 |
 | TASK-003 共享采集 | 引擎与私有 still 服务已集成 | 引擎/权限/像素/一次性采集已下沉，核心持有显示器、帧源和窗口生命周期；四目标库 check、真实 X11 与三端 SDK still 场景已有证据。真实 MFA facade 尚未调用新的私有入口；物理屏幕经宿主路径、macOS TCC 与 RDP 性能仍待验证。当前 matching UI/crash 继续收证。 |
 | TASK-004 RDP 公共库 | 已集成，公共库门已有证据 | `taomni-rdp-common` 与零依赖 `taomni-file-uri` 已被原调用方使用。`237e35f5f` 的 #43978893008 已取得四目标 check、三端 full/minimal unit/tree 与 Linux 原调用方单元；整轮其它失败保留，不称全 run 成功。精确保留 UI/剪贴板与发布性能仍按下方场景收口。 |
@@ -270,7 +270,7 @@
 | TASK-022 Mobile | 待 M0 决策 | 按 DEC-2 默认暂缓排期；M0 末提供 go/no-go 与公开例外，不能默认为已交付。 |
 | TASK-023 发布验收 | 部分 | 清单生成与上传顺序已有；四目标插件构建/系统签名、包签名、原子清单发布、独立插件更新/回滚、两套回归及性能。 |
 | TASK-024 入口/profile 协同 | 核心与宿主所有权已接入，完整入口矩阵待闭合 | GUI/headless bootstrap、ModeLease、可重试退出、宿主 ProfileUseLease/PluginDataLease、正常重启/静默与 writer lease 已有进程/native 证据；所有真实业务/re-exec 入口迁出和 G11 全矩阵未完成。 |
-| TASK-025 密钥/一致快照 | A–G 基础已有契约/native 证据；H/I 迁移未完成 | [实施方案](taomni-modular-vault-services-plan.md)的 Vault 协调、宿主一致快照、离线 v2 和运行/禁用/卸载保留数据的三态正常重启已逐批验证；这些 UI 仍使用核心 MFA。原生还原确认自动 relaunch、真实 MFA 宿主切换后的三态、legacy v1 alias/已安装升级与最终验收仍未完成。 |
+| TASK-025 密钥/一致快照 | A–G 基础已有契约/native 证据；H/I 迁移未完成 | [实施方案](taomni-modular-vault-services-plan.md)的 Vault 协调、宿主一致快照、离线 v2 和三态正常重启已逐批验证；macOS 15 Intel 的真实确认自动 relaunch 三态也已通过，ARM64 新轮待完成，Linux/Windows 自动接管尚未实现。这些 UI 仍使用核心 MFA；真实 MFA 宿主切换后的三态、legacy v1 alias/已安装升级与最终验收仍未完成。 |
 
 具体编号与子任务边界仍以设计原表为准；上表合并描述不改变范围或依赖。
 
@@ -319,7 +319,7 @@ Wayland `TC-FILE-OPEN-008` 在已有 AI 路径 chip 点击处失败：失败截�
 已完成 retained locator、离线 v2 备份/还原、宿主自持 ProfileUseLease/PluginDataLease 和运行中 prepare/snapshot/release 的接线。运行/禁用/卸载保留数据的三态正常重启与第二次重启已有 matching native 结果，仍使用核心 MFA；不能移用为独立 MFA 宿主后的还原或真实单体升级通过。已有证据只绑定实际输入，无关失败保留原始记录并不计通过。
 
 1. **收敛当前相关失败并取得新源码证据**：006 的 macOS 短窗口修订由 #43996571773 的 38 步 native 场景通过，22 片已收齐；Windows TC-WS-057 的 WebDriver setup 失败经 #44002005683 完整 crash-regression 复验 **22/22**，原失败保留。旧源码的总量预算/request 所有权三端各 18 项、真实宿主三端各 36 项通过；本批 `capture.still` 接线与 4 项 native gate 已由 #44009531599 三端通过，SDK 收流新增 3 项也由 #44011669782 三端通过，UI native 尚待完成。Linux、Windows 修复版、macOS ARM64/Intel 的实际包采样已完成，系统信任缺口保留。完成 shard 即下载，不等 summary；已记录无关 Wayland 失败保留、不计通过。
-2. **闭合 Vault、profile 与一致快照剩余边界（TASK-024/025）**：验证原生还原确认入口自动 relaunch 的接管，并补齐所有入口的多实例占用、取消/崩溃恢复矩阵；已有核心 MFA 三态正常重启结果保留。MFA 迁出时另需 v1 legacy alias 与独立宿主后的三态还原，不能用旧连接 owner 的结果代替。
+2. **闭合 Vault、profile 与一致快照剩余边界（TASK-024/025）**：macOS 15 Intel 的真实还原确认自动 relaunch 三态已由 #44095029967 完整通过；继续收齐 macOS 26 ARM64，另行实现 Linux/Windows 已存在新进程的安全接管，并补齐所有入口的多实例占用、取消/崩溃恢复矩阵。已有核心 MFA 三态正常重启结果保留。MFA 迁出时另需 v1 legacy alias 与独立宿主后的三态还原，不能用旧连接 owner 的结果代替。
 3. **迁出真实业务（TASK-005-B、013/014、016–022）**：MFA 原型和可信签名安装已有 runner 证据，长期有界防重放已由 `a41b27e72` 的三端协议/真实宿主门复验；继续补完整相关 G 门、旧库只读迁移、capture RPC 业务接线与动态 UI，最后切换生产 facade/连接 owner。之后依赖序推进 RDP/VNC 客户端与服务端、Servers、SocksCap、OCR/录制、本地语音的宿主、前端、状态与迁移。Mobile 按 DEC-2 留下明确 go/no-go 结论和公开例外，不能默认为交付；LanChat 任务已取消，不新增替代插件。
 4. **裁剪核心依赖闭包（TASK-006）**：随业务迁出，从核心 Cargo 默认 features、原生依赖、bundle/resources/helper 和前端 chunk 中实际移除相应实现。保存 cargo tree、资源与产物证据；把状态改名或放入 LegacyFeatureRuntime 不等于瘦身完成。
 5. **完成模块使用闭环（TASK-007、009–011）**：远端签名商店、三种代理设置 UI、跨应用重启发现并恢复下载、后台进度及错误恢复；实际主窗/分离窗动态 tab、坏 hash/缺失/禁用占位和清理；安装、启用、禁用、更新、回滚无需重启核心。
