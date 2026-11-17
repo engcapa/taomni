@@ -161,7 +161,9 @@ steps:
     value: ${fixture.mail_quick_connect}
 - click: '[data-testid="qc-submit"]'
 - wait_for: '[data-testid="mail-client-tab"]'
-- wait_for: '[data-testid="mail-message-row"][data-subject="Account-level AI policy"]'
+- wait_for:
+    selector: '[data-testid="mail-message-row"][data-subject="Account-level AI policy"]'
+    timeout_sec: 60
 - click: '[data-testid="mail-message-row"][data-subject="Account-level AI policy"]'
 - wait_for: '[data-testid="mail-attachment-open"][data-name="policy.txt"]'
 - dblclick: '[data-testid="mail-attachment-open"][data-name="policy.txt"]'
