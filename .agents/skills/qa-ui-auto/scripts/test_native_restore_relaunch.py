@@ -13,6 +13,7 @@ from unittest.mock import Mock, patch
 
 from native_macos_process import AdoptedProcess, BsdInfo, listener_pid, parse_environment
 from native_restore_relaunch import CONFIRM, confirm_restore_relaunch
+from tauri_webdriver import NativeSession
 from qa_ui_auto.behavior_contract import is_check
 from qa_ui_auto.restore_relaunch import run
 from qa_ui_auto.steps import StepError
@@ -74,9 +75,11 @@ class RelaunchTests(unittest.TestCase):
         driver = SimpleNamespace(proc=original, macos_lldb=False, report_root=root,
                                  host="127.0.0.1", port=4444, start=Mock())
         ready = {"dialog": True, "count": 1, "enabled": True, "visible": True, "staged": False, "error": None}
-        session = SimpleNamespace(application=binary, transport="macOS WKWebView bridge", deadline=None,
-            session_id="constant-mac-id", execute=Mock(side_effect=[ready, {**ready, "staged": True, "enabled": False}]),
-            click=Mock(), last_request={}, close=Mock())
+        session = NativeSession("http://127.0.0.1:4444", binary)
+        session.transport = "macOS WKWebView bridge"
+        session.session_id = "constant-mac-id"
+        session.execute = Mock(side_effect=[ready, {**ready, "staged": True, "enabled": False}])
+        session.click, session.close = Mock(), Mock()
         def attach():
             session.session_id = "constant-mac-id"
         session.start = Mock(side_effect=attach)
@@ -116,6 +119,29 @@ class RelaunchTests(unittest.TestCase):
                 session.close.assert_not_called()
                 session.click.assert_called_once_with(CONFIRM)
 
+    def test_existing_child_attachment_discards_the_exited_bridge_connection_without_replaying_input(self):
+        with tempfile.TemporaryDirectory() as directory, ExitStack() as stack:
+            driver, session = self.scenario(stack, Path(directory).resolve())
+            old_connection = Mock()
+            session._connection = old_connection
+
+            def attach():
+                if session._connection is old_connection:
+                    raise ConnectionResetError(54, "Connection reset by peer")
+                old_connection.close.assert_called_once_with()
+                self.assertEqual(session.restore_relaunch_observation["original_exit_code"], 0)
+                self.assertIsInstance(driver.proc, AdoptedProcess)
+                session.session_id = "constant-mac-id"
+
+            session.start.side_effect = attach
+            result = confirm_restore_relaunch(driver, session)
+            self.assertTrue(result["passed"])
+            self.assertTrue(result["previous_connection_closed"])
+            session.start.assert_called_once_with()
+            session.click.assert_called_once_with(CONFIRM)
+            session.close.assert_not_called()
+            driver.start.assert_not_called()
+
     def test_intercepted_confirmation_is_never_replayed(self):
         with tempfile.TemporaryDirectory() as directory, ExitStack() as stack:
             driver, session = self.scenario(stack, Path(directory).resolve())
@@ -124,6 +150,22 @@ class RelaunchTests(unittest.TestCase):
                 confirm_restore_relaunch(driver, session)
             session.click.assert_called_once_with(CONFIRM)
             session.start.assert_not_called()
+            driver.start.assert_not_called()
+
+    def test_a_new_bridge_connection_failure_is_not_retried_or_counted_as_a_relaunch_pass(self):
+        with tempfile.TemporaryDirectory() as directory, ExitStack() as stack:
+            driver, session = self.scenario(stack, Path(directory).resolve())
+            old_connection = Mock()
+            session._connection = old_connection
+            session.start.side_effect = ConnectionResetError(54, "new bridge failure")
+            with self.assertRaisesRegex(ConnectionResetError, "new bridge failure"):
+                confirm_restore_relaunch(driver, session)
+            old_connection.close.assert_called_once_with()
+            self.assertFalse(session.restore_relaunch_observation["passed"])
+            self.assertEqual(session.restore_relaunch_observation["stage"], "attach-existing-process")
+            session.start.assert_called_once_with()
+            session.click.assert_called_once_with(CONFIRM)
+            session.close.assert_not_called()
             driver.start.assert_not_called()
 
     def test_other_drivers_cannot_launch_a_new_app_disguised_as_attachment(self):

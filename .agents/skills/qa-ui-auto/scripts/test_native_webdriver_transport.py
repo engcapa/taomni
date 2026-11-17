@@ -74,6 +74,17 @@ class NativeCleanupTransportTest(TestCase):
                          ("DELETE", "complete", 200))
         self.assertGreaterEqual(request["duration_sec"], 0)
 
+    def test_discarding_an_obsolete_channel_does_not_delete_a_session_or_release_its_owner(self):
+        connection = Mock()
+        self.session._connection = connection
+        self.session.discard_connection()
+        self.session.discard_connection()
+        connection.close.assert_called_once_with()
+        self.assertIsNone(self.session._connection)
+        self.assertEqual(self.session.session_id, "owned-session")
+        self.assertEqual(self.server.requests, [])
+        self.owner.assert_not_called()
+
     def test_stalled_response_headers_fail_without_retry_and_still_release_owner(self):
         self.assert_stalled("stalled_headers", "response_headers")
 

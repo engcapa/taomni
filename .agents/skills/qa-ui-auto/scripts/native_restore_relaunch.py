@@ -93,6 +93,10 @@ def confirm_restore_relaunch(driver, session):
     if code != 0 or "staged_dialog" not in observation:
         raise RuntimeError("Automatic relaunch requires observed staged success and a normal original exit")
 
+    # The HTTP/1.1 channel belongs to the exited process even when its child
+    # binds the same bridge port and constant session ID. Never reuse it.
+    session.discard_connection()
+    observation["previous_connection_closed"] = True
     session.session_id = None  # Do not DELETE a restarted app's constant bridge session ID.
     observation["stage"] = "wait-new-listener"
     while time.monotonic() < end:

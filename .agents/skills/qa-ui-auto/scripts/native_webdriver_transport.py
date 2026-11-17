@@ -104,6 +104,12 @@ class WebDriverTransport:
             # can contain credentials. Keep only the latest command's phase.
             observation["duration_sec"] = time.monotonic() - started
 
+    def discard_connection(self) -> None:
+        """Drop a known obsolete HTTP channel without actions or owner cleanup."""
+        connection, self._connection = self._connection, None
+        if connection is not None:
+            connection.close()
+
     def close(self) -> None:
         from qa_ui_auto.deadline import Deadline
 
