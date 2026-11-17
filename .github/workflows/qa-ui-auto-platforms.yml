@@ -27,9 +27,9 @@ on:
         type: string
         default: ubuntu-24.04-xvfb
       macos_runner:
-        description: macOS 15 hosted architecture (Intel can recover unavailable ARM64 capacity)
+        description: Hosted macOS image (Intel or macOS 26 can recover unavailable macOS 15 ARM64 capacity)
         type: choice
-        options: [macos-15, macos-15-intel]
+        options: [macos-15, macos-15-intel, macos-26]
         default: macos-15
       shards:
         description: 'Shards per platform/mode/profile: auto or 1-8 (selected also fans out)'

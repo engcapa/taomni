@@ -26,7 +26,19 @@ Linux WebKitWebDriver 和 Windows WebView2 的自动 relaunch 后接管仍待实
 
 本地仅执行工具单元和 schema/behavior contract、catalog/refactor 静态检查。真实应用、进程、文件还原和三态自动 relaunch 全部留 GitHub `qa-ui-auto-platforms`，包含完整 crash-regression，并在运行中下载完成的 shard。
 
-修复后的 [Intel #44077458265](https://github.com/engcapa/taomni/actions/runs/44077458265) 绑定 `481d59afda4791578da03699aecc7c55a4fa9f2a`，4/4 分片均在 summary 前下载：33/34 通过，含 033 的完整 93 步与 034 的完整 104 步。033 原始 `native-restore-relaunch.jsonl` 为 `passed=true`、`stage=complete`、`manual_launch=false`、`previous_connection_closed=true`；staged 后确认禁用，原 PID 9496 exit=0，新 PID 9853，核验同一二进制和精确隔离环境后接管成功。035 的同一接管边界也通过（原 PID 10167 exit=0，新 PID 10552），但随后第 95 步误用要求预先创建 `qa-retained.txt` 的固定文本场景探针，阻挡了真实 SQLite 场景的后续数据/密码断言，035 仍计失败。ARM64 [#44087810304](https://github.com/engcapa/taomni/actions/runs/44087810304) 继续逐片收证，不外推三态或架构全部通过。
+[Intel #44095029967](https://github.com/engcapa/taomni/actions/runs/44095029967)（`0dfdfb159caa31b65ba239fd80917c79acee02e0`）已成功结束，4/4 分片即时下载，34/34、零 skip，包含 033/034/035 的完整 93/104/112 步和完整 native crash-regression。全部 artifact hash/bytes、receipt、身份及 case digest/计数已核验。三态原始记录均为单次确认、staged/禁重复、旧 HTTP 连接关闭、原进程 exit=0 和成功接管同一二进制/隔离环境的新 PID：
+
+| 用例 | 原 PID → 新 PID | 还原生命周期 | writer OS lease |
+|---|---|---|---|
+| 033 | 10514 → 10982 | enabled | held |
+| 034 | 10779 → 11193 | disabled | released |
+| 035 | 7877 → 8339 | uninstalled / dataRetained=true | released |
+
+035 原始 `retainedData` 为准确 `hello.sqlite` locator，数据库 8,192 bytes、SHA `e795d1c7a42109c63d7f6c81663067d1a1fa7346fce2969d889e9f2bd467f95e`，完整字节等于原已核验档案；密码回退和 HOTP 755224 均通过。已查看 035 解密后的真实 native MFA 截图，原账户及验证码正常显示。这闭合当前 macOS 15 Intel 的三态确认入口，不代表 Linux/Windows 的自动接管、独立 MFA 宿主或旧单体升级已经交付。
+
+同源码 ARM64 [#44095086934](https://github.com/engcapa/taomni/actions/runs/44095086934) 前两片因 GitHub 无法分配 hosted runner 在执行任何步骤前被取消，未计通过。按用户允许临时使用更高 macOS 的要求，workflow 增加官方 `macos-26` ARM64 选项；保留原 34 项及完整 crash 集合和准确 release 架构，原生结果待新运行。更高版本的通过也不代替未执行的 macOS 15 ARM64。
+
+修复后的 [Intel #44077458265](https://github.com/engcapa/taomni/actions/runs/44077458265) 绑定 `481d59afda4791578da03699aecc7c55a4fa9f2a`，4/4 分片均在 summary 前下载：33/34 通过，含 033 的完整 93 步与 034 的完整 104 步。033 原始 `native-restore-relaunch.jsonl` 为 `passed=true`、`stage=complete`、`manual_launch=false`、`previous_connection_closed=true`；staged 后确认禁用，原 PID 9496 exit=0，新 PID 9853，核验同一二进制和精确隔离环境后接管成功。035 的同一接管边界也通过（原 PID 10167 exit=0，新 PID 10552），但随后第 95 步误用要求预先创建 `qa-retained.txt` 的固定文本场景探针，阻挡了真实 SQLite 场景的后续数据/密码断言，035 仍计失败。ARM64 [#44087810304](https://github.com/engcapa/taomni/actions/runs/44087810304) 已被修订批次替代，在 release 构建后取消；没有完整应用用例结果，不计通过。
 
 035 修订为原签名/lifecycle `uninstalled` 检查加 `ui-restored` 的真实 SQLite oracle，保留全部既有业务行、generation、active pointer、writer lease、密码/HOTP 和 relaunch 断言。新增检查要求 `dataRetained=true`、准确 `hello.sqlite` locator、全部路径为普通隔离路径、完整数据库字节等于原已核验档案，以及原档案 hash 不变；不向场景补写文本或更改预期业务数据。单元先复现错误探针及原检查对伪造 locator/字节变化的漏检，再验证完整场景和拒绝分支，相关工具 71/71；workflow 规划阶段也执行这组单元。QA audit、actionlint 与 check:refactor 通过，修订后的原生结果待 GitHub 复验。
 

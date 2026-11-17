@@ -6,13 +6,17 @@ Live 表格此前直接使用 `textContent` 展示单元格，导致 `**` 等源
 
 ## 当前验收
 
+修正 035 探针后的 [Intel #44095029967](https://github.com/engcapa/taomni/actions/runs/44095029967)（`0dfdfb159caa31b65ba239fd80917c79acee02e0`、selection `563142a953e24addbe9a5089798eec0f`）已成功结束，4/4 分片在 summary 前收齐，34/34、零失败/skip，含完整 24 项 crash-regression。全部 artifact 的 hash/bytes、receipt、source/runner/selection、实际 case digest/计数与 release QA 身份已核验，详见 `qa-ui-auto-report/github/44095029967/hosted-evidence-review.json`。与下述已核验的 137 项共同覆盖三端 browser/native，目前共 171 项通过；macOS native 此结论限定 Intel macOS 15，ARM64 不能由此记为通过。
+
+ARM64 [#44095086934](https://github.com/engcapa/taomni/actions/runs/44095086934) 的前两片在任何步骤前被取消，GitHub 注释为多次无法分配 hosted runner，并明确 ARM64 容量限制；原始注释保存在该 run 的 `runner-capacity-annotations.json`。GitHub 官方 [macOS 26 ARM64 镜像说明](https://github.com/actions/runner-images/blob/main/images/macos/macos-26-arm64-Readme.md)确认可用，按用户允许临时使用更高版本的要求，在 workflow 的显式 runner 清单增加 `macos-26`，默认仍为 `macos-15`。选择单元要求相同用例、case digest、完整 crash 集合、release ARM64 构建和空 gaps/unreviewed；实际应用结果仍待新运行，不外推 macOS 15 ARM64 兼容性。
+
 产品修复 `2939a224e178563be0a4425127760e3460d62f08` 的 [GitHub #44071094242](https://github.com/engcapa/taomni/actions/runs/44071094242) 已核验 20 个实际执行分片，共 137 项通过、零失败、零 skip。三端 browser 各 25/25（各含完整 20 项 crash-regression），Linux Xvfb 与 Windows native 各 31/31（各含完整 24 项 crash-regression）；新 006/007、023 与保留场景全部通过。原始 artifact 的 hash/bytes、runner receipt、源码/用例/selection 和 native release QA 二进制身份已独立核验，记录在 `qa-ui-auto-report/github/44071094242/hosted-evidence-review.json`。已查看本轮 Windows browser 与 Linux/Windows native 新建对话框、Live 表格和 macOS browser 表格画面，控件与 inline 格式正常。
 
 该 workflow 的 macOS ARM64 build 因 GitHub hosted runner 容量不足，在任何步骤前被取消，4 个 native 分片未执行，整轮 workflow 不计全绿。[Intel 补跑 #44077458265](https://github.com/engcapa/taomni/actions/runs/44077458265) 与 [ARM64 补跑 #44087810304](https://github.com/engcapa/taomni/actions/runs/44087810304) 均绑定 `481d59afda4791578da03699aecc7c55a4fa9f2a`；两者与原计划的 34 个 macOS native 用例集合和 case digest 完全一致，gaps=[]/unreviewed=[]，按完成分片即时收证。
 
 Intel 4/4 分片已收齐，33/34 通过：文件新建/编辑/保存、Live 表格、全部保留用例与完整 crash-regression 均通过；已查看该端新建对话框和 Live 表格截图。唯一失败是 035 的第 95 步错误调用另一个场景的 `qa-retained.txt` 固定文本探针，本场景实际通过真实宿主创建并备份 `hello.sqlite`，未创建该文本文件。自动 relaunch 已成功，完整还原仍不计通过。修正保留 signed/lifecycle、完整业务行、generation、active pointer、writer lease、Vault/MFA/HOTP 和单次确认断言，并在 `ui-restored` 独立核验准确 SQLite locator、`dataRetained=true`、完整数据库字节和原始档案 hash；不更改原业务数据、不插入额外文件。新单元先复现错用场景和漏检，再验证拒绝缺失/伪造 locator、链接和 SQLite 尾部变化。相关工具 71/71、QA audit、actionlint 和 check:refactor 通过；修订后的真实执行另行补录，旧失败保留。
 
-两个 head 的产品源码指纹均为 `ad584d3171fd61ae23f88b0c4de9f78370e908144b1d60baf8639fca40d068aa`；后一个 head 只修复 QA 自动还原接管时的旧 HTTP 连接，runner 指纹分别绑定各自 selection，不能把工具变更后的结果回写到旧失败批次。macOS 结果必须按实际架构记录，browser/bridge 输入不代替物理 IME、AppKit 菜单或 OS 快捷键验证。本功能验收也不代表模块化整体迁出、真实单体升级激活或正式发布门已完成。
+上述产品修复与 QA 修订的产品源码指纹均为 `ad584d3171fd61ae23f88b0c4de9f78370e908144b1d60baf8639fca40d068aa`；QA 修订分别处理旧 HTTP 连接和 035 的场景探针，runner 指纹绑定各自 selection，035 的修订另以实际 case digest 记录，不能把新结果回写到旧失败批次。macOS 结果必须按实际架构记录，browser/bridge 输入不代替物理 IME、AppKit 菜单或 OS 快捷键验证。本功能验收也不代表模块化整体迁出、真实单体升级激活或正式发布门已完成。
 
 验收分工：
 

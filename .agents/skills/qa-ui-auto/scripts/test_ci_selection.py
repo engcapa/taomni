@@ -26,6 +26,24 @@ def args(**overrides):
 
 
 class MacosRunnerSelectionTests(unittest.TestCase):
+    def test_macos_26_arm64_recovery_keeps_cases_crash_selection_and_release_architecture(self):
+        selected = dict(scope="selected", platforms="macos", modes="native",
+                        case_ids="TC-EXPLORER-006,TC-EXPLORER-007,TC-FILE-OPEN-023,TC-MODULES-033,TC-MODULES-034,TC-MODULES-035",
+                        tags="crash-regression", native_release=True, shards="4")
+        original = make_plan(args(**selected))
+        recovery = make_plan(args(**selected, macos_runner="macos-26"))
+        self.assertEqual(recovery["groups"], original["groups"])
+        self.assertEqual(recovery["gaps"], [])
+        self.assertEqual(recovery["unreviewed"], [])
+        self.assertEqual(recovery["macos_runner"], "macos-26")
+        self.assertEqual({entry["runner"] for entry in recovery["entries"]}, {"macos-26"})
+        self.assertEqual({entry["arch"] for entry in recovery["entries"]}, {"ARM64"})
+        self.assertEqual(recovery["builds"][0]["id"], "native-build-macos-arm64-release")
+        self.assertEqual(recovery["builds"][0]["runner"], "macos-26")
+        for before, after in zip(original["entries"], recovery["entries"], strict=True):
+            for key in ("selected_ids", "case_digests", "capabilities"):
+                self.assertEqual(before[key], after[key])
+
     def test_macos_intel_keeps_cases_and_separates_native_build_architecture(self):
         selected = dict(scope="selected", platforms="macos", modes="browser,native",
                         case_ids="TC-MODULES-022,TC-MODULES-023", native_release=True)
