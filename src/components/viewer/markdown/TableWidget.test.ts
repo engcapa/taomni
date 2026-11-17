@@ -23,6 +23,23 @@ function editor(content = source, readOnly = false, context: Partial<MarkdownWid
 function firstCell(view: EditorView) {
   return view.dom.querySelector<HTMLElement>("[data-cell-row='1'][data-cell-column='0']")!;
 }
+function typeIntoCell(cell: HTMLElement, text: string) {
+  const selection = window.getSelection()!;
+  selection.selectAllChildren(cell);
+  let entered = "";
+  for (const character of text) {
+    const range = selection.getRangeAt(0);
+    range.deleteContents();
+    const node = document.createTextNode(character);
+    range.insertNode(node);
+    range.setStartAfter(node); range.collapse(true);
+    selection.removeAllRanges(); selection.addRange(range);
+    entered += character;
+    fireEvent.input(cell, { inputType: "insertText", data: character });
+    expect(cell.textContent).toBe(entered);
+    expect(cell.contains(selection.anchorNode)).toBe(true);
+  }
+}
 afterEach(() => { views.forEach((view) => view.destroy()); views.length = 0; document.body.replaceChildren(); vi.restoreAllMocks(); });
 
 it("renders inline GFM in read-only Live tables without changing the Markdown source", () => {
@@ -98,6 +115,38 @@ it("opening and leaving an editable cell does not rewrite its source or create a
   expect(view.state.doc.toString()).toBe(source);
   expect(undo(view)).toBe(false);
   expect(firstCell(view).querySelector("strong")?.textContent).toBe("bold");
+});
+
+it("preserves spaces and caret through character input and undoes the typing as one change", () => {
+  const view = editor();
+  const cell = firstCell(view);
+  cell.focus();
+  typeIntoCell(cell, "**changed** *italic* ~~removed~~ `code` $x^2$");
+  expect(view.state.doc.toString()).toContain("| **changed** *italic* ~~removed~~ `code` $x^2$ | **preserved** |");
+  cell.blur();
+  const changed = view.state.doc.toString();
+  expect(undo(view)).toBe(true);
+  expect(view.state.doc.toString()).toBe(source);
+  expect(redo(view)).toBe(true);
+  expect(view.state.doc.toString()).toBe(changed);
+});
+
+it("separates cell edit sessions in history and reflects Undo inside an active cell", () => {
+  const view = editor();
+  const cell = firstCell(view);
+  cell.focus(); typeIntoCell(cell, "first ");
+  expect(cell.textContent).toBe("first ");
+  expect(undo(view)).toBe(true);
+  expect(cell.textContent).toBe("**bold** *italic* ~~removed~~ `code`");
+  expect(redo(view)).toBe(true);
+  cell.blur();
+  const firstEdit = view.state.doc.toString();
+  const next = view.dom.querySelector<HTMLElement>("[data-cell-row='1'][data-cell-column='1']")!;
+  next.focus(); typeIntoCell(next, "**second**"); next.blur();
+  expect(undo(view)).toBe(true);
+  expect(view.state.doc.toString()).toBe(firstEdit);
+  expect(undo(view)).toBe(true);
+  expect(view.state.doc.toString()).toBe(source);
 });
 
 it.each(["Win32", "Linux x86_64", "MacIntel"])("select-all stays inside the active cell on %s without editing the document", (platform) => {

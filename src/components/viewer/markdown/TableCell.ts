@@ -1,18 +1,20 @@
 import type { EditorView } from "@codemirror/view";
 import { openExternalUrl } from "../../../lib/sftp";
 import { enhanceMarkdown, markdownFragment } from "./markdownRender";
-import type { MarkdownWidgetContext } from "./markdownWidgetContext";
+import type { MarkdownWidgetContext, WidgetEdit } from "./markdownWidgetContext";
 
 interface CellOptions {
   context: MarkdownWidgetContext;
   source: () => string;
-  commit: (source: string) => void;
+  commit: (source: string, edit: WidgetEdit) => boolean;
   activate: () => void;
 }
 
 /** Own a cell's rendered/editable DOM, including IME and async image lifetime. */
 export class TableCell {
   private editing = false;
+  private committing = false;
+  private firstChange = true;
   private composing = false;
   private compositionSource = "";
   private renderedSource: string | undefined;
@@ -30,11 +32,13 @@ export class TableCell {
     cell.addEventListener("compositionend", () => {
       this.composing = false;
       // Never overwrite a concurrent change to this cell with stale IME text.
-      if (this.compositionSource === options.source()) this.commit();
+      if (this.compositionSource === options.source()) this.commit("input.type.compose.start");
       else options.context.onError(options.context.label("单元格已更改，请重新输入", "Cell changed; please enter the text again"));
       this.sync();
     });
-    cell.oninput = () => { if (!this.composing) this.commit(); };
+    cell.oninput = (event) => {
+      if (!this.composing) this.commit((event as InputEvent).inputType?.startsWith("delete") ? "delete" : "input.type");
+    };
     cell.onpaste = (event) => this.paste(event);
     cell.addEventListener("keydown", (event) => this.selectAll(event));
     cell.onmousedown = (event) => {
@@ -57,13 +61,19 @@ export class TableCell {
   private edit(): void {
     if (this.options.context.readOnly || this.editing) return;
     this.editing = true;
+    this.firstChange = true;
     this.generation++;
     this.renderedSource = undefined;
     this.cell.textContent = this.options.source();
   }
 
-  private commit(): void {
-    if (!this.options.context.readOnly) this.options.commit(this.cell.textContent || "");
+  private commit(userEvent: string): void {
+    if (this.destroyed || this.options.context.readOnly) return;
+    this.committing = true;
+    try {
+      const isolate = userEvent === "input.paste" ? "full" : this.firstChange ? "before" : undefined;
+      if (this.options.commit(this.cell.textContent || "", { userEvent, isolate })) this.firstChange = false;
+    } finally { this.committing = false; }
   }
 
   private selectAll(event: KeyboardEvent): void {
@@ -79,7 +89,9 @@ export class TableCell {
   }
 
   sync(): void {
-    if (this.destroyed || this.composing) return;
+    // Parsing trims GFM padding. Echoing that normalization during an owned
+    // keystroke removes a just-typed space and resets the live DOM caret.
+    if (this.destroyed || this.composing || this.committing) return;
     const source = this.options.source();
     if (this.editing) {
       if (this.cell.textContent !== source) this.cell.textContent = source;
@@ -110,7 +122,7 @@ export class TableCell {
       range.insertNode(node); range.setStartAfter(node); range.collapse(true);
       selection?.removeAllRanges(); selection?.addRange(range);
     } else this.cell.textContent = text;
-    if (!this.composing) this.commit();
+    if (!this.composing) this.commit("input.paste");
   }
 
   destroy(): void { this.destroyed = true; this.generation++; }

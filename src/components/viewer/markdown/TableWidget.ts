@@ -1,6 +1,6 @@
 import { EditorView, WidgetType, runScopeHandlers } from "@codemirror/view";
 import { type MarkdownTable, modifyTable, serializeTable } from "./markdownModel";
-import { replaceWidgetSource, widgetButton, type MarkdownWidgetContext } from "./markdownWidgetContext";
+import { replaceWidgetSource, widgetButton, type MarkdownWidgetContext, type WidgetEdit } from "./markdownWidgetContext";
 import { TableCell } from "./TableCell";
 
 interface Runtime { widget: TableWidget; cells: Map<HTMLElement, TableCell> }
@@ -41,9 +41,9 @@ export class TableWidget extends WidgetType {
       const container = view.dom.querySelector<HTMLElement>(`[data-table-from="${runtime.widget.from}"]`);
       container?.querySelector<HTMLElement>(`[data-cell-row="${row}"][data-cell-column="${column}"]`)?.focus();
     });
-    const commit = (next: MarkdownTable) => {
+    const commit = (next: MarkdownTable, edit?: WidgetEdit) => {
       const current = runtime.widget;
-      return replaceWidgetSource(view, current.from, current.raw, serializeTable(next));
+      return replaceWidgetSource(view, current.from, current.raw, serializeTable(next), edit);
     };
     const action = (name: Parameters<typeof modifyTable>[1]) => {
       const next = modifyTable(runtime.widget.table, name, activeRow, activeColumn);
@@ -93,12 +93,12 @@ export class TableWidget extends WidgetType {
         };
         runtime.cells.set(cell, new TableCell(cell, view, { context: this.context, activate,
           source: () => runtime.widget.table.rows[rowIndex]?.[columnIndex] ?? "",
-          commit: (source) => {
+          commit: (source, edit) => {
             const current = runtime.widget.table;
             const rows = current.rows.map((cells) => [...cells]);
-            if (rows[rowIndex][columnIndex] === source) return;
+            if (rows[rowIndex][columnIndex] === source) return false;
             rows[rowIndex][columnIndex] = source;
-            commit({ rows, align: current.align });
+            return commit({ rows, align: current.align }, edit);
           } }));
         cell.onkeydown = (event) => {
           if (event.isComposing) return;
