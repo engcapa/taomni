@@ -8,7 +8,7 @@ from types import SimpleNamespace
 import tempfile
 import unittest
 
-from qa_ui_auto.fixtures.module_upgrade import CHAT_FILES, input_sessions, preview_snapshot
+from qa_ui_auto.fixtures.module_upgrade import CHAT_FILES, SERVER_ITEMS, SERVER_ROWS, input_sessions, preview_snapshot, preview_server_snapshot
 from qa_ui_auto.module_upgrade_observation import observe, run
 from qa_ui_auto.steps import StepError
 
@@ -41,7 +41,7 @@ class UpgradeObservationTests(unittest.TestCase):
         for args in [{"phase": "write"}, {"phase": "pending", "path": "/user-data"}, None]:
             with self.assertRaisesRegex(StepError, "fixed registered phase"):
                 run(None, args)
-        with self.assertRaisesRegex(StepError, "native VNC-only"):
+        with self.assertRaisesRegex(StepError, "registered native"):
             run(SimpleNamespace(case_id="TC-MODULES-026"), {"phase": "pending"})
 
     def test_preflight_is_read_only_and_a_journal_is_a_real_failure(self):
@@ -107,6 +107,26 @@ class UpgradeObservationTests(unittest.TestCase):
         with closing(sqlite3.connect(self.root / "taomni.db")) as db, db:
             db.execute("ALTER TABLE sessions ADD COLUMN extra TEXT")
         with self.assertRaisesRegex(StepError, "complete old-version"):
+            observe(self.root, self.state, "preflight")
+
+    def test_three_server_items_require_distinct_pending_owners_and_unchanged_config_bytes(self):
+        self.assertEqual([row["plugin_slug"] for row in preview_server_snapshot()["candidates"]],
+                         ["servers", "rdp-server", "vnc-server"])
+        self.state.update(expected_items=SERVER_ITEMS, server_configs=SERVER_ROWS)
+        with closing(sqlite3.connect(self.root / "taomni.db")) as db, db:
+            db.execute("CREATE TABLE server_configs (server_type TEXT, config_json TEXT, updated_at INTEGER)")
+            db.executemany("INSERT INTO server_configs VALUES (?, ?, ?)", SERVER_ROWS)
+        self.journal["entries"] = [{**self.journal["entries"][0], "item": item} for item in SERVER_ITEMS]
+        self.write_journal()
+        observe(self.root, self.state, "pending")
+        observe(self.root, self.state, "repeat")
+        self.journal["entries"][1]["item"] = "server-configs"
+        self.write_journal()
+        with self.assertRaisesRegex(StepError, "incorrect owner"):
+            observe(self.root, self.state, "repeat")
+        with closing(sqlite3.connect(self.root / "taomni.db")) as db, db:
+            db.execute("UPDATE server_configs SET config_json = '{}' WHERE server_type = 'rdp'")
+        with self.assertRaisesRegex(StepError, "original server configurations"):
             observe(self.root, self.state, "preflight")
 
 

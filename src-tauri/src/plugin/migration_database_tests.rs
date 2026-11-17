@@ -132,4 +132,70 @@ fn existing_rdp_journal_spelling_is_unchanged_and_vnc_is_additive() {
         serde_json::to_string(&MigrationItem::VncSessions).unwrap(),
         "\"vnc-sessions\""
     );
+    assert_eq!(
+        serde_json::to_string(&MigrationItem::ServerConfigs).unwrap(),
+        "\"server-configs\""
+    );
+    assert_eq!(
+        serde_json::to_string(&MigrationItem::RdpServerConfigs).unwrap(),
+        "\"rdp-server-configs\""
+    );
+    assert_eq!(
+        serde_json::to_string(&MigrationItem::VncServerConfigs).unwrap(),
+        "\"vnc-server-configs\""
+    );
+}
+
+#[test]
+fn remote_desktop_server_configs_never_recommend_the_general_server_owner() {
+    for (server_type, item, slug) in [
+        ("rdp", MigrationItem::RdpServerConfigs, "rdp-server"),
+        ("vnc", MigrationItem::VncServerConfigs, "vnc-server"),
+    ] {
+        let connection = database();
+        connection
+            .execute(
+                "INSERT INTO server_configs VALUES (?1, 'opaque config: never parse or export')",
+                [server_type],
+            )
+            .unwrap();
+        connection.pragma_update(None, "query_only", true).unwrap();
+        assert_eq!(owners(&connection), [(item, slug.into())]);
+        assert_eq!(connection.total_changes(), 1);
+        let snapshot = serde_json::to_string(&inspect_database(&connection).unwrap().1).unwrap();
+        assert!(!snapshot.contains("opaque config"));
+    }
+}
+
+#[test]
+fn mixed_server_configs_keep_three_distinct_owners_without_loading_payloads() {
+    let connection = database();
+    connection
+        .execute_batch(
+            "INSERT INTO server_configs VALUES ('http', 'http config');
+         INSERT INTO server_configs VALUES ('rdp', 'rdp config');
+         INSERT INTO server_configs VALUES ('vnc', 'vnc config');
+         INSERT INTO server_configs VALUES ('future-server', 'unknown retained config');",
+        )
+        .unwrap();
+    connection.pragma_update(None, "query_only", true).unwrap();
+    let expected = [
+        (MigrationItem::ServerConfigs, "servers".into()),
+        (MigrationItem::RdpServerConfigs, "rdp-server".into()),
+        (MigrationItem::VncServerConfigs, "vnc-server".into()),
+    ];
+    assert_eq!(owners(&connection), expected);
+    assert_eq!(owners(&connection), expected);
+    assert_eq!(connection.total_changes(), 4);
+}
+
+#[test]
+fn malformed_server_schema_is_reported_even_when_empty() {
+    let connection = Connection::open_in_memory().unwrap();
+    connection
+        .execute_batch("CREATE TABLE server_configs (id TEXT)")
+        .unwrap();
+    let error = inspect_database(&connection).unwrap_err();
+    assert!(error.contains("server_configs records cannot be inspected"));
+    assert!(error.contains("server_type"));
 }

@@ -200,7 +200,7 @@ fn inspects_real_legacy_sqlite_and_builds_only_file_specs() {
     db.execute_batch(
         "CREATE TABLE sessions (id TEXT, session_type TEXT);\
          CREATE TABLE rdp_certificate_pins (host TEXT);\
-         CREATE TABLE server_configs (id TEXT);\
+         CREATE TABLE server_configs (server_type TEXT);\
          INSERT INTO sessions VALUES ('rdp', 'RDP');\
          INSERT INTO rdp_certificate_pins VALUES ('rdp.example.test');\
          INSERT INTO server_configs VALUES ('ssh');",

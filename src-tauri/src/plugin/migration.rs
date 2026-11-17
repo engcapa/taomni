@@ -45,6 +45,8 @@ pub enum MigrationItem {
     VncSessions,
     RdpCertificatePins,
     ServerConfigs,
+    RdpServerConfigs,
+    VncServerConfigs,
     Mfa,
     SocksCap,
     Mobile,
@@ -337,6 +339,8 @@ fn pending_source_path(
             | MigrationItem::VncSessions
             | MigrationItem::RdpCertificatePins
             | MigrationItem::ServerConfigs
+            | MigrationItem::RdpServerConfigs
+            | MigrationItem::VncServerConfigs
     ) && snapshot.source_fingerprints.contains_key("taomni.db")
     {
         return Ok(PathBuf::from("taomni.db"));
@@ -404,6 +408,10 @@ fn hash_tree(path: &Path, digest: &mut Sha256, size: &mut u64) -> Result<(), Str
 #[path = "migration_preflight.rs"]
 mod preflight;
 pub use preflight::{build_file_migration_specs, inspect_legacy_install};
+
+#[cfg(test)]
+#[path = "migration_server_tests.rs"]
+mod server_tests;
 
 #[cfg(test)]
 #[path = "migration_fixture.rs"]

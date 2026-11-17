@@ -131,6 +131,8 @@ export type LegacyMigrationItem =
   | "vnc-sessions"
   | "rdp-certificate-pins"
   | "server-configs"
+  | "rdp-server-configs"
+  | "vnc-server-configs"
   | "mfa"
   | "socks-cap"
   | "mobile";

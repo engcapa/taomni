@@ -172,7 +172,9 @@ pub fn build_file_migration_specs(
             MigrationItem::RdpVncSessions
             | MigrationItem::VncSessions
             | MigrationItem::RdpCertificatePins
-            | MigrationItem::ServerConfigs => continue,
+            | MigrationItem::ServerConfigs
+            | MigrationItem::RdpServerConfigs
+            | MigrationItem::VncServerConfigs => continue,
         };
         let source_path = data_dir.join(&source);
         if !source_path.exists() {

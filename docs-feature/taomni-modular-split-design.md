@@ -706,7 +706,7 @@ v1.2 没有覆盖“已经在用旧版的用户”。核心 0.6.x 默认包不�
 迁移按以下顺序执行：
 
 1. **预检和快照**：以只读方式检查 `taomni.db` 的 `sessions`、`rdp_certificate_pins`、`server_configs` 表，以及 `mfa.db`、`sockscap/config.json`、移动端配置和 Vault 固定条目。记录文件大小与 SHA-256；无法读取、权限不足或 Vault 锁定时只显示可修复错误，不改写源数据。
-   预检必须查询实际记录，不能仅依据表是否存在推荐插件：`sessions.session_type=RDP/VNC` 分别归属 `rdp-client` / `vnc-client`，空表和 SSH/SFTP/本地终端等核心会话不产生候选；证书 pin 与 Servers 配置仅在有行时列出。所有检查位于同一只读 SQLite snapshot，仅查询 EXISTS，不读取凭据和配置正文；无法识别的 schema 显式返回错误。现有 `rdp-vnc-sessions` journal 拼写保持兼容，新 VNC 候选使用 additive `vnc-sessions`。重新记录预检只允许校正未执行且无 target 的 pending 占位；staged/committed/rolled-back 历史须交真实恢复执行器处理，不得被预检重置。原文件和 active 指针不因候选校正而改变。
+   预检必须查询实际记录，不能仅依据表是否存在推荐插件：`sessions.session_type=RDP/VNC` 分别归属 `rdp-client` / `vnc-client`，空表和 SSH/SFTP/本地终端等核心会话不产生候选；证书 pin 与 Servers 配置仅在有行时列出；`server_configs.server_type` 使用旧版真实持久值分类：`rdp` → `rdp-server`（`rdp-server-configs`）、`vnc` → `vnc-server`（`vnc-server-configs`），其余类型留 `servers`（兼容 `server-configs`），不读取配置正文。所有检查位于同一只读 SQLite snapshot，仅查询 EXISTS，不读取凭据和配置正文；无法识别的 schema 显式返回错误。现有 `rdp-vnc-sessions` journal 拼写保持兼容，新 VNC 候选使用 additive `vnc-sessions`。重新记录预检只允许校正未执行且无 target 的 pending 占位；staged/committed/rolled-back 历史须交真实恢复执行器处理，不得被预检重置。原文件和 active 指针不因候选校正而改变。
 2. **准备目标**：创建版本目录 `plugins/<slug>/versions/<version>.staging` 和独立数据目录；校验 `module.json`、平台、`coreApiVersion`、签名 trusted comment、路径和清单中的 `legacyTables`/`vaultFixedKeys`，任一步失败都清理 staging 并保留旧版核心可启动。
 3. **迁移数据**：先复制可直接归属插件的库和目录到 staging，再通过核心只读接口读取 `taomni.db` 中声明的 legacy 表；MFA 的 `data-key-v1` 仍由核心 Vault 按 slug 授权，插件宿主不获得 Vault 句柄。运行中的宿主在 `backup.snapshot` 完成前必须静默，避免热备份与写入交错。
 4. **提交和激活**：逐项完成后更新 journal 为 `staged`，对目标文件重新计算指纹并执行原子目录替换，最后切换 `active` 指针并写 `committed`。旧版核心和旧目录至少保留一个回滚点；插件下载、验签或启动失败时只回退 active 指针，不覆盖旧文件。

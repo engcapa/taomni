@@ -29,6 +29,10 @@ def observe(data, state, phase):
         raise StepError("Upgrade observation refuses a linked database")
     with closing(sqlite3.connect(database.as_uri() + "?mode=ro", uri=True)) as connection:
         rows = connection.execute("SELECT id, session_type, options_json FROM sessions ORDER BY id").fetchall()
+        if "server_configs" in state:
+            servers = connection.execute("SELECT server_type, config_json, updated_at FROM server_configs ORDER BY server_type").fetchall()
+            if servers != state["server_configs"]:
+                raise StepError("Upgrade preflight/pending changed the original server configurations")
         if "full_sessions" in state:
             connection.row_factory = sqlite3.Row
             full_rows = [dict(row) for row in connection.execute("SELECT * FROM sessions ORDER BY id")]
@@ -39,7 +43,7 @@ def observe(data, state, phase):
         raise StepError("Upgrade preflight/pending changed the original session records")
     # This case installs no package. A pending journal must confer no execution.
     plugins = data / "plugins"
-    for slug in ["rdp-client", "vnc-client", "servers", "mfa", "lanchat"]:
+    for slug in ["rdp-client", "vnc-client", "rdp-server", "vnc-server", "servers", "mfa", "lanchat"]:
         if (plugins / slug).exists() or (plugins / slug).is_symlink():
             raise StepError("Pending migration created a module owner/code/data directory")
     journal_path = data / "migration" / "journal.json"
@@ -56,14 +60,16 @@ def observe(data, state, phase):
         if journal.get("status") != "pending" or journal.get("to_core_api_version") != "1":
             raise StepError("Unperformed upgrade was incorrectly marked complete")
         entries = journal.get("entries", [])
-        if len(entries) != 1:
-            raise StepError("VNC-only upgrade must have exactly one journal item")
-        entry = entries[0]
-        if (entry.get("item"), entry.get("state"), entry.get("source_path"), entry.get("target")) != (
-                "vnc-sessions", "pending", "taomni.db", ""):
-            raise StepError("Pending VNC item has an incorrect owner/source/state/target")
-        if not re.fullmatch(r"sha256:[0-9a-f]{64}:bytes:[0-9]+", entry.get("source_fingerprint", "")):
-            raise StepError("Pending VNC item lacks its actual source fingerprint")
+        expected_items = state.get("expected_items", ["vnc-sessions"])
+        if len(entries) != len(expected_items):
+            raise StepError(f"Upgrade must have exactly one journal entry per item (expected {len(expected_items)})")
+        if [entry.get("item") for entry in entries] != expected_items:
+            raise StepError("Pending migration has an incorrect owner or duplicate item")
+        for entry in entries:
+            if (entry.get("state"), entry.get("source_path"), entry.get("target")) != ("pending", "taomni.db", ""):
+                raise StepError("Pending migration has an incorrect owner/source/state/target")
+            if not re.fullmatch(r"sha256:[0-9a-f]{64}:bytes:[0-9]+", entry.get("source_fingerprint", "")):
+                raise StepError("Pending migration lacks its actual source fingerprint")
         if phase == "repeat" and journal != state.get("journal"):
             raise StepError("Repeated pending migration changed its journal instead of remaining idempotent")
         state["journal"] = journal
@@ -76,8 +82,8 @@ def run(ctx, args):
         raise StepError("module_upgrade_probe requires a fixed registered phase")
     owner = getattr(ctx, "fixture_context", None) or ctx
     state = getattr(owner, "module_upgrade", None)
-    if not state or getattr(owner, "case_id", None) not in {"TC-MODULES-025", "TC-MODULES-027"}:
-        raise StepError("module_upgrade_probe requires its native VNC-only input fixture")
+    if not state or getattr(owner, "case_id", None) not in {"TC-MODULES-025", "TC-MODULES-027", "TC-MODULES-028"}:
+        raise StepError("module_upgrade_probe requires its registered native legacy input fixture")
     data = isolated_data_root(owner)
     if data != state["root"]:
         raise StepError("Upgrade observation requires its own isolated profile")

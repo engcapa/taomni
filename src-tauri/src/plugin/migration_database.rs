@@ -53,9 +53,21 @@ fn inspect_database(
         ),
         (
             "server_configs",
-            "SELECT EXISTS(SELECT 1 FROM server_configs)",
+            "SELECT EXISTS(SELECT 1 FROM server_configs WHERE server_type IS NULL OR server_type NOT IN ('rdp', 'vnc'))",
             MigrationItem::ServerConfigs,
             "servers",
+        ),
+        (
+            "server_configs",
+            "SELECT EXISTS(SELECT 1 FROM server_configs WHERE server_type = 'rdp')",
+            MigrationItem::RdpServerConfigs,
+            "rdp-server",
+        ),
+        (
+            "server_configs",
+            "SELECT EXISTS(SELECT 1 FROM server_configs WHERE server_type = 'vnc')",
+            MigrationItem::VncServerConfigs,
+            "vnc-server",
         ),
     ];
     for (table, query, item, slug) in checks {
