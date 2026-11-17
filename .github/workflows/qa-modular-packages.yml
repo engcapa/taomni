@@ -12,11 +12,17 @@ on:
         type: choice
         options: [hello-plugin, mfa]
         default: hello-plugin
+      macos_runner:
+        description: Hosted macOS package builder (both Darwin targets remain explicit)
+        type: choice
+        options: [macos-latest, macos-15, macos-15-intel, macos-26]
+        default: macos-latest
   workflow_call:
     inputs:
       head: {type: string, default: ''}
       artifact_key: {type: string, default: ''}
       module: {type: string, default: hello-plugin}
+      macos_runner: {type: string, default: macos-latest}
     secrets:
       TAURI_SIGNING_PRIVATE_KEY: {required: true}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: {required: false}
@@ -37,6 +43,7 @@ jobs:
     outputs:
       sha: ${{ steps.source.outputs.sha }}
       host_package: ${{ steps.source.outputs.host_package }}
+      macos_runner: ${{ steps.macos_runner.outputs.runner }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -56,6 +63,19 @@ jobs:
             exit 1
           }
           echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - id: macos_runner
+        name: Validate hosted macOS package builder
+        env:
+          PACKAGE_MACOS_RUNNER: ${{ inputs.macos_runner || 'macos-latest' }}
+        run: |
+          python - <<'PY'
+          import os
+          runner = os.environ['PACKAGE_MACOS_RUNNER']
+          if runner not in {'macos-latest', 'macos-15', 'macos-15-intel', 'macos-26'}:
+              raise SystemExit('Unknown hosted macOS package builder')
+          with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
+              output.write(f'runner={runner}\n')
+          PY
 
   build:
     name: Build unsigned ${{ inputs.module || 'hello-plugin' }} (${{ matrix.platform }})
@@ -68,7 +88,7 @@ jobs:
           - {os: windows-latest, target: x86_64-pc-windows-msvc, platform: windows-x86_64}
           - {os: macos-latest, target: aarch64-apple-darwin, platform: darwin-aarch64}
           - {os: macos-latest, target: x86_64-apple-darwin, platform: darwin-x86_64}
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ startsWith(matrix.platform, 'darwin-') && needs.source.outputs.macos_runner || matrix.os }}
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4

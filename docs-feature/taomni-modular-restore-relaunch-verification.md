@@ -24,6 +24,8 @@ Linux WebKitWebDriver 和 Windows WebView2 的自动 relaunch 后接管仍待实
 
 ## 执行状态
 
+合并后的 `750f6f417528c25fb813bdd547c36c69239e7079` 已启动 [macOS 15 Intel #44119238192](https://github.com/engcapa/taomni/actions/runs/44119238192) 与 [macOS 26 ARM64 #44119201895](https://github.com/engcapa/taomni/actions/runs/44119201895)，各计划 44 项 native，均含 013/014/015、033/034/035 和完整 crash-regression。ARM64 改为单 shard 减少 hosted 容量占用；两轮按完成片即时下载，仍需实际结果，不将下面旧 SHA 的通过结论转移到当前源码。
+
 用户再次要求同步 main 后已合并 `677ec4d77`；下述 Intel 全量与 ARM64 部分证据仍绑定其原始 SHA。旧 SHA 的单作业 #44110689605 在执行应用用例前结束，合并后的匹配构建和三态还原需要新的 hosted 结果，不将旧源码结果转为新源码通过。
 
 本地仅执行工具单元和 schema/behavior contract、catalog/refactor 静态检查。真实应用、进程、文件还原和三态自动 relaunch 全部留 GitHub `qa-ui-auto-platforms`，包含完整 crash-regression，并在运行中下载完成的 shard。

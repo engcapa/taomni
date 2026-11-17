@@ -6,6 +6,20 @@ Live 表格此前直接使用 `textContent` 展示单元格，导致 `**` 等源
 
 ## 当前验收
 
+合并后提交 `750f6f417528c25fb813bdd547c36c69239e7079` 已启动新的 hosted 验证，产品源码指纹为 `c35b48e6018a22744215dcd62f63f41f3e60313e810e3ea06be53f1c97f186bf`、runner 指纹为 `bccd320420dc81388adea1107b3de937643ebf4309ea659fd7d16367d3ad7eb2`。三轮均选择 release QA native binary，开启 Rust contracts，并在规划时启动即时收证。三轮 GitHub plan 均已通过，selection 已下载；下表为确认后的计划，实际通过数待原始结果补录，不等同于用例已经执行。
+
+| GitHub run | 平台与模式 | 计划用例 / shard |
+|---|---|---|
+| [44119120276](https://github.com/engcapa/taomni/actions/runs/44119120276) | Linux Xvfb、Windows，browser/native | 各 35 browser + 43 native，合计 16 shards |
+| [44119238192](https://github.com/engcapa/taomni/actions/runs/44119238192) | macOS 15 Intel，browser/native | 35 browser + 44 native，8 shards |
+| [44119201895](https://github.com/engcapa/taomni/actions/runs/44119201895) | macOS 26 ARM64，native | 44 native，1 shard |
+
+三轮均合并完整 crash-regression；额外覆盖 Explorer001–007、Live 表格029、保留 Markdown 和 main 新增的导出/格式回归、Workspace085/096/097、真实 MySQL 结果搜索与 Tao 配置/provider 用例。Tao045/046 现有 case 只声明 Linux/Windows native，由首轮执行，不外推 macOS。静态计划 gaps=[]/unreviewed=[]；全部真实结果必须另核验 receipt、完整 artifacts、case/selection/source/build 身份与截图。
+
+首轮运行期间已下载并逐份核验 8 个完成的 browser shards：Linux、Windows 各 **35/35**，各含完整 20 项 crash-regression，零失败/skip；全部 artifact hash/bytes、receipt、case digest 与 CI outcome 的 source/selection/run 绑定均通过。记录为 `qa-ui-auto-report/github/44119120276/hosted-evidence-review.json` 和 `post-main-review.json`。已查看 Linux 新建对话框、029 Live 表格与用户 testing.md 的实际截图，控件和格式正常。Native 构建及其它结果仍待完成。
+
+模块打包的 Darwin 构建仍固定 `macos-latest`，排队超过十分钟后阻挡了所有依赖签名模块的 native shard。补充 `qa-modular-packages.yml` 的 hosted macOS runner 选择和平台 workflow 转发；source job 先校验固定允许清单，再调度两个明确 Rust target，保持包平台与签名审查。纯工具/工作流单元 **29/29** 和 actionlint 已通过；实际恢复批次另行补录。此修改不改变产品源码和用例预期。
+
 再次合并远程 main `677ec4d77` 后，保留双方 Markdown 修复和实际编辑器回归测试；本页 Live 表格场景改为 `TC-FILE-OPEN-029`，main 的 native 导出操作场景继续使用 `TC-FILE-OPEN-023`。下列旧 run 与 171 项结论绑定合并前的产品源码指纹；合并后的匹配 browser/native 与完整 crash-regression 须另行记录。旧 SHA 的单作业 #44110689605 已在应用用例开始前结束，其未执行项不计通过。
 
 合并后相关前端单元 40 文件 **274/274**、QA 工具 **68/68**、TypeScript、catalog、check:refactor 及 852 个唯一用例的完整 audit gate 已通过。新增 Workspace 场景 WS-096 补充切回当前目录的真实点击、唯一 radio 选中和名称输入框隐藏断言，未修改 coverage baseline。上述属于本地单元与静态验证，新的真实多端结果另行记录。

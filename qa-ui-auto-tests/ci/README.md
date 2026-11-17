@@ -121,6 +121,13 @@ all retain the chosen architecture; an Intel pass does not count as an ARM64
 pass. For example, append `-f macos_runner=macos-15-intel` to a platforms run.
 The allowed labels are fixed; arbitrary or self-hosted runners are rejected.
 
+The platforms workflow forwards this choice to the signed-module package
+builders. `qa-modular-packages.yml` also accepts `macos_runner` directly, with
+`macos-latest` as its standalone default. The source job validates the hosted
+label before scheduling either Darwin package build; each build retains its
+explicit ARM64 or Intel Rust target. This allows the available Intel or macOS 26
+image to build the module packages needed by a focused native run.
+
 Linux package installation refreshes indexes and retries the exact requested
 package set once after apt exit 100 (for example, a removed package version
 referenced by a stale mirror index). A failed refresh or second installation
