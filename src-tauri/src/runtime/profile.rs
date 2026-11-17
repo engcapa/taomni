@@ -42,6 +42,7 @@ pub(crate) struct ProfileRuntimeLeases {
 }
 impl ProfileRuntimeLeases {
     pub(crate) fn acquire(data: &Path, mode: StartupMode) -> Result<Self, String> {
+        crate::plugin::migration_commit::recover_at_startup(data)?;
         let mode = ModeLease::acquire(data, mode)?;
         // Applies a pending restore under exclusive ownership before any DB opens.
         let profile = crate::backup::coordination::ProfileLease::prepare(data)?;

@@ -19,13 +19,32 @@ pub(super) fn deadline() -> Instant {
     Instant::now() + Duration::from_secs(15)
 }
 
-pub(super) struct InstalledMfa {
+pub(in crate::plugin) struct InstalledMfa {
     pub state: VaultHarness,
     pub package: VerifiedPackage,
 }
 
 impl InstalledMfa {
     pub fn new() -> Self {
+        let package = Self::verified_package();
+        let state = VaultHarness::new();
+        state.initialize();
+        let record = state.registry.install_verified(&package).unwrap();
+        assert!(record.reason.is_none());
+        assert_eq!(&record.manifest, package.manifest());
+        assert!(
+            !state
+                .services
+                .root
+                .path()
+                .join("plugins/mfa/data/mfa.db")
+                .exists()
+        );
+        state.registry.set_enabled("mfa", true).unwrap();
+        Self { state, package }
+    }
+
+    pub(in crate::plugin) fn verified_package() -> VerifiedPackage {
         let artifact = PathBuf::from(
             std::env::var_os("TAOMNI_SIGNED_MFA_PACKAGE_DIR")
                 .expect("hosted signed MFA artifact is required"),
@@ -72,21 +91,7 @@ impl InstalledMfa {
             expected.entry.host.as_mut().unwrap().push_str(".exe");
         }
         assert_eq!(package.manifest(), &expected);
-        let state = VaultHarness::new();
-        state.initialize();
-        let record = state.registry.install_verified(&package).unwrap();
-        assert!(record.reason.is_none());
-        assert_eq!(record.manifest, expected);
-        assert!(
-            !state
-                .services
-                .root
-                .path()
-                .join("plugins/mfa/data/mfa.db")
-                .exists()
-        );
-        state.registry.set_enabled("mfa", true).unwrap();
-        Self { state, package }
+        package
     }
 
     pub fn call(

@@ -79,11 +79,11 @@ fn with_wal(main: Fingerprint, wal: Option<Fingerprint>) -> Result<Fingerprint, 
     })
 }
 
-pub(super) fn database_fingerprint(path: &Path) -> Result<String, String> {
+pub(crate) fn database_fingerprint(path: &Path) -> Result<String, String> {
     database_fingerprint_checked(path, &|| Ok(()))
 }
 
-pub(super) fn database_fingerprint_checked(
+pub(crate) fn database_fingerprint_checked(
     path: &Path,
     check: &dyn Fn() -> Result<(), String>,
 ) -> Result<String, String> {

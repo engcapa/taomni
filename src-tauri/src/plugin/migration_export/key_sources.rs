@@ -37,7 +37,7 @@ impl PreparedMfaExport {
         verify: impl FnOnce(MfaKeySources<'_>) -> Result<T, String>,
     ) -> Result<T, String> {
         self.verify()?;
-        let check = || self.control.check().map_err(|error| error.to_string());
+        let check = || self.check();
         let database = self
             .database_path()
             .map(|path| {
@@ -52,13 +52,13 @@ impl PreparedMfaExport {
             verify(MfaKeySources {
                 vault,
                 database: database.as_ref(),
-                lease: &self._vault,
+                lease: &self.maintenance.vault,
                 check: &check,
             })
         };
         let result = if let Some(expected) = self.sources.fingerprints.get("vault.db") {
             source::read_bound_snapshot_checked(
-                &self.root.path().join("vault.db"),
+                &self.maintenance.profile().path().join("vault.db"),
                 Some(expected),
                 |vault| run(Some(vault)),
                 &check,

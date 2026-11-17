@@ -5,7 +5,7 @@ use std::{
     path::{Path, PathBuf},
 };
 
-pub(super) fn directory(path: &Path) -> Result<(), String> {
+pub(crate) fn directory(path: &Path) -> Result<(), String> {
     let metadata = fs::symlink_metadata(path).map_err(|error| error.to_string())?;
     if !metadata.is_dir() || is_link(&metadata) {
         return Err("legacy migration directory must not be linked".into());
@@ -25,7 +25,7 @@ pub(super) fn create_directory(parent: &Path, name: &str) -> Result<PathBuf, Str
     Ok(path)
 }
 
-pub(super) fn file_exists(path: &Path) -> Result<bool, String> {
+pub(crate) fn file_exists(path: &Path) -> Result<bool, String> {
     match fs::symlink_metadata(path) {
         Ok(metadata) => {
             regular(&metadata)?;
@@ -37,7 +37,7 @@ pub(super) fn file_exists(path: &Path) -> Result<bool, String> {
 }
 
 /// SQLite may open sidecars without passing through the main-file hash.
-pub(super) fn database_exists(path: &Path) -> Result<bool, String> {
+pub(crate) fn database_exists(path: &Path) -> Result<bool, String> {
     let exists = file_exists(path)?;
     for suffix in ["-wal", "-shm", "-journal"] {
         let mut sidecar = path.as_os_str().to_owned();
@@ -49,7 +49,50 @@ pub(super) fn database_exists(path: &Path) -> Result<bool, String> {
     Ok(exists)
 }
 
-pub(super) fn open_file(path: &Path) -> Result<File, String> {
+pub(crate) fn read_json_bounded<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T, String> {
+    use std::io::Read;
+    const MAX_BYTES: u64 = 1024 * 1024;
+    let mut data = Vec::new();
+    open_file(path)?
+        .take(MAX_BYTES + 1)
+        .read_to_end(&mut data)
+        .map_err(|error| error.to_string())?;
+    if data.len() as u64 > MAX_BYTES {
+        return Err("Migration record is too large".into());
+    }
+    serde_json::from_slice(&data).map_err(|error| error.to_string())
+}
+
+pub(crate) fn write_json_durable<T: serde::Serialize>(
+    path: &Path,
+    value: &T,
+) -> Result<(), String> {
+    use std::io::Write;
+    let parent = path.parent().ok_or("Missing migration directory")?;
+    directory(parent)?;
+    file_exists(path)?;
+    let mut stage = tempfile::NamedTempFile::new_in(parent).map_err(|error| error.to_string())?;
+    let json = serde_json::to_vec_pretty(value).map_err(|error| error.to_string())?;
+    stage.write_all(&json).map_err(|error| error.to_string())?;
+    stage
+        .as_file()
+        .sync_all()
+        .map_err(|error| error.to_string())?;
+    stage.persist(path).map_err(|error| error.to_string())?;
+    sync_directory(parent)
+}
+
+pub(crate) fn sync_directory(path: &Path) -> Result<(), String> {
+    #[cfg(unix)]
+    File::open(path)
+        .and_then(|directory| directory.sync_all())
+        .map_err(|error| error.to_string())?;
+    #[cfg(not(unix))]
+    let _ = path;
+    Ok(())
+}
+
+pub(crate) fn open_file(path: &Path) -> Result<File, String> {
     let mut options = OpenOptions::new();
     options.read(true);
     #[cfg(unix)]

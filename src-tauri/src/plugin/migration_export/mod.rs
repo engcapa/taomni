@@ -5,8 +5,10 @@
 //! journal. The future trusted transaction must retain this owner, revalidate
 //! it and perform the scoped key check before committing anything.
 mod key_sources;
+mod maintenance;
 mod sources;
 pub(crate) use key_sources::MfaKeySources;
+pub(crate) use maintenance::MfaMaintenance;
 
 use std::{
     collections::BTreeMap,
@@ -16,10 +18,7 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize};
-use taomni_profile_locks::{
-    LegacyUpgradeLease, PluginDataLease, PluginSlug, ProfileRestoreLease, ProfileRoot,
-    ProfileStateLease, VaultOperationLease,
-};
+use taomni_profile_locks::ProfileRoot;
 use taomni_sqlite_snapshot::{
     SnapshotControl, SnapshotOptions, SnapshotOutcome, snapshot_existing,
 };
@@ -57,15 +56,10 @@ pub struct MfaExportReceipt {
 pub struct PreparedMfaExport {
     // Delete temporary data before releasing any of its ownership guards.
     staging: tempfile::TempDir,
-    root: ProfileRoot,
     sources: MfaSources,
     receipt: MfaExportReceipt,
     control: SnapshotControl,
-    _data: PluginDataLease,
-    _vault: VaultOperationLease,
-    _state: ProfileStateLease,
-    _profile: ProfileRestoreLease,
-    _legacy_mode: LegacyUpgradeLease,
+    maintenance: MfaMaintenance,
 }
 
 impl PreparedMfaExport {
@@ -78,19 +72,7 @@ impl PreparedMfaExport {
         control: &SnapshotControl,
     ) -> Result<Self, String> {
         control.check().map_err(|error| error.to_string())?;
-        paths::directory(profile.path())?;
-        let _legacy_mode = LegacyUpgradeLease::try_acquire(profile)
-            .map_err(|error| format!("Close the legacy application before MFA export: {error}"))?;
-        let _profile = ProfileRestoreLease::try_acquire(profile)
-            .map_err(|error| format!("Close other instances before MFA export: {error}"))?;
-        let _state = ProfileStateLease::try_acquire(profile).map_err(|error| error.to_string())?;
-        let _vault = VaultOperationLease::try_write(profile)
-            .map_err(|error| format!("Vault is in use during MFA export: {error}"))?;
-        let _data = PluginDataLease::try_acquire(
-            profile,
-            &PluginSlug::parse("mfa").map_err(|error| error.to_string())?,
-        )
-        .map_err(|error| format!("MFA data is in use during export: {error}"))?;
+        let maintenance = MfaMaintenance::acquire(profile)?;
         let sources = MfaSources::from_snapshot(snapshot)?;
         if snapshot
             .vault
@@ -157,15 +139,10 @@ impl PreparedMfaExport {
         file.sync_all().map_err(|error| error.to_string())?;
         let prepared = Self {
             staging,
-            root: profile.clone(),
             sources,
             receipt,
             control: control.clone(),
-            _data,
-            _vault,
-            _state,
-            _profile,
-            _legacy_mode,
+            maintenance,
         };
         prepared.verify()?;
         Ok(prepared)
@@ -173,6 +150,22 @@ impl PreparedMfaExport {
 
     pub fn receipt(&self) -> &MfaExportReceipt {
         &self.receipt
+    }
+
+    pub(crate) fn maintenance(&self) -> &MfaMaintenance {
+        &self.maintenance
+    }
+
+    pub(crate) fn staging_name(&self) -> &str {
+        self.staging
+            .path()
+            .file_name()
+            .and_then(|name| name.to_str())
+            .expect("migration export staging names are ASCII")
+    }
+
+    pub(crate) fn check(&self) -> Result<(), String> {
+        self.control.check().map_err(|error| error.to_string())
     }
 
     pub fn database_path(&self) -> Option<PathBuf> {
@@ -184,10 +177,11 @@ impl PreparedMfaExport {
     /// Recheck both sources and the complete temporary artifact immediately
     /// before handing it to the future trusted activation/key-check owner.
     pub fn verify(&self) -> Result<(), String> {
-        let check = || self.control.check().map_err(|error| error.to_string());
-        self.sources.verify(self.root.path(), &self.control)?;
-        paths::directory(&self.root.path().join("migration"))?;
-        paths::directory(&self.root.path().join("migration/exports"))?;
+        let check = || self.check();
+        let root = self.maintenance.profile().path();
+        self.sources.verify(root, &self.control)?;
+        paths::directory(&root.join("migration"))?;
+        paths::directory(&root.join("migration/exports"))?;
         paths::directory(self.staging.path())?;
         let mut files = fs::read_dir(self.staging.path())
             .map_err(|error| error.to_string())?

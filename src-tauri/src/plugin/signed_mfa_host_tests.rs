@@ -2,7 +2,7 @@
 //! This prototype has no frontend; it does not establish OS system trust,
 //! installed-monolith upgrade or the app facade's eventual module routing.
 #[path = "signed_mfa_support.rs"]
-mod support;
+pub(super) mod support;
 use super::*;
 use serde_json::json;
 use support::*;

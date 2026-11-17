@@ -162,6 +162,12 @@ jobs:
           TAOMNI_SIGNED_MFA_PACKAGE_DIR: signed-mfa-package
           TAOMNI_SIGNED_MFA_SOURCE_SHA: ${{ needs.source.outputs.sha }}
         run: python scripts/run-signed-mfa-host-gates.py --evidence modular-mfa-install
+      - name: Migrate an encrypted legacy fixture and recover an interrupted activation
+        if: ${{ !inputs.network_only }}
+        env:
+          TAOMNI_SIGNED_MFA_PACKAGE_DIR: signed-mfa-package
+          TAOMNI_SIGNED_MFA_SOURCE_SHA: ${{ needs.source.outputs.sha }}
+        run: python scripts/run-signed-mfa-host-gates.py --evidence modular-mfa-install --suite legacy-migration
       - name: Exercise persisted module proxy modes and Vault credentials
         run: python scripts/run-module-network-gates.py --evidence modular-mfa-install
       - uses: actions/upload-artifact@v4

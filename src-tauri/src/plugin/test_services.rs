@@ -17,7 +17,10 @@ pub(crate) struct VaultHarness {
 
 impl VaultHarness {
     pub(crate) fn new() -> Self {
-        let root = tempfile::tempdir().unwrap();
+        Self::open(tempfile::tempdir().unwrap())
+    }
+
+    pub(crate) fn open(root: tempfile::TempDir) -> Self {
         let profile =
             Arc::new(ProfileRuntimeLeases::acquire(root.path(), StartupMode::Desktop).unwrap());
         let vault = Arc::new(Vault::open(&root.path().join("vault.db")).unwrap());

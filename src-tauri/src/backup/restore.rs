@@ -5,7 +5,7 @@ mod paths;
 
 use super::manifest::BackupManifest;
 use archive::{verified_archive, verified_archive_with_context};
-pub(super) use journal::JOURNAL_FILE;
+pub(crate) use journal::JOURNAL_FILE;
 pub use journal::apply_pending_restore;
 use serde::{Deserialize, Serialize};
 use std::fs::File;

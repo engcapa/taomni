@@ -415,10 +415,10 @@ mod preflight;
 pub use preflight::{build_file_migration_specs, inspect_legacy_install};
 
 #[path = "migration_source.rs"]
-mod source;
+pub(super) mod source;
 
 #[path = "migration_paths.rs"]
-mod paths;
+pub(super) mod paths;
 
 #[cfg(test)]
 #[path = "migration_wal_tests.rs"]

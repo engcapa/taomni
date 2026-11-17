@@ -52,6 +52,21 @@ fn access(
     let root = ProfileRoot::prepare(data).map_err(|e| e.to_string())?;
     let wait = WaitControl::new(Instant::now() + Duration::from_secs(5), &|| false);
     let _lease = ProfileStateLease::acquire(&root, &wait).map_err(|e| e.to_string())?;
+    access_locked(&root, replacement)
+}
+
+/// MFA export and recovery already own the exact profile-state lock.
+pub(crate) fn access_for_mfa_upgrade(
+    maintenance: &crate::plugin::migration::export::MfaMaintenance,
+    replacement: Option<ProfileGeneration>,
+) -> Result<ProfileGeneration, String> {
+    access_locked(maintenance.profile(), replacement)
+}
+
+fn access_locked(
+    root: &ProfileRoot,
+    replacement: Option<ProfileGeneration>,
+) -> Result<ProfileGeneration, String> {
     let path = root.path().join(STATE_FILE);
     let old = match fs::symlink_metadata(&path) {
         Ok(metadata) => {

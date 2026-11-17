@@ -16,6 +16,7 @@ def digest(path):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--evidence", type=Path, required=True)
+    parser.add_argument("--suite", choices=("installed", "legacy-migration"), default="installed")
     args = parser.parse_args()
     if os.environ.get("GITHUB_ACTIONS") != "true":
         parser.error("Actual host processes run only on GitHub; locally compile with --no-run")
@@ -44,13 +45,18 @@ def main():
     assert Path(archive_name).name == archive_name, "Unsafe archive name in receipt"
     archive = artifact / archive_name
     assert digest(archive) == package["sha256"], "Signed package artifact hash mismatch"
-    selected = "plugin::signed_mfa_host_tests"
+    if args.suite == "installed":
+        selected, evidence_name = "plugin::signed_mfa_host_tests", "installed-mfa"
+    else:
+        selected, evidence_name = "plugin::migration_commit::tests::signed_legacy_mfa_", "legacy-mfa-migration"
     listing = subprocess.check_output([str(executable), selected, "--ignored", "--list"], text=True)
-    (root / "selected-tests.txt").write_text(listing, encoding="utf-8")
+    listing_name = "selected-tests.txt" if args.suite == "installed" else "legacy-mfa-selected-tests.txt"
+    (root / listing_name).write_text(listing, encoding="utf-8")
     count = sum(line.endswith(": test") for line in listing.splitlines())
-    assert count == 3, f"Expected three actual signed-install gates, got {count}"
+    assert count == 3, f"Expected three actual {args.suite} gates, got {count}"
     receipt = {
-        "schema": "taomni.signed-mfa-install.v1", "head": source,
+        "schema": f"taomni.signed-mfa-{args.suite}.v1" if args.suite != "installed"
+                  else "taomni.signed-mfa-install.v1", "head": source,
         "platform": package["platform"], "filter": selected, "selected": count,
         "coreSha256": digest(executable), "packageSha256": digest(archive),
         "provenanceSha256": digest(artifact / "provenance.json"),
@@ -71,15 +77,18 @@ def main():
             output = output.decode("utf-8", errors="replace")
         output += "\nInstalled MFA gate exceeded its 180-second process deadline.\n"
         exit_code = 124
-    (root / "installed-mfa-process.log").write_text(output, encoding="utf-8")
+    (root / f"{evidence_name}-process.log").write_text(output, encoding="utf-8")
     print(output, flush=True)
     summary = re.search(
         r"test result: ok\. (\d+) passed; (\d+) failed; (\d+) ignored;", output,
     )
     passed = exit_code == 0 and summary is not None and summary.groups() == ("3", "0", "0")
-    receipt.update({"exitCode": exit_code, "allSelectedPassed": passed,
-                    "fixtureKeyRejectionVerified": passed})
-    (root / "installed-mfa-receipt.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+    receipt.update({"exitCode": exit_code, "allSelectedPassed": passed})
+    if args.suite == "installed":
+        receipt["fixtureKeyRejectionVerified"] = passed
+    else:
+        receipt["legacyProfileSeed"] = "synthetic-v0.5-style"
+    (root / f"{evidence_name}-receipt.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
     raise SystemExit(0 if passed else (exit_code or 1))
 
 
