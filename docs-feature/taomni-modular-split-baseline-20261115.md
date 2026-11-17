@@ -58,3 +58,16 @@ Windows [首轮采样 #44004139461](https://github.com/engcapa/taomni/actions/ru
 
 包体积是文件本身的 bytes，不是 Actions zip 大小。产品仍含业务实现，不能据此宣称核心瘦身；本批未启动应用或进行真实已安装升级，不建立启动/内存、legacy exporter、系统分发信任或 G1–G11 通过证据。
 
+
+### macOS Intel 实际包（2026-11-17）
+
+[采样 #44012918046](https://github.com/engcapa/taomni/actions/runs/44012918046) 成功；在 producer Intel artifact 上传后立即单目标 dispatch，不等待其它作业 summary。产品源码 `1eec7eca4ede44e9266d927674c4c7ea5f38ffe1`，工具源码 `35bc698a4eed84a795e6dcaafc23ab44268d51f9`，producer #43997809941，版本 0.6.0。immutable artifact `14296274984`，Actions zip 209251132 bytes，SHA-256 `ca84f2ddfe0119e3b0e8f38fdc53f482196db57d9fc3ebdbcf3a941c3b76b278`。
+
+| 实际文件 | bytes | SHA-256 |
+| --- | ---: | --- |
+| `Taomni_0.6.0_x64.dmg` | 104470089 | `e169a5148bee57ee65303f95f24d7ab58763e25a211c46062ae878fed86152e5` |
+| `Taomni.app.tar.gz` | 105608526 | `46eb17e24ce76f6fa8b778f30063f32821602805b30be67f471404d0dcedc3c6` |
+
+实际 DMG app 为 24 个 regular files / 270375836 bytes；主 executable 209838992 bytes，SHA-256 `961f45298699cd7337b8047e8195245925a3802abfea0da4f72bd427c6322f35`，架构 x86_64。updater app 的 identifier/version/executable hash 与 DMG 一致。DMG/updater `codesign --verify --deep --strict`、runtime paths 和 quarantine readback 通过；`spctl --assess` exit=3 / rejected，`systemTrustEstablished=false`。job 成功不能转为 G1 系统分发信任通过；没有启动应用或验证安装升级。
+
+原始证据：`qa-ui-auto-report/github/44012918046/live-samples/modular-bundle-darwin-x86_64-43997809941/` 中的 `bundle-baseline.json`、`bundle-source.json`、`macos-payload.json` 与 `producer-artifacts.json`；完整 producer/tooling 身份分开保留。
