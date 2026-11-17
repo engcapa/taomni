@@ -1,5 +1,7 @@
 # 模块化实施与验收台账
 
+2026-11-17 文件功能与自动还原补充：File Explorer 新建可编辑类型和 Markdown Live 表格格式/逐字输入/历史修复已提交。三端 browser 各 25/25、Linux Xvfb/Windows native 各 31/31，共 137 项原始证据已核验；Intel native 4/4 片即时收齐，33/34，其中新建、表格及完整 crash-regression 全部通过。033/034 已完成真实确认自动 relaunch 与后续数据解密；035 已接管真实新进程，但随后误用另一场景的固定文本探针，原失败保留。现改为准确 SQLite/locator/完整字节 oracle 并补充先红后绿单元，相关工具 71/71、QA audit、actionlint/check:refactor 通过，仍待修订后的 matching native 复验。详见[文件功能](file-explorer/editable-file-creation-and-live-tables.md)与[真实还原入口](taomni-modular-restore-relaunch-verification.md)。本批不改变下列业务迁出、真实单体升级和正式发布待办。
+
 2026-11-17 收证更新：完整 UI [#44040286838](https://github.com/engcapa/taomni/actions/runs/44040286838)（`b6b5379f50ca161940ee114ef1b29036aa3d01ba`、selection `fcb5bc65dc2b4a7984ee756661fdf629`）22/22 shards 已在执行期间收齐并核验 receipt/summary/source/build：三端 browser 各 36/36，Linux Xvfb native 56/56、Windows native 55/55、macOS ARM64 native 52/52。Windows TC-MODULES-015 原安装等待失败本轮通过，没有扩大等待预算；Wayland 54/56，FILE-OPEN-006/008 的既有非左键/X11 限制按用户授权单列忽略，仍保留原始失败。证据 `qa-ui-auto-report/github/44040286838/shard-case-totals.json`。自动 relaunch 新增三态用例首轮停在错误备份任务选择，已定位并准备定向复验，详见 `taomni-modular-restore-relaunch-verification.md`。模块化整体迁出和真实安装升级仍未完成。
 
 更新：2026-11-17。范围以[设计 §10.1](taomni-modular-split-design.md#101-可执行任务分解)与 [ADR](../claudedocs/adr-taomni-modular-split.md)为准。基础契约通过不代表业务已迁出或可发布。

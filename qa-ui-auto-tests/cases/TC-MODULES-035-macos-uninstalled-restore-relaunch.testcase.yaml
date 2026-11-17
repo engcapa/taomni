@@ -202,7 +202,7 @@ steps:
 - native_confirm_restore_relaunch: null
 - wait_for: '[data-testid="status-bar"]'
 - module_signed_probe:
-    phase: retained
+    phase: uninstalled
 - module_restore_probe:
     phase: ui-restored
 - wait_for: '[data-testid="vault-unlock-dialog"]'
@@ -283,11 +283,15 @@ verification:
     - step: 93
       expectation: The observer clicks once, sees staged success/disabled confirmation, reaps the original at exit=0, validates a different
         PID/start-time and identical executable/QA environment, and attaches without spawning an app.
+    - step: 95
+      expectation: The signed native module remains uninstalled with an inactive code pointer, rejected invocation and no writer lease.
     - step: 96
       expectation: Independent disk/host observations prove original module values, unchanged active pointer, new generation, clean
-        restore state, original lifecycle and correct writer lease.
+        restore state, original lifecycle and correct writer lease; the retained flag, exact SQLite locator and full database bytes
+        match the original verified snapshot.
     results:
     - 93
+    - 95
     - 96
   - id: R4
     requirement: The restored paired Vault/MFA accepts only the original password and decrypts the original account.

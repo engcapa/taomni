@@ -21,6 +21,7 @@ from .module_backup_observation import wait_manual_job
 from .module_live_backup_observation import VALUES, check_archive
 from .module_profile_observation import writer_lease
 from .module_retained_observation import ordinary
+from .module_restore_retained_observation import check_retained_sqlite
 from .module_signed_observation import invoke
 from .steps import StepError
 
@@ -162,7 +163,8 @@ def run(ctx, args):
     state = json.loads(state_path.read_text(encoding="utf-8")) if state_path.exists() else None
     observed = {"phase": phase, "passed": False}
     try:
-        native_state = record(ctx).get("state")
+        native_record = record(ctx)
+        native_state = native_record.get("state")
         if phase == "write-original":
             if state is not None or native_state != "enabled":
                 raise StepError("Original restore input requires a fresh enabled signed host")
@@ -239,6 +241,9 @@ def run(ctx, args):
                     raise StepError("Applied restore lost original rows or changed module activation state")
                 if hashlib.sha256((root / "hello-plugin/active.json").read_bytes()).hexdigest() != state["activePointerSha256"]:
                     raise StepError("Data restore changed the active code pointer")
+                if phase == "ui-restored" and native_state == "uninstalled":
+                    observed["retainedData"] = check_retained_sqlite(
+                        root, Path(state["archive"]), state["archiveSha256"], native_record)
                 if native_state == "enabled":
                     business(ctx, "hello/read", VALUES[:1])
                 observed["writerLease"] = writer_lease(root, enabled=native_state == "enabled")

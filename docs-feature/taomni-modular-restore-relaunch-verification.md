@@ -12,7 +12,7 @@
 
 每项从隔离空 profile 开始，经真实 UI 安装当前源码的官方签名 hello、创建 RFC HOTP 和手工本地 v2 备份。独立 oracle 核验准确 job、ZIP、全部文件 hash、模块 SQLite 与配对 Vault/MFA；然后更改真实宿主数据、推进 HOTP、重设主密码，并恢复该场景的生命周期。Settings 从这个本地任务打开原备份，原生确认拒绝旧的当前主密码且不 staging；正确密码之后只点击一次真正的还原确认。
 
-`native_confirm_restore_relaunch` 必须观察到 staged 成功、确认禁用及原进程 exit=0，再核验新 bridge listener 的不同内核 PID/start-time、同一可执行文件和完全相同的 data/config/cache、bridge host/port。只从内核读取这几个环境键，不归档完整环境或命令行。macOS 的 POST /session 仅连接已经运行的 bridge；探针不调用 driver.start、应用 spawn、还原/重启 IPC、DELETE 或 native_restart_app，也不重置 fixture 或重写存储。
+`native_confirm_restore_relaunch` 必须观察到 staged 成功、确认禁用及原进程 exit=0，再核验新 bridge listener 的不同内核 PID/start-time、同一可执行文件和完全相同的 data/config/cache、bridge host/port。只从内核读取这几个环境键，不归档完整环境或命令行。macOS 的 POST /session 仅连接已经运行的 bridge；探针不调用 driver.start、应用 spawn、还原/重启 IPC、DELETE /session 或 native_restart_app，也不重置 fixture 或重写存储。普通点击完成后释放按键的 DELETE /session/{id}/actions 不结束应用会话。
 
 接管后独立检查原模块行、原 active code 指针、推进后的 generation、正确 writer lease、清理后的还原状态，以及新密码被拒绝、原密码解密原账户和 HOTP 755224。原 renderer 和重启后的 renderer 分别断言运行时无错。保存原始进程记录、case receipt 和截图；截图仍需视觉复核。
 
@@ -26,6 +26,10 @@ Linux WebKitWebDriver 和 Windows WebView2 的自动 relaunch 后接管仍待实
 
 本地仅执行工具单元和 schema/behavior contract、catalog/refactor 静态检查。真实应用、进程、文件还原和三态自动 relaunch 全部留 GitHub `qa-ui-auto-platforms`，包含完整 crash-regression，并在运行中下载完成的 shard。
 
+修复后的 [Intel #44077458265](https://github.com/engcapa/taomni/actions/runs/44077458265) 绑定 `481d59afda4791578da03699aecc7c55a4fa9f2a`，4/4 分片均在 summary 前下载：33/34 通过，含 033 的完整 93 步与 034 的完整 104 步。033 原始 `native-restore-relaunch.jsonl` 为 `passed=true`、`stage=complete`、`manual_launch=false`、`previous_connection_closed=true`；staged 后确认禁用，原 PID 9496 exit=0，新 PID 9853，核验同一二进制和精确隔离环境后接管成功。035 的同一接管边界也通过（原 PID 10167 exit=0，新 PID 10552），但随后第 95 步误用要求预先创建 `qa-retained.txt` 的固定文本场景探针，阻挡了真实 SQLite 场景的后续数据/密码断言，035 仍计失败。ARM64 [#44087810304](https://github.com/engcapa/taomni/actions/runs/44087810304) 继续逐片收证，不外推三态或架构全部通过。
+
+035 修订为原签名/lifecycle `uninstalled` 检查加 `ui-restored` 的真实 SQLite oracle，保留全部既有业务行、generation、active pointer、writer lease、密码/HOTP 和 relaunch 断言。新增检查要求 `dataRetained=true`、准确 `hello.sqlite` locator、全部路径为普通隔离路径、完整数据库字节等于原已核验档案，以及原档案 hash 不变；不向场景补写文本或更改预期业务数据。单元先复现错误探针及原检查对伪造 locator/字节变化的漏检，再验证完整场景和拒绝分支，相关工具 71/71；workflow 规划阶段也执行这组单元。QA audit、actionlint 与 check:refactor 通过，修订后的原生结果待 GitHub 复验。
+
 [matching UI #44043206496](https://github.com/engcapa/taomni/actions/runs/44043206496) 绑定 `fa17261e4582f84c645bf41658949592767547ec`，selection 为 `f0c687845e4a473da0bcdd72862947d6`。实际计划含 macOS ARM64 native 32 项（包含 033/034/035），browser 三端各 19 项，Linux Xvfb/Wayland 与 Windows native 各 29 项；gaps=[]/unreviewed=[]。已启动即时收证，新增用例尚待 matching runner 结果；不能把静态审查或工具模拟写成原生通过。
 
 2026-11-17：#44043206496 的 macOS 033/034/035 原始失败均停在备份清单断言，尚未执行自动 relaunch。原失败 DOM 有多份真实本地任务；未限定任务的 selector 点击了另一份自动备份。修正 oracle 仅在独立核验准确手工 job、ZIP/全部 hash、原 HOTP counter 和配对 Vault/MFA 后公开该 job ID，三项用例通过对应 `backup-cloud-job[data-job-id]` 打开原任务。保留全部后续密码、staged、exit=0、新 PID/generation 和业务断言；增加工具单元同时检查三项用例的精确 UI 选择。修正后的真实自动重启仍待新 GitHub 结果，原失败不改写为通过。
@@ -38,4 +42,4 @@ Linux WebKitWebDriver 和 Windows WebView2 的自动 relaunch 后接管仍待实
 
 `44058015738` 的 macOS native shard 2 首次进入 033 观察器 preflight，在任何点击之前报 `WebDriverError: None`。下载的 `native-restore-relaunch.jsonl` 明确 `click_attempted=false`、`stage=preflight`；原进程仍存活、console 无错误。根因为 W3C 传输层把合法脚本观察结果中的 `error: null` 当作协议错误。新增经过 NativeSession.execute 的红测精确复现，修复仅对非空字符串 error code 判错；原 HTTP 500/W3C 错误、超时、截断、禁止重放和 owner 清理断言全部保留。传输/还原/重启单元 64/64 与 check:refactor 通过。没有改产品、凭证、预期数据或自动 relaunch 断言；沿用 033–035 复验真实单次点击、staging、原进程正常退出、新监听器身份与同一隔离目录的接管。该纯工具修复无需新增产品 YAML；platforms planner 新增输入与观察器单元步骤，确保 GitHub 也执行这些合同。
 
-`44066113956` 的 ARM64 native 033 已越过 preflight：真实确认只点击一次，独立观察 staged/禁重复、原 PID 6994 正常 exit=0，以及相同二进制和隔离环境的新 PID 7302。失败发生在 `attach-existing-process`，原持久 HTTP/1.1 连接仍绑定旧进程，重用时被 reset；该用例仍记失败，不能把前面的边界观察当整体还原通过。新增使用真实 NativeSession 的红测复现相同 ConnectionResetError。修复只在已观察 staged 成功及原进程 exit=0 后丢弃旧 HTTP 连接，保留应用/driver 所有权，再以一次 POST /session 接管已核验的新进程；不发送 DELETE、不重放点击或失败的接管，也不放宽超时/业务断言。另保留新连接实际失败时立即失败的回归。实际三态完整结果待新 GitHub 执行。
+`44066113956` 的 ARM64 native 033/034/035 均越过 preflight：每项真实确认只点击一次，独立观察 staged/禁重复、原进程正常 exit=0，以及相同二进制和隔离环境的新进程；其中 033 原 PID 6994、新 PID 7302。三项均失败于 `attach-existing-process`，原持久 HTTP/1.1 连接仍绑定旧进程，重用时被 reset；原始失败、artifact hash/bytes 与 receipt 已全部核验，不能把前面的边界观察当整体还原通过。新增使用真实 NativeSession 的红测复现相同 ConnectionResetError。修复只在已观察 staged 成功及原进程 exit=0 后丢弃旧 HTTP 连接，保留应用/driver 所有权，再以一次 POST /session 接管已核验的新进程；不发送 DELETE /session、不重放点击或失败的接管，也不放宽超时/业务断言。另保留新连接实际失败时立即失败的回归。修复 `481d59afda4791578da03699aecc7c55a4fa9f2a` 的传输/接管/退出单元 73/73、TypeScript 与 check:refactor 已通过；实际三态完整结果待新 GitHub 执行。

@@ -4,6 +4,16 @@ File Explorer 保留新建文件夹和原文本文件入口，工具栏“新建
 
 Live 表格此前直接使用 `textContent` 展示单元格，导致 `**` 等源码显示而未渲染。现由独立 TableCell owner 管理单元格渲染、源码编辑、IME、粘贴与图片异步生命周期：只读及未激活单元格调用共享 Markdown inline parser/sanitizer、KaTeX 和受控图片加载；激活可编辑单元格显示原源码，离开后恢复渲染。保留 Tab/Enter、行列/对齐、历史和标准 GFM 保存。渲染和焦点切换不写文档，非目标更新不覆盖正在组合的中文输入，同一单元格并发变更拒绝迟到的 IME 提交；编辑/销毁使旧图片结果失效。
 
+## 当前验收
+
+产品修复 `2939a224e178563be0a4425127760e3460d62f08` 的 [GitHub #44071094242](https://github.com/engcapa/taomni/actions/runs/44071094242) 已核验 20 个实际执行分片，共 137 项通过、零失败、零 skip。三端 browser 各 25/25（各含完整 20 项 crash-regression），Linux Xvfb 与 Windows native 各 31/31（各含完整 24 项 crash-regression）；新 006/007、023 与保留场景全部通过。原始 artifact 的 hash/bytes、runner receipt、源码/用例/selection 和 native release QA 二进制身份已独立核验，记录在 `qa-ui-auto-report/github/44071094242/hosted-evidence-review.json`。已查看本轮 Windows browser 与 Linux/Windows native 新建对话框、Live 表格和 macOS browser 表格画面，控件与 inline 格式正常。
+
+该 workflow 的 macOS ARM64 build 因 GitHub hosted runner 容量不足，在任何步骤前被取消，4 个 native 分片未执行，整轮 workflow 不计全绿。[Intel 补跑 #44077458265](https://github.com/engcapa/taomni/actions/runs/44077458265) 与 [ARM64 补跑 #44087810304](https://github.com/engcapa/taomni/actions/runs/44087810304) 均绑定 `481d59afda4791578da03699aecc7c55a4fa9f2a`；两者与原计划的 34 个 macOS native 用例集合和 case digest 完全一致，gaps=[]/unreviewed=[]，按完成分片即时收证。
+
+Intel 4/4 分片已收齐，33/34 通过：文件新建/编辑/保存、Live 表格、全部保留用例与完整 crash-regression 均通过；已查看该端新建对话框和 Live 表格截图。唯一失败是 035 的第 95 步错误调用另一个场景的 `qa-retained.txt` 固定文本探针，本场景实际通过真实宿主创建并备份 `hello.sqlite`，未创建该文本文件。自动 relaunch 已成功，完整还原仍不计通过。修正保留 signed/lifecycle、完整业务行、generation、active pointer、writer lease、Vault/MFA/HOTP 和单次确认断言，并在 `ui-restored` 独立核验准确 SQLite locator、`dataRetained=true`、完整数据库字节和原始档案 hash；不更改原业务数据、不插入额外文件。新单元先复现错用场景和漏检，再验证拒绝缺失/伪造 locator、链接和 SQLite 尾部变化。相关工具 71/71、QA audit、actionlint 和 check:refactor 通过；修订后的真实执行另行补录，旧失败保留。
+
+两个 head 的产品源码指纹均为 `ad584d3171fd61ae23f88b0c4de9f78370e908144b1d60baf8639fca40d068aa`；后一个 head 只修复 QA 自动还原接管时的旧 HTTP 连接，runner 指纹分别绑定各自 selection，不能把工具变更后的结果回写到旧失败批次。macOS 结果必须按实际架构记录，browser/bridge 输入不代替物理 IME、AppKit 菜单或 OS 快捷键验证。本功能验收也不代表模块化整体迁出、真实单体升级激活或正式发布门已完成。
+
 验收分工：
 
 | 证据 | 断言 |
@@ -15,7 +25,9 @@ Live 表格此前直接使用 `textContent` 展示单元格，导致 `**` 等源
 | `TC-FILE-OPEN-023` browser/native | Live/Split 格式一致、HTML 清理/本地图片/公式、只读、编辑/Tab/Undo/Redo、未改单元格与完整 GFM 保存重开；包含 crash-regression |
 | 保留用例 | Explorer001–005；FILE-OPEN001/003/004/007/013，覆盖旧文本/文件夹/操作、SVG与Markdown原合同和 native 导出；workflow 合并完整 crash-regression |
 
-真实 UI 和 native 磁盘/进程验证全部在 GitHub `qa-ui-auto-platforms` 执行，三端 browser/native、匹配 release QA binary，完成一个 shard 即下载检查。当前新增用例执行结果未出前不得记为通过。WebView 按键与 composition 单元不等于物理 IME、AppKit 菜单或 OS 快捷键证据；未改这些绑定。截图仅是保留证据，需要另外查看画面。
+真实 UI 和 native 磁盘/进程验证全部在 GitHub `qa-ui-auto-platforms` 执行，三端 browser/native、匹配 release QA binary，完成一个 shard 即下载检查。未执行的用例不得记为通过。WebView 按键与 composition 单元不等于物理 IME、AppKit 菜单或 OS 快捷键证据；单元格 Select All 的平台、焦点与菜单边界见下方记录。截图仅是保留证据，需要另外查看画面。
+
+## 调试与执行记录
 
 首次 [#44053218016](https://github.com/engcapa/taomni/actions/runs/44053218016) 在规划阶段的 `test_crash_regressions` 失败：新增两项 crash-regression 未同步固定 EXPECTED 清单和 smoke 注册，没有执行应用用例。补齐两项注册与专项说明，保留全部原集合和断言，修订后重新执行三端 browser/native。
 
