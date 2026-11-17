@@ -42,16 +42,16 @@ describe("Explorer shared FilePanel selection", () => {
 
   it("rubber-selects only geometrically intersecting rows and preserves additive selection", async () => {
     const { list } = await mountShell();
-    pointer(list, "pointerdown", { button: 0, clientX: 5, clientY: 1 });
-    pointer(window, "pointermove", { buttons: 1, clientX: 150, clientY: 20 });
+    pointer(list, "pointerdown", { button: 0, clientX: 5, clientY: 27 });
+    pointer(window, "pointermove", { buttons: 1, clientX: 150, clientY: 46 });
     expect(selection()).toEqual(["/fixture/folder"]);
-    pointer(window, "pointerup", { button: 0, clientX: 150, clientY: 20 });
+    pointer(window, "pointerup", { button: 0, clientX: 150, clientY: 46 });
     expect(list.querySelector(".ex-rubber")).toBeNull();
     fireEvent.click(row("gamma.csv"));
-    pointer(list, "pointerdown", { button: 0, ctrlKey: true, clientX: 5, clientY: 29 });
-    pointer(window, "pointermove", { buttons: 1, ctrlKey: true, clientX: 150, clientY: 45 });
+    pointer(list, "pointerdown", { button: 0, ctrlKey: true, clientX: 5, clientY: 55 });
+    pointer(window, "pointermove", { buttons: 1, ctrlKey: true, clientX: 150, clientY: 71 });
     expect(selection()).toEqual(["/fixture/gamma.csv", "/fixture/alpha.txt"]);
-    pointer(window, "pointercancel", { clientX: 150, clientY: 45 });
+    pointer(window, "pointercancel", { clientX: 150, clientY: 71 });
     expect(list.querySelector(".ex-rubber")).toBeNull();
   });
 

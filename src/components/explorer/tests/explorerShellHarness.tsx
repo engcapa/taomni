@@ -130,7 +130,7 @@ export function installShellHarness() {
     useSftpStore.setState({ sessions: {} });
     sessionRefCounts.clear(); inFlightLocalAttaches.clear(); inFlightAttaches.clear();
     setLocale("en");
-    setExplorerPreferences({ view: "details", sortKey: "name", sortDir: "asc", showHidden: false, preview: true, previewPosition: "right", previewWidth: 300, navWidth: 210, wrap: false, pinnedPaths: [], expandedPaths: [] });
+    setExplorerPreferences({ view: "details", sortKey: "name", sortDir: "asc", showHidden: false, preview: true, previewPosition: "right", previewWidth: 300, navWidth: 210, wrap: false, pinnedPaths: [], expandedPaths: [], columnWidths: {} });
     setExplorerClipboard(null);
     vi.stubGlobal("ResizeObserver", class {
       record: typeof observers[number];

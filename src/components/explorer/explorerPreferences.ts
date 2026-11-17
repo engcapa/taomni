@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { readExplorerColumns, type ExplorerColumnWidths } from "./explorerColumns";
 
 export interface ExplorerPreferences {
   view: "details" | "list" | "icons";
@@ -12,13 +13,14 @@ export interface ExplorerPreferences {
   wrap: boolean;
   pinnedPaths: string[];
   expandedPaths: string[];
+  columnWidths: ExplorerColumnWidths;
 }
 
 export const EXPLORER_PREFERENCES_KEY = "taomni.explorer.view.v1";
 const defaults: ExplorerPreferences = {
   view: "details", sortKey: "name", sortDir: "asc", showHidden: false,
   preview: true, previewPosition: "right", previewWidth: 300, navWidth: 210,
-  wrap: false, pinnedPaths: [], expandedPaths: [],
+  wrap: false, pinnedPaths: [], expandedPaths: [], columnWidths: {},
 };
 const listeners = new Set<() => void>();
 function readPreferences(): ExplorerPreferences {
@@ -38,6 +40,7 @@ function readPreferences(): ExplorerPreferences {
       navWidth: typeof p.navWidth === "number" && Number.isFinite(p.navWidth) ? Math.min(380, Math.max(140, p.navWidth)) : 210,
       wrap: p.wrap === true,
       pinnedPaths: paths(p.pinnedPaths), expandedPaths: paths(p.expandedPaths),
+      columnWidths: readExplorerColumns(p.columnWidths),
     };
   } catch { return { ...defaults }; }
 }
