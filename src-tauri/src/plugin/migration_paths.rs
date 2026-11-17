@@ -68,7 +68,10 @@ pub(crate) fn write_json_durable<T: serde::Serialize>(
     value: &T,
 ) -> Result<(), String> {
     use std::io::Write;
-    let parent = path.parent().ok_or("Missing migration directory")?;
+    let parent = path
+        .parent()
+        .filter(|parent| !parent.as_os_str().is_empty())
+        .unwrap_or_else(|| Path::new("."));
     directory(parent)?;
     file_exists(path)?;
     let mut stage = tempfile::NamedTempFile::new_in(parent).map_err(|error| error.to_string())?;

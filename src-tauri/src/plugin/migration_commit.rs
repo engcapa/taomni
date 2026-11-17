@@ -14,7 +14,8 @@ use super::{
     CORE_API_VERSION, ModuleManifest, PluginKind, SnapshotMode, current_platform,
     install::{ActivePointer, ModuleInstaller},
     migration::{
-        MigrationItem, MigrationJournal, MigrationRunState, MigrationStepState,
+        MFA_MIGRATION_TARGET as TARGET, MigrationItem, MigrationJournal, MigrationRunState,
+        MigrationStepState,
         export::{MfaExportKind, MfaExportReceipt, MfaMaintenance, PreparedMfaExport},
         paths, source,
     },
@@ -25,7 +26,6 @@ use crate::runtime::generation;
 const PLAN: &str = "migration/mfa-transaction.json";
 const JOURNAL: &str = "migration/journal.json";
 const DATA_DIR: &str = "plugins/mfa/data";
-const TARGET: &str = "plugins/mfa/data/mfa.db";
 const OWNER: &str = "mfa";
 const POINTER: &str = "plugins/mfa/active.json";
 const OWNERSHIP: &str = ".legacy-mfa-upgrade.json";
@@ -258,8 +258,8 @@ fn recover_locked(maintenance: &MfaMaintenance) -> Result<bool, String> {
         .version_dir(OWNER, &transaction.package_version)
         .map_err(message)?;
     if transaction.format != 1
-        || !valid_fingerprint(&transaction.target_fingerprint)
-        || !valid_fingerprint(&transaction.source_fingerprint)
+        || !source::valid_fingerprint(&transaction.target_fingerprint)
+        || !source::valid_fingerprint(&transaction.source_fingerprint)
         || !valid_export_name(&transaction.export_staging)
     {
         return Err("Invalid MFA recovery record".into());
@@ -372,17 +372,6 @@ fn validate_manifest(manifest: &ModuleManifest) -> Result<(), String> {
         return Err("The verified package does not support this legacy MFA data".into());
     }
     Ok(())
-}
-
-fn valid_fingerprint(fingerprint: &str) -> bool {
-    fingerprint
-        .strip_prefix("sha256:")
-        .and_then(|value| value.split_once(":bytes:"))
-        .is_some_and(|(digest, size)| {
-            digest.len() == 64
-                && digest.bytes().all(|byte| byte.is_ascii_hexdigit())
-                && size.parse::<u64>().is_ok_and(|size| size > 0)
-        })
 }
 
 fn valid_export_name(name: &str) -> bool {

@@ -145,6 +145,24 @@ fn signed_legacy_mfa_commit_preserves_original_journal_and_hotp_on_host_start() 
     assert_eq!(journal.status, MigrationRunState::Complete);
     assert!(journal.committed(MigrationItem::Mfa));
     assert_eq!(journal.entries[0].target, Path::new(TARGET));
+    let inspect = inspect_legacy_install(root, "0.5.9").unwrap();
+    let repeated = MigrationExecutor::new(
+        root,
+        root.join("plugins"),
+        root.join(JOURNAL),
+        "0.5.9",
+        CORE_API_VERSION,
+    )
+    .unwrap()
+    .record_pending(&inspect)
+    .unwrap();
+    assert_eq!(repeated.status, MigrationRunState::Complete);
+    assert_eq!(repeated.committed, [MigrationItem::Mfa]);
+    assert!(repeated.pending.is_empty());
+    assert_eq!(
+        MigrationJournal::load(&root.join(JOURNAL)).unwrap().entries,
+        journal.entries
+    );
     assert_ne!(generation::current(root).unwrap(), legacy.generation);
     assert!(!root.join(PLAN).exists());
     assert!(!root.join(DATA_DIR).join(OWNERSHIP).exists());

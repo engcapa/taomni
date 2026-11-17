@@ -15,6 +15,8 @@ use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
+pub(crate) const MFA_MIGRATION_TARGET: &str = "plugins/mfa/data/mfa.db";
+
 /// The fixed Vault entries that the migration preflight can observe without
 /// unlocking or decrypting the Vault.  The value is deliberately a boolean:
 /// the migration layer must never copy plaintext credentials or key material.
@@ -109,24 +111,17 @@ pub struct MigrationJournal {
 
 impl MigrationJournal {
     pub fn load(path: &Path) -> Result<Self, String> {
-        if !path.exists() {
+        if !paths::file_exists(path)? {
             return Ok(Self::default());
         }
-        let raw = fs::read_to_string(path).map_err(|error| error.to_string())?;
-        serde_json::from_str(&raw).map_err(|error| error.to_string())
+        paths::read_json_bounded(path)
     }
 
     pub fn save_atomic(&self, path: &Path) -> Result<(), String> {
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).map_err(|error| error.to_string())?;
         }
-        let tmp = path.with_extension("tmp");
-        fs::write(
-            &tmp,
-            serde_json::to_vec_pretty(self).map_err(|error| error.to_string())?,
-        )
-        .map_err(|error| error.to_string())?;
-        fs::rename(tmp, path).map_err(|error| error.to_string())
+        paths::write_json_durable(path, self)
     }
 
     pub fn mark(
@@ -269,62 +264,80 @@ impl MigrationExecutor {
             return Err("migration journal version does not match this executor".into());
         }
 
-        // Older schema-only preflights could record empty feature tables or
-        // attribute VNC to RDP. Reconcile only unperformed placeholders. A
-        // staged/committed transaction needs its actual recovery executor;
-        // rescanning must never erase or reset that history.
-        if journal.entries.iter().any(|entry| {
-            entry.state != MigrationStepState::Pending || !entry.target.as_os_str().is_empty()
-        }) {
-            return Err(
-                "migration journal contains performed work; explicit recovery is required".into(),
-            );
-        }
-        journal.entries.retain(|entry| {
-            snapshot
-                .candidates
-                .iter()
-                .any(|candidate| candidate.item == entry.item)
-        });
-
-        for candidate in &snapshot.candidates {
-            let source_path = pending_source_path(snapshot, candidate)?;
-            let source_key = source_path.to_string_lossy().into_owned();
-            let fingerprint = snapshot
-                .source_fingerprints
-                .get(&source_key)
-                .cloned()
-                .ok_or_else(|| {
-                    format!("missing source fingerprint for {}", source_path.display())
-                })?;
-            journal.mark_with_source(
-                candidate.item,
-                MigrationStepState::Pending,
-                fingerprint,
-                source_path,
-                PathBuf::new(),
-            );
-        }
-        journal.status = if snapshot.candidates.is_empty() {
-            MigrationRunState::Complete
-        } else {
-            MigrationRunState::Pending
-        };
+        let result = reconcile_pending(&mut journal, snapshot)?;
         journal.save_atomic(&self.journal_path)?;
-        Ok(MigrationExecutionResult {
-            status: journal.status,
-            committed: Vec::new(),
-            skipped: Vec::new(),
-            pending: snapshot
-                .candidates
-                .iter()
-                .map(|candidate| candidate.item)
-                .collect(),
-            pending_reason: (!snapshot.candidates.is_empty()).then(|| {
-                "A verified plugin package and the core-owned legacy data exporter are required before migration can copy data.".to_string()
-            }),
-        })
+        Ok(result)
     }
+}
+
+fn reconcile_pending(
+    journal: &mut MigrationJournal,
+    snapshot: &LegacyInstallSnapshot,
+) -> Result<MigrationExecutionResult, String> {
+    let mut committed = Vec::new();
+    for entry in &journal.entries {
+        match entry.state {
+            MigrationStepState::Pending if entry.target.as_os_str().is_empty() => (),
+            MigrationStepState::Committed
+                if entry.item == MigrationItem::Mfa
+                    && entry.source_path == Path::new("mfa.db")
+                    && source::valid_fingerprint(&entry.source_fingerprint)
+                    && entry.target == Path::new(MFA_MIGRATION_TARGET)
+                    && committed.is_empty() =>
+            {
+                committed.push(entry.item);
+            }
+            _ => {
+                return Err(
+                    "migration journal contains performed work; explicit recovery is required"
+                        .into(),
+                );
+            }
+        }
+    }
+    // Preserve the source identity of finished work even if a later scan
+    // sees a different legacy source. Only pending placeholders are rebuilt.
+    let mut entries = journal
+        .entries
+        .iter()
+        .filter(|entry| entry.state == MigrationStepState::Committed)
+        .cloned()
+        .collect::<Vec<_>>();
+    let mut pending = Vec::new();
+    for candidate in &snapshot.candidates {
+        if committed.contains(&candidate.item) {
+            continue;
+        }
+        let source_path = pending_source_path(snapshot, candidate)?;
+        let fingerprint = snapshot
+            .source_fingerprints
+            .get(source_path.to_string_lossy().as_ref())
+            .cloned()
+            .ok_or_else(|| format!("missing source fingerprint for {}", source_path.display()))?;
+        entries.push(MigrationJournalEntry {
+            item: candidate.item,
+            state: MigrationStepState::Pending,
+            source_fingerprint: fingerprint,
+            source_path,
+            target: PathBuf::new(),
+        });
+        pending.push(candidate.item);
+    }
+    journal.entries = entries;
+    journal.status = if pending.is_empty() {
+        MigrationRunState::Complete
+    } else {
+        MigrationRunState::Pending
+    };
+    Ok(MigrationExecutionResult {
+        status: journal.status,
+        committed,
+        skipped: Vec::new(),
+        pending_reason: (!pending.is_empty()).then(|| {
+            "A verified plugin package and the core-owned legacy data exporter are required before migration can copy data.".to_string()
+        }),
+        pending,
+    })
 }
 
 fn pending_source_path(
@@ -435,3 +448,7 @@ mod fixture;
 #[cfg(test)]
 #[path = "migration_tests.rs"]
 mod tests;
+
+#[cfg(test)]
+#[path = "migration_reconcile_tests.rs"]
+mod reconcile_tests;

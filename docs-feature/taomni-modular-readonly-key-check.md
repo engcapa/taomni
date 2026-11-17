@@ -35,3 +35,5 @@
 `migration/mfa-transaction.json` 先持久化。升级数据写入独立暂存目录，事务持有独占 profile 状态锁发布新 generation，再将完整目录移到 `plugins/mfa/data`，切换 active，最后在现有迁移 journal 提交条目。GUI 和 headless 在打开业务库前处理未清理的事务。提交点前发生崩溃时回滚 active、已验证归属和指纹的新数据、临时导出，保留已发布的 generation。提交点后的恢复复核已经发布的数据、版本包和 generation，再清理事务。原目录下的 MFA、Vault 和 LanChat 始终保留。
 
 `qa-modular-upgrade.yml` 的 `signed_mfa_only=true` 复用生产公钥并执行三个真实签名包场景。它们验证迁移后实际宿主可读原账号和 HOTP、在 active 切换后从独立进程突然退出并走正常启动恢复、错误口令与已有目标保留。该批使用合成的 0.5.x 风格数据。实际升级入口仍需接入维护请求与应用退出流程，切换 MFA 生产 facade，再从已安装 0.5.x 完整验证。
+
+升级后的重新预检保留 MFA 已提交条目、原源指纹和目标路径，只重新计算未执行的其他项目。已知路径和指纹格式以外的提交条目、重复条目与 staged 状态仍要求恢复。预检和提交共用持久化 journal 写入。纯单元验证重复扫描、剩余候选、完成状态与拒绝覆写异常记录，签名 native 场景额外验证真实 journal 的重复扫描。

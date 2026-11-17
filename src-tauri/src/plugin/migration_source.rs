@@ -83,6 +83,17 @@ pub(crate) fn database_fingerprint(path: &Path) -> Result<String, String> {
     database_fingerprint_checked(path, &|| Ok(()))
 }
 
+pub(crate) fn valid_fingerprint(fingerprint: &str) -> bool {
+    fingerprint
+        .strip_prefix("sha256:")
+        .and_then(|value| value.split_once(":bytes:"))
+        .is_some_and(|(digest, size)| {
+            digest.len() == 64
+                && digest.bytes().all(|byte| byte.is_ascii_hexdigit())
+                && size.parse::<u64>().is_ok_and(|size| size > 0)
+        })
+}
+
 pub(crate) fn database_fingerprint_checked(
     path: &Path,
     check: &dyn Fn() -> Result<(), String>,
