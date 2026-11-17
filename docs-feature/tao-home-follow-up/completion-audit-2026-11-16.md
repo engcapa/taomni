@@ -12,7 +12,25 @@
 
 R16 当前产品为 `dc6de5f80`，在 draw.io、Mermaid 查看、PDF 性能和共享 AI 设置之外，继续修复换行工具栏的导出提示遮挡和普通 provider 快速回复后的历史标题/配置保存。本地受影响单测 **60 文件 / 273 项通过**；三平台 browser 均 **46/46**，各含全部 **18 项 crash-regression**。匹配的 QA release 原生用例最终为 **Linux 54/54、Windows 54/54、macOS 52/52 通过**，各含全部 **22 项 crash-regression**。源码/构建/用例/配置/回执、产物及选集完整并集均已独立核验，索引为 `history-final-execution-coverage.json`。Windows 主批 **53/54** 中 AI009 在执行步骤前发生文档根节点准备超时；相同源码/用例的 AI009 加完整 crash 集合补跑 [44025575103](https://github.com/engcapa/taomni/actions/runs/44025575103) **23/23 通过**，未放宽超时或断言。Windows 最终 54 项为主批与补跑合并结果，原始失败及未明确归因的间歇启动问题均保留，不把原失败 workflow 改为通过。HOME045/046 当前仅声明 Linux/Windows native，不扩称 macOS 附件分支验收。原任务表的实现缺口和未验收范围继续保留。
 
-## 最新变化：macOS native 已补齐原缺失项
+### 当前范围与统计口径
+
+原始主表共 **39 项**：**13 项具名范围已交付、11 项部分实现、15 项整体验收未齐**（含 TH-032）。这是原任务逐项复核的状态分布；验收未齐的任务已有主要实现，不能将此分布直接换算为代码完成百分比。本轮新增的 draw.io、Mermaid 查看器和 MD-008～011 等不计入这 39 项，也不以通过用例数替代全部原 AC 验收。
+
+| 最近追加的要求 | 当前交付与边界 |
+| --- | --- |
+| 导出下拉、无工具栏滚动条、窄窗提示遮挡 | 已实现并通过受影响 browser/native 回归；重复导出保留真实点击与布局断言。 |
+| 预览主题旁文案精简、记忆导出目录 | 已实现 tooltip 和跨格式的上次成功目录；取消或失败不更新目录记忆。 |
+| 独立、可搜索 PDF 与性能优化 | 三平台原生复测完成，性能与逐页质量结果见 [性能记录](../markdown-drawio/pdf-performance-2026-11-17.md)。 |
+| Word 图形与框中文字清晰度 | SVG 矢量、明确文字布局、600 DPI 回退和关闭 Office 自动压缩已实现；三平台实际文件经独立解析和 LibreOffice 渲染复核。当前 Microsoft Word 客户端视觉与完整版式矩阵仍待补验。 |
+| Mermaid 右键、悬浮按钮与大图查看 | 已实现缩放/平移、100%、适应窗口/宽度、双向 90° 旋转、水平/垂直翻转、重置、背景切换、保存 SVG/PNG、复制图片/文字/源码，不使用 OCR。 |
+| draw.io 导入导出与内容链接 | 已实现全文/全部图片、单 Sheet/每图独立 Sheet、可编辑正文表格，以及导入时选择布局或文字恢复并保留原始数据。流程/状态/类/ER 图转原生节点连线，其他 Mermaid 类型保留 SVG/源码并提示回退。三平台受影响回归完成。 |
+| History 保存、恢复与显示 | 本批已修流式更新、离开刷新、快速回复后的标题/provider/草稿，以及附件分支授权与恢复；具名回归通过。全部冷重启/旧迁移组合仍随 TH-004 验收。 |
+| 合并 AI 设置、选择普通聊天 provider | 已实现共享保存及 OpenAI 兼容、Anthropic、本地模型等支持的聊天运行时；缺失 provider 不静默改路由。普通 provider 的原生附件/分支 HOME045/046 目前只验 Linux/Windows。 |
+| 真实 OpenCode Agent 多场景与工程开发 | 指定模型/max 已有简单、多轮、图片/文档及 Python/TypeScript 各九轮真实开发证据，包含测试、注入失败、模型修复和功能扩展。Python/TS 最终各 16/15 项测试通过；商业 CC/Codex、完整长任务及语音等边界仍待验。 |
+
+本次状态复核未新增商业请求或重跑产品用例；本页 R16 与 [最终验证记录](verification-md-history-agent-2026-11-17.md#r16-wrapped-export-notice-and-fast-reply-history) 指向已有的当前源码回执。深研/工作流真实执行、持久预算与费用确认、增量索引、本地结果导航、完整审计、长任务恢复等实现缺口仍在后文逐项跟踪。
+
+## 历史变化：macOS native 已补齐原缺失项
 
 [43886401191](https://github.com/engcapa/taomni/actions/runs/43886401191) 已成功结束。只选择 macOS native release，实际 **32 passed / 0 failed / 0 skipped**，包含此前缺失的全部 **21 项**及完整适用 **22 项 native crash-regression**。
 
@@ -94,9 +112,9 @@ R16 当前产品为 `dc6de5f80`，在 draw.io、Mermaid 查看、PDF 性能和�
 | 缺口 | 当前源码依据 |
 |---|---|
 | 工作流没有实际执行步骤 | `src-tauri/src/deepseek_app/workflow.rs:105` 的 advance 只读状态并更新步骤/run 表；`src/components/tao/ai-chat/WorkflowPanel.tsx` 的开始动作只创建 pending run。 |
-| 费用设置没有控制执行 | `cost_confirm_threshold_cny` 仅见配置默认值/持久化与 Settings 输入；`TaoHomeHost.tsx:28` 仍固定传入 0.5，未找到费用阈值确认的调用路径。 |
-| 重启后的预算续跑未实现 | `src/components/tao/ai-chat/controller.ts:396` hydrate 为每个线程重建 `usedTokens: 0` 的 runtime；工作流也没有真实阶段结果执行器。 |
-| 检索仍全量重建 | `src-tauri/src/deepseek_app/search.rs:140` 的 synchronize 在主库连接执行 `DELETE FROM ds_app_search` 再重新收集插入；产品源码未见独立 `tao_index.db` 或 `last_indexed_at` 水位。 |
+| 费用设置没有控制执行 | `cost_confirm_threshold_cny` 仅见配置默认值/持久化与 Settings 输入；`src/components/tao/home/TaoHomeHost.tsx:29` 仍固定传入 0.5，未找到费用阈值确认的调用路径。 |
+| 重启后的预算续跑未实现 | `src/components/tao/ai-chat/controller.ts:399` hydrate 为每个线程重建 `usedTokens: 0` 的 runtime；工作流也没有真实阶段结果执行器。 |
+| 检索仍全量重建 | `src-tauri/src/deepseek_app/search.rs:144` 的 synchronize 在主库连接执行 `DELETE FROM ds_app_search` 再重新收集插入；产品源码未见独立 `tao_index.db` 或 `last_indexed_at` 水位。 |
 | 本地检索结果不能打开原记录 | `src/components/tao/search/SearchPanel.tsx` 仅在 `result.ref.startsWith("http")` 时提供打开链接，没有本地 note/session/thread 的导航 adapter。 |
 | 完整安全中心未实现 | 已有 `TaoPrivacySettings.tsx` 的来源开关与迁移摘要；产品源码未见设计要求的 `tao_audit` 或审计读删导出链路。 |
 | 长上传的进度和重启恢复未闭环 | `src-tauri/src/deepseek_app/files.rs` 的上传进度只在开始/结束写入 0/总字节，任务表读取只返回存储 JSON；不能据此声称真实连续进度和重启后续传。 |
