@@ -307,8 +307,10 @@ export function createChatController(options: ChatControllerOptions = {}): TaoCh
       } catch (error) {
         if (!abortController.signal.aborted) processEvent(threadId, { type: "error", category: classifyError(error), message: String(error) });
       } finally {
+        // The backend settles its snapshot after the final stream event. Stamp
+        // completion so its newer timestamp cannot reject our UI preferences.
         running.delete(threadId);
-        patchThread(threadId, (thread) => ({ ...thread, running: false }));
+        patchThread(threadId, (thread) => ({ ...thread, running: false, updatedAt: now() }));
         patchRuntime(threadId, (runtime) => ({ ...runtime, finishedAt: now() }));
       }
       return true;
@@ -353,7 +355,7 @@ export function createChatController(options: ChatControllerOptions = {}): TaoCh
         return false;
       } finally {
         running.delete(threadId);
-        patchThread(threadId, (thread) => ({ ...thread, running: false }));
+        patchThread(threadId, (thread) => ({ ...thread, running: false, updatedAt: now() }));
         patchRuntime(threadId, (runtime) => ({ ...runtime, finishedAt: now(), phase: ["sending", "streaming", "thinking", "searching"].includes(runtime.phase) ? "idle" : runtime.phase }));
       }
     },
@@ -381,7 +383,7 @@ export function createChatController(options: ChatControllerOptions = {}): TaoCh
         return false;
       } finally {
         running.delete(threadId);
-        patchThread(threadId, (thread) => ({ ...thread, running: false }));
+        patchThread(threadId, (thread) => ({ ...thread, running: false, updatedAt: now() }));
         patchRuntime(threadId, (runtime) => ({ ...runtime, finishedAt: now(), phase: ["sending", "streaming", "thinking", "searching"].includes(runtime.phase) ? "idle" : runtime.phase }));
       }
     },
