@@ -23,12 +23,14 @@ R16 当前产品为 `dc6de5f80`，在 draw.io、Mermaid 查看、PDF 性能和�
 | 独立、可搜索 PDF 与性能优化 | 三平台原生复测完成，性能与逐页质量结果见 [性能记录](../markdown-drawio/pdf-performance-2026-11-17.md)。 |
 | Word 图形与框中文字清晰度 | SVG 矢量、明确文字布局、600 DPI 回退和关闭 Office 自动压缩已实现；三平台实际文件经独立解析和 LibreOffice 渲染复核。当前 Microsoft Word 客户端视觉与完整版式矩阵仍待补验。 |
 | Mermaid 右键、悬浮按钮与大图查看 | 已实现缩放/平移、100%、适应窗口/宽度、双向 90° 旋转、水平/垂直翻转、重置、背景切换、保存 SVG/PNG、复制图片/文字/源码，不使用 OCR。 |
-| draw.io 导入导出与内容链接 | 已实现全文/全部图片、单 Sheet/每图独立 Sheet、可编辑正文表格，以及导入时选择布局或文字恢复并保留原始数据。流程/状态/类/ER 图转原生节点连线，其他 Mermaid 类型保留 SVG/源码并提示回退。三平台受影响回归完成。 |
+| draw.io 导入导出与内容链接 | 已实现全文/全部图片、单 Sheet/每图独立 Sheet、可编辑正文表格，以及导入时选择布局或文字恢复并保留原始数据。此前流程/状态/类/ER 图的三平台回归完成；后续手测修复再加入可编辑时序图、默认无整体组合及保留原折线/曲线路由，新增源码验收见下段。其他未支持图族仍明确保留 SVG/源码并提示回退。 |
 | History 保存、恢复与显示 | 本批已修流式更新、离开刷新、快速回复后的标题/provider/草稿，以及附件分支授权与恢复；具名回归通过。全部冷重启/旧迁移组合仍随 TH-004 验收。 |
 | 合并 AI 设置、选择普通聊天 provider | 已实现共享保存及 OpenAI 兼容、Anthropic、本地模型等支持的聊天运行时；缺失 provider 不静默改路由。普通 provider 的原生附件/分支 HOME045/046 目前只验 Linux/Windows。 |
 | 真实 OpenCode Agent 多场景与工程开发 | 指定模型/max 已有简单、多轮、图片/文档及 Python/TypeScript 各九轮真实开发证据，包含测试、注入失败、模型修复和功能扩展。Python/TS 最终各 16/15 项测试通过；商业 CC/Codex、完整长任务及语音等边界仍待验。 |
 
 本次状态复核未新增商业请求或重跑产品用例；本页 R16 与 [最终验证记录](verification-md-history-agent-2026-11-17.md#r16-wrapped-export-notice-and-fast-reply-history) 指向已有的当前源码回执。深研/工作流真实执行、持久预算与费用确认、增量索引、本地结果导航、完整审计、长任务恢复等实现缺口仍在后文逐项跟踪。
+
+后续优先六项（Git 用 Tao 打开、Workspace 命名/添加目标、导出产物用 Tao 打开、Query Result 搜索导航、Agnes 无代理）及其验收，独立记录在 [workspace-result-follow-up-2026-11-17.md](../workspace-result-follow-up-2026-11-17.md)。新反馈的 Mermaid 保存图标、可编辑时序/原线路由和重复导入按钮，记录在 [修复与验收](../../docs-issue/markdown-mermaid-editable-export-2026-11-17.md)。产品提交 `97e89ead9`、修正用例 `00696cf81`；本机 149 项 Markdown 单测通过，当前源码与用例的有效并集为 Linux/Windows/macOS browser 各 28/28（18 项 crash）、匹配 QA release 的 native 各 33/33（22 项 crash），Linux Agnes 另有 1/1 无代理真实回复。[原批次 44052981988](https://github.com/engcapa/taomni/actions/runs/44052981988) 的 023/026 失败原件保留，[修正后 44057813183](https://github.com/engcapa/taomni/actions/runs/44057813183) 成功结束，Windows/macOS native 各 25/25。签名、身份、配置与绑定文件散列独立复核通过；R16 是历史基线，原 39 项状态统计不因这些追加修复整体关闭。
 
 ## 历史变化：macOS native 已补齐原缺失项
 

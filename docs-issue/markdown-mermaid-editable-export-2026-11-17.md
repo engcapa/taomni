@@ -36,3 +36,19 @@
 重点 browser `run-20261117-165210-221367348` 为 022/025 两项通过、identity stable；实际下载文件的独立 XML 检查确认单图 48 个独立元素、全部图片 4 Sheet / 72 个独立元素、没有图片回退，且同时存在保留折点的折线和曲线。已查看格式按钮截图。完整 browser/native 与 Windows/macOS hosted 最终结果运行后回填；dry-run 不计真实执行通过。
 
 完整 Linux browser `run-20261117-165744-683451083` 为 28/28（含全部 18 项 crash-regression），新 025 增加 SVG/PNG 真实下载后，`run-20261117-170555-620597995` 补跑 1/1。两份 receipt 签名有效、identity stable，分别绑定 145/15 个产物，逐文件大小和 SHA-256 独立复核无误。
+
+Linux native 完整批次 `run-20261117-170015-602376762` 为 30/33，全部 22 项 crash-regression 通过，identity stable。三项失败保留原始报告：023 命中隐藏旧 Explorer 的同名文件、026 在异步写盘完成前读 XML、WS085 系统文件管理器抢焦点后触发输入安全检查。用例分别限定活动 Explorer、等待保存完成和返回当前 Git 标签；保留真实文件、剪贴板、PTY 和焦点安全断言。`run-20261117-173646-156961843` 三项全部通过，当前有效并集为 **33/33、22 项 crash-regression**。两批回执分别绑定 747/76 个产物，独立复核签名、源码/runner/QA release 身份、用例指纹、配置和文件散列均通过。
+
+Windows/macOS browser 在 [44052981988](https://github.com/engcapa/taomni/actions/runs/44052981988) 各 **28/28、18 项 crash-regression**；native 均 **31/33、全部 22 项 crash-regression 通过**。原批次因 023 命中隐藏 Explorer、026 在写盘前读文件而失败，两端原因与本机一致；完整原始失败保留，未改写成成功。全部分片在 workflow 结束前下载并独立核验。
+
+023/026/WS085 的用例修正为 `00696cf81`，[44057813183](https://github.com/engcapa/taomni/actions/runs/44057813183) **成功结束**：Windows/macOS 各 **25/25、22 项 crash-regression** 全部通过。八片均已在 workflow 结束前下载，不等待最终汇总。三平台新 026 实际保存的单图均为 1 Sheet / 48 个独立元素，全部图片均为 4 Sheet / 72 个独立元素，同时保留折线与曲线，无图片回退；旋转/翻转和三平台格式按钮截图已复核。
+
+最终有效并集（当前产品、runner、用例和配置；原失败保留，使用修正后的具名补跑）：
+
+| 平台 | browser | native | 完整 crash-regression |
+| --- | --- | --- | --- |
+| Linux | 28/28 | 33/33 | browser 18 / native 22 |
+| Windows | 28/28 | 33/33 | browser 18 / native 22 |
+| macOS ARM hosted | 28/28 | 33/33 | browser 18 / native 22 |
+
+最终独立核验保存在证据根的 `independent-mermaid-evidence.json/.log`：签名、source/runner、QA release、用例指纹、执行配置和绑定产物大小/SHA-256；实际导出文件另记 `independent-native-export-files.json`。Linux 同一源码的 Agnes 无代理真实请求另有 1/1，不混入上述 33 项。`pnpm check:refactor`、开发用例契约和 case/control audit 均通过。macOS 截图/桥接按键不作为 OS 层送键或其他 macOS 版本/架构的证据，边界见六项 follow-up 记录。
