@@ -41,6 +41,57 @@ fn key_matches_check(key: &DataKey, record: &[u8]) -> bool {
         .unwrap_or(false)
 }
 
+/// Non-secret observations, never an authorization or an activation permit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ExistingKeyCheck {
+    /// An unused database without a fixed key or key-check record.
+    Unused,
+    Verified {
+        accounts: u64,
+        key_check_present: bool,
+    },
+}
+
+/// Check a stable existing snapshot without binding, initializing or repairing
+/// it. Unlike `prepare_key`, an older database without key_check stays unchanged.
+/// Every sealed row must open, including when a valid key_check already exists.
+///
+/// The owner supplies an admitted, load-only key provider and a cancellation /
+/// deadline check, keeps the snapshot stable and binds the key to its original
+/// Vault generation. This helper grants no access to Vault or plugin activation.
+pub fn verify_existing_key(
+    conn: &Connection,
+    keys: &dyn KeyProvider,
+    check: &dyn Fn() -> Result<(), String>,
+) -> Result<ExistingKeyCheck, String> {
+    check()?;
+    let stored = keys.load()?;
+    check()?;
+    let record = store::meta_get(conn, KEY_CHECK_META)?;
+    let Some(key) = stored else {
+        let accounts = store::count_accounts(conn)?;
+        check()?;
+        return if record.is_none() && accounts == 0 {
+            Ok(ExistingKeyCheck::Unused)
+        } else {
+            Err(ERR_KEY_MISSING.to_string())
+        };
+    };
+    check()?;
+    if record
+        .as_ref()
+        .is_some_and(|record| !key_matches_check(&key, record))
+    {
+        return Err(ERR_KEY_MISMATCH.to_string());
+    }
+    let accounts = store::verify_all_secrets(conn, &key, check)?;
+    check()?;
+    Ok(ExistingKeyCheck::Verified {
+        accounts,
+        key_check_present: record.is_some(),
+    })
+}
+
 /// Return the data key for `conn`, creating it on first use.
 ///
 /// Errors: `VAULT_LOCKED` (vault empty/locked), [`ERR_KEY_MISSING`] when the

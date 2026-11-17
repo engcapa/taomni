@@ -78,12 +78,17 @@ jobs:
           assert f"{len(units)} passed; 0 failed; 0 ignored" in unit_output, "Missing retained migration unit execution"
           listing = run("native-selection.txt", "--ignored", "--list")
           selected = sorted(line.removesuffix(": test") for line in listing.splitlines() if line.endswith(": test"))
-          expected = 11 if os.name == "nt" else 12
+          expected = 12 if os.name == "nt" else 13
           assert len(selected) == expected, f"Expected all {expected} real export scenarios, got {selected}"
           output = run("native-export.log", "--ignored", "--test-threads=1", "--nocapture")
           assert f"{expected} passed; 0 failed; 0 ignored" in output, "Missing native export execution"
           (evidence / "result.json").write_text(json.dumps({**identity, "unit_selected": units, "unit_passed": len(units), "selected": selected, "passed": expected, "failed": 0, "skipped": 0}, indent=2) + "\n")
           PY
+      - name: Verify read-only engine behavior and retained account/key contracts
+        run: |
+          set -o pipefail
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-mfa-engine --lib --locked -- --test-threads=1 --nocapture 2>&1 | tee modular-export-evidence/mfa-engine-unit.log
+          python -c 'from pathlib import Path; assert "21 passed; 0 failed; 0 ignored" in Path("modular-export-evidence/mfa-engine-unit.log").read_text(), "Missing actual read-only and retained MFA engine contracts"'
       - name: Verify old-mode exclusion and crash release across real processes
         run: |
           set -o pipefail

@@ -8,6 +8,8 @@ mod migration;
 mod data;
 #[path = "legacy_export/failure.rs"]
 mod failure;
+#[path = "legacy_export/key_check.rs"]
+mod key_check;
 #[path = "legacy_export/ownership.rs"]
 mod ownership;
 #[path = "legacy_export/support.rs"]
