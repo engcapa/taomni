@@ -6,22 +6,26 @@ Live 表格此前直接使用 `textContent` 展示单元格，导致 `**` 等源
 
 ## 当前验收
 
-当前复验绑定 `396b7bb294e0c4ccbc17871ac71eca246d5cfc0d`，产品源码指纹为 `c35b48e6018a22744215dcd62f63f41f3e60313e810e3ea06be53f1c97f186bf`、runner 指纹为 `10bb03145a467fbea7f9e9ea784d5e226469d9613a95acba250fd7f4974ce8a8`。下表四轮 plan 均已通过并下载 selection，全部保留完整 crash-regression、gaps=[]/unreviewed=[]；native 使用 release QA。完成 shard 即下载，逐份核验原始 receipt、完整 artifacts、case digest、selection/run/source 和 native build 身份；没有用计划数或缺失结果代替通过。
+当前复验绑定 `396b7bb294e0c4ccbc17871ac71eca246d5cfc0d`；Linux/Windows browser 的文档提交 `2621bae0081d3c0a6f96ab87a92c094cad0f463f` 与其产品/runner 输入相同。产品源码指纹为 `c35b48e6018a22744215dcd62f63f41f3e60313e810e3ea06be53f1c97f186bf`、runner 指纹为 `10bb03145a467fbea7f9e9ea784d5e226469d9613a95acba250fd7f4974ce8a8`。下表各轮 plan 均已通过并下载 selection，全部保留完整 crash-regression、gaps=[]/unreviewed=[]；native 使用 release QA。完成 shard 即下载，逐份核验原始 receipt、完整 artifacts、case digest、selection/run/source 和 native build 身份；没有用计划数或缺失结果代替通过。
 
 | GitHub run | 范围 | 计划用例 / shard | 状态 |
 |---|---|---|---|
 | [44128316716](https://github.com/engcapa/taomni/actions/runs/44128316716) | Linux Xvfb、Windows native | 各 43，合计 8 shards | 8/8 片已核验：Linux 43/43；Windows 42/43；两端完整 crash 各 24/24，Windows 外部 Shell Paste 超时另列 |
-| [44128351358](https://github.com/engcapa/taomni/actions/runs/44128351358) | macOS 15 Intel native | 44，1 shard | release QA 构建与仅 darwin-x86_64 签名包已完成，实际 native 用例执行中 |
+| [44142742009](https://github.com/engcapa/taomni/actions/runs/44142742009) | Windows native 定向复验 | 25，4 shards | 整轮成功，25/25、完整 crash 24/24，Explorer005 全 73 步通过 |
+| [44128351358](https://github.com/engcapa/taomni/actions/runs/44128351358) | macOS 15 Intel native | 44，1 shard | 整轮成功，44/44、完整 crash 24/24，三态真实自动 relaunch 全部通过 |
 | [44128388069](https://github.com/engcapa/taomni/actions/runs/44128388069) | macOS 26 ARM64 native | 44，1 shard | GitHub 容量取消，producer 没有任何执行步骤；无应用用例结果 |
 | [44130389617](https://github.com/engcapa/taomni/actions/runs/44130389617) | macOS 15 Intel browser | 35，1 shard | 整轮成功，35/35、完整 crash 20/20，Explorer002 全部 152 步通过 |
+| [44145215361](https://github.com/engcapa/taomni/actions/runs/44145215361) | Linux、Windows browser | 各 35，合计 8 shards | 整轮成功，各 35/35、完整 crash 各 20/20，8/8 片全部核验 |
 
 最新 Linux/Windows native 的 006（153 步）、007（131 步）、029（68 步）均通过；已查看两端新建对话框及 Live 表格原始截图，类型/名称/取消/创建控件完整，粗体、斜体、删除线、代码、公式、换行、列对齐与 escaped pipe 正常。macOS browser 的同三项及修订后的 Explorer002 均通过，也已查看对应表格与窄窗口预览画面；browser 画面不代替 AppKit/OS 输入证据。两端 native 的模块 013/014/015 均通过。
 
-Windows 唯一失败 `TC-EXPLORER-005` 停在第 25 步外部 Windows Shell `InvokeVerb('paste')` 的原有 30 秒 PowerShell 超时。第 24 步及 Paste 前的独立读取已验证准确 CF_HDROP 路径；实际剪贴板写入、解析和 Paste 脚本均与 main 相同。`host_clipboard._ps` 的新增参数保持该调用原默认值、命令和超时；Explorer `copy` 分支未改。保留原始失败、截图、`system-file-paste.jsonl` 与逐文件对照 `windows-explorer-005-unrelated-failure.json`，按用户授权作为本次改动无关的外部自动化失败单列，仍计失败，不声称已完成 main 复现或确定唯一 OS 根因。同 SHA 的[定向复验 #44142742009](https://github.com/engcapa/taomni/actions/runs/44142742009) 已通过 plan，25 项/4 片，保留完整 24 项 crash 集合，实际结果另录。
+Windows 原轮唯一失败 `TC-EXPLORER-005` 停在第 25 步外部 Windows Shell `InvokeVerb('paste')` 的原有 30 秒 PowerShell 超时。第 24 步及 Paste 前的独立读取已验证准确 CF_HDROP 路径；实际剪贴板写入、解析和 Paste 脚本均与 main 相同。`host_clipboard._ps` 的新增参数保持该调用原默认值、命令和超时；Explorer `copy` 分支未改。保留原始失败、截图、`system-file-paste.jsonl` 与逐文件对照 `windows-explorer-005-unrelated-failure.json`，按用户授权作为本次改动无关的外部自动化失败单列，不声称已完成 main 复现或确定唯一 OS 根因。同 SHA 的定向复验已核验 4/4 片、**25/25**，包含完整 24 项 crash 集合及 Explorer005 的全部 73 步；未改产品/用例、扩大超时或弱化断言。按相同 source/runner/case digest 的最新结果合并，Windows 所选 43 项均取得通过证据；原 #44128316716 workflow 仍为 failure，不能改写成单轮 43/43。
+
+最终矩阵保存于 `qa-ui-auto-report/github/file-feature-current-matrix.json`：browser 三端各 35、Linux native 43、Windows native 43（上述两轮按 case 合并）、Mac Intel native 44，六个执行范围均通过完整 crash 集合。逐 run 的 `workflow-result.json` 保留 GitHub 真实结论；ARM64 缺口使 `all_four_release_targets_verified=false`。该矩阵不代表整个模块化迁出或发布验收完成。
 
 最新 ARM64 producer 的原始 check annotations 已保存为 `runner-capacity-annotations.json`：明确报告 hosted runner 未获配及 macOS ARM64 capacity constraints，`steps=[]`。这是未执行的覆盖缺口，不能由 Intel 或旧 ARM64 部分通过替代。
 
-较早恢复轮 [44124269305](https://github.com/engcapa/taomni/actions/runs/44124269305) 绑定 `daa1fc0bd4ccd22d24247a19f0c75d41e0ed72bf`、runner `dc27dfdbdb09b317ba3e1c6af8c8a591e40acc03b4aa1882dbe33682e5a4b6a8`，产品源码与当前相同：Linux/Windows native 各 43/43、各完整 crash 24/24，8/8 片全部核验，整轮成功。该结果保留原 SHA，不能回写为最新 runner 通过。同一旧 runner 的 [Intel 44124347927](https://github.com/engcapa/taomni/actions/runs/44124347927) 已收齐前两片 22/22，含 035 的自动 relaunch；其余两片仍待执行。
+较早恢复轮 [44124269305](https://github.com/engcapa/taomni/actions/runs/44124269305) 绑定 `daa1fc0bd4ccd22d24247a19f0c75d41e0ed72bf`、runner `dc27dfdbdb09b317ba3e1c6af8c8a591e40acc03b4aa1882dbe33682e5a4b6a8`，产品源码与当前相同：Linux/Windows native 各 43/43、各完整 crash 24/24，8/8 片全部核验，整轮成功。同一旧 runner 的 [Intel 44124347927](https://github.com/engcapa/taomni/actions/runs/44124347927) 也已成功结束，4/4 片全部在运行期间下载核验，**44/44**、完整 crash **24/24**，含 033/034/035 三态真实自动 relaunch。新建文件与 Live 表格均通过，已查看该端对话框和表格截图。两轮保留原 SHA/runner，不能回写为最新 runner 执行。
 
 browser 的首次补跑 #44128421025 因输入误带 native 专用 ID，被规划器明确拒绝，未执行任何应用用例；已按首轮实际 macOS browser 的准确 35 项集合重新调度为上表 #44130389617，完整 crash 集合保持。原规划失败日志保存在对应 run 的 `plan-failure.log`。
 

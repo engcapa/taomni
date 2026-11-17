@@ -24,9 +24,27 @@ Linux WebKitWebDriver 和 Windows WebView2 的自动 relaunch 后接管仍待实
 
 ## 执行状态
 
-2026-11-18 再次 fetch/merge main，远程仍为 `677ec4d77`，已包含，无冲突。当前产品源码指纹为 `c35b48e6018a22744215dcd62f63f41f3e60313e810e3ea06be53f1c97f186bf`；[macOS 15 Intel #44128351358](https://github.com/engcapa/taomni/actions/runs/44128351358) 绑定 `396b7bb294e0c4ccbc17871ac71eca246d5cfc0d`，release QA 与 scoped 签名包已完成，44 项 native（含 013/014/015、033/034/035 及完整 crash-regression）正在执行，完成片即下载核验。[macOS 26 ARM64 #44128388069](https://github.com/engcapa/taomni/actions/runs/44128388069) 的 producer 没有执行任何步骤，被 GitHub 以 hosted runner 未获配/ARM64 容量不足取消；无应用用例结果，原始 annotations 保留。
+2026-11-18 再次 fetch/merge main，远程仍为 `677ec4d77`，已包含，无冲突。当前产品源码指纹为 `c35b48e6018a22744215dcd62f63f41f3e60313e810e3ea06be53f1c97f186bf`、runner 指纹为 `10bb03145a467fbea7f9e9ea784d5e226469d9613a95acba250fd7f4974ce8a8`。[macOS 15 Intel #44128351358](https://github.com/engcapa/taomni/actions/runs/44128351358) 绑定 `396b7bb294e0c4ccbc17871ac71eca246d5cfc0d`，已成功结束；完成片即下载，全部 artifact hash/bytes、receipt、case digest 与源码/构建/selection 身份已核验。**44/44**、完整 crash **24/24**，包含 013/014/015 和 033/034/035，后者全部 93/104/112 步通过：
 
-同产品源码、较早 runner 的 [Intel #44124347927](https://github.com/engcapa/taomni/actions/runs/44124347927) 绑定 `daa1fc0bd4ccd22d24247a19f0c75d41e0ed72bf`。已在运行期间收齐并核验前两片 **22/22**，其中 035 全 112 步通过：原 PID **12295 → 12859**，单次确认、staged/禁重复、旧进程 **exit=0**、旧 HTTP 连接关闭，核对同一二进制/精确隔离环境后接管完成。卸载/retained locator、完整 SQLite 字节、generation/active、released writer lease、原密码和 HOTP 755224 的原断言均通过。033/034 和其余两片仍待完成；此结果不能改写为最新 runner 或 ARM64 通过。
+| 用例 | 原 PID → 新 PID | 原退出码 | 恢复后状态 / writer lease |
+|---|---|---|---|
+| 033 | 27715 → 28133 | 0 | enabled / held |
+| 034 | 28195 → 28634 | 0 | disabled / released |
+| 035 | 28849 → 29355 | 0 | uninstalled、dataRetained=true / released |
+
+均为单次真实确认、staged/禁重复、旧 HTTP 关闭、精确二进制/隔离环境和新 PID 接管；generation/active、原密码和 HOTP 755224 全部通过。035 的准确 locator `hello.sqlite` 为 **8192 bytes**、SHA `e795d1c7a42109c63d7f6c81663067d1a1fa7346fce2969d889e9f2bd467f95e`，与原已核验档案相等；已查看最新解密后 MFA 截图，原账户和验证码正常。证据在 `qa-ui-auto-report/github/44128351358/live-shards/`。
+
+[macOS 26 ARM64 #44128388069](https://github.com/engcapa/taomni/actions/runs/44128388069) 的 producer 没有执行任何步骤，被 GitHub 以 hosted runner 未获配/ARM64 容量不足取消；无应用用例结果，原始 annotations 保留。Intel 通过不填补 ARM64 或 Linux/Windows 自动接管缺口。
+
+同产品源码、较早 runner 的 [Intel #44124347927](https://github.com/engcapa/taomni/actions/runs/44124347927) 绑定 `daa1fc0bd4ccd22d24247a19f0c75d41e0ed72bf`，已成功结束；4/4 片在执行期间收齐，**44/44**、完整 crash **24/24**，全部 artifact hash/bytes、receipt、case digest 与源码/构建/selection 身份已核验。三态的 93/104/112 步全部通过，原始进程与 OS writer lease 记录如下：
+
+| 用例 | 原 PID → 新 PID | 原退出码 | 恢复后状态 / writer lease |
+|---|---|---|---|
+| 033 | 8587 → 8856 | 0 | enabled / held |
+| 034 | 11493 → 11889 | 0 | disabled / released |
+| 035 | 12295 → 12859 | 0 | uninstalled、dataRetained=true / released |
+
+每项均为单次确认、staged/禁重复、关闭旧 HTTP 连接，核对同一二进制/精确隔离环境后接管完成；generation/active、原密码和 HOTP 755224 均通过。035 准确 locator 为 `hello.sqlite`，完整数据库 **8192 bytes**、SHA `e795d1c7a42109c63d7f6c81663067d1a1fa7346fce2969d889e9f2bd467f95e`，与原已核验档案相等。此结果保留原 runner 身份，不能改写为最新 runner 或 ARM64 通过。
 
 首轮 `750f6f417528c25fb813bdd547c36c69239e7079` 的 [Intel #44119238192](https://github.com/engcapa/taomni/actions/runs/44119238192) 虽完成 release QA build，但旧四目标模块包被无关 ARM64 容量阻断，native 未执行；[ARM64 #44119201895](https://github.com/engcapa/taomni/actions/runs/44119201895) 同样未取得 runner。下述旧 Intel 全量与 ARM64 部分证据仍绑定各自原始 SHA。旧 SHA 的单作业 #44110689605 在执行应用用例前结束，不将历史结果转为新源码通过。
 

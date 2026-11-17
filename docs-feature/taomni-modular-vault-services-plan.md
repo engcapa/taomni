@@ -320,6 +320,14 @@ RestoreJournal增加可向后兼容的generation字段；在第一次实际改�
 
 TASK-012继续负责真实exporter与安装状态迁移，不能借本方案把安全pending改为假committed。MFA迁移时：核心只读源 `mfa.db`/Vault存在性预检 → 签名MFA包准备完成 → plugin data staging用一致SQLite快照 → 同key ID的受限服务自检key_check及已知账户解密 → 原子发布数据generation/active与journal committed；失败保持源不变和可重试pending。首次打开新host不默认读取旧根路径，也不生成替代key。
 
+2026-11-18 接线前复核：`migration_preflight::build_file_migration_specs` 只是路径计划，MFA 的 `source=mfa.db` 不能被生产执行器解释为主文件直接复制；`migration_fixture` 中的伪版本/复制事务仍只用于测试。下一批 core-owned exporter 需遵守以下边界：
+
+- 源与目标从核心拥有的 profile、固定 slug 和签名包数据声明推导，不接受 renderer 提供路径。迁移 owner 绑定同一 profile 的排他维护 lease、Vault 操作屏障和生命周期；不能仅传入一个无法核对归属的 lease 加任意根目录。源 `mfa.db`、`vault.db` 及其非空 WAL 的指纹必须与只读预检一致，导出后再次核对；遇到 writer、checkpoint 或源变化时可重试失败，不以旧预检继续激活。
+- 使用现有 `taomni-sqlite-snapshot::snapshot_existing` 生成独立、已检查的 SQLite staging；保留原加密列、key_check、HOTP counter、metadata 和偏好，不调用 engine 的 `open_db/init_db` 去迁移或初始化旧源。源、sidecar、父目录及目标拒绝链接/重解析点；取消、超时、busy、校验失败和已有目标均不得替换工作库。staging 在完整检查与持久化后才交给后续可信激活事务，数据最终归 `plugins/mfa/data/mfa.db`，不放在只读 `versions/<version>` 代码目录。
+- 预检存在 Vault 固定项但缺少 `mfa.db` 也是现有合法候选。导出器要明确区分“无旧库”和“读取失败”，保留原固定项，不能生成替代密钥或把 key-only 输入错误记为已迁移。旧根 `taomni.db` 的业务记录则必须按归属白名单导出，不能整库复制给宿主；LanChat 历史库不参与扫描内容、导出或清理。
+
+该复核只确定接线约束，未实现 exporter 或改变生产 pending 行为。真实验证需覆盖已提交 WAL-only 记录、源并发变化、取消/busy 与失败重试、链接路径、key-only 输入，以及由同一受限 key 服务验证的真实 MFA/HOTP 数据；真实文件、进程和旧版安装输入均在 GitHub runner 执行。导出成功仍不等于可信包 staging、原子激活或完整升级/回滚验收。
+
 TASK-025完成不等于TASK-014完成；后者必须真正移除core的MfaStore/commands/crypto依赖，动态加载MFA UI，保留SSH登录MfaPrompt在core，跑真实安装与升级。headless初始化不能继续私有创建旧MfaStore来绕过插件服务。核心不直连新MFA业务DB（offline只读备份helper和受限legacy exporter除外）。
 
 ## 10. 分文件实施顺序与所有权
