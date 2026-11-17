@@ -29,3 +29,7 @@ Linux WebKitWebDriver 和 Windows WebView2 的自动 relaunch 后接管仍待实
 [matching UI #44043206496](https://github.com/engcapa/taomni/actions/runs/44043206496) 绑定 `fa17261e4582f84c645bf41658949592767547ec`，selection 为 `f0c687845e4a473da0bcdd72862947d6`。实际计划含 macOS ARM64 native 32 项（包含 033/034/035），browser 三端各 19 项，Linux Xvfb/Wayland 与 Windows native 各 29 项；gaps=[]/unreviewed=[]。已启动即时收证，新增用例尚待 matching runner 结果；不能把静态审查或工具模拟写成原生通过。
 
 2026-11-17：#44043206496 的 macOS 033/034/035 原始失败均停在备份清单断言，尚未执行自动 relaunch。原失败 DOM 有多份真实本地任务；未限定任务的 selector 点击了另一份自动备份。修正 oracle 仅在独立核验准确手工 job、ZIP/全部 hash、原 HOTP counter 和配对 Vault/MFA 后公开该 job ID，三项用例通过对应 `backup-cloud-job[data-job-id]` 打开原任务。保留全部后续密码、staged、exit=0、新 PID/generation 和业务断言；增加工具单元同时检查三项用例的精确 UI 选择。修正后的真实自动重启仍待新 GitHub 结果，原失败不改写为通过。
+
+精确任务选择修正已提交 `56d9a305641f7dc478212d01042e8f5009fe2b11`，[macOS 定向复验 #44050634191](https://github.com/engcapa/taomni/actions/runs/44050634191) 已启动，保留三态普通冷启动与完整 crash-regression；结果继续按完成 shard 收取。
+
+该轮 browser 4 片共 18/18 通过。已完成 native 片中 013/014/034/035 在观察器公布备份 job ID 时抛出 `NativeStepContext.values` 不存在，尚未执行自动 relaunch；同轮 FILE-OPEN-002 另有 ResizeObserver 通知失败，保留原始证据。观察器现通过 native 的 `fixture_context.values` 更新模板变量，browser 继续使用其原 fixture owner；使用实际 `NativeStepContext` 与 browser context 的单元先复现 native 红测，再验证两种上下文均能发布独立核验的任务 ID。密码、真实进程 relaunch、generation 和数据断言保持，修订后须重新在 GitHub 执行。

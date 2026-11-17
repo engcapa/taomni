@@ -245,7 +245,8 @@ def run(ctx, args):
                 state.update(step="restored", restoredGeneration=current)
         state_path.write_text(json.dumps(state, indent=2), encoding="utf-8")
         if state.get("jobId"):
-            ctx.values["module_restore_job_id"] = state["jobId"]
+            owner = getattr(ctx, "fixture_context", None) or ctx
+            owner.values["module_restore_job_id"] = state["jobId"]
         observed.update(passed=True, generation=current, registryState=native_state)
         return "module restore " + phase + " verified"
     finally:

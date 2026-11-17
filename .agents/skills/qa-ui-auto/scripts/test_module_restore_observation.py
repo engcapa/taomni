@@ -12,6 +12,7 @@ import zipfile
 
 from qa_ui_auto.behavior_contract import is_check
 from qa_ui_auto.module_restore_observation import check_core_snapshots, check_generation, check_staging, stage, validate
+from qa_ui_auto.native_steps import NativeStepContext
 from qa_ui_auto.steps import StepError
 from qa_ui_auto import module_restore_observation as observation
 
@@ -31,19 +32,23 @@ class RestoreObservationTests(unittest.TestCase):
             plugins.mkdir()
             (profile / ".profile-state.json").write_text(json.dumps({"generation": BEFORE}))
             (work / "official-module-fixture.json").write_text(json.dumps({"pluginRoot": str(plugins)}))
-            (work / "module-restore-state.json").write_text(json.dumps({"generation": BEFORE, "step": "original"}))
             archive = self.paired_archive(profile, 0)
             digest = hashlib.sha256(archive.read_bytes()).hexdigest()
-            ctx = SimpleNamespace(case_dir=work, values={"module_restore_job_id": "older-automatic-job"})
-            with patch.object(observation, "record", return_value={"state": "disabled"}), \
-                 patch.object(observation, "wait_manual_job", return_value=(AFTER, {"localPath": str(archive)})), \
-                 patch.object(observation, "check_archive", return_value={"sha256": digest}), \
-                 patch.object(observation, "writer_lease", return_value={"held": False}):
-                observation.run(ctx, {"phase": "disabled-archive"})
-            state = json.loads((work / "module-restore-state.json").read_text())
-            self.assertEqual(state["jobId"], AFTER)
-            self.assertEqual(state["archiveSha256"], digest)
-            self.assertEqual(ctx.values["module_restore_job_id"], AFTER)
+            for mode in ("browser", "native"):
+                with self.subTest(mode=mode):
+                    (work / "module-restore-state.json").write_text(json.dumps({"generation": BEFORE, "step": "original"}))
+                    fixture = SimpleNamespace(case_dir=work, values={"module_restore_job_id": "older-automatic-job"})
+                    ctx = fixture if mode == "browser" else NativeStepContext(
+                        SimpleNamespace(), work, {}, fixture_context=fixture)
+                    with patch.object(observation, "record", return_value={"state": "disabled"}), \
+                         patch.object(observation, "wait_manual_job", return_value=(AFTER, {"localPath": str(archive)})), \
+                         patch.object(observation, "check_archive", return_value={"sha256": digest}), \
+                         patch.object(observation, "writer_lease", return_value={"held": False}):
+                        observation.run(ctx, {"phase": "disabled-archive"})
+                    state = json.loads((work / "module-restore-state.json").read_text())
+                    self.assertEqual(state["jobId"], AFTER)
+                    self.assertEqual(state["archiveSha256"], digest)
+                    self.assertEqual(fixture.values["module_restore_job_id"], AFTER)
             # The UI targets the exact checked job even if automatic backups
             # were inserted earlier/later in the same history list.
             for case in ("033", "034", "035"):
