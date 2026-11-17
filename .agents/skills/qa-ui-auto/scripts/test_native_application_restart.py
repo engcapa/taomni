@@ -12,6 +12,7 @@ import yaml
 
 from native_application_restart import (EXIT_DIALOG_OBSERVATION, bind_application_restarter,
                                         close_application_window, restart_owned_application)
+from native_application_shutdown import ApplicationShutdownTimeout
 from native_webdriver_transport import WebDriverError
 from qa_ui_auto.native_steps import run_native_step
 from qa_ui_auto.steps import StepError
@@ -242,6 +243,21 @@ class NativeApplicationRestartTest(unittest.TestCase):
                 if failure == "shutdown":
                     driver.start.assert_not_called()
                 self.assertNotEqual(session.application_restart_observation["exit_confirmation"]["status"], "verified")
+
+    def test_restart_observation_keeps_shutdown_survivors_before_owner_cleanup(self):
+        session, driver, _, _, _ = self.confirmation_scenario()
+        survivors = [{"pid": 63, "name": "WebKitNetworkProcess", "state": "S",
+                      "parent_pid": 1, "process_group": 54, "kernel_start_time": "198"}]
+        self.shutdown.side_effect = ApplicationShutdownTimeout(survivors)
+        with patch("native_application_restart.close_application_window",
+                   return_value={"window_closed": True}):
+            with self.assertRaisesRegex(RuntimeError, "did not exit normally"):
+                restart_owned_application(driver, session)
+        observation = session.application_restart_observation
+        self.assertEqual(observation["error_stage"], "wait-for-application-exit")
+        self.assertEqual(observation["shutdown_remaining_processes"], survivors)
+        driver.stop.assert_called_once()
+        driver.start.assert_not_called()
 
     def test_x11_confirmation_keeps_native_close_and_shutdown_evidence(self):
         session, driver, _, expected, dialog = self.confirmation_scenario()

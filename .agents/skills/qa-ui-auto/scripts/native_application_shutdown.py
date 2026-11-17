@@ -5,6 +5,13 @@ from pathlib import Path
 import time
 
 
+class ApplicationShutdownTimeout(RuntimeError):
+    def __init__(self, processes: list[dict]):
+        self.processes = processes
+        pids = [process["pid"] for process in processes]
+        super().__init__(f"QA application/storage processes did not exit normally: {pids}")
+
+
 def linux_storage_processes(driver, application: Path, proc_root: Path = Path("/proc")) -> dict[int, str]:
     """Snapshot only application/WebKit processes in this launcher's group.
 
@@ -42,19 +49,28 @@ def wait_for_application_shutdown(driver, session, processes: dict[int, str], ti
         return {"exit_code": code, "duration_sec": time.monotonic() - started}
     remaining = dict(processes)
     while remaining:
+        survivors = []
         for pid, identity in list(remaining.items()):
             try:
-                fields = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)[1].split()
+                command, fields_text = Path(f"/proc/{pid}/stat").read_text().rsplit(")", 1)
+                fields = fields_text.split()
                 alive = fields[0] != "Z" and fields[19] == identity
-            except (OSError, IndexError):
+                parent, group = int(fields[1]), int(fields[2])
+            except (OSError, ValueError, IndexError):
                 alive = False
-            if not alive:
+            if alive:
+                survivors.append({
+                    "pid": pid, "name": command.partition("(")[2], "state": fields[0],
+                    "parent_pid": parent, "process_group": group,
+                    "kernel_start_time": fields[19],
+                })
+            else:
                 del remaining[pid]
         if not remaining:
             break
         if session.deadline:
             session.deadline.remaining()
         if time.monotonic() - started >= timeout:
-            raise RuntimeError(f"QA application/storage processes did not exit normally: {sorted(remaining)}")
+            raise ApplicationShutdownTimeout(sorted(survivors, key=lambda process: process["pid"]))
         time.sleep(0.05)
     return {"process_ids": sorted(processes), "duration_sec": time.monotonic() - started}
