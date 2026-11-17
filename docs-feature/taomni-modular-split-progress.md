@@ -12,6 +12,8 @@
 
 ## 2026-11-17 最新结果与后续验证
 
+- 最新拉取远程 `main` 仍为 `cb448d174e5629ca74a87e4e72533eafea1a2927`，已是当前分支祖先，`git merge --no-edit origin/main` 返回 `Already up to date`。工具批次 `7ffff94c6` 的 [#43985551747](https://github.com/engcapa/taomni/actions/runs/43985551747) 已成功：三端 API 各 21/21、Linux 完整 selection 单元 25/25，四份 artifact 执行期间收齐。
+- #43978896463 即时收证发现两项相关 Linux Xvfb 用例竞态：TC-MODULES-006 尚未进入验签，空表单按钮在持续搜索定位期间被面板底部裁切；补真实点击可见的空 archive 字段，让用户输入接管搜索定位，再按原断言验证必填拒绝。TC-MODULES-024 在点击异步 Save 后立即计数，46 步只读到原来一条；改为先等待真实新文本出现，再保留两条精确计数与独立原生 probe，断言不减少。原始失败保留，等待 matching case 复验。Wayland 文件查看器两项非左键/X11 能力失败与本批无关，保留为失败，不计通过。
 - 合并源码 #43978896463 的三端 browser 已在执行期间收齐六片，每端 **51/51**，包括 TC-MODULES-003 的全部 33 步、Tao Home 003/010 与完整 browser crash-regression；16 个 native shard 仍等三套 matching release QA 构建。旧源码 #43972739950 的三端 browser 各 20/20、Windows native 22/22 已保留；其余已被合并源码替代的任务主动取消，不将缺失 native 项计为通过。
 - 宿主 fixture 修复源码 `e962e623a55b6021b3d1741dd518e61911cf8b1e` 的 [host-only #43982728113](https://github.com/engcapa/taomni/actions/runs/43982728113) 已成功：三端每端 activation 3、cleanup 2、lifecycle 7、MFA 5、MFA snapshot 2、profile 5、services 8、snapshot 4，共 **36 个真实场景全部通过**；原 Windows readiness 失败的两项 cleanup 均通过。三份 artifact 执行期间收齐，Linux noexec receipt 的 `allSelectedPassed/fixtureMountRemoved` 均 true。原 #43978893008 失败仍保留，不将其全 run 改称成功。
 - Linux producer 的构建前工具单元阶段较长；`test_ci_selection` 的 25 项测试反复调用 `make_plan`，每次都重新解析/校验全套 YAML 并计算整个仓库身份。本批仅在这一个单元模块的生命周期内复用一次真实校验后的 catalog/身份快照，每次返回独立 case 副本、case 文件 digest 仍实时读取，结束恢复原函数；生产 planner、case discovery、freshness 和构建 fingerprint 未改。全部既有断言保留，本地纯单元 **25/25（115.925s）**；不是产品性能比较或加速倍数。GitHub 轻量协议入口补该完整模块的执行与独立原始日志，本批没有新增产品流程，不另造 UI YAML。

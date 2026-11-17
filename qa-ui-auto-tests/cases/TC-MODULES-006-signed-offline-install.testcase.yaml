@@ -5,7 +5,9 @@ description: >-
   through Settings. Native mode must execute the actual file/signature gate;
   browser preview must reject explicitly. Neither mode may invent an installed
   module. Closing and reopening Settings retains the draft and failure, and a
-  retry remains safe. TC-MODULES-007 separately verifies official trusted native installation.
+  retry remains safe. Focus the visible archive field after search so user input
+  takes over the section's automatic layout tracking before submitting the empty
+  form. TC-MODULES-007 separately verifies official trusted native installation.
 covers:
 - F-Modules-1
 tags:
@@ -31,6 +33,7 @@ steps:
     selector: '[data-testid="settings-search-input"]'
     value: module store
 - wait_for: '[data-testid="module-offline-install"]'
+- click: '[data-testid="module-offline-archive"]'
 - click: '[data-testid="module-offline-submit"]'
 - assert_visible: '[data-testid="module-offline-error"]'
 - assert_attribute:
@@ -92,45 +95,45 @@ verification:
   requirements:
   - id: R1
     requirement: Required inputs are validated, and an untrusted archive never becomes an installed module.
-    actions: [8, 11, 12, 13, 29]
+    actions: [8, 9, 12, 13, 14, 30]
     checkpoints:
-    - step: 10
+    - step: 11
       expectation: Required inputs produce a failed state without installing a module.
-    - step: 15
-      expectation: The real native signature boundary or explicit browser rejection exposes a signature error.
     - step: 16
+      expectation: The real native signature boundary or explicit browser rejection exposes a signature error.
+    - step: 17
       expectation: The installed-module projection remains empty.
-    - step: 32
-      expectation: Retrying an untrusted package still leaves the registry empty.
     - step: 33
-      expectation: The source archive remains intact after both failed attempts.
+      expectation: Retrying an untrusted package still leaves the registry empty.
     - step: 34
+      expectation: The source archive remains intact after both failed attempts.
+    - step: 35
       expectation: Validation failure, closing Settings and retry produce no unhandled renderer errors.
-    results: [10, 15, 16, 32, 33, 34]
+    results: [11, 16, 17, 33, 34, 35]
   - id: R2
     requirement: Closing Settings preserves the installation draft and error for a safe retry.
-    actions: [18, 20, 22, 29]
+    actions: [19, 21, 23, 30]
     checkpoints:
-    - step: 19
+    - step: 20
       expectation: The close gesture removes both the Settings tab and its panel before reopening.
-    - step: 24
-      expectation: Reopening Settings restores the failed operation state.
     - step: 25
-      expectation: The local archive path is retained exactly.
+      expectation: Reopening Settings restores the failed operation state.
     - step: 26
-      expectation: The detached signature draft is retained.
+      expectation: The local archive path is retained exactly.
     - step: 27
+      expectation: The detached signature draft is retained.
+    - step: 28
       expectation: The signature rejection remains visible after reopening.
-    - step: 31
+    - step: 32
       expectation: A repeated installation reports its failure after reopening Settings.
-    results: [19, 24, 25, 26, 27, 31]
+    results: [20, 25, 26, 27, 28, 32]
   - id: R3
     requirement: Untrusted input cannot create module data-management controls or a retained-data status.
-    actions: [13, 29]
+    actions: [14, 30]
     checkpoints:
-    - step: 36
+    - step: 37
       expectation: Browser and native Settings expose neither uninstall/delete controls nor a retained-data label for the rejected hello module.
-    results: [36]
+    results: [37]
   native:
   - check: The archive path reaches native disk access and signature verification without changing installed modules.
     method: automated

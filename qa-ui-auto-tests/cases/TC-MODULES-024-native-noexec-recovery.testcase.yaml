@@ -61,8 +61,8 @@ steps:
 - assert_not_visible: '[data-testid="hello-plugin-error"]'
 - fill: {selector: '[data-testid="hello-plugin-value"]', value: saved after noexec}
 - click: '[data-testid="hello-plugin-save"]'
-- assert_count: {selector: '[data-testid="hello-plugin-entry"]', equal: 2}
 - assert_text: {selector: '[data-testid="hello-plugin-values"]', contains: saved after noexec}
+- assert_count: {selector: '[data-testid="hello-plugin-entry"]', equal: 2}
 - module_execution_probe: {phase: recovered}
 - assert_no_runtime_errors: null
 - screenshot: module-noexec-recovered-data.png
@@ -93,8 +93,8 @@ verification:
     checkpoints:
     - {step: 42, expectation: Reopening the component reads the exact original persisted message.}
     - {step: 43, expectation: The new successful component clears the execution failure.}
-    - {step: 46, expectation: Both original and new saved messages are displayed exactly once.}
-    - {step: 47, expectation: The second persisted value is visible.}
+    - {step: 46, expectation: The asynchronous save finishes and the second persisted value is visible.}
+    - {step: 47, expectation: Both original and new saved messages are displayed exactly once.}
     - {step: 48, expectation: "The unchanged signed executable returns its identity and both messages, and owns the native writer lease again."}
     - {step: 49, expectation: Recovery produces no unhandled runtime errors.}
     results: [42, 43, 46, 47, 48, 49]
