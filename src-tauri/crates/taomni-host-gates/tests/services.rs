@@ -148,6 +148,58 @@ fn reverse_service_can_exceed_normal_invoke_timeout_while_heartbeats_continue() 
 }
 
 #[test]
+#[ignore = "70,000 real core/SDK stdio calls: GitHub runners only"]
+fn fresh_operations_and_sdk_commands_cross_the_old_transport_lifetime_limit() {
+    let mut harness = Harness::new(Duration::ZERO);
+    assert_eq!(harness.probe()["present"], true);
+    let host = harness.process.authorized_host().unwrap().clone();
+    let started = Instant::now();
+    for sequence in 1..=70_000 {
+        assert!(
+            started.elapsed() < Duration::from_secs(600),
+            "long-lived host gate exceeded its budget"
+        );
+        let permit = harness
+            .admission
+            .admit_new_until(
+                &host,
+                OperationKind::ReadData,
+                VaultOperationLease::try_read(&harness.root).unwrap(),
+                Instant::now() + Duration::from_secs(6),
+            )
+            .unwrap();
+        let result = harness
+            .process
+            .invoke_with_operation(
+                permit,
+                "service/probe",
+                Some(serde_json::json!({"echo": sequence})),
+            )
+            .unwrap();
+        assert_eq!(result["echo"], sequence);
+        assert_eq!(result["handled"], sequence);
+        assert_eq!(result["hostInstance"], host.instance().as_str());
+        if sequence % 10_000 == 0 {
+            println!(
+                "long-lived host: {sequence} actual stdio calls in {:?}",
+                started.elapsed()
+            );
+        }
+    }
+    assert_eq!(harness.admission.in_flight_count(), 0);
+    assert_eq!(
+        harness.process.authorized_host().unwrap().instance(),
+        host.instance()
+    );
+    assert_eq!(harness.process.state(), HostState::Running);
+    // Echoes exercise actual command transport/admission, not key retrieval.
+    // Real reverse RPC/key access must still work after crossing the old cap.
+    assert_eq!(harness.probe()["present"], true);
+    assert_eq!(harness.backend.calls.load(Ordering::Acquire), 2);
+    assert!(VaultOperationLease::try_write(&harness.root).is_ok());
+}
+
+#[test]
 #[ignore = "real stdio core/SDK gate: GitHub runners only"]
 fn cancel_while_sdk_waits_for_key_does_not_publish_a_late_success() {
     let mut harness = Harness::new(Duration::from_secs(3));

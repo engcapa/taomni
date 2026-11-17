@@ -6,7 +6,7 @@ use std::{
     },
     time::Instant,
 };
-use taomni_plugin_api::services::{CoreServiceError, OperationId, VaultEpoch};
+use taomni_plugin_api::services::{CoreServiceError, VaultEpoch};
 use taomni_plugin_services::{
     AdmissionState, AuthorizedHost, CoreServiceDispatcher, DispatcherConfig, OperationAdmission,
     OperationKind, OperationPermit, Revocation, VerifiedHostGrants,
@@ -148,13 +148,7 @@ impl PluginCoreServices {
                     _ => CoreServiceError::PluginProfileInUse,
                 })
             })?;
-            match self.admission.admit_until(
-                host,
-                OperationId::parse(uuid::Uuid::new_v4().to_string()).expect("canonical UUID"),
-                kind,
-                lease,
-                deadline,
-            ) {
+            match self.admission.admit_new_until(host, kind, lease, deadline) {
                 Ok(permit) => return Ok(permit),
                 Err(CoreServiceError::CoreServiceBusy) if self.admission.is_paused() => (),
                 Err(error) => return Err(service_error(error)),

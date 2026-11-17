@@ -6,7 +6,7 @@ use crate::{
     sensitive::{Envelope, LineReader, invalid_frame},
 };
 use std::{
-    collections::{BTreeSet, HashMap, HashSet},
+    collections::{BTreeSet, HashMap},
     io::{self, Read, Write},
     sync::{
         Arc, Mutex,
@@ -16,8 +16,8 @@ use std::{
     time::Duration,
 };
 use taomni_plugin_api::{
-    CancelRequest, ErrorCode, HandshakeRequest, HandshakeResponse, Heartbeat, RequestId, RpcError,
-    RpcMessage, RpcRequest, RpcResponse,
+    CancelRequest, ErrorCode, HandshakeRequest, HandshakeResponse, Heartbeat, ReplayError,
+    RequestId, RequestIdMode, RequestReplay, RpcError, RpcMessage, RpcRequest, RpcResponse,
     services::{
         HostInstanceId, RevokeKeys, RevokedKeys, ServiceCapabilities, VAULT_REVOKE_METHOD,
         VaultEpoch,
@@ -124,7 +124,8 @@ pub(crate) fn serve_owned(
     let mut host_instance: Option<HostInstanceId> = None;
     let mut revoked_epoch: Option<VaultEpoch> = None;
     let mut revoke: Option<(RequestId, RevokeKeys)> = None;
-    let mut seen = HashSet::new();
+    let mut replay =
+        RequestReplay::new(RequestIdMode::Legacy, "core", None).expect("legacy request ledger");
     while let Some(mut line) = reader.next()? {
         if writer_failed.load(Ordering::Acquire) || client.failed() {
             return Err(invalid_frame());
@@ -145,6 +146,27 @@ pub(crate) fn serve_owned(
             // Only commands/notifications take this generic path. Reverse key
             // results were borrowed raw and routed above, never via RpcMessage.
             let message: RpcMessage = serde_json::from_slice(&line).map_err(|_| invalid_frame())?;
+            if let RpcMessage::Request(request) = &message
+                && authenticated
+                && request.method != "plugin/handshake"
+            {
+                match replay.accept(&request.id) {
+                    Ok(()) => (),
+                    Err(ReplayError::Full) => return Err(invalid_frame()),
+                    Err(error) => {
+                        send_error(
+                            &client,
+                            request.id.clone(),
+                            if error == ReplayError::Duplicate {
+                                ErrorCode::DuplicateRequest
+                            } else {
+                                ErrorCode::InvalidRequest
+                            },
+                        )?;
+                        continue;
+                    }
+                }
+            }
             match message {
                 RpcMessage::Notification(notification)
                     if notification.method == Heartbeat::METHOD && authenticated =>
@@ -176,6 +198,12 @@ pub(crate) fn serve_owned(
                     };
                     let response = match accepted {
                         Ok((response, instance)) => {
+                            replay = RequestReplay::new(
+                                response.request_id_mode,
+                                "core",
+                                instance.as_ref(),
+                            )
+                            .map_err(|_| invalid_frame())?;
                             authenticated = true;
                             host_instance = instance;
                             RpcResponse::success(
@@ -213,13 +241,6 @@ pub(crate) fn serve_owned(
                     }
                 }
                 RpcMessage::Request(request) if authenticated => {
-                    if !seen.insert(request.id.clone()) {
-                        send_error(&client, request.id, ErrorCode::DuplicateRequest)?;
-                        continue;
-                    }
-                    if seen.len() > 65_536 {
-                        return Err(invalid_frame());
-                    }
                     if let Some(error) = validate_command(
                         &request,
                         &config,
@@ -315,12 +336,15 @@ pub(crate) fn handshake(
             .iter()
             .any(|(name, version)| !handshake.core_services.supports(name, *version))
         || (!config.required_services.is_empty() && handshake.host_instance.is_none())
+        || (handshake.request_id_mode == RequestIdMode::MonotonicV1
+            && handshake.host_instance.is_none())
     {
         return Err(RpcError::from_code(ErrorCode::PermissionDenied));
     }
     let mut response = HandshakeResponse::accepted(1000);
     response.core_services = config.required_services.clone();
     response.profile = profile;
+    response.request_id_mode = handshake.request_id_mode;
     Ok((response, handshake.host_instance))
 }
 

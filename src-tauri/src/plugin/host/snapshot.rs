@@ -125,7 +125,7 @@ impl HostProcess {
         if Instant::now() >= deadline {
             return Err(HostProcessError::Timeout);
         }
-        let id = self.next_request_id();
+        let id = self.next_request_id()?;
         let _request =
             super::cancellation::RequestGuard::new(self.cancellation.clone(), id.clone());
         let handle = self.cancellation.clone();

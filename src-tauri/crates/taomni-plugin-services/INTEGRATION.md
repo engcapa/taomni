@@ -42,11 +42,17 @@ The root host owner implements TASK-025-D against these files:
 
 - `policy.rs`: `VerifiedHostGrants`, `AuthorizedHost`, `fixed_key_owner`.
 - `admission.rs`: outer `OperationPermit` and `borrow_operation`.
+- `issued_operations.rs`: production admission allocates a reserved, checked
+  operation ID atomically, retaining only live permits. Explicit-ID compatibility
+  APIs and local core permits cannot re-admit any issued or future reserved ID.
 - `core_operation.rs`: in-process `CoreOperationPermit` shares the drain and
   lease barrier while legacy MFA still lives in core. It has no host identity
   or wire context and cannot authorize reverse service requests.
 - `operation.rs`: borrowed existing OS lease and context validity checks.
 - `service_request.rs`: bounded reverse requests and remembered IDs.
+- `session.rs`: handshake-selected monotonic request watermarks remember every
+  older sequence without growing with transport lifetime. Unnegotiated v1 peers
+  retain their original bounded ledger and duplicate/capacity rejection.
 - `sensitive_frame.rs`: hold the whole frame through queued/finished/discarded
   writes; `current_bytes` rejects a context invalidated while queued.
 - `revoke.rs`: admission closes and epoch increments before revoke RPC;

@@ -203,6 +203,18 @@ fn handshake_refuses_missing_service_identity_or_wrong_token_and_preserves_v1() 
     assert_eq!(instance.unwrap().as_str(), HOST);
     assert!(reply.core_services.supports(FIXED_KEY_SERVICE, 1));
     assert_eq!(reply.api_version, 1);
+    assert_eq!(
+        reply.request_id_mode,
+        taomni_plugin_api::RequestIdMode::Legacy
+    );
+    hello.request_id_mode = taomni_plugin_api::RequestIdMode::MonotonicV1;
+    let (reply, _) = handshake(&call(&hello), &config, "token", None).unwrap();
+    assert_eq!(
+        reply.request_id_mode,
+        taomni_plugin_api::RequestIdMode::MonotonicV1
+    );
+    hello.host_instance = None;
+    assert!(handshake(&call(&hello), &config, "token", None).is_err());
 }
 
 struct Fragments {

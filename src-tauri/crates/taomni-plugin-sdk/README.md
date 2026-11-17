@@ -7,10 +7,15 @@ permissions and required service versions through `HostConfig`.
 
 The core supplies an authenticated per-spawn `hostInstance` and an admitted
 top-level operation context. A service-enabled host rejects generic renderer
-invokes without that context. Host reverse IDs use `host/<instance>/<sequence>`;
-scoped core IDs use `core/<instance>/<operation>`. Neither direction uses the
-authentication token in its IDs. Replayed commands and unknown responses fail
-closed; one known response arriving after cancellation can be discarded.
+invokes without that context. Handshake `requestIdMode: monotonic-v1` explicitly
+negotiates strictly increasing `core/<instance>/<sequence>` and
+`host/<instance>/<sequence>` IDs, with constant-size receive watermarks. Missing
+echo keeps the legacy bounded ledger; scoped caller IDs may then retain their
+operation UUID. Neither direction uses the authentication token in its IDs.
+Replayed commands and unknown responses fail closed; one known response arriving
+after cancellation can be discarded. Pending plus unanswered cancelled requests
+share an eight-request bound and one atomic reply/retirement owner. Completed
+history consumes no capacity; checked counters never wrap or reuse an ID.
 
 Use `Operation::fixed_key` and `OperationKey::with_key` inside the business
 operation. Missing remains `None`; this API never silently creates a key. The

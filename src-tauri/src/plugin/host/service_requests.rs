@@ -26,7 +26,7 @@ impl HostProcess {
             profile_generation: revocation.generation.clone(),
             vault_epoch: revocation.epoch,
         };
-        let id = self.next_request_id();
+        let id = self.next_request_id()?;
         let result = self.invoke_until(
             id,
             taomni_plugin_api::services::VAULT_REVOKE_METHOD,
@@ -76,6 +76,7 @@ impl HostProcess {
 
     pub(super) fn discard_services(&mut self) {
         self.instance.take();
+        self.request_id_mode = RequestIdMode::Legacy;
         if let Some(permit) = self.active_operation.as_ref() {
             permit.cancel();
         }

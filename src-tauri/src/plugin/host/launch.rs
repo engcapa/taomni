@@ -6,7 +6,8 @@ use super::service_requests::fresh_host_instance;
 use super::{HostProcess, HostProcessError, Transport, process_token};
 use std::{process::Command, time::Instant};
 use taomni_plugin_api::{
-    HandshakeRequest, HandshakeResponse, RpcError, RpcMessage, RpcRequest, validate_versions,
+    HandshakeRequest, HandshakeResponse, RequestIdMode, RpcError, RpcMessage, RpcRequest,
+    validate_versions,
 };
 use taomni_plugin_services::ServiceSession;
 
@@ -22,7 +23,7 @@ impl HostProcess {
             .iter()
             .any(|method| method == "plugin/enable")
         {
-            let id = self.next_request_id();
+            let id = self.next_request_id()?;
             self.invoke_until(id, "plugin/enable", None, Some(deadline))?;
         }
         Ok(())
@@ -56,10 +57,9 @@ impl HostProcess {
         if let Some(services) = &self.service_config {
             request.core_services = services.grants.service_capabilities();
         }
-        if self.service_config.is_some() || self.launch.profile.is_some() {
-            request.host_instance = Some(fresh_host_instance());
-        }
-        let id = self.next_request_id();
+        request.host_instance = Some(fresh_host_instance());
+        request.request_id_mode = RequestIdMode::MonotonicV1;
+        let id = self.next_request_id()?;
         let message = RpcMessage::Request(RpcRequest::new(
             id.clone(),
             "plugin/handshake",
@@ -86,6 +86,14 @@ impl HostProcess {
             ));
         }
         validate_profile_ack(request.profile.as_ref(), handshake.profile.as_ref())?;
+        // Missing echo is an old peer. Never infer support from ID shape.
+        if handshake.request_id_mode != RequestIdMode::Legacy
+            && handshake.request_id_mode != request.request_id_mode
+        {
+            return Err(HostProcessError::Handshake(
+                "request ID mode was not offered".into(),
+            ));
+        }
         if request
             .core_services
             .0
@@ -105,6 +113,7 @@ impl HostProcess {
             ));
         }
         self.instance = request.host_instance.clone();
+        self.request_id_mode = handshake.request_id_mode;
         if let Some(config) = &self.service_config {
             let host = config.grants.clone().bind_authenticated_transport(
                 request.host_instance.expect("service transport identity"),
@@ -113,7 +122,11 @@ impl HostProcess {
                 .as_mut()
                 .expect("handshaken transport")
                 .bind_services(config.dispatcher.clone(), host.clone());
-            self.services = Some(ServiceSession::new(config.dispatcher.clone(), host));
+            self.services = Some(ServiceSession::with_request_id_mode(
+                config.dispatcher.clone(),
+                host,
+                self.request_id_mode,
+            ));
         }
         self.next_heartbeat_ms = self.elapsed_ms();
         Ok(())

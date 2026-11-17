@@ -7,7 +7,8 @@ use std::time::{Duration, Instant};
 
 use serde_json::Value;
 use taomni_plugin_api::{
-    CancelRequest, ErrorCode, Heartbeat, RequestId, RpcError, RpcMessage, RpcRequest, RpcResponse,
+    CancelRequest, ErrorCode, Heartbeat, RequestId, RequestIdMode, RpcError, RpcMessage,
+    RpcRequest, RpcResponse,
 };
 
 use super::{
@@ -115,6 +116,7 @@ pub struct HostProcess {
     services: Option<ServiceSession>,
     active_operation: Option<OperationPermit>,
     instance: Option<taomni_plugin_api::services::HostInstanceId>,
+    request_id_mode: RequestIdMode,
 }
 
 impl std::fmt::Debug for HostProcess {
@@ -221,6 +223,7 @@ impl HostProcess {
             services: None,
             active_operation: None,
             instance: None,
+            request_id_mode: RequestIdMode::Legacy,
         };
         process.spawn_and_activate()?;
         Ok(process)
@@ -239,8 +242,8 @@ impl HostProcess {
         method: &str,
         params: Option<Value>,
     ) -> Result<Value, HostProcessError> {
-        let id = self.next_request_id();
-        self.invoke_with_id(id, method, params)
+        let id = self.next_request_id()?;
+        self.invoke_until(id, method, params, None)
     }
 
     pub fn invoke_with_id(
@@ -249,7 +252,16 @@ impl HostProcess {
         method: &str,
         params: Option<Value>,
     ) -> Result<Value, HostProcessError> {
-        self.invoke_until(id, method, params, None)
+        if self.request_id_mode == RequestIdMode::MonotonicV1 {
+            let _caller = RequestGuard::new(self.cancellation.clone(), id.clone());
+            let wire_id = self.next_request_id()?;
+            if !self.cancellation.link(&id, &wire_id) {
+                return Err(HostProcessError::UnexpectedResponse);
+            }
+            self.invoke_until(wire_id, method, params, None)
+        } else {
+            self.invoke_until(id, method, params, None)
+        }
     }
 
     fn invoke_until(
@@ -447,12 +459,18 @@ impl HostProcess {
         }
     }
 
-    fn next_request_id(&mut self) -> RequestId {
-        self.next_id = self.next_id.saturating_add(1);
-        if let Some(host) = self.authorized_host() {
-            return format!("core/{}/{}", host.instance(), self.next_id).into();
+    fn next_request_id(&mut self) -> Result<RequestId, HostProcessError> {
+        self.next_id = self
+            .next_id
+            .checked_add(1)
+            .ok_or_else(|| HostProcessError::Rpc {
+                code: ErrorCode::InvalidState.as_i32(),
+                message: "plugin request sequence exhausted".into(),
+            })?;
+        if let Some(host) = self.instance.as_ref() {
+            return Ok(format!("core/{host}/{}", self.next_id).into());
         }
-        format!("taomni-internal-{}-{}", self.id_prefix, self.next_id).into()
+        Ok(format!("taomni-internal-{}-{}", self.id_prefix, self.next_id).into())
     }
 
     fn elapsed_ms(&self) -> u64 {

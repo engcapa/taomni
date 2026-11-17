@@ -343,3 +343,34 @@ fn expired_core_deadline_and_unauthorized_keys_never_reach_backend() {
     assert_eq!(session.submit(call).unwrap_err().code, -32004);
     assert_eq!(harness.backend.calls.load(Ordering::Acquire), 0);
 }
+
+#[test]
+fn monotonic_service_rejections_cross_the_old_cap_and_still_cannot_replay() {
+    let harness = Harness::new(false);
+    let operation = harness.operation(OperationKind::ReadData);
+    let mut session = ServiceSession::with_request_id_mode(
+        harness.dispatcher.clone(),
+        harness.host.clone(),
+        taomni_plugin_api::RequestIdMode::MonotonicV1,
+    );
+    for sequence in 1..=70_000 {
+        let mut call = request(&operation, sequence);
+        call.params = None;
+        assert_eq!(session.submit(call).unwrap_err().code, -32602);
+    }
+    assert_eq!(
+        session.submit(request(&operation, 1)).unwrap_err().code,
+        -32005
+    );
+    assert_eq!(
+        session
+            .submit(request(&operation, 70_000))
+            .unwrap_err()
+            .code,
+        -32005
+    );
+    assert_eq!(harness.backend.calls.load(Ordering::Acquire), 0);
+    session.submit(request(&operation, 70_001)).unwrap();
+    assert!(completion(&mut session).result.is_ok());
+    assert_eq!(harness.backend.calls.load(Ordering::Acquire), 1);
+}

@@ -30,6 +30,7 @@ pub(crate) struct AdmissionData {
     // live IDs, independently of the host's epoch-long replay ledger.
     pub active_core_operations: HashSet<OperationId>,
     pub seen_operations: HashSet<OperationId>,
+    issued_operations: crate::issued_operations::IssuedOperations,
 }
 
 pub(crate) struct AdmissionInner {
@@ -59,6 +60,7 @@ impl OperationAdmission {
                 max_in_flight: 128,
                 active_core_operations: HashSet::new(),
                 seen_operations: HashSet::new(),
+                issued_operations: Default::default(),
             }),
             drained: Condvar::new(),
         }))
@@ -73,7 +75,7 @@ impl OperationAdmission {
         kind: OperationKind,
         lease: VaultOperationLease,
     ) -> Result<OperationPermit, CoreServiceError> {
-        self.admit_inner(host, operation, kind, lease, None)
+        self.admit_inner(host, Some(operation), kind, lease, None)
     }
 
     /// Production RPC operations have a core-owned deadline; a host cannot
@@ -86,13 +88,27 @@ impl OperationAdmission {
         lease: VaultOperationLease,
         deadline: Instant,
     ) -> Result<OperationPermit, CoreServiceError> {
-        self.admit_inner(host, operation, kind, lease, Some(deadline))
+        self.admit_inner(host, Some(operation), kind, lease, Some(deadline))
+    }
+
+    /// Allocate and admit together under the core barrier. The reserved ID
+    /// cannot be supplied to either explicit-ID API or to local core permits.
+    /// A checked counter replaces lifetime history on this production path;
+    /// live work, transport identity, epoch and generation still gate every RPC.
+    pub fn admit_new_until(
+        &self,
+        host: &AuthorizedHost,
+        kind: OperationKind,
+        lease: VaultOperationLease,
+        deadline: Instant,
+    ) -> Result<OperationPermit, CoreServiceError> {
+        self.admit_inner(host, None, kind, lease, Some(deadline))
     }
 
     fn admit_inner(
         &self,
         host: &AuthorizedHost,
-        operation: OperationId,
+        operation: Option<OperationId>,
         kind: OperationKind,
         lease: VaultOperationLease,
         deadline: Option<Instant>,
@@ -115,14 +131,25 @@ impl OperationAdmission {
         if state.paused {
             return Err(CoreServiceError::CoreServiceBusy);
         }
-        if state.seen_operations.contains(&operation)
-            || state.active_core_operations.contains(&operation)
-        {
-            return Err(CoreServiceError::DuplicateRequest);
+        let explicit = operation.is_some();
+        if let Some(operation) = &operation {
+            if crate::issued_operations::is_core_issued(operation)
+                || state.seen_operations.contains(operation)
+                || state.active_core_operations.contains(operation)
+            {
+                return Err(CoreServiceError::DuplicateRequest);
+            }
+            if state.seen_operations.len() >= 65_536 {
+                return Err(CoreServiceError::CoreServiceBusy);
+            }
         }
-        if state.in_flight >= state.max_in_flight || state.seen_operations.len() >= 65_536 {
+        if state.in_flight >= state.max_in_flight {
             return Err(CoreServiceError::CoreServiceBusy);
         }
+        let operation = match operation {
+            Some(operation) => operation,
+            None => state.issued_operations.next()?,
+        };
         let context = OperationContext {
             host_instance: host.instance().clone(),
             operation: operation.clone(),
@@ -143,7 +170,9 @@ impl OperationAdmission {
             capture_source: Mutex::new(None),
         });
         state.in_flight += 1;
-        state.seen_operations.insert(operation.clone());
+        if explicit {
+            state.seen_operations.insert(operation.clone());
+        }
         state.operations.insert(operation, record.clone());
         Ok(OperationPermit {
             owner: self.clone(),

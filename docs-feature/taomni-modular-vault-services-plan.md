@@ -133,9 +133,18 @@ Tauri 的既有 Result<String> 边界通过一处映射保留已有错误前缀�
 7. host SDK 也需要独立读 pump：MFA worker 等 core key response 时仍接收 heartbeat、cancel、revoke；core 等 snapshot 时 host 也必须继续应答心跳。禁止同步 read-loop 中直接运行整项业务。
 8. snapshot/revoke 的 deadline 使用 core job/lifecycle配置，作为不同 OperationClass 显式传入；不能盲用普通短 invoke timeout，也不能接受 host 自报无穷超时。operation 结束时宿主先清 key，再发送结果；core 注销 permit 后拒绝迟到 service request。取消/超时先标记 epoch/context 无效，宿主未确认取消清理则沿用既有 containment 终止与有预算重启，绝不重放写入。
 
-仍在 core 的可信调用与宿主共用 in-flight/epoch/drain 屏障，但 core permit 不含 HostInstance/wire context，不能授权 reverse RPC；其 ID 只在 permit 存活期间保留，Drop 后释放，避免每秒取码消耗宿主历史重放 ledger。宿主历史 ID 仍拒绝重用，不能借 core permit 或取消后重新授权旧 context。真实宿主迁出前另须闭合 admission、ServiceSession 和 SDK 的长期 ledger/counter 上限，使用有界防重放方案，不以扩大固定额度或删除检查处理。
+仍在 core 的可信调用与宿主共用 in-flight/epoch/drain 屏障，但 core permit 不含 HostInstance/wire context，不能授权 reverse RPC；其 ID 只在 permit 存活期间保留，Drop 后释放，避免每秒取码消耗宿主历史重放 ledger。宿主历史 ID 仍拒绝重用，不能借 core permit 或取消后重新授权旧 context。长期防重放按下述方案实施；runner 证据闭合前不将此边界记为通过。
 
 锁约束：dispatcher 不拿 registry/host mutex；worker 不回调 PluginRegistry；Vault mutex 持有期间不等 host RPC；host DB mutex 持有期间向 core 请求 key是允许路径（MFA→Vault），但屏障/file lease 已由外层 operation 获取，不在这时再排队获取。
+
+### 4.1 长期运行与有界防重放
+
+- 握手增加可选 `requestIdMode: monotonic-v1`。只有对端明确回显才启用；缺省/旧宿主保留 v1 原有有限 ledger 和错误语义，不根据 ID 外观推断支持，不改变 API/protocol version 或业务 params。单调模式必须绑定本次 core 发放的 HostInstance。
+- 两个方向各自使用 `core/<HostInstance>/<u64>`、`host/<HostInstance>/<u64>`，严格十进制、非零、无前导零。单个 stdio writer 的分配与入队顺序一致；接收方只保存已接收最大值，较小/相等 ID 永久拒绝，busy/无效业务请求也消耗序号。允许跳号，不允许迟到补号；不是接受乱序请求的滑动窗口。计数溢出明确失败，绝不饱和重用或回绕。
+- renderer 的 correlation、core operation UUID 和线上序号保持各自作用。宿主 mutex 内才分配线上序号；稳定 caller ID 与 wire ID 原子关联同一个取消标记。排队前取消、关联时取消、发送后取消、释放两个 ID 均保留原来的语义。生命周期/snapshot/revoke 也使用同一 core writer 的序号。
+- 生产 `OperationAdmission` 在同一屏障内分配并登记新 ID，使用 `74616f6d-*-8*-8*-*` 保留 UUID 空间的 88 位非回绕计数；version/variant 与本地随机 v4 ID 明确分离，不持有已完成历史。显式传 ID 的兼容 API 和本地 core permit 均拒绝整个保留空间，调用方不能选一个旧/未来 ID 重新准入；原显式 API 的 epoch ledger/重复拒绝保持。计数不在 unlock/profile 切换时重置；实际服务仍逐次验证 live permit、已认证 host、generation、epoch、deadline、权限和租约，ID 本身不授予能力。
+- SDK 把 pending、待丢弃的一次迟到响应和序号归一个 owner/mutex。取消转为 retirement 与回复路由原子互斥，不存在中间丢失标记；pending + retirement 总计不超过 8。迟到响应只丢弃一次，重复/未发出的响应仍拒绝；对端欠响应时施加背压，收到响应即恢复容量，断开后整个 session 清理。成功/已收到迟到响应的历史不占容量，不按总调用数耗尽。
+- 验证包含 70,000 次 API watermark/SDK 内存收发、超过旧额度的核心准入与真实 SDK 子进程调用；额外检查旧握手、错误方向/实例/格式、重复与被拒绝 ID、并发 enqueue 顺序、取消/回复竞态、满队列恢复、溢出、正常退出/重启/epoch 和敏感资源清理。纯 channel 单元不能当真实 stdio、Vault 或 UI 迁移证据；GitHub 真实宿主门与受影响模块/MFA 及完整 crash-regression 分别归档。
 
 ## 5. 固定密钥 owner、创建和重置
 

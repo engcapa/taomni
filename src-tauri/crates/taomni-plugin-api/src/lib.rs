@@ -11,7 +11,9 @@ use serde_json::Value;
 
 mod binary_ref;
 pub use binary_ref::BinaryRef;
+mod correlation;
 mod metadata;
+pub use correlation::{ReplayError, RequestIdMode, RequestReplay};
 pub mod services;
 pub use metadata::PluginKind;
 
@@ -272,6 +274,8 @@ pub struct HandshakeRequest {
     pub host_instance: Option<services::HostInstanceId>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub profile: Option<services::HostProfileContext>,
+    #[serde(default, skip_serializing_if = "RequestIdMode::is_legacy")]
+    pub request_id_mode: RequestIdMode,
 }
 
 impl HandshakeRequest {
@@ -293,6 +297,7 @@ impl HandshakeRequest {
             core_services: services::ServiceCapabilities::default(),
             host_instance: None,
             profile: None,
+            request_id_mode: RequestIdMode::Legacy,
         }
     }
 }
@@ -316,6 +321,9 @@ pub struct HandshakeResponse {
     /// A host acknowledges this only after acquiring its own OS leases.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub profile: Option<services::HostProfileContext>,
+    /// Echoed only when both peers implement the scoped sequence contract.
+    #[serde(default, skip_serializing_if = "RequestIdMode::is_legacy")]
+    pub request_id_mode: RequestIdMode,
 }
 
 impl HandshakeResponse {
@@ -328,6 +336,7 @@ impl HandshakeResponse {
             heartbeat_interval_ms,
             core_services: services::ServiceCapabilities::default(),
             profile: None,
+            request_id_mode: RequestIdMode::Legacy,
         }
     }
 
@@ -340,6 +349,7 @@ impl HandshakeResponse {
             heartbeat_interval_ms: 0,
             core_services: services::ServiceCapabilities::default(),
             profile: None,
+            request_id_mode: RequestIdMode::Legacy,
         }
     }
 }

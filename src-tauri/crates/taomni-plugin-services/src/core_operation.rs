@@ -90,7 +90,8 @@ impl OperationAdmission {
         if state.paused {
             return Err(CoreServiceError::CoreServiceBusy);
         }
-        if state.seen_operations.contains(&operation)
+        if crate::issued_operations::is_core_issued(&operation)
+            || state.seen_operations.contains(&operation)
             || state.active_core_operations.contains(&operation)
         {
             return Err(CoreServiceError::DuplicateRequest);

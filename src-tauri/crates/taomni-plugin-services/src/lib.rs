@@ -11,6 +11,7 @@ mod capture_still;
 mod core_operation;
 mod dispatcher;
 mod grants;
+mod issued_operations;
 mod operation;
 mod policy;
 mod revoke;

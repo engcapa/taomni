@@ -2,7 +2,7 @@
 //! session and cannot receive completions addressed to its predecessor.
 
 use std::{
-    collections::{HashMap, HashSet},
+    collections::HashMap,
     sync::{
         Arc,
         atomic::{AtomicBool, Ordering},
@@ -11,7 +11,7 @@ use std::{
 };
 
 use taomni_plugin_api::{
-    ErrorCode, RequestId, RpcError, RpcRequest,
+    ErrorCode, ReplayError, RequestId, RequestIdMode, RequestReplay, RpcError, RpcRequest,
     services::{
         CAPTURE_STILL_METHOD, CaptureStillRequest, CoreServiceError, EXPORT_GRANT_METHOD,
         ExportGrantRequest, FIXED_KEY_METHOD, FixedKeyRequest, OperationContext,
@@ -32,7 +32,7 @@ pub struct ServiceCompletion {
 pub struct ServiceSession {
     dispatcher: Arc<CoreServiceDispatcher>,
     host: AuthorizedHost,
-    seen: HashSet<RequestId>,
+    replay: RequestReplay,
     pending: HashMap<RequestId, OperationContext>,
     completion: SyncSender<ServiceCompletion>,
     receiver: Receiver<ServiceCompletion>,
@@ -51,11 +51,21 @@ impl std::fmt::Debug for ServiceSession {
 impl ServiceSession {
     /// Only the transport owner calls this, after package and handshake checks.
     pub fn new(dispatcher: Arc<CoreServiceDispatcher>, host: AuthorizedHost) -> Self {
+        Self::with_request_id_mode(dispatcher, host, RequestIdMode::Legacy)
+    }
+
+    pub fn with_request_id_mode(
+        dispatcher: Arc<CoreServiceDispatcher>,
+        host: AuthorizedHost,
+        mode: RequestIdMode,
+    ) -> Self {
         let (completion, receiver) = mpsc::sync_channel(8);
+        let replay = RequestReplay::new(mode, "host", Some(host.instance()))
+            .expect("authenticated service transport");
         Self {
             dispatcher,
             host,
-            seen: HashSet::new(),
+            replay,
             pending: HashMap::new(),
             completion,
             receiver,
@@ -75,14 +85,14 @@ impl ServiceSession {
         if request.jsonrpc != "2.0" || !valid_host_request_id(&request.id, &self.host) {
             return Err(RpcError::from_code(ErrorCode::InvalidRequest));
         }
-        if self.seen.contains(&request.id) {
-            return Err(CoreServiceError::DuplicateRequest.into_rpc_error());
-        }
-        if self.seen.len() >= 65_536 {
-            return Err(CoreServiceError::CoreServiceBusy.into_rpc_error());
-        }
         // Remember rejected IDs too; retries must issue a fresh correlation ID.
-        self.seen.insert(request.id.clone());
+        self.replay
+            .accept(&request.id)
+            .map_err(|error| match error {
+                ReplayError::Invalid => RpcError::from_code(ErrorCode::InvalidRequest),
+                ReplayError::Duplicate => CoreServiceError::DuplicateRequest.into_rpc_error(),
+                ReplayError::Full => CoreServiceError::CoreServiceBusy.into_rpc_error(),
+            })?;
         if self.pending.len() >= 8 {
             return Err(CoreServiceError::CoreServiceBusy.into_rpc_error());
         }

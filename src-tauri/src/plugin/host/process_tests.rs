@@ -51,6 +51,7 @@ fn process(backoff: Duration) -> HostProcess {
         services: None,
         active_operation: None,
         instance: None,
+        request_id_mode: RequestIdMode::Legacy,
     }
 }
 
@@ -114,8 +115,40 @@ fn queued_cancellation_does_not_start_an_operation_and_releases_its_id() {
 #[test]
 fn internal_identifiers_never_embed_the_authentication_token() {
     let mut process = process(Duration::ZERO);
-    let first = process.next_request_id();
-    let second = process.next_request_id();
+    let first = process.next_request_id().unwrap();
+    let second = process.next_request_id().unwrap();
     assert_ne!(first, second);
     assert!(!first.to_string().contains(&process.token));
+}
+
+#[test]
+fn request_sequence_exhaustion_never_reuses_the_last_id() {
+    let mut process = process(Duration::ZERO);
+    process.next_id = u64::MAX - 1;
+    assert!(process.next_request_id().is_ok());
+    assert!(process.next_request_id().is_err());
+    assert!(process.next_request_id().is_err());
+    assert_eq!(process.next_id, u64::MAX);
+}
+
+#[test]
+fn sequenced_wire_mapping_keeps_cancellation_before_dispatch_and_releases_both_ids() {
+    let mut process = process(Duration::ZERO);
+    process.request_id_mode = RequestIdMode::MonotonicV1;
+    process.instance = Some(
+        taomni_plugin_api::services::HostInstanceId::parse("a1234567-1234-1234-1234-123456789abc")
+            .unwrap(),
+    );
+    let handle = process.cancellation_handle();
+    let id = RequestId::from("core/host/operation-uuid");
+    assert!(handle.register(&id));
+    assert!(handle.cancel(&id));
+    assert!(matches!(
+        process.invoke_with_id(id.clone(), "ping", None),
+        Err(HostProcessError::Cancelled)
+    ));
+    assert!(!handle.cancel(&id));
+    assert!(!handle.cancel(&RequestId::from(
+        "core/a1234567-1234-1234-1234-123456789abc/1"
+    )));
 }

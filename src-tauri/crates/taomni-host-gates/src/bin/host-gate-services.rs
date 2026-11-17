@@ -1,6 +1,13 @@
 //! Official SDK fixture only: no Vault path or key cache. Run on hosted gates.
 use sha2::{Digest, Sha256};
-use std::{collections::BTreeSet, sync::Arc, time::Duration};
+use std::{
+    collections::BTreeSet,
+    sync::{
+        Arc,
+        atomic::{AtomicUsize, Ordering},
+    },
+    time::Duration,
+};
 use taomni_plugin_api::{
     ErrorCode, RpcError,
     services::{
@@ -11,7 +18,10 @@ use taomni_plugin_api::{
 use taomni_plugin_sdk::{HostConfig, Operation, PluginHandler, serve_stdio_with};
 use taomni_profile_locks::{PluginDataLease, PluginSlug, ProfileRestoreLease};
 
-struct Handler;
+#[derive(Default)]
+struct Handler {
+    echo_calls: AtomicUsize,
+}
 impl PluginHandler for Handler {
     fn invoke(
         &self,
@@ -19,6 +29,14 @@ impl PluginHandler for Handler {
         method: &str,
         params: Option<serde_json::Value>,
     ) -> Result<serde_json::Value, RpcError> {
+        if method == "service/probe"
+            && let Some(echo) = params.as_ref().and_then(|params| params.get("echo"))
+        {
+            operation.check_current()?;
+            return Ok(serde_json::json!({"echo": echo,
+                "handled": self.echo_calls.fetch_add(1, Ordering::AcqRel) + 1,
+                "hostInstance": operation.context().map(|context| context.host_instance.as_str())}));
+        }
         let action = params
             .as_ref()
             .and_then(|params| params.get("action"))
@@ -73,7 +91,7 @@ fn main() -> std::process::ExitCode {
             PluginDataLease::try_acquire(storage.root(), &PluginSlug::parse("mfa").unwrap())
                 .is_err()
         );
-        Ok(Arc::new(Handler))
+        Ok(Arc::new(Handler::default()))
     });
     if result.is_ok() {
         std::process::ExitCode::SUCCESS
