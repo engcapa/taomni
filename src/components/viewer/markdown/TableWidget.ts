@@ -1,6 +1,8 @@
 import { EditorView, WidgetType, runScopeHandlers } from "@codemirror/view";
 import { type MarkdownTable, modifyTable, serializeTable } from "./markdownModel";
 import { replaceWidgetSource, widgetButton, type MarkdownWidgetContext } from "./markdownWidgetContext";
+import { updateTableCellContent } from "./tableCellContent";
+import { openExternalUrl } from "../../../lib/sftp";
 
 interface Runtime { widget: TableWidget }
 const runtimes = new WeakMap<HTMLElement, Runtime>();
@@ -17,7 +19,7 @@ export class TableWidget extends WidgetType {
     dom.dataset.tableFrom = String(this.from);
     dom.querySelectorAll<HTMLElement>("[data-cell-row]").forEach((cell) => {
       const row = Number(cell.dataset.cellRow), column = Number(cell.dataset.cellColumn);
-      if (cell.textContent !== this.table.rows[row]?.[column]) cell.textContent = this.table.rows[row]?.[column] ?? "";
+      updateTableCellContent(cell, this.table.rows[row]?.[column] ?? "", this.context.readOnly);
       cell.style.textAlign = this.table.align[column] || "left";
     });
     return true;
@@ -28,6 +30,13 @@ export class TableWidget extends WidgetType {
     root.className = "fv-md-table-wrap";
     root.dataset.testid = "markdown-table-widget";
     root.dataset.tableFrom = String(this.from);
+    root.addEventListener("click", event => {
+      const anchor = event.target instanceof Element ? event.target.closest("a") : null;
+      if (!anchor) return;
+      event.preventDefault();
+      const href = anchor.getAttribute("href") || "";
+      if (/^(https?:|mailto:)/i.test(href)) void openExternalUrl(href).catch(error => this.context.onError(String(error)));
+    });
     const runtime: Runtime = { widget: this };
     runtimes.set(root, runtime);
     const label = this.context.label;
@@ -73,7 +82,7 @@ export class TableWidget extends WidgetType {
       const row = document.createElement("tr");
       Array.from({ length: this.table.align.length }, (_, columnIndex) => {
         const cell = document.createElement(rowIndex ? "td" : "th");
-        cell.textContent = cells[columnIndex] ?? "";
+        updateTableCellContent(cell, cells[columnIndex] ?? "", this.context.readOnly);
         cell.setAttribute("contenteditable", this.context.readOnly ? "false" : "true");
         cell.spellcheck = false;
         cell.tabIndex = 0;
@@ -83,10 +92,12 @@ export class TableWidget extends WidgetType {
         cell.setAttribute("aria-label", label(`第 ${rowIndex + 1} 行，第 ${columnIndex + 1} 列`, `Row ${rowIndex + 1}, column ${columnIndex + 1}`));
         cell.onfocus = () => {
           activeRow = rowIndex; activeColumn = columnIndex;
+          updateTableCellContent(cell, runtime.widget.table.rows[rowIndex]?.[columnIndex] ?? "", runtime.widget.context.readOnly);
           root.querySelectorAll(".is-active").forEach((node) => node.classList.remove("is-active"));
           cell.classList.add("is-active");
           root.classList.add("is-active");
         };
+        cell.onblur = () => updateTableCellContent(cell, runtime.widget.table.rows[rowIndex]?.[columnIndex] ?? "", runtime.widget.context.readOnly);
         let composing = false;
         const update = () => {
           if (composing || runtime.widget.context.readOnly) return;

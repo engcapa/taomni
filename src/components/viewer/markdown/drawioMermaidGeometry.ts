@@ -11,6 +11,8 @@ const round = (value: number) => Math.round(value * 1000) / 1000;
 /** SVG measurement and whole-view transforms, without a grouping cell. All
  * positions remain in Mermaid coordinates until written to the graph. */
 export class MermaidGeometry {
+  private readonly verticalTerminals = new Set<string>();
+
   constructor(readonly page: DrawioPage, readonly svg: SVGSVGElement, readonly snapshot: DiagramSnapshot,
     readonly transform: DiagramTransform, readonly x: number, readonly y: number) {}
 
@@ -46,9 +48,12 @@ export class MermaidGeometry {
   }
 
   vertex(attributes: Attributes, box: MermaidBox): Element {
+    if (/(?:^|;)direction=(?:north|south);/.test(String(attributes.style))) this.verticalTerminals.add(String(attributes.id));
     const center = this.map({ x: box.x + box.width / 2, y: box.y + box.height / 2 });
     return drawioCell(this.page, { ...attributes, vertex: 1,
-      style: `${attributes.style || ""}rotation=${normalizeRotation(this.transform.rotation)};flipH=${Number(this.transform.flipX)};flipV=${Number(this.transform.flipY)};` },
+      // SVG anchors already use the displayed shape bounds. draw.io otherwise
+      // rotates them again for direction=south (maxGraph defaults differently).
+      style: `${attributes.style || ""}anchorPointDirection=0;legacyAnchorPoints=1;rotation=${normalizeRotation(this.transform.rotation)};flipH=${Number(this.transform.flipX)};flipV=${Number(this.transform.flipY)};` },
     { x: round(center.x - box.width / 2), y: round(center.y - box.height / 2), width: round(box.width), height: round(box.height) });
   }
 
@@ -76,8 +81,14 @@ export class MermaidGeometry {
   edge(attributes: Attributes, route: MermaidRoute, terminals?: { source: MermaidBox; target: MermaidBox }, label?: MermaidPoint): Element {
     const points = route.points.map((point) => this.map(point));
     const first = route.points[0], last = route.points.at(-1);
-    const anchor = (name: string, point: MermaidPoint, box: MermaidBox) => `${name}X=${round((point.x - box.x) / (box.width || 1))};${name}Y=${round((point.y - box.y) / (box.height || 1))};${name}Perimeter=0;`;
-    const ports = terminals && first && last ? anchor("exit", first, terminals.source) + anchor("entry", last, terminals.target) : "";
+    const anchor = (name: string, point: MermaidPoint, box: MermaidBox, terminal: string | number) => {
+      let x = (point.x - box.x) / (box.width || 1), y = (point.y - box.y) / (box.height || 1);
+      // Legacy draw.io swaps flip axes for north/south shapes even when
+      // anchorPointDirection=0. Compensate before its flip/rotation transform.
+      if (this.verticalTerminals.has(String(terminal)) && this.transform.flipX !== this.transform.flipY) { x = 1 - x; y = 1 - y; }
+      return `${name}X=${round(x)};${name}Y=${round(y)};${name}Perimeter=0;`;
+    };
+    const ports = terminals && first && last ? anchor("exit", first, terminals.source, attributes.source) + anchor("entry", last, terminals.target, attributes.target) : "";
     const cell = drawioCell(this.page, { ...attributes, edge: 1,
       style: `${attributes.style || ""}edgeStyle=none;noEdgeStyle=1;rounded=0;curved=${Number(route.curved)};${ports}` }, { relative: 1 });
     const geometry = cell.querySelector("mxGeometry")!;

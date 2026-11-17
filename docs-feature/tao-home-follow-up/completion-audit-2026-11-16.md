@@ -32,6 +32,8 @@ R16 当前产品为 `dc6de5f80`，在 draw.io、Mermaid 查看、PDF 性能和�
 
 后续优先六项（Git 用 Tao 打开、Workspace 命名/添加目标、导出产物用 Tao 打开、Query Result 搜索导航、Agnes 无代理）及其验收，独立记录在 [workspace-result-follow-up-2026-11-17.md](../workspace-result-follow-up-2026-11-17.md)。新反馈的 Mermaid 保存图标、可编辑时序/原线路由和重复导入按钮，记录在 [修复与验收](../../docs-issue/markdown-mermaid-editable-export-2026-11-17.md)。产品提交 `97e89ead9`、修正用例 `00696cf81`；本机 149 项 Markdown 单测通过，当前源码与用例的有效并集为 Linux/Windows/macOS browser 各 28/28（18 项 crash）、匹配 QA release 的 native 各 33/33（22 项 crash），Linux Agnes 另有 1/1 无代理真实回复。[原批次 44052981988](https://github.com/engcapa/taomni/actions/runs/44052981988) 的 023/026 失败原件保留，[修正后 44057813183](https://github.com/engcapa/taomni/actions/runs/44057813183) 成功结束，Windows/macOS native 各 25/25。签名、身份、配置与绑定文件散列独立复核通过；R16 是历史基线，原 39 项状态统计不因这些追加修复整体关闭。
 
+用户随后用真实 `testing.md` 又报告 Word 流程图线身、draw.io 时序连接点与 Live 表格格式问题；当前追加修复和原文件 QA 验收见 [真实文档回归](../../docs-issue/markdown-mermaid-editable-export-2026-11-17.md#真实-testingmd-追加回归进行中)。上一轮内部渲染检查没有覆盖实际 draw.io Desktop 的默认连接点差异，不能据旧批次宣称该问题已通过。新一轮全部证据尚在执行，原 39 项统计不改变。
+
 ## 历史变化：macOS native 已补齐原缺失项
 
 [43886401191](https://github.com/engcapa/taomni/actions/runs/43886401191) 已成功结束。只选择 macOS native release，实际 **32 passed / 0 failed / 0 skipped**，包含此前缺失的全部 **21 项**及完整适用 **22 项 native crash-regression**。

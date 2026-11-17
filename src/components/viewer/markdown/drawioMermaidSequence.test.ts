@@ -12,7 +12,7 @@ vi.mock("../../editor/workspace/model/mermaid", () => ({ inspectMermaidDiagram: 
 afterEach(() => vi.restoreAllMocks());
 const readFixture = (name: string): string => readFileSync(`src/components/viewer/markdown/fixtures/mermaid-agent-sequence.${name}`, "utf8");
 
-it("exports the reported agent sequence as independent native messages, actors, activations, loop and numbered labels", async () => {
+it.each([0, 90])("exports the reported agent sequence as independent native messages, actors, activations, loop and numbered labels at %s degrees", async (rotation) => {
   const data = JSON.parse(readFixture("json")) as MermaidSequence;
   vi.mocked(inspectMermaidDiagram).mockImplementation(async (_source, inspect) => inspect({ type: "sequence", db: { getActors: () => new Map(data.actors), getMessages: () => data.messages } }));
   // jsdom has no SVG geometry API; the browser/native regressions measure the
@@ -27,14 +27,17 @@ it("exports the reported agent sequence as independent native messages, actors, 
   try {
     const svg = new DOMParser().parseFromString(readFixture("svg"), "image/svg+xml").documentElement as unknown as SVGSVGElement;
     const source = readFixture("mmd"), page = newDrawioPage("agent", "Agent");
-    expect(await mermaidDrawioCells(page, { source, svg, width: 1181, height: 815, theme: "light", text: "", filename: "agent" }, DEFAULT_DIAGRAM_VIEW, "agent", 40, 80)).toBe(true);
+    expect(await mermaidDrawioCells(page, { source, svg, width: 1181, height: 815, theme: "light", text: "", filename: "agent" }, { ...DEFAULT_DIAGRAM_VIEW, rotation }, "agent", 40, 80)).toBe(true);
     const model = parseDrawio(drawioFile([page]))[0].model;
     const messages = Array.from(model.querySelectorAll("mxCell[taomniKind='sequence-message']"));
     expect(messages).toHaveLength(9);
     expect(messages.filter((cell) => cell.getAttribute("from") === cell.getAttribute("to"))).toHaveLength(3);
     expect(messages.filter((cell) => cell.getAttribute("style")?.includes("dashed=1;"))).toHaveLength(3);
     expect(messages.filter((cell) => cell.getAttribute("style")?.includes("curved=1;"))).toHaveLength(3);
-    expect(messages[0]?.getAttribute("value")).toBe("输入任务目标 (如: 修复代码并提交)");
+    const messageLabels = Array.from(model.querySelectorAll("mxCell[taomniKind='sequence-message-label']"));
+    expect(messageLabels).toHaveLength(rotation ? 9 : 0);
+    expect((rotation ? messageLabels : messages)[0]?.getAttribute("value")).toBe("输入任务目标 (如: 修复代码并提交)");
+    if (rotation) expect(messageLabels.every(cell => cell.getAttribute("style")?.includes(`rotation=${rotation};`))).toBe(true);
     expect(messages.every((cell) => !!cell.getAttribute("source") && !!cell.getAttribute("target"))).toBe(true);
     expect(model.querySelectorAll("mxCell[taomniKind='sequence-lifeline']")).toHaveLength(4);
     expect(model.querySelectorAll("mxCell[taomniKind='sequence-activation']")).toHaveLength(2);
