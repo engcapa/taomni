@@ -6,7 +6,7 @@ import { writeImagePng, writeText } from "../../../lib/clipboard";
 import { markdownBasename } from "../../../lib/markdownAssets";
 import { useViewerLabels } from "../viewerLabels";
 import { diagramActions, type DiagramAction } from "./diagramActions";
-import { DEFAULT_DIAGRAM_VIEW, snapshotDiagram, type DiagramSnapshot, type DiagramTransform } from "./diagramModel";
+import { DEFAULT_DIAGRAM_VIEW, diagramKind, MARKDOWN_DIAGRAM_SELECTOR, snapshotDiagram, type DiagramSnapshot, type DiagramTransform } from "./diagramModel";
 import { diagramPng, diagramSvg } from "./diagramExport";
 import { saveExportBlob } from "./exportFiles";
 import { MarkdownDiagramViewer } from "./MarkdownDiagramViewer";
@@ -32,7 +32,7 @@ export function MarkdownDiagramActions({ root, docPath, sourceOnDisk = true, onE
   const epoch = useRef(0), working = useRef(false);
   const focus = () => (state.current.active?.isConnected ? state.current.active : root.current?.querySelector<HTMLElement>(".fv-md-main") || root.current)?.focus();
   const closeViewer = () => { setViewer(null); focus(); };
-  const snapshot = (element: HTMLElement) => snapshotDiagram(element, `${markdownBasename(docPath).replace(/\.(md|markdown)$/i, "")}-diagram-${Array.from(root.current?.querySelectorAll(".fv-md-mermaid") || []).indexOf(element) + 1}`);
+  const snapshot = (element: HTMLElement) => snapshotDiagram(element, `${markdownBasename(docPath).replace(/\.(md|markdown)$/i, "")}-diagram-${Array.from(root.current?.querySelectorAll(MARKDOWN_DIAGRAM_SELECTOR) || []).indexOf(element) + 1}`);
   const open = (element: HTMLElement, action: DiagramAction = "open") => {
     try { setActive(element); setMenu(null); setNotice(""); setViewer({ snapshot: snapshot(element), action }); }
     catch (error) { onError(String(error)); }
@@ -50,11 +50,12 @@ export function MarkdownDiagramActions({ root, docPath, sourceOnDisk = true, onE
   useEffect(() => {
     const container = root.current;
     if (!container) return;
-    const find = (target: EventTarget | null) => target instanceof Element ? target.closest<HTMLElement>(".fv-md-mermaid") : null;
+    const find = (target: EventTarget | null) => target instanceof Element ? target.closest<HTMLElement>(MARKDOWN_DIAGRAM_SELECTOR) : null;
     const prepare = () => {
-      container.querySelectorAll<HTMLElement>(".fv-md-mermaid").forEach((element) => {
+      container.querySelectorAll<HTMLElement>(MARKDOWN_DIAGRAM_SELECTOR).forEach((element) => {
         element.tabIndex = 0; element.setAttribute("role", "figure");
-        element.setAttribute("aria-label", label("Mermaid 图表；回车查看，Shift+F10 打开菜单", "Mermaid diagram; Enter to view, Shift+F10 for menu"));
+        const name = diagramKind(element) === "drawio" ? "draw.io" : "Mermaid";
+        element.setAttribute("aria-label", label(`${name} 图表，回车查看，Shift+F10 打开菜单`, `${name} diagram, Enter to view, Shift+F10 for menu`));
       });
       const current = state.current.active;
       if (current && !container.contains(current)) { setActive(null); setMenu(null); setViewer(null); epoch.current++; working.current = false; setBusy(false); }
@@ -143,15 +144,17 @@ export function MarkdownDiagramActions({ root, docPath, sourceOnDisk = true, onE
       catch (error) { onError(String(error)); }
     } else open(active, id);
   };
-  const entries = diagramActions(label);
+  const kind = diagramKind(active);
+  const name = kind === "drawio" ? "draw.io" : "Mermaid";
+  const entries = diagramActions(label, kind);
   return <>
-    {active && position.visible && !viewer && createPortal(<div className="fv fv-md-diagram-tools" ref={toolbar} style={{ left: position.left, top: position.top }} role="toolbar" aria-label={label("Mermaid 图片操作", "Mermaid image actions")}
+    {active && position.visible && !viewer && createPortal(<div className="fv fv-md-diagram-tools" ref={toolbar} style={{ left: position.left, top: position.top }} role="toolbar" aria-label={label(`${name} 图片操作`, `${name} image actions`)}
       data-testid="markdown-diagram-tools" onMouseLeave={(event) => { if (!menu && !active.contains(event.relatedTarget instanceof Node ? event.relatedTarget : null) && !active.contains(document.activeElement)) setActive(null); }}>
       {entries.filter((entry) => ["open", "save-svg", "copy-text"].includes(entry.id)).map(({ id, title, Icon }) => <button key={id} type="button" className="fv-icon-button" title={title} aria-label={title} data-testid={`markdown-diagram-${id}`} disabled={busy} onClick={() => choose(id)}><Icon /></button>)}
       <button type="button" className="fv-icon-button" data-testid="markdown-diagram-more" aria-haspopup="menu" aria-expanded={!!menu} title={label("更多查看操作", "More viewing actions")} aria-label={label("更多查看操作", "More viewing actions")}
         onClick={(event) => { const box = event.currentTarget.getBoundingClientRect(); openMenu(active, box.left, box.bottom); }}><MoreHorizontal /></button>
     </div>, document.body)}
-    {menu && active && createPortal(<div className="fv fv-menu fv-md-diagram-menu" ref={menuElement} role="menu" aria-label={label("Mermaid 图片菜单", "Mermaid image menu")} data-testid="markdown-diagram-menu"
+    {menu && active && createPortal(<div className="fv fv-menu fv-md-diagram-menu" ref={menuElement} role="menu" aria-label={label(`${name} 图片菜单`, `${name} image menu`)} data-testid="markdown-diagram-menu"
       style={{ left: Math.max(8, Math.min(menu.x, window.innerWidth - 278)), top: Math.max(8, Math.min(menu.y, window.innerHeight - 510)) }} onKeyDown={(event) => {
         if (event.key === "Tab") { setMenu(null); focus(); return; }
         if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;

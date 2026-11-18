@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from "react";
 import { EditorView, type ViewUpdate } from "@codemirror/view";
 import { findNext, findPrevious, getSearchQuery, openSearchPanel, searchPanelOpen, setSearchQuery } from "@codemirror/search";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
@@ -29,6 +29,7 @@ import { PreviewAppearanceControl, previewThemeStyle, usePreviewTheme, type Prev
 import { MarkdownDiagramActions } from "./MarkdownDiagramActions";
 import { MarkdownDrawioImport } from "./MarkdownDrawioImport";
 import { markdownSearchHighlights } from "./markdownSearchHighlights";
+import { useMarkdownZoom } from "./useMarkdownZoom";
 import "./markdown.css";
 
 const markdownHighlighting = syntaxHighlighting(HighlightStyle.define([
@@ -59,6 +60,9 @@ export function MarkdownEditor({ document: current, onError, owner, requestedMod
   const [printRequest, setPrintRequest] = useState(0);
   const editor = useRef<EditorView | null>(null);
   const root = useRef<HTMLDivElement>(null);
+  const main = useRef<HTMLDivElement>(null);
+  const { percent: zoom, onKeyDown: handleZoomKey } = useMarkdownZoom(main, active !== false);
+  useLayoutEffect(() => { editor.current?.requestMeasure(); }, [zoom]);
   const imageInput = useRef<HTMLInputElement>(null);
   const imageRange = useRef<{ from: number; to: number; raw: string } | null>(null);
   const currentRef = useRef(current);
@@ -129,11 +133,14 @@ export function MarkdownEditor({ document: current, onError, owner, requestedMod
   useEffect(() => {
     if (!active) return;
     const handleUnfocused = (event: KeyboardEvent) => {
-      if (event.target === document.body) handleFindKey(event);
+      if (event.target === document.body) {
+        handleZoomKey(event);
+        handleFindKey(event);
+      }
     };
     window.addEventListener("keydown", handleUnfocused);
     return () => window.removeEventListener("keydown", handleUnfocused);
-  }, [active, handleFindKey]);
+  }, [active, handleFindKey, handleZoomKey]);
   useEffect(() => {
     setPasteStatus(""); setSlash(null); imageRange.current = null; setPosition(0); setEditing(false);
   }, [current.key]);
@@ -171,7 +178,8 @@ export function MarkdownEditor({ document: current, onError, owner, requestedMod
           root.current?.querySelector("[data-testid='markdown-preview']")?.querySelectorAll("h1,h2,h3,h4,h5,h6")[index]?.scrollIntoView({ block: "start" });
         }}>{item.text}</button>)}
       </aside>}
-      <div className="fv-md-main" data-testid={`markdown-${mode}`} tabIndex={-1}>
+      <div ref={main} className="fv-md-main" data-testid={`markdown-${mode}`} data-zoom={zoom} tabIndex={-1}
+        style={{ "--fv-md-zoom": zoom / 100 } as CSSProperties} onKeyDownCapture={handleZoomKey}>
       <MarkdownSplit enabled={mode === "split"}>
         <div className={`fv-md-editor-pane ${mode === "live" ? "fv-md-live-pane" : "fv-md-source-pane"}`} data-preview-theme={mode === "live" ? previewTheme : undefined} style={mode === "live" ? previewThemeStyle(previewTheme) : undefined}>
           <EditorSurface document={surfaceDocument} extensions={extensions} onView={onView} onChange={owner?.onChange} onSave={save}

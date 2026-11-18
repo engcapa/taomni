@@ -1,6 +1,7 @@
 import { useCallback } from "react";
 import { Terminal } from "@xterm/xterm";
 import { isEditableTarget } from "../../../lib/terminal/keyboardGuards";
+import { contentZoomShortcut } from "../../../lib/contentZoomShortcut";
 import { type TerminalBlockSelection } from "./types";
 import { isMacPrintableOptionInput } from "./policy";
 
@@ -186,19 +187,12 @@ export function useTerminalShortcuts(context: UseTerminalShortcutsContext) {
       gitToggle.onOpen();
       return false;
     }
-    if (event.ctrlKey && (event.key === "+" || event.key === "=")) {
+    const zoom = contentZoomShortcut(event);
+    if (zoom) {
       event.preventDefault();
-      increaseFontSize();
-      return false;
-    }
-    if (event.ctrlKey && (event.key === "-" || event.key === "_")) {
-      event.preventDefault();
-      decreaseFontSize();
-      return false;
-    }
-    if (event.ctrlKey && event.key === "0") {
-      event.preventDefault();
-      resetFontSize();
+      if (zoom === "in") increaseFontSize();
+      else if (zoom === "out") decreaseFontSize();
+      else resetFontSize();
       return false;
     }
     if (event.ctrlKey && event.code === "Space") {

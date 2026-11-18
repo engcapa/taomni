@@ -1,6 +1,8 @@
 //! Local file viewer I/O. Policy is independent of any window/document lifetime.
 mod assets;
 mod chunks;
+#[cfg(any(target_os = "macos", test))]
+mod drawio_frame;
 mod filesystem;
 mod html;
 mod html_document;
@@ -22,6 +24,14 @@ pub(crate) use temporary::{
 pub(crate) use text::{read_text, write_text};
 
 use serde::Serialize;
+
+pub(crate) fn drawio_renderer_url() -> Option<String> {
+    #[cfg(target_os = "macos")]
+    return Some(drawio_frame::url());
+
+    #[cfg(not(target_os = "macos"))]
+    None
+}
 
 pub(crate) const DEFAULT_TEXT_BYTES: u64 = 5 * 1024 * 1024;
 pub(crate) const HARD_TEXT_BYTES: u64 = 20 * 1024 * 1024;

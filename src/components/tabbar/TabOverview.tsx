@@ -12,6 +12,8 @@ import { filterOverviewItems, type PreviewItem } from "./overview/overviewModel"
 import { useTerminalPreviews } from "./overview/useTerminalPreviews";
 import { OverviewSummary } from "./overview/OverviewSummary";
 import { OverviewTitle } from "./overview/OverviewTitle";
+import { focusOverviewCard, moveOverviewFocus } from "./overview/overviewNavigation";
+import { useOverviewPreview } from "./overview/useOverviewPreview";
 
 /** Mode-scoped, live text overview. Reading a preview never starts a session. */
 export function TabOverview() {
@@ -34,6 +36,9 @@ function OpenTabOverview() {
   const [query, setQuery] = useState("");
   const searchRef = useRef<HTMLInputElement>(null);
   const dialogRef = useRef<HTMLDivElement>(null);
+  const gridRef = useRef<HTMLDivElement>(null);
+  const enlargedRef = useRef<HTMLDivElement>(null);
+  const { preview, hover, clear: clearPreview } = useOverviewPreview();
   const close = useTabOverviewStore((s) => s.close);
   const previews = useTerminalPreviews([
     ...(all || mode === "sessions" ? tabs.map((tab) => tab.id) : []),
@@ -47,6 +52,7 @@ function OpenTabOverview() {
       if (event.isComposing || event.keyCode === 229) return;
       if (event.key === "Escape") { event.preventDefault(); event.stopImmediatePropagation(); close(); }
       if (event.key === "Tab") {
+        clearPreview();
         const controls = Array.from(dialogRef.current?.querySelectorAll<HTMLElement>("button, input, [tabindex]") ?? [])
           .filter((element) => element.tabIndex >= 0 && !element.hasAttribute("disabled") && !element.closest("[hidden]"));
         const first = controls[0]; const last = controls[controls.length - 1];
@@ -56,7 +62,8 @@ function OpenTabOverview() {
     };
     window.addEventListener("keydown", onKey, true);
     return () => { window.removeEventListener("keydown", onKey, true); if (previous?.isConnected) previous.focus(); };
-  }, [close]);
+  }, [close, clearPreview]);
+  useEffect(() => { clearPreview(); }, [all, mode, query, clearPreview]);
 
   const items: PreviewItem[] = [];
   if (all || mode === "sessions") {
@@ -83,6 +90,8 @@ function OpenTabOverview() {
     }
   }
   const matching = filterOverviewItems(items, query);
+  const previewItem = preview && matching.find((item) => item.id === preview.id);
+  const previewWidth = preview ? Math.min(Math.max(440, preview.bounds.width * 1.45), window.innerWidth - 24) : 0;
   const activate = (item: PreviewItem) => {
     const app = useAppStore.getState();
     const sameMode = app.activeSideTab === (item.workspaceId ? "workspaces" : "sessions");
@@ -101,7 +110,7 @@ function OpenTabOverview() {
     close();
   };
   return createPortal(
-    <div ref={dialogRef} data-testid="tab-overview" data-scope={all ? "all" : mode} role="dialog" aria-modal="true" aria-labelledby="tab-overview-title" className="taomni-tab-overview">
+    <div ref={dialogRef} data-testid="tab-overview" data-scope={all ? "all" : mode} role="dialog" aria-modal="true" aria-labelledby="tab-overview-title" className="taomni-tab-overview" onScroll={clearPreview}>
       <div className="taomni-overview-header">
         <div><h2 id="tab-overview-title" className="flex items-center gap-2 text-[16px] font-bold"><LayoutGrid className="h-4 w-4" />{t("platform.tabOverview")}<kbd className="text-[11px] font-normal">Ctrl/Cmd+Shift+E</kbd></h2><p className="mt-1 text-[12px] text-[var(--taomni-text-muted)]">{t("platform.overviewHint")}</p></div>
         <button data-testid="tab-overview-close" className="taomni-btn" onClick={close}><X className="mr-1 h-3 w-3" />{t("common.close")} (Esc)</button>
@@ -113,7 +122,12 @@ function OpenTabOverview() {
             aria-label={t("platform.overviewSearch")} placeholder={t("platform.overviewSearch")}
             onChange={(event) => setQuery(event.target.value)}
             onKeyDown={(event) => {
-              if (event.key === "Enter" && !event.nativeEvent.isComposing && event.keyCode !== 229 && matching[0]) {
+              if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+              if ((event.key === "ArrowDown" || event.key === "ArrowUp") && focusOverviewCard(gridRef.current, event.key === "ArrowUp")) {
+                event.preventDefault();
+                clearPreview();
+              }
+              if (event.key === "Enter" && matching[0]) {
                 event.preventDefault(); activate(matching[0]);
               }
             }} />
@@ -126,19 +140,41 @@ function OpenTabOverview() {
         <button data-testid="tab-overview-current" className="taomni-toolbar-pill" aria-pressed={!all} onClick={() => setAll(false)}>{t("platform.overviewCurrent")}</button>
         <button data-testid="tab-overview-all" className="taomni-toolbar-pill" aria-pressed={all} onClick={() => setAll(true)}>{t("platform.overviewAll")}</button>
       </div>}
-      <div className="taomni-overview-grid">
-        {matching.map((item) => <button key={item.id} data-testid="tab-overview-card" data-tab-id={item.id} data-workspace-id={item.workspaceId}
-          data-active={item.active || undefined} data-output-active={item.outputActive || undefined} className="taomni-overview-card" onClick={() => activate(item)}>
-          <span className="taomni-overview-card-header"><span className="taomni-overview-kind">{item.kind}</span><OverviewTitle title={item.title} />
-            {item.outputActive && <span data-testid="tab-overview-output-badge" className="taomni-overview-output-badge"><Activity className="h-3 w-3" aria-hidden="true" />{t("platform.overviewNewOutput")}</span>}</span>
-          <OverviewSummary text={item.summary} followLatest={!!item.followLatest} />
-          <span className="taomni-overview-card-footer">
-            <span className={item.endpoint ? "min-w-0 max-w-[48%] shrink-0 truncate" : "min-w-0 truncate"}>{item.group}</span>
-            {item.endpoint && <span className="min-w-0 flex-1 truncate text-right" title={item.endpoint}>{item.endpoint}</span>}
-          </span>
+      <div ref={gridRef} className="taomni-overview-grid" onKeyDown={(event) => { moveOverviewFocus(event); if (event.defaultPrevented) clearPreview(); }}>
+        {matching.map((item) => <button key={item.id} type="button" data-testid="tab-overview-card" data-tab-id={item.id} data-workspace-id={item.workspaceId}
+          data-active={item.active || undefined} data-output-active={item.outputActive || undefined} className="taomni-overview-card"
+          onMouseEnter={(event) => hover(item.id, event.currentTarget)}
+          onMouseLeave={(event) => {
+            if (!(event.relatedTarget instanceof Node) || !enlargedRef.current?.contains(event.relatedTarget)) clearPreview();
+          }} onClick={() => activate(item)} onKeyDown={(event) => {
+            if (event.nativeEvent.isComposing || event.keyCode === 229) return;
+            if (event.key === " " || event.key === "Enter") event.preventDefault();
+            if (event.key === "Enter") activate(item);
+          }}>
+          <OverviewCardContents item={item} outputLabel={t("platform.overviewNewOutput")} />
         </button>)}
       </div>
+      {preview && previewItem && createPortal(
+        <div ref={enlargedRef} aria-hidden="true" data-testid="tab-overview-enlarged" data-tab-id={previewItem.id} className="taomni-overview-card taomni-overview-enlarged"
+          onMouseLeave={clearPreview} onClick={() => activate(previewItem)}
+          style={{ width: previewWidth,
+            left: Math.max(12, Math.min(preview.bounds.left + (preview.bounds.width - previewWidth) / 2, window.innerWidth - previewWidth - 12)),
+            top: Math.max(12, Math.min(preview.bounds.top, window.innerHeight - Math.min(460, window.innerHeight * 0.67) - 12)) }}>
+          <OverviewCardContents item={previewItem} outputLabel={t("platform.overviewNewOutput")} />
+        </div>, document.body)}
       {matching.length === 0 && <p data-testid="tab-overview-empty" className="p-12 text-center text-[var(--taomni-text-muted)]">{t(items.length ? "platform.overviewNoMatch" : "platform.overviewEmpty")}</p>}
     </div>, document.body,
   );
+}
+
+function OverviewCardContents({ item, outputLabel }: { item: PreviewItem; outputLabel: string }) {
+  return <>
+    <span className="taomni-overview-card-header"><span className="taomni-overview-kind">{item.kind}</span><OverviewTitle title={item.title} />
+      {item.outputActive && <span data-testid="tab-overview-output-badge" className="taomni-overview-output-badge"><Activity className="h-3 w-3" aria-hidden="true" />{outputLabel}</span>}</span>
+    <OverviewSummary text={item.summary} followLatest={!!item.followLatest} />
+    <span className="taomni-overview-card-footer">
+      <span className={item.endpoint ? "min-w-0 max-w-[48%] shrink-0 truncate" : "min-w-0 truncate"}>{item.group}</span>
+      {item.endpoint && <span className="min-w-0 flex-1 truncate text-right" title={item.endpoint}>{item.endpoint}</span>}
+    </span>
+  </>;
 }
