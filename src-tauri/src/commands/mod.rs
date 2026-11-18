@@ -208,6 +208,7 @@ pub(crate) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         | "viewer_save_pasted_image"
         | "viewer_html_open"
         | "viewer_html_close"
+        | "viewer_drawio_renderer_url"
         | "viewer_create_temp"
         | "viewer_release_temp"
         | "viewer_temp_allocate"

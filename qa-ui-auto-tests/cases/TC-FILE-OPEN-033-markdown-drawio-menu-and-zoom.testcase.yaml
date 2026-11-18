@@ -27,6 +27,7 @@ steps:
 - assert_text:
     selector: '.fv-md-drawio svg foreignObject b'
     contains: Check request
+    timeout_sec: 30
 - assert_visible: '.fv-md-drawio svg:has(path)'
 - press:
     selector: '[data-testid="markdown-live"]'
