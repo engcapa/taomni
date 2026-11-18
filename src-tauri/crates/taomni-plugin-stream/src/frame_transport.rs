@@ -11,6 +11,8 @@ use serde::{Deserialize, Serialize};
 use tokio::{io::AsyncWriteExt, process::Command, sync::watch, time};
 use tokio_tungstenite::tungstenite::Bytes;
 
+use crate::native_channel::{Channel, Offer};
+
 const WARMUP: u64 = 30;
 const SAMPLES: u64 = 150;
 const FRAME_COUNT: u64 = WARMUP + SAMPLES;
@@ -164,7 +166,7 @@ impl Measurement {
 
 enum Sink {
     InProcess([Bytes; 4]),
-    Host(wire::Socket),
+    Host(Channel),
 }
 
 impl Sink {
@@ -180,8 +182,8 @@ impl Sink {
     async fn finish(self) -> &'static str {
         match self {
             Self::InProcess(_) => "in-process",
-            Self::Host(mut socket) => {
-                socket.close(None).await.unwrap();
+            Self::Host(socket) => {
+                socket.close().await.unwrap();
                 "plugin-host"
             }
         }
@@ -212,7 +214,8 @@ async fn measure(workload: Workload, mut sink: Sink) -> Measurement {
 }
 
 async fn measure_host(workload: Workload) -> Measurement {
-    let (listener, input) = wire::bind(workload).await;
+    let offer = Offer::bind().await.unwrap();
+    let input = wire::input(&offer, workload);
     let mut child = Command::new(std::env::current_exe().unwrap())
         .args([
             "--ignored",
@@ -230,7 +233,7 @@ async fn measure_host(workload: Workload) -> Measurement {
         .await
         .unwrap();
     drop(stdin);
-    let socket = wire::accept(listener, &input).await;
+    let socket = offer.accept().await.unwrap();
     let result = measure(workload, Sink::Host(socket)).await;
     assert!(child.wait().await.unwrap().success());
     result

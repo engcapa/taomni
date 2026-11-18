@@ -77,6 +77,22 @@ Its standalone release build takes the original RDP client dependencies and
 can measure an already installed application. `native_build.py` stages the
 probe beside the matching QA executable for platform workflow cases.
 
+The installed Linux deb from `c660c6bb6` passed the native performance case.
+First graphics took 81 ms, input-to-frame p95 was 30.40 ms across all 40 samples,
+and the probe displayed 55.38 animation frames per second at 390.17 kbps.
+[Installed measurement](https://github.com/engcapa/taomni/actions/runs/44421453756)
+
+The hosted protocol workflow can also run the Linux X11 comparison with
+`protocol_only=true` and `rdp_pipeline=true`. The same release harness drives
+the product X11 capture, input, bitmap preparation and IronRDP encoder both
+in one process and with the encoder in a child process. The child takes one
+bitmap at a time over the authenticated loopback WebSocket. The comparison
+uses the connection, latency and throughput assertions from the existing
+native case and retains the probe reports and encoder process receipts. X11
+uses a fixed desktop size for these trials. The normal packaged app still
+uses its in-process RDP path. The real module lifecycle, Wayland and the
+Windows and macOS capture paths remain separate G5 work.
+
 GitHub tested source `fd123747c26d8ad8f7f9f44211e4b7658a30fd97`. Each route
 delivered 150 of 150 measured frames for both workloads. The harness requests
 millisecond timer resolution for its Windows process, and all reports include

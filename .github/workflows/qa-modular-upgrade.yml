@@ -64,6 +64,10 @@ on:
         description: Run only the plugin wire and QA selection unit contracts
         type: boolean
         default: false
+      rdp_pipeline:
+        description: Include the Linux X11 display and encoder comparison with protocol_only
+        type: boolean
+        default: false
       host_only:
         description: Run only the three-platform real host process and cleanup contracts
         type: boolean
@@ -129,6 +133,9 @@ on:
         type: boolean
         required: false
         default: false
+      rdp_pipeline:
+        type: boolean
+        default: false
       host_only:
         type: boolean
         required: false
@@ -185,6 +192,7 @@ jobs:
     uses: ./.github/workflows/qa-modular-protocol.yml
     with:
       head: ${{ inputs.head || github.sha }}
+      rdp_pipeline: ${{ inputs.rdp_pipeline }}
 
   system-execution:
     if: ${{ !inputs.signed_mfa_only && !inputs.package_run && !inputs.protocol_only && !inputs.host_only && inputs.system_execution_only }}

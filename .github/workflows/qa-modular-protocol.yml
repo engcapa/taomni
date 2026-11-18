@@ -6,6 +6,9 @@ on:
       head:
         type: string
         required: true
+      rdp_pipeline:
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -223,4 +226,80 @@ jobs:
         with:
           name: modular-rdp-probe-${{ runner.os }}-${{ runner.arch }}
           path: rdp-probe-evidence
+          if-no-files-found: error
+
+  rdp-pipeline:
+    if: inputs.rdp_pipeline
+    name: Linux X11 RDP encoder host comparison
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    env:
+      PYTHONPATH: .agents/skills/qa-ui-auto/scripts
+      PYTHONUNBUFFERED: '1'
+      XDG_SESSION_TYPE: x11
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head }}
+          persist-credentials: false
+      - uses: ./.github/actions/qa-runtime
+        with:
+          mode: native
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: arduino/setup-protoc@v3
+        with:
+          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install native X11 and build dependencies
+        run: |
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo apt-get -o Acquire::Retries=3 install -y --no-install-recommends \
+            libwebkit2gtk-4.1-dev libappindicator3-dev libgbm-dev librsvg2-dev patchelf \
+            libkrb5-dev libasound2-dev libpipewire-0.3-dev libclang-dev libdbus-1-dev \
+            libudev-dev nasm xvfb xauth python3-tk
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: modular-rdp-pipeline-${{ runner.os }}-${{ runner.arch }}
+          cache-on-failure: true
+      - name: Build the release test harness and probe
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p rdp-pipeline-evidence
+          git rev-parse HEAD > rdp-pipeline-evidence/source-sha.txt
+          printf '%s\n' "$RUNNER_OS" "$RUNNER_ARCH" > rdp-pipeline-evidence/runner.txt
+          rustc --version > rdp-pipeline-evidence/rustc-version.txt
+          pnpm build 2>&1 | tee rdp-pipeline-evidence/frontend-build.log
+          cargo build --locked --release --manifest-path src-tauri/Cargo.toml --package taomni-rdp-probe \
+            2>&1 | tee rdp-pipeline-evidence/probe-build.log
+          cargo test --locked --release --manifest-path src-tauri/Cargo.toml --package taomni \
+            --lib --no-default-features --no-run --message-format=json > rdp-pipeline-evidence/harness-build.jsonl
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          evidence = Path("rdp-pipeline-evidence")
+          harnesses = [
+              item["executable"] for line in (evidence / "harness-build.jsonl").read_text().splitlines()
+              if (item := json.loads(line)).get("reason") == "compiler-artifact"
+              and item["target"]["name"] == "taomni_lib" and item["profile"]["test"]
+              and item["executable"]
+          ]
+          assert len(harnesses) == 1, harnesses
+          (evidence / "harness-path.txt").write_text(harnesses[0] + "\n")
+          PY
+      - name: Measure both paths with the existing native performance budgets
+        shell: bash
+        run: |
+          set -o pipefail
+          read -r harness < rdp-pipeline-evidence/harness-path.txt
+          "$harness" --exact servers::rdp::host_perf::bitmap::validates_dimensions_stride_and_damage_offsets_before_allocating_pixels
+          xvfb-run -a -s '-noreset -screen 0 1920x1080x24 +extension DAMAGE +extension MIT-SHM -nolisten tcp' \
+            python .agents/skills/qa-ui-auto/scripts/modular_rdp_pipeline.py \
+            "$harness" src-tauri/target/release/rdp-probe rdp-pipeline-evidence/comparison \
+            2>&1 | tee rdp-pipeline-evidence/comparison.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: modular-rdp-pipeline-Linux-X64
+          path: rdp-pipeline-evidence
           if-no-files-found: error
