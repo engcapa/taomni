@@ -24,6 +24,9 @@ class OfficialPackageRunnerTests(unittest.TestCase):
             exec(compile(self.guard, "trusted-package-runner-admission", "exec"), {})
         return dict(line.split("=", 1) for line in output.read_text().splitlines())
 
+    def roster_targets(self, values, matrix):
+        return {entry["platform"]: entry["legacy_roster"] for entry in json.loads(values[matrix])["include"]}
+
     def test_available_hosted_images_emit_one_validated_output(self):
         for label in ("macos-latest", "macos-15", "macos-15-intel", "macos-26"):
             with self.subTest(label=label), tempfile.TemporaryDirectory() as directory:
@@ -64,7 +67,7 @@ class OfficialPackageRunnerTests(unittest.TestCase):
                          "${{ needs.plan.outputs.build_matrix }}")
         self.assertEqual(jobs["build"]["strategy"]["matrix"], "${{ fromJSON(needs.source.outputs.build_matrix) }}")
         self.assertEqual(jobs["sign"]["strategy"]["matrix"], "${{ fromJSON(needs.source.outputs.sign_matrix) }}")
-        self.assertEqual(set(json.loads(values["sign_matrix"])["platform"]), {target["platform"] for target in targets})
+        self.assertEqual(self.roster_targets(values, "sign_matrix"), {target["platform"]: False for target in targets})
 
     def test_focused_targets_dedupe_profiles_and_keep_macos_architectures_separate(self):
         for platforms, expected in [
@@ -77,7 +80,19 @@ class OfficialPackageRunnerTests(unittest.TestCase):
             with self.subTest(platforms=platforms), tempfile.TemporaryDirectory() as directory:
                 values = self.admit("macos-15-intel", Path(directory) / "output", json.dumps(builds))
                 self.assertEqual({target["platform"] for target in json.loads(values["build_matrix"])["include"]}, expected)
-                self.assertEqual(set(json.loads(values["sign_matrix"])["platform"]), expected)
+                self.assertEqual(self.roster_targets(values, "sign_matrix"), dict.fromkeys(expected, False))
+
+    def test_roster_builds_and_signs_both_modules_on_the_requested_platform(self):
+        builds = {"include": [
+            {"platform_key": "linux", "arch": "X64", "capabilities": ["signed-module"]},
+            {"platform_key": "macos", "arch": "ARM64", "capabilities": ["signed-module", "signed-roster"]},
+            {"platform_key": "macos", "arch": "X64", "capabilities": ["signed-module"]},
+        ]}
+        expected = {"linux-x86_64": False, "darwin-aarch64": True, "darwin-x86_64": False}
+        with tempfile.TemporaryDirectory() as directory:
+            values = self.admit("macos-26", Path(directory) / "output", json.dumps(builds))
+        self.assertEqual(self.roster_targets(values, "build_matrix"), expected)
+        self.assertEqual(self.roster_targets(values, "sign_matrix"), expected)
 
     def test_unknown_or_empty_target_selection_cannot_publish_outputs(self):
         for builds in [[], {}, {"include": []}, {"include": [None]},
@@ -98,7 +113,7 @@ class OfficialPackageRunnerTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             values = self.admit("macos-26", Path(directory) / "output", json.dumps(builds), "mfa")
         self.assertEqual(json.loads(values["build_matrix"])["include"][0]["target"], "aarch64-apple-darwin")
-        self.assertEqual(json.loads(values["sign_matrix"])["platform"], ["darwin-aarch64"])
+        self.assertEqual(self.roster_targets(values, "sign_matrix"), {"darwin-aarch64": False})
 
 
 if __name__ == "__main__":
