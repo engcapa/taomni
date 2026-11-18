@@ -14,6 +14,46 @@ fn endpoint() -> ProxyEndpoint {
     }
 }
 
+#[tokio::test]
+#[ignore = "native networking contract: execute only on GitHub hosted runners"]
+async fn https_catalog_handshake_rejects_an_untrusted_certificate() {
+    use std::time::Duration;
+
+    let certificate = rcgen::generate_simple_self_signed(vec!["127.0.0.1".into()]).unwrap();
+    let key = rustls::pki_types::PrivatePkcs8KeyDer::from(certificate.signing_key.serialize_der());
+    let config = rustls::ServerConfig::builder_with_provider(Arc::new(
+        rustls::crypto::ring::default_provider(),
+    ))
+    .with_safe_default_protocol_versions()
+    .unwrap()
+    .with_no_client_auth()
+    .with_single_cert(vec![certificate.cert.der().clone()], key.into())
+    .unwrap();
+    let acceptor = tokio_rustls::TlsAcceptor::from(Arc::new(config));
+    let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0))
+        .await
+        .unwrap();
+    let url = format!("https://{}/modules.json", listener.local_addr().unwrap());
+    let peer = async {
+        let (stream, _) = listener.accept().await.unwrap();
+        let error = acceptor.accept(stream).await.unwrap_err();
+        let tls_error = error
+            .get_ref()
+            .and_then(|err| err.downcast_ref::<rustls::Error>());
+        assert!(
+            matches!(tls_error, Some(rustls::Error::AlertReceived(_))),
+            "{error}"
+        );
+    };
+    let service = HttpDownloadService::new(&ProxyRoute::NoProxy).unwrap();
+    let (result, ()) = tokio::time::timeout(Duration::from_secs(10), async {
+        tokio::join!(service.fetch_metadata(&url, 1024), peer)
+    })
+    .await
+    .unwrap();
+    assert!(matches!(result, Err(DownloadError::Http(_))));
+}
+
 fn valid_catalog() -> ModuleCatalog {
     let mut platforms = BTreeMap::new();
     platforms.insert(

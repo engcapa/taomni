@@ -3,6 +3,7 @@
 use super::integrity::{self, MAX_PACKAGE_BYTES};
 use super::*;
 use futures::StreamExt;
+use rustls_platform_verifier::BuilderVerifierExt;
 use std::time::Duration;
 use tokio::io::AsyncWriteExt;
 
@@ -44,6 +45,7 @@ impl HttpDownloadService {
     /// An absent proxy always bypasses environment/system proxy discovery.
     pub fn with_explicit_proxy(proxy: Option<reqwest::Proxy>) -> Result<Self, DownloadError> {
         let mut builder = reqwest::Client::builder()
+            .tls_backend_preconfigured(download_tls_config()?)
             .no_proxy()
             .connect_timeout(Duration::from_secs(20))
             .read_timeout(Duration::from_secs(30))
@@ -362,6 +364,32 @@ impl HttpDownloadService {
             resumed,
         })
     }
+}
+
+fn download_tls_config() -> Result<rustls::ClientConfig, DownloadError> {
+    // The AWS-LC entropy initializer can abort during a background HTTPS
+    // check on macOS Intel VMs. Use ring's OS randomness for this client.
+    let provider = Arc::new(rustls::crypto::ring::default_provider());
+    let mut config = rustls::ClientConfig::builder_with_provider(provider)
+        .with_safe_default_protocol_versions()
+        .and_then(BuilderVerifierExt::with_platform_verifier)
+        .map_err(|error| DownloadError::Http(error.to_string()))?
+        .with_no_client_auth();
+    config.alpn_protocols = vec![b"http/1.1".to_vec()];
+    Ok(config)
+}
+
+#[cfg(test)]
+#[test]
+fn download_tls_uses_ring_even_when_reqwest_includes_aws_lc() {
+    let config = download_tls_config().unwrap();
+    assert_eq!(
+        format!("{:?}", config.crypto_provider().secure_random),
+        format!(
+            "{:?}",
+            rustls::crypto::ring::default_provider().secure_random
+        ),
+    );
 }
 
 fn validate_encoding(response: &reqwest::Response) -> Result<(), DownloadError> {

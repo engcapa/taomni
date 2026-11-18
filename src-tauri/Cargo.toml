@@ -187,6 +187,7 @@ ironrdp-bulk = "=0.1.1"
 ironrdp-tokio = { version = "0.10.0", features = ["reqwest-rustls-ring"] }
 rustls = { version = "0.23", default-features = false, features = ["ring", "std"] }
 rustls-native-certs = "0.8"
+rustls-platform-verifier = "0.7"
 x509-cert = "0.2"
 # RDP server (servers/rdp.rs): self-signed TLS cert + cross-platform input injection.
 rcgen = "0.14"

@@ -10912,6 +10912,7 @@ dependencies = [
  "russh-sftp",
  "rustls 0.23.44",
  "rustls-native-certs 0.8.4",
+ "rustls-platform-verifier",
  "rusty-s3",
  "same-file",
  "schemars 1.2.2",
@@ -11026,7 +11027,10 @@ version = "0.1.0"
 dependencies = [
  "futures",
  "log",
+ "rcgen",
  "reqwest 0.13.5",
+ "rustls 0.23.44",
+ "rustls-platform-verifier",
  "serde",
  "serde_json",
  "sha2 0.11.0",
@@ -11034,6 +11038,7 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.20",
  "tokio",
+ "tokio-rustls 0.26.5",
  "tokio-util 0.7.19",
 ]
 
