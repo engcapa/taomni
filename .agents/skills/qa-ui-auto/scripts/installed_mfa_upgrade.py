@@ -9,9 +9,11 @@ import platform
 from types import SimpleNamespace
 
 from ci_desktop import Desktop
+from installed_mfa_profile import copy_profile
+from linux_noexec import NoExecBind, is_noexec
 from modular_bundle_inventory import digest, inventory
 from qa_ui_auto.fixtures.module_legacy_mfa import (
-    ISSUER, PASSWORD, close_installed_desktop, commit_mfa_upgrade, desktop_action, element,
+    ISSUER, PASSWORD, close_installed_desktop, commit_mfa_upgrade, desktop_action, desktop_environment, element,
     installed_desktop, open_mfa, run_legacy_desktop, write_json,
 )
 from qa_ui_auto.fixtures.module_signed_archive import load_artifact
@@ -20,16 +22,21 @@ from qa_ui_auto.legacy_release import RELEASE_VERSION, selected_asset, verify_as
 from qa_ui_auto.native_steps import NativeStepContext
 
 
+def open_unlocked_mfa(ctx, session, evidence):
+    steps = NativeStepContext(session, evidence, ctx.cfg)
+    desktop_action(steps, "wait_for", element("vault-unlock-dialog"))
+    desktop_action(steps, "fill", {"selector": element("vault-unlock-pw"), "value": PASSWORD})
+    desktop_action(steps, "click", element("vault-unlock-confirm"))
+    desktop_action(steps, "wait_for", {
+        "selector": element("vault-unlock-dialog"), "state": "detached", "timeout_sec": 30,
+    })
+    open_mfa(steps)
+    return steps
+
+
 def inspect_accounts(ctx, executable, work, evidence, phase, code, *, next_code=None):
     with installed_desktop(ctx, executable, work / "desktop", evidence, phase) as (driver, session):
-        steps = NativeStepContext(session, evidence, ctx.cfg)
-        desktop_action(steps, "wait_for", element("vault-unlock-dialog"))
-        desktop_action(steps, "fill", {"selector": element("vault-unlock-pw"), "value": PASSWORD})
-        desktop_action(steps, "click", element("vault-unlock-confirm"))
-        desktop_action(steps, "wait_for", {
-            "selector": element("vault-unlock-dialog"), "state": "detached", "timeout_sec": 30,
-        })
-        open_mfa(steps)
+        steps = open_unlocked_mfa(ctx, session, evidence)
         desktop_action(steps, "assert_visible", element("mfa-account-row") + f'[data-issuer="{ISSUER}"]')
         desktop_action(steps, "assert_text_equals", {"selector": element("mfa-account-code"), "equals": code})
         if next_code is not None:
@@ -40,6 +47,54 @@ def inspect_accounts(ctx, executable, work, evidence, phase, code, *, next_code=
         desktop_action(steps, "assert_no_runtime_errors", None)
         return {"hotp": code, "nextHotp": next_code,
                 **close_installed_desktop(driver, session, executable)}
+
+
+def verify_relocation(ctx, candidate, work, profile, evidence, receipt):
+    tracked = ["plugins/mfa/active.json", "plugins/mfa/data/mfa.db"]
+    tracked.append(f"plugins/mfa/versions/{receipt['version']}/taomni-plugin-mfa")
+    original = {name: digest(profile / name) for name in tracked}
+    archived_chat = profile / "lanchat.db"
+    with archived_chat.open("xb") as stream:
+        stream.write(b"historical LanChat preservation fixture")
+    historical_sha = digest(archived_chat)
+    relocation_work = work / "relocated"
+    environment, destination = desktop_environment(relocation_work / "desktop")
+    mount = NoExecBind(profile, work)
+    result = {"passed": False, "mountRemoved": False}
+    verified = False
+    try:
+        result["mount"] = mount.block()
+        with installed_desktop(ctx, candidate, work / "desktop", evidence, "noexec-window") as (driver, session):
+            steps = open_unlocked_mfa(ctx, session, evidence)
+            selector = element("mfa-load-error")
+            desktop_action(steps, "wait_for", selector)
+            for text in ("MODULE_HOST_NOEXEC", str(profile), "XDG_DATA_HOME"):
+                desktop_action(steps, "assert_text", {"selector": selector, "contains": text})
+            desktop_action(steps, "assert_count", {"selector": element("mfa-account-row"), "equal": 0})
+            desktop_action(steps, "assert_no_runtime_errors", None)
+            result["blocked"] = close_installed_desktop(driver, session, candidate)
+        if {name: digest(profile / name) for name in tracked} != original:
+            raise RuntimeError("Noexec startup changed the installed MFA code, pointer or data")
+        result["files"] = copy_profile(profile, destination)
+        if is_noexec(destination) or not is_noexec(profile):
+            raise RuntimeError("The original profile must still be blocked while the copy can execute")
+        result["destinationXdgDataHome"] = environment["XDG_DATA_HOME"]
+        result["recovery"] = inspect_accounts(ctx, candidate, relocation_work, evidence,
+                                             "relocated-window", "359 152", next_code="969 429")
+        if any(digest(profile / name) != checksum for name, checksum in result["files"].items()):
+            raise RuntimeError("The relocated desktop changed files in the original profile")
+        if (destination / archived_chat.name).exists() or digest(archived_chat) != historical_sha:
+            raise RuntimeError("The historical chat file must stay with the original profile")
+        result["retainedChatSha256"] = historical_sha
+        verified = True
+    finally:
+        try:
+            mount.restore()
+            result["mountRemoved"] = mount.mount_id is None
+            result["passed"] = verified and result["mountRemoved"]
+        finally:
+            write_json(evidence, "installed-mfa-profile-relocation.json", result)
+    return result
 
 
 def replace_package(package, work, evidence, *, version, allow_downgrade=False):
@@ -105,6 +160,8 @@ def execute(args):
             if reinstalled["binarySha256"] != replacement["binarySha256"]:
                 raise RuntimeError("Candidate reinstall changed the installed executable")
             stages["reopenModule"] = inspect_accounts(ctx, candidate, work, report, "candidate-reopen", "359 152")
+            if args.verify_relocation:
+                stages["relocation"] = verify_relocation(ctx, candidate, work, profile, report, receipt)
             result["passed"] = True
     finally:
         write_json(report, "installed-mfa-upgrade.json", result)
@@ -114,4 +171,5 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     for argument in ("identity", "legacy", "candidate", "signed", "evidence", "work"):
         parser.add_argument("--" + argument, required=True, type=Path)
+    parser.add_argument("--verify-relocation", action="store_true")
     execute(parser.parse_args())

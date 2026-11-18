@@ -7,6 +7,7 @@ on:
       package_run: {type: string, required: true}
       package_source: {type: string, required: true}
       package_version: {type: string, required: true}
+      verify_relocation: {type: boolean, default: false}
     secrets:
       TAURI_SIGNING_PRIVATE_KEY: {required: true}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: {required: false}
@@ -105,12 +106,19 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: python -m qa_ui_auto.legacy_release legacy-input
       - name: Exercise apt replacement, signed MFA migration and rollback
+        env:
+          VERIFY_RELOCATION: ${{ inputs.verify_relocation }}
         run: |
+          extra=()
+          if [[ "$VERIFY_RELOCATION" == true ]]; then
+            python -m unittest test_installed_mfa_profile
+            extra+=(--verify-relocation)
+          fi
           dbus-run-session -- xvfb-run -a -s '-screen 0 1920x1080x24 -nolisten tcp -noreset' \
             python .agents/skills/qa-ui-auto/scripts/installed_mfa_upgrade.py \
             --identity installed-mfa-input/bundle-source.json --legacy legacy-input \
             --candidate candidate-input --signed signed-input \
-            --evidence installed-mfa-evidence --work installed-mfa-work
+            --evidence installed-mfa-evidence --work installed-mfa-work "${extra[@]}"
       - uses: actions/upload-artifact@v4
         if: always()
         with:
