@@ -41,6 +41,7 @@ pub struct VerifiedPackage {
     directory: TempDir,
     archive: NamedTempFile,
     signature: String,
+    archive_sha256: String,
     pub(super) manifest: ModuleManifest,
     pub(super) checksums: TreeDigests,
 }
@@ -110,6 +111,10 @@ impl VerifiedPackage {
 
     pub fn manifest(&self) -> &ModuleManifest {
         &self.manifest
+    }
+
+    pub(crate) fn archive_sha256(&self) -> &str {
+        &self.archive_sha256
     }
 
     pub(crate) fn directory(&self) -> &Path {
@@ -279,6 +284,7 @@ impl VerifiedPackage {
             directory,
             archive: snapshot,
             signature: detached.to_owned(),
+            archive_sha256: actual_sha,
             manifest,
             checksums,
         })

@@ -83,6 +83,8 @@ static QA_PROFILE_ACTIVE: AtomicBool = AtomicBool::new(false);
 
 #[doc(hidden)]
 pub use runtime::mfa_maintenance::{MFA_MAINTENANCE_ARG, run_mfa_maintenance};
+#[doc(hidden)]
+pub use runtime::mfa_restart::{MFA_RESTART_HELPER_ARG, run_mfa_restart_helper};
 
 fn is_qa_identifier(identifier: &str) -> bool {
     identifier == QA_APP_ID

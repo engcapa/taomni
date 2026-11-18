@@ -699,7 +699,7 @@ v1.2 没有覆盖“已经在用旧版的用户”。核心 0.6.x 默认包不�
 
 ### 6.5.1 单体安装升级协议（v1.5 实施补充）
 
-`plugin_migration_inspect` 只读扫描旧 profile，已提交的 MFA 从待迁移列表移除。生产 Settings 的 `plugin_migration_execute` 仍只记录 pending。MFA 的离线执行入口已接入签名包、原 Vault 验证和原子提交，待 Settings 接入退出交接后可沿用该入口。包括历史 LanChat 库在内的旧资料继续留在原目录。 [MFA 离线执行](taomni-modular-readonly-key-check.md#离线执行入口)
+`plugin_migration_inspect` 只读扫描旧 profile，已提交的 MFA 从待迁移列表移除。通用 `plugin_migration_execute` 记录 pending。Settings 的 MFA 签名包入口经原 Vault 验证和正常退出交给离线进程，迁移结果由启动后的 Settings 显示。包括历史 LanChat 库在内的旧资料继续留在原目录。 [MFA 执行与交接](taomni-modular-readonly-key-check.md#设置页交接)
 
 升级必须先完成迁移预检，再切换核心版本；不能把旧版目录直接当作插件目录，也不能在下载插件失败时删除旧数据。核心启动时在旧版应用数据目录上建立一次性的 `migration/journal.json`，记录源版本、目标 `coreApiVersion`、每个迁移项的源指纹、暂存目录和提交状态。写 journal 使用临时文件加原子 rename，进程被终止后从最后一个 `committed` 项继续，重复执行同一个项必须得到相同目标内容。
 

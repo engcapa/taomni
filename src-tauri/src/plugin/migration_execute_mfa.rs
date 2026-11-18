@@ -1,7 +1,7 @@
 //! Offline entry point shared by the maintenance process and signed QA gates.
 use std::{io::Read, path::Path};
 
-use taomni_profile_locks::ProfileRoot;
+use taomni_profile_locks::{ProfileRoot, WaitControl};
 use taomni_sqlite_snapshot::SnapshotControl;
 
 use super::{
@@ -50,12 +50,35 @@ pub(crate) fn execute(
     password: &str,
     control: &SnapshotControl,
 ) -> Result<MfaUpgradeOutcome, String> {
+    execute_inner(profile, package, password, control, None)
+}
+
+pub(crate) fn execute_after_exit(
+    profile: &Path,
+    package: &VerifiedPackage,
+    password: &str,
+    control: &SnapshotControl,
+    wait: &WaitControl<'_>,
+) -> Result<MfaUpgradeOutcome, String> {
+    execute_inner(profile, package, password, control, Some(wait))
+}
+
+fn execute_inner(
+    profile: &Path,
+    package: &VerifiedPackage,
+    password: &str,
+    control: &SnapshotControl,
+    wait: Option<&WaitControl<'_>>,
+) -> Result<MfaUpgradeOutcome, String> {
     control.check().map_err(|error| error.to_string())?;
     migration_commit::validate_manifest(package.manifest())?;
     paths::directory(profile)?;
     migration_commit::recover_at_startup(profile)?;
     let profile = ProfileRoot::prepare(profile).map_err(|error| error.to_string())?;
-    let maintenance = MfaMaintenance::acquire(&profile)?;
+    let maintenance = match wait {
+        Some(wait) => MfaMaintenance::acquire_after_exit(&profile, wait),
+        None => MfaMaintenance::acquire(&profile),
+    }?;
     let root = profile.path();
     if MigrationJournal::profile_mfa_committed(root)? {
         return Ok(MfaUpgradeOutcome::AlreadyMigrated);

@@ -220,6 +220,42 @@ controls:
   - id: module-upgrade-retained
     selector: '[data-testid="module-upgrade-retained"]'
     kind: display
+  - id: module-upgrade-mfa-open
+    selector: '[data-testid="module-upgrade-mfa-open"]'
+    kind: interactive
+  - id: module-upgrade-mfa-form
+    selector: '[data-testid="module-upgrade-mfa-form"]'
+    kind: display
+  - id: module-upgrade-mfa-archive
+    selector: '[data-testid="module-upgrade-mfa-archive"]'
+    kind: interactive
+  - id: module-upgrade-mfa-signature
+    selector: '[data-testid="module-upgrade-mfa-signature"]'
+    kind: interactive
+  - id: module-upgrade-mfa-choose-archive
+    selector: '[data-testid="module-upgrade-mfa-choose-archive"]'
+    kind: interactive
+  - id: module-upgrade-mfa-choose-signature
+    selector: '[data-testid="module-upgrade-mfa-choose-signature"]'
+    kind: interactive
+  - id: module-upgrade-mfa-password
+    selector: '[data-testid="module-upgrade-mfa-password"]'
+    kind: interactive
+  - id: module-upgrade-mfa-submit
+    selector: '[data-testid="module-upgrade-mfa-submit"]'
+    aliases:
+      - '[data-testid="module-upgrade-mfa-submit"][disabled]'
+      - '[data-testid="module-upgrade-mfa-submit"]:not([disabled])'
+    kind: interactive
+  - id: module-upgrade-mfa-cancel
+    selector: '[data-testid="module-upgrade-mfa-cancel"]'
+    kind: interactive
+  - id: module-upgrade-mfa-error
+    selector: '[data-testid="module-upgrade-mfa-error"]'
+    kind: display
+  - id: module-upgrade-mfa-result
+    selector: '[data-testid="module-upgrade-mfa-result"]'
+    kind: display
   - id: module-offline-install
     selector: '[data-testid="module-offline-install"]'
     kind: display

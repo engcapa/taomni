@@ -3,20 +3,23 @@ use super::ApplicationRuntime;
 use crate::state::AppState;
 use tauri::Manager;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum ExitAction {
     Quit,
     Restart,
+    UpgradeMfa(super::mfa_restart::MfaRestart),
 }
 
 pub(crate) async fn request(app: tauri::AppHandle, action: ExitAction) -> Result<(), String> {
     let quiet = std::sync::Mutex::new(None);
+    let restarting = !matches!(&action, ExitAction::Quit);
+    let await_handoff = matches!(&action, ExitAction::UpgradeMfa(_));
+    let (completion, finished) = tokio::sync::oneshot::channel();
     app.state::<crate::app_exit::ExitGate>()
         .run(
             async {
                 // Backup needs live stores/services. No permanent stop until all
                 // fallible cleanup has succeeded, so a refused exit can be retried.
-                crate::backup::scheduler::prepare_exit(&app, action == ExitAction::Restart).await;
+                crate::backup::scheduler::prepare_exit(&app, restarting).await;
                 crate::sockscap::prepare_for_exit(&app, app.state::<AppState>()).await?;
                 crate::screenshot::wait_for_recovery_recording().await?;
                 // Keep this reversible barrier through commit. Confirmation
@@ -41,6 +44,7 @@ pub(crate) async fn request(app: tauri::AppHandle, action: ExitAction) -> Result
                     {
                         tracing::warn!(%error, "Application remains open after unconfirmed plugin teardown");
                         app.state::<crate::app_exit::ExitGate>().refuse_teardown();
+                        let _ = completion.send(Err(error));
                         return;
                     }
                     crate::webview_recovery::closing_all(&app);
@@ -49,11 +53,27 @@ pub(crate) async fn request(app: tauri::AppHandle, action: ExitAction) -> Result
                     match action {
                         ExitAction::Quit => app.exit(0),
                         ExitAction::Restart => app.restart(),
+                        ExitAction::UpgradeMfa(handoff) => match handoff.approve() {
+                            Ok(approval) => {
+                                app.manage(approval);
+                                let _ = completion.send(Ok(()));
+                                app.exit(0);
+                            }
+                            Err(error) => {
+                                tracing::error!(%error, "MFA handoff failed during restart");
+                                let _ = completion.send(Err(error));
+                                app.restart();
+                            }
+                        },
                     }
                 });
             },
         )
-        .await
+        .await?;
+    if await_handoff {
+        finished.await.map_err(|error| error.to_string())??;
+    }
+    Ok(())
 }
 
 pub(crate) fn handle_exit_requested(

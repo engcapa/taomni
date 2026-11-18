@@ -388,6 +388,36 @@ pub fn plugin_migration_execute(
     executor.record_pending(&snapshot)
 }
 
+#[tauri::command]
+pub async fn plugin_mfa_migrate_and_restart(
+    app: AppHandle,
+    archive: PathBuf,
+    signature: PathBuf,
+    master_password: String,
+) -> Result<(), String> {
+    let request = zeroize::Zeroizing::new(master_password);
+    let owner = app.clone();
+    let handoff = tauri::async_runtime::spawn_blocking(move || {
+        crate::runtime::mfa_restart::MfaRestart::prepare(&owner, archive, signature, request)
+    })
+    .await
+    .map_err(|error| error.to_string())??;
+    crate::runtime::shutdown::request(
+        app,
+        crate::runtime::shutdown::ExitAction::UpgradeMfa(handoff),
+    )
+    .await
+}
+
+#[tauri::command]
+pub fn plugin_mfa_migration_result(state: State<'_, AppState>) -> Option<&'static str> {
+    let result = crate::runtime::mfa_restart::last_result()?;
+    if result == "complete" && !matches!(state.mfa.legacy_store(), Ok(None)) {
+        return None;
+    }
+    Some(result)
+}
+
 pub(super) fn handles(command: &str) -> bool {
     matches!(
         command,
@@ -415,6 +445,8 @@ pub(super) fn handles(command: &str) -> bool {
             | "plugin_marketplace_install"
             | "plugin_migration_inspect"
             | "plugin_migration_execute"
+            | "plugin_mfa_migrate_and_restart"
+            | "plugin_mfa_migration_result"
     )
 }
 
@@ -444,6 +476,8 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         crate::commands::plugin_marketplace::plugin_marketplace_install,
         crate::commands::plugin::plugin_migration_inspect,
         crate::commands::plugin::plugin_migration_execute,
+        crate::commands::plugin::plugin_mfa_migrate_and_restart,
+        crate::commands::plugin::plugin_mfa_migration_result,
     ];
     handler(invoke)
 }

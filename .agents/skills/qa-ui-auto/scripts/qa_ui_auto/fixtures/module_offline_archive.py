@@ -25,4 +25,7 @@ def setup(ctx):
         "platform=linux-x86_64 coreApiVersion=1 sha256=" + "0" * 64
         + "\n" + b64encode(bytes(64)).decode("ascii") + "\n"
     )
-    ctx.values.update(module_untrusted_archive=archive.as_posix(), module_untrusted_signature=signature)
+    signature_path = owned / "untrusted.minisig"
+    signature_path.write_text(signature, encoding="utf-8")
+    ctx.values.update(module_untrusted_archive=archive.as_posix(), module_untrusted_signature=signature,
+                      module_untrusted_signature_path=signature_path.as_posix())

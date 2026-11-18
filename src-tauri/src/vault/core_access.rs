@@ -13,6 +13,15 @@ pub(crate) enum MfaKeyAction {
 }
 
 impl Vault {
+    pub(crate) fn check_migration_password(&self, password: &str) -> Result<(), String> {
+        let inner = self.inner.lock().map_err(|_| "Vault is unavailable")?;
+        let meta = db::get_meta(&inner.conn)
+            .map_err(|error| error.to_string())?
+            .ok_or(super::ERR_VAULT_EMPTY)?;
+        drop(password_key::verify(&meta, password)?);
+        Ok(())
+    }
+
     pub(crate) fn mfa_key_with_permit(
         &self,
         permit: &CoreOperationPermit,

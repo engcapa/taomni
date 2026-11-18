@@ -12,7 +12,7 @@ use zeroize::Zeroizing;
 use crate::plugin::migration_execute_mfa::{self, MfaUpgradeOutcome};
 
 pub const MFA_MAINTENANCE_ARG: &str = "--migrate-mfa";
-const MAX_PASSWORD_BYTES: usize = 1024 * 1024;
+pub(super) const MAX_PASSWORD_BYTES: usize = 1024 * 1024;
 
 pub fn run_mfa_maintenance(args: impl IntoIterator<Item = OsString>) -> Result<(), String> {
     let mut args = args.into_iter();
@@ -45,7 +45,11 @@ pub fn run_mfa_maintenance(args: impl IntoIterator<Item = OsString>) -> Result<(
     Ok(())
 }
 
-fn read_limited(reader: impl Read, limit: usize, name: &str) -> Result<Zeroizing<Vec<u8>>, String> {
+pub(super) fn read_limited(
+    reader: impl Read,
+    limit: usize,
+    name: &str,
+) -> Result<Zeroizing<Vec<u8>>, String> {
     // Reserve the complete bound so growing the buffer cannot leave behind
     // old allocations containing the password.
     let mut bytes = Zeroizing::new(Vec::with_capacity(limit + 1));
@@ -59,7 +63,7 @@ fn read_limited(reader: impl Read, limit: usize, name: &str) -> Result<Zeroizing
     Ok(bytes)
 }
 
-fn utf8(bytes: &[u8]) -> Result<&str, String> {
+pub(super) fn utf8(bytes: &[u8]) -> Result<&str, String> {
     std::str::from_utf8(bytes).map_err(|_| "Maintenance input is not UTF-8".into())
 }
 

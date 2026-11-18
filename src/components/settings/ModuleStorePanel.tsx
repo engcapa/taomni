@@ -6,6 +6,7 @@ import { type ModuleRecord, type ModuleTransition } from "../../lib/moduleStore"
 import { useModuleStore } from "../../stores/moduleStore";
 import { ConfirmDialog } from "../sidebar/ConfirmDialog";
 import { ModuleTabActions } from "../plugins/ModuleTabActions";
+import { ModuleMfaUpgrade } from "./ModuleMfaUpgrade";
 
 /**
  * The settings surface deliberately owns no catalog or native IPC concerns.
@@ -178,6 +179,7 @@ export function ModuleStorePanel({
           {t("settings.moduleStoreCoreApi", { version: coreApiVersion })}
         </span>
       </div>
+      <ModuleMfaUpgrade eligible={migrationSnapshot?.candidates.some((item) => item.item === "mfa" && item.evidence.includes("mfa.db")) === true} />
       {migrationSnapshot && (
         <div
           data-testid="module-upgrade-status"

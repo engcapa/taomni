@@ -12,6 +12,8 @@
 
 离线维护入口已可从候选原生程序启动。签名包验签后，在排他 profile 持有期间准备原 MFA、校验 Vault 并提交。无 journal 可以首次迁移，已提交时重复执行保持原数据；启动恢复发布已启用状态并清理事务。Settings 已过滤已完成的 MFA 项，退出交接仍待开发。新增维护进程用例参与签名专项，覆盖真实跨进程锁、错密码及启用后 HOTP。 [离线执行设计](taomni-modular-readonly-key-check.md#离线执行入口)
 
+设置页的 MFA 签名包表单及正常退出交接已接线。确认的包摘要和原口令由维护进程重新核对，提交后重启显示结果。新增 036/037 测试无效签名、原账户保留和选择器取消。剩余正向实际 UI 交接、`0.5.x` 已安装应用创建 MFA 和安装包替换，以及完整回滚仍归入 TASK-012。 [设置页交接设计](taomni-modular-readonly-key-check.md#设置页交接)
+
 2026-11-18 合入远程 main `dfde6f9de`（#829），合并提交 `e967ebfbd`。解决 Explorer 窄窗口列样式冲突，保留新建文件对话框样式和可调详情列。main 的列宽用例保留 `TC-EXPLORER-006`，新建可编辑类型用例改为 `TC-EXPLORER-008`，并同步选择契约。Explorer/Markdown 单元 115/115、QA 工具单元 38/38、完整 QA 审计及 check:refactor 通过。
 
 合并源码中的 Vault 只读校验提交 `834435e3a` 通过 [升级契约 #44193490202](https://github.com/engcapa/taomni/actions/runs/44193490202)。Linux x64、Windows x64 和 macOS Intel 各 4/4 Vault 真实文件场景、4/4 Vault 内存单元、21/21 MFA engine 单元、13/12/13 个导出场景及各 1 个真实跨进程旧模式锁场景通过。所有 6 个 artifact 及时收齐。与同一源码匹配的 [三端 UI #44193516662](https://github.com/engcapa/taomni/actions/runs/44193516662) 三端 browser 各 36/36，含各 20 项完整 crash-regression，12 片已核验。native 继续收证。`macos-26` 首次选择包含五个 browser-only 场景，规划失败保留在 #44193545093，按声明过滤后，由 [#44195752497](https://github.com/engcapa/taomni/actions/runs/44195752497) 继续执行对应平台的全部 native 选择，含完整 crash-regression。
@@ -357,7 +359,7 @@ Wayland `TC-FILE-OPEN-008` 在已有 AI 路径 chip 点击处失败：失败截�
 3. **迁出真实业务（TASK-005-B、013/014、016–022）**：MFA 原型和可信签名安装已有 runner 证据，长期有界防重放已由 `a41b27e72` 的三端协议/真实宿主门复验；继续补完整相关 G 门、旧库只读迁移、capture RPC 业务接线与动态 UI，最后切换生产 facade/连接 owner。之后依赖序推进 RDP/VNC 客户端与服务端、Servers、SocksCap、OCR/录制、本地语音的宿主、前端、状态与迁移。Mobile 按 DEC-2 留下明确 go/no-go 结论和公开例外，不能默认为交付；LanChat 任务已取消，不新增替代插件。
 4. **裁剪核心依赖闭包（TASK-006）**：随业务迁出，从核心 Cargo 默认 features、原生依赖、bundle/resources/helper 和前端 chunk 中实际移除相应实现。保存 cargo tree、资源与产物证据；把状态改名或放入 LegacyFeatureRuntime 不等于瘦身完成。
 5. **补齐模块使用剩余闭环（TASK-007、009–011）**：远端签名商店、三种代理 UI、跨重启下载恢复、后台进度、动态 tab 和缺失/禁用占位已有基础证据；继续验证真实不同版本的运行中更新/回滚、失败恢复、业务资源释放，以及每个实际业务模块在主窗/分离窗中的完整行为。安装、启禁、更新和回滚须无需重启核心；测试签名目录不代替正式目录发布。
-6. **完成升级入口并验证真实旧单体升级（TASK-012）**：MFA 一致导出、Vault 自检、可信包离线提交与中断恢复已有三端专项证据。下一步接入 Settings 的签名包与口令、退出并交给独占 profile 的升级执行入口，再验证正式已安装 `0.5.x` 创建真实 MFA 数据、候选安装程序替换、提交恢复与回滚。目前 `plugin_migration_execute` 记录 pending，真实安装入口与工作资料保留仍须验收。历史 LanChat 库原样留存。
+6. **完成升级入口并验证真实旧单体升级（TASK-012）**：MFA 一致导出、Vault 自检、可信包离线提交与中断恢复已有三端专项证据。Settings 的签名包与原 Vault 交接已实现，正向签名包自动重启仍待 GitHub 实测。继续验证正式已安装 `0.5.x` 创建真实 MFA、候选安装程序替换、提交恢复与回滚。其它模块继续通过通用 `plugin_migration_execute` 记录 pending。历史 LanChat 库原样留存。
 7. **完成生产发布验收（TASK-001/002/023）**：闭合 G1–G11、冻结真实插件契约；完成四发布目标的宿主系统签名/包签名、原子 modules 清单、模块独立更新/回滚。核心-only 与实际全插件集合分别完成受影响用例及完整 crash-regression，并归档包体积、启动、内存、帧吞吐的匹配基线与原始样本。
 
 ### 2026-11-16 启用与原生观察修复批次（`911f411b2` 已提交，hosted 验证中）
