@@ -7,7 +7,7 @@ import platform
 import plistlib
 import subprocess
 
-from .legacy_release import RELEASE_ID, RELEASE_TAG, download_asset, selected_asset
+from .legacy_release import RELEASE_ID, RELEASE_TAG, RELEASE_VERSION, download_asset, selected_asset
 
 
 def command(args, evidence, label, *, accepted=(0,), timeout=180):
@@ -26,14 +26,14 @@ def linux_install(package, destination, evidence):
     fields = command(["dpkg-deb", "-f", str(package), "Package", "Version", "Architecture"],
                      evidence, "deb-metadata").stdout.decode()
     # dpkg-deb labels fields when more than one is requested.
-    expected = {"Package": "taomni", "Version": "0.5.9", "Architecture": "amd64"}
+    expected = {"Package": "taomni", "Version": RELEASE_VERSION, "Architecture": "amd64"}
     if dict(line.split(": ", 1) for line in fields.strip().splitlines()) != expected:
         raise RuntimeError("Pinned legacy deb metadata is unexpected")
     command(["sudo", "apt-get", "install", "--no-install-recommends", "-y", str(package)],
             evidence, "deb-install")
     installed = command(["dpkg-query", "-W", "-f=${Version} ${Architecture}", "taomni"],
                         evidence, "deb-installed").stdout.decode().strip()
-    if installed != "0.5.9 amd64":
+    if installed != f"{RELEASE_VERSION} amd64":
         raise RuntimeError("The legacy deb was not actually registered as installed")
     return Path("/usr/bin/taomni"), {"method": "apt-get install", "installedVersion": installed}
 
@@ -58,7 +58,7 @@ $exe=Get-Item -LiteralPath $env:QA_LEGACY_INSTALLED_EXE
                             env=env, capture_output=True, timeout=30, check=True)
     (evidence / "installed-exe.json").write_bytes(result.stdout)
     details = json.loads(result.stdout.decode("utf-8-sig"))
-    if details["productVersion"].split("+")[0] not in {"0.5.9", "0.5.9.0"}:
+    if details["productVersion"].split("+")[0] not in {RELEASE_VERSION, f"{RELEASE_VERSION}.0"}:
         raise RuntimeError("Legacy MSI installed an executable with an unexpected version")
     return executable, {"method": "msiexec /i (not administrative extraction)", **details}
 
@@ -78,7 +78,7 @@ def macos_install(package, destination, evidence):
         command(["hdiutil", "detach", str(mount)], evidence, "dmg-detach")
     with (app / "Contents/Info.plist").open("rb") as stream:
         info = plistlib.load(stream)
-    if info["CFBundleShortVersionString"] != "0.5.9" or info["CFBundleIdentifier"] != "com.taomni.app":
+    if info["CFBundleShortVersionString"] != RELEASE_VERSION or info["CFBundleIdentifier"] != "com.taomni.app":
         raise RuntimeError("Installed legacy app has an unexpected identity/version")
     command(["codesign", "--verify", "--deep", "--strict", str(app)], evidence, "macos-signature")
     assessment = command(["spctl", "--assess", "--type", "execute", "--verbose=4", str(app)],

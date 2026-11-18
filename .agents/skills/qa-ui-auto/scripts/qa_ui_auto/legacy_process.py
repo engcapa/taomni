@@ -16,7 +16,7 @@ def sanitized_output(raw):
 def initialize_profile(executable, data, work, evidence, label):
     """Use only the old release's documented headless entry, never a QA hook.
 
-    0.5.9's Windows release uses the GUI subsystem and exposes no headless quit
+    The legacy Windows release uses the GUI subsystem and exposes no headless quit
     endpoint. Its owned process tree is forcibly stopped; this is deliberately
     recorded as crash/recovery input, never described as a graceful shutdown.
     Unix must finish its SIGTERM handler with exit=0 or the case fails.

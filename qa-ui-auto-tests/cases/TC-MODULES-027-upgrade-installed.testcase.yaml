@@ -1,6 +1,6 @@
 id: TC-MODULES-027
-title: Installed 0.5.9 profile opens safely in the candidate with idempotent pending VNC upgrade
-description: Installs the pinned public 0.5.9 deb/MSI/DMG on an owned GitHub runner and runs its headless entry twice in the
+title: Installed 0.5.10 profile opens safely in the candidate with idempotent pending VNC upgrade
+description: Installs the pinned public 0.5.10 deb/MSI/DMG on an owned GitHub runner and runs its headless entry twice in the
   candidate QA profile. The old binary creates the actual schema; SSH/VNC business rows are synthetic and must survive its
   reopening. The candidate then uses real Settings/IPC to recommend only VNC, retain old chat bytes and sidecars, and keep
   pending state through normal candidate restart. Unix old processes must exit normally; Windows GUI-subsystem old processes
@@ -53,7 +53,9 @@ steps:
     equal: 0
 - module_upgrade_probe:
     phase: preflight
-- click: '[data-testid="module-upgrade-migrate"]'
+- press:
+    selector: '[data-testid="module-upgrade-migrate"]:not([disabled])'
+    key: Enter
 - wait_for: '[data-testid="module-upgrade-pending"]'
 - assert_attribute:
     selector: '[data-testid="module-upgrade-status"]'
@@ -97,7 +99,7 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Installs the pinned public 0.5.9 deb/MSI/DMG on an owned GitHub runner and runs its headless entry twice
+    requirement: Installs the pinned public 0.5.10 deb/MSI/DMG on an owned GitHub runner and runs its headless entry twice
       in the candidate QA profile. The old binary creates the actual schema; SSH/VNC business rows are synthetic and must
       survive its reopening. The candidate then uses real Settings/IPC to recommend only VNC, retain old chat bytes and sidecars,
       and keep pending state through normal candidate restart. Unix old processes must exit normally; Windows GUI-subsystem

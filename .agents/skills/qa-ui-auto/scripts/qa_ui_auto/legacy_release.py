@@ -1,4 +1,4 @@
-"""Immutable, public 0.5.9 installer inputs for hosted upgrade verification."""
+"""Immutable, public installer inputs for hosted upgrade verification."""
 from dataclasses import dataclass
 import hashlib
 from pathlib import Path
@@ -15,21 +15,22 @@ class ReleaseAsset:
     sha256: str
 
 
-RELEASE_ID = 443581958
-RELEASE_TAG = "v0.5.9"
+RELEASE_ID = 449346766
+RELEASE_VERSION = "0.5.10"
+RELEASE_TAG = f"v{RELEASE_VERSION}"
 ASSETS = {
     ("Linux", "x64"): ReleaseAsset(
-        741932993, "Taomni_0.5.9_amd64.deb", 106131316,
-        "f62218535835d6103f0c51d9cfdc7baf29a148981031965425025c53eaa0b00c"),
+        761457345, "Taomni_0.5.10_amd64.deb", 109669490,
+        "3667b1fd0983660c636b4c0bdcaea9759e40174a87ab0ccbecaaaa69046d9a0a"),
     ("Windows", "x64"): ReleaseAsset(
-        741933721, "Taomni_0.5.9_x64_en-US.msi", 92921856,
-        "dfdb0b246808768dd46469d3e64872994d0ee61068a34d15ab1bc567cf2faa8e"),
+        761458084, "Taomni_0.5.10_x64_en-US.msi", 96120832,
+        "bc83c2aa84852443b4f42fe87be95051f010baa7bb12ae82501db7611a36fb22"),
     ("Darwin", "arm64"): ReleaseAsset(
-        741932423, "Taomni_0.5.9_aarch64.dmg", 95259547,
-        "61351e3dc809a356fd59584275baae86aceaac858b11c09813f8be70605daafa"),
+        761456797, "Taomni_0.5.10_aarch64.dmg", 98516008,
+        "3044a7ee96e3a36ba4cbc8305a6777db1c96c7ffabed3e8b3aa6fa8c90ebe153"),
     ("Darwin", "x64"): ReleaseAsset(
-        741933471, "Taomni_0.5.9_x64.dmg", 101233955,
-        "f0b558fc38b63791b22685c320c4b269cce8df7e2c80054b762f27ee80f8320b"),
+        761457841, "Taomni_0.5.10_x64.dmg", 104617072,
+        "6cdd181a6ea61a370661cd9ee84ec368f9c71279e916558d780ac9fd0dcc658d"),
 }
 
 
@@ -40,7 +41,7 @@ def selected_asset(system=None, machine=None):
     try:
         return ASSETS[(system, arch)]
     except KeyError:
-        raise RuntimeError(f"No pinned 0.5.9 installer for {system}/{machine}") from None
+        raise RuntimeError(f"No pinned {RELEASE_VERSION} installer for {system}/{machine}") from None
 
 
 def verify_asset(path, asset):

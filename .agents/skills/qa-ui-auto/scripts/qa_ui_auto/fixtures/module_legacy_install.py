@@ -1,4 +1,4 @@
-"""Install and start real 0.5.9 before the candidate reads the same QA profile."""
+"""Install and start the pinned legacy release before the candidate opens its profile."""
 from contextlib import closing
 import hashlib
 import json
@@ -9,6 +9,7 @@ from .backup_policy import isolated_data_root
 from .module_upgrade import input_sessions
 from ..legacy_install import install
 from ..legacy_process import initialize_profile
+from ..legacy_release import RELEASE_VERSION
 
 
 def retained_manifest(data):
@@ -74,7 +75,7 @@ def setup(ctx):
     ctx.module_upgrade = {"root": data, "sessions": rows, "journal": None,
                           "retained": retained, "full_sessions": before}
     (evidence / "profile-input.json").write_text(json.dumps({
-        "scope": "Real installed 0.5.9 initialization/reopen with synthetic SSH/VNC business rows; candidate QA preflight/pending only",
+        "scope": f"Installed {RELEASE_VERSION} initialization and reopen with synthetic SSH/VNC rows and candidate QA preflight",
         "dataRoot": str(data), "sessionRows": before, "sessionIds": [row["id"] for row in before],
         "sessionTypes": [row["session_type"] for row in before], "retained": retained,
         "notEstablished": ["installer replacement by candidate", "MFA secret export", "trusted staging/activation", "rollback"],

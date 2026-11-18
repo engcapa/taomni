@@ -43,3 +43,14 @@ macOS 保留原始 `codesign` 与 `spctl` 结果。直接 CLI 启动、没有浏
 四组均完成 preflight/pending/repeat/repeat 四次独立观察、完整旧行与历史 chat/WAL 字节保持，以及候选正常重启。上述结果只覆盖本方案所述真实安装输入与 pending，不替代下述生产升级事务，也不覆盖未执行的 macOS Intel 输入。
 
 本批通过后，下一步仍是核心可信 exporter 与验证包 staging 的生产事务，以及候选安装程序对真实已安装版本的替换/中断/回滚。G1–G11 未闭合前不得切换 MFA 或其它业务 owner。
+
+## 正式 0.5.10 安装输入
+
+`TC-MODULES-027` 的现用安装输入固定到 `v0.5.10`（release ID `449346766`）。下载后按下表的字节长度和 SHA-256 验证，实际安装后再检查系统报告的应用版本。候选与旧版当前拥有相同的显示版本，因此核对安装资产、安装后旧程序与候选 QA runtime 的各自指纹。旧版初始化与重开、合成业务行、pending journal、正常候选重启及历史 chat 留存仍是同一场景的验收项。 [正式发布](https://github.com/engcapa/taomni/releases/tag/v0.5.10)
+
+| 目标 | 资产 ID | 字节 | SHA-256 |
+|---|---:|---:|---|
+| Linux x64 deb | 761457345 | 109669490 | `3667b1fd0983660c636b4c0bdcaea9759e40174a87ab0ccbecaaaa69046d9a0a` |
+| Windows x64 MSI | 761458084 | 96120832 | `bc83c2aa84852443b4f42fe87be95051f010baa7bb12ae82501db7611a36fb22` |
+| macOS ARM64 DMG | 761456797 | 98516008 | `3044a7ee96e3a36ba4cbc8305a6777db1c96c7ffabed3e8b3aa6fa8c90ebe153` |
+| macOS Intel DMG | 761457841 | 104617072 | `6cdd181a6ea61a370661cd9ee84ec368f9c71279e916558d780ac9fd0dcc658d` |
