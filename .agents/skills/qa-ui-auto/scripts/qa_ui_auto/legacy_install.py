@@ -22,19 +22,20 @@ def command(args, evidence, label, *, accepted=(0,), timeout=180):
     return result
 
 
-def linux_install(package, destination, evidence):
+def linux_install(package, destination, evidence, *, version=RELEASE_VERSION, allow_downgrade=False):
     fields = command(["dpkg-deb", "-f", str(package), "Package", "Version", "Architecture"],
                      evidence, "deb-metadata").stdout.decode()
     # dpkg-deb labels fields when more than one is requested.
-    expected = {"Package": "taomni", "Version": RELEASE_VERSION, "Architecture": "amd64"}
+    expected = {"Package": "taomni", "Version": version, "Architecture": "amd64"}
     if dict(line.split(": ", 1) for line in fields.strip().splitlines()) != expected:
         raise RuntimeError("Pinned legacy deb metadata is unexpected")
-    command(["sudo", "apt-get", "install", "--no-install-recommends", "-y", str(package)],
+    flags = ["--allow-downgrades"] if allow_downgrade else []
+    command(["sudo", "apt-get", "install", "--no-install-recommends", "-y", *flags, str(package)],
             evidence, "deb-install")
     installed = command(["dpkg-query", "-W", "-f=${Version} ${Architecture}", "taomni"],
                         evidence, "deb-installed").stdout.decode().strip()
-    if installed != f"{RELEASE_VERSION} amd64":
-        raise RuntimeError("The legacy deb was not actually registered as installed")
+    if installed != f"{version} amd64":
+        raise RuntimeError("The deb was not actually registered as installed")
     return Path("/usr/bin/taomni"), {"method": "apt-get install", "installedVersion": installed}
 
 

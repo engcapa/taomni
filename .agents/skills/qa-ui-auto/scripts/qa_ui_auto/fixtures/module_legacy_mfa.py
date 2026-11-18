@@ -55,15 +55,26 @@ def legacy_driver(ctx, executable, desktop):
     return TauriDriverProcess(config, desktop)
 
 
+def desktop_action(steps, verb, args):
+    try:
+        run_native_step(steps, verb, args)
+    except Exception as error:
+        selector = args.get("selector") if isinstance(args, dict) else args
+        raise RuntimeError(f"Installed desktop {verb} {selector}: {error}") from error
+
+
+def open_mfa(steps):
+    desktop_action(steps, "wait_for", element("welcome-panel"))
+    desktop_action(steps, "click", element("side-tab-tools"))
+    desktop_action(steps, "wait_for", element("sidebar-tools-panel"))
+    desktop_action(steps, "click", element("sidebar-tool-mfa"))
+
+
 def create_account(session, ctx, evidence):
     steps = NativeStepContext(session, evidence, ctx.cfg)
 
     def action(verb, args):
-        try:
-            run_native_step(steps, verb, args)
-        except Exception as error:
-            selector = args.get("selector") if isinstance(args, dict) else args
-            raise RuntimeError(f"Installed desktop {verb} {selector}: {error}") from error
+        desktop_action(steps, verb, args)
 
     def fill(testid, value):
         action("fill", {"selector": element(testid), "value": value})
@@ -71,10 +82,7 @@ def create_account(session, ctx, evidence):
     def expect_code(code):
         action("assert_text_equals", {"selector": element("mfa-account-code"), "equals": code})
 
-    action("wait_for", element("welcome-panel"))
-    action("click", element("side-tab-tools"))
-    action("wait_for", element("sidebar-tools-panel"))
-    action("click", element("sidebar-tool-mfa"))
+    open_mfa(steps)
     action("wait_for", element("vault-setup-dialog"))
     fill("vault-setup-pw1", PASSWORD)
     fill("vault-setup-pw2", PASSWORD)
@@ -96,38 +104,54 @@ def write_json(evidence, name, value):
     (evidence / name).write_text(json.dumps(value, indent=2) + "\n", encoding="utf-8")
 
 
-def run_legacy_desktop(ctx, executable, work, evidence):
-    desktop = work / "desktop"
+def desktop_environment(desktop):
     environment = native_isolation_env(desktop)
     if any(Path(value).resolve() != Path(value) or not Path(value).is_relative_to(desktop)
            for value in environment.values()):
         raise RuntimeError("The legacy GUI requires isolated XDG paths")
-    profile = Path(environment["XDG_DATA_HOME"]) / APP_ID
-    if profile.exists() or profile.is_symlink():
-        raise RuntimeError("The installed desktop requires a fresh isolated profile")
-    driver = legacy_driver(ctx, executable, desktop)
+    return environment, Path(environment["XDG_DATA_HOME"]) / APP_ID
+
+
+@contextmanager
+def installed_desktop(ctx, executable, desktop, evidence, label):
+    environment, _ = desktop_environment(desktop)
+    driver = legacy_driver(ctx, executable, evidence / label)
     with isolated_desktop(environment), ExitStack() as cleanup:
         session = NativeSession(driver.url, executable)
         session.deadline = Deadline(120)
-        session.pointer_observations_path = evidence / "legacy-pointer-clicks.jsonl"
+        session.pointer_observations_path = evidence / f"{label}-pointer-clicks.jsonl"
         cleanup.callback(driver.stop)
         cleanup.callback(session.close)
         driver.start()
         session.start()
+        yield driver, session
+
+
+def close_installed_desktop(driver, session, executable):
+    processes = linux_storage_processes(driver, executable)
+    close = close_application_window(session, processes=processes, expect_exit_confirmation={
+        "title": "Exit", "message": "There is 1 open tab. Exit Taomni and close it?",
+        "confirm_label": "Exit",
+    })
+    if close is None or close.get("pid") not in processes:
+        raise RuntimeError("The closed window does not belong to the installed desktop")
+    session.session_id = None
+    shutdown = wait_for_application_shutdown(driver, session, processes)
+    return {"close": close, "shutdown": shutdown,
+            "confirmation": session.application_restart_observation["exit_confirmation"]}
+
+
+def run_legacy_desktop(ctx, executable, work, evidence):
+    desktop = work / "desktop"
+    _, profile = desktop_environment(desktop)
+    if profile.exists() or profile.is_symlink():
+        raise RuntimeError("The installed desktop requires a fresh isolated profile")
+    with installed_desktop(ctx, executable, desktop, evidence, "legacy-window") as (driver, session):
         create_account(session, ctx, evidence)
-        processes = linux_storage_processes(driver, executable)
-        close = close_application_window(session, processes=processes, expect_exit_confirmation={
-            "title": "Exit", "message": "There is 1 open tab. Exit Taomni and close it?",
-            "confirm_label": "Exit",
-        })
-        if close is None or close.get("pid") not in processes:
-            raise RuntimeError("The closed window does not belong to the installed desktop")
-        session.session_id = None
-        shutdown = wait_for_application_shutdown(driver, session, processes)
+        close = close_installed_desktop(driver, session, executable)
         write_json(evidence, "legacy-desktop.json", {
             "appId": APP_ID, "profile": str(profile), "executable": str(executable),
-            "uiHotpCodes": ["755 224", "287 082"], "close": close, "shutdown": shutdown,
-            "confirmation": session.application_restart_observation["exit_confirmation"],
+            "uiHotpCodes": ["755 224", "287 082"], **close,
         })
     return profile
 
@@ -154,30 +178,9 @@ def transfer_databases(source, destination):
     return checksums
 
 
-def setup(ctx):
-    if (ctx.case_id != CASE_ID or platform.system() != "Linux" or not uses_x11_window_close()
-            or os.environ.get("GITHUB_ACTIONS") != "true"
-            or os.environ.get("GITHUB_REPOSITORY") != "engcapa/taomni"):
-        raise RuntimeError("The installed MFA desktop fixture requires its Linux X11 GitHub case")
-    profile = isolated_data_root(ctx)
-    if any(profile.iterdir()):
-        raise RuntimeError("MFA upgrade requires an empty isolated candidate profile")
-    work = Path(ctx.report_root).resolve() / "_workdirs" / "legacy-mfa"
-    if work.resolve() != work:
-        raise RuntimeError("The installed MFA desktop requires an unlinked work directory")
-    archive = ctx.values["mfa_signed_archive"]
-    signature = ctx.values["mfa_signed_signature"]
-    executable, evidence = install(ctx.case_dir, work)
-    try:
-        source = run_legacy_desktop(ctx, executable, work, evidence)
-    finally:
-        for path in (work / "desktop").glob("tauri-driver.*.log"):
-            shutil.copyfile(path, evidence / path.name)
-    write_json(evidence, "candidate-input.json", {
-        "profile": str(profile), "copiedDatabases": transfer_databases(source, profile),
-    })
+def commit_mfa_upgrade(executable, profile, archive, signature, evidence):
     maintenance = subprocess.run(
-        [str(native_binary(ctx.cfg).resolve()), "--migrate-mfa", str(profile), archive, signature],
+        [str(executable), "--migrate-mfa", str(profile), str(archive), str(signature)],
         input=PASSWORD.encode(), capture_output=True, timeout=90,
     )
     (evidence / "candidate-maintenance.stdout.txt").write_bytes(maintenance.stdout)
@@ -191,3 +194,23 @@ def setup(ctx):
             or records[0]["target"] != "plugins/mfa/data/mfa.db" or enabled.get("mfa") is not True):
         raise RuntimeError("The candidate did not commit and enable the signed MFA module")
     write_json(evidence, "candidate-activation.json", {"record": records[0], "enabled": True})
+
+
+def setup(ctx):
+    if (ctx.case_id != CASE_ID or platform.system() != "Linux" or not uses_x11_window_close()
+            or os.environ.get("GITHUB_ACTIONS") != "true"
+            or os.environ.get("GITHUB_REPOSITORY") != "engcapa/taomni"):
+        raise RuntimeError("The installed MFA desktop fixture requires its Linux X11 GitHub case")
+    profile = isolated_data_root(ctx)
+    if any(profile.iterdir()):
+        raise RuntimeError("MFA upgrade requires an empty isolated candidate profile")
+    work = Path(ctx.report_root).resolve() / "_workdirs" / "legacy-mfa"
+    if work.resolve() != work:
+        raise RuntimeError("The installed MFA desktop requires an unlinked work directory")
+    executable, evidence = install(ctx.case_dir, work)
+    source = run_legacy_desktop(ctx, executable, work, evidence)
+    write_json(evidence, "candidate-input.json", {
+        "profile": str(profile), "copiedDatabases": transfer_databases(source, profile),
+    })
+    commit_mfa_upgrade(native_binary(ctx.cfg).resolve(), profile, ctx.values["mfa_signed_archive"],
+                       ctx.values["mfa_signed_signature"], evidence)

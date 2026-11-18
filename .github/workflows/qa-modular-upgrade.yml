@@ -23,6 +23,10 @@ on:
         description: Package targets to inspect (all or comma-separated release targets)
         type: string
         default: all
+      package_upgrade_linux:
+        description: Validate Linux deb replacement and rollback with the installed MFA account
+        type: boolean
+        default: false
       download_only:
         description: Run only the three-platform native downloader and restart contracts
         type: boolean
@@ -70,6 +74,9 @@ on:
         type: string
         required: false
         default: all
+      package_upgrade_linux:
+        type: boolean
+        default: false
       download_only:
         type: boolean
         required: false
@@ -100,7 +107,7 @@ permissions:
   actions: read
 
 concurrency:
-  group: modular-upgrade-${{ github.ref }}-${{ inputs.signed_mfa_only && 'signed-mfa' || (inputs.package_run && format('packages-{0}-{1}', inputs.package_run, inputs.package_targets) || inputs.protocol_only && 'protocol' || (inputs.host_only && 'host' || (inputs.system_execution_only && 'system-execution' || (inputs.network_only && 'network' || (inputs.download_only || false))))) }}
+  group: modular-upgrade-${{ github.ref }}-${{ inputs.signed_mfa_only && 'signed-mfa' || (inputs.package_run && format('packages-{0}-{1}-{2}', inputs.package_run, inputs.package_targets, inputs.package_upgrade_linux && 'upgrade' || 'inventory') || inputs.protocol_only && 'protocol' || (inputs.host_only && 'host' || (inputs.system_execution_only && 'system-execution' || (inputs.network_only && 'network' || (inputs.download_only || false))))) }}
   cancel-in-progress: true
 
 env:
@@ -110,8 +117,20 @@ env:
   PYTHONUNBUFFERED: '1'
 
 jobs:
+  installed-linux-mfa:
+    if: ${{ !inputs.signed_mfa_only && inputs.package_run != '' && inputs.package_upgrade_linux }}
+    uses: ./.github/workflows/qa-modular-installed-mfa.yml
+    with:
+      head: ${{ inputs.head || github.sha }}
+      package_run: ${{ inputs.package_run }}
+      package_source: ${{ inputs.package_source }}
+      package_version: ${{ inputs.package_version }}
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
   release-bundle-samples:
-    if: ${{ !inputs.signed_mfa_only && inputs.package_run != '' }}
+    if: ${{ !inputs.signed_mfa_only && inputs.package_run != '' && !inputs.package_upgrade_linux }}
     uses: ./.github/workflows/qa-modular-bundles.yml
     with:
       head: ${{ inputs.head || github.sha }}
