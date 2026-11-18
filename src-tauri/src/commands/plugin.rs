@@ -21,7 +21,7 @@ fn legacy_profile_root(state: &AppState) -> PathBuf {
 fn legacy_version(value: Option<String>) -> String {
     value
         .filter(|version| !version.trim().is_empty())
-        .unwrap_or_else(|| "0.5.x".to_owned())
+        .unwrap_or_else(|| crate::plugin::migration::LEGACY_SOURCE_VERSION.to_owned())
 }
 
 pub(super) fn publish_registry_change(app: &AppHandle, result: &Result<PluginRecord, String>) {
@@ -352,10 +352,15 @@ pub fn plugin_migration_inspect(
     from_version: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<crate::plugin::migration::LegacyInstallSnapshot, String> {
-    crate::plugin::migration::inspect_legacy_install(
-        &legacy_profile_root(&state),
-        legacy_version(from_version),
-    )
+    use crate::plugin::migration::{MigrationItem, MigrationJournal, inspect_legacy_install};
+    let root = legacy_profile_root(&state);
+    let mut snapshot = inspect_legacy_install(&root, legacy_version(from_version))?;
+    if MigrationJournal::profile_mfa_committed(&root)? {
+        snapshot
+            .candidates
+            .retain(|candidate| candidate.item != MigrationItem::Mfa);
+    }
+    Ok(snapshot)
 }
 
 /// Record the upgrade preflight while the signed package installer and the

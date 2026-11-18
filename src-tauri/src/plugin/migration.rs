@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 pub(crate) const MFA_MIGRATION_TARGET: &str = "plugins/mfa/data/mfa.db";
+pub(crate) const LEGACY_SOURCE_VERSION: &str = "0.5.x";
 
 /// The fixed Vault entries that the migration preflight can observe without
 /// unlocking or decrypting the Vault.  The value is deliberately a boolean:

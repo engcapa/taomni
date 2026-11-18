@@ -19,9 +19,18 @@ use crate::{
     vault::Vault,
 };
 
+#[path = "migration_execute_mfa_tests.rs"]
+mod offline;
+
 const MASTER: &str = "qa legacy migration master";
 const CHILD_ROOT: &str = "TAOMNI_QA_MFA_CRASH_PROFILE";
 const EXIT_DURING_ACTIVATION: i32 = 73;
+
+#[test]
+#[ignore = "the offline process, original Vault and signed module run only on GitHub"]
+fn signed_legacy_mfa_offline_maintenance_starts_without_a_journal_and_retries_safely() {
+    offline::exercise_maintenance_process();
+}
 
 struct Legacy {
     directory: tempfile::TempDir,
@@ -391,7 +400,7 @@ fn interrupted_mfa_activation_child() {
     };
     let profile = ProfileRoot::prepare(&PathBuf::from(path)).unwrap();
     let package = InstalledMfa::verified_package();
-    commit_inner(prepare(&profile), &package, MASTER, || {
+    commit_inner(prepare(&profile), &package, MASTER, None, || {
         // A separate process exits without dropping the export or profile leases.
         std::process::exit(EXIT_DURING_ACTIVATION);
     })

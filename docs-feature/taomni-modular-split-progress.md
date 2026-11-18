@@ -1,10 +1,16 @@
 # 模块化实施与验收台账
 
-2026-11-18 再次合入远程 main `5fabcdd32`（#830），合并提交 `f5221ae94`，无冲突。核心版本随 `package.json` 更新为 `0.5.10`。已安装升级输入固定使用正式 `0.5.9`，因此资产和数据基线保持可复现。
+2026-11-18 再次合入远程 main `5fabcdd32`（#830），合并提交 `f5221ae94`，无冲突。核心版本随 `package.json` 更新为 `0.5.10`。合并后的第一轮使用固定校验的正式 `0.5.9` 安装件。`v0.5.10` 发布齐备后，`2c6047668` 将现用 `TC-MODULES-027` 切换到该版本的四个固定资产，保留 0.5.9 历史运行。 [正式安装输入](taomni-modular-installed-upgrade-verification.md) · [0.5.10 三端验收 #44220816594](https://github.com/engcapa/taomni/actions/runs/44220816594)
 
 `76c3f94e9` 将严格校验为 committed 的 MFA profile 接到签名宿主，覆盖原命令的账户读写、偏好、HOTP、导出和 reset。原生导出在 Vault 层验密后向该操作授予一次性授权，reset 在排空准入并取得独占 Vault lease 后执行。迁移后的备份走模块数据，旧归档的 MFA/Vault 对恢复到模块数据目录，原 `mfa.db` 继续作为迁移回退资料。语法错误、重复记录或未知目标使 MFA 拒绝访问。缺失或停用的宿主返回错误，重新启用可以访问已提交的数据。
 
 新增 browser/native `TC-MFA-016` 验证两账号的密码授权相互独立、拒绝和取消会清除敏感内容，增强 native `TC-MFA-108` 的关闭后清除与运行时断言。新增两项签名 native 场景，覆盖迁移后的生产命令、停用及卸载状态、旧格式归档恢复后的实际 HOTP。31 项前端单元、1 项新增 Rust 单元、QA 审计和 `check:refactor` 已通过。签名宿主由 GitHub 实际执行，完成分片即时下载。 [三端 UI #44212837788](https://github.com/engcapa/taomni/actions/runs/44212837788) · [升级契约 #44212837658](https://github.com/engcapa/taomni/actions/runs/44212837658)
+
+签名升级契约最终成功，11 份 artifact 在运行期间收齐。Linux x64、Windows x64、macOS ARM64 每端通过 **5/5** 迁移、**3/3** 签名安装和 **2/2** 网络场景，四个发布目标的包和对应 receipt 已复核。macOS 26 ARM64 的独立 UI 复验中 `TC-FILE-OPEN-009` 通过，原始 **23/24** 保留，`TC-FILE-OPEN-007` 在 Markdown 导出时未定位到系统保存对话框。 [业务归属与签名证据](taomni-modular-readonly-key-check.md#已提交迁移后的-mfa-数据归属) · [macOS 26 #44206889055](https://github.com/engcapa/taomni/actions/runs/44206889055)
+
+三端 UI 已收齐 18 片。Linux browser/native **44/44、47/47**，Windows **44/44、43/44**，macOS Intel **43/44、45/46**。Windows `TC-MODULES-025` 的真实点击误中离线签名区域，定向确认 Enter 后 **26/26**。macOS browser `TC-113` 为无关 SSH 脚手架的首步超时。macOS Intel 的 `TC-EXPLORER-007` 最后一个 TypeScript 文件未收到双击后的打开，改为聚焦列表后按 Enter 并保留其他文件的双击。Windows 的正式 `0.5.10` 安装验收 **27/27**，Linux **26/27**，`TC-MODULES-025` 完成 pending 和关闭主窗口后等待 WebKit 子进程超时，原记录保留。 [主矩阵 #44212837788](https://github.com/engcapa/taomni/actions/runs/44212837788) · [Windows 复验 #44219205689](https://github.com/engcapa/taomni/actions/runs/44219205689) · [正式安装 #44220816594](https://github.com/engcapa/taomni/actions/runs/44220816594)
+
+离线维护入口已可从候选原生程序启动。签名包验签后，在排他 profile 持有期间准备原 MFA、校验 Vault 并提交。无 journal 可以首次迁移，已提交时重复执行保持原数据；启动恢复发布已启用状态并清理事务。Settings 已过滤已完成的 MFA 项，退出交接仍待开发。新增维护进程用例参与签名专项，覆盖真实跨进程锁、错密码及启用后 HOTP。 [离线执行设计](taomni-modular-readonly-key-check.md#离线执行入口)
 
 2026-11-18 合入远程 main `dfde6f9de`（#829），合并提交 `e967ebfbd`。解决 Explorer 窄窗口列样式冲突，保留新建文件对话框样式和可调详情列。main 的列宽用例保留 `TC-EXPLORER-006`，新建可编辑类型用例改为 `TC-EXPLORER-008`，并同步选择契约。Explorer/Markdown 单元 115/115、QA 工具单元 38/38、完整 QA 审计及 check:refactor 通过。
 

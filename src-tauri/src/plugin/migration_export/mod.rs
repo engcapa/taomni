@@ -1,9 +1,8 @@
 //! Core-owned, temporary MFA data export for the legacy upgrade coordinator.
 //!
-//! This is not an installer or an activation permit. The encrypted SQLite
-//! snapshot is kept separate from code versions, active data and the pending
-//! journal. The future trusted transaction must retain this owner, revalidate
-//! it and perform the scoped key check before committing anything.
+//! The encrypted SQLite snapshot is kept separate from code versions, active
+//! data and the pending journal. The committing transaction retains this owner
+//! and revalidates the data and the scoped key before publishing any of them.
 mod key_sources;
 mod maintenance;
 mod sources;
@@ -73,6 +72,16 @@ impl PreparedMfaExport {
     ) -> Result<Self, String> {
         control.check().map_err(|error| error.to_string())?;
         let maintenance = MfaMaintenance::acquire(profile)?;
+        Self::prepare_under_maintenance(maintenance, snapshot, control)
+    }
+
+    pub(crate) fn prepare_under_maintenance(
+        maintenance: MfaMaintenance,
+        snapshot: &LegacyInstallSnapshot,
+        control: &SnapshotControl,
+    ) -> Result<Self, String> {
+        control.check().map_err(|error| error.to_string())?;
+        let profile = maintenance.profile();
         let sources = MfaSources::from_snapshot(snapshot)?;
         if snapshot
             .vault

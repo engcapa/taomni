@@ -2,6 +2,7 @@
 pub(crate) mod bootstrap;
 pub(crate) mod desktop;
 pub(crate) mod generation;
+pub(crate) mod mfa_maintenance;
 pub(crate) mod paths;
 pub(crate) mod profile;
 mod reaper;

@@ -276,7 +276,9 @@ steps:
 - press:
     selector: '[data-testid="explorer-rename-input"]'
     key: Enter
-- dblclick: '[data-testid="explorer-file-row"][data-name="authored.ts"]'
+- press:
+    selector: '[data-testid="explorer-file-list"]:has([data-name="authored.ts"][aria-selected="true"]):not(:has([data-testid="explorer-rename-input"]))'
+    key: Enter
 - wait_for: '[data-testid="code-workspace-editor"] .cm-content'
 - fill:
     selector: '[data-testid="code-workspace-editor"] .cm-content'

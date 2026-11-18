@@ -37,3 +37,21 @@
 `qa-modular-upgrade.yml` 的 `signed_mfa_only=true` 复用生产公钥并执行三个真实签名包场景。它们验证迁移后实际宿主可读原账号和 HOTP、在 active 切换后从独立进程突然退出并走正常启动恢复、错误口令与已有目标保留。该批使用合成的 0.5.x 风格数据。实际升级入口仍需接入维护请求与应用退出流程，切换 MFA 生产 facade，再从已安装 0.5.x 完整验证。
 
 升级后的重新预检保留 MFA 已提交条目、原源指纹和目标路径，只重新计算未执行的其他项目。已知路径和指纹格式以外的提交条目、重复条目与 staged 状态仍要求恢复。预检和提交共用持久化 journal 写入。纯单元验证重复扫描、剩余候选、完成状态与拒绝覆写异常记录，签名 native 场景额外验证真实 journal 的重复扫描。
+
+## 已提交迁移后的 MFA 数据归属
+
+`76c3f94e9` 在 GUI/headless 启动取得 profile lease 并恢复迁移和还原事务后，从 journal 确定 MFA 数据 owner。唯一且有效的 committed 条目使用签名宿主；没有已提交条目的 profile 仍使用核心连接。异常 journal 使 MFA 拒绝访问。已提交 profile 的模块被停用或卸载时，重新启用或重装后继续读取保留的模块数据。旧根目录中的 `mfa.db` 是迁移前的留存副本。
+
+MFA 命令保留现有 IPC 参数、返回值与 Vault 错误。导出由核心验证主密码，再向该次宿主操作发放单次 grant。重置先排空已准入操作并取得 Vault 独占 lease，再发放重置 grant。主密码停留在核心的零化缓冲区。屏幕、窗口与图像读取仍由核心处理。
+
+备份通过同一 Vault 屏障获取模块数据和 Vault。已提交 profile 恢复包含 `databases/mfa.db` 且没有 MFA 模块数据集的旧归档时，SQLite 恢复事务将该库写入 `plugins/mfa/data/mfa.db`，以同一归档的 Vault 验证。还原会持有数据 lease、建立恢复副本、更新数据 locator 和 profile generation。对包含独立 MFA 模块数据集的归档，模块库存放到对应的模块目标。模块版本与 active 指针由已安装包管理。
+
+GitHub 的 Linux x64、Windows x64、macOS ARM64 各通过 5 项迁移场景、3 项签名安装场景与 2 项网络场景。两项新增场景实际执行生产 MFA 路由、密码导出、重置、禁用/卸载，并通过启动恢复读取旧归档的原始 HOTP；原根数据库与 LanChat 留存字节核对通过。四个平台的签名包长度、SHA-256、测试源码和三端 harness receipt 已复核。升级输入使用原 Vault 和引擎生成的 0.5.x 风格数据。生产 Settings 仍记录 pending，正式旧版安装包写入 MFA 数据和候选安装程序替换继续归入 TASK-012。 [签名升级 #44212837658](https://github.com/engcapa/taomni/actions/runs/44212837658)
+
+## 离线执行入口
+
+候选原生程序的维护入口接收 `<profile> <plugin-archive> <minisig-file>`。原 Vault 密码通过私有 stdin 管道原样传入并在使用后清理。执行方先验签，再取得旧应用模式锁、profile 排他锁、状态锁、Vault 操作锁和 MFA 数据锁。它在锁内重新读源，兼容正常退出时 SQLite 对 WAL 的 checkpoint。错密码时原始数据、启用状态、active 指针和 journal 保持原状。
+
+首次迁移可以在没有 `migration/journal.json` 的情况下开始。落下 committed 条目后，恢复事务把 MFA 标记为已启用，然后清理事务记录。其余模块状态保持。正常启动根据 journal 选择宿主，Settings 的后续预检只显示剩余候选。重复执行会报告已迁移，并保持已提交的 journal、目标库和现有启用选择。
+
+新签名场景会在独立进程调用同一维护入口，检查仍有桌面占用时的拒绝、错密码、无 journal 的首次迁移、重复执行，以及实际签名宿主读取原账户和 HOTP。任务 6 还需要把设置页确认交给该入口，并验收真实已安装版本的替换、完整回滚和剩余模块迁移。

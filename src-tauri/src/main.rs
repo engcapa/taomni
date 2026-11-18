@@ -2,6 +2,14 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
+    let mut args = std::env::args_os().skip(1);
+    if args.next().as_deref() == Some(std::ffi::OsStr::new(taomni_lib::MFA_MAINTENANCE_ARG)) {
+        if let Err(error) = taomni_lib::run_mfa_maintenance(args) {
+            eprintln!("MFA migration failed: {error}");
+            std::process::exit(1);
+        }
+        return;
+    }
     if std::env::args().nth(1).as_deref() == Some("--headless") {
         std::process::exit(taomni_lib::mobile::headless::run());
     }

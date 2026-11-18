@@ -1,6 +1,7 @@
 //! Offline activation of a real, signed MFA package. The migration journal
 //! is the commit point. Recovery rolls back the writes preceding that point.
 use std::{
+    collections::BTreeMap,
     fs,
     io::{self, Write},
     path::{Path, PathBuf},
@@ -14,8 +15,8 @@ use super::{
     CORE_API_VERSION, ModuleManifest, PluginKind, SnapshotMode, current_platform,
     install::{ActivePointer, ModuleInstaller},
     migration::{
-        MFA_MIGRATION_TARGET as TARGET, MigrationItem, MigrationJournal, MigrationRunState,
-        MigrationStepState,
+        LegacyInstallSnapshot, MFA_MIGRATION_TARGET as TARGET, MigrationExecutor, MigrationItem,
+        MigrationJournal, MigrationRunState, MigrationStepState,
         export::{MfaExportKind, MfaExportReceipt, MfaMaintenance, PreparedMfaExport},
         paths, source,
     },
@@ -28,6 +29,7 @@ const JOURNAL: &str = "migration/journal.json";
 const DATA_DIR: &str = "plugins/mfa/data";
 const OWNER: &str = "mfa";
 const POINTER: &str = "plugins/mfa/active.json";
+const REGISTRY_STATE: &str = "plugins/state.json";
 const OWNERSHIP: &str = ".legacy-mfa-upgrade.json";
 
 /// Deserialization never grants trust in a package or selects a write path.
@@ -42,6 +44,8 @@ struct Transaction {
     source_fingerprint: String,
     pointer_existed: bool,
     export_staging: String,
+    #[serde(default)]
+    enable_after_commit: bool,
 }
 
 impl Transaction {
@@ -86,18 +90,29 @@ impl Transaction {
 
 /// Invoke before the live profile has opened its stores. The export owner
 /// holds all required leases through verification, commit, and rollback.
-pub(crate) fn commit(
+#[cfg(all(test, feature = "qa-release-trust-gates"))]
+fn commit(
     export: PreparedMfaExport,
     package: &VerifiedPackage,
     password: &str,
 ) -> Result<(), String> {
-    commit_inner(export, package, password, || {})
+    commit_inner(export, package, password, None, || {})
+}
+
+pub(super) fn commit_offline(
+    export: PreparedMfaExport,
+    snapshot: &LegacyInstallSnapshot,
+    package: &VerifiedPackage,
+    password: &str,
+) -> Result<(), String> {
+    commit_inner(export, package, password, Some(snapshot), || {})
 }
 
 fn commit_inner(
     export: PreparedMfaExport,
     package: &VerifiedPackage,
     password: &str,
+    preflight: Option<&LegacyInstallSnapshot>,
     after_activate: impl FnOnce(),
 ) -> Result<(), String> {
     let maintenance = export.maintenance();
@@ -143,7 +158,19 @@ fn commit_inner(
     if installer.active_pointer(OWNER).map_err(message)? != ActivePointer::default() {
         return Err("MFA already has an active or rollback version; original data retained".into());
     }
+    read_registry_state(root)?;
+    export.verify_key(password)?;
     let journal_path = root.join(JOURNAL);
+    if let Some(snapshot) = preflight {
+        MigrationExecutor::new(
+            root,
+            root.join("plugins"),
+            journal_path.clone(),
+            &snapshot.from_version,
+            CORE_API_VERSION,
+        )?
+        .record_pending(snapshot)?;
+    }
     let mut journal: MigrationJournal = paths::read_json_bounded(&journal_path)?;
     let transaction = Transaction {
         format: 1,
@@ -155,11 +182,11 @@ fn commit_inner(
         source_fingerprint,
         pointer_existed,
         export_staging: export.staging_name().into(),
+        enable_after_commit: true,
     };
     if transaction.journal_committed(&journal)? {
         return Err("MFA data has already been migrated".into());
     }
-    export.verify_key(password)?;
     let version_dir = installer.stage_verified(package).map_err(message)?;
     let installed = verify::verify_installed(&version_dir, current_platform()).map_err(message)?;
     if installed != *package.manifest() {
@@ -355,7 +382,7 @@ fn check_optional_dir(path: &Path) -> Result<bool, String> {
     }
 }
 
-fn validate_manifest(manifest: &ModuleManifest) -> Result<(), String> {
+pub(super) fn validate_manifest(manifest: &ModuleManifest) -> Result<(), String> {
     if manifest.slug != OWNER
         || manifest.id != "taomni-plugin-mfa"
         || manifest.kind != PluginKind::Auth
@@ -419,6 +446,12 @@ fn cleanup_stage(root: &Path, stage: &Path) -> Result<(), String> {
 }
 
 fn finish_commit(root: &Path, transaction: &Transaction) -> Result<(), String> {
+    if transaction.enable_after_commit {
+        let mut enabled = read_registry_state(root)?;
+        if enabled.insert(OWNER.into(), true) != Some(true) {
+            paths::write_json_durable(&root.join(REGISTRY_STATE), &enabled)?;
+        }
+    }
     let data = root.join(DATA_DIR);
     let marker = data.join(OWNERSHIP);
     if paths::file_exists(&marker)? {
@@ -431,6 +464,15 @@ fn finish_commit(root: &Path, transaction: &Transaction) -> Result<(), String> {
     }
     cleanup_export(root, transaction)?;
     cleanup_plan(root)
+}
+
+fn read_registry_state(root: &Path) -> Result<BTreeMap<String, bool>, String> {
+    let path = root.join(REGISTRY_STATE);
+    if paths::file_exists(&path)? {
+        paths::read_json_bounded(&path)
+    } else {
+        Ok(BTreeMap::new())
+    }
 }
 
 fn cleanup_export(root: &Path, transaction: &Transaction) -> Result<(), String> {
