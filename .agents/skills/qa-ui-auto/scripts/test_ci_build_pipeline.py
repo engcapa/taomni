@@ -14,6 +14,28 @@ ROOT = Path(__file__).resolve().parents[4]
 
 
 class BuildPipelineTests(unittest.TestCase):
+    def test_windows_native_cache_restore_never_crosses_runner_images(self):
+        workflow = yaml.safe_load((ROOT / '.github/workflows/qa-ui-auto-entry.yml').read_text())
+        steps = workflow['jobs']['entry']['steps']
+        scope = next(s for s in steps if s.get('id') == 'windows-cache-scope')
+        self.assertIn("runner.os == 'Windows'", scope['if'])
+        script = scope['run'].split('\n', 1)[1].rsplit('\nPY', 1)[0]
+        for image, expected_scope in [('20261116.315.1', 'image-20261116.315.1'),
+                                      ('20261109.311.1', 'image-20261109.311.1'), ('', 'run-17-2')]:
+            with self.subTest(image=image), tempfile.TemporaryDirectory() as directory:
+                output = Path(directory) / 'output'
+                env = dict(os.environ, ImageVersion=image, GITHUB_OUTPUT=str(output),
+                           QA_CACHE_PLATFORM='windows', GITHUB_RUN_ID='17', GITHUB_RUN_ATTEMPT='2')
+                subprocess.run([sys.executable, '-c', script], env=env, check=True)
+                self.assertEqual(output.read_text(), f'platform=windows-{expected_scope}\n')
+        expected_key = '${{ steps.windows-cache-scope.outputs.platform || matrix.cache_key }}'
+        dependencies = next(s for s in steps if s.get('uses') == 'swatinem/rust-cache@v2')
+        self.assertIn(expected_key, dependencies['with']['shared-key'])
+        for name in ('Native QA workspace cache', 'Native Rust contracts cache'):
+            paths = next(s['with'] for s in steps if s.get('name') == name)
+            for key in [paths['key'], *paths['restore-keys'].splitlines()]:
+                self.assertIn(expected_key, key)
+
     def test_frontend_regressions_run_once_on_linux_producer_and_keep_original_log(self):
         workflow = yaml.safe_load((ROOT / '.github/workflows/qa-ui-auto-entry.yml').read_text())
         steps = workflow['jobs']['entry']['steps']
