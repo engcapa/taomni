@@ -39,7 +39,7 @@ def linux_install(package, destination, evidence, *, version=RELEASE_VERSION, al
     return Path("/usr/bin/taomni"), {"method": "apt-get install", "installedVersion": installed}
 
 
-def windows_install(package, destination, evidence):
+def windows_install(package, destination, evidence, *, version=RELEASE_VERSION):
     command(["msiexec.exe", "/i", str(package), "/qn", "/norestart",
              "INSTALLDIR=" + str(destination), "/L*v", str(evidence / "msi-install.log")],
             evidence, "msi-install", accepted=(0, 3010))
@@ -59,12 +59,12 @@ $exe=Get-Item -LiteralPath $env:QA_LEGACY_INSTALLED_EXE
                             env=env, capture_output=True, timeout=30, check=True)
     (evidence / "installed-exe.json").write_bytes(result.stdout)
     details = json.loads(result.stdout.decode("utf-8-sig"))
-    if details["productVersion"].split("+")[0] not in {RELEASE_VERSION, f"{RELEASE_VERSION}.0"}:
-        raise RuntimeError("Legacy MSI installed an executable with an unexpected version")
+    if details["productVersion"].split("+")[0] not in {version, f"{version}.0"}:
+        raise RuntimeError("MSI installed an executable with an unexpected version")
     return executable, {"method": "msiexec /i (not administrative extraction)", **details}
 
 
-def macos_install(package, destination, evidence):
+def macos_install(package, destination, evidence, *, version=RELEASE_VERSION):
     mount = evidence / "dmg-mount"
     mount.mkdir()
     command(["hdiutil", "attach", str(package), "-readonly", "-nobrowse", "-mountpoint", str(mount)],
@@ -79,8 +79,8 @@ def macos_install(package, destination, evidence):
         command(["hdiutil", "detach", str(mount)], evidence, "dmg-detach")
     with (app / "Contents/Info.plist").open("rb") as stream:
         info = plistlib.load(stream)
-    if info["CFBundleShortVersionString"] != RELEASE_VERSION or info["CFBundleIdentifier"] != "com.taomni.app":
-        raise RuntimeError("Installed legacy app has an unexpected identity/version")
+    if info["CFBundleShortVersionString"] != version or info["CFBundleIdentifier"] != "com.taomni.app":
+        raise RuntimeError("Installed app has an unexpected identity/version")
     command(["codesign", "--verify", "--deep", "--strict", str(app)], evidence, "macos-signature")
     assessment = command(["spctl", "--assess", "--type", "execute", "--verbose=4", str(app)],
                          evidence, "macos-gatekeeper", accepted=(0, 1, 3))

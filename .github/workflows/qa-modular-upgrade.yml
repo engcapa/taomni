@@ -27,6 +27,10 @@ on:
         description: Validate Linux deb replacement and rollback with the installed MFA account
         type: boolean
         default: false
+      package_upgrade_desktop:
+        description: Exercise real Windows MSI and macOS DMG replacement and rollback
+        type: boolean
+        default: false
       download_only:
         description: Run only the three-platform native downloader and restart contracts
         type: boolean
@@ -77,6 +81,9 @@ on:
       package_upgrade_linux:
         type: boolean
         default: false
+      package_upgrade_desktop:
+        type: boolean
+        default: false
       download_only:
         type: boolean
         required: false
@@ -107,7 +114,7 @@ permissions:
   actions: read
 
 concurrency:
-  group: modular-upgrade-${{ github.ref }}-${{ inputs.signed_mfa_only && 'signed-mfa' || (inputs.package_run && format('packages-{0}-{1}-{2}', inputs.package_run, inputs.package_targets, inputs.package_upgrade_linux && 'upgrade' || 'inventory') || inputs.protocol_only && 'protocol' || (inputs.host_only && 'host' || (inputs.system_execution_only && 'system-execution' || (inputs.network_only && 'network' || (inputs.download_only || false))))) }}
+  group: modular-upgrade-${{ github.ref }}-${{ inputs.signed_mfa_only && 'signed-mfa' || (inputs.package_run && format('packages-{0}-{1}-{2}', inputs.package_run, inputs.package_targets, inputs.package_upgrade_linux && 'upgrade-linux' || inputs.package_upgrade_desktop && 'upgrade-desktop' || 'inventory') || inputs.protocol_only && 'protocol' || (inputs.host_only && 'host' || (inputs.system_execution_only && 'system-execution' || (inputs.network_only && 'network' || (inputs.download_only || false))))) }}
   cancel-in-progress: true
 
 env:
@@ -138,6 +145,7 @@ jobs:
       package_source: ${{ inputs.package_source }}
       package_version: ${{ inputs.package_version }}
       package_targets: ${{ inputs.package_targets }}
+      upgrade_desktop: ${{ inputs.package_upgrade_desktop }}
 
   protocol-contracts:
     if: ${{ !inputs.signed_mfa_only && !inputs.package_run && inputs.protocol_only }}

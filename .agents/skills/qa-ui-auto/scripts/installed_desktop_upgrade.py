@@ -1,0 +1,129 @@
+"""Replace actual MSI/DMG installs and reopen the same versioned profile."""
+from __future__ import annotations
+
+import argparse
+import json
+import os
+from pathlib import Path
+import platform
+from uuid import UUID
+
+from modular_bundle_inventory import digest, inventory, write_json
+from qa_ui_auto.fixtures.module_legacy_install import insert_business_rows, retained_manifest, session_rows
+from qa_ui_auto.fixtures.module_signed_archive import platform_key
+from qa_ui_auto.fixtures.module_upgrade import input_sessions
+from qa_ui_auto.legacy_install import command, macos_install, windows_install
+from qa_ui_auto.legacy_process import initialize_profile
+from qa_ui_auto.legacy_release import RELEASE_VERSION, selected_asset, verify_asset
+
+
+def install(package, slot, evidence, version):
+    evidence.mkdir()
+    adapter = windows_install if platform.system() == "Windows" else macos_install
+    executable, details = adapter(package, slot, evidence, version=version)
+    if executable.is_symlink() or not executable.is_file() or not executable.resolve().is_relative_to(slot):
+        raise RuntimeError("Installed executable is not in the run-owned application slot")
+    return executable, {**details, "packageSha256": digest(package), "binarySha256": digest(executable)}
+
+
+def msi_registration(package, evidence, label):
+    script = Path(__file__).with_name("modular_msi_registration.ps1")
+    result = command(["powershell.exe", "-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass",
+                      "-File", str(script), "-Package", str(package)], evidence, label)
+    return json.loads(result.stdout.decode("utf-8-sig"))
+
+
+def require_registration(old, candidate, *, upgraded):
+    if UUID(old["ProductCode"]) == UUID(candidate["ProductCode"]) or UUID(old["UpgradeCode"]) != UUID(candidate["UpgradeCode"]):
+        raise RuntimeError("Original and candidate MSI registrations are not versions of the same upgrade family")
+    if (old["InstalledState"] == 5, candidate["InstalledState"] == 5) != (not upgraded, upgraded):
+        raise RuntimeError("Windows Installer did not register exactly the expected installed version")
+
+
+def start_profile(executable, profile, work, evidence, label, expected_rows, retained=None):
+    process = initialize_profile(executable, profile, work, evidence, label)
+    if session_rows(profile) != expected_rows:
+        raise RuntimeError(f"{label} did not reopen the original SSH/VNC records")
+    observed = retained_manifest(profile)
+    if retained is not None and observed != retained:
+        raise RuntimeError(f"{label} changed the original historical chat files")
+    return {"executable": str(executable), "profile": str(profile), "process": process, "retainedFiles": observed}
+
+
+def select_candidate(directory, identity):
+    observed = inventory(directory, identity)
+    suffix = ".msi" if identity["target"].startswith("windows-") else ".dmg"
+    members = [item["name"] for item in observed["files"] if item["name"].endswith(suffix)]
+    if len(members) != 1:
+        raise RuntimeError(f"Expected exactly one release {suffix} installer")
+    return directory / members[0], observed
+
+
+def execute(args):
+    system = platform.system()
+    if (system not in {"Windows", "Darwin"} or os.environ.get("GITHUB_ACTIONS") != "true"
+            or os.environ.get("RUNNER_ENVIRONMENT") != "github-hosted"
+            or os.environ.get("GITHUB_REPOSITORY") != "engcapa/taomni"):
+        raise RuntimeError("Actual installer replacement requires its owned GitHub-hosted runner")
+    identity = json.loads(args.identity.read_text(encoding="utf-8"))
+    version = identity["version"]
+    if identity["target"] != platform_key() or version == RELEASE_VERSION:
+        raise RuntimeError("Choose a candidate package for this platform and a distinct version")
+    package, observed = select_candidate(args.candidate.resolve(strict=True), identity)
+    pinned = selected_asset()
+    old_package = args.legacy.resolve(strict=True) / pinned.name
+    verify_asset(old_package, pinned)
+    report, work = args.evidence.resolve(), args.work.resolve()
+    report.mkdir(parents=True, exist_ok=True)
+    work.mkdir(parents=True, exist_ok=False)
+    slot, profile = work / "Applications", work / "profile"
+    slot.mkdir()
+    profile.mkdir()
+    write_json(report / "installed-bundle-inventory.json", observed)
+    result = {"passed": False, "target": identity["target"], "producerSource": identity["producerSource"],
+              "originalVersion": RELEASE_VERSION, "candidateVersion": version, "stages": {}}
+    stages = result["stages"]
+    try:
+        old_binary, stages["original"] = install(old_package, slot, report / "original", RELEASE_VERSION)
+        initialize_profile(old_binary, profile, work, report, "original-start")
+        insert_business_rows(profile, input_sessions(True))
+        expected_rows = session_rows(profile)
+        stages["beforeUpgrade"] = start_profile(old_binary, profile, work, report, "original-reopen", expected_rows)
+        retained = stages["beforeUpgrade"]["retainedFiles"]
+        if system == "Windows":
+            require_registration(msi_registration(old_package, report, "original-registered"),
+                                 msi_registration(package, report, "candidate-before-install"), upgraded=False)
+        else:
+            old_binary.parents[2].rename(work / "original.app")
+
+        candidate, stages["candidate"] = install(package, slot, report / "candidate", version)
+        if candidate != old_binary or stages["candidate"]["binarySha256"] == stages["original"]["binarySha256"]:
+            raise RuntimeError("Candidate did not replace the original app in its installed location")
+        if system == "Windows":
+            require_registration(msi_registration(old_package, report, "original-after-upgrade"),
+                                 msi_registration(package, report, "candidate-registered"), upgraded=True)
+        stages["afterUpgrade"] = start_profile(candidate, profile, work, report, "candidate-reopen", expected_rows, retained)
+
+        if system == "Windows":
+            command(["msiexec.exe", "/x", str(package), "/qn", "/norestart", "/L*v", str(report / "candidate-uninstall.log")],
+                    report, "candidate-uninstall", accepted=(0, 3010))
+        else:
+            candidate.parents[2].rename(work / "candidate.app")
+
+        rollback, stages["rollback"] = install(old_package, slot, report / "rollback", RELEASE_VERSION)
+        if rollback != old_binary or stages["rollback"]["binarySha256"] != stages["original"]["binarySha256"]:
+            raise RuntimeError("Rollback did not restore the verified original executable")
+        if system == "Windows":
+            require_registration(msi_registration(old_package, report, "original-after-rollback"),
+                                 msi_registration(package, report, "candidate-after-rollback"), upgraded=False)
+        stages["afterRollback"] = start_profile(rollback, profile, work, report, "rollback-reopen", expected_rows)
+        result.update(passed=True, sessionTypes=[row["session_type"] for row in expected_rows], retainedFiles=retained)
+    finally:
+        write_json(report / "installed-desktop-upgrade.json", result)
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description=__doc__)
+    for name in ("identity", "legacy", "candidate", "evidence", "work"):
+        parser.add_argument("--" + name, required=True, type=Path)
+    execute(parser.parse_args())

@@ -68,3 +68,9 @@ macOS 保留原始 `codesign` 与 `spctl` 结果。直接 CLI 启动、没有浏
 GitHub Linux runner 从已安装的 `0.5.10` 界面创建合成 MFA 账户，经正常退出后在同一 XDG profile 上更换安装件。候选通过离线维护迁移，实际 UI 解锁并推进计数。降级到原 deb 时核对旧二进制指纹及旧库验证码，再装候选时核对候选指纹及模块中的新验证码。安装命令、源码和包 receipt、界面关闭及逐阶段结果归档在 `installed-linux-mfa-upgrade-<run-id>`。
 
 GitHub Linux x64 已完成全程。候选源码 `c660c6bb68578e7943594fff33a2963af65f659a` 的 deb 来自构建资产 `14403262209`，SHA-256 为 `c65382dc50e7e7e20c276c26aabb5143eba9b6e761eab8cdf63177a522906544`。原位升级到 `0.5.11 amd64` 后，原口令解锁成功，HOTP 从 `287 082` 推进到 `359 152`。降级到 `0.5.10 amd64` 核对了原二进制指纹与原库 `287 082`。重装 `0.5.11` 再读取模块计数，得到 `359 152`。资料来自核对过的发布安装件和同一隔离 profile。 [实际安装和回滚 #44250423203](https://github.com/engcapa/taomni/actions/runs/44250423203)
+
+### Windows MSI 与 macOS DMG 替换
+
+QA Modular Upgrade Contracts 使用 `package_upgrade_desktop=true` 运行已上传安装包的替换和回滚。`package_targets` 列出有产物的平台，例如 `windows-x86_64,darwin-x86_64`。输入包含 Release Bundle 的 run ID、完整源码 SHA 和候选版本。
+
+Windows 安装和回退走 `msiexec`。测试读取两个 MSI 的 ProductCode 和 UpgradeCode，并核对系统实际注册的安装状态。macOS 通过只读挂载 DMG 和 `ditto` 替换隔离 Applications 下的同一个 app，留存 `codesign` 与 Gatekeeper 的原始结果。各端对比原安装、候选及回退的可执行文件摘要，在同一隔离 profile 启动实际已安装二进制并读取原 SSH/VNC 会话。候选运行后核对历史 LanChat 库及现有 sidecar 的原字节。此场景验证安装替换、旧会话和启动后的可回退性。Windows/macOS 的完整 MFA 数据迁移仍由对应 native 与安装专项场景验收。

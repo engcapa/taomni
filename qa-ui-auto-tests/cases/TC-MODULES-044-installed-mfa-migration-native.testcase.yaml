@@ -37,7 +37,7 @@ steps:
 - fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.mfa_signed_signature_text}'}
 - click: '[data-testid="module-offline-submit"]'
 - wait_for: '[data-testid="module-offline-install"][data-phase="completed"]'
-- wait_for: '[data-testid="module-action-enable-mfa"]'
+- assert_text: {selector: '[data-testid="module-status-mfa"]', contains: Installed}
 - press: {selector: '[data-testid="module-upgrade-mfa-open"]', key: Enter}
 - assert_count: {selector: '[data-testid="module-upgrade-mfa-archive"]', equal: 0}
 - assert_count: {selector: '[data-testid="module-upgrade-mfa-signature"]', equal: 0}
@@ -74,6 +74,7 @@ verification:
     actions: [21, 23, 24, 25, 26, 29, 32, 33, 36, 37]
     checkpoints:
     - {step: 27, expectation: The package is installed through the real signed installer.}
+    - {step: 28, expectation: The settings registry lists the signed package as installed.}
     - {step: 30, expectation: The upgrade form selects the installed package automatically.}
     - {step: 31, expectation: The upgrade form selects the installed detached signature automatically.}
     - {step: 34, expectation: The wrong Vault password leaves the original app open.}

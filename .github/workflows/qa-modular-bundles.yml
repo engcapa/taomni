@@ -19,6 +19,9 @@ on:
         type: string
         required: false
         default: all
+      upgrade_desktop:
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -41,9 +44,14 @@ jobs:
         id: targets
         env:
           SAMPLE_TARGETS: ${{ inputs.package_targets }}
+          SAMPLE_UPGRADE_DESKTOP: ${{ inputs.upgrade_desktop }}
         run: |
+          args=()
+          if [[ "$SAMPLE_UPGRADE_DESKTOP" == true ]]; then
+            args+=(--upgrade-desktop)
+          fi
           python .agents/skills/qa-ui-auto/scripts/modular_bundle_inventory.py plan-targets \
-            --targets "$SAMPLE_TARGETS" --github-output "$GITHUB_OUTPUT"
+            --targets "$SAMPLE_TARGETS" --github-output "$GITHUB_OUTPUT" "${args[@]}"
 
   bundle-samples:
     needs: plan
@@ -74,7 +82,7 @@ jobs:
         with:
           python-version: '3.12'
       - name: Pure package evidence contracts
-        run: python -m unittest test_modular_bundle_inventory
+        run: python -m unittest test_modular_bundle_inventory test_installed_desktop_upgrade
       - name: Bind the selected package to its exact release producer
         id: source
         env:
@@ -141,6 +149,17 @@ jobs:
         run: |
           python .agents/skills/qa-ui-auto/scripts/modular_bundle_inventory.py validate-payload \
             --target "$SAMPLE_TARGET" --directory bundle-evidence
+      - name: Fetch the platform's pinned legacy installer
+        if: inputs.upgrade_desktop
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python -m qa_ui_auto.legacy_release legacy-input
+      - name: Replace the installed application, reopen its profile and roll back
+        if: inputs.upgrade_desktop
+        run: |
+          python .agents/skills/qa-ui-auto/scripts/installed_desktop_upgrade.py \
+            --identity bundle-evidence/bundle-source.json --legacy legacy-input \
+            --candidate package-input --work installed-upgrade-work --evidence bundle-evidence
       - uses: actions/upload-artifact@v4
         if: always()
         with:
