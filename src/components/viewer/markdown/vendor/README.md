@@ -4,4 +4,6 @@
 
 The renderer loads on demand in a sandboxed frame. Diagram import strips remote resources and retains the original file for editable export. The [Architects Daughter license](LICENSE.architects-daughter.txt) accompanies the bundled font used by draw.io labels.
 
+The macOS app serves the bundled renderer through the HTML preview loopback listener. The frame receives the packaged scripts and font. Diagram models travel through the frame's message channel.
+
 The upstream distribution is minified and exempt from the source file size check. Update the viewer and recorded hash together, then verify the swimlane, connector, rich-label and editable export cases.

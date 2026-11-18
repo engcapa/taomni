@@ -23,7 +23,9 @@ steps:
     selector: '[data-testid="explorer-address"]'
     key: Enter
 - dblclick: '[data-testid="explorer-file-row"][data-name="drawio-actions.md"]'
-- wait_for: '[data-testid="markdown-live"] .fv-md-drawio svg foreignObject b'
+- wait_for:
+    selector: '[data-testid="markdown-live"] .fv-md-drawio svg foreignObject b'
+    timeout_sec: 30
 - right_click: .fv-md-drawio
 - native_file_dialog:
     kind: save
@@ -36,6 +38,12 @@ steps:
 - assert_export_quality:
     path: ${fixture.drawio_context_png}
     kind: drawio-png
+- eval_readonly:
+    expression: >
+      document.querySelector('iframe[data-drawio-renderer]').contentDocument === null &&
+      document.querySelector('iframe[data-drawio-renderer]').getAttribute('sandbox') === 'allow-scripts' &&
+      (!/mac/i.test(navigator.platform) || /^http:\/\/127\.0\.0\.1:\d+\/_drawio-renderer\//.test(document.querySelector('iframe[data-drawio-renderer]').src))
+    expect_truthy: true
 - assert_no_runtime_errors: null
 verification:
   review: reviewed
@@ -51,8 +59,10 @@ verification:
     - step: 15
       expectation: Independently decode the saved PNG and verify its dimensions, node color and label pixels.
     - step: 16
+      expectation: The draw.io renderer runs in an opaque sandbox and uses the local HTTP document in WKWebView.
+    - step: 17
       expectation: No runtime errors were recorded.
-    results: [11, 14, 15, 16]
+    results: [11, 14, 15, 16, 17]
   native:
   - check: Native PNG save and disk artifact.
     method: automated
