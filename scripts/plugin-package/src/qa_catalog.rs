@@ -37,24 +37,30 @@ pub fn write(output: &Path, receipt: &Value, signer: &ReleaseSigner) -> Result<(
         "platforms":{(platform):{"url":format!("{ORIGIN}/{archive}"), "signature":signature,
             "sha256":receipt["sha256"],"size":receipt["size"]}}
     });
-    // Both authenticated sequences are retained to exercise the durable
-    // rollback rejection after a successful higher-sequence check/restart.
-    for (name, sequence) in [("modules.json", 42), ("modules-older.json", 41)] {
+    let source = receipt["sourceSha"]
+        .as_str()
+        .context("missing package source SHA")?;
+    let installed_roster = json!([id]);
+    let plugin_entry = json!({(id): plugin});
+    let empty_roster = json!([]);
+    let empty_catalog = json!({});
+    // Preserve the legacy enrollment and rollback inputs. The second pair
+    // introduces Hello as an optional module outside the fixed legacy roster.
+    for (name, sequence, roster, plugins) in [
+        ("modules.json", 42, &installed_roster, &plugin_entry),
+        ("modules-older.json", 41, &installed_roster, &plugin_entry),
+        ("modules-baseline.json", 43, &empty_roster, &empty_catalog),
+        ("modules-new.json", 44, &empty_roster, &plugin_entry),
+    ] {
         let raw = serde_json::to_vec_pretty(&json!({
             "coreApiVersion":receipt["coreApiVersion"], "sequence":sequence,
-            "updatedAt":"2026-11-16T00:00:00Z", "legacyUpgrade":[id], "plugins":{(id):plugin}
+            "updatedAt":"2026-11-16T00:00:00Z", "legacyUpgrade":roster, "plugins":plugins
         }))?;
         let path = output.join(name);
         fs::write(&path, raw)?;
         fs::write(
             output.join(format!("{name}.minisig")),
-            signer.sign(
-                &path,
-                &format!(
-                    "file={name} sourceSha={}",
-                    receipt["sourceSha"].as_str().unwrap()
-                ),
-            )?,
+            signer.sign(&path, &format!("file={name} sourceSha={source}"))?,
         )?;
     }
     Ok(())
@@ -65,7 +71,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn signs_exact_official_loopback_metadata_and_both_catalog_sequences() {
+    fn signs_official_loopback_metadata_and_optional_module_catalogs() {
         let directory = tempfile::tempdir().unwrap();
         let root = directory.path();
         let signer = ReleaseSigner::test_key();
@@ -104,6 +110,19 @@ mod tests {
             signer.verify(&path, &signature, &comment).unwrap();
             fs::write(&path, b"unsigned replacement").unwrap();
             assert!(signer.verify(&path, &signature, &comment).is_err());
+        }
+        for (name, sequence, count) in [
+            ("modules-baseline.json", 43, 0),
+            ("modules-new.json", 44, 1),
+        ] {
+            let path = root.join(name);
+            let catalog: Value = serde_json::from_slice(&fs::read(&path).unwrap()).unwrap();
+            assert_eq!(catalog["sequence"], sequence);
+            assert_eq!(catalog["legacyUpgrade"], json!([]));
+            assert_eq!(catalog["plugins"].as_object().unwrap().len(), count);
+            let signature = fs::read_to_string(root.join(format!("{name}.minisig"))).unwrap();
+            let comment = format!("file={name} sourceSha={}", "b".repeat(40));
+            signer.verify(&path, &signature, &comment).unwrap();
         }
         let mut forbidden = receipt;
         forbidden["id"] = json!("taomni-plugin-third-party");

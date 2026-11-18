@@ -5,11 +5,30 @@ from pathlib import Path
 import time
 
 from .fixtures.module_download import plugin_root
-from .fixtures.module_marketplace import ORIGIN
+from .fixtures.module_marketplace import BASELINE_CATALOG, NEW_MODULE_CATALOG, NEW_MODULE_SEQUENCE, ORIGIN
 from .module_update_observation import VERSION_STATES, observe as observe_update
 from .steps import StepError
 
-PHASES = {"source", "no-download", "downloaded", "installed", "rejected", "legacy-installed", "legacy-uninstalled"}
+NEW_MODULE_PHASES = {"new-available", "new-dismissed"}
+PHASES = {"source", "no-download", "downloaded", "installed", "rejected", "legacy-installed", "legacy-uninstalled"} | NEW_MODULE_PHASES
+
+
+def observe_new_module(root, origin, receipt, phase, archive):
+    if archive.exists() or archive.with_suffix(".part").exists() or "/" + receipt["archive"] in origin.requests:
+        raise StepError("An optional module transferred data before user consent")
+    if (root / receipt["slug"] / "active.json").exists():
+        raise StepError("An optional module was activated before user consent")
+    if not {"/" + BASELINE_CATALOG, "/" + NEW_MODULE_CATALOG}.issubset(origin.requests):
+        raise StepError("Both signed releases must reach the native verifier")
+    release = json.loads((root.parent / ".module-release.json").read_text())
+    expected = [receipt["id"]] if phase == "new-available" else []
+    if (
+        release["sequence"] != NEW_MODULE_SEQUENCE
+        or receipt["id"] not in release["seen"]
+        or release["newModules"] != expected
+    ):
+        raise StepError("The signed catalog change and user choice must be persisted for this profile")
+    return release
 
 
 def run(ctx, args):
@@ -26,7 +45,8 @@ def run(ctx, args):
         if phase == "source":
             # Only a transport preference, equivalent to the mirror input.
             # No catalog bytes, key, active pointer or install result is seeded.
-            ctx.session.execute("localStorage.setItem('taomni.module-catalog-source.v1', " + json.dumps(ORIGIN + "/modules.json") + "); return true;")
+            source = f"{ORIGIN}/{origin.start_catalog}"
+            ctx.session.execute("localStorage.setItem('taomni.module-catalog-source.v1', " + json.dumps(source) + "); return true;")
         elif phase in VERSION_STATES:
             record.update(observe_update(ctx, root, phase, origin))
         else:
@@ -45,11 +65,13 @@ def run(ctx, args):
             if phase == "no-download":
                 if archive_url in requests or archive.exists() or (root / "hello-plugin" / "active.json").exists():
                     raise StepError("Cancelling download confirmation must not transfer or activate a package")
+            elif phase in NEW_MODULE_PHASES:
+                record["release"] = observe_new_module(root, origin, receipt, phase, archive)
             else:
                 if requests.count(archive_url) != 1 or not archive.is_file() or hashlib.sha256(archive.read_bytes()).hexdigest() != receipt["sha256"]:
                     raise StepError("Marketplace did not download exactly one matching signed artifact")
                 cache = json.loads((root / ".catalog-trust" / "catalog.json").read_text())
-                if cache["payload"].encode() != origin.files["/modules.json"]:
+                if cache["payload"].encode() != origin.current_catalog:
                     raise StepError("Catalog rejection replaced the verified working cache")
                 if phase in {"installed", "rejected", "legacy-installed", "legacy-uninstalled"}:
                     pointer = json.loads((root / "hello-plugin" / "active.json").read_text())
@@ -73,7 +95,6 @@ def run(ctx, args):
                     watermark = json.loads((root / ".catalog-trust" / "catalog-sequence.json").read_text())
                     if watermark.get("sequence") != 42:
                         raise StepError("Rejected feeds lowered the durable accepted sequence")
-            record["passed"] = True
         record["passed"] = True
         return "module marketplace " + phase + " verified"
     finally:

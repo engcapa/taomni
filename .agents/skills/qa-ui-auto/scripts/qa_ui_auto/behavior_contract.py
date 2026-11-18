@@ -21,7 +21,11 @@ def is_check(step: dict) -> bool:
     if verb == "module_execution_probe":
         return isinstance(args, dict) and args.get("phase") in {"rejected", "recovered"}
     if verb == "module_marketplace_probe":
-        return isinstance(args, dict) and args.get("phase") in {"no-download", "downloaded", "installed", "rejected", "legacy-installed", "legacy-uninstalled", "old-enabled", "updated-disabled", "old-disabled", "updated-enabled", "failed-update", "rolled-back-enabled"}
+        return isinstance(args, dict) and args.get("phase") in {
+            "no-download", "downloaded", "installed", "rejected", "legacy-installed", "legacy-uninstalled",
+            "new-available", "new-dismissed", "old-enabled", "updated-disabled", "old-disabled",
+            "updated-enabled", "failed-update", "rolled-back-enabled",
+        }
     if verb == "module_download_probe":
         return isinstance(args, dict) and args.get("phase") in {"advance-background", "cancelled", "recovered", "proxy-failed", "completed", "forgotten"}
     if verb == "module_restore_probe":

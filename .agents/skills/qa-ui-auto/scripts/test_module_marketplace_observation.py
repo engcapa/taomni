@@ -7,7 +7,7 @@ from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
 
-from qa_ui_auto.fixtures.module_marketplace import ORIGIN, fixture_files, setup
+from qa_ui_auto.fixtures.module_marketplace import BASELINE_CATALOG, NEW_MODULE_CATALOG, ORIGIN, fixture_files, setup
 from qa_ui_auto.module_marketplace_observation import run
 from qa_ui_auto.steps import StepError
 
@@ -16,9 +16,13 @@ class MarketplaceTests(unittest.TestCase):
     def fixture(self, root):
         receipt = {"id":"taomni-plugin-hello-plugin", "platform":"linux-x86_64", "sourceSha":"b" * 40,
                    "archive":"hello.taomni-plugin", "sha256":"a" * 64, "size":123}
-        for name, sequence in [("modules.json",42),("modules-older.json",41)]:
-            data = {"sequence":sequence, "plugins":{receipt["id"]:{"name":"Hello Plugin", "platforms":{
-                receipt["platform"]:{"url":ORIGIN + "/hello.taomni-plugin", "sha256":receipt["sha256"],"size":123}}}}}
+        plugins = {receipt["id"]: {"name": "Hello Plugin", "platforms": {
+            receipt["platform"]: {"url": ORIGIN + "/hello.taomni-plugin", "sha256": receipt["sha256"], "size": 123}}}}
+        for name, sequence, entries in [
+            ("modules.json", 42, plugins), ("modules-older.json", 41, plugins),
+            (BASELINE_CATALOG, 43, {}), (NEW_MODULE_CATALOG, 44, plugins),
+        ]:
+            data = {"sequence":sequence, "plugins":entries, "legacyUpgrade":[]}
             (root / name).write_text(json.dumps(data))
             (root / (name + ".minisig")).write_text("trusted comment: file=" + name + " sourceSha=" + receipt["sourceSha"] + "\n")
         (root / receipt["archive"]).write_bytes(b"input fixture, not a cryptographic proof")
@@ -61,11 +65,13 @@ class MarketplaceTests(unittest.TestCase):
 
     def test_source_configures_only_transport_without_creating_registry_or_trust_state(self):
         with tempfile.TemporaryDirectory() as directory:
-            ctx = SimpleNamespace(case_dir=Path(directory), module_marketplace=object(), session=Mock())
+            origin = SimpleNamespace(start_catalog=BASELINE_CATALOG)
+            ctx = SimpleNamespace(case_dir=Path(directory), module_marketplace=origin, session=Mock())
             with patch("qa_ui_auto.module_marketplace_observation.plugin_root", return_value=Path(directory)):
                 run(ctx, {"phase":"source"})
             script = ctx.session.execute.call_args.args[0]
             self.assertIn("taomni.module-catalog-source.v1", script)
+            self.assertIn(f"{ORIGIN}/{BASELINE_CATALOG}", script)
             self.assertNotIn("plugin_install", script)
             self.assertNotIn("invoke", script)
             self.assertFalse((Path(directory) / ".catalog-trust").exists())
@@ -82,7 +88,7 @@ class MarketplaceTests(unittest.TestCase):
             cache = root / ".catalog-trust"
             cache.mkdir()
             (cache / "catalog.json").write_text(json.dumps({"payload":"changed cache"}))
-            origin = SimpleNamespace(requests=["/hello.pkg","/hello.pkg"], files={"/modules.json":b"original"})
+            origin = SimpleNamespace(requests=["/hello.pkg","/hello.pkg"], current_catalog=b"original")
             ctx = SimpleNamespace(case_dir=root, module_marketplace=origin)
             with patch("qa_ui_auto.module_marketplace_observation.plugin_root", return_value=root):
                 with self.assertRaisesRegex(StepError, "exactly one"):
@@ -92,6 +98,40 @@ class MarketplaceTests(unittest.TestCase):
                     run(ctx, {"phase":"downloaded"})
             rows = [json.loads(line) for line in (root / "module-marketplace-observations.jsonl").read_text().splitlines()]
             self.assertTrue(all(row["passed"] is False for row in rows))
+
+    def test_opt_in_fixture_rejects_a_new_catalog_that_enrolls_the_optional_module(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            receipt = self.fixture(root)
+            files = fixture_files(root, receipt, opt_in=True)
+            self.assertEqual(json.loads(files["/" + BASELINE_CATALOG])["plugins"], {})
+            self.assertIn(receipt["id"], json.loads(files["/" + NEW_MODULE_CATALOG])["plugins"])
+            catalog = json.loads(files["/" + NEW_MODULE_CATALOG])
+            catalog["legacyUpgrade"] = [receipt["id"]]
+            (root / NEW_MODULE_CATALOG).write_text(json.dumps(catalog))
+            with self.assertRaisesRegex(RuntimeError, "outside the legacy"):
+                fixture_files(root, receipt, opt_in=True)
+
+    def test_optional_module_probe_checks_actual_transfer_and_durable_choice(self):
+        with tempfile.TemporaryDirectory() as directory:
+            profile = Path(directory)
+            root = profile / "plugins"
+            receipt = {"archive": "hello.pkg", "sha256": "b" * 64, "slug": "hello-plugin", "id": "taomni-plugin-hello-plugin"}
+            (profile / "official-module-fixture.json").write_text(json.dumps(receipt))
+            origin = SimpleNamespace(requests=["/" + BASELINE_CATALOG, "/" + NEW_MODULE_CATALOG])
+            state_file = profile / ".module-release.json"
+            state = {"sequence": 44, "seen": [receipt["id"]], "newModules": [receipt["id"]]}
+            state_file.write_text(json.dumps(state))
+            ctx = SimpleNamespace(case_dir=profile, module_marketplace=origin)
+            with patch("qa_ui_auto.module_marketplace_observation.plugin_root", return_value=root):
+                run(ctx, {"phase": "new-available"})
+                with self.assertRaisesRegex(StepError, "persisted"):
+                    run(ctx, {"phase": "new-dismissed"})
+                state_file.write_text(json.dumps({**state, "newModules": []}))
+                run(ctx, {"phase": "new-dismissed"})
+                origin.requests.append("/hello.pkg")
+                with self.assertRaisesRegex(StepError, "before user consent"):
+                    run(ctx, {"phase": "new-dismissed"})
 
 
 if __name__ == "__main__":

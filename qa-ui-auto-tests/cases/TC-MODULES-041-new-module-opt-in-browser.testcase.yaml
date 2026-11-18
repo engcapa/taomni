@@ -107,7 +107,7 @@ verification:
   native:
   - check: Catalog authentication, transfer and install on disk.
     method: external
-    reason: Native TC-MODULES-022 and TC-MODULES-040 exercise the signed catalog and filesystem.
+    reason: Native TC-MODULES-045 exercises the signed catalog, persistent dismissal and filesystem.
   visual:
   - check: New module name, description and action labels fit the main window.
     method: manual
