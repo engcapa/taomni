@@ -11176,6 +11176,7 @@ dependencies = [
  "tokio",
  "tokio-tungstenite",
  "tokio-util 0.7.19",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]

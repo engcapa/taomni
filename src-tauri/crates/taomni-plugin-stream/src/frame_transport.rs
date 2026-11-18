@@ -15,6 +15,27 @@ const WARMUP: u64 = 30;
 const SAMPLES: u64 = 150;
 const FRAME_COUNT: u64 = WARMUP + SAMPLES;
 
+#[cfg(windows)]
+struct TimerResolution;
+
+#[cfg(windows)]
+impl TimerResolution {
+    fn begin() -> Self {
+        // SAFETY: One millisecond is a valid request on the hosted Windows image.
+        let result = unsafe { windows_sys::Win32::Media::timeBeginPeriod(1) };
+        assert_eq!(result, 0, "request one-millisecond timer resolution");
+        Self
+    }
+}
+
+#[cfg(windows)]
+impl Drop for TimerResolution {
+    fn drop(&mut self) {
+        // SAFETY: This guard owns one matching successful timeBeginPeriod call.
+        unsafe { windows_sys::Win32::Media::timeEndPeriod(1) };
+    }
+}
+
 #[derive(Clone, Copy, Debug, Deserialize, Serialize)]
 struct Workload {
     width: usize,
@@ -67,20 +88,31 @@ fn pixels_for(patterns: &[Bytes; 4], sequence: u64) -> &Bytes {
     &patterns[sequence as usize % patterns.len()]
 }
 
-async fn publish(workload: Workload, patterns: [Bytes; 4], latest: watch::Sender<Option<Frame>>) {
+async fn publish(
+    workload: Workload,
+    patterns: [Bytes; 4],
+    latest: watch::Sender<Option<Frame>>,
+    start: Instant,
+) -> Vec<u128> {
+    let mut publications = Vec::with_capacity(SAMPLES as usize);
     let mut timer = time::interval(workload.period());
-    timer.set_missed_tick_behavior(time::MissedTickBehavior::Delay);
+    timer.set_missed_tick_behavior(time::MissedTickBehavior::Skip);
     for sequence in 0..FRAME_COUNT {
         timer.tick().await;
         if latest.is_closed() {
-            return;
+            break;
+        }
+        let published = Instant::now();
+        if sequence >= WARMUP {
+            publications.push(published.duration_since(start).as_micros());
         }
         latest.send_replace(Some(Frame {
             sequence,
-            published: Instant::now(),
+            published,
             pixels: pixels_for(&patterns, sequence).clone(),
         }));
     }
+    publications
 }
 
 #[derive(Serialize)]
@@ -98,12 +130,15 @@ struct Measurement {
     delivered: usize,
     replaced: usize,
     fps: f64,
+    offered_fps: f64,
     p95_us: u128,
+    publications_us: Vec<u128>,
     samples: Vec<Sample>,
 }
 
 impl Measurement {
-    fn summarize(route: &'static str, samples: Vec<Sample>) -> Self {
+    fn summarize(route: &'static str, publications_us: Vec<u128>, samples: Vec<Sample>) -> Self {
+        assert_eq!(publications_us.len(), SAMPLES as usize);
         assert_eq!(samples.last().unwrap().sequence, FRAME_COUNT - 1);
         assert!(samples.len() >= 2, "Missing sustained frame delivery");
         let mut latency: Vec<_> = samples
@@ -112,13 +147,16 @@ impl Measurement {
             .collect();
         latency.sort_unstable();
         let duration = samples.last().unwrap().received_us - samples.first().unwrap().received_us;
+        let publish_duration = publications_us.last().unwrap() - publications_us.first().unwrap();
         let delivered = samples.len();
         Self {
             route,
             delivered,
             replaced: SAMPLES as usize - delivered,
             fps: (delivered - 1) as f64 * 1_000_000.0 / duration as f64,
+            offered_fps: (SAMPLES - 1) as f64 * 1_000_000.0 / publish_duration as f64,
             p95_us: latency[(delivered * 95).div_ceil(100) - 1],
+            publications_us,
             samples,
         }
     }
@@ -154,7 +192,7 @@ async fn measure(workload: Workload, mut sink: Sink) -> Measurement {
     let patterns = workload.pixels();
     let (source, mut latest) = watch::channel::<Option<Frame>>(None);
     let start = Instant::now();
-    let producer = tokio::spawn(publish(workload, patterns, source));
+    let producer = tokio::spawn(publish(workload, patterns, source, start));
     let mut samples = Vec::new();
     while latest.changed().await.is_ok() {
         let frame = latest
@@ -170,8 +208,7 @@ async fn measure(workload: Workload, mut sink: Sink) -> Measurement {
             });
         }
     }
-    producer.await.unwrap();
-    Measurement::summarize(sink.finish().await, samples)
+    Measurement::summarize(sink.finish().await, producer.await.unwrap(), samples)
 }
 
 async fn measure_host(workload: Workload) -> Measurement {
@@ -207,6 +244,8 @@ async fn compare_in_process_and_host() {
         "build the frame harness in release mode"
     );
     let path = std::env::var_os("QA_MODULE_FRAME_REPORT").expect("runner frame evidence path");
+    #[cfg(windows)]
+    let _timer_resolution = TimerResolution::begin();
     time::timeout(Duration::from_secs(90), async {
         let mut trials = Vec::new();
         for workload in WORKLOADS {
@@ -233,6 +272,9 @@ async fn host_receiver() {
 
 #[test]
 fn measurement_uses_delivered_frame_latencies_and_counts_replaced_frames() {
+    let publications = (0..SAMPLES)
+        .map(|index| 50 + u128::from(index) * 100)
+        .collect();
     let samples = vec![
         Sample {
             sequence: WARMUP,
@@ -241,14 +283,15 @@ fn measurement_uses_delivered_frame_latencies_and_counts_replaced_frames() {
         },
         Sample {
             sequence: FRAME_COUNT - 1,
-            published_us: 15_000,
+            published_us: 14_950,
             received_us: 16_000,
         },
     ];
-    let result = Measurement::summarize("in-process", samples);
+    let result = Measurement::summarize("in-process", publications, samples);
     assert_eq!(result.delivered, 2);
     assert_eq!(result.replaced, SAMPLES as usize - 2);
-    assert_eq!(result.p95_us, 1_000);
+    assert_eq!(result.offered_fps, 10_000.0);
+    assert_eq!(result.p95_us, 1_050);
     assert!((result.fps - 62.735).abs() < 0.001);
 }
 
