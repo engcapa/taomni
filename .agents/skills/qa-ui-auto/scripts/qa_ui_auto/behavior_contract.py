@@ -17,7 +17,7 @@ import yaml
 def is_check(step: dict) -> bool:
     verb, args = next(iter(step.items()))
     if verb == "module_upgrade_probe":
-        return isinstance(args, dict) and args.get("phase") in {"preflight", "pending", "repeat"}
+        return isinstance(args, dict) and args.get("phase") in {"preflight", "pending", "repeat", "after-first-install"}
     if verb == "module_execution_probe":
         return isinstance(args, dict) and args.get("phase") in {"rejected", "recovered"}
     if verb == "module_marketplace_probe":
