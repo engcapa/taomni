@@ -84,7 +84,9 @@ steps:
 - *id010
 - module_upgrade_probe:
     phase: repeat
-- click: '[data-testid="module-upgrade-migrate"]'
+- press:
+    selector: '[data-testid="module-upgrade-migrate"]:not([disabled])'
+    key: Enter
 - wait_for: '[data-testid="module-upgrade-pending"]'
 - wait_for: '[data-testid="module-upgrade-migrate"]:not([disabled])'
 - module_upgrade_probe:
