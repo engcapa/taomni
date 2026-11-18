@@ -26,17 +26,17 @@ steps:
 - screenshot: module-skipped-release-offer.png
 - click: '[data-testid="module-release-open-store"]'
 - wait_for: '[data-module-id="taomni-plugin-mfa"] [data-testid="module-marketplace-current"]'
-- assert_visible: '[data-module-id="taomni-plugin-hello-plugin"] [data-testid="module-marketplace-new"]'
+- assert_visible: '[data-testid="module-marketplace-card"][data-module-id="taomni-plugin-hello-plugin"] [data-testid="module-marketplace-new"]'
 - module_marketplace_probe: {phase: legacy-new-available}
-- click: '[data-module-id="taomni-plugin-hello-plugin"] [data-testid="module-marketplace-download"]'
+- click: '[data-testid="module-marketplace-card"][data-module-id="taomni-plugin-hello-plugin"] [data-testid="module-marketplace-download"]'
 - click: '[data-testid="confirm-dialog-confirm"]'
-- wait_for: '[data-module-id="taomni-plugin-hello-plugin"] [data-testid="module-marketplace-review"]'
-- click: '[data-module-id="taomni-plugin-hello-plugin"] [data-testid="module-marketplace-review"]'
+- wait_for: '[data-testid="module-marketplace-card"][data-module-id="taomni-plugin-hello-plugin"] [data-testid="module-marketplace-review"]'
+- click: '[data-testid="module-marketplace-card"][data-module-id="taomni-plugin-hello-plugin"] [data-testid="module-marketplace-review"]'
 - assert_text:
     selector: '[data-testid="confirm-dialog-message"]'
     contains: Hello Plugin 0.1.0
 - click: '[data-testid="confirm-dialog-confirm"]'
-- wait_for: '[data-module-id="taomni-plugin-hello-plugin"] [data-testid="module-marketplace-current"]'
+- wait_for: '[data-testid="module-marketplace-card"][data-module-id="taomni-plugin-hello-plugin"] [data-testid="module-marketplace-current"]'
 - assert_count:
     selector: '[data-testid="module-marketplace-current"]'
     equal: 2
