@@ -35,6 +35,7 @@ steps:
     trigger: '[data-testid="markdown-diagram-menu-save-png"]'
     filename: drawio-actions-diagram-1.png
     contains: [PNG]
+    artifact: drawio-png
 - right_click: .fv-md-drawio
 - assert_download:
     trigger: '[data-testid="markdown-diagram-menu-save-svg"]'
@@ -56,7 +57,7 @@ verification:
     - step: 15
       expectation: Copy Source completes through the browser clipboard.
     - step: 17
-      expectation: Save PNG downloads a raster image through the actual menu.
+      expectation: Save PNG produces a high-resolution raster with the request node and its label.
     - step: 19
       expectation: The SVG retains its styled XHTML label.
     - step: 21
@@ -71,4 +72,4 @@ verification:
   native:
   - check: Clipboard and OS chooser.
     method: not-applicable
-    reason: The browser case covers download outcomes. TC-FILE-OPEN-032 exercises the native editable save path.
+    reason: TC-FILE-OPEN-032 covers native editable save and TC-FILE-OPEN-036 covers the native PNG chooser and disk artifact.

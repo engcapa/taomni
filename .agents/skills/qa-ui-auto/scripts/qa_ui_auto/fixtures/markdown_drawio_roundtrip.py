@@ -33,4 +33,5 @@ def setup(ctx):
         drawio_roundtrip_input=str(case_dir / "roundtrip.drawio"),
         drawio_roundtrip_export=str(case_dir / "roundtrip-export.drawio"),
         drawio_roundtrip_markdown=root + "/drawio-roundtrip.md",
+        drawio_context_png=str(case_dir / "drawio-context.png"),
     )
