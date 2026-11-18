@@ -40,6 +40,7 @@ fn valid_catalog() -> ModuleCatalog {
         core_api_version: "1".into(),
         sequence: 1,
         updated_at: "2026-11-15T00:00:00Z".into(),
+        legacy_upgrade: None,
         plugins: BTreeMap::from([("taomni-plugin-demo".into(), plugin)]),
     }
 }

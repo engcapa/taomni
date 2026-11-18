@@ -12,6 +12,8 @@ impl PluginRegistry {
             .lifecycle
             .lock()
             .expect("plugin lifecycle lock poisoned");
+        let installer = install::ModuleInstaller::new(&self.root);
+        let _mutation = installer.lock_mutations()?;
         let record = self
             .get(slug)
             .ok_or_else(|| PluginError::NotFound(slug.to_owned()))?;
@@ -33,7 +35,7 @@ impl PluginRegistry {
         if !delete_data {
             retained_data::save(&self.root, &locator)?;
         }
-        install::ModuleInstaller::new(&self.root).uninstall(slug, delete_data)?;
+        installer.uninstall(slug, delete_data)?;
         if delete_data {
             // Failed deletion keeps the prior locator available for recovery.
             retained_data::remove(&self.root, slug)?;

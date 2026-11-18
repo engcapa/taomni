@@ -11,6 +11,8 @@ pub struct ModuleCatalog {
     pub core_api_version: String,
     pub sequence: u64,
     pub updated_at: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub legacy_upgrade: Option<std::collections::BTreeSet<String>>,
     pub plugins: std::collections::BTreeMap<String, ModuleCatalogPlugin>,
 }
 
@@ -51,6 +53,19 @@ impl ModuleCatalog {
         if self.sequence == 0 {
             return Err(DownloadError::InvalidCatalog(
                 "sequence must be positive".into(),
+            ));
+        }
+        if self.legacy_upgrade.as_ref().is_some_and(|ids| {
+            ids.iter().any(|id| {
+                id == "taomni-plugin-lanchat"
+                    || self
+                        .plugins
+                        .get(id)
+                        .is_none_or(|plugin| plugin.description.trim().is_empty())
+            })
+        }) {
+            return Err(DownloadError::InvalidCatalog(
+                "legacyUpgrade must reference published modules with descriptions".into(),
             ));
         }
         for (key, plugin) in &self.plugins {

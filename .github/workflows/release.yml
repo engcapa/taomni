@@ -562,6 +562,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
           TAG: ${{ needs.plan.outputs.tag }}
+          MODULES_LEGACY_UPGRADE_ROSTER: ${{ vars.TAOMNI_LEGACY_UPGRADE_IDS }}
         shell: bash
         run: |
           set -euo pipefail
@@ -576,6 +577,9 @@ jobs:
           if find artifacts -type f -name '*.taomni-plugin' -print -quit | grep -q .; then
             module_signature="$(find artifacts -type f -name 'modules.json.minisig' -print -quit)"
             test -n "$module_signature"
+            if [[ -n "$MODULES_LEGACY_UPGRADE_ROSTER" ]]; then
+              export MODULES_LEGACY_UPGRADE_IDS="$MODULES_LEGACY_UPGRADE_ROSTER"
+            fi
             MODULES_REQUIRE_SIGNATURE=1 MODULES_MANIFEST_SIGNATURE="$module_signature" \
               node scripts/compose-modules-manifest.mjs artifacts module-assets
           fi

@@ -40,6 +40,8 @@ Taomni 是 Tauri 2 + React 19 + Rust 的本地优先桌面工作台。重构前�
 
 ### 2.4 运行时、数据与发布
 
+首次从旧单体升级时，按签名目录安装首批正式模块在本机上的全部兼容产物。旧数据预检决定数据迁移内容。模块化 profile 持久记录首装状态和已见目录 ID，后续更新以当前 active 版本为依据，并保留禁用与卸载状态。目录新发布的兼容模块通过名称和功能简介提示用户选装。全新安装启动核心，用户可在模块商店选装。 [升级策略与迁移协议](../docs-feature/taomni-modular-split-design.md#64-更新检查)
+
 - 新增 `taomni-plugin-api` 和 `taomni-rdp-common` 库 crate；插件 crate 作为 `src-tauri` workspace 成员，以复用根 `[patch.crates-io]`，但不得依赖核心 crate 或其它插件。
 - 核心拆为 `CoreState + PluginRegistry`。插件内部状态保存在宿主；核心只保存元数据、宿主句柄、RPC client、安装状态和共享服务扩展点。
 - 每个插件有 `module.json`、独立版本、平台 artifact、分离 minisign、SHA-256、`coreApiVersion` 和 `permissions`。安装使用版本目录 + active 指针/原子替换，默认卸载保留数据，显式删除才清理。

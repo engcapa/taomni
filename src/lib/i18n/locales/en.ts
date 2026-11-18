@@ -2751,7 +2751,7 @@ const dict = {
     moduleStoreRollback: "Rollback to {version}",
     moduleStoreUninstallConfirm: "Uninstall {name}? Module data will be retained unless you select delete module data.",
     moduleUpgradeTitle: "Upgrade existing Taomni data",
-    moduleUpgradeSubtitle: "This profile contains data from Taomni {version}. Review the detected modules before copying files.",
+    moduleUpgradeSubtitle: "Review data detected from Taomni {version} before migrating it.",
     moduleUpgradeRetained: "Legacy files retained for backup: {count}",
     moduleUpgradeNone: "No legacy module data needs migration.",
     moduleUpgradeMigrate: "Migrate detected data",

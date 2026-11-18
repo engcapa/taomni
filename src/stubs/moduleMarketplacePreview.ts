@@ -9,14 +9,16 @@ const id = `module-hello-plugin-${digest}`;
 export const marketplacePreviewCatalog: ModuleMarketplaceCatalog = { platform: "linux-x86_64", catalog: {
   coreApiVersion: "1", sequence: 42, updatedAt: "2026-11-16T00:00:00Z", plugins: {
     [previewHelloManifest.id]: { id: previewHelloManifest.id, slug: "hello-plugin", name: "Hello Plugin",
-      version: "0.1.0", coreApiVersion: "1", kind: "collaboration", permissions: [], platforms: {
+      version: "0.1.0", coreApiVersion: "1", kind: "collaboration", permissions: [],
+      description: "Open a separate module tab and save text there.", platforms: {
         "linux-x86_64": { url: "https://preview.invalid/hello.taomni-plugin", signature: "explicit browser model", sha256: digest, size: 8192 },
       } },
   },
 } };
 
 export function invokeMarketplacePreview(command: string, args?: Record<string, unknown>): unknown {
-  if (localStorage.getItem(MARKETPLACE_PREVIEW_KEY) !== "true") {
+  const mode = localStorage.getItem(MARKETPLACE_PREVIEW_KEY);
+  if (mode !== "true" && mode !== "release") {
     if (command === "plugin_marketplace_catalog") return { ...marketplacePreviewCatalog, catalog: { ...marketplacePreviewCatalog.catalog, plugins: {} } };
     throw new Error("Browser preview cannot download or verify native module packages.");
   }
@@ -24,7 +26,20 @@ export function invokeMarketplacePreview(command: string, args?: Record<string, 
     const source = String(args?.url);
     if (source.includes("modules-bad")) throw new Error("Preview model: invalid catalog signature");
     if (source.includes("modules-older")) throw new Error("Preview model: catalog rollback rejected");
+    if (mode === "release") {
+      const baseline = source.includes("modules-baseline");
+      const installed = JSON.parse(localStorage.getItem(MODULE_PREVIEW_KEY) ?? "null");
+      return { ...marketplacePreviewCatalog, catalog: { ...marketplacePreviewCatalog.catalog,
+        ...(baseline ? { sequence: 41, plugins: {} } : {}),
+      }, release: { legacyWaiting: false, legacyPending: [], updates: [], newModules:
+        baseline || installed || sessionStorage.getItem("taomni.preview.new-module-dismissed") ? [] : [previewHelloManifest.id],
+      } };
+    }
     return marketplacePreviewCatalog;
+  }
+  if (command === "plugin_marketplace_dismiss_new") {
+    sessionStorage.setItem("taomni.preview.new-module-dismissed", "true");
+    return;
   }
   const selection = args?.selection as ModuleCatalogSelection;
   if (selection?.pluginId !== previewHelloManifest.id || selection.version !== "0.1.0" || selection.sha256 !== digest) throw new Error("Invalid browser model selection");

@@ -3,9 +3,10 @@ use tauri::{AppHandle, State};
 
 use crate::{
     plugin::{
-        PluginRecord,
-        download::{DownloadInfo, DownloadPhase},
+        InstallIntent, PluginRecord,
+        download::{DownloadError, DownloadInfo, DownloadPhase, DownloadRequest},
         marketplace::{self, CatalogSelection, InstallReview, MarketplaceCatalog},
+        release_state,
     },
     state::AppState,
 };
@@ -30,38 +31,81 @@ pub async fn plugin_marketplace_catalog(
     let service = super::plugin_network::service(&state, None, None, None)?;
     let catalog =
         crate::plugin::fetch_trusted_catalog(&service, &url, state.plugins.root()).await?;
-    Ok(MarketplaceCatalog {
-        catalog,
-        platform: crate::plugin::current_platform().into(),
+    let data = state.core.paths.data.clone();
+    let platform = crate::plugin::current_platform();
+    tauri::async_runtime::spawn_blocking(move || {
+        let release = release_state::plan(&data, &catalog, platform)?;
+        Ok(MarketplaceCatalog {
+            catalog,
+            platform: platform.into(),
+            release,
+        })
     })
+    .await
+    .map_err(|error| error.to_string())?
+}
+
+#[tauri::command]
+pub async fn plugin_marketplace_dismiss_new(
+    ids: Vec<String>,
+    state: State<'_, AppState>,
+) -> Result<(), String> {
+    let data = state.core.paths.data.clone();
+    tauri::async_runtime::spawn_blocking(move || release_state::dismiss(&data, &ids))
+        .await
+        .map_err(|error| error.to_string())?
 }
 
 #[tauri::command]
 pub async fn plugin_marketplace_download(
     selection: CatalogSelection,
+    installed_version: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<DownloadInfo, String> {
+    let plan = resolve_download(&state, selection, installed_version).await?;
+    start_download(&state, plan, true).await
+}
+
+async fn resolve_download(
+    state: &AppState,
+    selection: CatalogSelection,
+    installed_version: Option<String>,
+) -> Result<DownloadRequest, String> {
     let root = state.plugins.root().to_owned();
-    let plan =
-        tauri::async_runtime::spawn_blocking(move || marketplace::download_plan(&root, &selection))
-            .await
-            .map_err(|error| error.to_string())?
-            .map_err(|error| error.to_string())?;
+    tauri::async_runtime::spawn_blocking(move || {
+        marketplace::download_plan(&root, &selection, installed_version.as_deref())
+    })
+    .await
+    .map_err(|error| error.to_string())?
+    .map_err(|error| error.to_string())
+}
+
+async fn start_download(
+    state: &AppState,
+    plan: DownloadRequest,
+    retry: bool,
+) -> Result<DownloadInfo, String> {
     let id = plan.id.clone();
     let completed_path = plan.completed_path.clone();
     let existing = state.plugin_downloads.snapshot(&id).await;
-    if existing.as_ref().is_none_or(|progress| {
-        matches!(
-            progress.phase,
-            DownloadPhase::Cancelled | DownloadPhase::Failed
-        )
-    }) {
+    if existing.is_none()
+        || retry
+            && existing.is_some_and(|progress| {
+                matches!(
+                    progress.phase,
+                    DownloadPhase::Cancelled | DownloadPhase::Failed
+                )
+            })
+    {
         let service = super::plugin_network::service(&state, None, None, None)?;
-        state
+        match state
             .plugin_downloads
             .start_with_service(plan, service)
             .await
-            .map_err(|error| error.to_string())?;
+        {
+            Ok(_) | Err(DownloadError::AlreadyActive(_)) => {}
+            Err(error) => return Err(error.to_string()),
+        }
     }
     let progress = state
         .plugin_downloads
@@ -92,6 +136,7 @@ pub async fn plugin_marketplace_review(
 #[tauri::command]
 pub async fn plugin_marketplace_install(
     selection: CatalogSelection,
+    installed_version: Option<String>,
     state: State<'_, AppState>,
     app: AppHandle,
 ) -> Result<PluginRecord, String> {
@@ -101,12 +146,63 @@ pub async fn plugin_marketplace_install(
     let result = tauri::async_runtime::spawn_blocking(move || {
         let (package, _) = marketplace::prepare_install(registry.root(), &selection)
             .map_err(|error| error.to_string())?;
+        let intent = installed_version
+            .as_deref()
+            .map_or(InstallIntent::Explicit, InstallIntent::Update);
         registry
-            .install_verified(&package)
-            .map_err(|error| error.to_string())
+            .install_with_intent(&package, intent)
+            .map_err(|error| error.to_string())?
+            .ok_or_else(|| "Install skipped".into())
     })
     .await
     .map_err(|error| error.to_string())?;
     super::plugin::publish_registry_change(&app, &result);
     result
+}
+
+#[tauri::command]
+pub async fn plugin_marketplace_provision(
+    selection: CatalogSelection,
+    retry: bool,
+    state: State<'_, AppState>,
+    app: AppHandle,
+) -> Result<Option<PluginRecord>, String> {
+    let data = state.core.paths.data.clone();
+    let id = selection.plugin_id.clone();
+    let pending =
+        tauri::async_runtime::spawn_blocking(move || release_state::is_pending(&data, &id))
+            .await
+            .map_err(|error| error.to_string())??;
+    if !pending {
+        return Ok(None);
+    }
+    let plan = resolve_download(&state, selection.clone(), None).await?;
+    let task = start_download(&state, plan, retry).await?;
+    let progress = state
+        .plugin_downloads
+        .wait_for_finished(&task.id)
+        .await
+        .ok_or("Module download was removed; retry the installation")?;
+    if progress.phase != DownloadPhase::Completed {
+        return Err(progress
+            .error
+            .unwrap_or_else(|| "Module download cancelled; retry to resume".into()));
+    }
+    let registry = state.plugins.clone();
+    let data = state.core.paths.data.clone();
+    let record = tauri::async_runtime::spawn_blocking(move || {
+        let (package, _) = marketplace::prepare_install(registry.root(), &selection)
+            .map_err(|error| error.to_string())?;
+        let record = registry
+            .install_with_intent(&package, InstallIntent::Legacy)
+            .map_err(|error| error.to_string())?;
+        release_state::complete(&data, &selection.plugin_id)?;
+        Ok::<_, String>(record)
+    })
+    .await
+    .map_err(|error| error.to_string())??;
+    if let Some(record) = &record {
+        super::plugin::publish_registry_change(&app, &Ok(record.clone()));
+    }
+    Ok(record)
 }

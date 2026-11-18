@@ -2,12 +2,13 @@
 import hashlib
 import json
 from pathlib import Path
+import time
 
 from .fixtures.module_download import plugin_root
 from .fixtures.module_marketplace import ORIGIN
 from .steps import StepError
 
-PHASES = {"source", "no-download", "downloaded", "installed", "rejected"}
+PHASES = {"source", "no-download", "downloaded", "installed", "rejected", "legacy-installed", "legacy-uninstalled"}
 
 
 def run(ctx, args):
@@ -26,6 +27,13 @@ def run(ctx, args):
             # No catalog bytes, key, active pointer or install result is seeded.
             ctx.session.execute("localStorage.setItem('taomni.module-catalog-source.v1', " + json.dumps(ORIGIN + "/modules.json") + "); return true;")
         else:
+            if phase == "legacy-installed":
+                enrollment_path = root.parent / ".module-release.json"
+                deadline = time.monotonic() + 45
+                while time.monotonic() < deadline:
+                    if enrollment_path.is_file() and json.loads(enrollment_path.read_text()).get("legacyPending") == []:
+                        break
+                    time.sleep(0.1)
             receipt = json.loads((Path(ctx.case_dir) / "official-module-fixture.json").read_text())
             archive_url = "/" + receipt["archive"]
             requests = list(origin.requests)
@@ -40,14 +48,22 @@ def run(ctx, args):
                 cache = json.loads((root / ".catalog-trust" / "catalog.json").read_text())
                 if cache["payload"].encode() != origin.files["/modules.json"]:
                     raise StepError("Catalog rejection replaced the verified working cache")
-                if phase in {"installed", "rejected"}:
+                if phase in {"installed", "rejected", "legacy-installed", "legacy-uninstalled"}:
                     pointer = json.loads((root / "hello-plugin" / "active.json").read_text())
-                    if pointer.get("activeVersion") != "0.1.0":
+                    if phase == "legacy-uninstalled":
+                        if pointer != {"activeVersion": None, "previousVersion": "0.1.0"}:
+                            raise StepError("Restart reinstalled a module that the user removed")
+                    elif pointer.get("activeVersion") != "0.1.0":
                         raise StepError("Verified marketplace package was not atomically activated")
                     manifest = json.loads((root / "hello-plugin" / "versions" / "0.1.0" / "module.json").read_text())
                     if manifest.get("id") != receipt["id"] or manifest.get("version") != receipt["version"]:
                         raise StepError("Installed module identity differs from the signed selection")
                     record["pointer"] = pointer
+                if phase.startswith("legacy-"):
+                    enrollment = json.loads((root.parent / ".module-release.json").read_text())
+                    if enrollment.get("origin") != "legacy" or enrollment.get("legacyPending") != []:
+                        raise StepError("First installation was not recorded as complete for the legacy profile")
+                    record["enrollment"] = enrollment
                 if phase == "rejected":
                     if not {"/modules-bad.json", "/modules-older.json"}.issubset(requests):
                         raise StepError("Both tampered and authenticated older feeds must reach the real verifier")

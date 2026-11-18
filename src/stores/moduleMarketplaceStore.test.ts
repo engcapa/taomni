@@ -14,7 +14,8 @@ const deferred = <T,>() => {
 };
 function harness() {
   const adapter = { catalog: vi.fn().mockResolvedValue(catalog(1)), download: vi.fn().mockResolvedValue({}),
-    review: vi.fn(), install: vi.fn().mockResolvedValue({ slug: "hello-plugin" }) };
+    review: vi.fn(), install: vi.fn().mockResolvedValue({ slug: "hello-plugin" }),
+    provision: vi.fn().mockResolvedValue(undefined), dismiss: vi.fn().mockResolvedValue(undefined) };
   const storage = { getItem: vi.fn().mockReturnValue(null), setItem: vi.fn() };
   return { adapter, storage, store: createModuleMarketplaceStore(adapter, storage) };
 }
@@ -83,7 +84,7 @@ describe("module marketplace ownership", () => {
     expect(store.getState().review?.detail).toBe(review);
     adapter.install.mockRejectedValueOnce(new Error("Package changed after confirmation"));
     await store.getState().install();
-    expect(adapter.install).toHaveBeenCalledWith(selection);
+    expect(adapter.install).toHaveBeenCalledWith(selection, undefined);
     expect(store.getState().errors[selection.pluginId]).toBe("Package changed after confirmation");
     expect(store.getState().review).not.toBeNull();
     await store.getState().install();

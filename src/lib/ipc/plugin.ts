@@ -98,9 +98,17 @@ export interface ModuleCatalogSelection {
   sha256: string;
 }
 
+export interface ModuleReleasePlan {
+  legacyWaiting: boolean;
+  legacyPending: string[];
+  updates: string[];
+  newModules: string[];
+}
+
 export interface ModuleMarketplaceCatalog {
   catalog: ModuleCatalog;
   platform: string;
+  release?: ModuleReleasePlan;
 }
 
 export interface ModuleInstallReview {
@@ -114,16 +122,25 @@ export function fetchMarketplaceCatalog(url?: string): Promise<ModuleMarketplace
   return invoke("plugin_marketplace_catalog", { url });
 }
 
-export function downloadMarketplaceModule(selection: ModuleCatalogSelection): Promise<ModuleDownloadInfo> {
-  return invoke("plugin_marketplace_download", { selection });
+export function downloadMarketplaceModule(selection: ModuleCatalogSelection, installedVersion?: string): Promise<ModuleDownloadInfo> {
+  return invoke("plugin_marketplace_download", { selection, installedVersion });
 }
 
 export function reviewMarketplaceModule(selection: ModuleCatalogSelection): Promise<ModuleInstallReview> {
   return invoke("plugin_marketplace_review", { selection });
 }
 
-export async function installMarketplaceModule(selection: ModuleCatalogSelection): Promise<PluginRecord> {
-  return mutationResult(await invoke("plugin_marketplace_install", { selection }));
+export async function installMarketplaceModule(selection: ModuleCatalogSelection, installedVersion?: string): Promise<PluginRecord> {
+  return mutationResult(await invoke("plugin_marketplace_install", { selection, installedVersion }));
+}
+
+export async function provisionMarketplaceModule(selection: ModuleCatalogSelection, retry: boolean): Promise<void> {
+  const record = await invoke("plugin_marketplace_provision", { selection, retry });
+  if (record) mutationResult(record);
+}
+
+export function dismissNewMarketplaceModules(ids: readonly string[]): Promise<void> {
+  return invoke("plugin_marketplace_dismiss_new", { ids });
 }
 
 export type LegacyMigrationItem =

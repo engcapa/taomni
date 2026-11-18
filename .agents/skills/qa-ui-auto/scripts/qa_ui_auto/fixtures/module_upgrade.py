@@ -64,12 +64,12 @@ def preview_client_snapshot():
 
 
 def setup(ctx):
-    if ctx.case_id not in {"TC-MODULES-005", "TC-MODULES-025", "TC-MODULES-026", "TC-MODULES-028", "TC-MODULES-029", "TC-MODULES-030", "TC-MODULES-031", "TC-MODULES-032", "TC-MODULES-036", "TC-MODULES-037"}:
+    if ctx.case_id not in {"TC-MODULES-005", "TC-MODULES-025", "TC-MODULES-026", "TC-MODULES-028", "TC-MODULES-029", "TC-MODULES-030", "TC-MODULES-031", "TC-MODULES-032", "TC-MODULES-036", "TC-MODULES-037", "TC-MODULES-040"}:
         raise RuntimeError("module_upgrade requires a registered fixed-input case")
     server_profile = ctx.case_id in {"TC-MODULES-028", "TC-MODULES-029"}
     client_profile = ctx.case_id in {"TC-MODULES-030", "TC-MODULES-031"}
     mfa_profile = ctx.case_id in {"TC-MODULES-036", "TC-MODULES-037"}
-    vnc = ctx.case_id != "TC-MODULES-005" and not server_profile
+    vnc = ctx.case_id not in {"TC-MODULES-005", "TC-MODULES-040"} and not server_profile
     if (ctx.cfg.get("app") or {}).get("mode", "browser") == "browser":
         ctx.page.goto(ctx.cfg["app"]["base_url"])
         snapshot = preview_client_snapshot() if client_profile else preview_server_snapshot() if server_profile else preview_snapshot(vnc)

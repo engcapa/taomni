@@ -2604,6 +2604,15 @@
 - `[data-testid="module-marketplace-task"]` — display — F-Modules-1.module-marketplace-task
 - `[data-testid="module-marketplace-action-error"]` — display [optional] — F-Modules-1.module-marketplace-action-error
 - `[data-testid="module-marketplace-current"]` — display — F-Modules-1.module-marketplace-current
+- `[data-testid="module-marketplace-update"]` — display — F-Modules-1.module-marketplace-update
+- `[data-testid="module-marketplace-new"]` — display — F-Modules-1.module-marketplace-new
+- `[data-testid="module-release-notice"]` — display — F-Modules-1.module-release-notice
+- `[data-testid="module-release-new"]` — display — F-Modules-1.module-release-new
+- `[data-testid="module-release-new-item"]` — display — F-Modules-1.module-release-new-item
+- `[data-testid="module-release-open-store"]` — interactive — F-Modules-1.module-release-open-store
+- `[data-testid="module-release-later"]` — interactive — F-Modules-1.module-release-later
+- `[data-testid="module-release-legacy"]` — display [optional] — F-Modules-1.module-release-legacy
+- `[data-testid="module-marketplace-provision"]` — interactive [optional] — F-Modules-1.module-marketplace-provision
 - `[data-testid="module-marketplace-review"]` — interactive — F-Modules-1.module-marketplace-review
 - `[data-testid="module-marketplace-download"]` — interactive — F-Modules-1.module-marketplace-download
 - `[data-testid="module-network-settings"]` — display — F-Modules-1.module-network-settings

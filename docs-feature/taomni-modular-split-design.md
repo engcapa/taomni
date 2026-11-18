@@ -46,7 +46,7 @@
 | AC-014 | 完成核心-only、全量、crash-regression、受影响功能和发布演练；所有失败/skip/环境阻塞都有原始证据和后续责任；核心-only 无法执行的插件依赖用例必须在装有对应插件的全量集合中运行，不得记为通过或忽略（§11）。 |
 | AC-015 | 多进程入口与 profile 协同：`--headless`、`ModeLease`、`ProfileLease` 与插件宿主协同；备份还原前宿主全部静默；迁出的 re-exec 入口（`--vnc-special-key-hook`、`--sockscap-redirector-bridge`）由宿主承载，核心-only 二进制不含其代码。 |
 | AC-016 | 插件加密数据密钥（`mfa.data-key-v1`）经核心 Vault 的受限插件作用域服务访问，宿主不持有 Vault 句柄；备份还原后 Vault 与插件库一致、可解密；运行中的插件库通过 `backup.snapshot` 取得一致快照。 |
-| AC-017 | 已安装 0.5.x 单体应用升级到模块化核心时，预检、插件暂存、Vault/legacy table 迁移、原子激活、断点恢复和回滚均可重复执行；插件下载或验签失败不删除旧数据，核心功能仍可启动。 |
+| AC-017 | 单体首次升级默认安装首批全部本机兼容正式模块。旧数据按预检、暂存、迁移、提交顺序处理，支持重试和回滚。模块化版本后续只更新已安装的模块，保留禁用和卸载状态。新增正式模块展示名称与功能说明，由用户选择安装。 |
 
 ## 0. 决策摘要（先看这页）
 
@@ -82,7 +82,7 @@
 ### 0.4 成功标准（验收口径）
 
 - 核心-only 安装可启动、可建 24 种 session、可开终端 / SFTP / 数据库 / 邮件 / 工作区、可跑 Tao Agent；未装插件的入口（RDP / VNC / Servers / SocksCap / MFA / 截图 OCR 与录制 / 本地语音 / 移动端）点开时是“未安装，去商店安装”，不是白屏、不是崩溃、不是静默无反应；已保存的 RDP / VNC 会话、从其它工具导入的 RDP / VNC 会话在插件未装时仍显示在会话树里，不被隐藏、不被删除。
-- 从现有 0.5.x 升级的用户，升级后不会“凭空丢功能”：核心首次启动检测到用户已有 RDP / VNC 会话、`server_configs` 表、`mfa.db`、`sockscap/` 配置目录等插件数据，弹出一次“升级迁移向导”，列出需要安装的插件并一键安装（§6.5）。
+- 现有单体用户首次升级时默认安装本机可用的首批正式模块，可按需卸载。原有会话、服务器配置、MFA 和 SocksCap 等资料按各模块的迁移协议处理。后续根据当前安装状态提供更新，并提示用户选择是否添加新功能模块。见 §6.4–6.5。
 - 每个插件可独立安装、启用、禁用、卸载、回滚到上一版本；卸载后核心正常，插件自己的数据按 §8 处理（默认保留数据、显式删除才清）。
 - 核心与插件可独立发版：只改一个插件时，只发该插件的新包 + 新的 `modules.json`，不重发核心包；核心发版时不强制重发全部插件，只在 `coreApiVersion` 大版本变化时才要求插件适配。
 - 全部回归用例通过：核心-only 回归 + 全量回归两套都过；`pnpm check:refactor` 通过；新增文件遵守 800 行上限（AGENTS.md）。
@@ -685,17 +685,16 @@ G4 的 Linux 恢复策略：每次启动/监督重启前检查已验签宿主所
 
 ### 6.4 更新检查
 
-- 商店打开时查一次 `modules.json`，有更新的插件标“有更新”；不自动下载、不自动安装。
-- 核心更新（`latest.json`）与插件更新（`modules.json`）是两个独立检查，不互相阻塞；核心大版本升级（`coreApiVersion` 变化）时，商店提示哪些插件需同步更新，不强制全量更新。
+- 模块商店刷新签名 `modules.json`，按本机平台、核心 API 和注册表中的 active 版本给出模块更新。仅已安装且有更高兼容版本的模块进入更新列表。禁用但仍装有代码的模块可更新并保持禁用。更新提交前复核当前 active 版本，下载期间卸载的模块须由用户重新选择安装。
+- 核心更新继续使用 `latest.json`。主窗口独立检查模块目录，模块商店可主动刷新。后续模块更新使用现有下载、权限审查和安装确认。核心 API 升级时显示兼容性与可用更新。
+- 每个 profile 持久记录已经见过的正式模块 ID。首份验证成功的目录建立基线，后续目录新增的本机兼容 ID 显示名称和签名目录中的功能简介。用户可前往商店逐个安装或稍后处理。已在注册表中安装或卸载的模块、已处理的提示，以及临时从目录消失再出现的旧 ID 均沿用历史记录。
 
-### 6.5 从 0.5.x 升级的迁移向导（v1.3 新增）
+### 6.5 首次从单体升级到模块化版本
 
-v1.2 没有覆盖“已经在用旧版的用户”。核心 0.6.x 默认包不含任何插件，不处理就会让老用户升级后 RDP / VNC 会话打不开、内置服务器配置“消失”、聊天记录不可见。规则：
-
-- 首次启动 0.6.x 时，核心只读检测插件数据是否存在：`session_type` 为 RDP / VNC 的会话、`rdp_certificate_pins` 与 `server_configs` 表有行、`mfa.db`、`sockscap/config.json`、移动端 / 飞书配置、`mobile-desktop-remote.json`、`mobile_feishu_events` 等，再加用户历史启用记录；命中的插件列入向导。
-- 向导一次性列出“检测到你正在使用这些功能，需要安装以下模块”，每项显示大小，支持全选一键安装、逐项取消、稍后在商店安装；取消不影响核心使用，也不删除任何数据。
-- 向导只出现一次（可在商店页重新打开），不强制联网；离线环境提示改用“从本地文件安装”（§6.3）。
-- 企业 / 离线分发：额外提供“全量安装包”（核心 + 全部 10 个插件的合集安装程序）作为发布产物之一，体积等同今天的整包，避免内网用户必须逐个下载；是否做，见 §13.3。
+- 打开应用数据库前在 profile 记录来源。全新安装只装核心。旧单体 profile 首次进入模块化版本时，自动通过签名目录安装首批发布集合中所有本机兼容的正式模块。已有模块化标记的 profile 始终沿用当前安装状态，包括注册表为空或所有模块均已卸载的情况。
+- 签名 `modules.json` 的 `legacyUpgrade` 字段列出首批正式模块 ID，后续目录沿用该集合，确保跳过多个核心版本的旧用户仍使用同一首装范围。发布生成器按正式产物的稳定状态和平台资产核对集合。LanChat 已退出产品及首装集合。
+- 按 profile 持久化待处理 ID。模块用现有代理、后台传输、断点恢复及验签安装入口处理，模块商店展示进度和失败，支持重试。离线时核心可继续使用，已验签的本地包可通过商店安装。完成一项后重复执行依据 active 版本与卸载记录收敛。完成后的卸载沿用商店数据保留规则。
+- 旧数据预检决定每个模块具体迁入的数据。模块代码安装与数据迁移分别记录。依赖旧资料的功能须在数据提交后切换到新宿主，系统授权按对应能力首次使用时获取。
 
 ### 6.5.1 单体安装升级协议（v1.5 实施补充）
 
@@ -707,11 +706,11 @@ v1.2 没有覆盖“已经在用旧版的用户”。核心 0.6.x 默认包不�
 
 1. **预检和快照**：以只读方式检查 `taomni.db` 的 `sessions`、`rdp_certificate_pins`、`server_configs` 表，以及 `mfa.db`、`sockscap/config.json`、移动端配置和 Vault 固定条目。记录文件大小与 SHA-256；无法读取、权限不足或 Vault 锁定时只显示可修复错误，不改写源数据。
    SQLite 源指纹必须包含主文件和已有非空 `-wal` 的内容哈希与字节数，排除瞬态 `-shm`；不得为获取指纹主动 checkpoint。无 WAL/空 WAL 保留既有主文件指纹格式。分类和固定密钥存在性查询在只读事务中完成，查询前后复核源指纹；写入或 checkpoint 与扫描并发时明确要求稍后重试，不能把不同时间的候选和指纹记成同一个快照。MFA 文件只做稳定指纹，不解密业务内容；原生 032 和 hosted Rust WAL/并发写入场景保护这一边界，browser 026 只保护现有 renderer 流程。
-   预检必须查询实际记录，不能仅依据表是否存在推荐插件：`sessions.session_type=RDP/VNC` 分别归属 `rdp-client` / `vnc-client`，空表和 SSH/SFTP/本地终端等核心会话不产生候选；证书 pin 与 Servers 配置仅在有行时列出；`server_configs.server_type` 使用旧版真实持久值分类：`rdp` → `rdp-server`（`rdp-server-configs`）、`vnc` → `vnc-server`（`vnc-server-configs`），其余类型留 `servers`（兼容 `server-configs`），不读取配置正文。所有检查位于同一只读 SQLite snapshot，仅查询 EXISTS，不读取凭据和配置正文；无法识别的 schema 显式返回错误。现有 `rdp-vnc-sessions` journal 拼写保持兼容，新 VNC 候选使用 additive `vnc-sessions`。重新记录预检只允许校正未执行且无 target 的 pending 占位；staged/committed/rolled-back 历史须交真实恢复执行器处理，不得被预检重置。原文件和 active 指针不因候选校正而改变。 Settings 的推荐列表按 `plugin_slug` 保留首次出现顺序并去重；同一模块的会话、证书 pin 等数据项继续独立记录 journal，不能因界面去重而合并或丢弃迁移项。
+   预检按实际数据记录归属。`sessions.session_type=RDP/VNC` 分别归属 `rdp-client` 与 `vnc-client`，证书 pin 与 Servers 配置仅在有行时列出。`server_configs.server_type` 中 `rdp` 归属 `rdp-server`（`rdp-server-configs`），`vnc` 归属 `vnc-server`（`vnc-server-configs`），其余类型归属 `servers`（兼容 `server-configs`）。在同一只读 SQLite snapshot 内通过 EXISTS 检查，不读取凭据和配置正文，遇到未知 schema 显示错误。Journal 沿用 `rdp-vnc-sessions`，新增 `vnc-sessions`。预检仅校正未执行且无 target 的 pending 占位。恢复执行器处理 staged、committed 和 rolled-back 历史。设置页按模块显示旧数据归属，journal 逐项记录会话、证书 pin 等待迁内容。
 2. **准备目标**：创建版本目录 `plugins/<slug>/versions/<version>.staging` 和独立数据目录；校验 `module.json`、平台、`coreApiVersion`、签名 trusted comment、路径和清单中的 `legacyTables`/`vaultFixedKeys`，任一步失败都清理 staging 并保留旧版核心可启动。
 3. **迁移数据**：先复制可直接归属插件的库和目录到 staging，再通过核心只读接口读取 `taomni.db` 中声明的 legacy 表；MFA 的 `data-key-v1` 仍由核心 Vault 按 slug 授权，插件宿主不获得 Vault 句柄。运行中的宿主在 `backup.snapshot` 完成前必须静默，避免热备份与写入交错。
 4. **提交和激活**：逐项完成后更新 journal 为 `staged`，对目标文件重新计算指纹并执行原子目录替换，最后切换 `active` 指针并写 `committed`。旧版核心和旧目录至少保留一个回滚点；插件下载、验签或启动失败时只回退 active 指针，不覆盖旧文件。
-5. **恢复和收尾**：恢复应用后重新扫描注册表，缺少插件或插件被用户取消时保留源数据，并在欢迎页显示“稍后安装”；只有用户显式勾选删除数据时才删除插件数据。全部项提交后 journal 标记 `complete`，保留迁移摘要和源指纹用于审计；中断或失败的 journal 可重试或回滚，不能被静默删除。
+5. **恢复和收尾**。恢复应用后按注册表与首装记录继续待处理项。保留源数据，在模块商店呈现安装或迁移进度。用户可重试中断项，或卸载已安装模块。所有数据项提交后，迁移 journal 标记 `complete` 并保留摘要和源指纹，供恢复或回滚时核对。
 
 TC-MODULES-027 在 GitHub 安装固定哈希的正式 deb/MSI/DMG，由旧程序创建 schema、重开合成 SSH/VNC 行，再由候选 release QA 核心在同一隔离 profile 执行预检、记录 pending 并正常重启。历史基线为 `0.5.9`，现用固定安装输入为 `0.5.10`。Windows 旧 GUI-subsystem 进程的强停记录为 crash 输入。生产 exporter、候选安装包替换、可信 staging/激活和回滚另有对应的验收场景。 [正式旧版安装验证](taomni-modular-installed-upgrade-verification.md)
 

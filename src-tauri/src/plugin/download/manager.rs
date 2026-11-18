@@ -275,6 +275,23 @@ impl DownloadManager {
         Some(task.lock().await.snapshot().clone())
     }
 
+    /// Observe a transfer that was already started, including across renderer reloads.
+    pub(crate) async fn wait_for_finished(&self, id: &str) -> Option<DownloadProgress> {
+        loop {
+            let finished = self.workers_changed.notified();
+            tokio::pin!(finished);
+            finished.as_mut().enable();
+            let progress = self.snapshot(id).await?;
+            if matches!(
+                progress.phase,
+                DownloadPhase::Completed | DownloadPhase::Cancelled | DownloadPhase::Failed
+            ) {
+                return Some(progress);
+            }
+            finished.await;
+        }
+    }
+
     pub async fn forget(&self, id: &str) -> Result<(), DownloadError> {
         self.recover().await;
         let mut state = self.state.lock().await;

@@ -19,6 +19,7 @@ mod migration_key_check;
 pub(crate) mod network;
 pub mod protocol;
 mod quiescence;
+pub(crate) mod release_state;
 mod runtime;
 pub(crate) mod services;
 pub use quiescence::QuiescenceGuard;
@@ -36,6 +37,7 @@ mod uninstallation;
 mod vault_lifecycle;
 pub mod verify;
 
+pub(crate) use installation::InstallIntent;
 pub(crate) use installation::current_platform;
 pub(crate) use signed_catalog::{fetch_trusted_catalog, package_from_cached_catalog};
 
@@ -82,6 +84,8 @@ pub struct ModuleManifest {
     pub id: String,
     pub slug: String,
     pub name: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub description: String,
     pub version: String,
     #[serde(rename = "coreApiVersion")]
     pub core_api_version: String,
@@ -358,6 +362,7 @@ impl PluginRegistry {
             .lock()
             .expect("plugin lifecycle lock poisoned");
         let installer = install::ModuleInstaller::new(&self.root);
+        let _mutation = installer.lock_mutations()?;
         let pointer = installer.active_pointer(slug)?;
         let previous = pointer
             .previous_version
@@ -551,6 +556,7 @@ fn placeholder_manifest(slug: &str) -> ModuleManifest {
         id: format!("taomni-plugin-{slug}"),
         slug: slug.to_owned(),
         name: slug.to_owned(),
+        description: String::new(),
         version: "0.0.0".into(),
         core_api_version: CORE_API_VERSION.into(),
         kind: PluginKind::Media,

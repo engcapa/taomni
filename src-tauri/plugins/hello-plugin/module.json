@@ -2,6 +2,7 @@
   "id": "taomni-plugin-hello-plugin",
   "slug": "hello-plugin",
   "name": "Hello Plugin",
+  "description": "Verify that a signed module can open its own tab and save text in a separate data directory.",
   "version": "0.1.0",
   "coreApiVersion": "1",
   "kind": "collaboration",

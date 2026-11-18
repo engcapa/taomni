@@ -50,6 +50,7 @@ export interface PluginManifest {
   id: string;
   slug: string;
   name: string;
+  description?: string;
   version: string;
   coreApiVersion: string;
   kind: PluginKind;
@@ -105,7 +106,7 @@ function isSafeRelativePath(value: unknown): value is string {
 }
 
 const MANIFEST_FIELDS = new Set([
-  "id", "slug", "name", "version", "coreApiVersion", "kind", "status", "removalCandidate", "platforms",
+  "id", "slug", "name", "description", "version", "coreApiVersion", "kind", "status", "removalCandidate", "platforms",
   "entry", "tabs", "commands", "permissions", "dataDir", "dataSchemaVersion", "backupPaths", "legacyTables", "vaultFixedKeys", "snapshot",
 ]);
 
@@ -129,6 +130,7 @@ export function validatePluginManifest(
     errors.push("id must equal taomni-plugin-<slug>");
   }
   if (typeof input.name !== "string" || input.name.trim().length === 0) errors.push("name is required");
+  if (input.description !== undefined && typeof input.description !== "string") errors.push("description must be a string");
   if (typeof input.version !== "string" || !VERSION.test(input.version)) errors.push("version must be a semantic version");
   const coreApiVersion = typeof input.coreApiVersion === "string" ? input.coreApiVersion : "";
   if (!coreApiVersion) errors.push("coreApiVersion is required");
@@ -178,6 +180,7 @@ export function validatePluginManifest(
       id: id as string,
       slug: slug as string,
       name: input.name as string,
+      ...(typeof input.description === "string" ? { description: input.description } : {}),
       version: input.version as string,
       coreApiVersion,
       kind: input.kind as PluginKind,

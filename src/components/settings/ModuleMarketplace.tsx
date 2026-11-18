@@ -15,7 +15,9 @@ export function ModuleMarketplace() {
   const refreshDownloads = useModuleDownloadStore((owner) => owner.refresh);
   const [source, setSource] = useState(state.source);
   const [query, setQuery] = useState("");
-  const [download, setDownload] = useState<{ entry: ModuleCatalogPlugin; selection: ModuleCatalogSelection; size: number } | null>(null);
+  const [download, setDownload] = useState<{
+    entry: ModuleCatalogPlugin; selection: ModuleCatalogSelection; size: number; installedVersion?: string;
+  } | null>(null);
   useEffect(() => { void state.refresh(); }, [state.refresh]);
 
   const entries = useMemo(() => Object.values(state.catalog?.catalog.plugins ?? {})
@@ -60,7 +62,11 @@ export function ModuleMarketplace() {
         const id = asset ? `module-${entry.slug}-${asset.sha256.toLowerCase()}` : null;
         const task = downloads.find((task) => task.id === id);
         const active = task && ["connecting", "downloading", "verifying"].includes(task.progress.phase);
-        const installed = records[entry.slug]?.activeVersion === entry.version;
+        const installedVersion = records[entry.slug]?.activeVersion;
+        const release = state.catalog?.release;
+        const update = !!installedVersion && installedVersion !== entry.version && release?.updates.includes(entry.id);
+        const legacyPending = release?.legacyPending.includes(entry.id);
+        const isNew = !installedVersion && release?.newModules.includes(entry.id);
         const compatible = entry.coreApiVersion === PLUGIN_CORE_API_VERSION;
         const busy = state.busy[entry.id];
         return <article key={entry.id} data-testid="module-marketplace-card" data-module-id={entry.id}
@@ -69,32 +75,43 @@ export function ModuleMarketplace() {
             <span>{entry.version} · {displaySize(asset?.size)}</span></div>
           <p className="mt-1 text-[var(--taomni-text-muted)]">{t(`plugins.category.${entry.kind ?? "other"}`)}</p>
           {entry.description && <p className="my-1">{entry.description}</p>}
-          {records[entry.slug]?.activeVersion && <p data-testid="module-marketplace-installed">
-            {t("plugins.marketInstalled", { version: records[entry.slug].activeVersion! })}
+          {installedVersion && <p data-testid="module-marketplace-installed">
+            {t("plugins.marketInstalled", { version: installedVersion })}
           </p>}
+          {update && <p data-testid="module-marketplace-update">{t("plugins.marketUpdateAvailable", { version: entry.version })}</p>}
+          {isNew && <p data-testid="module-marketplace-new">{t("plugins.marketNew")}</p>}
           {(!asset || !compatible) && <p data-testid="module-marketplace-unavailable">{t("plugins.marketUnavailable")}</p>}
           {task && <p data-testid="module-marketplace-task">{t(`plugins.downloadPhase${task.progress.phase}`)}</p>}
           {state.errors[entry.id] && <p data-testid="module-marketplace-action-error" role="alert" className="my-2 text-red-500">{state.errors[entry.id]}</p>}
           <div className="mt-2 flex gap-2">
-            {installed ? <span data-testid="module-marketplace-current">{t("plugins.marketCurrent")}</span>
-              : task?.progress.phase === "completed" ? <button type="button" data-testid="module-marketplace-review" className="taomni-btn"
-                disabled={!!busy || !compatible || !asset} onClick={() => { void state.openReview(selection(entry)); }}>{busy ? t("plugins.marketWorking") : t("plugins.marketReview")}</button>
-                : <button type="button" data-testid="module-marketplace-download" className="taomni-btn"
-                  disabled={!!busy || !asset || !compatible || !!active}
-                  onClick={() => setDownload({ entry, selection: selection(entry), size: asset.size })}>{busy ? t("plugins.marketWorking") : active ? t("plugins.downloadPhasedownloading") : t("plugins.marketDownload")}</button>}
+            {legacyPending && !installedVersion ? <button type="button" data-testid="module-marketplace-provision" className="taomni-btn"
+              disabled={!!busy || !asset || !compatible} onClick={() => { void state.provision(entry.id, true); }}>
+              {busy ? t("plugins.marketWorking") : t("plugins.marketLegacyResume")}
+            </button> : installedVersion && !update ? (
+              installedVersion === entry.version ? <span data-testid="module-marketplace-current">{t("plugins.marketCurrent")}</span> : null
+            ) : task?.progress.phase === "completed" ? <button type="button" data-testid="module-marketplace-review" className="taomni-btn"
+              disabled={!!busy || !compatible || !asset} onClick={() => { void state.openReview(selection(entry), installedVersion); }}>
+              {busy ? t("plugins.marketWorking") : t(update ? "plugins.marketReviewUpdate" : "plugins.marketReview")}
+            </button> : <button type="button" data-testid="module-marketplace-download" className="taomni-btn"
+              disabled={!!busy || !asset || !compatible || !!active}
+              onClick={() => setDownload({ entry, selection: selection(entry), size: asset.size, installedVersion })}>
+              {busy ? t("plugins.marketWorking") : active ? t("plugins.downloadPhasedownloading") : t(update ? "plugins.marketDownloadUpdate" : "plugins.marketDownload")}
+            </button>}
           </div>
         </article>;
       })}
     </div>
-    {download && <ConfirmDialog title={t("plugins.marketDownloadTitle")} confirmLabel={t("plugins.marketDownload")}
+    {download && <ConfirmDialog title={t(download.installedVersion ? "plugins.marketDownloadUpdateTitle" : "plugins.marketDownloadTitle")}
+      confirmLabel={t(download.installedVersion ? "plugins.marketDownloadUpdate" : "plugins.marketDownload")}
       message={[`${download.entry.name} ${download.entry.version}`, displaySize(download.size),
         permissionLabels(download.entry.permissions), `plugins/${download.entry.slug}/data/`, t("plugins.marketAuthorization")].join("\n\n")}
       onCancel={() => setDownload(null)} onConfirm={() => {
-        const requested = download.selection;
+        const { selection: requested, installedVersion } = download;
         setDownload(null);
-        void state.download(requested).then(() => refreshDownloads());
+        void state.download(requested, installedVersion).then(() => refreshDownloads());
       }} />}
-    {review && <ConfirmDialog title={t("plugins.marketInstallTitle")} confirmLabel={t("plugins.marketInstall")}
+    {review && <ConfirmDialog title={t(review.installedVersion ? "plugins.marketUpdateTitle" : "plugins.marketInstallTitle")}
+      confirmLabel={t(review.installedVersion ? "plugins.marketUpdate" : "plugins.marketInstall")}
       message={[`${review.detail.manifest.name} ${review.detail.manifest.version}`, permissionLabels(review.detail.manifest.permissions),
         review.detail.dataDirectory, t("plugins.marketAuthorization")].join("\n\n")}
       onCancel={state.dismissReview} onConfirm={() => { void state.install(); state.dismissReview(); }} />}

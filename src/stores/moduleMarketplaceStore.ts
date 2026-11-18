@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import {
-  downloadMarketplaceModule, fetchMarketplaceCatalog, installMarketplaceModule, reviewMarketplaceModule,
+  dismissNewMarketplaceModules, downloadMarketplaceModule, fetchMarketplaceCatalog, installMarketplaceModule,
+  provisionMarketplaceModule, reviewMarketplaceModule,
   type ModuleCatalogSelection, type ModuleDownloadInfo, type ModuleInstallReview, type ModuleMarketplaceCatalog,
 } from "../lib/ipc/plugin";
 import type { PluginRecord } from "../lib/pluginRegistry";
@@ -11,12 +12,14 @@ const message = (reason: unknown) => reason instanceof Error ? reason.message : 
 
 interface Adapter {
   catalog(url: string): Promise<ModuleMarketplaceCatalog>;
-  download(selection: ModuleCatalogSelection): Promise<ModuleDownloadInfo>;
+  download(selection: ModuleCatalogSelection, installedVersion?: string): Promise<ModuleDownloadInfo>;
   review(selection: ModuleCatalogSelection): Promise<ModuleInstallReview>;
-  install(selection: ModuleCatalogSelection): Promise<PluginRecord>;
+  install(selection: ModuleCatalogSelection, installedVersion?: string): Promise<PluginRecord>;
+  provision(selection: ModuleCatalogSelection, retry: boolean): Promise<void>;
+  dismiss(ids: readonly string[]): Promise<void>;
 }
 
-interface Review { selection: ModuleCatalogSelection; detail: ModuleInstallReview }
+interface Review { selection: ModuleCatalogSelection; detail: ModuleInstallReview; installedVersion?: string }
 interface State {
   source: string;
   catalog: ModuleMarketplaceCatalog | null;
@@ -26,11 +29,14 @@ interface State {
   busy: Record<string, string | undefined>;
   errors: Record<string, string | undefined>;
   review: Review | null;
+  dismissError: string | null;
   refresh(source?: string): Promise<void>;
-  download(selection: ModuleCatalogSelection): Promise<void>;
-  openReview(selection: ModuleCatalogSelection): Promise<void>;
+  download(selection: ModuleCatalogSelection, installedVersion?: string): Promise<void>;
+  openReview(selection: ModuleCatalogSelection, installedVersion?: string): Promise<void>;
   dismissReview(): void;
   install(): Promise<void>;
+  provision(id: string, retry?: boolean): Promise<void>;
+  dismissNew(ids: readonly string[]): Promise<void>;
 }
 
 function readSource(storage?: Pick<Storage, "getItem">) {
@@ -42,6 +48,7 @@ function readSource(storage?: Pick<Storage, "getItem">) {
  * manager and installer own trust, files and registry state. */
 export function createModuleMarketplaceStore(adapter: Adapter, storage?: Pick<Storage, "getItem" | "setItem">) {
   let revision = 0;
+  const attempted = new Set<string>();
   let pending: { source: string; result: Promise<void> } | null = null;
   const operations = new Map<string, Promise<void>>();
   return create<State>((set, get) => {
@@ -59,8 +66,16 @@ export function createModuleMarketplaceStore(adapter: Adapter, storage?: Pick<St
       operations.set(id, result);
       return result;
     };
+    const dropReleaseEntry = (id: string, field: "legacyPending" | "newModules") => {
+      set((state) => {
+        const catalog = state.catalog;
+        if (!catalog?.release?.[field].includes(id)) return state;
+        return { catalog: { ...catalog, release: { ...catalog.release, [field]: catalog.release[field].filter((current) => current !== id) } } };
+      });
+    };
     return {
       source: readSource(storage), catalog: null, catalogSource: null, loading: false, error: null, busy: {}, errors: {}, review: null,
+      dismissError: null,
       refresh(source = get().source) {
         source = source.trim();
         if (pending?.source === source) return pending.result;
@@ -76,7 +91,14 @@ export function createModuleMarketplaceStore(adapter: Adapter, storage?: Pick<St
         const changed = source !== get().source;
         set({ source, loading: true, error: null, ...(changed ? { review: null } : {}) });
         const result = adapter.catalog(source).then((catalog) => {
-          if (revision === started) set({ catalog, catalogSource: source, error: null });
+          if (revision !== started) return;
+          set({ catalog, catalogSource: source, error: null });
+          void (async () => {
+            for (const id of catalog.release?.legacyPending ?? []) {
+              if (revision !== started) return;
+              await get().provision(id);
+            }
+          })();
         }).catch((reason: unknown) => {
           if (revision === started) set({ error: message(reason) });
         }).finally(() => {
@@ -85,12 +107,14 @@ export function createModuleMarketplaceStore(adapter: Adapter, storage?: Pick<St
         pending = { source, result };
         return result;
       },
-      download(selection) { return run(selection, "download", async () => { await adapter.download(selection); }); },
-      openReview(selection) {
+      download(selection, installedVersion) {
+        return run(selection, "download", async () => { await adapter.download(selection, installedVersion); });
+      },
+      openReview(selection, installedVersion) {
         const started = revision;
         return run(selection, "review", async () => {
           const detail = await adapter.review(selection);
-          if (revision === started) set({ review: { selection, detail } });
+          if (revision === started) set({ review: { selection, detail, installedVersion } });
         });
       },
       dismissReview() { set({ review: null }); },
@@ -98,9 +122,36 @@ export function createModuleMarketplaceStore(adapter: Adapter, storage?: Pick<St
         const review = get().review;
         if (!review) return Promise.resolve();
         return run(review.selection, "install", async () => {
-          await adapter.install(review.selection);
+          await adapter.install(review.selection, review.installedVersion);
+          dropReleaseEntry(review.selection.pluginId, "newModules");
+          dropReleaseEntry(review.selection.pluginId, "legacyPending");
           if (get().review === review) set({ review: null });
         });
+      },
+      provision(id, retry = false) {
+        const snapshot = get().catalog;
+        const entry = snapshot?.catalog.plugins[id];
+        const asset = snapshot && entry?.platforms[snapshot.platform];
+        if (!entry || !asset || !snapshot?.release?.legacyPending.includes(id)) return Promise.resolve();
+        const selection = { pluginId: id, version: entry.version, sha256: asset.sha256 };
+        const attempt = `${id}:${asset.sha256}`;
+        const active = operations.get(id);
+        if (active) return active;
+        if (!retry && attempted.has(attempt)) return Promise.resolve();
+        attempted.add(attempt);
+        return run(selection, "provision", async () => {
+          await adapter.provision(selection, retry);
+          dropReleaseEntry(id, "legacyPending");
+        });
+      },
+      async dismissNew(ids) {
+        set({ dismissError: null });
+        try {
+          await adapter.dismiss(ids);
+          for (const id of ids) dropReleaseEntry(id, "newModules");
+        } catch (reason) {
+          set({ dismissError: message(reason) });
+        }
       },
     };
   });
@@ -109,4 +160,5 @@ export function createModuleMarketplaceStore(adapter: Adapter, storage?: Pick<St
 export const useModuleMarketplaceStore = createModuleMarketplaceStore({
   catalog: fetchMarketplaceCatalog, download: downloadMarketplaceModule,
   review: reviewMarketplaceModule, install: installMarketplaceModule,
+  provision: provisionMarketplaceModule, dismiss: dismissNewMarketplaceModules,
 }, typeof localStorage === "undefined" ? undefined : localStorage);

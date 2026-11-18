@@ -2728,7 +2728,7 @@ export const zhCN: DeepPartial<typeof en> = {
     moduleStoreRollback: "回滚到 {version}",
     moduleStoreUninstallConfirm: "确定卸载 {name}？除非勾选删除模块数据，否则会保留模块数据。",
     moduleUpgradeTitle: "升级现有 Taomni 数据",
-    moduleUpgradeSubtitle: "此配置包含 Taomni {version} 的数据。复制文件前请先确认检测到的模块。",
+    moduleUpgradeSubtitle: "迁移前可查看从 Taomni {version} 检测到的旧数据。",
     moduleUpgradeRetained: "为备份保留的旧文件：{count}",
     moduleUpgradeNone: "未检测到需要迁移的旧模块数据。",
     moduleUpgradeMigrate: "迁移检测到的数据",

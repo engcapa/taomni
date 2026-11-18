@@ -8,10 +8,12 @@ components: [PluginRegistry, MigrationJournal]
 files:
   - src/lib/pluginRegistry.ts
   - src/components/settings/ModuleMarketplace.tsx
+  - src/components/plugins/ModuleReleaseNotice.tsx
   - src/stores/moduleMarketplaceStore.ts
   - src/lib/ipc/plugin.ts
   - src-tauri/src/commands/plugin_marketplace.rs
   - src-tauri/src/plugin/marketplace.rs
+  - src-tauri/src/plugin/release_state.rs
   - src/lib/pluginDataContract.ts
   - src/lib/pluginLoader.ts
   - src/lib/pluginFrontendHost.ts
@@ -91,6 +93,35 @@ controls:
   - id: module-marketplace-current
     selector: '[data-testid="module-marketplace-current"]'
     kind: display
+  - id: module-marketplace-update
+    selector: '[data-testid="module-marketplace-update"]'
+    kind: display
+  - id: module-marketplace-new
+    selector: '[data-testid="module-marketplace-new"]'
+    kind: display
+  - id: module-release-notice
+    selector: '[data-testid="module-release-notice"]'
+    kind: display
+  - id: module-release-new
+    selector: '[data-testid="module-release-new"]'
+    kind: display
+  - id: module-release-new-item
+    selector: '[data-testid="module-release-new-item"]'
+    kind: display
+  - id: module-release-open-store
+    selector: '[data-testid="module-release-open-store"]'
+    kind: interactive
+  - id: module-release-later
+    selector: '[data-testid="module-release-later"]'
+    kind: interactive
+  - id: module-release-legacy
+    selector: '[data-testid="module-release-legacy"]'
+    kind: display
+    optional: true # automatic installation can complete before the next rendered frame
+  - id: module-marketplace-provision
+    selector: '[data-testid="module-marketplace-provision"]'
+    kind: interactive
+    optional: true # signed transfer interruption is also covered by shared download controls
   - id: module-marketplace-review
     selector: '[data-testid="module-marketplace-review"]'
     kind: interactive

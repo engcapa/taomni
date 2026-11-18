@@ -11,6 +11,8 @@ export async function invokePlugin<T>(command: string, args?: Record<string, unk
     case "plugin_marketplace_download":
     case "plugin_marketplace_review":
     case "plugin_marketplace_install":
+    case "plugin_marketplace_dismiss_new":
+    case "plugin_marketplace_provision":
       return invokeMarketplacePreview(command, args) as T;
     case "plugin_download_list":
     case "plugin_download_cancel":

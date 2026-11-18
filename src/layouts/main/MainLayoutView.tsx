@@ -27,6 +27,7 @@ import { TaoAlertPoller } from "../../components/tao/TaoAlertPoller";
 import { TabOverview } from "../../components/tabbar/TabOverview";
 import { MultiExecBar } from "../../components/terminal/MultiExecBar";
 import { UpdateDialog } from "../../components/UpdateDialog";
+import { ModuleReleaseNotice } from "../../components/plugins/ModuleReleaseNotice";
 import { ServersTabBlockedDialog } from "../../components/servers/ServersTabBlockedDialog";
 import { VaultUnlockDialog } from "../../components/vault/VaultUnlockDialog";
 import { WindowResizeHandles } from "../../components/window/WindowResizeHandles";
@@ -383,6 +384,7 @@ export function MainLayoutView(props: MainLayoutViewProps) {
 
         {chrome.chatDrawerBottomPinned && <ChatDrawer />}
 
+        <ModuleReleaseNotice openSettings={utilityTabs.openSettingsTab} />
         <StatusBar />
 
         <MfaFloatingWindow

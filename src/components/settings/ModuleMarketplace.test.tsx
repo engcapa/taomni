@@ -44,7 +44,7 @@ describe("official module catalog", () => {
     expect(download).not.toHaveBeenCalled();
     fireEvent.click(screen.getByTestId("module-marketplace-download"));
     fireEvent.click(screen.getByTestId("confirm-dialog-confirm"));
-    expect(download).toHaveBeenCalledWith({ pluginId: entry.id, version: entry.version, sha256: "a".repeat(64) });
+    expect(download).toHaveBeenCalledWith({ pluginId: entry.id, version: entry.version, sha256: "a".repeat(64) }, undefined);
     expect(useModuleStore.getState().records).toEqual({});
   });
 

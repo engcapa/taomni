@@ -58,6 +58,12 @@
 
 ## 当前结论
 
+### 升级策略调整
+
+- 应用在打开核心库前记录 profile 来源。旧单体首次升级处理签名目录 `legacyUpgrade` 中本机适用的全部模块。已完成和卸载状态跨重启保留。模块数据沿用各自的只读预检和迁移 journal。
+- 后续更新按实际 active 版本给出候选，提交前再次核对 active 版本，保留禁用状态。目录中新出现的兼容模块会在主窗口显示名称和功能说明，用户可去模块商店安装或稍后处理。已见模块 ID 存于 profile 的 `.module-release.json`。
+- 第一批测试覆盖 Rust 的 profile 来源判定、首装断点收敛、禁用更新和卸载竞态，以及 TC-MODULES-040 native 首装/卸载重启、041 browser 新模块提示和选装。正式首批模块清单、完整业务迁移和发布包验收继续按 TASK-012、TASK-023 执行。
+
 核心仍包含旧 profile 的 MFA、Servers、SocksCap、远程桌面和本地语音等业务代码、状态与依赖。hello-plugin 和 MFA 已取得签名安装结果。已提交迁移的 MFA profile 通过签名宿主读写账户和生成验证码，原数据继续用作回退资料。主窗和分离窗已支持动态加载模块前端，MFA 的正式前端和新装 profile 仍待迁出。LanChat 功能已删除，历史 `lanchat.sqlite` 和 `lanchat.db` 保留原位。
 
 生产设置可以用可信包和原 Vault 口令启动 MFA 离线迁移及自动重启，其它候选项仍由通用升级入口记录只读预检和 pending journal。已安装正式旧版写入 MFA、候选安装件替换及回滚仍需各自的端到端证据。

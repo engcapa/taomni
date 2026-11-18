@@ -56,6 +56,30 @@ impl ModuleInstaller {
         &self.root
     }
 
+    /// Serialize pointer changes across desktop processes sharing the profile.
+    pub(super) fn lock_mutations(&self) -> Result<fs::File, InstallError> {
+        fs::create_dir_all(&self.root)?;
+        let path = self.root.join(".registry-mutations.lock");
+        match fs::symlink_metadata(&path) {
+            Ok(metadata) if !metadata.is_file() || super::data_contract::is_link(&metadata) => {
+                return Err(InstallError::InvalidPointer(
+                    "invalid registry mutation lock".into(),
+                ));
+            }
+            Ok(_) => {}
+            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
+            Err(error) => return Err(error.into()),
+        }
+        let lock = fs::OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(path)?;
+        lock.lock()?;
+        Ok(lock)
+    }
+
     pub fn version_dir(&self, slug: &str, version: &str) -> Result<PathBuf, InstallError> {
         validate_slug(slug)?;
         validate_version(version)?;

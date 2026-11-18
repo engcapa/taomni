@@ -2,6 +2,12 @@
 
 use super::*;
 
+pub(crate) enum InstallIntent<'a> {
+    Explicit,
+    Update(&'a str),
+    Legacy,
+}
+
 impl PluginRegistry {
     /// Retained IPC contract: arbitrary renderer directories are never trusted.
     /// Callers must supply a signed archive through the verified installer.
@@ -21,15 +27,43 @@ impl PluginRegistry {
         &self,
         package: &verify::VerifiedPackage,
     ) -> Result<PluginRecord, PluginError> {
+        self.install_with_intent(package, InstallIntent::Explicit)?
+            .ok_or_else(|| PluginError::InvalidManifest("explicit install was skipped".into()))
+    }
+
+    pub(crate) fn install_with_intent(
+        &self,
+        package: &verify::VerifiedPackage,
+        intent: InstallIntent<'_>,
+    ) -> Result<Option<PluginRecord>, PluginError> {
         let _lifecycle = self
             .lifecycle
             .lock()
             .expect("plugin lifecycle lock poisoned");
+        if self
+            .shutting_down
+            .load(std::sync::atomic::Ordering::Acquire)
+            || self.quiescence.load(std::sync::atomic::Ordering::Acquire) != 0
+        {
+            return Err(PluginError::HostRequest(
+                "Module operations are paused; retry when Taomni is ready".into(),
+            ));
+        }
         let manifest = package.manifest();
         self.validate_manifest_fields(manifest)?;
         let slug = &manifest.slug;
         let installer = install::ModuleInstaller::new(&self.root);
+        let _mutation = installer.lock_mutations()?;
         let previous = installer.active_pointer(slug)?;
+        match intent {
+            InstallIntent::Legacy
+                if previous.active_version.is_some() || previous.previous_version.is_some() =>
+            {
+                return Ok(None);
+            }
+            InstallIntent::Update(version) => check_update(&previous, version, &manifest.version)?,
+            _ => {}
+        }
         verify::validate_candidate_version(
             previous
                 .active_version
@@ -52,6 +86,7 @@ impl PluginRegistry {
         self.activate_transaction(manifest, &previous, || {
             installer.activate(slug, &manifest.version)
         })
+        .map(Some)
     }
 
     /// Roll back metadata and the in-memory projection together if publishing
@@ -111,6 +146,27 @@ impl PluginRegistry {
         }
         result
     }
+}
+
+pub(crate) fn check_update(
+    pointer: &install::ActivePointer,
+    installed: &str,
+    candidate: &str,
+) -> Result<(), PluginError> {
+    if pointer.active_version.as_deref() != Some(installed) {
+        return Err(PluginError::InvalidManifest(
+            "Installed module changed; refresh the module store before updating".into(),
+        ));
+    }
+    if !verify::compare_versions(candidate, installed)
+        .map_err(|error| PluginError::InvalidManifest(error.to_string()))?
+        .is_gt()
+    {
+        return Err(PluginError::InvalidManifest(
+            "Module update must be newer than the installed version".into(),
+        ));
+    }
+    Ok(())
 }
 
 /// The platform is owned by the native core; a renderer cannot override it.

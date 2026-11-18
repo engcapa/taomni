@@ -46,6 +46,9 @@ impl ProfileRuntimeLeases {
         let mode = ModeLease::acquire(data, mode)?;
         // Applies a pending restore under exclusive ownership before any DB opens.
         let profile = crate::backup::coordination::ProfileLease::prepare(data)?;
+        if let Err(error) = crate::plugin::release_state::initialize(data) {
+            tracing::warn!(%error, "Could not initialize module release state");
+        }
         let generation = super::generation::current(data)?;
         Ok(Self {
             generation,

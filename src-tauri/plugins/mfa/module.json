@@ -2,6 +2,7 @@
   "id": "taomni-plugin-mfa",
   "slug": "mfa",
   "name": "MFA Authenticator",
+  "description": "Manage two-factor authentication accounts and generate time-based and counter-based one-time codes.",
   "version": "0.1.0",
   "coreApiVersion": "1",
   "kind": "auth",

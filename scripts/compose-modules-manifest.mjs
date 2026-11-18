@@ -80,8 +80,11 @@ function validateModuleManifest(input, coreApiVersion) {
   if (input.permissions !== undefined && (!Array.isArray(input.permissions) || input.permissions.some((permission) => typeof permission !== "string"))) {
     throw new Error(`module ${slug} has invalid permissions`);
   }
+  if (input.description !== undefined && typeof input.description !== "string") {
+    throw new Error(`module ${slug} has an invalid description`);
+  }
   return { id, slug, version, name: typeof input.name === "string" ? input.name : slug, coreApiVersion, platforms: input.platforms,
-    kind: input.kind, permissions: input.permissions?.slice().sort() };
+    kind: input.kind, permissions: input.permissions?.slice().sort(), description: input.description?.trim(), status: input.status };
 }
 
 function packagePlatform(packagePath, manifest) {
@@ -136,6 +139,7 @@ export function composeModulesManifest({
   updatedAt = new Date().toISOString(),
   requireManifestSignature = false,
   manifestSignaturePath,
+  legacyUpgrade,
 }) {
   if (!/^v\d+\.\d+\.\d+(?:-[\da-zA-Z.-]+)?(?:\+[\da-zA-Z.-]+)?$/.test(tag)) throw new Error("Invalid release tag");
   if (!/^[\w.-]+\/[\w.-]+$/.test(repository)) throw new Error("Invalid GitHub repository");
@@ -148,6 +152,7 @@ export function composeModulesManifest({
   if (packages.length === 0) throw new Error("No .taomni-plugin packages found");
   const baseUrl = `https://github.com/${repository}/releases/download/${encodeURIComponent(tag)}`;
   const plugins = new Map();
+  const manifests = new Map();
   const assets = [];
   const names = new Set();
 
@@ -163,6 +168,12 @@ export function composeModulesManifest({
     const assetName = basename(packagePath);
     if (names.has(assetName)) throw new Error(`Conflicting plugin release asset filename: ${assetName}`);
     names.add(assetName);
+    const published = manifests.get(manifest.id);
+    if (published && (published.status !== manifest.status || published.description !== manifest.description ||
+        [...published.platforms].sort().join() !== [...manifest.platforms].sort().join())) {
+      throw new Error(`Plugin ${manifest.slug} has inconsistent metadata across platforms`);
+    }
+    manifests.set(manifest.id, manifest);
     const plugin = plugins.get(manifest.id) ?? {
       id: manifest.id,
       slug: manifest.slug,
@@ -171,6 +182,7 @@ export function composeModulesManifest({
       coreApiVersion: manifest.coreApiVersion,
       ...(manifest.kind !== undefined ? { kind: manifest.kind } : {}),
       ...(manifest.permissions !== undefined ? { permissions: manifest.permissions } : {}),
+      ...(manifest.description ? { description: manifest.description } : {}),
       platforms: {},
     };
     if (plugin.version !== manifest.version) throw new Error(`Plugin ${manifest.slug} has multiple versions in one release`);
@@ -188,10 +200,30 @@ export function composeModulesManifest({
     assets.push({ packagePath, signaturePath: signature.path, assetName });
   }
 
+  if (legacyUpgrade !== undefined) {
+    if (!Array.isArray(legacyUpgrade) || new Set(legacyUpgrade).size !== legacyUpgrade.length) {
+      throw new Error("legacyUpgrade must contain unique module IDs");
+    }
+    for (const id of legacyUpgrade) {
+      const module = manifests.get(id);
+      if (id === "taomni-plugin-lanchat" || module?.status !== "stable" || !module.description) {
+        throw new Error(`legacyUpgrade requires a stable module with a description: ${id}`);
+      }
+      if (module.platforms.some((platform) => !plugins.get(id).platforms[platform])) {
+        throw new Error(`legacyUpgrade requires all declared platform assets for ${id}`);
+      }
+    }
+    for (const module of manifests.values()) {
+      if (module.status === "stable" && !module.description) {
+        throw new Error(`Stable module ${module.id} needs a description for the module store`);
+      }
+    }
+  }
   const manifest = {
     coreApiVersion: String(coreApiVersion),
     sequence: Number(sequence),
     updatedAt,
+    ...(legacyUpgrade !== undefined ? { legacyUpgrade: [...legacyUpgrade].sort() } : {}),
     plugins: Object.fromEntries([...plugins].sort(([a], [b]) => a.localeCompare(b))),
   };
   mkdirSync(outputDir, { recursive: true });
@@ -219,6 +251,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     updatedAt: process.env.MODULE_UPDATED_AT ?? new Date().toISOString(),
     requireManifestSignature: process.env.MODULES_REQUIRE_SIGNATURE === "1",
     manifestSignaturePath: process.env.MODULES_MANIFEST_SIGNATURE,
+    legacyUpgrade: process.env.MODULES_LEGACY_UPGRADE_IDS?.split(",").map((id) => id.trim()).filter(Boolean),
   });
   console.log(`Staged ${result.assets.length} plugin packages for ${Object.keys(result.manifest.plugins).length} plugins${result.signedManifest ? " with signed modules.json" : ""}`);
 }

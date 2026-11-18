@@ -33,6 +33,7 @@ pub fn write(output: &Path, receipt: &Value, signer: &ReleaseSigner) -> Result<(
         "id":id, "slug":receipt["slug"], "name":manifest["name"],
         "version":receipt["version"], "coreApiVersion":receipt["coreApiVersion"],
         "kind":manifest["kind"], "permissions":manifest["permissions"],
+        "description":manifest["description"].as_str().unwrap_or("Exercise the official module lifecycle."),
         "platforms":{(platform):{"url":format!("{ORIGIN}/{archive}"), "signature":signature,
             "sha256":receipt["sha256"],"size":receipt["size"]}}
     });
@@ -41,7 +42,7 @@ pub fn write(output: &Path, receipt: &Value, signer: &ReleaseSigner) -> Result<(
     for (name, sequence) in [("modules.json", 42), ("modules-older.json", 41)] {
         let raw = serde_json::to_vec_pretty(&json!({
             "coreApiVersion":receipt["coreApiVersion"], "sequence":sequence,
-            "updatedAt":"2026-11-16T00:00:00Z", "plugins":{(id):plugin}
+            "updatedAt":"2026-11-16T00:00:00Z", "legacyUpgrade":[id], "plugins":{(id):plugin}
         }))?;
         let path = output.join(name);
         fs::write(&path, raw)?;

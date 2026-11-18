@@ -443,6 +443,8 @@ pub(super) fn handles(command: &str) -> bool {
             | "plugin_marketplace_download"
             | "plugin_marketplace_review"
             | "plugin_marketplace_install"
+            | "plugin_marketplace_provision"
+            | "plugin_marketplace_dismiss_new"
             | "plugin_migration_inspect"
             | "plugin_migration_execute"
             | "plugin_mfa_migrate_and_restart"
@@ -474,6 +476,8 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         crate::commands::plugin_marketplace::plugin_marketplace_download,
         crate::commands::plugin_marketplace::plugin_marketplace_review,
         crate::commands::plugin_marketplace::plugin_marketplace_install,
+        crate::commands::plugin_marketplace::plugin_marketplace_provision,
+        crate::commands::plugin_marketplace::plugin_marketplace_dismiss_new,
         crate::commands::plugin::plugin_migration_inspect,
         crate::commands::plugin::plugin_migration_execute,
         crate::commands::plugin::plugin_mfa_migrate_and_restart,

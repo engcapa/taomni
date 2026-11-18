@@ -75,8 +75,8 @@ fn fixture(root: &Path) -> (CatalogSelection, Vec<u8>) {
 fn plans_only_signed_native_asset_and_stable_content_paths() {
     let root = tempdir().unwrap();
     let (selection, bytes) = fixture(root.path());
-    let first = download_plan(root.path(), &selection).unwrap();
-    let second = download_plan(root.path(), &selection).unwrap();
+    let first = download_plan(root.path(), &selection, None).unwrap();
+    let second = download_plan(root.path(), &selection, None).unwrap();
     assert_eq!(first.id, second.id);
     assert_eq!(first.partial_path, second.partial_path);
     assert_eq!(first.url, "https://example.test/official.taomni-plugin");
@@ -110,7 +110,7 @@ fn stale_version_hash_and_absent_identity_cannot_select_other_bytes() {
             ..selection.clone()
         },
     ] {
-        assert!(download_plan(root.path(), &altered).is_err());
+        assert!(download_plan(root.path(), &altered, None).is_err());
     }
     assert!(!root.path().join(".downloads").exists());
 }
@@ -129,7 +129,7 @@ fn renderer_cannot_supply_platform_url_path_or_trust_flags() {
 fn review_requires_completed_signed_archive_and_tampering_is_rechecked() {
     let root = tempdir().unwrap();
     let (selection, bytes) = fixture(root.path());
-    let plan = download_plan(root.path(), &selection).unwrap();
+    let plan = download_plan(root.path(), &selection, None).unwrap();
     assert!(prepare_install(root.path(), &selection).is_err());
     fs::create_dir_all(plan.partial_path.parent().unwrap()).unwrap();
     fs::write(&plan.partial_path, &bytes).unwrap();
@@ -166,9 +166,9 @@ fn native_platform_is_required_and_unsigned_or_missing_cache_fails_closed() {
             .replace("MFA", "Changed")
     );
     fs::write(&cache, serde_json::to_vec(&envelope).unwrap()).unwrap();
-    assert!(download_plan(root.path(), &selection).is_err());
+    assert!(download_plan(root.path(), &selection, None).is_err());
     fs::remove_file(cache).unwrap();
-    assert!(download_plan(root.path(), &selection).is_err());
+    assert!(download_plan(root.path(), &selection, None).is_err());
 }
 
 #[test]
@@ -189,7 +189,7 @@ fn catalog_permissions_and_category_must_match_the_actual_signed_package() {
         envelope["signature"] = serde_json::json!(sign(payload.as_bytes(), "file=modules.json"));
         envelope["payload"] = serde_json::json!(payload);
         fs::write(&path, serde_json::to_vec(&envelope).unwrap()).unwrap();
-        let plan = download_plan(root.path(), &selection).unwrap();
+        let plan = download_plan(root.path(), &selection, None).unwrap();
         fs::create_dir_all(plan.completed_path.parent().unwrap()).unwrap();
         fs::write(plan.completed_path, bytes).unwrap();
         assert!(

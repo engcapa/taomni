@@ -1,0 +1,53 @@
+import { useEffect } from "react";
+import { useT } from "../../lib/i18n";
+import { isTauriRuntime } from "../../lib/runtime";
+import { openSettingsSection } from "../../lib/settingsNavigation";
+import { useModuleMarketplaceStore } from "../../stores/moduleMarketplaceStore";
+
+export function ModuleReleaseNotice({ openSettings }: { openSettings(): void }) {
+  const t = useT();
+  const snapshot = useModuleMarketplaceStore((state) => state.catalog);
+  const refresh = useModuleMarketplaceStore((state) => state.refresh);
+  const dismiss = useModuleMarketplaceStore((state) => state.dismissNew);
+  const dismissError = useModuleMarketplaceStore((state) => state.dismissError);
+
+  useEffect(() => {
+    if (!isTauriRuntime()) return;
+    const initial = window.setTimeout(() => void refresh(), 4000);
+    const periodic = window.setInterval(() => void refresh(), 6 * 60 * 60 * 1000);
+    return () => {
+      window.clearTimeout(initial);
+      window.clearInterval(periodic);
+    };
+  }, [refresh]);
+
+  const plan = snapshot?.release;
+  const newModules = (plan?.newModules ?? []).flatMap((id) => {
+    const entry = snapshot?.catalog.plugins[id];
+    return entry ? [entry] : [];
+  });
+  const legacyPending = plan?.legacyPending.length ?? 0;
+  if (!newModules.length && !legacyPending && !plan?.legacyWaiting) return null;
+
+  return <aside data-testid="module-release-notice" className="max-h-40 overflow-y-auto border-t border-[var(--taomni-divider)] px-3 py-2 text-[12px]">
+    {!!legacyPending && <p data-testid="module-release-legacy">{t("plugins.marketLegacyPending", { count: legacyPending })}</p>}
+    {plan?.legacyWaiting && <p data-testid="module-release-legacy">{t("plugins.marketLegacyWaiting")}</p>}
+    {!!newModules.length && <div data-testid="module-release-new">
+      <p className="font-semibold">{t("plugins.marketNewTitle")}</p>
+      <ul className="space-y-1">
+        {newModules.map((entry) => <li key={entry.id} data-testid="module-release-new-item" data-module-id={entry.id}>
+          <span className="font-medium">{entry.name}</span> — {entry.description}
+        </li>)}
+      </ul>
+    </div>}
+    {dismissError && <p role="alert">{dismissError}</p>}
+    <div className="mt-2 flex gap-2">
+      <button type="button" data-testid="module-release-open-store" className="taomni-btn" onClick={() => {
+        openSettingsSection("module-store");
+        openSettings();
+      }}>{t("plugins.browse")}</button>
+      {!!newModules.length && <button type="button" data-testid="module-release-later" className="taomni-btn"
+        onClick={() => void dismiss(newModules.map((entry) => entry.id))}>{t("plugins.marketLater")}</button>}
+    </div>
+  </aside>;
+}

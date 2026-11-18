@@ -6,6 +6,7 @@ fn manifest(slug: &str) -> ModuleManifest {
         id: format!("taomni-plugin-{slug}"),
         slug: slug.into(),
         name: slug.into(),
+        description: String::new(),
         version: "1.0.0".into(),
         core_api_version: CORE_API_VERSION.into(),
         kind: PluginKind::Auth,

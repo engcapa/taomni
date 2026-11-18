@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 use super::{
     ModuleManifest, PluginError, current_platform,
     download::{DownloadRequest, ModuleCatalog, ProxyRoute},
+    release_state::ReleasePlan,
     signed_catalog::read_cached_catalog,
     verify::{VerifiedCatalog, VerifiedPackage},
 };
@@ -28,6 +29,7 @@ pub struct CatalogSelection {
 pub struct MarketplaceCatalog {
     pub catalog: ModuleCatalog,
     pub platform: String,
+    pub release: ReleasePlan,
 }
 
 #[derive(Debug, Serialize)]
@@ -41,9 +43,17 @@ pub struct InstallReview {
 pub fn download_plan(
     plugin_root: &Path,
     selection: &CatalogSelection,
+    installed_version: Option<&str>,
 ) -> Result<DownloadRequest, PluginError> {
     let verified = read_cached_catalog(plugin_root)?;
-    plan_from_catalog(plugin_root, selection, &verified, current_platform())
+    let plan = plan_from_catalog(plugin_root, selection, &verified, current_platform())?;
+    if let Some(installed_version) = installed_version {
+        let plugin = &verified.catalog().plugins[&selection.plugin_id];
+        let pointer =
+            super::install::ModuleInstaller::new(plugin_root).active_pointer(&plugin.slug)?;
+        super::installation::check_update(&pointer, installed_version, &plugin.version)?;
+    }
+    Ok(plan)
 }
 
 fn plan_from_catalog(
