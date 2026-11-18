@@ -41,6 +41,24 @@ export interface LlmProviderConfig {
   custom_proxy?: AppProxyConfig;
   proxy_session_id?: string | null;
   proxy_url?: string | null;
+  custom?: CustomLlmProviderConfig;
+}
+
+export type CustomLlmProtocol = "anthropic" | "openai-compat" | "openai-responses";
+export type LlmReasoningEffort = "none" | "minimal" | "low" | "medium" | "high" | "xhigh" | "max";
+
+export interface CustomLlmModelConfig {
+  id: string;
+  context_window: number;
+  max_output_tokens: number;
+  multimodal: boolean;
+  reasoning_efforts: LlmReasoningEffort[];
+  native_search: boolean;
+}
+
+export interface CustomLlmProviderConfig {
+  label: string;
+  models: CustomLlmModelConfig[];
 }
 
 export interface LlmProviderCapabilities {
@@ -90,7 +108,7 @@ export interface AiConfig {
 export interface DeepSeekAppConfig {
   enabled: boolean;
   provider?: string;
-  reasoning_effort?: "low" | "medium" | "high" | "max";
+  reasoning_effort?: LlmReasoningEffort;
   model: "deepseek-flash" | "deepseek-v4-pro" | string;
   thinking_default: boolean;
   search_default: boolean;
@@ -98,7 +116,7 @@ export interface DeepSeekAppConfig {
   title_enabled: boolean;
   voice_provider: "local" | "deepseek" | string;
   tts_voice: "stella" | "tide" | string;
-  cost_confirm_threshold_cny: number;
+  cost_confirm_threshold_usd: number;
 }
 
 export interface CcCustomSettingsProfile {
@@ -218,6 +236,7 @@ export interface AiStore {
   loadConfig: () => Promise<void>;
   saveConfig: (config: AiConfig) => Promise<void>;
   updateLlmProvider: (id: string, provider: LlmProviderConfig) => void;
+  removeCustomLlmProvider: (id: string) => void;
   updateTaoDefaults: (options: Partial<DeepSeekAppConfig>) => void;
   updateLlmProviderGroup: (id: string, group: LlmProviderGroupConfig) => void;
   removeLlmProviderGroup: (id: string) => void;

@@ -54,6 +54,10 @@ it("never strips existing markup on focus/blur or during composition", () => {
 });
 it("keeps formatted readonly cells on focus and sanitizes inline HTML", () => {
   const { view, cell } = editor(true);
+  const table = cell.closest("[data-testid='markdown-table-widget']");
+  expect(table).toHaveAttribute("data-markdown-block-from", String(source.indexOf("|")));
+  expect(cell).toHaveAttribute("contenteditable", "false");
+  expect(cell).not.toHaveAttribute("tabindex");
   cell.focus();
   expect(cell.querySelector("strong")).toHaveTextContent("死循环防护");
   fireEvent.input(cell);

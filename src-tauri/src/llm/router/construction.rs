@@ -82,7 +82,10 @@ pub fn build_router_with_proxy_db(
             tracing::info!(provider = %id, "skipping provider without chat capability in LLM router");
             continue;
         }
-        if full_local_mode && !crate::ai::network_policy::is_local_runtime(&p.runtime) {
+        if full_local_mode
+            && !(crate::ai::network_policy::is_local_runtime(&p.runtime)
+                || p.custom.is_some() && crate::ai::network_policy::is_local_url(&p.base_url))
+        {
             tracing::info!(provider = %id, runtime = %p.runtime, "skipping cloud provider in full-local mode");
             continue;
         }
@@ -90,6 +93,7 @@ pub fn build_router_with_proxy_db(
         if !matches!(
             p.runtime.as_str(),
             "openai-compat"
+                | "openai-responses"
                 | "llama-server"
                 | "ollama"
                 | "anthropic"
@@ -135,6 +139,17 @@ pub fn build_router_with_proxy_db(
                     p.model.clone(),
                     proxy_error.clone().unwrap(),
                 ),
+                _ if p.custom.is_some() => match crate::llm::configured::ConfiguredProvider::new(
+                    id,
+                    p,
+                    &resolved_key,
+                    proxy_url.clone(),
+                ) {
+                    Ok(provider) => Arc::new(provider),
+                    Err(error) => {
+                        crate::llm::opencode_go::unavailable(id.clone(), p.model.clone(), error)
+                    }
+                },
                 "opencode-go" => Arc::new(crate::llm::opencode_go::OpenCodeGoProvider::new(
                     id.clone(),
                     p.base_url.clone(),
@@ -169,7 +184,7 @@ pub fn build_router_with_proxy_db(
                         proxy_url.clone(),
                     ))
                 }
-                _ => unreachable!("runtime was checked above"),
+                _ => continue,
             };
             variants.push(provider);
         }

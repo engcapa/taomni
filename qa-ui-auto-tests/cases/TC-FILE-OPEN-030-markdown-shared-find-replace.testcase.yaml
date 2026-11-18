@@ -1,0 +1,199 @@
+id: TC-FILE-OPEN-030
+title: Markdown modes share the editor find and replace controls
+description: Open Find from Live, Source and Split. Browse supports navigation and displays the current rendered match with write
+  actions disabled. Editing replaces individual matches and all remaining hits in the same document.
+modes:
+- browser
+- native
+covers:
+- F-FILEOPEN-1
+tags:
+- p1
+- regression
+- markdown
+- file-open
+fixtures:
+- reset_db
+- file_open_files
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-home-markdown-isolated
+- reload_window: null
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-file-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Control+l
+    macos_key: Meta+l
+- fill:
+    selector: '[data-testid="explorer-address"]'
+    value: ${fixture.file_open_root}
+- press:
+    key: Enter
+    selector: '[data-testid="explorer-address"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="live.md"]'
+- wait_for: '[data-testid="markdown-editor"][data-mode="live"]'
+- press:
+    key: Control+f
+    selector: '[data-testid="markdown-live"]'
+    macos_key: Meta+f
+- wait_for: '[data-testid="code-workspace-editor-search"]'
+- fill:
+    selector: '[data-testid="code-workspace-editor-search"] input[name=''search'']'
+    value: open
+- assert_text:
+    selector: '[data-testid="code-workspace-editor-search"] .cm-workspace-search-status'
+    contains: '2'
+- eval_readonly:
+    expression: CSS.highlights.get('markdown-find-current')?.size===1
+    expect_truthy: true
+    timeout_sec: 10
+- click: '[data-testid="code-workspace-editor-search"] button[aria-label="Next match"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-editor-search"] .cm-workspace-search-status'
+    contains: 2 / 2
+- click: '[data-testid="code-workspace-editor-search"] button[aria-label="Previous match"]'
+- assert_text:
+    selector: '[data-testid="code-workspace-editor-search"] .cm-workspace-search-status'
+    contains: 1 / 2
+- click: '[data-testid="code-workspace-editor-search"] button[aria-label="Show replace"]'
+- assert_disabled: '[data-testid="code-workspace-editor-search"] button[aria-label="Replace current match"]'
+- assert_disabled: '[data-testid="code-workspace-editor-search"] button[aria-label="Replace all matches"]'
+- click: '[data-testid="markdown-live-edit"]'
+- assert_enabled: '[data-testid="code-workspace-editor-search"] button[aria-label="Replace all matches"]'
+- fill:
+    selector: '[data-testid="code-workspace-editor-search"] input[name=''replace'']'
+    value: review
+- click: '[data-testid="code-workspace-editor-search"] button[aria-label="Replace current match"]'
+- click: '[data-testid="markdown-mode-source"]'
+- press:
+    key: Control+f
+    selector: '[data-testid="markdown-source"]'
+    macos_key: Meta+f
+- assert_attribute:
+    selector: '[data-testid="code-workspace-editor-search"] input[name=''search'']'
+    name: value
+    equals: open
+- eval_readonly:
+    expression: document.querySelector('.fv-md-source-pane .cm-content').textContent.includes('File review Markdown')
+    expect_truthy: true
+    timeout_sec: 10
+- assert_text:
+    selector: '[data-testid="code-workspace-editor-search"] .cm-workspace-search-status'
+    contains: 1 / 1
+- click: '[data-testid="markdown-mode-split"]'
+- press:
+    key: Control+r
+    selector: '[data-testid="markdown-preview"]'
+    macos_key: Meta+r
+- wait_for: '[data-testid="code-workspace-editor-search"] input[name=''replace'']'
+- click: '[data-testid="code-workspace-editor-search"] button[aria-label="Replace all matches"]'
+- eval_readonly:
+    expression: document.querySelector('.fv-md-source-pane .cm-content').textContent.includes('reviewFile')
+    expect_truthy: true
+    timeout_sec: 10
+- assert_text:
+    selector: '[data-testid="markdown-preview"] h1'
+    contains: File review Markdown
+- assert_attribute:
+    selector: '[data-testid="file-viewer"]'
+    name: data-dirty
+    equals: 'true'
+- click: '[data-testid="viewer-save"]'
+- wait_for: '[data-testid="file-viewer"][data-dirty="false"]'
+- screenshot: markdown-shared-find.png
+- press:
+    key: Escape
+    selector: '[data-testid="code-workspace-editor-search"] input[name=''search'']'
+- assert_not_visible: '[data-testid="code-workspace-editor-search"]'
+- click: '[data-testid="markdown-mode-live"]'
+- press:
+    key: Control+f
+    selector: '[data-testid="markdown-live"]'
+    macos_key: Meta+f
+- wait_for: '[data-testid="code-workspace-editor-search"]'
+- assert_attribute:
+    selector: '[data-testid="code-workspace-editor-search"] input[name=''search'']'
+    name: value
+    equals: open
+- assert_text:
+    selector: '[data-testid="code-workspace-editor-search"] .cm-workspace-search-status'
+    contains: '0'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Open Find from Live, Source and Split. Browse supports navigation and displays the current rendered match with
+      write actions disabled. Editing replaces individual matches and all remaining hits in the same document.
+    actions:
+    - 1
+    - 2
+    - 4
+    - 5
+    - 7
+    - 8
+    - 9
+    - 10
+    - 12
+    - 14
+    - 17
+    - 19
+    - 21
+    - 24
+    - 26
+    - 27
+    - 28
+    - 29
+    - 33
+    - 34
+    - 36
+    - 40
+    - 43
+    - 45
+    - 46
+    checkpoints:
+    - step: 16
+      expectation: Actual rendered Live match is highlighted.
+    - step: 18
+      expectation: Next selects the second occurrence.
+    - step: 20
+      expectation: Previous returns to the first occurrence.
+    - step: 23
+      expectation: Browse cannot replace.
+    - step: 25
+      expectation: Edit enables replacement in the already open toolbar.
+    - step: 31
+      expectation: First replacement persists in the shared source.
+    - step: 38
+      expectation: Split preview reflects the new heading.
+    - step: 41
+      expectation: Save clears the dirty state.
+    - step: 44
+      expectation: Escape closes Find.
+    - step: 48
+      expectation: The same search term remains selected on reopen.
+    - step: 49
+      expectation: Replacement removed all matches.
+    results:
+    - 16
+    - 18
+    - 20
+    - 23
+    - 25
+    - 31
+    - 38
+    - 41
+    - 44
+    - 48
+    - 49
+  visual:
+  - check: Toolbar and current content remain visible.
+    method: manual
+    reason: Screenshot retains the real setup and content.
+  native:
+  - check: Real app shortcuts, document owner and save
+    method: automated
+    reason: Native uses the packaged WebView and saves the actual file. Native macOS key delivery runs through the WKWebView bridge.

@@ -30,6 +30,22 @@
 .fv-md-live-surface .cm-content{font-family:var(--taomni-font-sans,Inter,system-ui,-apple-system,"Segoe UI",sans-serif)!important}
 .fv-md-live-surface .cm-scroller{font-size:15px}
 .fv-md-live-surface .cm-line{white-space:pre-wrap;overflow-wrap:anywhere}
+.fv-md-syntax-marker{color:var(--taomni-code-syntax-punctuation,var(--text))}
+.fv-markdown .cm-workspace-search-row{flex-wrap:wrap}
+.fv-markdown .cm-workspace-search-field{flex-basis:min(260px, 100%)}
+::highlight(markdown-find-match){background:#ffe28a;color:#241800}
+::highlight(markdown-find-current){background:#fca65d;color:#2b1400}
+
+.fv-markdown[data-mode="live"][data-editing="false"] .cm-content {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.fv-markdown[data-mode="live"][data-editing="false"] .cm-content::selection,
+.fv-markdown[data-mode="live"][data-editing="false"] .cm-content *::selection {
+  background-color: var(--text);
+  color: var(--bg);
+}
 /* CM's break-spaces belongs to editable source, not marked's HTML formatting
    newlines. Otherwise each serializer newline adds a full 26.25px blank line. */
 .fv-md-rendered-block,.fv-md-table-wrap,.fv-md-image{white-space:normal}

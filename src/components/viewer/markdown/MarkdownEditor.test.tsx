@@ -46,15 +46,44 @@ beforeEach(() => {
 afterEach(() => { cleanup(); style.remove(); useDocumentStore.setState({ documents: {} }); });
 
 describe("MarkdownEditor real host lifecycle", () => {
+  it("keeps the shared find panel across modes and permits replacement only in the editing surface", () => {
+    render(<Harness />);
+    fireEvent.keyDown(screen.getByTestId("markdown-live"), { key: "f", ctrlKey: true });
+    const panel = screen.getByTestId("code-workspace-editor-search");
+    const find = screen.getByRole("searchbox", { name: "Find" });
+    fireEvent.input(find, { target: { value: "Details" } });
+    fireEvent.click(screen.getByRole("button", { name: "Show replace" }));
+    expect(screen.getByRole("button", { name: "Replace all matches" })).toBeDisabled();
+    fireEvent.input(screen.getByLabelText("Replace", { selector: "input" }), { target: { value: "Outline" } });
+    expect(useDocumentStore.getState().documents["/docs/a.md"].content).toContain("## Details");
+
+    fireEvent.click(screen.getByTestId("markdown-mode-split"));
+    expect(screen.getByTestId("code-workspace-editor-search")).toBe(panel);
+    expect(find).toHaveValue("Details");
+    fireEvent.click(screen.getByRole("button", { name: "Replace all matches" }));
+    expect(useDocumentStore.getState().documents["/docs/a.md"].content).toContain("## Outline");
+
+    fireEvent.click(screen.getByTestId("markdown-mode-live"));
+    expect(screen.getByRole("button", { name: "Replace all matches" })).toBeDisabled();
+    fireEvent.keyDown(find, { key: "Escape" });
+    expect(screen.queryByTestId("code-workspace-editor-search")).not.toBeInTheDocument();
+  });
+
   it("keeps exactly one import/export control while actual editor selections and modes change", () => {
     render(<Harness />);
+    const importDrawio = screen.getByRole("button", { name: "Import draw.io" });
+    const insertImage = screen.getByRole("button", { name: "Insert image" });
+    expect(screen.getByRole("toolbar", { name: "Markdown formatting" })).toContainElement(importDrawio);
+    expect(insertImage.nextElementSibling).toBe(importDrawio);
+    expect(importDrawio).toBeDisabled();
     fireEvent.click(screen.getByTestId("markdown-live-edit"));
+    expect(importDrawio).toBeEnabled();
     const view = EditorView.findFromDOM(screen.getByTestId("viewer-editor").querySelector<HTMLElement>(".cm-editor")!)!;
     for (const mode of ["live", "source", "split", "live"] as const) {
       fireEvent.click(screen.getByTestId(`markdown-mode-${mode}`));
       for (const anchor of [source.indexOf("Details"), 0, source.indexOf("bold"), source.length, 3]) {
         act(() => view.dispatch({ selection: { anchor, head: Math.min(source.length, anchor + 3) } }));
-        expect(screen.getAllByTestId("markdown-import-drawio")).toHaveLength(1);
+        expect(screen.getAllByTestId("markdown-import-drawio")).toEqual([importDrawio]);
         expect(screen.getAllByTestId("markdown-export")).toHaveLength(1);
       }
     }

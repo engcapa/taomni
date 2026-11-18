@@ -20,6 +20,8 @@ export class TableWidget extends WidgetType {
     if (!runtime || runtime.widget.context !== this.context || runtime.widget.table.rows.length !== this.table.rows.length || runtime.widget.table.align.length !== this.table.align.length) return false;
     runtime.widget = this;
     dom.dataset.tableFrom = String(this.from);
+    dom.dataset.markdownBlockFrom = String(this.from);
+    dom.dataset.markdownBlockLength = String(this.raw.length);
     dom.querySelectorAll<HTMLElement>("[data-cell-row]").forEach((cell) => {
       const column = Number(cell.dataset.cellColumn);
       runtime.cells.get(cell)?.sync();
@@ -33,6 +35,8 @@ export class TableWidget extends WidgetType {
     root.className = "fv-md-table-wrap";
     root.dataset.testid = "markdown-table-widget";
     root.dataset.tableFrom = String(this.from);
+    root.dataset.markdownBlockFrom = String(this.from);
+    root.dataset.markdownBlockLength = String(this.raw.length);
     const runtime: Runtime = { widget: this, cells: new Map() };
     runtimes.set(root, runtime);
     const label = this.context.label;
@@ -79,12 +83,10 @@ export class TableWidget extends WidgetType {
       Array.from({ length: this.table.align.length }, (_, columnIndex) => {
         const cell = document.createElement(rowIndex ? "td" : "th");
         cell.setAttribute("contenteditable", this.context.readOnly ? "false" : "true");
-        cell.spellcheck = false;
-        cell.tabIndex = 0;
         cell.dataset.cellRow = String(rowIndex);
         cell.dataset.cellColumn = String(columnIndex);
         cell.style.textAlign = this.table.align[columnIndex] || "left";
-        cell.setAttribute("aria-label", label(`第 ${rowIndex + 1} 行，第 ${columnIndex + 1} 列`, `Row ${rowIndex + 1}, column ${columnIndex + 1}`));
+        row.append(cell);
         const activate = () => {
           activeRow = rowIndex; activeColumn = columnIndex;
           root.querySelectorAll(".is-active").forEach((node) => node.classList.remove("is-active"));
@@ -100,6 +102,10 @@ export class TableWidget extends WidgetType {
             rows[rowIndex][columnIndex] = source;
             return commit({ rows, align: current.align }, edit);
           } }));
+        if (this.context.readOnly) return;
+        cell.spellcheck = false;
+        cell.tabIndex = 0;
+        cell.setAttribute("aria-label", label(`第 ${rowIndex + 1} 行，第 ${columnIndex + 1} 列`, `Row ${rowIndex + 1}, column ${columnIndex + 1}`));
         cell.onkeydown = (event) => {
           if (event.isComposing) return;
           if ((event.ctrlKey || event.metaKey) && ["z", "y", "s", "p"].includes(event.key.toLowerCase()) && runScopeHandlers(view, event, "editor")) {
@@ -118,12 +124,12 @@ export class TableWidget extends WidgetType {
           index = Math.min(index, (runtime.widget.table.rows.length + 1) * columns - 1);
           focusCell(Math.floor(index / columns), index % columns);
         };
-        row.append(cell);
       });
       (rowIndex ? body : head).append(row);
     });
     table.append(head, body);
-    root.append(tools, table);
+    if (!this.context.readOnly) root.append(tools);
+    root.append(table);
     root.addEventListener("focusout", () => queueMicrotask(() => { if (!root.contains(document.activeElement)) root.classList.remove("is-active"); }));
     return root;
   }

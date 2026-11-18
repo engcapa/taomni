@@ -113,13 +113,14 @@ from . import module_download_preview
 from . import module_marketplace, module_marketplace_preview
 from . import module_execution
 from . import tao_llm
+from . import tao_custom_llm
 from . import tao_messages
 from . import tao_real_provider
 from . import tao_agent
 from . import tao_memory
 from . import tao_history
 from . import markdown_quality
-from . import markdown_drawio
+from . import markdown_drawio, markdown_drawio_roundtrip
 from . import markdown_testing
 
 
@@ -154,7 +155,9 @@ REGISTRY: dict[str, Fixture] = {
     "markdown_testing": Fixture("markdown_testing", markdown_testing.setup, markdown_testing.teardown),
     "markdown_quality": Fixture("markdown_quality", markdown_quality.setup, markdown_quality.teardown),
     "markdown_drawio": Fixture("markdown_drawio", markdown_drawio.setup, markdown_drawio.teardown),
+    "markdown_drawio_roundtrip": Fixture("markdown_drawio_roundtrip", markdown_drawio_roundtrip.setup),
     "tao_llm": Fixture("tao_llm", tao_llm.setup, tao_llm.teardown),
+    "tao_custom_llm": Fixture("tao_custom_llm", tao_custom_llm.setup, tao_custom_llm.teardown),
     "tao_messages": Fixture("tao_messages", tao_messages.setup, tao_messages.teardown),
     "tao_real_provider": Fixture("tao_real_provider", tao_real_provider.setup, tao_real_provider.teardown),
     "tao_agent": Fixture("tao_agent", tao_agent.setup, tao_agent.teardown),

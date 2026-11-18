@@ -1,0 +1,117 @@
+id: TC-WELCOME-RS-N-05-home-cold-restore
+title: Home restores a saved terminal after normal process restart
+description: Create and launch a saved local shell. Restart through the production exit confirmation, then restore from Home with
+  Enter. A repeat locates the existing live PTY.
+modes:
+- native
+covers:
+- F1.6
+- F1.11
+tags:
+- p1
+- regression
+- welcome
+- tao-home
+fixtures:
+- reset_db
+timeout_sec: 270
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-home-markdown-isolated
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- wait_for: '[data-testid="welcome-restore-status"][data-state="empty"]'
+- assert_disabled: '[data-testid="welcome-restore-last-session"]'
+- click: '[data-testid="tao-home-new-session"]'
+- click: '[data-testid="session-proto-shell"]'
+- click: '[data-testid="session-section-bookmark"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: QA Cold Shell
+- click: '[data-testid="session-save"]'
+- click: '[data-testid="side-tab-sessions"]'
+- dblclick: '[data-testid="session-tree-item"][data-session-name="QA Cold Shell"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+- click: '[data-testid="nav-mode-home"]'
+- wait_for: '[data-testid="welcome-restore-status"][data-state="available"]'
+- native_restart_app:
+    expect_exit_confirmation:
+      title: Exit
+      message: There is 1 open tab, including 1 terminal session. Exit Taomni and close them?
+      confirm_label: Exit
+- wait_for: '[data-testid="welcome-restore-status"][data-state="available"]'
+- assert_text:
+    selector: '[data-testid="welcome-restore-status"][data-state="available"]'
+    contains: QA Cold Shell
+- assert_count:
+    selector: '[data-testid="tab-item"][data-tab-type="terminal"]'
+    equal: 0
+- press:
+    key: Enter
+    selector: '[data-testid="welcome-restore-last-session"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+- assert_count:
+    selector: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
+    equal: 1
+- click: '[data-testid="nav-mode-home"]'
+- wait_for: '[data-testid="welcome-restore-status"][data-state="succeeded"]'
+- click: '[data-testid="welcome-restore-last-session"]'
+- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+- assert_count:
+    selector: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
+    equal: 1
+- assert_no_runtime_errors: null
+- screenshot: home-cold-restore.png
+verification:
+  review: reviewed
+  requirements:
+  - id: COLD-RESTORE
+    requirement: The Home action recovers the persisted snapshot and a live PTY on a new app process.
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 7
+    - 8
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+    - 15
+    - 17
+    - 21
+    - 24
+    - 26
+    checkpoints:
+    - step: 5
+      expectation: Empty state is visible before any session is opened.
+    - step: 16
+      expectation: Home sees the committed candidate before exit.
+    - step: 19
+      expectation: The restarted process presents the saved shell by name.
+    - step: 20
+      expectation: No terminal is active before restore.
+    - step: 22
+      expectation: Keyboard activation starts a ready terminal.
+    - step: 25
+      expectation: Home retains the success result.
+    - step: 28
+      expectation: Repeat keeps one live terminal.
+    results:
+    - 5
+    - 16
+    - 19
+    - 20
+    - 22
+    - 25
+    - 28
+  native:
+  - check: Normal process restart and actual PTY readiness
+    method: automated
+    reason: Native process ownership and persisted SQLite snapshot are required.
+  visual:
+  - check: Inspect the resulting controls and content in the case screenshots or WebView.
+    method: manual
+    reason: The automated checkpoints verify the semantic states independently.

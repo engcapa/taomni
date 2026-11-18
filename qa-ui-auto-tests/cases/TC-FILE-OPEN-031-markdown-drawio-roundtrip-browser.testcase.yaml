@@ -1,0 +1,96 @@
+id: TC-FILE-OPEN-031
+title: Markdown draw.io round trip with genuine Desktop reference (browser)
+description: >
+  Import from the left formatting toolbar. Compare Live browse and Split preview pixels
+  against a PNG exported by draw.io Desktop. Check exported XML against the original
+  editable shapes, labels, geometry, styles and edge terminals.
+covers: [F-FILEOPEN-1, F-EXPLORER-1]
+modes: [browser]
+tags: [p1, markdown, drawio, regression]
+fixtures: [reset_db, markdown_drawio_roundtrip]
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-drawio-roundtrip
+- reload_window: null
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-file-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Control+l
+    macos_key: Meta+l
+- fill:
+    selector: '[data-testid="explorer-address"]'
+    value: ${fixture.platform_workspace_root}
+- press:
+    selector: '[data-testid="explorer-address"]'
+    key: Enter
+- dblclick: '[data-testid="explorer-file-row"][data-name="drawio-roundtrip.md"]'
+- wait_for: '[data-testid="markdown-editor"][data-mode="live"]'
+- assert_visible: '.fv-md-format [data-testid="markdown-insert-image"] + [data-testid="markdown-import-drawio"]'
+- assert_disabled: '.fv-md-format [data-testid="markdown-import-drawio"]'
+- click: '[data-testid="markdown-live-edit"]'
+- wait_for: '.fv-md-format [data-testid="markdown-import-drawio"]:enabled'
+- click: '.fv-md-format [data-testid="markdown-import-drawio"]'
+- upload_file:
+    selector: '[data-testid="markdown-drawio-input"]'
+    path: ${fixture.drawio_roundtrip_input}
+- wait_for: '[data-testid="markdown-drawio-import-dialog"]'
+- click: '[data-testid="markdown-drawio-import-diagram"]'
+- click: '[data-testid="markdown-drawio-import-confirm"]'
+- click: '[data-testid="markdown-live-edit"]'
+- wait_for: '[data-testid="markdown-live"] .fv-md-drawio > svg'
+- assert_drawio_preview: live
+- click: '[data-testid="markdown-outline-toggle"]'
+- click: '[data-testid="markdown-mode-split"]'
+- wait_for: '[data-testid="markdown-preview"] .fv-md-drawio > svg'
+- assert_drawio_preview: split
+- assert_text:
+    selector: '[data-testid="markdown-preview"]'
+    contains: Keep this Markdown outside the diagram.
+- click: '[data-testid="viewer-save"]'
+- click: '[data-testid="markdown-export"]'
+- click: '[data-testid="markdown-export-drawio"]'
+- wait_for: '[data-testid="markdown-drawio-export-settings"]'
+- select_option:
+    selector: '[data-testid="markdown-drawio-scope"]'
+    value: images
+- select_option:
+    selector: '[data-testid="markdown-drawio-layout"]'
+    value: separate
+- assert_download:
+    trigger: '[data-testid="markdown-drawio-save"]'
+    filename: drawio-roundtrip.drawio
+- assert_drawio_roundtrip: download
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: DRAWIO-IMPORT-AND-EXPORT-FIDELITY
+    requirement: Import from the left toolbar and preserve the original drawing through both previews and editable re-export.
+    actions: [14, 17, 19, 20, 25, 33, 34, 35]
+    checkpoints:
+    - step: 12
+      expectation: Import draw.io is immediately after Insert image in the left formatting group.
+    - step: 13
+      expectation: Import stays disabled in Live browse.
+    - step: 15
+      expectation: Import becomes available when editing is enabled.
+    - step: 23
+      expectation: Live browse preserves the shapes, labels, colors and arrows in the Desktop reference.
+    - step: 27
+      expectation: Split preview preserves the same visible diagram.
+    - step: 28
+      expectation: Surrounding Markdown remains visible.
+    - step: 36
+      expectation: The exported sheet retains editable cells, style, geometry and all edge terminals.
+    results: [12, 13, 15, 23, 27, 28, 36]
+  native:
+  - check: Host Open and Save dialogs and file bytes
+    method: not-applicable
+    reason: TC-FILE-OPEN-032 covers the actual dialogs and disk writes.
+  visual:
+  - check: Uploaded draw.io appearance in Live browse and Split preview
+    method: automated
+    reason: Compare captured PNG pixels by color and position against the independent Desktop PNG, and retain the reference, captures and difference.

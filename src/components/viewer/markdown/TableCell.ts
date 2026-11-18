@@ -22,6 +22,18 @@ export class TableCell {
   private destroyed = false;
 
   constructor(private cell: HTMLElement, private view: EditorView, private options: CellOptions) {
+    cell.onclick = (event) => {
+      const anchor = event.target instanceof Element ? event.target.closest("a") : null;
+      if (!anchor) return;
+      event.preventDefault();
+      event.stopPropagation();
+      const href = anchor.getAttribute("href") || "";
+      if (/^(https?:|mailto:)/i.test(href)) void openExternalUrl(href).catch((error: unknown) => {
+        if (!this.destroyed) options.context.onError(String(error));
+      });
+    };
+    this.sync();
+    if (options.context.readOnly) return;
     cell.onfocus = () => { options.activate(); this.edit(); };
     cell.onblur = () => { this.editing = false; if (!this.composing) this.sync(); };
     cell.addEventListener("compositionstart", () => {
@@ -44,18 +56,8 @@ export class TableCell {
     cell.onmousedown = (event) => {
       // Keep the rendered anchor alive until click instead of focusing the
       // editable cell and replacing it with source on pointer down.
-      if ((event.target as Element).closest("a")) event.preventDefault();
+      if (event.target instanceof Element && event.target.closest("a")) event.preventDefault();
     };
-    cell.onclick = (event) => {
-      const anchor = (event.target as Element).closest("a");
-      if (!anchor) return;
-      event.preventDefault(); event.stopPropagation();
-      const href = anchor.getAttribute("href") || "";
-      if (/^(https?:|mailto:)/i.test(href)) void openExternalUrl(href).catch((error: unknown) => {
-        if (!this.destroyed) options.context.onError(String(error));
-      });
-    };
-    this.sync();
   }
 
   private edit(): void {

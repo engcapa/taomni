@@ -130,6 +130,6 @@ export const DEFAULT_CONFIG: AiConfig = {
     title_enabled: true,
     voice_provider: "local",
     tts_voice: "stella",
-    cost_confirm_threshold_cny: 0.5,
+    cost_confirm_threshold_usd: 0,
   },
 };

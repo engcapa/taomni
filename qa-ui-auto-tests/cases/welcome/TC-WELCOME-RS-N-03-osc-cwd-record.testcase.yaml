@@ -2,6 +2,7 @@ id: TC-WELCOME-RS-N-03-osc-cwd-record
 title: 'Native: plain local terminal OSC 7 cwd records local-cwd directory use'
 covers:
 - F1.6
+- F1.11
 tags:
 - welcome
 - native-gate
@@ -23,7 +24,8 @@ steps:
 - wait: 8
 - click: '[data-testid="nav-mode-home"]'
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="welcome-history-tab-directories"]'
+- click: '[data-testid="tao-home-history"]'
+- click: '[data-testid="tao-home-history-popover"] [data-testid="tao-home-history-tab-directories"]'
 - wait_for: '[data-testid="welcome-local-directories"]'
 - assert_visible: '[data-testid="welcome-local-directory"]'
 - screenshot: F1.6-native-osc-cwd.png
@@ -38,6 +40,7 @@ verification:
     - 4
     - 7
     - 9
+    - 10
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
@@ -45,13 +48,13 @@ verification:
       expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"]", "timeout_sec": 30}}'
     - step: 8
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 10
-      expectation: '{"wait_for": "[data-testid=\"welcome-local-directories\"]"}'
     - step: 11
+      expectation: '{"wait_for": "[data-testid=\"welcome-local-directories\"]"}'
+    - step: 12
       expectation: '{"assert_visible": "[data-testid=\"welcome-local-directory\"]"}'
     results:
-    - 10
     - 11
+    - 12
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

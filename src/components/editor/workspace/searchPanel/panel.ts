@@ -314,7 +314,7 @@ export class WorkspaceSearchPanel implements Panel {
         .map(({ from, to }) => ({ from: update.changes.mapPos(from, 1), to: update.changes.mapPos(to, -1) }))
         .filter(({ from, to }) => to > from);
     }
-    if (update.docChanged || update.selectionSet) this.updateStatus();
+    if (update.docChanged || update.selectionSet || update.startState.readOnly !== update.state.readOnly) this.updateStatus();
   }
 
   private commit(): void {

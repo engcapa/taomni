@@ -42,6 +42,6 @@ export function hasPlaintextVaultableKey(provider: LlmProviderConfig): boolean {
       key.length > 0 &&
       !key.startsWith("vault:") &&
       provider.runtime !== "llama-server" &&
-      key !== "local",
+      (key !== "local" || provider.custom !== undefined),
   );
 }
