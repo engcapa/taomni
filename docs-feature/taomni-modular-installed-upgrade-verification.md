@@ -66,3 +66,5 @@ macOS 保留原始 `codesign` 与 `spctl` 结果。直接 CLI 启动、没有浏
 使用 Release Bundle 的仅产出 artifacts 模式生成 QA 版本 `0.5.11`。在 QA Modular Upgrade Contracts 设置 `package_upgrade_linux=true`，传入构建 run ID、完整源码 SHA 和包版本。工作流按上传的资产 ID 下载真实 deb，用同一源码为 Linux 生成签名 MFA 包。 [候选包构建 #44243313388](https://github.com/engcapa/taomni/actions/runs/44243313388)
 
 GitHub Linux runner 从已安装的 `0.5.10` 界面创建合成 MFA 账户，经正常退出后在同一 XDG profile 上更换安装件。候选通过离线维护迁移，实际 UI 解锁并推进计数。降级到原 deb 时核对旧二进制指纹及旧库验证码，再装候选时核对候选指纹及模块中的新验证码。安装命令、源码和包 receipt、界面关闭及逐阶段结果归档在 `installed-linux-mfa-upgrade-<run-id>`。
+
+GitHub Linux x64 已完成全程。候选源码 `c660c6bb68578e7943594fff33a2963af65f659a` 的 deb 来自构建资产 `14403262209`，SHA-256 为 `c65382dc50e7e7e20c276c26aabb5143eba9b6e761eab8cdf63177a522906544`。原位升级到 `0.5.11 amd64` 后，原口令解锁成功，HOTP 从 `287 082` 推进到 `359 152`。降级到 `0.5.10 amd64` 核对了原二进制指纹与原库 `287 082`。重装 `0.5.11` 再读取模块计数，得到 `359 152`。资料来自核对过的发布安装件和同一隔离 profile。 [实际安装和回滚 #44250423203](https://github.com/engcapa/taomni/actions/runs/44250423203)

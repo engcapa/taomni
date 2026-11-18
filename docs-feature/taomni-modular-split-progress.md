@@ -1,5 +1,15 @@
 # 模块化实施与验收台账
 
+2026-11-18 再次 fetch 并合并 `origin/main`。远程仍为 `5fabcdd32`，当前分支已包含该提交，合并无冲突。
+
+`e7270860e` 新增 `TC-MODULES-038`。准备与候选源码和 macOS 架构匹配的正式签名 MFA 包，经正常设置页提交和退出后观察新进程。断言涵盖错密码、已提交的 journal、模块启用状态、原账户及 HOTP 续号。设置页的拒绝与文件选择仍由 036/037 覆盖。使用 macOS 15 Intel release QA 执行 browser、native 和完整 crash-regression，分片完成即下载。 [签名重启专项 #44238711034](https://github.com/engcapa/taomni/actions/runs/44238711034)
+
+`v0.5.10` 同标签重新上传四个安装件。Linux 和 macOS 的 027 在 fixture 下载阶段发现资产长度变化，旧运行保留。 `0e0711c8c` 改用重新核对的资产 ID、长度及 SHA-256，并通过 GitHub Releases API 按 ID 取件。三端 release QA 复跑 025、027 和完整 native crash-regression。 [历史失败 #44229808559](https://github.com/engcapa/taomni/actions/runs/44229808559) · [重新固定输入](taomni-modular-installed-upgrade-verification.md#正式-0510-安装输入) · [安装复验 #44238716077](https://github.com/engcapa/taomni/actions/runs/44238716077)
+
+`c660c6bb6` 将下载移到独立的 GitHub runner 准备步骤。只读授权随 API 初始请求发送，安装前重新验长和验哈希。025、027 已在 Linux、Windows 和 macOS Intel 通过，三端 browser 各 **23/23**。Linux、Windows、macOS Intel native 分别 **28/29、28/28、28/29**。039 已完成旧 deb 安装、原桌面建号、正常退出和签名 MFA 提交。038 已完成设置页提交、正常退出（exit 0）、新 PID 自动接管及提交后计数 1 的文件核验。两项的后续 UI 都遇到了启动 Vault 解锁框。代码 `dc7b2ec66` 先解锁并等待对话框关闭，再操作 Settings 或 Tools，保留原口令和 HOTP 检查。 [三端矩阵 #44242675844](https://github.com/engcapa/taomni/actions/runs/44242675844) · [最新版 MFA 复跑 #44249448069](https://github.com/engcapa/taomni/actions/runs/44249448069)
+
+`bc6ccffb1` 为 Linux 接入实际 deb 替换和降级复验。runner 已从正式 `0.5.10` 安装件建号，在同一 XDG profile 安装候选 `0.5.11`、执行签名迁移并推进 HOTP。降级复原旧二进制及旧计数，重装候选再次获取模块的新计数，七个阶段均已核验。Windows MSI 和 macOS DMG 还需各自的安装件替换与回滚证据。 [Linux 替换和回滚场景](taomni-modular-installed-upgrade-verification.md#linux-安装件替换与回滚) · [候选构建 #44243313388](https://github.com/engcapa/taomni/actions/runs/44243313388) · [原位升级 #44250423203](https://github.com/engcapa/taomni/actions/runs/44250423203)
+
 2026-11-18 再次合入远程 main `5fabcdd32`（#830），合并提交 `f5221ae94`，无冲突。核心版本随 `package.json` 更新为 `0.5.10`。合并后的第一轮使用固定校验的正式 `0.5.9` 安装件。`v0.5.10` 发布齐备后，`2c6047668` 将现用 `TC-MODULES-027` 切换到该版本的四个固定资产，保留 0.5.9 历史运行。 [正式安装输入](taomni-modular-installed-upgrade-verification.md) · [0.5.10 三端验收 #44220816594](https://github.com/engcapa/taomni/actions/runs/44220816594)
 
 `76c3f94e9` 将严格校验为 committed 的 MFA profile 接到签名宿主，覆盖原命令的账户读写、偏好、HOTP、导出和 reset。原生导出在 Vault 层验密后向该操作授予一次性授权，reset 在排空准入并取得独占 Vault lease 后执行。迁移后的备份走模块数据，旧归档的 MFA/Vault 对恢复到模块数据目录，原 `mfa.db` 继续作为迁移回退资料。语法错误、重复记录或未知目标使 MFA 拒绝访问。缺失或停用的宿主返回错误，重新启用可以访问已提交的数据。
@@ -46,9 +56,9 @@
 
 ## 当前结论
 
-核心仍包含 MFA、Servers、SocksCap、远程桌面和本地语音等业务代码、状态与依赖。hello-plugin 已有签名安装验证；MFA engine 与真实 SDK 宿主原型的两处 RPC 修复已由匹配源码的三端真实宿主门及 Linux 真实 Vault 门复验。MFA 四目标签名包已产出，源码 `fd9bf01cf` 的 Linux、Windows、macOS ARM64 正式安装门各通过 3 项实际场景，产品 facade 尚未切换。主窗/分离窗动态前端已实现，刷新可见模式、macOS 同源 ESM 和重复 Settings tab 修复正随最新 UI run 验证。LanChat 已删除；历史 `lanchat.sqlite` / `lanchat.db` 保留原位，不读取、不迁移、不删除。
+核心仍包含旧 profile 的 MFA、Servers、SocksCap、远程桌面和本地语音等业务代码、状态与依赖。hello-plugin 和 MFA 已取得签名安装结果。已提交迁移的 MFA profile 通过签名宿主读写账户和生成验证码，原数据继续用作回退资料。主窗和分离窗已支持动态加载模块前端，MFA 的正式前端和新装 profile 仍待迁出。LanChat 功能已删除，历史 `lanchat.sqlite` 和 `lanchat.db` 保留原位。
 
-生产升级 IPC 当前只记录只读预检、源指纹与 pending journal。缺少可信插件包和真实 exporter 时，不复制旧数据、不创建伪插件版本、不改变 active 指针。测试 fixture 的 staging/回滚原语不能算真实旧版升级验收。
+生产设置可以用可信包和原 Vault 口令启动 MFA 离线迁移及自动重启，其它候选项仍由通用升级入口记录只读预检和 pending journal。已安装正式旧版写入 MFA、候选安装件替换及回滚仍需各自的端到端证据。
 
 签名安装门、宿主生产监督、共享采集/RDP 公共库、CoreState/统一 bootstrap、正常退出与可逆静默已集成。生产工厂、scoped 入口、持久 profile generation、Vault IPC 协调，以及普通凭据消费者和仍在核心的 MFA facade 的服务准入已接入；源码 `fdd05d232` 的契约 #43819768258 已 23/23 jobs 成功，其 UI #43819770975 的 22 个 shard 已收齐：三端 browser 各 50/50、Linux Xvfb native 50/50、Windows native 48/48、macOS native 47/47；Wayland 46/50，四个既有无关失败按下文单列。离线 v2 备份/还原、运行中宿主快照和三态重启还原已逐批验证，下载恢复与真实代理的最新证据见下节。业务状态仍在 LegacyFeatureRuntime；官方远端商店已接入并有测试签名目录的多端证据，正式目录发布、业务宿主迁出与真实单体升级尚未完成。G1–G11 未通过前，不将具体业务插件迁移标为完成。
 
@@ -293,7 +303,7 @@
 | TASK-009 生命周期 | 安装/启禁/保留数据闭环已有证据 | 可信安装门、版本目录/active、正常重启、启禁/卸载保留数据已有真实 native 结果；实际不同版本的运行中更新/回滚链、无重启核心和业务资源释放仍需完整证据。 |
 | TASK-010 商店/下载 | 已接入并有 hosted 证据；正式目录待发布 | 三代理、后台进度、取消/续传、跨重启恢复、目录验签/搜索/确认/包审查安装已接入；TC-MODULES-022 的 58 步三端通过，相关下载与代理门已有原始结果。测试签名目录不能代替正式 release 的目录、独立更新/回滚闭环。 |
 | TASK-011 验签安装 | 基础闭环四种 native profile 通过 | pinned key 的真实 minisign 校验、清单防回滚、安全解包、内容绑定及安装入口强制验签已接入；#43804951477 的 TC-MODULES-007 在四种 native profile 全部 52 步通过，覆盖官方签名安装、启禁、正常重启和篡改拒绝。业务包、更新/回滚与最终发布仍需后续证据。 |
-| TASK-012 单体升级 | 部分 | 从安全 pending 进入真实 legacy exporter、可信包 staging、Vault 交接、激活、恢复/回滚；真实安装升级证据。 |
+| TASK-012 单体升级 | MFA 数据提交已接线，原位安装替换验证中 | 旧版建号、签名维护与应用接管已有分阶段证据。核对设置自动重启、正式候选安装件替换和回滚，以及剩余模块的激活路径。 |
 | TASK-013 原型与 G 门 | hello/MFA 真宿主与签名包已有证据；G 门未闭合 | 三端实际进程、四目标签名包及三端正式安装门已有结果；G1/G3 系统实验、Linux noexec 已保留通过项与限制。完整安装包、hardened runtime/签名信任、性能、core-only 与真实升级仍有缺口，不能宣布 G1–G11 全过。 |
 | TASK-014 MFA | 签名安装门通过；已提交 profile 的业务接管待复验 | 独立 store actor、作用域 KeyProvider、snapshot、可信包安装已有三端结果。`76c3f94e9` 接入已提交 profile 的宿主命令和旧归档恢复。新装 profile 的模块入口、实际旧安装的升级触发、capture RPC、动态 UI、相关 G 门与迁出后三态还原待闭合。 |
 | TASK-015 | 已取消 | 历史设计 `7bc498b35` 中为 LanChat 迁移，已由用户明确删除决定取消；主设计已保留编号并清理前置依赖。旧库保持原位，不读取、迁移或删除，不创建替代插件。 |
