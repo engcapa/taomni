@@ -46,11 +46,11 @@ macOS 保留原始 `codesign` 与 `spctl` 结果。直接 CLI 启动、没有浏
 
 ## 正式 0.5.10 安装输入
 
-`TC-MODULES-027` 的现用安装输入固定到 `v0.5.10`（release ID `449346766`）。下载后按下表的字节长度和 SHA-256 验证，实际安装后再检查系统报告的应用版本。候选与旧版当前拥有相同的显示版本，因此核对安装资产、安装后旧程序与候选 QA runtime 的各自指纹。旧版初始化与重开、合成业务行、pending journal、正常候选重启及历史 chat 留存仍是同一场景的验收项。 [正式发布](https://github.com/engcapa/taomni/releases/tag/v0.5.10)
+`TC-MODULES-027` 的现用安装输入固定到 `v0.5.10`（release ID `449346766`）。2026-11-18 的同标签发布替换了四个安装件。下表记录 03:25–03:26 UTC 重新上传的资产。fixture 通过 GitHub Releases API 按资产 ID 取件，核对字节长度及 SHA-256，实际安装后再检查应用版本。候选与旧版显示版本相同，因此仍分别核对安装件、旧程序与候选 QA 程序的指纹。 [正式发布](https://github.com/engcapa/taomni/releases/tag/v0.5.10)
 
 | 目标 | 资产 ID | 字节 | SHA-256 |
 |---|---:|---:|---|
-| Linux x64 deb | 761457345 | 109669490 | `3667b1fd0983660c636b4c0bdcaea9759e40174a87ab0ccbecaaaa69046d9a0a` |
-| Windows x64 MSI | 761458084 | 96120832 | `bc83c2aa84852443b4f42fe87be95051f010baa7bb12ae82501db7611a36fb22` |
-| macOS ARM64 DMG | 761456797 | 98516008 | `3044a7ee96e3a36ba4cbc8305a6777db1c96c7ffabed3e8b3aa6fa8c90ebe153` |
-| macOS Intel DMG | 761457841 | 104617072 | `6cdd181a6ea61a370661cd9ee84ec368f9c71279e916558d780ac9fd0dcc658d` |
+| Linux x64 deb | 761714749 | 109669454 | `237b5b3ae296e74d3227d9c1135d72caa189eb5fd41be7fb0042016bc39adb8a` |
+| Windows x64 MSI | 761715464 | 96120832 | `8b51c045c09a3411a4bd3a44613c48bb4e50192a5eaa4f6d0cf91e5135921237` |
+| macOS ARM64 DMG | 761714079 | 98517685 | `d5a78bddf9d71a4cce9ba57c3b744f14878806eece0283e181b0a48891645dab` |
+| macOS Intel DMG | 761715279 | 104617252 | `e6f8f3eb7f4f3af4e29e53d7870bc48a55a9d0b34de05724ced95e62a4514e2c` |

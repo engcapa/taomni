@@ -1,14 +1,16 @@
 """Pure authenticity/profile-oracle units; never downloads, installs or starts an app."""
 from contextlib import closing
 from dataclasses import replace
+from email.message import Message
 import hashlib
+from io import BytesIO
 from pathlib import Path
 import sqlite3
 import tempfile
 import unittest
 from unittest.mock import patch
 
-from qa_ui_auto.legacy_release import ASSETS, selected_asset, verify_asset
+from qa_ui_auto.legacy_release import ASSETS, download_asset, selected_asset, verify_asset
 from qa_ui_auto.legacy_process import sanitized_output
 from qa_ui_auto.legacy_install import install
 from qa_ui_auto.fixtures.module_legacy_install import insert_business_rows, retained_manifest, session_rows
@@ -37,6 +39,42 @@ class PinnedReleaseTests(unittest.TestCase):
             path.write_bytes(b"partial")
             with self.assertRaisesRegex(RuntimeError, "wrong size"):
                 verify_asset(path, asset)
+
+    def test_download_requests_the_pinned_asset_id_and_publishes_verified_bytes(self):
+        payload = b"verified installer"
+        asset = replace(selected_asset("Linux", "x86_64"), size=len(payload),
+                        sha256=hashlib.sha256(payload).hexdigest())
+        response = BytesIO(payload)
+        response.status = 200
+        response.url = "https://release-assets.githubusercontent.com/installer"
+        response.headers = Message()
+        response.headers["Content-Type"] = "application/octet-stream"
+        response.headers["Content-Length"] = str(len(payload))
+        with tempfile.TemporaryDirectory() as directory, patch(
+                "qa_ui_auto.legacy_release.urllib.request.urlopen", return_value=response) as open_url:
+            downloaded = download_asset(directory, asset)
+            self.assertEqual(downloaded.read_bytes(), payload)
+            request = open_url.call_args.args[0]
+            self.assertEqual(request.full_url,
+                             f"https://api.github.com/repos/engcapa/taomni/releases/assets/{asset.asset_id}?download=1")
+            self.assertEqual(request.get_header("Accept"), "application/octet-stream")
+            self.assertEqual(list(Path(directory).iterdir()), [downloaded])
+
+    def test_download_rejects_metadata_and_wrong_length_without_publishing(self):
+        asset = selected_asset("Linux", "x86_64")
+        for content_type, message in (("application/json", "pinned legacy asset"),
+                                      ("application/octet-stream", "Content-Length")):
+            with self.subTest(content_type=content_type), tempfile.TemporaryDirectory() as directory:
+                response = BytesIO(b"{}")
+                response.status = 200
+                response.url = "https://api.github.com/asset"
+                response.headers = Message()
+                response.headers["Content-Type"] = content_type
+                response.headers["Content-Length"] = "2"
+                with patch("qa_ui_auto.legacy_release.urllib.request.urlopen", return_value=response):
+                    with self.assertRaisesRegex(RuntimeError, message):
+                        download_asset(directory, asset)
+                self.assertEqual(list(Path(directory).iterdir()), [])
 
     def test_local_or_wrong_repository_install_cannot_reach_a_downloader(self):
         for environment in [{}, {"GITHUB_ACTIONS": "true", "GITHUB_REPOSITORY": "other/repo"}]:
