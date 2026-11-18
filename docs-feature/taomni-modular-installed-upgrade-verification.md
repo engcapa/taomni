@@ -77,6 +77,10 @@ GitHub Linux x64 已完成全程。候选源码 `c660c6bb68578e7943594fff33a2963
 
 三种格式各自在原配置目录应用 `noexec`。MFA 显示 `MODULE_HOST_NOEXEC`、受影响路径和 `XDG_DATA_HOME` 指引。正常退出后复制 14 项应用数据及已验签模块到可执行目录。新位置用原口令解锁，账号从 `359 152` 推进至 `969 429`。验证复核原始摘要、历史 LanChat 文件及挂载清理。 [验证 #44405163808](https://github.com/engcapa/taomni/actions/runs/44405163808)
 
+### Linux 已安装应用的强制退出
+
+GitHub runner 在实际替换、回退和重装 deb 后，通过设置页打开已迁移的 MFA，并将 HOTP 推进到 `969 429`。runner 按驱动进程组、可执行文件路径、父进程和内核启动时间绑定应用与签名宿主，只向应用的 pidfd 发送 `SIGKILL`。两个 pidfd 都在测试驱动清理前报告退出。再次启动同一安装与配置，原口令和账号可用，HOTP 由 `969 429` 推进到 `338 314`，已安装的宿主摘要和版本指针保持一致。候选产物使用 `c660c6bb6`，验证脚本使用 `bc26bab58`。 [安装验证 #44416333190](https://github.com/engcapa/taomni/actions/runs/44416333190)
+
 ### Windows MSI 与 macOS DMG 替换
 
 QA Modular Upgrade Contracts 使用 `package_upgrade_desktop=true` 运行已上传安装包的替换和回滚。`package_targets` 列出有产物的平台，例如 `windows-x86_64,darwin-x86_64`。输入包含 Release Bundle 的 run ID、完整源码 SHA 和候选版本。

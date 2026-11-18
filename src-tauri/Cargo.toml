@@ -18,6 +18,7 @@ members = [
     "crates/taomni-download-gates",
     "crates/taomni-host-gates",
     "crates/taomni-rdp-common",
+    "crates/taomni-rdp-probe",
     "crates/taomni-file-uri",
     "crates/taomni-mfa-engine",
     "crates/taomni-plugin-api",
@@ -44,13 +45,6 @@ crate-type = ["staticlib", "cdylib", "rlib"]
 name = "acp-fake-agent"
 path = "tests/support/acp_fake_agent.rs"
 test = false
-bench = false
-
-# QA-only RDP probe client (qa-ui-auto oracle + performance meter for the local
-# RDP server; see docs-feature/rdp-server-parity-design.md). Never bundled.
-[[bin]]
-name = "rdp-probe"
-path = "src/bin/rdp-probe/main.rs"
 bench = false
 
 # Elevated SocksCap helper (Windows UAC + WinDivert probe). Built alongside
@@ -313,8 +307,7 @@ qa-release-trust-gates = []
 asr-whisper = ["dep:whisper-rs"]
 asr-sherpa = ["dep:sherpa-onnx"]
 # RDP server sound: WASAPI loopback / virtual-microphone playback through cpal
-# (macOS loopback uses ScreenCaptureKit; Linux uses PipeWire directly). Also
-# lets the QA-only rdp-probe play and record host audio devices.
+# (macOS loopback uses ScreenCaptureKit; Linux uses PipeWire directly).
 rdp-server-audio = ["dep:cpal"]
 voice-capture = ["dep:cpal"]
 screen-capture = ["dep:xcap"]

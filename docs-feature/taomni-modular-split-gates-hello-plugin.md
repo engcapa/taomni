@@ -72,6 +72,11 @@ RDP capture and encoder path to meet the `rdp-probe` budgets with the host
 transport in place. `TC-RDPS-PERF-01-performance-budget` records the current
 in-process product baseline.
 
+The RDP probe is a QA-only workspace package in `src-tauri/crates/taomni-rdp-probe/`.
+Its standalone release build takes the original RDP client dependencies and
+can measure an already installed application. `native_build.py` stages the
+probe beside the matching QA executable for platform workflow cases.
+
 GitHub tested source `fd123747c26d8ad8f7f9f44211e4b7658a30fd97`. Each route
 delivered 150 of 150 measured frames for both workloads. The harness requests
 millisecond timer resolution for its Windows process, and all reports include

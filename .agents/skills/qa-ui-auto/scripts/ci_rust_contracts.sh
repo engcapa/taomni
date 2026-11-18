@@ -36,5 +36,5 @@ fi
 # libtest accepts multiple OR filters. Compile/link the root test binary once.
 cargo test --locked "${profile[@]}" --lib -- "${filters[@]}"
 if [[ "${QA_RDP_CONTRACTS:-false}" == true ]]; then
-  cargo test --locked "${profile[@]}" --bin rdp-probe
+  cargo test --locked "${profile[@]}" --package taomni-rdp-probe --bin rdp-probe
 fi

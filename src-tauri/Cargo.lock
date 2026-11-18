@@ -11198,6 +11198,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "taomni-rdp-probe"
+version = "0.1.0"
+dependencies = [
+ "cpal",
+ "hex",
+ "image",
+ "ironrdp",
+ "ironrdp-bulk",
+ "ironrdp-tokio",
+ "pipewire",
+ "rustls 0.23.44",
+ "serde_json",
+ "sha2 0.11.0",
+ "tokio",
+ "tokio-rustls 0.26.5",
+ "x509-cert",
+]
+
+[[package]]
 name = "taomni-sqlite-snapshot"
 version = "0.1.0"
 dependencies = [

@@ -59,6 +59,12 @@ class NativeBuildTest(unittest.TestCase):
                     self.assertTrue(check)
                     self.assertEqual(env["CARGO_TARGET_DIR"], str(target))
                     self.assertNotIn("TAURI_CONFIG", env)
+                    if command[0] == "cargo":
+                        self.assertTrue(expected.is_file())
+                        self.assertEqual(command[command.index("--package") + 1], "taomni-rdp-probe")
+                        self.assertEqual(command[command.index("--bin") + 1], "rdp-probe")
+                        self.assertEqual("--release" in command, release)
+                        return
                     self.assertEqual(command[command.index("--config") + 1], str(native_build.QA_CONFIG))
                     self.assertEqual("--debug" in command, not release)
                     expected.parent.mkdir(parents=True)

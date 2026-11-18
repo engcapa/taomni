@@ -16,6 +16,10 @@
 - macOS 15 ARM64 Native 28/28，包含四个模块用例及 24 项崩溃回归。核对了 027、040、045 的原生观察文件与 runner 回执，其中两份签名包的源码与构建一致，卸载后 Hello 版本指针为空且 MFA 仍为原版本。027 首装前后的 VNC 待迁移日志和历史资料摘要一致。 [ARM64 复验](https://github.com/engcapa/taomni/actions/runs/44395986321)
 - `dd96c7ed8` 和 `b8703e908` 让正式发布在签名前以已发布的签名目录核对首装名单，新目录继承名单并使用更高序号。首份正式目录要求全部随首发交付的模块进入名单。核心单独发布时保留已签名目录和既有模块 URL。GitHub 发布契约 18 项 Rust、28 项 Node 均通过。 [发布契约](https://github.com/engcapa/taomni/actions/runs/44393439596) · [发布指引](../scripts/plugin-package/README.md#production-catalog-preparation)
 - Linux deb、RPM 和 AppImage 的 `noexec` 恢复通过。以 `c660c6bb6` 的候选 deb 和匹配的已验签 MFA 包完成升级、回退和重装。三种格式均显示拒绝启动模块和恢复指引，在新 `XDG_DATA_HOME` 使用原口令、读取账号并推进 HOTP。各核对 14 项复制输入、原资料摘要、历史 LanChat 文件和挂载清理。RPM 在 Ubuntu 上由 `rpm` 安装，AppImage 使用其 `extract-and-run` 模式。 [三种安装格式](https://github.com/engcapa/taomni/actions/runs/44405163808)
+- Linux 实际安装的 deb 完成应用强制退出与签名 MFA 恢复。runner 观察到宿主在驱动清理前退出，重开后读取退出前推进的 HOTP 并再次推进。Windows 和 macOS 的完整安装包强退仍待验证。 [安装验证](taomni-modular-installed-upgrade-verification.md#linux-已安装应用的强制退出) · [GitHub #44416333190](https://github.com/engcapa/taomni/actions/runs/44416333190)
+- 连续帧实验在 Linux、Windows 和 macOS ARM64 对照同一 runner 的跨进程及进程内路径。两种负载均交付 150/150 帧。Windows 修正计时精度后达到 60/30 fps，1080p 宿主路径增加的 p95 交付时间为 2.54–3.49 ms。真实 RDP 端到端预算仍按 G5 推进。 [各平台原始结果](taomni-modular-split-gates-hello-plugin.md#g5-frame-transport-measurement) · [GitHub #44411459433](https://github.com/engcapa/taomni/actions/runs/44411459433)
+- 合并 #834 后 Browser 三端各 28/28，12 片均在工作流执行期间收齐，覆盖新模块名称与选装、模块更新、Draw.io、Live 表格和完整 browser 崩溃回归。Native 构建和分片继续收取。 [三端复验 #44414602924](https://github.com/engcapa/taomni/actions/runs/44414602924) · [macOS Intel #44414602437](https://github.com/engcapa/taomni/actions/runs/44414602437)
+- RDP 端到端基线首次构建时 GitHub hosted runner 失去连接。原生 Rust 契约通过，构建未上传运行时，四个 native 分片均未执行。已在相同提交重跑失败作业并保留原始记录。 [首次运行](https://github.com/engcapa/taomni/actions/runs/44407519124/attempts/1) · [重跑](https://github.com/engcapa/taomni/actions/runs/44407519124/attempts/2)
 
 2026-11-18 再次 fetch 并合并 `origin/main`。远程仍为 `5fabcdd32`，当前分支已包含该提交，合并无冲突。
 

@@ -221,8 +221,13 @@ def build_qa(*, release: bool = False, force: bool = False) -> Path:
     # on a newer toolchain. The provenance snapshot must describe the exact
     # checkout that was compiled, so a native build is locked.
     command.extend(["--", "--locked"])
+    probe = ["cargo", "build", "--locked", "--manifest-path", "src-tauri/Cargo.toml",
+             "--package", "taomni-rdp-probe", "--bin", "rdp-probe"]
+    if release:
+        probe.append("--release")
     started = time.monotonic()
     subprocess.run(command, cwd=ROOT, env=env, check=True)
+    subprocess.run(probe, cwd=ROOT, env=env, check=True)
     if inputs != build_inputs(release=release, env=env):
         raise ValueError("Build inputs changed during compilation; rebuild before collecting evidence")
     record = {
@@ -231,6 +236,7 @@ def build_qa(*, release: bool = False, force: bool = False) -> Path:
         "platform": platform.system(),
         "profile": "release" if release else "debug",
         "command": command,
+        "rdp_probe_command": probe,
         "source_sha256": inputs["source_sha256"],
         "build_inputs": inputs,
         "build_duration_sec": time.monotonic() - started,

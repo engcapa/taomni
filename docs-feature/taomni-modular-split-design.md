@@ -633,7 +633,7 @@ G4 的宿主启动和监督重启先检查已验签宿主所在文件系统的 `
 - `Cargo.toml [features]` 的重型默认特性：`asr-whisper、asr-sherpa` 从核心默认特性拿掉（归 `plugin-ai-voice-local`）；LanChat 及其历史 `native-av` feature 已删除；`hbase-kerberos` 留核心；`rdp-server-audio` 归 `plugin-rdp-server`；**`voice-capture`（cpal 麦克风采集）留核心**（云端 ASR 也要用，§4.4）。
 - 插件宿主 crate 的依赖白名单：只能依赖 `taomni-plugin-api`、库 crate 和第三方协议库，**不得依赖 `tauri`、`wry`、`tauri-utils`**（根 `[patch.crates-io]` 已含 vendored `wry`、`tauri-utils`，宿主引入它们等于把 WebView 栈带进每个插件），也不得依赖核心 crate。
 - `main.rs` 的 re-exec 入口按 §4.2 S11 的归属表迁移。
-- 现有 `src-tauri/src/bin/` 下 `sockscap-helper`、`rdp-probe`、`mitmproxy-redirector-poc` 随对应插件迁入插件 crate（`rdp-probe` 是 QA 探针，随 RDP 插件迁移，但发布包不带）。
+- `sockscap-helper` 和 `mitmproxy-redirector-poc` 随对应插件迁入插件 crate。QA 探针 `rdp-probe` 已移入独立的 `src-tauri/crates/taomni-rdp-probe/`，由 QA 构建编译并随对应测试运行时上传。
 
 ### 5.5 特权 / 重型模块的进程边界
 
