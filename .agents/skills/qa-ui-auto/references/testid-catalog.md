@@ -2042,6 +2042,7 @@
 - `[data-testid="welcome-local-directories"]` — display — F1.6.local-directories
 - `[data-testid="welcome-local-directory-filter"]` — interactive — F1.6.local-directory-filter
 - `[data-testid="welcome-restore-row"]` — display — F1.6.restore-row
+  ↳ `.tao-home-history-footer` — alias
 - `[data-testid="welcome-local-directory"]` — interactive [optional] — F1.6.local-directory-row
 - `[data-testid="welcome-local-directory-unavailable"]` — display [optional] — F1.6.local-directory-unavailable
 - `[data-testid="welcome-directory-retry"]` — interactive [optional] — F1.6.directory-retry
@@ -3708,6 +3709,9 @@
 - `[data-testid="tao-settings-provider"]` — interactive — F1.11.tao-settings-provider
 - `[data-testid="tao-settings-model"]` — interactive — F1.11.tao-settings-model
 - `[data-testid="tao-settings-cost"]` — interactive — F1.11.tao-settings-cost
+- `[data-testid="tao-privacy-summary"]` — display [optional] — F1.11.tao-privacy-summary
+- `[data-testid="tao-settings-thinking"]` — interactive [optional] — F1.11.tao-settings-thinking
+- `[data-testid="tao-settings-web"]` — interactive [optional] — F1.11.tao-settings-web
 - `[data-testid="tao-search-sources"]` — interactive [optional] — F1.11.tao-search-sources
 - `[data-testid="tao-search-sources-menu"]` — display [optional] — F1.11.tao-search-sources-menu
 - `[data-testid="tao-search-source-sql"]` — interactive [optional] — F1.11.tao-search-source-sql

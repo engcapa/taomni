@@ -27,10 +27,10 @@ steps:
     name: value
     equals: '0'
 - assert_text:
-    selector: label:has([data-testid="tao-settings-cost"])
+    selector: '[data-testid="tao-settings"]'
     contains: USD $
 - assert_text:
-    selector: '#tao-settings-cost-hint'
+    selector: '[data-testid="tao-settings"]'
     contains: $0 to skip
 - wait_for: '[data-testid="tao-privacy-summary"]'
 - assert_text:
@@ -47,6 +47,14 @@ steps:
 - assert_count:
     selector: '[data-testid="tao-search-source-sql"]:checked, [data-testid="tao-search-source-file_contents"]:not(:checked)'
     equal: 2
+- click: '[data-testid="tao-search-source-file_contents"]'
+- assert_text:
+    selector: '[data-testid="tao-search-sources"]'
+    contains: 13/16
+- click: '[data-testid="tao-search-source-file_contents"]'
+- assert_text:
+    selector: '[data-testid="tao-search-sources"]'
+    contains: 12/16
 - click: '[data-testid="tao-search-source-sql"]'
 - assert_count:
     selector: '[data-testid="tao-search-source-sql"]:not(:checked)'
@@ -102,13 +110,13 @@ verification:
     - 5
     - 6
     - 14
-    - 17
-    - 19
     - 21
-    - 24
+    - 23
     - 25
+    - 28
     - 29
-    - 30
+    - 33
+    - 34
     checkpoints:
     - step: 8
       expectation: Default threshold is zero.
@@ -116,13 +124,13 @@ verification:
       expectation: Input label names USD.
     - step: 10
       expectation: Zero is explained as skipping confirmation.
-    - step: 32
+    - step: 36
       expectation: Fractional dollar threshold persisted.
     results:
     - 8
     - 9
     - 10
-    - 32
+    - 36
   - id: PRIVACY
     requirement: Keyboard opens and dismisses the checkbox list and separate preferences survive reload.
     actions:
@@ -136,29 +144,37 @@ verification:
     - 17
     - 19
     - 21
-    - 24
+    - 23
     - 25
+    - 28
     - 29
-    - 30
+    - 33
     - 34
-    - 36
+    - 38
+    - 40
     checkpoints:
     - step: 16
       expectation: Default-enabled SQL and opt-in contents have their correct states.
+    - step: 18
+      expectation: Snapshot contents can be explicitly opted in.
     - step: 20
+      expectation: Turning the opt-in off restores the original enabled count.
+    - step: 24
       expectation: Two selections update the count.
-    - step: 23
+    - step: 27
       expectation: Escape restores trigger focus.
-    - step: 35
+    - step: 39
       expectation: Two deselections are restored from the backend.
-    - step: 37
+    - step: 41
       expectation: Re-enabling SQL changes only that source.
     results:
     - 16
+    - 18
     - 20
-    - 23
-    - 35
-    - 37
+    - 24
+    - 27
+    - 39
+    - 41
   native:
   - check: SQLite-backed source preferences and native AI configuration
     method: automated

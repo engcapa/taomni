@@ -28,7 +28,7 @@ steps:
     name: aria-selected
     equals: 'true'
 - press: Escape
-- assert_visible: '[data-testid="tao-home-host"] [data-testid="welcome-restore-row"]'
+- assert_visible: '[data-testid="welcome-restore-row"]'
 - press:
     selector: '[data-testid="welcome-restore-last-session"]'
     key: Enter

@@ -127,7 +127,7 @@ impl Llm for MappedProvider {
                     .is_some_and(|reason| !matches!(reason, "STOP" | "MAX_TOKENS"))
             })
         });
-        if value.get("error").is_some()
+        if !value["error"].is_null()
             || matches!(value["status"].as_str(), Some("failed" | "incomplete"))
             || value["promptFeedback"]["blockReason"].is_string()
             || blocked_candidate

@@ -448,6 +448,18 @@ controls:
 - id: tao-settings-cost
   selector: '[data-testid="tao-settings-cost"]'
   kind: interactive
+- id: tao-privacy-summary
+  selector: '[data-testid="tao-privacy-summary"]'
+  kind: display
+  optional: true
+- id: tao-settings-thinking
+  selector: '[data-testid="tao-settings-thinking"]'
+  kind: interactive
+  optional: true
+- id: tao-settings-web
+  selector: '[data-testid="tao-settings-web"]'
+  kind: interactive
+  optional: true
 - id: tao-search-sources
   selector: '[data-testid="tao-search-sources"]'
   kind: interactive
@@ -1170,6 +1182,7 @@ controls:
   # docs-feature/welcome-recents-session-restore-design.md §4.1/§4.2).
   - id: restore-row
     selector: '[data-testid="welcome-restore-row"]'
+    aliases: ['.tao-home-history-footer']
     kind: display
   - id: local-directory-row
     selector: '[data-testid="welcome-local-directory"]'

@@ -10,7 +10,8 @@ it("keeps independently committed source choices in a dismissible multi-select m
   vi.mocked(invoke).mockImplementation(async (command, args) => {
     if (command === "history_privacy_summary") return { version: 1, commandsCleaned: 2, queriesCleaned: 0 };
     if (command === "deepseek_app_search_sources") return { commands: true, sql: true, mail: false };
-    if (command === "deepseek_app_set_search_sources" && args?.sources && "commands" in args.sources) throw new Error("Source update failed");
+    const sources = (args as { sources?: Record<string, boolean> } | undefined)?.sources;
+    if (command === "deepseek_app_set_search_sources" && sources && "commands" in sources) throw new Error("Source update failed");
   });
   render(<TaoPrivacySettings />);
   const trigger = await screen.findByTestId("tao-search-sources");

@@ -50,7 +50,7 @@ steps:
 - click: '[data-testid="llm-provider-row"][data-custom="true"] [data-testid="llm-custom-model-row"]:nth-of-type(2) [data-testid="llm-custom-multimodal"]'
 - click: '[data-testid="llm-provider-row"][data-custom="true"] [data-testid="llm-custom-model-row"]:nth-of-type(2) [data-testid="llm-custom-native-search"]'
 - click: '[data-testid="llm-provider-row"][data-custom="true"] [data-testid="llm-custom-model-row"]:nth-of-type(2) [data-testid="llm-custom-effort-high"]'
-- click: '[data-testid="llm-provider-row"][data-custom="true"] [data-testid="llm-custom-model-row"]:nth-of-type(2) [data-testid="llm-custom-effort-xhigh"]'
+- click: '[data-testid="llm-custom-effort-xhigh"]:is([data-testid="llm-custom-model-row"]:nth-of-type(2) *)'
 - select_option:
     selector: '[data-testid="llm-custom-default-model"]'
     value: qa-responses-vision

@@ -40,8 +40,8 @@ steps:
     name: data-editing
     equals: 'false'
 - drag_to:
-    from: .fv-md-live-pane p strong
-    to: .fv-md-live-pane p code
+    from: '[data-testid="markdown-live"] p strong'
+    to: '[data-testid="markdown-live"] p code'
 - eval_readonly:
     expression: /bold\s+and\s+inl/.test(window.getSelection().toString()) && document.querySelector('.fv-md-live-pane').contains(window.getSelection().anchorNode)
     expect_truthy: true
@@ -64,8 +64,8 @@ steps:
     name: data-app-theme
     equals: dark
 - drag_to:
-    from: .fv-md-live-pane p strong
-    to: .fv-md-live-pane p code
+    from: '[data-testid="markdown-live"] p strong'
+    to: '[data-testid="markdown-live"] p code'
 - eval_readonly:
     expression: /bold\s+and\s+inl/.test(window.getSelection().toString()) && document.querySelector('.fv-md-live-pane').contains(window.getSelection().anchorNode)
     expect_truthy: true

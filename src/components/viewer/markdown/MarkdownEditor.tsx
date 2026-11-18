@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EditorView, type ViewUpdate } from "@codemirror/view";
-import { findNext, findPrevious, openSearchPanel, searchPanelOpen } from "@codemirror/search";
+import { findNext, findPrevious, getSearchQuery, openSearchPanel, searchPanelOpen, setSearchQuery } from "@codemirror/search";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { tags } from "@lezer/highlight";
 import { ListTree } from "lucide-react";
@@ -114,8 +114,12 @@ export function MarkdownEditor({ document: current, onError, owner, requestedMod
     const target = event.target instanceof Element ? event.target : null;
     if (target?.closest("input,textarea,select,[contenteditable=true]") && !view.dom.contains(target)) return;
     if (mod && !event.shiftKey && (key === "f" || key === "r")) {
+      const previousQuery = getSearchQuery(view.state);
       if (key === "r") openWorkspaceReplacePanel(view);
       else openSearchPanel(view);
+      if (previousQuery.search && !previousQuery.eq(getSearchQuery(view.state))) {
+        view.dispatch({ effects: setSearchQuery.of(previousQuery) });
+      }
     } else if (key === "f3" && !event.ctrlKey && !event.metaKey && searchPanelOpen(view.state)) {
       (event.shiftKey ? findPrevious : findNext)(view);
     } else return;
@@ -218,7 +222,7 @@ function MarkdownPreviewPane({ content, path, onError, theme, readImage }: { con
     void enhancements.then(() => { if (appearanceOnly) replace(); }).catch((error: unknown) => { if (!cancelled) onError(String(error)); });
     return () => { cancelled = true; };
   }, [content, path, onError, theme, readImage]);
-  return <div className="fv-md-preview-pane" data-testid="markdown-preview" data-preview-theme={theme} style={previewThemeStyle(theme)} onClick={(event) => {
+  return <div className="fv-md-preview-pane" data-testid="markdown-preview" data-preview-theme={theme} tabIndex={0} style={previewThemeStyle(theme)} onClick={(event) => {
     const anchor = (event.target as Element).closest("a");
     if (!anchor) return;
     event.preventDefault();
