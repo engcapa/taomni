@@ -54,7 +54,7 @@
 
 2026-11-17 收证更新：完整 UI [#44040286838](https://github.com/engcapa/taomni/actions/runs/44040286838)（`b6b5379f50ca161940ee114ef1b29036aa3d01ba`、selection `fcb5bc65dc2b4a7984ee756661fdf629`）22/22 shards 已在执行期间收齐并核验 receipt/summary/source/build：三端 browser 各 36/36，Linux Xvfb native 56/56、Windows native 55/55、macOS ARM64 native 52/52。Windows TC-MODULES-015 原安装等待失败本轮通过，没有扩大等待预算；Wayland 54/56，FILE-OPEN-006/008 的既有非左键/X11 限制按用户授权单列忽略，仍保留原始失败。证据 `qa-ui-auto-report/github/44040286838/shard-case-totals.json`。自动 relaunch 新增三态用例首轮停在错误备份任务选择，已定位并准备定向复验，详见 `taomni-modular-restore-relaunch-verification.md`。模块化整体迁出和真实安装升级仍未完成。
 
-更新：2026-11-17。范围以[设计 §10.1](taomni-modular-split-design.md#101-可执行任务分解)与 [ADR](../claudedocs/adr-taomni-modular-split.md)为准。基础契约通过不代表业务已迁出或可发布。
+更新于 2026-11-19。范围见[设计 §10.1](taomni-modular-split-design.md#101-可执行任务分解)与 [ADR](../claudedocs/adr-taomni-modular-split.md)。
 
 ## 当前结论
 
@@ -72,6 +72,8 @@
 - `TC-MODULES-027` 追加真实 `0.5.10` profile 上的自动首装，核对原 SSH/VNC 会话、历史文件和 VNC pending journal。`TC-MODULES-045` 使用两份签名 QA 目录核对新模块名称、描述、稍后处理、重启后零传输及最终选择安装。三端 browser 的 041/043 在 #44296447334 各通过，合并 main #831 后保留了双方 File Explorer 与 Markdown 用例，当前 GitHub 批次同时覆盖升级流程和完整 crash-regression。 [真实旧版首装 #44297621761](https://github.com/engcapa/taomni/actions/runs/44297621761) · [签名新模块 #44296447334](https://github.com/engcapa/taomni/actions/runs/44296447334) · [合并后验证 #44302421951](https://github.com/engcapa/taomni/actions/runs/44302421951)
 - 三端原生 027 和 045 的用例与磁盘观察均已通过。两个专项使用验签的 QA 目录，首装范围为 Hello，选装场景的第二份目录新增 Hello。Linux 原生旧版建号并迁移至签名 MFA 的 039 也已通过。 [原生首装 #44297621761](https://github.com/engcapa/taomni/actions/runs/44297621761) · [原生选装 #44296447334](https://github.com/engcapa/taomni/actions/runs/44296447334) · [Linux 旧版 MFA #44292054064](https://github.com/engcapa/taomni/actions/runs/44292054064)
 - 合入 main `f5a2b8e45`（#831）后保留两边的编辑器和文件浏览器行为。Live 表格与新文件打开回归改用 `TC-FILE-OPEN-033` 和 `TC-EXPLORER-009`，两项仍在完整 crash-regression 集合。三端 browser 各 27/27。Linux 单独重跑由格式检查修复后继续，macOS 15 Intel 使用单个 native 分片，Windows 另起单平台验证。 [Linux 与 Windows browser #44311270363](https://github.com/engcapa/taomni/actions/runs/44311270363) · [macOS Intel #44316971990](https://github.com/engcapa/taomni/actions/runs/44316971990) · [Linux native #44314260738](https://github.com/engcapa/taomni/actions/runs/44314260738) · [Windows #44322920906](https://github.com/engcapa/taomni/actions/runs/44322920906)
+- `0f8f1d28c` 将卸载记录与模块版本目录分开。卸载停止宿主并删除当前版本、回滚版本和其中的签名原件，保留版本历史及业务数据。用户可勾选并确认永久删除数据。新增原生磁盘检查、卸载中断恢复单测、Browser 确认取消及卸载后更新入口检查。本地 Rust 模块 187 项、模块备份 19 项、前端 44 项、QA 工具 102 项通过。合并 `main` #832、#833 的 `335054d04` 只纳入 Draw.io 探针修复，该探针应用范围与本轮选案无交集。 [三端验证 #44332329318](https://github.com/engcapa/taomni/actions/runs/44332329318) · [macOS Intel 验证 #44334829135](https://github.com/engcapa/taomni/actions/runs/44334829135)
+- 新版 Linux Browser 23/23、Native 35/35，Windows Browser 23/23、Native 34/34，macOS 15 Intel Browser 23/23，macOS 26 ARM64 Native 36/37。三端模块用例全部通过。执行期间收取并核对了 17 个主批次分片，另核对 010/040/042 的 9 份原生观察文件与 receipt 的字节数和摘要。macOS 26 的 Browser 第二片在分配 runner 前被取消，该片的 008 已在 Intel Browser 通过。macOS 26 Native 的 `TC-FILE-OPEN-007` 复现历史保存对话框定位失败，原始失败保留。044 的修订在旧源码专项及当前 macOS 26 批次均已通过。 [三端验证 #44332329318](https://github.com/engcapa/taomni/actions/runs/44332329318) · [macOS Intel #44334829135](https://github.com/engcapa/taomni/actions/runs/44334829135) · [MFA 复验 #44308634950](https://github.com/engcapa/taomni/actions/runs/44308634950)
 
 核心仍包含旧 profile 的 MFA、Servers、SocksCap、远程桌面和本地语音等业务代码、状态与依赖。hello-plugin 和 MFA 已取得签名安装结果。已提交迁移的 MFA profile 通过签名宿主读写账户和生成验证码，原数据继续用作回退资料。主窗和分离窗已支持动态加载模块前端，MFA 的正式前端和新装 profile 仍待迁出。LanChat 功能已删除，历史 `lanchat.sqlite` 和 `lanchat.db` 保留原位。
 
@@ -385,8 +387,8 @@ Wayland `TC-FILE-OPEN-008` 在已有 AI 路径 chip 点击处失败：失败截�
 2. **闭合 Vault、profile 与一致快照剩余边界（TASK-024/025）**：macOS 15 Intel 的真实还原确认自动 relaunch 三态已由当前 #44128351358 完整通过（旧 #44095029967 证据仍绑定原输入）；继续收齐 macOS 26 ARM64，另行实现 Linux/Windows 已存在新进程的安全接管，并补齐所有入口的多实例占用、取消/崩溃恢复矩阵。已有核心 MFA 三态正常重启结果保留。MFA 迁出时另需 v1 legacy alias 与独立宿主后的三态还原，不能用旧连接 owner 的结果代替。
 3. **迁出真实业务（TASK-005-B、013/014、016–022）**：MFA 原型和可信签名安装已有 runner 证据，长期有界防重放已由 `a41b27e72` 的三端协议/真实宿主门复验；继续补完整相关 G 门、旧库只读迁移、capture RPC 业务接线与动态 UI，最后切换生产 facade/连接 owner。之后依赖序推进 RDP/VNC 客户端与服务端、Servers、SocksCap、OCR/录制、本地语音的宿主、前端、状态与迁移。Mobile 按 DEC-2 留下明确 go/no-go 结论和公开例外，不能默认为交付；LanChat 任务已取消，不新增替代插件。
 4. **裁剪核心依赖闭包（TASK-006）**：随业务迁出，从核心 Cargo 默认 features、原生依赖、bundle/resources/helper 和前端 chunk 中实际移除相应实现。保存 cargo tree、资源与产物证据；把状态改名或放入 LegacyFeatureRuntime 不等于瘦身完成。
-5. **补齐模块使用剩余闭环（TASK-007、009–011）**：远端签名商店、三种代理 UI、跨重启下载恢复、后台进度、动态 tab 和缺失/禁用占位已有基础证据；继续验证真实不同版本的运行中更新/回滚、失败恢复、业务资源释放，以及每个实际业务模块在主窗/分离窗中的完整行为。安装、启禁、更新和回滚须无需重启核心；测试签名目录不代替正式目录发布。
-6. **完成升级入口并验证真实旧单体升级（TASK-012）**：MFA 一致导出、Vault 自检、可信包离线提交与中断恢复已有三端专项证据。Settings 的签名包与原 Vault 交接已实现，正向签名包自动重启仍待 GitHub 实测。继续验证正式已安装 `0.5.x` 创建真实 MFA、候选安装程序替换、提交恢复与回滚。其它模块继续通过通用 `plugin_migration_execute` 记录 pending。历史 LanChat 库原样留存。
+5. **补齐实际业务模块生命周期（TASK-007、009–011）**：远端签名目录、三种代理、跨重启下载、后台进度、动态 tab 和缺失或禁用的占位已有用例。签名 Hello 已验证运行中更新、回滚及失败恢复。实际业务模块还需验证各自的资源释放和主窗、分离窗行为。安装、启禁、更新和回滚须无需重启核心。
+6. **交付正式首装清单和剩余业务迁移（TASK-012）**：已有旧版安装件替换与回退、签名 MFA 迁移、中断恢复及 macOS 自动重启证据。正式首批模块要逐个验证自动安装、数据提交和回退。其他模块仍由 `plugin_migration_execute` 记录待迁移状态。历史 LanChat 库原位保留。
 7. **完成生产发布验收（TASK-001/002/023）**：闭合 G1–G11、冻结真实插件契约；完成四发布目标的宿主系统签名/包签名、原子 modules 清单、模块独立更新/回滚。核心-only 与实际全插件集合分别完成受影响用例及完整 crash-regression，并归档包体积、启动、内存、帧吞吐的匹配基线与原始样本。
 
 ### 2026-11-16 启用与原生观察修复批次（`911f411b2` 已提交，hosted 验证中）
