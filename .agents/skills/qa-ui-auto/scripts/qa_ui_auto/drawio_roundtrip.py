@@ -66,19 +66,26 @@ def compare_images(reference, captured, report, label):
         if min(retained, matched) < threshold:
             failures.append(f"{name} retained {retained:.1%}, matched {matched:.1%} (requires {threshold:.0%})")
 
-    for name, (color, threshold) in FEATURES.items():
-        rgb = np.array(ImageColor.getrgb(color), dtype=np.int16)
-        before = np.max(np.abs(expected_pixels - rgb), axis=2) <= 22
-        after = np.max(np.abs(actual_pixels - rgb), axis=2) <= 22
-        compare_mask(name, before, after, threshold, radius=2)
-
     # Glyph antialiasing varies by WebView. Include antialiased dark strokes,
     # and check each label's position independently, including short labels.
     before_ink = np.max(expected_pixels, axis=2) <= 124
     after_ink = np.max(actual_pixels, axis=2) <= 124
+    outside_labels = np.ones(before_ink.shape, dtype=bool)
     for label_name, (left, top, right, bottom) in LABEL_REGIONS.items():
         compare_mask(f"{label_name} label", before_ink[top:bottom, left:right],
                      after_ink[top:bottom, left:right], 0.90, radius=3)
+        outside_labels[top:bottom, left:right] = False
+
+    for name, (color, threshold) in FEATURES.items():
+        rgb = np.array(ImageColor.getrgb(color), dtype=np.int16)
+        before = np.max(np.abs(expected_pixels - rgb), axis=2) <= 22
+        after = np.max(np.abs(actual_pixels - rgb), axis=2) <= 22
+        if name == "outlines":
+            # The reference outlines stay outside the label regions. Text
+            # antialiasing over a fill can otherwise match the outline color.
+            before &= outside_labels
+            after &= outside_labels
+        compare_mask(name, before, after, threshold, radius=2)
 
     comparison = Image.new("RGB", (3 * expected.width + 32, expected.height + 36), "#f1f5f9")
     drawing = ImageDraw.Draw(comparison)

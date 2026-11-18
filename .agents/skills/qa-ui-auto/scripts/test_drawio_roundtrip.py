@@ -35,6 +35,21 @@ class DrawioRoundtripTest(unittest.TestCase):
             with self.assertRaisesRegex(StepError, "Load request label retained 0.0%"):
                 compare_images(reference, captured, report, "Invisible label")
 
+    def test_preview_detects_a_missing_shape_outline(self):
+        reference = ASSETS / "roundtrip.drawio.png"
+        with TemporaryDirectory() as directory, Image.open(reference) as image:
+            report = Path(directory) / "comparison"
+            captured = Path(directory) / "missing-outline.png"
+            modified = image.convert("RGB")
+            for y in range(14, 89):
+                for x in range(11, 140):
+                    red, green, blue = modified.getpixel((x, y))
+                    if abs(red - 71) <= 22 and abs(green - 102) <= 22 and abs(blue - 140) <= 22:
+                        modified.putpixel((x, y), (154, 198, 255))
+            modified.save(captured)
+            with self.assertRaisesRegex(StepError, "outlines retained"):
+                compare_images(reference, captured, report, "Missing outline")
+
     def test_export_detects_wrong_edge_terminal_and_lost_waypoint(self):
         original = ASSETS / "roundtrip.drawio"
         with TemporaryDirectory() as directory:
