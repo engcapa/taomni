@@ -46,6 +46,25 @@ beforeEach(() => {
 afterEach(() => { cleanup(); style.remove(); useDocumentStore.setState({ documents: {} }); });
 
 describe("MarkdownEditor real host lifecycle", () => {
+  it("shares terminal-style zoom across modes and leaves the editor history intact", () => {
+    render(<Harness />);
+    const content = screen.getByTestId("viewer-editor").querySelector<HTMLElement>(".cm-content")!;
+    fireEvent.keyDown(content, { key: "=", ctrlKey: true });
+    expect(screen.getByTestId("markdown-live")).toHaveAttribute("data-zoom", "110");
+    expect(fireEvent.wheel(content, { deltaY: -100, ctrlKey: true })).toBe(false);
+    expect(screen.getByTestId("markdown-live")).toHaveAttribute("data-zoom", "120");
+    fireEvent.wheel(content, { deltaY: 100 });
+    fireEvent.click(screen.getByTestId("markdown-mode-source"));
+    expect(screen.getByTestId("markdown-source")).toHaveAttribute("data-zoom", "120");
+    fireEvent.keyDown(content, { key: "-", ctrlKey: true });
+    fireEvent.keyDown(content, { key: "0", ctrlKey: true, isComposing: true });
+    expect(screen.getByTestId("markdown-source")).toHaveAttribute("data-zoom", "110");
+    fireEvent.click(screen.getByTestId("markdown-mode-split"));
+    fireEvent.keyDown(content, { key: "0", ctrlKey: true });
+    expect(screen.getByTestId("markdown-split")).toHaveAttribute("data-zoom", "100");
+    expect(useDocumentStore.getState().documents["/docs/a.md"].content).toBe(source);
+  });
+
   it("keeps the shared find panel across modes and permits replacement only in the editing surface", () => {
     render(<Harness />);
     fireEvent.keyDown(screen.getByTestId("markdown-live"), { key: "f", ctrlKey: true });

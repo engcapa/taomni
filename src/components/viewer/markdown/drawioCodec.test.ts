@@ -41,8 +41,9 @@ describe("untrusted draw.io rendering boundary", () => {
     const page = newDrawioPage("a", "a");
     drawioCell(page, { id: "text", vertex: 1, value: '<b>Safe 中文</b><br>Second line<img src="https://example.test/leak" onerror="alert(1)"><script>alert(2)</script>', style: "text;html=1;" }, { x: 0, y: 0, width: 200, height: 80 });
     const safe = safeDrawioModel(page);
-    expect(safe.querySelector("mxCell[id='text']")?.getAttribute("value")).toBe("Safe 中文\nSecond line");
-    expect(safe.querySelector("mxCell[id='text']")?.getAttribute("style")).toContain("html=0");
+    expect(safe.querySelector("mxCell[id='text']")?.getAttribute("value")).toBe("<b>Safe 中文</b><br>Second line");
+    expect(safe.querySelector("mxCell[id='text']")?.getAttribute("style")).toContain("html=1");
+    expect(safeDrawioModel(page, false).querySelector("mxCell[id='text']")?.getAttribute("value")).toBe("Safe 中文\nSecond line");
     expect(drawioFile([page])).toContain("example.test");
   });
   it("blocks network images, cyclic parents and extreme geometry before loading the graph engine", () => {

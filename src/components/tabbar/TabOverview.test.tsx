@@ -128,6 +128,37 @@ it("matches a new output in the open search without moving focus", () => {
   expect(input).toHaveFocus();
 });
 
+it("moves focus with arrows and enlarges a hovered card only after the dwell time", () => {
+  useAppStore.setState((state) => ({
+    tabs: [...state.tabs, { id: "session-2", type: "terminal", title: "Review", closable: true }],
+  }));
+  render(<TabOverview />);
+  const [first, second] = screen.getAllByTestId("tab-overview-card");
+  fireEvent.keyDown(screen.getByTestId("tab-overview-search"), { key: "ArrowDown" });
+  expect(first).toHaveFocus();
+  fireEvent.keyDown(first, { key: "ArrowRight" });
+  expect(second).toHaveFocus();
+  expect(useAppStore.getState().activeTabId).toBe("session-1");
+
+  fireEvent.mouseEnter(second);
+  act(() => vi.advanceTimersByTime(1_999));
+  expect(screen.queryByTestId("tab-overview-enlarged")).toBeNull();
+  fireEvent.mouseLeave(second);
+  act(() => vi.advanceTimersByTime(1));
+  expect(screen.queryByTestId("tab-overview-enlarged")).toBeNull();
+
+  fireEvent.mouseEnter(second);
+  act(() => vi.advanceTimersByTime(2_000));
+  const enlarged = screen.getByTestId("tab-overview-enlarged");
+  expect(enlarged).toHaveAttribute("data-tab-id", "session-2");
+  expect(useAppStore.getState().activeTabId).toBe("session-1");
+  fireEvent.mouseLeave(second, { relatedTarget: enlarged });
+  expect(enlarged).toBeVisible();
+  fireEvent.click(enlarged);
+  expect(screen.queryByTestId("tab-overview-enlarged")).toBeNull();
+  expect(useAppStore.getState().activeTabId).toBe("session-2");
+});
+
 it("places endpoint metadata in the footer so the header gives maximum room to titles", () => {
   const ws = useWorkspacePlatformStore.getState();
   const workspace = ws.createWorkspace({ name: "My Workspace" });

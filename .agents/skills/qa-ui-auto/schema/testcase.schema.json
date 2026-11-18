@@ -565,6 +565,7 @@
         "hover": {
           "$ref": "#/$defs/hover_arg"
         },
+        "control_wheel": {"type":"object","additionalProperties":false,"required":["selector","direction"],"properties":{"selector":{"type":"string","minLength":1},"direction":{"enum":["up","down"]}}},
         "drag_to": {
           "$ref": "#/$defs/drag_arg"
         },

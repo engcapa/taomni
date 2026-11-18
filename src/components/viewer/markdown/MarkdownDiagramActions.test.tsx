@@ -5,6 +5,8 @@ import { writeText } from "../../../lib/clipboard";
 import { saveExportBlob } from "./exportFiles";
 import { MarkdownDiagramActions } from "./MarkdownDiagramActions";
 import { rememberDiagram } from "./diagramModel";
+import { rememberDrawio } from "./drawioRender";
+import { parseDrawio } from "./drawioCodec";
 
 vi.mock("../viewerLabels", () => ({ useViewerLabels: () => label }));
 vi.mock("../../../lib/clipboard", () => ({ writeText: vi.fn(), writeImagePng: vi.fn() }));
@@ -13,20 +15,34 @@ vi.mock("./wordSvg", () => ({ portableWordSvg: vi.fn(async () => '<svg xmlns="ht
 const label = (_zh: string, en: string) => en;
 const source = "flowchart LR\nA[加载配置] --> B[保存历史]";
 let report = vi.fn();
-function Harness({ path = "/docs/example.md" }: { path?: string }) {
+const drawio = '<mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/><mxCell id="node" parent="1" vertex="1" value="Review"/></root></mxGraphModel>';
+function Harness({ path = "/docs/example.md", imported = false }: { path?: string; imported?: boolean }) {
   const root = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => {
-    const diagram = document.createElement("div"); diagram.className = "fv-md-mermaid";
+    const diagram = document.createElement("div"); diagram.className = imported ? "fv-md-drawio" : "fv-md-mermaid";
     diagram.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 640 240"><text>加载配置</text><text>保存历史</text></svg>';
-    rememberDiagram(diagram, { source, theme: "light" }); root.current!.prepend(diagram);
+    if (imported) rememberDrawio(diagram, parseDrawio(drawio)[0]);
+    else rememberDiagram(diagram, { source, theme: "light" });
+    root.current!.prepend(diagram);
     return () => diagram.remove();
-  }, [path]);
+  }, [path, imported]);
   return <div ref={root}><div className="fv-md-main" tabIndex={-1} /><MarkdownDiagramActions root={root} docPath={path} onError={report} /></div>;
 }
 const diagram = () => document.querySelector<HTMLElement>(".fv-md-mermaid")!;
 beforeEach(() => {
   vi.clearAllMocks(); report = vi.fn();
   vi.spyOn(URL, "createObjectURL").mockReturnValue("blob:diagram"); vi.spyOn(URL, "revokeObjectURL").mockImplementation(() => undefined);
+});
+
+it("opens the same menu for imported draw.io and copies its editable XML", async () => {
+  render(<Harness imported />);
+  const drawing = document.querySelector(".fv-md-drawio")!;
+  fireEvent.contextMenu(drawing);
+  expect(screen.getByRole("menu", { name: "draw.io image menu" })).toBeInTheDocument();
+  fireEvent.click(screen.getByRole("menuitem", { name: "Copy draw.io source" }));
+  await waitFor(() => expect(writeText).toHaveBeenCalledWith(expect.stringContaining('value="Review"')));
+  fireEvent.doubleClick(drawing);
+  expect(screen.getByRole("img", { name: "draw.io diagram" }).querySelector("svg")).toBeInTheDocument();
 });
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 

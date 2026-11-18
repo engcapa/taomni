@@ -11,16 +11,20 @@ def setup(ctx):
     platform_workspace_root.setup(ctx)
     root = ctx.values["platform_workspace_root"]
     source = "# Drawing round trip\n\nKeep this Markdown outside the diagram.\n"
-    path = root + "/drawio-roundtrip.md"
+    paths = {
+        root + "/drawio-roundtrip.md": source,
+        root + "/drawio-actions.md": "# Diagram actions\n\n```drawio\n" + (ASSETS / "swimlanes.drawio").read_text(encoding="utf-8") + "```\n",
+    }
     if ctx.cfg["app"]["mode"] == "native":
-        Path(path).write_text(source, encoding="utf-8")
+        for path, content in paths.items():
+            Path(path).write_text(content, encoding="utf-8")
     else:
         ctx.page.evaluate(
-            """async ({path, source}) => {
+            """async (paths) => {
                 const vfs = await import('/src/stubs/localVfs.ts');
-                await vfs.vfsWriteText(path, source);
+                for (const [path, source] of Object.entries(paths)) await vfs.vfsWriteText(path, source);
             }""",
-            {"path": path, "source": source},
+            paths,
         )
     case_dir = ctx.case_dir.resolve()
     for name in ("roundtrip.drawio", "roundtrip.drawio.png"):
@@ -28,5 +32,5 @@ def setup(ctx):
     ctx.values.update(
         drawio_roundtrip_input=str(case_dir / "roundtrip.drawio"),
         drawio_roundtrip_export=str(case_dir / "roundtrip-export.drawio"),
-        drawio_roundtrip_markdown=path,
+        drawio_roundtrip_markdown=root + "/drawio-roundtrip.md",
     )

@@ -1,0 +1,106 @@
+id: TC-WS-098
+title: Overview keyboard focus and delayed hover enlargement
+covers: [F1.5, F-WS-1, F-WS-2, F-WS-5]
+modes: [browser, native]
+tags: [p1, overview, workspace, regression]
+fixtures: [reset_db, platform_workspace_root]
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-overview-focus
+- wait_for: '[data-testid="welcome-panel"]'
+- seed_storage:
+    key: taomni.platformWorkspaces.v1
+    value: '{"version":1,"activeWorkspaceId":"default-workspace","createdNodes":[],"workspaces":[{"id":"default-workspace","name":"Default Workspace","description":"","isDefault":true,"rootFolders":[{"id":"root-1","name":"qa-root","path":"${fixture.platform_workspace_root}","addedAt":1}],"activeLeftToolWindow":"project","bottomDock":{"open":false,"activeTool":"terminal","heightPx":220},"openTabs":[],"activeTabId":""}]}'
+- reload_window: null
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="nav-mode-workspaces"]'
+- wait_for: '[data-testid="code-workspace-tree"]'
+- click: '[data-testid="code-workspace-tree-root"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
+- wait_for: '[data-testid="markdown-editor"]'
+- click: '[data-testid="code-workspace-tree-dir"][data-path="src"] [data-testid="code-workspace-tree-dir-arrow"]'
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="src/index.ts"]'
+- wait_for: '[data-testid="workspace-file-editor"][data-path="src/index.ts"] .cm-content'
+- click: '[data-testid="tab-overview-trigger"]'
+- wait_for: '[data-testid="tab-overview-search"]:focus'
+- press: ArrowDown
+- wait_for: '[data-testid="tab-overview-card"]:nth-child(1):focus'
+- press: Tab
+- wait_for: '[data-testid="tab-overview-card"]:nth-child(2):focus'
+- press: Shift+Tab
+- wait_for: '[data-testid="tab-overview-card"]:nth-child(1):focus'
+- press: ArrowRight
+- wait_for: '[data-testid="tab-overview-card"]:nth-child(2):focus'
+- press: ArrowLeft
+- wait_for: '[data-testid="tab-overview-card"]:nth-child(1):focus'
+- hover: '[data-testid="tab-overview-card"]:nth-child(1)'
+- wait_for: '[data-testid="tab-overview-enlarged"]'
+- assert_text:
+    selector: '[data-testid="tab-overview-enlarged"]'
+    contains: README.md
+- assert_visible: '[data-testid="tab-overview-card"]:nth-child(2)[data-active="true"]'
+- eval_readonly:
+    expression: >
+      document.querySelector('.taomni-overview-enlarged').getBoundingClientRect().width >
+      document.querySelector('.taomni-overview-card').getBoundingClientRect().width &&
+      document.querySelector('.taomni-overview-enlarged').getBoundingClientRect().right <= window.innerWidth
+    expect_truthy: true
+- press: Enter
+- assert_not_visible: '[data-testid="tab-overview"]'
+- wait_for: '[data-testid="markdown-editor"]'
+- click: '[data-testid="tab-overview-trigger"]'
+- hover: '[data-testid="tab-overview-card"]:nth-child(2)'
+- wait_for: '[data-testid="tab-overview-enlarged"]'
+- click: '[data-testid="tab-overview-enlarged"]'
+- assert_not_visible: '[data-testid="tab-overview"]'
+- wait_for: '[data-testid="workspace-file-editor"][data-path="src/index.ts"] .cm-content'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: OVERVIEW-KEYBOARD-HOVER
+    requirement: Overview keyboard focus and delayed hover enlargement.
+    actions: [15, 17, 19, 21, 23, 25, 27, 32, 35, 36, 38]
+    checkpoints:
+    - step: 16
+      expectation: Opening Overview focuses search.
+    - step: 18
+      expectation: Down focuses the first thumbnail.
+    - step: 20
+      expectation: Tab focuses the next thumbnail.
+    - step: 22
+      expectation: Shift+Tab returns to the preceding thumbnail.
+    - step: 24
+      expectation: Right focuses the second thumbnail.
+    - step: 26
+      expectation: Left focuses the first thumbnail.
+    - step: 28
+      expectation: Hover reveals the enlarged preview.
+    - step: 29
+      expectation: The enlarged preview shows the hovered document.
+    - step: 30
+      expectation: The previous active document stays selected while previewing.
+    - step: 31
+      expectation: The hovered card is displayed larger within the viewport.
+    - step: 33
+      expectation: Enter closes Overview.
+    - step: 34
+      expectation: Enter activates the focused document.
+    - step: 37
+      expectation: The second thumbnail enlarges after hovering.
+    - step: 39
+      expectation: Clicking the enlarged preview closes Overview.
+    - step: 40
+      expectation: Clicking the enlarged preview activates its document.
+    - step: 41
+      expectation: No runtime errors were recorded.
+    results: [16, 18, 20, 22, 24, 26, 28, 29, 30, 31, 33, 34, 37, 39, 40, 41]
+  visual:
+  - check: The enlarged preview remains within the viewport.
+    method: automated
+    reason: Read the mounted controls and require the expected visible content.
+  native:
+  - check: Keyboard and pointer behavior through the actual WebView.
+    method: automated
+    reason: The native runner exercises the packaged UI using WebView input.

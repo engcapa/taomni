@@ -15,23 +15,31 @@ export function MarkdownDiagramViewer({ snapshot, initialAction, label, busy, no
   const [error, setError] = useState("");
   const [background, setBackground] = useState("checker");
   const dialog = useRef<HTMLDivElement>(null);
+  const inlineSvg = useRef<HTMLDivElement>(null);
   useEffect(() => {
+    transform.stage.current?.focus();
+    if (snapshot.kind === "drawio") {
+      inlineSvg.current?.replaceChildren(snapshot.svg.cloneNode(true));
+      return;
+    }
     let disposed = false, resource = "";
     void portableWordSvg(snapshot.svg, snapshot.width, snapshot.height, snapshot.theme === "dark").then((svg) => {
       if (disposed) return;
       resource = URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" })); setUrl(resource);
     }).catch((cause: unknown) => { if (!disposed) setError(String(cause)); });
-    transform.stage.current?.focus();
     return () => { disposed = true; if (resource) URL.revokeObjectURL(resource); };
   }, [snapshot, transform.stage]);
-  const viewActions = diagramActions(label).filter((entry) => entry.id !== "open");
+  const name = snapshot.kind === "drawio" ? "draw.io" : "Mermaid";
+  const viewActions = diagramActions(label, snapshot.kind).filter((entry) => entry.id !== "open");
   const action = (id: DiagramAction) => {
     if (/^(save|copy)-/.test(id)) onAction(id, snapshot, transform.view);
     else transform.action(id);
   };
   const { view, scale } = transform;
+  const imageStyle = { width: snapshot.width, height: snapshot.height,
+    transform: `translate(-50%,-50%) translate(${view.x}px,${view.y}px) scale(${scale}) rotate(${view.rotation}deg) scale(${view.flipX ? -1 : 1},${view.flipY ? -1 : 1})` };
   return <div className="fv-md-diagram-backdrop" onPointerDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-    <div ref={dialog} className="fv fv-md-diagram-viewer" role="dialog" aria-modal="true" aria-label={label("Mermaid 图片查看器", "Mermaid image viewer")}
+    <div ref={dialog} className="fv fv-md-diagram-viewer" role="dialog" aria-modal="true" aria-label={label(`${name} 图片查看器`, `${name} image viewer`)}
       data-testid="markdown-diagram-viewer" onKeyDown={(event) => {
         if (event.key === "Escape" && !event.nativeEvent.isComposing) { event.preventDefault(); event.stopPropagation(); onClose(); return; }
         if (event.key === "Tab") {
@@ -60,9 +68,10 @@ export function MarkdownDiagramViewer({ snapshot, initialAction, label, busy, no
       <div ref={transform.stage} className={`fv-md-diagram-stage background-${background}`} data-testid="markdown-diagram-stage" tabIndex={0}
         aria-label={label("拖动平移，滚轮缩放；方向键平移", "Drag to pan, wheel to zoom; arrow keys to pan")}
         data-rotation={view.rotation} data-flip-x={view.flipX} data-flip-y={view.flipY} data-scale={scale} data-pan-x={view.x} data-pan-y={view.y} data-view-mode={view.mode} {...transform.pointer}>
-        {error ? <div role="alert">{error}</div> : url ? <img alt={label("Mermaid 图表", "Mermaid diagram")} src={url} draggable={false} width={snapshot.width} height={snapshot.height}
+        {error ? <div role="alert">{error}</div> : snapshot.kind === "drawio" ? <div ref={inlineSvg} className="fv-md-diagram-svg" role="img" aria-label={label("draw.io 图表", "draw.io diagram")} style={imageStyle} />
+          : url ? <img alt={label(`${name} 图表`, `${name} diagram`)} src={url} draggable={false} width={snapshot.width} height={snapshot.height}
           onError={() => setError(label("无法显示图片，请重新打开图表", "Cannot display image; reopen the diagram"))}
-          style={{ width: snapshot.width, height: snapshot.height, transform: `translate(-50%,-50%) translate(${view.x}px,${view.y}px) scale(${scale}) rotate(${view.rotation}deg) scale(${view.flipX ? -1 : 1},${view.flipY ? -1 : 1})` }} /> : <span role="status">{label("正在加载…", "Loading…")}</span>}
+          style={imageStyle} /> : <span role="status">{label("正在加载…", "Loading…")}</span>}
       </div>
       <div className="fv-md-diagram-footer" role="status" data-testid="markdown-diagram-status">{notice || label("拖动平移 · 滚轮缩放 · R 旋转 · Esc 关闭", "Drag to pan · Wheel to zoom · R to rotate · Esc to close")}</div>
     </div>

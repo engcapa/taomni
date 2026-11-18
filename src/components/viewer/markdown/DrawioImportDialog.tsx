@@ -55,7 +55,7 @@ export function DrawioImportDialog({ pages, onCancel, onInsert }: { pages: Drawi
         if (!mode) return;
         try {
           const selection = pages.filter((page) => selected.has(page.id));
-          selection.forEach(safeDrawioModel);
+          selection.forEach((page) => safeDrawioModel(page));
           onInsert(drawioToMarkdown(selection, mode));
         } catch (cause) { setError(String(cause)); }
       }}>{label("插入所选页面", "Insert selected sheets")} ({selected.size})</button></footer>

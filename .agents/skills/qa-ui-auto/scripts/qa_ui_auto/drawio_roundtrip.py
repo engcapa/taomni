@@ -121,29 +121,24 @@ def _sheet(path):
     pages = document.findall("diagram")
     if document.tag != "mxfile" or len(pages) != 1:
         raise StepError(f"expected exactly one editable draw.io sheet: {path.name}")
-    root = pages[0].find("./mxGraphModel/root")
-    if root is None:
+    model = pages[0].find("mxGraphModel")
+    if model is None or model.find("root") is None:
         raise StepError(f"missing editable mxGraphModel: {path.name}")
-    return pages[0].get("name", ""), list(root)
+    return pages[0].get("name", ""), model
 
 
 def _element(element):
     return element.tag, dict(element.attrib), [_element(child) for child in element]
 
 
-def _cell_graph(cells, group=""):
+def _cell_graph(cells):
     raw_ids = {cell.get("id") for cell in cells}
-    if group:
-        raw_ids.add(group)
     result = {}
     for cell in cells:
         attrs = dict(cell.attrib)
         for key in ("parent", "source", "target"):
             if key in attrs and attrs[key] not in raw_ids:
                 raise StepError(f"draw.io cell {attrs.get('id')!r} refers to a missing {key}")
-        for key in ("id", "parent", "source", "target"):
-            if group and key in attrs:
-                attrs[key] = "1" if attrs[key] == group else attrs[key].removeprefix(group + "-")
         identity = attrs.pop("id", "")
         if cell.tag != "mxCell" or not identity or identity in result:
             raise StepError("round-trip lost unique editable mxCell identities")
@@ -152,14 +147,14 @@ def _cell_graph(cells, group=""):
 
 
 def compare_export(original, exported):
-    original_title, source_cells = _sheet(original)
-    export_title, target_cells = _sheet(exported)
+    original_title, source_model = _sheet(original)
+    export_title, target_model = _sheet(exported)
     if export_title != original_title and not export_title.endswith(" · " + original_title):
         raise StepError(f"draw.io sheet name changed: {export_title!r}")
-    expected = _cell_graph(source_cells)
-    groups = [cell for cell in target_cells if cell.get("parent") == "1" and cell.get("style") == "group;"]
-    group = groups[0].get("id", "") if len(groups) == 1 else ""
-    actual = _cell_graph([cell for cell in target_cells if not group or cell.get("id") != group], group)
+    if source_model.attrib != target_model.attrib:
+        raise StepError("draw.io page settings changed")
+    expected = _cell_graph(source_model.find("root"))
+    actual = _cell_graph(target_model.find("root"))
     if expected.keys() != actual.keys():
         raise StepError(f"draw.io editable cells changed: expected {list(expected)}, found {list(actual)}")
     for identity, (attrs, geometry) in expected.items():
@@ -176,7 +171,9 @@ def compare_export(original, exported):
 _SVG_DETAILS = """svg => {
     if (!svg) return null;
     const bounds = svg.getBoundingClientRect();
-    return {labels: Array.from(svg.querySelectorAll("text"), text => text.textContent.trim()),
+    return {labels: Array.from(svg.querySelectorAll("text,foreignObject"))
+                .filter(text => text.localName === "foreignObject" || !text.closest("switch"))
+                .map(text => text.textContent.trim()).filter(Boolean),
             rect: [bounds.left, bounds.top, bounds.right, bounds.bottom],
             viewport: [window.innerWidth, window.innerHeight]};
 }"""
@@ -213,7 +210,8 @@ def assert_preview(ctx, args):
         locator.screenshot(path=str(captured), scale="css")
     compare_images(ctx.case_dir / "roundtrip.drawio.png", captured,
                    ctx.case_dir / f"drawio-{args}-comparison", f"Markdown {args.capitalize()}")
-    _, cells = _sheet(ctx.case_dir / "roundtrip.drawio")
+    _, model = _sheet(ctx.case_dir / "roundtrip.drawio")
+    cells = model.find("root")
     expected_labels = sorted(cell.get("value") for cell in cells if cell.get("value"))
     if sorted(details["labels"]) != expected_labels:
         raise StepError(f"draw.io visible labels changed: {details['labels']!r}")

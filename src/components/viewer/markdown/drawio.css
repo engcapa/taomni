@@ -14,3 +14,4 @@
 .fv-md-drawio-source summary{cursor:pointer}
 .fv-md-drawio-source pre{max-height:240px;overflow:auto}
 @media(max-width:650px){.fv-md-drawio-sheets{flex-direction:column;max-height:460px}.fv-md-drawio-sheet-list{flex:0 0 100px}.fv-md-drawio-dialog footer{flex-wrap:wrap}}
+@font-face{font-family:"Architects Daughter";src:url("./vendor/architects-daughter.ttf") format("truetype");font-display:swap}
