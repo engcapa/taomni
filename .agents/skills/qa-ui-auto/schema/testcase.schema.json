@@ -89,6 +89,7 @@
           "module_preview",
           "module_upgrade",
           "module_legacy_install",
+          "module_legacy_mfa",
           "module_download",
           "module_download_preview",
           "module_marketplace",

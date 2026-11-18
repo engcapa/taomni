@@ -54,3 +54,9 @@ macOS 保留原始 `codesign` 与 `spctl` 结果。直接 CLI 启动、没有浏
 | Windows x64 MSI | 761715464 | 96120832 | `8b51c045c09a3411a4bd3a44613c48bb4e50192a5eaa4f6d0cf91e5135921237` |
 | macOS ARM64 DMG | 761714079 | 98517685 | `d5a78bddf9d71a4cce9ba57c3b744f14878806eece0283e181b0a48891645dab` |
 | macOS Intel DMG | 761715279 | 104617252 | `e6f8f3eb7f4f3af4e29e53d7870bc48a55a9d0b34de05724ced95e62a4514e2c` |
+
+## 原生 Linux MFA 升级
+
+`TC-MODULES-039` 安装固定 deb，用 WebDriver 操作正式 `0.5.10` 的桌面界面，在隔离 XDG profile 新建 Vault 和 RFC HOTP 测试账号。推进到计数 1 后通过应用的退出确认关闭窗口，等待该进程组中的应用和 WebKit 子进程退出。fixture 保留实际安装记录、关闭凭据以及源 MFA 和 Vault 数据库的 SHA-256。它将数据库和存在的 WAL 交给隔离的候选 QA profile。
+
+候选执行生产离线维护入口，用真实签名包、原口令和旧库提交迁移。随后在候选界面用原口令解锁，校验原发行者、计数 1 的验证码和计数 2 的新验证码。设置页的自动重启独立由 macOS `TC-MODULES-038` 覆盖。正式候选安装器的原位替换和 rollback 仍需端到端执行。

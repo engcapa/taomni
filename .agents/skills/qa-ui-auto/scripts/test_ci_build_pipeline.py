@@ -52,7 +52,7 @@ class BuildPipelineTests(unittest.TestCase):
         jobs = yaml.safe_load((ROOT / '.github/workflows/qa-ui-auto-platforms.yml').read_text())['jobs']
         for platform in ('linux', 'windows', 'macos'):
             dependencies = ['plan', f'build-{platform}', 'signed-modular-packages']
-            if platform == 'macos':
+            if platform in ('linux', 'macos'):
                 dependencies.append('signed-mfa-packages')
             self.assertEqual(jobs[f'execute-{platform}-native']['needs'], dependencies)
             self.assertIn(f'execute-{platform}-native', jobs['summarize']['needs'])
@@ -63,8 +63,8 @@ class BuildPipelineTests(unittest.TestCase):
         self.assertIn('signed-modular-packages', jobs['summarize']['needs'])
         self.assertIn("contains(needs.plan.outputs.native_matrix, 'signed-module')", jobs['signed-modular-packages']['if'])
         self.assertIn('signed-mfa-packages', jobs['summarize']['needs'])
-        self.assertIn("contains(needs.plan.outputs.macos_native_matrix, 'signed-mfa')", jobs['signed-mfa-packages']['if'])
-        self.assertEqual(jobs['signed-mfa-packages']['with']['native_builds'], '${{ needs.plan.outputs.macos_build_matrix }}')
+        self.assertIn("contains(needs.plan.outputs.native_matrix, 'signed-mfa')", jobs['signed-mfa-packages']['if'])
+        self.assertEqual(jobs['signed-mfa-packages']['with']['native_builds'], '${{ needs.plan.outputs.build_matrix }}')
         self.assertNotIn('Validate QA tools', [s.get('name') for s in jobs['plan']['steps']])
 
     @unittest.skipUnless(os.name == 'posix' and shutil.which('bash'), 'POSIX shell contract')

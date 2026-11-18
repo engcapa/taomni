@@ -79,7 +79,7 @@ def setup(ctx):
 
 
 def setup_mfa(ctx):
-    if ctx.case_id != "TC-MODULES-038" or (ctx.cfg.get("app") or {}).get("mode") != "native":
+    if ctx.case_id not in {"TC-MODULES-038", "TC-MODULES-039"} or (ctx.cfg.get("app") or {}).get("mode") != "native":
         raise RuntimeError("Signed MFA input requires its registered native upgrade case")
     raw = os.environ.get("QA_SIGNED_MFA_ROOT")
     if not raw:

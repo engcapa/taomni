@@ -14,6 +14,7 @@ from qa_ui_auto.legacy_release import ASSETS, download_asset, selected_asset, ve
 from qa_ui_auto.legacy_process import sanitized_output
 from qa_ui_auto.legacy_install import install
 from qa_ui_auto.fixtures.module_legacy_install import insert_business_rows, retained_manifest, session_rows
+from qa_ui_auto.fixtures.module_legacy_mfa import transfer_databases
 from qa_ui_auto.fixtures.module_upgrade import input_sessions
 
 
@@ -92,6 +93,24 @@ class PinnedReleaseTests(unittest.TestCase):
 
 
 class OldProfileInputTests(unittest.TestCase):
+    def test_installed_desktop_transfer_preserves_database_bytes_and_wal(self):
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory).resolve() / "legacy"
+            destination = source.parent / "candidate"
+            source.mkdir()
+            destination.mkdir()
+            input_files = {"mfa.db": b"mfa database", "mfa.db-wal": b"legacy WAL",
+                           "vault.db": b"vault database", "vault.db-shm": b"transient"}
+            for name, payload in input_files.items():
+                (source / name).write_bytes(payload)
+            receipts = transfer_databases(source, destination)
+            self.assertEqual(set(receipts), {"mfa.db", "mfa.db-wal", "vault.db"})
+            for name in receipts:
+                self.assertEqual((destination / name).read_bytes(), input_files[name])
+                self.assertEqual(receipts[name], hashlib.sha256(input_files[name]).hexdigest())
+            with self.assertRaisesRegex(RuntimeError, "already contains"):
+                transfer_databases(source, destination)
+
     def test_missing_old_schema_is_rejected_instead_of_synthesized(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory).resolve()

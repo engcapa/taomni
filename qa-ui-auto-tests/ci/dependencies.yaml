@@ -51,6 +51,7 @@ TC-MFA-016: []
 TC-MODULES-036: []
 TC-MODULES-037: []
 TC-MODULES-038: []
+TC-MODULES-039: []
 TC-FILE-OPEN-011: []
 # Native artifact/global-entry/security cases own isolated inputs.
 TC-FILE-OPEN-007: []
