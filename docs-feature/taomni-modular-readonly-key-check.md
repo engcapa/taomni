@@ -60,4 +60,6 @@ GitHub 的 Linux x64、Windows x64、macOS ARM64 各通过 5 项迁移场景、3
 
 检测到可迁移的 `mfa.db` 时，模块商店提供 MFA 包、分离签名和原 Vault 主密码输入。签名和密码在当前应用退出前各验证一次。原生退出流程完成任务清理后授权维护子进程，父进程退出关闭管道写端。子进程核对批准数据、包的签名与确认时的 SHA-256，再获取排他 profile 锁并复用离线执行。完成或失败后启动同一应用，并在 Settings 显示结果。成功状态需要已有已提交迁移归属。主密码不进入命令行、环境变量或持久化记录。
 
-`TC-MODULES-036` 在 browser/native 覆盖拒绝无效签名、清空密码以及原 HOTP 保持；`TC-MODULES-037` 用浏览器的路径选择器验证包和签名字段独立、取消不清除已选路径。真实签名包通过设置页确认、退出和自动重启，以及正式已安装版本生成 MFA、候选安装包替换、完整回滚和剩余模块迁移均待对应的原生端到端场景。
+`TC-MODULES-036` 在 browser/native 覆盖拒绝无效签名、清空密码以及原 HOTP 保持。`TC-MODULES-037` 用浏览器的路径选择器验证包与签名字段独立，取消后可看到先前路径。`TC-MODULES-038` 在 macOS 15 Intel 使用真实签名包，从设置页确认后观察原进程正常退出和新进程自动接管，再用原 Vault 密码解锁并检查迁移后的 HOTP 续号。`TC-MODULES-039` 在 Linux Xvfb 验证迁移正式旧版创建的 MFA 账户。 [最终原生复跑 #44249448069](https://github.com/engcapa/taomni/actions/runs/44249448069)
+
+Linux 另以正式 `0.5.10` 和测试用 `0.5.11` deb 通过同一资料目录的原位替换、签名迁移、降级和重装。Windows 与 macOS 的实际候选安装件替换及回滚仍待验收。 [Linux 原位升级证据](taomni-modular-installed-upgrade-verification.md#linux-安装件替换与回滚)

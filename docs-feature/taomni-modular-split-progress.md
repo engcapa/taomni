@@ -10,6 +10,8 @@
 
 `bc6ccffb1` 为 Linux 接入实际 deb 替换和降级复验。runner 已从正式 `0.5.10` 安装件建号，在同一 XDG profile 安装候选 `0.5.11`、执行签名迁移并推进 HOTP。降级复原旧二进制及旧计数，重装候选再次获取模块的新计数，七个阶段均已核验。Windows MSI 和 macOS DMG 还需各自的安装件替换与回滚证据。 [Linux 替换和回滚场景](taomni-modular-installed-upgrade-verification.md#linux-安装件替换与回滚) · [候选构建 #44243313388](https://github.com/engcapa/taomni/actions/runs/44243313388) · [原位升级 #44250423203](https://github.com/engcapa/taomni/actions/runs/44250423203)
 
+`dc7b2ec66` 的最终复跑已成功结束。Linux Xvfb 和 macOS 15 Intel native 各 **25/25**，分别包含 039、038 及完整 **24/24** crash-regression。六个分片全部在运行中下载，逐项核验 selection、runner receipt、源码、构建身份和用例结果。此前 macOS 26 的 FILE-OPEN-007 失败发生在既有系统保存对话框定位，原记录保留。 [最终复跑 #44249448069](https://github.com/engcapa/taomni/actions/runs/44249448069) · [macOS 26 历史运行 #44246149531](https://github.com/engcapa/taomni/actions/runs/44246149531)
+
 2026-11-18 再次合入远程 main `5fabcdd32`（#830），合并提交 `f5221ae94`，无冲突。核心版本随 `package.json` 更新为 `0.5.10`。合并后的第一轮使用固定校验的正式 `0.5.9` 安装件。`v0.5.10` 发布齐备后，`2c6047668` 将现用 `TC-MODULES-027` 切换到该版本的四个固定资产，保留 0.5.9 历史运行。 [正式安装输入](taomni-modular-installed-upgrade-verification.md) · [0.5.10 三端验收 #44220816594](https://github.com/engcapa/taomni/actions/runs/44220816594)
 
 `76c3f94e9` 将严格校验为 committed 的 MFA profile 接到签名宿主，覆盖原命令的账户读写、偏好、HOTP、导出和 reset。原生导出在 Vault 层验密后向该操作授予一次性授权，reset 在排空准入并取得独占 Vault lease 后执行。迁移后的备份走模块数据，旧归档的 MFA/Vault 对恢复到模块数据目录，原 `mfa.db` 继续作为迁移回退资料。语法错误、重复记录或未知目标使 MFA 拒绝访问。缺失或停用的宿主返回错误，重新启用可以访问已提交的数据。
