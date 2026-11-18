@@ -17,6 +17,8 @@ mod windows;
 mod elements;
 
 mod actions;
+#[cfg(target_os = "macos")]
+mod appkit_drag;
 
 mod capture;
 

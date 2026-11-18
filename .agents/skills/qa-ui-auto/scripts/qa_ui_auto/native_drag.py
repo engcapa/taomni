@@ -5,6 +5,8 @@ from __future__ import annotations
 from contextlib import suppress
 import json
 from pathlib import Path
+import platform
+import time
 from typing import Any, Protocol
 from uuid import uuid4
 
@@ -78,12 +80,31 @@ def _append_drag_receipt(ctx: DragContext, value: dict[str, Any]) -> None:
         stream.write(json.dumps(value) + "\n")
 
 
+def _appkit_drag(session: DragSession, actions: list[dict], trace_id: str) -> None:
+    points = [[action["x"], action["y"]] for action in actions if action["type"] == "pointerMove"]
+    session.request("POST", session.endpoint("/qa/appkit-drag"), {"points": points})
+    trace = json.dumps(trace_id)
+    deadline = time.monotonic() + 6
+    while time.monotonic() < deadline:
+        observed = session.execute(f"""
+            const events = window[{trace}]?.events ?? [];
+            return ['mousedown', 'mouseup'].every(type => events.some(event => event.type === type && event.isTrusted));
+        """)
+        if observed is True:
+            return
+        time.sleep(0.05)
+    raise StepError("drag_to: WKWebView did not observe the AppKit mouse-down and mouse-up")
+
+
 def native_drag(ctx: DragContext, args: Any) -> str:
     if not isinstance(args, dict) or "from" not in args:
         raise StepError("drag_to: expected {from, to|by}")
     if "from_position" in args or "to_position" in args:
         raise StepError("drag_to: element-relative explicit positions are browser-only")
     modifiers = drag_modifiers(args)
+    appkit = platform.system() == "Darwin" and args.get("macos_appkit", False)
+    if appkit and modifiers:
+        raise StepError("drag_to: AppKit transport requires an unmodified drag")
     start, end, steps = prepare_drag_points(ctx.session, args)
     actions = [{"type": "pointerMove", "duration": 0, "origin": "viewport", "x": start[0], "y": start[1]},
                {"type": "pointerDown", "button": 0}]
@@ -93,7 +114,8 @@ def native_drag(ctx: DragContext, args: Any) -> str:
                         "y": round(start[1] + (end[1] - start[1]) * step / steps)})
     actions.append({"type": "pointerUp", "button": 0})
     trace_id = f"__taomniQaDragObservation_{uuid4().hex}"
-    _append_drag_receipt(ctx, {"args": args, "start": start, "end": end, "actions": actions, "traceId": trace_id})
+    _append_drag_receipt(ctx, {"args": args, "start": start, "end": end, "actions": actions, "traceId": trace_id,
+                               "transport": "appkit-window-events" if appkit else "webdriver-actions"})
     sources = [{"type": "pointer", "id": MOUSE_SOURCE, "parameters": {"pointerType": "mouse"}, "actions": actions}]
     if modifiers:
         keys = {"Control": "", "Alt": "", "Meta": "", "Shift": ""}
@@ -109,11 +131,17 @@ def native_drag(ctx: DragContext, args: Any) -> str:
         _start_dom_trace(ctx.session, trace_id)
     except Exception as error:
         diagnostics["setupError"] = str(error)
+        if appkit:
+            raise StepError(f"drag_to: AppKit event observation could not start: {error}") from error
     try:
-        ctx.session.request("POST", ctx.session.endpoint("/actions"), {"actions": sources})
+        if appkit:
+            _appkit_drag(ctx.session, actions, trace_id)
+        else:
+            ctx.session.request("POST", ctx.session.endpoint("/actions"), {"actions": sources})
     finally:
-        with suppress(Exception):
-            ctx.session.request("DELETE", ctx.session.endpoint("/actions"))
+        if not appkit:
+            with suppress(Exception):
+                ctx.session.request("DELETE", ctx.session.endpoint("/actions"))
         try:
             diagnostics.update(_finish_dom_trace(ctx.session, trace_id))
         except Exception as error:

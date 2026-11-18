@@ -102,10 +102,7 @@ steps:
     name: data-dirty
     equals: 'true'
 - click: '[data-testid="viewer-save"]'
-- assert_attribute:
-    selector: '[data-testid="file-viewer"]'
-    name: data-dirty
-    equals: 'false'
+- wait_for: '[data-testid="file-viewer"][data-dirty="false"]'
 - screenshot: markdown-shared-find.png
 - press:
     key: Escape

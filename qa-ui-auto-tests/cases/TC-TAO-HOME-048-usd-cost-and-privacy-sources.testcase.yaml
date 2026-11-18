@@ -56,9 +56,7 @@ steps:
     selector: '[data-testid="tao-search-sources"]'
     contains: 12/16
 - click: '[data-testid="tao-search-source-sql"]'
-- assert_count:
-    selector: '[data-testid="tao-search-source-sql"]:not(:checked)'
-    equal: 1
+- wait_for: '[data-testid="tao-search-source-sql"]:not(:checked)'
 - click: '[data-testid="tao-search-source-groups"]'
 - assert_text:
     selector: '[data-testid="tao-search-sources"]'

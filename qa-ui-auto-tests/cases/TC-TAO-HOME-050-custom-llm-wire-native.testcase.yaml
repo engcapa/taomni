@@ -49,7 +49,7 @@ steps:
 - assert_file_contains:
     path: ${fixture.tao_custom_llm_log}
     contains: /v1/chat/completions model=qa-wire-v1 max=240 effort=high search=false stream=false
-- assert_enabled: '[data-testid="llm-provider-row"][data-custom="true"] [data-testid="llm-provider-test"]'
+- wait_for: '[data-testid="llm-provider-row"][data-custom="true"] [data-testid="llm-provider-test"]:enabled'
 - select_option:
     selector: '[data-testid="llm-custom-protocol"]'
     value: anthropic
@@ -57,7 +57,7 @@ steps:
 - assert_file_contains:
     path: ${fixture.tao_custom_llm_log}
     contains: /v1/messages model=qa-wire-v1 max=240 effort=high search=false stream=false
-- assert_enabled: '[data-testid="llm-provider-row"][data-custom="true"] [data-testid="llm-provider-test"]'
+- wait_for: '[data-testid="llm-provider-row"][data-custom="true"] [data-testid="llm-provider-test"]:enabled'
 - select_option:
     selector: '[data-testid="llm-custom-protocol"]'
     value: openai-responses
@@ -65,7 +65,7 @@ steps:
 - assert_file_contains:
     path: ${fixture.tao_custom_llm_log}
     contains: /v1/responses model=qa-wire-v1 max=240 effort=high search=false stream=false
-- assert_enabled: '[data-testid="llm-provider-row"][data-custom="true"] [data-testid="llm-provider-test"]'
+- wait_for: '[data-testid="llm-provider-row"][data-custom="true"] [data-testid="llm-provider-test"]:enabled'
 - click: '[data-testid="llm-custom-native-search"]'
 - select_option:
     selector: '[data-testid="tao-settings-provider"]'

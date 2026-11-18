@@ -42,6 +42,7 @@ steps:
 - drag_to:
     from: '[data-testid="markdown-live"] p strong'
     to: '[data-testid="markdown-live"] p code'
+    macos_appkit: true
 - eval_readonly:
     expression: /bold\s+and\s+inl/.test(window.getSelection().toString()) && document.querySelector('.fv-md-live-pane').contains(window.getSelection().anchorNode)
     expect_truthy: true
@@ -66,6 +67,7 @@ steps:
 - drag_to:
     from: '[data-testid="markdown-live"] p strong'
     to: '[data-testid="markdown-live"] p code'
+    macos_appkit: true
 - eval_readonly:
     expression: /bold\s+and\s+inl/.test(window.getSelection().toString()) && document.querySelector('.fv-md-live-pane').contains(window.getSelection().anchorNode)
     expect_truthy: true

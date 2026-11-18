@@ -2088,6 +2088,7 @@
         },
         "modifiers": {"type": "array", "uniqueItems": true, "items": {"enum": ["Alt", "Control", "Meta", "Shift"]}},
         "macos_modifiers": {"type": "array", "uniqueItems": true, "items": {"enum": ["Alt", "Control", "Meta", "Shift"]}},
+        "macos_appkit": {"type": "boolean", "description": "Use AppKit window events for an unmodified drag in macOS native mode."},
         "from_position": {
           "$ref": "#/$defs/point",
           "description": "Pixel offset within the 'from' element where the target-based drag starts (Playwright source_position)."
