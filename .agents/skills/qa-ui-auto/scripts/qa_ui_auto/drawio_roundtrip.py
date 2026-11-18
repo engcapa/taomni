@@ -16,7 +16,16 @@ FEATURES = {
     "ellipse": ("#7ed9a8", 0.97),
     "outlines": ("#47668c", 0.93),
     "arrows": ("#8b30ce", 0.91),
-    "labels": ("#111827", 0.85),
+}
+
+# Individual label regions in the Desktop reference after trimming its margin.
+LABEL_REGIONS = {
+    "Load request": (12, 26, 118, 56),
+    "Submit": (138, 26, 194, 56),
+    "Validate": (240, 26, 320, 56),
+    "OK": (283, 98, 322, 132),
+    "Retry": (56, 171, 114, 211),
+    "Save result": (225, 170, 339, 211),
 }
 
 
@@ -45,18 +54,32 @@ def compare_images(reference, captured, report, label):
     failures = ["diagram proportions changed"] if aspect_error > 0.035 else []
     actual = observed.resize(expected.size, Image.Resampling.LANCZOS)
     expected_pixels, actual_pixels = np.asarray(expected, dtype=np.int16), np.asarray(actual, dtype=np.int16)
-    for name, (color, threshold) in FEATURES.items():
-        rgb = np.array(ImageColor.getrgb(color), dtype=np.int16)
-        before = np.max(np.abs(expected_pixels - rgb), axis=2) <= 22
-        after = np.max(np.abs(actual_pixels - rgb), axis=2) <= 22
-        before_near = np.asarray(Image.fromarray(before.astype("uint8") * 255).filter(ImageFilter.MaxFilter(5))) > 0
-        after_near = np.asarray(Image.fromarray(after.astype("uint8") * 255).filter(ImageFilter.MaxFilter(5))) > 0
+
+    def compare_mask(name, before, after, threshold, radius):
+        neighbors = ImageFilter.MaxFilter(2 * radius + 1)
+        before_near = np.asarray(Image.fromarray(before.astype("uint8") * 255).filter(neighbors)) > 0
+        after_near = np.asarray(Image.fromarray(after.astype("uint8") * 255).filter(neighbors)) > 0
         retained = (before & after_near).sum() / max(1, before.sum())
         matched = (after & before_near).sum() / max(1, after.sum())
         metrics["features"][name] = {"referencePixels": int(before.sum()), "observedPixels": int(after.sum()),
                                       "retained": round(retained, 4), "matched": round(matched, 4)}
         if min(retained, matched) < threshold:
             failures.append(f"{name} retained {retained:.1%}, matched {matched:.1%} (requires {threshold:.0%})")
+
+    for name, (color, threshold) in FEATURES.items():
+        rgb = np.array(ImageColor.getrgb(color), dtype=np.int16)
+        before = np.max(np.abs(expected_pixels - rgb), axis=2) <= 22
+        after = np.max(np.abs(actual_pixels - rgb), axis=2) <= 22
+        compare_mask(name, before, after, threshold, radius=2)
+
+    # Glyph antialiasing varies by WebView. Include antialiased dark strokes,
+    # and check each label's position independently, including short labels.
+    before_ink = np.max(expected_pixels, axis=2) <= 124
+    after_ink = np.max(actual_pixels, axis=2) <= 124
+    for label_name, (left, top, right, bottom) in LABEL_REGIONS.items():
+        compare_mask(f"{label_name} label", before_ink[top:bottom, left:right],
+                     after_ink[top:bottom, left:right], 0.90, radius=3)
+
     comparison = Image.new("RGB", (3 * expected.width + 32, expected.height + 36), "#f1f5f9")
     drawing = ImageDraw.Draw(comparison)
     for index, (title, image) in enumerate((("draw.io Desktop original", expected), (label, actual),

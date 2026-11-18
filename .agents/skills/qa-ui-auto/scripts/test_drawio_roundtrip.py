@@ -24,6 +24,17 @@ class DrawioRoundtripTest(unittest.TestCase):
                 compare_images(reference, captured, report, "Missing connector")
             self.assertTrue(report.with_suffix(".png").is_file())
 
+    def test_preview_detects_one_invisible_label(self):
+        reference = ASSETS / "roundtrip.drawio.png"
+        with TemporaryDirectory() as directory, Image.open(reference) as image:
+            report = Path(directory) / "comparison"
+            captured = Path(directory) / "invisible-label.png"
+            modified = image.convert("RGB")
+            modified.paste("#9ac6ff", (26, 42, 132, 67))
+            modified.save(captured)
+            with self.assertRaisesRegex(StepError, "Load request label retained 0.0%"):
+                compare_images(reference, captured, report, "Invisible label")
+
     def test_export_detects_wrong_edge_terminal_and_lost_waypoint(self):
         original = ASSETS / "roundtrip.drawio"
         with TemporaryDirectory() as directory:
