@@ -85,7 +85,9 @@ def validate_exit_confirmation(value: object) -> ExitConfirmation:
 def bind_application_restarter(driver, session) -> None:
     session.application_restarter = partial(restart_owned_application, driver, session)
     from native_restore_relaunch import confirm_restore_relaunch
+    from native_mfa_upgrade_relaunch import confirm_mfa_upgrade_relaunch
     session.restore_relauncher = partial(confirm_restore_relaunch, driver, session)
+    session.mfa_upgrade_relauncher = partial(confirm_mfa_upgrade_relaunch, driver, session)
 
 
 def close_macos_application_window(application: Path) -> dict:

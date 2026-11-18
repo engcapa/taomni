@@ -26,7 +26,7 @@ def is_check(step: dict) -> bool:
         return isinstance(args, dict) and args.get("phase") in {"advance-background", "cancelled", "recovered", "proxy-failed", "completed", "forgotten"}
     if verb == "module_restore_probe":
         return isinstance(args, dict) and args.get("phase") in {"running-archive", "disabled-archive", "retained-archive", "reject-password", "staged", "restored", "restart-persisted", "ui-restored"}
-    if verb == "native_confirm_restore_relaunch":
+    if verb in {"native_confirm_restore_relaunch", "native_confirm_mfa_upgrade_relaunch"}:
         return True  # One UI click plus independent process/isolation/reattachment checks.
     if verb == "module_live_backup_probe":
         return isinstance(args, dict) and args.get("phase") in {"first-archive", "second-archive", "after-restart"}

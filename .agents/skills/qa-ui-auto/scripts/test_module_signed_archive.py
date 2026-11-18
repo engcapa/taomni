@@ -12,7 +12,7 @@ import yaml
 
 from qa_ui_auto.behavior_contract import is_check
 from qa_ui_auto.ci import capabilities
-from qa_ui_auto.fixtures.module_signed_archive import load_artifact, platform_key, setup
+from qa_ui_auto.fixtures.module_signed_archive import load_artifact, platform_key, setup, setup_mfa
 from qa_ui_auto.module_signed_observation import check, validate
 from qa_ui_auto.steps import StepError
 from qa_ui_auto.testcase import load_case
@@ -21,13 +21,16 @@ ROOT = Path(__file__).resolve().parents[4]
 
 
 class OfficialModuleArtifactTests(unittest.TestCase):
-    def artifact(self, root):
-        name = "taomni-plugin-hello-plugin-0.1.0-linux-x86_64.taomni-plugin"
+    def artifact(self, root, slug="hello-plugin"):
+        name = f"taomni-plugin-{slug}-0.1.0-linux-x86_64.taomni-plugin"
         archive = root / name
         with zipfile.ZipFile(archive, "w") as zipped:
-            zipped.writestr("frontend/index.js", b"export const hello = true;\n")
-        receipt = {"schema": "taomni.plugin-package.v1", "id": "taomni-plugin-hello-plugin",
-                   "slug": "hello-plugin", "version": "0.1.0", "platform": "linux-x86_64",
+            if slug == "hello-plugin":
+                zipped.writestr("frontend/index.js", b"export const hello = true;\n")
+            else:
+                zipped.writestr("bin/taomni-plugin-mfa", b"unit payload")
+        receipt = {"schema": "taomni.plugin-package.v1", "id": f"taomni-plugin-{slug}",
+                   "slug": slug, "version": "0.1.0", "platform": "linux-x86_64",
                    "sourceSha": "a" * 40, "coreApiVersion": "1", "trust": "plugins.updater.pubkey",
                    "archive": name, "signature": name + ".minisig", "size": archive.stat().st_size,
                    "sha256": hashlib.sha256(archive.read_bytes()).hexdigest()}
@@ -37,7 +40,7 @@ class OfficialModuleArtifactTests(unittest.TestCase):
         # native success must still pass the unchanged product verifier.
         (root / receipt["signature"]).write_text(
             "untrusted comment: unit metadata only\nnot-a-real-signature\n"
-            "trusted comment: id=taomni-plugin-hello-plugin version=0.1.0 platform=linux-x86_64 coreApiVersion=1 sha256="
+            f"trusted comment: id=taomni-plugin-{slug} version=0.1.0 platform=linux-x86_64 coreApiVersion=1 sha256="
             + receipt["sha256"] + "\nnot-a-global-signature\n", encoding="utf-8")
         return receipt, archive
 
@@ -75,6 +78,22 @@ class OfficialModuleArtifactTests(unittest.TestCase):
                                           ("Darwin", "arm64", "darwin-aarch64"),
                                           ("Darwin", "x86_64", "darwin-x86_64")]:
             self.assertEqual(platform_key(system, machine), expected)
+
+    def test_mfa_case_requires_its_own_signed_module_without_a_frontend(self):
+        case = load_case(ROOT / "qa-ui-auto-tests/cases/TC-MODULES-038-macos-signed-mfa-relaunch.testcase.yaml")
+        self.assertEqual(case.modes, ["native"])
+        self.assertIn("signed-mfa", capabilities([case], "native"))
+        self.assertNotIn("signed-module", capabilities([case], "native"))
+        self.assertNotIn("signed-mfa", capabilities([case], "browser"))
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            receipt, archive = self.artifact(root, "mfa")
+            observed, path, _, frontend = load_artifact(root, "a" * 40, "linux-x86_64", "mfa")
+            self.assertEqual((observed, path, frontend), (receipt, archive, None))
+            with self.assertRaisesRegex(RuntimeError, "source/platform/identity"):
+                load_artifact(root, "a" * 40, "linux-x86_64")
+        with self.assertRaisesRegex(RuntimeError, "registered native upgrade case"):
+            setup_mfa(SimpleNamespace(case_id=case.id, cfg={"app": {"mode": "browser"}}))
 
     def test_native_oracle_does_not_accept_a_plausible_registry_without_real_ping(self):
         record = {"state": "enabled", "reason": None}

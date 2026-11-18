@@ -18,9 +18,9 @@ class OfficialPackageRunnerTests(unittest.TestCase):
                     if step.get("id") == "macos_runner")
         self.guard = step["run"].split("\n", 1)[1].rsplit("\nPY", 1)[0]
 
-    def admit(self, label, output, native_builds=""):
+    def admit(self, label, output, native_builds="", module="hello-plugin"):
         with patch.dict(os.environ, {"PACKAGE_MACOS_RUNNER": label, "GITHUB_OUTPUT": str(output),
-                                    "PACKAGE_NATIVE_BUILDS": native_builds}):
+                                    "PACKAGE_NATIVE_BUILDS": native_builds, "QA_MODULE": module}):
             exec(compile(self.guard, "trusted-package-runner-admission", "exec"), {})
         return dict(line.split("=", 1) for line in output.read_text().splitlines())
 
@@ -88,6 +88,17 @@ class OfficialPackageRunnerTests(unittest.TestCase):
                 with self.assertRaises(SystemExit):
                     self.admit("macos-26", output, json.dumps(builds))
                 self.assertFalse(output.exists())
+
+    def test_mfa_selects_only_builds_that_need_its_signed_package(self):
+        builds = {"include": [
+            {"platform_key": "linux", "arch": "X64", "capabilities": ["signed-module"]},
+            {"platform_key": "macos", "arch": "X64", "capabilities": ["signed-module"]},
+            {"platform_key": "macos", "arch": "ARM64", "capabilities": ["signed-mfa"]},
+        ]}
+        with tempfile.TemporaryDirectory() as directory:
+            values = self.admit("macos-26", Path(directory) / "output", json.dumps(builds), "mfa")
+        self.assertEqual(json.loads(values["build_matrix"])["include"][0]["target"], "aarch64-apple-darwin")
+        self.assertEqual(json.loads(values["sign_matrix"])["platform"], ["darwin-aarch64"])
 
 
 if __name__ == "__main__":

@@ -300,6 +300,20 @@ jobs:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
+  signed-mfa-packages:
+    needs: plan
+    if: github.event_name != 'pull_request' && contains(needs.plan.outputs.macos_native_matrix, 'signed-mfa')
+    uses: ./.github/workflows/qa-modular-packages.yml
+    with:
+      head: ${{ needs.plan.outputs.head }}
+      module: mfa
+      artifact_key: ${{ format('{0}-mfa', needs.plan.outputs.artifact_key) }}
+      macos_runner: ${{ inputs.macos_runner || 'macos-15' }}
+      native_builds: ${{ needs.plan.outputs.macos_build_matrix }}
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
   execute-browser:
     needs: plan
     if: needs.plan.outputs.has_browser == 'true'
@@ -364,8 +378,8 @@ jobs:
       operation: build
 
   execute-macos-native:
-    needs: [plan, build-macos, signed-modular-packages]
-    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.build-macos.result == 'success' && (needs.signed-modular-packages.result == 'success' || needs.signed-modular-packages.result == 'skipped') && needs.plan.outputs.has_macos_native == 'true' }}
+    needs: [plan, build-macos, signed-modular-packages, signed-mfa-packages]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && needs.build-macos.result == 'success' && (needs.signed-modular-packages.result == 'success' || needs.signed-modular-packages.result == 'skipped') && (needs.signed-mfa-packages.result == 'success' || needs.signed-mfa-packages.result == 'skipped') && needs.plan.outputs.has_macos_native == 'true' }}
     uses: ./.github/workflows/qa-ui-auto-entry.yml
     with:
       # Bound the burst on hosted ARM runners; retain every planned shard.
@@ -428,7 +442,7 @@ jobs:
   summarize:
     name: qa-ui-auto-platforms-result
     if: always() && needs.plan.result != 'skipped'
-    needs: [plan, tool-contracts, sftp-contracts, signed-modular-packages, execute-browser, build-linux, build-windows, build-macos, execute-linux-native, execute-windows-native, execute-macos-native, native-contracts]
+    needs: [plan, tool-contracts, sftp-contracts, signed-modular-packages, signed-mfa-packages, execute-browser, build-linux, build-windows, build-macos, execute-linux-native, execute-windows-native, execute-macos-native, native-contracts]
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@v4

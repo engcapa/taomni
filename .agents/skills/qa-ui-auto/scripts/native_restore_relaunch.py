@@ -93,6 +93,10 @@ def confirm_restore_relaunch(driver, session):
     if code != 0 or "staged_dialog" not in observation:
         raise RuntimeError("Automatic relaunch requires observed staged success and a normal original exit")
 
+    return attach_after_exit(driver, session, application, expected_env, before, observation, end)
+
+
+def attach_after_exit(driver, session, application, expected_env, before, observation, end):
     # The HTTP/1.1 channel belongs to the exited process even when its child
     # binds the same bridge port and constant session ID. Never reuse it.
     session.discard_connection()
@@ -106,7 +110,7 @@ def confirm_restore_relaunch(driver, session):
         if pid is not None:
             after = require_process(pid, application, expected_env)
             if after == before or after["pid"] == before["pid"]:
-                raise RuntimeError("Restore did not create a different native application process")
+                raise RuntimeError("Automatic relaunch did not create a different native application process")
             # Adopt before any WebView request so failure cleanup retains ownership.
             driver.proc = AdoptedProcess(after)
             session.owned_app_pid = pid

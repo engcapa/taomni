@@ -2668,6 +2668,7 @@
 - `[data-testid="module-upgrade-mfa-cancel"]` — interactive — F-Modules-1.module-upgrade-mfa-cancel
 - `[data-testid="module-upgrade-mfa-error"]` — display — F-Modules-1.module-upgrade-mfa-error
 - `[data-testid="module-upgrade-mfa-result"]` — display — F-Modules-1.module-upgrade-mfa-result
+  ↳ `[data-testid="module-upgrade-mfa-result"][data-state="complete"]` — alias
 - `[data-testid="module-offline-install"]` — display — F-Modules-1.module-offline-install
 - `[data-testid="module-offline-archive"]` — interactive — F-Modules-1.module-offline-archive
 - `[data-testid="module-offline-choose"]` — interactive — F-Modules-1.module-offline-choose

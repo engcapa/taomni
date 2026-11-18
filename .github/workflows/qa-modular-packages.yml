@@ -85,6 +85,7 @@ jobs:
           ]
           approved = {('linux', 'X64'): 'linux-x86_64', ('windows', 'X64'): 'windows-x86_64',
                       ('macos', 'ARM64'): 'darwin-aarch64', ('macos', 'X64'): 'darwin-x86_64'}
+          capability = {'hello-plugin': 'signed-module', 'mfa': 'signed-mfa'}[os.environ['QA_MODULE']]
           if raw := os.environ.get('PACKAGE_NATIVE_BUILDS'):
               document = json.loads(raw)
               if not isinstance(document, dict) or not isinstance(document.get('include'), list):
@@ -93,7 +94,7 @@ jobs:
               for build in document['include']:
                   if not isinstance(build, dict) or (build.get('platform_key'), build.get('arch')) not in approved:
                       raise SystemExit('Unknown native package target')
-                  if 'signed-module' in build.get('capabilities', []):
+                  if capability in build.get('capabilities', []):
                       requested.add(approved[(build['platform_key'], build['arch'])])
               if not requested:
                   raise SystemExit('No signed module target selected')

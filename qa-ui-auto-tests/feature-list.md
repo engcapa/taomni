@@ -255,6 +255,8 @@ controls:
     kind: display
   - id: module-upgrade-mfa-result
     selector: '[data-testid="module-upgrade-mfa-result"]'
+    aliases:
+      - '[data-testid="module-upgrade-mfa-result"][data-state="complete"]'
     kind: display
   - id: module-offline-install
     selector: '[data-testid="module-offline-install"]'
