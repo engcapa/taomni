@@ -698,7 +698,7 @@ G4 的 Linux 恢复策略：每次启动/监督重启前检查已验签宿主所
 
 ### 6.5.1 单体安装升级协议（v1.5 实施补充）
 
-`plugin_migration_inspect` 只读扫描旧 profile，已提交的 MFA 从待迁移列表移除。通用 `plugin_migration_execute` 记录 pending。Settings 的 MFA 签名包入口经原 Vault 验证和正常退出交给离线进程，迁移结果由启动后的 Settings 显示。包括历史 LanChat 库在内的旧资料继续留在原目录。 [MFA 执行与交接](taomni-modular-readonly-key-check.md#设置页交接)
+`plugin_migration_inspect` 只读扫描旧 profile，已提交的 MFA 从待迁移列表移除。通用 `plugin_migration_execute` 记录 pending。Settings 使用已安装 MFA 版本的签名原件或用户选取的签名包，经原 Vault 验证和正常退出交给离线进程，迁移结果由启动后的 Settings 显示。包括历史 LanChat 库在内的旧资料继续留在原目录。 [MFA 执行与交接](taomni-modular-readonly-key-check.md#设置页交接)
 
 升级必须先完成迁移预检，再切换核心版本；不能把旧版目录直接当作插件目录，也不能在下载插件失败时删除旧数据。核心启动时在旧版应用数据目录上建立一次性的 `migration/journal.json`，记录源版本、目标 `coreApiVersion`、每个迁移项的源指纹、暂存目录和提交状态。写 journal 使用临时文件加原子 rename，进程被终止后从最后一个 `committed` 项继续，重复执行同一个项必须得到相同目标内容。
 
@@ -712,7 +712,7 @@ G4 的 Linux 恢复策略：每次启动/监督重启前检查已验签宿主所
 4. **提交和激活**：逐项完成后更新 journal 为 `staged`，对目标文件重新计算指纹并执行原子目录替换，最后切换 `active` 指针并写 `committed`。旧版核心和旧目录至少保留一个回滚点；插件下载、验签或启动失败时只回退 active 指针，不覆盖旧文件。
 5. **恢复和收尾**。恢复应用后按注册表与首装记录继续待处理项。保留源数据，在模块商店呈现安装或迁移进度。用户可重试中断项，或卸载已安装模块。所有数据项提交后，迁移 journal 标记 `complete` 并保留摘要和源指纹，供恢复或回滚时核对。
 
-TC-MODULES-027 在 GitHub 安装固定哈希的正式 deb/MSI/DMG，由旧程序创建 schema、重开合成 SSH/VNC 行，再由候选 release QA 核心在同一隔离 profile 执行预检、记录 pending 并正常重启。历史基线为 `0.5.9`，现用固定安装输入为 `0.5.10`。Windows 旧 GUI-subsystem 进程的强停记录为 crash 输入。生产 exporter、候选安装包替换、可信 staging/激活和回滚另有对应的验收场景。 [正式旧版安装验证](taomni-modular-installed-upgrade-verification.md)
+TC-MODULES-027 在 GitHub 安装固定哈希的正式 deb/MSI/DMG，由旧程序创建 schema、重开合成 SSH/VNC 行，再由候选 release QA 核心在同一隔离 profile 执行预检、记录 pending 并正常重启。重启后经签名 QA 目录自动安装首装模块，复核旧文件和 VNC journal。历史基线为 `0.5.9`，现用固定安装输入为 `0.5.10`。Windows 旧 GUI-subsystem 进程的强停记录为 crash 输入。正式候选安装包替换与回退另有对应的验收场景。 [正式旧版安装验证](taomni-modular-installed-upgrade-verification.md)
 
 升级期间核心仍必须能打开终端、Workspace、设置、备份和旧会话编辑页；指向未安装插件的连接动作进入带安装入口的占位页。旧版本运行中的宿主在升级前由核心协调退出，若无法退出则阻止替换并提示关闭相关窗口。离线环境只允许使用已验签的本地插件包；没有可用包时升级仍完成核心更新，插件迁移保持 `pending`。
 

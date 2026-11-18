@@ -68,10 +68,12 @@
 - 模块注册表现将真实回滚版本交给设置页，持久记录七天有效期，并校验用户点击时选择的版本。活动宿主更新与回滚时立即重新握手，握手失败会恢复旧版本和原宿主。新增 Native 042 与 Browser 043 验证同一应用会话内的版本切换、禁用偏好、原始数据与已签名错误包恢复。
 - MFA 代码已经安装时，旧数据迁移直接读取该版本的验签原件，设置页提示输入原 Vault 密码。提交和中断恢复均保留既有版本指针，也保留明确设为禁用的偏好。新增 Native 044 和真实签名包中断专项覆盖这条路径。现有未安装流程沿用签名文件选择器。
 - Windows x64 MSI 与 macOS Intel DMG 的真实替换与回退均已通过。同一隔离 profile 上完成 0.5.10 → 0.5.11 → 0.5.10，原 SSH/VNC 会话保留，回退后恢复原应用摘要。原始产物和系统签名结果见安装验证记录。 [安装验证 #44292054057](https://github.com/engcapa/taomni/actions/runs/44292054057)
+- 已装 MFA 的迁移与中断恢复专项在 Linux x64、Windows x64、macOS ARM64 每端通过 7 项签名迁移检查。签名宿主安装各 3 项通过。用例使用隔离的旧格式资料并复用同一正式公钥。 [专项 #44290411100](https://github.com/engcapa/taomni/actions/runs/44290411100)
+- `TC-MODULES-027` 追加真实 `0.5.10` profile 上的自动首装，核对原 SSH/VNC 会话、历史文件和 VNC pending journal。`TC-MODULES-045` 使用两份签名 QA 目录核对新模块名称、描述、稍后处理、重启后零传输及最终选择安装。三端 browser 的 041/043 在 #44296447334 各通过，合并 main #831 后保留了双方 File Explorer 与 Markdown 用例，当前 GitHub 批次同时覆盖升级流程和完整 crash-regression。 [真实旧版首装 #44297621761](https://github.com/engcapa/taomni/actions/runs/44297621761) · [签名新模块 #44296447334](https://github.com/engcapa/taomni/actions/runs/44296447334) · [合并后验证 #44302421951](https://github.com/engcapa/taomni/actions/runs/44302421951)
 
 核心仍包含旧 profile 的 MFA、Servers、SocksCap、远程桌面和本地语音等业务代码、状态与依赖。hello-plugin 和 MFA 已取得签名安装结果。已提交迁移的 MFA profile 通过签名宿主读写账户和生成验证码，原数据继续用作回退资料。主窗和分离窗已支持动态加载模块前端，MFA 的正式前端和新装 profile 仍待迁出。LanChat 功能已删除，历史 `lanchat.sqlite` 和 `lanchat.db` 保留原位。
 
-生产设置可以用可信包和原 Vault 口令启动 MFA 离线迁移及自动重启，其它候选项仍由通用升级入口记录只读预检和 pending journal。已安装正式旧版写入 MFA、候选安装件替换及回滚仍需各自的端到端证据。
+生产设置用可信包和原 Vault 口令启动 MFA 离线迁移及自动重启。Linux 已验证正式旧版实际建号、候选安装件替换、数据迁移和回退。Windows、macOS Intel 已验证安装件替换与旧会话回退。macOS ARM64 候选 DMG 已生成，安装专项正在执行。其它业务候选项仍由通用入口记录只读预检及 pending journal。 [Linux #44250423203](https://github.com/engcapa/taomni/actions/runs/44250423203) · [ARM64 #44300055546](https://github.com/engcapa/taomni/actions/runs/44300055546)
 
 签名安装门、宿主生产监督、共享采集/RDP 公共库、CoreState/统一 bootstrap、正常退出与可逆静默已集成。生产工厂、scoped 入口、持久 profile generation、Vault IPC 协调，以及普通凭据消费者和仍在核心的 MFA facade 的服务准入已接入；源码 `fdd05d232` 的契约 #43819768258 已 23/23 jobs 成功，其 UI #43819770975 的 22 个 shard 已收齐：三端 browser 各 50/50、Linux Xvfb native 50/50、Windows native 48/48、macOS native 47/47；Wayland 46/50，四个既有无关失败按下文单列。离线 v2 备份/还原、运行中宿主快照和三态重启还原已逐批验证，下载恢复与真实代理的最新证据见下节。业务状态仍在 LegacyFeatureRuntime；官方远端商店已接入并有测试签名目录的多端证据，正式目录发布、业务宿主迁出与真实单体升级尚未完成。G1–G11 未通过前，不将具体业务插件迁移标为完成。
 
