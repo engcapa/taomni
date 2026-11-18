@@ -65,6 +65,9 @@ steps:
 - click: '[data-testid="confirm-dialog-confirm"]'
 - wait_for: '[data-testid="module-marketplace-review"]'
 - click: '[data-testid="module-marketplace-review"]'
+- assert_text:
+    selector: '[data-testid="confirm-dialog-message"]'
+    contains: Hello Plugin 0.1.0
 - click: '[data-testid="confirm-dialog-confirm"]'
 - wait_for: '[data-testid="module-marketplace-current"]'
 - module_marketplace_probe: {phase: installed}
@@ -92,7 +95,7 @@ verification:
     results: [9, 14, 15, 16, 17, 20]
   - id: R2
     requirement: Keep the dismissal after a normal restart and install the module after explicit download and review.
-    actions: [21, 23, 31, 32, 34, 35]
+    actions: [21, 23, 31, 32, 34, 36]
     checkpoints:
     - step: 22
       expectation: Later dismisses the visible offer.
@@ -102,13 +105,15 @@ verification:
       expectation: The module remains uninstalled before confirmation.
     - step: 30
       expectation: The profile remembers the dismissal and the signed archive has still received zero requests.
-    - step: 36
-      expectation: The store shows the confirmed module as current.
+    - step: 35
+      expectation: The review opens with the name and version from the verified package after the startup catalog check.
     - step: 37
-      expectation: Exactly one verified archive transfer occurred and the matching version is active on disk.
+      expectation: The store shows the confirmed module as current.
     - step: 38
+      expectation: Exactly one verified archive transfer occurred and the matching version is active on disk.
+    - step: 39
       expectation: The renderer records no unhandled errors.
-    results: [22, 28, 29, 30, 36, 37, 38]
+    results: [22, 28, 29, 30, 35, 37, 38, 39]
   native:
   - check: Catalog authentication, profile history, HTTP transfer and active version.
     method: external

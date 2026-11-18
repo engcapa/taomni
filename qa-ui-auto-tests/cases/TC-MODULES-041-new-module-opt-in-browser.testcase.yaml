@@ -65,6 +65,9 @@ steps:
 - click: '[data-testid="confirm-dialog-confirm"]'
 - wait_for: '[data-testid="module-marketplace-review"]'
 - click: '[data-testid="module-marketplace-review"]'
+- assert_text:
+    selector: '[data-testid="confirm-dialog-message"]'
+    contains: Hello Plugin 0.1.0
 - click: '[data-testid="confirm-dialog-confirm"]'
 - wait_for: '[data-testid="module-marketplace-current"]'
 - assert_no_runtime_errors: null
@@ -91,7 +94,7 @@ verification:
     results: [6, 11, 12, 13, 14, 16]
   - id: R2
     requirement: Later dismisses the prompt through reload, and a separate choice installs the previously offered module.
-    actions: [17, 19, 21, 26, 27, 29, 30]
+    actions: [17, 19, 21, 26, 27, 29, 31]
     checkpoints:
     - step: 18
       expectation: Later dismisses the open notice.
@@ -99,11 +102,13 @@ verification:
       expectation: The dismissed prompt stays hidden after reopening.
     - step: 25
       expectation: The module is still uninstalled before confirmation.
-    - step: 31
-      expectation: The user-selected module appears as installed after confirmed review.
+    - step: 30
+      expectation: The installation dialog shows the name and version from the package review.
     - step: 32
+      expectation: The user-selected module appears as installed after confirmed review.
+    - step: 33
       expectation: The renderer records no unhandled errors.
-    results: [18, 24, 25, 31, 32]
+    results: [18, 24, 25, 30, 32, 33]
   native:
   - check: Catalog authentication, transfer and install on disk.
     method: external

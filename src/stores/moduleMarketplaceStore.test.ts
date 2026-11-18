@@ -3,8 +3,13 @@ import { createModuleMarketplaceStore } from "./moduleMarketplaceStore";
 import type { ModuleInstallReview, ModuleMarketplaceCatalog } from "../lib/ipc/plugin";
 
 const selection = { pluginId: "taomni-plugin-hello-plugin", version: "0.1.0", sha256: "a".repeat(64) };
-const catalog = (sequence: number): ModuleMarketplaceCatalog => ({ platform: "linux-x86_64", catalog: {
-  coreApiVersion: "1", sequence, updatedAt: "2026-11-16", plugins: {},
+const catalog = (sequence: number, version?: string): ModuleMarketplaceCatalog => ({ platform: "linux-x86_64", catalog: {
+  coreApiVersion: "1", sequence, updatedAt: "2026-11-16", plugins: version ? {
+    [selection.pluginId]: {
+      id: selection.pluginId, slug: "hello-plugin", name: "Hello Plugin", version, coreApiVersion: "1",
+      platforms: { "linux-x86_64": { url: "https://modules.test/hello", sha256: selection.sha256, signature: "signed", size: 1024 } },
+    },
+  } : {},
 } });
 const deferred = <T,>() => {
   let resolve!: (value: T) => void;
@@ -100,5 +105,42 @@ describe("module marketplace ownership", () => {
     response.resolve({} as ModuleInstallReview);
     await pending;
     expect(store.getState().review).toBeNull();
+  });
+
+  it("preserves a verified review when the background check still offers the same package", async () => {
+    const { adapter, store } = harness();
+    adapter.catalog.mockResolvedValueOnce(catalog(1, selection.version));
+    await store.getState().refresh();
+    const response = deferred<ModuleInstallReview>();
+    adapter.review.mockReturnValueOnce(response.promise);
+    const pending = store.getState().openReview(selection);
+    await Promise.resolve();
+    expect(adapter.review).toHaveBeenCalledWith(selection);
+
+    adapter.catalog.mockResolvedValueOnce(catalog(2, selection.version));
+    await store.getState().refresh();
+    const detail = {} as ModuleInstallReview;
+    response.resolve(detail);
+    await pending;
+    expect(store.getState().review).toMatchObject({ selection, detail });
+
+    adapter.catalog.mockResolvedValueOnce(catalog(3, selection.version));
+    await store.getState().refresh();
+    expect(store.getState().review?.detail).toBe(detail);
+  });
+
+  it("closes the review when the refreshed catalog replaces the selected package", async () => {
+    const { adapter, store } = harness();
+    adapter.catalog.mockResolvedValueOnce(catalog(1, selection.version));
+    await store.getState().refresh();
+    adapter.review.mockResolvedValueOnce({} as ModuleInstallReview);
+    await store.getState().openReview(selection);
+    expect(store.getState().review?.selection).toEqual(selection);
+
+    adapter.catalog.mockResolvedValueOnce(catalog(2, "0.2.0"));
+    await store.getState().refresh();
+    expect(store.getState().review).toBeNull();
+    await store.getState().install();
+    expect(adapter.install).not.toHaveBeenCalled();
   });
 });

@@ -44,10 +44,17 @@ function readSource(storage?: Pick<Storage, "getItem">) {
   catch { return OFFICIAL_MODULE_CATALOG; }
 }
 
+function matchesSelection(catalog: ModuleMarketplaceCatalog, selection: ModuleCatalogSelection) {
+  const entry = catalog.catalog.plugins[selection.pluginId];
+  const asset = entry?.platforms[catalog.platform];
+  return entry?.version === selection.version && asset?.sha256.toLowerCase() === selection.sha256.toLowerCase();
+}
+
 /** Commands keep running when Settings unmounts. The native catalog, download
  * manager and installer own trust, files and registry state. */
 export function createModuleMarketplaceStore(adapter: Adapter, storage?: Pick<Storage, "getItem" | "setItem">) {
   let revision = 0;
+  let sourceRevision = 0;
   const attempted = new Set<string>();
   let pending: { source: string; result: Promise<void> } | null = null;
   const operations = new Map<string, Promise<void>>();
@@ -89,10 +96,14 @@ export function createModuleMarketplaceStore(adapter: Adapter, storage?: Pick<St
         }
         const started = ++revision;
         const changed = source !== get().source;
+        if (changed) sourceRevision++;
         set({ source, loading: true, error: null, ...(changed ? { review: null } : {}) });
         const result = adapter.catalog(source).then((catalog) => {
           if (revision !== started) return;
-          set({ catalog, catalogSource: source, error: null });
+          set((state) => ({
+            catalog, catalogSource: source, error: null,
+            review: state.review && matchesSelection(catalog, state.review.selection) ? state.review : null,
+          }));
           void (async () => {
             for (const id of catalog.release?.legacyPending ?? []) {
               if (revision !== started) return;
@@ -111,10 +122,13 @@ export function createModuleMarketplaceStore(adapter: Adapter, storage?: Pick<St
         return run(selection, "download", async () => { await adapter.download(selection, installedVersion); });
       },
       openReview(selection, installedVersion) {
-        const started = revision;
+        const started = sourceRevision;
         return run(selection, "review", async () => {
           const detail = await adapter.review(selection);
-          if (revision === started) set({ review: { selection, detail, installedVersion } });
+          const { catalog } = get();
+          if (sourceRevision === started && (!catalog || matchesSelection(catalog, selection))) {
+            set({ review: { selection, detail, installedVersion } });
+          }
         });
       },
       dismissReview() { set({ review: null }); },
