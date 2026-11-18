@@ -31,6 +31,7 @@ from pathlib import Path
 from typing import Any
 
 from .deadline import budget_time as time
+from .fixtures.rdp_server_required import probe_binary
 from .native_steps import NativeStepContext, _verb
 from .steps import StepError
 from . import host_clipboard
@@ -42,15 +43,7 @@ HELPERS = Path(__file__).resolve().parent / "rdp_helpers"
 
 
 def _probe_path(ctx: NativeStepContext) -> Path:
-    configured = (ctx.cfg.get("app") or {}).get("native_binary")
-    if configured:
-        base = Path(str(configured)).expanduser().resolve().parent
-    else:
-        sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-        from native_build import qa_binary  # type: ignore[import-not-found]
-
-        base = qa_binary().parent
-    probe = base / ("rdp-probe.exe" if platform.system() == "Windows" else "rdp-probe")
+    probe = probe_binary(ctx.cfg)
     if not probe.is_file():
         raise StepError(f"rdp-probe binary not found next to the QA app: {probe}")
     return probe

@@ -8,6 +8,7 @@ on:
       package_source: {type: string, required: true}
       package_version: {type: string, required: true}
       verify_relocation: {type: boolean, default: false}
+      verify_rdp_perf: {type: boolean, default: false}
       signed_run: {type: string, default: ''}
     secrets:
       TAURI_SIGNING_PRIVATE_KEY: {required: true}
@@ -123,12 +124,26 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: python -m qa_ui_auto.legacy_release legacy-input
+      - name: Build the standalone release RDP probe
+        if: inputs.verify_rdp_perf
+        run: |
+          sudo apt-get -o Acquire::Retries=3 update
+          sudo apt-get -o Acquire::Retries=3 install -y --no-install-recommends libasound2-dev libpipewire-0.3-dev libclang-dev python3-tk
+          cargo build --locked --release --manifest-path src-tauri/Cargo.toml --package taomni-rdp-probe
+          mkdir -p installed-mfa-evidence/rdp-probe
+          git rev-parse HEAD > installed-mfa-evidence/rdp-probe/source-sha.txt
+          sha256sum src-tauri/target/release/rdp-probe > installed-mfa-evidence/rdp-probe/sha256.txt
       - name: Exercise apt replacement, signed MFA migration and rollback
         env:
           VERIFY_RELOCATION: ${{ inputs.verify_relocation }}
+          VERIFY_RDP_PERF: ${{ inputs.verify_rdp_perf }}
         run: |
           extra=()
           python -m unittest test_installed_mfa_crash
+          if [[ "$VERIFY_RDP_PERF" == true ]]; then
+            python -m unittest test_installed_rdp_baseline
+            extra+=(--rdp-probe src-tauri/target/release/rdp-probe)
+          fi
           if [[ "$VERIFY_RELOCATION" == true ]]; then
             python -m unittest test_installed_mfa_profile test_installed_linux_formats
             sudo apt-get install -y --no-install-recommends libfuse2t64 rpm

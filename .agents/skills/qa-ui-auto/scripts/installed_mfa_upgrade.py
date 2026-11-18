@@ -230,6 +230,10 @@ def execute(args):
                 stages["otherFormats"] = verify_other_formats(ctx, work, report, profile, args.candidate.resolve(), bundled, receipt)
             observation = stages["crashRecovery"] = {"passed": False}
             verify_crash_recovery(ctx, candidate, work, profile, report, receipt, observation)
+            if args.rdp_probe:
+                from installed_rdp_baseline import measure
+                stages["rdpPerformance"] = measure(candidate, args.rdp_probe.resolve(strict=True),
+                                                   target["producerSource"], work, report)
             result["passed"] = True
     finally:
         write_json(report, "installed-mfa-upgrade.json", result)
@@ -240,4 +244,5 @@ if __name__ == "__main__":
     for argument in ("identity", "legacy", "candidate", "signed", "evidence", "work"):
         parser.add_argument("--" + argument, required=True, type=Path)
     parser.add_argument("--verify-relocation", action="store_true")
+    parser.add_argument("--rdp-probe", type=Path)
     execute(parser.parse_args())

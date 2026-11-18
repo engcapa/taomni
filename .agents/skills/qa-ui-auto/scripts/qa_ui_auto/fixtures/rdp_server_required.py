@@ -65,7 +65,10 @@ def _export(name: str, value: str, ctx: Any) -> None:
 
 
 def probe_binary(cfg: dict) -> Path:
-    configured = (cfg.get("app") or {}).get("native_binary")
+    app = cfg.get("app") or {}
+    if app.get("rdp_probe_binary"):
+        return Path(app["rdp_probe_binary"]).resolve(strict=True)
+    configured = app.get("native_binary")
     if configured:
         base = Path(str(configured)).expanduser().resolve().parent
     else:
