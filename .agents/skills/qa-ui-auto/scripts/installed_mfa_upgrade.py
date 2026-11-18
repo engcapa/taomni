@@ -10,6 +10,7 @@ from types import SimpleNamespace
 
 from ci_desktop import Desktop
 from installed_linux_formats import appimage_binary, install_rpm, prepare_appimage
+from installed_mfa_crash import abrupt_exit
 from installed_mfa_profile import copy_profile
 from linux_noexec import NoExecBind, is_noexec
 from modular_bundle_inventory import digest, inventory
@@ -60,6 +61,33 @@ def close_verified_desktop(driver, session, executable):
         return {"launchedBinarySha256": digest(binary), **close_installed_desktop(driver, session, binary)}
     finally:
         session.application = launcher
+
+
+def verify_crash_recovery(ctx, candidate, work, profile, evidence, receipt, observation):
+    state = profile / "plugins/mfa/active.json"
+    active = json.loads(state.read_text(encoding="utf-8"))
+    if active["activeVersion"] != receipt["version"]:
+        raise RuntimeError("The active MFA version differs from the verified package")
+    directory = state.parent / "versions" / receipt["version"]
+    if digest(directory / ".taomni-trust/package.taomni-plugin") != receipt["sha256"]:
+        raise RuntimeError("The installed MFA package proof differs from the signed fixture")
+    module = directory / "taomni-plugin-mfa"
+    observation.update(moduleSha256=digest(module), activeVersion=active["activeVersion"])
+    with installed_desktop(ctx, candidate, work / "desktop", evidence, "abrupt-exit-window") as (driver, session):
+        steps = open_unlocked_mfa(ctx, session, evidence)
+        code = element("mfa-account-code")
+        desktop_action(steps, "assert_text_equals", {"selector": code, "equals": "359 152"})
+        desktop_action(steps, "click", element("mfa-account-hotp-next"))
+        desktop_action(steps, "assert_text_equals", {"selector": code, "equals": "969 429"})
+        observation["hotpBeforeExit"] = "969 429"
+        abrupt_exit(candidate, module, driver.proc.pid, observation)
+        session.session_id = None
+
+    observation["reopen"] = inspect_accounts(ctx, candidate, work, evidence, "after-abrupt-exit", "969 429",
+                                             next_code="338 314")
+    if json.loads(state.read_text(encoding="utf-8")) != active or digest(module) != observation["moduleSha256"]:
+        raise RuntimeError("Recovery changed the installed module or active version")
+    observation["passed"] = True
 
 
 def verify_relocation(ctx, candidate, work, profile, evidence, receipt):
@@ -200,6 +228,8 @@ def execute(args):
             if args.verify_relocation:
                 stages["relocation"] = verify_relocation(ctx, candidate, work, profile, report, receipt)
                 stages["otherFormats"] = verify_other_formats(ctx, work, report, profile, args.candidate.resolve(), bundled, receipt)
+            observation = stages["crashRecovery"] = {"passed": False}
+            verify_crash_recovery(ctx, candidate, work, profile, report, receipt, observation)
             result["passed"] = True
     finally:
         write_json(report, "installed-mfa-upgrade.json", result)
