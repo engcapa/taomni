@@ -4,7 +4,7 @@ import { joinPath, sftpListLocalDetailed, sftpLocalDrives, type DriveEntry, type
 import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
 import { useContextMenu } from "../ContextMenu";
 import { ExplorerFileIcon } from "./ExplorerFileIcon";
-import { explorerCrumbs, sameExplorerPath } from "./explorerPaths";
+import { explorerCrumbs, explorerPathKey, sameExplorerPath } from "./explorerPaths";
 import { setExplorerPreferences, useExplorerPreferences } from "./explorerPreferences";
 import { useExplorerLabels } from "./explorerLabels";
 
@@ -24,14 +24,15 @@ export function ExplorerNavTree({ id, hidden = false, home, path, dropPath, onNa
   const mounted = useRef(true);
   const ctx = useContextMenu();
   const load = useCallback(async (directory: string, retry = false) => {
-    if (pending.current.has(directory) || (!retry && listing[directory])) return;
-    pending.current.add(directory);
+    const key = explorerPathKey(directory);
+    if (pending.current.has(key) || (!retry && listing[key])) return;
+    pending.current.add(key);
     try {
       const result = await sftpListLocalDetailed(directory);
-      if (mounted.current) setListing((state) => ({ ...state, [directory]: { entries: result.entries.filter((item) => item.fileType === "dir" || item.targetFileType === "dir") } }));
+      if (mounted.current) setListing((state) => ({ ...state, [key]: { entries: result.entries.filter((item) => item.fileType === "dir" || item.targetFileType === "dir") } }));
     } catch (error) {
-      if (mounted.current) setListing((state) => ({ ...state, [directory]: { entries: [], error: String(error) } }));
-    } finally { pending.current.delete(directory); }
+      if (mounted.current) setListing((state) => ({ ...state, [key]: { entries: [], error: String(error) } }));
+    } finally { pending.current.delete(key); }
   }, [listing]);
   useEffect(() => {
     mounted.current = true;
@@ -47,14 +48,16 @@ export function ExplorerNavTree({ id, hidden = false, home, path, dropPath, onNa
     for (const crumb of explorerCrumbs(path)) void load(crumb.path);
     for (const expanded of preferences.expandedPaths) void load(expanded);
   }, [hidden, path, preferences.expandedPaths, load]);
-  const autoPaths = explorerCrumbs(path).map((crumb) => crumb.path);
+  const autoPaths = new Set(explorerCrumbs(path).map((crumb) => explorerPathKey(crumb.path)));
+  const expandedPaths = new Set(preferences.expandedPaths.map(explorerPathKey));
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const toggle = (directory: string, open: boolean) => {
-    const expanded = preferences.expandedPaths.filter((value) => value !== directory);
+    const key = explorerPathKey(directory);
+    const expanded = preferences.expandedPaths.filter((value) => explorerPathKey(value) !== key);
     if (!open) expanded.push(directory);
     setExplorerPreferences({ expandedPaths: expanded });
-    setCollapsed((old) => { const next = new Set(old); if (open) next.add(directory); else next.delete(directory); return next; });
-    if (!open) void load(directory, !!listing[directory]?.error);
+    setCollapsed((old) => { const next = new Set(old); if (open) next.add(key); else next.delete(key); return next; });
+    if (!open) void load(directory, !!listing[key]?.error);
   };
   const menu = (event: React.MouseEvent, directory: string) => ctx.show(event, [
     { label: label("打开", "Open"), onClick: () => onNavigate(directory) },
@@ -70,11 +73,12 @@ export function ExplorerNavTree({ id, hidden = false, home, path, dropPath, onNa
     <span className="ex-tw" />{isHome ? <Home /> : <ExplorerFileIcon directory />}<span className="ex-nav-label">{name}</span>
   </div>;
   const tree = (directory: string, name: string, depth: number, drive = false, ancestors = new Set<string>()): React.ReactNode => {
-    if (depth > 32 || ancestors.has(directory)) return null;
-    const branch = new Set(ancestors); branch.add(directory);
-    const open = !collapsed.has(directory) && (preferences.expandedPaths.includes(directory) || autoPaths.some((value) => sameExplorerPath(value, directory)));
-    const cached = listing[directory];
-    const children = cached?.entries.filter((item) => preferences.showHidden || !item.isHidden || autoPaths.some((value) => sameExplorerPath(value, item.path))).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true })) ?? [];
+    const key = explorerPathKey(directory);
+    if (depth > 32 || ancestors.has(key)) return null;
+    const branch = new Set(ancestors); branch.add(key);
+    const open = !collapsed.has(key) && (expandedPaths.has(key) || autoPaths.has(key));
+    const cached = listing[key];
+    const children = cached?.entries.filter((item) => preferences.showHidden || !item.isHidden || autoPaths.has(explorerPathKey(item.path))).sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true })) ?? [];
     return <div key={directory} role="none">
       <div className={`ex-nav-row ${sameExplorerPath(path, directory) ? "on" : ""} ${dropPath === directory ? "ex-drop" : ""}`} role="treeitem" aria-selected={sameExplorerPath(path, directory)} aria-expanded={open}
         data-testid="explorer-nav-node" data-path={directory} data-explorer-drop={directory} tabIndex={0}
