@@ -2,7 +2,9 @@
 
 ## 2026-11-19 首次全量安装与后续按需升级
 
+- 合入 `origin/main` 的 `1d709c748`（#834），合并提交为 `f6e55e493`。新 Draw.io 用例沿用 main 的 `TC-FILE-OPEN-033`，Live 表格用例移到 `TC-FILE-OPEN-037`，继续参加 browser/native crash-regression。之前运行使用的旧编号保留在对应记录中。
 - 首次从单体版升级时，按签名 `modules.json` 的固定首发名单安装本机兼容模块。用户可单独卸载，默认保留业务数据。后续仅对已装模块显示兼容更新并保留启禁选择。首次出现在后续目录中的兼容模块显示名称和功能说明，用户选择是否安装。 [升级设计](taomni-modular-split-design.md#64-更新检查)
+- 旧单体用户直接升级到模块化首发之后的版本时，以签名首装名单为基线。名单外的新模块显示选装提示，首次联网读到缺少名单的旧目录时继续等待有效名单。Native 046 使用后续签名目录覆盖自动安装 MFA、展示 Hello 说明和确认前零传输。Browser 041 同步检查安装后提示清理。 [原生用例](../qa-ui-auto-tests/cases/TC-MODULES-046-skip-first-modular-release.testcase.yaml)
 - `dca19714e` 将 027、040 的首发测试目录扩展为同一平台上的签名 Hello 与 MFA。027 用正式 `0.5.10` 建立的旧配置验证自动首装和旧资料，040 验证卸载 Hello 后正常重启仍保留 MFA。首轮 #44371527011 在规划阶段发现签名矩阵单测仍读取旧格式，`49ce6785f` 更新断言并补齐混合平台覆盖。 [首轮规划结果](https://github.com/engcapa/taomni/actions/runs/44371527011)
 - Ring 批次收齐 18 片并核对用例和构建身份。三端 Browser 各 26/26，Linux、Windows、macOS Intel Native 分别 37/38、36/37、40/40。Intel 的 015 完成 115 步，两次正常重启记录均与 runner receipt 一致。Windows `TC-FILE-OPEN-002` 在首个步骤前遇到历史 WebView 初始化超时。 [Ring 批次](https://github.com/engcapa/taomni/actions/runs/44361591364)
 - Linux 045 触发同源后台刷目录时安装确认未打开。`76c5189c3` 按实际源和包身份校验审阅结果，后台刷新仍提供同一包时保留确认。041、045 增加对确认框内模块名和版本的断言。正式签名打包 17 项、规划的模块契约 78 项和前端 11 项纯单元通过。 [三端复验](https://github.com/engcapa/taomni/actions/runs/44373042546)

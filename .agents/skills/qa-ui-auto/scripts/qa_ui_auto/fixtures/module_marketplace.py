@@ -13,14 +13,15 @@ BASELINE_CATALOG = "modules-baseline.json"
 NEW_MODULE_CATALOG = "modules-new.json"
 NEW_MODULE_SEQUENCE = 44
 ROSTER_CATALOG = "modules-roster.json"
+LATER_ROSTER_CATALOG = "modules-roster-with-optional.json"
 
 
 class Origin:
-    def __init__(self, files, evidence, *, opt_in=False, roster=None):
+    def __init__(self, files, evidence, *, opt_in=False, roster=None, start_catalog=None):
         self.files = files
         self.evidence = evidence
         self.roster = roster
-        self.start_catalog = ROSTER_CATALOG if roster else BASELINE_CATALOG if opt_in else "modules.json"
+        self.start_catalog = start_catalog or (BASELINE_CATALOG if opt_in else "modules.json")
         current = NEW_MODULE_CATALOG if opt_in else self.start_catalog
         self.current_catalog = files["/" + current]
         self.requests = []
@@ -116,16 +117,19 @@ def setup_roster(ctx):
     root = Path(os.environ["QA_SIGNED_MODULE_ROOT"])
     hello, hello_archive, _, _ = load_artifact(root, receipt["sourceSha"], receipt["platform"])
     mfa, mfa_archive, _, _ = load_artifact(root / "legacy-roster-mfa", receipt["sourceSha"], receipt["platform"], "mfa")
-    catalog = root / ROSTER_CATALOG
+    skipped_releases = ctx.case_id == "TC-MODULES-046"
+    catalog = root / (LATER_ROSTER_CATALOG if skipped_releases else ROSTER_CATALOG)
     signature = catalog.with_name(catalog.name + ".minisig")
     if any(path.is_symlink() or not path.is_file() for path in (catalog, signature)):
         raise RuntimeError("Hosted first-upgrade roster is missing or symlinked")
     raw, detached = catalog.read_bytes(), signature.read_bytes()
     document = json.loads(raw)
     roster = {entry["id"]: entry for entry in (hello, mfa)}
-    if document["sequence"] != 42 or set(document["legacyUpgrade"]) != roster.keys() or document["plugins"].keys() != roster.keys():
-        raise RuntimeError("Expected the same two signed packages in the catalog and first-upgrade roster")
-    trusted_comment = f"trusted comment: file={ROSTER_CATALOG} sourceSha={receipt['sourceSha']}"
+    expected_ids = {mfa["id"]} if skipped_releases else set(roster)
+    sequence = NEW_MODULE_SEQUENCE if skipped_releases else 42
+    if document["sequence"] != sequence or set(document["legacyUpgrade"]) != expected_ids or document["plugins"].keys() != roster.keys():
+        raise RuntimeError("Expected a first-upgrade roster and matching signed entries for Hello and MFA")
+    trusted_comment = f"trusted comment: file={catalog.name} sourceSha={receipt['sourceSha']}"
     if trusted_comment not in detached.decode().splitlines():
         raise RuntimeError("First-upgrade roster source identity differs from the native QA binary")
     for key, entry in roster.items():
@@ -139,7 +143,9 @@ def setup_roster(ctx):
         "/" + mfa_archive.name: mfa_archive.read_bytes(),
     }
     (Path(ctx.case_dir) / "module-legacy-roster.json").write_text(json.dumps(roster, indent=2), encoding="utf-8")
-    ctx.module_marketplace = Origin(files, Path(ctx.case_dir) / "module-marketplace-requests.json", roster=roster)
+    enrollment = {id: entry for id, entry in roster.items() if id in expected_ids}
+    ctx.module_marketplace = Origin(files, Path(ctx.case_dir) / "module-marketplace-requests.json",
+                                    roster=enrollment, start_catalog=catalog.name)
 
 
 def teardown(ctx):

@@ -75,6 +75,37 @@ fn legacy_enrolls_all_eligible_modules_even_without_relevant_data() {
 }
 
 #[test]
+fn legacy_first_check_offers_new_modules_when_skipping_modular_releases() {
+    let dir = tempdir().unwrap();
+    let root = dir.path();
+    fs::write(root.join("taomni.db"), b"legacy core database").unwrap();
+    initialize(root).unwrap();
+    let mut latest = catalog(
+        5,
+        &[
+            ("mfa", PLATFORM),
+            ("new", PLATFORM),
+            ("foreign", "windows-x86_64"),
+        ],
+    );
+    let mut waiting = latest.clone();
+    waiting.sequence = 4;
+    assert!(plan(root, &waiting, PLATFORM).unwrap().legacy_waiting);
+    latest.legacy_upgrade = Some(BTreeSet::from([id("mfa")]));
+    let release = plan(root, &latest, PLATFORM).unwrap();
+    assert_eq!(release.legacy_pending, BTreeSet::from([id("mfa")]));
+    assert_eq!(release.new_modules, BTreeSet::from([id("new")]));
+    assert!(release.updates.is_empty());
+    dismiss(root, &[id("new")]).unwrap();
+    assert!(
+        plan(root, &latest, PLATFORM)
+            .unwrap()
+            .new_modules
+            .is_empty()
+    );
+}
+
+#[test]
 fn fresh_and_existing_empty_modular_profiles_do_not_enroll() {
     for modular in [false, true] {
         let dir = tempdir().unwrap();

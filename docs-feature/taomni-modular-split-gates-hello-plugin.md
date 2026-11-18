@@ -72,6 +72,21 @@ RDP capture and encoder path to meet the `rdp-probe` budgets with the host
 transport in place. `TC-RDPS-PERF-01-performance-budget` records the current
 in-process product baseline.
 
+GitHub tested source `fd123747c26d8ad8f7f9f44211e4b7658a30fd97`. Each route
+delivered 150 of 150 measured frames for both workloads. The harness requests
+millisecond timer resolution for its Windows process, and all reports include
+the actual publication times. The earlier run captured Windows below its
+configured rate on both routes. [Recheck #44411459433](https://github.com/engcapa/taomni/actions/runs/44411459433) · [Initial run #44410472315](https://github.com/engcapa/taomni/actions/runs/44410472315)
+
+| Runner | Frame size and target | In-process fps / p95 ms | Host fps / p95 ms |
+| --- | --- | --- | --- |
+| Ubuntu 24.04 x64 | 640×360 at 60 Hz | 60.00 / 0.108 | 59.99 / 0.734 |
+| Ubuntu 24.04 x64 | 1920×1080 at 30 Hz | 29.99 / 0.844 | 30.00 / 3.385 |
+| Windows x64 | 640×360 at 60 Hz | 60.01 / 0.067 | 60.02 / 0.467 |
+| Windows x64 | 1920×1080 at 30 Hz | 29.99 / 0.566 | 30.00 / 3.507 |
+| macOS 15 ARM64 | 640×360 at 60 Hz | 59.95 / 0.134 | 59.83 / 1.067 |
+| macOS 15 ARM64 | 1920×1080 at 30 Hz | 30.02 / 1.535 | 29.99 / 5.025 |
+
 ## `capture.still` service integration (2026-11-17, verification pending)
 
 The additive v1 service is `core/capture.still`, advertised as `capture.still`

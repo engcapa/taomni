@@ -71,6 +71,9 @@ steps:
 - click: '[data-testid="confirm-dialog-confirm"]'
 - wait_for: '[data-testid="module-marketplace-current"]'
 - assert_no_runtime_errors: null
+- assert_count:
+    selector: '[data-testid="module-release-new-item"], [data-testid="module-marketplace-new"]'
+    equal: 0
 - screenshot: module-new-opt-in-browser.png
 verification:
   review: reviewed
@@ -108,7 +111,9 @@ verification:
       expectation: The user-selected module appears as installed after confirmed review.
     - step: 33
       expectation: The renderer records no unhandled errors.
-    results: [18, 24, 25, 30, 32, 33]
+    - step: 34
+      expectation: The store and main window clear the new-module offer once the user installs it.
+    results: [18, 24, 25, 30, 32, 33, 34]
   native:
   - check: Catalog authentication, transfer and install on disk.
     method: external

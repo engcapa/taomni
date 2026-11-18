@@ -23,7 +23,7 @@ def is_check(step: dict) -> bool:
     if verb == "module_marketplace_probe":
         return isinstance(args, dict) and args.get("phase") in {
             "no-download", "downloaded", "installed", "rejected", "legacy-installed", "legacy-uninstalled",
-            "new-available", "new-dismissed", "old-enabled", "updated-disabled", "old-disabled",
+            "new-available", "new-dismissed", "legacy-new-available", "old-enabled", "updated-disabled", "old-disabled",
             "updated-enabled", "failed-update", "rolled-back-enabled", "removed-before-update",
         }
     if verb == "module_download_probe":

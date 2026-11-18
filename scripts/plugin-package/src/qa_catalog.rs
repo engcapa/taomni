@@ -44,11 +44,20 @@ pub fn write_legacy_roster(
         plugins.insert(id.to_owned(), entry.clone());
     }
     let roster: Vec<_> = plugins.keys().cloned().collect();
-    let catalog = json!({
+    let mut catalog = json!({
         "coreApiVersion": "1", "sequence": 42, "updatedAt": "2026-11-16T00:00:00Z",
         "legacyUpgrade": roster, "plugins": plugins
     });
-    sign_catalog(hello, "modules-roster.json", &catalog, source, signer)
+    sign_catalog(hello, "modules-roster.json", &catalog, source, signer)?;
+    catalog["sequence"] = json!(44);
+    catalog["legacyUpgrade"] = json!(["taomni-plugin-mfa"]);
+    sign_catalog(
+        hello,
+        "modules-roster-with-optional.json",
+        &catalog,
+        source,
+        signer,
+    )
 }
 
 pub fn write(output: &Path, receipt: &Value, signer: &ReleaseSigner) -> Result<()> {
@@ -161,6 +170,20 @@ mod tests {
         for id in catalog["legacyUpgrade"].as_array().unwrap() {
             assert!(catalog["plugins"][id.as_str().unwrap()]["platforms"][platform].is_object());
         }
+        let later = "modules-roster-with-optional.json";
+        let path = hello.join(later);
+        let signature = fs::read_to_string(hello.join(format!("{later}.minisig"))).unwrap();
+        signer
+            .verify(
+                &path,
+                &signature,
+                &format!("file={later} sourceSha={source}"),
+            )
+            .unwrap();
+        let latest: Value = serde_json::from_slice(&fs::read(path).unwrap()).unwrap();
+        assert_eq!(latest["sequence"], 44);
+        assert_eq!(latest["legacyUpgrade"], json!(["taomni-plugin-mfa"]));
+        assert_eq!(latest["plugins"], catalog["plugins"]);
         fs::write(mfa.join("modules.json"), b"changed catalog").unwrap();
         assert!(write_legacy_roster(&hello, &mfa, &source, platform, &signer).is_err());
     }

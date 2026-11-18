@@ -5,12 +5,12 @@ from pathlib import Path
 import time
 
 from .fixtures.module_download import plugin_root
-from .fixtures.module_marketplace import BASELINE_CATALOG, NEW_MODULE_CATALOG, NEW_MODULE_SEQUENCE, ORIGIN
+from .fixtures.module_marketplace import BASELINE_CATALOG, LATER_ROSTER_CATALOG, NEW_MODULE_CATALOG, NEW_MODULE_SEQUENCE, ORIGIN
 from .module_retained_observation import assert_code_removed
 from .module_update_observation import VERSION_STATES, observe as observe_update
 from .steps import StepError
 
-NEW_MODULE_PHASES = {"new-available", "new-dismissed"}
+NEW_MODULE_PHASES = {"new-available", "new-dismissed", "legacy-new-available"}
 PHASES = {"source", "no-download", "downloaded", "installed", "rejected", "legacy-installed", "legacy-uninstalled"} | NEW_MODULE_PHASES
 
 
@@ -19,10 +19,11 @@ def observe_new_module(root, origin, receipt, phase, archive):
         raise StepError("An optional module transferred data before user consent")
     if (root / receipt["slug"] / "active.json").exists():
         raise StepError("An optional module was activated before user consent")
-    if not {"/" + BASELINE_CATALOG, "/" + NEW_MODULE_CATALOG}.issubset(origin.requests):
-        raise StepError("Both signed releases must reach the native verifier")
+    catalogs = [LATER_ROSTER_CATALOG] if phase == "legacy-new-available" else [BASELINE_CATALOG, NEW_MODULE_CATALOG]
+    if not {"/" + name for name in catalogs}.issubset(origin.requests):
+        raise StepError("The signed releases must reach the native verifier")
     release = json.loads((root.parent / ".module-release.json").read_text())
-    expected = [receipt["id"]] if phase == "new-available" else []
+    expected = [] if phase == "new-dismissed" else [receipt["id"]]
     if (
         release["sequence"] != NEW_MODULE_SEQUENCE
         or receipt["id"] not in release["seen"]
@@ -74,7 +75,7 @@ def run(ctx, args):
         elif phase in VERSION_STATES:
             record.update(observe_update(ctx, root, phase, origin))
         else:
-            if phase == "legacy-installed":
+            if phase in {"legacy-installed", "legacy-new-available"}:
                 enrollment_path = root.parent / ".module-release.json"
                 deadline = time.monotonic() + 45
                 while time.monotonic() < deadline:
@@ -91,6 +92,13 @@ def run(ctx, args):
                     raise StepError("Cancelling download confirmation must not transfer or activate a package")
             elif phase in NEW_MODULE_PHASES:
                 record["release"] = observe_new_module(root, origin, receipt, phase, archive)
+                if phase == "legacy-new-available":
+                    release = record["release"]
+                    if release["origin"] != "legacy" or release["legacyPending"] != []:
+                        raise StepError("First installation did not finish for the legacy profile")
+                    if set(release["seen"]) != {*origin.roster, receipt["id"]}:
+                        raise StepError("The profile must remember both modules in the signed release")
+                    record["rosterPointers"] = observe_legacy_roster(root, origin, None)
             else:
                 if requests.count(archive_url) != 1 or not archive.is_file() or hashlib.sha256(archive.read_bytes()).hexdigest() != receipt["sha256"]:
                     raise StepError("Marketplace did not download exactly one matching signed artifact")

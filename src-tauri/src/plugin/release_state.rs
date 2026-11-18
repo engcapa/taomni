@@ -82,16 +82,21 @@ pub(crate) fn plan(
             }
         }
         let legacy = state.origin == ProfileOrigin::Legacy;
-        if legacy && state.legacy_pending.is_none() {
-            if let Some(roster) = &catalog.legacy_upgrade {
-                state.legacy_pending = Some(roster.intersection(&available).cloned().collect());
-            }
+        let first_legacy_roster = catalog
+            .legacy_upgrade
+            .as_ref()
+            .filter(|_| legacy && state.legacy_pending.is_none());
+        if let Some(roster) = first_legacy_roster {
+            state.legacy_pending = Some(roster.intersection(&available).cloned().collect());
         }
         if let Some(pending) = &mut state.legacy_pending {
             pending.retain(|id| !handled.contains(id));
         }
-        if state.sequence.is_none_or(|last| catalog.sequence > last) {
-            if state.sequence.is_some() {
+        let legacy_waiting = legacy && state.legacy_pending.is_none();
+        if !legacy_waiting && state.sequence.is_none_or(|last| catalog.sequence > last) {
+            // The frozen roster is already a baseline for a profile that skips
+            // directly from the monolith to a later modular release.
+            if state.sequence.is_some() || first_legacy_roster.is_some() {
                 state.new_modules.extend(
                     available
                         .difference(&state.seen)
@@ -113,7 +118,7 @@ pub(crate) fn plan(
         }
         state.new_modules.retain(|id| !handled.contains(id));
         Ok(ReleasePlan {
-            legacy_waiting: legacy && state.legacy_pending.is_none(),
+            legacy_waiting,
             legacy_pending: state.legacy_pending.clone().unwrap_or_default(),
             updates,
             new_modules: state
