@@ -55,6 +55,8 @@ macOS 保留原始 `codesign` 与 `spctl` 结果。直接 CLI 启动、没有浏
 | macOS ARM64 DMG | 761714079 | 98517685 | `d5a78bddf9d71a4cce9ba57c3b744f14878806eece0283e181b0a48891645dab` |
 | macOS Intel DMG | 761715279 | 104617252 | `e6f8f3eb7f4f3af4e29e53d7870bc48a55a9d0b34de05724ced95e62a4514e2c` |
 
+`TC-MODULES-027` 在上述旧安装预检与重启之后，通过真实签名 QA 目录触发首装。候选主窗自动下载模块并写入当前版本指针，模块商店读到已安装状态。测试复核旧会话、历史文件摘要及尚待迁移的 VNC journal。该目录提供用于验证自动安装的 Hello 包，正式首批目录随业务模块发布。
+
 ## 原生 Linux MFA 升级
 
 `TC-MODULES-039` 安装固定 deb，用 WebDriver 操作正式 `0.5.10` 的桌面界面，在隔离 XDG profile 新建 Vault 和 RFC HOTP 测试账号。推进到计数 1 后通过应用的退出确认关闭窗口，等待该进程组中的应用和 WebKit 子进程退出。fixture 保留实际安装记录、关闭凭据以及源 MFA 和 Vault 数据库的 SHA-256。它将数据库和存在的 WAL 交给隔离的候选 QA profile。

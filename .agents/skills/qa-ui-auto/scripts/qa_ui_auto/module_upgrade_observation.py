@@ -61,7 +61,7 @@ def observe(data, state, phase):
     expected = sorted((row["id"], row["session_type"], row["options_json"]) for row in state["sessions"])
     if rows != expected:
         raise StepError("Upgrade preflight/pending changed the original session records")
-    # This case installs no package. A pending journal must confer no execution.
+    # A pending journal must confer no execution for its migration targets.
     plugins = data / "plugins"
     for slug in ["rdp-client", "vnc-client", "rdp-server", "vnc-server", "servers", "mfa", "lanchat"]:
         if (plugins / slug).exists() or (plugins / slug).is_symlink():

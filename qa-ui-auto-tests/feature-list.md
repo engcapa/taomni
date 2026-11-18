@@ -393,7 +393,7 @@ controls:
 
 动态前端基础接入主窗和独立 WebView：共享 React SDK、owner-scoped IPC、仅 locator 的保存恢复、启禁撤销、缺失占位和重试。`TC-MODULES-016` 验证官方签名 ESM/相对资源、真实 host 写入、非活动草稿、reload、分离窗启禁同步和回挂；`TC-MODULES-017` 以明确 browser-only model 覆盖同类 renderer 流程，不代表验签或原生存储；`TC-MODULES-018` 独立篡改已安装前端，验证原生协议拒绝、错误隔离及恢复原字节后重试。它们尚待 matching runner，不将 MFA 产品入口迁出或 TASK-007 全部验收记为完成。
 
-`TC-MODULES-040` 覆盖旧单体 profile 的签名模块首装和卸载后重启。`TC-MODULES-041/045` 分别在 browser 和 native 检查新模块提示、名称和说明、稍后处理与之后主动安装。045 使用两份正式公钥可验证的 QA 目录，独立核对提示记录、实际请求、包摘要和 active 版本。
+`TC-MODULES-027` 在真实旧版 profile 上验证自动首装，复核待迁移的 VNC journal 和旧文件。`TC-MODULES-040` 另覆盖无待迁移数据的 profile 首装和卸载后重启。`TC-MODULES-041/045` 分别在 browser 和 native 检查新模块提示、名称和说明、稍后处理与之后主动安装。045 使用两份正式公钥可验证的 QA 目录，独立核对提示记录、实际请求、包摘要和 active 版本。
 
 原生还原确认的自动 relaunch 另由 `TC-MODULES-033/034/035` 覆盖 macOS 的运行、禁用与卸载保留数据三态。它们使用 UI 创建的真实配对备份，先变更模块数据、HOTP 和主密码，再经真实还原确认拒绝旧密码、接受当前密码；独立观察旧进程 exit=0、新 PID/start-time、同一可执行文件与 QA 隔离目录，并只连接应用自己重启后的 WKWebView。不得以手动启动、重启 IPC 或 `native_restart_app` 冒充自动重启。还原后核验原始模块行、active 指针、generation、writer lease、原密码和 755224。browser 保留 `TC-BACKUP-RESTORE-001` 的确认/错误/重复提交模型；Linux/Windows 自动接管及独立 MFA 宿主仍是明确缺口，新用例在实际执行前不计通过。
 
