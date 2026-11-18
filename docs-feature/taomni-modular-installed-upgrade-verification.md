@@ -46,7 +46,7 @@ macOS 保留原始 `codesign` 与 `spctl` 结果。直接 CLI 启动、没有浏
 
 ## 正式 0.5.10 安装输入
 
-`TC-MODULES-027` 的现用安装输入固定到 `v0.5.10`（release ID `449346766`）。2026-11-18 的同标签发布替换了四个安装件。下表记录 03:25–03:26 UTC 重新上传的资产。fixture 通过 GitHub Releases API 按资产 ID 取件，核对字节长度及 SHA-256，实际安装后再检查应用版本。候选与旧版显示版本相同，因此仍分别核对安装件、旧程序与候选 QA 程序的指纹。 [正式发布](https://github.com/engcapa/taomni/releases/tag/v0.5.10)
+`TC-MODULES-027` 的现用安装输入固定到 `v0.5.10`（release ID `449346766`）。2026-11-18 的同标签发布替换了四个安装件。下表记录 03:25–03:26 UTC 重新上传的资产。runner 的准备步骤用只读 token 通过 GitHub Releases API 按资产 ID 取件，核对字节长度及 SHA-256。fixture 在启动安装前复核文件，安装后检查应用版本。候选与旧版显示版本相同，因此分别核对安装件、旧程序与候选 QA 程序的指纹。 [正式发布](https://github.com/engcapa/taomni/releases/tag/v0.5.10)
 
 | 目标 | 资产 ID | 字节 | SHA-256 |
 |---|---:|---:|---|

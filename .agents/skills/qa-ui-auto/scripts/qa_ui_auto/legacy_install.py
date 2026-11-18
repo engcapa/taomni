@@ -7,7 +7,7 @@ import platform
 import plistlib
 import subprocess
 
-from .legacy_release import RELEASE_ID, RELEASE_TAG, RELEASE_VERSION, download_asset, selected_asset
+from .legacy_release import RELEASE_ID, RELEASE_TAG, RELEASE_VERSION, selected_asset, verify_asset
 
 
 def command(args, evidence, label, *, accepted=(0,), timeout=180):
@@ -99,7 +99,11 @@ def install(case_dir, work):
     evidence = case_dir / "legacy-install"
     evidence.mkdir()
     asset = selected_asset()
-    package = download_asset(work / "downloads", asset)
+    staged = os.environ.get("QA_LEGACY_INSTALLER_DIR")
+    if not staged:
+        raise RuntimeError("The hosted job did not stage the pinned legacy installer")
+    package = Path(staged) / asset.name
+    verify_asset(package, asset)
     destination = work / "Applications"
     destination.mkdir()
     adapter = {"Linux": linux_install, "Windows": windows_install, "Darwin": macos_install}[platform.system()]

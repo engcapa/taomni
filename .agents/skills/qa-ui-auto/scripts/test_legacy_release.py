@@ -53,12 +53,14 @@ class PinnedReleaseTests(unittest.TestCase):
         response.headers["Content-Length"] = str(len(payload))
         with tempfile.TemporaryDirectory() as directory, patch(
                 "qa_ui_auto.legacy_release.urllib.request.urlopen", return_value=response) as open_url:
-            downloaded = download_asset(directory, asset)
+            downloaded = download_asset(directory, asset, token="read-only-test-token")
             self.assertEqual(downloaded.read_bytes(), payload)
             request = open_url.call_args.args[0]
             self.assertEqual(request.full_url,
                              f"https://api.github.com/repos/engcapa/taomni/releases/assets/{asset.asset_id}?download=1")
             self.assertEqual(request.get_header("Accept"), "application/octet-stream")
+            self.assertEqual(request.unredirected_hdrs["Authorization"], "Bearer read-only-test-token")
+            self.assertNotIn("Authorization", request.headers)
             self.assertEqual(list(Path(directory).iterdir()), [downloaded])
 
     def test_download_rejects_metadata_and_wrong_length_without_publishing(self):
@@ -79,10 +81,10 @@ class PinnedReleaseTests(unittest.TestCase):
 
     def test_local_or_wrong_repository_install_cannot_reach_a_downloader(self):
         for environment in [{}, {"GITHUB_ACTIONS": "true", "GITHUB_REPOSITORY": "other/repo"}]:
-            with patch.dict("os.environ", environment, clear=True), patch("qa_ui_auto.legacy_install.download_asset") as download:
+            with patch.dict("os.environ", environment, clear=True), patch("qa_ui_auto.legacy_install.verify_asset") as verify:
                 with self.assertRaisesRegex(RuntimeError, "GitHub runners"):
                     install(Path("unused"), Path("unused"))
-                download.assert_not_called()
+                verify.assert_not_called()
 
     def test_pairing_codes_are_removed_but_startup_failure_remains_readable(self):
         raw = "Mobile endpoint: http://127.0.0.1:1234\nPairing code (5 minutes): 123456\nHeadless: permission denied\n"

@@ -1,8 +1,10 @@
 """Immutable, public installer inputs for hosted upgrade verification."""
 from dataclasses import dataclass
 import hashlib
+import os
 from pathlib import Path
 import platform
+import sys
 import time
 import urllib.request
 
@@ -55,7 +57,7 @@ def verify_asset(path, asset):
         raise RuntimeError("Legacy installer SHA-256 does not match the pinned release")
 
 
-def download_asset(directory, asset):
+def download_asset(directory, asset, *, token=None):
     """Never install a partial, redirected-to-HTML or substituted release asset."""
     directory = Path(directory)
     directory.mkdir(parents=True, exist_ok=True)
@@ -72,6 +74,8 @@ def download_asset(directory, asset):
         "Accept": "application/octet-stream",
         "X-GitHub-Api-Version": "2022-11-28",
     })
+    if token:
+        request.add_unredirected_header("Authorization", f"Bearer {token}")
     deadline = time.monotonic() + 240
     try:
         with urllib.request.urlopen(request, timeout=30) as response, partial.open("xb") as output:
@@ -93,3 +97,16 @@ def download_asset(directory, asset):
         return completed
     finally:
         partial.unlink(missing_ok=True)
+
+
+def main():
+    token = os.environ.get("GH_TOKEN")
+    if len(sys.argv) != 2 or not token:
+        raise SystemExit("Provide the hosted installer staging directory and a read-only GH_TOKEN")
+    asset = selected_asset()
+    download_asset(Path(sys.argv[1]), asset, token=token)
+    print(f"Verified {asset.name} (asset {asset.asset_id}, SHA-256 {asset.sha256})")
+
+
+if __name__ == "__main__":
+    main()

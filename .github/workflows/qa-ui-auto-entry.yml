@@ -443,6 +443,13 @@ jobs:
         with:
           name: qa-modular-package-${{ steps.module_platform.outputs.platform }}-${{ inputs.artifact_key }}-mfa
           path: qa-ui-auto-report/official-mfa-input
+      - name: Stage the pinned public legacy installer
+        if: inputs.operation == 'run' && matrix.mode == 'native' && contains(matrix.capabilities, 'legacy-installer')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          python -m qa_ui_auto.legacy_release qa-ui-auto-report/legacy-installer-input
+          python -c 'import os; from pathlib import Path; Path(os.environ["GITHUB_ENV"]).open("a", encoding="utf-8").write("QA_LEGACY_INSTALLER_DIR=" + str(Path("qa-ui-auto-report/legacy-installer-input").resolve()) + "\n")'
       - name: Download this invocation's verified native runtime
         if: inputs.operation == 'run' && matrix.mode == 'native'
         uses: ./.github/actions/qa-download-artifact
