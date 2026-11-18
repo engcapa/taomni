@@ -6,9 +6,30 @@ import unittest
 from unittest.mock import patch
 
 from installed_linux_formats import appimage_binary, install_rpm, prepare_appimage
+from installed_mfa_upgrade import close_verified_desktop
 
 
 class InstalledLinuxFormatTests(unittest.TestCase):
+    def test_appimage_shutdown_uses_the_verified_child_that_owns_the_window(self):
+        driver = SimpleNamespace(proc=SimpleNamespace(pid=17))
+        launcher = Path("Taomni.AppImage")
+        binary = Path("unpacked/usr/bin/taomni")
+        session = SimpleNamespace(application=launcher)
+
+        def close(owned_driver, owned_session, executable):
+            self.assertIs(owned_driver, driver)
+            self.assertEqual(executable, binary)
+            self.assertEqual(owned_session.application, binary)
+            return {"close": "confirmed"}
+
+        with patch("installed_mfa_upgrade.appimage_binary", return_value=binary) as identify, \
+                patch("installed_mfa_upgrade.digest", return_value="verified-digest"), \
+                patch("installed_mfa_upgrade.close_installed_desktop", side_effect=close):
+            result = close_verified_desktop(driver, session, launcher)
+        identify.assert_called_once_with(launcher, driver.proc.pid)
+        self.assertEqual(result, {"launchedBinarySha256": "verified-digest", "close": "confirmed"})
+        self.assertEqual(session.application, launcher)
+
     def test_rpm_registration_queries_use_the_installers_package_database(self):
         result = SimpleNamespace(stdout=b"taomni 0.5.11 x86_64")
         with patch("installed_linux_formats.command", return_value=result) as command, patch.object(Path, "is_file", return_value=True):

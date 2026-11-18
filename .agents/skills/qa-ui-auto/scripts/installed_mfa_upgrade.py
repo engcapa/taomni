@@ -53,7 +53,13 @@ def close_verified_desktop(driver, session, executable):
     binary = executable
     if executable.suffix == ".AppImage":
         binary = appimage_binary(executable, driver.proc.pid)
-    return {"launchedBinarySha256": digest(binary), **close_installed_desktop(driver, session, binary)}
+    # The AppImage launcher starts a separate executable which owns the X11 window.
+    launcher = session.application
+    try:
+        session.application = binary
+        return {"launchedBinarySha256": digest(binary), **close_installed_desktop(driver, session, binary)}
+    finally:
+        session.application = launcher
 
 
 def verify_relocation(ctx, candidate, work, profile, evidence, receipt):
