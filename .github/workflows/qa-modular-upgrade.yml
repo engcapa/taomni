@@ -31,6 +31,10 @@ on:
         description: Also exercise the installed Linux deb with a noexec profile and relocate its data
         type: boolean
         default: false
+      package_signed_run:
+        description: Reuse the matching signed MFA input from a successful installed Linux upgrade run
+        type: string
+        default: ''
       package_upgrade_desktop:
         description: Exercise real Windows MSI and macOS DMG replacement and rollback
         type: boolean
@@ -93,6 +97,9 @@ on:
       package_relocation_linux:
         type: boolean
         default: false
+      package_signed_run:
+        type: string
+        default: ''
       package_upgrade_desktop:
         type: boolean
         default: false
@@ -148,6 +155,7 @@ jobs:
       package_source: ${{ inputs.package_source }}
       package_version: ${{ inputs.package_version }}
       verify_relocation: ${{ inputs.package_relocation_linux }}
+      signed_run: ${{ inputs.package_signed_run }}
     secrets:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}

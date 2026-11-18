@@ -8,6 +8,7 @@ on:
       package_source: {type: string, required: true}
       package_version: {type: string, required: true}
       verify_relocation: {type: boolean, default: false}
+      signed_run: {type: string, default: ''}
     secrets:
       TAURI_SIGNING_PRIVATE_KEY: {required: true}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: {required: false}
@@ -47,6 +48,19 @@ jobs:
             --repository "$GITHUB_REPOSITORY" --run-id "$PACKAGE_RUN" --source "$PACKAGE_SOURCE" \
             --version "$PACKAGE_VERSION" --target linux-x86_64 \
             --out installed-mfa-input/bundle-source.json --github-output "$GITHUB_OUTPUT"
+      - name: Verify the source of an existing signed MFA artifact
+        if: inputs.signed_run != ''
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SIGNED_RUN: ${{ inputs.signed_run }}
+        run: |
+          [[ "$SIGNED_RUN" =~ ^[1-9][0-9]*$ ]]
+          gh api "repos/$GITHUB_REPOSITORY/actions/runs/$SIGNED_RUN" > installed-mfa-input/signed-producer.json
+          jq -e --arg repo "$GITHUB_REPOSITORY" --arg run "$SIGNED_RUN" '
+            (.id | tostring) == $run and .status == "completed" and .conclusion == "success" and
+            .event == "workflow_dispatch" and .path == ".github/workflows/qa-modular-upgrade.yml" and
+            .repository.full_name == $repo and .head_repository.full_name == $repo
+          ' installed-mfa-input/signed-producer.json
       - uses: actions/upload-artifact@v4
         with:
           name: installed-mfa-input-${{ github.run_id }}
@@ -55,6 +69,7 @@ jobs:
 
   signed-mfa:
     needs: package
+    if: inputs.signed_run == ''
     uses: ./.github/workflows/qa-modular-packages.yml
     with:
       head: ${{ inputs.package_source }}
@@ -66,6 +81,7 @@ jobs:
 
   upgrade:
     needs: [package, signed-mfa]
+    if: ${{ !cancelled() && needs.package.result == 'success' && (needs.signed-mfa.result == 'success' || needs.signed-mfa.result == 'skipped') }}
     runs-on: ubuntu-24.04
     timeout-minutes: 35
     steps:
@@ -99,8 +115,10 @@ jobs:
           path: candidate-input
       - uses: actions/download-artifact@v4
         with:
-          name: qa-modular-package-linux-x86_64-${{ github.run_id }}
+          name: qa-modular-package-linux-x86_64-${{ inputs.signed_run || github.run_id }}
           path: signed-input
+          run-id: ${{ inputs.signed_run || github.run_id }}
+          github-token: ${{ github.token }}
       - name: Stage the pinned legacy deb
         env:
           GH_TOKEN: ${{ github.token }}
