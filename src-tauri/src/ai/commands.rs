@@ -106,7 +106,7 @@ async fn test_provider_connection(
     provider.normalize();
     provider.validate_custom()?;
     if provider.custom.is_some() {
-        let config = &state.ai_ctx.read().await.config;
+        let config = &state.legacy.ai_ctx.read().await.config;
         if config.fully_disabled {
             return Err("AI is disabled in Settings".into());
         }

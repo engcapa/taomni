@@ -73,7 +73,7 @@
 
 核心仍包含旧 profile 的 MFA、Servers、SocksCap、远程桌面和本地语音等业务代码、状态与依赖。hello-plugin 和 MFA 已取得签名安装结果。已提交迁移的 MFA profile 通过签名宿主读写账户和生成验证码，原数据继续用作回退资料。主窗和分离窗已支持动态加载模块前端，MFA 的正式前端和新装 profile 仍待迁出。LanChat 功能已删除，历史 `lanchat.sqlite` 和 `lanchat.db` 保留原位。
 
-生产设置用可信包和原 Vault 口令启动 MFA 离线迁移及自动重启。Linux 已验证正式旧版实际建号、候选安装件替换、数据迁移和回退。Windows、macOS Intel 已验证安装件替换与旧会话回退。macOS ARM64 候选 DMG 已生成，安装专项正在执行。其它业务候选项仍由通用入口记录只读预检及 pending journal。 [Linux #44250423203](https://github.com/engcapa/taomni/actions/runs/44250423203) · [ARM64 #44300055546](https://github.com/engcapa/taomni/actions/runs/44300055546)
+生产设置用可信包和原 Vault 口令启动 MFA 离线迁移及自动重启。Linux 已验证正式旧版实际建号、候选安装件替换、数据迁移和回退。Windows、macOS Intel、macOS ARM64 已验证安装件替换与旧会话回退。其它业务候选项仍由通用入口记录只读预检及 pending journal。 [Linux #44250423203](https://github.com/engcapa/taomni/actions/runs/44250423203) · [ARM64 #44300055546](https://github.com/engcapa/taomni/actions/runs/44300055546)
 
 签名安装门、宿主生产监督、共享采集/RDP 公共库、CoreState/统一 bootstrap、正常退出与可逆静默已集成。生产工厂、scoped 入口、持久 profile generation、Vault IPC 协调，以及普通凭据消费者和仍在核心的 MFA facade 的服务准入已接入；源码 `fdd05d232` 的契约 #43819768258 已 23/23 jobs 成功，其 UI #43819770975 的 22 个 shard 已收齐：三端 browser 各 50/50、Linux Xvfb native 50/50、Windows native 48/48、macOS native 47/47；Wayland 46/50，四个既有无关失败按下文单列。离线 v2 备份/还原、运行中宿主快照和三态重启还原已逐批验证，下载恢复与真实代理的最新证据见下节。业务状态仍在 LegacyFeatureRuntime；官方远端商店已接入并有测试签名目录的多端证据，正式目录发布、业务宿主迁出与真实单体升级尚未完成。G1–G11 未通过前，不将具体业务插件迁移标为完成。
 
