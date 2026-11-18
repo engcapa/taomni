@@ -69,7 +69,26 @@ jobs:
         run: pnpm test src/lib/updateService.test.ts src/stores/updateStore.test.ts src/components/UpdateDialog.test.tsx
       - name: Rust source formatting contract
         if: runner.os == 'Linux' && inputs.operation == 'build'
-        run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+        run: |
+          python - <<'PY'
+          import json
+          from pathlib import Path
+          import subprocess
+
+          manifest = Path("src-tauri/Cargo.toml").resolve()
+          manifest_args = ["--manifest-path", str(manifest)]
+          metadata = json.loads(subprocess.check_output(
+              ["cargo", "metadata", *manifest_args, "--no-deps", "--format-version", "1"]
+          ))
+          # The vendored workspace crates keep their upstream formatting.
+          packages = [
+              f"--package={package['name']}"
+              for package in metadata["packages"]
+              if package["id"] in metadata["workspace_members"]
+              and Path(package["manifest_path"]).relative_to(manifest.parent).parts[0] != "vendor"
+          ]
+          subprocess.run(["cargo", "fmt", *manifest_args, *packages, "--", "--check"], check=True)
+          PY
       - name: Frontend behavior unit regressions
         if: runner.os == 'Linux' && inputs.operation == 'build'
         run: |
