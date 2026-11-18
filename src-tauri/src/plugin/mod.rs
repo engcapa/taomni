@@ -239,6 +239,7 @@ impl PluginRegistry {
             .lifecycle
             .lock()
             .expect("plugin lifecycle lock poisoned");
+        let _mutation = install::ModuleInstaller::new(&self.root).lock_mutations()?;
         self.scan_locked()
     }
 
@@ -384,7 +385,12 @@ impl PluginRegistry {
         plugin_dir: &Path,
         slug: &str,
     ) -> Result<(ModuleManifest, LifecycleState, install::ActivePointer), PluginError> {
-        let pointer = install::ModuleInstaller::new(&self.root).active_pointer(slug)?;
+        let installer = install::ModuleInstaller::new(&self.root);
+        let pointer = installer.active_pointer(slug)?;
+        if pointer.was_uninstalled() {
+            let manifest = self.uninstalled_manifest(&installer, slug, &pointer);
+            return Ok((manifest, LifecycleState::Uninstalled, pointer));
+        }
         let (manifest_path, state) = if let Some(active) = &pointer.active_version {
             (
                 plugin_dir.join("versions").join(active).join("module.json"),

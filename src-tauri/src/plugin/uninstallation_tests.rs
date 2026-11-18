@@ -48,7 +48,43 @@ fn retained_locator_survives_registry_restart_and_explicit_delete_removes_it() {
             .unwrap()
             .is_none()
     );
-    assert!(reopened.root().join("mfa/versions/1.0.0/host").exists());
+    assert!(!reopened.root().join("mfa/versions").exists());
+}
+
+#[test]
+fn restart_finishes_interrupted_code_deletion_and_explicit_reinstall_is_inactive() {
+    let (_profile, registry) = fixture();
+    registry.set_enabled("mfa", true).unwrap();
+    let installed = registry.get("mfa").unwrap().manifest;
+    let installer = ModuleInstaller::new(registry.root());
+    // Interruption after committing the removed state and before deleting code
+    // or clearing the previous enabled preference.
+    let locator =
+        retained_data::discover(registry.root(), "mfa", installed.data_schema_version).unwrap();
+    retained_data::save(registry.root(), &locator).unwrap();
+    installer
+        .mark_uninstalled("mfa", UninstalledModule::from(&installed))
+        .unwrap();
+
+    let reopened = PluginRegistry::new(registry.root());
+    reopened.scan().unwrap();
+    let removed = reopened.get("mfa").unwrap();
+    assert_eq!(removed.state, LifecycleState::Uninstalled);
+    assert_eq!(removed.manifest.name, installed.name);
+    assert!(removed.manifest.entry.host.is_none());
+    assert!(removed.manifest.permissions.is_empty());
+    assert!(removed.data_retained);
+    assert!(!reopened.root().join("mfa/versions").exists());
+
+    let package = verify::test_support::verified_package(&installed);
+    assert_eq!(
+        reopened.install_verified(&package).unwrap().state,
+        LifecycleState::Installed
+    );
+    assert_eq!(
+        fs::read(reopened.root().join("mfa/data/accounts.bin")).unwrap(),
+        b"real retained bytes"
+    );
 }
 
 #[test]
@@ -66,7 +102,7 @@ fn competing_owner_prevents_uninstall_and_preserves_pointer_data_and_enablement(
         );
         assert_eq!(registry.get("mfa").unwrap().state, LifecycleState::Enabled);
         assert_eq!(
-            install::ModuleInstaller::new(registry.root())
+            ModuleInstaller::new(registry.root())
                 .active_pointer("mfa")
                 .unwrap()
                 .active_version
@@ -101,7 +137,7 @@ fn locator_publication_failure_keeps_activation_and_user_data() {
         LifecycleState::Installed
     );
     assert_eq!(
-        install::ModuleInstaller::new(registry.root())
+        ModuleInstaller::new(registry.root())
             .active_pointer("mfa")
             .unwrap()
             .active_version

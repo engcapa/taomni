@@ -205,6 +205,11 @@ describe("ModuleStorePanel", () => {
     const checkbox = screen.getByTestId("module-delete-data-database-tools");
     await user.click(checkbox);
     await user.click(screen.getByTestId("module-action-uninstall-database-tools"));
+    expect(screen.getByTestId("confirm-dialog-message")).toHaveTextContent("permanently delete its data");
+    await user.click(screen.getByTestId("confirm-dialog-cancel"));
+    expect(secondUninstall).not.toHaveBeenCalled();
+    await user.click(screen.getByTestId("module-action-uninstall-database-tools"));
+    await user.click(screen.getByTestId("confirm-dialog-confirm"));
     await waitFor(() => expect(secondUninstall).toHaveBeenCalledWith(entry, true));
     expect(useModuleStore.getState().records[entry.slug].dataRetained).toBe(false);
     expect(screen.queryByTestId("module-data-retained-database-tools")).not.toBeInTheDocument();

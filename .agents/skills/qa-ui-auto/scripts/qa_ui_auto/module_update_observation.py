@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 
 from .module_profile_observation import writer_lease
+from .module_retained_observation import assert_code_removed
 from .module_signed_observation import invoke
 from .steps import StepError
 
@@ -14,6 +15,7 @@ VERSION_STATES = {
     "updated-enabled": ("0.1.0", "0.0.9", "enabled"),
     "failed-update": ("0.1.0", "0.0.9", "enabled"),
     "rolled-back-enabled": ("0.0.9", "0.1.0", "enabled"),
+    "removed-before-update": (None, "0.0.9", "uninstalled"),
 }
 
 
@@ -28,16 +30,21 @@ def observe(ctx, root, phase, origin):
     pointer = json.loads((directory / "active.json").read_text())
     if (pointer["activeVersion"], pointer["previousVersion"]) != (version, previous):
         raise StepError(f"Unexpected module active/previous versions: {pointer}")
-    if previous and not isinstance(pointer.get("rollbackUntil"), int):
+    if version and previous and not isinstance(pointer.get("rollbackUntil"), int):
         raise StepError("Activation did not persist its rollback deadline")
-    expected = official if version == official["version"] else variants[version]
-    proof = directory / "versions" / version / ".taomni-trust/package.taomni-plugin"
-    if hashlib.sha256(proof.read_bytes()).hexdigest() != expected["sha256"]:
-        raise StepError("Installed proof does not match the signed version selected by the UI")
+    if version:
+        expected = official if version == official["version"] else variants[version]
+        proof = directory / "versions" / version / ".taomni-trust/package.taomni-plugin"
+        if hashlib.sha256(proof.read_bytes()).hexdigest() != expected["sha256"]:
+            raise StepError("Installed proof does not match the signed version selected by the UI")
+    else:
+        assert_code_removed(directory)
     records = invoke(ctx.session, "plugin_list")["value"]
     installed = next((record for record in records if record["manifest"]["slug"] == "hello-plugin"), None)
-    if not installed or installed["state"] != lifecycle or installed.get("reason") or installed.get("previousVersion") != previous:
+    if not installed or installed["state"] != lifecycle or installed.get("reason") or installed.get("previousVersion") != (previous if version else None):
         raise StepError(f"Unexpected active module state: {installed}")
+    if not version and not installed.get("dataRetained"):
+        raise StepError("Uninstall lost the data from the module's previous versions")
     running = lifecycle == "enabled"
     # Check the OS lease before any oracle command could lazily restart a host.
     lease = writer_lease(root, enabled=running)

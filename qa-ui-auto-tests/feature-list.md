@@ -395,6 +395,8 @@ controls:
 
 `TC-MODULES-027` 在真实旧版 profile 上验证自动首装，复核待迁移的 VNC journal 和旧文件。`TC-MODULES-040` 另覆盖无待迁移数据的 profile 首装和卸载后重启。`TC-MODULES-041/045` 分别在 browser 和 native 检查新模块提示、名称和说明、稍后处理与之后主动安装。045 使用两份正式公钥可验证的 QA 目录，独立核对提示记录、实际请求、包摘要和 active 版本。
 
+`TC-MODULES-007/010/040/042` 观察真实版本目录删除。010 还确认取消永久删除时签名包和业务数据原样保留，确认后数据和定位记录消失。042 校验存在更新时卸载会释放宿主、清理所有版本并保留业务数据。043 使用浏览器模型检查取消永久删除和卸载后只提供主动安装。
+
 原生还原确认的自动 relaunch 另由 `TC-MODULES-033/034/035` 覆盖 macOS 的运行、禁用与卸载保留数据三态。它们使用 UI 创建的真实配对备份，先变更模块数据、HOTP 和主密码，再经真实还原确认拒绝旧密码、接受当前密码；独立观察旧进程 exit=0、新 PID/start-time、同一可执行文件与 QA 隔离目录，并只连接应用自己重启后的 WKWebView。不得以手动启动、重启 IPC 或 `native_restart_app` 冒充自动重启。还原后核验原始模块行、active 指针、generation、writer lease、原密码和 755224。browser 保留 `TC-BACKUP-RESTORE-001` 的确认/错误/重复提交模型；Linux/Windows 自动接管及独立 MFA 宿主仍是明确缺口，新用例在实际执行前不计通过。
 
 > 本文档基于当前仓库代码、稳定 `data-testid` 目录和自动化用例维护，**仅记录已实现并接入主流程的功能**。架构与现状索引见 `DESIGN.md`、`IMPLEMENTATION_PLAN.md`。

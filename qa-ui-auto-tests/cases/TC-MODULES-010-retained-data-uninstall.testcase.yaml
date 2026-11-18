@@ -4,7 +4,7 @@ description: Install an official current-source signed hello package through Set
   business-data file while the module is inactive; the fixture never changes code, registry state, pointers,
   keys or permissions. Cancel a default uninstall, then confirm it and verify exact original bytes and the
   core data-only locator. Restart normally and verify persisted uninstalled state and the retained-data label.
-  Reinstall through the same trusted form, then explicitly delete data and prove both the data and locator
+  Reinstall through the same trusted form, then cancel and confirm explicit deletion. Verify both the data and locator
   stay absent after another normal restart. This is native data/lifecycle evidence, not plugin snapshot/restore
   or a real MFA migration.
 covers:
@@ -86,6 +86,14 @@ steps:
     phase: installed-data
 - click: '[data-testid="module-delete-data-hello-plugin"]'
 - click: '[data-testid="module-action-uninstall-hello-plugin"]'
+- assert_text:
+    selector: '[data-testid="confirm-dialog-message"]'
+    contains: This cannot be undone.
+- click: '[data-testid="confirm-dialog-cancel"]'
+- module_signed_probe:
+    phase: installed-data
+- click: '[data-testid="module-action-uninstall-hello-plugin"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
 - wait_for: '[data-testid="module-action-install-hello-plugin"]'
 - module_signed_probe:
     phase: deleted
@@ -144,7 +152,7 @@ verification:
     - 30
     checkpoints:
     - step: 23
-      expectation: The native pointer is inactive, invoke is denied, original file bytes remain and the locator
+      expectation: All installed code is absent, the pointer is inactive, original file bytes remain and the locator
         contains only the expected owner/schema/file.
     - step: 24
       expectation: Settings identifies retained data after the actual default uninstall.
@@ -165,31 +173,40 @@ verification:
     - 35
     - 39
     - 40
+    - 42
     - 44
-    - 47
+    - 45
     - 49
+    - 52
+    - 54
     checkpoints:
     - step: 38
       expectation: Reinstalling through the real signed form preserves exact existing business bytes and leaves
         invoke inactive.
-    - step: 42
-      expectation: Explicit deletion leaves no data directory or locator and the native registry reports dataRetained=false.
+    - step: 41
+      expectation: Explicit deletion shows its irreversible effect before performing any filesystem mutation.
     - step: 43
+      expectation: Cancelling explicit deletion preserves the installed package and the exact business data.
+    - step: 47
+      expectation: Confirmed deletion leaves no code, data directory or locator and the native registry reports dataRetained=false.
+    - step: 48
       expectation: The deletion result does not display a retained-data label.
-    - step: 46
+    - step: 51
       expectation: A newly started process still reports uninstalled state, no data, no locator and invoke
         denied.
-    - step: 51
+    - step: 56
       expectation: Reopened Settings does not invent retained data after explicit deletion.
-    - step: 52
+    - step: 57
       expectation: Install, cancel, retain, restart, reinstall and delete produce no runtime errors.
     results:
     - 38
-    - 42
+    - 41
     - 43
-    - 46
+    - 47
+    - 48
     - 51
-    - 52
+    - 56
+    - 57
   native:
   - check: Real signed installation, native registry, file bytes, atomic locator and normal process restarts.
     method: automated

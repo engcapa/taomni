@@ -1,7 +1,8 @@
 id: TC-MODULES-040
 title: First upgrade installs the signed release module with no matching old data and respects uninstall
 description: An isolated legacy-style profile contains only an SSH session. The signed loopback release roster supplies
-  the platform's real hello package. The main window starts installation, and the module stays removed after a normal restart.
+  the platform's real hello package. The main window starts installation. Uninstall removes the installed code,
+  and a normal restart preserves the removal.
 covers:
 - F-Modules-1
 tags:
@@ -92,7 +93,7 @@ verification:
     - step: 24
       expectation: The application does not resume first installation.
     - step: 25
-      expectation: The active pointer stays absent, with the previous version retained and no new download.
+      expectation: Installed code remains absent on disk, the inactive pointer retains version history, and no new download starts.
     - step: 26
       expectation: The renderer records no unhandled errors.
     results: [21, 22, 23, 24, 25, 26]

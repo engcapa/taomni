@@ -6,6 +6,7 @@ import time
 
 from .fixtures.module_download import plugin_root
 from .fixtures.module_marketplace import BASELINE_CATALOG, NEW_MODULE_CATALOG, NEW_MODULE_SEQUENCE, ORIGIN
+from .module_retained_observation import assert_code_removed
 from .module_update_observation import VERSION_STATES, observe as observe_update
 from .steps import StepError
 
@@ -74,15 +75,19 @@ def run(ctx, args):
                 if cache["payload"].encode() != origin.current_catalog:
                     raise StepError("Catalog rejection replaced the verified working cache")
                 if phase in {"installed", "rejected", "legacy-installed", "legacy-uninstalled"}:
-                    pointer = json.loads((root / "hello-plugin" / "active.json").read_text())
+                    module = root / receipt["slug"]
+                    pointer = json.loads((module / "active.json").read_text())
                     if phase == "legacy-uninstalled":
-                        if pointer != {"activeVersion": None, "previousVersion": "0.1.0"}:
+                        if pointer["activeVersion"] is not None or pointer["previousVersion"] != receipt["version"]:
                             raise StepError("Restart reinstalled a module that the user removed")
-                    elif pointer.get("activeVersion") != "0.1.0":
-                        raise StepError("Verified marketplace package was not atomically activated")
-                    manifest = json.loads((root / "hello-plugin" / "versions" / "0.1.0" / "module.json").read_text())
-                    if manifest.get("id") != receipt["id"] or manifest.get("version") != receipt["version"]:
-                        raise StepError("Installed module identity differs from the signed selection")
+                        assert_code_removed(module)
+                        record["codeAbsent"] = True
+                    else:
+                        if pointer.get("activeVersion") != receipt["version"]:
+                            raise StepError("Verified marketplace package was not atomically activated")
+                        manifest = json.loads((module / "versions" / receipt["version"] / "module.json").read_text())
+                        if manifest.get("id") != receipt["id"] or manifest.get("version") != receipt["version"]:
+                            raise StepError("Installed module identity differs from the signed selection")
                     record["pointer"] = pointer
                 if phase.startswith("legacy-"):
                     enrollment = json.loads((root.parent / ".module-release.json").read_text())

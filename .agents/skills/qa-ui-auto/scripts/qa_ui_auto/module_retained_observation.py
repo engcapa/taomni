@@ -21,6 +21,13 @@ def ordinary(path: Path, *, directory=False):
         raise StepError("Module data observation requires ordinary run-owned paths")
 
 
+def assert_code_removed(owner: Path):
+    ordinary(owner, directory=True)
+    versions = owner / "versions"
+    if versions.exists() or versions.is_symlink():
+        raise StepError("Uninstall left executable versions or their signed proof on disk")
+
+
 def observe(root: Path, phase: str, record: dict):
     owner = root / "hello-plugin"
     data = owner / "data"

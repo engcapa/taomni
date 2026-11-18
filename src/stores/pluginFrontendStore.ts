@@ -21,6 +21,7 @@ export interface PluginFrontendServices {
 }
 
 function validateRecord(record: PluginRecord): PluginRecord {
+  if (record.lifecycle === "uninstalled") return { ...record, manifest: null };
   if (!record.manifest) return record;
   const validation = validatePluginManifest(record.manifest, { coreApiVersion: PLUGIN_CORE_API_VERSION });
   if (!validation.ok || record.slug !== record.manifest.slug) {

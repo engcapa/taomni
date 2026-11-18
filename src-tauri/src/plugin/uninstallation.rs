@@ -1,8 +1,14 @@
 //! Keep data ownership and its inventory valid before removing activation.
+use std::{fs, io};
+
 use taomni_plugin_api::services::CoreServiceError;
 use taomni_profile_locks::{PluginDataLease, PluginSlug, ProfileRoot};
 
-use super::{PluginError, PluginRecord, PluginRegistry, data_contract, install, retained_data};
+use super::{
+    ModuleManifest, PluginError, PluginRecord, PluginRegistry, current_platform, data_contract,
+    install::{ActivePointer, ModuleInstaller, UninstalledModule},
+    placeholder_manifest, retained_data, verify,
+};
 
 impl PluginRegistry {
     /// Deactivate a module under its cross-process data lease. Persist a
@@ -12,7 +18,7 @@ impl PluginRegistry {
             .lifecycle
             .lock()
             .expect("plugin lifecycle lock poisoned");
-        let installer = install::ModuleInstaller::new(&self.root);
+        let installer = ModuleInstaller::new(&self.root);
         let _mutation = installer.lock_mutations()?;
         let record = self
             .get(slug)
@@ -24,26 +30,65 @@ impl PluginRegistry {
         let _lease = PluginDataLease::try_acquire(&profile, &owner)
             .map_err(|_| super::services::service_error(CoreServiceError::PluginProfileInUse))?;
         let previous = retained_data::load(&self.root, slug)?;
-        let schema = if record.reason.is_none() {
-            record.manifest.data_schema_version
-        } else {
-            previous
-                .as_ref()
-                .map_or(1, |locator| locator.data_schema_version)
-        };
+        let schema =
+            if record.reason.is_some() || record.state == super::LifecycleState::Uninstalled {
+                previous
+                    .as_ref()
+                    .map_or(1, |locator| locator.data_schema_version)
+            } else {
+                record.manifest.data_schema_version
+            };
         let locator = retained_data::discover(&self.root, slug, schema)?;
-        if !delete_data {
+        if !delete_data || !locator.files.is_empty() {
             retained_data::save(&self.root, &locator)?;
         }
-        installer.uninstall(slug, delete_data)?;
-        if delete_data {
-            // Failed deletion keeps the prior locator available for recovery.
-            retained_data::remove(&self.root, slug)?;
-        }
+        installer.mark_uninstalled(slug, UninstalledModule::from(&record.manifest))?;
+        let cleanup = (|| -> Result<(), PluginError> {
+            installer.remove_version_tree(slug)?;
+            if delete_data {
+                match fs::remove_dir_all(self.root.join(slug).join("data")) {
+                    Ok(()) => (),
+                    Err(error) if error.kind() == io::ErrorKind::NotFound => (),
+                    Err(error) => return Err(error.into()),
+                }
+                retained_data::remove(&self.root, slug)?;
+            }
+            Ok(())
+        })();
         self.scan_locked()?;
         self.persist_enabled_preference(slug, None)?;
+        cleanup?;
         self.get(slug)
             .ok_or_else(|| PluginError::NotFound(slug.to_owned()))
+    }
+
+    pub(super) fn uninstalled_manifest(
+        &self,
+        installer: &ModuleInstaller,
+        slug: &str,
+        pointer: &ActivePointer,
+    ) -> ModuleManifest {
+        let mut manifest = placeholder_manifest(slug);
+        if let Some(version) = pointer.previous_version.as_deref() {
+            manifest.version = version.into();
+        }
+        if let Some(display) = &pointer.uninstalled {
+            // A restart or refresh can finish deleting code after an interrupted
+            // uninstall. Every scan holds the cross-process mutation lock.
+            if let Err(error) = installer.remove_version_tree(slug) {
+                log::warn!("Could not remove uninstalled module {slug}: {error}");
+            }
+            display.apply(&mut manifest);
+        } else if let Some(version) = pointer.previous_version.as_deref()
+            && let Ok(path) = installer.version_dir(slug, version)
+            && let Ok(old) = verify::verify_installed(&path, current_platform())
+            && old.slug == slug
+            && old.version == version
+        {
+            // Older versions kept the package after uninstall.
+            UninstalledModule::from(&old).apply(&mut manifest);
+        }
+        manifest
     }
 
     pub(crate) fn data_profile(&self) -> Result<ProfileRoot, PluginError> {
@@ -59,6 +104,26 @@ impl PluginRegistry {
         }
         ProfileRoot::prepare(self.root.parent().expect("plugins has a parent"))
             .map_err(|error| PluginError::HostRequest(error.to_string()))
+    }
+}
+
+impl From<&ModuleManifest> for UninstalledModule {
+    fn from(manifest: &ModuleManifest) -> Self {
+        Self {
+            name: manifest.name.clone(),
+            description: manifest.description.clone(),
+            kind: manifest.kind.clone(),
+            status: manifest.status.clone(),
+        }
+    }
+}
+
+impl UninstalledModule {
+    fn apply(&self, manifest: &mut ModuleManifest) {
+        manifest.name.clone_from(&self.name);
+        manifest.description.clone_from(&self.description);
+        manifest.kind.clone_from(&self.kind);
+        manifest.status.clone_from(&self.status);
     }
 }
 

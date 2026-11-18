@@ -61,8 +61,7 @@ impl Transaction {
             .clone()
             .unwrap_or_else(|| ActivePointer {
                 active_version: Some(self.package_version.clone()),
-                previous_version: None,
-                rollback_until: None,
+                ..ActivePointer::default()
             })
     }
 

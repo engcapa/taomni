@@ -77,7 +77,7 @@ pub(crate) fn plan(
                     updates.insert(plugin.id.clone());
                 }
             }
-            if pointer.active_version.is_some() || pointer.previous_version.is_some() {
+            if pointer.active_version.is_some() || pointer.was_uninstalled() {
                 handled.insert(plugin.id.clone());
             }
         }

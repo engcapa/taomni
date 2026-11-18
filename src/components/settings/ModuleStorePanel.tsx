@@ -108,7 +108,7 @@ export function ModuleStorePanel({
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deleteData, setDeleteData] = useState<Record<string, boolean>>({});
-  const [pendingUninstall, setPendingUninstall] = useState<ModuleStoreCatalogEntry | null>(null);
+  const [pendingUninstall, setPendingUninstall] = useState<{ entry: ModuleStoreCatalogEntry; removeData: boolean } | null>(null);
   const [migrationBusy, setMigrationBusy] = useState(false);
 
   const entries = useMemo(() => [...catalog].sort((left, right) => left.name.localeCompare(right.name)), [catalog]);
@@ -140,14 +140,7 @@ export function ModuleStorePanel({
   const disable = (entry: ModuleStoreCatalogEntry) => run(entry, "disable", onDisable ? () => onDisable(entry) : undefined, { type: "disable" });
   const performUninstall = (entry: ModuleStoreCatalogEntry, removeData: boolean) =>
     run(entry, "uninstall", onUninstall ? () => onUninstall(entry, removeData) : undefined, { type: "uninstall", deleteData: removeData });
-  const uninstall = (entry: ModuleStoreCatalogEntry) => {
-    const removeData = deleteData[entry.slug] === true;
-    if (!removeData) {
-      setPendingUninstall(entry);
-      return;
-    }
-    return performUninstall(entry, true);
-  };
+  const uninstall = (entry: ModuleStoreCatalogEntry) => setPendingUninstall({ entry, removeData: deleteData[entry.slug] === true });
   const rollback = (entry: ModuleStoreCatalogEntry, record: ModuleRecord) => {
     const version = record.previousVersion;
     if (!version) return;
@@ -302,13 +295,15 @@ export function ModuleStorePanel({
       )}
       {pendingUninstall && <ConfirmDialog
         title={t("settings.moduleStoreUninstall")}
-        message={t("settings.moduleStoreUninstallConfirm", { name: pendingUninstall.name })}
+        message={t(pendingUninstall.removeData ? "settings.moduleStoreUninstallDeleteConfirm" : "settings.moduleStoreUninstallConfirm", { name: pendingUninstall.entry.name })}
         confirmLabel={t("settings.moduleStoreUninstall")}
+        danger={pendingUninstall.removeData}
         onCancel={() => setPendingUninstall(null)}
         onConfirm={() => {
-          const entry = pendingUninstall;
+          const { entry, removeData } = pendingUninstall;
           setPendingUninstall(null);
-          void performUninstall(entry, false);
+          if (removeData) setDeleteData((current) => ({ ...current, [entry.slug]: false }));
+          void performUninstall(entry, removeData);
         }}
       />}
     </section>

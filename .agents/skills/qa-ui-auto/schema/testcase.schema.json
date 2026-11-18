@@ -945,7 +945,7 @@
         },
         "module_marketplace_probe": {
           "type": "object", "additionalProperties": false, "required": ["phase"],
-          "properties": { "phase": { "enum": ["source", "no-download", "downloaded", "installed", "rejected", "legacy-installed", "legacy-uninstalled", "new-available", "new-dismissed", "old-enabled", "updated-disabled", "old-disabled", "updated-enabled", "failed-update", "rolled-back-enabled"] } },
+          "properties": { "phase": { "enum": ["source", "no-download", "downloaded", "installed", "rejected", "legacy-installed", "legacy-uninstalled", "new-available", "new-dismissed", "old-enabled", "updated-disabled", "old-disabled", "updated-enabled", "failed-update", "rolled-back-enabled", "removed-before-update"] } },
           "description": "Native only: fixed official signed loopback feed, independent completed bytes, trusted cache, active pointer and rollback watermark observations. Only source sets a transport preference; no native trust, install or registry state is seeded."
         },
         "module_download_probe": {

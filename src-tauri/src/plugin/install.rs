@@ -27,6 +27,17 @@ pub struct ActivePointer {
         skip_serializing_if = "Option::is_none"
     )]
     pub rollback_until: Option<u64>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub(crate) uninstalled: Option<UninstalledModule>,
+}
+
+/// Display metadata for removed code. It carries no executable paths or grants.
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Eq)]
+pub(crate) struct UninstalledModule {
+    pub(crate) name: String,
+    pub(crate) description: String,
+    pub(crate) kind: super::PluginKind,
+    pub(crate) status: super::PluginStatus,
 }
 
 const ROLLBACK_WINDOW: Duration = Duration::from_secs(7 * 24 * 60 * 60);
@@ -38,6 +49,11 @@ fn unix_seconds(time: SystemTime) -> u64 {
 }
 
 impl ActivePointer {
+    pub(crate) fn was_uninstalled(&self) -> bool {
+        self.active_version.is_none()
+            && (self.previous_version.is_some() || self.uninstalled.is_some())
+    }
+
     pub(super) fn rollback_version(&self, slug: &str) -> Result<&str, InstallError> {
         let previous = self
             .previous_version
@@ -248,6 +264,7 @@ impl ModuleInstaller {
         if pointer.active_version.as_deref() != Some(version) {
             pointer.previous_version = pointer.active_version.take();
             pointer.active_version = Some(version.to_owned());
+            pointer.uninstalled = None;
             pointer.rollback_until = pointer
                 .previous_version
                 .as_ref()
@@ -275,8 +292,8 @@ impl ModuleInstaller {
     }
 
     /// Restore the exact pre-transaction pointer after an activation or
-    /// registry refresh failure. This is recovery, not an unsigned install:
-    /// every referenced version must already exist under this module root.
+    /// registry refresh failure. Active and rollback versions must already
+    /// exist. An inactive pointer's previous version records history only.
     pub(crate) fn restore_pointer(
         &self,
         slug: &str,
@@ -291,6 +308,9 @@ impl ModuleInstaller {
         .flatten()
         {
             let path = self.version_dir(slug, version)?;
+            if pointer.was_uninstalled() {
+                continue;
+            }
             let metadata = fs::symlink_metadata(path)?;
             if !metadata.is_dir() || metadata.file_type().is_symlink() {
                 return Err(InstallError::NotStaged {
@@ -302,23 +322,47 @@ impl ModuleInstaller {
         self.write_pointer(slug, pointer)
     }
 
-    /// Deactivate a module while retaining its immutable versions and data.
-    /// Data is removed only when `delete_data` is explicitly true.
-    pub fn uninstall(&self, slug: &str, delete_data: bool) -> Result<ActivePointer, InstallError> {
+    /// Commit the uninstall before removing any code. The previous version is
+    /// history for reinstall/downgrade checks, even after its files are gone.
+    pub(super) fn mark_uninstalled(
+        &self,
+        slug: &str,
+        display: UninstalledModule,
+    ) -> Result<(), InstallError> {
         validate_slug(slug)?;
         let mut pointer = self.active_pointer(slug)?;
         if pointer.active_version.is_some() {
             pointer.previous_version = pointer.active_version.take();
         }
         pointer.rollback_until = None;
-        self.write_pointer(slug, &pointer)?;
-        if delete_data {
-            let data = self.root.join(slug).join("data");
-            if data.exists() {
-                fs::remove_dir_all(data)?;
+        pointer.uninstalled = Some(display);
+        self.write_pointer(slug, &pointer)
+    }
+
+    /// Only called under the registry mutation lock after uninstall commits.
+    /// Refuse a redirected root so cleanup cannot affect a different module.
+    pub(super) fn remove_version_tree(&self, slug: &str) -> Result<(), InstallError> {
+        validate_slug(slug)?;
+        let owner = self.root.join(slug);
+        let versions = owner.join("versions");
+        for path in [&self.root, &owner, &versions] {
+            match fs::symlink_metadata(path) {
+                Ok(metadata) if metadata.is_dir() && !super::data_contract::is_link(&metadata) => {
+                    ()
+                }
+                Ok(_) => {
+                    return Err(InstallError::InvalidPointer(
+                        "invalid module versions directory".into(),
+                    ));
+                }
+                Err(error) if error.kind() == io::ErrorKind::NotFound => return Ok(()),
+                Err(error) => return Err(error.into()),
             }
         }
-        Ok(pointer)
+        fs::remove_dir_all(versions)?;
+        #[cfg(unix)]
+        fs::File::open(owner)?.sync_all()?;
+        Ok(())
     }
 
     fn write_pointer(&self, slug: &str, pointer: &ActivePointer) -> Result<(), InstallError> {
@@ -448,7 +492,7 @@ mod tests {
     }
 
     #[test]
-    fn rollback_and_uninstall_keep_versions_and_data_by_default() {
+    fn rollback_and_uninstall_remove_all_versions_but_retain_history_and_data() {
         let root = tempdir().unwrap();
         let package = tempdir().unwrap();
         fs::write(package.path().join("host"), b"host").unwrap();
@@ -464,9 +508,25 @@ mod tests {
         let rolled = installer.rollback("rdp-client").unwrap();
         assert_eq!(rolled.active_version.as_deref(), Some("1.0.0"));
         fs::create_dir_all(root.path().join("rdp-client/data")).unwrap();
-        installer.uninstall("rdp-client", false).unwrap();
-        assert!(root.path().join("rdp-client/versions/1.0.0/host").exists());
+        installer
+            .mark_uninstalled(
+                "rdp-client",
+                UninstalledModule {
+                    name: "RDP Client".into(),
+                    description: String::new(),
+                    kind: super::super::PluginKind::RemoteClient,
+                    status: super::super::PluginStatus::Stable,
+                },
+            )
+            .unwrap();
+        installer.remove_version_tree("rdp-client").unwrap();
+        assert!(!root.path().join("rdp-client/versions").exists());
         assert!(root.path().join("rdp-client/data").exists());
+        let removed = installer.active_pointer("rdp-client").unwrap();
+        assert!(removed.was_uninstalled());
+        assert_eq!(removed.previous_version.as_deref(), Some("1.0.0"));
+        installer.restore_pointer("rdp-client", &removed).unwrap();
+        assert_eq!(installer.active_pointer("rdp-client").unwrap(), removed);
     }
 
     #[test]
@@ -490,6 +550,7 @@ mod tests {
             active_version: Some("2.0.0".into()),
             previous_version: Some("1.0.0".into()),
             rollback_until: Some(1),
+            uninstalled: None,
         };
         installer.write_pointer("mfa", &expired).unwrap();
         assert!(matches!(
@@ -530,14 +591,12 @@ mod tests {
         assert_eq!(installer.active_pointer("mfa").unwrap(), original);
         let invalid = ActivePointer {
             active_version: Some("../outside".into()),
-            previous_version: None,
-            rollback_until: None,
+            ..ActivePointer::default()
         };
         assert!(installer.restore_pointer("mfa", &invalid).is_err());
         let missing = ActivePointer {
             active_version: Some("9.0.0".into()),
-            previous_version: None,
-            rollback_until: None,
+            ..ActivePointer::default()
         };
         assert!(installer.restore_pointer("mfa", &missing).is_err());
         assert_eq!(installer.active_pointer("mfa").unwrap(), original);

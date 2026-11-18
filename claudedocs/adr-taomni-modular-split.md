@@ -44,7 +44,7 @@ Taomni 是 Tauri 2 + React 19 + Rust 的本地优先桌面工作台。重构前�
 
 - 新增 `taomni-plugin-api` 和 `taomni-rdp-common` 库 crate；插件 crate 作为 `src-tauri` workspace 成员，以复用根 `[patch.crates-io]`，但不得依赖核心 crate 或其它插件。
 - 核心拆为 `CoreState + PluginRegistry`。插件内部状态保存在宿主；核心只保存元数据、宿主句柄、RPC client、安装状态和共享服务扩展点。
-- 每个插件有 `module.json`、独立版本、平台 artifact、分离 minisign、SHA-256、`coreApiVersion` 和 `permissions`。安装使用版本目录 + active 指针/原子替换，默认卸载保留数据，显式删除才清理。
+- 每个插件有 `module.json`、独立版本、平台 artifact、分离 minisign、SHA-256、`coreApiVersion` 和 `permissions`。安装通过 active 指针原子切换版本。卸载删除版本目录，保留卸载记录及业务数据。用户明确确认后可同时删除数据。
 - 核心继续使用 `latest.json`；插件使用独立签名的 `modules.json`。模块清单生成器独立为 `scripts/compose-modules-manifest.mjs`，共享底层签名/资产校验但不改变核心更新清单契约。
 - 商店允许保存官方目录镜像传输地址，所有来源仍由同一固定官方公钥、精确字节和持久 sequence 验证；不新增信任锚。renderer 仅发送插件 ID、版本和包 hash，native 重新验签目录并选择本机资产、固定内容路径，下载完成后审查实际包权限与数据目录，安装确认后再次验签。目录声明的分类与权限必须匹配实际包；失败保留原已验证目录与已安装版本。具体接线与 QA 目录边界见设计 §6.1–6.2。
 - 代理、下载、断点续传、取消、进度、失败恢复、备份和迁移必须遵循仓库 `AGENTS.md` 的外部网络与数据完整性要求。

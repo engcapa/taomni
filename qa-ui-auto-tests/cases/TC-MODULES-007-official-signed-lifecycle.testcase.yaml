@@ -81,6 +81,8 @@ steps:
 - wait_for: '[data-testid="module-action-uninstall-hello-plugin"]'
 - click: '[data-testid="module-delete-data-hello-plugin"]'
 - click: '[data-testid="module-action-uninstall-hello-plugin"]'
+- wait_for: '[data-testid="confirm-dialog"]'
+- click: '[data-testid="confirm-dialog-confirm"]'
 - wait_for: '[data-testid="module-action-install-hello-plugin"]'
 - module_signed_probe: {phase: uninstalled}
 - native_restart_app:
@@ -132,18 +134,18 @@ verification:
     results: [35, 39]
   - id: R4
     requirement: Uninstall deactivates the module and a subsequent app restart cannot resurrect it.
-    actions: [44, 45, 48]
+    actions: [44, 45, 47, 50]
     checkpoints:
-    - step: 47
-      expectation: Native registry is uninstalled, activeVersion is null, and invocation rejects with InvalidState.
-    - step: 50
+    - step: 49
+      expectation: Native registry is uninstalled, activeVersion is null, all installed code is absent, and invocation rejects with InvalidState.
+    - step: 52
       expectation: After the exact one-tab Exit confirmation and normal shutdown, the same uninstalled state persists in a newly started native process.
-    - step: 51
+    - step: 53
       expectation: Installation, lifecycle, recovery and uninstall produce no unhandled renderer error.
-    results: [47, 50, 51]
+    results: [49, 52, 53]
   - id: R5
     requirement: The actual native host owns the writer lease while enabled and releases it when inactive, including after normal restart and integrity rejection.
-    actions: [13, 16, 19, 29, 33, 37, 45, 48]
+    actions: [13, 16, 19, 29, 33, 37, 45, 50]
     checkpoints:
     - step: 15
       expectation: An independent nonblocking OS lock attempt cannot take hello-plugin's writer lease after a successful host ping.
@@ -153,9 +155,9 @@ verification:
       expectation: The newly started native host owns the writer lock after normal application restart.
     - step: 35
       expectation: Integrity rejection leaves no host writer lease held.
-    - step: 50
+    - step: 52
       expectation: Uninstalled state after restart has no host writer lease held.
-    results: [15, 18, 31, 35, 50]
+    results: [15, 18, 31, 35, 52]
   native:
   - check: Official pinned-key installation, host process invocation, independent OS writer-lock ownership/release, native disk persistence and graceful restart re-verification.
     method: automated

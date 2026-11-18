@@ -2750,6 +2750,7 @@ const dict = {
     moduleStoreDeleteData: "Delete module data",
     moduleStoreRollback: "Rollback to {version}",
     moduleStoreUninstallConfirm: "Uninstall {name}? Module data will be retained unless you select delete module data.",
+    moduleStoreUninstallDeleteConfirm: "Uninstall {name} and permanently delete its data? This cannot be undone.",
     moduleUpgradeTitle: "Upgrade existing Taomni data",
     moduleUpgradeSubtitle: "Review data detected from Taomni {version} before migrating it.",
     moduleUpgradeRetained: "Legacy files retained for backup: {count}",

@@ -14,7 +14,7 @@ import uuid
 
 from .deadline import budget_time as time
 from .steps import StepError
-from .module_retained_observation import observe as observe_data
+from .module_retained_observation import assert_code_removed, observe as observe_data
 from .module_profile_observation import writer_lease
 
 PHASES = {"installed", "enabled", "disabled", "invalid", "uninstalled", "tamper-frontend", "restore-frontend",
@@ -74,7 +74,8 @@ def run(ctx, args):
     root = Path(fixture["pluginRoot"])
     if root.resolve() != root or not root.is_relative_to(Path(ctx.case_dir).resolve().parent):
         raise StepError("Plugin observation escaped the run-owned QA profile")
-    directory = root / "hello-plugin" / "versions" / "0.1.0"
+    module = root / "hello-plugin"
+    directory = module / "versions" / "0.1.0"
     frontend = directory / "frontend/index.js"
     original = Path(ctx.case_dir) / "official-module/frontend-index.js.original"
     observation = {"phase": phase, "passed": False, "versionDirectory": str(directory)}
@@ -113,17 +114,22 @@ def run(ctx, args):
                     raise StepError("A changed signed frontend was not rejected on startup")
             elif record.get("manifest", {}).get("version") != "0.1.0" or record.get("reason"):
                 raise StepError("Native plugin version or trust differs from the official artifact")
-            proof = directory / ".taomni-trust/package.taomni-plugin"
-            if hashlib.sha256(proof.read_bytes()).hexdigest() != fixture["sha256"]:
-                raise StepError("Installed re-verification proof does not match the signed original")
-            if phase != "invalid" and hashlib.sha256(frontend.read_bytes()).hexdigest() != fixture["frontendSha256"]:
-                raise StepError("Installed frontend bytes do not match the signed original")
-            pointer = json.loads((root / "hello-plugin/active.json").read_text(encoding="utf-8"))
+            if expected_state == "uninstalled":
+                assert_code_removed(module)
+                observation["codeAbsent"] = True
+            else:
+                proof = directory / ".taomni-trust/package.taomni-plugin"
+                if hashlib.sha256(proof.read_bytes()).hexdigest() != fixture["sha256"]:
+                    raise StepError("Installed re-verification proof does not match the signed original")
+                if phase != "invalid" and hashlib.sha256(frontend.read_bytes()).hexdigest() != fixture["frontendSha256"]:
+                    raise StepError("Installed frontend bytes do not match the signed original")
+            pointer = json.loads((module / "active.json").read_text(encoding="utf-8"))
             observation["activePointer"] = pointer
-            # Pointers use snake_case on disk; the UI never writes them.
             expected_version = None if expected_state == "uninstalled" else "0.1.0"
-            if pointer.get("activeVersion", pointer.get("active_version")) != expected_version:
+            if pointer["activeVersion"] != expected_version:
                 raise StepError("Native active pointer differs from lifecycle state")
+            if expected_state == "uninstalled" and pointer["previousVersion"] != "0.1.0":
+                raise StepError("Uninstall lost the previously installed version history")
             if phase in {"seed-data", "retained", "installed-data", "deleted"}:
                 observation["data"] = observe_data(root, phase, record)
         observation["passed"] = True

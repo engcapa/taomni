@@ -49,7 +49,7 @@ impl PluginRegistry {
         let previous = installer.active_pointer(slug)?;
         match intent {
             InstallIntent::Legacy
-                if previous.active_version.is_some() || previous.previous_version.is_some() =>
+                if previous.active_version.is_some() || previous.was_uninstalled() =>
             {
                 return Ok(None);
             }
@@ -65,6 +65,9 @@ impl PluginRegistry {
             false,
         )
         .map_err(|error| PluginError::InvalidManifest(error.to_string()))?;
+        if previous.uninstalled.is_some() && previous.was_uninstalled() {
+            installer.remove_version_tree(slug)?;
+        }
         // Stage and recheck content before stopping a working host or changing
         // the pointer. A bad download never interrupts the active version.
         let destination = installer.stage_verified(package)?;
@@ -74,6 +77,10 @@ impl PluginRegistry {
             return Err(PluginError::InvalidManifest(
                 "installed manifest differs from verified package".into(),
             ));
+        }
+        if previous.was_uninstalled() {
+            // Also covers interruption before uninstall cleared the preference.
+            self.persist_enabled_preference(slug, None)?;
         }
         self.activate_transaction(manifest, &previous, || {
             installer.activate(slug, &manifest.version)
