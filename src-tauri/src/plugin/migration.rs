@@ -163,6 +163,41 @@ impl MigrationJournal {
             .iter()
             .any(|entry| entry.item == item && entry.state == MigrationStepState::Committed)
     }
+
+    pub(crate) fn committed_mfa(&self) -> Result<bool, String> {
+        let mut entries = self
+            .entries
+            .iter()
+            .filter(|entry| entry.item == MigrationItem::Mfa);
+        let Some(entry) = entries.next() else {
+            return Ok(false);
+        };
+        if entries.next().is_some() {
+            return Err("MFA migration journal contains duplicate rows".into());
+        }
+        match entry.state {
+            MigrationStepState::Pending if entry.target.as_os_str().is_empty() => Ok(false),
+            MigrationStepState::Committed if valid_mfa_commit(entry) => Ok(true),
+            _ => Err("MFA migration journal requires recovery".into()),
+        }
+    }
+
+    pub(crate) fn profile_mfa_committed(profile: &Path) -> Result<bool, String> {
+        let directory = profile.join("migration");
+        match fs::symlink_metadata(&directory) {
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(false),
+            Err(error) => return Err(error.to_string()),
+            Ok(_) => paths::directory(&directory)?,
+        }
+        Self::load(&directory.join("journal.json"))?.committed_mfa()
+    }
+}
+
+fn valid_mfa_commit(entry: &MigrationJournalEntry) -> bool {
+    entry.item == MigrationItem::Mfa
+        && entry.source_path == Path::new("mfa.db")
+        && source::valid_fingerprint(&entry.source_fingerprint)
+        && entry.target == Path::new(MFA_MIGRATION_TARGET)
 }
 
 /// One filesystem migration operation. Database legacy tables are represented
@@ -278,13 +313,7 @@ fn reconcile_pending(
     for entry in &journal.entries {
         match entry.state {
             MigrationStepState::Pending if entry.target.as_os_str().is_empty() => (),
-            MigrationStepState::Committed
-                if entry.item == MigrationItem::Mfa
-                    && entry.source_path == Path::new("mfa.db")
-                    && source::valid_fingerprint(&entry.source_fingerprint)
-                    && entry.target == Path::new(MFA_MIGRATION_TARGET)
-                    && committed.is_empty() =>
-            {
+            MigrationStepState::Committed if valid_mfa_commit(entry) && committed.is_empty() => {
                 committed.push(entry.item);
             }
             _ => {

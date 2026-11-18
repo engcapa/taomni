@@ -15,7 +15,7 @@ pub const PLUGIN_ID: &str = "taomni-plugin-mfa";
 pub const PLUGIN_VERSION: &str = env!("CARGO_PKG_VERSION");
 /// Internal retry signal. The core must drop its shared permit before admitting
 /// a separate InitializeEmptyStore operation; the host cannot upgrade it.
-pub const INITIALIZATION_REQUIRED: &str = "MFA_INITIALIZATION_REQUIRED";
+pub use taomni_mfa_engine::INITIALIZATION_REQUIRED;
 
 pub fn host_config() -> HostConfig {
     let mut services = ServiceCapabilities::default();

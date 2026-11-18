@@ -11,6 +11,7 @@ pub mod host;
 pub mod install;
 mod installation;
 pub(crate) mod marketplace;
+mod mfa_calls;
 pub mod migration;
 pub(crate) mod migration_commit;
 mod migration_key_check;

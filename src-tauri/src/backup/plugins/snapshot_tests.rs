@@ -27,7 +27,7 @@ fn orphan_retained_data_and_locked_vault_share_the_job_without_starting_or_initi
     let snapshot = stage_with_plugins(
         &h.registry,
         &h.vault,
-        &mfa,
+        Some(&mfa),
         staging.path(),
         resolve_scope_flags("core", None),
         &SnapshotContext::default(),
@@ -80,7 +80,7 @@ fn busy_retained_owner_aborts_the_complete_protected_batch_and_resumes_admission
     let error = stage_with_plugins(
         &h.registry,
         &h.vault,
-        &mfa,
+        Some(&mfa),
         staging.path(),
         resolve_scope_flags("core", None),
         &SnapshotContext::default(),
@@ -97,7 +97,7 @@ fn busy_retained_owner_aborts_the_complete_protected_batch_and_resumes_admission
     let snapshot = stage_with_plugins(
         &h.registry,
         &h.vault,
-        &mfa,
+        Some(&mfa),
         staging.path(),
         resolve_scope_flags("core", None),
         &SnapshotContext::default(),

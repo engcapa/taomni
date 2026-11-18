@@ -60,7 +60,8 @@ fn construct(
     std::fs::create_dir_all(paths.data.join("mail-cache")).map_err(|e| e.to_string())?;
     let config = config.unwrap_or_else(|| AiConfig::load(&paths.config.join("taomni/ai.json")));
     let ai_ctx = AppAiCtx::from_config_with_proxy_db(config, vault.clone(), Some(&db));
-    let legacy = LegacyFeatureRuntime::new(&paths.data, ai_ctx);
+    let legacy = LegacyFeatureRuntime::new(ai_ctx);
+    let mfa = crate::mfa::backend::MfaBackend::load(&paths.data);
     let services = Arc::new(crate::plugin::services::PluginCoreServices::new(
         &paths.data,
         vault.clone(),
@@ -90,6 +91,7 @@ fn construct(
         core,
         plugins,
         plugin_downloads,
+        mfa,
         legacy,
         _profile: leases,
     })

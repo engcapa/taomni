@@ -6,7 +6,7 @@ use std::{
     time::{Duration, Instant},
 };
 use taomni_plugin_api::{ErrorCode, RequestId};
-use taomni_plugin_services::OperationKind;
+use taomni_plugin_services::{OperationKind, OperationPermit};
 
 #[derive(Debug)]
 pub(super) struct PendingRequest {
@@ -14,7 +14,7 @@ pub(super) struct PendingRequest {
     target: Option<(host::HostCancellation, RequestId)>,
 }
 
-struct PendingCall<'a> {
+pub(super) struct PendingCall<'a> {
     registry: &'a PluginRegistry,
     key: (String, String),
 }
@@ -40,7 +40,7 @@ impl PendingCall<'_> {
         }
     }
 
-    fn cancelled(&self) -> bool {
+    pub(super) fn cancelled(&self) -> bool {
         self.registry.shutting_down.load(Ordering::Acquire)
             || self.registry.quiescence.load(Ordering::Acquire) != 0
             || self
@@ -118,7 +118,7 @@ impl PluginRegistry {
         kind: OperationKind,
         deadline: Instant,
     ) -> Result<Value, PluginError> {
-        self.invoke_scoped_inner(slug, command, payload, request_id, kind, deadline, None)
+        self.invoke_scoped_inner(slug, command, request_id, kind, deadline, |_| Ok(payload))
     }
 
     /// The invoking window is supplied by a typed core facade. It never comes
@@ -143,23 +143,26 @@ impl PluginRegistry {
         self.invoke_scoped_inner(
             slug,
             command,
-            payload,
             request_id,
             OperationKind::ReadData,
             deadline,
-            Some(source),
+            |permit| {
+                permit
+                    .grant_still_capture(source)
+                    .map_err(services::service_error)?;
+                Ok(payload)
+            },
         )
     }
 
-    fn invoke_scoped_inner(
+    pub(super) fn invoke_scoped_inner(
         &self,
         slug: &str,
         command: &str,
-        payload: Value,
         request_id: &str,
         kind: OperationKind,
         deadline: Instant,
-        capture: Option<std::sync::Arc<dyn taomni_plugin_services::StillCaptureService>>,
+        prepare: impl FnOnce(&mut OperationPermit) -> Result<Value, PluginError>,
     ) -> Result<Value, PluginError> {
         let record = self.call_record(slug, command)?;
         let pending = self.begin_call(slug, request_id)?;
@@ -178,18 +181,25 @@ impl PluginRegistry {
             .as_ref()
             .ok_or_else(|| PluginError::HostUnavailable(slug.into()))?;
         let mut permit = services.admit(&identity, kind, deadline, &|| pending.cancelled())?;
-        if let Some(source) = capture {
-            permit
-                .grant_still_capture(source)
-                .map_err(services::service_error)?;
-        }
+        let payload = prepare(&mut permit)?;
+        self.call_scoped_host(&pending, &runtime, permit, command, payload)
+    }
+
+    pub(super) fn call_scoped_host(
+        &self,
+        pending: &PendingCall<'_>,
+        runtime: &RuntimeHost,
+        permit: OperationPermit,
+        command: &str,
+        payload: Value,
+    ) -> Result<Value, PluginError> {
         let wire_id = format!(
             "core/{}/{}",
             permit.context().host_instance,
             permit.context().operation
         )
         .into();
-        pending.attach(&runtime, wire_id);
+        pending.attach(runtime, wire_id);
         loop {
             if pending.cancelled() {
                 permit.cancel();
@@ -199,16 +209,28 @@ impl PluginRegistry {
             if let Ok(mut process) = runtime.process.try_lock() {
                 return process
                     .invoke_with_operation(permit, command, Some(payload))
-                    .map_err(|error| PluginError::Rpc {
-                        code: error.rpc_code(),
-                        message: format!("{slug}: {error}"),
+                    .map_err(|error| {
+                        let slug = &runtime.manifest.slug;
+                        match error {
+                            host::HostProcessError::Rpc { code, message } if slug == "mfa" => {
+                                PluginError::Rpc { code, message }
+                            }
+                            _ => PluginError::Rpc {
+                                code: error.rpc_code(),
+                                message: format!("{slug}: {error}"),
+                            },
+                        }
                     });
             }
             std::thread::sleep(Duration::from_millis(10));
         }
     }
 
-    fn call_record(&self, slug: &str, command: &str) -> Result<PluginRecord, PluginError> {
+    pub(super) fn call_record(
+        &self,
+        slug: &str,
+        command: &str,
+    ) -> Result<PluginRecord, PluginError> {
         use taomni_plugin_api::services::{
             SNAPSHOT_METHOD, SNAPSHOT_PREPARE_METHOD, SNAPSHOT_RELEASE_METHOD, VAULT_REVOKE_METHOD,
         };
@@ -239,7 +261,11 @@ impl PluginRegistry {
         Ok(record)
     }
 
-    fn begin_call(&self, slug: &str, request_id: &str) -> Result<PendingCall<'_>, PluginError> {
+    pub(super) fn begin_call(
+        &self,
+        slug: &str,
+        request_id: &str,
+    ) -> Result<PendingCall<'_>, PluginError> {
         if request_id.is_empty()
             || request_id.len() > 128
             || !request_id

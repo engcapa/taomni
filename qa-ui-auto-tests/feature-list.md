@@ -12195,6 +12195,7 @@ controls:
 - 显示二维码：重新输入主密码后由后端 `mfa_export_uri` 生成 `otpauth://` 链接并在本地渲染为二维码，供其他验证器扫码迁移；关闭即清除，再次打开需重新验证。
 - 锁定请求立即清除标签页、悬浮窗的验证码和导出弹窗；旧异步结果不能恢复已隐藏内容，解锁后重新读取账户与 HOTP 计数。`TC-MFA-013` 在 browser/native 验证悬浮窗与标签页同步门禁、错误口令拒绝及正确口令后的计数连续性。
 - `TC-MFA-014` 在 browser/native 验证设置页修改主密码后保留同一账户、HOTP 计数与原密钥；旧密码不能解锁或导出，新密码恢复原验证码与 secret。浏览器只证明门禁，实际密钥重包由 native 验证。
+- `TC-MFA-016` 在 browser/native 验证单次导出仅授权当前账户、错误密码没有可见的 QR 或密钥、取消后重开会清除密码和错误，并验证两个账户各自的密钥和保留状态。
 - 账户校验、OTP、AES-GCM、key-check、事务导入和偏好存储由不依赖 Tauri/Vault 的 `taomni-mfa-engine` 提供；当前核心适配层仍持有连接和准入，独立 MFA 宿主尚未交付。`TC-MFA-015` 在 browser/native 验证重复拒绝、编辑/置顶、偏好重载、HOTP 连续性和取消/确认删除；native 使用真实 Vault 与 `mfa.db`，不把 browser stub 或 WebView reload 记作独立宿主或正常进程重启证据。
 
 ### 27.2 添加账户：密钥、截图、屏幕扫描与摄像头 ✅

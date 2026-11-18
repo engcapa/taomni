@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use zeroize::Zeroizing;
 
 /// Account metadata sent to the renderer. Never carries the secret.
-#[derive(Debug, Clone, Serialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct MfaAccount {
     pub id: String,
@@ -27,7 +27,7 @@ pub struct MfaAccount {
 
 /// Structured account the renderer parsed from a form, otpauth link or QR code.
 /// Enumerations stay strings so bad values become field errors, not IPC errors.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MfaAccountInput {
     #[serde(default)]
@@ -65,7 +65,7 @@ pub(crate) fn default_period() -> u32 {
 }
 
 /// Full replacement of the user-editable metadata.
-#[derive(Debug, Clone, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MfaAccountPatch {
     pub issuer: String,
@@ -96,7 +96,7 @@ impl Default for MfaPrefs {
 }
 
 /// One generated code. TOTP rows carry their validity window; HOTP rows do not.
-#[derive(Debug, Clone, Serialize, PartialEq)]
+#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 #[serde(rename_all = "camelCase")]
 pub struct MfaCode {
     pub id: String,
@@ -122,14 +122,14 @@ pub struct ValidAccount {
     pub secret: Zeroizing<Vec<u8>>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MfaSnapshot {
     pub accounts: Vec<MfaAccount>,
     pub prefs: MfaPrefs,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MfaInspectItem {
     pub ok: bool,
@@ -137,7 +137,7 @@ pub struct MfaInspectItem {
     pub duplicate_of: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct MfaAddResult {
     pub added: Vec<MfaAccount>,

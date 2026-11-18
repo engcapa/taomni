@@ -47,13 +47,15 @@ def main():
     assert digest(archive) == package["sha256"], "Signed package artifact hash mismatch"
     if args.suite == "installed":
         selected, evidence_name = "plugin::signed_mfa_host_tests", "installed-mfa"
+        expected_tests = 3
     else:
         selected, evidence_name = "plugin::migration_commit::tests::signed_legacy_mfa_", "legacy-mfa-migration"
+        expected_tests = 5
     listing = subprocess.check_output([str(executable), selected, "--ignored", "--list"], text=True)
     listing_name = "selected-tests.txt" if args.suite == "installed" else "legacy-mfa-selected-tests.txt"
     (root / listing_name).write_text(listing, encoding="utf-8")
     count = sum(line.endswith(": test") for line in listing.splitlines())
-    assert count == 3, f"Expected three actual {args.suite} gates, got {count}"
+    assert count == expected_tests, f"Expected {expected_tests} actual {args.suite} gates, got {count}"
     receipt = {
         "schema": f"taomni.signed-mfa-{args.suite}.v1" if args.suite != "installed"
                   else "taomni.signed-mfa-install.v1", "head": source,
@@ -61,7 +63,8 @@ def main():
         "coreSha256": digest(executable), "packageSha256": digest(archive),
         "provenanceSha256": digest(artifact / "provenance.json"),
         "trust": "plugins.updater.pubkey",
-        "systemTrust": "unverified", "productFacade": "legacy-core",
+        "systemTrust": "unverified",
+        "productFacade": "direct-registry" if args.suite == "installed" else "committed-mfa",
         "monolithUpgrade": "unverified", "features": ["qa-release-trust-gates"],
     }
     try:
@@ -82,7 +85,7 @@ def main():
     summary = re.search(
         r"test result: ok\. (\d+) passed; (\d+) failed; (\d+) ignored;", output,
     )
-    passed = exit_code == 0 and summary is not None and summary.groups() == ("3", "0", "0")
+    passed = exit_code == 0 and summary is not None and summary.groups() == (str(expected_tests), "0", "0")
     receipt.update({"exitCode": exit_code, "allSelectedPassed": passed})
     if args.suite == "installed":
         receipt["fixtureKeyRejectionVerified"] = passed

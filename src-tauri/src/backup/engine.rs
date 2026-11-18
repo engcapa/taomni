@@ -228,7 +228,11 @@ fn create_backup_locked(
     let protected = super::protected_snapshot::stage_with_plugins(
         &state.plugins,
         &state.core.vault,
-        &state.legacy.mfa,
+        if flags.mfa {
+            state.mfa.legacy_store()?
+        } else {
+            None
+        },
         &temp_staging_dir,
         flags,
         context,

@@ -1,8 +1,9 @@
 //! A snapshot pauses new work and lets admitted work finish. Unlike a Vault
 //! lock/rekey it neither revokes keys nor invalidates the current epoch.
-use crate::{AdmissionState, OperationAdmission};
+use crate::{AdmissionState, AuthorizedHost, OperationAdmission, OperationPermit};
 use std::time::{Duration, Instant};
 use taomni_plugin_api::services::CoreServiceError;
+use taomni_profile_locks::VaultOperationLease;
 
 pub struct AdmissionPause {
     owner: OperationAdmission,
@@ -63,6 +64,20 @@ impl OperationAdmission {
 }
 
 impl AdmissionPause {
+    /// A confirmed MFA reset is the sole operation permitted during its own
+    /// drained pause. Retain this guard until the reset and its result finish.
+    pub fn admit_mfa_reset(
+        &mut self,
+        host: &AuthorizedHost,
+        lease: VaultOperationLease,
+        deadline: Instant,
+    ) -> Result<OperationPermit, CoreServiceError> {
+        if self.mode != AdmissionState::Open {
+            return Err(CoreServiceError::VaultLocked);
+        }
+        self.owner.admit_paused_mfa_reset(host, lease, deadline)
+    }
+
     fn wait_drained(
         &self,
         deadline: Instant,

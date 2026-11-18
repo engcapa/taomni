@@ -6,6 +6,7 @@ use super::{
 };
 use crate::plugin::{
     data_contract::{PluginDataRoot, require_directory},
+    migration::{MFA_MIGRATION_TARGET, MigrationJournal},
     retained_data,
 };
 use std::{
@@ -14,6 +15,33 @@ use std::{
     path::{Path, PathBuf},
 };
 use taomni_profile_locks::{PluginDataLease, PluginSlug, ProfileRoot};
+
+fn legacy_mfa_alias(profile: &Path, manifest: &BackupManifest) -> Result<bool, String> {
+    Ok(manifest
+        .files
+        .iter()
+        .any(|entry| entry.path == "databases/mfa.db")
+        && !manifest
+            .plugin_datasets
+            .iter()
+            .any(|dataset| dataset.slug == "mfa")
+        && MigrationJournal::profile_mfa_committed(profile)?)
+}
+
+pub(crate) fn restore_owners(
+    profile: &Path,
+    manifest: &BackupManifest,
+) -> Result<Vec<String>, String> {
+    let mut owners = manifest
+        .plugin_datasets
+        .iter()
+        .map(|dataset| dataset.slug.clone())
+        .collect::<Vec<_>>();
+    if legacy_mfa_alias(profile, manifest)? {
+        owners.push("mfa".into());
+    }
+    Ok(owners)
+}
 
 /// Runs before creating a restore intent, and again before applying it. The
 /// second check catches encrypted plugin data created after the intent.
@@ -29,11 +57,7 @@ pub(crate) fn check_restore_dependencies(
     {
         return Ok(());
     }
-    let restored: BTreeSet<_> = manifest
-        .plugin_datasets
-        .iter()
-        .map(|dataset| dataset.slug.as_str())
-        .collect();
+    let restored: BTreeSet<_> = restore_owners(profile, manifest)?.into_iter().collect();
     let plugins = profile.join("plugins");
     for owner in discover_owners(&plugins)? {
         if owner_requires_vault(&owner) && !restored.contains(owner.as_str()) {
@@ -49,8 +73,12 @@ pub(crate) fn check_restore_dependencies(
             }
         }
     }
-    // Until MFA migrates, the legacy business DB still consumes this Vault.
-    // Reading its table is a core-known alias, never a manifest-selected path.
+    // After migration the original MFA database is an upgrade rollback copy.
+    // The plugin dataset above is the active dependency.
+    if MigrationJournal::profile_mfa_committed(profile)? {
+        return Ok(());
+    }
+    // On a legacy profile the fixed root database still consumes this Vault.
     let legacy_mfa = profile.join("mfa.db");
     if legacy_mfa.try_exists().map_err(|e| e.to_string())?
         && !manifest
@@ -87,6 +115,9 @@ pub(crate) fn destination(
     manifest: &BackupManifest,
     name: &str,
 ) -> Result<Option<PathBuf>, String> {
+    if name == "databases/mfa.db" && legacy_mfa_alias(profile, manifest)? {
+        return Ok(Some(profile.join(MFA_MIGRATION_TARGET)));
+    }
     if !name.starts_with("plugins/") {
         return Ok(None);
     }
@@ -125,7 +156,15 @@ pub(crate) fn restore_targets(
     profile: &Path,
     manifest: &BackupManifest,
 ) -> Result<(Vec<PluginDataLease>, Vec<PathBuf>), String> {
-    if manifest.plugin_datasets.is_empty() {
+    let mut owners = manifest
+        .plugin_datasets
+        .iter()
+        .map(|dataset| (dataset.slug.as_str(), dataset.data_schema_version))
+        .collect::<Vec<_>>();
+    if legacy_mfa_alias(profile, manifest)? {
+        owners.push(("mfa", 1));
+    }
+    if owners.is_empty() {
         return Ok((Vec::new(), Vec::new()));
     }
     let root = ProfileRoot::prepare(profile).map_err(|e| e.to_string())?;
@@ -136,17 +175,15 @@ pub(crate) fn restore_targets(
     require_directory(&plugins).map_err(|e| e.to_string())?;
     let mut leases = Vec::new();
     let mut targets = Vec::new();
-    let mut owners: Vec<_> = manifest.plugin_datasets.iter().collect();
-    owners.sort_by(|a, b| a.slug.cmp(&b.slug));
-    for dataset in owners {
-        let slug = PluginSlug::parse(&dataset.slug).map_err(|e| e.to_string())?;
+    owners.sort_by_key(|(slug, _)| *slug);
+    for (name, schema) in owners {
+        let slug = PluginSlug::parse(name).map_err(|e| e.to_string())?;
         leases.push(
             PluginDataLease::try_acquire(&root, &slug)
-                .map_err(|e| format!("Plugin {} is in use during restore: {e}", dataset.slug))?,
+                .map_err(|e| format!("Plugin {name} is in use during restore: {e}"))?,
         );
-        let old = retained_data::discover(&plugins, &dataset.slug, dataset.data_schema_version)
-            .map_err(|e| e.to_string())?;
-        let data = PluginDataRoot::open(&plugins, &dataset.slug).map_err(|e| e.to_string())?;
+        let old = retained_data::discover(&plugins, name, schema).map_err(|e| e.to_string())?;
+        let data = PluginDataRoot::open(&plugins, name).map_err(|e| e.to_string())?;
         for file in old.files {
             targets.push(data.resolve_file(&file.path).map_err(|e| e.to_string())?);
         }
@@ -183,11 +220,10 @@ pub(crate) fn stage_locators(
     staging: &Path,
     manifest: &BackupManifest,
 ) -> Result<Vec<(PathBuf, PathBuf)>, String> {
-    let mut mappings = Vec::new();
-    for dataset in &manifest.plugin_datasets {
-        let plugins = profile.join("plugins");
-        retained_data::load(&plugins, &dataset.slug).map_err(|e| e.to_string())?;
-        let locator = retained_data::RetainedDataLocator {
+    let mut locators = manifest
+        .plugin_datasets
+        .iter()
+        .map(|dataset| retained_data::RetainedDataLocator {
             format_version: 1,
             slug: dataset.slug.clone(),
             data_schema_version: dataset.data_schema_version,
@@ -206,18 +242,34 @@ pub(crate) fn stage_locators(
                     },
                 })
                 .collect(),
-        };
-        locator.validate(&dataset.slug).map_err(|e| e.to_string())?;
+        })
+        .collect::<Vec<_>>();
+    if legacy_mfa_alias(profile, manifest)? {
+        locators.push(retained_data::RetainedDataLocator {
+            format_version: 1,
+            slug: "mfa".into(),
+            data_schema_version: 1,
+            files: vec![retained_data::RetainedDataFile {
+                path: "mfa.db".into(),
+                kind: retained_data::DataFileKind::Sqlite,
+            }],
+        });
+    }
+    let plugins = profile.join("plugins");
+    let mut mappings = Vec::new();
+    for locator in locators {
+        retained_data::load(&plugins, &locator.slug).map_err(|e| e.to_string())?;
+        locator.validate(&locator.slug).map_err(|e| e.to_string())?;
         let core_staging = staging.join(".core-locators");
         fs::create_dir_all(&core_staging).map_err(|e| e.to_string())?;
         retained_data::save(&core_staging, &locator).map_err(|e| e.to_string())?;
         mappings.push((
             core_staging
                 .join(".retained-data")
-                .join(format!("{}.json", dataset.slug)),
+                .join(format!("{}.json", locator.slug)),
             plugins
                 .join(".retained-data")
-                .join(format!("{}.json", dataset.slug)),
+                .join(format!("{}.json", locator.slug)),
         ));
     }
     Ok(mappings)

@@ -241,6 +241,150 @@ fn signed_legacy_mfa_restart_rolls_back_interrupted_activation_and_allows_retry(
 }
 
 #[test]
+#[ignore = "the production facade uses the actual signed MFA host and files on GitHub"]
+fn signed_legacy_mfa_facade_keeps_exclusive_ownership_after_migration() {
+    use crate::{ai::config::AiConfig, mfa::backend, runtime::bootstrap::isolated_state};
+
+    let legacy = Legacy::new();
+    let root = legacy.root.path();
+    let package = InstalledMfa::verified_package();
+    commit(legacy.prepare(), &package, MASTER).unwrap();
+    let state = isolated_state(root, AiConfig::default()).unwrap();
+    assert!(state.mfa.legacy_store().unwrap().is_none());
+    state.plugins.set_enabled(OWNER, true).unwrap();
+    let original_mfa = fs::read(root.join("mfa.db")).unwrap();
+
+    let list = || {
+        tauri::async_runtime::block_on(backend::run(
+            &state,
+            "mfa_list",
+            OperationKind::ReadData,
+            (),
+            |_| json!({}),
+            |_, _, ()| -> Result<mfa::models::MfaSnapshot, String> {
+                panic!("committed MFA must never reopen its legacy store")
+            },
+        ))
+    };
+    let export = |password: &str| {
+        tauri::async_runtime::block_on(backend::export(
+            &state,
+            legacy.account_id.clone(),
+            Zeroizing::new(password.into()),
+        ))
+    };
+    assert_eq!(list().unwrap_err(), "VAULT_LOCKED");
+    state
+        .plugins
+        .unlock_vault(&state.core.vault, MASTER)
+        .unwrap();
+    let listed = list().unwrap();
+    assert_eq!(listed.accounts[0].id, legacy.account_id);
+    assert_eq!(listed.accounts[0].issuer, "original issuer");
+    assert_eq!(export("wrong-password").unwrap_err(), "VAULT_BAD_PASSWORD");
+    let uri = Zeroizing::new(export(MASTER).unwrap());
+    assert!(uri.starts_with("otpauth://hotp/") && uri.contains("counter=0"));
+    state.plugins.set_enabled(OWNER, false).unwrap();
+    assert_eq!(list().unwrap_err(), "plugin mfa is disabled");
+    state.plugins.set_enabled(OWNER, true).unwrap();
+
+    tauri::async_runtime::block_on(backend::reset(&state)).unwrap();
+    assert!(list().unwrap().accounts.is_empty());
+    assert_eq!(export(MASTER).unwrap_err(), "MFA_NOT_FOUND");
+    assert_eq!(fs::read(root.join("mfa.db")).unwrap(), original_mfa);
+    state.plugins.uninstall(OWNER, false).unwrap();
+    assert!(list().is_err());
+    assert!(state.mfa.legacy_store().unwrap().is_none());
+    assert_eq!(fs::read(root.join("mfa.db")).unwrap(), original_mfa);
+    state.plugins.shutdown().unwrap();
+}
+
+#[test]
+#[ignore = "legacy archive restore and signed host are exercised on GitHub"]
+fn signed_legacy_mfa_restore_uses_module_data_after_normal_profile_startup() {
+    use crate::{
+        ai::config::AiConfig,
+        backup::{
+            engine::{StagedFile, pack_staged_archive},
+            restore::stage_restore_to_dir,
+        },
+        mfa::backend,
+        runtime::bootstrap::isolated_state,
+    };
+
+    let legacy = Legacy::new();
+    let root = legacy.root.path();
+    let archive = root.join("legacy-mfa.taobak");
+    pack_staged_archive(
+        &["mfa.db", "vault.db"].map(|name| StagedFile {
+            archive_path: format!("databases/{name}"),
+            disk_path: root.join(name),
+        }),
+        "0.5.9",
+        "core",
+        None,
+        &archive,
+    )
+    .unwrap();
+    commit(legacy.prepare(), &InstalledMfa::verified_package(), MASTER).unwrap();
+    let active = root.join("plugins/mfa/active.json");
+    let original_active = fs::read(&active).unwrap();
+    let original_mfa = fs::read(root.join("mfa.db")).unwrap();
+    {
+        let mut db = mfa::store::open_db(&root.join(TARGET)).unwrap();
+        let key = Zeroizing::new([37_u8; 32]);
+        assert_eq!(
+            mfa::operations::hotp_next(&mut db, &key, &legacy.account_id)
+                .unwrap()
+                .code,
+            "287082"
+        );
+    }
+    let before_restore = generation::current(root).unwrap();
+    assert!(
+        stage_restore_to_dir(root, &archive, None)
+            .unwrap()
+            .restart_required
+    );
+    assert_eq!(generation::current(root).unwrap(), before_restore);
+
+    let state = isolated_state(root, AiConfig::default()).unwrap();
+    assert!(state.mfa.legacy_store().unwrap().is_none());
+    assert_ne!(generation::current(root).unwrap(), before_restore);
+    assert_eq!(fs::read(&active).unwrap(), original_active);
+    assert_eq!(fs::read(root.join("mfa.db")).unwrap(), original_mfa);
+    assert_eq!(
+        fs::read(root.join("lanchat.sqlite")).unwrap(),
+        legacy.source_bytes[2]
+    );
+    let locator = crate::plugin::retained_data::load(&root.join("plugins"), OWNER)
+        .unwrap()
+        .unwrap();
+    assert_eq!(locator.files[0].path, "mfa.db");
+    assert_eq!(locator.data_schema_version, 1);
+    state.plugins.set_enabled(OWNER, true).unwrap();
+    state
+        .plugins
+        .unlock_vault(&state.core.vault, MASTER)
+        .unwrap();
+    let codes = tauri::async_runtime::block_on(backend::run(
+        &state,
+        "mfa_codes",
+        OperationKind::ReadData,
+        (),
+        |_| json!({}),
+        |_, _, ()| -> Result<Vec<mfa::models::MfaCode>, String> {
+            panic!("restoring an old backup must keep the module data owner")
+        },
+    ))
+    .unwrap();
+    assert_eq!(codes.len(), 1);
+    assert_eq!(codes[0].id, legacy.account_id);
+    assert_eq!(codes[0].code, "755224");
+    state.plugins.shutdown().unwrap();
+}
+
+#[test]
 fn interrupted_mfa_activation_child() {
     let Some(path) = std::env::var_os(CHILD_ROOT) else {
         return;

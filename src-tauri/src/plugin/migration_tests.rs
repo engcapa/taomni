@@ -2,6 +2,29 @@ use super::*;
 use tempfile::tempdir;
 
 #[test]
+fn mfa_owner_requires_a_single_committed_entry_with_known_paths() {
+    let mut journal = MigrationJournal::default();
+    assert_eq!(journal.committed_mfa(), Ok(false));
+    journal.mark_with_source(
+        MigrationItem::Mfa,
+        MigrationStepState::Pending,
+        format!("sha256:{}:bytes:1", "a".repeat(64)),
+        "mfa.db".into(),
+        PathBuf::new(),
+    );
+    assert_eq!(journal.committed_mfa(), Ok(false));
+    journal.entries[0].state = MigrationStepState::Committed;
+    journal.entries[0].target = MFA_MIGRATION_TARGET.into();
+    assert_eq!(journal.committed_mfa(), Ok(true));
+    let committed = journal.entries[0].clone();
+    journal.entries[0].source_path = "unexpected.db".into();
+    assert!(journal.committed_mfa().is_err());
+    journal.entries[0] = committed.clone();
+    journal.entries.push(committed);
+    assert!(journal.committed_mfa().is_err());
+}
+
+#[test]
 fn detects_legacy_files_without_mutating_data_or_reading_removed_chat() {
     let dir = tempdir().unwrap();
     fs::write(dir.path().join("mfa.db"), b"legacy").unwrap();

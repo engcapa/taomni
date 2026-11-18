@@ -7,6 +7,7 @@
 //! See `docs-feature/mfa-authenticator-design.md`.
 
 mod access;
+pub(crate) mod backend;
 pub mod capture;
 pub mod commands;
 pub mod crypto;

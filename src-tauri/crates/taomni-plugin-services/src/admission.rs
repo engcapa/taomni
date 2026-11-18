@@ -75,7 +75,7 @@ impl OperationAdmission {
         kind: OperationKind,
         lease: VaultOperationLease,
     ) -> Result<OperationPermit, CoreServiceError> {
-        self.admit_inner(host, Some(operation), kind, lease, None)
+        self.admit_inner(host, Some(operation), kind, lease, None, false)
     }
 
     /// Production RPC operations have a core-owned deadline; a host cannot
@@ -88,7 +88,7 @@ impl OperationAdmission {
         lease: VaultOperationLease,
         deadline: Instant,
     ) -> Result<OperationPermit, CoreServiceError> {
-        self.admit_inner(host, Some(operation), kind, lease, Some(deadline))
+        self.admit_inner(host, Some(operation), kind, lease, Some(deadline), false)
     }
 
     /// Allocate and admit together under the core barrier. The reserved ID
@@ -102,7 +102,25 @@ impl OperationAdmission {
         lease: VaultOperationLease,
         deadline: Instant,
     ) -> Result<OperationPermit, CoreServiceError> {
-        self.admit_inner(host, None, kind, lease, Some(deadline))
+        self.admit_inner(host, None, kind, lease, Some(deadline), false)
+    }
+
+    pub(crate) fn admit_paused_mfa_reset(
+        &self,
+        host: &AuthorizedHost,
+        lease: VaultOperationLease,
+        deadline: Instant,
+    ) -> Result<OperationPermit, CoreServiceError> {
+        use taomni_plugin_api::services::{FixedKeyId, MFA_DATA_KEY_ID};
+        host.fixed_key_owner(&FixedKeyId::parse(MFA_DATA_KEY_ID).expect("well-known MFA key ID"))?;
+        self.admit_inner(
+            host,
+            None,
+            OperationKind::ResetStore,
+            lease,
+            Some(deadline),
+            true,
+        )
     }
 
     fn admit_inner(
@@ -112,6 +130,7 @@ impl OperationAdmission {
         kind: OperationKind,
         lease: VaultOperationLease,
         deadline: Option<Instant>,
+        paused_reset: bool,
     ) -> Result<OperationPermit, CoreServiceError> {
         if deadline.is_some_and(|deadline| deadline <= Instant::now()) {
             return Err(CoreServiceError::TimedOut);
@@ -128,7 +147,7 @@ impl OperationAdmission {
         if state.mode != AdmissionState::Open {
             return Err(CoreServiceError::VaultLocked);
         }
-        if state.paused {
+        if state.paused != paused_reset || (paused_reset && state.in_flight != 0) {
             return Err(CoreServiceError::CoreServiceBusy);
         }
         let explicit = operation.is_some();

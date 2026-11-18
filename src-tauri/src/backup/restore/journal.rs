@@ -147,12 +147,7 @@ pub fn apply_pending_restore(app_data: &Path) -> Result<(), String> {
     let mut journal = RestoreJournal {
         entries: vec![],
         committed: false,
-        plugin_owners: intent
-            .manifest
-            .plugin_datasets
-            .iter()
-            .map(|data| data.slug.clone())
-            .collect(),
+        plugin_owners: plugins::restore::restore_owners(app_data, &intent.manifest)?,
         profile_generation: None,
     };
     let mut mappings = vec![];

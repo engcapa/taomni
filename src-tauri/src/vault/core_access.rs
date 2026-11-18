@@ -2,7 +2,9 @@
 //! A core permit cannot authorize reverse RPC or select another fixed key.
 use super::{Vault, db, password_key, plugin_access};
 use taomni_plugin_api::services::SecretKey32;
-use taomni_plugin_services::{CoreOperationPermit, MFA_FIXED_KEY_OWNER, OperationKind};
+use taomni_plugin_services::{
+    CoreOperationPermit, MFA_FIXED_KEY_OWNER, OperationKind, OperationPermit,
+};
 
 pub(crate) enum MfaKeyAction {
     Load,
@@ -64,10 +66,27 @@ impl Vault {
         password: &str,
         permit: &CoreOperationPermit,
     ) -> Result<(), String> {
-        if permit.kind() != OperationKind::ExportSecret {
+        self.verify_export_password(password, permit.kind(), || permit.check_current())
+    }
+
+    pub(crate) fn verify_mfa_host_export_password(
+        &self,
+        password: &str,
+        permit: &OperationPermit,
+    ) -> Result<(), String> {
+        self.verify_export_password(password, permit.kind(), || permit.check_current())
+    }
+
+    fn verify_export_password(
+        &self,
+        password: &str,
+        kind: OperationKind,
+        current: impl Fn() -> Result<(), taomni_plugin_api::services::CoreServiceError>,
+    ) -> Result<(), String> {
+        if kind != OperationKind::ExportSecret {
             return Err("PERMISSION_DENIED".into());
         }
-        permit.check_current().map_err(|e| e.kind().to_string())?;
+        current().map_err(|e| e.kind().to_string())?;
         let mut inner = self.inner.lock().map_err(|_| "Vault is unavailable")?;
         plugin_access::verify_current_root(&mut inner).map_err(|e| e.to_string())?;
         let password = password.trim();
@@ -78,6 +97,6 @@ impl Vault {
             .map_err(|e| e.to_string())?
             .ok_or(super::ERR_VAULT_EMPTY)?;
         drop(password_key::verify(&meta, password)?);
-        permit.check_current().map_err(|e| e.kind().to_string())
+        current().map_err(|e| e.kind().to_string())
     }
 }

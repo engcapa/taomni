@@ -62,6 +62,7 @@ pub struct AppState {
     pub core: Arc<CoreState>,
     pub plugins: Arc<crate::plugin::PluginRegistry>,
     pub plugin_downloads: Arc<crate::plugin::download::DownloadManager>,
+    pub(crate) mfa: crate::mfa::backend::MfaBackend,
     pub legacy: LegacyFeatureRuntime,
     pub(crate) _profile: Arc<crate::runtime::profile::ProfileRuntimeLeases>,
 }

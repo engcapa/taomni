@@ -11,7 +11,7 @@ use std::{
 pub(super) fn stage_with_plugins(
     registry: &PluginRegistry,
     vault: &Vault,
-    mfa: &MfaStore,
+    mfa: Option<&MfaStore>,
     staging: &Path,
     flags: BackupScopeFlags,
     context: &SnapshotContext,
@@ -48,7 +48,10 @@ pub(super) fn stage_with_plugins(
             )?;
             // All ordinary operations are already drained. Both snapshots
             // retain the same external exclusive lease, including rekey.
-            let has_mfa = flags.mfa && mfa.backup_to_with_context(&mfa_path, context)?;
+            let has_mfa = match mfa {
+                Some(mfa) if flags.mfa => mfa.backup_to_with_context(&mfa_path, context)?,
+                _ => false,
+            };
             context.check()?;
             if flags.vault || plugins.datasets.iter().any(|data| data.requires_vault) {
                 vault.backup_to_with_context(&vault_path, context)?;
@@ -85,5 +88,6 @@ pub(super) fn stage(
     flags: BackupScopeFlags,
     context: &SnapshotContext,
 ) -> Result<Vec<StagedFile>, String> {
-    stage_with_plugins(registry, vault, mfa, staging, flags, context).map(|snapshot| snapshot.files)
+    stage_with_plugins(registry, vault, Some(mfa), staging, flags, context)
+        .map(|snapshot| snapshot.files)
 }
