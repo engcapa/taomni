@@ -22,6 +22,9 @@ on:
       upgrade_desktop:
         type: boolean
         default: false
+      macos_arm_runner:
+        type: string
+        default: macos-15
 
 permissions:
   contents: read
@@ -45,13 +48,15 @@ jobs:
         env:
           SAMPLE_TARGETS: ${{ inputs.package_targets }}
           SAMPLE_UPGRADE_DESKTOP: ${{ inputs.upgrade_desktop }}
+          SAMPLE_MACOS_ARM_RUNNER: ${{ inputs.macos_arm_runner }}
         run: |
           args=()
           if [[ "$SAMPLE_UPGRADE_DESKTOP" == true ]]; then
             args+=(--upgrade-desktop)
           fi
           python .agents/skills/qa-ui-auto/scripts/modular_bundle_inventory.py plan-targets \
-            --targets "$SAMPLE_TARGETS" --github-output "$GITHUB_OUTPUT" "${args[@]}"
+            --targets "$SAMPLE_TARGETS" --macos-arm-runner "$SAMPLE_MACOS_ARM_RUNNER" \
+            --github-output "$GITHUB_OUTPUT" "${args[@]}"
 
   bundle-samples:
     needs: plan

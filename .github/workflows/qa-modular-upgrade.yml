@@ -31,6 +31,11 @@ on:
         description: Exercise real Windows MSI and macOS DMG replacement and rollback
         type: boolean
         default: false
+      package_macos_arm_runner:
+        description: Hosted ARM64 runner for macOS bundle inspection and installation
+        type: choice
+        options: [macos-15, macos-26]
+        default: macos-15
       download_only:
         description: Run only the three-platform native downloader and restart contracts
         type: boolean
@@ -84,6 +89,9 @@ on:
       package_upgrade_desktop:
         type: boolean
         default: false
+      package_macos_arm_runner:
+        type: string
+        default: macos-15
       download_only:
         type: boolean
         required: false
@@ -146,6 +154,7 @@ jobs:
       package_version: ${{ inputs.package_version }}
       package_targets: ${{ inputs.package_targets }}
       upgrade_desktop: ${{ inputs.package_upgrade_desktop }}
+      macos_arm_runner: ${{ inputs.package_macos_arm_runner || 'macos-15' }}
 
   protocol-contracts:
     if: ${{ !inputs.signed_mfa_only && !inputs.package_run && inputs.protocol_only }}

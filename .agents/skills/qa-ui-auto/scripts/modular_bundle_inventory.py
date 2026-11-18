@@ -25,12 +25,15 @@ RUNNERS = {'linux-x86_64': 'ubuntu-22.04', 'windows-x86_64': 'windows-latest',
            'darwin-aarch64': 'macos-15', 'darwin-x86_64': 'macos-15-intel'}
 
 
-def plan_targets(value: str, *, upgrade_desktop: bool = False) -> dict:
+def plan_targets(value: str, *, upgrade_desktop: bool = False, macos_arm_runner: str = 'macos-15') -> dict:
+    if macos_arm_runner not in {'macos-15', 'macos-26'}:
+        raise ValueError('select a supported macOS ARM64 runner')
     supported = [target for target in TARGETS if not upgrade_desktop or not target.startswith('linux-')]
     targets = supported if value == 'all' else [part.strip() for part in value.split(',')]
     if not targets or len(set(targets)) != len(targets) or any(target not in supported for target in targets):
         raise ValueError('select all or unique supported package targets')
-    return {'include': [{'os': RUNNERS[target], 'target': target} for target in targets]}
+    runners = {**RUNNERS, 'darwin-aarch64': macos_arm_runner}
+    return {'include': [{'os': runners[target], 'target': target} for target in targets]}
 
 
 def write_json(path: Path, value) -> None:
@@ -187,6 +190,7 @@ def main() -> None:
     plan = commands.add_parser('plan-targets')
     plan.add_argument('--targets', required=True)
     plan.add_argument('--upgrade-desktop', action='store_true')
+    plan.add_argument('--macos-arm-runner', default='macos-15', choices=('macos-15', 'macos-26'))
     plan.add_argument('--github-output', type=Path, required=True)
     payload = commands.add_parser('validate-payload')
     payload.add_argument('--target', required=True)
@@ -203,7 +207,7 @@ def main() -> None:
     collect.add_argument('--linux-metadata', action='store_true')
     args = parser.parse_args()
     if args.command == 'plan-targets':
-        matrix = plan_targets(args.targets, upgrade_desktop=args.upgrade_desktop)
+        matrix = plan_targets(args.targets, upgrade_desktop=args.upgrade_desktop, macos_arm_runner=args.macos_arm_runner)
         with args.github_output.open('a', encoding='utf-8') as stream:
             stream.write('matrix=' + json.dumps(matrix, separators=(',', ':')) + '\n')
         return

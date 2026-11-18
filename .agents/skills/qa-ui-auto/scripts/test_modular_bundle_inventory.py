@@ -42,6 +42,15 @@ class BundleSourceTests(unittest.TestCase):
             with self.subTest(value=value), self.assertRaises(ValueError):
                 plan_targets(value)
 
+    def test_macos_26_upgrade_keeps_the_producer_target_and_intel_runner(self):
+        matrix = plan_targets('darwin-aarch64,darwin-x86_64', upgrade_desktop=True, macos_arm_runner='macos-26')
+        self.assertEqual(matrix['include'], [
+            {'os': 'macos-26', 'target': 'darwin-aarch64'},
+            {'os': 'macos-15-intel', 'target': 'darwin-x86_64'},
+        ])
+        with self.assertRaisesRegex(ValueError, 'supported macOS ARM64 runner'):
+            plan_targets('darwin-aarch64', macos_arm_runner='self-hosted')
+
     def test_completed_artifact_can_be_sampled_before_the_other_builders_finish(self):
         run, artifacts = source_fixture()
         result = validate(run, artifacts)
