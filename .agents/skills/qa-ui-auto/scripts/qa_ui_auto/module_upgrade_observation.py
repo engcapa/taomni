@@ -10,6 +10,8 @@ from .fixtures.backup_policy import isolated_data_root
 from .fixtures.module_upgrade import CHAT_FILES
 from .steps import StepError
 
+AFTER_FIRST_INSTALL = "after-first-install"
+
 
 def wal_fingerprint(data, state):
     main = data / "taomni.db"
@@ -61,15 +63,18 @@ def observe(data, state, phase):
     expected = sorted((row["id"], row["session_type"], row["options_json"]) for row in state["sessions"])
     if rows != expected:
         raise StepError("Upgrade preflight/pending changed the original session records")
-    # A pending journal must confer no execution for its migration targets.
-    plugins = data / "plugins"
-    for slug in ["rdp-client", "vnc-client", "rdp-server", "vnc-server", "servers", "mfa", "lanchat"]:
-        if (plugins / slug).exists() or (plugins / slug).is_symlink():
-            raise StepError("Pending migration created a module owner/code/data directory")
+    absent = ["rdp-client", "vnc-client", "rdp-server", "vnc-server", "servers", "lanchat"]
+    # The signed first-install probe has already verified the independent MFA package.
+    if phase != AFTER_FIRST_INSTALL:
+        absent.append("mfa")
+    for slug in absent:
+        directory = data / "plugins" / slug
+        if directory.exists() or directory.is_symlink():
+            raise StepError(f"Pending migration created a module owner/code/data directory for {slug}")
     journal_path = data / "migration" / "journal.json"
     result = {"sessionTypes": [row[1] for row in rows], "retainedSha256": {
         name: value["sha256"] for name, value in retained.items()},
-        "moduleDirectoriesAbsent": True}
+        "moduleDirectoriesAbsent": True, "checkedAbsentModuleDirectories": absent}
     expected_fingerprint = None
     if "wal_main_sha256" in state:
         expected_fingerprint, result["walInput"] = wal_fingerprint(data, state)
@@ -95,7 +100,7 @@ def observe(data, state, phase):
                 raise StepError("Pending migration lacks its actual source fingerprint")
             if expected_fingerprint and entry["source_fingerprint"] != expected_fingerprint:
                 raise StepError("Pending migration fingerprint does not bind the committed WAL input")
-        if phase == "repeat" and journal != state.get("journal"):
+        if phase in {"repeat", AFTER_FIRST_INSTALL} and journal != state.get("journal"):
             raise StepError("Repeated pending migration changed its journal instead of remaining idempotent")
         state["journal"] = journal
         result["journal"] = journal
@@ -103,12 +108,15 @@ def observe(data, state, phase):
 
 
 def run(ctx, args):
-    if not isinstance(args, dict) or set(args) != {"phase"} or args["phase"] not in {"preflight", "pending", "repeat"}:
+    if not isinstance(args, dict) or set(args) != {"phase"} or args["phase"] not in {"preflight", "pending", "repeat", AFTER_FIRST_INSTALL}:
         raise StepError("module_upgrade_probe requires a fixed registered phase")
     owner = getattr(ctx, "fixture_context", None) or ctx
     state = getattr(owner, "module_upgrade", None)
-    if not state or getattr(owner, "case_id", None) not in {"TC-MODULES-025", "TC-MODULES-027", "TC-MODULES-028", "TC-MODULES-030", "TC-MODULES-032"}:
+    case_id = getattr(owner, "case_id", None)
+    if not state or case_id not in {"TC-MODULES-025", "TC-MODULES-027", "TC-MODULES-028", "TC-MODULES-030", "TC-MODULES-032"}:
         raise StepError("module_upgrade_probe requires its registered native legacy input fixture")
+    if args["phase"] == AFTER_FIRST_INSTALL and case_id != "TC-MODULES-027":
+        raise StepError("After-first-install verification requires the installed legacy roster case")
     data = isolated_data_root(owner)
     if data != state["root"]:
         raise StepError("Upgrade observation requires its own isolated profile")

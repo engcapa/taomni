@@ -941,8 +941,8 @@
         },
         "module_upgrade_probe": {
           "type": "object", "additionalProperties": false, "required": ["phase"],
-          "properties": { "phase": { "enum": ["preflight", "pending", "repeat"] } },
-          "description": "Native only: read-only observation of registered VNC, combined RDP/VNC/pin or mixed-server legacy inputs, including installed-0.5.9 input. Checks original session/config/certificate-pin records, retained chat bytes/sidecars, absent module directories and distinct idempotent pending items. No YAML paths, SQL, commands or product mutations."
+          "properties": { "phase": { "enum": ["preflight", "pending", "repeat", "after-first-install"] } },
+          "description": "Native only: read-only checks of legacy session/config/certificate-pin records, retained chat bytes/sidecars, absent pending module directories and idempotent journal items. TC-MODULES-027 can check after installing the independent signed roster, including MFA. No YAML paths, SQL, commands or product mutations."
         },
         "module_marketplace_probe": {
           "type": "object", "additionalProperties": false, "required": ["phase"],

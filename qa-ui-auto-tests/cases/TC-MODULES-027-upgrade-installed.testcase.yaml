@@ -104,7 +104,7 @@ steps:
 - *id003
 - *id004
 - wait_for: '[data-module-id="taomni-plugin-mfa"] [data-testid="module-marketplace-current"]'
-- module_upgrade_probe: {phase: repeat}
+- module_upgrade_probe: {phase: after-first-install}
 - assert_no_runtime_errors: null
 - screenshot: module-upgrade-installed-0510-native.png
 verification:
@@ -217,7 +217,7 @@ verification:
     - step: 43
       expectation: The store shows MFA as installed alongside Hello.
     - step: 44
-      expectation: The first installation preserves complete legacy sessions, historical chat file hashes and the VNC journal.
+      expectation: The first installation preserves complete legacy sessions, historical chat file hashes and the exact pending VNC journal. No VNC module directory is created.
     - step: 45
       expectation: The renderer records no unhandled errors after the first installation.
     results: [39, 43, 44, 45]

@@ -62,6 +62,19 @@ class UpgradeObservationTests(unittest.TestCase):
         with self.assertRaisesRegex(StepError, "exactly one"):
             observe(self.root, self.state, "repeat")
 
+    def test_first_install_allows_mfa_while_preserving_the_pending_vnc_owner_and_journal(self):
+        self.write_journal()
+        original = observe(self.root, self.state, "pending")["journal"]
+        (self.root / "plugins" / "mfa" / "versions" / "0.1.0").mkdir(parents=True)
+        with self.assertRaisesRegex(StepError, "directory for mfa"):
+            observe(self.root, self.state, "repeat")
+        result = observe(self.root, self.state, "after-first-install")
+        self.assertEqual(result["journal"], original)
+        self.assertIn("vnc-client", result["checkedAbsentModuleDirectories"])
+        (self.root / "plugins" / "vnc-client").mkdir()
+        with self.assertRaisesRegex(StepError, "directory for vnc-client"):
+            observe(self.root, self.state, "after-first-install")
+
     def test_false_completion_wrong_owner_and_changed_fingerprint_are_rejected(self):
         self.journal["status"] = "complete"
         self.write_journal()
