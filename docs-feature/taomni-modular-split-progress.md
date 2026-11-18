@@ -1,5 +1,20 @@
 # 模块化实施与验收台账
 
+## 2026-11-19 首次全量安装与后续按需升级
+
+- 首次从单体版升级时，按签名 `modules.json` 的固定首发名单安装本机兼容模块。用户可单独卸载，默认保留业务数据。后续仅对已装模块显示兼容更新并保留启禁选择。首次出现在后续目录中的兼容模块显示名称和功能说明，用户选择是否安装。 [升级设计](taomni-modular-split-design.md#64-更新检查)
+- `dca19714e` 将 027、040 的首发测试目录扩展为同一平台上的签名 Hello 与 MFA。027 用正式 `0.5.10` 建立的旧配置验证自动首装和旧资料，040 验证卸载 Hello 后正常重启仍保留 MFA。首轮 #44371527011 在规划阶段发现签名矩阵单测仍读取旧格式，`49ce6785f` 更新断言并补齐混合平台覆盖。 [首轮规划结果](https://github.com/engcapa/taomni/actions/runs/44371527011)
+- Ring 批次收齐 18 片并核对用例和构建身份。三端 Browser 各 26/26，Linux、Windows、macOS Intel Native 分别 37/38、36/37、40/40。Intel 的 015 完成 115 步，两次正常重启记录均与 runner receipt 一致。Windows `TC-FILE-OPEN-002` 在首个步骤前遇到历史 WebView 初始化超时。 [Ring 批次](https://github.com/engcapa/taomni/actions/runs/44361591364)
+- Linux 045 触发同源后台刷目录时安装确认未打开。`76c5189c3` 按实际源和包身份校验审阅结果，后台刷新仍提供同一包时保留确认。041、045 增加对确认框内模块名和版本的断言。正式签名打包 17 项、规划的模块契约 78 项和前端 11 项纯单元通过。 [三端复验](https://github.com/engcapa/taomni/actions/runs/44373042546)
+- 三端 Browser 各 22/22，macOS 26 的第二片在分配 runner 前取消，该端完整集合由 macOS 15 Intel 补跑。Linux 的 040 和 045 已通过，原始观察文件已核对。027 的初次复验已装好两份签名包，最后的旧数据探针沿用了首装前的目录检查。`52b9efd4d` 和 `a29eca0ec` 将该检查应用于 VNC 等仍待迁移的目录，继续复核完整旧会话、旧文件摘要和原 VNC journal。修正后的 027 用例与完整原生崩溃回归已派发。 [Intel Browser 补跑](https://github.com/engcapa/taomni/actions/runs/44378264747) · [027 Linux 复验](https://github.com/engcapa/taomni/actions/runs/44381204409) · [027 macOS 复验](https://github.com/engcapa/taomni/actions/runs/44382003777)
+- Windows 首次构建的依赖缓存仍记录 MSVC 14.51 汇编器路径，runner 已升级到 MSVC 14.52。`ddd36af2a` 按 Windows runner 镜像隔离构建和依赖缓存，以原应用源码重跑。 [Windows 重新构建](https://github.com/engcapa/taomni/actions/runs/44377661324)
+- Linux 修正后 Native 25/25，四片均已收齐。027 的两份安装凭据、旧资料摘要和首装前后的 VNC journal 已与 runner 回执核对。Windows 同一应用源码的隔离缓存构建已成功，027 使用修正后的探针复跑。macOS 26 的 027 复验在 runner 分配前取消，另用 macOS 15 Intel 执行四个模块用例及完整原生崩溃回归。 [Linux](https://github.com/engcapa/taomni/actions/runs/44381204409) · [Windows 027](https://github.com/engcapa/taomni/actions/runs/44383149925) · [macOS Intel Native](https://github.com/engcapa/taomni/actions/runs/44384761347)
+- Windows 修正后 Native 25/25，已核对真实 MSI 生成的旧配置、两份签名安装包及保留的 VNC journal。Linux 和 Windows 的 040、042、045 已在同一应用代码上分别通过。 [Windows 027](https://github.com/engcapa/taomni/actions/runs/44383149925) · [Windows 模块用例](https://github.com/engcapa/taomni/actions/runs/44377661324)
+- macOS 15 Intel Native 27/28，027、040、042、045 均通过，027、040、045 的落盘观察已核对。`TC-FILE-OPEN-012` 等待大 PNG 就绪超时，随后保存的同次失败页面显示图片已就绪。该用例 SHA 与先前 Intel 通过结果相同，两轮之间的应用改动仅涉及模块商店。原失败按无关问题记录。macOS 26 补跑的构建在分配 runner 前取消。 [Intel 复验](https://github.com/engcapa/taomni/actions/runs/44384761347) · [前一轮 Intel](https://github.com/engcapa/taomni/actions/runs/44361591364)
+- macOS 15 ARM64 Native 28/28，包含四个模块用例及 24 项崩溃回归。核对了 027、040、045 的原生观察文件与 runner 回执，其中两份签名包的源码与构建一致，卸载后 Hello 版本指针为空且 MFA 仍为原版本。027 首装前后的 VNC 待迁移日志和历史资料摘要一致。 [ARM64 复验](https://github.com/engcapa/taomni/actions/runs/44395986321)
+- `dd96c7ed8` 和 `b8703e908` 让正式发布在签名前以已发布的签名目录核对首装名单，新目录继承名单并使用更高序号。首份正式目录要求全部随首发交付的模块进入名单。核心单独发布时保留已签名目录和既有模块 URL。GitHub 发布契约 18 项 Rust、28 项 Node 均通过。 [发布契约](https://github.com/engcapa/taomni/actions/runs/44393439596) · [发布指引](../scripts/plugin-package/README.md#production-catalog-preparation)
+- Linux deb、RPM 和 AppImage 的 `noexec` 恢复通过。以 `c660c6bb6` 的候选 deb 和匹配的已验签 MFA 包完成升级、回退和重装。三种格式均显示拒绝启动模块和恢复指引，在新 `XDG_DATA_HOME` 使用原口令、读取账号并推进 HOTP。各核对 14 项复制输入、原资料摘要、历史 LanChat 文件和挂载清理。RPM 在 Ubuntu 上由 `rpm` 安装，AppImage 使用其 `extract-and-run` 模式。 [三种安装格式](https://github.com/engcapa/taomni/actions/runs/44405163808)
+
 2026-11-18 再次 fetch 并合并 `origin/main`。远程仍为 `5fabcdd32`，当前分支已包含该提交，合并无冲突。
 
 `e7270860e` 新增 `TC-MODULES-038`。准备与候选源码和 macOS 架构匹配的正式签名 MFA 包，经正常设置页提交和退出后观察新进程。断言涵盖错密码、已提交的 journal、模块启用状态、原账户及 HOTP 续号。设置页的拒绝与文件选择仍由 036/037 覆盖。使用 macOS 15 Intel release QA 执行 browser、native 和完整 crash-regression，分片完成即下载。 [签名重启专项 #44238711034](https://github.com/engcapa/taomni/actions/runs/44238711034)
@@ -337,7 +352,7 @@
 | TASK-020 截图 OCR/录制 | 待前置闭合 | OCR/录制插件；截图入口、滚动截图与采集保持核心归属。 |
 | TASK-021 本地语音 | 待前置闭合 | 本地 ASR/FIM 引擎和模型插件；云 ASR/麦克风保持核心归属。 |
 | TASK-022 Mobile | 待 M0 决策 | 按 DEC-2 默认暂缓排期；M0 末提供 go/no-go 与公开例外，不能默认为已交付。 |
-| TASK-023 发布验收 | 已接入候选包目录签名与正式发布终检 | 发布终检覆盖已暂存模块的签名、声明平台、描述和摘要。尚需接入正式模块构建矩阵与独立模块发布，完成系统签名、首批目录、核心版和完整插件版回归及性能。 |
+| TASK-023 发布验收 | 目录签名、首装名单和独立模块发布准备已验证 | 发布工具覆盖已暂存模块的签名、声明平台、描述和摘要。核心发布继承签名目录，独立发布保留原模块的资产地址。正式模块构建矩阵、系统签名、首批目录及最终两种安装集合的回归和性能仍待交付。 |
 | TASK-024 入口/profile 协同 | 核心与宿主所有权已接入，完整入口矩阵待闭合 | GUI/headless bootstrap、ModeLease、可重试退出、宿主 ProfileUseLease/PluginDataLease、正常重启/静默与 writer lease 已有进程/native 证据；所有真实业务/re-exec 入口迁出和 G11 全矩阵未完成。 |
 | TASK-025 密钥/一致快照 | A–G 基础已有契约/native 证据；H/I 迁移未完成 | [实施方案](taomni-modular-vault-services-plan.md)的 Vault 协调、宿主一致快照、离线 v2 和三态正常重启已逐批验证；macOS 15 Intel 的真实确认自动 relaunch 三态也已通过，ARM64 新轮待完成，Linux/Windows 自动接管尚未实现。这些 UI 仍使用核心 MFA；真实 MFA 宿主切换后的三态、legacy v1 alias/已安装升级与最终验收仍未完成。 |
 

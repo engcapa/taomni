@@ -7,7 +7,7 @@
 - 目标读者：Taomni 维护者 / 实现者 / 评审者
 - 状态：部分可实施。§13.1 的用户决策有效；M0 基线、契约冻结、宿主验证和共享能力下沉可立即开始，M2 插件迁移必须等待 §5.0 的 G1–G11 全部通过。v1.4 修正了过期基线、插件数量表述、核心依赖隔离遗漏、前端安全边界、数据迁移幂等性和发布例外规则，并新增 TASK-001–TASK-023、AC-001–AC-014、V-001–V-010。v1.5 按新代码更正 MFA 采集、前端 lazy 现状等结论，补充文件查看器、移动端桌面远控与 headless、re-exec 入口、插件数据密钥与备份快照、crash-regression 插件依赖等遗漏，新增 S11–S15、G11、TASK-024/025、AC-015/016、V-011。
 
-当前分支实现进度：插件 API/注册表、版本目录、真实签名安装门、宿主监督、原生下载与设置页离线安装已集成；共享采集和 RDP 公共库已下沉，实际验证范围见[实施与验收台账](taomni-modular-split-progress.md)。生产升级当前只记录只读预检、源指纹和安全 pending journal；测试专用 staging/回滚执行器不代表真实旧版升级已实现。官方签名远端商店正在接入，实际业务迁出、核心状态与依赖闭包、真实 exporter、业务插件迁移和完整发布验收仍按 §10.1 推进。可复现的 TASK-001 起点记录在 `docs-feature/taomni-modular-split-baseline-20261115.md`。
+当前分支已集成插件注册表、版本化安装、宿主监督、签名远端商店、原生下载和离线安装。共享采集与 RDP 公共库已下沉。从正式 `0.5.10` 升级的验证覆盖安装包替换和回退、签名目录自动首装及 MFA 数据迁移，其余业务数据仍记录待迁移。后续更新以模块的实际安装版本为依据，新模块由用户选装。正式首批目录、剩余业务迁出、核心依赖裁剪和发布验收按 §10.1 推进。 [实施与验收台账](taomni-modular-split-progress.md) · [基线记录](taomni-modular-split-baseline-20261115.md)
 
 > 一句话：Taomni 从“一个安装包打全部功能”改成“核心默认安装 + 插件独立打包发布”。第一版不做 P0 多 profile 打包的过渡态，直接做 P1 真插件 + 模块商店；首发目标是全部有效非核心模块，按受控例外规则发布。
 
@@ -562,7 +562,7 @@ v1.2 的方案是：每个插件是 `crate-type = ["cdylib", "rlib"]` 的 Cargo 
 | G10 | RPC 契约、超时、取消和重复请求 | 握手版本不兼容、未声明命令、未授权权限、超时、宿主崩溃、重复 request id 均得到稳定错误码；取消后宿主和 loopback WS 不再持有该请求资源 |
 | G11 | 多进程 profile 协同与入口模式（v1.5） | 宿主与 `ProfileLease` / `ModeLease` 协同：备份还原前所有宿主静默并释放文件锁；`--headless` 与 GUI 共享 profile 时宿主不重复启动或有明确错误；迁出的 re-exec 入口（`--vnc-special-key-hook`、`--sockscap-redirector-bridge`）由宿主二进制承载且核心-only 二进制不再含其代码（S11、S13、S15） |
 
-G4 的 Linux 恢复策略：每次启动/监督重启前检查已验签宿主所在文件系统的实际 `ST_NOEXEC`。拒绝时返回 `MODULE_HOST_NOEXEC` 与协议 `PermissionDenied`，UI 展示具体路径及可执行数据目录建议；不启动进程、不修改已安装包/active 版本/业务数据，也不自动复制到临时目录或重挂载用户文件系统。用户可在正常退出并备份当前受支持的 profile 数据后，将这些数据复制到允许执行、归当前用户所有的文件系统，保留原应用标识目录结构，再以新的 `XDG_DATA_HOME` 启动；原 profile 保留以便恢复。已退出产品范围的 `lanchat.sqlite` / `lanchat.db` 必须留在原位置，工具不读取、不复制、不迁移、不删除这些历史库。核心的 deb/rpm/AppImage 启动器均遵循同一 Linux 数据目录规则，实际三种格式及完整 profile 搬迁仍须分别取得安装证据，不能用隔离 QA 二进制代替。`TC-MODULES-024` 只对 run-owned 的已验签 hello 版本施加/移除 noexec bind fault，验证可诊断拒绝、字节不变和恢复后原数据可读写；轻量 host gate 另外验证 hello 与真实 MFA 的相同字节在显式可执行替代目录可用，测试不自动把 G4 标为完成。
+G4 的宿主启动和监督重启先检查已验签宿主所在文件系统的 `ST_NOEXEC`。受限时返回 `MODULE_HOST_NOEXEC` 和协议 `PermissionDenied`，并显示实际路径和恢复指引。用户正常退出并备份后，将受支持的数据复制到允许执行且归自己所有的文件系统，保留应用标识目录结构，再通过新的 `XDG_DATA_HOME` 启动。原数据和历史 LanChat 库保留在原位置。`TC-MODULES-024` 检查挂载限制、真实宿主拒绝和卸载限制后的读写恢复。正式格式的 QA 候选 deb、RPM 和 AppImage 均验证了可执行目录搬迁及原 MFA 数据读写。 [Linux 安装验证](taomni-modular-installed-upgrade-verification.md#linux-安装格式的-noexec-恢复)
 
 **备选方案（DEC-1 选项 B）**：进程内 cdylib，但边界收窄为 `extern "C"` 的单入口 `taomni_plugin_call(json) -> json` + 事件回调，加 `libloading` 手写加载器、macOS 加 `disable-library-validation` 并确认签名身份一致、插件禁用 / 升级一律重启应用。它保留了低延迟与单进程，但保留了崩溃拖垮核心、无法热卸载的缺点，并要把 `Entitlements.plist` 放宽（安全面扩大）。v1.3 不推荐，仅在 G5 不通过时回到这里重议。
 

@@ -4,7 +4,7 @@
 
 Accepted as a design decision; M0 implementation is in progress. v1.6 is the current review revision, based on `7bc498b35` (Merge PR #813); it records the 2026-11-15 decision to remove LanChat completely. Plugin migration remains blocked until the G1–G11 feasibility gates pass. The executable plan is in `docs-feature/taomni-modular-split-design.md` §10.1.
 
-2026-11-18 实施快照：本分支已集成插件 API/registry、真实验签安装、生产宿主监督、共享采集与 RDP 公共库、CoreState/统一 bootstrap、原生后台下载、作用域 Vault/快照和升级预检，以及独立清单生成器。官方签名远端商店已接入并有测试目录的三端 native 证据，正式目录和独立业务更新/回滚尚未发布。hello-plugin 与 MFA SDK 宿主已有签名包/真实安装门证据，生产 MFA facade 和其他业务 owner 仍在核心。生产升级仍只记录安全 pending journal；真实 0.5.9 deb/MSI/DMG 输入的预检/保持数据已有证据，尚不代表生产 exporter、候选安装替换、staging/激活/回滚已完成。核心业务迁出、依赖闭包和最终发布门继续按[实施与验收台账](../docs-feature/taomni-modular-split-progress.md)推进，不能把基础契约通过视为完整交付。
+2026-11-19 实施快照。本分支已集成插件注册表、版本化签名安装、生产宿主监督、共享采集、RDP 公共库、原生后台下载及作用域 Vault 快照。正式 `0.5.10` 安装包替换与回退已在四个发布目标验证。签名 QA 目录覆盖旧配置自动首装、已装模块更新和新模块选装。MFA 迁移可提交到签名宿主，其余业务数据继续记录待迁移。正式模块目录、剩余业务迁出、核心依赖裁剪及发布验收继续推进。 [实施与验收台账](../docs-feature/taomni-modular-split-progress.md)
 
 验证按源码提交、用例、平台与构建身份记录在台账及原始 artifact 中。历史整库单测和旧 hosted run 不能替代后续修改的验证；无关失败须有具体依据才能单列忽略，本次引入的回归必须修复重跑。
 

@@ -67,6 +67,12 @@ The case retains signed inputs and `official-module-observations.jsonl` under
 the normal shard artifact, including restart integrity and uninstall results.
 Browser `TC-MODULES-006` continues to reject explicitly.
 
+Native `TC-MODULES-027` and `TC-MODULES-040` also request a signed first-upgrade
+catalog containing the Hello and MFA archives for the selected platform. The
+fixture records both package receipts, the download requests and the installed
+version pointers. The cases cover a real `0.5.10` profile and removal of one
+module followed by a normal restart.
+
 `qa-modular-mfa-install.yml`, also called by `qa-modular-upgrade.yml`, builds and
 signs MFA for all four targets, then runs three installed-registry/Vault process
 gates on Linux x86_64, Windows x86_64 and macOS arm64. A dedicated
@@ -82,7 +88,11 @@ trust, the final UI route and monolith upgrade remain separate acceptance work.
 ## Production catalog preparation
 
 For the first modular release, compose the complete catalog from all stable
-packages and set `MODULES_LEGACY_UPGRADE_IDS` to the first-release roster.
+packages and set `MODULES_LEGACY_UPGRADE_IDS` to the first-release roster. The
+release workflow requires each module in that catalog to be in the roster.
+For later core releases that include module packages, the workflow verifies
+the current public catalog and checks the roster before signing the new one.
+Those releases default to the published roster and advance past its sequence.
 
 For a module-only release, collect the current official `modules.json`,
 `modules.json.minisig` and the package and sidecar for every asset referenced

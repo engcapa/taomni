@@ -71,6 +71,12 @@ GitHub Linux runner 从已安装的 `0.5.10` 界面创建合成 MFA 账户，经
 
 GitHub Linux x64 已完成全程。候选源码 `c660c6bb68578e7943594fff33a2963af65f659a` 的 deb 来自构建资产 `14403262209`，SHA-256 为 `c65382dc50e7e7e20c276c26aabb5143eba9b6e761eab8cdf63177a522906544`。原位升级到 `0.5.11 amd64` 后，原口令解锁成功，HOTP 从 `287 082` 推进到 `359 152`。降级到 `0.5.10 amd64` 核对了原二进制指纹与原库 `287 082`。重装 `0.5.11` 再读取模块计数，得到 `359 152`。资料来自核对过的发布安装件和同一隔离 profile。 [实际安装和回滚 #44250423203](https://github.com/engcapa/taomni/actions/runs/44250423203)
 
+### Linux 安装格式的 noexec 恢复
+
+`package_relocation_linux=true` 在真实 deb 升级、回退和重装之后验证原生恢复。工作流使用 `package_signed_run` 取得候选源码匹配的已验签 MFA 资产，并从同一发布构建取得 RPM 和 AppImage。RPM 在 Ubuntu 上由 `rpm` 安装，使用已安装的发行版依赖。AppImage 使用其 `extract-and-run` 模式，X11 正常退出依据真实应用进程。
+
+三种格式各自在原配置目录应用 `noexec`。MFA 显示 `MODULE_HOST_NOEXEC`、受影响路径和 `XDG_DATA_HOME` 指引。正常退出后复制 14 项应用数据及已验签模块到可执行目录。新位置用原口令解锁，账号从 `359 152` 推进至 `969 429`。验证复核原始摘要、历史 LanChat 文件及挂载清理。 [验证 #44405163808](https://github.com/engcapa/taomni/actions/runs/44405163808)
+
 ### Windows MSI 与 macOS DMG 替换
 
 QA Modular Upgrade Contracts 使用 `package_upgrade_desktop=true` 运行已上传安装包的替换和回滚。`package_targets` 列出有产物的平台，例如 `windows-x86_64,darwin-x86_64`。输入包含 Release Bundle 的 run ID、完整源码 SHA 和候选版本。

@@ -126,9 +126,14 @@ process adapter and SDK. Matching UI run
 [#43936173592](https://github.com/engcapa/taomni/actions/runs/43936173592)
 passed all 50 steps of `TC-MODULES-024` on both Xvfb and Wayland, including
 signed installation, visible refusal, independent unchanged-data/active/hash
-observations, mount removal, and real read/write recovery. This closes the
-mount/adapter and isolated UI recovery experiments only; deb/rpm/AppImage
-installation and relocation of the supported profile remain unverified.
+observations, mount removal, and real read/write recovery. That batch covered
+the host adapter and the isolated QA app.
+
+The released-package build passed profile relocation using its deb, RPM and
+AppImage. The runner verified the noexec error, HOTP advance from the new
+profile, original file hashes and mount cleanup for each format. It installed
+the RPM on Ubuntu and launched the AppImage in extract-and-run mode.
+[Installation record](taomni-modular-installed-upgrade-verification.md#linux-安装格式的-noexec-恢复) · [GitHub verification](https://github.com/engcapa/taomni/actions/runs/44405163808)
 
 ## macOS G1 experiment and release boundary
 
