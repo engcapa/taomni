@@ -1,12 +1,13 @@
 id: TC-TAO-HOME-050
 title: Custom provider uses each protocol and native search reaches Responses
-description: Use the real Settings test path to send protocol-correct requests with a local test key. Persist Responses and authenticate
-  again from Vault after a WebView reload. The rendered answer and loopback server confirm the model limit, reasoning effort, and
+description: Use the real Settings test path to send protocol-correct requests with a local test key. Initialize Vault while saving
+  Responses and use the stored key after a WebView reload. The rendered answer and loopback server confirm the model limit, reasoning effort, and
   per-model web search.
 modes:
 - native
 covers:
 - F1.11
+- F12.1
 tags:
 - p1
 - regression
@@ -18,7 +19,6 @@ fixtures:
 timeout_sec: 250
 steps:
 - open: ${cfg.app.base_url}
-- vault_first_run: qa-new-features
 - click: '[data-testid="language-switcher"]'
 - click: '[data-testid="language-option-en"]'
 - click: '[data-testid="tao-home-dock-more"]'
@@ -73,6 +73,8 @@ steps:
 - click: '[data-testid="tao-settings-thinking"]'
 - click: '[data-testid="tao-settings-web"]'
 - click: '[data-testid="llm-providers-save"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- vault_first_run: qa-new-features
 - wait_for: '[data-testid="llm-providers-status"]'
 - reload_window: null
 - wait_for: '[data-testid="tao-home-composer-input"]:enabled'
@@ -92,8 +94,8 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Use the real Settings test path to send protocol-correct requests with a local test key. Persist Responses and
-      authenticate again from Vault after a WebView reload. The rendered answer and loopback server confirm the model limit, reasoning
+    requirement: Settings sends protocol-correct requests with a local test key. Configuring Vault allows the pending save to finish.
+      The stored key authenticates the request after reload. The rendered answer and loopback server confirm the model limit, reasoning
       effort, and per-model web search.
     actions:
     - 1
@@ -101,8 +103,8 @@ verification:
     - 3
     - 4
     - 5
-    - 6
-    - 8
+    - 7
+    - 9
     - 10
     - 11
     - 12
@@ -110,35 +112,42 @@ verification:
     - 14
     - 15
     - 16
-    - 17
+    - 19
     - 20
-    - 21
+    - 23
     - 24
-    - 25
+    - 27
     - 28
     - 29
     - 30
     - 31
-    - 32
-    - 36
+    - 33
+    - 35
     - 37
+    - 38
     checkpoints:
-    - step: 18
+    - step: 17
       expectation: Chat Completions receives the model and completion limit.
-    - step: 22
+    - step: 21
       expectation: Anthropic receives the proper messages request.
-    - step: 26
+    - step: 25
       expectation: Responses receives the non-streaming input and output limit.
-    - step: 38
-      expectation: Tao renders the streamed Responses answer.
+    - step: 32
+      expectation: Saving a new API key prompts for Vault setup.
+    - step: 34
+      expectation: Settings reports a successful save after Vault setup.
     - step: 39
+      expectation: Tao renders the streamed Responses answer.
+    - step: 40
       expectation: Responses streaming has the requested tool and reasoning configuration.
     results:
-    - 18
-    - 22
-    - 26
-    - 38
+    - 17
+    - 21
+    - 25
+    - 32
+    - 34
     - 39
+    - 40
   visual:
   - check: Toolbar and current content remain visible.
     method: manual
