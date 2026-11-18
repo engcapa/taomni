@@ -129,7 +129,8 @@ jobs:
         run: |
           extra=()
           if [[ "$VERIFY_RELOCATION" == true ]]; then
-            python -m unittest test_installed_mfa_profile
+            python -m unittest test_installed_mfa_profile test_installed_linux_formats
+            sudo apt-get install -y --no-install-recommends libfuse2t64 rpm
             extra+=(--verify-relocation)
           fi
           dbus-run-session -- xvfb-run -a -s '-screen 0 1920x1080x24 -nolisten tcp -noreset' \

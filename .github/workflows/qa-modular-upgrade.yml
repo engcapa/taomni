@@ -28,7 +28,7 @@ on:
         type: boolean
         default: false
       package_relocation_linux:
-        description: Also exercise the installed Linux deb with a noexec profile and relocate its data
+        description: Exercise noexec profile recovery through the Linux deb, RPM and AppImage
         type: boolean
         default: false
       package_signed_run:

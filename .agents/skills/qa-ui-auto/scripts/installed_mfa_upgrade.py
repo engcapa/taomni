@@ -9,12 +9,13 @@ import platform
 from types import SimpleNamespace
 
 from ci_desktop import Desktop
+from installed_linux_formats import appimage_binary, install_rpm, prepare_appimage
 from installed_mfa_profile import copy_profile
 from linux_noexec import NoExecBind, is_noexec
 from modular_bundle_inventory import digest, inventory
 from qa_ui_auto.fixtures.module_legacy_mfa import (
     ISSUER, PASSWORD, close_installed_desktop, commit_mfa_upgrade, desktop_action, desktop_environment, element,
-    installed_desktop, open_mfa, run_legacy_desktop, write_json,
+    installed_desktop, isolated_desktop, open_mfa, run_legacy_desktop, write_json,
 )
 from qa_ui_auto.fixtures.module_signed_archive import load_artifact
 from qa_ui_auto.legacy_install import linux_install
@@ -45,8 +46,14 @@ def inspect_accounts(ctx, executable, work, evidence, phase, code, *, next_code=
                 "selector": element("mfa-account-code"), "equals": next_code,
             })
         desktop_action(steps, "assert_no_runtime_errors", None)
-        return {"hotp": code, "nextHotp": next_code,
-                **close_installed_desktop(driver, session, executable)}
+        return {"hotp": code, "nextHotp": next_code, **close_verified_desktop(driver, session, executable)}
+
+
+def close_verified_desktop(driver, session, executable):
+    binary = executable
+    if executable.suffix == ".AppImage":
+        binary = appimage_binary(executable, driver.proc.pid)
+    return {"launchedBinarySha256": digest(binary), **close_installed_desktop(driver, session, binary)}
 
 
 def verify_relocation(ctx, candidate, work, profile, evidence, receipt):
@@ -72,7 +79,7 @@ def verify_relocation(ctx, candidate, work, profile, evidence, receipt):
                 desktop_action(steps, "assert_text", {"selector": selector, "contains": text})
             desktop_action(steps, "assert_count", {"selector": element("mfa-account-row"), "equal": 0})
             desktop_action(steps, "assert_no_runtime_errors", None)
-            result["blocked"] = close_installed_desktop(driver, session, candidate)
+            result["blocked"] = close_verified_desktop(driver, session, candidate)
         if {name: digest(profile / name) for name in tracked} != original:
             raise RuntimeError("Noexec startup changed the installed MFA code, pointer or data")
         result["files"] = copy_profile(profile, destination)
@@ -95,6 +102,30 @@ def verify_relocation(ctx, candidate, work, profile, evidence, receipt):
         finally:
             write_json(evidence, "installed-mfa-profile-relocation.json", result)
     return result
+
+
+def verify_other_formats(ctx, work, report, profile, bundle_dir, bundles, receipt):
+    formats = {}
+    for suffix in (".rpm", ".AppImage"):
+        label = suffix[1:].lower()
+        evidence = report / label
+        evidence.mkdir()
+        staged = work / label
+        _, destination = desktop_environment(staged / "desktop")
+        copy_profile(profile, destination)
+        package = bundle_dir / next(file["name"] for file in bundles["files"] if file["name"].endswith(suffix))
+        environment = {}
+        if suffix == ".rpm":
+            launcher = install_rpm(package, bundles["version"], evidence)
+            method = "rpm install on Ubuntu with resolved runtime dependencies"
+        else:
+            launcher = prepare_appimage(package, staged / "launch")
+            environment["APPIMAGE_EXTRACT_AND_RUN"] = "1"
+            method = "AppImage extract-and-run"
+        with isolated_desktop(environment):
+            result = verify_relocation(ctx, launcher, staged, destination, evidence, receipt)
+        formats[label] = {"method": method, "packageSha256": digest(package), **result}
+    return formats
 
 
 def replace_package(package, work, evidence, *, version, allow_downgrade=False):
@@ -162,6 +193,7 @@ def execute(args):
             stages["reopenModule"] = inspect_accounts(ctx, candidate, work, report, "candidate-reopen", "359 152")
             if args.verify_relocation:
                 stages["relocation"] = verify_relocation(ctx, candidate, work, profile, report, receipt)
+                stages["otherFormats"] = verify_other_formats(ctx, work, report, profile, args.candidate.resolve(), bundled, receipt)
             result["passed"] = True
     finally:
         write_json(report, "installed-mfa-upgrade.json", result)
