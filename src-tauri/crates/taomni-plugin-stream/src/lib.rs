@@ -68,4 +68,6 @@ fn error(code: ErrorCode, message: &'static str) -> RpcError {
 }
 
 #[cfg(test)]
+mod frame_transport;
+#[cfg(test)]
 mod tests;

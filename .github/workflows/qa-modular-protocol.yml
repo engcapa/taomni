@@ -139,3 +139,41 @@ jobs:
           name: modular-protocol-${{ runner.os }}-${{ runner.arch }}
           path: modular-protocol-evidence
           if-no-files-found: error
+
+  rdp-frame-transport:
+    name: RDP frame transport measurement (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-latest, macos-15]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.head }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri -> target
+          shared-key: modular-rdp-frames-${{ runner.os }}-${{ runner.arch }}
+      - name: Measure matched in-process and native host frame delivery
+        shell: bash
+        run: |
+          set -o pipefail
+          mkdir -p rdp-frame-evidence
+          git rev-parse HEAD > rdp-frame-evidence/source-sha.txt
+          rustc --version > rdp-frame-evidence/rustc-version.txt
+          printf '%s\n' "$RUNNER_OS" "$RUNNER_ARCH" > rdp-frame-evidence/runner.txt
+          export QA_MODULE_FRAME_REPORT="$GITHUB_WORKSPACE/rdp-frame-evidence/frames.json"
+          cargo test --release --manifest-path src-tauri/Cargo.toml -p taomni-plugin-stream --locked --lib \
+            frame_transport::compare_in_process_and_host -- --ignored --exact --nocapture \
+            2>&1 | tee rdp-frame-evidence/frame-transport.log
+          test -s rdp-frame-evidence/frames.json
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: modular-rdp-frames-${{ runner.os }}-${{ runner.arch }}
+          path: rdp-frame-evidence
+          if-no-files-found: error

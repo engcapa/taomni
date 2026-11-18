@@ -54,6 +54,24 @@ revocation. Continuous RDP flow control and a matched real `rdp-probe` baseline
 with raw frame/latency/throughput samples remain open. Passing the library's
 small payload checks cannot close those gates.
 
+## G5 frame transport measurement
+
+The registered `protocol_only=true` run measures two BGRA workloads on the
+same runner and release profile. Each route sends 30 warmup frames followed
+by 150 measured frames at 640×360/60 Hz and 1920×1080/30 Hz. Both routes use a
+single slot for the latest frame. For the host route, a child receives a
+private descriptor on stdin and authenticates on loopback using the native
+binary handshake. It reconstructs each full frame, checks the bytes and
+acknowledges the sequence before the sender takes the latest pending frame.
+
+The `modular-rdp-frames-*` artifact contains raw publication and delivery
+timestamps, replacement counts, delivered fps and p95 latency. The host
+timing includes the acknowledgement. This test uses fixed pixels and runs
+only in the Rust test harness. The end-to-end gate also requires the actual
+RDP capture and encoder path to meet the `rdp-probe` budgets with the host
+transport in place. `TC-RDPS-PERF-01-performance-budget` records the current
+in-process product baseline.
+
 ## `capture.still` service integration (2026-11-17, verification pending)
 
 The additive v1 service is `core/capture.still`, advertised as `capture.still`
