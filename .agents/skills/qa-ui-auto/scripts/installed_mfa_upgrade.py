@@ -26,7 +26,9 @@ def inspect_accounts(ctx, executable, work, evidence, phase, code, *, next_code=
         desktop_action(steps, "wait_for", element("vault-unlock-dialog"))
         desktop_action(steps, "fill", {"selector": element("vault-unlock-pw"), "value": PASSWORD})
         desktop_action(steps, "click", element("vault-unlock-confirm"))
-        desktop_action(steps, "assert_count", {"selector": element("vault-unlock-dialog"), "equal": 0})
+        desktop_action(steps, "wait_for", {
+            "selector": element("vault-unlock-dialog"), "state": "detached", "timeout_sec": 30,
+        })
         open_mfa(steps)
         desktop_action(steps, "assert_visible", element("mfa-account-row") + f'[data-issuer="{ISSUER}"]')
         desktop_action(steps, "assert_text_equals", {"selector": element("mfa-account-code"), "equals": code})

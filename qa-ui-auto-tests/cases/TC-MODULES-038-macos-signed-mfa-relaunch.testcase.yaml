@@ -49,7 +49,7 @@ steps:
 - wait_for: '[data-testid="vault-unlock-dialog"]'
 - fill: {selector: '[data-testid="vault-unlock-pw"]', value: qa-original-mfa-038}
 - click: '[data-testid="vault-unlock-confirm"]'
-- assert_count: {selector: '[data-testid="vault-unlock-dialog"]', equal: 0}
+- wait_for: {selector: '[data-testid="vault-unlock-dialog"]', state: detached, timeout_sec: 30}
 - click: '[data-testid="ribbon-settings"]'
 - wait_for: '[data-testid="settings-panel"]'
 - fill: {selector: '[data-testid="settings-search-input"]', value: module store}

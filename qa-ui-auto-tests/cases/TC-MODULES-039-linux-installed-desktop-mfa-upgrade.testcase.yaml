@@ -18,7 +18,7 @@ steps:
 - wait_for: '[data-testid="vault-unlock-dialog"]'
 - fill: {selector: '[data-testid="vault-unlock-pw"]', value: qa-installed-mfa-039}
 - click: '[data-testid="vault-unlock-confirm"]'
-- assert_count: {selector: '[data-testid="vault-unlock-dialog"]', equal: 0}
+- wait_for: {selector: '[data-testid="vault-unlock-dialog"]', state: detached, timeout_sec: 30}
 - click: '[data-testid="side-tab-tools"]'
 - wait_for: '[data-testid="sidebar-tools-panel"]'
 - click: '[data-testid="sidebar-tool-mfa"]'
