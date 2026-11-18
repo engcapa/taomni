@@ -5,6 +5,7 @@ import {
   commitWelcomeRunSnapshot,
   getWelcomeRunSnapshot,
   entryDisplayName,
+  snapshotEntriesFingerprint,
 } from "../lib/welcomeSessionResume";
 import type {
   ResumeIssue,
@@ -156,15 +157,12 @@ export function useWelcomeSessionResume(
         currentView.state === "succeeded" ||
         currentView.state === "partial" ||
         currentView.state === "failed";
-      // Re-entering Welcome must not drop an in-flight operation or a
-      // finished outcome for the same snapshot (design §4.2.4, AC-13). A
-      // genuinely newer snapshot (revision moved) still refreshes the entry.
-      const sameSnapshot =
-        incoming &&
-        recordRef.current &&
-        incoming.revision === recordRef.current.revision &&
-        incoming.batchId === recordRef.current.batchId;
-      if (!force && (operationActive || (showingOutcome && sameSnapshot))) {
+      // Restored tabs can be collected into a new run before Home is shown.
+      // A new revision or active tab alone does not change the restore targets.
+      const previous = recordRef.current;
+      const sameEntries = incoming && previous &&
+        snapshotEntriesFingerprint(incoming.entries, null) === snapshotEntriesFingerprint(previous.entries, null);
+      if (!force && (operationActive || (showingOutcome && sameEntries))) {
         if (incoming) {
           revisionRef.current = incoming.revision;
         }

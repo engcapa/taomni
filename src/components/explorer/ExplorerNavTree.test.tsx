@@ -2,12 +2,12 @@ import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-libra
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ExplorerNavTree } from "./ExplorerNavTree";
 import { setExplorerPreferences } from "./explorerPreferences";
-import { sftpListLocalDetailed, type FileEntry } from "../../lib/sftp";
+import { sftpListLocalDetailed, sftpLocalDrives, type FileEntry } from "../../lib/sftp";
 vi.mock("../../lib/sftp", async (original) => ({ ...await original<typeof import("../../lib/sftp")>(),
   sftpLocalDrives: vi.fn(async () => [{ id: "root", path: "/", label: "/" }]), sftpListLocalDetailed: vi.fn(),
 }));
 vi.mock("../../stores/workspacePlatformStore", () => ({ useWorkspacePlatformStore: (selector: (state: { workspaces: [] }) => unknown) => selector({ workspaces: [] }) }));
-const dir = (path: string): FileEntry => ({ path, name: path.split("/").at(-1)!, fileType: "dir", size: 0, mode: 0, mtime: 0, isHidden: false });
+const dir = (path: string): FileEntry => ({ path, name: path.split(/[\\/]/).at(-1)!, fileType: "dir", size: 0, mode: 0, mtime: 0, isHidden: false });
 const deferred = () => { let resolve!: (value: { entries: FileEntry[]; skippedCount: number; diagnostics: [] }) => void; const promise = new Promise<{ entries: FileEntry[]; skippedCount: number; diagnostics: [] }>((done) => { resolve = done; }); return { promise, resolve }; };
 beforeEach(() => {
   vi.clearAllMocks(); setExplorerPreferences({ expandedPaths: [], pinnedPaths: [], showHidden: false });
@@ -38,6 +38,44 @@ describe("Explorer lazy navigation tree", () => {
     await waitFor(() => expect(sftpListLocalDetailed).toHaveBeenCalledWith("/other"));
     expect(localStorage.getItem("taomni.explorer.view.v1")).toContain("/other");
   });
+
+  it("opens Windows branches when the listing and Explorer use different path separators and case", async () => {
+    const workspace = "D:\\Work";
+    const project = `${workspace}\\Project`;
+    const sibling = `${workspace}\\Other`;
+    vi.mocked(sftpLocalDrives).mockResolvedValueOnce([{ id: "d", path: "D:\\", label: "D:" }]);
+    vi.mocked(sftpListLocalDetailed).mockImplementation(async (path) => ({
+      entries: path === "D:/" ? [dir(workspace)] : path === "D:/work" ? [dir(project), dir(sibling)] : [],
+      skippedCount: 0,
+      diagnostics: [],
+    }));
+    setExplorerPreferences({ expandedPaths: ["d:/work/other"] });
+    render(<ExplorerNavTree home="" path="D:/work/PROJECT" dropPath={null} onNavigate={vi.fn()} onOpenExplorer={vi.fn()} onOpenTerminal={vi.fn()} />);
+    const node = (path: string) => screen.getAllByTestId("explorer-nav-node").find((item) => item.getAttribute("data-path") === path);
+    await waitFor(() => expect(node(project)).toHaveAttribute("aria-selected", "true"));
+    expect(node(sibling)).toHaveAttribute("aria-expanded", "true");
+    expect(sftpListLocalDetailed).toHaveBeenCalledTimes(4);
+    fireEvent.keyDown(node(sibling)!, { key: "ArrowLeft" });
+    expect(node(sibling)).toHaveAttribute("aria-expanded", "false");
+    expect(localStorage.getItem("taomni.explorer.view.v1")).not.toContain("d:/work/other");
+  });
+
+  it("retains branch state while hidden and loads the newly selected path when reopened", async () => {
+    const props = { home: "", path: "/home/qa", dropPath: null, onNavigate: vi.fn(), onOpenExplorer: vi.fn(), onOpenTerminal: vi.fn() };
+    const { rerender } = render(<ExplorerNavTree {...props} />);
+    const home = () => document.querySelector('[data-testid="explorer-nav-node"][data-path="/home"]');
+    await waitFor(() => expect(home()).toHaveAttribute("aria-expanded", "true"));
+    fireEvent.keyDown(home()!, { key: "ArrowLeft" });
+    expect(home()).toHaveAttribute("aria-expanded", "false");
+    rerender(<ExplorerNavTree {...props} hidden path="/other" />);
+    expect(screen.getByTestId("explorer-nav-tree")).not.toBeVisible();
+    expect(sftpListLocalDetailed).not.toHaveBeenCalledWith("/other");
+    rerender(<ExplorerNavTree {...props} path="/other" />);
+    expect(screen.getByTestId("explorer-nav-tree")).toBeVisible();
+    expect(home()).toHaveAttribute("aria-expanded", "false");
+    await waitFor(() => expect(sftpListLocalDetailed).toHaveBeenCalledWith("/other"));
+  });
+
   it("cleans up a pending directory read on unmount without state resurrection", async () => {
     const pending = deferred();
     vi.mocked(sftpListLocalDetailed).mockReturnValue(pending.promise);

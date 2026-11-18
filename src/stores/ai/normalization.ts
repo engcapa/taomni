@@ -1,4 +1,5 @@
 import { getLocale } from "../../lib/i18n";
+import { customProviderEndpoint } from "./customLlm";
 import { DEFAULT_CLAUDE_CODE_MODEL, DEFAULT_CODEX_MODEL, DEFAULT_CONFIG, DEFAULT_GROK_ACP_PROFILE } from "./defaults";
 import {
   type AcpBridgeConfig,
@@ -139,8 +140,14 @@ export function normalizeLlmProvider(provider: LlmProviderConfig): LlmProviderCo
     .map((key) => key ?? "")
     .filter((key) => key.trim() !== "");
   const apiKeys = configuredKeys.length > 0 ? configuredKeys : [provider.api_key ?? ""];
+  const custom = provider.custom;
   return {
     ...provider,
+    ...(custom ? {
+      base_url: customProviderEndpoint(provider.base_url, provider.runtime),
+      model: provider.model.trim(),
+      custom: { label: custom.label.trim(), models: custom.models.map((model) => ({ ...model, id: model.id.trim() })) },
+    } : {}),
     api_key: apiKeys[0] ?? "",
     api_keys: apiKeys,
     capabilities: {
@@ -184,7 +191,7 @@ export function isPlaintextVaultableKey(provider: LlmProviderConfig, key: string
     key.length > 0 &&
     !key.startsWith("vault:") &&
     provider.runtime !== "llama-server" &&
-    key !== "local"
+    (key !== "local" || provider.custom !== undefined)
   );
 }
 
@@ -193,6 +200,7 @@ export function isPlaintextAsrKey(key: string): boolean {
 }
 
 export function normalizeAiConfig(config: AiConfig): AiConfig {
+  const costThreshold = config.deepseek_app?.cost_confirm_threshold_usd ?? 0;
   const providers = {
     agnes: DEFAULT_CONFIG.llm.providers.agnes,
     anthropic: DEFAULT_CONFIG.llm.providers.anthropic,
@@ -269,7 +277,7 @@ export function normalizeAiConfig(config: AiConfig): AiConfig {
       title_enabled: config.deepseek_app?.title_enabled ?? true,
       voice_provider: config.deepseek_app?.voice_provider ?? "local",
       tts_voice: config.deepseek_app?.tts_voice ?? "stella",
-      cost_confirm_threshold_cny: Math.max(0, Number(config.deepseek_app?.cost_confirm_threshold_cny ?? 0.5)),
+      cost_confirm_threshold_usd: Number.isFinite(costThreshold) ? Math.max(0, costThreshold) : 0,
     },
   };
 }

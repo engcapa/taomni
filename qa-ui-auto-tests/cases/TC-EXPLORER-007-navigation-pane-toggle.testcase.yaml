@@ -1,0 +1,225 @@
+id: TC-EXPLORER-007
+title: Explorer navigation tree can collapse and restore layout and expanded branches
+description: Open a real Explorer path under legacy view preferences. Resize and expand a branch, collapse with a file
+  selected, navigate while hidden and restore the same tree width and branches. Check sharing across tabs and WebView
+  reload.
+modes:
+- browser
+- native
+covers:
+- F-EXPLORER-1
+tags:
+- p1
+- explorer
+- preferences
+- regression
+fixtures:
+- reset_db
+- explorer_files
+timeout_sec: 220
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-explorer-navigation-pane
+- seed_storage:
+    key: taomni.explorer.view.v1
+    value: '{"view":"details","preview":false,"navWidth":230}'
+- reload_window: null
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-file-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Control+l
+    macos_key: Meta+l
+- fill:
+    selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-address"]'
+    value: ${fixture.explorer_previews}
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-address"]'
+    key: Enter
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="notes.txt"]'
+- assert_attribute:
+    selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-navigation"]'
+    name: aria-expanded
+    equals: 'true'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-nav-node"]${fixture.explorer_previews_match}'
+- assert_attribute:
+    selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-nav-node"]${fixture.explorer_previews_match}'
+    name: aria-selected
+    equals: 'true'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-nav-node"]${fixture.explorer_previews_folder_match}'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-nav-node"]${fixture.explorer_previews_folder_match}'
+    key: ArrowRight
+- assert_attribute:
+    selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-nav-node"]${fixture.explorer_previews_folder_match}'
+    name: aria-expanded
+    equals: 'true'
+- drag_to:
+    from: '[data-testid="explorer-nav-resize"]'
+    by:
+      dx: 40
+- assert_localstorage:
+    key: taomni.explorer.view.v1
+    contains: '"navWidth":270'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="notes.txt"]'
+- press:
+    selector: '[data-testid="explorer-cmd-navigation"]'
+    key: Enter
+- assert_attribute:
+    selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-navigation"]'
+    name: aria-expanded
+    equals: 'false'
+- assert_not_visible: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-nav-tree"]'
+- assert_count:
+    selector: '[data-testid="explorer-nav-resize"]'
+    equal: 0
+- assert_attribute:
+    selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="notes.txt"]'
+    name: aria-selected
+    equals: 'true'
+- eval_readonly:
+    expression: document.querySelector('.ex-shell:focus-within .ex-main').clientWidth === document.querySelector('.ex-shell:focus-within
+      .ex-body').clientWidth
+    expect_truthy: true
+    timeout_sec: 6
+- screenshot: explorer-navigation-collapsed.png
+- dblclick: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="folder"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="child.txt"]'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-back"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="notes.txt"]'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-navigation"]'
+    key: Space
+- assert_attribute:
+    selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-navigation"]'
+    name: aria-expanded
+    equals: 'true'
+- assert_attribute:
+    selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-nav-node"]${fixture.explorer_previews_folder_match}'
+    name: aria-expanded
+    equals: 'true'
+- eval_readonly:
+    expression: Math.abs(document.querySelector('.ex-shell:focus-within .ex-nav').getBoundingClientRect().width - 270)
+      < 1.5
+    expect_truthy: true
+    timeout_sec: 6
+- screenshot: explorer-navigation-reopened.png
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-navigation"]'
+- assert_localstorage:
+    key: taomni.explorer.view.v1
+    contains: '"navVisible":false'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-newtab"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-file-row"][data-name="notes.txt"]'
+- assert_attribute:
+    selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-navigation"]'
+    name: aria-expanded
+    equals: 'false'
+- reload_window: null
+- wait_for: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-navigation"]'
+- assert_attribute:
+    selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-navigation"]'
+    name: aria-expanded
+    equals: 'false'
+- click: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-navigation"]'
+- assert_attribute:
+    selector: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-cmd-navigation"]'
+    name: aria-expanded
+    equals: 'true'
+- assert_visible: '[data-testid="explorer-tab"][data-active="true"] [data-testid="explorer-nav-tree"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: EXPLORER-NAVIGATION
+    requirement: Folder navigation can be hidden and restored from the toolbar without losing selection, real directory
+      navigation or the existing tree layout. The shared preference is persisted.
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 8
+    - 9
+    - 10
+    - 16
+    - 18
+    - 20
+    - 21
+    - 28
+    - 30
+    - 32
+    - 37
+    - 39
+    - 42
+    - 45
+    checkpoints:
+    - step: 12
+      expectation: A legacy preference opens the tree by default.
+    - step: 14
+      expectation: The tree selects the committed file-list directory.
+    - step: 17
+      expectation: The child branch is expanded by keyboard.
+    - step: 19
+      expectation: Pointer resizing stores the new tree width.
+    - step: 22
+      expectation: Enter toggles the pane even with a file selected.
+    - step: 23
+      expectation: The tree no longer renders in the viewport.
+    - step: 24
+      expectation: The tree resize handle leaves the layout.
+    - step: 25
+      expectation: Toggling preserves the selected file.
+    - step: 26
+      expectation: The file region fills the Explorer body.
+    - step: 29
+      expectation: Real navigation still works while collapsed.
+    - step: 33
+      expectation: Space restores the folder tree.
+    - step: 34
+      expectation: Previously expanded branches stay expanded.
+    - step: 35
+      expectation: The reopened tree restores its resized width.
+    - step: 38
+      expectation: The fold state is saved as an Explorer preference.
+    - step: 41
+      expectation: An additional Explorer tab uses the saved state.
+    - step: 44
+      expectation: The preference survives the normal WebView reload.
+    - step: 46
+      expectation: The reloaded Explorer still offers reopening.
+    - step: 47
+      expectation: The tree returns alongside the active file list.
+    - step: 48
+      expectation: Toggle, navigation and reload complete without runtime errors.
+    results:
+    - 12
+    - 14
+    - 17
+    - 19
+    - 22
+    - 23
+    - 24
+    - 25
+    - 26
+    - 29
+    - 33
+    - 34
+    - 35
+    - 38
+    - 41
+    - 44
+    - 46
+    - 47
+    - 48
+  visual:
+  - check: File area grows after collapse and the resized tree returns when reopened.
+    method: automated
+    reason: The geometry checks measure the actual panes and the screenshots retain each state.
+  native:
+  - check: Packaged WebView keyboard, pointer and real folder navigation.
+    method: automated
+    reason: Native runs read fixture directories from disk and verify the same app keyboard and overflow behavior across
+      WebViews.

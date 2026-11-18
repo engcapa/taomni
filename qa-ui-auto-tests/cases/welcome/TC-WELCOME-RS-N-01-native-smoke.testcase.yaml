@@ -4,15 +4,16 @@ description: 'V-10 Linux slice (design docs-feature/welcome-recents-session-rest
 
   §8). Fresh isolated app-data: the restore entry starts empty/disabled;
 
-  opening a real host local terminal through the Welcome directory entry
+  opening a real host local terminal from the Home toolbar
 
   produces a genuine WebKitGTK/PTY tab; the run-snapshot collector commits the
 
-  saved LocalShell tab into taomni.db, verified on disk after the case.
+  local terminal run and makes the restore action available when returning to Home.
 
   '
 covers:
 - F1.6
+- F1.11
 tags:
 - welcome
 - native-gate
@@ -40,13 +41,14 @@ steps:
     timeout_sec: 30
 - click: '[data-testid="nav-mode-home"]'
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="welcome-history-tab-directories"]'
+- click: '[data-testid="tao-home-history"]'
+- click: '[data-testid="tao-home-history-popover"] [data-testid="tao-home-history-tab-directories"]'
 - wait_for: '[data-testid="welcome-local-directories"]'
 - assert_visible: '[data-testid="welcome-local-directory"]'
 - assert_visible: '[data-testid="welcome-local-directory-filter"]'
 - screenshot: F1.6-native-welcome-directories.png
-- wait: 2
-- assert_visible: '[data-testid="welcome-restore-status"]'
+- press: Escape
+- wait_for: '[data-testid="welcome-restore-status"][data-state="available"]'
 - screenshot: F1.6-native-restore-state.png
 verification:
   review: reviewed
@@ -59,6 +61,8 @@ verification:
     - 6
     - 8
     - 10
+    - 11
+    - 16
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
@@ -70,19 +74,19 @@ verification:
       expectation: '{"wait_for": {"selector": "[data-testid=\"terminal-pane\"]", "timeout_sec": 30}}'
     - step: 9
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 11
-      expectation: '{"wait_for": "[data-testid=\"welcome-local-directories\"]"}'
     - step: 12
-      expectation: '{"assert_visible": "[data-testid=\"welcome-local-directory\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"welcome-local-directories\"]"}'
     - step: 13
+      expectation: '{"assert_visible": "[data-testid=\"welcome-local-directory\"]"}'
+    - step: 14
       expectation: '{"assert_visible": "[data-testid=\"welcome-local-directory-filter\"]"}'
-    - step: 16
-      expectation: '{"assert_visible": "[data-testid=\"welcome-restore-status\"]"}'
+    - step: 17
+      expectation: Home offers the snapshot after the real terminal is started.
     results:
-    - 11
     - 12
     - 13
-    - 16
+    - 14
+    - 17
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

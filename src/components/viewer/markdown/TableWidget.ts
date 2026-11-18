@@ -17,6 +17,8 @@ export class TableWidget extends WidgetType {
     if (!runtime || runtime.widget.context !== this.context || runtime.widget.table.rows.length !== this.table.rows.length || runtime.widget.table.align.length !== this.table.align.length) return false;
     runtime.widget = this;
     dom.dataset.tableFrom = String(this.from);
+    dom.dataset.markdownBlockFrom = String(this.from);
+    dom.dataset.markdownBlockLength = String(this.raw.length);
     dom.querySelectorAll<HTMLElement>("[data-cell-row]").forEach((cell) => {
       const row = Number(cell.dataset.cellRow), column = Number(cell.dataset.cellColumn);
       updateTableCellContent(cell, this.table.rows[row]?.[column] ?? "", this.context.readOnly);
@@ -30,6 +32,8 @@ export class TableWidget extends WidgetType {
     root.className = "fv-md-table-wrap";
     root.dataset.testid = "markdown-table-widget";
     root.dataset.tableFrom = String(this.from);
+    root.dataset.markdownBlockFrom = String(this.from);
+    root.dataset.markdownBlockLength = String(this.raw.length);
     root.addEventListener("click", event => {
       const anchor = event.target instanceof Element ? event.target.closest("a") : null;
       if (!anchor) return;
@@ -84,11 +88,13 @@ export class TableWidget extends WidgetType {
         const cell = document.createElement(rowIndex ? "td" : "th");
         updateTableCellContent(cell, cells[columnIndex] ?? "", this.context.readOnly);
         cell.setAttribute("contenteditable", this.context.readOnly ? "false" : "true");
-        cell.spellcheck = false;
-        cell.tabIndex = 0;
         cell.dataset.cellRow = String(rowIndex);
         cell.dataset.cellColumn = String(columnIndex);
         cell.style.textAlign = this.table.align[columnIndex] || "left";
+        row.append(cell);
+        if (this.context.readOnly) return;
+        cell.spellcheck = false;
+        cell.tabIndex = 0;
         cell.setAttribute("aria-label", label(`第 ${rowIndex + 1} 行，第 ${columnIndex + 1} 列`, `Row ${rowIndex + 1}, column ${columnIndex + 1}`));
         cell.onfocus = () => {
           activeRow = rowIndex; activeColumn = columnIndex;
@@ -140,12 +146,12 @@ export class TableWidget extends WidgetType {
           index = Math.min(index, (runtime.widget.table.rows.length + 1) * columns - 1);
           focusCell(Math.floor(index / columns), index % columns);
         };
-        row.append(cell);
       });
       (rowIndex ? body : head).append(row);
     });
     table.append(head, body);
-    root.append(tools, table);
+    if (!this.context.readOnly) root.append(tools);
+    root.append(table);
     root.addEventListener("focusout", () => queueMicrotask(() => { if (!root.contains(document.activeElement)) root.classList.remove("is-active"); }));
     return root;
   }

@@ -2,6 +2,7 @@
 // LLM receives plain text; it does not know about audio or ASR.
 
 pub mod anthropic;
+pub(crate) mod configured;
 pub mod gpu_detect;
 pub mod llama_server;
 pub mod model_catalog;

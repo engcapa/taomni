@@ -1,0 +1,183 @@
+id: TC-TAO-HOME-048
+title: USD cost threshold and local sources multiselect persist
+description: Check the default disabled threshold and a saved fractional dollar value. Toggle two existing sources in the compact
+  menu, test Escape focus, reload, and re-enable one source.
+modes:
+- native
+covers:
+- F1.11
+tags:
+- p1
+- regression
+- tao-home
+- settings
+fixtures:
+- reset_db
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-home-markdown-isolated
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- click: '[data-testid="tao-home-dock-more"]'
+- click: '[data-testid="tao-home-dock-settings"]'
+- wait_for: '[data-testid="tao-settings"]'
+- assert_attribute:
+    selector: '[data-testid="tao-settings-cost"]'
+    name: value
+    equals: '0'
+- assert_text:
+    selector: '[data-testid="tao-settings"]'
+    contains: USD $
+- assert_text:
+    selector: '[data-testid="tao-settings"]'
+    contains: $0 to skip
+- wait_for: '[data-testid="tao-privacy-summary"]'
+- assert_text:
+    selector: '[data-testid="tao-search-sources"]'
+    contains: 12/16
+- assert_attribute:
+    selector: '[data-testid="tao-search-sources"]'
+    name: aria-expanded
+    equals: 'false'
+- press:
+    key: Enter
+    selector: '[data-testid="tao-search-sources"]'
+- wait_for: '[data-testid="tao-search-sources-menu"]'
+- assert_count:
+    selector: '[data-testid="tao-search-source-sql"]:checked, [data-testid="tao-search-source-file_contents"]:not(:checked)'
+    equal: 2
+- click: '[data-testid="tao-search-source-file_contents"]'
+- assert_text:
+    selector: '[data-testid="tao-search-sources"]'
+    contains: 13/16
+- click: '[data-testid="tao-search-source-file_contents"]'
+- assert_text:
+    selector: '[data-testid="tao-search-sources"]'
+    contains: 12/16
+- click: '[data-testid="tao-search-source-sql"]'
+- wait_for: '[data-testid="tao-search-source-sql"]:not(:checked)'
+- click: '[data-testid="tao-search-source-groups"]'
+- assert_text:
+    selector: '[data-testid="tao-search-sources"]'
+    contains: 10/16
+- press: Escape
+- assert_attribute:
+    selector: '[data-testid="tao-search-sources"]'
+    name: aria-expanded
+    equals: 'false'
+- assert_count:
+    selector: '[data-testid="tao-search-sources"]:focus'
+    equal: 1
+- fill:
+    selector: '[data-testid="tao-settings-cost"]'
+    value: '0.25'
+- click: '[data-testid="llm-providers-save"]'
+- wait_for: '[data-testid="llm-providers-status"]'
+- reload_window: null
+- wait_for: '[data-testid="tao-home-host"]'
+- click: '[data-testid="tao-home-dock-more"]'
+- click: '[data-testid="tao-home-dock-settings"]'
+- wait_for: '[data-testid="tao-settings"]'
+- assert_attribute:
+    selector: '[data-testid="tao-settings-cost"]'
+    name: value
+    equals: '0.25'
+- assert_text:
+    selector: '[data-testid="tao-search-sources"]'
+    contains: 10/16
+- click: '[data-testid="tao-search-sources"]'
+- assert_count:
+    selector: '[data-testid="tao-search-source-sql"]:not(:checked), [data-testid="tao-search-source-groups"]:not(:checked)'
+    equal: 2
+- click: '[data-testid="tao-search-source-sql"]'
+- assert_text:
+    selector: '[data-testid="tao-search-sources"]'
+    contains: 11/16
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: USD
+    requirement: USD is shown with a zero default and fractional values survive reload.
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 14
+    - 21
+    - 23
+    - 25
+    - 28
+    - 29
+    - 33
+    - 34
+    checkpoints:
+    - step: 8
+      expectation: Default threshold is zero.
+    - step: 9
+      expectation: Input label names USD.
+    - step: 10
+      expectation: Zero is explained as skipping confirmation.
+    - step: 36
+      expectation: Fractional dollar threshold persisted.
+    results:
+    - 8
+    - 9
+    - 10
+    - 36
+  - id: PRIVACY
+    requirement: Keyboard opens and dismisses the checkbox list and separate preferences survive reload.
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 14
+    - 17
+    - 19
+    - 21
+    - 23
+    - 25
+    - 28
+    - 29
+    - 33
+    - 34
+    - 38
+    - 40
+    checkpoints:
+    - step: 16
+      expectation: Default-enabled SQL and opt-in contents have their correct states.
+    - step: 18
+      expectation: Snapshot contents can be explicitly opted in.
+    - step: 20
+      expectation: Turning the opt-in off restores the original enabled count.
+    - step: 24
+      expectation: Two selections update the count.
+    - step: 27
+      expectation: Escape restores trigger focus.
+    - step: 39
+      expectation: Two deselections are restored from the backend.
+    - step: 41
+      expectation: Re-enabling SQL changes only that source.
+    results:
+    - 16
+    - 18
+    - 20
+    - 24
+    - 27
+    - 39
+    - 41
+  native:
+  - check: SQLite-backed source preferences and native AI configuration
+    method: automated
+    reason: Browser preview does not expose local index preferences.
+  visual:
+  - check: Inspect the resulting controls and content in the case screenshots or WebView.
+    method: manual
+    reason: The automated checkpoints verify the semantic states independently.

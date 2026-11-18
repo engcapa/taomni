@@ -104,6 +104,30 @@ describe("useWelcomeSessionResume (V-07)", () => {
     }
   });
 
+  it("keeps the result when restored tabs are collected again and refreshes it for changed targets", async () => {
+    const initial = record([savedEntry("a")], "saved:a");
+    const recollected = { ...initial, revision: 4, batchId: "batch-2", activeIdentity: null };
+    const different = { ...recollected, revision: 5, entries: [savedEntry("b")] };
+    for (const snapshot of [initial, recollected, different]) {
+      resumeIpcMocks.getWelcomeRunSnapshot.mockResolvedValueOnce({ record: snapshot, legacyCandidate: null, issue: null });
+    }
+    const callbacks = makeCallbacks();
+    const { result, rerender } = renderHook(({ active }) => useWelcomeSessionResume(active, callbacks), {
+      initialProps: { active: true },
+    });
+    await waitFor(() => expect(result.current.view.state).toBe("available"));
+    act(() => result.current.startRestore());
+    await waitFor(() => expect(result.current.view.state).toBe("succeeded"));
+
+    rerender({ active: false });
+    await act(async () => rerender({ active: true }));
+    expect(resumeIpcMocks.getWelcomeRunSnapshot).toHaveBeenCalledTimes(2);
+    expect(result.current.view.state).toBe("succeeded");
+
+    await act(async () => result.current.refresh());
+    expect(result.current.view).toMatchObject({ state: "available", record: different });
+  });
+
   it("maps an unknown schema issue to the unavailable/schema state", async () => {
     resumeIpcMocks.getWelcomeRunSnapshot.mockResolvedValue({
       record: null,

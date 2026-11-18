@@ -160,6 +160,52 @@ describe("Explorer editing and shortcut ownership", () => {
 });
 
 describe("Explorer preferences and responsive preview", () => {
+  it("toggles folder navigation while preserving the file pane, selection and previous tree width", async () => {
+    const { root, list } = await mountShell();
+    const tree = screen.getByTestId("explorer-nav-tree");
+    const toggle = screen.getByRole("button", { name: "Folder navigation" });
+    const separator = screen.getByTestId("explorer-nav-resize");
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(toggle).toHaveAttribute("aria-controls", tree.id);
+
+    fireEvent.click(row("alpha.txt"));
+    expect(fireEvent.keyDown(toggle, { key: "Enter" })).toBe(true);
+    expect(native.openFile).not.toHaveBeenCalled();
+    act(() => setExplorerPreferences({ navWidth: 260 }));
+    pointer(separator, "pointerdown", { button: 0, clientX: 260 });
+    fireEvent.click(toggle);
+    pointer(window, "pointermove", { button: 0, clientX: 310 });
+
+    expect(toggle).toHaveFocus();
+    expect(toggle).toHaveAttribute("aria-expanded", "false");
+    expect(tree).not.toBeVisible();
+    expect(screen.queryByTestId("explorer-nav-resize")).toBeNull();
+    expect(screen.getByTestId("explorer-file-list")).toBe(list);
+    expect(root).toHaveAttribute("data-path", "/fixture");
+    expect(selection()).toEqual(["/fixture/alpha.txt"]);
+    expect(getExplorerPreferences().navWidth).toBe(260);
+    expect(localStorage.getItem("taomni.explorer.view.v1")).toContain('"navVisible":false');
+
+    fireEvent.click(toggle);
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    expect(tree).toBeVisible();
+    expect(screen.getByTestId("explorer-nav-tree")).toBe(tree);
+    expect(getExplorerPreferences().navWidth).toBe(260);
+  });
+
+  it("uses the released width when deciding whether the preview fits", async () => {
+    const { root } = await mountShell();
+    setWidth(790);
+    expect(root).toHaveAttribute("data-preview-collapsed", "true");
+    const toggle = screen.getByTestId("explorer-cmd-navigation");
+    fireEvent.click(toggle);
+    expect(root).toHaveAttribute("data-preview-collapsed", "false");
+    expect(screen.getByTestId("explorer-preview")).toBeVisible();
+    fireEvent.click(toggle);
+    expect(root).toHaveAttribute("data-preview-collapsed", "true");
+    expect(getExplorerPreferences().preview).toBe(true);
+  });
+
   it("shares hidden/sort/view preferences across independent tabs without remounting lists", async () => {
     const first = await mountShell();
     const second = await mountShell({ tabId: "second-shell" });

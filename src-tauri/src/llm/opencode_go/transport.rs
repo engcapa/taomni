@@ -36,6 +36,7 @@ pub struct MappedProvider {
     pub model: String,
     pub headers: HeaderMap,
     pub google: bool,
+    pub configured_model: Option<crate::ai::config::CustomLlmModel>,
 }
 impl MappedProvider {
     fn url(&self, stream: bool) -> LlmResult<String> {
@@ -74,11 +75,20 @@ impl MappedProvider {
         tools: &[ChatTool],
         stream: bool,
     ) -> LlmResult<reqwest::Response> {
-        let body = if self.google {
+        let mut body = if self.google {
             google::request_body(req, tools)
         } else {
             responses::request_body(&self.model, req, tools, stream)
         };
+        if let Some(model) = &self.configured_model {
+            model.apply_request_options(
+                "openai-responses",
+                &mut body,
+                req.max_tokens.unwrap_or(model.max_output_tokens),
+                model.reasoning_efforts.first().map(String::as_str),
+                false,
+            );
+        }
         let builder = self
             .client
             .post(self.url(stream)?)
@@ -117,7 +127,7 @@ impl Llm for MappedProvider {
                     .is_some_and(|reason| !matches!(reason, "STOP" | "MAX_TOKENS"))
             })
         });
-        if value.get("error").is_some()
+        if !value["error"].is_null()
             || matches!(value["status"].as_str(), Some("failed" | "incomplete"))
             || value["promptFeedback"]["blockReason"].is_string()
             || blocked_candidate

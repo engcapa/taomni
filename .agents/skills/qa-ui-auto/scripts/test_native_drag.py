@@ -75,6 +75,19 @@ class NativeDragTest(TestCase):
                 self.assertEqual(len(sources[0]["actions"]), len(sources[1]["actions"]))
                 self.assertEqual(session.request.call_args_list[-1].args[0], "DELETE")
 
+    def test_appkit_drag_queues_mouse_events_once_and_requires_trusted_delivery(self):
+        with TemporaryDirectory() as directory:
+            session = Mock()
+            session.endpoint.side_effect = lambda path: path
+            self.points.return_value = ((8, 9), (20, 9), 2)
+            session.execute.side_effect = [True, False, True, {"events": []}]
+            with patch("qa_ui_auto.native_drag.platform.system", return_value="Darwin"):
+                VERBS["drag_to"](SimpleNamespace(session=session, case_dir=Path(directory)),
+                                 {"from": "strong", "to": "code", "macos_appkit": True})
+            session.request.assert_called_once_with("POST", "/qa/appkit-drag", {"points": [[8, 9], [14, 9], [20, 9]]})
+            self.assertIn("event.isTrusted", session.execute.call_args_list[1].args[0])
+            self.assertEqual(session.execute.call_count, 4)
+
     def test_unprepared_target_cannot_be_reported_as_a_delivered_native_drag(self):
         with TemporaryDirectory() as directory:
             session = Mock()

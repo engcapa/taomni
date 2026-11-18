@@ -3,7 +3,7 @@ pub mod google;
 pub mod responses;
 #[cfg(test)]
 pub(crate) mod test_gateway;
-mod transport;
+pub(super) mod transport;
 
 use crate::llm::{ChatRequest, ChatResponse, ChatStreamEvent, ChatTool, Llm, LlmError, LlmResult};
 use async_trait::async_trait;
@@ -155,6 +155,7 @@ impl OpenCodeGoProvider {
                 model: model.into(),
                 headers,
                 google: protocol == "google",
+                configured_model: None,
             }),
         };
         Ok((provider, entry.is_none()))

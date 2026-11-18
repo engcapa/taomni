@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { EditorView, type ViewUpdate } from "@codemirror/view";
+import { findNext, findPrevious, getSearchQuery, openSearchPanel, searchPanelOpen, setSearchQuery } from "@codemirror/search";
+import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
+import { tags } from "@lezer/highlight";
 import { ListTree } from "lucide-react";
 import type { ViewerDocument } from "../../../lib/viewer";
 import { useDocumentStore } from "../../../stores/documentStore";
@@ -7,6 +10,9 @@ import { useFileOpenPreferences } from "../../../lib/openFile/preferences";
 import { markdownDirectory, resolveMarkdownAsset } from "../../../lib/markdownAssets";
 import { openExternalUrl } from "../../../lib/sftp";
 import { openExplorer } from "../../../lib/explorer/openExplorer";
+import { codeHighlightStyle } from "../../../lib/codeViewTheme";
+import { getAppPlatform } from "../../../lib/runtime";
+import { createWorkspaceSearchPanel, openWorkspaceReplacePanel, WORKSPACE_SEARCH_STYLE } from "../../editor/workspace/editorSearchPanel";
 import { EditorSurface } from "../EditorSurface";
 import { useViewerLabels } from "../viewerLabels";
 import { liveMarkdown } from "./liveMarkdown";
@@ -22,11 +28,20 @@ import { MarkdownSplit } from "./MarkdownSplit";
 import { PreviewAppearanceControl, previewThemeStyle, usePreviewTheme, type PreviewAppearance } from "./PreviewAppearance";
 import { MarkdownDiagramActions } from "./MarkdownDiagramActions";
 import { MarkdownDrawioImport } from "./MarkdownDrawioImport";
+import { markdownSearchHighlights } from "./markdownSearchHighlights";
 import "./markdown.css";
 
-export function MarkdownEditor({ document: current, onError, owner, requestedMode, onModeChange }: {
+const markdownHighlighting = syntaxHighlighting(HighlightStyle.define([
+  ...codeHighlightStyle.specs,
+  { tag: tags.processingInstruction, class: "fv-md-syntax-marker" },
+  { tag: tags.monospace, color: "var(--taomni-code-syntax-string)" },
+  { tag: tags.strikethrough, textDecoration: "line-through" },
+]));
+
+export function MarkdownEditor({ document: current, onError, owner, requestedMode, onModeChange, active }: {
   document: ViewerDocument; onError: (message: string) => void; owner?: MarkdownDocumentOwner;
   requestedMode?: MarkdownMode; onModeChange?: (mode: MarkdownMode) => void;
+  active?: boolean;
 }) {
   const label = useViewerLabels();
   const [mode, setMode] = useState<MarkdownMode>(requestedMode ?? "live");
@@ -86,9 +101,39 @@ export function MarkdownEditor({ document: current, onError, owner, requestedMod
     setHeading(/^#{1,6}\s/.exec(line.text)?.[0].trim().length || 0);
     setSlash(!update.state.readOnly && line.text === "/" && head === line.to ? line.from : null);
   }), []);
-  const extensions = useMemo(() => [input, shortcuts, listener, ...(mode === "live" ? [liveMarkdown(context, focus)] : [])],
+  const extensions = useMemo(() => [input, shortcuts, listener, markdownHighlighting, WORKSPACE_SEARCH_STYLE,
+    ...(mode === "live" ? [liveMarkdown(context, focus), markdownSearchHighlights] : [])],
     [input, shortcuts, listener, mode, context, focus]);
   const onView = useCallback((view: EditorView | null) => { editor.current = view; }, []);
+  const handleFindKey = useCallback((event: KeyboardEvent | React.KeyboardEvent) => {
+    const view = editor.current;
+    const native = "nativeEvent" in event ? event.nativeEvent : event;
+    if (!view || event.defaultPrevented || native.isComposing || event.altKey) return;
+    const key = event.key.toLowerCase();
+    const mod = getAppPlatform() === "macos" ? event.metaKey && !event.ctrlKey : event.ctrlKey && !event.metaKey;
+    const target = event.target instanceof Element ? event.target : null;
+    if (target?.closest("input,textarea,select,[contenteditable=true]") && !view.dom.contains(target)) return;
+    if (mod && !event.shiftKey && (key === "f" || key === "r")) {
+      const previousQuery = getSearchQuery(view.state);
+      if (key === "r") openWorkspaceReplacePanel(view);
+      else openSearchPanel(view);
+      if (previousQuery.search && !previousQuery.eq(getSearchQuery(view.state))) {
+        view.dispatch({ effects: setSearchQuery.of(previousQuery) });
+      }
+    } else if (key === "f3" && !event.ctrlKey && !event.metaKey && searchPanelOpen(view.state)) {
+      (event.shiftKey ? findPrevious : findNext)(view);
+    } else return;
+    event.preventDefault();
+    event.stopPropagation();
+  }, []);
+  useEffect(() => {
+    if (!active) return;
+    const handleUnfocused = (event: KeyboardEvent) => {
+      if (event.target === document.body) handleFindKey(event);
+    };
+    window.addEventListener("keydown", handleUnfocused);
+    return () => window.removeEventListener("keydown", handleUnfocused);
+  }, [active, handleFindKey]);
   useEffect(() => {
     setPasteStatus(""); setSlash(null); imageRange.current = null; setPosition(0); setEditing(false);
   }, [current.key]);
@@ -103,13 +148,13 @@ export function MarkdownEditor({ document: current, onError, owner, requestedMod
     else if (action === "image") chooseImage();
     else formatMarkdown(view, action);
   };
-  return <div ref={root} className={`fv-markdown ${focus ? "fv-md-focus" : ""}`} data-testid="markdown-editor" data-mode={mode} data-editing={mode !== "live" || editing}>
+  return <div ref={root} className={`fv-markdown ${focus ? "fv-md-focus" : ""}`} data-testid="markdown-editor" data-mode={mode} data-editing={mode !== "live" || editing} onKeyDownCapture={handleFindKey}>
     <div className="fv-bar fv-md-toolbar">
       <MarkdownToolbar view={() => editor.current} readOnly={effectiveReadOnly} mode={mode} focus={focus} outline={outline} heading={heading}
-        onMode={changeMode} onFocus={() => setFocus(!focus)} onOutline={() => setOutline(!outline)} onImage={chooseImage} />
+        onMode={changeMode} onFocus={() => setFocus(!focus)} onOutline={() => setOutline(!outline)} onImage={chooseImage}
+        drawioImport={<MarkdownDrawioImport key={current.key} view={() => editor.current} readOnly={effectiveReadOnly} onError={report} />} />
       {mode === "live" && <button className="fv-button outline" data-testid="markdown-live-edit" aria-pressed={editing} disabled={current.readOnly || current.truncated}
         onClick={() => setEditing(!editing)}>{editing ? label("完成编辑", "Done editing") : label("编辑", "Edit")}</button>}
-      <MarkdownDrawioImport key={`drawio-import:${current.key}`} view={() => editor.current} readOnly={effectiveReadOnly} onError={report} />
       <PreviewAppearanceControl value={appearance} onChange={setAppearance} />
       <MarkdownExportMenu key={`export:${current.key}`} document={current} onError={report} printRequest={printRequest} onExport={owner?.onExport} />
     </div>
@@ -129,7 +174,8 @@ export function MarkdownEditor({ document: current, onError, owner, requestedMod
       <div className="fv-md-main" data-testid={`markdown-${mode}`} tabIndex={-1}>
       <MarkdownSplit enabled={mode === "split"}>
         <div className={`fv-md-editor-pane ${mode === "live" ? "fv-md-live-pane" : "fv-md-source-pane"}`} data-preview-theme={mode === "live" ? previewTheme : undefined} style={mode === "live" ? previewThemeStyle(previewTheme) : undefined}>
-          <EditorSurface document={surfaceDocument} extensions={extensions} onView={onView} onChange={owner?.onChange} onSave={save} className={mode === "live" ? "fv-md-live-surface" : "fv-md-source-surface"} />
+          <EditorSurface document={surfaceDocument} extensions={extensions} onView={onView} onChange={owner?.onChange} onSave={save}
+            className={mode === "live" ? "fv-md-live-surface" : "fv-md-source-surface"} nativeSelection={mode === "live" && effectiveReadOnly} createSearchPanel={createWorkspaceSearchPanel} />
           {slash !== null && <MarkdownInsertMenu from={slash} onInsert={insert} />}
         </div>
         {mode === "split" ? <MarkdownPreviewPane content={current.content} path={current.path} onError={report} theme={previewTheme} readImage={owner?.readImage} /> : null}
@@ -176,7 +222,7 @@ function MarkdownPreviewPane({ content, path, onError, theme, readImage }: { con
     void enhancements.then(() => { if (appearanceOnly) replace(); }).catch((error: unknown) => { if (!cancelled) onError(String(error)); });
     return () => { cancelled = true; };
   }, [content, path, onError, theme, readImage]);
-  return <div className="fv-md-preview-pane" data-testid="markdown-preview" data-preview-theme={theme} style={previewThemeStyle(theme)} onClick={(event) => {
+  return <div className="fv-md-preview-pane" data-testid="markdown-preview" data-preview-theme={theme} tabIndex={0} style={previewThemeStyle(theme)} onClick={(event) => {
     const anchor = (event.target as Element).closest("a");
     if (!anchor) return;
     event.preventDefault();
