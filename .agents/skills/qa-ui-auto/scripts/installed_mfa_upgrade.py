@@ -23,10 +23,11 @@ from qa_ui_auto.native_steps import NativeStepContext
 def inspect_accounts(ctx, executable, work, evidence, phase, code, *, next_code=None):
     with installed_desktop(ctx, executable, work / "desktop", evidence, phase) as (driver, session):
         steps = NativeStepContext(session, evidence, ctx.cfg)
-        open_mfa(steps)
         desktop_action(steps, "wait_for", element("vault-unlock-dialog"))
         desktop_action(steps, "fill", {"selector": element("vault-unlock-pw"), "value": PASSWORD})
         desktop_action(steps, "click", element("vault-unlock-confirm"))
+        desktop_action(steps, "assert_count", {"selector": element("vault-unlock-dialog"), "equal": 0})
+        open_mfa(steps)
         desktop_action(steps, "assert_visible", element("mfa-account-row") + f'[data-issuer="{ISSUER}"]')
         desktop_action(steps, "assert_text_equals", {"selector": element("mfa-account-code"), "equals": code})
         if next_code is not None:

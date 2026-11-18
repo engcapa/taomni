@@ -15,12 +15,13 @@ timeout_sec: 480
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: {selector: '[data-testid="welcome-panel"]', timeout_sec: 60}
-- click: '[data-testid="side-tab-tools"]'
-- wait_for: '[data-testid="sidebar-tools-panel"]'
-- click: '[data-testid="sidebar-tool-mfa"]'
 - wait_for: '[data-testid="vault-unlock-dialog"]'
 - fill: {selector: '[data-testid="vault-unlock-pw"]', value: qa-installed-mfa-039}
 - click: '[data-testid="vault-unlock-confirm"]'
+- assert_count: {selector: '[data-testid="vault-unlock-dialog"]', equal: 0}
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-mfa"]'
 - assert_visible: '[data-testid="mfa-account-row"][data-issuer="Installed MFA"]'
 - assert_text_equals: {selector: '[data-testid="mfa-account-code"]', equals: 287 082, timeout_sec: 30}
 - click: '[data-testid="mfa-account-hotp-next"]'
@@ -34,14 +35,14 @@ verification:
       The old installed desktop creates and advances a real encrypted account.
       After the signed offline migration, the candidate unlocks its original
       Vault, displays the migrated account, and advances the same HOTP counter.
-    actions: [3, 5, 7, 8, 11]
+    actions: [4, 5, 7, 9, 12]
     checkpoints:
-    - {step: 6, expectation: The candidate requests the original Vault password.}
-    - {step: 9, expectation: The issuer entered in the installed desktop is visible.}
-    - {step: 10, expectation: The candidate displays the exact legacy counter-one code.}
-    - {step: 12, expectation: The signed host generates the counter-two code.}
-    - {step: 13, expectation: The candidate emits no unhandled runtime errors.}
-    results: [9, 10, 12, 13]
+    - {step: 3, expectation: The candidate requests the original Vault password.}
+    - {step: 10, expectation: The issuer entered in the installed desktop is visible.}
+    - {step: 11, expectation: The candidate displays the exact legacy counter-one code.}
+    - {step: 13, expectation: The signed host generates the counter-two code.}
+    - {step: 14, expectation: The candidate emits no unhandled runtime errors.}
+    results: [10, 11, 13, 14]
   visual:
   - check: The original issuer and HOTP code are visible in the candidate application.
     method: automated

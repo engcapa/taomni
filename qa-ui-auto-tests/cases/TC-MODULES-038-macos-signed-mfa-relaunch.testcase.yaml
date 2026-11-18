@@ -46,6 +46,10 @@ steps:
 - fill: {selector: '[data-testid="module-upgrade-mfa-password"]', value: qa-original-mfa-038}
 - native_confirm_mfa_upgrade_relaunch: null
 - wait_for: {selector: '[data-testid="status-bar"]', timeout_sec: 60}
+- wait_for: '[data-testid="vault-unlock-dialog"]'
+- fill: {selector: '[data-testid="vault-unlock-pw"]', value: qa-original-mfa-038}
+- click: '[data-testid="vault-unlock-confirm"]'
+- assert_count: {selector: '[data-testid="vault-unlock-dialog"]', equal: 0}
 - click: '[data-testid="ribbon-settings"]'
 - wait_for: '[data-testid="settings-panel"]'
 - fill: {selector: '[data-testid="settings-search-input"]', value: module store}
@@ -55,9 +59,6 @@ steps:
 - click: '[data-testid="side-tab-tools"]'
 - wait_for: '[data-testid="sidebar-tools-panel"]'
 - click: '[data-testid="sidebar-tool-mfa"]'
-- wait_for: '[data-testid="vault-unlock-dialog"]'
-- fill: {selector: '[data-testid="vault-unlock-pw"]', value: qa-original-mfa-038}
-- click: '[data-testid="vault-unlock-confirm"]'
 - assert_visible: '[data-testid="mfa-account-row"][data-issuer="Signed Upgrade"]'
 - assert_text_equals: {selector: '[data-testid="mfa-account-code"]', equals: 287 082, timeout_sec: 30}
 - click: '[data-testid="mfa-account-hotp-next"]'
@@ -72,19 +73,19 @@ verification:
     checkpoints:
     - {step: 29, expectation: The wrong Vault password leaves the original UI open.}
     - {step: 32, expectation: The owned original process exits normally and the bridge attaches to its own new process.}
-    - {step: 37, expectation: Settings reports a committed MFA upgrade.}
-    - {step: 38, expectation: The committed profile has no remaining MFA migration action.}
-    results: [29, 32, 37, 38]
+    - {step: 41, expectation: Settings reports a committed MFA upgrade.}
+    - {step: 42, expectation: The committed profile has no remaining MFA migration action.}
+    results: [29, 32, 41, 42]
   - id: R2
     requirement: The signed host reads and updates the migrated encrypted account using its retained Vault key.
-    actions: [17, 19, 39, 40, 42, 44, 45, 48]
+    actions: [17, 19, 35, 36, 43, 44, 46, 49]
     checkpoints:
     - {step: 20, expectation: The legacy store has the counter-one RFC HOTP code.}
-    - {step: 46, expectation: The original issuer appears after Vault unlock.}
-    - {step: 47, expectation: The hosted account preserves the counter-one code.}
-    - {step: 49, expectation: Next returns the counter-two code from the signed host.}
-    - {step: 50, expectation: The relaunched UI has no unhandled runtime errors.}
-    results: [46, 47, 49, 50]
+    - {step: 47, expectation: The original issuer appears after Vault unlock.}
+    - {step: 48, expectation: The hosted account preserves the counter-one code.}
+    - {step: 50, expectation: Next returns the counter-two code from the signed host.}
+    - {step: 51, expectation: The relaunched UI has no unhandled runtime errors.}
+    results: [47, 48, 50, 51]
   visual:
   - check: Wrong password, successful result and the migrated account are visible in the actual application.
     method: automated
