@@ -2690,6 +2690,7 @@
 - `[data-testid="module-status-hello-plugin"]` — display — F-Modules-1.module-status-hello-plugin
 - `[data-testid="module-action-rollback-hello-plugin"]` — interactive — F-Modules-1.module-action-rollback-hello-plugin
 - `[data-testid="module-action-enable-hello-plugin"]` — interactive — F-Modules-1.module-action-enable-hello-plugin
+- `[data-testid="module-action-enable-mfa"]` — interactive [optional] — F-Modules-1.module-action-enable-mfa
 - `[data-testid="module-action-disable-hello-plugin"]` — interactive — F-Modules-1.module-action-disable-hello-plugin
 - `[data-testid="module-action-uninstall-hello-plugin"]` — interactive — F-Modules-1.module-action-uninstall-hello-plugin
 - `[data-testid="module-action-install-hello-plugin"]` — interactive — F-Modules-1.module-action-install-hello-plugin

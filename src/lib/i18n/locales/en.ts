@@ -2756,6 +2756,7 @@ const dict = {
     moduleUpgradeNone: "No legacy module data needs migration.",
     moduleUpgradeMigrate: "Migrate detected data",
     moduleUpgradeMfaOpen: "Migrate MFA from a signed package",
+    moduleUpgradeMfaInstalled: "Migrate data to the installed MFA module",
     moduleUpgradeMfaArchive: "MFA module package",
     moduleUpgradeMfaSignature: "Detached signature file",
     moduleUpgradeMfaPassword: "Original Vault password",

@@ -1,6 +1,10 @@
 """Fixed real-UI restore confirmation, process observation and bridge attachment."""
+import hashlib
 import json
+import sqlite3
+from contextlib import closing
 
+from .fixtures.module_download import plugin_root
 from .steps import StepError
 
 
@@ -25,13 +29,22 @@ def run(ctx, args):
 
 
 def run_mfa(ctx, args):
-    if args is not None or getattr(ctx.fixture_context, "case_id", None) != "TC-MODULES-038":
+    case_id = getattr(ctx.fixture_context, "case_id", None)
+    if args is not None or case_id not in {"TC-MODULES-038", "TC-MODULES-044"}:
         raise StepError("MFA upgrade relaunch requires its fixed native case")
     callback = getattr(ctx.session, "mfa_upgrade_relauncher", None)
     if not callable(callback):
         raise StepError("MFA upgrade relaunch requires its owned native bridge")
     try:
+        before = installed_mfa_state(ctx) if case_id == "TC-MODULES-044" else None
         callback()
+        if before is not None:
+            after = installed_mfa_state(ctx)
+            if before["targetPresent"] or not after["targetPresent"] or before["pointerSha256"] != after["pointerSha256"]:
+                raise StepError("MFA migration did not retain its preinstalled module pointer and publish its own database")
+            if before["legacyRowsSha256"] != after["legacyRowsSha256"]:
+                raise StepError("MFA migration changed the original encrypted records")
+            ctx.session.mfa_upgrade_relaunch_observation["installedPackage"] = {"before": before, "after": after}
         return "observed the successful native exit and reattached to the restarted application"
     except Exception as error:
         result = getattr(ctx.session, "mfa_upgrade_relaunch_observation", {})
@@ -41,3 +54,25 @@ def run_mfa(ctx, args):
     finally:
         result = getattr(ctx.session, "mfa_upgrade_relaunch_observation", {"passed": False})
         (ctx.case_dir / "native-mfa-upgrade-relaunch.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")
+
+
+def installed_mfa_state(ctx):
+    plugins = plugin_root(ctx)
+    pointer = (plugins / "mfa/active.json").read_bytes()
+    if json.loads(pointer).get("activeVersion") != "0.1.0":
+        raise StepError("Expected the QA signed MFA version to already be installed")
+    proof = plugins / "mfa/versions/0.1.0/.taomni-trust/package.taomni-plugin"
+    provenance = json.loads((ctx.case_dir / "signed-mfa/provenance.json").read_text(encoding="utf-8"))
+    if hashlib.sha256(proof.read_bytes()).hexdigest() != provenance["sha256"]:
+        raise StepError("Installed MFA package differs from its signed input receipt")
+    legacy = plugins.parent / "mfa.db"
+    with closing(sqlite3.connect(legacy.as_uri() + "?mode=ro", uri=True)) as db:
+        # A normal exit may checkpoint the WAL. Compare the encrypted records
+        # from the same logical database view, including any committed WAL rows.
+        db.execute("BEGIN")
+        legacy_rows = hashlib.sha256("\n".join(db.iterdump()).encode()).hexdigest()
+    return {
+        "pointerSha256": hashlib.sha256(pointer).hexdigest(),
+        "legacyRowsSha256": legacy_rows,
+        "targetPresent": (plugins / "mfa/data/mfa.db").is_file(),
+    }

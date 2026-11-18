@@ -325,6 +325,10 @@ controls:
   - id: module-action-enable-hello-plugin
     selector: '[data-testid="module-action-enable-hello-plugin"]'
     kind: interactive
+  - id: module-action-enable-mfa
+    selector: '[data-testid="module-action-enable-mfa"]'
+    kind: interactive
+    optional: true # TC-MODULES-044 checks the installed state before the consent and migration flow
   - id: module-action-disable-hello-plugin
     selector: '[data-testid="module-action-disable-hello-plugin"]'
     kind: interactive

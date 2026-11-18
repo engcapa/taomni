@@ -3,7 +3,7 @@
 
 use std::fs::{self, File};
 use std::io::{Read, Seek, SeekFrom, Write};
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 use tempfile::{NamedTempFile, TempDir};
 
@@ -16,6 +16,14 @@ use crate::plugin::ModuleManifest;
 const MAX_ARCHIVE_BYTES: u64 = 4 * 1024 * 1024 * 1024;
 const MAX_MANIFEST_BYTES: u64 = 2 * 1024 * 1024;
 const TRUST_DIR: &str = ".taomni-trust";
+
+pub(crate) fn installed_proof_paths(directory: &Path) -> (PathBuf, PathBuf) {
+    let proof = directory.join(TRUST_DIR);
+    (
+        proof.join("package.taomni-plugin"),
+        proof.join("signature.minisig"),
+    )
+}
 pub(super) const KNOWN_PERMISSIONS: [&str; 14] = [
     "vault.ref",
     "vault.session-secret",
@@ -318,7 +326,7 @@ pub(super) fn inspect_installed_with(
     }
     let proof = path.join(TRUST_DIR);
     reject_symlink(&proof)?;
-    let signature_path = proof.join("signature.minisig");
+    let (archive_path, signature_path) = installed_proof_paths(path);
     reject_symlink(&signature_path)?;
     if !fs::symlink_metadata(&signature_path)?.is_file() {
         return Err(invalid("signature proof must be a regular file"));
@@ -327,13 +335,7 @@ pub(super) fn inspect_installed_with(
     File::open(signature_path)?
         .take(16 * 1024 + 1)
         .read_to_string(&mut signature)?;
-    let verified = VerifiedPackage::prepare(
-        &proof.join("package.taomni-plugin"),
-        &signature,
-        platform,
-        verifier,
-        None,
-    )?;
+    let verified = VerifiedPackage::prepare(&archive_path, &signature, platform, verifier, None)?;
     archive::check_installed_tree(path, &verified.checksums)?;
     Ok(verified)
 }

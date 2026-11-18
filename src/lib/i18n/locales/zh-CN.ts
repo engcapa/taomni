@@ -2733,6 +2733,7 @@ export const zhCN: DeepPartial<typeof en> = {
     moduleUpgradeNone: "未检测到需要迁移的旧模块数据。",
     moduleUpgradeMigrate: "迁移检测到的数据",
     moduleUpgradeMfaOpen: "使用签名包迁移 MFA",
+    moduleUpgradeMfaInstalled: "将旧数据迁入已安装的 MFA 模块",
     moduleUpgradeMfaArchive: "MFA 模块包",
     moduleUpgradeMfaSignature: "分离签名文件",
     moduleUpgradeMfaPassword: "原 Vault 主密码",

@@ -333,7 +333,7 @@ export function executePluginMigration(fromVersion?: string): Promise<MigrationE
   return invoke<MigrationExecutionResult>("plugin_migration_execute", { fromVersion });
 }
 
-export function migrateMfaAndRestart(archive: string, signature: string, masterPassword: string): Promise<void> {
+export function migrateMfaAndRestart(archive: string | undefined, signature: string | undefined, masterPassword: string): Promise<void> {
   return invoke<void>("plugin_mfa_migrate_and_restart", { archive, signature, masterPassword });
 }
 

@@ -43,6 +43,8 @@ struct Transaction {
     target_fingerprint: String,
     source_fingerprint: String,
     pointer_existed: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    installed_pointer: Option<ActivePointer>,
     export_staging: String,
     #[serde(default)]
     enable_after_commit: bool,
@@ -55,11 +57,13 @@ impl Transaction {
     }
 
     fn active_pointer(&self) -> ActivePointer {
-        ActivePointer {
-            active_version: Some(self.package_version.clone()),
-            previous_version: None,
-            rollback_until: None,
-        }
+        self.installed_pointer
+            .clone()
+            .unwrap_or_else(|| ActivePointer {
+                active_version: Some(self.package_version.clone()),
+                previous_version: None,
+                rollback_until: None,
+            })
     }
 
     fn journal_committed(&self, journal: &MigrationJournal) -> Result<bool, String> {
@@ -156,10 +160,20 @@ fn commit_inner(
     }
     let installer = ModuleInstaller::new(root.join("plugins"));
     let pointer_existed = paths::file_exists(&root.join(POINTER))?;
-    if installer.active_pointer(OWNER).map_err(message)? != ActivePointer::default() {
-        return Err("MFA already has an active or rollback version; original data retained".into());
-    }
-    read_registry_state(root)?;
+    let current = installer.active_pointer(OWNER).map_err(message)?;
+    let installed_pointer = if current == ActivePointer::default() {
+        None
+    } else if current.active_version.as_deref() == Some(package.manifest().version.as_str()) {
+        Some(current)
+    } else {
+        return Err(
+            "The installed MFA version changed. Choose its signed package in Settings".into(),
+        );
+    };
+    let enabled = read_registry_state(root)?
+        .get(OWNER)
+        .copied()
+        .unwrap_or(true);
     export.verify_key(password)?;
     let journal_path = root.join(JOURNAL);
     if let Some(snapshot) = preflight {
@@ -182,8 +196,9 @@ fn commit_inner(
         target_fingerprint: fingerprint,
         source_fingerprint,
         pointer_existed,
+        installed_pointer,
         export_staging: export.staging_name().into(),
-        enable_after_commit: true,
+        enable_after_commit: enabled,
     };
     if transaction.journal_committed(&journal)? {
         return Err("MFA data has already been migrated".into());
@@ -289,6 +304,14 @@ fn recover_locked(maintenance: &MfaMaintenance) -> Result<bool, String> {
         || !source::valid_fingerprint(&transaction.target_fingerprint)
         || !source::valid_fingerprint(&transaction.source_fingerprint)
         || !valid_export_name(&transaction.export_staging)
+        || transaction
+            .installed_pointer
+            .as_ref()
+            .is_some_and(|pointer| {
+                !transaction.pointer_existed
+                    || pointer.active_version.as_deref()
+                        != Some(transaction.package_version.as_str())
+            })
     {
         return Err("Invalid MFA recovery record".into());
     }
@@ -297,7 +320,9 @@ fn recover_locked(maintenance: &MfaMaintenance) -> Result<bool, String> {
     let pointer_file = paths::file_exists(&root.join(POINTER))?;
     let current = installer.active_pointer(OWNER).map_err(message)?;
     let activated = current == transaction.active_pointer();
-    if !activated && current != ActivePointer::default() {
+    if !activated
+        && (transaction.installed_pointer.is_some() || current != ActivePointer::default())
+    {
         return Err("MFA active pointer was changed outside the upgrade".into());
     }
     let data = root.join(DATA_DIR);
@@ -326,11 +351,11 @@ fn recover_locked(maintenance: &MfaMaintenance) -> Result<bool, String> {
             check_database(root, &transaction)?;
             check_staging_contents(&data)?;
         }
-        if activated && transaction.pointer_existed {
+        if activated && transaction.installed_pointer.is_none() && transaction.pointer_existed {
             installer
                 .restore_pointer(OWNER, &ActivePointer::default())
                 .map_err(message)?;
-        } else if activated {
+        } else if activated && transaction.installed_pointer.is_none() {
             fs::remove_file(root.join(POINTER)).map_err(message)?;
             paths::sync_directory(&root.join("plugins/mfa"))?;
         }

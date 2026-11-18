@@ -8,6 +8,7 @@ mod archive;
 mod catalog;
 mod installed;
 mod package;
+pub(crate) use package::installed_proof_paths;
 mod signature;
 
 pub use catalog::VerifiedCatalog;

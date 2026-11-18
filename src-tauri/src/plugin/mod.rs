@@ -333,7 +333,6 @@ impl PluginRegistry {
             .lock()
             .expect("plugin lifecycle lock poisoned");
         let _mutation = install::ModuleInstaller::new(&self.root).lock_mutations()?;
-        self.scan_locked()?;
         let verified = if enabled {
             Some(verify::verify_installed(
                 &self.active_directory(slug)?,
@@ -371,9 +370,8 @@ impl PluginRegistry {
         } else {
             LifecycleState::Disabled
         };
-        let snapshot = records.clone();
         drop(records);
-        if let Err(error) = self.persist_enabled_state(&snapshot) {
+        if let Err(error) = self.persist_enabled_preference(slug, Some(enabled)) {
             *self.records.write().expect("plugin registry lock poisoned") = before;
             return Err(error);
         }
@@ -484,11 +482,7 @@ impl PluginRegistry {
         &self,
         records: &mut HashMap<String, PluginRecord>,
     ) -> Result<(), PluginError> {
-        let path = self.state_path();
-        if !path.exists() {
-            return Ok(());
-        }
-        let enabled: HashMap<String, bool> = serde_json::from_str(&fs::read_to_string(path)?)?;
+        let enabled = self.read_enabled_state()?;
         for (slug, is_enabled) in enabled {
             if let Some(record) = records.get_mut(&slug) {
                 if record.reason.is_none() && record.state != LifecycleState::Uninstalled {
@@ -503,17 +497,28 @@ impl PluginRegistry {
         Ok(())
     }
 
-    fn persist_enabled_state(
+    fn read_enabled_state(&self) -> Result<HashMap<String, bool>, PluginError> {
+        match fs::read(self.state_path()) {
+            Ok(bytes) => Ok(serde_json::from_slice(&bytes)?),
+            Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(HashMap::new()),
+            Err(error) => Err(error.into()),
+        }
+    }
+
+    fn persist_enabled_preference(
         &self,
-        records: &HashMap<String, PluginRecord>,
+        slug: &str,
+        enabled: Option<bool>,
     ) -> Result<(), PluginError> {
-        let state = records
-            .iter()
-            .filter(|(_, record)| {
-                record.reason.is_none() && record.state != LifecycleState::Uninstalled
-            })
-            .map(|(slug, record)| (slug.clone(), record.state == LifecycleState::Enabled))
-            .collect::<HashMap<_, _>>();
+        let mut state = self.read_enabled_state()?;
+        match enabled {
+            Some(enabled) => {
+                state.insert(slug.to_owned(), enabled);
+            }
+            None => {
+                state.remove(slug);
+            }
+        }
         let tmp = self.root.join("state.json.tmp");
         fs::write(&tmp, serde_json::to_vec_pretty(&state)?)?;
         fs::rename(tmp, self.state_path())?;

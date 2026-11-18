@@ -11,6 +11,22 @@ use super::{PluginError, PluginRegistry, services::service_error, vault_lifecycl
 const OWNER: &str = "mfa";
 
 impl PluginRegistry {
+    pub(crate) fn installed_mfa_upgrade_package(
+        &self,
+    ) -> Result<(std::path::PathBuf, std::path::PathBuf), String> {
+        let _lifecycle = self
+            .lifecycle
+            .lock()
+            .map_err(|_| "Module registry is unavailable")?;
+        let directory = self
+            .active_directory(OWNER)
+            .map_err(|error| error.to_string())?;
+        let manifest = super::verify::verify_installed(&directory, super::current_platform())
+            .map_err(|error| error.to_string())?;
+        super::migration_commit::validate_manifest(&manifest)?;
+        Ok(super::verify::installed_proof_paths(&directory))
+    }
+
     pub(crate) fn export_mfa_uri(
         &self,
         id: &str,

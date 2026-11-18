@@ -200,8 +200,25 @@ fn signed_legacy_mfa_commit_preserves_original_journal_and_hotp_on_host_start() 
 #[test]
 #[ignore = "real signed package, abrupt child exit and boot recovery run only on GitHub"]
 fn signed_legacy_mfa_restart_rolls_back_interrupted_activation_and_allows_retry() {
+    interrupted_migration_can_retry(false);
+}
+
+#[test]
+#[ignore = "real preinstalled signed package, abrupt child exit and boot recovery run only on GitHub"]
+fn signed_legacy_mfa_restart_preserves_preinstalled_module_and_disabled_preference() {
+    interrupted_migration_can_retry(true);
+}
+
+fn interrupted_migration_can_retry(preinstalled: bool) {
     let legacy = Legacy::new();
     let root = legacy.root.path();
+    let package = InstalledMfa::verified_package();
+    let original_pointer = preinstalled.then(|| {
+        let registry = crate::plugin::PluginRegistry::new(root.join("plugins"));
+        registry.install_verified(&package).unwrap();
+        registry.set_enabled(OWNER, false).unwrap();
+        fs::read(root.join(POINTER)).unwrap()
+    });
     let child = Command::new(std::env::current_exe().unwrap())
         .args([
             "--exact",
@@ -223,9 +240,8 @@ fn signed_legacy_mfa_restart_rolls_back_interrupted_activation_and_allows_retry(
     assert_ne!(staged_generation, legacy.generation);
     let leases = ProfileRuntimeLeases::acquire(root, StartupMode::Headless).unwrap();
     assert_eq!(leases.generation, staged_generation);
-    assert!(
-        !root.join(TARGET).exists() && !root.join(PLAN).exists() && !root.join(POINTER).exists()
-    );
+    assert!(!root.join(TARGET).exists() && !root.join(PLAN).exists());
+    assert_eq!(fs::read(root.join(POINTER)).ok(), original_pointer);
     assert!(
         fs::read_dir(root.join("migration/exports"))
             .unwrap()
@@ -238,8 +254,11 @@ fn signed_legacy_mfa_restart_rolls_back_interrupted_activation_and_allows_retry(
     );
     legacy.assert_legacy_intact();
     drop(leases);
-    let package = InstalledMfa::verified_package();
     commit(legacy.prepare(), &package, MASTER).unwrap();
+    if let Some(pointer) = original_pointer {
+        assert_eq!(fs::read(root.join(POINTER)).unwrap(), pointer);
+        assert_eq!(read_registry_state(root).unwrap().get(OWNER), Some(&false));
+    }
     assert_ne!(generation::current(root).unwrap(), staged_generation);
     assert!(
         MigrationJournal::load(&root.join(JOURNAL))

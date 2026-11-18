@@ -41,12 +41,7 @@ impl PluginRegistry {
             retained_data::remove(&self.root, slug)?;
         }
         self.scan_locked()?;
-        let snapshot = self
-            .records
-            .read()
-            .expect("plugin registry lock poisoned")
-            .clone();
-        self.persist_enabled_state(&snapshot)?;
+        self.persist_enabled_preference(slug, None)?;
         self.get(slug)
             .ok_or_else(|| PluginError::NotFound(slug.to_owned()))
     }

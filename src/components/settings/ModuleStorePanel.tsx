@@ -184,7 +184,10 @@ export function ModuleStorePanel({
           {t("settings.moduleStoreCoreApi", { version: coreApiVersion })}
         </span>
       </div>
-      <ModuleMfaUpgrade eligible={migrationSnapshot?.candidates.some((item) => item.item === "mfa" && item.evidence.includes("mfa.db")) === true} />
+      <ModuleMfaUpgrade
+        eligible={migrationSnapshot?.candidates.some((item) => item.item === "mfa" && item.evidence.includes("mfa.db")) === true}
+        installed={!!records.mfa?.activeVersion}
+      />
       {migrationSnapshot && (
         <div
           data-testid="module-upgrade-status"

@@ -394,14 +394,25 @@ pub fn plugin_migration_execute(
 #[tauri::command]
 pub async fn plugin_mfa_migrate_and_restart(
     app: AppHandle,
-    archive: PathBuf,
-    signature: PathBuf,
+    archive: Option<PathBuf>,
+    signature: Option<PathBuf>,
     master_password: String,
 ) -> Result<(), String> {
     let request = zeroize::Zeroizing::new(master_password);
     let owner = app.clone();
     let handoff = tauri::async_runtime::spawn_blocking(move || {
-        crate::runtime::mfa_restart::MfaRestart::prepare(&owner, archive, signature, request)
+        let package = match (archive, signature) {
+            (Some(archive), Some(signature)) => (archive, signature),
+            (None, None) => {
+                use tauri::Manager;
+                owner
+                    .state::<AppState>()
+                    .plugins
+                    .installed_mfa_upgrade_package()?
+            }
+            _ => return Err("Choose both the MFA package and its detached signature".into()),
+        };
+        crate::runtime::mfa_restart::MfaRestart::prepare(&owner, package.0, package.1, request)
     })
     .await
     .map_err(|error| error.to_string())??;
