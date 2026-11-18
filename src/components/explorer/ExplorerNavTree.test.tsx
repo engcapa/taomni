@@ -38,6 +38,22 @@ describe("Explorer lazy navigation tree", () => {
     await waitFor(() => expect(sftpListLocalDetailed).toHaveBeenCalledWith("/other"));
     expect(localStorage.getItem("taomni.explorer.view.v1")).toContain("/other");
   });
+  it("retains branch state while hidden and loads the newly selected path when reopened", async () => {
+    const props = { home: "", path: "/home/qa", dropPath: null, onNavigate: vi.fn(), onOpenExplorer: vi.fn(), onOpenTerminal: vi.fn() };
+    const { rerender } = render(<ExplorerNavTree {...props} />);
+    const home = () => document.querySelector('[data-testid="explorer-nav-node"][data-path="/home"]');
+    await waitFor(() => expect(home()).toHaveAttribute("aria-expanded", "true"));
+    fireEvent.keyDown(home()!, { key: "ArrowLeft" });
+    expect(home()).toHaveAttribute("aria-expanded", "false");
+    rerender(<ExplorerNavTree {...props} hidden path="/other" />);
+    expect(screen.getByTestId("explorer-nav-tree")).not.toBeVisible();
+    expect(sftpListLocalDetailed).not.toHaveBeenCalledWith("/other");
+    rerender(<ExplorerNavTree {...props} path="/other" />);
+    expect(screen.getByTestId("explorer-nav-tree")).toBeVisible();
+    expect(home()).toHaveAttribute("aria-expanded", "false");
+    await waitFor(() => expect(sftpListLocalDetailed).toHaveBeenCalledWith("/other"));
+  });
+
   it("cleans up a pending directory read on unmount without state resurrection", async () => {
     const pending = deferred();
     vi.mocked(sftpListLocalDetailed).mockReturnValue(pending.promise);

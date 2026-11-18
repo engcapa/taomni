@@ -1145,6 +1145,8 @@
 - `[data-testid="explorer-cmd-cut"]` — interactive — F-EXPLORER-1.explorer-cmd-cut
 - `[data-testid="explorer-cmd-delete"]` — interactive — F-EXPLORER-1.explorer-cmd-delete
 - `[data-testid="explorer-cmd-more"]` — interactive — F-EXPLORER-1.explorer-cmd-more
+- `[data-testid="explorer-cmd-navigation"]` — interactive — F-EXPLORER-1.explorer-cmd-navigation
+- `[data-testid="explorer-nav-resize"]` — interactive — F-EXPLORER-1.explorer-nav-resize
 - `[data-testid="explorer-cmd-new"]` — interactive — F-EXPLORER-1.explorer-cmd-new
 - `[data-testid="explorer-cmd-newtab"]` — interactive — F-EXPLORER-1.explorer-cmd-newtab
 - `[data-testid="explorer-cmd-paste"]` — interactive — F-EXPLORER-1.explorer-cmd-paste

@@ -54,6 +54,7 @@ html[data-app-theme="dark"] .ex-shell {
 .ex-main { flex:1; min-width:0; min-height:0; display:flex; position:relative; }
 .ex-main.bottom { flex-direction:column; }
 .ex-nav { width:210px; border-right:1px solid var(--ex-divider); overflow:auto; padding:4px; flex-shrink:0; background:var(--ex-panel); }
+.ex-nav[hidden] { display:none; }
 .ex-nav-sec { font-size:10.5px; color:var(--ex-muted); font-weight:700; letter-spacing:.04em; padding:8px 6px 3px; }
 .ex-nav-row { display:flex; align-items:center; gap:6px; height:26px; padding:0 6px; border-radius:5px; white-space:nowrap; cursor:default; }
 .ex-nav-row:hover { background:var(--ex-hover); }

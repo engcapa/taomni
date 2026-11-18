@@ -9,6 +9,7 @@ export interface ExplorerPreferences {
   preview: boolean;
   previewPosition: "right" | "bottom";
   previewWidth: number;
+  navVisible: boolean;
   navWidth: number;
   wrap: boolean;
   pinnedPaths: string[];
@@ -19,7 +20,7 @@ export interface ExplorerPreferences {
 export const EXPLORER_PREFERENCES_KEY = "taomni.explorer.view.v1";
 const defaults: ExplorerPreferences = {
   view: "details", sortKey: "name", sortDir: "asc", showHidden: false,
-  preview: true, previewPosition: "right", previewWidth: 300, navWidth: 210,
+  preview: true, previewPosition: "right", previewWidth: 300, navVisible: true, navWidth: 210,
   wrap: false, pinnedPaths: [], expandedPaths: [], columnWidths: {},
 };
 const listeners = new Set<() => void>();
@@ -37,6 +38,7 @@ function readPreferences(): ExplorerPreferences {
       preview: typeof p.preview === "boolean" ? p.preview : true,
       previewPosition: p.previewPosition === "bottom" ? "bottom" : "right",
       previewWidth: typeof p.previewWidth === "number" && Number.isFinite(p.previewWidth) ? Math.min(600, Math.max(220, p.previewWidth)) : 300,
+      navVisible: p.navVisible !== false,
       navWidth: typeof p.navWidth === "number" && Number.isFinite(p.navWidth) ? Math.min(380, Math.max(140, p.navWidth)) : 210,
       wrap: p.wrap === true,
       pinnedPaths: paths(p.pinnedPaths), expandedPaths: paths(p.expandedPaths),

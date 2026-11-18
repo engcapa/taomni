@@ -9,8 +9,8 @@ import { setExplorerPreferences, useExplorerPreferences } from "./explorerPrefer
 import { useExplorerLabels } from "./explorerLabels";
 
 interface Listing { entries: FileEntry[]; error?: string }
-export function ExplorerNavTree({ home, path, dropPath, onNavigate, onOpenExplorer, onOpenTerminal }: {
-  home: string; path: string; dropPath: string | null;
+export function ExplorerNavTree({ id, hidden = false, home, path, dropPath, onNavigate, onOpenExplorer, onOpenTerminal }: {
+  id?: string; hidden?: boolean; home: string; path: string; dropPath: string | null;
   onNavigate: (path: string) => void; onOpenExplorer: (path: string, forceNew?: boolean) => void;
   onOpenTerminal: (path: string) => void;
 }) {
@@ -39,10 +39,14 @@ export function ExplorerNavTree({ home, path, dropPath, onNavigate, onOpenExplor
     return () => { mounted.current = false; };
   }, []);
   useEffect(() => {
+    if (hidden && ctx.isOpen) ctx.close();
+  }, [hidden, ctx.isOpen, ctx.close]);
+  useEffect(() => {
+    if (hidden) return;
     // Auto-expand the committed path without loading an entire filesystem tree.
     for (const crumb of explorerCrumbs(path)) void load(crumb.path);
     for (const expanded of preferences.expandedPaths) void load(expanded);
-  }, [path, preferences.expandedPaths, load]);
+  }, [hidden, path, preferences.expandedPaths, load]);
   const autoPaths = explorerCrumbs(path).map((crumb) => crumb.path);
   const [collapsed, setCollapsed] = useState<Set<string>>(new Set());
   const toggle = (directory: string, open: boolean) => {
@@ -97,7 +101,7 @@ export function ExplorerNavTree({ home, path, dropPath, onNavigate, onOpenExplor
     roots.push({ id: currentRoot.path, path: currentRoot.path, label: currentRoot.name });
   }
   const workspaceRoots = [...new Map(workspaces.flatMap((workspace) => workspace.rootFolders.map((root) => [root.path, { path: root.path, name: root.name || workspace.name }] as const))).values()];
-  return <nav className="ex-nav" data-testid="explorer-nav-tree" aria-label={label("文件夹导航", "Folder navigation")} style={{ width: preferences.navWidth }} role="tree">
+  return <nav id={id} hidden={hidden} className="ex-nav" data-testid="explorer-nav-tree" aria-label={label("文件夹导航", "Folder navigation")} style={{ width: preferences.navWidth }} role="tree">
     <div className="ex-nav-sec">{label("快速访问", "Quick access")}</div>
     {home && quickRow(home, label("主目录", "Home"), true)}
     {home && [["Desktop", label("桌面", "Desktop")], ["Documents", label("文档", "Documents")], ["Downloads", label("下载", "Downloads")], ["Pictures", label("图片", "Pictures")]].map(([folder, name]) => quickRow(joinPath(home, folder), name))}
@@ -107,6 +111,6 @@ export function ExplorerNavTree({ home, path, dropPath, onNavigate, onOpenExplor
     <div className="ex-nav-sec">{label("此电脑", "This PC")}</div>
     {driveError && <div className="ex-warning" role="alert">{driveError}</div>}
     {roots.map((drive) => tree(drive.path, drive.label, 0, true))}
-    {ctx.render}
+    {!hidden && ctx.render}
   </nav>;
 }

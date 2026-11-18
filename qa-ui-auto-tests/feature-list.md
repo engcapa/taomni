@@ -15293,6 +15293,12 @@ controls:
   - id: explorer-cmd-more
     selector: '[data-testid="explorer-cmd-more"]'
     kind: interactive
+  - id: explorer-cmd-navigation
+    selector: '[data-testid="explorer-cmd-navigation"]'
+    kind: interactive
+  - id: explorer-nav-resize
+    selector: '[data-testid="explorer-nav-resize"]'
+    kind: interactive
   - id: explorer-cmd-new
     selector: '[data-testid="explorer-cmd-new"]'
     kind: interactive
