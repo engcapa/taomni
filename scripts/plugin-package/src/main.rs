@@ -14,6 +14,23 @@ fn main() {
 
 fn run() -> Result<()> {
     let mut args = std::env::args().skip(1).peekable();
+    if args
+        .peek()
+        .is_some_and(|argument| argument == "--prepare-catalog-update")
+    {
+        args.next();
+        let directories: Vec<_> = args.collect();
+        let [previous, changed, output] = directories.as_slice() else {
+            anyhow::bail!("expected --prepare-catalog-update PREVIOUS_DIR CHANGED_DIR OUTPUT_DIR");
+        };
+        let assets = taomni_plugin_package::release_catalog::prepare_catalog_update(
+            Path::new(previous),
+            Path::new(changed),
+            Path::new(output),
+        )?;
+        println!("{}", serde_json::to_string_pretty(&assets)?);
+        return Ok(());
+    }
     if matches!(
         args.peek().map(String::as_str),
         Some("--sign-catalog" | "--verify-catalog")

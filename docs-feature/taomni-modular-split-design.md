@@ -738,7 +738,7 @@ TC-MODULES-027 在 GitHub 安装固定哈希的正式 deb/MSI/DMG，由旧程序
 
 - `.github/workflows/release.yml` 扩展：现有核心矩阵不变；新增插件矩阵（每个原生插件 × 四个现有发布目标：Linux x86_64、Windows x86_64、macOS arm64 / x86_64；纯前端插件只出一份与平台无关的包），产物是插件包（`.taomni-plugin`，zip 格式，内含 `module.json` + 宿主可执行文件 + 前端 chunk + `SHA256SUMS`；签名是包旁边的分离 `.minisig`），不是整包安装程序。macOS 包内可执行文件须用与核心相同的签名身份签名（G1），Windows 可执行文件的 Authenticode 要求以 G3 结论为准。
 - 每个插件单独出 Release asset：同一 GitHub Release 里，核心包与插件包共存，但文件名、签名、清单条目各自独立，不互相覆盖（吸取 v0.4.29 macOS ARM / Intel 同名覆盖的教训，见 `claudedocs/auto-update-plan.md` 2026-10-02 一节）。
-- 只改一个插件时，只发该插件的新包 + 新的 `modules.json`，不重发核心包；`modules.json` 的发布是原子操作（先传完所有插件包与签名，最后发布完整清单）。
+- 只改一个插件时，打包该模块的全部声明平台，以当前已签名目录为基线生成完整的新目录。工具沿用首装清单和其他模块的资产地址，并要求目录序号递增。先上传新包及签名，再上传目录签名和目录。客户端验签成功后原子替换本地目录缓存。 [模块独立发布准备](../scripts/plugin-package/README.md#production-catalog-preparation)
 
 ### 7.4 兼容矩阵（第一版）
 

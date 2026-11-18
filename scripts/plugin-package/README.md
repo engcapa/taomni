@@ -79,15 +79,39 @@ rekey/lock/unlock, HOTP/key preservation and real host data leases. Receipts bin
 the source, package and core harness hashes. Intel macOS execution, OS system
 trust, the final UI route and monolith upgrade remain separate acceptance work.
 
-For production release, upload immutable versioned `.taomni-plugin` and
-`.minisig` assets, then publish the signed `modules.json` last using the existing
-`compose-modules-manifest.mjs` sequence/atomic-publication flow. A single module
-release need not rebuild the core. This QA workflow grants no production
-publication permission and does not close G1/G2/G3, system signing or migration
-acceptance. Installed packages live under the application data directory's
-`plugins/<slug>/versions/<version>/`; `.taomni-trust` retains the original signed
-archive for restart/enable/rollback verification. `active.json` identifies the
-active and previous immutable versions; data is owned separately.
+## Production catalog preparation
+
+For the first modular release, compose the complete catalog from all stable
+packages and set `MODULES_LEGACY_UPGRADE_IDS` to the first-release roster.
+
+For a module-only release, collect the current official `modules.json`,
+`modules.json.minisig` and the package and sidecar for every asset referenced
+in that catalog under `current-modules/`. Build and sign the changed module
+for every platform listed in its manifest. Compose a partial catalog with a
+higher sequence number and the current public GitHub Release tag for the new
+assets. Use `MODULES_LEGACY_UPGRADE_IDS` when composing the first catalog.
+
+```bash
+TAG=v0.6.0 MODULE_SEQUENCE=22 GITHUB_REPOSITORY=engcapa/taomni \
+  node scripts/compose-modules-manifest.mjs changed-artifacts changed-modules
+scripts/plugin-package/target/release/taomni-plugin-package \
+  --prepare-catalog-update current-modules changed-modules next-modules > new-assets.json
+scripts/plugin-package/target/release/taomni-plugin-package --sign-catalog next-modules
+scripts/plugin-package/target/release/taomni-plugin-package --verify-catalog next-modules
+```
+
+The preparation command verifies the baseline signature and the packages,
+keeps the first-upgrade roster, and copies the complete catalog and its
+referenced packages into a fresh staging directory. Its JSON output lists the
+new immutable files to upload. Upload those packages and sidecars before
+publishing `modules.json.minisig` and then `modules.json`. Keep the catalog
+available at the release URL the application checks. The core installer and
+`latest.json` are separate release assets.
+
+Installed packages live at `<app data>/plugins/<slug>/versions/<version>/`.
+`.taomni-trust` holds the original signed archive for verification at restart,
+enable and rollback. `active.json` records active and previous versions.
+Uninstall removes the version directories and keeps module data by default.
 
 Pure local validation:
 

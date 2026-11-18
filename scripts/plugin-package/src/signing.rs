@@ -1,6 +1,6 @@
 //! Production Minisign identity; there is no CLI public-key override.
 
-use std::{fs::File, path::Path};
+use std::{fs::File, io::Read, path::Path};
 
 use anyhow::{Context, Result, bail, ensure};
 use base64::{Engine, engine::general_purpose::STANDARD};
@@ -112,17 +112,24 @@ pub(crate) fn verify_file(
     signature: &str,
     comment: &str,
 ) -> Result<()> {
-    use std::io::Read;
+    verify_reader(verifier, File::open(path)?, signature, comment)
+}
+
+pub(crate) fn verify_reader(
+    verifier: &VerifyingKey,
+    mut source: impl Read,
+    signature: &str,
+    comment: &str,
+) -> Result<()> {
     let signature = Signature::decode(signature)?;
     ensure!(
         signature.trusted_comment() == comment,
         "detached signature identifies different release metadata"
     );
     let mut stream = verifier.verify_stream(&signature)?;
-    let mut file = File::open(path)?;
     let mut buffer = [0_u8; 128 * 1024];
     loop {
-        let size = file.read(&mut buffer)?;
+        let size = source.read(&mut buffer)?;
         if size == 0 {
             break;
         }

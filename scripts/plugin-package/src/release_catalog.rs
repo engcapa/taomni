@@ -12,8 +12,11 @@ use sha2::{Digest, Sha256};
 
 use crate::{
     PLATFORMS,
-    signing::{ReleaseSigner, public_verifier, verify_file},
+    signing::{ReleaseSigner, public_verifier, verify_file, verify_reader},
 };
+
+mod update;
+pub use update::prepare_catalog_update;
 
 const CATALOG: &str = "modules.json";
 const SIGNATURE: &str = "modules.json.minisig";
@@ -33,14 +36,14 @@ pub fn sign_staged(directory: &Path) -> Result<()> {
 
 pub fn verify_staged(directory: &Path) -> Result<()> {
     let verifier = public_verifier()?;
-    let catalog = inspect(directory, &verifier)?;
-    let signature = read_text(&directory.join(SIGNATURE), 16 * 1024)?;
-    verify_file(&verifier, &catalog.path, &signature, &catalog.comment())
+    inspect_signed(directory, &verifier).map(|_| ())
 }
 
 struct Catalog {
     path: PathBuf,
     sequence: u64,
+    document: Value,
+    raw: String,
 }
 
 impl Catalog {
@@ -49,18 +52,52 @@ impl Catalog {
     }
 }
 
-fn inspect(directory: &Path, verifier: &minisign_verify::PublicKey) -> Result<Catalog> {
+fn read_catalog(directory: &Path) -> Result<Catalog> {
     let path = directory.join(CATALOG);
-    let doc: Value = serde_json::from_str(&read_text(&path, MAX_CATALOG)?)?;
-    let sequence = doc["sequence"]
+    let raw = read_text(&path, MAX_CATALOG)?;
+    let document: Value = serde_json::from_str(&raw)?;
+    let sequence = document["sequence"]
         .as_u64()
         .filter(|n| *n > 0)
         .context("invalid module catalog sequence")?;
-    let api = crate::string(&doc, "coreApiVersion")?;
-    let plugins = doc["plugins"]
+    Ok(Catalog {
+        path,
+        sequence,
+        document,
+        raw,
+    })
+}
+
+fn inspect(directory: &Path, verifier: &minisign_verify::PublicKey) -> Result<Catalog> {
+    let catalog = read_catalog(directory)?;
+    validate_roster(&catalog.document)?;
+    verify_packages(directory, verifier, &catalog.document)?;
+    Ok(catalog)
+}
+
+fn inspect_signed(directory: &Path, verifier: &minisign_verify::PublicKey) -> Result<Catalog> {
+    let catalog = read_catalog(directory)?;
+    let signature = read_text(&directory.join(SIGNATURE), 16 * 1024)?;
+    verify_reader(
+        verifier,
+        catalog.raw.as_bytes(),
+        &signature,
+        &catalog.comment(),
+    )?;
+    validate_roster(&catalog.document)?;
+    verify_packages(directory, verifier, &catalog.document)?;
+    Ok(catalog)
+}
+
+fn catalog_plugins(doc: &Value) -> Result<&serde_json::Map<String, Value>> {
+    doc["plugins"]
         .as_object()
         .filter(|plugins| !plugins.is_empty())
-        .context("empty module catalog")?;
+        .context("empty module catalog")
+}
+
+fn validate_roster(doc: &Value) -> Result<()> {
+    let plugins = catalog_plugins(doc)?;
     let roster = doc["legacyUpgrade"]
         .as_array()
         .context("release catalog requires the first-upgrade roster")?;
@@ -73,6 +110,16 @@ fn inspect(directory: &Path, verifier: &minisign_verify::PublicKey) -> Result<Ca
             "first-upgrade module ID is absent or repeated"
         );
     }
+    Ok(())
+}
+
+fn verify_packages(
+    directory: &Path,
+    verifier: &minisign_verify::PublicKey,
+    doc: &Value,
+) -> Result<()> {
+    let api = crate::string(doc, "coreApiVersion")?;
+    let plugins = catalog_plugins(doc)?;
     for (id, plugin) in plugins {
         let slug = crate::string(plugin, "slug")?;
         ensure!(
@@ -100,7 +147,7 @@ fn inspect(directory: &Path, verifier: &minisign_verify::PublicKey) -> Result<Ca
             verify_asset(directory, verifier, plugin, version, platform, asset)?;
         }
     }
-    Ok(Catalog { path, sequence })
+    Ok(())
 }
 
 fn verify_asset(
@@ -223,13 +270,23 @@ mod tests {
     use serde_json::json;
 
     fn stage(root: &Path, signer: &ReleaseSigner) -> (PathBuf, Value) {
+        stage_module(root, signer, "mfa", "1.1.0", "v0.6.0")
+    }
+
+    pub(super) fn stage_module(
+        root: &Path,
+        signer: &ReleaseSigner,
+        slug: &str,
+        version: &str,
+        tag: &str,
+    ) -> (PathBuf, Value) {
         let payload = root.join("input");
-        fs::create_dir(&payload).unwrap();
+        fs::create_dir_all(&payload).unwrap();
         fs::write(payload.join("host"), b"sample execution payload").unwrap();
-        let id = "taomni-plugin-mfa";
+        let id = format!("taomni-plugin-{slug}");
         let platform = "linux-x86_64";
         let manifest = json!({
-            "id": id, "slug": "mfa", "name": "MFA", "version": "1.1.0", "coreApiVersion": "1",
+            "id": id, "slug": slug, "name": slug, "version": version, "coreApiVersion": "1",
             "description": "Generate time-based codes", "status": "stable", "kind": "auth",
             "platforms": [platform], "entry": {"host": "host"}, "permissions": ["vault.fixed-key"]
         });
@@ -245,10 +302,11 @@ mod tests {
             fs::read_to_string(staged.join(receipt["signature"].as_str().unwrap())).unwrap();
         let mut module = manifest;
         module["platforms"] = json!({(platform): {
-            "url": format!("https://github.com/engcapa/taomni/releases/download/v0.6.0/{name}"),
+            "url": format!("https://github.com/engcapa/taomni/releases/download/{tag}/{name}"),
             "signature": signature, "sha256": receipt["sha256"], "size": receipt["size"]
         }});
-        let catalog = json!({"sequence": 21, "coreApiVersion": "1", "legacyUpgrade": [id], "plugins": {(id): module}});
+        let catalog = json!({"sequence": 21, "coreApiVersion": "1", "legacyUpgrade": [id],
+            "updatedAt": "2026-11-19T00:00:00Z", "plugins": {(id): module}});
         fs::write(staged.join(CATALOG), serde_json::to_vec(&catalog).unwrap()).unwrap();
         (staged, catalog)
     }
