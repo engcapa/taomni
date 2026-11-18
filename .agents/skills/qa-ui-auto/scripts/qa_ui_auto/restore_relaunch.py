@@ -4,8 +4,12 @@ import json
 import sqlite3
 from contextlib import closing
 
-from .fixtures.module_download import plugin_root
 from .steps import StepError
+
+MFA_UPGRADE_ISSUERS = {
+    "TC-MODULES-038": "Signed Upgrade",
+    "TC-MODULES-044": "Installed MFA Upgrade",
+}
 
 
 def run(ctx, args):
@@ -30,14 +34,14 @@ def run(ctx, args):
 
 def run_mfa(ctx, args):
     case_id = getattr(ctx.fixture_context, "case_id", None)
-    if args is not None or case_id not in {"TC-MODULES-038", "TC-MODULES-044"}:
+    if args is not None or case_id not in MFA_UPGRADE_ISSUERS:
         raise StepError("MFA upgrade relaunch requires its fixed native case")
     callback = getattr(ctx.session, "mfa_upgrade_relauncher", None)
     if not callable(callback):
         raise StepError("MFA upgrade relaunch requires its owned native bridge")
     try:
         before = installed_mfa_state(ctx) if case_id == "TC-MODULES-044" else None
-        callback()
+        callback(expected_issuer=MFA_UPGRADE_ISSUERS[case_id])
         if before is not None:
             after = installed_mfa_state(ctx)
             if before["targetPresent"] or not after["targetPresent"] or before["pointerSha256"] != after["pointerSha256"]:
@@ -57,6 +61,8 @@ def run_mfa(ctx, args):
 
 
 def installed_mfa_state(ctx):
+    from .fixtures.module_download import plugin_root
+
     plugins = plugin_root(ctx)
     pointer = (plugins / "mfa/active.json").read_bytes()
     if json.loads(pointer).get("activeVersion") != "0.1.0":

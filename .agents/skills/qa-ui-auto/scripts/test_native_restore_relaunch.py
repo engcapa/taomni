@@ -15,7 +15,7 @@ from native_macos_process import AdoptedProcess, BsdInfo, listener_pid, parse_en
 from native_restore_relaunch import CONFIRM, confirm_restore_relaunch
 from tauri_webdriver import NativeSession
 from qa_ui_auto.behavior_contract import is_check
-from qa_ui_auto.restore_relaunch import run
+from qa_ui_auto.restore_relaunch import run, run_mfa
 from qa_ui_auto.steps import StepError
 
 
@@ -188,6 +188,23 @@ class RelaunchTests(unittest.TestCase):
                 with self.assertRaises(StepError):
                     run(ctx, args)
             self.assertTrue(is_check({"native_confirm_restore_relaunch": None}))
+
+    def test_mfa_relaunch_checks_the_account_for_each_installed_package_scenario(self):
+        state = {"targetPresent": False, "pointerSha256": "package", "legacyRowsSha256": "original"}
+        for case_id, expected_issuer in [
+            ("TC-MODULES-038", "Signed Upgrade"),
+            ("TC-MODULES-044", "Installed MFA Upgrade"),
+        ]:
+            with self.subTest(case_id=case_id), tempfile.TemporaryDirectory() as directory:
+                session = SimpleNamespace(mfa_upgrade_relauncher=Mock(), mfa_upgrade_relaunch_observation={"passed": True})
+                ctx = SimpleNamespace(session=session, case_dir=Path(directory),
+                                      fixture_context=SimpleNamespace(case_id=case_id))
+                with patch("qa_ui_auto.restore_relaunch.installed_mfa_state",
+                           side_effect=[state, {**state, "targetPresent": True}]):
+                    run_mfa(ctx, None)
+                session.mfa_upgrade_relauncher.assert_called_once_with(expected_issuer=expected_issuer)
+                with self.assertRaises(StepError):
+                    run_mfa(ctx, {"expected_issuer": "override"})
 
 
 if __name__ == "__main__":

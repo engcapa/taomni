@@ -48,7 +48,7 @@ def verify_commit(root, original):
             "journal_state": entries[0]["state"]}
 
 
-def confirm_mfa_upgrade_relaunch(driver, session):
+def confirm_mfa_upgrade_relaunch(driver, session, *, expected_issuer):
     observed = {"schema": "taomni.qa.mfa-upgrade-relaunch.v1", "passed": False,
                 "stage": "preflight", "manual_launch": False, "click_attempted": False}
     session.mfa_upgrade_relaunch_observation = observed
@@ -68,7 +68,7 @@ def confirm_mfa_upgrade_relaunch(driver, session):
         raise RuntimeError("MFA upgrade needs one visible enabled confirmation")
     root = profile_root(expected_env["NEWMOB_DATA_DIR"])
     accounts = account_rows(root / "mfa.db")
-    if len(accounts) != 1 or accounts[0][1:] != ("Signed Upgrade", 1):
+    if len(accounts) != 1 or accounts[0][1:] != (expected_issuer, 1):
         raise RuntimeError("MFA upgrade needs the original counter-one test account")
 
     observed.update(stage="click-confirm", click_attempted=True)
