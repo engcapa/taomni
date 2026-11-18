@@ -315,10 +315,10 @@
 | TASK-006 核心依赖闭包 | 待开始 | Cargo 默认 features、bundle/resources、平台依赖与核心前端 chunk 真正移除已迁移业务。 |
 | TASK-007 前端注册和路由 | 运行时已有 native 证据；业务前端待迁出 | 主窗/分离窗真实动态 ESM、共享 SDK、owner 失效/取消、locator 恢复和篡改拒绝已接入，TC-MODULES-016/018 有 matching native 结果；十个业务前端与各独立入口的完整等价验证尚未完成。 |
 | TASK-008 宿主监督 | 生产 adapter 已接入，三端 37 项门通过 | 主动心跳、重启预算、取消/revoke、确认进程树退出、双向服务、profile 与 snapshot 已接入；最新产品源码 #44020928836 三端各 37/37。完整已安装发行包的强杀/下次清扫与业务资源仍按 G6/G11 验证。 |
-| TASK-009 生命周期 | 安装/启禁/保留数据闭环已有证据 | 可信安装门、版本目录/active、正常重启、启禁/卸载保留数据已有真实 native 结果；实际不同版本的运行中更新/回滚链、无重启核心和业务资源释放仍需完整证据。 |
+| TASK-009 生命周期 | 已验证签名模块无重启更新与回滚 | Linux、Windows、macOS Intel 的 TC-MODULES-042 通过，含禁用偏好、原数据、切换后真实宿主与握手失败恢复。各正式业务模块仍需核对其资源释放和数据。 [三端 #44287815253](https://github.com/engcapa/taomni/actions/runs/44287815253) |
 | TASK-010 商店/下载 | 已接入并有 hosted 证据；正式目录待发布 | 三代理、后台进度、取消/续传、跨重启恢复、目录验签/搜索/确认/包审查安装已接入；TC-MODULES-022 的 58 步三端通过，相关下载与代理门已有原始结果。测试签名目录不能代替正式 release 的目录、独立更新/回滚闭环。 |
 | TASK-011 验签安装 | 基础闭环四种 native profile 通过 | pinned key 的真实 minisign 校验、清单防回滚、安全解包、内容绑定及安装入口强制验签已接入；#43804951477 的 TC-MODULES-007 在四种 native profile 全部 52 步通过，覆盖官方签名安装、启禁、正常重启和篡改拒绝。业务包、更新/回滚与最终发布仍需后续证据。 |
-| TASK-012 单体升级 | MFA 数据提交已接线，原位安装替换验证中 | 旧版建号、签名维护与应用接管已有分阶段证据。核对设置自动重启、正式候选安装件替换和回滚，以及剩余模块的激活路径。 |
+| TASK-012 单体升级 | 四目标安装替换和回退已验证，MFA 数据路径已有证据 | Linux deb 覆盖原账户迁移与 HOTP 续号，Windows MSI 与两种 macOS DMG 覆盖原会话与历史文件。正式首批目录和其余业务的数据提交仍待交付。 [安装验证](taomni-modular-installed-upgrade-verification.md) |
 | TASK-013 原型与 G 门 | hello/MFA 真宿主与签名包已有证据；G 门未闭合 | 三端实际进程、四目标签名包及三端正式安装门已有结果；G1/G3 系统实验、Linux noexec 已保留通过项与限制。完整安装包、hardened runtime/签名信任、性能、core-only 与真实升级仍有缺口，不能宣布 G1–G11 全过。 |
 | TASK-014 MFA | 签名安装门通过；已提交 profile 的业务接管待复验 | 独立 store actor、作用域 KeyProvider、snapshot、可信包安装已有三端结果。`76c3f94e9` 接入已提交 profile 的宿主命令和旧归档恢复。新装 profile 的模块入口、实际旧安装的升级触发、capture RPC、动态 UI、相关 G 门与迁出后三态还原待闭合。 |
 | TASK-015 | 已取消 | 历史设计 `7bc498b35` 中为 LanChat 迁移，已由用户明确删除决定取消；主设计已保留编号并清理前置依赖。旧库保持原位，不读取、迁移或删除，不创建替代插件。 |
@@ -329,7 +329,7 @@
 | TASK-020 截图 OCR/录制 | 待前置闭合 | OCR/录制插件；截图入口、滚动截图与采集保持核心归属。 |
 | TASK-021 本地语音 | 待前置闭合 | 本地 ASR/FIM 引擎和模型插件；云 ASR/麦克风保持核心归属。 |
 | TASK-022 Mobile | 待 M0 决策 | 按 DEC-2 默认暂缓排期；M0 末提供 go/no-go 与公开例外，不能默认为已交付。 |
-| TASK-023 发布验收 | 部分 | 清单生成与上传顺序已有；四目标插件构建/系统签名、包签名、原子清单发布、独立插件更新/回滚、两套回归及性能。 |
+| TASK-023 发布验收 | 已接入候选包目录签名与正式发布终检 | 发布终检覆盖已暂存模块的签名、声明平台、描述和摘要。尚需接入正式模块构建矩阵与独立模块发布，完成系统签名、首批目录、核心版和完整插件版回归及性能。 |
 | TASK-024 入口/profile 协同 | 核心与宿主所有权已接入，完整入口矩阵待闭合 | GUI/headless bootstrap、ModeLease、可重试退出、宿主 ProfileUseLease/PluginDataLease、正常重启/静默与 writer lease 已有进程/native 证据；所有真实业务/re-exec 入口迁出和 G11 全矩阵未完成。 |
 | TASK-025 密钥/一致快照 | A–G 基础已有契约/native 证据；H/I 迁移未完成 | [实施方案](taomni-modular-vault-services-plan.md)的 Vault 协调、宿主一致快照、离线 v2 和三态正常重启已逐批验证；macOS 15 Intel 的真实确认自动 relaunch 三态也已通过，ARM64 新轮待完成，Linux/Windows 自动接管尚未实现。这些 UI 仍使用核心 MFA；真实 MFA 宿主切换后的三态、legacy v1 alias/已安装升级与最终验收仍未完成。 |
 
