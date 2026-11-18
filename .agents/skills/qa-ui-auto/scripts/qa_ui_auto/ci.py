@@ -21,7 +21,7 @@ from .verification import browser_support, native_support, plan as impact_plan
 
 PLATFORMS = {"linux": ("Linux", "ubuntu-24.04", "X64"),
              "windows": ("Windows", "windows-2025", "X64"),
-             "macos": ("macOS", "macos-15", "ARM64")}
+             "macos": ("macOS", "macos-15-intel", "X64")}
 POLICY = Path("qa-ui-auto-tests/ci/policy.yaml")
 DEPENDENCIES = Path("qa-ui-auto-tests/ci/dependencies.yaml")
 
