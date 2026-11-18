@@ -85,13 +85,14 @@ def operation_states() -> dict[str, Any]:
 def path_attribute_match(path: str) -> str:
     """Match fixture paths in DOM without assuming Windows separator spelling.
 
-    Entered paths retain '/', while native directory entries use '\\'. Both are
-    the same fixture location; JSON string escaping also gives valid CSS strings.
-    No basename-only selector can accidentally select another directory.
+    Entered paths retain '/', and native directory entries append '\\' to their
+    parent. Accept each possible boundary between the entered path and its native
+    descendants, while matching the full fixture path.
     """
     spellings = [path]
     if len(path) > 2 and path[1:3] == ":/":
-        spellings.append(path.replace("/", "\\"))
+        spellings.extend(path[:index] + path[index:].replace("/", "\\")
+                         for index, char in enumerate(path) if char == "/")
     return ":is(" + ",".join("[data-path=" + json.dumps(value, ensure_ascii=False) + "]" for value in spellings) + ")"
 
 

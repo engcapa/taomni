@@ -151,10 +151,10 @@ export function MarkdownEditor({ document: current, onError, owner, requestedMod
   return <div ref={root} className={`fv-markdown ${focus ? "fv-md-focus" : ""}`} data-testid="markdown-editor" data-mode={mode} data-editing={mode !== "live" || editing} onKeyDownCapture={handleFindKey}>
     <div className="fv-bar fv-md-toolbar">
       <MarkdownToolbar view={() => editor.current} readOnly={effectiveReadOnly} mode={mode} focus={focus} outline={outline} heading={heading}
-        onMode={changeMode} onFocus={() => setFocus(!focus)} onOutline={() => setOutline(!outline)} onImage={chooseImage} />
+        onMode={changeMode} onFocus={() => setFocus(!focus)} onOutline={() => setOutline(!outline)} onImage={chooseImage}
+        drawioImport={<MarkdownDrawioImport key={current.key} view={() => editor.current} readOnly={effectiveReadOnly} onError={report} />} />
       {mode === "live" && <button className="fv-button outline" data-testid="markdown-live-edit" aria-pressed={editing} disabled={current.readOnly || current.truncated}
         onClick={() => setEditing(!editing)}>{editing ? label("完成编辑", "Done editing") : label("编辑", "Edit")}</button>}
-      <MarkdownDrawioImport key={`drawio-import:${current.key}`} view={() => editor.current} readOnly={effectiveReadOnly} onError={report} />
       <PreviewAppearanceControl value={appearance} onChange={setAppearance} />
       <MarkdownExportMenu key={`export:${current.key}`} document={current} onError={report} printRequest={printRequest} onExport={owner?.onExport} />
     </div>

@@ -3,13 +3,15 @@ import {
   List, ListChecks, ListOrdered, ListTree, Minus, Quote, Strikethrough, Table,
 } from "lucide-react";
 import type { EditorView } from "@codemirror/view";
+import type { ReactNode } from "react";
 import { useViewerLabels } from "../viewerLabels";
 import { formatMarkdown, setMarkdownHeading, type MarkdownFormat } from "./markdownCommands";
 
 export type MarkdownMode = "live" | "source" | "split";
-export function MarkdownToolbar({ view, readOnly, mode, focus, outline, heading, onMode, onFocus, onOutline, onImage }: {
+export function MarkdownToolbar({ view, readOnly, mode, focus, outline, heading, onMode, onFocus, onOutline, onImage, drawioImport }: {
   view: () => EditorView | null; readOnly: boolean; mode: MarkdownMode; focus: boolean; outline: boolean; heading: number;
   onMode: (mode: MarkdownMode) => void; onFocus: () => void; onOutline: () => void; onImage: () => void;
+  drawioImport: ReactNode;
 }) {
   const label = useViewerLabels();
   const chord = /Mac/i.test(navigator.platform) ? "⌘" : "Ctrl+";
@@ -22,7 +24,9 @@ export function MarkdownToolbar({ view, readOnly, mode, focus, outline, heading,
       <span className="fv-separator" />
       {button("bullet", "无序列表", "Bullet list", List)}{button("ordered", "有序列表", "Numbered list", ListOrdered)}{button("task", "任务列表", "Task list", ListChecks)}{button("quote", "引用", "Quote", Quote)}
       <span className="fv-separator" />
-      {button("table", "插入表格", "Insert table", Table)}<button className="fv-icon-button" data-testid="markdown-insert-image" title={label("插入图片", "Insert image")} aria-label={label("插入图片", "Insert image")} disabled={readOnly} onMouseDown={(event) => event.preventDefault()} onClick={onImage}><ImagePlus /></button>{button("codeblock", "代码块", "Code block", CodeXml)}{button("hr", "分隔线", "Horizontal rule", Minus)}
+      {button("table", "插入表格", "Insert table", Table)}<button className="fv-icon-button" data-testid="markdown-insert-image" title={label("插入图片", "Insert image")} aria-label={label("插入图片", "Insert image")} disabled={readOnly} onMouseDown={(event) => event.preventDefault()} onClick={onImage}><ImagePlus /></button>
+      {drawioImport}
+      {button("codeblock", "代码块", "Code block", CodeXml)}{button("hr", "分隔线", "Horizontal rule", Minus)}
     </div>
     <span className="fv-spacer" />
     <div className="fv-seg" aria-label={label("Markdown 模式", "Markdown mode")}>{(["live", "source", "split"] as const).map((value) => <button key={value} data-testid={`markdown-mode-${value}`} className={value === mode ? "on" : ""} aria-pressed={value === mode} onClick={() => onMode(value)}>{value === "live" ? label("实时", "Live") : value === "source" ? label("源码", "Source") : label("分栏", "Split")}</button>)}</div>

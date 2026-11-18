@@ -1171,6 +1171,7 @@ controls:
     kind: interactive
   - id: history-tab-directories
     selector: '[data-testid="welcome-history-tab-directories"]'
+    aliases: ['[data-testid="tao-home-history-popover"] [data-testid="tao-home-history-tab-directories"]']
     kind: interactive
   - id: local-directories
     selector: '[data-testid="welcome-local-directories"]'
@@ -15849,6 +15850,9 @@ controls:
   - id: markdown-outline
     selector: '[data-testid="markdown-outline"]'
     kind: interactive
+  - id: markdown-outline-toggle
+    selector: '[data-testid="markdown-outline-toggle"]'
+    kind: interactive
   - id: markdown-preview
     selector: '[data-testid="markdown-preview"]'
     kind: display
@@ -15926,6 +15930,9 @@ controls:
     kind: interactive
   - id: markdown-import-drawio
     selector: '[data-testid="markdown-import-drawio"]'
+    aliases:
+    - '.fv-md-format [data-testid="markdown-import-drawio"]'
+    - '.fv-md-format [data-testid="markdown-insert-image"] + [data-testid="markdown-import-drawio"]'
     kind: interactive
   - id: markdown-drawio-input
     selector: '[data-testid="markdown-drawio-input"]'
@@ -16345,3 +16352,4 @@ The retired Tao-specific key/save selectors are retained as optional absence ass
 真实用户 testing.md 回归由 TC-FILE-OPEN-027/028 验证 Live 表格内联格式、Word 流程图线身、draw.io 时序连接点和可搜索 PDF，并核对原文 SHA。实际 draw.io Desktop / LibreOffice 视觉证据另行留存；不将内部 maxGraph 预览当作外部编辑器验收。
 
 TC-FILE-OPEN-029/030 覆盖 Markdown Live 的实际拖选与选区对比度、深色源码标记以及 Live、源码和分栏的共享查找替换控件。
+TC-FILE-OPEN-031/032 覆盖左侧工具栏的 draw.io 导入、Live 和分栏预览与 draw.io Desktop 原图的像素比较，以及导出后可编辑节点和连线的往返校验。

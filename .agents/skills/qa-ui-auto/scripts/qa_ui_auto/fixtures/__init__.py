@@ -110,7 +110,7 @@ from . import tao_agent
 from . import tao_memory
 from . import tao_history
 from . import markdown_quality
-from . import markdown_drawio
+from . import markdown_drawio, markdown_drawio_roundtrip
 from . import markdown_testing
 
 
@@ -132,6 +132,7 @@ REGISTRY: dict[str, Fixture] = {
     "markdown_testing": Fixture("markdown_testing", markdown_testing.setup, markdown_testing.teardown),
     "markdown_quality": Fixture("markdown_quality", markdown_quality.setup, markdown_quality.teardown),
     "markdown_drawio": Fixture("markdown_drawio", markdown_drawio.setup, markdown_drawio.teardown),
+    "markdown_drawio_roundtrip": Fixture("markdown_drawio_roundtrip", markdown_drawio_roundtrip.setup),
     "tao_llm": Fixture("tao_llm", tao_llm.setup, tao_llm.teardown),
     "tao_custom_llm": Fixture("tao_custom_llm", tao_custom_llm.setup, tao_custom_llm.teardown),
     "tao_messages": Fixture("tao_messages", tao_messages.setup, tao_messages.teardown),

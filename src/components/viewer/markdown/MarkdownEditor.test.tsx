@@ -71,13 +71,19 @@ describe("MarkdownEditor real host lifecycle", () => {
 
   it("keeps exactly one import/export control while actual editor selections and modes change", () => {
     render(<Harness />);
+    const importDrawio = screen.getByRole("button", { name: "Import draw.io" });
+    const insertImage = screen.getByRole("button", { name: "Insert image" });
+    expect(screen.getByRole("toolbar", { name: "Markdown formatting" })).toContainElement(importDrawio);
+    expect(insertImage.nextElementSibling).toBe(importDrawio);
+    expect(importDrawio).toBeDisabled();
     fireEvent.click(screen.getByTestId("markdown-live-edit"));
+    expect(importDrawio).toBeEnabled();
     const view = EditorView.findFromDOM(screen.getByTestId("viewer-editor").querySelector<HTMLElement>(".cm-editor")!)!;
     for (const mode of ["live", "source", "split", "live"] as const) {
       fireEvent.click(screen.getByTestId(`markdown-mode-${mode}`));
       for (const anchor of [source.indexOf("Details"), 0, source.indexOf("bold"), source.length, 3]) {
         act(() => view.dispatch({ selection: { anchor, head: Math.min(source.length, anchor + 3) } }));
-        expect(screen.getAllByTestId("markdown-import-drawio")).toHaveLength(1);
+        expect(screen.getAllByTestId("markdown-import-drawio")).toEqual([importDrawio]);
         expect(screen.getAllByTestId("markdown-export")).toHaveLength(1);
       }
     }

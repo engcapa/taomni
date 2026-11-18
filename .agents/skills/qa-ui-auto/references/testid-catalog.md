@@ -1315,6 +1315,7 @@
 - `[data-testid="markdown-focus"]` — interactive — F-FILEOPEN-1.markdown-focus
 - `[data-testid="markdown-format-bold"]` — interactive — F-FILEOPEN-1.markdown-format-bold
 - `[data-testid="markdown-outline"]` — interactive — F-FILEOPEN-1.markdown-outline
+- `[data-testid="markdown-outline-toggle"]` — interactive — F-FILEOPEN-1.markdown-outline-toggle
 - `[data-testid="markdown-preview"]` — display — F-FILEOPEN-1.markdown-preview
 - `[data-testid="markdown-live-edit"]` — interactive — F-FILEOPEN-1.markdown-live-edit
 - `[data-testid="markdown-split-resize"]` — interactive — F-FILEOPEN-1.markdown-split-resize
@@ -1341,6 +1342,8 @@
 - `.fv-md-drawio-source` — display — F-FILEOPEN-1.markdown-original-drawio
 - `[data-testid="markdown-export-drawio"]` — interactive — F-FILEOPEN-1.markdown-export-drawio
 - `[data-testid="markdown-import-drawio"]` — interactive — F-FILEOPEN-1.markdown-import-drawio
+  ↳ `.fv-md-format [data-testid="markdown-import-drawio"]` — alias
+  ↳ `.fv-md-format [data-testid="markdown-insert-image"] + [data-testid="markdown-import-drawio"]` — alias
 - `[data-testid="markdown-drawio-input"]` — interactive — F-FILEOPEN-1.markdown-drawio-input
 - `[data-testid="markdown-drawio-export-settings"]` — display — F-FILEOPEN-1.markdown-drawio-export-settings
 - `[data-testid="markdown-drawio-import-dialog"]` — display — F-FILEOPEN-1.markdown-drawio-import-dialog
@@ -2041,6 +2044,7 @@
 - `[data-testid="welcome-history-tab-sessions"]` — interactive — F1.6.history-tab-sessions
   ↳ `[data-testid="tao-home-history-popover"] [data-testid="tao-home-history-tab-sessions"]` — alias
 - `[data-testid="welcome-history-tab-directories"]` — interactive — F1.6.history-tab-directories
+  ↳ `[data-testid="tao-home-history-popover"] [data-testid="tao-home-history-tab-directories"]` — alias
 - `[data-testid="welcome-local-directories"]` — display — F1.6.local-directories
 - `[data-testid="welcome-local-directory-filter"]` — interactive — F1.6.local-directory-filter
 - `[data-testid="welcome-restore-row"]` — display — F1.6.restore-row
