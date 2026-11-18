@@ -34,6 +34,17 @@ assert(publishStep, "the tested publishing step must exist in release.yml");
 const publishScript = publishStep.split("        run: |\n")[1].split("\n")
   .map((line) => line.startsWith("          ") ? line.slice(10) : line).join("\n");
 
+test("checks the previously published first-upgrade roster before signing new catalogs", () => {
+  const stage = workflow.indexOf("node scripts/stage-published-module-catalog.mjs carried-module-catalog --allow-missing");
+  const assemble = workflow.indexOf("node scripts/compose-modules-manifest.mjs artifacts module-assets");
+  const verify = workflow.indexOf('--verify-release-roster module-assets "${previous[@]}"');
+  const sign = workflow.indexOf("--sign-catalog module-assets");
+  assert(stage > 0 && stage < assemble && assemble < verify && verify < sign);
+  const verificationStep = workflow.slice(workflow.indexOf("      - name: Verify the first-upgrade roster before signing"), verify);
+  assert(verificationStep.includes("previous+=(carried-module-catalog)"));
+  assert(!verificationStep.includes("TAURI_SIGNING_PRIVATE_KEY"));
+});
+
 function fixture(t, tag = "v0.4.30") {
   const root = mkdtempSync(join(tmpdir(), "taomni-release-workflow-unit-"));
   t.after(() => rmSync(root, { recursive: true, force: true }));

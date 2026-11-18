@@ -16,6 +16,24 @@ fn run() -> Result<()> {
     let mut args = std::env::args().skip(1).peekable();
     if args
         .peek()
+        .is_some_and(|argument| argument == "--verify-release-roster")
+    {
+        args.next();
+        let staged = args
+            .next()
+            .context("expected the staged release directory")?;
+        let previous = args.next();
+        ensure!(
+            args.next().is_none(),
+            "expected --verify-release-roster DIR [PREVIOUS_DIR]"
+        );
+        return taomni_plugin_package::release_catalog::verify_release_roster(
+            Path::new(&staged),
+            previous.as_deref().map(Path::new),
+        );
+    }
+    if args
+        .peek()
         .is_some_and(|argument| argument == "--prepare-catalog-update")
     {
         args.next();

@@ -70,3 +70,14 @@ test("an incomplete or absent catalog fails before preparing an upload", (t) => 
   assert.throws(() => stagePublishedModuleCatalog(absent.output, absent.gh), /needs a complete signed module catalog/);
   assert(!existsSync(absent.output));
 });
+
+test("allows an absent pre-modular catalog and still rejects a partial publication", (t) => {
+  const absent = fixture(t, [{ tagName: "v0.5.10", isLatest: true, assets: {} }]);
+  assert.equal(stagePublishedModuleCatalog(absent.output, absent.gh, { allowMissing: true }), undefined);
+  assert(!existsSync(absent.output));
+  const partial = fixture(t, [{
+    tagName: "v0.6.0", isLatest: true, assets: { "modules.json.minisig": signedAssets["modules.json.minisig"] },
+  }]);
+  assert.throws(() => stagePublishedModuleCatalog(partial.output, partial.gh, { allowMissing: true }), /incomplete signed module catalog/);
+  assert(!existsSync(partial.output));
+});

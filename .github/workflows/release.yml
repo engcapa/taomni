@@ -566,12 +566,14 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          node scripts/stage-published-module-catalog.mjs carried-module-catalog --allow-missing >> "$GITHUB_OUTPUT"
           if find artifacts -type f -name '*.taomni-plugin' -print -quit | grep -q .; then
             export MODULE_UPDATED_AT="$(git show -s --format=%cI HEAD)"
             node scripts/compose-modules-manifest.mjs artifacts module-assets
             echo 'present=true' >> "$GITHUB_OUTPUT"
-          elif [[ -n "$MODULES_LEGACY_UPGRADE_IDS" ]]; then
-            node scripts/stage-published-module-catalog.mjs carried-module-catalog >> "$GITHUB_OUTPUT"
+          elif [[ -n "$MODULES_LEGACY_UPGRADE_IDS" && ! -d carried-module-catalog ]]; then
+            echo 'The first modular release requires signed module packages.' >&2
+            exit 1
           fi
       - uses: dtolnay/rust-toolchain@stable
         if: steps.module-catalog.outputs.present == 'true' || steps.module-catalog.outputs.source_tag != ''
@@ -580,6 +582,15 @@ jobs:
         run: |
           cargo test --manifest-path scripts/plugin-package/Cargo.toml --lib --locked
           cargo build --manifest-path scripts/plugin-package/Cargo.toml --bin taomni-plugin-package --release --locked
+      - name: Verify the first-upgrade roster before signing
+        if: steps.module-catalog.outputs.present == 'true'
+        shell: bash
+        run: |
+          previous=()
+          if [[ -d carried-module-catalog ]]; then
+            previous+=(carried-module-catalog)
+          fi
+          scripts/plugin-package/target/release/taomni-plugin-package --verify-release-roster module-assets "${previous[@]}"
       - name: Sign the verified complete module catalog
         if: steps.module-catalog.outputs.present == 'true'
         env:

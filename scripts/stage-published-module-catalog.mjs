@@ -9,7 +9,7 @@ const releaseTag = /^v[0-9]+\.[0-9]+\.[0-9]+(?:[-+][0-9A-Za-z.]+)*$/;
 const runGh = (args) => execFileSync("gh", args, { encoding: "utf8" });
 
 /** Stage the signed index for a core-only release after modules have shipped. */
-export function stagePublishedModuleCatalog(output, gh = runGh) {
+export function stagePublishedModuleCatalog(output, gh = runGh, { allowMissing = false } = {}) {
   const releases = JSON.parse(gh([
     "release", "list", "--exclude-drafts", "--exclude-pre-releases", "--limit", "2", "--json", "tagName,isLatest",
   ])).sort((left, right) => Number(right.isLatest) - Number(left.isLatest));
@@ -35,12 +35,15 @@ export function stagePublishedModuleCatalog(output, gh = runGh) {
     }
     return tagName;
   }
-  throw new Error("The first modular release needs a complete signed module catalog");
+  if (!allowMissing) throw new Error("The first modular release needs a complete signed module catalog");
+  return undefined;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  const [directory] = process.argv.slice(2);
-  if (!directory) throw new Error("Usage: node scripts/stage-published-module-catalog.mjs DIRECTORY");
-  const source = stagePublishedModuleCatalog(directory);
-  console.log(`source_tag=${source}`);
+  const [directory, option, ...extra] = process.argv.slice(2);
+  if (!directory || extra.length || (option && option !== "--allow-missing")) {
+    throw new Error("Usage: node scripts/stage-published-module-catalog.mjs DIRECTORY [--allow-missing]");
+  }
+  const source = stagePublishedModuleCatalog(directory, runGh, { allowMissing: option === "--allow-missing" });
+  if (source) console.log(`source_tag=${source}`);
 }

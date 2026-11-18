@@ -45,6 +45,36 @@ pub fn verify_catalog_signature(directory: &Path) -> Result<()> {
     read_signed_catalog(directory, &public_verifier()?).map(|_| ())
 }
 
+pub fn verify_release_roster(directory: &Path, previous: Option<&Path>) -> Result<()> {
+    check_release_roster(directory, previous, &public_verifier()?)
+}
+
+fn check_release_roster(
+    directory: &Path,
+    previous: Option<&Path>,
+    verifier: &minisign_verify::PublicKey,
+) -> Result<()> {
+    let catalog = read_catalog(directory)?;
+    let roster = validated_roster(&catalog.document)?;
+    if let Some(directory) = previous {
+        let previous = read_signed_catalog(directory, verifier)?;
+        ensure!(
+            roster == validated_roster(&previous.document)?,
+            "the published first-upgrade roster must be preserved"
+        );
+        ensure!(
+            catalog.raw == previous.raw || catalog.sequence > previous.sequence,
+            "a changed module catalog needs a higher sequence"
+        );
+    } else {
+        ensure!(
+            roster.len() == catalog_plugins(&catalog.document)?.len(),
+            "the first-upgrade roster must include every module in the first release"
+        );
+    }
+    Ok(())
+}
+
 struct Catalog {
     path: PathBuf,
     sequence: u64,
@@ -76,7 +106,7 @@ fn read_catalog(directory: &Path) -> Result<Catalog> {
 
 fn inspect(directory: &Path, verifier: &minisign_verify::PublicKey) -> Result<Catalog> {
     let catalog = read_catalog(directory)?;
-    validate_roster(&catalog.document)?;
+    validated_roster(&catalog.document)?;
     verify_packages(directory, verifier, &catalog.document)?;
     Ok(catalog)
 }
@@ -96,7 +126,7 @@ fn read_signed_catalog(directory: &Path, verifier: &minisign_verify::PublicKey) 
         &signature,
         &catalog.comment(),
     )?;
-    validate_roster(&catalog.document)?;
+    validated_roster(&catalog.document)?;
     Ok(catalog)
 }
 
@@ -107,7 +137,7 @@ fn catalog_plugins(doc: &Value) -> Result<&serde_json::Map<String, Value>> {
         .context("empty module catalog")
 }
 
-fn validate_roster(doc: &Value) -> Result<()> {
+fn validated_roster(doc: &Value) -> Result<BTreeSet<&str>> {
     let plugins = catalog_plugins(doc)?;
     let roster = doc["legacyUpgrade"]
         .as_array()
@@ -121,7 +151,7 @@ fn validate_roster(doc: &Value) -> Result<()> {
             "first-upgrade module ID is absent or repeated"
         );
     }
-    Ok(())
+    Ok(seen)
 }
 
 fn verify_packages(
@@ -402,5 +432,46 @@ mod tests {
         assert!(inspect_signed(&published, signer.test_verifier()).is_err());
         fs::write(published.join(CATALOG), format!("{}\n", catalog.raw)).unwrap();
         assert!(read_signed_catalog(&published, signer.test_verifier()).is_err());
+    }
+
+    #[test]
+    fn first_release_includes_every_module_and_later_releases_keep_the_signed_roster() {
+        let root = tempfile::tempdir().unwrap();
+        let signer = ReleaseSigner::test_key();
+        let verifier = signer.test_verifier();
+        let (published, original) = stage(root.path(), &signer);
+        let verified = read_catalog(&published).unwrap();
+        let signature = signer.sign(&verified.path, &verified.comment()).unwrap();
+        fs::write(published.join(SIGNATURE), signature).unwrap();
+        check_release_roster(&published, None, verifier).unwrap();
+        check_release_roster(&published, Some(&published), verifier).unwrap();
+
+        let staged = root.path().join("candidate");
+        fs::create_dir(&staged).unwrap();
+        let mut next = original.clone();
+        next["plugins"]["taomni-plugin-vnc-client"] = json!({});
+        fs::write(staged.join(CATALOG), serde_json::to_vec(&next).unwrap()).unwrap();
+        let omitted = check_release_roster(&staged, None, verifier).unwrap_err();
+        assert!(omitted.to_string().contains("every module"));
+        let repeated = check_release_roster(&staged, Some(&published), verifier).unwrap_err();
+        assert!(repeated.to_string().contains("higher sequence"));
+
+        next["sequence"] = 22.into();
+        fs::write(staged.join(CATALOG), serde_json::to_vec(&next).unwrap()).unwrap();
+        check_release_roster(&staged, Some(&published), verifier).unwrap();
+
+        next["legacyUpgrade"] = json!(["taomni-plugin-mfa", "taomni-plugin-vnc-client"]);
+        fs::write(staged.join(CATALOG), serde_json::to_vec(&next).unwrap()).unwrap();
+        check_release_roster(&staged, None, verifier).unwrap();
+        let changed = check_release_roster(&staged, Some(&published), verifier).unwrap_err();
+        assert!(
+            changed
+                .to_string()
+                .contains("published first-upgrade roster")
+        );
+
+        fs::write(&verified.path, format!("{}\n", verified.raw)).unwrap();
+        let corrupt = check_release_roster(&staged, Some(&published), verifier).unwrap_err();
+        assert!(corrupt.to_string().contains("signature"));
     }
 }
