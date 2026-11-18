@@ -1,5 +1,5 @@
 import type { ModuleCatalogSelection, ModuleMarketplaceCatalog } from "../lib/ipc/plugin";
-import { MODULE_PREVIEW_KEY, previewHelloManifest } from "./modulePreview";
+import { MODULE_PREVIEW_KEY, previewHelloManifest, previewModuleRecord, readModulePreview } from "./modulePreview";
 
 /** Explicit browser fixture only. Paths and lifecycle are a local model;
  * this cannot verify a native signature or install a package. */
@@ -18,21 +18,27 @@ export const marketplacePreviewCatalog: ModuleMarketplaceCatalog = { platform: "
 
 export function invokeMarketplacePreview(command: string, args?: Record<string, unknown>): unknown {
   const mode = localStorage.getItem(MARKETPLACE_PREVIEW_KEY);
-  if (mode !== "true" && mode !== "release") {
+  if (mode !== "true" && mode !== "release" && mode !== "update") {
     if (command === "plugin_marketplace_catalog") return { ...marketplacePreviewCatalog, catalog: { ...marketplacePreviewCatalog.catalog, plugins: {} } };
     throw new Error("Browser preview cannot download or verify native module packages.");
   }
+  const installed = readModulePreview();
   if (command === "plugin_marketplace_catalog") {
     const source = String(args?.url);
     if (source.includes("modules-bad")) throw new Error("Preview model: invalid catalog signature");
     if (source.includes("modules-older")) throw new Error("Preview model: catalog rollback rejected");
     if (mode === "release") {
       const baseline = source.includes("modules-baseline");
-      const installed = JSON.parse(localStorage.getItem(MODULE_PREVIEW_KEY) ?? "null");
       return { ...marketplacePreviewCatalog, catalog: { ...marketplacePreviewCatalog.catalog,
         ...(baseline ? { sequence: 41, plugins: {} } : {}),
       }, release: { legacyWaiting: false, legacyPending: [], updates: [], newModules:
         baseline || installed || sessionStorage.getItem("taomni.preview.new-module-dismissed") ? [] : [previewHelloManifest.id],
+      } };
+    }
+    if (mode === "update") {
+      const eligible = installed?.version === "0.0.9" && installed.lifecycle !== "uninstalled";
+      return { ...marketplacePreviewCatalog, release: {
+        legacyWaiting: false, legacyPending: [], updates: eligible ? [previewHelloManifest.id] : [], newModules: [],
       } };
     }
     return marketplacePreviewCatalog;
@@ -43,6 +49,9 @@ export function invokeMarketplacePreview(command: string, args?: Record<string, 
   }
   const selection = args?.selection as ModuleCatalogSelection;
   if (selection?.pluginId !== previewHelloManifest.id || selection.version !== "0.1.0" || selection.sha256 !== digest) throw new Error("Invalid browser model selection");
+  if (args?.installedVersion && (installed?.version !== args.installedVersion || installed?.lifecycle === "uninstalled")) {
+    throw new Error("Installed module changed. Refresh the module store before updating");
+  }
   if (command === "plugin_marketplace_download") {
     const task = { id, completedPath: "preview/hello.taomni-plugin", progress: { revision: 1, phase: "completed", downloaded: 8192, total: 8192 } };
     localStorage.setItem("taomni.preview.module-downloads.v1", JSON.stringify({ tasks: [task], recoveryErrors: [] }));
@@ -50,6 +59,11 @@ export function invokeMarketplacePreview(command: string, args?: Record<string, 
   }
   if (command === "plugin_marketplace_review") return { manifest: previewHelloManifest, dataDirectory: "preview/plugins/hello-plugin/data", downloadId: id };
   if (command === "plugin_marketplace_install") {
+    if (mode === "update" && installed && args?.installedVersion === installed.version) {
+      const updated = { ...installed, version: selection.version, previousVersion: installed.version };
+      localStorage.setItem(MODULE_PREVIEW_KEY, JSON.stringify(updated));
+      return previewModuleRecord(updated);
+    }
     localStorage.setItem(MODULE_PREVIEW_KEY, JSON.stringify({ lifecycle: "installed", values: [] }));
     return { manifest: previewHelloManifest, state: "installed", dataRetained: true };
   }

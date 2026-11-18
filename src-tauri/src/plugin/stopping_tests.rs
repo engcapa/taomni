@@ -13,6 +13,8 @@ fn fixture(root: &std::path::Path) -> (PluginRegistry, Arc<RuntimeHost>) {
             state: LifecycleState::Enabled,
             reason: None,
             data_retained: false,
+            previous_version: None,
+            rollback_until: None,
         },
     );
     let runtime = Arc::new(RuntimeHost::stopped_for_test(manifest));

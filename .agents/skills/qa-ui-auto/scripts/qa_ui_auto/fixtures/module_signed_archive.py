@@ -26,17 +26,17 @@ def platform_key(system=None, machine=None):
     return f"{name}-{arch}"
 
 
-def load_artifact(root: Path, source_sha: str, expected_platform: str, slug: str = "hello-plugin"):
+def load_artifact(root: Path, source_sha: str, expected_platform: str, slug: str = "hello-plugin", *, version="0.1.0"):
     root = root.absolute()
     if root.resolve() != root or not root.is_dir():
         raise RuntimeError("Signed module artifact must be a real directory")
     receipt = json.loads((root / "provenance.json").read_text(encoding="utf-8"))
     expected = {"schema": "taomni.plugin-package.v1", "id": f"taomni-plugin-{slug}",
-                "slug": slug, "version": "0.1.0", "platform": expected_platform,
+                "slug": slug, "version": version, "platform": expected_platform,
                 "sourceSha": source_sha, "coreApiVersion": "1", "trust": "plugins.updater.pubkey"}
     if any(receipt.get(key) != value for key, value in expected.items()):
         raise RuntimeError("Signed module source/platform/identity differs from current native inputs")
-    archive_name = f"taomni-plugin-{slug}-0.1.0-{expected_platform}.taomni-plugin"
+    archive_name = f"taomni-plugin-{slug}-{version}-{expected_platform}.taomni-plugin"
     if receipt.get("archive") != archive_name or receipt.get("signature") != archive_name + ".minisig":
         raise RuntimeError("Unexpected official module artifact filenames")
     archive, signature = root / archive_name, root / (archive_name + ".minisig")
@@ -45,7 +45,7 @@ def load_artifact(root: Path, source_sha: str, expected_platform: str, slug: str
     if hashlib.sha256(archive.read_bytes()).hexdigest() != receipt.get("sha256") or archive.stat().st_size != receipt.get("size"):
         raise RuntimeError("Official module artifact digest/size differs from provenance")
     detached = signature.read_text(encoding="utf-8")
-    trusted = f"trusted comment: id={receipt['id']} version=0.1.0 platform={expected_platform} coreApiVersion=1 sha256={receipt['sha256']}"
+    trusted = f"trusted comment: id={receipt['id']} version={version} platform={expected_platform} coreApiVersion=1 sha256={receipt['sha256']}"
     if len(detached.splitlines()) != 4 or detached.splitlines()[2] != trusted:
         raise RuntimeError("Official module signature does not bind the expected metadata")
     frontend = None
@@ -76,6 +76,16 @@ def setup(ctx):
                    frontendSha256=hashlib.sha256(frontend).hexdigest())
     (Path(ctx.case_dir) / "official-module-fixture.json").write_text(json.dumps(receipt, indent=2), encoding="utf-8")
     ctx.values.update(module_signed_archive=destination.as_posix(), module_signed_signature=signature)
+    if ctx.case_id == "TC-MODULES-042":
+        variants = {}
+        for directory, version in [("previous", "0.0.9"), ("handshake-failure", "0.1.1")]:
+            variant, archive, signature, _ = load_artifact(Path(raw) / directory, source, platform_key(), version=version)
+            destination = owned / archive.name
+            shutil.copyfile(archive, destination)
+            key = directory.replace("-", "_")
+            ctx.values.update({f"module_{key}_archive": destination.as_posix(), f"module_{key}_signature": signature})
+            variants[version] = variant
+        (owned / "variants.json").write_text(json.dumps(variants, indent=2), encoding="utf-8")
 
 
 def setup_mfa(ctx):

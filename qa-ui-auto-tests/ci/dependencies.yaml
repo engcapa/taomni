@@ -54,6 +54,8 @@ TC-MODULES-038: []
 TC-MODULES-039: []
 TC-MODULES-040: []
 TC-MODULES-041: []
+TC-MODULES-042: []
+TC-MODULES-043: []
 TC-FILE-OPEN-011: []
 # Native artifact/global-entry/security cases own isolated inputs.
 TC-FILE-OPEN-007: []

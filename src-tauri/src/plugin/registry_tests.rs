@@ -98,6 +98,8 @@ fn installs_rolls_back_and_uninstalls_through_registry_projection() {
     let package_v2 = verify::test_support::verified_package(&updated);
     let second = registry.install_verified(&package_v2).unwrap();
     assert_eq!(second.manifest.version, "1.1.0");
+    assert_eq!(second.previous_version.as_deref(), Some("1.0.0"));
+    assert!(registry.rollback_to("mfa", Some("0.9.0")).is_err());
     let rolled = registry.rollback("mfa").unwrap();
     assert_eq!(rolled.manifest.version, "1.0.0");
 
@@ -105,6 +107,8 @@ fn installs_rolls_back_and_uninstalls_through_registry_projection() {
     fs::write(plugins.join("mfa/data/keep.db"), b"keep").unwrap();
     let uninstalled = registry.uninstall("mfa", false).unwrap();
     assert_eq!(uninstalled.state, LifecycleState::Uninstalled);
+    assert!(uninstalled.previous_version.is_none());
+    assert!(registry.rollback("mfa").is_err());
     assert!(plugins.join("mfa/data/keep.db").is_file());
     let retained = retained_data::load(&plugins, "mfa").unwrap().unwrap();
     assert_eq!(retained.files[0].path, "keep.db");

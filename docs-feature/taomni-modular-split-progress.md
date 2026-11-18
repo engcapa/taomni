@@ -63,6 +63,9 @@
 - 应用在打开核心库前记录 profile 来源。旧单体首次升级处理签名目录 `legacyUpgrade` 中本机适用的全部模块。已完成和卸载状态跨重启保留。模块数据沿用各自的只读预检和迁移 journal。
 - 后续更新按实际 active 版本给出候选，提交前再次核对 active 版本，保留禁用状态。目录中新出现的兼容模块会在主窗口显示名称和功能说明，用户可去模块商店安装或稍后处理。已见模块 ID 存于 profile 的 `.module-release.json`。
 - 第一批测试覆盖 Rust 的 profile 来源判定、首装断点收敛、禁用更新和卸载竞态，以及 TC-MODULES-040 native 首装/卸载重启、041 browser 新模块提示和选装。正式首批模块清单、完整业务迁移和发布包验收继续按 TASK-012、TASK-023 执行。
+- `6f70f63c1` 首批升级策略由 GitHub 三端验证。18 个分片均已核对，三端 browser 各 28/28，Linux native 37/37，Windows native 36/36，macOS 15 Intel native 36/37。两条新增用例各在三端通过。macOS Intel 的 `TC-FILE-OPEN-002` 记录一条 ResizeObserver 运行时错误，关联性待核对，原始分片保留。 [升级策略多端运行](https://github.com/engcapa/taomni/actions/runs/44264806849)
+- macOS 26 ARM64 的前一轮源码 `dc7b2ec66` 重跑收齐四片，28/29。`027`、`033–035` 和 `038` 均通过，包括实际 MFA 签名包自动重启和三态还原。`TC-FILE-OPEN-007` 的系统 Save 对话框定位失败与已记录的 ARM64 环境差异一致。 [ARM64 第二次运行](https://github.com/engcapa/taomni/actions/runs/44257552331/attempts/2)
+- 模块注册表现将真实回滚版本交给设置页，持久记录七天有效期，并校验用户点击时选择的版本。活动宿主更新与回滚时立即重新握手，握手失败会恢复旧版本和原宿主。新增 Native 042 与 Browser 043 验证同一应用会话内的版本切换、禁用偏好、原始数据与已签名错误包恢复。
 
 核心仍包含旧 profile 的 MFA、Servers、SocksCap、远程桌面和本地语音等业务代码、状态与依赖。hello-plugin 和 MFA 已取得签名安装结果。已提交迁移的 MFA profile 通过签名宿主读写账户和生成验证码，原数据继续用作回退资料。主窗和分离窗已支持动态加载模块前端，MFA 的正式前端和新装 profile 仍待迁出。LanChat 功能已删除，历史 `lanchat.sqlite` 和 `lanchat.db` 保留原位。
 

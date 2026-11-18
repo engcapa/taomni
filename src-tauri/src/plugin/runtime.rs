@@ -116,6 +116,14 @@ impl PluginRegistry {
             .lifecycle
             .lock()
             .expect("plugin lifecycle lock poisoned");
+        self.host_for_locked(slug, record)
+    }
+
+    pub(super) fn host_for_locked(
+        &self,
+        slug: &str,
+        record: &PluginRecord,
+    ) -> Result<Arc<RuntimeHost>, PluginError> {
         if (self.shutting_down.load(Ordering::Acquire)
             || self.quiescence.load(Ordering::Acquire) != 0)
         {

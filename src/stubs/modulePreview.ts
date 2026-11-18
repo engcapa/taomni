@@ -13,9 +13,9 @@ export const previewHelloManifest: PluginManifest = {
   legacyTables: [], vaultFixedKeys: [], snapshot: "rpc",
 };
 
-interface PreviewState { lifecycle: PluginRecord["lifecycle"]; values: string[] }
+interface PreviewState { lifecycle: PluginRecord["lifecycle"]; values: string[]; version?: string; previousVersion?: string }
 
-function read(): PreviewState | null {
+export function readModulePreview(): PreviewState | null {
   try {
     const value = JSON.parse(localStorage.getItem(MODULE_PREVIEW_KEY) ?? "null");
     if (!["installed", "enabled", "disabled", "uninstalled"].includes(value?.lifecycle)
@@ -24,21 +24,27 @@ function read(): PreviewState | null {
   } catch { return null; }
 }
 
-function record(state: PreviewState): PluginRecord {
-  return { slug: "hello-plugin", manifest: previewHelloManifest, lifecycle: state.lifecycle, dataRetained: state.values.length > 0 };
+export function previewModuleRecord(state: PreviewState): PluginRecord {
+  return {
+    slug: "hello-plugin", manifest: { ...previewHelloManifest, version: state.version ?? previewHelloManifest.version },
+    lifecycle: state.lifecycle, previousVersion: state.previousVersion, dataRetained: state.values.length > 0,
+  };
 }
 
 export function invokeModulePreview(command: string, args?: Record<string, unknown>): unknown {
-  const state = read();
-  if (command === "plugin_list" || command === "plugin_refresh") return state ? [record(state)] : [];
+  const state = readModulePreview();
+  if (command === "plugin_list" || command === "plugin_refresh") return state ? [previewModuleRecord(state)] : [];
   if (!state || args?.slug !== "hello-plugin") throw new Error(`Module operation requires the desktop app: ${command}`);
   if (command === "plugin_set_enabled" && state.lifecycle !== "uninstalled") {
     state.lifecycle = args.enabled === true ? "enabled" : "disabled";
   } else if (command === "plugin_uninstall") {
     state.lifecycle = "uninstalled";
+    delete state.previousVersion;
     if (args.deleteData === true) state.values = [];
+  } else if (command === "plugin_rollback" && state.lifecycle !== "uninstalled" && state.previousVersion && args.version === state.previousVersion) {
+    [state.version, state.previousVersion] = [state.previousVersion, state.version];
   } else if (command === "plugin_invoke" && state.lifecycle === "enabled") {
-    if (args.command === "hello/ping") return { pluginId: previewHelloManifest.id, version: "0.1.0", enabled: true };
+    if (args.command === "hello/ping") return { pluginId: previewHelloManifest.id, version: state.version ?? previewHelloManifest.version, enabled: true };
     if (args.command === "hello/read") return { values: [...state.values] };
     const value = (args.payload as { value?: unknown } | undefined)?.value;
     if (args.command !== "hello/write" || typeof value !== "string" || new TextEncoder().encode(value).length > 4096) {
@@ -49,5 +55,5 @@ export function invokeModulePreview(command: string, args?: Record<string, unkno
     return { values: [...state.values] };
   } else throw new Error(`Module operation is unavailable: ${command}`);
   localStorage.setItem(MODULE_PREVIEW_KEY, JSON.stringify(state));
-  return record(state);
+  return previewModuleRecord(state);
 }

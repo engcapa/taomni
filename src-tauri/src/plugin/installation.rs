@@ -40,15 +40,7 @@ impl PluginRegistry {
             .lifecycle
             .lock()
             .expect("plugin lifecycle lock poisoned");
-        if self
-            .shutting_down
-            .load(std::sync::atomic::Ordering::Acquire)
-            || self.quiescence.load(std::sync::atomic::Ordering::Acquire) != 0
-        {
-            return Err(PluginError::HostRequest(
-                "Module operations are paused; retry when Taomni is ready".into(),
-            ));
-        }
+        self.ensure_installation_available()?;
         let manifest = package.manifest();
         self.validate_manifest_fields(manifest)?;
         let slug = &manifest.slug;
@@ -89,8 +81,51 @@ impl PluginRegistry {
         .map(Some)
     }
 
-    /// Roll back metadata and the in-memory projection together if publishing
-    /// the new version or refreshing persisted preferences fails.
+    pub fn rollback(&self, slug: &str) -> Result<PluginRecord, PluginError> {
+        self.rollback_to(slug, None)
+    }
+
+    pub(crate) fn rollback_to(
+        &self,
+        slug: &str,
+        expected: Option<&str>,
+    ) -> Result<PluginRecord, PluginError> {
+        let _lifecycle = self
+            .lifecycle
+            .lock()
+            .expect("plugin lifecycle lock poisoned");
+        self.ensure_installation_available()?;
+        let installer = install::ModuleInstaller::new(&self.root);
+        let _mutation = installer.lock_mutations()?;
+        let pointer = installer.active_pointer(slug)?;
+        let previous = pointer.rollback_version(slug)?;
+        if expected.is_some_and(|version| version != previous) {
+            return Err(PluginError::InvalidManifest(
+                "Rollback version changed; refresh the module store".into(),
+            ));
+        }
+        let target = installer.version_dir(slug, previous)?;
+        let manifest = verify::verify_installed(&target, current_platform())?;
+        if manifest.version != previous || manifest.slug != slug {
+            return Err(PluginError::InvalidManifest(
+                "rollback version directory does not match its manifest".into(),
+            ));
+        }
+        self.activate_transaction(&manifest, &pointer, || installer.rollback(slug))
+    }
+
+    fn ensure_installation_available(&self) -> Result<(), PluginError> {
+        use std::sync::atomic::Ordering::Acquire;
+        if self.shutting_down.load(Acquire) || self.quiescence.load(Acquire) != 0 {
+            return Err(PluginError::HostRequest(
+                "Module operations are paused. Retry when Taomni is ready".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    /// Renew an already running host before reporting activation success.
+    /// If activation fails, restore the pointer and reopen the previous host.
     pub(super) fn activate_transaction(
         &self,
         manifest: &ModuleManifest,
@@ -103,6 +138,11 @@ impl PluginRegistry {
             .expect("plugin registry lock poisoned")
             .clone();
         let slug = &manifest.slug;
+        let was_running = self
+            .hosts
+            .lock()
+            .expect("plugin host lock poisoned")
+            .contains_key(slug);
         self.stop_host(slug)?;
         let result = (|| {
             activate()?;
@@ -117,15 +157,21 @@ impl PluginRegistry {
                         .unwrap_or_else(|| "activated manifest differs".into()),
                 ));
             }
+            if was_running
+                && record.state == LifecycleState::Enabled
+                && manifest.entry.host.is_some()
+            {
+                self.host_for_locked(slug, &record)?;
+            }
             Ok(record)
         })();
-        if result.is_err() {
+        if let Err(failure) = result {
             if let Err(restore_error) =
                 install::ModuleInstaller::new(&self.root).restore_pointer(slug, previous)
             {
                 let reason = format!(
                     "activation failed: {}; restoring previous version failed: {restore_error}",
-                    result.as_ref().unwrap_err()
+                    failure
                 );
                 let mut records = self.records.write().expect("plugin registry lock poisoned");
                 if let Some(record) = records.get_mut(slug) {
@@ -143,6 +189,17 @@ impl PluginRegistry {
                 .write()
                 .expect("plugin asset lock poisoned")
                 .clear();
+            if let Some(old) = self
+                .get(slug)
+                .filter(|old| was_running && old.state == LifecycleState::Enabled)
+            {
+                if let Err(recovery_error) = self.host_for_locked(slug, &old) {
+                    return Err(PluginError::HostRequest(format!(
+                        "{failure}. Previous version restored, but its host could not restart: {recovery_error}"
+                    )));
+                }
+            }
+            return Err(failure);
         }
         result
     }

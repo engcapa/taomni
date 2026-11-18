@@ -10,6 +10,7 @@
 use std::fs;
 use std::io::{self, Write};
 use std::path::{Component, Path, PathBuf};
+use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
@@ -20,6 +21,38 @@ pub struct ActivePointer {
     pub active_version: Option<String>,
     #[serde(rename = "previousVersion")]
     pub previous_version: Option<String>,
+    #[serde(
+        default,
+        rename = "rollbackUntil",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub rollback_until: Option<u64>,
+}
+
+const ROLLBACK_WINDOW: Duration = Duration::from_secs(7 * 24 * 60 * 60);
+
+fn unix_seconds(time: SystemTime) -> u64 {
+    time.duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
+}
+
+impl ActivePointer {
+    pub(super) fn rollback_version(&self, slug: &str) -> Result<&str, InstallError> {
+        let previous = self
+            .previous_version
+            .as_deref()
+            .filter(|_| self.active_version.is_some())
+            .ok_or_else(|| InstallError::NoRollback(slug.into()))?;
+        if !Self::rollback_time_is_open(self.rollback_until) {
+            return Err(InstallError::RollbackExpired(slug.into()));
+        }
+        Ok(previous)
+    }
+
+    pub(super) fn rollback_time_is_open(deadline: Option<u64>) -> bool {
+        deadline.is_some_and(|deadline| deadline > unix_seconds(SystemTime::now()))
+    }
 }
 
 #[derive(Debug, Error)]
@@ -34,6 +67,8 @@ pub enum InstallError {
     NotStaged { slug: String, version: String },
     #[error("module {0} has no previous version to roll back to")]
     NoRollback(String),
+    #[error("the seven-day rollback window for {0} has expired")]
+    RollbackExpired(String),
     #[error("module filesystem operation failed: {0}")]
     Io(#[from] io::Error),
     #[error("module active pointer is invalid: {0}")]
@@ -98,7 +133,7 @@ impl ModuleInstaller {
                 "active.json must not be a symlink".into(),
             ));
         }
-        let pointer: ActivePointer = serde_json::from_slice(&fs::read(path)?)?;
+        let mut pointer: ActivePointer = serde_json::from_slice(&fs::read(path)?)?;
         for version in [
             pointer.active_version.as_deref(),
             pointer.previous_version.as_deref(),
@@ -109,6 +144,15 @@ impl ModuleInstaller {
             validate_version(version).map_err(|error| {
                 InstallError::InvalidPointer(format!("invalid version {version}: {error}"))
             })?;
+        }
+        // Existing pointers predate rollbackUntil. Use their activation file's
+        // timestamp and persist that deadline if a subsequent operation writes it.
+        if pointer.rollback_until.is_none()
+            && pointer.active_version.is_some()
+            && pointer.previous_version.is_some()
+        {
+            pointer.rollback_until =
+                Some(unix_seconds(metadata.modified()?).saturating_add(ROLLBACK_WINDOW.as_secs()));
         }
         Ok(pointer)
     }
@@ -204,6 +248,10 @@ impl ModuleInstaller {
         if pointer.active_version.as_deref() != Some(version) {
             pointer.previous_version = pointer.active_version.take();
             pointer.active_version = Some(version.to_owned());
+            pointer.rollback_until = pointer
+                .previous_version
+                .as_ref()
+                .map(|_| unix_seconds(SystemTime::now()).saturating_add(ROLLBACK_WINDOW.as_secs()));
             self.write_pointer(slug, &pointer)?;
         }
         Ok(pointer)
@@ -213,15 +261,12 @@ impl ModuleInstaller {
     /// this twice toggles between the two versions and remains idempotent.
     pub fn rollback(&self, slug: &str) -> Result<ActivePointer, InstallError> {
         let mut pointer = self.active_pointer(slug)?;
-        let previous = pointer
-            .previous_version
-            .clone()
-            .ok_or_else(|| InstallError::NoRollback(slug.to_owned()))?;
-        let previous_dir = self.version_dir(slug, &previous)?;
+        let previous = pointer.rollback_version(slug)?;
+        let previous_dir = self.version_dir(slug, previous)?;
         if !previous_dir.is_dir() {
             return Err(InstallError::NotStaged {
                 slug: slug.to_owned(),
-                version: previous,
+                version: previous.to_owned(),
             });
         }
         std::mem::swap(&mut pointer.active_version, &mut pointer.previous_version);
@@ -265,6 +310,7 @@ impl ModuleInstaller {
         if pointer.active_version.is_some() {
             pointer.previous_version = pointer.active_version.take();
         }
+        pointer.rollback_until = None;
         self.write_pointer(slug, &pointer)?;
         if delete_data {
             let data = self.root.join(slug).join("data");
@@ -437,6 +483,23 @@ mod tests {
     }
 
     #[test]
+    fn an_expired_rollback_window_leaves_both_pointers_unchanged() {
+        let root = tempdir().unwrap();
+        let installer = ModuleInstaller::new(root.path());
+        let expired = ActivePointer {
+            active_version: Some("2.0.0".into()),
+            previous_version: Some("1.0.0".into()),
+            rollback_until: Some(1),
+        };
+        installer.write_pointer("mfa", &expired).unwrap();
+        assert!(matches!(
+            installer.rollback("mfa"),
+            Err(InstallError::RollbackExpired(_))
+        ));
+        assert_eq!(installer.active_pointer("mfa").unwrap(), expired);
+    }
+
+    #[test]
     fn rejects_tampered_active_pointer_paths() {
         let root = tempdir().unwrap();
         let plugin = root.path().join("mfa");
@@ -468,11 +531,13 @@ mod tests {
         let invalid = ActivePointer {
             active_version: Some("../outside".into()),
             previous_version: None,
+            rollback_until: None,
         };
         assert!(installer.restore_pointer("mfa", &invalid).is_err());
         let missing = ActivePointer {
             active_version: Some("9.0.0".into()),
             previous_version: None,
+            rollback_until: None,
         };
         assert!(installer.restore_pointer("mfa", &missing).is_err());
         assert_eq!(installer.active_pointer("mfa").unwrap(), original);

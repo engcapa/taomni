@@ -11,7 +11,7 @@ import { useSystemFonts } from "../../lib/systemFonts";
 import { DEFAULT_TERMINAL_DEFAULT_PROFILE, DEFAULT_TERMINAL_PROFILE, loadTerminalDefaultProfile, saveTerminalDefaultProfile, type TerminalProfile } from "../../lib/terminalProfile";
 import { useAiStore } from "../../stores/aiStore";
 import { useAppStore } from "../../stores/appStore";
-import { useModuleStore } from "../../stores/moduleStore";
+import { projectModuleRecord, useModuleStore } from "../../stores/moduleStore";
 import { usePluginFrontendStore } from "../../stores/pluginFrontendStore";
 import { type FontPickerOption } from "../terminal/FontPickerPanel";
 import { type ModuleStoreCatalogEntry } from "./ModuleStorePanel";
@@ -27,7 +27,7 @@ function moduleCatalogEntry(record: PluginRecord): ModuleStoreCatalogEntry | nul
   return {
     slug: manifest.slug,
     name: manifest.name,
-    description: `${manifest.kind} module`,
+    description: manifest.description || `${manifest.kind} module`,
     version: manifest.version,
     coreApiVersion: manifest.coreApiVersion,
     permissions: manifest.permissions,
@@ -263,14 +263,7 @@ export function SettingsPanel() {
     listPlugins()
       .then((records) => {
         if (!mounted) return;
-        hydrateModuleStore(records.map((record) => ({
-          slug: record.slug,
-          version: record.manifest?.version ?? "0.0.0",
-          activeVersion: record.lifecycle === "uninstalled" ? undefined : record.manifest?.version,
-          lifecycle: record.lifecycle,
-          dataRetained: record.dataRetained === true,
-          error: record.reason,
-        })));
+        hydrateModuleStore(records.map(projectModuleRecord));
         setModuleCatalog(records.map(moduleCatalogEntry).filter((entry): entry is ModuleStoreCatalogEntry => entry !== null));
         setModuleCatalogError(null);
       })
@@ -325,9 +318,8 @@ export function SettingsPanel() {
   const moduleOnUninstall = useCallback(async (entry: ModuleStoreCatalogEntry, deleteData: boolean) => {
     await uninstallPlugin(entry.slug, deleteData);
   }, []);
-  const moduleOnRollback = useCallback(async (entry: ModuleStoreCatalogEntry, _version: string) => {
-    await rollbackPlugin(entry.slug);
-  }, []);
+  const moduleOnRollback = useCallback(async (entry: ModuleStoreCatalogEntry, version: string) =>
+    projectModuleRecord(await rollbackPlugin(entry.slug, version)), []);
   const moduleOnMigrationExecute = useCallback(async () => {
     try {
       const result = await executePluginMigration(migrationSnapshot?.from_version);

@@ -122,12 +122,15 @@ pub async fn plugin_install_archive(
 #[tauri::command]
 pub async fn plugin_rollback(
     slug: String,
+    version: Option<String>,
     state: State<'_, AppState>,
     app: AppHandle,
 ) -> Result<PluginRecord, String> {
     let registry = state.plugins.clone();
     let result = tauri::async_runtime::spawn_blocking(move || {
-        registry.rollback(&slug).map_err(|error| error.to_string())
+        registry
+            .rollback_to(&slug, version.as_deref())
+            .map_err(|error| error.to_string())
     })
     .await
     .map_err(|error| error.to_string())?;

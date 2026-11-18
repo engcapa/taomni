@@ -316,6 +316,12 @@ controls:
   - id: module-version-hello-plugin
     selector: '[data-testid="module-version-hello-plugin"]'
     kind: display
+  - id: module-status-hello-plugin
+    selector: '[data-testid="module-status-hello-plugin"]'
+    kind: display
+  - id: module-action-rollback-hello-plugin
+    selector: '[data-testid="module-action-rollback-hello-plugin"]'
+    kind: interactive
   - id: module-action-enable-hello-plugin
     selector: '[data-testid="module-action-enable-hello-plugin"]'
     kind: interactive

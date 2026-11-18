@@ -24,7 +24,7 @@ import { CodexCodePanel } from "../CodexCodePanel";
 import { EditorAiLanguagePanel } from "../EditorAiLanguagePanel";
 import { FileOpenSettings } from "../FileOpenSettings";
 import { MobileServiceSettings } from "../MobileServiceSettings";
-import { ModuleStorePanel, type ModuleStoreCatalogEntry } from "../ModuleStorePanel";
+import { ModuleStorePanel, type ModuleStoreCatalogEntry, type ModuleStorePanelProps } from "../ModuleStorePanel";
 import { ModuleOfflineInstall } from "../ModuleOfflineInstall";
 import { ModuleNetworkSettings } from "../ModuleNetworkSettings";
 import { ModuleDownloads } from "../ModuleDownloads";
@@ -90,7 +90,7 @@ export interface SettingsPanelViewProps {
   moduleOnEnable: (entry: ModuleStoreCatalogEntry) => Promise<void>;
   moduleOnDisable: (entry: ModuleStoreCatalogEntry) => Promise<void>;
   moduleOnUninstall: (entry: ModuleStoreCatalogEntry, deleteData: boolean) => Promise<void>;
-  moduleOnRollback: (entry: ModuleStoreCatalogEntry, version: string) => Promise<void>;
+  moduleOnRollback: NonNullable<ModuleStorePanelProps["onRollback"]>;
   migrationSnapshot: LegacyInstallSnapshot | null;
   migrationLoading: boolean;
   migrationError: string | null;

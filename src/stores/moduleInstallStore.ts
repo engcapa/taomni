@@ -1,7 +1,7 @@
 import { create } from "zustand";
 import { installPluginArchive, listPlugins } from "../lib/ipc/plugin";
 import type { PluginRecord } from "../lib/pluginRegistry";
-import { useModuleStore } from "./moduleStore";
+import { projectModuleRecord, useModuleStore } from "./moduleStore";
 
 export type ModuleInstallPhase = "idle" | "verifying" | "completed" | "failed";
 
@@ -89,12 +89,5 @@ export function createModuleInstallStore(services: InstallServices) {
 export const useModuleInstallStore = createModuleInstallStore({
   install: installPluginArchive,
   list: listPlugins,
-  hydrate: (records) => useModuleStore.getState().hydrate(records.map((record) => ({
-    slug: record.slug ?? record.manifest?.slug ?? "unknown",
-    version: record.manifest?.version ?? "0.0.0",
-    activeVersion: record.lifecycle === "uninstalled" ? undefined : record.manifest?.version,
-    lifecycle: record.lifecycle,
-    dataRetained: true,
-    error: record.reason,
-  }))),
+  hydrate: (records) => useModuleStore.getState().hydrate(records.map(projectModuleRecord)),
 });

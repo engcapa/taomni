@@ -112,6 +112,8 @@ mod tests {
                 state: super::super::LifecycleState::Enabled,
                 reason: None,
                 data_retained: false,
+                previous_version: None,
+                rollback_until: None,
             },
         );
         registry

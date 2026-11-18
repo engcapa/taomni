@@ -40,7 +40,7 @@ export interface ModuleStorePanelProps {
   onEnable?: (entry: ModuleStoreCatalogEntry) => Promise<void> | void;
   onDisable?: (entry: ModuleStoreCatalogEntry) => Promise<void> | void;
   onUninstall?: (entry: ModuleStoreCatalogEntry, deleteData: boolean) => Promise<void> | void;
-  onRollback?: (entry: ModuleStoreCatalogEntry, version: string) => Promise<void> | void;
+  onRollback?: (entry: ModuleStoreCatalogEntry, version: string) => Promise<ModuleRecord | void> | void;
   /** Legacy 0.5.x preflight shown before any migration writes occur. */
   migrationSnapshot?: LegacyInstallSnapshot | null;
   migrationLoading?: boolean;
@@ -104,6 +104,7 @@ export function ModuleStorePanel({
   const t = useT();
   const records = useModuleStore((state) => state.records);
   const apply = useModuleStore((state) => state.apply);
+  const updateRecord = useModuleStore((state) => state.update);
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [deleteData, setDeleteData] = useState<Record<string, boolean>>({});
@@ -148,15 +149,19 @@ export function ModuleStorePanel({
     return performUninstall(entry, true);
   };
   const rollback = (entry: ModuleStoreCatalogEntry, record: ModuleRecord) => {
-    if (!record.previousVersion) return;
-    const callback = onRollback ? () => onRollback(entry, record.previousVersion!) : undefined;
+    const version = record.previousVersion;
+    if (!version) return;
     setBusy(`${entry.slug}:rollback`);
     setError(null);
     void (async () => {
       try {
-        apply(entry.slug, { type: "begin-rollback" });
-        await callback?.();
-        apply(entry.slug, { type: "complete-rollback", version: record.previousVersion! });
+        const updated = await onRollback?.(entry, version);
+        if (updated) {
+          updateRecord(updated);
+        } else {
+          apply(entry.slug, { type: "begin-rollback" });
+          apply(entry.slug, { type: "complete-rollback", version });
+        }
       } catch (reason) {
         const message = reason instanceof Error ? reason.message : String(reason);
         setError(message);

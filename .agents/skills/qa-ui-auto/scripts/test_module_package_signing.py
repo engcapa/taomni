@@ -30,6 +30,10 @@ class OfficialPackageSigningGuardTests(unittest.TestCase):
             shutil.copytree(ROOT / "src-tauri/plugins" / module / "frontend", trusted / "frontend")
             shutil.copytree(trusted / "frontend", payload / "frontend")
         (payload / "module.json").write_text(json.dumps(manifest))
+        if module == "hello-plugin":
+            previous = root / "candidate/unsigned-previous"
+            shutil.copytree(payload, previous)
+            (previous / "module.json").write_text(json.dumps({**manifest, "version": "0.0.9"}))
         (root / "candidate/candidate-source.json").write_text(json.dumps({
             "sourceSha": "a" * 40, "platform": platform, "module": module,
         }))
@@ -52,6 +56,22 @@ class OfficialPackageSigningGuardTests(unittest.TestCase):
                     root = Path(directory)
                     self.seed(root, module, platform)
                     self.guard(root, module, platform)
+                    if module == "hello-plugin":
+                        failure = root / "candidate/handshake-failure"
+                        manifest = json.loads((failure / "module.json").read_text())
+                        self.assertEqual(manifest["version"], "0.1.1")
+                        self.assertEqual((failure / manifest["entry"]["host"]).read_bytes(),
+                                         (root / "candidate/unsigned-module" / manifest["entry"]["host"]).read_bytes())
+
+    def test_alternate_version_is_limited_to_the_previous_protocol_fixture(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            self.seed(root, "hello-plugin", "linux-x86_64")
+            path = root / "candidate/unsigned-previous/module.json"
+            manifest = json.loads(path.read_text())
+            path.write_text(json.dumps({**manifest, "version": "3.0.0"}))
+            with self.assertRaisesRegex(AssertionError, "trusted official contract"):
+                self.guard(root, "hello-plugin", "linux-x86_64")
 
     def test_source_module_metadata_and_unsigned_file_changes_are_rejected(self):
         for change in ["source", "module", "permissions", "frontend-entry", "extra-file", "frontend-bytes", "secondary-chunk"]:

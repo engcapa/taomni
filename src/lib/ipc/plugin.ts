@@ -246,9 +246,9 @@ export function cancelPluginRequest(slug: string, requestId: string): Promise<bo
   return invoke<boolean>("plugin_cancel_request", { slug, requestId });
 }
 
-export async function rollbackPlugin(slug: string): Promise<PluginRecord> {
+export async function rollbackPlugin(slug: string, version?: string): Promise<PluginRecord> {
   if (!SLUG.test(slug)) return Promise.reject(new Error(`Invalid plugin slug: ${slug}`));
-  return mutationResult(await invoke<unknown>("plugin_rollback", { slug }));
+  return mutationResult(await invoke<unknown>("plugin_rollback", { slug, version }));
 }
 
 export async function uninstallPlugin(slug: string, deleteData = false): Promise<PluginRecord> {

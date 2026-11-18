@@ -87,6 +87,7 @@ export interface PluginRecord {
   /** A human readable reason is retained for the disabled/invalid view. */
   reason?: string;
   dataRetained?: boolean;
+  previousVersion?: string;
 }
 
 const SLUG = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/;

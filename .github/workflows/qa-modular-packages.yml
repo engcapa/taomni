@@ -152,11 +152,39 @@ jobs:
               shutil.copytree(source / 'frontend', output / 'frontend')
           pathlib.Path('candidate-source.json').write_text(json.dumps({'sourceSha': os.environ['MODULE_SOURCE_SHA'], 'platform': os.environ['MODULE_PLATFORM'], 'module': os.environ['QA_MODULE']}), encoding='utf-8')
           PY
+      - name: Build the previous hello protocol version for the lifecycle test
+        if: env.QA_MODULE == 'hello-plugin'
+        env:
+          MODULE_TARGET: ${{ matrix.target }}
+        run: |
+          python - <<'PY'
+          import pathlib
+          files = [pathlib.Path('src-tauri/plugins/hello-plugin/Cargo.toml'), pathlib.Path('src-tauri/Cargo.lock')]
+          old = 'name = "taomni-hello-plugin"\nversion = "0.1.0"'
+          new = old.replace('0.1.0', '0.0.9')
+          for path in files:
+              text = path.read_text(encoding='utf-8')
+              assert text.count(old) == 1, f'Expected one hello version in {path}'
+              path.write_text(text.replace(old, new), encoding='utf-8')
+          PY
+          cargo build --manifest-path src-tauri/Cargo.toml -p taomni-hello-plugin --bin taomni-hello-plugin --release --target "$MODULE_TARGET" --locked
+          python - <<'PY'
+          import json, os, pathlib, shutil
+          previous = pathlib.Path('unsigned-previous')
+          shutil.copytree('unsigned-module', previous)
+          path = previous / 'module.json'
+          manifest = json.loads(path.read_text(encoding='utf-8'))
+          manifest['version'] = '0.0.9'
+          path.write_text(json.dumps(manifest, indent=2), encoding='utf-8')
+          host = manifest['entry']['host']
+          shutil.copyfile(pathlib.Path('src-tauri/target') / os.environ['MODULE_TARGET'] / 'release' / host, previous / host)
+          PY
       - uses: actions/upload-artifact@v4
         with:
           name: unsigned-module-${{ matrix.platform }}-${{ inputs.artifact_key || github.run_id }}
           path: |
             unsigned-module/
+            unsigned-previous/
             candidate-source.json
           if-no-files-found: error
           retention-days: 7
@@ -196,7 +224,7 @@ jobs:
           MODULE_SOURCE_SHA: ${{ needs.source.outputs.sha }}
         run: |
           python - <<'PY'
-          import json, os, pathlib
+          import json, os, pathlib, shutil
           root = pathlib.Path('candidate')
           module = os.environ['QA_MODULE']
           assert module in {'hello-plugin', 'mfa'}, 'Unknown official QA module'
@@ -206,10 +234,8 @@ jobs:
           expected = json.loads((trusted_source / 'module.json').read_text(encoding='utf-8'))
           if os.environ['MODULE_PLATFORM'].startswith('windows'):
               expected['entry']['host'] += '.exe'
-          actual = json.loads((root / 'unsigned-module/module.json').read_text(encoding='utf-8'))
           assert not any(p.is_symlink() for p in root.rglob('*'))
-          assert actual == expected, 'Candidate metadata differs from the trusted official contract'
-          assert actual['id'] == 'taomni-plugin-' + module and actual['version'] == '0.1.0'
+          assert expected['id'] == 'taomni-plugin-' + module and expected['version'] == '0.1.0'
           allowed = {'module.json', expected['entry']['host']}
           frontend = expected['entry'].get('frontend')
           if frontend:
@@ -219,10 +245,24 @@ jobs:
                   if source.is_file():
                       relative = source.relative_to(trusted_source).as_posix()
                       allowed.add(relative)
-                      assert (root / 'unsigned-module' / relative).read_bytes() == source.read_bytes(), 'Candidate changed official frontend without a trusted revision'
-          files = {p.relative_to(root / 'unsigned-module').as_posix() for p in (root / 'unsigned-module').rglob('*') if p.is_file()}
-          assert files == allowed, 'Unexpected files in official QA payload'
-          assert not any(p.is_symlink() for p in root.rglob('*'))
+          versions = {'unsigned-module': '0.1.0'}
+          if module == 'hello-plugin':
+              versions['unsigned-previous'] = '0.0.9'
+          for folder, version in versions.items():
+              payload = root / folder
+              manifest = json.loads((payload / 'module.json').read_text(encoding='utf-8'))
+              assert manifest == {**expected, 'version': version}, 'Candidate metadata differs from the trusted official contract'
+              files = {p.relative_to(payload).as_posix() for p in payload.rglob('*') if p.is_file()}
+              assert files == allowed, 'Unexpected files in official QA payload'
+              for relative in allowed - {'module.json', expected['entry']['host']}:
+                  assert (payload / relative).read_bytes() == (trusted_source / relative).read_bytes(), 'Candidate changed official frontend without a trusted revision'
+          if module == 'hello-plugin':
+              # This signed test input deliberately changes only the declared
+              # version. The binary will reject the host handshake, exercising
+              # recovery through the actual installer and verified registry.
+              failing = root / 'handshake-failure'
+              shutil.copytree(root / 'unsigned-module', failing)
+              (failing / 'module.json').write_text(json.dumps({**expected, 'version': '0.1.1'}), encoding='utf-8')
           PY
       - name: Sign and independently verify against the production pinned public key
         env:
@@ -230,11 +270,19 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           MODULE_PLATFORM: ${{ matrix.platform }}
           MODULE_SOURCE_SHA: ${{ needs.source.outputs.sha }}
-        run: >-
-          scripts/plugin-package/target/release/taomni-plugin-package
-          --payload candidate/unsigned-module --platform "$MODULE_PLATFORM"
-          --output signed-module --source-sha "$MODULE_SOURCE_SHA"
-          --qa-catalog true
+        run: |
+          scripts/plugin-package/target/release/taomni-plugin-package \
+            --payload candidate/unsigned-module --platform "$MODULE_PLATFORM" \
+            --output signed-module --source-sha "$MODULE_SOURCE_SHA" \
+            --qa-catalog true
+          if [[ "$QA_MODULE" == "hello-plugin" ]]; then
+            for pair in 'unsigned-previous previous' 'handshake-failure handshake-failure'; do
+              read -r payload destination <<< "$pair"
+              scripts/plugin-package/target/release/taomni-plugin-package \
+                --payload "candidate/$payload" --platform "$MODULE_PLATFORM" \
+                --output "signed-module/$destination" --source-sha "$MODULE_SOURCE_SHA"
+            done
+          fi
       - uses: actions/upload-artifact@v4
         with:
           name: qa-modular-package-${{ matrix.platform }}-${{ inputs.artifact_key || github.run_id }}

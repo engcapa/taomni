@@ -96,7 +96,7 @@ class SignedHostGateReceiptTests(unittest.TestCase):
                 self.assertFalse((self.evidence / "installed-mfa-receipt.json").exists())
 
     def test_incomplete_listing_cannot_run_or_issue_a_passing_receipt(self):
-        with self.assertRaisesRegex(AssertionError, "Expected three"):
+        with self.assertRaisesRegex(AssertionError, "Expected 3 actual installed gates"):
             self.run_gate(listing="")
         self.assertFalse((self.evidence / "installed-mfa-receipt.json").exists())
 

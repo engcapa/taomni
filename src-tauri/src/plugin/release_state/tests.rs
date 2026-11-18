@@ -30,6 +30,7 @@ fn pointer(root: &Path, slug: &str, active: Option<&str>, previous: Option<&str>
         &ActivePointer {
             active_version: active.map(str::to_owned),
             previous_version: previous.map(str::to_owned),
+            rollback_until: None,
         },
     )
     .unwrap();

@@ -6,13 +6,14 @@ import time
 
 from .fixtures.module_download import plugin_root
 from .fixtures.module_marketplace import ORIGIN
+from .module_update_observation import VERSION_STATES, observe as observe_update
 from .steps import StepError
 
 PHASES = {"source", "no-download", "downloaded", "installed", "rejected", "legacy-installed", "legacy-uninstalled"}
 
 
 def run(ctx, args):
-    if not isinstance(args, dict) or set(args) != {"phase"} or args["phase"] not in PHASES:
+    if not isinstance(args, dict) or set(args) != {"phase"} or args["phase"] not in PHASES | VERSION_STATES.keys():
         raise StepError("module_marketplace_probe requires a registered fixed phase")
     owner = getattr(ctx, "fixture_context", None) or ctx
     origin = getattr(owner, "module_marketplace", None)
@@ -26,6 +27,8 @@ def run(ctx, args):
             # Only a transport preference, equivalent to the mirror input.
             # No catalog bytes, key, active pointer or install result is seeded.
             ctx.session.execute("localStorage.setItem('taomni.module-catalog-source.v1', " + json.dumps(ORIGIN + "/modules.json") + "); return true;")
+        elif phase in VERSION_STATES:
+            record.update(observe_update(ctx, root, phase, origin))
         else:
             if phase == "legacy-installed":
                 enrollment_path = root.parent / ".module-release.json"

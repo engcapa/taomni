@@ -139,6 +139,23 @@ pub struct PluginRecord {
     pub reason: Option<String>,
     #[serde(default, rename = "dataRetained")]
     pub data_retained: bool,
+    #[serde(
+        default,
+        rename = "previousVersion",
+        skip_serializing_if = "Option::is_none"
+    )]
+    pub previous_version: Option<String>,
+    #[serde(skip)]
+    rollback_until: Option<u64>,
+}
+
+impl PluginRecord {
+    fn with_current_rollback(mut self) -> Self {
+        if !install::ActivePointer::rollback_time_is_open(self.rollback_until) {
+            self.previous_version = None;
+        }
+        self
+    }
 }
 
 #[derive(Debug, Error)]
@@ -240,17 +257,23 @@ impl PluginRegistry {
             let data_retained = fs::symlink_metadata(path.join("data"))
                 .is_ok_and(|metadata| metadata.is_dir() && !data_contract::is_link(&metadata));
             let record = match self.read_manifest(&path, &slug) {
-                Ok((manifest, state)) => PluginRecord {
+                Ok((manifest, state, pointer)) => PluginRecord {
                     manifest,
                     state,
                     reason: None,
                     data_retained,
+                    previous_version: pointer
+                        .previous_version
+                        .filter(|_| pointer.active_version.is_some()),
+                    rollback_until: pointer.rollback_until,
                 },
                 Err(error) => PluginRecord {
                     manifest: placeholder_manifest(&slug),
                     state: LifecycleState::Disabled,
                     reason: Some(error.to_string()),
                     data_retained,
+                    previous_version: None,
+                    rollback_until: None,
                 },
             };
             records.insert(slug, record);
@@ -289,6 +312,7 @@ impl PluginRegistry {
             .expect("plugin registry lock poisoned")
             .values()
             .cloned()
+            .map(PluginRecord::with_current_rollback)
             .collect::<Vec<_>>();
         values.sort_by(|a, b| a.manifest.slug.cmp(&b.manifest.slug));
         values
@@ -300,6 +324,7 @@ impl PluginRegistry {
             .expect("plugin registry lock poisoned")
             .get(slug)
             .cloned()
+            .map(PluginRecord::with_current_rollback)
     }
 
     pub fn set_enabled(&self, slug: &str, enabled: bool) -> Result<PluginRecord, PluginError> {
@@ -307,6 +332,8 @@ impl PluginRegistry {
             .lifecycle
             .lock()
             .expect("plugin lifecycle lock poisoned");
+        let _mutation = install::ModuleInstaller::new(&self.root).lock_mutations()?;
+        self.scan_locked()?;
         let verified = if enabled {
             Some(verify::verify_installed(
                 &self.active_directory(slug)?,
@@ -354,37 +381,13 @@ impl PluginRegistry {
             .ok_or_else(|| PluginError::NotFound(slug.to_owned()))
     }
 
-    /// Switch the active immutable version to the previous one and refresh the
-    /// registry projection. The host supervisor will re-handshake separately.
-    pub fn rollback(&self, slug: &str) -> Result<PluginRecord, PluginError> {
-        let _lifecycle = self
-            .lifecycle
-            .lock()
-            .expect("plugin lifecycle lock poisoned");
-        let installer = install::ModuleInstaller::new(&self.root);
-        let _mutation = installer.lock_mutations()?;
-        let pointer = installer.active_pointer(slug)?;
-        let previous = pointer
-            .previous_version
-            .as_ref()
-            .ok_or_else(|| install::InstallError::NoRollback(slug.into()))?;
-        let manifest =
-            verify::verify_installed(&installer.version_dir(slug, previous)?, current_platform())?;
-        if &manifest.version != previous || manifest.slug != slug {
-            return Err(PluginError::InvalidManifest(
-                "rollback version directory does not match its manifest".into(),
-            ));
-        }
-        self.activate_transaction(&manifest, &pointer, || installer.rollback(slug))
-    }
-
     fn read_manifest(
         &self,
         plugin_dir: &Path,
         slug: &str,
-    ) -> Result<(ModuleManifest, LifecycleState), PluginError> {
+    ) -> Result<(ModuleManifest, LifecycleState, install::ActivePointer), PluginError> {
         let pointer = install::ModuleInstaller::new(&self.root).active_pointer(slug)?;
-        let (manifest_path, state) = if let Some(active) = pointer.active_version {
+        let (manifest_path, state) = if let Some(active) = &pointer.active_version {
             (
                 plugin_dir.join("versions").join(active).join("module.json"),
                 LifecycleState::Installed,
@@ -424,7 +427,7 @@ impl PluginRegistry {
             ));
         }
         self.validate_manifest(&manifest, plugin_dir)?;
-        Ok((manifest, state))
+        Ok((manifest, state, pointer))
     }
 
     fn validate_manifest(&self, manifest: &ModuleManifest, dir: &Path) -> Result<(), PluginError> {
