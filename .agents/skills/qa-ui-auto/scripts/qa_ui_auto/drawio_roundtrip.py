@@ -15,7 +15,6 @@ FEATURES = {
     "diamond": ("#ffd470", 0.97),
     "ellipse": ("#7ed9a8", 0.97),
     "outlines": ("#47668c", 0.93),
-    "arrows": ("#8b30ce", 0.91),
 }
 
 # Individual label regions in the Desktop reference after trimming its margin.
@@ -86,6 +85,19 @@ def compare_images(reference, captured, report, label):
             before &= outside_labels
             after &= outside_labels
         compare_mask(name, before, after, threshold, radius=2)
+
+    arrow_ink = 255 - np.array(ImageColor.getrgb("#8b30ce"), dtype=float)
+
+    def arrow_mask(pixels):
+        # A connector at reduced scale can cover only part of an output pixel.
+        # Match the ink composited over the white diagram background.
+        shade = 255 - pixels
+        coverage = (shade @ arrow_ink) / (arrow_ink @ arrow_ink)
+        blended = coverage[..., None] * arrow_ink
+        color_error = np.max(np.abs(shade - blended), axis=2)
+        return (coverage >= 0.30) & (color_error <= 20)
+
+    compare_mask("arrows", arrow_mask(expected_pixels), arrow_mask(actual_pixels), 0.91, radius=2)
 
     comparison = Image.new("RGB", (3 * expected.width + 32, expected.height + 36), "#f1f5f9")
     drawing = ImageDraw.Draw(comparison)

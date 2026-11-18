@@ -24,6 +24,21 @@ class DrawioRoundtripTest(unittest.TestCase):
                 compare_images(reference, captured, report, "Missing connector")
             self.assertTrue(report.with_suffix(".png").is_file())
 
+    def test_preview_accepts_partially_covered_connector_pixels(self):
+        reference = ASSETS / "roundtrip.drawio.png"
+        with TemporaryDirectory() as directory, Image.open(reference) as image:
+            report = Path(directory) / "comparison"
+            captured = Path(directory) / "antialiased-connectors.png"
+            modified = image.convert("RGB")
+            for y in range(modified.height):
+                for x in range(modified.width):
+                    red, green, blue = modified.getpixel((x, y))
+                    if red - green >= 25 and blue - red >= 20:
+                        blend = tuple(round((channel + 255) / 2) for channel in (red, green, blue))
+                        modified.putpixel((x, y), blend)
+            modified.save(captured)
+            compare_images(reference, captured, report, "Antialiased connectors")
+
     def test_preview_detects_one_invisible_label(self):
         reference = ASSETS / "roundtrip.drawio.png"
         with TemporaryDirectory() as directory, Image.open(reference) as image:
