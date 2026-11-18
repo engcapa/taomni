@@ -33,7 +33,7 @@ fn run() -> Result<()> {
     }
     if matches!(
         args.peek().map(String::as_str),
-        Some("--sign-catalog" | "--verify-catalog")
+        Some("--sign-catalog" | "--verify-catalog" | "--verify-catalog-signature")
     ) {
         let operation = args.next().expect("catalog operation");
         let path = args
@@ -43,10 +43,12 @@ fn run() -> Result<()> {
             args.next().is_none(),
             "catalog operations accept one directory"
         );
-        return if operation == "--sign-catalog" {
-            taomni_plugin_package::release_catalog::sign_staged(Path::new(&path))
-        } else {
-            taomni_plugin_package::release_catalog::verify_staged(Path::new(&path))
+        use taomni_plugin_package::release_catalog;
+        let directory = Path::new(&path);
+        return match operation.as_str() {
+            "--sign-catalog" => release_catalog::sign_staged(directory),
+            "--verify-catalog-signature" => release_catalog::verify_catalog_signature(directory),
+            _ => release_catalog::verify_staged(directory),
         };
     }
     let mut values = BTreeMap::new();

@@ -549,18 +549,20 @@ jobs:
         with:
           node-version: '22'
       - name: Updater and plugin manifest unit contracts
-        run: node --test scripts/compose-updater-manifest.test.mjs scripts/compose-modules-manifest.test.mjs scripts/verify-updater-signatures.test.mjs scripts/release-workflow.test.mjs
+        run: node --test scripts/compose-updater-manifest.test.mjs scripts/compose-modules-manifest.test.mjs scripts/verify-updater-signatures.test.mjs scripts/stage-published-module-catalog.test.mjs scripts/release-workflow.test.mjs
       - name: Download workflow artifacts
         if: needs.plan.outputs.tag != ''
         uses: actions/download-artifact@v4
         with:
           path: artifacts
 
-      - name: Assemble the complete staged module catalog
+      - name: Assemble or carry forward the signed module catalog
         id: module-catalog
         env:
           TAG: ${{ needs.plan.outputs.tag }}
           MODULES_LEGACY_UPGRADE_IDS: ${{ vars.TAOMNI_LEGACY_UPGRADE_IDS }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
         shell: bash
         run: |
           set -euo pipefail
@@ -568,11 +570,13 @@ jobs:
             export MODULE_UPDATED_AT="$(git show -s --format=%cI HEAD)"
             node scripts/compose-modules-manifest.mjs artifacts module-assets
             echo 'present=true' >> "$GITHUB_OUTPUT"
+          elif [[ -n "$MODULES_LEGACY_UPGRADE_IDS" ]]; then
+            node scripts/stage-published-module-catalog.mjs carried-module-catalog >> "$GITHUB_OUTPUT"
           fi
       - uses: dtolnay/rust-toolchain@stable
-        if: steps.module-catalog.outputs.present == 'true'
+        if: steps.module-catalog.outputs.present == 'true' || steps.module-catalog.outputs.source_tag != ''
       - name: Build the catalog signer before providing the signing key
-        if: steps.module-catalog.outputs.present == 'true'
+        if: steps.module-catalog.outputs.present == 'true' || steps.module-catalog.outputs.source_tag != ''
         run: |
           cargo test --manifest-path scripts/plugin-package/Cargo.toml --lib --locked
           cargo build --manifest-path scripts/plugin-package/Cargo.toml --bin taomni-plugin-package --release --locked
@@ -589,6 +593,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
           TAG: ${{ needs.plan.outputs.tag }}
+          MODULE_CATALOG_SOURCE_TAG: ${{ steps.module-catalog.outputs.source_tag }}
         shell: bash
         run: |
           set -euo pipefail
@@ -597,6 +602,8 @@ jobs:
 
           if [ -d module-assets ]; then
             scripts/plugin-package/target/release/taomni-plugin-package --verify-catalog module-assets
+          elif [ -d carried-module-catalog ]; then
+            scripts/plugin-package/target/release/taomni-plugin-package --verify-catalog-signature carried-module-catalog
           fi
 
           # No release mutation until every platform/signature gate has passed.
@@ -640,6 +647,9 @@ jobs:
             done < <(find module-assets -maxdepth 1 -type f ! -name modules.json ! -name modules.json.minisig | sort)
             gh release upload "$TAG" module-assets/modules.json.minisig --clobber
             gh release upload "$TAG" module-assets/modules.json --clobber
+          elif [[ -d carried-module-catalog && "$MODULE_CATALOG_SOURCE_TAG" != "$TAG" ]]; then
+            gh release upload "$TAG" carried-module-catalog/modules.json.minisig --clobber
+            gh release upload "$TAG" carried-module-catalog/modules.json --clobber
           fi
 
           # Publish the complete manifest only after every referenced asset exists.

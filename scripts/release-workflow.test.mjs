@@ -117,6 +117,26 @@ test("verifies the detached module catalog and all its packages before any relea
     "module-assets/modules.json.minisig", "module-assets/modules.json", "updater-assets/latest.json"]);
 });
 
+test("validates and carries the signed catalog before a core-only release becomes visible", (t) => {
+  const f = fixture(t, "v0.6.2");
+  const verifier = join(f.root, "scripts/plugin-package/target/release/taomni-plugin-package");
+  f.put(verifier, '#!/bin/sh\n[ "$1" = "--verify-catalog-signature" ] && [ "$2" = "carried-module-catalog" ] && [ -f carried-module-catalog/modules.json.minisig ]\n');
+  chmodSync(verifier, 0o755);
+  f.put(join(f.root, "carried-module-catalog/modules.json"), "exact verified catalog");
+  const env = { MODULE_CATALOG_SOURCE_TAG: "v0.6.1", TEST_GH_EXISTING_DRAFT: "1" };
+  assert.notEqual(f.run(env).status, 0);
+  assert.deepEqual(f.calls(), []);
+  rmSync(join(f.root, "updater-assets"), { recursive: true });
+  f.put(join(f.root, "carried-module-catalog/modules.json.minisig"), "exact detached signature");
+  const result = f.run(env);
+  assert.equal(result.status, 0, result.stderr + result.stdout);
+  const calls = f.calls();
+  const uploads = calls.filter((args) => args[1] === "upload").map((args) => args[3]);
+  assert.deepEqual(uploads.slice(-3), ["carried-module-catalog/modules.json.minisig",
+    "carried-module-catalog/modules.json", "updater-assets/latest.json"]);
+  assert.deepEqual(calls.at(-1), ["release", "edit", "v0.6.2", "--draft=false"]);
+});
+
 test("builders only store workflow artifacts; finalizer uploads installers/updates before latest.json", (t) => {
   assert(!workflow.includes("tagName:"));
   assert(!workflow.includes("releaseId:"));

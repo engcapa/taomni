@@ -108,6 +108,10 @@ publishing `modules.json.minisig` and then `modules.json`. Keep the catalog
 available at the release URL the application checks. The core installer and
 `latest.json` are separate release assets.
 
+After the first modular release, the core release workflow carries the original
+signed catalog bytes to a new core release when only the core changes. Package
+URLs continue to point to their original GitHub Release assets.
+
 Installed packages live at `<app data>/plugins/<slug>/versions/<version>/`.
 `.taomni-trust` holds the original signed archive for verification at restart,
 enable and rollback. `active.json` records active and previous versions.

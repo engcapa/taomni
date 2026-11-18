@@ -77,6 +77,7 @@
 - macOS 15 Intel 的 `TC-MODULES-015` 在还原成功后的第二次退出返回 SIGABRT。原始 `.ips` 对应该次退出的 PID，故障线程正在后台拉取签名目录，堆栈位于 AWS-LC 的随机数初始化。模块下载客户端改用现有 Ring provider 和同一套系统证书验证。新增 provider 单测和真实 TLS 拒绝不受信证书的用例。下载模块 29 项本地单测通过，真实 TLS 用例及崩溃场景留在 GitHub runner 复验。 [故障分片 #44334829135](https://github.com/engcapa/taomni/actions/runs/44334829135)
 - Ring 下载客户端在 Linux、Windows、macOS 的真实 TLS 和下载专项均已通过，包含不受信证书的拒绝断言。包含 Intel 第二次重启的三端应用回归继续按分片收证。 [下载专项 #44361591281](https://github.com/engcapa/taomni/actions/runs/44361591281) · [应用复验 #44361591364](https://github.com/engcapa/taomni/actions/runs/44361591364)
 - 模块独立发布准备支持以官方签名目录为基线，加入新模块或替换单个模块的版本。保留原首装清单与其他模块的资产地址，输出完整待签目录及本次新增资产列表。15 项打包工具单测通过，含签名基线篡改、序号重复、同版本覆盖和首装清单变更的拒绝。 [独立发布指引](../scripts/plugin-package/README.md#production-catalog-preparation)
+- 仅更新核心的发布现在会继承已签名目录。启用正式首装清单后，工作流从现行公开 Release 或其直接前序取得目录和签名，以内置公钥验证原始字节，再随新核心安装件发布。包地址沿用原 Release，模块版本及目录序号随原始字节保留。16 项 Rust 与 25 项发布工具单测通过，后续复验使用 GitHub 现有升级契约入口。 [发布实现](../.github/workflows/release.yml)
 
 核心仍包含旧 profile 的 MFA、Servers、SocksCap、远程桌面和本地语音等业务代码、状态与依赖。hello-plugin 和 MFA 已取得签名安装结果。已提交迁移的 MFA profile 通过签名宿主读写账户和生成验证码，原数据继续用作回退资料。主窗和分离窗已支持动态加载模块前端，MFA 的正式前端和新装 profile 仍待迁出。LanChat 功能已删除，历史 `lanchat.sqlite` 和 `lanchat.db` 保留原位。
 

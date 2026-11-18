@@ -39,6 +39,12 @@ pub fn verify_staged(directory: &Path) -> Result<()> {
     inspect_signed(directory, &verifier).map(|_| ())
 }
 
+/// Verify a published catalog before copying its exact bytes to a new core
+/// release. The asset URLs still refer to the original packages.
+pub fn verify_catalog_signature(directory: &Path) -> Result<()> {
+    read_signed_catalog(directory, &public_verifier()?).map(|_| ())
+}
+
 struct Catalog {
     path: PathBuf,
     sequence: u64,
@@ -76,6 +82,12 @@ fn inspect(directory: &Path, verifier: &minisign_verify::PublicKey) -> Result<Ca
 }
 
 fn inspect_signed(directory: &Path, verifier: &minisign_verify::PublicKey) -> Result<Catalog> {
+    let catalog = read_signed_catalog(directory, verifier)?;
+    verify_packages(directory, verifier, &catalog.document)?;
+    Ok(catalog)
+}
+
+fn read_signed_catalog(directory: &Path, verifier: &minisign_verify::PublicKey) -> Result<Catalog> {
     let catalog = read_catalog(directory)?;
     let signature = read_text(&directory.join(SIGNATURE), 16 * 1024)?;
     verify_reader(
@@ -85,7 +97,6 @@ fn inspect_signed(directory: &Path, verifier: &minisign_verify::PublicKey) -> Re
         &catalog.comment(),
     )?;
     validate_roster(&catalog.document)?;
-    verify_packages(directory, verifier, &catalog.document)?;
     Ok(catalog)
 }
 
@@ -373,5 +384,23 @@ mod tests {
                 .to_string()
                 .contains("hash mismatch")
         );
+    }
+
+    #[test]
+    fn verifies_exact_published_catalog_bytes_without_restaging_unchanged_packages() {
+        let root = tempfile::tempdir().unwrap();
+        let signer = ReleaseSigner::test_key();
+        let (staged, _) = stage(root.path(), &signer);
+        let catalog = inspect(&staged, signer.test_verifier()).unwrap();
+        let signature = signer.sign(&catalog.path, &catalog.comment()).unwrap();
+        let published = root.path().join("published");
+        fs::create_dir(&published).unwrap();
+        fs::copy(catalog.path, published.join(CATALOG)).unwrap();
+        fs::write(published.join(SIGNATURE), signature).unwrap();
+        let verified = read_signed_catalog(&published, signer.test_verifier()).unwrap();
+        assert_eq!(verified.raw, catalog.raw);
+        assert!(inspect_signed(&published, signer.test_verifier()).is_err());
+        fs::write(published.join(CATALOG), format!("{}\n", catalog.raw)).unwrap();
+        assert!(read_signed_catalog(&published, signer.test_verifier()).is_err());
     }
 }
