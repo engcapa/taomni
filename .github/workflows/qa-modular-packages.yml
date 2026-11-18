@@ -86,6 +86,7 @@ jobs:
           approved = {('linux', 'X64'): 'linux-x86_64', ('windows', 'X64'): 'windows-x86_64',
                       ('macos', 'ARM64'): 'darwin-aarch64', ('macos', 'X64'): 'darwin-x86_64'}
           capability = {'hello-plugin': 'signed-module', 'mfa': 'signed-mfa'}[os.environ['QA_MODULE']]
+          roster = set()
           if raw := os.environ.get('PACKAGE_NATIVE_BUILDS'):
               document = json.loads(raw)
               if not isinstance(document, dict) or not isinstance(document.get('include'), list):
@@ -95,14 +96,21 @@ jobs:
                   if not isinstance(build, dict) or (build.get('platform_key'), build.get('arch')) not in approved:
                       raise SystemExit('Unknown native package target')
                   if capability in build.get('capabilities', []):
-                      requested.add(approved[(build['platform_key'], build['arch'])])
+                      platform = approved[(build['platform_key'], build['arch'])]
+                      requested.add(platform)
+                      if capability == 'signed-module' and 'signed-roster' in build['capabilities']:
+                          roster.add(platform)
               if not requested:
                   raise SystemExit('No signed module target selected')
               targets = [target for target in targets if target['platform'] in requested]
+          for target in targets:
+              target['legacy_roster'] = target['platform'] in roster
           with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
               output.write(f'runner={runner}\n')
               output.write('build_matrix=' + json.dumps({'include': targets}, separators=(',', ':')) + '\n')
-              output.write('sign_matrix=' + json.dumps({'platform': [target['platform'] for target in targets]}, separators=(',', ':')) + '\n')
+              output.write('sign_matrix=' + json.dumps({'include': [
+                  {'platform': target['platform'], 'legacy_roster': target['legacy_roster']} for target in targets
+              ]}, separators=(',', ':')) + '\n')
           PY
 
   build:
@@ -132,24 +140,33 @@ jobs:
         env:
           MODULE_PACKAGE: ${{ needs.source.outputs.host_package }}
         run: cargo build --manifest-path src-tauri/Cargo.toml -p "$MODULE_PACKAGE" --bin "$MODULE_PACKAGE" --release --target '${{ matrix.target }}' --locked
+      - name: Build the second first-upgrade module
+        if: matrix.legacy_roster
+        run: cargo build --manifest-path src-tauri/Cargo.toml -p taomni-plugin-mfa --bin taomni-plugin-mfa --release --target '${{ matrix.target }}' --locked
       - name: Stage the platform payload
         env:
           MODULE_TARGET: ${{ matrix.target }}
           MODULE_PLATFORM: ${{ matrix.platform }}
           MODULE_SOURCE_SHA: ${{ needs.source.outputs.sha }}
+          MODULE_LEGACY_ROSTER: ${{ matrix.legacy_roster }}
         run: |
           python - <<'PY'
           import json, os, pathlib, shutil
-          source = pathlib.Path('src-tauri/plugins') / os.environ['QA_MODULE']
-          output = pathlib.Path('unsigned-module')
-          output.mkdir()
-          manifest = json.loads((source / 'module.json').read_text(encoding='utf-8'))
-          host = manifest['entry']['host'] + ('.exe' if os.environ['MODULE_PLATFORM'].startswith('windows') else '')
-          manifest['entry']['host'] = host
-          (output / 'module.json').write_text(json.dumps(manifest, indent=2), encoding='utf-8')
-          shutil.copyfile(pathlib.Path('src-tauri/target') / os.environ['MODULE_TARGET'] / 'release' / host, output / host)
-          if manifest['entry'].get('frontend'):
-              shutil.copytree(source / 'frontend', output / 'frontend')
+          def stage(slug, folder):
+              source = pathlib.Path('src-tauri/plugins') / slug
+              output = pathlib.Path(folder)
+              output.mkdir()
+              manifest = json.loads((source / 'module.json').read_text(encoding='utf-8'))
+              host = manifest['entry']['host'] + ('.exe' if os.environ['MODULE_PLATFORM'].startswith('windows') else '')
+              manifest['entry']['host'] = host
+              (output / 'module.json').write_text(json.dumps(manifest, indent=2), encoding='utf-8')
+              shutil.copyfile(pathlib.Path('src-tauri/target') / os.environ['MODULE_TARGET'] / 'release' / host, output / host)
+              if manifest['entry'].get('frontend'):
+                  shutil.copytree(source / 'frontend', output / 'frontend')
+
+          stage(os.environ['QA_MODULE'], 'unsigned-module')
+          if os.environ['MODULE_LEGACY_ROSTER'] == 'true':
+              stage('mfa', 'unsigned-roster-mfa')
           pathlib.Path('candidate-source.json').write_text(json.dumps({'sourceSha': os.environ['MODULE_SOURCE_SHA'], 'platform': os.environ['MODULE_PLATFORM'], 'module': os.environ['QA_MODULE']}), encoding='utf-8')
           PY
       - name: Build the previous hello protocol version for the lifecycle test
@@ -185,6 +202,7 @@ jobs:
           path: |
             unsigned-module/
             unsigned-previous/
+            unsigned-roster-mfa/
             candidate-source.json
           if-no-files-found: error
           retention-days: 7
@@ -222,6 +240,7 @@ jobs:
         env:
           MODULE_PLATFORM: ${{ matrix.platform }}
           MODULE_SOURCE_SHA: ${{ needs.source.outputs.sha }}
+          MODULE_LEGACY_ROSTER: ${{ matrix.legacy_roster }}
         run: |
           python - <<'PY'
           import json, os, pathlib, shutil
@@ -230,25 +249,22 @@ jobs:
           assert module in {'hello-plugin', 'mfa'}, 'Unknown official QA module'
           observed = json.loads((root / 'candidate-source.json').read_text(encoding='utf-8'))
           assert observed == {'sourceSha': os.environ['MODULE_SOURCE_SHA'], 'platform': os.environ['MODULE_PLATFORM'], 'module': module}
-          trusted_source = pathlib.Path('src-tauri/plugins') / module
-          expected = json.loads((trusted_source / 'module.json').read_text(encoding='utf-8'))
-          if os.environ['MODULE_PLATFORM'].startswith('windows'):
-              expected['entry']['host'] += '.exe'
           assert not any(p.is_symlink() for p in root.rglob('*'))
-          assert expected['id'] == 'taomni-plugin-' + module and expected['version'] == '0.1.0'
-          allowed = {'module.json', expected['entry']['host']}
-          frontend = expected['entry'].get('frontend')
-          if frontend:
-              assert (trusted_source / frontend).is_file()
-              for source in (trusted_source / 'frontend').rglob('*'):
-                  assert not source.is_symlink()
-                  if source.is_file():
-                      relative = source.relative_to(trusted_source).as_posix()
-                      allowed.add(relative)
-          versions = {'unsigned-module': '0.1.0'}
-          if module == 'hello-plugin':
-              versions['unsigned-previous'] = '0.0.9'
-          for folder, version in versions.items():
+
+          def check_payload(slug, folder, version):
+              trusted_source = pathlib.Path('src-tauri/plugins') / slug
+              expected = json.loads((trusted_source / 'module.json').read_text(encoding='utf-8'))
+              if os.environ['MODULE_PLATFORM'].startswith('windows'):
+                  expected['entry']['host'] += '.exe'
+              assert expected['id'] == 'taomni-plugin-' + slug and expected['version'] == '0.1.0'
+              allowed = {'module.json', expected['entry']['host']}
+              frontend = expected['entry'].get('frontend')
+              if frontend:
+                  assert (trusted_source / frontend).is_file()
+                  for source in (trusted_source / 'frontend').rglob('*'):
+                      assert not source.is_symlink()
+                      if source.is_file():
+                          allowed.add(source.relative_to(trusted_source).as_posix())
               payload = root / folder
               manifest = json.loads((payload / 'module.json').read_text(encoding='utf-8'))
               assert manifest == {**expected, 'version': version}, 'Candidate metadata differs from the trusted official contract'
@@ -256,7 +272,14 @@ jobs:
               assert files == allowed, 'Unexpected files in official QA payload'
               for relative in allowed - {'module.json', expected['entry']['host']}:
                   assert (payload / relative).read_bytes() == (trusted_source / relative).read_bytes(), 'Candidate changed official frontend without a trusted revision'
+              return expected
+
+          expected = check_payload(module, 'unsigned-module', '0.1.0')
+          if os.environ['MODULE_LEGACY_ROSTER'] == 'true':
+              assert module == 'hello-plugin'
+              check_payload('mfa', 'unsigned-roster-mfa', '0.1.0')
           if module == 'hello-plugin':
+              check_payload(module, 'unsigned-previous', '0.0.9')
               # This signed test input deliberately changes only the declared
               # version. The binary will reject the host handshake, exercising
               # recovery through the actual installer and verified registry.
@@ -270,11 +293,18 @@ jobs:
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
           MODULE_PLATFORM: ${{ matrix.platform }}
           MODULE_SOURCE_SHA: ${{ needs.source.outputs.sha }}
+          MODULE_LEGACY_ROSTER: ${{ matrix.legacy_roster }}
         run: |
           scripts/plugin-package/target/release/taomni-plugin-package \
             --payload candidate/unsigned-module --platform "$MODULE_PLATFORM" \
             --output signed-module --source-sha "$MODULE_SOURCE_SHA" \
             --qa-catalog true
+          if [[ "$MODULE_LEGACY_ROSTER" == 'true' ]]; then
+            scripts/plugin-package/target/release/taomni-plugin-package \
+              --payload candidate/unsigned-roster-mfa --platform "$MODULE_PLATFORM" \
+              --output signed-module/legacy-roster-mfa --source-sha "$MODULE_SOURCE_SHA" \
+              --qa-catalog true --qa-roster-root signed-module
+          fi
           if [[ "$QA_MODULE" == "hello-plugin" ]]; then
             for pair in 'unsigned-previous previous' 'handshake-failure handshake-failure'; do
               read -r payload destination <<< "$pair"

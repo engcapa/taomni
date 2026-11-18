@@ -93,6 +93,9 @@ controls:
   - id: module-marketplace-current
     selector: '[data-testid="module-marketplace-current"]'
     kind: display
+  - id: module-marketplace-mfa-current
+    selector: '[data-module-id="taomni-plugin-mfa"] [data-testid="module-marketplace-current"]'
+    kind: display
   - id: module-marketplace-update
     selector: '[data-testid="module-marketplace-update"]'
     kind: display
@@ -393,7 +396,7 @@ controls:
 
 动态前端基础接入主窗和独立 WebView：共享 React SDK、owner-scoped IPC、仅 locator 的保存恢复、启禁撤销、缺失占位和重试。`TC-MODULES-016` 验证官方签名 ESM/相对资源、真实 host 写入、非活动草稿、reload、分离窗启禁同步和回挂；`TC-MODULES-017` 以明确 browser-only model 覆盖同类 renderer 流程，不代表验签或原生存储；`TC-MODULES-018` 独立篡改已安装前端，验证原生协议拒绝、错误隔离及恢复原字节后重试。它们尚待 matching runner，不将 MFA 产品入口迁出或 TASK-007 全部验收记为完成。
 
-`TC-MODULES-027` 在真实旧版 profile 上验证自动首装，复核待迁移的 VNC journal 和旧文件。`TC-MODULES-040` 另覆盖无待迁移数据的 profile 首装和卸载后重启。`TC-MODULES-041/045` 分别在 browser 和 native 检查新模块提示、名称和说明、稍后处理与之后主动安装。045 使用两份正式公钥可验证的 QA 目录，独立核对提示记录、实际请求、包摘要和 active 版本。
+`TC-MODULES-027/040` 使用同一签名目录自动安装 Hello 和 MFA。027 在真实旧版 profile 上复核待迁移的 VNC journal 和旧文件。040 确认卸载 Hello 并重启后，MFA 仍使用原签名包。`TC-MODULES-041/045` 分别在 browser 和 native 检查新模块提示、名称和说明、稍后处理与之后主动安装。045 使用两份正式公钥可验证的 QA 目录，独立核对提示记录、实际请求、包摘要和 active 版本。
 
 `TC-MODULES-007/010/040/042` 观察真实版本目录删除。010 还确认取消永久删除时签名包和业务数据原样保留，确认后数据和定位记录消失。042 校验存在更新时卸载会释放宿主、清理所有版本并保留业务数据。043 使用浏览器模型检查取消永久删除和卸载后只提供主动安装。
 

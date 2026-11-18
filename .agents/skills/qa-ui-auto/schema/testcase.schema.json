@@ -94,6 +94,7 @@
           "module_download",
           "module_download_preview",
           "module_marketplace",
+          "module_legacy_roster",
           "module_marketplace_preview",
           "module_signed_archive",
           "module_signed_mfa_archive",

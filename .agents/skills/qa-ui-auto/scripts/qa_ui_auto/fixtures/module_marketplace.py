@@ -6,19 +6,22 @@ from pathlib import Path
 import threading
 
 from .module_download import plugin_root
+from .module_signed_archive import load_artifact
 
 ORIGIN = "http://127.0.0.1:50301"
 BASELINE_CATALOG = "modules-baseline.json"
 NEW_MODULE_CATALOG = "modules-new.json"
 NEW_MODULE_SEQUENCE = 44
+ROSTER_CATALOG = "modules-roster.json"
 
 
 class Origin:
-    def __init__(self, files, evidence, *, opt_in=False):
+    def __init__(self, files, evidence, *, opt_in=False, roster=None):
         self.files = files
         self.evidence = evidence
-        self.start_catalog = BASELINE_CATALOG if opt_in else "modules.json"
-        current = NEW_MODULE_CATALOG if opt_in else "modules.json"
+        self.roster = roster
+        self.start_catalog = ROSTER_CATALOG if roster else BASELINE_CATALOG if opt_in else "modules.json"
+        current = NEW_MODULE_CATALOG if opt_in else self.start_catalog
         self.current_catalog = files["/" + current]
         self.requests = []
         self.lock = threading.Lock()
@@ -103,6 +106,40 @@ def setup(ctx):
     ctx.module_marketplace = Origin(files, Path(ctx.case_dir) / "module-marketplace-requests.json", opt_in=opt_in)
     ctx.values.update(module_marketplace_url=f"{ORIGIN}/modules.json", module_marketplace_bad_url=f"{ORIGIN}/modules-bad.json",
                       module_marketplace_older_url=f"{ORIGIN}/modules-older.json", module_marketplace_new_url=f"{ORIGIN}/{NEW_MODULE_CATALOG}")
+
+
+def setup_roster(ctx):
+    if (ctx.cfg.get("app") or {}).get("mode") != "native":
+        raise RuntimeError("module_legacy_roster requires the native pinned verifier")
+    plugin_root(ctx)
+    receipt = json.loads((Path(ctx.case_dir) / "official-module-fixture.json").read_text(encoding="utf-8"))
+    root = Path(os.environ["QA_SIGNED_MODULE_ROOT"])
+    hello, hello_archive, _, _ = load_artifact(root, receipt["sourceSha"], receipt["platform"])
+    mfa, mfa_archive, _, _ = load_artifact(root / "legacy-roster-mfa", receipt["sourceSha"], receipt["platform"], "mfa")
+    catalog = root / ROSTER_CATALOG
+    signature = catalog.with_name(catalog.name + ".minisig")
+    if any(path.is_symlink() or not path.is_file() for path in (catalog, signature)):
+        raise RuntimeError("Hosted first-upgrade roster is missing or symlinked")
+    raw, detached = catalog.read_bytes(), signature.read_bytes()
+    document = json.loads(raw)
+    roster = {entry["id"]: entry for entry in (hello, mfa)}
+    if document["sequence"] != 42 or set(document["legacyUpgrade"]) != roster.keys() or document["plugins"].keys() != roster.keys():
+        raise RuntimeError("Expected the same two signed packages in the catalog and first-upgrade roster")
+    trusted_comment = f"trusted comment: file={ROSTER_CATALOG} sourceSha={receipt['sourceSha']}"
+    if trusted_comment not in detached.decode().splitlines():
+        raise RuntimeError("First-upgrade roster source identity differs from the native QA binary")
+    for key, entry in roster.items():
+        asset = document["plugins"][key]["platforms"][entry["platform"]]
+        if asset["sha256"] != entry["sha256"] or asset["size"] != entry["size"] or asset["url"] != f"{ORIGIN}/{entry['archive']}":
+            raise RuntimeError("First-upgrade roster does not bind the installed package inputs")
+    files = {
+        "/" + catalog.name: raw,
+        "/" + signature.name: detached,
+        "/" + hello_archive.name: hello_archive.read_bytes(),
+        "/" + mfa_archive.name: mfa_archive.read_bytes(),
+    }
+    (Path(ctx.case_dir) / "module-legacy-roster.json").write_text(json.dumps(roster, indent=2), encoding="utf-8")
+    ctx.module_marketplace = Origin(files, Path(ctx.case_dir) / "module-marketplace-requests.json", roster=roster)
 
 
 def teardown(ctx):

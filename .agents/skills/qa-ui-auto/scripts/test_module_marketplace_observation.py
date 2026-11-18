@@ -2,13 +2,14 @@
 import hashlib
 import json
 from pathlib import Path
+import shutil
 import tempfile
 from types import SimpleNamespace
 import unittest
 from unittest.mock import Mock, patch
 
 from qa_ui_auto.fixtures.module_marketplace import BASELINE_CATALOG, NEW_MODULE_CATALOG, ORIGIN, fixture_files, setup
-from qa_ui_auto.module_marketplace_observation import run
+from qa_ui_auto.module_marketplace_observation import observe_legacy_roster, run
 from qa_ui_auto.steps import StepError
 
 
@@ -132,6 +133,34 @@ class MarketplaceTests(unittest.TestCase):
                 origin.requests.append("/hello.pkg")
                 with self.assertRaisesRegex(StepError, "before user consent"):
                     run(ctx, {"phase": "new-dismissed"})
+
+    def test_first_upgrade_requires_both_signed_packages_and_keeps_mfa_after_hello_removal(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            downloads = root / ".downloads"
+            downloads.mkdir()
+            roster = {}
+            requests = []
+            for slug in ("hello-plugin", "mfa"):
+                package = slug.encode()
+                digest = hashlib.sha256(package).hexdigest()
+                archive = f"{slug}.taomni-plugin"
+                (downloads / (digest + ".taomni-plugin")).write_bytes(package)
+                proof = root / slug / "versions/0.1.0/.taomni-trust"
+                proof.mkdir(parents=True)
+                (proof / "package.taomni-plugin").write_bytes(package)
+                (root / slug / "active.json").write_text(json.dumps({"activeVersion": "0.1.0", "previousVersion": None}))
+                roster[slug] = {"slug": slug, "version": "0.1.0", "sha256": digest, "archive": archive}
+                requests.append("/" + archive)
+            origin = SimpleNamespace(roster=roster, requests=requests)
+            self.assertEqual(set(observe_legacy_roster(root, origin, None)), set(roster))
+            (root / "hello-plugin/active.json").write_text(json.dumps({"activeVersion": None, "previousVersion": "0.1.0"}))
+            shutil.rmtree(root / "hello-plugin/versions")
+            result = observe_legacy_roster(root, origin, "hello-plugin")
+            self.assertEqual(result["mfa"]["activeVersion"], "0.1.0")
+            requests.pop()
+            with self.assertRaisesRegex(StepError, "exactly one signed package for mfa"):
+                observe_legacy_roster(root, origin, "hello-plugin")
 
 
 if __name__ == "__main__":

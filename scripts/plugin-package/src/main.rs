@@ -59,7 +59,8 @@ fn run() -> Result<()> {
                 "--platform",
                 "--output",
                 "--source-sha",
-                "--qa-catalog"
+                "--qa-catalog",
+                "--qa-roster-root"
             ]
             .contains(&flag.as_str()),
             "expected --payload DIR --platform PLATFORM --output DIR --source-sha COMMIT"
@@ -68,6 +69,10 @@ fn run() -> Result<()> {
         ensure!(values.insert(flag, value).is_none(), "repeated option");
     }
     let get = |flag| values.get(flag).with_context(|| format!("missing {flag}"));
+    ensure!(
+        !values.contains_key("--qa-roster-root") || values.contains_key("--qa-catalog"),
+        "a QA roster requires the QA catalog option"
+    );
     let signer = ReleaseSigner::from_environment()?;
     let receipt = package(
         Path::new(get("--payload")?),
@@ -82,6 +87,15 @@ fn run() -> Result<()> {
             "QA catalog signing is restricted to GitHub workflows"
         );
         taomni_plugin_package::qa_catalog::write(Path::new(get("--output")?), &receipt, &signer)?;
+        if let Some(root) = values.get("--qa-roster-root") {
+            taomni_plugin_package::qa_catalog::write_legacy_roster(
+                Path::new(root),
+                Path::new(get("--output")?),
+                get("--source-sha")?,
+                get("--platform")?,
+                &signer,
+            )?;
+        }
     }
     println!("{}", serde_json::to_string_pretty(&receipt)?);
     Ok(())

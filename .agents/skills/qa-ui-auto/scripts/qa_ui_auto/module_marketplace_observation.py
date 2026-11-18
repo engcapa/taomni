@@ -32,6 +32,29 @@ def observe_new_module(root, origin, receipt, phase, archive):
     return release
 
 
+def observe_legacy_roster(root, origin, removed):
+    pointers = {}
+    for entry in origin.roster.values():
+        slug, version = entry["slug"], entry["version"]
+        archive = root / ".downloads" / (entry["sha256"] + ".taomni-plugin")
+        if origin.requests.count("/" + entry["archive"]) != 1 or not archive.is_file() or hashlib.sha256(archive.read_bytes()).hexdigest() != entry["sha256"]:
+            raise StepError(f"First upgrade did not transfer exactly one signed package for {slug}")
+        owner = root / slug
+        pointer = json.loads((owner / "active.json").read_text(encoding="utf-8"))
+        if slug == removed:
+            if pointer["activeVersion"] is not None or pointer["previousVersion"] != version:
+                raise StepError("Restart reinstalled the module that the user removed")
+            assert_code_removed(owner)
+        else:
+            if pointer["activeVersion"] != version:
+                raise StepError(f"First upgrade did not activate the roster's signed version for {slug}")
+            proof = owner / "versions" / version / ".taomni-trust/package.taomni-plugin"
+            if hashlib.sha256(proof.read_bytes()).hexdigest() != entry["sha256"]:
+                raise StepError(f"Installed signed package does not match the roster for {slug}")
+        pointers[slug] = pointer
+    return pointers
+
+
 def run(ctx, args):
     if not isinstance(args, dict) or set(args) != {"phase"} or args["phase"] not in PHASES | VERSION_STATES.keys():
         raise StepError("module_marketplace_probe requires a registered fixed phase")
@@ -94,6 +117,9 @@ def run(ctx, args):
                     if enrollment.get("origin") != "legacy" or enrollment.get("legacyPending") != []:
                         raise StepError("First installation was not recorded as complete for the legacy profile")
                     record["enrollment"] = enrollment
+                    if getattr(origin, "roster", None):
+                        removed = receipt["slug"] if phase == "legacy-uninstalled" else None
+                        record["rosterPointers"] = observe_legacy_roster(root, origin, removed)
                 if phase == "rejected":
                     if not {"/modules-bad.json", "/modules-older.json"}.issubset(requests):
                         raise StepError("Both tampered and authenticated older feeds must reach the real verifier")

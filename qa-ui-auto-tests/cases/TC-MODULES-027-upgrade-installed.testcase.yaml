@@ -3,8 +3,8 @@ title: Installed 0.5.10 profile opens safely in the candidate with idempotent pe
 description: Installs the pinned public 0.5.10 deb/MSI/DMG on an owned GitHub runner and runs its headless entry twice in the
   candidate QA profile. The old binary creates the actual schema; SSH/VNC business rows are synthetic and must survive its
   reopening. The candidate then uses real Settings/IPC to recommend only VNC, retain old chat bytes and sidecars, and keep
-  pending state through normal candidate restart. The main window then installs the signed release roster's module
-  and the oracle verifies that the original data and pending VNC journal survive. Unix old processes must exit normally.
+  pending state through normal candidate restart. The main window then installs Hello and MFA from the signed release roster.
+  The oracle verifies that both packages, the original data and the pending VNC journal are present. Unix old processes must exit normally.
   Windows GUI-subsystem old processes are forcibly stopped and recorded as crash input.
 covers:
 - F-Modules-1
@@ -19,7 +19,7 @@ fixtures:
 - reset_db
 - module_legacy_install
 - module_signed_archive
-- module_marketplace
+- module_legacy_roster
 timeout_sec: 900
 steps:
 - open: ${cfg.app.base_url}
@@ -103,7 +103,7 @@ steps:
 - *id002
 - *id003
 - *id004
-- wait_for: '[data-testid="module-marketplace-current"]'
+- wait_for: '[data-module-id="taomni-plugin-mfa"] [data-testid="module-marketplace-current"]'
 - module_upgrade_probe: {phase: repeat}
 - assert_no_runtime_errors: null
 - screenshot: module-upgrade-installed-0510-native.png
@@ -209,13 +209,13 @@ verification:
     - 34
     - 35
   - id: R2
-    requirement: Install the signed first-upgrade module on the real legacy profile and preserve its data migration journal.
+    requirement: Install all platform-compatible signed roster modules on the real legacy profile and preserve its data migration journal.
     actions: [36, 37, 40, 42]
     checkpoints:
     - step: 39
-      expectation: The main window automatically downloads and installs the signed module and records enrollment as complete.
+      expectation: The main window automatically downloads and installs the signed Hello and MFA packages and records enrollment as complete.
     - step: 43
-      expectation: The store shows the roster module as installed.
+      expectation: The store shows MFA as installed alongside Hello.
     - step: 44
       expectation: The first installation preserves complete legacy sessions, historical chat file hashes and the VNC journal.
     - step: 45

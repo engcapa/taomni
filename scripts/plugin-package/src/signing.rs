@@ -73,6 +73,10 @@ impl ReleaseSigner {
         verify_file(&self.verifier, path, signature, comment)
     }
 
+    pub(crate) fn verify_bytes(&self, bytes: &[u8], signature: &str, comment: &str) -> Result<()> {
+        verify_reader(&self.verifier, bytes, signature, comment)
+    }
+
     #[cfg(test)]
     pub(crate) fn test_key() -> Self {
         let keys = minisign::KeyPair::generate_unencrypted_keypair().unwrap();

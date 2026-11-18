@@ -15,12 +15,12 @@ PLATFORMS = ["linux-x86_64", "windows-x86_64", "darwin-aarch64", "darwin-x86_64"
 
 
 class OfficialPackageSigningGuardTests(unittest.TestCase):
-    def seed(self, root, module, platform):
+    def seed_payload(self, root, module, platform, folder):
         trusted = root / "src-tauri/plugins" / module
         trusted.mkdir(parents=True)
         shutil.copyfile(ROOT / "src-tauri/plugins" / module / "module.json", trusted / "module.json")
         manifest = json.loads((trusted / "module.json").read_text())
-        payload = root / "candidate/unsigned-module"
+        payload = root / "candidate" / folder
         payload.mkdir(parents=True)
         if platform.startswith("windows"):
             manifest["entry"]["host"] += ".exe"
@@ -30,22 +30,28 @@ class OfficialPackageSigningGuardTests(unittest.TestCase):
             shutil.copytree(ROOT / "src-tauri/plugins" / module / "frontend", trusted / "frontend")
             shutil.copytree(trusted / "frontend", payload / "frontend")
         (payload / "module.json").write_text(json.dumps(manifest))
+        return payload
+
+    def seed(self, root, module, platform):
+        payload = self.seed_payload(root, module, platform, "unsigned-module")
         if module == "hello-plugin":
             previous = root / "candidate/unsigned-previous"
             shutil.copytree(payload, previous)
+            manifest = json.loads((payload / "module.json").read_text())
             (previous / "module.json").write_text(json.dumps({**manifest, "version": "0.0.9"}))
         (root / "candidate/candidate-source.json").write_text(json.dumps({
             "sourceSha": "a" * 40, "platform": platform, "module": module,
         }))
         return payload
 
-    def guard(self, root, module, platform):
+    def guard(self, root, module, platform, legacy_roster="false"):
         workflow = yaml.safe_load((ROOT / ".github/workflows/qa-modular-packages.yml").read_text())
         guard = next(step["run"] for step in workflow["jobs"]["sign"]["steps"]
                      if step.get("name", "").startswith("Restrict QA signing"))
         source = guard.split("\n", 1)[1].rsplit("\nPY", 1)[0]
         with chdir(root), patch.dict(os.environ, {
             "QA_MODULE": module, "MODULE_PLATFORM": platform, "MODULE_SOURCE_SHA": "a" * 40,
+            "MODULE_LEGACY_ROSTER": legacy_roster,
         }):
             exec(compile(source, "trusted-workflow-payload-guard", "exec"), {})
 
@@ -72,6 +78,21 @@ class OfficialPackageSigningGuardTests(unittest.TestCase):
             path.write_text(json.dumps({**manifest, "version": "3.0.0"}))
             with self.assertRaisesRegex(AssertionError, "trusted official contract"):
                 self.guard(root, "hello-plugin", "linux-x86_64")
+
+    def test_first_upgrade_roster_requires_the_trusted_mfa_payload(self):
+        for platform in PLATFORMS:
+            with self.subTest(platform=platform), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                self.seed(root, "hello-plugin", platform)
+                with self.assertRaises(FileNotFoundError):
+                    self.guard(root, "hello-plugin", platform, legacy_roster="true")
+                payload = self.seed_payload(root, "mfa", platform, "unsigned-roster-mfa")
+                self.guard(root, "hello-plugin", platform, legacy_roster="true")
+                manifest = payload / "module.json"
+                value = json.loads(manifest.read_text())
+                manifest.write_text(json.dumps({**value, "version": "0.0.9"}))
+                with self.assertRaisesRegex(AssertionError, "trusted official contract"):
+                    self.guard(root, "hello-plugin", platform, legacy_roster="true")
 
     def test_source_module_metadata_and_unsigned_file_changes_are_rejected(self):
         for change in ["source", "module", "permissions", "frontend-entry", "extra-file", "frontend-bytes", "secondary-chunk"]:

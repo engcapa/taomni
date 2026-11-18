@@ -1,8 +1,8 @@
 id: TC-MODULES-040
-title: First upgrade installs the signed release module with no matching old data and respects uninstall
+title: First upgrade installs both signed roster modules and keeps MFA after Hello is removed
 description: An isolated legacy-style profile contains only an SSH session. The signed loopback release roster supplies
-  the platform's real hello package. The main window starts installation. Uninstall removes the installed code,
-  and a normal restart preserves the removal.
+  the platform's Hello and MFA packages. The main window installs both. Removing Hello deletes its code,
+  and a normal restart preserves the removal and the installed MFA module.
 covers:
 - F-Modules-1
 tags:
@@ -16,7 +16,7 @@ fixtures:
 - reset_db
 - module_upgrade
 - module_signed_archive
-- module_marketplace
+- module_legacy_roster
 timeout_sec: 300
 steps:
 - open: ${cfg.app.base_url}
@@ -31,7 +31,7 @@ steps:
 - fill:
     selector: '[data-testid="settings-search-input"]'
     value: module store
-- wait_for: '[data-testid="module-marketplace-current"]'
+- wait_for: '[data-module-id="taomni-plugin-mfa"] [data-testid="module-marketplace-current"]'
 - wait_for: '[data-testid="module-upgrade-status"][data-state="empty"]'
 - module_marketplace_probe:
     phase: legacy-installed
@@ -56,7 +56,7 @@ steps:
     equal: 0
 - assert_count:
     selector: '[data-testid="module-marketplace-current"]'
-    equal: 0
+    equal: 1
 - assert_count:
     selector: '[data-testid="module-release-notice"]'
     equal: 0
@@ -68,17 +68,17 @@ verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: Install the platform-compatible signed release module automatically for a legacy profile with no module data.
+    requirement: Install every platform-compatible module in the signed release roster for a legacy profile without module data.
     actions: [3, 4, 7, 8]
     checkpoints:
     - step: 6
-      expectation: The main window installs the module before opening Settings.
+      expectation: The main window installs the Hello and MFA packages before opening Settings.
     - step: 9
-      expectation: The module appears as installed without a download or install confirmation.
+      expectation: MFA appears as installed without a download or install confirmation.
     - step: 10
       expectation: Old data discovery has no candidate, although the release module was installed.
     - step: 11
-      expectation: A single network transfer matches the official archive hash, and the persisted enrollment is complete.
+      expectation: Each official archive is transferred once. Both signed versions are present on disk and enrollment is complete.
     results: [6, 9, 10, 11]
   - id: R2
     requirement: Keep the module uninstalled after the user removes it and checks the same catalog on a normal restart.
@@ -89,11 +89,11 @@ verification:
     - step: 22
       expectation: The removed module has no upgrade offer.
     - step: 23
-      expectation: The module's old version shows as absent.
+      expectation: The module store shows exactly one current installed module.
     - step: 24
       expectation: The application does not resume first installation.
     - step: 25
-      expectation: Installed code remains absent on disk, the inactive pointer retains version history, and no new download starts.
+      expectation: Hello remains uninstalled with version history and no new transfer. MFA stays installed with the same signed package.
     - step: 26
       expectation: The renderer records no unhandled errors.
     results: [21, 22, 23, 24, 25, 26]

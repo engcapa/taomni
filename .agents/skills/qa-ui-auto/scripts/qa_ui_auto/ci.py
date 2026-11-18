@@ -108,6 +108,8 @@ def capabilities(cases, mode: str) -> list[str]:
             result.add("display")
             if "module_signed_archive" in fixtures:
                 result.add("signed-module")
+            if "module_legacy_roster" in fixtures:
+                result.update({"signed-module", "signed-roster"})
             if "module_signed_mfa_archive" in fixtures:
                 result.add("signed-mfa")
             if fixtures & {"module_legacy_install", "module_legacy_mfa"}:

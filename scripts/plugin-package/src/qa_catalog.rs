@@ -9,6 +9,48 @@ use crate::signing::ReleaseSigner;
 
 pub const ORIGIN: &str = "http://127.0.0.1:50301";
 
+pub fn write_legacy_roster(
+    hello: &Path,
+    mfa: &Path,
+    source: &str,
+    platform: &str,
+    signer: &ReleaseSigner,
+) -> Result<()> {
+    let mut plugins = serde_json::Map::new();
+    for (directory, id) in [
+        (hello, "taomni-plugin-hello-plugin"),
+        (mfa, "taomni-plugin-mfa"),
+    ] {
+        let catalog_path = directory.join("modules.json");
+        let signature = fs::read_to_string(directory.join("modules.json.minisig"))?;
+        let raw = fs::read(&catalog_path)?;
+        signer.verify_bytes(
+            &raw,
+            &signature,
+            &format!("file=modules.json sourceSha={source}"),
+        )?;
+        let catalog: Value = serde_json::from_slice(&raw)?;
+        let entry = &catalog["plugins"][id];
+        ensure!(
+            catalog["plugins"]
+                .as_object()
+                .is_some_and(|entries| entries.len() == 1)
+                && entry["id"] == id
+                && entry["platforms"]
+                    .as_object()
+                    .is_some_and(|targets| targets.len() == 1 && targets.contains_key(platform)),
+            "legacy QA roster requires the two matching official module packages"
+        );
+        plugins.insert(id.to_owned(), entry.clone());
+    }
+    let roster: Vec<_> = plugins.keys().cloned().collect();
+    let catalog = json!({
+        "coreApiVersion": "1", "sequence": 42, "updatedAt": "2026-11-16T00:00:00Z",
+        "legacyUpgrade": roster, "plugins": plugins
+    });
+    sign_catalog(hello, "modules-roster.json", &catalog, source, signer)
+}
+
 pub fn write(output: &Path, receipt: &Value, signer: &ReleaseSigner) -> Result<()> {
     let manifest: Value = serde_json::from_slice(&fs::read(output.join("module.json"))?)?;
     let id = receipt["id"].as_str().context("missing package id")?;
@@ -52,23 +94,76 @@ pub fn write(output: &Path, receipt: &Value, signer: &ReleaseSigner) -> Result<(
         ("modules-baseline.json", 43, &empty_roster, &empty_catalog),
         ("modules-new.json", 44, &empty_roster, &plugin_entry),
     ] {
-        let raw = serde_json::to_vec_pretty(&json!({
+        let catalog = json!({
             "coreApiVersion":receipt["coreApiVersion"], "sequence":sequence,
             "updatedAt":"2026-11-16T00:00:00Z", "legacyUpgrade":roster, "plugins":plugins
-        }))?;
-        let path = output.join(name);
-        fs::write(&path, raw)?;
-        fs::write(
-            output.join(format!("{name}.minisig")),
-            signer.sign(&path, &format!("file={name} sourceSha={source}"))?,
-        )?;
+        });
+        sign_catalog(output, name, &catalog, source, signer)?;
     }
+    Ok(())
+}
+
+fn sign_catalog(
+    output: &Path,
+    name: &str,
+    catalog: &Value,
+    source: &str,
+    signer: &ReleaseSigner,
+) -> Result<()> {
+    let path = output.join(name);
+    fs::write(&path, serde_json::to_vec_pretty(catalog)?)?;
+    fs::write(
+        output.join(format!("{name}.minisig")),
+        signer.sign(&path, &format!("file={name} sourceSha={source}"))?,
+    )?;
     Ok(())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn first_upgrade_roster_binds_both_modules_to_one_source_and_platform() {
+        let directory = tempfile::tempdir().unwrap();
+        let signer = ReleaseSigner::test_key();
+        let source = "b".repeat(40);
+        let platform = "linux-x86_64";
+        let hello = directory.path().join("hello");
+        let mfa = directory.path().join("mfa");
+        for (root, slug) in [(&hello, "hello-plugin"), (&mfa, "mfa")] {
+            fs::create_dir(root).unwrap();
+            let id = format!("taomni-plugin-{slug}");
+            let archive = format!("{slug}.taomni-plugin");
+            let receipt = json!({
+                "id": id, "slug": slug, "version": "0.1.0", "coreApiVersion": "1",
+                "platform": platform, "archive": archive, "sha256": "a".repeat(64),
+                "size": 12, "sourceSha": source,
+            });
+            fs::write(root.join("module.json"), json!({"name": slug}).to_string()).unwrap();
+            fs::write(root.join(format!("{archive}.minisig")), "package signature").unwrap();
+            write(root, &receipt, &signer).unwrap();
+        }
+        assert!(write_legacy_roster(&hello, &mfa, &source, "windows-x86_64", &signer).is_err());
+        assert!(write_legacy_roster(&hello, &mfa, &"c".repeat(40), platform, &signer).is_err());
+        write_legacy_roster(&hello, &mfa, &source, platform, &signer).unwrap();
+        let name = "modules-roster.json";
+        let path = hello.join(name);
+        let detached = fs::read_to_string(hello.join(format!("{name}.minisig"))).unwrap();
+        signer
+            .verify(&path, &detached, &format!("file={name} sourceSha={source}"))
+            .unwrap();
+        let catalog: Value = serde_json::from_slice(&fs::read(path).unwrap()).unwrap();
+        assert_eq!(
+            catalog["legacyUpgrade"],
+            json!(["taomni-plugin-hello-plugin", "taomni-plugin-mfa"])
+        );
+        for id in catalog["legacyUpgrade"].as_array().unwrap() {
+            assert!(catalog["plugins"][id.as_str().unwrap()]["platforms"][platform].is_object());
+        }
+        fs::write(mfa.join("modules.json"), b"changed catalog").unwrap();
+        assert!(write_legacy_roster(&hello, &mfa, &source, platform, &signer).is_err());
+    }
 
     #[test]
     fn signs_official_loopback_metadata_and_optional_module_catalogs() {
