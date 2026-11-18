@@ -39,4 +39,20 @@ receipt 的最终数据目标为 `plugins/mfa/data/mfa.db`，不归 `versions/<v
 
 同轮原生产宿主三端各 37/37 真实场景、Linux/Mac 25/25 与 Windows 22/22 宿主单元均通过；它们绑定原源码，不填补新增导出失败。所有原始失败、identity/selection 与正例 receipt 保存在 `qa-ui-auto-report/github/44157139520/live-contracts/`。
 
-配对 UI #44157172973 已通过计划（24 shards、3 builds），因为上述测试修订改变严格 source identity，主动取消该被替代轮并保留已有产物；这是 agent 主动取消，不能描述为 GitHub 容量失败。后续先闭合专用契约，再调度 matching UI 及完整 crash-regression。每个完成 artifact/shard 仍在运行期间下载审查，失败不改写成通过。
+配对 UI #44157172973 最终为 cancelled。主动取消前已取得 10 份 shard artifact（另有 selection），其中 5 份含 summary，共 24 个原始通过结果，未执行 native UI，尚缺 14 片。这些结果保留在原 SHA 下，不计为本批完整通过；取消后下载器和汇总作业的失败同样保留。完整 run/jobs/artifacts 与取消原因写入 `qa-ui-auto-report/github/44157172973/superseded-run.json`。这是 agent 因源码被修订而主动取消，不能描述为 GitHub 容量失败。
+
+修订源码 `52ce75ae87d62e94543f8577d5f67f655e0a0501` 的[复验 #44161262665](https://github.com/engcapa/taomni/actions/runs/44161262665) 已在执行期间收齐并逐项核验三端 exporter artifact：
+
+| 执行目标 | 原迁移测试 | 真实导出场景 | 独立跨进程旧模式锁 |
+|---|---:|---:|---:|
+| Linux x64 | 34/34 | 12/12 | 1/1 |
+| Windows x64 | 33/33 | 11/11 | 1/1 |
+| macOS 15 Intel | 34/34 | 12/12 | 1/1 |
+
+本批数据正例由真实 MFA engine/SQLite 创建加密 legacy fixture，并用测试只读 KeyProvider 和原 fixture key 解密作为字节保留 oracle。Vault 在 exporter 内只验证固定项存在性与源一致性；尚未通过生产受限 key 服务验证旧库解密，也没有把 fixture 标为已安装旧应用生成的 MFA 数据。这两项仍属于后续可信升级 coordinator 和真实旧安装验收。
+
+三端均确认 main-only oracle 为 0 账户、实际导出为 1 账户，schema/业务行/密文/metadata/偏好相等，原 key 解出 HOTP，原数据与 journal/active/既有模块数据保持。完整取消/超时/清理/重试链已执行，不再只通过错误码断言。Windows junction、Unix hard link 与链接路径保护均由对应平台实际场景证明。测试 binary hash、精确 selection、日志/receipt 和所有下载文件的 SHA-256/字节长度已核对，记录为该 run 的 `contract-review.json`；不是只依据 workflow 颜色判断。整轮 6 个实际作业均 success，6 份 artifact 在运行期间收齐；原宿主 Linux/Windows/macOS 各 37/37 进程场景及 25/25、22/22、25/25 单元也通过，原失败 run 保持 failure。
+
+相同源码的 [UI #44163030680](https://github.com/engcapa/taomni/actions/runs/44163030680) 选择 025–032 与完整 crash-regression，使用 release QA。三端 browser 均 **23/23**，各含完整 **20/20** crash-regression。Linux、Windows、macOS Intel native 各 **29/29**，各含完整 **24/24** crash-regression。24 片均在运行时按完成片下载。独立核验 source/case/runner/selection、release build、receipt 的全部文件摘要及配置，记录在该 run 下的 `hosted-evidence-review.json`。源码指纹为 `4071d9164f28403e8d748860c668bcb6135578cff721d3e4574cb5fa1710ec35`，runner 为 `10bb03145a467fbea7f9e9ea784d5e226469d9613a95acba250fd7f4974ce8a8`。
+
+按用户允许临时使用新版 macOS，另派发 [#44164214737](https://github.com/engcapa/taomni/actions/runs/44164214737)，相同源码/runner、`macos-26` ARM64、一个 native shard、49 个精确用例，包含文件功能、025/027/028/030/032、原三态冷启动还原、033–035 自动 relaunch 及完整 crash-regression。签名候选与 release QA 构建成功，执行作业取消且没有步骤或分片结果。保留原失败和缺失 evidence；后续合并源码独立补跑 [#44195752497](https://github.com/engcapa/taomni/actions/runs/44195752497)，当前状态见实施台账。

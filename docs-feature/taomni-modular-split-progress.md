@@ -1,6 +1,26 @@
 # 模块化实施与验收台账
 
-2026-11-18 继续开发：新增 core-owned `PreparedMfaExport`，在同一 profile 的旧模式/新 profile/Vault/MFA 数据维护锁下生成真实一致 SQLite staging，绑定 MFA/Vault 主文件与 WAL、保留密文/metadata/偏好，区分 key-only，复核源及产物并在取消/失败/drop 时清理。只读预检散列新增逐块取消；源打开拒绝链接。纯内存单元 8/8、独立生产 harness 编译通过；三端真实文件/进程 gate 与 matching UI 尚待 GitHub，不计通过。未接入可信安装/激活，`plugin_migration_execute` 保持安全 pending；详情见[旧版 MFA 导出验证](taomni-modular-legacy-mfa-export-verification.md)。
+2026-11-18 再次合入远程 main `5fabcdd32`（#830），合并提交 `f5221ae94`，无冲突。核心版本随 `package.json` 更新为 `0.5.10`。已安装升级输入固定使用正式 `0.5.9`，因此资产和数据基线保持可复现。
+
+`76c3f94e9` 将严格校验为 committed 的 MFA profile 接到签名宿主，覆盖原命令的账户读写、偏好、HOTP、导出和 reset。原生导出在 Vault 层验密后向该操作授予一次性授权，reset 在排空准入并取得独占 Vault lease 后执行。迁移后的备份走模块数据，旧归档的 MFA/Vault 对恢复到模块数据目录，原 `mfa.db` 继续作为迁移回退资料。语法错误、重复记录或未知目标使 MFA 拒绝访问。缺失或停用的宿主返回错误，重新启用可以访问已提交的数据。
+
+新增 browser/native `TC-MFA-016` 验证两账号的密码授权相互独立、拒绝和取消会清除敏感内容，增强 native `TC-MFA-108` 的关闭后清除与运行时断言。新增两项签名 native 场景，覆盖迁移后的生产命令、停用及卸载状态、旧格式归档恢复后的实际 HOTP。31 项前端单元、1 项新增 Rust 单元、QA 审计和 `check:refactor` 已通过。签名宿主由 GitHub 实际执行，完成分片即时下载。 [三端 UI #44212837788](https://github.com/engcapa/taomni/actions/runs/44212837788) · [升级契约 #44212837658](https://github.com/engcapa/taomni/actions/runs/44212837658)
+
+2026-11-18 合入远程 main `dfde6f9de`（#829），合并提交 `e967ebfbd`。解决 Explorer 窄窗口列样式冲突，保留新建文件对话框样式和可调详情列。main 的列宽用例保留 `TC-EXPLORER-006`，新建可编辑类型用例改为 `TC-EXPLORER-008`，并同步选择契约。Explorer/Markdown 单元 115/115、QA 工具单元 38/38、完整 QA 审计及 check:refactor 通过。
+
+合并源码中的 Vault 只读校验提交 `834435e3a` 通过 [升级契约 #44193490202](https://github.com/engcapa/taomni/actions/runs/44193490202)。Linux x64、Windows x64 和 macOS Intel 各 4/4 Vault 真实文件场景、4/4 Vault 内存单元、21/21 MFA engine 单元、13/12/13 个导出场景及各 1 个真实跨进程旧模式锁场景通过。所有 6 个 artifact 及时收齐。与同一源码匹配的 [三端 UI #44193516662](https://github.com/engcapa/taomni/actions/runs/44193516662) 三端 browser 各 36/36，含各 20 项完整 crash-regression，12 片已核验。native 继续收证。`macos-26` 首次选择包含五个 browser-only 场景，规划失败保留在 #44193545093，按声明过滤后，由 [#44195752497](https://github.com/engcapa/taomni/actions/runs/44195752497) 继续执行对应平台的全部 native 选择，含完整 crash-regression。
+
+`cdbef3871` 实现受信任的 MFA 离线提交和启动恢复，由签名包、原 Vault 密钥、同一 profile 排他维护锁和迁移 journal 共同约束。签名 [#44198966336](https://github.com/engcapa/taomni/actions/runs/44198966336) 全部成功，四个发布目标签名包实际产出，11 份 artifact 在运行时收齐。Linux x64、Windows x64、macOS ARM64 各 3/3 签名迁移场景、3/3 原签名安装场景和 2/2 原网络场景通过，已核对实际源码、核心 harness SHA、包 SHA 和结果 receipt。迁移输入由实际 Vault 和 MFA engine 生成合成旧资料，验证宿主原 HOTP、进程中断自动恢复及重试。产品升级按钮仍执行安全预检，剩余真实用户入口、MFA 业务接管和旧应用完整替换。详见[只读密钥与离线提交](taomni-modular-readonly-key-check.md)。
+
+`723401a3c` 让重复预检保留 MFA 已提交 journal，只重算尚未迁移的项目。两项新增纯单元及 check:refactor 通过。[三端契约 #44201267223](https://github.com/engcapa/taomni/actions/runs/44201267223) 的 6 份证据已即时收齐并核验。迁移测试 Linux/Windows/Mac Intel 各 36/35/36 项，真实导出 13/12/13 项，四项真实 Vault 场景、四项 Vault 单元、21 项 MFA engine 单元、跨进程旧模式锁各端均通过。签名迁移专项和 UI 用例的实际源码身份独立保存。
+
+合并源码 [UI #44193516662](https://github.com/engcapa/taomni/actions/runs/44193516662) 已下载并核验全部 24 片。Linux native **52/53**，TC-WS-054 在 X11 窗口关闭后等待进程退出超时。其后 `723401a3c` 的 Linux Xvfb release QA 定向复验 **24/24**，TC-WS-054 和完整 native crash-regression 通过。诊断提交 `a2477eacf` 在退出超时记录未退出进程名、状态、父进程、进程组和启动时间，3 项纯单元通过。 [复验 #44201839054](https://github.com/engcapa/taomni/actions/runs/44201839054)
+
+同轮 Windows native **52/53**，TC-MODULES-027 的旧版安装、首次 pending、正常重启和读回原 journal 都通过。失败出现在重启后的第二次点击，原截图和输入事件证明鼠标实际命中离线签名输入框，升级状态一直是 candidates。测试保留首次真实鼠标点击，第二次用 Enter 激活已启用的迁移按钮，原 pending、磁盘探针和超时仍保留。Windows 复验的 TC-MODULES-027 已通过，另一分片中的 TC-FILE-OPEN-002 失败，原失败与复验均保留。macOS Intel native **56/56**，包括完整 24 项 crash-regression 与 033–035 自动 relaunch。 [Windows 复验 #44205498365](https://github.com/engcapa/taomni/actions/runs/44205498365)
+
+预检源码 `723401a3c` 的三端 browser 各 **31/31**，Linux、Windows native 各 **41/41**，含各自完整 crash-regression。总计 20 片下载并核验，运行最终为 cancelled，缺少 macOS Intel native 4 片。macOS 26 的 `834435e3a` 矩阵 **50/56**，033–035 三态自动 relaunch 均通过，原生文件选择器和 HTML 断言仍有失败。各轮按实际构建、用例和 runner 身份保存。 [预检 UI #44202711518](https://github.com/engcapa/taomni/actions/runs/44202711518) · [macOS 26 #44195752497](https://github.com/engcapa/taomni/actions/runs/44195752497)
+
+2026-11-18 继续开发：已再次 fetch/merge main，远程仍为 `677ec4d77`，无冲突。新增 core-owned `PreparedMfaExport`，在同一 profile 的旧模式/新 profile/Vault/MFA 数据维护锁下生成真实一致 SQLite staging，绑定 MFA/Vault 主文件与 WAL、保留密文/metadata/偏好，区分 key-only，复核源及产物并在取消/失败/drop 时清理。只读预检散列新增逐块取消；源打开拒绝链接。纯内存单元 8/8、核心完整单元与独立生产 harness 的 no-run 编译通过。修正首轮 fixture 的 canonical 路径和精确原取消错误码后，源码 `52ce75ae8` 的 [#44161262665](https://github.com/engcapa/taomni/actions/runs/44161262665) 已全部 success，6 份 artifact 在执行期间收齐：Linux/Windows/Mac Intel 真实导出 **12/12、11/11、12/12**、原迁移 **34/34、33/33、34/34** 和各 **1/1** 跨进程旧模式锁场景；三端原宿主各 **37/37** 进程场景通过。matching [UI #44163030680](https://github.com/engcapa/taomni/actions/runs/44163030680) 已派发 025–032 与完整 crash-regression，完成 shard 即下载核验，结果待收齐。首轮原失败与主动取消 UI 均原样保留。未接入可信安装/激活，`plugin_migration_execute` 保持安全 pending；详情见[旧版 MFA 导出验证](taomni-modular-legacy-mfa-export-verification.md)。
 
 2026-11-18 最新：再次 fetch/merge main，远程仍为 `677ec4d77`，当前分支已包含，无冲突。当前相同产品/runner 输入的三端 browser 均已通过 **35/35**、各完整 crash **20/20**；Linux native **43/43**、Mac Intel native **44/44**，各完整 crash **24/24**。Windows 原轮 #44128316716 的 **42/43** 与外部 Shell Paste 超时原样保留；同 SHA 定向复验 [#44142742009](https://github.com/engcapa/taomni/actions/runs/44142742009) 已成功，**25/25**、完整 crash **24/24**，Explorer005 全 73 步通过，未改产品/用例或超时。按相同 source/runner/case digest 的最新结果合并，Windows 所选 43 项均取得通过证据，原失败 workflow 不改写为成功。Mac [#44128351358](https://github.com/engcapa/taomni/actions/runs/44128351358) 的三态真实自动 relaunch 全部通过；全部完成 shard 均在运行期间下载核验。ARM64 producer 因 hosted 容量取消、steps=[]，仍未执行。最终矩阵 `qa-ui-auto-report/github/file-feature-current-matrix.json` 保留此缺口；详见[文件功能验收](file-explorer/editable-file-creation-and-live-tables.md)与[真实还原入口](taomni-modular-restore-relaunch-verification.md)。
 
@@ -267,7 +287,7 @@
 | TASK-011 验签安装 | 基础闭环四种 native profile 通过 | pinned key 的真实 minisign 校验、清单防回滚、安全解包、内容绑定及安装入口强制验签已接入；#43804951477 的 TC-MODULES-007 在四种 native profile 全部 52 步通过，覆盖官方签名安装、启禁、正常重启和篡改拒绝。业务包、更新/回滚与最终发布仍需后续证据。 |
 | TASK-012 单体升级 | 部分 | 从安全 pending 进入真实 legacy exporter、可信包 staging、Vault 交接、激活、恢复/回滚；真实安装升级证据。 |
 | TASK-013 原型与 G 门 | hello/MFA 真宿主与签名包已有证据；G 门未闭合 | 三端实际进程、四目标签名包及三端正式安装门已有结果；G1/G3 系统实验、Linux noexec 已保留通过项与限制。完整安装包、hardened runtime/签名信任、性能、core-only 与真实升级仍有缺口，不能宣布 G1–G11 全过。 |
-| TASK-014 MFA | engine/SDK/store 原型与正式安装门通过；生产未切换 | 独立 store actor、作用域 KeyProvider、snapshot、可信包安装已有三端结果；现有 facade/连接 owner 仍在核心。真实旧库迁移、capture RPC 业务调用、动态 MFA UI、相关 G 门与迁出后三态还原待闭合。 |
+| TASK-014 MFA | 签名安装门通过；已提交 profile 的业务接管待复验 | 独立 store actor、作用域 KeyProvider、snapshot、可信包安装已有三端结果。`76c3f94e9` 接入已提交 profile 的宿主命令和旧归档恢复。新装 profile 的模块入口、实际旧安装的升级触发、capture RPC、动态 UI、相关 G 门与迁出后三态还原待闭合。 |
 | TASK-015 | 已取消 | 历史设计 `7bc498b35` 中为 LanChat 迁移，已由用户明确删除决定取消；主设计已保留编号并清理前置依赖。旧库保持原位，不读取、迁移或删除，不创建替代插件。 |
 | TASK-016 RDP/VNC 客户端 | 待前置闭合 | 两个插件宿主与前端、证书钉扎、剪贴板/输入、保留会话及特定按键辅助入口。 |
 | TASK-017 RDP/VNC 服务端 | 待前置闭合 | 两个插件宿主、共享采集/公共库、系统权限和平台边界。 |
@@ -331,7 +351,7 @@ Wayland `TC-FILE-OPEN-008` 在已有 AI 路径 chip 点击处失败：失败截�
 3. **迁出真实业务（TASK-005-B、013/014、016–022）**：MFA 原型和可信签名安装已有 runner 证据，长期有界防重放已由 `a41b27e72` 的三端协议/真实宿主门复验；继续补完整相关 G 门、旧库只读迁移、capture RPC 业务接线与动态 UI，最后切换生产 facade/连接 owner。之后依赖序推进 RDP/VNC 客户端与服务端、Servers、SocksCap、OCR/录制、本地语音的宿主、前端、状态与迁移。Mobile 按 DEC-2 留下明确 go/no-go 结论和公开例外，不能默认为交付；LanChat 任务已取消，不新增替代插件。
 4. **裁剪核心依赖闭包（TASK-006）**：随业务迁出，从核心 Cargo 默认 features、原生依赖、bundle/resources/helper 和前端 chunk 中实际移除相应实现。保存 cargo tree、资源与产物证据；把状态改名或放入 LegacyFeatureRuntime 不等于瘦身完成。
 5. **补齐模块使用剩余闭环（TASK-007、009–011）**：远端签名商店、三种代理 UI、跨重启下载恢复、后台进度、动态 tab 和缺失/禁用占位已有基础证据；继续验证真实不同版本的运行中更新/回滚、失败恢复、业务资源释放，以及每个实际业务模块在主窗/分离窗中的完整行为。安装、启禁、更新和回滚须无需重启核心；测试签名目录不代替正式目录发布。
-6. **验证真实旧单体升级（TASK-012）**：从已发布、已安装的 0.5.x 取得真实数据，经 legacy exporter、可信包 staging、Vault 交接和原子激活；覆盖升级中断、失败、重试和回滚，并证明原数据未损坏。现有只读预检/pending journal 与合成 fixture 都不算该验收；旧 LanChat 库保持原位且不读取。
+6. **完成升级入口并验证真实旧单体升级（TASK-012）**：MFA 一致导出、Vault 自检、可信包离线提交与中断恢复已有三端专项证据。下一步接入 Settings 的签名包与口令、退出并交给独占 profile 的升级执行入口，再验证正式已安装 `0.5.x` 创建真实 MFA 数据、候选安装程序替换、提交恢复与回滚。目前 `plugin_migration_execute` 记录 pending，真实安装入口与工作资料保留仍须验收。历史 LanChat 库原样留存。
 7. **完成生产发布验收（TASK-001/002/023）**：闭合 G1–G11、冻结真实插件契约；完成四发布目标的宿主系统签名/包签名、原子 modules 清单、模块独立更新/回滚。核心-only 与实际全插件集合分别完成受影响用例及完整 crash-regression，并归档包体积、启动、内存、帧吞吐的匹配基线与原始样本。
 
 ### 2026-11-16 启用与原生观察修复批次（`911f411b2` 已提交，hosted 验证中）
