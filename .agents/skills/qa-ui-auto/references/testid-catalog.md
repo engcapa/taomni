@@ -2042,7 +2042,6 @@
 - `[data-testid="welcome-local-directories"]` — display — F1.6.local-directories
 - `[data-testid="welcome-local-directory-filter"]` — interactive — F1.6.local-directory-filter
 - `[data-testid="welcome-restore-row"]` — display — F1.6.restore-row
-  ↳ `.tao-home-history-footer` — alias
 - `[data-testid="welcome-local-directory"]` — interactive [optional] — F1.6.local-directory-row
 - `[data-testid="welcome-local-directory-unavailable"]` — display [optional] — F1.6.local-directory-unavailable
 - `[data-testid="welcome-directory-retry"]` — interactive [optional] — F1.6.directory-retry
@@ -3709,6 +3708,28 @@
 - `[data-testid="tao-settings-provider"]` — interactive — F1.11.tao-settings-provider
 - `[data-testid="tao-settings-model"]` — interactive — F1.11.tao-settings-model
 - `[data-testid="tao-settings-cost"]` — interactive — F1.11.tao-settings-cost
+- `[data-testid="tao-search-sources"]` — interactive [optional] — F1.11.tao-search-sources
+- `[data-testid="tao-search-sources-menu"]` — display [optional] — F1.11.tao-search-sources-menu
+- `[data-testid="tao-search-source-sql"]` — interactive [optional] — F1.11.tao-search-source-sql
+- `[data-testid="tao-search-source-groups"]` — interactive [optional] — F1.11.tao-search-source-groups
+- `[data-testid="tao-search-source-file_contents"]` — interactive [optional] — F1.11.tao-search-source-file_contents
+- `[data-testid="llm-add-custom-provider"]` — interactive [optional] — F1.11.llm-add-custom-provider
+- `[data-testid="llm-custom-toggle"]` — interactive [optional] — F1.11.llm-custom-toggle
+- `[data-testid="llm-custom-fields"]` — display [optional] — F1.11.llm-custom-fields
+- `[data-testid="llm-custom-name"]` — interactive [optional] — F1.11.llm-custom-name
+- `[data-testid="llm-custom-protocol"]` — interactive [optional] — F1.11.llm-custom-protocol
+- `[data-testid="llm-custom-add-model"]` — interactive [optional] — F1.11.llm-custom-add-model
+- `[data-testid="llm-custom-model-row"]` — display [optional] — F1.11.llm-custom-model-row
+- `[data-testid="llm-custom-model-id"]` — interactive [optional] — F1.11.llm-custom-model-id
+- `[data-testid="llm-custom-context"]` — interactive [optional] — F1.11.llm-custom-context
+- `[data-testid="llm-custom-max-output"]` — interactive [optional] — F1.11.llm-custom-max-output
+- `[data-testid="llm-custom-multimodal"]` — interactive [optional] — F1.11.llm-custom-multimodal
+- `[data-testid="llm-custom-native-search"]` — interactive [optional] — F1.11.llm-custom-native-search
+- `[data-testid="llm-custom-default-model"]` — interactive [optional] — F1.11.llm-custom-default-model
+- `[data-testid="llm-custom-remove-model"]` — interactive [optional] — F1.11.llm-custom-remove-model
+- `[data-testid="llm-custom-remove"]` — interactive [optional] — F1.11.llm-custom-remove
+- `[data-testid="llm-custom-effort-high"]` — interactive [optional] — F1.11.llm-custom-effort-high
+- `[data-testid="llm-custom-effort-xhigh"]` — interactive [optional] — F1.11.llm-custom-effort-xhigh
 - `[data-testid="tao-settings-tts"]` — interactive — F1.11.tao-settings-tts
 - `[data-testid="tao-home-model"]` — interactive — F1.11.tao-home-model
 - `[data-provider="deepseek-app"] [data-testid="llm-proxy-mode"]` — interactive — F1.11.tao-shared-provider-proxy

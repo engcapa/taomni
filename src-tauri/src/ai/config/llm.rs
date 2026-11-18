@@ -23,6 +23,7 @@ impl Default for LlmConfig {
         providers.insert(
             "deepseek".into(),
             LlmProviderConfig {
+                custom: None,
                 base_url: "https://api.deepseek.com/v1".into(),
                 api_key: String::new(),
                 api_keys: Vec::new(),
@@ -41,6 +42,7 @@ impl Default for LlmConfig {
         providers.insert(
             "deepseek-app".into(),
             LlmProviderConfig {
+                custom: None,
                 base_url: "https://api.deepseek.com".into(),
                 api_key: String::new(),
                 api_keys: Vec::new(),
@@ -59,6 +61,7 @@ impl Default for LlmConfig {
         providers.insert(
             "agnes".into(),
             LlmProviderConfig {
+                custom: None,
                 base_url: "https://apihub.agnes-ai.com/v1".into(),
                 api_key: String::new(),
                 api_keys: Vec::new(),
@@ -81,6 +84,7 @@ impl Default for LlmConfig {
         providers.insert(
             "glm".into(),
             LlmProviderConfig {
+                custom: None,
                 base_url: "https://open.bigmodel.cn/api/paas/v4".into(),
                 api_key: String::new(),
                 api_keys: Vec::new(),
@@ -99,6 +103,7 @@ impl Default for LlmConfig {
         providers.insert(
             "siliconflow".into(),
             LlmProviderConfig {
+                custom: None,
                 base_url: "https://api.siliconflow.cn/v1".into(),
                 api_key: String::new(),
                 api_keys: Vec::new(),
@@ -117,6 +122,7 @@ impl Default for LlmConfig {
         providers.insert(
             "groq".into(),
             LlmProviderConfig {
+                custom: None,
                 base_url: "https://api.groq.com/openai/v1".into(),
                 api_key: String::new(),
                 api_keys: Vec::new(),
@@ -135,6 +141,7 @@ impl Default for LlmConfig {
         providers.insert(
             "local".into(),
             LlmProviderConfig {
+                custom: None,
                 base_url: "http://127.0.0.1:8080/v1".into(),
                 api_key: "local".into(),
                 api_keys: Vec::new(),
@@ -153,6 +160,7 @@ impl Default for LlmConfig {
         providers.insert(
             "anthropic".into(),
             LlmProviderConfig {
+                custom: None,
                 base_url: "https://api.anthropic.com/v1".into(),
                 api_key: String::new(),
                 api_keys: Vec::new(),
@@ -212,6 +220,7 @@ impl LlmConfig {
         self.providers
             .entry("deepseek-app".into())
             .or_insert_with(|| LlmProviderConfig {
+                custom: None,
                 base_url: "https://api.deepseek.com".into(),
                 api_key: String::new(),
                 api_keys: Vec::new(),
@@ -231,6 +240,7 @@ impl LlmConfig {
 
 pub(super) fn default_agnes_provider() -> LlmProviderConfig {
     LlmProviderConfig {
+        custom: None,
         base_url: "https://apihub.agnes-ai.com/v1".into(),
         api_key: String::new(),
         api_keys: Vec::new(),
@@ -253,6 +263,8 @@ pub(super) fn default_agnes_provider() -> LlmProviderConfig {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LlmProviderConfig {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub custom: Option<super::custom_llm::CustomLlmProvider>,
     #[serde(default, skip_serializing_if = "HashMap::is_empty")]
     pub protocol_overrides: HashMap<String, String>,
     pub base_url: String,
@@ -280,6 +292,7 @@ pub struct LlmProviderConfig {
 
 pub fn default_opencode_go_provider() -> LlmProviderConfig {
     LlmProviderConfig {
+        custom: None,
         base_url: "https://opencode.ai/inference/go/v1".into(),
         api_key: String::new(),
         api_keys: Vec::new(),
@@ -298,6 +311,14 @@ pub fn default_opencode_go_provider() -> LlmProviderConfig {
 
 impl LlmProviderConfig {
     pub fn normalize(&mut self) {
+        if let Some(custom) = &mut self.custom {
+            self.base_url = super::custom_llm::base_url(&self.base_url, &self.runtime);
+            self.model = self.model.trim().to_owned();
+            custom.label = custom.label.trim().to_owned();
+            for model in &mut custom.models {
+                model.id = model.id.trim().to_owned();
+            }
+        }
         self.proxy_url = self
             .proxy_url
             .as_ref()

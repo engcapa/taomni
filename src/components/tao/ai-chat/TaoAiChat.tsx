@@ -53,6 +53,7 @@ export function TaoAiChat({ controller, profile, slots, disabled = false, active
   return (
     <section ref={rootRef} className="tao-ai-chat" data-testid="tao-ai-chat" data-tao-active={active}>
       <TopBar state={state} profile={profile} controller={controller} onMode={controller.setMode} onSearch={() => controller.setSearchOpen(true)} onOpenSettings={onOpenSettings} onOpenAppearance={onOpenAppearance} slots={slots?.headerTrailing ?? slots?.headerLeading} />
+      {slots?.belowHeader}
       <div className="tao-home-body" data-testid="tao-home-body">
       <div className={`tao-home-main ${thread?.messages.length ? "has-messages" : "empty"}`} data-testid="tao-home-chat-column">
         <div ref={feed.feedRef} onScroll={feed.onScroll} className="tao-home-feed" data-testid="tao-home-feed">

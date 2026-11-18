@@ -448,6 +448,94 @@ controls:
 - id: tao-settings-cost
   selector: '[data-testid="tao-settings-cost"]'
   kind: interactive
+- id: tao-search-sources
+  selector: '[data-testid="tao-search-sources"]'
+  kind: interactive
+  optional: true
+- id: tao-search-sources-menu
+  selector: '[data-testid="tao-search-sources-menu"]'
+  kind: display
+  optional: true
+- id: tao-search-source-sql
+  selector: '[data-testid="tao-search-source-sql"]'
+  kind: interactive
+  optional: true
+- id: tao-search-source-groups
+  selector: '[data-testid="tao-search-source-groups"]'
+  kind: interactive
+  optional: true
+- id: tao-search-source-file_contents
+  selector: '[data-testid="tao-search-source-file_contents"]'
+  kind: interactive
+  optional: true
+- id: llm-add-custom-provider
+  selector: '[data-testid="llm-add-custom-provider"]'
+  kind: interactive
+  optional: true
+- id: llm-custom-toggle
+  selector: '[data-testid="llm-custom-toggle"]'
+  kind: interactive
+  optional: true
+- id: llm-custom-fields
+  selector: '[data-testid="llm-custom-fields"]'
+  kind: display
+  optional: true
+- id: llm-custom-name
+  selector: '[data-testid="llm-custom-name"]'
+  kind: interactive
+  optional: true
+- id: llm-custom-protocol
+  selector: '[data-testid="llm-custom-protocol"]'
+  kind: interactive
+  optional: true
+- id: llm-custom-add-model
+  selector: '[data-testid="llm-custom-add-model"]'
+  kind: interactive
+  optional: true
+- id: llm-custom-model-row
+  selector: '[data-testid="llm-custom-model-row"]'
+  kind: display
+  optional: true
+- id: llm-custom-model-id
+  selector: '[data-testid="llm-custom-model-id"]'
+  kind: interactive
+  optional: true
+- id: llm-custom-context
+  selector: '[data-testid="llm-custom-context"]'
+  kind: interactive
+  optional: true
+- id: llm-custom-max-output
+  selector: '[data-testid="llm-custom-max-output"]'
+  kind: interactive
+  optional: true
+- id: llm-custom-multimodal
+  selector: '[data-testid="llm-custom-multimodal"]'
+  kind: interactive
+  optional: true
+- id: llm-custom-native-search
+  selector: '[data-testid="llm-custom-native-search"]'
+  kind: interactive
+  optional: true
+- id: llm-custom-default-model
+  selector: '[data-testid="llm-custom-default-model"]'
+  kind: interactive
+  optional: true
+- id: llm-custom-remove-model
+  selector: '[data-testid="llm-custom-remove-model"]'
+  kind: interactive
+  optional: true
+- id: llm-custom-remove
+  selector: '[data-testid="llm-custom-remove"]'
+  kind: interactive
+  optional: true
+- id: llm-custom-effort-high
+  selector: '[data-testid="llm-custom-effort-high"]'
+  kind: interactive
+  optional: true
+- id: llm-custom-effort-xhigh
+  selector: '[data-testid="llm-custom-effort-xhigh"]'
+  kind: interactive
+  optional: true
 - id: tao-settings-tts
   selector: '[data-testid="tao-settings-tts"]'
   kind: interactive
@@ -621,6 +709,8 @@ controls:
   selector: '[data-testid="tao-home-search-filter-note"]'
   kind: interactive
 -->
+
+TC-WELCOME-RS-02 和 TC-WELCOME-RS-N-05 验证 Home 顶部的恢复入口、键盘启动、真实 PTY 的重启恢复与重复定位。TC-TAO-HOME-048 验证美元费用阈值和本地检索来源下拉多选。TC-TAO-HOME-049/050 验证自定义 Provider 的模型配置、保存以及三个协议的实际请求。
 
 Tao Home 将问、做、深研三种模式、绑定栏、Composer、消息状态、历史快捷行与本地资料搜索组合为独立宿主；首页入口移除 LAN 聊天，WSL 只在检测到可用发行版时显示。用例 `TC-TAO-HOME-001` 覆盖无 Key 空态、模式切换、历史三页签、搜索快捷键和托管 WebView smoke。
 
@@ -1080,7 +1170,6 @@ controls:
   # docs-feature/welcome-recents-session-restore-design.md §4.1/§4.2).
   - id: restore-row
     selector: '[data-testid="welcome-restore-row"]'
-    aliases: ['.tao-home-history-footer']
     kind: display
   - id: local-directory-row
     selector: '[data-testid="welcome-local-directory"]'
@@ -16235,3 +16324,5 @@ The retired Tao-specific key/save selectors are retained as optional absence ass
 - TC-FILE-OPEN-018: native release PDF performance comparison, three identical long-table/Mermaid/Unicode samples through actual save dialogs. Raw durations and PDF artifacts are reviewed against a fixed baseline; no speedup is inferred from pass status.
 
 真实用户 testing.md 回归由 TC-FILE-OPEN-027/028 验证 Live 表格内联格式、Word 流程图线身、draw.io 时序连接点和可搜索 PDF，并核对原文 SHA。实际 draw.io Desktop / LibreOffice 视觉证据另行留存；不将内部 maxGraph 预览当作外部编辑器验收。
+
+TC-FILE-OPEN-029/030 覆盖 Markdown Live 的实际拖选与选区对比度、深色源码标记以及 Live、源码和分栏的共享查找替换控件。

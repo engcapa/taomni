@@ -14,6 +14,9 @@ class RenderedBlock extends WidgetType {
   constructor(readonly from: number, readonly raw: string, readonly context: MarkdownWidgetContext) { super(); }
   eq(other: RenderedBlock): boolean { return this.from === other.from && this.raw === other.raw && this.context === other.context; }
   ignoreEvent(event: Event): boolean {
+    // In browse mode the WebView selects and copies the rendered text. A
+    // CodeMirror selection would map each block to its underlying source span.
+    if (this.context.readOnly) return true;
     // Diagram actions own their pointer/keyboard lifecycle. Letting CodeMirror
     // handle right-button mouseup moves the caret into this block and removes
     // the widget while its portal menu is receiving focus.
@@ -23,6 +26,8 @@ class RenderedBlock extends WidgetType {
   toDOM(view: EditorView): HTMLElement {
     const root = markdownFragment(this.raw);
     root.className = "fv-md-rendered-block";
+    root.dataset.markdownBlockFrom = String(this.from);
+    root.dataset.markdownBlockLength = String(this.raw.length);
     const owner = { cancelled: false };
     owners.set(root, owner);
     // Start image resolution while detached; it strips network/path src values
@@ -152,12 +157,14 @@ function decorations(state: EditorState, context: MarkdownWidgetContext, focus: 
       // still get a real editable line, including the final insertion point.
       let replaceTo = block.to;
       for (let next = index + 1; next < blocks.length && !blocks[next].raw.trim(); next++) replaceTo = blocks[next].to;
-      for (const selection of state.selection.ranges) {
-        if (selection.from >= block.to && selection.from <= replaceTo) {
-          replaceTo = Math.max(block.to, state.doc.lineAt(selection.from).from);
+      if (!context.readOnly) {
+        for (const selection of state.selection.ranges) {
+          if (selection.from >= block.to && selection.from <= replaceTo) {
+            replaceTo = Math.max(block.to, state.doc.lineAt(selection.from).from);
+          }
         }
       }
-      const endsAtCaretLine = state.selection.ranges.some((selection) => state.doc.lineAt(selection.from).from === replaceTo);
+      const endsAtCaretLine = !context.readOnly && state.selection.ranges.some((selection) => state.doc.lineAt(selection.from).from === replaceTo);
       ranges.push(Decoration.replace({ widget, block: true, inclusiveStart: true, inclusiveEnd: !endsAtCaretLine }).range(block.from, replaceTo));
     } else {
       let pos = block.from;
@@ -176,7 +183,7 @@ function decorations(state: EditorState, context: MarkdownWidgetContext, focus: 
   }
   // Space tokens are not rendered blocks. Keep the active empty source line
   // visibly editable even when surrounding rendered blocks own their spacing.
-  if (!currentLine.text.trim() && !ranges.some((range) => range.value.spec.class?.includes("fv-md-current-line"))) {
+  if (!context.readOnly && !currentLine.text.trim() && !ranges.some((range) => range.value.spec.class?.includes("fv-md-current-line"))) {
     ranges.push(Decoration.line({ class: "fv-md-source-line fv-md-current-line" }).range(currentLine.from));
   }
   return Decoration.set(ranges, true);

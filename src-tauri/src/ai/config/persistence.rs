@@ -61,8 +61,8 @@ pub struct DeepSeekAppConfig {
     pub voice_provider: String,
     #[serde(default = "default_tts_voice")]
     pub tts_voice: String,
-    #[serde(default = "default_cost_threshold")]
-    pub cost_confirm_threshold_cny: f64,
+    #[serde(default)]
+    pub cost_confirm_threshold_usd: f64,
 }
 
 fn default_true() -> bool {
@@ -83,10 +83,6 @@ fn default_voice_provider() -> String {
 fn default_tts_voice() -> String {
     "stella".into()
 }
-fn default_cost_threshold() -> f64 {
-    0.5
-}
-
 impl Default for DeepSeekAppConfig {
     fn default() -> Self {
         Self {
@@ -100,7 +96,7 @@ impl Default for DeepSeekAppConfig {
             title_enabled: true,
             voice_provider: default_voice_provider(),
             tts_voice: default_tts_voice(),
-            cost_confirm_threshold_cny: default_cost_threshold(),
+            cost_confirm_threshold_usd: 0.0,
         }
     }
 }
@@ -147,6 +143,8 @@ impl AiConfig {
         self.acp_bridge.normalize();
         self.llm.normalize();
         self.asr.normalize();
+        self.deepseek_app.cost_confirm_threshold_usd =
+            self.deepseek_app.cost_confirm_threshold_usd.max(0.0);
     }
 
     pub fn save(&self, path: &PathBuf) -> std::io::Result<()> {

@@ -46,6 +46,29 @@ beforeEach(() => {
 afterEach(() => { cleanup(); style.remove(); useDocumentStore.setState({ documents: {} }); });
 
 describe("MarkdownEditor real host lifecycle", () => {
+  it("keeps the shared find panel across modes and permits replacement only in the editing surface", () => {
+    render(<Harness />);
+    fireEvent.keyDown(screen.getByTestId("markdown-live"), { key: "f", ctrlKey: true });
+    const panel = screen.getByTestId("code-workspace-editor-search");
+    const find = screen.getByRole("searchbox", { name: "Find" });
+    fireEvent.input(find, { target: { value: "Details" } });
+    fireEvent.click(screen.getByRole("button", { name: "Show replace" }));
+    expect(screen.getByRole("button", { name: "Replace all matches" })).toBeDisabled();
+    fireEvent.input(screen.getByLabelText("Replace", { selector: "input" }), { target: { value: "Outline" } });
+    expect(useDocumentStore.getState().documents["/docs/a.md"].content).toContain("## Details");
+
+    fireEvent.click(screen.getByTestId("markdown-mode-split"));
+    expect(screen.getByTestId("code-workspace-editor-search")).toBe(panel);
+    expect(find).toHaveValue("Details");
+    fireEvent.click(screen.getByRole("button", { name: "Replace all matches" }));
+    expect(useDocumentStore.getState().documents["/docs/a.md"].content).toContain("## Outline");
+
+    fireEvent.click(screen.getByTestId("markdown-mode-live"));
+    expect(screen.getByRole("button", { name: "Replace all matches" })).toBeDisabled();
+    fireEvent.keyDown(find, { key: "Escape" });
+    expect(screen.queryByTestId("code-workspace-editor-search")).not.toBeInTheDocument();
+  });
+
   it("keeps exactly one import/export control while actual editor selections and modes change", () => {
     render(<Harness />);
     fireEvent.click(screen.getByTestId("markdown-live-edit"));
