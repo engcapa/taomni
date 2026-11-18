@@ -569,6 +569,9 @@ jobs:
           node scripts/stage-published-module-catalog.mjs carried-module-catalog --allow-missing >> "$GITHUB_OUTPUT"
           if find artifacts -type f -name '*.taomni-plugin' -print -quit | grep -q .; then
             export MODULE_UPDATED_AT="$(git show -s --format=%cI HEAD)"
+            if [[ -d carried-module-catalog ]]; then
+              export MODULES_PUBLISHED_CATALOG=carried-module-catalog/modules.json
+            fi
             node scripts/compose-modules-manifest.mjs artifacts module-assets
             echo 'present=true' >> "$GITHUB_OUTPUT"
           elif [[ -n "$MODULES_LEGACY_UPGRADE_IDS" && ! -d carried-module-catalog ]]; then

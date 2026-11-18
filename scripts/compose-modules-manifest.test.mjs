@@ -1,8 +1,10 @@
 import { strict as assert } from "node:assert";
+import { spawnSync } from "node:child_process";
 import { createHash } from "node:crypto";
 import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 import { composeModulesManifest } from "./compose-modules-manifest.mjs";
 
@@ -144,5 +146,29 @@ test("cannot publish an incomplete first-upgrade module", (t) => {
   f.add("linux-x86_64", "linux", manifest);
   assert.throws(() => composeModulesManifest({ artifactsDir: f.artifacts, outputDir: f.output,
     tag: "v0.6.0", repository: "engcapa/taomni", legacyUpgrade: [manifest.id] }), /all declared platform assets/);
+});
+
+test("a core release inherits the published roster and advances past a module-only sequence", (t) => {
+  const f = fixture(t);
+  const first = moduleManifest({ description: "First feature", platforms: ["linux-x86_64"] });
+  f.add("linux-x86_64", "first", first);
+  f.add("linux-x86_64", "next", moduleManifest({
+    id: "taomni-plugin-next", slug: "next", description: "New feature", platforms: ["linux-x86_64"],
+  }));
+  const previous = join(f.root, "published.json");
+  writeFileSync(previous, JSON.stringify({ sequence: 42, legacyUpgrade: [first.id] }));
+  const script = fileURLToPath(new URL("./compose-modules-manifest.mjs", import.meta.url));
+  const result = spawnSync(process.execPath, [script, f.artifacts, f.output], {
+    env: {
+      TAG: "v0.6.0", GITHUB_REPOSITORY: "engcapa/taomni", GITHUB_RUN_NUMBER: "11",
+      MODULES_LEGACY_UPGRADE_IDS: "", MODULES_PUBLISHED_CATALOG: previous,
+    },
+    encoding: "utf8",
+  });
+  assert.equal(result.status, 0, result.stderr);
+  const catalog = JSON.parse(readFileSync(join(f.output, "modules.json"), "utf8"));
+  assert.equal(catalog.sequence, 43);
+  assert.deepEqual(catalog.legacyUpgrade, [first.id]);
+  assert.equal(catalog.plugins["taomni-plugin-next"].description, "New feature");
 });
 
