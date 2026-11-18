@@ -18,12 +18,7 @@ impl ReleaseSigner {
         let encoded = std::env::var("TAURI_SIGNING_PRIVATE_KEY")
             .context("TAURI_SIGNING_PRIVATE_KEY is required")?;
         let password = std::env::var("TAURI_SIGNING_PRIVATE_KEY_PASSWORD").unwrap_or_default();
-        let config: serde_json::Value =
-            serde_json::from_str(include_str!("../../../src-tauri/tauri.conf.json"))?;
-        let public = config["plugins"]["updater"]["pubkey"]
-            .as_str()
-            .context("embedded release key is missing")?;
-        Self::decode(&encoded, password, public)
+        Self::decode(&encoded, password, &embedded_public_key()?)
     }
 
     fn decode(encoded: &str, password: String, public: &str) -> Result<Self> {
@@ -75,26 +70,7 @@ impl ReleaseSigner {
     }
 
     pub(crate) fn verify(&self, path: &Path, signature: &str, comment: &str) -> Result<()> {
-        use std::io::Read;
-        let signature = Signature::decode(signature)?;
-        ensure!(
-            signature.trusted_comment() == comment,
-            "trusted comment changed during signing"
-        );
-        let mut stream = self.verifier.verify_stream(&signature)?;
-        let mut file = File::open(path)?;
-        let mut buffer = [0_u8; 128 * 1024];
-        loop {
-            let size = file.read(&mut buffer)?;
-            if size == 0 {
-                break;
-            }
-            stream.update(&buffer[..size]);
-        }
-        if stream.finalize().is_err() {
-            bail!("generated package signature failed independent verification");
-        }
-        Ok(())
+        verify_file(&self.verifier, path, signature, comment)
     }
 
     #[cfg(test)]
@@ -107,6 +83,55 @@ impl ReleaseSigner {
             verifier: VerifyingKey::decode(&public_text).unwrap(),
         }
     }
+
+    #[cfg(test)]
+    pub(crate) fn test_verifier(&self) -> &VerifyingKey {
+        &self.verifier
+    }
+}
+
+fn embedded_public_key() -> Result<String> {
+    let config: serde_json::Value =
+        serde_json::from_str(include_str!("../../../src-tauri/tauri.conf.json"))?;
+    Ok(config["plugins"]["updater"]["pubkey"]
+        .as_str()
+        .context("embedded release key is missing")?
+        .to_owned())
+}
+
+pub(crate) fn public_verifier() -> Result<VerifyingKey> {
+    let encoded = embedded_public_key()?;
+    Ok(VerifyingKey::decode(&String::from_utf8(
+        STANDARD.decode(encoded.trim())?,
+    )?)?)
+}
+
+pub(crate) fn verify_file(
+    verifier: &VerifyingKey,
+    path: &Path,
+    signature: &str,
+    comment: &str,
+) -> Result<()> {
+    use std::io::Read;
+    let signature = Signature::decode(signature)?;
+    ensure!(
+        signature.trusted_comment() == comment,
+        "detached signature identifies different release metadata"
+    );
+    let mut stream = verifier.verify_stream(&signature)?;
+    let mut file = File::open(path)?;
+    let mut buffer = [0_u8; 128 * 1024];
+    loop {
+        let size = file.read(&mut buffer)?;
+        if size == 0 {
+            break;
+        }
+        stream.update(&buffer[..size]);
+    }
+    if stream.finalize().is_err() {
+        bail!("module signature failed independent verification");
+    }
+    Ok(())
 }
 
 #[cfg(test)]

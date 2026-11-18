@@ -67,6 +67,7 @@
 - macOS 26 ARM64 的前一轮源码 `dc7b2ec66` 重跑收齐四片，28/29。`027`、`033–035` 和 `038` 均通过，包括实际 MFA 签名包自动重启和三态还原。`TC-FILE-OPEN-007` 的系统 Save 对话框定位失败与已记录的 ARM64 环境差异一致。 [ARM64 第二次运行](https://github.com/engcapa/taomni/actions/runs/44257552331/attempts/2)
 - 模块注册表现将真实回滚版本交给设置页，持久记录七天有效期，并校验用户点击时选择的版本。活动宿主更新与回滚时立即重新握手，握手失败会恢复旧版本和原宿主。新增 Native 042 与 Browser 043 验证同一应用会话内的版本切换、禁用偏好、原始数据与已签名错误包恢复。
 - MFA 代码已经安装时，旧数据迁移直接读取该版本的验签原件，设置页提示输入原 Vault 密码。提交和中断恢复均保留既有版本指针，也保留明确设为禁用的偏好。新增 Native 044 和真实签名包中断专项覆盖这条路径。现有未安装流程沿用签名文件选择器。
+- Windows x64 MSI 与 macOS Intel DMG 的真实替换与回退均已通过。同一隔离 profile 上完成 0.5.10 → 0.5.11 → 0.5.10，原 SSH/VNC 会话保留，回退后恢复原应用摘要。原始产物和系统签名结果见安装验证记录。 [安装验证 #44292054057](https://github.com/engcapa/taomni/actions/runs/44292054057)
 
 核心仍包含旧 profile 的 MFA、Servers、SocksCap、远程桌面和本地语音等业务代码、状态与依赖。hello-plugin 和 MFA 已取得签名安装结果。已提交迁移的 MFA profile 通过签名宿主读写账户和生成验证码，原数据继续用作回退资料。主窗和分离窗已支持动态加载模块前端，MFA 的正式前端和新装 profile 仍待迁出。LanChat 功能已删除，历史 `lanchat.sqlite` 和 `lanchat.db` 保留原位。
 

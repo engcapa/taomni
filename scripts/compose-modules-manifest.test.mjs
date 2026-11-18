@@ -124,3 +124,25 @@ test("rejects platform payloads that disagree about the permissions shown before
   assert.throws(() => composeModulesManifest({ artifactsDir: f.artifacts, outputDir: f.output, tag: "v0.6.0", repository: "engcapa/taomni" }), /inconsistent metadata/);
 });
 
+test("keeps a complete legacy roster and the description of a separately added stable module", (t) => {
+  const f = fixture(t);
+  const baseline = moduleManifest({ description: "Old feature description" });
+  f.add("linux-x86_64", "linux", baseline);
+  f.add("windows-x86_64", "windows", baseline);
+  f.add("linux-x86_64", "new", moduleManifest({
+    slug: "next", id: "taomni-plugin-next", description: "New feature description", platforms: ["linux-x86_64"],
+  }));
+  const result = composeModulesManifest({ artifactsDir: f.artifacts, outputDir: f.output,
+    tag: "v0.6.0", repository: "engcapa/taomni", legacyUpgrade: [baseline.id] });
+  assert.deepEqual(result.manifest.legacyUpgrade, [baseline.id]);
+  assert.equal(result.manifest.plugins["taomni-plugin-next"].description, "New feature description");
+});
+
+test("cannot publish an incomplete first-upgrade module", (t) => {
+  const f = fixture(t);
+  const manifest = moduleManifest({ description: "Old feature description" });
+  f.add("linux-x86_64", "linux", manifest);
+  assert.throws(() => composeModulesManifest({ artifactsDir: f.artifacts, outputDir: f.output,
+    tag: "v0.6.0", repository: "engcapa/taomni", legacyUpgrade: [manifest.id] }), /all declared platform assets/);
+});
+

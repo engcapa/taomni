@@ -89,10 +89,33 @@ if (args[1] === "upload" && process.env.TEST_GH_UPLOAD_FAIL && !args[3].endsWith
   };
   return {
     root, signedPaths,
+    put,
     calls: () => existsSync(trace) ? readFileSync(trace, "utf8").trim().split("\n").map(JSON.parse) : [],
     run: (overrides = {}) => spawnSync("bash", ["-c", publishScript], { cwd: root, env: { ...env, ...overrides }, encoding: "utf8" }),
   };
 }
+
+test("verifies the detached module catalog and all its packages before any release mutation", (t) => {
+  const f = fixture(t);
+  f.put(join(f.root, "module-assets/modules.json"), "staged catalog");
+  assert.notEqual(f.run().status, 0);
+  assert.deepEqual(f.calls(), []);
+  rmSync(join(f.root, "updater-assets"), { recursive: true });
+  const verifier = join(f.root, "scripts/plugin-package/target/release/taomni-plugin-package");
+  f.put(verifier, '#!/bin/sh\n[ "$1" = "--verify-catalog" ] && [ "$2" = "module-assets" ] && [ -f module-assets/modules.json.minisig ]\n');
+  chmodSync(verifier, 0o755);
+  assert.notEqual(f.run().status, 0);
+  assert.deepEqual(f.calls(), []);
+  rmSync(join(f.root, "updater-assets"), { recursive: true });
+  f.put(join(f.root, "module-assets/modules.json.minisig"), "verified exact catalog signature");
+  f.put(join(f.root, "module-assets/example.taomni-plugin"), "fixture only");
+  f.put(join(f.root, "module-assets/example.taomni-plugin.minisig"), "fixture only");
+  const result = f.run({ TEST_GH_EXISTING_DRAFT: "1" });
+  assert.equal(result.status, 0, result.stderr + result.stdout);
+  const published = f.calls().filter((args) => args[1] === "upload").slice(-5).map((args) => args[3]);
+  assert.deepEqual(published, ["module-assets/example.taomni-plugin", "module-assets/example.taomni-plugin.minisig",
+    "module-assets/modules.json.minisig", "module-assets/modules.json", "updater-assets/latest.json"]);
+});
 
 test("builders only store workflow artifacts; finalizer uploads installers/updates before latest.json", (t) => {
   assert(!workflow.includes("tagName:"));

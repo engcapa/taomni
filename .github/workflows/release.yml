@@ -556,32 +556,47 @@ jobs:
         with:
           path: artifacts
 
+      - name: Assemble the complete staged module catalog
+        id: module-catalog
+        env:
+          TAG: ${{ needs.plan.outputs.tag }}
+          MODULES_LEGACY_UPGRADE_IDS: ${{ vars.TAOMNI_LEGACY_UPGRADE_IDS }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          if find artifacts -type f -name '*.taomni-plugin' -print -quit | grep -q .; then
+            export MODULE_UPDATED_AT="$(git show -s --format=%cI HEAD)"
+            node scripts/compose-modules-manifest.mjs artifacts module-assets
+            echo 'present=true' >> "$GITHUB_OUTPUT"
+          fi
+      - uses: dtolnay/rust-toolchain@stable
+        if: steps.module-catalog.outputs.present == 'true'
+      - name: Build the catalog signer before providing the signing key
+        if: steps.module-catalog.outputs.present == 'true'
+        run: |
+          cargo test --manifest-path scripts/plugin-package/Cargo.toml --lib --locked
+          cargo build --manifest-path scripts/plugin-package/Cargo.toml --bin taomni-plugin-package --release --locked
+      - name: Sign the verified complete module catalog
+        if: steps.module-catalog.outputs.present == 'true'
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: scripts/plugin-package/target/release/taomni-plugin-package --sign-catalog module-assets
+
       - name: Verify and publish release assets
         if: needs.plan.outputs.tag != ''
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GH_REPO: ${{ github.repository }}
           TAG: ${{ needs.plan.outputs.tag }}
-          MODULES_LEGACY_UPGRADE_ROSTER: ${{ vars.TAOMNI_LEGACY_UPGRADE_IDS }}
         shell: bash
         run: |
           set -euo pipefail
           node scripts/compose-updater-manifest.mjs artifacts updater-assets
           node scripts/verify-updater-signatures.mjs updater-assets
 
-          # Plugin builders upload .taomni-plugin artifacts independently of
-          # the core matrix. When present, compose and stage modules.json in
-          # the same release while leaving latest.json untouched. The detached
-          # catalogue signature is produced by the release signing job and is
-          # required before any module asset is published.
-          if find artifacts -type f -name '*.taomni-plugin' -print -quit | grep -q .; then
-            module_signature="$(find artifacts -type f -name 'modules.json.minisig' -print -quit)"
-            test -n "$module_signature"
-            if [[ -n "$MODULES_LEGACY_UPGRADE_ROSTER" ]]; then
-              export MODULES_LEGACY_UPGRADE_IDS="$MODULES_LEGACY_UPGRADE_ROSTER"
-            fi
-            MODULES_REQUIRE_SIGNATURE=1 MODULES_MANIFEST_SIGNATURE="$module_signature" \
-              node scripts/compose-modules-manifest.mjs artifacts module-assets
+          if [ -d module-assets ]; then
+            scripts/plugin-package/target/release/taomni-plugin-package --verify-catalog module-assets
           fi
 
           # No release mutation until every platform/signature gate has passed.

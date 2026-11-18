@@ -13,7 +13,25 @@ fn main() {
 }
 
 fn run() -> Result<()> {
-    let mut args = std::env::args().skip(1);
+    let mut args = std::env::args().skip(1).peekable();
+    if matches!(
+        args.peek().map(String::as_str),
+        Some("--sign-catalog" | "--verify-catalog")
+    ) {
+        let operation = args.next().expect("catalog operation");
+        let path = args
+            .next()
+            .context("expected the staged catalog directory")?;
+        ensure!(
+            args.next().is_none(),
+            "catalog operations accept one directory"
+        );
+        return if operation == "--sign-catalog" {
+            taomni_plugin_package::release_catalog::sign_staged(Path::new(&path))
+        } else {
+            taomni_plugin_package::release_catalog::verify_staged(Path::new(&path))
+        };
+    }
     let mut values = BTreeMap::new();
     while let Some(flag) = args.next() {
         ensure!(

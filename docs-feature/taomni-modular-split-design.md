@@ -732,6 +732,8 @@ TC-MODULES-027 在 GitHub 安装固定哈希的正式 deb/MSI/DMG，由旧程序
 - 新增插件清单 `modules.json`，结构：`{ "coreApiVersion": "1", "sequence": 42, "updatedAt": "...", "plugins": { "<id>": { "version": "...", "platforms": { "<platform>-<arch>": { "url": "...", "signature": "...", "sha256": "...", "size": 123 } } } } }`；平台键沿用 `latest.json` 的 `windows-x86_64 / darwin-aarch64 / darwin-x86_64 / linux-x86_64` 命名。`modules.json` 自身也有分离签名（`modules.json.minisig`），`sequence` 单调递增，用于防回滚攻击（§9）。
 - 生成器：扩展 `scripts/compose-updater-manifest.mjs`（或新增 `scripts/compose-modules-manifest.mjs`，二选一，评审时定），从各插件构建产物生成；同名双架构、签名原始字节不变、平台别名等回归门禁复用现有测试（`scripts/compose-updater-manifest.test.mjs` 的思路）。
 
+发布时使用 `scripts/compose-modules-manifest.mjs`，通过仓库变量 `TAOMNI_LEGACY_UPGRADE_IDS` 提供被冻结的首装 ID。发布工具在签 `modules.json` 前验证每个模块的包签名、SHA-256、所有声明平台、版本及描述。最终上传步骤使用内置公钥再次验签。正式清单只接受 `stable` 模块及完整平台产物。
+
 ### 7.3 发布流程（CI）
 
 - `.github/workflows/release.yml` 扩展：现有核心矩阵不变；新增插件矩阵（每个原生插件 × 四个现有发布目标：Linux x86_64、Windows x86_64、macOS arm64 / x86_64；纯前端插件只出一份与平台无关的包），产物是插件包（`.taomni-plugin`，zip 格式，内含 `module.json` + 宿主可执行文件 + 前端 chunk + `SHA256SUMS`；签名是包旁边的分离 `.minisig`），不是整包安装程序。macOS 包内可执行文件须用与核心相同的签名身份签名（G1），Windows 可执行文件的 Authenticode 要求以 G3 结论为准。

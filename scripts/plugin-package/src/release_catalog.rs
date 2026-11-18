@@ -1,0 +1,319 @@
+//! Verify staged packages before authenticating the exact public catalog bytes.
+use std::{
+    collections::BTreeSet,
+    fs::{self, File},
+    io::{Read, Write},
+    path::{Path, PathBuf},
+};
+
+use anyhow::{Context, Result, ensure};
+use serde_json::Value;
+use sha2::{Digest, Sha256};
+
+use crate::{
+    PLATFORMS,
+    signing::{ReleaseSigner, public_verifier, verify_file},
+};
+
+const CATALOG: &str = "modules.json";
+const SIGNATURE: &str = "modules.json.minisig";
+const MAX_CATALOG: u64 = 4 * 1024 * 1024;
+
+pub fn sign_staged(directory: &Path) -> Result<()> {
+    let verifier = public_verifier()?;
+    let catalog = inspect(directory, &verifier)?;
+    let signer = ReleaseSigner::from_environment()?;
+    let signature = signer.sign(&catalog.path, &catalog.comment())?;
+    let mut temporary = tempfile::NamedTempFile::new_in(directory)?;
+    temporary.write_all(signature.as_bytes())?;
+    temporary.as_file().sync_all()?;
+    temporary.persist(directory.join(SIGNATURE))?;
+    Ok(())
+}
+
+pub fn verify_staged(directory: &Path) -> Result<()> {
+    let verifier = public_verifier()?;
+    let catalog = inspect(directory, &verifier)?;
+    let signature = read_text(&directory.join(SIGNATURE), 16 * 1024)?;
+    verify_file(&verifier, &catalog.path, &signature, &catalog.comment())
+}
+
+struct Catalog {
+    path: PathBuf,
+    sequence: u64,
+}
+
+impl Catalog {
+    fn comment(&self) -> String {
+        format!("file={CATALOG} sequence={}", self.sequence)
+    }
+}
+
+fn inspect(directory: &Path, verifier: &minisign_verify::PublicKey) -> Result<Catalog> {
+    let path = directory.join(CATALOG);
+    let doc: Value = serde_json::from_str(&read_text(&path, MAX_CATALOG)?)?;
+    let sequence = doc["sequence"]
+        .as_u64()
+        .filter(|n| *n > 0)
+        .context("invalid module catalog sequence")?;
+    let api = crate::string(&doc, "coreApiVersion")?;
+    let plugins = doc["plugins"]
+        .as_object()
+        .filter(|plugins| !plugins.is_empty())
+        .context("empty module catalog")?;
+    let roster = doc["legacyUpgrade"]
+        .as_array()
+        .context("release catalog requires the first-upgrade roster")?;
+    ensure!(!roster.is_empty(), "first-upgrade roster is empty");
+    let mut seen = BTreeSet::new();
+    for id in roster {
+        let id = id.as_str().context("invalid first-upgrade module ID")?;
+        ensure!(
+            plugins.contains_key(id) && seen.insert(id),
+            "first-upgrade module ID is absent or repeated"
+        );
+    }
+    for (id, plugin) in plugins {
+        let slug = crate::string(plugin, "slug")?;
+        ensure!(
+            crate::valid_slug(slug)
+                && id == &format!("taomni-plugin-{slug}")
+                && slug != "lanchat"
+                && slug != "hello-plugin",
+            "invalid release module identity"
+        );
+        ensure!(
+            crate::string(plugin, "id")? == id && crate::string(plugin, "coreApiVersion")? == api,
+            "catalog identity or API mismatch for {id}"
+        );
+        let version = crate::string(plugin, "version")?;
+        semver::Version::parse(version)?;
+        let assets = plugin["platforms"]
+            .as_object()
+            .filter(|assets| !assets.is_empty())
+            .context("module has no platform assets")?;
+        for (platform, asset) in assets {
+            ensure!(
+                PLATFORMS.contains(&platform.as_str()),
+                "unsupported module platform: {platform}"
+            );
+            verify_asset(directory, verifier, plugin, version, platform, asset)?;
+        }
+    }
+    Ok(Catalog { path, sequence })
+}
+
+fn verify_asset(
+    directory: &Path,
+    verifier: &minisign_verify::PublicKey,
+    plugin: &Value,
+    version: &str,
+    platform: &str,
+    asset: &Value,
+) -> Result<()> {
+    let id = crate::string(plugin, "id")?;
+    let filename = format!("{id}-{version}-{platform}.taomni-plugin");
+    let path = directory.join(&filename);
+    let url = crate::string(asset, "url")?;
+    ensure!(
+        url.starts_with("https://github.com/")
+            && url.contains("/releases/download/")
+            && url.rsplit('/').next() == Some(filename.replace('+', "%2B").as_str()),
+        "catalog URL names a different package: {id}"
+    );
+    let metadata = fs::symlink_metadata(&path)?;
+    let size = asset["size"]
+        .as_u64()
+        .filter(|bytes| *bytes > 0)
+        .context("invalid module size")?;
+    ensure!(
+        metadata.is_file() && metadata.len() == size,
+        "staged module size mismatch: {filename}"
+    );
+    let sha = crate::string(asset, "sha256")?;
+    let mut digest = Sha256::new();
+    std::io::copy(&mut File::open(&path)?, &mut digest)?;
+    ensure!(
+        format!("{:x}", digest.finalize()) == sha,
+        "staged module hash mismatch: {filename}"
+    );
+    let signature = read_text(&directory.join(format!("{filename}.minisig")), 16 * 1024)?;
+    ensure!(
+        signature.trim() == crate::string(asset, "signature")?.trim(),
+        "catalog signature mismatch: {filename}"
+    );
+    let api = crate::string(plugin, "coreApiVersion")?;
+    verify_file(
+        verifier,
+        &path,
+        &signature,
+        &format!("id={id} version={version} platform={platform} coreApiVersion={api} sha256={sha}"),
+    )?;
+    let mut archive = zip::ZipArchive::new(File::open(path)?)?;
+    let entry = archive.by_name("module.json")?;
+    ensure!(
+        entry.size() <= 128 * 1024,
+        "module manifest is too large: {filename}"
+    );
+    let manifest: Value = serde_json::from_reader(entry)?;
+    let description = crate::string(&manifest, "description")?.trim();
+    ensure!(
+        manifest["status"] == "stable" && !description.is_empty(),
+        "release module must be stable and described: {id}"
+    );
+    for key in ["id", "slug", "version", "name", "coreApiVersion", "kind"] {
+        ensure!(
+            manifest[key] == plugin[key],
+            "signed package metadata differs for {id}/{key}"
+        );
+    }
+    let declared = manifest["platforms"]
+        .as_array()
+        .context("module manifest has no platform list")?;
+    let declared: BTreeSet<_> = declared
+        .iter()
+        .map(|value| value.as_str().context("invalid manifest platform"))
+        .collect::<Result<_>>()?;
+    let published: BTreeSet<_> = plugin["platforms"]
+        .as_object()
+        .context("invalid catalog platform list")?
+        .keys()
+        .map(String::as_str)
+        .collect();
+    ensure!(
+        declared == published,
+        "release does not contain all declared platforms for {id}"
+    );
+    let permissions = |value: &Value| {
+        value["permissions"].as_array().map(|items| {
+            let mut items = items.clone();
+            items.sort_by(|left, right| left.as_str().cmp(&right.as_str()));
+            items
+        })
+    };
+    ensure!(
+        description == crate::string(plugin, "description")?
+            && permissions(&manifest) == permissions(plugin),
+        "signed package description or permissions differ for {id}"
+    );
+    Ok(())
+}
+
+fn read_text(path: &Path, limit: u64) -> Result<String> {
+    let metadata = fs::symlink_metadata(path)?;
+    ensure!(
+        metadata.is_file() && metadata.len() <= limit,
+        "invalid release file: {}",
+        path.display()
+    );
+    let mut text = String::new();
+    File::open(path)?
+        .take(limit + 1)
+        .read_to_string(&mut text)?;
+    ensure!(
+        text.len() as u64 <= limit,
+        "release file exceeds its byte limit"
+    );
+    Ok(text)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    fn stage(root: &Path, signer: &ReleaseSigner) -> (PathBuf, Value) {
+        let payload = root.join("input");
+        fs::create_dir(&payload).unwrap();
+        fs::write(payload.join("host"), b"sample execution payload").unwrap();
+        let id = "taomni-plugin-mfa";
+        let platform = "linux-x86_64";
+        let manifest = json!({
+            "id": id, "slug": "mfa", "name": "MFA", "version": "1.1.0", "coreApiVersion": "1",
+            "description": "Generate time-based codes", "status": "stable", "kind": "auth",
+            "platforms": [platform], "entry": {"host": "host"}, "permissions": ["vault.fixed-key"]
+        });
+        fs::write(
+            payload.join("module.json"),
+            serde_json::to_vec(&manifest).unwrap(),
+        )
+        .unwrap();
+        let staged = root.join("staged");
+        let receipt = crate::package(&payload, platform, &staged, &"a".repeat(40), signer).unwrap();
+        let name = receipt["archive"].as_str().unwrap();
+        let signature =
+            fs::read_to_string(staged.join(receipt["signature"].as_str().unwrap())).unwrap();
+        let mut module = manifest;
+        module["platforms"] = json!({(platform): {
+            "url": format!("https://github.com/engcapa/taomni/releases/download/v0.6.0/{name}"),
+            "signature": signature, "sha256": receipt["sha256"], "size": receipt["size"]
+        }});
+        let catalog = json!({"sequence": 21, "coreApiVersion": "1", "legacyUpgrade": [id], "plugins": {(id): module}});
+        fs::write(staged.join(CATALOG), serde_json::to_vec(&catalog).unwrap()).unwrap();
+        (staged, catalog)
+    }
+
+    #[test]
+    fn signs_exact_staged_catalog_after_binding_package_bytes_and_description() {
+        let root = tempfile::tempdir().unwrap();
+        let signer = ReleaseSigner::test_key();
+        let (staged, mut doc) = stage(root.path(), &signer);
+        let catalog = inspect(&staged, signer.test_verifier()).unwrap();
+        let signature = signer.sign(&catalog.path, &catalog.comment()).unwrap();
+        verify_file(
+            signer.test_verifier(),
+            &catalog.path,
+            &signature,
+            &catalog.comment(),
+        )
+        .unwrap();
+        doc["plugins"]["taomni-plugin-mfa"]["description"] = json!("Untrusted replacement");
+        fs::write(&catalog.path, serde_json::to_vec(&doc).unwrap()).unwrap();
+        assert!(
+            verify_file(
+                signer.test_verifier(),
+                &catalog.path,
+                &signature,
+                &catalog.comment()
+            )
+            .is_err()
+        );
+        assert!(
+            inspect(&staged, signer.test_verifier())
+                .err()
+                .unwrap()
+                .to_string()
+                .contains("description")
+        );
+    }
+
+    #[test]
+    fn rejects_wrong_roster_and_package_bytes_before_catalog_signing() {
+        let root = tempfile::tempdir().unwrap();
+        let signer = ReleaseSigner::test_key();
+        let (staged, mut doc) = stage(root.path(), &signer);
+        doc["legacyUpgrade"] = json!(["taomni-plugin-missing"]);
+        let path = staged.join(CATALOG);
+        fs::write(&path, serde_json::to_vec(&doc).unwrap()).unwrap();
+        assert!(
+            inspect(&staged, signer.test_verifier())
+                .err()
+                .unwrap()
+                .to_string()
+                .contains("absent")
+        );
+        doc["legacyUpgrade"] = json!(["taomni-plugin-mfa"]);
+        fs::write(&path, serde_json::to_vec(&doc).unwrap()).unwrap();
+        let package = staged.join("taomni-plugin-mfa-1.1.0-linux-x86_64.taomni-plugin");
+        let mut bytes = fs::read(&package).unwrap();
+        bytes[0] ^= 1;
+        fs::write(package, bytes).unwrap();
+        assert!(
+            inspect(&staged, signer.test_verifier())
+                .err()
+                .unwrap()
+                .to_string()
+                .contains("hash mismatch")
+        );
+    }
+}

@@ -74,3 +74,5 @@ GitHub Linux x64 已完成全程。候选源码 `c660c6bb68578e7943594fff33a2963
 QA Modular Upgrade Contracts 使用 `package_upgrade_desktop=true` 运行已上传安装包的替换和回滚。`package_targets` 列出有产物的平台，例如 `windows-x86_64,darwin-x86_64`。输入包含 Release Bundle 的 run ID、完整源码 SHA 和候选版本。
 
 Windows 安装和回退走 `msiexec`。测试读取两个 MSI 的 ProductCode 和 UpgradeCode，并核对系统实际注册的安装状态。macOS 通过只读挂载 DMG 和 `ditto` 替换隔离 Applications 下的同一个 app，留存 `codesign` 与 Gatekeeper 的原始结果。各端对比原安装、候选及回退的可执行文件摘要，在同一隔离 profile 启动实际已安装二进制并读取原 SSH/VNC 会话。候选运行后核对历史 LanChat 库及现有 sidecar 的原字节。此场景验证安装替换、旧会话和启动后的可回退性。Windows/macOS 的完整 MFA 数据迁移仍由对应 native 与安装专项场景验收。
+
+Windows x64 和 macOS Intel 已完成 `0.5.10 → 0.5.11 → 0.5.10` 的实际安装、profile 重开和回退。候选安装包均来自 `c660c6bb68578e7943594fff33a2963af65f659a`，MSI 资产 ID `14404860675`，Intel DMG 资产 ID `14404300717`。两端原 SSH/VNC 会话及候选运行前后的历史库核对通过。Windows 测试对正常运行的 GUI-subsystem headless 进程按既有方法执行受控强停，安装的可执行文件报告 `NotSigned`。macOS 三次进程均由正常退出信号完成，候选 DMG 的代码签名校验成功，Gatekeeper 评估 exit 3。 [安装替换与回退 #44292054057](https://github.com/engcapa/taomni/actions/runs/44292054057)
