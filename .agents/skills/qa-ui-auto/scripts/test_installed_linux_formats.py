@@ -1,12 +1,23 @@
 """Unit checks for release input and AppImage process identity."""
 from pathlib import Path
 import tempfile
+from types import SimpleNamespace
 import unittest
+from unittest.mock import patch
 
-from installed_linux_formats import appimage_binary, prepare_appimage
+from installed_linux_formats import appimage_binary, install_rpm, prepare_appimage
 
 
 class InstalledLinuxFormatTests(unittest.TestCase):
+    def test_rpm_registration_queries_use_the_installers_package_database(self):
+        result = SimpleNamespace(stdout=b"taomni 0.5.11 x86_64")
+        with patch("installed_linux_formats.command", return_value=result) as command, patch.object(Path, "is_file", return_value=True):
+            binary = install_rpm(Path("Taomni.rpm"), "0.5.11", Path("evidence"))
+        self.assertEqual(binary, Path("/usr/bin/taomni"))
+        commands = {call.args[2]: call.args[0] for call in command.call_args_list}
+        for name in ("rpm-install", "rpm-installed", "rpm-executable-owner"):
+            self.assertEqual(commands[name][:2], ["sudo", "rpm"])
+
     def test_appimage_launch_copy_preserves_the_artifact_bytes(self):
         with tempfile.TemporaryDirectory() as temporary:
             root = Path(temporary).resolve()

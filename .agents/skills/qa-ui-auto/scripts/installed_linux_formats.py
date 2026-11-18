@@ -15,10 +15,12 @@ def install_rpm(package: Path, version: str, evidence: Path) -> Path:
         raise RuntimeError("Unexpected release RPM identity")
     # Ubuntu supplies the runtime dependencies installed with the verified deb.
     command(["sudo", "dpkg", "--remove", "taomni"], evidence, "deb-remove")
-    command(["sudo", "rpm", "--install", "--nodeps", str(package)], evidence, "rpm-install")
-    registered = command(["rpm", "-q", "--qf", fields, "taomni"], evidence, "rpm-installed").stdout.decode()
+    # The package database on Ubuntu follows the user who runs RPM.
+    manager = ["sudo", "rpm"]
+    command([*manager, "--install", "--nodeps", str(package)], evidence, "rpm-install")
+    registered = command([*manager, "-q", "--qf", fields, "taomni"], evidence, "rpm-installed").stdout.decode()
     binary = Path("/usr/bin/taomni")
-    owner = command(["rpm", "-qf", "--qf", fields, str(binary)], evidence, "rpm-executable-owner").stdout.decode()
+    owner = command([*manager, "-qf", "--qf", fields, str(binary)], evidence, "rpm-executable-owner").stdout.decode()
     if registered != expected or owner != expected or not binary.is_file():
         raise RuntimeError("The RPM did not install and register the release executable")
     return binary
