@@ -6,6 +6,7 @@ description: "Fixture seeds confirmed use times (A=3000, Home=2000, Downloads=10
   \ Tao Home history is the retained directories entry; the backend ordering and failed-launch assertions are unchanged."
 covers:
 - F1.6
+- F1.11
 tags:
 - auto-generated
 - p1
@@ -70,7 +71,7 @@ steps:
 - click: '[data-testid="welcome-local-directory"][data-directory-path="/preview/A"]'
 - click: '[data-testid="nav-mode-home"]'
 - assert_text:
-    selector: '.tao-home-launch-status'
+    selector: '[data-testid="tao-home-host"]'
     contains: Local terminal is not available in browser preview
 - click: '[data-testid="tao-home-history"]'
 - click: '[data-testid="tao-home-history-tab-directories"]'
