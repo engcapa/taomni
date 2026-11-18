@@ -2,11 +2,11 @@ import {
   Code2, Copy, FileCode2, FileImage, FlipHorizontal2, FlipVertical2, Maximize, MoveHorizontal,
   RotateCcw, RotateCw, Scan, Search, ZoomIn, ZoomOut, Image, Link, Workflow,
 } from "lucide-react";
-import type { DiagramView } from "./diagramModel";
+import type { DiagramKind, DiagramView } from "./diagramModel";
 
 export type DiagramAction = "open" | "zoom-in" | "zoom-out" | "actual" | "fit" | "width" | "rotate-left" | "rotate-right" | "flip-h" | "flip-v" | "reset" | "save-svg" | "save-png" | "save-drawio" | "copy-drawio-link" | "copy-image" | "copy-text" | "copy-source";
 export type DiagramLabel = (zh: string, en: string) => string;
-export function diagramActions(label: DiagramLabel) {
+export function diagramActions(label: DiagramLabel, kind: DiagramKind = "mermaid") {
   return [
     { id: "open", title: label("打开大图", "Open large view"), Icon: Search },
     { id: "zoom-in", title: label("放大 (+)", "Zoom in (+)"), Icon: ZoomIn },
@@ -25,7 +25,7 @@ export function diagramActions(label: DiagramLabel) {
     { id: "copy-drawio-link", title: label("复制 draw.io 在线链接", "Copy draw.io online link"), Icon: Link },
     { id: "copy-image", title: label("复制图片", "Copy image"), Icon: Image },
     { id: "copy-text", title: label("复制图中文字", "Copy diagram text"), Icon: Copy },
-    { id: "copy-source", title: label("复制 Mermaid 源码", "Copy Mermaid source"), Icon: Code2 },
+    { id: "copy-source", title: kind === "drawio" ? label("复制 draw.io 源码", "Copy draw.io source") : label("复制 Mermaid 源码", "Copy Mermaid source"), Icon: Code2 },
   ] satisfies Array<{ id: DiagramAction; title: string; Icon: typeof Copy; format?: string }>;
 }
 export function applyDiagramAction(view: DiagramView, action: DiagramAction): DiagramView {

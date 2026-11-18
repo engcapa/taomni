@@ -1,8 +1,10 @@
 import DOMPurify from "dompurify";
 import { drawioElement, type DrawioPage } from "./drawioCodec";
+import { renderInDrawioFrame } from "./drawioFrameClient";
+import { safeDrawioLabel, safeDrawioSvg } from "./drawioLabels";
+import { svgGeometry } from "./docxImages";
 
 export interface DrawioPreview { svg: string; width: number; height: number; warnings: string[] }
-const SVG_NS = "http://www.w3.org/2000/svg";
 const importedPages = new WeakMap<HTMLElement, DrawioPage>();
 export function rememberDrawio(element: HTMLElement, page: DrawioPage): void { importedPages.set(element, page); }
 export function renderedDrawioPage(element: HTMLElement): DrawioPage | undefined { return importedPages.get(element); }
@@ -18,8 +20,11 @@ export function drawioPlainText(html: string): string {
 /** Rebuild a rendering copy from a small model schema. Raw XML is retained
  * separately; external links, executable HTML and remote images never reach
  * the graph decoder or the WebView network stack. */
-export function safeDrawioModel(page: DrawioPage): Element {
+export function safeDrawioModel(page: DrawioPage, rich = true): Element {
   const doc = document.implementation.createDocument("", "mxGraphModel");
+  const background = page.model.getAttribute("background");
+  if (background && /^(?:#[a-f\d]{3,8}|none|white|black)$/i.test(background)) doc.documentElement.setAttribute("background", background);
+  if (page.model.getAttribute("shadow") === "1") doc.documentElement.setAttribute("shadow", "1");
   const root = doc.createElement("root"); doc.documentElement.append(root);
   const sources = Array.from(page.model.querySelector("root")!.children);
   const ids = new Set<string>();
@@ -35,11 +40,12 @@ export function safeDrawioModel(page: DrawioPage): Element {
       const value = cell.getAttribute(key); if (value !== null) attrs[key] = value;
     }
     const rawLabel = source === cell ? cell.getAttribute("value") || "" : source.getAttribute("label") || "";
-    attrs.value = drawioPlainText(rawLabel);
     const style = cell.getAttribute("style") || "";
+    attrs.value = rich && /(?:^|;)html=1(?:;|$)/.test(style) ? safeDrawioLabel(rawLabel) : drawioPlainText(rawLabel);
     const parts = style.split(";").filter(Boolean).map((entry) => {
       const [key, ...rest] = entry.split("=");
       const value = rest.join("=");
+      if (key === "fontSource") return "";
       if (key === "image") {
         if (!/^data:image\/(?:png|jpe?g|gif|webp|bmp),[a-z\d+/=]+$/i.test(value)) {
           // SVG data needs a full sanitizer before it can be used as an image.
@@ -50,7 +56,7 @@ export function safeDrawioModel(page: DrawioPage): Element {
         } else return `image=${value.replace(",", ";base64,")}`;
       }
       if (/javascript:|https?:|file:|url\(|expression\(|<|>/i.test(entry)) throw new Error("draw.io contains an unsafe style");
-      return key === "html" ? "html=0" : entry;
+      return !rich && key === "html" ? "html=0" : entry;
     });
     attrs.style = parts.join(";");
     const target = drawioElement(doc, "mxCell", attrs);
@@ -83,31 +89,10 @@ export function safeDrawioModel(page: DrawioPage): Element {
   return doc.documentElement;
 }
 
-export async function renderDrawioPage(page: DrawioPage): Promise<DrawioPreview> {
-  const model = safeDrawioModel(page);
-  const { Graph, ModelXmlSerializer, ImageExport, SvgCanvas2D } = await import("@maxgraph/core");
-  const host = document.createElement("div");
-  host.style.cssText = "position:fixed;left:-100000px;top:0;width:1200px;height:900px;visibility:hidden;pointer-events:none";
-  document.body.append(host);
-  const graph = new Graph(host, undefined, []);
-  try {
-    graph.setEnabled(false); graph.setHtmlLabels(false);
-    new ModelXmlSerializer(graph.getDataModel()).import(model);
-    graph.getView().validate();
-    await document.fonts?.ready;
-    const bounds = graph.getGraphBounds();
-    if (!Number.isFinite(bounds.width) || bounds.width > 100000 || bounds.height > 100000) throw new Error("draw.io sheet is too large to preview");
-    const width = Math.max(80, Math.ceil(bounds.width + 24)), height = Math.max(60, Math.ceil(bounds.height + 24));
-    const svg = document.createElementNS(SVG_NS, "svg");
-    svg.setAttribute("xmlns", SVG_NS); svg.setAttribute("width", String(width)); svg.setAttribute("height", String(height)); svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
-    const canvas = new SvgCanvas2D(svg, false); canvas.foEnabled = false;
-    canvas.translate(12 - bounds.x, 12 - bounds.y);
-    const graphRoot = graph.getDataModel().getRoot();
-    if (!graphRoot) throw new Error("draw.io has no graph root");
-    const state = graph.getView().getState(graphRoot);
-    if (state) new ImageExport().drawState(state, canvas);
-    const warnings: string[] = [];
-    if (Array.from(model.querySelectorAll("mxCell")).some((cell) => /shape=mxgraph\./.test(cell.getAttribute("style") || ""))) warnings.push("Custom stencil shapes may use a basic outline in this preview. Original draw.io data is retained.");
-    return { svg: new XMLSerializer().serializeToString(svg), width, height, warnings };
-  } finally { graph.destroy(); host.remove(); }
+export async function renderDrawioPage(page: DrawioPage, rich = true): Promise<DrawioPreview> {
+  const model = safeDrawioModel(page, rich);
+  const svg = safeDrawioSvg(await renderInDrawioFrame(model, rich));
+  const warnings: string[] = [];
+  if (Array.from(model.querySelectorAll("mxCell")).some((cell) => /shape=mxgraph\./.test(cell.getAttribute("style") || ""))) warnings.push("Some custom stencils require assets outside the bundled viewer. Original draw.io data is retained.");
+  return { svg: new XMLSerializer().serializeToString(svg), ...svgGeometry(svg), warnings };
 }

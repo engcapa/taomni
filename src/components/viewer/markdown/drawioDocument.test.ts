@@ -4,6 +4,7 @@ import { drawioToMarkdown } from "./drawioImport";
 import { drawioCell, newDrawioPage, parseDrawio } from "./drawioCodec";
 import { inspectMermaidDiagram } from "../../editor/workspace/model/mermaid";
 import { DEFAULT_DIAGRAM_VIEW, rememberDiagram, snapshotDiagram } from "./diagramModel";
+import { rememberDrawio } from "./drawioRender";
 
 vi.mock("../../editor/workspace/model/mermaid", () => ({ inspectMermaidDiagram: vi.fn() }));
 afterEach(() => vi.restoreAllMocks());
@@ -35,6 +36,23 @@ describe("editable document export and text/table recovery", () => {
     const text = drawioToMarkdown([page], "text");
     expect(text).toContain("```drawio\n"); expect(text).toContain("```drawio-source\n");
     expect(() => drawioToMarkdown([], "diagram")).toThrow(/Select/);
+  });
+  it("re-exports an independent sheet with its original layers, IDs and page settings", async () => {
+    const page = newDrawioPage("original", "Parking map");
+    page.model.setAttribute("background", "#f0f5ff");
+    page.model.setAttribute("pageWidth", "1600");
+    page.model.querySelector("mxCell[id='1']")!.setAttribute("value", "Background layer");
+    drawioCell(page, { id: "spot", vertex: 1, value: "Parking spot", style: "shape=rectangle;" }, { x: 50, width: 120, height: 80 });
+    const root = document.createElement("div");
+    const preview = document.createElement("div");
+    preview.className = "fv-md-drawio";
+    root.append(preview);
+    rememberDrawio(preview, page);
+
+    const exported = await markdownDrawio(root, "parking", { scope: "images", layout: "separate" });
+    const [sheet] = parseDrawio(exported.xml);
+    expect(sheet.model.isEqualNode(page.model)).toBe(true);
+    expect(exported.nativeDiagrams).toBe(1);
   });
   it("restores standard diagrams.net table rows without Taomni metadata", () => {
     const page = newDrawioPage("a", "External table");

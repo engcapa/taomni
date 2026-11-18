@@ -954,6 +954,9 @@ controls:
 - id: tab-overview-card
   selector: '[data-testid="tab-overview-card"]'
   kind: interactive
+- id: tab-overview-enlarged
+  selector: '[data-testid="tab-overview-enlarged"]'
+  kind: display
 - id: tab-overview-card-title
   selector: '[data-testid="tab-overview-card-title"]'
   kind: display

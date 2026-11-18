@@ -15,6 +15,7 @@ const exceptions = new Map([
   ["src/lib/i18n/locales/en.ts", "English locale dictionary."],
   ["src/lib/i18n/locales/zh-CN.ts", "Chinese locale dictionary."],
   ["src-tauri/src/commands/mod.rs", "Homogeneous compile-time Tauri command routing table."],
+  ["src/components/viewer/markdown/vendor/viewer-static.min.js", "Unmodified draw.io distribution asset. See adjacent README for its pinned source."],
 ]);
 
 function sources(directory) {

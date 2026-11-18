@@ -104,6 +104,11 @@ async fn viewer_html_close(webview: tauri::Webview, token: String) -> Result<(),
 }
 
 #[tauri::command]
+async fn viewer_drawio_renderer_url() -> Result<Option<String>, String> {
+    on_worker(|| Ok(viewer::drawio_renderer_url())).await
+}
+
+#[tauri::command]
 async fn viewer_create_temp(file_name: String, bytes: Vec<u8>) -> Result<TempFile, String> {
     on_worker(move || viewer::create_temp(&file_name, &bytes)).await
 }
@@ -134,6 +139,7 @@ pub(super) fn handles(command: &str) -> bool {
             | "viewer_save_pasted_image"
             | "viewer_html_open"
             | "viewer_html_close"
+            | "viewer_drawio_renderer_url"
             | "viewer_create_temp"
             | "viewer_release_temp"
             | "viewer_temp_allocate"
@@ -151,6 +157,7 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         crate::commands::viewer::viewer_save_pasted_image,
         crate::commands::viewer::viewer_html_open,
         crate::commands::viewer::viewer_html_close,
+        crate::commands::viewer::viewer_drawio_renderer_url,
         crate::commands::viewer::viewer_create_temp,
         crate::commands::viewer::viewer_release_temp,
         crate::commands::viewer::viewer_temp_allocate,

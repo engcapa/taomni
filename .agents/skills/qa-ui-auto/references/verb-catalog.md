@@ -702,6 +702,7 @@ TC-MOBILE-007 also authenticates through real SSH direct-tcpip jump channels (OT
 and encrypted key), and HTTP/SOCKS5/application/independent proxies after locking
 the vault through desktop Settings; the peer independently records routing.
 
-| `assert_export_quality` | `{path, kind: pdf\|docx\|drawio\|testing-pdf\|testing-docx}` | Native only. `testing-*` checks the exact reported user Markdown including solid flowchart line bodies. Independently parses the retained real PDF/DOCX file: complete A4 pages at 300 DPI, or readable explicit SVG labels, 600 DPI fallback, original raster dimensions and disabled compression. No print API or renderer state substitution. |
+| `assert_export_quality` | `{path, kind: pdf\|docx\|drawio\|drawio-png\|testing-pdf\|testing-docx}` | Native only. Parses the saved artifact. `drawio-png` checks the swimlane fixture's PNG dimensions, node fill and label pixels. `testing-*` checks the reported Markdown export including solid flowchart lines. |
 | `assert_drawio_preview` | `live\|split` | Captures the rendered drawing in the browser or native WebView. Compares shapes, outlines, arrows and text pixels against the draw.io Desktop reference. Retains the original, actual, difference and comparison metrics. Uses the `markdown_drawio_roundtrip` fixture. |
 | `assert_drawio_roundtrip` | `download\|save` | Parses the browser download or native saved file independently and compares the editable sheet, cell geometry, style, label and edge endpoints with the original. Uses the `markdown_drawio_roundtrip` fixture. |
+| `control_wheel` | `{selector, direction: up\|down}` | Moves to the target and sends Control+wheel via Chromium input or a Linux X11 wheel event in the isolated native session. |
