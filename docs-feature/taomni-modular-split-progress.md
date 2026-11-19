@@ -117,6 +117,14 @@ TASK-027 将 G1–G11 设为独立发布阻断门。每个门必须在匹配源�
 - 同一源码已派发四目标候选构建标识 `57d87b7ed`。每个平台工件到达后独立派发包检查，保留包生产 run 和原始摘要。系统执行、进程与核心清单也按同一源码派发。 [候选构建](https://github.com/engcapa/taomni/actions/runs/44609963649) · [系统](https://github.com/engcapa/taomni/actions/runs/44610275540) · [宿主](https://github.com/engcapa/taomni/actions/runs/44610275027) · [核心清单](https://github.com/engcapa/taomni/actions/runs/44610275246)
 - Mail 完整邮件的 gzip 编解码、SHA-256 校验和 MIME 附件检测已迁入 `taomni-mail-engine`，用于存档、读取、导出和旧索引回填。核心过渡层仍管理 SQLite、临时文件发布和缓存迁移。复用 `TC-MAIL-STORAGE-01` 至 `09` 核对浏览和原生存储流程。引擎 2 项、存储和索引 11 项及模块边界 11 项单测通过。
 
+### 2026-11-20 固定证书、邮件存储和 RDP 复验
+
+- #840 的 `33aa88469` 只改动三个 CI 文件。入口在派发前执行八项单测，`desktop` 增加 RDP 实际连接、输入、重启与性能预算。已核对派发回执和子运行选集，源码均为 `514c95edb`。该选集包含 Linux、Windows 和 macOS 26 的 Browser、Native 和完整崩溃回归。分片一上传即下载到 `qa-ui-auto-report/github/<run>/live-shards`。 [CI PR](https://github.com/engcapa/taomni/pull/840) · [派发回执](https://github.com/engcapa/taomni/actions/runs/44618067373) · [子运行](https://github.com/engcapa/taomni/actions/runs/44619095037)
+- `ba285b690` 在 macOS 15 Intel 以固定自签名证书签署测试应用、Hello 与 MFA。逐件提取证书并核对指纹、hardened runtime 和二进制摘要。清理临时签名密钥后，两项实际隔离进程用例通过，三件样本的 Gatekeeper 评估均为 exit 3。生产 DMG 的 hardened runtime 和分发信任仍待验证。原始记录在 `modular-system-execution-macos-fixed` 工件。 [G1 固定证书](https://github.com/engcapa/taomni/actions/runs/44620630155)
+- `514c95edb`、`9d56029c7` 将邮件 SQLite 连接、锁、schema、完整原件、归档检索和清理迁入邮件引擎。原 IPC 仍通过桌面适配层使用同一数据格式。引擎 11 项、缓存和备份 26 项、旧 schema 幂等迁移 1 项单测通过。独立邮件宿主、动态前端和核心依赖裁剪继续按 TASK-026 验收。 [邮件三端](https://github.com/engcapa/taomni/actions/runs/44623555310)
+- `57d87b7ed` 的旧 `newmob.db` 加 WAL 原生测试在 Linux、Windows 通过，均核对了旧库、WAL 摘要、SSH/VNC 会话及二次预检的 journal。macOS 原生结果单独核对。 [WAL 三端](https://github.com/engcapa/taomni/actions/runs/44609458437)
+- Windows G5 对照两条路径均通过连接和画面检查。进程内及独立编码宿主的延迟 p95 为 76.05 和 77.65 ms，带宽为 12,642 和 12,894 kbps，均超出现有 65 ms 和 4,905 kbps 预算。已在 macOS 作业结束前保存 Windows 工件。Windows 对照的桌面样本包含 runner 控制台背景，`514d96832` 使用静态背景控制测量条件，并使用与生产一致的多线程运行时和编码统计。Windows 复跑继续使用原用例的目标、操作和预算。 [原始对照](https://github.com/engcapa/taomni/actions/runs/44613553681) · [Windows 复跑](https://github.com/engcapa/taomni/actions/runs/44623916926)
+
 ## 当前结论
 
 ### 升级策略调整

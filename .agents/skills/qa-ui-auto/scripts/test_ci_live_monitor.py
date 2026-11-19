@@ -6,7 +6,7 @@ from pathlib import Path
 import subprocess
 import tempfile
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import Mock, call, patch
 
 from ci_live_monitor import discover_selection, main
 from ci_live_shards import GitHubArtifacts, collect
@@ -62,6 +62,15 @@ class SelectionDiscoveryTests(unittest.TestCase):
         client.listing.return_value = [{"name": f"qa-selection-{key}"} for key in ("first", "second")]
         with self.assertRaisesRegex(RuntimeError, "--artifact-key"):
             self.discover(client)
+
+    def test_planner_checks_artifacts_more_often_than_workflow_status(self):
+        client = Mock()
+        client.listing.side_effect = [[], [], [], [{"name": "qa-selection-current"}]]
+        client.run_status.return_value = "queued"
+        with redirect_stdout(io.StringIO()):
+            self.assertEqual(self.discover(client), "current")
+        self.assertEqual(client.listing.call_args_list, [call("artifacts")] * 4)
+        client.run_status.assert_called_once_with()
 
     def test_terminal_or_expired_missing_selection_is_not_success(self):
         client = Mock()
@@ -168,6 +177,7 @@ class LiveCollectionTests(unittest.TestCase):
             self.assertIn("actual case: failed", output.getvalue())
             self.assertIn("actual case: passed", output.getvalue())
         self.assertEqual(downloaded, [(names[0], 1), (names[1], 2), (names[2], 4)])
+        self.assertEqual(client.listing.call_args_list.count(call("jobs")), 1)
         client.run_status.assert_not_called()  # Finished shards do not wait for the run/summary.
 
 

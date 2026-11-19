@@ -13,12 +13,13 @@ import re
 import subprocess
 import time
 
-from ci_live_shards import GitHubArtifacts, collect
+from ci_live_shards import GitHubArtifacts, PROGRESS_POLL_SECONDS, collect
 
 
 def discover_selection(client: GitHubArtifacts, deadline: float, *,
                        poll_seconds: float = 15, sleep=time.sleep,
                        monotonic=time.monotonic) -> str:
+    next_status_read = monotonic()
     while monotonic() < deadline:
         try:
             candidates = [artifact for artifact in client.listing("artifacts")
@@ -32,8 +33,10 @@ def discover_selection(client: GitHubArtifacts, deadline: float, *,
                     raise RuntimeError("Invalid hosted selection artifact key")
                 print(f"Discovered selection {candidates[0]['name']}", flush=True)
                 return key
-            if client.run_status() == "completed":
-                raise RuntimeError("Run completed without an available selection artifact")
+            if monotonic() >= next_status_read:
+                next_status_read = monotonic() + PROGRESS_POLL_SECONDS
+                if client.run_status() == "completed":
+                    raise RuntimeError("Run completed without an available selection artifact")
             print("Planner is running; waiting for its selection artifact", flush=True)
         except (OSError, ValueError, subprocess.SubprocessError) as error:
             print(f"Retrying GitHub selection observation: {type(error).__name__}", flush=True)

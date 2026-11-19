@@ -13,6 +13,9 @@ import xml.etree.ElementTree as ET
 import zipfile
 
 
+PROGRESS_POLL_SECONDS = 60
+
+
 class GitHubArtifacts:
     def __init__(self, repository: str, run_id: str):
         self.repository = repository
@@ -136,6 +139,7 @@ def collect(client: GitHubArtifacts, destination: Path, run_id: str, artifact_ke
     entries: dict[str, dict] | None = None
     blocked: set[str] = set()
     deadline = monotonic() + timeout_seconds
+    next_jobs_read = monotonic()
     settled_polls = 0
     timed_out = False
     try:
@@ -168,8 +172,11 @@ def collect(client: GitHubArtifacts, destination: Path, run_id: str, artifact_ke
                                if f"qa-{identifier}-{artifact_key}" not in seen}
                     if not missing:
                         break
-                    jobs = client.listing("jobs")
-                    blocked = blocked_entries({identifier: entries[identifier] for identifier in missing}, jobs)
+                    if monotonic() >= next_jobs_read:
+                        next_jobs_read = monotonic() + PROGRESS_POLL_SECONDS
+                        jobs = client.listing("jobs")
+                        blocked = blocked_entries({identifier: entries[identifier] for identifier in missing}, jobs)
+                    blocked.intersection_update(missing)
                     # Give the artifact listing time to catch up with terminal
                     # jobs. An available but failed transfer keeps retrying.
                     downloadable = {identifier for identifier in missing
