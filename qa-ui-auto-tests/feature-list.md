@@ -1091,7 +1091,7 @@ controls:
     kind: interactive
     optional: true       # only rendered when >1 local shell detected
   - id: open-home-folder
-    selector: '[data-testid="welcome-open-home-folder"]'
+    selector: '[data-testid="tao-home-open-home-folder"]'
     kind: interactive
     optional: true       # only rendered when onOpenLocalPath prop is set
   - id: open-as-administrator

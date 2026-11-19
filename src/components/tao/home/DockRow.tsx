@@ -77,7 +77,7 @@ export function DockRow(props: Props) {
         <ThemedSelect label={tr("选择 Shell")} testId="tao-home-shell-options" value={shells.selectedShellId} onChange={shells.setSelectedShellId}
           options={shells.mergedShells.map((shell) => ({ value: shell.id, label: shell.name }))} />
         <button type="button" disabled={!shells.selectedShell?.canElevate} onClick={() => { shellMenu.close(); void openLocalShellAsAdministrator(shells.selectedShell?.id).catch((error) => setStatus(String(error))); }}>{tr("以管理员身份启动")}</button>
-        <button type="button" disabled={!props.onOpenLocalPath} onClick={() => { shellMenu.close(false); void sftpLocalHome().then((home) => { if (home) props.onOpenLocalPath?.(home, { embedFolder: true }); }).catch((error) => setStatus(String(error))); }}>{tr("打开 Home 目录")}</button>
+        <button type="button" data-testid="tao-home-open-home-folder" disabled={!props.onOpenLocalPath} onClick={() => { shellMenu.close(false); void sftpLocalHome().then((home) => { if (home) props.onOpenLocalPath?.(home, { embedFolder: true }); }).catch((error) => setStatus(String(error))); }}>{tr("打开 Home 目录")}</button>
       </div></TaoPopover>
       {hasWsl ? <button type="button" className="tao-home-dock-button" data-testid="tao-home-wsl" onClick={() => void props.onStartLocalTerminal({ id: "wsl.exe", name: `WSL: ${shells.wslDistros[0].name}`, args: ["-d", shells.wslDistros[0].name] })}>WSL</button> : null}
       <button type="button" className="tao-home-dock-button" data-testid="tao-home-new-session" onClick={props.onNewSession}><Plus size={14} />{tr("新会话")}</button>

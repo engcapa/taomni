@@ -4,7 +4,7 @@
     "features_with_controls": 110,
     "required": 2120,
     "covered_required": 1853,
-    "shallow": 60,
+    "shallow": 61,
     "orphans": 4
   },
   "features": {
@@ -156,7 +156,7 @@
     "F7.5": {
       "required": 23,
       "covered_required": 23,
-      "shallow": 0
+      "shallow": 1
     },
     "F8.2": {
       "required": 28,
