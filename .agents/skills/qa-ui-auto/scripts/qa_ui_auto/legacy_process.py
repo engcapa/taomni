@@ -1,4 +1,4 @@
-"""Bounded real old-app initialization with explicit platform shutdown evidence."""
+"""Bounded installed-app initialization with explicit platform shutdown evidence."""
 import json
 import os
 from pathlib import Path
@@ -13,8 +13,28 @@ def sanitized_output(raw):
     return re.sub(r"(?im)^.*pairing code.*$", "[ephemeral pairing code omitted]", raw)
 
 
-def initialize_profile(executable, data, work, evidence, label):
-    """Use only the old release's documented headless entry, never a QA hook.
+def _observe_same_profile_contender(argv, owner, evidence, label):
+    try:
+        result = subprocess.run(
+            argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=20,
+        )
+        exit_code, output = result.returncode, result.stdout
+    except subprocess.TimeoutExpired as error:
+        exit_code, output = None, error.stdout or b""
+    text = output.decode("utf-8", errors="replace")
+    (Path(evidence) / (label + "-contender.log")).write_text(
+        sanitized_output(text), encoding="utf-8",
+    )
+    return {
+        "exitCode": exit_code,
+        "modeLeaseError": "Headless: Close the other Taomni mode using this profile first" in text.splitlines(),
+        "openedEndpoint": "Mobile endpoint:" in text,
+        "ownerStillRunning": owner.poll() is None,
+    }
+
+
+def initialize_profile(executable, data, work, evidence, label, *, verify_mode_lease=False):
+    """Use the installed release's documented headless entry.
 
     The legacy Windows release uses the GUI subsystem and exposes no headless quit
     endpoint. Its owned process tree is forcibly stopped; this is deliberately
@@ -45,6 +65,12 @@ def initialize_profile(executable, data, work, evidence, label):
                 time.sleep(0.05)
             if not record["ready"]:
                 raise RuntimeError("Legacy app did not initialize within 60 seconds")
+            if verify_mode_lease:
+                contender = _observe_same_profile_contender(record["argv"], process, evidence, label)
+                record["sameProfileContender"] = contender
+                if (contender["exitCode"] != 1 or not contender["modeLeaseError"]
+                        or contender["openedEndpoint"] or not contender["ownerStillRunning"]):
+                    raise RuntimeError("Candidate did not reject a second headless process for the same profile")
             if windows:
                 record["shutdown"] = "owned GUI-subsystem process tree forced stop (crash input)"
                 subprocess.run(["taskkill.exe", "/PID", str(process.pid), "/T", "/F"],

@@ -40,8 +40,8 @@ def require_registration(old, candidate, *, upgraded):
         raise RuntimeError("Windows Installer did not register exactly the expected installed version")
 
 
-def start_profile(executable, profile, work, evidence, label, expected_rows, retained=None):
-    process = initialize_profile(executable, profile, work, evidence, label)
+def start_profile(executable, profile, work, evidence, label, expected_rows, retained=None, *, verify_mode_lease=False):
+    process = initialize_profile(executable, profile, work, evidence, label, verify_mode_lease=verify_mode_lease)
     if session_rows(profile) != expected_rows:
         raise RuntimeError(f"{label} did not reopen the original SSH/VNC records")
     observed = retained_manifest(profile)
@@ -102,7 +102,12 @@ def execute(args):
         if system == "Windows":
             require_registration(msi_registration(old_package, report, "original-after-upgrade"),
                                  msi_registration(package, report, "candidate-registered"), upgraded=True)
-        stages["afterUpgrade"] = start_profile(candidate, profile, work, report, "candidate-reopen", expected_rows, retained)
+        stages["afterUpgrade"] = start_profile(
+            candidate, profile, work, report, "candidate-reopen", expected_rows, retained, verify_mode_lease=True,
+        )
+        stages["afterModeLeaseRelease"] = start_profile(
+            candidate, profile, work, report, "candidate-after-mode-lease", expected_rows, retained,
+        )
 
         if system == "Windows":
             command(["msiexec.exe", "/x", str(package), "/qn", "/norestart", "/L*v", str(report / "candidate-uninstall.log")],

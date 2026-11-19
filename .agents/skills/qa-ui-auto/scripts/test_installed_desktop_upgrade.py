@@ -1,10 +1,13 @@
 """Pure contracts for the installed-upgrade inputs and registration checks."""
 from pathlib import Path
+import subprocess
+from tempfile import TemporaryDirectory
 import unittest
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from installed_desktop_upgrade import require_registration, select_candidate
 from modular_bundle_inventory import plan_targets
+from qa_ui_auto.legacy_process import _observe_same_profile_contender
 
 
 class InstalledDesktopUpgradeTests(unittest.TestCase):
@@ -38,3 +41,25 @@ class InstalledDesktopUpgradeTests(unittest.TestCase):
                          {"windows-x86_64", "darwin-x86_64", "darwin-aarch64"})
         with self.assertRaisesRegex(ValueError, "supported package targets"):
             plan_targets("linux-x86_64", upgrade_desktop=True)
+
+    def test_contender_evidence_records_rejection_and_redacts_pairing_codes(self):
+        argv = ["taomni", "--headless", "--data-dir", "same-profile", "--mobile-port", "0"]
+        rejected = b"Headless: Close the other Taomni mode using this profile first\n"
+        unexpected = b"Mobile endpoint: 127.0.0.1:43210\nPairing code (5 minutes): 123456\n"
+        owner = Mock()
+        owner.poll.return_value = None
+        with TemporaryDirectory() as directory:
+            evidence = Path(directory)
+            with patch("qa_ui_auto.legacy_process.subprocess.run") as run:
+                run.return_value = subprocess.CompletedProcess(argv, 1, rejected)
+                self.assertEqual(_observe_same_profile_contender(argv, owner, evidence, "denied"), {
+                    "exitCode": 1, "modeLeaseError": True, "openedEndpoint": False, "ownerStillRunning": True,
+                })
+                self.assertEqual(run.call_args.args[0], argv)
+                run.side_effect = subprocess.TimeoutExpired(argv, 20, output=unexpected)
+                self.assertEqual(_observe_same_profile_contender(argv, owner, evidence, "opened"), {
+                    "exitCode": None, "modeLeaseError": False, "openedEndpoint": True, "ownerStillRunning": True,
+                })
+            log = (evidence / "opened-contender.log").read_text(encoding="utf-8")
+            self.assertIn("[ephemeral pairing code omitted]", log)
+            self.assertNotIn("123456", log)
