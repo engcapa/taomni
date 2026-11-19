@@ -48,7 +48,11 @@ pub(super) fn exercise_round_trip(lifecycle: MfaState) {
 
     let workspace = tempfile::tempdir().unwrap();
     let archive = workspace.path().join("mfa-data.taobak");
-    snapshot(&state, workspace.path(), &archive, &package, lifecycle);
+    // macOS exposes `/var` as a symlink to `/private/var`. The SQLite
+    // no-follow check must receive the canonical staging root, otherwise a
+    // valid snapshot is rejected before it can be inspected.
+    let staging = workspace.path().canonicalize().unwrap();
+    snapshot(&state, &staging, &archive, &package, lifecycle);
 
     if lifecycle != MfaState::Running {
         unlock(&state, MASTER);
