@@ -120,6 +120,7 @@ steps:
     selector: input[data-testid="explorer-address"]
     key: Escape
 - wait_for: '[data-testid="explorer-crumbs"]'
+- wait: 1
 - click: '[data-testid="explorer-crumbs"] > span:nth-last-child(2) button'
 - assert_text:
     selector: '[data-testid="explorer-file-list"]'
