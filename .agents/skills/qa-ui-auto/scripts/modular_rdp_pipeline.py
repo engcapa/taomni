@@ -90,17 +90,17 @@ def trial_server(binary, route, directory):
 
 
 @contextmanager
-def measurement_desktop(root, config, system):
+def measurement_desktop(root, config, system, background):
     ctx = NativeStepContext(None, root, config)
     try:
-        if system == "Windows":
+        if system == "Windows" and background == "static":
             run_native_step(ctx, "host_helper", {"action": "start", "name": "backdrop", "mode": "backdrop"})
         yield
     finally:
         ctx.restore_host_permissions()
 
 
-def measure(binary, probe, root):
+def measure(binary, probe, root, background="static"):
     system = platform.system()
     if system not in {"Linux", "Windows", "Darwin"}:
         raise RuntimeError("The desktop encoder comparison requires Linux, Windows or macOS")
@@ -109,12 +109,12 @@ def measure(binary, probe, root):
     report = {
         "case": case.id, "caseSha256": digest(CASE),
         "harnessSha256": digest(binary), "probeSha256": digest(probe),
-        "platform": system, "platformVersion": platform.version(), "trials": [],
+        "platform": system, "platformVersion": platform.version(), "background": background, "trials": [],
     }
     config = {"app": {"rdp_probe_binary": str(probe)}}
     environment = {"QA_RDP_USER": "qa-rdp", "QA_RDP_PASSWORD": "Qa1_" + secrets.token_hex(12)}
     failures = []
-    with isolated_desktop(environment), measurement_desktop(root, config, system):
+    with isolated_desktop(environment), measurement_desktop(root, config, system, background):
         for scenario, helper, args, budget in perf_steps(case):
             for route in ROUTES:
                 directory = root / scenario / route
@@ -155,5 +155,6 @@ if __name__ == "__main__":
     parser.add_argument("harness", type=Path)
     parser.add_argument("probe", type=Path)
     parser.add_argument("report", type=Path)
+    parser.add_argument("--background", choices=["static", "desktop"], default="static")
     args = parser.parse_args()
-    measure(args.harness.resolve(strict=True), args.probe.resolve(strict=True), args.report.resolve())
+    measure(args.harness.resolve(strict=True), args.probe.resolve(strict=True), args.report.resolve(), args.background)

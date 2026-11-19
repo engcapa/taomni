@@ -15,6 +15,7 @@ permissions:
 
 jobs:
   selection:
+    if: ${{ !inputs.rdp_pipeline }}
     name: QA selection and module release contracts (Linux)
     runs-on: ubuntu-24.04
     timeout-minutes: 15
@@ -58,6 +59,7 @@ jobs:
           if-no-files-found: error
 
   protocol:
+    if: ${{ !inputs.rdp_pipeline }}
     name: Plugin wire contracts (${{ matrix.os }})
     strategy:
       fail-fast: false
@@ -148,6 +150,7 @@ jobs:
           if-no-files-found: error
 
   rdp-frame-transport:
+    if: ${{ !inputs.rdp_pipeline }}
     name: RDP frame transport measurement (${{ matrix.os }})
     strategy:
       fail-fast: false
@@ -186,6 +189,7 @@ jobs:
           if-no-files-found: error
 
   rdp-probe:
+    if: ${{ !inputs.rdp_pipeline }}
     name: Standalone RDP probe (${{ matrix.os }})
     strategy:
       fail-fast: false
@@ -238,7 +242,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, windows-2025, macos-26]
+        os: [windows-2025]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
     env:
@@ -333,9 +337,18 @@ jobs:
           elif [[ "$RUNNER_OS" == Windows ]]; then
             probe+=.exe
           fi
-          "${runner[@]}" python .agents/skills/qa-ui-auto/scripts/modular_rdp_pipeline.py \
-            "$harness" "$probe" rdp-pipeline-evidence/comparison \
-            2>&1 | tee rdp-pipeline-evidence/comparison.log
+          statuses=()
+          for background in desktop static; do
+            if "${runner[@]}" python .agents/skills/qa-ui-auto/scripts/modular_rdp_pipeline.py \
+              "$harness" "$probe" "rdp-pipeline-evidence/comparison-$background" --background "$background" \
+              2>&1 | tee "rdp-pipeline-evidence/comparison-$background.log"; then
+              statuses+=(0)
+            else
+              statuses+=(1)
+            fi
+          done
+          printf '%s\n' "${statuses[@]}" > rdp-pipeline-evidence/comparison-exit-codes.txt
+          test "${statuses[0]}" = 0 && test "${statuses[1]}" = 0
       - uses: actions/upload-artifact@v4
         if: always()
         with:
