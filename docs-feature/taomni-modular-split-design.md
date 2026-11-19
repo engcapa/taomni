@@ -1012,11 +1012,11 @@ TC-MODULES-027 在 GitHub 安装固定哈希的正式 deb/MSI/DMG，由旧程序
 
 | 验证门 | 已取得的结果 | 剩余验证 |
 |---|---|---|
-| G1 macOS 宿主启动 | macOS 15 Intel 使用 ad-hoc 和固定自签名证书分别验证了启用 hardened runtime 的测试应用启动带隔离属性的 Hello 和 MFA。Gatekeeper 返回 exit 3。 [固定证书结果](https://github.com/engcapa/taomni/actions/runs/44620630155) | 完整发行包与下载宿主的签名身份、hardened runtime 及分发信任。 |
+| G1 macOS 宿主启动 | macOS 15 Intel 的 ad-hoc 和固定自签名测试应用启用 hardened runtime 后成功启动带隔离属性的 Hello 和 MFA。macOS 26 ARM64 候选 DMG 通过实际升级和回滚，签名记录显示 `flags=0x0`，Gatekeeper 拒绝。 [宿主实验](https://github.com/engcapa/taomni/actions/runs/44630628742) · [候选 DMG](https://github.com/engcapa/taomni/actions/runs/44631750900) | 在启用 hardened runtime 的发行包内验证下载宿主启动，并记录分发信任。 |
 | G2 macOS 系统权限 | 核心共用 `capture/`，已实现 `capture.still` 的作用域服务。 [接线记录](taomni-modular-split-gates-hello-plugin.md#capturestill-service-integration-2026-11-17-verification-pending) | 已安装应用的原生屏幕录制和辅助功能授权归属，以及升级后的复用。 |
 | G3 Windows 系统保护 | GitHub Windows Runner 在 Defender 实时保护开启时从 `LOCALAPPDATA` 成功启动带 Internet 区域标记的 Hello 和 MFA。启动前后均确认实时保护开启。 [Defender 工件](https://github.com/engcapa/taomni/actions/runs/44628961420) | 正式 Authenticode 资产和实际 SmartScreen 分发信誉。 |
 | G4 Linux `noexec` | deb、RPM 和 AppImage 均验证宿主拒绝、用户按指引迁移 profile、原 Vault 与 MFA 连续读写。 [安装验证](taomni-modular-installed-upgrade-verification.md#linux-安装格式的-noexec-恢复) | 正式首发产物按同场景复验。 |
-| G5 帧吞吐 | 三端 loopback 连续帧测试交付全部帧。Linux X11 与 macOS 26 ARM64 的实际采集和 IronRDP 编码对照通过原预算。Windows 两条路径在初测中延迟、带宽超标。 [Linux 测量](taomni-modular-split-gates-hello-plugin.md#g5-frame-transport-measurement) · [macOS 与 Windows 初测](https://github.com/engcapa/taomni/actions/runs/44613553681) | Windows 对照复验和匹配发行包上的端到端结果。 |
+| G5 帧吞吐 | 三端 loopback 连续帧全部交付，Linux X11 与 macOS 26 ARM64 的采集和编码对照通过原预算。Windows 复跑的首帧、实际动画帧率和带宽已达标，进程内及独立宿主的输入到画面 p95 分别为 79.43 和 78.24 ms。`main` Windows 桌面用例 p95 为 51.89 ms。 [Windows 复跑](https://github.com/engcapa/taomni/actions/runs/44623916926) · [main 基线](https://github.com/engcapa/taomni/actions/runs/44526382399/job/135598828285) | 同一预算下验证候选桌面和独立宿主的 Windows 延迟，以及匹配发行包上的端到端结果。 |
 | G6 强制退出 | 三端实际进程门验证宿主回收。Linux 安装 deb 后强杀应用，签名 MFA 宿主在驱动清理前退出，重开后继续原账号计数。 [Linux 安装验证](taomni-modular-installed-upgrade-verification.md#linux-已安装应用的强制退出) | Windows MSI 和 macOS DMG 安装后的强退、重开和宿主回收。 |
 | G7 无重启生命周期 | Linux、Windows、macOS Intel 的签名模块更新和回滚经过实际宿主重新握手，保留禁用偏好及原数据。 [三端结果](https://github.com/engcapa/taomni/actions/runs/44287815253) | 正式业务宿主逐个验证状态、资源释放与回滚。 |
 | G8 验签与路径 | 四种原生运行配置通过正式公钥校验的包安装和篡改拒绝。签名目录和原子发布另有下载与发布契约。 [安装用例](https://github.com/engcapa/taomni/actions/runs/43804951477) · [发布契约](https://github.com/engcapa/taomni/actions/runs/44393439596) | 正式首发目录与每个首批包的签名及拒绝用例。 |

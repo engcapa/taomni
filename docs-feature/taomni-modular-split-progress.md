@@ -130,6 +130,15 @@ TASK-027 将 G1–G11 设为独立发布阻断门。每个门必须在匹配源�
 - 签名 MFA 历史批次的 macOS ARM64 安装、旧库迁移、中断恢复和代理均通过。Windows 编译找到旧源码的 RDP 测试 logger 限制，Linux 的 Protoc 下载返回 GitHub Server Error。以包含 logger 修复的最新源码重新派发，保留两端原始失败记录。 [历史结果](https://github.com/engcapa/taomni/actions/runs/44602505246) · [同选集复验](https://github.com/engcapa/taomni/actions/runs/44628069614)
 - Windows G3 专项在一次性 GitHub Runner 启用 Defender 实时防护。带 Internet 区域标记的未签名 Hello 和 MFA 均成功启动，前后记录的 `RealTimeProtectionEnabled` 均为 true。已把这个条件加入系统验证入口。正式 Authenticode 与 SmartScreen 信誉仍需发行资产。 [Defender 专项](https://github.com/engcapa/taomni/actions/runs/44628961420)
 
+### 2026-11-20 CI/CD 验证与工件
+
+- CI/CD PR #840 的 `e5b6134a3` 涉及三个文件。桌面套件新增滚动截图、Linux 无显示器 headless 启动及 Mail 存档的既有用例，继续运行三端适用的完整崩溃回归。八项派发单测和 GitHub 派发均通过。子运行的应用和工作流源码同为 `782487eb6`，使用 macOS 26 ARM64。 [CI/CD PR](https://github.com/engcapa/taomni/pull/840) · [派发](https://github.com/engcapa/taomni/actions/runs/44632854045) · [三端执行](https://github.com/engcapa/taomni/actions/runs/44633515606)
+- Windows G5 复跑 `700d782f0` 中，两条路径首帧分别为 27 和 20 ms，实际显示动画为 30.24 和 29.94 fps，带宽为 168.30 和 162.95 kbps，均在预算内。40 个点击样本均返回画面。进程内及独立宿主的 p95 为 79.43 和 78.24 ms，均超过 65 ms。另行核对 `main` 的 `fee37971e` release QA，同为 `windows-2025`，产品内 RDP 用例通过，p95 为 51.89 ms。该次测量使用产品界面与当时的桌面内容，仍需匹配候选端到端结果判断差异。 [双路径工件](https://github.com/engcapa/taomni/actions/runs/44623916926) · [main 原生基线](https://github.com/engcapa/taomni/actions/runs/44526382399/job/135598828285)
+- `782487eb6` 的系统实验全部通过。macOS 15 Intel 的 ad-hoc 和固定自签名两组均验证 hardened runtime 宿主启动，Gatekeeper 返回 3。Windows `10.0.26100` 的 Internet 区域标记宿主在 Defender 实时保护开启时成功启动，Authenticode 状态为 `NotSigned`。原始工件已保存至 `qa-ui-auto-report/github/44630628742/live-contracts/`。 [系统实验](https://github.com/engcapa/taomni/actions/runs/44630628742)
+- macOS 26 ARM64 安装了 `514c95edb` 的候选 DMG，从 0.5.10 升到 0.5.11、拒绝同 profile 的第二个 headless 进程并回滚，SSH 和 VNC 原会话可重新打开。签名记录为 `Taomni Local Code Signing`，`CodeDirectory` flags 为 `0x0`，Gatekeeper 拒绝，G1 仍缺少启用 hardened runtime 的实际发行包启动证据。原始工件位于 `qa-ui-auto-report/github/44618087869/package-checks/darwin-aarch64/44631750900/`。 [ARM64 安装验证](https://github.com/engcapa/taomni/actions/runs/44631750900)
+- GitHub 分片上传后由 `ci_live_monitor.py` 从三端子运行下载到 `qa-ui-auto-report/github/44633515606/live-shards/`。旧库 WAL 批次已核对三端 Browser 各 22/22、Linux 和 Windows Native 各 31/31，macOS Native 继续收证。上一个桌面批次已核对三端 Browser 各 39/39。 [WAL 批次](https://github.com/engcapa/taomni/actions/runs/44609458437) · [前一桌面批次](https://github.com/engcapa/taomni/actions/runs/44619095037)
+- Mail 的 mboxrd 编解码及 EML 换行规范化已迁入 `taomni-mail-engine`。现有导入导出入口使用同一套字节转换，保留 Rust 的 IMAP 往返用例。独立引擎 13 项单测和 11 项模块依赖边界单测通过。
+
 ## 当前结论
 
 ### 升级策略调整
