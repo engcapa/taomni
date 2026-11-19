@@ -76,6 +76,34 @@ async fn run_server(
     stop: oneshot::Receiver<()>,
 ) -> anyhow::Result<()> {
     let log = LogEmitter::rdp_test_log();
+    #[cfg(target_os = "macos")]
+    let (display, mapping) = {
+        use std::sync::atomic::AtomicU32;
+        use taomni_capture::{engine::mac::selected_display_bounds, permissions};
+
+        let accessibility = permissions::control_permission_granted();
+        publish(
+            report,
+            "input-permission.json",
+            &serde_json::json!({
+                "pid": std::process::id(),
+                "accessibility": accessibility
+            }),
+        )?;
+        ensure!(
+            accessibility,
+            "RDP input requires macOS Accessibility permission"
+        );
+
+        let mut display = display;
+        let size = display.size().await;
+        let packed = (u32::from(size.width) << 16) | u32::from(size.height);
+        let mapping = super::input::MacInputMapping::new(
+            selected_display_bounds(None)?,
+            Arc::new(AtomicU32::new(packed)),
+        )?;
+        (display, Some(mapping))
+    };
     let input = RdpInput::new(
         log.clone(),
         false,
@@ -83,6 +111,8 @@ async fn run_server(
         RdpMetrics::new(log),
         #[cfg(target_os = "linux")]
         None,
+        #[cfg(target_os = "macos")]
+        mapping,
     );
     let identity_dir = tempfile::tempdir()?;
     let identity = tls_identity(identity_dir.path());
@@ -243,7 +273,26 @@ async fn serve_desktop() -> anyhow::Result<()> {
     let report =
         PathBuf::from(std::env::var_os("QA_RDP_GATE_REPORT").context("Missing trial directory")?);
     let log = LogEmitter::rdp_test_log();
-    let display = RdpDisplay::new(log.clone(), None, RdpMetrics::new(log), false)?;
+    #[cfg(target_os = "macos")]
+    let gfx = {
+        publish(
+            &report,
+            "capture-permission.json",
+            &serde_json::json!({
+                "pid": std::process::id(),
+                "screenRecording": taomni_capture::permissions::screen_permission_granted()
+            }),
+        )?;
+        super::gfx::GfxTransport::new(log.clone())
+    };
+    let display = RdpDisplay::new(
+        log.clone(),
+        None,
+        RdpMetrics::new(log),
+        false,
+        #[cfg(target_os = "macos")]
+        gfx,
+    )?;
     let stop = eof();
     match std::env::var("QA_RDP_GATE_ROUTE")?.as_str() {
         "in-process" => run_server(display, &report, stop).await,

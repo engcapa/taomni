@@ -60,7 +60,7 @@ mod bulk_loopback_tests;
 #[cfg(test)]
 mod loopback_tests;
 
-#[cfg(all(test, any(target_os = "linux", target_os = "windows")))]
+#[cfg(test)]
 mod host_perf;
 
 mod metrics;
