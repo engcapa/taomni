@@ -28,8 +28,9 @@ steps:
       "kind": "folder"}], "looseFiles": [], "lastActiveFile": {"kind": "root", "rootId": "parity009", "path": "src/StructuralTarget.java"},
       "lastOpenedAt": 1756100000000, "isGitRepo": false}]'
 - reload_window: null
-- click: '[data-testid="welcome-history-tab-workspaces"]'
-- click: '[data-testid="welcome-recent-workspace-row"]'
+- click: '[data-testid="tao-home-history"]'
+- click: '[data-testid="tao-home-history-tab-workspaces"]'
+- click: '[data-testid="tao-home-history-row"]'
 - wait_for:
     selector: '[data-testid="code-workspace-editor"] .cm-content'
     timeout_sec: 45
@@ -115,54 +116,54 @@ verification:
     requirement: Search and navigation use unsaved editor content; inactive files participate in module searches but not the
       current-file scope.
     actions:
-    - 5
     - 6
-    - 8
+    - 7
     - 9
     - 10
-    - 12
-    - 14
+    - 11
+    - 13
     - 15
     - 16
-    - 19
+    - 17
     - 20
     - 21
-    - 24
+    - 22
     - 25
     - 26
-    - 29
-    - 31
+    - 27
+    - 30
     - 32
     - 33
-    - 35
+    - 34
     - 36
     - 37
-    - 41
+    - 38
+    - 42
     checkpoints:
-    - step: 18
+    - step: 19
       expectation: '{assert_attribute: {equals: java, name: value, selector: ''[data-testid="structural-search-language"]''}}'
-    - step: 23
+    - step: 24
       expectation: '{assert_count: {equal: 0, selector: ''[data-testid="structural-search-match"]''}}'
-    - step: 28
+    - step: 29
       expectation: '{assert_count: {equal: 1, selector: ''[data-testid="structural-search-match"]''}}'
-    - step: 30
+    - step: 31
       expectation: "{assert_text_equals: {equals: 'class Other {}', selector: '[data-testid=\"code-workspace-editor\"]\n \
         \     .cm-content'}}"
-    - step: 39
-      expectation: '{assert_count: {equal: 1, selector: ''[data-testid="structural-search-match"]''}}'
     - step: 40
+      expectation: '{assert_count: {equal: 1, selector: ''[data-testid="structural-search-match"]''}}'
+    - step: 41
       expectation: '{assert_attribute: {equals: src/StructuralTarget.java, name: data-path, selector: ''[data-testid="structural-search-match"]''}}'
-    - step: 42
+    - step: 43
       expectation: "{assert_text_equals: {equals: 'class StructuralTarget { void run() { System.out.println(999);\n      }\
         \ }', selector: '[data-testid=\"code-workspace-editor\"] .cm-content'}}"
     results:
-    - 18
-    - 23
-    - 28
-    - 30
-    - 39
+    - 19
+    - 24
+    - 29
+    - 31
     - 40
-    - 42
+    - 41
+    - 43
   visual:
   - check: Existing search dialog and result layout retained.
     method: not-applicable

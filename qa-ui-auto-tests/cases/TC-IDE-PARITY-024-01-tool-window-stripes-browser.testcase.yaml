@@ -22,6 +22,10 @@ fixtures:
 timeout_sec: 240
 steps:
 - open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.fileOpen.preferences.v1
+    value: '{"associations":{"md":"workspace","txt":"workspace","json":"workspace"}}'
+- reload_window: null
 - wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="side-tab-tools"]:visible'
 - click: '[data-testid="sidebar-tool-code-workspace"]'
@@ -160,164 +164,164 @@ verification:
   - id: R1
     requirement: A1：默认图标栏在独立工作区为 40px、合并导航栏为 42px，开启 Show Tool Window Names 后恢复 59px 命名宽度。
     actions:
-    - 12
     - 14
-    - 15
-    checkpoints:
-    - step: 16
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tool-rail-left\"]", "name": "data-show-names", "equals": "true"}}'
-    - step: 17
-      expectation: '{"eval_readonly": {"expression": "Math.round(document.querySelector(\"[data-testid\" + String.fromCharCode(61) + \"\\\"code-workspace-tool-rail-left\\\"]\").getBoundingClientRect().width)
-        === 59", "expect_truthy": true}}'
-    - step: 13
-      expectation: 默认工具栏使用 40px 图标模式。
-    results:
     - 16
     - 17
-    - 13
+    checkpoints:
+    - step: 18
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tool-rail-left\"]", "name": "data-show-names", "equals": "true"}}'
+    - step: 19
+      expectation: '{"eval_readonly": {"expression": "Math.round(document.querySelector(\"[data-testid\" + String.fromCharCode(61) + \"\\\"code-workspace-tool-rail-left\\\"]\").getBoundingClientRect().width)
+        === 59", "expect_truthy": true}}'
+    - step: 15
+      expectation: 默认工具栏使用 40px 图标模式。
+    results:
+    - 18
+    - 19
+    - 15
   - id: R2
     requirement: A2：stripe 按钮右键 Move → Right Top 后按钮移到右 stripe（隐藏态不自动打开，同 IDEA）；点击后 Problems 在右侧打开且底部 dock 关闭；再点隐藏并把焦点交回编辑器；Alt+6 在右侧重新打开。
     actions:
-    - 18
-    - 19
     - 20
-    - 23
-    - 27
-    - 30
+    - 21
+    - 22
+    - 25
+    - 29
+    - 32
     checkpoints:
-    - step: 21
+    - step: 23
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-tool-rail-right\"] [data-testid=\"code-workspace-bottom-tab-problems\"]"}'
-    - step: 22
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-bottom-tab-problems\"]", "name": "aria-pressed", "equals": "false"}}'
     - step: 24
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-bottom-tab-problems\"]", "name": "aria-pressed", "equals": "false"}}'
+    - step: 26
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-right-pane\"] [data-testid=\"code-workspace-tool-window-problems\"]", "timeout_sec":
         10}}'
-    - step: 25
+    - step: 27
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-bottom-tab-problems\"]", "name": "aria-pressed", "equals": "true"}}'
-    - step: 26
-      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-bottom-dock-body\"]"}'
     - step: 28
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-bottom-dock-body\"]"}'
+    - step: 30
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-tool-window-problems\"]", "state": "detached", "timeout_sec": 5}}'
-    - step: 29
-      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList?.contains(\"cm-content\") === true", "expect_truthy": true}}'
     - step: 31
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList?.contains(\"cm-content\") === true", "expect_truthy": true}}'
+    - step: 33
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-right-pane\"] [data-testid=\"code-workspace-tool-window-problems\"]", "timeout_sec":
         10}}'
     results:
-    - 21
-    - 22
+    - 23
     - 24
     - 26
     - 28
-    - 29
+    - 30
     - 31
+    - 33
   - id: R3
     requirement: A2：工具窗头 ⋮ → Move to → Bottom Left 把 Problems 送回底部 dock，按钮回到左 stripe 下组；Structure 在 Project 下方（Left Bottom）打开。
     actions:
-    - 32
-    - 33
     - 34
-    - 38
-    checkpoints:
-    - step: 35
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-dock\"][data-open] [data-testid=\"code-workspace-tool-window-problems\"]",
-        "timeout_sec": 10}}'
-    - step: 36
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tool-rail-left\"] [data-testid=\"code-workspace-bottom-tab-problems\"]"}'
-    - step: 37
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-tool-window-title\"]", "contains": "Problems"}}'
-    - step: 39
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-left-tool-area\"] [data-testid=\"code-workspace-tool-window-structure\"]",
-        "timeout_sec": 10}}'
-    - step: 40
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-new\"]"}'
-    results:
     - 35
     - 36
-    - 39
     - 40
+    checkpoints:
+    - step: 37
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-dock\"][data-open] [data-testid=\"code-workspace-tool-window-problems\"]",
+        "timeout_sec": 10}}'
+    - step: 38
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tool-rail-left\"] [data-testid=\"code-workspace-bottom-tab-problems\"]"}'
+    - step: 39
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-tool-window-title\"]", "contains": "Problems"}}'
+    - step: 41
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-left-tool-area\"] [data-testid=\"code-workspace-tool-window-structure\"]",
+        "timeout_sec": 10}}'
+    - step: 42
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-new\"]"}'
+    results:
+    - 37
+    - 38
+    - 41
+    - 42
   - id: R4
     requirement: A1：Show Tool Window Names 关闭后 stripe 为 40 px 图标栏且不可拉伸；重新打开后内侧边缘可用键盘拉伸（每步 4 px）。
     actions:
-    - 41
-    - 42
-    - 45
-    - 46
+    - 43
+    - 44
     - 47
+    - 48
+    - 49
     checkpoints:
-    - step: 43
+    - step: 45
       expectation: '{"eval_readonly": {"expression": "Math.round(document.querySelector(\"[data-testid\" + String.fromCharCode(61) + \"\\\"code-workspace-tool-rail-left\\\"]\").getBoundingClientRect().width)
         === 40", "expect_truthy": true}}'
-    - step: 44
+    - step: 46
       expectation: '{"assert_count": {"selector": "[data-testid=\"sidebar-rail-resize\"]", "equal": 0}}'
-    - step: 53
+    - step: 55
       expectation: '{"eval_readonly": {"expression": "Math.round(document.querySelector(\"[data-testid\" + String.fromCharCode(61) + \"\\\"code-workspace-tool-rail-left\\\"]\").getBoundingClientRect().width)
         === 79", "expect_truthy": true}}'
     results:
-    - 43
-    - 44
-    - 53
+    - 45
+    - 46
+    - 55
   - id: R5
     requirement: A3：Remove from Sidebar 移除 Run 按钮；More tool windows 选择 Run 恢复按钮并在底部打开 Run。
     actions:
-    - 54
-    - 55
-    - 57
-    - 58
-    checkpoints:
-    - step: 56
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-bottom-tab-run\"]", "equal": 0}}'
-    - step: 59
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-tab-run\"][aria-pressed=\"true\"]", "timeout_sec": 10}}'
-    - step: 60
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-tool-window-title\"]", "contains": "Run"}}'
-    results:
     - 56
+    - 57
     - 59
     - 60
+    checkpoints:
+    - step: 58
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-bottom-tab-run\"]", "equal": 0}}'
+    - step: 61
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-tab-run\"][aria-pressed=\"true\"]", "timeout_sec": 10}}'
+    - step: 62
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-tool-window-title\"]", "contains": "Run"}}'
+    results:
+    - 58
+    - 61
+    - 62
   - id: R6
     requirement: A6：Project 工具窗口头部提供 IDEA 的 Expand All / Collapse All / Select Opened File——展开后出现展开目录、折叠后全部收起、选中其他节点后 Select Opened File 重新选中活动文件。
     actions:
-    - 62
     - 64
     - 66
-    - 67
+    - 68
+    - 69
     checkpoints:
-    - step: 63
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-dir\"][aria-expanded=\"true\"]"}'
     - step: 65
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-dir\"][aria-expanded=\"true\"]"}'
+    - step: 67
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-tree-dir\"][aria-expanded=\"true\"]", "state": "detached", "timeout_sec": 10}}'
-    - step: 68
+    - step: 70
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-file\"][data-active=\"true\"][aria-selected=\"true\"]"}'
     results:
-    - 63
     - 65
-    - 68
+    - 67
+    - 70
   - id: R7
     requirement: A2：工具窗口内容经 portal 重新挂载后，Esc 仍按 IDEA 把焦点还给编辑器——Alt+4 打开 Run 并获焦后 Esc 回到编辑器；Alt+7 打开 Structure 后在其中按 Esc 同样回到编辑器。
     actions:
-    - 69
-    - 70
-    - 73
-    - 75
-    - 77
-    checkpoints:
-    - step: 71
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-run-panel\"]"}'
-    - step: 72
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-dock\"]:focus-within", "timeout_sec": 5}}'
-    - step: 74
-      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'') === true", "expect_truthy": true}}'
-    - step: 76
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-tool-window-structure\"]:focus-within", "timeout_sec": 5}}'
-    - step: 78
-      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'') === true", "expect_truthy": true}}'
-    results:
     - 71
     - 72
+    - 75
+    - 77
+    - 79
+    checkpoints:
+    - step: 73
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-run-panel\"]"}'
+    - step: 74
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-dock\"]:focus-within", "timeout_sec": 5}}'
+    - step: 76
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'') === true", "expect_truthy": true}}'
+    - step: 78
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-tool-window-structure\"]:focus-within", "timeout_sec": 5}}'
+    - step: 80
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'') === true", "expect_truthy": true}}'
+    results:
+    - 73
     - 74
     - 76
     - 78
+    - 80
   visual:
   - check: stripe 名称字号、按钮间距、分隔线与 IDEA 2026.2 新 UI 对照。
     method: manual

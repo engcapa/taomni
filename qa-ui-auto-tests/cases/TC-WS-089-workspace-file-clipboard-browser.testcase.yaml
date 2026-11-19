@@ -21,6 +21,9 @@ steps:
 - seed_storage:
     key: taomni.platformWorkspaces.v1
     value: ${fixture.workspace_drop_workspace}
+- seed_storage:
+    key: taomni.fileOpen.preferences.v1
+    value: '{"associations":{"md":"workspace","txt":"workspace","json":"workspace"}}'
 - reload_window: null
 - click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="session-tree"]'
@@ -104,58 +107,58 @@ verification:
   requirements:
   - id: R1
     requirement: Explicit root2 menu Paste copies external Unicode files plus recursive binary/empty directory while every source and root1 byte survives.
-    actions: [13, 15, 16, 18, 23]
+    actions: [14, 16, 17, 19, 24]
     checkpoints:
-    - {step: 17, expectation: Paste is available without an internal tree Copy.}
-    - {step: 19, expectation: Three external items completed into the explicit root2 incoming.}
-    - {step: 20, expectation: Unicode/space file is refreshed.}
-    - {step: 21, expectation: Recursive directory is refreshed.}
-    - {step: 22, expectation: Exact complete source/root1/root2 hashes and empty directories match the independent copy manifest.}
-    - {step: 25, expectation: The pasted Unicode file opens with all exact original lines.}
-    results: [17, 19, 20, 21, 22, 25]
+    - {step: 18, expectation: Paste is available without an internal tree Copy.}
+    - {step: 20, expectation: Three external items completed into the explicit root2 incoming.}
+    - {step: 21, expectation: Unicode/space file is refreshed.}
+    - {step: 22, expectation: Recursive directory is refreshed.}
+    - {step: 23, expectation: Exact complete source/root1/root2 hashes and empty directories match the independent copy manifest.}
+    - {step: 26, expectation: The pasted Unicode file opens with all exact original lines.}
+    results: [18, 20, 21, 22, 23, 26]
   - id: R2
     requirement: Collision rejects without overwrite and CtrlV/CmdV in the tree can subsequently import a fresh file once.
-    actions: [26, 27, 28, 31, 32, 33]
+    actions: [27, 28, 29, 32, 33, 34]
     checkpoints:
-    - {step: 29, expectation: Path already exists is visible.}
-    - {step: 30, expectation: Collision source and original target bytes are unchanged.}
-    - {step: 34, expectation: One fresh item is imported after failure.}
-    - {step: 35, expectation: Recovery file is present in the intended directory.}
-    - {step: 36, expectation: Exact recovered snapshot rejects duplicate/extra writes and root1 pollution.}
-    results: [29, 30, 34, 35, 36]
+    - {step: 30, expectation: Path already exists is visible.}
+    - {step: 31, expectation: Collision source and original target bytes are unchanged.}
+    - {step: 35, expectation: One fresh item is imported after failure.}
+    - {step: 36, expectation: Recovery file is present in the intended directory.}
+    - {step: 37, expectation: Exact recovered snapshot rejects duplicate/extra writes and root1 pollution.}
+    results: [30, 31, 35, 36, 37]
   - id: R3
     requirement: Tree Copy publishes A but newer external B is used by root Paste; empty clipboard cannot replay A or B.
-    actions: [37, 38, 41, 42, 43, 47, 48, 51, 52, 53]
+    actions: [38, 39, 42, 43, 44, 48, 49, 52, 53, 54]
     checkpoints:
-    - {step: 39, expectation: Tree Copy reports a file reference only after success.}
-    - {step: 40, expectation: The memory file list exactly contains A.}
-    - {step: 44, expectation: Root Paste reports one B import.}
-    - {step: 45, expectation: Latest B is refreshed at root2 itself.}
-    - {step: 46, expectation: Root snapshot includes B but no stale A copy or overwrite.}
-    - {step: 49, expectation: Tree shortcut Copy reports the B file reference.}
-    - {step: 50, expectation: The file list exactly contains root2 B after shortcut Copy.}
-    - {step: 54, expectation: Empty list reports no files rather than replaying a stale reference.}
-    - {step: 55, expectation: Exact source/target bytes remain unchanged after empty Paste.}
-    results: [39, 40, 44, 45, 46, 49, 50, 54, 55]
+    - {step: 40, expectation: Tree Copy reports a file reference only after success.}
+    - {step: 41, expectation: The memory file list exactly contains A.}
+    - {step: 45, expectation: Root Paste reports one B import.}
+    - {step: 46, expectation: Latest B is refreshed at root2 itself.}
+    - {step: 47, expectation: Root snapshot includes B but no stale A copy or overwrite.}
+    - {step: 50, expectation: Tree shortcut Copy reports the B file reference.}
+    - {step: 51, expectation: The file list exactly contains root2 B after shortcut Copy.}
+    - {step: 55, expectation: Empty list reports no files rather than replaying a stale reference.}
+    - {step: 56, expectation: Exact source/target bytes remain unchanged after empty Paste.}
+    results: [40, 41, 45, 46, 47, 50, 51, 55, 56]
   - id: R4
     requirement: Directory Copy publishes its file reference and editor-owned Copy never imports or changes documents.
-    actions: [56, 57, 60, 61, 62]
+    actions: [57, 58, 61, 62, 63]
     checkpoints:
-    - {step: 58, expectation: Directory Copy reports the exact recursive directory reference.}
-    - {step: 59, expectation: Memory clipboard contains that directory rather than a text payload.}
-    - {step: 63, expectation: Editor text remains exact after its own select-all and Copy.}
-    - {step: 64, expectation: No tree import side effect occurred from editor Copy.}
-    results: [58, 59, 63, 64]
+    - {step: 59, expectation: Directory Copy reports the exact recursive directory reference.}
+    - {step: 60, expectation: Memory clipboard contains that directory rather than a text payload.}
+    - {step: 64, expectation: Editor text remains exact after its own select-all and Copy.}
+    - {step: 65, expectation: No tree import side effect occurred from editor Copy.}
+    results: [59, 60, 64, 65]
   - id: R5
     requirement: Same-root internal Cut and Paste retain exact move bytes without replacing the system-copy feature with a cross-application move.
-    actions: [65, 66, 68, 69]
+    actions: [66, 67, 69, 70]
     checkpoints:
-    - {step: 67, expectation: Internal Cut feedback explicitly states within-workspace scope.}
-    - {step: 70, expectation: Same-root move reports its exact destination.}
-    - {step: 71, expectation: Complete snapshot confirms exact source deletion and target creation only for the internal cut file.}
-    - {step: 72, expectation: Moved file is refreshed in root1 incoming.}
-    - {step: 73, expectation: Workspace remains usable without runtime crash errors.}
-    results: [67, 70, 71, 72, 73]
+    - {step: 68, expectation: Internal Cut feedback explicitly states within-workspace scope.}
+    - {step: 71, expectation: Same-root move reports its exact destination.}
+    - {step: 72, expectation: Complete snapshot confirms exact source deletion and target creation only for the internal cut file.}
+    - {step: 73, expectation: Moved file is refreshed in root1 incoming.}
+    - {step: 74, expectation: Workspace remains usable without runtime crash errors.}
+    results: [68, 71, 72, 73, 74]
   visual:
   - check: Existing tree Copy/Paste/Cut menus and refreshed document hierarchy.
     method: manual

@@ -40,8 +40,9 @@ steps:
     key: taomni.recentWorkspaces.v1
     value: '[{"id":"qa-completion-refine","name":"maven-single","roots":[{"id":"maven-single","name":"maven-single","path":"${fixture.maven_single_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"maven-single","path":"src/main/java/com/example/single/App.java"},"lastOpenedAt":1788566400000,"isGitRepo":false}]'
 - reload_window: null
-- click: '[data-testid="welcome-history-tab-workspaces"]'
-- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_single_root}"]'
+- click: '[data-testid="tao-home-history"]'
+- click: '[data-testid="tao-home-history-tab-workspaces"]'
+- click: '[data-testid="tao-home-history-row"][data-workspace-path="${fixture.maven_single_root}"]'
 - wait_for: '[data-testid="code-workspace-editor"] .cm-content'
 - wait_for:
     selector: '[data-testid="code-workspace-lsp-status-pill"][data-semantic-ready="true"]'
@@ -159,64 +160,64 @@ verification:
     - 2
     - 4
     - 5
-    - 6
     - 7
-    - 10
+    - 8
     - 11
-    - 13
+    - 12
     - 14
-    - 18
+    - 15
     - 19
-    - 21
-    - 31
-    - 35
-    - 39
-    - 41
-    - 43
-    - 45
+    - 20
+    - 22
+    - 32
+    - 36
+    - 40
+    - 42
+    - 44
     - 46
     - 47
     - 48
-    - 51
-    - 53
+    - 49
+    - 52
+    - 54
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 8
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor\"] .cm-content"}'
     - step: 9
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor\"] .cm-content"}'
+    - step: 10
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"][data-semantic-ready=\"true\"]",
         "timeout_sec": 120}}'
-    - step: 16
-      expectation: Go to Line places the caret at logical source position 10:1 regardless of folded imports.
     - step: 17
+      expectation: Go to Line places the caret at logical source position 10:1 regardless of folded imports.
+    - step: 18
       expectation: The active source line is the existing System.out.println(names.size()); statement inside main,
         before any edit.
-    - step: 20
+    - step: 21
       expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete li.cm-completion-type-method", "timeout_sec":
         90}}'
-    - step: 34
+    - step: 35
       expectation: '{"assert_text": {"selector": ".cm-tooltip-autocomplete", "contains": "println("}}'
-    - step: 37
+    - step: 38
       expectation: '{"wait_for": ".cm-tooltip-autocomplete .cm-completionInfo"}'
-    - step: 40
+    - step: 41
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "System.out.println("}}'
-    - step: 42
+    - step: 43
       expectation: '{"eval_readonly": {"expression": "document.querySelector(\".cm-content\").innerText.includes(\"System.out.println\\n\")",
         "expect_truthy": true}}'
-    - step: 44
+    - step: 45
       expectation: '{"eval_readonly": {"expression": "document.activeElement === document.querySelectorAll(\".cm-content\")[0]",
         "expect_truthy": true}}'
-    - step: 49
+    - step: 50
       expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete li.cm-completion-type-method", "timeout_sec":
         90}}'
-    - step: 52
+    - step: 53
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "System.out.println("}}'
-    - step: 54
+    - step: 55
       expectation: '{"eval_readonly": {"expression": "document.querySelector(\".cm-content\").innerText.includes(\"System.out.println\\n\")",
         "expect_truthy": true}}'
     results:
-    - 54
+    - 55
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

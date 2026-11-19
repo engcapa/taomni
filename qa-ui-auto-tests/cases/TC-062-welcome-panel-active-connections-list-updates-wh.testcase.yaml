@@ -29,9 +29,7 @@ steps:
 - wait: 1
 - click: '[data-testid="nav-mode-home"]'
 - wait: 1
-- assert_text:
-    selector: '[data-testid="welcome-panel"]'
-    contains: 本地终端
+- assert_visible: '[data-testid="welcome-panel"] [data-testid="tao-home-local-terminal"]'
 - screenshot: 062-welcome-active-connections.png
 verification:
   review: reviewed
@@ -50,7 +48,7 @@ verification:
     - step: 5
       expectation: '{"wait_for": "[data-testid=\"terminal-pane\"]"}'
     - step: 9
-      expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]", "contains": "本地终端"}}'
+      expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"] [data-testid=\"tao-home-local-terminal\"]"}'
     results:
     - 9
   visual:

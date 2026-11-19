@@ -20,6 +20,10 @@ fixtures:
 timeout_sec: 240
 steps:
 - open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.fileOpen.preferences.v1
+    value: '{"associations":{"md":"workspace","txt":"workspace","json":"workspace"}}'
+- reload_window: null
 - wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="side-tab-tools"]:visible'
 - click: '[data-testid="sidebar-tool-code-workspace"]'
@@ -109,41 +113,41 @@ verification:
   - id: R1
     requirement: A2.5：Taomni Classic 方案下 Go to Definition 显示 F12，Jump to Last Tool Window 无快捷键。
     actions:
-    - 24
+    - 26
     checkpoints:
-    - step: 26
-      expectation: '{"assert_text": {"selector": "[data-testid=\"keymap-row-workspace.gotoDefinition\"]", "contains": "F12"}}'
     - step: 28
+      expectation: '{"assert_text": {"selector": "[data-testid=\"keymap-row-workspace.gotoDefinition\"]", "contains": "F12"}}'
+    - step: 30
       expectation: '{"assert_visible": "[data-testid=\"keymap-no-shortcut-workspace.jumpToLastToolWindow\"]"}'
     results:
-    - 26
     - 28
+    - 30
   - id: R2
     requirement: A2.5：Apply Classic 后 F12 不再打开工具窗，存储只记录内置方案 id。
     actions:
-    - 29
-    - 33
+    - 31
+    - 35
     checkpoints:
-    - step: 35
+    - step: 37
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-bottom-dock\"][data-open]", "equal": 0}}'
-    - step: 36
+    - step: 38
       expectation: '{"assert_localstorage": {"key": "taomni.codeWorkspace.keymap.v3:active", "equals": "builtin:taomni-classic"}}'
     results:
-    - 35
-    - 36
+    - 37
+    - 38
   - id: R3
     requirement: DEC-013-05：切回 IDEA defaults 后 F12 重新打开上次工具窗（Problems）。
     actions:
-    - 13
-    - 43
-    - 48
+    - 15
+    - 45
+    - 50
     checkpoints:
-    - step: 17
+    - step: 19
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-dock\"][data-open]", "state": "detached", "timeout_sec": 5}}'
-    - step: 49
+    - step: 51
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-dock\"][data-open]", "timeout_sec": 10}}'
     results:
-    - 49
+    - 51
   visual:
   - check: 方案下拉中 Taomni Classic 文案完整。
     method: manual

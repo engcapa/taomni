@@ -29,25 +29,15 @@ steps:
     selector: '[data-testid="ai-chat-drawer-ribbon"]'
     equal: 0
 - assert_visible: '[data-testid="welcome-panel"]'
-- assert_text:
-    selector: '[data-testid="welcome-panel"]'
-    contains: Welcome to Taomni
-- assert_text:
-    selector: '[data-testid="welcome-panel"]'
-    contains: 本地终端
+- assert_visible: '[data-testid="tao-home-host"]'
+- assert_visible: '[data-testid="welcome-panel"] [data-testid="tao-home-local-terminal"]'
 - assert_visible: '[data-testid="tao-home-local-terminal"]'
 - assert_enabled: '[data-testid="tao-home-local-terminal"]'
-- assert_visible: '[data-testid="welcome-version"]'
-- assert_visible: '[data-testid="welcome-version-footer"]'
-- assert_text:
-    selector: '[data-testid="welcome-panel"]'
-    contains: New session
-- assert_text:
-    selector: '[data-testid="welcome-panel"]'
-    contains: Tips
-- assert_text:
-    selector: '[data-testid="welcome-panel"]'
-    contains: Quick connect
+- assert_visible: '[data-testid="tao-home-dock-row"]'
+- assert_visible: '[data-testid="tao-home-dock-more"]'
+- assert_visible: '[data-testid="tao-home-new-session"]'
+- assert_visible: '[data-testid="tao-home-history"]'
+- assert_visible: '[data-testid="tao-home-shell-menu"]'
 - click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="sessions-empty-state"]'
 - assert_not_visible: '[data-testid="welcome-panel"]'
@@ -117,23 +107,23 @@ verification:
     - step: 9
       expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"]"}'
     - step: 10
-      expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]", "contains": "Welcome to Taomni"}}'
+      expectation: '{"assert_visible": "[data-testid=\"tao-home-host\"]"}'
     - step: 11
-      expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]", "contains": "本地终端"}}'
+      expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"] [data-testid=\"tao-home-local-terminal\"]"}'
     - step: 12
       expectation: '{"assert_visible": "[data-testid=\"tao-home-local-terminal\"]"}'
     - step: 13
       expectation: '{"assert_enabled": "[data-testid=\"tao-home-local-terminal\"]"}'
     - step: 14
-      expectation: '{"assert_visible": "[data-testid=\"welcome-version\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"tao-home-dock-row\"]"}'
     - step: 15
-      expectation: '{"assert_visible": "[data-testid=\"welcome-version-footer\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"tao-home-dock-more\"]"}'
     - step: 16
-      expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]", "contains": "New session"}}'
+      expectation: '{"assert_visible": "[data-testid=\"tao-home-new-session\"]"}'
     - step: 17
-      expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]", "contains": "Tips"}}'
+      expectation: '{"assert_visible": "[data-testid=\"tao-home-history\"]"}'
     - step: 18
-      expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]", "contains": "Quick connect"}}'
+      expectation: '{"assert_visible": "[data-testid=\"tao-home-shell-menu\"]"}'
     - step: 20
       expectation: '{"wait_for": "[data-testid=\"sessions-empty-state\"]"}'
     - step: 21

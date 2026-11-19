@@ -20,6 +20,10 @@ timeout_sec: 240
 steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-ws-25
+- seed_storage:
+    key: taomni.fileOpen.preferences.v1
+    value: '{"associations":{"md":"workspace","txt":"workspace","json":"workspace"}}'
+- reload_window: null
 - click: '[data-testid="tao-home-new-workspace"]'
 - wait_for: '[data-testid="text-input-dialog"]'
 - fill:
@@ -63,8 +67,9 @@ steps:
     expect_truthy: true
 - screenshot: home-workspace-ide-group.png
 - click: '[data-testid="nav-mode-home"]'
-- click: '[data-testid="welcome-history-tab-workspaces"]'
-- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.platform_workspace_root}"]'
+- click: '[data-testid="tao-home-history"]'
+- click: '[data-testid="tao-home-history-tab-workspaces"]'
+- click: '[data-testid="tao-home-history-row"][data-workspace-path="${fixture.platform_workspace_root}"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - assert_text:
     selector: '[data-testid="code-workspace-editor"]'
@@ -102,19 +107,22 @@ steps:
     equal: 0
 - press: Escape
 - click: '[data-testid="nav-mode-home"]'
-- click: '[data-testid="welcome-history-tab-workspaces"]'
+- click: '[data-testid="tao-home-history"]'
+- click: '[data-testid="tao-home-history-tab-workspaces"]'
 - fill:
-    selector: '[data-testid="welcome-recent-workspace-filter"]'
+    selector: '[data-testid="tao-home-history-search"]'
     value: ${fixture.platform_workspace_root}
-- assert_visible: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.platform_workspace_root}"]'
-- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.platform_workspace_root}"]'
+- assert_visible: '[data-testid="tao-home-history-row"][data-workspace-path="${fixture.platform_workspace_root}"]'
+- click: '[data-testid="tao-home-history-row"][data-workspace-path="${fixture.platform_workspace_root}"]'
 - wait_for: '[data-testid="code-workspace-tab"]:visible'
 - click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="tao-home-history"]'
+- click: '[data-testid="tao-home-history-tab-workspaces"]'
 - assert_attribute:
-    selector: '[data-testid="welcome-recent-workspace-filter"]'
+    selector: '[data-testid="tao-home-history-search"]'
     name: value
     equals: ${fixture.platform_workspace_root}
-- assert_visible: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.platform_workspace_root}"]'
+- assert_visible: '[data-testid="tao-home-history-row"][data-workspace-path="${fixture.platform_workspace_root}"]'
 - assert_no_runtime_errors: null
 verification:
   review: reviewed
@@ -123,124 +131,124 @@ verification:
     requirement: Home new/recent opens the same full editor inside Workspaces, save survives re-entry, Sessions contains no code tabs, and context-free Code Editor
       routes to the default workspace. IDE tools are separated by at least 12px with a divider and tooltip.
     actions:
-    - 3
     - 5
-    - 6
-    - 14
-    - 15
+    - 7
+    - 8
     - 16
     - 17
-    - 22
-    - 23
+    - 18
+    - 19
     - 24
-    - 28
-    - 33
-    - 34
-    - 42
+    - 26
+    - 27
+    - 31
+    - 36
+    - 37
+    - 45
     checkpoints:
-    - step: 4
+    - step: 6
       expectation: '{"wait_for": "[data-testid=\"text-input-dialog\"]"}'
-    - step: 7
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
-    - step: 8
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"nav-mode-workspaces\"]", "name": "aria-pressed", "equals": "true"}}'
     - step: 9
-      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"code-workspace\"]", "equal": 0}}'
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
     - step: 10
-      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tab\"][data-tab-kind=\"code\"]", "equal": 1}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"nav-mode-workspaces\"]", "name": "aria-pressed", "equals": "true"}}'
     - step: 11
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"]"}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"code-workspace\"]", "equal": 0}}'
+    - step: 12
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tab\"][data-tab-kind=\"code\"]", "equal": 1}}'
     - step: 13
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"]"}'
+    - step: 15
       expectation: '{"wait_for": "[data-testid=\"code-workspace-editor\"]"}'
-    - step: 18
+    - step: 20
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "QA_HOME_ROUTE_SAVE"}}'
-    - step: 19
+    - step: 21
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"sidebar-tool-window-rail\"]'').title.length
         > 0 && parseFloat(getComputedStyle(document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"sidebar-tool-window-rail\"]'')).borderTopWidth) >=
         1", "expect_truthy": true}}'
-    - step: 20
+    - step: 22
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"sidebar-tool-window-rail\"]'').getBoundingClientRect().top
         - document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"rail-mode-group\"]'').getBoundingClientRect().bottom >= 12", "expect_truthy": true}}'
-    - step: 25
+    - step: 28
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
-    - step: 26
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "QA_HOME_ROUTE_SAVE"}}'
-    - step: 27
-      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tab\"][data-tab-kind=\"code\"]", "equal": 1}}'
     - step: 29
-      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-tab\"]"}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "QA_HOME_ROUTE_SAVE"}}'
     - step: 30
-      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"code-workspace\"]", "equal": 0}}'
-    - step: 31
-      expectation: '{"assert_not_visible": "[data-testid=\"nav-mode-agents\"]"}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tab\"][data-tab-kind=\"code\"]", "equal": 1}}'
     - step: 32
-      expectation: '{"assert_visible": "[data-testid=\"rail-chat-button\"]"}'
-    - step: 35
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
-    - step: 36
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"nav-mode-workspaces\"]", "name": "aria-pressed", "equals": "true"}}'
-    - step: 37
-      expectation: '{"assert_visible": "[data-testid=\"expanded-sidebar-panel\"]"}'
-    - step: 38
-      expectation: '{"wait_for": "[data-testid=\"workspace-switcher\"]"}'
-    - step: 39
-      expectation: '{"assert_visible": "[data-testid=\"workspace-default-badge\"]"}'
-    - step: 40
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 33
       expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"code-workspace\"]", "equal": 0}}'
-    - step: 44
+    - step: 34
+      expectation: '{"assert_not_visible": "[data-testid=\"nav-mode-agents\"]"}'
+    - step: 35
+      expectation: '{"assert_visible": "[data-testid=\"rail-chat-button\"]"}'
+    - step: 38
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 39
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"nav-mode-workspaces\"]", "name": "aria-pressed", "equals": "true"}}'
+    - step: 40
+      expectation: '{"assert_visible": "[data-testid=\"expanded-sidebar-panel\"]"}'
+    - step: 41
+      expectation: '{"wait_for": "[data-testid=\"workspace-switcher\"]"}'
+    - step: 42
+      expectation: '{"assert_visible": "[data-testid=\"workspace-default-badge\"]"}'
+    - step: 43
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"code-workspace\"]", "equal": 0}}'
+    - step: 47
       expectation: '{"assert_count": {"selector": "[data-testid=\"platform-toolbar-actions\"] [data-testid=\"workspace-toolbar-bottom-dock\"]", "equal": 0}}'
     results:
-    - 4
-    - 7
-    - 8
+    - 6
     - 9
     - 10
     - 11
+    - 12
     - 13
-    - 18
-    - 19
+    - 15
     - 20
-    - 25
-    - 26
-    - 27
+    - 21
+    - 22
+    - 28
     - 29
     - 30
-    - 31
     - 32
+    - 33
+    - 34
     - 35
-    - 36
-    - 37
     - 38
     - 39
     - 40
-    - 44
+    - 41
+    - 42
+    - 43
+    - 47
   - id: R2
     requirement: Hidden Home retains the selected history section and search text while workspace recent-file publications update; returning shows the current matching
       workspace and keeps its routing action usable.
     actions:
-    - 45
-    - 46
-    - 47
     - 48
-    - 50
-    - 52
-    checkpoints:
-    - step: 49
-      expectation: '{"assert_visible": "[data-testid=\"welcome-recent-workspace-row\"][data-workspace-path=\"${fixture.platform_workspace_root}\"]"}'
-    - step: 51
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]:visible"}'
-    - step: 53
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"welcome-recent-workspace-filter\"]", "name": "value", "equals": "${fixture.platform_workspace_root}"}}'
-    - step: 54
-      expectation: '{"assert_visible": "[data-testid=\"welcome-recent-workspace-row\"][data-workspace-path=\"${fixture.platform_workspace_root}\"]"}'
-    - step: 55
-      expectation: '{"assert_no_runtime_errors": null}'
-    results:
     - 49
     - 51
-    - 53
+    - 52
     - 54
+    - 56
+    checkpoints:
+    - step: 53
+      expectation: '{"assert_visible": "[data-testid=\"tao-home-history-row\"][data-workspace-path=\"${fixture.platform_workspace_root}\"]"}'
+    - step: 55
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]:visible"}'
+    - step: 59
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"tao-home-history-search\"]", "name": "value", "equals": "${fixture.platform_workspace_root}"}}'
+    - step: 60
+      expectation: '{"assert_visible": "[data-testid=\"tao-home-history-row\"][data-workspace-path=\"${fixture.platform_workspace_root}\"]"}'
+    - step: 61
+      expectation: '{"assert_no_runtime_errors": null}'
+    results:
+    - 53
     - 55
+    - 59
+    - 60
+    - 61
   visual:
   - check: Compact controls retain readable icons and active states without toolbar overlap.
     method: manual

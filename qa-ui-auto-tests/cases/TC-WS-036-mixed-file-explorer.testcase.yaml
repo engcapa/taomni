@@ -20,6 +20,10 @@ timeout_sec: 240
 steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-ws-explorer
+- seed_storage:
+    key: taomni.fileOpen.preferences.v1
+    value: '{"associations":{"md":"workspace","txt":"workspace","json":"workspace"}}'
+- reload_window: null
 - click: '[data-testid="nav-mode-workspaces"]'
 - click: '[data-testid="workspace-open-session-plus"]'
 - click: '[data-testid="workspace-plus-add-folder"]'
@@ -95,82 +99,82 @@ verification:
     actions:
     - 1
     - 2
-    - 3
     - 5
-    - 6
     - 7
+    - 8
     - 9
-    - 10
-    - 15
-    - 16
+    - 11
+    - 12
+    - 17
     - 18
     - 20
     - 22
-    - 23
     - 24
     - 25
+    - 26
     - 27
-    - 34
-    - 35
+    - 29
+    - 36
     - 37
     - 39
-    - 40
+    - 41
+    - 42
     checkpoints:
-    - step: 8
+    - step: 10
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tree\"]"}'
-    - step: 11
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-flat-file\"][data-path=\"Documents/notes.txt\"]"}'
-    - step: 12
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-flat-file\"][data-path=\"Documents/budget.csv\"] [data-file-type=\"spreadsheet\"]"}'
     - step: 13
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-flat-file\"][data-path=\"Pictures/logo.svg\"] [data-file-type=\"image\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-flat-file\"][data-path=\"Documents/notes.txt\"]"}'
     - step: 14
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-flat-file\"][data-path=\"Documents/budget.csv\"] [data-file-type=\"spreadsheet\"]"}'
+    - step: 15
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-flat-file\"][data-path=\"Pictures/logo.svg\"] [data-file-type=\"image\"]"}'
+    - step: 16
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-flat-file\"][data-path=\"README.md\"] [data-file-type=\"document\"]"}'
-    - step: 17
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-flat-file\"]", "equal": 0}}'
     - step: 19
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-flat-file\"]", "equal": 1}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-flat-file\"]", "equal": 0}}'
     - step: 21
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-flat-file\"]", "equal": 1}}'
+    - step: 23
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-open-default\"]"}'
-    - step: 26
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-flat-file\"][data-path=\"notes.txt\"]"}'
     - step: 28
-      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"] .cm-content"}'
-    - step: 29
-      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "Weekly notes"}}'
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-flat-file\"][data-path=\"notes.txt\"]"}'
     - step: 30
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-highlighting-widget\"]", "equal": 1}}'
+      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"] .cm-content"}'
     - step: 31
-      expectation: '{"assert_count": {"selector": "[data-testid^=\"code-workspace-banner-lsp-error:\"]", "equal": 0}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "Weekly notes"}}'
     - step: 32
-      expectation: '{"assert_count": {"selector": "[data-testid=\"editor-open-git-diff\"]", "equal": 1}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-highlighting-widget\"]", "equal": 1}}'
     - step: 33
+      expectation: '{"assert_count": {"selector": "[data-testid^=\"code-workspace-banner-lsp-error:\"]", "equal": 0}}'
+    - step: 34
+      expectation: '{"assert_count": {"selector": "[data-testid=\"editor-open-git-diff\"]", "equal": 1}}'
+    - step: 35
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-git-panel-toggle\"]", "equal": 0}}'
-    - step: 36
-      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"][data-dirty=\"true\"]"}'
     - step: 38
+      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"][data-dirty=\"true\"]"}'
+    - step: 40
       expectation: '{"wait_for": {"selector": "[data-testid=\"workspace-file-editor\"][data-dirty]", "state": "detached"}}'
-    - step: 41
+    - step: 43
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"][data-path=\"notes.txt\"]"}'
     results:
-    - 8
-    - 11
-    - 12
+    - 10
     - 13
     - 14
-    - 17
+    - 15
+    - 16
     - 19
     - 21
-    - 26
+    - 23
     - 28
-    - 29
     - 30
     - 31
     - 32
     - 33
-    - 36
+    - 34
+    - 35
     - 38
-    - 41
+    - 40
+    - 43
   visual:
   - check: Review type icons, tree selection, header density and ordinary document editing.
     method: manual

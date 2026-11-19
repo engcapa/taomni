@@ -279,7 +279,7 @@ controls:
   selector: '[data-testid="tao-home-history-tab-directories"]'
   kind: interactive
 - id: tao-home-history-search
-  selector: '.tao-home-history-search input'
+  selector: '[data-testid="tao-home-history-search"]'
   kind: interactive
 - id: tao-home-local-terminal
   selector: '[data-testid="tao-home-local-terminal"]'
@@ -334,6 +334,9 @@ controls:
   kind: interactive
 - id: tao-home-shell-menu
   selector: '[data-testid="tao-home-shell-menu"]'
+  kind: interactive
+- id: tao-home-shell-admin
+  selector: '[data-testid="tao-home-shell-admin"]'
   kind: interactive
 - id: tao-home-shell-options
   selector: '[data-testid="tao-home-shell-options"]'

@@ -11,6 +11,7 @@ import { useChatStore } from "../../../stores/chatStore";
 import type { WelcomePanelProps } from "../../welcome/types";
 import { useWelcomeShells } from "../../welcome/useWelcomeShells";
 import { HistoryPopover } from "./HistoryPopover";
+import { showAgentsComingSoon } from "../../agents/comingSoon";
 import { TaoPopover, useTaoPopover } from "../ai-chat/Popover";
 import type { TaoChatController, TaoThread } from "../ai-chat";
 
@@ -28,6 +29,7 @@ export function DockRow(props: Props) {
   const { controller, threads, demoMode } = props;
   const t = useT();
   const [status, setStatus] = useState("");
+  const [workspaceQuery, setWorkspaceQuery] = useState("");
   const [pending, setPending] = useState<string[]>([]);
   const pendingRef = useRef(new Set<string>());
   const history = useTaoPopover();
@@ -66,7 +68,7 @@ export function DockRow(props: Props) {
   return <>
     <div className="tao-home-dock-row" data-testid="tao-home-dock-row">
       <button ref={history.triggerRef} type="button" className="tao-home-dock-button history" data-testid="tao-home-history" aria-expanded={history.open} onClick={() => { if (!history.open && !props.historyLoading) props.onRefreshHistory?.(); history.setOpen(!history.open); }}><History size={14} />{tr("历史")}<ChevronUp size={12} /></button>
-      <TaoPopover owner={history} className="tao-home-history-popup" label={tr("历史")}><HistoryPopover loading={props.historyLoading} error={props.historyError} onRefresh={props.onRefreshHistory} threads={threads} sessions={props.recentSessions ?? []} workspaces={props.recentWorkspaces ?? []} demoMode={demoMode} onSelectThread={(thread) => void openHistoryThread(thread)} onDeleteThread={props.onDeleteThread} onOpenSession={props.onOpenRecentSession} onOpenWorkspace={props.onOpenRecentWorkspace} onNewThread={() => controller.createThread()} onRestore={canRestore ? props.restore?.onStartRestore : undefined} onClose={() => history.close()} directories={<LocalDirectoriesPanel translate={t} directories={directories} pendingDirectoryIds={pending} loadStatus={shells.directoriesStatus} loadError={shells.directoriesError} onRetry={shells.reloadDirectories} onStartInDirectory={(directory) => {
+      <TaoPopover owner={history} className="tao-home-history-popup" label={tr("历史")}><HistoryPopover workspaceQuery={workspaceQuery} onWorkspaceQueryChange={setWorkspaceQuery} loading={props.historyLoading} error={props.historyError} onRefresh={props.onRefreshHistory} threads={threads} sessions={props.recentSessions ?? []} workspaces={props.recentWorkspaces ?? []} demoMode={demoMode} onSelectThread={(thread) => void openHistoryThread(thread)} onDeleteThread={props.onDeleteThread} onOpenSession={props.onOpenRecentSession} onOpenWorkspace={props.onOpenRecentWorkspace} onNewThread={() => controller.createThread()} onRestore={canRestore ? props.restore?.onStartRestore : undefined} onClose={() => history.close()} directories={<LocalDirectoriesPanel translate={t} directories={directories} pendingDirectoryIds={pending} loadStatus={shells.directoriesStatus} loadError={shells.directoriesError} onRetry={shells.reloadDirectories} onStartInDirectory={(directory) => {
         const actual = demoMode ? shells.localDirectories.find((item) => item.directoryId === directory.directoryId) : directory;
         if (actual) return startInDirectory(actual);
       }} />} /></TaoPopover>
@@ -76,14 +78,14 @@ export function DockRow(props: Props) {
       <TaoPopover owner={shellMenu} label={tr("本地终端选项")}><div className="tao-home-popup-items">
         <ThemedSelect label={tr("选择 Shell")} testId="tao-home-shell-options" value={shells.selectedShellId} onChange={shells.setSelectedShellId}
           options={shells.mergedShells.map((shell) => ({ value: shell.id, label: shell.name }))} />
-        <button type="button" disabled={!shells.selectedShell?.canElevate} onClick={() => { shellMenu.close(); void openLocalShellAsAdministrator(shells.selectedShell?.id).catch((error) => setStatus(String(error))); }}>{tr("以管理员身份启动")}</button>
-        <button type="button" disabled={!props.onOpenLocalPath} onClick={() => { shellMenu.close(false); void sftpLocalHome().then((home) => { if (home) props.onOpenLocalPath?.(home, { embedFolder: true }); }).catch((error) => setStatus(String(error))); }}>{tr("打开 Home 目录")}</button>
+        <button type="button" data-testid="tao-home-shell-admin" disabled={!shells.selectedShell?.canElevate} onClick={() => { shellMenu.close(); void openLocalShellAsAdministrator(shells.selectedShell?.id).catch((error) => setStatus(String(error))); }}>{tr("以管理员身份启动")}</button>
+        <button type="button" data-testid="welcome-open-home-folder" disabled={!props.onOpenLocalPath} onClick={() => { shellMenu.close(false); void sftpLocalHome().then((home) => { if (home) props.onOpenLocalPath?.(home, { embedFolder: true }); }).catch((error) => setStatus(String(error))); }}>{tr("打开 Home 目录")}</button>
       </div></TaoPopover>
       {hasWsl ? <button type="button" className="tao-home-dock-button" data-testid="tao-home-wsl" onClick={() => void props.onStartLocalTerminal({ id: "wsl.exe", name: `WSL: ${shells.wslDistros[0].name}`, args: ["-d", shells.wslDistros[0].name] })}>WSL</button> : null}
       <button type="button" className="tao-home-dock-button" data-testid="tao-home-new-session" onClick={props.onNewSession}><Plus size={14} />{tr("新会话")}</button>
       <button type="button" className="tao-home-dock-button" data-testid="tao-home-new-workspace" onClick={props.onOpenNewWorkspace}><FolderOpen size={14} />{tr("新工作区")}</button>
       <button ref={more.triggerRef} type="button" className="tao-home-dock-button" data-testid="tao-home-dock-more" aria-expanded={more.open} onClick={() => more.setOpen(!more.open)}><MoreHorizontal size={14} />{tr("更多")}</button>
-      <TaoPopover owner={more} label={tr("更多启动选项")}><div className="tao-home-popup-items"><button type="button" data-testid="tao-home-dock-directory" onClick={() => command("file-explorer")}>{tr("本地目录")}</button><button type="button" data-testid="tao-home-dock-mail" onClick={() => command("mail-unified")}>{tr("邮件会话")}</button><button type="button" data-testid="tao-home-dock-session" onClick={() => { more.close(false); props.onNewSession(); }}>{tr("数据库 / VNC / RDP 会话")}</button><button type="button" data-testid="tao-home-dock-settings" onClick={() => { more.close(false); props.onOpenSettings?.(); }}>{tr("Tao 设置")}</button></div></TaoPopover>
+      <TaoPopover owner={more} label={tr("更多启动选项")}><div className="tao-home-popup-items"><button type="button" data-testid="tao-home-dock-directory" onClick={() => command("file-explorer")}>{tr("本地目录")}</button><button type="button" data-testid="tao-home-dock-mail" onClick={() => command("mail-unified")}>{tr("邮件会话")}</button><button type="button" data-testid="tao-home-dock-session" onClick={() => { more.close(false); props.onNewSession(); }}>{tr("数据库 / VNC / RDP 会话")}</button><button type="button" data-testid="home-open-agents" onClick={() => { more.close(false); showAgentsComingSoon(); }}>{t("platform.agents")}</button><button type="button" data-testid="tao-home-dock-settings" onClick={() => { more.close(false); props.onOpenSettings?.(); }}>{tr("Tao 设置")}</button></div></TaoPopover>
     </div>
     {status ? <p className="tao-home-launch-status" role="status">{status}<button type="button" aria-label={tr("关闭启动提示")} onClick={() => setStatus("")}>×</button></p> : null}
   </>;

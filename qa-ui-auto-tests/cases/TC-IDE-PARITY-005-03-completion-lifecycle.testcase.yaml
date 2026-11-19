@@ -9,8 +9,9 @@ timeout_sec: 240
 steps:
   - open: ${cfg.app.base_url}
   - wait_for: '[data-testid="welcome-panel"]'
-  - click: '[data-testid="welcome-history-tab-workspaces"]'
-  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity005_root}"]'
+  - click: '[data-testid="tao-home-history"]'
+  - click: '[data-testid="tao-home-history-tab-workspaces"]'
+  - click: '[data-testid="tao-home-history-row"][data-workspace-path="${fixture.parity005_root}"]'
   - wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
   - press: Control+Shift+N
   - wait_for: '[data-testid="code-workspace-search-everywhere"]'
@@ -219,103 +220,103 @@ verification:
   requirements:
     - id: ED-PARITY-005-V3-fresh-after-undo
       requirement: Undo restores the word-middle caret and a fresh Basic request returns the provider candidate without editing M0.
-      actions: [27, 30, 32, 37, 40]
+      actions: [28, 31, 33, 38, 41]
       checkpoints:
-        - step: 31
+        - step: 32
           expectation: The combined replace acceptance lands one import and no suffix.
-        - step: 33
-          expectation: One Undo restores exact M0.
         - step: 34
+          expectation: One Undo restores exact M0.
+        - step: 35
           expectation: The caret returns to the original word-middle position.
-        - step: 39
+        - step: 40
           expectation: A fresh provider candidate is visible.
-        - step: 42
+        - step: 43
           expectation: Escape leaves exact M0 unchanged.
-      results: [31, 33, 34, 39, 42]
+      results: [32, 34, 35, 40, 43]
     - id: ED-PARITY-005-V3-fetch-cancel
       requirement: Escape during a held fetch prevents a late provider candidate and preserves M0.
-      actions: [43, 44, 46, 47]
+      actions: [44, 45, 47, 48]
       checkpoints:
-        - step: 45
+        - step: 46
           expectation: The real renderer request is pending at the controlled provider.
-        - step: 48
-          expectation: Escape keeps the popup closed after release.
         - step: 49
+          expectation: Escape keeps the popup closed after release.
+        - step: 50
           expectation: No document edit occurred.
-      results: [45, 48, 49]
+      results: [46, 49, 50]
     - id: ED-PARITY-005-V3-resolve-cancel
       requirement: Escape during a held resolve blocks delayed acceptance and a fresh request succeeds.
-      actions: [51, 53, 55, 57, 58, 62, 65, 67]
+      actions: [52, 54, 56, 58, 59, 63, 66, 68]
       checkpoints:
-        - step: 56
+        - step: 57
           expectation: The selected candidate entered pending resolve.
-        - step: 59
-          expectation: Release does not revive a gate.
         - step: 60
+          expectation: Release does not revive a gate.
+        - step: 61
           expectation: Escape left exact M0.
-        - step: 66
+        - step: 67
           expectation: Fresh acceptance lands the import and identifier.
-        - step: 68
+        - step: 69
           expectation: One Undo restores exact M0.
-      results: [56, 59, 60, 66, 68]
+      results: [57, 60, 61, 67, 69]
     - id: ED-PARITY-005-V3-switch
       requirement: Switching to Main.java during Mid.java resolve prevents late writes in either buffer.
-      actions: [69, 71, 74, 76, 80, 81, 83, 87]
+      actions: [70, 72, 75, 77, 81, 82, 84, 88]
       checkpoints:
-        - step: 75
+        - step: 76
           expectation: The Mid.java resolve is pending before the file switch.
-        - step: 82
+        - step: 83
           expectation: Main.java remains at exact B1 after the old response.
-        - step: 88
+        - step: 89
           expectation: Mid.java also remains at exact M0 on return.
-      results: [75, 82, 88]
+      results: [76, 83, 89]
     - id: ED-PARITY-005-V3-empty
       requirement: A real empty provider response shows no forged provider item and normal mode recovers.
-      actions: [89, 98, 99, 103, 104, 105, 108]
+      actions: [90, 99, 100, 104, 105, 106, 109]
       checkpoints:
-        - step: 97
+        - step: 98
           expectation: The active editor caret was restored to the exact M0 word-middle position.
-        - step: 100
-          expectation: The controlled empty provider request completed.
         - step: 101
-          expectation: No provider row was invented after the empty response.
+          expectation: The controlled empty provider request completed.
         - step: 102
+          expectation: No provider row was invented after the empty response.
+        - step: 103
           expectation: No StringUtils provider item was invented.
-        - step: 107
+        - step: 108
           expectation: A new provider request restores StringUtils.
-        - step: 109
+        - step: 110
           expectation: Escape preserves exact M0.
-      results: [97, 100, 101, 102, 107, 109]
+      results: [98, 101, 102, 103, 108, 110]
     - id: ED-PARITY-005-V3-facts-fallback
       requirement: Each isolated unready facts state is recorded as a reasoned document fallback; ready restores the module scope.
-      actions: [110, 111, 115, 116, 120, 121, 125, 126, 130, 131]
+      actions: [111, 112, 116, 117, 121, 122, 126, 127, 131, 132]
       checkpoints:
-        - step: 113
+        - step: 114
           expectation: Loading facts produce scope-facts-missing with the loading reason.
-        - step: 118
+        - step: 119
           expectation: Degraded facts produce scope-facts-missing with the degraded reason.
-        - step: 123
+        - step: 124
           expectation: Failed facts produce scope-facts-missing with the failed reason.
-        - step: 128
+        - step: 129
           expectation: Stale facts produce scope-facts-missing with the stale reason.
-        - step: 133
+        - step: 134
           expectation: A fresh request after restoring ready facts records module scope.
-      results: [113, 118, 123, 128, 133]
+      results: [114, 119, 124, 129, 134]
     - id: ED-PARITY-005-V3-facts-invalidation
       requirement: A facts generation change during pending resolve blocks late acceptance, then a fresh request accepts and one Undo restores M0.
-      actions: [135, 136, 139, 141, 142, 145, 146, 147, 150, 152]
+      actions: [136, 137, 140, 142, 143, 146, 147, 148, 151, 153]
       checkpoints:
-        - step: 140
+        - step: 141
           expectation: The real editor acceptance reached a held resolve request.
-        - step: 143
-          expectation: Releasing the old resolve did not edit M0.
         - step: 144
+          expectation: Releasing the old resolve did not edit M0.
+        - step: 145
           expectation: The old response did not present a new gate.
-        - step: 151
+        - step: 152
           expectation: Fresh ready facts permit the complete import and identifier acceptance.
-        - step: 153
+        - step: 154
           expectation: One Undo restores exact M0.
-      results: [140, 143, 144, 151, 153]
+      results: [141, 144, 145, 152, 154]
   visual:
     - check: Candidate popup and selected row remain accessible after Undo.
       method: manual

@@ -10,29 +10,24 @@ from qa_ui_auto.fixtures.explorer_files import path_attribute_match, setup
 
 
 class ExplorerFixtureSelectorTest(TestCase):
-    def test_css_matches_both_exact_windows_spellings_and_no_unrelated_path(self):
+    def test_css_matches_exact_windows_spellings_and_no_unrelated_path(self):
         path = 'D:/a/qa report/source/folder'
         selector = '[data-testid="explorer-nav-node"]' + path_attribute_match(path)
-        self.assertEqual(
-            selector,
-            '[data-testid="explorer-nav-node"]:is('
-            '[data-path="D:/a/qa report/source/folder"],'
-            '[data-path="D:\\\\a\\\\qa report\\\\source\\\\folder"]'
-            ')',
-        )
-
-        # Keep this contract independent of the frontend dependency tree. The
-        # selector contains only exact path alternatives, so these are the
-        # values a browser query must return for the same fixture rows.
-        candidates = [
+        spellings = [
             path,
             path.replace('/', '\\'),
+            r'D:/a\qa report\source\folder',
+            r'D:/a/qa report\source\folder',
+            r'D:/a/qa report/source\folder',
+        ]
+        expected = ','.join('[data-path=' + json.dumps(value) + ']' for value in spellings)
+        self.assertEqual(selector, '[data-testid="explorer-nav-node"]:is(' + expected + ')')
+        for unrelated in [
             'D:/unrelated/folder',
             path + '/child',
             'E:' + path[2:],
-        ]
-        exact_paths = {path, path.replace('/', '\\')}
-        self.assertEqual([value for value in candidates if value in exact_paths], candidates[:2])
+        ]:
+            self.assertNotIn('[data-path=' + json.dumps(unrelated) + ']', selector)
 
     def test_posix_quotes_backslashes_and_spaces_are_escaped_as_literal_attributes(self):
         path = '/qa/report "quoted"/folder\\name'

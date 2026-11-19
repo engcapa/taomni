@@ -27,6 +27,10 @@ fixtures:
 timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.fileOpen.preferences.v1
+    value: '{"associations":{"md":"workspace","txt":"workspace","json":"workspace"}}'
+- reload_window: null
 - wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="side-tab-tools"]'
 - wait_for: '[data-testid="sidebar-tools-panel"]'
@@ -94,46 +98,46 @@ verification:
   - id: R1
     requirement: Actions触发重排无提供者时显示同步前提错误，整个文档不变
     actions:
-    - 15
-    - 18
+    - 17
     - 20
-    - 21
     - 22
     - 23
+    - 24
+    - 25
     checkpoints:
-    - step: 19
+    - step: 21
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "timeout_sec":
         30}}'
-    - step: 24
+    - step: 26
       expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "finish synchronizing
         current editor buffers", "timeout_sec": 20}}'
-    - step: 25
+    - step: 27
       expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line",
         "equals": ["public class Sample {", "    public void beta() {}", "    public void alpha() {}", "}"]}}'
     results:
-    - 24
-    - 25
+    - 26
+    - 27
   - id: R2
     requirement: Actions触发清理同样报告错误并保持整个文档不变
     actions:
-    - 27
     - 29
-    - 30
     - 31
     - 32
+    - 33
+    - 34
     checkpoints:
-    - step: 28
+    - step: 30
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "timeout_sec":
         30}}'
-    - step: 33
+    - step: 35
       expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "finish synchronizing
         current editor buffers", "timeout_sec": 20}}'
-    - step: 34
+    - step: 36
       expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line",
         "equals": ["public class Sample {", "    public void beta() {}", "    public void alpha() {}", "}"]}}'
     results:
-    - 33
-    - 34
+    - 35
+    - 36
   visual:
   - check: 检查最终截图中的编辑器/菜单/状态反馈无遮挡和溢出；截图本身不是视觉通过。
     method: manual

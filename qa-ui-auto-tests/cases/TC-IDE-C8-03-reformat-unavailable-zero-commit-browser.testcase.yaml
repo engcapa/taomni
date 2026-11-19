@@ -30,6 +30,10 @@ fixtures:
 timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.fileOpen.preferences.v1
+    value: '{"associations":{"md":"workspace","txt":"workspace","json":"workspace"}}'
+- reload_window: null
 - wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="side-tab-tools"]'
 - wait_for: '[data-testid="sidebar-tools-panel"]'
@@ -67,19 +71,19 @@ verification:
   - id: R1
     requirement: 没有格式化提供者时快捷键明确报不可用，所有行及空白保持原样
     actions:
-    - 14
-    - 15
+    - 16
+    - 17
     checkpoints:
-    - step: 16
+    - step: 18
       expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "No formatter
         provider", "timeout_sec": 20}}'
-    - step: 17
+    - step: 19
       expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content .cm-line",
         "equals": ["public class ReformatProbe {", "    // @formatter:off", "       badly_indented();", "    //
         @formatter:on", "        also_bad();", "}"]}}'
     results:
-    - 16
-    - 17
+    - 18
+    - 19
   visual:
   - check: 检查最终截图中的编辑器/菜单/状态反馈无遮挡和溢出；截图本身不是视觉通过。
     method: manual

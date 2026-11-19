@@ -24,8 +24,9 @@ steps:
 - seed_storage:
     key: taomni.codeWorkspace.refactorOptions.v1
     value: '{"mode":"dialog"}'
-- click: '[data-testid="welcome-history-tab-workspaces"]'
-- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity007_root}"]'
+- click: '[data-testid="tao-home-history"]'
+- click: '[data-testid="tao-home-history-tab-workspaces"]'
+- click: '[data-testid="tao-home-history-row"][data-workspace-path="${fixture.parity007_root}"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
 - wait_for:
@@ -337,61 +338,61 @@ verification:
   - id: ED-PARITY-007-V3-05-refactor-this
     requirement: Refactor This keeps its generic candidate list (method plus variable) and selecting the method candidate joins the same naming chain as the direct chord.
     actions:
-    - 9
+    - 10
     checkpoints:
-    - step: 21
+    - step: 22
       expectation: The generic Refactor This menu lists exactly the two provider candidates.
-    - step: 24
+    - step: 25
       expectation: Selecting the method candidate committed B1 through the naming dialog.
-    - step: 32
+    - step: 33
       expectation: Undo after the unchanged-name path returns B0.
     results:
-    - 21
-    - 24
-    - 32
+    - 22
+    - 25
+    - 33
   - id: ED-PARITY-007-V3-05-alt-enter
     requirement: 'Alt+Enter keeps the generic code-action flow: the non-method candidate is still listed and Escape leaves the buffer untouched.'
     actions:
-    - 36
+    - 37
     checkpoints:
-    - step: 47
-      expectation: Exactly the variable candidate is listed; the method filter did not drop it.
     - step: 48
+      expectation: Exactly the variable candidate is listed; the method filter did not drop it.
+    - step: 49
       expectation: The variable candidate title is visible.
-    - step: 51
-      expectation: Escape leaves the buffer at B0.
     - step: 52
+      expectation: Escape leaves the buffer at B0.
+    - step: 53
       expectation: Alt+Enter issued one request and resolved nothing.
     results:
-    - 47
     - 48
-    - 51
+    - 49
     - 52
+    - 53
   - id: ED-PARITY-007-V3-05-preview
     requirement: A real multi-file method edit enters the shared preview; every extraction operation is a required edit, so Select None cannot deselect the declaration or the call site, Apply commits the
       complete extraction and its naming step, and a fresh Cancel leaves every file unchanged.
     actions:
-    - 53
+    - 54
     checkpoints:
-    - step: 69
-      expectation: The extraction changes are all selected before the exclusion attempt.
     - step: 70
+      expectation: The extraction changes are all selected before the exclusion attempt.
+    - step: 71
       expectation: The Apply label counts the required changes, so a broken partial apply cannot start.
-    - step: 72
-      expectation: After Select None the required declaration and call-site edits are still selected.
     - step: 73
+      expectation: After Select None the required declaration and call-site edits are still selected.
+    - step: 74
       expectation: The Apply label still counts the full edit after Select None (never 0).
-    - step: 76
+    - step: 77
       expectation: 'Apply commits the complete extraction: call site and new method in the same buffer.'
-    - step: 99
+    - step: 100
       expectation: A fresh preview cancelled with Cancel leaves the committed text unchanged.
     results:
-    - 69
     - 70
-    - 72
+    - 71
     - 73
-    - 76
-    - 99
+    - 74
+    - 77
+    - 100
   visual:
   - check: Preview dialog layout and the extraction entry labels.
     method: manual

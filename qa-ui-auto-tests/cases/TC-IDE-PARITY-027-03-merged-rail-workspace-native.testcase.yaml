@@ -30,8 +30,9 @@ steps:
       "looseFiles": [], "lastActiveFile": {"kind": "root", "rootId": "qa-ed027", "path": "notes.txt"}, "lastOpenedAt": 1756500000000, "isGitRepo": false}]'
 - reload_window: null
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="welcome-history-tab-workspaces"]'
-- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.workspace_root}"]'
+- click: '[data-testid="tao-home-history"]'
+- click: '[data-testid="tao-home-history-tab-workspaces"]'
+- click: '[data-testid="tao-home-history-row"][data-workspace-path="${fixture.workspace_root}"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - assert_attribute:
     selector: '[data-testid="nav-mode-workspaces"]'
@@ -119,103 +120,102 @@ verification:
     requirement: 打开Code Workspace进入Workspaces。Project窗口宽度保持180–500px且可隐藏/恢复，名称偏好可切换。展开侧栏、切换Home/Sessions、关闭旧合并设置和重载都只保留一条带IDE分组的左工具条，项目及会话分区隔离。
     actions:
     - 5
-    - 7
     - 8
-    - 17
-    - 19
-    - 21
+    - 9
+    - 18
+    - 20
     - 22
-    - 25
+    - 23
     - 26
-    - 33
-    - 35
-    - 39
-    - 42
-    - 44
+    - 27
+    - 34
+    - 36
+    - 40
+    - 43
     - 45
-    - 47
-    - 51
-    - 53
+    - 46
+    - 48
+    - 52
+    - 54
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
     - step: 6
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 9
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
     - step: 10
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"nav-mode-workspaces\"]", "name": "aria-pressed", "equals": "true"}}'
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
     - step: 11
-      expectation: '{"wait_for": "[data-testid=\"expanded-sidebar-panel\"]"}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"nav-mode-workspaces\"]", "name": "aria-pressed", "equals": "true"}}'
     - step: 12
-      expectation: '{"wait_for": "[data-testid=\"sidebar-tool-window-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"expanded-sidebar-panel\"]"}'
     - step: 13
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tab\"] [data-testid=\"code-workspace-tool-rail-left\"]", "equal": 0}}'
+      expectation: '{"wait_for": "[data-testid=\"sidebar-tool-window-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]"}'
     - step: 14
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tab\"] [data-testid=\"code-workspace-tool-rail-right\"]"}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tab\"] [data-testid=\"code-workspace-tool-rail-left\"]", "equal": 0}}'
     - step: 15
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tab\"] [data-testid=\"code-workspace-tool-rail-right\"]"}'
     - step: 16
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"]"}'
+    - step: 17
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"code-workspace-tree-pane\"]'').getBoundingClientRect().width
         >= 180 && document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"code-workspace-tree-pane\"]'').getBoundingClientRect().width < 500",
         "expect_truthy": true}}'
-    - step: 18
+    - step: 19
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-tree-pane\"]", "state": "hidden", "timeout_sec": 5}}'
-    - step: 20
+    - step: 21
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-pane\"]"}'
-    - step: 23
-      expectation: '{"wait_for": "[data-testid=\"sidebar-tool-window-rail\"] [data-testid=\"code-workspace-tool-rail-left\"][data-show-names=\"true\"]"}'
     - step: 24
+      expectation: '{"wait_for": "[data-testid=\"sidebar-tool-window-rail\"] [data-testid=\"code-workspace-tool-rail-left\"][data-show-names=\"true\"]"}'
+    - step: 25
       expectation: '{"assert_text_equals": {"selector": "[data-testid=\"sidebar-tool-window-rail\"] [data-testid=\"code-workspace-tool-rail-project\"]",
         "equals": "Project"}}'
-    - step: 27
+    - step: 28
       expectation: '{"assert_text_equals": {"selector": "[data-testid=\"sidebar-tool-window-rail\"] [data-testid=\"code-workspace-tool-rail-project\"]",
         "equals": ""}}'
-    - step: 29
+    - step: 30
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"sidebar-tool-window-rail\"] [data-testid=\"code-workspace-tool-rail-project\"]", "name":
         "aria-pressed", "equals": "true"}}'
-    - step: 30
-      expectation: '{"wait_for": "[data-testid=\"expanded-sidebar-panel\"]"}'
     - step: 31
-      expectation: '{"wait_for": "[data-testid=\"sidebar-tool-window-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"expanded-sidebar-panel\"]"}'
     - step: 32
+      expectation: '{"wait_for": "[data-testid=\"sidebar-tool-window-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]"}'
+    - step: 33
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tab\"] [data-testid=\"code-workspace-tool-rail-left\"]", "equal": 0}}'
-    - step: 34
+    - step: 35
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 36
-      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
     - step: 37
-      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-tab\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
     - step: 38
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 39
       expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"code-workspace\"]", "equal": 0}}'
-    - step: 40
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
     - step: 41
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 42
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"]"}'
-    - step: 43
+    - step: 44
       expectation: '{"wait_for": "[data-testid=\"settings-panel\"]"}'
-    - step: 46
+    - step: 47
       expectation: '{"assert_localstorage": {"key": "taomni.mergeToolWindowRail", "equals": "false"}}'
-    - step: 48
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
     - step: 49
-      expectation: '{"wait_for": "[data-testid=\"sidebar-tool-window-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]"}'
-    - step: 50
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tab\"] [data-testid=\"code-workspace-tool-rail-left\"]", "equal": 0}}'
-    - step: 52
-      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 54
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
-    - step: 55
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"]"}'
-    - step: 56
+    - step: 50
       expectation: '{"wait_for": "[data-testid=\"sidebar-tool-window-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]"}'
+    - step: 51
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tab\"] [data-testid=\"code-workspace-tool-rail-left\"]", "equal": 0}}'
+    - step: 53
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 55
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 56
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"]"}'
     - step: 57
+      expectation: '{"wait_for": "[data-testid=\"sidebar-tool-window-rail\"] [data-testid=\"code-workspace-tool-rail-left\"]"}'
+    - step: 58
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tab\"] [data-testid=\"code-workspace-tool-rail-left\"]", "equal": 0}}'
     results:
     - 3
     - 6
-    - 9
     - 10
     - 11
     - 12
@@ -223,31 +223,32 @@ verification:
     - 14
     - 15
     - 16
-    - 18
-    - 20
-    - 23
+    - 17
+    - 19
+    - 21
     - 24
-    - 27
-    - 29
+    - 25
+    - 28
     - 30
     - 31
     - 32
-    - 34
-    - 36
+    - 33
+    - 35
     - 37
     - 38
-    - 40
+    - 39
     - 41
-    - 43
-    - 46
-    - 48
+    - 42
+    - 44
+    - 47
     - 49
     - 50
-    - 52
-    - 54
+    - 51
+    - 53
     - 55
     - 56
     - 57
+    - 58
   visual:
   - check: Single grouped left rail, readable icons and pixel-stable Project panel.
     method: manual

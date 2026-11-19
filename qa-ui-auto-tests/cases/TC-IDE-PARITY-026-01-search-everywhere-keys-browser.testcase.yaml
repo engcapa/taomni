@@ -15,6 +15,10 @@ fixtures:
 timeout_sec: 240
 steps:
 - open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.fileOpen.preferences.v1
+    value: '{"associations":{"md":"workspace","txt":"workspace","json":"workspace"}}'
+- reload_window: null
 - wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="side-tab-tools"]:visible'
 - click: '[data-testid="sidebar-tool-code-workspace"]'
@@ -136,120 +140,120 @@ verification:
   - id: R1
     requirement: A1：Ctrl+Shift+N 打开 Search Everywhere（Files）；Alt+Right/Alt+Left（macOS Ctrl+Right/Ctrl+Left、Cmd+Shift+]）按 IDEA NextTab/PreviousTab 在 All/Classes/Files/Symbols/Actions/Text 间切换；普通左右箭头只移动输入框光标，不切换页签。
     actions:
-    - 13
-    - 16
+    - 15
     - 18
     - 20
     - 22
     - 24
+    - 26
     checkpoints:
-    - step: 14
+    - step: 16
       expectation: '{"wait_for": "[data-testid=\"code-workspace-search-everywhere\"] input[aria-label=\"Go to file\"]"}'
-    - step: 15
-      expectation: '{"wait_for": {"selector": "[data-testid=\"search-everywhere-tab-files\"][aria-selected=\"true\"]", "timeout_sec": 15}}'
     - step: 17
-      expectation: '{"wait_for": {"selector": "[data-testid=\"search-everywhere-tab-symbols\"][aria-selected=\"true\"]", "timeout_sec": 15}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"search-everywhere-tab-files\"][aria-selected=\"true\"]", "timeout_sec": 15}}'
     - step: 19
-      expectation: '{"wait_for": {"selector": "[data-testid=\"search-everywhere-tab-files\"][aria-selected=\"true\"]", "timeout_sec": 15}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"search-everywhere-tab-symbols\"][aria-selected=\"true\"]", "timeout_sec": 15}}'
     - step: 21
-      expectation: '{"wait_for": {"selector": "[data-testid=\"search-everywhere-tab-classes\"][aria-selected=\"true\"]", "timeout_sec": 15}}'
-    - step: 23
       expectation: '{"wait_for": {"selector": "[data-testid=\"search-everywhere-tab-files\"][aria-selected=\"true\"]", "timeout_sec": 15}}'
+    - step: 23
+      expectation: '{"wait_for": {"selector": "[data-testid=\"search-everywhere-tab-classes\"][aria-selected=\"true\"]", "timeout_sec": 15}}'
     - step: 25
       expectation: '{"wait_for": {"selector": "[data-testid=\"search-everywhere-tab-files\"][aria-selected=\"true\"]", "timeout_sec": 15}}'
+    - step: 27
+      expectation: '{"wait_for": {"selector": "[data-testid=\"search-everywhere-tab-files\"][aria-selected=\"true\"]", "timeout_sec": 15}}'
     results:
-    - 14
-    - 15
+    - 16
     - 17
     - 19
     - 21
     - 23
     - 25
+    - 27
   - id: R2
     requirement: A1：Ctrl+Tab / Ctrl+Shift+Tab（IDEA Switcher）与 Tab / Shift+Tab（SearchEverywhere.NextTab/PrevTab）切换页签。
     actions:
-    - 27
     - 29
     - 31
     - 33
+    - 35
     checkpoints:
-    - step: 28
-      expectation: '{"wait_for": {"selector": "[data-testid=\"search-everywhere-tab-symbols\"][aria-selected=\"true\"]", "timeout_sec": 15}}'
     - step: 30
-      expectation: '{"wait_for": {"selector": "[data-testid=\"search-everywhere-tab-files\"][aria-selected=\"true\"]", "timeout_sec": 15}}'
-    - step: 32
       expectation: '{"wait_for": {"selector": "[data-testid=\"search-everywhere-tab-symbols\"][aria-selected=\"true\"]", "timeout_sec": 15}}'
+    - step: 32
+      expectation: '{"wait_for": {"selector": "[data-testid=\"search-everywhere-tab-files\"][aria-selected=\"true\"]", "timeout_sec": 15}}'
     - step: 34
+      expectation: '{"wait_for": {"selector": "[data-testid=\"search-everywhere-tab-symbols\"][aria-selected=\"true\"]", "timeout_sec": 15}}'
+    - step: 36
       expectation: '{"wait_for": {"selector": "[data-testid=\"search-everywhere-tab-files\"][aria-selected=\"true\"]", "timeout_sec": 15}}'
     results:
-    - 28
     - 30
     - 32
     - 34
+    - 36
   - id: R3
     requirement: A1：Tab 依次切到 Symbols、Actions；在多行的 Actions 结果中 PageDown/Ctrl+Down 选中最后一个结果，PageUp/Ctrl+Up 回到第一个（IDEA NavigateToNextGroup/PrevGroup）。
     actions:
-    - 35
     - 37
-    - 42
+    - 39
     - 44
     - 46
     - 48
+    - 50
     checkpoints:
-    - step: 36
-      expectation: '{"wait_for": {"selector": "[data-testid=\"search-everywhere-tab-symbols\"][aria-selected=\"true\"]", "timeout_sec": 15}}'
     - step: 38
-      expectation: '{"wait_for": {"selector": "[data-testid=\"search-everywhere-tab-actions\"][aria-selected=\"true\"]", "timeout_sec": 15}}'
-    - step: 39
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-search-everywhere\"] [data-index=\"1\"]"}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"search-everywhere-tab-symbols\"][aria-selected=\"true\"]", "timeout_sec": 15}}'
     - step: 40
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-search-everywhere\"] [data-index]'').length > 1", "expect_truthy": true}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"search-everywhere-tab-actions\"][aria-selected=\"true\"]", "timeout_sec": 15}}'
     - step: 41
-      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-search-everywhere\"] [data-index]'')[0].getAttribute(''data-selected'') === ''true''", "expect_truthy": true}}'
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-search-everywhere\"] [data-index=\"1\"]"}'
+    - step: 42
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-search-everywhere\"] [data-index]'').length > 1", "expect_truthy": true}}'
     - step: 43
-      expectation: '{"eval_readonly": {"expression": "Array.from(document.querySelectorAll(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-search-everywhere\"] [data-index]'')).at(-1).getAttribute(''data-selected'') === ''true''", "expect_truthy": true}}'
-    - step: 45
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-search-everywhere\"] [data-index]'')[0].getAttribute(''data-selected'') === ''true''", "expect_truthy": true}}'
-    - step: 47
+    - step: 45
       expectation: '{"eval_readonly": {"expression": "Array.from(document.querySelectorAll(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-search-everywhere\"] [data-index]'')).at(-1).getAttribute(''data-selected'') === ''true''", "expect_truthy": true}}'
+    - step: 47
+      expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-search-everywhere\"] [data-index]'')[0].getAttribute(''data-selected'') === ''true''", "expect_truthy": true}}'
     - step: 49
+      expectation: '{"eval_readonly": {"expression": "Array.from(document.querySelectorAll(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-search-everywhere\"] [data-index]'')).at(-1).getAttribute(''data-selected'') === ''true''", "expect_truthy": true}}'
+    - step: 51
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-search-everywhere\"] [data-index]'')[0].getAttribute(''data-selected'') === ''true''", "expect_truthy": true}}'
     results:
-    - 36
     - 38
-    - 39
     - 40
     - 41
+    - 42
     - 43
     - 45
     - 47
     - 49
+    - 51
   - id: R4
     requirement: A1：输入查询后 Esc 关闭，再用 Ctrl+N 打开时查询为空（无符号提供方时 Go to Class 回落到 Files 页签）（修复 013-04 macOS 重开保留旧查询）。
     actions:
-    - 50
     - 52
     - 54
+    - 56
     checkpoints:
-    - step: 51
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-search-everywhere\"] input[aria-label=\"Search actions\"]", "name": "value", "equals": "zzqq"}}'
     - step: 53
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "state": "detached", "timeout_sec": 5}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-search-everywhere\"] input[aria-label=\"Search actions\"]", "name": "value", "equals": "zzqq"}}'
     - step: 55
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-search-everywhere\"]"}'
-    - step: 56
-      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-search-everywhere\"] input'').value === ''''", "expect_truthy": true}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "state": "detached", "timeout_sec": 5}}'
     - step: 57
-      expectation: '{"wait_for": {"selector": "[data-testid=\"search-everywhere-tab-files\"][aria-selected=\"true\"]", "timeout_sec": 15}}'
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-search-everywhere\"]"}'
     - step: 58
+      expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid'' + String.fromCharCode(61) + ''\"code-workspace-search-everywhere\"] input'').value === ''''", "expect_truthy": true}}'
+    - step: 59
+      expectation: '{"wait_for": {"selector": "[data-testid=\"search-everywhere-tab-files\"][aria-selected=\"true\"]", "timeout_sec": 15}}'
+    - step: 60
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-search-everywhere\"] input[aria-label=\"Go to file\"]"}'
     results:
-    - 51
     - 53
     - 55
-    - 56
     - 57
     - 58
+    - 59
+    - 60
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

@@ -30,6 +30,10 @@ fixtures:
 timeout_sec: 300
 steps:
 - open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.fileOpen.preferences.v1
+    value: '{"associations":{"md":"workspace","txt":"workspace","json":"workspace"}}'
+- reload_window: null
 - wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="side-tab-tools"]'
 - wait_for: '[data-testid="sidebar-tools-panel"]'
@@ -167,48 +171,48 @@ verification:
   requirements:
   - id: R1
     requirement: "A1.4 DEC-03：录制并确认后的草稿不写任何存储，关闭对话框零写入，live 仍按旧 chord 派发。"
-    actions: [26, 27, 28]
+    actions: [28, 29, 30]
     checkpoints:
-    - step: 29
+    - step: 31
       expectation: "{\"assert_pattern\": {\"selector\": \"[data-testid=\\\"keymap-row-editor.replace\\\"]\", \"regex\": \"(Alt|Option)[+]Shift[+]R\"}}"
-    - step: 30
+    - step: 32
       expectation: "{\"assert_localstorage\": {\"key\": \"taomni.codeWorkspace.keymap.v3:index\", \"exists\": false}}"
-    - step: 36
+    - step: 38
       expectation: "{\"assert_visible\": \"[data-testid=\\\"code-workspace-editor-search\\\"]\"}"
-    results: [30, 36]
+    results: [32, 38]
   - id: R2
     requirement: "A1.4/A1.5 S3：Apply 是唯一提交边界；Apply 后新 chord 真的执行 Replace，旧 chord 仍执行 Replace（ED-PARITY-013 DEC-013-12：Add 按 IDEA 追加而非替换继承的 Ctrl+R），重复按下不重复派发。"
-    actions: [53]
+    actions: [55]
     checkpoints:
-    - step: 54
+    - step: 56
       expectation: "{\"assert_disabled\": \"[data-testid=\\\"keymap-settings-apply\\\"]\"}"
-    - step: 55
+    - step: 57
       expectation: "{\"assert_localstorage\": {\"key\": \"taomni.codeWorkspace.keymap.v3:index\", \"contains\": \"Alt+Shift+R\"}}"
-    - step: 60
+    - step: 62
       expectation: "{\"assert_visible\": \"[data-testid=\\\"code-workspace-editor-search\\\"]\"}"
-    - step: 65
+    - step: 67
       expectation: "{\"assert_visible\": \"[data-testid=\\\"code-workspace-editor-search\\\"]\"}"
-    - step: 68
+    - step: 70
       expectation: "{\"assert_visible\": \"[data-testid=\\\"code-workspace-editor-search\\\"]\"}"
-    results: [55, 60, 65, 68]
+    results: [57, 62, 67, 70]
   - id: R3
     requirement: "A1.5 S3c：重开设置对话框读到 Apply 后的有效配置。"
-    actions: [78]
+    actions: [80]
     checkpoints:
-    - step: 81
+    - step: 83
       expectation: "{\"assert_pattern\": {\"selector\": \"[data-testid=\\\"keymap-row-editor.replace\\\"]\", \"regex\": \"(Alt|Option)[+]Shift[+]R\"}}"
-    results: [81]
+    results: [83]
   - id: R4
     requirement: "A1.2 S5：改键后不 Apply 直接 Esc 关闭，live 有效绑定仍按已生效的 Alt+Shift+R 工作。"
-    actions: [85]
+    actions: [87]
     checkpoints:
-    - step: 85
+    - step: 87
       expectation: "{\"assert_enabled\": \"[data-testid=\\\"keymap-settings-apply\\\"]\"}"
-    - step: 88
+    - step: 90
       expectation: "{\"wait_for\": {\"selector\": \"[data-testid=\\\"workspace-keymap-settings-dialog\\\"]\", \"state\": \"detached\", \"timeout_sec\": 5}}"
-    - step: 91
+    - step: 93
       expectation: "{\"assert_visible\": \"[data-testid=\\\"code-workspace-editor-search\\\"]\"}"
-    results: [91]
+    results: [93]
   visual:
   - check: 草稿态与 Apply 后的动作行 swatch、底部 OK/Cancel/Apply 三按钮（Apply 禁用态）布局无截断；
       720px 对话框内动作标题与 swatch 不互相遮挡。

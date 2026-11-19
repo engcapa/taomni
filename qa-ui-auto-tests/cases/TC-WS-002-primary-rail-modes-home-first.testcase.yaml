@@ -37,9 +37,7 @@ steps:
 - wait_for: '[data-testid="collapsed-sidebar-rail"]'
 - assert_visible: '[data-testid="welcome-panel"]'
 - assert_visible: '[data-testid="tao-home-local-terminal"]'
-- assert_text:
-    selector: '[data-testid="welcome-panel"]'
-    contains: 本地终端
+- assert_visible: '[data-testid="welcome-panel"] [data-testid="tao-home-local-terminal"]'
 - click: '[data-testid="nav-mode-workspaces"]'
 - wait_for: '[data-testid="workspace-switcher"]'
 - click: '[data-testid="side-tab-sessions"]'
@@ -87,7 +85,7 @@ verification:
     - step: 14
       expectation: '{"assert_visible": "[data-testid=\"tao-home-local-terminal\"]"}'
     - step: 15
-      expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]", "contains": "本地终端"}}'
+      expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"] [data-testid=\"tao-home-local-terminal\"]"}'
     - step: 17
       expectation: '{"wait_for": "[data-testid=\"workspace-switcher\"]"}'
     - step: 19

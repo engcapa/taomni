@@ -19,6 +19,10 @@ fixtures:
 timeout_sec: 240
 steps:
 - open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.fileOpen.preferences.v1
+    value: '{"associations":{"md":"workspace","txt":"workspace","json":"workspace"}}'
+- reload_window: null
 - wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="side-tab-tools"]:visible'
 - click: '[data-testid="sidebar-tool-code-workspace"]'
@@ -70,28 +74,28 @@ verification:
   - id: R1
     requirement: A3：编辑产生 dirty 后切换 Problems/Search、隐藏/恢复全部工具窗、恢复默认布局，编辑器文本与 dirty 标记保留，只有一个 editor view。
     actions:
-    - 14
     - 16
     - 18
-    - 21
+    - 20
     - 23
     - 25
+    - 27
     checkpoints:
-    - step: 15
+    - step: 17
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-editor-tab-strip\"] [data-dirty=\"true\"]", "name": "data-dirty", "equals": "true"}}'
-    - step: 24
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-dock\"][data-open]", "timeout_sec": 10}}'
     - step: 26
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "contains": "zz010"}}'
-    - step: 27
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-tab-strip\"] [data-dirty=\"true\"]", "equal": 1}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-dock\"][data-open]", "timeout_sec": 10}}'
     - step: 28
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "contains": "zz010"}}'
+    - step: 29
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor-tab-strip\"] [data-dirty=\"true\"]", "equal": 1}}'
+    - step: 30
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "equal": 1}}'
     results:
-    - 24
     - 26
-    - 27
     - 28
+    - 29
+    - 30
   visual:
   - check: rail 图标/标签截断与选中蓝底需人工对照 IDEA idea-01-shell。
     method: manual

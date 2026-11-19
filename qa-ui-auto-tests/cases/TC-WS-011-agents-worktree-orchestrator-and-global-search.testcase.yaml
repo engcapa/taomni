@@ -19,6 +19,7 @@ steps:
 - vault_first_run: qa-ws-011
 - wait_for: '[data-testid="welcome-panel"]'
 - assert_not_visible: '[data-testid="nav-mode-agents"]'
+- click: '[data-testid="tao-home-dock-more"]'
 - click: '[data-testid="home-open-agents"]'
 - wait_for: '[data-testid="alert-dialog-message"]'
 - assert_text:
@@ -27,6 +28,7 @@ steps:
 - click: '[data-testid="alert-dialog-ok"]'
 - assert_visible: '[data-testid="welcome-panel"]'
 - click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="tao-home-dock-more"]'
 - click: '[data-testid="home-open-agents"]'
 - wait_for: '[data-testid="alert-dialog-message"]'
 - click: '[data-testid="alert-dialog-ok"]'
@@ -65,74 +67,74 @@ verification:
     requirement: Home Crew and command-palette Agents display the development notice and preserve the canvas; global search can still activate workspaces
       and tools.
     actions:
-    - 5
-    - 8
-    - 10
+    - 6
+    - 9
     - 11
     - 13
     - 15
     - 17
-    - 18
+    - 19
     - 20
     - 22
     - 24
     - 26
     - 28
-    - 31
+    - 30
     - 33
+    - 35
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
     - step: 4
       expectation: '{"assert_not_visible": "[data-testid=\"nav-mode-agents\"]"}'
-    - step: 6
-      expectation: '{"wait_for": "[data-testid=\"alert-dialog-message\"]"}'
     - step: 7
+      expectation: '{"wait_for": "[data-testid=\"alert-dialog-message\"]"}'
+    - step: 8
       expectation: '{"assert_text": {"selector": "[data-testid=\"alert-dialog-message\"]", "contains": "under development"}}'
-    - step: 9
+    - step: 10
       expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"]"}'
-    - step: 12
-      expectation: '{"wait_for": "[data-testid=\"alert-dialog-message\"]"}'
     - step: 14
-      expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"]"}'
-    - step: 16
-      expectation: '{"wait_for": "[data-testid=\"global-search-modal\"]"}'
-    - step: 19
       expectation: '{"wait_for": "[data-testid=\"alert-dialog-message\"]"}'
+    - step: 16
+      expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"]"}'
+    - step: 18
+      expectation: '{"wait_for": "[data-testid=\"global-search-modal\"]"}'
     - step: 21
-      expectation: '{"assert_not_visible": "[data-testid=\"alert-dialog-message\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"alert-dialog-message\"]"}'
     - step: 23
-      expectation: '{"wait_for": "[data-testid=\"global-search-modal\"]"}'
+      expectation: '{"assert_not_visible": "[data-testid=\"alert-dialog-message\"]"}'
     - step: 25
-      expectation: '{"wait_for": "[data-testid=\"global-search-result\"][data-result-id=\"floating-mfa\"]"}'
-    - step: 27
-      expectation: '{"wait_for": "[data-testid=\"global-search-result\"][data-kind=\"workspace\"]"}'
-    - step: 29
-      expectation: '{"wait_for": "[data-testid=\"workspace-switcher\"]"}'
-    - step: 30
-      expectation: '{"assert_not_visible": "[data-testid=\"global-search-modal\"]"}'
-    - step: 32
       expectation: '{"wait_for": "[data-testid=\"global-search-modal\"]"}'
+    - step: 27
+      expectation: '{"wait_for": "[data-testid=\"global-search-result\"][data-result-id=\"floating-mfa\"]"}'
+    - step: 29
+      expectation: '{"wait_for": "[data-testid=\"global-search-result\"][data-kind=\"workspace\"]"}'
+    - step: 31
+      expectation: '{"wait_for": "[data-testid=\"workspace-switcher\"]"}'
+    - step: 32
+      expectation: '{"assert_not_visible": "[data-testid=\"global-search-modal\"]"}'
     - step: 34
+      expectation: '{"wait_for": "[data-testid=\"global-search-modal\"]"}'
+    - step: 36
       expectation: '{"assert_not_visible": "[data-testid=\"global-search-modal\"]"}'
     results:
     - 3
     - 4
-    - 6
     - 7
-    - 9
-    - 12
+    - 8
+    - 10
     - 14
     - 16
-    - 19
+    - 18
     - 21
     - 23
     - 25
     - 27
     - 29
-    - 30
+    - 31
     - 32
     - 34
+    - 36
   visual:
   - check: Compact controls retain readable icons and active states without toolbar overlap.
     method: manual

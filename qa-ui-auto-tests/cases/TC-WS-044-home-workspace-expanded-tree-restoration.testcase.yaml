@@ -23,6 +23,10 @@ timeout_sec: 240
 steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-ws-restored-tree
+- seed_storage:
+    key: taomni.fileOpen.preferences.v1
+    value: '{"associations":{"md":"workspace","txt":"workspace","json":"workspace"}}'
+- reload_window: null
 - click: '[data-testid="nav-mode-workspaces"]'
 - click: '[data-testid="workspace-create-button"]'
 - fill:
@@ -87,59 +91,59 @@ verification:
     requirement: Restored expanded document and nested source directories load their real entries when selected from Home; tree and list preserve expansion
       and the selected file.
     actions:
-    - 3
-    - 4
     - 5
     - 6
     - 7
     - 8
     - 9
     - 10
+    - 11
     - 12
     - 14
     - 16
     - 18
     - 20
-    - 21
+    - 22
     - 23
-    - 24
     - 25
+    - 26
     - 27
-    - 28
-    - 35
-    - 36
+    - 29
+    - 30
     - 37
     - 38
-    - 42
+    - 39
+    - 40
+    - 44
     results:
-    - 30
-    - 31
     - 32
     - 33
     - 34
-    - 40
-    - 41
+    - 35
+    - 36
+    - 42
     - 43
-    - 44
+    - 45
+    - 46
     checkpoints:
-    - step: 30
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-file\"][data-path=\"src/index.ts\"]"}'
-    - step: 31
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-dir\"][data-path=\"src/main/java\"]"}'
     - step: 32
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-file\"][data-path=\"src/index.ts\"]"}'
+    - step: 33
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-dir\"][data-path=\"src/main/java\"]"}'
+    - step: 34
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tree-dir\"][data-path=\"src/main\"]", "name": "aria-expanded", "equals":
         "true"}}'
-    - step: 33
+    - step: 35
       expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"]", "contains": "Weekly notes"}}'
-    - step: 34
+    - step: 36
       expectation: '{"assert_no_runtime_errors": null}'
-    - step: 40
+    - step: 42
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-dir\"][data-path=\"src/main/java\"]"}'
-    - step: 41
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tree\"]", "name": "data-view-mode", "equals": "list"}}'
     - step: 43
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tree\"]", "name": "data-view-mode", "equals": "list"}}'
+    - step: 45
       expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"]", "contains": "export const platform = \"workspace\""}}'
-    - step: 44
+    - step: 46
       expectation: '{"assert_no_runtime_errors": null}'
   visual:
   - check: Restored expanded rows show their children in the retained tree/list screenshot.

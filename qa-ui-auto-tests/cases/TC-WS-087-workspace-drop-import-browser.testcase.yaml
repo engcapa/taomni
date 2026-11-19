@@ -20,6 +20,9 @@ steps:
 - seed_storage:
     key: taomni.platformWorkspaces.v1
     value: ${fixture.workspace_drop_workspace}
+- seed_storage:
+    key: taomni.fileOpen.preferences.v1
+    value: '{"associations":{"md":"workspace","txt":"workspace","json":"workspace"}}'
 - reload_window: null
 - click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="session-tree"]'
@@ -205,74 +208,74 @@ verification:
   requirements:
   - id: R0
     requirement: Isolated setup mounts exactly root1/root2 with explicit path and kind metadata and a clean external-source baseline before dragging.
-    actions: [1, 2, 4, 5, 6, 8, 10, 11, 17]
+    actions: [1, 2, 4, 6, 7, 9, 11, 12, 18]
     checkpoints:
-    - {step: 12, expectation: Exactly two production Project roots are mounted.}
-    - {step: 13, expectation: Root1 identity and kind resolve to its isolated fixture path.}
-    - {step: 14, expectation: Root2 identity and kind resolve to its separate fixture path.}
-    - {step: 15, expectation: Root1 has its own incoming directory.}
-    - {step: 16, expectation: Root2 has an independent same-named incoming directory.}
-    - {step: 18, expectation: Every source and target byte and directory matches the initial independent fixture manifest.}
-    results: [12, 13, 14, 15, 16, 18]
+    - {step: 13, expectation: Exactly two production Project roots are mounted.}
+    - {step: 14, expectation: Root1 identity and kind resolve to its isolated fixture path.}
+    - {step: 15, expectation: Root2 identity and kind resolve to its separate fixture path.}
+    - {step: 16, expectation: Root1 has its own incoming directory.}
+    - {step: 17, expectation: Root2 has an independent same-named incoming directory.}
+    - {step: 19, expectation: Every source and target byte and directory matches the initial independent fixture manifest.}
+    results: [13, 14, 15, 16, 17, 19]
   - id: R1
     requirement: Hover transfers between the selected root1 and root2 directory, and leave clears the highlight without changing any bytes.
-    actions: [19, 21, 25]
+    actions: [20, 22, 26]
     checkpoints:
-    - {step: 20, expectation: Root1 enter highlights the real production root row.}
-    - {step: 22, expectation: Over resolves incoming by root2 identity and highlights that row.}
-    - {step: 23, expectation: The previous root1 highlight is removed.}
-    - {step: 26, expectation: Leave removes every drop target attribute.}
-    - {step: 27, expectation: Exact VFS source and both roots remain at their seeded bytes and directory sets.}
-    results: [20, 22, 23, 26, 27]
+    - {step: 21, expectation: Root1 enter highlights the real production root row.}
+    - {step: 23, expectation: Over resolves incoming by root2 identity and highlights that row.}
+    - {step: 24, expectation: The previous root1 highlight is removed.}
+    - {step: 27, expectation: Leave removes every drop target attribute.}
+    - {step: 28, expectation: Exact VFS source and both roots remain at their seeded bytes and directory sets.}
+    results: [21, 23, 24, 27, 28]
   - id: R2
     requirement: Multiple external files and a recursive directory copy into root2 incoming regardless of root1 selection; Chinese/spaces, binary and empty directories survive and files open with exact content.
-    actions: [17, 28, 29, 31, 38, 41, 43, 45]
+    actions: [18, 29, 30, 32, 39, 42, 44, 46]
     checkpoints:
-    - {step: 32, expectation: Completion reports three imported top-level items into drop-root-two / incoming.}
-    - {step: 33, expectation: Drop clears all hover highlights.}
-    - {step: 34, expectation: Chinese/space file appears in root2 incoming.}
-    - {step: 35, expectation: The second independent file appears in root2 incoming.}
-    - {step: 36, expectation: The recursive directory is refreshed in root2.}
-    - {step: 37, expectation: Complete VFS hashes and directories match the copy manifest; root1 and every source byte are unchanged.}
-    - {step: 40, expectation: Chinese file opens with all exact lines and trailing newline.}
-    - {step: 42, expectation: The nested empty directory appears as a directory.}
-    - {step: 44, expectation: Nested binary file appears.}
-    - {step: 47, expectation: Recursive text file opens with every exact line.}
-    results: [32, 33, 34, 35, 36, 37, 40, 42, 44, 47]
+    - {step: 33, expectation: Completion reports three imported top-level items into drop-root-two / incoming.}
+    - {step: 34, expectation: Drop clears all hover highlights.}
+    - {step: 35, expectation: Chinese/space file appears in root2 incoming.}
+    - {step: 36, expectation: The second independent file appears in root2 incoming.}
+    - {step: 37, expectation: The recursive directory is refreshed in root2.}
+    - {step: 38, expectation: Complete VFS hashes and directories match the copy manifest; root1 and every source byte are unchanged.}
+    - {step: 41, expectation: Chinese file opens with all exact lines and trailing newline.}
+    - {step: 43, expectation: The nested empty directory appears as a directory.}
+    - {step: 45, expectation: Nested binary file appears.}
+    - {step: 48, expectation: Recursive text file opens with every exact line.}
+    results: [33, 34, 35, 36, 37, 38, 41, 43, 45, 48]
   - id: R3
     requirement: A conflicting import reports Path already exists, preserves distinct target/source bytes, and a subsequent fresh-file import succeeds.
-    actions: [48, 49, 53, 56, 57]
+    actions: [49, 50, 54, 57, 58]
     checkpoints:
-    - {step: 50, expectation: Failure feedback contains Path already exists.}
-    - {step: 51, expectation: Failure leaves no hover highlight.}
-    - {step: 52, expectation: All original target and source SHA256 values and directory sets remain unchanged after rejection.}
-    - {step: 55, expectation: Opening the collision target still shows its exact original lines.}
-    - {step: 58, expectation: A fresh import after failure reports one completed item.}
-    - {step: 59, expectation: Recovery file is refreshed in root2 incoming.}
-    - {step: 60, expectation: Complete VFS snapshot includes only the intended fresh copy with source and root1 preserved.}
-    results: [50, 51, 52, 55, 58, 59, 60]
+    - {step: 51, expectation: Failure feedback contains Path already exists.}
+    - {step: 52, expectation: Failure leaves no hover highlight.}
+    - {step: 53, expectation: All original target and source SHA256 values and directory sets remain unchanged after rejection.}
+    - {step: 56, expectation: Opening the collision target still shows its exact original lines.}
+    - {step: 59, expectation: A fresh import after failure reports one completed item.}
+    - {step: 60, expectation: Recovery file is refreshed in root2 incoming.}
+    - {step: 61, expectation: Complete VFS snapshot includes only the intended fresh copy with source and root1 preserved.}
+    results: [51, 52, 53, 56, 59, 60, 61]
   - id: R4
     requirement: Dropping onto the root2 root uses its empty relative directory, not the selected root1 directory.
-    actions: [61, 62, 64]
+    actions: [62, 63, 65]
     checkpoints:
-    - {step: 63, expectation: Root2 itself is highlighted.}
-    - {step: 65, expectation: Completion names drop-root-two / . as destination.}
-    - {step: 66, expectation: The file appears directly below root2.}
-    - {step: 67, expectation: The complete VFS snapshot places the file only at root2/root file.txt.}
-    results: [63, 65, 66, 67]
+    - {step: 64, expectation: Root2 itself is highlighted.}
+    - {step: 66, expectation: Completion names drop-root-two / . as destination.}
+    - {step: 67, expectation: The file appears directly below root2.}
+    - {step: 68, expectation: The complete VFS snapshot places the file only at root2/root file.txt.}
+    results: [64, 66, 67, 68]
   - id: R5
     requirement: File-row and genuinely blank Project-tree drops neither highlight nor import; content, both roots and runtime remain usable.
-    actions: [68, 69, 71, 74, 75, 77]
+    actions: [69, 70, 72, 75, 76, 78]
     checkpoints:
-    - {step: 70, expectation: A file row is not a highlighted target.}
-    - {step: 72, expectation: Exact hashes and directories remain unchanged over a 500ms quiet observation after the file drop.}
-    - {step: 73, expectation: Completion status is not replaced by another import.}
-    - {step: 76, expectation: Blank tree space has no highlighted row.}
-    - {step: 78, expectation: Complete source/root snapshots remain unchanged over 500ms after the blank-space drop.}
-    - {step: 79, expectation: Blank drop leaves prior completion feedback unchanged.}
-    - {step: 80, expectation: Both workspace roots remain mounted.}
-    - {step: 81, expectation: No uncaught runtime error or crash fallback occurred.}
-    results: [70, 72, 73, 76, 78, 79, 80, 81]
+    - {step: 71, expectation: A file row is not a highlighted target.}
+    - {step: 73, expectation: Exact hashes and directories remain unchanged over a 500ms quiet observation after the file drop.}
+    - {step: 74, expectation: Completion status is not replaced by another import.}
+    - {step: 77, expectation: Blank tree space has no highlighted row.}
+    - {step: 79, expectation: Complete source/root snapshots remain unchanged over 500ms after the blank-space drop.}
+    - {step: 80, expectation: Blank drop leaves prior completion feedback unchanged.}
+    - {step: 81, expectation: Both workspace roots remain mounted.}
+    - {step: 82, expectation: No uncaught runtime error or crash fallback occurred.}
+    results: [71, 73, 74, 77, 79, 80, 81, 82]
   visual:
   - check: Highlight visibility, target contrast and tree indentation with Chinese/space paths.
     method: manual

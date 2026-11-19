@@ -3672,7 +3672,7 @@
 - `[data-testid="tao-home-history-tab-sessions"]` — interactive — F1.11.tao-home-history-tab-sessions
 - `[data-testid="tao-home-history-tab-workspaces"]` — interactive — F1.11.tao-home-history-tab-workspaces
 - `[data-testid="tao-home-history-tab-directories"]` — interactive — F1.11.tao-home-history-tab-directories
-- `.tao-home-history-search input` — interactive — F1.11.tao-home-history-search
+- `[data-testid="tao-home-history-search"]` — interactive — F1.11.tao-home-history-search
 - `[data-testid="tao-home-local-terminal"]` — interactive — F1.11.tao-home-local-terminal
 - `[data-testid="tao-home-wsl"]` — display [optional] — F1.11.tao-home-wsl
 - `[data-testid="tao-home-new-session"]` — interactive — F1.11.tao-home-new-session
@@ -3689,6 +3689,7 @@
 - `[data-testid="tao-home-plus"]` — interactive — F1.11.tao-home-plus
 - `[data-testid="tao-home-voice"]` — interactive — F1.11.tao-home-voice
 - `[data-testid="tao-home-shell-menu"]` — interactive — F1.11.tao-home-shell-menu
+- `[data-testid="tao-home-shell-admin"]` — interactive — F1.11.tao-home-shell-admin
 - `[data-testid="tao-home-shell-options"]` — interactive — F1.11.tao-home-shell-options
 - `[data-testid="tao-home-history-sort"]` — interactive — F1.11.tao-home-history-sort
 - `[data-testid="tao-home-history-sort-options"]` — display — F1.11.tao-home-history-sort-options

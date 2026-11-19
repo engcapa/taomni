@@ -19,6 +19,10 @@ fixtures:
 timeout_sec: 240
 steps:
 - open: ${cfg.app.base_url}
+- seed_storage:
+    key: taomni.fileOpen.preferences.v1
+    value: '{"associations":{"md":"workspace","txt":"workspace","json":"workspace"}}'
+- reload_window: null
 - wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="side-tab-tools"]:visible'
 - click: '[data-testid="sidebar-tool-code-workspace"]'
@@ -94,79 +98,79 @@ verification:
   - id: R1
     requirement: A1/A4：主工具栏不再平铺分屏/缩放等次要控件，⋮ 菜单承载它们并可 Esc 关闭；保留搜索入口。
     actions:
-    - 15
-    - 19
-    - 22
+    - 17
+    - 21
+    - 24
     checkpoints:
-    - step: 13
+    - step: 15
       expectation: '{"assert_count": {"selector": "header [data-testid=\"code-workspace-split-right\"]", "equal": 0}}'
-    - step: 14
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-toolbar-search\"]"}'
     - step: 16
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-toolbar-search\"]"}'
+    - step: 18
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "timeout_sec": 30}}'
-    - step: 20
+    - step: 22
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-toolbar-more-menu\"] [data-testid=\"code-workspace-split-right\"]"}'
-    - step: 21
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-toolbar-more-menu\"] [data-testid=\"code-workspace-zoom-reset\"]"}'
     - step: 23
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-toolbar-more-menu\"] [data-testid=\"code-workspace-zoom-reset\"]"}'
+    - step: 25
       expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-toolbar-more-menu\"]"}'
     results:
-    - 13
-    - 16
-    - 20
-    - 21
+    - 15
+    - 18
+    - 22
     - 23
+    - 25
   - id: R2
     requirement: A4：状态栏导航栏显示当前文件，选区 5 字符时光标段为 `1:6 (5 chars)`，应用级 X11 等段在 workspace 激活时隐藏。
     actions:
-    - 13
+    - 15
     checkpoints:
-    - step: 24
+    - step: 26
       expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-navbar-host\"]", "contains": "README.txt"}}'
-    - step: 32
+    - step: 34
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "regex": "^1:6 \\(5 chars\\)$"}}'
-    - step: 33
+    - step: 35
       expectation: '{"eval_readonly": {"expression": "!document.querySelector(\"[data-testid\" + String.fromCharCode(61) + \"\\\"status-bar\\\"]\").textContent.includes(\"X11:\")", "expect_truthy": true}}'
     results:
-    - 24
-    - 32
-    - 33
+    - 26
+    - 34
+    - 35
   - id: R3
     requirement: A4/DEC-010-03：空编辑器显示 IDEA 快捷提示（Double Shift、Go to File 的真实绑定）。
     actions:
-    - 34
+    - 36
     checkpoints:
-    - step: 35
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-empty-editor\"]", "timeout_sec": 10}}'
-    - step: 36
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-empty-editor\"]", "contains": "Double Shift"}}'
     - step: 37
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-empty-editor\"]", "timeout_sec": 10}}'
+    - step: 38
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-empty-editor\"]", "contains": "Double Shift"}}'
+    - step: 39
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-empty-editor\"]", "regex": "Go to File\\s*(Ctrl[+]Shift|Shift[+]Cmd)[+]N"}}'
     results:
-    - 36
-    - 37
+    - 38
+    - 39
   - id: R4
     requirement: DEC-010-04：工具栏 Settings 入口打开设置。
     actions:
-    - 43
+    - 45
     checkpoints:
-    - step: 44
+    - step: 46
       expectation: '{"wait_for": {"selector": "[data-testid=\"settings-panel\"]", "timeout_sec": 10}}'
     results:
-    - 44
+    - 46
   - id: R5
     requirement: A4：两次干净的 Shift 触发 IDEA Double Shift 手势打开 Search Everywhere，Esc 关闭；中间发生指针按下时不触发。
     actions:
-    - 38
-    - 39
+    - 40
+    - 41
     checkpoints:
-    - step: 40
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"] input[aria-label=\"Search everywhere\"]", "timeout_sec": 30}}'
     - step: 42
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"] input[aria-label=\"Search everywhere\"]", "timeout_sec": 30}}'
+    - step: 44
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "state": "detached", "timeout_sec": 10}}'
     results:
-    - 40
     - 42
+    - 44
   visual:
   - check: rail 图标/标签截断与选中蓝底需人工对照 IDEA idea-01-shell。
     method: manual

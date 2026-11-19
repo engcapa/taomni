@@ -40,8 +40,9 @@ steps:
     key: taomni.recentWorkspaces.v1
     value: '[{"id":"qa-improve002","name":"maven-single","roots":[{"id":"maven-single","name":"maven-single","path":"${fixture.sortable_single_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"maven-single","path":"src/main/java/com/example/single/SortMembers.java"},"lastOpenedAt":1756100000000,"isGitRepo":false}]'
 - reload_window: null
-- click: '[data-testid="welcome-history-tab-workspaces"]'
-- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.sortable_single_root}"]'
+- click: '[data-testid="tao-home-history"]'
+- click: '[data-testid="tao-home-history-tab-workspaces"]'
+- click: '[data-testid="tao-home-history-row"][data-workspace-path="${fixture.sortable_single_root}"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - wait_for:
     selector: '[data-testid="code-workspace-editor-pane"]'
@@ -125,8 +126,9 @@ steps:
       com.example.single;\n\npublic class SortMembers {\n    private int laterField = 2;\n    private int earlyField
       = 1;\n\n    void zebra() {\n    }\n\n    void apple() {\n    }\n}\n","postHash":"41dafa75c4ef8d67a0f08b2e0d13e63e514643d601b1ea11a2aacb9256ab5890","encoding":"UTF-8","bom":false,"eol":"lf"}],"resourceMoves":[],"verification":{"mismatchedUris":[],"checkedAt":null}}'
 - reload_window: null
-- click: '[data-testid="welcome-history-tab-workspaces"]'
-- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.sortable_single_root}"]'
+- click: '[data-testid="tao-home-history"]'
+- click: '[data-testid="tao-home-history-tab-workspaces"]'
+- click: '[data-testid="tao-home-history-row"][data-workspace-path="${fixture.sortable_single_root}"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - wait_for:
     selector: '[data-testid="refactor-recovery-review"]'
@@ -158,8 +160,9 @@ steps:
     timeout_sec: 30
 - screenshot: tc-ide-improve002-segment2-restored.png
 - reload_window: null
-- click: '[data-testid="welcome-history-tab-workspaces"]'
-- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.sortable_single_root}"]'
+- click: '[data-testid="tao-home-history"]'
+- click: '[data-testid="tao-home-history-tab-workspaces"]'
+- click: '[data-testid="tao-home-history-row"][data-workspace-path="${fixture.sortable_single_root}"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - wait: 8
 - assert_not_visible: '[data-testid="refactor-recovery-review"]'
@@ -184,8 +187,9 @@ steps:
     text: "package com.example.single;\n\npublic class SortMembers {\n    // third-party edit\n    void zebra()\
       \ {\n    }\n}\n"
 - reload_window: null
-- click: '[data-testid="welcome-history-tab-workspaces"]'
-- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.sortable_single_root}"]'
+- click: '[data-testid="tao-home-history"]'
+- click: '[data-testid="tao-home-history-tab-workspaces"]'
+- click: '[data-testid="tao-home-history-row"][data-workspace-path="${fixture.sortable_single_root}"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - wait_for:
     selector: '[data-testid="refactor-recovery-review"]'
@@ -208,8 +212,9 @@ steps:
     text: "package com.example.single;\n\npublic class SortMembers {\n    private int laterField = 2;\n    private\
       \ int earlyField = 1;\n\n    void zebra() {\n    }\n\n    void apple() {\n    }\n}\n"
 - reload_window: null
-- click: '[data-testid="welcome-history-tab-workspaces"]'
-- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.sortable_single_root}"]'
+- click: '[data-testid="tao-home-history"]'
+- click: '[data-testid="tao-home-history-tab-workspaces"]'
+- click: '[data-testid="tao-home-history-row"][data-workspace-path="${fixture.sortable_single_root}"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - wait_for:
     selector: '[data-testid="refactor-recovery-review"]'
@@ -250,157 +255,157 @@ verification:
     - 2
     - 4
     - 5
-    - 6
     - 7
-    - 13
-    - 15
+    - 8
+    - 14
     - 16
     - 17
     - 18
-    - 21
-    - 24
+    - 19
+    - 22
     - 25
-    - 28
-    - 31
-    - 33
-    - 36
-    - 38
+    - 26
+    - 29
+    - 32
+    - 34
+    - 37
     - 39
     - 40
-    - 41
-    - 46
-    - 49
-    - 53
-    - 54
+    - 42
+    - 43
+    - 48
+    - 51
     - 55
-    - 61
-    - 62
-    - 63
+    - 57
+    - 58
     - 64
     - 65
     - 66
-    - 71
-    - 73
-    - 74
+    - 67
+    - 69
+    - 70
     - 75
-    - 76
+    - 77
+    - 78
+    - 80
     - 81
-    - 84
+    - 86
+    - 89
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 8
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
     - step: 9
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "timeout_sec": 60}}'
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
     - step: 10
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "timeout_sec": 60}}'
+    - step: 11
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "void zebra",
         "timeout_sec": 60}}'
-    - step: 11
+    - step: 12
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"]", "contains":
         "Java", "timeout_sec": 60}}'
-    - step: 14
+    - step: 15
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "timeout_sec":
         30}}'
-    - step: 19
-      expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "timeout_sec": 60}}'
     - step: 20
+      expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "timeout_sec": 60}}'
+    - step: 21
       expectation: '{"assert_text": {"selector": "[data-testid=\"confirm-dialog\"]", "contains": "Rearrange preview",
         "timeout_sec": 10}}'
-    - step: 22
+    - step: 23
       expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "Rearranged
         SortMembers.java", "timeout_sec": 60}}'
-    - step: 23
+    - step: 24
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"]", "regex": "(?s)private
         int laterField.*void apple", "timeout_sec": 10}}'
-    - step: 26
+    - step: 27
       expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "Undid Rearrange
         Code", "timeout_sec": 10}}'
-    - step: 27
+    - step: 28
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"]", "regex": "(?s)void
         zebra.*private int laterField", "timeout_sec": 10}}'
-    - step: 29
+    - step: 30
       expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "Redid Rearrange
         Code", "timeout_sec": 10}}'
-    - step: 30
+    - step: 31
       expectation: '{"assert_pattern": {"selector": "[data-testid=\"code-workspace-editor\"]", "regex": "(?s)private
         int laterField.*void apple", "timeout_sec": 10}}'
-    - step: 32
+    - step: 33
       expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "Undid Rearrange
         Code", "timeout_sec": 10}}'
-    - step: 34
+    - step: 35
       expectation: '{"assert_file_sha256": {"path": "${fixture.sortable_single_root}/src/main/java/com/example/single/SortMembers.java",
         "equals": "68142feae5f38ffc310302e58f6a211c61c9d68994cfa5b643d2fbcaf239f93b", "timeout_sec": 30}}'
-    - step: 37
+    - step: 38
       expectation: '{"assert_file_sha256": {"path": "${fixture.sortable_single_root}/src/main/java/com/example/single/SortMembers.java",
         "equals": "41dafa75c4ef8d67a0f08b2e0d13e63e514643d601b1ea11a2aacb9256ab5890", "timeout_sec": 30}}'
-    - step: 42
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
-    - step: 43
-      expectation: '{"wait_for": {"selector": "[data-testid=\"refactor-recovery-review\"]", "timeout_sec": 60}}'
     - step: 44
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 45
+      expectation: '{"wait_for": {"selector": "[data-testid=\"refactor-recovery-review\"]", "timeout_sec": 60}}'
+    - step: 46
       expectation: '{"assert_text": {"selector": "[data-testid=\"refactor-recovery-review\"]", "contains": "Review
         refactor recovery", "timeout_sec": 10}}'
-    - step: 45
+    - step: 47
       expectation: '{"assert_text": {"selector": "[data-testid=\"refactor-recovery-review\"]", "contains": "restorable",
         "timeout_sec": 15}}'
-    - step: 47
+    - step: 49
       expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "timeout_sec": 30}}'
-    - step: 48
+    - step: 50
       expectation: '{"assert_text": {"selector": "[data-testid=\"confirm-dialog\"]", "contains": "Restore pre-refactor
         content", "timeout_sec": 10}}'
-    - step: 50
+    - step: 52
       expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "Refactor recovery
         complete", "timeout_sec": 60}}'
-    - step: 51
+    - step: 53
       expectation: '{"assert_file_sha256": {"path": "${fixture.sortable_single_root}/src/main/java/com/example/single/SortMembers.java",
         "equals": "68142feae5f38ffc310302e58f6a211c61c9d68994cfa5b643d2fbcaf239f93b", "timeout_sec": 30}}'
-    - step: 56
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
-    - step: 58
-      expectation: '{"assert_not_visible": "[data-testid=\"refactor-recovery-review\"]"}'
     - step: 59
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 61
+      expectation: '{"assert_not_visible": "[data-testid=\"refactor-recovery-review\"]"}'
+    - step: 62
       expectation: '{"assert_not_visible": "[data-testid=\"confirm-dialog\"]"}'
-    - step: 60
+    - step: 63
       expectation: '{"assert_file_sha256": {"path": "${fixture.sortable_single_root}/src/main/java/com/example/single/SortMembers.java",
         "equals": "68142feae5f38ffc310302e58f6a211c61c9d68994cfa5b643d2fbcaf239f93b", "timeout_sec": 30}}'
-    - step: 67
+    - step: 71
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
-    - step: 68
+    - step: 72
       expectation: '{"wait_for": {"selector": "[data-testid=\"refactor-recovery-review\"]", "timeout_sec": 60}}'
-    - step: 69
+    - step: 73
       expectation: '{"assert_text": {"selector": "[data-testid=\"refactor-recovery-review\"]", "contains": "Review
         refactor recovery", "timeout_sec": 10}}'
-    - step: 70
+    - step: 74
       expectation: '{"assert_text": {"selector": "[data-testid=\"refactor-recovery-review\"]", "contains": "cannot
         be restored automatically and will not be overwritten", "timeout_sec": 10}}'
-    - step: 72
+    - step: 76
       expectation: '{"assert_file_sha256": {"path": "${fixture.sortable_single_root}/src/main/java/com/example/single/SortMembers.java",
         "equals": "e051b7abb64e955e302974c04caf3299be005d9ca0dcb314a763090454797c2d", "timeout_sec": 30}}'
-    - step: 77
+    - step: 82
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
-    - step: 78
+    - step: 83
       expectation: '{"wait_for": {"selector": "[data-testid=\"refactor-recovery-review\"]", "timeout_sec": 60}}'
-    - step: 79
+    - step: 84
       expectation: '{"assert_text": {"selector": "[data-testid=\"refactor-recovery-review\"]", "contains": "Review
         refactor recovery", "timeout_sec": 10}}'
-    - step: 80
+    - step: 85
       expectation: '{"assert_text": {"selector": "[data-testid=\"refactor-recovery-review\"]", "contains": "restorable",
         "timeout_sec": 15}}'
-    - step: 82
+    - step: 87
       expectation: '{"wait_for": {"selector": "[data-testid=\"confirm-dialog\"]", "timeout_sec": 30}}'
-    - step: 83
+    - step: 88
       expectation: '{"assert_text": {"selector": "[data-testid=\"confirm-dialog\"]", "contains": "Restore pre-refactor
         content", "timeout_sec": 10}}'
-    - step: 85
+    - step: 90
       expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "Refactor recovery
         complete", "timeout_sec": 60}}'
-    - step: 86
+    - step: 91
       expectation: '{"assert_file_sha256": {"path": "${fixture.sortable_single_root}/src/main/java/com/example/single/SortMembers.java",
         "equals": "68142feae5f38ffc310302e58f6a211c61c9d68994cfa5b643d2fbcaf239f93b", "timeout_sec": 30}}'
     results:
-    - 85
-    - 86
+    - 90
+    - 91
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

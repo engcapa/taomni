@@ -10,8 +10,9 @@ timeout_sec: 240
 steps:
   - open: ${cfg.app.base_url}
   - wait_for: '[data-testid="welcome-panel"]'
-  - click: '[data-testid="welcome-history-tab-workspaces"]'
-  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity006_root}"]'
+  - click: '[data-testid="tao-home-history"]'
+  - click: '[data-testid="tao-home-history-tab-workspaces"]'
+  - click: '[data-testid="tao-home-history-row"][data-workspace-path="${fixture.parity006_root}"]'
   - wait_for: '[data-testid="code-workspace-tab"]'
   - press: Mod+Shift+F
   - wait_for: '[data-testid="code-workspace-find-in-files-panel"]'
@@ -133,75 +134,75 @@ verification:
   requirements:
   - id: ED-PARITY-006-V2
     requirement: Input undo remains local; result and Actions undo trap keyboard focus, cancel preserves history, and one confirmed undo restores both files.
-    actions: [1, 3, 4, 6, 8, 9, 10, 11, 12, 14, 15, 16, 17, 19, 21, 22, 23, 26, 27, 32, 34, 36, 38, 40, 41, 45, 47, 51, 53, 54, 55, 58, 63, 64, 65, 66, 69]
+    actions: [1, 4, 5, 7, 9, 10, 11, 12, 13, 15, 16, 17, 18, 20, 22, 23, 24, 27, 28, 33, 35, 37, 39, 41, 42, 46, 48, 52, 54, 55, 56, 59, 64, 65, 66, 67, 70]
     checkpoints:
     - step: 2
       expectation: Welcome is ready.
-    - step: 5
+    - step: 6
       expectation: Workspace is open.
-    - step: 7
+    - step: 8
       expectation: Find panel opens from its shortcut.
-    - step: 13
+    - step: 14
       expectation: Scoped results are visible.
-    - step: 18
+    - step: 19
       expectation: Replace preview opens.
-    - step: 20
+    - step: 21
       expectation: Two files are replaced.
-    - step: 24
-      expectation: Input undo and redo open no workspace confirmation.
     - step: 25
+      expectation: Input undo and redo open no workspace confirmation.
+    - step: 26
       expectation: Input undo and redo leave replaced editor text intact.
-    - step: 28
-      expectation: Result-row shortcut opens confirmation.
     - step: 29
-      expectation: Confirmation names the replacement.
+      expectation: Result-row shortcut opens confirmation.
     - step: 30
+      expectation: Confirmation names the replacement.
+    - step: 31
       expectation: OK has initial focus.
-    - step: 33
+    - step: 34
       expectation: Tab from OK wraps to Cancel.
-    - step: 35
+    - step: 36
       expectation: Tab from Cancel returns to OK.
-    - step: 37
+    - step: 38
       expectation: Shift+Tab from OK moves to Cancel.
-    - step: 39
+    - step: 40
       expectation: Shift+Tab from Cancel wraps to OK.
-    - step: 42
-      expectation: Enter on Cancel closes confirmation.
     - step: 43
-      expectation: Cancel restores focus to the result row.
+      expectation: Enter on Cancel closes confirmation.
     - step: 44
+      expectation: Cancel restores focus to the result row.
+    - step: 45
       expectation: Cancel preserves the replaced editor text.
-    - step: 46
+    - step: 47
       expectation: Undo reopens from restored result-row focus.
-    - step: 48
-      expectation: Escape closes confirmation.
     - step: 49
-      expectation: Escape restores focus to the result row.
+      expectation: Escape closes confirmation.
     - step: 50
+      expectation: Escape restores focus to the result row.
+    - step: 51
       expectation: Escape preserves the replaced editor text.
-    - step: 52
+    - step: 53
       expectation: Actions palette opens from the result row.
-    - step: 56
-      expectation: Actions Undo opens confirmation.
     - step: 57
+      expectation: Actions Undo opens confirmation.
+    - step: 58
       expectation: OK has focus without test-directed refocus.
-    - step: 59
-      expectation: Enter confirms one two-file undo.
     - step: 60
-      expectation: Confirmation closes after undo.
+      expectation: Enter confirms one two-file undo.
     - step: 61
-      expectation: Actions Undo returns focus to its prior result-row entry.
+      expectation: Confirmation closes after undo.
     - step: 62
+      expectation: Actions Undo returns focus to its prior result-row entry.
+    - step: 63
       expectation: Both editor lines are restored.
-    - step: 67
-      expectation: Editor claim undo opens no workspace confirmation.
     - step: 68
+      expectation: Editor claim undo opens no workspace confirmation.
+    - step: 69
       expectation: Local editor text is restored.
-    - step: 70
-      expectation: Replace panel opens from its shortcut.
     - step: 71
+      expectation: Replace panel opens from its shortcut.
+    - step: 72
       expectation: Replacement input receives focus.
-    results: [20, 24, 25, 29, 33, 35, 37, 39, 42, 43, 44, 46, 48, 49, 50, 56, 57, 59, 60, 61, 62, 67, 68, 71]
+    results: [21, 25, 26, 30, 34, 36, 38, 40, 43, 44, 45, 47, 49, 50, 51, 57, 58, 60, 61, 62, 63, 68, 69, 72]
   visual:
   - check: Undo dialog and focus transitions are readable.
     method: manual

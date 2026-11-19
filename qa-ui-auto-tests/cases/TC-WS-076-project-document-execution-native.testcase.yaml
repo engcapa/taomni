@@ -19,6 +19,10 @@ timeout_sec: 120
 steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-project-document-run
+- seed_storage:
+    key: taomni.fileOpen.preferences.v1
+    value: '{"associations":{"md":"workspace","txt":"workspace","json":"workspace"}}'
+- reload_window: null
 - observe_language_startup: null
 - click: '[data-testid="nav-mode-workspaces"]'
 - wait_for: '[data-testid="code-workspace-tree-empty"]'
@@ -61,36 +65,36 @@ verification:
     actions:
     - 1
     - 2
-    - 4
     - 6
-    - 7
     - 8
     - 9
+    - 10
     - 11
-    - 15
-    results:
-    - 12
     - 13
-    - 14
-    - 16
     - 17
+    results:
+    - 14
+    - 15
+    - 16
     - 18
     - 19
+    - 20
+    - 21
     checkpoints:
-    - step: 12
-      expectation: "assert_text_equals:\n  selector: '[data-testid=\"workspace-file-editor\"] .cm-content'\n  equals: Public project notes"
-    - step: 13
-      expectation: "wait_for:\n  selector: '[data-testid=\"code-workspace-run-target\"]:not(:disabled)'\n  timeout_sec: 30"
     - step: 14
-      expectation: "assert_language_startup:\n  commands:\n    workspace_execution_model:\n      min: 1\n      fulfilled: 1"
+      expectation: "assert_text_equals:\n  selector: '[data-testid=\"workspace-file-editor\"] .cm-content'\n  equals: Public project notes"
+    - step: 15
+      expectation: "wait_for:\n  selector: '[data-testid=\"code-workspace-run-target\"]:not(:disabled)'\n  timeout_sec: 30"
     - step: 16
+      expectation: "assert_language_startup:\n  commands:\n    workspace_execution_model:\n      min: 1\n      fulfilled: 1"
+    - step: 18
       expectation: 'wait_for: ''[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'''
-    - step: 17
+    - step: 19
       expectation: "assert_pattern:\n  selector: '[data-testid=\"terminal-pane\"][data-terminal-active=\"true\"]'\n  regex: (?m)^QA_EXECUTION_DOCUMENT_OK\\\
         s*$\n  timeout_sec: 30"
-    - step: 18
+    - step: 20
       expectation: "assert_text_equals:\n  selector: '[data-testid=\"workspace-file-editor\"] .cm-content'\n  equals: Public project notes"
-    - step: 19
+    - step: 21
       expectation: 'assert_no_runtime_errors: null'
   native:
   - check: A real execution model and package script execute from a plain document.

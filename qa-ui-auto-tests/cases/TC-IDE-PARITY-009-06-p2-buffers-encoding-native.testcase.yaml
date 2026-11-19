@@ -30,8 +30,9 @@ steps:
       "looseFiles": [], "lastActiveFile": {"kind": "root", "rootId": "parity009", "path": "src/StructuralTarget.java"}, "lastOpenedAt":
       1756100000000, "isGitRepo": false}]'
 - reload_window: null
-- click: '[data-testid="welcome-history-tab-workspaces"]'
-- click: '[data-testid="welcome-recent-workspace-row"]'
+- click: '[data-testid="tao-home-history"]'
+- click: '[data-testid="tao-home-history-tab-workspaces"]'
+- click: '[data-testid="tao-home-history-row"]'
 - wait_for:
     selector: '[data-testid="code-workspace-editor"] .cm-content'
     timeout_sec: 45
@@ -154,83 +155,83 @@ verification:
     requirement: Unsaved changes replace disk content even when inactive; file scope excludes other buffers; errors never
       become empty results, retry works and native disk bytes remain unchanged.
     actions:
-    - 6
     - 7
-    - 9
+    - 8
     - 10
     - 11
-    - 13
-    - 15
+    - 12
+    - 14
     - 16
-    - 19
-    - 22
+    - 17
+    - 20
     - 23
     - 24
-    - 27
+    - 25
     - 28
     - 29
-    - 32
-    - 34
+    - 30
+    - 33
     - 35
     - 36
-    - 38
+    - 37
     - 39
     - 40
-    - 44
-    - 48
+    - 41
+    - 45
     - 49
     - 50
-    - 55
+    - 51
     - 56
+    - 57
     checkpoints:
-    - step: 17
-      expectation: 'Search actions retains the complete Search Structurally query.'
     - step: 18
+      expectation: 'Search actions retains the complete Search Structurally query.'
+    - step: 19
       expectation: 'The selected action is Search Structurally… before Enter.'
-    - step: 21
+    - step: 22
       expectation: '{assert_attribute: {equals: java, name: value, selector: ''[data-testid="structural-search-language"]''}}'
-    - step: 26
+    - step: 27
       expectation: '{assert_count: {equal: 0, selector: ''[data-testid="structural-search-match"]''}}'
-    - step: 31
+    - step: 32
       expectation: '{assert_count: {equal: 1, selector: ''[data-testid="structural-search-match"]''}}'
-    - step: 33
+    - step: 34
       expectation: "{assert_text_equals: {equals: 'class Other {}', selector: '[data-testid=\"code-workspace-editor\"]\n \
         \     .cm-content'}}"
-    - step: 42
-      expectation: '{assert_count: {equal: 1, selector: ''[data-testid="structural-search-match"]''}}'
     - step: 43
+      expectation: '{assert_count: {equal: 1, selector: ''[data-testid="structural-search-match"]''}}'
+    - step: 44
       expectation: '{assert_attribute: {equals: src/StructuralTarget.java, name: data-path, selector: ''[data-testid="structural-search-match"]''}}'
-    - step: 45
+    - step: 46
       expectation: "{assert_text_equals: {equals: 'class StructuralTarget { void run() { System.out.println(999);\n      }\
         \ }', selector: '[data-testid=\"code-workspace-editor\"] .cm-content'}}"
-    - step: 52
-      expectation: '{assert_text: {contains: ''Legacy.java: file is not UTF-8'', selector: ''[data-testid="structural-search-error"]''}}'
     - step: 53
+      expectation: '{assert_text: {contains: ''Legacy.java: file is not UTF-8'', selector: ''[data-testid="structural-search-error"]''}}'
+    - step: 54
       expectation: '{assert_count: {equal: 0, selector: ''[data-testid="structural-search-empty"]''}}'
-    - step: 58
-      expectation: '{assert_count: {equal: 1, selector: ''[data-testid="structural-search-match"]''}}'
     - step: 59
-      expectation: '{assert_not_visible: ''[data-testid="structural-search-dialog"]''}'
+      expectation: '{assert_count: {equal: 1, selector: ''[data-testid="structural-search-match"]''}}'
     - step: 60
-      expectation: '{assert_file_sha256: {equals: ''${fixture.parity009_target_sha256}'', path: ''${fixture.parity009_target}''}}'
+      expectation: '{assert_not_visible: ''[data-testid="structural-search-dialog"]''}'
     - step: 61
+      expectation: '{assert_file_sha256: {equals: ''${fixture.parity009_target_sha256}'', path: ''${fixture.parity009_target}''}}'
+    - step: 62
       expectation: '{assert_file_sha256: {equals: ''${fixture.parity009_encoding_sha256}'', path: ''${fixture.parity009_encoding_file}''}}'
     results:
-    - 17
     - 18
-    - 21
-    - 26
-    - 31
-    - 33
-    - 42
+    - 19
+    - 22
+    - 27
+    - 32
+    - 34
     - 43
-    - 45
-    - 52
+    - 44
+    - 46
     - 53
-    - 58
+    - 54
     - 59
     - 60
     - 61
+    - 62
   visual:
   - check: Existing search dialog and result layout retained.
     method: not-applicable
