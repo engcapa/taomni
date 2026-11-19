@@ -47,7 +47,7 @@ fn fixture(
         smtp_password: "pass".into(),
         network_settings: None,
     };
-    let handle = Arc::new(coordination::MailDatabase::new(dir.path().join("qa.db")));
+    let handle = Arc::new(coordination::mailbox_database(dir.path().join("qa.db")));
     let job = ArchiveJob {
         pause: AtomicBool::new(false),
         running: AtomicBool::new(true),
@@ -397,7 +397,7 @@ fn loopback_resume_saves_complete_mime_and_leaves_it_unread() {
         socket: Mutex::new(None),
     };
     drop(db);
-    let handle = Arc::new(coordination::MailDatabase::new(dir.path().join("qa.db")));
+    let handle = Arc::new(coordination::mailbox_database(dir.path().join("qa.db")));
     let mut imap = ActiveImapSession::Plain {
         session: fake.session(),
         forward_task: None,

@@ -1,6 +1,7 @@
 //! Mail message data, MIME parsing and archived message codecs.
 
 pub mod archive;
+pub mod database;
 mod inline_images;
 mod lists;
 mod mime;

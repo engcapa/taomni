@@ -28,7 +28,7 @@ impl Harness {
             network_settings: None,
         };
         let directory = tempfile::tempdir().unwrap();
-        let db = Arc::new(coordination::MailDatabase::new(
+        let db = Arc::new(coordination::mailbox_database(
             directory.path().join("mail.db"),
         ));
         {

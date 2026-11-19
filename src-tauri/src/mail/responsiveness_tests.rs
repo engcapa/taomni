@@ -13,7 +13,7 @@ fn moving_200_messages_adapts_to_provider_copy_count_limit() {
         state.max_transfer_count = Some(20);
     }
     let directory = tempfile::tempdir().unwrap();
-    let db = Arc::new(coordination::MailDatabase::new(
+    let db = Arc::new(coordination::mailbox_database(
         directory.path().join("mutation.db"),
     ));
     let runtime = tokio::runtime::Runtime::new().unwrap();
@@ -126,7 +126,7 @@ fn folder_read_includes_uncached_mail_and_recovers_a_lost_store_response() {
         conn.execute("INSERT INTO mail_messages(account_id, folder, uid, subject, updated_at) VALUES(?1, 'INBOX', ?2, 'cached', 0)", params![account.config.session_id, uid]).unwrap();
     }
     drop(conn);
-    let db = Arc::new(coordination::MailDatabase::new(path));
+    let db = Arc::new(coordination::mailbox_database(path));
     let runtime = tokio::runtime::Runtime::new().unwrap();
     let result = read_actions::mark_read_cached(
         &MailImapPool::new(),
@@ -230,7 +230,7 @@ fn interactive_body_completes_while_background_imap_is_busy() {
 #[tokio::test(flavor = "current_thread")]
 async fn cache_lock_wait_does_not_block_runtime_timers() {
     let directory = tempfile::tempdir().unwrap();
-    let db = Arc::new(coordination::MailDatabase::new(
+    let db = Arc::new(coordination::mailbox_database(
         directory.path().join("timers.db"),
     ));
     let (locked_tx, locked_rx) = mpsc::channel();

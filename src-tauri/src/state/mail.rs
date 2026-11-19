@@ -39,7 +39,7 @@ impl MailRuntime {
             .transpose()?
             .unwrap_or_else(|| self.cache_root.clone());
         let path = configured.join(format!("{stem}.db"));
-        let handle = Arc::new(crate::mail::coordination::MailDatabase::new(path));
+        let handle = Arc::new(crate::mail::coordination::mailbox_database(path));
         dbs.insert(stem, Arc::clone(&handle));
         Ok(handle)
     }

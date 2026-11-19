@@ -342,7 +342,7 @@ fn create_backup_locked(
                 {
                     continue;
                 }
-                let handle = crate::mail::coordination::MailDatabase::new(path);
+                let handle = crate::mail::coordination::mailbox_database(path);
                 let db = handle.lock_for_snapshot(&context.cancel)?;
                 let account = super::mail_snapshot::snapshot_account(&db)?;
                 staged_files.extend(snapshot_mail_with_options(

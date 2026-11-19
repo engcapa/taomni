@@ -546,7 +546,7 @@ fn complete_mail_snapshot_survives_cleanup_and_restores_from_a_custom_directory(
             .any(|f| f.path.ends_with(".eml.gz"))
     );
     let target_db = restore.path().join("mail-cache").join(format!("{stem}.db"));
-    let cached = crate::mail::coordination::MailDatabase::new(target_db.clone());
+    let cached = crate::mail::coordination::mailbox_database(target_db.clone());
     drop(cached.lock().unwrap());
     crate::mail::coordination::write_redirect(
         &target_db,
@@ -566,7 +566,7 @@ fn complete_mail_snapshot_survives_cleanup_and_restores_from_a_custom_directory(
     // Windows correctly prevents replacing a database held open by this fixture.
     drop(cached);
     apply_pending_restore(restore.path()).unwrap();
-    let cached = crate::mail::coordination::MailDatabase::new(target_db.clone());
+    let cached = crate::mail::coordination::mailbox_database(target_db.clone());
     assert!(!crate::mail::coordination::redirect_path(&target_db).exists());
     assert_eq!(
         storage::read(&cached.lock().unwrap(), "mail-qa", "INBOX", 1)
