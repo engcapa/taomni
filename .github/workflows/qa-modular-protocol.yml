@@ -260,6 +260,17 @@ jobs:
             libwebkit2gtk-4.1-dev libappindicator3-dev libgbm-dev librsvg2-dev patchelf \
             libkrb5-dev libasound2-dev libpipewire-0.3-dev libclang-dev libdbus-1-dev \
             libudev-dev nasm xvfb xauth python3-tk
+      - name: Select a complete Windows Perl for vendored OpenSSL
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $perl = 'C:\Strawberry\perl\bin\perl.exe'
+          if (-not (Test-Path $perl)) { choco install strawberryperl --yes --no-progress }
+          & $perl -MIPC::Cmd -e 'print "Perl ready"'
+          if ($LASTEXITCODE -ne 0) { throw 'Complete Perl unavailable' }
+          "OPENSSL_SRC_PERL=$perl" >> $env:GITHUB_ENV
+          'C:\Strawberry\perl\bin' >> $env:GITHUB_PATH
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
