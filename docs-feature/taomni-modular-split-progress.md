@@ -138,6 +138,9 @@ TASK-027 将 G1–G11 设为独立发布阻断门。每个门必须在匹配源�
 - macOS 26 ARM64 安装了 `514c95edb` 的候选 DMG，从 0.5.10 升到 0.5.11、拒绝同 profile 的第二个 headless 进程并回滚，SSH 和 VNC 原会话可重新打开。签名记录为 `Taomni Local Code Signing`，`CodeDirectory` flags 为 `0x0`，Gatekeeper 拒绝，G1 仍缺少启用 hardened runtime 的实际发行包启动证据。原始工件位于 `qa-ui-auto-report/github/44618087869/package-checks/darwin-aarch64/44631750900/`。 [ARM64 安装验证](https://github.com/engcapa/taomni/actions/runs/44631750900)
 - GitHub 分片上传后由 `ci_live_monitor.py` 从三端子运行下载到 `qa-ui-auto-report/github/44633515606/live-shards/`。旧库 WAL 批次已核对三端 Browser 各 22/22、Linux 和 Windows Native 各 31/31，macOS Native 继续收证。上一个桌面批次已核对三端 Browser 各 39/39。 [WAL 批次](https://github.com/engcapa/taomni/actions/runs/44609458437) · [前一桌面批次](https://github.com/engcapa/taomni/actions/runs/44619095037)
 - Mail 的 mboxrd 编解码及 EML 换行规范化已迁入 `taomni-mail-engine`。现有导入导出入口使用同一套字节转换，保留 Rust 的 IMAP 往返用例。独立引擎 13 项单测和 11 项模块依赖边界单测通过。
+- `1b1b7be08` 的安装验证工具在 Windows MSI `57d87b7ed` 上通过 GUI 与 headless 双向互斥、generation 保留、原 SSH/VNC 会话及安装回滚。两次被拒绝的进程均未建立监听端口。macOS 26 对同样场景及 `514c95edb` 候选 DMG 已派发。四目标匹配源码安装件由候选构建 `44637271292` 生成，工件上传后按目标启动复验。 [Windows 已安装观察](https://github.com/engcapa/taomni/actions/runs/44637271602) · [macOS 待复验](https://github.com/engcapa/taomni/actions/runs/44637272024) · [候选构建](https://github.com/engcapa/taomni/actions/runs/44637271292)
+- Windows G5 在同一 `windows-2025` runner 保留原目标和四项阈值，分别观察原桌面和静态背景下的两条编码路径。工件同时保留两组原始探针数据。 [Windows 对照](https://github.com/engcapa/taomni/actions/runs/44635990580)
+- Mail 的发件、已发送副本和服务器草稿共用的 MIME 组装已迁入邮件引擎。桌面适配层解析账户和附件来源，把地址参数和取得的附件内容交给引擎。引擎 15 项及核心撰写和草稿 10 项单测通过。复用 `TC-MAIL-SEND-01`、`TC-MAIL-OUTBOX-01` 和 `TC-MAIL-ATTACH-01` 覆盖现有 Browser 与 Native 入口。
 
 ## 当前结论
 
