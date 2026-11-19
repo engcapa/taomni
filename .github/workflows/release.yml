@@ -114,10 +114,23 @@ jobs:
         with:
           targets: ${{ matrix.rust-targets }}
 
+      - name: Scope Windows native dependencies to the runner image
+        if: runner.os == 'Windows'
+        id: windows-cache-scope
+        shell: pwsh
+        run: |
+          $scope = if ($env:ImageVersion) {
+            "windows-image-$env:ImageVersion"
+          } else {
+            "windows-run-$env:GITHUB_RUN_ID-$env:GITHUB_RUN_ATTEMPT"
+          }
+          "key=$scope" >> $env:GITHUB_OUTPUT
+
       - name: Cache Rust build
         uses: swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
+          key: ${{ steps.windows-cache-scope.outputs.key }}
 
       - name: Refresh sherpa-onnx native cache
         run: node scripts/refresh-sherpa-onnx-cache.mjs
