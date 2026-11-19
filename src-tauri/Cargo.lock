@@ -11091,8 +11091,11 @@ name = "taomni-mail-engine"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
+ "flate2",
+ "hex",
  "mail-parser",
  "serde",
+ "sha2 0.11.0",
 ]
 
 [[package]]

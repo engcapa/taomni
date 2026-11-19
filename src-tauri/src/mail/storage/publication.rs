@@ -3,18 +3,14 @@ use super::index::object_path;
 use super::model::FullMessage;
 use super::model::PreparedMessage;
 use super::reading::open;
-use flate2::Compression;
-use flate2::read::GzDecoder;
-use flate2::write::GzEncoder;
 use rusqlite::Connection;
 use rusqlite::params;
-use sha2::Digest;
-use sha2::Sha256;
 use std::fs;
 use std::fs::File;
 use std::io::Read;
 use std::io::Write;
 use std::path::Path;
+use taomni_mail_engine::archive::{MessageObject, compress_message, verify_message};
 
 pub fn store(
     db: &Connection,
@@ -37,39 +33,18 @@ pub fn store(
 /// Compression runs outside the account DB lock. Relocation first stops this worker.
 pub fn prepare(
     root: &Path,
-    mut raw: impl Read,
+    raw: impl Read,
     check: impl Fn() -> Result<(), String>,
 ) -> Result<PreparedMessage, String> {
     fs::create_dir_all(root.join("objects")).map_err(|e| e.to_string())?;
     let mut temp =
         tempfile::NamedTempFile::new_in(root.join("objects")).map_err(|e| e.to_string())?;
-    let mut hash = Sha256::new();
-    let mut raw_size = 0u64;
-    let mut attachments = super::super::archive_metadata::AttachmentScan::default();
-    {
-        let mut encoder = GzEncoder::new(temp.as_file_mut(), Compression::new(3));
-        let mut buffer = [0u8; 128 * 1024];
-        loop {
-            check()?;
-            let n = raw
-                .read(&mut buffer)
-                .map_err(|e| format!("Read full email: {e}"))?;
-            if n == 0 {
-                break;
-            }
-            attachments.feed(&buffer[..n]);
-            hash.update(&buffer[..n]);
-            raw_size += n as u64;
-            encoder
-                .write_all(&buffer[..n])
-                .map_err(|e| format!("Compress full email: {e}"))?;
-        }
-        encoder
-            .finish()
-            .map_err(|e| format!("Finish full email: {e}"))?;
-    }
+    let MessageObject {
+        hash,
+        raw_size,
+        has_attachments,
+    } = compress_message(raw, temp.as_file_mut(), check)?;
     temp.as_file().sync_all().map_err(|e| e.to_string())?;
-    let hash = hex::encode(hash.finalize());
     let existing = object_path(root, &hash)?;
     if existing.exists() {
         // Duplicate verification, like compression, must stay off the DB lock.
@@ -79,7 +54,7 @@ pub fn prepare(
         temp,
         hash,
         raw_size,
-        has_attachments: attachments.found,
+        has_attachments,
     })
 }
 
@@ -132,42 +107,10 @@ pub(super) fn verify_object(
     expected: u64,
     destination: impl Write,
 ) -> Result<(), String> {
-    verify_open_object(
+    verify_message(
         File::open(path).map_err(|e| format!("Open saved email: {e}"))?,
         hash,
         expected,
         destination,
     )
-}
-
-pub(super) fn verify_open_object(
-    file: File,
-    hash: &str,
-    expected: u64,
-    mut destination: impl Write,
-) -> Result<(), String> {
-    let mut decoder = GzDecoder::new(file);
-    let mut digest = Sha256::new();
-    let mut size = 0u64;
-    let mut buffer = [0u8; 128 * 1024];
-    loop {
-        let n = decoder
-            .read(&mut buffer)
-            .map_err(|e| format!("Saved email is damaged: {e}"))?;
-        if n == 0 {
-            break;
-        }
-        size += n as u64;
-        if size > expected {
-            return Err("Saved email size verification failed".into());
-        }
-        digest.update(&buffer[..n]);
-        destination
-            .write_all(&buffer[..n])
-            .map_err(|e| e.to_string())?;
-    }
-    if size != expected || hex::encode(digest.finalize()) != hash {
-        return Err("Saved email checksum verification failed".into());
-    }
-    Ok(())
 }

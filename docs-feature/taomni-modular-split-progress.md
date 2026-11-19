@@ -115,6 +115,7 @@ TASK-027 将 G1–G11 设为独立发布阻断门。每个门必须在匹配源�
 - 已下载 `1d1299e5e` 的 Linux Browser 失败分片，`apt` 缺少 Playwright 字体依赖，分片在运行用例前退出。同一源码补跑通过 21 项，包含该分片和完整 Linux Browser 崩溃回归。 [原运行](https://github.com/engcapa/taomni/actions/runs/44599020570) · [补跑](https://github.com/engcapa/taomni/actions/runs/44604640102)
 - `57d87b7ed` 修复旧 `newmob.db` 改名时遗漏 WAL 的故障。修复前单测复现数据库损坏。修复后 14 项 Rust 单测和 38 项 QA 单测通过，包含已提交记录恢复、失败可重试和待还原配置的首装识别。新增 TC-MODULES-051，三端 Browser、Native 与完整崩溃回归正在执行。 [GitHub 三端](https://github.com/engcapa/taomni/actions/runs/44609458437)
 - 同一源码已派发四目标候选构建标识 `57d87b7ed`。每个平台工件到达后独立派发包检查，保留包生产 run 和原始摘要。系统执行、进程与核心清单也按同一源码派发。 [候选构建](https://github.com/engcapa/taomni/actions/runs/44609963649) · [系统](https://github.com/engcapa/taomni/actions/runs/44610275540) · [宿主](https://github.com/engcapa/taomni/actions/runs/44610275027) · [核心清单](https://github.com/engcapa/taomni/actions/runs/44610275246)
+- Mail 完整邮件的 gzip 编解码、SHA-256 校验和 MIME 附件检测已迁入 `taomni-mail-engine`，用于存档、读取、导出和旧索引回填。核心过渡层仍管理 SQLite、临时文件发布和缓存迁移。复用 `TC-MAIL-STORAGE-01` 至 `09` 核对浏览和原生存储流程。引擎 2 项、存储和索引 11 项及模块边界 11 项单测通过。
 
 ## 当前结论
 

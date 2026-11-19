@@ -1,14 +1,13 @@
 use super::model::FullMessage;
 use super::model::FullMessageMode;
 use super::reading::open;
-use flate2::read::GzDecoder;
 use rusqlite::Connection;
 use rusqlite::OptionalExtension;
 use rusqlite::params;
 use std::fs::File;
-use std::io::Read;
 use std::path::Path;
 use std::path::PathBuf;
+use taomni_mail_engine::archive::has_attachment;
 
 pub fn stores_full(settings: &super::super::MailCacheSettings, folder: &str) -> bool {
     // Keep old exact server keys working, and accept the full readable path
@@ -76,20 +75,7 @@ pub(in crate::mail) fn legacy_attachment_flag(
     hash: &str,
 ) -> Result<bool, String> {
     let path = object_path(&account_root(db, account)?, hash)?;
-    let mut reader = GzDecoder::new(File::open(path).map_err(|e| e.to_string())?);
-    let mut scan = super::super::archive_metadata::AttachmentScan::default();
-    let mut buffer = [0u8; 65536];
-    loop {
-        let n = reader.read(&mut buffer).map_err(|e| e.to_string())?;
-        if n == 0 {
-            break;
-        }
-        scan.feed(&buffer[..n]);
-        if scan.found {
-            break;
-        }
-    }
-    Ok(scan.found)
+    has_attachment(File::open(path).map_err(|e| e.to_string())?)
 }
 
 pub(super) fn object_path(root: &Path, hash: &str) -> Result<PathBuf, String> {

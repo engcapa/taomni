@@ -1,4 +1,4 @@
-//! Bounded MIME header inspection alongside streaming compression.
+//! Bounded MIME header inspection for archived messages.
 use mail_parser::{MessageParser, MimeHeaders};
 
 pub(super) struct AttachmentScan {

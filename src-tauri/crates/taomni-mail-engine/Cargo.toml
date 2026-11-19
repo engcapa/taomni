@@ -8,5 +8,8 @@ description = "Mail message parsing and data contracts independent of desktop ru
 
 [dependencies]
 base64 = "0.22"
+flate2 = "1"
+hex = "0.4"
 mail-parser = { version = "0.11.4", features = ["full_encoding"] }
 serde = { version = "1", features = ["derive"] }
+sha2 = "0.11"

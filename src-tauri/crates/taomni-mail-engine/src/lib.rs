@@ -1,5 +1,6 @@
-//! Mail message data and MIME parsing shared by the legacy client and the module host.
+//! Mail message data, MIME parsing and archived message codecs.
 
+pub mod archive;
 mod inline_images;
 mod lists;
 mod mime;

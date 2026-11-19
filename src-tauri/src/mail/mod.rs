@@ -60,8 +60,6 @@ mod tests;
 
 pub mod archive;
 
-mod archive_metadata;
-
 pub(crate) mod archive_query;
 
 pub mod autoconfig;

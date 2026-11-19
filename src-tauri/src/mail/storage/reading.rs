@@ -2,13 +2,13 @@ use super::index::account_root;
 use super::index::lookup;
 use super::index::object_path;
 use super::model::ArchiveEntry;
-use super::publication::verify_open_object;
 use rusqlite::Connection;
 use rusqlite::params;
 use std::fs;
 use std::fs::File;
 use std::io::Read;
 use std::path::Path;
+use taomni_mail_engine::archive::verify_message;
 
 /// Open while the DB lock protects the object reference, then release that
 /// lock before decompressing, parsing or exporting a potentially large MIME.
@@ -25,7 +25,7 @@ impl OpenMessage {
             return Err("This saved email exceeds the 512 MiB reader limit; save its original EML to open it externally".into());
         }
         let mut bytes = Vec::new();
-        verify_open_object(self.file, &self.hash, self.raw_size, &mut bytes)?;
+        verify_message(self.file, &self.hash, self.raw_size, &mut bytes)?;
         Ok(bytes)
     }
 
@@ -33,7 +33,7 @@ impl OpenMessage {
         let parent = target.parent().ok_or("Invalid email export path")?;
         fs::create_dir_all(parent).map_err(|e| e.to_string())?;
         let mut temp = tempfile::NamedTempFile::new_in(parent).map_err(|e| e.to_string())?;
-        verify_open_object(self.file, &self.hash, self.raw_size, temp.as_file_mut())?;
+        verify_message(self.file, &self.hash, self.raw_size, temp.as_file_mut())?;
         temp.as_file().sync_all().map_err(|e| e.to_string())?;
         temp.persist(target).map_err(|e| e.error.to_string())?;
         Ok(self.raw_size)
