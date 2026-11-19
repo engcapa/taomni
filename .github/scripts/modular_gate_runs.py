@@ -5,6 +5,7 @@ import os
 from pathlib import Path
 import re
 import subprocess
+import time
 from urllib.parse import quote
 
 
@@ -14,15 +15,23 @@ SUITES = {"all", "system", "protocol", "host", "desktop", "core", "release"}
 MACOS_RUNNERS = {"macos-15", "macos-15-intel", "macos-26"}
 
 
-def api(repository, endpoint, *, body=None):
+def api(repository, endpoint, *, body=None, retry_missing=False):
     command = ["gh", "api", f"repos/{repository}/{endpoint}"]
     if body is not None:
         command.extend(["--method", "POST", "--input", "-"])
-    output = subprocess.check_output(
-        command, input=json.dumps(body) if body is not None else None,
-        encoding="utf-8", timeout=45,
-    )
-    return json.loads(output)
+    delays = (0, 1, 2, 4, 8, 16) if retry_missing and body is None else (0,)
+    for delay in delays:
+        if delay:
+            time.sleep(delay)
+        result = subprocess.run(
+            command, input=json.dumps(body) if body is not None else None,
+            capture_output=True, encoding="utf-8", timeout=45,
+        )
+        if result.returncode == 0:
+            return json.loads(result.stdout)
+        if "(HTTP 404)" not in result.stderr:
+            break
+    raise RuntimeError(f"GitHub API request failed for {endpoint}: {result.stderr.strip()}")
 
 
 def plan(suite, macos_runner, package_run, package_version):
@@ -97,7 +106,8 @@ def dispatch(repository, source_ref, expected_head, suite, macos_runner, package
             run = {"check": name, "workflow": workflow, "id": run_id, "url": url, "inputs": inputs}
             receipt["runs"].append(run)
             print(f"{name} {url}", flush=True)
-            recorded = api(repository, f"actions/runs/{run_id}")
+            # A workflow dispatch can return a run ID before the run is readable.
+            recorded = api(repository, f"actions/runs/{run_id}", retry_missing=True)
             run["workflowSha"] = recorded.get("head_sha")
             if run["workflowSha"] != head:
                 raise ValueError(f"Workflow ref moved during dispatch. Run {run_id} has a different workflow SHA")
