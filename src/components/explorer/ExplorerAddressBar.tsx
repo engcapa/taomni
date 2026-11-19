@@ -64,7 +64,11 @@ export function ExplorerAddressBar({ tabId, pane, home, filter, onFilter, addres
         if (!editing && !(event.target as HTMLElement).closest("button")) startEditing();
       }}>
         {!editing && <><div className="ex-crumbs" data-testid="explorer-crumbs" ref={crumbContainer}>
-          {crumbs.map((crumb, index) => <span key={crumb.path} className="inline-flex shrink-0 items-center">
+          {crumbs.map((crumb, index) => <span key={crumb.path} className="inline-flex shrink-0 items-center"
+            onClick={(event) => {
+              if ((event.target as HTMLElement).closest(".ex-csep")) return;
+              go(crumb.path);
+            }}>
             <button className={`ex-crumb ${index === crumbs.length - 1 ? "last" : ""}`} data-explorer-drop={crumb.path} data-testid="explorer-crumb" data-path={crumb.path} title={crumb.path} onClick={() => go(crumb.path)}>{index === 0 ? <HardDrive /> : crumb.name}</button>
             {index < crumbs.length - 1 && <button className="ex-csep" title={label("显示子目录", "Show subfolders")} onClick={(event) => void subfolders(event, crumb)}><ChevronRight /></button>}
           </span>)}

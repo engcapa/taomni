@@ -44,7 +44,7 @@ steps:
 - wait_for: '[data-testid="alert-dialog-message"]'
 - click: '[data-testid="alert-dialog-ok"]'
 - assert_not_visible: '[data-testid="alert-dialog-message"]'
-- press: Mod+k
+- click: '[data-testid="global-search-trigger"]'
 - wait_for:
     selector: '[data-testid="global-search-modal"]'
     timeout_sec: 30
@@ -59,7 +59,7 @@ steps:
 - press: Enter
 - wait_for: '[data-testid="workspace-switcher"]'
 - assert_not_visible: '[data-testid="global-search-modal"]'
-- press: Mod+k
+- click: '[data-testid="global-search-trigger"]'
 - wait_for:
     selector: '[data-testid="global-search-modal"]'
     timeout_sec: 30
