@@ -289,7 +289,7 @@ jobs:
               and item["executable"]
           ]
           assert len(harnesses) == 1, harnesses
-          (evidence / "harness-path.txt").write_text(harnesses[0] + "\n")
+          (evidence / "harness-path.txt").write_text(harnesses[0] + "\n", encoding="utf-8", newline="\n")
           PY
       - name: Measure both paths with the existing native performance budgets
         shell: bash
