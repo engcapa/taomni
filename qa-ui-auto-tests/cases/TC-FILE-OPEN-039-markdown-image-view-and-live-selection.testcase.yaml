@@ -56,7 +56,9 @@ steps:
 - assert_not_visible: '[data-testid="markdown-diagram-menu"]'
 - right_click: '[data-testid="markdown-live"] .fv-md-drawio'
 - assert_visible: '[data-testid="markdown-diagram-menu-copy-source"]'
-- click: '[data-testid="markdown-live"] .fv-md-mermaid'
+- blur: '[data-testid="markdown-diagram-menu-open"]'
+- click: '[data-testid="markdown-outline-toggle"]'
+- assert_not_visible: '[data-testid="markdown-outline"]'
 - assert_not_visible: '[data-testid="markdown-diagram-menu"]'
 - click: '[data-testid="markdown-mode-split"]'
 - eval_readonly:
