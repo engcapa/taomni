@@ -2,6 +2,7 @@
 
 ## 2026-11-19 首次全量安装与后续按需升级
 
+- `b34634e0d` 将仍处于迁移过渡期的 `MfaBackend` 从 `AppState` 顶层移入显式 `LegacyFeatureRuntime`，备份、升级、命令和 MFA facade 均改用 `state.legacy.mfa`。这只收口状态所有权边界，未把 MFA 业务标记为已迁出。`cargo check --lib --no-default-features`、相关 Rust 编译测试、`pnpm check:refactor` 和 `git diff --check` 通过。匹配源码的 hosted UI 复验为 #44526631104，完成 shard 会在运行期间下载。
 - 合入 `origin/main` 的 `1d709c748`（#834），合并提交为 `f6e55e493`。新 Draw.io 用例沿用 main 的 `TC-FILE-OPEN-033`，Live 表格用例移到 `TC-FILE-OPEN-037`，继续参加 browser/native crash-regression。之前运行使用的旧编号保留在对应记录中。
 - 首次从单体版升级时，按签名 `modules.json` 的固定首发名单安装本机兼容模块。用户可单独卸载，默认保留业务数据。后续仅对已装模块显示兼容更新并保留启禁选择。首次出现在后续目录中的兼容模块显示名称和功能说明，用户选择是否安装。 [升级设计](taomni-modular-split-design.md#64-更新检查)
 - 旧单体用户直接升级到模块化首发之后的版本时，以签名首装名单为基线。名单外的新模块显示选装提示，首次联网读到缺少名单的旧目录时继续等待有效名单。Native 046 使用后续签名目录覆盖自动安装 MFA、展示 Hello 说明和确认前零传输。Browser 041 同步检查安装后提示清理。 [原生用例](../qa-ui-auto-tests/cases/TC-MODULES-046-skip-first-modular-release.testcase.yaml)
