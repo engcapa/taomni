@@ -18,6 +18,10 @@ on:
       system_execution_only:
         type: boolean
         default: false
+    secrets:
+      APPLE_CERTIFICATE: {required: false}
+      APPLE_CERTIFICATE_PASSWORD: {required: false}
+      APPLE_SIGNING_IDENTITY: {required: false}
 
 permissions:
   contents: read
@@ -62,7 +66,7 @@ jobs:
           if-no-files-found: error
 
   macos-system-execution:
-    name: macOS ad-hoc hardened runtime and quarantined hosts
+    name: macOS hardened runtime and quarantined hosts
     runs-on: macos-15-intel
     timeout-minutes: 30
     defaults:
@@ -94,6 +98,37 @@ jobs:
           name: modular-system-execution-macos-intel
           path: qa-modular-system-execution
           if-no-files-found: error
+      - uses: actions/setup-node@v4
+        if: vars.MACOS_SIGNING_CERT_SHA1 != ''
+        with:
+          node-version: '22'
+      - name: Import the fixed certificate after compiling the test binaries
+        if: vars.MACOS_SIGNING_CERT_SHA1 != ''
+        env:
+          RELEASE_PLATFORM: macOS
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          MACOS_SIGNING_CERT_SHA1: ${{ vars.MACOS_SIGNING_CERT_SHA1 }}
+        run: node scripts/configure-release-signing.mjs
+      - name: Verify fixed-certificate launch with hardened runtime
+        if: vars.MACOS_SIGNING_CERT_SHA1 != ''
+        run: |
+          python scripts/run-module-system-execution-gates.py \
+            --evidence qa-modular-system-execution-fixed \
+            --harness-build-log qa-modular-system-execution/harness-build.log
+      - name: Remove temporary signing credentials after a failed check
+        if: always() && env.MACOS_SIGNING_WORK_DIR != ''
+        run: |
+          if [[ -d "$MACOS_SIGNING_WORK_DIR" ]]; then
+            node scripts/configure-release-signing.mjs --cleanup-macos
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always() && vars.MACOS_SIGNING_CERT_SHA1 != ''
+        with:
+          name: modular-system-execution-macos-fixed
+          path: qa-modular-system-execution-fixed
+          if-no-files-found: warn
 
   hello-plugin:
     if: ${{ !inputs.system_execution_only }}

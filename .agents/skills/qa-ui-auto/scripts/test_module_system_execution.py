@@ -1,4 +1,5 @@
 """Pure contracts; never sign code, assess Gatekeeper or launch an application."""
+import hashlib
 import importlib.util
 import json
 import os
@@ -37,6 +38,18 @@ class SystemExecutionGateTests(unittest.TestCase):
         for output in ["", valid.replace("0x10000", "0x2"), valid.replace("Signature=adhoc", "Authority=Other")]:
             with self.assertRaisesRegex(RuntimeError, "actual ad-hoc"):
                 gate.hardened_signature(output)
+
+    def test_fixed_mode_compares_the_extracted_leaf_certificate_and_runtime_flag(self):
+        details = "CodeDirectory v=20500 size=1 flags=0x10000(runtime)\nAuthority=Local"
+        leaf = b"test certificate bytes"
+        expected = hashlib.sha1(leaf, usedforsecurity=False).hexdigest().upper()
+        self.assertEqual(gate.hardened_signature(details, expected, leaf)["certificateSha1"], expected)
+        with self.assertRaisesRegex(RuntimeError, "pinned release certificate"):
+            gate.hardened_signature(details, expected, b"unrelated certificate")
+        with self.assertRaisesRegex(RuntimeError, "hardened runtime"):
+            gate.hardened_signature(details.replace("0x10000", "0x0"), expected, leaf)
+        with self.assertRaisesRegex(RuntimeError, "fixed certificate"):
+            gate.hardened_signature(details + "\nSignature=adhoc", expected, leaf)
 
     def test_harness_selection_rejects_empty_ambiguous_and_non_test_builds(self):
         with tempfile.TemporaryDirectory() as temporary:

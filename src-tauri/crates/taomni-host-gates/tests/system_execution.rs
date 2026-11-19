@@ -7,10 +7,10 @@ use std::time::{Duration, Instant};
 
 fn require_hosted_experiment() {
     assert_eq!(std::env::var("GITHUB_ACTIONS").as_deref(), Ok("true"));
-    assert_eq!(
+    assert!(matches!(
         std::env::var("TAOMNI_SYSTEM_EXECUTION_GATE").as_deref(),
-        Ok("adhoc-hardened")
-    );
+        Ok("adhoc-hardened" | "fixed-hardened")
+    ));
 }
 
 #[test]
