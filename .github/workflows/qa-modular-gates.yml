@@ -1,277 +1,116 @@
-name: QA Modular G1-G11 Release Gates
+name: QA Modular G1-G11
 
 on:
   workflow_dispatch:
     inputs:
-      head:
-        description: Commit or ref to test
+      source_ref:
+        description: Branch with the modular product and its QA workflows
         type: string
-        required: false
-        default: ''
-  workflow_call:
-    inputs:
+        required: true
       head:
-        description: Commit or ref to test
+        description: Expected full source SHA (empty pins the current branch tip)
         type: string
-        required: false
-        default: ''
+      suite:
+        description: Checks to dispatch
+        type: choice
+        options: [all, system, protocol, host, desktop, core, release]
+        default: all
+      macos_runner:
+        description: macOS runner for desktop QA
+        type: choice
+        options: [macos-15, macos-15-intel, macos-26]
+        default: macos-15
+      package_run:
+        description: Matching artifact-only Release Bundle run ID (required for release suite)
+        type: string
+      package_version:
+        description: Version in that run's installers
+        type: string
 
 permissions:
   contents: read
-
-concurrency:
-  group: modular-gates-${{ github.ref }}-${{ inputs.head }}
-  cancel-in-progress: true
+  actions: read
 
 jobs:
-  g8-g9-contracts:
-    name: G8/G9 package and core-only contracts
+  dispatch:
+    name: Dispatch modular QA and retain run links
     runs-on: ubuntu-24.04
-    timeout-minutes: 35
-    defaults:
-      run:
-        shell: bash
-    env:
-      PYTHONPATH: .agents/skills/qa-ui-auto/scripts
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: write
+    outputs:
+      head: ${{ steps.dispatch.outputs.head }}
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ inputs.head || github.sha }}
+          ref: ${{ github.workflow_sha }}
           persist-credentials: false
-      - uses: actions/setup-node@v4
+          sparse-checkout: .github/scripts/modular_gate_runs.py
+          sparse-checkout-cone-mode: false
+      - name: Resolve source and dispatch the existing QA workflows
+        id: dispatch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_REF: ${{ inputs.source_ref }}
+          EXPECTED_HEAD: ${{ inputs.head }}
+          VERIFICATION_SUITE: ${{ inputs.suite }}
+          MACOS_RUNNER: ${{ inputs.macos_runner }}
+          PACKAGE_RUN: ${{ inputs.package_run }}
+          PACKAGE_VERSION: ${{ inputs.package_version }}
+        run: python .github/scripts/modular_gate_runs.py
+      - uses: actions/upload-artifact@v4
+        if: always()
         with:
-          node-version: '22'
+          name: modular-gate-runs
+          path: modular-gate-runs.json
+          if-no-files-found: warn
+          retention-days: 30
+
+  core-inventory:
+    name: G9 core build inventory and G11 entrypoint inventory
+    needs: dispatch
+    if: ${{ inputs.suite == 'all' || inputs.suite == 'core' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.dispatch.outputs.head }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
       - uses: pnpm/action-setup@v4
         with:
           version: 10
-          run_install: false
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Install frontend dependencies
-        run: pnpm install --frozen-lockfile
-      - name: Record gate identity
-        run: |
-          mkdir -p modular-gates-evidence/G8-G9
-          git rev-parse HEAD | tee modular-gates-evidence/G8-G9/source-sha.txt
-          rustc --version | tee modular-gates-evidence/G8-G9/rustc-version.txt
-          node --version | tee modular-gates-evidence/G8-G9/node-version.txt
-      - name: Verify package, catalog and release contracts
-        run: |
-          set -o pipefail
-          cargo test --manifest-path scripts/plugin-package/Cargo.toml --lib --locked 2>&1 | tee modular-gates-evidence/G8-G9/package-tool.log
-          node --test scripts/compose-modules-manifest.test.mjs scripts/stage-published-module-catalog.test.mjs scripts/release-workflow.test.mjs 2>&1 | tee modular-gates-evidence/G8-G9/catalog-tool.log
-      - name: Verify static boundaries and core-only build
-        run: |
-          set -o pipefail
-          pnpm check:refactor 2>&1 | tee modular-gates-evidence/G8-G9/refactor.log
-          cargo check --manifest-path src-tauri/Cargo.toml --lib --no-default-features --locked 2>&1 | tee modular-gates-evidence/G8-G9/core-only-check.log
-          cargo tree --manifest-path src-tauri/Cargo.toml --no-default-features --locked --edges normal > modular-gates-evidence/G8-G9/core-only-tree.txt
-      - uses: actions/upload-artifact@v4
-        if: always()
+      - uses: actions/setup-node@v4
         with:
-          name: modular-gates-G8-G9
-          path: modular-gates-evidence/G8-G9
-          if-no-files-found: error
-
-  g10-protocol:
-    name: G10 protocol, timeout and cancellation (${{ matrix.os }})
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-24.04, windows-latest, macos-15]
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
-    defaults:
-      run:
+          node-version: 22
+          cache: pnpm
+      - name: Record the release dependency graph and native entrypoints
         shell: bash
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.head || github.sha }}
-          persist-credentials: false
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri -> target
-          shared-key: modular-gates-g10-${{ runner.os }}-${{ runner.arch }}
-      - name: Record gate identity
         run: |
-          mkdir -p modular-gates-evidence/G10
-          git rev-parse HEAD | tee modular-gates-evidence/G10/source-sha.txt
-          rustc --version | tee modular-gates-evidence/G10/rustc-version.txt
-      - name: Run wire and real host cancellation contracts
-        run: |
-          set -o pipefail
-          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-api --locked 2>&1 | tee modular-gates-evidence/G10/api.log
-          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-services --lib --locked 2>&1 | tee modular-gates-evidence/G10/services.log
-          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-host-gates --test lifecycle --locked -- --ignored --test-threads=1 --nocapture 2>&1 | tee modular-gates-evidence/G10/lifecycle.log
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: modular-gates-G10-${{ matrix.os }}
-          path: modular-gates-evidence/G10
-          if-no-files-found: error
-
-  g6-g7-g11-host:
-    name: G6/G7/G11 host lifecycle (${{ matrix.os }})
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-24.04, windows-latest, macos-15]
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 40
-    defaults:
-      run:
+          mkdir -p gate-inventory
+          git rev-parse HEAD > gate-inventory/source-sha.txt
+          rustc --version > gate-inventory/rustc-version.txt
+          for target in x86_64-unknown-linux-gnu x86_64-pc-windows-msvc aarch64-apple-darwin x86_64-apple-darwin; do
+            cargo tree --manifest-path src-tauri/Cargo.toml --locked -p taomni --edges normal,build \
+              --target "$target" > "gate-inventory/cargo-tree-$target.txt"
+          done
+          git ls-files src-tauri/resources > gate-inventory/resource-sources.txt
+          git ls-files src-tauri/tauri.conf.json 'src-tauri/tauri.*.conf.json' > gate-inventory/bundle-configs.txt
+          git grep -n -E -- '"--(headless|vnc-special-key-hook|sockscap-redirector-bridge)"' \
+            -- src-tauri/src src-tauri/plugins > gate-inventory/entrypoints.txt || test "$?" -eq 1
+      - name: Build the release frontend and record actual chunk hashes
         shell: bash
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.head || github.sha }}
-          persist-credentials: false
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri -> target
-          shared-key: modular-gates-host-${{ runner.os }}-${{ runner.arch }}
-      - name: Build official host fixtures
-        run: cargo build --manifest-path src-tauri/Cargo.toml -p taomni-hello-plugin -p taomni-plugin-mfa --bins --locked
-      - name: Record gate identity
         run: |
-          mkdir -p modular-gates-evidence/G6-G7-G11
-          git rev-parse HEAD | tee modular-gates-evidence/G6-G7-G11/source-sha.txt
-          rustc --version | tee modular-gates-evidence/G6-G7-G11/rustc-version.txt
-      - name: Run real process lifecycle and profile ownership gates
-        run: |
-          set -o pipefail
-          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-host-gates --test lifecycle --locked -- --ignored --test-threads=1 --nocapture 2>&1 | tee modular-gates-evidence/G6-G7-G11/lifecycle.log
-          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-host-gates --test profile --locked -- --ignored --test-threads=1 --nocapture 2>&1 | tee modular-gates-evidence/G6-G7-G11/profile.log
+          pnpm install --frozen-lockfile
+          pnpm run build --manifest
+          cp dist/.vite/manifest.json gate-inventory/vite-manifest.json
+          find dist -type f -print0 | sort -z | xargs -0 -r sha256sum > gate-inventory/dist-sha256.txt
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: modular-gates-G6-G7-G11-${{ matrix.os }}
-          path: modular-gates-evidence/G6-G7-G11
+          name: modular-core-build-inventory
+          path: gate-inventory/
           if-no-files-found: error
-
-  g1-g3-system-trust:
-    name: G1/G3 system trust
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - os: macos-15-intel
-            gate: G1
-            command: python scripts/run-module-system-execution-gates.py --evidence modular-gates-evidence/G1
-          - os: windows-latest
-            gate: G3
-            command: python scripts/run-module-windows-execution-gates.py --evidence modular-gates-evidence/G3
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 35
-    defaults:
-      run:
-        shell: bash
-    env:
-      PYTHONPATH: .agents/skills/qa-ui-auto/scripts
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.head || github.sha }}
-          persist-credentials: false
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Build host fixtures without release secrets
-        run: cargo build --manifest-path src-tauri/Cargo.toml -p taomni-hello-plugin -p taomni-plugin-mfa --bins --locked
-      - name: Run system trust gate
-        run: |
-          mkdir -p modular-gates-evidence/${{ matrix.gate }}
-          git rev-parse HEAD > modular-gates-evidence/${{ matrix.gate }}/source-sha.txt
-          ${{ matrix.command }}
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: modular-gates-${{ matrix.gate }}-${{ matrix.os }}
-          path: modular-gates-evidence/${{ matrix.gate }}
-          if-no-files-found: error
-
-  g4-g5-capture-execution:
-    name: G4/G5 Linux execution and frame transport
-    runs-on: ubuntu-24.04
-    timeout-minutes: 45
-    defaults:
-      run:
-        shell: bash
-    env:
-      PYTHONPATH: .agents/skills/qa-ui-auto/scripts
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.head || github.sha }}
-          persist-credentials: false
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Install Linux capture dependencies
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y --no-install-recommends libasound2-dev libpipewire-0.3-dev libclang-dev xvfb xauth
-      - name: Build hosts and record identity
-        run: |
-          mkdir -p modular-gates-evidence/G4-G5
-          git rev-parse HEAD | tee modular-gates-evidence/G4-G5/source-sha.txt
-          cargo build --manifest-path src-tauri/Cargo.toml -p taomni-hello-plugin -p taomni-plugin-mfa --bins --locked
-      - name: Run noexec and frame contracts
-        run: |
-          set -o pipefail
-          python scripts/run-module-execution-gates.py --evidence modular-gates-evidence/G4-G5
-          cargo test --release --manifest-path src-tauri/Cargo.toml -p taomni-plugin-stream --locked --lib frame_transport::compare_in_process_and_host -- --ignored --exact --nocapture 2>&1 | tee modular-gates-evidence/G4-G5/frame.log
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: modular-gates-G4-G5
-          path: modular-gates-evidence/G4-G5
-          if-no-files-found: error
-
-  g2-capture-permissions:
-    name: G2 capture and permission ownership (${{ matrix.os }})
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-24.04, windows-latest, macos-15]
-    runs-on: ${{ matrix.os }}
-    timeout-minutes: 35
-    defaults:
-      run:
-        shell: bash
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.head || github.sha }}
-          persist-credentials: false
-      - uses: dtolnay/rust-toolchain@stable
-      - name: Record identity and run capture ownership contracts
-        run: |
-          set -o pipefail
-          mkdir -p modular-gates-evidence/G2
-          git rev-parse HEAD > modular-gates-evidence/G2/source-sha.txt
-          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-sdk --lib capture_native_tests --locked -- --ignored --test-threads=1 --nocapture 2>&1 | tee modular-gates-evidence/G2/sdk-capture.log
-          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-host-gates --test capture_still --locked -- --ignored --test-threads=1 --nocapture 2>&1 | tee modular-gates-evidence/G2/core-capture.log
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: modular-gates-G2-${{ matrix.os }}
-          path: modular-gates-evidence/G2
-          if-no-files-found: error
-
-  gate-summary:
-    name: G1-G11 release gate summary
-    if: ${{ always() }}
-    needs: [g8-g9-contracts, g10-protocol, g6-g7-g11-host, g1-g3-system-trust, g4-g5-capture-execution, g2-capture-permissions]
-    runs-on: ubuntu-24.04
-    steps:
-      - name: Require every gate job to pass
-        env:
-          RESULTS: ${{ toJSON(needs) }}
-        run: |
-          python - <<'PY'
-          import json, os
-          results = json.loads(os.environ['RESULTS'])
-          failed = {name: value['result'] for name, value in results.items() if value['result'] != 'success'}
-          if failed:
-              raise SystemExit(f'G1-G11 release gates are not closed: {failed}')
-          print('G1-G11 gate jobs passed for the selected source.')
-          PY
+          retention-days: 30
