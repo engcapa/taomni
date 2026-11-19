@@ -22,6 +22,24 @@ sha256() {
   shasum -a 256 "$1" | awk '{print $1}'
 }
 
+validate_stapled_ticket() {
+  local app_path="$1" attempt output status
+  for attempt in 1 2 3; do
+    if output="$(xcrun stapler validate "$app_path" 2>&1)"; then
+      printf '%s\n' "$output"
+      return 0
+    else
+      status=$?
+    fi
+    printf '%s\n' "$output" >&2
+    if [[ "$attempt" == 3 ]] || ! grep -Eq 'NSURLErrorDomain Code=-1005([^0-9]|$)' <<<"$output"; then
+      return "$status"
+    fi
+    echo "Stapler lost its network connection. Retrying validation." >&2
+    sleep "$((attempt * 2))"
+  done
+}
+
 verify_staged() {
   test -f "$manifest" || {
     echo "Redirector manifest is missing: $manifest" >&2
@@ -75,7 +93,7 @@ verify_staged() {
   gatekeeper="$(spctl --assess --type execute --verbose=4 "$app" 2>&1)"
   grep -Fq 'source=Notarized Developer ID' <<<"$gatekeeper"
   if xcrun --find stapler >/dev/null 2>&1; then
-    xcrun stapler validate "$app"
+    validate_stapled_ticket "$app"
   elif [[ "${CI:-}" == "true" ]]; then
     echo "Xcode stapler is required for the macOS release gate" >&2
     exit 1
