@@ -344,12 +344,16 @@ controls:
   - id: module-action-install-hello-plugin
     selector: '[data-testid="module-action-install-hello-plugin"]'
     kind: interactive
+    aliases:
+    - '[data-testid="module-action-install-mfa"]'
   - id: module-delete-data-hello-plugin
     selector: '[data-testid="module-delete-data-hello-plugin"]'
     kind: interactive
   - id: module-data-retained-hello-plugin
     selector: '[data-testid="module-data-retained-hello-plugin"]'
     kind: display
+    aliases:
+    - '[data-testid="module-data-retained-mfa"]'
   - id: module-action-open-hello-plugin
     selector: '[data-testid="module-action-open-hello-plugin-hello-plugin"]'
     kind: interactive

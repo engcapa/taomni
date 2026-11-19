@@ -2715,8 +2715,10 @@
   ↳ `[data-testid="module-action-disable-mfa"]` — alias
 - `[data-testid="module-action-uninstall-hello-plugin"]` — interactive — F-Modules-1.module-action-uninstall-hello-plugin
 - `[data-testid="module-action-install-hello-plugin"]` — interactive — F-Modules-1.module-action-install-hello-plugin
+  ↳ `[data-testid="module-action-install-mfa"]` — alias
 - `[data-testid="module-delete-data-hello-plugin"]` — interactive — F-Modules-1.module-delete-data-hello-plugin
 - `[data-testid="module-data-retained-hello-plugin"]` — display — F-Modules-1.module-data-retained-hello-plugin
+  ↳ `[data-testid="module-data-retained-mfa"]` — alias
 - `[data-testid="module-action-open-hello-plugin-hello-plugin"]` — interactive — F-Modules-1.module-action-open-hello-plugin
 - `[data-testid="plugin-tab-panel"]` — display — F-Modules-1.plugin-tab-panel
 - `[data-testid="plugin-tab-unavailable"]` — display — F-Modules-1.plugin-tab-unavailable

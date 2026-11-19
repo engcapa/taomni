@@ -166,6 +166,47 @@ fn uninstall_does_not_restore_enabled_state_from_settings() {
 }
 
 #[test]
+fn restored_data_requires_installation_and_is_preserved_when_installing() {
+    let root = tempdir().unwrap();
+    let plugins = root.path().join("plugins");
+    let data = plugins.join("mfa/data/mfa.db");
+    fs::create_dir_all(data.parent().unwrap()).unwrap();
+    fs::write(&data, b"restored MFA data").unwrap();
+    let locator = retained_data::discover(&plugins, "mfa", 1).unwrap();
+    retained_data::save(&plugins, &locator).unwrap();
+
+    let registry = PluginRegistry::new(&plugins);
+    registry.scan().unwrap();
+    let record = registry.get("mfa").unwrap();
+    assert_eq!(record.state, LifecycleState::Uninstalled);
+    assert!(record.data_retained && record.reason.is_none());
+    assert!(matches!(
+        registry.invoke("mfa", "ping", Value::Null),
+        Err(PluginError::NotFound(_))
+    ));
+    assert!(matches!(
+        registry.frontend_asset("mfa", "1.0.0", "frontend/index.js"),
+        Err(PluginError::NotFound(_))
+    ));
+    assert!(matches!(
+        registry.set_enabled("mfa", true),
+        Err(PluginError::NotFound(_))
+    ));
+    assert!(!plugins.join("mfa/active.json").exists());
+
+    let record = registry
+        .install_verified(&verify::test_support::verified_package(&manifest("mfa")))
+        .unwrap();
+    assert_eq!(record.state, LifecycleState::Installed);
+    assert!(record.data_retained);
+    assert!(matches!(
+        registry.invoke("mfa", "ping", Value::Null),
+        Err(PluginError::Disabled(_))
+    ));
+    assert_eq!(fs::read(data).unwrap(), b"restored MFA data");
+}
+
+#[test]
 fn frontend_serves_signed_bytes_and_rejects_tampering_or_disabled_state() {
     let root = tempdir().unwrap();
     let registry = PluginRegistry::new(root.path());

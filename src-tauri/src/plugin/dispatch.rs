@@ -246,12 +246,7 @@ impl PluginRegistry {
                 command: command.into(),
             });
         }
-        let record = self
-            .get(slug)
-            .ok_or_else(|| PluginError::NotFound(slug.into()))?;
-        if record.state != LifecycleState::Enabled {
-            return Err(PluginError::Disabled(slug.into()));
-        }
+        let record = self.enabled_record(slug)?;
         if !record.manifest.commands.contains(command) {
             return Err(PluginError::CommandDenied {
                 slug: slug.into(),

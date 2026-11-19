@@ -12,6 +12,7 @@ use crate::{
         snapshot_context::SnapshotContext,
     },
     mfa::backend,
+    plugin::LifecycleState,
     runtime::bootstrap::isolated_state,
 };
 
@@ -54,7 +55,8 @@ pub(super) fn exercise_modular_restore() {
     .unwrap();
 
     let destination = tempfile::tempdir().unwrap();
-    let profile = destination.path();
+    let profile_root = ProfileRoot::prepare(destination.path()).unwrap();
+    let profile = profile_root.path();
     stage_restore_to_dir(profile, &archive, None).unwrap();
     assert!(!profile.join(TARGET).exists());
     let state = isolated_state(profile, AiConfig::default()).unwrap();
@@ -63,6 +65,9 @@ pub(super) fn exercise_modular_restore() {
         fs::read(source.join(TARGET)).unwrap()
     );
     assert!(!profile.join("plugins/mfa/active.json").exists());
+    let retained = state.plugins.get(OWNER).unwrap();
+    assert_eq!(retained.state, LifecycleState::Uninstalled);
+    assert!(retained.data_retained && retained.reason.is_none());
     let codes = || {
         tauri::async_runtime::block_on(backend::run::<Vec<mfa::models::MfaCode>, _>(
             &state,

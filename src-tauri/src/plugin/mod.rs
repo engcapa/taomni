@@ -328,6 +328,17 @@ impl PluginRegistry {
             .map(PluginRecord::with_current_rollback)
     }
 
+    fn enabled_record(&self, slug: &str) -> Result<PluginRecord, PluginError> {
+        let record = self
+            .get(slug)
+            .filter(|record| record.state != LifecycleState::Uninstalled)
+            .ok_or_else(|| PluginError::NotFound(slug.into()))?;
+        if record.state != LifecycleState::Enabled {
+            return Err(PluginError::Disabled(slug.into()));
+        }
+        Ok(record)
+    }
+
     pub fn set_enabled(&self, slug: &str, enabled: bool) -> Result<PluginRecord, PluginError> {
         let _lifecycle = self
             .lifecycle
@@ -410,12 +421,15 @@ impl PluginRegistry {
                 .filter(|path| path.is_file())
                 .collect::<Vec<_>>();
             candidates.sort();
-            (
-                candidates
-                    .pop()
-                    .ok_or_else(|| PluginError::NotFound(slug.to_owned()))?,
-                LifecycleState::Uninstalled,
-            )
+            let Some(path) = candidates.pop() else {
+                // Restore can publish data before a signed version is installed.
+                let locator = retained_data::load(&self.root, slug)?
+                    .ok_or_else(|| PluginError::NotFound(slug.to_owned()))?;
+                let mut manifest = placeholder_manifest(slug);
+                manifest.data_schema_version = locator.data_schema_version;
+                return Ok((manifest, LifecycleState::Uninstalled, pointer));
+            };
+            (path, LifecycleState::Uninstalled)
         };
         let manifest = verify::verify_installed(
             manifest_path

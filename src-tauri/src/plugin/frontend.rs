@@ -19,12 +19,7 @@ impl PluginRegistry {
                 "only frontend assets can be served".into(),
             ));
         }
-        let record = self
-            .get(slug)
-            .ok_or_else(|| PluginError::NotFound(slug.into()))?;
-        if record.state != LifecycleState::Enabled {
-            return Err(PluginError::Disabled(slug.into()));
-        }
+        let record = self.enabled_record(slug)?;
         if record.manifest.version != version {
             return Err(PluginError::InvalidManifest(
                 "frontend version is no longer active; reopen the module".into(),

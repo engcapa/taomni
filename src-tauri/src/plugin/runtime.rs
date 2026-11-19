@@ -129,10 +129,8 @@ impl PluginRegistry {
         {
             return Err(PluginError::HostUnavailable(slug.into()));
         }
-        let current = self
-            .get(slug)
-            .ok_or_else(|| PluginError::NotFound(slug.into()))?;
-        if current.state != LifecycleState::Enabled || current.manifest != record.manifest {
+        let current = self.enabled_record(slug)?;
+        if current.manifest != record.manifest {
             return Err(PluginError::Disabled(slug.into()));
         }
         let host_name = record
