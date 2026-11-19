@@ -1,4 +1,4 @@
-//! One-time on-disk migration from the legacy `Taomni` identity to `Taomni`.
+//! One-time on-disk migration from the legacy `NewMob` identity to `Taomni`.
 //!
 //! The app was renamed NewMob → Taomni. That rename moves three on-disk roots:
 //!   1. The Tauri app-data dir, which is derived from the bundle identifier
@@ -25,14 +25,8 @@ const LEGACY_DB_NAME: &str = "newmob.db";
 /// New primary database filename.
 const NEW_DB_NAME: &str = "taomni.db";
 
-/// Run all migrations. Call once at startup, before the app-data dir is
-/// created or the database is opened.
-pub fn run_profile(new_app_data: &Path) {
-    migrate_app_data_dir(new_app_data);
-    migrate_db_file(new_app_data);
-}
-pub fn run(new_app_data: &Path) {
-    run_profile(new_app_data);
+/// Migrate the global named directories once startup has profile ownership.
+pub(crate) fn migrate_default_roots() {
     if std::env::var_os("NEWMOB_DATA_DIR").is_some() {
         return;
     }
@@ -45,7 +39,7 @@ pub fn run(new_app_data: &Path) {
 /// The legacy dir is the sibling of `new_app_data` named after the old bundle
 /// identifier. We only migrate when the new dir does not yet exist (or is
 /// empty) and the legacy dir is present.
-fn migrate_app_data_dir(new_app_data: &Path) {
+pub(crate) fn migrate_app_data_dir(new_app_data: &Path) {
     let Some(parent) = new_app_data.parent() else {
         return;
     };
@@ -62,7 +56,7 @@ fn migrate_app_data_dir(new_app_data: &Path) {
 
 /// Rename the primary DB file `newmob.db` → `taomni.db` inside the (already
 /// migrated) app-data dir, if the new name isn't there yet.
-fn migrate_db_file(new_app_data: &Path) {
+pub(crate) fn migrate_db_file(new_app_data: &Path) {
     let new_db = new_app_data.join(NEW_DB_NAME);
     let legacy_db = new_app_data.join(LEGACY_DB_NAME);
     if new_db.exists() || !legacy_db.exists() {

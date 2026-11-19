@@ -47,6 +47,7 @@ impl ProfileRuntimeLeases {
         // Record the installation origin before restore can create a modular
         // generation marker. Both occur under the profile lease.
         let profile = crate::backup::coordination::ProfileLease::prepare(data, || {
+            crate::migrate::migrate_db_file(data);
             if let Err(error) = crate::plugin::release_state::initialize(data) {
                 tracing::warn!(%error, "Could not initialize module release state");
             }

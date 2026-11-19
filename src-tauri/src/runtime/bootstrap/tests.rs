@@ -21,6 +21,7 @@ fn construction_is_explicit_and_preserves_lazy_optional_data_and_mail_identity()
         ProfilePaths::isolated(root.path()),
         StartupMode::Headless,
         Some(config()),
+        false,
     )
     .unwrap();
     assert!(
@@ -73,7 +74,8 @@ fn startup_failure_releases_both_mode_and_profile_ownership() {
         bootstrap(
             ProfilePaths::isolated(root.path()),
             StartupMode::Headless,
-            Some(config())
+            Some(config()),
+            false,
         )
         .is_err()
     );
@@ -82,6 +84,7 @@ fn startup_failure_releases_both_mode_and_profile_ownership() {
         ProfilePaths::isolated(root.path()),
         StartupMode::Headless,
         Some(config()),
+        false,
     )
     .unwrap();
     assert!(recovered.state.core.db.lock().is_ok());
@@ -94,13 +97,15 @@ fn desktop_and_headless_share_core_schema_and_keep_profile_lock_through_extracte
         ProfilePaths::isolated(root.path()),
         StartupMode::Desktop,
         Some(config()),
+        false,
     )
     .unwrap();
     assert!(
         bootstrap(
             ProfilePaths::isolated(root.path()),
             StartupMode::Headless,
-            Some(config())
+            Some(config()),
+            false,
         )
         .is_err()
     );
@@ -110,7 +115,8 @@ fn desktop_and_headless_share_core_schema_and_keep_profile_lock_through_extracte
         bootstrap(
             ProfilePaths::isolated(root.path()),
             StartupMode::Headless,
-            Some(config())
+            Some(config()),
+            false,
         )
         .is_err()
     );
@@ -119,6 +125,7 @@ fn desktop_and_headless_share_core_schema_and_keep_profile_lock_through_extracte
         ProfilePaths::isolated(root.path()),
         StartupMode::Headless,
         Some(config()),
+        false,
     )
     .unwrap();
     assert!(
@@ -132,4 +139,51 @@ fn desktop_and_headless_share_core_schema_and_keep_profile_lock_through_extracte
                 .get::<_, i64>(0))
             .is_ok()
     );
+}
+
+#[test]
+fn refused_startup_leaves_the_legacy_database_at_its_original_path() {
+    use crate::runtime::profile::ModeLease;
+
+    for (owner, contender) in [
+        (StartupMode::Desktop, StartupMode::Headless),
+        (StartupMode::Headless, StartupMode::Desktop),
+    ] {
+        let root = tempfile::tempdir().unwrap();
+        let legacy = root.path().join("newmob.db");
+        let current = root.path().join("taomni.db");
+        rusqlite::Connection::open(&legacy)
+            .unwrap()
+            .execute_batch("CREATE TABLE previous_profile (value TEXT); INSERT INTO previous_profile VALUES ('retained');")
+            .unwrap();
+        let original = std::fs::read(&legacy).unwrap();
+        let lease = ModeLease::acquire(root.path(), owner).unwrap();
+        let attempt = bootstrap(
+            ProfilePaths::isolated(root.path()),
+            contender,
+            Some(config()),
+            false,
+        );
+        assert_eq!(
+            attempt.err().as_deref(),
+            Some("Close the other Taomni mode using this profile first")
+        );
+        assert_eq!(std::fs::read(&legacy).unwrap(), original);
+        assert!(!current.exists());
+
+        drop(lease);
+        let started = bootstrap(
+            ProfilePaths::isolated(root.path()),
+            contender,
+            Some(config()),
+            false,
+        )
+        .unwrap();
+        assert!(!legacy.exists());
+        let connection = started.state.core.db.lock().unwrap();
+        let value: String = connection
+            .query_row("SELECT value FROM previous_profile", [], |row| row.get(0))
+            .unwrap();
+        assert_eq!(value, "retained");
+    }
 }

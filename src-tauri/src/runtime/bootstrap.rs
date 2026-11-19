@@ -19,16 +19,22 @@ pub(crate) struct BootstrappedApplication {
 
 pub(crate) fn desktop(app: &tauri::AppHandle) -> Result<BootstrappedApplication, String> {
     let paths = ProfilePaths::desktop(app)?;
-    crate::migrate::run(&paths.data);
-    bootstrap(paths, StartupMode::Desktop, None)
+    bootstrap(paths, StartupMode::Desktop, None, true)
 }
 
 pub(crate) fn bootstrap(
     paths: ProfilePaths,
     mode: StartupMode,
     config: Option<AiConfig>,
+    migrate_default_roots: bool,
 ) -> Result<BootstrappedApplication, String> {
+    // The previous bundle identifier can be moved only before opening locks in
+    // the replacement directory. An occupied profile already has lock files.
+    crate::migrate::migrate_app_data_dir(&paths.data);
     let leases = Arc::new(ProfileRuntimeLeases::acquire(&paths.data, mode)?);
+    if migrate_default_roots {
+        crate::migrate::migrate_default_roots();
+    }
     let state = construct(paths, leases, config)?;
     let runtime = ApplicationRuntime::new(state.plugins.clone());
     Ok(BootstrappedApplication { state, runtime })

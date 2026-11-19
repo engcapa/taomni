@@ -53,16 +53,12 @@ async fn serve() -> Result<(), String> {
         .parse::<u16>()
         .map_err(|_| "Invalid port")?;
     let lan = std::env::args().any(|a| a == "--mobile-lan");
-    if custom_data.is_some() {
-        crate::migrate::run_profile(&data);
-    } else {
-        crate::migrate::run(&data);
-    }
     let paths = crate::runtime::paths::ProfilePaths::headless(&data, custom_data.is_some())?;
     let boot = crate::runtime::bootstrap::bootstrap(
         paths,
         crate::runtime::profile::StartupMode::Headless,
         None,
+        custom_data.is_none(),
     )?;
     let state = Arc::new(boot.state);
     let runtime = boot.runtime;
