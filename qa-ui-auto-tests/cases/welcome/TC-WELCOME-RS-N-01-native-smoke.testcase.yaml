@@ -48,7 +48,9 @@ steps:
 - assert_visible: '[data-testid="welcome-local-directory-filter"]'
 - screenshot: F1.6-native-welcome-directories.png
 - press: Escape
-- wait_for: '[data-testid="welcome-restore-status"][data-state="available"]'
+- wait_for:
+    selector: '[data-testid="welcome-restore-status"][data-state="available"]'
+    timeout_sec: 30
 - screenshot: F1.6-native-restore-state.png
 verification:
   review: reviewed
