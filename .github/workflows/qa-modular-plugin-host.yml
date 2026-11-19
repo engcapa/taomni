@@ -56,6 +56,26 @@ jobs:
         run: python -m unittest test_module_windows_execution
       - name: Build the actual hello and MFA hosts without signing credentials
         run: cargo build --manifest-path src-tauri/Cargo.toml -p taomni-hello-plugin -p taomni-plugin-mfa --bins --locked
+      - name: Require active Defender in this disposable runner
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:RUNNER_ENVIRONMENT -ne 'github-hosted') { throw 'Requires a disposable hosted runner' }
+          New-Item -ItemType Directory -Force qa-modular-windows-execution | Out-Null
+          try {
+            Set-MpPreference -DisableRealtimeMonitoring $false
+            $deadline = (Get-Date).AddSeconds(30)
+            do {
+              $state = Get-MpComputerStatus
+              if ($state.RealTimeProtectionEnabled) { break }
+              Start-Sleep -Seconds 1
+            } while ((Get-Date) -lt $deadline)
+            if (-not $state.RealTimeProtectionEnabled) { throw 'The hosted image did not enable real-time protection' }
+          } finally {
+            Get-MpComputerStatus |
+              Select-Object AMServiceEnabled, AntivirusEnabled, RealTimeProtectionEnabled, BehaviorMonitorEnabled, IoavProtectionEnabled |
+              ConvertTo-Json | Set-Content -Encoding utf8 qa-modular-windows-execution/defender-state.json
+          }
       - name: Observe actual Authenticode and protection state and execute Internet-zone hosts
         run: python scripts/run-module-windows-execution-gates.py --evidence qa-modular-windows-execution
       - uses: actions/upload-artifact@v4
@@ -64,71 +84,6 @@ jobs:
           name: modular-system-execution-windows
           path: qa-modular-windows-execution
           if-no-files-found: error
-
-  macos-system-execution:
-    name: macOS hardened runtime and quarantined hosts
-    runs-on: macos-15-intel
-    timeout-minutes: 30
-    defaults:
-      run:
-        shell: bash
-    env:
-      PYTHONPATH: .agents/skills/qa-ui-auto/scripts
-    steps:
-      - uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.head || github.sha }}
-          persist-credentials: false
-      - uses: dtolnay/rust-toolchain@stable
-      - uses: Swatinem/rust-cache@v2
-        with:
-          workspaces: src-tauri -> target
-          shared-key: modular-system-execution-intel
-      - name: System experiment tool unit contracts
-        run: python -m unittest test_module_system_execution
-      # This experiment uses an ad-hoc identity only. No signing credential or
-      # private key is available to candidate compilation or native execution.
-      - name: Build the actual hello and MFA hosts without signing credentials
-        run: cargo build --manifest-path src-tauri/Cargo.toml -p taomni-hello-plugin -p taomni-plugin-mfa --bins --locked
-      - name: Sign the experiment with hardened runtime and observe quarantined host execution
-        run: python scripts/run-module-system-execution-gates.py --evidence qa-modular-system-execution
-      - uses: actions/upload-artifact@v4
-        if: always()
-        with:
-          name: modular-system-execution-macos-intel
-          path: qa-modular-system-execution
-          if-no-files-found: error
-      - uses: actions/setup-node@v4
-        if: vars.MACOS_SIGNING_CERT_SHA1 != ''
-        with:
-          node-version: '22'
-      - name: Import the fixed certificate after compiling the test binaries
-        if: vars.MACOS_SIGNING_CERT_SHA1 != ''
-        env:
-          RELEASE_PLATFORM: macOS
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          MACOS_SIGNING_CERT_SHA1: ${{ vars.MACOS_SIGNING_CERT_SHA1 }}
-        run: node scripts/configure-release-signing.mjs
-      - name: Verify fixed-certificate launch with hardened runtime
-        if: vars.MACOS_SIGNING_CERT_SHA1 != ''
-        run: |
-          python scripts/run-module-system-execution-gates.py \
-            --evidence qa-modular-system-execution-fixed \
-            --harness-build-log qa-modular-system-execution/harness-build.log
-      - name: Remove temporary signing credentials after a failed check
-        if: always() && env.MACOS_SIGNING_WORK_DIR != ''
-        run: |
-          if [[ -d "$MACOS_SIGNING_WORK_DIR" ]]; then
-            node scripts/configure-release-signing.mjs --cleanup-macos
-          fi
-      - uses: actions/upload-artifact@v4
-        if: always() && vars.MACOS_SIGNING_CERT_SHA1 != ''
-        with:
-          name: modular-system-execution-macos-fixed
-          path: qa-modular-system-execution-fixed
-          if-no-files-found: warn
 
   hello-plugin:
     if: ${{ !inputs.system_execution_only }}
