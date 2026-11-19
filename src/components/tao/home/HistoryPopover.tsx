@@ -69,7 +69,7 @@ export function HistoryPopover(props: Props) {
     {props.error ? <p role="alert" data-testid="tao-home-history-error">{props.error}</p> : null}
     <div className="tao-home-history-tabs" role="tablist">{(["chat", "sessions", "workspaces", "directories"] as const).map((item) => <button type="button" role="tab" aria-selected={tab === item} data-testid={`tao-home-history-tab-${item}`} key={item} className={tab === item ? "active" : ""} onClick={() => { setTab(item); setQuery(""); }}>{tr(({ chat: "Tao 对话", sessions: "最近会话", workspaces: "最近工作区", directories: "最近目录" })[item])}</button>)}</div>
     {tab === "directories" ? <div className="tao-home-directory-history">{props.directories}</div> : <>
-      <label className="tao-home-history-search"><Search size={13} /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder={tr("搜索历史")} /></label>
+      <label className="tao-home-history-search"><Search size={13} /><input autoFocus value={query} data-testid="tao-home-history-search" onChange={(event) => setQuery(event.target.value)} placeholder={tr("搜索历史")} /></label>
       {tab === "sessions" ? <ThemedSelect label={tr("会话排序")} testId="tao-home-history-sort" value={sort} onChange={setSort}
         options={(["last-desc", "last-asc", "name-asc", "name-desc", "type-asc", "type-desc", "host-asc", "host-desc"] as const).map((value) => ({
           value, label: tr(({ "last-desc": "最近连接优先", "last-asc": "较早连接优先", "name-asc": "名称升序", "name-desc": "名称降序", "type-asc": "类型升序", "type-desc": "类型降序", "host-asc": "主机升序", "host-desc": "主机降序" })[value]),
