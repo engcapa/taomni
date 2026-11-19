@@ -7,6 +7,7 @@ import re
 import signal
 import subprocess
 import time
+from collections.abc import Callable
 
 
 def sanitized_output(raw):
@@ -37,7 +38,10 @@ def observe_same_profile_contender(argv, owner, evidence, label):
     }
 
 
-def initialize_profile(executable, data, work, evidence, label, *, verify_mode_lease=False):
+def initialize_profile(
+    executable, data, work, evidence, label, *, verify_mode_lease=False,
+    observe_ready: Callable[[subprocess.Popen[bytes]], None] | None = None,
+):
     """Use the installed release's documented headless entry.
 
     The legacy Windows release uses the GUI subsystem and exposes no headless quit
@@ -75,6 +79,8 @@ def initialize_profile(executable, data, work, evidence, label, *, verify_mode_l
                 if (contender["exitCode"] != 1 or not contender["modeLeaseError"]
                         or contender["openedEndpoint"] or not contender["ownerStillRunning"]):
                     raise RuntimeError("Candidate did not reject a second headless process for the same profile")
+            if observe_ready is not None:
+                observe_ready(process)
             if windows:
                 record["shutdown"] = "owned GUI-subsystem process tree forced stop (crash input)"
                 subprocess.run(["taskkill.exe", "/PID", str(process.pid), "/T", "/F"],

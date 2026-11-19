@@ -6,6 +6,8 @@ import json
 import os
 from pathlib import Path
 import platform
+import signal
+import subprocess
 from types import SimpleNamespace
 
 from ci_desktop import Desktop
@@ -82,10 +84,37 @@ def verify_desktop_profile_lease(ctx, candidate, work, profile, evidence, observ
         desktop_action(steps, "assert_text_equals", code)
         desktop_action(steps, "assert_no_runtime_errors", None)
         observation["desktopShutdown"] = close_verified_desktop(driver, session, candidate)
+
+    def verify_gui_contender(owner):
+        log = evidence / "headless-owns-mode-lease-desktop.log"
+        with log.open("xb") as output, subprocess.Popen(
+            [str(candidate)], start_new_session=True, stdin=subprocess.DEVNULL, stdout=output,
+            stderr=subprocess.STDOUT,
+        ) as contender:
+            try:
+                exit_code = contender.wait(timeout=20)
+            except subprocess.TimeoutExpired:
+                try:
+                    os.killpg(contender.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+                exit_code = None
+        raw = log.read_text(encoding="utf-8", errors="replace")
+        denied = "Close the other Taomni mode using this profile first" in raw
+        owner_alive = owner.poll() is None
+        observation["desktopContender"] = {
+            "exitCode": exit_code, "modeLeaseError": denied, "ownerStillRunning": owner_alive,
+        }
+        if exit_code in (0, None) or not denied or not owner_alive:
+            raise RuntimeError("The installed desktop was not rejected while headless mode owned its profile")
+
     with isolated_desktop(environment):
         observation["headlessAfterDesktopExit"] = initialize_profile(
-            candidate, profile, work, evidence, "headless-after-desktop-exit",
+            candidate, profile, work, evidence, "headless-after-desktop-exit", observe_ready=verify_gui_contender,
         )
+    observation["desktopAfterHeadlessExit"] = inspect_accounts(
+        ctx, candidate, work, evidence, "desktop-after-headless-exit", "359 152",
+    )
     observation["passed"] = True
 
 
