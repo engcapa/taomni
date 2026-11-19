@@ -106,6 +106,51 @@ fn legacy_first_check_offers_new_modules_when_skipping_modular_releases() {
 }
 
 #[test]
+fn first_start_applies_legacy_restore_without_skipping_the_module_roster() {
+    use crate::{
+        backup::{
+            engine::{StagedFile, pack_staged_archive},
+            restore::{RESTORE_INTENT_FILE, stage_restore_to_dir},
+        },
+        runtime::profile::{ProfileRuntimeLeases, StartupMode},
+    };
+
+    let dir = tempdir().unwrap();
+    let profile = dir.path().join("profile");
+    fs::create_dir(&profile).unwrap();
+    let restored = br#"{"version":1,"tunnels":[]}"#;
+    let source = dir.path().join("tunnels.json");
+    fs::write(&source, restored).unwrap();
+    fs::write(profile.join("tunnels.json"), b"old live data").unwrap();
+    rusqlite::Connection::open(profile.join("taomni.db")).unwrap();
+    let archive = dir.path().join("legacy.taobak");
+    pack_staged_archive(
+        &[StagedFile {
+            archive_path: "configs/tunnels.json".into(),
+            disk_path: source,
+        }],
+        "0.5.10",
+        "core",
+        None,
+        &archive,
+    )
+    .unwrap();
+    stage_restore_to_dir(&profile, &archive, None).unwrap();
+    assert!(!profile.join(".profile-state.json").exists());
+
+    let _runtime = ProfileRuntimeLeases::acquire(&profile, StartupMode::Desktop).unwrap();
+    assert!(!profile.join(RESTORE_INTENT_FILE).exists());
+    assert_eq!(fs::read(profile.join("tunnels.json")).unwrap(), restored);
+
+    let mut first = catalog(1, &[("mfa", PLATFORM), ("rdp", PLATFORM)]);
+    first.legacy_upgrade = Some(BTreeSet::from([id("mfa"), id("rdp")]));
+    assert_eq!(
+        plan(&profile, &first, PLATFORM).unwrap().legacy_pending,
+        BTreeSet::from([id("mfa"), id("rdp")])
+    );
+}
+
+#[test]
 fn fresh_and_existing_empty_modular_profiles_do_not_enroll() {
     for modular in [false, true] {
         let dir = tempdir().unwrap();

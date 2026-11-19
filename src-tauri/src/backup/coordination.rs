@@ -8,7 +8,7 @@ const LOCK_FILE_NAME: &str = ".backup-operation.lock";
 /// and requires all other instances using that profile to have closed first.
 pub struct ProfileLease(File);
 impl ProfileLease {
-    pub fn prepare(app_data: &Path) -> Result<Self, String> {
+    pub fn prepare(app_data: &Path, before_restore: impl FnOnce()) -> Result<Self, String> {
         std::fs::create_dir_all(app_data).map_err(|e| e.to_string())?;
         let file = OpenOptions::new()
             .create(true)
@@ -21,11 +21,14 @@ impl ProfileLease {
             |_| "Another Taomni instance is restoring this profile; retry after it finishes",
         )?;
         let lease = Self(file);
-        if app_data.join(super::restore::RESTORE_INTENT_FILE).exists()
-            || app_data.join(super::restore::JOURNAL_FILE).exists()
-        {
+        let has_restore = app_data.join(super::restore::RESTORE_INTENT_FILE).exists()
+            || app_data.join(super::restore::JOURNAL_FILE).exists();
+        if has_restore {
             lease.0.unlock().map_err(|e| e.to_string())?;
             lease.0.try_lock().map_err(|_| "Close the other Taomni instances using this profile before applying the pending backup restore")?;
+        }
+        before_restore();
+        if has_restore {
             super::restore::apply_pending_restore(app_data)?;
             lease.0.unlock().map_err(|e| e.to_string())?;
             lease.0.lock_shared().map_err(|e| e.to_string())?;
@@ -105,17 +108,19 @@ mod tests {
     #[test]
     fn profile_allows_multiple_instances_but_rejects_restore_while_in_use() {
         let root = tempfile::tempdir().unwrap();
-        let first = ProfileLease::prepare(root.path()).unwrap();
-        let second = ProfileLease::prepare(root.path()).unwrap();
+        let first = ProfileLease::prepare(root.path(), || {}).unwrap();
+        let second = ProfileLease::prepare(root.path(), || {}).unwrap();
         let intent = root.path().join(super::super::restore::RESTORE_INTENT_FILE);
         std::fs::write(&intent, b"pending fixture").unwrap();
-        let error = ProfileLease::prepare(root.path()).err().unwrap();
+        let error = ProfileLease::prepare(root.path(), || panic!("Profile remains in use"))
+            .err()
+            .unwrap();
         assert!(error.contains("Close the other Taomni instances"));
         assert_eq!(std::fs::read(&intent).unwrap(), b"pending fixture");
         drop(first);
         drop(second);
         std::fs::remove_file(intent).unwrap();
-        let _reopened = ProfileLease::prepare(root.path()).unwrap();
+        let _reopened = ProfileLease::prepare(root.path(), || {}).unwrap();
     }
 
     impl Drop for ChildGuard {

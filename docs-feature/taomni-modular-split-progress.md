@@ -20,8 +20,11 @@
 - 连续帧实验在 Linux、Windows 和 macOS ARM64 对照同一 runner 的跨进程及进程内路径。两种负载均交付 150/150 帧。Windows 修正计时精度后达到 60/30 fps，1080p 宿主路径增加的 p95 交付时间为 2.54–3.49 ms。真实 RDP 端到端预算仍按 G5 推进。 [各平台原始结果](taomni-modular-split-gates-hello-plugin.md#g5-frame-transport-measurement) · [GitHub #44411459433](https://github.com/engcapa/taomni/actions/runs/44411459433)
 - 合并 #834 后 Browser 三端各 28/28，12 片均在工作流执行期间收齐，覆盖新模块名称与选装、模块更新、Draw.io、Live 表格和完整 browser 崩溃回归。Native 构建和分片继续收取。 [三端复验 #44414602924](https://github.com/engcapa/taomni/actions/runs/44414602924) · [macOS Intel #44414602437](https://github.com/engcapa/taomni/actions/runs/44414602437)
 - 再次拉取远程 `main`，仍为已合入的 `1d709c748`，合并无新冲突。三端 UI 批次收齐 24 个分片，Linux Xvfb、Windows、macOS ARM64 Native 分别通过 34/34、33/33、33/33。三端的 046 均核对网络记录，确认前仅下载一份 MFA 签名包，确认后下载一份 Hello 签名包。 [三端 UI #44414602924](https://github.com/engcapa/taomni/actions/runs/44414602924)
+- 同一源码的 macOS Intel 两片已在执行中收齐，Native 33/33。046 的所有签名包请求也与该端的检查记录匹配。 [macOS Intel #44414602437](https://github.com/engcapa/taomni/actions/runs/44414602437)
 - 独立 RDP probe 在 Linux、Windows、macOS ARM64 和 Intel 的 release 构建及单元均通过。已安装 Linux deb 跑完原有 RDP 性能用例，首帧 81 ms，输入到画面 p95 30.40 ms（40/40 样本），动画显示 55.38 fps，带宽 390.17 kbps，随后正常关闭。应用来自 `c660c6bb6` 的 deb，probe 来自 `1affe92cd`。 [独立 probe](https://github.com/engcapa/taomni/actions/runs/44420266270) · [已安装性能基线](https://github.com/engcapa/taomni/actions/runs/44421453756)
 - RDP 端到端基线首次构建时 GitHub hosted runner 失去连接。原生 Rust 契约通过，构建未上传运行时，四个 native 分片均未执行。已在相同提交重跑失败作业并保留原始记录。 [首次运行](https://github.com/engcapa/taomni/actions/runs/44407519124/attempts/1) · [重跑](https://github.com/engcapa/taomni/actions/runs/44407519124/attempts/2)
+- RDP 基线重跑收齐四个 Native 分片。端到端用例首帧 102 ms，输入到画面 p95 43.71 ms，动画显示 53.89 fps，带宽 385.43 kbps。真实 X11 采集后以独立进程编码的对照已派发，保留相同用例的预算。首轮派发使用短 SHA 使 checkout 失败，已改用完整 SHA 重跑。 [基线重跑](https://github.com/engcapa/taomni/actions/runs/44407519124/attempts/2) · [编码进程对照](https://github.com/engcapa/taomni/actions/runs/44424998405)
+- 旧版遗留的备份还原会在启动写入模块化 generation。已将首装来源判定移到持有 profile 锁且应用备份之前，避免将该配置误判为已模块化。Rust 回归先复现两项首装计划为空，修复后 6 项首装与升级单元通过。新增 047 在原生应用验证实际会话恢复和签名首发模块自动安装。
 
 2026-11-18 再次 fetch 并合并 `origin/main`。远程仍为 `5fabcdd32`，当前分支已包含该提交，合并无冲突。
 

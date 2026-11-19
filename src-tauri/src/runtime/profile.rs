@@ -44,11 +44,13 @@ impl ProfileRuntimeLeases {
     pub(crate) fn acquire(data: &Path, mode: StartupMode) -> Result<Self, String> {
         crate::plugin::migration_commit::recover_at_startup(data)?;
         let mode = ModeLease::acquire(data, mode)?;
-        // Applies a pending restore under exclusive ownership before any DB opens.
-        let profile = crate::backup::coordination::ProfileLease::prepare(data)?;
-        if let Err(error) = crate::plugin::release_state::initialize(data) {
-            tracing::warn!(%error, "Could not initialize module release state");
-        }
+        // Record the installation origin before restore can create a modular
+        // generation marker. Both occur under the profile lease.
+        let profile = crate::backup::coordination::ProfileLease::prepare(data, || {
+            if let Err(error) = crate::plugin::release_state::initialize(data) {
+                tracing::warn!(%error, "Could not initialize module release state");
+            }
+        })?;
         let generation = super::generation::current(data)?;
         Ok(Self {
             generation,

@@ -7,6 +7,7 @@ import re
 import sqlite3
 
 from .fixtures.backup_policy import isolated_data_root
+from .fixtures import module_legacy_restore
 from .fixtures.module_upgrade import CHAT_FILES
 from .steps import StepError
 
@@ -108,21 +109,27 @@ def observe(data, state, phase):
 
 
 def run(ctx, args):
-    if not isinstance(args, dict) or set(args) != {"phase"} or args["phase"] not in {"preflight", "pending", "repeat", AFTER_FIRST_INSTALL}:
+    phases = {"preflight", "pending", "repeat", AFTER_FIRST_INSTALL, module_legacy_restore.PHASE}
+    if not isinstance(args, dict) or set(args) != {"phase"} or args["phase"] not in phases:
         raise StepError("module_upgrade_probe requires a fixed registered phase")
     owner = getattr(ctx, "fixture_context", None) or ctx
     state = getattr(owner, "module_upgrade", None)
     case_id = getattr(owner, "case_id", None)
-    if not state or case_id not in {"TC-MODULES-025", "TC-MODULES-027", "TC-MODULES-028", "TC-MODULES-030", "TC-MODULES-032"}:
+    if not state or case_id not in {"TC-MODULES-025", "TC-MODULES-027", "TC-MODULES-028", "TC-MODULES-030", "TC-MODULES-032", module_legacy_restore.CASE_ID}:
         raise StepError("module_upgrade_probe requires its registered native legacy input fixture")
     if args["phase"] == AFTER_FIRST_INSTALL and case_id != "TC-MODULES-027":
         raise StepError("After-first-install verification requires the installed legacy roster case")
+    if (args["phase"] == module_legacy_restore.PHASE) != (case_id == module_legacy_restore.CASE_ID):
+        raise StepError("The staged-restore observation belongs to its own legacy profile case")
     data = isolated_data_root(owner)
     if data != state["root"]:
         raise StepError("Upgrade observation requires its own isolated profile")
     record = {"phase": args["phase"], "passed": False}
     try:
-        record.update(observe(data, state, args["phase"]))
+        if args["phase"] == module_legacy_restore.PHASE:
+            record.update(module_legacy_restore.observe(data, state["sessions"][0]))
+        else:
+            record.update(observe(data, state, args["phase"]))
         record["passed"] = True
         return "legacy upgrade " + args["phase"] + " verified"
     finally:

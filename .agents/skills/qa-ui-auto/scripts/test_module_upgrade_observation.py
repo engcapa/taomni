@@ -8,12 +8,15 @@ from types import SimpleNamespace
 import tempfile
 import unittest
 
+from qa_ui_auto.fixtures import module_legacy_restore
 from qa_ui_auto.fixtures.module_upgrade import (
     CHAT_FILES, CLIENT_ITEMS, PIN_ROWS, SERVER_ITEMS, SERVER_ROWS, client_sessions,
     input_sessions, preview_client_snapshot, preview_snapshot, preview_server_snapshot,
 )
+from qa_ui_auto.fixtures.session_config import seed_sessions
 from qa_ui_auto.module_upgrade_observation import observe, run, wal_fingerprint
 from qa_ui_auto.steps import StepError
+from unittest.mock import patch
 
 
 class UpgradeObservationTests(unittest.TestCase):
@@ -36,6 +39,30 @@ class UpgradeObservationTests(unittest.TestCase):
         path = self.root / "migration" / "journal.json"
         path.parent.mkdir(exist_ok=True)
         path.write_text(json.dumps(self.journal), encoding="utf-8")
+
+    def test_staged_restore_uses_the_legacy_session_schema_and_rejects_unapplied_data(self):
+        profile = self.root / "staged"
+        profile.mkdir()
+        ctx = SimpleNamespace(case_dir=self.root)
+        sessions = input_sessions(False)
+        with patch("qa_ui_auto.fixtures.session_config.isolated_data_root", return_value=profile):
+            seed_sessions(ctx, sessions)
+        session = sessions[0]
+        module_legacy_restore.stage(ctx, profile, session)
+        with self.assertRaisesRegex(RuntimeError, "did not clear restore_intent.json"):
+            module_legacy_restore.observe(profile, session)
+        (profile / "restore_intent.json").unlink()
+        pending = profile / ".pending_restore"
+        saved = pending / module_legacy_restore.ARCHIVE_PATH
+        saved.rename(self.root / "restore-db")
+        saved.parent.rmdir()
+        pending.rmdir()
+        with self.assertRaisesRegex(RuntimeError, "did not restore the original session"):
+            module_legacy_restore.observe(profile, session)
+        (self.root / "restore-db").replace(profile / "taomni.db")
+        self.assertEqual(module_legacy_restore.observe(profile, session), {
+            "sessionId": session["id"], "restoredName": session["name"],
+        })
 
     def test_fixed_browser_model_is_explicitly_separate_from_native_evidence(self):
         self.assertEqual(preview_snapshot(False)["candidates"], [])

@@ -6,6 +6,7 @@ from pathlib import Path
 import sqlite3
 
 from .backup_policy import isolated_data_root
+from . import module_legacy_restore
 from .session_config import seed_sessions, ssh_session
 
 PREVIEW_KEY = "taomni.preview.module-upgrade.v1"
@@ -64,12 +65,12 @@ def preview_client_snapshot():
 
 
 def setup(ctx):
-    if ctx.case_id not in {"TC-MODULES-005", "TC-MODULES-025", "TC-MODULES-026", "TC-MODULES-028", "TC-MODULES-029", "TC-MODULES-030", "TC-MODULES-031", "TC-MODULES-032", "TC-MODULES-036", "TC-MODULES-037", "TC-MODULES-040", "TC-MODULES-046"}:
+    if ctx.case_id not in {"TC-MODULES-005", "TC-MODULES-025", "TC-MODULES-026", "TC-MODULES-028", "TC-MODULES-029", "TC-MODULES-030", "TC-MODULES-031", "TC-MODULES-032", "TC-MODULES-036", "TC-MODULES-037", "TC-MODULES-040", "TC-MODULES-046", module_legacy_restore.CASE_ID}:
         raise RuntimeError("module_upgrade requires a registered fixed-input case")
     server_profile = ctx.case_id in {"TC-MODULES-028", "TC-MODULES-029"}
     client_profile = ctx.case_id in {"TC-MODULES-030", "TC-MODULES-031"}
     mfa_profile = ctx.case_id in {"TC-MODULES-036", "TC-MODULES-037"}
-    vnc = ctx.case_id not in {"TC-MODULES-005", "TC-MODULES-040", "TC-MODULES-046"} and not server_profile
+    vnc = ctx.case_id not in {"TC-MODULES-005", "TC-MODULES-040", "TC-MODULES-046", module_legacy_restore.CASE_ID} and not server_profile
     if (ctx.cfg.get("app") or {}).get("mode", "browser") == "browser":
         ctx.page.goto(ctx.cfg["app"]["base_url"])
         snapshot = preview_client_snapshot() if client_profile else preview_server_snapshot() if server_profile else preview_snapshot(vnc)
@@ -89,6 +90,8 @@ def setup(ctx):
             with (data / name).open("xb") as stream:
                 stream.write(content)
     ctx.module_upgrade = {"root": data, "sessions": rows, "journal": None}
+    if ctx.case_id == module_legacy_restore.CASE_ID:
+        module_legacy_restore.stage(ctx, data, rows[0])
     if ctx.case_id == "TC-MODULES-032":
         _seed_wal_input(ctx, data, rows)
     if client_profile:
