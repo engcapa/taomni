@@ -11091,6 +11091,7 @@ name = "taomni-mail-engine"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
+ "chrono",
  "flate2",
  "hex",
  "mail-parser",

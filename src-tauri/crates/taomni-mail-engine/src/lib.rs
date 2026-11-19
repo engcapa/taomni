@@ -5,6 +5,7 @@ pub mod cache;
 pub mod database;
 mod inline_images;
 mod lists;
+pub mod mbox;
 mod mime;
 mod models;
 pub mod storage;

@@ -679,6 +679,7 @@ jobs:
               "rdp::session::tests::input_and_channels",
               "servers::rdp::clipboard::tests",
               "config::tests",
+              "mail::mbox::tests::export_then_import_on_fake_server",
               "vault::plugin_access::tests",
               "vault::data_access_tests",
               "vault::tests",

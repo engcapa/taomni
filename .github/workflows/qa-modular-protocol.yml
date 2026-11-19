@@ -89,6 +89,10 @@ jobs:
         run: |
           set -o pipefail
           cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-stream --lib --locked 2>&1 | tee modular-protocol-evidence/stream-unit.log
+      - name: Verify independent Mail storage and message codecs
+        run: |
+          set -o pipefail
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-mail-engine --lib --locked 2>&1 | tee modular-protocol-evidence/mail-engine-unit.log
       - name: Verify operation cancellation and retained service contracts
         run: |
           set -o pipefail

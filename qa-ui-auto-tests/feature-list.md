@@ -8148,6 +8148,7 @@ files:
   - src/lib/mailto.ts
   - src-tauri/src/mail/lists.rs
   - src-tauri/src/mail/mbox.rs
+  - src-tauri/crates/taomni-mail-engine/src/mbox.rs
 controls:
   - id: unsubscribe
     selector: '[data-testid="mail-unsubscribe"]'
