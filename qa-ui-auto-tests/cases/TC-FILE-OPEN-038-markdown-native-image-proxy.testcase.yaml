@@ -45,6 +45,7 @@ steps:
 - fill:
     selector: '[data-testid="settings-search-input"]'
     value: files and opening
+- wait_for: '[data-testid="markdown-image-proxy-mode"]'
 - select_option:
     selector: '[data-testid="markdown-image-proxy-mode"]'
     value: custom
@@ -59,6 +60,7 @@ steps:
     path: ${fixture.markdown_image_log}
     contains: '"forwarded": "custom"'
 - click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="markdown-image-proxy-mode"]'
 - select_option:
     selector: '[data-testid="markdown-image-proxy-mode"]'
     value: none
