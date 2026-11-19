@@ -8,7 +8,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-pub(super) fn stage_with_plugins(
+pub(crate) fn stage_with_plugins(
     registry: &PluginRegistry,
     vault: &Vault,
     mfa: Option<&MfaStore>,

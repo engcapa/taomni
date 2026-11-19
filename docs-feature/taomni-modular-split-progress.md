@@ -29,6 +29,10 @@
 - `5023116d3` 的三端批次收齐全部 24 片。Browser 三端各 22/22，Linux、Windows、macOS ARM64 Native 分别 33/33、32/33、33/33。047 在三端通过 13 步，复核了原 SSH 会话恢复、两份签名包请求及实际安装。Windows 的 040 第 12 步点击落到模块目录文字，第 13 步等待卸载确认超时。用例改用 Enter 激活卸载按钮，保留原确认、卸载、重启和磁盘核对。 [三端 #44426748136](https://github.com/engcapa/taomni/actions/runs/44426748136)
 - 随后的两个 Windows 专项均为 25/25，含 047 和完整 Windows 原生崩溃回归。#44437405989 使用 `7e6165496` 的工作流执行 `5023116d3` 的产品源码。#44442164724 的工作流与选集均固定为 `7e6165496`。每轮四片均在汇总前下载，已核对 047 的用例摘要和观察文件。 [首轮 #44437405989](https://github.com/engcapa/taomni/actions/runs/44437405989) · [同提交复验 #44442164724](https://github.com/engcapa/taomni/actions/runs/44442164724)
 - 新配置恢复 v2 MFA 后，以还原生成的定位记录选择模块数据。该路径保留旧库已有账号时的还原检查，也让后续 v1 MFA 还原继续写入模块数据。新增 048 使用正式 Linux 旧版界面生成的配对数据库，检查启动后模块缺失、签名安装、原口令和 HOTP 续号。Rust 模块还原单元 7/7、QA 工具单元 37/37 通过。 [原生用例](../qa-ui-auto-tests/cases/TC-MODULES-048-restore-modular-mfa-profile.testcase.yaml)
+- `6061816c4` 合入 `origin/main` 的 `80ec08eee`（#835）。解决了 Tao Dock 的合并冲突，保留新版 Shell 选择器及模块商店、Tao 设置入口。主线占用 `TC-FILE-OPEN-037`–`040`，Live 表格用例移至 `041`，继续参加三端 Browser、Native 和完整崩溃回归。Node 22 定向单测 41 项、QA 工具单测 50 项、类型和目录检查通过。 [合并批次 #44457403750](https://github.com/engcapa/taomni/actions/runs/44457403750)
+- `b24a03726` 的 18 个分片已在运行期间收齐。三端 Browser 各 26/26，Linux、Windows、macOS ARM64 Native 分别 33/34、32/32、33/33。Windows 修正后的 040 通过。Linux 048 在检查缺失 MFA 模块时误报已禁用。此前的签名 MFA 专项在 Linux、Windows 也复现该状态错误，每端 7/8。macOS ARM64 专项的目标临时目录经 `/var` 符号链接访问，还原在路径检查时拒绝。 [UI #44452488592](https://github.com/engcapa/taomni/actions/runs/44452488592) · [签名专项 #44455293151](https://github.com/engcapa/taomni/actions/runs/44455293151)
+- `b81847f16` 把有效还原记录中的数据投影为模块未安装，商店显示安装及数据已保留。更新后的 048 验证此状态和签名安装后的实际 HOTP。macOS 专项使用规范化的临时 profile 路径。Rust 注册表 13 项、还原 7 项、前端 22 项和 QA 审计已通过。 [三端 UI 复验 #44459243176](https://github.com/engcapa/taomni/actions/runs/44459243176) · [签名复验 #44459243291](https://github.com/engcapa/taomni/actions/runs/44459243291)
+- 签名 MFA 备份补充运行、禁用和卸载保留数据三种场景。三项均从已迁移账户开始，通过应用的备份屏障生成 v2 归档，在改动计数器和 Vault 口令后应用备份并重新启动。检查原口令、HOTP、模块启禁或卸载状态及归档清单。禁用和卸载状态直接从磁盘创建备份。验证使用 GitHub 签名专项。
 
 2026-11-18 再次 fetch 并合并 `origin/main`。远程仍为 `5fabcdd32`，当前分支已包含该提交，合并无冲突。
 

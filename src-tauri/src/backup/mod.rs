@@ -50,6 +50,8 @@ pub use restore::StageRestoreResult;
 
 #[cfg(all(test, feature = "qa-release-trust-gates"))]
 pub(crate) use archive_writer::pack_staged_archive_with_plugins;
+#[cfg(all(test, feature = "qa-release-trust-gates"))]
+pub(crate) use protected_snapshot::stage_with_plugins as stage_protected_backup;
 
 use std::path::PathBuf;
 use tauri::{AppHandle, Manager};

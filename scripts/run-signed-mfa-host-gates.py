@@ -50,7 +50,7 @@ def main():
         expected_tests = 3
     else:
         selected, evidence_name = "plugin::migration_commit::tests::signed_legacy_mfa_", "legacy-mfa-migration"
-        expected_tests = 8
+        expected_tests = 11
     listing = subprocess.check_output([str(executable), selected, "--ignored", "--list"], text=True)
     listing_name = "selected-tests.txt" if args.suite == "installed" else "legacy-mfa-selected-tests.txt"
     (root / listing_name).write_text(listing, encoding="utf-8")

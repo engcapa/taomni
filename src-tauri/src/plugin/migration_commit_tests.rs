@@ -19,6 +19,8 @@ use crate::{
     vault::Vault,
 };
 
+#[path = "migration_backup_mfa_tests.rs"]
+mod mfa_backup;
 #[path = "migration_execute_mfa_tests.rs"]
 mod offline;
 #[path = "migration_restore_mfa_tests.rs"]
@@ -38,6 +40,24 @@ fn signed_legacy_mfa_offline_maintenance_starts_without_a_journal_and_retries_sa
 #[ignore = "a production-signed MFA process verifies the restored profile on GitHub"]
 fn signed_legacy_mfa_backup_restores_into_a_new_profile() {
     restored_mfa::exercise_modular_restore();
+}
+
+#[test]
+#[ignore = "the active signed host and Vault are snapshotted and restored on GitHub"]
+fn signed_legacy_mfa_running_host_backup_restores_original_vault_and_counter() {
+    mfa_backup::exercise_round_trip(mfa_backup::MfaState::Running);
+}
+
+#[test]
+#[ignore = "disabled signed host data is snapshotted and restored on GitHub"]
+fn signed_legacy_mfa_disabled_module_backup_preserves_disabled_preference() {
+    mfa_backup::exercise_round_trip(mfa_backup::MfaState::Disabled);
+}
+
+#[test]
+#[ignore = "uninstalled signed host data is snapshotted and restored on GitHub"]
+fn signed_legacy_mfa_uninstalled_module_backup_restores_data_without_code() {
+    mfa_backup::exercise_round_trip(mfa_backup::MfaState::Uninstalled);
 }
 
 struct Legacy {
