@@ -111,6 +111,24 @@ describe("MarkdownEditor real host lifecycle", () => {
     fireEvent.click(screen.getByTestId("markdown-export"));
     expect(screen.getByTestId("markdown-export-menu")).toBeInTheDocument();
   });
+  it("keeps the export menu above diagram actions when the shared viewer styles load last", () => {
+    const viewerStyles = document.createElement("style");
+    viewerStyles.textContent = readFileSync("src/components/viewer/viewer.css", "utf8")
+      + readFileSync("src/components/viewer/markdown/diagram.css", "utf8");
+    const diagramTools = document.createElement("div");
+    diagramTools.className = "fv fv-md-diagram-tools";
+    document.head.append(viewerStyles);
+    document.body.append(diagramTools);
+    try {
+      render(<Harness />);
+      fireEvent.click(screen.getByTestId("markdown-export"));
+      const menu = screen.getByTestId("markdown-export-menu");
+      expect(Number(getComputedStyle(menu).zIndex)).toBeGreaterThan(Number(getComputedStyle(diagramTools).zIndex));
+    } finally {
+      viewerStyles.remove();
+      diagramTools.remove();
+    }
+  });
   it("keeps one source/history across live/source/split/focus switches, with outline navigation", async () => {
     render(<Harness />);
     const dom = screen.getByTestId("markdown-editor").querySelector<HTMLElement>(".cm-editor")!;
