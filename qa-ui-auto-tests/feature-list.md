@@ -16131,6 +16131,9 @@ files:
   - src/components/viewer/markdown/drawioCodec.ts
   - src/components/viewer/markdown/drawioExport.ts
   - src/components/viewer/markdown/drawioImport.ts
+  - src/components/viewer/markdown/drawioImageStyle.ts
+  - src/components/viewer/markdown/drawioLabels.ts
+  - src/components/viewer/markdown/drawioModel.ts
   - src/components/viewer/markdown/drawioRender.ts
   - src/components/viewer/markdown/drawioMermaid.ts
   - src/components/viewer/markdown/diagramActions.tsx

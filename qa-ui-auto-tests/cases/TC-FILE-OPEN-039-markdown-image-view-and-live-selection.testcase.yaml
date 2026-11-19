@@ -56,7 +56,11 @@ steps:
 - click: '[data-testid="markdown-outline-toggle"]'
 - assert_not_visible: '[data-testid="markdown-outline"]'
 - assert_not_visible: '[data-testid="markdown-diagram-menu"]'
-- wait_for: '[data-testid="markdown-live"] .fv-md-drawio svg'
+# The renderer bounds both frame startup and drawing to 20 seconds each.
+- wait_for:
+    selector: '[data-testid="markdown-live"] :is(.fv-md-drawio svg, .fv-md-render-error)'
+    timeout_sec: 42
+- assert_visible: '[data-testid="markdown-live"] .fv-md-drawio svg'
 - right_click: '[data-testid="markdown-live"] .fv-md-drawio'
 - assert_visible: '[data-testid="markdown-diagram-menu-copy-source"]'
 - blur: '[data-testid="markdown-diagram-menu-open"]'

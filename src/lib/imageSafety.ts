@@ -12,7 +12,10 @@ export function safeImageBlob(bytes: readonly number[] | Uint8Array, mime: strin
   if (bytes.length > maxBytes) throw new Error(`too_large: image exceeds ${maxBytes / 1024 / 1024} MiB`);
   const data = new Uint8Array(bytes);
   if (contentType !== "image/svg+xml") return new Blob([data], { type: contentType });
-  const source = new TextDecoder().decode(data);
+  return new Blob([sanitizeImageSvg(new TextDecoder().decode(data))], { type: contentType });
+}
+
+export function sanitizeImageSvg(source: string): string {
   const original = new DOMParser().parseFromString(source, "image/svg+xml");
   if (original.querySelector("parsererror") || original.documentElement.localName !== "svg") {
     throw new Error("Invalid SVG image");
@@ -22,10 +25,11 @@ export function safeImageBlob(bytes: readonly number[] | Uint8Array, mime: strin
     FORBID_TAGS: ["style", "script", "foreignObject", "image", "use", "feImage", "a", "animate", "animateMotion", "animateTransform", "set"],
     FORBID_ATTR: ["href", "xlink:href", "style", "src", "srcset", "xml:base"],
     ALLOW_DATA_ATTR: false,
+    RETURN_DOM_FRAGMENT: true,
   });
-  const document = new DOMParser().parseFromString(sanitized, "image/svg+xml");
-  if (document.querySelector("parsererror") || document.documentElement.localName !== "svg") throw new Error("Invalid SVG image");
-  for (const element of [document.documentElement, ...document.documentElement.querySelectorAll("*")]) {
+  const svg = sanitized.firstElementChild;
+  if (svg?.localName !== "svg" || svg.namespaceURI !== "http://www.w3.org/2000/svg") throw new Error("Invalid SVG image");
+  for (const element of [svg, ...svg.querySelectorAll("*")]) {
     for (const attribute of Array.from(element.attributes)) {
       // Keep local gradient/clip references, never external CSS resource loads.
       if (/url\s*\(/i.test(attribute.value) && !/^url\(\s*["']?#[\w:.-]+["']?\s*\)$/i.test(attribute.value.trim())) {
@@ -33,5 +37,5 @@ export function safeImageBlob(bytes: readonly number[] | Uint8Array, mime: strin
       }
     }
   }
-  return new Blob([new XMLSerializer().serializeToString(document.documentElement)], { type: contentType });
+  return new XMLSerializer().serializeToString(svg);
 }
