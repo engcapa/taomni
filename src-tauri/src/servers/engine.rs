@@ -51,7 +51,7 @@ pub struct LogEmitter {
 #[derive(Clone)]
 enum LogTarget {
     App(AppHandle),
-    #[cfg(all(test, target_os = "linux"))]
+    #[cfg(test)]
     Stderr,
 }
 
@@ -63,7 +63,7 @@ impl LogEmitter {
         }
     }
 
-    #[cfg(all(test, target_os = "linux"))]
+    #[cfg(test)]
     pub(crate) fn rdp_test_log() -> Self {
         Self {
             target: LogTarget::Stderr,
@@ -83,7 +83,7 @@ impl LogEmitter {
         let line = format!("[{}] {}", ts, msg.into());
         let app = match &self.target {
             LogTarget::App(app) => app,
-            #[cfg(all(test, target_os = "linux"))]
+            #[cfg(test)]
             LogTarget::Stderr => {
                 eprintln!("{line}");
                 return;

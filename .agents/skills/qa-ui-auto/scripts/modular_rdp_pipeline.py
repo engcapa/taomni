@@ -91,8 +91,8 @@ def trial_server(binary, route, directory):
 
 def measure(binary, probe, root):
     system = platform.system()
-    if system not in {"Linux", "Windows"}:
-        raise RuntimeError("The desktop encoder comparison supports Linux and Windows")
+    if system not in {"Linux", "Windows", "Darwin"}:
+        raise RuntimeError("The desktop encoder comparison requires Linux, Windows or macOS")
     case = load_case(CASE)
     root.mkdir(parents=True, exist_ok=False)
     report = {

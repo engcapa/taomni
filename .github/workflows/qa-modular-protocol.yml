@@ -234,7 +234,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-24.04, windows-2025]
+        os: [ubuntu-24.04, windows-2025, macos-26]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 90
     env:
@@ -260,6 +260,17 @@ jobs:
             libwebkit2gtk-4.1-dev libappindicator3-dev libgbm-dev librsvg2-dev patchelf \
             libkrb5-dev libasound2-dev libpipewire-0.3-dev libclang-dev libdbus-1-dev \
             libudev-dev nasm xvfb xauth python3-tk
+      - name: Prepare macOS native harness dependencies
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          brew install krb5
+          krb5="$(brew --prefix krb5)"
+          echo "LIBGSSAPI_IMPL=mit" >> "$GITHUB_ENV"
+          echo "LIBGSSAPI_PREFIX=$krb5" >> "$GITHUB_ENV"
+          echo "PKG_CONFIG_PATH=$krb5/lib/pkgconfig" >> "$GITHUB_ENV"
+          bash scripts/bundle-krb5-macos.sh stage
+          python -c 'import tkinter; tkinter.Tcl()'
       - name: Select a complete Windows Perl for vendored OpenSSL
         if: runner.os == 'Windows'
         shell: pwsh
@@ -314,7 +325,7 @@ jobs:
           if [[ "$RUNNER_OS" == Linux ]]; then
             export XDG_SESSION_TYPE=x11
             runner=(xvfb-run -a -s '-noreset -screen 0 1920x1080x24 +extension DAMAGE +extension MIT-SHM -nolisten tcp')
-          else
+          elif [[ "$RUNNER_OS" == Windows ]]; then
             probe+=.exe
           fi
           "${runner[@]}" python .agents/skills/qa-ui-auto/scripts/modular_rdp_pipeline.py \
