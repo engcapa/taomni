@@ -2,7 +2,7 @@ id: TC-MODULES-049
 title: Legacy Mail accounts produce one pending migration and retain their original data
 description: A saved SSH session and two Mail accounts use an isolated old-schema profile. The actual desktop preflight
   recommends Mail once. Confirming the migration records the pending source while preserving both accounts and the custom
-  cache. Reopening and retrying retains the same journal.
+  cache. Reopening and retrying retains the same journal and leaves unused default Mail storage absent.
 covers: [F-Modules-1]
 tags: [p1, modules, upgrade, mail]
 modes: [native]
@@ -52,20 +52,20 @@ verification:
     checkpoints:
     - {step: 7, expectation: The SSH session adds no recommendation and both Mail accounts share one recommendation.}
     - {step: 8, expectation: The recommendation identifies the Mail module.}
-    - {step: 9, expectation: The preflight preserves the original session rows and creates no journal or Mail module directory.}
+    - {step: 9, expectation: "The preflight preserves the original session rows and leaves the journal, module and unused default cache absent."}
     - {step: 10, expectation: Opening Settings preserves the custom cache bytes.}
     - {step: 13, expectation: The pending status describes the verified package requirement.}
     - {step: 14, expectation: The journal contains one pending Mail entry bound to the legacy database.}
     - {step: 22, expectation: The same Mail recommendation appears after normal restart.}
     - {step: 23, expectation: The original journal and session rows survive restart.}
-    - {step: 27, expectation: Retrying preserves the journal and creates no Mail module directory.}
+    - {step: 27, expectation: Retrying preserves the journal and leaves the Mail module and unused default cache absent.}
     - {step: 28, expectation: The custom cache bytes still match their original digest.}
     - {step: 29, expectation: No renderer runtime error occurred.}
     results: [7, 8, 9, 10, 13, 14, 22, 23, 27, 28, 29]
   native:
   - check: The real desktop uses read-only SQLite preflight and records retryable pending state.
     method: automated
-    reason: An independent disk probe checks session rows, the journal and absence of a Mail module directory.
+    reason: An independent disk probe checks session rows, the journal and the absence of unused Mail directories.
   visual:
   - check: The Module Store displays the Mail recommendation and its pending message.
     method: manual

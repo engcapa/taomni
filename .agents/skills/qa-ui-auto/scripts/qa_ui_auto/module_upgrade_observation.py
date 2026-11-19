@@ -65,7 +65,11 @@ def observe(data, state, phase):
     if rows != expected:
         raise StepError("Upgrade preflight/pending changed the original session records")
     absent = ["rdp-client", "vnc-client", "rdp-server", "vnc-server", "servers", "lanchat"]
-    if "mail-accounts" in state.get("expected_items", []):
+    mail_preflight = "mail-accounts" in state.get("expected_items", [])
+    if mail_preflight:
+        cache = data / "mail-cache"
+        if cache.exists() or cache.is_symlink():
+            raise StepError("Opening a legacy profile without using Mail created default Mail storage")
         absent.append("mail")
     # The signed first-install probe has already verified the independent MFA package.
     if phase != AFTER_FIRST_INSTALL:
@@ -78,6 +82,8 @@ def observe(data, state, phase):
     result = {"sessionTypes": [row[1] for row in rows], "retainedSha256": {
         name: value["sha256"] for name, value in retained.items()},
         "moduleDirectoriesAbsent": True, "checkedAbsentModuleDirectories": absent}
+    if mail_preflight:
+        result["unusedDefaultMailCacheAbsent"] = True
     expected_fingerprint = None
     if "wal_main_sha256" in state:
         expected_fingerprint, result["walInput"] = wal_fingerprint(data, state)

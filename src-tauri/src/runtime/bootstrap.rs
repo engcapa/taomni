@@ -57,7 +57,7 @@ fn construct(
     let vault = Arc::new(
         crate::vault::Vault::open(&paths.data.join("vault.db")).map_err(|e| e.to_string())?,
     );
-    let mail = MailRuntime::new(&paths.data)?;
+    let mail = MailRuntime::new(&paths.data);
     let config = config.unwrap_or_else(|| AiConfig::load(&paths.config.join("taomni/ai.json")));
     let ai_ctx = AppAiCtx::from_config_with_proxy_db(config, vault.clone(), Some(&db));
     let mfa = crate::mfa::backend::MfaBackend::load(&paths.data);

@@ -80,6 +80,13 @@ class UpgradeObservationTests(unittest.TestCase):
         with self.assertRaisesRegex(StepError, "Read-only preflight wrote"):
             observe(self.root, self.state, "preflight")
 
+    def test_mail_preflight_rejects_creation_of_unused_default_storage(self):
+        self.state["expected_items"] = ["mail-accounts"]
+        self.assertTrue(observe(self.root, self.state, "preflight")["unusedDefaultMailCacheAbsent"])
+        (self.root / "mail-cache").mkdir()
+        with self.assertRaisesRegex(StepError, "created default Mail storage"):
+            observe(self.root, self.state, "preflight")
+
     def test_pending_and_repeat_preserve_exact_journal_without_duplicate_items(self):
         self.write_journal()
         observe(self.root, self.state, "pending")

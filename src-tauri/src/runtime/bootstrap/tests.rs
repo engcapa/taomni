@@ -55,6 +55,9 @@ fn construction_is_explicit_and_preserves_lazy_optional_data_and_mail_identity()
         "compat facade must use the one legacy mail owner"
     );
     assert_eq!(boot.state.mail_cache_root(), root.path().join("mail-cache"));
+    assert!(!boot.state.mail_cache_root().exists());
+    let mail = first.lock().unwrap();
+    assert!(std::path::Path::new(mail.path().unwrap()).is_file());
     assert_eq!(std::fs::read(lanchat).unwrap(), b"retained legacy bytes");
     assert_eq!(
         std::fs::read(root.path().join("mfa.db")).unwrap(),

@@ -13,15 +13,14 @@ pub(crate) struct MailRuntime {
 }
 
 impl MailRuntime {
-    pub(crate) fn new(profile: &Path) -> Result<Self, String> {
-        let cache_root = profile.join("mail-cache");
-        std::fs::create_dir_all(&cache_root).map_err(|error| error.to_string())?;
-        Ok(Self {
-            cache_root,
+    pub(crate) fn new(profile: &Path) -> Self {
+        Self {
+            // MailDatabase creates the selected account directory when it opens storage.
+            cache_root: profile.join("mail-cache"),
             databases: Mutex::new(HashMap::new()),
             mail_imap_pool: Arc::new(crate::mail::MailImapPool::new()),
             mail_archive: crate::mail::archive::ArchiveManager::default(),
-        })
+        }
     }
 
     pub(crate) fn database(
