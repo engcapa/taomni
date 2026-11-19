@@ -2,6 +2,7 @@
 
 pub mod archive;
 pub mod cache;
+pub mod compose;
 pub mod database;
 mod inline_images;
 mod lists;

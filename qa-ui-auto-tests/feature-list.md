@@ -7502,6 +7502,8 @@ files:
   - src/lib/mail.ts
   - src/stubs/tauri-core.ts
   - src-tauri/src/mail/mod.rs
+  - src-tauri/src/mail/smtp.rs
+  - src-tauri/crates/taomni-mail-engine/src/compose.rs
 controls:
   - id: drafts-open
     selector: '[data-testid="mail-drafts-open"]'
@@ -7757,6 +7759,7 @@ files:
   - src/stubs/tauri-core.ts
   - src-tauri/src/mail/outgoing.rs
   - src-tauri/src/mail/mod.rs
+  - src-tauri/crates/taomni-mail-engine/src/compose.rs
 controls:
   - id: thread-view-toggle
     selector: '[data-testid="mail-thread-view-toggle"]'
@@ -8059,6 +8062,7 @@ files:
   - src/lib/mailOutbox.ts
   - src/components/session/SessionEditor.tsx
   - src-tauri/src/mail/mod.rs
+  - src-tauri/crates/taomni-mail-engine/src/compose.rs
 controls:
   - id: compose-send-later
     selector: '[data-testid="mail-compose-send-later"]'

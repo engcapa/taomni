@@ -147,8 +147,6 @@ use base64::{
     engine::general_purpose::{STANDARD as BASE64_STANDARD, URL_SAFE_NO_PAD},
 };
 
-use lettre::message::{Attachment, Mailbox, MultiPart, SinglePart, header::ContentType};
-
 use lettre::transport::smtp::authentication::{Credentials, Mechanism};
 
 use lettre::transport::smtp::client::Tls;
@@ -239,8 +237,6 @@ pub use outgoing_model::{
     MailDraft, MailDraftAttachment, MailDraftContext, MailDraftSaveRequest, MailOutboxState,
     MailSendAttachment, MailSendRequest, MailSendResult,
 };
-
-use outgoing_model::DispositionNotificationTo;
 
 use utilities::{
     folders_for_header_sync, non_empty, non_empty_str, now_ts, should_list_remote_folders,

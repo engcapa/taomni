@@ -1,59 +1,7 @@
 use serde::Deserialize;
 use serde::Serialize;
 
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MailSendRequest {
-    pub to: Vec<String>,
-    #[serde(default)]
-    pub cc: Vec<String>,
-    #[serde(default)]
-    pub bcc: Vec<String>,
-    pub subject: String,
-    #[serde(default)]
-    pub text_body: Option<String>,
-    #[serde(default)]
-    pub html_body: Option<String>,
-    #[serde(default)]
-    pub attachments: Vec<MailSendAttachment>,
-    /// Message id this message replies to (brackets optional).
-    #[serde(default)]
-    pub in_reply_to: Option<String>,
-    /// Thread ancestry, oldest first (brackets optional).
-    #[serde(default)]
-    pub references: Vec<String>,
-    /// Local draft whose server copy (Drafts folder) should be removed after
-    /// a successful send.
-    #[serde(default)]
-    pub draft_id: Option<String>,
-    /// `From:` of a non-default identity ("Name <addr>"); `None` = account.
-    #[serde(default)]
-    pub from: Option<String>,
-    /// Reply-To of that identity (overrides the account Reply-To).
-    #[serde(default)]
-    pub reply_to: Option<String>,
-    /// Ask for a read receipt (RFC 8098 `Disposition-Notification-To`).
-    #[serde(default)]
-    pub request_read_receipt: bool,
-}
-
-/// `Disposition-Notification-To` (RFC 8098); lettre has no typed header.
-#[derive(Debug, Clone)]
-pub(super) struct DispositionNotificationTo(pub(super) String);
-
-impl lettre::message::header::Header for DispositionNotificationTo {
-    fn name() -> lettre::message::header::HeaderName {
-        lettre::message::header::HeaderName::new_from_ascii_str("Disposition-Notification-To")
-    }
-
-    fn parse(s: &str) -> Result<Self, Box<dyn std::error::Error + Send + Sync>> {
-        Ok(Self(s.trim().to_string()))
-    }
-
-    fn display(&self) -> lettre::message::header::HeaderValue {
-        lettre::message::header::HeaderValue::new(Self::name(), self.0.clone())
-    }
-}
+pub use taomni_mail_engine::compose::{MailSendAttachment, MailSendRequest};
 
 /// Queue state of a draft waiting in the local Outbox (TASK-17).
 #[derive(Debug, Clone, Default, Serialize, Deserialize, PartialEq, Eq)]
@@ -70,20 +18,6 @@ pub struct MailOutboxState {
     pub last_error: Option<String>,
     #[serde(default)]
     pub read_receipt: bool,
-}
-
-#[derive(Debug, Clone, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MailSendAttachment {
-    pub path: String,
-    #[serde(default)]
-    pub name: Option<String>,
-    #[serde(default)]
-    pub content_type: Option<String>,
-    #[serde(default)]
-    pub inline: bool,
-    #[serde(default)]
-    pub content_id: Option<String>,
 }
 
 #[derive(Debug, Serialize)]
