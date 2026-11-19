@@ -33,8 +33,10 @@ steps:
     path: ${fixture.maven_single_root}/src/main/java/com/example/single/App.java
     text: "package com.example.single;\n\npublic class App {\n\n    public static void main(String[] args) {\n        int count = \"text\";\n        java.util.List raw = null;\n        System.out.println(count + \" \" + raw);\n    }\n}\n"
 - reload_window: null
-- click: '[data-testid="welcome-history-tab-workspaces"]'
-- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_single_root}"]'
+- click: '[data-testid="tao-home-history"]'
+- wait_for: '[data-testid="tao-home-history-popover"]'
+- click: '[data-testid="tao-home-history-tab-workspaces"]'
+- click: '[data-testid="tao-home-history-row"][data-workspace-path="${fixture.maven_single_root}"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - wait_for:
     selector: '[data-testid="code-workspace-editor-pane"]'
@@ -124,59 +126,59 @@ verification:
   - id: R1
     requirement: A2/DEC-022-01：真实 JDT LS 诊断在右侧 error stripe 以错误/警告刻度出现在对应行；点击错误刻度把 caret 移到第 6 行，文档不变。
     actions:
-    - 23
+    - 25
     checkpoints:
-    - step: 12
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"][data-semantic-ready=\"true\"]", "timeout_sec": 120}}'
-    - step: 13
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-error-stripe-mark\"][data-kind=\"error\"][data-line=\"6\"]", "timeout_sec": 60}}'
     - step: 14
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-error-stripe-mark\"][data-kind=\"warning\"][data-line=\"7\"]", "timeout_sec": 30}}'
-    - step: 24
-      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "6:1", "timeout_sec": 10}}'
-    - step: 40
-      expectation: '{"assert_count": {"selector": "[data-editor-tab-key][data-active=\"true\"][data-dirty=\"true\"]", "equal": 0}}'
-    results:
-    - 13
-    - 14
-    - 24
-    - 40
-  - id: R2
-    requirement: A2/DEC-022-03：有真实运行 facts 的 App.java 在类声明与 main 行显示运行图标；点击弹出 Run/Debug 菜单，Esc 关闭。
-    actions:
-    - 18
-    - 21
-    checkpoints:
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"][data-semantic-ready=\"true\"]", "timeout_sec": 120}}'
     - step: 15
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-run-gutter\"][data-line=\"5\"]", "timeout_sec": 60}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-error-stripe-mark\"][data-kind=\"error\"][data-line=\"6\"]", "timeout_sec": 60}}'
     - step: 16
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-run-gutter\"][data-line=\"3\"]"}'
-    - step: 19
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-run-gutter-run\"]"}'
-    - step: 20
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-run-gutter-debug\"]"}'
-    - step: 22
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-run-gutter-run\"]", "state": "detached", "timeout_sec": 5}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-error-stripe-mark\"][data-kind=\"warning\"][data-line=\"7\"]", "timeout_sec": 30}}'
+    - step: 26
+      expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-workspace-cursor\"]", "contains": "6:1", "timeout_sec": 10}}'
+    - step: 42
+      expectation: '{"assert_count": {"selector": "[data-editor-tab-key][data-active=\"true\"][data-dirty=\"true\"]", "equal": 0}}'
     results:
     - 15
     - 16
-    - 19
+    - 26
+    - 42
+  - id: R2
+    requirement: A2/DEC-022-03：有真实运行 facts 的 App.java 在类声明与 main 行显示运行图标；点击弹出 Run/Debug 菜单，Esc 关闭。
+    actions:
     - 20
+    - 23
+    checkpoints:
+    - step: 17
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-run-gutter\"][data-line=\"5\"]", "timeout_sec": 60}}'
+    - step: 18
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-run-gutter\"][data-line=\"3\"]"}'
+    - step: 21
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-run-gutter-run\"]"}'
+    - step: 22
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-run-gutter-debug\"]"}'
+    - step: 24
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-run-gutter-run\"]", "state": "detached", "timeout_sec": 5}}'
+    results:
+    - 17
+    - 18
+    - 21
     - 22
+    - 24
   - id: R3
     requirement: A2/DEC-022-04：caret 停在 count 上时由 provider 语义高亮用法（刻度同步进入 stripe）；gutter/stripe 更新不产生编辑或 dirty。
     actions:
-    - 37
+    - 39
     checkpoints:
-    - step: 38
-      expectation: '{"wait_for": {"selector": ".cm-lsp-usage", "timeout_sec": 30}}'
-    - step: 39
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-error-stripe-mark\"][data-kind=\"usage\"]", "timeout_sec": 10}}'
     - step: 40
+      expectation: '{"wait_for": {"selector": ".cm-lsp-usage", "timeout_sec": 30}}'
+    - step: 41
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-error-stripe-mark\"][data-kind=\"usage\"]", "timeout_sec": 10}}'
+    - step: 42
       expectation: '{"assert_count": {"selector": "[data-editor-tab-key][data-active=\"true\"][data-dirty=\"true\"]", "equal": 0}}'
     results:
-    - 38
     - 40
+    - 42
   visual:
   - check: 不声明视觉结论。
     method: not-applicable

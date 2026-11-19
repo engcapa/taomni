@@ -28,7 +28,7 @@ steps:
 - assert_visible: '[data-testid="tao-home-local-terminal"]'
 - assert_text:
     selector: '[data-testid="welcome-panel"]'
-    contains: 本地终端
+    contains: Local terminal
 - click: '[data-testid="welcome-panel"] [data-testid="tao-home-local-terminal"]'
 - wait_for:
     selector: '[data-testid="terminal-pane"]'

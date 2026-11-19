@@ -22,8 +22,10 @@ timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="welcome-history-tab-workspaces"]'
-- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity009_root}"]'
+- click: '[data-testid="tao-home-history"]'
+- wait_for: '[data-testid="tao-home-history-popover"]'
+- click: '[data-testid="tao-home-history-tab-workspaces"]'
+- click: '[data-testid="tao-home-history-row"][data-workspace-path="${fixture.parity009_root}"]'
 - wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
 - click: '[data-testid="code-workspace-editor"] .cm-content'
 - press: Control+Shift+A
@@ -73,59 +75,59 @@ verification:
   - id: R1
     requirement: A1/DEC-016-01：对话框左侧有 Recent 与 Existing Templates（Java），点击模板载入模板编辑器。
     actions:
-    - 13
     - 15
+    - 17
     checkpoints:
-    - step: 11
+    - step: 13
       expectation: '{"wait_for": "[data-testid=\"structural-search-dialog\"]"}'
-    - step: 12
-      expectation: '{"assert_visible": "[data-testid=\"structural-search-templates\"]"}'
     - step: 14
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"structural-search-template\"]", "name": "value", "equals": "System.err.println($arg$);"}}'
+      expectation: '{"assert_visible": "[data-testid=\"structural-search-templates\"]"}'
     - step: 16
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"structural-search-template\"]", "name": "value", "equals": "System.err.println($arg$);"}}'
+    - step: 18
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"structural-search-template\"]", "name": "value", "equals": "System.out.println($arg$);"}}'
     results:
-    - 14
     - 16
+    - 18
   - id: R2
     requirement: A1/DEC-016-02：Add filter 列出 Text/Count/Type/Reference/Script；语法后端只支持 Text，其余 typed unavailable 并给出原因；选择 Text 聚焦 Text 过滤输入。
     actions:
-    - 17
-    - 22
+    - 19
+    - 24
     checkpoints:
-    - step: 18
-      expectation: '{"assert_visible": "[data-testid=\"structural-search-filter-menu\"]"}'
-    - step: 19
-      expectation: '{"assert_disabled": "[data-testid=\"structural-search-filter-option-type\"]"}'
     - step: 20
-      expectation: '{"assert_disabled": "[data-testid=\"structural-search-filter-option-count\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"structural-search-filter-menu\"]"}'
     - step: 21
-      expectation: '{"assert_text": {"selector": "[data-testid=\"structural-search-filter-reason\"]", "contains": "syntax-only backend"}}'
+      expectation: '{"assert_disabled": "[data-testid=\"structural-search-filter-option-type\"]"}'
+    - step: 22
+      expectation: '{"assert_disabled": "[data-testid=\"structural-search-filter-option-count\"]"}'
     - step: 23
+      expectation: '{"assert_text": {"selector": "[data-testid=\"structural-search-filter-reason\"]", "contains": "syntax-only backend"}}'
+    - step: 25
       expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(''data-testid'') === ''structural-search-variable-text''", "expect_truthy": true}}'
     results:
-    - 19
-    - 20
     - 21
+    - 22
     - 23
+    - 25
   - id: R3
     requirement: A2：运行后结果仍为 3 个 AST 匹配；再次打开对话框时刚运行的模板出现在 Recent；Esc 关闭。
     actions:
-    - 24
-    - 27
-    checkpoints:
-    - step: 25
-      expectation: '{"wait_for": "[data-testid=\"structural-search-panel\"][data-phase=\"results\"]"}'
-    - step: 26
-      expectation: '{"assert_text": {"selector": "[data-testid=\"structural-search-summary\"]", "contains": "3 results"}}'
-    - step: 29
-      expectation: '{"assert_text": {"selector": "[data-testid=\"structural-search-template-item\"][data-template-kind=\"recent\"]", "contains": "System.out.println($arg$);"}}'
-    - step: 31
-      expectation: '{"assert_not_visible": "[data-testid=\"structural-search-dialog\"]"}'
-    results:
     - 26
     - 29
+    checkpoints:
+    - step: 27
+      expectation: '{"wait_for": "[data-testid=\"structural-search-panel\"][data-phase=\"results\"]"}'
+    - step: 28
+      expectation: '{"assert_text": {"selector": "[data-testid=\"structural-search-summary\"]", "contains": "3 results"}}'
+    - step: 31
+      expectation: '{"assert_text": {"selector": "[data-testid=\"structural-search-template-item\"][data-template-kind=\"recent\"]", "contains": "System.out.println($arg$);"}}'
+    - step: 33
+      expectation: '{"assert_not_visible": "[data-testid=\"structural-search-dialog\"]"}'
+    results:
+    - 28
     - 31
+    - 33
   visual:
   - check: 对照 IDEA Search Structurally 对话框的三栏布局。
     method: manual

@@ -21,8 +21,10 @@ steps:
       key: taomni.recentWorkspaces.v1
       value: '[{"id":"qa-parity009-native","name":"parity009","roots":[{"id":"parity009","name":"parity009","path":"${fixture.parity009_root}","kind":"folder"},{"id":"parity009-bulk","name":"parity009-bulk","path":"${fixture.parity009_bulk_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"parity009","path":"src/StructuralTarget.java"},"lastOpenedAt":1756100000000,"isGitRepo":false}]'
   - reload_window: null
-  - click: '[data-testid="welcome-history-tab-workspaces"]'
-  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity009_root}"]'
+  - click: '[data-testid="tao-home-history"]'
+  - wait_for: '[data-testid="tao-home-history-popover"]'
+  - click: '[data-testid="tao-home-history-tab-workspaces"]'
+  - click: '[data-testid="tao-home-history-row"][data-workspace-path="${fixture.parity009_root}"]'
   - wait_for:
       selector: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
       timeout_sec: 60
@@ -114,69 +116,69 @@ verification:
   - id: ED-PARITY-009-N1
     requirement: 原生 tree-sitter-java 后端经真实 IPC 返回 3 / Text=42→1 / Text=999→空态，并导航到第 4 行。
     actions:
-    - 7
-    - 15
+    - 9
     - 17
-    - 18
-    - 23
-    - 27
-    - 28
-    - 32
-    - 33
-    checkpoints:
-    - step: 19
-      expectation: '{wait_for: {selector: ''[data-testid="structural-search-panel"][data-phase="results"]'', timeout_sec:
-        60}}'
-    - step: 20
-      expectation: '{assert_items: {attribute: data-line, equals: [''3'', ''4'', ''5''], selector: ''[data-testid="structural-search-match"]''}}'
-    - step: 21
-      expectation: '{assert_text: {contains: tree-sitter-java · tree-sitter-java 0.23.5, selector: ''[data-testid="structural-search-backend"]''}}'
-    - step: 24
-      expectation: '{assert_text_equals: {equals: ''    System.out.println(42);'', selector: ''[data-testid="code-workspace-editor"]
-        .cm-activeLine''}}'
-    - step: 29
-      expectation: '{wait_for: {selector: ''[data-testid="structural-search-panel"][data-phase="results"]'', timeout_sec:
-        60}}'
-    - step: 30
-      expectation: '{assert_items: {attribute: data-line, equals: [''4''], selector: ''[data-testid="structural-search-match"]''}}'
-    - step: 34
-      expectation: '{wait_for: {selector: ''[data-testid="structural-search-empty"]'', timeout_sec: 60}}'
-    - step: 35
-      expectation: '{assert_count: {equal: 0, selector: ''[data-testid="structural-search-unavailable"]''}}'
-    results:
+    - 19
+    - 20
+    - 25
+    - 29
     - 30
     - 34
     - 35
+    checkpoints:
+    - step: 21
+      expectation: '{wait_for: {selector: ''[data-testid="structural-search-panel"][data-phase="results"]'', timeout_sec:
+        60}}'
+    - step: 22
+      expectation: '{assert_items: {attribute: data-line, equals: [''3'', ''4'', ''5''], selector: ''[data-testid="structural-search-match"]''}}'
+    - step: 23
+      expectation: '{assert_text: {contains: tree-sitter-java · tree-sitter-java 0.23.5, selector: ''[data-testid="structural-search-backend"]''}}'
+    - step: 26
+      expectation: '{assert_text_equals: {equals: ''    System.out.println(42);'', selector: ''[data-testid="code-workspace-editor"]
+        .cm-activeLine''}}'
+    - step: 31
+      expectation: '{wait_for: {selector: ''[data-testid="structural-search-panel"][data-phase="results"]'', timeout_sec:
+        60}}'
+    - step: 32
+      expectation: '{assert_items: {attribute: data-line, equals: [''4''], selector: ''[data-testid="structural-search-match"]''}}'
+    - step: 36
+      expectation: '{wait_for: {selector: ''[data-testid="structural-search-empty"]'', timeout_sec: 60}}'
+    - step: 37
+      expectation: '{assert_count: {equal: 0, selector: ''[data-testid="structural-search-unavailable"]''}}'
+    results:
+    - 32
+    - 36
+    - 37
   - id: ED-PARITY-009-N2
     requirement: 无效模板为类型化错误；大工作区 In Project 运行中 Esc 取消，后端 active requests 回到 0；源文件 SHA-256 不变、编辑器不 dirty。
     actions:
-    - 38
-    - 39
-    - 44
-    - 45
-    - 48
+    - 40
+    - 41
+    - 46
+    - 47
+    - 50
     checkpoints:
-    - step: 40
+    - step: 42
       expectation: '{wait_for: ''[data-testid="structural-search-error"]''}'
-    - step: 41
+    - step: 43
       expectation: '{assert_text: {contains: ''not a single Java statement, expression or class member'', selector: ''[data-testid="structural-search-error"]''}}'
-    - step: 46
+    - step: 48
       expectation: '{wait_for: ''[data-testid="structural-search-running"]''}'
-    - step: 49
+    - step: 51
       expectation: '{assert_not_visible: ''[data-testid="structural-search-dialog"]''}'
-    - step: 50
+    - step: 52
       expectation: '{wait_for: {selector: ''[data-testid="structural-search-panel"][data-phase="cancelled"][data-active-requests="0"]'',
         timeout_sec: 60}}'
-    - step: 51
-      expectation: '{assert_visible: ''[data-testid="structural-search-cancelled"]''}'
     - step: 53
+      expectation: '{assert_visible: ''[data-testid="structural-search-cancelled"]''}'
+    - step: 55
       expectation: '{assert_count: {equal: 0, selector: ''[data-editor-tab-key][data-dirty="true"]''}}'
-    - step: 54
+    - step: 56
       expectation: '{assert_file_sha256: {equals: ''${fixture.parity009_target_sha256}'', path: ''${fixture.parity009_target}''}}'
     results:
-    - 51
     - 53
-    - 54
+    - 55
+    - 56
   visual:
   - check: 截图中标题、n/N 导航、两侧标签/结果树与高亮无截断遮挡；与 IDEA 参照的视觉差异单独记录于 comparison record。
     method: manual

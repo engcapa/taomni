@@ -46,8 +46,10 @@ steps:
     key: taomni.recentWorkspaces.v1
     value: '[{"id":"qa-audit008","name":"maven-single","roots":[{"id":"maven-single","name":"maven-single","path":"${fixture.maven_single_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"maven-single","path":"src/main/java/com/example/single/QuickFixTarget.java"},"lastOpenedAt":1756100000000,"isGitRepo":false}]'
 - reload_window: null
-- click: '[data-testid="welcome-history-tab-workspaces"]'
-- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_single_root}"]'
+- click: '[data-testid="tao-home-history"]'
+- wait_for: '[data-testid="tao-home-history-popover"]'
+- click: '[data-testid="tao-home-history-tab-workspaces"]'
+- click: '[data-testid="tao-home-history-row"][data-workspace-path="${fixture.maven_single_root}"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - wait_for:
     selector: '[data-testid="code-workspace-editor-pane"]'
@@ -176,90 +178,90 @@ verification:
     - 4
     - 5
     - 6
-    - 7
-    - 14
+    - 9
     - 16
-    - 21
-    - 24
+    - 18
+    - 23
     - 26
-    - 27
-    - 30
-    - 34
-    - 38
-    - 41
+    - 28
+    - 29
+    - 32
+    - 36
+    - 40
     - 43
-    - 44
-    - 47
+    - 45
+    - 46
+    - 49
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 8
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
-    - step: 9
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "timeout_sec": 60}}'
     - step: 10
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 11
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-editor-pane\"]", "timeout_sec": 60}}'
+    - step: 12
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "quickFixTargets",
         "timeout_sec": 60}}'
-    - step: 11
+    - step: 13
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"]", "contains":
         "Java", "timeout_sec": 60}}'
-    - step: 12
+    - step: 14
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-lightbulb\"]", "timeout_sec": 90}}'
-    - step: 15
-      expectation: "{\"assert_text\": {\"selector\": \"[data-testid=\\\"status-bar-workspace-cursor\\\"]\", \"contains\": \"13:34\", \"timeout_sec\": 10}}"
     - step: 17
+      expectation: "{\"assert_text\": {\"selector\": \"[data-testid=\\\"status-bar-workspace-cursor\\\"]\", \"contains\": \"13:34\", \"timeout_sec\": 10}}"
+    - step: 19
       expectation: '{"wait_for": {"selector": "[data-testid=\"context-menu\"]", "timeout_sec": 90}}'
-    - step: 18
+    - step: 20
       expectation: '{"assert_text": {"selector": "[data-testid=\"context-menu\"]", "contains": "Import ''StringUtils''
         (org.apache.commons.lang3)", "timeout_sec": 10}}'
-    - step: 19
+    - step: 21
       expectation: '{"assert_text": {"selector": "[data-testid=\"context-menu\"]", "contains": "Add all missing
         imports", "timeout_sec": 10}}'
-    - step: 22
+    - step: 24
       expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "Applied code
         action", "timeout_sec": 30}}'
-    - step: 23
+    - step: 25
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "import
         org.apache.commons.lang3.StringUtils;", "timeout_sec": 30}}'
-    - step: 25
+    - step: 27
       expectation: '{"assert_file_sha256": {"path": "${fixture.maven_single_root}/src/main/java/com/example/single/QuickFixTarget.java",
         "equals": "a1a321c4326cdfef25e6aec6ccce42ec1f06395f10ba44154a0f424b5105dec2", "timeout_sec": 30}}'
-    - step: 28
+    - step: 30
       expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "Undid Import
         ''StringUtils''", "timeout_sec": 10}}'
-    - step: 29
+    - step: 31
       expectation: '{"eval_readonly": {"expression": "!document.querySelector(''.cm-content'').innerText.includes(''import
         org.apache.commons.lang3'')", "expect_truthy": true}}'
-    - step: 31
+    - step: 33
       expectation: '{"assert_file_sha256": {"path": "${fixture.maven_single_root}/src/main/java/com/example/single/QuickFixTarget.java",
         "equals": "f2de5c8ab98b58cf18ff998ebc47d19c127bb6f4290550d2827a40a37552e70a", "timeout_sec": 30}}'
-    - step: 32
+    - step: 34
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-lightbulb\"]", "timeout_sec": 90}}'
-    - step: 35
+    - step: 37
       expectation: '{"wait_for": {"selector": "[data-testid=\"context-menu\"]", "timeout_sec": 30}}'
-    - step: 36
+    - step: 38
       expectation: '{"assert_text": {"selector": "[data-testid=\"context-menu\"]", "contains": "Import ''StringUtils''
         (org.apache.commons.lang3)", "timeout_sec": 10}}'
-    - step: 39
+    - step: 41
       expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "Applied code
         action", "timeout_sec": 30}}'
-    - step: 40
+    - step: 42
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "import
         org.apache.commons.lang3.StringUtils;", "timeout_sec": 30}}'
-    - step: 42
+    - step: 44
       expectation: '{"assert_file_sha256": {"path": "${fixture.maven_single_root}/src/main/java/com/example/single/QuickFixTarget.java",
         "equals": "a1a321c4326cdfef25e6aec6ccce42ec1f06395f10ba44154a0f424b5105dec2", "timeout_sec": 30}}'
-    - step: 45
+    - step: 47
       expectation: '{"assert_text": {"selector": "[data-testid=\"status-bar-message\"]", "contains": "Undid Import
         ''StringUtils''", "timeout_sec": 10}}'
-    - step: 46
+    - step: 48
       expectation: '{"eval_readonly": {"expression": "!document.querySelector(''.cm-content'').innerText.includes(''import
         org.apache.commons.lang3'')", "expect_truthy": true}}'
-    - step: 48
+    - step: 50
       expectation: '{"assert_file_sha256": {"path": "${fixture.maven_single_root}/src/main/java/com/example/single/QuickFixTarget.java",
         "equals": "f2de5c8ab98b58cf18ff998ebc47d19c127bb6f4290550d2827a40a37552e70a", "timeout_sec": 30}}'
     results:
-    - 48
+    - 50
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

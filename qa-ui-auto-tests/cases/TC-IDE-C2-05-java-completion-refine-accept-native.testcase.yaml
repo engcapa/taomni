@@ -40,8 +40,10 @@ steps:
     key: taomni.recentWorkspaces.v1
     value: '[{"id":"qa-completion-refine","name":"maven-single","roots":[{"id":"maven-single","name":"maven-single","path":"${fixture.maven_single_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"maven-single","path":"src/main/java/com/example/single/App.java"},"lastOpenedAt":1788566400000,"isGitRepo":false}]'
 - reload_window: null
-- click: '[data-testid="welcome-history-tab-workspaces"]'
-- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_single_root}"]'
+- click: '[data-testid="tao-home-history"]'
+- wait_for: '[data-testid="tao-home-history-popover"]'
+- click: '[data-testid="tao-home-history-tab-workspaces"]'
+- click: '[data-testid="tao-home-history-row"][data-workspace-path="${fixture.maven_single_root}"]'
 - wait_for: '[data-testid="code-workspace-editor"] .cm-content'
 - wait_for:
     selector: '[data-testid="code-workspace-lsp-status-pill"][data-semantic-ready="true"]'
@@ -160,63 +162,63 @@ verification:
     - 4
     - 5
     - 6
-    - 7
-    - 10
-    - 11
+    - 9
+    - 12
     - 13
-    - 14
-    - 18
-    - 19
+    - 15
+    - 16
+    - 20
     - 21
-    - 31
-    - 35
-    - 39
+    - 23
+    - 33
+    - 37
     - 41
     - 43
     - 45
-    - 46
     - 47
     - 48
-    - 51
+    - 49
+    - 50
     - 53
+    - 55
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 8
+    - step: 10
       expectation: '{"wait_for": "[data-testid=\"code-workspace-editor\"] .cm-content"}'
-    - step: 9
+    - step: 11
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"][data-semantic-ready=\"true\"]",
         "timeout_sec": 120}}'
-    - step: 16
+    - step: 18
       expectation: Go to Line places the caret at logical source position 10:1 regardless of folded imports.
-    - step: 17
+    - step: 19
       expectation: The active source line is the existing System.out.println(names.size()); statement inside main,
         before any edit.
-    - step: 20
+    - step: 22
       expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete li.cm-completion-type-method", "timeout_sec":
         90}}'
-    - step: 34
+    - step: 36
       expectation: '{"assert_text": {"selector": ".cm-tooltip-autocomplete", "contains": "println("}}'
-    - step: 37
+    - step: 39
       expectation: '{"wait_for": ".cm-tooltip-autocomplete .cm-completionInfo"}'
-    - step: 40
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "System.out.println("}}'
     - step: 42
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "System.out.println("}}'
+    - step: 44
       expectation: '{"eval_readonly": {"expression": "document.querySelector(\".cm-content\").innerText.includes(\"System.out.println\\n\")",
         "expect_truthy": true}}'
-    - step: 44
+    - step: 46
       expectation: '{"eval_readonly": {"expression": "document.activeElement === document.querySelectorAll(\".cm-content\")[0]",
         "expect_truthy": true}}'
-    - step: 49
+    - step: 51
       expectation: '{"wait_for": {"selector": ".cm-tooltip-autocomplete li.cm-completion-type-method", "timeout_sec":
         90}}'
-    - step: 52
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "System.out.println("}}'
     - step: 54
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "System.out.println("}}'
+    - step: 56
       expectation: '{"eval_readonly": {"expression": "document.querySelector(\".cm-content\").innerText.includes(\"System.out.println\\n\")",
         "expect_truthy": true}}'
     results:
-    - 54
+    - 56
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

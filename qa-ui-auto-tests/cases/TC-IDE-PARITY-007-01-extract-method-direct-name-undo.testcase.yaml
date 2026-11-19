@@ -25,8 +25,10 @@ steps:
 - seed_storage:
     key: taomni.codeWorkspace.refactorOptions.v1
     value: '{"mode":"dialog"}'
-- click: '[data-testid="welcome-history-tab-workspaces"]'
-- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity007_root}"]'
+- click: '[data-testid="tao-home-history"]'
+- wait_for: '[data-testid="tao-home-history-popover"]'
+- click: '[data-testid="tao-home-history-tab-workspaces"]'
+- click: '[data-testid="tao-home-history-row"][data-workspace-path="${fixture.parity007_root}"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
 - wait_for:
@@ -605,82 +607,82 @@ verification:
     requirement: Ctrl+Alt+M on the E1 selection runs the single method candidate directly (no candidate menu), prompts in the Extract Method dialog with the provider default name fully selected, and produces
       B1 on the buffer and on disk.
     actions:
-    - 19
+    - 21
     checkpoints:
-    - step: 33
+    - step: 35
       expectation: Exactly one code-action request and one resolve; no second candidate and no rename were involved.
-    - step: 32
+    - step: 34
       expectation: No frozen candidate menu is present.
     - step: 2
       expectation: The naming dialog opened directly (Extract Method TextInputDialog).
-    - step: 26
+    - step: 28
       expectation: The provider default name is present and fully selected in the input.
-    - step: 27
+    - step: 29
       expectation: The buffer is the extracted B1 with the call site and the new method.
     results:
-    - 33
+    - 35
     - 2
-    - 26
-    - 27
+    - 28
+    - 29
   - id: ED-PARITY-007-V3-01-naming
     requirement: Enter renames both the call site and the declaration, and two editor undos then redos walk B2 -> B1 -> B0 -> B1 -> B2 without an undo confirmation.
     actions:
-    - 30
+    - 32
     checkpoints:
-    - step: 32
+    - step: 34
       expectation: The committed buffer is B2 with sumOf in the declaration and the call site.
-    - step: 33
+    - step: 35
       expectation: The naming step issued exactly one provider prepare and rename.
-    - step: 39
+    - step: 41
       expectation: The first editor undo returns B1 with no undo confirmation.
-    - step: 43
+    - step: 45
       expectation: The second undo returns the initial B0.
-    - step: 51
+    - step: 53
       expectation: Redo restores B1 and then B2.
-    - step: 38
+    - step: 40
       expectation: No undo confirmation dialog appears for the editor undo.
     results:
-    - 32
-    - 39
-    - 43
-    - 51
-    - 38
+    - 34
+    - 41
+    - 45
+    - 53
+    - 40
   - id: ED-PARITY-007-V3-01-cancel
     requirement: Escape and the mouse Cancel keep the provider default name, leaving exactly one extraction history entry that one undo reverts.
     actions:
-    - 80
+    - 82
     checkpoints:
-    - step: 71
+    - step: 73
       expectation: Escape leaves B1 with the default name and no extra rename.
-    - step: 79
+    - step: 81
       expectation: One undo after the Escape path returns B0.
-    - step: 94
+    - step: 96
       expectation: Cancel keeps the default name and adds no rename.
-    - step: 99
+    - step: 101
       expectation: One undo after the Cancel path returns B0.
     results:
-    - 71
-    - 79
-    - 94
-    - 99
+    - 73
+    - 81
+    - 96
+    - 101
   - id: ED-PARITY-007-V3-01-validation
     requirement: A provider-rejected name keeps the committed B1 and the user input, and a corrected retry renames without repeating the extraction.
     actions:
-    - 111
+    - 113
     checkpoints:
-    - step: 115
+    - step: 117
       expectation: The dialog reopens with the rejected 1bad input preserved.
-    - step: 116
+    - step: 118
       expectation: The committed buffer is still B1; the extraction was not repeated.
-    - step: 121
+    - step: 123
       expectation: The corrected name commits B2.
-    - step: 122
+    - step: 124
       expectation: Only rename requests grew; the code-action request count did not.
     results:
-    - 115
-    - 116
-    - 121
-    - 122
+    - 117
+    - 118
+    - 123
+    - 124
   visual:
   - check: Dialog geometry, disabled-confirm styling and the extracted call site against the IDEA reference.
     method: manual

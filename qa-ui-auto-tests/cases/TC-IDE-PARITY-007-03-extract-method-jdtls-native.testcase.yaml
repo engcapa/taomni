@@ -32,8 +32,10 @@ steps:
     value: '[{"id": "qa-parity007-native", "name": "parity007", "roots": [{"id": "parity007", "name": "parity007", "path": "${fixture.parity007_root}", "kind": "folder"}], "looseFiles": [], "lastActiveFile":
       {"kind": "root", "rootId": "parity007", "path": "src/main/java/demo/ExtractTarget.java"}, "lastOpenedAt": 1756100000000, "isGitRepo": false}]'
 - reload_window: null
-- click: '[data-testid="welcome-history-tab-workspaces"]'
-- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity007_root}"]'
+- click: '[data-testid="tao-home-history"]'
+- wait_for: '[data-testid="tao-home-history-popover"]'
+- click: '[data-testid="tao-home-history-tab-workspaces"]'
+- click: '[data-testid="tao-home-history-row"][data-workspace-path="${fixture.parity007_root}"]'
 - wait_for:
     selector: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
     timeout_sec: 90
@@ -192,61 +194,61 @@ verification:
   - id: ED-PARITY-007-V4-1-provider
     requirement: The real JDT LS offers the method extraction for E1; the direct chord applies it, the host file becomes B1, and the E1 program oracle keeps stdout 12,0,-2,12.
     actions:
-    - 12
+    - 14
     checkpoints:
-    - step: 12
+    - step: 14
       expectation: The host ExtractTarget.java still has the reference B0 bytes before the extraction.
-    - step: 13
+    - step: 15
       expectation: javac/java of the initial source prints exactly 12,0,-2,12 with exit 0.
-    - step: 27
-      expectation: The real provider edit produced the call site and the new method on disk.
     - step: 29
+      expectation: The real provider edit produced the call site and the new method on disk.
+    - step: 31
       expectation: The extracted B1 still prints exactly 12,0,-2,12.
     results:
-    - 12
-    - 13
-    - 27
+    - 14
+    - 15
     - 29
+    - 31
   - id: ED-PARITY-007-V4-2-naming-undo
     requirement: Naming through the real Rename chain updates the declaration and the call site, and two undos then redos walk the host bytes B2 -> B1 -> B0 -> B1 -> B2 with the oracle holding at every
       state.
     actions:
-    - 37
+    - 39
     checkpoints:
-    - step: 37
-      expectation: The host file has sumOf in the declaration and the call site.
     - step: 39
+      expectation: The host file has sumOf in the declaration and the call site.
+    - step: 41
       expectation: The renamed B2 still prints 12,0,-2,12.
-    - step: 44
+    - step: 46
       expectation: The first undo restores B1 on disk and the oracle still passes.
-    - step: 47
+    - step: 49
       expectation: The second undo restores the exact initial B0 hash.
-    - step: 56
+    - step: 58
       expectation: Redo restores B1 then B2 on disk and the oracle still passes.
     results:
-    - 37
     - 39
-    - 44
-    - 47
-    - 56
+    - 41
+    - 46
+    - 49
+    - 58
   - id: ED-PARITY-007-V4-3-dirty
     requirement: With unsaved input the extraction stays in the buffer, never writes the pending input to disk, does not prompt for a name, and undo keeps the pending input.
     actions:
-    - 58
+    - 60
     checkpoints:
-    - step: 78
-      expectation: The status line asks to save before renaming.
-    - step: 79
-      expectation: No naming dialog appears for the dirty buffer.
     - step: 80
+      expectation: The status line asks to save before renaming.
+    - step: 81
+      expectation: No naming dialog appears for the dirty buffer.
+    - step: 82
       expectation: The host file is unchanged by the dirty extraction.
-    - step: 83
+    - step: 85
       expectation: Undo keeps the pending input in the buffer.
     results:
-    - 78
-    - 79
     - 80
-    - 83
+    - 81
+    - 82
+    - 85
   visual:
   - check: Real WebView dialog rendering and the extracted method layout.
     method: manual

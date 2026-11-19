@@ -20,8 +20,10 @@ steps:
 - seed_storage:
     key: taomni.codeWorkspace.refactorOptions.v1
     value: '{"mode":"dialog"}'
-- click: '[data-testid="welcome-history-tab-workspaces"]'
-- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity007_root}"]'
+- click: '[data-testid="tao-home-history"]'
+- wait_for: '[data-testid="tao-home-history-popover"]'
+- click: '[data-testid="tao-home-history-tab-workspaces"]'
+- click: '[data-testid="tao-home-history-row"][data-workspace-path="${fixture.parity007_root}"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
 - click: '[data-testid="code-workspace-editor"] .cm-content'
@@ -293,39 +295,39 @@ verification:
   - id: ED-PARITY-007-V3-04-entries
     requirement: Search Everywhere Actions and the keymap cheat sheet run the same direct Extract Method transaction as the editor chord.
     actions:
-    - 40
+    - 42
     checkpoints:
-    - step: 42
+    - step: 44
       expectation: The Actions entry lists the Extract Method command.
-    - step: 45
+    - step: 47
       expectation: The Actions entry produced the extracted B1 on the buffer.
-    - step: 51
+    - step: 53
       expectation: Undo after the Escape path returns the initial B0.
-    - step: 67
+    - step: 69
       expectation: The cheat sheet lists and runs the Extract Method action.
-    - step: 78
+    - step: 80
       expectation: All three entries left no pending provider response (one request and one resolve per entry).
     results:
-    - 42
-    - 45
-    - 51
-    - 67
-    - 78
+    - 44
+    - 47
+    - 53
+    - 69
+    - 80
   - id: ED-PARITY-007-V3-04-protection
     requirement: The chord is not dispatched from the Find input, requires both modifiers, and never opens a menu for a partial chord.
     actions:
-    - 79
+    - 81
     checkpoints:
-    - step: 84
+    - step: 86
       expectation: Ctrl+Alt+M inside the Find query issues no request.
-    - step: 96
+    - step: 98
       expectation: Ctrl+M without Alt issues no request.
-    - step: 108
+    - step: 110
       expectation: Alt+M without Ctrl issues no request and opens no menu.
     results:
-    - 84
-    - 96
-    - 108
+    - 86
+    - 98
+    - 110
   visual:
   - check: Candidate menu anchor at the selection and the dialog chrome against the IDEA reference.
     method: manual

@@ -36,8 +36,10 @@ steps:
     key: taomni.recentWorkspaces.v1
     value: '[{"id":"qa-analysis-line","name":"maven-single","roots":[{"id":"maven-single","name":"maven-single","path":"${fixture.maven_single_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"maven-single","path":"src/main/java/com/example/single/QuickFixTarget.java"},"lastOpenedAt":1789259400000,"isGitRepo":false}]'
 - reload_window: null
-- click: '[data-testid="welcome-history-tab-workspaces"]'
-- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_single_root}"]'
+- click: '[data-testid="tao-home-history"]'
+- wait_for: '[data-testid="tao-home-history-popover"]'
+- click: '[data-testid="tao-home-history-tab-workspaces"]'
+- click: '[data-testid="tao-home-history-row"][data-workspace-path="${fixture.maven_single_root}"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - wait_for:
     selector: '[data-testid="code-workspace-lsp-status-pill"]'
@@ -68,33 +70,33 @@ verification:
     - 4
     - 5
     - 6
-    - 7
-    - 10
-    - 13
+    - 9
+    - 12
     - 15
+    - 17
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 8
+    - step: 10
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
-    - step: 9
+    - step: 11
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"]", "timeout_sec":
         90}}'
-    - step: 11
+    - step: 13
       expectation: '{"wait_for": "[data-testid=\"code-workspace-problems-panel\"]"}'
-    - step: 12
+    - step: 14
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-problems-panel\"]", "contains":
         "StringUtils cannot be resolved", "timeout_sec": 30}}'
-    - step: 14
-      expectation: '{"wait_for": "[data-testid=\"context-menu-item-hide-this-diagnostic-locally-line\"]"}'
     - step: 16
+      expectation: '{"wait_for": "[data-testid=\"context-menu-item-hide-this-diagnostic-locally-line\"]"}'
+    - step: 18
       expectation: '{"wait_for": "[data-testid=\"code-workspace-problems-panel\"]"}'
-    - step: 17
+    - step: 19
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-problems-panel\"]", "contains":
         "No problems in open files", "timeout_sec": 15}}'
     results:
-    - 16
-    - 17
+    - 18
+    - 19
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

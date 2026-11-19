@@ -31,23 +31,23 @@ steps:
 - assert_visible: '[data-testid="welcome-panel"]'
 - assert_text:
     selector: '[data-testid="welcome-panel"]'
-    contains: Welcome to Taomni
+    contains: Tao is here
 - assert_text:
     selector: '[data-testid="welcome-panel"]'
-    contains: 本地终端
+    contains: Local terminal
 - assert_visible: '[data-testid="tao-home-local-terminal"]'
 - assert_enabled: '[data-testid="tao-home-local-terminal"]'
-- assert_visible: '[data-testid="welcome-version"]'
-- assert_visible: '[data-testid="welcome-version-footer"]'
+- assert_visible: '[data-testid="welcome-restore-row"]'
+- assert_visible: '[data-testid="tao-home-new-session"]'
 - assert_text:
     selector: '[data-testid="welcome-panel"]'
     contains: New session
 - assert_text:
     selector: '[data-testid="welcome-panel"]'
-    contains: Tips
+    contains: Try asking
 - assert_text:
     selector: '[data-testid="welcome-panel"]'
-    contains: Quick connect
+    contains: Restore last session
 - click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="sessions-empty-state"]'
 - assert_not_visible: '[data-testid="welcome-panel"]'
@@ -117,23 +117,23 @@ verification:
     - step: 9
       expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"]"}'
     - step: 10
-      expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]", "contains": "Welcome to Taomni"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]", "contains": "Tao is here"}}'
     - step: 11
-      expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]", "contains": "本地终端"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]", "contains": "Local terminal"}}'
     - step: 12
       expectation: '{"assert_visible": "[data-testid=\"tao-home-local-terminal\"]"}'
     - step: 13
       expectation: '{"assert_enabled": "[data-testid=\"tao-home-local-terminal\"]"}'
     - step: 14
-      expectation: '{"assert_visible": "[data-testid=\"welcome-version\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"welcome-restore-row\"]"}'
     - step: 15
-      expectation: '{"assert_visible": "[data-testid=\"welcome-version-footer\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"tao-home-new-session\"]"}'
     - step: 16
       expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]", "contains": "New session"}}'
     - step: 17
-      expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]", "contains": "Tips"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]", "contains": "Try asking"}}'
     - step: 18
-      expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]", "contains": "Quick connect"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"welcome-panel\"]", "contains": "Restore last session"}}'
     - step: 20
       expectation: '{"wait_for": "[data-testid=\"sessions-empty-state\"]"}'
     - step: 21
