@@ -79,10 +79,23 @@ jobs:
       - uses: arduino/setup-protoc@v3
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Scope Windows host builds to the runner image
+        id: windows-cache-scope
+        if: runner.os == 'Windows'
+        shell: bash
+        run: |
+          python - <<'PY'
+          import os
+
+          image = os.environ.get("ImageVersion")
+          scope = f"image-{image}" if image else f"run-{os.environ['GITHUB_RUN_ID']}-{os.environ['GITHUB_RUN_ATTEMPT']}"
+          with open(os.environ["GITHUB_OUTPUT"], "a", encoding="utf-8") as output:
+              output.write(f"suffix=-{scope}\n")
+          PY
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
-          shared-key: modular-core-unit-${{ runner.os }}-${{ runner.arch }}
+          shared-key: modular-core-unit-${{ runner.os }}-${{ runner.arch }}${{ steps.windows-cache-scope.outputs.suffix }}
           cache-on-failure: true
       - name: Refresh sherpa native runtime after cache restore
         run: node scripts/refresh-sherpa-onnx-cache.mjs
