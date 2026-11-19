@@ -60,3 +60,7 @@ verification:
   - check: Tao Home history remains readable and the saved session row is visible.
     method: manual
     reason: Screenshot review covers layout and clipping.
+  native:
+  - check: This case is browser-only and does not claim packaged native evidence.
+    method: external
+    reason: The case declares browser mode only.
