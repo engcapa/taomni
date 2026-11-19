@@ -107,6 +107,76 @@ fn modular_archive_restores_whole_data_set_without_activating_code_or_trust() {
 }
 
 #[test]
+fn restored_modular_mfa_owns_the_store_without_a_migration_journal() {
+    let source = tempfile::tempdir().unwrap();
+    let vault = source.path().join("vault.db");
+    let mfa = source.path().join("mfa.db");
+    rusqlite::Connection::open(&vault)
+        .unwrap()
+        .execute_batch("CREATE TABLE marker(value);")
+        .unwrap();
+    rusqlite::Connection::open(&mfa)
+        .unwrap()
+        .execute_batch("CREATE TABLE mfa_accounts(id); INSERT INTO mfa_accounts VALUES (1);")
+        .unwrap();
+    let mut data = dataset("mfa", &[("mfa.db", PluginDataFileKind::Sqlite)]);
+    data.data_schema_version = 1;
+    let archive = archive(
+        source.path(),
+        data,
+        &[
+            StagedFile {
+                archive_path: "databases/vault.db".into(),
+                disk_path: vault,
+            },
+            StagedFile {
+                archive_path: "plugins/mfa/data/mfa.db".into(),
+                disk_path: mfa,
+            },
+        ],
+        None,
+    );
+    let target = tempfile::tempdir().unwrap();
+    let profile = target.path();
+    let legacy = profile.join("mfa.db");
+    rusqlite::Connection::open(&legacy)
+        .unwrap()
+        .execute_batch("CREATE TABLE mfa_accounts(id);")
+        .unwrap();
+    let legacy_bytes = fs::read(&legacy).unwrap();
+    restore::stage_restore_to_dir(profile, &archive, None).unwrap();
+    restore::apply_pending_restore(profile).unwrap();
+
+    let backend = crate::mfa::backend::MfaBackend::load(profile);
+    assert!(backend.legacy_store().unwrap().is_none());
+    assert_eq!(fs::read(&legacy).unwrap(), legacy_bytes);
+    assert!(!profile.join("plugins/mfa/active.json").exists());
+    assert!(!profile.join("migration/journal.json").exists());
+
+    // A subsequent v1 restore must target the same active data owner.
+    let mut legacy_manifest =
+        crate::backup::BackupManifest::new("0.5.10".into(), "core".into(), false);
+    legacy_manifest.add_file("databases/mfa.db".into(), "a".repeat(64), 1);
+    assert_eq!(
+        super::restore::destination(profile, &legacy_manifest, "databases/mfa.db").unwrap(),
+        Some(profile.join("plugins/mfa/data/mfa.db"))
+    );
+
+    let target_with_accounts = tempfile::tempdir().unwrap();
+    let profile = target_with_accounts.path();
+    let legacy = profile.join("mfa.db");
+    rusqlite::Connection::open(&legacy)
+        .unwrap()
+        .execute_batch("CREATE TABLE mfa_accounts(id); INSERT INTO mfa_accounts VALUES (2);")
+        .unwrap();
+    let legacy_bytes = fs::read(&legacy).unwrap();
+    let error = restore::stage_restore_to_dir(profile, &archive, None).unwrap_err();
+    assert!(error.contains("matching existing MFA accounts"), "{error}");
+    assert_eq!(fs::read(&legacy).unwrap(), legacy_bytes);
+    assert!(!profile.join(RESTORE_INTENT_FILE).exists());
+}
+
+#[test]
 fn dishonest_or_corrupt_sqlite_payloads_never_stage_or_change_target_data() {
     for (actual_sqlite, kind, corrupt_pages) in [
         (true, PluginDataFileKind::File, false),

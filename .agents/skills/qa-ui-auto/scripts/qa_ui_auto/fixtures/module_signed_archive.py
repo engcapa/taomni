@@ -18,6 +18,8 @@ import zipfile
 from native_build import QA_APP_ID
 from tauri_webdriver import native_isolation_env
 
+from .module_mfa_restore import CASE_ID as MFA_RESTORE_CASE
+
 
 def platform_key(system=None, machine=None):
     system, machine = system or platform.system(), (machine or platform.machine()).lower()
@@ -89,7 +91,7 @@ def setup(ctx):
 
 
 def setup_mfa(ctx):
-    if ctx.case_id not in {"TC-MODULES-038", "TC-MODULES-039", "TC-MODULES-044"} or (ctx.cfg.get("app") or {}).get("mode") != "native":
+    if ctx.case_id not in {"TC-MODULES-038", "TC-MODULES-039", "TC-MODULES-044", MFA_RESTORE_CASE} or (ctx.cfg.get("app") or {}).get("mode") != "native":
         raise RuntimeError("Signed MFA input requires its registered native upgrade case")
     raw = os.environ.get("QA_SIGNED_MFA_ROOT")
     if not raw:

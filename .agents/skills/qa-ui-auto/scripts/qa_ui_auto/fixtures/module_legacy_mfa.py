@@ -16,6 +16,7 @@ from tauri_webdriver import NativeSession, TauriDriverProcess, native_binary, na
 from ..deadline import Deadline
 from ..legacy_install import install
 from ..native_steps import NativeStepContext, run_native_step
+from . import module_mfa_restore
 from .backup_policy import isolated_data_root
 
 CASE_ID = "TC-MODULES-039"
@@ -197,7 +198,8 @@ def commit_mfa_upgrade(executable, profile, archive, signature, evidence):
 
 
 def setup(ctx):
-    if (ctx.case_id != CASE_ID or platform.system() != "Linux" or not uses_x11_window_close()
+    if (ctx.case_id not in {CASE_ID, module_mfa_restore.CASE_ID}
+            or platform.system() != "Linux" or not uses_x11_window_close()
             or os.environ.get("GITHUB_ACTIONS") != "true"
             or os.environ.get("GITHUB_REPOSITORY") != "engcapa/taomni"):
         raise RuntimeError("The installed MFA desktop fixture requires its Linux X11 GitHub case")
@@ -209,6 +211,13 @@ def setup(ctx):
         raise RuntimeError("The installed MFA desktop requires an unlinked work directory")
     executable, evidence = install(ctx.case_dir, work)
     source = run_legacy_desktop(ctx, executable, work, evidence)
+    if ctx.case_id == module_mfa_restore.CASE_ID:
+        checksum = module_mfa_restore.stage(profile, source, evidence)
+        ctx.values.update(
+            restored_mfa_path=(profile / module_mfa_restore.MODULE_DB).as_posix(),
+            restored_mfa_sha256=checksum,
+        )
+        return
     write_json(evidence, "candidate-input.json", {
         "profile": str(profile), "copiedDatabases": transfer_databases(source, profile),
     })

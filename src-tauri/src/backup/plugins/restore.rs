@@ -4,10 +4,13 @@ use super::{
     contracts::{owner_requires_vault, validate_manifest},
     discover_owners,
 };
-use crate::plugin::{
-    data_contract::{PluginDataRoot, require_directory},
-    migration::{MFA_MIGRATION_TARGET, MigrationJournal},
-    retained_data,
+use crate::{
+    mfa::ownership::{legacy_has_accounts, uses_module_data},
+    plugin::{
+        data_contract::{PluginDataRoot, require_directory},
+        migration::{MFA_MIGRATION_TARGET, MigrationJournal},
+        retained_data,
+    },
 };
 use std::{
     collections::BTreeSet,
@@ -25,7 +28,7 @@ fn legacy_mfa_alias(profile: &Path, manifest: &BackupManifest) -> Result<bool, S
             .plugin_datasets
             .iter()
             .any(|dataset| dataset.slug == "mfa")
-        && MigrationJournal::profile_mfa_committed(profile)?)
+        && uses_module_data(profile)?)
 }
 
 pub(crate) fn restore_owners(
@@ -79,33 +82,15 @@ pub(crate) fn check_restore_dependencies(
         return Ok(());
     }
     // On a legacy profile the fixed root database still consumes this Vault.
-    let legacy_mfa = profile.join("mfa.db");
-    if legacy_mfa.try_exists().map_err(|e| e.to_string())?
-        && !manifest
-            .files
-            .iter()
-            .any(|entry| entry.path == "databases/mfa.db")
+    if !manifest
+        .files
+        .iter()
+        .any(|entry| entry.path == "databases/mfa.db")
+        && legacy_has_accounts(profile)?
     {
-        let file =
-            crate::plugin::data_contract::open_regular(&legacy_mfa).map_err(|e| e.to_string())?;
-        if file.metadata().map_err(|e| e.to_string())?.len() != 0 {
-            let conn = rusqlite::Connection::open_with_flags(
-                &legacy_mfa,
-                rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
-            )
-            .map_err(|e| format!("Cannot check existing MFA data before Vault restore: {e}"))?;
-            let has_table: bool = conn.query_row("SELECT EXISTS(SELECT 1 FROM sqlite_master WHERE type='table' AND name='mfa_accounts')", [], |row| row.get(0)).map_err(|e| e.to_string())?;
-            if has_table {
-                let accounts: bool = conn
-                    .query_row("SELECT EXISTS(SELECT 1 FROM mfa_accounts)", [], |row| {
-                        row.get(0)
-                    })
-                    .map_err(|e| e.to_string())?;
-                if accounts {
-                    return Err("Restoring Vault requires the matching existing MFA accounts in the same backup".into());
-                }
-            }
-        }
+        return Err(
+            "Restoring Vault requires the matching existing MFA accounts in the same backup".into(),
+        );
     }
     Ok(())
 }

@@ -1,0 +1,75 @@
+id: TC-MODULES-048
+title: Restored modular MFA data is available after installing the signed module
+description: Stage a v2 restore on a fresh profile with the encrypted account and Vault created by the pinned Linux desktop.
+  After startup applies the restore, unlock Vault and check that MFA requires its module. Install and enable the signed
+  package, then read the original account and advance its HOTP counter.
+covers: [F-Modules-1, F-MFA-1, F-MFA-2, F-BACKUP-1]
+tags: [modules, mfa, backup, native-boundary, p1]
+modes: [native]
+native_platforms: [Linux]
+fixtures: [reset_db, linux_x11_required, release_build_required, module_signed_mfa_archive, module_legacy_mfa]
+timeout_sec: 480
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: {selector: '[data-testid="status-bar"]', timeout_sec: 60}
+- assert_file_sha256: {path: '${fixture.restored_mfa_path}', equals: '${fixture.restored_mfa_sha256}'}
+- wait_for: '[data-testid="vault-unlock-dialog"]'
+- fill: {selector: '[data-testid="vault-unlock-pw"]', value: qa-installed-mfa-039}
+- click: '[data-testid="vault-unlock-confirm"]'
+- wait_for: {selector: '[data-testid="vault-unlock-dialog"]', state: detached, timeout_sec: 30}
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-mfa"]'
+- assert_text: {selector: '[data-testid="mfa-load-error"]', contains: plugin mfa is not installed}
+- assert_count: {selector: '[data-testid="mfa-account-row"]', equal: 0}
+- click: '[data-testid="tab-item"][data-tab-type="mfa"] [data-testid="tab-close"]'
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- wait_for: '[data-testid="module-offline-install"]'
+- fill: {selector: '[data-testid="module-offline-archive"]', value: '${fixture.mfa_signed_archive}'}
+- fill: {selector: '[data-testid="module-offline-signature"]', value: '${fixture.mfa_signed_signature_text}'}
+- press: {selector: '[data-testid="module-offline-submit"]', key: Enter}
+- wait_for: '[data-testid="module-offline-install"][data-phase="completed"]'
+- press: {selector: '[data-testid="module-action-enable-mfa"]:not([disabled])', key: Enter}
+- wait_for: '[data-testid="module-action-disable-mfa"]'
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-tools"]'
+- wait_for: '[data-testid="sidebar-tools-panel"]'
+- click: '[data-testid="sidebar-tool-mfa"]'
+- assert_visible: '[data-testid="mfa-account-row"][data-issuer="Installed MFA"]'
+- assert_text_equals: {selector: '[data-testid="mfa-account-code"]', equals: 287 082, timeout_sec: 30}
+- click: '[data-testid="mfa-account-hotp-next"]'
+- assert_text_equals: {selector: '[data-testid="mfa-account-code"]', equals: 359 152}
+- assert_no_runtime_errors: null
+- screenshot: restored-modular-mfa.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A fresh profile applies the modular restore and requires a signed MFA module to access the restored account.
+    actions: [1, 5, 6, 10, 18, 19, 20, 22]
+    checkpoints:
+    - {step: 3, expectation: The applied module database matches the staged snapshot checksum.}
+    - {step: 11, expectation: MFA reports that the required module is missing.}
+    - {step: 12, expectation: No account is displayed before the user installs the module.}
+    - {step: 21, expectation: The ordinary offline installer verifies and installs the package.}
+    - {step: 23, expectation: The user can enable the installed package.}
+    results: [3, 11, 12, 21, 23]
+  - id: R2
+    requirement: The signed host uses the original Vault and the restored counter from the modular backup.
+    actions: [6, 27, 30]
+    checkpoints:
+    - {step: 28, expectation: MFA shows the issuer created in the old desktop.}
+    - {step: 29, expectation: The restored account starts from counter one.}
+    - {step: 31, expectation: The signed host advances the saved counter and returns the exact next code.}
+    - {step: 32, expectation: The restore and signed module workflow emits no renderer runtime errors.}
+    results: [28, 29, 31, 32]
+  native:
+  - check: The published Linux desktop creates the encrypted account and Vault used by the staged v2 fixture.
+    method: automated
+    reason: The runner retains the actual installer, the legacy GUI shutdown and the fixture snapshot checksum.
+  visual:
+  - check: MFA shows the original issuer after the signed module is installed and enabled.
+    method: automated
+    reason: The native WebView observes the restored account on the normal MFA panel.

@@ -49,7 +49,8 @@ Taomni 是 Tauri 2 + React 19 + Rust 的本地优先桌面工作台。重构前�
 - 商店允许保存官方目录镜像传输地址，所有来源仍由同一固定官方公钥、精确字节和持久 sequence 验证；不新增信任锚。renderer 仅发送插件 ID、版本和包 hash，native 重新验签目录并选择本机资产、固定内容路径，下载完成后审查实际包权限与数据目录，安装确认后再次验签。目录声明的分类与权限必须匹配实际包；失败保留原已验证目录与已安装版本。具体接线与 QA 目录边界见设计 §6.1–6.2。
 - 代理、下载、断点续传、取消、进度、失败恢复、备份和迁移必须遵循仓库 `AGENTS.md` 的外部网络与数据完整性要求。
 - 从 0.5.x 单体包升级时，核心先只读预检并写原子 `migration/journal.json`。当前 M0 的 `plugin_migration_execute` 在可信插件包、签名安装门和核心 legacy-table/Vault exporter 尚未接入前，只记录候选的 `pending` 状态及缺少前置条件的原因，不复制旧文件、不创建伪插件版本目录、不修改 `active.json`；旧 LanChat 数据只在旧数据目录原样保留，不读取、不复制、不移动、不迁移、不删除。接入完整安装门后，再把插件代码放入 staging 目录；legacy tables 通过核心只读接口迁移，MFA 固定密钥经核心 Vault 的 slug 作用域服务访问。迁移项逐项以源指纹和 `committed` 状态记账，插件验签、下载、宿主退出或 Vault 访问失败时只回滚 active 指针并保留旧数据；核心仍可启动，用户可稍后安装缺失插件。完整协议见设计文档 §6.5.1，验证 ID 为 AC-017/V-012。
- 若旧 profile 同时存在待应用的备份还原，必须先以排他 profile 锁完成还原事务，再初始化模块 release state。这样还原创建的 `.profile-state.json` 不会把旧单体误判为已模块化，也不会跳过首发 roster。还原意图、journal 和暂存目录必须在启动恢复后清理，恢复失败保留可诊断状态并阻止打开业务数据库。
+- 若旧 profile 同时存在待应用的备份还原，在排他 profile 锁下先记录模块首装所需的来源，再应用还原。这样还原创建的 `.profile-state.json` 不会导致跳过旧单体的首发名单。还原成功后清理还原意图、journal 和暂存目录，随后打开业务库。恢复失败保留可诊断状态。
+- 新配置恢复 v2 MFA 数据后，由还原生成的定位记录确定模块数据归属。签名宿主的安装和启用仍由模块商店处理。受旧 Vault 保护的已有 MFA 账号需要配对数据才能恢复 Vault。 [数据与迁移](../docs-feature/taomni-modular-split-design.md#82-迁移规则)
 
 模块源码继续保存在 monorepo 的 `src-tauri/plugins/<slug>/`，安装时落在 `<app data>/plugins/<slug>/versions/<version>/`，由 `active.json` 原子指向当前版本，`data/` 默认跨禁用/卸载保留。核心发布 `latest.json`；插件发布 `.taomni-plugin`、`.minisig`、`SHA256SUMS`，所有资产上传完成后再原子发布签名的 `modules.json`。新增模块必须先补 `module.json`、宿主/前端注册、安装生命周期、browser/native 用例和 catalog，再接入平台构建/签名矩阵；未通过相关门禁不得进入清单。设置页的 registry 管理与远端商店共用 native 注册表和安装门，QA 官方签名目录及 browser 模型均不代表正式目录已经发布。
 

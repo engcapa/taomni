@@ -10,7 +10,7 @@ use taomni_mfa_engine::INITIALIZATION_REQUIRED;
 use taomni_plugin_services::OperationKind;
 
 use crate::{
-    plugin::{PluginError, PluginRegistry, migration::MigrationJournal},
+    plugin::{PluginError, PluginRegistry},
     state::AppState,
 };
 
@@ -24,7 +24,7 @@ pub(crate) enum MfaBackend {
 
 impl MfaBackend {
     pub(crate) fn load(profile: &Path) -> Self {
-        match MigrationJournal::profile_mfa_committed(profile) {
+        match super::ownership::uses_module_data(profile) {
             Ok(false) => Self::Legacy(MfaStore::new(profile.join("mfa.db"))),
             Ok(true) => Self::Module,
             Err(error) => Self::Unavailable(error),

@@ -328,12 +328,16 @@ controls:
   - id: module-action-enable-hello-plugin
     selector: '[data-testid="module-action-enable-hello-plugin"]'
     kind: interactive
+    aliases:
+    - '[data-testid="module-action-enable-mfa"]'
   - id: module-status-mfa
     selector: '[data-testid="module-status-mfa"]'
     kind: display
   - id: module-action-disable-hello-plugin
     selector: '[data-testid="module-action-disable-hello-plugin"]'
     kind: interactive
+    aliases:
+    - '[data-testid="module-action-disable-mfa"]'
   - id: module-action-uninstall-hello-plugin
     selector: '[data-testid="module-action-uninstall-hello-plugin"]'
     kind: interactive
@@ -401,6 +405,8 @@ controls:
 `TC-MODULES-046` 从旧配置直接打开后续签名目录，核对 MFA 自动安装，以及新增的 Hello 在用户确认前只展示名称和说明。随后确认安装 Hello，核对两份包与版本指针。
 
 `TC-MODULES-047` 用含待应用备份的旧配置启动。检查原会话名称已从备份恢复，再核对首发签名目录的两份模块均自动安装。
+
+`TC-MODULES-048` 从正式 Linux 旧版界面取得真实加密 MFA 和 Vault 数据，以 v2 暂存格式验证新配置启动恢复。用例核对已恢复的模块数据库摘要、模块缺失提示、正式签名包安装和启用，以及原账号的 HOTP 续号。
 
 `TC-MODULES-007/010/040/042` 观察真实版本目录删除。010 还确认取消永久删除时签名包和业务数据原样保留，确认后数据和定位记录消失。042 校验存在更新时卸载会释放宿主、清理所有版本并保留业务数据。043 使用浏览器模型检查取消永久删除和卸载后只提供主动安装。
 

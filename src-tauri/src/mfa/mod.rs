@@ -12,6 +12,7 @@ pub mod capture;
 pub mod commands;
 pub mod crypto;
 mod key_provider;
+pub(crate) mod ownership;
 pub use taomni_mfa_engine::otp;
 pub mod store;
 

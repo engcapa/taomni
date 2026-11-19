@@ -355,10 +355,18 @@ pub fn plugin_migration_inspect(
     from_version: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<crate::plugin::migration::LegacyInstallSnapshot, String> {
-    use crate::plugin::migration::{MigrationItem, MigrationJournal, inspect_legacy_install};
     let root = legacy_profile_root(&state);
-    let mut snapshot = inspect_legacy_install(&root, legacy_version(from_version))?;
-    if MigrationJournal::profile_mfa_committed(&root)? {
+    inspect_legacy_profile(&root, from_version, &state)
+}
+
+fn inspect_legacy_profile(
+    root: &std::path::Path,
+    from_version: Option<String>,
+    state: &AppState,
+) -> Result<crate::plugin::migration::LegacyInstallSnapshot, String> {
+    use crate::plugin::migration::{MigrationItem, inspect_legacy_install};
+    let mut snapshot = inspect_legacy_install(root, legacy_version(from_version))?;
+    if state.mfa.legacy_store()?.is_none() {
         snapshot
             .candidates
             .retain(|candidate| candidate.item != MigrationItem::Mfa);
@@ -376,10 +384,7 @@ pub fn plugin_migration_execute(
     state: State<'_, AppState>,
 ) -> Result<crate::plugin::migration::MigrationExecutionResult, String> {
     let source_root = legacy_profile_root(&state);
-    let snapshot = crate::plugin::migration::inspect_legacy_install(
-        &source_root,
-        legacy_version(from_version),
-    )?;
+    let snapshot = inspect_legacy_profile(&source_root, from_version, &state)?;
     let journal_path = source_root.join("migration").join("journal.json");
     let executor = crate::plugin::migration::MigrationExecutor::new(
         source_root,

@@ -35,7 +35,9 @@ steps:
 - wait_for: '[data-testid="module-upgrade-status"][data-state="empty"]'
 - module_marketplace_probe:
     phase: legacy-installed
-- click: '[data-testid="module-action-uninstall-hello-plugin"]'
+- press:
+    selector: '[data-testid="module-action-uninstall-hello-plugin"]:not([disabled])'
+    key: Enter
 - wait_for: '[data-testid="confirm-dialog"]'
 - click: '[data-testid="confirm-dialog-confirm"]'
 - wait_for: '[data-testid="module-action-install-hello-plugin"]'
