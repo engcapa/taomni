@@ -10,11 +10,11 @@ function fixture(t, manifest = "") {
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   for (const child of ["src/screenshot", "src/mfa", "src/mobile", "src/servers", "src/config",
     "crates/taomni-capture/src", "crates/taomni-file-uri/src", "crates/taomni-rdp-common/src",
-    "crates/taomni-mfa-engine/src"]) {
+    "crates/taomni-mail-engine/src", "crates/taomni-mfa-engine/src"]) {
     fs.mkdirSync(path.join(root, "src-tauri", child), { recursive: true });
   }
   fs.writeFileSync(path.join(root, "src-tauri/crates/taomni-capture/Cargo.toml"), manifest);
-  for (const name of ["taomni-file-uri", "taomni-rdp-common", "taomni-mfa-engine"]) {
+  for (const name of ["taomni-file-uri", "taomni-rdp-common", "taomni-mail-engine", "taomni-mfa-engine"]) {
     fs.writeFileSync(path.join(root, "src-tauri/crates", name, "Cargo.toml"), "");
   }
   return root;
@@ -108,6 +108,18 @@ test("MFA engine rejects runtime dependencies, core paths and application servic
   write(root, "src-tauri/crates/taomni-mfa-engine/Cargo.toml", '[dependencies]\nrusqlite = "0.40"\n');
   write(root, "src-tauri/crates/taomni-mfa-engine/src/keys.rs", "use crate::crypto::DataKey;\n");
   assert.deepEqual(modularBoundaryViolations(root), []);
+});
+
+test("Mail engine rejects dependencies on the desktop and host runtime", (t) => {
+  const root = fixture(t);
+  const manifest = "src-tauri/crates/taomni-mail-engine/Cargo.toml";
+  write(root, manifest, '[dependencies]\nmail-parser = "0.11"\n');
+  assert.deepEqual(modularBoundaryViolations(root), []);
+  write(root, manifest, '[dependencies]\ncore = { path = "../.." }\n');
+  write(root, "src-tauri/crates/taomni-mail-engine/src/lib.rs", "use taomni_plugin_sdk::HostSession;\n");
+  const errors = modularBoundaryViolations(root).join("\n");
+  assert.match(errors, /taomni-mail-engine\/Cargo.toml.*core links application\/plugin state/);
+  assert.match(errors, /lib.rs: shared library must not import application\/plugin state/);
 });
 
 test("MFA host requires SDK services and rejects transitive application ownership", (t) => {

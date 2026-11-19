@@ -28,7 +28,7 @@ function cargoDependencies(manifest) {
   return entries;
 }
 
-function sharedRdpViolations(root) {
+function sharedLibraryViolations(root) {
   const errors = [];
   for (const consumer of ["servers", "config"]) {
     for (const filename of rustFiles(path.join(root, "src-tauri/src", consumer))) {
@@ -39,7 +39,7 @@ function sharedRdpViolations(root) {
       }
     }
   }
-  for (const name of ["taomni-file-uri", "taomni-rdp-common"]) {
+  for (const name of ["taomni-file-uri", "taomni-rdp-common", "taomni-mail-engine"]) {
     const directory = path.join(root, "src-tauri/crates", name);
     const manifest = fs.readFileSync(path.join(directory, "Cargo.toml"), "utf8");
     for (const match of manifest.matchAll(/\bpackage\s*=\s*"(tauri(?:-[^"\s]+)?|wry|taomni|taomni-plugin-[^"\s]+)"/g)) {
@@ -160,7 +160,7 @@ function mfaHostViolations(root, treeFile) {
 
 /** Return all violations, so one CI run identifies every broken ownership edge. */
 export function modularBoundaryViolations(root, { linuxTreeFile, mfaTreeFile, mfaHostTreeFile } = {}) {
-  const errors = [...sharedRdpViolations(root), ...coreStateViolations(root), ...mfaEngineViolations(root, mfaTreeFile), ...mfaHostViolations(root, mfaHostTreeFile)];
+  const errors = [...sharedLibraryViolations(root), ...coreStateViolations(root), ...mfaEngineViolations(root, mfaTreeFile), ...mfaHostViolations(root, mfaHostTreeFile)];
   const consumers = ["screenshot", "mfa", "mobile"];
   for (const consumer of consumers) {
     for (const filename of rustFiles(path.join(root, "src-tauri/src", consumer))) {
@@ -216,7 +216,7 @@ export function checkModularBoundaries(root = repository, options = {}) {
   if (errors.length) {
     throw new Error(`Modular boundary checks failed:\n${errors.map((message) => `- ${message}`).join("\n")}`);
   }
-  console.log(`Modular capture/RDP/MFA boundaries passed${options.linuxTreeFile ? "; Linux dependency tree checked" : ""}${options.mfaTreeFile ? "; MFA dependency tree checked" : ""}${options.mfaHostTreeFile ? "; MFA host dependency tree checked" : ""}.`);
+  console.log(`Modular capture/RDP/Mail/MFA boundaries passed${options.linuxTreeFile ? "; Linux dependency tree checked" : ""}${options.mfaTreeFile ? "; MFA dependency tree checked" : ""}${options.mfaHostTreeFile ? "; MFA host dependency tree checked" : ""}.`);
 }
 
 if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {

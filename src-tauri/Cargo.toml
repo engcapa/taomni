@@ -20,6 +20,7 @@ members = [
     "crates/taomni-rdp-common",
     "crates/taomni-rdp-probe",
     "crates/taomni-file-uri",
+    "crates/taomni-mail-engine",
     "crates/taomni-mfa-engine",
     "crates/taomni-plugin-api",
     "crates/taomni-plugin-services",
@@ -164,6 +165,7 @@ imap = "2.4.1"
 imap-proto = "=0.10.2"
 lettre = "0.11.22"
 mail-parser = { version = "0.11.4", features = ["full_encoding"] }
+taomni-mail-engine = { path = "crates/taomni-mail-engine" }
 native-tls = "0.2"
 tokio-native-tls = "0.3"
 # RFB security type 18 uses anonymous TLS, which rustls and the platform

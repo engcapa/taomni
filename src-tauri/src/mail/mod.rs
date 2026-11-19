@@ -142,7 +142,7 @@ use std::path::Path;
 
 use std::sync::Arc;
 
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 
 use base64::{
     Engine as _,
@@ -157,7 +157,8 @@ use lettre::transport::smtp::client::Tls;
 
 use lettre::{Message, SmtpTransport, Transport};
 
-use mail_parser::{Address as ParsedAddress, MessageParser, MimeHeaders, PartType};
+#[cfg(test)]
+use mail_parser::{MessageParser, MimeHeaders};
 
 use native_tls::TlsConnector;
 
@@ -197,8 +198,7 @@ mod utilities;
 
 use limits::{
     DEFAULT_BODY_MAX_BYTES, DEFAULT_MESSAGE_LIMIT, DEFAULT_TIMEOUT_SECS, IMAP_LIVE_IDLE_TTL,
-    IMAP_LOGIN_RETRY_DELAYS_MS, MAX_EMBEDDED_BODY_BYTES, MAX_INLINE_CID_IMAGE_BYTES,
-    OAUTH_REAUTHORIZE_REQUIRED, OAUTH_REFRESH_SKEW_SECS,
+    IMAP_LOGIN_RETRY_DELAYS_MS, OAUTH_REAUTHORIZE_REQUIRED, OAUTH_REFRESH_SKEW_SECS,
 };
 
 pub use connection_model::{
@@ -245,6 +245,5 @@ pub use outgoing_model::{
 use outgoing_model::DispositionNotificationTo;
 
 use utilities::{
-    folders_for_header_sync, non_empty, non_empty_str, normalize_preview, now_ts,
-    should_list_remote_folders,
+    folders_for_header_sync, non_empty, non_empty_str, now_ts, should_list_remote_folders,
 };
