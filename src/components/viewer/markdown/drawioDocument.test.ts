@@ -54,6 +54,22 @@ describe("editable document export and text/table recovery", () => {
     expect(sheet.model.isEqualNode(page.model)).toBe(true);
     expect(exported.nativeDiagrams).toBe(1);
   });
+  it("keeps imported layer visibility and connected cells in a one-sheet export", async () => {
+    const [page] = parseDrawio('<mxGraphModel><root><mxCell id="diagram-root"/><mxCell id="primary" parent="diagram-root"/>'
+      + '<mxCell id="secondary" parent="diagram-root" visible="0"/><object id="start" label="Start"><mxCell parent="primary" vertex="1"/></object>'
+      + '<mxCell id="end" parent="secondary" vertex="1"/><mxCell id="link" parent="primary" edge="1" source="start" target="end"/></root></mxGraphModel>');
+    const root = document.createElement("div");
+    root.innerHTML = '<div class="fv-md-drawio"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200"/></div>';
+    rememberDrawio(root.firstElementChild as HTMLElement, page);
+
+    const exported = await markdownDrawio(root, "Imported diagram", { scope: "images", layout: "single" });
+    const [{ model }] = parseDrawio(exported.xml);
+    expect(model.querySelector('mxCell[id="import-1-secondary"]')?.getAttribute("visible")).toBe("0");
+    expect(model.querySelector('object[id="import-1-start"] mxCell')?.getAttribute("parent")).toBe("import-1-primary");
+    expect(model.querySelector('mxCell[id="import-1-end"]')?.getAttribute("parent")).toBe("import-1-secondary");
+    expect(model.querySelector('mxCell[edge="1"]')?.getAttribute("source")).toBe("import-1-start");
+    expect(model.querySelector('mxCell[edge="1"]')?.getAttribute("target")).toBe("import-1-end");
+  });
   it("restores standard diagrams.net table rows without Taomni metadata", () => {
     const page = newDrawioPage("a", "External table");
     drawioCell(page, { id: "table", vertex: 1, style: "shape=table;" }, { width: 400, height: 80 });

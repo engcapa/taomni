@@ -27,11 +27,12 @@ def setup(ctx):
             paths,
         )
     case_dir = ctx.case_dir.resolve()
-    for name in ("roundtrip.drawio", "roundtrip.drawio.png"):
+    for name in ("roundtrip.drawio", "roundtrip.drawio.png", "legacy-assets.drawio"):
         copyfile(ASSETS / name, case_dir / name)
     ctx.values.update(
         drawio_roundtrip_input=str(case_dir / "roundtrip.drawio"),
         drawio_roundtrip_export=str(case_dir / "roundtrip-export.drawio"),
         drawio_roundtrip_markdown=root + "/drawio-roundtrip.md",
         drawio_context_png=str(case_dir / "drawio-context.png"),
+        drawio_legacy_input=str(case_dir / "legacy-assets.drawio"),
     )

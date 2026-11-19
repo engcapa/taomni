@@ -6,7 +6,7 @@ import { drawioCell, newDrawioPage } from "./drawioCodec";
 import type { ViewerDocument } from "../../../lib/viewer";
 
 vi.mock("../viewerLabels", () => ({ useViewerLabels: () => (_zh: string, en: string) => en }));
-vi.mock("./drawioRender", async (original) => ({ ...await original<typeof import("./drawioRender")>(), renderDrawioPage: vi.fn(async () => ({ svg: '<svg xmlns="http://www.w3.org/2000/svg"><text>Sheet preview</text></svg>', width: 200, height: 80, warnings: [] })) }));
+vi.mock("./drawioRender", async (original) => ({ ...await original<typeof import("./drawioRender")>(), renderDrawioPage: vi.fn(async () => ({ svg: '<svg xmlns="http://www.w3.org/2000/svg"><text>Sheet preview</text></svg>', width: 200, height: 80, warnings: [], missingImages: 1 })) }));
 afterEach(cleanup);
 
 it("requires an explicit import mode, previews sheets and inserts only checked pages", async () => {
@@ -16,6 +16,7 @@ it("requires an explicit import mode, previews sheets and inserts only checked p
   render(<DrawioImportDialog pages={[a, b]} onCancel={vi.fn()} onInsert={insert} />);
   expect(screen.getByTestId("markdown-drawio-import-confirm")).toBeDisabled();
   await waitFor(() => expect(screen.getByTestId("markdown-drawio-import-preview")).toHaveTextContent("Sheet preview"));
+  expect(screen.getByRole("status")).toHaveTextContent("1 image unavailable offline. Original reference preserved.");
   fireEvent.click(screen.getByLabelText("Import sheet Second"));
   fireEvent.click(screen.getByTestId("markdown-drawio-import-text"));
   fireEvent.click(screen.getByTestId("markdown-drawio-import-confirm"));
