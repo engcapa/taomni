@@ -3,8 +3,8 @@ title: Markdown preview finds rendered text and retains source and split focus
 modes:
 - browser
 - native
-description: Ctrl+F searches the rendered Markdown without switching modes; closing and reopening restores focus. Native checks the packaged WebView shortcut
-  path, including a Split preview focused before the asynchronous source editor finishes mounting. The focused rendered preview owns its Find action even when the source editor command port is not ready; no shortcut replay or source-mode switch is used.
+description: Set the Markdown association to Code Workspace before opening the fixture. Check the shared appearance control and verify that Find searches
+  rendered Markdown and restores focus on close. Native checks the packaged WebView shortcuts, including a Split preview focused while the source editor mounts.
 covers:
 - F25.1
 fixtures:
@@ -18,6 +18,13 @@ timeout_sec: 180
 steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-markdown-find
+- click: '[data-testid="ribbon-settings"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: files and opening
+- select_option:
+    selector: '[data-testid="file-open-association-markdown"]'
+    value: workspace
 - click: '[data-testid="nav-mode-workspaces"]'
 - click: '[data-testid="workspace-open-session-plus"]'
 - click: '[data-testid="workspace-plus-add-folder"]'
@@ -28,6 +35,16 @@ steps:
 - dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
 - wait_for: '[data-testid="code-workspace-editor"] .cm-content'
 - click: button[title="Preview"]
+- select_option:
+    selector: '[data-testid="markdown-preview-appearance"]'
+    value: dark
+- assert_attribute:
+    selector: '[data-testid="code-workspace-markdown-preview"]'
+    name: data-preview-theme
+    equals: dark
+- select_option:
+    selector: '[data-testid="markdown-preview-appearance"]'
+    value: auto
 - click: '[data-testid="code-workspace-markdown-preview"]'
 - press: Mod+f
 - wait_for: '[aria-label="Find in preview"]'
@@ -92,61 +109,68 @@ verification:
     requirement: Ctrl+F searches the rendered Markdown without switching modes; closing and reopening restores focus. Native checks the packaged WebView
       shortcut path.
     actions:
-    - 3
-    - 4
-    - 5
     - 6
     - 7
     - 8
+    - 9
     - 10
     - 11
-    - 12
-    - 14
+    - 13
     - 17
     - 18
     - 20
-    - 22
-    - 25
-    - 27
+    - 23
+    - 24
+    - 26
     - 28
-    - 30
     - 31
     - 33
     - 34
-    - 35
+    - 36
     - 37
+    - 39
     - 40
     - 41
-    - 42
+    - 43
+    - 46
+    - 47
+    - 48
     results:
-    - 15
-    - 16
     - 21
-    - 23
-    - 24
-    - 32
+    - 22
+    - 27
+    - 29
+    - 30
     - 38
     - 44
-    - 45
+    - 50
+    - 51
+    checkpoints:
+    - step: 21
+      expectation: '{"assert_count": {"selector": "[data-testid=\"markdown-search-match\"]", "equal": 1}}'
+    - step: 22
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"markdown-search-count\"]", "equals": "1/1"}}'
+    - step: 27
+      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"markdown-search-count\"]", "equals": "0/0"}}'
+    - step: 29
+      expectation: '{"assert_count": {"selector": "[data-testid=\"markdown-preview-search\"]", "equal": 0}}'
+    - step: 30
+      expectation: '{"eval_readonly": {"expression": "document.activeElement.dataset.testid === \"code-workspace-markdown-preview\"", "expect_truthy": true}}'
+    - step: 38
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "contains": "# platform workspace root"}}'
+    - step: 44
+      expectation: '{"assert_count": {"selector": "[data-testid=\"markdown-search-match\"]", "equal": 1}}'
+    - step: 50
+      expectation: '{"assert_count": {"selector": "[data-testid=\"markdown-preview-search\"]", "equal": 0}}'
+    - step: 51
+      expectation: '{"assert_no_runtime_errors": null}'
+  - id: R2
+    requirement: The shared appearance dropdown applies Dark to the rendered Workspace preview.
+    actions: [13, 14]
+    results: [15]
     checkpoints:
     - step: 15
-      expectation: '{"assert_count": {"selector": "[data-testid=\"markdown-search-match\"]", "equal": 1}}'
-    - step: 16
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"markdown-search-count\"]", "equals": "1/1"}}'
-    - step: 21
-      expectation: '{"assert_text_equals": {"selector": "[data-testid=\"markdown-search-count\"]", "equals": "0/0"}}'
-    - step: 23
-      expectation: '{"assert_count": {"selector": "[data-testid=\"markdown-preview-search\"]", "equal": 0}}'
-    - step: 24
-      expectation: '{"eval_readonly": {"expression": "document.activeElement.dataset.testid === \"code-workspace-markdown-preview\"", "expect_truthy": true}}'
-    - step: 32
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-content", "contains": "# platform workspace root"}}'
-    - step: 38
-      expectation: '{"assert_count": {"selector": "[data-testid=\"markdown-search-match\"]", "equal": 1}}'
-    - step: 44
-      expectation: '{"assert_count": {"selector": "[data-testid=\"markdown-preview-search\"]", "equal": 0}}'
-    - step: 45
-      expectation: '{"assert_no_runtime_errors": null}'
+      expectation: The rendered Workspace preview reports the dark theme.
   visual:
   - check: Review markdown-preview-found.png and markdown-split-preview-found.png for actual highlighted text and unobstructed controls.
     method: manual

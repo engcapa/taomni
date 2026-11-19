@@ -28,8 +28,10 @@ it("routes document/images and Sheet layout to the existing Notes export owner a
   const onExport = vi.fn(async () => ({ status: "copied" as const, drawio: { pages: 2, nativeDiagrams: 1, fallbackDiagrams: 0 } }));
   render(<MarkdownExportMenu document={{ path: "note.md", content: "# Note", loading: false } as ViewerDocument} onError={vi.fn()} onExport={onExport} />);
   fireEvent.click(screen.getByTestId("markdown-export")); fireEvent.click(screen.getByTestId("markdown-export-drawio"));
-  fireEvent.change(screen.getByTestId("markdown-drawio-scope"), { target: { value: "images" } });
-  fireEvent.change(screen.getByTestId("markdown-drawio-layout"), { target: { value: "single" } });
+  fireEvent.click(screen.getByTestId("markdown-drawio-scope"));
+  fireEvent.click(screen.getByRole("option", { name: "All images and diagrams" }));
+  fireEvent.click(screen.getByTestId("markdown-drawio-layout"));
+  fireEvent.click(screen.getByRole("option", { name: "All content in one sheet" }));
   fireEvent.click(screen.getByTestId("markdown-drawio-copy-link"));
   await waitFor(() => expect(onExport).toHaveBeenCalledWith("drawio-link", "# Note", expect.objectContaining({ drawio: { scope: "images", layout: "single" } })));
   expect(screen.getByTestId("markdown-export-status")).toHaveAttribute("data-export-state", "copied");

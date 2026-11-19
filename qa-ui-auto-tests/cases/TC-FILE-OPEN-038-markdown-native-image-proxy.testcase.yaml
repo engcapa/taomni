@@ -1,0 +1,79 @@
+id: TC-FILE-OPEN-038
+title: Native Markdown images use the selected proxy and embed bytes in HTML
+covers: [F-FILEOPEN-1, F-EXPLORER-1]
+modes: [native]
+tags: [p1, markdown, file-open, export]
+fixtures: [reset_db, markdown_remote_images]
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-markdown-image-proxy
+- reload_window: null
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-file-explorer"]'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Mod+l
+- fill:
+    selector: '[data-testid="explorer-address"]'
+    value: ${fixture.platform_workspace_root}
+- press:
+    selector: '[data-testid="explorer-address"]'
+    key: Enter
+- dblclick: '[data-testid="explorer-file-row"][data-name="remote-images.md"]'
+- eval_readonly:
+    expression: document.querySelector('.fv-md-image img')?.naturalWidth === 96
+    expect_truthy: true
+    timeout_sec: 25
+- assert_file_contains:
+    path: ${fixture.markdown_image_log}
+    contains: '"forwarded": "app"'
+- click: '[data-testid="markdown-export"]'
+- native_file_dialog:
+    kind: save
+    action: choose
+    path: ${fixture.markdown_remote_html}
+    trigger: '[data-testid="markdown-export-html"]'
+- assert_attribute:
+    selector: '[data-testid="markdown-export-status"]'
+    name: data-export-state
+    equals: saved
+- assert_file_contains:
+    path: ${fixture.markdown_remote_html}
+    contains: 'src="data:image/png;base64,iVBORw0KGgo'
+- click: '[data-testid="ribbon-settings"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: files and opening
+- wait_for: '[data-testid="markdown-image-proxy-mode"]'
+- select_option:
+    selector: '[data-testid="markdown-image-proxy-mode"]'
+    value: custom
+- fill:
+    selector: '[data-testid="markdown-image-custom-proxy-panel"] input[aria-label="Proxy host"]'
+    value: '127.0.0.1'
+- fill:
+    selector: '[data-testid="markdown-image-custom-proxy-panel"] input[type="number"]'
+    value: ${fixture.markdown_image_custom_port}
+- click: '[data-testid="tab-item"][data-tab-type="file-viewer"]'
+- assert_file_contains:
+    path: ${fixture.markdown_image_log}
+    contains: '"forwarded": "custom"'
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="markdown-image-proxy-mode"]'
+- select_option:
+    selector: '[data-testid="markdown-image-proxy-mode"]'
+    value: none
+- click: '[data-testid="tab-item"][data-tab-type="file-viewer"]'
+- assert_file_contains:
+    path: ${fixture.markdown_image_log}
+    contains: '"forwarded": "direct"'
+- click: '[data-testid="ribbon-settings"]'
+- set_check:
+    selector: '[data-testid="file-open-markdown-restrict-remote"]'
+    checked: true
+- click: '[data-testid="tab-item"][data-tab-type="file-viewer"]'
+- assert_text:
+    selector: '[data-testid="markdown-image-widget"] figcaption'
+    contains: Remote images are blocked
+- assert_no_runtime_errors: null

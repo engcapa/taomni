@@ -2,6 +2,7 @@ import { taoText as tr } from "../i18n";
 import { Clock3, MessageSquare, RefreshCw, Search, Trash2, X } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ConfirmDialog } from "../../sidebar/ConfirmDialog";
+import { ThemedSelect } from "../../ThemedSelect";
 import type { SessionConfig } from "../../../lib/ipc";
 import type { RecentWorkspace } from "../../../types";
 import { compareRecentSessions } from "../../welcome/sessionModel";
@@ -69,7 +70,10 @@ export function HistoryPopover(props: Props) {
     <div className="tao-home-history-tabs" role="tablist">{(["chat", "sessions", "workspaces", "directories"] as const).map((item) => <button type="button" role="tab" aria-selected={tab === item} data-testid={`tao-home-history-tab-${item}`} key={item} className={tab === item ? "active" : ""} onClick={() => { setTab(item); setQuery(""); }}>{tr(({ chat: "Tao 对话", sessions: "最近会话", workspaces: "最近工作区", directories: "最近目录" })[item])}</button>)}</div>
     {tab === "directories" ? <div className="tao-home-directory-history">{props.directories}</div> : <>
       <label className="tao-home-history-search"><Search size={13} /><input autoFocus value={query} onChange={(event) => setQuery(event.target.value)} placeholder={tr("搜索历史")} /></label>
-      {tab === "sessions" ? <select aria-label={tr("会话排序")} value={sort} onChange={(event) => setSort(event.target.value as RecentSessionSort)}>{(["last-desc", "last-asc", "name-asc", "name-desc", "type-asc", "type-desc", "host-asc", "host-desc"] as const).map((value) => <option key={value} value={value}>{tr(({ "last-desc": "最近连接优先", "last-asc": "较早连接优先", "name-asc": "名称升序", "name-desc": "名称降序", "type-asc": "类型升序", "type-desc": "类型降序", "host-asc": "主机升序", "host-desc": "主机降序" })[value])}</option>)}</select> : null}
+      {tab === "sessions" ? <ThemedSelect label={tr("会话排序")} testId="tao-home-history-sort" value={sort} onChange={setSort}
+        options={(["last-desc", "last-asc", "name-asc", "name-desc", "type-asc", "type-desc", "host-asc", "host-desc"] as const).map((value) => ({
+          value, label: tr(({ "last-desc": "最近连接优先", "last-asc": "较早连接优先", "name-asc": "名称升序", "name-desc": "名称降序", "type-asc": "类型升序", "type-desc": "类型降序", "host-asc": "主机升序", "host-desc": "主机降序" })[value]),
+        }))} /> : null}
       <div className="tao-home-history-list" onKeyDown={(event) => {
         if (event.key !== "ArrowDown" && event.key !== "ArrowUp") return;
         const rows = Array.from(event.currentTarget.querySelectorAll<HTMLButtonElement>(".tao-home-history-row"));

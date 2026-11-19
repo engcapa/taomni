@@ -95,6 +95,17 @@ it("supports keyboard menu dismissal and never generates or writes an image afte
   expect(saveExportBlob).toHaveBeenCalledWith("example-diagram-1.png", expect.any(Function), "/docs/example.md");
 });
 
+it("dismisses the context menu when a diagram consumes pointerdown or when focus moves outside", () => {
+  render(<Harness />);
+  fireEvent.contextMenu(diagram());
+  expect(screen.getByRole("menu")).toBeInTheDocument();
+  fireEvent.pointerDown(diagram(), { button: 0 });
+  expect(screen.queryByRole("menu")).toBeNull();
+  fireEvent.contextMenu(diagram());
+  act(() => document.querySelector<HTMLElement>(".fv-md-main")!.focus());
+  expect(screen.queryByRole("menu")).toBeNull();
+});
+
 it("disposes portals and ignores a failed save from the previous document", async () => {
   let reject!: (cause: Error) => void;
   vi.mocked(saveExportBlob).mockImplementation(() => new Promise((_resolve, fail) => { reject = fail; }));

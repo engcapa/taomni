@@ -2,9 +2,7 @@
 .fv-bar.fv-md-toolbar{position:relative;flex-wrap:wrap;overflow:visible;gap:4px}
 .fv-md-format{display:flex;align-items:center;gap:1px;flex-wrap:wrap;min-width:0;overflow:visible}
 .fv-md-format .fv-icon-button{flex:none}
-.fv-md-heading-select{position:relative;min-width:74px;flex:none;padding:0 5px!important}
-.fv-md-heading-select select{appearance:none;background:transparent;color:inherit;border:0;outline:0;padding:0 16px 0 4px;width:100%;height:26px;font-size:12px;cursor:pointer}
-.fv-md-heading-select>svg{position:absolute;right:5px;pointer-events:none;width:12px!important}
+.fv-md-heading-select{min-width:74px;flex:none}
 .fv-md-toolbar .fv-seg{flex:none;white-space:nowrap}
 .fv-md-wrap{flex:1;min-height:0;min-width:0;display:flex}
 .fv-md-outline{width:210px;border-right:1px solid var(--divider);background:var(--panel);overflow:auto;padding:8px 6px;flex:none}
@@ -110,7 +108,7 @@
 .fv-md-focus .fv-md-rendered-block:hover,.fv-md-focus .fv-md-table-wrap:focus-within,.fv-md-focus .fv-md-image:focus-within{opacity:1}
 .fv-md-insert-menu{position:absolute;left:44px;bottom:28px;z-index:20;min-width:200px}
 .fv-md-export-control{position:relative;flex:none}
-.fv-md-export-menu{min-width:min(270px,calc(100vw - 16px));max-width:calc(100vw - 16px);max-height:calc(100vh - 16px);overflow:auto;z-index:1100}
+.fv-menu.fv-md-export-menu{min-width:min(270px,calc(100vw - 16px));max-width:calc(100vw - 16px);max-height:calc(100vh - 16px);overflow:auto;z-index:1130}
 .fv-md-export-menu>button,.fv-md-insert-menu>button{display:flex;align-items:center;text-align:left;gap:8px;width:100%;padding:6px 10px;font-size:12px;border-radius:5px;white-space:nowrap}
 .fv-md-export-menu>button:hover,.fv-md-export-menu>button:focus,.fv-md-insert-menu>button:hover,.fv-md-insert-menu>button:focus{background:var(--hover);outline:none}
 .fv-md-export-menu svg,.fv-md-insert-menu svg{width:15px;height:15px;flex:none}
@@ -121,7 +119,7 @@
 .fv-md-export-fields{padding:4px 0 10px}
 .fv-md-field{display:flex;align-items:center;gap:10px;margin:14px 0;flex-wrap:wrap;font-size:12px}
 .fv-md-field>span:first-child{width:64px;flex:none;color:var(--muted)}
-.fv-md-field .fv-select{min-width:82px}
+.fv-md-field .taomni-select-trigger{min-width:82px}
 .fv-md-setting-check{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
 .fv-md-setting-check input{accent-color:var(--accent-s);width:14px;height:14px}
 .fv-md-export-hint{font-size:12px;line-height:1.7;color:var(--muted);border:1px dashed var(--divider);background:var(--hover);border-radius:6px;padding:8px 10px}

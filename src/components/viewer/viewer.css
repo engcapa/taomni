@@ -38,6 +38,11 @@
 }
 .fv *, .fv *::before, .fv *::after { box-sizing: border-box; }
 .fv button, .fv select, .fv input { font: inherit; color: inherit; }
+.fv select { color-scheme: var(--taomni-color-scheme, light); }
+.fv select option {
+  background-color: var(--taomni-card-bg);
+  color: var(--taomni-text);
+}
 .fv button { cursor: pointer; white-space: nowrap; }
 .fv button:disabled { opacity: .4; cursor: default; }
 .fv button:focus-visible, .fv select:focus-visible, .fv input:focus-visible { outline: 2px solid var(--accent-s); outline-offset: 1px; }
@@ -67,7 +72,6 @@
 .fv-status { height: 25px; display: flex; align-items: center; padding: 3px 12px; gap: 16px; color: var(--muted); border-top: 1px solid var(--divider); font-size: 11px; flex: none; }
 .fv-status .dirty { color: var(--warn); }
 .fv-select { height: 26px; border: 0; background: var(--bg); padding: 0 5px; font-size: 12px; }
-.fv-select option { background: var(--card); color: var(--text); }
 .fv-font-size { display: flex; align-items: center; gap: 3px; white-space: nowrap; }
 .fv-font-size select { background: transparent; border: 0; }
 .fv-toggle { width: 30px; height: 17px; border-radius: 9px; background: var(--chrome-b); position: relative; display: inline-block; flex: none; }

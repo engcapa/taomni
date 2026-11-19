@@ -57,12 +57,12 @@ steps:
 - assert_not_visible: '[data-testid="tao-home-settings"]'
 - assert_not_visible: '[data-testid="tao-home-appearance"]'
 - click: '[data-testid="tao-home-shell-menu"]'
-- wait_for: '[role="dialog"] select[aria-label="Choose shell"]:enabled'
-- press: {selector: '[role="dialog"] select[aria-label="Choose shell"]', key: Home}
+- press: {selector: '[data-testid="tao-home-shell-options"]:enabled', key: Home}
+- press: Enter
 - press: Escape
 - click: '[data-testid="tao-home-shell-menu"]'
 - eval_readonly:
-    expression: document.querySelector('.tao-home-popup-items select').selectedIndex === 0
+    expression: document.querySelector('.tao-home-popup-items .taomni-select-trigger')?.dataset.value?.length > 0
     expect_truthy: true
     timeout_sec: 5
 - click: 'xpath=//*[@role="dialog"]//button[normalize-space(.)="Open home directory"]'

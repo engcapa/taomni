@@ -1,9 +1,10 @@
 import {
-  Bold, ChevronDown, Code, CodeXml, Focus, Heading, ImagePlus, Italic, Link,
+  Bold, Code, CodeXml, Focus, Heading, ImagePlus, Italic, Link,
   List, ListChecks, ListOrdered, ListTree, Minus, Quote, Strikethrough, Table,
 } from "lucide-react";
 import type { EditorView } from "@codemirror/view";
 import type { ReactNode } from "react";
+import { ThemedSelect } from "../../ThemedSelect";
 import { useViewerLabels } from "../viewerLabels";
 import { formatMarkdown, setMarkdownHeading, type MarkdownFormat } from "./markdownCommands";
 
@@ -18,7 +19,10 @@ export function MarkdownToolbar({ view, readOnly, mode, focus, outline, heading,
   const button = (action: MarkdownFormat, zh: string, en: string, Icon: typeof Bold, shortcut = "") => <button key={action} className="fv-icon-button" data-testid={`markdown-format-${action}`} title={`${label(zh, en)}${shortcut ? ` ${chord}${shortcut}` : ""}`} aria-label={label(zh, en)} disabled={readOnly} onMouseDown={(event) => event.preventDefault()} onClick={() => { const editor = view(); if (editor) formatMarkdown(editor, action); }}><Icon /></button>;
   return <>
     <div className="fv-md-format" role="toolbar" aria-label={label("Markdown 格式", "Markdown formatting")}>
-      <label className="fv-md-heading-select fv-button outline"><select data-testid="markdown-heading" aria-label={label("段落样式", "Paragraph style")} value={heading} disabled={readOnly} onChange={(event) => { const editor = view(); if (editor) setMarkdownHeading(editor, Number(event.target.value)); }}><option value={0}>{label("正文", "Body")}</option>{[1, 2, 3, 4, 5, 6].map((level) => <option key={level} value={level}>{label("标题", "Heading")} {level}</option>)}</select><ChevronDown /></label>
+      <ThemedSelect className="fv-md-heading-select" testId="markdown-heading" label={label("段落样式", "Paragraph style")}
+        value={String(heading)} disabled={readOnly}
+        options={[{ value: "0", label: label("正文", "Body") }, ...[1, 2, 3, 4, 5, 6].map((level) => ({ value: String(level), label: `${label("标题", "Heading")} ${level}` }))]}
+        onChange={(next) => { const editor = view(); if (editor) setMarkdownHeading(editor, Number(next)); }} />
       <span className="fv-separator" />
       {button("bold", "粗体", "Bold", Bold, "B")}{button("italic", "斜体", "Italic", Italic, "I")}{button("strike", "删除线", "Strikethrough", Strikethrough)}{button("code", "行内代码", "Inline code", Code)}{button("link", "链接", "Link", Link, "K")}
       <span className="fv-separator" />

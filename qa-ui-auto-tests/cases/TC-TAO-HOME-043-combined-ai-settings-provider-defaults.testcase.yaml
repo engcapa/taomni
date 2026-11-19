@@ -66,7 +66,7 @@ steps:
     contains: qa-chat-default
 - click: '[data-testid="tao-home-capabilities"]'
 - eval_readonly:
-    expression: document.querySelector('.tao-home-popup-items select').value === "local"
+    expression: document.querySelector('.tao-home-control-field .taomni-select-trigger').dataset.value === "local"
     expect_truthy: true
 - assert_disabled: '[data-testid="tao-home-capability-thinking"]'
 - assert_disabled: '[data-testid="tao-home-capability-web"]'
@@ -146,7 +146,7 @@ verification:
     - step: 25
       expectation: '{''selector'': ''[data-testid="tao-home-capabilities"]'', ''contains'': ''qa-chat-default''}'
     - step: 27
-      expectation: '{''expression'': ''document.querySelector(\''.tao-home-popup-items select\'').value === "local"'', ''expect_truthy'':
+      expectation: '{''expression'': ''document.querySelector(\''.tao-home-control-field .taomni-select-trigger\'').dataset.value === "local"'', ''expect_truthy'':
         True}'
     - step: 28
       expectation: '[data-testid="tao-home-capability-thinking"]'

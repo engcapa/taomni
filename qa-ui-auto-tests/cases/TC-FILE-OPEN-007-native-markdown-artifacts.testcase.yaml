@@ -196,10 +196,10 @@ steps:
 - click: '[data-testid="markdown-export-pdf"]'
 - wait_for: '[data-testid="markdown-export-settings"]'
 - select_option:
-    selector: '[data-testid="markdown-export-settings"] select[aria-label="Paper"]'
+    selector: '[data-testid="markdown-export-settings"] [role="combobox"][aria-label="Paper"]'
     value: Letter
 - press:
-    selector: '[data-testid="markdown-export-settings"] select[aria-label="Paper"]'
+    selector: '[data-testid="markdown-export-settings"] [role="combobox"][aria-label="Paper"]'
     key: Escape
 - assert_not_visible: '[data-testid="markdown-export-settings"]'
 - assert_markdown_artifact:
@@ -210,7 +210,7 @@ steps:
 - click: '[data-testid="markdown-export-print"]'
 - wait_for: '[data-testid="markdown-export-settings"]'
 - press:
-    selector: '[data-testid="markdown-export-settings"] select[aria-label="Paper"]'
+    selector: '[data-testid="markdown-export-settings"] [role="combobox"][aria-label="Paper"]'
     key: Escape
 - assert_not_visible: '[data-testid="markdown-export-settings"]'
 - assert_markdown_artifact:
