@@ -2031,7 +2031,7 @@
 - `select[aria-label="Terminal shell"]` — interactive [optional] — F1.6.shell-select
 - `[data-testid="welcome-open-home-folder"]` — interactive [optional] — F1.6.open-home-folder
 - `button[aria-label="Open as administrator"]` — interactive [optional] — F1.6.open-as-administrator
-- `text="New session…"` — display — F1.6.new-session-card
+- `[data-testid="tao-home-dock-row"]` — display — F1.6.launcher-dock
 - `[data-testid="welcome-panel"] [data-testid="tao-home-new-session"]` — interactive — F1.6.new-session-card-testid
 - `[data-testid="welcome-recent-sessions"]` — display — F1.6.recent-sessions-panel
 - `[data-testid="welcome-recent-filter"]` — interactive — F1.6.recent-filter
@@ -2070,8 +2070,8 @@
 - `[data-testid="welcome-restore-cancel"]` — interactive [optional] — F1.6.restore-cancel
 - `[data-testid="welcome-restore-clear"]` — interactive [optional] — F1.6.restore-clear
 - `text="Tips"` — display — F1.6.tips-section
-- `[data-testid="welcome-version"]` — display — F1.6.version-header
-- `[data-testid="welcome-version-footer"]` — display — F1.6.version-footer
+- `[data-testid="tao-home-shell-menu"]` — interactive — F1.6.shell-menu
+- `[data-testid="tao-home-dock-more"]` — interactive — F1.6.optional-launchers
 
 ## main/window (F1.3)
 
@@ -3673,6 +3673,7 @@
 - `[data-testid="tao-home-history-tab-workspaces"]` — interactive — F1.11.tao-home-history-tab-workspaces
 - `[data-testid="tao-home-history-tab-directories"]` — interactive — F1.11.tao-home-history-tab-directories
 - `[data-testid="tao-home-history-search"]` — interactive — F1.11.tao-home-history-search
+  ↳ `.tao-home-history-search input` — alias
 - `[data-testid="tao-home-local-terminal"]` — interactive — F1.11.tao-home-local-terminal
 - `[data-testid="tao-home-wsl"]` — display [optional] — F1.11.tao-home-wsl
 - `[data-testid="tao-home-new-session"]` — interactive — F1.11.tao-home-new-session

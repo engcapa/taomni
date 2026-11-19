@@ -280,6 +280,7 @@ controls:
   kind: interactive
 - id: tao-home-history-search
   selector: '[data-testid="tao-home-history-search"]'
+  aliases: ['.tao-home-history-search input']
   kind: interactive
 - id: tao-home-local-terminal
   selector: '[data-testid="tao-home-local-terminal"]'
@@ -1101,9 +1102,9 @@ controls:
     selector: 'button[aria-label="Open as administrator"]'
     kind: interactive
     optional: true       # only rendered when selected shell canElevate
-  - id: new-session-card
-    selector: 'text="New session…"'
-    kind: display # card heading; the action is welcome-new-session below
+  - id: launcher-dock
+    selector: '[data-testid="tao-home-dock-row"]'
+    kind: display
   - id: new-session-card-testid
     selector: '[data-testid="welcome-panel"] [data-testid="tao-home-new-session"]'
     kind: interactive
@@ -1230,12 +1231,12 @@ controls:
   - id: tips-section
     selector: 'text="Tips"'
     kind: display
-  - id: version-header
-    selector: '[data-testid="welcome-version"]'
-    kind: display
-  - id: version-footer
-    selector: '[data-testid="welcome-version-footer"]'
-    kind: display
+  - id: shell-menu
+    selector: '[data-testid="tao-home-shell-menu"]'
+    kind: interactive
+  - id: optional-launchers
+    selector: '[data-testid="tao-home-dock-more"]'
+    kind: interactive
 -->
 
 - 启动入口：开始本地终端、新建会话、导入 OpenSSH config
