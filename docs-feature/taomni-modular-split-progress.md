@@ -124,6 +124,10 @@ TASK-027 将 G1–G11 设为独立发布阻断门。每个门必须在匹配源�
 - `514c95edb`、`9d56029c7` 将邮件 SQLite 连接、锁、schema、完整原件、归档检索和清理迁入邮件引擎。原 IPC 仍通过桌面适配层使用同一数据格式。引擎 11 项、缓存和备份 26 项、旧 schema 幂等迁移 1 项单测通过。独立邮件宿主、动态前端和核心依赖裁剪继续按 TASK-026 验收。 [邮件三端](https://github.com/engcapa/taomni/actions/runs/44623555310)
 - `57d87b7ed` 的旧 `newmob.db` 加 WAL 原生测试在 Linux、Windows 通过，均核对了旧库、WAL 摘要、SSH/VNC 会话及二次预检的 journal。macOS 原生结果单独核对。 [WAL 三端](https://github.com/engcapa/taomni/actions/runs/44609458437)
 - Windows G5 对照两条路径均通过连接和画面检查。进程内及独立编码宿主的延迟 p95 为 76.05 和 77.65 ms，带宽为 12,642 和 12,894 kbps，均超出现有 65 ms 和 4,905 kbps 预算。已在 macOS 作业结束前保存 Windows 工件。Windows 对照的桌面样本包含 runner 控制台背景，`514d96832` 使用静态背景控制测量条件，并使用与生产一致的多线程运行时和编码统计。Windows 复跑继续使用原用例的目标、操作和预算。 [原始对照](https://github.com/engcapa/taomni/actions/runs/44613553681) · [Windows 复跑](https://github.com/engcapa/taomni/actions/runs/44623916926)
+- 同轮 macOS 26 ARM64 对照的六项通过。进程内及独立编码宿主的 p95 为 63.66 和 45.82 ms，动画为 31.09 和 35.78 fps，带宽为 183.15 和 211.54 kbps。原始工件记录采集进程的屏幕录制和输入进程的辅助功能检查均返回 true。生产 DMG 升级后的 TCC 授权复用继续单独验证。 [macOS 对照工件](https://github.com/engcapa/taomni/actions/runs/44613553681)
+- `57d87b7ed` 的两份候选安装件分别通过 Linux 和 Windows 检查。Linux deb 真实升级、签名 MFA 强退后的 HOTP 续号、三种安装格式的 `noexec` 恢复和桌面/headless 双向互斥均有落盘回执。Windows 验证了 0.5.10 到 0.5.11 的 MSI 替换、headless 互斥及回滚，Authenticode 状态为 `NotSigned`。 [Linux 安装工件](https://github.com/engcapa/taomni/actions/runs/44617201962) · [Windows 安装工件](https://github.com/engcapa/taomni/actions/runs/44622413596)
+- `436fa9998` 扩展 TC-MODULES-009。在桌面正常退出后，以同一 QA 二进制启动 headless，核对同一 profile 拒绝第二个桌面及 owner 仍存活。关闭 headless 后，恢复原笔记、注册表和 generation，并验证桌面持锁时拒绝 headless。70 项工具单测与用例审计通过，三端原生用例已派发。 [G11 双向用例](https://github.com/engcapa/taomni/actions/runs/44627312069)
+- 签名 MFA 历史批次的 macOS ARM64 安装、旧库迁移、中断恢复和代理均通过。Windows 编译找到旧源码的 RDP 测试 logger 限制，Linux 的 Protoc 下载返回 GitHub Server Error。以包含 logger 修复的最新源码重新派发，保留两端原始失败记录。 [历史结果](https://github.com/engcapa/taomni/actions/runs/44602505246) · [同选集复验](https://github.com/engcapa/taomni/actions/runs/44628069614)
 
 ## 当前结论
 

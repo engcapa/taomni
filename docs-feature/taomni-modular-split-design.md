@@ -618,7 +618,7 @@ G4 的宿主启动和监督重启先检查已验签宿主所在文件系统的 `
 
 ### 5.3 前端拆分
 
-- `TabContentRouter.tsx` 的静态 import 全部改成按插件注册表动态加载：核心 tab（terminal / sftp / database / mail / code-workspace / 隧道管理器 `nettools` 等）仍静态 import；插件 tab（rdp / vnc / servers / sockscap / mfa / proxy-test 等）走 `React.lazy + 注册表`。`TabKind` 拆为核心字面量 + 插件登记的开放字符串（§4.2 S5）。已移除的能力不进入注册表。
+- 核心 tab 保留静态入口，包括 terminal、sftp、database、code-workspace 和隧道管理器 `nettools`。`TabContentRouter.tsx` 通过 `React.lazy` 和模块注册表加载 mail、mail-unified、rdp、vnc、servers、sockscap 和 mfa 等模块 tab。已保存的邮件会话及恢复信息归核心。`TabKind` 使用核心字面量和模块登记的开放字符串（§4.2 S5）。LanChat 已从注册表移除。
 - 每个插件前端是一个独立 Vite 构建（`frontend/index.js`），单独打 chunk，不进核心 `dist`；`src/stubs/` 的浏览器预览为每个插件提供桩，桌面-only 效果不得泄漏桩假设（沿用现有 `src/stubs/` 规则）。
 - **插件 chunk 必须使用宿主提供的 React 与共享库**，不得各自打包一份：两份 React 会让 hooks 失效。构建时把 `react`、`react-dom`、`zustand`、`lucide-react`、i18n、`ipc` 等标成 external，运行时由核心通过 `globalThis.__taomniHost` 或 import map 解析；这批共享面就是“前端插件 SDK”，版本绑定 `coreApiVersion`，列入 §7.1。
 - **加载来源与 CSP**：现有 CSP 是 `script-src 'self' 'wasm-unsafe-eval'`，应用数据目录里的 chunk 无法直接加载。方案：核心注册一个自定义 URI scheme（如 `taomni-plugin://<slug>/<file>`）只服务 `plugins/<slug>/frontend/**`，并仅把这个 scheme 加进 `script-src`；不放宽 `assetProtocol` 范围（当前只放行 `$APPDATA/ai-generations/**/*`）。分支上的 `viewer::register_protocol` 已经在 `lib.rs` 的 `tauri::Builder` 上注册了 `taomni-preview`，并把 `taomni-preview:` 与 `http(s)://taomni-preview.localhost` 加进 `frame-src`（Windows / Android 上自定义协议以 `http(s)://<scheme>.localhost` 形式出现，所以插件 scheme 也必须同时登记这两种形式）。插件 scheme 沿用该注册模式，`csp` 与 `devCsp` 两处同步修改并保留预览项，不得引入 `unsafe-inline` 脚本；vendored `wry` 的“只对主框架注入 IPC 凭据”保证必须保持（§3.9）。CSP 变更属安全敏感变更，需单独评审。
@@ -877,7 +877,7 @@ TC-MODULES-027 在 GitHub 安装固定哈希的正式 deb/MSI/DMG，由旧程序
 
 ## 11. 测试与验收
 
-- **核心-only 回归**：不装任何插件，跑现有 `qa-ui-auto-tests` 全量中核心相关的用例（终端、SFTP、数据库、邮件、工作区、Tao、备份），全部通过；Mail、RDP、VNC 等模块入口在全量插件集合中验证，未装插件的入口全部是“未安装”占位页，无白屏、无崩溃。
+- **核心-only 回归**要求在空模块配置下通过终端、SFTP、数据库、工作区、Tao、备份和核心会话管理用例。邮件等历史会话仍可查看，打开未安装的模块时显示安装提示。全插件配置验证 Mail、RDP、VNC 等实际业务。
 - **全量回归**：装全部 11 个有效插件；若 `plugin-mobile` 或 macOS G2 触发 DEC-2，则按实际发布集合执行并在报告、`modules.json`、§13.4 同时注明，不能用“全量”掩盖缺项。
 - **插件单测**：每个插件独立安装 / 启用 / 禁用 / 卸载 / 回滚各一遍；签名失败、版本不兼容、下载中断、迁移失败各一遍，全部有明确错误与回滚。
 - **发布演练**：只发一个插件的新版本（不发核心），`modules.json` 更新后商店显示更新、安装成功、核心不受影响。
@@ -1012,11 +1012,11 @@ TC-MODULES-027 在 GitHub 安装固定哈希的正式 deb/MSI/DMG，由旧程序
 
 | 验证门 | 已取得的结果 | 剩余验证 |
 |---|---|---|
-| G1 macOS 宿主启动 | macOS 15 Intel 的 ad-hoc hardened runtime 实验成功启动 Hello 和 MFA，Gatekeeper 返回 exit 3。 [实验记录](taomni-modular-split-gates-hello-plugin.md#macos-g1-experiment-and-release-boundary) | 完整发行包与下载宿主的签名身份、hardened runtime 及分发信任。 |
+| G1 macOS 宿主启动 | macOS 15 Intel 使用 ad-hoc 和固定自签名证书分别验证了启用 hardened runtime 的测试应用启动带隔离属性的 Hello 和 MFA。Gatekeeper 返回 exit 3。 [固定证书结果](https://github.com/engcapa/taomni/actions/runs/44620630155) | 完整发行包与下载宿主的签名身份、hardened runtime 及分发信任。 |
 | G2 macOS 系统权限 | 核心共用 `capture/`，已实现 `capture.still` 的作用域服务。 [接线记录](taomni-modular-split-gates-hello-plugin.md#capturestill-service-integration-2026-11-17-verification-pending) | 已安装应用的原生屏幕录制和辅助功能授权归属，以及升级后的复用。 |
 | G3 Windows 系统保护 | 实验从 `LOCALAPPDATA` 启动带 Internet 区域标记的 Hello 和 MFA。实测环境的 Defender 实时保护关闭。 [实验记录](taomni-modular-split-gates-hello-plugin.md#windows-g3-execution-experiment) | 正式 Authenticode 资产及启用实时保护、SmartScreen 策略的系统环境。 |
 | G4 Linux `noexec` | deb、RPM 和 AppImage 均验证宿主拒绝、用户按指引迁移 profile、原 Vault 与 MFA 连续读写。 [安装验证](taomni-modular-installed-upgrade-verification.md#linux-安装格式的-noexec-恢复) | 正式首发产物按同场景复验。 |
-| G5 帧吞吐 | 三端 loopback 连续帧测试交付全部帧，Linux X11 实采和 IronRDP 编码的两条路径通过同一组预算。 [测量记录](taomni-modular-split-gates-hello-plugin.md#g5-frame-transport-measurement) | Windows、macOS 的真实采集和独立 RDP 宿主端到端比较。 |
+| G5 帧吞吐 | 三端 loopback 连续帧测试交付全部帧。Linux X11 与 macOS 26 ARM64 的实际采集和 IronRDP 编码对照通过原预算。Windows 两条路径在初测中延迟、带宽超标。 [Linux 测量](taomni-modular-split-gates-hello-plugin.md#g5-frame-transport-measurement) · [macOS 与 Windows 初测](https://github.com/engcapa/taomni/actions/runs/44613553681) | Windows 对照复验和匹配发行包上的端到端结果。 |
 | G6 强制退出 | 三端实际进程门验证宿主回收。Linux 安装 deb 后强杀应用，签名 MFA 宿主在驱动清理前退出，重开后继续原账号计数。 [Linux 安装验证](taomni-modular-installed-upgrade-verification.md#linux-已安装应用的强制退出) | Windows MSI 和 macOS DMG 安装后的强退、重开和宿主回收。 |
 | G7 无重启生命周期 | Linux、Windows、macOS Intel 的签名模块更新和回滚经过实际宿主重新握手，保留禁用偏好及原数据。 [三端结果](https://github.com/engcapa/taomni/actions/runs/44287815253) | 正式业务宿主逐个验证状态、资源释放与回滚。 |
 | G8 验签与路径 | 四种原生运行配置通过正式公钥校验的包安装和篡改拒绝。签名目录和原子发布另有下载与发布契约。 [安装用例](https://github.com/engcapa/taomni/actions/runs/43804951477) · [发布契约](https://github.com/engcapa/taomni/actions/runs/44393439596) | 正式首发目录与每个首批包的签名及拒绝用例。 |
