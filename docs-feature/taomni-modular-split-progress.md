@@ -107,6 +107,15 @@ TASK-027 将 G1–G11 设为独立发布阻断门。每个门必须在匹配源�
 - `c13d5a2a4` 的 GitHub runner 通过 macOS 15 Intel ad-hoc hardened runtime 宿主和 Windows 带 Internet 区域标记宿主的执行实验。macOS `spctl` 返回 3，Windows 样本为 `NotSigned`，实时防护关闭。G1/G2/G3 的正式签名、TCC 和启用防护的环境待验证。三端协议原始记录包含每端 4 项采集、3 项 SDK 中途取消、10 项 loopback、1 项传输资源清理、7 项请求资源所有权。三端帧传输两种负载各交付 150/150，Linux X11 的连接、延迟和吞吐各有两条实际路径的通过结果。 [系统执行](https://github.com/engcapa/taomni/actions/runs/44585376412) · [协议和帧传输](https://github.com/engcapa/taomni/actions/runs/44583739695)
 - Mail 在 `c13d5a2a4` 的预检测试中已核对 Linux Native 29/29，Linux 和 Windows Browser 各 25/25。`e1e555eca` 延迟创建 `mail-cache`，原生预检增加对闲置默认目录缺失和原自定义缓存摘要的核验。`066c490fb` 为正常重启用例增加桌面持锁时 headless 真实进程被拒绝的断言。`87f024671` 将 MIME、附件提取与邮件数据模型拆入 `taomni-mail-engine`，现有 IPC 沿用同一解析逻辑。独立解析单测 1 项、旧解析/缓存/发件单测 21 项、模块边界单测 11 项通过。现版 Browser/Native 回归由匹配源码的三端运行验证，包含完整崩溃回归。 [Mail 升级](https://github.com/engcapa/taomni/actions/runs/44581418346) · [缓存和进程互斥](https://github.com/engcapa/taomni/actions/runs/44588756693) · [当前版本](https://github.com/engcapa/taomni/actions/runs/44593442521)
 
+### CI 独立提交与旧数据库升级补测
+
+- PR #840 的 `77980b64b` 保持三个 CI 文件，新增 `suite=signed`，`all` 也派发既有签名 MFA 安装、迁移和中断恢复验证。派发回执核对了子运行的 `1d1299e5e` 源码。7 项派发单测和 actionlint 通过。 [CI/CD PR](https://github.com/engcapa/taomni/pull/840) · [派发](https://github.com/engcapa/taomni/actions/runs/44601826639) · [签名 MFA 执行](https://github.com/engcapa/taomni/actions/runs/44602505246)
+- `c13d5a2a4` 的 Debian、RPM 和 AppImage 实装恢复、RDP 性能、强退清理和 profile 互斥通过。Windows 首次安装旧 MSI 成功，随后读取 EXE 元数据的 PowerShell 超时。`0d8d1a831` 仅重试元数据查询，保留超时日志。同一 MSI 复跑通过升级、同配置互斥和回滚，EXE 的 Authenticode 记录为 `NotSigned`。同源码 macOS 26 ARM64 DMG 通过安装、配置重开和回滚，Gatekeeper 评估返回 3。 [Linux](https://github.com/engcapa/taomni/actions/runs/44601100290) · [Windows 首轮](https://github.com/engcapa/taomni/actions/runs/44602873148) · [Windows 复跑](https://github.com/engcapa/taomni/actions/runs/44605688094) · [ARM64](https://github.com/engcapa/taomni/actions/runs/44605410295)
+- Windows RDP 对照在安装完整 Perl 后编译到测试日志适配器，因该适配器只为 Linux 编译而失败。`100dcc320` 将测试日志接入 Windows 和 macOS，并在 macOS 26 上使用真实屏幕、键鼠输入及既有 RDP 性能预算。相关结果由定向对照运行收集。 [Windows 原始失败](https://github.com/engcapa/taomni/actions/runs/44599395203) · [两端对照](https://github.com/engcapa/taomni/actions/runs/44606510994)
+- 已下载 `1d1299e5e` 的 Linux Browser 失败分片，`apt` 缺少 Playwright 字体依赖，分片在运行用例前退出。同一源码补跑通过 21 项，包含该分片和完整 Linux Browser 崩溃回归。 [原运行](https://github.com/engcapa/taomni/actions/runs/44599020570) · [补跑](https://github.com/engcapa/taomni/actions/runs/44604640102)
+- `57d87b7ed` 修复旧 `newmob.db` 改名时遗漏 WAL 的故障。修复前单测复现数据库损坏。修复后 14 项 Rust 单测和 38 项 QA 单测通过，包含已提交记录恢复、失败可重试和待还原配置的首装识别。新增 TC-MODULES-051，三端 Browser、Native 与完整崩溃回归正在执行。 [GitHub 三端](https://github.com/engcapa/taomni/actions/runs/44609458437)
+- 同一源码已派发四目标候选构建标识 `57d87b7ed`。每个平台工件到达后独立派发包检查，保留包生产 run 和原始摘要。系统执行、进程与核心清单也按同一源码派发。 [候选构建](https://github.com/engcapa/taomni/actions/runs/44609963649) · [系统](https://github.com/engcapa/taomni/actions/runs/44610275540) · [宿主](https://github.com/engcapa/taomni/actions/runs/44610275027) · [核心清单](https://github.com/engcapa/taomni/actions/runs/44610275246)
+
 ## 当前结论
 
 ### 升级策略调整
