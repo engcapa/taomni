@@ -108,7 +108,7 @@
 .fv-md-focus .fv-md-rendered-block:hover,.fv-md-focus .fv-md-table-wrap:focus-within,.fv-md-focus .fv-md-image:focus-within{opacity:1}
 .fv-md-insert-menu{position:absolute;left:44px;bottom:28px;z-index:20;min-width:200px}
 .fv-md-export-control{position:relative;flex:none}
-.fv-md-export-menu{min-width:min(270px,calc(100vw - 16px));max-width:calc(100vw - 16px);max-height:calc(100vh - 16px);overflow:auto;z-index:1100}
+.fv-md-export-menu{min-width:min(270px,calc(100vw - 16px));max-width:calc(100vw - 16px);max-height:calc(100vh - 16px);overflow:auto;z-index:1130}
 .fv-md-export-menu>button,.fv-md-insert-menu>button{display:flex;align-items:center;text-align:left;gap:8px;width:100%;padding:6px 10px;font-size:12px;border-radius:5px;white-space:nowrap}
 .fv-md-export-menu>button:hover,.fv-md-export-menu>button:focus,.fv-md-insert-menu>button:hover,.fv-md-insert-menu>button:focus{background:var(--hover);outline:none}
 .fv-md-export-menu svg,.fv-md-insert-menu svg{width:15px;height:15px;flex:none}
