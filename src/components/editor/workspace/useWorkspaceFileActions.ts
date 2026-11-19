@@ -204,7 +204,10 @@ export function useWorkspaceFileActions({
 
   const addLooseFilePath = useCallback(async (path: string) => {
     if (!path) return;
-    if (classifyFile(path) !== "source") {
+    // Text files join the workspace editor like source files (IDEA parity);
+    // only kinds the editor cannot host move to the shared viewer.
+    const kind = classifyFile(path);
+    if (kind !== "source" && kind !== "text") {
       await openSharedFile({ path }, { context: "workspace-file", workspaceId: fileOpenWorkspaceId(workspaceId) });
       return;
     }
