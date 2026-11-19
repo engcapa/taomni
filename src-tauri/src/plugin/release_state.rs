@@ -206,7 +206,10 @@ fn exists(path: &Path) -> Result<bool, String> {
 fn initial(data: &Path) -> Result<State, String> {
     let origin = if exists(&data.join(".profile-state.json"))? || exists(&data.join("plugins"))? {
         ProfileOrigin::Modular
-    } else if exists(&data.join("taomni.db"))? || exists(&data.join("vault.db"))? {
+    } else if exists(&data.join("taomni.db"))?
+        || exists(&data.join(crate::migrate::LEGACY_DB_NAME))?
+        || exists(&data.join("vault.db"))?
+    {
         ProfileOrigin::Legacy
     } else {
         ProfileOrigin::New

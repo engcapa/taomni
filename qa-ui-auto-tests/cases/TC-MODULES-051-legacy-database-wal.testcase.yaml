@@ -1,0 +1,57 @@
+id: TC-MODULES-051
+title: Upgrade preserves committed WAL records from the old NewMob database filename
+description: The isolated profile contains an original NewMob database with a VNC setting saved only in its
+  SQLite WAL. Starting Taomni exposes those settings and the VNC module recommendation. The original files,
+  migrated rows and pending journal survive a normal restart.
+covers: [F-Modules-1]
+tags: [p1, modules, upgrade, lifecycle]
+modes: [native]
+fixtures: [reset_db, module_upgrade]
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- wait_for: '[data-testid="module-upgrade-status"][data-state="candidates"]'
+- assert_text_equals: {selector: '[data-testid="module-upgrade-candidates"] li', equals: vnc-client}
+- module_upgrade_probe: {phase: preflight}
+- click: '[data-testid="module-upgrade-migrate"]'
+- wait_for: '[data-testid="module-upgrade-pending"]'
+- module_upgrade_probe: {phase: pending}
+- native_restart_app:
+    expect_exit_confirmation:
+      title: Exit
+      message: There is 1 open tab. Exit Taomni and close it?
+      confirm_label: Exit
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- wait_for: '[data-testid="settings-panel"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- wait_for: '[data-testid="module-upgrade-status"][data-state="candidates"]'
+- assert_text_equals: {selector: '[data-testid="module-upgrade-candidates"] li', equals: vnc-client}
+- module_upgrade_probe: {phase: repeat}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Upgrade consumes the committed WAL and preserves the source and retryable module state.
+    actions: [3, 5, 9, 12, 14, 16]
+    checkpoints:
+    - {step: 7, expectation: The migrated profile recommends the VNC module.}
+    - {step: 8, expectation: The current database contains the committed VNC settings and both original hashes match.}
+    - {step: 11, expectation: Confirming migration records one pending VNC entry and preserves the original files.}
+    - {step: 18, expectation: The VNC recommendation survives normal restart.}
+    - {step: 19, expectation: The original main file and WAL hashes still match and restart preserves records and journal.}
+    - {step: 20, expectation: The migrated profile reopens without renderer runtime errors.}
+    results: [7, 8, 11, 18, 19, 20]
+  native:
+  - check: Startup loads committed SQLite WAL data from the old database filename and retains the source files.
+    method: automated
+    reason: This requires real SQLite files and application startup on each desktop platform.
+  visual:
+  - check: Appearance of the migration status.
+    method: not-applicable
+    reason: Acceptance depends on database contents, source hashes and the persisted journal.

@@ -7,12 +7,19 @@
 //!   3. `<cache_dir>/newmob` → `<cache_dir>/taomni` (models, sidecars, perf log).
 //!
 //! Plus the primary DB file rename `newmob.db` → `taomni.db` inside the
-//! app-data dir. All steps are best-effort and idempotent: once the new
-//! location exists we never touch the old one again, so a user who downgrades
-//! and re-upgrades won't lose data. Failures are logged, not fatal — a fresh
-//! install simply has nothing to migrate.
+//! app-data dir. Existing destinations are preserved on re-upgrade. Startup
+//! requires a successful migration of an existing primary database before
+//! opening it under the new name.
 
-use std::path::{Path, PathBuf};
+use std::{
+    path::{Path, PathBuf},
+    time::{Duration, Instant},
+};
+
+use taomni_profile_locks::{ProfileRoot, ProfileStateLease, WaitControl};
+use taomni_sqlite_snapshot::{
+    SnapshotControl, SnapshotOptions, SnapshotOutcome, snapshot_existing,
+};
 
 /// Legacy Tauri bundle identifier (pre-rename).
 const LEGACY_IDENTIFIER: &str = "com.newmob.app";
@@ -21,7 +28,7 @@ const LEGACY_DIR_NAME: &str = "newmob";
 /// New hardcoded config/cache directory name.
 const NEW_DIR_NAME: &str = "taomni";
 /// Legacy primary database filename.
-const LEGACY_DB_NAME: &str = "newmob.db";
+pub(crate) const LEGACY_DB_NAME: &str = "newmob.db";
 /// New primary database filename.
 const NEW_DB_NAME: &str = "taomni.db";
 
@@ -54,19 +61,45 @@ pub(crate) fn migrate_app_data_dir(new_app_data: &Path) {
     move_tree(&legacy, new_app_data, "app-data dir");
 }
 
-/// Rename the primary DB file `newmob.db` → `taomni.db` inside the (already
-/// migrated) app-data dir, if the new name isn't there yet.
-pub(crate) fn migrate_db_file(new_app_data: &Path) {
+/// Publish the primary database under its new name while the profile is held.
+pub(crate) fn migrate_db_file(new_app_data: &Path) -> anyhow::Result<()> {
     let new_db = new_app_data.join(NEW_DB_NAME);
     let legacy_db = new_app_data.join(LEGACY_DB_NAME);
-    if new_db.exists() || !legacy_db.exists() {
-        return;
+    let pending =
+        || -> std::io::Result<bool> { Ok(!new_db.try_exists()? && legacy_db.try_exists()?) };
+    if !pending()? {
+        return Ok(());
     }
-    if let Err(e) = std::fs::rename(&legacy_db, &new_db) {
-        tracing::warn!(?e, "failed to rename {LEGACY_DB_NAME} -> {NEW_DB_NAME}");
+
+    // Desktop instances can hold shared profile leases. Serialize publication
+    // before any of them can open the new database.
+    let root = ProfileRoot::prepare(new_app_data)?;
+    let timeout = Duration::from_secs(30);
+    let wait = WaitControl::new(Instant::now() + timeout, &|| false);
+    let _state = ProfileStateLease::acquire(&root, &wait)?;
+    if !pending()? {
+        return Ok(());
+    }
+    if new_app_data.join("newmob.db-wal").try_exists()?
+        || new_app_data.join("newmob.db-journal").try_exists()?
+    {
+        // SQLite's backup preserves committed pages and leaves the original
+        // database and journal together for recovery or downgrade.
+        let outcome = snapshot_existing(
+            &legacy_db,
+            &new_db,
+            &SnapshotOptions::default(),
+            &SnapshotControl::with_timeout(timeout),
+        )?;
+        anyhow::ensure!(
+            outcome != SnapshotOutcome::Missing,
+            "Legacy database disappeared"
+        );
     } else {
-        tracing::info!("migrated {LEGACY_DB_NAME} -> {NEW_DB_NAME}");
+        std::fs::rename(&legacy_db, &new_db)?;
     }
+    tracing::info!("migrated {LEGACY_DB_NAME} -> {NEW_DB_NAME}");
+    Ok(())
 }
 
 /// Migrate `<base>/newmob` → `<base>/taomni` for a config or cache base dir.
@@ -145,7 +178,7 @@ mod tests {
         write(&legacy.join("vault.db"), "vault");
 
         migrate_app_data_dir(&new);
-        migrate_db_file(&new);
+        migrate_db_file(&new).unwrap();
 
         // Old dir moved, db renamed, vault preserved.
         assert!(new.join(NEW_DB_NAME).exists());

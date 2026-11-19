@@ -40,6 +40,7 @@ files:
   - src-tauri/src/plugin/uninstallation.rs
   - src-tauri/src/plugin/migration.rs
   - src-tauri/src/plugin/migration_preflight.rs
+  - src-tauri/src/migrate.rs
   - src-tauri/src/plugin/migration_database.rs
   - src-tauri/src/plugin/migration_source.rs
 controls:

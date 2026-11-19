@@ -8,7 +8,7 @@ import sqlite3
 
 from .fixtures.backup_policy import isolated_data_root
 from .fixtures import module_legacy_restore
-from .fixtures.module_upgrade import CHAT_FILES
+from .fixtures.module_upgrade import CHAT_FILES, LEGACY_WAL_CASE
 from .steps import StepError
 
 AFTER_FIRST_INSTALL = "after-first-install"
@@ -87,6 +87,13 @@ def observe(data, state, phase):
     expected_fingerprint = None
     if "wal_main_sha256" in state:
         expected_fingerprint, result["walInput"] = wal_fingerprint(data, state)
+    if legacy_wal := state.get("legacy_wal_sources"):
+        for name, expected_digest in legacy_wal.items():
+            source = data / name
+            if (source.is_symlink() or not source.is_file()
+                    or hashlib.sha256(source.read_bytes()).hexdigest() != expected_digest):
+                raise StepError("Upgrade changed the original NewMob database or its WAL")
+        result["retainedLegacyDatabaseSha256"] = legacy_wal
     if phase == "preflight":
         if journal_path.exists():
             raise StepError("Read-only preflight wrote a migration journal")
@@ -123,7 +130,7 @@ def run(ctx, args):
     owner = getattr(ctx, "fixture_context", None) or ctx
     state = getattr(owner, "module_upgrade", None)
     case_id = getattr(owner, "case_id", None)
-    if not state or case_id not in {"TC-MODULES-025", "TC-MODULES-027", "TC-MODULES-028", "TC-MODULES-030", "TC-MODULES-032", "TC-MODULES-049", module_legacy_restore.CASE_ID}:
+    if not state or case_id not in {"TC-MODULES-025", "TC-MODULES-027", "TC-MODULES-028", "TC-MODULES-030", "TC-MODULES-032", "TC-MODULES-049", module_legacy_restore.CASE_ID, LEGACY_WAL_CASE}:
         raise StepError("module_upgrade_probe requires its registered native legacy input fixture")
     if args["phase"] == AFTER_FIRST_INSTALL and case_id != "TC-MODULES-027":
         raise StepError("After-first-install verification requires the installed legacy roster case")

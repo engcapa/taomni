@@ -122,7 +122,7 @@ fn first_start_applies_legacy_restore_without_skipping_the_module_roster() {
     let source = dir.path().join("tunnels.json");
     fs::write(&source, restored).unwrap();
     fs::write(profile.join("tunnels.json"), b"old live data").unwrap();
-    rusqlite::Connection::open(profile.join("taomni.db")).unwrap();
+    rusqlite::Connection::open(profile.join(crate::migrate::LEGACY_DB_NAME)).unwrap();
     let archive = dir.path().join("legacy.taobak");
     pack_staged_archive(
         &[StagedFile {
@@ -140,6 +140,7 @@ fn first_start_applies_legacy_restore_without_skipping_the_module_roster() {
 
     let _runtime = ProfileRuntimeLeases::acquire(&profile, StartupMode::Desktop).unwrap();
     assert!(!profile.join(RESTORE_INTENT_FILE).exists());
+    assert!(profile.join("taomni.db").is_file());
     assert_eq!(fs::read(profile.join("tunnels.json")).unwrap(), restored);
 
     let mut first = catalog(1, &[("mfa", PLATFORM), ("rdp", PLATFORM)]);

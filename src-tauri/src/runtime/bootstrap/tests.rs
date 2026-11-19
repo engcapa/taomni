@@ -187,3 +187,69 @@ fn refused_startup_leaves_the_legacy_database_at_its_original_path() {
         assert_eq!(value, "retained");
     }
 }
+
+#[test]
+fn startup_preserves_committed_records_in_legacy_database_wal() {
+    let root = tempfile::tempdir().unwrap();
+    let legacy = root.path().join("newmob.db");
+    let wal = root.path().join("newmob.db-wal");
+    let source = rusqlite::Connection::open(&legacy).unwrap();
+    source
+        .execute_batch(
+            "PRAGMA journal_mode=WAL; PRAGMA wal_autocheckpoint=0;
+             CREATE TABLE original_profile (value TEXT);
+             PRAGMA wal_checkpoint(TRUNCATE);
+             INSERT INTO original_profile VALUES ('committed to the WAL');",
+        )
+        .unwrap();
+    let original_db = std::fs::read(&legacy).unwrap();
+    let original_wal = std::fs::read(&wal).unwrap();
+    assert!(!original_wal.is_empty());
+
+    let started = bootstrap(
+        ProfilePaths::isolated(root.path()),
+        StartupMode::Headless,
+        Some(config()),
+        false,
+    )
+    .unwrap();
+    let value: String = started
+        .state
+        .core
+        .db
+        .lock()
+        .unwrap()
+        .query_row("SELECT value FROM original_profile", [], |row| row.get(0))
+        .unwrap();
+    assert_eq!(value, "committed to the WAL");
+    assert_eq!(std::fs::read(&legacy).unwrap(), original_db);
+    assert_eq!(std::fs::read(&wal).unwrap(), original_wal);
+}
+
+#[test]
+fn unreadable_legacy_wal_database_leaves_the_profile_retryable() {
+    let root = tempfile::tempdir().unwrap();
+    let legacy = root.path().join("newmob.db");
+    let wal = root.path().join("newmob.db-wal");
+    std::fs::write(&legacy, b"damaged database").unwrap();
+    std::fs::write(&wal, b"damaged WAL").unwrap();
+    let start = || {
+        bootstrap(
+            ProfilePaths::isolated(root.path()),
+            StartupMode::Headless,
+            Some(config()),
+            false,
+        )
+    };
+
+    let error = start().err().expect("Damaged data must fail startup");
+    assert!(error.contains("Could not migrate the legacy database"));
+    assert!(!root.path().join("taomni.db").exists());
+    assert_eq!(std::fs::read(&legacy).unwrap(), b"damaged database");
+    assert_eq!(std::fs::read(&wal).unwrap(), b"damaged WAL");
+
+    std::fs::remove_file(&legacy).unwrap();
+    std::fs::remove_file(&wal).unwrap();
+    rusqlite::Connection::open(&legacy).unwrap();
+    assert!(start().is_ok());
+}

@@ -19,6 +19,7 @@ SERVER_ROWS = [(name, json.dumps({"autoStart": False, "fixture": "qa-legacy-" + 
 CLIENT_ITEMS = ["rdp-vnc-sessions", "vnc-sessions", "rdp-certificate-pins"]
 PIN_ROWS = [("qa-upgrade.invalid:3389", "ab" * 32, 1)]
 MAIL_CASES = {"TC-MODULES-049", "TC-MODULES-050"}
+LEGACY_WAL_CASE = "TC-MODULES-051"
 
 
 def input_sessions(vnc):
@@ -66,7 +67,7 @@ def preview_client_snapshot():
 
 
 def setup(ctx):
-    if ctx.case_id not in {"TC-MODULES-005", "TC-MODULES-025", "TC-MODULES-026", "TC-MODULES-028", "TC-MODULES-029", "TC-MODULES-030", "TC-MODULES-031", "TC-MODULES-032", "TC-MODULES-036", "TC-MODULES-037", "TC-MODULES-040", "TC-MODULES-046", module_legacy_restore.CASE_ID, *MAIL_CASES}:
+    if ctx.case_id not in {"TC-MODULES-005", "TC-MODULES-025", "TC-MODULES-026", "TC-MODULES-028", "TC-MODULES-029", "TC-MODULES-030", "TC-MODULES-031", "TC-MODULES-032", "TC-MODULES-036", "TC-MODULES-037", "TC-MODULES-040", "TC-MODULES-046", module_legacy_restore.CASE_ID, LEGACY_WAL_CASE, *MAIL_CASES}:
         raise RuntimeError("module_upgrade requires a registered fixed-input case")
     server_profile = ctx.case_id in {"TC-MODULES-028", "TC-MODULES-029"}
     client_profile = ctx.case_id in {"TC-MODULES-030", "TC-MODULES-031"}
@@ -111,7 +112,7 @@ def setup(ctx):
         ctx.module_upgrade["expected_items"] = ["mail-accounts"]
     if ctx.case_id == module_legacy_restore.CASE_ID:
         module_legacy_restore.stage(ctx, data, rows[0])
-    if ctx.case_id == "TC-MODULES-032":
+    if ctx.case_id in {"TC-MODULES-032", LEGACY_WAL_CASE}:
         _seed_wal_input(ctx, data, rows)
     if client_profile:
         with closing(sqlite3.connect(data / "taomni.db")) as db, db:
@@ -135,6 +136,9 @@ def setup(ctx):
 def _seed_wal_input(ctx, data, rows):
     """Keep the real writer open so candidate restarts cannot hide the WAL input."""
     path = data / "taomni.db"
+    renamed_source = ctx.case_id == LEGACY_WAL_CASE
+    if renamed_source:
+        path = path.rename(data / "newmob.db")
     connection = sqlite3.connect(path)
     try:
         if connection.execute("PRAGMA journal_mode=WAL").fetchone()[0] != "wal":
@@ -148,7 +152,17 @@ def _seed_wal_input(ctx, data, rows):
         connection.commit()
         if hashlib.sha256(path.read_bytes()).hexdigest() != main_sha256:
             raise RuntimeError("Upgrade WAL fixture unexpectedly checkpointed its committed input")
-        ctx.module_upgrade.update(wal_connection=connection, wal_main_sha256=main_sha256)
+        if renamed_source:
+            wal = data / "newmob.db-wal"
+            wal_bytes = wal.read_bytes()
+            if len(wal_bytes) <= 32:
+                raise RuntimeError("The original database WAL must contain the committed change")
+            ctx.module_upgrade["legacy_wal_sources"] = {
+                path.name: main_sha256, wal.name: hashlib.sha256(wal_bytes).hexdigest(),
+            }
+        else:
+            ctx.module_upgrade["wal_main_sha256"] = main_sha256
+        ctx.module_upgrade["wal_connection"] = connection
     except BaseException:
         connection.close()
         raise
