@@ -4,7 +4,7 @@ import subprocess
 import unittest
 from unittest.mock import call, patch
 
-from modular_gate_runs import api, plan
+from modular_gate_runs import UPGRADE, api, plan
 
 
 class GitHubRunLookupTests(unittest.TestCase):
@@ -35,6 +35,14 @@ class GitHubRunLookupTests(unittest.TestCase):
                     with self.assertRaisesRegex(RuntimeError, failure):
                         api("engcapa/taomni", "some-endpoint", body=body, retry_missing=True)
                 run.assert_called_once()
+
+
+class SignedModuleSelectionTests(unittest.TestCase):
+    def test_signed_gate_runs_independently_of_release_installers(self):
+        signed = plan("signed", "macos-15", "", "")
+        self.assertEqual(len(signed), 1)
+        self.assertEqual(signed[0][1:], (UPGRADE, {"signed_mfa_only": "true"}))
+        self.assertIn(signed[0], plan("all", "macos-15", "", ""))
 
 
 class ReleasePackageSelectionTests(unittest.TestCase):

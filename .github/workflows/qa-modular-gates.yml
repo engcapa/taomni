@@ -13,7 +13,7 @@ on:
       suite:
         description: Checks to dispatch
         type: choice
-        options: [all, system, protocol, host, desktop, core, release]
+        options: [all, system, protocol, host, signed, desktop, core, release]
         default: all
       macos_runner:
         description: macOS runner for desktop QA

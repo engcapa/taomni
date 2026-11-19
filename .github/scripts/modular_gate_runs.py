@@ -11,7 +11,7 @@ from urllib.parse import quote
 
 UPGRADE = "qa-modular-upgrade.yml"
 PLATFORMS = "qa-ui-auto-platforms.yml"
-SUITES = {"all", "system", "protocol", "host", "desktop", "core", "release"}
+SUITES = {"all", "system", "protocol", "host", "signed", "desktop", "core", "release"}
 MACOS_RUNNERS = {"macos-15", "macos-15-intel", "macos-26"}
 LINUX_PACKAGE = "linux-x86_64"
 DESKTOP_PACKAGES = ("windows-x86_64", "darwin-aarch64", "darwin-x86_64")
@@ -54,6 +54,10 @@ def plan(suite, macos_runner, package_run, package_version, package_targets="all
         }))
     if suite in {"all", "host"}:
         checks.append(("G4/G6/G7/G10/G11 process and profile contracts", UPGRADE, {"host_only": "true"}))
+    if suite in {"all", "signed"}:
+        checks.append(("G7/G8/G11 signed module installation and migration", UPGRADE, {
+            "signed_mfa_only": "true",
+        }))
     if suite in {"all", "desktop"}:
         checks.append(("G2/G4/G7/G8/G11 browser and native cases", PLATFORMS, {
             "scope": "selected", "platforms": "linux,windows,macos", "modes": "browser,native",
