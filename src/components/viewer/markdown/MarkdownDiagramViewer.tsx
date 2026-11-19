@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { diagramActions, type DiagramAction, type DiagramLabel } from "./diagramActions";
-import type { DiagramSnapshot, DiagramTransform } from "./diagramModel";
+import type { MarkdownVisualSnapshot, DiagramTransform } from "./diagramModel";
 import { portableWordSvg } from "./wordSvg";
 import { useDiagramView } from "./useDiagramView";
 
 export function MarkdownDiagramViewer({ snapshot, initialAction, label, busy, notice, onAction, onClose }: {
-  snapshot: DiagramSnapshot; initialAction: DiagramAction; label: DiagramLabel; busy: boolean; notice: string;
-  onAction: (action: DiagramAction, snapshot: DiagramSnapshot, transform: DiagramTransform) => void;
+  snapshot: MarkdownVisualSnapshot; initialAction: DiagramAction; label: DiagramLabel; busy: boolean; notice: string;
+  onAction: (action: DiagramAction, snapshot: MarkdownVisualSnapshot, transform: DiagramTransform) => void;
   onClose: () => void;
 }) {
   const transform = useDiagramView(snapshot, initialAction);
@@ -18,6 +18,7 @@ export function MarkdownDiagramViewer({ snapshot, initialAction, label, busy, no
   const inlineSvg = useRef<HTMLDivElement>(null);
   useEffect(() => {
     transform.stage.current?.focus();
+    if (snapshot.kind === "image") return;
     if (snapshot.kind === "drawio") {
       inlineSvg.current?.replaceChildren(snapshot.svg.cloneNode(true));
       return;
@@ -30,6 +31,8 @@ export function MarkdownDiagramViewer({ snapshot, initialAction, label, busy, no
     return () => { disposed = true; if (resource) URL.revokeObjectURL(resource); };
   }, [snapshot, transform.stage]);
   const name = snapshot.kind === "drawio" ? "draw.io" : "Mermaid";
+  const imageLabel = snapshot.kind === "image" ? snapshot.alt : label(`${name} 图表`, `${name} diagram`);
+  const imageUrl = snapshot.kind === "image" ? snapshot.src : url;
   const viewActions = diagramActions(label, snapshot.kind).filter((entry) => entry.id !== "open");
   const action = (id: DiagramAction) => {
     if (/^(save|copy)-/.test(id)) onAction(id, snapshot, transform.view);
@@ -39,7 +42,8 @@ export function MarkdownDiagramViewer({ snapshot, initialAction, label, busy, no
   const imageStyle = { width: snapshot.width, height: snapshot.height,
     transform: `translate(-50%,-50%) translate(${view.x}px,${view.y}px) scale(${scale}) rotate(${view.rotation}deg) scale(${view.flipX ? -1 : 1},${view.flipY ? -1 : 1})` };
   return <div className="fv-md-diagram-backdrop" onPointerDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
-    <div ref={dialog} className="fv fv-md-diagram-viewer" role="dialog" aria-modal="true" aria-label={label(`${name} 图片查看器`, `${name} image viewer`)}
+    <div ref={dialog} className="fv fv-md-diagram-viewer" role="dialog" aria-modal="true"
+      aria-label={snapshot.kind === "image" ? label("图片查看器", "Image viewer") : label(`${name} 图片查看器`, `${name} image viewer`)}
       data-testid="markdown-diagram-viewer" onKeyDown={(event) => {
         if (event.key === "Escape" && !event.nativeEvent.isComposing) { event.preventDefault(); event.stopPropagation(); onClose(); return; }
         if (event.key === "Tab") {
@@ -69,8 +73,8 @@ export function MarkdownDiagramViewer({ snapshot, initialAction, label, busy, no
         aria-label={label("拖动平移，滚轮缩放；方向键平移", "Drag to pan, wheel to zoom; arrow keys to pan")}
         data-rotation={view.rotation} data-flip-x={view.flipX} data-flip-y={view.flipY} data-scale={scale} data-pan-x={view.x} data-pan-y={view.y} data-view-mode={view.mode} {...transform.pointer}>
         {error ? <div role="alert">{error}</div> : snapshot.kind === "drawio" ? <div ref={inlineSvg} className="fv-md-diagram-svg" role="img" aria-label={label("draw.io 图表", "draw.io diagram")} style={imageStyle} />
-          : url ? <img alt={label(`${name} 图表`, `${name} diagram`)} src={url} draggable={false} width={snapshot.width} height={snapshot.height}
-          onError={() => setError(label("无法显示图片，请重新打开图表", "Cannot display image; reopen the diagram"))}
+          : imageUrl ? <img alt={imageLabel} src={imageUrl} draggable={false} width={snapshot.width} height={snapshot.height}
+          onError={() => setError(label("无法显示图片，请重新打开", "Cannot display image. Reopen the viewer."))}
           style={imageStyle} /> : <span role="status">{label("正在加载…", "Loading…")}</span>}
       </div>
       <div className="fv-md-diagram-footer" role="status" data-testid="markdown-diagram-status">{notice || label("拖动平移 · 滚轮缩放 · R 旋转 · Esc 关闭", "Drag to pan · Wheel to zoom · R to rotate · Esc to close")}</div>

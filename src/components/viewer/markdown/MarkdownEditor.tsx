@@ -8,6 +8,7 @@ import type { ViewerDocument } from "../../../lib/viewer";
 import { useDocumentStore } from "../../../stores/documentStore";
 import { useFileOpenPreferences } from "../../../lib/openFile/preferences";
 import { markdownDirectory, resolveMarkdownAsset } from "../../../lib/markdownAssets";
+import { markdownImagePolicy, readFileMarkdownImage } from "../../../lib/markdownRemoteImages";
 import { openExternalUrl } from "../../../lib/sftp";
 import { openExplorer } from "../../../lib/explorer/openExplorer";
 import { codeHighlightStyle } from "../../../lib/codeViewTheme";
@@ -27,6 +28,7 @@ import type { MarkdownDocumentOwner } from "./markdownOwner";
 import { MarkdownSplit } from "./MarkdownSplit";
 import { PreviewAppearanceControl, previewThemeStyle, usePreviewTheme, type PreviewAppearance } from "./PreviewAppearance";
 import { MarkdownDiagramActions } from "./MarkdownDiagramActions";
+import { MarkdownLiveMenu } from "./MarkdownLiveMenu";
 import { MarkdownDrawioImport } from "./MarkdownDrawioImport";
 import { markdownSearchHighlights } from "./markdownSearchHighlights";
 import { useMarkdownZoom } from "./useMarkdownZoom";
@@ -49,6 +51,11 @@ export function MarkdownEditor({ document: current, onError, owner, requestedMod
   const [editing, setEditing] = useState(false);
   const [appearance, setAppearance] = useState<PreviewAppearance>("auto");
   const previewTheme = usePreviewTheme(appearance);
+  const imagePolicy = useFileOpenPreferences(markdownImagePolicy);
+  const readImage = useMemo(() => owner?.readImage ?? ((reference: string) => {
+    // Changing the policy refreshes mounted images, including cached results.
+    return readFileMarkdownImage(current.path, reference);
+  }), [current.path, imagePolicy, owner?.readImage]);
   const effectiveReadOnly = current.readOnly || current.truncated || (mode === "live" && !editing);
   const surfaceDocument = useMemo(() => ({ ...current, readOnly: effectiveReadOnly }), [current, effectiveReadOnly]);
   const [focus, setFocus] = useState(false);
@@ -80,7 +87,7 @@ export function MarkdownEditor({ document: current, onError, owner, requestedMod
     imageRange.current = { from: start, to: end, raw: view.state.doc.sliceString(start, end) };
     imageInput.current?.click();
   }, []);
-  const context = useMemo<MarkdownWidgetContext>(() => ({ docPath: current.path, readOnly: effectiveReadOnly, theme: previewTheme, readImage: owner?.readImage,
+  const context = useMemo<MarkdownWidgetContext>(() => ({ docPath: current.path, readOnly: effectiveReadOnly, theme: previewTheme, readImage,
     onChange: owner?.onChange ?? ((content) => useDocumentStore.getState().edit(current.path, content)), label,
     onError: report, replaceImage: (from, to) => chooseImage(from, to), revealImage: (reference) => {
       try {
@@ -90,7 +97,7 @@ export function MarkdownEditor({ document: current, onError, owner, requestedMod
         void openExplorer(markdownDirectory(path)).catch((error: unknown) => report(String(error)));
       } catch (error) { report(String(error)); }
     },
-  }), [current.path, effectiveReadOnly, previewTheme, owner?.readImage, owner?.onChange, owner?.revealImage, label, report, chooseImage]);
+  }), [current.path, effectiveReadOnly, previewTheme, readImage, owner?.onChange, owner?.revealImage, label, report, chooseImage]);
   const input = useMemo(() => markdownInput({ docPath: current.path, preferences: () => useFileOpenPreferences.getState(),
     onStatus: setPasteStatus, onError: report, label, saveImage: owner?.saveImage }), [current.path, label, report, owner?.saveImage]);
   const save = useCallback(() => Promise.resolve(ownerRef.current ? ownerRef.current.onSave() : useDocumentStore.getState().save(currentRef.current.path)), []);
@@ -186,11 +193,12 @@ export function MarkdownEditor({ document: current, onError, owner, requestedMod
             className={mode === "live" ? "fv-md-live-surface" : "fv-md-source-surface"} nativeSelection={mode === "live" && effectiveReadOnly} createSearchPanel={createWorkspaceSearchPanel} />
           {slash !== null && <MarkdownInsertMenu from={slash} onInsert={insert} />}
         </div>
-        {mode === "split" ? <MarkdownPreviewPane content={current.content} path={current.path} onError={report} theme={previewTheme} readImage={owner?.readImage} /> : null}
+        {mode === "split" ? <MarkdownPreviewPane content={current.content} path={current.path} onError={report} theme={previewTheme} readImage={readImage} /> : null}
       </MarkdownSplit>
       </div>
     </div>
-    <MarkdownDiagramActions key={current.key} root={root} docPath={current.path} sourceOnDisk={!owner} onError={report} />
+    <MarkdownDiagramActions key={current.key} root={root} docPath={current.path} sourceOnDisk={!owner} enabled={active !== false} onError={report} />
+    <MarkdownLiveMenu key={current.key} root={root} enabled={active !== false && mode === "live" && effectiveReadOnly} onError={report} />
     {pasteStatus && <div className="fv-md-paste-status" role="status" data-testid="markdown-paste-status">{pasteStatus}<button aria-label={label("关闭提示", "Dismiss")} onClick={() => setPasteStatus("")}>×</button></div>}
     <input ref={imageInput} type="file" accept="image/*" hidden data-testid="markdown-image-input" multiple onChange={(event) => {
       const files = Array.from(event.target.files || []);

@@ -1246,6 +1246,12 @@
 
 ## files/viewer (F-FILEOPEN-1)
 
+- `[data-testid="file-open-markdown-restrict-remote"]` — interactive — F-FILEOPEN-1.file-open-markdown-restrict-remote
+- `[data-testid="markdown-image-proxy-mode"]` — interactive — F-FILEOPEN-1.markdown-image-proxy-mode
+- `[data-testid="markdown-live-context-menu"]` — display — F-FILEOPEN-1.markdown-live-context-menu
+- `[data-testid="markdown-live-copy-selection"]` — interactive — F-FILEOPEN-1.markdown-live-copy-selection
+- `[data-testid="markdown-live-select-all"]` — interactive — F-FILEOPEN-1.markdown-live-select-all
+- `[data-testid="markdown-image-tools"]` — display — F-FILEOPEN-1.markdown-image-tools
 - `[data-testid="markdown-export-open-tao"]` — interactive [optional] — F-FILEOPEN-1.markdown-export-open-tao
 - `[data-testid="markdown-export-show-system"]` — interactive [optional] — F-FILEOPEN-1.markdown-export-show-system
 - `[data-testid="file-viewer"]` — display — F-FILEOPEN-1.file-viewer

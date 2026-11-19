@@ -15621,6 +15621,9 @@ files:
   - src/components/viewer/markdown/MarkdownDrawioImport.tsx
   - src/components/viewer/markdown/MarkdownDiagramActions.tsx
   - src/components/viewer/markdown/MarkdownDiagramViewer.tsx
+  - src/components/viewer/markdown/MarkdownLiveMenu.tsx
+  - src/lib/markdownRemoteImages.ts
+  - src-tauri/src/viewer/markdown_images.rs
   - src/components/viewer/markdown/drawioCodec.ts
   - src/components/viewer/markdown/drawioExport.ts
   - src/components/viewer/markdown/drawioImport.ts
@@ -15644,6 +15647,24 @@ files:
   - src/components/viewer/markdown/exportDocx.ts
   - src-tauri/src/viewer/mod.rs
 controls:
+  - id: file-open-markdown-restrict-remote
+    selector: '[data-testid="file-open-markdown-restrict-remote"]'
+    kind: interactive
+  - id: markdown-image-proxy-mode
+    selector: '[data-testid="markdown-image-proxy-mode"]'
+    kind: interactive
+  - id: markdown-live-context-menu
+    selector: '[data-testid="markdown-live-context-menu"]'
+    kind: display
+  - id: markdown-live-copy-selection
+    selector: '[data-testid="markdown-live-copy-selection"]'
+    kind: interactive
+  - id: markdown-live-select-all
+    selector: '[data-testid="markdown-live-select-all"]'
+    kind: interactive
+  - id: markdown-image-tools
+    selector: '[data-testid="markdown-image-tools"]'
+    kind: display
   - id: markdown-export-open-tao
     selector: '[data-testid="markdown-export-open-tao"]'
     kind: interactive
