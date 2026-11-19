@@ -90,6 +90,10 @@
 
 更新于 2026-11-19。范围见[设计 §10.1](taomni-modular-split-design.md#101-可执行任务分解)与 [ADR](../claudedocs/adr-taomni-modular-split.md)。
 
+## G1–G11 收口任务（2026-11-19）
+
+TASK-027 将 G1–G11 设为独立发布阻断门。每个门必须在匹配源码 SHA 的 GitHub runner 上产生原始 receipt，并记录 runner、构建身份、包身份和 artifact 路径。当前已有部分三端实验和契约结果，仍需补齐正式发行包、业务模块、核心-only 依赖闭包、Windows/macOS 系统信任、完整 ProfileLease/ModeLease/re-exec 矩阵。单元测试、测试签名目录和历史源码结果不能替代当前源码的门禁证据。
+
 ## 当前结论
 
 ### 升级策略调整
@@ -110,7 +114,7 @@
 - 新版 Linux Browser 23/23、Native 35/35，Windows Browser 23/23、Native 34/34，macOS 15 Intel Browser 23/23，macOS 26 ARM64 Native 36/37。三端模块用例全部通过。执行期间收取并核对了 17 个主批次分片，另核对 010/040/042 的 9 份原生观察文件与 receipt 的字节数和摘要。macOS 26 的 Browser 第二片在分配 runner 前被取消，该片的 008 已在 Intel Browser 通过。macOS 26 Native 的 `TC-FILE-OPEN-007` 复现历史保存对话框定位失败，原始失败保留。044 的修订在旧源码专项及当前 macOS 26 批次均已通过。 [三端验证 #44332329318](https://github.com/engcapa/taomni/actions/runs/44332329318) · [macOS Intel #44334829135](https://github.com/engcapa/taomni/actions/runs/44334829135) · [MFA 复验 #44308634950](https://github.com/engcapa/taomni/actions/runs/44308634950)
 - macOS 15 Intel 的 `TC-MODULES-015` 在还原成功后的第二次退出返回 SIGABRT。原始 `.ips` 对应该次退出的 PID，故障线程正在后台拉取签名目录，堆栈位于 AWS-LC 的随机数初始化。模块下载客户端改用现有 Ring provider 和同一套系统证书验证。新增 provider 单测和真实 TLS 拒绝不受信证书的用例。下载模块 29 项本地单测通过，真实 TLS 用例及崩溃场景留在 GitHub runner 复验。 [故障分片 #44334829135](https://github.com/engcapa/taomni/actions/runs/44334829135)
 - Ring 下载客户端在 Linux、Windows、macOS 的真实 TLS 和下载专项均已通过，包含不受信证书的拒绝断言。包含 Intel 第二次重启的三端应用回归继续按分片收证。 [下载专项 #44361591281](https://github.com/engcapa/taomni/actions/runs/44361591281) · [应用复验 #44361591364](https://github.com/engcapa/taomni/actions/runs/44361591364)
-- 模块独立发布准备支持以官方签名目录为基线，加入新模块或替换单个模块的版本。保留原首装清单与其他模块的资产地址，输出完整待签目录及本次新增资产列表。15 项打包工具单测通过，含签名基线篡改、序号重复、同版本覆盖和首装清单变更的拒绝。 [独立发布指引](../scripts/plugin-package/README.md#production-catalog-preparation)
+- 模块独立发布准备支持以官方签名目录为基线，加入新模块或替换单个模块的版本。保留原首装清单与其他模块的资产地址，输出完整待签目录及本次新增资产列表。独立 workflow `.github/workflows/release-modules.yml` 只上传四平台模块包、分离签名和新的 `modules.json`，不会生成核心安装包。发布工具单测覆盖签名基线篡改、序号重复、同版本覆盖和首装清单变更的拒绝。 [独立发布指引](../scripts/plugin-package/README.md#production-catalog-preparation)
 - 仅更新核心的发布现在会继承已签名目录。启用正式首装清单后，工作流从现行公开 Release 或其直接前序取得目录和签名，以内置公钥验证原始字节，再随新核心安装件发布。包地址沿用原 Release，模块版本及目录序号随原始字节保留。16 项 Rust 与 25 项发布工具单测通过，后续复验使用 GitHub 现有升级契约入口。 [发布实现](../.github/workflows/release.yml)
 
 核心仍包含旧 profile 的 MFA、Servers、SocksCap、远程桌面和本地语音等业务代码、状态与依赖。hello-plugin 和 MFA 已取得签名安装结果。已提交迁移的 MFA profile 通过签名宿主读写账户和生成验证码，原数据继续用作回退资料。主窗和分离窗已支持动态加载模块前端，MFA 的正式前端和新装 profile 仍待迁出。LanChat 功能已删除，历史 `lanchat.sqlite` 和 `lanchat.db` 保留原位。
@@ -374,6 +378,7 @@
 | TASK-023 发布验收 | 目录签名、首装名单和独立模块发布准备已验证 | 发布工具覆盖已暂存模块的签名、声明平台、描述和摘要。核心发布继承签名目录，独立发布保留原模块的资产地址。正式模块构建矩阵、系统签名、首批目录及最终两种安装集合的回归和性能仍待交付。 |
 | TASK-024 入口/profile 协同 | 核心与宿主所有权已接入，完整入口矩阵待闭合 | GUI/headless bootstrap、ModeLease、可重试退出、宿主 ProfileUseLease/PluginDataLease、正常重启/静默与 writer lease 已有进程/native 证据；所有真实业务/re-exec 入口迁出和 G11 全矩阵未完成。 |
 | TASK-025 密钥/一致快照 | A–G 基础已有契约/native 证据；H/I 迁移未完成 | [实施方案](taomni-modular-vault-services-plan.md)的 Vault 协调、宿主一致快照、离线 v2 和三态正常重启已逐批验证；macOS 15 Intel 的真实确认自动 relaunch 三态也已通过，ARM64 新轮待完成，Linux/Windows 自动接管尚未实现。这些 UI 仍使用核心 MFA；真实 MFA 宿主切换后的三态、legacy v1 alias/已安装升级与最终验收仍未完成。 |
+| TASK-027 G1–G11 全门禁收口 | 新增任务，未闭合 | G1–G11 的当前证据仍存在正式发行包、业务模块、核心依赖闭包、系统信任和完整入口矩阵缺口；必须用匹配源码的 GitHub runner receipt 逐项闭合后才能进入生产发布。 |
 
 具体编号与子任务边界仍以设计原表为准；上表合并描述不改变范围或依赖。
 
@@ -427,7 +432,7 @@ Wayland `TC-FILE-OPEN-008` 在已有 AI 路径 chip 点击处失败：失败截�
 4. **裁剪核心依赖闭包（TASK-006）**：随业务迁出，从核心 Cargo 默认 features、原生依赖、bundle/resources/helper 和前端 chunk 中实际移除相应实现。保存 cargo tree、资源与产物证据；把状态改名或放入 LegacyFeatureRuntime 不等于瘦身完成。
 5. **补齐实际业务模块生命周期（TASK-007、009–011）**：远端签名目录、三种代理、跨重启下载、后台进度、动态 tab 和缺失或禁用的占位已有用例。签名 Hello 已验证运行中更新、回滚及失败恢复。实际业务模块还需验证各自的资源释放和主窗、分离窗行为。安装、启禁、更新和回滚须无需重启核心。
 6. **交付正式首装清单和剩余业务迁移（TASK-012）**：已有旧版安装件替换与回退、签名 MFA 迁移、中断恢复及 macOS 自动重启证据。正式首批模块要逐个验证自动安装、数据提交和回退。其他模块仍由 `plugin_migration_execute` 记录待迁移状态。历史 LanChat 库原位保留。
-7. **完成生产发布验收（TASK-001/002/023）**：闭合 G1–G11、冻结真实插件契约；完成四发布目标的宿主系统签名/包签名、原子 modules 清单、模块独立更新/回滚。核心-only 与实际全插件集合分别完成受影响用例及完整 crash-regression，并归档包体积、启动、内存、帧吞吐的匹配基线与原始样本。
+7. **完成生产发布验收（TASK-001/002/023/027）**：闭合 G1–G11、冻结真实插件契约；完成四发布目标的宿主系统签名/包签名、原子 modules 清单、模块独立更新/回滚。核心-only 与实际全插件集合分别完成受影响用例及完整 crash-regression，并归档包体积、启动、内存、帧吞吐的匹配基线与原始样本。
 
 ### 2026-11-16 启用与原生观察修复批次（`911f411b2` 已提交，hosted 验证中）
 
