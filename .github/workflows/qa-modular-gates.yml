@@ -50,8 +50,12 @@ jobs:
         with:
           ref: ${{ github.workflow_sha }}
           persist-credentials: false
-          sparse-checkout: .github/scripts/modular_gate_runs.py
+          sparse-checkout: |
+            .github/scripts/modular_gate_runs.py
+            .github/scripts/test_modular_gate_runs.py
           sparse-checkout-cone-mode: false
+      - name: Check dispatch and target selections
+        run: python -m unittest discover -s .github/scripts -p test_modular_gate_runs.py
       - name: Resolve source and dispatch the existing QA workflows
         id: dispatch
         env:
