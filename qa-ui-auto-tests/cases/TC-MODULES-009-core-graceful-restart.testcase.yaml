@@ -20,7 +20,7 @@ description: Save a note through the production Notes UI, close the run-owned QA
   and registry setup recover. No kill or fixture reset is a successful shutdown. Read the actual core-owned profile generation before and after restart;
   it must remain identical without a restore. The fixture registers the owned path; asserting probes read the file after application readiness and never
   write it. Hide the saved Notes overlay before using window chrome; an open drawer may cover the Windows close button. The closed drawer remains
-  mounted to retain its content, so verify that it is hidden rather than requiring DOM removal.
+  mounted to retain its content, so verify that it is hidden rather than requiring DOM removal. The reopened desktop also rejects headless startup on its profile.
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="status-bar"]'
@@ -66,6 +66,7 @@ steps:
 - assert_core_profile_generation:
     phase: unchanged
     path: ${fixture.core_profile_state_path}
+- assert_headless_profile_blocked: null
 verification:
   review: reviewed
   requirements:
@@ -100,6 +101,8 @@ verification:
       expectation: No runtime error occurs in the restarted application.
     - step: 28
       expectation: Normal startup retains the same generation instead of invalidating contexts on every restart.
+    - step: 29
+      expectation: Headless startup reports the profile in use and opens no endpoint while the reopened desktop remains responsive.
     - step: 14
       expectation: Closing the saved Notes overlay exposes the native window close button before normal restart.
     - step: 21
@@ -115,6 +118,7 @@ verification:
     - 26
     - 27
     - 28
+    - 29
   native:
   - check: Normal exit, process ownership change, profile lock release and SQLite persistence.
     method: automated

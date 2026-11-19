@@ -5,10 +5,10 @@ import uuid
 from pathlib import Path
 from types import SimpleNamespace
 from unittest import TestCase
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 from .fixtures import core_profile_state
-from .core_profile_observation import run
+from .core_profile_observation import assert_headless_profile_blocked, run
 from .steps import StepError
 
 
@@ -84,3 +84,37 @@ class CoreProfileStateTest(TestCase):
                     with self.assertRaises((RuntimeError, ValueError)):
                         core_profile_state.read_generation(path)
                     self.assertEqual(path.read_bytes(), raw)
+
+    def test_launch_probe_uses_only_the_active_application_and_its_profile(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder).resolve()
+            case, profile = root / "case", root / "profile"
+            case.mkdir()
+            profile.mkdir()
+            generation = str(uuid.uuid4())
+            (profile / ".profile-state.json").write_text(json.dumps({
+                "formatVersion": 1, "generation": generation,
+            }), encoding="utf-8")
+            application = root / "taomni"
+            application.touch()
+            session = Mock(application=application)
+            owner = SimpleNamespace(case_id="TC-MODULES-009")
+            ctx = SimpleNamespace(session=session, fixture_context=owner, case_dir=case)
+            outcome = {"exitCode": 1, "modeLeaseError": True, "openedEndpoint": False, "ownerStillRunning": True}
+
+            def run_contender(argv, desktop_alive, *_):
+                self.assertEqual(argv, [str(application), "--headless", "--data-dir", str(profile), "--mobile-port", "0"])
+                self.assertTrue(desktop_alive())
+                return outcome
+
+            with patch("qa_ui_auto.core_profile_observation.isolated_data_root", return_value=profile) as isolated:
+                with patch("qa_ui_auto.core_profile_observation.observe_same_profile_contender", side_effect=run_contender):
+                    assert_headless_profile_blocked(ctx, None)
+                    isolated.assert_called_once_with(owner)
+                    session.wait_for_app_ready.assert_called_once_with(timeout=5)
+                    receipt = case / "desktop-mode-lease.json"
+                    self.assertEqual(json.loads(receipt.read_text())["generation"], generation)
+                    outcome["openedEndpoint"] = True
+                    with self.assertRaisesRegex(StepError, "before opening an endpoint"):
+                        assert_headless_profile_blocked(ctx, None)
+                    self.assertFalse(json.loads(receipt.read_text())["passed"])

@@ -1216,6 +1216,10 @@
           },
           "description": "Read canonical core metadata after readiness, capture once and assert the same generation after a normal native restart; never seed profile state."
         },
+        "assert_headless_profile_blocked": {
+          "type": "null",
+          "description": "Require the native desktop to reject a headless launch on its isolated profile before opening a listener."
+        },
         "native_restart_app": {
           "oneOf": [
             { "type": "null" },

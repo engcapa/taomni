@@ -46,18 +46,17 @@ class InstalledDesktopUpgradeTests(unittest.TestCase):
         argv = ["taomni", "--headless", "--data-dir", "same-profile", "--mobile-port", "0"]
         rejected = b"Headless: Close the other Taomni mode using this profile first\n"
         unexpected = b"Mobile endpoint: 127.0.0.1:43210\nPairing code (5 minutes): 123456\n"
-        owner = Mock()
-        owner.poll.return_value = None
+        owner_alive = Mock(return_value=True)
         with TemporaryDirectory() as directory:
             evidence = Path(directory)
             with patch("qa_ui_auto.legacy_process.subprocess.run") as run:
                 run.return_value = subprocess.CompletedProcess(argv, 1, rejected)
-                self.assertEqual(observe_same_profile_contender(argv, owner, evidence, "denied"), {
+                self.assertEqual(observe_same_profile_contender(argv, owner_alive, evidence, "denied"), {
                     "exitCode": 1, "modeLeaseError": True, "openedEndpoint": False, "ownerStillRunning": True,
                 })
                 self.assertEqual(run.call_args.args[0], argv)
                 run.side_effect = subprocess.TimeoutExpired(argv, 20, output=unexpected)
-                self.assertEqual(observe_same_profile_contender(argv, owner, evidence, "opened"), {
+                self.assertEqual(observe_same_profile_contender(argv, owner_alive, evidence, "opened"), {
                     "exitCode": None, "modeLeaseError": False, "openedEndpoint": True, "ownerStillRunning": True,
                 })
             log = (evidence / "opened-contender.log").read_text(encoding="utf-8")

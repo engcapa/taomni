@@ -75,8 +75,10 @@ def verify_desktop_profile_lease(ctx, candidate, work, profile, evidence, observ
         steps = open_unlocked_mfa(ctx, session, evidence)
         code = {"selector": element("mfa-account-code"), "equals": "359 152"}
         desktop_action(steps, "assert_text_equals", code)
-        contender = observe_same_profile_contender(headless_command(candidate, profile), driver.proc, evidence,
-                                                   "desktop-owns-mode-lease")
+        contender = observe_same_profile_contender(
+            headless_command(candidate, profile), lambda: driver.proc.poll() is None,
+            evidence, "desktop-owns-mode-lease",
+        )
         observation["headlessContender"] = contender
         if (contender["exitCode"] != 1 or not contender["modeLeaseError"] or contender["openedEndpoint"]
                 or not contender["ownerStillRunning"]):

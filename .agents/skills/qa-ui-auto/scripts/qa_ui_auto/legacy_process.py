@@ -18,7 +18,7 @@ def headless_command(executable: Path, data: Path) -> list[str]:
     return [str(executable), "--headless", "--data-dir", str(data), "--mobile-port", "0"]
 
 
-def observe_same_profile_contender(argv, owner, evidence, label):
+def observe_same_profile_contender(argv, owner_alive, evidence, label):
     try:
         result = subprocess.run(
             argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=20,
@@ -34,7 +34,7 @@ def observe_same_profile_contender(argv, owner, evidence, label):
         "exitCode": exit_code,
         "modeLeaseError": "Headless: Close the other Taomni mode using this profile first" in text.splitlines(),
         "openedEndpoint": "Mobile endpoint:" in text,
-        "ownerStillRunning": owner.poll() is None,
+        "ownerStillRunning": owner_alive(),
     }
 
 
@@ -74,7 +74,9 @@ def initialize_profile(
             if not record["ready"]:
                 raise RuntimeError("Legacy app did not initialize within 60 seconds")
             if verify_mode_lease:
-                contender = observe_same_profile_contender(record["argv"], process, evidence, label)
+                contender = observe_same_profile_contender(
+                    record["argv"], lambda: process.poll() is None, evidence, label,
+                )
                 record["sameProfileContender"] = contender
                 if (contender["exitCode"] != 1 or not contender["modeLeaseError"]
                         or contender["openedEndpoint"] or not contender["ownerStillRunning"]):
