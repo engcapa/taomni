@@ -273,7 +273,7 @@ jobs:
           cargo build --locked --release --manifest-path src-tauri/Cargo.toml --package taomni-rdp-probe \
             2>&1 | tee rdp-pipeline-evidence/probe-build.log
           cargo test --locked --release --manifest-path src-tauri/Cargo.toml --package taomni \
-            --lib --no-default-features --no-run --message-format=json > rdp-pipeline-evidence/harness-build.jsonl
+            --lib --no-default-features --features voice-capture --no-run --message-format=json > rdp-pipeline-evidence/harness-build.jsonl
           python - <<'PY'
           import json
           from pathlib import Path
