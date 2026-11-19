@@ -46,7 +46,7 @@ class SignedModuleSelectionTests(unittest.TestCase):
 
 
 class DesktopGateSelectionTests(unittest.TestCase):
-    def test_desktop_gate_covers_capture_permissions_and_rdp_performance(self):
+    def test_desktop_gate_covers_affected_capture_headless_rdp_and_mail_cases(self):
         (desktop,) = plan("desktop", "macos-26", "", "")
         self.assertEqual(desktop[1], PLATFORMS)
         inputs = desktop[2]
@@ -55,8 +55,10 @@ class DesktopGateSelectionTests(unittest.TestCase):
         self.assertEqual(inputs["macos_runner"], "macos-26")
         self.assertEqual(inputs["native_release"], "true")
         self.assertEqual(set(inputs["case_ids"].split(",")), {
-            "TC-MFA-106", "TC-MOBILE-021", "TC-SHOT-N10", "TC-SHOT-N15", "TC-SHOT-N19",
+            "TC-MFA-106", "TC-MOBILE-003", "TC-MOBILE-021",
+            "TC-SHOT-003", "TC-SHOT-N2", "TC-SHOT-N10", "TC-SHOT-N15", "TC-SHOT-N19",
             "TC-RDPS-NAT-01-start-connect-display", "TC-RDPS-PERF-01-performance-budget",
+            *(f"TC-MAIL-STORAGE-{number:02d}" for number in range(1, 10)),
         })
         self.assertIn(desktop, plan("all", "macos-26", "", ""))
 
