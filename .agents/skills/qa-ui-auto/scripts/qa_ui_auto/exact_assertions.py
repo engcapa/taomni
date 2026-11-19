@@ -17,7 +17,10 @@ def assert_exact(read: Callable[[str], Any], args: dict, *, items: bool) -> str:
     expression = (
         f"Array.from(document.querySelectorAll({json.dumps(selector)}), e => {value})"
     )
-    expires = time.monotonic() + float(args.get("timeout_sec", 10))
+    # Packaged WebViews can publish the tab before CodeMirror has committed its
+    # first line. Keep exact assertions retryable by default so they observe
+    # the settled editor state instead of sampling the transient empty DOM.
+    expires = time.monotonic() + float(args.get("timeout_sec", 30))
     last: Any = None
     while time.monotonic() < expires:
         last = read(expression)
