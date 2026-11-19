@@ -111,6 +111,24 @@ describe("MarkdownEditor real host lifecycle", () => {
     fireEvent.click(screen.getByTestId("markdown-export"));
     expect(screen.getByTestId("markdown-export-menu")).toBeInTheDocument();
   });
+  it("keeps the export menu above diagram actions when the shared viewer styles load last", () => {
+    const viewerStyles = document.createElement("style");
+    viewerStyles.textContent = readFileSync("src/components/viewer/viewer.css", "utf8")
+      + readFileSync("src/components/viewer/markdown/diagram.css", "utf8");
+    const diagramTools = document.createElement("div");
+    diagramTools.className = "fv fv-md-diagram-tools";
+    document.head.append(viewerStyles);
+    document.body.append(diagramTools);
+    try {
+      render(<Harness />);
+      fireEvent.click(screen.getByTestId("markdown-export"));
+      const menu = screen.getByTestId("markdown-export-menu");
+      expect(Number(getComputedStyle(menu).zIndex)).toBeGreaterThan(Number(getComputedStyle(diagramTools).zIndex));
+    } finally {
+      viewerStyles.remove();
+      diagramTools.remove();
+    }
+  });
   it("keeps one source/history across live/source/split/focus switches, with outline navigation", async () => {
     render(<Harness />);
     const dom = screen.getByTestId("markdown-editor").querySelector<HTMLElement>(".cm-editor")!;
@@ -201,7 +219,8 @@ describe("MarkdownEditor real host lifecycle", () => {
     render(<Harness />);
     expect(screen.getByTestId("markdown-live-edit")).toBeDisabled();
     const sourceTheme = document.documentElement.dataset.appTheme;
-    fireEvent.change(screen.getByTestId("markdown-preview-appearance"), { target: { value: "dark" } });
+    fireEvent.click(screen.getByTestId("markdown-preview-appearance"));
+    fireEvent.click(screen.getByRole("option", { name: "Dark" }));
     expect(document.querySelector(".fv-md-live-pane")).toHaveAttribute("data-preview-theme", "dark");
     expect(document.documentElement.dataset.appTheme).toBe(sourceTheme);
     fireEvent.click(screen.getByTestId("markdown-mode-split"));
@@ -230,7 +249,8 @@ describe("MarkdownEditor real host lifecycle", () => {
     render(<Harness />);
     fireEvent.click(screen.getByTestId("markdown-export")); fireEvent.click(screen.getByTestId("markdown-export-pdf"));
     expect(screen.getByTestId("markdown-export-settings")).toHaveTextContent("A4");
-    fireEvent.change(screen.getByLabelText("Paper"), { target: { value: "Letter" } });
+    fireEvent.click(screen.getByRole("combobox", { name: "Paper" }));
+    fireEvent.click(screen.getByRole("option", { name: "Letter" }));
     fireEvent.click(screen.getByTestId("markdown-export-confirm"));
     await waitFor(() => expect(exportMarkdown).toHaveBeenCalledWith("pdf", source, "/docs/a.md", expect.objectContaining({ paper: "Letter" })));
     expect(screen.getByTestId("markdown-export-status")).toHaveAttribute("data-export-state", "saved");

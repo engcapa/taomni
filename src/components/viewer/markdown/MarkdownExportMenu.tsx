@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import { useElementResizeFrame } from "../../../hooks/useElementResizeFrame";
+import { ThemedSelect } from "../../ThemedSelect";
 import { ChevronDown, Copy, Download, FileCode2, FileImage, FileText, FolderDown, Printer, X } from "lucide-react";
 import { useViewerLabels } from "../viewerLabels";
 import type { ViewerDocument } from "../../../lib/viewer";
@@ -120,7 +121,7 @@ function ExportSettings({ kind, filename, settings, onChange, onCancel, onConfir
 }) {
   const label = useViewerLabels();
   const root = useRef<HTMLDivElement>(null);
-  useEffect(() => { root.current?.querySelector<HTMLSelectElement>("select")?.focus(); }, []);
+  useEffect(() => { root.current?.querySelector<HTMLButtonElement>("[role=combobox]")?.focus(); }, []);
   const patch = (value: Partial<MarkdownExportSettings>) => onChange({ ...settings, ...value });
   const check = (field: "toc" | "pageNumbers" | "fileHeader" | "wrapCode" | "highlight", zh: string, en: string) => <label className="fv-md-setting-check"><input type="checkbox" data-testid={`markdown-export-${field}`} checked={settings[field]} onChange={(event) => patch({ [field]: event.target.checked })} />{label(zh, en)}</label>;
   return <div className="fv-modal-bg" onMouseDown={(event) => { if (event.target === event.currentTarget) onCancel(); }}><div ref={root} className="fv-modal fv-md-export-settings" role="dialog" aria-modal="true" aria-labelledby="fv-md-export-title" data-testid="markdown-export-settings" onKeyDown={(event) => {
@@ -133,8 +134,22 @@ function ExportSettings({ kind, filename, settings, onChange, onCancel, onConfir
   }}>
     <h3 id="fv-md-export-title">{label("导出", "Export")} {kind === "print" ? label("打印", "Print") : kind.toUpperCase()} — {filename}</h3>
     <div className="fv-md-export-fields">
-      <div className="fv-md-field"><span>{label("主题", "Theme")}</span><select className="fv-select" aria-label={label("主题", "Theme")} value={settings.theme} onChange={(event) => patch({ theme: event.target.value as "light" | "dark" })}><option value="light">{label("浅色（打印友好）", "Light (print-friendly)")}</option><option value="dark">{label("深色", "Dark")}</option></select></div>
-      <div className="fv-md-field"><span>{label("页面", "Page")}</span><select className="fv-select" aria-label={label("纸张", "Paper")} value={settings.paper} onChange={(event) => patch({ paper: event.target.value as "A4" | "Letter" })}><option>A4</option><option>Letter</option></select><select className="fv-select" aria-label={label("方向", "Orientation")} value={settings.orientation} onChange={(event) => patch({ orientation: event.target.value as "portrait" | "landscape" })}><option value="portrait">{label("纵向", "Portrait")}</option><option value="landscape">{label("横向", "Landscape")}</option></select><select className="fv-select" aria-label={label("页边距", "Margins")} value={settings.margins} onChange={(event) => patch({ margins: event.target.value as MarkdownExportSettings["margins"] })}><option value="normal">{label("页边距 常规", "Margins: normal")}</option><option value="narrow">{label("窄", "Narrow")}</option><option value="wide">{label("宽", "Wide")}</option></select></div>
+      <div className="fv-md-field"><span>{label("主题", "Theme")}</span>
+        <ThemedSelect label={label("主题", "Theme")} value={settings.theme} onChange={(theme) => patch({ theme })} options={[
+          { value: "light", label: label("浅色（打印友好）", "Light (print-friendly)") }, { value: "dark", label: label("深色", "Dark") },
+        ]} />
+      </div>
+      <div className="fv-md-field"><span>{label("页面", "Page")}</span>
+        <ThemedSelect label={label("纸张", "Paper")} value={settings.paper} onChange={(paper) => patch({ paper })} options={[
+          { value: "A4", label: "A4" }, { value: "Letter", label: "Letter" },
+        ]} />
+        <ThemedSelect label={label("方向", "Orientation")} value={settings.orientation} onChange={(orientation) => patch({ orientation })} options={[
+          { value: "portrait", label: label("纵向", "Portrait") }, { value: "landscape", label: label("横向", "Landscape") },
+        ]} />
+        <ThemedSelect label={label("页边距", "Margins")} value={settings.margins} onChange={(margins) => patch({ margins })} options={[
+          { value: "normal", label: label("页边距 常规", "Margins: normal") }, { value: "narrow", label: label("窄", "Narrow") }, { value: "wide", label: label("宽", "Wide") },
+        ]} />
+      </div>
       <div className="fv-md-field"><span>{label("包含", "Include")}</span>{check("toc", "目录", "Contents")}{check("pageNumbers", "页码", "Page numbers")}{check("fileHeader", "页眉文件名", "Filename header")}</div>
       <div className="fv-md-field"><span>{label("代码块", "Code blocks")}</span>{check("wrapCode", "保持换行", "Wrap lines")}{check("highlight", "语法高亮", "Syntax highlighting")}</div>
       <p className="fv-md-export-hint">{kind === "print" ? label("打印使用系统打印窗口。", "Printing uses the system print dialog.") : label("图片以内嵌方式导出；本地相对路径图片已解析。PDF 直接保存为文件，无需打印机。", "Images are embedded; local relative images are resolved. PDF saves directly to a file without a printer.")}</p>

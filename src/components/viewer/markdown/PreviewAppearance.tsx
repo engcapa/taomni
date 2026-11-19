@@ -1,4 +1,5 @@
 import { useEffect, useState, type CSSProperties } from "react";
+import { ThemedSelect } from "../../ThemedSelect";
 import { useViewerLabels } from "../viewerLabels";
 
 export type PreviewTheme = "light" | "dark";
@@ -34,9 +35,10 @@ export function previewThemeStyle(theme: PreviewTheme): CSSProperties & Record<`
 
 export function PreviewAppearanceControl({ value, onChange }: { value: PreviewAppearance; onChange: (value: PreviewAppearance) => void }) {
   const label = useViewerLabels();
-  return <label className="fv-md-appearance" title={label("预览外观", "Preview appearance")}>
-    <select className="fv-select" data-testid="markdown-preview-appearance" aria-label={label("预览外观", "Preview appearance")} title={label("预览外观", "Preview appearance")} value={value}
-      onChange={(event) => onChange(event.target.value as PreviewAppearance)}>
-      <option value="auto">{label("跟随应用", "Follow app")}</option><option value="light">{label("浅色", "Light")}</option><option value="dark">{label("深色", "Dark")}</option>
-    </select></label>;
+  return <ThemedSelect className="fv-md-appearance" testId="markdown-preview-appearance" label={label("预览外观", "Preview appearance")}
+    value={value} onChange={onChange} options={[
+      { value: "auto", label: label("跟随应用", "Follow app") },
+      { value: "light", label: label("浅色", "Light") },
+      { value: "dark", label: label("深色", "Dark") },
+    ]} />;
 }

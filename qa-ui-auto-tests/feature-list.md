@@ -743,6 +743,15 @@ controls:
 - id: tao-home-shell-menu
   selector: '[data-testid="tao-home-shell-menu"]'
   kind: interactive
+- id: tao-home-shell-options
+  selector: '[data-testid="tao-home-shell-options"]'
+  kind: interactive
+- id: tao-home-history-sort
+  selector: '[data-testid="tao-home-history-sort"]'
+  kind: interactive
+- id: tao-home-history-sort-options
+  selector: '[data-testid="tao-home-history-sort-options"]'
+  kind: display
 - id: tao-home-side-panel
   selector: '[data-testid="tao-home-side-panel"]'
   kind: display
@@ -787,9 +796,6 @@ controls:
   kind: interactive
 - id: tao-home-popup-web
   selector: '[role="dialog"] button:has-text("Web")'
-  kind: interactive
-- id: tao-home-popup-shell-select
-  selector: '[role="dialog"] select[aria-label="Choose shell"]'
   kind: interactive
 - id: tao-home-popup-shell-home
   selector: 'xpath=//*[@role="dialog"]//button[normalize-space(.)="Open home directory"]'
@@ -16115,6 +16121,9 @@ files:
   - src/components/viewer/markdown/MarkdownDrawioImport.tsx
   - src/components/viewer/markdown/MarkdownDiagramActions.tsx
   - src/components/viewer/markdown/MarkdownDiagramViewer.tsx
+  - src/components/viewer/markdown/MarkdownLiveMenu.tsx
+  - src/lib/markdownRemoteImages.ts
+  - src-tauri/src/viewer/markdown_images.rs
   - src/components/viewer/markdown/drawioCodec.ts
   - src/components/viewer/markdown/drawioExport.ts
   - src/components/viewer/markdown/drawioImport.ts
@@ -16137,6 +16146,30 @@ files:
   - src/components/viewer/markdown/exportDocx.ts
   - src-tauri/src/viewer/mod.rs
 controls:
+  - id: file-open-markdown-restrict-remote
+    selector: '[data-testid="file-open-markdown-restrict-remote"]'
+    kind: interactive
+  - id: markdown-image-proxy-mode
+    selector: '[data-testid="markdown-image-proxy-mode"]'
+    kind: interactive
+  - id: markdown-image-proxy-host
+    selector: '[data-testid="markdown-image-custom-proxy-panel"] input[aria-label="Proxy host"]'
+    kind: interactive
+  - id: markdown-image-proxy-port
+    selector: '[data-testid="markdown-image-custom-proxy-panel"] input[type="number"]'
+    kind: interactive
+  - id: markdown-live-context-menu
+    selector: '[data-testid="markdown-live-context-menu"]'
+    kind: display
+  - id: markdown-live-copy-selection
+    selector: '[data-testid="markdown-live-copy-selection"]'
+    kind: interactive
+  - id: markdown-live-select-all
+    selector: '[data-testid="markdown-live-select-all"]'
+    kind: interactive
+  - id: markdown-image-tools
+    selector: '[data-testid="markdown-image-tools"]'
+    kind: display
   - id: markdown-export-open-tao
     selector: '[data-testid="markdown-export-open-tao"]'
     kind: interactive
@@ -16360,6 +16393,15 @@ controls:
     kind: interactive
   - id: markdown-preview-appearance
     selector: '[data-testid="markdown-preview-appearance"]'
+    kind: interactive
+  - id: markdown-preview-appearance-options
+    selector: '[data-testid="markdown-preview-appearance-options"]'
+    kind: display
+  - id: markdown-heading-options
+    selector: '[data-testid="markdown-heading-options"]'
+    kind: display
+  - id: markdown-heading
+    selector: '[data-testid="markdown-heading"]'
     kind: interactive
   - id: markdown-table-widget
     selector: '[data-testid="markdown-table-widget"]'

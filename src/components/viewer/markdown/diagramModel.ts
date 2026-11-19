@@ -4,6 +4,8 @@ import { renderedDrawioPage } from "./drawioRender";
 
 export type DiagramKind = "mermaid" | "drawio";
 export const MARKDOWN_DIAGRAM_SELECTOR = ".fv-md-mermaid,.fv-md-drawio";
+export const MARKDOWN_IMAGE_SELECTOR = ".fv-md-image-frame > img,.fv-md-rendered-block img,.fv-md-doc img";
+export type MarkdownVisualKind = DiagramKind | "image";
 export function diagramKind(element: HTMLElement | null): DiagramKind {
   return element?.classList.contains("fv-md-drawio") ? "drawio" : "mermaid";
 }
@@ -15,6 +17,24 @@ export interface DiagramSnapshot extends DiagramDefinition {
   height: number;
   text: string;
   filename: string;
+}
+export interface ImageSnapshot {
+  kind: "image";
+  src: string;
+  alt: string;
+  width: number;
+  height: number;
+  filename: string;
+}
+export type MarkdownVisualSnapshot = DiagramSnapshot | ImageSnapshot;
+
+export function loadedMarkdownImage(element: Element | null): element is HTMLImageElement {
+  return element instanceof HTMLImageElement && element.matches(MARKDOWN_IMAGE_SELECTOR)
+    && element.complete && element.naturalWidth > 0 && /^data:image\//i.test(element.src);
+}
+
+export function snapshotMarkdownImage(image: HTMLImageElement, filename: string): ImageSnapshot {
+  return { kind: "image", src: image.src, alt: image.alt, width: image.naturalWidth, height: image.naturalHeight, filename };
 }
 const definitions = new WeakMap<HTMLElement, DiagramDefinition>();
 

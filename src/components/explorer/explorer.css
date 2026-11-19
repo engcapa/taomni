@@ -1,4 +1,5 @@
 .ex-shell {
+  color-scheme: var(--taomni-color-scheme, light);
   --ex-bg:#f8fafc; --ex-panel:#f1f5f9; --ex-card:#fff; --ex-card-b:#e2e8f0;
   --ex-accent:#1e40af; --ex-accent-s:#3b82f6; --ex-sel:#dbeafe; --ex-sel-b:#93c5fd;
   --ex-hover:rgba(15,23,42,.06); --ex-hover2:rgba(15,23,42,.11);

@@ -7,6 +7,7 @@ mod filesystem;
 mod html;
 mod html_document;
 mod html_loopback;
+pub(crate) mod markdown_images;
 mod network;
 mod network_rewrite;
 mod paths;
@@ -17,7 +18,7 @@ pub(crate) use assets::save_pasted_image;
 pub(crate) use chunks::read_text_chunk;
 pub(crate) use filesystem::{read_bytes, stat};
 pub(crate) use html::{HtmlSession, close_html, open_html, register_protocol};
-pub(crate) use network::resolve_proxy as resolve_html_proxy;
+pub(crate) use network::resolve_proxy as resolve_preview_proxy;
 pub(crate) use temporary::{
     allocate_temp, create_temp, release_temp, release_temp_token, shutdown,
 };

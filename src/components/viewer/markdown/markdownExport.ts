@@ -5,6 +5,7 @@ import { notifyClipboardWritten } from "../../../lib/clipboardOwnership";
 import { exportMarkdownFolder, saveExportBlob } from "./exportFiles";
 import { prepareMarkdownExport, type MarkdownExportKind, type MarkdownExportSettings } from "./exportModel";
 import type { MarkdownAssets } from "./markdownOwner";
+import { readFileMarkdownImage } from "../../../lib/markdownRemoteImages";
 import { DEFAULT_DRAWIO_OPTIONS, markdownDrawio, type DrawioExportDocument } from "./drawioExport";
 import { drawioLink } from "./drawioCodec";
 import { openExternalUrl } from "../../../lib/sftp";
@@ -71,11 +72,12 @@ export async function exportMarkdown(
   assets?: MarkdownAssets,
   sourceIsFile = true,
 ): Promise<MarkdownExportResult> {
+  const resourceOwner = assets ?? { readImage: (reference: string) => readFileMarkdownImage(docPath, reference) };
   if (kind === "markdown") {
-    const path = await exportMarkdownFolder(content, docPath, assets);
+    const path = await exportMarkdownFolder(content, docPath, resourceOwner);
     return path ? { status: "saved", path, openPath: `${path}/${markdownBasename(docPath)}` } : { status: "cancelled" };
   }
-  const prepared = await prepareMarkdownExport(content, docPath, settings, assets);
+  const prepared = await prepareMarkdownExport(content, docPath, settings, resourceOwner);
   const stem = markdownBasename(docPath).replace(/\.(md|markdown)$/i, "");
   if (kind.startsWith("drawio")) {
     let output: DrawioExportDocument | undefined;

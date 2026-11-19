@@ -1,4 +1,4 @@
-id: TC-FILE-OPEN-037
+id: TC-FILE-OPEN-041
 title: Live Markdown tables render inline formatting and preserve standard source through edit, history and reopen
 description: 'User regression: Live showed raw emphasis inside table cells while Split/PDF rendered it. Read-only and inactive editable cells
   render inline GFM using the shared sanitizer, math and controlled local images. Focus exposes source only for the active editable cell. Verify
@@ -218,7 +218,7 @@ steps:
 
       '
 - assert_no_runtime_errors: null
-- screenshot: TC-FILE-OPEN-037-live-table-inline.png
+- screenshot: TC-FILE-OPEN-041-live-table-inline.png
 verification:
   review: reviewed
   requirements:
