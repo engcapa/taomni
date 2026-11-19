@@ -13,6 +13,8 @@ UPGRADE = "qa-modular-upgrade.yml"
 PLATFORMS = "qa-ui-auto-platforms.yml"
 SUITES = {"all", "system", "protocol", "host", "desktop", "core", "release"}
 MACOS_RUNNERS = {"macos-15", "macos-15-intel", "macos-26"}
+LINUX_PACKAGE = "linux-x86_64"
+DESKTOP_PACKAGES = ("windows-x86_64", "darwin-aarch64", "darwin-x86_64")
 
 
 def api(repository, endpoint, *, body=None, retry_missing=False):
@@ -34,7 +36,7 @@ def api(repository, endpoint, *, body=None, retry_missing=False):
     raise RuntimeError(f"GitHub API request failed for {endpoint}: {result.stderr.strip()}")
 
 
-def plan(suite, macos_runner, package_run, package_version):
+def plan(suite, macos_runner, package_run, package_version, package_targets="all"):
     if suite not in SUITES or macos_runner not in MACOS_RUNNERS:
         raise ValueError("Choose a supported QA suite and macOS runner")
     if (package_run or package_version or suite == "release") and (
@@ -59,24 +61,34 @@ def plan(suite, macos_runner, package_run, package_version):
             "case_ids": "TC-MFA-106,TC-MOBILE-021,TC-SHOT-N15",
         }))
     if suite in {"all", "release"} and package_run:
+        supported = (LINUX_PACKAGE, *DESKTOP_PACKAGES)
+        targets = supported if package_targets == "all" else tuple(
+            target.strip() for target in package_targets.split(",")
+        )
+        if len(targets) != len(set(targets)) or any(target not in supported for target in targets):
+            raise ValueError("Select all or unique supported release package targets")
         package = {"package_run": package_run, "package_version": package_version}
         arm_runner = "macos-26" if macos_runner == "macos-26" else "macos-15"
-        checks.extend([
-            ("G1/G3/G9 release bundle inspection", UPGRADE, {
-                **package, "package_targets": "all", "package_macos_arm_runner": arm_runner,
-            }),
-            ("G4/G5/G6 installed Linux noexec, RDP and forced exit", UPGRADE, {
-                **package, "package_relocation_linux": "true", "package_rdp_perf": "true",
-            }),
-            ("G11 installed MSI/DMG upgrade and rollback", UPGRADE, {
+        if LINUX_PACKAGE in targets:
+            linux = {**package, "package_targets": LINUX_PACKAGE}
+            checks.extend([
+                ("G9 Linux release bundle inspection", UPGRADE, linux),
+                ("G4/G5/G6/G11 installed Linux recovery, RDP, forced exit and profile leases", UPGRADE, {
+                    **linux, "package_relocation_linux": "true", "package_rdp_perf": "true",
+                }),
+            ])
+        desktop = [target for target in targets if target in DESKTOP_PACKAGES]
+        if desktop:
+            checks.append(("G1/G3/G9/G11 MSI/DMG inspection, upgrade and rollback", UPGRADE, {
                 **package, "package_upgrade_desktop": "true", "package_macos_arm_runner": arm_runner,
-            }),
-        ])
+                "package_targets": ",".join(desktop),
+            }))
     return checks
 
 
-def dispatch(repository, source_ref, expected_head, suite, macos_runner, package_run, package_version):
-    checks = plan(suite, macos_runner, package_run, package_version)
+def dispatch(repository, source_ref, expected_head, suite, macos_runner, package_run, package_version,
+             package_targets="all"):
+    checks = plan(suite, macos_runner, package_run, package_version, package_targets)
     subprocess.run(["git", "check-ref-format", f"refs/heads/{source_ref}"], check=True)
     branch = api(repository, f"git/ref/heads/{quote(source_ref, safe='/')}")
     head = branch.get("object", {}).get("sha", "")
@@ -129,4 +141,5 @@ if __name__ == "__main__":
         os.environ["GITHUB_REPOSITORY"], os.environ["SOURCE_REF"], os.environ["EXPECTED_HEAD"],
         os.environ["VERIFICATION_SUITE"], os.environ["MACOS_RUNNER"],
         os.environ["PACKAGE_RUN"], os.environ["PACKAGE_VERSION"],
+        os.environ.get("PACKAGE_TARGETS") or "all",
     )

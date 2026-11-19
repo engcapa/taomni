@@ -4,7 +4,7 @@ import subprocess
 import unittest
 from unittest.mock import call, patch
 
-from modular_gate_runs import api
+from modular_gate_runs import api, plan
 
 
 class GitHubRunLookupTests(unittest.TestCase):
@@ -35,3 +35,26 @@ class GitHubRunLookupTests(unittest.TestCase):
                     with self.assertRaisesRegex(RuntimeError, failure):
                         api("engcapa/taomni", "some-endpoint", body=body, retry_missing=True)
                 run.assert_called_once()
+
+
+class ReleasePackageSelectionTests(unittest.TestCase):
+    def test_partial_desktop_selection_runs_inspection_and_upgrade_in_one_job(self):
+        checks = plan("release", "macos-26", "123", "0.5.11", "darwin-aarch64")
+        self.assertEqual(len(checks), 1)
+        self.assertEqual(checks[0][2], {
+            "package_run": "123", "package_version": "0.5.11", "package_targets": "darwin-aarch64",
+            "package_upgrade_desktop": "true", "package_macos_arm_runner": "macos-26",
+        })
+
+    def test_all_keeps_linux_inspection_and_installed_checks_and_every_desktop_target(self):
+        linux_inventory, linux_recovery, desktop = [check[2] for check in plan("release", "macos-15", "123", "0.5.11")]
+        self.assertEqual(linux_inventory["package_targets"], "linux-x86_64")
+        self.assertEqual(linux_recovery["package_targets"], "linux-x86_64")
+        self.assertEqual(linux_recovery["package_relocation_linux"], "true")
+        self.assertEqual(linux_recovery["package_rdp_perf"], "true")
+        self.assertEqual(desktop["package_targets"], "windows-x86_64,darwin-aarch64,darwin-x86_64")
+
+    def test_unknown_or_repeated_targets_fail_before_dispatch(self):
+        for targets in ("all,linux-x86_64", "windows-x86_64,windows-x86_64", "darwin-aarch64,"):
+            with self.subTest(targets=targets), self.assertRaisesRegex(ValueError, "supported release package targets"):
+                plan("release", "macos-15", "123", "0.5.11", targets)
