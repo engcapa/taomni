@@ -20,6 +20,7 @@ from qa_ui_auto.fixtures.module_legacy_mfa import (
 )
 from qa_ui_auto.fixtures.module_signed_archive import load_artifact
 from qa_ui_auto.legacy_install import linux_install
+from qa_ui_auto.legacy_process import headless_command, initialize_profile, observe_same_profile_contender
 from qa_ui_auto.legacy_release import RELEASE_VERSION, selected_asset, verify_asset
 from qa_ui_auto.native_steps import NativeStepContext
 
@@ -61,6 +62,31 @@ def close_verified_desktop(driver, session, executable):
         return {"launchedBinarySha256": digest(binary), **close_installed_desktop(driver, session, binary)}
     finally:
         session.application = launcher
+
+
+def verify_desktop_profile_lease(ctx, candidate, work, profile, evidence, observation):
+    desktop = work / "desktop"
+    environment, resolved_profile = desktop_environment(desktop)
+    if resolved_profile != profile:
+        raise RuntimeError("The installed desktop and headless process must share the same profile")
+    with installed_desktop(ctx, candidate, desktop, evidence, "desktop-owns-mode-lease") as (driver, session):
+        steps = open_unlocked_mfa(ctx, session, evidence)
+        code = {"selector": element("mfa-account-code"), "equals": "359 152"}
+        desktop_action(steps, "assert_text_equals", code)
+        contender = observe_same_profile_contender(headless_command(candidate, profile), driver.proc, evidence,
+                                                   "desktop-owns-mode-lease")
+        observation["headlessContender"] = contender
+        if (contender["exitCode"] != 1 or not contender["modeLeaseError"] or contender["openedEndpoint"]
+                or not contender["ownerStillRunning"]):
+            raise RuntimeError("A headless process was not rejected while the installed desktop owned its profile")
+        desktop_action(steps, "assert_text_equals", code)
+        desktop_action(steps, "assert_no_runtime_errors", None)
+        observation["desktopShutdown"] = close_verified_desktop(driver, session, candidate)
+    with isolated_desktop(environment):
+        observation["headlessAfterDesktopExit"] = initialize_profile(
+            candidate, profile, work, evidence, "headless-after-desktop-exit",
+        )
+    observation["passed"] = True
 
 
 def verify_crash_recovery(ctx, candidate, work, profile, evidence, receipt, observation):
@@ -225,6 +251,8 @@ def execute(args):
             if reinstalled["binarySha256"] != replacement["binarySha256"]:
                 raise RuntimeError("Candidate reinstall changed the installed executable")
             stages["reopenModule"] = inspect_accounts(ctx, candidate, work, report, "candidate-reopen", "359 152")
+            profile_lease = stages["desktopProfileLease"] = {"passed": False}
+            verify_desktop_profile_lease(ctx, candidate, work, profile, report, profile_lease)
             if args.verify_relocation:
                 stages["relocation"] = verify_relocation(ctx, candidate, work, profile, report, receipt)
                 stages["otherFormats"] = verify_other_formats(ctx, work, report, profile, args.candidate.resolve(), bundled, receipt)

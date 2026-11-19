@@ -13,7 +13,11 @@ def sanitized_output(raw):
     return re.sub(r"(?im)^.*pairing code.*$", "[ephemeral pairing code omitted]", raw)
 
 
-def _observe_same_profile_contender(argv, owner, evidence, label):
+def headless_command(executable: Path, data: Path) -> list[str]:
+    return [str(executable), "--headless", "--data-dir", str(data), "--mobile-port", "0"]
+
+
+def observe_same_profile_contender(argv, owner, evidence, label):
     try:
         result = subprocess.run(
             argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=20,
@@ -43,7 +47,7 @@ def initialize_profile(executable, data, work, evidence, label, *, verify_mode_l
     """
     log = Path(work) / (label + ".raw.log")
     record = {"schema": "taomni.qa.legacy-start.v1", "dataRoot": str(data),
-              "argv": [str(executable), "--headless", "--data-dir", str(data), "--mobile-port", "0"],
+              "argv": headless_command(executable, data),
               "ready": False, "forcedCleanup": False}
     process = None
     windows = platform.system() == "Windows"
@@ -66,7 +70,7 @@ def initialize_profile(executable, data, work, evidence, label, *, verify_mode_l
             if not record["ready"]:
                 raise RuntimeError("Legacy app did not initialize within 60 seconds")
             if verify_mode_lease:
-                contender = _observe_same_profile_contender(record["argv"], process, evidence, label)
+                contender = observe_same_profile_contender(record["argv"], process, evidence, label)
                 record["sameProfileContender"] = contender
                 if (contender["exitCode"] != 1 or not contender["modeLeaseError"]
                         or contender["openedEndpoint"] or not contender["ownerStillRunning"]):

@@ -7,7 +7,7 @@ from unittest.mock import Mock, patch
 
 from installed_desktop_upgrade import require_registration, select_candidate
 from modular_bundle_inventory import plan_targets
-from qa_ui_auto.legacy_process import _observe_same_profile_contender
+from qa_ui_auto.legacy_process import observe_same_profile_contender
 
 
 class InstalledDesktopUpgradeTests(unittest.TestCase):
@@ -52,12 +52,12 @@ class InstalledDesktopUpgradeTests(unittest.TestCase):
             evidence = Path(directory)
             with patch("qa_ui_auto.legacy_process.subprocess.run") as run:
                 run.return_value = subprocess.CompletedProcess(argv, 1, rejected)
-                self.assertEqual(_observe_same_profile_contender(argv, owner, evidence, "denied"), {
+                self.assertEqual(observe_same_profile_contender(argv, owner, evidence, "denied"), {
                     "exitCode": 1, "modeLeaseError": True, "openedEndpoint": False, "ownerStillRunning": True,
                 })
                 self.assertEqual(run.call_args.args[0], argv)
                 run.side_effect = subprocess.TimeoutExpired(argv, 20, output=unexpected)
-                self.assertEqual(_observe_same_profile_contender(argv, owner, evidence, "opened"), {
+                self.assertEqual(observe_same_profile_contender(argv, owner, evidence, "opened"), {
                     "exitCode": None, "modeLeaseError": False, "openedEndpoint": True, "ownerStillRunning": True,
                 })
             log = (evidence / "opened-contender.log").read_text(encoding="utf-8")
