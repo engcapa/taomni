@@ -131,7 +131,8 @@ async fn run_server(
     let (address_tx, address_rx) = oneshot::channel();
     server
         .event_sender()
-        .send(ServerEvent::GetLocalAddr(address_tx))?;
+        .send(ServerEvent::GetLocalAddr(address_tx))
+        .map_err(|_| anyhow::anyhow!("RDP server event channel closed"))?;
     let listening = async {
         let address = address_rx.await?.context("RDP listener has no address")?;
         publish(

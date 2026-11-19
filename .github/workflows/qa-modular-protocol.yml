@@ -304,12 +304,13 @@ jobs:
           import json
           from pathlib import Path
           evidence = Path("rdp-pipeline-evidence")
-          harnesses = [
-              item["executable"] for line in (evidence / "harness-build.jsonl").read_text().splitlines()
-              if (item := json.loads(line)).get("reason") == "compiler-artifact"
-              and item["target"]["name"] == "taomni_lib" and item["profile"]["test"]
-              and item["executable"]
-          ]
+          with (evidence / "harness-build.jsonl").open(encoding="utf-8") as build:
+              harnesses = [
+                  item["executable"] for line in build
+                  if (item := json.loads(line)).get("reason") == "compiler-artifact"
+                  and item["target"]["name"] == "taomni_lib" and item["profile"]["test"]
+                  and item["executable"]
+              ]
           assert len(harnesses) == 1, harnesses
           (evidence / "harness-path.txt").write_text(harnesses[0] + "\n", encoding="utf-8", newline="\n")
           PY
