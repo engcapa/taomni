@@ -2031,7 +2031,6 @@
 - `select[aria-label="Terminal shell"]` — interactive [optional] — F1.6.shell-select
 - `[data-testid="welcome-open-home-folder"]` — interactive [optional] — F1.6.open-home-folder
 - `button[aria-label="Open as administrator"]` — interactive [optional] — F1.6.open-as-administrator
-- `text="New session…"` — display — F1.6.new-session-card
 - `[data-testid="welcome-panel"] [data-testid="tao-home-new-session"]` — interactive — F1.6.new-session-card-testid
 - `[data-testid="welcome-recent-sessions"]` — display — F1.6.recent-sessions-panel
 - `[data-testid="welcome-recent-filter"]` — interactive — F1.6.recent-filter
@@ -2069,9 +2068,6 @@
 - `[data-testid="welcome-restore-retry"]` — interactive [optional] — F1.6.restore-retry
 - `[data-testid="welcome-restore-cancel"]` — interactive [optional] — F1.6.restore-cancel
 - `[data-testid="welcome-restore-clear"]` — interactive [optional] — F1.6.restore-clear
-- `text="Tips"` — display — F1.6.tips-section
-- `[data-testid="welcome-version"]` — display — F1.6.version-header
-- `[data-testid="welcome-version-footer"]` — display — F1.6.version-footer
 
 ## main/window (F1.3)
 

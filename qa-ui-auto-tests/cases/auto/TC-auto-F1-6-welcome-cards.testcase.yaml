@@ -29,7 +29,7 @@ steps:
 - assert_not_visible: '[data-testid="welcome-panel"] >> text="Import OpenSSH config"'
 - assert_not_visible: '[data-testid="welcome-panel"] >> text="Refresh sessions"'
 - assert_visible: '[data-testid="tao-home-new-workspace"]'
-- assert_visible: '[data-testid="welcome-panel"] >> text="Try asking"'
+- assert_visible: '[data-testid="tao-home-suggestions"]'
 - click: '[data-testid="welcome-panel"] [data-testid="tao-home-new-session"]'
 - wait_for: '[data-testid="session-editor"]'
 - press: Escape
@@ -59,7 +59,7 @@ verification:
     - step: 6
       expectation: '{"assert_visible": "[data-testid=\"tao-home-new-workspace\"]"}'
     - step: 7
-      expectation: '{"assert_visible": "[data-testid=\"welcome-panel\"] >> text=\"Try asking\""}'
+      expectation: '{"assert_visible": "[data-testid=\"tao-home-suggestions\"]"}'
     - step: 9
       expectation: '{"wait_for": "[data-testid=\"session-editor\"]"}'
     - step: 11

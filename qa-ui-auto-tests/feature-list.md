@@ -1098,9 +1098,6 @@ controls:
     selector: 'button[aria-label="Open as administrator"]'
     kind: interactive
     optional: true       # only rendered when selected shell canElevate
-  - id: new-session-card
-    selector: 'text="New session…"'
-    kind: display # card heading; the action is welcome-new-session below
   - id: new-session-card-testid
     selector: '[data-testid="welcome-panel"] [data-testid="tao-home-new-session"]'
     kind: interactive
@@ -1224,15 +1221,6 @@ controls:
     selector: '[data-testid="welcome-restore-clear"]'
     kind: interactive
     optional: true       # only when a record is available/finished
-  - id: tips-section
-    selector: 'text="Tips"'
-    kind: display
-  - id: version-header
-    selector: '[data-testid="welcome-version"]'
-    kind: display
-  - id: version-footer
-    selector: '[data-testid="welcome-version-footer"]'
-    kind: display
 -->
 
 - 启动入口：开始本地终端、新建会话、导入 OpenSSH config
