@@ -1,6 +1,7 @@
 """Restart only this run's owned QA application, retaining its isolated profile."""
 from __future__ import annotations
 
+from collections.abc import Callable
 from functools import partial
 import json
 import os
@@ -275,7 +276,8 @@ def close_application_window(session, timeout: float = 15,
 
 def restart_owned_application(driver, session, *,
                               expect_exit_confirmation: ExitConfirmation | None = None,
-                              preserve_dirty_drafts: bool = False) -> dict:
+                              preserve_dirty_drafts: bool = False,
+                              before_relaunch: Callable[[], None] | None = None) -> dict:
     deadline = session.deadline
     before = session.session_id
     macos_bridge = session.transport == "macOS WKWebView bridge"
@@ -326,6 +328,9 @@ def restart_owned_application(driver, session, *,
     ports = (driver.port,) if session.transport == "macOS WKWebView bridge" else (driver.port, driver.native_port)
     observation["stage"] = "wait-for-old-ports"
     observation["driver_port_release"] = wait_for_driver_ports(driver.host, ports)
+    if before_relaunch is not None:
+        observation["stage"] = "before-relaunch"
+        before_relaunch()
     driver._restart_required = False
     observation["stage"] = "start-owner"
     driver.start()

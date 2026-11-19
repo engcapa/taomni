@@ -20,7 +20,8 @@ description: Save a note through the production Notes UI, close the run-owned QA
   and registry setup recover. No kill or fixture reset is a successful shutdown. Read the actual core-owned profile generation before and after restart;
   it must remain identical without a restore. The fixture registers the owned path; asserting probes read the file after application readiness and never
   write it. Hide the saved Notes overlay before using window chrome; an open drawer may cover the Windows close button. The closed drawer remains
-  mounted to retain its content, so verify that it is hidden rather than requiring DOM removal. The reopened desktop also rejects headless startup on its profile.
+  mounted to retain its content, so verify that it is hidden rather than requiring DOM removal. After normal desktop shutdown, an actual headless owner
+  rejects a competing desktop on the same profile. After the headless owner releases it, the restored desktop rejects a headless contender.
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="status-bar"]'
@@ -46,7 +47,8 @@ steps:
   wait_for:
     selector: '[data-testid="ai-chat-drawer"]'
     state: hidden
-- native_restart_app: null
+- native_restart_app:
+    verify_mode_lease: true
 - wait_for: '[data-testid="status-bar"]'
 - click: '[data-testid="rail-chat-button"]'
 - wait_for: '[data-testid="notes-panel"]'
@@ -67,6 +69,15 @@ steps:
     phase: unchanged
     path: ${fixture.core_profile_state_path}
 - assert_headless_profile_blocked: null
+- assert_json_file:
+    path: headless-mode-lease.json
+    expect:
+      passed: true
+      headlessOwner.ready: true
+      headlessOwner.exited: true
+      desktopContender.modeLeaseError: true
+      desktopContender.ownerStillRunning: true
+      desktopContender.openedEndpoint: false
 verification:
   review: reviewed
   requirements:
@@ -105,6 +116,8 @@ verification:
       expectation: Headless startup reports the profile in use and opens no endpoint while the reopened desktop remains responsive.
     - step: 14
       expectation: Closing the saved Notes overlay exposes the native window close button before normal restart.
+    - step: 30
+      expectation: Headless starts on the released profile, stays alive while the desktop exits with the profile-in-use error, then exits so the desktop can reopen the same data.
     - step: 21
       expectation: After proving persisted notes, closing the overlay exposes Settings without discarding data.
     results:
@@ -119,6 +132,7 @@ verification:
     - 27
     - 28
     - 29
+    - 30
   native:
   - check: Normal exit, process ownership change, profile lock release and SQLite persistence.
     method: automated

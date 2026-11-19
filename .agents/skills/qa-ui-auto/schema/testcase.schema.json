@@ -1241,6 +1241,10 @@
                 "preserve_dirty_drafts": {
                   "const": true,
                   "description": "Explicitly approve the viewer close dialog's Keep draft action before a native cold restart."
+                },
+                "verify_mode_lease": {
+                  "const": true,
+                  "description": "TC-MODULES-009 starts a headless owner between desktop sessions and checks that a competing desktop is rejected."
                 }
               }
             }

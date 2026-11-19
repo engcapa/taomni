@@ -8,7 +8,7 @@ from unittest import TestCase
 from unittest.mock import Mock, patch
 
 from .fixtures import core_profile_state
-from .core_profile_observation import assert_headless_profile_blocked, run
+from .core_profile_observation import assert_desktop_profile_blocked, assert_headless_profile_blocked, run
 from .steps import StepError
 
 
@@ -118,3 +118,44 @@ class CoreProfileStateTest(TestCase):
                     with self.assertRaisesRegex(StepError, "before opening an endpoint"):
                         assert_headless_profile_blocked(ctx, None)
                     self.assertFalse(json.loads(receipt.read_text())["passed"])
+
+    def test_running_headless_owner_requires_the_real_desktop_lease_error(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory).resolve()
+            application = root / "taomni"
+            application.touch()
+            profile = root / "com.taomni.app.qa"
+            profile.mkdir()
+            generation = str(uuid.uuid4())
+            (profile / ".profile-state.json").write_text(json.dumps({
+                "formatVersion": 1, "generation": generation,
+            }), encoding="utf-8")
+            ctx = SimpleNamespace(session=SimpleNamespace(application=application),
+                                  fixture_context=Mock(), case_dir=root)
+            owner = Mock()
+            owner.poll.return_value = None
+            result = {"exitCode": 101, "modeLeaseError": True, "ownerStillRunning": True}
+
+            def start_headless(binary, data, work, evidence, label, *, observe_ready):
+                self.assertEqual((binary, data, evidence), (application, profile, root))
+                self.assertNotEqual(work, evidence)
+                observe_ready(owner)
+                return {"ready": True, "exited": True}
+
+            def try_contender(argv, alive, evidence, label, *, desktop_env):
+                self.assertEqual(argv, [str(application)])
+                self.assertEqual(desktop_env["NEWMOB_DATA_DIR"], str(profile))
+                self.assertTrue(alive())
+                return result
+
+            prefix = "qa_ui_auto.core_profile_observation."
+            with patch(prefix + "isolated_data_root", return_value=profile), \
+                    patch(prefix + "initialize_profile", side_effect=start_headless), \
+                    patch(prefix + "observe_same_profile_contender", side_effect=try_contender):
+                assert_desktop_profile_blocked(ctx)
+                receipt = root / "headless-mode-lease.json"
+                self.assertTrue(json.loads(receipt.read_text())["passed"])
+                result["modeLeaseError"] = False
+                with self.assertRaisesRegex(StepError, "must reject the desktop"):
+                    assert_desktop_profile_blocked(ctx)
+                self.assertFalse(json.loads(receipt.read_text())["passed"])

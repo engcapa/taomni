@@ -302,6 +302,11 @@ class NativeApplicationRestartTest(unittest.TestCase):
             restart_owned_application(driver, session)
         self.assertEqual(session.execute.call_count, 2)
 
+    def test_probe_runs_between_normal_shutdown_and_starting_new_owner(self):
+        session, driver, events = self.scenario()
+        restart_owned_application(driver, session, before_relaunch=lambda: events.append("probe"))
+        self.assertEqual(events, ["window-close", "close", "stop-owner", "probe", "start-owner", "start-session"])
+
     def test_webkit_terminated_reply_after_window_close_is_expected(self):
         session, driver, _ = self.scenario()
         session.click.side_effect = WebDriverError("Session terminated without a reply")
@@ -531,6 +536,17 @@ class RestartVerbContractTest(unittest.TestCase):
         self.restart.assert_called_once_with(preserve_dirty_drafts=True)
         self.assertEqual(self.receipts()[0]["viewer_close"], viewer_close)
 
+    def test_mode_lease_option_is_limited_to_the_owned_case(self):
+        self.ctx.fixture_context = SimpleNamespace(case_id="TC-MODULES-009")
+        with patch("qa_ui_auto.core_profile_observation.assert_desktop_profile_blocked") as probe:
+            run_native_step(self.ctx, "native_restart_app", {"verify_mode_lease": True})
+            self.restart.call_args.kwargs["before_relaunch"]()
+            probe.assert_called_once_with(self.ctx)
+        self.ctx.fixture_context.case_id = "TC-OTHER"
+        with self.assertRaisesRegex(StepError, "requires TC-MODULES-009"):
+            run_native_step(self.ctx, "native_restart_app", {"verify_mode_lease": True})
+        self.restart.assert_called_once()
+
     def test_failed_restart_retains_confirm_input_and_primary_error_without_claiming_success(self):
         observed = {"title": "Exit", "message": "Unexpected open tabs", "confirm_label": "Exit"}
         self.session.application_restart_observation = {
@@ -562,7 +578,8 @@ class RestartVerbContractTest(unittest.TestCase):
                    {"expect_exit_confirmation": None}, {"expect_exit_confirmation": {}},
                    {"expect_exit_confirmation": self.expected, "preserve_dirty_drafts": False},
                    {"expect_exit_confirmation": self.expected, "force": True},
-                   {"preserve_dirty_drafts": False}, {"preserve_dirty_drafts": 1}]
+                   {"preserve_dirty_drafts": False}, {"preserve_dirty_drafts": 1},
+                   {"verify_mode_lease": False}, {"verify_mode_lease": 1}]
         for field in self.expected:
             for value in (None, 1, "", " \n\t"):
                 invalid.append({"expect_exit_confirmation": {**self.expected, field: value}})

@@ -1,10 +1,12 @@
 """Observe real bootstrap metadata after app readiness; never create it."""
 import json
+import os
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from .fixtures.backup_policy import isolated_data_root
 from .fixtures.core_profile_state import read_generation
-from .legacy_process import headless_command, observe_same_profile_contender
+from .legacy_process import headless_command, initialize_profile, observe_same_profile_contender
 from .steps import StepError
 
 
@@ -62,3 +64,36 @@ def assert_headless_profile_blocked(ctx, args):
     if not passed:
         raise StepError("The active desktop must reject headless on the same profile before opening an endpoint")
     return "headless startup exited with the profile-in-use error and the desktop is still ready"
+
+
+def assert_desktop_profile_blocked(ctx):
+    profile = isolated_data_root(ctx.fixture_context)
+    generation = read_generation(profile / ".profile-state.json")
+    application = ctx.session.application.resolve(strict=True)
+    log_dir = Path(ctx.case_dir)
+    receipt = {"application": str(application), "profile": str(profile),
+               "generation": generation, "passed": False}
+
+    def try_desktop(owner):
+        desktop_env = {**os.environ, "NEWMOB_DATA_DIR": str(profile)}
+        result = observe_same_profile_contender(
+            [str(application)], lambda: owner.poll() is None, log_dir,
+            "headless-mode-lease", desktop_env=desktop_env,
+        )
+        receipt["desktopContender"] = result
+        if (result["exitCode"] in (None, 0) or not result["modeLeaseError"]
+                or not result["ownerStillRunning"]):
+            raise StepError("The active headless process must reject the desktop on the same profile")
+
+    try:
+        with TemporaryDirectory(prefix="taomni-headless-lease-") as work:
+            receipt["headlessOwner"] = initialize_profile(
+                application, profile, Path(work), log_dir, "headless-mode-lease", observe_ready=try_desktop,
+            )
+        if read_generation(profile / ".profile-state.json") != generation:
+            raise StepError("The headless process changed the canonical profile generation")
+        receipt["passed"] = True
+    finally:
+        (log_dir / "headless-mode-lease.json").write_text(
+            json.dumps(receipt, indent=2) + "\n", encoding="utf-8",
+        )

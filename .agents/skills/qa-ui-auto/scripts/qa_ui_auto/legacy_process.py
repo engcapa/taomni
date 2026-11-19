@@ -18,21 +18,49 @@ def headless_command(executable: Path, data: Path) -> list[str]:
     return [str(executable), "--headless", "--data-dir", str(data), "--mobile-port", "0"]
 
 
-def observe_same_profile_contender(argv, owner_alive, evidence, label):
-    try:
-        result = subprocess.run(
-            argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=20,
-        )
-        exit_code, output = result.returncode, result.stdout
-    except subprocess.TimeoutExpired as error:
-        exit_code, output = None, error.stdout or b""
+def _run_desktop_contender(argv, desktop_env):
+    windows = platform.system() == "Windows"
+    with subprocess.Popen(
+        argv, env=desktop_env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT, start_new_session=not windows,
+    ) as contender:
+        try:
+            output, _ = contender.communicate(timeout=20)
+            return contender.returncode, output
+        except subprocess.TimeoutExpired:
+            if windows:
+                subprocess.run(["taskkill.exe", "/PID", str(contender.pid), "/T", "/F"],
+                               capture_output=True, timeout=15)
+            else:
+                try:
+                    os.killpg(contender.pid, signal.SIGKILL)
+                except ProcessLookupError:
+                    pass
+            output, _ = contender.communicate(timeout=10)
+            return None, output
+
+
+def observe_same_profile_contender(argv, owner_alive, evidence, label, *, desktop_env=None):
+    if desktop_env is not None:
+        exit_code, output = _run_desktop_contender(argv, desktop_env)
+    else:
+        try:
+            result = subprocess.run(
+                argv, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, timeout=20,
+            )
+            exit_code, output = result.returncode, result.stdout
+        except subprocess.TimeoutExpired as error:
+            exit_code, output = None, error.stdout or b""
     text = output.decode("utf-8", errors="replace")
     (Path(evidence) / (label + "-contender.log")).write_text(
         sanitized_output(text), encoding="utf-8",
     )
+    mode_error = "Close the other Taomni mode using this profile first"
+    denied = (mode_error in text if desktop_env is not None
+              else f"Headless: {mode_error}" in text.splitlines())
     return {
         "exitCode": exit_code,
-        "modeLeaseError": "Headless: Close the other Taomni mode using this profile first" in text.splitlines(),
+        "modeLeaseError": denied,
         "openedEndpoint": "Mobile endpoint:" in text,
         "ownerStillRunning": owner_alive(),
     }
