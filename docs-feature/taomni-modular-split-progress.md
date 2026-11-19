@@ -24,6 +24,7 @@
 - 独立 RDP probe 在 Linux、Windows、macOS ARM64 和 Intel 的 release 构建及单元均通过。已安装 Linux deb 跑完原有 RDP 性能用例，首帧 81 ms，输入到画面 p95 30.40 ms（40/40 样本），动画显示 55.38 fps，带宽 390.17 kbps，随后正常关闭。应用来自 `c660c6bb6` 的 deb，probe 来自 `1affe92cd`。 [独立 probe](https://github.com/engcapa/taomni/actions/runs/44420266270) · [已安装性能基线](https://github.com/engcapa/taomni/actions/runs/44421453756)
 - RDP 端到端基线首次构建时 GitHub hosted runner 失去连接。原生 Rust 契约通过，构建未上传运行时，四个 native 分片均未执行。已在相同提交重跑失败作业并保留原始记录。 [首次运行](https://github.com/engcapa/taomni/actions/runs/44407519124/attempts/1) · [重跑](https://github.com/engcapa/taomni/actions/runs/44407519124/attempts/2)
 - RDP 基线重跑收齐四个 Native 分片。端到端用例首帧 102 ms，输入到画面 p95 43.71 ms，动画显示 53.89 fps，带宽 385.43 kbps。真实 X11 采集后以独立进程编码的对照已派发，保留相同用例的预算。首轮派发使用短 SHA 使 checkout 失败，已改用完整 SHA 重跑。 [基线重跑](https://github.com/engcapa/taomni/actions/runs/44407519124/attempts/2) · [编码进程对照](https://github.com/engcapa/taomni/actions/runs/44424998405)
+- RDP X11 对照在修复 harness 的 voice-capture feature 选择后通过。Linux 实际采集和 IronRDP 编码分别运行在同进程与独立子进程，两条路径的 connect、latency、throughput 六个 trial 全部通过。独立编码器收到 connect 的 8,294,400 字节整帧、latency 的 44 个 bitmap/43 个 damage region、throughput 的 666 个 bitmap/664 个 damage region。 [完整 SHA 对照 #44432198468](https://github.com/engcapa/taomni/actions/runs/44432198468)
 - 旧版遗留的备份还原会在启动写入模块化 generation。已将首装来源判定移到持有 profile 锁且应用备份之前，避免将该配置误判为已模块化。Rust 回归先复现两项首装计划为空，修复后 6 项首装与升级单元通过。新增 047 在原生应用验证实际会话恢复和签名首发模块自动安装。
 
 2026-11-18 再次 fetch 并合并 `origin/main`。远程仍为 `5fabcdd32`，当前分支已包含该提交，合并无冲突。

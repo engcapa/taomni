@@ -93,6 +93,13 @@ uses a fixed desktop size for these trials. The normal packaged app still
 uses its in-process RDP path. The real module lifecycle, Wayland and the
 Windows and macOS capture paths remain separate G5 work.
 
+The first real X11 comparison passed on source 8296a705da89b8bc4098bde235805c2eddf28630.
+All six trials passed. The child encoder received one full 8,294,400-byte bitmap
+for connect, 44 bitmaps with 43 damage regions for latency, and 666 bitmaps
+with 664 damage regions for throughput. The evidence retains the exact reviewed
+case digest, release harness hash, probe hash, process IDs and transport byte
+counts. [Linux X11 comparison #44432198468](https://github.com/engcapa/taomni/actions/runs/44432198468)
+
 GitHub tested source `fd123747c26d8ad8f7f9f44211e4b7658a30fd97`. Each route
 delivered 150 of 150 measured frames for both workloads. The harness requests
 millisecond timer resolution for its Windows process, and all reports include
