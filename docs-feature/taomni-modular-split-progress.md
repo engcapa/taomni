@@ -26,6 +26,8 @@
 - RDP 基线重跑收齐四个 Native 分片。端到端用例首帧 102 ms，输入到画面 p95 43.71 ms，动画显示 53.89 fps，带宽 385.43 kbps。真实 X11 采集后以独立进程编码的对照已派发，保留相同用例的预算。首轮派发使用短 SHA 使 checkout 失败，已改用完整 SHA 重跑。 [基线重跑](https://github.com/engcapa/taomni/actions/runs/44407519124/attempts/2) · [编码进程对照](https://github.com/engcapa/taomni/actions/runs/44424998405)
 - RDP X11 对照在修复 harness 的 voice-capture feature 选择后通过。Linux 实际采集和 IronRDP 编码分别运行在同进程与独立子进程，两条路径的 connect、latency、throughput 六个 trial 全部通过。独立编码器收到 connect 的 8,294,400 字节整帧、latency 的 44 个 bitmap/43 个 damage region、throughput 的 666 个 bitmap/664 个 damage region。 [完整 SHA 对照 #44432198468](https://github.com/engcapa/taomni/actions/runs/44432198468)
 - 旧版遗留的备份还原会在启动写入模块化 generation。已将首装来源判定移到持有 profile 锁且应用备份之前，避免将该配置误判为已模块化。Rust 回归先复现两项首装计划为空，修复后 6 项首装与升级单元通过。新增 047 在原生应用验证实际会话恢复和签名首发模块自动安装。
+- Windows focused workflow [#44437405989](https://github.com/engcapa/taomni/actions/runs/44437405989) 已完成。workflow checkout 的 `headSha` 为 `7e6165496`，但该轮显式 selection 的 `head` 固定为产品提交 `5023116d3`，两者之间只有 workflow/文档改动，产品源文件一致。Windows 2025 x64 release QA runtime 的 4 个 native shard 在 summary 前全部下载，25/25 通过、0 failed、0 skipped，包含 `TC-MODULES-047` 和相关 crash-regression。047 的实际观察确认 `qa-upgrade-ssh` 在首发签名模块安装前已从 staged legacy restore 恢复，两个签名 roster 模块随后安装成功。四份 summary 的 `source_sha256`、case digest、`com.taomni.app.qa` binary 和 runner receipt 一致，live collector 退出码为 0。此前综合 run 缺少 Windows Native 分片的问题已由该 focused run 补齐。
+- 同一选集已按完整源码 SHA `7e616549688053efbe15343f2397833fdb1e3cd7` 重新派发 Windows native 复验 [#44442164724](https://github.com/engcapa/taomni/actions/runs/44442164724)，分片完成即下载。该轮用于消除上一轮 selection head 与 workflow head 的身份歧义，结果待收齐后再更新通过计数。
 
 2026-11-18 再次 fetch 并合并 `origin/main`。远程仍为 `5fabcdd32`，当前分支已包含该提交，合并无冲突。
 
