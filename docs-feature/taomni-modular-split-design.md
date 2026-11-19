@@ -992,17 +992,33 @@ TC-MODULES-027 在 GitHub 安装固定哈希的正式 deb/MSI/DMG，由旧程序
 - v1.1（2026-11-14 20:22 澄清后）：第 5 项改按客户端 / 服务端两类，RDP / VNC 拆为 4 个插件，插件总数 10→12；第 4 项确认理解正确；新增 §4.1 暂定插件（后续可能移除）。
 - v1.0（2026-11-14 18:22 决策后）：初稿；§13 全部 5 项已决策，§13.2 三处解释待确认。
 
-### 13.5 当前实现与 hosted 验证快照（2026-11-18）
+**M0 验证记录（2026-11-19）**
+
+| 验证门 | 已取得的结果 | 剩余验证 |
+|---|---|---|
+| G1 macOS 宿主启动 | macOS 15 Intel 的 ad-hoc hardened runtime 实验成功启动 Hello 和 MFA，Gatekeeper 返回 exit 3。 [实验记录](taomni-modular-split-gates-hello-plugin.md#macos-g1-experiment-and-release-boundary) | 完整发行包与下载宿主的签名身份、hardened runtime 及分发信任。 |
+| G2 macOS 系统权限 | 核心共用 `capture/`，已实现 `capture.still` 的作用域服务。 [接线记录](taomni-modular-split-gates-hello-plugin.md#capturestill-service-integration-2026-11-17-verification-pending) | 已安装应用的原生屏幕录制和辅助功能授权归属，以及升级后的复用。 |
+| G3 Windows 系统保护 | 实验从 `LOCALAPPDATA` 启动带 Internet 区域标记的 Hello 和 MFA。实测环境的 Defender 实时保护关闭。 [实验记录](taomni-modular-split-gates-hello-plugin.md#windows-g3-execution-experiment) | 正式 Authenticode 资产及启用实时保护、SmartScreen 策略的系统环境。 |
+| G4 Linux `noexec` | deb、RPM 和 AppImage 均验证宿主拒绝、用户按指引迁移 profile、原 Vault 与 MFA 连续读写。 [安装验证](taomni-modular-installed-upgrade-verification.md#linux-安装格式的-noexec-恢复) | 正式首发产物按同场景复验。 |
+| G5 帧吞吐 | 三端 loopback 连续帧测试交付全部帧，Linux X11 实采和 IronRDP 编码的两条路径通过同一组预算。 [测量记录](taomni-modular-split-gates-hello-plugin.md#g5-frame-transport-measurement) | Windows、macOS 的真实采集和独立 RDP 宿主端到端比较。 |
+| G6 强制退出 | 三端实际进程门验证宿主回收。Linux 安装 deb 后强杀应用，签名 MFA 宿主在驱动清理前退出，重开后继续原账号计数。 [Linux 安装验证](taomni-modular-installed-upgrade-verification.md#linux-已安装应用的强制退出) | Windows MSI 和 macOS DMG 安装后的强退、重开和宿主回收。 |
+| G7 无重启生命周期 | Linux、Windows、macOS Intel 的签名模块更新和回滚经过实际宿主重新握手，保留禁用偏好及原数据。 [三端结果](https://github.com/engcapa/taomni/actions/runs/44287815253) | 正式业务宿主逐个验证状态、资源释放与回滚。 |
+| G8 验签与路径 | 四种原生运行配置通过正式公钥校验的包安装和篡改拒绝。签名目录和原子发布另有下载与发布契约。 [安装用例](https://github.com/engcapa/taomni/actions/runs/43804951477) · [发布契约](https://github.com/engcapa/taomni/actions/runs/44393439596) | 正式首发目录与每个首批包的签名及拒绝用例。 |
+| G9 核心依赖闭包 | 采集、RDP 和 MFA 的共享库通过边界检查，已建立体积和依赖基线。 [基线](taomni-modular-split-baseline-20261115.md) | 业务迁出后的核心 Cargo、前端产物、bundle 资源和 helper 清单。 |
+| G10 协议与取消 | 三端各 37 项实际进程测试覆盖监督、取消、Vault 撤销、profile 作用域和快照。 [宿主结果](https://github.com/engcapa/taomni/actions/runs/44020928836) | 首批业务的完整请求、错误和资源释放验收。 |
+| G11 多进程 profile | 现有入口已统一持锁，得到宿主生命周期和实际快照、正常重启的证据。 [进程及还原证据](taomni-modular-split-progress.md) | 所有正式入口的多实例矩阵、迁出的 re-exec 与核心产物裁剪。 |
+
+### 13.5 当前实现与 hosted 验证快照（2026-11-19）
 
 插件 API/registry、验签安装、生产宿主监督、共享采集/RDP 公共库、CoreState/统一 bootstrap、作用域 Vault、profile generation 与静默快照已集成。原生下载支持三代理、后台进度、取消、续传及重启恢复；远端商店已接入并取得测试签名目录的三端 native 证据，正式目录、独立业务更新/回滚和四目标正式发布仍待完成。各批结果只保护对应源码与场景，逐 TASK/AC/G 的身份、原始结果和缺口见[实施台账](taomni-modular-split-progress.md)。
 
-TASK-025 A–G 的服务、锁、一致快照、离线 v2 和三态正常重启已逐批取得契约/native 证据。macOS 15 Intel 的真实确认自动 relaunch 三态已在历史批次通过；ARM64 部分证据和 Linux/Windows 自动接管限制见[还原入口验证](taomni-modular-restore-relaunch-verification.md)。这些 UI 仍使用核心 MFA。MFA engine、SDK 宿主/store actor/operation-scoped KeyProvider/snapshot 原型已有真实进程门、四目标签名包与三端正式安装门证据；生产 facade、真实旧库交接、动态 MFA UI、相关 G 门及独立 MFA 后的三态还原仍未完成。详见[Vault 服务方案](taomni-modular-vault-services-plan.md)；上述准备不构成 TASK-014 或 AC-016 全部验收。
+TASK-025 的 Vault 服务、锁、一致快照、离线 v2 和三态正常重启已有契约及 Native 证据。macOS 15 Intel 的真实确认自动 relaunch 已覆盖三态。旧 MFA 迁移完成后，生产入口通过签名宿主访问原账号，v2 数据归档可在另一个 profile 还原后单独安装并启用模块。动态 MFA 界面、新装 profile 的宿主入口和签名 MFA 三态完整验收按台账推进。 [还原入口验证](taomni-modular-restore-relaunch-verification.md) · [实施台账](taomni-modular-split-progress.md)
 
 主窗/独立 WebView 的动态模块 ESM、状态清理、locator 恢复与篡改拒绝已有 native 证据，具体业务前端仍待迁出。WKWebView 的跨 `tauri`/`taomni-plugin` scheme 导入问题使用应用同源保留前缀转发到相同 registry/完整性验证器解决，不放宽 CSP、CORS 或原生文件范围；契约与验证边界见[前端接入方案](taomni-modular-frontend-contract.md)。
 
-生产 `plugin_migration_execute` 仍只记录安全 pending journal。已有[真实已安装 0.5.9 输入验证](taomni-modular-installed-upgrade-verification.md)，覆盖正式 deb/MSI/DMG、旧 binary 创建数据、只读预检、重复 pending、候选正常重启及原数据保持；Windows 旧 GUI 进程强停如实记为 crash 输入。此证据不代表候选安装程序替换、生产 legacy exporter、可信数据 staging、激活/中断/回滚已交付。旧源和已删除 LanChat 的历史库保持原位，产品不读取、复制、迁移或删除历史 chat 数据；fixture 的事务原语不算真实升级完成。
+从单体版首次升级按签名首发名单自动安装当前平台兼容模块。后续按实际安装状态提供更新，目录中新增的兼容模块展示名称、说明和选装入口。已验证从 `0.5.10` 替换和回退四种目标的安装件，Linux deb 还覆盖原账号进入签名 MFA 模块。`plugin_migration_execute` 为其余业务项记录 pending journal。历史 LanChat 库留在原 profile。 [安装验证](taomni-modular-installed-upgrade-verification.md) · [更新策略](#64-更新检查)
 
-远程 main `677ec4d77` 已合并；File Explorer 可编辑类型新建与 Markdown Live 表格的合并后复验见[专项验收](file-explorer/editable-file-creation-and-live-tables.md)，包含最新 selection、源码/runner 指纹、逐 shard 结果与完整 crash-regression。G1–G11、核心业务 owner 迁出、core-only 依赖裁剪、真实升级及正式发布/性能仍待收口；TASK-015 已按用户决定取消，LanChat 不创建替代插件。原型或历史通过项不能当作全部完成。本地仅单元与静态检查，browser/native、跨进程和真实安装升级均在 GitHub runner 执行，完成 shard 即下载并核验。
+远程 main `80ec08eee` 已合并，保留 File Explorer 可编辑类型新建和 Markdown Live 表格。TASK-015 已按删除 LanChat 的决定取消。Browser、Native、跨进程和真实安装验证在 GitHub runner 执行，分片完成即下载并核对源码及结果。 [文件编辑验收](file-explorer/editable-file-creation-and-live-tables.md) · [运行台账](taomni-modular-split-progress.md)
 
 ---
 

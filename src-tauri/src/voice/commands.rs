@@ -4,8 +4,9 @@ use std::sync::{
     Arc, Mutex, OnceLock,
     atomic::{AtomicBool, Ordering},
 };
-use tauri::State;
-use tauri::{AppHandle, Emitter};
+#[cfg(feature = "voice-capture")]
+use tauri::Emitter;
+use tauri::{AppHandle, State};
 #[derive(serde::Serialize)]
 pub struct VoiceTranscriptResult {
     transcript: String,
@@ -194,6 +195,24 @@ pub async fn voice_start_stream(
     app: AppHandle,
     window: tauri::WebviewWindow,
 ) -> Result<(), String> {
+    #[cfg(feature = "voice-capture")]
+    {
+        start_realtime_stream(session_id, &state, app, window).await
+    }
+    #[cfg(not(feature = "voice-capture"))]
+    {
+        let _ = (session_id, state, app, window);
+        Err("Voice support not built".into())
+    }
+}
+
+#[cfg(feature = "voice-capture")]
+async fn start_realtime_stream(
+    session_id: String,
+    state: &AppState,
+    app: AppHandle,
+    window: tauri::WebviewWindow,
+) -> Result<(), String> {
     let generation = crate::webview_recovery::output_generation(&app, window.label());
     if !crate::webview_recovery::renderer_is_current(&app, window.label(), generation) {
         return Err("Recording owner expired".into());
@@ -226,14 +245,12 @@ pub async fn voice_start_stream(
             .as_ref()
             .ok_or("ASR_PROVIDER_MISSING: configure the selected realtime provider")?;
         let proxy = match config.proxy_mode.as_str() {
-            "app" => {
-                crate::proxy::resolve_default(&state).map_err(|e| format!("ASR_PROXY: {e}"))?
-            }
+            "app" => crate::proxy::resolve_default(state).map_err(|e| format!("ASR_PROXY: {e}"))?,
             "custom" => {
                 if let Some(custom) = &config.custom_proxy {
                     let mut custom = custom.clone();
                     custom.enabled = true;
-                    crate::proxy::resolve(&state, &custom)
+                    crate::proxy::resolve(state, &custom)
                         .map_err(|e| format!("ASR_PROXY: {e}"))?
                         .ok_or("ASR_PROXY: configure a feature proxy")
                         .map(Some)?
@@ -265,7 +282,7 @@ pub async fn voice_start_stream(
     // Validate terms before microphone acquisition; uploads remain cancellable
     // inside the session-owned backend task.
     crate::voice::vocabulary::validate(&hotwords)?;
-    voice_start_capture_inner(&session_id, &state, false).await?;
+    voice_start_capture_inner(&session_id, state, false).await?;
     if !crate::webview_recovery::renderer_is_current(&app, window.label(), generation) {
         voice_stop_capture(session_id);
         return Err("Recording owner expired".into());
@@ -373,6 +390,7 @@ pub async fn voice_start_stream(
     Ok(())
 }
 
+#[cfg(any(feature = "voice-capture", test))]
 fn parse_asr_proxy_url(value: &str) -> Result<Option<crate::proxy::ResolvedProxy>, String> {
     let url =
         url::Url::parse(value.trim()).map_err(|_| "ASR_PROXY: invalid proxy URL".to_string())?;
@@ -402,6 +420,7 @@ pub async fn voice_stop_stream(session_id: String) -> Result<(), String> {
         .ok_or("ASR_CANCELLED: recording expired")?;
     session.finishing.store(true, Ordering::SeqCst);
     let mut completed = session.completed.subscribe();
+    #[cfg(feature = "voice-capture")]
     if let Some(capture) = session.capture.lock().unwrap().take() {
         let _ = capture.stop.send(());
     }
