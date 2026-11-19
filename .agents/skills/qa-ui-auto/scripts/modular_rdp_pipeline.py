@@ -89,6 +89,17 @@ def trial_server(binary, route, directory):
             raise RuntimeError(f"RDP trial exited with status {status}, see {directory / 'server.log'}")
 
 
+@contextmanager
+def measurement_desktop(root, config, system):
+    ctx = NativeStepContext(None, root, config)
+    try:
+        if system == "Windows":
+            run_native_step(ctx, "host_helper", {"action": "start", "name": "backdrop", "mode": "backdrop"})
+        yield
+    finally:
+        ctx.restore_host_permissions()
+
+
 def measure(binary, probe, root):
     system = platform.system()
     if system not in {"Linux", "Windows", "Darwin"}:
@@ -103,7 +114,7 @@ def measure(binary, probe, root):
     config = {"app": {"rdp_probe_binary": str(probe)}}
     environment = {"QA_RDP_USER": "qa-rdp", "QA_RDP_PASSWORD": "Qa1_" + secrets.token_hex(12)}
     failures = []
-    with isolated_desktop(environment):
+    with isolated_desktop(environment), measurement_desktop(root, config, system):
         for scenario, helper, args, budget in perf_steps(case):
             for route in ROUTES:
                 directory = root / scenario / route

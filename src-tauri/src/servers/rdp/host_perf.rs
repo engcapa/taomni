@@ -7,7 +7,7 @@ use std::{
     net::{Ipv4Addr, SocketAddr},
     path::{Path, PathBuf},
     process::Stdio,
-    sync::Arc,
+    sync::{Arc, atomic::AtomicU32},
     time::Duration,
 };
 
@@ -15,8 +15,8 @@ use anyhow::{Context, ensure};
 use async_trait::async_trait;
 use bytes::Bytes;
 use ironrdp::server::{
-    Credentials, DesktopSize, DisplayUpdate, RdpServer, RdpServerDisplay, RdpServerDisplayUpdates,
-    ServerEvent,
+    Credentials, DesktopSize, DisplayUpdate, EncoderStats, RdpServer, RdpServerDisplay,
+    RdpServerDisplayUpdates, ServerEvent,
 };
 use serde::{Deserialize, Serialize};
 use taomni_plugin_stream::native_channel::{Channel, Endpoint, Offer};
@@ -78,7 +78,6 @@ async fn run_server(
     let log = LogEmitter::rdp_test_log();
     #[cfg(target_os = "macos")]
     let (display, mapping) = {
-        use std::sync::atomic::AtomicU32;
         use taomni_capture::{engine::mac::selected_display_bounds, permissions};
 
         let accessibility = permissions::control_permission_granted();
@@ -104,11 +103,16 @@ async fn run_server(
         )?;
         (display, Some(mapping))
     };
+    let encoder_stats = Arc::new(EncoderStats::default());
+    let network_rtt = Arc::new(AtomicU32::new(u32::MAX));
+    let metrics = RdpMetrics::new(log.clone())
+        .with_encoder_stats(Arc::clone(&encoder_stats))
+        .with_network_rtt(Arc::clone(&network_rtt));
     let input = RdpInput::new(
         log.clone(),
         false,
         None,
-        RdpMetrics::new(log),
+        metrics,
         #[cfg(target_os = "linux")]
         None,
         #[cfg(target_os = "macos")]
@@ -122,6 +126,8 @@ async fn run_server(
         .with_input_handler(input)
         .with_display_handler(display)
         .with_bulk_compression(true)
+        .with_encoder_stats_handle(encoder_stats)
+        .with_autodetect_rtt_handle(network_rtt)
         .build();
     server.set_credentials(Some(Credentials {
         username: "qa-rdp".into(),
@@ -267,7 +273,7 @@ impl RdpServerDisplayUpdates for RemoteUpdates {
     }
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "native desktop and RDP performance fixture executed by GitHub Actions"]
 async fn serve_desktop() -> anyhow::Result<()> {
     ensure!(!cfg!(debug_assertions), "Use a release test harness");
@@ -302,7 +308,7 @@ async fn serve_desktop() -> anyhow::Result<()> {
     }
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread")]
 #[ignore = "child of the hosted desktop and RDP performance fixture"]
 async fn encoder_process() -> anyhow::Result<()> {
     let mut line = String::new();

@@ -11,6 +11,7 @@ Modes:
   flip     black/white square that inverts on each click or key press
   animate  vertical bars scrolling at ~60 Hz (frame counter in the state file)
   photo    deterministic noisy panning gradient, with the same frame marker
+  backdrop  static desktop behind a standalone benchmark target
 """
 from __future__ import annotations
 
@@ -100,7 +101,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--geometry", default="480x320+40+80", help="WxH+X+Y in desktop pixels")
     parser.add_argument("--state", type=Path, required=True)
-    parser.add_argument("--mode", choices=["flip", "animate", "photo"], default="flip")
+    parser.add_argument("--mode", choices=["flip", "animate", "photo", "backdrop"], default="flip")
     parser.add_argument("--pattern", action="store_true", help="Known magenta/cyan markers for mstsc screenshot verification")
     parser.add_argument("--lifetime-sec", type=float, default=900.0)
     args = parser.parse_args()
@@ -121,15 +122,23 @@ def _run_target(args: argparse.Namespace, activity: str) -> int:
     root = tk.Tk()
     root.title("taomni-rdp-target")
     root.overrideredirect(True)
-    root.attributes("-topmost", True)
-    root.geometry(args.geometry)
-    width, height = (int(v) for v in args.geometry.split("+", 1)[0].split("x"))
-    canvas = tk.Canvas(root, width=width, height=height, highlightthickness=0, bg="#000000")
+    backdrop = args.mode == "backdrop"
+    geometry = args.geometry
+    if backdrop:
+        # Keep the runner console outside the encoder workload. The actual
+        # animation/latency windows remain visible above this static window.
+        geometry = f"{root.winfo_screenwidth()}x{root.winfo_screenheight()}+0+0"
+    else:
+        root.attributes("-topmost", True)
+    root.geometry(geometry)
+    width, height = (int(v) for v in geometry.split("+", 1)[0].split("x"))
+    canvas = tk.Canvas(root, width=width, height=height, highlightthickness=0,
+                       bg="#0c0c0c" if backdrop else "#000000")
     canvas.pack(fill="both", expand=True)
     state = {
         "mode": args.mode,
         "pid": os.getpid(),
-        "geometry": args.geometry,
+        "geometry": geometry,
         "flips": 0,
         "color": "#000000",
         "frames": 0,
@@ -233,7 +242,7 @@ def _run_target(args: argparse.Namespace, activity: str) -> int:
             root.after(animation_delay_ms(animation_started, time.monotonic()), step)
 
         root.after(animation_delay_ms(animation_started, time.monotonic()), step)
-    else:
+    elif args.mode == "flip":
         canvas.bind("<Button-1>", flip)
         root.bind("<Key>", flip)
         if args.pattern:
