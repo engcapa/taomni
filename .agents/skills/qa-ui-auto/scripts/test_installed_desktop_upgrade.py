@@ -1,4 +1,5 @@
 """Pure contracts for the installed-upgrade inputs and registration checks."""
+import json
 from pathlib import Path
 import subprocess
 from tempfile import TemporaryDirectory
@@ -7,6 +8,7 @@ from unittest.mock import Mock, patch
 
 from installed_desktop_upgrade import require_registration, select_candidate
 from modular_bundle_inventory import plan_targets
+from qa_ui_auto.legacy_install import windows_install
 from qa_ui_auto.legacy_process import observe_same_profile_contender
 
 
@@ -41,6 +43,30 @@ class InstalledDesktopUpgradeTests(unittest.TestCase):
                          {"windows-x86_64", "darwin-x86_64", "darwin-aarch64"})
         with self.assertRaisesRegex(ValueError, "supported package targets"):
             plan_targets("linux-x86_64", upgrade_desktop=True)
+
+    def test_windows_retries_inspection_after_timeout_with_one_msi_install(self):
+        with TemporaryDirectory() as directory:
+            destination = Path(directory)
+            executable = destination / "taomni.exe"
+            executable.touch()
+            details = b'{"productVersion":"0.5.10","signatureStatus":"NotSigned"}'
+            with patch("qa_ui_auto.legacy_install.subprocess.run", side_effect=[
+                subprocess.CompletedProcess([], 0, b"", b""),
+                subprocess.TimeoutExpired("powershell.exe", 30, stderr=b"inspection pending"),
+                subprocess.CompletedProcess([], 0, details, b""),
+            ]) as run:
+                installed, observed = windows_install(Path("legacy.msi"), destination, destination)
+            self.assertEqual(installed, executable.resolve())
+            self.assertEqual(observed["signatureStatus"], "NotSigned")
+            installer, query, retry = run.call_args_list
+            self.assertEqual(installer.args[0][:2], ["msiexec.exe", "/i"])
+            self.assertEqual(query.args[0], retry.args[0])
+            self.assertEqual(retry.kwargs["env"]["QA_LEGACY_INSTALLED_EXE"], str(installed))
+            timed_out = json.loads((destination / "installed-exe-query.command.json").read_text())
+            self.assertIsNone(timed_out["exitCode"])
+            self.assertGreater(retry.kwargs["timeout"], timed_out["timeoutSeconds"])
+            self.assertEqual((destination / "installed-exe-query.stderr.txt").read_bytes(), b"inspection pending")
+            self.assertEqual((destination / "installed-exe.json").read_bytes(), details)
 
     def test_contender_evidence_records_rejection_and_redacts_pairing_codes(self):
         argv = ["taomni", "--headless", "--data-dir", "same-profile", "--mobile-port", "0"]

@@ -10,8 +10,16 @@ import subprocess
 from .legacy_release import RELEASE_ID, RELEASE_TAG, RELEASE_VERSION, selected_asset, verify_asset
 
 
-def command(args, evidence, label, *, accepted=(0,), timeout=180):
-    result = subprocess.run(args, capture_output=True, timeout=timeout)
+def command(args, evidence, label, *, accepted=(0,), timeout=180, env=None):
+    try:
+        result = subprocess.run(args, capture_output=True, timeout=timeout, env=env)
+    except subprocess.TimeoutExpired as error:
+        (evidence / (label + ".stdout.txt")).write_bytes(error.stdout or b"")
+        (evidence / (label + ".stderr.txt")).write_bytes(error.stderr or b"")
+        (evidence / (label + ".command.json")).write_text(json.dumps({
+            "argv": [str(arg) for arg in args], "exitCode": None, "timeoutSeconds": timeout,
+        }, indent=2) + "\n", encoding="utf-8")
+        raise
     (evidence / (label + ".stdout.txt")).write_bytes(result.stdout)
     (evidence / (label + ".stderr.txt")).write_bytes(result.stderr)
     (evidence / (label + ".command.json")).write_text(json.dumps({
@@ -55,8 +63,12 @@ $exe=Get-Item -LiteralPath $env:QA_LEGACY_INSTALLED_EXE
   signatureStatus=(Get-AuthenticodeSignature -LiteralPath $exe.FullName).Status.ToString()} |
   ConvertTo-Json -Compress
 """
-    result = subprocess.run(["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script],
-                            env=env, capture_output=True, timeout=30, check=True)
+    query = ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command", script]
+    try:
+        result = command(query, evidence, "installed-exe-query", env=env, timeout=30)
+    except subprocess.TimeoutExpired:
+        # Retry the metadata query. The MSI installation has already committed.
+        result = command(query, evidence, "installed-exe-query-retry", env=env, timeout=90)
     (evidence / "installed-exe.json").write_bytes(result.stdout)
     details = json.loads(result.stdout.decode("utf-8-sig"))
     if details["productVersion"].split("+")[0] not in {version, f"{version}.0"}:
