@@ -193,6 +193,7 @@ pub fn build_file_migration_specs(
             ),
             MigrationItem::RdpVncSessions
             | MigrationItem::VncSessions
+            | MigrationItem::MailAccounts
             | MigrationItem::RdpCertificatePins
             | MigrationItem::ServerConfigs
             | MigrationItem::RdpServerConfigs

@@ -18,6 +18,7 @@ SERVER_ROWS = [(name, json.dumps({"autoStart": False, "fixture": "qa-legacy-" + 
                for name in ["http", "rdp", "vnc"]]
 CLIENT_ITEMS = ["rdp-vnc-sessions", "vnc-sessions", "rdp-certificate-pins"]
 PIN_ROWS = [("qa-upgrade.invalid:3389", "ab" * 32, 1)]
+MAIL_CASES = {"TC-MODULES-049", "TC-MODULES-050"}
 
 
 def input_sessions(vnc):
@@ -65,18 +66,21 @@ def preview_client_snapshot():
 
 
 def setup(ctx):
-    if ctx.case_id not in {"TC-MODULES-005", "TC-MODULES-025", "TC-MODULES-026", "TC-MODULES-028", "TC-MODULES-029", "TC-MODULES-030", "TC-MODULES-031", "TC-MODULES-032", "TC-MODULES-036", "TC-MODULES-037", "TC-MODULES-040", "TC-MODULES-046", module_legacy_restore.CASE_ID}:
+    if ctx.case_id not in {"TC-MODULES-005", "TC-MODULES-025", "TC-MODULES-026", "TC-MODULES-028", "TC-MODULES-029", "TC-MODULES-030", "TC-MODULES-031", "TC-MODULES-032", "TC-MODULES-036", "TC-MODULES-037", "TC-MODULES-040", "TC-MODULES-046", module_legacy_restore.CASE_ID, *MAIL_CASES}:
         raise RuntimeError("module_upgrade requires a registered fixed-input case")
     server_profile = ctx.case_id in {"TC-MODULES-028", "TC-MODULES-029"}
     client_profile = ctx.case_id in {"TC-MODULES-030", "TC-MODULES-031"}
     mfa_profile = ctx.case_id in {"TC-MODULES-036", "TC-MODULES-037"}
-    vnc = ctx.case_id not in {"TC-MODULES-005", "TC-MODULES-040", "TC-MODULES-046", module_legacy_restore.CASE_ID} and not server_profile
+    mail_profile = ctx.case_id in MAIL_CASES
+    vnc = ctx.case_id not in {"TC-MODULES-005", "TC-MODULES-040", "TC-MODULES-046", module_legacy_restore.CASE_ID} and not (server_profile or mail_profile)
     if (ctx.cfg.get("app") or {}).get("mode", "browser") == "browser":
         ctx.page.goto(ctx.cfg["app"]["base_url"])
         snapshot = preview_client_snapshot() if client_profile else preview_server_snapshot() if server_profile else preview_snapshot(vnc)
         if mfa_profile:
             snapshot = preview_snapshot(False)
             snapshot["candidates"] = [{"item": "mfa", "plugin_slug": "mfa", "evidence": ["mfa.db"]}]
+        if mail_profile:
+            snapshot["candidates"] = [{"item": "mail-accounts", "plugin_slug": "mail", "evidence": ["taomni.db"]}]
         ctx.page.evaluate("value => localStorage.setItem('" + PREVIEW_KEY + "', value)", json.dumps(snapshot))
         return
     if mfa_profile:
@@ -84,12 +88,27 @@ def setup(ctx):
         return
     data = isolated_data_root(ctx)
     rows = client_sessions() if client_profile else input_sessions(vnc)
+    if mail_profile:
+        cache = Path(ctx.case_dir).resolve() / "legacy-mail-cache"
+        cache.mkdir()
+        message = cache / "retained.eml"
+        content = b"Subject: Retained QA mail\r\n\r\nOriginal message bytes.\r\n"
+        message.write_bytes(content)
+        ctx.values.update(legacy_mail_cache_path=str(message), legacy_mail_cache_hash=hashlib.sha256(content).hexdigest())
+        for suffix, options in [("default", {}), ("custom", {"mailStorageDirectory": str(cache)})]:
+            row = ssh_session(f"qa-upgrade-mail-{suffix}", {**options, "passwordRef": "vault:qa-mail"},
+                              host="imap.example.test", port=993, auth="Password")
+            row["session_type"] = "Mail"
+            rows.append(row)
     seed_sessions(ctx, rows)
-    if vnc or server_profile:
+    retain_chat = vnc or server_profile or mail_profile
+    if retain_chat:
         for name, content in CHAT_FILES.items():
             with (data / name).open("xb") as stream:
                 stream.write(content)
     ctx.module_upgrade = {"root": data, "sessions": rows, "journal": None}
+    if mail_profile:
+        ctx.module_upgrade["expected_items"] = ["mail-accounts"]
     if ctx.case_id == module_legacy_restore.CASE_ID:
         module_legacy_restore.stage(ctx, data, rows[0])
     if ctx.case_id == "TC-MODULES-032":
@@ -107,7 +126,7 @@ def setup(ctx):
     (Path(ctx.case_dir) / "module-upgrade-input.json").write_text(json.dumps({
         "scope": "synthetic previous-version row contract; not an installed 0.5.x upgrade",
         "dataRoot": str(data), "sessionTypes": [row["session_type"] for row in rows],
-        "retainedFiles": list(CHAT_FILES) if vnc or server_profile else [],
+        "retainedFiles": list(CHAT_FILES) if retain_chat else [],
         "serverTypes": [row[0] for row in SERVER_ROWS] if server_profile else [],
         "certificatePinCount": len(PIN_ROWS) if client_profile else 0,
     }, indent=2) + "\n", encoding="utf-8")

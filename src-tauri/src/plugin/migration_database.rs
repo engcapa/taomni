@@ -50,6 +50,12 @@ fn inspect_database(
             "vnc-client",
         ),
         (
+            "sessions",
+            "SELECT EXISTS(SELECT 1 FROM sessions WHERE session_type = 'Mail')",
+            MigrationItem::MailAccounts,
+            "mail",
+        ),
+        (
             "rdp_certificate_pins",
             "SELECT EXISTS(SELECT 1 FROM rdp_certificate_pins)",
             MigrationItem::RdpCertificatePins,

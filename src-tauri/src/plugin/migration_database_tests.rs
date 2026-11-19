@@ -74,6 +74,8 @@ fn each_populated_feature_gets_its_own_candidate_in_stable_order() {
         .execute_batch(
             "INSERT INTO sessions VALUES ('rdp', 'RDP', NULL);
              INSERT INTO sessions VALUES ('vnc', 'VNC', NULL);
+             INSERT INTO sessions VALUES ('mail-a', 'Mail', 'opaque-vault-reference');
+             INSERT INTO sessions VALUES ('mail-b', 'Mail', 'second-opaque-reference');
              INSERT INTO rdp_certificate_pins VALUES ('example.test');
              INSERT INTO server_configs VALUES ('ssh', '{}');",
         )
@@ -81,11 +83,16 @@ fn each_populated_feature_gets_its_own_candidate_in_stable_order() {
     let expected = vec![
         (MigrationItem::RdpVncSessions, "rdp-client".into()),
         (MigrationItem::VncSessions, "vnc-client".into()),
+        (MigrationItem::MailAccounts, "mail".into()),
         (MigrationItem::RdpCertificatePins, "rdp-client".into()),
         (MigrationItem::ServerConfigs, "servers".into()),
     ];
     assert_eq!(owners(&connection), expected);
     assert_eq!(owners(&connection), expected);
+    let wire = serde_json::to_string(&inspect_database(&connection).unwrap().1).unwrap();
+    assert!(wire.contains("mail-accounts"));
+    assert!(!wire.contains("opaque-vault-reference"));
+    assert!(!wire.contains("second-opaque-reference"));
     assert!(
         inspect_database(&connection)
             .unwrap()

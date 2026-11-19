@@ -65,6 +65,8 @@ def observe(data, state, phase):
     if rows != expected:
         raise StepError("Upgrade preflight/pending changed the original session records")
     absent = ["rdp-client", "vnc-client", "rdp-server", "vnc-server", "servers", "lanchat"]
+    if "mail-accounts" in state.get("expected_items", []):
+        absent.append("mail")
     # The signed first-install probe has already verified the independent MFA package.
     if phase != AFTER_FIRST_INSTALL:
         absent.append("mfa")
@@ -115,7 +117,7 @@ def run(ctx, args):
     owner = getattr(ctx, "fixture_context", None) or ctx
     state = getattr(owner, "module_upgrade", None)
     case_id = getattr(owner, "case_id", None)
-    if not state or case_id not in {"TC-MODULES-025", "TC-MODULES-027", "TC-MODULES-028", "TC-MODULES-030", "TC-MODULES-032", module_legacy_restore.CASE_ID}:
+    if not state or case_id not in {"TC-MODULES-025", "TC-MODULES-027", "TC-MODULES-028", "TC-MODULES-030", "TC-MODULES-032", "TC-MODULES-049", module_legacy_restore.CASE_ID}:
         raise StepError("module_upgrade_probe requires its registered native legacy input fixture")
     if args["phase"] == AFTER_FIRST_INSTALL and case_id != "TC-MODULES-027":
         raise StepError("After-first-install verification requires the installed legacy roster case")

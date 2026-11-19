@@ -102,6 +102,7 @@ TASK-027 将 G1–G11 设为独立发布阻断门。每个门必须在匹配源�
 - Windows MSI 候选 `3f188f824` 与 macOS Intel DMG 候选 `c660c6bb6` 分别完成 0.5.10 到 0.5.11 升级、同 profile 第二个 headless 进程拒绝、退出后重开和回滚。两次执行都使用 `8ad65d483` 的测试工具，记录了候选各自的包摘要。Windows 安装包的 Authenticode 状态为 `NotSigned`。 [Windows](https://github.com/engcapa/taomni/actions/runs/44561998173) · [macOS Intel](https://github.com/engcapa/taomni/actions/runs/44558215797)
 - `3f188f824` 的三端 Browser 各通过 38 项，Windows Native 58/58。Linux `TC-MODULES-048` 修正后定向复跑 25/25。另一次 Linux 原生执行为 60/61，`TC-MODULES-039` 在旧版应用关窗后等待 WebKit 进程退出时超时。同一源码的 039 与完整崩溃回归复验已通过 25/25。 [三端 UI](https://github.com/engcapa/taomni/actions/runs/44552647653) · [048 复验](https://github.com/engcapa/taomni/actions/runs/44547518422) · [039 复验](https://github.com/engcapa/taomni/actions/runs/44566840037)
 - macOS 26.7.2 ARM64 使用 `26a6471d0` 的 DMG 通过安装升级、同 profile 进程互斥和回滚。Linux 实际安装的 `3f188f824` 也验证 GUI 占用时拒绝 headless，正常关闭后 headless 可以打开原 profile 并正常退出。 [macOS ARM64](https://github.com/engcapa/taomni/actions/runs/44562685994) · [Linux](https://github.com/engcapa/taomni/actions/runs/44569576360)
+- Linux 安装包补齐反向验证。headless 持锁期间，GUI 启动报告同一 profile 已占用。headless 正常退出后，GUI 重开并读到原 HOTP。macOS 15 的帧传输作业在 runner 分配前取消，macOS 26 的同源码复跑两种负载各交付 150/150 帧。 [Linux 双向互斥](https://github.com/engcapa/taomni/actions/runs/44576414002) · [macOS 帧传输](https://github.com/engcapa/taomni/actions/runs/44574652351)
 
 ## 当前结论
 
@@ -387,7 +388,7 @@ TASK-027 将 G1–G11 设为独立发布阻断门。每个门必须在匹配源�
 | TASK-023 发布验收 | 目录签名、首装名单和独立模块发布准备已验证 | 发布工具覆盖已暂存模块的签名、声明平台、描述和摘要。核心发布继承签名目录，独立发布保留原模块的资产地址。正式模块构建矩阵、系统签名、首批目录及最终两种安装集合的回归和性能仍待交付。 |
 | TASK-024 入口/profile 协同 | 核心与宿主所有权已接入，完整入口矩阵待闭合 | GUI/headless bootstrap、ModeLease、可重试退出、宿主 ProfileUseLease/PluginDataLease、正常重启/静默与 writer lease 已有进程/native 证据；所有真实业务/re-exec 入口迁出和 G11 全矩阵未完成。 |
 | TASK-025 密钥/一致快照 | A–G 基础已有契约/native 证据；H/I 迁移未完成 | [实施方案](taomni-modular-vault-services-plan.md)的 Vault 协调、宿主一致快照、离线 v2 和三态正常重启已逐批验证；macOS 15 Intel 的真实确认自动 relaunch 三态也已通过，ARM64 新轮待完成，Linux/Windows 自动接管尚未实现。这些 UI 仍使用核心 MFA；真实 MFA 宿主切换后的三态、legacy v1 alias/已安装升级与最终验收仍未完成。 |
-| TASK-026 Mail | 已从 `CoreState` 提取进程内状态 | IMAP 连接池、归档任务和缓存句柄由 `LegacyFeatureRuntime` 持有。核心提供保存的会话设置，Mail 继续使用既有缓存路径和文件名。复用 `TC-MAIL-SYNC-01`、`TC-MAIL-STORAGE-02`、`TC-BACKUP-MAIL-001` 等用例验证真实收信、搬迁和备份。独立宿主、前端包及旧配置迁移待交付。 |
+| TASK-026 Mail | 已提取进程内状态并接入升级预检 | IMAP 连接池、归档任务和缓存句柄由 `LegacyFeatureRuntime` 持有。核心提供保存的会话设置，Mail 继续使用既有缓存路径和文件名。旧版的多个 Mail 会话只产生一项模块建议，复用只读 SQLite 扫描及 pending journal。新用例 `TC-MODULES-049/050` 核对原会话、自定义缓存和重试。独立宿主、前端包及旧配置搬迁待交付。 |
 | TASK-027 G1–G11 全门禁收口 | 新增任务，未闭合 | G1–G11 的当前证据仍存在正式发行包、业务模块、核心依赖闭包、系统信任和完整入口矩阵缺口；必须用匹配源码的 GitHub runner receipt 逐项闭合后才能进入生产发布。 |
 
 具体编号与子任务边界仍以设计原表为准；上表合并描述不改变范围或依赖。

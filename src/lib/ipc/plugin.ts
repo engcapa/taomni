@@ -146,6 +146,7 @@ export function dismissNewMarketplaceModules(ids: readonly string[]): Promise<vo
 export type LegacyMigrationItem =
   | "rdp-vnc-sessions"
   | "vnc-sessions"
+  | "mail-accounts"
   | "rdp-certificate-pins"
   | "server-configs"
   | "rdp-server-configs"

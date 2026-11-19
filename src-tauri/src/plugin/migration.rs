@@ -51,6 +51,7 @@ pub enum MigrationItem {
     // Keep the existing journal spelling for RDP; VNC now has its own owner.
     RdpVncSessions,
     VncSessions,
+    MailAccounts,
     RdpCertificatePins,
     ServerConfigs,
     RdpServerConfigs,
@@ -385,6 +386,7 @@ fn pending_source_path(
         candidate.item,
         MigrationItem::RdpVncSessions
             | MigrationItem::VncSessions
+            | MigrationItem::MailAccounts
             | MigrationItem::RdpCertificatePins
             | MigrationItem::ServerConfigs
             | MigrationItem::RdpServerConfigs
