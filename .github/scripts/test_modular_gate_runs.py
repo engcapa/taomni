@@ -4,7 +4,7 @@ import subprocess
 import unittest
 from unittest.mock import call, patch
 
-from modular_gate_runs import UPGRADE, api, plan
+from modular_gate_runs import PLATFORMS, UPGRADE, api, plan
 
 
 class GitHubRunLookupTests(unittest.TestCase):
@@ -43,6 +43,21 @@ class SignedModuleSelectionTests(unittest.TestCase):
         self.assertEqual(len(signed), 1)
         self.assertEqual(signed[0][1:], (UPGRADE, {"signed_mfa_only": "true"}))
         self.assertIn(signed[0], plan("all", "macos-15", "", ""))
+
+
+class DesktopGateSelectionTests(unittest.TestCase):
+    def test_desktop_gate_covers_capture_results_and_both_macos_permission_errors(self):
+        (desktop,) = plan("desktop", "macos-26", "", "")
+        self.assertEqual(desktop[1], PLATFORMS)
+        inputs = desktop[2]
+        self.assertEqual(inputs["platforms"], "linux,windows,macos")
+        self.assertEqual(inputs["modes"], "browser,native")
+        self.assertEqual(inputs["macos_runner"], "macos-26")
+        self.assertEqual(inputs["native_release"], "true")
+        self.assertEqual(set(inputs["case_ids"].split(",")), {
+            "TC-MFA-106", "TC-MOBILE-021", "TC-SHOT-N10", "TC-SHOT-N15", "TC-SHOT-N19",
+        })
+        self.assertIn(desktop, plan("all", "macos-26", "", ""))
 
 
 class ReleasePackageSelectionTests(unittest.TestCase):

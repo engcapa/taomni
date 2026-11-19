@@ -62,7 +62,7 @@ def plan(suite, macos_runner, package_run, package_version, package_targets="all
         checks.append(("G2/G4/G7/G8/G11 browser and native cases", PLATFORMS, {
             "scope": "selected", "platforms": "linux,windows,macos", "modes": "browser,native",
             "macos_runner": macos_runner, "native_release": "true", "features": "F-Modules-1",
-            "case_ids": "TC-MFA-106,TC-MOBILE-021,TC-SHOT-N15",
+            "case_ids": "TC-MFA-106,TC-MOBILE-021,TC-SHOT-N10,TC-SHOT-N15,TC-SHOT-N19",
         }))
     if suite in {"all", "release"} and package_run:
         supported = (LINUX_PACKAGE, *DESKTOP_PACKAGES)
