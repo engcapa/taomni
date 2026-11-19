@@ -21,6 +21,8 @@ use crate::{
 
 #[path = "migration_execute_mfa_tests.rs"]
 mod offline;
+#[path = "migration_restore_mfa_tests.rs"]
+mod restored_mfa;
 
 const MASTER: &str = "qa legacy migration master";
 const CHILD_ROOT: &str = "TAOMNI_QA_MFA_CRASH_PROFILE";
@@ -30,6 +32,12 @@ const EXIT_DURING_ACTIVATION: i32 = 73;
 #[ignore = "the offline process, original Vault and signed module run only on GitHub"]
 fn signed_legacy_mfa_offline_maintenance_starts_without_a_journal_and_retries_safely() {
     offline::exercise_maintenance_process();
+}
+
+#[test]
+#[ignore = "a production-signed MFA process verifies the restored profile on GitHub"]
+fn signed_legacy_mfa_backup_restores_into_a_new_profile() {
+    restored_mfa::exercise_modular_restore();
 }
 
 struct Legacy {

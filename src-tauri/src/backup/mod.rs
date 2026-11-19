@@ -48,6 +48,9 @@ pub use manifest::BackupManifest;
 pub use policy::BackupPolicy;
 pub use restore::StageRestoreResult;
 
+#[cfg(all(test, feature = "qa-release-trust-gates"))]
+pub(crate) use archive_writer::pack_staged_archive_with_plugins;
+
 use std::path::PathBuf;
 use tauri::{AppHandle, Manager};
 
