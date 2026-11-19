@@ -30,6 +30,9 @@ steps:
       1}], "pinnedSessionIds": [], "activeLeftToolWindow": "project", "bottomDock": {"open": false, "activeTool": "terminal", "heightPx": 220}, "openTabs":
       [], "activeTabId": ""}, {"id": "second-workspace", "name": "Second Workspace", "description": "", "isDefault": false, "rootFolders": [], "pinnedSessionIds":
       [], "activeLeftToolWindow": "project", "bottomDock": {"open": false, "activeTool": "terminal", "heightPx": 220}, "openTabs": [], "activeTabId": ""}]}'
+- seed_storage:
+    key: taomni.fileOpen.preferences.v1
+    value: '{"associations":{"md":"workspace"}}'
 - reload_window: null
 - wait_for: '[data-testid="welcome-panel"]'
 - click: '[data-testid="nav-mode-workspaces"]'
@@ -68,27 +71,27 @@ verification:
     - 1
     - 2
     - 3
-    - 4
-    - 6
+    - 5
     - 7
     - 8
-    - 10
+    - 9
     - 11
-    - 13
+    - 12
+    - 14
     checkpoints:
-    - step: 13
-      expectation: Real kernel lock, pending atomic write and UI navigation under 1500ms; lock release publishes exact SHA-256 with no pending temp.
     - step: 14
-      expectation: Independent host SHA-256 equals the intended complete file.
+      expectation: Real kernel lock, pending atomic write and UI navigation under 1500ms; lock release publishes exact SHA-256 with no pending temp.
     - step: 15
-      expectation: Editor retains the intended text after mode transitions.
+      expectation: Independent host SHA-256 equals the intended complete file.
     - step: 16
+      expectation: Editor retains the intended text after mode transitions.
+    - step: 17
       expectation: No runtime errors.
     results:
-    - 13
     - 14
     - 15
     - 16
+    - 17
   native:
   - check: Actual Win32 reader lock and native IPC scheduling
     method: automated

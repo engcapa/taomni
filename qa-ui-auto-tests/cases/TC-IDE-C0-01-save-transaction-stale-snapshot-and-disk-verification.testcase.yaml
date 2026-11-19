@@ -70,6 +70,9 @@ steps:
 - seed_storage:
     key: taomni.recentWorkspaces.v1
     value: '[{"id":"qa-c0","name":"qa-c0","roots":[{"id":"r1","name":"qa-c0","path":"${fixture.workspace_root}","kind":"folder"}],"looseFiles":[],"lastOpenedAt":1756100000000,"isGitRepo":false}]'
+- seed_storage:
+    key: taomni.fileOpen.preferences.v1
+    value: '{"associations":{"md":"workspace"}}'
 - reload_window: null
 - click: '[data-testid="tao-home-history"]'
 - wait_for: '[data-testid="tao-home-history-popover"]'
@@ -473,267 +476,267 @@ verification:
     - 1
     - 2
     - 5
-    - 6
     - 7
-    - 10
-    - 13
-    - 15
-    - 18
-    - 20
+    - 8
+    - 11
+    - 14
+    - 16
+    - 19
     - 21
-    - 23
-    - 25
+    - 22
+    - 24
     - 26
-    - 29
-    - 31
-    - 33
+    - 27
+    - 30
+    - 32
     - 34
     - 35
-    - 37
-    - 39
-    - 41
+    - 36
+    - 38
+    - 40
     - 42
-    - 44
+    - 43
     - 45
-    - 47
-    - 49
-    - 51
+    - 46
+    - 48
+    - 50
     - 52
-    - 54
+    - 53
     - 55
     - 56
-    - 58
+    - 57
     - 59
     - 60
     - 61
     - 62
-    - 70
+    - 63
     - 71
-    - 73
-    - 77
+    - 72
+    - 74
     - 78
     - 79
     - 80
-    - 87
-    - 91
-    - 93
-    - 95
-    - 97
-    - 100
-    - 105
+    - 81
+    - 88
+    - 92
+    - 94
+    - 96
+    - 98
+    - 101
     - 106
     - 107
-    - 110
-    - 112
-    - 114
+    - 108
+    - 111
+    - 113
     - 115
-    - 123
-    - 125
+    - 116
+    - 124
     - 126
-    - 128
+    - 127
     - 129
     - 130
-    - 133
-    - 136
-    - 140
-    - 144
-    - 146
-    - 151
-    - 154
+    - 131
+    - 134
+    - 137
+    - 141
+    - 145
+    - 147
+    - 152
     - 155
     - 156
-    - 159
+    - 157
+    - 160
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 11
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
     - step: 12
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 13
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"][data-path=\"README.md\"]"}'
-    - step: 14
+    - step: 15
       expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-pane\"]"}'
-    - step: 17
+    - step: 18
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
         "data-state", "equals": "dirty"}}'
-    - step: 19
+    - step: 20
       expectation: '{"assert_file_receipt": {"path": "${fixture.workspace_root}/README.md", "selector": "[data-testid=\"code-workspace-save-observation\"]",
         "encoding": "UTF-8", "bom": false, "eol": "lf", "expected_text": "café\nmatrix", "require_history": true}}'
-    - step: 22
+    - step: 23
       expectation: '{"assert_file_receipt": {"path": "${fixture.workspace_root}/README.md", "selector": "[data-testid=\"code-workspace-save-observation\"]",
         "encoding": "UTF-8", "bom": false, "eol": "crlf", "expected_text": "café\nmatrix"}}'
-    - step: 24
+    - step: 25
       expectation: '{"wait_for": "[data-testid=\"file-encoding-dialog\"]"}'
-    - step: 27
+    - step: 28
       expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(\"data-testid\") ===
         \"file-encoding-bom\" && document.activeElement?.checked", "expect_truthy": true}}'
-    - step: 30
+    - step: 31
       expectation: '{"eval_readonly": {"expression": "document.querySelector(\"[data-testid\\x3d\\\"status-bar-message\\\"]\")?.textContent",
         "contains": "save as UTF-8 BOM"}}'
-    - step: 32
+    - step: 33
       expectation: '{"assert_file_receipt": {"path": "${fixture.workspace_root}/README.md", "selector": "[data-testid=\"code-workspace-save-observation\"]",
         "encoding": "UTF-8", "bom": true, "eol": "crlf", "expected_text": "café\nmatrix"}}'
-    - step: 36
+    - step: 37
       expectation: '{"assert_file_receipt": {"path": "${fixture.workspace_root}/README.md", "selector": "[data-testid=\"code-workspace-save-observation\"]",
         "encoding": "UTF-8", "bom": true, "eol": "lf", "expected_text": "café\nmatrix"}}'
-    - step: 38
+    - step: 39
       expectation: '{"wait_for": "[data-testid=\"file-encoding-dialog\"]"}'
-    - step: 43
+    - step: 44
       expectation: '{"assert_file_receipt": {"path": "${fixture.workspace_root}/README.md", "selector": "[data-testid=\"code-workspace-save-observation\"]",
         "encoding": "UTF-16LE", "bom": true, "eol": "lf", "expected_text": "café\nmatrix", "require_history": false}}'
-    - step: 46
+    - step: 47
       expectation: '{"assert_file_receipt": {"path": "${fixture.workspace_root}/README.md", "selector": "[data-testid=\"code-workspace-save-observation\"]",
         "encoding": "UTF-16LE", "bom": true, "eol": "crlf", "expected_text": "café\nmatrix", "require_history":
         false}}'
-    - step: 48
+    - step: 49
       expectation: '{"wait_for": "[data-testid=\"file-encoding-dialog\"]"}'
-    - step: 53
+    - step: 54
       expectation: '{"assert_file_receipt": {"path": "${fixture.workspace_root}/README.md", "selector": "[data-testid=\"code-workspace-save-observation\"]",
         "encoding": "ISO-8859-1", "bom": false, "eol": "crlf", "expected_text": "café\nmatrix"}}'
-    - step: 57
+    - step: 58
       expectation: '{"assert_file_receipt": {"path": "${fixture.workspace_root}/README.md", "selector": "[data-testid=\"code-workspace-save-observation\"]",
         "encoding": "ISO-8859-1", "bom": false, "eol": "lf", "expected_text": "café\nmatrix"}}'
-    - step: 64
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
-        "data-state", "equals": "error"}}'
     - step: 65
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
-        "data-result-kind", "equals": "failed"}}'
+        "data-state", "equals": "error"}}'
     - step: 66
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
-        "data-disk-effect", "equals": "none"}}'
+        "data-result-kind", "equals": "failed"}}'
     - step: 67
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
-        "data-dirty", "equals": "true"}}'
+        "data-disk-effect", "equals": "none"}}'
     - step: 68
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-dirty", "equals": "true"}}'
+    - step: 69
       expectation: '{"eval_readonly": {"expression": "!document.getElementById(\"code-workspace-save-observation\")?.hasAttribute(\"data-receipt-id\")",
         "expect_truthy": true}}'
-    - step: 69
+    - step: 70
       expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/README.md", "equals": "10bb077efed7a101322b31e43e39fea7fd64c6078a57f02fdd6f01a61413143c"}}'
-    - step: 72
+    - step: 73
       expectation: '{"assert_file_receipt": {"path": "${fixture.workspace_root}/README.md", "selector": "[data-testid=\"code-workspace-save-observation\"]",
         "encoding": "ISO-8859-1", "bom": false, "eol": "lf", "expected_text": "café\nmatrix!", "require_history":
         false}}'
-    - step: 75
+    - step: 76
       expectation: '{"eval_readonly": {"expression": "JSON.stringify([document.querySelectorAll(\".cm-line\")[0]?.textContent,
         document.querySelectorAll(\".cm-line\")[1]?.textContent])", "contains": "[\"café\",\"matrix\"]"}}'
-    - step: 76
+    - step: 77
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
         "data-state", "equals": "dirty"}}'
-    - step: 82
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
-        "data-state", "equals": "error"}}'
     - step: 83
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
-        "data-result-kind", "equals": "failed"}}'
+        "data-state", "equals": "error"}}'
     - step: 84
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
-        "data-disk-effect", "equals": "none"}}'
+        "data-result-kind", "equals": "failed"}}'
     - step: 85
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-disk-effect", "equals": "none"}}'
+    - step: 86
       expectation: '{"eval_readonly": {"expression": "!document.getElementById(\"code-workspace-save-observation\")?.hasAttribute(\"data-receipt-id\")",
         "expect_truthy": true}}'
-    - step: 86
+    - step: 87
       expectation: '{"eval_readonly": {"expression": "JSON.stringify({tag:document.activeElement?.tagName,className:document.activeElement?.className,testId:document.activeElement?.getAttribute(\"data-testid\")})",
         "contains": "cm-content"}}'
-    - step: 89
+    - step: 90
       expectation: '{"eval_readonly": {"expression": "JSON.stringify([document.querySelectorAll(\".cm-line\")[0]?.textContent,
         document.querySelectorAll(\".cm-line\")[1]?.textContent])", "contains": "[\"café\",\"matrix\"]"}}'
-    - step: 90
+    - step: 91
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
         "data-state", "equals": "dirty"}}'
-    - step: 92
+    - step: 93
       expectation: '{"wait_for": "[data-testid=\"file-encoding-dialog\"]"}'
-    - step: 96
+    - step: 97
       expectation: '{"eval_readonly": {"expression": "document.querySelector(\"[data-testid\\x3d\\\"status-bar-message\\\"]\")?.textContent",
         "contains": "save as UTF-8"}}'
-    - step: 99
+    - step: 100
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
         "data-state", "equals": "dirty"}}'
-    - step: 101
+    - step: 102
       expectation: '{"assert_file_receipt": {"path": "${fixture.workspace_root}/README.md", "selector": "[data-testid=\"code-workspace-save-observation\"]",
         "encoding": "UTF-8", "bom": false, "eol": "lf", "expected_text": "café\nmatrix\n恢复", "require_history":
         false}}'
-    - step: 102
+    - step: 103
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
         "aria-live", "equals": "polite"}}'
-    - step: 103
+    - step: 104
       expectation: '{"eval_readonly": {"expression": "document.querySelector(\".cm-content:focus\")?.matches(\".cm-content\")",
         "expect_truthy": true}}'
-    - step: 109
+    - step: 110
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
         "data-state", "equals": "dirty"}}'
-    - step: 111
+    - step: 112
       expectation: '{"wait_for": {"selector": "[data-testid=\"external-file-conflict-dialog\"]", "timeout_sec":
         30}}'
-    - step: 113
+    - step: 114
       expectation: '{"assert_not_visible": "[data-testid=\"external-file-conflict-dialog\"]"}'
-    - step: 117
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
-        "data-state", "equals": "conflict"}}'
     - step: 118
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
-        "data-result-kind", "equals": "conflict"}}'
+        "data-state", "equals": "conflict"}}'
     - step: 119
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
-        "data-disk-effect", "equals": "none"}}'
+        "data-result-kind", "equals": "conflict"}}'
     - step: 120
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
-        "data-dirty", "equals": "true"}}'
+        "data-disk-effect", "equals": "none"}}'
     - step: 121
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
+        "data-dirty", "equals": "true"}}'
+    - step: 122
       expectation: '{"eval_readonly": {"expression": "!document.getElementById(\"code-workspace-save-observation\")?.hasAttribute(\"data-receipt-id\")",
         "expect_truthy": true}}'
-    - step: 122
+    - step: 123
       expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/README.md", "equals": "5185a66ab96d05620dff4ba24fcb4fec28df21dae051c073396380b99270497b",
         "timeout_sec": 10}}'
-    - step: 127
+    - step: 128
       expectation: '{"assert_file_receipt": {"path": "${fixture.workspace_root}/README.md", "selector": "[data-testid=\"code-workspace-save-observation\"]",
         "encoding": "UTF-8", "bom": false, "eol": "lf", "expected_text": "café\nmatrix\n恢复!", "require_history":
         false}}'
-    - step: 132
+    - step: 133
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
         "data-state", "equals": "dirty"}}'
-    - step: 135
+    - step: 136
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
         "data-state", "equals": "clean"}}'
-    - step: 138
+    - step: 139
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
         "data-state", "equals": "dirty"}}'
-    - step: 139
+    - step: 140
       expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/README.md", "equals": "5ff143d98db375226ee1be8d3394a7b0c3cd56c4705485f76bfdbc19154e3168",
         "timeout_sec": 10}}'
-    - step: 141
+    - step: 142
       expectation: '{"assert_file_sha256": {"path": "${fixture.workspace_root}/README.md", "equals": "36d1444a8eac6a3d580b945759caebf6593cc1799986c1b6607b3802411244ec",
         "timeout_sec": 30}}'
-    - step: 143
+    - step: 144
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
         "data-state", "equals": "saved"}}'
-    - step: 145
+    - step: 146
       expectation: '{"assert_menu_items": ["Local History"]}'
-    - step: 147
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-local-history-dialog\"]"}'
     - step: 148
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-local-history-dialog\"] button[data-selected=\"true\"]",
-        "timeout_sec": 30}}'
-    - step: 149
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-local-history-compare\"]"}'
-    - step: 150
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-local-history-restore\"]"}'
-    - step: 152
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-compare-dialog\"]"}'
-    - step: 153
-      expectation: '{"assert_text": {"selector": "[data-testid=\"compare-session-metadata\"]", "contains": "local-history"}}'
-    - step: 157
       expectation: '{"wait_for": "[data-testid=\"code-workspace-local-history-dialog\"]"}'
-    - step: 158
+    - step: 149
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-local-history-dialog\"] button[data-selected=\"true\"]",
         "timeout_sec": 30}}'
-    - step: 160
-      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-local-history-dialog\"]"}'
+    - step: 150
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-local-history-compare\"]"}'
+    - step: 151
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-local-history-restore\"]"}'
+    - step: 153
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-compare-dialog\"]"}'
+    - step: 154
+      expectation: '{"assert_text": {"selector": "[data-testid=\"compare-session-metadata\"]", "contains": "local-history"}}'
+    - step: 158
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-local-history-dialog\"]"}'
+    - step: 159
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-local-history-dialog\"] button[data-selected=\"true\"]",
+        "timeout_sec": 30}}'
     - step: 161
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-local-history-dialog\"]"}'
+    - step: 162
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-save-observation\"]", "name":
         "data-state", "equals": "dirty"}}'
     results:
-    - 160
     - 161
+    - 162
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual
