@@ -47,20 +47,34 @@ class SignedModuleSelectionTests(unittest.TestCase):
 
 class DesktopGateSelectionTests(unittest.TestCase):
     def test_desktop_gate_covers_affected_capture_headless_rdp_and_mail_cases(self):
-        (desktop,) = plan("desktop", "macos-26", "", "")
+        desktop, wayland = plan("desktop", "macos-26", "", "")
         self.assertEqual(desktop[1], PLATFORMS)
         inputs = desktop[2]
         self.assertEqual(inputs["platforms"], "linux,windows,macos")
         self.assertEqual(inputs["modes"], "browser,native")
+        self.assertEqual(inputs["linux_profiles"], "ubuntu-24.04-xvfb")
         self.assertEqual(inputs["macos_runner"], "macos-26")
         self.assertEqual(inputs["native_release"], "true")
         self.assertEqual(set(inputs["case_ids"].split(",")), {
             "TC-MFA-106", "TC-MOBILE-003", "TC-MOBILE-021",
             "TC-SHOT-003", "TC-SHOT-N2", "TC-SHOT-N10", "TC-SHOT-N15", "TC-SHOT-N19",
             "TC-RDPS-NAT-01-start-connect-display", "TC-RDPS-PERF-01-performance-budget",
+            "TC-MAIL-SEND-01", "TC-MAIL-OUTBOX-01", "TC-MAIL-ATTACH-01",
             *(f"TC-MAIL-STORAGE-{number:02d}" for number in range(1, 10)),
         })
-        self.assertIn(desktop, plan("all", "macos-26", "", ""))
+        self.assertEqual(wayland[1], PLATFORMS)
+        wayland_inputs = wayland[2]
+        self.assertEqual(wayland_inputs["platforms"], "linux")
+        self.assertEqual(wayland_inputs["modes"], "native")
+        self.assertEqual(wayland_inputs["linux_profiles"], "ubuntu-26.04-wayland")
+        self.assertEqual(wayland_inputs["native_release"], "true")
+        self.assertEqual(set(wayland_inputs["case_ids"].split(",")), {
+            "TC-MFA-106", "TC-SHOT-N2", "TC-SHOT-N10",
+            "TC-RDPS-NAT-01-start-connect-display", "TC-RDPS-PERF-01-performance-budget",
+        })
+        checks = plan("all", "macos-26", "", "")
+        self.assertIn(desktop, checks)
+        self.assertIn(wayland, checks)
 
 
 class ReleasePackageSelectionTests(unittest.TestCase):

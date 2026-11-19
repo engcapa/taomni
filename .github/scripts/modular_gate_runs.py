@@ -61,6 +61,7 @@ def plan(suite, macos_runner, package_run, package_version, package_targets="all
     if suite in {"all", "desktop"}:
         checks.append(("G2/G4/G5/G7/G8/G9/G11 browser and native cases", PLATFORMS, {
             "scope": "selected", "platforms": "linux,windows,macos", "modes": "browser,native",
+            "linux_profiles": "ubuntu-24.04-xvfb",
             "macos_runner": macos_runner, "native_release": "true", "features": "F-Modules-1",
             "case_ids": (
                 "TC-MFA-106,TC-MOBILE-003,TC-MOBILE-021,"
@@ -68,7 +69,15 @@ def plan(suite, macos_runner, package_run, package_version, package_targets="all
                 "TC-RDPS-NAT-01-start-connect-display,TC-RDPS-PERF-01-performance-budget,"
                 "TC-MAIL-STORAGE-01,TC-MAIL-STORAGE-02,TC-MAIL-STORAGE-03,TC-MAIL-STORAGE-04,"
                 "TC-MAIL-STORAGE-05,TC-MAIL-STORAGE-06,TC-MAIL-STORAGE-07,TC-MAIL-STORAGE-08,"
-                "TC-MAIL-STORAGE-09"
+                "TC-MAIL-STORAGE-09,TC-MAIL-SEND-01,TC-MAIL-OUTBOX-01,TC-MAIL-ATTACH-01"
+            ),
+        }))
+        checks.append(("G2/G5 Linux Wayland native capture and input", PLATFORMS, {
+            "scope": "selected", "platforms": "linux", "modes": "native",
+            "linux_profiles": "ubuntu-26.04-wayland", "native_release": "true",
+            "case_ids": (
+                "TC-MFA-106,TC-SHOT-N2,TC-SHOT-N10,"
+                "TC-RDPS-NAT-01-start-connect-display,TC-RDPS-PERF-01-performance-budget"
             ),
         }))
     if suite in {"all", "release"} and package_run:
