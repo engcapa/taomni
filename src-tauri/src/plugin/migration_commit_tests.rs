@@ -306,7 +306,7 @@ fn signed_legacy_mfa_facade_keeps_exclusive_ownership_after_migration() {
     let package = InstalledMfa::verified_package();
     commit(legacy.prepare(), &package, MASTER).unwrap();
     let state = isolated_state(root, AiConfig::default()).unwrap();
-    assert!(state.mfa.legacy_store().unwrap().is_none());
+    assert!(state.legacy.mfa.legacy_store().unwrap().is_none());
     state.plugins.set_enabled(OWNER, true).unwrap();
     let original_mfa = fs::read(root.join("mfa.db")).unwrap();
 
@@ -350,7 +350,7 @@ fn signed_legacy_mfa_facade_keeps_exclusive_ownership_after_migration() {
     assert_eq!(fs::read(root.join("mfa.db")).unwrap(), original_mfa);
     state.plugins.uninstall(OWNER, false).unwrap();
     assert!(list().is_err());
-    assert!(state.mfa.legacy_store().unwrap().is_none());
+    assert!(state.legacy.mfa.legacy_store().unwrap().is_none());
     assert_eq!(fs::read(root.join("mfa.db")).unwrap(), original_mfa);
     state.plugins.shutdown().unwrap();
 }
@@ -405,7 +405,7 @@ fn signed_legacy_mfa_restore_uses_module_data_after_normal_profile_startup() {
     assert_eq!(generation::current(root).unwrap(), before_restore);
 
     let state = isolated_state(root, AiConfig::default()).unwrap();
-    assert!(state.mfa.legacy_store().unwrap().is_none());
+    assert!(state.legacy.mfa.legacy_store().unwrap().is_none());
     assert_ne!(generation::current(root).unwrap(), before_restore);
     assert_eq!(fs::read(&active).unwrap(), original_active);
     assert_eq!(fs::read(root.join("mfa.db")).unwrap(), original_mfa);

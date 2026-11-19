@@ -47,7 +47,7 @@ pub(super) fn exercise_maintenance_process() {
     legacy.assert_legacy_intact();
 
     let state = isolated_state(root, AiConfig::default()).unwrap();
-    assert!(state.mfa.legacy_store().unwrap().is_none());
+    assert!(state.legacy.mfa.legacy_store().unwrap().is_none());
     state
         .plugins
         .unlock_vault(&state.core.vault, MASTER)

@@ -48,7 +48,7 @@ pub(crate) async fn run<T: DeserializeOwned + Send + 'static, A: Send + 'static>
     wire: impl Fn(&A) -> Value + Send + 'static,
     legacy: impl FnOnce(&mut rusqlite::Connection, &DataKey, A) -> Result<T, String>,
 ) -> Result<T, String> {
-    match state.mfa.legacy_store()? {
+    match state.legacy.mfa.legacy_store()? {
         Some(store) => access::with_key(
             &state.plugins,
             &state.core.vault,
@@ -70,7 +70,7 @@ pub(crate) async fn export(
     id: String,
     password: zeroize::Zeroizing<String>,
 ) -> Result<String, String> {
-    match state.mfa.legacy_store()? {
+    match state.legacy.mfa.legacy_store()? {
         Some(store) => {
             access::export_with_password(&state.plugins, &state.core.vault, store, &id, &password)
         }
@@ -87,7 +87,7 @@ pub(crate) async fn export(
 }
 
 pub(crate) async fn reset(state: &AppState) -> Result<(), String> {
-    match state.mfa.legacy_store()? {
+    match state.legacy.mfa.legacy_store()? {
         Some(store) => access::reset_store(&state.plugins, &state.core.vault, store),
         None => {
             on_host(state, move |registry| {

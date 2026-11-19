@@ -45,6 +45,7 @@ impl MfaRestart {
         let state = app.state::<AppState>();
         let profile = &state.core.paths.data;
         let store = state
+            .legacy
             .mfa
             .legacy_store()?
             .ok_or("MFA data is already migrated")?;

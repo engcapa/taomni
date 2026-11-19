@@ -133,7 +133,7 @@ fn snapshot(
     let snapshot = stage_protected_backup(
         &state.plugins,
         &state.core.vault,
-        state.mfa.legacy_store().unwrap(),
+        state.legacy.mfa.legacy_store().unwrap(),
         staging,
         resolve_scope_flags("custom", Some(options)),
         &context,
@@ -189,7 +189,7 @@ fn assert_lifecycle(state: &AppState, lifecycle: MfaState) {
     let record = state.plugins.get(OWNER).unwrap();
     assert_eq!(record.state, expected);
     assert!(record.data_retained);
-    assert!(state.mfa.legacy_store().unwrap().is_none());
+    assert!(state.legacy.mfa.legacy_store().unwrap().is_none());
 }
 
 fn activate(state: &AppState, package: &VerifiedPackage, prior: MfaState) {

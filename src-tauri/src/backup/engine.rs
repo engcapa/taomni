@@ -229,7 +229,7 @@ fn create_backup_locked(
         &state.plugins,
         &state.core.vault,
         if flags.mfa {
-            state.mfa.legacy_store()?
+            state.legacy.mfa.legacy_store()?
         } else {
             None
         },

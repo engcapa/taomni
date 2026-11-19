@@ -366,7 +366,7 @@ fn inspect_legacy_profile(
 ) -> Result<crate::plugin::migration::LegacyInstallSnapshot, String> {
     use crate::plugin::migration::{MigrationItem, inspect_legacy_install};
     let mut snapshot = inspect_legacy_install(root, legacy_version(from_version))?;
-    if state.mfa.legacy_store()?.is_none() {
+    if state.legacy.mfa.legacy_store()?.is_none() {
         snapshot
             .candidates
             .retain(|candidate| candidate.item != MigrationItem::Mfa);
@@ -431,7 +431,7 @@ pub async fn plugin_mfa_migrate_and_restart(
 #[tauri::command]
 pub fn plugin_mfa_migration_result(state: State<'_, AppState>) -> Option<&'static str> {
     let result = crate::runtime::mfa_restart::last_result()?;
-    if result == "complete" && !matches!(state.mfa.legacy_store(), Ok(None)) {
+    if result == "complete" && !matches!(state.legacy.mfa.legacy_store(), Ok(None)) {
         return None;
     }
     Some(result)
