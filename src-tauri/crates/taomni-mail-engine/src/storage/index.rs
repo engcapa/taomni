@@ -1,30 +1,11 @@
 use super::model::FullMessage;
-use super::model::FullMessageMode;
-use super::reading::open;
+use crate::archive::has_attachment;
 use rusqlite::Connection;
 use rusqlite::OptionalExtension;
 use rusqlite::params;
 use std::fs::File;
 use std::path::Path;
 use std::path::PathBuf;
-use taomni_mail_engine::archive::has_attachment;
-
-pub fn stores_full(settings: &super::super::MailCacheSettings, folder: &str) -> bool {
-    // Keep old exact server keys working, and accept the full readable path
-    // entered before the account has ever connected or cached its folders.
-    let readable_folder = super::super::decode_imap_modified_utf7(folder);
-    let selected = settings.full_message_folders.iter().any(|name| {
-        let name = name.trim();
-        name == folder
-            || name == readable_folder
-            || (name.eq_ignore_ascii_case("INBOX") && folder.eq_ignore_ascii_case("INBOX"))
-    });
-    match settings.full_message_mode {
-        FullMessageMode::All => true,
-        FullMessageMode::Include => selected,
-        FullMessageMode::Exclude => !selected,
-    }
-}
 
 pub fn init_tables(db: &Connection) -> rusqlite::Result<()> {
     db.execute_batch(
@@ -45,7 +26,7 @@ pub fn init_tables(db: &Connection) -> rusqlite::Result<()> {
             INSERT OR IGNORE INTO mail_archive_gc(sha256) VALUES(old.sha256);
          END;",
     )?;
-    super::super::archive_query::init_index(db)
+    super::query::init_index(db)
 }
 
 pub fn account_root(db: &Connection, account_id: &str) -> Result<PathBuf, String> {
@@ -65,11 +46,11 @@ pub fn account_root(db: &Connection, account_id: &str) -> Result<PathBuf, String
         .map_err(|e| format!("Resolve mail storage directory: {e}"))?;
     Ok(parent.join(format!(
         "{}.mail",
-        crate::state::mail_db_file_stem(account_id)
+        crate::database::mail_db_file_stem(account_id)
     )))
 }
 
-pub(in crate::mail) fn legacy_attachment_flag(
+pub(super) fn legacy_attachment_flag(
     db: &Connection,
     account: &str,
     hash: &str,

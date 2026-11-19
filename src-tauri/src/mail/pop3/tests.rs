@@ -179,7 +179,10 @@ fn permanent_delete_retains_original_and_cleanup_never_reuses_its_uid() {
     let entries = super::super::storage::list(&conn, "pop", 0).unwrap();
     assert_eq!(entries.len(), 1);
     assert_eq!(
-        super::super::storage::read_entry(&conn, "pop", &entries[0]).unwrap(),
+        super::super::storage::open_entry(&conn, "pop", &entries[0])
+            .unwrap()
+            .read()
+            .unwrap(),
         original
     );
     super::super::storage::remove_entries(&conn, "pop", &entries).unwrap();

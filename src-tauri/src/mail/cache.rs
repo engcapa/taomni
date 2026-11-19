@@ -26,9 +26,10 @@ pub(super) use contacts::{
 pub(super) use pruning::{prune_mail_cache, purge_cached_folder, remove_cached_messages};
 
 pub(super) use reading::{
-    cached_header, get_cached_body, list_cached_folders, list_cached_messages, unread_cached_uids,
+    get_cached_body, list_cached_folders, list_cached_messages, unread_cached_uids,
 };
 
 pub(super) use flags::{flags_include_seen, mark_cached_messages_read, update_cached_flags};
 
-pub(super) use mapping::{cached_to_body, row_to_header};
+pub(super) use mapping::cached_to_body;
+pub(super) use taomni_mail_engine::cache::{cached_header, row_to_header};

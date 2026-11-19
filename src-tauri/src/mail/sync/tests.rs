@@ -13,8 +13,6 @@ use super::model::step_result;
 use super::planning::plan_backfill;
 use super::planning::plan_fill_range;
 use super::planning::recent_window_start;
-use super::schema::MAIL_SCHEMA_VERSION;
-use super::schema::migrate_mail_tables;
 use crate::mail::MailFolder;
 use crate::mail::ResolvedMailAccount;
 use crate::mail::imap_fetch_messages_for_uids;
@@ -22,6 +20,7 @@ use crate::mail::now_ts;
 use crate::mail::upsert_folder;
 use rusqlite::Connection;
 use rusqlite::params;
+use taomni_mail_engine::cache::{MAIL_SCHEMA_VERSION, migrate_mail_tables};
 
 #[test]
 fn fill_plan_fetches_newest_missing_first_and_reports_vanished() {

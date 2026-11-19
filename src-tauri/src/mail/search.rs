@@ -21,46 +21,6 @@ use super::{
 };
 use crate::state::AppState;
 
-/// Content columns of the index. Kept in one place for the triggers.
-const FTS_SELECT: &str = "COALESCE(subject, ''),
-    COALESCE(from_name, '') || ' ' || COALESCE(from_addr, ''),
-    COALESCE(to_json, '') || ' ' || COALESCE(cc_json, ''),
-    COALESCE(snippet, '') || ' ' || COALESCE(body_text, '')";
-
-/// Create the FTS table, its sync triggers and index existing rows.
-pub(super) fn migrate_search_index(conn: &Connection) -> SqlResult<()> {
-    conn.execute_batch(&format!(
-        "CREATE VIRTUAL TABLE IF NOT EXISTS mail_messages_fts USING fts5(
-            subject, sender, recipients, body,
-            tokenize = 'trigram case_sensitive 0'
-         );
-         CREATE TRIGGER IF NOT EXISTS mail_messages_fts_ai AFTER INSERT ON mail_messages BEGIN
-            INSERT INTO mail_messages_fts(rowid, subject, sender, recipients, body)
-            SELECT new.rowid, {new_cols};
-         END;
-         CREATE TRIGGER IF NOT EXISTS mail_messages_fts_ad AFTER DELETE ON mail_messages BEGIN
-            DELETE FROM mail_messages_fts WHERE rowid = old.rowid;
-         END;
-         CREATE TRIGGER IF NOT EXISTS mail_messages_fts_au AFTER UPDATE OF
-            subject, from_name, from_addr, to_json, cc_json, snippet, body_text ON mail_messages BEGIN
-            DELETE FROM mail_messages_fts WHERE rowid = old.rowid;
-            INSERT INTO mail_messages_fts(rowid, subject, sender, recipients, body)
-            SELECT new.rowid, {new_cols};
-         END;
-         DELETE FROM mail_messages_fts;
-         INSERT INTO mail_messages_fts(rowid, subject, sender, recipients, body)
-            SELECT rowid, {FTS_SELECT} FROM mail_messages;",
-        new_cols = FTS_SELECT
-            .replace("subject", "new.subject")
-            .replace("from_name", "new.from_name")
-            .replace("from_addr", "new.from_addr")
-            .replace("to_json", "new.to_json")
-            .replace("cc_json", "new.cc_json")
-            .replace("snippet", "new.snippet")
-            .replace("body_text", "new.body_text"),
-    ))
-}
-
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub enum MailSearchField {

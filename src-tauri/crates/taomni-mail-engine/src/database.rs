@@ -216,6 +216,31 @@ impl DerefMut for MailGuard<'_> {
     }
 }
 
+pub fn mail_db_file_stem(account_id: &str) -> String {
+    use sha2::{Digest, Sha256};
+
+    let mut cleaned = account_id
+        .chars()
+        .map(|ch| {
+            if ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_') {
+                ch
+            } else {
+                '_'
+            }
+        })
+        .collect::<String>()
+        .trim_matches('_')
+        .to_string();
+    if cleaned.is_empty() {
+        cleaned = "mail".into();
+    }
+    cleaned = cleaned.chars().take(80).collect();
+
+    let digest = Sha256::digest(account_id.as_bytes());
+    let digest_hex = hex::encode(digest);
+    format!("{cleaned}-{}", &digest_hex[..16])
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

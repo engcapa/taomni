@@ -2,6 +2,7 @@ use super::{AppState, MailDbHandle};
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
+pub(crate) use taomni_mail_engine::database::mail_db_file_stem;
 
 pub(crate) struct MailRuntime {
     // Each account's database is separate from taomni.db and other accounts.
@@ -58,29 +59,4 @@ impl AppState {
                 .map(|session| session.options_json))
         })
     }
-}
-
-pub(crate) fn mail_db_file_stem(account_id: &str) -> String {
-    use sha2::{Digest, Sha256};
-
-    let mut cleaned = account_id
-        .chars()
-        .map(|ch| {
-            if ch.is_ascii_alphanumeric() || matches!(ch, '-' | '_') {
-                ch
-            } else {
-                '_'
-            }
-        })
-        .collect::<String>()
-        .trim_matches('_')
-        .to_string();
-    if cleaned.is_empty() {
-        cleaned = "mail".into();
-    }
-    cleaned = cleaned.chars().take(80).collect();
-
-    let digest = Sha256::digest(account_id.as_bytes());
-    let digest_hex = hex::encode(digest);
-    format!("{cleaned}-{}", &digest_hex[..16])
 }

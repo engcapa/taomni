@@ -2,13 +2,12 @@ use super::index::account_root;
 use super::index::lookup;
 use super::index::object_path;
 use super::model::ArchiveEntry;
+use crate::archive::verify_message;
 use rusqlite::Connection;
 use rusqlite::params;
 use std::fs;
 use std::fs::File;
-use std::io::Read;
 use std::path::Path;
-use taomni_mail_engine::archive::verify_message;
 
 /// Open while the DB lock protects the object reference, then release that
 /// lock before decompressing, parsing or exporting a potentially large MIME.

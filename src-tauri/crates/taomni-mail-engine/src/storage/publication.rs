@@ -2,7 +2,7 @@ use super::index::account_root;
 use super::index::object_path;
 use super::model::FullMessage;
 use super::model::PreparedMessage;
-use super::reading::open;
+use crate::archive::{MessageObject, compress_message, verify_message};
 use rusqlite::Connection;
 use rusqlite::params;
 use std::fs;
@@ -10,7 +10,6 @@ use std::fs::File;
 use std::io::Read;
 use std::io::Write;
 use std::path::Path;
-use taomni_mail_engine::archive::{MessageObject, compress_message, verify_message};
 
 pub fn store(
     db: &Connection,
@@ -82,7 +81,7 @@ pub fn publish(
     let stored_size = fs::metadata(&path).map_err(|e| e.to_string())?.len();
     let tx = db.unchecked_transaction().map_err(|e| e.to_string())?;
     let mut header =
-        super::super::cached_header(&tx, account, folder, uid).map_err(|e| e.to_string())?;
+        crate::cache::cached_header(&tx, account, folder, uid).map_err(|e| e.to_string())?;
     if let Some(header) = &mut header {
         header.has_attachments = has_attachments;
     }
@@ -91,7 +90,7 @@ pub fn publish(
     tx.execute(
         "INSERT INTO mail_full_messages(account_id,folder,uid,uid_validity,sha256,raw_size,stored_size,stored_at,header_json)
          VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9)",
-        params![account,folder,uid,uid_validity,hash,raw_size as i64,stored_size as i64,super::super::now_ts(),header_json],
+        params![account,folder,uid,uid_validity,hash,raw_size as i64,stored_size as i64,crate::now_ts(),header_json],
     ).map_err(|e|e.to_string())?;
     tx.commit().map_err(|e| e.to_string())?;
     Ok(FullMessage {

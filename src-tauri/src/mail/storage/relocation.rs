@@ -1,6 +1,3 @@
-use super::reading::open;
-#[cfg(test)]
-use super::reading::read;
 use rusqlite::Connection;
 use std::fs;
 use std::path::Path;

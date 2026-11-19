@@ -14,8 +14,6 @@
 
 mod limits;
 
-mod schema;
-
 mod model;
 
 mod cache;
@@ -30,8 +28,6 @@ mod folder_step;
 mod tests;
 
 pub(super) use limits::FLAG_RECONCILE_WINDOW;
-
-pub use schema::migrate_mail_tables;
 
 pub use model::{MailFolderSyncResult, MailSyncMode, MailSyncRequestMode};
 

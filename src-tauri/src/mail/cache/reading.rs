@@ -1,5 +1,4 @@
 use super::flags::flags_include_seen;
-use super::mapping::row_to_header;
 use crate::mail::message_model::MailFolder;
 use crate::mail::message_model::MailMessageBody;
 use crate::mail::message_model::MailMessageHeader;
@@ -8,6 +7,7 @@ use rusqlite::Connection;
 use rusqlite::OptionalExtension;
 use rusqlite::Result as SqlResult;
 use rusqlite::params;
+use taomni_mail_engine::cache::row_to_header;
 
 pub(in crate::mail) fn list_cached_folders(
     conn: &Connection,
@@ -68,26 +68,6 @@ pub(in crate::mail) fn list_cached_messages(
     )?;
     let rows = stmt.query_map(params![account_id, folder, limit, offset], row_to_header)?;
     rows.collect()
-}
-
-/// One cached header.
-pub(in crate::mail) fn cached_header(
-    conn: &Connection,
-    account_id: &str,
-    folder: &str,
-    uid: u32,
-) -> SqlResult<Option<MailMessageHeader>> {
-    conn.query_row(
-        "SELECT account_id, folder, uid, message_id, subject, from_name, from_addr,
-                to_json, cc_json, date_ts, flags_json, has_attachments, attachment_count,
-                attachments_json, snippet, raw_size, body_cached_at, in_reply_to, references_json,
-                list_unsubscribe_json, receipt_to
-         FROM mail_messages
-         WHERE account_id = ?1 AND folder = ?2 AND uid = ?3",
-        params![account_id, folder, uid],
-        row_to_header,
-    )
-    .optional()
 }
 
 pub(in crate::mail) fn unread_cached_uids(

@@ -1,11 +1,13 @@
 //! Mail message data, MIME parsing and archived message codecs.
 
 pub mod archive;
+pub mod cache;
 pub mod database;
 mod inline_images;
 mod lists;
 mod mime;
 mod models;
+pub mod storage;
 #[cfg(test)]
 mod tests;
 

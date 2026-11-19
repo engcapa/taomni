@@ -60,7 +60,7 @@ mod tests;
 
 pub mod archive;
 
-pub(crate) mod archive_query;
+pub(crate) use taomni_mail_engine::storage::query as archive_query;
 
 pub mod autoconfig;
 
