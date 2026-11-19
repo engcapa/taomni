@@ -86,6 +86,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Install the pinned QA fixture dependencies
+        run: python -m pip install -r .agents/skills/qa-ui-auto/requirements-ci.txt
       - name: Pure package evidence contracts
         run: python -m unittest test_modular_bundle_inventory test_installed_desktop_upgrade
       - name: Bind the selected package to its exact release producer
