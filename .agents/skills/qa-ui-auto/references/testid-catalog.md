@@ -1328,6 +1328,9 @@
 - `[data-testid="markdown-live-edit"]` — interactive — F-FILEOPEN-1.markdown-live-edit
 - `[data-testid="markdown-split-resize"]` — interactive — F-FILEOPEN-1.markdown-split-resize
 - `[data-testid="markdown-preview-appearance"]` — interactive — F-FILEOPEN-1.markdown-preview-appearance
+- `[data-testid="markdown-preview-appearance-options"]` — display — F-FILEOPEN-1.markdown-preview-appearance-options
+- `[data-testid="markdown-heading-options"]` — display — F-FILEOPEN-1.markdown-heading-options
+- `[data-testid="markdown-heading"]` — interactive — F-FILEOPEN-1.markdown-heading
 - `[data-testid="markdown-table-widget"]` — interactive — F-FILEOPEN-1.markdown-table-widget
 - `[data-testid="markdown-image-widget"]` — interactive — F-FILEOPEN-1.markdown-image-widget
 - `[data-testid="markdown-paste-status"]` — display — F-FILEOPEN-1.markdown-paste-status
@@ -3686,6 +3689,9 @@
 - `[data-testid="tao-home-plus"]` — interactive — F1.11.tao-home-plus
 - `[data-testid="tao-home-voice"]` — interactive — F1.11.tao-home-voice
 - `[data-testid="tao-home-shell-menu"]` — interactive — F1.11.tao-home-shell-menu
+- `[data-testid="tao-home-shell-options"]` — interactive — F1.11.tao-home-shell-options
+- `[data-testid="tao-home-history-sort"]` — interactive — F1.11.tao-home-history-sort
+- `[data-testid="tao-home-history-sort-options"]` — display — F1.11.tao-home-history-sort-options
 - `[data-testid="tao-home-side-panel"]` — display — F1.11.tao-home-side-panel
 - `[data-testid="tao-home-files"]` — display — F1.11.tao-home-files
 - `[data-testid="tao-home-workflows"]` — display — F1.11.tao-home-workflows
@@ -3702,7 +3708,6 @@
 - `[role="dialog"] button:has-text("Skills / workflows")` — interactive — F1.11.tao-home-popup-workflows
 - `[role="dialog"] button:has-text("Thinking")` — interactive — F1.11.tao-home-popup-thinking
 - `[role="dialog"] button:has-text("Web")` — interactive — F1.11.tao-home-popup-web
-- `[role="dialog"] select[aria-label="Choose shell"]` — interactive — F1.11.tao-home-popup-shell-select
 - `xpath=//*[@role="dialog"]//button[normalize-space(.)="Open home directory"]` — interactive — F1.11.tao-home-popup-shell-home
 - `[data-testid="tao-home-send"]` — interactive — F1.11.tao-home-send
 - `[data-testid="tao-home-stop"]` — interactive — F1.11.tao-home-stop

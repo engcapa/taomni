@@ -335,6 +335,15 @@ controls:
 - id: tao-home-shell-menu
   selector: '[data-testid="tao-home-shell-menu"]'
   kind: interactive
+- id: tao-home-shell-options
+  selector: '[data-testid="tao-home-shell-options"]'
+  kind: interactive
+- id: tao-home-history-sort
+  selector: '[data-testid="tao-home-history-sort"]'
+  kind: interactive
+- id: tao-home-history-sort-options
+  selector: '[data-testid="tao-home-history-sort-options"]'
+  kind: display
 - id: tao-home-side-panel
   selector: '[data-testid="tao-home-side-panel"]'
   kind: display
@@ -379,9 +388,6 @@ controls:
   kind: interactive
 - id: tao-home-popup-web
   selector: '[role="dialog"] button:has-text("Web")'
-  kind: interactive
-- id: tao-home-popup-shell-select
-  selector: '[role="dialog"] select[aria-label="Choose shell"]'
   kind: interactive
 - id: tao-home-popup-shell-home
   selector: 'xpath=//*[@role="dialog"]//button[normalize-space(.)="Open home directory"]'
@@ -15894,6 +15900,15 @@ controls:
     kind: interactive
   - id: markdown-preview-appearance
     selector: '[data-testid="markdown-preview-appearance"]'
+    kind: interactive
+  - id: markdown-preview-appearance-options
+    selector: '[data-testid="markdown-preview-appearance-options"]'
+    kind: display
+  - id: markdown-heading-options
+    selector: '[data-testid="markdown-heading-options"]'
+    kind: display
+  - id: markdown-heading
+    selector: '[data-testid="markdown-heading"]'
     kind: interactive
   - id: markdown-table-widget
     selector: '[data-testid="markdown-table-widget"]'

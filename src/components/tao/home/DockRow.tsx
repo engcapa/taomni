@@ -2,6 +2,7 @@ import { taoText as tr } from "../i18n";
 import { ChevronUp, FolderOpen, History, MoreHorizontal, Plus, Terminal } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { useT } from "../../../lib/i18n";
+import { ThemedSelect } from "../../ThemedSelect";
 import { openLocalShellAsAdministrator, type LocalDirectoryShortcut } from "../../../lib/ipc";
 import { sftpLocalHome } from "../../../lib/sftp";
 import { LocalDirectoriesPanel } from "../../welcome/LocalDirectoriesPanel";
@@ -72,7 +73,12 @@ export function DockRow(props: Props) {
       <span className="tao-home-dock-divider" />
       <button type="button" className="tao-home-dock-button" data-testid="tao-home-local-terminal" disabled={shells.shellStatus === "loading"} onClick={() => void props.onStartLocalTerminal(localShellSelectionFromOption(shells.selectedShell))}><Terminal size={14} />{tr("本地终端")}</button>
       <button ref={shellMenu.triggerRef} type="button" className="tao-home-dock-button" aria-label={tr("选择本地终端")} data-testid="tao-home-shell-menu" onClick={() => shellMenu.setOpen(!shellMenu.open)}><ChevronUp size={12} /></button>
-      <TaoPopover owner={shellMenu} label={tr("本地终端选项")}><div className="tao-home-popup-items"><select aria-label={tr("选择 Shell")} value={shells.selectedShellId} onChange={(event) => shells.setSelectedShellId(event.target.value)}>{shells.mergedShells.map((shell) => <option value={shell.id} key={shell.id}>{shell.name}</option>)}</select><button type="button" disabled={!shells.selectedShell?.canElevate} onClick={() => { shellMenu.close(); void openLocalShellAsAdministrator(shells.selectedShell?.id).catch((error) => setStatus(String(error))); }}>{tr("以管理员身份启动")}</button><button type="button" disabled={!props.onOpenLocalPath} onClick={() => { shellMenu.close(false); void sftpLocalHome().then((home) => { if (home) props.onOpenLocalPath?.(home, { embedFolder: true }); }).catch((error) => setStatus(String(error))); }}>{tr("打开 Home 目录")}</button></div></TaoPopover>
+      <TaoPopover owner={shellMenu} label={tr("本地终端选项")}><div className="tao-home-popup-items">
+        <ThemedSelect label={tr("选择 Shell")} testId="tao-home-shell-options" value={shells.selectedShellId} onChange={shells.setSelectedShellId}
+          options={shells.mergedShells.map((shell) => ({ value: shell.id, label: shell.name }))} />
+        <button type="button" disabled={!shells.selectedShell?.canElevate} onClick={() => { shellMenu.close(); void openLocalShellAsAdministrator(shells.selectedShell?.id).catch((error) => setStatus(String(error))); }}>{tr("以管理员身份启动")}</button>
+        <button type="button" disabled={!props.onOpenLocalPath} onClick={() => { shellMenu.close(false); void sftpLocalHome().then((home) => { if (home) props.onOpenLocalPath?.(home, { embedFolder: true }); }).catch((error) => setStatus(String(error))); }}>{tr("打开 Home 目录")}</button>
+      </div></TaoPopover>
       {hasWsl ? <button type="button" className="tao-home-dock-button" data-testid="tao-home-wsl" onClick={() => void props.onStartLocalTerminal({ id: "wsl.exe", name: `WSL: ${shells.wslDistros[0].name}`, args: ["-d", shells.wslDistros[0].name] })}>WSL</button> : null}
       <button type="button" className="tao-home-dock-button" data-testid="tao-home-new-session" onClick={props.onNewSession}><Plus size={14} />{tr("新会话")}</button>
       <button type="button" className="tao-home-dock-button" data-testid="tao-home-new-workspace" onClick={props.onOpenNewWorkspace}><FolderOpen size={14} />{tr("新工作区")}</button>

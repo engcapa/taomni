@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import platform
 import re
 import time
@@ -284,7 +285,21 @@ def step_select_option(ctx: StepContext, args: Any) -> None:
         raise StepError("select_option: provide label or value")
     if ctx.dry_run:
         return
-    ctx.page.locator(sel).first.select_option(**target)  # type: ignore[attr-defined]
+    control = ctx.page.locator(sel).first
+    if not control.evaluate("(el) => el.matches('button.taomni-select-trigger')"):
+        control.select_option(**target)
+        return
+    if control.get_attribute("aria-expanded") != "true":
+        control.click()
+    popup_id = control.get_attribute("aria-controls")
+    if not popup_id:
+        raise StepError(f"select_option: could not open {sel}")
+    popup = ctx.page.locator(f"[id={json.dumps(popup_id)}]")
+    if "value" in target:
+        option = popup.locator(f'[role="option"][data-value={json.dumps(str(target["value"]))}]')
+    else:
+        option = popup.get_by_role("option", name=target["label"], exact=True)
+    option.click()
 
 
 @verb("upload_file")

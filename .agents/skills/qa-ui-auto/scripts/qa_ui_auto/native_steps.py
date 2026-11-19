@@ -462,6 +462,29 @@ def _select_option(ctx: NativeStepContext, args: Any) -> str:
     label = args.get("label")
     if value is None and label is None:
         raise StepError("select_option: value or label is required")
+    _wait_for(ctx, selector)
+    is_combobox = ctx.session.execute(
+        f"return document.querySelector({json.dumps(selector)})?.matches('button.taomni-select-trigger');"
+    )
+    if is_combobox:
+        expanded = ctx.session.execute(
+            f"return document.querySelector({json.dumps(selector)})?.getAttribute('aria-expanded') === 'true';"
+        )
+        if not expanded:
+            ctx.session.click(selector)
+        option = ctx.session.execute(
+            f"const control = document.querySelector({json.dumps(selector)});"
+            "const list = document.getElementById(control.getAttribute('aria-controls'));"
+            f"const expectedValue = {json.dumps(None if value is None else str(value))};"
+            f"const expectedLabel = {json.dumps(None if label is None else str(label))};"
+            "return Array.from(list?.querySelectorAll('[role=option]') ?? []).find((candidate) => "
+            "(expectedValue !== null && candidate.dataset.value === expectedValue) || "
+            "(expectedLabel !== null && candidate.textContent.trim() === expectedLabel))?.id ?? null;"
+        )
+        if not option:
+            raise StepError(f"select_option: missing option {value or label!r} in {selector}")
+        ctx.session.click(f'[id={json.dumps(option)}]')
+        return f"selected {value or label!r} in {selector}"
     result = ctx.session.execute(
         f"const el = document.querySelector({json.dumps(selector)});"
         "if (!(el instanceof HTMLSelectElement)) return {ok:false, reason:'not-select'};"

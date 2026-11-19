@@ -201,7 +201,8 @@ describe("MarkdownEditor real host lifecycle", () => {
     render(<Harness />);
     expect(screen.getByTestId("markdown-live-edit")).toBeDisabled();
     const sourceTheme = document.documentElement.dataset.appTheme;
-    fireEvent.change(screen.getByTestId("markdown-preview-appearance"), { target: { value: "dark" } });
+    fireEvent.click(screen.getByTestId("markdown-preview-appearance"));
+    fireEvent.click(screen.getByRole("option", { name: "Dark" }));
     expect(document.querySelector(".fv-md-live-pane")).toHaveAttribute("data-preview-theme", "dark");
     expect(document.documentElement.dataset.appTheme).toBe(sourceTheme);
     fireEvent.click(screen.getByTestId("markdown-mode-split"));
@@ -230,7 +231,8 @@ describe("MarkdownEditor real host lifecycle", () => {
     render(<Harness />);
     fireEvent.click(screen.getByTestId("markdown-export")); fireEvent.click(screen.getByTestId("markdown-export-pdf"));
     expect(screen.getByTestId("markdown-export-settings")).toHaveTextContent("A4");
-    fireEvent.change(screen.getByLabelText("Paper"), { target: { value: "Letter" } });
+    fireEvent.click(screen.getByRole("combobox", { name: "Paper" }));
+    fireEvent.click(screen.getByRole("option", { name: "Letter" }));
     fireEvent.click(screen.getByTestId("markdown-export-confirm"));
     await waitFor(() => expect(exportMarkdown).toHaveBeenCalledWith("pdf", source, "/docs/a.md", expect.objectContaining({ paper: "Letter" })));
     expect(screen.getByTestId("markdown-export-status")).toHaveAttribute("data-export-state", "saved");

@@ -38,8 +38,8 @@
 }
 .fv *, .fv *::before, .fv *::after { box-sizing: border-box; }
 .fv button, .fv select, .fv input { font: inherit; color: inherit; }
-.fv select, .fv-md-appearance select { color-scheme: var(--taomni-color-scheme, light); }
-.fv select option, .fv-md-appearance select option {
+.fv select { color-scheme: var(--taomni-color-scheme, light); }
+.fv select option {
   background-color: var(--taomni-card-bg);
   color: var(--taomni-text);
 }

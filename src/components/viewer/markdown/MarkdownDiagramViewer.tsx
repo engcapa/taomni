@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
+import { ThemedSelect } from "../../ThemedSelect";
 import { diagramActions, type DiagramAction, type DiagramLabel } from "./diagramActions";
 import type { MarkdownVisualSnapshot, DiagramTransform } from "./diagramModel";
 import { portableWordSvg } from "./wordSvg";
@@ -53,7 +54,7 @@ export function MarkdownDiagramViewer({ snapshot, initialAction, label, busy, no
           else if (!event.shiftKey && document.activeElement === last) { event.preventDefault(); first?.focus(); }
           return;
         }
-        if (event.nativeEvent.isComposing || event.ctrlKey || event.metaKey || event.altKey || (event.target as Element).closest("input,textarea,select,[contenteditable=true]")) return;
+        if (event.nativeEvent.isComposing || event.ctrlKey || event.metaKey || event.altKey || (event.target as Element).closest("input,textarea,select,[role=combobox],[contenteditable=true]")) return;
         const id: DiagramAction | undefined = ({ "+": "zoom-in", "=": "zoom-in", "-": "zoom-out", "0": "actual", f: "fit", w: "width", r: "rotate-right", R: "rotate-left" } as Record<string, DiagramAction>)[event.key];
         if (id) { event.preventDefault(); event.stopPropagation(); action(id); }
         else if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(event.key) && event.target === transform.stage.current) {
@@ -65,9 +66,12 @@ export function MarkdownDiagramViewer({ snapshot, initialAction, label, busy, no
         {viewActions.map(({ id, title, Icon, format }) => <button key={id} type="button" className={`fv-icon-button${format ? " fv-md-diagram-save" : ""}`} data-testid={`markdown-diagram-view-${id}`} title={title} aria-label={title}
           disabled={busy && /^(save|copy)-/.test(id)} aria-pressed={id === "flip-h" ? view.flipX : id === "flip-v" ? view.flipY : undefined} onClick={() => action(id)}><Icon />{format && <span aria-hidden="true">{format}</span>}</button>)}
         <output data-testid="markdown-diagram-zoom">{Math.round(scale * 100)}%</output>
-        <select className="fv-select" data-testid="markdown-diagram-background" aria-label={label("查看器背景", "Viewer background")} value={background} onChange={(event) => setBackground(event.target.value)}>
-          <option value="checker">{label("棋盘背景", "Checker background")}</option><option value="light">{label("浅色背景", "Light background")}</option><option value="dark">{label("深色背景", "Dark background")}</option>
-        </select>
+        <ThemedSelect className="fv-md-diagram-background" testId="markdown-diagram-background" label={label("查看器背景", "Viewer background")}
+          value={background} onChange={setBackground} options={[
+            { value: "checker", label: label("棋盘背景", "Checker background") },
+            { value: "light", label: label("浅色背景", "Light background") },
+            { value: "dark", label: label("深色背景", "Dark background") },
+          ]} />
       </div>
       <div ref={transform.stage} className={`fv-md-diagram-stage background-${background}`} data-testid="markdown-diagram-stage" tabIndex={0}
         aria-label={label("拖动平移，滚轮缩放；方向键平移", "Drag to pan, wheel to zoom; arrow keys to pan")}

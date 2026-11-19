@@ -17,12 +17,19 @@ steps:
 - click: '[data-testid="nav-mode-home"]'
 - click: '[data-testid="tao-home-history"]'
 - click: '[data-testid="tao-home-history-tab-sessions"]'
+- click: '[data-testid="tao-home-history-sort"]'
+- assert_visible: '[data-testid="tao-home-history-sort-options"] [role="option"]'
 - eval_readonly:
-    expression: getComputedStyle(document.querySelector('.tao-home-history-content select')).colorScheme === 'dark'
+    expression: Math.max(...getComputedStyle(document.querySelector('.taomni-select-options')).backgroundColor.match(/\d+/g).map(Number)) < 100
     expect_truthy: true
-- eval_readonly:
-    expression: Math.max(...getComputedStyle(document.querySelector('.tao-home-history-content option')).backgroundColor.match(/\d+/g).map(Number)) < 100
-    expect_truthy: true
+- select_option:
+    selector: '[data-testid="tao-home-history-sort"]'
+    value: name-asc
+- assert_attribute:
+    selector: '[data-testid="tao-home-history-sort"]'
+    name: data-value
+    equals: name-asc
+- assert_visible: '[data-testid="tao-home-history-popover"]'
 - press: Escape
 - click: '[data-testid="side-tab-tools"]'
 - click: '[data-testid="sidebar-tool-file-explorer"]'
@@ -42,16 +49,23 @@ steps:
 - press: Escape
 - dblclick: '[data-testid="explorer-file-row"][data-name="remote-images.md"]'
 - click: '[data-testid="markdown-live-edit"]'
+- click: '[data-testid="markdown-heading"]'
+- assert_visible: '[data-testid="markdown-heading-options"] [role="option"]'
 - eval_readonly:
-    expression: getComputedStyle(document.querySelector('.fv-md-heading-select select')).colorScheme === 'dark'
+    expression: Math.max(...getComputedStyle(document.querySelector('.taomni-select-options')).backgroundColor.match(/\d+/g).map(Number)) < 100
     expect_truthy: true
+- screenshot: markdown-dark-expanded-headings.png
+- press: Escape
+- assert_not_visible: '[data-testid="markdown-heading-options"]'
+- press:
+    selector: '[data-testid="markdown-preview-appearance"]'
+    key: ArrowDown
+- assert_visible: '[data-testid="markdown-preview-appearance-options"] [role="option"]'
 - eval_readonly:
-    expression: Math.max(...getComputedStyle(document.querySelector('.fv-md-heading-select option')).backgroundColor.match(/\d+/g).map(Number)) < 100
-    expect_truthy: true
-- eval_readonly:
-    expression: Math.max(...getComputedStyle(document.querySelector('.fv-md-appearance option')).backgroundColor.match(/\d+/g).map(Number)) < 100
+    expression: Math.max(...getComputedStyle(document.querySelector('.taomni-select-options')).backgroundColor.match(/\d+/g).map(Number)) < 100
     expect_truthy: true
 - click: '[data-testid="markdown-export"]'
+- assert_not_visible: '[data-testid="markdown-preview-appearance-options"]'
 - eval_readonly:
     expression: Math.max(...getComputedStyle(document.querySelector('.fv-md-export-menu')).backgroundColor.match(/\d+/g).map(Number)) < 100
     expect_truthy: true
