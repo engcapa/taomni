@@ -293,6 +293,10 @@ steps:
     attribute: data-path
     equals:
     - ${fixture.path_completion_root}/only space/
+- click: '[data-testid="sftp-local-path-suggestions"] [role="option"][data-path="${fixture.path_completion_root}/only space/"]'
+- fill:
+    selector: input[data-testid="sftp-local-path"]
+    value: ${fixture.path_completion_root}/only
 - press:
     selector: input[data-testid="sftp-local-path"]
     key: Tab
@@ -365,8 +369,8 @@ verification:
     - 95
     - 98
     - 101
-    - 103
     - 105
+    - 107
     checkpoints:
     - step: 3
       expectation: '{"wait_for": {"selector": "[data-testid=\"session-new\"]", "timeout_sec": 60}}'
@@ -474,16 +478,15 @@ verification:
     - step: 100
       expectation: '{"eval_readonly": {"expression": "document.activeElement?.dataset.testid === \"sftp-local-path\"", "expect_truthy": true, "timeout_sec": 5}}'
     - step: 102
-      expectation: '{"assert_items": {"selector": "[data-testid=\"sftp-local-path-suggestions\"] [role=\"option\"]", "attribute": "data-path", "equals": ["${fixture.path_completion_root}/only
-        space/"]}}'
-    - step: 104
-      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-local-path\"]", "name": "value", "equals": "${fixture.path_completion_root}/only space/"}}'
+      expectation: '{"assert_items": {"selector": "[data-testid=\"sftp-local-path-suggestions\"] [role=\"option\"]", "attribute": "data-path", "equals": ["${fixture.path_completion_root}/only space/"]}}'
     - step: 106
+      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-local-path\"]", "name": "value", "equals": "${fixture.path_completion_root}/only space/"}}'
+    - step: 108
       expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-local-list\"]", "contains": "beta-marker.txt"}}'
-    - step: 107
+    - step: 109
       expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-remote-list\"]", "contains": "beta-marker.txt"}}'
     results:
-    - 107
+    - 109
   visual:
   - check: Inspect the matching-folder popup, input, selection and pane for clipping or overlap; folder names must remain distinguishable with long parent paths.
     method: manual

@@ -1228,9 +1228,9 @@ controls:
     selector: '[data-testid="welcome-restore-clear"]'
     kind: interactive
     optional: true       # only when a record is available/finished
-  - id: tips-section
-    selector: 'text="Tips"'
-    kind: display
+  - id: tao-history-dock
+    selector: '[data-testid="welcome-panel"] [data-testid="tao-home-history"]'
+    kind: interactive
   - id: shell-menu
     selector: '[data-testid="welcome-panel"] [data-testid="tao-home-shell-menu"]'
     kind: interactive
@@ -15286,6 +15286,7 @@ controls:
   - id: explorer-address
     selector: '[data-testid="explorer-address"]'
     kind: interactive
+    aliases: ['input[data-testid="explorer-address"]']
   - id: explorer-address-edit
     selector: '[data-testid="explorer-address-edit"]'
     kind: interactive

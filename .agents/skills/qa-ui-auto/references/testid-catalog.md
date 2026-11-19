@@ -1138,6 +1138,7 @@
 - `[data-testid="code-workspace-tree-open-explorer"]` — interactive — F-EXPLORER-1.code-workspace-tree-open-explorer
 - `[data-testid="code-workspace-tree-open-explorer-new"]` — interactive — F-EXPLORER-1.code-workspace-tree-open-explorer-new
 - `[data-testid="explorer-address"]` — interactive — F-EXPLORER-1.explorer-address
+  ↳ `input[data-testid="explorer-address"]` — alias
 - `[data-testid="explorer-address-edit"]` — interactive — F-EXPLORER-1.explorer-address-edit
 - `[data-testid="explorer-address-suggestions"]` — display — F-EXPLORER-1.explorer-address-suggestions
 - `[data-testid="explorer-crumbs"]` — display — F-EXPLORER-1.explorer-crumbs
@@ -2072,7 +2073,7 @@
 - `[data-testid="welcome-restore-retry"]` — interactive [optional] — F1.6.restore-retry
 - `[data-testid="welcome-restore-cancel"]` — interactive [optional] — F1.6.restore-cancel
 - `[data-testid="welcome-restore-clear"]` — interactive [optional] — F1.6.restore-clear
-- `text="Tips"` — display — F1.6.tips-section
+- `[data-testid="welcome-panel"] [data-testid="tao-home-history"]` — interactive — F1.6.tao-history-dock
 - `[data-testid="welcome-panel"] [data-testid="tao-home-shell-menu"]` — interactive — F1.6.shell-menu
 - `[data-testid="welcome-panel"] [data-testid="tao-home-dock-more"]` — interactive — F1.6.optional-launchers
 
