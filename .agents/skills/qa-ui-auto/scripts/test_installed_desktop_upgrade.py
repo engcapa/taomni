@@ -4,8 +4,9 @@ from pathlib import Path
 import subprocess
 from tempfile import TemporaryDirectory
 import unittest
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, Mock, patch
 
+from installed_desktop_mode_lease import check_mode_lease, reserve_default_profile
 from installed_desktop_upgrade import require_registration, select_candidate
 from modular_bundle_inventory import plan_targets
 from qa_ui_auto.legacy_install import windows_install
@@ -88,3 +89,62 @@ class InstalledDesktopUpgradeTests(unittest.TestCase):
             log = (evidence / "opened-contender.log").read_text(encoding="utf-8")
             self.assertIn("[ephemeral pairing code omitted]", log)
             self.assertNotIn("123456", log)
+
+
+class InstalledDesktopModeLeaseTests(unittest.TestCase):
+    hosted = {"GITHUB_ACTIONS": "true", "RUNNER_ENVIRONMENT": "github-hosted", "GITHUB_REPOSITORY": "engcapa/taomni"}
+
+    def test_never_reuses_a_production_profile_that_already_exists(self):
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            data = root / "Library" / "Application Support"
+            data.mkdir(parents=True)
+            evidence = root / "evidence"
+            evidence.mkdir()
+            with patch.dict("os.environ", self.hosted), patch(
+                "installed_desktop_mode_lease.platform.system", return_value="Darwin",
+            ), patch("installed_desktop_mode_lease.Path.home", return_value=root):
+                profile = reserve_default_profile(evidence)
+                original = profile / "taomni.db"
+                original.write_bytes(b"recorded state")
+                with self.assertRaises(FileExistsError):
+                    reserve_default_profile(evidence)
+                self.assertEqual(original.read_bytes(), b"recorded state")
+                self.assertEqual(profile, data.resolve() / "com.taomni.app")
+
+    def test_relaunches_same_installed_binary_in_both_modes(self):
+        denied = {"exitCode": 1, "modeLeaseError": True, "openedEndpoint": False, "ownerStillRunning": True}
+        generation = "6bb4a236-8790-45b5-b74a-eeb997387abc"
+        desktop = MagicMock(pid=17, returncode=None)
+        desktop.poll.return_value = None
+        desktop.__enter__.return_value = desktop
+        desktop.wait.return_value = 1
+        headless = Mock()
+        headless.poll.return_value = None
+        with TemporaryDirectory() as directory:
+            root = Path(directory)
+            executable = root / "taomni"
+            executable.touch()
+            profile = root / "com.taomni.app"
+
+            def initialize(binary, data, work, evidence, label, *, observe_ready):
+                self.assertEqual((binary, data), (executable, profile))
+                desktop.kill.assert_called_once()
+                observe_ready(headless)
+                return {"ready": True, "exited": True}
+
+            with patch("installed_desktop_mode_lease.reserve_default_profile", return_value=profile), patch(
+                "installed_desktop_mode_lease.subprocess.Popen", return_value=desktop,
+            ), patch("installed_desktop_mode_lease.wait_for_generation", return_value=generation), patch(
+                "installed_desktop_mode_lease.read_generation", return_value=generation,
+            ), patch("installed_desktop_mode_lease.initialize_profile", side_effect=initialize), patch(
+                "installed_desktop_mode_lease.observe_same_profile_contender", return_value=denied,
+            ) as contenders:
+                receipt = check_mode_lease(executable, root, root)
+            self.assertTrue(receipt["passed"])
+            self.assertEqual(receipt["generation"], generation)
+            self.assertEqual(receipt["headlessContender"], denied)
+            self.assertEqual(receipt["desktopContender"], denied)
+            first, second = contenders.call_args_list
+            self.assertEqual(first.args[0][:4], [str(executable), "--headless", "--data-dir", str(profile)])
+            self.assertEqual(second.args[0], [str(executable)])

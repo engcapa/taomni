@@ -8,6 +8,7 @@ from pathlib import Path
 import platform
 from uuid import UUID
 
+from installed_desktop_mode_lease import check_mode_lease
 from modular_bundle_inventory import digest, inventory, write_json
 from qa_ui_auto.fixtures.module_legacy_install import insert_business_rows, retained_manifest, session_rows
 from qa_ui_auto.fixtures.module_signed_archive import platform_key
@@ -108,6 +109,7 @@ def execute(args):
         stages["afterModeLeaseRelease"] = start_profile(
             candidate, profile, work, report, "candidate-after-mode-lease", expected_rows, retained,
         )
+        stages["desktopAndHeadlessModeLease"] = check_mode_lease(candidate, work, report)
 
         if system == "Windows":
             command(["msiexec.exe", "/x", str(package), "/qn", "/norestart", "/L*v", str(report / "candidate-uninstall.log")],

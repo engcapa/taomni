@@ -87,6 +87,8 @@ QA Modular Upgrade Contracts 使用 `package_upgrade_desktop=true` 运行已上�
 
 Windows 安装和回退走 `msiexec`。测试读取两个 MSI 的 ProductCode 和 UpgradeCode，并核对系统实际注册的安装状态。macOS 通过只读挂载 DMG 和 `ditto` 替换隔离 Applications 下的同一个 app，留存 `codesign` 与 Gatekeeper 的原始结果。各端对比原安装、候选及回退的可执行文件摘要，在同一隔离 profile 启动实际已安装二进制并读取原 SSH/VNC 会话。候选运行后核对历史 LanChat 库及现有 sidecar 的原字节。此场景验证安装替换、旧会话和启动后的可回退性。Windows/macOS 的完整 MFA 数据迁移仍由对应 native 与安装专项场景验收。
 
+G11 的安装件专项在一次性 runner 上预留实际 `com.taomni.app` 数据目录，遇到已有目录即停止该场景。候选 GUI 创建 profile 后，运行同一可执行文件的 headless 入口，检查其退出码、占用错误和未创建监听端口的结果。结束 GUI 后重开同一 profile 的 headless，再用实际安装的 GUI 复核反向互斥和 profile generation。进程与包身份、两次拒绝的详细结果留在 `installed-desktop-mode-lease.json`。已安装宿主的强退回收仍由 G6 专项验证。
+
 Windows x64 和 macOS Intel 已完成 `0.5.10 → 0.5.11 → 0.5.10` 的实际安装、profile 重开和回退。候选安装包均来自 `c660c6bb68578e7943594fff33a2963af65f659a`，MSI 资产 ID `14404860675`，Intel DMG 资产 ID `14404300717`。两端原 SSH/VNC 会话及候选运行前后的历史库核对通过。Windows 测试对正常运行的 GUI-subsystem headless 进程按既有方法执行受控强停，安装的可执行文件报告 `NotSigned`。macOS 三次进程均由正常退出信号完成，候选 DMG 的代码签名校验成功，Gatekeeper 评估 exit 3。 [安装替换与回退 #44292054057](https://github.com/engcapa/taomni/actions/runs/44292054057)
 
 macOS 15.8.2 ARM64 已完成同一版本链路。候选 DMG 来自源码 `26a6471d014711bda960df3eaee1d9eaf2cd1131`、资产 ID `14425596053`。使用同一隔离 profile 重开并复核原 SSH/VNC 会话与历史库，回退后恢复旧版摘要。候选 app 和 updater app 的代码签名校验成功，Gatekeeper 评估 exit 3。 [ARM64 候选构建 #44293901398](https://github.com/engcapa/taomni/actions/runs/44293901398) · [安装替换与回退 #44300055546](https://github.com/engcapa/taomni/actions/runs/44300055546)
