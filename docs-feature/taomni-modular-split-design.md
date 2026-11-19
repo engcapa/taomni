@@ -1014,7 +1014,7 @@ TC-MODULES-027 在 GitHub 安装固定哈希的正式 deb/MSI/DMG，由旧程序
 |---|---|---|
 | G1 macOS 宿主启动 | macOS 15 Intel 使用 ad-hoc 和固定自签名证书分别验证了启用 hardened runtime 的测试应用启动带隔离属性的 Hello 和 MFA。Gatekeeper 返回 exit 3。 [固定证书结果](https://github.com/engcapa/taomni/actions/runs/44620630155) | 完整发行包与下载宿主的签名身份、hardened runtime 及分发信任。 |
 | G2 macOS 系统权限 | 核心共用 `capture/`，已实现 `capture.still` 的作用域服务。 [接线记录](taomni-modular-split-gates-hello-plugin.md#capturestill-service-integration-2026-11-17-verification-pending) | 已安装应用的原生屏幕录制和辅助功能授权归属，以及升级后的复用。 |
-| G3 Windows 系统保护 | 实验从 `LOCALAPPDATA` 启动带 Internet 区域标记的 Hello 和 MFA。实测环境的 Defender 实时保护关闭。 [实验记录](taomni-modular-split-gates-hello-plugin.md#windows-g3-execution-experiment) | 正式 Authenticode 资产及启用实时保护、SmartScreen 策略的系统环境。 |
+| G3 Windows 系统保护 | GitHub Windows Runner 在 Defender 实时保护开启时从 `LOCALAPPDATA` 成功启动带 Internet 区域标记的 Hello 和 MFA。启动前后均确认实时保护开启。 [Defender 工件](https://github.com/engcapa/taomni/actions/runs/44628961420) | 正式 Authenticode 资产和实际 SmartScreen 分发信誉。 |
 | G4 Linux `noexec` | deb、RPM 和 AppImage 均验证宿主拒绝、用户按指引迁移 profile、原 Vault 与 MFA 连续读写。 [安装验证](taomni-modular-installed-upgrade-verification.md#linux-安装格式的-noexec-恢复) | 正式首发产物按同场景复验。 |
 | G5 帧吞吐 | 三端 loopback 连续帧测试交付全部帧。Linux X11 与 macOS 26 ARM64 的实际采集和 IronRDP 编码对照通过原预算。Windows 两条路径在初测中延迟、带宽超标。 [Linux 测量](taomni-modular-split-gates-hello-plugin.md#g5-frame-transport-measurement) · [macOS 与 Windows 初测](https://github.com/engcapa/taomni/actions/runs/44613553681) | Windows 对照复验和匹配发行包上的端到端结果。 |
 | G6 强制退出 | 三端实际进程门验证宿主回收。Linux 安装 deb 后强杀应用，签名 MFA 宿主在驱动清理前退出，重开后继续原账号计数。 [Linux 安装验证](taomni-modular-installed-upgrade-verification.md#linux-已安装应用的强制退出) | Windows MSI 和 macOS DMG 安装后的强退、重开和宿主回收。 |

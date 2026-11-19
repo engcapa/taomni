@@ -128,6 +128,7 @@ TASK-027 将 G1–G11 设为独立发布阻断门。每个门必须在匹配源�
 - `57d87b7ed` 的两份候选安装件分别通过 Linux 和 Windows 检查。Linux deb 真实升级、签名 MFA 强退后的 HOTP 续号、三种安装格式的 `noexec` 恢复和桌面/headless 双向互斥均有落盘回执。Windows 验证了 0.5.10 到 0.5.11 的 MSI 替换、headless 互斥及回滚，Authenticode 状态为 `NotSigned`。 [Linux 安装工件](https://github.com/engcapa/taomni/actions/runs/44617201962) · [Windows 安装工件](https://github.com/engcapa/taomni/actions/runs/44622413596)
 - `436fa9998` 扩展 TC-MODULES-009。在桌面正常退出后，以同一 QA 二进制启动 headless，核对同一 profile 拒绝第二个桌面及 owner 仍存活。关闭 headless 后，恢复原笔记、注册表和 generation，并验证桌面持锁时拒绝 headless。70 项工具单测与用例审计通过，三端原生用例已派发。 [G11 双向用例](https://github.com/engcapa/taomni/actions/runs/44627312069)
 - 签名 MFA 历史批次的 macOS ARM64 安装、旧库迁移、中断恢复和代理均通过。Windows 编译找到旧源码的 RDP 测试 logger 限制，Linux 的 Protoc 下载返回 GitHub Server Error。以包含 logger 修复的最新源码重新派发，保留两端原始失败记录。 [历史结果](https://github.com/engcapa/taomni/actions/runs/44602505246) · [同选集复验](https://github.com/engcapa/taomni/actions/runs/44628069614)
+- Windows G3 专项在一次性 GitHub Runner 启用 Defender 实时防护。带 Internet 区域标记的未签名 Hello 和 MFA 均成功启动，前后记录的 `RealTimeProtectionEnabled` 均为 true。已把这个条件加入系统验证入口。正式 Authenticode 与 SmartScreen 信誉仍需发行资产。 [Defender 专项](https://github.com/engcapa/taomni/actions/runs/44628961420)
 
 ## 当前结论
 

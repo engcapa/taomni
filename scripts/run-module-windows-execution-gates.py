@@ -41,7 +41,7 @@ def validate_host_observation(record, target, *, downloaded):
         raise RuntimeError("Downloaded host Zone.Identifier differs from the Internet-zone fixture")
 
 
-def run(evidence):
+def run(evidence, *, require_defender=False):
     require_hosted()
     evidence = evidence.resolve()
     evidence.mkdir(parents=True, exist_ok=True)
@@ -50,11 +50,14 @@ def run(evidence):
                "core": "production-process-adapter-experiment", "signingMode": "unsigned",
                "downloadMark": "synthetic-Internet-zone-ADS-read-back",
                "releasePackage": "unverified", "systemTrust": "unverified",
-               "smartScreenReputation": "unverified", "allSelectedPassed": False, "artifacts": {}}
+               "smartScreenReputation": "unverified", "allSelectedPassed": False, "artifacts": {},
+               "requiresDefenderRealTimeProtection": require_defender}
     try:
         _, source = run_command(["git", "rev-parse", "HEAD"], evidence, "source")
         receipt["sourceSha"] = source.strip()
         receipt["securityBefore"] = observe(evidence, "security-before", "security")
+        if require_defender and receipt["securityBefore"]["defender"].get("realTimeProtectionEnabled") is not True:
+            raise RuntimeError("Defender real-time protection must be active before launching the host")
         _, build = run_command(["cargo", "test", "--manifest-path", "src-tauri/Cargo.toml",
                                 "-p", "taomni-host-gates", "--test", "windows_system_execution",
                                 "--no-run", "--locked", "--message-format=json"],
@@ -97,6 +100,8 @@ def run(evidence):
                     raise RuntimeError("System experiment modified an executable")
                 receipt["artifacts"][name]["after"] = after
             receipt["securityAfter"] = observe(evidence, "security-after", "security")
+            if require_defender and receipt["securityAfter"]["defender"].get("realTimeProtectionEnabled") is not True:
+                raise RuntimeError("Defender real-time protection was inactive after host execution")
             receipt["allSelectedPassed"] = code == 0 and "2 passed; 0 failed; 0 ignored" in output
             if not receipt["allSelectedPassed"]:
                 raise RuntimeError("Unsigned download-marked host execution failed; inspect system-process.log")
@@ -107,4 +112,6 @@ def run(evidence):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--evidence", type=Path, required=True)
-    run(parser.parse_args().evidence)
+    parser.add_argument("--require-defender", action="store_true")
+    args = parser.parse_args()
+    run(args.evidence, require_defender=args.require_defender)

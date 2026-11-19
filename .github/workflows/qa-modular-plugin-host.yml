@@ -32,7 +32,7 @@ concurrency:
 
 jobs:
   windows-system-execution:
-    name: Windows unsigned download-marked hosts and protection observations
+    name: Windows download-marked hosts with Defender active
     runs-on: windows-latest
     timeout-minutes: 30
     defaults:
@@ -56,8 +56,28 @@ jobs:
         run: python -m unittest test_module_windows_execution
       - name: Build the actual hello and MFA hosts without signing credentials
         run: cargo build --manifest-path src-tauri/Cargo.toml -p taomni-hello-plugin -p taomni-plugin-mfa --bins --locked
+      - name: Require active Defender in this disposable runner
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          if ($env:RUNNER_ENVIRONMENT -ne 'github-hosted') { throw 'Requires a disposable hosted runner' }
+          New-Item -ItemType Directory -Force qa-modular-windows-execution | Out-Null
+          try {
+            Set-MpPreference -DisableRealtimeMonitoring $false
+            $deadline = (Get-Date).AddSeconds(30)
+            do {
+              $state = Get-MpComputerStatus
+              if ($state.RealTimeProtectionEnabled) { break }
+              Start-Sleep -Seconds 1
+            } while ((Get-Date) -lt $deadline)
+            if (-not $state.RealTimeProtectionEnabled) { throw 'The hosted image did not enable real-time protection' }
+          } finally {
+            Get-MpComputerStatus |
+              Select-Object AMServiceEnabled, AntivirusEnabled, RealTimeProtectionEnabled, BehaviorMonitorEnabled, IoavProtectionEnabled |
+              ConvertTo-Json | Set-Content -Encoding utf8 qa-modular-windows-execution/defender-state.json
+          }
       - name: Observe actual Authenticode and protection state and execute Internet-zone hosts
-        run: python scripts/run-module-windows-execution-gates.py --evidence qa-modular-windows-execution
+        run: python scripts/run-module-windows-execution-gates.py --evidence qa-modular-windows-execution --require-defender
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -63,7 +63,8 @@ class WindowsExecutionGateTests(unittest.TestCase):
             with self.assertRaisesRegex(RuntimeError, "exactly one"):
                 gate.select_harness(json.dumps(row), "windows_system_execution")
 
-    def run_mock_experiment(self, root, *, process_code=0, listing_count=2, mutate_zone=False):
+    def run_mock_experiment(self, root, *, process_code=0, listing_count=2, mutate_zone=False,
+                            require_defender=False, defender_states=None):
         artifacts = root / "source"
         artifacts.mkdir()
         harness = artifacts / "harness.exe"
@@ -85,6 +86,8 @@ class WindowsExecutionGateTests(unittest.TestCase):
             raise AssertionError(f"Unexpected command: {argv}")
         def observe(evidence, name, operation, target=None):
             if operation == "security":
+                if defender_states is not None:
+                    return {"defender": {"available": True, "realTimeProtectionEnabled": next(defender_states)}}
                 return {"defender": {"available": False, "error": "mock unavailable"}}
             zone = None if target.name == "gate-core.exe" else gate.ZONE
             if mutate_zone and name == "hello-after":
@@ -93,7 +96,7 @@ class WindowsExecutionGateTests(unittest.TestCase):
         with patch.object(gate, "ROOT", root), patch.object(gate, "require_hosted"), \
                 patch.dict(os.environ, {"LOCALAPPDATA": str(root)}), \
                 patch.object(gate, "run_command", side_effect=command), patch.object(gate, "observe", side_effect=observe):
-            gate.run(root / "evidence")
+            gate.run(root / "evidence", require_defender=require_defender)
 
     def test_success_preserves_unverified_trust_and_unavailable_security_observation(self):
         with tempfile.TemporaryDirectory() as temporary:
@@ -117,6 +120,19 @@ class WindowsExecutionGateTests(unittest.TestCase):
                 receipt = json.loads((root / "evidence/windows-execution-receipt.json").read_text())
                 self.assertFalse(receipt["allSelectedPassed"])
                 self.assertFalse(list(root.glob("taomni-module-execution-*")))
+
+    def test_required_defender_must_remain_active_before_and_after_launch(self):
+        for states in ((False, True), (True, False), (True, True)):
+            with self.subTest(states=states), tempfile.TemporaryDirectory() as temporary:
+                root = Path(temporary).resolve()
+                options = {"require_defender": True, "defender_states": iter(states)}
+                if all(states):
+                    self.run_mock_experiment(root, **options)
+                else:
+                    with self.assertRaisesRegex(RuntimeError, "Defender real-time protection"):
+                        self.run_mock_experiment(root, **options)
+                receipt = json.loads((root / "evidence/windows-execution-receipt.json").read_text())
+                self.assertIs(receipt["allSelectedPassed"], all(states))
 
 
 if __name__ == "__main__":
