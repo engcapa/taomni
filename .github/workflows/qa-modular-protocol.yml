@@ -253,9 +253,8 @@ jobs:
         with:
           mode: native
       - uses: dtolnay/rust-toolchain@stable
-      - uses: arduino/setup-protoc@v3
-        with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install verified fixed protoc
+        run: python .agents/skills/qa-ui-auto/scripts/ci_setup_protoc.py
       - name: Install native X11 and build dependencies
         if: runner.os == 'Linux'
         run: |

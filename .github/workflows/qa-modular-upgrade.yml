@@ -574,9 +574,8 @@ jobs:
         with:
           mode: browser
       - uses: dtolnay/rust-toolchain@stable
-      - uses: arduino/setup-protoc@v3
-        with:
-          repo-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install verified fixed protoc
+        run: python .agents/skills/qa-ui-auto/scripts/ci_setup_protoc.py
       - uses: Swatinem/rust-cache@v2
         if: runner.os == 'Linux'
         with:
