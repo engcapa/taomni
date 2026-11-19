@@ -1,4 +1,4 @@
-//! Hosted G5 comparison using the real X11 capture/display and IronRDP encoder.
+//! Hosted G5 comparison using the native desktop capture and IronRDP encoder.
 //! The remote encoder takes one bitmap at a time across the native channel.
 mod bitmap;
 
@@ -76,7 +76,14 @@ async fn run_server(
     stop: oneshot::Receiver<()>,
 ) -> anyhow::Result<()> {
     let log = LogEmitter::rdp_test_log();
-    let input = RdpInput::new(log.clone(), false, None, RdpMetrics::new(log), None);
+    let input = RdpInput::new(
+        log.clone(),
+        false,
+        None,
+        RdpMetrics::new(log),
+        #[cfg(target_os = "linux")]
+        None,
+    );
     let identity_dir = tempfile::tempdir()?;
     let identity = tls_identity(identity_dir.path());
     let mut server = RdpServer::builder()
@@ -127,7 +134,7 @@ async fn export_bitmaps(
         ensure!(request == NEXT_BITMAP, "Expected a single bitmap request");
         let update = updates.next_update().await?.context("Capture stopped")?;
         let DisplayUpdate::Bitmap(update) = update else {
-            anyhow::bail!("The fixed X11 comparison expects bitmap updates");
+            anyhow::bail!("The desktop encoder comparison expects bitmap updates");
         };
         let damage = update.x != 0 || update.y != 0;
         stats.bitmap_bytes += bitmap::send(channel, update).await? as u64;
@@ -230,8 +237,8 @@ impl RdpServerDisplayUpdates for RemoteUpdates {
 }
 
 #[tokio::test]
-#[ignore = "real X11 and RDP performance fixture executed by GitHub Actions"]
-async fn serve_x11() -> anyhow::Result<()> {
+#[ignore = "native desktop and RDP performance fixture executed by GitHub Actions"]
+async fn serve_desktop() -> anyhow::Result<()> {
     ensure!(!cfg!(debug_assertions), "Use a release test harness");
     let report =
         PathBuf::from(std::env::var_os("QA_RDP_GATE_REPORT").context("Missing trial directory")?);
@@ -246,7 +253,7 @@ async fn serve_x11() -> anyhow::Result<()> {
 }
 
 #[tokio::test]
-#[ignore = "child of the hosted X11 and RDP performance fixture"]
+#[ignore = "child of the hosted desktop and RDP performance fixture"]
 async fn encoder_process() -> anyhow::Result<()> {
     let mut line = String::new();
     io::stdin().read_line(&mut line)?;

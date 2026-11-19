@@ -65,7 +65,7 @@ on:
         type: boolean
         default: false
       rdp_pipeline:
-        description: Include the Linux X11 display and encoder comparison with protocol_only
+        description: Include native desktop display and encoder comparisons with protocol_only
         type: boolean
         default: false
       host_only:

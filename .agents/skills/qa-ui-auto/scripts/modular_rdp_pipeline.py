@@ -1,10 +1,11 @@
-"""Compare the Linux RDP display/encoder with and without the native hop."""
+"""Compare the native RDP display and encoder on one hosted desktop."""
 
 import argparse
 from contextlib import contextmanager
 import json
 import os
 from pathlib import Path
+import platform
 import secrets
 import signal
 import subprocess
@@ -16,7 +17,7 @@ from qa_ui_auto.native_steps import NativeStepContext, run_native_step
 from qa_ui_auto.testcase import load_case, step_verb_and_args
 
 CASE = Path("qa-ui-auto-tests/cases/TC-RDPS-PERF-01-performance-budget.testcase.yaml")
-SERVER = "servers::rdp::host_perf::serve_x11"
+SERVER = "servers::rdp::host_perf::serve_desktop"
 ROUTES = ("in-process", "encoder-host")
 
 
@@ -60,11 +61,12 @@ def wait_for_listener(process, path):
 
 @contextmanager
 def trial_server(binary, route, directory):
+    windows = platform.system() == "Windows"
     with (directory / "server.log").open("wb") as log:
         process = subprocess.Popen(
             [str(binary), "--ignored", "--exact", SERVER, "--nocapture"],
             env={**os.environ, "QA_RDP_GATE_ROUTE": route, "QA_RDP_GATE_REPORT": str(directory)},
-            stdin=subprocess.PIPE, stdout=log, stderr=subprocess.STDOUT, start_new_session=True,
+            stdin=subprocess.PIPE, stdout=log, stderr=subprocess.STDOUT, start_new_session=not windows,
         )
     try:
         encoder = wait_for_listener(process, directory / "encoder.json")
@@ -76,7 +78,11 @@ def trial_server(binary, route, directory):
         try:
             status = process.wait(timeout=15)
         except subprocess.TimeoutExpired:
-            os.killpg(process.pid, signal.SIGKILL)
+            if windows:
+                subprocess.run(["taskkill.exe", "/PID", str(process.pid), "/T", "/F"],
+                               capture_output=True, timeout=10)
+            else:
+                os.killpg(process.pid, signal.SIGKILL)
             process.wait(timeout=10)
             raise RuntimeError("RDP trial did not exit after closing its control pipe")
         if status:
@@ -84,12 +90,15 @@ def trial_server(binary, route, directory):
 
 
 def measure(binary, probe, root):
+    system = platform.system()
+    if system not in {"Linux", "Windows"}:
+        raise RuntimeError("The desktop encoder comparison supports Linux and Windows")
     case = load_case(CASE)
     root.mkdir(parents=True, exist_ok=False)
     report = {
         "case": case.id, "caseSha256": digest(CASE),
         "harnessSha256": digest(binary), "probeSha256": digest(probe),
-        "trials": [],
+        "platform": system, "platformVersion": platform.version(), "trials": [],
     }
     config = {"app": {"rdp_probe_binary": str(probe)}}
     environment = {"QA_RDP_USER": "qa-rdp", "QA_RDP_PASSWORD": "Qa1_" + secrets.token_hex(12)}
@@ -114,7 +123,7 @@ def measure(binary, probe, root):
                         transport = read_json(directory / "transport.json")
                         if transport["bitmaps"] == 0 or transport["bitmapBytes"] == 0:
                             raise RuntimeError("No screen pixels reached the encoder host")
-                        if scenario == "throughput" and transport["damageRegions"] == 0:
+                        if system == "Linux" and scenario == "throughput" and transport["damageRegions"] == 0:
                             raise RuntimeError("The animation produced no damage regions across the hop")
                         receipt["transport"] = transport
                     receipt["passed"] = True

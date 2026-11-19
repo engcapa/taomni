@@ -230,13 +230,16 @@ jobs:
 
   rdp-pipeline:
     if: inputs.rdp_pipeline
-    name: Linux X11 RDP encoder host comparison
-    runs-on: ubuntu-24.04
-    timeout-minutes: 50
+    name: Native RDP encoder host comparison (${{ matrix.os }})
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-24.04, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 90
     env:
       PYTHONPATH: .agents/skills/qa-ui-auto/scripts
       PYTHONUNBUFFERED: '1'
-      XDG_SESSION_TYPE: x11
     steps:
       - uses: actions/checkout@v4
         with:
@@ -250,6 +253,7 @@ jobs:
         with:
           repo-token: ${{ secrets.GITHUB_TOKEN }}
       - name: Install native X11 and build dependencies
+        if: runner.os == 'Linux'
         run: |
           sudo apt-get -o Acquire::Retries=3 update
           sudo apt-get -o Acquire::Retries=3 install -y --no-install-recommends \
@@ -259,7 +263,7 @@ jobs:
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
-          shared-key: modular-rdp-pipeline-${{ runner.os }}-${{ runner.arch }}
+          shared-key: modular-rdp-pipeline-${{ matrix.os }}-${{ runner.arch }}
           cache-on-failure: true
       - name: Build the release test harness and probe
         shell: bash
@@ -292,14 +296,22 @@ jobs:
         run: |
           set -o pipefail
           read -r harness < rdp-pipeline-evidence/harness-path.txt
+          if [[ "$RUNNER_OS" == Windows ]]; then harness="$(cygpath -u "$harness")"; fi
           "$harness" --exact servers::rdp::host_perf::bitmap::validates_dimensions_stride_and_damage_offsets_before_allocating_pixels
-          xvfb-run -a -s '-noreset -screen 0 1920x1080x24 +extension DAMAGE +extension MIT-SHM -nolisten tcp' \
-            python .agents/skills/qa-ui-auto/scripts/modular_rdp_pipeline.py \
-            "$harness" src-tauri/target/release/rdp-probe rdp-pipeline-evidence/comparison \
+          runner=()
+          probe=src-tauri/target/release/rdp-probe
+          if [[ "$RUNNER_OS" == Linux ]]; then
+            export XDG_SESSION_TYPE=x11
+            runner=(xvfb-run -a -s '-noreset -screen 0 1920x1080x24 +extension DAMAGE +extension MIT-SHM -nolisten tcp')
+          else
+            probe+=.exe
+          fi
+          "${runner[@]}" python .agents/skills/qa-ui-auto/scripts/modular_rdp_pipeline.py \
+            "$harness" "$probe" rdp-pipeline-evidence/comparison \
             2>&1 | tee rdp-pipeline-evidence/comparison.log
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: modular-rdp-pipeline-Linux-X64
+          name: modular-rdp-pipeline-${{ runner.os }}-${{ runner.arch }}
           path: rdp-pipeline-evidence
           if-no-files-found: error
