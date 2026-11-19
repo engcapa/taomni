@@ -120,7 +120,11 @@ steps:
     contains: External editor changed the preview
 - assert_no_runtime_errors: null
 - screenshot: explorer-native-clipboard-terminal-preview.png
-- click: '[data-testid="tab-item"][data-tab-type="terminal"] [data-testid="tab-close"]'
+- right_click: '[data-testid="tab-item"][data-tab-type="terminal"]'
+- click: '[data-testid="context-menu-item-close"]'
+- wait_for:
+    selector: '[data-testid="tab-item"][data-tab-type="terminal"]'
+    state: detached
 - click: '[data-testid="tab-item"][data-tab-type="file-browser"]'
 - click: '[data-testid="explorer-preview-close"]'
 - assert_localstorage:
@@ -234,39 +238,39 @@ verification:
     - 28
     - 30
     - 31
-    - 57
-    - 66
+    - 59
     - 68
-    - 69
+    - 70
+    - 71
     checkpoints:
     - step: 29
       expectation: Bottom position applies before the OS-process restart.
     - step: 32
       expectation: Wrap is persisted.
-    - step: 62
-      expectation: Current native directory restores after the verified OS-process restart, not a WebView reload.
-    - step: 63
-      expectation: Restore does not duplicate Explorer.
     - step: 64
-      expectation: Bottom position restores.
+      expectation: Current native directory restores after the verified OS-process restart, not a WebView reload.
     - step: 65
+      expectation: Restore does not duplicate Explorer.
+    - step: 66
+      expectation: Bottom position restores.
+    - step: 67
       expectation: Wrap restores.
-    - step: 71
-      expectation: Force-new from terminal adds exactly one Explorer.
-    - step: 72
-      expectation: Both same-cwd Explorer panes remain independently mounted.
     - step: 73
+      expectation: Force-new from terminal adds exactly one Explorer.
+    - step: 74
+      expectation: Both same-cwd Explorer panes remain independently mounted.
+    - step: 75
       expectation: No runtime errors after native restore and new tab.
     results:
     - 29
     - 32
-    - 62
-    - 63
     - 64
     - 65
-    - 71
-    - 72
+    - 66
+    - 67
     - 73
+    - 74
+    - 75
   visual:
   - check: Native packaged preview, terminal context menu and Explorer tabs.
     method: manual
