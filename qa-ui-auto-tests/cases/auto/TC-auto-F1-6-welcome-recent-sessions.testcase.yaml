@@ -51,11 +51,9 @@ verification:
     checkpoints:
     - step: 2
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 15
-      expectation: '{"click": "[data-testid=\"tao-home-history-tab-sessions\"]"}'
-    - step: 16
+    - step: 17
       expectation: '{"assert_text": {"selector": "[data-testid=\"tao-home-history-popover\"]", "contains": "qa-ui-auto-welcome-recent"}}'
-    results: [16]
+    results: [17]
   visual:
   - check: Tao Home history remains readable and the saved session row is visible.
     method: manual
