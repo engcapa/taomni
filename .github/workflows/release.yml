@@ -24,6 +24,11 @@ on:
         default: both
         type: choice
         options: [both, x86_64, aarch64]
+      macos_runner:
+        description: "Apple Silicon runner for artifact-only macOS builds."
+        default: macos-15
+        type: choice
+        options: [macos-15, macos-26]
       test_version:
         description: "Optional SemVer override for artifact-only upgrade tests; package.json is unchanged."
         required: false
@@ -47,6 +52,7 @@ jobs:
       build_desktop: ${{ steps.plan.outputs.build_desktop }}
       macos_aarch64: ${{ steps.plan.outputs.macos_aarch64 }}
       macos_x86_64: ${{ steps.plan.outputs.macos_x86_64 }}
+      macos_runner: ${{ steps.plan.outputs.macos_runner }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -61,6 +67,7 @@ jobs:
           INPUT_RELEASE_TAG: ${{ inputs.tag }}
           INPUT_PLATFORMS: ${{ inputs.platforms }}
           INPUT_MACOS_ARCH: ${{ inputs.macos_arch }}
+          INPUT_MACOS_RUNNER: ${{ inputs.macos_runner }}
           RELEASE_TEST_VERSION: ${{ inputs.test_version }}
         run: node scripts/resolve-release-build.mjs
 
@@ -328,9 +335,7 @@ jobs:
   build-macos:
     needs: plan
     name: Bundle (macOS)
-    # Pin the major runner image instead of following the moving `macos-latest`
-    # label. GitHub's macos-15 standard image is arm64 (Apple Silicon).
-    runs-on: macos-15
+    runs-on: ${{ needs.plan.outputs.macos_runner }}
     env:
       # Direct cargo tests run before Tauri exports minimumSystemVersion.
       # Keep native C/C++ dependencies on the same floor as the app bundle.

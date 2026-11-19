@@ -23,9 +23,13 @@ export function releaseBuildPlan(env, packageVersion) {
   }
   const platforms = manual ? env.INPUT_PLATFORMS || "all" : "all";
   const arch = manual ? env.INPUT_MACOS_ARCH || "both" : "both";
+  const macosRunner = manual && !tag ? env.INPUT_MACOS_RUNNER || "macos-15" : "macos-15";
   const testVersion = manual ? env.RELEASE_TEST_VERSION || "" : "";
   if (!["all", "macos"].includes(platforms) || !["both", "aarch64", "x86_64"].includes(arch)) {
     throw new Error("Unsupported build platform or macOS architecture.");
+  }
+  if (!["macos-15", "macos-26"].includes(macosRunner)) {
+    throw new Error("Unsupported macOS build runner.");
   }
   validateTestVersion(testVersion, tag);
   if (tag && (platforms !== "all" || arch !== "both")) {
@@ -38,6 +42,7 @@ export function releaseBuildPlan(env, packageVersion) {
     build_desktop: String(platforms === "all"),
     macos_aarch64: String(arch !== "x86_64"),
     macos_x86_64: String(arch !== "aarch64"),
+    macos_runner: macosRunner,
   };
 }
 
