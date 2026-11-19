@@ -23,6 +23,10 @@ timeout_sec: 240
 steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-ws-plain-files
+- seed_storage:
+    key: taomni.fileOpen.preferences.v1
+    value: '{"associations":{"md":"workspace"}}'
+- reload_window: null
 - observe_language_startup: null
 - click: '[data-testid="nav-mode-workspaces"]'
 - wait_for: '[data-testid="code-workspace-tree-empty"]'
@@ -159,105 +163,105 @@ verification:
     requirement: Ordinary documents are usable and persist saved content without automatic SDK/LSP discovery; the explicit SDK dialog and Refresh still
       resolve the real root.
     actions:
-    - 4
-    - 7
-    - 8
+    - 6
     - 9
     - 10
-    - 13
-    - 14
-    - 18
-    - 22
-    - 26
-    - 30
-    - 35
-    - 36
-    - 37
-    - 39
-    - 40
-    - 43
-    - 44
-    - 47
-    - 51
-    - 53
-    results:
-    - 6
+    - 11
     - 12
+    - 15
     - 16
-    - 17
     - 20
-    - 21
     - 24
-    - 25
     - 28
-    - 29
     - 32
-    - 33
-    - 34
+    - 37
     - 38
+    - 39
+    - 41
     - 42
     - 45
     - 46
-    - 50
+    - 49
+    - 53
+    - 55
+    results:
+    - 8
+    - 14
+    - 18
+    - 19
+    - 22
+    - 23
+    - 26
+    - 27
+    - 30
+    - 31
+    - 34
+    - 35
+    - 36
+    - 40
+    - 44
+    - 47
+    - 48
     - 52
     - 54
-    - 55
+    - 56
+    - 57
     checkpoints:
-    - step: 6
+    - step: 8
       expectation: '{"assert_language_startup": {"commands": {"sdk_get_registry": {"equal": 0}, "sdk_analyze_workspace": {"equal": 0}, "sdk_resolve_workspace":
         {"equal": 0}, "lsp_detect_servers": {"equal": 0}, "lsp_discover_java_bundles": {"equal": 0}, "lsp_open_document": {"equal": 0}, "lsp_document_status":
         {"equal": 0}}, "quiet_ms": 500}}'
-    - step: 12
+    - step: 14
       expectation: '{"assert_language_startup": {"commands": {"sdk_get_registry": {"equal": 0}, "sdk_analyze_workspace": {"equal": 0}, "sdk_resolve_workspace":
         {"equal": 0}, "lsp_detect_servers": {"equal": 0}, "lsp_discover_java_bundles": {"equal": 0}, "lsp_open_document": {"equal": 0}, "lsp_document_status":
         {"equal": 0}}, "quiet_ms": 500}}'
-    - step: 16
+    - step: 18
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-tab\"][data-active=\"true\"]", "name": "data-tab-title", "equals": "notes.txt"}}'
-    - step: 17
+    - step: 19
       expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-line:first-child", "equals": "Weekly notes"}}'
-    - step: 20
+    - step: 22
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-tab\"][data-active=\"true\"]", "name": "data-tab-title", "equals": "budget.csv"}}'
-    - step: 21
+    - step: 23
       expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-line:first-child", "equals": "item,amount"}}'
-    - step: 24
+    - step: 26
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-tab\"][data-active=\"true\"]", "name": "data-tab-title", "equals": "preferences.json"}}'
-    - step: 25
+    - step: 27
       expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-line:first-child", "equals": "{\"language\":\"auto\",\"plainDocument\":true}"}}'
-    - step: 28
+    - step: 30
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-tab\"][data-active=\"true\"]", "name": "data-tab-title", "equals": "service.log"}}'
-    - step: 29
+    - step: 31
       expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-line:first-child", "equals": "2026-10-29 INFO ready"}}'
-    - step: 32
+    - step: 34
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-tab\"][data-active=\"true\"]", "name": "data-tab-title", "equals": "README.md"}}'
-    - step: 33
+    - step: 35
       expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-line:first-child", "equals": "# platform workspace
         root"}}'
-    - step: 34
+    - step: 36
       expectation: '{"assert_language_startup": {"commands": {"sdk_get_registry": {"equal": 0}, "sdk_analyze_workspace": {"equal": 0}, "sdk_resolve_workspace":
         {"equal": 0}, "lsp_detect_servers": {"equal": 0}, "lsp_discover_java_bundles": {"equal": 0}, "lsp_open_document": {"equal": 0}, "lsp_document_status":
         {"equal": 0}}, "quiet_ms": 500}}'
-    - step: 38
+    - step: 40
       expectation: '{"assert_visible": "[data-testid=\"workspace-editor-save\"]:disabled"}'
-    - step: 42
+    - step: 44
       expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "equals": "Ordinary document saved without
         SDK"}}'
-    - step: 45
+    - step: 47
       expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "equals": "Ordinary document saved without
         SDK"}}'
-    - step: 46
+    - step: 48
       expectation: '{"assert_language_startup": {"commands": {"sdk_get_registry": {"equal": 0}, "sdk_analyze_workspace": {"equal": 0}, "sdk_resolve_workspace":
         {"equal": 0}, "lsp_detect_servers": {"equal": 0}, "lsp_discover_java_bundles": {"equal": 0}, "lsp_open_document": {"equal": 0}, "lsp_document_status":
         {"equal": 0}}, "quiet_ms": 500}}'
-    - step: 50
+    - step: 52
       expectation: '{"assert_language_startup": {"commands": {"sdk_get_registry": {"min": 1, "pending": 0}, "sdk_resolve_workspace": {"min": 1, "pending":
         0}, "lsp_open_document": {"equal": 0}}}}'
-    - step: 52
+    - step: 54
       expectation: '{"assert_language_startup": {"commands": {"sdk_get_registry": {"min": 2, "pending": 0}, "sdk_resolve_workspace": {"min": 2, "pending":
         0}, "lsp_open_document": {"equal": 0}}}}'
-    - step: 54
+    - step: 56
       expectation: '{"assert_text_equals": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "equals": "Ordinary document saved without
         SDK"}}'
-    - step: 55
+    - step: 57
       expectation: '{"assert_no_runtime_errors": null}'
   visual:
   - check: Readable file rows, editor and SDK dialog.

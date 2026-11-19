@@ -22,6 +22,10 @@ timeout_sec: 240
 steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-ws-native-menu
+- seed_storage:
+    key: taomni.fileOpen.preferences.v1
+    value: '{"associations":{"md":"workspace"}}'
+- reload_window: null
 - click: '[data-testid="nav-mode-workspaces"]'
 - wait_for: '[data-testid="code-workspace-tree-empty"]'
 - native_menu:
@@ -137,40 +141,38 @@ verification:
     actions:
     - 1
     - 2
-    - 3
-    - 6
-    - 9
+    - 5
+    - 8
     - 11
     - 13
-    - 14
     - 15
     - 16
+    - 17
     - 18
-    - 22
+    - 20
     - 24
-    - 27
-    - 31
-    - 34
+    - 26
+    - 29
+    - 33
     - 36
     - 38
-    - 42
-    - 43
-    - 47
+    - 40
+    - 44
+    - 45
     - 49
+    - 51
     results:
-    - 4
-    - 5
     - 6
     - 7
     - 8
+    - 9
     - 10
     - 12
-    - 17
+    - 14
     - 19
-    - 20
     - 21
+    - 22
     - 23
-    - 24
     - 25
     - 26
     - 27
@@ -180,81 +182,83 @@ verification:
     - 31
     - 32
     - 33
+    - 34
     - 35
     - 37
     - 39
-    - 40
     - 41
-    - 44
-    - 45
+    - 42
+    - 43
     - 46
+    - 47
     - 48
     - 50
-    - 51
+    - 52
+    - 53
     checkpoints:
-    - step: 4
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-empty\"]"}'
-    - step: 5
-      expectation: '{"native_menu": {"action": "close-active", "enabled": false}}'
     - step: 6
-      expectation: '{"native_menu": {"action": "toggle-quick-connect", "enabled": true, "checked": false, "activate": true}}'
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-empty\"]"}'
     - step: 7
-      expectation: '{"wait_for": "[data-testid=\"quick-connect\"]"}'
-    - step: 8
-      expectation: '{"native_menu": {"action": "toggle-quick-connect", "enabled": true, "checked": true}}'
-    - step: 10
-      expectation: '{"wait_for": "[data-testid=\"about-dialog\"]"}'
-    - step: 12
-      expectation: '{"assert_not_visible": "[data-testid=\"about-dialog\"]"}'
-    - step: 17
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"][data-path=\"README.md\"]"}'
-    - step: 19
-      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"] .cm-content"}'
-    - step: 20
-      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "platform workspace root"}}'
-    - step: 21
-      expectation: '{"native_menu": {"action": "workspace-command:workspace.save", "enabled": false}}'
-    - step: 23
-      expectation: '{"wait_for": "[data-testid=\"workspace-editor-save\"]:not(:disabled)"}'
-    - step: 24
-      expectation: '{"native_menu": {"action": "workspace-command:workspace.save", "enabled": true, "activate": true}}'
-    - step: 25
-      expectation: '{"wait_for": "[data-testid=\"workspace-editor-save\"]:disabled"}'
-    - step: 26
-      expectation: '{"native_menu": {"action": "workspace-command:workspace.save", "enabled": false}}'
-    - step: 27
-      expectation: '{"native_menu": {"action": "close-active", "enabled": true, "activate": true}}'
-    - step: 28
-      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tab\"]", "equal": 0}}'
-    - step: 29
-      expectation: '{"assert_not_visible": "[data-testid=\"workspace-file-editor\"]"}'
-    - step: 30
       expectation: '{"native_menu": {"action": "close-active", "enabled": false}}'
-    - step: 31
-      expectation: '{"native_menu": {"action": "toggle-quick-connect", "enabled": true, "checked": true, "activate": true}}'
-    - step: 32
-      expectation: '{"assert_not_visible": "[data-testid=\"quick-connect\"]"}'
-    - step: 33
-      expectation: '{"native_menu": {"action": "toggle-quick-connect", "enabled": true, "checked": false}}'
-    - step: 35
+    - step: 8
+      expectation: '{"native_menu": {"action": "toggle-quick-connect", "enabled": true, "checked": false, "activate": true}}'
+    - step: 9
+      expectation: '{"wait_for": "[data-testid=\"quick-connect\"]"}'
+    - step: 10
+      expectation: '{"native_menu": {"action": "toggle-quick-connect", "enabled": true, "checked": true}}'
+    - step: 12
       expectation: '{"wait_for": "[data-testid=\"about-dialog\"]"}'
-    - step: 37
+    - step: 14
       expectation: '{"assert_not_visible": "[data-testid=\"about-dialog\"]"}'
-    - step: 39
-      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "Public native menu save"}}'
-    - step: 40
-      expectation: '{"native_menu": {"action": "close-active", "enabled": true}}'
-    - step: 41
-      expectation: '{"assert_no_runtime_errors": null}'
-    - step: 44
+    - step: 19
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"][data-path=\"README.md\"]"}'
+    - step: 21
       expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"] .cm-content"}'
-    - step: 45
-      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "Public native menu save"}}'
-    - step: 46
+    - step: 22
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "platform workspace root"}}'
+    - step: 23
       expectation: '{"native_menu": {"action": "workspace-command:workspace.save", "enabled": false}}'
-    - step: 48
+    - step: 25
+      expectation: '{"wait_for": "[data-testid=\"workspace-editor-save\"]:not(:disabled)"}'
+    - step: 26
+      expectation: '{"native_menu": {"action": "workspace-command:workspace.save", "enabled": true, "activate": true}}'
+    - step: 27
+      expectation: '{"wait_for": "[data-testid=\"workspace-editor-save\"]:disabled"}'
+    - step: 28
+      expectation: '{"native_menu": {"action": "workspace-command:workspace.save", "enabled": false}}'
+    - step: 29
+      expectation: '{"native_menu": {"action": "close-active", "enabled": true, "activate": true}}'
+    - step: 30
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tab\"]", "equal": 0}}'
+    - step: 31
+      expectation: '{"assert_not_visible": "[data-testid=\"workspace-file-editor\"]"}'
+    - step: 32
+      expectation: '{"native_menu": {"action": "close-active", "enabled": false}}'
+    - step: 33
+      expectation: '{"native_menu": {"action": "toggle-quick-connect", "enabled": true, "checked": true, "activate": true}}'
+    - step: 34
+      expectation: '{"assert_not_visible": "[data-testid=\"quick-connect\"]"}'
+    - step: 35
+      expectation: '{"native_menu": {"action": "toggle-quick-connect", "enabled": true, "checked": false}}'
+    - step: 37
       expectation: '{"wait_for": "[data-testid=\"about-dialog\"]"}'
-    - step: 50
+    - step: 39
       expectation: '{"assert_not_visible": "[data-testid=\"about-dialog\"]"}'
-    - step: 51
+    - step: 41
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "Public native menu save"}}'
+    - step: 42
+      expectation: '{"native_menu": {"action": "close-active", "enabled": true}}'
+    - step: 43
+      expectation: '{"assert_no_runtime_errors": null}'
+    - step: 46
+      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"] .cm-content"}'
+    - step: 47
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "Public native menu save"}}'
+    - step: 48
+      expectation: '{"native_menu": {"action": "workspace-command:workspace.save", "enabled": false}}'
+    - step: 50
+      expectation: '{"wait_for": "[data-testid=\"about-dialog\"]"}'
+    - step: 52
+      expectation: '{"assert_not_visible": "[data-testid=\"about-dialog\"]"}'
+    - step: 53
       expectation: '{"assert_no_runtime_errors": null}'
