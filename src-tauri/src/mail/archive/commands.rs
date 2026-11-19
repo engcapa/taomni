@@ -26,7 +26,7 @@ pub async fn mail_archive_status(
 ) -> Result<ArchiveStatus, String> {
     {
         let jobs = state
-            .core
+            .legacy
             .mail
             .mail_archive
             .jobs
@@ -53,7 +53,7 @@ pub async fn mail_archive_status(
     .await?;
     if !shared {
         if let Some(job) = state
-            .core
+            .legacy
             .mail
             .mail_archive
             .jobs
@@ -93,7 +93,7 @@ pub async fn mail_archive_pause(
     account_id: String,
     state: State<'_, AppState>,
 ) -> Result<(), String> {
-    state.core.mail.mail_archive.pause_account(&account_id)?;
+    state.legacy.mail.mail_archive.pause_account(&account_id)?;
     with_mail_db_async(&state, &account_id, |db, account| {
         db.execute(
             "INSERT INTO mail_archive_preferences(account_id,paused) VALUES(?1,1)
@@ -138,11 +138,11 @@ pub async fn mail_archive_start(
     let job =
         {
             let _changes =
-                state.core.mail.mail_archive.changes.try_lock().map_err(
+                state.legacy.mail.mail_archive.changes.try_lock().map_err(
                     |_| "Mail settings or backup snapshot is being saved; retry shortly",
                 )?;
             let mut jobs = state
-                .core
+                .legacy
                 .mail
                 .mail_archive
                 .jobs

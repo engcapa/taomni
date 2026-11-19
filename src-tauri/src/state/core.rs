@@ -14,7 +14,6 @@ pub struct CoreState {
     pub vault: Arc<crate::vault::Vault>,
     pub opencode_go_catalog: Arc<crate::llm::opencode_go::catalog::CatalogService>,
     pub workspace: WorkspaceRuntime,
-    pub mail: MailRuntime,
     pub terminal: TerminalRuntime,
     pub files: FileRuntime,
     pub database: DatabaseRuntime,
@@ -31,7 +30,6 @@ impl CoreState {
         vault: Arc<crate::vault::Vault>,
         profile: Arc<crate::runtime::profile::ProfileRuntimeLeases>,
     ) -> Self {
-        let mail_db_dir = paths.data.join("mail-cache");
         let sdk = Arc::new(crate::sdk::SdkManager::load(
             paths.config.join("taomni/sdk.json"),
         ));
@@ -47,12 +45,6 @@ impl CoreState {
             vault,
             opencode_go_catalog: crate::llm::opencode_go::catalog::shared_catalog(),
             workspace: WorkspaceRuntime { lsp, dap, sdk },
-            mail: MailRuntime {
-                mail_db_dir,
-                mail_dbs: Arc::new(Mutex::new(HashMap::new())),
-                mail_archive: crate::mail::archive::ArchiveManager::default(),
-                mail_imap_pool: Arc::new(crate::mail::MailImapPool::new()),
-            },
             terminal: TerminalRuntime {
                 terminals: Arc::new(RwLock::new(HashMap::new())),
                 terminal_outputs: Arc::new(crate::terminal::TerminalOutputHub::new()),

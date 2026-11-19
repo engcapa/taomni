@@ -54,13 +54,13 @@ pub fn save_mail_session(
 ) -> Result<(), String> {
     let target_root = configured_directory(&config.options_json, state.mail_cache_root())?;
     let _changes = state
-        .core
+        .legacy
         .mail
         .mail_archive
         .changes
         .lock()
         .map_err(|e| e.to_string())?;
-    state.core.mail.mail_archive.stop_account(&config.id)?;
+    state.legacy.mail.mail_archive.stop_account(&config.id)?;
     let handle = state.mail_db(&config.id)?;
     let mut db = handle.lock().map_err(|e| e.to_string())?;
     let _worker = super::super::coordination::ProcessLock::try_at(

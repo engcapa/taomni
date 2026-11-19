@@ -1,5 +1,6 @@
 //! Temporary in-process owners. Delete each field only with its verified host migration.
 //! This is 005-B debt; it is deliberately outside CoreState and PluginRegistry.
+use super::mail::MailRuntime;
 use crate::ai::AppAiCtx;
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -15,6 +16,7 @@ pub struct LegacyFeatureRuntime {
     // TASK-014: the in-process MFA backend remains a temporary owner until the
     // signed MFA host takes over every production command and migration path.
     pub(crate) mfa: crate::mfa::backend::MfaBackend,
+    pub(crate) mail: MailRuntime,
     // TASK-019: privileged helper/recovery/xray owner.
     pub sockscap: Arc<crate::sockscap::SocksCapRuntime>,
     // TASK-017/018: split real service and approval owners, not just this wrapper.
@@ -29,9 +31,14 @@ pub struct LegacyFeatureRuntime {
 }
 
 impl LegacyFeatureRuntime {
-    pub(crate) fn new(ai_ctx: AppAiCtx, mfa: crate::mfa::backend::MfaBackend) -> Self {
+    pub(crate) fn new(
+        ai_ctx: AppAiCtx,
+        mfa: crate::mfa::backend::MfaBackend,
+        mail: MailRuntime,
+    ) -> Self {
         Self {
             mfa,
+            mail,
             sockscap: Arc::new(crate::sockscap::SocksCapRuntime::new()),
             servers: Arc::new(crate::servers::ServerRegistry::new()),
             servers_tab_lock: Mutex::new(None),

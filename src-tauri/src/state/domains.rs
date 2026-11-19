@@ -1,6 +1,5 @@
 use super::{
-    CcPermissionResponder, CcToolResponder, MailDbHandle, ReadStreamHandle, SshAuthResponder,
-    WriteStreamHandle,
+    CcPermissionResponder, CcToolResponder, ReadStreamHandle, SshAuthResponder, WriteStreamHandle,
 };
 use crate::agent::acp_bridge::{AcpProcess, AcpThreadProcess};
 use crate::agent::cc_bridge::process::CcProcess;
@@ -10,12 +9,10 @@ use crate::database::DbSession;
 use crate::filebrowser::{sftp::ActiveSftp, transfer::TransferHandle};
 use crate::hbase::HBaseSession;
 use crate::lsp::LspManager;
-use crate::mail::MailImapPool;
 use crate::objectstorage::ObjectStorageSession;
 use crate::sdk::SdkManager;
 use crate::terminal::ActiveTerminal;
 use std::collections::HashMap;
-use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tokio::sync::RwLock;
 
@@ -27,20 +24,6 @@ pub struct WorkspaceRuntime {
     pub dap: Arc<crate::dap::DapManager>,
     /// Versioned SDK installations, defaults and per-workspace manual bindings.
     pub sdk: Arc<SdkManager>,
-}
-
-/// Runtime ownership for the mail domain.
-pub struct MailRuntime {
-    /// Directory containing one SQLite cache database per saved or transient mail
-    /// session. Mail caches are intentionally isolated from `taomni.db`, and
-    /// from each other, so mailbox refresh writes cannot block session CRUD.
-    pub(super) mail_db_dir: PathBuf,
-    pub(super) mail_dbs: Arc<Mutex<HashMap<String, MailDbHandle>>>,
-    /// Live IMAP sessions keyed by mail account/session id. Reuses TCP/TLS/auth
-    /// and any session-level proxy forwarder across mail commands. Never routes
-    /// through the app global proxy.
-    pub mail_imap_pool: Arc<MailImapPool>,
-    pub mail_archive: crate::mail::archive::ArchiveManager,
 }
 
 /// Runtime ownership for the terminal domain.

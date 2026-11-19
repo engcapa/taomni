@@ -6,7 +6,7 @@ mod mail;
 pub use core::CoreState;
 pub use domains::*;
 pub use legacy::LegacyFeatureRuntime;
-pub(crate) use mail::mail_db_file_stem;
+pub(crate) use mail::{MailRuntime, mail_db_file_stem};
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -64,14 +64,4 @@ pub struct AppState {
     pub plugin_downloads: Arc<crate::plugin::download::DownloadManager>,
     pub legacy: LegacyFeatureRuntime,
     pub(crate) _profile: Arc<crate::runtime::profile::ProfileRuntimeLeases>,
-}
-
-impl AppState {
-    pub fn mail_cache_root(&self) -> &std::path::Path {
-        self.core.mail_cache_root()
-    }
-
-    pub fn mail_db(&self, account_id: &str) -> Result<MailDbHandle, String> {
-        self.core.mail_db(account_id)
-    }
 }

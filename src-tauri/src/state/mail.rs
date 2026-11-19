@@ -1,36 +1,63 @@
-use super::{CoreState, MailDbHandle};
-use std::sync::Arc;
+use super::{AppState, MailDbHandle};
+use std::collections::HashMap;
+use std::path::{Path, PathBuf};
+use std::sync::{Arc, Mutex};
 
-impl CoreState {
-    /// Root of the per-account mail caches (`<app_data>/mail-cache`).
-    pub fn mail_cache_root(&self) -> &std::path::Path {
-        &self.mail.mail_db_dir
+pub(crate) struct MailRuntime {
+    // Each account's database is separate from taomni.db and other accounts.
+    cache_root: PathBuf,
+    databases: Mutex<HashMap<String, MailDbHandle>>,
+    // The pool also owns each connection's account-level proxy forwarder.
+    pub(crate) mail_imap_pool: Arc<crate::mail::MailImapPool>,
+    pub(crate) mail_archive: crate::mail::archive::ArchiveManager,
+}
+
+impl MailRuntime {
+    pub(crate) fn new(profile: &Path) -> Result<Self, String> {
+        let cache_root = profile.join("mail-cache");
+        std::fs::create_dir_all(&cache_root).map_err(|error| error.to_string())?;
+        Ok(Self {
+            cache_root,
+            databases: Mutex::new(HashMap::new()),
+            mail_imap_pool: Arc::new(crate::mail::MailImapPool::new()),
+            mail_archive: crate::mail::archive::ArchiveManager::default(),
+        })
     }
 
-    pub fn mail_db(&self, account_id: &str) -> Result<MailDbHandle, String> {
+    pub(crate) fn database(
+        &self,
+        account_id: &str,
+        load_options: impl FnOnce() -> Result<Option<String>, String>,
+    ) -> Result<MailDbHandle, String> {
         let stem = mail_db_file_stem(account_id);
-        let mut dbs = self.mail.mail_dbs.lock().map_err(|e| e.to_string())?;
+        let mut dbs = self.databases.lock().map_err(|e| e.to_string())?;
         if let Some(db) = dbs.get(&stem) {
             return Ok(Arc::clone(db));
         }
 
-        let configured = {
-            let db = self.db.lock().map_err(|e| e.to_string())?;
-            crate::session::db::get_session(&db, account_id)
-                .ok()
-                .map(|session| {
-                    crate::mail::storage::configured_directory(
-                        &session.options_json,
-                        &self.mail.mail_db_dir,
-                    )
-                })
-                .transpose()?
-                .unwrap_or_else(|| self.mail.mail_db_dir.clone())
-        };
+        let configured = load_options()?
+            .map(|options| crate::mail::storage::configured_directory(&options, &self.cache_root))
+            .transpose()?
+            .unwrap_or_else(|| self.cache_root.clone());
         let path = configured.join(format!("{stem}.db"));
         let handle = Arc::new(crate::mail::coordination::MailDatabase::new(path));
         dbs.insert(stem, Arc::clone(&handle));
         Ok(handle)
+    }
+}
+
+impl AppState {
+    pub fn mail_cache_root(&self) -> &Path {
+        &self.legacy.mail.cache_root
+    }
+
+    pub fn mail_db(&self, account_id: &str) -> Result<MailDbHandle, String> {
+        self.legacy.mail.database(account_id, || {
+            let db = self.core.db.lock().map_err(|error| error.to_string())?;
+            Ok(crate::session::db::get_session(&db, account_id)
+                .ok()
+                .map(|session| session.options_json))
+        })
     }
 }
 

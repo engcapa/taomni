@@ -40,7 +40,7 @@ pub async fn mail_sync_headers(
     };
     let do_list = should_list_remote_folders(refresh_folders, cached_folders.len());
 
-    let pool = Arc::clone(&state.core.mail.mail_imap_pool);
+    let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
     let mut result = tokio::task::spawn_blocking(move || {
         with_imap_session(
@@ -157,7 +157,7 @@ pub async fn mail_sync_folder(
         FolderSyncState::default()
     };
 
-    let pool = Arc::clone(&state.core.mail.mail_imap_pool);
+    let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
     let step_folder = folder.clone();
     let started_ms = sync::now_ms();
@@ -233,7 +233,7 @@ pub async fn mail_sync_all_folders(
         MailSyncRequestMode::Reconcile
     };
     let skip_unchanged = cache_enabled && reconcile_mode == MailSyncRequestMode::Reconcile;
-    let pool = Arc::clone(&state.core.mail.mail_imap_pool);
+    let pool = Arc::clone(&state.legacy.mail.mail_imap_pool);
     let handle = tokio::runtime::Handle::current();
     let listed = {
         let pool = Arc::clone(&pool);

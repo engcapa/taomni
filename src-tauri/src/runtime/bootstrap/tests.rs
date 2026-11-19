@@ -42,11 +42,19 @@ fn construction_is_explicit_and_preserves_lazy_optional_data_and_mail_identity()
             .is_ok()
     );
     let first = boot.state.mail_db("unknown-account").unwrap();
-    let second = boot.state.core.mail_db("unknown-account").unwrap();
+    let second = boot
+        .state
+        .legacy
+        .mail
+        .database("unknown-account", || {
+            panic!("A cached handle must not reload session options")
+        })
+        .unwrap();
     assert!(
         Arc::ptr_eq(&first, &second),
-        "compat facade must use the one core mail owner"
+        "compat facade must use the one legacy mail owner"
     );
+    assert_eq!(boot.state.mail_cache_root(), root.path().join("mail-cache"));
     assert_eq!(std::fs::read(lanchat).unwrap(), b"retained legacy bytes");
     assert_eq!(
         std::fs::read(root.path().join("mfa.db")).unwrap(),

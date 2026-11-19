@@ -240,7 +240,7 @@ fn create_backup_locked(
     staged_files.extend(protected.files);
 
     let mail_paths = if flags.mail {
-        Some(context.lock(&state.core.mail.mail_archive.changes)?)
+        Some(context.lock(&state.legacy.mail.mail_archive.changes)?)
     } else {
         None
     };

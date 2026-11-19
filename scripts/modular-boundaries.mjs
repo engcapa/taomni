@@ -74,7 +74,7 @@ function coreStateViolations(root) {
   if (!fs.existsSync(path.join(stateRoot, "core.rs"))) return errors;
   for (const name of ["core.rs", "domains.rs"]) {
     const source = fs.readFileSync(path.join(stateRoot, name), "utf8").replace(/\/\/[^\n]*/g, "");
-    if (/\bcrate\s*::\s*(?:mfa|servers|sockscap|vnc|rdp|mobile|asr)\s*::|\b(?:MfaStore|ServerRegistry|SocksCapRuntime|VncSession|RdpSession|MobileRuntime|AsrManager|AppAiCtx)\b/.test(source)) {
+    if (/\bcrate\s*::\s*(?:mfa|mail|servers|sockscap|vnc|rdp|mobile|asr)\s*::|\b(?:MfaStore|MailRuntime|MailImapPool|MailDbHandle|ServerRegistry|SocksCapRuntime|VncSession|RdpSession|MobileRuntime|AsrManager|AppAiCtx)\b/.test(source)) {
       errors.push(`src-tauri/src/state/${name}: core state cannot own optional feature implementation types`);
     }
   }

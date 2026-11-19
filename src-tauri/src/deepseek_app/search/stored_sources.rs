@@ -8,15 +8,11 @@ pub fn collect(state: &AppState, enabled: &BTreeMap<String, bool>) -> Result<Vec
     let mut result = Vec::new();
     let on = |source: &str| enabled.get(source) == Some(&true);
     if on("snapshots") || on("file_contents") {
-        // mail-cache and local-history are siblings in this app's isolated data
-        // directory. Never scan the user's home or read arbitrary source paths.
-        if let Some(data) = state.mail_cache_root().parent() {
-            result.extend(snapshot_entries(
-                &data.join("local-history"),
-                on("snapshots"),
-                on("file_contents"),
-            )?);
-        }
+        result.extend(snapshot_entries(
+            &state.core.paths.data.join("local-history"),
+            on("snapshots"),
+            on("file_contents"),
+        )?);
     }
     if on("mail") || on("mail_bodies") {
         let accounts = {
