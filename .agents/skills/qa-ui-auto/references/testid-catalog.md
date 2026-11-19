@@ -1970,6 +1970,7 @@
 ## main/tabs (F1.5)
 
 - `[data-testid="tab-bar"]` — display — F1.5.tab-bar
+- `[data-testid="context-menu-item-close"]` — interactive [optional] — F1.5.tab-context-close
 - `[data-testid="tab-item"]` — interactive — F1.5.tab-item
   ↳ `[data-testid="tab-item"][data-tab-type="welcome"]` — alias
   ↳ `:nth-match([data-testid="tab-item"][data-tab-type="file-browser"], 1)` — alias
@@ -2071,6 +2072,7 @@
 
 - `[data-testid="global-search-trigger"]` — interactive — F-WS-1.global-search-trigger
 - `[data-testid="home-sidebar-panel"]` — display — F-WS-1.home-sidebar-panel
+- `[data-testid="home-nav-agents"]` — interactive — F-WS-1.home-nav-agents
 - `[data-testid="nav-mode-home"]` — interactive — F-WS-1.nav-mode-home
 - `[data-testid="nav-mode-workspaces"]` — interactive — F-WS-1.nav-mode-workspaces
 - `[data-testid="right-sidebar"]` — display — F-WS-1.right-sidebar
@@ -2245,6 +2247,8 @@
 - `[data-testid="workspace-editor-save"]` — interactive — F-WS-2.workspace-editor-save
 - `[data-testid="workspace-switcher-option-default-workspace"]` — interactive — F-WS-2.workspace-switcher-option-default-workspace
 - `[data-testid="workspace-switcher-option-second-workspace"]` — interactive — F-WS-2.workspace-switcher-option-second-workspace
+- `[data-testid^="workspace-switcher-option-"]:has-text("QA other")` — interactive [optional] — F-WS-2.workspace-switcher-option-named
+  ↳ `[data-testid^="workspace-switcher-option-"]:not([data-testid="workspace-switcher-option-default-workspace"])` — alias
 - `[data-testid="workspace-layout-split"]` — interactive — F-WS-2.workspace-layout-split
 - `[data-testid="workspace-toolbar-bottom-dock"]` — interactive — F-WS-2.workspace-toolbar-bottom-dock
 - `[data-testid="workspace-canvas-panes"]` — display — F-WS-2.workspace-canvas-panes
@@ -3508,7 +3512,6 @@
 ## sftp (F7.2)
 
 - `[data-testid="sftp-browser"]` — display — F7.2.panel-root
-- `[role="dialog"][aria-modal="true"]:has-text("Open remote file?")` — display [optional] — F7.2.download-prompt-dialog
 - `[data-testid="sftp-local-pane"]` — display — F7.2.local-pane
 - `[data-testid="sftp-remote-pane"]` — display — F7.2.remote-pane
 - `[data-testid="sftp-local-list"]` — display — F7.2.local-list
@@ -3648,7 +3651,7 @@
 - `[data-testid="tao-home-history-tab-sessions"]` — interactive — F1.11.tao-home-history-tab-sessions
 - `[data-testid="tao-home-history-tab-workspaces"]` — interactive — F1.11.tao-home-history-tab-workspaces
 - `[data-testid="tao-home-history-tab-directories"]` — interactive — F1.11.tao-home-history-tab-directories
-- `.tao-home-history-search input` — interactive — F1.11.tao-home-history-search
+- `[data-testid="tao-home-history-search"]` — interactive — F1.11.tao-home-history-search
 - `[data-testid="tao-home-local-terminal"]` — interactive — F1.11.tao-home-local-terminal
 - `[data-testid="tao-home-wsl"]` — display [optional] — F1.11.tao-home-wsl
 - `[data-testid="tao-home-new-session"]` — interactive — F1.11.tao-home-new-session

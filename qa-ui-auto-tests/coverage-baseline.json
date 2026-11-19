@@ -2,9 +2,9 @@
   "version": 1,
   "totals": {
     "features_with_controls": 110,
-    "required": 2110,
+    "required": 2111,
     "covered_required": 1842,
-    "shallow": 61,
+    "shallow": 62,
     "orphans": 5
   },
   "features": {
@@ -436,7 +436,7 @@
     "F25.1": {
       "required": 56,
       "covered_required": 56,
-      "shallow": 0
+      "shallow": 1
     },
     "F25.5": {
       "required": 24,
@@ -509,7 +509,7 @@
       "shallow": 0
     },
     "F-WS-1": {
-      "required": 41,
+      "required": 42,
       "covered_required": 18,
       "shallow": 0
     },

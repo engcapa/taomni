@@ -279,7 +279,7 @@ controls:
   selector: '[data-testid="tao-home-history-tab-directories"]'
   kind: interactive
 - id: tao-home-history-search
-  selector: '.tao-home-history-search input'
+  selector: '[data-testid="tao-home-history-search"]'
   kind: interactive
 - id: tao-home-local-terminal
   selector: '[data-testid="tao-home-local-terminal"]'
@@ -919,6 +919,10 @@ controls:
 - id: tab-bar
   selector: '[data-testid="tab-bar"]'
   kind: display
+- id: tab-context-close
+  selector: '[data-testid="context-menu-item-close"]'
+  kind: interactive
+  optional: true       # tab context menu Close item
 - id: tab-item                 # individual tab; pair with [data-tab-type=...] / [data-tab-title=...] when targeting
   selector: '[data-testid="tab-item"]'
   aliases:
@@ -2960,10 +2964,6 @@ controls:
   - id: panel-root
     selector: '[data-testid="sftp-browser"]'
     kind: display
-  - id: download-prompt-dialog      # fixed overlay, no testid — addressed via role+title text
-    selector: '[role="dialog"][aria-modal="true"]:has-text("Open remote file?")'
-    kind: display
-    optional: true       # only after double-clicking a remote file
   - id: local-pane
     selector: '[data-testid="sftp-local-pane"]'
     kind: display
@@ -13374,6 +13374,9 @@ controls:
 - id: home-sidebar-panel
   selector: '[data-testid="home-sidebar-panel"]'
   kind: display
+- id: home-nav-agents
+  selector: '[data-testid="home-nav-agents"]'
+  kind: interactive
 - id: nav-mode-home
   selector: '[data-testid="nav-mode-home"]'
   kind: interactive
@@ -14010,6 +14013,12 @@ controls:
 - id: workspace-switcher-option-second-workspace
   selector: '[data-testid="workspace-switcher-option-second-workspace"]'
   kind: interactive
+- id: workspace-switcher-option-named
+  selector: '[data-testid^="workspace-switcher-option-"]:has-text("QA other")'
+  aliases:
+  - '[data-testid^="workspace-switcher-option-"]:not([data-testid="workspace-switcher-option-default-workspace"])'
+  kind: interactive
+  optional: true       # custom workspace created by the case under test
 - id: workspace-layout-split
   selector: '[data-testid="workspace-layout-split"]'
   kind: interactive
