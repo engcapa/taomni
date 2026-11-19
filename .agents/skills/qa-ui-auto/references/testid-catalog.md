@@ -1138,6 +1138,9 @@
 - `[data-testid="code-workspace-tree-open-explorer"]` — interactive — F-EXPLORER-1.code-workspace-tree-open-explorer
 - `[data-testid="code-workspace-tree-open-explorer-new"]` — interactive — F-EXPLORER-1.code-workspace-tree-open-explorer-new
 - `[data-testid="explorer-address"]` — interactive — F-EXPLORER-1.explorer-address
+- `[data-testid="explorer-address-edit"]` — interactive — F-EXPLORER-1.explorer-address-edit
+- `[data-testid="explorer-address-suggestions"]` — display — F-EXPLORER-1.explorer-address-suggestions
+- `[data-testid="explorer-crumbs"]` — display — F-EXPLORER-1.explorer-crumbs
 - `[data-testid="explorer-address-bar"]` — interactive — F-EXPLORER-1.explorer-address-bar
 - `[data-testid="explorer-address-error"]` — display — F-EXPLORER-1.explorer-address-error
 - `[data-testid="explorer-back"]` — interactive — F-EXPLORER-1.explorer-back
@@ -2031,7 +2034,7 @@
 - `select[aria-label="Terminal shell"]` — interactive [optional] — F1.6.shell-select
 - `[data-testid="welcome-open-home-folder"]` — interactive [optional] — F1.6.open-home-folder
 - `button[aria-label="Open as administrator"]` — interactive [optional] — F1.6.open-as-administrator
-- `[data-testid="tao-home-dock-row"]` — display — F1.6.launcher-dock
+- `[data-testid="welcome-panel"] [data-testid="tao-home-dock-row"]` — display — F1.6.launcher-dock
 - `[data-testid="welcome-panel"] [data-testid="tao-home-new-session"]` — interactive — F1.6.new-session-card-testid
 - `[data-testid="welcome-recent-sessions"]` — display — F1.6.recent-sessions-panel
 - `[data-testid="welcome-recent-filter"]` — interactive — F1.6.recent-filter
@@ -2070,8 +2073,8 @@
 - `[data-testid="welcome-restore-cancel"]` — interactive [optional] — F1.6.restore-cancel
 - `[data-testid="welcome-restore-clear"]` — interactive [optional] — F1.6.restore-clear
 - `text="Tips"` — display — F1.6.tips-section
-- `[data-testid="tao-home-shell-menu"]` — interactive — F1.6.shell-menu
-- `[data-testid="tao-home-dock-more"]` — interactive — F1.6.optional-launchers
+- `[data-testid="welcome-panel"] [data-testid="tao-home-shell-menu"]` — interactive — F1.6.shell-menu
+- `[data-testid="welcome-panel"] [data-testid="tao-home-dock-more"]` — interactive — F1.6.optional-launchers
 
 ## main/window (F1.3)
 

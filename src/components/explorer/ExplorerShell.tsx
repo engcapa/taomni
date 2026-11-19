@@ -41,7 +41,7 @@ export function ExplorerShell({ tabId, initialPath, workspaceId, active = true, 
   const [width, setWidth] = useState(1200);
   const [previewOverlay, setPreviewOverlay] = useState(false);
   const root = useRef<HTMLDivElement>(null);
-  const address = useRef<HTMLInputElement>(null);
+  const address = useRef<HTMLButtonElement>(null);
   const navigationId = useId();
   const resizeCleanup = useRef<(() => void) | null>(null);
   const dropPath = useExplorerDrop(root, operations);
@@ -95,7 +95,7 @@ export function ExplorerShell({ tabId, initialPath, workspaceId, active = true, 
     const key = event.key.toLowerCase();
     const editChord = mod && !event.shiftKey && !event.altKey && !(mac ? event.ctrlKey : event.metaKey);
     if (editChord && key === "l") {
-      event.preventDefault(); event.stopPropagation(); address.current?.focus(); address.current?.select(); return;
+      event.preventDefault(); event.stopPropagation(); address.current?.click(); return;
     }
     if (editable) return;
     const store = useSftpStore.getState();

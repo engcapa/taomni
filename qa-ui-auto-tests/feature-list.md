@@ -1103,7 +1103,7 @@ controls:
     kind: interactive
     optional: true       # only rendered when selected shell canElevate
   - id: launcher-dock
-    selector: '[data-testid="tao-home-dock-row"]'
+    selector: '[data-testid="welcome-panel"] [data-testid="tao-home-dock-row"]'
     kind: display
   - id: new-session-card-testid
     selector: '[data-testid="welcome-panel"] [data-testid="tao-home-new-session"]'
@@ -1232,10 +1232,10 @@ controls:
     selector: 'text="Tips"'
     kind: display
   - id: shell-menu
-    selector: '[data-testid="tao-home-shell-menu"]'
+    selector: '[data-testid="welcome-panel"] [data-testid="tao-home-shell-menu"]'
     kind: interactive
   - id: optional-launchers
-    selector: '[data-testid="tao-home-dock-more"]'
+    selector: '[data-testid="welcome-panel"] [data-testid="tao-home-dock-more"]'
     kind: interactive
 -->
 
@@ -15286,6 +15286,15 @@ controls:
   - id: explorer-address
     selector: '[data-testid="explorer-address"]'
     kind: interactive
+  - id: explorer-address-edit
+    selector: '[data-testid="explorer-address-edit"]'
+    kind: interactive
+  - id: explorer-address-suggestions
+    selector: '[data-testid="explorer-address-suggestions"]'
+    kind: display
+  - id: explorer-crumbs
+    selector: '[data-testid="explorer-crumbs"]'
+    kind: display
   - id: explorer-address-bar
     selector: '[data-testid="explorer-address-bar"]'
     kind: interactive

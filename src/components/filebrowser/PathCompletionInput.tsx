@@ -16,9 +16,10 @@ interface Props {
   detectWindows?: boolean;
   showHidden?: boolean;
   testId?: string;
+  label?: string;
 }
 
-export function PathCompletionInput({ path, value, onChange, onCommit, onCancel, listDirectory, homePath, detectWindows, showHidden, testId }: Props) {
+export function PathCompletionInput({ path, value, onChange, onCommit, onCancel, listDirectory, homePath, detectWindows, showHidden, testId, label }: Props) {
   const t = useT();
   const listId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -108,7 +109,7 @@ export function PathCompletionInput({ path, value, onChange, onCommit, onCancel,
     <input
       ref={inputRef}
       data-testid={testId}
-      aria-label={testId ?? t("fileBrowser.pathBreadcrumbEditTitle")}
+      aria-label={label ?? testId ?? t("fileBrowser.pathBreadcrumbEditTitle")}
       role="combobox"
       aria-autocomplete="list"
       aria-expanded={open}

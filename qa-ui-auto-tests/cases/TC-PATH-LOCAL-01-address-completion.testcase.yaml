@@ -6,6 +6,7 @@ description: Use a File session created through the editor. Browser seeds an iso
 covers:
 - F7.2
 - F7.5
+- F-EXPLORER-1
 tags:
 - p1
 - path-completion
@@ -38,194 +39,194 @@ steps:
 - dblclick: '[data-testid="session-tree-item"][data-session-name="qa-path-completion-local"]'
 - wait_for: '[data-testid="tab-item"][data-tab-type="file-browser"]'
 - assert_text:
-    selector: '[data-testid="sftp-local-list"]'
+    selector: '[data-testid="explorer-file-list"]'
     contains: project-alpha
-- click: '[data-testid="sftp-local-path-edit"]'
+- click: '[data-testid="explorer-address-edit"]'
 - fill:
-    selector: input[data-testid="sftp-local-path"]
+    selector: input[data-testid="explorer-address"]
     value: ${fixture.path_completion_root}/pro
 - assert_items:
-    selector: '[data-testid="sftp-local-path-suggestions"] [role="option"]'
+    selector: '[data-testid="explorer-address-suggestions"] [role="option"]'
     attribute: data-path
     equals:
     - ${fixture.path_completion_root}/project-alpha/
     - ${fixture.path_completion_root}/project-beta/
 - screenshot: local-folder-suggestions.png
 - press:
-    selector: input[data-testid="sftp-local-path"]
+    selector: input[data-testid="explorer-address"]
     key: Tab
 - assert_attribute:
-    selector: input[data-testid="sftp-local-path"]
+    selector: input[data-testid="explorer-address"]
     name: value
     equals: ${fixture.path_completion_root}/project-
 - eval_readonly:
-    expression: document.activeElement?.getAttribute("data-testid") === "sftp-local-path"
+    expression: document.activeElement?.getAttribute("data-testid") === "explorer-address"
     expect_truthy: true
 - press:
-    selector: input[data-testid="sftp-local-path"]
+    selector: input[data-testid="explorer-address"]
     key: ArrowUp
 - press:
-    selector: input[data-testid="sftp-local-path"]
+    selector: input[data-testid="explorer-address"]
     key: Tab
 - assert_attribute:
-    selector: input[data-testid="sftp-local-path"]
+    selector: input[data-testid="explorer-address"]
     name: value
     equals: ${fixture.path_completion_root}/project-beta/
 - eval_readonly:
-    expression: document.activeElement?.getAttribute("data-testid") === "sftp-local-path"
+    expression: document.activeElement?.getAttribute("data-testid") === "explorer-address"
     expect_truthy: true
 - press:
-    selector: input[data-testid="sftp-local-path"]
+    selector: input[data-testid="explorer-address"]
     key: Escape
 - assert_text:
-    selector: '[data-testid="sftp-local-list"]'
+    selector: '[data-testid="explorer-file-list"]'
     contains: project-alpha
-- click: '[data-testid="sftp-local-path-edit"]'
+- click: '[data-testid="explorer-address-edit"]'
 - assert_attribute:
-    selector: input[data-testid="sftp-local-path"]
+    selector: input[data-testid="explorer-address"]
     name: value
     equals: ${fixture.path_completion_root}
 - fill:
-    selector: input[data-testid="sftp-local-path"]
+    selector: input[data-testid="explorer-address"]
     value: ${fixture.path_completion_root}/only
 - assert_items:
-    selector: '[data-testid="sftp-local-path-suggestions"] [role="option"]'
+    selector: '[data-testid="explorer-address-suggestions"] [role="option"]'
     attribute: data-path
     equals:
     - ${fixture.path_completion_root}/only space/
 - press:
-    selector: input[data-testid="sftp-local-path"]
+    selector: input[data-testid="explorer-address"]
     key: Tab
 - assert_attribute:
-    selector: input[data-testid="sftp-local-path"]
+    selector: input[data-testid="explorer-address"]
     name: value
     equals: ${fixture.path_completion_root}/only space/
 - assert_items:
-    selector: '[data-testid="sftp-local-path-suggestions"] [role="option"]'
+    selector: '[data-testid="explorer-address-suggestions"] [role="option"]'
     attribute: data-path
     equals:
     - ${fixture.path_completion_root}/only space/child/
 - press:
-    selector: input[data-testid="sftp-local-path"]
+    selector: input[data-testid="explorer-address"]
     key: Tab
 - assert_attribute:
-    selector: input[data-testid="sftp-local-path"]
+    selector: input[data-testid="explorer-address"]
     name: value
     equals: ${fixture.path_completion_root}/only space/child/
 - press:
-    selector: input[data-testid="sftp-local-path"]
+    selector: input[data-testid="explorer-address"]
     key: Enter
 - assert_text:
-    selector: '[data-testid="sftp-local-list"]'
+    selector: '[data-testid="explorer-file-list"]'
     contains: child-marker.txt
-- click: '[data-testid="sftp-local-back"]'
+- click: '[data-testid="explorer-back"]'
 - assert_text:
-    selector: '[data-testid="sftp-local-list"]'
+    selector: '[data-testid="explorer-file-list"]'
     contains: project-alpha
-- click: '[data-testid="sftp-local-forward"]'
+- click: '[data-testid="explorer-forward"]'
 - assert_text:
-    selector: '[data-testid="sftp-local-list"]'
+    selector: '[data-testid="explorer-file-list"]'
     contains: child-marker.txt
-- click: '[data-testid="sftp-local-up"]'
+- click: '[data-testid="explorer-up"]'
 - assert_text:
-    selector: '[data-testid="sftp-local-list"]'
+    selector: '[data-testid="explorer-file-list"]'
     contains: child
-- click: '[data-testid="sftp-local-back"]'
+- click: '[data-testid="explorer-back"]'
 - assert_text:
-    selector: '[data-testid="sftp-local-list"]'
+    selector: '[data-testid="explorer-file-list"]'
     contains: child-marker.txt
-- click: '[data-testid="sftp-local-back"]'
+- click: '[data-testid="explorer-back"]'
 - assert_text:
-    selector: '[data-testid="sftp-local-list"]'
+    selector: '[data-testid="explorer-file-list"]'
     contains: project-alpha
-- click: '[data-testid="sftp-local-path-edit"]'
+- click: '[data-testid="explorer-address-edit"]'
 - fill:
-    selector: input[data-testid="sftp-local-path"]
+    selector: input[data-testid="explorer-address"]
     value: pro
 - assert_items:
-    selector: '[data-testid="sftp-local-path-suggestions"] [role="option"]'
+    selector: '[data-testid="explorer-address-suggestions"] [role="option"]'
     attribute: data-path
     equals:
     - ${fixture.path_completion_root}/project-alpha/
     - ${fixture.path_completion_root}/project-beta/
-- click: '[data-testid="sftp-local-path-suggestions"] [role="option"][data-path="${fixture.path_completion_root}/project-beta/"]'
+- click: '[data-testid="explorer-address-suggestions"] [role="option"][data-path="${fixture.path_completion_root}/project-beta/"]'
 - assert_attribute:
-    selector: input[data-testid="sftp-local-path"]
+    selector: input[data-testid="explorer-address"]
     name: value
     equals: ${fixture.path_completion_root}/project-beta/
 - eval_readonly:
-    expression: document.activeElement?.getAttribute("data-testid") === "sftp-local-path"
+    expression: document.activeElement?.getAttribute("data-testid") === "explorer-address"
     expect_truthy: true
 - press:
-    selector: input[data-testid="sftp-local-path"]
+    selector: input[data-testid="explorer-address"]
     key: Enter
 - assert_text:
-    selector: '[data-testid="sftp-local-list"]'
+    selector: '[data-testid="explorer-file-list"]'
     contains: beta-marker.txt
-- click: '[data-testid="sftp-local-path-edit"]'
+- click: '[data-testid="explorer-address-edit"]'
 - fill:
-    selector: input[data-testid="sftp-local-path"]
+    selector: input[data-testid="explorer-address"]
     value: ${fixture.path_completion_root}/.
 - assert_items:
-    selector: '[data-testid="sftp-local-path-suggestions"] [role="option"]'
+    selector: '[data-testid="explorer-address-suggestions"] [role="option"]'
     attribute: data-path
     equals:
     - ${fixture.path_completion_root}/.hidden/
 - press:
-    selector: input[data-testid="sftp-local-path"]
+    selector: input[data-testid="explorer-address"]
     key: Tab
 - assert_attribute:
-    selector: input[data-testid="sftp-local-path"]
+    selector: input[data-testid="explorer-address"]
     name: value
     equals: ${fixture.path_completion_root}/.hidden/
 - press:
-    selector: input[data-testid="sftp-local-path"]
+    selector: input[data-testid="explorer-address"]
     key: Escape
 - assert_text:
-    selector: '[data-testid="sftp-local-list"]'
+    selector: '[data-testid="explorer-file-list"]'
     contains: beta-marker.txt
-- click: '[data-testid="sftp-local-path-edit"]'
+- click: '[data-testid="explorer-address-edit"]'
 - fill:
-    selector: input[data-testid="sftp-local-path"]
+    selector: input[data-testid="explorer-address"]
     value: ${fixture.path_completion_root}/zz-no-such-prefix
 - assert_text:
-    selector: '[data-testid="sftp-local-path-suggestions"]'
+    selector: '[data-testid="explorer-address-suggestions"]'
     contains: No matching folders
 - assert_items:
-    selector: '[data-testid="sftp-local-path-suggestions"] [role="option"]'
+    selector: '[data-testid="explorer-address-suggestions"] [role="option"]'
     attribute: data-path
     equals: []
 - fill:
-    selector: input[data-testid="sftp-local-path"]
+    selector: input[data-testid="explorer-address"]
     value: '''${fixture.path_completion_root}'''
-- blur: input[data-testid="sftp-local-path"]
+- blur: input[data-testid="explorer-address"]
 - assert_text:
-    selector: '[data-testid="sftp-local-list"]'
+    selector: '[data-testid="explorer-file-list"]'
     contains: project-alpha
-- click: '[data-testid="sftp-local-path-edit"]'
+- click: '[data-testid="explorer-address-edit"]'
 - fill:
-    selector: input[data-testid="sftp-local-path"]
+    selector: input[data-testid="explorer-address"]
     value: ${fixture.path_completion_root}/中文
 - assert_items:
-    selector: '[data-testid="sftp-local-path-suggestions"] [role="option"]'
+    selector: '[data-testid="explorer-address-suggestions"] [role="option"]'
     attribute: data-path
     equals:
     - ${fixture.path_completion_root}/中文目录/
 - press:
-    selector: input[data-testid="sftp-local-path"]
+    selector: input[data-testid="explorer-address"]
     key: Tab
 - assert_attribute:
-    selector: input[data-testid="sftp-local-path"]
+    selector: input[data-testid="explorer-address"]
     name: value
     equals: ${fixture.path_completion_root}/中文目录/
 - eval_readonly:
-    expression: document.activeElement?.getAttribute("data-testid") === "sftp-local-path"
+    expression: document.activeElement?.getAttribute("data-testid") === "explorer-address"
     expect_truthy: true
 - press:
-    selector: input[data-testid="sftp-local-path"]
+    selector: input[data-testid="explorer-address"]
     key: Escape
 - assert_text:
-    selector: '[data-testid="sftp-local-list"]'
+    selector: '[data-testid="explorer-file-list"]'
     contains: project-alpha
 verification:
   review: reviewed
@@ -277,73 +278,73 @@ verification:
     - step: 3
       expectation: '{"wait_for": {"selector": "[data-testid=\"session-new\"]", "timeout_sec": 60}}'
     - step: 14
-      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-local-list\"]", "contains": "project-alpha"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"explorer-file-list\"]", "contains": "project-alpha"}}'
     - step: 17
-      expectation: '{"assert_items": {"selector": "[data-testid=\"sftp-local-path-suggestions\"] [role=\"option\"]", "attribute": "data-path", "equals": ["${fixture.path_completion_root}/project-alpha/",
+      expectation: '{"assert_items": {"selector": "[data-testid=\"explorer-address-suggestions\"] [role=\"option\"]", "attribute": "data-path", "equals": ["${fixture.path_completion_root}/project-alpha/",
         "${fixture.path_completion_root}/project-beta/"]}}'
     - step: 20
-      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-local-path\"]", "name": "value", "equals": "${fixture.path_completion_root}/project-"}}'
+      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"explorer-address\"]", "name": "value", "equals": "${fixture.path_completion_root}/project-"}}'
     - step: 21
-      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(\"data-testid\") === \"sftp-local-path\"", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(\"data-testid\") === \"explorer-address\"", "expect_truthy": true}}'
     - step: 24
-      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-local-path\"]", "name": "value", "equals": "${fixture.path_completion_root}/project-beta/"}}'
+      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"explorer-address\"]", "name": "value", "equals": "${fixture.path_completion_root}/project-beta/"}}'
     - step: 25
-      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(\"data-testid\") === \"sftp-local-path\"", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(\"data-testid\") === \"explorer-address\"", "expect_truthy": true}}'
     - step: 27
-      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-local-list\"]", "contains": "project-alpha"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"explorer-file-list\"]", "contains": "project-alpha"}}'
     - step: 29
-      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-local-path\"]", "name": "value", "equals": "${fixture.path_completion_root}"}}'
+      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"explorer-address\"]", "name": "value", "equals": "${fixture.path_completion_root}"}}'
     - step: 31
-      expectation: '{"assert_items": {"selector": "[data-testid=\"sftp-local-path-suggestions\"] [role=\"option\"]", "attribute": "data-path", "equals": ["${fixture.path_completion_root}/only
+      expectation: '{"assert_items": {"selector": "[data-testid=\"explorer-address-suggestions\"] [role=\"option\"]", "attribute": "data-path", "equals": ["${fixture.path_completion_root}/only
         space/"]}}'
     - step: 33
-      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-local-path\"]", "name": "value", "equals": "${fixture.path_completion_root}/only space/"}}'
+      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"explorer-address\"]", "name": "value", "equals": "${fixture.path_completion_root}/only space/"}}'
     - step: 34
-      expectation: '{"assert_items": {"selector": "[data-testid=\"sftp-local-path-suggestions\"] [role=\"option\"]", "attribute": "data-path", "equals": ["${fixture.path_completion_root}/only
+      expectation: '{"assert_items": {"selector": "[data-testid=\"explorer-address-suggestions\"] [role=\"option\"]", "attribute": "data-path", "equals": ["${fixture.path_completion_root}/only
         space/child/"]}}'
     - step: 36
-      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-local-path\"]", "name": "value", "equals": "${fixture.path_completion_root}/only space/child/"}}'
+      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"explorer-address\"]", "name": "value", "equals": "${fixture.path_completion_root}/only space/child/"}}'
     - step: 38
-      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-local-list\"]", "contains": "child-marker.txt"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"explorer-file-list\"]", "contains": "child-marker.txt"}}'
     - step: 40
-      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-local-list\"]", "contains": "project-alpha"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"explorer-file-list\"]", "contains": "project-alpha"}}'
     - step: 42
-      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-local-list\"]", "contains": "child-marker.txt"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"explorer-file-list\"]", "contains": "child-marker.txt"}}'
     - step: 44
-      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-local-list\"]", "contains": "child"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"explorer-file-list\"]", "contains": "child"}}'
     - step: 46
-      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-local-list\"]", "contains": "child-marker.txt"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"explorer-file-list\"]", "contains": "child-marker.txt"}}'
     - step: 48
-      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-local-list\"]", "contains": "project-alpha"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"explorer-file-list\"]", "contains": "project-alpha"}}'
     - step: 51
-      expectation: '{"assert_items": {"selector": "[data-testid=\"sftp-local-path-suggestions\"] [role=\"option\"]", "attribute": "data-path", "equals": ["${fixture.path_completion_root}/project-alpha/",
+      expectation: '{"assert_items": {"selector": "[data-testid=\"explorer-address-suggestions\"] [role=\"option\"]", "attribute": "data-path", "equals": ["${fixture.path_completion_root}/project-alpha/",
         "${fixture.path_completion_root}/project-beta/"]}}'
     - step: 53
-      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-local-path\"]", "name": "value", "equals": "${fixture.path_completion_root}/project-beta/"}}'
+      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"explorer-address\"]", "name": "value", "equals": "${fixture.path_completion_root}/project-beta/"}}'
     - step: 54
-      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(\"data-testid\") === \"sftp-local-path\"", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(\"data-testid\") === \"explorer-address\"", "expect_truthy": true}}'
     - step: 56
-      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-local-list\"]", "contains": "beta-marker.txt"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"explorer-file-list\"]", "contains": "beta-marker.txt"}}'
     - step: 59
-      expectation: '{"assert_items": {"selector": "[data-testid=\"sftp-local-path-suggestions\"] [role=\"option\"]", "attribute": "data-path", "equals": ["${fixture.path_completion_root}/.hidden/"]}}'
+      expectation: '{"assert_items": {"selector": "[data-testid=\"explorer-address-suggestions\"] [role=\"option\"]", "attribute": "data-path", "equals": ["${fixture.path_completion_root}/.hidden/"]}}'
     - step: 61
-      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-local-path\"]", "name": "value", "equals": "${fixture.path_completion_root}/.hidden/"}}'
+      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"explorer-address\"]", "name": "value", "equals": "${fixture.path_completion_root}/.hidden/"}}'
     - step: 63
-      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-local-list\"]", "contains": "beta-marker.txt"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"explorer-file-list\"]", "contains": "beta-marker.txt"}}'
     - step: 66
-      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-local-path-suggestions\"]", "contains": "No matching folders"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"explorer-address-suggestions\"]", "contains": "No matching folders"}}'
     - step: 67
-      expectation: '{"assert_items": {"selector": "[data-testid=\"sftp-local-path-suggestions\"] [role=\"option\"]", "attribute": "data-path", "equals": []}}'
+      expectation: '{"assert_items": {"selector": "[data-testid=\"explorer-address-suggestions\"] [role=\"option\"]", "attribute": "data-path", "equals": []}}'
     - step: 70
-      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-local-list\"]", "contains": "project-alpha"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"explorer-file-list\"]", "contains": "project-alpha"}}'
     - step: 73
-      expectation: '{"assert_items": {"selector": "[data-testid=\"sftp-local-path-suggestions\"] [role=\"option\"]", "attribute": "data-path", "equals": ["${fixture.path_completion_root}/中文目录/"]}}'
+      expectation: '{"assert_items": {"selector": "[data-testid=\"explorer-address-suggestions\"] [role=\"option\"]", "attribute": "data-path", "equals": ["${fixture.path_completion_root}/中文目录/"]}}'
     - step: 75
-      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"sftp-local-path\"]", "name": "value", "equals": "${fixture.path_completion_root}/中文目录/"}}'
+      expectation: '{"assert_attribute": {"selector": "input[data-testid=\"explorer-address\"]", "name": "value", "equals": "${fixture.path_completion_root}/中文目录/"}}'
     - step: 76
-      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(\"data-testid\") === \"sftp-local-path\"", "expect_truthy": true}}'
+      expectation: '{"eval_readonly": {"expression": "document.activeElement?.getAttribute(\"data-testid\") === \"explorer-address\"", "expect_truthy": true}}'
     - step: 78
-      expectation: '{"assert_text": {"selector": "[data-testid=\"sftp-local-list\"]", "contains": "project-alpha"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"explorer-file-list\"]", "contains": "project-alpha"}}'
     results:
     - 78
   visual:

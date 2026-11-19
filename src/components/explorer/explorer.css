@@ -31,7 +31,8 @@ html[data-app-theme="dark"] .ex-shell {
 .ex-address { flex:1; min-width:0; height:30px; border:1px solid var(--ex-input-b); background:var(--ex-input); border-radius:7px; display:flex; align-items:center; padding:0 4px; overflow:hidden; cursor:text; }
 .ex-address:focus-within { border-color:var(--ex-accent-s); box-shadow:0 0 0 2px color-mix(in srgb,var(--ex-accent-s) 25%,transparent); }
 .ex-address input { flex:1; min-width:0; height:100%; padding:0 8px; outline:none; background:transparent; }
-.ex-crumbs { display:flex; align-items:center; min-width:0; overflow:auto hidden; flex:1; height:100%; scrollbar-width:none; }
+.ex-crumbs { display:flex; align-items:center; min-width:0; overflow:auto hidden; flex:1; height:100%; scrollbar-width:thin; }
+.ex-address-edit { flex:none; }
 .ex-crumb { padding:0 6px; height:22px; border-radius:4px; display:inline-flex; align-items:center; flex-shrink:0; }
 .ex-crumb:hover { background:var(--ex-hover2); }
 .ex-crumb.last { font-weight:600; }
