@@ -1,0 +1,90 @@
+id: TC-FILE-OPEN-041
+title: Import draw.io sheets with named layers and embedded or offline images (browser)
+description: Select a sheet without the default root IDs, render its labels and images, preserve the original asset references, and reopen the saved Markdown.
+covers: [F-FILEOPEN-1, F-EXPLORER-1]
+fixtures: [reset_db, markdown_drawio_roundtrip]
+modes: [browser]
+tags: [p1, markdown, drawio, regression]
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-drawio-legacy-assets
+- reload_window: null
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-file-explorer"]'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Mod+l
+- fill:
+    selector: '[data-testid="explorer-address"]'
+    value: ${fixture.platform_workspace_root}
+- press:
+    selector: '[data-testid="explorer-address"]'
+    key: Enter
+- dblclick: '[data-testid="explorer-file-row"][data-name="drawio-roundtrip.md"]'
+- click: '[data-testid="markdown-live-edit"]'
+- click: '[data-testid="markdown-import-drawio"]'
+- upload_file:
+    selector: '[data-testid="markdown-drawio-input"]'
+    path: ${fixture.drawio_legacy_input}
+- wait_for:
+    selector: '[data-testid="markdown-drawio-import-preview"] svg'
+    timeout_sec: 40
+- assert_count:
+    selector: '[data-testid="markdown-drawio-sheet-check"]'
+    equal: 2
+- set_check:
+    selector: '[data-testid="markdown-drawio-sheet-check"][aria-label="Import sheet Plain example"]'
+    checked: false
+- click: '[data-testid="markdown-drawio-sheet-preview"][aria-pressed="false"]'
+- assert_text:
+    selector: '[data-testid="markdown-drawio-import-preview"] svg'
+    contains: Kubernetes service
+    timeout_sec: 40
+- eval_readonly:
+    expression: document.querySelector('.fv-md-drawio-preview svg foreignObject b')?.textContent.includes(String.fromCharCode(160))
+    expect_truthy: true
+- assert_count:
+    selector: '[data-testid="markdown-drawio-import-preview"] svg image[*|href^="data:image/"]'
+    equal: 3
+- assert_visible: '[data-testid="markdown-drawio-import-preview"] svg image[*|href^="data:image/png;base64,"]'
+- assert_count:
+    selector: '[data-testid="markdown-drawio-import-preview"] svg use[*|href^="#drawio-image-"]'
+    equal: 2
+- assert_text:
+    selector: '[data-testid="markdown-drawio-import-preview"]'
+    contains: 2 images unavailable offline
+- assert_disabled: '[data-testid="markdown-drawio-import-confirm"]'
+- click: '[data-testid="markdown-drawio-import-diagram"]'
+- click: '[data-testid="markdown-drawio-import-confirm"]'
+- click: '[data-testid="markdown-live-edit"]'
+- wait_for:
+    selector: '[data-testid="markdown-live"] .fv-md-drawio svg'
+    timeout_sec: 40
+- assert_text:
+    selector: '[data-testid="markdown-live"] .fv-md-drawio'
+    contains: 2 images unavailable offline
+- assert_not_visible: '[data-testid="markdown-drawio-import-dialog"]'
+- assert_count:
+    selector: '[data-testid="markdown-live"] .fv-md-drawio'
+    equal: 1
+- click: '[data-testid="viewer-save"]'
+- click: '[data-testid="markdown-mode-source"]'
+- assert_text:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    contains: 'id="legacy-layer"'
+- assert_text:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    contains: 'image=https://example.invalid/diagram-icon.png'
+- reload_window: null
+- wait_for: '[data-testid="markdown-editor"]'
+- click: '[data-testid="markdown-mode-live"]'
+- assert_text:
+    selector: '[data-testid="markdown-live"] .fv-md-drawio svg'
+    contains: Gateway
+    timeout_sec: 40
+- assert_count:
+    selector: '[data-testid="markdown-live"] .fv-md-drawio'
+    equal: 1
+- assert_no_runtime_errors: null
+- screenshot: drawio-legacy-assets-reopened.png

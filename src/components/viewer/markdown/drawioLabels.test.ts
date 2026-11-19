@@ -15,3 +15,25 @@ it("keeps the generated XHTML label namespace and removes external references", 
   expect(label?.querySelector("b")?.textContent).toBe("Check");
   expect(svg.querySelector("script,[href]")).toBeNull();
 });
+
+it("keeps a nonbreaking space in SVG text and XHTML labels after sanitization", () => {
+  const raw = '<svg xmlns="http://www.w3.org/2000/svg"><text>Private&#160;network</text>'
+    + '<foreignObject><div xmlns="http://www.w3.org/1999/xhtml">Virtual&#160;network</div></foreignObject></svg>';
+  const result = safeDrawioSvg(raw);
+  expect(result.querySelector("text")?.textContent).toBe("Private\u00a0network");
+  expect(result.querySelector("foreignObject div")?.textContent).toBe("Virtual\u00a0network");
+  const serialized = new XMLSerializer().serializeToString(result);
+  expect(new DOMParser().parseFromString(serialized, "image/svg+xml").querySelector("parsererror")).toBeNull();
+});
+
+it("keeps reused embedded images local to the rendered diagram", () => {
+  const raw = '<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"><defs>'
+    + '<symbol id="shared"><image xlink:href="data:image/png;base64,AA=="/></symbol></defs>'
+    + '<use xlink:href="#shared" x="10"/><use href="#shared" x="30"/><use href="#outside"/><use href="https://example.invalid/icon.svg"/></svg>';
+  const first = safeDrawioSvg(raw);
+  const second = safeDrawioSvg(raw);
+  const id = first.querySelector("symbol")!.id;
+  const references = Array.from(first.querySelectorAll("use"), (use) => [use.getAttribute("href"), use.getAttribute("x")]);
+  expect(references).toEqual([[`#${id}`, "10"], [`#${id}`, "30"]]);
+  expect(second.querySelector("symbol")?.id).not.toBe(id);
+});

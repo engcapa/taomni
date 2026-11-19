@@ -25,7 +25,7 @@ def setup(ctx):
     fixture_dir.mkdir(parents=True, exist_ok=True)
     source = fixture_dir / "multi.drawio"; source.write_text(xml, encoding="utf-8")
     invalid = fixture_dir / "invalid.drawio"; invalid.write_text("<mxfile><broken>", encoding="utf-8")
-    hostile = fixture_dir / "hostile.drawio"; hostile.write_text(xml.replace("rounded=1;fillColor=#dbeafe;", "shape=image;image=https://example.invalid/blocked-image;"), encoding="utf-8")
+    hostile = fixture_dir / "hostile.drawio"; hostile.write_text(xml.replace("rounded=1;fillColor=#dbeafe;", "shape=image;image=data:text/plain,not-an-image;"), encoding="utf-8")
     ctx.values.update(drawio_import_file=str(source), drawio_invalid_file=str(invalid), drawio_hostile_file=str(hostile))
     graphs = '''# Editable diagram families
 

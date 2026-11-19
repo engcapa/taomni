@@ -8,6 +8,7 @@ import { enhanceMarkdownMath, replaceMarkdownMath } from "./markdownMath";
 import { rememberDiagram } from "./diagramModel";
 import { parseDrawio } from "./drawioCodec";
 import { rememberDrawio, renderDrawioPage } from "./drawioRender";
+import { drawioMissingImagesMessage } from "./drawioImageStyle";
 import "./drawio.css";
 import "katex/dist/katex.min.css";
 
@@ -85,6 +86,12 @@ export async function enhanceMarkdown(root: HTMLElement, owner: RenderOwner, str
           const diagram = document.createElement("div"); diagram.className = "fv-md-drawio";
           diagram.setAttribute("aria-label", page.name);
           diagram.innerHTML = preview.svg;
+          if (!strict && preview.missingImages) {
+            const notice = document.createElement("p");
+            notice.className = "fv-md-drawio-image-notice";
+            notice.textContent = drawioMissingImagesMessage(preview.missingImages);
+            diagram.append(notice);
+          }
           rememberDrawio(diagram, page); container.append(diagram);
         }
         if (!owner.cancelled()) { block.parentElement?.replaceWith(container); owner.onResize?.(); }
