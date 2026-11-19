@@ -14,7 +14,7 @@ steps:
     value: theme
 - click: '[data-testid="app-theme-select"]'
 - click: '[data-testid="app-theme-dark"]'
-- click: '[data-testid="tab-item"][data-tab-type="settings"] [data-testid="tab-close"]'
+- click: '[data-testid="nav-mode-home"]'
 - click: '[data-testid="tao-home-history"]'
 - click: '[data-testid="tao-home-history-tab-sessions"]'
 - eval_readonly:

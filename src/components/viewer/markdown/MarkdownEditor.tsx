@@ -197,8 +197,8 @@ export function MarkdownEditor({ document: current, onError, owner, requestedMod
       </MarkdownSplit>
       </div>
     </div>
-    <MarkdownDiagramActions key={current.key} root={root} docPath={current.path} sourceOnDisk={!owner} enabled={active !== false} onError={report} />
-    <MarkdownLiveMenu key={current.key} root={root} enabled={active !== false && mode === "live" && effectiveReadOnly} onError={report} />
+    <MarkdownDiagramActions key={`visual:${current.key}`} root={root} docPath={current.path} sourceOnDisk={!owner} enabled={active !== false} onError={report} />
+    <MarkdownLiveMenu key={`live-menu:${current.key}`} root={root} enabled={active !== false && mode === "live" && effectiveReadOnly} onError={report} />
     {pasteStatus && <div className="fv-md-paste-status" role="status" data-testid="markdown-paste-status">{pasteStatus}<button aria-label={label("关闭提示", "Dismiss")} onClick={() => setPasteStatus("")}>×</button></div>}
     <input ref={imageInput} type="file" accept="image/*" hidden data-testid="markdown-image-input" multiple onChange={(event) => {
       const files = Array.from(event.target.files || []);

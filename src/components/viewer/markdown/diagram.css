@@ -1,7 +1,7 @@
 .fv-md-mermaid:focus-visible,.fv-md-drawio:focus-visible{outline:2px solid var(--accent-s);outline-offset:2px}
-.fv-md-diagram-tools{position:fixed;display:flex;gap:3px;padding:4px;background:var(--card);border:1px solid var(--divider);border-radius:8px;box-shadow:var(--shadow);z-index:1120}
+.fv.fv-md-diagram-tools{position:fixed;display:flex;flex-direction:row;width:max-content;height:auto;gap:3px;padding:4px;background:var(--card);border:1px solid var(--divider);border-radius:8px;box-shadow:var(--shadow);z-index:1120}
 .fv-md-diagram-tools .fv-icon-button{width:32px;height:30px}
-.fv-md-diagram-menu{position:fixed;z-index:1140;width:270px;max-width:calc(100vw - 16px);max-height:calc(100vh - 16px);overflow:auto;padding:5px}
+.fv.fv-md-diagram-menu{position:fixed;z-index:1140;width:270px;height:auto;max-width:calc(100vw - 16px);max-height:calc(100vh - 16px);overflow:auto;padding:5px}
 .fv-md-diagram-menu>button{display:flex;align-items:center;gap:8px;width:100%;padding:6px 8px;border-radius:5px;font-size:12px;white-space:nowrap;text-align:left}
 .fv-md-diagram-menu>button:hover,.fv-md-diagram-menu>button:focus-visible{background:var(--hover);outline:none}
 .fv-md-diagram-menu svg{width:15px;height:15px;flex:none}

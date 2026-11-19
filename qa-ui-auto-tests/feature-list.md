@@ -15653,6 +15653,12 @@ controls:
   - id: markdown-image-proxy-mode
     selector: '[data-testid="markdown-image-proxy-mode"]'
     kind: interactive
+  - id: markdown-image-proxy-host
+    selector: '[data-testid="markdown-image-custom-proxy-panel"] input[aria-label="Proxy host"]'
+    kind: interactive
+  - id: markdown-image-proxy-port
+    selector: '[data-testid="markdown-image-custom-proxy-panel"] input[type="number"]'
+    kind: interactive
   - id: markdown-live-context-menu
     selector: '[data-testid="markdown-live-context-menu"]'
     kind: display

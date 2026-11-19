@@ -1248,6 +1248,8 @@
 
 - `[data-testid="file-open-markdown-restrict-remote"]` — interactive — F-FILEOPEN-1.file-open-markdown-restrict-remote
 - `[data-testid="markdown-image-proxy-mode"]` — interactive — F-FILEOPEN-1.markdown-image-proxy-mode
+- `[data-testid="markdown-image-custom-proxy-panel"] input[aria-label="Proxy host"]` — interactive — F-FILEOPEN-1.markdown-image-proxy-host
+- `[data-testid="markdown-image-custom-proxy-panel"] input[type="number"]` — interactive — F-FILEOPEN-1.markdown-image-proxy-port
 - `[data-testid="markdown-live-context-menu"]` — display — F-FILEOPEN-1.markdown-live-context-menu
 - `[data-testid="markdown-live-copy-selection"]` — interactive — F-FILEOPEN-1.markdown-live-copy-selection
 - `[data-testid="markdown-live-select-all"]` — interactive — F-FILEOPEN-1.markdown-live-select-all
