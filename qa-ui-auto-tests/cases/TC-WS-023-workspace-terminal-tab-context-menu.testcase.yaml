@@ -174,7 +174,7 @@ steps:
     selector: '[data-testid="workspace-tab"]'
     equal: 0
 - click: '[data-testid="workspace-switcher-button"]'
-- click: '[data-testid^="workspace-switcher-option-"]:not([data-testid="workspace-switcher-option-default-workspace"])'
+- click: '[data-testid^="workspace-switcher-option-"]:has-text("QA other")'
 - assert_items:
     selector: '[data-testid="workspace-tab"]'
     attribute: title
