@@ -55,6 +55,11 @@ For real release-package samples, dispatch that registered workflow with
 `package_run=<Release Bundle run ID>`, `package_source=<exact 40-character
 producer SHA>`, and `package_version=<artifact-only test version>`. `head` selects
 the inspection tooling; its SHA is recorded separately from the package source.
+For a Windows installed-upgrade retry, run Release Bundle with
+`platforms=windows` and an empty `tag` to build the MSI without publishing. Pass
+`package_targets=windows-x86_64` and `package_upgrade_desktop=true` to the
+upgrade workflow for that artifact. `runner.json` records the hosted image and
+attempt alongside the producer identity and installed-app receipts.
 This exclusive route calls `qa-modular-bundles.yml` on Linux x64, Windows x64,
 macOS ARM64 and macOS Intel. It checks the producer repository/workflow/SHA and
 immutable artifact ID before downloading, then records every actual package's

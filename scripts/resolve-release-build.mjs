@@ -25,7 +25,7 @@ export function releaseBuildPlan(env, packageVersion) {
   const arch = manual ? env.INPUT_MACOS_ARCH || "both" : "both";
   const macosRunner = manual && !tag ? env.INPUT_MACOS_RUNNER || "macos-15" : "macos-15";
   const testVersion = manual ? env.RELEASE_TEST_VERSION || "" : "";
-  if (!["all", "macos"].includes(platforms) || !["both", "aarch64", "x86_64"].includes(arch)) {
+  if (!["all", "macos", "windows"].includes(platforms) || !["both", "aarch64", "x86_64"].includes(arch)) {
     throw new Error("Unsupported build platform or macOS architecture.");
   }
   if (!["macos-15", "macos-26"].includes(macosRunner)) {
@@ -35,13 +35,18 @@ export function releaseBuildPlan(env, packageVersion) {
   if (tag && (platforms !== "all" || arch !== "both")) {
     throw new Error("Tagged releases require every platform and both macOS architectures.");
   }
+  const desktopPlatforms = [];
+  // Keep the Linux bundle on the glibc 2.35 baseline.
+  if (platforms === "all") desktopPlatforms.push("ubuntu-22.04");
+  if (platforms !== "macos") desktopPlatforms.push("windows-latest");
   return {
     version: testVersion || packageVersion,
     tag: tag || "",
     test_version: testVersion,
-    build_desktop: String(platforms === "all"),
-    macos_aarch64: String(arch !== "x86_64"),
-    macos_x86_64: String(arch !== "aarch64"),
+    build_desktop: String(desktopPlatforms.length > 0),
+    desktop_platforms: JSON.stringify(desktopPlatforms),
+    macos_aarch64: String(platforms !== "windows" && arch !== "x86_64"),
+    macos_x86_64: String(platforms !== "windows" && arch !== "aarch64"),
     macos_runner: macosRunner,
   };
 }

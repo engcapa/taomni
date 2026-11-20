@@ -33,6 +33,8 @@ test("macOS native tests and bundles share a deployment target supporting Whispe
 });
 test("artifact-only selection controls builders and cannot enter the publishing job", () => {
   assert(workflow.includes("    if: needs.plan.outputs.build_desktop == 'true'"));
+  assert(workflow.includes("        platform: ${{ fromJSON(needs.plan.outputs.desktop_platforms) }}"));
+  assert(workflow.includes("    if: needs.plan.outputs.macos_aarch64 == 'true' || needs.plan.outputs.macos_x86_64 == 'true'"));
   const finalizer = workflow.split("  finalize-updater-manifest:\n")[1];
   assert(finalizer.includes("    needs: [plan, build, build-macos]"));
   assert(finalizer.includes("    if: needs.plan.outputs.tag != ''"));

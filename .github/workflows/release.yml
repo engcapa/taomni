@@ -17,7 +17,7 @@ on:
         required: true
         default: all
         type: choice
-        options: [all, macos]
+        options: [all, macos, windows]
       macos_arch:
         description: "Artifact-only macOS architecture selection. Tagged releases require both."
         required: true
@@ -50,6 +50,7 @@ jobs:
       tag: ${{ steps.plan.outputs.tag }}
       test_version: ${{ steps.plan.outputs.test_version }}
       build_desktop: ${{ steps.plan.outputs.build_desktop }}
+      desktop_platforms: ${{ steps.plan.outputs.desktop_platforms }}
       macos_aarch64: ${{ steps.plan.outputs.macos_aarch64 }}
       macos_x86_64: ${{ steps.plan.outputs.macos_x86_64 }}
       macos_runner: ${{ steps.plan.outputs.macos_runner }}
@@ -82,18 +83,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          # Stay on 22.04 so the Linux bundle keeps glibc 2.35 and runs on
-          # Ubuntu 22.04 / Debian bookworm-class distros. Stock jammy PipeWire
-          # (~0.3.48) headers are too old for libspa 0.9 (missing
-          # spa_video_info_raw.flags); we install a newer PipeWire from source
-          # for build only (see "Install PipeWire 1.x for libspa" step).
-          - platform: ubuntu-22.04
-            args: ""
-            rust-targets: ""
-          - platform: windows-latest
-            args: ""
-            rust-targets: ""
+        platform: ${{ fromJSON(needs.plan.outputs.desktop_platforms) }}
 
     steps:
       - name: Checkout
@@ -118,8 +108,6 @@ jobs:
 
       - name: Setup Rust
         uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: ${{ matrix.rust-targets }}
 
       - name: Scope Windows native dependencies to the runner image
         if: runner.os == 'Windows'
@@ -297,7 +285,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          args: ${{ matrix.args }} --config '${{ env.TAURI_RELEASE_CONFIG }}'
+          args: --config '${{ env.TAURI_RELEASE_CONFIG }}'
 
       - name: Verify Windows installer runtimes
         if: matrix.platform == 'windows-latest'
@@ -334,6 +322,7 @@ jobs:
   # ---------------------------------------------------------------------------
   build-macos:
     needs: plan
+    if: needs.plan.outputs.macos_aarch64 == 'true' || needs.plan.outputs.macos_x86_64 == 'true'
     name: Bundle (macOS)
     runs-on: ${{ needs.plan.outputs.macos_runner }}
     env:

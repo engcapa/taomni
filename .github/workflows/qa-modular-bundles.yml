@@ -180,6 +180,18 @@ jobs:
         run: |
           git rev-parse HEAD > bundle-evidence/tooling-source-sha.txt
           python --version > bundle-evidence/python-version.txt
+          python - <<'PY'
+          import json, os
+          from pathlib import Path
+
+          fields = {
+              'runId': 'GITHUB_RUN_ID', 'runAttempt': 'GITHUB_RUN_ATTEMPT',
+              'os': 'RUNNER_OS', 'architecture': 'RUNNER_ARCH',
+              'image': 'ImageOS', 'imageVersion': 'ImageVersion',
+          }
+          runner = {key: os.environ.get(name) for key, name in fields.items()}
+          Path('bundle-evidence/runner.json').write_text(json.dumps(runner, indent=2) + '\n', encoding='utf-8')
+          PY
           python .agents/skills/qa-ui-auto/scripts/modular_bundle_inventory.py inventory \
             --directory package-input --identity bundle-evidence/bundle-source.json \
             --out bundle-evidence --tooling-source "$(git rev-parse HEAD)"

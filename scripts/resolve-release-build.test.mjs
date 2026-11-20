@@ -7,7 +7,8 @@ const manual = { GITHUB_EVENT_NAME: "workflow_dispatch", GITHUB_REF_TYPE: "branc
 
 test("the default manual build collects all platforms without publishing", () => {
   assert.deepEqual(releaseBuildPlan(manual, version), {
-    version, tag: "", test_version: "", build_desktop: "true", macos_aarch64: "true", macos_x86_64: "true", macos_runner: "macos-15",
+    version, tag: "", test_version: "", build_desktop: "true", desktop_platforms: '["ubuntu-22.04","windows-latest"]',
+    macos_aarch64: "true", macos_x86_64: "true", macos_runner: "macos-15",
   });
 });
 
@@ -15,12 +16,23 @@ test("Intel-only upgrade tests resolve distinct versions without enabling releas
   for (const testVersion of ["0.4.31-permission.1", "0.4.31-permission.2"]) {
     const plan = releaseBuildPlan({ ...manual, INPUT_PLATFORMS: "macos", INPUT_MACOS_ARCH: "x86_64", RELEASE_TEST_VERSION: testVersion }, version);
     assert.deepEqual(plan, {
-      version: testVersion, tag: "", test_version: testVersion, build_desktop: "false", macos_aarch64: "false", macos_x86_64: "true", macos_runner: "macos-15",
+      version: testVersion, tag: "", test_version: testVersion, build_desktop: "false", desktop_platforms: "[]",
+      macos_aarch64: "false", macos_x86_64: "true", macos_runner: "macos-15",
     });
   }
   const arm = releaseBuildPlan({ ...manual, INPUT_MACOS_ARCH: "aarch64" }, version);
   assert.equal(arm.macos_aarch64, "true");
   assert.equal(arm.macos_x86_64, "false");
+});
+
+test("Windows-only upgrade tests build one MSI target and never enter release publication", () => {
+  const plan = releaseBuildPlan({ ...manual, INPUT_PLATFORMS: "windows" }, version);
+  assert.equal(plan.tag, "");
+  assert.equal(plan.build_desktop, "true");
+  assert.deepEqual(JSON.parse(plan.desktop_platforms), ["windows-latest"]);
+  assert.equal(plan.macos_aarch64, "false");
+  assert.equal(plan.macos_x86_64, "false");
+  assert.throws(() => releaseBuildPlan({ ...manual, INPUT_PLATFORMS: "windows", INPUT_RELEASE_TAG: `v${version}` }, version), /every platform/);
 });
 
 test("macOS 26 is available for test artifacts", () => {

@@ -5,6 +5,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { test } from "node:test";
 import { fileURLToPath } from "node:url";
+import { releaseBuildPlan } from "./resolve-release-build.mjs";
 
 const script = fileURLToPath(new URL("./install-linux-release-deps.sh", import.meta.url));
 const workflow = readFileSync(new URL("../.github/workflows/release.yml", import.meta.url), "utf8").replace(/\r\n/g, "\n");
@@ -105,5 +106,5 @@ test("release workflow runs dependency regressions before builders and bounds Li
   assert(step.includes("if: matrix.platform == 'ubuntu-22.04'"));
   assert(step.includes("timeout-minutes: 20"));
   assert(step.includes("run: bash scripts/install-linux-release-deps.sh"));
-  assert(workflow.includes("- platform: ubuntu-22.04"));
+  assert.equal(JSON.parse(releaseBuildPlan({}, "0.5.11").desktop_platforms)[0], "ubuntu-22.04");
 });
