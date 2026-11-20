@@ -2,6 +2,7 @@
 
 pub mod archive;
 pub mod cache;
+pub mod calendar;
 pub mod compose;
 pub mod database;
 pub mod imap_auth;
@@ -10,6 +11,7 @@ mod inline_images;
 mod lists;
 pub mod mbox;
 mod mime;
+pub mod mime_sections;
 mod models;
 pub mod storage;
 #[cfg(test)]

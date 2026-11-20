@@ -164,7 +164,6 @@ imap = "2.4.1"
 # BODYSTRUCTURE / section types; same version `imap` already uses.
 imap-proto = "=0.10.2"
 lettre = "0.11.22"
-mail-parser = { version = "0.11.4", features = ["full_encoding"] }
 taomni-mail-engine = { path = "crates/taomni-mail-engine" }
 native-tls = "0.2"
 tokio-native-tls = "0.3"
@@ -437,6 +436,7 @@ webkit2gtk = { version = "=2.0.2", features = ["v2_38"] }
 gtk = "0.18.2"
 
 [dev-dependencies]
+mail-parser = { version = "0.11.4", features = ["full_encoding"] }
 tempfile = "3"
 ed25519-dalek = "2"
 # JPEG encoder for Tight decoder tests only.
