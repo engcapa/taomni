@@ -23,5 +23,7 @@ The transition installer stages the helper under
 beside the application binary. Native QA ties both binaries to the build
 identity and verifies early and normal owner-pipe exit.
 
-The VNC module package will own this executable when the client host and
-frontend move out of the desktop application.
+The Windows signed VNC QA package carries the helper beside the module host in
+the archive. The package signature covers the helper's bytes and the other
+targets have only the declared module files. Desktop launches switch to the
+module package when the client host and frontend move out of the application.

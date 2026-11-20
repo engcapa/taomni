@@ -10,7 +10,7 @@ on:
       module:
         description: Official QA module
         type: choice
-        options: [hello-plugin, mfa, mail]
+        options: [hello-plugin, mfa, mail, vnc-client]
         default: hello-plugin
       macos_runner:
         description: Hosted macOS package builder (both Darwin targets remain explicit)
@@ -18,7 +18,7 @@ on:
         options: [macos-latest, macos-15, macos-15-intel, macos-26]
         default: macos-latest
       native_macos_signing:
-        description: Sign the Mail or MFA host with the fixed macOS identity before packaging
+        description: Sign the Mail, MFA or VNC host with the fixed macOS identity before packaging
         type: boolean
         default: false
   workflow_call:
@@ -66,14 +66,15 @@ jobs:
         env:
           NATIVE_MACOS_SIGNING: ${{ inputs.native_macos_signing }}
         run: |
-          if [[ "$NATIVE_MACOS_SIGNING" == 'true' && "$QA_MODULE" != 'mfa' && "$QA_MODULE" != 'mail' ]]; then
-            echo 'Select MFA or Mail for the macOS host signature check.' >&2
+          if [[ "$NATIVE_MACOS_SIGNING" == 'true' && "$QA_MODULE" == 'hello-plugin' ]]; then
+            echo 'Select MFA, Mail or VNC for the macOS host signature check.' >&2
             exit 1
           fi
           case "$QA_MODULE" in
             hello-plugin) echo 'host_package=taomni-hello-plugin' >> "$GITHUB_OUTPUT" ;;
             mfa) echo 'host_package=taomni-plugin-mfa' >> "$GITHUB_OUTPUT" ;;
             mail) echo 'host_package=taomni-plugin-mail' >> "$GITHUB_OUTPUT" ;;
+            vnc-client) echo 'host_package=taomni-plugin-vnc-client' >> "$GITHUB_OUTPUT" ;;
             *) echo 'Unknown official QA module.' >&2; exit 1 ;;
           esac
           test -n "$(git for-each-ref --format='%(refname)' --contains HEAD refs/remotes/origin/)" || {
@@ -100,7 +101,8 @@ jobs:
           ]
           approved = {('linux', 'X64'): 'linux-x86_64', ('windows', 'X64'): 'windows-x86_64',
                       ('macos', 'ARM64'): 'darwin-aarch64', ('macos', 'X64'): 'darwin-x86_64'}
-          capability = {'hello-plugin': 'signed-module', 'mfa': 'signed-mfa', 'mail': 'signed-mail'}[os.environ['QA_MODULE']]
+          capability = {'hello-plugin': 'signed-module', 'mfa': 'signed-mfa', 'mail': 'signed-mail',
+                        'vnc-client': 'signed-vnc'}[os.environ['QA_MODULE']]
           roster = set()
           if raw := os.environ.get('PACKAGE_NATIVE_BUILDS'):
               document = json.loads(raw)
@@ -148,6 +150,17 @@ jobs:
         with:
           workspaces: src-tauri -> target
           shared-key: modular-official-${{ inputs.module || 'hello-plugin' }}-${{ matrix.target }}
+      - name: Prepare Perl for the Windows VNC TLS build
+        if: env.QA_MODULE == 'vnc-client' && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $perl = 'C:\Strawberry\perl\bin\perl.exe'
+          if (-not (Test-Path $perl)) { choco install strawberryperl --yes --no-progress }
+          & $perl -MIPC::Cmd -e 'print "Perl ready"'
+          if ($LASTEXITCODE -ne 0) { throw 'Complete Perl unavailable' }
+          "OPENSSL_SRC_PERL=$perl" >> $env:GITHUB_ENV
+          'C:\Strawberry\perl\bin' >> $env:GITHUB_PATH
       # Candidate code, Cargo build scripts and host binaries never share a
       # runner/job with signing secrets. Nothing from this job is executed by
       # the signing job; it receives only an inert payload directory.
@@ -155,6 +168,9 @@ jobs:
         env:
           MODULE_PACKAGE: ${{ needs.source.outputs.host_package }}
         run: cargo build --manifest-path src-tauri/Cargo.toml -p "$MODULE_PACKAGE" --bin "$MODULE_PACKAGE" --release --target '${{ matrix.target }}' --locked
+      - name: Build the Windows VNC key helper
+        if: env.QA_MODULE == 'vnc-client' && runner.os == 'Windows'
+        run: cargo build --manifest-path src-tauri/Cargo.toml -p taomni-vnc-key-helper --bin taomni-vnc-key-helper --release --target '${{ matrix.target }}' --locked
       - name: Build the second first-upgrade module
         if: matrix.legacy_roster
         run: cargo build --manifest-path src-tauri/Cargo.toml -p taomni-plugin-mfa --bin taomni-plugin-mfa --release --target '${{ matrix.target }}' --locked
@@ -175,7 +191,11 @@ jobs:
               host = manifest['entry']['host'] + ('.exe' if os.environ['MODULE_PLATFORM'].startswith('windows') else '')
               manifest['entry']['host'] = host
               (output / 'module.json').write_text(json.dumps(manifest, indent=2), encoding='utf-8')
-              shutil.copyfile(pathlib.Path('src-tauri/target') / os.environ['MODULE_TARGET'] / 'release' / host, output / host)
+              binaries = pathlib.Path('src-tauri/target') / os.environ['MODULE_TARGET'] / 'release'
+              shutil.copyfile(binaries / host, output / host)
+              if slug == 'vnc-client' and os.environ['MODULE_PLATFORM'] == 'windows-x86_64':
+                  helper = 'taomni-vnc-key-helper.exe'
+                  shutil.copyfile(binaries / helper, output / helper)
               if manifest['entry'].get('frontend'):
                   shutil.copytree(source / 'frontend', output / 'frontend')
 
@@ -261,7 +281,7 @@ jobs:
           import json, os, pathlib, shutil
           root = pathlib.Path('candidate')
           module = os.environ['QA_MODULE']
-          assert module in {'hello-plugin', 'mfa', 'mail'}, 'Unknown official QA module'
+          assert module in {'hello-plugin', 'mfa', 'mail', 'vnc-client'}, 'Unknown official QA module'
           observed = json.loads((root / 'candidate-source.json').read_text(encoding='utf-8'))
           assert observed == {'sourceSha': os.environ['MODULE_SOURCE_SHA'], 'platform': os.environ['MODULE_PLATFORM'], 'module': module}
           assert not any(p.is_symlink() for p in root.rglob('*'))
@@ -272,7 +292,10 @@ jobs:
               if os.environ['MODULE_PLATFORM'].startswith('windows'):
                   expected['entry']['host'] += '.exe'
               assert expected['id'] == 'taomni-plugin-' + slug and expected['version'] == '0.1.0'
-              allowed = {'module.json', expected['entry']['host']}
+              binaries = {expected['entry']['host']}
+              if slug == 'vnc-client' and os.environ['MODULE_PLATFORM'] == 'windows-x86_64':
+                  binaries.add('taomni-vnc-key-helper.exe')
+              allowed = {'module.json', *binaries}
               frontend = expected['entry'].get('frontend')
               if frontend:
                   assert (trusted_source / frontend).is_file()
@@ -285,7 +308,7 @@ jobs:
               assert manifest == {**expected, 'version': version}, 'Candidate metadata differs from the trusted official contract'
               files = {p.relative_to(payload).as_posix() for p in payload.rglob('*') if p.is_file()}
               assert files == allowed, 'Unexpected files in official QA payload'
-              for relative in allowed - {'module.json', expected['entry']['host']}:
+              for relative in allowed - {'module.json'} - binaries:
                   assert (payload / relative).read_bytes() == (trusted_source / relative).read_bytes(), 'Candidate changed official frontend without a trusted revision'
               return expected
 
@@ -324,7 +347,7 @@ jobs:
           export MODULE_SLUG="$QA_MODULE"
           bash scripts/sign-macos-module-host.sh "candidate/unsigned-module/taomni-plugin-$MODULE_SLUG" macos-signing
       - name: Sign and independently verify against the production pinned public key
-        if: env.QA_MODULE != 'mail'
+        if: env.QA_MODULE == 'hello-plugin' || env.QA_MODULE == 'mfa'
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
@@ -350,8 +373,8 @@ jobs:
                 --output "signed-module/$destination" --source-sha "$MODULE_SOURCE_SHA"
             done
           fi
-      - name: Sign the official Mail upgrade input
-        if: env.QA_MODULE == 'mail'
+      - name: Sign the official Mail or VNC package
+        if: env.QA_MODULE == 'mail' || env.QA_MODULE == 'vnc-client'
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}

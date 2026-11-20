@@ -25,6 +25,8 @@ class OfficialPackageSigningGuardTests(unittest.TestCase):
         if platform.startswith("windows"):
             manifest["entry"]["host"] += ".exe"
         (payload / manifest["entry"]["host"]).write_bytes(b"inert unit host; never executed")
+        if module == "vnc-client" and platform == "windows-x86_64":
+            (payload / "taomni-vnc-key-helper.exe").write_bytes(b"inert unit helper")
         frontend = manifest["entry"].get("frontend")
         if frontend:
             shutil.copytree(ROOT / "src-tauri/plugins" / module / "frontend", trusted / "frontend")
@@ -93,6 +95,20 @@ class OfficialPackageSigningGuardTests(unittest.TestCase):
                 manifest.write_text(json.dumps({**value, "version": "0.0.9"}))
                 with self.assertRaisesRegex(AssertionError, "trusted official contract"):
                     self.guard(root, "hello-plugin", platform, legacy_roster="true")
+
+    def test_vnc_key_helper_is_required_on_windows_and_excluded_from_other_packages(self):
+        for platform in PLATFORMS:
+            with self.subTest(platform=platform), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                payload = self.seed(root, "vnc-client", platform)
+                self.guard(root, "vnc-client", platform)
+                helper = payload / "taomni-vnc-key-helper.exe"
+                if platform == "windows-x86_64":
+                    helper.unlink()
+                else:
+                    helper.write_bytes(b"unexpected Windows helper")
+                with self.assertRaisesRegex(AssertionError, "Unexpected files"):
+                    self.guard(root, "vnc-client", platform)
 
     def test_source_module_metadata_and_unsigned_file_changes_are_rejected(self):
         for change in ["source", "module", "permissions", "frontend-entry", "extra-file", "frontend-bytes", "secondary-chunk"]:

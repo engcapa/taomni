@@ -73,13 +73,13 @@ on:
         type: boolean
         default: false
       signed_mfa_only:
-        description: Run only the signed module install and legacy migration gates
+        description: Run only the selected signed module checks
         type: boolean
         default: false
       signed_migration_module:
-        description: Module to exercise with the signed legacy migration gate
+        description: Module to verify. VNC runs the four-target package and signature checks.
         type: choice
-        options: [mfa, mail]
+        options: [mfa, mail, vnc-client]
         default: mfa
       signed_native_macos:
         description: Apply the fixed macOS system signature in the signed module gate
@@ -165,7 +165,7 @@ permissions:
   actions: read
 
 concurrency:
-  group: modular-upgrade-${{ github.ref }}-${{ inputs.signed_mfa_only && 'signed-mfa' || (inputs.package_run && format('packages-{0}-{1}-{2}', inputs.package_run, inputs.package_targets, inputs.package_rdp_perf && 'rdp-perf-linux' || inputs.package_relocation_linux && 'relocate-linux' || inputs.package_upgrade_linux && 'upgrade-linux' || inputs.package_upgrade_desktop && 'upgrade-desktop' || 'inventory') || inputs.protocol_only && 'protocol' || (inputs.host_only && 'host' || (inputs.system_execution_only && 'system-execution' || (inputs.network_only && 'network' || (inputs.download_only || false))))) }}
+  group: modular-upgrade-${{ github.ref }}-${{ inputs.signed_mfa_only && format('signed-{0}', inputs.signed_migration_module || 'mfa') || (inputs.package_run && format('packages-{0}-{1}-{2}', inputs.package_run, inputs.package_targets, inputs.package_rdp_perf && 'rdp-perf-linux' || inputs.package_relocation_linux && 'relocate-linux' || inputs.package_upgrade_linux && 'upgrade-linux' || inputs.package_upgrade_desktop && 'upgrade-desktop' || 'inventory') || inputs.protocol_only && 'protocol' || (inputs.host_only && 'host' || (inputs.system_execution_only && 'system-execution' || (inputs.network_only && 'network' || (inputs.download_only || false))))) }}
   cancel-in-progress: true
 
 env:
@@ -229,8 +229,18 @@ jobs:
     with:
       head: ${{ inputs.head || github.sha }}
 
+  signed-vnc-packages:
+    if: ${{ inputs.signed_mfa_only && inputs.signed_migration_module == 'vnc-client' }}
+    uses: ./.github/workflows/qa-modular-packages.yml
+    with:
+      head: ${{ inputs.head || github.sha }}
+      module: vnc-client
+      macos_runner: ${{ inputs.package_macos_arm_runner || 'macos-15' }}
+      native_macos_signing: ${{ inputs.signed_native_macos }}
+    secrets: inherit
+
   signed-mfa-install:
-    if: ${{ inputs.signed_mfa_only || (!inputs.package_run && !inputs.protocol_only && !inputs.host_only && !inputs.system_execution_only && (inputs.network_only || !inputs.download_only)) }}
+    if: ${{ inputs.signed_mfa_only && inputs.signed_migration_module != 'vnc-client' || !inputs.signed_mfa_only && !inputs.package_run && !inputs.protocol_only && !inputs.host_only && !inputs.system_execution_only && (inputs.network_only || !inputs.download_only) }}
     uses: ./.github/workflows/qa-modular-mfa-install.yml
     with:
       head: ${{ inputs.head || github.sha }}

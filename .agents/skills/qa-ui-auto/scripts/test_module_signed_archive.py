@@ -133,8 +133,11 @@ class OfficialModuleArtifactTests(unittest.TestCase):
         self.assertEqual([step["with"]["ref"] for step in checkouts], ["${{ github.workflow_sha }}"])
         secret_steps = [step for step in signing if "secrets." in json.dumps(step)]
         macos_condition = "inputs.native_macos_signing && startsWith(matrix.platform, 'darwin-')"
-        self.assertEqual([step["if"] for step in secret_steps],
-                         [macos_condition, "env.QA_MODULE != 'mail'", "env.QA_MODULE == 'mail'"])
+        self.assertEqual([step["if"] for step in secret_steps], [
+            macos_condition,
+            "env.QA_MODULE == 'hello-plugin' || env.QA_MODULE == 'mfa'",
+            "env.QA_MODULE == 'mail' || env.QA_MODULE == 'vnc-client'",
+        ])
         guard = next(step for step in signing if step.get("name", "").startswith("Restrict QA signing"))
         for step in secret_steps:
             self.assertLess(signing.index(guard), signing.index(step),
