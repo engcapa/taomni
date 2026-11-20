@@ -1,0 +1,102 @@
+id: TC-FILE-OPEN-043
+title: Markdown missing assets and invalid diagrams export placeholders in browser
+description: Open a Mermaid README-shaped document with one missing local reference, one valid image/diagram, invalid Mermaid and
+  invalid draw.io. Live keeps valid content, reports deduplicated dismissible warnings, and downloaded HTML contains the same placeholders.
+covers: [F-FILEOPEN-1, F-EXPLORER-1]
+modes: [browser]
+tags: [p1, markdown, file-open, export, regression]
+fixtures: [reset_db, markdown_missing_assets]
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-markdown-missing-assets
+- reload_window: null
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-file-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Mod+l
+- fill:
+    selector: '[data-testid="explorer-address"]'
+    value: ${fixture.markdown_missing_root}
+- press:
+    selector: '[data-testid="explorer-address"]'
+    key: Enter
+- dblclick: '[data-testid="explorer-file-row"][data-name="mermaid-readme.md"]'
+- eval_readonly:
+    expression: document.querySelector('.fv-md-image img')?.naturalWidth === 96
+    expect_truthy: true
+    timeout_sec: 25
+- wait_for: '[data-testid="markdown-live"] .fv-md-mermaid svg'
+- wait_for: '[data-testid="markdown-live"] [data-kind="drawio"]'
+- eval_readonly:
+    expression: >-
+      document.querySelectorAll('.fv-md-live-pane .fv-md-render-placeholder-image').length === 1 && document.querySelectorAll('.fv-md-live-pane .fv-md-render-placeholder-mermaid').length === 1 && document.querySelectorAll('.fv-md-live-pane .fv-md-render-placeholder-drawio').length === 1
+    expect_truthy: true
+- assert_count:
+    selector: '[data-testid="markdown-render-warning-item"]'
+    equal: 3
+- assert_text:
+    selector: '[data-testid="markdown-live"]'
+    contains: 'Readable tail: export must complete with explicit placeholders.'
+- screenshot: markdown-missing-assets-live-warning.png
+- click: '[data-testid="markdown-render-warning-dismiss"]'
+- assert_not_visible: '[data-testid="markdown-render-warnings"]'
+- assert_count:
+    selector: '[data-testid="markdown-live"] [data-testid="markdown-render-placeholder"]'
+    equal: 3
+- click: '[data-testid="markdown-mode-split"]'
+- wait_for: '[data-testid="markdown-preview"] [data-kind="image"]'
+- eval_readonly:
+    expression: document.querySelector('.cm-content')?.textContent.includes('Missing header') && document.querySelectorAll('.fv-md-preview-pane .fv-md-render-placeholder').length === 3
+    expect_truthy: true
+- click: '[data-testid="markdown-export"]'
+- assert_download:
+    trigger: '[data-testid="markdown-export-html"]'
+    filename: mermaid-readme.html
+    contains: [Image unavailable, './img/header.png', Mermaid diagram unavailable, draw.io diagram unavailable, Readable tail, 'data:image/png;base64,']
+- wait_for: '[data-testid="markdown-export-status"][data-export-state="saved"]'
+- click: '[data-testid="markdown-mode-live"]'
+- assert_not_visible: '[data-testid="markdown-render-warnings"]'
+- assert_file_open_bytes:
+    path: ${fixture.markdown_missing_source}
+    sha256: ${fixture.markdown_missing_sha}
+- assert_no_runtime_errors: null
+- screenshot: markdown-missing-assets-browser-export.png
+verification:
+  review: reviewed
+  requirements:
+  - id: LIVE-FALLBACK
+    requirement: Valid images, Mermaid and text remain visible; each failed source produces one placeholder and one deduplicated warning;
+      dismissing the warning does not remove placeholders or source access.
+    actions: [10, 18, 21]
+    checkpoints:
+    - {step: 11, expectation: The valid local PNG retains its independently seeded dimensions.}
+    - {step: 12, expectation: The valid Mermaid block renders an actual SVG.}
+    - {step: 14, expectation: 'Image, Mermaid and draw.io failures each have a Live placeholder.'}
+    - {step: 15, expectation: Three source failures produce three warnings without duplicates.}
+    - {step: 16, expectation: Ordinary document text remains readable.}
+    - {step: 19, expectation: The user can dismiss the warning banner.}
+    - {step: 20, expectation: Dismissal leaves all three placeholders visible.}
+    - {step: 23, expectation: Split preserves raw source and all rendered placeholders.}
+    results: [11, 12, 14, 15, 16, 19, 20, 23]
+  - id: EXPORT-FALLBACK
+    requirement: Browser HTML download succeeds with self-contained valid media and explicit image/Mermaid/draw.io placeholders;
+      returning to Live does not reopen a dismissed warning and the source bytes remain exact.
+    actions: [24, 25, 27]
+    checkpoints:
+    - {step: 25, expectation: The actual downloaded HTML contains valid embedded media and all fallback text.}
+    - {step: 26, expectation: Export reports saved rather than failing on the missing path.}
+    - {step: 28, expectation: A dismissed warning stays dismissed across mode changes.}
+    - {step: 29, expectation: Export does not modify the source document.}
+    - {step: 30, expectation: The complete workflow has no unhandled runtime errors.}
+    results: [25, 26, 28, 29, 30]
+  visual:
+  - check: Inspect warning density, placeholder text, valid diagram and final Live layout in both screenshots.
+    method: manual
+    reason: Semantic assertions do not certify visual spacing, overflow or contrast.
+  native:
+  - check: Matching native save dialogs, host-side HTML and portable Markdown assets
+    method: automated
+    reason: TC-FILE-OPEN-044 executes the corresponding packaged native workflow.

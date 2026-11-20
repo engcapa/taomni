@@ -1,0 +1,125 @@
+name: QA Modular G1-G11
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_ref:
+        description: Branch with the modular product and its QA workflows
+        type: string
+        required: true
+      head:
+        description: Expected full source SHA (empty pins the current branch tip)
+        type: string
+      suite:
+        description: Checks to dispatch
+        type: choice
+        options: [all, system, protocol, host, signed, desktop, core, release]
+        default: all
+      macos_runner:
+        description: macOS runner for desktop QA
+        type: choice
+        options: [macos-15, macos-15-intel, macos-26]
+        default: macos-15
+      package_run:
+        description: Matching artifact-only Release Bundle run ID (required for release suite)
+        type: string
+      package_version:
+        description: Version in that run's installers
+        type: string
+      package_targets:
+        description: Release package targets to verify (all or comma-separated)
+        type: string
+        default: all
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  dispatch:
+    name: Dispatch modular QA and retain run links
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: write
+    outputs:
+      head: ${{ steps.dispatch.outputs.head }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.workflow_sha }}
+          persist-credentials: false
+          sparse-checkout: |
+            .github/scripts/modular_gate_runs.py
+            .github/scripts/test_modular_gate_runs.py
+          sparse-checkout-cone-mode: false
+      - name: Check dispatch and target selections
+        run: python -m unittest discover -s .github/scripts -p test_modular_gate_runs.py
+      - name: Resolve source and dispatch the existing QA workflows
+        id: dispatch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          SOURCE_REF: ${{ inputs.source_ref }}
+          EXPECTED_HEAD: ${{ inputs.head }}
+          VERIFICATION_SUITE: ${{ inputs.suite }}
+          MACOS_RUNNER: ${{ inputs.macos_runner }}
+          PACKAGE_RUN: ${{ inputs.package_run }}
+          PACKAGE_VERSION: ${{ inputs.package_version }}
+          PACKAGE_TARGETS: ${{ inputs.package_targets }}
+        run: python .github/scripts/modular_gate_runs.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: modular-gate-runs
+          path: modular-gate-runs.json
+          if-no-files-found: warn
+          retention-days: 30
+
+  core-inventory:
+    name: G9 core build inventory and G11 entrypoint inventory
+    needs: dispatch
+    if: ${{ inputs.suite == 'all' || inputs.suite == 'core' }}
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.dispatch.outputs.head }}
+          persist-credentials: false
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - name: Record the release dependency graph and native entrypoints
+        shell: bash
+        run: |
+          mkdir -p gate-inventory
+          git rev-parse HEAD > gate-inventory/source-sha.txt
+          rustc --version > gate-inventory/rustc-version.txt
+          for target in x86_64-unknown-linux-gnu x86_64-pc-windows-msvc aarch64-apple-darwin x86_64-apple-darwin; do
+            cargo tree --manifest-path src-tauri/Cargo.toml --locked -p taomni --edges normal,build \
+              --target "$target" > "gate-inventory/cargo-tree-$target.txt"
+          done
+          git ls-files src-tauri/resources > gate-inventory/resource-sources.txt
+          git ls-files src-tauri/tauri.conf.json 'src-tauri/tauri.*.conf.json' > gate-inventory/bundle-configs.txt
+          git grep -n -E -- '"--(headless|vnc-special-key-hook|sockscap-redirector-bridge)"' \
+            -- src-tauri/src src-tauri/plugins > gate-inventory/entrypoints.txt || test "$?" -eq 1
+      - name: Build the release frontend and record actual chunk hashes
+        shell: bash
+        run: |
+          pnpm install --frozen-lockfile
+          pnpm run build --manifest
+          cp dist/.vite/manifest.json gate-inventory/vite-manifest.json
+          find dist -type f -print0 | sort -z | xargs -0 -r sha256sum > gate-inventory/dist-sha256.txt
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: modular-core-build-inventory
+          path: gate-inventory/
+          if-no-files-found: error
+          retention-days: 30

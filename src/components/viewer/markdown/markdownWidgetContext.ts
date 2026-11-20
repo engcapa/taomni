@@ -1,5 +1,6 @@
 import { EditorView } from "@codemirror/view";
 import { Transaction } from "@codemirror/state";
+import type { MarkdownWarningHandler } from "./markdownRenderFallback";
 
 export interface MarkdownWidgetContext {
   docPath: string;
@@ -9,6 +10,7 @@ export interface MarkdownWidgetContext {
   label: (zh: string, en: string) => string;
   onChange?: (content: string) => void;
   onError: (message: string) => void;
+  onWarning?: MarkdownWarningHandler;
   replaceImage: (from: number, to: number) => void;
   revealImage: (reference: string) => void;
 }
