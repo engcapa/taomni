@@ -186,6 +186,53 @@ fn refused_startup_leaves_the_legacy_database_at_its_original_path() {
 }
 
 #[test]
+fn startup_modes_and_offline_mfa_share_legacy_profile_ownership() {
+    use crate::runtime::profile::ModeLease;
+    use taomni_profile_locks::{LeaseError, LeaseKind, LegacyUpgradeLease, ProfileRoot};
+
+    let root = tempfile::tempdir().unwrap();
+    let profile = ProfileRoot::prepare(root.path()).unwrap();
+    let desktop = ModeLease::acquire(root.path(), StartupMode::Desktop).unwrap();
+    let second_desktop = ModeLease::acquire(root.path(), StartupMode::Desktop).unwrap();
+    assert!(matches!(
+        LegacyUpgradeLease::try_acquire(&profile),
+        Err(LeaseError::Busy(LeaseKind::LegacyUpgrade))
+    ));
+    drop(desktop);
+    assert!(matches!(
+        ModeLease::acquire(root.path(), StartupMode::Headless),
+        Err(ProfileStartupError::ModeInUse)
+    ));
+    drop(second_desktop);
+
+    let maintenance = LegacyUpgradeLease::try_acquire(&profile).unwrap();
+    for mode in [StartupMode::Desktop, StartupMode::Headless] {
+        assert!(matches!(
+            ModeLease::acquire(root.path(), mode),
+            Err(ProfileStartupError::ModeInUse)
+        ));
+    }
+    drop(maintenance);
+    assert!(ModeLease::acquire(root.path(), StartupMode::Headless).is_ok());
+}
+
+#[cfg(unix)]
+#[test]
+fn startup_rejects_a_linked_legacy_mode_lock() {
+    use crate::runtime::profile::ModeLease;
+
+    let root = tempfile::tempdir().unwrap();
+    let original = root.path().join("unrelated");
+    std::fs::write(&original, b"untouched").unwrap();
+    std::os::unix::fs::symlink(&original, root.path().join(".mobile-mode.lock")).unwrap();
+    for mode in [StartupMode::Desktop, StartupMode::Headless] {
+        assert!(matches!(ModeLease::acquire(root.path(), mode),
+            Err(ProfileStartupError::Failed(message)) if message.contains("unsafe profile lock path")));
+    }
+    assert_eq!(std::fs::read(&original).unwrap(), b"untouched");
+}
+
+#[test]
 fn pending_mfa_recovery_preserves_mode_conflicts_and_the_transaction() {
     use crate::runtime::profile::ModeLease;
 

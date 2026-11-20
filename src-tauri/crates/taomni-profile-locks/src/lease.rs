@@ -75,6 +75,7 @@ lease!(ProfileStateLease, ProfileState, open_state, false);
 
 // Old desktop/headless binaries know the mode lock, but not the newer profile
 // lock. An upgrade must hold this exclusive lease AND ProfileRestoreLease.
+lease!(LegacyDesktopLease, LegacyUpgrade, open_legacy_upgrade, true);
 lease!(
     LegacyUpgradeLease,
     LegacyUpgrade,

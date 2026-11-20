@@ -1,6 +1,8 @@
 //! Profile ownership is core infrastructure, including when mobile is absent.
 use std::path::Path;
-use taomni_profile_locks::{LeaseError, LeaseKind};
+use taomni_profile_locks::{
+    LeaseError, LeaseKind, LegacyDesktopLease, LegacyUpgradeLease, ProfileRoot,
+};
 
 use crate::plugin::{migration::export::MfaMaintenanceError, migration_commit};
 
@@ -25,33 +27,32 @@ impl From<String> for ProfileStartupError {
 }
 
 /// Preserve the installed profile's existing desktop/shared, headless/exclusive lock.
-pub(crate) struct ModeLease(std::fs::File);
+pub(crate) enum ModeLease {
+    Desktop { _lease: LegacyDesktopLease },
+    Headless { _lease: LegacyUpgradeLease },
+}
+
 impl ModeLease {
     pub(crate) fn acquire(data: &Path, mode: StartupMode) -> Result<Self, ProfileStartupError> {
-        std::fs::create_dir_all(data).map_err(|e| e.to_string())?;
-        let file = std::fs::OpenOptions::new()
-            .create(true)
-            .truncate(false)
-            .read(true)
-            .write(true)
-            .open(data.join(".mobile-mode.lock"))
-            .map_err(|e| e.to_string())?;
+        let profile = ProfileRoot::prepare(data).map_err(mode_lease_error)?;
         let result = match mode {
-            StartupMode::Headless => file.try_lock(),
-            StartupMode::Desktop => file.try_lock_shared(),
+            StartupMode::Desktop => {
+                LegacyDesktopLease::try_acquire(&profile).map(|_lease| Self::Desktop { _lease })
+            }
+            StartupMode::Headless => {
+                LegacyUpgradeLease::try_acquire(&profile).map(|_lease| Self::Headless { _lease })
+            }
         };
-        match result {
-            Ok(()) => Ok(Self(file)),
-            Err(std::fs::TryLockError::WouldBlock) => Err(ProfileStartupError::ModeInUse),
-            Err(std::fs::TryLockError::Error(error)) => Err(ProfileStartupError::Failed(format!(
-                "Could not acquire the Taomni profile mode lock: {error}"
-            ))),
-        }
+        result.map_err(mode_lease_error)
     }
 }
-impl Drop for ModeLease {
-    fn drop(&mut self) {
-        let _ = self.0.unlock();
+
+fn mode_lease_error(error: LeaseError) -> ProfileStartupError {
+    match error {
+        LeaseError::Busy(LeaseKind::LegacyUpgrade) => ProfileStartupError::ModeInUse,
+        error => ProfileStartupError::Failed(format!(
+            "Could not acquire the Taomni profile mode lock: {error}"
+        )),
     }
 }
 
