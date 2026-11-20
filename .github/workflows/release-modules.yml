@@ -160,8 +160,22 @@ jobs:
         with:
           workspaces: src-tauri -> target
           shared-key: module-release-${{ needs.source.outputs.slug }}-${{ matrix.target }}
+      - name: Prepare complete Perl for the Windows VNC TLS build
+        if: needs.source.outputs.slug == 'vnc-client' && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $perl = 'C:\Strawberry\perl\bin\perl.exe'
+          if (-not (Test-Path $perl)) { choco install strawberryperl --yes --no-progress }
+          & $perl -MIPC::Cmd -e 'print "Perl ready"'
+          if ($LASTEXITCODE -ne 0) { throw 'Complete Perl unavailable' }
+          "OPENSSL_SRC_PERL=$perl" >> $env:GITHUB_ENV
+          'C:\Strawberry\perl\bin' >> $env:GITHUB_PATH
       - name: Build the module host without signing credentials
         run: cargo build --manifest-path src-tauri/Cargo.toml -p '${{ needs.source.outputs.package }}' --release --target '${{ matrix.target }}' --locked
+      - name: Build the Windows VNC key helper
+        if: needs.source.outputs.slug == 'vnc-client' && runner.os == 'Windows'
+        run: cargo build --manifest-path src-tauri/Cargo.toml -p taomni-vnc-key-helper --bin taomni-vnc-key-helper --release --target '${{ matrix.target }}' --locked
       - name: Stage the exact package payload
         env:
           MODULE_TARGET: ${{ matrix.target }}
@@ -181,9 +195,12 @@ jobs:
           payload = pathlib.Path('unsigned-module')
           payload.mkdir()
           (payload / 'module.json').write_text(json.dumps(manifest, indent=2) + '\n', encoding='utf-8')
+          binaries = pathlib.Path('src-tauri/target') / os.environ['MODULE_TARGET'] / 'release'
           if host:
-              binary = pathlib.Path('src-tauri/target') / os.environ['MODULE_TARGET'] / 'release' / host
-              shutil.copyfile(binary, payload / host)
+              shutil.copyfile(binaries / host, payload / host)
+          if slug == 'vnc-client' and os.environ['MODULE_PLATFORM'] == 'windows-x86_64':
+              helper = 'taomni-vnc-key-helper.exe'
+              shutil.copyfile(binaries / helper, payload / helper)
           frontend = manifest.get('entry', {}).get('frontend')
           if frontend:
               source_frontend = source / pathlib.Path(frontend).parent
@@ -253,6 +270,10 @@ jobs:
               raise SystemExit('candidate is not a stable official module')
           if any(path.is_symlink() for path in root.rglob('*')):
               raise SystemExit('candidate payload contains a symlink')
+          if os.environ['MODULE_SLUG'] == 'vnc-client' and os.environ['MODULE_PLATFORM'] == 'windows-x86_64':
+              helper = root / 'unsigned-module/taomni-vnc-key-helper.exe'
+              if not helper.is_file() or helper.stat().st_size == 0:
+                  raise SystemExit('candidate Windows VNC key helper is missing')
           if host:
               if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]*', host) or not (root / 'unsigned-module' / host).is_file():
                   raise SystemExit('candidate host binary is missing or has an invalid name')

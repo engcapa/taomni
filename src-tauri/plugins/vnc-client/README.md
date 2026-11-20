@@ -25,6 +25,6 @@ The transition installer stages the helper under
 beside the application binary. Native QA ties both binaries to the build
 identity and verifies early and normal owner-pipe exit.
 
-The Windows signed VNC QA package carries the helper beside the module host in
-the archive. The package signature covers the helper's bytes. An installed
-module starts its packaged helper and owns its lifetime.
+Windows VNC packages stage the helper beside the module host before signing the
+archive. The signature covers the helper's bytes. An installed module starts its
+packaged helper and owns its lifetime.

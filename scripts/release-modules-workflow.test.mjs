@@ -36,6 +36,14 @@ test("signing checks the selected source SHA and trusted manifest", () => {
   assert.match(workflow, /only stable modules can enter a production catalog/);
 });
 
+test("the production Windows VNC archive owns the special-key helper", () => {
+  const build = workflow.split("- name: Build the Windows VNC key helper\n")[1].split("- name:")[0];
+  assert.match(build, /slug == 'vnc-client' && runner\.os == 'Windows'/);
+  assert.match(build, /-p taomni-vnc-key-helper --bin taomni-vnc-key-helper/);
+  assert.match(workflow, /helper = 'taomni-vnc-key-helper\.exe'\s+shutil\.copyfile\(binaries \/ helper, payload \/ helper\)/);
+  assert.match(workflow, /candidate Windows VNC key helper is missing/);
+});
+
 test("the fixed macOS identity signs the host before the detached package signature", () => {
   const check = workflow.indexOf("Check candidate identity against the trusted manifest");
   const host = workflow.indexOf("Sign the macOS host before signing its module archive");
