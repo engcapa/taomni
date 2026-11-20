@@ -7,7 +7,7 @@ mod key_sources;
 mod maintenance;
 mod sources;
 pub(crate) use key_sources::MfaKeySources;
-pub(crate) use maintenance::MfaMaintenance;
+pub(crate) use maintenance::{MfaMaintenance, MfaMaintenanceError};
 
 use std::{
     collections::BTreeMap,
@@ -71,7 +71,7 @@ impl PreparedMfaExport {
         control: &SnapshotControl,
     ) -> Result<Self, String> {
         control.check().map_err(|error| error.to_string())?;
-        let maintenance = MfaMaintenance::acquire(profile)?;
+        let maintenance = MfaMaintenance::acquire(profile).map_err(|error| error.to_string())?;
         Self::prepare_under_maintenance(maintenance, snapshot, control)
     }
 

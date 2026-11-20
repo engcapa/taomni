@@ -1,5 +1,8 @@
 //! Profile ownership is core infrastructure, including when mobile is absent.
 use std::path::Path;
+use taomni_profile_locks::{LeaseError, LeaseKind};
+
+use crate::plugin::{migration::export::MfaMaintenanceError, migration_commit};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum StartupMode {
@@ -61,8 +64,21 @@ pub(crate) struct ProfileRuntimeLeases {
 }
 impl ProfileRuntimeLeases {
     pub(crate) fn acquire(data: &Path, mode: StartupMode) -> Result<Self, ProfileStartupError> {
-        crate::plugin::migration_commit::recover_at_startup(data)?;
-        let mode = ModeLease::acquire(data, mode)?;
+        let mode = loop {
+            let lease = ModeLease::acquire(data, mode)?;
+            // An offline upgrade can publish a transaction only while holding
+            // the exclusive mode lock. Check with ownership before opening stores.
+            if !migration_commit::recovery_pending(data)? {
+                break lease;
+            }
+            drop(lease);
+            migration_commit::recover_at_startup(data).map_err(|error| match error {
+                MfaMaintenanceError::LegacyMode(LeaseError::Busy(LeaseKind::LegacyUpgrade)) => {
+                    ProfileStartupError::ModeInUse
+                }
+                error => ProfileStartupError::Failed(error.to_string()),
+            })?;
+        };
         // Record the installation origin before restore can create a modular
         // generation marker. Both occur under the profile lease.
         let profile = crate::backup::coordination::ProfileLease::prepare(data, || {

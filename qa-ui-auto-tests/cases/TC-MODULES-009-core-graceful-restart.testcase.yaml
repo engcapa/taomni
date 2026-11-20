@@ -22,6 +22,7 @@ description: Save a note through the production Notes UI, close the run-owned QA
   write it. Hide the saved Notes overlay before using window chrome; an open drawer may cover the Windows close button. The closed drawer remains
   mounted to retain its content, so verify that it is hidden rather than requiring DOM removal. After normal desktop shutdown, an actual headless owner
   rejects a competing desktop on the same profile. After the headless owner releases it, the restored desktop rejects a headless contender.
+  Verify both conflicts again with a pending MFA recovery record in the isolated profile and confirm that the contender preserves the record.
 steps:
 - open: ${cfg.app.base_url}
 - wait_for: '[data-testid="status-bar"]'
@@ -79,6 +80,11 @@ steps:
       desktopContender.modeLeaseError: true
       desktopContender.ownerStillRunning: true
       desktopContender.openedEndpoint: false
+      pendingMfaRecoveryContender.exitCode: 1
+      pendingMfaRecoveryContender.modeLeaseError: true
+      pendingMfaRecoveryContender.ownerStillRunning: true
+      pendingMfaRecoveryContender.openedEndpoint: false
+      pendingMfaRecoveryContender.recoveryRecordPreserved: true
 verification:
   review: reviewed
   requirements:
@@ -114,11 +120,11 @@ verification:
     - step: 28
       expectation: Normal startup retains the same generation instead of invalidating contexts on every restart.
     - step: 29
-      expectation: Headless startup reports the profile in use and opens no endpoint while the reopened desktop remains responsive.
+      expectation: Headless startup reports the profile in use and opens no endpoint while the reopened desktop remains responsive, including with a pending MFA recovery record.
     - step: 14
       expectation: Closing the saved Notes overlay exposes the native window close button before normal restart.
     - step: 30
-      expectation: Headless starts on the released profile, stays alive while the desktop reports the profile-in-use error and exits with status 1, then exits so the desktop can reopen the same data.
+      expectation: Headless stays alive while the desktop exits with status 1 in both attempts. The pending MFA recovery record is preserved and the desktop reopens the same data after headless exits.
     - step: 21
       expectation: After proving persisted notes, closing the overlay exposes Settings without discarding data.
     results:

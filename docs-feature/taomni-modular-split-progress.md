@@ -150,6 +150,8 @@ TASK-027 将 G1–G11 设为独立发布阻断门。每个门必须在匹配源�
 - Mail 的 IMAP LIST、LSUB、订阅状态和原始 STATUS 已迁入邮件引擎。桌面适配层继续管理连接和现有缓存同步。引擎 20 项和核心两项单测通过。TC-MAIL-FOLDER-01 增加重开后 INBOX 可见及无运行时错误检查，加入 CI/CD PR 的 Browser 与 Native 选集。 [CI/CD PR](https://github.com/engcapa/taomni/pull/840)
 - #840 已合入 `main` 的 `4b70e4838`，并同步至重构分支。新入口已派发固定 `fab39ad33` 的 G9/G11 清单验证。 [合并](https://github.com/engcapa/taomni/pull/840) · [main 派发](https://github.com/engcapa/taomni/actions/runs/44652323097)
 - Mail 的独立引擎接管分段 MIME 解码、日历邀请解析和 iTIP 回复生成。核心的 `mail-parser` 直接依赖仅用于剩余单元测试，正式构建通过邮件引擎使用解析器。25 项引擎单测和 7 项核心单测通过，邮件邀请流程由 TC-MAIL-INVITE-01 验证。
+- Wayland 批次的四个原始分片已收齐，28 项通过。TC-FILE-OPEN-006 和 008 复现既有的非左键输入依赖 X11 限制。同期 Linux、Windows Browser 各 47 项通过，三端合集继续收取其余分片。 [Wayland 工件](https://github.com/engcapa/taomni/actions/runs/44643485787) · [三端合集](https://github.com/engcapa/taomni/actions/runs/44643481993)
+- 存在待恢复的 MFA 事务时，启动先检查模式占用，再在独占维护锁下恢复事务。启动竞争仍返回配置占用，未打开核心数据库。修复前单测复现通用启动错误，修复后 12 项 Rust 单测及 63 项 QA 工具单测通过。TC-MODULES-009 增加两个方向的原生竞争检查，使用隔离的事务标记验证退出码 1、原进程存活和事务记录保留。实装与原生复验继续执行。
 
 ## 当前结论
 

@@ -101,19 +101,24 @@ class CoreProfileStateTest(TestCase):
             owner = SimpleNamespace(case_id="TC-MODULES-009")
             ctx = SimpleNamespace(session=session, fixture_context=owner, case_dir=case)
             outcome = {"exitCode": 1, "modeLeaseError": True, "openedEndpoint": False, "ownerStillRunning": True}
+            marker = profile / "migration/mfa-transaction.json"
 
-            def run_contender(argv, desktop_alive, *_):
+            def run_contender(argv, desktop_alive, evidence, label, *, desktop_env=None):
                 self.assertEqual(argv, [str(application), "--headless", "--data-dir", str(profile), "--mobile-port", "0"])
                 self.assertTrue(desktop_alive())
+                self.assertEqual(marker.exists(), label.endswith("pending-mfa"))
                 return outcome
 
             with patch("qa_ui_auto.core_profile_observation.isolated_data_root", return_value=profile) as isolated:
                 with patch("qa_ui_auto.core_profile_observation.observe_same_profile_contender", side_effect=run_contender):
                     assert_headless_profile_blocked(ctx, None)
                     isolated.assert_called_once_with(owner)
-                    session.wait_for_app_ready.assert_called_once_with(timeout=5)
+                    self.assertEqual(session.wait_for_app_ready.call_count, 2)
                     receipt = case / "desktop-mode-lease.json"
-                    self.assertEqual(json.loads(receipt.read_text())["generation"], generation)
+                    result = json.loads(receipt.read_text())
+                    self.assertEqual(result["generation"], generation)
+                    self.assertTrue(result["pendingMfaRecoveryContender"]["recoveryRecordPreserved"])
+                    self.assertFalse(marker.exists())
                     outcome["openedEndpoint"] = True
                     with self.assertRaisesRegex(StepError, "before opening an endpoint"):
                         assert_headless_profile_blocked(ctx, None)
@@ -135,6 +140,8 @@ class CoreProfileStateTest(TestCase):
             owner = Mock()
             owner.poll.return_value = None
             result = {"exitCode": 1, "modeLeaseError": True, "openedEndpoint": False, "ownerStillRunning": True}
+            marker = profile / "migration/mfa-transaction.json"
+            fail_pending_recovery = False
 
             def start_headless(binary, data, work, evidence, label, *, observe_ready):
                 self.assertEqual((binary, data, evidence), (application, profile, root))
@@ -146,6 +153,12 @@ class CoreProfileStateTest(TestCase):
                 self.assertEqual(argv, [str(application)])
                 self.assertEqual(desktop_env["NEWMOB_DATA_DIR"], str(profile))
                 self.assertTrue(alive())
+                if label.endswith("pending-mfa"):
+                    self.assertEqual(marker.read_bytes(), b"{}\n")
+                    if fail_pending_recovery:
+                        return {**result, "exitCode": -6}
+                else:
+                    self.assertFalse(marker.exists())
                 return result
 
             prefix = "qa_ui_auto.core_profile_observation."
@@ -154,8 +167,15 @@ class CoreProfileStateTest(TestCase):
                     patch(prefix + "observe_same_profile_contender", side_effect=try_contender):
                 assert_desktop_profile_blocked(ctx)
                 receipt = root / "headless-mode-lease.json"
-                self.assertTrue(json.loads(receipt.read_text())["passed"])
-                result["exitCode"] = -6
-                with self.assertRaisesRegex(StepError, "must reject the desktop"):
+                passed = json.loads(receipt.read_text())
+                self.assertTrue(passed["passed"])
+                self.assertTrue(passed["pendingMfaRecoveryContender"]["recoveryRecordPreserved"])
+                self.assertFalse(marker.exists())
+                fail_pending_recovery = True
+                with self.assertRaisesRegex(StepError, "preserve the MFA recovery record"):
                     assert_desktop_profile_blocked(ctx)
-                self.assertFalse(json.loads(receipt.read_text())["passed"])
+                failed = json.loads(receipt.read_text())
+                self.assertFalse(failed["passed"])
+                self.assertEqual(failed["desktopContender"]["exitCode"], 1)
+                self.assertEqual(failed["pendingMfaRecoveryContender"]["exitCode"], -6)
+                self.assertFalse(marker.exists())

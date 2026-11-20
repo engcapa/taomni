@@ -1,4 +1,4 @@
-"""Observe real bootstrap metadata after app readiness; never create it."""
+"""Observe native bootstrap metadata and exercise ownership of a QA profile."""
 import json
 import os
 from pathlib import Path
@@ -8,6 +8,8 @@ from .fixtures.backup_policy import isolated_data_root
 from .fixtures.core_profile_state import read_generation
 from .legacy_process import MODE_LEASE_DENIAL, headless_command, initialize_profile, observe_same_profile_contender
 from .steps import StepError
+
+MFA_RECOVERY_DENIAL = {**MODE_LEASE_DENIAL, "recoveryRecordPreserved": True}
 
 
 def run(ctx, args):
@@ -51,13 +53,17 @@ def assert_headless_profile_blocked(ctx, args):
         ctx.session.wait_for_app_ready(timeout=5)
         return True
 
+    command = headless_command(application, profile)
     result = observe_same_profile_contender(
-        headless_command(application, profile), desktop_alive, log_dir, "desktop-mode-lease",
+        command, desktop_alive, log_dir, "desktop-mode-lease",
     )
-    passed = result == MODE_LEASE_DENIAL
+    recovery = _observe_pending_mfa_contender(
+        profile, command, desktop_alive, log_dir, "desktop-mode-lease-pending-mfa",
+    )
+    passed = result == MODE_LEASE_DENIAL and recovery == MFA_RECOVERY_DENIAL
     (log_dir / "desktop-mode-lease.json").write_text(json.dumps({
         "application": str(application), "profile": str(profile), "generation": generation,
-        "passed": passed, **result,
+        "passed": passed, **result, "pendingMfaRecoveryContender": recovery,
     }, indent=2) + "\n", encoding="utf-8")
     if not passed:
         raise StepError("The active desktop must reject headless on the same profile before opening an endpoint")
@@ -74,13 +80,23 @@ def assert_desktop_profile_blocked(ctx):
 
     def try_desktop(owner):
         desktop_env = {**os.environ, "NEWMOB_DATA_DIR": str(profile)}
+        def owner_alive():
+            return owner.poll() is None
+
         result = observe_same_profile_contender(
-            [str(application)], lambda: owner.poll() is None, log_dir,
+            [str(application)], owner_alive, log_dir,
             "headless-mode-lease", desktop_env=desktop_env,
         )
         receipt["desktopContender"] = result
         if result != MODE_LEASE_DENIAL:
             raise StepError("The active headless process must reject the desktop with exit code 1 on the same profile")
+        recovery = _observe_pending_mfa_contender(
+            profile, [str(application)], owner_alive, log_dir,
+            "headless-mode-lease-pending-mfa", desktop_env=desktop_env,
+        )
+        receipt["pendingMfaRecoveryContender"] = recovery
+        if recovery != MFA_RECOVERY_DENIAL:
+            raise StepError("The active headless process must reject the desktop and preserve the MFA recovery record")
 
     try:
         with TemporaryDirectory(prefix="taomni-headless-lease-") as work:
@@ -94,3 +110,23 @@ def assert_desktop_profile_blocked(ctx):
         (log_dir / "headless-mode-lease.json").write_text(
             json.dumps(receipt, indent=2) + "\n", encoding="utf-8",
         )
+
+
+def _observe_pending_mfa_contender(profile, command, owner_alive, evidence, label, *, desktop_env=None):
+    directory = profile / "migration"
+    if directory.resolve() != directory:
+        raise StepError("MFA recovery record must stay within the run-owned profile")
+    directory.mkdir(exist_ok=True)
+    marker = directory / "mfa-transaction.json"
+    # The contender must recognize the live owner before reading this sentinel.
+    contents = b"{}\n"
+    with marker.open("xb") as stream:
+        stream.write(contents)
+    try:
+        result = observe_same_profile_contender(
+            command, owner_alive, evidence, label, desktop_env=desktop_env,
+        )
+        return {**result, "recoveryRecordPreserved": marker.is_file()
+                and not marker.is_symlink() and marker.read_bytes() == contents}
+    finally:
+        marker.unlink(missing_ok=True)

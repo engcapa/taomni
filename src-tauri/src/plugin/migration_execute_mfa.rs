@@ -73,12 +73,13 @@ fn execute_inner(
     control.check().map_err(|error| error.to_string())?;
     migration_commit::validate_manifest(package.manifest())?;
     paths::directory(profile)?;
-    migration_commit::recover_at_startup(profile)?;
+    migration_commit::recover_at_startup(profile).map_err(|error| error.to_string())?;
     let profile = ProfileRoot::prepare(profile).map_err(|error| error.to_string())?;
     let maintenance = match wait {
         Some(wait) => MfaMaintenance::acquire_after_exit(&profile, wait),
         None => MfaMaintenance::acquire(&profile),
-    }?;
+    }
+    .map_err(|error| error.to_string())?;
     let root = profile.path();
     if MigrationJournal::profile_mfa_committed(root)? {
         return Ok(MfaUpgradeOutcome::AlreadyMigrated);

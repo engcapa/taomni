@@ -186,6 +186,50 @@ fn refused_startup_leaves_the_legacy_database_at_its_original_path() {
 }
 
 #[test]
+fn pending_mfa_recovery_preserves_mode_conflicts_and_the_transaction() {
+    use crate::runtime::profile::ModeLease;
+
+    for (owner, contender) in [
+        (StartupMode::Desktop, StartupMode::Headless),
+        (StartupMode::Headless, StartupMode::Desktop),
+        (StartupMode::Desktop, StartupMode::Desktop),
+    ] {
+        let root = tempfile::tempdir().unwrap();
+        for dir in ["migration", "plugins/mfa/versions"] {
+            std::fs::create_dir_all(root.path().join(dir)).unwrap();
+        }
+        let transaction = root.path().join("migration/mfa-transaction.json");
+        std::fs::write(&transaction, b"{}\n").unwrap();
+        let lease = ModeLease::acquire(root.path(), owner).unwrap();
+        let start = || {
+            bootstrap(
+                ProfilePaths::isolated(root.path()),
+                contender,
+                Some(config()),
+                false,
+            )
+        };
+
+        let error = start()
+            .err()
+            .expect("Recovery requires exclusive ownership");
+        assert!(matches!(error, ProfileStartupError::ModeInUse), "{error}");
+        assert_eq!(std::fs::read(&transaction).unwrap(), b"{}\n");
+        assert!(!root.path().join("taomni.db").exists());
+
+        drop(lease);
+        let error = start().err().expect("Invalid MFA transaction must fail");
+        assert!(
+            matches!(error, ProfileStartupError::Failed(message) if message.contains("missing field"))
+        );
+        assert_eq!(std::fs::read(&transaction).unwrap(), b"{}\n");
+        assert!(!root.path().join("taomni.db").exists());
+        std::fs::remove_file(&transaction).unwrap();
+        assert!(start().is_ok());
+    }
+}
+
+#[test]
 fn startup_preserves_committed_records_in_legacy_database_wal() {
     let root = tempfile::tempdir().unwrap();
     let legacy = root.path().join("newmob.db");

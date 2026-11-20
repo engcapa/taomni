@@ -17,7 +17,9 @@ use super::{
     migration::{
         LegacyInstallSnapshot, MFA_MIGRATION_TARGET as TARGET, MigrationExecutor, MigrationItem,
         MigrationJournal, MigrationRunState, MigrationStepState,
-        export::{MfaExportKind, MfaExportReceipt, MfaMaintenance, PreparedMfaExport},
+        export::{
+            MfaExportKind, MfaExportReceipt, MfaMaintenance, MfaMaintenanceError, PreparedMfaExport,
+        },
         paths, source,
     },
     verify::{self, VerifiedPackage},
@@ -274,15 +276,18 @@ fn commit_inner(
     }
 }
 
-pub(crate) fn recover_at_startup(data: &Path) -> Result<(), String> {
-    let directory = data.join("migration");
-    if !check_optional_dir(&directory)? || !paths::file_exists(&data.join(PLAN))? {
+pub(crate) fn recovery_pending(data: &Path) -> Result<bool, String> {
+    Ok(check_optional_dir(&data.join("migration"))? && paths::file_exists(&data.join(PLAN))?)
+}
+
+pub(crate) fn recover_at_startup(data: &Path) -> Result<(), MfaMaintenanceError> {
+    if !recovery_pending(data)? {
         return Ok(());
     }
     let profile = ProfileRoot::prepare(data).map_err(message)?;
     let maintenance = MfaMaintenance::acquire(&profile)?;
     // A racing recovery may have finished while acquiring ownership.
-    if paths::file_exists(&profile.path().join(PLAN))? {
+    if recovery_pending(profile.path())? {
         recover_locked(&maintenance)?;
     }
     Ok(())
