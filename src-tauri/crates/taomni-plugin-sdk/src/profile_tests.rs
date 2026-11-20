@@ -164,6 +164,7 @@ fn reader_eof_does_not_release_ownership_while_a_business_worker_or_its_store_is
         commands: BTreeSet::from(["work".into()]),
         permissions: BTreeSet::new(),
         required_services: Default::default(),
+        optional_services: Default::default(),
         operation_timeout: Duration::from_secs(5),
         snapshot_timeout: Duration::from_secs(30),
     };

@@ -50,6 +50,7 @@ fn manifest_and_compiled_host_have_the_same_identity_and_service_contract() {
         BTreeSet::from([MFA_DATA_KEY_ID.into()])
     );
     assert!(config.required_services.supports(FIXED_KEY_SERVICE, 1));
+    assert!(config.optional_services.supports(CAPTURE_STILL_SERVICE, 1));
     assert_eq!(manifest["snapshot"], "rpc");
     assert_eq!(manifest["backupPaths"], json!(["plugins/mfa/data/mfa.db"]));
 }

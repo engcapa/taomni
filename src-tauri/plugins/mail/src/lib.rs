@@ -33,6 +33,7 @@ fn host_config() -> HostConfig {
             .collect(),
         permissions: BTreeSet::from([DATA_DIRECTORY_PERMISSION.into()]),
         required_services: Default::default(),
+        optional_services: Default::default(),
         operation_timeout: Duration::from_secs(10),
         snapshot_timeout: Duration::from_secs(300),
     }

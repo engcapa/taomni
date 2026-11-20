@@ -171,6 +171,7 @@ fn handshake_refuses_missing_service_identity_or_wrong_token_and_preserves_v1() 
         commands: BTreeSet::from(["mfa/list".into()]),
         permissions: BTreeSet::from([FIXED_KEY_SERVICE.into()]),
         required_services: required.clone(),
+        optional_services: ServiceCapabilities([(CAPTURE_STILL_SERVICE.into(), 1)].into()),
         operation_timeout: Duration::from_secs(5),
         snapshot_timeout: Duration::from_secs(30),
     };
@@ -202,17 +203,30 @@ fn handshake_refuses_missing_service_identity_or_wrong_token_and_preserves_v1() 
     let (reply, instance) = handshake(&call(&hello), &config, "token", None).unwrap();
     assert_eq!(instance.unwrap().as_str(), HOST);
     assert!(reply.core_services.supports(FIXED_KEY_SERVICE, 1));
+    assert!(!reply.core_services.supports(CAPTURE_STILL_SERVICE, 1));
     assert_eq!(reply.api_version, 1);
     assert_eq!(
         reply.request_id_mode,
         taomni_plugin_api::RequestIdMode::Legacy
     );
+    hello.core_services.0.extend([
+        (CAPTURE_STILL_SERVICE.into(), 1),
+        ("unknown.service".into(), 1),
+    ]);
     hello.request_id_mode = taomni_plugin_api::RequestIdMode::MonotonicV1;
     let (reply, _) = handshake(&call(&hello), &config, "token", None).unwrap();
+    assert!(reply.core_services.supports(CAPTURE_STILL_SERVICE, 1));
+    assert!(!reply.core_services.supports("unknown.service", 1));
     assert_eq!(
         reply.request_id_mode,
         taomni_plugin_api::RequestIdMode::MonotonicV1
     );
+    hello
+        .core_services
+        .0
+        .insert(CAPTURE_STILL_SERVICE.into(), 2);
+    let (reply, _) = handshake(&call(&hello), &config, "token", None).unwrap();
+    assert!(!reply.core_services.0.contains_key(CAPTURE_STILL_SERVICE));
     hello.host_instance = None;
     assert!(handshake(&call(&hello), &config, "token", None).is_err());
 }

@@ -42,6 +42,7 @@ pub fn serve_profiled() -> io::Result<()> {
             commands: commands(),
             permissions: BTreeSet::new(),
             required_services: ServiceCapabilities::default(),
+            optional_services: ServiceCapabilities::default(),
             operation_timeout: Duration::from_secs(30),
             snapshot_timeout: Duration::from_secs(300),
         },
