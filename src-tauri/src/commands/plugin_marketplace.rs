@@ -6,7 +6,7 @@ use crate::{
         InstallIntent, PluginRecord,
         download::{DownloadError, DownloadInfo, DownloadPhase, DownloadRequest},
         marketplace::{self, CatalogSelection, InstallReview, MarketplaceCatalog},
-        release_state,
+        migration_mail_provision, release_state,
     },
     state::AppState,
 };
@@ -160,13 +160,23 @@ pub async fn plugin_marketplace_install(
     result
 }
 
+#[derive(serde::Serialize)]
+#[serde(untagged)]
+pub enum ProvisionOutcome {
+    Record(Option<PluginRecord>),
+    Staged {
+        #[serde(rename = "restartRequired")]
+        restart_required: bool,
+    },
+}
+
 #[tauri::command]
 pub async fn plugin_marketplace_provision(
     selection: CatalogSelection,
     retry: bool,
     state: State<'_, AppState>,
     app: AppHandle,
-) -> Result<Option<PluginRecord>, String> {
+) -> Result<ProvisionOutcome, String> {
     let data = state.core.paths.data.clone();
     let id = selection.plugin_id.clone();
     let pending =
@@ -174,7 +184,7 @@ pub async fn plugin_marketplace_provision(
             .await
             .map_err(|error| error.to_string())??;
     if !pending {
-        return Ok(None);
+        return Ok(ProvisionOutcome::Record(None));
     }
     let plan = resolve_download(&state, selection.clone(), None).await?;
     let task = start_download(&state, plan, retry).await?;
@@ -189,20 +199,32 @@ pub async fn plugin_marketplace_provision(
             .unwrap_or_else(|| "Module download cancelled; retry to resume".into()));
     }
     let registry = state.plugins.clone();
+    let core = state.core.clone();
     let data = state.core.paths.data.clone();
-    let record = tauri::async_runtime::spawn_blocking(move || {
+    let outcome = tauri::async_runtime::spawn_blocking(move || {
         let (package, _) = marketplace::prepare_install(registry.root(), &selection)
             .map_err(|error| error.to_string())?;
+        if selection.plugin_id == migration_mail_provision::MAIL_ID {
+            let has_legacy_accounts = {
+                let db = core.db.lock().map_err(|error| error.to_string())?;
+                migration_mail_provision::has_legacy_accounts(&db)?
+            };
+            if has_legacy_accounts && migration_mail_provision::queue(&data, &package)? {
+                return Ok::<_, String>(ProvisionOutcome::Staged {
+                    restart_required: true,
+                });
+            }
+        }
         let record = registry
             .install_with_intent(&package, InstallIntent::Legacy)
             .map_err(|error| error.to_string())?;
         release_state::complete(&data, &selection.plugin_id)?;
-        Ok::<_, String>(record)
+        Ok(ProvisionOutcome::Record(record))
     })
     .await
     .map_err(|error| error.to_string())??;
-    if let Some(record) = &record {
+    if let ProvisionOutcome::Record(Some(record)) = &outcome {
         super::plugin::publish_registry_change(&app, &Ok(record.clone()));
     }
-    Ok(record)
+    Ok(outcome)
 }

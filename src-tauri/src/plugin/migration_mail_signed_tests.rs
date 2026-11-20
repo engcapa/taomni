@@ -4,7 +4,7 @@ use std::process::{Command, Output};
 use serde_json::Value;
 
 use super::*;
-use crate::plugin::test_services::VaultHarness;
+use crate::plugin::{migration_mail_provision as provision, test_services::VaultHarness};
 
 const QA_PROFILE: &str = "TAOMNI_SIGNED_MAIL_TEST_PROFILE";
 
@@ -36,6 +36,18 @@ fn mail_maintenance_child() {
     let Some(profile) = std::env::var_os(QA_PROFILE) else {
         return;
     };
+    let [archive, signature] = signed_mail_files();
+    if let Err(error) = crate::run_mail_maintenance([
+        profile,
+        archive.into_os_string(),
+        signature.into_os_string(),
+    ]) {
+        eprintln!("{error}");
+        std::process::exit(74);
+    }
+}
+
+fn signed_mail_files() -> [PathBuf; 2] {
     let artifact = PathBuf::from(std::env::var_os("TAOMNI_SIGNED_MAIL_PACKAGE_DIR").unwrap());
     let receipt: Value = paths::read_json_bounded(&artifact.join("provenance.json")).unwrap();
     assert_eq!(receipt["platform"], current_platform());
@@ -46,16 +58,9 @@ fn mail_maintenance_child() {
     let artifact_path = |field: &str| {
         let name = receipt[field].as_str().unwrap();
         assert_eq!(Path::new(name).file_name().unwrap(), name);
-        artifact.join(name).into_os_string()
+        artifact.join(name)
     };
-    if let Err(error) = crate::run_mail_maintenance([
-        profile,
-        artifact_path("archive"),
-        artifact_path("signature"),
-    ]) {
-        eprintln!("{error}");
-        std::process::exit(74);
-    }
+    [artifact_path("archive"), artifact_path("signature")]
 }
 
 #[test]
@@ -77,16 +82,18 @@ fn signed_mail_upgrade_starts_the_installed_host_with_retained_migrated_data() {
     assert_eq!(blocked.status.code(), Some(74));
     let error = String::from_utf8_lossy(&blocked.stderr);
     assert!(error.contains("Close the legacy application"), "{error}");
+    let [archive, signature] = signed_mail_files();
+    let package = verify_archive(&archive, &signature).unwrap();
+    assert!(provision::queue(&profile, &package).unwrap());
+    assert!(provision::queued(&profile).unwrap());
     assert!(active_version(&profile).is_none());
     // Keep the TempDir owned while releasing the active profile leases.
     let root = close_profile(state);
-    let applied = run_maintenance(&profile);
-    assert!(applied.status.success(), "{:?}", applied.stderr);
-    assert!(String::from_utf8_lossy(&applied.stdout).contains("Mail data migrated"));
+    let state = VaultHarness::open(root);
+    assert!(!provision::queued(&profile).unwrap());
     let journal = MigrationJournal::load(&profile.join("migration/journal.json")).unwrap();
     assert!(mail_already_committed(&journal).unwrap());
 
-    let state = VaultHarness::open(root);
     state.registry.scan().unwrap();
     state.registry.set_enabled(OWNER, true).unwrap();
     for (account, expected) in [

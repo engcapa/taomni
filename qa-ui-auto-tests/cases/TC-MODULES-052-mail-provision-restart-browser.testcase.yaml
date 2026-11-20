@@ -1,0 +1,67 @@
+id: TC-MODULES-052
+title: A prepared legacy Mail package remains pending until Taomni starts again
+description: The preview fixture models a legacy profile whose Mail package is prepared by automatic provisioning. Settings
+  displays the next-start message across renderer reload. After a simulated import failure, the user resumes the installation.
+covers: [F-Modules-1]
+tags: [p1, modules, upgrade, mail]
+modes: [browser]
+fixtures: [reset_db]
+timeout_sec: 90
+steps:
+- open: ${cfg.app.base_url}
+- seed_storage: {key: taomni.preview.marketplace.v1, value: legacy-mail}
+- reload_window: null
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- assert_text:
+    selector: '[data-testid="module-marketplace-card"][data-module-id="taomni-plugin-mail"]'
+    contains: Mail will import data from the previous version the next time Taomni opens.
+- assert_count: {selector: '[data-testid="module-marketplace-installed"]', equal: 0}
+- reload_window: null
+- wait_for: '[data-testid="status-bar"]'
+- click: '[data-testid="ribbon-settings"]'
+- fill: {selector: '[data-testid="settings-search-input"]', value: module store}
+- assert_text:
+    selector: '[data-testid="module-marketplace-card"][data-module-id="taomni-plugin-mail"]'
+    contains: Mail will import data from the previous version the next time Taomni opens.
+- assert_count: {selector: '[data-testid="module-marketplace-installed"]', equal: 0}
+- seed_storage: {key: taomni.preview.marketplace.v1, value: legacy-mail-failed}
+- click: '[data-testid="module-marketplace-refresh"]'
+- assert_text:
+    selector: '[data-testid="module-marketplace-card"][data-module-id="taomni-plugin-mail"]'
+    contains: Mail import failed. Resume installation in Module Store.
+- click: '[data-testid="module-marketplace-provision"]'
+- assert_text:
+    selector: '[data-testid="module-marketplace-card"][data-module-id="taomni-plugin-mail"]'
+    contains: Mail will import data from the previous version the next time Taomni opens.
+- assert_no_runtime_errors: null
+- screenshot: mail-provision-restart-browser.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: A prepared Mail package displays the next-start message and remains pending across renderer reload.
+    actions: [1, 2, 3, 5, 6, 9, 11, 12]
+    checkpoints:
+    - {step: 7, expectation: The Mail card displays the next-start message after provisioning.}
+    - {step: 8, expectation: The prepared module has no installed version in the renderer.}
+    - {step: 13, expectation: Reloading the renderer keeps the next-start message.}
+    - {step: 14, expectation: Reloading the renderer leaves the module pending.}
+    results: [7, 8, 13, 14]
+  - id: R2
+    requirement: An unsuccessful import shows the retry state. Resuming installation prepares Mail for the next start.
+    actions: [15, 16, 18]
+    checkpoints:
+    - {step: 17, expectation: The Mail card displays the import failure and recovery message.}
+    - {step: 19, expectation: Resuming installation restores the next-start message.}
+    - {step: 20, expectation: No renderer runtime errors occurred.}
+    results: [17, 19, 20]
+  native:
+  - check: Starting the desktop with a closed profile applies the verified package and opens migrated mail.
+    method: not-applicable
+    reason: The signed Mail migration workflow runs the real startup and installed process.
+  visual:
+  - check: The next-start message appears within the Mail module card.
+    method: manual
+    reason: The runner retains the Mail card screenshot.

@@ -101,6 +101,8 @@ export interface ModuleCatalogSelection {
 export interface ModuleReleasePlan {
   legacyWaiting: boolean;
   legacyPending: string[];
+  legacyRestartRequired?: string[];
+  legacyImportFailed?: string[];
   updates: string[];
   newModules: string[];
 }
@@ -134,9 +136,15 @@ export async function installMarketplaceModule(selection: ModuleCatalogSelection
   return mutationResult(await invoke("plugin_marketplace_install", { selection, installedVersion }));
 }
 
-export async function provisionMarketplaceModule(selection: ModuleCatalogSelection, retry: boolean): Promise<void> {
-  const record = await invoke("plugin_marketplace_provision", { selection, retry });
-  if (record) mutationResult(record);
+export async function provisionMarketplaceModule(
+  selection: ModuleCatalogSelection,
+  retry: boolean,
+): Promise<void | "restart-required"> {
+  const result = await invoke<unknown>("plugin_marketplace_provision", { selection, retry });
+  if (result && typeof result === "object" && "restartRequired" in result && result.restartRequired === true) {
+    return "restart-required";
+  }
+  if (result) mutationResult(result);
 }
 
 export function dismissNewMarketplaceModules(ids: readonly string[]): Promise<void> {

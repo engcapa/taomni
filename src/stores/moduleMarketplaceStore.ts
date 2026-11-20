@@ -15,7 +15,7 @@ interface Adapter {
   download(selection: ModuleCatalogSelection, installedVersion?: string): Promise<ModuleDownloadInfo>;
   review(selection: ModuleCatalogSelection): Promise<ModuleInstallReview>;
   install(selection: ModuleCatalogSelection, installedVersion?: string): Promise<PluginRecord>;
-  provision(selection: ModuleCatalogSelection, retry: boolean): Promise<void>;
+  provision(selection: ModuleCatalogSelection, retry: boolean): Promise<void | "restart-required">;
   dismiss(ids: readonly string[]): Promise<void>;
 }
 
@@ -77,7 +77,15 @@ export function createModuleMarketplaceStore(adapter: Adapter, storage?: Pick<St
       set((state) => {
         const catalog = state.catalog;
         if (!catalog?.release?.[field].includes(id)) return state;
-        return { catalog: { ...catalog, release: { ...catalog.release, [field]: catalog.release[field].filter((current) => current !== id) } } };
+        const release = {
+          ...catalog.release,
+          [field]: catalog.release[field].filter((current) => current !== id),
+        };
+        if (field === "legacyPending") {
+          release.legacyRestartRequired = release.legacyRestartRequired?.filter((current) => current !== id);
+          release.legacyImportFailed = release.legacyImportFailed?.filter((current) => current !== id);
+        }
+        return { catalog: { ...catalog, release } };
       });
     };
     return {
@@ -147,6 +155,9 @@ export function createModuleMarketplaceStore(adapter: Adapter, storage?: Pick<St
         const entry = snapshot?.catalog.plugins[id];
         const asset = snapshot && entry?.platforms[snapshot.platform];
         if (!entry || !asset || !snapshot?.release?.legacyPending.includes(id)) return Promise.resolve();
+        if (!retry && (snapshot.release.legacyRestartRequired?.includes(id) || snapshot.release.legacyImportFailed?.includes(id))) {
+          return Promise.resolve();
+        }
         const selection = { pluginId: id, version: entry.version, sha256: asset.sha256 };
         const attempt = `${id}:${asset.sha256}`;
         const active = operations.get(id);
@@ -154,8 +165,26 @@ export function createModuleMarketplaceStore(adapter: Adapter, storage?: Pick<St
         if (!retry && attempted.has(attempt)) return Promise.resolve();
         attempted.add(attempt);
         return run(selection, "provision", async () => {
-          await adapter.provision(selection, retry);
-          dropReleaseEntry(id, "legacyPending");
+          const result = await adapter.provision(selection, retry);
+          if (result === "restart-required") {
+            set((state) => {
+              const catalog = state.catalog;
+              const release = catalog?.release;
+              if (!catalog || !release || !matchesSelection(catalog, selection)) return state;
+              return {
+                catalog: {
+                  ...catalog,
+                  release: {
+                    ...release,
+                    legacyRestartRequired: [...new Set([...(release.legacyRestartRequired ?? []), id])],
+                    legacyImportFailed: release.legacyImportFailed?.filter((current) => current !== id),
+                  },
+                },
+              };
+            });
+          } else {
+            dropReleaseEntry(id, "legacyPending");
+          }
         });
       },
       async dismissNew(ids) {

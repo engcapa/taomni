@@ -57,6 +57,51 @@ fn active_version(profile: &Path) -> Option<String> {
         .active_version
 }
 
+#[cfg(not(feature = "qa-release-trust-gates"))]
+#[test]
+fn legacy_mail_is_staged_without_opening_the_cache_and_applied_by_startup() {
+    use crate::{
+        plugin::migration_mail_provision as provision,
+        runtime::profile::{ProfileRuntimeLeases, StartupMode},
+    };
+
+    let profile = tempfile::tempdir().unwrap();
+    let custom = tempfile::tempdir().unwrap();
+    let profile = profile.path().canonicalize().unwrap();
+    legacy_profile(&profile, custom.path());
+    cached_mail(custom.path(), "custom", "mail from legacy cache");
+
+    let live = ProfileRuntimeLeases::acquire(&profile, StartupMode::Desktop).unwrap();
+    assert!(provision::queue(&profile, &package()).unwrap());
+    assert!(provision::queued(&profile).unwrap());
+    assert!(!profile.join(MAIL_MIGRATION_TARGET).exists());
+    assert!(active_version(&profile).is_none());
+    assert!(provision::apply_before_startup(&profile).is_err());
+    assert!(provision::queued(&profile).unwrap());
+    drop(live);
+
+    let plan_path = profile.join("migration/mail-provision.json");
+    let original: serde_json::Value = paths::read_json_bounded(&plan_path).unwrap();
+    let mut tampered = original.clone();
+    tampered["archive_sha256"] = json!("0".repeat(64));
+    paths::write_json_durable(&plan_path, &tampered).unwrap();
+    assert!(provision::apply_before_startup(&profile).is_err());
+    assert_eq!(provision::queued_failure(&profile).unwrap(), Some(true));
+    assert!(active_version(&profile).is_none());
+    assert!(!profile.join(MAIL_MIGRATION_TARGET).exists());
+    paths::write_json_durable(&plan_path, &original).unwrap();
+
+    let _startup = ProfileRuntimeLeases::acquire(&profile, StartupMode::Desktop).unwrap();
+    assert!(
+        mail_already_committed(
+            &MigrationJournal::load(&profile.join("migration/journal.json")).unwrap()
+        )
+        .unwrap()
+    );
+    assert!(!provision::queued(&profile).unwrap());
+    assert!(active_version(&profile).is_some());
+}
+
 #[test]
 fn installs_and_records_default_and_custom_mail_data_for_a_verified_package() {
     let profile = tempfile::tempdir().unwrap();

@@ -40,6 +40,10 @@ struct State {
 pub(crate) struct ReleasePlan {
     pub(crate) legacy_waiting: bool,
     pub(crate) legacy_pending: BTreeSet<String>,
+    #[serde(skip_serializing_if = "BTreeSet::is_empty")]
+    pub(crate) legacy_restart_required: BTreeSet<String>,
+    #[serde(skip_serializing_if = "BTreeSet::is_empty")]
+    pub(crate) legacy_import_failed: BTreeSet<String>,
     pub(crate) updates: BTreeSet<String>,
     pub(crate) new_modules: BTreeSet<String>,
 }
@@ -117,9 +121,27 @@ pub(crate) fn plan(
             state.sequence = Some(catalog.sequence);
         }
         state.new_modules.retain(|id| !handled.contains(id));
+        let legacy_pending = state.legacy_pending.clone().unwrap_or_default();
+        let mut legacy_restart_required = BTreeSet::new();
+        let mut legacy_import_failed = BTreeSet::new();
+        let mail_id = super::migration_mail_provision::MAIL_ID;
+        if legacy_pending.contains(mail_id) {
+            match super::migration_mail_provision::queued_failure(data) {
+                Ok(Some(false)) => {
+                    legacy_restart_required.insert(mail_id.to_owned());
+                }
+                Ok(Some(true)) => {
+                    legacy_import_failed.insert(mail_id.to_owned());
+                }
+                Ok(None) => (),
+                Err(error) => tracing::warn!(%error, "Could not read pending Mail upgrade"),
+            }
+        }
         Ok(ReleasePlan {
             legacy_waiting,
-            legacy_pending: state.legacy_pending.clone().unwrap_or_default(),
+            legacy_pending,
+            legacy_restart_required,
+            legacy_import_failed,
             updates,
             new_modules: state
                 .new_modules

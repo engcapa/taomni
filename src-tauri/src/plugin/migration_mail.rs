@@ -48,6 +48,41 @@ struct DataReceipt {
     data_schema_version: u32,
 }
 
+pub(super) struct MailMaintenance {
+    root: ProfileRoot,
+    _mail: PluginDataLease,
+    _profile: ProfileRestoreLease,
+    _legacy: LegacyUpgradeLease,
+}
+
+impl MailMaintenance {
+    pub(super) fn acquire(profile: &Path) -> Result<Self, String> {
+        paths::directory(profile)?;
+        super::migration_commit::recover_at_startup(profile).map_err(|error| error.to_string())?;
+        let root = ProfileRoot::prepare(profile).map_err(|error| error.to_string())?;
+        let legacy = LegacyUpgradeLease::try_acquire(&root).map_err(|error| {
+            format!("Close the legacy application before Mail upgrade: {error}")
+        })?;
+        let profile = ProfileRestoreLease::try_acquire(&root)
+            .map_err(|error| format!("Close other instances before Mail upgrade: {error}"))?;
+        let mail = PluginDataLease::try_acquire(
+            &root,
+            &PluginSlug::parse(OWNER).expect("built-in Mail slug"),
+        )
+        .map_err(|error| format!("Mail data is in use: {error}"))?;
+        Ok(Self {
+            root,
+            _mail: mail,
+            _profile: profile,
+            _legacy: legacy,
+        })
+    }
+
+    pub(super) fn path(&self) -> &Path {
+        self.root.path()
+    }
+}
+
 pub(crate) fn verify_archive(archive: &Path, signature: &Path) -> Result<VerifiedPackage, String> {
     let package = VerifiedPackage::from_offline(
         archive,
@@ -64,23 +99,20 @@ pub(crate) fn execute(
     package: &VerifiedPackage,
     control: &SnapshotControl,
 ) -> Result<MailUpgradeOutcome, String> {
+    control.check().map_err(|error| error.to_string())?;
+    execute_under_maintenance(&MailMaintenance::acquire(profile)?, package, control)
+}
+
+pub(super) fn execute_under_maintenance(
+    maintenance: &MailMaintenance,
+    package: &VerifiedPackage,
+    control: &SnapshotControl,
+) -> Result<MailUpgradeOutcome, String> {
     let manifest = package.manifest();
     validate_manifest(manifest)?;
     let check = || control.check().map_err(|error| error.to_string());
     check()?;
-    paths::directory(profile)?;
-    super::migration_commit::recover_at_startup(profile).map_err(|error| error.to_string())?;
-    let profile = ProfileRoot::prepare(profile).map_err(|error| error.to_string())?;
-    let _legacy = LegacyUpgradeLease::try_acquire(&profile)
-        .map_err(|error| format!("Close the legacy application before Mail upgrade: {error}"))?;
-    let _profile = ProfileRestoreLease::try_acquire(&profile)
-        .map_err(|error| format!("Close other instances before Mail upgrade: {error}"))?;
-    let _mail = PluginDataLease::try_acquire(
-        &profile,
-        &PluginSlug::parse(OWNER).expect("built-in Mail slug"),
-    )
-    .map_err(|error| format!("Mail data is in use: {error}"))?;
-    let root = profile.path();
+    let root = maintenance.path();
 
     let migration = paths::create_directory(root, "migration")?;
     let journal_path = migration.join("journal.json");
@@ -179,7 +211,7 @@ pub(crate) fn execute(
     Ok(MailUpgradeOutcome::Migrated)
 }
 
-fn validate_manifest(manifest: &ModuleManifest) -> Result<(), String> {
+pub(super) fn validate_manifest(manifest: &ModuleManifest) -> Result<(), String> {
     if manifest.slug != OWNER
         || manifest.id != "taomni-plugin-mail"
         || manifest.kind != PluginKind::Collaboration

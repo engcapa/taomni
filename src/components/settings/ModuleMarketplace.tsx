@@ -82,6 +82,10 @@ export function ModuleMarketplace() {
           {isNew && <p data-testid="module-marketplace-new">{t("plugins.marketNew")}</p>}
           {(!asset || !compatible) && <p data-testid="module-marketplace-unavailable">{t("plugins.marketUnavailable")}</p>}
           {task && <p data-testid="module-marketplace-task">{t(`plugins.downloadPhase${task.progress.phase}`)}</p>}
+          {legacyPending && release?.legacyRestartRequired?.includes(entry.id)
+            && <p>{t("plugins.marketMailRestartRequired")}</p>}
+          {legacyPending && release?.legacyImportFailed?.includes(entry.id)
+            && <p role="alert">{t("plugins.marketMailImportFailed")}</p>}
           {state.errors[entry.id] && <p data-testid="module-marketplace-action-error" role="alert" className="my-2 text-red-500">{state.errors[entry.id]}</p>}
           <div className="mt-2 flex gap-2">
             {legacyPending && !installedVersion ? <button type="button" data-testid="module-marketplace-provision" className="taomni-btn"
