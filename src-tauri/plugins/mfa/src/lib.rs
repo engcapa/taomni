@@ -20,7 +20,7 @@ pub use taomni_mfa_engine::INITIALIZATION_REQUIRED;
 
 pub fn host_config() -> HostConfig {
     let mut services = ServiceCapabilities::default();
-    services.0.insert(FIXED_KEY_SERVICE.into(), 1);
+    services.0.insert(FIXED_KEY_SERVICE.into(), SERVICE_VERSION);
     HostConfig {
         plugin_id: PLUGIN_ID.into(),
         plugin_version: PLUGIN_VERSION.into(),
@@ -48,6 +48,9 @@ pub fn host_config() -> HostConfig {
         .collect(),
         permissions: BTreeSet::from([FIXED_KEY_SERVICE.into(), CAPTURE_SCREEN_PERMISSION.into()]),
         required_services: services,
+        optional_services: ServiceCapabilities(
+            [(CAPTURE_STILL_SERVICE.into(), SERVICE_VERSION)].into(),
+        ),
         operation_timeout: Duration::from_secs(10),
         snapshot_timeout: Duration::from_secs(300),
     }

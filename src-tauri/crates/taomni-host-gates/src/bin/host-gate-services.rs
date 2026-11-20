@@ -81,6 +81,7 @@ fn main() -> std::process::ExitCode {
             FIXED_KEY_SERVICE.into(),
             1,
         )])),
+        optional_services: Default::default(),
         operation_timeout: Duration::from_secs(10),
         snapshot_timeout: Duration::from_secs(30),
     };

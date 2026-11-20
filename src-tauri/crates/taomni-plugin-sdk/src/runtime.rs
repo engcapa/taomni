@@ -36,6 +36,8 @@ pub struct HostConfig {
     pub commands: BTreeSet<String>,
     pub permissions: BTreeSet<String>,
     pub required_services: ServiceCapabilities,
+    /// Additional services negotiated when the core offers the same version.
+    pub optional_services: ServiceCapabilities,
     pub operation_timeout: Duration,
     pub snapshot_timeout: Duration,
 }
@@ -121,6 +123,7 @@ pub(crate) fn serve_owned(
     let jobs = worker::start(active.clone(), client.clone(), handler, storage.clone())?;
     let mut reader = LineReader::new(reader);
     let mut authenticated = false;
+    let mut scoped_commands = false;
     let mut host_instance: Option<HostInstanceId> = None;
     let mut revoked_epoch: Option<VaultEpoch> = None;
     let mut revoke: Option<(RequestId, RevokeKeys)> = None;
@@ -205,6 +208,7 @@ pub(crate) fn serve_owned(
                             )
                             .map_err(|_| invalid_frame())?;
                             authenticated = true;
+                            scoped_commands = !response.core_services.is_empty();
                             host_instance = instance;
                             RpcResponse::success(
                                 request.id,
@@ -244,6 +248,7 @@ pub(crate) fn serve_owned(
                     if let Some(error) = validate_command(
                         &request,
                         &config,
+                        scoped_commands,
                         host_instance.as_ref(),
                         revoked_epoch,
                         revoke.is_some(),
@@ -321,6 +326,12 @@ pub(crate) fn handshake(
     validate_versions(handshake.api_version, handshake.protocol_version)?;
     validate_token(token, &handshake.token)?;
     let profile = confirm_profile_handshake(storage, handshake.profile.as_ref())?;
+    let mut services = config.required_services.clone();
+    for (name, version) in &config.optional_services.0 {
+        if handshake.core_services.supports(name, *version) {
+            services.0.insert(name.clone(), *version);
+        }
+    }
     if handshake.plugin_id != config.plugin_id
         || handshake.plugin_version != config.plugin_version
         || handshake.commands.iter().cloned().collect::<BTreeSet<_>>() != config.commands
@@ -335,14 +346,14 @@ pub(crate) fn handshake(
             .0
             .iter()
             .any(|(name, version)| !handshake.core_services.supports(name, *version))
-        || (!config.required_services.is_empty() && handshake.host_instance.is_none())
+        || (!services.is_empty() && handshake.host_instance.is_none())
         || (handshake.request_id_mode == RequestIdMode::MonotonicV1
             && handshake.host_instance.is_none())
     {
         return Err(RpcError::from_code(ErrorCode::PermissionDenied));
     }
     let mut response = HandshakeResponse::accepted(1000);
-    response.core_services = config.required_services.clone();
+    response.core_services = services;
     response.profile = profile;
     response.request_id_mode = handshake.request_id_mode;
     Ok((response, handshake.host_instance))
@@ -351,6 +362,7 @@ pub(crate) fn handshake(
 fn validate_command(
     request: &RpcRequest,
     config: &HostConfig,
+    scoped_commands: bool,
     host: Option<&HostInstanceId>,
     revoked: Option<VaultEpoch>,
     revoking: bool,
@@ -366,7 +378,7 @@ fn validate_command(
         return (profile.is_none() || host.is_none() || request.context.is_some())
             .then(|| RpcError::from_code(ErrorCode::PermissionDenied));
     }
-    if !config.required_services.is_empty() {
+    if scoped_commands {
         let valid = request.context.as_ref().is_some_and(|context| Some(&context.host_instance) == host
             && revoked.is_none_or(|epoch| context.vault_epoch.get() > epoch.get())
             && profile.is_none_or(|profile| profile.generation == context.profile_generation)
