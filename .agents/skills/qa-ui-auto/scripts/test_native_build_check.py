@@ -22,6 +22,7 @@ class BuildCheckTest(unittest.TestCase):
             record_path.write_text(json.dumps(record), encoding="utf-8")
             original = record_path.read_bytes()
             with patch.object(native_build, "qa_binary", return_value=binary), \
+                 patch.object(native_build.platform, "system", return_value="Linux"), \
                  patch.object(native_build, "build_inputs", return_value=inputs), \
                  patch.object(native_build.subprocess, "run") as compile_process, \
                  contextlib.redirect_stdout(io.StringIO()):
@@ -56,10 +57,33 @@ class BuildCheckTest(unittest.TestCase):
                 "binary_sha256": native_build.binary_digest(binary),
                 "build_inputs": {"source_sha256": "source", "optional": None},
             }), encoding="utf-8")
-            with patch.object(native_build, "qa_binary", return_value=binary):
+            with patch.object(native_build, "qa_binary", return_value=binary), \
+                 patch.object(native_build.platform, "system", return_value="Linux"):
                 result = native_build.check_build(inputs={"source_sha256": "source"})
             self.assertFalse(result["reusable"])
             self.assertEqual(result["changed_inputs"], ["optional"])
+
+    def test_windows_build_reuse_requires_the_matching_helper(self):
+        with tempfile.TemporaryDirectory() as directory:
+            binary = Path(directory) / "taomni.exe"
+            binary.write_bytes(b"qa app")
+            helper = binary.with_name("sockscap-helper.exe")
+            helper.write_bytes(b"qa helper")
+            inputs = {"source_sha256": "source"}
+            record = {"identifier": native_build.QA_APP_ID, "binary_sha256": native_build.binary_digest(binary),
+                      "build_inputs": inputs}
+            path = native_build.identity_path(binary)
+            path.write_text(json.dumps(record), encoding="utf-8")
+            with patch.object(native_build, "qa_binary", return_value=binary), \
+                 patch.object(native_build.platform, "system", return_value="Windows"):
+                self.assertIn("identity missing", native_build.check_build(inputs=inputs)["reason"])
+                record["sockscap_helper_sha256"] = native_build.binary_digest(helper)
+                path.write_text(json.dumps(record), encoding="utf-8")
+                self.assertTrue(native_build.check_build(inputs=inputs)["reusable"])
+                helper.write_bytes(b"stale helper")
+                self.assertIn("helper differs", native_build.check_build(inputs=inputs)["reason"])
+                helper.unlink()
+                self.assertFalse(native_build.check_build(inputs=inputs)["reusable"])
 
 
 if __name__ == "__main__":

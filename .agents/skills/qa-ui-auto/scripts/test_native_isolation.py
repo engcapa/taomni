@@ -53,6 +53,10 @@ class NativeBuildTest(unittest.TestCase):
                 target = root / "src-tauri" / "target" / "qa-ui-auto"
                 expected = target / ("release" if release else "debug") / (
                     "taomni.exe" if system == "Windows" else "taomni")
+                expected_tools = [("taomni-rdp-probe", "rdp-probe")]
+                if system == "Windows":
+                    expected_tools.append(("taomni-sockscap-tools", "sockscap-helper"))
+                compiled_tools = []
 
                 def compile_binary(command, *, cwd, env, check):
                     self.assertEqual(cwd, root)
@@ -61,8 +65,11 @@ class NativeBuildTest(unittest.TestCase):
                     self.assertNotIn("TAURI_CONFIG", env)
                     if command[0] == "cargo":
                         self.assertTrue(expected.is_file())
-                        self.assertEqual(command[command.index("--package") + 1], "taomni-rdp-probe")
-                        self.assertEqual(command[command.index("--bin") + 1], "rdp-probe")
+                        package = command[command.index("--package") + 1]
+                        name = command[command.index("--bin") + 1]
+                        compiled_tools.append((package, name))
+                        if system == "Windows" and name == "sockscap-helper":
+                            expected.with_name("sockscap-helper.exe").write_bytes(b"QA helper")
                         self.assertEqual("--release" in command, release)
                         return
                     self.assertEqual(command[command.index("--config") + 1], str(native_build.QA_CONFIG))
@@ -83,9 +90,13 @@ class NativeBuildTest(unittest.TestCase):
                 ):
                     binary = native_build.build_qa(release=release)
                 self.assertEqual(binary, expected)
+                self.assertEqual(compiled_tools, expected_tools)
                 record = native_build.verify_identity(binary)
                 self.assertEqual(record["identifier"], native_build.QA_APP_ID)
                 self.assertEqual(record["platform"], system)
+                if system == "Windows":
+                    self.assertEqual(record["sockscap_helper_sha256"],
+                                     native_build.binary_digest(binary.with_name("sockscap-helper.exe")))
 
     def test_failed_rebuild_invalidates_old_authorization(self):
         with TemporaryDirectory() as directory:

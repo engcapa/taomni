@@ -412,19 +412,24 @@ jobs:
         env:
           QA_RELEASE: ${{ contains(matrix.capabilities, 'release') }}
         run: |
-          # A verified cached app skips its frontend build. Cargo still runs
-          # the package build script when compiling the helper's test target.
-          pnpm build:mobile
           python - <<'PYTHON' 2>&1 | tee qa-build-output/capture-contracts.log
           import os, subprocess
           from native_build import ROOT, configured_environment
           env = configured_environment()
-          env['CARGO_TARGET_DIR'] = str(ROOT / 'src-tauri' / 'target' / 'qa-ui-auto')
-          command = ['cargo', 'test', '--locked', '--manifest-path', 'src-tauri/Cargo.toml', '--bin', 'sockscap-helper']
-          if os.environ['QA_RELEASE'] == 'true':
+          target = ROOT / 'src-tauri' / 'target' / 'qa-ui-auto'
+          env['CARGO_TARGET_DIR'] = str(target)
+          command = ['cargo', 'test', '--locked', '--manifest-path', 'src-tauri/Cargo.toml',
+                     '-p', 'taomni-sockscap-tools', '--bin', 'sockscap-helper']
+          profile = 'release' if os.environ['QA_RELEASE'] == 'true' else 'debug'
+          if profile == 'release':
               env['CARGO_PROFILE_RELEASE_DEBUG_ASSERTIONS'] = 'true'
               command.append('--release')
           subprocess.run(command, cwd=ROOT, env=env, check=True)
+          helper = target / profile / 'sockscap-helper.exe'
+          denied = subprocess.run([str(helper)], capture_output=True, text=True, timeout=15)
+          if denied.returncode != 2 or '--token and --port are required' not in denied.stderr:
+              raise SystemExit(f'QA helper did not reject an unconfigured launch: exit {denied.returncode}, {denied.stderr}')
+          print('QA runtime contains its own SocksCap helper. Unconfigured launch exited with status 2.')
           PYTHON
       - name: Upload native runtime once per build
         if: inputs.operation == 'build'

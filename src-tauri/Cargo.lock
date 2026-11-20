@@ -11241,6 +11241,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "taomni-sockscap-tools"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "bytes",
+ "prost",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+ "winapi",
+]
+
+[[package]]
 name = "taomni-sqlite-snapshot"
 version = "0.1.0"
 dependencies = [

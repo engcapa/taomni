@@ -156,6 +156,9 @@ TASK-027 将 G1–G11 设为独立发布阻断门。每个门必须在匹配源�
 - Windows G5 的最新两条路径各匹配 40 组采样。进程内、独立宿主的输入到画面 p95 分别为 71.82 和 73.79 ms。绘制提交到捕获采样的 p95 分别为 52.45 和 50.52 ms，捕获采样到编码交接分别为 19.48 和 18.91 ms，交接到探针收图分别为 5.18 和 7.43 ms。该批连接、首帧和吞吐场景通过，延迟仍需达到原 65 ms 预算。 [Windows 原始采样](https://github.com/engcapa/taomni/actions/runs/44649616170)
 - 独立模块发布先验证现行目录签名，再下载并验证基线资产。只对变化模块生成增量目录，由打包器合并并签署完整目录。模块 Release 保留新包、签名和目录快照，并维持核心 Release 的 Latest 入口。新包可下载后，才同步目录到核心 Release。37 项发布工具和工作流单测通过，涵盖首装名单中的其他模块、目录发布顺序与失败后恢复。 [差异发布规则](taomni-modular-split-design.md#76-核心与模块差异发布规则v17)
 - Mail 的 SMTP 建连、认证、消息发送及共用 TLS 证书策略迁入邮件引擎。桌面适配层根据会话配置选择直连或转发，并在 SMTP 初始化失败时释放转发任务。31 项引擎单测和 17 项核心单测通过。TC-MAIL-SEND-01 对照 SMTP 收件与 Sent 副本，回执和日历回复用例增加运行时检查。
+- GUI、headless 和离线 MFA 维护统一通过同一套校验打开 `.mobile-mode.lock`。7 项锁库单测和 9 项启动单测通过，覆盖桌面共享、维护和 headless 排他、轮流释放及 Unix 拒绝链接文件。
+- Linux 候选安装包清单确认旧构建包含 Windows helper 和 macOS Redirector 实验程序。两件工具移入独立的 `taomni-sockscap-tools`，核心 Cargo 包的二进制目标没有这两件工具。Windows Release 显式编译、暂存和检查当前产品所用的 helper，Windows Native QA 工件单独记录 helper 摘要。Windows 与 macOS 工具交叉编译检查及 41 项 QA 工具单测已通过。SocksCap 正式宿主、资源拆分与 macOS `--sockscap-redirector-bridge` 迁出继续按 TASK-019 验收。 [旧候选清单](https://github.com/engcapa/taomni/actions/runs/44658625990)
+- Windows GDI 单独实验的进程内延迟 p95 为 60.63 ms，独立宿主为 74.90 ms，两条路径的帧率分别为 20.91 和 21.54 fps，低于 25.6 fps 门槛。这份分支用于定位采集开销。 [GDI 原始结果](https://github.com/engcapa/taomni/actions/runs/44660430509)
 
 ## 当前结论
 

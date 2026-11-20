@@ -33,6 +33,9 @@ if ($args -contains "--check") {
     Write-Host "WinDivert.dll missing."
     exit 1
   }
+  if (-not (Test-Path -LiteralPath (Join-Path $resWin "sockscap-helper.exe") -PathType Leaf)) {
+    throw "SocksCap helper missing from Windows bundle resources. Run this script without --check to build it."
+  }
   # xray-core is optional: its absence only disables core-backed upstreams
   # (shadowsocks/trojan/vmess/vless/wireguard), not capture. Warn, don't fail.
   $xray = Join-Path $resWin "xray.exe"
@@ -140,10 +143,11 @@ Push-Location $tauri
 try {
   Write-Host "Building sockscap-helper ($Configuration)..."
   if ($Configuration -eq "release") {
-    cargo build --bin sockscap-helper --release
+    cargo build --locked -p taomni-sockscap-tools --bin sockscap-helper --release
   } else {
-    cargo build --bin sockscap-helper
+    cargo build --locked -p taomni-sockscap-tools --bin sockscap-helper
   }
+  if ($LASTEXITCODE -ne 0) { throw "SocksCap helper build failed ($LASTEXITCODE)" }
 } finally {
   Pop-Location
 }

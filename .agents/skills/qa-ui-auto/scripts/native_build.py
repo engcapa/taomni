@@ -81,6 +81,10 @@ def verify_identity(binary: Path) -> dict:
             raise ValueError("expected the independent QA application ID")
         if record.get("binary_sha256") != binary_digest(binary):
             raise ValueError("binary differs from its QA build record")
+        if "sockscap_helper_sha256" in record:
+            helper = binary.with_name("sockscap-helper.exe")
+            if record["sockscap_helper_sha256"] != binary_digest(helper):
+                raise ValueError("SocksCap helper differs from its QA build record")
     except (OSError, ValueError) as exc:
         raise ValueError(f"Native QA identity check failed: {exc}. Build with: {BUILD_RECIPE}") from exc
     return record
@@ -163,6 +167,8 @@ def check_build(*, release: bool = False, inputs: dict | None = None) -> dict:
     except ValueError as exc:
         return dict(result, reason=str(exc))
     expected = inputs if inputs is not None else build_inputs(release=release)
+    if platform.system() == "Windows" and "sockscap_helper_sha256" not in previous:
+        return dict(result, reason="SocksCap helper identity missing from its QA build record")
     recorded = previous.get("build_inputs")
     recorded = recorded if isinstance(recorded, dict) else {}
     changed = sorted(key for key in set(expected) | set(recorded)
@@ -228,6 +234,14 @@ def build_qa(*, release: bool = False, force: bool = False) -> Path:
     started = time.monotonic()
     subprocess.run(command, cwd=ROOT, env=env, check=True)
     subprocess.run(probe, cwd=ROOT, env=env, check=True)
+    helper_sha = None
+    if platform.system() == "Windows":
+        helper = ["cargo", "build", "--locked", "--manifest-path", "src-tauri/Cargo.toml",
+                  "--package", "taomni-sockscap-tools", "--bin", "sockscap-helper"]
+        if release:
+            helper.append("--release")
+        subprocess.run(helper, cwd=ROOT, env=env, check=True)
+        helper_sha = binary_digest(binary.with_name("sockscap-helper.exe"))
     if inputs != build_inputs(release=release, env=env):
         raise ValueError("Build inputs changed during compilation; rebuild before collecting evidence")
     record = {
@@ -241,6 +255,8 @@ def build_qa(*, release: bool = False, force: bool = False) -> Path:
         "build_inputs": inputs,
         "build_duration_sec": time.monotonic() - started,
     }
+    if helper_sha is not None:
+        record["sockscap_helper_sha256"] = helper_sha
     record_path.write_text(json.dumps(record, indent=2) + "\n", encoding="utf-8")
     return binary
 

@@ -225,7 +225,7 @@ mod macos {
     fn print_help() {
         println!(
             "mitmproxy-redirector-poc\n\n\
-         Usage:\n  cargo run --bin mitmproxy-redirector-poc -- --intercept <SPEC> [OPTIONS]\n\n\
+         Usage:\n  cargo run -p taomni-sockscap-tools --bin mitmproxy-redirector-poc -- --intercept <SPEC> [OPTIONS]\n\n\
          Options:\n  --intercept <SPEC>    Comma-separated process path substrings or PIDs (required)\n  \
          --redirector <PATH>  Signed Redirector executable [default: {DEFAULT_REDIRECTOR}]\n  \
          --socket <PATH>      IPC socket directly under /tmp\n  \
