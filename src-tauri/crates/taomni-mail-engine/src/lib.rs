@@ -8,6 +8,7 @@ pub mod database;
 pub mod filters;
 pub mod imap_auth;
 pub mod imap_folders;
+pub mod imap_transport;
 mod inline_images;
 mod lists;
 pub mod mbox;

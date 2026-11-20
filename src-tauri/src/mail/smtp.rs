@@ -9,19 +9,9 @@ pub(super) use taomni_mail_engine::compose::{
 
 use taomni_mail_engine::smtp::{SmtpClient, SmtpEndpoint};
 
-struct ProxyForward(Option<JoinHandle<()>>);
-
-impl Drop for ProxyForward {
-    fn drop(&mut self) {
-        if let Some(task) = self.0.take() {
-            task.abort();
-        }
-    }
-}
-
 pub(super) struct MailSmtpTransport {
     pub(super) mailer: SmtpClient,
-    _forward: ProxyForward,
+    _forward: Option<ProxyForward>,
 }
 
 pub(super) fn send_smtp_with(
@@ -54,9 +44,8 @@ pub(super) fn build_smtp_transport(
     runtime: &tokio::runtime::Handle,
 ) -> Result<MailSmtpTransport, String> {
     let host = account.config.smtp.host.trim();
-    let (connect_host, connect_port, forward_task) =
+    let (connect_host, connect_port, forward) =
         mail_effective_endpoint(account, host, account.config.smtp.port, runtime)?;
-    let forward = ProxyForward(forward_task);
     let mailer = SmtpClient::new(SmtpEndpoint {
         connect_host: &connect_host,
         connect_port,

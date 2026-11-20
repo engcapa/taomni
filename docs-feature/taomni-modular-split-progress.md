@@ -159,6 +159,8 @@ TASK-027 将 G1–G11 设为独立发布阻断门。每个门必须在匹配源�
 - GUI、headless 和离线 MFA 维护统一通过同一套校验打开 `.mobile-mode.lock`。7 项锁库单测和 9 项启动单测通过，覆盖桌面共享、维护和 headless 排他、轮流释放及 Unix 拒绝链接文件。
 - Linux 候选安装包清单确认旧构建包含 Windows helper 和 macOS Redirector 实验程序。两件工具移入独立的 `taomni-sockscap-tools`，核心 Cargo 包的二进制目标没有这两件工具。Windows Release 显式编译、暂存和检查当前产品所用的 helper，Windows Native QA 工件单独记录 helper 摘要。Windows 与 macOS 工具交叉编译检查及 41 项 QA 工具单测已通过。SocksCap 正式宿主、资源拆分与 macOS `--sockscap-redirector-bridge` 迁出继续按 TASK-019 验收。 [旧候选清单](https://github.com/engcapa/taomni/actions/runs/44658625990)
 - Windows GDI 单独实验的进程内延迟 p95 为 60.63 ms，独立宿主为 74.90 ms，两条路径的帧率分别为 20.91 和 21.54 fps，低于 25.6 fps 门槛。这份分支用于定位采集开销。 [GDI 原始结果](https://github.com/engcapa/taomni/actions/runs/44660430509)
+- Windows G5 用单独分支测试 DIB section 直接读取采集帧。用例沿用 65 ms 延迟和 25.6 fps 门槛。 [Windows 采集对照](https://github.com/engcapa/taomni/actions/runs/44667760818)
+- Mail 的 IMAP greeting、TLS、STARTTLS 和认证已接入独立引擎。核心过渡层按会话设置打开连接，连接失败或结束时回收转发任务。更新 TC-MAIL-IDLE-01、TC-MAIL-POP3-01 和 TC-MAIL-SYNC-03，保留 IDLE 断开、POP3 去重和稀疏 UID 重连的独立断言，并检查运行时错误。
 
 ## 当前结论
 

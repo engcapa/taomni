@@ -70,6 +70,7 @@ steps:
     timeout_sec: 30
 - mail_server_assert_list_matches:
     timeout_sec: 30
+- assert_no_runtime_errors: null
 - screenshot: mail-pop3-01-local-inbox.png
 verification:
   review: reviewed
@@ -106,9 +107,12 @@ verification:
       expectation: '{"assert_text": {"selector": "[data-testid=\"mail-client-tab\"]", "contains": "new headers across", "timeout_sec": 30}}'
     - step: 18
       expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 30}}'
+    - step: 19
+      expectation: '{"assert_no_runtime_errors": null}'
     results:
     - 14
     - 18
+    - 19
   visual:
   - check: 截图中本地文件夹（INBOX/Sent/Drafts/Trash/Junk）与 POP3 状态显示正确。
     method: manual

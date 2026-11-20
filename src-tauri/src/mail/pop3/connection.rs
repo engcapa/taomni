@@ -1,6 +1,7 @@
 use super::limits::READ_TIMEOUT;
 use crate::mail::MailAuthMode;
 use crate::mail::MailConnectionSecurity;
+use crate::mail::ProxyForward;
 use crate::mail::ResolvedMailAccount;
 use crate::mail::certs;
 use crate::mail::mail_effective_endpoint;
@@ -143,9 +144,23 @@ pub(super) fn authenticate<S: Read + Write>(
     }
 }
 
-pub(in crate::mail) enum Pop3Client {
+enum Pop3Session {
     Plain(Pop3Conn<TcpStream>),
     Tls(Pop3Conn<native_tls::TlsStream<TcpStream>>),
+}
+
+pub(in crate::mail) struct Pop3Client {
+    session: Pop3Session,
+    _forward: Option<ProxyForward>,
+}
+
+macro_rules! each {
+    ($client:ident, $conn:ident => $body:expr) => {
+        match &mut $client.session {
+            Pop3Session::Plain($conn) => $body,
+            Pop3Session::Tls($conn) => $body,
+        }
+    };
 }
 
 impl Pop3Client {
@@ -155,7 +170,7 @@ impl Pop3Client {
     ) -> Result<Self, String> {
         let host = account.config.imap.host.trim();
         let port = account.config.imap.port;
-        let (connect_host, connect_port, _forward) =
+        let (connect_host, connect_port, forward) =
             mail_effective_endpoint(account, host, port, runtime)?;
         let stream = tcp_connect(&connect_host, connect_port)?;
         stream.set_read_timeout(Some(READ_TIMEOUT)).ok();
@@ -172,12 +187,12 @@ impl Pop3Client {
                     )
                 })
         };
-        let mut client = match account.config.imap.security {
+        let session = match account.config.imap.security {
             MailConnectionSecurity::Tls => {
                 let mut conn = Pop3Conn::new(tls(stream)?);
                 let greeting = conn.status()?;
                 authenticate(&mut conn, account, &greeting, true)?;
-                Pop3Client::Tls(conn)
+                Pop3Session::Tls(conn)
             }
             MailConnectionSecurity::Starttls => {
                 let mut plain = Pop3Conn::new(stream);
@@ -187,14 +202,18 @@ impl Pop3Client {
                     .map_err(|e| format!("POP3 STLS failed: {e}"))?;
                 let mut conn = Pop3Conn::new(tls(plain.into_inner())?);
                 authenticate(&mut conn, account, "", true)?;
-                Pop3Client::Tls(conn)
+                Pop3Session::Tls(conn)
             }
             MailConnectionSecurity::None => {
                 let mut conn = Pop3Conn::new(stream);
                 let greeting = conn.status()?;
                 authenticate(&mut conn, account, &greeting, false)?;
-                Pop3Client::Plain(conn)
+                Pop3Session::Plain(conn)
             }
+        };
+        let mut client = Self {
+            session,
+            _forward: forward,
         };
         client.stat()?;
         Ok(client)
@@ -235,7 +254,6 @@ impl Pop3Client {
 
     /// QUIT commits DELE marks (RFC 1939 UPDATE state).
     pub(in crate::mail) fn quit(mut self) -> Result<(), String> {
-        let client = &mut self;
-        each!(client, c => c.command("QUIT")).map(|_| ())
+        each!(self, c => c.command("QUIT")).map(|_| ())
     }
 }

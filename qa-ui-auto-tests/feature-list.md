@@ -7711,6 +7711,7 @@ files:
   - src/stubs/mailServerStub.ts
   - src-tauri/src/mail/sync.rs
   - src-tauri/src/mail/mod.rs
+  - src-tauri/crates/taomni-mail-engine/src/imap_transport.rs
 controls:
   - id: message-count
     selector: '[data-testid="mail-message-count"]'
@@ -7935,6 +7936,7 @@ files:
   - src/lib/mail.ts
   - src/lib/lanNotify.ts
   - src-tauri/src/mail/idle.rs
+  - src-tauri/src/mail/imap_transport.rs
 controls:
   - id: idle-status
     selector: '[data-testid="mail-idle-status"]'
@@ -8260,6 +8262,8 @@ files:
   - src/components/session/SessionEditor.tsx
   - src/lib/quickConnect.ts
   - src-tauri/src/mail/pop3.rs
+  - src-tauri/src/mail/pop3/connection.rs
+  - src-tauri/src/mail/imap_transport.rs
   - src-tauri/src/mail/local_cmds.rs
   - src-tauri/crates/taomni-mail-engine/src/imap_auth.rs
 controls:
@@ -13861,7 +13865,8 @@ controls:
 > - Ribbon `Packages`、`Macros`
 > - SFTP 底部的 "Cross-host transfer (remote ↔ remote)" 按钮（disabled 占位）
 
-- TC-MAIL-SYNC-03: native sparse UID command limits, FETCH reconnect, gap-free catch-up and full remote deletion/flag reconciliation (F-MAIL-5/F-MAIL-3).
+- TC-MAIL-SYNC-03 covers native sparse UID command limits, FETCH reconnect, gap-free catch-up, remote deletion and flag reconciliation, and runtime error checks (F-MAIL-5/F-MAIL-3).
+- TC-MAIL-IDLE-01 and TC-MAIL-POP3-01 check renderer and native connection behavior, including IDLE release after closing the tab and repeated POP3 sync without duplicates (F-MAIL-10/F-MAIL-17).
 
 ---
 

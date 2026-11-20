@@ -12,15 +12,6 @@
 //! downloaded mail on the server (AC-66). Local mail is never pruned by the
 //! header retention settings — it has no other copy.
 
-macro_rules! each {
-    ($self:ident, $conn:ident => $body:expr) => {
-        match $self {
-            Pop3Client::Plain($conn) => $body,
-            Pop3Client::Tls($conn) => $body,
-        }
-    };
-}
-
 #[cfg(test)]
 pub(super) mod fake {
     //! Minimal POP3 test server (USER/PASS, APOP, STAT, UIDL, RETR, DELE, QUIT).

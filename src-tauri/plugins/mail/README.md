@@ -7,10 +7,12 @@ inbox, synchronization workers, drafts, contacts, calendar integration and
 the `mail-cache` data tree.
 
 `taomni-mail-engine` provides MIME parsing and composition, archive storage,
-mbox and EML conversion, and IMAP authentication over an established
-connection. The desktop adapter supplies account settings, connection and
-proxy resolution, and attachment bytes. Mail keeps its existing session
-settings and data formats during the transition.
+mbox and EML conversion, and IMAP greeting, TLS, STARTTLS and authentication
+over an established socket. The desktop adapter supplies account settings,
+opens the connection using the session's network settings, and resolves
+attachment bytes. A live connection owns its proxy forwarder and releases
+it when connection setup fails or the connection closes. Mail keeps its
+existing session settings and data formats during the transition.
 
 The manifest is provisional until the native host, frontend bundle, legacy
 cache migration, scoped core-service contract and browser/native acceptance

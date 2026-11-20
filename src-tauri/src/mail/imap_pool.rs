@@ -4,11 +4,11 @@ use taomni_mail_engine::imap_folders::imap_list_folders;
 pub(super) enum ActiveImapSession {
     Tls {
         session: imap::Session<native_tls::TlsStream<TcpStream>>,
-        forward_task: Option<JoinHandle<()>>,
+        forward_task: Option<ProxyForward>,
     },
     Plain {
         session: imap::Session<TcpStream>,
-        forward_task: Option<JoinHandle<()>>,
+        forward_task: Option<ProxyForward>,
     },
 }
 
@@ -236,9 +236,7 @@ impl Drop for ActiveImapSession {
                 forward_task.take()
             }
         };
-        if let Some(task) = task {
-            task.abort();
-        }
+        drop(task);
     }
 }
 
