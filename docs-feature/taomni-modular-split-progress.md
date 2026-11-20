@@ -152,6 +152,7 @@ TASK-027 将 G1–G11 设为独立发布阻断门。每个门必须在匹配源�
 - Mail 的独立引擎接管分段 MIME 解码、日历邀请解析和 iTIP 回复生成。核心的 `mail-parser` 直接依赖仅用于剩余单元测试，正式构建通过邮件引擎使用解析器。25 项引擎单测和 7 项核心单测通过，邮件邀请流程由 TC-MAIL-INVITE-01 验证。
 - Wayland 批次的四个原始分片已收齐，28 项通过。TC-FILE-OPEN-006 和 008 复现既有的非左键输入依赖 X11 限制。同期 Linux、Windows Browser 各 47 项通过，三端合集继续收取其余分片。 [Wayland 工件](https://github.com/engcapa/taomni/actions/runs/44643485787) · [三端合集](https://github.com/engcapa/taomni/actions/runs/44643481993)
 - 存在待恢复的 MFA 事务时，启动先检查模式占用，再在独占维护锁下恢复事务。启动竞争仍返回配置占用，未打开核心数据库。修复前单测复现通用启动错误，修复后 12 项 Rust 单测及 63 项 QA 工具单测通过。TC-MODULES-009 增加两个方向的原生竞争检查，使用隔离的事务标记验证退出码 1、原进程存活和事务记录保留。实装与原生复验继续执行。
+- Mail 将过滤规则解析、执行计划、SQLite 规则与 UID 水位、规则导入导出格式迁入 `taomni-mail-engine`。核心适配层仍负责用户文件读写、连接与实际执行。30 项邮件引擎单测和 16 项核心单测通过。TC-MAIL-FILTER-01 在 Browser 和 Native 增加保存、重开后读取规则及运行时检查，保留服务端最终邮件位置断言。
 
 ## 当前结论
 

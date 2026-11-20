@@ -5,10 +5,11 @@ use super::model::MailFilterActionKind;
 use super::model::MailFilterField;
 use super::model::MailFilterOp;
 use regex::RegexBuilder;
+use std::collections::HashSet;
 
 /// What the matching filters want done to one message.
 #[derive(Debug, Default, Clone, PartialEq, Eq)]
-pub(in crate::mail) struct MessagePlan {
+pub struct MessagePlan {
     pub matched: Vec<String>,
     pub mark_read: bool,
     pub mark_unread: bool,
@@ -22,14 +23,14 @@ pub(in crate::mail) struct MessagePlan {
 }
 
 impl MessagePlan {
-    pub(super) fn is_empty(&self) -> bool {
+    pub fn is_empty(&self) -> bool {
         self.matched.is_empty()
     }
 }
 
 /// Run `filters` in order against one message (Thunderbird semantics: every
 /// matching filter applies; "Stop", move and delete end the chain).
-pub(in crate::mail) fn plan_message(
+pub fn plan_message(
     filters: &[&MailFilter],
     message: &FilterMessage,
 ) -> MessagePlan {
@@ -87,7 +88,7 @@ pub(in crate::mail) fn plan_message(
     plan
 }
 
-pub(in crate::mail) fn validate_filter(filter: &MailFilter) -> Result<(), String> {
+pub(super) fn validate_filter(filter: &MailFilter) -> Result<(), String> {
     let label = if filter.name.trim().is_empty() {
         "a filter"
     } else {
@@ -138,4 +139,18 @@ pub(in crate::mail) fn validate_filter(filter: &MailFilter) -> Result<(), String
         }
     }
     Ok(())
+}
+
+pub fn prepare_filters(mut filters: Vec<MailFilter>) -> Result<Vec<MailFilter>, String> {
+    let mut seen = HashSet::new();
+    let stamp = crate::now_ts();
+    for (index, filter) in filters.iter_mut().enumerate() {
+        filter.name = filter.name.trim().to_string();
+        validate_filter(filter)?;
+        if filter.id.trim().is_empty() || !seen.insert(filter.id.clone()) {
+            filter.id = format!("filter-{stamp}-{index}");
+            seen.insert(filter.id.clone());
+        }
+    }
+    Ok(filters)
 }

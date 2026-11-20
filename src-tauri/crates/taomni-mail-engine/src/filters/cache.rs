@@ -1,14 +1,13 @@
 use super::model::MailFilter;
-use crate::mail::MailMessageHeader;
-use crate::mail::now_ts;
-use crate::mail::row_to_header;
+use crate::cache::row_to_header;
+use crate::{MailMessageHeader, now_ts};
 use rusqlite::Connection;
 use rusqlite::OptionalExtension;
 use rusqlite::Result as SqlResult;
 use rusqlite::params;
 use std::collections::HashSet;
 
-pub(in crate::mail) fn migrate_filter_tables(conn: &Connection) -> SqlResult<()> {
+pub fn migrate_filter_tables(conn: &Connection) -> SqlResult<()> {
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS mail_filters (
             account_id TEXT NOT NULL,
@@ -28,10 +27,7 @@ pub(in crate::mail) fn migrate_filter_tables(conn: &Connection) -> SqlResult<()>
     )
 }
 
-pub(in crate::mail) fn load_filters(
-    conn: &Connection,
-    account_id: &str,
-) -> SqlResult<Vec<MailFilter>> {
+pub fn load_filters(conn: &Connection, account_id: &str) -> SqlResult<Vec<MailFilter>> {
     let mut stmt = conn.prepare(
         "SELECT filter_json FROM mail_filters WHERE account_id = ?1 ORDER BY position, id",
     )?;
@@ -45,7 +41,7 @@ pub(in crate::mail) fn load_filters(
     Ok(filters)
 }
 
-pub(in crate::mail) fn store_filters(
+pub fn store_filters(
     conn: &Connection,
     account_id: &str,
     filters: &[MailFilter],
@@ -71,7 +67,7 @@ pub(in crate::mail) fn store_filters(
     tx.commit()
 }
 
-pub(super) fn folder_uid_validity(
+fn folder_uid_validity(
     conn: &Connection,
     account_id: &str,
     folder: &str,
@@ -85,7 +81,7 @@ pub(super) fn folder_uid_validity(
     .map(|value| value.flatten().map(|v| v as u32))
 }
 
-pub(super) fn max_cached_uid(conn: &Connection, account_id: &str, folder: &str) -> SqlResult<u32> {
+fn max_cached_uid(conn: &Connection, account_id: &str, folder: &str) -> SqlResult<u32> {
     conn.query_row(
         "SELECT COALESCE(MAX(uid), 0) FROM mail_messages WHERE account_id = ?1 AND folder = ?2",
         params![account_id, folder],
@@ -96,7 +92,7 @@ pub(super) fn max_cached_uid(conn: &Connection, account_id: &str, folder: &str) 
 
 /// Highest UID already offered to the incoming filters, or `None` when the
 /// mark is missing or belongs to an older UIDVALIDITY.
-pub(in crate::mail) fn filter_mark(
+pub fn filter_mark(
     conn: &Connection,
     account_id: &str,
     folder: &str,
@@ -114,7 +110,7 @@ pub(in crate::mail) fn filter_mark(
     }))
 }
 
-pub(in crate::mail) fn set_filter_mark(
+pub fn set_filter_mark(
     conn: &Connection,
     account_id: &str,
     folder: &str,
@@ -133,7 +129,7 @@ pub(in crate::mail) fn set_filter_mark(
 
 /// Mark everything cached as already filtered (called when filters are saved
 /// so only mail that arrives afterwards is filtered).
-pub(in crate::mail) fn ensure_filter_mark(
+pub fn ensure_filter_mark(
     conn: &Connection,
     account_id: &str,
     folder: &str,
@@ -146,7 +142,7 @@ pub(in crate::mail) fn ensure_filter_mark(
 }
 
 /// Cached headers (and text bodies) of the candidates, oldest first.
-pub(super) fn load_candidates(
+pub fn load_candidates(
     conn: &Connection,
     account_id: &str,
     folder: &str,
@@ -181,7 +177,7 @@ pub(super) fn load_candidates(
     Ok(out)
 }
 
-pub(super) enum CandidateSelection {
+pub enum CandidateSelection {
     Above(u32),
     All,
     Uids(Vec<u32>),

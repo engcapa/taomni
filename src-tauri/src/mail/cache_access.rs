@@ -4,7 +4,7 @@ pub fn init_mail_tables(conn: &Connection) -> SqlResult<()> {
     taomni_mail_engine::cache::init_cache_tables(conn)?;
     storage::init_tables(conn)?;
     pop3::migrate_local_tables(conn)?;
-    filters::migrate_filter_tables(conn)?;
+    taomni_mail_engine::filters::migrate_filter_tables(conn)?;
     contacts::migrate_contact_tables(conn)?;
     caldav::migrate_calendar_tables(conn)
 }

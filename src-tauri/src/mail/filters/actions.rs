@@ -1,5 +1,3 @@
-use super::model::MailFilterRunResult;
-use super::planning::MessagePlan;
 use crate::mail::ImapSessionOpts;
 use crate::mail::MailAccountConfig;
 use crate::mail::MailMessageHeader;
@@ -8,6 +6,7 @@ use crate::mail::resolve_config;
 use crate::mail::with_imap_session;
 use crate::state::AppState;
 use std::collections::BTreeMap;
+use taomni_mail_engine::filters::{MailFilterRunResult, MessagePlan};
 use tauri::State;
 
 pub(super) async fn raw_bytes(

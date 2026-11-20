@@ -1,4 +1,4 @@
-use crate::mail::MailMessageHeader;
+use crate::MailMessageHeader;
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashSet;
@@ -67,7 +67,7 @@ pub struct MailFilterAction {
     pub value: Option<String>,
 }
 
-pub(super) fn default_true() -> bool {
+fn default_true() -> bool {
     true
 }
 
@@ -90,7 +90,7 @@ pub struct MailFilter {
 
 /// A message as the evaluator sees it. `body` is the cached text body; when
 /// it is `None` body conditions ask `server_body` (server-side SEARCH).
-pub(in crate::mail) struct FilterMessage<'a> {
+pub struct FilterMessage<'a> {
     pub header: &'a MailMessageHeader,
     pub body: Option<&'a str>,
     pub server_body: Option<&'a HashSet<String>>,

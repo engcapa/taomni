@@ -1,12 +1,10 @@
-use super::model::MailFilter;
-use super::model::MailFilterField;
-use super::model::MailFilterOp;
 use crate::mail::ActiveImapSession;
 use crate::mail::sync::quote_imap_string;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::io::Read;
 use std::io::Write;
+use taomni_mail_engine::filters::{MailFilter, MailFilterField, MailFilterOp};
 
 /// Body needles used by `contains` / `does not contain` conditions.
 pub(super) fn body_needles(filters: &[&MailFilter]) -> Vec<String> {

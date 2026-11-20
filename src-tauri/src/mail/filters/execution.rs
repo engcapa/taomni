@@ -1,17 +1,5 @@
 use super::actions::execute_plans;
-use super::cache::CandidateSelection;
-use super::cache::ensure_filter_mark;
-use super::cache::filter_mark;
-use super::cache::load_candidates;
-use super::cache::load_filters;
-use super::cache::set_filter_mark;
 use super::imap_search::body_needles;
-use super::model::FilterMessage;
-use super::model::MailFilter;
-use super::model::MailFilterRunResult;
-use super::planning::MessagePlan;
-use super::planning::plan_message;
-use super::planning::validate_filter;
 use crate::mail::ImapSessionOpts;
 use crate::mail::MailAccountConfig;
 use crate::mail::MailMessageHeader;
@@ -22,6 +10,10 @@ use crate::mail::with_mail_db;
 use crate::state::AppState;
 use std::collections::HashMap;
 use std::collections::HashSet;
+use taomni_mail_engine::filters::{
+    CandidateSelection, FilterMessage, MailFilter, MailFilterRunResult, MessagePlan,
+    ensure_filter_mark, filter_mark, load_candidates, load_filters, plan_message, set_filter_mark,
+};
 use tauri::State;
 
 /// Run filters on a folder. `trigger = "incoming"` filters only mail newer
@@ -160,18 +152,4 @@ pub async fn mail_apply_filters(
     .await;
     finish_mark(&state)?;
     Ok(result)
-}
-
-pub(super) fn prepare_filters(mut filters: Vec<MailFilter>) -> Result<Vec<MailFilter>, String> {
-    let mut seen = HashSet::new();
-    let stamp = now_ts();
-    for (index, filter) in filters.iter_mut().enumerate() {
-        filter.name = filter.name.trim().to_string();
-        validate_filter(filter)?;
-        if filter.id.trim().is_empty() || !seen.insert(filter.id.clone()) {
-            filter.id = format!("filter-{stamp}-{index}");
-            seen.insert(filter.id.clone());
-        }
-    }
-    Ok(filters)
 }

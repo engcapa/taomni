@@ -3,9 +3,10 @@ use super::model::MailFilter;
 use super::model::MailFilterCondition;
 use super::model::MailFilterField;
 use super::model::MailFilterOp;
+use crate::MailAddress;
 use regex::RegexBuilder;
 
-pub(super) fn text_matches(op: MailFilterOp, haystack: &str, needle: &str) -> bool {
+fn text_matches(op: MailFilterOp, haystack: &str, needle: &str) -> bool {
     let hay = haystack.to_lowercase();
     let needle_lower = needle.to_lowercase();
     match op {
@@ -24,7 +25,7 @@ pub(super) fn text_matches(op: MailFilterOp, haystack: &str, needle: &str) -> bo
     }
 }
 
-pub(super) fn number_matches(op: MailFilterOp, actual: Option<f64>, value: &str) -> bool {
+fn number_matches(op: MailFilterOp, actual: Option<f64>, value: &str) -> bool {
     let (Some(actual), Ok(limit)) = (actual, value.trim().parse::<f64>()) else {
         return false;
     };
@@ -37,7 +38,7 @@ pub(super) fn number_matches(op: MailFilterOp, actual: Option<f64>, value: &str)
     }
 }
 
-pub(super) fn address_text(addresses: &[&super::super::MailAddress]) -> String {
+fn address_text(addresses: &[&MailAddress]) -> String {
     addresses
         .iter()
         .map(|a| {
@@ -53,11 +54,7 @@ pub(super) fn address_text(addresses: &[&super::super::MailAddress]) -> String {
 
 /// Address fields: `is`/`begins`/`ends` compare each address (or name) on
 /// its own, so "is boss@example.com" works on a multi-recipient To.
-pub(super) fn address_matches(
-    op: MailFilterOp,
-    addresses: &[&super::super::MailAddress],
-    value: &str,
-) -> bool {
+fn address_matches(op: MailFilterOp, addresses: &[&MailAddress], value: &str) -> bool {
     let each = |test: &dyn Fn(&str) -> bool| {
         addresses
             .iter()
@@ -72,7 +69,7 @@ pub(super) fn address_matches(
     }
 }
 
-pub(in crate::mail) fn condition_matches(
+pub(super) fn condition_matches(
     condition: &MailFilterCondition,
     message: &FilterMessage,
 ) -> bool {
@@ -141,7 +138,7 @@ pub(in crate::mail) fn condition_matches(
     }
 }
 
-pub(in crate::mail) fn filter_matches(filter: &MailFilter, message: &FilterMessage) -> bool {
+pub(super) fn filter_matches(filter: &MailFilter, message: &FilterMessage) -> bool {
     if filter.conditions.is_empty() {
         return false;
     }

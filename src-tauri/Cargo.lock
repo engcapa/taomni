@@ -11097,6 +11097,7 @@ dependencies = [
  "imap",
  "lettre",
  "mail-parser",
+ "regex",
  "rusqlite",
  "serde",
  "serde_json",

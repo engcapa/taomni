@@ -1,13 +1,10 @@
-use super::cache::ensure_filter_mark;
-use super::cache::load_filters;
-use super::cache::store_filters;
-use super::execution::prepare_filters;
-use super::model::FILTER_FILE_FORMAT;
-use super::model::FilterFile;
-use super::model::MailFilter;
 use crate::mail::with_mail_db;
 use crate::state::AppState;
 use std::collections::HashSet;
+use taomni_mail_engine::filters::{
+    MailFilter, ensure_filter_mark, load_filters, parse_filter_file, prepare_filters,
+    serialize_filter_file, store_filters,
+};
 use tauri::State;
 
 #[tauri::command]
@@ -41,26 +38,11 @@ pub async fn mail_export_filters(
     state: State<'_, AppState>,
 ) -> Result<usize, String> {
     let filters = with_mail_db(&state, &account_id, |db| load_filters(db, &account_id))?;
-    let file = FilterFile {
-        format: FILTER_FILE_FORMAT.into(),
-        version: 1,
-        filters,
-    };
-    let json = serde_json::to_string_pretty(&file).map_err(|e| e.to_string())?;
+    let count = filters.len();
+    let json = serialize_filter_file(filters)?;
     std::fs::write(target_path.trim(), json)
         .map_err(|e| format!("failed to write filters: {e}"))?;
-    Ok(file.filters.len())
-}
-
-/// Parse an exported filter file (or a bare JSON array of filters).
-pub(in crate::mail) fn parse_filter_file(text: &str) -> Result<Vec<MailFilter>, String> {
-    if let Ok(file) = serde_json::from_str::<FilterFile>(text) {
-        if file.format != FILTER_FILE_FORMAT {
-            return Err(format!("not a Taomni filter file ({})", file.format));
-        }
-        return Ok(file.filters);
-    }
-    serde_json::from_str::<Vec<MailFilter>>(text).map_err(|e| format!("invalid filter file: {e}"))
+    Ok(count)
 }
 
 /// Append the filters of a file after the existing ones.
