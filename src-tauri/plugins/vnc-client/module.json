@@ -2,7 +2,7 @@
   "id": "taomni-plugin-vnc-client",
   "slug": "vnc-client",
   "name": "VNC Client",
-  "description": "Connect to VNC desktops directly or through a desktop-managed proxy and exchange display, keyboard, pointer and clipboard updates.",
+  "description": "Connect to VNC desktops through direct, proxy or SSH jump routes. The module relays frames, clipboard and input, including the Windows special-key helper.",
   "version": "0.1.0",
   "coreApiVersion": "1",
   "kind": "remote-client",

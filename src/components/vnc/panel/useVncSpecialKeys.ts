@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { encodeWsKey } from "../../../lib/vnc";
+import type { WsOutgoing } from "../../../lib/vnc";
 import { type VncViewerOptions } from "../../../lib/vncOptions";
 import { invoke } from "@tauri-apps/api/core";
 import { listen } from "@tauri-apps/api/event";
@@ -15,12 +16,17 @@ export interface UseVncSpecialKeysContext {
   canvasFocused: boolean;
   canvasFocusedRef: import("react").RefObject<boolean>;
   flushAltGrRef: import("react").RefObject<() => void>;
+  onSpecialKeyRef: import("react").RefObject<((code: string, down: boolean) => void) | null>;
+  sendWs: (message: WsOutgoing) => void;
   sendWsBinary: (data: ArrayBuffer) => boolean;
   pressedKeysymsRef: import("react").RefObject<Set<number>>;
 }
 
 export function useVncSpecialKeys(context: UseVncSpecialKeysContext) {
-  const { visible, conn, viewOnly, viewer, canvasFocused, canvasFocusedRef, flushAltGrRef, sendWsBinary, pressedKeysymsRef } = context;
+  const {
+    visible, conn, viewOnly, viewer, canvasFocused, canvasFocusedRef, flushAltGrRef,
+    onSpecialKeyRef, sendWs, sendWsBinary, pressedKeysymsRef,
+  } = context;
 
   // ── Special keys (VNC-INPUT-003, Windows) ─────────────────────────
   // While the canvas has focus in the foreground window, a low-level
@@ -48,18 +54,29 @@ export function useVncSpecialKeys(context: UseVncSpecialKeysContext) {
     && windowFocused;
   useEffect(() => {
     if (!captureSpecialKeys) return;
-    let disposed = false;
-    let unlisten: (() => void) | null = null;
-    void invoke("vnc_set_special_key_capture", { enabled: true }).catch(() => { });
-    void listen<{ code: string; down: boolean; }>("vnc-special-key", (event) => {
-      const keysym = SPECIAL_KEY_KEYSYMS[event.payload.code];
+    const forward = (code: string, down: boolean) => {
+      const keysym = SPECIAL_KEY_KEYSYMS[code];
       if (!keysym || !canvasFocusedRef.current) return;
       // Ctrl+Esc: the Ctrl held back by the AltGr check must reach the
       // remote before the intercepted key, or the remote sees a plain Esc.
-      if (event.payload.down) flushAltGrRef.current();
-      sendWsBinary(encodeWsKey(event.payload.down, keysym));
-      if (event.payload.down) pressedKeysymsRef.current.add(keysym);
+      if (down) flushAltGrRef.current();
+      sendWsBinary(encodeWsKey(down, keysym));
+      if (down) pressedKeysymsRef.current.add(keysym);
       else pressedKeysymsRef.current.delete(keysym);
+    };
+    if (conn?.nativeSpecialKeys) {
+      onSpecialKeyRef.current = forward;
+      sendWs({ type: "special_key_capture", enabled: true });
+      return () => {
+        onSpecialKeyRef.current = null;
+        sendWs({ type: "special_key_capture", enabled: false });
+      };
+    }
+    let disposed = false;
+    let unlisten: (() => void) | null = null;
+    void invoke("vnc_set_special_key_capture", { enabled: true }).catch(() => { });
+    void listen<{ code: string; down: boolean; }>("vnc-special-key", ({ payload }) => {
+      forward(payload.code, payload.down);
     }).then((fn) => {
       if (disposed) fn();
       else unlisten = fn;
@@ -69,6 +86,6 @@ export function useVncSpecialKeys(context: UseVncSpecialKeysContext) {
       unlisten?.();
       void invoke("vnc_set_special_key_capture", { enabled: false }).catch(() => { });
     };
-  }, [captureSpecialKeys, sendWsBinary]);
+  }, [captureSpecialKeys, conn?.sessionId, conn?.nativeSpecialKeys, sendWs, sendWsBinary]);
   return { captureSpecialKeys };
 }

@@ -59,6 +59,7 @@ export const CONNECTED: VncConnectionState = {
   protocol: "RFB 3.8",
   security: "VNC Authentication",
   encrypted: false,
+  nativeSpecialKeys: false,
   error: null,
 };
 

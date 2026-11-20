@@ -4,7 +4,7 @@ use crate::policy::VncSecurityPolicy;
 use crate::quality::QualityController;
 use crate::queue::FrameQueueSender;
 use crate::ws::ForwardTaskGuard;
-use crate::ws::NativePointer;
+use crate::ws::NativeInput;
 use crate::ws::VNC_AUTH_TIMEOUT;
 use crate::ws::VncControl;
 use crate::ws::VncDialedTransport;
@@ -34,14 +34,14 @@ pub struct RelayRequest {
 pub async fn spawn_relay(
     request: RelayRequest,
     dial: impl Future<Output = Result<VncDialedTransport, String>> + Send,
-    native_pointer: Option<Box<dyn NativePointer>>,
+    native_input: NativeInput,
     attempt: CancellationToken,
 ) -> Result<VncSession, String> {
     tokio::select! {
         result = start_relay(
             request,
             dial,
-            native_pointer,
+            native_input,
             attempt.clone(),
         ) => result,
         _ = attempt.cancelled() => Err("VNC connection attempt stopped by the user".into()),
@@ -51,7 +51,7 @@ pub async fn spawn_relay(
 async fn start_relay(
     request: RelayRequest,
     dial: impl Future<Output = Result<VncDialedTransport, String>> + Send,
-    native_pointer: Option<Box<dyn NativePointer>>,
+    native_input: NativeInput,
     attempt: CancellationToken,
 ) -> Result<VncSession, String> {
     let RelayRequest {
@@ -148,7 +148,8 @@ async fn start_relay(
         protocol: rfb.protocol_version(),
         security: rfb.security_label(),
         encrypted: rfb.encrypted(),
-        native_pointer: native_pointer.is_some() && !view_only,
+        native_pointer: native_input.pointer.is_some() && !view_only,
+        native_special_keys: native_input.special_keys.is_some() && !view_only,
     })
     .unwrap();
     let _ = ws_out_tx.send_critical_control(connected);
@@ -176,7 +177,7 @@ async fn start_relay(
             clipboard_policy,
             Arc::new(std::sync::Mutex::new(quality)),
             options,
-            native_pointer,
+            native_input,
         )
         .await
         {

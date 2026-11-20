@@ -21,6 +21,18 @@ pub use probe::{ProbeRequest, probe_connection};
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+pub type SpecialKeySink = Arc<dyn Fn(&'static str, bool) + Send + Sync>;
+
+pub trait NativeSpecialKeys: Send {
+    fn set_enabled(&mut self, enabled: bool, emit: &SpecialKeySink) -> Result<(), String>;
+}
+
+#[derive(Default)]
+pub struct NativeInput {
+    pub pointer: Option<Box<dyn NativePointer>>,
+    pub special_keys: Option<Box<dyn NativeSpecialKeys>>,
+}
+
 use base64::{Engine as _, engine::general_purpose::STANDARD as BASE64_STANDARD};
 use image::{ColorType, ImageEncoder};
 use serde::{Deserialize, Serialize};
@@ -86,6 +98,7 @@ pub enum VncControl {
     /// Start (`Some`) or stop native pointer sampling over the canvas
     /// (VNC-PERF-005).
     NativePointer(Option<NativePointerTarget>),
+    SpecialKeyCapture(bool),
     /// A cursor position read by the native sampler (no buttons). Applied
     /// only while no button is held; the WebView's later copies of the same
     /// moves are then dropped.
@@ -147,6 +160,8 @@ enum WsIncoming {
         #[serde(default)]
         fb_height: Option<u16>,
     },
+    #[serde(rename = "special_key_capture")]
+    SpecialKeyCapture { enabled: bool },
 }
 
 #[derive(Debug, Serialize)]
@@ -163,7 +178,10 @@ enum WsOutgoingText {
         /// The relay samples the cursor natively while it rests over the
         /// canvas (Windows, VNC-PERF-005).
         native_pointer: bool,
+        native_special_keys: bool,
     },
+    #[serde(rename = "special_key")]
+    SpecialKey { code: &'static str, down: bool },
     #[serde(rename = "desktop_size")]
     DesktopSize {
         width: u16,

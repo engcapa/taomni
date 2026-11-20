@@ -14,12 +14,13 @@ use crate::rfb::RfbWriter;
 use crate::rfb::RuntimeStats;
 use crate::rfb::ServerMessage;
 use crate::ws::FrameFlow;
-use crate::ws::NativePointer;
+use crate::ws::NativeInput;
 use crate::ws::PointerArbiter;
 use crate::ws::RELAY_TICK;
 use crate::ws::ServerClipboardCaps;
 use crate::ws::SharedFrameFlow;
 use crate::ws::SharedQuality;
+use crate::ws::SpecialKeySink;
 use crate::ws::StatsWindow;
 use crate::ws::VncControl;
 use crate::ws::VncRelayOptions;
@@ -74,8 +75,12 @@ pub(in crate::ws) async fn run_relay(
     clipboard_policy: VncClipboardPolicy,
     quality: SharedQuality,
     options: VncRelayOptions,
-    mut native_pointer: Option<Box<dyn NativePointer>>,
+    native_input: NativeInput,
 ) -> Result<(), String> {
+    let NativeInput {
+        pointer: mut native_pointer,
+        mut special_keys,
+    } = native_input;
     let ws_stream = accept_authorized_ws(listener, &ws_token, &cancel).await?;
 
     let (mut ws_sink, ws_reader) = ws_stream.split();
@@ -195,6 +200,9 @@ pub(in crate::ws) async fn run_relay(
                             } => Some(VncControl::NativePointer(native_pointer_target(
                                 on, left, top, width, height, dpr, fb_width, fb_height,
                             ))),
+                            WsIncoming::SpecialKeyCapture { enabled } => {
+                                Some(VncControl::SpecialKeyCapture(enabled))
+                            }
                         };
                         if let Some(m) = ctrl_msg
                             && control_allowed(&m, view_only, clipboard_policy, &control_limits)
@@ -420,6 +428,14 @@ pub(in crate::ws) async fn run_relay(
     let ws_out_ctrl = ws_out_tx.clone();
     let quality_ctrl = quality.clone();
     let native_pointer_tx = control_tx.clone();
+    let special_key_sink: Option<SpecialKeySink> = special_keys.as_ref().map(|_| {
+        let output = ws_out_tx.clone();
+        Arc::new(move |code, down| {
+            if let Ok(message) = serde_json::to_string(&WsOutgoingText::SpecialKey { code, down }) {
+                let _ = output.send_critical_control(message);
+            }
+        }) as SpecialKeySink
+    });
     let mut vnc_ctrl = tokio::spawn(async move {
         let mut deferred_ctrl: Option<VncControl> = None;
         let mut last_pointer_buttons = 0u8;
@@ -593,6 +609,12 @@ pub(in crate::ws) async fn run_relay(
                         sampler.set(target, &native_pointer_tx);
                     }
                     Ok(())
+                }
+                VncControl::SpecialKeyCapture(enabled) => {
+                    match (&mut special_keys, &special_key_sink) {
+                        (Some(keys), Some(emit)) => keys.set_enabled(enabled, emit),
+                        _ => Ok(()),
+                    }
                 }
                 VncControl::SampledPointer { x, y } => {
                     if pointer_arbiter.sample(x, y, Instant::now()) {

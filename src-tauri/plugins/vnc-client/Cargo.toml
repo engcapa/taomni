@@ -17,6 +17,9 @@ tokio-util = "0.7"
 uuid = { version = "1", features = ["v4"] }
 zeroize = { version = "1", features = ["serde"] }
 
+[target.'cfg(windows)'.dependencies]
+taomni-vnc-key-protocol = { path = "../../crates/taomni-vnc-key-protocol" }
+
 [dev-dependencies]
 futures = "0.3"
 tempfile = "3"

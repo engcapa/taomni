@@ -92,6 +92,7 @@ export default function VncPanel({
   const [propertiesOpen, setPropertiesOpen] = useState(false);
   const serverClipboardGraceUntilRef = useRef(0);
   const canvasFocusedRef = useRef(false);
+  const onSpecialKeyRef = useRef<((code: string, down: boolean) => void) | null>(null);
   const [canvasFocused, setCanvasFocused] = useState(false);
   const [ctrlLatched, setCtrlLatched] = useState(false);
   const [altLatched, setAltLatched] = useState(false);
@@ -405,6 +406,7 @@ export default function VncPanel({
     sessionSettings,
     clipboardPolicyProp,
     pressedKeysymsRef,
+    onSpecialKeyRef,
     keyCodeKeysymsRef,
     pasteDelayTimerRef,
     delayedPointerDownRef,
@@ -491,6 +493,8 @@ export default function VncPanel({
     canvasFocused,
     canvasFocusedRef,
     flushAltGrRef,
+    onSpecialKeyRef,
+    sendWs,
     sendWsBinary,
     pressedKeysymsRef,
   });

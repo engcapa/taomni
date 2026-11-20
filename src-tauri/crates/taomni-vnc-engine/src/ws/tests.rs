@@ -251,9 +251,11 @@ fn connected_message_offers_native_pointer_sampling() {
         security: "VNC password".into(),
         encrypted: false,
         native_pointer: true,
+        native_special_keys: false,
     })
     .unwrap();
     assert_eq!(json["native_pointer"], serde_json::json!(true));
+    assert_eq!(json["native_special_keys"], false);
 }
 
 #[test]
@@ -616,7 +618,7 @@ async fn relay_waits_for_paint_ack_and_repaints_after_desktop_size() {
                 network_forward_task: None,
             })
         },
-        None,
+        NativeInput::default(),
         CancellationToken::new(),
     )
     .await

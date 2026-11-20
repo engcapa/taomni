@@ -3,7 +3,7 @@
 use tokio_util::sync::CancellationToken;
 
 use taomni_vnc_engine::ws::{
-    ForwardTaskGuard, RelayRequest, VncDialedTransport, forward::ForwardRoute,
+    ForwardTaskGuard, NativeInput, RelayRequest, VncDialedTransport, forward::ForwardRoute,
     native_pointer_sampler, spawn_relay,
 };
 pub use taomni_vnc_engine::ws::{VNC_AUTH_TIMEOUT, VncControl, VncRelayOptions, VncSession};
@@ -59,7 +59,10 @@ pub async fn spawn_vnc_relay(
     spawn_relay(
         request,
         transport,
-        native_pointer_sampler(std::process::id()),
+        NativeInput {
+            pointer: native_pointer_sampler(std::process::id()),
+            ..NativeInput::default()
+        },
         attempt,
     )
     .await

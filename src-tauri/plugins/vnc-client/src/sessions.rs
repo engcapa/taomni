@@ -7,7 +7,9 @@ use std::{
 };
 
 use taomni_plugin_api::{ErrorCode, RpcError};
-use taomni_vnc_engine::ws::{VncSession, native_pointer_sampler, probe_connection, spawn_relay};
+use taomni_vnc_engine::ws::{
+    NativeInput, VncSession, native_pointer_sampler, probe_connection, spawn_relay,
+};
 use tokio::runtime::{Builder, Runtime};
 use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tokio_util::sync::CancellationToken;
@@ -29,10 +31,16 @@ pub(crate) struct Sessions {
     slots: Arc<Semaphore>,
     runtime: Runtime,
     desktop_pid: u32,
+    #[cfg(windows)]
+    keyboard: Option<crate::keyboard::Keyboard>,
 }
 
 impl Sessions {
     pub(crate) fn new() -> io::Result<Self> {
+        let desktop_pid = std::env::var("TAOMNI_VNC_DESKTOP_PID")
+            .ok()
+            .and_then(|value| value.parse().ok())
+            .unwrap_or_default();
         Ok(Self {
             active: Arc::new(Mutex::new(HashMap::new())),
             slots: Arc::new(Semaphore::new(SESSION_LIMIT)),
@@ -40,10 +48,9 @@ impl Sessions {
                 .worker_threads(2)
                 .enable_all()
                 .build()?,
-            desktop_pid: std::env::var("TAOMNI_VNC_DESKTOP_PID")
-                .ok()
-                .and_then(|value| value.parse().ok())
-                .unwrap_or_default(),
+            desktop_pid,
+            #[cfg(windows)]
+            keyboard: crate::keyboard::Keyboard::new(desktop_pid)?,
         })
     }
 
@@ -57,9 +64,15 @@ impl Sessions {
         let slot = Arc::clone(&self.slots)
             .try_acquire_owned()
             .map_err(|_| RpcError::new(ErrorCode::InvalidState, "VNC_SESSION_LIMIT"))?;
-        let pointer = native_pointer_sampler(self.desktop_pid);
+        let native = NativeInput {
+            pointer: native_pointer_sampler(self.desktop_pid),
+            #[cfg(windows)]
+            special_keys: self.keyboard.as_ref().map(|keyboard| keyboard.claim()),
+            #[cfg(not(windows))]
+            special_keys: None,
+        };
         let session = match self.run(check, |attempt| {
-            spawn_relay(request, dial.connect(), pointer, attempt)
+            spawn_relay(request, dial.connect(), native, attempt)
         })? {
             Ok(session) => session,
             Err(error) => return Ok(Err(error)),

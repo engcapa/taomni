@@ -1,6 +1,8 @@
 //! Standalone VNC session owner. The desktop owns saved sessions and supplies
 //! the original endpoint or a single-use authenticated loopback route.
 
+#[cfg(windows)]
+mod keyboard;
 mod request;
 mod sessions;
 

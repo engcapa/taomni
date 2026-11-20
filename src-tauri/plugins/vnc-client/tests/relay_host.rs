@@ -9,6 +9,8 @@ use std::{
     time::{Duration, Instant},
 };
 
+#[cfg(windows)]
+use futures::SinkExt;
 use futures::StreamExt;
 use serde_json::{Value, json};
 use taomni_plugin_api::{
@@ -24,6 +26,10 @@ use tokio_tungstenite::{
 
 const TOKEN: &str = "vnc-host-fixture-token";
 const WAIT: Duration = Duration::from_secs(15);
+
+#[cfg(windows)]
+#[path = "support/windows_helper.rs"]
+mod windows_helper;
 
 struct Host {
     child: Child,
@@ -43,6 +49,7 @@ impl Host {
         .unwrap();
         let mut child = Command::new(env!("CARGO_BIN_EXE_taomni-plugin-vnc-client"))
             .env("TAOMNI_PLUGIN_TOKEN", TOKEN)
+            .env("TAOMNI_VNC_DESKTOP_PID", std::process::id().to_string())
             .env(
                 HOST_PROFILE_ENV,
                 json!({"root":profile,"context":context}).to_string(),
@@ -243,6 +250,7 @@ async fn relay_host_paints_and_closes_sessions_and_exits_with_live_streams() {
                             assert_eq!(value["name"], "fixture");
                             assert_eq!(value["width"], 1);
                             assert_eq!(value["height"], 1);
+                            assert_eq!(value["native_special_keys"], cfg!(windows));
                             connected = true;
                         }
                     }
@@ -258,6 +266,18 @@ async fn relay_host_paints_and_closes_sessions_and_exits_with_live_streams() {
         })
         .await
         .unwrap();
+        #[cfg(windows)]
+        if command == "client-close" {
+            socket
+                .send(Message::Text(
+                    json!({"type":"special_key_capture","enabled":true})
+                        .to_string()
+                        .into(),
+                ))
+                .await
+                .unwrap();
+            windows_helper::wait_for_child(host.child.id(), true).await;
+        }
         match command {
             "client-close" => socket.close(None).await.unwrap(),
             "close" => {
@@ -285,6 +305,8 @@ async fn relay_host_paints_and_closes_sessions_and_exits_with_live_streams() {
                     .await
                     .is_err()
             );
+            #[cfg(windows)]
+            windows_helper::wait_for_child(host.child.id(), false).await;
         }
     }
 }

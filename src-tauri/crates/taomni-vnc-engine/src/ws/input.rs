@@ -173,6 +173,7 @@ pub(super) fn control_allowed(
         VncControl::Key { .. }
         | VncControl::Pointer { .. }
         | VncControl::NativePointer(_)
+        | VncControl::SpecialKeyCapture(_)
         | VncControl::SampledPointer { .. } => !view_only,
         VncControl::Clipboard(text) => {
             clipboard_policy.allows_client_to_server() && limits.clipboard_bytes(text.len()).is_ok()

@@ -4052,7 +4052,7 @@ controls: []   # backend-only — RFB protocol + WebSocket bridge; the canvas su
 
 ### 9.5 输入处理 ✅
 - 鼠标：左/中/右键、滚轮、拖拽（pointer capture）；Windows 上画布无按键时 relay 直接采样系统光标位置，绕开 WebView 按刷新对齐的 pointermove（VNC-PERF-005，`TAOMNI_VNC_NATIVE_POINTER=0` 关闭）
-- 键盘：包含 RealVNC 输入修复，组合键正确转发；菜单键（默认 F8，可改或关闭）打开会话菜单而不发往远端；Windows 低级键盘钩子把 Win、Alt+Tab、Alt+Esc、Ctrl+Esc、PrtScn 直通远端（可关闭），AltGr 发送 ISO_Level3_Shift（VNC-INPUT-002/003）
+- 键盘：菜单键（默认 F8，可改或关闭）打开会话菜单，AltGr 发送 ISO_Level3_Shift。Windows 会话启用特殊键直通且画布获得焦点时，低级键盘钩子把 Win、Alt+Tab、Alt+Esc、Ctrl+Esc 和 PrtScn 转发到远端。启用签名 VNC 模块后，由模块宿主启动同版本目录的辅助程序，随失焦或会话关闭结束。
 - 剪贴板：双向同步，自动切换 Extended / Legacy；连接时不推送本地剪贴板，指针进入画布、窗口重新获得焦点或本地复制时发送变化，远端写入本机后不回送（VNC-CLIP-001）
 
 ### 9.6 前端 `VncPanel` ✅

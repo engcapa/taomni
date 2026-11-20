@@ -11241,6 +11241,7 @@ dependencies = [
  "taomni-plugin-api",
  "taomni-plugin-sdk",
  "taomni-vnc-engine",
+ "taomni-vnc-key-protocol",
  "tempfile",
  "tokio",
  "tokio-tungstenite",

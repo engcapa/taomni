@@ -16,6 +16,7 @@ export interface VncConnectionState {
   protocol: string;
   security: string;
   encrypted: boolean;
+  nativeSpecialKeys: boolean;
   error: string | null;
 }
 
@@ -32,6 +33,7 @@ interface VncStore {
     protocol?: string,
     security?: string,
     encrypted?: boolean,
+    nativeSpecialKeys?: boolean,
   ) => void;
   setDesktopSize: (tabId: string, width: number, height: number) => void;
   setDisconnected: (tabId: string, reason?: string) => void;
@@ -55,6 +57,7 @@ export const useVncStore = create<VncStore>((set) => ({
           protocol: "",
           security: "",
           encrypted: false,
+          nativeSpecialKeys: false,
           error: null,
         },
       },
@@ -76,7 +79,7 @@ export const useVncStore = create<VncStore>((set) => ({
     }));
   },
 
-  setConnected(tabId, width, height, name, protocol = "", security = "", encrypted = false) {
+  setConnected(tabId, width, height, name, protocol = "", security = "", encrypted = false, nativeSpecialKeys = false) {
     set((s) => ({
       connections: {
         ...s.connections,
@@ -89,6 +92,7 @@ export const useVncStore = create<VncStore>((set) => ({
           protocol,
           security,
           encrypted,
+          nativeSpecialKeys,
           error: null,
         } as VncConnectionState,
       },

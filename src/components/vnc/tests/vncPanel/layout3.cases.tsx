@@ -215,12 +215,14 @@ export function registerVncPanelLayout3Cases() {
       }
     });
 
-    it("sends Ctrl before a key passed through by the special-key hook (Ctrl+Esc)", async () => {
+    it.each([false, true])("sends Ctrl before a captured Escape (module relay: %s)", async (hosted) => {
       const platform = vi.spyOn(navigator, "platform", "get").mockReturnValue("Win32");
       const tauri = window as unknown as { __TAURI_INTERNALS__?: unknown; };
       tauri.__TAURI_INTERNALS__ = {};
       try {
-        const { socket, canvas } = await renderConnected();
+        const { socket, canvas } = await renderConnected({}, { native_special_keys: hosted });
+        act(() => window.dispatchEvent(new Event("blur")));
+        socket.send.mockClear();
         act(() => {
           window.dispatchEvent(new Event("focus"));
           fireEvent.focus(canvas);
@@ -228,15 +230,28 @@ export function registerVncPanelLayout3Cases() {
         await act(async () => {
           await vi.advanceTimersByTimeAsync(0);
         });
-        expect(mocks.invoke).toHaveBeenCalledWith("vnc_set_special_key_capture", { enabled: true });
         const special = mocks.listeners.get("vnc-special-key");
-        expect(special).toBeDefined();
+        if (hosted) {
+          expect(sentText(socket)).toContainEqual({ type: "special_key_capture", enabled: true });
+          expect(mocks.invoke).not.toHaveBeenCalledWith("vnc_set_special_key_capture", { enabled: true });
+        } else {
+          expect(mocks.invoke).toHaveBeenCalledWith("vnc_set_special_key_capture", { enabled: true });
+          expect(special).toBeDefined();
+        }
+        const deliver = (down: boolean) => {
+          const payload = { code: "Escape", down };
+          if (hosted) {
+            socket.onmessage?.({ data: JSON.stringify({ type: "special_key", ...payload }) } as MessageEvent);
+          } else {
+            special?.({ payload });
+          }
+        };
         act(() => {
           canvas.dispatchEvent(new KeyboardEvent("keydown", { key: "Control", code: "ControlLeft", ctrlKey: true, bubbles: true, cancelable: true }));
           // Esc arrives from the hook 40 ms later, inside the AltGr pairing wait.
           vi.advanceTimersByTime(40);
-          special?.({ payload: { code: "Escape", down: true } });
-          special?.({ payload: { code: "Escape", down: false } });
+          deliver(true);
+          deliver(false);
           canvas.dispatchEvent(new KeyboardEvent("keyup", { key: "Control", code: "ControlLeft", bubbles: true, cancelable: true }));
         });
         await act(async () => {
@@ -248,6 +263,10 @@ export function registerVncPanelLayout3Cases() {
           { kind: "key", down: false, keysym: 0xff1b },
           { kind: "key", down: false, keysym: 0xffe3 },
         ]);
+        if (hosted) {
+          act(() => window.dispatchEvent(new Event("blur")));
+          expect(sentText(socket)).toContainEqual({ type: "special_key_capture", enabled: false });
+        }
       } finally {
         delete tauri.__TAURI_INTERNALS__;
         mocks.listeners.clear();

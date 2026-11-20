@@ -39,6 +39,7 @@ export interface UseVncConnectionContext {
   sessionSettings: { viewOnly: boolean; clipboardPolicy: import("../../../lib/vnc").VncClipboardPolicy; };
   clipboardPolicyProp: import("../../../lib/vnc").VncClipboardPolicy;
   pressedKeysymsRef: import("react").RefObject<Set<number>>;
+  onSpecialKeyRef: import("react").RefObject<((code: string, down: boolean) => void) | null>;
   keyCodeKeysymsRef: import("react").RefObject<Map<string, number>>;
   pasteDelayTimerRef: import("react").RefObject<number | null>;
   delayedPointerDownRef: import("react").RefObject<DelayedPointerDown | null>;
@@ -74,6 +75,7 @@ export function useVncConnection(context: UseVncConnectionContext) {
     sessionSettings,
     clipboardPolicyProp,
     pressedKeysymsRef,
+    onSpecialKeyRef,
     keyCodeKeysymsRef,
     pasteDelayTimerRef,
     delayedPointerDownRef,
@@ -256,13 +258,16 @@ export function useVncConnection(context: UseVncConnectionContext) {
                 framebufferGenerationRef.current = 0;
                 nativePointerAvailableRef.current = msg.native_pointer === true;
                 nativePointerOnRef.current = false;
-                store.setConnected(tabId, msg.width, msg.height, msg.name, msg.protocol, msg.security, msg.encrypted);
+                store.setConnected(tabId, msg.width, msg.height, msg.name, msg.protocol, msg.security, msg.encrypted, msg.native_special_keys === true);
                 reconnectStableTimerRef.current = window.setTimeout(() => {
                   if (generation === connectGenerationRef.current) {
                     reconnectAttemptRef.current = 0;
                   }
                   reconnectStableTimerRef.current = null;
                 }, RECONNECT_STABLE_MS);
+                break;
+              case "special_key":
+                onSpecialKeyRef.current?.(msg.code, msg.down);
                 break;
               case "desktop_size":
                 if (msg.generation <= framebufferGenerationRef.current) break;
