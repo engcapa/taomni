@@ -52,6 +52,7 @@ steps:
 - dblclick: '[data-testid="sftp-remote-pane"] >> text="qa-ui-auto-dblclick.txt"'
 - wait: 2
 - wait_for: '[data-testid="file-viewer"][data-path$="qa-ui-auto-dblclick.txt"]'
+- click: '[data-testid="tab-item"][data-tab-type="terminal"]'
 - click: '[data-testid="sftp-remote-pane"] >> text="qa-ui-auto-dblclick.txt"'
 - click: '[data-testid="sftp-remote-delete"]'
 - wait_for: '[data-testid="confirm-dialog"]'
@@ -85,8 +86,8 @@ verification:
     - 26
     - 27
     - 29
-    - 30
-    - 32
+    - 31
+    - 33
     checkpoints:
     - step: 5
       expectation: '{"wait_for": "[data-testid=\"qc-input\"]"}'
@@ -107,15 +108,15 @@ verification:
       expectation: '{"wait_for": "[data-testid=\"sftp-remote-pane\"] tr[title$=\"/qa-ui-auto-dblclick.txt\"]"}'
     - step: 28
       expectation: '{"wait_for": "[data-testid=\"file-viewer\"][data-path$=\"qa-ui-auto-dblclick.txt\"]"}'
-    - step: 31
+    - step: 32
       expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
-    - step: 33
+    - step: 34
       expectation: '{"assert_not_visible": "[data-testid=\"confirm-dialog\"]"}'
-    - step: 35
+    - step: 36
       expectation: '{"assert_not_visible": "[data-testid=\"sftp-remote-pane\"] tr[title$=\"/qa-ui-auto-dblclick.txt\"]"}'
     results:
-    - 33
-    - 35
+    - 34
+    - 36
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual
