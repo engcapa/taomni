@@ -164,10 +164,7 @@ fn refused_startup_leaves_the_legacy_database_at_its_original_path() {
             Some(config()),
             false,
         );
-        assert_eq!(
-            attempt.err().as_deref(),
-            Some("Close the other Taomni mode using this profile first")
-        );
+        assert!(matches!(attempt, Err(ProfileStartupError::ModeInUse)));
         assert_eq!(std::fs::read(&legacy).unwrap(), original);
         assert!(!current.exists());
 
@@ -243,7 +240,8 @@ fn unreadable_legacy_wal_database_leaves_the_profile_retryable() {
     };
 
     let error = start().err().expect("Damaged data must fail startup");
-    assert!(error.contains("Could not migrate the legacy database"));
+    assert!(matches!(error, ProfileStartupError::Failed(message)
+        if message.contains("Could not migrate the legacy database")));
     assert!(!root.path().join("taomni.db").exists());
     assert_eq!(std::fs::read(&legacy).unwrap(), b"damaged database");
     assert_eq!(std::fs::read(&wal).unwrap(), b"damaged WAL");

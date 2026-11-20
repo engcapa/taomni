@@ -75,6 +75,7 @@ steps:
       passed: true
       headlessOwner.ready: true
       headlessOwner.exited: true
+      desktopContender.exitCode: 1
       desktopContender.modeLeaseError: true
       desktopContender.ownerStillRunning: true
       desktopContender.openedEndpoint: false
@@ -117,7 +118,7 @@ verification:
     - step: 14
       expectation: Closing the saved Notes overlay exposes the native window close button before normal restart.
     - step: 30
-      expectation: Headless starts on the released profile, stays alive while the desktop exits with the profile-in-use error, then exits so the desktop can reopen the same data.
+      expectation: Headless starts on the released profile, stays alive while the desktop reports the profile-in-use error and exits with status 1, then exits so the desktop can reopen the same data.
     - step: 21
       expectation: After proving persisted notes, closing the overlay exposes Settings without discarding data.
     results:

@@ -194,7 +194,15 @@ pub fn run() {
             // stray NEWMOB_* environment cannot redirect a normal install.
             activate_qa_profile(&app.config().identifier);
             screenshot::init(app.handle());
-            let boot = runtime::bootstrap::desktop(app.handle()).map_err(std::io::Error::other)?;
+            let boot = match runtime::bootstrap::desktop(app.handle()) {
+                Err(error @ runtime::profile::ProfileStartupError::ModeInUse) => {
+                    eprintln!("Taomni: {error}");
+                    app.state::<app_exit::ExitGate>().allow_platform_exit();
+                    app.handle().exit(1);
+                    return Ok(());
+                }
+                result => result.map_err(std::io::Error::other)?,
+            };
             app.manage(boot.state);
             app.manage(boot.runtime);
             runtime::desktop::attach(app.handle()).map_err(std::io::Error::other)?;

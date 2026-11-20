@@ -2,7 +2,7 @@
 use super::{
     ApplicationRuntime,
     paths::ProfilePaths,
-    profile::{ProfileRuntimeLeases, StartupMode},
+    profile::{ProfileRuntimeLeases, ProfileStartupError, StartupMode},
 };
 use crate::{
     ai::{AppAiCtx, config::AiConfig},
@@ -17,7 +17,9 @@ pub(crate) struct BootstrappedApplication {
     pub(crate) runtime: ApplicationRuntime,
 }
 
-pub(crate) fn desktop(app: &tauri::AppHandle) -> Result<BootstrappedApplication, String> {
+pub(crate) fn desktop(
+    app: &tauri::AppHandle,
+) -> Result<BootstrappedApplication, ProfileStartupError> {
     let paths = ProfilePaths::desktop(app)?;
     bootstrap(paths, StartupMode::Desktop, None, true)
 }
@@ -27,7 +29,7 @@ pub(crate) fn bootstrap(
     mode: StartupMode,
     config: Option<AiConfig>,
     migrate_default_roots: bool,
-) -> Result<BootstrappedApplication, String> {
+) -> Result<BootstrappedApplication, ProfileStartupError> {
     // The previous bundle identifier can be moved only before opening locks in
     // the replacement directory. An occupied profile already has lock files.
     crate::migrate::migrate_app_data_dir(&paths.data);
@@ -44,7 +46,10 @@ pub(crate) fn bootstrap(
 /// supervision thread or listener until its caller explicitly starts one.
 pub(crate) fn isolated_state(data: &std::path::Path, config: AiConfig) -> Result<AppState, String> {
     let paths = ProfilePaths::isolated(data);
-    let leases = Arc::new(ProfileRuntimeLeases::acquire(data, StartupMode::Headless)?);
+    let leases = Arc::new(
+        ProfileRuntimeLeases::acquire(data, StartupMode::Headless)
+            .map_err(|error| error.to_string())?,
+    );
     construct(paths, leases, Some(config))
 }
 

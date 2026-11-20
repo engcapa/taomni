@@ -134,7 +134,7 @@ class CoreProfileStateTest(TestCase):
                                   fixture_context=Mock(), case_dir=root)
             owner = Mock()
             owner.poll.return_value = None
-            result = {"exitCode": 101, "modeLeaseError": True, "ownerStillRunning": True}
+            result = {"exitCode": 1, "modeLeaseError": True, "openedEndpoint": False, "ownerStillRunning": True}
 
             def start_headless(binary, data, work, evidence, label, *, observe_ready):
                 self.assertEqual((binary, data, evidence), (application, profile, root))
@@ -155,7 +155,7 @@ class CoreProfileStateTest(TestCase):
                 assert_desktop_profile_blocked(ctx)
                 receipt = root / "headless-mode-lease.json"
                 self.assertTrue(json.loads(receipt.read_text())["passed"])
-                result["modeLeaseError"] = False
+                result["exitCode"] = -6
                 with self.assertRaisesRegex(StepError, "must reject the desktop"):
                     assert_desktop_profile_blocked(ctx)
                 self.assertFalse(json.loads(receipt.read_text())["passed"])

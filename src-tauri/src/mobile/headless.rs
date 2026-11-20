@@ -59,7 +59,8 @@ async fn serve() -> Result<(), String> {
         crate::runtime::profile::StartupMode::Headless,
         None,
         custom_data.is_none(),
-    )?;
+    )
+    .map_err(|error| error.to_string())?;
     let state = Arc::new(boot.state);
     let runtime = boot.runtime;
     runtime.start();

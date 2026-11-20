@@ -9,6 +9,13 @@ from .fixtures.core_profile_state import read_generation
 from .legacy_process import headless_command, initialize_profile, observe_same_profile_contender
 from .steps import StepError
 
+MODE_LEASE_DENIAL = {
+    "exitCode": 1,
+    "modeLeaseError": True,
+    "openedEndpoint": False,
+    "ownerStillRunning": True,
+}
+
 
 def run(ctx, args):
     if (not isinstance(args, dict) or set(args) != {"phase", "path"}
@@ -54,9 +61,7 @@ def assert_headless_profile_blocked(ctx, args):
     result = observe_same_profile_contender(
         headless_command(application, profile), desktop_alive, log_dir, "desktop-mode-lease",
     )
-    passed = result == {
-        "exitCode": 1, "modeLeaseError": True, "openedEndpoint": False, "ownerStillRunning": True,
-    }
+    passed = result == MODE_LEASE_DENIAL
     (log_dir / "desktop-mode-lease.json").write_text(json.dumps({
         "application": str(application), "profile": str(profile), "generation": generation,
         "passed": passed, **result,
@@ -81,9 +86,8 @@ def assert_desktop_profile_blocked(ctx):
             "headless-mode-lease", desktop_env=desktop_env,
         )
         receipt["desktopContender"] = result
-        if (result["exitCode"] in (None, 0) or not result["modeLeaseError"]
-                or not result["ownerStillRunning"]):
-            raise StepError("The active headless process must reject the desktop on the same profile")
+        if result != MODE_LEASE_DENIAL:
+            raise StepError("The active headless process must reject the desktop with exit code 1 on the same profile")
 
     try:
         with TemporaryDirectory(prefix="taomni-headless-lease-") as work:
