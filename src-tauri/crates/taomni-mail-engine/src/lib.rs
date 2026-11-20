@@ -4,6 +4,7 @@ pub mod archive;
 pub mod cache;
 pub mod compose;
 pub mod database;
+pub mod imap_auth;
 mod inline_images;
 mod lists;
 pub mod mbox;

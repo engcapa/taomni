@@ -11094,6 +11094,7 @@ dependencies = [
  "chrono",
  "flate2",
  "hex",
+ "imap",
  "lettre",
  "mail-parser",
  "rusqlite",
@@ -11102,6 +11103,7 @@ dependencies = [
  "sha2 0.11.0",
  "tempfile",
  "tokio-util 0.7.19",
+ "tracing",
  "uuid",
 ]
 

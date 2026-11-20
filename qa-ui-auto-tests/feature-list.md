@@ -7631,6 +7631,8 @@ files:
   - src/components/mail/MailClientTab.tsx
   - src/lib/mail.ts
   - src-tauri/src/mail/mod.rs
+  - src-tauri/src/mail/imap_transport.rs
+  - src-tauri/crates/taomni-mail-engine/src/imap_auth.rs
 controls:
   - id: sync-button
     selector: '[data-testid="mail-sync-button"]'
@@ -8212,6 +8214,7 @@ files:
   - src/components/mail/MailClientTab.tsx
   - src-tauri/src/mail/autoconfig.rs
   - src-tauri/src/mail/certs.rs
+  - src-tauri/crates/taomni-mail-engine/src/imap_auth.rs
 controls:
   - id: autoconfig
     selector: '[data-testid="mail-autoconfig"]'
@@ -8258,6 +8261,7 @@ files:
   - src/lib/quickConnect.ts
   - src-tauri/src/mail/pop3.rs
   - src-tauri/src/mail/local_cmds.rs
+  - src-tauri/crates/taomni-mail-engine/src/imap_auth.rs
 controls:
   - id: incoming-protocol
     selector: '[data-testid="mail-incoming-protocol"]'

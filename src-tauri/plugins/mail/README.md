@@ -6,6 +6,12 @@ integration and backup coordination. The module owns the mail client, unified
 inbox, synchronization workers, drafts, contacts, calendar integration and
 the `mail-cache` data tree.
 
+`taomni-mail-engine` provides MIME parsing and composition, archive storage,
+mbox and EML conversion, and IMAP authentication over an established
+connection. The desktop adapter supplies account settings, connection and
+proxy resolution, and attachment bytes. Mail keeps its existing session
+settings and data formats during the transition.
+
 The manifest is provisional until the native host, frontend bundle, legacy
 cache migration, scoped core-service contract and browser/native acceptance
 cases are complete. It must not be added to a production `modules.json` before

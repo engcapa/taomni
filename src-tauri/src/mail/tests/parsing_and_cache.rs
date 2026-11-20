@@ -10,20 +10,6 @@ fn decode_imap_modified_utf7_mailbox_names() {
 }
 
 #[test]
-fn imap_login_retry_classifies_transient_and_auth_errors() {
-    assert!(should_retry_imap_login("No Response: LOGIN Login error"));
-    assert!(should_retry_imap_login(
-        "temporary rate limit, try again later"
-    ));
-    assert!(!should_retry_imap_login(
-        "NO [AUTHENTICATIONFAILED] Invalid credentials"
-    ));
-    assert!(!should_retry_imap_login(
-        "NO invalid login or password incorrect"
-    ));
-}
-
-#[test]
 fn parse_body_decodes_headers_and_preview() {
     let parsed = parse_body_message("acct", "INBOX", 7, Some(512), &sample_message(), 4096);
     assert_eq!(parsed.header.subject, "测试邮件");
