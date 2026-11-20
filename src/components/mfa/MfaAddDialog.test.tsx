@@ -1,9 +1,13 @@
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const HOTP_LINK = "otpauth://hotp/QA%20Bank:qa.hotp%40example.com?secret=GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ&issuer=QA%20Bank&counter=0";
 const decodeImageBlob = vi.fn(async (_blob: Blob): Promise<string[]> => [HOTP_LINK]);
 const decodeVideoFrame = vi.fn(async (): Promise<string | null> => HOTP_LINK);
+const scanScreen = vi.fn(async (): Promise<string[] | null> => {
+  throw new Error("MFA_DESKTOP_ONLY");
+});
+const captureScreens = vi.fn();
 
 vi.mock("../../lib/clipboard", () => ({ writeText: async () => undefined, readClipboardImageFiles: async () => [new File(["x"], "shot.png", { type: "image/png" })] }));
 vi.mock("../../lib/mfa/qrImage", async (importOriginal) => ({
@@ -13,7 +17,12 @@ vi.mock("../../lib/mfa/qrImage", async (importOriginal) => ({
 }));
 vi.mock("@tauri-apps/api/core", async () => {
   const { stubMfaInvoke } = await import("../../stubs/mfaStub");
-  return { invoke: (cmd: string, args?: Record<string, unknown>) => stubMfaInvoke(cmd, args, true) };
+  return {
+    invoke: (cmd: string, args?: Record<string, unknown>) => {
+      if (cmd === "mfa_capture_screens") return args?.decode ? scanScreen() : captureScreens();
+      return stubMfaInvoke(cmd, args, true);
+    },
+  };
 });
 
 import { MFA_STUB_STORAGE_KEY } from "../../stubs/mfaStub";
@@ -30,6 +39,8 @@ describe("MfaAddDialog import sources", () => {
   beforeEach(() => {
     localStorage.removeItem(MFA_STUB_STORAGE_KEY);
     decodeImageBlob.mockClear();
+    scanScreen.mockClear();
+    captureScreens.mockClear();
     useVaultStore.setState({ state: "unlocked", transitionPending: false, requiresUnlock: false });
     useMfaStore.setState({ accounts: [], codes: {} });
   });
@@ -67,6 +78,28 @@ describe("MfaAddDialog import sources", () => {
     render(<MfaAddDialog initialMode="screen" onClose={vi.fn()} onAdded={vi.fn()} />);
     fireEvent.click(screen.getByTestId("mfa-screen-scan"));
     await waitFor(() => expect(screen.getByTestId("mfa-screen-status")).toHaveTextContent("only available in the desktop app"));
+  });
+
+  it("uses the module response for empty and successful scans without fetching raw frames", async () => {
+    scanScreen.mockResolvedValueOnce([]).mockResolvedValueOnce([HOTP_LINK]);
+    render(<MfaAddDialog initialMode="screen" onClose={vi.fn()} onAdded={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("mfa-screen-scan"));
+    await waitFor(() => expect(screen.getByTestId("mfa-screen-status")).toHaveTextContent("No QR code found"));
+    fireEvent.click(screen.getByTestId("mfa-screen-scan"));
+    expect(await screen.findByTestId("mfa-import-preview")).toBeInTheDocument();
+    expect(screen.getByTestId("mfa-add-dialog")).toHaveAttribute("data-screen-decoder", "module");
+    expect(captureScreens).not.toHaveBeenCalled();
+  });
+
+  it("discards a pending scan when the user switches to the secret form", async () => {
+    let resolveScan: (texts: string[]) => void = () => undefined;
+    scanScreen.mockReturnValueOnce(new Promise((resolve) => { resolveScan = resolve; }));
+    render(<MfaAddDialog initialMode="screen" onClose={vi.fn()} onAdded={vi.fn()} />);
+    fireEvent.click(screen.getByTestId("mfa-screen-scan"));
+    fireEvent.click(screen.getByTestId("mfa-add-mode-secret"));
+    await act(async () => { resolveScan([HOTP_LINK]); });
+    expect(screen.getByTestId("mfa-add-dialog")).toHaveAttribute("data-mode", "secret");
+    expect(screen.queryByTestId("mfa-import-preview")).not.toBeInTheDocument();
   });
 
   it("handles missing cameras, denial and a successful scan that releases the camera", async () => {

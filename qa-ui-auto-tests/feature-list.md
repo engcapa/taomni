@@ -12444,7 +12444,10 @@ files:
   - src-tauri/src/capture/service.rs
   - src-tauri/crates/taomni-capture/src/still/
   - src-tauri/crates/taomni-capture/src/pixels.rs
+  - src-tauri/src/capture/plugin_service.rs
   - src-tauri/src/mfa/capture.rs
+  - src-tauri/src/mfa/backend.rs
+  - src-tauri/plugins/mfa/src/screen_scan.rs
   - src/lib/mfa/base32.ts
   - src/lib/mfa/otpauth.ts
   - src/lib/mfa/migration.ts
@@ -12461,6 +12464,7 @@ controls:
   - id: dialog
     selector: '[data-testid="mfa-add-dialog"]'
     kind: display
+    note: Screen import preview exposes the decoder owner in data-screen-decoder.
   - id: close
     selector: '[data-testid="mfa-add-close"]'
     kind: interactive
@@ -12612,7 +12616,8 @@ controls:
 - 密钥模式：发行方/账户/Base32 密钥（允许小写、空格分组）/分组，高级项可选 TOTP/HOTP、SHA1/256/512、6～8 位、周期或初始计数；粘贴 `otpauth://` 链接自动填表；逐项校验并拒绝重复密钥。
 - 截图模式：粘贴截图（按钮或 Ctrl/⌘+V，桌面版经 Rust arboard 读取系统剪贴板图片）、拖入或选择图片文件；在 MFA 标签上直接粘贴截图会跳到导入预览。
 - 屏幕扫描（桌面版）：临时隐藏 Taomni，截取所有显示器后恢复窗口；macOS 需屏幕录制权限。摄像头：设备选择、无设备/拒绝授权状态与重试，识别后立即停止视频流。
-- 二维码由渲染层 `qr` 解码；支持 Google Authenticator `otpauth-migration` 批量导出码。导入前预览每个账户（可取消勾选、改名、统一分组），已存在的账户标记为“已添加”。
+- 支持扫码的签名 MFA 宿主经核心授权读取屏幕帧并解码，旧版和不含该能力的宿主沿用渲染层解码。TC-MODULES-039 在 Linux 实际迁移后验证已安装宿主的识别与空结果。TC-MFA-007 验证浏览器仍显示桌面限定提示。
+- 支持 Google Authenticator `otpauth-migration` 批量导出码。导入前预览每个账户（可取消勾选、改名、统一分组），已存在的账户标记为“已添加”。
 
 ### 27.3 备份与恢复中的 MFA 数据 ✅
 

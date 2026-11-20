@@ -196,9 +196,20 @@ pub async fn mfa_read_clipboard_image(state: State<'_, AppState>) -> Result<Resp
         .map(Response::new)
 }
 
-/// Hide the calling window, capture every display and return luma frames.
+/// Return raw frames to legacy callers. When a signed MFA host provides the
+/// scanner, it decodes the frames granted by the core for this window.
 #[tauri::command]
-pub async fn mfa_capture_screens(window: tauri::WebviewWindow) -> Result<Response, String> {
+pub async fn mfa_capture_screens(
+    window: tauri::WebviewWindow,
+    decode: Option<bool>,
+    state: State<'_, AppState>,
+) -> Result<Response, String> {
+    if decode == Some(true) {
+        return backend::scan_in_host(&state, window)
+            .await
+            .and_then(|value| serde_json::to_string(&value).map_err(|error| error.to_string()))
+            .map(Response::new);
+    }
     tauri::async_runtime::spawn_blocking(move || {
         let bytes = capture::capture_screens_hiding(&window)?;
         capture::retain_hosted_qa_scan(&window, &bytes);

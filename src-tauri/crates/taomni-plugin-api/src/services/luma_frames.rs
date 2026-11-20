@@ -52,6 +52,15 @@ pub fn encode_luma_frames(frames: &[LumaFrameRef<'_>]) -> Result<Vec<u8>, RpcErr
 }
 
 pub fn validate_luma_frames(bytes: &[u8]) -> Result<(), RpcError> {
+    visit_luma_frames(bytes, |_| Ok(()))
+}
+
+/// Borrow each validated frame in display order. A malformed later frame or
+/// trailing data still fails the call after earlier frames have been visited.
+pub fn visit_luma_frames(
+    bytes: &[u8],
+    mut visit: impl FnMut(LumaFrameRef<'_>) -> Result<(), RpcError>,
+) -> Result<(), RpcError> {
     if bytes.len() < 8 || bytes.len() > MAX_CAPTURE_BYTES || &bytes[..4] != MAGIC {
         return Err(invalid());
     }
@@ -68,11 +77,16 @@ pub fn validate_luma_frames(bytes: &[u8]) -> Result<(), RpcError> {
             .ok_or_else(invalid)?;
         let width = u32::from_le_bytes(header[..4].try_into().map_err(|_| invalid())?);
         let height = u32::from_le_bytes(header[4..].try_into().map_err(|_| invalid())?);
-        offset = offset
-            .checked_add(8)
-            .and_then(|n| n.checked_add(pixels(width, height).ok()?))
+        let start = offset + 8;
+        offset = start
+            .checked_add(pixels(width, height)?)
             .filter(|n| *n <= bytes.len())
             .ok_or_else(invalid)?;
+        visit(LumaFrameRef {
+            width,
+            height,
+            luma: &bytes[start..offset],
+        })?;
     }
     if offset != bytes.len() {
         return Err(invalid());

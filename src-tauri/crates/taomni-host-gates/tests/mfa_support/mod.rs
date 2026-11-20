@@ -146,13 +146,13 @@ impl Harness {
         let dispatcher = Arc::new(
             CoreServiceDispatcher::new(admission, backend, DispatcherConfig::default()).unwrap(),
         );
+        let config = taomni_plugin_mfa::host_config();
         let grants = VerifiedHostGrants::from_verified_manifest(
             PluginSlug::parse("mfa").unwrap(),
-            BTreeSet::from([FIXED_KEY_SERVICE.into()]),
+            config.permissions.clone(),
             BTreeSet::from([MFA_DATA_KEY_ID.into()]),
         )
         .unwrap();
-        let config = taomni_plugin_mfa::host_config();
         HostProcess::start_profiled(
             HostProfileConfig::new(
                 root.clone(),

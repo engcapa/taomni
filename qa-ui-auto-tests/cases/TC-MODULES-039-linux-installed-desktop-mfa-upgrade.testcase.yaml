@@ -5,7 +5,8 @@ description: >-
   encrypted HOTP account and advance its counter. Close the legacy desktop,
   give its MFA and Vault databases to the isolated candidate and run the
   candidate's signed maintenance entry. Unlock the candidate with the original
-  Vault password and continue generating HOTP through the signed module.
+  Vault password, continue generating HOTP and scan a real screen QR through
+  the signed module's core capture grant.
 covers: [F-Modules-1, F-MFA-1, F-MFA-2]
 tags: [modules, mfa, upgrade, native-boundary, p0]
 modes: [native]
@@ -26,6 +27,25 @@ steps:
 - assert_text_equals: {selector: '[data-testid="mfa-account-code"]', equals: 287 082, timeout_sec: 30}
 - click: '[data-testid="mfa-account-hotp-next"]'
 - assert_text_equals: {selector: '[data-testid="mfa-account-code"]', equals: 359 152}
+- native_show_image_window: {path: qa-ui-auto-tests/synthetic-fixtures/mfa/hotp-qa-bank.png}
+- click: '[data-testid="mfa-add"]'
+- click: '[data-testid="mfa-add-mode-screen"]'
+- click: '[data-testid="mfa-screen-scan"]'
+- wait_for: {selector: '[data-testid="mfa-add-dialog"][data-mode="preview"]', timeout_sec: 60}
+- assert_attribute: {selector: '[data-testid="mfa-add-dialog"]', name: data-screen-decoder, equals: module}
+- assert_items: {selector: '[data-testid="mfa-import-item"]', attribute: data-issuer, equals: [QA Bank]}
+- native_show_image_window: {action: close}
+- press: Escape
+- assert_not_visible: '[data-testid="mfa-add-dialog"]'
+- click: '[data-testid="mfa-add"]'
+- click: '[data-testid="mfa-add-mode-screen"]'
+- click: '[data-testid="mfa-screen-scan"]'
+- assert_text: {selector: '[data-testid="mfa-screen-status"]', contains: No QR code found on screen, timeout_sec: 60}
+- assert_enabled: '[data-testid="mfa-screen-scan"]'
+- press: Escape
+- assert_not_visible: '[data-testid="mfa-add-dialog"]'
+- assert_count: {selector: '[data-testid="mfa-account-row"]', equal: 1}
+- assert_text_equals: {selector: '[data-testid="mfa-account-code"]', equals: 359 152}
 - assert_no_runtime_errors: null
 verification:
   review: reviewed
@@ -41,8 +61,22 @@ verification:
     - {step: 10, expectation: The issuer entered in the installed desktop is visible.}
     - {step: 11, expectation: The candidate displays the exact legacy counter-one code.}
     - {step: 13, expectation: The signed host generates the counter-two code.}
-    - {step: 14, expectation: The candidate emits no unhandled runtime errors.}
-    results: [10, 11, 13, 14]
+    results: [10, 11, 13]
+  - id: R2
+    requirement: The signed host decodes an external QR. The next scan sees its removal and preserves the migrated account.
+    actions: [14, 15, 16, 17, 21, 22, 24, 25, 26, 29]
+    checkpoints:
+    - {step: 18, expectation: Screen scan reaches the import preview.}
+    - {step: 19, expectation: The signed MFA host decoded the captured frames.}
+    - {step: 20, expectation: The QR shown in the external window decodes as QA Bank.}
+    - {step: 23, expectation: The dialog closes after capture.}
+    - {step: 27, expectation: The external QR is absent from the next capture.}
+    - {step: 28, expectation: The scan button is usable again.}
+    - {step: 30, expectation: Escape closes the screen pane after the second capture.}
+    - {step: 31, expectation: Both scans leave the stored account count intact.}
+    - {step: 32, expectation: The migrated HOTP counter is intact.}
+    - {step: 33, expectation: The candidate emits no unhandled runtime errors.}
+    results: [18, 19, 20, 23, 27, 28, 30, 31, 32, 33]
   visual:
   - check: The original issuer and HOTP code are visible in the candidate application.
     method: automated

@@ -54,3 +54,7 @@ export async function mfaReadClipboardImage(): Promise<MfaLumaFrame[]> {
 export async function mfaCaptureScreens(): Promise<MfaLumaFrame[]> {
   return parseLumaFrames(await invoke<ArrayBuffer>("mfa_capture_screens"));
 }
+
+export function mfaScanScreenTexts(): Promise<string[] | null> {
+  return invoke("mfa_capture_screens", { decode: true });
+}

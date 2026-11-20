@@ -5,7 +5,7 @@ import { MfaImportError, parseImportTexts, type MfaParsedItem } from "../../lib/
 import { MfaCameraPane } from "./MfaCameraPane";
 import { MfaImagePane, type MfaTextsOutcome } from "./MfaImagePane";
 import { MfaImportPreview } from "./MfaImportPreview";
-import { MfaScreenPane } from "./MfaScreenPane";
+import { MfaScreenPane, type MfaScreenDecoder } from "./MfaScreenPane";
 import { MfaSecretForm } from "./MfaSecretForm";
 
 export type MfaAddMode = "secret" | "image" | "screen" | "camera";
@@ -25,6 +25,11 @@ const MODE_LABELS: Record<MfaAddMode, string> = {
   camera: "mfa.modeCamera",
 };
 
+type ImportPreview = {
+  items: MfaParsedItem[];
+  screenDecoder?: MfaScreenDecoder;
+};
+
 export function MfaAddDialog({
   initialMode,
   initialItems,
@@ -39,7 +44,9 @@ export function MfaAddDialog({
 }) {
   const t = useT();
   const [mode, setMode] = useState<MfaAddMode>(initialMode);
-  const [items, setItems] = useState<MfaParsedItem[] | null>(initialItems ?? null);
+  const [preview, setPreview] = useState<ImportPreview | null>(
+    initialItems ? { items: initialItems } : null,
+  );
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -53,11 +60,11 @@ export function MfaAddDialog({
   }, [onClose]);
 
   /** Turn decoded QR texts into a preview, or explain why nothing matched. */
-  const handleTexts = (texts: string[]): MfaTextsOutcome => {
+  const handleTexts = (texts: string[], decoder?: MfaScreenDecoder): MfaTextsOutcome => {
     try {
       const { items: parsed } = parseImportTexts(texts);
       if (parsed.length === 0) return { ok: false, message: t("mfa.imageNotOtp") };
-      setItems(parsed);
+      setPreview({ items: parsed, screenDecoder: decoder });
       return { ok: true };
     } catch (err) {
       return { ok: false, message: t("mfa.imageInvalid", { error: err instanceof MfaImportError ? err.message : String(err) }) };
@@ -71,18 +78,19 @@ export function MfaAddDialog({
         aria-modal="true"
         aria-label={t("mfa.addTitle")}
         data-testid="mfa-add-dialog"
-        data-mode={items ? "preview" : mode}
+        data-mode={preview ? "preview" : mode}
+        data-screen-decoder={preview?.screenDecoder}
         className="w-[520px] max-w-[calc(100vw-24px)] max-h-[calc(100vh-24px)] overflow-y-auto rounded shadow-lg"
         style={{ background: "var(--taomni-bg)", border: "1px solid var(--taomni-card-border)", color: "var(--taomni-text)" }}
         onClick={(event) => event.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b px-4 py-2" style={{ borderColor: "var(--taomni-divider)" }}>
-          <div className="text-sm font-semibold">{items ? t("mfa.previewTitle") : t("mfa.addTitle")}</div>
+          <div className="text-sm font-semibold">{preview ? t("mfa.previewTitle") : t("mfa.addTitle")}</div>
           <button type="button" data-testid="mfa-add-close" aria-label={t("mfa.close")} className="rounded p-1 hover:bg-[var(--taomni-hover)]" onClick={onClose}>
             <X className="h-3.5 w-3.5" />
           </button>
         </div>
-        {!items ? (
+        {!preview ? (
           <div role="tablist" aria-label={t("mfa.addTitle")} className="flex gap-1 border-b px-3 pt-2" style={{ borderColor: "var(--taomni-divider)" }}>
             {MFA_ADD_MODES.map((entry) => {
               const Icon = MODE_ICONS[entry];
@@ -105,10 +113,10 @@ export function MfaAddDialog({
           </div>
         ) : null}
         <div className="p-4">
-          {items ? (
-            <MfaImportPreview items={items} onBack={() => setItems(null)} onImported={onAdded} />
+          {preview ? (
+            <MfaImportPreview items={preview.items} onBack={() => setPreview(null)} onImported={onAdded} />
           ) : mode === "secret" ? (
-            <MfaSecretForm onAdded={onAdded} onCancel={onClose} onParsedItems={setItems} />
+            <MfaSecretForm onAdded={onAdded} onCancel={onClose} onParsedItems={(items) => setPreview({ items })} />
           ) : mode === "image" ? (
             <MfaImagePane onTexts={handleTexts} />
           ) : mode === "screen" ? (
