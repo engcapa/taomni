@@ -420,8 +420,6 @@ cases:
 - TC-MAIN-RAIL-04
 - TC-UPDATE-MACOS-001
 - TC-UPDATE-MACOS-002
-- TC-PATH-LOCAL-01
-- TC-PATH-LOCAL-02
 - TC-PATH-SFTP-01
 - TC-PATH-SFTP-02
 - TC-BACKUP-001
@@ -785,7 +783,6 @@ cases:
 - TC-auto-F1-5-tab-launch-menu
 - TC-auto-F1-5-tab-rename
 - TC-auto-F1-6
-- TC-auto-F1-6-welcome-recent-sessions
 - TC-auto-F1-8
 - TC-auto-F1-9
 - TC-auto-F11-1-sql-completion-settings

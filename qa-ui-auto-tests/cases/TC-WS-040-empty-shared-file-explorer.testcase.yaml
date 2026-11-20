@@ -20,6 +20,10 @@ timeout_sec: 240
 steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-ws-empty-explorer
+- seed_storage:
+    key: taomni.fileOpen.preferences.v1
+    value: '{"associations":{"md":"workspace"}}'
+- reload_window: null
 - click: '[data-testid="nav-mode-workspaces"]'
 - wait_for: '[data-testid="code-workspace-tree-empty"]'
 - assert_visible: '[data-testid="code-workspace-tree-open-file"]'
@@ -88,62 +92,62 @@ verification:
     requirement: An empty workspace exposes files and sessions; cancellation adds no root, adding the chosen folder upgrades the same runtime and opens
       the selected file.
     actions:
-    - 3
-    - 9
+    - 5
     - 11
     - 13
     - 15
     - 17
-    - 18
     - 19
-    - 24
-    - 27
-    - 30
+    - 20
+    - 21
+    - 26
+    - 29
     - 32
+    - 34
     results:
-    - 5
-    - 6
     - 7
     - 8
-    - 12
-    - 16
-    - 21
-    - 22
+    - 9
+    - 10
+    - 14
+    - 18
     - 23
-    - 26
+    - 24
+    - 25
     - 28
-    - 29
-    - 33
-    - 34
+    - 30
+    - 31
+    - 35
+    - 36
     checkpoints:
-    - step: 5
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-open-file\"]"}'
-    - step: 6
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-linked-sessions-toggle\"]", "name": "aria-expanded", "equals": "false"}}'
     - step: 7
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tree-root\"]", "equal": 0}}'
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-open-file\"]"}'
     - step: 8
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tab\"]", "equal": 1}}'
-    - step: 12
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-linked-sessions-toggle\"]", "name": "aria-expanded", "equals": "false"}}'
+    - step: 9
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tree-root\"]", "equal": 0}}'
-    - step: 16
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tree-root\"]", "equal": 0}}'
-    - step: 21
+    - step: 10
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tab\"]", "equal": 1}}'
-    - step: 22
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tree\"]", "equal": 1}}'
+    - step: 14
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tree-root\"]", "equal": 0}}'
+    - step: 18
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tree-root\"]", "equal": 0}}'
     - step: 23
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tab\"]", "equal": 1}}'
+    - step: 24
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tree\"]", "equal": 1}}'
+    - step: 25
       expectation: '{"eval_readonly": {"expression": "JSON.parse(localStorage.getItem(\"taomni.platformWorkspaces.v1\")).workspaces[0].rootFolders.length
         === 1", "expect_truthy": true, "timeout_sec": 5}}'
-    - step: 26
-      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"]", "contains": "platform workspace root"}}'
     - step: 28
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"]", "contains": "platform workspace root"}}'
+    - step: 30
       expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-switcher-add-folder\"]", "equal": 1}}'
-    - step: 29
+    - step: 31
       expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-switcher-menu-add-folder\"]", "equal": 0}}'
-    - step: 33
+    - step: 35
       expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-tree-root\"]", "equal": 1}}'
-    - step: 34
+    - step: 36
       expectation: '{"assert_no_runtime_errors": null}'
   visual:
   - check: Review file area, row metadata, selection, toolbar and package layout in the retained screenshot.

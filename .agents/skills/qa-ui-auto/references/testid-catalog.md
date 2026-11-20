@@ -1987,6 +1987,7 @@
 ## main/tabs (F1.5)
 
 - `[data-testid="tab-bar"]` — display — F1.5.tab-bar
+- `[data-testid="context-menu-item-close"]` — interactive [optional] — F1.5.tab-context-close
 - `[data-testid="tab-item"]` — interactive — F1.5.tab-item
   ↳ `[data-testid="tab-item"][data-tab-type="welcome"]` — alias
   ↳ `:nth-match([data-testid="tab-item"][data-tab-type="file-browser"], 1)` — alias
@@ -2047,30 +2048,9 @@
 - `[data-testid="welcome-browse-modules"]` — interactive — F1.6.browse-modules
 - `[data-testid="welcome-panel"] [data-testid="tao-home-local-terminal"]` — interactive — F1.6.open-local-terminal
 - `select[aria-label="Terminal shell"]` — interactive [optional] — F1.6.shell-select
-- `[data-testid="welcome-open-home-folder"]` — interactive [optional] — F1.6.open-home-folder
+- `[data-testid="tao-home-open-home-folder"]` — interactive [optional] — F1.6.open-home-folder
 - `button[aria-label="Open as administrator"]` — interactive [optional] — F1.6.open-as-administrator
-- `text="New session…"` — display — F1.6.new-session-card
 - `[data-testid="welcome-panel"] [data-testid="tao-home-new-session"]` — interactive — F1.6.new-session-card-testid
-- `[data-testid="welcome-recent-sessions"]` — display — F1.6.recent-sessions-panel
-- `[data-testid="welcome-recent-filter"]` — interactive — F1.6.recent-filter
-- `[data-testid="welcome-recent-type-filter"]` — interactive — F1.6.recent-type-filter
-- `[data-testid="welcome-recent-sort"]` — interactive — F1.6.recent-sort
-- `[data-testid="welcome-recent-open-all"]` — interactive — F1.6.recent-open-all
-- `[data-testid="welcome-recent-open-filtered"]` — interactive — F1.6.recent-open-filtered
-- `[data-testid="welcome-recent-open-selected"]` — interactive — F1.6.recent-open-selected
-- `[data-testid="welcome-recent-select-filtered"]` — interactive — F1.6.recent-select-filtered
-- `[data-testid="welcome-recent-clear-filter"]` — interactive — F1.6.recent-clear-filter
-- `[data-testid="welcome-recent-clear-selection"]` — interactive [optional] — F1.6.recent-clear-selection
-- `[data-testid="welcome-recent-settings"]` — interactive — F1.6.recent-settings
-- `[data-testid="welcome-recent-session-row"]` — display [optional] — F1.6.recent-session-row
-- `[data-testid="welcome-recent-select"]` — interactive [optional] — F1.6.recent-session-select
-- `[data-testid="welcome-recent-open"]` — interactive [optional] — F1.6.recent-session-open
-- `[data-testid="welcome-recent-reveal"]` — interactive [optional] — F1.6.recent-session-reveal
-- `[data-testid="welcome-recent-empty"]` — display [optional] — F1.6.recent-empty
-- `[data-testid="welcome-recent-no-matches"]` — display [optional] — F1.6.recent-no-matches
-- `[data-testid="welcome-recent-workspace-row"]` — interactive [optional] — F1.6.recent-workspace-row
-- `[data-testid="welcome-recent-workspace-filter"]` — interactive [optional] — F1.6.recent-workspace-filter
-- `[data-testid="welcome-history-tab-workspaces"]` — interactive [optional] — F1.6.history-tab-workspaces
 - `[data-testid="welcome-history-tab-sessions"]` — interactive — F1.6.history-tab-sessions
   ↳ `[data-testid="tao-home-history-popover"] [data-testid="tao-home-history-tab-sessions"]` — alias
 - `[data-testid="welcome-history-tab-directories"]` — interactive — F1.6.history-tab-directories
@@ -2087,9 +2067,6 @@
 - `[data-testid="welcome-restore-retry"]` — interactive [optional] — F1.6.restore-retry
 - `[data-testid="welcome-restore-cancel"]` — interactive [optional] — F1.6.restore-cancel
 - `[data-testid="welcome-restore-clear"]` — interactive [optional] — F1.6.restore-clear
-- `text="Tips"` — display — F1.6.tips-section
-- `[data-testid="welcome-version"]` — display — F1.6.version-header
-- `[data-testid="welcome-version-footer"]` — display — F1.6.version-footer
 
 ## main/window (F1.3)
 
@@ -2113,6 +2090,7 @@
 
 - `[data-testid="global-search-trigger"]` — interactive — F-WS-1.global-search-trigger
 - `[data-testid="home-sidebar-panel"]` — display — F-WS-1.home-sidebar-panel
+- `[data-testid="home-nav-agents"]` — interactive — F-WS-1.home-nav-agents
 - `[data-testid="nav-mode-home"]` — interactive — F-WS-1.nav-mode-home
 - `[data-testid="nav-mode-workspaces"]` — interactive — F-WS-1.nav-mode-workspaces
 - `[data-testid="right-sidebar"]` — display — F-WS-1.right-sidebar
@@ -2285,6 +2263,8 @@
 - `[data-testid="workspace-editor-save"]` — interactive — F-WS-2.workspace-editor-save
 - `[data-testid="workspace-switcher-option-default-workspace"]` — interactive — F-WS-2.workspace-switcher-option-default-workspace
 - `[data-testid="workspace-switcher-option-second-workspace"]` — interactive — F-WS-2.workspace-switcher-option-second-workspace
+- `[data-testid^="workspace-switcher-option-"]:has-text("QA other")` — interactive [optional] — F-WS-2.workspace-switcher-option-named
+  ↳ `[data-testid^="workspace-switcher-option-"]:not([data-testid="workspace-switcher-option-default-workspace"])` — alias
 - `[data-testid="workspace-layout-split"]` — interactive — F-WS-2.workspace-layout-split
 - `[data-testid="workspace-toolbar-bottom-dock"]` — interactive — F-WS-2.workspace-toolbar-bottom-dock
 - `[data-testid="workspace-canvas-panes"]` — display — F-WS-2.workspace-canvas-panes
@@ -3687,7 +3667,6 @@
 ## sftp (F7.2)
 
 - `[data-testid="sftp-browser"]` — display — F7.2.panel-root
-- `[role="dialog"][aria-modal="true"]:has-text("Open remote file?")` — display [optional] — F7.2.download-prompt-dialog
 - `[data-testid="sftp-local-pane"]` — display — F7.2.local-pane
 - `[data-testid="sftp-remote-pane"]` — display — F7.2.remote-pane
 - `[data-testid="sftp-local-list"]` — display — F7.2.local-list
@@ -3827,7 +3806,7 @@
 - `[data-testid="tao-home-history-tab-sessions"]` — interactive — F1.11.tao-home-history-tab-sessions
 - `[data-testid="tao-home-history-tab-workspaces"]` — interactive — F1.11.tao-home-history-tab-workspaces
 - `[data-testid="tao-home-history-tab-directories"]` — interactive — F1.11.tao-home-history-tab-directories
-- `.tao-home-history-search input` — interactive — F1.11.tao-home-history-search
+- `[data-testid="tao-home-history-search"]` — interactive — F1.11.tao-home-history-search
 - `[data-testid="tao-home-local-terminal"]` — interactive — F1.11.tao-home-local-terminal
 - `[data-testid="tao-home-wsl"]` — display [optional] — F1.11.tao-home-wsl
 - `[data-testid="tao-home-new-session"]` — interactive — F1.11.tao-home-new-session

@@ -168,6 +168,9 @@ steps:
 - wait_for: '[data-testid="mail-attachment-open"][data-name="policy.txt"]'
 - dblclick: '[data-testid="mail-attachment-open"][data-name="policy.txt"]'
 - wait_for: '[data-testid="file-viewer"][data-readonly="true"]'
+- wait_for:
+    selector: '[data-testid="file-viewer"][data-readonly="true"] .cm-content:has-text("Mail attachment read-only fixture.")'
+    timeout_sec: 30
 - assert_visible: '[data-testid="file-viewer"][data-readonly="true"] [data-testid="viewer-readonly"]'
 - assert_disabled: '[data-testid="file-viewer"][data-readonly="true"] [data-testid="viewer-save"]'
 - assert_attribute:
@@ -278,32 +281,32 @@ verification:
     - 61
     - 64
     - 66
-    - 73
     - 74
-    - 77
+    - 75
+    - 78
     checkpoints:
-    - step: 69
-      expectation: Remote copy cannot Save in place.
     - step: 70
-      expectation: CodeMirror is genuinely non-editable.
+      expectation: Remote copy cannot Save in place.
     - step: 71
-      expectation: Downloaded text is exact.
+      expectation: CodeMirror is genuinely non-editable.
     - step: 72
+      expectation: Downloaded text is exact.
+    - step: 73
       expectation: Independent VFS/native bytes match downloaded attachment and controlled path is retained.
-    - step: 76
+    - step: 77
       expectation: Reopening the same attachment reuses one main viewer.
-    - step: 79
-      expectation: Closing the final host removes its observed controlled temp file.
     - step: 80
+      expectation: Closing the final host removes its observed controlled temp file.
+    - step: 81
       expectation: Shared scope/settings/temp lifecycle has no uncaught runtime errors.
     results:
-    - 69
     - 70
     - 71
     - 72
-    - 76
-    - 79
+    - 73
+    - 77
     - 80
+    - 81
   - id: R4
     requirement: HTML proxy mode has app/custom/none choices, custom panel is feature-local, and none persists across reload
       without opening network by default.

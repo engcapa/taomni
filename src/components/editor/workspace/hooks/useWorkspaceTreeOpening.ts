@@ -108,7 +108,11 @@ export function useWorkspaceTreeOpening(context: UseWorkspaceTreeOpeningContext)
     const readScope = readScopeRef.current;
     const root = ref.kind === "root" ? context.rootsRef?.current.find((item) => item.id === ref.rootId) : undefined;
     const path = ref.kind === "loose" ? ref.path : root ? absoluteWorkspacePath(root, ref.path) : undefined;
-    if (path && classifyFile(path) !== "source") {
+    // Text files stay in the workspace editor (IDEA parity: .txt/.json/.yaml
+    // open in the project editor, not a preview viewer). Only kinds the editor
+    // cannot host move to the shared viewer.
+    const kind = path ? classifyFile(path) : null;
+    if (path && kind && kind !== "source" && kind !== "text") {
       // Viewer hosts own their own focus and draft lifecycle. Never leave an
       // editor-focus intent/split behind when this open changes host kind.
       treeFocus.pendingTreeOpenIntentRef.current = null;

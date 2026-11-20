@@ -9,8 +9,10 @@ timeout_sec: 240
 steps:
   - open: ${cfg.app.base_url}
   - wait_for: '[data-testid="welcome-panel"]'
-  - click: '[data-testid="welcome-history-tab-workspaces"]'
-  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity005_root}"]'
+  - click: '[data-testid="tao-home-history"]'
+  - wait_for: '[data-testid="tao-home-history-popover"]'
+  - click: '[data-testid="tao-home-history-tab-workspaces"]'
+  - click: '[data-testid="tao-home-history-row"][data-workspace-path="${fixture.parity005_root}"]'
   - wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
   - click: '[data-testid="code-workspace-editor"] .cm-content'
   - press: Mod+Home
@@ -319,154 +321,154 @@ verification:
   requirements:
     - id: ED-PARITY-005-V2-atomic
       requirement: Enter lands exact primary plus import in one edit; one Undo restores B1 and Redo restores B2.
-      actions: [14, 19, 22, 24, 26]
+      actions: [16, 21, 24, 26, 28]
       checkpoints:
-        - step: 20
+        - step: 22
           expectation: Complete B2 text includes one import and snippet expansion.
-        - step: 21
-          expectation: First placeholder is selected.
         - step: 23
-          expectation: One Undo restores exact B1.
+          expectation: First placeholder is selected.
         - step: 25
-          expectation: Redo restores the accepted text.
+          expectation: One Undo restores exact B1.
         - step: 27
+          expectation: Redo restores the accepted text.
+        - step: 29
           expectation: A second Undo restores the prefix.
-      results: [20, 21, 23, 25, 27]
+      results: [22, 23, 25, 27, 29]
     - id: ED-PARITY-005-V2-tabstops
       requirement: Tab acceptance and subsequent placeholder navigation do not add a document edit.
-      actions: [28, 31, 34, 36, 38, 39, 41]
+      actions: [30, 33, 36, 38, 40, 41, 43]
       checkpoints:
-        - step: 32
+        - step: 34
           expectation: Tab accepts the same primary and import.
-        - step: 33
-          expectation: First placeholder is selected.
         - step: 35
-          expectation: Tab selects the second placeholder.
+          expectation: First placeholder is selected.
         - step: 37
+          expectation: Tab selects the second placeholder.
+        - step: 39
           expectation: Shift Tab returns to the first placeholder.
-        - step: 40
-          expectation: Navigation left the text unchanged.
         - step: 42
+          expectation: Navigation left the text unchanged.
+        - step: 44
           expectation: One Undo after navigation restores exact B1.
-      results: [32, 33, 35, 37, 40, 42]
+      results: [34, 35, 37, 39, 42, 44]
     - id: ED-PARITY-005-V2-mouse
       requirement: First click selects the provider item; double click accepts once and one Undo restores B1.
-      actions: [43, 45, 47, 49]
+      actions: [45, 47, 49, 51]
       checkpoints:
-        - step: 46
-          expectation: Single click has not edited the prefix.
         - step: 48
-          expectation: Double click accepted the full snippet.
+          expectation: Single click has not edited the prefix.
         - step: 50
+          expectation: Double click accepted the full snippet.
+        - step: 52
           expectation: One Undo restores the prefix.
-      results: [46, 48, 50]
+      results: [48, 50, 52]
     - id: ED-PARITY-005-V2-mid-enter
       requirement: Enter at Tmid uses the insert range, retaining Suffix and adding exactly one import; one Undo restores M0.
-      actions: [52, 56, 59, 74, 78, 80, 82, 84]
+      actions: [54, 58, 61, 76, 80, 82, 84, 86]
       checkpoints:
-        - step: 58
+        - step: 60
           expectation: Mid.java starts at exact M0.
-        - step: 73
+        - step: 75
           expectation: The caret is after StringUti and before Suffix.
-        - step: 76
+        - step: 78
           expectation: The selected item has the required package identity.
-        - step: 80
-          expectation: Enter produces complete StringUtilsSuffix plus one import.
         - step: 82
-          expectation: One Undo restores exact M0.
+          expectation: Enter produces complete StringUtilsSuffix plus one import.
         - step: 84
-          expectation: Redo restores the insert result.
+          expectation: One Undo restores exact M0.
         - step: 86
+          expectation: Redo restores the insert result.
+        - step: 88
           expectation: Undo returns to the original token.
-      results: [58, 73, 76, 80, 82, 84, 86]
+      results: [60, 75, 78, 82, 84, 86, 88]
     - id: ED-PARITY-005-V2-mid-tab
       requirement: Tab at Tmid uses the replace range and one Undo restores M0.
-      actions: [86, 89, 91]
+      actions: [88, 91, 93]
       checkpoints:
-        - step: 91
-          expectation: Tab replaces the full identifier suffix and lands one import.
         - step: 93
+          expectation: Tab replaces the full identifier suffix and lands one import.
+        - step: 95
           expectation: One Undo restores exact M0.
-      results: [91, 93]
+      results: [93, 95]
     - id: ED-PARITY-005-V2-mid-mouse
       requirement: Single click selects without editing; double click uses the insert range and one Undo restores M0.
-      actions: [95, 98, 100, 102]
+      actions: [97, 100, 102, 104]
       checkpoints:
-        - step: 93
+        - step: 95
           expectation: Undo restored the word-middle caret for the next round.
-        - step: 99
-          expectation: Single click retains M0.
         - step: 101
-          expectation: Double click produces complete StringUtilsSuffix plus one import.
+          expectation: Single click retains M0.
         - step: 103
+          expectation: Double click produces complete StringUtilsSuffix plus one import.
+        - step: 105
           expectation: One Undo restores exact M0.
-      results: [93, 99, 101, 103]
+      results: [95, 101, 103, 105]
     - id: ED-PARITY-005-V2-empty-placeholder
       requirement: A controlled empty snippet placeholder starts inside the call, Tab reaches the final stop without an edit, and one Undo restores B1.
-      actions: [105, 106, 110, 113, 121, 124, 127, 129, 131, 133]
+      actions: [107, 108, 112, 115, 123, 126, 129, 131, 133, 135]
       checkpoints:
-        - step: 112
+        - step: 114
           expectation: Main.java is restored to exact B1 before the variant.
-        - step: 125
+        - step: 127
           expectation: The provider's empty placeholder expands to StringBuilder() with one import.
-        - step: 126
-          expectation: The caret begins inside the empty parentheses.
         - step: 128
-          expectation: Tab moves to the final stop after the closing parenthesis.
+          expectation: The caret begins inside the empty parentheses.
         - step: 130
-          expectation: Shift Tab returns to the empty placeholder without editing.
+          expectation: Tab moves to the final stop after the closing parenthesis.
         - step: 132
-          expectation: Navigation left the full accepted text unchanged.
+          expectation: Shift Tab returns to the empty placeholder without editing.
         - step: 134
+          expectation: Navigation left the full accepted text unchanged.
+        - step: 136
           expectation: One Undo returns to exact B1.
-      results: [112, 125, 126, 128, 130, 132, 134]
+      results: [114, 127, 128, 130, 132, 134, 136]
     - id: ED-PARITY-005-V2-nonfirst
       requirement: Keyboard and mouse select different non-first raw items, each resolving its own import and remaining one-Undo recoverable.
-      actions: [136, 139, 142, 145, 147, 149, 152, 155]
+      actions: [138, 141, 144, 147, 149, 151, 154, 157]
       checkpoints:
-        - step: 140
+        - step: 142
           expectation: ArrowDown selects StringBuffer.
-        - step: 143
+        - step: 145
           expectation: StringBuffer lands only its matching import and text.
-        - step: 144
-          expectation: The resolve raw identity remains parity005-buffer-2.
         - step: 146
+          expectation: The resolve raw identity remains parity005-buffer-2.
+        - step: 148
           expectation: One Undo restores B1.
-        - step: 150
+        - step: 152
           expectation: A single click selects StringJoiner without editing.
-        - step: 151
-          expectation: The editor still contains the original prefix before double-click.
         - step: 153
+          expectation: The editor still contains the original prefix before double-click.
+        - step: 155
           expectation: StringJoiner lands only its matching import and text.
-        - step: 154
-          expectation: The resolve raw identity remains parity005-joiner-3.
         - step: 156
+          expectation: The resolve raw identity remains parity005-joiner-3.
+        - step: 158
           expectation: One Undo restores B1.
-      results: [140, 143, 144, 146, 150, 151, 153, 154, 156]
+      results: [142, 145, 146, 148, 152, 153, 155, 156, 158]
     - id: ED-PARITY-005-V2-narrow
       requirement: At 950 by 390 the completion list stays within the viewport and Escape leaves the buffer intact.
-      actions: [157, 158, 162]
+      actions: [159, 160, 164]
       checkpoints:
-        - step: 160
+        - step: 162
           expectation: The popup rectangle is fully within the viewport.
-        - step: 163
+        - step: 165
           expectation: Escape leaves B1 untouched.
-      results: [160, 163]
+      results: [162, 165]
     - id: ED-PARITY-005-V2-shared-history
       requirement: Two UI views of Main.java show the same atomic acceptance; Undo from the sibling view restores both and removes the import.
-      actions: [166, 177, 180, 183, 184]
+      actions: [168, 179, 182, 185, 186]
       checkpoints:
-        - step: 168
+        - step: 170
           expectation: The split exposes two editor views.
-        - step: 181
+        - step: 183
           expectation: Both views show the same single import.
-        - step: 182
+        - step: 184
           expectation: Both views show the accepted snippet text.
-        - step: 185
+        - step: 187
           expectation: One Undo in the sibling view restores the prefix in both views.
-        - step: 186
+        - step: 188
           expectation: The import is absent from both views after Undo.
-      results: [168, 181, 182, 185, 186]
+      results: [170, 183, 184, 187, 188]
   visual:
     - check: Selected row, documentation, popup anchor, density and clipping against IDEA R1/R2/R6.
       method: manual

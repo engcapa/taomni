@@ -551,6 +551,9 @@ export const zhCN: DeepPartial<typeof en> = {
   welcome: {
     versionLabel: "版本 {version}",
     localTerminal: "启动本地终端",
+    startLocalTerminal: "启动本地终端",
+    newSession: "新建会话",
+    recentSessions: "最近会话",
     openShell: "打开 {shell}。",
     openLocalShell: "打开一个本地 Shell。",
     detectingShells: "正在检测可用的 Shell……",

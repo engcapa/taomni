@@ -713,7 +713,7 @@ controls:
   selector: '[data-testid="tao-home-history-tab-directories"]'
   kind: interactive
 - id: tao-home-history-search
-  selector: '.tao-home-history-search input'
+  selector: '[data-testid="tao-home-history-search"]'
   kind: interactive
 - id: tao-home-local-terminal
   selector: '[data-testid="tao-home-local-terminal"]'
@@ -1349,6 +1349,10 @@ controls:
 - id: tab-bar
   selector: '[data-testid="tab-bar"]'
   kind: display
+- id: tab-context-close
+  selector: '[data-testid="context-menu-item-close"]'
+  kind: interactive
+  optional: true       # tab context menu Close item
 - id: tab-item                 # individual tab; pair with [data-tab-type=...] / [data-tab-title=...] when targeting
   selector: '[data-testid="tab-item"]'
   aliases:
@@ -1526,89 +1530,16 @@ controls:
     kind: interactive
     optional: true       # only rendered when >1 local shell detected
   - id: open-home-folder
-    selector: '[data-testid="welcome-open-home-folder"]'
+    selector: '[data-testid="tao-home-open-home-folder"]'
     kind: interactive
     optional: true       # only rendered when onOpenLocalPath prop is set
   - id: open-as-administrator
     selector: 'button[aria-label="Open as administrator"]'
     kind: interactive
     optional: true       # only rendered when selected shell canElevate
-  - id: new-session-card
-    selector: 'text="New session…"'
-    kind: display # card heading; the action is welcome-new-session below
   - id: new-session-card-testid
     selector: '[data-testid="welcome-panel"] [data-testid="tao-home-new-session"]'
     kind: interactive
-  - id: recent-sessions-panel
-    selector: '[data-testid="welcome-recent-sessions"]'
-    kind: display
-  - id: recent-filter
-    selector: '[data-testid="welcome-recent-filter"]'
-    kind: interactive
-  - id: recent-type-filter
-    selector: '[data-testid="welcome-recent-type-filter"]'
-    kind: interactive
-  - id: recent-sort
-    selector: '[data-testid="welcome-recent-sort"]'
-    kind: interactive
-  - id: recent-open-all
-    selector: '[data-testid="welcome-recent-open-all"]'
-    kind: interactive
-  - id: recent-open-filtered
-    selector: '[data-testid="welcome-recent-open-filtered"]'
-    kind: interactive
-  - id: recent-open-selected
-    selector: '[data-testid="welcome-recent-open-selected"]'
-    kind: interactive
-  - id: recent-select-filtered
-    selector: '[data-testid="welcome-recent-select-filtered"]'
-    kind: interactive
-  - id: recent-clear-filter
-    selector: '[data-testid="welcome-recent-clear-filter"]'
-    kind: interactive
-  - id: recent-clear-selection
-    selector: '[data-testid="welcome-recent-clear-selection"]'
-    kind: interactive
-    optional: true       # rendered only after at least one recent row is selected
-  - id: recent-settings
-    selector: '[data-testid="welcome-recent-settings"]'
-    kind: interactive
-  - id: recent-session-row
-    selector: '[data-testid="welcome-recent-session-row"]'
-    kind: display
-    optional: true       # only rendered when saved sessions have last_connected_at
-  - id: recent-session-select
-    selector: '[data-testid="welcome-recent-select"]'
-    kind: interactive
-    optional: true
-  - id: recent-session-open
-    selector: '[data-testid="welcome-recent-open"]'
-    kind: interactive
-    optional: true
-  - id: recent-session-reveal
-    selector: '[data-testid="welcome-recent-reveal"]'
-    kind: interactive
-    optional: true
-  - id: recent-empty
-    selector: '[data-testid="welcome-recent-empty"]'
-    kind: display
-    optional: true
-  - id: recent-no-matches
-    selector: '[data-testid="welcome-recent-no-matches"]'
-    kind: display
-    optional: true
-  - id: recent-workspace-row
-    selector: '[data-testid="welcome-recent-workspace-row"]'
-    kind: interactive
-    optional: true       # rendered only when recent workspaces exist (native gate C0 enters here)
-  - id: recent-workspace-filter
-    selector: '[data-testid="welcome-recent-workspace-filter"]'
-    kind: interactive
-    optional: true       # available in the workspace history section
-  - id: history-tab-workspaces
-    selector: '[data-testid="welcome-history-tab-workspaces"]'
-    kind: interactive
-    optional: true       # template testid welcome-history-tab-${tab.id}; sessions|workspaces|directories
   - id: history-tab-sessions
     selector: '[data-testid="welcome-history-tab-sessions"]'
     aliases: ['[data-testid="tao-home-history-popover"] [data-testid="tao-home-history-tab-sessions"]']
@@ -1659,15 +1590,6 @@ controls:
     selector: '[data-testid="welcome-restore-clear"]'
     kind: interactive
     optional: true       # only when a record is available/finished
-  - id: tips-section
-    selector: 'text="Tips"'
-    kind: display
-  - id: version-header
-    selector: '[data-testid="welcome-version"]'
-    kind: display
-  - id: version-footer
-    selector: '[data-testid="welcome-version-footer"]'
-    kind: display
 -->
 
 - 启动入口：开始本地终端、新建会话、导入 OpenSSH config
@@ -3477,10 +3399,6 @@ controls:
   - id: panel-root
     selector: '[data-testid="sftp-browser"]'
     kind: display
-  - id: download-prompt-dialog      # fixed overlay, no testid — addressed via role+title text
-    selector: '[role="dialog"][aria-modal="true"]:has-text("Open remote file?")'
-    kind: display
-    optional: true       # only after double-clicking a remote file
   - id: local-pane
     selector: '[data-testid="sftp-local-pane"]'
     kind: display
@@ -13977,6 +13895,9 @@ controls:
 - id: home-sidebar-panel
   selector: '[data-testid="home-sidebar-panel"]'
   kind: display
+- id: home-nav-agents
+  selector: '[data-testid="home-nav-agents"]'
+  kind: interactive
 - id: nav-mode-home
   selector: '[data-testid="nav-mode-home"]'
   kind: interactive
@@ -14607,6 +14528,12 @@ controls:
 - id: workspace-switcher-option-second-workspace
   selector: '[data-testid="workspace-switcher-option-second-workspace"]'
   kind: interactive
+- id: workspace-switcher-option-named
+  selector: '[data-testid^="workspace-switcher-option-"]:has-text("QA other")'
+  aliases:
+  - '[data-testid^="workspace-switcher-option-"]:not([data-testid="workspace-switcher-option-default-workspace"])'
+  kind: interactive
+  optional: true       # custom workspace created by the case under test
 - id: workspace-layout-split
   selector: '[data-testid="workspace-layout-split"]'
   kind: interactive

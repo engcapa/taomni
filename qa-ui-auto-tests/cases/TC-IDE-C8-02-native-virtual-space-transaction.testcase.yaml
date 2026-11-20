@@ -40,9 +40,14 @@ steps:
 - seed_storage:
     key: taomni.recentWorkspaces.v1
     value: '[{"id":"qa-c8","name":"qa-c8","roots":[{"id":"r1","name":"qa-c8","path":"${fixture.workspace_root}","kind":"folder"}],"looseFiles":[],"lastOpenedAt":1756100000000,"isGitRepo":false}]'
+- seed_storage:
+    key: taomni.fileOpen.preferences.v1
+    value: '{"associations":{"md":"workspace"}}'
 - reload_window: null
-- click: '[data-testid="welcome-history-tab-workspaces"]'
-- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.workspace_root}"]'
+- click: '[data-testid="tao-home-history"]'
+- wait_for: '[data-testid="tao-home-history-popover"]'
+- click: '[data-testid="tao-home-history-tab-workspaces"]'
+- click: '[data-testid="tao-home-history-row"][data-workspace-path="${fixture.workspace_root}"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - wait_for: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
 - dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
@@ -169,23 +174,20 @@ verification:
     - 1
     - 2
     - 4
-    - 5
     - 6
     - 7
     - 10
-    - 12
     - 13
-    - 14
+    - 15
     - 16
     - 17
-    - 18
     - 19
+    - 20
     - 21
     - 22
-    - 23
+    - 24
     - 25
     - 26
-    - 27
     - 28
     - 29
     - 30
@@ -195,90 +197,93 @@ verification:
     - 34
     - 35
     - 36
+    - 37
     - 38
     - 39
-    - 40
     - 41
     - 42
     - 43
     - 44
     - 45
+    - 46
     - 47
-    - 49
+    - 48
     - 50
-    - 51
     - 52
     - 53
     - 54
     - 55
     - 56
     - 57
+    - 58
     - 59
-    - 61
-    - 63
-    - 65
+    - 60
+    - 62
+    - 64
     - 66
-    - 67
     - 68
     - 69
     - 70
     - 71
     - 72
+    - 73
     - 74
     - 75
-    - 76
     - 77
+    - 78
+    - 79
+    - 80
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 8
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
-    - step: 9
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"][data-path=\"README.md\"]"}'
     - step: 11
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 12
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"][data-path=\"README.md\"]"}'
+    - step: 14
       expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-pane\"]"}'
-    - step: 15
+    - step: 18
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-search-everywhere\"]", "timeout_sec":
         30}}'
-    - step: 20
+    - step: 23
       expectation: '{"wait_for": "[data-testid=\"workspace-editor-appearance-settings-dialog\"]"}'
-    - step: 37
+    - step: 40
       expectation: '{"eval_readonly": {"expression": "JSON.stringify([document.querySelectorAll(\".cm-line\")[0]?.textContent,
         document.querySelectorAll(\".cm-line\")[1]?.textContent, document.querySelectorAll(\".cm-line\")[2]?.textContent])",
         "contains": "[\"prefixX\",\"X\",\"longprefixX\"]"}}'
-    - step: 46
+    - step: 49
       expectation: '{"eval_readonly": {"expression": "JSON.stringify([document.querySelectorAll(\".cm-line\")[0]?.textContent,
         document.querySelectorAll(\".cm-line\")[1]?.textContent, document.querySelectorAll(\".cm-line\")[2]?.textContent])",
         "contains": "[\"prefixX\",\"X      Z\",\"lZongprefixXZ\"]"}}'
-    - step: 48
+    - step: 51
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".cm-line\")[0]?.textContent ===
         \"prefixX\" && document.querySelectorAll(\".cm-line\")[1]?.textContent === \"X\" && document.querySelectorAll(\".cm-line\")[2]?.textContent
         === \"longprefixX\"", "expect_truthy": true}}'
-    - step: 58
+    - step: 61
       expectation: '{"eval_readonly": {"expression": "JSON.stringify([document.querySelectorAll(\".cm-line\")[0]?.textContent,
         document.querySelectorAll(\".cm-line\")[1]?.textContent, document.querySelectorAll(\".cm-line\")[2]?.textContent])",
         "contains": "[\"prefixX W\",\"X W\",\"longprefixX W\"]"}}'
-    - step: 60
+    - step: 63
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".cm-line\")[0]?.textContent ===
         \"prefixX\" && document.querySelectorAll(\".cm-line\")[1]?.textContent === \"X\" && document.querySelectorAll(\".cm-line\")[2]?.textContent
         === \"longprefixX\"", "expect_truthy": true}}'
-    - step: 62
+    - step: 65
       expectation: '{"eval_readonly": {"expression": "JSON.stringify([document.querySelectorAll(\".cm-line\")[0]?.textContent,
         document.querySelectorAll(\".cm-line\")[1]?.textContent, document.querySelectorAll(\".cm-line\")[2]?.textContent])",
         "contains": "[\"prefixX V\",\"X V\",\"longprefixX V\"]"}}'
-    - step: 64
+    - step: 67
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".cm-line\")[0]?.textContent ===
         \"prefixX\"", "expect_truthy": true}}'
-    - step: 73
+    - step: 76
       expectation: '{"eval_readonly": {"expression": "document.querySelectorAll(\".cm-line\")[0]?.textContent ===
         \"prefixX\" && document.querySelectorAll(\".cm-line\")[1]?.textContent === \"QX\" && document.querySelectorAll(\".cm-line\")[2]?.textContent
         === \"longprefixX\"", "expect_truthy": true}}'
-    - step: 78
+    - step: 81
       expectation: '{"eval_readonly": {"expression": "JSON.stringify([document.querySelectorAll(\".cm-line\")[0]?.textContent,
         document.querySelectorAll(\".cm-line\")[1]?.textContent, document.querySelectorAll(\".cm-line\")[2]?.textContent])",
         "contains": "[\"你prefixX\",\"X\",\"longprefixX\"]"}}'
     results:
-    - 78
+    - 81
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

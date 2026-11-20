@@ -22,8 +22,10 @@ steps:
 - seed_storage:
     key: taomni.codeWorkspace.refactorOptions.v1
     value: '{"mode":"dialog"}'
-- click: '[data-testid="welcome-history-tab-workspaces"]'
-- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity007_root}"]'
+- click: '[data-testid="tao-home-history"]'
+- wait_for: '[data-testid="tao-home-history-popover"]'
+- click: '[data-testid="tao-home-history-tab-workspaces"]'
+- click: '[data-testid="tao-home-history-row"][data-workspace-path="${fixture.parity007_root}"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
 - wait_for:
@@ -730,57 +732,57 @@ verification:
   - id: ED-PARITY-007-V3-07-boundaries
     requirement: Zero-candidate results distinguish empty and non-empty selections, and a caret with a real method candidate still extracts.
     actions:
-    - 10
+    - 12
     checkpoints:
-    - step: 21
+    - step: 23
       expectation: A non-empty selection without a method candidate gets the DEC-06 selection wording.
-    - step: 31
+    - step: 33
       expectation: An empty caret without a method candidate gets the DEC-06 empty-selection wording.
-    - step: 42
+    - step: 44
       expectation: An empty caret with a method candidate still produces B1 through the normal naming flow.
     results:
-    - 21
-    - 31
-    - 42
+    - 23
+    - 33
+    - 44
   - id: ED-PARITY-007-V3-07-failures
     requirement: Each provider failure mode reports its real reason with zero writes, and symbol/rename failures keep the committed B1.
     actions:
-    - 51
+    - 53
     checkpoints:
-    - step: 62
+    - step: 64
       expectation: A provider-declared disabled candidate reports its own reason and writes nothing.
-    - step: 77
+    - step: 79
       expectation: A malformed provider response is reported as malformed, not as an empty list.
-    - step: 92
+    - step: 94
       expectation: An unknown continuation command is rejected before any write.
-    - step: 107
+    - step: 109
       expectation: A provider timeout is reported as a timeout.
-    - step: 122
+    - step: 124
       expectation: A document-changed cancellation is reported as a cancellation.
-    - step: 167
+    - step: 169
       expectation: An ambiguous symbol snapshot keeps B1 and explains that the new method could not be located.
-    - step: 211
+    - step: 213
       expectation: A provider-rejected rename keeps B1 and shows the provider reason.
     results:
-    - 62
-    - 77
-    - 92
-    - 107
-    - 122
-    - 167
-    - 211
+    - 64
+    - 79
+    - 94
+    - 109
+    - 124
+    - 169
+    - 213
   - id: ED-PARITY-007-V3-07-menu
     requirement: Multiple method candidates open the frozen menu with every method item, and Escape closes it with zero effect.
     actions:
-    - 221
+    - 223
     checkpoints:
-    - step: 233
+    - step: 235
       expectation: Exactly three method candidates are listed (one disabled).
-    - step: 236
+    - step: 238
       expectation: Escape closes the candidate menu and leaves the buffer unchanged.
     results:
-    - 233
-    - 236
+    - 235
+    - 238
   visual:
   - check: Candidate menu anchor at the selection and the dialog chrome against the IDEA reference.
     method: manual

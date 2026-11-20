@@ -9,8 +9,10 @@ timeout_sec: 240
 steps:
   - open: ${cfg.app.base_url}
   - wait_for: '[data-testid="welcome-panel"]'
-  - click: '[data-testid="welcome-history-tab-workspaces"]'
-  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity005_root}"]'
+  - click: '[data-testid="tao-home-history"]'
+  - wait_for: '[data-testid="tao-home-history-popover"]'
+  - click: '[data-testid="tao-home-history-tab-workspaces"]'
+  - click: '[data-testid="tao-home-history-row"][data-workspace-path="${fixture.parity005_root}"]'
   - wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
   - click: '[data-testid="code-workspace-editor"] .cm-content'
   - press: Mod+Home
@@ -138,75 +140,75 @@ verification:
   requirements:
     - id: ED-PARITY-005-V4-null-retry
       requirement: Null resolve keeps B1 untouched; failed Retry still does; a fresh successful Retry commits B2 once.
-      actions: [14, 15, 18, 23, 26, 27, 30]
+      actions: [16, 17, 20, 25, 28, 29, 32]
       checkpoints:
-        - step: 20
+        - step: 22
           expectation: Null resolve is presented as unavailable.
-        - step: 21
+        - step: 23
           expectation: No edit occurred before a gate choice.
-        - step: 24
+        - step: 26
           expectation: Failed Retry is visible.
-        - step: 25
+        - step: 27
           expectation: Failed Retry did not edit the buffer.
-        - step: 28
+        - step: 30
           expectation: Successful Retry closes the gate.
-        - step: 29
-          expectation: Successful Retry lands exact B2.
         - step: 31
+          expectation: Successful Retry lands exact B2.
+        - step: 33
           expectation: One Undo restores exact B1.
-      results: [20, 21, 24, 25, 28, 29, 31]
+      results: [22, 23, 26, 27, 30, 31, 33]
     - id: ED-PARITY-005-V4-primary-only
       requirement: Provider error leaves B1 intact; explicit primary-only omits the import and remains one-Undo recoverable.
-      actions: [32, 33, 36, 40, 43]
+      actions: [34, 35, 38, 42, 45]
       checkpoints:
-        - step: 38
+        - step: 40
           expectation: Provider error is named as a failure.
-        - step: 39
-          expectation: No edit occurred on error.
         - step: 41
+          expectation: No edit occurred on error.
+        - step: 43
           expectation: Primary-only closes the gate.
-        - step: 42
-          expectation: Only the primary snippet text appears, with no import.
         - step: 44
+          expectation: Only the primary snippet text appears, with no import.
+        - step: 46
           expectation: One Undo restores exact B1.
-      results: [38, 39, 41, 42, 44]
+      results: [40, 41, 43, 44, 46]
     - id: ED-PARITY-005-V4-timeout-dismiss
       requirement: Timeout names the reason; Dismiss preserves B1 and a new explicit request succeeds.
-      actions: [45, 46, 49, 52, 55, 56, 59, 61]
+      actions: [47, 48, 51, 54, 57, 58, 61, 63]
       checkpoints:
-        - step: 51
-          expectation: Timeout reason is visible.
         - step: 53
+          expectation: Timeout reason is visible.
+        - step: 55
           expectation: Dismiss closes the gate.
-        - step: 54
+        - step: 56
           expectation: Dismiss left the exact prefix unchanged.
-        - step: 60
-          expectation: A new request can accept after recovery.
         - step: 62
+          expectation: A new request can accept after recovery.
+        - step: 64
           expectation: One Undo again restores exact B1.
-      results: [51, 53, 54, 60, 62]
+      results: [53, 55, 56, 62, 64]
     - id: ED-PARITY-005-V4-invalid-edits
       requirement: Overlapping or out-of-range resolved edits reject the entire acceptance.
-      actions: [64, 65, 68, 72, 73, 76]
+      actions: [66, 67, 70, 74, 75, 78]
       checkpoints:
-        - step: 69
-          expectation: Overlap leaves exact B1 without a partial primary edit.
         - step: 71
+          expectation: Overlap leaves exact B1 without a partial primary edit.
+        - step: 73
           expectation: Overlap does not present a false recovery gate.
-        - step: 77
+        - step: 79
           expectation: Invalid coordinates leave exact B1.
-      results: [69, 71, 77]
+      results: [71, 73, 79]
     - id: ED-PARITY-005-V4-escape
       requirement: Escape closes an unavailable resolve gate without writing the document.
-      actions: [78, 79, 82, 84]
+      actions: [80, 81, 84, 86]
       checkpoints:
-        - step: 83
-          expectation: The unavailable gate opens before Escape.
         - step: 85
+          expectation: The unavailable gate opens before Escape.
+        - step: 87
           expectation: Escape dismisses the gate.
-        - step: 86
+        - step: 88
           expectation: B1 remains byte-for-byte unchanged in the editor.
-      results: [83, 85, 86]
+      results: [85, 87, 88]
   visual:
     - check: Gate labels, all controls and focus remain readable at the caret.
       method: manual

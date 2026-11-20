@@ -552,6 +552,9 @@ const dict = {
   welcome: {
     versionLabel: "Version {version}",
     localTerminal: "Start local terminal",
+    startLocalTerminal: "Start local terminal",
+    newSession: "New session",
+    recentSessions: "Recent sessions",
     openShell: "Open {shell}.",
     openLocalShell: "Open a local shell.",
     detectingShells: "Detecting available shells...",

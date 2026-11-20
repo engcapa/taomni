@@ -1,11 +1,11 @@
 {
   "version": 1,
   "totals": {
-    "features_with_controls": 105,
-    "required": 1147,
-    "covered_required": 1111,
-    "shallow": 60,
-    "orphans": 4
+    "features_with_controls": 110,
+    "required": 2111,
+    "covered_required": 1842,
+    "shallow": 62,
+    "orphans": 5
   },
   "features": {
     "F1.10": {
@@ -13,24 +13,29 @@
       "covered_required": 18,
       "shallow": 0
     },
+    "F1.11": {
+      "required": 126,
+      "covered_required": 114,
+      "shallow": 3
+    },
     "F1.2": {
       "required": 1,
       "covered_required": 1,
       "shallow": 0
     },
     "F1.3": {
-      "required": 11,
-      "covered_required": 11,
+      "required": 13,
+      "covered_required": 13,
       "shallow": 0
     },
     "F1.5": {
-      "required": 8,
-      "covered_required": 8,
+      "required": 23,
+      "covered_required": 23,
       "shallow": 0
     },
     "F1.6": {
-      "required": 24,
-      "covered_required": 24,
+      "required": 10,
+      "covered_required": 10,
       "shallow": 1
     },
     "F1.7": {
@@ -46,7 +51,7 @@
     "F1.9": {
       "required": 4,
       "covered_required": 4,
-      "shallow": 2
+      "shallow": 1
     },
     "F2.2": {
       "required": 2,
@@ -91,7 +96,7 @@
     "F4.11": {
       "required": 0,
       "covered_required": 0,
-      "shallow": 1
+      "shallow": 0
     },
     "F4.12": {
       "required": 0,
@@ -114,8 +119,8 @@
       "shallow": 5
     },
     "F6.3": {
-      "required": 80,
-      "covered_required": 80,
+      "required": 102,
+      "covered_required": 102,
       "shallow": 0
     },
     "F6.4": {
@@ -151,7 +156,7 @@
     "F7.5": {
       "required": 23,
       "covered_required": 23,
-      "shallow": 0
+      "shallow": 1
     },
     "F8.2": {
       "required": 28,
@@ -174,7 +179,7 @@
       "shallow": 0
     },
     "F11.1": {
-      "required": 13,
+      "required": 14,
       "covered_required": 13,
       "shallow": 0
     },
@@ -304,8 +309,8 @@
       "shallow": 0
     },
     "F-TAO-1": {
-      "required": 0,
-      "covered_required": 0,
+      "required": 61,
+      "covered_required": 57,
       "shallow": 3
     },
     "F-MAIL-1": {
@@ -359,8 +364,8 @@
       "shallow": 0
     },
     "F-MAIL-11": {
-      "required": 5,
-      "covered_required": 4,
+      "required": 6,
+      "covered_required": 5,
       "shallow": 0
     },
     "F-MAIL-12": {
@@ -429,13 +434,13 @@
       "shallow": 3
     },
     "F25.1": {
-      "required": 44,
-      "covered_required": 44,
-      "shallow": 0
+      "required": 56,
+      "covered_required": 56,
+      "shallow": 1
     },
     "F25.5": {
-      "required": 19,
-      "covered_required": 19,
+      "required": 24,
+      "covered_required": 24,
       "shallow": 1
     },
     "F25.2": {
@@ -454,8 +459,8 @@
       "shallow": 1
     },
     "F26.1": {
-      "required": 13,
-      "covered_required": 13,
+      "required": 22,
+      "covered_required": 22,
       "shallow": 0
     },
     "F26.2": {
@@ -474,18 +479,18 @@
       "shallow": 0
     },
     "F-MFA-3": {
-      "required": 7,
-      "covered_required": 7,
+      "required": 8,
+      "covered_required": 8,
       "shallow": 0
     },
     "F-BACKUP-2": {
-      "required": 28,
-      "covered_required": 20,
-      "shallow": 3
+      "required": 47,
+      "covered_required": 39,
+      "shallow": 2
     },
     "F-BACKUP-1": {
-      "required": 8,
-      "covered_required": 8,
+      "required": 44,
+      "covered_required": 43,
       "shallow": 0
     },
     "F27.1": {
@@ -504,14 +509,14 @@
       "shallow": 0
     },
     "F-WS-1": {
-      "required": 9,
-      "covered_required": 8,
+      "required": 42,
+      "covered_required": 18,
       "shallow": 0
     },
     "F-WS-2": {
-      "required": 43,
-      "covered_required": 34,
-      "shallow": 9
+      "required": 114,
+      "covered_required": 87,
+      "shallow": 5
     },
     "F-WS-3": {
       "required": 11,
@@ -525,13 +530,33 @@
     },
     "F-WS-5": {
       "required": 3,
-      "covered_required": 2,
-      "shallow": 1
+      "covered_required": 3,
+      "shallow": 0
     },
     "F-WS-6": {
-      "required": 7,
+      "required": 5,
       "covered_required": 5,
-      "shallow": 2
+      "shallow": 0
+    },
+    "F-MOBILE-1": {
+      "required": 194,
+      "covered_required": 147,
+      "shallow": 0
+    },
+    "F-MOBILE-2": {
+      "required": 30,
+      "covered_required": 24,
+      "shallow": 5
+    },
+    "F-EXPLORER-1": {
+      "required": 109,
+      "covered_required": 61,
+      "shallow": 1
+    },
+    "F-FILEOPEN-1": {
+      "required": 234,
+      "covered_required": 158,
+      "shallow": 1
     }
   }
 }

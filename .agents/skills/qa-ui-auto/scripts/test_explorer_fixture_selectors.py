@@ -10,7 +10,7 @@ from qa_ui_auto.fixtures.explorer_files import path_attribute_match, setup
 
 
 class ExplorerFixtureSelectorTest(TestCase):
-    def test_css_matches_exact_windows_paths_with_native_child_separators(self):
+    def test_css_matches_windows_boundary_spellings_and_no_unrelated_path(self):
         path = 'D:/a/qa report/source/folder'
         selector = '[data-testid="explorer-nav-node"]' + path_attribute_match(path)
         expected = [

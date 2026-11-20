@@ -37,8 +37,10 @@ steps:
     key: taomni.recentWorkspaces.v1
     value: '[{"id":"qa-git-diff","name":"qa-git-diff","roots":[{"id":"qa-git-root","name":"qa-git-diff","path":"${fixture.git_diff_repo}","kind":"git"}],"looseFiles":[],"lastOpenedAt":1756100000000,"lastActiveFile":{"kind":"root","rootId":"qa-git-root","path":"long-lines.txt"},"isGitRepo":true}]'
 - reload_window: null
-- click: '[data-testid="welcome-history-tab-workspaces"]'
-- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.git_diff_repo}"]'
+- click: '[data-testid="tao-home-history"]'
+- wait_for: '[data-testid="tao-home-history-popover"]'
+- click: '[data-testid="tao-home-history-tab-workspaces"]'
+- click: '[data-testid="tao-home-history-row"][data-workspace-path="${fixture.git_diff_repo}"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - wait_for: '[data-testid="code-workspace-tool-rail-git"]'
 - click: '[data-testid="code-workspace-tool-rail-git"]'
@@ -106,75 +108,75 @@ verification:
     - 4
     - 5
     - 6
-    - 7
-    - 10
+    - 9
     - 12
     - 14
     - 16
-    - 19
-    - 20
-    - 25
-    - 26
+    - 18
+    - 21
+    - 22
+    - 27
     - 28
     - 30
-    - 31
     - 32
-    - 36
+    - 33
+    - 34
     - 38
     - 40
+    - 42
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 8
+    - step: 10
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
-    - step: 9
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tool-rail-git\"]"}'
     - step: 11
-      expectation: '{"wait_for": "[data-testid=\"git-panel\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tool-rail-git\"]"}'
     - step: 13
-      expectation: '{"wait_for": "[data-testid=\"git-log-commit\"][data-oid=\"${fixture.git_diff_commit_b}\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"git-panel\"]"}'
     - step: 15
-      expectation: '{"wait_for": "[data-testid=\"git-log-file\"][data-path=\"long-lines.txt\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"git-log-commit\"][data-oid=\"${fixture.git_diff_commit_b}\"]"}'
     - step: 17
+      expectation: '{"wait_for": "[data-testid=\"git-log-file\"][data-path=\"long-lines.txt\"]"}'
+    - step: 19
       expectation: '{"wait_for": "[data-testid=\"git-log-file\"][data-path=\"long-lines.txt\"][aria-pressed=\"true\"]"}'
-    - step: 18
+    - step: 20
       expectation: '{"wait_for": ".git-log-view [data-testid=\"git-diff-viewer\"][data-path=\"long-lines.txt\"]"}'
-    - step: 21
-      expectation: '{"wait_for": ".git-log-view [data-testid=\"git-diff-splitter\"][data-layout-ready=\"true\"]"}'
-    - step: 22
-      expectation: '{"wait_for": ".git-log-view [data-testid=\"git-diff-left-scroll\"]"}'
     - step: 23
-      expectation: '{"wait_for": ".git-log-view [data-testid=\"git-diff-right-scroll\"]"}'
+      expectation: '{"wait_for": ".git-log-view [data-testid=\"git-diff-splitter\"][data-layout-ready=\"true\"]"}'
     - step: 24
+      expectation: '{"wait_for": ".git-log-view [data-testid=\"git-diff-left-scroll\"]"}'
+    - step: 25
+      expectation: '{"wait_for": ".git-log-view [data-testid=\"git-diff-right-scroll\"]"}'
+    - step: 26
       expectation: '{"eval_readonly": {"expression": "Math.abs(document.querySelector(\".git-log-view\")?.querySelector(\"[data-testid\"
         + String.fromCharCode(61) + \"\\\"git-diff-left-scroll\\\"]\")?.scrollLeft ?? 0) <= 1 && Math.abs(document.querySelector(\".git-log-view\")?.querySelector(\"[data-testid\"
         + String.fromCharCode(61) + \"\\\"git-diff-right-scroll\\\"]\")?.scrollLeft ?? 0) <= 1", "expect_truthy":
         true}}'
-    - step: 27
-      expectation: '{"assert_attribute": {"selector": ".git-log-view [data-testid=\"git-diff-splitter\"]", "name":
-        "aria-valuenow", "equals": "52"}}'
     - step: 29
       expectation: '{"assert_attribute": {"selector": ".git-log-view [data-testid=\"git-diff-splitter\"]", "name":
+        "aria-valuenow", "equals": "52"}}'
+    - step: 31
+      expectation: '{"assert_attribute": {"selector": ".git-log-view [data-testid=\"git-diff-splitter\"]", "name":
         "aria-valuenow", "equals": "50"}}'
-    - step: 33
+    - step: 35
       expectation: '{"eval_readonly": {"expression": "Math.abs(document.querySelector(\".git-log-view\")?.querySelector(\"[data-testid\"
         + String.fromCharCode(61) + \"\\\"git-diff-left-scroll\\\"]\")?.scrollLeft ?? 0) <= 1 && Math.abs(document.querySelector(\".git-log-view\")?.querySelector(\"[data-testid\"
         + String.fromCharCode(61) + \"\\\"git-diff-right-scroll\\\"]\")?.scrollLeft ?? 0) <= 1", "expect_truthy":
         true}}'
-    - step: 35
+    - step: 37
       expectation: '{"eval_readonly": {"expression": "document.querySelector(\".git-log-view\")?.querySelector(\"[data-testid\"
         + String.fromCharCode(61) + \"\\\"git-diff-right-scroll\\\"]\")?.textContent", "contains": "LINE020:"}}'
-    - step: 37
+    - step: 39
       expectation: '{"eval_readonly": {"expression": "Math.abs(document.querySelector(\".git-log-view\")?.querySelector(\"[data-testid\"
         + String.fromCharCode(61) + \"\\\"git-diff-left-scroll\\\"]\")?.scrollLeft ?? 0) <= 1 && Math.abs(document.querySelector(\".git-log-view\")?.querySelector(\"[data-testid\"
         + String.fromCharCode(61) + \"\\\"git-diff-right-scroll\\\"]\")?.scrollLeft ?? 0) <= 1", "expect_truthy":
         true}}'
-    - step: 39
-      expectation: '{"assert_not_visible": ".git-log-view [data-testid=\"git-diff-splitter\"]"}'
     - step: 41
+      expectation: '{"assert_not_visible": ".git-log-view [data-testid=\"git-diff-splitter\"]"}'
+    - step: 43
       expectation: '{"wait_for": ".git-log-view [data-testid=\"git-diff-splitter\"]"}'
     results:
-    - 41
+    - 43
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual

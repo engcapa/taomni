@@ -138,8 +138,8 @@ steps:
     to: '[data-testid="explorer-crumb"]${fixture.explorer_crumb_folder_match}'
     modifiers: [Control]
     macos_modifiers: [Alt]
-- wait_for: {selector: '[data-testid="explorer-progress"]', state: detached}
 - wait_for: '[data-testid="explorer-toast"]'
+- wait_for: {selector: '[data-testid="explorer-progress"]', state: detached}
 - assert_explorer_files: {state: drag-breadcrumb}
 - click: '[data-testid="explorer-nav-node"]${fixture.explorer_source_match} button'
 - wait_for: '[data-testid="explorer-nav-node"]${fixture.explorer_source_folder_match}'

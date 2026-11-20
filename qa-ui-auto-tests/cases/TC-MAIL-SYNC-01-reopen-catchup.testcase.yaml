@@ -55,9 +55,10 @@ steps:
 - mail_server_assert_list_matches:
     timeout_sec: 60
     unread: true
-- click: '[data-testid="tab-item"][data-tab-type="mail"] [data-testid="tab-close"]'
+- right_click: '[data-testid="tab-item"][data-tab-type="mail"]'
+- click: '[data-testid="context-menu-item-close"]'
 - wait_for:
-    selector: '[data-testid="mail-client-tab"]'
+    selector: '[data-testid="tab-item"][data-tab-type="mail"]'
     state: detached
 - mail_server_deliver:
     count: 450
@@ -94,30 +95,31 @@ verification:
     - 6
     - 8
     - 10
-    - 12
+    - 11
     - 13
     - 14
-    - 18
+    - 15
+    - 19
     checkpoints:
     - step: 7
       expectation: '{"wait_for": "[data-testid=\"mail-client-tab\"]"}'
     - step: 9
       expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60, "unread": true}}'
-    - step: 11
-      expectation: '{"wait_for": {"selector": "[data-testid=\"mail-client-tab\"]", "state": "detached"}}'
-    - step: 16
-      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 120}}'
+    - step: 12
+      expectation: '{"wait_for": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"mail\"]", "state": "detached"}}'
     - step: 17
+      expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 120}}'
+    - step: 18
       expectation: '{"assert_count": {"selector": "[data-testid=\"mail-message-row\"]", "min": 450}}'
-    - step: 19
-      expectation: 正文区域显示同步后收到的 Closed-tab 0450。
     - step: 20
+      expectation: 正文区域显示同步后收到的 Closed-tab 0450。
+    - step: 21
       expectation: 同步及打开正文期间无运行时错误。
     results:
-    - 16
     - 17
-    - 19
+    - 18
     - 20
+    - 21
   visual:
   - check: 截图中邮件列表、文件夹与计数显示完整，无同步进度残留或遮挡。
     method: manual
