@@ -73,6 +73,7 @@ steps:
     text: report-type=disposition-notification
     timeout_sec: 20
 - assert_not_visible: '[data-testid="mail-receipt-banner"]'
+- assert_no_runtime_errors: null
 - screenshot: mail-receipt-01.png
 verification:
   review: reviewed
@@ -110,9 +111,12 @@ verification:
       expectation: '{"mail_server_assert_smtp_contains": {"text": "report-type=disposition-notification", "timeout_sec": 20}}'
     - step: 18
       expectation: '{"assert_not_visible": "[data-testid=\"mail-receipt-banner\"]"}'
+    - step: 19
+      expectation: Sending the receipt leaves no runtime errors.
     results:
     - 17
     - 18
+    - 19
   visual:
   - check: 截图中阅读区不再显示回执提示，状态栏显示回执已发送。
     method: manual

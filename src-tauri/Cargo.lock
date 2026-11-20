@@ -11097,6 +11097,7 @@ dependencies = [
  "imap",
  "lettre",
  "mail-parser",
+ "native-tls",
  "regex",
  "rusqlite",
  "serde",

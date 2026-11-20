@@ -7,33 +7,21 @@ pub(super) use taomni_mail_engine::compose::{
     MessageBuildOptions, parse_mailbox, validate_send_request,
 };
 
-pub(super) struct MailSmtpTransport {
-    pub(super) mailer: SmtpTransport,
-    pub(super) forward_task: Option<JoinHandle<()>>,
-}
+use taomni_mail_engine::smtp::{SmtpClient, SmtpEndpoint};
 
-impl Drop for MailSmtpTransport {
+struct ProxyForward(Option<JoinHandle<()>>);
+
+impl Drop for ProxyForward {
     fn drop(&mut self) {
-        if let Some(task) = self.forward_task.take() {
+        if let Some(task) = self.0.take() {
             task.abort();
         }
     }
 }
 
-/// SMTP failure text, with a hint when the server rejected the size (AC-47).
-pub(super) fn smtp_send_error(error: &str) -> String {
-    let lower = error.to_ascii_lowercase();
-    let too_big = lower.contains("552")
-        || lower.contains("message size")
-        || lower.contains("too large")
-        || lower.contains("exceeds") && lower.contains("size");
-    if too_big {
-        format!(
-            "SMTP send failed: the message is larger than this server accepts (SIZE limit). Remove or shrink attachments, or share them as links. Server said: {error}"
-        )
-    } else {
-        certs::certificate_error_hint(&format!("SMTP send failed: {error}"), false)
-    }
+pub(super) struct MailSmtpTransport {
+    pub(super) mailer: SmtpClient,
+    _forward: ProxyForward,
 }
 
 pub(super) fn send_smtp_with(
@@ -44,10 +32,7 @@ pub(super) fn send_smtp_with(
 ) -> Result<MailSendResult, String> {
     let message = build_send_message_with(account, request, options)?;
     let transport = build_smtp_transport(account, runtime)?;
-    let response = transport
-        .mailer
-        .send(&message)
-        .map_err(|e| smtp_send_error(&e.to_string()))?;
+    let response = transport.mailer.send(&message)?;
     Ok(MailSendResult {
         accepted: true,
         response: format!("{response:?}"),
@@ -61,15 +46,7 @@ pub(super) fn test_smtp(
     runtime: &tokio::runtime::Handle,
 ) -> Result<(), String> {
     let transport = build_smtp_transport(account, runtime)?;
-    let connected = transport
-        .mailer
-        .test_connection()
-        .map_err(|e| format!("SMTP test failed: {e}"))?;
-    if connected {
-        Ok(())
-    } else {
-        Err("SMTP test did not establish a connection".into())
-    }
+    transport.mailer.test_connection()
 }
 
 pub(super) fn build_smtp_transport(
@@ -79,29 +56,21 @@ pub(super) fn build_smtp_transport(
     let host = account.config.smtp.host.trim();
     let (connect_host, connect_port, forward_task) =
         mail_effective_endpoint(account, host, account.config.smtp.port, runtime)?;
-    let mut builder = SmtpTransport::builder_dangerous(connect_host)
-        .port(connect_port)
-        .timeout(Some(Duration::from_secs(DEFAULT_TIMEOUT_SECS)))
-        .credentials(Credentials::new(
-            account.smtp_username.clone(),
-            account.smtp_password.clone(),
-        ));
-    if account.auth_mode == MailAuthMode::OAuth2 {
-        builder = builder.authentication(vec![Mechanism::Xoauth2]);
-    }
-    let trusted = account.config.smtp.trusted_cert.as_deref();
-    builder = match account.config.smtp.security {
-        MailConnectionSecurity::Tls => {
-            builder.tls(Tls::Wrapper(certs::smtp_tls_parameters(host, trusted)?))
-        }
-        MailConnectionSecurity::Starttls => {
-            builder.tls(Tls::Required(certs::smtp_tls_parameters(host, trusted)?))
-        }
-        MailConnectionSecurity::None => builder.tls(Tls::None),
-    };
+    let forward = ProxyForward(forward_task);
+    let mailer = SmtpClient::new(SmtpEndpoint {
+        connect_host: &connect_host,
+        connect_port,
+        server_name: host,
+        timeout: Duration::from_secs(DEFAULT_TIMEOUT_SECS),
+        security: account.config.smtp.security,
+        trusted_certificate: account.config.smtp.trusted_cert.as_deref(),
+        username: &account.smtp_username,
+        secret: &account.smtp_password,
+        authentication: account.auth_mode,
+    })?;
     Ok(MailSmtpTransport {
-        mailer: builder.build(),
-        forward_task,
+        mailer,
+        _forward: forward,
     })
 }
 

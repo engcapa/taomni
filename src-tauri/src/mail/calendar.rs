@@ -10,7 +10,7 @@ use tauri::State;
 
 use super::{
     ImapSessionOpts, MailAccountConfig, build_smtp_transport, now_ts, parse_mailbox,
-    resolve_config, smtp_send_error, with_imap_session,
+    resolve_config, with_imap_session,
 };
 use crate::state::AppState;
 
@@ -121,13 +121,8 @@ pub async fn mail_respond_invite(
         .map_err(|e| format!("failed to build invitation reply: {e}"))?;
     let handle = tokio::runtime::Handle::current();
     tokio::task::spawn_blocking(move || {
-        use lettre::Transport;
         let transport = build_smtp_transport(&account, &handle)?;
-        transport
-            .mailer
-            .send(&message)
-            .map(|_| ())
-            .map_err(|e| smtp_send_error(&e.to_string()))
+        transport.mailer.send(&message).map(|_| ())
     })
     .await
     .map_err(|e| format!("invite reply task failed: {e}"))??;

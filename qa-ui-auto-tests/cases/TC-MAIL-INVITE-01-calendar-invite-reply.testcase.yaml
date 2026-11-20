@@ -71,6 +71,7 @@ steps:
 - mail_server_assert_smtp_contains:
     text: PARTSTAT=ACCEPTED
     timeout_sec: 20
+- assert_no_runtime_errors: null
 - screenshot: mail-invite-01-accepted.png
 verification:
   review: reviewed
@@ -108,9 +109,12 @@ verification:
       expectation: '{"wait_for": {"selector": "[data-testid=\"mail-invite-responded\"]", "timeout_sec": 30}}'
     - step: 18
       expectation: '{"mail_server_assert_smtp_contains": {"text": "PARTSTAT=ACCEPTED", "timeout_sec": 20}}'
+    - step: 19
+      expectation: Sending the invitation reply leaves no runtime errors.
     results:
     - 17
     - 18
+    - 19
   visual:
   - check: 截图中邀请卡片显示标题、时间、地点、组织者，Accept 高亮并显示 “Reply sent (accepted)”。
     method: manual

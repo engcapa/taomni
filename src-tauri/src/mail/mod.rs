@@ -147,11 +147,7 @@ use base64::{
     engine::general_purpose::{STANDARD as BASE64_STANDARD, URL_SAFE_NO_PAD},
 };
 
-use lettre::transport::smtp::authentication::{Credentials, Mechanism};
-
-use lettre::transport::smtp::client::Tls;
-
-use lettre::{Message, SmtpTransport, Transport};
+use lettre::Message;
 
 #[cfg(test)]
 use mail_parser::{MessageParser, MimeHeaders};

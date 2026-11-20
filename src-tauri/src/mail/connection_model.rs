@@ -1,25 +1,11 @@
 use super::account_model::MailAccountConfig;
 use crate::terminal::network::NetworkSettings;
-use lettre::transport::smtp::client::Tls;
 use serde::Deserialize;
 use serde::Serialize;
-pub use taomni_mail_engine::imap_auth::{MailAuthMode, MailProvider};
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum MailConnectionSecurity {
-    #[serde(rename = "tls", alias = "TLS", alias = "Tls")]
-    Tls,
-    #[serde(rename = "starttls", alias = "STARTTLS", alias = "StartTls")]
-    Starttls,
-    #[serde(rename = "none", alias = "None", alias = "NONE")]
-    None,
-}
-
-impl Default for MailConnectionSecurity {
-    fn default() -> Self {
-        Self::Tls
-    }
-}
+pub use taomni_mail_engine::{
+    imap_auth::{MailAuthMode, MailProvider},
+    tls::MailConnectionSecurity,
+};
 
 /// Incoming protocol of an account (TASK-21).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]

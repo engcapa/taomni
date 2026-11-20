@@ -157,18 +157,6 @@ fn contact_index_searches_cached_headers() {
 }
 
 #[test]
-fn smtp_size_rejections_get_a_hint() {
-    assert!(
-        smtp_send_error("permanent error (552): 5.3.4 Message size exceeds fixed limit")
-            .contains("SIZE limit")
-    );
-    assert_eq!(
-        smtp_send_error("permanent error (550): no such user"),
-        "SMTP send failed: permanent error (550): no such user"
-    );
-}
-
-#[test]
 fn sent_contacts_raise_sent_source() {
     let conn = Connection::open_in_memory().unwrap();
     init_mail_tables(&conn).unwrap();

@@ -2,14 +2,13 @@
 //! Notifications, and the RFC 3503 `$MDNSent` keyword so a request is
 //! answered (or declined) only once, from any client.
 
-use lettre::Transport;
 use lettre::address::{Address, Envelope};
 use serde::Serialize;
 use tauri::State;
 
 use super::{
     MailAccountConfig, MailMessageHeader, build_smtp_transport, now_ts, resolve_config,
-    smtp_send_error, with_mail_db,
+    with_mail_db,
 };
 use crate::state::AppState;
 
@@ -128,7 +127,6 @@ pub async fn mail_send_receipt(
             .mailer
             .send_raw(&envelope, raw.as_bytes())
             .map(|_| ())
-            .map_err(|e| smtp_send_error(&e.to_string()))
     })
     .await
     .map_err(|e| format!("read receipt task failed: {e}"))??;

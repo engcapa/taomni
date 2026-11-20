@@ -14,7 +14,9 @@ pub mod mbox;
 mod mime;
 pub mod mime_sections;
 mod models;
+pub mod smtp;
 pub mod storage;
+pub mod tls;
 #[cfg(test)]
 mod tests;
 
