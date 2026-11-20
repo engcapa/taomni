@@ -1,0 +1,305 @@
+//! IMAP mailbox naming, subscriptions and change detection over an established connection.
+
+use std::collections::HashSet;
+use std::io::{Read, Write};
+
+use base64::{Engine, engine::general_purpose::STANDARD as BASE64_STANDARD};
+use imap::types::NameAttribute;
+
+use crate::{MailFolder, now_ts};
+
+pub const SUBSCRIBED_ATTRIBUTE: &str = "\\Subscribed";
+
+/// RFC wire form of a LIST attribute (the `imap` crate only has Debug output).
+fn attribute_string(attribute: &NameAttribute<'_>) -> String {
+    match attribute {
+        NameAttribute::NoInferiors => "\\Noinferiors".into(),
+        NameAttribute::NoSelect => "\\Noselect".into(),
+        NameAttribute::Marked => "\\Marked".into(),
+        NameAttribute::Unmarked => "\\Unmarked".into(),
+        NameAttribute::Custom(value) => value.to_string(),
+    }
+}
+
+fn folder_is_inbox(folder: &MailFolder) -> bool {
+    folder.name.eq_ignore_ascii_case("INBOX")
+}
+
+fn folder_is_subscribed(folder: &MailFolder) -> bool {
+    folder
+        .flags
+        .iter()
+        .any(|flag| flag.eq_ignore_ascii_case(SUBSCRIBED_ATTRIBUTE))
+}
+
+/// Whether the tree/sync should include `folder` under `subscribed_only`.
+pub fn folder_visible(folder: &MailFolder, subscribed_only: bool) -> bool {
+    !subscribed_only || folder_is_inbox(folder) || folder_is_subscribed(folder)
+}
+
+/// Mark LSUB-reported folders `\Subscribed`. An empty or failed LSUB means
+/// the server does not track subscriptions: every folder counts as subscribed
+/// so "subscribed only" never hides a whole account.
+fn mark_subscribed(folders: &mut [MailFolder], subscribed: Option<HashSet<String>>) {
+    let subscribed = subscribed.filter(|names| !names.is_empty());
+    for folder in folders.iter_mut() {
+        folder
+            .flags
+            .retain(|flag| !flag.eq_ignore_ascii_case(SUBSCRIBED_ATTRIBUTE));
+        let on = subscribed
+            .as_ref()
+            .is_none_or(|names| names.contains(&folder.name));
+        if on {
+            folder.flags.push(SUBSCRIBED_ATTRIBUTE.into());
+        }
+    }
+}
+
+fn imap_subscribed_names<T: Read + Write>(
+    session: &mut imap::Session<T>,
+) -> Option<HashSet<String>> {
+    session
+        .lsub(Some(""), Some("*"))
+        .ok()
+        .map(|names| names.iter().map(|name| name.name().to_string()).collect())
+}
+
+pub fn imap_set_subscription<T: Read + Write>(
+    session: &mut imap::Session<T>,
+    folder: &str,
+    subscribed: bool,
+) -> Result<(), String> {
+    let result = if subscribed {
+        session.subscribe(folder)
+    } else {
+        session.unsubscribe(folder)
+    };
+    result.map_err(|e| {
+        let verb = if subscribed {
+            "SUBSCRIBE"
+        } else {
+            "UNSUBSCRIBE"
+        };
+        format!("IMAP {verb} {folder} failed: {e}")
+    })
+}
+
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct FolderStatus {
+    pub messages: Option<u32>,
+    pub unseen: Option<u32>,
+    pub uid_next: Option<u32>,
+    pub uid_validity: Option<u32>,
+    pub highest_modseq: Option<u64>,
+}
+
+/// Parse `* STATUS <name> (KEY value ...)` from a raw response.
+fn parse_status_response(raw: &str) -> Option<FolderStatus> {
+    let line = raw
+        .lines()
+        .map(str::trim)
+        .find(|line| line.to_ascii_uppercase().starts_with("* STATUS "))?;
+    let open = line.rfind('(')?;
+    let close = line.rfind(')')?;
+    if close <= open {
+        return None;
+    }
+    let mut status = FolderStatus::default();
+    let mut parts = line[open + 1..close].split_whitespace();
+    while let (Some(key), Some(value)) = (parts.next(), parts.next()) {
+        match key.to_ascii_uppercase().as_str() {
+            "MESSAGES" => status.messages = value.parse().ok(),
+            "UNSEEN" => status.unseen = value.parse().ok(),
+            "UIDNEXT" => status.uid_next = value.parse().ok(),
+            "UIDVALIDITY" => status.uid_validity = value.parse().ok(),
+            "HIGHESTMODSEQ" => status.highest_modseq = value.parse().ok(),
+            _ => {}
+        }
+    }
+    Some(status)
+}
+
+/// Raw STATUS: the crate's typed `status()` routes the attributes through the
+/// unsolicited channel, which desynced some Outlook + proxy streams.
+pub fn imap_folder_status<T: Read + Write>(
+    session: &mut imap::Session<T>,
+    folder: &str,
+    condstore: bool,
+) -> Option<FolderStatus> {
+    let items = if condstore {
+        "(MESSAGES UNSEEN UIDNEXT UIDVALIDITY HIGHESTMODSEQ)"
+    } else {
+        "(MESSAGES UNSEEN UIDNEXT UIDVALIDITY)"
+    };
+    let raw = session
+        .run_command_and_read_response(format!("STATUS {} {items}", quote_imap_string(folder)))
+        .ok()?;
+    parse_status_response(&String::from_utf8_lossy(&raw))
+}
+
+pub fn imap_list_folders<T: Read + Write>(
+    session: &mut imap::Session<T>,
+    account_id: &str,
+) -> Result<Vec<MailFolder>, String> {
+    let names = session
+        .list(None, Some("*"))
+        .map_err(|e| format!("IMAP LIST failed: {e}"))?;
+    let now = now_ts();
+    let mut listed: Vec<MailFolder> = names
+        .iter()
+        .map(|name| {
+            let raw_name = name.name().to_string();
+            MailFolder {
+                account_id: account_id.to_string(),
+                display_name: decode_imap_modified_utf7(&raw_name),
+                name: raw_name,
+                delimiter: name.delimiter().map(ToOwned::to_owned),
+                flags: name
+                    .attributes()
+                    .iter()
+                    .map(attribute_string)
+                    .collect(),
+                uid_validity: None,
+                uid_next: None,
+                total: None,
+                unread: None,
+                updated_at: now,
+                ..MailFolder::default()
+            }
+        })
+        .collect();
+    drop(names);
+    mark_subscribed(&mut listed, imap_subscribed_names(session));
+    Ok(listed)
+}
+
+/// Quote a mailbox name for a raw IMAP command.
+pub fn quote_imap_string(value: &str) -> String {
+    let mut out = String::with_capacity(value.len() + 2);
+    out.push('"');
+    for ch in value.chars() {
+        if ch == '"' || ch == '\\' {
+            out.push('\\');
+        }
+        if ch != '\r' && ch != '\n' {
+            out.push(ch);
+        }
+    }
+    out.push('"');
+    out
+}
+
+pub fn decode_imap_modified_utf7(input: &str) -> String {
+    let mut out = String::with_capacity(input.len());
+    let mut index = 0;
+    while index < input.len() {
+        let rest = &input[index..];
+        if !rest.starts_with('&') {
+            let ch = rest.chars().next().unwrap_or_default();
+            out.push(ch);
+            index += ch.len_utf8();
+            continue;
+        }
+
+        let after_amp = index + 1;
+        let Some(relative_end) = input[after_amp..].find('-') else {
+            out.push_str(rest);
+            break;
+        };
+        let end = after_amp + relative_end;
+        let encoded = &input[after_amp..end];
+        if encoded.is_empty() {
+            out.push('&');
+            index = end + 1;
+            continue;
+        }
+
+        match decode_imap_modified_utf7_segment(encoded) {
+            Some(decoded) => out.push_str(&decoded),
+            None => out.push_str(&input[index..=end]),
+        }
+        index = end + 1;
+    }
+    out
+}
+
+fn decode_imap_modified_utf7_segment(encoded: &str) -> Option<String> {
+    let mut b64 = encoded.replace(',', "/");
+    while b64.len() % 4 != 0 {
+        b64.push('=');
+    }
+    let bytes = BASE64_STANDARD.decode(b64.as_bytes()).ok()?;
+    if bytes.len() % 2 != 0 {
+        return None;
+    }
+    let units = bytes
+        .chunks_exact(2)
+        .map(|chunk| u16::from_be_bytes([chunk[0], chunk[1]]))
+        .collect::<Vec<_>>();
+    String::from_utf16(&units).ok()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn folder(name: &str, flags: &[&str]) -> MailFolder {
+        MailFolder {
+            account_id: "acct".into(),
+            name: name.into(),
+            display_name: name.into(),
+            flags: flags.iter().map(|flag| flag.to_string()).collect(),
+            ..MailFolder::default()
+        }
+    }
+
+    #[test]
+    fn attributes_use_rfc_form() {
+        assert_eq!(attribute_string(&NameAttribute::NoSelect), "\\Noselect");
+        assert_eq!(
+            attribute_string(&NameAttribute::Custom("\\Sent".into())),
+            "\\Sent"
+        );
+    }
+
+    #[test]
+    fn subscriptions_mark_folders_and_empty_lsub_means_all() {
+        let mut folders = vec![
+            folder("INBOX", &[]),
+            folder("Work", &[]),
+            folder("Old", &[]),
+        ];
+        mark_subscribed(
+            &mut folders,
+            Some(["Work".to_string()].into_iter().collect()),
+        );
+        assert!(!folder_is_subscribed(&folders[0]));
+        assert!(folder_is_subscribed(&folders[1]));
+        assert!(!folder_is_subscribed(&folders[2]));
+        assert!(folder_visible(&folders[0], true), "INBOX always visible");
+        assert!(!folder_visible(&folders[2], true));
+        assert!(folder_visible(&folders[2], false));
+
+        mark_subscribed(&mut folders, Some(HashSet::new()));
+        assert!(folders.iter().all(folder_is_subscribed));
+        mark_subscribed(&mut folders, None);
+        assert!(folders.iter().all(folder_is_subscribed));
+        assert_eq!(folders[1].flags, vec![SUBSCRIBED_ATTRIBUTE.to_string()]);
+    }
+
+    #[test]
+    fn parses_status_line() {
+        let raw = "* STATUS \"Sent Items\" (MESSAGES 12 UNSEEN 3 UIDNEXT 40 UIDVALIDITY 7 HIGHESTMODSEQ 99)\r\na1 OK done\r\n";
+        assert_eq!(
+            parse_status_response(raw),
+            Some(FolderStatus {
+                messages: Some(12),
+                unseen: Some(3),
+                uid_next: Some(40),
+                uid_validity: Some(7),
+                highest_modseq: Some(99),
+            })
+        );
+        assert_eq!(parse_status_response("a1 NO nope\r\n"), None);
+    }
+}

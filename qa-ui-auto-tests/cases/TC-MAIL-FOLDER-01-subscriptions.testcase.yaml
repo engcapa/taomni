@@ -97,6 +97,8 @@ steps:
 - assert_count:
     selector: '[data-testid="mail-folder-row"][data-folder-name="Archive"]'
     equal: 0
+- assert_visible: '[data-testid="mail-folder-row"][data-folder-name="INBOX"]'
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -161,9 +163,15 @@ verification:
       expectation: '{"wait_for": {"selector": "[data-testid=\"mail-folder-row\"][data-folder-name=\"Archive\"]", "state": "detached", "timeout_sec": 10}}'
     - step: 34
       expectation: '{"assert_count": {"selector": "[data-testid=\"mail-folder-row\"][data-folder-name=\"Archive\"]", "equal": 0}}'
+    - step: 35
+      expectation: INBOX remains visible after reopening with the subscription filter still active.
+    - step: 36
+      expectation: Reopening and applying the folder subscription filter produces no runtime errors.
     results:
     - 33
     - 34
+    - 35
+    - 36
   visual:
   - check: 截图中订阅对话框的 Archive 未勾选、“只显示已订阅”已勾选，文件夹树不含 Archive。
     method: manual

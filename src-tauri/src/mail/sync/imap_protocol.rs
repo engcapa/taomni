@@ -17,21 +17,7 @@ pub(in crate::mail) struct RemoteMailbox {
     pub highest_modseq: Option<u64>,
 }
 
-/// Quote a mailbox name for a raw IMAP command.
-pub(in crate::mail) fn quote_imap_string(value: &str) -> String {
-    let mut out = String::with_capacity(value.len() + 2);
-    out.push('"');
-    for ch in value.chars() {
-        if ch == '"' || ch == '\\' {
-            out.push('\\');
-        }
-        if ch != '\r' && ch != '\n' {
-            out.push(ch);
-        }
-    }
-    out.push('"');
-    out
-}
+pub(in crate::mail) use taomni_mail_engine::imap_folders::quote_imap_string;
 
 /// Parse the untagged data of an `EXAMINE ... (CONDSTORE)` response.
 pub(in crate::mail) fn parse_examine_response(raw: &str) -> RemoteMailbox {

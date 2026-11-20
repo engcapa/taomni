@@ -1,41 +1,5 @@
 use super::*;
 
-pub(super) fn imap_list_folders<T: Read + Write>(
-    session: &mut imap::Session<T>,
-    account_id: &str,
-) -> Result<Vec<MailFolder>, String> {
-    let names = session
-        .list(None, Some("*"))
-        .map_err(|e| format!("IMAP LIST failed: {e}"))?;
-    let now = now_ts();
-    let mut listed: Vec<MailFolder> = names
-        .iter()
-        .map(|name| {
-            let raw_name = name.name().to_string();
-            MailFolder {
-                account_id: account_id.to_string(),
-                display_name: decode_imap_modified_utf7(&raw_name),
-                name: raw_name,
-                delimiter: name.delimiter().map(ToOwned::to_owned),
-                flags: name
-                    .attributes()
-                    .iter()
-                    .map(folders::attribute_string)
-                    .collect(),
-                uid_validity: None,
-                uid_next: None,
-                total: None,
-                unread: None,
-                updated_at: now,
-                ..MailFolder::default()
-            }
-        })
-        .collect();
-    drop(names);
-    folders::mark_subscribed(&mut listed, folders::imap_subscribed_names(session));
-    Ok(listed)
-}
-
 pub(super) fn imap_unread_count<T: Read + Write>(
     session: &mut imap::Session<T>,
     _folder: &str,
