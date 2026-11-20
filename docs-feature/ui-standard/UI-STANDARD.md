@@ -1,6 +1,6 @@
 # Taomni UI 与交互统一规范（UI-STANDARD）
 
-> 状态：草案 v0.1（2026-11-17），待确认落点与严格程度后生效。落地与执行机制见同目录 [ENFORCEMENT.md](ENFORCEMENT.md)。
+> 状态：v0.2（2026-11-20）。落点（本目录）与 lint 基线策略已确认，实施已拆分为任务，规则随任务逐步生效。落地与执行机制见同目录 [ENFORCEMENT.md](ENFORCEMENT.md)。
 > 适用对象：所有为 Taomni 编写或修改前端 UI 的人和 agent。规则有稳定 ID，PR、设计文档、QA 用例都按 ID 引用。
 
 ## 0. 如何使用本规范

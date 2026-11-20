@@ -1,6 +1,6 @@
 # UI 规范的落点、测试用例集成与执行机制
 
-> 状态：方案草案 v0.1（2026-11-17），待确认。配套规范见 [UI-STANDARD.md](UI-STANDARD.md)。
+> 状态：方案 v0.2，落点与严格程度已确认（见 §8），已拆分为任务（见 §9）。配套规范见 [UI-STANDARD.md](UI-STANDARD.md)。
 > 目标：让「不同 agent 写出不同风格、同类控件交互不一致、有些控件无法操作」这个问题**无法再通过评审以外的漏洞出现**。
 
 ## 1. 结论：规范放哪里
@@ -14,7 +14,7 @@
 | ③ 测试把关 | **`qa-ui-auto`**：`SKILL.md`、`references/authoring.md`、新增 `references/ui-standard-verification.md`、schema、`dev_contract.py`、`ui-contract` 套件 | 每条规则的验证配方、用例模板、用例必须声明 `ui_standard` 规则 ID 的要求 | 用户明确要求：规范必须体现在测试用例里；用例是唯一能阻断合并的执行点 |
 | ④ 静态把关 | `scripts/ui-standard-lint.mjs` + 基线文件，接入 `pnpm check:refactor`（`pnpm build` 已包含） | 可机械检查的规则（禁用 `window.confirm`、裸 z-index、未定义令牌、硬编码色…） | 复用现有 `source-file-size.mjs` 的模式；基线只降不升，不会因历史债务阻塞开发 |
 | ⑤ 组件落地 | `src/components/ui/`（Modal、Button、Tooltip、Toast、Menu 封装、Field、Tabs、Popover、Banner、EmptyState、Spinner/Progress、Kbd）+ 共享 hooks | 把规则写成代码；每个组件附 README 指向规则 ID，并带挂载单元测试 | **最有效的一层**：规则一次实现、全局生效；agent 复用即合规 |
-| ⑥ 设计入口 | `feature-design`、`issue-design` skill 的设计模板；PR 模板；`DESIGN.md` 文档归属一行 | 新增「UI 规范符合性」小节（用到的规则 ID、偏离项） | 在写代码之前就纳入，而不是评审时才发现 |
+| ⑥ 设计入口 | `feature-design`、`issue-design` skill 的设计模板；`AGENTS.md` 的 PR 指引（仓库当前没有 PR 模板文件，不新建）；`DESIGN.md` 文档归属一行 | 新增「UI 规范符合性」小节（用到的规则 ID、偏离项） | 在写代码之前就纳入，而不是评审时才发现 |
 | ⑦ 对齐类 skill | `code-workspace-idea-parity`、`db-client-parity`、`vnc-realvnc-task` 等 | 一句话声明与 UI-STANDARD 的优先级（见 UI-STANDARD §0.2、§9 EXC-IDEA） | 避免「对标 IDEA/DBeaver」被当作绕过规范的理由 |
 
 **不放的地方**：`replit.md`（项目概述，不承载约束）；`README.md`（面向使用者）。**可选**：若有人使用 Claude Code，加一个只含 `@AGENTS.md` 的 `CLAUDE.md`，保证同一入口。
@@ -191,9 +191,36 @@ verification:                   # 沿用现有 requirement/checkpoint 结构，�
 | P2 | 中文字面量绕过 i18n | 94 个文件 | 英文界面出现中文 |
 | P2 | Tao Home 独立方言 | `taoHome*.css` | 视觉不统一 |
 
-## 8. 需要你确认的决策
+## 8. 已确认的决策
 
-1. **规范落点**：是否同意「`UI-STANDARD.md` 为唯一权威 + `AGENTS.md` 只放触发与强制动作 + `qa-ui-auto` 放验证配方与门禁」？最终位置选 `docs-feature/ui-standard/` 还是晋升到仓库根？
-2. **严格程度**：lint 采用「基线只降不升」（推荐），还是一开始即硬性失败？`dev_contract` 的 UI 检查先 warning 后升级是否可接受？
-3. **规范语言**：规范正文用中文（当前），`AGENTS.md` 新增节用英文（与现有一致）。是否可以？
-4. **是否进入阶段 1**：确认后，我先落地 `AGENTS.md` 增节、`qa-ui-auto` 文档与 schema 变更、令牌补齐与 lint 基线；共享组件与存量迁移再按任务拆分。
+| 决策 | 结论 |
+|---|---|
+| 规范位置 | 保持在 `docs-feature/ui-standard/`，不晋升到仓库根；`AGENTS.md`、`DESIGN.md`、skill 均指向该路径 |
+| lint 严格程度 | 「只降不升」基线：按文件记录违规数，允许减少、不允许增加，新文件基线为 0；基线归零后才改为硬性失败（阶段 4） |
+| 本轮范围 | 只产出文档与任务拆分，不执行任何实施（不改 `AGENTS.md`、`qa-ui-auto`、令牌、lint、组件） |
+| 规范语言 | 规范正文中文；`AGENTS.md` 新增节英文（沿用，用户未异议） |
+| `CLAUDE.md` 指针 | 未决定，默认不新增；如需要由任务 1 之后单独提出 |
+| `dev_contract` 的 UI 检查 | 先 warning，阶段 4 升级为 error（沿用推荐） |
+
+## 9. 任务拆分
+
+实施按下表拆为 10 个任务，依赖关系用于避免多个 agent 同时修改同一批文件。每个任务都必须遵守 `UI-STANDARD.md`，并按 `AGENTS.md` 在评审前运行 `crash-regression` 套件及受影响功能用例。
+
+| # | 任务 | 对应阶段 | 依赖 | 主要改动范围 |
+|---|---|---|---|---|
+| 1 | 规范治理与 QA 门禁（文档、schema、`dev_contract`、`audit`、`ui-contract` 套件登记） | 1 | 无 | `AGENTS.md`、`DESIGN.md`、`qa-ui-auto` 文档与脚本、设计类 skill |
+| 2 | 设计令牌补齐与 UI 规范 lint 基线 | 1 | 无 | `src/styles/`、`scripts/`、`package.json` |
+| 3 | QA 新增断言动词与一致性清扫生成器（L2） | 2 | 1 | `qa-ui-auto` 脚本与 schema、registry 夹具 |
+| 4 | 共享浮层原语：Modal、焦点/Esc 层栈、Menu 封装、Popover | 2 | 2 | `src/components/ui/`（浮层部分）、`src/hooks/` |
+| 5 | 共享控件原语：Button、Tooltip、Toast、Field/复选/单选/Switch、Tabs、Banner 等 | 2 | 2 | `src/components/ui/`（控件部分）、格式化函数 |
+| 6 | P0 可操作性修复：原生 confirm/alert/prompt、无 Esc 对话框、可点击 div | 3 | 2 | 约 19 + 21 + 14 个文件，仅做最小修复 |
+| 7 | 对话框迁移到共享 Modal（按功能分批） | 3 | 3、4、6 | 对话框组件与对应用例 |
+| 8 | 菜单、标签页、下拉、复选框、Tooltip 迁移 | 3 | 5、7 | 各功能模块的菜单/标签/选择类控件 |
+| 9 | 树、列表、表格的选择模型与键盘导航统一 | 3 | 8 | Explorer、SFTP、会话树、DB 网格等 |
+| 10 | 颜色/字号/z-index/i18n 清扫与收紧 lint | 4 | 9 | 全局样式清扫、Tao Home 收敛、基线归零后硬性失败 |
+
+任务编号对应项目任务板：表中 1–10 依次为 #30–#39。
+
+并行关系：任务 1 与 2 可同时进行；任务 3、4、5、6 在各自依赖满足后可并行（任务 4 与 5 位于 `src/components/ui/` 的不同文件，各自维护导出）；任务 7 起按依赖串行，避免同文件冲突。
+
+已知环境事项：当前沙箱缺少 `node_modules/@tanstack/react-virtual`，浏览器预览会 500，需要 `pnpm install` 后才能做浏览器验证（任务 1 起均可能受影响，执行者先确认）。
