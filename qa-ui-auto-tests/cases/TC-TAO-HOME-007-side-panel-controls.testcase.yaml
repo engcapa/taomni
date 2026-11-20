@@ -96,7 +96,6 @@ steps:
 - eval_readonly:
     expression: document.querySelector('.tao-home-side-panel').getBoundingClientRect().left - document.querySelector('.tao-home-main').getBoundingClientRect().right <= 1 && document.querySelector('.tao-home-body').getBoundingClientRect().right - document.querySelector('.tao-home-side-panel').getBoundingClientRect().right <= 1
     expect_truthy: true
-    expect_truthy: true
 - press:
     selector: '[data-testid="tao-home-side-resize"]'
     key: ArrowLeft
@@ -170,33 +169,33 @@ verification:
     actions:
     - 6
     - 31
-    - 35
-    - 47
-    - 51
-    - 55
+    - 36
+    - 48
+    - 52
+    - 56
     checkpoints:
     - step: 32
       expectation: A 60px pointer drag expands the rendered panel beyond its original width.
     - step: 33
       expectation: Chat and sidebar occupy disjoint rectangles.
-    - step: 34
-      expectation: Their combined width fills the body with no overlay.
-    - step: 36
+    - step: 35
+      expectation: The panes tile the body (main-to-side gap and side-to-body right edge stay within 1px).
+    - step: 37
       expectation: ArrowLeft expands the panel by a further 20px.
-    - step: 50
+    - step: 51
       expectation: Closing restores the full chat column.
-    - step: 53
+    - step: 54
       expectation: Reopening preserves the resized width.
-    - step: 56
+    - step: 57
       expectation: A second toggle hides the panel completely.
     results:
     - 32
     - 33
-    - 34
-    - 36
-    - 50
-    - 53
-    - 56
+    - 35
+    - 37
+    - 51
+    - 54
+    - 57
   - id: SIDEBAR-ICONS
     requirement: Eight semantic icon tabs expose labels and tooltips; one header toggle restores the last view without duplicate
       close controls or a menu.
@@ -208,50 +207,50 @@ verification:
     - 18
     - 21
     - 24
-    - 37
-    - 39
-    - 47
-    - 51
-    - 55
+    - 38
+    - 40
+    - 48
+    - 52
+    - 56
     checkpoints:
-    - step: 41
+    - step: 42
       expectation: Memory and skills use different icon drawings.
-    - step: 43
-      expectation: Exactly eight tab buttons exist.
     - step: 44
-      expectation: The redundant close button is absent.
+      expectation: Exactly eight tab buttons exist.
     - step: 45
+      expectation: The redundant close button is absent.
+    - step: 46
       expectation: The redundant collapse button is absent.
-    - step: 52
+    - step: 53
       expectation: Reopening restores the selected Skills tab.
-    - step: 54
+    - step: 55
       expectation: Opening uses the sidebar directly without a popup.
-    - step: 57
+    - step: 58
       expectation: No runtime errors occurred through repeated toggles.
     results:
-    - 41
-    - 43
+    - 42
     - 44
     - 45
-    - 52
-    - 54
-    - 57
+    - 46
+    - 53
+    - 55
+    - 58
   - id: HOME-COMPACT-HEADER
     requirement: The user-requested header removes Tao settings and appearance, with demo immediately before the final sidebar
       toggle.
     actions:
     - 6
     checkpoints:
-    - step: 59
-      expectation: No Tao settings shortcut remains in the header.
     - step: 60
-      expectation: No appearance shortcut remains in the header.
+      expectation: No Tao settings shortcut remains in the header.
     - step: 61
+      expectation: No appearance shortcut remains in the header.
+    - step: 62
       expectation: The final visible buttons are demo then sidebar, in actual left-to-right geometry.
     results:
-    - 59
     - 60
     - 61
+    - 62
   visual:
   - check: Sidebar and chat remain adjacent through resize and repeated toggles
     method: automated
