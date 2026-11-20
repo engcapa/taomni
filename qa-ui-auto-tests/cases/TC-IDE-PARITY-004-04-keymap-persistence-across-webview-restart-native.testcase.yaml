@@ -44,8 +44,10 @@ steps:
     key: taomni.recentWorkspaces.v1
     value: '[{"id":"qa-ed004","name":"qa-ed004","roots":[{"id":"qa-ed004","name":"qa-ed004","path":"${fixture.workspace_root}","kind":"folder"}],"looseFiles":[],"lastActiveFile":{"kind":"root","rootId":"qa-ed004","path":"notes.txt"},"lastOpenedAt":1756500000000,"isGitRepo":false}]'
 - reload_window: null
-- click: '[data-testid="welcome-history-tab-workspaces"]'
-- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.workspace_root}"]'
+- click: '[data-testid="tao-home-history"]'
+- wait_for: '[data-testid="tao-home-history-popover"]'
+- click: '[data-testid="tao-home-history-tab-workspaces"]'
+- click: '[data-testid="tao-home-history-row"][data-workspace-path="${fixture.workspace_root}"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - wait_for:
     selector: '[data-testid="code-workspace-editor-pane"]'
@@ -85,8 +87,10 @@ steps:
 - screenshot: tc-ide-parity-004-04-before-restart.png
 - reload_window: null
 - wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="welcome-history-tab-workspaces"]'
-- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.workspace_root}"]'
+- click: '[data-testid="tao-home-history"]'
+- wait_for: '[data-testid="tao-home-history-popover"]'
+- click: '[data-testid="tao-home-history-tab-workspaces"]'
+- click: '[data-testid="tao-home-history-row"][data-workspace-path="${fixture.workspace_root}"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - wait_for:
     selector: '[data-testid="code-workspace-editor-pane"]'
@@ -131,29 +135,29 @@ verification:
   requirements:
   - id: R1
     requirement: "A1.4 DEC-03：Apply 是唯一提交边界——Apply 后草稿变干净（Apply 禁用）且存储字节里出现新 chord 的物理结构。"
-    actions: [24, 26, 28]
+    actions: [26, 28, 30]
     checkpoints:
-    - step: 27
+    - step: 29
       expectation: "{\"assert_disabled\": \"[data-testid=\\\"keymap-settings-apply\\\"]\"}"
-    - step: 30
+    - step: 32
       expectation: "{\"assert_localstorage\": {\"key\": \"taomni.codeWorkspace.keymap.v3:index\", \"contains\": \"\\\"key\\\":\\\"r\\\",\\\"ctrl\\\":false,\\\"alt\\\":true,\\\"shift\\\":true\"}}"
-    results: [27, 30]
+    results: [29, 32]
   - id: R2
     requirement: "A1.5 V2：销毁并重建真实 webview 上下文后，重开设置读到的是 Apply 后的生效绑定，而不是草稿或默认值。"
-    actions: [32, 45, 48]
+    actions: [34, 49, 52]
     checkpoints:
-    - step: 49
+    - step: 53
       expectation: "{\"assert_pattern\": {\"selector\": \"[data-testid=\\\"keymap-row-editor.replace\\\"]\", \"regex\": \"(Alt|Option)[+]Shift[+]R\"}}"
-    results: [49]
+    results: [53]
   - id: R3
     requirement: "A1.5 V2：重启后 live host 同样加载了持久化 scheme——新 chord 真实执行 Replace，继承的 Ctrl+R 仍可用（ED-PARITY-013 DEC-013-12：Add 按 IDEA 追加）。"
-    actions: [54, 59]
+    actions: [58, 63]
     checkpoints:
-    - step: 55
+    - step: 59
       expectation: "{\"assert_visible\": \"[data-testid=\\\"code-workspace-editor-search\\\"] input[name=\\\"replace\\\"]\"}"
-    - step: 60
+    - step: 64
       expectation: "{\"assert_visible\": \"[data-testid=\\\"code-workspace-editor-search\\\"]\"}"
-    results: [55, 60]
+    results: [59, 64]
   visual:
   - check: "重启前后两张截图中 editor.replace 行的 swatch 呈现一致（Alt+Shift+R），底部动作栏与行布局无截断。"
     method: manual

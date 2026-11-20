@@ -68,7 +68,10 @@ jobs:
         run: pnpm test src/lib/updateService.test.ts src/stores/updateStore.test.ts src/components/UpdateDialog.test.tsx
       - name: Rust source formatting contract
         if: runner.os == 'Linux' && inputs.operation == 'build'
-        run: cargo fmt --manifest-path src-tauri/Cargo.toml -- --check
+        # Keep the gate on the application package: the patched vendored
+        # protocol crates are workspace members with their own upstream
+        # formatting, so a rustfmt update must not fail them here.
+        run: cargo fmt --manifest-path src-tauri/Cargo.toml -p taomni -- --check
       - name: Frontend behavior unit regressions
         if: runner.os == 'Linux' && inputs.operation == 'build'
         run: |

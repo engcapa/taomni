@@ -32,8 +32,10 @@ steps:
     value: '[{"id": "qa-parity007-e3-native", "name": "parity007-e3", "roots": [{"id": "parity007", "name": "parity007", "path": "${fixture.parity007_e3_root}", "kind": "folder"}], "looseFiles": [], "lastActiveFile":
       {"kind": "root", "rootId": "parity007", "path": "src/main/java/parity007/ExtractSample.java"}, "lastOpenedAt": 1756100000000, "isGitRepo": false}]'
 - reload_window: null
-- click: '[data-testid="welcome-history-tab-workspaces"]'
-- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity007_e3_root}"]'
+- click: '[data-testid="tao-home-history"]'
+- wait_for: '[data-testid="tao-home-history-popover"]'
+- click: '[data-testid="tao-home-history-tab-workspaces"]'
+- click: '[data-testid="tao-home-history-row"][data-workspace-path="${fixture.parity007_e3_root}"]'
 - wait_for:
     selector: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
     timeout_sec: 90
@@ -159,27 +161,27 @@ verification:
   - id: ED-PARITY-007-V4-4-e3
     requirement: 'The E3 side-effect sample keeps next(base) called exactly once after the extraction and the rename: every fresh JVM prints exactly 13:1, including after undo and redo.'
     actions:
-    - 13
+    - 15
     checkpoints:
-    - step: 13
+    - step: 15
       expectation: The unmodified E3 sample prints exactly 13:1 with exit 0.
-    - step: 38
+    - step: 40
       expectation: The default-name extraction prints exactly 13:1 (no double next(base) call).
-    - step: 45
+    - step: 47
       expectation: After naming calculateTotal the program still prints exactly 13:1.
-    - step: 50
+    - step: 52
       expectation: The first undo keeps the program printing 13:1.
-    - step: 54
+    - step: 56
       expectation: The second undo restores the exact initial bytes and prints 13:1.
-    - step: 61
+    - step: 63
       expectation: Redo restores the renamed method and prints 13:1.
     results:
-    - 13
-    - 38
-    - 45
-    - 50
-    - 54
-    - 61
+    - 15
+    - 40
+    - 47
+    - 52
+    - 56
+    - 63
   visual:
   - check: Real WebView rendering of the E3 extraction states.
     method: manual

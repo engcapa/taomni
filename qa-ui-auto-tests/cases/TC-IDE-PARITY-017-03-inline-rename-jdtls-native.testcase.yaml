@@ -36,8 +36,10 @@ steps:
     path: ${fixture.maven_single_root}/src/main/java/com/example/single/Caller.java
     text: "package com.example.single;\n\npublic class Caller {\n    String call() {\n        return Greeter.greet();\n    }\n}\n"
 - reload_window: null
-- click: '[data-testid="welcome-history-tab-workspaces"]'
-- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.maven_single_root}"]'
+- click: '[data-testid="tao-home-history"]'
+- wait_for: '[data-testid="tao-home-history-popover"]'
+- click: '[data-testid="tao-home-history-tab-workspaces"]'
+- click: '[data-testid="tao-home-history-row"][data-workspace-path="${fixture.maven_single_root}"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - wait_for:
     selector: '[data-testid="code-workspace-editor-pane"]'
@@ -149,54 +151,54 @@ verification:
   - id: R1
     requirement: A1：真实 JDT LS 下 Shift+F6 打开行内命名（预填 provider 名称、加框），不弹 Rename 对话框。
     actions:
-    - 26
+    - 28
     checkpoints:
-    - step: 13
+    - step: 15
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-lsp-status-pill\"][data-semantic-ready=\"true\"]", "timeout_sec": 120}}'
-    - step: 27
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-inline-rename-input\"]", "timeout_sec": 60}}'
-    - step: 28
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-inline-rename-input\"]", "name": "value", "equals": "greet"}}'
     - step: 29
-      expectation: '{"assert_text": {"selector": ".cm-inline-rename-target", "contains": "greet"}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-inline-rename-input\"]", "timeout_sec": 60}}'
     - step: 30
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-inline-rename-input\"]", "name": "value", "equals": "greet"}}'
+    - step: 31
+      expectation: '{"assert_text": {"selector": ".cm-inline-rename-target", "contains": "greet"}}'
+    - step: 32
       expectation: '{"assert_count": {"selector": "[data-testid=\"text-input-dialog\"]", "equal": 0}}'
     results:
-    - 28
-    - 29
     - 30
+    - 31
+    - 32
   - id: R2
     requirement: A2：跨文件 rename 的 Preview 显示两个文件的真实改前/改后行；Do Refactor 后编辑器与未打开文件的磁盘内容一致更新；一次 Undo 同时恢复两个文件。
     actions:
-    - 33
-    - 40
-    - 43
+    - 35
+    - 42
+    - 45
     checkpoints:
-    - step: 34
-      expectation: '{"wait_for": {"selector": "[data-testid=\"refactoring-preview-dialog\"]", "timeout_sec": 60}}'
-    - step: 35
-      expectation: '{"assert_text": {"selector": "[data-testid=\"refactoring-preview-row\"][data-path$=\"Caller.java\"] [data-testid=\"refactoring-preview-before\"]", "contains": "return Greeter.greet();", "timeout_sec": 10}}'
     - step: 36
-      expectation: '{"assert_text": {"selector": "[data-testid=\"refactoring-preview-row\"][data-path$=\"Caller.java\"] [data-testid=\"refactoring-preview-after\"]", "contains": "return Greeter.salute();"}}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"refactoring-preview-dialog\"]", "timeout_sec": 60}}'
     - step: 37
-      expectation: '{"assert_text": {"selector": "[data-testid=\"refactoring-preview-row\"][data-path$=\"Greeter.java\"] [data-testid=\"refactoring-preview-after\"]", "contains": "public static String salute() {"}}'
+      expectation: '{"assert_text": {"selector": "[data-testid=\"refactoring-preview-row\"][data-path$=\"Caller.java\"] [data-testid=\"refactoring-preview-before\"]", "contains": "return Greeter.greet();", "timeout_sec": 10}}'
     - step: 38
+      expectation: '{"assert_text": {"selector": "[data-testid=\"refactoring-preview-row\"][data-path$=\"Caller.java\"] [data-testid=\"refactoring-preview-after\"]", "contains": "return Greeter.salute();"}}'
+    - step: 39
+      expectation: '{"assert_text": {"selector": "[data-testid=\"refactoring-preview-row\"][data-path$=\"Greeter.java\"] [data-testid=\"refactoring-preview-after\"]", "contains": "public static String salute() {"}}'
+    - step: 40
       expectation: '{"assert_count": {"selector": "[data-testid=\"refactoring-preview-source-unavailable\"]", "equal": 0}}'
-    - step: 41
+    - step: 43
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "public static String salute()", "timeout_sec": 30}}'
-    - step: 42
-      expectation: '{"assert_file_contains": {"path": "${fixture.maven_single_root}/src/main/java/com/example/single/Caller.java", "contains": "Greeter.salute()", "timeout_sec": 120}}'
     - step: 44
+      expectation: '{"assert_file_contains": {"path": "${fixture.maven_single_root}/src/main/java/com/example/single/Caller.java", "contains": "Greeter.salute()", "timeout_sec": 120}}'
+    - step: 46
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "public static String greet()", "timeout_sec": 30}}'
-    - step: 45
+    - step: 47
       expectation: '{"assert_file_contains": {"path": "${fixture.maven_single_root}/src/main/java/com/example/single/Caller.java", "contains": "Greeter.greet()", "timeout_sec": 120}}'
     results:
-    - 35
-    - 36
     - 37
-    - 42
+    - 38
+    - 39
     - 44
-    - 45
+    - 46
+    - 47
   visual:
   - check: 不声明视觉结论。
     method: not-applicable

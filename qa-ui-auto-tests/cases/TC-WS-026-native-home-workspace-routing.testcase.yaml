@@ -20,6 +20,10 @@ timeout_sec: 240
 steps:
 - open: ${cfg.app.base_url}
 - vault_first_run: qa-ws-26
+- seed_storage:
+    key: taomni.fileOpen.preferences.v1
+    value: '{"associations":{"md":"workspace"}}'
+- reload_window: null
 - native_folder_dialog:
     trigger: '[data-testid="tao-home-new-workspace"]'
     action: choose
@@ -64,8 +68,10 @@ steps:
     expect_truthy: true
 - screenshot: home-workspace-ide-group.png
 - click: '[data-testid="nav-mode-home"]'
-- click: '[data-testid="welcome-history-tab-workspaces"]'
-- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.platform_workspace_root}"]'
+- click: '[data-testid="tao-home-history"]'
+- wait_for: '[data-testid="tao-home-history-popover"]'
+- click: '[data-testid="tao-home-history-tab-workspaces"]'
+- click: '[data-testid="tao-home-history-row"][data-workspace-path="${fixture.platform_workspace_root}"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - assert_text:
     selector: '[data-testid="code-workspace-editor"]'
@@ -108,95 +114,95 @@ verification:
     requirement: Home new/recent opens the same full editor inside Workspaces, save survives re-entry, Sessions contains no code tabs, and context-free Code Editor routes
       to the default workspace. IDE tools are separated by at least 12px with a divider and tooltip.
     actions:
-    - 3
-    - 11
-    - 12
+    - 5
     - 13
     - 14
-    - 20
-    - 21
+    - 15
+    - 16
     - 22
+    - 23
     - 26
-    - 31
-    - 32
-    - 40
+    - 30
+    - 35
+    - 36
+    - 44
     checkpoints:
-    - step: 4
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
-    - step: 5
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"nav-mode-workspaces\"]", "name": "aria-pressed", "equals": "true"}}'
     - step: 6
-      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"code-workspace\"]", "equal": 0}}'
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
     - step: 7
-      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tab\"][data-tab-kind=\"code\"]", "equal": 1}}'
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"nav-mode-workspaces\"]", "name": "aria-pressed", "equals": "true"}}'
     - step: 8
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"]"}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"code-workspace\"]", "equal": 0}}'
+    - step: 9
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tab\"][data-tab-kind=\"code\"]", "equal": 1}}'
     - step: 10
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"]"}'
+    - step: 12
       expectation: '{"wait_for": "[data-testid=\"code-workspace-editor\"]"}'
-    - step: 15
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "QA_HOME_ROUTE_SAVE"}}'
-    - step: 16
-      expectation: '{"assert_file_contains": {"path": "${fixture.platform_workspace_root}/README.md", "contains": "QA_HOME_ROUTE_SAVE"}}'
     - step: 17
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "QA_HOME_ROUTE_SAVE"}}'
+    - step: 18
+      expectation: '{"assert_file_contains": {"path": "${fixture.platform_workspace_root}/README.md", "contains": "QA_HOME_ROUTE_SAVE"}}'
+    - step: 19
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"sidebar-tool-window-rail\"]'').title.length > 0 &&
         parseFloat(getComputedStyle(document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"sidebar-tool-window-rail\"]'')).borderTopWidth) >= 1", "expect_truthy":
         true}}'
-    - step: 18
+    - step: 20
       expectation: '{"eval_readonly": {"expression": "document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"sidebar-tool-window-rail\"]'').getBoundingClientRect().top
         - document.querySelector(''[data-testid''+String.fromCharCode(61)+''\"rail-mode-group\"]'').getBoundingClientRect().bottom >= 12", "expect_truthy": true}}'
-    - step: 23
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
-    - step: 24
-      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "QA_HOME_ROUTE_SAVE"}}'
-    - step: 25
-      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tab\"][data-tab-kind=\"code\"]", "equal": 1}}'
     - step: 27
-      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-tab\"]"}'
-    - step: 28
-      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"code-workspace\"]", "equal": 0}}'
-    - step: 29
-      expectation: '{"assert_not_visible": "[data-testid=\"nav-mode-agents\"]"}'
-    - step: 30
-      expectation: '{"assert_visible": "[data-testid=\"rail-chat-button\"]"}'
-    - step: 33
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
-    - step: 34
-      expectation: '{"assert_attribute": {"selector": "[data-testid=\"nav-mode-workspaces\"]", "name": "aria-pressed", "equals": "true"}}'
-    - step: 35
-      expectation: '{"assert_visible": "[data-testid=\"expanded-sidebar-panel\"]"}'
-    - step: 36
-      expectation: '{"wait_for": "[data-testid=\"workspace-switcher\"]"}'
-    - step: 37
-      expectation: '{"assert_visible": "[data-testid=\"workspace-default-badge\"]"}'
-    - step: 38
+    - step: 28
+      expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor\"]", "contains": "QA_HOME_ROUTE_SAVE"}}'
+    - step: 29
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-tab\"][data-tab-kind=\"code\"]", "equal": 1}}'
+    - step: 31
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 32
       expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"code-workspace\"]", "equal": 0}}'
+    - step: 33
+      expectation: '{"assert_not_visible": "[data-testid=\"nav-mode-agents\"]"}'
+    - step: 34
+      expectation: '{"assert_visible": "[data-testid=\"rail-chat-button\"]"}'
+    - step: 37
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 38
+      expectation: '{"assert_attribute": {"selector": "[data-testid=\"nav-mode-workspaces\"]", "name": "aria-pressed", "equals": "true"}}'
+    - step: 39
+      expectation: '{"assert_visible": "[data-testid=\"expanded-sidebar-panel\"]"}'
+    - step: 40
+      expectation: '{"wait_for": "[data-testid=\"workspace-switcher\"]"}'
+    - step: 41
+      expectation: '{"assert_visible": "[data-testid=\"workspace-default-badge\"]"}'
     - step: 42
+      expectation: '{"assert_count": {"selector": "[data-testid=\"tab-item\"][data-tab-type=\"code-workspace\"]", "equal": 0}}'
+    - step: 46
       expectation: '{"assert_count": {"selector": "[data-testid=\"platform-toolbar-actions\"] [data-testid=\"workspace-toolbar-bottom-dock\"]", "equal": 0}}'
     results:
-    - 4
-    - 5
     - 6
     - 7
     - 8
+    - 9
     - 10
-    - 15
-    - 16
+    - 12
     - 17
     - 18
-    - 23
-    - 24
-    - 25
+    - 19
+    - 20
     - 27
     - 28
     - 29
-    - 30
+    - 31
+    - 32
     - 33
     - 34
-    - 35
-    - 36
     - 37
     - 38
+    - 39
+    - 40
+    - 41
     - 42
+    - 46
   visual:
   - check: Compact controls retain readable icons and active states without toolbar overlap.
     method: manual

@@ -9,8 +9,10 @@ timeout_sec: 180
 steps:
   - open: ${cfg.app.base_url}
   - wait_for: '[data-testid="welcome-panel"]'
-  - click: '[data-testid="welcome-history-tab-workspaces"]'
-  - click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity005_root}"]'
+  - click: '[data-testid="tao-home-history"]'
+  - wait_for: '[data-testid="tao-home-history-popover"]'
+  - click: '[data-testid="tao-home-history-tab-workspaces"]'
+  - click: '[data-testid="tao-home-history-row"][data-workspace-path="${fixture.parity005_root}"]'
   - wait_for: '[data-testid="code-workspace-tab"]'
   - wait_for: '[data-testid="code-workspace-editor"] .cm-content[data-language="java"]'
   - assert_text:
@@ -176,72 +178,72 @@ verification:
   requirements:
     - id: ED-PARITY-005-V1
       requirement: Ctrl+Space requests the current controlled candidate once; Escape preserves the input.
-      actions: [4, 8, 17, 21]
+      actions: [6, 10, 19, 23]
       checkpoints:
-        - step: 18
-          expectation: The actual autocomplete list becomes visible.
-        - step: 19
-          expectation: The list contains the controlled StringBuilder candidate.
         - step: 20
-          expectation: Exactly one provider request was recorded.
+          expectation: The actual autocomplete list becomes visible.
+        - step: 21
+          expectation: The list contains the controlled StringBuilder candidate.
         - step: 22
+          expectation: Exactly one provider request was recorded.
+        - step: 24
           expectation: The completion popup closes after Escape.
-        - step: 23
+        - step: 25
           expectation: The original prefix remains after Escape.
-      results: [19, 20, 22, 23]
+      results: [21, 22, 24, 25]
     - id: ED-PARITY-005-V1-entries
       requirement: Alternate key, Actions and All entries route one request; the cheat sheet records its disabled state in the modal context, then the editor entry routes one request without editing the buffer.
-      actions: [25, 31, 36, 40, 44, 48, 52]
+      actions: [27, 33, 38, 42, 46, 50, 54]
       checkpoints:
-        - step: 52
+        - step: 54
           expectation: The cheat sheet has no Run control while the modal has editor focus.
-        - step: 27
+        - step: 29
           expectation: Alt slash produced exactly one additional request.
-        - step: 38
+        - step: 40
           expectation: Actions Enter produced exactly one additional request.
-        - step: 46
+        - step: 48
           expectation: All click produced exactly one additional request.
-        - step: 60
-          expectation: Closing the disabled cheat sheet and invoking Ctrl+Space from the editor produced exactly one additional request.
         - step: 62
+          expectation: Closing the disabled cheat sheet and invoking Ctrl+Space from the editor produced exactly one additional request.
+        - step: 64
           expectation: The original buffer remains intact after all entries.
-      results: [27, 38, 46, 52, 60, 62]
+      results: [29, 40, 48, 54, 62, 64]
     - id: ED-PARITY-005-V1-repeat-focus
       requirement: Repeated invocation refreshes one request per key, while Find, Search Everywhere and settings inputs retain focus and issue none.
-      actions: [63, 65, 68, 72, 75, 76, 84, 85, 96, 97]
+      actions: [65, 67, 70, 74, 77, 78, 86, 87, 98, 99]
       checkpoints:
-        - step: 67
+        - step: 69
           expectation: Two Ctrl+Space invocations each issue one fresh request.
-        - step: 70
+        - step: 72
           expectation: Alt slash adds exactly one request while the popup is open.
-        - step: 77
+        - step: 79
           expectation: Find keys issue no completion request and leave Find focused.
-        - step: 78
+        - step: 80
           expectation: The active input remains the Find query.
-        - step: 86
+        - step: 88
           expectation: Search keys issue no completion request and leave the query focused.
-        - step: 87
+        - step: 89
           expectation: The active input remains the Search Everywhere query.
-        - step: 98
+        - step: 100
           expectation: Settings keys issue no completion request and leave the font input focused.
-        - step: 99
-          expectation: The active input remains the font family setting.
         - step: 101
+          expectation: The active input remains the font family setting.
+        - step: 103
           expectation: All protected input checks leave the Java buffer unchanged.
-      results: [67, 70, 77, 78, 86, 87, 98, 99, 101]
+      results: [69, 72, 79, 80, 88, 89, 100, 101, 103]
     - id: ED-PARITY-005-V1-modifiers-composition
       requirement: Parameter-info chord does not request Basic Completion; a composing Basic key does not request completion and the committed text remains undoable.
-      actions: [110, 113, 116]
+      actions: [112, 115, 118]
       checkpoints:
-        - step: 111
+        - step: 113
           expectation: Ctrl Shift Space did not call the Basic provider.
-        - step: 114
+        - step: 116
           expectation: Ctrl Space during composition did not call the Basic provider.
-        - step: 115
-          expectation: The composition committed one space at the caret.
         - step: 117
+          expectation: The composition committed one space at the caret.
+        - step: 119
           expectation: One Undo returns the exact original buffer.
-      results: [111, 114, 115, 117]
+      results: [113, 116, 117, 119]
   visual:
     - check: Popup anchor, selected row, documentation and viewport clipping against the IDEA state.
       method: manual

@@ -271,7 +271,7 @@ export function registerMainLayoutLayout1Cases() {
       act(() => useAppStore.getState().setActiveSideTab("home"));
       await waitFor(() => expect(screen.getByTestId("tao-home-history")).toBeInTheDocument());
       fireEvent.click(screen.getByTestId("tao-home-history"));
-      expect(screen.getByTestId("tao-home-history-restore")).toBeInTheDocument();
+      expect(screen.getByTestId("tao-home-history-restore")).toBeEnabled();
       expect(useAppStore.getState().activeTabId).toBe("saved-local");
       vi.mocked(getWelcomeRunSnapshot).mockResolvedValue({ record: null, legacyCandidate: null, issue: null });
     });

@@ -31,6 +31,10 @@ steps:
 - reload_window: null
 - click: '[data-testid="side-tab-sessions"]'
 - wait_for: '[data-testid="session-tree"]'
+- seed_storage:
+    key: taomni.fileOpen.preferences.v1
+    value: '{"associations":{"md":"workspace"}}'
+- reload_window: null
 - click: '[data-testid="nav-mode-workspaces"]'
 - wait_for: '[data-testid="code-workspace-tree"]'
 - click: '[data-testid="code-workspace-tree-root"]'
@@ -54,22 +58,6 @@ steps:
     selector: '[data-testid="workspace-file-editor"]'
     name: data-dirty
     equals: 'true'
-- click: '[data-testid="workspace-switcher-button"]'
-- click: '[data-testid="workspace-switcher-option-second-workspace"]'
-- assert_not_visible: '[data-testid="workspace-file-editor"]'
-- click: '[data-testid="workspace-switcher-button"]'
-- click: '[data-testid="workspace-switcher-option-default-workspace"]'
-- assert_text:
-    selector: '[data-testid="workspace-file-editor"] .cm-content'
-    contains: X
-- click: '[data-testid="nav-mode-home"]'
-- wait_for: '[data-testid="welcome-panel"]'
-- click: '[data-testid="side-tab-sessions"]'
-- wait_for: '[data-testid="session-tree"]'
-- click: '[data-testid="nav-mode-workspaces"]'
-- assert_text:
-    selector: '[data-testid="workspace-file-editor"] .cm-content'
-    contains: X
 - press:
     selector: '[data-testid="workspace-file-editor"] .cm-content'
     key: Mod+z
@@ -83,6 +71,22 @@ steps:
 - press:
     selector: '[data-testid="workspace-file-editor"] .cm-content'
     key: Mod+Shift+z
+- assert_text:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    contains: X
+- click: '[data-testid="workspace-switcher-button"]'
+- click: '[data-testid="workspace-switcher-option-second-workspace"]'
+- assert_not_visible: '[data-testid="workspace-file-editor"]'
+- click: '[data-testid="workspace-switcher-button"]'
+- click: '[data-testid="workspace-switcher-option-default-workspace"]'
+- assert_text:
+    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    contains: X
+- click: '[data-testid="nav-mode-home"]'
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="session-tree"]'
+- click: '[data-testid="nav-mode-workspaces"]'
 - assert_text:
     selector: '[data-testid="workspace-file-editor"] .cm-content'
     contains: X
@@ -134,113 +138,113 @@ verification:
     - 2
     - 4
     - 5
-    - 8
     - 10
     - 12
-    - 15
-    - 16
+    - 14
     - 17
-    - 20
-    - 21
-    - 23
-    - 24
+    - 18
+    - 19
+    - 26
+    - 27
+    - 29
+    - 30
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
     - step: 7
       expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
-    - step: 9
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree\"]"}'
     - step: 11
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"][data-path=\"README.md\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree\"]"}'
     - step: 13
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"][data-path=\"README.md\"]"}'
+    - step: 15
       expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"] .cm-content"}'
-    - step: 14
+    - step: 16
       expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "platform workspace root"}}'
-    - step: 19
+    - step: 21
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"workspace-file-editor\"]", "name": "data-dirty", "equals": "true"}}'
-    - step: 22
+    - step: 28
       expectation: '{"assert_not_visible": "[data-testid=\"workspace-file-editor\"]"}'
-    - step: 25
+    - step: 31
       expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "X"}}'
     results:
     - 3
     - 7
-    - 9
     - 11
     - 13
-    - 14
-    - 19
-    - 22
-    - 25
+    - 15
+    - 16
+    - 21
+    - 28
+    - 31
   - id: R2
     requirement: Home、Sessions 再返回工作区保留未保存内容与撤销重做历史。
     actions:
-    - 26
-    - 28
-    - 30
     - 32
     - 34
+    - 36
+    - 22
+    - 24
     checkpoints:
-    - step: 27
-      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 29
-      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
-    - step: 31
-      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "X"}}'
     - step: 33
+      expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
+    - step: 35
+      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
+    - step: 37
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "X"}}'
+    - step: 23
       expectation: '{"assert_items": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content .cm-line", "equals": ["# platform workspace root",
         "", "Seeded by the qa-ui-auto platform_workspace_root fixture.", ""]}}'
-    - step: 35
+    - step: 25
       expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "X"}}'
     results:
-    - 27
-    - 29
-    - 31
     - 33
     - 35
+    - 37
+    - 23
+    - 25
   - id: R3
     requirement: 保存完成后重载仍可读取编辑后的文件；native 经过真实磁盘 IPC。
     actions:
-    - 36
-    - 39
-    - 42
-    checkpoints:
-    - step: 38
-      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"][data-dirty]", "equal": 0}}'
-    - step: 41
-      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
-    - step: 43
-      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"] .cm-content"}'
-    - step: 44
-      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "X"}}'
-    results:
     - 38
     - 41
-    - 43
     - 44
+    checkpoints:
+    - step: 40
+      expectation: '{"assert_count": {"selector": "[data-testid=\"workspace-file-editor\"][data-dirty]", "equal": 0}}'
+    - step: 43
+      expectation: '{"wait_for": "[data-testid=\"session-tree\"]"}'
+    - step: 45
+      expectation: '{"wait_for": "[data-testid=\"workspace-file-editor\"] .cm-content"}'
+    - step: 46
+      expectation: '{"assert_text": {"selector": "[data-testid=\"workspace-file-editor\"] .cm-content", "contains": "X"}}'
+    results:
+    - 40
+    - 43
+    - 45
+    - 46
   - id: R4
     requirement: 文件过滤只展示匹配的已加载文件，清空后恢复文件树。
     actions:
-    - 46
     - 48
-    - 49
+    - 50
     - 51
     - 53
+    - 55
     checkpoints:
-    - step: 47
+    - step: 49
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"]"}'
-    - step: 50
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-flat-file\"]", "equal": 0}}'
     - step: 52
-      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-flat-file\"]", "equal": 1}}'
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-flat-file\"]", "equal": 0}}'
     - step: 54
+      expectation: '{"assert_count": {"selector": "[data-testid=\"code-workspace-flat-file\"]", "equal": 1}}'
+    - step: 56
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree-file\"]"}'
     results:
-    - 47
-    - 50
+    - 49
     - 52
     - 54
+    - 56
   visual:
   - check: 与 HTML 原型比较圆角框架、紧凑尺寸、无溢出和可用操作入口。
     method: manual

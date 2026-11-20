@@ -34,10 +34,9 @@ steps:
     action: choose
     path: ${fixture.markdown_remote_html}
     trigger: '[data-testid="markdown-export-html"]'
-- assert_attribute:
-    selector: '[data-testid="markdown-export-status"]'
-    name: data-export-state
-    equals: saved
+- wait_for:
+    selector: '[data-testid="markdown-export-status"][data-export-state="saved"]'
+    timeout_sec: 30
 - assert_file_contains:
     path: ${fixture.markdown_remote_html}
     contains: 'src="data:image/png;base64,iVBORw0KGgo'

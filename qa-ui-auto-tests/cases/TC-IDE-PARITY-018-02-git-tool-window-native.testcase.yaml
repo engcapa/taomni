@@ -34,8 +34,10 @@ steps:
     key: taomni.git.workspace.changes.tree
     value: '"flat"'
 - reload_window: null
-- click: '[data-testid="welcome-history-tab-workspaces"]'
-- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.parity008_root}"]'
+- click: '[data-testid="tao-home-history"]'
+- wait_for: '[data-testid="tao-home-history-popover"]'
+- click: '[data-testid="tao-home-history-tab-workspaces"]'
+- click: '[data-testid="tao-home-history-row"][data-workspace-path="${fixture.parity008_root}"]'
 - wait_for:
     selector: '[data-testid="code-workspace-editor"] .cm-content'
     timeout_sec: 60
@@ -99,46 +101,46 @@ verification:
   - id: R1
     requirement: A1：打包应用中 Alt+9 打开 workspace Git 工具窗，列出两个真实仓库的变更，repo 标识不串。
     actions:
-    - 15
+    - 17
     checkpoints:
-    - step: 16
+    - step: 18
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-git-tool-window\"] [data-testid=\"workspace-change-row\"][data-repo-root$=\"repo-b\"][data-path=\"same.txt\"]", "timeout_sec": 60}}'
-    - step: 17
+    - step: 19
       expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-git-tool-window\"] [data-testid=\"workspace-change-row\"]", "attribute": "aria-label", "equals": ["repo-a same.txt Staged", "repo-a untracked.txt Untracked", "repo-b same.txt Modified"]}}'
     results:
-    - 17
+    - 19
   - id: R2
     requirement: A3：隐藏工具窗后编辑器文本与 dirty 保留；两个仓库 index/refs/worktree 字节不变（零 Git 写入）。
     actions:
-    - 19
+    - 21
     checkpoints:
-    - step: 20
-      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-dock\"][data-open]", "state": "detached", "timeout_sec": 10}}'
-    - step: 21
-      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line", "equals": ["repo-a WORKTREE", "shared line", "edit-kept"]}}'
     - step: 22
-      expectation: '{"assert_visible": "[data-editor-tab-key][data-active=\"true\"][data-dirty=\"true\"]"}'
+      expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-bottom-dock\"][data-open]", "state": "detached", "timeout_sec": 10}}'
     - step: 23
-      expectation: '{"assert_file_sha256": {"path": "${fixture.parity008_repo_a}/.git/index", "equals": "${fixture.parity008_repo_a_index_sha256}"}}'
+      expectation: '{"assert_items": {"selector": "[data-testid=\"code-workspace-editor\"] .cm-line", "equals": ["repo-a WORKTREE", "shared line", "edit-kept"]}}'
     - step: 24
-      expectation: '{"assert_file_sha256": {"path": "${fixture.parity008_repo_b}/.git/index", "equals": "${fixture.parity008_repo_b_index_sha256}"}}'
+      expectation: '{"assert_visible": "[data-editor-tab-key][data-active=\"true\"][data-dirty=\"true\"]"}'
     - step: 25
-      expectation: '{"assert_file_sha256": {"path": "${fixture.parity008_repo_a}/.git/refs/heads/main", "equals": "${fixture.parity008_repo_a_main_sha256}"}}'
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity008_repo_a}/.git/index", "equals": "${fixture.parity008_repo_a_index_sha256}"}}'
     - step: 26
-      expectation: '{"assert_file_sha256": {"path": "${fixture.parity008_repo_b}/.git/refs/heads/main", "equals": "${fixture.parity008_repo_b_main_sha256}"}}'
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity008_repo_b}/.git/index", "equals": "${fixture.parity008_repo_b_index_sha256}"}}'
     - step: 27
-      expectation: '{"assert_file_sha256": {"path": "${fixture.parity008_repo_a}/same.txt", "equals": "${fixture.parity008_repo_a_worktree_sha256}"}}'
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity008_repo_a}/.git/refs/heads/main", "equals": "${fixture.parity008_repo_a_main_sha256}"}}'
     - step: 28
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity008_repo_b}/.git/refs/heads/main", "equals": "${fixture.parity008_repo_b_main_sha256}"}}'
+    - step: 29
+      expectation: '{"assert_file_sha256": {"path": "${fixture.parity008_repo_a}/same.txt", "equals": "${fixture.parity008_repo_a_worktree_sha256}"}}'
+    - step: 30
       expectation: '{"assert_file_sha256": {"path": "${fixture.parity008_repo_b}/same.txt", "equals": "${fixture.parity008_repo_b_worktree_sha256}"}}'
     results:
-    - 21
-    - 22
     - 23
     - 24
     - 25
     - 26
     - 27
     - 28
+    - 29
+    - 30
   visual:
   - check: 不声明视觉结论。
     method: not-applicable

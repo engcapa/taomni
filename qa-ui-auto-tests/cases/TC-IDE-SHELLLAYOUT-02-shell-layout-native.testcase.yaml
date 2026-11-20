@@ -46,9 +46,14 @@ steps:
 - seed_storage:
     key: taomni.recentWorkspaces.v1
     value: '[{"id":"qa-shell","name":"fixture","roots":[{"id":"fixture","name":"fixture","path":"${fixture.project_tree_root}","kind":"folder"}],"looseFiles":[],"lastOpenedAt":1789259400000,"isGitRepo":false}]'
+- seed_storage:
+    key: taomni.fileOpen.preferences.v1
+    value: '{"associations":{"md":"workspace"}}'
 - reload_window: null
-- click: '[data-testid="welcome-history-tab-workspaces"]'
-- click: '[data-testid="welcome-recent-workspace-row"][data-workspace-path="${fixture.project_tree_root}"]'
+- click: '[data-testid="tao-home-history"]'
+- wait_for: '[data-testid="tao-home-history-popover"]'
+- click: '[data-testid="tao-home-history-tab-workspaces"]'
+- click: '[data-testid="tao-home-history-row"][data-workspace-path="${fixture.project_tree_root}"]'
 - wait_for: '[data-testid="code-workspace-tab"]'
 - wait_for: '[data-testid="code-workspace-tree"]'
 - assert_visible: '[data-testid="code-workspace-tree"]'
@@ -163,119 +168,119 @@ verification:
     - 1
     - 2
     - 4
-    - 5
     - 6
     - 7
-    - 14
+    - 10
     - 17
-    - 18
     - 20
-    - 22
-    - 24
-    - 26
-    - 28
-    - 30
+    - 21
+    - 23
+    - 25
+    - 27
+    - 29
+    - 31
     - 33
-    - 37
-    - 38
+    - 36
     - 40
-    - 44
+    - 41
+    - 43
     - 47
-    - 48
-    - 49
+    - 50
+    - 51
     - 52
-    - 53
+    - 55
     - 56
-    - 61
-    - 62
-    - 63
+    - 59
+    - 64
+    - 65
     - 66
-    - 67
+    - 69
+    - 70
     checkpoints:
     - step: 3
       expectation: '{"wait_for": "[data-testid=\"welcome-panel\"]"}'
-    - step: 8
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
-    - step: 9
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree\"]"}'
-    - step: 10
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree\"]"}'
     - step: 11
-      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-bottom-dock-resize\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tab\"]"}'
+    - step: 12
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree\"]"}'
     - step: 13
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"][data-path=\"README.md\"]"}'
-    - step: 15
-      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-pane\"]"}'
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-tree\"]"}'
+    - step: 14
+      expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-bottom-dock-resize\"]"}'
     - step: 16
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"][data-path=\"README.md\"]"}'
+    - step: 18
+      expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-pane\"]"}'
+    - step: 19
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-pane\"] .cm-content", "contains":
         "Disposable project tree reference"}}'
-    - step: 19
+    - step: 22
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tree-dir\"][data-path=\"docs\"]",
         "name": "aria-selected", "equals": "true"}}'
-    - step: 21
+    - step: 24
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tree-dir\"][data-path=\"src\"]",
         "name": "aria-expanded", "equals": "false"}}'
-    - step: 23
+    - step: 26
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-dir\"][data-path=\"src/main\"]"}'
-    - step: 25
+    - step: 28
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tree-dir\"][data-path=\"src/main\"]",
         "name": "aria-selected", "equals": "true"}}'
-    - step: 27
+    - step: 30
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tree-file\"][data-path=\"src/main/example.txt\"]"}'
-    - step: 29
+    - step: 32
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-tree-file\"][data-path=\"src/main/example.txt\"]",
         "name": "aria-selected", "equals": "true"}}'
-    - step: 31
+    - step: 34
       expectation: '{"wait_for": "[data-testid=\"code-workspace-editor-pane\"]"}'
-    - step: 32
+    - step: 35
       expectation: '{"assert_text": {"selector": "[data-testid=\"code-workspace-editor-pane\"] .cm-content", "contains":
         "The editor buffer should survive tree navigation."}}'
-    - step: 34
+    - step: 37
       expectation: '{"wait_for": "[data-testid=\"code-workspace-bottom-dock-resize\"]"}'
-    - step: 35
+    - step: 38
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-bottom-dock-resize\"]"}'
-    - step: 36
+    - step: 39
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"code-workspace-bottom-dock\"]", "name": "data-open",
         "equals": "true"}}'
-    - step: 41
+    - step: 44
       expectation: '{"wait_for": "[data-testid=\"code-workspace-run-panel\"]"}'
-    - step: 42
-      expectation: '{"assert_visible": "[data-testid=\"code-workspace-bottom-dock-resize\"]"}'
     - step: 45
+      expectation: '{"assert_visible": "[data-testid=\"code-workspace-bottom-dock-resize\"]"}'
+    - step: 48
       expectation: '{"eval_readonly": {"expression": "document.activeElement?.classList.contains(''cm-content'')"}}'
-    - step: 50
+    - step: 53
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-save-observation\"][data-state=\"saved\"]",
         "timeout_sec": 30}}'
-    - step: 51
+    - step: 54
       expectation: '{"assert_file_contains": {"path": "${fixture.project_tree_root}/src/main/example.txt", "contains":
         "z"}}'
-    - step: 54
+    - step: 57
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-save-observation\"][data-state=\"saved\"]",
         "timeout_sec": 30}}'
-    - step: 55
+    - step: 58
       expectation: '{"assert_file_sha256": {"path": "${fixture.project_tree_root}/src/main/example.txt", "equals":
         "bbbab91a4e4ea594b1e2207721999dc375ac98c30c5960cfbbf1329a441aa01a"}}'
-    - step: 57
+    - step: 60
       expectation: '{"wait_for": "[data-testid=\"code-workspace-tree\"]"}'
-    - step: 58
+    - step: 61
       expectation: '{"assert_not_visible": "[data-testid=\"code-workspace-bottom-dock-resize\"]"}'
-    - step: 59
+    - step: 62
       expectation: '{"assert_visible": "[data-testid=\"code-workspace-editor-pane\"]"}'
-    - step: 64
+    - step: 67
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-save-observation\"][data-state=\"saved\"]",
         "timeout_sec": 30}}'
-    - step: 65
+    - step: 68
       expectation: '{"assert_file_contains": {"path": "${fixture.project_tree_root}/src/main/example.txt", "contains":
         "z"}}'
-    - step: 68
+    - step: 71
       expectation: '{"wait_for": {"selector": "[data-testid=\"code-workspace-save-observation\"][data-state=\"saved\"]",
         "timeout_sec": 30}}'
-    - step: 69
+    - step: 72
       expectation: '{"assert_file_sha256": {"path": "${fixture.project_tree_root}/src/main/example.txt", "equals":
         "bbbab91a4e4ea594b1e2207721999dc375ac98c30c5960cfbbf1329a441aa01a"}}'
     results:
-    - 68
-    - 69
+    - 71
+    - 72
   visual:
   - check: 检查截图中关键控件、状态反馈、文本和布局无截断或遮挡；截图需要人工评审。
     method: manual
