@@ -1,12 +1,12 @@
-pub use taomni_vnc_engine::{
-    clipboard, encodings, error, framebuffer, limits, pixel, policy, quality, queue, rfb, tight,
-    tls,
-};
+pub use taomni_vnc_api::{error, policy, quality};
+#[cfg(all(test, feature = "legacy-vnc-client"))]
+use taomni_vnc_engine::{encodings, framebuffer, limits, pixel, rfb};
 
 pub mod keyboard_hook;
-#[cfg(test)]
+#[cfg(all(test, feature = "legacy-vnc-client"))]
 mod live_bench;
 mod module_host;
+#[cfg(feature = "legacy-vnc-client")]
 pub mod ws;
 
 pub(crate) use module_host::SLUG as MODULE_SLUG;
@@ -18,10 +18,10 @@ use uuid::Uuid;
 use crate::state::AppState;
 use crate::vnc::policy::VncClipboardPolicy;
 use crate::vnc::quality::VncPictureQuality;
-use crate::vnc::ws::{VncControl, VncRelayOptions, spawn_vnc_relay};
-use taomni_vnc_engine::ws::{ProbeRequest, RelayRequest};
+use taomni_vnc_api::ConnectionRequest;
 
 pub enum DesktopVncSession {
+    #[cfg(feature = "legacy-vnc-client")]
     Local(ws::VncSession),
     Module(module_host::HostedSession),
 }
@@ -29,6 +29,7 @@ pub enum DesktopVncSession {
 impl DesktopVncSession {
     fn endpoint(&self) -> (u16, &str) {
         match self {
+            #[cfg(feature = "legacy-vnc-client")]
             Self::Local(session) => (session.ws_port, &session.ws_token),
             Self::Module(session) => session.endpoint(),
         }
@@ -36,6 +37,7 @@ impl DesktopVncSession {
 
     fn closed(&self) -> tokio_util::sync::CancellationToken {
         match self {
+            #[cfg(feature = "legacy-vnc-client")]
             Self::Local(session) => session.cancel.clone(),
             Self::Module(session) => session.closed().clone(),
         }
@@ -255,33 +257,23 @@ pub async fn vnc_connect(
             .map_err(structured_error)?;
         crate::terminal::resolve_jump_credentials(&state, n).map_err(structured_error)?;
     }
-    let policy = security_policy.unwrap_or_default();
-    let options = VncRelayOptions {
-        picture_quality: picture_quality.unwrap_or_default(),
-        shared: shared.unwrap_or(true),
-        // Older callers never asked, so keep their behaviour.
-        allow_unencrypted: allow_unencrypted.unwrap_or(true),
-        ..VncRelayOptions::default()
-    };
-    let request = RelayRequest {
+    let request = ConnectionRequest {
         host,
+        port,
         username,
         password: resolved_password,
-        security_policy: policy,
+        forward: None,
+        security_policy: security_policy.unwrap_or_default(),
         view_only: view_only.unwrap_or(false),
         clipboard_policy: clipboard_policy.unwrap_or_default(),
-        options,
+        picture_quality: picture_quality.unwrap_or_default(),
+        shared,
+        // Older callers did not set this field.
+        allow_unencrypted: allow_unencrypted.unwrap_or(true),
     };
-    let session = if module_host::route_to_host(&state.plugins).map_err(structured_error)? {
-        module_host::start_session(&state.plugins, request, port, network, attempt)
-            .await
-            .map(DesktopVncSession::Module)
-    } else {
-        spawn_vnc_relay(request, port, network, attempt)
-            .await
-            .map(DesktopVncSession::Local)
-    }
-    .map_err(structured_error)?;
+    let session = module_host::start_session(&state.plugins, request, network, attempt)
+        .await
+        .map_err(structured_error)?;
 
     let (ws_port, ws_token) = session.endpoint();
     let result = VncConnectResult {
@@ -363,8 +355,9 @@ pub async fn vnc_disconnect(state: State<'_, AppState>, session_id: String) -> R
         .await
         .remove(&session_id);
     match session {
+        #[cfg(feature = "legacy-vnc-client")]
         Some(DesktopVncSession::Local(session)) => {
-            let _ = session.control_tx.send(VncControl::Disconnect).await;
+            let _ = session.control_tx.send(ws::VncControl::Disconnect).await;
             session.cancel.cancel();
         }
         Some(DesktopVncSession::Module(session)) => session.close().await,
@@ -408,14 +401,19 @@ pub async fn vnc_test_connection(
         }
         module_host::test_connection(
             &state.plugins,
-            ProbeRequest {
+            ConnectionRequest {
                 host,
+                port,
                 username,
                 password: resolved,
                 security_policy: security_policy.unwrap_or_default(),
                 allow_unencrypted: true,
+                forward: None,
+                clipboard_policy: VncClipboardPolicy::default(),
+                picture_quality: VncPictureQuality::default(),
+                view_only: true,
+                shared: None,
             },
-            port,
             network,
         )
         .await

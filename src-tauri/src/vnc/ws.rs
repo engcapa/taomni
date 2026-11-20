@@ -2,11 +2,15 @@
 
 use tokio_util::sync::CancellationToken;
 
-use taomni_vnc_engine::ws::{
-    ForwardTaskGuard, NativeInput, RelayRequest, VncDialedTransport, forward::ForwardRoute,
-    native_pointer_sampler, spawn_relay,
+use taomni_vnc_api::{
+    ConnectionRequest,
+    forward::{ForwardRoute, ForwardTaskGuard},
 };
-pub use taomni_vnc_engine::ws::{VNC_AUTH_TIMEOUT, VncControl, VncRelayOptions, VncSession};
+use taomni_vnc_engine::ws::{
+    NativeInput, ProbeRequest, VncDialedTransport, native_pointer_sampler, probe_connection,
+    spawn_relay,
+};
+pub use taomni_vnc_engine::ws::{VncControl, VncSession};
 
 use crate::terminal::network::NetworkSettings;
 use crate::terminal::ssh::{SshTransport, build_ssh_transport};
@@ -50,20 +54,38 @@ pub(crate) async fn dial_vnc_transport(
 }
 
 pub async fn spawn_vnc_relay(
-    request: RelayRequest,
-    port: u16,
+    input: ConnectionRequest,
     network: Option<NetworkSettings>,
     attempt: CancellationToken,
 ) -> Result<VncSession, String> {
-    let transport = dial_vnc_transport(request.host.clone(), port, network);
+    let transport = dial_vnc_transport(input.host.clone(), input.port, network);
     spawn_relay(
-        request,
+        input.into(),
         transport,
         NativeInput {
             pointer: native_pointer_sampler(std::process::id()),
             ..NativeInput::default()
         },
         attempt,
+    )
+    .await
+}
+
+pub(crate) async fn test_connection(
+    input: ConnectionRequest,
+    network: Option<NetworkSettings>,
+) -> Result<String, String> {
+    let dial = dial_vnc_transport(input.host.clone(), input.port, network);
+    probe_connection(
+        ProbeRequest {
+            host: input.host,
+            username: input.username,
+            password: input.password,
+            security_policy: input.security_policy,
+            allow_unencrypted: input.allow_unencrypted,
+        },
+        dial,
+        CancellationToken::new(),
     )
     .await
 }

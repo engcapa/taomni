@@ -1,5 +1,9 @@
 use serde::Serialize;
 
+/// The selected VNC authentication method requires a password before it can continue.
+pub const CREDENTIALS_REQUIRED: &str =
+    "credentials required: the server asks for a password to log in";
+
 #[derive(Debug, Clone, Copy, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "kebab-case")]
 pub enum VncStage {
@@ -43,8 +47,7 @@ impl VncError {
                 false,
             )
         } else if lower.starts_with("credentials required:") {
-            // Only the client's own stop (rfb::CREDENTIALS_REQUIRED), never a
-            // server's failure reason.
+            // The authentication code prefixes server failure reasons.
             ("credentials-required", VncStage::Authentication, false)
         } else if lower.contains("attempt stopped by the user") {
             ("connection-stopped", VncStage::Runtime, false)
@@ -147,7 +150,7 @@ mod tests {
 
     #[test]
     fn missing_credentials_ask_without_counting_as_a_failure() {
-        let error = VncError::classify(crate::rfb::CREDENTIALS_REQUIRED);
+        let error = VncError::classify(CREDENTIALS_REQUIRED);
         assert_eq!(error.code, "credentials-required");
         assert_eq!(error.stage, VncStage::Authentication);
         assert!(!error.retryable);

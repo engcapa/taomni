@@ -29,6 +29,7 @@ members = [
     "crates/taomni-profile-locks",
     "crates/taomni-redirector",
     "crates/taomni-sqlite-snapshot",
+    "crates/taomni-vnc-api",
     "crates/taomni-vnc-engine",
     "crates/taomni-vnc-key-protocol",
     "plugins/hello-plugin",
@@ -86,7 +87,8 @@ taomni-capture = { path = "crates/taomni-capture" }
 taomni-rdp-common = { path = "crates/taomni-rdp-common", features = ["bitmap"] }
 taomni-file-uri = { path = "crates/taomni-file-uri" }
 taomni-mfa-engine = { path = "crates/taomni-mfa-engine" }
-taomni-vnc-engine = { path = "crates/taomni-vnc-engine" }
+taomni-vnc-api = { path = "crates/taomni-vnc-api" }
+taomni-vnc-engine = { path = "crates/taomni-vnc-engine", optional = true }
 toml = "0.9"
 tokio = { version = "1", features = ["full"] }
 uuid = { version = "1", features = ["v4"] }
@@ -285,7 +287,9 @@ wry = { path = "vendor/wry" }
 winscard = { path = "vendor/winscard" }
 
 [features]
-default = ["hbase-kerberos", "rdp-server-audio", "voice-capture", "asr-whisper", "asr-sherpa"]
+default = ["hbase-kerberos", "rdp-server-audio", "voice-capture", "asr-whisper", "asr-sherpa", "legacy-vnc-client"]
+# Until the first production VNC catalog is available, normal builds can also open legacy sessions.
+legacy-vnc-client = ["dep:taomni-vnc-engine", "dep:taomni-vnc-key-protocol"]
 # Dedicated hosted test harness: use the production pinned key on every thread
 # instead of the normal unit-fixture key. Production verification is unchanged.
 qa-release-trust-gates = []
@@ -301,7 +305,7 @@ local-llm-fim = ["dep:llama-cpp-2"]
 hbase-kerberos = ["dep:cross-krb5"]
 
 [target.'cfg(windows)'.dependencies]
-taomni-vnc-key-protocol = { path = "crates/taomni-vnc-key-protocol" }
+taomni-vnc-key-protocol = { path = "crates/taomni-vnc-key-protocol", optional = true }
 webview2-com = "=0.39.1"
 winapi = { version = "0.3", features = [
   "fileapi", "commdlg", "shellapi", "winbase", "winuser",

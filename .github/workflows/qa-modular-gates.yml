@@ -109,6 +109,34 @@ jobs:
           git ls-files src-tauri/tauri.conf.json 'src-tauri/tauri.*.conf.json' > gate-inventory/bundle-configs.txt
           git grep -n -E -- '"--(headless|vnc-special-key-hook|sockscap-redirector-bridge)"' \
             -- src-tauri/src src-tauri/plugins > gate-inventory/entrypoints.txt || test "$?" -eq 1
+      - name: Check the core dependency graph with the VNC relay excluded
+        shell: bash
+        run: |
+          python - <<'PY'
+          from pathlib import Path
+          import subprocess, tomllib
+
+          manifest = Path("src-tauri/Cargo.toml")
+          defaults = tomllib.loads(manifest.read_text())["features"]["default"]
+          features = [feature for feature in defaults if feature != "legacy-vnc-client"]
+          assert len(features) + 1 == len(defaults), "VNC compatibility feature missing from the default profile"
+          out = Path("gate-inventory")
+          (out / "core-without-legacy-vnc-features.txt").write_text("\n".join(features) + "\n")
+          for target in ("x86_64-unknown-linux-gnu", "x86_64-pc-windows-msvc",
+                         "aarch64-apple-darwin", "x86_64-apple-darwin"):
+              tree = subprocess.check_output([
+                  "cargo", "tree", "--manifest-path", str(manifest), "--locked", "-p", "taomni",
+                  "--edges", "normal,build", "--prefix", "none", "--target", target,
+                  "--no-default-features", "--features", ",".join(features),
+              ], text=True)
+              (out / f"cargo-tree-without-legacy-vnc-{target}.txt").write_text(tree)
+              packages = {line.split()[0] for line in tree.splitlines() if line.split()}
+              assert "taomni-vnc-api" in packages, f"{target}: missing shared VNC types"
+              assert not packages.intersection({
+                  "taomni-vnc-engine", "taomni-vnc-key-protocol", "taomni-vnc-key-helper",
+                  "taomni-plugin-vnc-client",
+              }), f"{target}: the core still depends on the VNC client implementation"
+          PY
       - name: Build the release frontend and record actual chunk hashes
         shell: bash
         run: |

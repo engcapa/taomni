@@ -1,6 +1,8 @@
 use std::io::Error;
 use std::io::ErrorKind;
 
+pub(crate) use taomni_vnc_api::error::CREDENTIALS_REQUIRED;
+
 pub(super) const SEC_TYPE_NONE: u8 = 1;
 pub(super) const SEC_TYPE_VNC_AUTH: u8 = 2;
 pub(super) const SEC_TYPE_RA2_128: u8 = 5;
@@ -15,12 +17,6 @@ pub(super) const ARD_MIN_KEY_BYTES: usize = 64;
 pub(super) const ARD_MAX_KEY_BYTES: usize = 1024;
 /// Username and password are NUL-terminated in 64-byte fields.
 pub(super) const ARD_FIELD_BYTES: usize = 64;
-
-/// The chosen security type needs a password the caller did not supply; the
-/// attempt stops before any challenge is answered so the viewer can ask
-/// (DEC-VNC-21). `VncError::classify` maps it to `credentials-required`.
-pub(crate) const CREDENTIALS_REQUIRED: &str =
-    "credentials required: the server asks for a password to log in";
 
 /// Security types that authenticate with a password.
 pub(super) fn needs_password(sec_type: u8) -> bool {

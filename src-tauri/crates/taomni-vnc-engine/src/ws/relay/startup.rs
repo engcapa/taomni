@@ -13,6 +13,7 @@ use crate::ws::VncSession;
 use crate::ws::WsOutgoingText;
 use std::future::Future;
 use std::sync::Arc;
+use taomni_vnc_api::ConnectionRequest;
 use tokio::net::TcpListener;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
@@ -28,6 +29,25 @@ pub struct RelayRequest {
     pub view_only: bool,
     pub clipboard_policy: VncClipboardPolicy,
     pub options: VncRelayOptions,
+}
+
+impl From<ConnectionRequest> for RelayRequest {
+    fn from(input: ConnectionRequest) -> Self {
+        Self {
+            host: input.host,
+            username: input.username,
+            password: input.password,
+            security_policy: input.security_policy,
+            view_only: input.view_only,
+            clipboard_policy: input.clipboard_policy,
+            options: VncRelayOptions {
+                picture_quality: input.picture_quality,
+                shared: input.shared.unwrap_or(true),
+                allow_unencrypted: input.allow_unencrypted,
+                ..VncRelayOptions::default()
+            },
+        }
+    }
 }
 
 /// Authenticate an RFB transport and start its WebSocket relay.

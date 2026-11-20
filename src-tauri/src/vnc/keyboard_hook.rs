@@ -33,7 +33,7 @@ pub struct SpecialKeyCaptureStatus {
     pub intercepted: u64,
 }
 
-#[cfg(windows)]
+#[cfg(all(windows, feature = "legacy-vnc-client"))]
 mod imp {
     use std::io::{BufRead, BufReader, Write};
     use std::os::windows::process::CommandExt;
@@ -171,11 +171,11 @@ mod imp {
 /// being passed through on this platform.
 #[tauri::command]
 pub fn vnc_set_special_key_capture(app: tauri::AppHandle, enabled: bool) -> bool {
-    #[cfg(windows)]
+    #[cfg(all(windows, feature = "legacy-vnc-client"))]
     {
         imp::set_capture(app, enabled)
     }
-    #[cfg(not(windows))]
+    #[cfg(not(all(windows, feature = "legacy-vnc-client")))]
     {
         let _ = (app, enabled);
         false
@@ -185,11 +185,11 @@ pub fn vnc_set_special_key_capture(app: tauri::AppHandle, enabled: bool) -> bool
 /// Whether the hook is installed and how many keys it has swallowed (native QA).
 #[tauri::command]
 pub fn vnc_special_key_capture_status() -> SpecialKeyCaptureStatus {
-    #[cfg(windows)]
+    #[cfg(all(windows, feature = "legacy-vnc-client"))]
     {
         imp::status()
     }
-    #[cfg(not(windows))]
+    #[cfg(not(all(windows, feature = "legacy-vnc-client")))]
     {
         SpecialKeyCaptureStatus::default()
     }

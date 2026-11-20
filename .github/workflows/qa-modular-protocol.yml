@@ -159,6 +159,7 @@ jobs:
             echo 'The VNC host links the desktop runtime or a peer module.' >&2
             exit 1
           fi
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-vnc-api --lib --locked 2>&1 | tee modular-protocol-evidence/vnc-api-unit.log
           cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-vnc-client --lib --locked 2>&1 | tee modular-protocol-evidence/vnc-host-unit.log
           if [[ "$RUNNER_OS" == Windows ]]; then
             cargo build --manifest-path src-tauri/Cargo.toml -p taomni-vnc-key-helper --locked

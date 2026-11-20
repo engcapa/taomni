@@ -1,23 +1,5 @@
 use super::*;
 
-impl ForwardTaskGuard {
-    pub fn new(task: Option<tokio::task::JoinHandle<()>>) -> Self {
-        Self(task)
-    }
-
-    pub fn take(&mut self) -> Option<tokio::task::JoinHandle<()>> {
-        self.0.take()
-    }
-}
-
-impl Drop for ForwardTaskGuard {
-    fn drop(&mut self) {
-        if let Some(task) = self.0.as_ref() {
-            task.abort();
-        }
-    }
-}
-
 pub(super) async fn accept_authorized_ws(
     listener: TcpListener,
     ws_token: &str,

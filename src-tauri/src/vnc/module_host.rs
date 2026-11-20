@@ -2,9 +2,10 @@
 
 use std::time::Duration;
 
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
-use taomni_vnc_engine::ws::{
-    ForwardTaskGuard, ProbeRequest, RelayRequest, forward::ForwardRoute, probe_connection,
+use serde::de::DeserializeOwned;
+use taomni_vnc_api::{
+    ConnectionRequest, Started,
+    forward::{ForwardRoute, ForwardTaskGuard},
 };
 use tokio_util::sync::CancellationToken;
 
@@ -13,43 +14,11 @@ use crate::{
     terminal::{network::NetworkSettings, ssh::build_ssh_transport},
 };
 
-use super::{
-    policy::{VncClipboardPolicy, VncSecurityPolicy},
-    quality::VncPictureQuality,
-};
+use super::DesktopVncSession;
 
 pub(crate) const SLUG: &str = "vnc-client";
 const PROBE: &str = "vnc/test";
 const START: &str = "vnc/start";
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct HostedEndpoint {
-    host: String,
-    port: u16,
-    username: Option<String>,
-    password: Option<zeroize::Zeroizing<String>>,
-    security_policy: VncSecurityPolicy,
-    allow_unencrypted: bool,
-    forward: ForwardRoute,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct HostedStart {
-    #[serde(flatten)]
-    endpoint: HostedEndpoint,
-    view_only: bool,
-    clipboard_policy: VncClipboardPolicy,
-    picture_quality: VncPictureQuality,
-    shared: bool,
-}
-
-#[derive(Deserialize)]
-struct Started {
-    ws_port: u16,
-    ws_token: String,
-}
 
 pub struct HostedSession {
     started: Started,
@@ -78,83 +47,77 @@ impl Drop for HostedSession {
     }
 }
 
-pub(super) fn route_to_host(registry: &PluginRegistry) -> Result<bool, String> {
-    let Some(record) = registry.get(SLUG) else {
-        return Ok(false);
-    };
+fn require_host(registry: &PluginRegistry) -> Result<(), String> {
+    let record = registry
+        .get(SLUG)
+        .ok_or_else(|| "VNC Client must be installed and enabled".to_string())?;
     if record.state != LifecycleState::Enabled {
         return Err("VNC Client must be installed and enabled".into());
     }
     if !record.manifest.commands.contains(PROBE) || !record.manifest.commands.contains(START) {
         return Err("Update the VNC Client module".into());
     }
-    Ok(true)
+    Ok(())
 }
 
 pub(super) async fn test_connection(
     registry: &PluginRegistry,
-    request: ProbeRequest,
-    port: u16,
+    mut request: ConnectionRequest,
     network: Option<NetworkSettings>,
 ) -> Result<String, String> {
-    if !route_to_host(registry)? {
-        let dial = super::ws::dial_vnc_transport(request.host.clone(), port, network);
-        return probe_connection(request, dial, CancellationToken::new()).await;
+    #[cfg(feature = "legacy-vnc-client")]
+    if registry.get(SLUG).is_none() {
+        return super::ws::test_connection(request, network).await;
     }
-    let (endpoint, _forward) = open_route(request, port, network).await?;
-    invoke(registry, PROBE, endpoint, CancellationToken::new()).await
+    require_host(registry)?;
+    let (route, task) = open_route(&request.host, request.port, network).await?;
+    let _forward = ForwardTaskGuard::new(Some(task));
+    request.forward = Some(route);
+    invoke(registry, PROBE, request, CancellationToken::new()).await
 }
 
 pub(super) async fn start_session(
     registry: &PluginRegistry,
-    request: RelayRequest,
-    port: u16,
+    mut request: ConnectionRequest,
     network: Option<NetworkSettings>,
     attempt: CancellationToken,
-) -> Result<HostedSession, String> {
-    let view_only = request.view_only;
-    let clipboard_policy = request.clipboard_policy;
-    let picture_quality = request.options.picture_quality;
-    let shared = request.options.shared;
-    let (endpoint, mut forward) = tokio::select! {
-        route = open_route(request.into(), port, network) => route?,
+) -> Result<DesktopVncSession, String> {
+    #[cfg(feature = "legacy-vnc-client")]
+    if registry.get(SLUG).is_none() {
+        return super::ws::spawn_vnc_relay(request, network, attempt)
+            .await
+            .map(DesktopVncSession::Local);
+    }
+    require_host(registry)?;
+    let (route, task) = tokio::select! {
+        route = open_route(&request.host, request.port, network) => route?,
         _ = attempt.cancelled() => return Err(stopped()),
     };
-    let started = invoke(
-        registry,
-        START,
-        HostedStart {
-            endpoint,
-            view_only,
-            clipboard_policy,
-            picture_quality,
-            shared,
-        },
-        attempt,
-    )
-    .await?;
+    let mut task = ForwardTaskGuard::new(Some(task));
+    request.forward = Some(route);
+    let started = invoke(registry, START, request, attempt).await?;
     let closed = CancellationToken::new();
     let watcher = closed.clone();
-    let task = forward.take().expect("bound VNC bridge");
+    let task = task.take().expect("bound VNC bridge");
     let forward = task.abort_handle();
     tokio::spawn(async move {
         let _ = task.await;
         watcher.cancel();
     });
-    Ok(HostedSession {
+    Ok(DesktopVncSession::Module(HostedSession {
         started,
         closed,
         forward,
-    })
+    }))
 }
 
 async fn open_route(
-    request: ProbeRequest,
+    host: &str,
     port: u16,
     network: Option<NetworkSettings>,
-) -> Result<(HostedEndpoint, ForwardTaskGuard), String> {
-    let (forward, task) = tokio::time::timeout(Duration::from_secs(15), async {
-        let upstream = build_ssh_transport(&request.host, port, network.as_ref())
+) -> Result<(ForwardRoute, tokio::task::JoinHandle<()>), String> {
+    tokio::time::timeout(Duration::from_secs(15), async {
+        let upstream = build_ssh_transport(host, port, network.as_ref())
             .await
             .map_err(|error| format!("VNC TCP connection failed: {error}"))?;
         ForwardRoute::bind(upstream)
@@ -162,23 +125,13 @@ async fn open_route(
             .map_err(|error| format!("VNC forward failed: {error}"))
     })
     .await
-    .map_err(|_| "VNC TCP connection timed out after 15 seconds".to_string())??;
-    let endpoint = HostedEndpoint {
-        host: request.host,
-        port,
-        username: request.username,
-        password: request.password,
-        security_policy: request.security_policy,
-        allow_unencrypted: request.allow_unencrypted,
-        forward,
-    };
-    Ok((endpoint, ForwardTaskGuard::new(Some(task))))
+    .map_err(|_| "VNC TCP connection timed out after 15 seconds".to_string())?
 }
 
 async fn invoke<T: DeserializeOwned>(
     registry: &PluginRegistry,
     method: &'static str,
-    payload: impl Serialize,
+    payload: ConnectionRequest,
     attempt: CancellationToken,
 ) -> Result<T, String> {
     if attempt.is_cancelled() {

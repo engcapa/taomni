@@ -25,8 +25,7 @@ fn rejects_invalid_endpoints_and_caller_selected_proxy_hosts() {
         json!({"host":"vnc.example","port":5900,"forward":{"port":0,"token":"invalid"}}),
         json!({"host":"vnc.example","port":5900,"forwardHost":"outside.example"}),
     ] {
-        let result =
-            request::decode::<request::Start>(Some(input)).and_then(request::Start::checked);
+        let result = request::decode::<request::Start>(Some(input)).and_then(request::checked);
         assert!(matches!(result, Err(error) if error.code == ErrorCode::InvalidParams.as_i32()));
     }
 }

@@ -1,4 +1,4 @@
-pub mod forward;
+pub use taomni_vnc_api::forward::{self, ForwardTaskGuard};
 mod frame_flow;
 mod transport;
 use frame_flow::*;
@@ -311,9 +311,6 @@ pub struct VncDialedTransport {
     pub stream: TcpStream,
     pub network_forward_task: Option<tokio::task::JoinHandle<()>>,
 }
-
-/// Aborts a transport forwarding task if a connection attempt exits early.
-pub struct ForwardTaskGuard(Option<tokio::task::JoinHandle<()>>);
 
 #[derive(Debug, Clone, Copy, Default)]
 struct ServerClipboardCaps {

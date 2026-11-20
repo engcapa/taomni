@@ -10950,6 +10950,7 @@ dependencies = [
  "taomni-rdp-common",
  "taomni-redirector",
  "taomni-sqlite-snapshot",
+ "taomni-vnc-api",
  "taomni-vnc-engine",
  "taomni-vnc-key-protocol",
  "tauri",
@@ -11240,6 +11241,7 @@ dependencies = [
  "serde_json",
  "taomni-plugin-api",
  "taomni-plugin-sdk",
+ "taomni-vnc-api",
  "taomni-vnc-engine",
  "taomni-vnc-key-protocol",
  "tempfile",
@@ -11247,7 +11249,6 @@ dependencies = [
  "tokio-tungstenite",
  "tokio-util 0.7.19",
  "uuid",
- "zeroize",
 ]
 
 [[package]]
@@ -11327,6 +11328,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "taomni-vnc-api"
+version = "0.1.0"
+dependencies = [
+ "serde",
+ "serde_json",
+ "subtle",
+ "tokio",
+ "tracing",
+ "uuid",
+ "zeroize",
+]
+
+[[package]]
 name = "taomni-vnc-engine"
 version = "0.1.0"
 dependencies = [
@@ -11344,6 +11358,7 @@ dependencies = [
  "serde_json",
  "sha1 0.11.0",
  "sha2 0.11.0",
+ "taomni-vnc-api",
  "tokio",
  "tokio-openssl",
  "tokio-tungstenite",

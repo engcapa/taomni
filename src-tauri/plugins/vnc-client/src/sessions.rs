@@ -59,7 +59,7 @@ impl Sessions {
         input: Start,
         check: &dyn Fn() -> Result<(), RpcError>,
     ) -> Result<Result<Started, String>, RpcError> {
-        let (request, dial) = input.checked()?;
+        let (request, dial) = crate::request::checked(input)?;
         check()?;
         let slot = Arc::clone(&self.slots)
             .try_acquire_owned()
@@ -114,7 +114,7 @@ impl Sessions {
         input: Start,
         check: &dyn Fn() -> Result<(), RpcError>,
     ) -> Result<Result<String, String>, RpcError> {
-        let (request, dial) = input.checked()?;
+        let (request, dial) = crate::request::checked(input)?;
         self.run(check, |attempt| {
             probe_connection(request.into(), dial.connect(), attempt)
         })

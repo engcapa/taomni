@@ -8,7 +8,7 @@
 
 use std::time::{Duration, Instant};
 
-use serde::{Deserialize, Serialize};
+pub use taomni_vnc_api::quality::VncPictureQuality;
 
 use crate::clipboard::{ENCODING_EXTENDED_CLIPBOARD, ENCODING_EXTENDED_CLIPBOARD_LEGACY};
 use crate::encodings::{
@@ -18,43 +18,12 @@ use crate::pixel::PixelFormat;
 use crate::rfb::encoding_name;
 use crate::tight::{ENCODING_COMPRESS_LEVEL_0, ENCODING_JPEG_QUALITY_0, ENCODING_TIGHT};
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum VncPictureQuality {
-    #[default]
-    Automatic,
-    High,
-    Medium,
-    Low,
-}
-
-impl VncPictureQuality {
-    pub fn from_wire(value: u8) -> Option<Self> {
-        Some(match value {
-            0 => Self::Automatic,
-            1 => Self::High,
-            2 => Self::Medium,
-            3 => Self::Low,
-            _ => return None,
-        })
-    }
-
-    pub fn label(self) -> &'static str {
-        match self {
-            Self::Automatic => "automatic",
-            Self::High => "high",
-            Self::Medium => "medium",
-            Self::Low => "low",
-        }
-    }
-
-    fn fixed_level(self) -> Option<QualityLevel> {
-        match self {
-            Self::Automatic => None,
-            Self::High => Some(QualityLevel::High),
-            Self::Medium => Some(QualityLevel::Medium),
-            Self::Low => Some(QualityLevel::Low),
-        }
+fn fixed_level(preset: VncPictureQuality) -> Option<QualityLevel> {
+    match preset {
+        VncPictureQuality::Automatic => None,
+        VncPictureQuality::High => Some(QualityLevel::High),
+        VncPictureQuality::Medium => Some(QualityLevel::Medium),
+        VncPictureQuality::Low => Some(QualityLevel::Low),
     }
 }
 
@@ -270,7 +239,7 @@ pub struct QualityController {
 
 impl QualityController {
     pub fn new(preset: VncPictureQuality) -> Self {
-        let level = preset.fixed_level().unwrap_or(QualityLevel::High);
+        let level = fixed_level(preset).unwrap_or(QualityLevel::High);
         Self {
             preset,
             level,
@@ -302,7 +271,7 @@ impl QualityController {
         self.preset = preset;
         self.down_votes = 0;
         self.up_votes = 0;
-        if let Some(level) = preset.fixed_level() {
+        if let Some(level) = fixed_level(preset) {
             self.set_level(level);
         }
     }

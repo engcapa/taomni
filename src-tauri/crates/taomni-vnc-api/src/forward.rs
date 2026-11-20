@@ -3,6 +3,7 @@
 use std::{io, net::Ipv4Addr, time::Duration};
 
 use serde::{Deserialize, Serialize};
+use subtle::ConstantTimeEq;
 use tokio::{
     io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt},
     net::{TcpListener, TcpStream},
@@ -80,7 +81,7 @@ impl ForwardRoute {
             let mut supplied = Zeroizing::new([0_u8; TOKEN_LEN]);
             let received = timeout_at(auth_deadline, stream.read_exact(supplied.as_mut())).await;
             if !matches!(received, Ok(Ok(TOKEN_LEN)))
-                || !openssl::memcmp::eq(supplied.as_ref(), self.token.as_bytes())
+                || !bool::from(supplied.as_ref().ct_eq(self.token.as_bytes()))
             {
                 continue;
             }
@@ -96,6 +97,27 @@ impl ForwardRoute {
         tokio::select! {
             result = tokio::io::copy(&mut local_read, &mut upstream_write) => result.map(|_| ()),
             result = tokio::io::copy(&mut upstream_read, &mut local_write) => result.map(|_| ()),
+        }
+    }
+}
+
+/// Aborts a forwarding task when its connection attempt ends.
+pub struct ForwardTaskGuard(Option<JoinHandle<()>>);
+
+impl ForwardTaskGuard {
+    pub fn new(task: Option<JoinHandle<()>>) -> Self {
+        Self(task)
+    }
+
+    pub fn take(&mut self) -> Option<JoinHandle<()>> {
+        self.0.take()
+    }
+}
+
+impl Drop for ForwardTaskGuard {
+    fn drop(&mut self) {
+        if let Some(task) = self.0.as_ref() {
+            task.abort();
         }
     }
 }

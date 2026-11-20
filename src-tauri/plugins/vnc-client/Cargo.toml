@@ -11,11 +11,11 @@ serde = { version = "1", features = ["derive"] }
 serde_json = "1"
 taomni-plugin-api = { path = "../../crates/taomni-plugin-api" }
 taomni-plugin-sdk = { path = "../../crates/taomni-plugin-sdk" }
+taomni-vnc-api = { path = "../../crates/taomni-vnc-api" }
 taomni-vnc-engine = { path = "../../crates/taomni-vnc-engine" }
 tokio = { version = "1", features = ["macros", "net", "rt-multi-thread", "sync", "time"] }
 tokio-util = "0.7"
 uuid = { version = "1", features = ["v4"] }
-zeroize = { version = "1", features = ["serde"] }
 
 [target.'cfg(windows)'.dependencies]
 taomni-vnc-key-protocol = { path = "../../crates/taomni-vnc-key-protocol" }
