@@ -38,6 +38,7 @@ const STAGING: &str = "d1234567-1234-1234-1234-123456789abc";
 struct MailHost {
     child: Child,
     replies: Receiver<RpcMessage>,
+    next_request_id: i64,
 }
 
 impl MailHost {
@@ -62,7 +63,11 @@ impl MailHost {
                 }
             }
         });
-        Self { child, replies }
+        Self {
+            child,
+            replies,
+            next_request_id: 0,
+        }
     }
 
     fn call(&mut self, method: &str, params: Value) -> Value {
@@ -72,7 +77,8 @@ impl MailHost {
     }
 
     fn send(&mut self, method: &str, params: Value) -> RpcResponse {
-        let request = RpcRequest::new(method, method, Some(params));
+        let request = RpcRequest::new(self.next_request_id, method, Some(params));
+        self.next_request_id += 1;
         let input = self.child.stdin.as_mut().unwrap();
         serde_json::to_writer(&mut *input, &RpcMessage::Request(request.clone())).unwrap();
         input.write_all(b"\n").unwrap();
