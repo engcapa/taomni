@@ -92,7 +92,7 @@ steps:
       + 1
     expect_truthy: true
 - eval_readonly:
-    expression: document.querySelector('.tao-home-body').clientWidth - document.querySelector('.tao-home-main').clientWidth - document.querySelector('.tao-home-side-panel').getBoundingClientRect().width >= 0 && document.querySelector('.tao-home-body').clientWidth - document.querySelector('.tao-home-main').clientWidth - document.querySelector('.tao-home-side-panel').getBoundingClientRect().width < 12
+    expression: document.querySelector('.tao-home-side-panel').getBoundingClientRect().left - document.querySelector('.tao-home-main').getBoundingClientRect().right <= 1 && document.querySelector('.tao-home-body').getBoundingClientRect().right - document.querySelector('.tao-home-side-panel').getBoundingClientRect().right <= 1
     expect_truthy: true
 - press:
     selector: '[data-testid="tao-home-side-resize"]'
