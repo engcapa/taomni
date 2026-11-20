@@ -51,7 +51,7 @@ steps:
 - wait_for: '[data-testid="sftp-remote-pane"] tr[title$="/qa-ui-auto-dblclick.txt"]'
 - dblclick: '[data-testid="sftp-remote-pane"] >> text="qa-ui-auto-dblclick.txt"'
 - wait: 2
-- wait_for: '[data-testid="sftp-local-list"] tr[title$="/qa-ui-auto-dblclick.txt"]'
+- wait_for: '[data-testid="file-viewer"][data-path$="qa-ui-auto-dblclick.txt"]'
 - click: '[data-testid="sftp-remote-pane"] >> text="qa-ui-auto-dblclick.txt"'
 - click: '[data-testid="sftp-remote-delete"]'
 - wait_for: '[data-testid="confirm-dialog"]'
@@ -106,7 +106,7 @@ verification:
     - step: 25
       expectation: '{"wait_for": "[data-testid=\"sftp-remote-pane\"] tr[title$=\"/qa-ui-auto-dblclick.txt\"]"}'
     - step: 28
-      expectation: '{"wait_for": "[data-testid=\"sftp-local-list\"] tr[title$=\"/qa-ui-auto-dblclick.txt\"]"}'
+      expectation: '{"wait_for": "[data-testid=\"file-viewer\"][data-path$=\"qa-ui-auto-dblclick.txt\"]"}'
     - step: 31
       expectation: '{"wait_for": "[data-testid=\"confirm-dialog\"]"}'
     - step: 33
