@@ -18,6 +18,8 @@ export const marketplacePreviewCatalog: ModuleMarketplaceCatalog = { platform: "
 
 const mailId = "taomni-plugin-mail";
 const mailStaged = "taomni.preview.mail-provisioned";
+const mailMode = JSON.stringify("legacy-mail");
+const failedMailMode = JSON.stringify("legacy-mail-failed");
 function invokeLegacyMailPreview(command: string, args: Record<string, unknown> | undefined, failed: boolean): unknown {
   if (command === "plugin_marketplace_catalog") {
     const sample = marketplacePreviewCatalog.catalog.plugins[previewHelloManifest.id];
@@ -41,7 +43,7 @@ function invokeLegacyMailPreview(command: string, args: Record<string, unknown> 
     if (selection?.pluginId === mailId && selection.sha256 === digest && selection.version === "0.1.0"
       && (!failed || args?.retry === true)) {
       sessionStorage.setItem(mailStaged, "true");
-      localStorage.setItem(MARKETPLACE_PREVIEW_KEY, "legacy-mail");
+      localStorage.setItem(MARKETPLACE_PREVIEW_KEY, mailMode);
       return { restartRequired: true };
     }
   }
@@ -50,8 +52,8 @@ function invokeLegacyMailPreview(command: string, args: Record<string, unknown> 
 
 export function invokeMarketplacePreview(command: string, args?: Record<string, unknown>): unknown {
   const mode = localStorage.getItem(MARKETPLACE_PREVIEW_KEY);
-  if (mode === "legacy-mail" || mode === "legacy-mail-failed") {
-    return invokeLegacyMailPreview(command, args, mode === "legacy-mail-failed");
+  if (mode === mailMode || mode === failedMailMode) {
+    return invokeLegacyMailPreview(command, args, mode === failedMailMode);
   }
   if (mode !== "true" && mode !== "release" && mode !== "update") {
     if (command === "plugin_marketplace_catalog") return { ...marketplacePreviewCatalog, catalog: { ...marketplacePreviewCatalog.catalog, plugins: {} } };

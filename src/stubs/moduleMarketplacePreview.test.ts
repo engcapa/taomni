@@ -47,3 +47,23 @@ it("keeps a modeled completed transfer separate from the explicit installation a
   invokeMarketplacePreview("plugin_marketplace_install", { selection });
   expect(JSON.parse(localStorage.getItem(MODULE_PREVIEW_KEY)!)).toEqual({ lifecycle: "installed", values: [] });
 });
+
+it("accepts the JSON fixture used by the Mail upgrade case and resumes a failed import", () => {
+  const pluginId = "taomni-plugin-mail";
+  const args = { selection: { ...selection, pluginId } };
+  sessionStorage.removeItem("taomni.preview.mail-provisioned");
+  localStorage.setItem(MARKETPLACE_PREVIEW_KEY, '"legacy-mail"');
+  expect(invokeMarketplacePreview("plugin_marketplace_catalog")).toMatchObject({
+    release: { legacyPending: [pluginId], legacyRestartRequired: [] },
+  });
+  expect(invokeMarketplacePreview("plugin_marketplace_provision", args)).toEqual({ restartRequired: true });
+  localStorage.setItem(MARKETPLACE_PREVIEW_KEY, '"legacy-mail-failed"');
+  expect(invokeMarketplacePreview("plugin_marketplace_catalog")).toMatchObject({
+    release: { legacyImportFailed: [pluginId], legacyRestartRequired: [] },
+  });
+  expect(invokeMarketplacePreview("plugin_marketplace_provision", { ...args, retry: true }))
+    .toEqual({ restartRequired: true });
+  expect(invokeMarketplacePreview("plugin_marketplace_catalog")).toMatchObject({
+    release: { legacyImportFailed: [], legacyRestartRequired: [pluginId] },
+  });
+});
