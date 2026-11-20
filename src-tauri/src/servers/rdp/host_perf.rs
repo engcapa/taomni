@@ -1,6 +1,7 @@
 //! Hosted G5 comparison using the native desktop capture and IronRDP encoder.
 //! The remote encoder takes one bitmap at a time across the native channel.
 mod bitmap;
+pub(super) mod frame_samples;
 
 use std::{
     io,
@@ -292,20 +293,26 @@ async fn serve_desktop() -> anyhow::Result<()> {
         )?;
         super::gfx::GfxTransport::new(log.clone())
     };
+    let trace = frame_samples::FrameSamples::from_env()?.map(Arc::new);
+    let metrics = RdpMetrics::new(log.clone()).with_frame_samples(trace.clone());
     let display = RdpDisplay::new(
         log.clone(),
         None,
-        RdpMetrics::new(log),
+        metrics,
         false,
         #[cfg(target_os = "macos")]
         gfx,
     )?;
     let stop = eof();
-    match std::env::var("QA_RDP_GATE_ROUTE")?.as_str() {
+    let result = match std::env::var("QA_RDP_GATE_ROUTE")?.as_str() {
         "in-process" => run_server(display, &report, stop).await,
         "encoder-host" => run_in_child(display, &report, stop).await,
         _ => anyhow::bail!("Unknown trial route"),
+    };
+    if let Some(trace) = trace {
+        trace.save(&report)?;
     }
+    result
 }
 
 #[tokio::test(flavor = "multi_thread")]

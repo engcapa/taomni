@@ -315,6 +315,10 @@ impl RdpServerDisplayUpdates for DisplayUpdatesImpl {
                         return Ok(Some(DisplayUpdate::Resize(frame_size)));
                     }
                     self.metrics.record_frame_handoff(frame.captured_at);
+                    #[cfg(test)]
+                    if let Some(samples) = &self.metrics.frame_samples {
+                        samples.handoff(&frame);
+                    }
                     self.metrics.report_if_due();
                     #[cfg(target_os = "macos")]
                     {

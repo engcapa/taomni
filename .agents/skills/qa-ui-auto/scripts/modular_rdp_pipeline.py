@@ -60,12 +60,15 @@ def wait_for_listener(process, path):
 
 
 @contextmanager
-def trial_server(binary, route, directory):
+def trial_server(binary, route, directory, sample_point=None):
     windows = platform.system() == "Windows"
+    environment = {**os.environ, "QA_RDP_GATE_ROUTE": route, "QA_RDP_GATE_REPORT": str(directory)}
+    if sample_point is not None:
+        environment["QA_RDP_FRAME_SAMPLE_POINT"] = sample_point
     with (directory / "server.log").open("wb") as log:
         process = subprocess.Popen(
             [str(binary), "--ignored", "--exact", SERVER, "--nocapture"],
-            env={**os.environ, "QA_RDP_GATE_ROUTE": route, "QA_RDP_GATE_REPORT": str(directory)},
+            env=environment,
             stdin=subprocess.PIPE, stdout=log, stderr=subprocess.STDOUT, start_new_session=not windows,
         )
     try:
@@ -116,6 +119,12 @@ def measure(binary, probe, root):
     failures = []
     with isolated_desktop(environment), measurement_desktop(root, config, system):
         for scenario, helper, args, budget in perf_steps(case):
+            sample_point = None
+            if system == "Windows" and scenario == "latency":
+                probe_args = args["args"]
+                sample_x = max(0, probe_args["x"] + probe_args.get("sample-dx", -40))
+                sample_y = max(0, probe_args["y"] + probe_args.get("sample-dy", -40))
+                sample_point = f"{sample_x},{sample_y}"
             for route in ROUTES:
                 directory = root / scenario / route
                 directory.mkdir(parents=True)
@@ -123,7 +132,7 @@ def measure(binary, probe, root):
                 report["trials"].append(receipt)
                 ctx = NativeStepContext(None, directory, config)
                 try:
-                    with trial_server(binary, route, directory) as encoder:
+                    with trial_server(binary, route, directory, sample_point) as encoder:
                         receipt["encoder"] = encoder
                         with isolated_desktop({"QA_RDP_PORT": str(encoder["port"])}):
                             if helper is not None:

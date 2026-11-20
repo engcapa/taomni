@@ -11,6 +11,8 @@ use std::sync::atomic::{AtomicU32, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
+#[cfg(test)]
+use super::host_perf::frame_samples::FrameSamples;
 use crate::servers::engine::LogEmitter;
 
 const REPORT_INTERVAL: Duration = Duration::from_secs(5);
@@ -27,6 +29,8 @@ pub(crate) struct RdpMetrics {
     /// Auto-detect RTT shared with the RDP server (see `with_network_rtt`).
     network_rtt: Option<Arc<AtomicU32>>,
     encoder_stats: Option<Arc<ironrdp::server::EncoderStats>>,
+    #[cfg(test)]
+    pub(super) frame_samples: Option<Arc<FrameSamples>>,
 }
 
 struct MetricsState {
@@ -111,7 +115,15 @@ impl RdpMetrics {
             log,
             network_rtt: None,
             encoder_stats: None,
+            #[cfg(test)]
+            frame_samples: None,
         }
+    }
+
+    #[cfg(test)]
+    pub(super) fn with_frame_samples(mut self, samples: Option<Arc<FrameSamples>>) -> Self {
+        self.frame_samples = samples;
+        self
     }
 
     /// Record capture-side latency: the time attributable to getting one frame's
