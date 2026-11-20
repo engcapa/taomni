@@ -69,6 +69,11 @@ platform-specific receipt do not close a gate. The final release record must
 bind every gate to the source SHA, runner image, package identity, and raw
 artifact path.
 
+For G5, accept input-to-frame p95 up to twice the existing 65 ms reference.
+Record the 130 ms limit and the observed p95 in the modular QA evidence. Apply
+the reviewed RDP case checks for first graphics, frame rate, bandwidth, and
+sample completeness.
+
 ## Build, Test, and Development Commands
 
 Use pnpm 10 and Node.js 22 to match CI. Native builds require Rust 1.94+, `protoc`, a complete Perl distribution, and Tauri system dependencies; see `README.md`.

@@ -63,6 +63,7 @@ def plan(suite, macos_runner, package_run, package_version, package_targets="all
             "scope": "selected", "platforms": "linux,windows,macos", "modes": "browser,native",
             "linux_profiles": "ubuntu-24.04-xvfb",
             "macos_runner": macos_runner, "native_release": "true", "features": "F-Modules-1",
+            "modular_rdp_p95": "true",
             "case_ids": (
                 "TC-MFA-106,TC-MOBILE-003,TC-MOBILE-021,"
                 "TC-SHOT-003,TC-SHOT-N2,TC-SHOT-N10,TC-SHOT-N15,TC-SHOT-N19,"
@@ -75,6 +76,7 @@ def plan(suite, macos_runner, package_run, package_version, package_targets="all
         checks.append(("G2/G5 Linux Wayland native capture and input", PLATFORMS, {
             "scope": "selected", "platforms": "linux", "modes": "native",
             "linux_profiles": "ubuntu-26.04-wayland", "native_release": "true",
+            "modular_rdp_p95": "true",
             "case_ids": (
                 "TC-MFA-106,TC-SHOT-N2,TC-SHOT-N10,"
                 "TC-RDPS-NAT-01-start-connect-display,TC-RDPS-PERF-01-performance-budget"

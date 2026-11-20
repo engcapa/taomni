@@ -317,7 +317,7 @@ jobs:
           assert len(harnesses) == 1, harnesses
           (evidence / "harness-path.txt").write_text(harnesses[0] + "\n", encoding="utf-8", newline="\n")
           PY
-      - name: Measure both paths with the existing native performance budgets
+      - name: Measure both paths against the modular release performance budgets
         shell: bash
         run: |
           set -o pipefail

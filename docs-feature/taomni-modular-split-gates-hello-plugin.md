@@ -87,8 +87,10 @@ The hosted protocol workflow can also run the Linux X11 comparison with
 the product X11 capture, input, bitmap preparation and IronRDP encoder both
 in one process and with the encoder in a child process. The child takes one
 bitmap at a time over the authenticated loopback WebSocket. The comparison
-uses the connection, latency and throughput assertions from the existing
-native case and retains the probe reports and encoder process receipts. X11
+uses the connection and throughput assertions from the existing native case
+and retains the probe reports and encoder process receipts. For G5, the
+user-approved p95 allowance doubles the case's 65 ms reference to 130 ms.
+The comparison and installed release checks capture the applied limit. X11
 uses a fixed desktop size for these trials. The normal packaged app still
 uses its in-process RDP path. The real module lifecycle, Wayland and the
 Windows and macOS capture paths remain separate G5 work.

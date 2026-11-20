@@ -327,6 +327,7 @@ def make_plan(args) -> dict:
     return {"schema": "qa-ui-auto.ci-selection.v1", "groups": groups, "builds": builds, "head": head, "base": base,
             "linux_profiles": linux_profiles, "macos_runner": macos_runner,
             "native_release": bool(getattr(args, "native_release", False)),
+            "modular_rdp_p95": bool(getattr(args, "modular_rdp_p95", False)),
             "merge_base": ancestor, "scope": args.scope, "changed_paths": changed,
             "identity": execution_identity(Path.cwd()), "reasons": reasons, "impact": impact,
             "entries": entries, "gaps": gaps, "no_relevant_changes": not entries,
@@ -492,6 +493,8 @@ def main(argv=None):
     plan.add_argument("--browser-workers", type=int, default=int(os.environ.get("QA_BROWSER_WORKERS") or 2))
     plan.add_argument("--native-release", action="store_true",
                       default=os.environ.get("QA_NATIVE_RELEASE", "").lower() in {"true", "1"})
+    plan.add_argument("--modular-rdp-p95", action="store_true",
+                      default=os.environ.get("QA_MODULAR_RDP_P95", "").lower() in {"true", "1"})
     plan.add_argument("--output", type=Path, default=Path("qa-ui-auto-report/selection.json"))
     report = subs.add_parser("report")
     report.add_argument("--selection", type=Path, required=True)

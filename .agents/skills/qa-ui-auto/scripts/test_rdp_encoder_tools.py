@@ -15,9 +15,47 @@ from unittest.mock import MagicMock, Mock, patch
 from qa_ui_auto import rdp_steps as steps
 from qa_ui_auto.fixtures import xrdp_server_required as xrdp
 from qa_ui_auto.fixtures import rdp_baseline_required as baseline
+from qa_ui_auto.provenance import conditions_identity
 from qa_ui_auto.rdp_helpers.rdp_target import animation_delay_ms, photo_noise
 from qa_ui_auto.rdp_helpers import mstsc
+from qa_ui_auto.rdp_helpers.report_assertions import check_expectations, report_expectations
 from qa_ui_auto.steps import StepError
+
+
+class ModularRdpP95Tests(unittest.TestCase):
+    def test_native_assertion_records_the_modular_p95_limit(self):
+        config = {"rdp": {"modular_p95": True}}
+        self.assertNotEqual(conditions_identity(config, "native"), conditions_identity({}, "native"))
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            (directory / "perf-latency.json").write_text('{"latency_ms":{"p95":130}}', encoding="utf-8")
+            context = SimpleNamespace(case_dir=directory, cfg=config)
+            result = steps._do_assert_json_file(context, {
+                "path": "perf-latency.json", "expect": {"latency_ms.p95": {"max": 65}},
+            })
+        self.assertEqual(result, "perf-latency.json satisfies the modular p95 limit of 130 ms")
+
+    def test_only_the_modular_latency_assertion_doubles_its_maximum(self):
+        step = {"path": "perf-latency.json", "expect": {
+            "latency_ms.p95": {"max": 65},
+            "latency_ms.count": {"min": 36},
+        }}
+        ordinary = report_expectations(step, modular_rdp_p95=False)
+        modular = report_expectations(step, modular_rdp_p95=True)
+        self.assertEqual(ordinary["latency_ms.p95"], {"max": 65})
+        self.assertEqual(modular["latency_ms.p95"], {"max": 130})
+        self.assertEqual(modular["latency_ms.count"], {"min": 36})
+        self.assertEqual(step["expect"], ordinary)
+        for value, count, passed in [(129.9, 40, True), (130, 40, True), (130.1, 40, False), (42, 35, False)]:
+            with self.subTest(value=value, count=count):
+                report = {"latency_ms": {"p95": value, "count": count}}
+                self.assertEqual(not check_expectations(report, modular, "G5"), passed)
+        self.assertTrue(check_expectations({"latency_ms": {"p95": 73.79, "count": 40}}, ordinary, "M2"))
+        for other in [
+            {"path": "perf-connect.json", "expect": {"first_graphics_ms": {"max": 500}}},
+            {"path": "perf-throughput.json", "expect": {"marker.observed_fps": {"min": 25.6}, "kbps": {"max": 4905}}},
+        ]:
+            self.assertEqual(report_expectations(other, modular_rdp_p95=True), other["expect"])
 
 
 class EncoderToolsTest(unittest.TestCase):
