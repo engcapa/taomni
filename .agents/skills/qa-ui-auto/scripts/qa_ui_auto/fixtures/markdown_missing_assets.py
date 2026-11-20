@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import io
+import json
 from pathlib import Path
 
 from . import platform_workspace_root
@@ -63,6 +64,7 @@ def setup(ctx):
     else:
         ctx.page.evaluate("""async ({root, files}) => {
           const vfs = await import('/src/stubs/localVfs.ts');
+          try { await vfs.vfsStat(root + '/assets'); } catch { await vfs.vfsMkdir(root + '/assets'); }
           for (const [name, bytes] of Object.entries(files)) {
             await vfs.vfsWriteBytes(root + '/' + name, new Uint8Array(bytes).buffer);
           }
@@ -73,6 +75,14 @@ def setup(ctx):
         markdown_missing_exports=root + "/exports",
         markdown_missing_sha=hashlib.sha256(source).hexdigest(),
     )
+    ctx.case_dir.mkdir(parents=True, exist_ok=True)
+    (ctx.case_dir / "file-open-fixture.json").write_text(json.dumps({
+        "schema": "qa.file-open-fixture.v1",
+        "mode": "native" if native else "browser",
+        "root": root,
+        "files": {name: hashlib.sha256(data).hexdigest() for name, data in files.items()},
+        "boundary": "Browser reads VFS bytes; native reads isolated host bytes independently of the viewer.",
+    }, ensure_ascii=False, indent=2) + "\n", encoding="utf-8")
 
 
 def teardown(ctx):

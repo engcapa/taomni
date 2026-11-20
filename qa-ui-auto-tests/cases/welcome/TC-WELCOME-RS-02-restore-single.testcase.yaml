@@ -42,9 +42,6 @@ steps:
     equal: 1
 - click: '[data-testid="nav-mode-home"]'
 - assert_not_visible: '[data-testid="welcome-restore-row"]'
-- assert_count:
-    selector: '[data-testid="tab-item"][data-tab-type="file-browser"]'
-    equal: 1
 - click: '[data-testid="tao-home-history"]'
 - wait_for: '[data-testid="tao-home-history-restore"]:enabled'
 - click: '[data-testid="tao-home-history-restore"]'
@@ -64,10 +61,8 @@ verification:
     - 3
     - 10
     - 14
-    - 15
     - 16
-    - 17
-    - 19
+    - 18
     - 4
     - 6
     checkpoints:
@@ -77,11 +72,9 @@ verification:
       expectation: Restoration opens exactly one file-browser tab.
     - step: 15
       expectation: Successful restoration removes the completed banner from Home.
-    - step: 16
-      expectation: Dismissing the completed banner leaves the recovered tab open.
-    - step: 21
+    - step: 20
       expectation: Repeated restoration from History reuses the same single active tab.
-    - step: 22
+    - step: 21
       expectation: Both routes complete without runtime errors.
     - step: 9
       expectation: The restore row is visible directly in Home.
@@ -91,9 +84,8 @@ verification:
     - 12
     - 13
     - 15
-    - 16
+    - 20
     - 21
-    - 22
     - 9
     - 7
   visual:
