@@ -172,3 +172,24 @@ test("a core release inherits the published roster and advances past a module-on
   assert.equal(catalog.plugins["taomni-plugin-next"].description, "New feature");
 });
 
+test("a changed module can be staged against a roster containing other modules", (t) => {
+  const f = fixture(t);
+  const next = moduleManifest({ description: "Updated feature", platforms: ["linux-x86_64"] });
+  f.add("linux-x86_64", "next", next);
+  const previous = join(f.root, "published.json");
+  writeFileSync(previous, JSON.stringify({ sequence: 42, legacyUpgrade: [next.id, "taomni-plugin-mail"] }));
+  const script = fileURLToPath(new URL("./compose-modules-manifest.mjs", import.meta.url));
+  const result = spawnSync(process.execPath, [script, f.artifacts, f.output, "--delta"], {
+    env: {
+      TAG: "v0.6.0-hello.2", GITHUB_REPOSITORY: "engcapa/taomni", MODULE_SEQUENCE: "11",
+      MODULES_PUBLISHED_CATALOG: previous,
+    },
+    encoding: "utf8",
+  });
+  assert.equal(result.status, 0, result.stderr);
+  const catalog = JSON.parse(readFileSync(join(f.output, "modules.json"), "utf8"));
+  assert.equal(catalog.sequence, 43);
+  assert.equal(catalog.legacyUpgrade, undefined);
+  assert.deepEqual(Object.keys(catalog.plugins), [next.id]);
+});
+

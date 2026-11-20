@@ -561,6 +561,9 @@ jobs:
     needs: [plan, build, build-macos]
     runs-on: ubuntu-22.04
     if: needs.plan.outputs.tag != ''
+    concurrency:
+      group: taomni-release-catalog-publication
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

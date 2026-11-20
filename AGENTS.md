@@ -43,7 +43,8 @@ forward the last verified `modules.json` and its signature without rebuilding
 module packages. A module-only change builds and publishes that module for all
 declared platforms, preserves the other catalog entries and the frozen
 `legacyUpgrade` roster, increments the catalog sequence, and publishes the new
-signed `modules.json` without publishing a new core installer. A change that
+signed catalog and packages to a module release. It then updates the catalog
+assets on the latest core release. A change that
 touches both produces both asset sets in one draft release and publishes both
 manifests after their respective gates pass. Module assets remain separate
 GitHub Release assets and are never embedded into the core installer.

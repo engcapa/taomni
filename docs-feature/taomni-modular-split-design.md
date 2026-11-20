@@ -758,7 +758,7 @@ TC-MODULES-027 在 GitHub 安装固定哈希的正式 deb/MSI/DMG，由旧程序
 ### 7.6 核心与模块差异发布规则（v1.7）
 
 - **只改核心**：构建新的核心安装包和 `latest.json`。发布工作流从上一份正式目录继承原始 `modules.json` 与 `modules.json.minisig`，把目录文件带到新的核心 Release，模块包继续使用原 Release 的资产地址，不重新构建或上传未变化模块。
-- **只改模块**：只构建该模块声明的全部平台包。以已发布目录和全部原始模块资产为基线生成完整的新 `modules.json`，保留 `legacyUpgrade` 和未变化模块的原始 URL，只上传变化模块的新包及签名，再上传目录签名和目录。核心安装包与 `latest.json` 不参与这次发布。
+- **只改模块**：只构建该模块声明的全部平台包。以已发布目录和全部原始模块资产为基线生成完整的新 `modules.json`，保留 `legacyUpgrade` 和未变化模块的原始 URL。新的包、签名及目录快照保存在独立的模块 Release。该 Release 可下载后，把验签的目录签名与目录同步到 Latest 核心 Release，商店继续从固定入口刷新。
 - **核心与模块同时改**：在同一 draft Release 中上传两组资产。所有包和签名完成校验后，最后上传 `modules.json`、`modules.json.minisig` 和 `latest.json`。
 - 模块目录始终是完整目录，Release 资产按变化集合增量保存。核心 API 大版本变化时，所有受影响模块必须重新适配并发布。
 

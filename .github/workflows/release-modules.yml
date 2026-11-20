@@ -65,6 +65,7 @@ jobs:
     runs-on: ubuntu-24.04
     outputs:
       sha: ${{ steps.source.outputs.sha }}
+      committed_at: ${{ steps.source.outputs.committed_at }}
       slug: ${{ steps.source.outputs.slug }}
       package: ${{ steps.source.outputs.package }}
       version: ${{ steps.source.outputs.version }}
@@ -124,6 +125,7 @@ jobs:
           output = os.environ['GITHUB_OUTPUT']
           with open(output, 'a', encoding='utf-8') as stream:
               stream.write(f"sha={subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()}\n")
+              stream.write(f"committed_at={subprocess.check_output(['git', 'show', '-s', '--format=%cI', 'HEAD'], text=True).strip()}\n")
               stream.write(f'slug={slug}\npackage={package}\nversion={manifest["version"]}\n')
               stream.write('matrix=' + json.dumps({'include': targets}, separators=(',', ':')) + '\n')
               stream.write(f"macos_runner={os.environ['MACOS_RUNNER']}\n")
@@ -261,6 +263,9 @@ jobs:
     if: needs.source.result == 'success' && needs.sign.result == 'success'
     runs-on: ubuntu-24.04
     timeout-minutes: 30
+    concurrency:
+      group: taomni-release-catalog-publication
+      cancel-in-progress: false
     env:
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
       GH_REPO: ${{ github.repository }}
@@ -270,7 +275,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: ${{ needs.source.outputs.sha }}
+          ref: ${{ github.workflow_sha }}
           persist-credentials: false
       - uses: actions/setup-node@v4
         with:
@@ -291,49 +296,90 @@ jobs:
           path: signed-artifacts
           merge-multiple: false
       - name: Stage the signed public catalog baseline
+        id: catalog-baseline
         run: |
           set -euo pipefail
-          node scripts/stage-published-module-catalog.mjs current-catalog
-          scripts/plugin-package/target/release/taomni-plugin-package --verify-catalog current-catalog
+          core_tag="$(gh release view --json tagName,assets --jq 'select(any(.assets[]; .name == "latest.json")).tagName')"
+          if [[ -z "$core_tag" || "$core_tag" == "$TAG" ]]; then
+            echo 'Use a separate module tag and start from a published core release.' >&2
+            exit 1
+          fi
+          catalog_source="$(node scripts/stage-published-module-catalog.mjs current-catalog)"
+          test "$catalog_source" = "source_tag=$core_tag"
+          scripts/plugin-package/target/release/taomni-plugin-package --verify-catalog-signature current-catalog
           node scripts/fetch-published-module-assets.mjs current-catalog current-catalog
-      - name: Compose, merge and sign the next catalog
+          scripts/plugin-package/target/release/taomni-plugin-package --verify-catalog current-catalog
+          echo "core_tag=$core_tag" >> "$GITHUB_OUTPUT"
+      - name: Compose and merge the next module catalog
         env:
           MODULES_PUBLISHED_CATALOG: current-catalog/modules.json
           MODULE_SEQUENCE: ${{ github.run_number }}
           MODULES_REQUIRE_SIGNATURE: '0'
+          MODULE_UPDATED_AT: ${{ needs.source.outputs.committed_at }}
         run: |
           set -euo pipefail
-          export MODULE_UPDATED_AT="$(git show -s --format=%cI "$MODULE_SOURCE_SHA")"
           mkdir -p changed-modules
           find signed-artifacts -type f -name '*.taomni-plugin' -exec cp {} changed-modules/ \;
           find signed-artifacts -type f -name '*.taomni-plugin.minisig' -exec cp {} changed-modules/ \;
           test "$(find changed-modules -type f -name '*.taomni-plugin' | wc -l)" = 4
-          node scripts/compose-modules-manifest.mjs changed-modules changed-catalog
+          node scripts/compose-modules-manifest.mjs changed-modules changed-catalog --delta
           scripts/plugin-package/target/release/taomni-plugin-package \
             --prepare-catalog-update current-catalog changed-catalog next-catalog > new-assets.json
-          scripts/plugin-package/target/release/taomni-plugin-package --sign-catalog next-catalog
+      - name: Sign the complete module catalog
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: scripts/plugin-package/target/release/taomni-plugin-package --sign-catalog next-catalog
+      - name: Verify and record the signed catalog
+        run: |
+          set -euo pipefail
           scripts/plugin-package/target/release/taomni-plugin-package --verify-catalog next-catalog
-          git rev-parse HEAD > module-release-evidence-source-sha.txt
+          printf '%s\n' "$MODULE_SOURCE_SHA" > module-release-evidence-source-sha.txt
           cp next-catalog/modules.json module-release-evidence-modules.json
           cp new-assets.json module-release-evidence-assets.json
       - name: Create or reuse the draft module release
         run: |
           set -euo pipefail
-          if ! gh release view "$TAG" >/dev/null 2>&1; then
+          if core_manifest="$(gh release view "$TAG" --json assets --jq 'any(.assets[]; .name == "latest.json")' 2>/dev/null)"; then
+            test "$core_manifest" = false
+          else
             gh release create "$TAG" --draft --title "Taomni modules $TAG" --generate-notes --target "$MODULE_SOURCE_SHA"
           fi
       - name: Upload changed packages before the signed catalog
         run: |
           set -euo pipefail
           python - <<'PY'
-          import json, os, subprocess
-          for name in json.loads(open('new-assets.json', encoding='utf-8').read()):
-              subprocess.run(['gh', 'release', 'upload', os.environ['TAG'], f'next-catalog/{name}', '--clobber'], check=True)
+          import filecmp, json, os, pathlib, subprocess, tempfile
+
+          tag = os.environ['TAG']
+          release = json.loads(subprocess.check_output(['gh', 'release', 'view', tag, '--json', 'assets'], text=True))
+          existing = {asset['name'] for asset in release['assets']}
+          for name in json.loads(pathlib.Path('new-assets.json').read_text(encoding='utf-8')):
+              candidate = f'next-catalog/{name}'
+              if name not in existing:
+                  subprocess.run(['gh', 'release', 'upload', tag, candidate], check=True)
+                  continue
+              with tempfile.TemporaryDirectory() as work:
+                  downloaded = str(pathlib.Path(work) / name)
+                  subprocess.run(['gh', 'release', 'download', tag, '--pattern', name, '--output', downloaded], check=True)
+                  if not filecmp.cmp(downloaded, candidate, shallow=False):
+                      raise SystemExit(f'Existing release asset has different bytes: {name}')
           PY
           gh release upload "$TAG" next-catalog/modules.json.minisig --clobber
           gh release upload "$TAG" next-catalog/modules.json --clobber
-      - name: Publish the draft after all module assets are present
-        run: gh release edit "$TAG" --draft=false
+      - name: Publish the module assets and update the core release catalog
+        env:
+          CORE_TAG: ${{ steps.catalog-baseline.outputs.core_tag }}
+        run: |
+          set -euo pipefail
+          gh release edit "$TAG" --draft=false --latest=false
+          test "$(gh release view --json tagName --jq .tagName)" = "$CORE_TAG"
+          if ! gh release upload "$CORE_TAG" next-catalog/modules.json.minisig --clobber \
+            || ! gh release upload "$CORE_TAG" next-catalog/modules.json --clobber; then
+            gh release upload "$CORE_TAG" current-catalog/modules.json.minisig --clobber
+            gh release upload "$CORE_TAG" current-catalog/modules.json --clobber
+            exit 1
+          fi
       - uses: actions/upload-artifact@v4
         if: always()
         with:

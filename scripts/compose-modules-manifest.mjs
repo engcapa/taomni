@@ -239,8 +239,10 @@ export function composeModulesManifest({
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
-  const [artifactsDir, outputDir] = process.argv.slice(2);
-  if (!artifactsDir || !outputDir) throw new Error("Usage: node scripts/compose-modules-manifest.mjs <artifacts-dir> <staging-dir>");
+  const [artifactsDir, outputDir, mode, ...extra] = process.argv.slice(2);
+  if (!artifactsDir || !outputDir || (mode && mode !== "--delta") || extra.length) {
+    throw new Error("Usage: node scripts/compose-modules-manifest.mjs <artifacts-dir> <staging-dir> [--delta]");
+  }
   const published = process.env.MODULES_PUBLISHED_CATALOG
     ? readJson(process.env.MODULES_PUBLISHED_CATALOG, "published modules.json") : null;
   if (published && (!Number.isSafeInteger(published.sequence) || published.sequence < 1)) {
@@ -258,7 +260,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
     updatedAt: process.env.MODULE_UPDATED_AT ?? new Date().toISOString(),
     requireManifestSignature: process.env.MODULES_REQUIRE_SIGNATURE === "1",
     manifestSignaturePath: process.env.MODULES_MANIFEST_SIGNATURE,
-    legacyUpgrade: configuredRoster?.length ? configuredRoster : published?.legacyUpgrade,
+    legacyUpgrade: mode === "--delta" ? undefined : (configuredRoster?.length ? configuredRoster : published?.legacyUpgrade),
   });
   console.log(`Staged ${result.assets.length} plugin packages for ${Object.keys(result.manifest.plugins).length} plugins${result.signedManifest ? " with signed modules.json" : ""}`);
 }

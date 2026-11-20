@@ -102,8 +102,9 @@ higher sequence number and the current public GitHub Release tag for the new
 assets. Use `MODULES_LEGACY_UPGRADE_IDS` when composing the first catalog.
 
 ```bash
-TAG=v0.6.0 MODULE_SEQUENCE=22 GITHUB_REPOSITORY=engcapa/taomni \
-  node scripts/compose-modules-manifest.mjs changed-artifacts changed-modules
+TAG=v0.6.0-mail.1 MODULE_SEQUENCE=22 GITHUB_REPOSITORY=engcapa/taomni \
+  MODULES_PUBLISHED_CATALOG=current-modules/modules.json \
+  node scripts/compose-modules-manifest.mjs changed-artifacts changed-modules --delta
 scripts/plugin-package/target/release/taomni-plugin-package \
   --prepare-catalog-update current-modules changed-modules next-modules > new-assets.json
 scripts/plugin-package/target/release/taomni-plugin-package --sign-catalog next-modules
@@ -113,10 +114,11 @@ scripts/plugin-package/target/release/taomni-plugin-package --verify-catalog nex
 The preparation command verifies the baseline signature and the packages,
 keeps the first-upgrade roster, and copies the complete catalog and its
 referenced packages into a fresh staging directory. Its JSON output lists the
-new immutable files to upload. Upload those packages and sidecars before
-publishing `modules.json.minisig` and then `modules.json`. Keep the catalog
-available at the release URL the application checks. The core installer and
-`latest.json` are separate release assets.
+new immutable files to upload. The module release uploads those files and the
+signed catalog, then becomes public with GitHub's Latest designation disabled.
+The workflow copies `modules.json.minisig` and `modules.json` to the latest core
+release after the referenced assets are public. The store and the core updater
+use the two manifest files at that release.
 
 After the first modular release, the core release workflow carries the original
 signed catalog bytes to a new core release when only the core changes. Package
