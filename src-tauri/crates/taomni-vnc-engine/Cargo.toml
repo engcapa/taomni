@@ -29,6 +29,7 @@ tokio-tungstenite = "0.29"
 tokio-util = "0.7"
 tracing = "0.1"
 uuid = { version = "1", features = ["v4"] }
+zeroize = { version = "1", features = ["serde"] }
 # Persistent-stream inflate for VNC ZRLE and Tight (VNC-PERF-003).
 zlib-rs = { version = "0.6", default-features = false, features = ["std"] }
 zune-core = "0.5"

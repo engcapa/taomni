@@ -1,5 +1,14 @@
 # 模块化实施与验收台账
 
+## 2026-11-21 当前进展
+
+- 重新拉取的远程 `main` 为 `afb7cf593`（#841），`refactor/modules-arch` 已包含该提交。`7346956d8` 新增独立 VNC 会话宿主。桌面 VNC 复用现有代理和 SSH 跳板解析，跳板经单次认证的本机桥接传输。独立宿主以同一协议接收桌面转发。TC-156 增加关闭重开后的画布和按键回归。宿主单测、核心编译和用例审计通过。正式模块的生产路由、动态前端及签名包接线按 TASK-016 继续。 [VNC 宿主提交](https://github.com/engcapa/taomni/commit/7346956d88d3e67b98ed4cf5b3f439233e20993b)
+- `ae46db7a9` 的 Mail 签名迁移专项成功。四个发布目标均产出签名模块包，Linux、Windows、macOS ARM64 的三份迁移回执均与源码、用例清单、核心及模块包身份匹配。回执覆盖隔离旧数据到已提交 Mail 宿主的迁移，完整单体安装升级和系统信任待实装验收。原始资料在 `qa-ui-auto-report/github/44726111709/live-contracts/`。 [Mail 专项](https://github.com/engcapa/taomni/actions/runs/44726111709)
+- 同一源码的 UI 批次在执行中收齐 18 片。Linux、Windows、macOS Browser 分别为 34/34、34/34、33/34，Native 分别为 38/39、37/38、33/38。Linux 的 039 和 macOS 的 038 在迁移后等待 MFA 账户失败。`c0918edf4` 修复了 039 已定位的 `capture.still` 协商问题，两项在新源码复验。剩余失败涉及文件对话框、只读保存和 Home 恢复，原始失败保留。已下载分片、选集、构建身份和逐片核验位于 `qa-ui-auto-report/github/44725968775/live-shards/`。 [Browser 与 Native](https://github.com/engcapa/taomni/actions/runs/44725968775)
+- `7346956d8` 的 VNC 进程用例在 Linux、Windows 和 macOS ARM64 各通过 2 项。同轮 Mail 跨进程用例的夹具把 RPC 方法名当作请求 ID，重复查询被协议拒绝。`380513bed` 改用递增请求 ID，生产协议继续拒绝重复 ID。工件在 `qa-ui-auto-report/github/44735256214/live-contracts/`。 [协议专项](https://github.com/engcapa/taomni/actions/runs/44735256214)
+- macOS 26 ARM64 的 `912c9050d` 构建因 `kdb5_util` 静态链接存在重复符号而退出。`8b9661bff` 按上游依赖顺序构建实验所需库和元数据，GitHub 已产出 DMG、更新归档及签名。实装首轮在旧版签名工具的大小写单测停下。工具分支 `4f3dfe777` 同步已验证的修复，以相同 `8b9661bff` 应用源码和 DMG 复验匹配证书的宿主启动及升级。原始包在 `qa-ui-auto-report/github/44736301048/live-contracts/`。 [候选 DMG](https://github.com/engcapa/taomni/actions/runs/44736301048) · [实装复验](https://github.com/engcapa/taomni/actions/runs/44768215797)
+- 以 130 ms 为 G5 p95 上限的三端采集和编码对照共通过 18 项。Linux 安装格式的 G4 恢复和 G6 强退有实装记录。正式候选仍需补齐 G1–G3 系统信任与权限、Windows 和 macOS 实装 G6、G9 的核心依赖裁剪，以及 G11 的完整入口矩阵，再逐项绑定同一发布候选的 GitHub 回执。 [G5 三端对照](https://github.com/engcapa/taomni/actions/runs/44674876677)
+
 ## 2026-11-19 首次全量安装与后续按需升级
 
 - `b34634e0d` 将仍处于迁移过渡期的 `MfaBackend` 从 `AppState` 顶层移入显式 `LegacyFeatureRuntime`，备份、升级、命令和 MFA facade 均改用 `state.legacy.mfa`。这只收口状态所有权边界，未把 MFA 业务标记为已迁出。`cargo check --lib --no-default-features`、相关 Rust 编译测试、`pnpm check:refactor` 和 `git diff --check` 通过。匹配源码的 hosted UI 复验为 #44526631104，完成 shard 会在运行期间下载。

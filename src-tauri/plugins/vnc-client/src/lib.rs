@@ -1,5 +1,5 @@
 //! Standalone VNC session owner. The desktop owns saved sessions and supplies
-//! the original endpoint or a loopback endpoint for an existing proxy route.
+//! the original endpoint or a single-use authenticated loopback route.
 
 mod request;
 mod sessions;

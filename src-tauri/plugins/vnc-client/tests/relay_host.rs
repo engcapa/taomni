@@ -15,6 +15,8 @@ use taomni_plugin_api::{
     CancelRequest, ErrorCode, HandshakeRequest, RpcMessage, RpcRequest, RpcResponse,
     services::{HOST_PROFILE_ENV, HostProfileContext, ProfileGeneration},
 };
+use taomni_vnc_engine::ws::forward::ForwardRoute;
+use tokio::net::TcpStream;
 use tokio_tungstenite::{
     connect_async,
     tungstenite::{Message, client::IntoClientRequest, http::header},
@@ -174,20 +176,39 @@ fn desktop_fixture() -> (u16, thread::JoinHandle<()>) {
     (port, server)
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[ignore = "real sockets and a standalone VNC module process on GitHub"]
 async fn relay_host_paints_and_closes_sessions_and_exits_with_live_streams() {
     let temporary = tempfile::tempdir().unwrap();
     let mut host = Host::start(&temporary.path().canonicalize().unwrap());
     for command in ["close", "exit"] {
         let (port, server) = desktop_fixture();
+        let upstream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+        let (route, forward) = ForwardRoute::bind(upstream).await.unwrap();
+        let params = serde_json::to_value(&route).unwrap();
+        let mut invalid = params.clone();
+        invalid["token"] = json!("0".repeat(64));
+        let invalid: ForwardRoute = serde_json::from_value(invalid).unwrap();
+        assert!(
+            tokio::time::timeout(WAIT, invalid.connect())
+                .await
+                .unwrap()
+                .is_err()
+        );
+
         let session = host.call(
             command,
             "vnc/start",
             json!({
-                "host":"vnc-fixture.example","port":5900,"forwardPort":port,
+                "host":"vnc-fixture.example","port":5900,"forward":params,
                 "securityPolicy":"allow-none","allowUnencrypted":true
             }),
+        );
+        assert!(
+            tokio::time::timeout(WAIT, route.connect())
+                .await
+                .unwrap()
+                .is_err()
         );
         let ws_port = session["ws_port"].as_u64().unwrap();
         let mut request = format!("ws://127.0.0.1:{ws_port}/vnc")
@@ -236,6 +257,7 @@ async fn relay_host_paints_and_closes_sessions_and_exits_with_live_streams() {
         } else {
             host.exit();
         }
+        tokio::time::timeout(WAIT, forward).await.unwrap().unwrap();
         server.join().unwrap();
         tokio::time::timeout(WAIT, async {
             while let Some(Ok(message)) = socket.next().await {
@@ -249,44 +271,67 @@ async fn relay_host_paints_and_closes_sessions_and_exits_with_live_streams() {
     }
 }
 
-#[tokio::test]
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
 #[ignore = "real sockets and a standalone VNC module process on GitHub"]
 async fn cancellation_during_rfb_negotiation_releases_the_transport() {
     let temporary = tempfile::tempdir().unwrap();
     let mut host = Host::start(&temporary.path().canonicalize().unwrap());
-    let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0))
+    for (id, forwarded) in [("cancel-direct", false), ("cancel-forwarded", true)] {
+        let listener = tokio::net::TcpListener::bind(("127.0.0.1", 0))
+            .await
+            .unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let mut params = json!({"host":"127.0.0.1","port":port});
+        let forward = if forwarded {
+            let upstream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+            let (route, task) = ForwardRoute::bind(upstream).await.unwrap();
+            params["forward"] = serde_json::to_value(route).unwrap();
+            Some(task)
+        } else {
+            None
+        };
+        host.send(RpcMessage::Request(RpcRequest::new(
+            id,
+            "vnc/start",
+            Some(params),
+        )));
+        let (mut peer, _) = tokio::time::timeout(WAIT, listener.accept())
+            .await
+            .unwrap()
+            .unwrap();
+        // Complete banner exchange so cancellation exercises an open RFB socket.
+        tokio::time::timeout(WAIT, async {
+            use tokio::io::{AsyncReadExt, AsyncWriteExt};
+            peer.write_all(b"RFB 003.008\n").await.unwrap();
+            let mut banner = [0; 12];
+            peer.read_exact(&mut banner).await.unwrap();
+            assert_eq!(&banner, b"RFB 003.008\n");
+        })
         .await
         .unwrap();
-    let port = listener.local_addr().unwrap().port();
-    let id = "cancel-start";
-    host.send(RpcMessage::Request(RpcRequest::new(
-        id,
-        "vnc/start",
-        Some(json!({"host":"127.0.0.1","port":port})),
-    )));
-    let (mut peer, _) = tokio::time::timeout(WAIT, listener.accept())
-        .await
-        .unwrap()
-        .unwrap();
-    host.send(RpcMessage::Notification(
-        CancelRequest {
-            request_id: id.into(),
-            reason: None,
+        host.send(RpcMessage::Notification(
+            CancelRequest {
+                request_id: id.into(),
+                reason: None,
+            }
+            .notification(),
+        ));
+        let response = host.response(id);
+        assert_eq!(
+            response.error.unwrap().code,
+            ErrorCode::RequestCancelled.as_i32()
+        );
+        let mut byte = [0];
+        let read = tokio::time::timeout(WAIT, tokio::io::AsyncReadExt::read(&mut peer, &mut byte))
+            .await
+            .unwrap();
+        match read {
+            Ok(size) => assert_eq!(size, 0),
+            Err(error) => assert_eq!(error.kind(), std::io::ErrorKind::ConnectionReset),
         }
-        .notification(),
-    ));
-    let response = host.response(id);
-    assert_eq!(
-        response.error.unwrap().code,
-        ErrorCode::RequestCancelled.as_i32()
-    );
-    let mut byte = [0];
-    let read = tokio::time::timeout(WAIT, tokio::io::AsyncReadExt::read(&mut peer, &mut byte))
-        .await
-        .unwrap();
-    match read {
-        Ok(size) => assert_eq!(size, 0),
-        Err(error) => assert_eq!(error.kind(), std::io::ErrorKind::ConnectionReset),
+        if let Some(task) = forward {
+            tokio::time::timeout(WAIT, task).await.unwrap().unwrap();
+        }
     }
     host.exit();
 }

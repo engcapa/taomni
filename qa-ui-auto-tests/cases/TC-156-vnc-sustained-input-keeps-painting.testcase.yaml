@@ -1,7 +1,6 @@
 id: TC-156
 title: VNC keeps painting after sustained pointer and keyboard input
-description: 'Regression coverage for the freeze reported after a few mouse operations. Connect to the scriptable VNC fixture, verify the initial frame, send a sustained sequence of
-  pointer moves, left/right clicks and a key, then force three remote DesktopSize updates. The fixture must receive the input and the canvas must continue painting after the input burst.'
+description: 'Connect to the VNC fixture and verify that input and repaint survive three remote DesktopSize updates. Close the tab and reconnect to the saved session. Verify the new framebuffer and input.'
 covers:
 - F9.6
 tags:
@@ -126,6 +125,33 @@ steps:
     path: ${fixture.vnc_events}
     contains: '"keysym": 98, "keysym_hex": "0x62"'
 - assert_no_runtime_errors: null
+- click: '[data-testid="tab-item"][data-tab-type="vnc"][data-active="true"] [data-testid="tab-close"]'
+- assert_not_visible: '[data-testid="vnc-canvas"]'
+- dblclick: '[data-testid="session-tree-item"][data-session-name="qa-ui-auto-vnc-sustained-input"]'
+- wait_for:
+    selector: '[data-testid="vnc-unencrypted-continue"]'
+    timeout_sec: 20
+- click: '[data-testid="vnc-unencrypted-continue"]'
+- wait_for:
+    selector: '[data-testid="vnc-auth-password"]'
+    timeout_sec: 20
+- fill:
+    selector: '[data-testid="vnc-auth-password"]'
+    value: ${env.QA_VNC_PASSWORD}
+- click: '[data-testid="vnc-auth-ok"]'
+- wait_for:
+    selector: '[data-testid="vnc-canvas"][width="1024"][height="768"]'
+    timeout_sec: 20
+- eval_readonly:
+    expression: "document.querySelector('.vnc-container canvas')?.getContext('2d')?.getImageData(16, 16, 1, 1).data[3] === 255"
+    timeout_sec: 10
+- press:
+    key: c
+    selector: '[data-testid="vnc-canvas"]'
+- assert_file_contains:
+    path: ${fixture.vnc_events}
+    contains: '"keysym": 99, "keysym_hex": "0x63"'
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -229,6 +255,21 @@ verification:
     results:
     - 41
     - 42
+  - id: R4
+    requirement: Closing and reopening a saved VNC session creates a viewer that can authenticate, paint and send fresh input.
+    actions: [43, 45, 47, 49, 50, 53]
+    checkpoints:
+    - step: 44
+      expectation: The previous viewer disappears when the tab closes.
+    - step: 51
+      expectation: The reopened session uses the current remote framebuffer dimensions.
+    - step: 52
+      expectation: The canvas displays real pixels from the reopened connection.
+    - step: 54
+      expectation: The RFB fixture receives the new key from the reopened viewer.
+    - step: 55
+      expectation: The close and reopen complete without uncaught runtime errors.
+    results: [44, 51, 52, 54, 55]
   visual:
   - check: The final connected session shows the fixture gradient without a stale overlay, clipped canvas or frozen blank surface.
     method: manual

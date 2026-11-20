@@ -1,13 +1,14 @@
 # VNC client
 
 The provisional module host owns VNC connections and their WebSocket relays.
-It accepts a direct endpoint or the loopback port of a desktop-managed proxy
+It accepts a direct endpoint or an authenticated desktop-managed loopback
 route, then returns an ephemeral relay token and session ID. The host keeps
 live sessions in memory. The desktop owns saved session records and supplies
 credentials for each connection.
 
-The hosted protocol workflow verifies framebuffer bytes, cancellation during
-RFB setup, explicit close, and upstream socket release when the host exits.
+The hosted protocol workflow verifies single-use forwarding, framebuffer bytes,
+cancellation during RFB setup, explicit close, and upstream socket release when
+the host exits.
 Desktop tabs continue to use the existing adapter while the signed frontend,
 desktop routing and module packaging are being integrated.
 

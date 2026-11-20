@@ -1,4 +1,4 @@
-use std::{net::Ipv4Addr, time::Duration};
+use std::time::Duration;
 
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::Value;
@@ -7,9 +7,10 @@ use taomni_vnc_engine::{
     error::VncError,
     policy::{VncClipboardPolicy, VncSecurityPolicy},
     quality::VncPictureQuality,
-    ws::{RelayRequest, VncDialedTransport, VncRelayOptions},
+    ws::{RelayRequest, VncDialedTransport, VncRelayOptions, forward::ForwardRoute},
 };
 use tokio::net::TcpStream;
+use zeroize::Zeroizing;
 
 const MAX_CREDENTIAL_BYTES: usize = 64 * 1024;
 const TCP_TIMEOUT: Duration = Duration::from_secs(15);
@@ -20,8 +21,8 @@ pub(crate) struct Start {
     host: String,
     port: u16,
     username: Option<String>,
-    password: Option<String>,
-    forward_port: Option<u16>,
+    password: Option<Zeroizing<String>>,
+    forward: Option<ForwardRoute>,
     #[serde(default)]
     security_policy: VncSecurityPolicy,
     #[serde(default)]
@@ -55,16 +56,19 @@ impl Start {
             || self.host.contains(char::is_whitespace)
             || self.host.contains('\0')
             || self.port == 0
-            || self.forward_port == Some(0)
-            || [self.username.as_deref(), self.password.as_deref()]
-                .into_iter()
-                .flatten()
-                .any(|value| value.len() > MAX_CREDENTIAL_BYTES)
+            || self.forward.as_ref().is_some_and(|route| !route.is_valid())
+            || [
+                self.username.as_deref(),
+                self.password.as_deref().map(String::as_str),
+            ]
+            .into_iter()
+            .flatten()
+            .any(|value| value.len() > MAX_CREDENTIAL_BYTES)
         {
             return Err(RpcError::from_code(ErrorCode::InvalidParams));
         }
-        let dial = match self.forward_port {
-            Some(port) => Dial::Forwarded(port),
+        let dial = match self.forward {
+            Some(route) => Dial::Forwarded(route),
             None => Dial::Direct(self.host.clone(), self.port),
         };
         Ok((
@@ -89,15 +93,19 @@ impl Start {
 
 pub(crate) enum Dial {
     Direct(String, u16),
-    Forwarded(u16),
+    Forwarded(ForwardRoute),
 }
 
 impl Dial {
     pub(crate) async fn connect(self) -> Result<VncDialedTransport, String> {
         let stream = tokio::time::timeout(TCP_TIMEOUT, async {
             match self {
-                Self::Direct(host, port) => TcpStream::connect((host.as_str(), port)).await,
-                Self::Forwarded(port) => TcpStream::connect((Ipv4Addr::LOCALHOST, port)).await,
+                Self::Direct(host, port) => {
+                    let stream = TcpStream::connect((host.as_str(), port)).await?;
+                    stream.set_nodelay(true)?;
+                    Ok(stream)
+                }
+                Self::Forwarded(route) => route.connect().await,
             }
         })
         .await

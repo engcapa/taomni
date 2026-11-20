@@ -22,7 +22,7 @@ fn rejects_invalid_endpoints_and_caller_selected_proxy_hosts() {
     for input in [
         json!({"host":"","port":5900}),
         json!({"host":"vnc.example","port":0}),
-        json!({"host":"vnc.example","port":5900,"forwardPort":0}),
+        json!({"host":"vnc.example","port":5900,"forward":{"port":0,"token":"invalid"}}),
         json!({"host":"vnc.example","port":5900,"forwardHost":"outside.example"}),
     ] {
         let result =

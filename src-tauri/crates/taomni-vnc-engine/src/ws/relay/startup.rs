@@ -17,12 +17,13 @@ use tokio::net::TcpListener;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
+use zeroize::Zeroizing;
 
 pub struct RelayRequest {
     /// Original server name for the TLS handshake, including forwarded sessions.
     pub host: String,
     pub username: Option<String>,
-    pub password: Option<String>,
+    pub password: Option<Zeroizing<String>>,
     pub security_policy: VncSecurityPolicy,
     pub view_only: bool,
     pub clipboard_policy: VncClipboardPolicy,
@@ -103,7 +104,7 @@ async fn start_relay(
         rfb.set_shared(options.shared);
         let server_init = rfb.authenticate_with_policy(
             username.as_deref(),
-            password.as_deref(),
+            password.as_deref().map(String::as_str),
             security_policy,
         )?;
         // Encodings and pixel format come from the picture-quality profile
