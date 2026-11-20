@@ -9,6 +9,13 @@ import subprocess
 import time
 from collections.abc import Callable
 
+MODE_LEASE_DENIAL = {
+    "exitCode": 1,
+    "modeLeaseError": True,
+    "openedEndpoint": False,
+    "ownerStillRunning": True,
+}
+
 
 def sanitized_output(raw):
     return re.sub(r"(?im)^.*pairing code.*$", "[ephemeral pairing code omitted]", raw)
@@ -106,8 +113,7 @@ def initialize_profile(
                     record["argv"], lambda: process.poll() is None, evidence, label,
                 )
                 record["sameProfileContender"] = contender
-                if (contender["exitCode"] != 1 or not contender["modeLeaseError"]
-                        or contender["openedEndpoint"] or not contender["ownerStillRunning"]):
+                if contender != MODE_LEASE_DENIAL:
                     raise RuntimeError("Candidate did not reject a second headless process for the same profile")
             if observe_ready is not None:
                 observe_ready(process)

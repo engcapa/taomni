@@ -8,7 +8,7 @@ import time
 
 from modular_bundle_inventory import digest, write_json
 from qa_ui_auto.fixtures.core_profile_state import read_generation
-from qa_ui_auto.legacy_process import headless_command, initialize_profile, observe_same_profile_contender
+from qa_ui_auto.legacy_process import MODE_LEASE_DENIAL, headless_command, initialize_profile, observe_same_profile_contender
 
 
 def reserve_default_profile(evidence):
@@ -65,9 +65,7 @@ def check_mode_lease(executable, work, evidence):
                     evidence, "installed-headless-contender",
                 )
                 observation["headlessContender"] = contender
-                if contender != {
-                    "exitCode": 1, "modeLeaseError": True, "openedEndpoint": False, "ownerStillRunning": True,
-                }:
+                if contender != MODE_LEASE_DENIAL:
                     raise RuntimeError("The installed desktop did not reject a headless contender")
             finally:
                 if desktop.poll() is None:
@@ -80,9 +78,8 @@ def check_mode_lease(executable, work, evidence):
                 desktop_env=os.environ.copy(),
             )
             observation["desktopContender"] = contender
-            if (contender["exitCode"] in (None, 0) or not contender["modeLeaseError"]
-                    or contender["openedEndpoint"] or not contender["ownerStillRunning"]):
-                raise RuntimeError("The headless owner did not reject the installed desktop")
+            if contender != MODE_LEASE_DENIAL:
+                raise RuntimeError("The installed desktop did not report a mode conflict and exit with status 1")
 
         observation["headlessOwner"] = initialize_profile(
             executable, profile, work, evidence, "installed-headless-owner", observe_ready=check_desktop_conflict,

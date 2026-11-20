@@ -140,7 +140,8 @@ TASK-027 将 G1–G11 设为独立发布阻断门。每个门必须在匹配源�
 - Mail 的 mboxrd 编解码及 EML 换行规范化已迁入 `taomni-mail-engine`。现有导入导出入口使用同一套字节转换，保留 Rust 的 IMAP 往返用例。独立引擎 13 项单测和 11 项模块依赖边界单测通过。
 - `1b1b7be08` 验证工具使用 Windows MSI `57d87b7ed` 和 macOS 26 ARM64 DMG `514c95edb`，两端均通过 GUI 与 headless 双向互斥、generation 保留、原 SSH/VNC 会话及安装回滚。两次被拒绝的进程均未建立监听端口，原模式继续运行。另有 Intel DMG 和匹配源码的四目标构建，安装件上传后逐目标启动复验。 [Windows 实装](https://github.com/engcapa/taomni/actions/runs/44637271602) · [macOS ARM64 实装](https://github.com/engcapa/taomni/actions/runs/44637272024) · [macOS Intel](https://github.com/engcapa/taomni/actions/runs/44639372096) · [候选构建](https://github.com/engcapa/taomni/actions/runs/44637271292)
 - G11 双向互斥在早期 Windows 和 macOS 候选中触发了 GUI 启动 panic。桌面现在识别模式锁占用，在创建窗口和业务服务前记录冲突并退出 1。TC-MODULES-009 增加退出码断言，同时保留 owner 存活、无监听端口和重启后数据复原检查。7 项 Rust 单测、61 项 QA 工具单测、静态用例审计及重构边界检查通过。正常退出码由三端 Native 复验。
-- Windows G5 在同一 `windows-2025` runner 保留原目标和四项阈值，分别观察原桌面和静态背景下的两条编码路径。工件同时保留两组原始探针数据。 [Windows 对照](https://github.com/engcapa/taomni/actions/runs/44635990580)
+- Intel DMG 也通过了真实升级、双向互斥和回滚。候选源码为 `514c95edb`，验证工具源码为 `1b1b7be08`。桌面竞争者报出模式冲突后退出码为 -6，headless 竞争者退出码为 1。最新原生用例以 `5b3850f2e` 复验两个退出码，安装验证也已采用相同规则。 [Intel 实装](https://github.com/engcapa/taomni/actions/runs/44639372096) · [三端原生复验](https://github.com/engcapa/taomni/actions/runs/44644557238)
+- Windows G5 在同一 `windows-2025` runner 的两种背景下各收齐 40 个样本。首帧、动画帧率和带宽均达标。原桌面两条路径的 p95 为 91.95 / 88.65 ms，静态背景为 97.51 / 84.71 ms，均超过 65 ms 预算。四组实验的输入到绘制提交 p95 均低于 2 ms，时间主要耗在绘制提交至探针收到更新之间。静态背景下两条路径都用 Planar，仍超出预算。 [Windows 对照](https://github.com/engcapa/taomni/actions/runs/44635990580)
 - Mail 的发件、已发送副本和服务器草稿共用的 MIME 组装已迁入邮件引擎。桌面适配层解析账户和附件来源，把地址参数和取得的附件内容交给引擎。引擎 15 项及核心撰写和草稿 10 项单测通过。复用 `TC-MAIL-SEND-01`、`TC-MAIL-OUTBOX-01` 和 `TC-MAIL-ATTACH-01` 覆盖现有 Browser 与 Native 入口。
 
 ## 当前结论

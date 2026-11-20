@@ -6,15 +6,8 @@ from tempfile import TemporaryDirectory
 
 from .fixtures.backup_policy import isolated_data_root
 from .fixtures.core_profile_state import read_generation
-from .legacy_process import headless_command, initialize_profile, observe_same_profile_contender
+from .legacy_process import MODE_LEASE_DENIAL, headless_command, initialize_profile, observe_same_profile_contender
 from .steps import StepError
-
-MODE_LEASE_DENIAL = {
-    "exitCode": 1,
-    "modeLeaseError": True,
-    "openedEndpoint": False,
-    "ownerStillRunning": True,
-}
 
 
 def run(ctx, args):

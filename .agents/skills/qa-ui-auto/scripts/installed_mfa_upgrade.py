@@ -6,8 +6,6 @@ import json
 import os
 from pathlib import Path
 import platform
-import signal
-import subprocess
 from types import SimpleNamespace
 
 from ci_desktop import Desktop
@@ -22,7 +20,7 @@ from qa_ui_auto.fixtures.module_legacy_mfa import (
 )
 from qa_ui_auto.fixtures.module_signed_archive import load_artifact
 from qa_ui_auto.legacy_install import linux_install
-from qa_ui_auto.legacy_process import headless_command, initialize_profile, observe_same_profile_contender
+from qa_ui_auto.legacy_process import MODE_LEASE_DENIAL, headless_command, initialize_profile, observe_same_profile_contender
 from qa_ui_auto.legacy_release import RELEASE_VERSION, selected_asset, verify_asset
 from qa_ui_auto.native_steps import NativeStepContext
 
@@ -80,35 +78,20 @@ def verify_desktop_profile_lease(ctx, candidate, work, profile, evidence, observ
             evidence, "desktop-owns-mode-lease",
         )
         observation["headlessContender"] = contender
-        if (contender["exitCode"] != 1 or not contender["modeLeaseError"] or contender["openedEndpoint"]
-                or not contender["ownerStillRunning"]):
+        if contender != MODE_LEASE_DENIAL:
             raise RuntimeError("A headless process was not rejected while the installed desktop owned its profile")
         desktop_action(steps, "assert_text_equals", code)
         desktop_action(steps, "assert_no_runtime_errors", None)
         observation["desktopShutdown"] = close_verified_desktop(driver, session, candidate)
 
     def verify_gui_contender(owner):
-        log = evidence / "headless-owns-mode-lease-desktop.log"
-        with log.open("xb") as output, subprocess.Popen(
-            [str(candidate)], start_new_session=True, stdin=subprocess.DEVNULL, stdout=output,
-            stderr=subprocess.STDOUT,
-        ) as contender:
-            try:
-                exit_code = contender.wait(timeout=20)
-            except subprocess.TimeoutExpired:
-                try:
-                    os.killpg(contender.pid, signal.SIGKILL)
-                except ProcessLookupError:
-                    pass
-                exit_code = None
-        raw = log.read_text(encoding="utf-8", errors="replace")
-        denied = "Close the other Taomni mode using this profile first" in raw
-        owner_alive = owner.poll() is None
-        observation["desktopContender"] = {
-            "exitCode": exit_code, "modeLeaseError": denied, "ownerStillRunning": owner_alive,
-        }
-        if exit_code in (0, None) or not denied or not owner_alive:
-            raise RuntimeError("The installed desktop was not rejected while headless mode owned its profile")
+        contender = observe_same_profile_contender(
+            [str(candidate)], lambda: owner.poll() is None,
+            evidence, "headless-owns-mode-lease-desktop", desktop_env=environment,
+        )
+        observation["desktopContender"] = contender
+        if contender != MODE_LEASE_DENIAL:
+            raise RuntimeError("The installed desktop did not report a mode conflict and exit with status 1")
 
     with isolated_desktop(environment):
         observation["headlessAfterDesktopExit"] = initialize_profile(
