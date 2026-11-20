@@ -61,7 +61,15 @@ export function releaseSigningPlan(env) {
   environment.MACOS_NOTARIZE = String(hasNotarization);
   // Self-signed certificates have no Apple Team ID. Hardened runtime's
   // library validation would reject Taomni's bundled krb5 dylibs in that mode.
-  config.bundle.macOS = { hardenedRuntime: mode !== "self-signed" };
+  const staticKerberos = env.MACOS_STATIC_KRB5 === "true";
+  if (staticKerberos && (release || mode === "adhoc")) {
+    throw new Error("The static Kerberos comparison requires a fixed certificate and an artifact-only build.");
+  }
+  config.bundle.macOS = { hardenedRuntime: mode !== "self-signed" || staticKerberos };
+  if (staticKerberos) {
+    config.bundle.macOS.frameworks = [];
+    environment.MACOS_STATIC_KRB5 = "true";
+  }
   environment.TAURI_RELEASE_CONFIG = JSON.stringify(config);
   return { environment, mode, notarize: hasNotarization };
 }

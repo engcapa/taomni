@@ -33,6 +33,9 @@ if (name === "otool") {
   if (args[0] === "-l") console.log(value.rpath ? "path @executable_path/../Frameworks (offset 12)" : "");
   else console.log(file + ":\\n" + value.deps.map((dep) => "\\t" + dep + " (compatibility version 1.0.0, current version 1.0.0)").join("\\n"));
 }
+if (name === "nm") {
+  console.log(value.staticGss ? "0000000100000100 (__TEXT,__text) external _gss_init_sec_context" : "                 (undefined) external _gss_init_sec_context");
+}
 if (name === "install_name_tool") {
   // Git Bash translates /opt/... arguments for native Node on Windows.
   if (args[0] === "-change") value.deps = value.deps.map((dep) => dep === args[1] || (process.platform === "win32" && args[1].replaceAll("\\\\", "/").endsWith(dep)) ? args[2] : dep);
@@ -42,7 +45,7 @@ if (name === "codesign") {
   if (value.deps.some((dep) => !dep.startsWith("@rpath/") && !dep.startsWith("/usr/lib/"))) process.exit(1);
 }
 `;
-  for (const name of ["uname", "otool", "install_name_tool", "codesign"]) {
+  for (const name of ["uname", "otool", "install_name_tool", "codesign", "nm"]) {
     const path = join(root, "bin", name);
     put(path, tool); chmodSync(path, 0o755);
   }
@@ -96,4 +99,19 @@ test("runtime gate rejects bottle paths, missing dylibs and missing Frameworks r
 test("failed dependency inspection stops bundling instead of silently skipping relocation", (t) => {
   const f = fixture(t, "@@HOMEBREW_PREFIX@@/opt/krb5/lib");
   assert.notEqual(f.run("bundle-krb5-macos.sh", ["fixbin"], { TEST_OTOOL_FAIL: "1" }).status, 0);
+});
+
+test("static Kerberos artifact requires GSSAPI code defined in the executable and system-only load commands", (t) => {
+  const f = fixture(t, "/opt/homebrew/opt/krb5/lib");
+  const executable = join(f.app, "Contents/MacOS/taomni");
+  mkdirSync(dirname(executable), { recursive: true });
+  const env = { MACOS_STATIC_KRB5: "true" };
+  const staticBinary = { deps: ["/usr/lib/libSystem.B.dylib", "/System/Library/Frameworks/Kerberos.framework/Versions/A/Kerberos"], staticGss: true };
+  writeFileSync(executable, JSON.stringify(staticBinary));
+  const verification = f.run("verify-macos-runtime-paths.sh", [f.app], env);
+  assert.equal(verification.status, 0, verification.stderr + verification.stdout);
+  writeFileSync(executable, JSON.stringify({ ...staticBinary, staticGss: false }));
+  assert.match(f.run("verify-macos-runtime-paths.sh", [f.app], env).stderr, /does not contain MIT GSSAPI code/);
+  writeFileSync(executable, JSON.stringify({ ...staticBinary, deps: ["/opt/homebrew/opt/krb5/lib/libkrb5.3.dylib"] }));
+  assert.match(f.run("verify-macos-runtime-paths.sh", [f.app], env).stderr, /Unexpected non-system load command/);
 });
