@@ -15,8 +15,8 @@ pub fn helper_exe_name() -> &'static str {
 /// All candidate paths for the elevated helper binary (first existing wins).
 ///
 /// `scripts/stage-sockscap-windows.ps1` stages the helper into
-/// `src-tauri/resources/sockscap/windows/`, and `tauri.conf.json` bundles
-/// `resources/sockscap/**/*` — so an installed build has it at
+/// `src-tauri/resources/sockscap/windows/`, and `tauri.windows.conf.json`
+/// includes that directory, so an installed build has it at
 /// `<install dir>\resources\sockscap\windows\sockscap-helper.exe`. Note that on
 /// Windows `resource_dir()` *is* the exe directory, so the `resources/` segment
 /// is part of the path and must be searched explicitly (this mirrors what

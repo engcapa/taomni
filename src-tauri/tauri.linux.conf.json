@@ -1,0 +1,8 @@
+{
+  "bundle": {
+    "resources": [
+      "resources/licenses/*",
+      "resources/sockscap/linux/**/*"
+    ]
+  }
+}

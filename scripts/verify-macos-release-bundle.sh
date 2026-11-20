@@ -125,6 +125,12 @@ test "$main_architectures" = "$expected_arch" || {
   exit 1
 }
 
+foreign_resources="$(find "$resource_root" -type d \( -path '*/sockscap/linux' -o -path '*/sockscap/windows' \) -print -quit)"
+if [ -n "$foreign_resources" ]; then
+  echo "Unexpected SocksCap resources in the macOS bundle: $foreign_resources" >&2
+  exit 1
+fi
+
 xray_count="$(find "$resource_root" -type f -path '*/sockscap/macos/xray' | wc -l | tr -d ' ')"
 test "$xray_count" = "1" || {
   echo "Expected one bundled macOS xray executable, found $xray_count" >&2

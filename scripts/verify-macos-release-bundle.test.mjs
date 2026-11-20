@@ -83,6 +83,14 @@ test("self-signed release gate validates the app and archived updater against th
   assert(!trace.includes("spctl"));
 });
 
+test("macOS release rejects SocksCap resources from another desktop platform", (t) => {
+  const f = fixture(t);
+  mkdirSync(join(f.app, "Contents/Resources/sockscap/windows"), { recursive: true });
+  const result = f.run();
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /Unexpected SocksCap resources in the macOS bundle/);
+});
+
 for (const failure of ["TEST_INVALID_SIGNATURE", "TEST_DIFFERENT_CERTIFICATE", "TEST_CDHASH", "TEST_DIFFERENT_REQUIREMENT", "TEST_WRONG_ARCH", "TEST_HARDENED_RUNTIME", "TEST_BOTTLE_PATH"]) {
   test(`release gate rejects ${failure}`, (t) => {
     const f = fixture(t);

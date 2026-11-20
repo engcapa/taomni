@@ -161,6 +161,9 @@ TASK-027 将 G1–G11 设为独立发布阻断门。每个门必须在匹配源�
 - Windows GDI 单独实验的进程内延迟 p95 为 60.63 ms，独立宿主为 74.90 ms，两条路径的帧率分别为 20.91 和 21.54 fps，低于 25.6 fps 门槛。这份分支用于定位采集开销。 [GDI 原始结果](https://github.com/engcapa/taomni/actions/runs/44660430509)
 - Windows G5 用单独分支测试 DIB section 直接读取采集帧。用例沿用 65 ms 延迟和 25.6 fps 门槛。 [Windows 采集对照](https://github.com/engcapa/taomni/actions/runs/44667760818)
 - Mail 的 IMAP greeting、TLS、STARTTLS 和认证已接入独立引擎。核心过渡层按会话设置打开连接，连接失败或结束时回收转发任务。更新 TC-MAIL-IDLE-01、TC-MAIL-POP3-01 和 TC-MAIL-SYNC-03，保留 IDLE 断开、POP3 去重和稀疏 UID 重连的独立断言，并检查运行时错误。
+- `5f3eccfde` 的邮件引擎 32 项单测、核心 10 项定向单测、QA 审计和重构边界检查通过。三端执行选集包括 Mail 八项入口及完整崩溃回归。 [三端 Mail 回归](https://github.com/engcapa/taomni/actions/runs/44669328730)
+- macOS G1 在独立验证分支以现用固定证书制作 ARM64 DMG。MIT Kerberos 改用静态链接，产物同时检查 GSSAPI 代码、系统动态库依赖、hardened runtime 签名和升级归档身份。该实验仍依赖 GitHub 原生构建及实装回执。 [ARM64 DMG 比较](https://github.com/engcapa/taomni/actions/runs/44670439565)
+- 各端核心过渡安装包只复制本机 SocksCap 资源及通用许可证。Windows 安装包校验两种解包格式中的 helper、WinDivert 和已暂存 xray 摘要，macOS 包检查外平台资源目录。现场功能入口复用 TC-MAIN-RAIL-01，产物差异由真实安装包清单验证。独立模块包仍按 TASK-019 推进。
 
 ## 当前结论
 
