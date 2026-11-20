@@ -10,7 +10,7 @@ on:
       module:
         description: Official QA module
         type: choice
-        options: [hello-plugin, mfa]
+        options: [hello-plugin, mfa, mail]
         default: hello-plugin
       macos_runner:
         description: Hosted macOS package builder (both Darwin targets remain explicit)
@@ -59,6 +59,7 @@ jobs:
           case "$QA_MODULE" in
             hello-plugin) echo 'host_package=taomni-hello-plugin' >> "$GITHUB_OUTPUT" ;;
             mfa) echo 'host_package=taomni-plugin-mfa' >> "$GITHUB_OUTPUT" ;;
+            mail) echo 'host_package=taomni-plugin-mail' >> "$GITHUB_OUTPUT" ;;
             *) echo 'Unknown official QA module.' >&2; exit 1 ;;
           esac
           test -n "$(git for-each-ref --format='%(refname)' --contains HEAD refs/remotes/origin/)" || {
@@ -85,7 +86,7 @@ jobs:
           ]
           approved = {('linux', 'X64'): 'linux-x86_64', ('windows', 'X64'): 'windows-x86_64',
                       ('macos', 'ARM64'): 'darwin-aarch64', ('macos', 'X64'): 'darwin-x86_64'}
-          capability = {'hello-plugin': 'signed-module', 'mfa': 'signed-mfa'}[os.environ['QA_MODULE']]
+          capability = {'hello-plugin': 'signed-module', 'mfa': 'signed-mfa', 'mail': 'signed-mail'}[os.environ['QA_MODULE']]
           roster = set()
           if raw := os.environ.get('PACKAGE_NATIVE_BUILDS'):
               document = json.loads(raw)
@@ -246,7 +247,7 @@ jobs:
           import json, os, pathlib, shutil
           root = pathlib.Path('candidate')
           module = os.environ['QA_MODULE']
-          assert module in {'hello-plugin', 'mfa'}, 'Unknown official QA module'
+          assert module in {'hello-plugin', 'mfa', 'mail'}, 'Unknown official QA module'
           observed = json.loads((root / 'candidate-source.json').read_text(encoding='utf-8'))
           assert observed == {'sourceSha': os.environ['MODULE_SOURCE_SHA'], 'platform': os.environ['MODULE_PLATFORM'], 'module': module}
           assert not any(p.is_symlink() for p in root.rglob('*'))
@@ -288,6 +289,7 @@ jobs:
               (failing / 'module.json').write_text(json.dumps({**expected, 'version': '0.1.1'}), encoding='utf-8')
           PY
       - name: Sign and independently verify against the production pinned public key
+        if: env.QA_MODULE != 'mail'
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
@@ -313,6 +315,17 @@ jobs:
                 --output "signed-module/$destination" --source-sha "$MODULE_SOURCE_SHA"
             done
           fi
+      - name: Sign the official Mail upgrade input
+        if: env.QA_MODULE == 'mail'
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          MODULE_PLATFORM: ${{ matrix.platform }}
+          MODULE_SOURCE_SHA: ${{ needs.source.outputs.sha }}
+        run: |
+          scripts/plugin-package/target/release/taomni-plugin-package \
+            --payload candidate/unsigned-module --platform "$MODULE_PLATFORM" \
+            --output signed-module --source-sha "$MODULE_SOURCE_SHA"
       - uses: actions/upload-artifact@v4
         with:
           name: qa-modular-package-${{ matrix.platform }}-${{ inputs.artifact_key || github.run_id }}

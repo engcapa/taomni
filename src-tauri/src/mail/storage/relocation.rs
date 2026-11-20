@@ -3,22 +3,7 @@ use std::fs;
 use std::path::Path;
 use std::path::PathBuf;
 
-pub fn configured_directory(options: &str, default: &Path) -> Result<PathBuf, String> {
-    let options: serde_json::Value = serde_json::from_str(options).map_err(|e| e.to_string())?;
-    let directory = options
-        .get("mailStorageDirectory")
-        .and_then(|v| v.as_str())
-        .unwrap_or("")
-        .trim();
-    if directory.is_empty() {
-        return Ok(default.to_path_buf());
-    }
-    let path = PathBuf::from(directory);
-    if !path.is_absolute() {
-        return Err("Mail storage directory must be an absolute path".into());
-    }
-    Ok(path)
-}
+pub use taomni_mail_engine::database::configured_directory;
 
 pub(super) fn copy_tree(source: &Path, target: &Path) -> Result<(), String> {
     if !source.exists() {

@@ -16,6 +16,7 @@ pub mod imap_transport;
 mod inline_images;
 mod lists;
 pub mod mbox;
+pub mod migration;
 mod mime;
 pub mod mime_sections;
 mod models;

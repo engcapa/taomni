@@ -2,7 +2,7 @@
   "id": "taomni-plugin-mail",
   "slug": "mail",
   "name": "Mail",
-  "description": "Read cached folders, message headers and bodies from the Mail module data directory.",
+  "description": "Read cached folders, message headers and bodies, including data staged from a legacy Mail cache.",
   "version": "0.1.0",
   "coreApiVersion": "1",
   "kind": "collaboration",

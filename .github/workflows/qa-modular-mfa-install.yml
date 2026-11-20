@@ -11,10 +11,22 @@ on:
         description: Compile the core and run persisted proxy contracts without signed MFA packages
         type: boolean
         default: false
+      module:
+        description: Signed module migration to execute
+        type: choice
+        options: [mfa, mail]
+        default: mfa
+      macos_runner:
+        description: Hosted ARM64 macOS image for the native gate
+        type: choice
+        options: [macos-latest, macos-26]
+        default: macos-latest
   workflow_call:
     inputs:
       head: {type: string, default: ''}
       network_only: {type: boolean, default: false}
+      module: {type: string, default: mfa}
+      macos_runner: {type: string, default: macos-latest}
     secrets:
       TAURI_SIGNING_PRIVATE_KEY: {required: true}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: {required: false}
@@ -45,12 +57,13 @@ jobs:
     uses: ./.github/workflows/qa-modular-packages.yml
     with:
       head: ${{ needs.source.outputs.sha }}
-      module: mfa
-      artifact_key: mfa-install-${{ github.run_id }}
+      module: ${{ inputs.module }}
+      artifact_key: ${{ inputs.module }}-install-${{ github.run_id }}
+      macos_runner: ${{ inputs.macos_runner }}
     secrets: inherit
 
   installed-host:
-    name: ${{ inputs.network_only && 'Core network' || 'Installed MFA' }} (${{ matrix.platform }})
+    name: ${{ inputs.network_only && 'Core network' || format('Installed {0}', inputs.module) }} (${{ matrix.platform }})
     needs: [source, packages]
     if: ${{ !cancelled() && needs.source.result == 'success' && (inputs.network_only || needs.packages.result == 'success') }}
     strategy:
@@ -62,11 +75,12 @@ jobs:
           - {os: ubuntu-24.04, platform: linux-x86_64}
           - {os: windows-latest, platform: windows-x86_64}
           - {os: macos-latest, platform: darwin-aarch64}
-    runs-on: ${{ matrix.os }}
+    runs-on: ${{ matrix.platform == 'darwin-aarch64' && inputs.macos_runner || matrix.os }}
     timeout-minutes: 360
     env:
       PYTHONUTF8: '1'
       PYTHONUNBUFFERED: '1'
+      QA_RUNNER_LABEL: ${{ matrix.platform == 'darwin-aarch64' && inputs.macos_runner || matrix.os }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -130,8 +144,8 @@ jobs:
       - uses: actions/download-artifact@v4
         if: ${{ !inputs.network_only }}
         with:
-          name: qa-modular-package-${{ matrix.platform }}-mfa-install-${{ github.run_id }}
-          path: signed-mfa-package
+          name: qa-modular-package-${{ matrix.platform }}-${{ inputs.module }}-install-${{ github.run_id }}
+          path: signed-module-package
       - name: Compile a dedicated harness with the production pinned trust anchor
         run: |
           mkdir -p modular-mfa-install
@@ -169,23 +183,30 @@ jobs:
               output.write(str(library) + "\n")
           PYTHON
       - name: Exercise the installed production registry and persisted Vault
-        if: ${{ !inputs.network_only }}
+        if: ${{ !inputs.network_only && inputs.module == 'mfa' }}
         env:
-          TAOMNI_SIGNED_MFA_PACKAGE_DIR: signed-mfa-package
+          TAOMNI_SIGNED_MFA_PACKAGE_DIR: signed-module-package
           TAOMNI_SIGNED_MFA_SOURCE_SHA: ${{ needs.source.outputs.sha }}
         run: python scripts/run-signed-mfa-host-gates.py --evidence modular-mfa-install
       - name: Migrate an encrypted legacy fixture and recover an interrupted activation
-        if: ${{ !inputs.network_only }}
+        if: ${{ !inputs.network_only && inputs.module == 'mfa' }}
         env:
-          TAOMNI_SIGNED_MFA_PACKAGE_DIR: signed-mfa-package
+          TAOMNI_SIGNED_MFA_PACKAGE_DIR: signed-module-package
           TAOMNI_SIGNED_MFA_SOURCE_SHA: ${{ needs.source.outputs.sha }}
         run: python scripts/run-signed-mfa-host-gates.py --evidence modular-mfa-install --suite legacy-migration
+      - name: Migrate the old Mail profile and read its cache through the installed host
+        if: ${{ !inputs.network_only && inputs.module == 'mail' }}
+        env:
+          TAOMNI_SIGNED_MAIL_PACKAGE_DIR: signed-module-package
+          TAOMNI_SIGNED_MAIL_SOURCE_SHA: ${{ needs.source.outputs.sha }}
+        run: python scripts/run-signed-mfa-host-gates.py --evidence modular-mfa-install --suite legacy-mail
       - name: Exercise persisted module proxy modes and Vault credentials
+        if: ${{ inputs.network_only || inputs.module == 'mfa' }}
         run: python scripts/run-module-network-gates.py --evidence modular-mfa-install
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: ${{ inputs.network_only && 'modular-network' || 'modular-signed-mfa-install' }}-${{ matrix.platform }}
+          name: ${{ inputs.network_only && 'modular-network' || format('modular-signed-{0}-install', inputs.module) }}-${{ matrix.platform }}
           path: modular-mfa-install/
           if-no-files-found: error
           retention-days: 14

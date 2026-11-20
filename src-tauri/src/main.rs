@@ -5,13 +5,14 @@ fn main() {
     let mut args = std::env::args_os().skip(1);
     let first = args.next();
     let maintenance = match first.as_deref().and_then(std::ffi::OsStr::to_str) {
+        Some(taomni_lib::MAIL_MAINTENANCE_ARG) => Some(taomni_lib::run_mail_maintenance(args)),
         Some(taomni_lib::MFA_MAINTENANCE_ARG) => Some(taomni_lib::run_mfa_maintenance(args)),
         Some(taomni_lib::MFA_RESTART_HELPER_ARG) => Some(taomni_lib::run_mfa_restart_helper(args)),
         _ => None,
     };
     if let Some(result) = maintenance {
         if let Err(error) = result {
-            eprintln!("MFA migration failed: {error}");
+            eprintln!("Module maintenance failed: {error}");
             std::process::exit(1);
         }
         return;

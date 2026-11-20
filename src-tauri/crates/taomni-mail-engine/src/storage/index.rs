@@ -59,7 +59,7 @@ pub(super) fn legacy_attachment_flag(
     has_attachment(File::open(path).map_err(|e| e.to_string())?)
 }
 
-pub(super) fn object_path(root: &Path, hash: &str) -> Result<PathBuf, String> {
+pub(crate) fn object_path(root: &Path, hash: &str) -> Result<PathBuf, String> {
     if hash.len() != 64
         || !hash
             .bytes()

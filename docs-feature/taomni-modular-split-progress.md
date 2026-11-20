@@ -174,6 +174,8 @@ TASK-027 将 G1–G11 设为独立发布阻断门。每个门必须在匹配源�
 - `0c19232a7` 的邮件大正文、归档和分批操作由三端 Browser、Native 和完整崩溃回归验证。Windows VNC 特殊键入口已迁入独立辅助程序，核心不再提供原 re-exec 分支。发布过渡包按 Windows 资源路径暂存辅助程序，MSI 与 NSIS 解包检查其摘要，QA 核对实际辅助程序在控制端断开时退出。VNC 宿主和前端迁出后由模块包提供该程序。 [邮件三端运行](https://github.com/engcapa/taomni/actions/runs/44683732219)
 - `cd0668280` 的 Windows `windows-2025` G5 工件已收齐六项对照结果。进程内和独立编码宿主各使用 40 个输入样本，p95 分别为 71.48 ms 和 73.95 ms，均落在 130 ms 上限内。对应连接和吞吐检查也全部通过。原始数据、源码、可执行文件摘要保存在该运行的 `modular-rdp-pipeline-Windows-X64` 工件。 [Windows 工件](https://github.com/engcapa/taomni/actions/runs/44674876677/artifacts/14605924642)
 - macOS SocksCap Redirector 桥接程序迁入独立工具，核心通过同一控制与数据协议启动。共用代码保留 peer PID、audit token、签名身份和文件摘要验证。过渡 DMG 及 updater 核对桥接程序的可执行权限、目标架构及一致字节。SocksCap 模块包接管该工具及系统扩展资源后，才能完成其核心安装包依赖裁剪。
+- Mail 已接入签名离线升级。配置租约保护旧会话，暂存默认和自定义目录的 SQLite、WAL 已提交数据、原件及附件后切换模块版本。未激活的升级中断后会重新从原缓存取快照。51 项邮件引擎、4 项宿主、5 项核心迁移及 31 项 QA 工具单测通过。设置页沿用 TC-MODULES-049/050，签名升级专项运行真实宿主与维护进程。Mail 自动首装迁移、正式前端和网络服务仍待接入。
+- 旧 Mail 宿主源码 `58c293a5b` 在 Windows 取得进程级通过回执。macOS 单测使用未经规范化的临时目录，SQLite 将系统路径别名视为链接并拒绝打开。测试夹具改用和生产 SDK 一致的规范路径，三端使用当前源码复验。 [原始工件](https://github.com/engcapa/taomni/actions/runs/44682092156)
 
 ## 当前结论
 

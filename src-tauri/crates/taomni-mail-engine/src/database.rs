@@ -7,6 +7,23 @@ use std::path::{Path, PathBuf};
 use std::sync::{Mutex, MutexGuard};
 use std::time::{Duration, Instant};
 
+pub fn configured_directory(options: &str, default: &Path) -> Result<PathBuf, String> {
+    let options: serde_json::Value = serde_json::from_str(options).map_err(|e| e.to_string())?;
+    let directory = options
+        .get("mailStorageDirectory")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .trim();
+    if directory.is_empty() {
+        return Ok(default.to_path_buf());
+    }
+    let path = PathBuf::from(directory);
+    if !path.is_absolute() {
+        return Err("Mail storage directory must be an absolute path".into());
+    }
+    Ok(path)
+}
+
 pub struct ProcessLock(File);
 
 impl ProcessLock {

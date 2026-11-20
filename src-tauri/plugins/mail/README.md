@@ -23,9 +23,17 @@ The provisional host serves cached folders, paged headers and cached bodies
 from `plugins/mail/data/<account-stem>.db` while the SDK holds its profile and
 module leases. The host opens existing SQLite data in read-only mode. The
 manifest declares the commands and permissions implemented by this host.
-The hosted protocol workflow verifies cache reads, competing host rejection,
-exit and reopening against an isolated profile on Linux, Windows and macOS.
+The hosted protocol workflow stages a legacy cache containing committed WAL
+data, then verifies that the host reads it, detects competing ownership and
+can reopen it after exit. Linux, Windows and macOS run this check.
 
-Production activation requires legacy cache migration, the frontend bundle
-and the scoped Vault, proxy and file-viewer services from TASK-026. Add the
-module to the production catalog after TASK-026 and TASK-027 are closed.
+The signed offline upgrade command requires a closed profile. It imports the
+default or account-specific cache, archived originals and attachment cache.
+It publishes the module data before activating the verified package and
+records the result in the migration journal. The old account records and
+files support rollback. The signed installation workflow tests this path
+using an isolated legacy profile and the packaged Mail host.
+
+Production activation still requires the frontend bundle, scoped Vault,
+proxy and file-viewer services, and integration with the automatic upgrade
+flow in TASK-026. The production catalog follows the TASK-027 gates.

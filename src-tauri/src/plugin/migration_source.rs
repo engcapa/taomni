@@ -120,7 +120,7 @@ pub(super) fn read_snapshot<T>(
     read_snapshot_checked(path, inspect, &|| Ok(()))
 }
 
-pub(super) fn read_snapshot_checked<T>(
+pub(in crate::plugin) fn read_snapshot_checked<T>(
     path: &Path,
     inspect: impl FnOnce(&Connection) -> Result<T, String>,
     check: &dyn Fn() -> Result<(), String>,

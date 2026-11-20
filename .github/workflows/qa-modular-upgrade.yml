@@ -73,9 +73,14 @@ on:
         type: boolean
         default: false
       signed_mfa_only:
-        description: Run only the signed MFA install and legacy migration gates
+        description: Run only the signed module install and legacy migration gates
         type: boolean
         default: false
+      signed_migration_module:
+        description: Module to exercise with the signed legacy migration gate
+        type: choice
+        options: [mfa, mail]
+        default: mfa
   workflow_call:
     inputs:
       head:
@@ -144,6 +149,9 @@ on:
         type: boolean
         required: false
         default: false
+      signed_migration_module:
+        type: string
+        default: mfa
 
 permissions:
   contents: read
@@ -220,6 +228,8 @@ jobs:
     with:
       head: ${{ inputs.head || github.sha }}
       network_only: ${{ !inputs.signed_mfa_only && inputs.network_only || false }}
+      module: ${{ inputs.signed_mfa_only && inputs.signed_migration_module || 'mfa' }}
+      macos_runner: ${{ inputs.signed_mfa_only && inputs.signed_migration_module == 'mail' && inputs.package_macos_arm_runner || 'macos-latest' }}
     secrets: inherit
 
   mfa-engine-contracts:

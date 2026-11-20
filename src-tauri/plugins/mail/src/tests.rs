@@ -31,7 +31,7 @@ fn host_handshake_matches_the_manifest() {
 #[test]
 fn queries_read_the_owned_mailbox_and_do_not_create_missing_data() {
     let profile = tempfile::tempdir().unwrap();
-    let store = Store::new(profile.path());
+    let store = Store::new(&profile.path().canonicalize().unwrap());
     let query = json!({"accountId": "saved-mail"});
     assert_eq!(
         commands::invoke(&store, "mail_list_cached_folders", Some(query.clone())).unwrap(),
@@ -86,7 +86,7 @@ fn queries_read_the_owned_mailbox_and_do_not_create_missing_data() {
 #[test]
 fn request_cannot_supply_a_database_path_and_oversized_bodies_get_an_rpc_error() {
     let profile = tempfile::tempdir().unwrap();
-    let store = Store::new(profile.path());
+    let store = Store::new(&profile.path().canonicalize().unwrap());
     let path = json!({"accountId":"saved","path":"taomni.db"});
     assert_eq!(
         commands::invoke(&store, "mail_list_cached_folders", Some(path))
@@ -121,7 +121,7 @@ fn directory_or_sqlite_sidecar_links_are_rejected() {
 
     let profile = tempfile::tempdir().unwrap();
     let outside = tempfile::tempdir().unwrap();
-    let store = Store::new(profile.path());
+    let store = Store::new(&profile.path().canonicalize().unwrap());
     let root = profile.path().join("plugins/mail");
     fs::create_dir_all(&root).unwrap();
     let link = root.join("data");

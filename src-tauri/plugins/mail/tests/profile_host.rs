@@ -13,12 +13,14 @@ use taomni_mail_engine::{
     MailFolder,
     cache::{init_mail_tables, upsert_folder, upsert_message},
     database::mail_db_file_stem,
+    migration::{LegacyMailbox, StagedMailData},
     parse_body_message,
 };
 use taomni_plugin_api::{
     HandshakeRequest, HandshakeResponse, RpcMessage, RpcRequest,
     services::{HOST_PROFILE_ENV, HostProfileContext, ProfileGeneration},
 };
+use taomni_sqlite_snapshot::SnapshotControl;
 
 const ACCOUNT: &str = "existing-mail";
 const WAIT: Duration = Duration::from_secs(15);
@@ -111,7 +113,7 @@ impl Drop for MailHost {
 
 #[test]
 #[ignore = "requires an actual host process on a GitHub runner"]
-fn reads_retained_cache_and_releases_profile_ownership_on_exit() {
+fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
     let fixture = tempfile::tempdir().unwrap();
     let profile = fixture.path().canonicalize().unwrap();
     let context = HostProfileContext {
@@ -124,10 +126,16 @@ fn reads_retained_cache_and_releases_profile_ownership_on_exit() {
     )
     .unwrap();
     let root = profile.join("plugins/mail/data");
-    fs::create_dir_all(&root).unwrap();
-    let path = root.join(format!("{}.db", mail_db_file_stem(ACCOUNT)));
-    {
-        let db = Connection::open(&path).unwrap();
+    let module = root.parent().unwrap();
+    let old_storage = profile.join("external-mail-storage");
+    fs::create_dir_all(module).unwrap();
+    fs::create_dir(&old_storage).unwrap();
+    let filename = format!("{}.db", mail_db_file_stem(ACCOUNT));
+    let source = old_storage.join(&filename);
+    let writer = {
+        let db = Connection::open(&source).unwrap();
+        db.execute_batch("PRAGMA journal_mode=WAL; PRAGMA wal_autocheckpoint=0;")
+            .unwrap();
         init_mail_tables(&db).unwrap();
         upsert_folder(
             &db,
@@ -144,7 +152,23 @@ fn reads_retained_cache_and_releases_profile_ownership_on_exit() {
             &parse_body_message(ACCOUNT, "INBOX", 9, None, raw, 1024),
         )
         .unwrap();
-    }
+        db
+    };
+    let legacy_bytes = fs::read(&source).unwrap();
+    let stage = StagedMailData::prepare(
+        module,
+        &[LegacyMailbox {
+            account_id: ACCOUNT.into(),
+            database: source.clone(),
+        }],
+        &SnapshotControl::with_timeout(WAIT),
+    )
+    .unwrap();
+    assert_eq!(stage.mailbox_count(), 1);
+    fs::rename(stage.data(), &root).unwrap();
+    assert_eq!(fs::read(&source).unwrap(), legacy_bytes);
+    drop(writer);
+    let path = root.join(filename);
     let before = fs::read(&path).unwrap();
     let mut host = MailHost::spawn(&profile, &context);
     host.handshake(&context);

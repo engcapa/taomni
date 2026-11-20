@@ -11099,6 +11099,7 @@ dependencies = [
  "imap",
  "imap-proto",
  "lettre",
+ "libc",
  "mail-parser",
  "md-5 0.11.0",
  "native-tls",
@@ -11107,6 +11108,7 @@ dependencies = [
  "serde",
  "serde_json",
  "sha2 0.11.0",
+ "taomni-sqlite-snapshot",
  "tempfile",
  "tokio-util 0.7.19",
  "tracing",
@@ -11151,6 +11153,7 @@ dependencies = [
  "taomni-mail-engine",
  "taomni-plugin-api",
  "taomni-plugin-sdk",
+ "taomni-sqlite-snapshot",
  "tempfile",
 ]
 

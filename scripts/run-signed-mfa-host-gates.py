@@ -1,4 +1,4 @@
-"""Run the production-key installed-MFA process gates on GitHub runners only."""
+"""Run the production-key installed module process gates on GitHub runners."""
 import argparse
 import hashlib
 import json
@@ -16,7 +16,7 @@ def digest(path):
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--evidence", type=Path, required=True)
-    parser.add_argument("--suite", choices=("installed", "legacy-migration"), default="installed")
+    parser.add_argument("--suite", choices=("installed", "legacy-migration", "legacy-mail"), default="installed")
     args = parser.parse_args()
     if os.environ.get("GITHUB_ACTIONS") != "true":
         parser.error("Actual host processes run only on GitHub; locally compile with --no-run")
@@ -34,13 +34,15 @@ def main():
         raise SystemExit(f"Expected one dedicated production-trust harness, got {len(artifacts)}")
     executable = Path(artifacts.pop()).resolve(strict=True)
     source = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
-    expected = os.environ["TAOMNI_SIGNED_MFA_SOURCE_SHA"]
+    slug = "mail" if args.suite == "legacy-mail" else "mfa"
+    prefix = f"TAOMNI_SIGNED_{slug.upper()}"
+    expected = os.environ[f"{prefix}_SOURCE_SHA"]
     assert source == expected, "Core harness source differs from selected package source"
-    artifact = Path(os.environ["TAOMNI_SIGNED_MFA_PACKAGE_DIR"]).resolve(strict=True)
-    os.environ["TAOMNI_SIGNED_MFA_PACKAGE_DIR"] = str(artifact)
+    artifact = Path(os.environ[f"{prefix}_PACKAGE_DIR"]).resolve(strict=True)
+    os.environ[f"{prefix}_PACKAGE_DIR"] = str(artifact)
     package = json.loads((artifact / "provenance.json").read_text())
     assert package["sourceSha"] == source
-    assert package["slug"] == "mfa" and package["trust"] == "plugins.updater.pubkey"
+    assert package["slug"] == slug and package["trust"] == "plugins.updater.pubkey"
     archive_name = package["archive"]
     assert Path(archive_name).name == archive_name, "Unsafe archive name in receipt"
     archive = artifact / archive_name
@@ -48,23 +50,33 @@ def main():
     if args.suite == "installed":
         selected, evidence_name = "plugin::signed_mfa_host_tests", "installed-mfa"
         expected_tests = 3
-    else:
+        listing_name = "selected-tests.txt"
+    elif args.suite == "legacy-migration":
         selected, evidence_name = "plugin::migration_commit::tests::signed_legacy_mfa_", "legacy-mfa-migration"
         expected_tests = 11
+        listing_name = "legacy-mfa-selected-tests.txt"
+    else:
+        selected, evidence_name = "plugin::migration_mail::tests::signed::signed_mail_upgrade", "legacy-mail-migration"
+        expected_tests = 1
+        listing_name = "legacy-mail-selected-tests.txt"
     listing = subprocess.check_output([str(executable), selected, "--ignored", "--list"], text=True)
-    listing_name = "selected-tests.txt" if args.suite == "installed" else "legacy-mfa-selected-tests.txt"
     (root / listing_name).write_text(listing, encoding="utf-8")
     count = sum(line.endswith(": test") for line in listing.splitlines())
     assert count == expected_tests, f"Expected {expected_tests} actual {args.suite} gates, got {count}"
     receipt = {
-        "schema": f"taomni.signed-mfa-{args.suite}.v1" if args.suite != "installed"
-                  else "taomni.signed-mfa-install.v1", "head": source,
+        "schema": f"taomni.signed-{slug}-legacy-migration.v1"
+                  if args.suite != "installed" else "taomni.signed-mfa-install.v1", "head": source,
         "platform": package["platform"], "filter": selected, "selected": count,
         "coreSha256": digest(executable), "packageSha256": digest(archive),
         "provenanceSha256": digest(artifact / "provenance.json"),
+        "runner": os.environ.get("QA_RUNNER_LABEL"),
+        "runnerImage": os.environ.get("ImageVersion"),
+        "runnerArchitecture": os.environ.get("RUNNER_ARCH"),
+        "caseSelectionSha256": digest(root / listing_name),
+        "artifactLog": f"{evidence_name}-process.log",
         "trust": "plugins.updater.pubkey",
         "systemTrust": "unverified",
-        "productFacade": "direct-registry" if args.suite == "installed" else "committed-mfa",
+        "productFacade": "direct-registry" if args.suite == "installed" else f"committed-{slug}",
         "monolithUpgrade": "unverified", "features": ["qa-release-trust-gates"],
     }
     try:
@@ -78,7 +90,7 @@ def main():
         output = error.stdout or b""
         if isinstance(output, bytes):
             output = output.decode("utf-8", errors="replace")
-        output += "\nInstalled MFA gate exceeded its 180-second process deadline.\n"
+        output += f"\nInstalled {slug} gate exceeded its 180-second process deadline.\n"
         exit_code = 124
     (root / f"{evidence_name}-process.log").write_text(output, encoding="utf-8")
     print(output, flush=True)

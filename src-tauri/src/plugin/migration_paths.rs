@@ -13,7 +13,7 @@ pub(crate) fn directory(path: &Path) -> Result<(), String> {
     Ok(())
 }
 
-pub(super) fn create_directory(parent: &Path, name: &str) -> Result<PathBuf, String> {
+pub(in crate::plugin) fn create_directory(parent: &Path, name: &str) -> Result<PathBuf, String> {
     directory(parent)?;
     let path = parent.join(name);
     match fs::create_dir(&path) {
@@ -61,6 +61,20 @@ pub(crate) fn read_json_bounded<T: serde::de::DeserializeOwned>(path: &Path) -> 
         return Err("Migration record is too large".into());
     }
     serde_json::from_slice(&data).map_err(|error| error.to_string())
+}
+
+pub(in crate::plugin) fn read_detached_signature(path: &Path) -> Result<String, String> {
+    use std::io::Read;
+    const MAX_BYTES: u64 = 16 * 1024;
+    let mut signature = String::new();
+    open_file(path)?
+        .take(MAX_BYTES + 1)
+        .read_to_string(&mut signature)
+        .map_err(|error| format!("Could not read detached signature: {error}"))?;
+    if signature.len() as u64 > MAX_BYTES {
+        return Err("Detached signature is too large".into());
+    }
+    Ok(signature)
 }
 
 pub(crate) fn write_json_durable<T: serde::Serialize>(

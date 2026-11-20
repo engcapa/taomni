@@ -1,5 +1,5 @@
 //! Offline entry point shared by the maintenance process and signed QA gates.
-use std::{io::Read, path::Path};
+use std::path::Path;
 
 use taomni_profile_locks::{ProfileRoot, WaitControl};
 use taomni_sqlite_snapshot::SnapshotControl;
@@ -32,16 +32,7 @@ pub(crate) fn verify_archive_with_sidecar(
     archive: &Path,
     signature: &Path,
 ) -> Result<VerifiedPackage, String> {
-    const MAX_SIGNATURE_BYTES: u64 = 16 * 1024;
-    let mut detached = String::new();
-    paths::open_file(signature)?
-        .take(MAX_SIGNATURE_BYTES + 1)
-        .read_to_string(&mut detached)
-        .map_err(|error| format!("Could not read detached signature: {error}"))?;
-    if detached.len() as u64 > MAX_SIGNATURE_BYTES {
-        return Err("Detached signature is too large".into());
-    }
-    verify_archive(archive, &detached)
+    verify_archive(archive, &paths::read_detached_signature(signature)?)
 }
 
 pub(crate) fn execute(
