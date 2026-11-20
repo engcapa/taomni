@@ -65,6 +65,7 @@ impl Fixture {
                 token: StagingToken::parse(ID).unwrap(),
                 absolute_job_root: output,
                 allowed_files: vec![SafeRelativePath::parse("mfa.db").unwrap()],
+                opaque_files: Vec::new(),
             },
         };
         Self {

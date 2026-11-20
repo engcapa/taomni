@@ -7,6 +7,13 @@ param(
 $ErrorActionPreference = "Stop"
 $ReleaseDir = (Resolve-Path -LiteralPath $ReleaseDir).Path
 $dlls = @("sherpa-onnx-c-api.dll", "sherpa-onnx-cxx-api.dll", "onnxruntime.dll", "onnxruntime_providers_shared.dll")
+$sockscapStaging = Join-Path $PSScriptRoot "../src-tauri/resources/sockscap/windows"
+$vncHelperPath = "resources/vnc/windows/taomni-vnc-key-helper.exe"
+$vncHelperSource = Join-Path $PSScriptRoot "../src-tauri/$vncHelperPath"
+$sockscapRuntime = @("sockscap-helper.exe", "WinDivert.dll", "WinDivert64.sys")
+if (Test-Path -LiteralPath (Join-Path $sockscapStaging "xray.exe") -PathType Leaf) {
+  $sockscapRuntime += "xray.exe"
+}
 $nsis = @(Get-ChildItem -LiteralPath (Join-Path $ReleaseDir "bundle/nsis") -Filter '*-setup.exe')
 $msi = @(Get-ChildItem -LiteralPath (Join-Path $ReleaseDir "bundle/msi") -Filter '*.msi')
 if ($nsis.Count -ne 1 -or $msi.Count -ne 1) {
@@ -40,6 +47,27 @@ public static class TaomniRuntimeLoader {
     $executables = @(Get-ChildItem -LiteralPath $directory -Recurse -File -Filter taomni.exe)
     if ($executables.Count -ne 1) { throw "Expected one taomni.exe in $directory" }
     $appDir = $executables[0].DirectoryName
+    $vncHelper = Join-Path $appDir $vncHelperPath
+    if (-not (Test-Path -LiteralPath $vncHelper -PathType Leaf) -or
+        (Get-FileHash -LiteralPath $vncHelper).Hash -ne (Get-FileHash -LiteralPath $vncHelperSource).Hash) {
+      throw "The Windows installer must contain the staged VNC key helper"
+    }
+    $sockscapDir = Join-Path $appDir "resources/sockscap"
+    foreach ($platform in @("linux", "macos")) {
+      if (Test-Path -LiteralPath (Join-Path $sockscapDir $platform)) {
+        throw "Unexpected SocksCap $platform resources in the Windows installer"
+      }
+    }
+    foreach ($name in $sockscapRuntime) {
+      $staged = Join-Path $sockscapStaging $name
+      $bundled = Join-Path $sockscapDir "windows/$name"
+      if (-not (Test-Path -LiteralPath $bundled -PathType Leaf)) {
+        throw "Missing SocksCap resource in the Windows installer: $name"
+      }
+      if ((Get-FileHash -LiteralPath $bundled).Hash -ne (Get-FileHash -LiteralPath $staged).Hash) {
+        throw "Bundled SocksCap resource differs from staging: $name"
+      }
+    }
     # Tauri patches the main executable's bundle-type marker separately for
     # NSIS/MSI, so its hash legitimately differs between the two installers.
     foreach ($name in $dlls) {

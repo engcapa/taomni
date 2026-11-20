@@ -64,6 +64,8 @@ Linux `noexec` 采用显式拒绝与用户选择可执行 profile 的策略（�
 
 核心-only 依赖闭包是硬门：只把插件 crate 加入 workspace 不算拆分，根 `Cargo.toml` 的 optional dependencies、default features、bundle resources、Linux package dependencies、前端 chunks 和 helper 必须一起迁移并由 `cargo tree`/artifact 检查证明。
 
+2026-11-20 用户确认 G5 输入到画面延迟的 p95 可增加最多 100%。模块化验收以原验收上限 65 ms 为基准，上限为 130 ms，首帧、帧率、带宽和采样要求继续按 RDP 用例执行。
+
 ## 4. Consequences
 
 正向结果：核心可离线运行；插件可独立安装、启用、禁用、卸载、回滚和发布；原生特权面、崩溃和重型依赖可单独审计。

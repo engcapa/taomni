@@ -8,6 +8,7 @@ from qa_ui_auto.deadline import Deadline, using_deadline
 from qa_ui_auto.fixtures import rdp_server_required
 from qa_ui_auto.fixtures.module_legacy_mfa import close_installed_desktop, desktop_action, installed_desktop
 from qa_ui_auto.native_steps import NativeStepContext
+from qa_ui_auto.rdp_helpers.report_assertions import P95_METRIC, report_expectations
 from qa_ui_auto.testcase import load_case, step_verb_and_args
 
 
@@ -19,6 +20,7 @@ def measure(candidate, probe, source, work, report):
     evidence = report / "rdp-performance"
     evidence.mkdir()
     config = {"app": {"mode": "native", "native_binary": str(candidate), "rdp_probe_binary": str(probe)},
+              "rdp": {"modular_p95": True},
               "webdriver": {"startup_timeout": 45}}
     observer = SimpleNamespace(cfg=config, env={}, values={})
     result = {"case": case.id, "caseSha256": digest(CASE), "applicationSource": source,
@@ -35,6 +37,13 @@ def measure(candidate, probe, source, work, report):
                         verb, args = step_verb_and_args(step)
                         observation = {"step": index, "verb": verb, "passed": False}
                         result["steps"].append(observation)
+                        if verb == "assert_json_file":
+                            expectations = report_expectations(args, modular_rdp_p95=True)
+                            if expectations is not args["expect"]:
+                                observation["latencyP95BudgetMs"] = {
+                                    "reference": args["expect"][P95_METRIC]["max"],
+                                    "applied": expectations[P95_METRIC]["max"],
+                                }
                         desktop_action(steps, verb, resolve(args, cfg=observer.cfg, env=observer.env, fixture=observer.values))
                         observation["passed"] = True
                     desktop_action(steps, "assert_no_runtime_errors", None)

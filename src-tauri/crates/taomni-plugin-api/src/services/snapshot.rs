@@ -19,6 +19,10 @@ pub struct SnapshotDestinationGrant {
     pub token: StagingToken,
     pub absolute_job_root: PathBuf,
     pub allowed_files: Vec<SafeRelativePath>,
+    /// A subset whose contents are opaque to the module, such as attachments
+    /// that happen to contain a SQLite database.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub opaque_files: Vec<SafeRelativePath>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]

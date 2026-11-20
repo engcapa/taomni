@@ -25,6 +25,50 @@ function harness() {
   return { adapter, storage, store: createModuleMarketplaceStore(adapter, storage) };
 }
 
+it("keeps a staged module pending and waits for the next launch instead of downloading it again", async () => {
+  const { adapter, store } = harness();
+  const pending = {
+    legacyWaiting: false,
+    legacyPending: [selection.pluginId],
+    updates: [],
+    newModules: [],
+  };
+  adapter.catalog
+    .mockResolvedValueOnce({ ...catalog(1, selection.version), release: pending })
+    .mockResolvedValue({ ...catalog(1, selection.version), release: {
+      ...pending, legacyRestartRequired: [selection.pluginId],
+    } });
+  adapter.provision.mockResolvedValue("restart-required");
+
+  await store.getState().refresh();
+  await vi.waitFor(() => {
+    const plan = store.getState().catalog?.release;
+    expect(plan?.legacyRestartRequired).toEqual([selection.pluginId]);
+    expect(plan?.legacyPending).toEqual([selection.pluginId]);
+  });
+  await store.getState().refresh();
+  expect(adapter.provision).toHaveBeenCalledTimes(1);
+  await store.getState().provision(selection.pluginId, true);
+  expect(adapter.provision).toHaveBeenLastCalledWith(selection, true);
+});
+
+it("retries an unsuccessful import only after the user resumes the installation", async () => {
+  const { adapter, store } = harness();
+  adapter.catalog.mockResolvedValue({ ...catalog(1, selection.version), release: {
+    legacyWaiting: false,
+    legacyPending: [selection.pluginId],
+    legacyImportFailed: [selection.pluginId],
+    updates: [],
+    newModules: [],
+  } });
+  adapter.provision.mockResolvedValue("restart-required");
+
+  await store.getState().refresh();
+  expect(adapter.provision).not.toHaveBeenCalled();
+  await store.getState().provision(selection.pluginId, true);
+  expect(store.getState().catalog?.release?.legacyRestartRequired).toEqual([selection.pluginId]);
+  expect(store.getState().catalog?.release?.legacyImportFailed).toEqual([]);
+});
 describe("module marketplace ownership", () => {
   it("deduplicates catalog refresh and rejects late results from an old mirror", async () => {
     const { adapter, storage, store } = harness();

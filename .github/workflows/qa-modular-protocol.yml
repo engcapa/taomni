@@ -74,6 +74,9 @@ jobs:
           ref: ${{ inputs.head }}
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@stable
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - uses: Swatinem/rust-cache@v2
         with:
           workspaces: src-tauri -> target
@@ -93,6 +96,32 @@ jobs:
         run: |
           set -o pipefail
           cargo test --manifest-path src-tauri/Cargo.toml -p taomni-mail-engine --lib --locked 2>&1 | tee modular-protocol-evidence/mail-engine-unit.log
+      - name: Verify the Mail module's cached mailbox and profile ownership
+        env:
+          MAIL_HOST_RUNNER: ${{ matrix.os }}
+        run: |
+          set -o pipefail
+          cargo tree --manifest-path src-tauri/Cargo.toml -p taomni-plugin-mail --edges normal,build --prefix none --locked > modular-protocol-evidence/mail-host-tree.txt
+          node scripts/modular-boundaries.mjs --mail-host-tree modular-protocol-evidence/mail-host-tree.txt
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-mail --lib --locked 2>&1 | tee modular-protocol-evidence/mail-host-unit.log
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-mail --test profile_host --locked -- --ignored 2>&1 | tee modular-protocol-evidence/mail-host-native.log
+          python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          evidence = Path('modular-protocol-evidence')
+          native = evidence / 'mail-host-native.log'
+          assert '1 passed; 0 failed; 0 ignored' in native.read_text(encoding='utf-8')
+          host = Path('src-tauri/target/debug') / ('taomni-plugin-mail.exe' if os.name == 'nt' else 'taomni-plugin-mail')
+          receipt = {
+              'sourceSha': (evidence / 'source-sha.txt').read_text().strip(),
+              'runner': os.environ['MAIL_HOST_RUNNER'],
+              'runnerArchitecture': os.environ['RUNNER_ARCH'],
+              'runnerImage': os.environ.get('ImageVersion'),
+              'binarySha256': hashlib.sha256(host.read_bytes()).hexdigest(),
+              'artifactLog': native.name,
+          }
+          (evidence / 'mail-host-receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
+          PY
       - name: Verify operation cancellation and retained service contracts
         run: |
           set -o pipefail
@@ -317,7 +346,7 @@ jobs:
           assert len(harnesses) == 1, harnesses
           (evidence / "harness-path.txt").write_text(harnesses[0] + "\n", encoding="utf-8", newline="\n")
           PY
-      - name: Measure both paths with the existing native performance budgets
+      - name: Measure both paths against the modular release performance budgets
         shell: bash
         run: |
           set -o pipefail

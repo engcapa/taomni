@@ -189,8 +189,8 @@ mod outgoing_model;
 mod utilities;
 
 use limits::{
-    DEFAULT_BODY_MAX_BYTES, DEFAULT_MESSAGE_LIMIT, DEFAULT_TIMEOUT_SECS, IMAP_LIVE_IDLE_TTL,
-    OAUTH_REAUTHORIZE_REQUIRED, OAUTH_REFRESH_SKEW_SECS,
+    DEFAULT_MESSAGE_LIMIT, DEFAULT_TIMEOUT_SECS, IMAP_LIVE_IDLE_TTL, OAUTH_REAUTHORIZE_REQUIRED,
+    OAUTH_REFRESH_SKEW_SECS,
 };
 
 pub use connection_model::{
@@ -211,11 +211,7 @@ use oauth_model::{
 
 pub use account_model::{MailAccountConfig, MailAiSettings, MailCacheSettings, MailSyncSettings};
 
-use account_model::{
-    default_body_max_bytes, default_body_recent_limit, default_header_limit_per_folder,
-    default_header_retention_days, default_max_fetch_per_sync, default_sync_interval_minutes,
-    default_true,
-};
+use account_model::{default_max_fetch_per_sync, default_sync_interval_minutes, default_true};
 
 pub use message_model::{
     MailAddress, MailAttachmentInfo, MailFolder, MailMessageBody, MailMessageHeader,

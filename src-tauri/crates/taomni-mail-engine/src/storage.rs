@@ -13,6 +13,7 @@ mod tests;
 pub use cleanup::{
     as_sql_error, collect_garbage, remove_entries, snapshot_objects, snapshot_objects_with,
 };
+pub(crate) use index::object_path;
 pub use index::{account_root, init_tables, lookup};
 pub use model::{ArchiveEntry, FullMessage, FullMessageMode, PreparedMessage};
 pub use publication::{prepare, publish, store};

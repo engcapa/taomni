@@ -171,12 +171,7 @@ impl ScopeSnapshot {
     }
 }
 
-pub fn inert_actions() -> Vec<String> {
-    vec![format!(
-        "/__taomni_no_process__/{}/",
-        uuid::Uuid::new_v4().simple()
-    )]
-}
+pub use taomni_redirector::inert_actions;
 
 fn canonical_absolute_pattern(path: &Path, app_family: bool) -> Result<String, String> {
     let resolved = std::fs::canonicalize(path).unwrap_or_else(|_| path.to_path_buf());

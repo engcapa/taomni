@@ -24,6 +24,9 @@ function fixture(t) {
   put(join(app, "Contents/MacOS/taomni"), "#!/bin/sh\n# app executable\n", true);
   put(join(app, "Contents/Frameworks/libgssapi_krb5.2.2.dylib"), "bundled krb5");
   put(join(app, "Contents/Resources/sockscap/macos/xray"), "#!/bin/sh\n# xray executable\n", true);
+  const bridge = "sockscap/macos/sockscap-redirector-bridge";
+  put(join(root, "src-tauri/resources", bridge), "bridge executable", true);
+  put(join(app, "Contents/Resources", bridge), "bridge executable", true);
   for (const name of ["Mitmproxy Redirector.app.tar", "manifest.json", "LICENSE"]) {
     const relative = `sockscap/macos/redirector/0.12.11/${name}`;
     put(join(root, "src-tauri/resources", relative), `pinned ${name}`);
@@ -81,6 +84,14 @@ test("self-signed release gate validates the app and archived updater against th
   const trace = readFileSync(f.trace, "utf8");
   assert.equal(trace.split("\n").filter((line) => line.startsWith("codesign --verify --deep --strict")).length, 2);
   assert(!trace.includes("spctl"));
+});
+
+test("macOS release rejects SocksCap resources from another desktop platform", (t) => {
+  const f = fixture(t);
+  mkdirSync(join(f.app, "Contents/Resources/sockscap/windows"), { recursive: true });
+  const result = f.run();
+  assert.notEqual(result.status, 0);
+  assert.match(result.stderr, /Unexpected SocksCap resources in the macOS bundle/);
 });
 
 for (const failure of ["TEST_INVALID_SIGNATURE", "TEST_DIFFERENT_CERTIFICATE", "TEST_CDHASH", "TEST_DIFFERENT_REQUIREMENT", "TEST_WRONG_ARCH", "TEST_HARDENED_RUNTIME", "TEST_BOTTLE_PATH"]) {

@@ -31,6 +31,9 @@ impl StillCaptureService for WindowStillCapture {
             super::service::StillServiceError::ScreenPermission => {
                 RpcError::new(ErrorCode::PermissionDenied, "SCREEN_PERMISSION_REQUIRED")
             }
+            super::service::StillServiceError::Capture(
+                taomni_capture::still::StillError::NoDisplay(_),
+            ) => RpcError::new(ErrorCode::InvalidState, "SCREEN_CAPTURE_NO_DISPLAY"),
             _ => RpcError::new(ErrorCode::InternalError, "SCREEN_CAPTURE_FAILED"),
         })?;
         // Native capture may be synchronous. Its OS lease stays owned until

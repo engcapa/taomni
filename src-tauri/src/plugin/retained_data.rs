@@ -81,7 +81,7 @@ pub(crate) fn discover(
     let root = PluginDataRoot::open(plugins, slug)?;
     let mut files = Vec::new();
     if root.data.exists() {
-        collect(&root, &root.data, &mut files)?;
+        collect(&root, slug, &root.data, &mut files)?;
     }
     files.sort_by(|left, right| left.path.cmp(&right.path));
     let locator = RetainedDataLocator {
@@ -96,6 +96,7 @@ pub(crate) fn discover(
 
 fn collect(
     root: &PluginDataRoot,
+    slug: &str,
     path: &Path,
     files: &mut Vec<RetainedDataFile>,
 ) -> Result<(), PluginError> {
@@ -115,7 +116,7 @@ fn collect(
             return Err(invalid("plugin data contains a link/reparse point"));
         }
         if metadata.is_dir() {
-            collect(root, &path, files)?;
+            collect(root, slug, &path, files)?;
         } else {
             require_file(&metadata)?;
             if files.len() == MAX_FILES {
@@ -125,17 +126,27 @@ fn collect(
             root.open_file(&relative)?
                 .take(16)
                 .read_to_end(&mut header)?;
+            let kind = if is_database(slug, &relative, &header) {
+                DataFileKind::Sqlite
+            } else {
+                DataFileKind::File
+            };
             files.push(RetainedDataFile {
                 path: relative,
-                kind: if header == b"SQLite format 3\0" {
-                    DataFileKind::Sqlite
-                } else {
-                    DataFileKind::File
-                },
+                kind,
             });
         }
     }
     Ok(())
+}
+
+/// Attachments contain downloaded bytes with no SQLite lifecycle.
+pub(crate) fn opaque_file(slug: &str, relative: &str) -> bool {
+    slug == "mail" && relative.starts_with("attachments/")
+}
+
+pub(crate) fn is_database(slug: &str, relative: &str, header: &[u8]) -> bool {
+    !opaque_file(slug, relative) && header == b"SQLite format 3\0"
 }
 
 pub(crate) fn save(plugins: &Path, locator: &RetainedDataLocator) -> Result<(), PluginError> {

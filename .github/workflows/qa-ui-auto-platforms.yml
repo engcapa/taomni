@@ -43,6 +43,10 @@ on:
         description: Use release QA builds for selected native cases (reuse full-run caches)
         type: boolean
         default: false
+      modular_rdp_p95:
+        description: Apply the modular release allowance to RDP latency p95
+        type: boolean
+        default: false
       workspace_stage_trace:
         description: Diagnostic workspace task/layout tracing (exclude from performance acceptance)
         type: boolean
@@ -76,6 +80,7 @@ on:
       shards: {type: string, default: auto}
       browser_workers: {type: number, default: 2}
       native_release: {type: boolean, default: false}
+      modular_rdp_p95: {type: boolean, default: false}
       workspace_stage_trace: {type: boolean, default: false}
       run_rdp_unit_contracts: {type: boolean, default: true}
       case_ids: {type: string, default: ''}
@@ -88,6 +93,8 @@ on:
       - 'mobile-web/**'
       - 'src-tauri/build.rs'
       - 'src-tauri/src/**'
+      - 'src-tauri/crates/**'
+      - 'src-tauri/plugins/**'
       - 'package.json'
       - 'pnpm-lock.yaml'
       - 'pnpm-workspace.yaml'
@@ -95,7 +102,7 @@ on:
       - 'vite.config.ts'
       - 'src-tauri/Cargo.toml'
       - 'src-tauri/Cargo.lock'
-      - 'src-tauri/tauri.conf.json'
+      - 'src-tauri/tauri*.conf.json'
       - 'src-tauri/capabilities/**'
       - 'src-tauri/resources/**'
       - 'public/**'
@@ -273,6 +280,7 @@ jobs:
           QA_LINUX_PROFILES: ${{ inputs.linux_profiles }}
           QA_MACOS_RUNNER: ${{ inputs.macos_runner }}
           QA_NATIVE_RELEASE: ${{ inputs.native_release }}
+          QA_MODULAR_RDP_P95: ${{ inputs.modular_rdp_p95 }}
           QA_SHARDS: ${{ inputs.shards }}
           QA_BROWSER_WORKERS: ${{ inputs.browser_workers }}
           QA_CASE_IDS: ${{ inputs.case_ids }}

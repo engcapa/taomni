@@ -8365,6 +8365,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "quircs"
+version = "0.10.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d71dee9e56835add6f9c26227e6c690b19eda9414f5affc666c3ec833ba140dc"
+dependencies = [
+ "num-derive",
+ "num-traits",
+ "thiserror 2.0.20",
+]
+
+[[package]]
 name = "quote"
 version = "1.0.47"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -10941,7 +10952,9 @@ dependencies = [
  "taomni-plugin-stream",
  "taomni-profile-locks",
  "taomni-rdp-common",
+ "taomni-redirector",
  "taomni-sqlite-snapshot",
+ "taomni-vnc-key-protocol",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",
@@ -11095,14 +11108,18 @@ dependencies = [
  "flate2",
  "hex",
  "imap",
+ "imap-proto",
  "lettre",
+ "libc",
  "mail-parser",
+ "md-5 0.11.0",
  "native-tls",
  "regex",
  "rusqlite",
  "serde",
  "serde_json",
  "sha2 0.11.0",
+ "taomni-sqlite-snapshot",
  "tempfile",
  "tokio-util 0.7.19",
  "tracing",
@@ -11138,9 +11155,26 @@ dependencies = [
 ]
 
 [[package]]
+name = "taomni-plugin-mail"
+version = "0.1.0"
+dependencies = [
+ "libc",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "taomni-mail-engine",
+ "taomni-plugin-api",
+ "taomni-plugin-sdk",
+ "taomni-sqlite-snapshot",
+ "tempfile",
+]
+
+[[package]]
 name = "taomni-plugin-mfa"
 version = "0.1.0"
 dependencies = [
+ "png 0.18.1",
+ "quircs",
  "rusqlite",
  "serde",
  "serde_json",
@@ -11241,14 +11275,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "taomni-redirector"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "hex",
+ "libc",
+ "prost",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "taomni-sockscap-tools"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "bytes",
+ "libc",
  "prost",
  "serde",
  "serde_json",
+ "taomni-redirector",
  "tokio",
  "tracing",
  "winapi",
@@ -11260,6 +11311,21 @@ version = "0.1.0"
 dependencies = [
  "rusqlite",
  "tempfile",
+]
+
+[[package]]
+name = "taomni-vnc-key-helper"
+version = "0.1.0"
+dependencies = [
+ "taomni-vnc-key-protocol",
+ "winapi",
+]
+
+[[package]]
+name = "taomni-vnc-key-protocol"
+version = "0.1.0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]

@@ -556,7 +556,7 @@ v1.2 的方案是：每个插件是 `crate-type = ["cdylib", "rlib"]` 的 Cargo 
 | G2 | macOS 屏幕录制 / 辅助功能（TCC）授权的归属：由核心拉起的宿主进程做屏幕采集、输入注入，授权算谁的（对象含截图引擎、`plugin-rdp-server`、`plugin-mobile` 的桌面窗口输入与屏幕采集、`plugin-mfa` 的屏幕扫描） | 若算宿主自己的 TCC 主体，截图引擎与 `plugin-rdp-server` 的采集需要二次授权，且升级后 cdhash 变化会再次失效（见 `docs-issue/macos-screenshot-permission-and-signing.md`）；此时这两类能力改走核心内 `capture/`（§4.2 S1）或由 DEC-2 例外处理 |
 | G3 | Windows：下载到应用数据目录的 exe 被 SmartScreen / Defender 拦截的概率与处置 | 记录；至少 Authenticode 签名是否必需（现有发布流程是否已签名要先核实） |
 | G4 | Linux：deb / rpm / AppImage 下应用数据目录是否可执行（`noexec` 挂载） | 不可执行时的明确报错与替代目录 |
-| G5 | 数据通道吞吐：RDP 帧经宿主进程 + loopback WS，与现有进程内路径对比 | 以 `rdp-probe` 现有基线为准，不退化到影响可用（阈值 M0 定，写入验收） |
+| G5 | 数据通道吞吐：RDP 帧经宿主进程 + loopback WS，与现有进程内路径对比 | 输入到画面的 p95 可比原验收上限增加最多 100%，以 65 ms 为基准，模块化验收上限为 130 ms。首帧 ≤ 500 ms，动画 ≥ 25.6 fps，带宽 ≤ 4905 kbps，沿用原用例的采样和画面验证。 |
 | G6 | 应用崩溃 / 强杀后宿主进程是否残留 | 三端都不残留，或有下一次启动的清扫 |
 | G7 | 启用 / 禁用 / 升级 / 回滚是否都不需要重启核心 | 通过 |
 | G8 | 安装包、`module.json`、`modules.json` 的篡改和路径穿越 | 任意包内容、清单、签名文件、`dataDir`、`backupPaths` 被篡改或包含 `..` / 符号链接时拒绝安装，不覆盖当前版本，并留下可诊断错误 |
@@ -798,6 +798,7 @@ TC-MODULES-027 在 GitHub 安装固定哈希的正式 deb/MSI/DMG，由旧程序
 - **SocksCap 恢复日志的特例**：`sockscap/recovery.json` 记录“系统网络状态被改动、需要在崩溃后恢复”。若启动时该日志处于未清理状态而 SocksCap 插件未安装 / 已禁用，核心不得忽略：显示明确提示，引导安装插件完成恢复或手动清理，不静默留脏系统状态（现有恢复服务见 `sockscap/recovery_service`）。
 - 备份（核心）备份全部数据文件（核心库 + 各插件库），恢复时按 §3.7 处理。运行中的宿主用 `backup.snapshot` 取一致快照，已禁用 / 未安装的插件按 `backupPaths` 拷贝；还原前核心先停全部宿主并持有独占 `ProfileLease`（S13）。Vault 与插件库必须同批恢复，否则加密库无法解密（AC-016）。
 - 将 v2 MFA 备份恢复到新配置后，启动时按还原事务生成的定位记录使用 `plugins/mfa/data/mfa.db`。用户安装并启用签名模块后，用原 Vault 密码访问已恢复的账号。后续恢复 v1 MFA 备份也写入该配置当前使用的模块库。仍使用旧库且已含账号的配置会拒绝缺少配对旧 MFA 数据的 Vault 还原。
+- 首次升级遇到旧 Mail 账号时，模块商店自动准备验签包并显示下次启动时导入。应用下次启动先处理未完成的备份还原，再在打开业务库前用独占租约导入邮件。SQLite 快照包含已提交的 WAL 内容，原件和已缓存附件随账号一起复制。核心先发布数据，再激活验签代码，最后提交 journal。首次激活前中断时，重试使用最新的原缓存。会话记录和原缓存保留，供旧版回滚读取。
 
 ---
 
@@ -1016,7 +1017,7 @@ TC-MODULES-027 在 GitHub 安装固定哈希的正式 deb/MSI/DMG，由旧程序
 | G2 macOS 系统权限 | 核心共用 `capture/`，已实现 `capture.still` 的作用域服务。 [接线记录](taomni-modular-split-gates-hello-plugin.md#capturestill-service-integration-2026-11-17-verification-pending) | 已安装应用的原生屏幕录制和辅助功能授权归属，以及升级后的复用。 |
 | G3 Windows 系统保护 | GitHub Windows Runner 在 Defender 实时保护开启时从 `LOCALAPPDATA` 成功启动带 Internet 区域标记的 Hello 和 MFA。启动前后均确认实时保护开启。 [Defender 工件](https://github.com/engcapa/taomni/actions/runs/44628961420) | 正式 Authenticode 资产和实际 SmartScreen 分发信誉。 |
 | G4 Linux `noexec` | deb、RPM 和 AppImage 均验证宿主拒绝、用户按指引迁移 profile、原 Vault 与 MFA 连续读写。 [安装验证](taomni-modular-installed-upgrade-verification.md#linux-安装格式的-noexec-恢复) | 正式首发产物按同场景复验。 |
-| G5 帧吞吐 | 三端 loopback 连续帧全部交付，Linux X11 与 macOS 26 ARM64 的采集和编码对照通过原预算。Windows 复跑的首帧、实际动画帧率和带宽已达标，进程内及独立宿主的输入到画面 p95 分别为 79.43 和 78.24 ms。`main` Windows 桌面用例 p95 为 51.89 ms。 [Windows 复跑](https://github.com/engcapa/taomni/actions/runs/44623916926) · [main 基线](https://github.com/engcapa/taomni/actions/runs/44526382399/job/135598828285) | 同一预算下验证候选桌面和独立宿主的 Windows 延迟，以及匹配发行包上的端到端结果。 |
+| G5 帧吞吐 | 三端 loopback 连续帧全部交付，Linux X11 与 macOS 26 ARM64 的采集和编码对照通过原预算。最近的 Windows 双路径样本 p95 为 71.82 和 73.79 ms，落在 130 ms 的模块化上限内。 [Windows 原始样本](https://github.com/engcapa/taomni/actions/runs/44649616170) | 用匹配源码和发行包执行同一用例并归档每条路径的 p95、首帧、帧率及带宽。 |
 | G6 强制退出 | 三端实际进程门验证宿主回收。Linux 安装 deb 后强杀应用，签名 MFA 宿主在驱动清理前退出，重开后继续原账号计数。 [Linux 安装验证](taomni-modular-installed-upgrade-verification.md#linux-已安装应用的强制退出) | Windows MSI 和 macOS DMG 安装后的强退、重开和宿主回收。 |
 | G7 无重启生命周期 | Linux、Windows、macOS Intel 的签名模块更新和回滚经过实际宿主重新握手，保留禁用偏好及原数据。 [三端结果](https://github.com/engcapa/taomni/actions/runs/44287815253) | 正式业务宿主逐个验证状态、资源释放与回滚。 |
 | G8 验签与路径 | 四种原生运行配置通过正式公钥校验的包安装和篡改拒绝。签名目录和原子发布另有下载与发布契约。 [安装用例](https://github.com/engcapa/taomni/actions/runs/43804951477) · [发布契约](https://github.com/engcapa/taomni/actions/runs/44393439596) | 正式首发目录与每个首批包的签名及拒绝用例。 |

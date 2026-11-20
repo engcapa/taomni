@@ -16,6 +16,8 @@ pub mod migration;
 pub(crate) mod migration_commit;
 pub(crate) mod migration_execute_mfa;
 mod migration_key_check;
+pub(crate) mod migration_mail;
+pub(crate) mod migration_mail_provision;
 pub(crate) mod network;
 pub mod protocol;
 mod quiescence;

@@ -39,7 +39,7 @@ function sharedLibraryViolations(root) {
       }
     }
   }
-  for (const name of ["taomni-file-uri", "taomni-rdp-common", "taomni-mail-engine"]) {
+  for (const name of ["taomni-file-uri", "taomni-rdp-common", "taomni-mail-engine", "taomni-vnc-key-protocol", "taomni-redirector"]) {
     const directory = path.join(root, "src-tauri/crates", name);
     const manifest = fs.readFileSync(path.join(directory, "Cargo.toml"), "utf8");
     for (const match of manifest.matchAll(/\bpackage\s*=\s*"(tauri(?:-[^"\s]+)?|wry|taomni|taomni-plugin-[^"\s]+)"/g)) {
@@ -125,42 +125,54 @@ function mfaEngineViolations(root, treeFile) {
   return errors;
 }
 
-function mfaHostViolations(root, treeFile) {
+function hostViolations(root, slug, title, treeFile) {
   const errors = [];
-  const directory = path.join(root, "src-tauri/plugins/mfa");
+  const plugins = path.join(root, "src-tauri/plugins");
+  const directory = path.join(plugins, slug);
   if (!fs.existsSync(directory)) return errors;
   const manifest = fs.readFileSync(path.join(directory, "Cargo.toml"), "utf8");
-  const forbidden = /^(?:tauri(?:-|$)|wry$|taomni$|taomni-plugin-services$|reqwest$|xcap$)/;
+  const packageId = `taomni-plugin-${slug}`;
+  const forbidden = (packageName) => /^(?:tauri(?:-|$)|wry$|taomni$|taomni-hello-plugin$)/.test(packageName)
+    || (/^taomni-plugin-/.test(packageName) && !["taomni-plugin-api", "taomni-plugin-sdk", "taomni-plugin-stream"].includes(packageName))
+    || (slug === "mfa" && /^(?:reqwest|xcap)$/.test(packageName));
   for (const match of manifest.matchAll(/\bpackage\s*=\s*"([^"]+)"/g)) {
-    if (forbidden.test(match[1])) errors.push(`MFA host alias links core-owned package ${match[1]}`);
+    if (forbidden(match[1])) errors.push(`${title} host alias links core-owned package ${match[1]}`);
   }
   for (const { section, name, value } of cargoDependencies(manifest)) {
     const packageName = value.match(/\bpackage\s*=\s*"([^"]+)"/)?.[1] ?? name;
     const dependencyPath = value.match(/\bpath\s*=\s*"([^"]+)"/)?.[1];
-    if (forbidden.test(packageName) || (dependencyPath && path.resolve(directory, dependencyPath) === path.join(root, "src-tauri"))) {
-      errors.push(`MFA host ${section}.${name} links core-owned services or native runtime`);
+    const resolved = dependencyPath && path.resolve(directory, dependencyPath);
+    if (forbidden(packageName) || resolved === path.join(root, "src-tauri") || resolved?.startsWith(plugins + path.sep)) {
+      errors.push(`${title} host ${section}.${name} links core-owned services, native runtime or another module`);
     }
   }
   for (const filename of rustFiles(path.join(directory, "src"))) {
     const source = fs.readFileSync(filename, "utf8").replace(/\/\/[^\n]*/g, "");
-    if (/\b(?:tauri(?:_[\w]+)?|wry|taomni_lib|taomni_plugin_services|reqwest|xcap)::|\bcrate::(?:state|vault|backup|capture)::/.test(source)) {
-      errors.push(`${path.relative(root, filename)}: MFA host must access core services only through the SDK`);
+    if (/\b(?:tauri(?:_[\w]+)?|wry|taomni_lib|taomni_plugin_services)::|\bcrate::(?:state|vault|backup|capture)::/.test(source)
+        || (slug === "mfa" && /\b(?:reqwest|xcap)::/.test(source))) {
+      errors.push(`${path.relative(root, filename)}: ${title} host must access core services only through the SDK`);
     }
   }
   if (treeFile) {
     const tree = fs.readFileSync(treeFile, "utf8");
-    if (!/^taomni-plugin-mfa v/m.test(tree)) errors.push("MFA host cargo tree does not identify taomni-plugin-mfa as its root");
+    if (!tree.startsWith(`${packageId} v`)) errors.push(`${title} host cargo tree does not identify ${packageId} as its root`);
     for (const line of tree.split(/\r?\n/)) {
       const packageName = line.trim().split(/\s+/)[0];
-      if (forbidden.test(packageName)) errors.push(`MFA host dependency tree contains ${packageName}`);
+      if (packageName !== packageId && forbidden(packageName)) errors.push(`${title} host dependency tree contains ${packageName}`);
     }
   }
   return errors;
 }
 
 /** Return all violations, so one CI run identifies every broken ownership edge. */
-export function modularBoundaryViolations(root, { linuxTreeFile, mfaTreeFile, mfaHostTreeFile } = {}) {
-  const errors = [...sharedLibraryViolations(root), ...coreStateViolations(root), ...mfaEngineViolations(root, mfaTreeFile), ...mfaHostViolations(root, mfaHostTreeFile)];
+export function modularBoundaryViolations(root, { linuxTreeFile, mfaTreeFile, mfaHostTreeFile, mailHostTreeFile } = {}) {
+  const errors = [
+    ...sharedLibraryViolations(root),
+    ...coreStateViolations(root),
+    ...mfaEngineViolations(root, mfaTreeFile),
+    ...hostViolations(root, "mfa", "MFA", mfaHostTreeFile),
+    ...hostViolations(root, "mail", "Mail", mailHostTreeFile),
+  ];
   const consumers = ["screenshot", "mfa", "mobile"];
   for (const consumer of consumers) {
     for (const filename of rustFiles(path.join(root, "src-tauri/src", consumer))) {
@@ -223,14 +235,17 @@ if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.me
   const treeIndex = process.argv.indexOf("--linux-tree");
   const mfaTreeIndex = process.argv.indexOf("--mfa-tree");
   const hostTreeIndex = process.argv.indexOf("--mfa-host-tree");
+  const mailHostTreeIndex = process.argv.indexOf("--mail-host-tree");
   try {
     if (treeIndex >= 0 && !process.argv[treeIndex + 1]) throw new Error("--linux-tree requires a cargo tree output path");
     if (mfaTreeIndex >= 0 && !process.argv[mfaTreeIndex + 1]) throw new Error("--mfa-tree requires a cargo tree output path");
     if (hostTreeIndex >= 0 && !process.argv[hostTreeIndex + 1]) throw new Error("--mfa-host-tree requires a cargo tree output path");
+    if (mailHostTreeIndex >= 0 && !process.argv[mailHostTreeIndex + 1]) throw new Error("--mail-host-tree requires a cargo tree output path");
     checkModularBoundaries(repository, {
       linuxTreeFile: treeIndex >= 0 ? process.argv[treeIndex + 1] : undefined,
       mfaTreeFile: mfaTreeIndex >= 0 ? process.argv[mfaTreeIndex + 1] : undefined,
       mfaHostTreeFile: hostTreeIndex >= 0 ? process.argv[hostTreeIndex + 1] : undefined,
+      mailHostTreeFile: mailHostTreeIndex >= 0 ? process.argv[mailHostTreeIndex + 1] : undefined,
     });
   } catch (error) {
     console.error(error.message);

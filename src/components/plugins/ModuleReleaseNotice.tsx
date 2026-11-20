@@ -26,11 +26,15 @@ export function ModuleReleaseNotice({ openSettings }: { openSettings(): void }) 
     const entry = snapshot?.catalog.plugins[id];
     return entry ? [entry] : [];
   });
-  const legacyPending = plan?.legacyPending.length ?? 0;
-  if (!newModules.length && !legacyPending && !plan?.legacyWaiting) return null;
+  const waitingForRestart = plan?.legacyRestartRequired?.length ?? 0;
+  const importFailed = plan?.legacyImportFailed?.length ?? 0;
+  const legacyPending = (plan?.legacyPending.length ?? 0) - waitingForRestart - importFailed;
+  if (!newModules.length && !legacyPending && !waitingForRestart && !importFailed && !plan?.legacyWaiting) return null;
 
   return <aside data-testid="module-release-notice" className="max-h-40 overflow-y-auto border-t border-[var(--taomni-divider)] px-3 py-2 text-[12px]">
     {!!legacyPending && <p data-testid="module-release-legacy">{t("plugins.marketLegacyPending", { count: legacyPending })}</p>}
+    {!!waitingForRestart && <p data-testid="module-release-legacy">{t("plugins.marketMailRestartRequired")}</p>}
+    {!!importFailed && <p data-testid="module-release-legacy">{t("plugins.marketMailImportFailed")}</p>}
     {plan?.legacyWaiting && <p data-testid="module-release-legacy">{t("plugins.marketLegacyWaiting")}</p>}
     {!!newModules.length && <div data-testid="module-release-new">
       <p className="font-semibold">{t("plugins.marketNewTitle")}</p>

@@ -64,6 +64,7 @@ impl Fixture {
                 token: StagingToken::parse(id).unwrap(),
                 absolute_job_root: target,
                 allowed_files: vec![SafeRelativePath::parse("hello.sqlite").unwrap()],
+                opaque_files: Vec::new(),
             },
         }
     }

@@ -14,6 +14,7 @@ import time
 from modular_bundle_inventory import digest, write_json
 from qa_ui_auto.fixtures.module_legacy_mfa import isolated_desktop
 from qa_ui_auto.native_steps import NativeStepContext, run_native_step
+from qa_ui_auto.rdp_helpers.report_assertions import P95_METRIC, report_expectations
 from qa_ui_auto.testcase import load_case, step_verb_and_args
 
 CASE = Path("qa-ui-auto-tests/cases/TC-RDPS-PERF-01-performance-budget.testcase.yaml")
@@ -114,11 +115,17 @@ def measure(binary, probe, root):
         "harnessSha256": digest(binary), "probeSha256": digest(probe),
         "platform": system, "platformVersion": platform.version(), "trials": [],
     }
-    config = {"app": {"rdp_probe_binary": str(probe)}}
+    config = {"app": {"rdp_probe_binary": str(probe)}, "rdp": {"modular_p95": True}}
     environment = {"QA_RDP_USER": "qa-rdp", "QA_RDP_PASSWORD": "Qa1_" + secrets.token_hex(12)}
     failures = []
     with isolated_desktop(environment), measurement_desktop(root, config, system):
         for scenario, helper, args, budget in perf_steps(case):
+            expectations = report_expectations(budget, modular_rdp_p95=True)
+            if scenario == "latency":
+                report["latencyP95BudgetMs"] = {
+                    "reference": budget["expect"][P95_METRIC]["max"],
+                    "applied": expectations[P95_METRIC]["max"],
+                }
             sample_point = None
             if system == "Windows" and scenario == "latency":
                 probe_args = args["args"]

@@ -50,7 +50,6 @@
       "icons/icon.ico"
     ],
     "resources": [
-      "resources/sockscap/**/*",
       "resources/licenses/*"
     ],
     "windows": {

@@ -10,11 +10,12 @@ function fixture(t, manifest = "") {
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   for (const child of ["src/screenshot", "src/mfa", "src/mobile", "src/servers", "src/config",
     "crates/taomni-capture/src", "crates/taomni-file-uri/src", "crates/taomni-rdp-common/src",
-    "crates/taomni-mail-engine/src", "crates/taomni-mfa-engine/src"]) {
+    "crates/taomni-mail-engine/src", "crates/taomni-mfa-engine/src",
+    "crates/taomni-vnc-key-protocol/src", "crates/taomni-redirector/src"]) {
     fs.mkdirSync(path.join(root, "src-tauri", child), { recursive: true });
   }
   fs.writeFileSync(path.join(root, "src-tauri/crates/taomni-capture/Cargo.toml"), manifest);
-  for (const name of ["taomni-file-uri", "taomni-rdp-common", "taomni-mail-engine", "taomni-mfa-engine"]) {
+  for (const name of ["taomni-file-uri", "taomni-rdp-common", "taomni-mail-engine", "taomni-mfa-engine", "taomni-vnc-key-protocol", "taomni-redirector"]) {
     fs.writeFileSync(path.join(root, "src-tauri/crates", name, "Cargo.toml"), "");
   }
   return root;
@@ -151,4 +152,16 @@ test("MFA runtime cargo tree rejects transitive core/SDK and network ownership",
   assert.deepEqual(modularBoundaryViolations(root, { mfaTreeFile: tree }), []);
   fs.writeFileSync(tree, "wrong-root v0.1.0\n");
   assert.match(modularBoundaryViolations(root, { mfaTreeFile: tree }).join("\n"), /does not identify/);
+});
+
+test("Mail host may use the engine and SDK without linking a peer module", (t) => {
+  const root = fixture(t);
+  const directory = "src-tauri/plugins/mail";
+  fs.mkdirSync(path.join(root, directory, "src"), { recursive: true });
+  write(root, `${directory}/Cargo.toml`, '[dependencies]\ntaomni-mail-engine = { path = "../../crates/taomni-mail-engine" }\n');
+  const tree = path.join(root, "mail-host-tree.txt");
+  fs.writeFileSync(tree, "taomni-plugin-mail v0.1.0\ntaomni-mail-engine v0.1.0\ntaomni-plugin-sdk v0.1.0\n");
+  assert.deepEqual(modularBoundaryViolations(root, { mailHostTreeFile: tree }), []);
+  fs.appendFileSync(tree, "taomni-plugin-mfa v0.1.0\n");
+  assert.match(modularBoundaryViolations(root, { mailHostTreeFile: tree }).join("\n"), /Mail host dependency tree contains taomni-plugin-mfa/);
 });

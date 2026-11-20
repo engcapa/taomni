@@ -69,6 +69,8 @@ class BuildCheckTest(unittest.TestCase):
             binary.write_bytes(b"qa app")
             helper = binary.with_name("sockscap-helper.exe")
             helper.write_bytes(b"qa helper")
+            vnc_key_helper = binary.with_name("taomni-vnc-key-helper.exe")
+            vnc_key_helper.write_bytes(b"qa vnc key helper")
             inputs = {"source_sha256": "source"}
             record = {"identifier": native_build.QA_APP_ID, "binary_sha256": native_build.binary_digest(binary),
                       "build_inputs": inputs}
@@ -79,7 +81,15 @@ class BuildCheckTest(unittest.TestCase):
                 self.assertIn("identity missing", native_build.check_build(inputs=inputs)["reason"])
                 record["sockscap_helper_sha256"] = native_build.binary_digest(helper)
                 path.write_text(json.dumps(record), encoding="utf-8")
+                self.assertIn("taomni-vnc-key-helper identity missing",
+                              native_build.check_build(inputs=inputs)["reason"])
+                record["vnc_key_helper_sha256"] = native_build.binary_digest(vnc_key_helper)
+                path.write_text(json.dumps(record), encoding="utf-8")
                 self.assertTrue(native_build.check_build(inputs=inputs)["reusable"])
+                vnc_key_helper.write_bytes(b"stale vnc key helper")
+                self.assertIn("taomni-vnc-key-helper differs",
+                              native_build.check_build(inputs=inputs)["reason"])
+                vnc_key_helper.write_bytes(b"qa vnc key helper")
                 helper.write_bytes(b"stale helper")
                 self.assertIn("helper differs", native_build.check_build(inputs=inputs)["reason"])
                 helper.unlink()

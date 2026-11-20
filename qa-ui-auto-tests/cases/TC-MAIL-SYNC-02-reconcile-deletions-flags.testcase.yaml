@@ -6,7 +6,8 @@ description: 'AC-04/AC-05: after the list matches the server, another client del
 
   Sync must remove the expunged rows and show the server''s read state, so the
 
-  unread rows equal the server''s unseen count. Browser mode uses the stub
+  unread rows equal the server''s unseen count after synchronization and
+  after reopening the same mailbox. Browser mode uses the stub
 
   server model; native mode uses the fake IMAP server and the real backend.
 
@@ -59,14 +60,27 @@ steps:
     unread: true
     timeout_sec: 60
 - assert_visible: '[data-testid="mail-message-count"]'
+- click: '[data-testid="tab-item"][data-tab-type="mail"] [data-testid="tab-close"]'
+- wait_for:
+    selector: '[data-testid="mail-client-tab"]'
+    state: detached
+- fill:
+    selector: '[data-testid="qc-input"]'
+    value: ${fixture.mail_quick_connect}
+- click: '[data-testid="qc-submit"]'
+- wait_for: '[data-testid="mail-client-tab"]'
+- mail_server_assert_list_matches:
+    unread: true
+    timeout_sec: 60
 - click: '[data-testid="mail-message-row"]'
 - wait_for: '[data-testid="mail-message-row"][aria-pressed="true"]'
+- assert_no_runtime_errors: null
 - screenshot: mail-sync-02-reconcile.png
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: 其他客户端的新增、删除与已读变化在手工同步后全部反映到列表：数量与未读数均与服务器一致（AC-04/AC-05）。
+    requirement: 手工同步后，其他客户端的新增、删除与已读变化反映到列表，重开后列表数量与未读数仍与服务器一致（AC-04/AC-05）。
     actions:
     - 1
     - 2
@@ -79,6 +93,9 @@ verification:
     - 13
     - 14
     - 18
+    - 20
+    - 21
+    - 24
     checkpoints:
     - step: 8
       expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 60}}'
@@ -92,10 +109,18 @@ verification:
     - step: 17
       expectation: '{"assert_visible": "[data-testid=\"mail-message-count\"]"}'
     - step: 19
+      expectation: The Mail tab closes before reopening the saved mailbox.
+    - step: 23
+      expectation: The reopened list reflects the deletions and read flags and matches the server counts.
+    - step: 25
       expectation: '{"wait_for": "[data-testid=\"mail-message-row\"][aria-pressed=\"true\"]"}'
+    - step: 26
+      expectation: No runtime errors during reconciliation and reopen.
     results:
     - 16
     - 17
+    - 23
+    - 26
     - 19
   visual:
   - check: 截图中列表与未读样式正确，无残留的已删除邮件。

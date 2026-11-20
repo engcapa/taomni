@@ -21,6 +21,30 @@ fn a_sqlite_handle_cannot_be_exported_through_the_ordinary_file_path() {
 }
 
 #[test]
+fn an_opaque_attachment_grant_preserves_sqlite_payload_bytes() {
+    let fixture = Fixture::new();
+    let source = fixture.root.path().join("plugins/mfa/data/mfa.db");
+    let mut grant = fixture.request.destination.clone();
+    let attachment = SafeRelativePath::parse("attachments/mail/INBOX/4-1.bin").unwrap();
+    grant.opaque_files = vec![attachment.clone()];
+    assert!(SnapshotExport::validate(&grant, fixture.root.path()).is_err());
+    grant.allowed_files = vec![attachment.clone()];
+    SnapshotExport::validate(&grant, fixture.root.path()).unwrap();
+
+    let mut output = SnapshotExport::new(&grant, operation());
+    let db = rusqlite::Connection::open(&source).unwrap();
+    assert!(output.sqlite(attachment.as_str(), &db).is_err());
+    output
+        .file(attachment.as_str(), fs::File::open(&source).unwrap())
+        .unwrap();
+    assert_eq!(
+        fs::read(grant.absolute_job_root.join(attachment.as_str())).unwrap(),
+        fs::read(source).unwrap(),
+    );
+    assert_eq!(output.complete().unwrap().len(), 1);
+}
+
+#[test]
 fn a_grant_rejects_aliased_paths_nonempty_roots_and_business_data_destinations() {
     let fixture = Fixture::new();
     let profile = fixture.root.path();

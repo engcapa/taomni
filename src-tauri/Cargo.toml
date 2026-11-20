@@ -27,10 +27,14 @@ members = [
     "crates/taomni-plugin-sdk",
     "crates/taomni-plugin-stream",
     "crates/taomni-profile-locks",
+    "crates/taomni-redirector",
     "crates/taomni-sqlite-snapshot",
+    "crates/taomni-vnc-key-protocol",
     "plugins/hello-plugin",
+    "plugins/mail",
     "plugins/mfa",
     "plugins/sockscap/tools",
+    "plugins/vnc-client/key-helper",
     "vendor/ironrdp-acceptor",
     "vendor/ironrdp-bulk",
     "vendor/ironrdp-server",
@@ -74,6 +78,7 @@ taomni-plugin-api = { path = "crates/taomni-plugin-api" }
 taomni-plugin-services = { path = "crates/taomni-plugin-services" }
 taomni-plugin-stream = { path = "crates/taomni-plugin-stream" }
 taomni-profile-locks = { path = "crates/taomni-profile-locks" }
+taomni-redirector = { path = "crates/taomni-redirector" }
 taomni-sqlite-snapshot = { path = "crates/taomni-sqlite-snapshot" }
 taomni-capture = { path = "crates/taomni-capture" }
 taomni-rdp-common = { path = "crates/taomni-rdp-common", features = ["bitmap"] }
@@ -310,6 +315,7 @@ local-llm-fim = ["dep:llama-cpp-2"]
 hbase-kerberos = ["dep:cross-krb5"]
 
 [target.'cfg(windows)'.dependencies]
+taomni-vnc-key-protocol = { path = "crates/taomni-vnc-key-protocol" }
 webview2-com = "=0.39.1"
 winapi = { version = "0.3", features = [
   "fileapi", "commdlg", "shellapi", "winbase", "winuser",

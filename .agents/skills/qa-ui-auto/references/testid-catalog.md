@@ -1769,6 +1769,7 @@
 
 - `[data-testid="mail-incoming-protocol"]` — interactive [optional] — F-MAIL-17.incoming-protocol
 - `[data-testid="mail-pop3-leave-days"]` — interactive [optional] — F-MAIL-17.pop3-leave-days
+- `[data-testid="mail-reader-text"]` — display — F-MAIL-17.received-text
 
 ## mail/search (F-MAIL-7)
 

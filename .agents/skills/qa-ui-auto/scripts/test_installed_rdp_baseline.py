@@ -22,6 +22,7 @@ class InstalledRdpBaselineTests(unittest.TestCase):
 
             def setup(observer):
                 self.assertEqual(observer.cfg["app"]["rdp_probe_binary"], str(probe))
+                self.assertIs(observer.cfg["rdp"]["modular_p95"], True)
                 observer.env.update(QA_RDP_PORT="23456", QA_RDP_USER="qa", QA_RDP_PASSWORD="qa-password",
                                     QA_VAULT_PASSWORD="qa-vault")
 
@@ -60,6 +61,7 @@ class InstalledRdpBaselineTests(unittest.TestCase):
         self.assertEqual(len(result["steps"]), len(case.steps))
         self.assertEqual(steps[-1], ("assert_no_runtime_errors", None))
         self.assertEqual(steps[-2][1], case.steps[-1]["assert_json_file"])
+        self.assertEqual(result["steps"][-2]["latencyP95BudgetMs"], {"reference": 65, "applied": 130})
 
     def test_preserves_the_failed_measurement_step_and_releases_helpers(self):
         _, result = self.exercise(fail_at=7)

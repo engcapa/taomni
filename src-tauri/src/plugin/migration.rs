@@ -16,6 +16,7 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 
 pub(crate) const MFA_MIGRATION_TARGET: &str = "plugins/mfa/data/mfa.db";
+pub(crate) const MAIL_MIGRATION_TARGET: &str = "plugins/mail/data";
 pub(crate) const LEGACY_SOURCE_VERSION: &str = "0.5.x";
 
 /// The fixed Vault entries that the migration preflight can observe without
@@ -202,6 +203,13 @@ fn valid_mfa_commit(entry: &MigrationJournalEntry) -> bool {
         && entry.target == Path::new(MFA_MIGRATION_TARGET)
 }
 
+pub(super) fn valid_mail_commit(entry: &MigrationJournalEntry) -> bool {
+    entry.item == MigrationItem::MailAccounts
+        && entry.source_path == Path::new("taomni.db")
+        && source::valid_fingerprint(&entry.source_fingerprint)
+        && entry.target == Path::new(MAIL_MIGRATION_TARGET)
+}
+
 /// One filesystem migration operation. Database legacy tables are represented
 /// by a read-only export written to `source`; the plugin host never opens the
 /// monolith database directly. `target` is relative to the plugin version
@@ -315,7 +323,10 @@ fn reconcile_pending(
     for entry in &journal.entries {
         match entry.state {
             MigrationStepState::Pending if entry.target.as_os_str().is_empty() => (),
-            MigrationStepState::Committed if valid_mfa_commit(entry) && committed.is_empty() => {
+            MigrationStepState::Committed
+                if (valid_mfa_commit(entry) || valid_mail_commit(entry))
+                    && !committed.contains(&entry.item) =>
+            {
                 committed.push(entry.item);
             }
             _ => {

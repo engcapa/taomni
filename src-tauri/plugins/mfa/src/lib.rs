@@ -4,6 +4,7 @@
 mod commands;
 mod key_provider;
 mod paths;
+mod screen_scan;
 mod snapshot;
 mod store;
 
@@ -37,6 +38,7 @@ pub fn host_config() -> HostConfig {
             "mfa_export_uri",
             "mfa_reset_store",
             "mfa_initialize_empty",
+            screen_scan::METHOD,
             SNAPSHOT_PREPARE_METHOD,
             SNAPSHOT_METHOD,
             SNAPSHOT_RELEASE_METHOD,
@@ -44,7 +46,7 @@ pub fn host_config() -> HostConfig {
         .into_iter()
         .map(String::from)
         .collect(),
-        permissions: BTreeSet::from([FIXED_KEY_SERVICE.into()]),
+        permissions: BTreeSet::from([FIXED_KEY_SERVICE.into(), CAPTURE_SCREEN_PERMISSION.into()]),
         required_services: services,
         operation_timeout: Duration::from_secs(10),
         snapshot_timeout: Duration::from_secs(300),
@@ -80,6 +82,9 @@ impl PluginHandler for Handler {
         operation.check_current()?;
         if operation.context().is_none() {
             return Err(CoreServiceError::StalePluginContext.into_rpc_error());
+        }
+        if method == screen_scan::METHOD {
+            return screen_scan::capture_texts(operation, params);
         }
         commands::invoke(&self.store, operation, commands::parse(method, params)?)
     }

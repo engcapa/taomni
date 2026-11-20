@@ -157,7 +157,7 @@ if (-not (Test-Path $helperSrc)) {
   throw "helper not found at $helperSrc"
 }
 
-# Stage helper into resources/sockscap/windows/ so it is bundled with the app (via resources wildcard + paths.rs support).
+# tauri.windows.conf.json packages the staged helper from resources/sockscap/windows/.
 $helperDest = Join-Path $resWin "sockscap-helper.exe"
 Copy-Item -Path $helperSrc -Destination $helperDest -Force
 Write-Host "Helper staged to resources for bundling: $helperDest"

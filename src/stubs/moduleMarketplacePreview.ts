@@ -16,8 +16,43 @@ export const marketplacePreviewCatalog: ModuleMarketplaceCatalog = { platform: "
   },
 } };
 
+const mailId = "taomni-plugin-mail";
+const mailStaged = "taomni.preview.mail-provisioned";
+function invokeLegacyMailPreview(command: string, args: Record<string, unknown> | undefined, failed: boolean): unknown {
+  if (command === "plugin_marketplace_catalog") {
+    const sample = marketplacePreviewCatalog.catalog.plugins[previewHelloManifest.id];
+    return {
+      ...marketplacePreviewCatalog,
+      catalog: { ...marketplacePreviewCatalog.catalog, plugins: {
+        [mailId]: { ...sample, id: mailId, slug: "mail", name: "Mail", description: "Mail and the unified inbox" },
+      } },
+      release: {
+        legacyWaiting: false,
+        legacyPending: [mailId],
+        legacyRestartRequired: !failed && sessionStorage.getItem(mailStaged) ? [mailId] : [],
+        legacyImportFailed: failed ? [mailId] : [],
+        updates: [],
+        newModules: [],
+      },
+    };
+  }
+  if (command === "plugin_marketplace_provision") {
+    const selection = args?.selection as ModuleCatalogSelection | undefined;
+    if (selection?.pluginId === mailId && selection.sha256 === digest && selection.version === "0.1.0"
+      && (!failed || args?.retry === true)) {
+      sessionStorage.setItem(mailStaged, "true");
+      localStorage.setItem(MARKETPLACE_PREVIEW_KEY, "legacy-mail");
+      return { restartRequired: true };
+    }
+  }
+  throw new Error("Invalid browser Mail provision fixture");
+}
+
 export function invokeMarketplacePreview(command: string, args?: Record<string, unknown>): unknown {
   const mode = localStorage.getItem(MARKETPLACE_PREVIEW_KEY);
+  if (mode === "legacy-mail" || mode === "legacy-mail-failed") {
+    return invokeLegacyMailPreview(command, args, mode === "legacy-mail-failed");
+  }
   if (mode !== "true" && mode !== "release" && mode !== "update") {
     if (command === "plugin_marketplace_catalog") return { ...marketplacePreviewCatalog, catalog: { ...marketplacePreviewCatalog.catalog, plugins: {} } };
     throw new Error("Browser preview cannot download or verify native module packages.");

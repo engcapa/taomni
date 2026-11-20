@@ -129,27 +129,6 @@ pub(super) fn parse_events(ics: &str) -> Vec<MailAgendaEvent> {
     events
 }
 
-pub(super) fn migrate_calendar_tables(conn: &Connection) -> SqlResult<()> {
-    conn.execute_batch(
-        "CREATE TABLE IF NOT EXISTS mail_calendar_events (
-            account_id TEXT NOT NULL,
-            href TEXT NOT NULL,
-            instance TEXT NOT NULL DEFAULT '',
-            event_json TEXT NOT NULL,
-            start_ts INTEGER,
-            updated_at INTEGER NOT NULL,
-            PRIMARY KEY (account_id, href, instance)
-        );
-        CREATE TABLE IF NOT EXISTS mail_caldav_state (
-            account_id TEXT PRIMARY KEY,
-            base_url TEXT,
-            collection_url TEXT,
-            last_sync INTEGER,
-            last_error TEXT
-        );",
-    )
-}
-
 /// Replace the cached events of the synced resources.
 pub(super) fn store_events(
     conn: &Connection,

@@ -1,13 +1,11 @@
-use super::connection::Pop3Client;
 use super::limits::POP3_FETCH_BATCH;
-use super::local_store::ensure_local_folders;
-use super::local_store::insert_local;
-use super::local_store::refresh_counts;
+use super::{ensure_local_folders, insert_local, refresh_counts};
 use crate::mail::MailMessageCached;
 use crate::mail::now_ts;
 use rusqlite::Connection;
 use rusqlite::params;
 use std::collections::HashMap;
+use taomni_mail_engine::pop3::{Pop3Session, plan_round};
 
 // ---------------------------------------------------------------------------
 // Download
@@ -19,39 +17,9 @@ pub(in crate::mail) struct Pop3SyncOutcome {
     pub deleted_on_server: usize,
 }
 
-/// Plan one sync round from the server listing and the remembered UIDLs.
-/// Returns (numbers to download, numbers to delete on the server).
-pub(in crate::mail) fn plan_round(
-    listing: &[(u32, String)],
-    known: &HashMap<String, i64>,
-    limit: usize,
-    leave_days: Option<u32>,
-    now: i64,
-) -> (Vec<(u32, String)>, Vec<u32>) {
-    let fetch: Vec<(u32, String)> = listing
-        .iter()
-        .filter(|(_, id)| !known.contains_key(id))
-        .take(limit)
-        .cloned()
-        .collect();
-    let deletes = match leave_days {
-        None => Vec::new(),
-        Some(days) => {
-            let cutoff = now - i64::from(days) * 86_400;
-            listing
-                .iter()
-                .filter(|(_, id)| known.get(id).is_some_and(|fetched| *fetched <= cutoff))
-                .map(|(number, _)| *number)
-                .collect()
-        }
-    };
-    (fetch, deletes)
-}
-
-/// Download new mail into the local INBOX (one batch) and apply the
-/// leave-on-server policy. The connection is opened and closed here.
+/// Download one batch into the local INBOX and apply the leave-on-server policy.
 pub(in crate::mail) fn sync_inbox(
-    client: &mut Pop3Client,
+    client: &mut Pop3Session,
     conn: &Connection,
     account_id: &str,
     leave_days: Option<u32>,

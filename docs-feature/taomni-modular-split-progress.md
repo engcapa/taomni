@@ -161,6 +161,26 @@ TASK-027 将 G1–G11 设为独立发布阻断门。每个门必须在匹配源�
 - Windows GDI 单独实验的进程内延迟 p95 为 60.63 ms，独立宿主为 74.90 ms，两条路径的帧率分别为 20.91 和 21.54 fps，低于 25.6 fps 门槛。这份分支用于定位采集开销。 [GDI 原始结果](https://github.com/engcapa/taomni/actions/runs/44660430509)
 - Windows G5 用单独分支测试 DIB section 直接读取采集帧。用例沿用 65 ms 延迟和 25.6 fps 门槛。 [Windows 采集对照](https://github.com/engcapa/taomni/actions/runs/44667760818)
 - Mail 的 IMAP greeting、TLS、STARTTLS 和认证已接入独立引擎。核心过渡层按会话设置打开连接，连接失败或结束时回收转发任务。更新 TC-MAIL-IDLE-01、TC-MAIL-POP3-01 和 TC-MAIL-SYNC-03，保留 IDLE 断开、POP3 去重和稀疏 UID 重连的独立断言，并检查运行时错误。
+- `5f3eccfde` 的邮件引擎 32 项单测、核心 10 项定向单测、QA 审计和重构边界检查通过。三端执行选集包括 Mail 八项入口及完整崩溃回归。 [三端 Mail 回归](https://github.com/engcapa/taomni/actions/runs/44669328730)
+- macOS G1 在独立验证分支以现用固定证书制作 ARM64 DMG。MIT Kerberos 改用静态链接，产物同时检查 GSSAPI 代码、系统动态库依赖、hardened runtime 签名和升级归档身份。该实验仍依赖 GitHub 原生构建及实装回执。 [ARM64 DMG 比较](https://github.com/engcapa/taomni/actions/runs/44670439565)
+- 各端核心过渡安装包只复制本机 SocksCap 资源及通用许可证。Windows 安装包校验两种解包格式中的 helper、WinDivert 和已暂存 xray 摘要，macOS 包检查外平台资源目录。现场功能入口复用 TC-MAIN-RAIL-01，产物差异由真实安装包清单验证。独立模块包仍按 TASK-019 推进。
+- 用户确认 G5 的 p95 容许增加最多 100%。模块化专项按原验收上限 65 ms 计算，允许最多 130 ms。Windows 之前的两条实测路径为 71.82 和 73.79 ms，两者均在该范围内。首帧、帧率、带宽和采样要求继续由原用例检查。 [Windows 原始采样](https://github.com/engcapa/taomni/actions/runs/44649616170)
+- 按新 p95 口径核对 Windows 历史原始数据，两条路径的连接、延迟和吞吐共六项达标。提交 `cd0668280` 的三端对照及 Browser/Native 回归已派发，选集记录模块化 p95 设置。 [三端采集对照](https://github.com/engcapa/taomni/actions/runs/44674876677) · [应用回归](https://github.com/engcapa/taomni/actions/runs/44674877474)
+- Mail 的 POP3 协议、TLS/STLS 握手、APOP、UIDL 去重规划和原信字节读取迁入独立引擎。核心过渡层持有会话转发及本地 SQLite 写入。TC-MAIL-POP3-01 在 Browser 和 Native 验证重复同步后打开新收邮件的正文。
+- `fad537a25` 的邮件引擎 35 项、桌面适配层 10 项单测通过。`30234305c` 迁出 IMAP 增量同步、历史补拉、对账、分页与正文预取，本地 42 项引擎及 29 项桌面单测通过。TC-MAIL-SYNC-01 新增重开后读取最新正文的断言。两个批次均启动三端 Browser、Native 和崩溃回归，分片上传后直接下载。 [POP3](https://github.com/engcapa/taomni/actions/runs/44677155053) · [IMAP](https://github.com/engcapa/taomni/actions/runs/44679358478)
+- 邮件引擎已接管 SQLite 缓存读写、同步水位、已读冲突处理、联系人索引和 POP3 本地文件夹。旧库重复初始化仍可读取原有标题和正文。45 项引擎单测、43 项桌面与备份单测及 QA 审计通过。TC-MAIL-SYNC-02 增加重开后观察删除和已读状态的 Browser 与 Native 检查。
+- `b9c6d34e7` 的邮件缓存、旧 Mail 预检和完整崩溃回归由三端运行验证。独立 Mail 宿主已实现只读模块目录中的缓存文件夹、分页标题和正文，4 项宿主单测通过。三端协议运行验证独占 profile 的实际进程、退出重开和缓存原件不变。Mail 面板、旧缓存搬迁和网络服务仍处于 TASK-026 实施阶段。 [缓存三端运行](https://github.com/engcapa/taomni/actions/runs/44681017385)
+- `58c293a5b` 的 Mail 宿主进程、源码与二进制身份由三端专项收证。IMAP 的大邮件正文、附件分段读取、原件获取及分批已读和删除操作已迁入邮件引擎。47 项引擎单测、30 项桌面单测及 QA 审计通过。桌面单测核对截断片段不会保存为原件，按分段获取的正文和附件字节完整。TC-MAIL-BULK-01 补查读标记与删除并发时的运行时错误。 [宿主三端运行](https://github.com/engcapa/taomni/actions/runs/44682092156)
+- `0c19232a7` 的邮件大正文、归档和分批操作由三端 Browser、Native 和完整崩溃回归验证。Windows VNC 特殊键入口已迁入独立辅助程序，核心不再提供原 re-exec 分支。发布过渡包按 Windows 资源路径暂存辅助程序，MSI 与 NSIS 解包检查其摘要，QA 核对实际辅助程序在控制端断开时退出。VNC 宿主和前端迁出后由模块包提供该程序。 [邮件三端运行](https://github.com/engcapa/taomni/actions/runs/44683732219)
+- `cd0668280` 的 Windows `windows-2025` G5 工件已收齐六项对照结果。进程内和独立编码宿主各使用 40 个输入样本，p95 分别为 71.48 ms 和 73.95 ms，均落在 130 ms 上限内。对应连接和吞吐检查也全部通过。原始数据、源码、可执行文件摘要保存在该运行的 `modular-rdp-pipeline-Windows-X64` 工件。 [Windows 工件](https://github.com/engcapa/taomni/actions/runs/44674876677/artifacts/14605924642)
+- macOS SocksCap Redirector 桥接程序迁入独立工具，核心通过同一控制与数据协议启动。共用代码保留 peer PID、audit token、签名身份和文件摘要验证。过渡 DMG 及 updater 核对桥接程序的可执行权限、目标架构及一致字节。SocksCap 模块包接管该工具及系统扩展资源后，才能完成其核心安装包依赖裁剪。
+- Mail 已接入签名离线升级。配置租约保护旧会话，暂存默认和自定义目录的 SQLite、WAL 已提交数据、原件及附件后切换模块版本。未激活的升级中断后会重新从原缓存取快照。51 项邮件引擎、4 项宿主、5 项核心迁移及 31 项 QA 工具单测通过。设置页沿用 TC-MODULES-049/050，签名升级专项运行真实宿主与维护进程。Mail 自动首装迁移、正式前端和网络服务仍待接入。
+- 旧 Mail 宿主源码 `58c293a5b` 在 Windows 取得进程级通过回执。macOS 单测使用未经规范化的临时目录，SQLite 将系统路径别名视为链接并拒绝打开。测试夹具改用和生产 SDK 一致的规范路径，三端使用当前源码复验。 [原始工件](https://github.com/engcapa/taomni/actions/runs/44682092156)
+- `cd0668280` 的 macOS 26 ARM64 G5 工件已收取。进程内和独立编码宿主各取得 40 个样本，输入到画面 p95 分别为 44.68 ms 和 44.83 ms。两条路径的连接、延迟和吞吐共六项通过。Linux 对照及当前发行候选的匹配源码复验仍待完成。 [macOS 工件](https://github.com/engcapa/taomni/actions/runs/44674876677/artifacts/14610072079)
+- Mail 草稿、模板和发件箱的数据模型及 SQLite 读写移入邮件引擎。宿主可分页读取迁移后的草稿和定时发送状态，并在备份期间导出库快照及原附件。备份和还原按原字节保留具有 SQLite 文件头的下载附件。相关邮件引擎 51 项、宿主 5 项、桌面撰写与草稿 10 项、SDK 27 项及核心备份 22 项单测通过。TC-MAIL-OUTBOX-01 增加收件人、定时状态、发送后空态和运行时检查，跨进程用例留 GitHub 执行。
+- Mail 宿主接管本地草稿保存与删除。每次请求按账号和草稿 ID 更新，首次保存完整提交后才发布库文件。宿主 7 项单测通过，覆盖同 ID 重试、账号隔离、取消后未留下半写入库。跨进程用例增加备份屏障期间拒绝写入、释放屏障后保存和删除、重开后核对数据以及旧缓存保留。
+- `cd0668280` 的 Linux x64 G5 对照已通过。两条路径各 40 个样本，p95 分别为 18.65 ms 和 18.74 ms。Linux、Windows 和 macOS 的 18 项连接、延迟及吞吐检查均通过。发行候选冻结后按匹配源码重新收证。 [Linux 工件](https://github.com/engcapa/taomni/actions/runs/44674876677/artifacts/14613135161)
+- 旧账号对应的 Mail 包已接入首次自动安装流程。模块商店在当前会话准备验签包并提示下次打开应用时导入。启动先处理待完成的备份还原，再暂时释放启动租约供 Mail 迁移取得独占权。导入失败时可在商店继续安装。TC-MODULES-052 检查提示和刷新后的状态，签名宿主专项覆盖真实启动后读取旧邮件。
 
 ## 当前结论
 
@@ -446,7 +466,7 @@ TASK-027 将 G1–G11 设为独立发布阻断门。每个门必须在匹配源�
 | TASK-023 发布验收 | 目录签名、首装名单和独立模块发布准备已验证 | 发布工具覆盖已暂存模块的签名、声明平台、描述和摘要。核心发布继承签名目录，独立发布保留原模块的资产地址。正式模块构建矩阵、系统签名、首批目录及最终两种安装集合的回归和性能仍待交付。 |
 | TASK-024 入口/profile 协同 | 核心与宿主所有权已接入，完整入口矩阵待闭合 | GUI/headless bootstrap、ModeLease、可重试退出、宿主 ProfileUseLease/PluginDataLease、正常重启/静默与 writer lease 已有进程/native 证据；所有真实业务/re-exec 入口迁出和 G11 全矩阵未完成。 |
 | TASK-025 密钥/一致快照 | A–G 基础已有契约/native 证据；H/I 迁移未完成 | [实施方案](taomni-modular-vault-services-plan.md)的 Vault 协调、宿主一致快照、离线 v2 和三态正常重启已逐批验证；macOS 15 Intel 的真实确认自动 relaunch 三态也已通过，ARM64 新轮待完成，Linux/Windows 自动接管尚未实现。这些 UI 仍使用核心 MFA；真实 MFA 宿主切换后的三态、legacy v1 alias/已安装升级与最终验收仍未完成。 |
-| TASK-026 Mail | 已提取进程内状态和 MIME 引擎，接入升级预检 | IMAP 连接池、归档任务和缓存句柄由 `LegacyFeatureRuntime` 持有。MIME 和邮件数据模型由 `taomni-mail-engine` 提供。核心保存会话设置，现有缓存路径和文件名继续生效。旧版的多个 Mail 会话只产生一项模块建议，复用只读 SQLite 扫描及 pending journal。用例 `TC-MODULES-049/050` 核对原会话、自定义缓存和重试。独立宿主、前端包及旧配置搬迁待交付。 |
+| TASK-026 Mail | 独立宿主已实现缓存、草稿与备份，签名自动首装与导入验证中 | 核心保存会话设置。独立宿主读取缓存并读写草稿，运行时备份由宿主导出。首次升级准备验签包，下次启动导入 SQLite、原件及附件。剩余工作包括正式前端、收发和同步的宿主接管、作用域核心服务、实装升级与模块发布验收。 |
 | TASK-027 G1–G11 全门禁收口 | 新增任务，未闭合 | G1–G11 的当前证据仍存在正式发行包、业务模块、核心依赖闭包、系统信任和完整入口矩阵缺口；必须用匹配源码的 GitHub runner receipt 逐项闭合后才能进入生产发布。 |
 
 具体编号与子任务边界仍以设计原表为准；上表合并描述不改变范围或依赖。

@@ -53,6 +53,7 @@ steps:
 - click: '[data-testid="mfa-screen-scan"]'
 - assert_text: {selector: '[data-testid="mfa-screen-status"]', contains: only available in the desktop app}
 - assert_enabled: '[data-testid="mfa-screen-scan"]'
+- assert_visible: '[data-testid="mfa-add-dialog"][data-mode="screen"]:not([data-screen-decoder])'
 - press: Escape
 - assert_not_visible: '[data-testid="mfa-add-dialog"]'
 - assert_count: {selector: '[data-testid="mfa-account-row"]', equal: 1}
@@ -90,15 +91,16 @@ verification:
     results: [34]
   - id: R4
     requirement: Reopening the screen pane after its browser-only error remains recoverable and preserves the previously imported account.
-    actions: [36, 37, 38, 41]
+    actions: [36, 37, 38, 42]
     checkpoints:
     - {step: 39, expectation: Retried scan reports the same desktop-only boundary.}
     - {step: 40, expectation: Scan can be retried after the error.}
-    - {step: 42, expectation: Escape closes the reopened dialog.}
-    - {step: 43, expectation: No duplicate or missing account after the failed scans.}
-    - {step: 44, expectation: The retained HOTP account still reads 755 224.}
-    - {step: 45, expectation: No runtime errors occurred.}
-    results: [39, 40, 42, 43, 44, 45]
+    - {step: 41, expectation: The dialog stays in screen mode with no decoded scan.}
+    - {step: 43, expectation: Escape closes the reopened dialog.}
+    - {step: 44, expectation: The account list still contains one account.}
+    - {step: 45, expectation: The retained HOTP account still reads 755 224.}
+    - {step: 46, expectation: No runtime errors occurred.}
+    results: [39, 40, 41, 43, 44, 45, 46]
   visual:
   - check: Camera states and the screen-scan message are legible.
     method: manual

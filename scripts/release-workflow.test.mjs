@@ -8,6 +8,21 @@ import { fileURLToPath } from "node:url";
 import { test } from "node:test";
 
 const workflow = readFileSync(fileURLToPath(new URL("../.github/workflows/release.yml", import.meta.url)), "utf8").replace(/\r\n/g, "\n");
+test("desktop bundles stage only their own SocksCap runtime resources and include shared licenses", () => {
+  const config = (target = "") => JSON.parse(readFileSync(new URL(`../src-tauri/tauri${target}.conf.json`, import.meta.url), "utf8"));
+  assert.deepEqual(config().bundle.resources, ["resources/licenses/*"]);
+  for (const platform of ["linux", "macos", "windows"]) {
+    // Tauri applies RFC 7396, replacing the base resource array.
+    assert.deepEqual(config(`.${platform}`).bundle.resources, [
+      "resources/licenses/*",
+      `resources/sockscap/${platform}/**/*`,
+      ...(platform === "windows" ? ["resources/vnc/windows/**/*"] : []),
+    ]);
+  }
+  const windows = config(".windows").build;
+  assert.match(windows.beforeDevCommand, /stage-vnc-key-helper\.ps1/);
+  assert.match(windows.beforeBuildCommand, /stage-vnc-key-helper\.ps1 -Configuration release/);
+});
 test("macOS native tests and bundles share a deployment target supporting Whisper filesystem APIs", () => {
   const config = JSON.parse(readFileSync(fileURLToPath(new URL("../src-tauri/tauri.conf.json", import.meta.url)), "utf8"));
   const macosJob = workflow.split("  build-macos:\n")[1].split("    steps:\n")[0];

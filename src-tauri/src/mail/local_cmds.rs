@@ -74,7 +74,7 @@ async fn download(
         let outcome = {
             let conn = db.lock().map_err(|e| e.to_string())?;
             super::init_mail_tables(&conn).map_err(|e| e.to_string())?;
-            pop3::sync_inbox(&mut client, &conn, &account_id, leave_days)?
+            pop3::sync_inbox(&mut client.session, &conn, &account_id, leave_days)?
         };
         client.quit()?;
         let new_unseen = outcome.messages.len();

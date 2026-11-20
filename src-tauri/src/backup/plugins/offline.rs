@@ -49,6 +49,7 @@ pub(crate) fn stage(
         for file in &retained.files {
             if file.kind == DataFileKind::Sqlite
                 && actual.get(file.path.as_str()) == Some(&DataFileKind::File)
+                && !retained_data::opaque_file(slug, &file.path)
             {
                 return Err(format!(
                     "Known SQLite data has an invalid header: {slug}/{}",

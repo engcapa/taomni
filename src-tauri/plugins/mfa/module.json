@@ -13,10 +13,10 @@
   "commands": [
     "mfa_list", "mfa_codes", "mfa_inspect", "mfa_add", "mfa_update",
     "mfa_delete", "mfa_reorder", "mfa_hotp_next", "mfa_mark_used",
-    "mfa_set_prefs", "mfa_export_uri", "mfa_reset_store", "mfa_initialize_empty",
+    "mfa_set_prefs", "mfa_export_uri", "mfa_reset_store", "mfa_initialize_empty", "mfa_scan_screen_codes",
     "backup/prepare", "backup/snapshot", "backup/release"
   ],
-  "permissions": ["vault.fixed-key"],
+  "permissions": ["vault.fixed-key", "capture.screen"],
   "dataDir": "plugins/mfa",
   "dataSchemaVersion": 1,
   "backupPaths": ["plugins/mfa/data/mfa.db"],

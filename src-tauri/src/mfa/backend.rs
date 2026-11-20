@@ -7,10 +7,11 @@ use std::{
 use serde::de::DeserializeOwned;
 use serde_json::{Value, json};
 use taomni_mfa_engine::INITIALIZATION_REQUIRED;
+use taomni_plugin_api::services::CAPTURE_SCREEN_PERMISSION;
 use taomni_plugin_services::OperationKind;
 
 use crate::{
-    plugin::{PluginError, PluginRegistry},
+    plugin::{LifecycleState, PluginError, PluginRegistry},
     state::AppState,
 };
 
@@ -99,6 +100,45 @@ pub(crate) async fn reset(state: &AppState) -> Result<(), String> {
             .await
         }
     }
+}
+
+pub(super) async fn scan_in_host(
+    state: &AppState,
+    window: tauri::WebviewWindow,
+) -> Result<Option<Vec<String>>, String> {
+    const METHOD: &str = "mfa_scan_screen_codes";
+    let registry = &state.plugins;
+    if !registry.get("mfa").is_some_and(|record| {
+        record.state == LifecycleState::Enabled
+            && record.reason.is_none()
+            && record.manifest.commands.contains(METHOD)
+            && record
+                .manifest
+                .permissions
+                .contains(CAPTURE_SCREEN_PERMISSION)
+    }) {
+        return Ok(None);
+    }
+    on_host(state, move |registry| {
+        registry
+            .invoke_scoped_capture(
+                window,
+                "mfa",
+                METHOD,
+                json!({}),
+                &uuid::Uuid::new_v4().to_string(),
+                deadline(),
+            )
+            .map_err(|failure| match error(failure).as_str() {
+                "SCREEN_PERMISSION_REQUIRED" => super::ERR_SCREEN_PERMISSION.into(),
+                "SCREEN_CAPTURE_NO_DISPLAY" => super::ERR_NO_DISPLAY.into(),
+                "SCREEN_CAPTURE_FAILED" => super::ERR_CAPTURE_FAILED.into(),
+                message => message.to_owned(),
+            })
+            .and_then(decode)
+            .map(Some)
+    })
+    .await
 }
 
 async fn on_host<T: Send + 'static>(

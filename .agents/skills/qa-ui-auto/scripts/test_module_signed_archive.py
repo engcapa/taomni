@@ -132,13 +132,16 @@ class OfficialModuleArtifactTests(unittest.TestCase):
         checkouts = [step for step in signing if step.get("uses", "").startswith("actions/checkout@")]
         self.assertEqual([step["with"]["ref"] for step in checkouts], ["${{ github.workflow_sha }}"])
         secret_steps = [step for step in signing if "secrets." in json.dumps(step)]
-        self.assertEqual(len(secret_steps), 1)
-        self.assertTrue(secret_steps[0]["run"].startswith("scripts/plugin-package/target/release/taomni-plugin-package"))
-        self.assertNotIn("cargo", secret_steps[0]["run"])
-        self.assertNotIn("TAURI_SIGNING_PRIVATE_KEY", secret_steps[0]["run"])
+        self.assertEqual([step["if"] for step in secret_steps],
+                         ["env.QA_MODULE != 'mail'", "env.QA_MODULE == 'mail'"])
         guard = next(step for step in signing if step.get("name", "").startswith("Restrict QA signing"))
-        self.assertLess(signing.index(guard), signing.index(secret_steps[0]),
-                        "The inert candidate must be checked before the key-bearing signing step")
+        for step in secret_steps:
+            self.assertTrue(step["run"].startswith("scripts/plugin-package/target/release/taomni-plugin-package"))
+            self.assertNotIn("cargo", step["run"])
+            self.assertNotIn("TAURI_SIGNING_PRIVATE_KEY", step["run"])
+            self.assertLess(signing.index(guard), signing.index(step),
+                            "The inert candidate must be checked before a key-bearing signing step")
+        self.assertNotIn("--qa-catalog", secret_steps[1]["run"])
         self.assertNotIn("release", json.dumps([step for step in signing if "upload-artifact" in step.get("uses", "")]).lower())
 
 

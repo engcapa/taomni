@@ -65,7 +65,40 @@ pub(crate) struct ProfileRuntimeLeases {
 }
 impl ProfileRuntimeLeases {
     pub(crate) fn acquire(data: &Path, mode: StartupMode) -> Result<Self, ProfileStartupError> {
-        let mode = loop {
+        use crate::plugin::migration_mail_provision as mail_upgrade;
+
+        let (profile, mode_lease) = Self::prepare_profile(data, mode)?;
+        let (profile, mode_lease) = match mail_upgrade::queued(data) {
+            Ok(true) => {
+                // Existing restore intents take precedence. Both live leases
+                // then yield so migration can take exclusive ownership before
+                // normal startup creates a database handle.
+                drop(profile);
+                drop(mode_lease);
+                if let Err(error) = mail_upgrade::apply_before_startup(data) {
+                    tracing::warn!(%error, "Could not complete the staged Mail upgrade");
+                }
+                Self::prepare_profile(data, mode)?
+            }
+            Ok(false) => (profile, mode_lease),
+            Err(error) => {
+                tracing::warn!(%error, "Could not read the staged Mail upgrade");
+                (profile, mode_lease)
+            }
+        };
+        let generation = super::generation::current(data)?;
+        Ok(Self {
+            generation,
+            _profile: profile,
+            _mode: mode_lease,
+        })
+    }
+
+    fn prepare_profile(
+        data: &Path,
+        mode: StartupMode,
+    ) -> Result<(crate::backup::coordination::ProfileLease, ModeLease), ProfileStartupError> {
+        let mode_lease = loop {
             let lease = ModeLease::acquire(data, mode)?;
             // An offline upgrade can publish a transaction only while holding
             // the exclusive mode lock. Check with ownership before opening stores.
@@ -89,11 +122,6 @@ impl ProfileRuntimeLeases {
         })?;
         crate::migrate::migrate_db_file(data)
             .map_err(|error| format!("Could not migrate the legacy database: {error}"))?;
-        let generation = super::generation::current(data)?;
-        Ok(Self {
-            generation,
-            _profile: profile,
-            _mode: mode,
-        })
+        Ok((profile, mode_lease))
     }
 }

@@ -1,24 +1,32 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { ScanLine } from "lucide-react";
 import { useT } from "../../lib/i18n";
 import { errorText, mfaErrorCode } from "../../lib/mfa/format";
-import { mfaCaptureScreens } from "../../lib/mfa/ipc";
+import { mfaCaptureScreens, mfaScanScreenTexts } from "../../lib/mfa/ipc";
 import { decodeLumaFrames } from "../../lib/mfa/qrImage";
 import type { MfaTextsOutcome } from "./MfaImagePane";
+
+export type MfaScreenDecoder = "renderer" | "module";
 
 type ScanState = { kind: "idle" } | { kind: "busy" } | { kind: "error"; message: string };
 
 /** In-app screen scan: the backend hides Taomni, captures every display and restores it. */
-export function MfaScreenPane({ onTexts }: { onTexts: (texts: string[]) => MfaTextsOutcome }) {
+export function MfaScreenPane({ onTexts }: { onTexts: (texts: string[], decoder: MfaScreenDecoder) => MfaTextsOutcome }) {
   const t = useT();
+  const statusRef = useRef<HTMLDivElement>(null);
   const [state, setState] = useState<ScanState>({ kind: "idle" });
 
   const scan = async () => {
     setState({ kind: "busy" });
     try {
-      const frames = await mfaCaptureScreens();
-      const texts = await decodeLumaFrames(frames);
+      const inHost = await mfaScanScreenTexts();
+      if (!statusRef.current) return;
+      const decoder = inHost === null ? "renderer" : "module";
+      const frames = inHost === null ? await mfaCaptureScreens() : [];
+      const texts = inHost ?? await decodeLumaFrames(frames);
+      if (!statusRef.current) return;
       if (import.meta.env.MODE === "qa") console.info("[qa MFA scan]", {
+        owner: decoder,
         frames: frames.map(({ width, height }) => ({ width, height })),
         decoded: texts.map((text) => ({ length: text.length, otp: text.startsWith("otpauth") })),
       });
@@ -26,9 +34,10 @@ export function MfaScreenPane({ onTexts }: { onTexts: (texts: string[]) => MfaTe
         setState({ kind: "error", message: t("mfa.screenNoQr") });
         return;
       }
-      const outcome = onTexts(texts);
+      const outcome = onTexts(texts, decoder);
       setState(outcome.ok ? { kind: "idle" } : { kind: "error", message: outcome.message });
     } catch (err) {
+      if (!statusRef.current) return;
       const code = mfaErrorCode(err);
       const message =
         code === "MFA_DESKTOP_ONLY"
@@ -55,6 +64,7 @@ export function MfaScreenPane({ onTexts }: { onTexts: (texts: string[]) => MfaTe
         {t("mfa.screenScan")}
       </button>
       <div
+        ref={statusRef}
         data-testid="mfa-screen-status"
         data-state={state.kind}
         role="status"

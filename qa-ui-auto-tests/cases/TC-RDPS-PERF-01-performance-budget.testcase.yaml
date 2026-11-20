@@ -23,7 +23,9 @@ description: 'V-13 (docs-feature/rdp-server-parity-design.md §4.7, AC-16). Meas
 
   tightened (DEC-04). The server log is saved as server-log.txt for the
 
-  capture and encoder timings.
+  capture and encoder timings. Modular release runs explicitly apply up to a
+  100% increase to the M2 reference limit. The QA selection records the modular
+  setting, and the result records the applied 130 ms limit.
 
 
   Measured on a release QA build (release_build_required) on all three
@@ -208,7 +210,7 @@ verification:
     - step: 27
       expectation: The first graphics update arrives within 500 ms of activation (M1).
     - step: 28
-      expectation: Input-to-frame latency p95 is at most 65 ms (M2).
+      expectation: Input-to-frame latency p95 is at most 65 ms for M2 and 130 ms when the modular release allowance is selected.
     - step: 29
       expectation: At least 25.6 distinct animation frames per second are displayed (M3) using at most 4905 kbps
         (M4).

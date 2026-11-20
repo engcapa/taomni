@@ -415,6 +415,10 @@ controls:
 
 `TC-MODULES-049/050` 覆盖旧 Mail 会话的模块推荐。Native 核对多个账号只产生一条 pending 记录、原会话和自定义缓存保留，以及正常重启和重试后的 journal。Browser 核对重新加载设置后仍可处理同一条推荐。
 
+Mail 的签名离线升级另由 GitHub 专项覆盖。用例在旧格式配置中准备默认和自定义缓存，验证配置占用拒绝、旧文件保留、迁移 journal 以及已安装宿主读取两份缓存。
+
+`TC-MODULES-052` 检查首次自动准备 Mail 后，商店展示下次启动导入的状态。Browser 刷新后状态保留，签名升级专项通过真实启动应用迁移。
+
 `TC-MODULES-007/010/040/042` 观察真实版本目录删除。010 还确认取消永久删除时签名包和业务数据原样保留，确认后数据和定位记录消失。042 校验存在更新时卸载会释放宿主、清理所有版本并保留业务数据。043 使用浏览器模型检查取消永久删除和卸载后只提供主动安装。
 
 原生还原确认的自动 relaunch 另由 `TC-MODULES-033/034/035` 覆盖 macOS 的运行、禁用与卸载保留数据三态。它们使用 UI 创建的真实配对备份，先变更模块数据、HOTP 和主密码，再经真实还原确认拒绝旧密码、接受当前密码；独立观察旧进程 exit=0、新 PID/start-time、同一可执行文件与 QA 隔离目录，并只连接应用自己重启后的 WKWebView。不得以手动启动、重启 IPC 或 `native_restart_app` 冒充自动重启。还原后核验原始模块行、active 指针、generation、writer lease、原密码和 755224。browser 保留 `TC-BACKUP-RESTORE-001` 的确认/错误/重复提交模型；Linux/Windows 自动接管及独立 MFA 宿主仍是明确缺口，新用例在实际执行前不计通过。
@@ -8067,6 +8071,7 @@ files:
   - src/components/session/SessionEditor.tsx
   - src-tauri/src/mail/mod.rs
   - src-tauri/crates/taomni-mail-engine/src/compose.rs
+  - src-tauri/crates/taomni-mail-engine/src/drafts.rs
 controls:
   - id: compose-send-later
     selector: '[data-testid="mail-compose-send-later"]'
@@ -8265,7 +8270,7 @@ files:
   - src-tauri/src/mail/pop3/connection.rs
   - src-tauri/src/mail/imap_transport.rs
   - src-tauri/src/mail/local_cmds.rs
-  - src-tauri/crates/taomni-mail-engine/src/imap_auth.rs
+  - src-tauri/crates/taomni-mail-engine/src/pop3.rs
 controls:
   - id: incoming-protocol
     selector: '[data-testid="mail-incoming-protocol"]'
@@ -8275,6 +8280,9 @@ controls:
     selector: '[data-testid="mail-pop3-leave-days"]'
     kind: interactive
     optional: true
+  - id: received-text
+    selector: '[data-testid="mail-reader-text"]'
+    kind: display
 -->
 
 - 会话编辑器 “Incoming” 可选 POP3（本地文件夹），Quick Connect 支持 `pop3://` / `pop3s://`（默认端口 995/110）。支持 TLS、STLS 与明文；明文且服务器提供时间戳时使用 APOP，OAuth 使用 XOAUTH2。
@@ -12436,7 +12444,10 @@ files:
   - src-tauri/src/capture/service.rs
   - src-tauri/crates/taomni-capture/src/still/
   - src-tauri/crates/taomni-capture/src/pixels.rs
+  - src-tauri/src/capture/plugin_service.rs
   - src-tauri/src/mfa/capture.rs
+  - src-tauri/src/mfa/backend.rs
+  - src-tauri/plugins/mfa/src/screen_scan.rs
   - src/lib/mfa/base32.ts
   - src/lib/mfa/otpauth.ts
   - src/lib/mfa/migration.ts
@@ -12453,6 +12464,7 @@ controls:
   - id: dialog
     selector: '[data-testid="mfa-add-dialog"]'
     kind: display
+    note: Screen import preview exposes the decoder owner in data-screen-decoder.
   - id: close
     selector: '[data-testid="mfa-add-close"]'
     kind: interactive
@@ -12604,7 +12616,8 @@ controls:
 - 密钥模式：发行方/账户/Base32 密钥（允许小写、空格分组）/分组，高级项可选 TOTP/HOTP、SHA1/256/512、6～8 位、周期或初始计数；粘贴 `otpauth://` 链接自动填表；逐项校验并拒绝重复密钥。
 - 截图模式：粘贴截图（按钮或 Ctrl/⌘+V，桌面版经 Rust arboard 读取系统剪贴板图片）、拖入或选择图片文件；在 MFA 标签上直接粘贴截图会跳到导入预览。
 - 屏幕扫描（桌面版）：临时隐藏 Taomni，截取所有显示器后恢复窗口；macOS 需屏幕录制权限。摄像头：设备选择、无设备/拒绝授权状态与重试，识别后立即停止视频流。
-- 二维码由渲染层 `qr` 解码；支持 Google Authenticator `otpauth-migration` 批量导出码。导入前预览每个账户（可取消勾选、改名、统一分组），已存在的账户标记为“已添加”。
+- 支持扫码的签名 MFA 宿主经核心授权读取屏幕帧并解码，旧版和不含该能力的宿主沿用渲染层解码。TC-MODULES-039 在 Linux 实际迁移后验证已安装宿主的识别与空结果。TC-MFA-007 验证浏览器仍显示桌面限定提示。
+- 支持 Google Authenticator `otpauth-migration` 批量导出码。导入前预览每个账户（可取消勾选、改名、统一分组），已存在的账户标记为“已添加”。
 
 ### 27.3 备份与恢复中的 MFA 数据 ✅
 
@@ -13865,8 +13878,10 @@ controls:
 > - Ribbon `Packages`、`Macros`
 > - SFTP 底部的 "Cross-host transfer (remote ↔ remote)" 按钮（disabled 占位）
 
+- TC-MAIL-SYNC-01 verifies that all 450 messages delivered while the tab was closed appear after reopening and that the newest body opens in browser and native mode (F-MAIL-5).
+- TC-MAIL-SYNC-02 verifies that remote deletions and read flags still match the reopened mailbox in browser and native mode (F-MAIL-5/F-MAIL-3).
 - TC-MAIL-SYNC-03 covers native sparse UID command limits, FETCH reconnect, gap-free catch-up, remote deletion and flag reconciliation, and runtime error checks (F-MAIL-5/F-MAIL-3).
-- TC-MAIL-IDLE-01 and TC-MAIL-POP3-01 check renderer and native connection behavior, including IDLE release after closing the tab and repeated POP3 sync without duplicates (F-MAIL-10/F-MAIL-17).
+- TC-MAIL-IDLE-01 and TC-MAIL-POP3-01 check renderer and native connection behavior, including IDLE release after closing the tab, POP3 sync without duplicates and reading the newly downloaded message (F-MAIL-10/F-MAIL-17).
 
 ---
 
