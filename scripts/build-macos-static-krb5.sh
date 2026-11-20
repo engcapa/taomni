@@ -24,7 +24,10 @@ done
 
 (
   cd "$work/krb5-$version/src"
+  # MIT's macOS cache adapter calls CCAPI in the system Kerberos framework.
+  # Static archives cannot carry that dependency into the build's programs.
   CPPFLAGS="-I$openssl_prefix/include" LDFLAGS="-L$prefix/lib" \
+    LIBS="-framework Kerberos" \
     ./configure --prefix="$prefix" --enable-static --disable-shared \
       --disable-nls --without-system-verto --with-tls-impl=openssl --with-spake-openssl
   make -j"$(sysctl -n hw.logicalcpu)"
