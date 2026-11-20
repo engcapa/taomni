@@ -21,25 +21,25 @@ use std::sync::{Arc, Mutex};
 
 use std::time::Duration;
 
-use crate::vnc::clipboard::{
+use crate::clipboard::{
     ExtendedClipboardMsg, decode_legacy_cut_text, encode_legacy_cut_text,
     parse_extended_body_with_limits,
 };
 
-use crate::vnc::encodings::{
+use crate::encodings::{
     self, DecodedCursor, DecodedPointerPosition, ENCODING_DESKTOP_SIZE, ENCODING_POINTER_POS,
     ENCODING_RICH_CURSOR, ENCODING_X_CURSOR, HextileState, ZrleDecoder,
 };
 
-use crate::vnc::framebuffer::{FbRect, Framebuffer, SharedFramebuffer};
+use crate::framebuffer::{FbRect, Framebuffer, SharedFramebuffer};
 
-use crate::vnc::limits::DecodeLimits;
+use crate::limits::DecodeLimits;
 
-use crate::vnc::pixel::{PixelConverter, PixelFormat};
+use crate::pixel::{PixelConverter, PixelFormat};
 
-use crate::vnc::policy::VncSecurityPolicy;
+use crate::policy::VncSecurityPolicy;
 
-use crate::vnc::tight::{self, ENCODING_TIGHT, TightDecoder};
+use crate::tight::{self, ENCODING_TIGHT, TightDecoder};
 
 mod negotiation;
 

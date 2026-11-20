@@ -147,7 +147,7 @@ mod tests {
 
     #[test]
     fn missing_credentials_ask_without_counting_as_a_failure() {
-        let error = VncError::classify(crate::vnc::rfb::CREDENTIALS_REQUIRED);
+        let error = VncError::classify(crate::rfb::CREDENTIALS_REQUIRED);
         assert_eq!(error.code, "credentials-required");
         assert_eq!(error.stage, VncStage::Authentication);
         assert!(!error.retryable);

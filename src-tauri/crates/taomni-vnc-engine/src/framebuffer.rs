@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex};
 
-use crate::vnc::limits::DecodeLimits;
+use crate::limits::DecodeLimits;
 
 /// Bytes in front of every relay rectangle: x, y, w, h (u16 BE) + 4 reserved.
 pub const RELAY_RECT_HEADER_LEN: usize = 12;

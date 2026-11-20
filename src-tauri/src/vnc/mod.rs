@@ -1,19 +1,13 @@
-pub mod clipboard;
-pub mod encodings;
-pub mod error;
-pub mod framebuffer;
+pub use taomni_vnc_engine::{
+    clipboard, encodings, error, framebuffer, limits, pixel, policy, rfb, tight, tls,
+};
+
 pub mod keyboard_hook;
-pub mod limits;
 #[cfg(test)]
 mod live_bench;
 pub mod native_pointer;
-pub mod pixel;
-pub mod policy;
 pub mod quality;
 pub mod queue;
-pub mod rfb;
-pub mod tight;
-pub mod tls;
 pub mod ws;
 
 use serde::{Deserialize, Serialize};
@@ -380,7 +374,7 @@ pub async fn vnc_test_connection(
         let policy = security_policy.unwrap_or_default();
         let transport = dial_vnc_transport(host.clone(), port, network).await?;
         let forward_task = transport.network_forward_task;
-        let prepared = match crate::vnc::tls::prepare_rfb_transport(
+        let mut prepared = match crate::vnc::tls::prepare_rfb_transport(
             transport.stream,
             &host,
             policy,
@@ -400,16 +394,12 @@ pub async fn vnc_test_connection(
                 return Err(error);
             }
         };
-        let tls_task = prepared.tls_task;
+        let tls_task = prepared.take_tls_task();
         let handshake = tokio::task::spawn_blocking(move || {
-            let mut rfb = crate::vnc::rfb::RfbConnection::from_negotiated_stream(
-                prepared.stream,
+            let mut rfb = prepared.into_connection(
                 crate::vnc::ws::VNC_AUTH_TIMEOUT,
                 policy,
                 crate::vnc::limits::DecodeLimits::default(),
-                prepared.proto_minor,
-                prepared.pending_security,
-                prepared.outer_security_type,
             )?;
             let init =
                 rfb.authenticate_with_policy(username.as_deref(), resolved.as_deref(), policy)?;

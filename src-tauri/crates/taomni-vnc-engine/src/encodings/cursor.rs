@@ -1,5 +1,5 @@
 use super::model::DecodedCursor;
-use crate::vnc::pixel::PixelConverter;
+use crate::pixel::PixelConverter;
 use std::io::Read;
 
 pub(super) const MAX_CURSOR_DIMENSION: u16 = 512;

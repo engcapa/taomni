@@ -28,7 +28,7 @@ use flate2::write::ZlibEncoder;
 use flate2::{Compression, Decompress, FlushDecompress, Status};
 use std::io::Write;
 
-use crate::vnc::limits::DecodeLimits;
+use crate::limits::DecodeLimits;
 
 pub const ENCODING_EXTENDED_CLIPBOARD: i32 = 0xC0A1_E5CEu32 as i32;
 // Older Taomni builds advertised this incorrect value. Keeping it in the

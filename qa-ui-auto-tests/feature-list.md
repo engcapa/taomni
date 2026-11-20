@@ -4014,10 +4014,11 @@ status: done
 area: vnc
 files:
   - src-tauri/src/vnc/
+  - src-tauri/crates/taomni-vnc-engine/
 controls: []   # backend-only — RFB protocol + WebSocket bridge; the canvas surface is owned by F9.6
 -->
 
-- Rust 端 VNC 模块：`src-tauri/src/vnc/{mod,rfb,tls,ws,encodings,tight,pixel,quality,framebuffer,clipboard,error,limits,policy,queue,keyboard_hook,native_pointer}.rs`
+- `taomni-vnc-engine` 提供 RFB 握手、协议编解码、画面和剪贴板数据。桌面适配层 `src-tauri/src/vnc/` 负责 IPC、会话、代理连接、WebSocket relay 与系统输入。
 - Tauri 命令：`vnc_connect / vnc_cancel_connect / vnc_disconnect / vnc_test_connection / vnc_create_detach_claim / vnc_consume_detach_claim / vnc_set_special_key_capture / vnc_special_key_capture_status`
 - 本地动态端口 WebSocket relay：VNC server ↔ 前端 Canvas（前端不再直接持有 TCP 套接字）
 

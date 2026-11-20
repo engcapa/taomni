@@ -1,19 +1,19 @@
 use super::model::RfbConnection;
 use super::model::ServerMessage;
-use crate::vnc::clipboard::decode_legacy_cut_text;
-use crate::vnc::clipboard::parse_extended_body_with_limits;
-use crate::vnc::encodings;
-use crate::vnc::encodings::DecodedPointerPosition;
-use crate::vnc::encodings::ENCODING_DESKTOP_SIZE;
-use crate::vnc::encodings::ENCODING_POINTER_POS;
-use crate::vnc::encodings::ENCODING_RICH_CURSOR;
-use crate::vnc::encodings::ENCODING_X_CURSOR;
-use crate::vnc::framebuffer::FbRect;
-use crate::vnc::pixel::PixelConverter;
-use crate::vnc::rfb::stream;
-use crate::vnc::rfb::stream::RfbStreamReader;
-use crate::vnc::tight;
-use crate::vnc::tight::ENCODING_TIGHT;
+use crate::clipboard::decode_legacy_cut_text;
+use crate::clipboard::parse_extended_body_with_limits;
+use crate::encodings;
+use crate::encodings::DecodedPointerPosition;
+use crate::encodings::ENCODING_DESKTOP_SIZE;
+use crate::encodings::ENCODING_POINTER_POS;
+use crate::encodings::ENCODING_RICH_CURSOR;
+use crate::encodings::ENCODING_X_CURSOR;
+use crate::framebuffer::FbRect;
+use crate::pixel::PixelConverter;
+use crate::rfb::stream;
+use crate::rfb::stream::RfbStreamReader;
+use crate::tight;
+use crate::tight::ENCODING_TIGHT;
 use std::io::Read;
 
 impl RfbConnection {

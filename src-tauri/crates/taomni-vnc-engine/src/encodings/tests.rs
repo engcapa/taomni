@@ -12,8 +12,8 @@ use super::raw::read_copyrect_source;
 use super::zrle::ZRLE_PIPELINE_MIN_COMPRESSED;
 use super::zrle::ZrleDecoder;
 use super::zrle::decode_zrle_into;
-use crate::vnc::limits::DecodeLimits;
-use crate::vnc::pixel::PixelConverter;
+use crate::limits::DecodeLimits;
+use crate::pixel::PixelConverter;
 
 use std::io::Cursor;
 

@@ -2,7 +2,7 @@ use super::model::RfbConnection;
 use super::negotiation::ARD_MAX_KEY_BYTES;
 use super::negotiation::ARD_MIN_KEY_BYTES;
 use super::negotiation::authentication_read_error;
-use crate::vnc::rfb::security::ard_response;
+use crate::rfb::security::ard_response;
 use std::io::Read;
 use std::io::Write;
 

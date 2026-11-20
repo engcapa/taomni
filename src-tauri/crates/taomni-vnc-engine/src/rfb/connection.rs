@@ -1,17 +1,17 @@
 use super::model::PendingSecurity;
 use super::model::RfbConnection;
 use super::negotiation::SEC_TYPE_ANONYMOUS_TLS;
-use crate::vnc::encodings::HextileState;
-use crate::vnc::encodings::ZrleDecoder;
-use crate::vnc::framebuffer::Framebuffer;
-use crate::vnc::limits::DecodeLimits;
-use crate::vnc::pixel::PixelConverter;
-use crate::vnc::policy::VncSecurityPolicy;
-use crate::vnc::rfb::stream;
-use crate::vnc::rfb::stream::RUNTIME_READ_BUFFER_BYTES;
-use crate::vnc::rfb::stream::ReadBuffer;
-use crate::vnc::rfb::stream::RuntimeStats;
-use crate::vnc::tight::TightDecoder;
+use crate::encodings::HextileState;
+use crate::encodings::ZrleDecoder;
+use crate::framebuffer::Framebuffer;
+use crate::limits::DecodeLimits;
+use crate::pixel::PixelConverter;
+use crate::policy::VncSecurityPolicy;
+use crate::rfb::stream;
+use crate::rfb::stream::RUNTIME_READ_BUFFER_BYTES;
+use crate::rfb::stream::ReadBuffer;
+use crate::rfb::stream::RuntimeStats;
+use crate::tight::TightDecoder;
 use std::net::TcpStream;
 use std::net::ToSocketAddrs;
 use std::sync::Arc;
@@ -142,7 +142,7 @@ impl RfbConnection {
     pub fn security_label(&self) -> String {
         let inner = self
             .security_type
-            .and_then(crate::vnc::policy::security_type_kind)
+            .and_then(crate::policy::security_type_kind)
             .map(|kind| kind.label())
             .unwrap_or("Unknown");
         if self.outer_security_type == Some(SEC_TYPE_ANONYMOUS_TLS) {
@@ -156,7 +156,7 @@ impl RfbConnection {
         self.outer_security_type == Some(SEC_TYPE_ANONYMOUS_TLS)
             || self
                 .security_type
-                .and_then(crate::vnc::policy::security_type_kind)
+                .and_then(crate::policy::security_type_kind)
                 .is_some_and(|kind| kind.encrypted())
     }
 

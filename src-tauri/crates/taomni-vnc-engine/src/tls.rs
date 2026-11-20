@@ -6,20 +6,49 @@ use tokio::io::{AsyncReadExt, AsyncWriteExt};
 use tokio::net::{TcpListener, TcpStream};
 use tokio_openssl::SslStream;
 
-use crate::vnc::limits::DecodeLimits;
-use crate::vnc::policy::VncSecurityPolicy;
-use crate::vnc::rfb::{PendingSecurity, SEC_TYPE_ANONYMOUS_TLS, negotiate_protocol_version};
+use crate::limits::DecodeLimits;
+use crate::policy::VncSecurityPolicy;
+use crate::rfb::{
+    PendingSecurity, RfbConnection, SEC_TYPE_ANONYMOUS_TLS, negotiate_protocol_version,
+};
 
-pub(crate) struct PreparedRfbTransport {
-    pub stream: std::net::TcpStream,
-    pub proto_minor: u8,
-    pub pending_security: Option<PendingSecurity>,
-    pub outer_security_type: Option<u8>,
-    pub tls_task: Option<tokio::task::JoinHandle<()>>,
+pub struct PreparedRfbTransport {
+    stream: std::net::TcpStream,
+    proto_minor: u8,
+    pending_security: Option<PendingSecurity>,
+    outer_security_type: Option<u8>,
+    tls_task: Option<tokio::task::JoinHandle<()>>,
+}
+
+impl PreparedRfbTransport {
+    pub fn try_clone_stream(&self) -> std::io::Result<std::net::TcpStream> {
+        self.stream.try_clone()
+    }
+
+    pub fn take_tls_task(&mut self) -> Option<tokio::task::JoinHandle<()>> {
+        self.tls_task.take()
+    }
+
+    pub fn into_connection(
+        self,
+        timeout: Duration,
+        policy: VncSecurityPolicy,
+        limits: DecodeLimits,
+    ) -> Result<RfbConnection, String> {
+        RfbConnection::from_negotiated_stream(
+            self.stream,
+            timeout,
+            policy,
+            limits,
+            self.proto_minor,
+            self.pending_security,
+            self.outer_security_type,
+        )
+    }
 }
 
 /// `has_username` steers the security choice (ARD needs the macOS account).
-pub(crate) async fn prepare_rfb_transport(
+pub async fn prepare_rfb_transport(
     socket: TcpStream,
     host: &str,
     policy: VncSecurityPolicy,
@@ -238,10 +267,10 @@ mod tests {
     use tokio::io::{AsyncRead, AsyncReadExt, AsyncWrite, AsyncWriteExt};
 
     use super::*;
-    use crate::vnc::encodings::{
+    use crate::encodings::{
         ENCODING_DESKTOP_SIZE, ENCODING_POINTER_POS, ENCODING_RICH_CURSOR, ENCODING_X_CURSOR,
     };
-    use crate::vnc::rfb::{RfbConnection, ServerMessage};
+    use crate::rfb::{RfbConnection, ServerMessage};
 
     async fn write_server_init<S: AsyncWrite + Unpin>(
         stream: &mut S,
@@ -375,14 +404,10 @@ mod tests {
         assert!(prepared.stream.nodelay().unwrap());
         let started = Instant::now();
         let init = tokio::task::spawn_blocking(move || {
-            let mut connection = RfbConnection::from_negotiated_stream(
-                prepared.stream,
+            let mut connection = prepared.into_connection(
                 Duration::from_millis(250),
                 VncSecurityPolicy::LegacyCompatible,
                 DecodeLimits::default(),
-                prepared.proto_minor,
-                prepared.pending_security,
-                prepared.outer_security_type,
             )?;
             connection.authenticate(None, Some("passw0rd"))
         })
@@ -421,7 +446,7 @@ mod tests {
         });
 
         let socket = TcpStream::connect(address).await.unwrap();
-        let prepared = prepare_rfb_transport(
+        let mut prepared = prepare_rfb_transport(
             socket,
             "127.0.0.1",
             VncSecurityPolicy::PreferEncryption,
@@ -432,16 +457,12 @@ mod tests {
         .await
         .unwrap();
         assert_eq!(prepared.outer_security_type, Some(18));
-        let tls_task = prepared.tls_task;
+        let tls_task = prepared.take_tls_task();
         let result = tokio::task::spawn_blocking(move || {
-            let mut connection = RfbConnection::from_negotiated_stream(
-                prepared.stream,
+            let mut connection = prepared.into_connection(
                 Duration::from_secs(2),
                 VncSecurityPolicy::PreferEncryption,
                 DecodeLimits::default(),
-                prepared.proto_minor,
-                prepared.pending_security,
-                prepared.outer_security_type,
             )?;
             let init = connection.authenticate(None, Some("passw0rd"))?;
             Ok::<_, String>((init, connection.security_label(), connection.encrypted()))
@@ -471,7 +492,7 @@ mod tests {
         let username = std::env::var("TAOMNI_VNC_LIVE_USERNAME").ok();
         let password = std::env::var("TAOMNI_VNC_LIVE_PASSWORD").unwrap();
         let socket = TcpStream::connect((host.as_str(), port)).await.unwrap();
-        let prepared = prepare_rfb_transport(
+        let mut prepared = prepare_rfb_transport(
             socket,
             &host,
             VncSecurityPolicy::PreferEncryption,
@@ -481,16 +502,12 @@ mod tests {
         )
         .await
         .unwrap();
-        let tls_task = prepared.tls_task;
+        let tls_task = prepared.take_tls_task();
         let result = tokio::task::spawn_blocking(move || {
-            let mut connection = RfbConnection::from_negotiated_stream(
-                prepared.stream,
+            let mut connection = prepared.into_connection(
                 Duration::from_secs(45),
                 VncSecurityPolicy::PreferEncryption,
                 DecodeLimits::default(),
-                prepared.proto_minor,
-                prepared.pending_security,
-                prepared.outer_security_type,
             )?;
             let init = connection.authenticate(username.as_deref(), Some(&password))?;
             let security = connection.security_label();

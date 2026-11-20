@@ -1,6 +1,6 @@
 use super::pixels::check_scratch;
 use super::pixels::read_u16_be;
-use crate::vnc::pixel::PixelConverter;
+use crate::pixel::PixelConverter;
 use std::io::Read;
 
 // ── Raw encoding (type 0) ──────────────────────────────────────────

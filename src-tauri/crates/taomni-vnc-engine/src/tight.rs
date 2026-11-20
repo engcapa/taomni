@@ -7,8 +7,8 @@ use std::io::Read;
 
 use zlib_rs::{Inflate, InflateFlush};
 
-use crate::vnc::limits::DecodeLimits;
-use crate::vnc::pixel::PixelConverter;
+use crate::limits::DecodeLimits;
+use crate::pixel::PixelConverter;
 
 pub const ENCODING_TIGHT: i32 = 7;
 /// `-32 + level` selects JPEG quality 0..=9 (Tight "quality level").
@@ -177,7 +177,7 @@ pub fn decode_tight_into<R: Read>(
     match filter {
         FILTER_COPY => {
             if tpx == 3 {
-                crate::vnc::encodings::rgb_to_rgba(data, out);
+                crate::encodings::rgb_to_rgba(data, out);
             } else {
                 conv.convert_row(data, out);
             }
@@ -363,7 +363,7 @@ mod tests {
     use flate2::{Compress, Compression, FlushCompress};
 
     use super::*;
-    use crate::vnc::pixel::PixelFormat;
+    use crate::pixel::PixelFormat;
 
     fn compact(len: usize) -> Vec<u8> {
         let mut out = vec![(len & 0x7F) as u8];

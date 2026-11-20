@@ -4,7 +4,6 @@ use crate::vnc::policy::VncClipboardPolicy;
 use crate::vnc::policy::VncSecurityPolicy;
 use crate::vnc::quality::QualityController;
 use crate::vnc::queue::FrameQueueSender;
-use crate::vnc::rfb::RfbConnection;
 use crate::vnc::ws::ForwardTaskGuard;
 use crate::vnc::ws::VNC_AUTH_TIMEOUT;
 use crate::vnc::ws::VncControl;
@@ -76,7 +75,7 @@ pub(in crate::vnc::ws) async fn spawn_vnc_relay_inner(
     // network path remains fully asynchronous and cancellable.
     let transport = dial_vnc_transport(host.clone(), port, network).await?;
     let mut network_forward_guard = ForwardTaskGuard(transport.network_forward_task);
-    let prepared = crate::vnc::tls::prepare_rfb_transport(
+    let mut prepared = crate::vnc::tls::prepare_rfb_transport(
         transport.stream,
         &host,
         security_policy,
@@ -87,12 +86,11 @@ pub(in crate::vnc::ws) async fn spawn_vnc_relay_inner(
             .is_some_and(|name| !name.trim().is_empty()),
     )
     .await?;
-    let mut tls_guard = ForwardTaskGuard(prepared.tls_task);
+    let mut tls_guard = ForwardTaskGuard(prepared.take_tls_task());
     // Stop closes the socket so the blocking authentication read returns
     // instead of waiting for a slow server (VNC-SESS-003).
     let stop_handle = prepared
-        .stream
-        .try_clone()
+        .try_clone_stream()
         .map_err(|e| format!("clone VNC stream for stop: {e}"))?;
     let stop_watch = {
         let attempt = attempt.clone();
@@ -102,14 +100,10 @@ pub(in crate::vnc::ws) async fn spawn_vnc_relay_inner(
         })
     };
     let handshake = tokio::task::spawn_blocking(move || {
-        let mut rfb = RfbConnection::from_negotiated_stream(
-            prepared.stream,
+        let mut rfb = prepared.into_connection(
             VNC_AUTH_TIMEOUT,
             security_policy,
             crate::vnc::limits::DecodeLimits::default(),
-            prepared.proto_minor,
-            prepared.pending_security,
-            prepared.outer_security_type,
         )?;
         rfb.set_shared(options.shared);
         let server_init = rfb.authenticate_with_policy(

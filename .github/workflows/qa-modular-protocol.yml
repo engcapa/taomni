@@ -64,7 +64,7 @@ jobs:
       matrix:
         os: [ubuntu-24.04, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 15
+    timeout-minutes: 30
     defaults:
       run:
         shell: bash
@@ -96,6 +96,26 @@ jobs:
         run: |
           set -o pipefail
           cargo test --manifest-path src-tauri/Cargo.toml -p taomni-mail-engine --lib --locked 2>&1 | tee modular-protocol-evidence/mail-engine-unit.log
+      - name: Prepare Perl for the Windows VNC TLS build
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $perl = 'C:\Strawberry\perl\bin\perl.exe'
+          if (-not (Test-Path $perl)) { choco install strawberryperl --yes --no-progress }
+          & $perl -MIPC::Cmd -e 'print "Perl ready"'
+          if ($LASTEXITCODE -ne 0) { throw 'Complete Perl unavailable' }
+          "OPENSSL_SRC_PERL=$perl" >> $env:GITHUB_ENV
+          'C:\Strawberry\perl\bin' >> $env:GITHUB_PATH
+      - name: Verify the standalone VNC protocol and loopback fixtures
+        run: |
+          set -o pipefail
+          cargo tree --manifest-path src-tauri/Cargo.toml -p taomni-vnc-engine --edges normal,build --prefix none --locked > modular-protocol-evidence/vnc-engine-tree.txt
+          if grep -Eq '^(tauri(-[^[:space:]]+)?|wry|taomni|taomni-plugin-[^[:space:]]+) ' modular-protocol-evidence/vnc-engine-tree.txt; then
+            echo 'The standalone VNC engine links the desktop runtime.' >&2
+            exit 1
+          fi
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-vnc-engine --lib --locked 2>&1 | tee modular-protocol-evidence/vnc-engine.log
       - name: Verify the Mail module's cached mailbox and profile ownership
         env:
           MAIL_HOST_RUNNER: ${{ matrix.os }}

@@ -81,6 +81,12 @@ steps:
     contains: '"type": "desktop_size", "width": 1024, "height": 768'
 - assert_no_runtime_errors: null
 - screenshot: 151-vnc-fixture-session.png
+- eval_readonly:
+    expression: >-
+      document.querySelector('[data-testid="vnc-canvas"][width="1024"][height="768"]')
+        ?.getContext('2d')?.getImageData(512, 384, 1, 1).data[3] === 255
+    expect_truthy: true
+    timeout_sec: 15
 verification:
   review: reviewed
   requirements:
@@ -147,10 +153,13 @@ verification:
       expectation: '{"assert_file_contains": {"path": "${fixture.vnc_events}", "contains": "\"type\": \"desktop_size\", \"width\": 1024, \"height\": 768"}}'
     - step: 31
       expectation: The VNC session stays free of runtime errors after input and resize.
+    - step: 33
+      expectation: The client paints remote framebuffer updates through the resize.
     results:
     - 29
     - 30
     - 31
+    - 33
   visual:
   - check: The connected session shows the fixture's gradient desktop without overlays, letterboxing or clipped tab actions.
     method: manual

@@ -1,7 +1,7 @@
 use super::pixels::check_scratch;
 use super::pixels::fill_block;
 use super::pixels::read_u8;
-use crate::vnc::pixel::PixelConverter;
+use crate::pixel::PixelConverter;
 use std::io::Read;
 
 // ── Hextile encoding (type 5) ──────────────────────────────────────

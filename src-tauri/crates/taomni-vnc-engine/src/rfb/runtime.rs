@@ -1,14 +1,14 @@
 use super::model::RfbConnection;
 use super::model::RfbWriter;
-use crate::vnc::encodings;
-use crate::vnc::framebuffer::Framebuffer;
-use crate::vnc::framebuffer::SharedFramebuffer;
-use crate::vnc::pixel::PixelConverter;
-use crate::vnc::pixel::PixelFormat;
-use crate::vnc::rfb::stream;
-use crate::vnc::rfb::stream::RuntimeStats;
-use crate::vnc::rfb::stream::set_encodings_message;
-use crate::vnc::rfb::stream::set_pixel_format_message;
+use crate::encodings;
+use crate::framebuffer::Framebuffer;
+use crate::framebuffer::SharedFramebuffer;
+use crate::pixel::PixelConverter;
+use crate::pixel::PixelFormat;
+use crate::rfb::stream;
+use crate::rfb::stream::RuntimeStats;
+use crate::rfb::stream::set_encodings_message;
+use crate::rfb::stream::set_pixel_format_message;
 use std::io::Write;
 
 impl RfbConnection {

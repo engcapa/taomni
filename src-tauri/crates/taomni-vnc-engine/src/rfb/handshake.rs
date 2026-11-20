@@ -13,9 +13,9 @@ use super::negotiation::authentication_read_error;
 use super::negotiation::missing_password;
 use super::negotiation::needs_password;
 use super::negotiation::negotiate_protocol_version;
-use crate::vnc::framebuffer::Framebuffer;
-use crate::vnc::policy::VncSecurityPolicy;
-use crate::vnc::rfb::security::vnc_des_encrypt;
+use crate::framebuffer::Framebuffer;
+use crate::policy::VncSecurityPolicy;
+use crate::rfb::security::vnc_des_encrypt;
 use std::io::Read;
 use std::io::Write;
 
