@@ -148,7 +148,14 @@ pub(super) fn verified_archive_with_context(
             return Err(format!("Checksum mismatch for {name}"));
         }
         if let Some(kind) = plugin_entries.get(&name) {
-            if (*kind == PluginDataFileKind::Sqlite) != (header == b"SQLite format 3\0") {
+            let declared_db = *kind == PluginDataFileKind::Sqlite;
+            let opaque = name
+                .strip_prefix("plugins/")
+                .and_then(|path| path.split_once("/data/"))
+                .is_some_and(|(owner, relative)| {
+                    crate::plugin::retained_data::opaque_file(owner, relative)
+                });
+            if declared_db != (header == b"SQLite format 3\0") && !(opaque && !declared_db) {
                 return Err(format!(
                     "Plugin payload type disagrees with SQLite header: {name}"
                 ));

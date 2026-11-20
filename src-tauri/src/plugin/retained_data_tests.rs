@@ -3,6 +3,23 @@ use crate::plugin::{data_contract, verify};
 use tempfile::tempdir;
 
 #[test]
+fn stored_mail_attachment_is_opaque_even_with_a_database_header() {
+    let profile = tempdir().unwrap();
+    let plugins = profile.path().join("plugins");
+    let data = plugins.join("mail/data");
+    let attachment = "attachments/account/INBOX/4-1.bin";
+    fs::create_dir_all(data.join(attachment).parent().unwrap()).unwrap();
+    let payload = b"SQLite format 3\0fixture contents";
+    fs::write(data.join(attachment), payload).unwrap();
+    fs::write(data.join("account.db"), payload).unwrap();
+    let files = discover(&plugins, "mail", 1).unwrap().files;
+    assert_eq!(files[0].kind, DataFileKind::Sqlite);
+    assert_eq!(files[1].path, attachment);
+    assert_eq!(files[1].kind, DataFileKind::File);
+    assert!(is_database("another-owner", attachment, &payload[..16]));
+}
+
+#[test]
 fn manifest_data_paths_cannot_reach_core_code_other_owners_or_control_files() {
     let mut manifest = verify::test_support::manifest();
     for path in [

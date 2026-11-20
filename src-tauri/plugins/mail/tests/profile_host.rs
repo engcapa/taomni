@@ -13,17 +13,24 @@ use taomni_mail_engine::{
     MailFolder,
     cache::{init_mail_tables, upsert_folder, upsert_message},
     database::mail_db_file_stem,
+    drafts::{list_mail_drafts, save_mail_draft},
     migration::{LegacyMailbox, StagedMailData},
     parse_body_message,
 };
 use taomni_plugin_api::{
     HandshakeRequest, HandshakeResponse, RpcMessage, RpcRequest,
-    services::{HOST_PROFILE_ENV, HostProfileContext, ProfileGeneration},
+    services::{
+        HOST_PROFILE_ENV, HostInstanceId, HostProfileContext, ProfileGeneration, SNAPSHOT_METHOD,
+        SNAPSHOT_PREPARE_METHOD, SNAPSHOT_RELEASE_METHOD, SnapshotResult,
+    },
 };
 use taomni_sqlite_snapshot::SnapshotControl;
 
 const ACCOUNT: &str = "existing-mail";
 const WAIT: Duration = Duration::from_secs(15);
+const HOST: &str = "b1234567-1234-1234-1234-123456789abc";
+const JOB: &str = "c1234567-1234-1234-1234-123456789abc";
+const STAGING: &str = "d1234567-1234-1234-1234-123456789abc";
 
 struct MailHost {
     child: Child,
@@ -78,12 +85,17 @@ impl MailHost {
                 "mail_list_cached_folders",
                 "mail_list_cached_messages",
                 "mail_get_cached_body",
+                "mail_list_drafts",
+                SNAPSHOT_PREPARE_METHOD,
+                SNAPSHOT_METHOD,
+                SNAPSHOT_RELEASE_METHOD,
             ]
             .map(String::from)
             .to_vec(),
             vec!["fs.dataDir".into()],
         );
         request.profile = Some(context.clone());
+        request.host_instance = Some(HostInstanceId::parse(HOST).unwrap());
         let data = self.call("plugin/handshake", serde_json::to_value(request).unwrap());
         let result: HandshakeResponse = serde_json::from_value(data).unwrap();
         assert!(result.accepted);
@@ -100,6 +112,55 @@ impl MailHost {
         }
         panic!("Mail host remained running");
     }
+}
+
+fn snapshot_cache(
+    host: &mut MailHost,
+    context: &HostProfileContext,
+    profile: &Path,
+    database: &str,
+    attachment: &str,
+) {
+    let export = profile.join("backup-export");
+    fs::create_dir(&export).unwrap();
+    let prepared = host.call(
+        SNAPSHOT_PREPARE_METHOD,
+        json!({
+            "job":JOB,
+            "profileGeneration":context.generation,
+            "destination":{
+                "token":STAGING,"absoluteJobRoot":export,
+                "allowedFiles":[database,attachment],"opaqueFiles":[attachment]
+            },
+        }),
+    );
+    let snapshot = host.call(
+        SNAPSHOT_METHOD,
+        json!({
+            "job":JOB,"staging":STAGING,"barrier":prepared["barrier"],
+        }),
+    );
+    let snapshot: SnapshotResult = serde_json::from_value(snapshot).unwrap();
+    assert_eq!(snapshot.files.len(), 2);
+    assert_eq!(snapshot.host_instance.as_str(), HOST);
+    let db = Connection::open_with_flags(
+        export.join(database),
+        rusqlite::OpenFlags::SQLITE_OPEN_READ_ONLY,
+    )
+    .unwrap();
+    assert_eq!(
+        list_mail_drafts(&db, ACCOUNT).unwrap()[0].subject,
+        "Draft saved by the monolith"
+    );
+    let original = fs::read(profile.join("plugins/mail/data").join(attachment)).unwrap();
+    assert!(original.starts_with(b"SQLite format 3\0"));
+    assert_eq!(fs::read(export.join(attachment)).unwrap(), original);
+    assert!(!export.join(format!("{database}-wal")).exists());
+    assert!(!export.join(format!("{database}-shm")).exists());
+    host.call(
+        SNAPSHOT_RELEASE_METHOD,
+        json!({"job":JOB,"barrier":prepared["barrier"]}),
+    );
 }
 
 impl Drop for MailHost {
@@ -132,6 +193,18 @@ fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
     fs::create_dir(&old_storage).unwrap();
     let filename = format!("{}.db", mail_db_file_stem(ACCOUNT));
     let source = old_storage.join(&filename);
+    let attachment = format!("attachments/{}/INBOX/9-1.bin", mail_db_file_stem(ACCOUNT));
+    let attachment_path = old_storage.join(&attachment);
+    fs::create_dir_all(attachment_path.parent().unwrap()).unwrap();
+    {
+        let attachment = Connection::open(&attachment_path).unwrap();
+        attachment
+            .execute_batch(
+                "CREATE TABLE contents(value TEXT);
+            INSERT INTO contents VALUES ('old attachment bytes');",
+            )
+            .unwrap();
+    }
     let writer = {
         let db = Connection::open(&source).unwrap();
         db.execute_batch("PRAGMA journal_mode=WAL; PRAGMA wal_autocheckpoint=0;")
@@ -152,6 +225,14 @@ fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
             &parse_body_message(ACCOUNT, "INBOX", 9, None, raw, 1024),
         )
         .unwrap();
+        let draft = serde_json::from_value(json!({
+            "id":"scheduled",
+            "subject":"Draft saved by the monolith",
+            "to":["receiver@example.com"],
+            "replyContext":{"outbox":{"sendAt":4102444800_i64,"queuedAt":1700000000_i64}}
+        }))
+        .unwrap();
+        save_mail_draft(&db, ACCOUNT, draft).unwrap();
         db
     };
     let legacy_bytes = fs::read(&source).unwrap();
@@ -168,16 +249,23 @@ fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
     fs::rename(stage.data(), &root).unwrap();
     assert_eq!(fs::read(&source).unwrap(), legacy_bytes);
     drop(writer);
-    let path = root.join(filename);
+    let path = root.join(&filename);
     let before = fs::read(&path).unwrap();
     let mut host = MailHost::spawn(&profile, &context);
     host.handshake(&context);
+    snapshot_cache(&mut host, &context, &profile, &filename, &attachment);
     let folders = host.call("mail_list_cached_folders", json!({"accountId":ACCOUNT}));
     assert_eq!(folders[0]["name"], "INBOX");
     assert_eq!(folders[0]["cachedCount"], 1);
     let page = json!({"accountId":ACCOUNT,"folder":"INBOX","limit":1});
     let messages = host.call("mail_list_cached_messages", page);
     assert_eq!(messages[0]["subject"], "Original");
+    let drafts = host.call("mail_list_drafts", json!({"accountId":ACCOUNT,"limit":1}));
+    assert_eq!(drafts[0]["subject"], "Draft saved by the monolith");
+    assert_eq!(
+        drafts[0]["replyContext"]["outbox"]["sendAt"],
+        4102444800_i64
+    );
 
     let mut competing = MailHost::spawn(&profile, &context);
     assert_eq!(competing.exit_code(), Some(1));
@@ -195,6 +283,10 @@ fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
     let mut reopened = MailHost::spawn(&profile, &context);
     reopened.handshake(&context);
     assert_eq!(reopened.call("mail_get_cached_body", params), body);
+    assert_eq!(
+        reopened.call("mail_list_drafts", json!({"accountId":ACCOUNT})),
+        drafts
+    );
     drop(reopened.child.stdin.take());
     assert_eq!(reopened.exit_code(), Some(0));
     assert_eq!(fs::read(path).unwrap(), before);

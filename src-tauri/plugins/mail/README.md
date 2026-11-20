@@ -19,13 +19,16 @@ opens connections using session network settings and resolves user-selected file
 The connection owns its proxy forwarder and releases it when connection
 setup fails or the connection closes.
 
-The provisional host serves cached folders, paged headers and cached bodies
+The provisional host serves cached folders, paged headers, bodies and drafts
 from `plugins/mail/data/<account-stem>.db` while the SDK holds its profile and
 module leases. The host opens existing SQLite data in read-only mode. The
-manifest declares the commands and permissions implemented by this host.
+manifest declares the commands and permissions implemented by this host. The
+core's authenticated backup barrier exports standalone SQLite snapshots and
+copies the granted originals and attachment files from the module data root.
 The hosted protocol workflow stages a legacy cache containing committed WAL
-data, then verifies that the host reads it, detects competing ownership and
-can reopen it after exit. Linux, Windows and macOS run this check.
+data, then verifies that the host reads it and the scheduled Outbox, detects
+competing ownership and can reopen it after exit. Linux, Windows and macOS
+run this check.
 
 The signed offline upgrade command requires a closed profile. It imports the
 default or account-specific cache, archived originals and attachment cache.

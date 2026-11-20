@@ -9,6 +9,38 @@ use super::{
 use std::fs;
 
 #[test]
+fn mail_attachment_with_a_sqlite_header_restores_as_its_original_bytes() {
+    let source = tempfile::tempdir().unwrap();
+    let attachment = source.path().join("attachment.bin");
+    let db = rusqlite::Connection::open(&attachment).unwrap();
+    db.execute_batch(
+        "CREATE TABLE test(value); INSERT INTO test VALUES ('downloaded attachment');",
+    )
+    .unwrap();
+    drop(db);
+    let original = fs::read(&attachment).unwrap();
+    let relative = "attachments/account/INBOX/4-1.bin";
+    let data = dataset("mail", &[(relative, PluginDataFileKind::File)]);
+    let archive_path = data.archive_path(relative);
+    let archive = archive(
+        source.path(),
+        data,
+        &[StagedFile {
+            archive_path: archive_path.clone(),
+            disk_path: attachment,
+        }],
+        None,
+    );
+    let profile = tempfile::tempdir().unwrap();
+    restore::stage_restore_to_dir(profile.path(), &archive, None).unwrap();
+    restore::apply_pending_restore(profile.path()).unwrap();
+    assert_eq!(
+        fs::read(profile.path().join(archive_path)).unwrap(),
+        original
+    );
+}
+
+#[test]
 fn modular_archive_restores_whole_data_set_without_activating_code_or_trust() {
     for password in [None, Some("qa-modular-backup-password")] {
         let source = tempfile::tempdir().unwrap();

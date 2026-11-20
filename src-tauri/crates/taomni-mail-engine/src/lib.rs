@@ -5,6 +5,7 @@ pub mod cache;
 pub mod calendar;
 pub mod compose;
 pub mod database;
+pub mod drafts;
 pub mod filters;
 pub mod imap_auth;
 pub mod imap_folders;

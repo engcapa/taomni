@@ -56,6 +56,11 @@ pub(super) fn stage(
             .iter()
             .map(|file| SafeRelativePath::parse(file.path.clone()).map_err(|e| e.to_string()))
             .collect::<Result<_, _>>()?,
+        opaque_files: files
+            .iter()
+            .filter(|file| retained_data::opaque_file(slug, &file.path))
+            .map(|file| SafeRelativePath::parse(file.path.clone()).map_err(|e| e.to_string()))
+            .collect::<Result<_, _>>()?,
     };
     let host = registry.prepare_data_snapshot(
         slug,
@@ -181,7 +186,7 @@ pub(super) fn validate_and_copy(
         }
         output.sync_all().map_err(|e| e.to_string())?;
         drop(output);
-        let sqlite = header.as_slice() == b"SQLite format 3\0";
+        let sqlite = retained_data::is_database(slug, relative, &header);
         if sqlite != (expected.kind == DataFileKind::Sqlite) {
             return Err("Plugin snapshot database type disagrees with its inventory".into());
         }

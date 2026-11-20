@@ -6,11 +6,51 @@ use taomni_mail_engine::{
     MailFolder,
     cache::{init_mail_tables, upsert_folder, upsert_message},
     database::mail_db_file_stem,
+    drafts::save_mail_draft,
     parse_body_message,
 };
 use taomni_plugin_api::ErrorCode;
 
 use super::{commands, host_config, store::Store};
+
+#[test]
+fn draft_pages_keep_outbox_fields_and_filter_by_account() {
+    let profile = tempfile::tempdir().unwrap();
+    let store = Store::new(&profile.path().canonicalize().unwrap());
+    let root = profile.path().join("plugins/mail/data");
+    fs::create_dir_all(&root).unwrap();
+    let database =
+        Connection::open(root.join(format!("{}.db", mail_db_file_stem("saved")))).unwrap();
+    init_mail_tables(&database).unwrap();
+    for (account, id, send_at) in [
+        ("saved", "queued", 1800000010),
+        ("saved", "reply", 1800000020),
+        ("other", "hidden", 1),
+    ] {
+        let draft = serde_json::from_value(json!({
+            "id":id, "subject":id, "to":["receiver@example.com"],
+            "replyContext":{"outbox":{"sendAt":send_at}},
+        }))
+        .unwrap();
+        save_mail_draft(&database, account, draft).unwrap();
+    }
+    // Same update timestamp to check stable pagination before and after retries.
+    database
+        .execute("UPDATE mail_drafts SET updated_at=1", [])
+        .unwrap();
+    let page = |offset| {
+        commands::invoke(
+            &store,
+            "mail_list_drafts",
+            Some(json!({"accountId":"saved","limit":1,"offset":offset})),
+        )
+        .unwrap()
+    };
+    assert_eq!(page(0)[0]["subject"], "queued");
+    assert_eq!(page(0)[0]["replyContext"]["outbox"]["sendAt"], 1800000010);
+    assert_eq!(page(1)[0]["subject"], "reply");
+    assert_eq!(page(2), json!([]));
+}
 
 #[test]
 fn host_handshake_matches_the_manifest() {

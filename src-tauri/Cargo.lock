@@ -11147,6 +11147,7 @@ dependencies = [
 name = "taomni-plugin-mail"
 version = "0.1.0"
 dependencies = [
+ "libc",
  "rusqlite",
  "serde",
  "serde_json",

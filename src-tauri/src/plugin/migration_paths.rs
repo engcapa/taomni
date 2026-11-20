@@ -13,7 +13,7 @@ pub(crate) fn directory(path: &Path) -> Result<(), String> {
     Ok(())
 }
 
-pub(in crate::plugin) fn create_directory(parent: &Path, name: &str) -> Result<PathBuf, String> {
+pub(crate) fn create_directory(parent: &Path, name: &str) -> Result<PathBuf, String> {
     directory(parent)?;
     let path = parent.join(name);
     match fs::create_dir(&path) {
@@ -63,7 +63,7 @@ pub(crate) fn read_json_bounded<T: serde::de::DeserializeOwned>(path: &Path) -> 
     serde_json::from_slice(&data).map_err(|error| error.to_string())
 }
 
-pub(in crate::plugin) fn read_detached_signature(path: &Path) -> Result<String, String> {
+pub(crate) fn read_detached_signature(path: &Path) -> Result<String, String> {
     use std::io::Read;
     const MAX_BYTES: u64 = 16 * 1024;
     let mut signature = String::new();

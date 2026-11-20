@@ -256,6 +256,7 @@ impl Harness {
                     .iter()
                     .map(|path| SafeRelativePath::parse(*path).unwrap())
                     .collect(),
+                opaque_files: Vec::new(),
             },
         }
     }

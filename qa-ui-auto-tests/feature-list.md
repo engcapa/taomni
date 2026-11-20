@@ -8069,6 +8069,7 @@ files:
   - src/components/session/SessionEditor.tsx
   - src-tauri/src/mail/mod.rs
   - src-tauri/crates/taomni-mail-engine/src/compose.rs
+  - src-tauri/crates/taomni-mail-engine/src/drafts.rs
 controls:
   - id: compose-send-later
     selector: '[data-testid="mail-compose-send-later"]'

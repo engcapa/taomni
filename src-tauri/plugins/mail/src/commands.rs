@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::Value;
-use taomni_mail_engine::cache;
+use taomni_mail_engine::{cache, drafts::list_mail_drafts_page};
 use taomni_plugin_api::{ErrorCode, RpcError};
 
 use super::store::{Store, unavailable};
@@ -8,7 +8,8 @@ use super::store::{Store, unavailable};
 const LIST_FOLDERS: &str = "mail_list_cached_folders";
 const LIST_MESSAGES: &str = "mail_list_cached_messages";
 const READ_BODY: &str = "mail_get_cached_body";
-pub(super) const METHODS: [&str; 3] = [LIST_FOLDERS, LIST_MESSAGES, READ_BODY];
+const LIST_DRAFTS: &str = "mail_list_drafts";
+pub(super) const METHODS: [&str; 4] = [LIST_FOLDERS, LIST_MESSAGES, READ_BODY, LIST_DRAFTS];
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -31,6 +32,14 @@ struct Message {
     account_id: String,
     folder: String,
     uid: u32,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct DraftsPage {
+    account_id: String,
+    limit: Option<u32>,
+    offset: Option<u32>,
 }
 
 pub(super) fn invoke(
@@ -65,6 +74,18 @@ pub(super) fn invoke(
                 cache::get_cached_body(db, &input.account_id, &input.folder, input.uid)
             })?;
             encode(body)
+        }
+        LIST_DRAFTS => {
+            let input: DraftsPage = decode(params)?;
+            let drafts = store.query(&input.account_id, |db| {
+                list_mail_drafts_page(
+                    db,
+                    &input.account_id,
+                    input.limit.unwrap_or(50).min(100),
+                    input.offset.unwrap_or(0),
+                )
+            })?;
+            encode(drafts)
         }
         _ => Err(RpcError::from_code(ErrorCode::MethodNotFound)),
     }

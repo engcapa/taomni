@@ -17,6 +17,7 @@ use taomni_sqlite_snapshot::{SnapshotControl, SnapshotObserver};
 pub struct SnapshotExport {
     root: PathBuf,
     allowed: BTreeSet<String>,
+    opaque: BTreeSet<String>,
     completed: BTreeMap<String, SnapshotFile>,
     operation: Arc<Operation>,
 }
@@ -32,6 +33,10 @@ pub(crate) fn io_error(_: impl std::fmt::Display) -> RpcError {
 impl SnapshotExport {
     pub fn allowed_paths(&self) -> impl Iterator<Item = &str> {
         self.allowed.iter().map(String::as_str)
+    }
+
+    pub fn is_opaque_file(&self, relative: &str) -> bool {
+        self.opaque.contains(relative)
     }
 
     pub(crate) fn validate(
@@ -50,6 +55,19 @@ impl SnapshotExport {
         }
         directory(path)?;
         if fs::read_dir(path).map_err(io_error)?.next().is_some() {
+            return Err(invalid());
+        }
+        let allowed: BTreeSet<_> = grant
+            .allowed_files
+            .iter()
+            .map(SafeRelativePath::as_str)
+            .collect();
+        let opaque: BTreeSet<_> = grant
+            .opaque_files
+            .iter()
+            .map(SafeRelativePath::as_str)
+            .collect();
+        if opaque.len() != grant.opaque_files.len() || !opaque.is_subset(&allowed) {
             return Err(invalid());
         }
         let mut paths = BTreeSet::new();
@@ -97,6 +115,11 @@ impl SnapshotExport {
                 .iter()
                 .map(|path| path.as_str().into())
                 .collect(),
+            opaque: grant
+                .opaque_files
+                .iter()
+                .map(|path| path.as_str().into())
+                .collect(),
             completed: BTreeMap::new(),
             operation,
         }
@@ -109,6 +132,9 @@ impl SnapshotExport {
         relative: &str,
         connection: &rusqlite::Connection,
     ) -> Result<(), RpcError> {
+        if self.is_opaque_file(relative) {
+            return Err(invalid());
+        }
         let target = self.target(relative)?;
         let control = SnapshotControl::new(
             self.operation.deadline(),
@@ -137,7 +163,7 @@ impl SnapshotExport {
             .take(16)
             .read_to_end(&mut header)
             .map_err(io_error)?;
-        if header == b"SQLite format 3\0" {
+        if header == b"SQLite format 3\0" && !self.is_opaque_file(relative) {
             return Err(RpcError::new(
                 ErrorCode::InvalidState,
                 "PLUGIN_SQLITE_SNAPSHOT_REQUIRED",
