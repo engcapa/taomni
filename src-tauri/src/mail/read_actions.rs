@@ -2,21 +2,8 @@
 use super::*;
 use crate::state::MailDbHandle;
 
-// Even sparse ten-digit UIDs stay below a 4 KiB command-line limit.
-pub(super) const UID_BATCH_SIZE: usize = 250;
-
-pub(super) fn unread_uids<T: Read + Write>(
-    session: &mut imap::Session<T>,
-    folder: &str,
-) -> Result<Vec<u32>, String> {
-    session
-        .select(folder)
-        .map_err(|e| format!("IMAP SELECT {folder} failed: {e}"))?;
-    session
-        .uid_search("UNSEEN")
-        .map(|uids| uids.into_iter().collect())
-        .map_err(|e| format!("IMAP UID SEARCH UNSEEN failed: {e}"))
-}
+use taomni_mail_engine::imap_mutations::UID_BATCH_SIZE;
+pub(super) use taomni_mail_engine::imap_mutations::unread_uids;
 
 pub(super) fn mark_read_cached(
     pool: &MailImapPool,

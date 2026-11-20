@@ -163,6 +163,7 @@ steps:
 - assert_text:
     selector: '[data-testid="mail-selection-count"]'
     contains: 0 selected
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -267,6 +268,8 @@ verification:
     - step: 60
       expectation: '{''assert_text'': {''selector'': ''[data-testid="mail-selection-count"]'', ''contains'':
         ''0 selected''}}'
+    - step: 61
+      expectation: Reading flags and deleting the selection concurrently produces no runtime errors.
     results:
     - 46
     - 49
@@ -277,6 +280,7 @@ verification:
     - 58
     - 59
     - 60
+    - 61
   visual:
   - check: Selected rows, selection count and Delete selected button are visible without clipping.
     method: manual

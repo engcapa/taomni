@@ -1,5 +1,5 @@
 use crate::{
-    HeaderInput, MailFolder, MailMessageCached, cache::MailCacheSettings,
+    HeaderInput, MailFolder, MailMessageCached, cache::MailCacheSettings, empty_cached_message,
     imap_folders::decode_imap_modified_utf7, merge_body, now_ts, parse_body_message, parse_header,
 };
 use std::{
@@ -62,6 +62,58 @@ where
                 .then(b.header.uid.cmp(&a.header.uid))
         });
         Ok((folder_info, messages, has_more))
+    }
+
+    pub fn fetch_body<T: Read + Write>(
+        &mut self,
+        session: &mut imap::Session<T>,
+        uid: u32,
+    ) -> Result<MailMessageCached, String> {
+        let folder = self.name;
+        session
+            .examine(folder)
+            .map_err(|e| format!("IMAP EXAMINE {folder} failed: {e}"))?;
+        let raw_limit = self.cache.body_max_bytes.clamp(1024, 10 * 1024 * 1024) as usize;
+        let query = format!(
+            "(UID FLAGS RFC822.SIZE INTERNALDATE BODY.PEEK[HEADER] BODY.PEEK[]<0.{raw_limit}>)"
+        );
+        let fetches = session
+            .uid_fetch(uid.to_string(), query)
+            .map_err(|e| format!("IMAP UID FETCH body failed: {e}"))?;
+        let fetch = fetches
+            .iter()
+            .next()
+            .ok_or_else(|| format!("message UID {uid} not found in {folder}"))?;
+        let mut message = parse_fetch_header(self.account_id, folder, fetch)
+            .unwrap_or_else(|| empty_cached_message(self.account_id, folder, uid));
+        let truncated = fetch.size.is_some_and(|size| size as usize > raw_limit);
+        if let Some(body) = fetch.body() {
+            if !truncated {
+                (self.save_original)(uid, body)?;
+            }
+            let parsed =
+                parse_body_message(self.account_id, folder, uid, fetch.size, body, raw_limit);
+            merge_body(&mut message, parsed);
+        }
+        if truncated {
+            // TASK-15: the partial fetch cut the message; read the text parts
+            // whole and list every attachment from BODYSTRUCTURE instead.
+            match crate::imap_parts::imap_fetch_large_body(session, uid) {
+                Ok(large) => {
+                    if large.text.is_some() || large.html.is_some() {
+                        message.body_text = large.text;
+                        message.body_html = large.html;
+                    }
+                    if !large.attachments.is_empty() {
+                        message.header.has_attachments = true;
+                        message.header.attachment_count = large.attachments.len();
+                        message.header.attachments = large.attachments;
+                    }
+                }
+                Err(e) => tracing::debug!("mail: BODYSTRUCTURE fallback failed for UID {uid}: {e}"),
+            }
+        }
+        Ok(message)
     }
 
     pub fn fetch_messages<T: Read + Write>(
@@ -229,7 +281,7 @@ pub(crate) fn imap_page_uids_newest_first<T: Read + Write>(
     Ok((fetch_uids, has_more))
 }
 
-pub fn parse_fetch_header(
+fn parse_fetch_header(
     account_id: &str,
     folder: &str,
     fetch: &imap::types::Fetch,
@@ -261,4 +313,25 @@ pub fn uid_set_string(uids: &[u32]) -> String {
         .map(ToString::to_string)
         .collect::<Vec<_>>()
         .join(",")
+}
+
+pub fn imap_fetch_raw<T: Read + Write>(
+    session: &mut imap::Session<T>,
+    folder: &str,
+    uid: u32,
+) -> Result<Vec<u8>, String> {
+    session
+        .examine(folder)
+        .map_err(|e| format!("IMAP EXAMINE {folder} failed: {e}"))?;
+    let fetches = session
+        .uid_fetch(uid.to_string(), "(UID BODY.PEEK[])")
+        .map_err(|e| format!("IMAP UID FETCH raw failed: {e}"))?;
+    let fetch = fetches
+        .iter()
+        .next()
+        .ok_or_else(|| format!("message UID {uid} not found in {folder}"))?;
+    let body = fetch
+        .body()
+        .ok_or_else(|| format!("message UID {uid} did not include a body"))?;
+    Ok(body.to_vec())
 }

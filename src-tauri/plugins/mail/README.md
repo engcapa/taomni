@@ -13,8 +13,9 @@ reconciles deletions and flags, and fetches paged headers and prefetched bodies
 using the persisted cache policy. It also handles POP3 TLS and STLS, login,
 UIDL planning and retrieval of raw messages. Its SQLite cache owns persisted
 sync watermarks, delayed flag ordering, contact indexing, retention and POP3
-local originals. The desktop adapter opens connections using session network
-settings and resolves attachment bytes and user-selected file destinations.
+local originals. The engine fetches large-message text and attachment
+sections and sends bounded IMAP flag and delete requests. The desktop adapter
+opens connections using session network settings and resolves user-selected file destinations.
 The connection owns its proxy forwarder and releases it when connection
 setup fails or the connection closes.
 

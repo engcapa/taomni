@@ -11095,6 +11095,7 @@ dependencies = [
  "flate2",
  "hex",
  "imap",
+ "imap-proto",
  "lettre",
  "mail-parser",
  "md-5 0.11.0",

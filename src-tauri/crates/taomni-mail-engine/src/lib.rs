@@ -9,6 +9,8 @@ pub mod filters;
 pub mod imap_auth;
 pub mod imap_folders;
 pub mod imap_messages;
+pub mod imap_mutations;
+pub mod imap_parts;
 pub mod imap_sync;
 pub mod imap_transport;
 mod inline_images;
