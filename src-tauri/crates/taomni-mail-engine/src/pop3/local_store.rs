@@ -162,6 +162,33 @@ pub fn local_raw(
     uid: u32,
 ) -> SqlResult<Option<Vec<u8>>> {
     migrate_local_tables(conn)?;
+    select_local_raw(conn, account_id, folder, uid)
+}
+
+/// Read a saved POP3 original from an existing store without changing its schema.
+pub fn read_local_raw(
+    conn: &Connection,
+    account_id: &str,
+    folder: &str,
+    uid: u32,
+) -> SqlResult<Option<Vec<u8>>> {
+    let present: bool = conn.query_row(
+        "SELECT EXISTS(SELECT 1 FROM sqlite_schema WHERE type = 'table' AND name = 'mail_local_raw')",
+        [],
+        |row| row.get(0),
+    )?;
+    if !present {
+        return Ok(None);
+    }
+    select_local_raw(conn, account_id, folder, uid)
+}
+
+fn select_local_raw(
+    conn: &Connection,
+    account_id: &str,
+    folder: &str,
+    uid: u32,
+) -> SqlResult<Option<Vec<u8>>> {
     conn.query_row(
         "SELECT raw FROM mail_local_raw WHERE account_id = ?1 AND folder = ?2 AND uid = ?3",
         params![account_id, folder, uid],

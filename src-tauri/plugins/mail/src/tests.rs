@@ -7,7 +7,9 @@ use taomni_mail_engine::{
     cache::{init_mail_tables, upsert_folder, upsert_message},
     database::mail_db_file_stem,
     drafts::save_mail_draft,
-    parse_body_message, storage,
+    parse_body_message,
+    pop3::local_store::{ensure_local_folders, insert_local},
+    storage,
 };
 use taomni_plugin_api::ErrorCode;
 
@@ -231,6 +233,47 @@ fn saved_original_takes_precedence_and_corruption_is_reported() {
         .join(format!("{}.eml.gz", saved.hash));
     fs::write(archive, b"broken archive").unwrap();
     assert_eq!(read().unwrap_err().message, "MAIL_STORE_UNAVAILABLE");
+}
+
+#[test]
+fn pop3_original_restores_the_body_when_only_headers_are_cached() {
+    let profile = tempfile::tempdir().unwrap();
+    let root = profile.path().canonicalize().unwrap();
+    let store = Store::new(&root);
+    let data = root.join("plugins/mail/data");
+    fs::create_dir_all(&data).unwrap();
+    let account = "local-pop3";
+    let database = data.join(format!("{}.db", mail_db_file_stem(account)));
+    let db = Connection::open(&database).unwrap();
+    init_mail_tables(&db).unwrap();
+    ensure_local_folders(&db, account).unwrap();
+    let raw = b"Subject: Local original\r\n\r\nPOP3 body retained in SQLite\r\n";
+    let uid = insert_local(&db, account, "INBOX", raw, &[])
+        .unwrap()
+        .header
+        .uid;
+    db.execute(
+        "UPDATE mail_messages SET body_text = NULL, body_html = NULL, body_cached_at = NULL
+         WHERE account_id = ?1 AND uid = ?2",
+        rusqlite::params![account, uid],
+    )
+    .unwrap();
+    drop(db);
+    let before = fs::read(&database).unwrap();
+    let body = invoke(
+        &store,
+        "mail_get_cached_body",
+        Some(json!({"accountId":account,"folder":"INBOX","uid":uid})),
+    )
+    .unwrap();
+    assert_eq!(body["subject"], "Local original");
+    assert!(
+        body["text"]
+            .as_str()
+            .unwrap()
+            .contains("POP3 body retained in SQLite")
+    );
+    assert_eq!(fs::read(database).unwrap(), before);
 }
 
 #[test]

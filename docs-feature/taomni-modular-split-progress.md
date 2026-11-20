@@ -184,6 +184,9 @@ TASK-027 将 G1–G11 设为独立发布阻断门。每个门必须在匹配源�
 - `0477353f6` 将屏幕二维码解码接入签名 MFA 宿主。应用继续拥有屏幕采集和窗口恢复。TC-MFA-007 检查浏览器错误和重试，TC-MODULES-039 在 Linux 上迁移正式旧版生成的 MFA 数据后，验证宿主识别外部二维码及移除二维码后的空结果。40 项 Rust 单测、16 项前端单测和用例审计通过。 [三端 UI](https://github.com/engcapa/taomni/actions/runs/44710605491) · [Wayland 回归](https://github.com/engcapa/taomni/actions/runs/44710604908) · [宿主专项](https://github.com/engcapa/taomni/actions/runs/44710605284)
 - macOS 26 ARM64 的静态 Kerberos 构建因 `_cc_initialize` 缺少系统库失败。验证分支在构建阶段链接系统 Kerberos framework，并保留已有的 DMG、updater 资产和宿主签名检查。修订候选源码为 `67ae2a6a3`。 [首轮失败](https://github.com/engcapa/taomni/actions/runs/44670439565/job/136081361111) · [ARM64 重试](https://github.com/engcapa/taomni/actions/runs/44711792115)
 - Mail 的宿主读取迁移后的归档对象，逐块校验解压长度、SHA-256 并检查取消状态。具有完整原信时按原件解析正文，其他邮件沿用缓存行。跨进程用例使用迁移前后的完整归档、独立宿主及正常退出重开。51 项邮件引擎单测和 8 项宿主单测通过。桌面 Mail 入口仍由过渡实现提供。
+- `7e92a8816` 合入 main 的 #841。Markdown Live 的撤销历史与导出占位提示均保留。浏览器 Draw.io 旧资产用例移到 TC-FILE-OPEN-045，新版缺失资产用例沿用 main 的 043/044。38 项定向单测、TypeScript、用例审计和三端选集检查通过。 [UI 与崩溃回归](https://github.com/engcapa/taomni/actions/runs/44713935706) · [Mail 跨进程](https://github.com/engcapa/taomni/actions/runs/44713935448) · [Mail 签名升级](https://github.com/engcapa/taomni/actions/runs/44713935863)
+- `c50be74c4` 扩展 TC-MODULES-038，在 macOS 26 的候选应用完成签名 MFA 升级和正常重启后，用外部 AppKit 窗口验证实屏扫码。10 项 QA 工具单测通过。实屏授权由 runner 的真实状态决定。 [macOS Browser 与 Native](https://github.com/engcapa/taomni/actions/runs/44715355515)
+- Mail 宿主在缓存仅留邮件标题时，可从迁移后的 SQLite 读取 POP3 原件并显示正文。读取使用只读连接，复核旧数据库字节不变。51 项邮件引擎单测和 9 项宿主单测通过，三端跨进程用例同时覆盖归档原件和 POP3 原件。
 
 ## 当前结论
 

@@ -3,7 +3,9 @@ use serde_json::Value;
 use taomni_mail_engine::{
     MailMessageBody, cache,
     drafts::{MailDraftSaveRequest, delete_mail_draft, list_mail_drafts_page, save_mail_draft},
-    parse_body_message, storage,
+    parse_body_message,
+    pop3::local_store::read_local_raw,
+    storage,
 };
 use taomni_plugin_api::{ErrorCode, RpcError};
 
@@ -67,6 +69,12 @@ struct DraftSave {
 struct DraftDelete {
     account_id: String,
     draft_id: String,
+}
+
+enum SavedBody {
+    Archive(storage::OpenMessage),
+    Cached(MailMessageBody),
+    LocalOriginal(Vec<u8>),
 }
 
 pub(super) fn invoke(
@@ -146,34 +154,42 @@ fn read_body(
         folder,
         uid,
     } = message;
-    let (original, cached) = store.query(account_id, |db| {
-        let original = storage::open_with(db, account_id, folder, *uid, |path| {
+    let body = store.query(account_id, |db| {
+        if let Some(original) = storage::open_with(db, account_id, folder, *uid, |path| {
             store.open_owned_file(path).map_err(|error| error.message)
         })
-        .map_err(storage::as_sql_error)?;
-        let cached = if original.is_some() {
-            None
-        } else {
-            cache::get_cached_body(db, account_id, folder, *uid)?
-        };
-        Ok((original, cached))
+        .map_err(storage::as_sql_error)?
+        {
+            return Ok(Some(SavedBody::Archive(original)));
+        }
+        if let Some(cached) = cache::get_cached_body(db, account_id, folder, *uid)? {
+            return Ok(Some(SavedBody::Cached(cached)));
+        }
+        Ok(read_local_raw(db, account_id, folder, *uid)?.map(SavedBody::LocalOriginal))
     })?;
-    let Some(original) = original else {
-        return Ok(cached);
+    let (raw, source, parse_limit) = match body {
+        None => return Ok(None),
+        Some(SavedBody::Cached(body)) => return Ok(Some(body)),
+        Some(SavedBody::Archive(original)) => {
+            let raw = original.read_with(|| check().map_err(|error| error.message));
+            check()?;
+            let raw = raw.map_err(|_| unavailable())?;
+            let limit = raw.len();
+            (raw, "archive", limit)
+        }
+        Some(SavedBody::LocalOriginal(raw)) => (raw, "cache", 8 * 1024 * 1024),
     };
-    let raw = original.read_with(|| check().map_err(|error| error.message));
     check()?;
-    let raw = raw.map_err(|_| unavailable())?;
     let message = parse_body_message(
         account_id,
         folder,
         *uid,
         Some(raw.len() as u32),
         &raw,
-        raw.len(),
+        parse_limit,
     );
     check()?;
-    Ok(Some(cache::cached_to_body(message, "archive")))
+    Ok(Some(cache::cached_to_body(message, source)))
 }
 
 fn decode<T: DeserializeOwned>(params: Option<Value>) -> Result<T, RpcError> {
