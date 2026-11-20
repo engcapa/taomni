@@ -132,16 +132,29 @@ class OfficialModuleArtifactTests(unittest.TestCase):
         checkouts = [step for step in signing if step.get("uses", "").startswith("actions/checkout@")]
         self.assertEqual([step["with"]["ref"] for step in checkouts], ["${{ github.workflow_sha }}"])
         secret_steps = [step for step in signing if "secrets." in json.dumps(step)]
+        macos_condition = "inputs.native_macos_signing && startsWith(matrix.platform, 'darwin-')"
         self.assertEqual([step["if"] for step in secret_steps],
-                         ["env.QA_MODULE != 'mail'", "env.QA_MODULE == 'mail'"])
+                         [macos_condition, "env.QA_MODULE != 'mail'", "env.QA_MODULE == 'mail'"])
         guard = next(step for step in signing if step.get("name", "").startswith("Restrict QA signing"))
         for step in secret_steps:
+            self.assertLess(signing.index(guard), signing.index(step),
+                            "The inert candidate must be checked before a key-bearing signing step")
+        macos_identity, *package_steps = secret_steps
+        self.assertEqual(macos_identity["run"], "node scripts/configure-release-signing.mjs")
+        self.assertEqual(macos_identity["env"]["APPLE_CERTIFICATE"], "${{ secrets.APPLE_CERTIFICATE }}")
+        macos_host = next(step for step in signing if step.get("name") == "Sign and verify the macOS host")
+        self.assertEqual(macos_host["if"], macos_condition)
+        self.assertEqual(macos_host["run"].splitlines(), [
+            'export MODULE_SLUG="$QA_MODULE"',
+            'bash scripts/sign-macos-module-host.sh "candidate/unsigned-module/taomni-plugin-$MODULE_SLUG" macos-signing',
+        ])
+        self.assertLess(signing.index(macos_identity), signing.index(macos_host))
+        for step in package_steps:
             self.assertTrue(step["run"].startswith("scripts/plugin-package/target/release/taomni-plugin-package"))
             self.assertNotIn("cargo", step["run"])
             self.assertNotIn("TAURI_SIGNING_PRIVATE_KEY", step["run"])
-            self.assertLess(signing.index(guard), signing.index(step),
-                            "The inert candidate must be checked before a key-bearing signing step")
-        self.assertNotIn("--qa-catalog", secret_steps[1]["run"])
+            self.assertLess(signing.index(macos_host), signing.index(step))
+        self.assertNotIn("--qa-catalog", package_steps[1]["run"])
         self.assertNotIn("release", json.dumps([step for step in signing if "upload-artifact" in step.get("uses", "")]).lower())
 
 
