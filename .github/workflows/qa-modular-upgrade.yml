@@ -44,7 +44,7 @@ on:
         type: boolean
         default: false
       package_macos_hardened_mfa:
-        description: Require the installed macOS application to launch the matching certificate-signed MFA host with quarantine.
+        description: Verify the static-Kerberos DMG and launch its matching quarantined, certificate-signed MFA host.
         type: boolean
         default: false
       package_macos_arm_runner:

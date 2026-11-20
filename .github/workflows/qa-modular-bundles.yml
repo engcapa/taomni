@@ -214,6 +214,8 @@ jobs:
         run: ./.agents/skills/qa-ui-auto/scripts/modular_bundle_windows.ps1 -Directory package-input -OutputDirectory bundle-evidence -Version $env:SAMPLE_VERSION
       - name: Inspect the real DMG, updater app, signatures and quarantine assessment
         if: runner.os == 'macOS'
+        env:
+          MACOS_STATIC_KRB5: ${{ inputs.macos_hardened_mfa }}
         run: |
           sw_vers > bundle-evidence/macos-version.txt
           uname -m > bundle-evidence/runner-architecture.txt
