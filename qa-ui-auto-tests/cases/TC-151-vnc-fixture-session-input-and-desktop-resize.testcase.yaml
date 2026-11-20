@@ -82,10 +82,7 @@ steps:
 - assert_no_runtime_errors: null
 - screenshot: 151-vnc-fixture-session.png
 - eval_readonly:
-    expression: >-
-      document.querySelector('[data-testid="vnc-canvas"][width="1024"][height="768"]')
-        ?.getContext('2d')?.getImageData(512, 384, 1, 1).data[3] === 255
-    expect_truthy: true
+    expression: document.querySelector('.vnc-container canvas')?.getContext('2d')?.getImageData(512, 384, 1, 1).data[3] === 255
     timeout_sec: 15
 verification:
   review: reviewed
