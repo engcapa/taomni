@@ -7,31 +7,32 @@ import subprocess
 import time
 
 from modular_bundle_inventory import write_json
+from native_windows_tcp import windows_listeners
 from qa_ui_auto.deadline import Deadline
 from qa_ui_auto.fixtures.module_legacy_mfa import legacy_driver
 from tauri_webdriver import NativeSession
 
 
-def wait_for_owned_webview(owner, port, deadline):
+def wait_for_owned_webview(owner, port, deadline, observation):
     import psutil
 
     root = psutil.Process(owner.pid)
     while time.monotonic() < deadline:
         if owner.poll() is not None:
             raise RuntimeError(f"The installed application exited before starting WebView2 ({owner.returncode})")
-        children = set()
+        children = {}
         with suppress(psutil.NoSuchProcess):
             for child in root.children(recursive=True):
                 with suppress(psutil.NoSuchProcess):
-                    if child.name().casefold() == "msedgewebview2.exe":
-                        children.add(child.pid)
-        for endpoint in psutil.net_connections(kind="tcp"):
-            if endpoint.status != psutil.CONN_LISTEN or endpoint.laddr.port != port:
-                continue
-            if endpoint.laddr.ip not in {"127.0.0.1", "::1"}:
-                raise RuntimeError("WebView2 debugging listener must be local to the runner")
-            if endpoint.laddr.ip == "127.0.0.1" and endpoint.pid in children:
-                return endpoint.pid
+                    children[child.pid] = child.name().casefold()
+        listeners = windows_listeners((port,))
+        observation.update(children=children, listeners=listeners)
+        if any(endpoint["LocalAddress"] not in {"127.0.0.1", "::1"} for endpoint in listeners):
+            raise RuntimeError("WebView2 debugging listener must be local to the runner")
+        for endpoint in listeners:
+            pid = endpoint["OwningProcess"]
+            if endpoint["LocalAddress"] == "127.0.0.1" and children.get(pid) == "msedgewebview2.exe":
+                return pid
         time.sleep(0.25)
     raise RuntimeError(f"Windows application PID {owner.pid} did not open its loopback WebView2 port {port}")
 
@@ -65,7 +66,7 @@ def installed_windows_desktop(ctx, executable, work, evidence, label):
                                      stderr=subprocess.STDOUT, env=environment)
             cleanup.callback(stop, owner)
             observation["installedPid"] = owner.pid
-            observation["webviewPid"] = wait_for_owned_webview(owner, port, time.monotonic() + 60)
+            observation["webviewPid"] = wait_for_owned_webview(owner, port, time.monotonic() + 60, observation)
             driver = legacy_driver(ctx, executable, stage)
             cleanup.callback(driver.stop)
             driver.start()

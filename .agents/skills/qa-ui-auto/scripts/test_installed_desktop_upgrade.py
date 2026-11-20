@@ -236,17 +236,21 @@ class InstalledDesktopMfaCrashTests(unittest.TestCase):
         for ip, pid, error in (("127.0.0.1", 22, None), ("127.0.0.1", 23, "did not open"),
                                ("0.0.0.0", 22, "must be local")):
             with self.subTest(ip=ip, pid=pid):
-                endpoint = SimpleNamespace(status="LISTEN", pid=pid, laddr=SimpleNamespace(ip=ip, port=port))
-                observer = SimpleNamespace(Process=Mock(return_value=core), NoSuchProcess=ProcessLookupError,
-                                           net_connections=Mock(return_value=[endpoint]), CONN_LISTEN="LISTEN")
+                endpoint = {"LocalAddress": ip, "LocalPort": port, "OwningProcess": pid}
+                observer = SimpleNamespace(Process=Mock(return_value=core), NoSuchProcess=ProcessLookupError)
+                observation = {}
                 with patch.dict(sys.modules, {"psutil": observer}), patch(
                     "installed_windows_webview.time.monotonic", side_effect=[0, 1],
-                ), patch("installed_windows_webview.time.sleep"):
+                ), patch("installed_windows_webview.time.sleep"), patch(
+                    "installed_windows_webview.windows_listeners", return_value=[endpoint],
+                ):
                     if error:
                         with self.assertRaisesRegex(RuntimeError, error):
-                            wait_for_owned_webview(owner, port, 1)
+                            wait_for_owned_webview(owner, port, 1, observation)
                     else:
-                        self.assertEqual(wait_for_owned_webview(owner, port, 1), child.pid)
+                        self.assertEqual(wait_for_owned_webview(owner, port, 1, observation), child.pid)
+                self.assertEqual(observation["listeners"], [endpoint])
+                self.assertEqual(observation["children"], {22: "msedgewebview2.exe"})
 
     def test_macos_uses_the_owned_bridge_and_matches_a_hardened_child_command(self):
         with TemporaryDirectory() as temporary:
