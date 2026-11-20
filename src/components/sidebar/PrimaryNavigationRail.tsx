@@ -1,5 +1,6 @@
 import {
   Boxes,
+  FolderOpen,
   Home,
   KeyRound,
   MessageSquare,
@@ -21,6 +22,7 @@ import { isChatCapableTabType, useChatStore } from "../../stores/chatStore";
 import { useAiStore } from "../../stores/aiStore";
 import { LanguageSwitcher } from "../window/LanguageSwitcher";
 import { useAppThemeI18nLabel } from "../../lib/i18n/labels";
+import { openExplorer } from "../../lib/explorer/openExplorer";
 
 const THEME_ORDER = ["light", "dark", "system"] as const;
 
@@ -75,10 +77,15 @@ export function PrimaryNavigationRail({
     { mode: "home", testId: "nav-mode-home", label: t("platform.home"), icon: <Home /> },
     { mode: "workspaces", testId: "nav-mode-workspaces", label: t("platform.workspaces"), icon: <Boxes /> },
     { mode: "sessions", testId: "side-tab-sessions", label: t("sidebar.sideTabSessions"), icon: <PanelsTopLeft /> },
+    { mode: "explorer", testId: "side-tab-explorer", label: t("menu.fileExplorer"), icon: <FolderOpen /> },
     { mode: "tools", testId: "side-tab-tools", label: t("sidebar.sideTabTools"), icon: <Wrench /> },
   ];
 
   const activateMode = (mode: PrimaryNavMode, clickCount = 0) => {
+    if (mode === "explorer") {
+      void openExplorer().catch((error) => useAppStore.getState().setStatusMessage(String(error)));
+      return;
+    }
     if (mode === "home") {
       setActiveSideTab("home");
       setSidebarCollapsed(true);
@@ -132,7 +139,7 @@ export function PrimaryNavigationRail({
               onClick={(event) => activateMode(entry.mode, event.detail)}
               onDoubleClick={(event) => {
                 event.preventDefault();
-                setSidebarCollapsed(true);
+                if (entry.mode !== "explorer") setSidebarCollapsed(true);
               }}
             />
           ))}

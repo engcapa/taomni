@@ -16,6 +16,7 @@ import { t as tr } from "../../lib/i18n";
 import { SAVED_PASSWORD_VAULT_REASON_KEY, passwordRefFromOptions } from "./authentication";
 import { sessionToDbConnectInfo, sessionToHBaseConnectInfo } from "./databaseSession";
 import { sessionToMailTabInfo } from "./mailSession";
+import { openExplorer } from "../../lib/explorer/openExplorer";
 
 
 export interface UseProtocolTabsContext {
@@ -150,16 +151,8 @@ export function useProtocolTabs(context: UseProtocolTabsContext) {
   }, [addTab, markConnected]);
 
   const openFileBrowserTab = useCallback((title: string, initialPath: string, sessionId?: string) => {
-    const id = `file-${sessionId ?? "ad-hoc"}-${Date.now()}`;
-    addTab({
-      id,
-      type: "file-browser",
-      title,
-      sessionId,
-      closable: true,
-      fileBrowser: { initialPath, explorer: true },
-    });
-  }, [addTab]);
+    void openExplorer(initialPath, { title, sessionId }).catch((error) => setStatusMessage(String(error)));
+  }, [setStatusMessage]);
 
   const openDbTab = useCallback((session: SessionConfig, password?: string) => {
     const engine = session.session_type as DbConnectInfo["engine"];

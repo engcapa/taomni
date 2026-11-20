@@ -1,6 +1,6 @@
 import { useEffect, useRef } from "react";
 import { basename } from "../../lib/sftp";
-import { useAppStore } from "../../stores/appStore";
+import { useExplorerStore } from "../../stores/explorerStore";
 import { useSftpStore } from "../../stores/sftpStore";
 import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
 import { ExplorerShell } from "./ExplorerShell";
@@ -37,13 +37,7 @@ export function ExplorerTabPane(props: ExplorerTabPaneProps) {
     if (workspaceId) {
       useWorkspacePlatformStore.getState().updateExplorerPath(workspaceId, tabId, path);
     } else {
-      useAppStore.setState((state) => {
-        const tab = state.tabs.find((item) => item.id === tabId);
-        const title = basename(path) || path;
-        if (!tab?.fileBrowser || (tab.fileBrowser.initialPath === path && tab.title === title)) return state;
-        return { tabs: state.tabs.map((item) => item.id === tabId
-          ? { ...item, title, fileBrowser: { initialPath: path, explorer: true } } : item) };
-      });
+      useExplorerStore.getState().updateExplorerPath(tabId, path, basename(path) || path);
     }
   }, [tabId, workspaceId, pane?.path, pane?.loading, pane?.error]);
   return <ExplorerShell {...shellProps} tabId={tabId} workspaceId={workspaceId} active={active} initialPath={startupPath.current} />;

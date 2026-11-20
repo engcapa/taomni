@@ -1,4 +1,5 @@
 import { useAppStore } from "../../stores/appStore";
+import { useExplorerStore } from "../../stores/explorerStore";
 import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
 import { useDocumentStore } from "../../stores/documentStore";
 import { explorerCanonicalPath } from "../explorer";
@@ -24,6 +25,7 @@ export interface OpenFileOptions {
   mode?: "taomni" | "workspace" | "system" | "source";
   line?: number;
   alternate?: boolean;
+  host?: "explorer";
 }
 const opening = new Map<string, Promise<string | void>>();
 
@@ -89,6 +91,23 @@ export function openFile(target: OpenFileTarget | string, options: OpenFileOptio
     if (mode === "system" || (!supportsFileViewer(kind) && kind !== "source")) return sftpOpenPath(path);
     const key = documentPathKey(path);
     const readOnlyReason = input.readOnlyReason ?? (input.source && input.source !== "local" ? "只读副本 / Read-only copy" : undefined);
+    const explorerHost = options.host === "explorer" || (!options.workspaceId && useAppStore.getState().activeSideTab === "explorer");
+    if (explorerHost && mode !== "workspace") {
+      const explorer = useExplorerStore.getState();
+      const existing = explorer.tabs.find((tab) => tab.type === "file-viewer" && tab.fileViewer && documentPathKey(tab.fileViewer.path) === key);
+      if (existing) {
+        if (options.mode === "source" || options.mode === "taomni") explorer.updateViewerMode(existing.id, options.mode);
+        explorer.setActiveTab(existing.id);
+        useAppStore.getState().setActiveSideTab("explorer");
+        return existing.id;
+      }
+      const id = `explorer-viewer-${crypto.randomUUID()}`;
+      const viewer: FileViewerTabInfo = { path, kind: readOnlyReason && kind === "source" ? "text" : kind,
+        mode: mode === "source" ? "source" : "taomni", readOnlyReason, source: input.source ?? "local" };
+      explorer.openTab({ id, type: "file-viewer", title: basename(path), closable: true, fileViewer: viewer }, true);
+      useAppStore.getState().setActiveSideTab("explorer");
+      return id;
+    }
     // Terminal links are repeat activations of the same viewer entry. Resolve
     // that identity before code-owner routing so a stale workspace context
     // cannot steal focus from the already-open main viewer.

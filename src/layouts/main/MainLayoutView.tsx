@@ -16,6 +16,7 @@ import { SessionEditor } from "../../components/session/SessionEditor";
 import { Sidebar } from "../../components/sidebar/Sidebar";
 import { StatusBar } from "../../components/statusbar/StatusBar";
 import { AgentsPlatformView } from "../../components/agents/AgentsPlatformView";
+import { ExplorerPlatformView } from "../../components/explorer/ExplorerPlatformView";
 import { MfaFloatingWindow } from "../../components/mfa/MfaFloatingWindow";
 import { GlobalCommandModal } from "../../components/search/GlobalCommandModal";
 import { RightContextPanel } from "../../components/workspace/RightContextPanel";
@@ -268,7 +269,8 @@ export function MainLayoutView(props: MainLayoutViewProps) {
                     <WorkspaceMainPanel onEditSession={sessionActions.handleEditSessionById} visible={activeSideTab === "workspaces"} onCommandsChange={layout.handleWorkspaceCommandsChange} />
                   </div>
                   {activeSideTab === "agents" && <AgentsPlatformView />}
-                  <div data-testid="global-session-surface" className="flex min-h-0 flex-1 flex-col" style={{ display: activeSideTab === "workspaces" || activeSideTab === "agents" ? "none" : "flex" }}>
+                  <ExplorerPlatformView visible={activeSideTab === "explorer"} onOpenTerminal={(path) => { void sessionActions.openLocalTab(undefined, undefined, undefined, undefined, path); }} />
+                  <div data-testid="global-session-surface" className="flex min-h-0 flex-1 flex-col" style={{ display: activeSideTab === "workspaces" || activeSideTab === "agents" || activeSideTab === "explorer" ? "none" : "flex" }}>
                   <TabContentRouter
                     activeTab={activeSideTab === "home" ? undefined : layout.activeTab}
                     showHome={activeSideTab === "home"}
@@ -290,7 +292,7 @@ export function MainLayoutView(props: MainLayoutViewProps) {
                     revealRecentCodeWorkspace={workspaceOpening.revealRecentCodeWorkspace}
                     openNewCodeWorkspaceFromWelcome={workspaceOpening.openNewCodeWorkspaceFromWelcome}
                     openSettingsTab={utilityTabs.openSettingsTab}
-                    terminalSplitVisible={activeSideTab !== "home" && activeSideTab !== "workspaces" && activeSideTab !== "agents" && chrome.terminalSplitVisible}
+                    terminalSplitVisible={activeSideTab !== "home" && activeSideTab !== "workspaces" && activeSideTab !== "agents" && activeSideTab !== "explorer" && chrome.terminalSplitVisible}
                     terminalSplitLayout={layout.terminalSplitLayout}
                     terminalSplitInputLockedTabIds={layout.terminalSplitInputLockedTabIds}
                     setTerminalSplitLayout={layout.setTerminalSplitLayout}
@@ -301,7 +303,7 @@ export function MainLayoutView(props: MainLayoutViewProps) {
                     splitGridColumnTemplate={chrome.splitGridColumnTemplate}
                     splitGridRowTemplate={chrome.splitGridRowTemplate}
                     terminalTabs={chrome.terminalTabs}
-                    activeTabId={activeSideTab === "home" || activeSideTab === "workspaces" || activeSideTab === "agents" ? null : layout.activeTabId}
+                    activeTabId={activeSideTab === "home" || activeSideTab === "workspaces" || activeSideTab === "agents" || activeSideTab === "explorer" ? null : layout.activeTabId}
                     attachedSidebars={layout.attachedSidebars}
                     terminalProfileOverrides={layout.terminalProfileOverrides}
                     terminalProfilesBySessionId={layout.terminalProfilesBySessionId}
@@ -362,7 +364,6 @@ export function MainLayoutView(props: MainLayoutViewProps) {
                     openDetachedVnc={windowLifecycle.openDetachedVnc}
                     rdpTabs={chrome.rdpTabs}
                     openDetachedRdp={windowLifecycle.openDetachedRdp}
-                    fileBrowserTabs={chrome.fileBrowserTabs}
                     objectStorageTabs={chrome.objectStorageTabs}
                     mailTabs={chrome.mailTabs}
                     handleEditSessionById={sessionActions.handleEditSessionById}

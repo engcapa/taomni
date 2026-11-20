@@ -8,11 +8,14 @@ import { defaultStripeSettings } from "../../editor/workspace/toolWindowLayout";
 import { useChatStore } from "../../../stores/chatStore";
 import { useAiStore } from "../../../stores/aiStore";
 import { DEFAULT_CONFIG } from "../../../stores/ai/defaults";
+import { openExplorer } from "../../../lib/explorer/openExplorer";
+vi.mock("../../../lib/explorer/openExplorer", () => ({ openExplorer: vi.fn(async () => "explorer-home") }));
 
 const MODE_ORDER = [
   "nav-mode-home",
   "nav-mode-workspaces",
   "side-tab-sessions",
+  "side-tab-explorer",
   "side-tab-tools",
 ];
 
@@ -65,13 +68,19 @@ describe("PrimaryNavigationRail (TASK-02)", () => {
     fireEvent.click(screen.getByTestId("rail-chat-button"));
     expect(toggle).toHaveBeenLastCalledWith("session-b");
   });
-  it("UT-WS-02-01 renders the four primary modes in order with Home first", () => {
+  it("UT-WS-02-01 renders the primary modes with Explorer directly below Sessions", () => {
     render(<PrimaryNavigationRail />);
     const rail = screen.getByTestId("sidebar-rail");
     const modeGroup = within(rail).getByTestId("rail-mode-group");
     const order = Array.from(modeGroup.querySelectorAll<HTMLElement>("button")).map((button) => button.dataset.testid);
     expect(order).toEqual(MODE_ORDER);
     expect(within(rail).getByTestId("nav-mode-home").getAttribute("aria-label")).toBe("Home");
+  });
+
+  it("opens the default home directory from the dedicated Explorer rail entry", () => {
+    render(<PrimaryNavigationRail />);
+    fireEvent.click(screen.getByTestId("side-tab-explorer"));
+    expect(openExplorer).toHaveBeenCalledWith();
   });
 
   it("provides one shared tool host even before an empty workspace has files", () => {

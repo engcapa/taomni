@@ -1,6 +1,7 @@
 import type { WorkspaceCommandRegistration } from "../../components/editor/workspace/workspaceCommands";
 import { useDocumentStore } from "../../stores/documentStore";
 import { useAppStore } from "../../stores/appStore";
+import { activeExplorerTab } from "../../stores/explorerStore";
 import { useWorkspacePlatformStore } from "../../stores/workspacePlatformStore";
 import { documentPathKey } from "./pathIdentity";
 import { getAppPlatform } from "../runtime";
@@ -11,6 +12,7 @@ function activeViewer() {
     const workspace = useWorkspacePlatformStore.getState().getWorkspace();
     return workspace?.openTabs.find((tab) => tab.id === workspace.activeTabId)?.fileViewer;
   }
+  if (app.activeSideTab === "explorer") return activeExplorerTab()?.fileViewer;
   if (app.activeSideTab !== "sessions" && app.activeSideTab !== "tools") return undefined;
   return app.tabs.find((tab) => tab.id === app.activeTabId)?.fileViewer;
 }

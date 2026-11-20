@@ -1,4 +1,5 @@
 import type { Tab } from "../../types";
+import { supportsFileViewer } from "../openFile/classifyFile";
 
 export const EXPLORER_TABS_KEY = "taomni.explorer.tabs.v1";
 export const EXPLORER_RESTORE_KEY = "taomni.explorer.restoreTabs.v1";
@@ -10,7 +11,6 @@ export type ExplorerRecoveryForeground = { kind: "main"; tabId: string }
 export interface ExplorerTabSnapshot {
   tabs: Tab[];
   activeTabId: string | null;
-  /** Absent only in v1 metadata; null means keep the normal Home startup. */
   foreground?: ExplorerRecoveryForeground;
 }
 
@@ -26,15 +26,23 @@ export function setExplorerRestoreEnabled(enabled: boolean): void {
   window.dispatchEvent(new Event(EXPLORER_RESTORE_EVENT));
 }
 
+function durableTab(tab: Tab): boolean {
+  if (tab.type === "file-browser") return !!tab.fileBrowser;
+  return tab.type === "file-viewer" && !!tab.fileViewer && (!tab.fileViewer.source || tab.fileViewer.source === "local");
+}
+
 /** Recovery metadata contains no credentials, copied files, selection or tasks. */
 export function explorerTabSnapshot(tabs: readonly Tab[], activeTabId: string | null, foreground?: ExplorerRecoveryForeground): ExplorerTabSnapshot {
   return {
     ...(foreground === undefined ? {} : { foreground }),
-    tabs: tabs.filter((tab) => tab.type === "file-browser" && !!tab.fileBrowser).map((tab) => ({
+    tabs: tabs.filter(durableTab).map((tab) => tab.type === "file-browser" ? {
       id: tab.id, type: "file-browser", title: tab.title, closable: true,
       ...(tab.sessionId ? { sessionId: tab.sessionId } : {}),
       fileBrowser: { initialPath: tab.fileBrowser!.initialPath, explorer: true },
-    })),
+    } : {
+      id: tab.id, type: "file-viewer", title: tab.title, closable: true,
+      fileViewer: { ...tab.fileViewer! },
+    }),
     activeTabId,
   };
 }
@@ -44,8 +52,11 @@ export function readExplorerTabSnapshot(): ExplorerTabSnapshot {
     const value = JSON.parse(localStorage.getItem(EXPLORER_TABS_KEY) ?? "null") as ExplorerTabSnapshot | null;
     const ids = new Set<string>();
     const tabs = (Array.isArray(value?.tabs) ? value.tabs : []).filter((tab) => {
-      if (!tab || tab.type !== "file-browser" || typeof tab.id !== "string" || !tab.id || ids.has(tab.id)
-        || typeof tab.title !== "string" || typeof tab.fileBrowser?.initialPath !== "string" || !tab.fileBrowser.initialPath) return false;
+      if (!tab || typeof tab.id !== "string" || !tab.id || ids.has(tab.id) || typeof tab.title !== "string") return false;
+      const validBrowser = tab.type === "file-browser" && typeof tab.fileBrowser?.initialPath === "string" && !!tab.fileBrowser.initialPath;
+      const validViewer = tab.type === "file-viewer" && !!tab.fileViewer && typeof tab.fileViewer.path === "string"
+        && supportsFileViewer(tab.fileViewer.kind) && (!tab.fileViewer.source || tab.fileViewer.source === "local");
+      if (!validBrowser && !validViewer) return false;
       ids.add(tab.id);
       return true;
     });
