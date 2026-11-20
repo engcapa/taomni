@@ -14,12 +14,16 @@ const PLUGIN_ID: &str = "taomni-plugin-vnc-client";
 const PLUGIN_VERSION: &str = env!("CARGO_PKG_VERSION");
 const START: &str = "vnc/start";
 const CLOSE: &str = "vnc/close";
+const PROBE: &str = "vnc/test";
 
 fn host_config() -> HostConfig {
     HostConfig {
         plugin_id: PLUGIN_ID.into(),
         plugin_version: PLUGIN_VERSION.into(),
-        commands: [START, CLOSE].into_iter().map(String::from).collect(),
+        commands: [START, CLOSE, PROBE]
+            .into_iter()
+            .map(String::from)
+            .collect(),
         permissions: Default::default(),
         required_services: Default::default(),
         optional_services: Default::default(),
@@ -53,6 +57,12 @@ impl PluginHandler for sessions::Sessions {
             CLOSE => {
                 let input: request::Close = request::decode(params)?;
                 Ok(Value::Bool(self.close(&input.session_id)?))
+            }
+            PROBE => {
+                let input: request::Start = request::decode(params)?;
+                let result = self.probe(input, &|| operation.check_current())?;
+                serde_json::to_value(result)
+                    .map_err(|_| RpcError::from_code(ErrorCode::InternalError))
             }
             _ => Err(RpcError::from_code(ErrorCode::MethodNotFound)),
         }

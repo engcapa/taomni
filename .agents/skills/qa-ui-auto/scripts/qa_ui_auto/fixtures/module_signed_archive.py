@@ -107,3 +107,19 @@ def setup_mfa(ctx):
     (owned / "provenance.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
     ctx.values.update(mfa_signed_archive=destination.as_posix(), mfa_signed_signature=detached.as_posix(), mfa_signed_signature_text=signature)
 
+
+def setup_vnc(ctx):
+    if (ctx.cfg.get("app") or {}).get("mode") != "native":
+        raise RuntimeError("Signed VNC input requires the native package verifier")
+    raw = os.environ.get("QA_SIGNED_VNC_ROOT")
+    if not raw:
+        raise RuntimeError("QA_SIGNED_VNC_ROOT is required; build the signed VNC artifact first")
+    source = subprocess.check_output(["git", "rev-parse", "HEAD"], text=True).strip()
+    receipt, archive, signature, _ = load_artifact(Path(raw), source, platform_key(), "vnc-client")
+    owned = Path(ctx.case_dir).resolve() / "signed-vnc"
+    owned.mkdir()
+    destination = owned / archive.name
+    shutil.copyfile(archive, destination)
+    (owned / "provenance.json").write_text(json.dumps(receipt, indent=2) + "\n", encoding="utf-8")
+    ctx.values.update(vnc_signed_archive=destination.as_posix(), vnc_signed_signature=signature)
+

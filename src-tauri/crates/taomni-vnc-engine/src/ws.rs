@@ -9,10 +9,14 @@ use clipboard::*;
 mod input;
 use input::*;
 mod native_pointer;
+mod platform_pointer;
+mod probe;
 #[cfg(test)]
 mod tests;
 
 pub use native_pointer::{NativePointer, NativePointerTarget};
+pub use platform_pointer::native_pointer_sampler;
+pub use probe::{ProbeRequest, probe_connection};
 
 use std::sync::Arc;
 use std::time::{Duration, Instant};

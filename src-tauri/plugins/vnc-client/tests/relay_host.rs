@@ -66,7 +66,7 @@ impl Host {
             "taomni-plugin-vnc-client",
             env!("CARGO_PKG_VERSION"),
             TOKEN,
-            vec!["vnc/start".into(), "vnc/close".into()],
+            vec!["vnc/start".into(), "vnc/close".into(), "vnc/test".into()],
             vec![],
         );
         hello.profile = Some(context.clone());
@@ -129,7 +129,7 @@ impl Drop for Host {
     }
 }
 
-fn desktop_fixture() -> (u16, thread::JoinHandle<()>) {
+fn desktop_fixture(relay: bool) -> (u16, thread::JoinHandle<()>) {
     let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
     let port = listener.local_addr().unwrap().port();
     let server = thread::spawn(move || {
@@ -152,6 +152,13 @@ fn desktop_fixture() -> (u16, thread::JoinHandle<()>) {
         ])
         .unwrap();
         peer.write_all(b"\x00\x00\x00\x07fixture").unwrap();
+        if !relay {
+            match peer.read(&mut [0]) {
+                Ok(size) => assert_eq!(size, 0, "a probe must not request framebuffer updates"),
+                Err(error) => assert_eq!(error.kind(), std::io::ErrorKind::ConnectionReset),
+            }
+            return;
+        }
         let mut format = [0; 20];
         peer.read_exact(&mut format).unwrap();
         assert_eq!(format[0], 0);
@@ -182,7 +189,7 @@ async fn relay_host_paints_and_closes_sessions_and_exits_with_live_streams() {
     let temporary = tempfile::tempdir().unwrap();
     let mut host = Host::start(&temporary.path().canonicalize().unwrap());
     for command in ["close", "exit"] {
-        let (port, server) = desktop_fixture();
+        let (port, server) = desktop_fixture(true);
         let upstream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
         let (route, forward) = ForwardRoute::bind(upstream).await.unwrap();
         let params = serde_json::to_value(&route).unwrap();
@@ -204,6 +211,7 @@ async fn relay_host_paints_and_closes_sessions_and_exits_with_live_streams() {
                 "securityPolicy":"allow-none","allowUnencrypted":true
             }),
         );
+        let session = &session["Ok"];
         assert!(
             tokio::time::timeout(WAIT, route.connect())
                 .await
@@ -269,6 +277,28 @@ async fn relay_host_paints_and_closes_sessions_and_exits_with_live_streams() {
         .await
         .unwrap();
     }
+}
+
+#[tokio::test(flavor = "multi_thread", worker_threads = 2)]
+#[ignore = "real sockets and a standalone VNC module process on GitHub"]
+async fn forwarded_probe_authenticates_without_opening_a_frame_relay() {
+    let temporary = tempfile::tempdir().unwrap();
+    let mut host = Host::start(&temporary.path().canonicalize().unwrap());
+    let (port, server) = desktop_fixture(false);
+    let upstream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+    let (route, forward) = ForwardRoute::bind(upstream).await.unwrap();
+    assert_eq!(
+        host.call(
+            "probe",
+            "vnc/test",
+            json!({"host":"vnc-fixture.example","port":5900,"forward":route,
+                   "securityPolicy":"allow-none","allowUnencrypted":true}),
+        ),
+        json!({"Ok":"Connection successful: 1x1 - fixture"})
+    );
+    tokio::time::timeout(WAIT, forward).await.unwrap().unwrap();
+    server.join().unwrap();
+    host.exit();
 }
 
 #[tokio::test(flavor = "multi_thread", worker_threads = 2)]

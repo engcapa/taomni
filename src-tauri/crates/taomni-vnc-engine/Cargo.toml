@@ -35,5 +35,8 @@ zlib-rs = { version = "0.6", default-features = false, features = ["std"] }
 zune-core = "0.5"
 zune-jpeg = "0.5"
 
+[target.'cfg(windows)'.dependencies]
+winapi = { version = "0.3", features = ["windef", "winuser"] }
+
 [dev-dependencies]
 image = { version = "0.25", default-features = false, features = ["jpeg"] }

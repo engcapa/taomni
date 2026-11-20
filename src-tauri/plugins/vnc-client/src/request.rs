@@ -4,7 +4,6 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::Value;
 use taomni_plugin_api::{ErrorCode, RpcError};
 use taomni_vnc_engine::{
-    error::VncError,
     policy::{VncClipboardPolicy, VncSecurityPolicy},
     quality::VncPictureQuality,
     ws::{RelayRequest, VncDialedTransport, VncRelayOptions, forward::ForwardRoute},
@@ -121,10 +120,4 @@ impl Dial {
 pub(crate) fn decode<T: DeserializeOwned>(params: Option<Value>) -> Result<T, RpcError> {
     serde_json::from_value(params.unwrap_or_default())
         .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))
-}
-
-pub(crate) fn connection_error(error: String) -> RpcError {
-    let failure = VncError::classify(error);
-    RpcError::new(ErrorCode::InvalidState, failure.code)
-        .with_data(serde_json::to_value(&failure).expect("VNC failure is serializable"))
 }

@@ -38,6 +38,9 @@ impl HostProcess {
             .current_dir(&self.launch.working_dir)
             .env("TAOMNI_PLUGIN_TOKEN", &self.token)
             .env_remove(taomni_plugin_api::services::HOST_PROFILE_ENV);
+        if self.launch.plugin_id == "taomni-plugin-vnc-client" {
+            command.env("TAOMNI_VNC_DESKTOP_PID", std::process::id().to_string());
+        }
         if let Some(profile) = &self.launch.profile {
             profile.configure(&mut command, &self.launch.plugin_id)?;
         }

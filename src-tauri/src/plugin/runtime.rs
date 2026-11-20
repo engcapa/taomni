@@ -159,6 +159,11 @@ impl PluginRegistry {
             .map_err(PluginError::HostRequest)?;
         let owner = taomni_profile_locks::PluginSlug::parse(verified.slug.clone())
             .map_err(|error| PluginError::HostRequest(error.to_string()))?;
+        let mut supervisor = host::HostSupervisorConfig::default();
+        if verified.slug == crate::vnc::MODULE_SLUG {
+            // Allow for the RFB security and authentication waits in the host.
+            supervisor.request_timeout = Duration::from_secs(65);
+        }
         let process = host::HostProcess::start_profiled(
             host::HostProfileConfig::new(profile, owner, generation),
             &record.manifest.id,
@@ -172,7 +177,7 @@ impl PluginRegistry {
                 .iter()
                 .cloned()
                 .collect::<Vec<_>>(),
-            host::HostSupervisorConfig::default(),
+            supervisor,
             services,
         )
         .map_err(|error| match error {

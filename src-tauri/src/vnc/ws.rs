@@ -3,12 +3,11 @@
 use tokio_util::sync::CancellationToken;
 
 use taomni_vnc_engine::ws::{
-    ForwardTaskGuard, RelayRequest, VncDialedTransport, forward::ForwardRoute, spawn_relay,
+    ForwardTaskGuard, RelayRequest, VncDialedTransport, forward::ForwardRoute,
+    native_pointer_sampler, spawn_relay,
 };
 pub use taomni_vnc_engine::ws::{VNC_AUTH_TIMEOUT, VncControl, VncRelayOptions, VncSession};
 
-use super::native_pointer::native_pointer_sampler;
-use super::policy::{VncClipboardPolicy, VncSecurityPolicy};
 use crate::terminal::network::NetworkSettings;
 use crate::terminal::ssh::{SshTransport, build_ssh_transport};
 
@@ -51,30 +50,16 @@ pub(crate) async fn dial_vnc_transport(
 }
 
 pub async fn spawn_vnc_relay(
-    host: String,
+    request: RelayRequest,
     port: u16,
-    username: Option<String>,
-    password: Option<String>,
     network: Option<NetworkSettings>,
-    security_policy: VncSecurityPolicy,
-    view_only: bool,
-    clipboard_policy: VncClipboardPolicy,
-    options: VncRelayOptions,
     attempt: CancellationToken,
 ) -> Result<VncSession, String> {
-    let transport = dial_vnc_transport(host.clone(), port, network);
+    let transport = dial_vnc_transport(request.host.clone(), port, network);
     spawn_relay(
-        RelayRequest {
-            host,
-            username,
-            password: password.map(zeroize::Zeroizing::new),
-            security_policy,
-            view_only,
-            clipboard_policy,
-            options,
-        },
+        request,
         transport,
-        native_pointer_sampler(),
+        native_pointer_sampler(std::process::id()),
         attempt,
     )
     .await

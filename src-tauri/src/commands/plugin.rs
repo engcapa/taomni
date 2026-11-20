@@ -184,6 +184,12 @@ pub async fn plugin_invoke(
     request_id: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<Value, taomni_plugin_api::RpcError> {
+    if slug == crate::vnc::MODULE_SLUG && command.starts_with("vnc/") {
+        // VNC network routes and credentials are resolved by the desktop commands.
+        return Err(taomni_plugin_api::RpcError::from_code(
+            taomni_plugin_api::ErrorCode::MethodNotFound,
+        ));
+    }
     let registry = state.plugins.clone();
     let request_id = request_id.unwrap_or_else(|| uuid::Uuid::new_v4().to_string());
     tauri::async_runtime::spawn_blocking(move || {

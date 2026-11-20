@@ -489,7 +489,7 @@ jobs:
             qa-ui-auto-report/${{ matrix.id }}/
           retention-days: 14
       - name: Identify the native platform for the official module input
-        if: inputs.operation == 'run' && matrix.mode == 'native' && (contains(matrix.capabilities, 'signed-module') || contains(matrix.capabilities, 'signed-mfa'))
+        if: inputs.operation == 'run' && matrix.mode == 'native' && (contains(matrix.capabilities, 'signed-module') || contains(matrix.capabilities, 'signed-mfa') || contains(matrix.capabilities, 'signed-vnc'))
         id: module_platform
         run: |
           python - <<'PY'
@@ -500,6 +500,7 @@ jobs:
           with open(os.environ['GITHUB_ENV'], 'a', encoding='utf-8') as stream:
               stream.write('QA_SIGNED_MODULE_ROOT=' + os.path.abspath('qa-ui-auto-report/official-module-input') + '\n')
               stream.write('QA_SIGNED_MFA_ROOT=' + os.path.abspath('qa-ui-auto-report/official-mfa-input') + '\n')
+              stream.write('QA_SIGNED_VNC_ROOT=' + os.path.abspath('qa-ui-auto-report/official-vnc-input') + '\n')
           PY
       - name: Download this invocation's production-signed module
         if: inputs.operation == 'run' && matrix.mode == 'native' && contains(matrix.capabilities, 'signed-module')
@@ -513,6 +514,12 @@ jobs:
         with:
           name: qa-modular-package-${{ steps.module_platform.outputs.platform }}-${{ inputs.artifact_key }}-mfa
           path: qa-ui-auto-report/official-mfa-input
+      - name: Download this invocation's production-signed VNC module
+        if: inputs.operation == 'run' && matrix.mode == 'native' && contains(matrix.capabilities, 'signed-vnc')
+        uses: ./.github/actions/qa-download-artifact
+        with:
+          name: qa-modular-package-${{ steps.module_platform.outputs.platform }}-${{ inputs.artifact_key }}-vnc
+          path: qa-ui-auto-report/official-vnc-input
       - name: Stage the pinned public legacy installer
         if: inputs.operation == 'run' && matrix.mode == 'native' && contains(matrix.capabilities, 'legacy-installer')
         env:

@@ -2715,6 +2715,7 @@
 - `[data-testid="module-action-rollback-hello-plugin"]` — interactive — F-Modules-1.module-action-rollback-hello-plugin
 - `[data-testid="module-action-enable-hello-plugin"]` — interactive — F-Modules-1.module-action-enable-hello-plugin
   ↳ `[data-testid="module-action-enable-mfa"]` — alias
+  ↳ `[data-testid="module-action-enable-vnc-client"]` — alias
 - `[data-testid="module-status-mfa"]` — display — F-Modules-1.module-status-mfa
 - `[data-testid="module-action-disable-hello-plugin"]` — interactive — F-Modules-1.module-action-disable-hello-plugin
   ↳ `[data-testid="module-action-disable-mfa"]` — alias

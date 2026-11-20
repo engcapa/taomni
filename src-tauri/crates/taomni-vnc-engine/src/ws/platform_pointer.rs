@@ -15,20 +15,20 @@
 //! path is unchanged. `TAOMNI_VNC_NATIVE_POINTER=0` turns it off.
 
 #[cfg(windows)]
-use crate::vnc::ws::VncControl;
-#[cfg(windows)]
 use tokio::sync::mpsc::Sender;
 
-use taomni_vnc_engine::ws::NativePointer;
+use super::NativePointer;
 #[cfg(windows)]
-use taomni_vnc_engine::ws::NativePointerTarget;
+use super::{NativePointerTarget, VncControl};
 
-/// Sampling runs in the process that owns the desktop window.
-pub(super) fn native_pointer_sampler() -> Option<Box<dyn NativePointer>> {
+/// Limit sampling to windows owned by the desktop process.
+pub fn native_pointer_sampler(owner: u32) -> Option<Box<dyn NativePointer>> {
     #[cfg(windows)]
-    if std::env::var_os("TAOMNI_VNC_NATIVE_POINTER").is_none_or(|value| value != "0") {
-        return Some(Box::new(windows_impl::NativePointerSampler::new()));
+    if owner != 0 && std::env::var_os("TAOMNI_VNC_NATIVE_POINTER").is_none_or(|value| value != "0")
+    {
+        return Some(Box::new(windows_impl::NativePointerSampler::new(owner)));
     }
+    let _ = owner;
     None
 }
 
@@ -37,11 +37,11 @@ mod windows_impl {
     use std::sync::{Arc, Mutex};
     use std::time::{Duration, Instant};
 
+    use winapi::shared::windef::DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2;
     use winapi::shared::windef::{HWND, POINT};
-    use winapi::um::processthreadsapi::GetCurrentProcessId;
     use winapi::um::winuser::{
         GA_ROOT, GetAncestor, GetCursorPos, GetWindowThreadProcessId, ScreenToClient,
-        WindowFromPoint,
+        SetThreadDpiAwarenessContext, WindowFromPoint,
     };
 
     use super::{NativePointer, NativePointerTarget, Sender, VncControl};
@@ -67,13 +67,15 @@ mod windows_impl {
     pub struct NativePointerSampler {
         shared: Arc<Mutex<Shared>>,
         started: bool,
+        owner: u32,
     }
 
     impl NativePointerSampler {
-        pub fn new() -> Self {
+        pub fn new(owner: u32) -> Self {
             Self {
                 shared: Arc::new(Mutex::new(Shared::default())),
                 started: false,
+                owner,
             }
         }
     }
@@ -97,7 +99,7 @@ mod windows_impl {
                 if target.is_some() {
                     // The canvas reports itself while the cursor is over it,
                     // so the window under the cursor is the one hosting it.
-                    if let Some(root) = root_under_cursor() {
+                    if let Some(root) = root_under_cursor(self.owner) {
                         shared.root = root;
                     }
                 }
@@ -106,9 +108,10 @@ mod windows_impl {
             if target.is_some() && !self.started {
                 let shared = self.shared.clone();
                 let control = control.clone();
+                let owner = self.owner;
                 self.started = std::thread::Builder::new()
                     .name("vnc-native-pointer".into())
-                    .spawn(move || run(shared, control))
+                    .spawn(move || run(shared, control, owner))
                     .is_ok();
             }
         }
@@ -128,8 +131,8 @@ mod windows_impl {
         (unsafe { GetCursorPos(&mut point) } != 0).then_some(point)
     }
 
-    /// Top-level window under `point` when this process owns it.
-    fn root_at(point: POINT) -> Option<HWND> {
+    /// Top-level window under `point` when the desktop owns it.
+    fn root_at(point: POINT, owner: u32) -> Option<HWND> {
         // SAFETY: plain window queries; null handles are checked.
         unsafe {
             let hit = WindowFromPoint(point);
@@ -142,15 +145,20 @@ mod windows_impl {
             }
             let mut pid = 0u32;
             GetWindowThreadProcessId(root, &mut pid);
-            (pid == GetCurrentProcessId()).then_some(root)
+            (pid == owner).then_some(root)
         }
     }
 
-    fn root_under_cursor() -> Option<usize> {
-        cursor().and_then(root_at).map(|root| root as usize)
+    fn root_under_cursor(owner: u32) -> Option<usize> {
+        cursor()
+            .and_then(|point| root_at(point, owner))
+            .map(|root| root as usize)
     }
 
-    fn run(shared: Arc<Mutex<Shared>>, control: Sender<VncControl>) {
+    fn run(shared: Arc<Mutex<Shared>>, control: Sender<VncControl>, owner: u32) {
+        // The module has no window manifest. Sample physical coordinates on
+        // this dedicated thread to match the WebView's device pixel ratio.
+        unsafe { SetThreadDpiAwarenessContext(DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2) };
         let mut last_point: Option<(i32, i32)> = None;
         let mut last_sent: Option<(u16, u16)> = None;
         let mut moved_at = Instant::now()
@@ -177,7 +185,7 @@ mod windows_impl {
             {
                 last_point = Some((point.x, point.y));
                 moved_at = Instant::now();
-                if let Some(position) = framebuffer_position(point, root, &target)
+                if let Some(position) = framebuffer_position(point, root, &target, owner)
                     && last_sent != Some(position)
                 {
                     let (x, y) = position;
@@ -201,13 +209,14 @@ mod windows_impl {
     /// The framebuffer pixel for a screen point over our canvas window; `None`
     /// when another window is in front of it or the point is off the canvas.
     /// An unknown `root` (0: the cursor had left when sampling started)
-    /// accepts any window of this process.
+    /// accepts any window owned by the desktop process.
     fn framebuffer_position(
         point: POINT,
         root: usize,
         target: &NativePointerTarget,
+        owner: u32,
     ) -> Option<(u16, u16)> {
-        let window = root_at(point)?;
+        let window = root_at(point, owner)?;
         if root != 0 && window as usize != root {
             return None;
         }

@@ -331,12 +331,15 @@ controls:
     kind: interactive
     aliases:
     - '[data-testid="module-action-enable-mfa"]'
+    - '[data-testid="module-action-enable-vnc-client"]'
   - id: module-status-mfa
     selector: '[data-testid="module-status-mfa"]'
     kind: display
   - id: module-action-disable-hello-plugin
     selector: '[data-testid="module-action-disable-hello-plugin"]'
     kind: interactive
+    aliases:
+    - '[data-testid="module-action-disable-vnc-client"]'
     aliases:
     - '[data-testid="module-action-disable-mfa"]'
   - id: module-action-uninstall-hello-plugin
@@ -4015,11 +4018,12 @@ area: vnc
 files:
   - src-tauri/src/vnc/
   - src-tauri/crates/taomni-vnc-engine/
+  - src-tauri/plugins/vnc-client/
 controls: []   # backend-only — RFB protocol + WebSocket bridge; the canvas surface is owned by F9.6
 -->
 
-- `taomni-vnc-engine` 提供 RFB 握手、协议编解码、画质策略、帧队列和 WebSocket relay。桌面适配层 `src-tauri/src/vnc/` 提供 IPC、会话记录、代理连接和 Windows 系统光标采样。
-- `src-tauri/plugins/vnc-client/` 的宿主专项经真实子进程检查转发凭据、帧像素、直连与转发取消、主动断开与退出后的 TCP/WS 释放。TC-156 通过桌面和 Browser 入口检查关闭标签后可以重新认证、绘制和发送输入。TC-151 和原有剪贴板用例保留认证与会话回归。
+- `taomni-vnc-engine` 提供 RFB 握手、协议编解码、画质策略、帧队列、WebSocket relay 和 Windows 系统光标采样。桌面适配层 `src-tauri/src/vnc/` 提供 IPC、会话记录和代理连接。启用已安装的 VNC Client 模块后，宿主负责认证和帧转发。
+- 宿主专项检查转发凭据、连接探测、帧像素、取消和 TCP/WS 释放。TC-MODULES-053 验证签名安装、启禁和保存会话重开。TC-156 验证关闭标签时释放原连接，重开后重新认证、绘制和发送输入。TC-151 和原有剪贴板用例继续覆盖认证与会话。
 - Tauri 命令：`vnc_connect / vnc_cancel_connect / vnc_disconnect / vnc_test_connection / vnc_create_detach_claim / vnc_consume_detach_claim / vnc_set_special_key_capture / vnc_special_key_capture_status`
 - 本地动态端口 WebSocket relay：VNC server ↔ 前端 Canvas（前端不再直接持有 TCP 套接字）
 

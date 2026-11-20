@@ -167,7 +167,7 @@ jobs:
 
           evidence = Path('modular-protocol-evidence')
           log = evidence / 'vnc-host-process.log'
-          assert '2 passed; 0 failed; 0 ignored' in log.read_text(encoding='utf-8')
+          assert '3 passed; 0 failed; 0 ignored' in log.read_text(encoding='utf-8')
           binary = Path('src-tauri/target/debug') / ('taomni-plugin-vnc-client.exe' if os.name == 'nt' else 'taomni-plugin-vnc-client')
           with binary.open('rb') as stream:
               digest = hashlib.file_digest(stream, 'sha256').hexdigest()

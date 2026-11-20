@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex};
 use tokio::sync::RwLock;
 
 pub struct RemoteDesktopRuntime {
-    pub vnc_sessions: Arc<RwLock<HashMap<String, crate::vnc::ws::VncSession>>>,
+    pub vnc_sessions: Arc<RwLock<HashMap<String, crate::vnc::DesktopVncSession>>>,
     pub vnc_detach_claims: Arc<RwLock<HashMap<String, crate::vnc::VncDetachClaim>>>,
     pub rdp_sessions: Arc<RwLock<HashMap<String, crate::rdp::ws::RdpSession>>>,
 }

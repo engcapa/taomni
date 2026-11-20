@@ -98,6 +98,7 @@
           "module_marketplace_preview",
           "module_signed_archive",
           "module_signed_mfa_archive",
+          "module_signed_vnc_archive",
           "module_execution",
           "module_backup_data",
           "vnc_required",
