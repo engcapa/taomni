@@ -33,6 +33,7 @@ class RenderedBlock extends WidgetType {
     // Start image resolution while detached; it strips network/path src values
     // synchronously before the node is inserted by CodeMirror.
     void enhanceMarkdown(root, { docPath: this.context.docPath, theme: this.context.theme, readImage: this.context.readImage, cancelled: () => owner.cancelled,
+      onWarning: this.context.onWarning, label: this.context.label,
       onResize: () => { if (!owner.cancelled) view.requestMeasure(); } }).catch((error: unknown) => {
       if (!owner.cancelled) this.context.onError(String(error));
     });

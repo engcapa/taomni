@@ -3,6 +3,7 @@ import { readMarkdownImage, resolveMarkdownAsset } from "../../../lib/markdownAs
 import { writeText } from "../../../lib/clipboard";
 import { type StandaloneImage } from "./markdownModel";
 import { revealSource, widgetButton, type MarkdownWidgetContext } from "./markdownWidgetContext";
+import { createMarkdownRenderPlaceholder, createMarkdownRenderWarning } from "./markdownRenderFallback";
 
 const owners = new WeakMap<HTMLElement, { cancelled: boolean }>();
 
@@ -62,7 +63,10 @@ export class ImageWidget extends WidgetType {
       image.src = url;
     }).catch((error: unknown) => {
       if (owner.cancelled) return;
-      caption.textContent = `${this.image.href} — ${error instanceof Error ? error.message : String(error)}`;
+      const warning = createMarkdownRenderWarning("image", this.image.href, this.image.alt || this.image.href, error);
+      this.context.onWarning?.(warning);
+      frame.replaceChildren(createMarkdownRenderPlaceholder(warning, this.context.label));
+      caption.textContent = this.image.href;
       root.classList.add("is-error");
       view.requestMeasure();
     });

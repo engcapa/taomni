@@ -105,6 +105,7 @@
           "markdown_drawio",
         "markdown_drawio_roundtrip",
         "markdown_remote_images",
+        "markdown_missing_assets",
           "markdown_testing",
           "file_open_mail",
           "html_network_test",
