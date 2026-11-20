@@ -20,6 +20,31 @@ class GitHubArtifacts:
     def __init__(self, repository: str, run_id: str):
         self.repository = repository
         self.run_id = run_id
+        self._cached: dict[str, tuple[str, dict]] = {}
+
+    def _read(self, resource: str = "") -> dict:
+        endpoint = f"repos/{self.repository}/actions/runs/{self.run_id}{resource}"
+        command = ["gh", "api", "--include", endpoint]
+        cached = self._cached.get(resource)
+        if cached:
+            command.extend(["--header", f"If-None-Match: {cached[0]}"])
+        response = subprocess.run(command, capture_output=True, timeout=120)
+        header, separator, body = response.stdout.partition(b"\r\n\r\n")
+        if not separator:
+            header, _, body = response.stdout.partition(b"\n\n")
+        status, *headers = header.splitlines() or [b""]
+        if cached and status.split()[1:2] == [b"304"]:
+            return cached[1]
+        response.check_returncode()
+        value = json.loads(body)
+        for line in headers:
+            name, _, etag = line.partition(b":")
+            if name.lower() == b"etag":
+                self._cached[resource] = (etag.strip().decode("ascii"), value)
+                break
+        else:
+            self._cached.pop(resource, None)
+        return value
 
     def listing(self, resource: str) -> list[dict]:
         # Explicit pages also work with older authenticated gh installations
@@ -28,23 +53,14 @@ class GitHubArtifacts:
         items = []
         page = 1
         while True:
-            result = subprocess.run(
-                ["gh", "api", f"repos/{self.repository}/actions/runs/{self.run_id}/"
-                 f"{resource}?per_page=100&page={page}"],
-                check=True, capture_output=True, timeout=120,
-            )
-            current = json.loads(result.stdout)[resource]
+            current = self._read(f"/{resource}?per_page=100&page={page}")[resource]
             items.extend(current)
             if len(current) < 100:
                 return items
             page += 1
 
     def run_status(self) -> str:
-        result = subprocess.run(
-            ["gh", "api", f"repos/{self.repository}/actions/runs/{self.run_id}"],
-            check=True, capture_output=True, timeout=120,
-        )
-        return json.loads(result.stdout)["status"]
+        return self._read()["status"]
 
     def download(self, artifact: dict, target: Path) -> None:
         # gh handles the REST archive endpoint's signed storage redirect. Do not

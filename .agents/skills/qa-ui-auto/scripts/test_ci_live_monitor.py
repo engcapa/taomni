@@ -24,17 +24,40 @@ class Clock:
 
 
 class GitHubListingTests(unittest.TestCase):
+    @staticmethod
+    def reply(value, etag=None):
+        header = b"HTTP/2.0 200 OK\n"
+        if etag:
+            header += f"ETag: {etag}\r\n".encode("ascii")
+        header += b"Content-Type: application/json\r\n\r\n"
+        return subprocess.CompletedProcess([], 0, header + json.dumps(value).encode("utf-8"))
+
     def test_paginated_listing_does_not_require_a_newer_gh_slurp_option(self):
         pages = [{"artifacts": [{"id": n} for n in range(100)]},
                  {"artifacts": [{"id": 100}]}]
-        replies = [subprocess.CompletedProcess([], 0, json.dumps(page)) for page in pages]
+        replies = [self.reply(page) for page in pages]
         with patch("ci_live_shards.subprocess.run", side_effect=replies) as run:
             observed = GitHubArtifacts("engcapa/taomni", "42").listing("artifacts")
         self.assertEqual([item["id"] for item in observed], list(range(101)))
         self.assertEqual(run.call_count, 2)
         for page, call in enumerate(run.call_args_list, start=1):
-            self.assertEqual(call.args[0], ["gh", "api",
+            self.assertEqual(call.args[0], ["gh", "api", "--include",
                 f"repos/engcapa/taomni/actions/runs/42/artifacts?per_page=100&page={page}"])
+
+    def test_unchanged_artifacts_reuse_the_page_until_a_new_shard_arrives(self):
+        first = {"artifacts": [{"id": 1}]}
+        second = {"artifacts": [{"id": 1}, {"id": 2}]}
+        unchanged = subprocess.CompletedProcess([], 1, b"HTTP/2.0 304 Not Modified\n\n")
+        client = GitHubArtifacts("engcapa/taomni", "42")
+        with patch("ci_live_shards.subprocess.run", side_effect=[
+            self.reply(first, '"revision-1"'), unchanged, self.reply(second, '"revision-2"'), unchanged,
+        ]) as run:
+            self.assertEqual(client.listing("artifacts"), first["artifacts"])
+            self.assertEqual(client.listing("artifacts"), first["artifacts"])
+            self.assertEqual(client.listing("artifacts"), second["artifacts"])
+            self.assertEqual(client.listing("artifacts"), second["artifacts"])
+        self.assertEqual(run.call_args_list[1].args[0][-2:], ["--header", 'If-None-Match: "revision-1"'])
+        self.assertEqual(run.call_args_list[3].args[0][-2:], ["--header", 'If-None-Match: "revision-2"'])
 
     def test_listing_failure_is_reported_instead_of_an_empty_success(self):
         with patch("ci_live_shards.subprocess.run", side_effect=subprocess.CalledProcessError(1, "gh")):
