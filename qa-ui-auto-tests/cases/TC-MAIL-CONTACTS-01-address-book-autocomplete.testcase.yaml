@@ -10,7 +10,7 @@ description: 'TASK-19 (docs-feature/mail-thunderbird-parity-design.md AC-61, DEC
 
   discovery, two-way sync and conflict handling (AC-60) are covered by the
 
-  Rust tests against an in-process CardDAV server (mail::contacts, mail::vcard).
+  Mail engine unit tests and the hosted CardDAV contract tests.
 
   Browser mode drives the stub address book (renderer orchestration only);
 
@@ -101,6 +101,12 @@ steps:
       || document.querySelector('.taomni-mail-reader-text')?.textContent?.trim())
       && document.querySelector('.taomni-mail-reader-paper').getBoundingClientRect().height >= 120
     expect_truthy: true
+- assert_no_runtime_errors: null
+- click: '[data-testid="mail-address-book-open"]'
+- wait_for: '[data-testid="mail-contact-row"][data-contact-name="Zed Contact"]'
+- assert_text:
+    selector: '[data-testid="mail-contact-row"][data-contact-name="Zed Contact"]'
+    contains: zed.contact@example.org
 - assert_no_runtime_errors: null
 verification:
   review: reviewed
@@ -194,6 +200,21 @@ verification:
       expectation: The selected message has nonempty body content (iframe for native HTML or text for browser stub) and a visible reader at least 120 pixels high.
     - step: 34
       expectation: No uncaught runtime error, including ResizeObserver delivery errors.
+  - id: R6
+    requirement: The saved contact retains its email address when the address book is reopened.
+    actions:
+    - 35
+    checkpoints:
+    - step: 36
+      expectation: The saved contact is visible in the reopened address book.
+    - step: 37
+      expectation: The contact row contains the saved email address.
+    - step: 38
+      expectation: Reopening the address book produces no uncaught runtime error.
+    results:
+    - 36
+    - 37
+    - 38
   visual:
   - check: 截图中收件人下拉列出 “Zed Contact <zed.contact@example.org>”。
     method: manual

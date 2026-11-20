@@ -1,11 +1,11 @@
 use super::storage::load_cards;
-use crate::mail::MailContactSuggestion;
+use crate::cache::{MailContactSuggestion, search_contacts};
 use rusqlite::Connection;
 use rusqlite::Result as SqlResult;
 use std::collections::HashSet;
 
 /// Address book matches for the composer's autocomplete, best first.
-pub(in crate::mail) fn address_book_suggestions(
+pub(super) fn address_book_suggestions(
     conn: &Connection,
     account_id: &str,
     query: &str,
@@ -52,7 +52,7 @@ pub(in crate::mail) fn address_book_suggestions(
 }
 
 /// Address book entries first (with their names), then collected contacts.
-pub(in crate::mail) fn merge_suggestions(
+pub(super) fn merge_suggestions(
     book: Vec<MailContactSuggestion>,
     collected: Vec<MailContactSuggestion>,
     limit: u32,
@@ -63,4 +63,15 @@ pub(in crate::mail) fn merge_suggestions(
         .filter(|s| seen.insert(s.email.to_lowercase()))
         .take(limit as usize)
         .collect()
+}
+
+pub fn search_recipient_suggestions(
+    conn: &Connection,
+    account_id: &str,
+    query: &str,
+    limit: u32,
+) -> SqlResult<Vec<MailContactSuggestion>> {
+    let book = address_book_suggestions(conn, account_id, query, limit)?;
+    let collected = search_contacts(conn, account_id, query, limit)?;
+    Ok(merge_suggestions(book, collected, limit))
 }

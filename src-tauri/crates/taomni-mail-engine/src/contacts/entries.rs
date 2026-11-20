@@ -1,24 +1,23 @@
+use super::model::ContactWriteError;
 use super::model::MailAddressBookEntry;
 use super::model::StoredCard;
 use super::storage::load_card;
 use super::storage::load_cards;
+use super::storage::load_visible_cards_page;
 use super::storage::remove_card;
 use super::storage::store_card;
-use crate::mail::MailAccountConfig;
-use crate::mail::now_ts;
-use crate::mail::vcard::MailContactCard;
-use crate::mail::vcard::parse_vcards;
-use crate::mail::vcard::serialize_vcard;
+use crate::now_ts;
+use crate::vcard::{MailContactCard, parse_vcards, serialize_vcard};
 use rusqlite::Connection;
 use rusqlite::Result as SqlResult;
 
 /// Save an edited or new entry; CardDAV cards are marked for upload.
-pub(in crate::mail) fn save_entry(
+pub fn save_entry(
     conn: &Connection,
     account_id: &str,
     entry: MailAddressBookEntry,
     default_book: &str,
-) -> Result<MailAddressBookEntry, String> {
+) -> Result<MailAddressBookEntry, ContactWriteError> {
     let display_name = entry.display_name.trim().to_string();
     let emails: Vec<String> = entry
         .emails
@@ -27,18 +26,22 @@ pub(in crate::mail) fn save_entry(
         .filter(|e| !e.is_empty())
         .collect();
     if display_name.is_empty() && emails.is_empty() {
-        return Err("a contact needs a name or an email address".into());
+        return Err(ContactWriteError::InvalidEntry(
+            "a contact needs a name or an email address".into(),
+        ));
     }
     if let Some(bad) = emails
         .iter()
         .find(|e| !e.contains('@') || e.contains(char::is_whitespace))
     {
-        return Err(format!("\"{bad}\" is not an email address"));
+        return Err(ContactWriteError::InvalidEntry(format!(
+            "\"{bad}\" is not an email address"
+        )));
     }
     let existing = if entry.uid.trim().is_empty() {
         None
     } else {
-        load_card(conn, account_id, entry.uid.trim()).map_err(|e| e.to_string())?
+        load_card(conn, account_id, entry.uid.trim())?
     };
     let uid = existing
         .as_ref()
@@ -81,15 +84,11 @@ pub(in crate::mail) fn save_entry(
         dirty,
         deleted: false,
     };
-    store_card(conn, account_id, &stored).map_err(|e| e.to_string())?;
+    store_card(conn, account_id, &stored)?;
     Ok(MailAddressBookEntry::from_card(stored.card, &book, dirty))
 }
 
-pub(in crate::mail) fn delete_entry(
-    conn: &Connection,
-    account_id: &str,
-    uid: &str,
-) -> SqlResult<bool> {
+pub fn delete_entry(conn: &Connection, account_id: &str, uid: &str) -> SqlResult<bool> {
     let Some(mut stored) = load_card(conn, account_id, uid)? else {
         return Ok(false);
     };
@@ -105,7 +104,7 @@ pub(in crate::mail) fn delete_entry(
 }
 
 /// Import vCards; a card whose UID exists replaces that card's fields.
-pub(in crate::mail) fn import_cards(
+pub fn import_cards(
     conn: &Connection,
     account_id: &str,
     text: &str,
@@ -135,10 +134,7 @@ pub(in crate::mail) fn import_cards(
     Ok(count)
 }
 
-pub(in crate::mail) fn export_cards(
-    conn: &Connection,
-    account_id: &str,
-) -> SqlResult<(String, usize)> {
+pub fn export_cards(conn: &Connection, account_id: &str) -> SqlResult<(String, usize)> {
     let cards: Vec<StoredCard> = load_cards(conn, account_id)?
         .into_iter()
         .filter(|s| !s.deleted)
@@ -151,25 +147,22 @@ pub(in crate::mail) fn export_cards(
     Ok((text, cards.len()))
 }
 
-pub(super) fn default_book(config: &MailAccountConfig) -> &'static str {
-    if config
-        .carddav
-        .as_ref()
-        .is_some_and(|c| !c.url.trim().is_empty())
-    {
-        "carddav"
-    } else {
-        "local"
-    }
-}
-
-pub(super) fn entries(conn: &Connection, account_id: &str) -> SqlResult<Vec<MailAddressBookEntry>> {
+pub fn entries(conn: &Connection, account_id: &str) -> SqlResult<Vec<MailAddressBookEntry>> {
     Ok(load_cards(conn, account_id)?
         .into_iter()
         .filter(|s| !s.deleted)
-        .map(|s| {
-            let pending = s.dirty;
-            MailAddressBookEntry::from_card(s.card, &s.book, pending)
-        })
+        .map(|stored| MailAddressBookEntry::from_card(stored.card, &stored.book, stored.dirty))
+        .collect())
+}
+
+pub fn list_entries_page(
+    conn: &Connection,
+    account_id: &str,
+    limit: u32,
+    offset: u32,
+) -> SqlResult<Vec<MailAddressBookEntry>> {
+    Ok(load_visible_cards_page(conn, account_id, limit, offset)?
+        .into_iter()
+        .map(|stored| MailAddressBookEntry::from_card(stored.card, &stored.book, stored.dirty))
         .collect())
 }

@@ -187,6 +187,11 @@ TASK-027 将 G1–G11 设为独立发布阻断门。每个门必须在匹配源�
 - `7e92a8816` 合入 main 的 #841。Markdown Live 的撤销历史与导出占位提示均保留。浏览器 Draw.io 旧资产用例移到 TC-FILE-OPEN-045，新版缺失资产用例沿用 main 的 043/044。38 项定向单测、TypeScript、用例审计和三端选集检查通过。 [UI 与崩溃回归](https://github.com/engcapa/taomni/actions/runs/44713935706) · [Mail 跨进程](https://github.com/engcapa/taomni/actions/runs/44713935448) · [Mail 签名升级](https://github.com/engcapa/taomni/actions/runs/44713935863)
 - `c50be74c4` 扩展 TC-MODULES-038，在 macOS 26 的候选应用完成签名 MFA 升级和正常重启后，用外部 AppKit 窗口验证实屏扫码。10 项 QA 工具单测通过。实屏授权由 runner 的真实状态决定。 [macOS Browser 与 Native](https://github.com/engcapa/taomni/actions/runs/44715355515)
 - Mail 宿主在缓存仅留邮件标题时，可从迁移后的 SQLite 读取 POP3 原件并显示正文。读取使用只读连接，复核旧数据库字节不变。51 项邮件引擎单测和 9 项宿主单测通过，三端跨进程用例同时覆盖归档原件和 POP3 原件。
+- VNC 的 RFB、TLS、帧缓冲和剪贴板协议移入 `taomni-vnc-engine`。当前产品的连接预检与会话转发共用该库。TC-151 在 Browser 和 Native 核对远端缩放后的真实像素，独立引擎 63 项单测通过。 [VNC 引擎](https://github.com/engcapa/taomni/commit/9ba42c0ba)
+- `7e92a8816` 的六个 Browser 分片已收取并核对。三端均为 28/29，唯一失败为 TC-MODULES-052 的 Mail 升级模型传入未编码的 JSON。Linux Native 在格式检查处停止。修复后的 `ae46db7a9` 选集覆盖原全部用例，另含 VNC 与升级回归。Linux 和 Windows Browser 各通过 34/34。macOS Browser 的 TC-WELCOME-RS-02 在断言时读到空目录，失败页 HTML 随即记录 `/preview`。该用例及恢复、Explorer 代码在两个提交间相同，原始结果留在 `qa-ui-auto-report/github/44725968775/live-shards/`。 [旧结果](https://github.com/engcapa/taomni/actions/runs/44713935706) · [当前回归](https://github.com/engcapa/taomni/actions/runs/44725968775)
+- 两个 macOS Mail 签名作业在打包工具的路径大小写单测处停止。修订后在内存中验证路径冲突，同时检查归档根清单的准确名称和保留的 `SHA256SUMS` 大小写别名。20 项本地单测通过。新签名批次已收到匹配源码的 Linux 和 Windows 模块资产，实装与 macOS 回执仍待收取。 [macOS 失败](https://github.com/engcapa/taomni/actions/runs/44718152405) · [签名复验](https://github.com/engcapa/taomni/actions/runs/44726111709)
+- ARM64 加固运行时的第二轮构建定位到 MIT Kerberos 1.22 与 OpenSSL 4 头文件的类型差异。验证分支选用 OpenSSL 3，并保留 Kerberos 系统框架链接。新 run 仅构建用于实装验证的 macOS 26 ARM64 工件。 [失败日志](https://github.com/engcapa/taomni/actions/runs/44711792115/job/136232223359) · [ARM64 构建](https://github.com/engcapa/taomni/actions/runs/44726859603)
+- Mail 地址簿 SQLite 操作、vCard 转换和收件人建议移入邮件引擎。独立宿主按账号分页列出、保存和删除联系人，已迁移的 CardDAV 卡片保留待同步状态。TC-MAIL-CONTACTS-01 检查重开地址簿仍显示原邮箱，签名升级用例检查默认及自定义旧缓存，另有跨进程重开读取。55 项引擎单测、10 项宿主单测、核心编译和用例审计通过。跨进程与三端用例等待 GitHub 执行。
 
 ## 当前结论
 

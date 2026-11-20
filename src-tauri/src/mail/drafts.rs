@@ -74,10 +74,7 @@ pub async fn mail_search_contacts(
 ) -> Result<Vec<MailContactSuggestion>, String> {
     let limit = limit.unwrap_or(8).clamp(1, 20);
     with_mail_db_async(&state, &account_id, move |db, account_id| {
-        // Address book entries (TASK-19) first, then collected contacts.
-        let book = contacts::address_book_suggestions(db, &account_id, &query, limit)?;
-        let collected = search_contacts(db, &account_id, &query, limit)?;
-        Ok(contacts::merge_suggestions(book, collected, limit))
+        taomni_mail_engine::contacts::search_recipient_suggestions(db, &account_id, &query, limit)
     })
     .await
 }

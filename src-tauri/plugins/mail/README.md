@@ -19,23 +19,24 @@ opens connections using session network settings and resolves user-selected file
 The connection owns its proxy forwarder and releases it when connection
 setup fails or the connection closes.
 
-The provisional host serves cached folders, paged headers, bodies and drafts
-from `plugins/mail/data/<account-stem>.db` while the SDK holds its profile and
-module leases. Draft updates and deletions use a transaction under the same
-host owner. The core's authenticated backup barrier pauses ordinary requests,
-exports standalone SQLite snapshots and copies the granted originals and
-attachment files from the module data root.
+The provisional host serves cached folders, paged headers, bodies, drafts and
+address books from `plugins/mail/data/<account-stem>.db` while the SDK holds its
+profile and module leases. Draft and contact edits use transactions. Recipient
+suggestions prioritize address book entries over collected mail contacts.
+The core's authenticated backup barrier pauses ordinary requests, exports
+standalone SQLite snapshots and copies the granted originals and attachment
+files from the module data root.
 The hosted protocol workflow stages a legacy cache containing committed WAL
-data, then verifies that the host reads it and the scheduled Outbox, detects
-competing ownership and can reopen it after exit. Linux, Windows and macOS
-run this check.
+data, then verifies that the host reads the cache, scheduled Outbox and address
+book, detects competing ownership and reopens the edited data after exit.
+Linux, Windows and macOS run this check.
 
 The signed offline upgrade command requires a closed profile. It imports the
 default or account-specific cache, archived originals and attachment cache.
 It publishes the module data before activating the verified package and
-records the result in the migration journal. The old account records and
-files support rollback. The signed installation workflow tests this path
-using an isolated legacy profile and the packaged Mail host.
+records the result in the migration journal. The old account records and files
+support rollback. The signed installation workflow uses an isolated legacy
+profile and verifies contact queries for both default and custom caches.
 
 Production activation still requires the frontend bundle, scoped Vault,
 proxy and file-viewer services, and integration with the automatic upgrade

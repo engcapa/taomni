@@ -1,6 +1,6 @@
 use super::model::CardChange;
 use super::model::StoredCard;
-use crate::mail::now_ts;
+use crate::now_ts;
 use rusqlite::Connection;
 use rusqlite::OptionalExtension;
 use rusqlite::Result as SqlResult;
@@ -20,15 +20,26 @@ pub(super) fn row_to_stored(row: &rusqlite::Row<'_>) -> SqlResult<StoredCard> {
 
 pub(super) const CARD_COLUMNS: &str = "card_json, book, href, etag, dirty, deleted";
 
-pub(in crate::mail) fn load_cards(
-    conn: &Connection,
-    account_id: &str,
-) -> SqlResult<Vec<StoredCard>> {
+pub fn load_cards(conn: &Connection, account_id: &str) -> SqlResult<Vec<StoredCard>> {
     let mut stmt = conn.prepare(&format!(
         "SELECT {CARD_COLUMNS} FROM mail_cards WHERE account_id = ?1
          ORDER BY lower(display_name), uid"
     ))?;
     let rows = stmt.query_map(params![account_id], row_to_stored)?;
+    rows.collect()
+}
+
+pub(super) fn load_visible_cards_page(
+    conn: &Connection,
+    account_id: &str,
+    limit: u32,
+    offset: u32,
+) -> SqlResult<Vec<StoredCard>> {
+    let mut stmt = conn.prepare(&format!(
+        "SELECT {CARD_COLUMNS} FROM mail_cards WHERE account_id = ?1 AND deleted = 0
+         ORDER BY lower(display_name), uid LIMIT ?2 OFFSET ?3"
+    ))?;
+    let rows = stmt.query_map(params![account_id, limit, offset], row_to_stored)?;
     rows.collect()
 }
 
@@ -45,11 +56,7 @@ pub(super) fn load_card(
     .optional()
 }
 
-pub(in crate::mail) fn store_card(
-    conn: &Connection,
-    account_id: &str,
-    stored: &StoredCard,
-) -> SqlResult<()> {
+pub fn store_card(conn: &Connection, account_id: &str, stored: &StoredCard) -> SqlResult<()> {
     let emails = stored
         .card
         .emails
@@ -91,11 +98,7 @@ pub(super) fn remove_card(conn: &Connection, account_id: &str, uid: &str) -> Sql
     Ok(())
 }
 
-pub(in crate::mail) fn apply_changes(
-    conn: &Connection,
-    account_id: &str,
-    changes: &[CardChange],
-) -> SqlResult<()> {
+pub fn apply_changes(conn: &Connection, account_id: &str, changes: &[CardChange]) -> SqlResult<()> {
     for change in changes {
         match change {
             CardChange::Store(stored) => store_card(conn, account_id, stored)?,

@@ -12,6 +12,7 @@ use serde_json::{Value, json};
 use taomni_mail_engine::{
     MailFolder,
     cache::{init_mail_tables, upsert_folder, upsert_message},
+    contacts::{MailAddressBookEntry, save_entry},
     database::mail_db_file_stem,
     drafts::{list_mail_drafts, save_mail_draft},
     migration::{LegacyMailbox, StagedMailData},
@@ -95,6 +96,10 @@ impl MailHost {
                 "mail_list_drafts",
                 "mail_save_draft",
                 "mail_delete_draft",
+                "mail_list_address_book",
+                "mail_save_address_book_entry",
+                "mail_delete_address_book_entry",
+                "mail_search_contacts",
                 SNAPSHOT_PREPARE_METHOD,
                 SNAPSHOT_METHOD,
                 SNAPSHOT_RELEASE_METHOD,
@@ -258,6 +263,17 @@ fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
         }))
         .unwrap();
         save_mail_draft(&db, ACCOUNT, draft).unwrap();
+        save_entry(
+            &db,
+            ACCOUNT,
+            MailAddressBookEntry {
+                display_name: "Migrated Card".into(),
+                emails: vec!["migrated@example.com".into()],
+                ..Default::default()
+            },
+            "carddav",
+        )
+        .unwrap();
         db
     };
     let legacy_bytes = fs::read(&source).unwrap();
@@ -309,6 +325,27 @@ fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
     assert_eq!(sent["subject"], "Original sent mail");
     assert!(sent["text"].as_str().unwrap().contains("Saved POP3 copy"));
     assert_eq!(fs::read(&path).unwrap(), before);
+    let listed = host.call(
+        "mail_list_address_book",
+        json!({"accountId":ACCOUNT,"limit":1}),
+    );
+    let contact = &listed[0];
+    assert_eq!(contact["book"], "carddav");
+    assert_eq!(contact["pendingSync"], true);
+    let contact_uid = contact["uid"].as_str().unwrap();
+    let search = json!({"accountId":ACCOUNT,"query":"migrated"});
+    let original = host.call("mail_search_contacts", search.clone());
+    assert_eq!(original[0]["name"], "Migrated Card");
+    assert_eq!(original[0]["email"], "migrated@example.com");
+    assert_eq!(original[0]["source"], "addressBook");
+    let changed = host.call(
+        "mail_save_address_book_entry",
+        json!({"accountId":ACCOUNT,"entry":{
+            "uid":contact_uid,"displayName":"Migrated Card Edited","emails":["migrated@example.com"]
+        }}),
+    );
+    assert_eq!(changed["uid"], contact_uid);
+    assert_eq!(changed["book"], "carddav");
     let saved = host.call(
         "mail_save_draft",
         json!({"accountId":ACCOUNT,"draft":{"id":"module-draft","subject":"Edited in the Mail host"}}),
@@ -328,6 +365,9 @@ fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
     assert_eq!(reopened.call("mail_get_cached_body", sent_params), sent);
     let reopened_drafts = reopened.call("mail_list_drafts", json!({"accountId":ACCOUNT}));
     assert_eq!(reopened_drafts, json!([saved]));
+    let suggestions = reopened.call("mail_search_contacts", search);
+    assert_eq!(suggestions[0]["name"], "Migrated Card Edited");
+    assert_eq!(suggestions[0]["email"], "migrated@example.com");
     drop(reopened.child.stdin.take());
     assert_eq!(reopened.exit_code(), Some(0));
     assert_eq!(fs::read(path).unwrap(), after);

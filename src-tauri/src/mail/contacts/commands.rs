@@ -1,15 +1,6 @@
 use super::dav_protocol::collection_url;
 use super::dav_sync::sync_collection;
-use super::entries::default_book;
-use super::entries::delete_entry;
-use super::entries::entries;
-use super::entries::export_cards;
-use super::entries::import_cards;
-use super::entries::save_entry;
-use super::model::MailAddressBookEntry;
 use super::model::MailCardDavSyncResult;
-use super::storage::apply_changes;
-use super::storage::load_cards;
 use crate::mail::MailAccountConfig;
 use crate::mail::MailAuthMode;
 use crate::mail::now_ts;
@@ -22,7 +13,23 @@ use crate::state::AppState;
 use reqwest::Url;
 use rusqlite::OptionalExtension;
 use rusqlite::params;
+use taomni_mail_engine::contacts::{
+    MailAddressBookEntry, apply_changes, delete_entry, entries, export_cards, import_cards,
+    load_cards, save_entry,
+};
 use tauri::State;
+
+fn default_book(config: &MailAccountConfig) -> &'static str {
+    if config
+        .carddav
+        .as_ref()
+        .is_some_and(|c| !c.url.trim().is_empty())
+    {
+        "carddav"
+    } else {
+        "local"
+    }
+}
 
 #[tauri::command]
 pub async fn mail_list_address_book(
@@ -43,7 +50,7 @@ pub async fn mail_save_address_book_entry(
     let db = state.mail_db(&account_id)?;
     let db = db.lock().map_err(|e| e.to_string())?;
     super::super::init_mail_tables(&db).map_err(|e| e.to_string())?;
-    save_entry(&db, &account_id, entry, book)
+    save_entry(&db, &account_id, entry, book).map_err(|error| error.to_string())
 }
 
 #[tauri::command]

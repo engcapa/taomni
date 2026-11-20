@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::Value;
 use taomni_mail_engine::{
     MailMessageBody, cache,
+    contacts::{self, ContactWriteError, MailAddressBookEntry},
     drafts::{MailDraftSaveRequest, delete_mail_draft, list_mail_drafts_page, save_mail_draft},
     parse_body_message,
     pop3::local_store::read_local_raw,
@@ -17,13 +18,21 @@ const READ_BODY: &str = "mail_get_cached_body";
 const LIST_DRAFTS: &str = "mail_list_drafts";
 const SAVE_DRAFT: &str = "mail_save_draft";
 const DELETE_DRAFT: &str = "mail_delete_draft";
-pub(super) const METHODS: [&str; 6] = [
+const LIST_CONTACTS: &str = "mail_list_address_book";
+const SAVE_CONTACT: &str = "mail_save_address_book_entry";
+const DELETE_CONTACT: &str = "mail_delete_address_book_entry";
+const SEARCH_CONTACTS: &str = "mail_search_contacts";
+pub(super) const METHODS: [&str; 10] = [
     LIST_FOLDERS,
     LIST_MESSAGES,
     READ_BODY,
     LIST_DRAFTS,
     SAVE_DRAFT,
     DELETE_DRAFT,
+    LIST_CONTACTS,
+    SAVE_CONTACT,
+    DELETE_CONTACT,
+    SEARCH_CONTACTS,
 ];
 
 #[derive(Deserialize)]
@@ -51,7 +60,7 @@ struct Message {
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
-struct DraftsPage {
+struct AccountPage {
     account_id: String,
     limit: Option<u32>,
     offset: Option<u32>,
@@ -69,6 +78,30 @@ struct DraftSave {
 struct DraftDelete {
     account_id: String,
     draft_id: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct SaveContact {
+    account_id: String,
+    entry: MailAddressBookEntry,
+    #[serde(default)]
+    carddav: bool,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct DeleteContact {
+    account_id: String,
+    uid: String,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct ContactSearch {
+    account_id: String,
+    query: String,
+    limit: Option<u32>,
 }
 
 enum SavedBody {
@@ -109,7 +142,7 @@ pub(super) fn invoke(
             encode(read_body(store, &input, check)?)
         }
         LIST_DRAFTS => {
-            let input: DraftsPage = decode(params)?;
+            let input: AccountPage = decode(params)?;
             let drafts = store.query(&input.account_id, |db| {
                 list_mail_drafts_page(
                     db,
@@ -139,6 +172,52 @@ pub(super) fn invoke(
                 delete_mail_draft(db, account, draft_id).map_err(|_| unavailable())
             })?;
             Ok(Value::Null)
+        }
+        LIST_CONTACTS => {
+            let input: AccountPage = decode(params)?;
+            let entries = store.query(&input.account_id, |db| {
+                contacts::list_entries_page(
+                    db,
+                    &input.account_id,
+                    input.limit.unwrap_or(100).clamp(1, 500),
+                    input.offset.unwrap_or(0),
+                )
+            })?;
+            encode(entries)
+        }
+        SAVE_CONTACT => {
+            let input: SaveContact = decode(params)?;
+            let default_book = if input.carddav { "carddav" } else { "local" };
+            store.mutate(&input.account_id, true, check, |db| {
+                let saved = contacts::save_entry(db, &input.account_id, input.entry, default_book)
+                    .map_err(|error| match error {
+                        ContactWriteError::InvalidEntry(message) => {
+                            RpcError::new(ErrorCode::InvalidParams, message)
+                        }
+                        ContactWriteError::Database(_) => unavailable(),
+                    })?;
+                encode(saved)
+            })
+        }
+        DELETE_CONTACT => {
+            let input: DeleteContact = decode(params)?;
+            let removed = store.mutate(&input.account_id, false, check, |db| {
+                contacts::delete_entry(db, &input.account_id, input.uid.trim())
+                    .map_err(|_| unavailable())
+            })?;
+            encode(removed)
+        }
+        SEARCH_CONTACTS => {
+            let input: ContactSearch = decode(params)?;
+            let entries = store.query(&input.account_id, |db| {
+                contacts::search_recipient_suggestions(
+                    db,
+                    &input.account_id,
+                    &input.query,
+                    input.limit.unwrap_or(8).clamp(1, 20),
+                )
+            })?;
+            encode(entries)
         }
         _ => Err(RpcError::from_code(ErrorCode::MethodNotFound)),
     }

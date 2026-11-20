@@ -17,7 +17,7 @@ use crate::state::AppState;
 pub use taomni_mail_engine::calendar::{MailInvite, MailInviteAttendee, MailInviteTime};
 use taomni_mail_engine::calendar::{build_reply_ics, invite_from_message, partstat_of};
 pub(super) use taomni_mail_engine::calendar::{
-    escape, fold, param, parse_time, split_property, unescape, unfold,
+    fold, param, parse_time, split_property, unescape, unfold,
 };
 
 /// Invite of a message, parsed from the raw message (local store for POP3).

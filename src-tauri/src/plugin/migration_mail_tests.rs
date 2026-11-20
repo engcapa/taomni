@@ -3,6 +3,7 @@ use std::time::Duration;
 use rusqlite::params;
 use serde_json::json;
 use taomni_mail_engine::cache::{get_cached_body, init_mail_tables, upsert_message};
+use taomni_mail_engine::contacts::{MailAddressBookEntry, save_entry};
 
 use super::*;
 use crate::plugin::{
@@ -47,6 +48,17 @@ fn cached_mail(root: &Path, account: &str, text: &str) -> PathBuf {
     let message =
         taomni_mail_engine::parse_body_message(account, "INBOX", 9, None, raw.as_bytes(), 256);
     upsert_message(&db, &message).unwrap();
+    save_entry(
+        &db,
+        account,
+        MailAddressBookEntry {
+            display_name: format!("Legacy {account} contact"),
+            emails: vec![format!("{account}@example.com")],
+            ..Default::default()
+        },
+        "local",
+    )
+    .unwrap();
     path
 }
 

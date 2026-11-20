@@ -109,6 +109,17 @@ fn signed_mail_upgrade_starts_the_installed_host_with_retained_migrated_data() {
             )
             .unwrap();
         assert!(value["text"].as_str().unwrap().contains(expected));
+        let contacts = state
+            .registry
+            .invoke(
+                OWNER,
+                "mail_search_contacts",
+                json!({"accountId":account,"query":"legacy"}),
+            )
+            .unwrap();
+        assert_eq!(contacts.as_array().unwrap().len(), 1);
+        assert_eq!(contacts[0]["source"], "addressBook");
+        assert_eq!(contacts[0]["email"], format!("{account}@example.com"));
     }
     state.registry.shutdown().unwrap();
     let root = close_profile(state);

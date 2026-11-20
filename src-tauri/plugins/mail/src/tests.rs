@@ -58,6 +58,67 @@ fn draft_writes_are_account_scoped_and_retryable() {
 }
 
 #[test]
+fn address_book_writes_fail_cleanly_and_only_affect_the_selected_mailbox() {
+    let profile = tempfile::tempdir().unwrap();
+    let store = Store::new(&profile.path().canonicalize().unwrap());
+    let error = invoke(
+        &store,
+        "mail_save_address_book_entry",
+        Some(json!({"accountId":"mail-a","entry":{"emails":["invalid address"]}})),
+    )
+    .unwrap_err();
+    assert_eq!(error.code, ErrorCode::InvalidParams as i32);
+    assert!(error.message.contains("not an email address"));
+    assert_eq!(
+        profile
+            .path()
+            .join("plugins/mail/data")
+            .read_dir()
+            .unwrap()
+            .count(),
+        0
+    );
+
+    let saved = invoke(
+        &store,
+        "mail_save_address_book_entry",
+        Some(json!({
+            "accountId":"mail-a",
+            "entry":{"displayName":"Contact","emails":["contact@example.com"]}
+        })),
+    )
+    .unwrap();
+    let delete = |account| {
+        invoke(
+            &store,
+            "mail_delete_address_book_entry",
+            Some(json!({"accountId":account,"uid":saved["uid"]})),
+        )
+        .unwrap()
+    };
+    assert_eq!(delete("mail-b"), false);
+    let suggestions = invoke(
+        &store,
+        "mail_search_contacts",
+        Some(json!({"accountId":"mail-a","query":"contact"})),
+    )
+    .unwrap();
+    assert_eq!(suggestions[0]["email"], "contact@example.com");
+    assert_eq!(suggestions[0]["source"], "addressBook");
+    assert_eq!(delete("mail-a"), true);
+    assert_eq!(delete("mail-a"), false);
+    assert_eq!(
+        invoke(
+            &store,
+            "mail_list_address_book",
+            Some(json!({"accountId":"mail-a"})),
+        )
+        .unwrap(),
+        json!([])
+    );
+}
+
+#[test]
 fn cancellation_during_first_draft_save_leaves_no_database() {
     let profile = tempfile::tempdir().unwrap();
     let store = Store::new(&profile.path().canonicalize().unwrap());

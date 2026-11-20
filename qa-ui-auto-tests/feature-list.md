@@ -8565,7 +8565,9 @@ files:
   - src/components/mail/MailAddressBookPanel.tsx
   - src/lib/mailContacts.ts
   - src-tauri/src/mail/contacts.rs
-  - src-tauri/src/mail/vcard.rs
+  - src-tauri/crates/taomni-mail-engine/src/contacts.rs
+  - src-tauri/crates/taomni-mail-engine/src/vcard.rs
+  - src-tauri/plugins/mail/src/commands.rs
 controls:
   - id: address-book-open
     selector: '[data-testid="mail-address-book-open"]'
@@ -8641,6 +8643,7 @@ controls:
 - 邮箱栏 “Address book” 按钮打开地址簿：联系人（姓名、多个邮箱与电话、单位、备注）增删改与搜索；邮件右键 “Add sender to address book…” 预填发件人；联系人行可直接写信。
 - vCard 2.1/3.0/4.0 导入（一个 .vcf 可含多张卡片，支持 quoted-printable 与 Apple 分组属性）与导出（vCard 3.0）；照片、地址等未建模的属性原样保留，往返不丢数据（DEC-13：自行实现，不新增依赖）。
 - 写信自动补全先列出地址簿联系人（带姓名），再列出收发历史中收集的联系人，按邮箱去重（AC-61）。
+- TC-MAIL-CONTACTS-01 在 Browser 和 Native 检查写信建议以及重开地址簿后的联系人地址。签名 Mail 升级检查默认和自定义旧缓存中的地址簿查询。
 - CardDAV：会话设置填写 CardDAV URL（服务器、principal 或地址簿地址均可，按 `/.well-known/carddav`、`current-user-principal`、`addressbook-home-set` 发现），用户名默认与 IMAP 相同，密码使用邮件密码（OAuth 账户发送 Bearer 令牌）。“Sync” 先上传本地修改（`If-Match`/`If-None-Match`，冲突时以服务器为准），再按 ETag 拉取变化（`addressbook-multiget`，不支持时逐个 GET），服务器删除的卡片同步删除（AC-60）。
 - 未完成：CardDAV 不走会话代理/跳板机；Google 通讯录需要额外 OAuth scope，未接入；CardDAV 只同步发现到的第一个地址簿；不定时自动同步（手动 Sync）。托管 UI 用例不连 CardDAV 服务器，CardDAV 流程由 Rust 进程内服务器测试覆盖，仅在 Windows 本机执行过。
 

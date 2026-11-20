@@ -110,8 +110,6 @@ pub(crate) mod storage;
 
 mod sync;
 
-mod vcard;
-
 mod webdav;
 
 pub use sync::{MailFolderSyncResult, MailSyncRequestMode};

@@ -4,6 +4,7 @@ pub mod archive;
 pub mod cache;
 pub mod calendar;
 pub mod compose;
+pub mod contacts;
 pub mod database;
 pub mod drafts;
 pub mod filters;
@@ -27,6 +28,7 @@ pub mod storage;
 #[cfg(test)]
 mod tests;
 pub mod tls;
+pub mod vcard;
 
 pub use lists::{MailListUnsubscribe, parse_list_unsubscribe};
 pub use mime::{

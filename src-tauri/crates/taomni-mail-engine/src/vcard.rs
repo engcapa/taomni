@@ -158,7 +158,7 @@ fn parse_card(lines: &[String]) -> Option<MailContactCard> {
 }
 
 /// Every `BEGIN:VCARD … END:VCARD` in `text` (one .vcf may hold many).
-pub(super) fn parse_vcards(text: &str) -> Vec<MailContactCard> {
+pub fn parse_vcards(text: &str) -> Vec<MailContactCard> {
     let lines = unfold(&join_qp_soft_breaks(text));
     let mut cards = Vec::new();
     let mut current: Option<Vec<String>> = None;
@@ -193,7 +193,7 @@ pub(super) fn parse_vcards(text: &str) -> Vec<MailContactCard> {
 }
 
 /// vCard 3.0 text of `card`, keeping unmodelled lines of `card.raw`.
-pub(super) fn serialize_vcard(card: &MailContactCard, rev: i64) -> String {
+pub fn serialize_vcard(card: &MailContactCard, rev: i64) -> String {
     let mut lines = vec!["BEGIN:VCARD".to_string(), "VERSION:3.0".to_string()];
     lines.push("PRODID:-//Taomni//Mail//EN".to_string());
     lines.push(format!("UID:{}", card.uid));
