@@ -1,0 +1,10 @@
+[package]
+name = "taomni-vnc-key-helper"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.94"
+publish = false
+
+[target.'cfg(windows)'.dependencies]
+taomni-vnc-key-protocol = { path = "../../../crates/taomni-vnc-key-protocol" }
+winapi = { version = "0.3", features = ["libloaderapi", "processthreadsapi", "winuser"] }

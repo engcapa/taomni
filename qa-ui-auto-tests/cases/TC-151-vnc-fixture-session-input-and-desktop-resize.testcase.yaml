@@ -79,6 +79,7 @@ steps:
 - assert_file_contains:
     path: ${fixture.vnc_events}
     contains: '"type": "desktop_size", "width": 1024, "height": 768'
+- assert_no_runtime_errors: null
 - screenshot: 151-vnc-fixture-session.png
 verification:
   review: reviewed
@@ -144,9 +145,12 @@ verification:
       expectation: '{"wait_for": {"selector": "[data-testid=\"vnc-canvas\"][width=\"1024\"][height=\"768\"]", "timeout_sec": 15}}'
     - step: 30
       expectation: '{"assert_file_contains": {"path": "${fixture.vnc_events}", "contains": "\"type\": \"desktop_size\", \"width\": 1024, \"height\": 768"}}'
+    - step: 31
+      expectation: The VNC session stays free of runtime errors after input and resize.
     results:
     - 29
     - 30
+    - 31
   visual:
   - check: The connected session shows the fixture's gradient desktop without overlays, letterboxing or clipped tab actions.
     method: manual

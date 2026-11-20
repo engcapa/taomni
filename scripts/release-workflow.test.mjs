@@ -16,8 +16,12 @@ test("desktop bundles stage only their own SocksCap runtime resources and includ
     assert.deepEqual(config(`.${platform}`).bundle.resources, [
       "resources/licenses/*",
       `resources/sockscap/${platform}/**/*`,
+      ...(platform === "windows" ? ["resources/vnc/windows/**/*"] : []),
     ]);
   }
+  const windows = config(".windows").build;
+  assert.match(windows.beforeDevCommand, /stage-vnc-key-helper\.ps1/);
+  assert.match(windows.beforeBuildCommand, /stage-vnc-key-helper\.ps1 -Configuration release/);
 });
 test("macOS native tests and bundles share a deployment target supporting Whisper filesystem APIs", () => {
   const config = JSON.parse(readFileSync(fileURLToPath(new URL("../src-tauri/tauri.conf.json", import.meta.url)), "utf8"));

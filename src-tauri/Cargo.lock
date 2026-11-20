@@ -10942,6 +10942,7 @@ dependencies = [
  "taomni-profile-locks",
  "taomni-rdp-common",
  "taomni-sqlite-snapshot",
+ "taomni-vnc-key-protocol",
  "tauri",
  "tauri-build",
  "tauri-plugin-dialog",
@@ -11275,6 +11276,21 @@ version = "0.1.0"
 dependencies = [
  "rusqlite",
  "tempfile",
+]
+
+[[package]]
+name = "taomni-vnc-key-helper"
+version = "0.1.0"
+dependencies = [
+ "taomni-vnc-key-protocol",
+ "winapi",
+]
+
+[[package]]
+name = "taomni-vnc-key-protocol"
+version = "0.1.0"
+dependencies = [
+ "serde",
 ]
 
 [[package]]

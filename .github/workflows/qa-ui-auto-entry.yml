@@ -431,6 +431,20 @@ jobs:
               raise SystemExit(f'QA helper did not reject an unconfigured launch: exit {denied.returncode}, {denied.stderr}')
           print('QA runtime contains its own SocksCap helper. Unconfigured launch exited with status 2.')
           PYTHON
+      - name: Windows VNC helper process ownership
+        if: runner.os == 'Windows' && inputs.operation == 'build'
+        env:
+          QA_RELEASE: ${{ matrix.profile == 'release' }}
+        run: |
+          set -o pipefail
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-vnc-key-protocol --lib --locked
+          args=()
+          if [[ "$QA_RELEASE" == "true" ]]; then
+            args+=(--release)
+          fi
+          python .agents/skills/qa-ui-auto/scripts/ci_vnc_key_helper.py \
+            --receipt qa-build-output/vnc-key-helper-receipt.json "${args[@]}" \
+            2>&1 | tee qa-build-output/vnc-key-helper.log
       - name: Upload native runtime once per build
         if: inputs.operation == 'build'
         uses: actions/upload-artifact@v4
@@ -449,6 +463,8 @@ jobs:
             qa-build-output/build.log
             qa-build-output/frontend-unit-contracts.log
             qa-build-output/capture-contracts.log
+            qa-build-output/vnc-key-helper-receipt.json
+            qa-build-output/vnc-key-helper.log
             qa-build-output/session-cleanup-contracts.log
             qa-build-output/backup-atomic-contracts.log
             qa-build-output/backup-reader-contracts.log

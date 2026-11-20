@@ -49,6 +49,7 @@ mod servers;
 pub mod session;
 pub mod sockscap;
 mod state;
+mod structural_search;
 mod tab;
 pub mod terminal;
 mod test_results;
@@ -57,12 +58,6 @@ mod update;
 pub mod vault;
 mod viewer;
 mod vnc;
-/// The VNC special-key hook helper process (`taomni --vnc-special-key-hook <pid>`).
-#[cfg(windows)]
-pub use vnc::keyboard_hook::{
-    HOOK_PROCESS_ARG as VNC_SPECIAL_KEY_HOOK_ARG, run_hook_process as run_vnc_special_key_hook,
-};
-mod structural_search;
 mod voice;
 mod webview_environment;
 mod webview_recovery;
