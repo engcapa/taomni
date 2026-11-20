@@ -74,11 +74,12 @@ class BuildPipelineTests(unittest.TestCase):
         jobs = yaml.safe_load((ROOT / '.github/workflows/qa-ui-auto-platforms.yml').read_text())['jobs']
         for platform in ('linux', 'windows', 'macos'):
             dependencies = ['plan', f'build-{platform}', 'signed-modular-packages']
-            if platform in ('linux', 'macos'):
-                signer = f'signed-mfa-{platform}'
+            modules = ['mfa', 'vnc'] if platform in ('linux', 'macos') else ['vnc']
+            for module in modules:
+                signer = f'signed-{module}-{platform}'
                 dependencies.append(signer)
                 self.assertIn(signer, jobs['summarize']['needs'])
-                self.assertIn(f"contains(needs.plan.outputs.{platform}_native_matrix, 'signed-mfa')", jobs[signer]['if'])
+                self.assertIn(f"contains(needs.plan.outputs.{platform}_native_matrix, 'signed-{module}')", jobs[signer]['if'])
                 self.assertEqual(jobs[signer]['with']['native_builds'],
                                  '${{ needs.plan.outputs.' + platform + '_build_matrix }}')
             self.assertEqual(jobs[f'execute-{platform}-native']['needs'], dependencies)
