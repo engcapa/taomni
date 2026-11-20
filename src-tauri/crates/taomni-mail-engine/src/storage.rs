@@ -17,4 +17,4 @@ pub(crate) use index::object_path;
 pub use index::{account_root, init_tables, lookup};
 pub use model::{ArchiveEntry, FullMessage, FullMessageMode, PreparedMessage};
 pub use publication::{prepare, publish, store};
-pub use reading::{OpenMessage, list, open, open_entry};
+pub use reading::{OpenMessage, list, open, open_entry, open_with};

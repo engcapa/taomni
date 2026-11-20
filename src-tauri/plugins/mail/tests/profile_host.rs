@@ -15,7 +15,7 @@ use taomni_mail_engine::{
     database::mail_db_file_stem,
     drafts::{list_mail_drafts, save_mail_draft},
     migration::{LegacyMailbox, StagedMailData},
-    parse_body_message,
+    parse_body_message, storage,
 };
 use taomni_plugin_api::{
     HandshakeRequest, HandshakeResponse, RpcMessage, RpcRequest, RpcResponse,
@@ -237,6 +237,8 @@ fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
             &parse_body_message(ACCOUNT, "INBOX", 9, None, raw, 1024),
         )
         .unwrap();
+        let original = b"Subject: Original\r\n\r\nComplete migrated message\r\n";
+        storage::store(&db, ACCOUNT, "INBOX", 9, 1, &original[..]).unwrap();
         let draft = serde_json::from_value(json!({
             "id":"scheduled",
             "subject":"Draft saved by the monolith",
@@ -288,8 +290,9 @@ fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
         body["text"]
             .as_str()
             .unwrap()
-            .contains("Profile retains mail")
+            .contains("Complete migrated message")
     );
+    assert_eq!(body["source"], "archive");
     assert_eq!(fs::read(&path).unwrap(), before);
     let saved = host.call(
         "mail_save_draft",

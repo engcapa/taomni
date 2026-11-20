@@ -1,8 +1,9 @@
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::Value;
 use taomni_mail_engine::{
-    cache,
+    MailMessageBody, cache,
     drafts::{MailDraftSaveRequest, delete_mail_draft, list_mail_drafts_page, save_mail_draft},
+    parse_body_message, storage,
 };
 use taomni_plugin_api::{ErrorCode, RpcError};
 
@@ -97,10 +98,7 @@ pub(super) fn invoke(
         }
         READ_BODY => {
             let input: Message = decode(params)?;
-            let body = store.query(&input.account_id, |db| {
-                cache::get_cached_body(db, &input.account_id, &input.folder, input.uid)
-            })?;
-            encode(body)
+            encode(read_body(store, &input, check)?)
         }
         LIST_DRAFTS => {
             let input: DraftsPage = decode(params)?;
@@ -136,6 +134,46 @@ pub(super) fn invoke(
         }
         _ => Err(RpcError::from_code(ErrorCode::MethodNotFound)),
     }
+}
+
+fn read_body(
+    store: &Store,
+    message: &Message,
+    check: &dyn Fn() -> Result<(), RpcError>,
+) -> Result<Option<MailMessageBody>, RpcError> {
+    let Message {
+        account_id,
+        folder,
+        uid,
+    } = message;
+    let (original, cached) = store.query(account_id, |db| {
+        let original = storage::open_with(db, account_id, folder, *uid, |path| {
+            store.open_owned_file(path).map_err(|error| error.message)
+        })
+        .map_err(storage::as_sql_error)?;
+        let cached = if original.is_some() {
+            None
+        } else {
+            cache::get_cached_body(db, account_id, folder, *uid)?
+        };
+        Ok((original, cached))
+    })?;
+    let Some(original) = original else {
+        return Ok(cached);
+    };
+    let raw = original.read_with(|| check().map_err(|error| error.message));
+    check()?;
+    let raw = raw.map_err(|_| unavailable())?;
+    let message = parse_body_message(
+        account_id,
+        folder,
+        *uid,
+        Some(raw.len() as u32),
+        &raw,
+        raw.len(),
+    );
+    check()?;
+    Ok(Some(cache::cached_to_body(message, "archive")))
 }
 
 fn decode<T: DeserializeOwned>(params: Option<Value>) -> Result<T, RpcError> {

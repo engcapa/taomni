@@ -69,13 +69,24 @@ pub fn verify_message(
     source: impl Read,
     hash: &str,
     expected: u64,
+    destination: impl Write,
+) -> Result<(), String> {
+    verify_message_with(source, hash, expected, destination, || Ok(()))
+}
+
+pub(crate) fn verify_message_with(
+    source: impl Read,
+    hash: &str,
+    expected: u64,
     mut destination: impl Write,
+    check: impl Fn() -> Result<(), String>,
 ) -> Result<(), String> {
     let mut decoder = GzDecoder::new(source);
     let mut digest = Sha256::new();
     let mut size = 0u64;
     let mut buffer = [0u8; 128 * 1024];
     loop {
+        check()?;
         let n = decoder
             .read(&mut buffer)
             .map_err(|e| format!("Saved email is damaged: {e}"))?;

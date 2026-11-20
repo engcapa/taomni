@@ -7,7 +7,7 @@ use taomni_mail_engine::{
     cache::{init_mail_tables, upsert_folder, upsert_message},
     database::mail_db_file_stem,
     drafts::save_mail_draft,
-    parse_body_message,
+    parse_body_message, storage,
 };
 use taomni_plugin_api::ErrorCode;
 
@@ -189,6 +189,48 @@ fn queries_read_the_owned_mailbox_and_do_not_create_missing_data() {
         json!([])
     );
     assert_eq!(fs::read_dir(&root).unwrap().count(), 1);
+}
+
+#[test]
+fn saved_original_takes_precedence_and_corruption_is_reported() {
+    let profile = tempfile::tempdir().unwrap();
+    let root = profile.path().canonicalize().unwrap();
+    let store = Store::new(&root);
+    let data = root.join("plugins/mail/data");
+    fs::create_dir_all(&data).unwrap();
+    let account = "saved";
+    let db = Connection::open(data.join(format!("{}.db", mail_db_file_stem(account)))).unwrap();
+    init_mail_tables(&db).unwrap();
+    let snippet = b"Subject: Cached\r\n\r\nCached snippet\r\n";
+    upsert_message(
+        &db,
+        &parse_body_message(account, "INBOX", 5, None, snippet, 1024),
+    )
+    .unwrap();
+    let original = b"Subject: Original\r\n\r\nFull archived body\r\n";
+    let saved = storage::store(&db, account, "INBOX", 5, 1, &original[..]).unwrap();
+    let read = || {
+        invoke(
+            &store,
+            "mail_get_cached_body",
+            Some(json!({"accountId":account,"folder":"INBOX","uid":5})),
+        )
+    };
+    let body = read().unwrap();
+    assert_eq!(body["source"], "archive");
+    assert!(
+        body["text"]
+            .as_str()
+            .unwrap()
+            .contains("Full archived body")
+    );
+    let archive = storage::account_root(&db, account)
+        .unwrap()
+        .join("objects")
+        .join(&saved.hash[..2])
+        .join(format!("{}.eml.gz", saved.hash));
+    fs::write(archive, b"broken archive").unwrap();
+    assert_eq!(read().unwrap_err().message, "MAIL_STORE_UNAVAILABLE");
 }
 
 #[test]

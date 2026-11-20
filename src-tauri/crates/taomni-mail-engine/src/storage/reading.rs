@@ -2,7 +2,7 @@ use super::index::account_root;
 use super::index::lookup;
 use super::index::object_path;
 use super::model::ArchiveEntry;
-use crate::archive::verify_message;
+use crate::archive::{verify_message, verify_message_with};
 use rusqlite::Connection;
 use rusqlite::params;
 use std::fs;
@@ -20,11 +20,15 @@ pub struct OpenMessage {
 
 impl OpenMessage {
     pub fn read(self) -> Result<Vec<u8>, String> {
+        self.read_with(|| Ok(()))
+    }
+
+    pub fn read_with(self, check: impl Fn() -> Result<(), String>) -> Result<Vec<u8>, String> {
         if self.raw_size > 512 * 1024 * 1024 {
             return Err("This saved email exceeds the 512 MiB reader limit; save its original EML to open it externally".into());
         }
         let mut bytes = Vec::new();
-        verify_message(self.file, &self.hash, self.raw_size, &mut bytes)?;
+        verify_message_with(self.file, &self.hash, self.raw_size, &mut bytes, check)?;
         Ok(bytes)
     }
 
@@ -39,14 +43,14 @@ impl OpenMessage {
     }
 }
 
-pub(super) fn open_object(
+fn open_object(
     db: &Connection,
     account: &str,
     hash: String,
     raw_size: u64,
+    open_file: impl FnOnce(&Path) -> Result<File, String>,
 ) -> Result<OpenMessage, String> {
-    let file = File::open(object_path(&account_root(db, account)?, &hash)?)
-        .map_err(|e| format!("Open saved email: {e}"))?;
+    let file = open_file(&object_path(&account_root(db, account)?, &hash)?)?;
     Ok(OpenMessage {
         file,
         hash,
@@ -60,8 +64,19 @@ pub fn open(
     folder: &str,
     uid: u32,
 ) -> Result<Option<OpenMessage>, String> {
+    open_with(db, account, folder, uid, open_file)
+}
+
+/// Resolve the indexed object and let the storage owner open the verified path.
+pub fn open_with(
+    db: &Connection,
+    account: &str,
+    folder: &str,
+    uid: u32,
+    open_file: impl FnOnce(&Path) -> Result<File, String>,
+) -> Result<Option<OpenMessage>, String> {
     lookup(db, account, folder, uid)?
-        .map(|entry| open_object(db, account, entry.hash, entry.raw_size))
+        .map(|entry| open_object(db, account, entry.hash, entry.raw_size, open_file))
         .transpose()
 }
 
@@ -75,7 +90,11 @@ pub fn open_entry(
         params![account,entry.folder,entry.uid_validity,entry.uid],
         |row| Ok((row.get(0)?, row.get::<_,i64>(1)? as u64)),
     ).map_err(|e| e.to_string())?;
-    open_object(db, account, hash, size)
+    open_object(db, account, hash, size, open_file)
+}
+
+fn open_file(path: &Path) -> Result<File, String> {
+    File::open(path).map_err(|error| format!("Open saved email: {error}"))
 }
 
 #[cfg(test)]

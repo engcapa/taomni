@@ -181,6 +181,9 @@ TASK-027 将 G1–G11 设为独立发布阻断门。每个门必须在匹配源�
 - Mail 宿主接管本地草稿保存与删除。每次请求按账号和草稿 ID 更新，首次保存完整提交后才发布库文件。宿主 7 项单测通过，覆盖同 ID 重试、账号隔离、取消后未留下半写入库。跨进程用例增加备份屏障期间拒绝写入、释放屏障后保存和删除、重开后核对数据以及旧缓存保留。
 - `cd0668280` 的 Linux x64 G5 对照已通过。两条路径各 40 个样本，p95 分别为 18.65 ms 和 18.74 ms。Linux、Windows 和 macOS 的 18 项连接、延迟及吞吐检查均通过。发行候选冻结后按匹配源码重新收证。 [Linux 工件](https://github.com/engcapa/taomni/actions/runs/44674876677/artifacts/14613135161)
 - 旧账号对应的 Mail 包已接入首次自动安装流程。模块商店在当前会话准备验签包并提示下次打开应用时导入。启动先处理待完成的备份还原，再暂时释放启动租约供 Mail 迁移取得独占权。导入失败时可在商店继续安装。TC-MODULES-052 检查提示和刷新后的状态，签名宿主专项覆盖真实启动后读取旧邮件。
+- `0477353f6` 将屏幕二维码解码接入签名 MFA 宿主。应用继续拥有屏幕采集和窗口恢复。TC-MFA-007 检查浏览器错误和重试，TC-MODULES-039 在 Linux 上迁移正式旧版生成的 MFA 数据后，验证宿主识别外部二维码及移除二维码后的空结果。40 项 Rust 单测、16 项前端单测和用例审计通过。 [三端 UI](https://github.com/engcapa/taomni/actions/runs/44710605491) · [Wayland 回归](https://github.com/engcapa/taomni/actions/runs/44710604908) · [宿主专项](https://github.com/engcapa/taomni/actions/runs/44710605284)
+- macOS 26 ARM64 的静态 Kerberos 构建因 `_cc_initialize` 缺少系统库失败。验证分支在构建阶段链接系统 Kerberos framework，并保留已有的 DMG、updater 资产和宿主签名检查。修订候选源码为 `67ae2a6a3`。 [首轮失败](https://github.com/engcapa/taomni/actions/runs/44670439565/job/136081361111) · [ARM64 重试](https://github.com/engcapa/taomni/actions/runs/44711792115)
+- Mail 的宿主读取迁移后的归档对象，逐块校验解压长度、SHA-256 并检查取消状态。具有完整原信时按原件解析正文，其他邮件沿用缓存行。跨进程用例使用迁移前后的完整归档、独立宿主及正常退出重开。51 项邮件引擎单测和 8 项宿主单测通过。桌面 Mail 入口仍由过渡实现提供。
 
 ## 当前结论
 

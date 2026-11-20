@@ -1,7 +1,7 @@
 use std::{
     fs::{self, File, Metadata, OpenOptions},
     io::ErrorKind,
-    path::{Path, PathBuf},
+    path::{Component, Path, PathBuf},
     time::Duration,
 };
 
@@ -105,20 +105,34 @@ impl Store {
     pub(super) fn snapshot_source(&self, relative: &str) -> Result<PathBuf, RpcError> {
         let path = SafeRelativePath::parse(relative)
             .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
-        let mut source = self.data_root(false)?.ok_or_else(unavailable)?;
-        let parts: Vec<_> = path.as_str().split('/').collect();
-        for part in &parts[..parts.len() - 1] {
-            source.push(part);
-            if !directory(&source)? {
-                return Err(unavailable());
-            }
-        }
-        source.push(parts.last().ok_or_else(unavailable)?);
-        if !regular(&source)? {
+        let root = self.data_root(false)?.ok_or_else(unavailable)?;
+        checked_data_file(root, Path::new(path.as_str()))
+    }
+
+    pub(super) fn open_owned_file(&self, path: &Path) -> Result<File, RpcError> {
+        let root = self.data_root(false)?.ok_or_else(unavailable)?;
+        let relative = path.strip_prefix(&root).map_err(|_| unavailable())?;
+        let source = checked_data_file(root, relative)?;
+        open_snapshot_file(&source)
+    }
+}
+
+fn checked_data_file(mut root: PathBuf, relative: &Path) -> Result<PathBuf, RpcError> {
+    let parent = relative.parent().ok_or_else(unavailable)?;
+    for component in parent.components() {
+        let Component::Normal(part) = component else {
+            return Err(unavailable());
+        };
+        root.push(part);
+        if !directory(&root)? {
             return Err(unavailable());
         }
-        Ok(source)
     }
+    root.push(relative.file_name().ok_or_else(unavailable)?);
+    if !regular(&root)? {
+        return Err(unavailable());
+    }
+    Ok(root)
 }
 
 fn validate_account(account_id: &str) -> Result<(), RpcError> {
