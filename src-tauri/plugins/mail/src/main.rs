@@ -1,0 +1,11 @@
+use std::process::ExitCode;
+
+fn main() -> ExitCode {
+    match taomni_plugin_mail::serve_stdio() {
+        Ok(()) => ExitCode::SUCCESS,
+        Err(_) => {
+            eprintln!("Mail host failed to start or lost its control channel");
+            ExitCode::FAILURE
+        }
+    }
+}

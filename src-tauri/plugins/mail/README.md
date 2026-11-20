@@ -18,7 +18,13 @@ settings and resolves attachment bytes and user-selected file destinations.
 The connection owns its proxy forwarder and releases it when connection
 setup fails or the connection closes.
 
-The manifest is provisional until the native host, frontend bundle, legacy
-cache migration, scoped core-service contract and browser/native acceptance
-cases are complete. It must not be added to a production `modules.json` before
-TASK-026 and TASK-027 are closed.
+The provisional host serves cached folders, paged headers and cached bodies
+from `plugins/mail/data/<account-stem>.db` while the SDK holds its profile and
+module leases. The host opens existing SQLite data in read-only mode. The
+manifest declares the commands and permissions implemented by this host.
+The hosted protocol workflow verifies cache reads, competing host rejection,
+exit and reopening against an isolated profile on Linux, Windows and macOS.
+
+Production activation requires legacy cache migration, the frontend bundle
+and the scoped Vault, proxy and file-viewer services from TASK-026. Add the
+module to the production catalog after TASK-026 and TASK-027 are closed.

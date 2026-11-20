@@ -152,3 +152,15 @@ test("MFA runtime cargo tree rejects transitive core/SDK and network ownership",
   fs.writeFileSync(tree, "wrong-root v0.1.0\n");
   assert.match(modularBoundaryViolations(root, { mfaTreeFile: tree }).join("\n"), /does not identify/);
 });
+
+test("Mail host may use the engine and SDK without linking a peer module", (t) => {
+  const root = fixture(t);
+  const directory = "src-tauri/plugins/mail";
+  fs.mkdirSync(path.join(root, directory, "src"), { recursive: true });
+  write(root, `${directory}/Cargo.toml`, '[dependencies]\ntaomni-mail-engine = { path = "../../crates/taomni-mail-engine" }\n');
+  const tree = path.join(root, "mail-host-tree.txt");
+  fs.writeFileSync(tree, "taomni-plugin-mail v0.1.0\ntaomni-mail-engine v0.1.0\ntaomni-plugin-sdk v0.1.0\n");
+  assert.deepEqual(modularBoundaryViolations(root, { mailHostTreeFile: tree }), []);
+  fs.appendFileSync(tree, "taomni-plugin-mfa v0.1.0\n");
+  assert.match(modularBoundaryViolations(root, { mailHostTreeFile: tree }).join("\n"), /Mail host dependency tree contains taomni-plugin-mfa/);
+});

@@ -169,6 +169,7 @@ TASK-027 将 G1–G11 设为独立发布阻断门。每个门必须在匹配源�
 - Mail 的 POP3 协议、TLS/STLS 握手、APOP、UIDL 去重规划和原信字节读取迁入独立引擎。核心过渡层持有会话转发及本地 SQLite 写入。TC-MAIL-POP3-01 在 Browser 和 Native 验证重复同步后打开新收邮件的正文。
 - `fad537a25` 的邮件引擎 35 项、桌面适配层 10 项单测通过。`30234305c` 迁出 IMAP 增量同步、历史补拉、对账、分页与正文预取，本地 42 项引擎及 29 项桌面单测通过。TC-MAIL-SYNC-01 新增重开后读取最新正文的断言。两个批次均启动三端 Browser、Native 和崩溃回归，分片上传后直接下载。 [POP3](https://github.com/engcapa/taomni/actions/runs/44677155053) · [IMAP](https://github.com/engcapa/taomni/actions/runs/44679358478)
 - 邮件引擎已接管 SQLite 缓存读写、同步水位、已读冲突处理、联系人索引和 POP3 本地文件夹。旧库重复初始化仍可读取原有标题和正文。45 项引擎单测、43 项桌面与备份单测及 QA 审计通过。TC-MAIL-SYNC-02 增加重开后观察删除和已读状态的 Browser 与 Native 检查。
+- `b9c6d34e7` 的邮件缓存、旧 Mail 预检和完整崩溃回归由三端运行验证。独立 Mail 宿主已实现只读模块目录中的缓存文件夹、分页标题和正文，4 项宿主单测通过。三端协议运行验证独占 profile 的实际进程、退出重开和缓存原件不变。Mail 面板、旧缓存搬迁和网络服务仍处于 TASK-026 实施阶段。 [缓存三端运行](https://github.com/engcapa/taomni/actions/runs/44681017385)
 
 ## 当前结论
 

@@ -11139,6 +11139,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "taomni-plugin-mail"
+version = "0.1.0"
+dependencies = [
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "taomni-mail-engine",
+ "taomni-plugin-api",
+ "taomni-plugin-sdk",
+ "tempfile",
+]
+
+[[package]]
 name = "taomni-plugin-mfa"
 version = "0.1.0"
 dependencies = [
