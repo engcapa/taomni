@@ -1,7 +1,9 @@
 import type { PluginManifest, PluginRecord } from "../lib/pluginRegistry";
+import vncManifest from "../../src-tauri/plugins/vnc-client/module.json";
 
 /** Explicit browser-only fixture model. Never verifies or installs an archive. */
 export const MODULE_PREVIEW_KEY = "taomni.preview.modules.v1";
+const VNC_PREVIEW_KEY = "taomni.preview.modules.vnc.v1";
 export const previewHelloManifest: PluginManifest = {
   id: "taomni-plugin-hello-plugin", slug: "hello-plugin", name: "Hello Plugin", version: "0.1.0",
   coreApiVersion: "1", kind: "collaboration", status: "provisional",
@@ -12,29 +14,43 @@ export const previewHelloManifest: PluginManifest = {
   permissions: [], dataDir: "plugins/hello-plugin", backupPaths: ["plugins/hello-plugin/data"],
   legacyTables: [], vaultFixedKeys: [], snapshot: "rpc",
 };
+const previewVncManifest = vncManifest as PluginManifest;
 
 interface PreviewState { lifecycle: PluginRecord["lifecycle"]; values: string[]; version?: string; previousVersion?: string }
 
-export function readModulePreview(): PreviewState | null {
+function readPreview(key: string): PreviewState | null {
   try {
-    const value = JSON.parse(localStorage.getItem(MODULE_PREVIEW_KEY) ?? "null");
+    const value = JSON.parse(localStorage.getItem(key) ?? "null");
     if (!["installed", "enabled", "disabled", "uninstalled"].includes(value?.lifecycle)
       || !Array.isArray(value.values) || value.values.some((entry: unknown) => typeof entry !== "string")) return null;
     return value;
   } catch { return null; }
 }
 
-export function previewModuleRecord(state: PreviewState): PluginRecord {
+export function readModulePreview(): PreviewState | null {
+  return readPreview(MODULE_PREVIEW_KEY);
+}
+
+export function previewModuleRecord(state: PreviewState, manifest = previewHelloManifest): PluginRecord {
   return {
-    slug: "hello-plugin", manifest: { ...previewHelloManifest, version: state.version ?? previewHelloManifest.version },
+    slug: manifest.slug, manifest: { ...manifest, version: state.version ?? manifest.version },
     lifecycle: state.lifecycle, previousVersion: state.previousVersion, dataRetained: state.values.length > 0,
   };
 }
 
 export function invokeModulePreview(command: string, args?: Record<string, unknown>): unknown {
-  const state = readModulePreview();
-  if (command === "plugin_list" || command === "plugin_refresh") return state ? [previewModuleRecord(state)] : [];
-  if (!state || args?.slug !== "hello-plugin") throw new Error(`Module operation requires the desktop app: ${command}`);
+  if (command === "plugin_list" || command === "plugin_refresh") {
+    const hello = readModulePreview();
+    const vnc = readPreview(VNC_PREVIEW_KEY);
+    return [
+      ...(hello ? [previewModuleRecord(hello)] : []),
+      ...(vnc ? [previewModuleRecord(vnc, previewVncManifest)] : []),
+    ];
+  }
+  const manifest = args?.slug === previewVncManifest.slug ? previewVncManifest : previewHelloManifest;
+  const key = manifest === previewVncManifest ? VNC_PREVIEW_KEY : MODULE_PREVIEW_KEY;
+  const state = readPreview(key);
+  if (!state || args?.slug !== manifest.slug) throw new Error(`Module operation requires the desktop app: ${command}`);
   if (command === "plugin_set_enabled" && state.lifecycle !== "uninstalled") {
     state.lifecycle = args.enabled === true ? "enabled" : "disabled";
   } else if (command === "plugin_uninstall") {
@@ -43,7 +59,7 @@ export function invokeModulePreview(command: string, args?: Record<string, unkno
     if (args.deleteData === true) state.values = [];
   } else if (command === "plugin_rollback" && state.lifecycle !== "uninstalled" && state.previousVersion && args.version === state.previousVersion) {
     [state.version, state.previousVersion] = [state.previousVersion, state.version];
-  } else if (command === "plugin_invoke" && state.lifecycle === "enabled") {
+  } else if (command === "plugin_invoke" && manifest === previewHelloManifest && state.lifecycle === "enabled") {
     if (args.command === "hello/ping") return { pluginId: previewHelloManifest.id, version: state.version ?? previewHelloManifest.version, enabled: true };
     if (args.command === "hello/read") return { values: [...state.values] };
     const value = (args.payload as { value?: unknown } | undefined)?.value;
@@ -51,9 +67,9 @@ export function invokeModulePreview(command: string, args?: Record<string, unkno
       throw new Error("Invalid preview module request");
     }
     state.values.push(value);
-    localStorage.setItem(MODULE_PREVIEW_KEY, JSON.stringify(state));
+    localStorage.setItem(key, JSON.stringify(state));
     return { values: [...state.values] };
   } else throw new Error(`Module operation is unavailable: ${command}`);
-  localStorage.setItem(MODULE_PREVIEW_KEY, JSON.stringify(state));
-  return previewModuleRecord(state);
+  localStorage.setItem(key, JSON.stringify(state));
+  return previewModuleRecord(state, manifest);
 }

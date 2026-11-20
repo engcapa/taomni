@@ -21,6 +21,7 @@ files:
   - src/lib/pluginTabPersistence.ts
   - src/stores/pluginFrontendStore.ts
   - src/components/plugins/PluginTabPane.tsx
+  - src/components/plugins/PluginUnavailablePane.tsx
   - src/components/plugins/ModuleTabActions.tsx
   - src/lib/moduleStore.ts
   - src/stores/moduleStore.ts
@@ -365,6 +366,8 @@ controls:
     kind: display
   - id: plugin-tab-unavailable
     selector: '[data-testid="plugin-tab-unavailable"]'
+    aliases:
+      - '[data-plugin-slug="vnc-client"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
     kind: display
   - id: plugin-tab-error
     selector: '[data-testid="plugin-tab-error"]'
@@ -374,6 +377,8 @@ controls:
     kind: interactive
   - id: plugin-tab-settings
     selector: '[data-testid="plugin-tab-settings"]'
+    aliases:
+      - '[data-plugin-slug="vnc-client"] [data-testid="plugin-tab-settings"]'
     kind: interactive
   - id: plugin-tab-loading
     selector: '[data-testid="plugin-tab-loading"]'
@@ -4024,7 +4029,7 @@ controls: []   # backend-only — RFB protocol + WebSocket bridge; the canvas su
 
 - `taomni-vnc-engine` 提供 RFB 握手、协议编解码、画质策略、帧队列、WebSocket relay 和 Windows 系统光标采样。桌面适配层 `src-tauri/src/vnc/` 提供 IPC、会话记录和代理连接。启用已安装的 VNC Client 模块后，宿主负责认证和帧转发。
 - `taomni-vnc-api` 提供核心与宿主共用的连接参数、错误和经认证的转发协议。关闭 `legacy-vnc-client` 的核心调用已启用的签名宿主。
-- 宿主专项检查转发凭据、连接探测、帧像素、取消和 TCP/WS 释放。TC-MODULES-053 验证签名安装、启禁和保存会话重开。TC-156 验证关闭标签时释放原连接，重开后重新认证、绘制和发送输入。TC-151 和原有剪贴板用例继续覆盖认证与会话。
+- 宿主专项检查转发凭据、连接探测、帧像素、取消和 TCP/WS 释放。TC-MODULES-053 验证签名安装、禁用时关闭连接及重新启用后恢复原标签。TC-156 验证关闭标签时释放原连接，重开后重新认证、绘制和发送输入。TC-151 和原有剪贴板用例继续覆盖认证与会话。
 - Tauri 命令：`vnc_connect / vnc_cancel_connect / vnc_disconnect / vnc_test_connection / vnc_create_detach_claim / vnc_consume_detach_claim / vnc_set_special_key_capture / vnc_special_key_capture_status`
 - 本地动态端口 WebSocket relay：VNC server ↔ 前端 Canvas（前端不再直接持有 TCP 套接字）
 
@@ -4065,6 +4070,8 @@ status: done
 area: vnc
 components: [VncPanel, FloatingToolbar, CaptureToolbar, SessionEditor]
 files:
+  - src/components/plugins/VncSessionPane.tsx
+  - src/stubs/modulePreview.ts
   - src/components/vnc/VncPanel.tsx
   - src/components/vnc/vncSessionMenu.ts
   - src/components/vnc/VncConnectionOverlay.tsx

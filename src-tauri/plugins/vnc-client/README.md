@@ -9,8 +9,10 @@ credentials for each connection.
 The hosted protocol workflow verifies single-use forwarding, framebuffer bytes,
 cancellation during RFB setup, explicit close, and upstream socket release when
 the host exits.
-Desktop tabs continue to use the existing adapter while the signed frontend,
-desktop routing and module packaging are being integrated.
+The desktop adapter routes an enabled module's connections through the signed
+host. Disabling or uninstalling the module unmounts the viewer and keeps its
+saved session. The renderer is still built into the desktop during the frontend
+migration.
 
 The Windows special-key helper builds from `key-helper/` without linking the
 desktop application. The current VNC adapter starts it by executable name and
@@ -24,6 +26,5 @@ beside the application binary. Native QA ties both binaries to the build
 identity and verifies early and normal owner-pipe exit.
 
 The Windows signed VNC QA package carries the helper beside the module host in
-the archive. The package signature covers the helper's bytes and the other
-targets have only the declared module files. Desktop launches switch to the
-module package when the client host and frontend move out of the application.
+the archive. The package signature covers the helper's bytes. An installed
+module starts its packaged helper and owns its lifetime.

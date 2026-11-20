@@ -2,12 +2,12 @@ import { lazy, Suspense, type ReactNode } from "react";
 import type { VncSessionProperties } from "../vnc/VncPropertiesDialog";
 import type { MailTabInfo, Tab } from "../../types";
 import { useT } from "../../lib/i18n";
+import VncSessionPane from "./VncSessionPane";
 
 const LegacyMfaTab = lazy(() => import("../mfa/MfaTab").then((module) => ({ default: module.MfaTab })));
 const LegacyServersPanel = lazy(() => import("../servers/ServersPanel").then((module) => ({ default: module.ServersPanel })));
 const LegacySocksCapPanel = lazy(() => import("../sockscap/SocksCapPanel").then((module) => ({ default: module.SocksCapPanel })));
 const LegacyRdpPanel = lazy(() => import("../rdp/RdpPanel"));
-const LegacyVncPanel = lazy(() => import("../vnc/VncPanel"));
 const LegacyProxyTestTab = lazy(() => import("../proxy/ProxyTestTab"));
 const LegacyMailClientTab = lazy(() => import("../mail/MailClientTab").then((module) => ({ default: module.MailClientTab })));
 const LegacyMailUnifiedTab = lazy(() => import("../mail/MailUnifiedTab").then((module) => ({ default: module.MailUnifiedTab })));
@@ -83,7 +83,7 @@ export function LegacyPluginTabPane(props: LegacyPluginTabPaneProps) {
     }
     case "vnc": {
       const info = tab.vnc;
-      content = info ? <LegacyVncPanel
+      content = info ? <VncSessionPane
         tabId={tab.id}
         host={info.host}
         port={info.port}

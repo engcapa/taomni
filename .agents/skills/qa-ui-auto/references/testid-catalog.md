@@ -2729,9 +2729,11 @@
 - `[data-testid="module-action-open-hello-plugin-hello-plugin"]` — interactive — F-Modules-1.module-action-open-hello-plugin
 - `[data-testid="plugin-tab-panel"]` — display — F-Modules-1.plugin-tab-panel
 - `[data-testid="plugin-tab-unavailable"]` — display — F-Modules-1.plugin-tab-unavailable
+  ↳ `[data-plugin-slug="vnc-client"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]` — alias
 - `[data-testid="plugin-tab-error"]` — display — F-Modules-1.plugin-tab-error
 - `[data-testid="plugin-tab-retry"]` — interactive — F-Modules-1.plugin-tab-retry
 - `[data-testid="plugin-tab-settings"]` — interactive — F-Modules-1.plugin-tab-settings
+  ↳ `[data-plugin-slug="vnc-client"] [data-testid="plugin-tab-settings"]` — alias
 - `[data-testid="plugin-tab-loading"]` — display [optional] — F-Modules-1.plugin-tab-loading
 - `[data-testid="hello-plugin-view"]` — display — F-Modules-1.hello-plugin-view
 - `[data-testid="hello-plugin-value"]` — interactive — F-Modules-1.hello-plugin-value

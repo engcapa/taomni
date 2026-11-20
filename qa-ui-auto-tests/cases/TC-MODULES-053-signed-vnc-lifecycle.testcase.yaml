@@ -3,8 +3,9 @@ title: A signed VNC host connects and follows the module lifecycle
 description: >-
   Install the matching signed VNC module, enable it and open a saved VNC session.
   Check authentication, pixels and input on a real runner-local RFB server. Disable
-  the module while the session is active and observe the authenticated socket close.
-  Enable it again and use the same saved session without restarting the app.
+  the module while the session is active, verify the authenticated socket closes
+  and that the open tab explains how to enable the module. Resume the same saved
+  session without closing the tab or restarting the app.
 covers: [F-Modules-1, F9.1, F9.6]
 tags: [modules, vnc, lifecycle, native-boundary, p1]
 modes: [native]
@@ -45,11 +46,19 @@ steps:
 - click: '[data-testid="module-action-disable-vnc-client"]'
 - wait_for: '[data-testid="module-action-enable-vnc-client"]'
 - assert_file_contains: {path: '${fixture.vnc_events}', contains: '"type": "session_closed"'}
+- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
+- click: '[data-testid="tab-item"][data-tab-type="vnc"]'
+- wait_for: '[data-plugin-slug="vnc-client"] [data-testid="plugin-tab-unavailable"][data-reason="disabled"]'
+- assert_count: {selector: '[data-testid="vnc-panel"]', equal: 0}
+- assert_count: {selector: '[data-testid="tab-item"][data-tab-type="vnc"]', equal: 1}
+- click: '[data-plugin-slug="vnc-client"] [data-testid="plugin-tab-settings"]'
+- wait_for: '[data-testid="module-action-enable-vnc-client"]'
 - click: '[data-testid="module-action-enable-vnc-client"]'
 - wait_for: '[data-testid="module-action-disable-vnc-client"]'
+- click: '[data-testid="nav-mode-home"]'
 - click: '[data-testid="side-tab-sessions"]'
-- click: '[data-testid="tab-item"][data-tab-type="vnc"] [data-testid="tab-close"]'
-- dblclick: '[data-testid="session-tree-item"][data-session-name="qa-signed-vnc"]'
+- click: '[data-testid="tab-item"][data-tab-type="vnc"]'
 - click: '[data-testid="vnc-unencrypted-continue"]'
 - fill: {selector: '[data-testid="vnc-auth-password"]', value: '${env.QA_VNC_PASSWORD}'}
 - click: '[data-testid="vnc-auth-ok"]'
@@ -74,15 +83,18 @@ verification:
     results: [8, 10, 25, 27]
   - id: R2
     requirement: Disabling VNC closes its active transport and enabling it restores the saved session without restarting the desktop.
-    actions: [28, 29, 30, 33, 35, 36, 37, 38, 39, 40, 43]
+    actions: [28, 29, 30, 33, 34, 35, 39, 41, 43, 44, 45, 46, 47, 48, 51]
     checkpoints:
     - {step: 31, expectation: Settings shows the module ready to enable.}
     - {step: 32, expectation: The RFB server observes the authenticated connection end on disable.}
-    - {step: 34, expectation: Settings shows the module enabled again.}
-    - {step: 42, expectation: The reopened saved session paints frames.}
-    - {step: 44, expectation: The RFB server receives fresh input from the reopened viewer.}
-    - {step: 45, expectation: Lifecycle changes leave the desktop without uncaught renderer errors.}
-    results: [31, 32, 34, 42, 44, 45]
+    - {step: 36, expectation: The saved session displays the disabled module state.}
+    - {step: 37, expectation: The VNC renderer unmounts when the module is disabled.}
+    - {step: 38, expectation: A single VNC tab preserves the saved session.}
+    - {step: 42, expectation: Settings shows the module enabled again.}
+    - {step: 50, expectation: The reopened saved session paints frames.}
+    - {step: 52, expectation: The RFB server receives fresh input from the reopened viewer.}
+    - {step: 53, expectation: Lifecycle changes leave the desktop without uncaught renderer errors.}
+    results: [31, 32, 36, 37, 38, 42, 50, 52, 53]
   visual:
   - check: The connected viewer paints the fixture before disable and after re-enable.
     method: automated

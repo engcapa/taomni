@@ -57,9 +57,9 @@ import { TabActionSlotProvider } from "../tabbar/TabActionSlot";
 import { ChatDrawer } from "../chat/ChatDrawer";
 import { TaoRibbon } from "../tao/TaoRibbon";
 import { CcAgentBridge } from "../agent/CcAgentBridge";
+import VncSessionPane from "../plugins/VncSessionPane";
 
 const RdpPanel = lazy(() => import("../rdp/RdpPanel"));
-const VncPanel = lazy(() => import("../vnc/VncPanel"));
 const DbClientTab = lazy(() => import("../database/DbClientTab"));
 
 /* ── Handoff payload shapes ──────────────────────────────────────────── */
@@ -611,7 +611,7 @@ function renderInner(
       if (!p.host || !p.port) return <LoadingScreen label={tr("vnc.loading")} />;
       return (
         <Suspense fallback={<LoadingScreen label={tr("vnc.loading")} />}>
-          <VncPanel
+          <VncSessionPane
             tabId={p.tabId ?? `detached-vnc-${id}`}
             host={p.host}
             port={p.port}

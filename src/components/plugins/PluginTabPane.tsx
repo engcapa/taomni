@@ -4,6 +4,7 @@ import { useT } from "../../lib/i18n";
 import { loadPluginFrontend, type PluginImporter } from "../../lib/pluginLoader";
 import { createPluginFrontendApi, installPluginFrontendHost, type PluginFrontendApi, type PluginFrontendProps } from "../../lib/pluginFrontendHost";
 import { usePluginFrontendStore } from "../../stores/pluginFrontendStore";
+import { PluginUnavailablePane } from "./PluginUnavailablePane";
 
 interface LoadedFrontend {
   identity: string;
@@ -76,12 +77,9 @@ export function PluginTabPane({ tab, active, importer, onOpenSettings }: {
     content = <p data-testid="plugin-tab-loading" role="status" className="m-auto p-6 text-[13px]">{t("plugins.loading")}</p>;
   } else if (!available) {
     const reason = record?.lifecycle === "uninstalled" || !record ? "missing" : record.lifecycle !== "enabled" ? "disabled" : "unavailable";
-    content = <div data-testid="plugin-tab-unavailable" data-reason={reason} className="m-auto max-w-lg space-y-3 p-6 text-[13px]">
-      <p className="font-semibold">{t(`plugins.${reason}`)}</p>
-      <p className="break-words text-[var(--taomni-text-muted)]">{record?.reason ?? t("plugins.retained")}</p>
-      {onOpenSettings && <button data-testid="plugin-tab-settings" className="taomni-btn px-3 py-1" onClick={onOpenSettings}>{t("plugins.settings")}</button>}
+    content = <PluginUnavailablePane reason={reason} detail={record?.reason} onOpenSettings={onOpenSettings}>
       <button data-testid="plugin-tab-retry" className="taomni-btn px-3 py-1" onClick={retryLoad}>{t("plugins.retry")}</button>
-    </div>;
+    </PluginUnavailablePane>;
   } else if (failure?.identity === identity) {
     content = errorView(failure.error);
   } else if (loaded?.identity === identity) {
