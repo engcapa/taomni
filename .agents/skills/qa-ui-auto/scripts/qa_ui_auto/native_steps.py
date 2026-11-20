@@ -3159,30 +3159,6 @@ def _mfa_helper_line(proc: subprocess.Popen[str], timeout: float) -> str:
     return lines[0] if lines else ""
 
 
-# Topmost Tk window showing the fixture image, so a real screen capture of the
-# desktop (with Taomni hidden) contains a QR code. Prints its geometry once mapped.
-_MFA_IMAGE_WINDOW_SOURCE = r'''
-import sys
-import tkinter as tk
-
-path, x, y = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
-root = tk.Tk()
-root.title("Taomni QA MFA QR")
-root.configure(background="white")
-image = tk.PhotoImage(file=path)
-tk.Label(root, image=image, background="white", borderwidth=0).pack(padx=24, pady=24)
-root.geometry(f"+{x}+{y}")
-root.attributes("-topmost", True)
-
-def ready():
-    root.update_idletasks()
-    print("WINDOW-READY", root.winfo_rootx(), root.winfo_rooty(), root.winfo_width(), root.winfo_height(), flush=True)
-
-root.after(300, ready)
-root.mainloop()
-'''
-
-
 @_verb("native_show_image_window")
 def _do_native_show_image_window(ctx: NativeStepContext, args: Any) -> str:
     from .mfa_support import png_fixture
@@ -3190,18 +3166,26 @@ def _do_native_show_image_window(ctx: NativeStepContext, args: Any) -> str:
     args = args if isinstance(args, dict) else {"path": args}
     if args.get("action", "show") == "close":
         return "image window closed" if ctx.stop_mfa_helper("image-window") else "no image window was open"
-    if platform.system() not in {"Linux", "Windows"} or (platform.system() == "Linux" and not (os.environ.get("DISPLAY") or wayland.active())):
-        raise StepError("native_show_image_window: requires a Linux X11 display or a Windows desktop")
+    system = platform.system()
+    if system not in {"Linux", "Windows", "Darwin"} or (system == "Linux" and not (os.environ.get("DISPLAY") or wayland.active())):
+        raise StepError("native_show_image_window: requires an interactive Linux, Windows or macOS desktop")
     target, data = png_fixture(args.get("path"), "native_show_image_window")
     ctx.stop_mfa_helper("image-window")
-    command = (["/usr/bin/python3", str(Path(__file__).resolve().parents[1] / "ci_wayland_fixture.py"), "image", "--path", str(target)]
-               if wayland.active() else [sys.executable, "-c", _MFA_IMAGE_WINDOW_SOURCE, str(target), str(int(args.get("x", 40))), str(int(args.get("y", 40)))])
+    scripts = Path(__file__).resolve().parents[1]
+    position = [str(int(args.get(axis, 40))) for axis in ("x", "y")]
+    if system == "Darwin":
+        command = ["swift", str(scripts / "macos_mfa_image_window.swift"), str(target), *position]
+    elif wayland.active():
+        command = ["/usr/bin/python3", str(scripts / "ci_wayland_fixture.py"), "image", "--path", str(target)]
+    else:
+        command = [sys.executable, str(scripts / "mfa_image_window_tk.py"), str(target), *position]
     proc = subprocess.Popen(
         command,
         stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
     )
     ctx._mfa_helpers["image-window"] = proc
-    line = _mfa_helper_line(proc, timeout=20)
+    startup_timeout = 45 if system == "Darwin" else 20
+    line = _mfa_helper_line(proc, timeout=startup_timeout)
     if not line.startswith("WINDOW-READY"):
         exited = proc.poll() is not None
         err = ""
@@ -3209,7 +3193,7 @@ def _do_native_show_image_window(ctx: NativeStepContext, args: Any) -> str:
             with suppress(Exception):
                 err = proc.stderr.read().strip()
         ctx.stop_mfa_helper("image-window")
-        detail = line.strip() or err or (f"exit {proc.returncode}" if exited else "no ready signal within 20s")
+        detail = line.strip() or err or (f"exit {proc.returncode}" if exited else f"no ready signal within {startup_timeout}s")
         raise StepError(f"native_show_image_window: window did not appear: {detail}")
     x, y, width, height = (int(v) for v in line.split()[1:5])
     observation = {"path": str(target), "sha256": hashlib.sha256(data).hexdigest(), "pid": proc.pid,
