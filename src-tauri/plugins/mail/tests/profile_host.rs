@@ -7,7 +7,7 @@ use std::{
     time::{Duration, Instant},
 };
 
-use rusqlite::Connection;
+use rusqlite::{Connection, TransactionBehavior};
 use serde_json::{Value, json};
 use taomni_mail_engine::{
     MailFolder,
@@ -21,7 +21,7 @@ use taomni_mail_engine::{
     storage,
 };
 use taomni_plugin_api::{
-    HandshakeRequest, HandshakeResponse, RequestId, RpcMessage, RpcRequest, RpcResponse,
+    ErrorCode, HandshakeRequest, HandshakeResponse, RequestId, RpcMessage, RpcRequest, RpcResponse,
     services::{
         HOST_PROFILE_ENV, HostInstanceId, HostProfileContext, ProfileGeneration, SNAPSHOT_METHOD,
         SNAPSHOT_PREPARE_METHOD, SNAPSHOT_RELEASE_METHOD, SnapshotResult,
@@ -381,26 +381,38 @@ fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
         "mail_delete_draft",
         json!({"accountId":ACCOUNT,"draftId":"scheduled"}),
     );
-    let after = fs::read(&path).unwrap();
-    let mut outstanding = ["template", "queued"]
-        .into_iter()
-        .map(|id| {
-            host.write_request(
-                "mail_save_draft",
-                json!({"accountId":FRESH_ACCOUNT,"draft":{"id":id,"subject":id}}),
-            )
-        })
-        .collect::<Vec<_>>();
-    for _ in 0..2 {
-        let response = host.read_response();
-        assert!(response.error.is_none(), "{:?}", response.error);
-        let id = response.id.unwrap();
-        let index = outstanding
-            .iter()
-            .position(|pending| *pending == id)
+    let saved = {
+        // Hold the admitted write open while a second request reaches the SDK.
+        let mut blocker = Connection::open(&path).unwrap();
+        let lock = blocker
+            .transaction_with_behavior(TransactionBehavior::Immediate)
             .unwrap();
-        outstanding.swap_remove(index);
-    }
+        let admitted = host.write_request(
+            "mail_save_draft",
+            json!({"accountId":ACCOUNT,"draft":{"id":"module-draft","subject":"Retried after lock"}}),
+        );
+        let create =
+            json!({"accountId":FRESH_ACCOUNT,"draft":{"id":"template","subject":"Template"}});
+        let rejected = host.write_request("mail_save_draft", create.clone());
+        let response = host.read_response();
+        assert_eq!(response.id, Some(rejected));
+        assert_eq!(response.error.unwrap().code, ErrorCode::InvalidState as i32);
+        assert!(
+            !root
+                .join(format!("{}.db", mail_db_file_stem(FRESH_ACCOUNT)))
+                .exists()
+        );
+
+        lock.rollback().unwrap();
+        let response = host.read_response();
+        assert_eq!(response.id, Some(admitted));
+        assert!(response.error.is_none(), "{:?}", response.error);
+        let saved = response.result.unwrap();
+        assert_eq!(saved["subject"], "Retried after lock");
+        assert_eq!(host.call("mail_save_draft", create)["id"], "template");
+        saved
+    };
+    let after = fs::read(&path).unwrap();
     drop(host.child.stdin.take());
     assert_eq!(host.exit_code(), Some(0));
 
@@ -411,14 +423,8 @@ fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
     let reopened_drafts = reopened.call("mail_list_drafts", json!({"accountId":ACCOUNT}));
     assert_eq!(reopened_drafts, json!([saved]));
     let fresh = reopened.call("mail_list_drafts", json!({"accountId":FRESH_ACCOUNT}));
-    let mut ids = fresh
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|draft| draft["id"].as_str().unwrap())
-        .collect::<Vec<_>>();
-    ids.sort_unstable();
-    assert_eq!(ids, ["queued", "template"]);
+    assert_eq!(fresh.as_array().unwrap().len(), 1);
+    assert_eq!(fresh[0]["id"], "template");
     let suggestions = reopened.call("mail_search_contacts", search);
     assert_eq!(suggestions[0]["name"], "Migrated Card Edited");
     assert_eq!(suggestions[0]["email"], "migrated@example.com");

@@ -1,4 +1,4 @@
-use std::{collections::BTreeSet, fs, sync::Barrier, thread};
+use std::{collections::BTreeSet, fs};
 
 use rusqlite::Connection;
 use serde_json::{Value, json};
@@ -55,57 +55,6 @@ fn draft_writes_are_account_scoped_and_retryable() {
     assert_eq!(drafts[0]["subject"], "updated");
     invoke(&store, "mail_delete_draft", Some(delete("mail-a"))).unwrap();
     assert_eq!(list(), json!([]));
-}
-
-#[test]
-fn simultaneous_saves_publish_one_mailbox_and_keep_each_draft() {
-    let profile = tempfile::tempdir().unwrap();
-    let store = Store::new(&profile.path().canonicalize().unwrap());
-    for offset in [0, 8] {
-        let start = Barrier::new(8);
-        thread::scope(|scope| {
-            for index in offset..offset + 8 {
-                let store = &store;
-                let start = &start;
-                scope.spawn(move || {
-                    let id = format!("draft-{index:02}");
-                    start.wait();
-                    let saved = invoke(
-                        store,
-                        "mail_save_draft",
-                        Some(json!({"accountId":"mail-a","draft":{"id":id,"subject":id}})),
-                    )
-                    .unwrap();
-                    assert_eq!(saved["id"], id);
-                });
-            }
-        });
-    }
-    let drafts = invoke(
-        &store,
-        "mail_list_drafts",
-        Some(json!({"accountId":"mail-a"})),
-    )
-    .unwrap();
-    let ids = drafts
-        .as_array()
-        .unwrap()
-        .iter()
-        .map(|row| row["id"].as_str().unwrap())
-        .collect::<BTreeSet<_>>();
-    let expected = (0..16)
-        .map(|index| format!("draft-{index:02}"))
-        .collect::<Vec<_>>();
-    assert_eq!(ids, expected.iter().map(String::as_str).collect());
-    assert_eq!(
-        profile
-            .path()
-            .join("plugins/mail/data")
-            .read_dir()
-            .unwrap()
-            .count(),
-        1
-    );
 }
 
 #[test]

@@ -2,7 +2,6 @@ use std::{
     fs::{self, File, Metadata, OpenOptions},
     io::ErrorKind,
     path::{Component, Path, PathBuf},
-    sync::Mutex,
     time::Duration,
 };
 
@@ -12,14 +11,12 @@ use taomni_plugin_api::{ErrorCode, RpcError, services::SafeRelativePath};
 
 pub(super) struct Store {
     profile: PathBuf,
-    create_database: Mutex<()>,
 }
 
 impl Store {
     pub(super) fn new(profile: &Path) -> Self {
         Self {
             profile: profile.to_owned(),
-            create_database: Mutex::new(()),
         }
     }
 
@@ -51,16 +48,7 @@ impl Store {
             };
         };
         let path = database_for(&root, account_id);
-        // The first writer publishes a complete database. Later writers wait
-        // for that publication and add their changes to the same database.
-        let creation = if create && !regular(&path)? {
-            Some(self.create_database.lock().map_err(|_| unavailable())?)
-        } else {
-            None
-        };
-        check()?;
         if regular(&path)? {
-            drop(creation);
             let mut db = connect(&path, OpenFlags::SQLITE_OPEN_READ_WRITE)?;
             return apply_change(&mut db, check, change);
         }
@@ -164,6 +152,7 @@ fn apply_change<T>(
     change: impl FnOnce(&Connection) -> Result<T, RpcError>,
 ) -> Result<T, RpcError> {
     check()?;
+    // Acquire the writer lock before reading a row that will be updated.
     let transaction = database
         .transaction_with_behavior(TransactionBehavior::Immediate)
         .map_err(|_| unavailable())?;
