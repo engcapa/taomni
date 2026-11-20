@@ -26,7 +26,8 @@ steps:
 - fill:
     selector: '[data-testid="module-marketplace-source"]'
     value: ${fixture.module_marketplace_new_url}
-- click: '[data-testid="module-marketplace-refresh"]'
+- wait_for: '[data-testid="module-marketplace-refresh"]:not([disabled])'
+- press: {selector: '[data-testid="module-marketplace-refresh"]:not([disabled])', key: Enter}
 - wait_for: '[data-testid="module-release-new-item"]'
 - assert_text:
     selector: '[data-testid="module-release-new-item"]'
@@ -78,42 +79,44 @@ verification:
   requirements:
   - id: R1
     requirement: Compare signed releases and show a new module with its description while waiting for consent.
-    actions: [3, 4, 10, 11, 12, 19]
+    actions: [3, 4, 10, 11, 13, 20]
     checkpoints:
     - step: 9
       expectation: The signed baseline has no offer.
-    - step: 14
-      expectation: The main window shows the module name.
+    - step: 12
+      expectation: The baseline check has finished and the refresh button accepts a new catalog request.
     - step: 15
-      expectation: The main window shows the signed description.
+      expectation: The main window shows the module name.
     - step: 16
-      expectation: The store marks the module as new.
+      expectation: The main window shows the signed description.
     - step: 17
+      expectation: The store marks the module as new.
+    - step: 18
       expectation: The profile records the new ID, with zero archive requests, staged bytes or active pointer.
-    - step: 20
+    - step: 21
       expectation: The offer opens the store.
-    results: [9, 14, 15, 16, 17, 20]
+    results: [9, 12, 15, 16, 17, 18, 21]
   - id: R2
     requirement: Keep the dismissal after a normal restart and install the module after explicit download and review.
-    actions: [21, 23, 31, 32, 34, 36]
+    actions: [22, 24, 32, 33, 35, 37]
     checkpoints:
-    - step: 22
+    - step: 23
       expectation: Later dismisses the visible offer.
-    - step: 28
-      expectation: The offer remains dismissed after a normal restart.
     - step: 29
-      expectation: The module remains uninstalled before confirmation.
+      expectation: The offer remains dismissed after a normal restart.
     - step: 30
+      expectation: The module remains uninstalled before confirmation.
+    - step: 31
       expectation: The profile remembers the dismissal and the signed archive has still received zero requests.
-    - step: 35
+    - step: 36
       expectation: The review opens with the name and version from the verified package after the startup catalog check.
-    - step: 37
-      expectation: The store shows the confirmed module as current.
     - step: 38
-      expectation: Exactly one verified archive transfer occurred and the matching version is active on disk.
+      expectation: The store shows the confirmed module as current.
     - step: 39
+      expectation: Exactly one verified archive transfer occurred and the matching version is active on disk.
+    - step: 40
       expectation: The renderer records no unhandled errors.
-    results: [22, 28, 29, 30, 35, 37, 38, 39]
+    results: [23, 29, 30, 31, 36, 38, 39, 40]
   native:
   - check: Catalog authentication, profile history, HTTP transfer and active version.
     method: external
