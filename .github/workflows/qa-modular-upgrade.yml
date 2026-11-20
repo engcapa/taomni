@@ -81,6 +81,10 @@ on:
         type: choice
         options: [mfa, mail]
         default: mfa
+      signed_native_macos:
+        description: Apply the fixed macOS system signature in the signed module gate
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       head:
@@ -152,6 +156,9 @@ on:
       signed_migration_module:
         type: string
         default: mfa
+      signed_native_macos:
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -229,7 +236,8 @@ jobs:
       head: ${{ inputs.head || github.sha }}
       network_only: ${{ !inputs.signed_mfa_only && inputs.network_only || false }}
       module: ${{ inputs.signed_mfa_only && inputs.signed_migration_module || 'mfa' }}
-      macos_runner: ${{ inputs.signed_mfa_only && inputs.signed_migration_module == 'mail' && inputs.package_macos_arm_runner || 'macos-latest' }}
+      macos_runner: ${{ inputs.signed_mfa_only && (inputs.signed_migration_module == 'mail' || inputs.signed_native_macos) && inputs.package_macos_arm_runner || 'macos-latest' }}
+      native_macos_signing: ${{ inputs.signed_mfa_only && inputs.signed_native_macos || false }}
     secrets: inherit
 
   mfa-engine-contracts:

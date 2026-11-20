@@ -94,6 +94,12 @@ For later core releases that include module packages, the workflow verifies
 the current public catalog and checks the roster before signing the new one.
 Those releases default to the published roster and advance past its sequence.
 
+The module release workflow applies the pinned macOS certificate and hardened
+runtime to Darwin hosts before creating the detached package signature.
+The signing job records the host digest and Gatekeeper assessment. Exercise
+the same signer on GitHub with `qa-modular-upgrade.yml` using
+`signed_mfa_only=true` and `signed_native_macos=true`.
+
 For a module-only release, collect the current official `modules.json`,
 `modules.json.minisig` and the package and sidecar for every asset referenced
 in that catalog under `current-modules/`. Build and sign the changed module

@@ -21,15 +21,23 @@ on:
         type: choice
         options: [macos-latest, macos-26]
         default: macos-latest
+      native_macos_signing:
+        description: Apply the fixed macOS system signature before packing the QA module
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       head: {type: string, default: ''}
       network_only: {type: boolean, default: false}
       module: {type: string, default: mfa}
       macos_runner: {type: string, default: macos-latest}
+      native_macos_signing: {type: boolean, default: false}
     secrets:
       TAURI_SIGNING_PRIVATE_KEY: {required: true}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: {required: false}
+      APPLE_CERTIFICATE: {required: false}
+      APPLE_CERTIFICATE_PASSWORD: {required: false}
+      APPLE_SIGNING_IDENTITY: {required: false}
 
 permissions:
   contents: read
@@ -60,6 +68,7 @@ jobs:
       module: ${{ inputs.module }}
       artifact_key: ${{ inputs.module }}-install-${{ github.run_id }}
       macos_runner: ${{ inputs.macos_runner }}
+      native_macos_signing: ${{ inputs.native_macos_signing }}
     secrets: inherit
 
   installed-host:

@@ -1,5 +1,6 @@
 import { strict as assert } from "node:assert";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
@@ -33,6 +34,58 @@ test("signing checks the selected source SHA and trusted manifest", () => {
   assert.match(workflow, /ref: \$\{\{ github\.workflow_sha \}\}/);
   assert.match(workflow, /candidate source identity does not match the selected commit/);
   assert.match(workflow, /only stable modules can enter a production catalog/);
+});
+
+test("the fixed macOS identity signs the host before the detached package signature", () => {
+  const check = workflow.indexOf("Check candidate identity against the trusted manifest");
+  const host = workflow.indexOf("Sign the macOS host before signing its module archive");
+  const archive = workflow.indexOf("Sign and verify the immutable package");
+  assert(check > 0 && check < host && host < archive);
+  assert.match(workflow, /MACOS_SIGNING_CERT_SHA1: \$\{\{ vars\.MACOS_SIGNING_CERT_SHA1 \}\}/);
+  assert.match(workflow, /always\(\) && env\.MACOS_SIGNING_WORK_DIR != ''/);
+});
+
+test("macOS module signing verifies the pinned host identity and records the assessment", (t) => {
+  const root = mkdtempSync(join(tmpdir(), "taomni-module-signing-test-"));
+  t.after(() => rmSync(root, { recursive: true, force: true }));
+  const certificate = "test public certificate";
+  const fingerprint = createHash("sha1").update(certificate).digest("hex").toUpperCase();
+  const binary = join(root, "taomni-plugin-mail");
+  const evidence = join(root, "evidence");
+  const source = "b".repeat(40);
+  writeFileSync(binary, "test executable");
+  writeFileSync(join(root, "lipo"), "#!/usr/bin/env bash\nprintf 'arm64\\n'\n", { mode: 0o755 });
+  writeFileSync(join(root, "spctl"), "#!/usr/bin/env bash\nprintf 'rejected\\n'\nexit 3\n", { mode: 0o755 });
+  writeFileSync(join(root, "codesign"), `#!/usr/bin/env bash
+case "$1" in
+  --force) test "$5" = runtime ;;
+  --verify) exit 0 ;;
+  -d)
+    case "$2" in
+      --verbose=4) printf 'Identifier=com.taomni.module.mail\\nflags=0x10000(runtime)\\n' >&2 ;;
+      --extract-certificates=*)
+        prefix="$(printf '%s' "$2" | cut -d= -f2-)"
+        printf '%s' "$TEST_CERTIFICATE" > "$prefix"0
+        ;;
+    esac
+    ;;
+esac
+`, { mode: 0o755 });
+  const signing = new URL("./sign-macos-module-host.sh", import.meta.url);
+  const run = (pinned) => spawnSync("bash", [signing.pathname, binary, evidence], {
+    cwd: root,
+    env: { ...process.env, PATH: `${root}:${process.env.PATH}`, RUNNER_TEMP: root,
+      MODULE_SLUG: "mail", MODULE_PLATFORM: "darwin-aarch64", MODULE_SOURCE_SHA: source,
+      MACOS_SIGNING_MODE: "self-signed", MACOS_SIGNING_WORK_DIR: root,
+      MACOS_SIGNING_CERT_SHA1: pinned, TEST_CERTIFICATE: certificate },
+    encoding: "utf8",
+  });
+  assert.equal(run("A".repeat(40)).status, 1);
+  const result = run(fingerprint);
+  assert.equal(result.status, 0, result.stderr);
+  const identity = readFileSync(join(evidence, "identity.txt"), "utf8");
+  assert.match(identity, /gatekeeperExitCode=3/);
+  assert(identity.includes("sourceSha=" + source));
 });
 
 test("authenticates the existing catalog before fetching its assets and signs the merged delta", () => {

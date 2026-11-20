@@ -21,7 +21,7 @@ on:
         required: false
         default: macos-15
         type: choice
-        options: [macos-15, macos-15-intel, macos-latest]
+        options: [macos-15, macos-15-intel, macos-26, macos-latest]
   workflow_call:
     inputs:
       tag:
@@ -46,6 +46,12 @@ on:
       TAURI_SIGNING_PRIVATE_KEY:
         required: true
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD:
+        required: false
+      APPLE_CERTIFICATE:
+        required: false
+      APPLE_CERTIFICATE_PASSWORD:
+        required: false
+      APPLE_SIGNING_IDENTITY:
         required: false
 
 permissions:
@@ -89,10 +95,13 @@ jobs:
 
           slug = os.environ['MODULE_SLUG'].strip()
           tag = os.environ['RELEASE_TAG'].strip()
+          macos_runner = os.environ['MACOS_RUNNER']
           if not re.fullmatch(r'[a-z0-9](?:[a-z0-9-]*[a-z0-9])?', slug):
               raise SystemExit('module must be a lowercase module slug')
           if not re.fullmatch(r'v\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)*', tag):
               raise SystemExit('tag must be a semantic version prefixed with v')
+          if macos_runner not in {'macos-15', 'macos-15-intel', 'macos-26', 'macos-latest'}:
+              raise SystemExit('select a supported GitHub-hosted macOS runner')
           manifest_path = pathlib.Path('src-tauri/plugins') / slug / 'module.json'
           if not manifest_path.is_file():
               raise SystemExit(f'module manifest is missing: {manifest_path}')
@@ -116,8 +125,8 @@ jobs:
           targets = [
               {'os': 'ubuntu-24.04', 'target': 'x86_64-unknown-linux-gnu', 'platform': 'linux-x86_64'},
               {'os': 'windows-latest', 'target': 'x86_64-pc-windows-msvc', 'platform': 'windows-x86_64'},
-              {'os': os.environ['MACOS_RUNNER'], 'target': 'aarch64-apple-darwin', 'platform': 'darwin-aarch64'},
-              {'os': os.environ['MACOS_RUNNER'], 'target': 'x86_64-apple-darwin', 'platform': 'darwin-x86_64'},
+              {'os': macos_runner, 'target': 'aarch64-apple-darwin', 'platform': 'darwin-aarch64'},
+              {'os': macos_runner, 'target': 'x86_64-apple-darwin', 'platform': 'darwin-x86_64'},
           ]
           declared = set(manifest.get('platforms', []))
           if {target['platform'] for target in targets} - declared:
@@ -128,7 +137,7 @@ jobs:
               stream.write(f"committed_at={subprocess.check_output(['git', 'show', '-s', '--format=%cI', 'HEAD'], text=True).strip()}\n")
               stream.write(f'slug={slug}\npackage={package}\nversion={manifest["version"]}\n')
               stream.write('matrix=' + json.dumps({'include': targets}, separators=(',', ':')) + '\n')
-              stream.write(f"macos_runner={os.environ['MACOS_RUNNER']}\n")
+              stream.write(f'macos_runner={macos_runner}\n')
           PY
 
   build:
@@ -201,7 +210,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.source.outputs.matrix) }}
-    runs-on: ubuntu-24.04
+    runs-on: ${{ startsWith(matrix.platform, 'darwin-') && needs.source.outputs.macos_runner || 'ubuntu-24.04' }}
     timeout-minutes: 25
     steps:
       - name: Checkout trusted signing tooling
@@ -219,13 +228,14 @@ jobs:
           name: module-unsigned-${{ matrix.platform }}-${{ github.run_id }}
           path: candidate
       - name: Check candidate identity against the trusted manifest
+        id: candidate
         env:
           MODULE_PLATFORM: ${{ matrix.platform }}
           MODULE_SOURCE_SHA: ${{ needs.source.outputs.sha }}
           MODULE_SLUG: ${{ needs.source.outputs.slug }}
         run: |
           python - <<'PY'
-          import json, os, pathlib
+          import json, os, pathlib, re
           root = pathlib.Path('candidate')
           observed = json.loads((root / 'candidate-source.json').read_text(encoding='utf-8'))
           expected_observed = {'sourceSha': os.environ['MODULE_SOURCE_SHA'], 'platform': os.environ['MODULE_PLATFORM'], 'module': os.environ['MODULE_SLUG']}
@@ -233,13 +243,43 @@ jobs:
               raise SystemExit('candidate source identity does not match the selected commit')
           trusted = json.loads((pathlib.Path('src-tauri/plugins') / os.environ['MODULE_SLUG'] / 'module.json').read_text(encoding='utf-8'))
           candidate = json.loads((root / 'unsigned-module/module.json').read_text(encoding='utf-8'))
-          if trusted != {**candidate, 'entry': {**candidate.get('entry', {}), 'host': trusted.get('entry', {}).get('host')}}:
+          host = trusted.get('entry', {}).get('host')
+          if host and os.environ['MODULE_PLATFORM'].startswith('windows-') and not host.endswith('.exe'):
+              host += '.exe'
+              trusted['entry']['host'] = host
+          if trusted != candidate:
               raise SystemExit('candidate module metadata differs from trusted source')
           if candidate.get('status') != 'stable' or candidate.get('id') != f"taomni-plugin-{os.environ['MODULE_SLUG']}":
               raise SystemExit('candidate is not a stable official module')
           if any(path.is_symlink() for path in root.rglob('*')):
               raise SystemExit('candidate payload contains a symlink')
+          if host:
+              if not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]*', host) or not (root / 'unsigned-module' / host).is_file():
+                  raise SystemExit('candidate host binary is missing or has an invalid name')
+              with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as stream:
+                  stream.write(f'host={host}\n')
           PY
+      - uses: actions/setup-node@v4
+        if: startsWith(matrix.platform, 'darwin-') && steps.candidate.outputs.host != ''
+        with:
+          node-version: '22'
+      - name: Import the fixed macOS signing identity
+        if: startsWith(matrix.platform, 'darwin-') && steps.candidate.outputs.host != ''
+        env:
+          RELEASE_PLATFORM: macOS
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          MACOS_SIGNING_CERT_SHA1: ${{ vars.MACOS_SIGNING_CERT_SHA1 }}
+        run: node scripts/configure-release-signing.mjs
+      - name: Sign the macOS host before signing its module archive
+        if: startsWith(matrix.platform, 'darwin-') && steps.candidate.outputs.host != ''
+        env:
+          MODULE_HOST: ${{ steps.candidate.outputs.host }}
+          MODULE_PLATFORM: ${{ matrix.platform }}
+          MODULE_SLUG: ${{ needs.source.outputs.slug }}
+          MODULE_SOURCE_SHA: ${{ needs.source.outputs.sha }}
+        run: bash scripts/sign-macos-module-host.sh "candidate/unsigned-module/$MODULE_HOST" macos-signing
       - name: Sign and verify the immutable package
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -253,9 +293,14 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: module-signed-${{ matrix.platform }}-${{ github.run_id }}
-          path: signed-module/
+          path: |
+            signed-module/
+            macos-signing/
           if-no-files-found: error
           retention-days: 14
+      - name: Clean temporary macOS signing keychain
+        if: always() && env.MACOS_SIGNING_WORK_DIR != ''
+        run: node scripts/configure-release-signing.mjs --cleanup-macos
 
   publish:
     name: Publish module catalog and packages

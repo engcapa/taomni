@@ -17,6 +17,10 @@ on:
         type: choice
         options: [macos-latest, macos-15, macos-15-intel, macos-26]
         default: macos-latest
+      native_macos_signing:
+        description: Sign the Mail or MFA host with the fixed macOS identity before packaging
+        type: boolean
+        default: false
   workflow_call:
     inputs:
       head: {type: string, default: ''}
@@ -24,9 +28,13 @@ on:
       module: {type: string, default: hello-plugin}
       macos_runner: {type: string, default: macos-latest}
       native_builds: {type: string, default: ''}
+      native_macos_signing: {type: boolean, default: false}
     secrets:
       TAURI_SIGNING_PRIVATE_KEY: {required: true}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: {required: false}
+      APPLE_CERTIFICATE: {required: false}
+      APPLE_CERTIFICATE_PASSWORD: {required: false}
+      APPLE_SIGNING_IDENTITY: {required: false}
 
 permissions:
   contents: read
@@ -55,7 +63,13 @@ jobs:
           persist-credentials: false
       - id: source
         name: Require a commit reachable from a repository-owned branch
+        env:
+          NATIVE_MACOS_SIGNING: ${{ inputs.native_macos_signing }}
         run: |
+          if [[ "$NATIVE_MACOS_SIGNING" == 'true' && "$QA_MODULE" != 'mfa' && "$QA_MODULE" != 'mail' ]]; then
+            echo 'Select MFA or Mail for the macOS host signature check.' >&2
+            exit 1
+          fi
           case "$QA_MODULE" in
             hello-plugin) echo 'host_package=taomni-hello-plugin' >> "$GITHUB_OUTPUT" ;;
             mfa) echo 'host_package=taomni-plugin-mfa' >> "$GITHUB_OUTPUT" ;;
@@ -214,7 +228,7 @@ jobs:
     # Fork pull requests cannot request a production signature. A manual or
     # reusable invocation runs the workflow revision trusted by its operator.
     if: github.event_name != 'pull_request' && github.repository == 'engcapa/taomni'
-    runs-on: ubuntu-24.04
+    runs-on: ${{ inputs.native_macos_signing && startsWith(matrix.platform, 'darwin-') && needs.source.outputs.macos_runner || 'ubuntu-24.04' }}
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -288,6 +302,27 @@ jobs:
               shutil.copytree(root / 'unsigned-module', failing)
               (failing / 'module.json').write_text(json.dumps({**expected, 'version': '0.1.1'}), encoding='utf-8')
           PY
+      - uses: actions/setup-node@v4
+        if: inputs.native_macos_signing && startsWith(matrix.platform, 'darwin-')
+        with:
+          node-version: '22'
+      - name: Import the fixed macOS signing identity
+        if: inputs.native_macos_signing && startsWith(matrix.platform, 'darwin-')
+        env:
+          RELEASE_PLATFORM: macOS
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          MACOS_SIGNING_CERT_SHA1: ${{ vars.MACOS_SIGNING_CERT_SHA1 }}
+        run: node scripts/configure-release-signing.mjs
+      - name: Sign and verify the macOS host
+        if: inputs.native_macos_signing && startsWith(matrix.platform, 'darwin-')
+        env:
+          MODULE_PLATFORM: ${{ matrix.platform }}
+          MODULE_SOURCE_SHA: ${{ needs.source.outputs.sha }}
+        run: |
+          export MODULE_SLUG="$QA_MODULE"
+          bash scripts/sign-macos-module-host.sh "candidate/unsigned-module/taomni-plugin-$MODULE_SLUG" macos-signing
       - name: Sign and independently verify against the production pinned public key
         if: env.QA_MODULE != 'mail'
         env:
@@ -332,3 +367,13 @@ jobs:
           path: signed-module/
           if-no-files-found: error
           retention-days: 14
+      - uses: actions/upload-artifact@v4
+        if: inputs.native_macos_signing && startsWith(matrix.platform, 'darwin-')
+        with:
+          name: qa-module-macos-signature-${{ matrix.platform }}-${{ inputs.artifact_key || github.run_id }}
+          path: macos-signing/
+          if-no-files-found: error
+          retention-days: 14
+      - name: Clean temporary macOS signing keychain
+        if: always() && env.MACOS_SIGNING_WORK_DIR != ''
+        run: node scripts/configure-release-signing.mjs --cleanup-macos
