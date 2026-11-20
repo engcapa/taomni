@@ -208,6 +208,34 @@ class InstalledDesktopMfaCrashTests(unittest.TestCase):
                 host.kill.assert_not_called()
                 launcher.kill.assert_not_called()
 
+    def test_macos_uses_the_owned_bridge_and_matches_a_hardened_child_command(self):
+        with TemporaryDirectory() as temporary:
+            application = Path(temporary).resolve() / "Taomni"
+            module = application.with_name("taomni-plugin-mfa")
+            application.touch()
+            module.touch()
+            launcher = Mock(pid=21, args=[str(application)])
+            launcher.poll.return_value = None
+            launcher.wait.return_value = -9
+            core = Mock(pid=21)
+            host = Mock(pid=22)
+            host.exe.side_effect = PermissionError("hardened executable")
+            host.cmdline.return_value = [str(module)]
+            core.children.return_value = [host]
+            observer = SimpleNamespace(Process=Mock(return_value=core),
+                                       NoSuchProcess=ProcessLookupError, AccessDenied=PermissionError)
+            result = {}
+            with patch.dict(sys.modules, {"psutil": observer}), patch(
+                "installed_desktop_mfa_crash.platform.system", return_value="Darwin",
+            ):
+                observe_abrupt_exit(SimpleNamespace(proc=launcher), application, module, result)
+            self.assertEqual(result["coreIdentity"], "owned-wkwebview-launch")
+            self.assertEqual(result["host"]["pid"], host.pid)
+            self.assertTrue(result["hostExitedBeforeDriverCleanup"])
+            launcher.kill.assert_called_once_with()
+            core.kill.assert_not_called()
+            host.kill.assert_not_called()
+
 
 class InstalledMacPermissionsTests(unittest.TestCase):
     def test_reports_missing_and_lost_grants_without_counting_them_as_continuity(self):

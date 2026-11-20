@@ -16,13 +16,19 @@ from qa_ui_auto.fixtures.module_legacy_mfa import (
 from qa_ui_auto.fixtures.module_signed_archive import load_artifact, platform_key
 
 
-def select_owned_process(processes, executable, process_errors):
+def select_owned_process(processes, executable, process_errors, *, direct_child_command=False):
+    expected = executable.resolve(strict=False)
     matching = []
     for process in processes:
+        path = None
         with suppress(*process_errors):
             path = process.exe()
-            if path and Path(path).resolve() == executable:
-                matching.append(process)
+        if not path and direct_child_command:
+            with suppress(*process_errors):
+                command = process.cmdline()
+                path = command[0] if command else None
+        if path and Path(path).is_absolute() and Path(path).resolve() == expected:
+            matching.append(process)
     if len(matching) != 1:
         raise RuntimeError(f"Expected exactly one owned process for {executable.name}")
     return matching[0]
@@ -31,23 +37,33 @@ def select_owned_process(processes, executable, process_errors):
 def observe_abrupt_exit(driver, executable, module, observation):
     import psutil
 
-    root = psutil.Process(driver.proc.pid)
+    launcher = driver.proc
+    root = psutil.Process(launcher.pid)
     process_errors = (psutil.NoSuchProcess, psutil.AccessDenied)
-    core = select_owned_process(
-        [root, *root.children(recursive=True)], executable, process_errors,
-    )
-    host = select_owned_process(core.children(), module, process_errors)
+    direct = platform.system() == "Darwin"
+    if direct:
+        # The WKWebView bridge is in the exact executable this runner launched.
+        # macOS can restrict inspection of a hardened process's executable.
+        if launcher.args != [str(executable.resolve(strict=True))] or launcher.poll() is not None:
+            raise RuntimeError("The macOS bridge launcher does not own the installed executable")
+        core = root
+        owner = launcher
+    else:
+        core = select_owned_process([root, *root.children(recursive=True)], executable, process_errors)
+        owner = core
+    host = select_owned_process(core.children(), module, process_errors, direct_child_command=direct)
     observation.update(
         core={"pid": core.pid, "createdAt": core.create_time(), "executable": str(executable)},
         host={"pid": host.pid, "createdAt": host.create_time(), "executable": str(module), "parent": core.pid},
         termination="TerminateProcess" if platform.system() == "Windows" else "SIGKILL",
+        coreIdentity="owned-wkwebview-launch" if direct else "owned-driver-descendant",
     )
     if "macosHostExecution" in observation:
         observation["macosHostExecution"]["launched"] = True
     # The running processes are identified by executable, lineage and creation
     # time before the parent is killed. Driver teardown follows the host wait.
-    core.kill()
-    observation["coreExitCode"] = core.wait(timeout=10)
+    owner.kill()
+    observation["coreExitCode"] = owner.wait(timeout=10)
     observation["coreExited"] = True
     observation["hostExitCode"] = host.wait(timeout=10)
     observation["hostExitedBeforeDriverCleanup"] = True
