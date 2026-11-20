@@ -1,7 +1,7 @@
 """Verify signed MFA host recovery after killing an installed Windows/macOS app."""
 from __future__ import annotations
 
-from contextlib import suppress
+from contextlib import contextmanager, suppress
 import json
 import os
 from pathlib import Path
@@ -9,6 +9,7 @@ import platform
 from types import SimpleNamespace
 
 from installed_macos_host_signature import observe_hardened_host
+from installed_windows_webview import installed_windows_desktop
 from modular_bundle_inventory import digest, write_json
 from qa_ui_auto.fixtures.module_legacy_mfa import (
     commit_mfa_upgrade, create_account, desktop_action, element, installed_desktop, open_unlocked_mfa,
@@ -34,39 +35,40 @@ def select_owned_process(processes, executable, process_errors, *, direct_child_
     return matching[0]
 
 
-def observe_abrupt_exit(driver, executable, module, observation):
+def observe_abrupt_exit(launcher, executable, module, observation):
     import psutil
 
-    launcher = driver.proc
-    root = psutil.Process(launcher.pid)
+    if launcher.args != [str(executable.resolve(strict=True))] or launcher.poll() is not None:
+        raise RuntimeError("The UI launcher does not own the installed executable")
+    core = psutil.Process(launcher.pid)
     process_errors = (psutil.NoSuchProcess, psutil.AccessDenied)
-    direct = platform.system() == "Darwin"
-    if direct:
-        # The WKWebView bridge is in the exact executable this runner launched.
-        # macOS can restrict inspection of a hardened process's executable.
-        if launcher.args != [str(executable.resolve(strict=True))] or launcher.poll() is not None:
-            raise RuntimeError("The macOS bridge launcher does not own the installed executable")
-        core = root
-        owner = launcher
-    else:
-        core = select_owned_process([root, *root.children(recursive=True)], executable, process_errors)
-        owner = core
-    host = select_owned_process(core.children(), module, process_errors, direct_child_command=direct)
+    windows = platform.system() == "Windows"
+    host = select_owned_process(core.children(), module, process_errors, direct_child_command=not windows)
     observation.update(
         core={"pid": core.pid, "createdAt": core.create_time(), "executable": str(executable)},
         host={"pid": host.pid, "createdAt": host.create_time(), "executable": str(module), "parent": core.pid},
-        termination="TerminateProcess" if platform.system() == "Windows" else "SIGKILL",
-        coreIdentity="owned-wkwebview-launch" if direct else "owned-driver-descendant",
+        termination="TerminateProcess" if windows else "SIGKILL",
+        coreIdentity="owned-webview2-launch" if windows else "owned-wkwebview-launch",
     )
     if "macosHostExecution" in observation:
         observation["macosHostExecution"]["launched"] = True
     # The running processes are identified by executable, lineage and creation
     # time before the parent is killed. Driver teardown follows the host wait.
-    owner.kill()
-    observation["coreExitCode"] = owner.wait(timeout=10)
+    launcher.kill()
+    observation["coreExitCode"] = launcher.wait(timeout=10)
     observation["coreExited"] = True
     observation["hostExitCode"] = host.wait(timeout=10)
     observation["hostExitedBeforeDriverCleanup"] = True
+
+
+@contextmanager
+def open_desktop(ctx, executable, work, evidence, label):
+    if platform.system() == "Windows":
+        with installed_windows_desktop(ctx, executable, work, evidence, label) as desktop:
+            yield desktop
+    else:
+        with installed_desktop(ctx, executable, work, evidence, label, environment={}) as (driver, session):
+            yield driver.proc, session
 
 
 def verify_crash_recovery(executable, profile, signed, source, evidence, work, *, macos_hardened_mfa=False):
@@ -82,14 +84,7 @@ def verify_crash_recovery(executable, profile, signed, source, evidence, work, *
     active_path = profile / "plugins/mfa/active.json"
     account = {"selector": element("mfa-account-code"), "equals": "287 082"}
     try:
-        environment = {}
-        if platform.system() == "Windows":
-            webview = work / "mfa-webview"
-            webview.mkdir()
-            environment["TAOMNI_QA_WEBVIEW_DIR"] = str(webview)
-            environment["WEBVIEW2_USER_DATA_FOLDER"] = str(webview)
-            result["webviewDataFolder"] = str(webview)
-        with installed_desktop(ctx, executable, work, evidence, "mfa-legacy-seed", environment=environment) as (_, session):
+        with open_desktop(ctx, executable, work, evidence, "mfa-legacy-seed") as (_, session):
             create_account(session, ctx, evidence)
         result["legacyDatabaseSha256"] = digest(profile / "mfa.db")
         commit_mfa_upgrade(executable, profile, archive, signature, evidence)
@@ -107,16 +102,16 @@ def verify_crash_recovery(executable, profile, signed, source, evidence, work, *
             result["macosHostExecution"] = observe_hardened_host(
                 executable, module, evidence, os.environ.get("MACOS_SIGNING_CERT_SHA1", "").upper(),
             )
-        with installed_desktop(ctx, executable, work, evidence, "mfa-before-kill", environment=environment) as (driver, session):
+        with open_desktop(ctx, executable, work, evidence, "mfa-before-kill") as (launcher, session):
             steps = open_unlocked_mfa(ctx, session, evidence)
             desktop_action(steps, "assert_text_equals", account)
             active = json.loads(active_path.read_text(encoding="utf-8"))
             if active["activeVersion"] != installed["activeVersion"]:
                 raise RuntimeError("Opening MFA selected a different installed version")
             result.update(moduleBinarySha256=digest(module), hotpBeforeExit=account["equals"])
-            observe_abrupt_exit(driver, executable, module, result)
+            observe_abrupt_exit(launcher, executable, module, result)
             session.session_id = None
-        with installed_desktop(ctx, executable, work, evidence, "mfa-after-kill", environment=environment) as (_, session):
+        with open_desktop(ctx, executable, work, evidence, "mfa-after-kill") as (_, session):
             steps = open_unlocked_mfa(ctx, session, evidence)
             desktop_action(steps, "assert_text_equals", account)
             desktop_action(steps, "click", element("mfa-account-hotp-next"))

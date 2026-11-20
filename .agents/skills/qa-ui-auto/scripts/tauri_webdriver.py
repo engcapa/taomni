@@ -30,7 +30,7 @@ from native_pointer import pointer_button_click, prepare_click_target
 from native_doubleclick import double_click
 from native_paced_input import type_paced_text
 from native_window_focus import NativeWindowFocus
-from native_driver_lifecycle import driver_start_environment, windows_webview_options
+from native_driver_lifecycle import driver_start_environment, session_payload
 
 
 ROOT = Path.cwd()
@@ -411,18 +411,8 @@ class NativeSession(WebDriverTransport):
         self.transport = "macOS WKWebView bridge" if platform.system() == "Darwin" else "tauri-driver"
         self._window_focus = NativeWindowFocus(self, os.environ)
 
-    def start(self) -> None:
-        payload = {
-            "capabilities": {
-                "alwaysMatch": {
-                    "tauri:options": {
-                        "application": str(self.application.resolve())
-                    }
-                }
-            }
-        }
-        if platform.system() == "Windows":
-            payload["capabilities"]["alwaysMatch"]["tauri:options"]["webviewOptions"] = windows_webview_options()
+    def start(self, *, webview_debugger_port: int | None = None) -> None:
+        payload = session_payload(self.application, platform.system(), webview_debugger_port)
         value = self.request("POST", "/session", payload)
         sid = value.get("sessionId") if isinstance(value, dict) else None
         if not sid:

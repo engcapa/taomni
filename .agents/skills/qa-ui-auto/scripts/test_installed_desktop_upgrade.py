@@ -2,7 +2,6 @@
 from contextlib import nullcontext
 import hashlib
 import json
-import os
 from pathlib import Path
 import subprocess
 import sys
@@ -16,8 +15,10 @@ from installed_desktop_mfa_crash import observe_abrupt_exit
 from installed_desktop_upgrade import require_registration, select_candidate
 from installed_macos_host_signature import require_hardened_signature
 from installed_macos_permissions import compare_permissions, observe_hosted_screen_scan
+from installed_windows_webview import wait_for_owned_webview
 from modular_bundle_inventory import plan_targets
-from native_driver_lifecycle import windows_webview_options
+from native_driver_lifecycle import session_payload
+from native_webdriver_transport import WebDriverError
 from qa_ui_auto.legacy_install import windows_install
 from qa_ui_auto.legacy_process import observe_same_profile_contender
 
@@ -27,13 +28,16 @@ class InstalledDesktopUpgradeTests(unittest.TestCase):
            "UpgradeCode": "{cd0d07ef-a2b5-4a17-8d25-434297419ccd}", "InstalledState": 5}
     candidate = {**old, "ProductCode": "{a5e2ebb2-b24a-4a54-ae83-80154c4a8b0e}", "InstalledState": -1}
 
-    def test_installed_webview_options_require_only_the_explicit_webview_root(self):
-        webview = str(Path("installed-mfa-webview").resolve())
-        with patch.dict(os.environ, {"TAOMNI_QA_WEBVIEW_DIR": webview}, clear=True):
-            self.assertEqual(windows_webview_options(), {
-                "userDataFolder": webview,
-                "additionalBrowserArguments": ["--force-color-profile=srgb"],
-            })
+    def test_installed_webview_options_attach_to_a_windows_loopback_port(self):
+        application = Path("installed-taomni.exe")
+        self.assertEqual(session_payload(application, "Windows", 65123)["capabilities"]["alwaysMatch"], {
+            "browserName": "webview2",
+            "ms:edgeChromium": True,
+            "ms:edgeOptions": {"debuggerAddress": "127.0.0.1:65123"},
+        })
+        for system, port in (("Windows", 0), ("Darwin", 65123)):
+            with self.assertRaises(WebDriverError):
+                session_payload(application, system, port)
 
     def test_requires_only_one_version_from_the_same_registered_msi_family(self):
         require_registration(self.old, self.candidate, upgraded=False)
@@ -189,39 +193,60 @@ class InstalledDesktopModeLeaseTests(unittest.TestCase):
 class InstalledDesktopMfaCrashTests(unittest.TestCase):
     def test_kills_only_the_owned_application_and_waits_for_the_signed_host(self):
         for host_survives in (False, True):
-            with self.subTest(host_survives=host_survives):
+            with self.subTest(host_survives=host_survives), TemporaryDirectory() as temporary:
                 timeout = TimeoutError("host survived")
-                application = Path("installed-taomni").resolve()
-                module = Path("installed-mfa-module").resolve()
-                launcher = Mock(pid=21)
-                core = Mock(pid=22)
+                application = Path(temporary).resolve() / "installed-taomni.exe"
+                module = application.with_name("installed-mfa-module.exe")
+                application.touch()
+                launcher = Mock(pid=21, args=[str(application)])
+                launcher.poll.return_value = None
+                launcher.wait.return_value = 1
+                core = Mock(pid=21)
                 host = Mock(pid=23)
-                launcher.exe.return_value = "test-driver"
-                core.exe.return_value = str(application)
                 host.exe.return_value = str(module)
-                launcher.children.return_value = [core, host]
                 core.children.return_value = [host]
-                core.wait.return_value = 1
                 host.wait.side_effect = timeout if host_survives else None
-                observer = SimpleNamespace(Process=Mock(return_value=launcher),
+                observer = SimpleNamespace(Process=Mock(return_value=core),
                                            NoSuchProcess=ProcessLookupError, AccessDenied=PermissionError)
                 result = {}
                 with patch.dict(sys.modules, {"psutil": observer}), patch(
                     "installed_desktop_mfa_crash.platform.system", return_value="Windows",
                 ):
-                    driver = SimpleNamespace(proc=SimpleNamespace(pid=launcher.pid))
                     if host_survives:
                         with self.assertRaisesRegex(TimeoutError, "host survived"):
-                            observe_abrupt_exit(driver, application, module, result)
+                            observe_abrupt_exit(launcher, application, module, result)
                     else:
-                        observe_abrupt_exit(driver, application, module, result)
+                        observe_abrupt_exit(launcher, application, module, result)
                 self.assertNotEqual(host_survives, result.get("hostExitedBeforeDriverCleanup", False))
                 self.assertTrue(result["coreExited"])
-                self.assertEqual(result["coreIdentity"], "owned-driver-descendant")
+                self.assertEqual(result["coreIdentity"], "owned-webview2-launch")
                 self.assertEqual(result["termination"], "TerminateProcess")
-                core.kill.assert_called_once_with()
+                core.kill.assert_not_called()
                 host.kill.assert_not_called()
-                launcher.kill.assert_not_called()
+                launcher.kill.assert_called_once_with()
+
+    def test_webview_attachment_requires_an_owned_loopback_listener(self):
+        owner = Mock(pid=21)
+        owner.poll.return_value = None
+        child = Mock(pid=22)
+        child.name.return_value = "msedgewebview2.exe"
+        core = Mock()
+        core.children.return_value = [child]
+        port = 65123
+        for ip, pid, error in (("127.0.0.1", 22, None), ("127.0.0.1", 23, "did not open"),
+                               ("0.0.0.0", 22, "must be local")):
+            with self.subTest(ip=ip, pid=pid):
+                endpoint = SimpleNamespace(status="LISTEN", pid=pid, laddr=SimpleNamespace(ip=ip, port=port))
+                observer = SimpleNamespace(Process=Mock(return_value=core), NoSuchProcess=ProcessLookupError,
+                                           net_connections=Mock(return_value=[endpoint]), CONN_LISTEN="LISTEN")
+                with patch.dict(sys.modules, {"psutil": observer}), patch(
+                    "installed_windows_webview.time.monotonic", side_effect=[0, 1],
+                ), patch("installed_windows_webview.time.sleep"):
+                    if error:
+                        with self.assertRaisesRegex(RuntimeError, error):
+                            wait_for_owned_webview(owner, port, 1)
+                    else:
+                        self.assertEqual(wait_for_owned_webview(owner, port, 1), child.pid)
 
     def test_macos_uses_the_owned_bridge_and_matches_a_hardened_child_command(self):
         with TemporaryDirectory() as temporary:
@@ -243,7 +268,7 @@ class InstalledDesktopMfaCrashTests(unittest.TestCase):
             with patch.dict(sys.modules, {"psutil": observer}), patch(
                 "installed_desktop_mfa_crash.platform.system", return_value="Darwin",
             ):
-                observe_abrupt_exit(SimpleNamespace(proc=launcher), application, module, result)
+                observe_abrupt_exit(launcher, application, module, result)
             self.assertEqual(result["coreIdentity"], "owned-wkwebview-launch")
             self.assertEqual(result["host"]["pid"], host.pid)
             self.assertTrue(result["hostExitedBeforeDriverCleanup"])
