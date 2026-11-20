@@ -1,11 +1,12 @@
 """Observe read-only macOS permission checks through both installed app versions."""
+import json
 from pathlib import Path
 import plistlib
 import time
 from types import SimpleNamespace
 
 from modular_bundle_inventory import digest, write_json
-from qa_ui_auto.fixtures.module_legacy_mfa import desktop_action, element, installed_desktop
+from qa_ui_auto.fixtures.module_legacy_mfa import desktop_action, element, installed_desktop, open_unlocked_mfa
 from qa_ui_auto.legacy_install import command
 from qa_ui_auto.native_steps import NativeStepContext
 
@@ -82,3 +83,43 @@ def compare_permissions(previous, candidate):
         "lostGrants": lost,
         "retainedBothGrants": same_requirement and not missing and not lost,
     }
+
+
+def observe_hosted_screen_scan(executable, evidence, recovery):
+    """Capture an external AppKit window using the installed core and MFA host."""
+    result = {key: recovery[key] for key in ("sourceSha", "installedBinarySha256", "modulePackageSha256", "moduleBinarySha256")}
+    result["passed"] = False
+    ctx = SimpleNamespace(cfg={"webdriver": {"startup_timeout": 60}})
+    try:
+        with installed_desktop(ctx, executable, evidence, evidence, "mfa-screen-scan", environment={}) as (driver, session):
+            result["corePid"] = driver.proc.pid
+            steps = open_unlocked_mfa(ctx, session, evidence)
+            desktop_action(steps, "click", element("mfa-add"))
+            desktop_action(steps, "click", element("mfa-add-mode-screen"))
+            try:
+                desktop_action(steps, "native_show_image_window", {
+                    "path": "qa-ui-auto-tests/synthetic-fixtures/mfa/hotp-qa-bank.png", "x": 16, "y": 60,
+                })
+                result["imageWindow"] = json.loads((evidence / "native-image-window.json").read_text(encoding="utf-8"))
+                desktop_action(steps, "click", element("mfa-screen-scan"))
+                desktop_action(steps, "wait_for", {
+                    "selector": element("mfa-add-dialog") + '[data-mode="preview"]', "timeout_sec": 60,
+                })
+                desktop_action(steps, "assert_attribute", {
+                    "selector": element("mfa-add-dialog"), "name": "data-screen-decoder", "equals": "module",
+                })
+                desktop_action(steps, "assert_items", {
+                    "selector": element("mfa-import-item"), "attribute": "data-issuer", "equals": ["QA Bank"],
+                })
+            finally:
+                desktop_action(steps, "native_show_image_window", {"action": "close"})
+            desktop_action(steps, "press", "Escape")
+            desktop_action(steps, "assert_not_visible", element("mfa-add-dialog"))
+            desktop_action(steps, "assert_text_equals", {
+                "selector": element("mfa-account-code"), "equals": recovery["nextHotp"],
+            })
+            desktop_action(steps, "assert_no_runtime_errors", None)
+        result.update(passed=True, captureService="capture.still", decoder="module", issuers=["QA Bank"])
+        return result
+    finally:
+        write_json(evidence / "installed-macos-mfa-screen-scan.json", result)

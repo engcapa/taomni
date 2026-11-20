@@ -68,7 +68,7 @@ verify_certificate_signature() {
     echo "Expected a certificate signature, found ad-hoc: $signed_app" >&2
     return 1
   fi
-  if [ "$signing_mode" = developer-id ]; then
+  if [ "$signing_mode" = developer-id ] || [ "${MACOS_STATIC_KRB5:-false}" = true ]; then
     grep -Eq 'flags=.*\(runtime\)' <<<"$signature"
   elif grep -Eq 'flags=.*\(runtime\)' <<<"$signature"; then
     echo "Self-signed bundles must disable hardened runtime to load krb5 libraries without an Apple Team ID." >&2

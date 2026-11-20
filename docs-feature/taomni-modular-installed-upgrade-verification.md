@@ -92,3 +92,9 @@ G11 的安装件专项在一次性 runner 上预留实际 `com.taomni.app` 数�
 Windows x64 和 macOS Intel 已完成 `0.5.10 → 0.5.11 → 0.5.10` 的实际安装、profile 重开和回退。候选安装包均来自 `c660c6bb68578e7943594fff33a2963af65f659a`，MSI 资产 ID `14404860675`，Intel DMG 资产 ID `14404300717`。两端原 SSH/VNC 会话及候选运行前后的历史库核对通过。Windows 测试对正常运行的 GUI-subsystem headless 进程按既有方法执行受控强停，安装的可执行文件报告 `NotSigned`。macOS 三次进程均由正常退出信号完成，候选 DMG 的代码签名校验成功，Gatekeeper 评估 exit 3。 [安装替换与回退 #44292054057](https://github.com/engcapa/taomni/actions/runs/44292054057)
 
 macOS 15.8.2 ARM64 已完成同一版本链路。候选 DMG 来自源码 `26a6471d014711bda960df3eaee1d9eaf2cd1131`、资产 ID `14425596053`。使用同一隔离 profile 重开并复核原 SSH/VNC 会话与历史库，回退后恢复旧版摘要。候选 app 和 updater app 的代码签名校验成功，Gatekeeper 评估 exit 3。 [ARM64 候选构建 #44293901398](https://github.com/engcapa/taomni/actions/runs/44293901398) · [安装替换与回退 #44300055546](https://github.com/engcapa/taomni/actions/runs/44300055546)
+
+### macOS 26 签名宿主与强退恢复
+
+macOS 26.7.2 ARM64 在 `macos-26-arm64` 镜像 `20261117.0516.1` 上通过 0.5.10 → 0.5.11 安装替换、profile 双向互斥和回退。DMG 生产源码为 `c16b4218ac68eb5028c079b542b0044525ecd5b9`，选用构建 #44799259990 的工件 `14668975419`，DMG SHA-256 为 `f7c33f26aec9b3c8d80dcbc597e8cf489f1d5b75ad5a0d240c5692ca6a488037`。验证工具源码为 `0d07a68d59a92edde5a6ecc28e5a395175da52e5`。 [候选构建](https://github.com/engcapa/taomni/actions/runs/44799259990) · [验收与原始日志](https://github.com/engcapa/taomni/actions/runs/44816840208/job/136569044783)
+
+核心与 MFA 宿主均通过固定证书验证，且均启用 hardened runtime。已验证包的 SHA-256 为 `f6a6ac5d14bc48e4cb203a4e8347cd4d8ada7784be0371677e199050282bf171`。候选核心实际拉起带隔离属性的 MFA，核心收到 `SIGKILL` 后宿主在驱动清理前退出。重开后保留原 HOTP 并推进一次。屏幕录制与辅助功能授权在新旧核心间均保留，两个签名主体的 Gatekeeper 评估均返回 3。原始记录为 `qa-ui-auto-report/github/44816840208/live-contracts/modular-bundle-darwin-aarch64-44799259990/` 下的 `bundle-baseline.json`、`installed-desktop-upgrade.json`、`installed-desktop-mode-lease.json`、`installed-desktop-mfa-crash.json` 和 `macos-permissions-*.json`。 [GitHub 工件](https://github.com/engcapa/taomni/actions/runs/44816840208)

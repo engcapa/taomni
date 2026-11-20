@@ -43,6 +43,10 @@ on:
         description: Exercise real Windows MSI and macOS DMG replacement and rollback
         type: boolean
         default: false
+      package_macos_hardened_mfa:
+        description: Verify the static-Kerberos DMG and run its matching signed MFA host.
+        type: boolean
+        default: false
       package_macos_arm_runner:
         description: Hosted ARM64 runner for macOS bundle inspection and installation
         type: choice
@@ -123,6 +127,9 @@ on:
       package_upgrade_desktop:
         type: boolean
         default: false
+      package_macos_hardened_mfa:
+        type: boolean
+        default: false
       package_macos_arm_runner:
         type: string
         default: macos-15
@@ -200,10 +207,14 @@ jobs:
       package_version: ${{ inputs.package_version }}
       package_targets: ${{ inputs.package_targets }}
       upgrade_desktop: ${{ inputs.package_upgrade_desktop }}
+      macos_hardened_mfa: ${{ inputs.package_macos_hardened_mfa }}
       macos_arm_runner: ${{ inputs.package_macos_arm_runner || 'macos-15' }}
     secrets:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
 
   protocol-contracts:
     if: ${{ !inputs.signed_mfa_only && !inputs.package_run && inputs.protocol_only }}

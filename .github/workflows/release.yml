@@ -29,6 +29,10 @@ on:
         default: macos-15
         type: choice
         options: [macos-15, macos-26]
+      macos_static_krb5:
+        description: "Build the ARM64 QA artifact with static Kerberos and hardened runtime."
+        type: boolean
+        default: false
       test_version:
         description: "Optional SemVer override for artifact-only upgrade tests; package.json is unchanged."
         required: false
@@ -405,6 +409,23 @@ jobs:
           cargo test --manifest-path src-tauri/Cargo.toml --lib sockscap::redirector -- --test-threads=1
           cargo test --manifest-path src-tauri/Cargo.toml --lib sockscap::recovery -- --test-threads=1
 
+      - name: Build static MIT Kerberos for the ARM64 signing comparison
+        if: inputs.macos_static_krb5
+        env:
+          RELEASE_TAG: ${{ needs.plan.outputs.tag }}
+          BUILD_DESKTOP: ${{ needs.plan.outputs.build_desktop }}
+          BUILD_ARM64: ${{ needs.plan.outputs.macos_aarch64 }}
+          BUILD_INTEL: ${{ needs.plan.outputs.macos_x86_64 }}
+        run: |
+          set -euo pipefail
+          if [ -n "$RELEASE_TAG" ] || [ "$BUILD_DESKTOP" != false ] || [ "$BUILD_ARM64" != true ] || [ "$BUILD_INTEL" != false ]; then
+            echo 'Select an artifact-only macOS ARM64 build for the static Kerberos comparison.' >&2
+            exit 1
+          fi
+          brew list --versions openssl@3 >/dev/null || brew install openssl@3
+          bash scripts/build-macos-static-krb5.sh "$RUNNER_TEMP/taomni-static-krb5"
+          echo 'MIT_KRB5_GSSAPI_STATIC=1' >> "$GITHUB_ENV"
+
       - name: Release signing unit contracts
         run: node --test scripts/configure-release-signing.test.mjs scripts/verify-macos-release-bundle.test.mjs scripts/macos-runtime-paths.test.mjs
 
@@ -417,6 +438,7 @@ jobs:
         shell: bash
         env:
           RELEASE_PLATFORM: macOS
+          MACOS_STATIC_KRB5: ${{ inputs.macos_static_krb5 }}
           RELEASE_TAG: ${{ needs.plan.outputs.tag }}
           RELEASE_TEST_VERSION: ${{ needs.plan.outputs.test_version }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -445,10 +467,9 @@ jobs:
         uses: tauri-apps/tauri-action@action-v0.6.2
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          # Point libgssapi-sys at Homebrew MIT Kerberos (arm64)
           LIBGSSAPI_IMPL: mit
-          LIBGSSAPI_PREFIX: /opt/homebrew/opt/krb5
-          PKG_CONFIG_PATH: /opt/homebrew/opt/krb5/lib/pkgconfig
+          LIBGSSAPI_PREFIX: ${{ inputs.macos_static_krb5 && format('{0}/taomni-static-krb5', runner.temp) || '/opt/homebrew/opt/krb5' }}
+          PKG_CONFIG_PATH: ${{ inputs.macos_static_krb5 && format('{0}/taomni-static-krb5/lib/pkgconfig', runner.temp) || '/opt/homebrew/opt/krb5/lib/pkgconfig' }}
         with:
           args: --target aarch64-apple-darwin --config '${{ env.TAURI_RELEASE_CONFIG }}'
 

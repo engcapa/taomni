@@ -10,7 +10,7 @@ from uuid import UUID
 
 from installed_desktop_mfa_crash import verify_crash_recovery
 from installed_desktop_mode_lease import check_mode_lease, reserve_default_profile
-from installed_macos_permissions import compare_permissions, observe_permissions
+from installed_macos_permissions import compare_permissions, observe_hosted_screen_scan, observe_permissions
 from modular_bundle_inventory import digest, inventory, write_json
 from qa_ui_auto.fixtures.module_legacy_install import insert_business_rows, retained_manifest, session_rows
 from qa_ui_auto.fixtures.module_signed_archive import platform_key
@@ -135,11 +135,19 @@ def execute(args):
             stages["crashRecovery"] = verify_crash_recovery(
                 candidate, Path(stages["desktopAndHeadlessModeLease"]["profile"]),
                 args.signed.resolve(strict=True), identity["producerSource"], report,
+                macos_hardened_mfa=args.macos_hardened_mfa,
             )
         except Exception as error:
             # Preserve rollback evidence after the hosted crash scenario fails.
             recovery_failure = error
             stages["crashRecovery"] = {"passed": False, "error": str(error)}
+
+        if args.macos_hardened_mfa and recovery_failure is None:
+            try:
+                stages["mfaScreenScan"] = observe_hosted_screen_scan(candidate, report, stages["crashRecovery"])
+            except Exception as error:
+                permission_failure = permission_failure or error
+                stages["mfaScreenScan"] = {"passed": False, "error": str(error)}
 
         if system == "Windows":
             command(["msiexec.exe", "/x", str(package), "/qn", "/norestart", "/L*v", str(report / "candidate-uninstall.log")],
@@ -169,4 +177,5 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("identity", "legacy", "candidate", "signed", "evidence", "work"):
         parser.add_argument("--" + name, required=True, type=Path)
+    parser.add_argument("--macos-hardened-mfa", action="store_true")
     execute(parser.parse_args())

@@ -1,4 +1,6 @@
 """Pure contracts for the installed-upgrade inputs and registration checks."""
+from contextlib import nullcontext
+import hashlib
 import json
 from pathlib import Path
 import subprocess
@@ -11,7 +13,8 @@ from unittest.mock import MagicMock, Mock, patch
 from installed_desktop_mode_lease import check_mode_lease, reserve_default_profile
 from installed_desktop_mfa_crash import observe_abrupt_exit
 from installed_desktop_upgrade import require_registration, select_candidate
-from installed_macos_permissions import compare_permissions
+from installed_macos_host_signature import require_hardened_signature
+from installed_macos_permissions import compare_permissions, observe_hosted_screen_scan
 from modular_bundle_inventory import plan_targets
 from qa_ui_auto.legacy_install import windows_install
 from qa_ui_auto.legacy_process import observe_same_profile_contender
@@ -93,6 +96,25 @@ class InstalledDesktopUpgradeTests(unittest.TestCase):
             log = (evidence / "opened-contender.log").read_text(encoding="utf-8")
             self.assertIn("[ephemeral pairing code omitted]", log)
             self.assertNotIn("123456", log)
+
+
+class InstalledHardenedSignatureTests(unittest.TestCase):
+    def test_requires_pinned_leaf_and_hardened_code_directory(self):
+        leaf = b"fixed-certificate"
+        fingerprint = hashlib.sha1(leaf, usedforsecurity=False).hexdigest().upper()
+        details = "Executable=/Applications/Taomni.app\nCodeDirectory v=20500 size=320 flags=0x10000(runtime) hashes=5+3\n"
+        self.assertEqual(require_hardened_signature(details, leaf, fingerprint), {
+            "certificateSha1": fingerprint, "hardenedRuntime": True,
+        })
+        with self.assertRaisesRegex(RuntimeError, "different leaf certificate"):
+            require_hardened_signature(details, b"different-certificate", fingerprint)
+        for invalid in [
+            details.replace("0x10000(runtime)", "0x0(none)"),
+            details + "Signature=adhoc\n",
+            "Executable=/fake flags=0x10000(runtime)\n",
+        ]:
+            with self.subTest(invalid=invalid), self.assertRaisesRegex(RuntimeError, "hardened runtime"):
+                require_hardened_signature(invalid, leaf, fingerprint)
 
 
 class InstalledDesktopModeLeaseTests(unittest.TestCase):
@@ -221,6 +243,30 @@ class InstalledDesktopMfaCrashTests(unittest.TestCase):
 
 
 class InstalledMacPermissionsTests(unittest.TestCase):
+    def test_failed_capture_closes_the_fixture_and_records_incomplete_evidence(self):
+        recovery = dict(sourceSha="source", installedBinarySha256="core", modulePackageSha256="package",
+                        moduleBinarySha256="host", nextHotp="359 152")
+        steps = object()
+
+        def desktop_action(_steps, verb, args):
+            if verb == "wait_for":
+                raise RuntimeError("capture did not produce an import preview")
+
+        with TemporaryDirectory() as directory:
+            evidence = Path(directory)
+            (evidence / "native-image-window.json").write_text('{"pid": 42}', encoding="utf-8")
+            desktop = nullcontext((SimpleNamespace(proc=SimpleNamespace(pid=17)), object()))
+            with patch("installed_macos_permissions.installed_desktop", return_value=desktop), patch(
+                "installed_macos_permissions.open_unlocked_mfa", return_value=steps,
+            ), patch("installed_macos_permissions.desktop_action", side_effect=desktop_action) as action:
+                with self.assertRaisesRegex(RuntimeError, "import preview"):
+                    observe_hosted_screen_scan(evidence / "taomni", evidence, recovery)
+            action.assert_called_with(steps, "native_show_image_window", {"action": "close"})
+            result = json.loads((evidence / "installed-macos-mfa-screen-scan.json").read_text(encoding="utf-8"))
+            self.assertFalse(result["passed"])
+            self.assertEqual(result["corePid"], 17)
+            self.assertEqual(result["imageWindow"], {"pid": 42})
+
     def test_reports_missing_and_lost_grants_without_counting_them_as_continuity(self):
         trusted = {"screenRecording": "granted", "accessibility": "granted", "requirement": "fixed"}
         self.assertTrue(compare_permissions(trusted, trusted)["retainedBothGrants"])

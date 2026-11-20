@@ -2,7 +2,10 @@
 
 ## 2026-11-21 当前进展
 
-- 重新拉取的远程 `main` 为 `afb7cf593`（#841），`refactor/modules-arch` 已包含该提交。`7346956d8` 新增独立 VNC 会话宿主。桌面 VNC 复用现有代理和 SSH 跳板解析，跳板经单次认证的本机桥接传输。独立宿主以同一协议接收桌面转发。TC-156 增加关闭重开后的画布和按键回归。宿主单测、核心编译和用例审计通过。正式模块的生产路由、动态前端及签名包接线按 TASK-016 继续。 [VNC 宿主提交](https://github.com/engcapa/taomni/commit/7346956d88d3e67b98ed4cf5b3f439233e20993b)
+- `main` 的 `afb7cf593` 已在 `refactor/modules-arch` 中。`575ca26ee` 让 Sessions、Workspace 和分离窗口共享 VNC 模块状态。禁用时关闭活动连接并保留标签，重新启用后可在原标签连接。TC-MODULES-053 检查签名宿主和实际 RFB 连接释放，TC-MODULES-054 检查 Browser 的禁用提示、商店启用与画面恢复。 [三端验证](https://github.com/engcapa/taomni/actions/runs/44819405030)
+- macOS 26 ARM64 已安装 `c16b4218a` 的 DMG，使用同一固定证书且开启 hardened runtime 的核心与 MFA 宿主。宿主带隔离属性启动。核心收到 `SIGKILL` 后，宿主在驱动清理前退出。重开后原 HOTP 从 `287 082` 推进到 `359 152`，0.5.10 升级和回退通过，两个核心权限在升级后保持授权。核心与宿主的 Gatekeeper 评估均为 exit 3。 [实装验收与回执](taomni-modular-installed-upgrade-verification.md#macos-26-签名宿主与强退恢复) · [GitHub](https://github.com/engcapa/taomni/actions/runs/44816840208)
+- `d06f10916` 增加 Windows 单目标安装包构建，后续实装用产物 SHA、安装后可执行文件摘要和 runner 镜像记录确认同一安装件。 [Windows 候选 MSI](https://github.com/engcapa/taomni/actions/runs/44820492397)
+- `7346956d8` 新增独立 VNC 会话宿主。桌面 VNC 复用现有代理和 SSH 跳板解析，跳板经单次认证的本机桥接传输。独立宿主以同一协议接收桌面转发。TC-156 增加关闭重开后的画布和按键回归。宿主单测、核心编译和用例审计通过。正式模块动态前端和发行包按 TASK-016 继续。 [VNC 宿主提交](https://github.com/engcapa/taomni/commit/7346956d88d3e67b98ed4cf5b3f439233e20993b)
 - `ae46db7a9` 的 Mail 签名迁移专项成功。四个发布目标均产出签名模块包，Linux、Windows、macOS ARM64 的三份迁移回执均与源码、用例清单、核心及模块包身份匹配。回执覆盖隔离旧数据到已提交 Mail 宿主的迁移，完整单体安装升级和系统信任待实装验收。原始资料在 `qa-ui-auto-report/github/44726111709/live-contracts/`。 [Mail 专项](https://github.com/engcapa/taomni/actions/runs/44726111709)
 - 同一源码的 UI 批次在执行中收齐 18 片。Linux、Windows、macOS Browser 分别为 34/34、34/34、33/34，Native 分别为 38/39、37/38、33/38。Linux 的 039 和 macOS 的 038 在迁移后等待 MFA 账户失败。`c0918edf4` 修复了 039 已定位的 `capture.still` 协商问题，两项在新源码复验。剩余失败涉及文件对话框、只读保存和 Home 恢复，原始失败保留。已下载分片、选集、构建身份和逐片核验位于 `qa-ui-auto-report/github/44725968775/live-shards/`。 [Browser 与 Native](https://github.com/engcapa/taomni/actions/runs/44725968775)
 - `7346956d8` 的 VNC 进程用例在 Linux、Windows 和 macOS ARM64 各通过 2 项。同轮 Mail 跨进程用例的夹具把 RPC 方法名当作请求 ID，重复查询被协议拒绝。`380513bed` 改用递增请求 ID，生产协议继续拒绝重复 ID。工件在 `qa-ui-auto-report/github/44735256214/live-contracts/`。 [协议专项](https://github.com/engcapa/taomni/actions/runs/44735256214)

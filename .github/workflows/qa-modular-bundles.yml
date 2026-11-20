@@ -22,12 +22,18 @@ on:
       upgrade_desktop:
         type: boolean
         default: false
+      macos_hardened_mfa:
+        type: boolean
+        default: false
       macos_arm_runner:
         type: string
         default: macos-15
     secrets:
       TAURI_SIGNING_PRIVATE_KEY: {required: false}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: {required: false}
+      APPLE_CERTIFICATE: {required: false}
+      APPLE_CERTIFICATE_PASSWORD: {required: false}
+      APPLE_SIGNING_IDENTITY: {required: false}
 
 permissions:
   contents: read
@@ -52,9 +58,15 @@ jobs:
         env:
           SAMPLE_TARGETS: ${{ inputs.package_targets }}
           SAMPLE_UPGRADE_DESKTOP: ${{ inputs.upgrade_desktop }}
+          SAMPLE_MACOS_HARDENED_MFA: ${{ inputs.macos_hardened_mfa }}
           SAMPLE_MACOS_ARM_RUNNER: ${{ inputs.macos_arm_runner }}
         run: |
           args=()
+          if [[ "$SAMPLE_MACOS_HARDENED_MFA" == true ]] &&
+             [[ "$SAMPLE_UPGRADE_DESKTOP" != true || ! "$SAMPLE_TARGETS" =~ ^darwin-(aarch64|x86_64)$ ]]; then
+            echo 'Select one macOS target and installed desktop verification for the hardened host check.' >&2
+            exit 1
+          fi
           if [[ "$SAMPLE_UPGRADE_DESKTOP" == true ]]; then
             args+=(--upgrade-desktop)
           fi
@@ -72,9 +84,13 @@ jobs:
       artifact_key: installed-desktop-${{ github.run_id }}
       macos_runner: ${{ inputs.macos_arm_runner }}
       native_builds: ${{ needs.plan.outputs.mfa_builds }}
+      native_macos_signing: ${{ inputs.macos_hardened_mfa }}
     secrets:
       TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+      APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
 
   bundle-samples:
     needs: [plan, signed-mfa]
@@ -209,6 +225,8 @@ jobs:
         run: ./.agents/skills/qa-ui-auto/scripts/modular_bundle_windows.ps1 -Directory package-input -OutputDirectory bundle-evidence -Version $env:SAMPLE_VERSION
       - name: Inspect the real DMG, updater app, signatures and quarantine assessment
         if: runner.os == 'macOS'
+        env:
+          MACOS_STATIC_KRB5: ${{ inputs.macos_hardened_mfa }}
         run: |
           sw_vers > bundle-evidence/macos-version.txt
           uname -m > bundle-evidence/runner-architecture.txt
@@ -230,11 +248,18 @@ jobs:
           path: signed-mfa-input
       - name: Replace the installed application, reopen its profile and roll back
         if: inputs.upgrade_desktop
+        env:
+          SAMPLE_MACOS_HARDENED_MFA: ${{ inputs.macos_hardened_mfa }}
+          MACOS_SIGNING_CERT_SHA1: ${{ vars.MACOS_SIGNING_CERT_SHA1 }}
         run: |
+          args=()
+          if [[ "$SAMPLE_MACOS_HARDENED_MFA" == true ]]; then
+            args+=(--macos-hardened-mfa)
+          fi
           python .agents/skills/qa-ui-auto/scripts/installed_desktop_upgrade.py \
             --identity bundle-evidence/bundle-source.json --legacy legacy-input \
             --candidate package-input --signed signed-mfa-input \
-            --work installed-upgrade-work --evidence bundle-evidence
+            --work installed-upgrade-work --evidence bundle-evidence "${args[@]}"
       - uses: actions/upload-artifact@v4
         if: always()
         with:

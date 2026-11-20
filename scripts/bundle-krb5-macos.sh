@@ -21,6 +21,7 @@ set -euo pipefail
 
 # macOS only; Linux/Windows bundles ignore bundle.macOS.frameworks.
 [ "$(uname -s)" = "Darwin" ] || exit 0
+[ "${MACOS_STATIC_KRB5:-false}" != true ] || exit 0
 
 MODE="${1:-all}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
