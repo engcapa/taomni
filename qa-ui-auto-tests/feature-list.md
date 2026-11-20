@@ -8265,7 +8265,7 @@ files:
   - src-tauri/src/mail/pop3/connection.rs
   - src-tauri/src/mail/imap_transport.rs
   - src-tauri/src/mail/local_cmds.rs
-  - src-tauri/crates/taomni-mail-engine/src/imap_auth.rs
+  - src-tauri/crates/taomni-mail-engine/src/pop3.rs
 controls:
   - id: incoming-protocol
     selector: '[data-testid="mail-incoming-protocol"]'
@@ -8275,6 +8275,9 @@ controls:
     selector: '[data-testid="mail-pop3-leave-days"]'
     kind: interactive
     optional: true
+  - id: received-text
+    selector: '[data-testid="mail-reader-text"]'
+    kind: display
 -->
 
 - 会话编辑器 “Incoming” 可选 POP3（本地文件夹），Quick Connect 支持 `pop3://` / `pop3s://`（默认端口 995/110）。支持 TLS、STLS 与明文；明文且服务器提供时间戳时使用 APOP，OAuth 使用 XOAUTH2。

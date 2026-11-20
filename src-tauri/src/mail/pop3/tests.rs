@@ -1,5 +1,4 @@
 use super::connection::Pop3Client;
-use super::connection::apop_digest;
 use super::local_store::create_local_folder;
 use super::local_store::delete_local;
 use super::local_store::ensure_local_folders;
@@ -8,7 +7,6 @@ use super::local_store::insert_local;
 use super::local_store::local_raw;
 use super::local_store::move_local;
 use super::local_store::rename_local_folder;
-use super::synchronization::plan_round;
 use super::synchronization::sync_inbox;
 use crate::mail::MailAccountConfig;
 use crate::mail::MailAuthMode;
@@ -17,7 +15,6 @@ use crate::mail::list_cached_folders;
 #[cfg(test)]
 use crate::mail::pop3::fake;
 use rusqlite::Connection;
-use std::collections::HashMap;
 
 use std::sync::{Arc, Mutex};
 
@@ -54,33 +51,6 @@ fn db() -> Connection {
     conn
 }
 
-#[test]
-fn apop_matches_rfc1939_example() {
-    assert_eq!(
-        apop_digest("<1896.697170952@dbc.mtview.ca.us>", "tanstaaf"),
-        "c4c9334bac560ecc979e58001b3e22fb"
-    );
-}
-
-#[test]
-fn plans_new_downloads_and_expired_deletes() {
-    let listing = vec![
-        (1, "a".to_string()),
-        (2, "b".to_string()),
-        (3, "c".to_string()),
-    ];
-    let known: HashMap<String, i64> = [("a".to_string(), 0), ("b".to_string(), 1_000_000)].into();
-    let (fetch, deletes) = plan_round(&listing, &known, 10, Some(7), 1_000_000);
-    assert_eq!(fetch, vec![(3, "c".to_string())]);
-    assert_eq!(
-        deletes,
-        vec![1],
-        "only mail downloaded more than 7 days ago"
-    );
-    let (_, keep) = plan_round(&listing, &known, 10, None, 1_000_000);
-    assert!(keep.is_empty(), "no policy keeps everything on the server");
-}
-
 #[tokio::test(flavor = "multi_thread")]
 async fn downloads_once_and_leaves_or_deletes() {
     let state = Arc::new(Mutex::new(fake::FakePop3State {
@@ -93,7 +63,7 @@ async fn downloads_once_and_leaves_or_deletes() {
     let handle = tokio::runtime::Handle::current();
     let run = |conn: &Connection, leave: Option<u32>| {
         let mut client = Pop3Client::connect(&account, &handle).unwrap();
-        let outcome = sync_inbox(&mut client, conn, "pop", leave).unwrap();
+        let outcome = sync_inbox(&mut client.session, conn, "pop", leave).unwrap();
         client.quit().unwrap();
         outcome
     };

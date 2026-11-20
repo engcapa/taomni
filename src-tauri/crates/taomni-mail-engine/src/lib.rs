@@ -15,6 +15,7 @@ pub mod mbox;
 mod mime;
 pub mod mime_sections;
 mod models;
+pub mod pop3;
 pub mod smtp;
 pub mod storage;
 pub mod tls;

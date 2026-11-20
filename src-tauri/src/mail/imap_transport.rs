@@ -1,5 +1,6 @@
 use super::*;
 
+#[cfg(test)]
 pub(super) use taomni_mail_engine::imap_auth::xoauth2_sasl_response;
 use taomni_mail_engine::imap_transport::{ImapConnection, ImapSession};
 

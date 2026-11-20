@@ -116,9 +116,8 @@ use base64::engine::general_purpose::STANDARD as BASE64;
 use rusqlite::{Connection, OptionalExtension, Result as SqlResult, params};
 
 use super::{
-    MailAccountConfig, MailAuthMode, MailConnectionSecurity, MailFolder, MailMessageCached,
-    ResolvedMailAccount, certs, list_cached_folders, mail_effective_endpoint, now_ts,
-    parse_body_message, tcp_connect, upsert_folder, upsert_message, xoauth2_sasl_response,
+    MailAccountConfig, MailFolder, MailMessageCached, list_cached_folders, now_ts,
+    parse_body_message, upsert_folder, upsert_message,
 };
 
 mod limits;
@@ -132,9 +131,7 @@ mod synchronization;
 #[cfg(test)]
 mod tests;
 
-pub(super) use limits::POP3_FETCH_BATCH;
-
-use limits::{LOCAL_FOLDERS, READ_TIMEOUT};
+use limits::LOCAL_FOLDERS;
 
 pub(super) use local_store::{
     create_local_folder, delete_local, delete_local_folder, ensure_local_folders, has_local_store,
@@ -144,8 +141,6 @@ pub(super) use local_store::{
 
 use local_store::{delete_rows, local_folder, next_uid};
 
-pub(super) use connection::{Pop3Client, Pop3Conn, apop_digest};
+pub(super) use connection::Pop3Client;
 
-use connection::{authenticate, greeting_timestamp};
-
-pub(super) use synchronization::{Pop3SyncOutcome, plan_round, sync_inbox};
+pub(super) use synchronization::sync_inbox;

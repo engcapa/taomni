@@ -14,6 +14,7 @@ hex = "0.4"
 imap = { version = "2.4.1", features = ["tls"], default-features = false }
 lettre = { version = "0.11.22", default-features = false, features = ["builder", "native-tls", "pool", "smtp-transport"] }
 mail-parser = { version = "0.11.4", features = ["full_encoding"] }
+md-5 = "0.11"
 native-tls = "0.2"
 regex = "1"
 rusqlite = { version = "0.40", features = ["bundled", "hooks"] }

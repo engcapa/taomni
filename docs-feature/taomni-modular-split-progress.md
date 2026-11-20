@@ -165,6 +165,8 @@ TASK-027 将 G1–G11 设为独立发布阻断门。每个门必须在匹配源�
 - macOS G1 在独立验证分支以现用固定证书制作 ARM64 DMG。MIT Kerberos 改用静态链接，产物同时检查 GSSAPI 代码、系统动态库依赖、hardened runtime 签名和升级归档身份。该实验仍依赖 GitHub 原生构建及实装回执。 [ARM64 DMG 比较](https://github.com/engcapa/taomni/actions/runs/44670439565)
 - 各端核心过渡安装包只复制本机 SocksCap 资源及通用许可证。Windows 安装包校验两种解包格式中的 helper、WinDivert 和已暂存 xray 摘要，macOS 包检查外平台资源目录。现场功能入口复用 TC-MAIN-RAIL-01，产物差异由真实安装包清单验证。独立模块包仍按 TASK-019 推进。
 - 用户确认 G5 的 p95 容许增加最多 100%。模块化专项按原验收上限 65 ms 计算，允许最多 130 ms。Windows 之前的两条实测路径为 71.82 和 73.79 ms，两者均在该范围内。首帧、帧率、带宽和采样要求继续由原用例检查。 [Windows 原始采样](https://github.com/engcapa/taomni/actions/runs/44649616170)
+- 按新 p95 口径核对 Windows 历史原始数据，两条路径的连接、延迟和吞吐共六项达标。提交 `cd0668280` 的三端对照及 Browser/Native 回归已派发，选集记录模块化 p95 设置。 [三端采集对照](https://github.com/engcapa/taomni/actions/runs/44674876677) · [应用回归](https://github.com/engcapa/taomni/actions/runs/44674877474)
+- Mail 的 POP3 协议、TLS/STLS 握手、APOP、UIDL 去重规划和原信字节读取迁入独立引擎。核心过渡层持有会话转发及本地 SQLite 写入。TC-MAIL-POP3-01 在 Browser 和 Native 验证重复同步后打开新收邮件的正文。
 
 ## 当前结论
 
