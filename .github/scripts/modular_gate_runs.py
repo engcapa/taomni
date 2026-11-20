@@ -69,7 +69,7 @@ def plan(suite, macos_runner, package_run, package_version, package_targets="all
                 "TC-RDPS-NAT-01-start-connect-display,TC-RDPS-PERF-01-performance-budget,"
                 "TC-MAIL-STORAGE-01,TC-MAIL-STORAGE-02,TC-MAIL-STORAGE-03,TC-MAIL-STORAGE-04,"
                 "TC-MAIL-STORAGE-05,TC-MAIL-STORAGE-06,TC-MAIL-STORAGE-07,TC-MAIL-STORAGE-08,"
-                "TC-MAIL-STORAGE-09,TC-MAIL-SEND-01,TC-MAIL-OUTBOX-01,TC-MAIL-ATTACH-01"
+                "TC-MAIL-STORAGE-09,TC-MAIL-SEND-01,TC-MAIL-OUTBOX-01,TC-MAIL-ATTACH-01,TC-MAIL-FOLDER-01"
             ),
         }))
         checks.append(("G2/G5 Linux Wayland native capture and input", PLATFORMS, {

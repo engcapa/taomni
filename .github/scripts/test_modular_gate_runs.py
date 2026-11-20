@@ -59,7 +59,7 @@ class DesktopGateSelectionTests(unittest.TestCase):
             "TC-MFA-106", "TC-MOBILE-003", "TC-MOBILE-021",
             "TC-SHOT-003", "TC-SHOT-N2", "TC-SHOT-N10", "TC-SHOT-N15", "TC-SHOT-N19",
             "TC-RDPS-NAT-01-start-connect-display", "TC-RDPS-PERF-01-performance-budget",
-            "TC-MAIL-SEND-01", "TC-MAIL-OUTBOX-01", "TC-MAIL-ATTACH-01",
+            "TC-MAIL-SEND-01", "TC-MAIL-OUTBOX-01", "TC-MAIL-ATTACH-01", "TC-MAIL-FOLDER-01",
             *(f"TC-MAIL-STORAGE-{number:02d}" for number in range(1, 10)),
         })
         self.assertEqual(wayland[1], PLATFORMS)
