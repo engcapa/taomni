@@ -13,7 +13,7 @@ on:
       suite:
         description: Checks to dispatch
         type: choice
-        options: [all, system, protocol, host, desktop, core, release]
+        options: [all, system, protocol, host, signed, desktop, core, release]
         default: all
       macos_runner:
         description: macOS runner for desktop QA
@@ -26,6 +26,10 @@ on:
       package_version:
         description: Version in that run's installers
         type: string
+      package_targets:
+        description: Release package targets to verify (all or comma-separated)
+        type: string
+        default: all
 
 permissions:
   contents: read
@@ -46,8 +50,12 @@ jobs:
         with:
           ref: ${{ github.workflow_sha }}
           persist-credentials: false
-          sparse-checkout: .github/scripts/modular_gate_runs.py
+          sparse-checkout: |
+            .github/scripts/modular_gate_runs.py
+            .github/scripts/test_modular_gate_runs.py
           sparse-checkout-cone-mode: false
+      - name: Check dispatch and target selections
+        run: python -m unittest discover -s .github/scripts -p test_modular_gate_runs.py
       - name: Resolve source and dispatch the existing QA workflows
         id: dispatch
         env:
@@ -58,6 +66,7 @@ jobs:
           MACOS_RUNNER: ${{ inputs.macos_runner }}
           PACKAGE_RUN: ${{ inputs.package_run }}
           PACKAGE_VERSION: ${{ inputs.package_version }}
+          PACKAGE_TARGETS: ${{ inputs.package_targets }}
         run: python .github/scripts/modular_gate_runs.py
       - uses: actions/upload-artifact@v4
         if: always()
