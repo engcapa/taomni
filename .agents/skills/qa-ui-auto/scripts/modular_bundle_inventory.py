@@ -210,6 +210,14 @@ def main() -> None:
         matrix = plan_targets(args.targets, upgrade_desktop=args.upgrade_desktop, macos_arm_runner=args.macos_arm_runner)
         with args.github_output.open('a', encoding='utf-8') as stream:
             stream.write('matrix=' + json.dumps(matrix, separators=(',', ':')) + '\n')
+            if args.upgrade_desktop:
+                builds = {"include": [
+                    {"platform_key": "windows" if entry["target"].startswith("windows-") else "macos",
+                     "arch": "ARM64" if entry["target"].endswith("-aarch64") else "X64",
+                     "capabilities": ["signed-mfa"]}
+                    for entry in matrix["include"]
+                ]}
+                stream.write('mfa_builds=' + json.dumps(builds, separators=(',', ':')) + '\n')
         return
     if args.command == 'validate-payload':
         name = ('macos' if args.target.startswith('darwin') else args.target.split('-')[0]) + '-payload.json'

@@ -25,6 +25,9 @@ on:
       macos_arm_runner:
         type: string
         default: macos-15
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: {required: false}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: {required: false}
 
 permissions:
   contents: read
@@ -35,6 +38,7 @@ jobs:
     runs-on: ubuntu-22.04
     outputs:
       matrix: ${{ steps.targets.outputs.matrix }}
+      mfa_builds: ${{ steps.targets.outputs.mfa_builds }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -58,11 +62,26 @@ jobs:
             --targets "$SAMPLE_TARGETS" --macos-arm-runner "$SAMPLE_MACOS_ARM_RUNNER" \
             --github-output "$GITHUB_OUTPUT" "${args[@]}"
 
-  bundle-samples:
+  signed-mfa:
+    if: inputs.upgrade_desktop
     needs: plan
+    uses: ./.github/workflows/qa-modular-packages.yml
+    with:
+      head: ${{ inputs.package_source }}
+      module: mfa
+      artifact_key: installed-desktop-${{ github.run_id }}
+      macos_runner: ${{ inputs.macos_arm_runner }}
+      native_builds: ${{ needs.plan.outputs.mfa_builds }}
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+  bundle-samples:
+    needs: [plan, signed-mfa]
+    if: ${{ !cancelled() && needs.plan.result == 'success' && (!inputs.upgrade_desktop || needs.signed-mfa.result == 'success') }}
     name: Real release bundle (${{ matrix.target }})
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 25
+    timeout-minutes: 40
     strategy:
       fail-fast: false
       matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
@@ -90,6 +109,37 @@ jobs:
         run: python -m pip install -r .agents/skills/qa-ui-auto/requirements-ci.txt
       - name: Pure package evidence contracts
         run: python -m unittest test_modular_bundle_inventory test_installed_desktop_upgrade
+      - name: Install the process observer for installed-app recovery
+        if: inputs.upgrade_desktop
+        run: python -m pip install psutil==7.2.2
+      - name: Install the adapter matching the installed WebView2 runtime
+        if: inputs.upgrade_desktop && runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $runtimeRoot = "${env:ProgramFiles(x86)}\Microsoft\EdgeWebView\Application"
+          $runtime = Get-ChildItem -LiteralPath $runtimeRoot -Directory | Where-Object Name -Match '^\d+\.\d+\.\d+\.\d+$' | Sort-Object { [version]$_.Name } -Descending | Select-Object -First 1
+          if (-not $runtime) { throw 'WebView2 runtime unavailable' }
+          $zip = Join-Path $env:RUNNER_TEMP 'qa-edgedriver.zip'
+          $driver = Join-Path $env:RUNNER_TEMP 'qa-edgedriver'
+          Invoke-WebRequest "https://msedgedriver.microsoft.com/$($runtime.Name)/edgedriver_win64.zip" -OutFile $zip
+          Expand-Archive -LiteralPath $zip -DestinationPath $driver -Force
+          $driver >> $env:GITHUB_PATH
+      - uses: dtolnay/rust-toolchain@stable
+        if: inputs.upgrade_desktop && runner.os == 'Windows'
+      - uses: actions/cache@v4
+        if: inputs.upgrade_desktop && runner.os == 'Windows'
+        with:
+          path: ~/.cache/taomni-qa/adapter
+          key: qa-tauri-driver-2.0.4-${{ runner.os }}-${{ runner.arch }}-${{ matrix.os }}
+      - name: Install the pinned Tauri WebDriver adapter
+        if: inputs.upgrade_desktop && runner.os == 'Windows'
+        run: |
+          adapter="$HOME/.cache/taomni-qa/adapter"
+          if ! "$adapter/bin/tauri-driver.exe" --help; then
+            cargo install tauri-driver --version 2.0.4 --locked --root "$adapter"
+          fi
+          cygpath -w "$adapter/bin" >> "$GITHUB_PATH"
       - name: Bind the selected package to its exact release producer
         id: source
         env:
@@ -161,12 +211,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: python -m qa_ui_auto.legacy_release legacy-input
+      - uses: actions/download-artifact@v4
+        if: inputs.upgrade_desktop
+        with:
+          name: qa-modular-package-${{ matrix.target }}-installed-desktop-${{ github.run_id }}
+          path: signed-mfa-input
       - name: Replace the installed application, reopen its profile and roll back
         if: inputs.upgrade_desktop
         run: |
           python .agents/skills/qa-ui-auto/scripts/installed_desktop_upgrade.py \
             --identity bundle-evidence/bundle-source.json --legacy legacy-input \
-            --candidate package-input --work installed-upgrade-work --evidence bundle-evidence
+            --candidate package-input --signed signed-mfa-input \
+            --work installed-upgrade-work --evidence bundle-evidence
       - uses: actions/upload-artifact@v4
         if: always()
         with:

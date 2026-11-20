@@ -186,6 +186,9 @@ jobs:
       package_targets: ${{ inputs.package_targets }}
       upgrade_desktop: ${{ inputs.package_upgrade_desktop }}
       macos_arm_runner: ${{ inputs.package_macos_arm_runner || 'macos-15' }}
+    secrets:
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
 
   protocol-contracts:
     if: ${{ !inputs.signed_mfa_only && !inputs.package_run && inputs.protocol_only }}

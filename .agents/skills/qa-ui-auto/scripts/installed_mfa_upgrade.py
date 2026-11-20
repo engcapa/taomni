@@ -15,27 +15,13 @@ from installed_mfa_profile import copy_profile
 from linux_noexec import NoExecBind, is_noexec
 from modular_bundle_inventory import digest, inventory
 from qa_ui_auto.fixtures.module_legacy_mfa import (
-    ISSUER, PASSWORD, close_installed_desktop, commit_mfa_upgrade, desktop_action, desktop_environment, element,
-    installed_desktop, isolated_desktop, open_mfa, run_legacy_desktop, write_json,
+    ISSUER, close_installed_desktop, commit_mfa_upgrade, desktop_action, desktop_environment, element,
+    installed_desktop, isolated_desktop, open_unlocked_mfa, run_legacy_desktop, write_json,
 )
 from qa_ui_auto.fixtures.module_signed_archive import load_artifact
 from qa_ui_auto.legacy_install import linux_install
 from qa_ui_auto.legacy_process import MODE_LEASE_DENIAL, headless_command, initialize_profile, observe_same_profile_contender
 from qa_ui_auto.legacy_release import RELEASE_VERSION, selected_asset, verify_asset
-from qa_ui_auto.native_steps import NativeStepContext
-
-
-def open_unlocked_mfa(ctx, session, evidence):
-    steps = NativeStepContext(session, evidence, ctx.cfg)
-    desktop_action(steps, "wait_for", element("vault-unlock-dialog"))
-    desktop_action(steps, "fill", {"selector": element("vault-unlock-pw"), "value": PASSWORD})
-    desktop_action(steps, "click", element("vault-unlock-confirm"))
-    desktop_action(steps, "wait_for", {
-        "selector": element("vault-unlock-dialog"), "state": "detached", "timeout_sec": 30,
-    })
-    open_mfa(steps)
-    return steps
-
 
 def inspect_accounts(ctx, executable, work, evidence, phase, code, *, next_code=None):
     with installed_desktop(ctx, executable, work / "desktop", evidence, phase) as (driver, session):

@@ -71,6 +71,18 @@ def open_mfa(steps):
     desktop_action(steps, "click", element("sidebar-tool-mfa"))
 
 
+def open_unlocked_mfa(ctx, session, evidence):
+    steps = NativeStepContext(session, evidence, ctx.cfg)
+    desktop_action(steps, "wait_for", element("vault-unlock-dialog"))
+    desktop_action(steps, "fill", {"selector": element("vault-unlock-pw"), "value": PASSWORD})
+    desktop_action(steps, "click", element("vault-unlock-confirm"))
+    desktop_action(steps, "wait_for", {
+        "selector": element("vault-unlock-dialog"), "state": "detached", "timeout_sec": 30,
+    })
+    open_mfa(steps)
+    return steps
+
+
 def create_account(session, ctx, evidence):
     steps = NativeStepContext(session, evidence, ctx.cfg)
 
@@ -114,8 +126,9 @@ def desktop_environment(desktop):
 
 
 @contextmanager
-def installed_desktop(ctx, executable, desktop, evidence, label):
-    environment, _ = desktop_environment(desktop)
+def installed_desktop(ctx, executable, desktop, evidence, label, *, environment=None):
+    if environment is None:
+        environment, _ = desktop_environment(desktop)
     driver = legacy_driver(ctx, executable, evidence / label)
     with isolated_desktop(environment), ExitStack() as cleanup:
         session = NativeSession(driver.url, executable)

@@ -2,11 +2,14 @@
 import json
 from pathlib import Path
 import subprocess
+import sys
 from tempfile import TemporaryDirectory
+from types import SimpleNamespace
 import unittest
 from unittest.mock import MagicMock, Mock, patch
 
 from installed_desktop_mode_lease import check_mode_lease, reserve_default_profile
+from installed_desktop_mfa_crash import observe_abrupt_exit
 from installed_desktop_upgrade import require_registration, select_candidate
 from modular_bundle_inventory import plan_targets
 from qa_ui_auto.legacy_install import windows_install
@@ -148,3 +151,37 @@ class InstalledDesktopModeLeaseTests(unittest.TestCase):
             first, second = contenders.call_args_list
             self.assertEqual(first.args[0][:4], [str(executable), "--headless", "--data-dir", str(profile)])
             self.assertEqual(second.args[0], [str(executable)])
+
+
+class InstalledDesktopMfaCrashTests(unittest.TestCase):
+    def test_kills_only_the_owned_application_and_waits_for_the_signed_host(self):
+        for host_survives in (False, True):
+            with self.subTest(host_survives=host_survives):
+                timeout = TimeoutError("host survived")
+                application = Path("installed-taomni").resolve()
+                module = Path("installed-mfa-module").resolve()
+                launcher = Mock(pid=21)
+                core = Mock(pid=22)
+                host = Mock(pid=23)
+                launcher.exe.return_value = "test-driver"
+                core.exe.return_value = str(application)
+                host.exe.return_value = str(module)
+                launcher.children.return_value = [core, host]
+                core.children.return_value = [host]
+                core.wait.return_value = 1
+                host.wait.side_effect = timeout if host_survives else None
+                observer = SimpleNamespace(Process=Mock(return_value=launcher),
+                                           NoSuchProcess=ProcessLookupError, AccessDenied=PermissionError)
+                result = {}
+                with patch.dict(sys.modules, {"psutil": observer}):
+                    driver = SimpleNamespace(proc=SimpleNamespace(pid=launcher.pid))
+                    if host_survives:
+                        with self.assertRaisesRegex(TimeoutError, "host survived"):
+                            observe_abrupt_exit(driver, application, module, result)
+                    else:
+                        observe_abrupt_exit(driver, application, module, result)
+                self.assertNotEqual(host_survives, result.get("hostExitedBeforeDriverCleanup", False))
+                self.assertTrue(result["coreExited"])
+                core.kill.assert_called_once_with()
+                host.kill.assert_not_called()
+                launcher.kill.assert_not_called()

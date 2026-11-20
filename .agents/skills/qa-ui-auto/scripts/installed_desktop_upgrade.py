@@ -8,6 +8,7 @@ from pathlib import Path
 import platform
 from uuid import UUID
 
+from installed_desktop_mfa_crash import verify_crash_recovery
 from installed_desktop_mode_lease import check_mode_lease
 from modular_bundle_inventory import digest, inventory, write_json
 from qa_ui_auto.fixtures.module_legacy_install import insert_business_rows, retained_manifest, session_rows
@@ -110,6 +111,16 @@ def execute(args):
             candidate, profile, work, report, "candidate-after-mode-lease", expected_rows, retained,
         )
         stages["desktopAndHeadlessModeLease"] = check_mode_lease(candidate, work, report)
+        recovery_failure = None
+        try:
+            stages["crashRecovery"] = verify_crash_recovery(
+                candidate, Path(stages["desktopAndHeadlessModeLease"]["profile"]),
+                args.signed.resolve(strict=True), identity["producerSource"], report,
+            )
+        except Exception as error:
+            # Preserve rollback evidence after the hosted crash scenario fails.
+            recovery_failure = error
+            stages["crashRecovery"] = {"passed": False, "error": str(error)}
 
         if system == "Windows":
             command(["msiexec.exe", "/x", str(package), "/qn", "/norestart", "/L*v", str(report / "candidate-uninstall.log")],
@@ -124,6 +135,8 @@ def execute(args):
             require_registration(msi_registration(old_package, report, "original-after-rollback"),
                                  msi_registration(package, report, "candidate-after-rollback"), upgraded=False)
         stages["afterRollback"] = start_profile(rollback, profile, work, report, "rollback-reopen", expected_rows)
+        if recovery_failure is not None:
+            raise recovery_failure
         result.update(passed=True, sessionTypes=[row["session_type"] for row in expected_rows], retainedFiles=retained)
     finally:
         write_json(report / "installed-desktop-upgrade.json", result)
@@ -131,6 +144,6 @@ def execute(args):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    for name in ("identity", "legacy", "candidate", "evidence", "work"):
+    for name in ("identity", "legacy", "candidate", "signed", "evidence", "work"):
         parser.add_argument("--" + name, required=True, type=Path)
     execute(parser.parse_args())
