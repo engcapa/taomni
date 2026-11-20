@@ -86,13 +86,31 @@ impl PluginRegistry {
         payload: Value,
         request_id: &str,
     ) -> Result<Value, PluginError> {
+        self.invoke_cancellable(slug, command, payload, request_id, || false)
+    }
+
+    pub(crate) fn invoke_cancellable(
+        &self,
+        slug: &str,
+        command: &str,
+        payload: Value,
+        request_id: &str,
+        caller_cancelled: impl Fn() -> bool,
+    ) -> Result<Value, PluginError> {
+        if caller_cancelled() {
+            return Err(cancelled());
+        }
         let record = self.call_record(slug, command)?;
         let pending = self.begin_call(slug, request_id)?;
+        // Cancellation can arrive before the blocking worker registers its ID.
+        if caller_cancelled() || pending.cancelled() {
+            return Err(cancelled());
+        }
         let runtime = self.host_for(slug, &record)?;
         let id = RequestId::from(request_id);
         pending.attach(&runtime, id.clone());
         loop {
-            if pending.cancelled() {
+            if caller_cancelled() || pending.cancelled() {
                 return Err(cancelled());
             }
             if let Ok(mut process) = runtime.process.try_lock() {
@@ -318,6 +336,36 @@ impl PluginRegistry {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn blocking_caller_cancellation_during_registration_does_not_start_host() {
+        let registry = PluginRegistry::new("unused");
+        let manifest: ModuleManifest =
+            serde_json::from_str(include_str!("../../plugins/vnc-client/module.json")).unwrap();
+        registry.records.write().unwrap().insert(
+            manifest.slug.clone(),
+            PluginRecord {
+                manifest,
+                state: LifecycleState::Enabled,
+                reason: None,
+                data_retained: false,
+                previous_version: None,
+                rollback_until: None,
+            },
+        );
+        let checked = std::cell::Cell::new(false);
+        let result = registry.invoke_cancellable(
+            "vnc-client",
+            "vnc/start",
+            Value::Null,
+            "cancel-before-attachment",
+            || checked.replace(true),
+        );
+        assert!(matches!(result, Err(PluginError::Rpc { code, .. })
+                if code == ErrorCode::RequestCancelled.as_i32()));
+        assert!(registry.pending_requests.lock().unwrap().is_empty());
+        assert!(registry.hosts.lock().unwrap().is_empty());
+    }
 
     #[test]
     fn renderer_cancel_maps_to_scoped_wire_id_even_when_cancelled_before_attachment() {

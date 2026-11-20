@@ -1,8 +1,15 @@
-use std::{collections::HashMap, future::Future, io, sync::Mutex, time::Duration};
+use std::{
+    collections::HashMap,
+    future::Future,
+    io,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
 use taomni_plugin_api::{ErrorCode, RpcError};
 use taomni_vnc_engine::ws::{VncSession, native_pointer_sampler, probe_connection, spawn_relay};
 use tokio::runtime::{Builder, Runtime};
+use tokio::sync::{OwnedSemaphorePermit, Semaphore};
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
@@ -10,10 +17,16 @@ use crate::request::{Start, Started};
 
 const SESSION_LIMIT: usize = 32;
 
+struct ActiveSession {
+    _relay: VncSession,
+    _slot: OwnedSemaphorePermit,
+}
+
 pub(crate) struct Sessions {
     // Drop session handles before dropping the runtime. Their cancellation
     // closes the socket and releases the blocking RFB reader.
-    active: Mutex<HashMap<Uuid, VncSession>>,
+    active: Arc<Mutex<HashMap<Uuid, ActiveSession>>>,
+    slots: Arc<Semaphore>,
     runtime: Runtime,
     desktop_pid: u32,
 }
@@ -21,7 +34,8 @@ pub(crate) struct Sessions {
 impl Sessions {
     pub(crate) fn new() -> io::Result<Self> {
         Ok(Self {
-            active: Mutex::new(HashMap::new()),
+            active: Arc::new(Mutex::new(HashMap::new())),
+            slots: Arc::new(Semaphore::new(SESSION_LIMIT)),
             runtime: Builder::new_multi_thread()
                 .worker_threads(2)
                 .enable_all()
@@ -40,11 +54,9 @@ impl Sessions {
     ) -> Result<Result<Started, String>, RpcError> {
         let (request, dial) = input.checked()?;
         check()?;
-        let mut active = self.active.lock().map_err(|_| lock_failed())?;
-        active.retain(|_, session| !session.cancel.is_cancelled());
-        if active.len() >= SESSION_LIMIT {
-            return Err(RpcError::new(ErrorCode::InvalidState, "VNC_SESSION_LIMIT"));
-        }
+        let slot = Arc::clone(&self.slots)
+            .try_acquire_owned()
+            .map_err(|_| RpcError::new(ErrorCode::InvalidState, "VNC_SESSION_LIMIT"))?;
         let pointer = native_pointer_sampler(self.desktop_pid);
         let session = match self.run(check, |attempt| {
             spawn_relay(request, dial.connect(), pointer, attempt)
@@ -58,7 +70,23 @@ impl Sessions {
             ws_port: session.ws_port,
             ws_token: session.ws_token.clone(),
         };
-        active.insert(id, session);
+        let closed = session.cancel.clone();
+        self.active.lock().map_err(|_| lock_failed())?.insert(
+            id,
+            ActiveSession {
+                _relay: session,
+                _slot: slot,
+            },
+        );
+        let sessions = Arc::downgrade(&self.active);
+        self.runtime.spawn(async move {
+            closed.cancelled().await;
+            if let Some(sessions) = sessions.upgrade()
+                && let Ok(mut active) = sessions.lock()
+            {
+                active.remove(&id);
+            }
+        });
         Ok(Ok(started))
     }
 

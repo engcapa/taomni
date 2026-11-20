@@ -190,13 +190,9 @@ async fn invoke<T: DeserializeOwned>(
     let request_id = id.clone();
     let request_attempt = attempt.clone();
     let request = tauri::async_runtime::spawn_blocking(move || {
-        if request_attempt.is_cancelled() {
-            return Err(crate::plugin::PluginError::Rpc {
-                code: taomni_plugin_api::ErrorCode::RequestCancelled.as_i32(),
-                message: stopped(),
-            });
-        }
-        owner.invoke_with_id(SLUG, method, payload, &request_id)
+        owner.invoke_cancellable(SLUG, method, payload, &request_id, || {
+            request_attempt.is_cancelled()
+        })
     });
     let response = tokio::select! {
         response = request => response.map_err(|error| error.to_string())?

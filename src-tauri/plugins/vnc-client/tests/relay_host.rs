@@ -188,7 +188,7 @@ fn desktop_fixture(relay: bool) -> (u16, thread::JoinHandle<()>) {
 async fn relay_host_paints_and_closes_sessions_and_exits_with_live_streams() {
     let temporary = tempfile::tempdir().unwrap();
     let mut host = Host::start(&temporary.path().canonicalize().unwrap());
-    for command in ["close", "exit"] {
+    for command in ["client-close", "close", "exit"] {
         let (port, server) = desktop_fixture(true);
         let upstream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
         let (route, forward) = ForwardRoute::bind(upstream).await.unwrap();
@@ -258,12 +258,15 @@ async fn relay_host_paints_and_closes_sessions_and_exits_with_live_streams() {
         })
         .await
         .unwrap();
-        if command == "close" {
-            let args = json!({"sessionId":session["session_id"]});
-            assert_eq!(host.call("close-session", "vnc/close", args.clone()), true);
-            assert_eq!(host.call("close-again", "vnc/close", args), false);
-        } else {
-            host.exit();
+        match command {
+            "client-close" => socket.close(None).await.unwrap(),
+            "close" => {
+                let args = json!({"sessionId":session["session_id"]});
+                assert_eq!(host.call("close-session", "vnc/close", args.clone()), true);
+                assert_eq!(host.call("close-again", "vnc/close", args), false);
+            }
+            "exit" => host.exit(),
+            _ => unreachable!(),
         }
         tokio::time::timeout(WAIT, forward).await.unwrap().unwrap();
         server.join().unwrap();
@@ -276,6 +279,13 @@ async fn relay_host_paints_and_closes_sessions_and_exits_with_live_streams() {
         })
         .await
         .unwrap();
+        if command == "client-close" {
+            assert!(
+                TcpStream::connect(("127.0.0.1", ws_port as u16))
+                    .await
+                    .is_err()
+            );
+        }
     }
 }
 
