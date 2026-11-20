@@ -1,7 +1,7 @@
-use crate::mail::MailFolder;
-use crate::mail::MailMessageCached;
-use crate::mail::MailMessageHeader;
-use crate::mail::now_ts;
+use crate::MailFolder;
+use crate::MailMessageCached;
+use crate::MailMessageHeader;
+use crate::now_ts;
 use serde::Deserialize;
 use serde::Serialize;
 use std::collections::HashSet;
@@ -61,7 +61,7 @@ pub struct MailFolderSyncResult {
 
 /// Persisted per-folder sync state plus the cached UID set.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub(in crate::mail) struct FolderSyncState {
+pub struct FolderSyncState {
     pub uid_validity: Option<u32>,
     pub low: Option<u32>,
     pub high: Option<u32>,
@@ -75,7 +75,7 @@ pub(in crate::mail) struct FolderSyncState {
 }
 
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
-pub(in crate::mail) struct Watermark {
+pub struct Watermark {
     pub low: Option<u32>,
     pub high: Option<u32>,
     pub complete: bool,
@@ -84,7 +84,7 @@ pub(in crate::mail) struct Watermark {
 
 /// Result of one IMAP step before it is written to the cache.
 #[derive(Debug)]
-pub(in crate::mail) struct FolderStepOutcome {
+pub struct FolderStepOutcome {
     pub folder: MailFolder,
     pub mode: MailSyncMode,
     pub messages: Vec<MailMessageCached>,
@@ -100,7 +100,7 @@ pub(in crate::mail) struct FolderStepOutcome {
     pub new_unseen: usize,
 }
 
-pub(in crate::mail) struct AppliedStep {
+pub struct AppliedStep {
     pub flags_updated: usize,
     pub folder: Option<MailFolder>,
 }
@@ -109,7 +109,7 @@ pub(in crate::mail) struct AppliedStep {
 // Step
 // ---------------------------------------------------------------------------
 
-pub(in crate::mail) struct StepParams {
+pub struct StepParams {
     pub request: MailSyncRequestMode,
     pub limit: usize,
     pub include_bodies: bool,
@@ -118,10 +118,7 @@ pub(in crate::mail) struct StepParams {
 
 /// In-memory state after `outcome` is applied (for multi-step batches that
 /// run inside one IMAP session before anything is written).
-pub(in crate::mail) fn advance_state(
-    state: &FolderSyncState,
-    outcome: &FolderStepOutcome,
-) -> FolderSyncState {
+pub fn advance_state(state: &FolderSyncState, outcome: &FolderStepOutcome) -> FolderSyncState {
     let mut cached: HashSet<u32> = if outcome.uid_validity_reset {
         HashSet::new()
     } else {
@@ -148,7 +145,7 @@ pub(in crate::mail) fn advance_state(
 }
 
 /// Build the IPC result from a step outcome after it was applied.
-pub(in crate::mail) fn step_result(
+pub fn step_result(
     account_id: &str,
     outcome: FolderStepOutcome,
     applied: Option<AppliedStep>,

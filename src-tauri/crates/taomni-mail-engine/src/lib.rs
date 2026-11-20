@@ -8,6 +8,8 @@ pub mod database;
 pub mod filters;
 pub mod imap_auth;
 pub mod imap_folders;
+pub mod imap_messages;
+pub mod imap_sync;
 pub mod imap_transport;
 mod inline_images;
 mod lists;
@@ -18,9 +20,9 @@ mod models;
 pub mod pop3;
 pub mod smtp;
 pub mod storage;
-pub mod tls;
 #[cfg(test)]
 mod tests;
+pub mod tls;
 
 pub use lists::{MailListUnsubscribe, parse_list_unsubscribe};
 pub use mime::{

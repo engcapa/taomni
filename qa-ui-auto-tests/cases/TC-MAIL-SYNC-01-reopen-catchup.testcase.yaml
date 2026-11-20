@@ -72,12 +72,20 @@ steps:
 - assert_count:
     selector: '[data-testid="mail-message-row"]'
     min: 450
+- press:
+    selector: '[data-testid="mail-message-row"][data-subject="Closed-tab 0450"]'
+    key: Enter
+- assert_text:
+    selector: '[data-testid="mail-reader-text"]'
+    contains: Closed-tab 0450
+    timeout_sec: 30
+- assert_no_runtime_errors: null
 - screenshot: mail-sync-01-reopen-catchup.png
 verification:
   review: reviewed
   requirements:
   - id: R1
-    requirement: 标签关闭期间到达的 450 封邮件在重开后全部出现在列表中，列表数量与服务器完全一致且无更多待加载项（AC-01/AC-02）。
+    requirement: 标签关闭期间到达的 450 封邮件在重开后全部出现在列表中，列表数量与服务器完全一致且无更多待加载项，最新邮件的正文可打开（AC-01/AC-02）。
     actions:
     - 1
     - 2
@@ -89,6 +97,7 @@ verification:
     - 12
     - 13
     - 14
+    - 18
     checkpoints:
     - step: 7
       expectation: '{"wait_for": "[data-testid=\"mail-client-tab\"]"}'
@@ -100,9 +109,15 @@ verification:
       expectation: '{"mail_server_assert_list_matches": {"timeout_sec": 120}}'
     - step: 17
       expectation: '{"assert_count": {"selector": "[data-testid=\"mail-message-row\"]", "min": 450}}'
+    - step: 19
+      expectation: 正文区域显示同步后收到的 Closed-tab 0450。
+    - step: 20
+      expectation: 同步及打开正文期间无运行时错误。
     results:
     - 16
     - 17
+    - 19
+    - 20
   visual:
   - check: 截图中邮件列表、文件夹与计数显示完整，无同步进度残留或遮挡。
     method: manual

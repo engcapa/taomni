@@ -13868,8 +13868,9 @@ controls:
 > - Ribbon `Packages`、`Macros`
 > - SFTP 底部的 "Cross-host transfer (remote ↔ remote)" 按钮（disabled 占位）
 
+- TC-MAIL-SYNC-01 verifies that all 450 messages delivered while the tab was closed appear after reopening and that the newest body opens in browser and native mode (F-MAIL-5).
 - TC-MAIL-SYNC-03 covers native sparse UID command limits, FETCH reconnect, gap-free catch-up, remote deletion and flag reconciliation, and runtime error checks (F-MAIL-5/F-MAIL-3).
-- TC-MAIL-IDLE-01 and TC-MAIL-POP3-01 check renderer and native connection behavior, including IDLE release after closing the tab and repeated POP3 sync without duplicates (F-MAIL-10/F-MAIL-17).
+- TC-MAIL-IDLE-01 and TC-MAIL-POP3-01 check renderer and native connection behavior, including IDLE release after closing the tab, POP3 sync without duplicates and reading the newly downloaded message (F-MAIL-10/F-MAIL-17).
 
 ---
 

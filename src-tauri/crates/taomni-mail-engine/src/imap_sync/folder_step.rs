@@ -1,10 +1,3 @@
-use super::cache::count_unseen;
-use super::imap_protocol::fetch_desc;
-use super::imap_protocol::imap_examine;
-use super::imap_protocol::imap_fetch_flags;
-use super::imap_protocol::imap_fetch_flags_for_uids;
-use super::imap_protocol::imap_search_older;
-use super::imap_protocol::imap_search_uid_range;
 use super::limits::FLAG_RECONCILE_WINDOW;
 use super::model::FolderStepOutcome;
 use super::model::FolderSyncState;
@@ -15,30 +8,31 @@ use super::model::Watermark;
 use super::planning::plan_backfill;
 use super::planning::plan_fill_range;
 use super::planning::recent_window_start;
-use crate::mail::MailFolder;
-use crate::mail::ResolvedMailAccount;
-use crate::mail::decode_imap_modified_utf7;
-use crate::mail::imap_fetch_messages_for_uids;
-use crate::mail::imap_page_uids_newest_first;
-use crate::mail::imap_unread_count;
-use crate::mail::now_ts;
+use super::protocol::fetch_desc;
+use super::protocol::imap_examine;
+use super::protocol::imap_fetch_flags;
+use super::protocol::imap_fetch_flags_for_uids;
+use super::protocol::imap_search_older;
+use super::protocol::imap_search_uid_range;
+use crate::imap_folders::decode_imap_modified_utf7;
+use crate::imap_messages::{Mailbox, imap_page_uids_newest_first, imap_unread_count};
+use crate::{MailFolder, MailMessageCached, now_ts};
 use std::collections::HashSet;
 use std::io::Read;
 use std::io::Write;
 
 /// Run one bounded sync step for `folder` against the stored `state`.
-pub(in crate::mail) fn imap_sync_folder_step<T: Read + Write>(
+pub fn imap_sync_folder_step<T: Read + Write>(
     session: &mut imap::Session<T>,
-    account: &ResolvedMailAccount,
-    folder: &str,
+    mailbox: &mut Mailbox<'_, impl FnMut(u32, &[u8]) -> Result<(), String>>,
     state: &FolderSyncState,
     params: &StepParams,
 ) -> Result<FolderStepOutcome, String> {
+    let folder = mailbox.name;
     let remote = imap_examine(session, folder, params.condstore)?;
-    let unread = imap_unread_count(session, folder);
-    let account_id = &account.config.session_id;
+    let unread = imap_unread_count(session);
     let folder_info = MailFolder {
-        account_id: account_id.clone(),
+        account_id: mailbox.account_id.to_owned(),
         name: folder.to_string(),
         display_name: decode_imap_modified_utf7(folder),
         flags: remote.flags.clone(),
@@ -83,8 +77,7 @@ pub(in crate::mail) fn imap_sync_folder_step<T: Read + Write>(
     if state.high.is_none() && state.cached_uids.is_empty() {
         let (page, has_more) =
             imap_page_uids_newest_first(session, remote.uid_next, remote.exists, 0, limit)?;
-        let messages =
-            imap_fetch_messages_for_uids(session, account, folder, &page, params.include_bodies)?;
+        let messages = mailbox.fetch_messages(session, &page, params.include_bodies)?;
         let empty_high = remote
             .uid_next
             .map(|next| next.saturating_sub(1))
@@ -124,13 +117,7 @@ pub(in crate::mail) fn imap_sync_folder_step<T: Read + Write>(
     if state.needs_repair {
         let server = imap_search_uid_range(session, low, Some(high))?;
         let plan = plan_fill_range(&server, &state.cached_uids, low, Some(high), limit);
-        let messages = imap_fetch_messages_for_uids(
-            session,
-            account,
-            folder,
-            &plan.fetch,
-            params.include_bodies,
-        )?;
+        let messages = mailbox.fetch_messages(session, &plan.fetch, params.include_bodies)?;
         outcome.mode = MailSyncMode::Repair;
         outcome.messages = fetch_desc(messages);
         outcome.vanished = plan.vanished;
@@ -146,13 +133,7 @@ pub(in crate::mail) fn imap_sync_folder_step<T: Read + Write>(
             let start = high.saturating_add(1);
             let server = imap_search_uid_range(session, start, None)?;
             let plan = plan_fill_range(&server, &state.cached_uids, start, None, limit);
-            let messages = imap_fetch_messages_for_uids(
-                session,
-                account,
-                folder,
-                &plan.fetch,
-                params.include_bodies,
-            )?;
+            let messages = mailbox.fetch_messages(session, &plan.fetch, params.include_bodies)?;
             outcome.mode = MailSyncMode::Catchup;
             outcome.new_unseen = count_unseen(&messages);
             outcome.messages = fetch_desc(messages);
@@ -172,13 +153,7 @@ pub(in crate::mail) fn imap_sync_folder_step<T: Read + Write>(
             }
             let (older, reached_start) = imap_search_older(session, low, limit)?;
             let plan = plan_backfill(&older, &state.cached_uids, reached_start, limit);
-            let messages = imap_fetch_messages_for_uids(
-                session,
-                account,
-                folder,
-                &plan.fetch,
-                params.include_bodies,
-            )?;
+            let messages = mailbox.fetch_messages(session, &plan.fetch, params.include_bodies)?;
             outcome.messages = fetch_desc(messages);
             if let Some(new_low) = plan.new_low {
                 outcome.watermark.low = Some(new_low.min(low));
@@ -205,13 +180,7 @@ pub(in crate::mail) fn imap_sync_folder_step<T: Read + Write>(
             };
             let server = imap_search_uid_range(session, lo, Some(high))?;
             let plan = plan_fill_range(&server, &state.cached_uids, lo, Some(high), limit);
-            let messages = imap_fetch_messages_for_uids(
-                session,
-                account,
-                folder,
-                &plan.fetch,
-                params.include_bodies,
-            )?;
+            let messages = mailbox.fetch_messages(session, &plan.fetch, params.include_bodies)?;
             let fetched: HashSet<u32> = plan.fetch.iter().copied().collect();
             outcome.messages = fetch_desc(messages);
             outcome.vanished = plan.vanished;
@@ -247,4 +216,17 @@ pub(in crate::mail) fn imap_sync_folder_step<T: Read + Write>(
         }
     }
     Ok(outcome)
+}
+
+fn count_unseen(messages: &[MailMessageCached]) -> usize {
+    messages
+        .iter()
+        .filter(|message| {
+            !message
+                .header
+                .flags
+                .iter()
+                .any(|flag| flag.eq_ignore_ascii_case("\\Seen"))
+        })
+        .count()
 }

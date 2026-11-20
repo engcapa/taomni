@@ -1,9 +1,8 @@
-use super::model::AppliedStep;
-use super::model::FolderStepOutcome;
-use super::model::FolderSyncState;
-use super::model::MailSyncMode;
+use super::AppliedStep;
+use super::FolderStepOutcome;
+use super::FolderSyncState;
+use super::MailSyncMode;
 use crate::mail::MailCacheSettings;
-use crate::mail::MailMessageCached;
 use crate::mail::cache_synced_messages;
 use crate::mail::now_ts;
 use crate::mail::prune_mail_cache;
@@ -219,17 +218,4 @@ pub(in crate::mail) fn apply_folder_step(
         flags_updated,
         folder,
     })
-}
-
-pub(in crate::mail) fn count_unseen(messages: &[MailMessageCached]) -> usize {
-    messages
-        .iter()
-        .filter(|message| {
-            !message
-                .header
-                .flags
-                .iter()
-                .any(|flag| flag.eq_ignore_ascii_case("\\Seen"))
-        })
-        .count()
 }

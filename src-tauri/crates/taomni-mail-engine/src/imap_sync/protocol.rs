@@ -1,7 +1,6 @@
 use super::limits::FLAG_FETCH_CHUNK;
-use crate::mail::MailMessageCached;
-use crate::mail::fetch_flag_strings;
-use crate::mail::uid_set_string;
+use crate::MailMessageCached;
+use crate::imap_messages::{fetch_flag_strings, uid_set_string};
 use std::io::Read;
 use std::io::Write;
 
@@ -9,7 +8,7 @@ use std::io::Write;
 // IMAP helpers
 // ---------------------------------------------------------------------------
 
-pub(in crate::mail) struct RemoteMailbox {
+pub(super) struct RemoteMailbox {
     pub exists: u32,
     pub uid_validity: Option<u32>,
     pub uid_next: Option<u32>,
@@ -17,10 +16,10 @@ pub(in crate::mail) struct RemoteMailbox {
     pub highest_modseq: Option<u64>,
 }
 
-pub(in crate::mail) use taomni_mail_engine::imap_folders::quote_imap_string;
+use crate::imap_folders::quote_imap_string;
 
 /// Parse the untagged data of an `EXAMINE ... (CONDSTORE)` response.
-pub(in crate::mail) fn parse_examine_response(raw: &str) -> RemoteMailbox {
+pub(super) fn parse_examine_response(raw: &str) -> RemoteMailbox {
     let mut mailbox = RemoteMailbox {
         exists: 0,
         uid_validity: None,
@@ -59,10 +58,7 @@ pub(in crate::mail) fn parse_examine_response(raw: &str) -> RemoteMailbox {
     mailbox
 }
 
-pub(in crate::mail) fn imap_has_capability<T: Read + Write>(
-    session: &mut imap::Session<T>,
-    name: &str,
-) -> bool {
+pub fn imap_has_capability<T: Read + Write>(session: &mut imap::Session<T>, name: &str) -> bool {
     session
         .capabilities()
         .map(|caps| caps.has_str(name))

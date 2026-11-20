@@ -2,7 +2,7 @@
   "id": "taomni-plugin-mail",
   "slug": "mail",
   "name": "Mail",
-  "description": "IMAP, SMTP, unified inbox, synchronization, drafts, contacts, calendar and local mail cache.",
+  "description": "IMAP, POP3, SMTP, unified inbox, synchronization, drafts, contacts, calendar and local mail cache.",
   "version": "0.1.0",
   "coreApiVersion": "1",
   "kind": "collaboration",

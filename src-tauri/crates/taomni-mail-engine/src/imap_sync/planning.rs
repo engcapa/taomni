@@ -5,7 +5,7 @@ use std::collections::HashSet;
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub(in crate::mail) struct FillPlan {
+pub(super) struct FillPlan {
     /// UIDs to fetch now, ascending (the newest `limit` missing ones).
     pub fetch: Vec<u32>,
     /// Cached UIDs in range that the server no longer has.
@@ -17,7 +17,7 @@ pub(in crate::mail) struct FillPlan {
 
 /// Plan filling `[lo, hi]` (hi = None means open-ended) from the server UID
 /// set: fetch what is missing (newest first), report what vanished.
-pub(in crate::mail) fn plan_fill_range(
+pub(super) fn plan_fill_range(
     server: &[u32],
     cached: &[u32],
     lo: u32,
@@ -53,7 +53,7 @@ pub(in crate::mail) fn plan_fill_range(
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub(in crate::mail) struct BackfillPlan {
+pub(super) struct BackfillPlan {
     pub fetch: Vec<u32>,
     pub new_low: Option<u32>,
     pub complete: bool,
@@ -61,7 +61,7 @@ pub(in crate::mail) struct BackfillPlan {
 
 /// Plan the next older block below the span. `older` are server UIDs below
 /// `low` found by a search whose window reached UID 1 iff `reached_start`.
-pub(in crate::mail) fn plan_backfill(
+pub(super) fn plan_backfill(
     older: &[u32],
     cached: &[u32],
     reached_start: bool,
@@ -85,7 +85,7 @@ pub(in crate::mail) fn plan_backfill(
 }
 
 /// Lower bound of the newest `window` cached UIDs (quiet reconcile range).
-pub(in crate::mail) fn recent_window_start(cached: &[u32], low: u32, window: usize) -> u32 {
+pub(super) fn recent_window_start(cached: &[u32], low: u32, window: usize) -> u32 {
     if cached.len() > window {
         cached[cached.len() - window].max(low)
     } else {
