@@ -339,9 +339,8 @@ controls:
     selector: '[data-testid="module-action-disable-hello-plugin"]'
     kind: interactive
     aliases:
-    - '[data-testid="module-action-disable-vnc-client"]'
-    aliases:
     - '[data-testid="module-action-disable-mfa"]'
+    - '[data-testid="module-action-disable-vnc-client"]'
   - id: module-action-uninstall-hello-plugin
     selector: '[data-testid="module-action-uninstall-hello-plugin"]'
     kind: interactive
