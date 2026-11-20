@@ -1,17 +1,9 @@
 use super::connection::Pop3Client;
-use super::local_store::create_local_folder;
-use super::local_store::delete_local;
-use super::local_store::ensure_local_folders;
-use super::local_store::has_local_store;
-use super::local_store::insert_local;
-use super::local_store::local_raw;
-use super::local_store::move_local;
-use super::local_store::rename_local_folder;
+use super::local_raw;
 use super::synchronization::sync_inbox;
 use crate::mail::MailAccountConfig;
 use crate::mail::MailAuthMode;
 use crate::mail::ResolvedMailAccount;
-use crate::mail::list_cached_folders;
 #[cfg(test)]
 use crate::mail::pop3::fake;
 use rusqlite::Connection;
@@ -103,67 +95,4 @@ async fn downloads_once_and_leaves_or_deletes() {
     assert_eq!(third.deleted_on_server, 3);
     assert_eq!(state.lock().unwrap().deleted.len(), 3);
     assert!(state.lock().unwrap().messages.is_empty());
-}
-
-#[test]
-fn local_folders_move_copy_delete() {
-    let conn = db();
-    ensure_local_folders(&conn, "pop").unwrap();
-    let a = insert_local(&conn, "pop", "INBOX", &raw("alpha"), &[]).unwrap();
-    let b = insert_local(&conn, "pop", "INBOX", &raw("beta"), &["\\Seen"]).unwrap();
-    assert_eq!((a.header.uid, b.header.uid), (1, 2));
-    create_local_folder(&conn, "pop", "Projects").unwrap();
-    assert_eq!(
-        move_local(&conn, "pop", "INBOX", &[1], "Projects", false).unwrap(),
-        1
-    );
-    assert_eq!(
-        move_local(&conn, "pop", "INBOX", &[2], "Archive2", true).unwrap(),
-        1
-    );
-    let folders = list_cached_folders(&conn, "pop").unwrap();
-    let count = |name: &str| {
-        folders
-            .iter()
-            .find(|f| f.name == name)
-            .and_then(|f| f.total)
-    };
-    assert_eq!(count("INBOX"), Some(1));
-    assert_eq!(count("Projects"), Some(1));
-    assert!(local_raw(&conn, "pop", "Projects", 1).unwrap().is_some());
-    assert_eq!(delete_local(&conn, "pop", "INBOX", Some(&[2])).unwrap(), 1);
-    rename_local_folder(&conn, "pop", "Projects", "Work").unwrap();
-    assert!(local_raw(&conn, "pop", "Work", 1).unwrap().is_some());
-    assert!(has_local_store(&conn, "pop").unwrap());
-}
-
-#[test]
-fn permanent_delete_retains_original_and_cleanup_never_reuses_its_uid() {
-    let dir = tempfile::tempdir().unwrap();
-    let conn = Connection::open(dir.path().join("qa-pop3.db")).unwrap();
-    super::super::init_mail_tables(&conn).unwrap();
-    ensure_local_folders(&conn, "pop").unwrap();
-    let original = raw("retained");
-    let first = insert_local(&conn, "pop", "INBOX", &original, &[]).unwrap();
-    delete_local(&conn, "pop", "INBOX", Some(&[first.header.uid])).unwrap();
-    let entries = super::super::storage::list(&conn, "pop", 0).unwrap();
-    assert_eq!(entries.len(), 1);
-    assert_eq!(
-        super::super::storage::open_entry(&conn, "pop", &entries[0])
-            .unwrap()
-            .read()
-            .unwrap(),
-        original
-    );
-    super::super::storage::remove_entries(&conn, "pop", &entries).unwrap();
-    let next = insert_local(&conn, "pop", "INBOX", &raw("next"), &[]).unwrap();
-    assert!(next.header.uid > first.header.uid);
-    delete_local(&conn, "pop", "INBOX", Some(&[next.header.uid])).unwrap();
-    let retained = super::super::storage::list(&conn, "pop", 0).unwrap();
-    assert_eq!(
-        retained.len(),
-        1,
-        "cleaning an old UID must not suppress a new email"
-    );
-    assert_eq!(retained[0].uid, next.header.uid);
 }

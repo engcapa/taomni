@@ -1,13 +1,6 @@
 use super::*;
 
-pub fn init_mail_tables(conn: &Connection) -> SqlResult<()> {
-    taomni_mail_engine::cache::init_cache_tables(conn)?;
-    storage::init_tables(conn)?;
-    pop3::migrate_local_tables(conn)?;
-    taomni_mail_engine::filters::migrate_filter_tables(conn)?;
-    contacts::migrate_contact_tables(conn)?;
-    caldav::migrate_calendar_tables(conn)
-}
+pub use taomni_mail_engine::cache::init_mail_tables;
 
 pub(super) fn with_mail_db<T>(
     state: &State<'_, AppState>,

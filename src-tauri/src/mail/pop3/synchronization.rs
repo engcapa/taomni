@@ -1,7 +1,5 @@
 use super::limits::POP3_FETCH_BATCH;
-use super::local_store::ensure_local_folders;
-use super::local_store::insert_local;
-use super::local_store::refresh_counts;
+use super::{ensure_local_folders, insert_local, refresh_counts};
 use crate::mail::MailMessageCached;
 use crate::mail::now_ts;
 use rusqlite::Connection;

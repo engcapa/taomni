@@ -1,17 +1,10 @@
-use crate::mail::contacts;
-use crate::mail::message_model::MailAddress;
-use crate::mail::outgoing_model::MailSendRequest;
-use crate::mail::result_model::MailContactSuggestion;
-use crate::mail::smtp::parse_mailbox;
-use crate::mail::utilities::now_ts;
+use crate::{MailAddress, compose::parse_mailbox, now_ts};
 use lettre::message::Mailbox;
-use rusqlite::Connection;
-use rusqlite::Result as SqlResult;
-use rusqlite::params;
-use std::collections::HashMap;
-use std::collections::HashSet;
+use rusqlite::{Connection, Result as SqlResult, params};
+use serde::Serialize;
+use std::collections::{HashMap, HashSet};
 
-pub(in crate::mail) fn contact_email(address: &MailAddress) -> Option<String> {
+pub fn contact_email(address: &MailAddress) -> Option<String> {
     let email = address.address.as_deref()?.trim().to_lowercase();
     if email.contains('@')
         && !email
@@ -24,7 +17,7 @@ pub(in crate::mail) fn contact_email(address: &MailAddress) -> Option<String> {
     }
 }
 
-pub(in crate::mail) fn clean_contact_name(address: &MailAddress) -> Option<String> {
+pub fn clean_contact_name(address: &MailAddress) -> Option<String> {
     address
         .name
         .as_deref()
@@ -33,7 +26,7 @@ pub(in crate::mail) fn clean_contact_name(address: &MailAddress) -> Option<Strin
         .map(|name| name.to_string())
 }
 
-pub(in crate::mail) fn upsert_contact(
+pub fn upsert_contact(
     conn: &Connection,
     account_id: &str,
     address: &MailAddress,
@@ -77,10 +70,7 @@ pub(in crate::mail) fn upsert_contact(
     Ok(true)
 }
 
-pub(in crate::mail) fn reindex_cached_contacts(
-    conn: &Connection,
-    account_id: &str,
-) -> SqlResult<usize> {
+pub fn reindex_cached_contacts(conn: &Connection, account_id: &str) -> SqlResult<usize> {
     conn.execute(
         "DELETE FROM mail_contacts WHERE account_id = ?1",
         params![account_id],
@@ -157,27 +147,22 @@ pub(in crate::mail) fn reindex_cached_contacts(
     Ok(contacts.len())
 }
 
-pub(in crate::mail) fn mailbox_to_contact(mailbox: Mailbox) -> MailAddress {
+pub fn mailbox_to_contact(mailbox: Mailbox) -> MailAddress {
     MailAddress {
         name: mailbox.name,
         address: Some(mailbox.email.to_string()),
     }
 }
 
-pub(in crate::mail) fn upsert_sent_contacts(
+pub fn upsert_sent_contacts<'a>(
     conn: &Connection,
     account_id: &str,
-    request: &MailSendRequest,
+    recipients: impl IntoIterator<Item = &'a str>,
 ) -> SqlResult<usize> {
     let mut changed = 0;
     let now = now_ts();
     let mut seen = HashSet::new();
-    for raw in request
-        .to
-        .iter()
-        .chain(request.cc.iter())
-        .chain(request.bcc.iter())
-    {
+    for raw in recipients {
         let Ok(mailbox) = parse_mailbox(raw) else {
             continue;
         };
@@ -195,14 +180,14 @@ pub(in crate::mail) fn upsert_sent_contacts(
     Ok(changed)
 }
 
-pub(in crate::mail) fn escape_like(value: &str) -> String {
+pub fn escape_like(value: &str) -> String {
     value
         .replace('\\', "\\\\")
         .replace('%', "\\%")
         .replace('_', "\\_")
 }
 
-pub(in crate::mail) fn search_contacts(
+pub fn search_contacts(
     conn: &Connection,
     account_id: &str,
     query: &str,
@@ -252,4 +237,14 @@ pub(in crate::mail) fn search_contacts(
         },
     )?;
     rows.collect()
+}
+
+#[derive(Debug, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct MailContactSuggestion {
+    pub name: Option<String>,
+    pub email: String,
+    pub source: String,
+    pub score: i64,
+    pub last_seen_at: Option<i64>,
 }

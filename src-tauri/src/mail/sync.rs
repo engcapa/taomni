@@ -1,6 +1,4 @@
-//! Desktop persistence and account adapters for the IMAP sync engine.
-
-mod cache;
+//! Desktop account adapter for the IMAP sync engine.
 
 #[cfg(test)]
 mod tests;
@@ -9,13 +7,12 @@ pub use taomni_mail_engine::imap_sync::{MailFolderSyncResult, MailSyncMode, Mail
 
 pub(super) use taomni_mail_engine::imap_folders::quote_imap_string;
 pub(super) use taomni_mail_engine::imap_sync::{
-    AppliedStep, FLAG_RECONCILE_WINDOW, FolderStepOutcome, FolderSyncState, StepParams,
-    advance_state, imap_has_capability, step_result,
+    FLAG_RECONCILE_WINDOW, FolderStepOutcome, FolderSyncState, StepParams, advance_state,
+    imap_has_capability, step_result,
 };
 
-pub(super) use cache::{
-    apply_folder_step, apply_prune_cut, load_folder_sync_state, now_ms, record_folder_error,
-    reset_folder_cache,
+pub(super) use taomni_mail_engine::cache::{
+    apply_folder_step, load_folder_sync_state, now_ms, record_folder_error,
 };
 
 use super::{ResolvedMailAccount, imap_mailbox};

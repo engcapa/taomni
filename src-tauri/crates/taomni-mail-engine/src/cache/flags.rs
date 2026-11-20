@@ -1,11 +1,11 @@
-use crate::mail::sync;
-use crate::mail::utilities::now_ts;
+use super::now_ms;
+use crate::now_ts;
 use rusqlite::Connection;
 use rusqlite::OptionalExtension;
 use rusqlite::Result as SqlResult;
 use rusqlite::params;
 
-pub(in crate::mail) fn mark_cached_messages_read(
+pub fn mark_cached_messages_read(
     conn: &Connection,
     account_id: &str,
     folder: &str,
@@ -38,7 +38,7 @@ pub(in crate::mail) fn mark_cached_messages_read(
             *uid as i64,
             next_flags_json,
             now_ts(),
-            sync::now_ms()
+            now_ms()
         ])?;
         changed += 1;
     }
@@ -58,11 +58,11 @@ pub(in crate::mail) fn mark_cached_messages_read(
     Ok(())
 }
 
-pub(in crate::mail) fn flags_include_seen(flags: &[String]) -> bool {
+pub fn flags_include_seen(flags: &[String]) -> bool {
     flags.iter().any(|flag| flag.eq_ignore_ascii_case("\\Seen"))
 }
 
-pub(in crate::mail) fn update_cached_flags(
+pub fn update_cached_flags(
     conn: &Connection,
     account_id: &str,
     folder: &str,
@@ -104,7 +104,7 @@ pub(in crate::mail) fn update_cached_flags(
             *uid as i64,
             next_flags_json,
             now_ts(),
-            sync::now_ms()
+            now_ms()
         ])?;
     }
     Ok(())

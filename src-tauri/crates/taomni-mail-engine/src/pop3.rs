@@ -1,5 +1,7 @@
 //! POP3 command, authentication and synchronization planning.
 
+pub mod local_store;
+
 use std::collections::HashMap;
 use std::io::{BufRead as _, BufReader, Read, Write};
 use std::net::TcpStream;

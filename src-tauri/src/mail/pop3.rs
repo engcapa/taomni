@@ -122,8 +122,6 @@ use super::{
 
 mod limits;
 
-mod local_store;
-
 mod connection;
 
 mod synchronization;
@@ -131,15 +129,14 @@ mod synchronization;
 #[cfg(test)]
 mod tests;
 
-use limits::LOCAL_FOLDERS;
-
-pub(super) use local_store::{
+pub(super) use taomni_mail_engine::pop3::local_store::{
     create_local_folder, delete_local, delete_local_folder, ensure_local_folders, has_local_store,
-    insert_local, is_pop3, local_raw, migrate_local_tables, move_local, refresh_counts,
-    rename_local_folder,
+    insert_local, local_raw, migrate_local_tables, move_local, refresh_counts, rename_local_folder,
 };
 
-use local_store::{delete_rows, local_folder, next_uid};
+pub(super) fn is_pop3(config: &MailAccountConfig) -> bool {
+    config.incoming == super::MailIncomingProtocol::Pop3
+}
 
 pub(super) use connection::Pop3Client;
 

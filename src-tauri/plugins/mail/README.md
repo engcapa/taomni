@@ -11,11 +11,12 @@ mbox and EML conversion, and IMAP greeting, TLS, STARTTLS and authentication
 over an established socket. The engine plans IMAP UID catch-up and backfill,
 reconciles deletions and flags, and fetches paged headers and prefetched bodies
 using the persisted cache policy. It also handles POP3 TLS and STLS, login,
-UIDL planning and retrieval of raw messages. The desktop adapter opens
-connections using session network settings, applies sync results to the cache
-and resolves attachment bytes and user-selected file destinations. The
-connection owns its proxy forwarder and releases it when connection setup
-fails or the connection closes.
+UIDL planning and retrieval of raw messages. Its SQLite cache owns persisted
+sync watermarks, delayed flag ordering, contact indexing, retention and POP3
+local originals. The desktop adapter opens connections using session network
+settings and resolves attachment bytes and user-selected file destinations.
+The connection owns its proxy forwarder and releases it when connection
+setup fails or the connection closes.
 
 The manifest is provisional until the native host, frontend bundle, legacy
 cache migration, scoped core-service contract and browser/native acceptance

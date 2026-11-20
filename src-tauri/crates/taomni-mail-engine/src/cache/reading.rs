@@ -1,18 +1,15 @@
 use super::flags::flags_include_seen;
-use crate::mail::message_model::MailFolder;
-use crate::mail::message_model::MailMessageBody;
-use crate::mail::message_model::MailMessageHeader;
-use crate::mail::mime::decode_imap_modified_utf7;
+use super::row_to_header;
+use crate::MailFolder;
+use crate::MailMessageBody;
+use crate::MailMessageHeader;
+use crate::imap_folders::decode_imap_modified_utf7;
 use rusqlite::Connection;
 use rusqlite::OptionalExtension;
 use rusqlite::Result as SqlResult;
 use rusqlite::params;
-use taomni_mail_engine::cache::row_to_header;
 
-pub(in crate::mail) fn list_cached_folders(
-    conn: &Connection,
-    account_id: &str,
-) -> SqlResult<Vec<MailFolder>> {
+pub fn list_cached_folders(conn: &Connection, account_id: &str) -> SqlResult<Vec<MailFolder>> {
     let mut stmt = conn.prepare(
         "SELECT f.account_id, f.name, f.delimiter, f.flags_json, f.uid_validity, f.uid_next,
                 f.total, f.unread, f.updated_at, f.sync_low_uid, f.sync_high_uid,
@@ -49,7 +46,7 @@ pub(in crate::mail) fn list_cached_folders(
     rows.collect()
 }
 
-pub(in crate::mail) fn list_cached_messages(
+pub fn list_cached_messages(
     conn: &Connection,
     account_id: &str,
     folder: &str,
@@ -70,7 +67,7 @@ pub(in crate::mail) fn list_cached_messages(
     rows.collect()
 }
 
-pub(in crate::mail) fn unread_cached_uids(
+pub fn unread_cached_uids(
     conn: &Connection,
     account_id: &str,
     folder: &str,
@@ -94,7 +91,7 @@ pub(in crate::mail) fn unread_cached_uids(
     Ok(uids)
 }
 
-pub(in crate::mail) fn get_cached_body(
+pub fn get_cached_body(
     conn: &Connection,
     account_id: &str,
     folder: &str,

@@ -1,25 +1,24 @@
-use crate::mail::account_model::MailCacheSettings;
-use crate::mail::cache;
-use crate::mail::pop3;
-use crate::mail::sync;
-use crate::mail::utilities::now_ts;
+use super::MailCacheSettings;
+use super::watermarks::apply_prune_cut;
+use crate::now_ts;
+use crate::pop3::local_store;
 use rusqlite::Connection;
 use rusqlite::OptionalExtension;
 use rusqlite::Result as SqlResult;
 use rusqlite::params;
 
-pub(in crate::mail) fn prune_mail_cache(
+pub fn prune_mail_cache(
     conn: &Connection,
     account_id: &str,
     folder: &str,
     cache: &MailCacheSettings,
 ) -> SqlResult<usize> {
     // POP3 mail exists only locally: never prune it (TASK-21).
-    if pop3::has_local_store(conn, account_id)? {
+    if local_store::has_local_store(conn, account_id)? {
         return Ok(0);
     }
     // Header pruning only ever cuts the low (oldest-UID) end so the cached span
-    // stays contiguous; `sync::apply_prune_cut` moves the watermark with it.
+    // stays contiguous; `apply_prune_cut` moves the watermark with it.
     // Retention uses the server arrival time (INTERNALDATE), not the sender's
     // `Date:` header, so a freshly delivered but back-dated message survives.
     let mut cut: Option<u32> = None;
@@ -63,7 +62,7 @@ pub(in crate::mail) fn prune_mail_cache(
         };
     }
     let pruned = if let Some(cut) = cut {
-        sync::apply_prune_cut(conn, account_id, folder, cut)?
+        apply_prune_cut(conn, account_id, folder, cut)?
     } else {
         0
     };
@@ -93,7 +92,7 @@ pub(in crate::mail) fn prune_mail_cache(
     Ok(pruned)
 }
 
-pub(in crate::mail) fn remove_cached_messages(
+pub fn remove_cached_messages(
     conn: &Connection,
     account_id: &str,
     folder: &str,
@@ -108,11 +107,7 @@ pub(in crate::mail) fn remove_cached_messages(
     Ok(())
 }
 
-pub(in crate::mail) fn purge_cached_folder(
-    conn: &Connection,
-    account_id: &str,
-    folder: &str,
-) -> SqlResult<()> {
+pub fn purge_cached_folder(conn: &Connection, account_id: &str, folder: &str) -> SqlResult<()> {
     // Remove the folder and its messages, plus any nested subfolders addressed
     // with the common IMAP hierarchy delimiters.
     conn.execute(

@@ -1,13 +1,13 @@
-use super::AppliedStep;
-use super::FolderStepOutcome;
-use super::FolderSyncState;
-use super::MailSyncMode;
-use crate::mail::MailCacheSettings;
-use crate::mail::cache_synced_messages;
-use crate::mail::now_ts;
-use crate::mail::prune_mail_cache;
-use crate::mail::reindex_cached_contacts;
-use crate::mail::upsert_folder;
+use super::MailCacheSettings;
+use super::cache_synced_messages;
+use super::prune_mail_cache;
+use super::reindex_cached_contacts;
+use super::upsert_folder;
+use crate::imap_sync::AppliedStep;
+use crate::imap_sync::FolderStepOutcome;
+use crate::imap_sync::FolderSyncState;
+use crate::imap_sync::MailSyncMode;
+use crate::now_ts;
 use rusqlite::Connection;
 use rusqlite::OptionalExtension;
 use rusqlite::Result as SqlResult;
@@ -17,7 +17,7 @@ use rusqlite::params;
 // Cache state
 // ---------------------------------------------------------------------------
 
-pub(in crate::mail) fn load_folder_sync_state(
+pub fn load_folder_sync_state(
     conn: &Connection,
     account_id: &str,
     folder: &str,
@@ -62,11 +62,7 @@ pub(in crate::mail) fn load_folder_sync_state(
 }
 
 /// Drop a folder's cached messages and watermarks (UIDVALIDITY changed).
-pub(in crate::mail) fn reset_folder_cache(
-    conn: &Connection,
-    account_id: &str,
-    folder: &str,
-) -> SqlResult<()> {
+pub fn reset_folder_cache(conn: &Connection, account_id: &str, folder: &str) -> SqlResult<()> {
     conn.execute(
         "DELETE FROM mail_messages WHERE account_id = ?1 AND folder = ?2",
         params![account_id, folder],
@@ -85,7 +81,7 @@ pub(in crate::mail) fn reset_folder_cache(
 /// dropped history is intentionally outside the retention policy, so the span
 /// is marked complete (no backfill below it) and `high` is raised to at least
 /// `cut - 1` so a catch-up never refetches what was just pruned.
-pub(in crate::mail) fn apply_prune_cut(
+pub fn apply_prune_cut(
     conn: &Connection,
     account_id: &str,
     folder: &str,
@@ -108,7 +104,7 @@ pub(in crate::mail) fn apply_prune_cut(
 }
 
 /// Record a per-folder sync failure so the UI can show it.
-pub(in crate::mail) fn record_folder_error(
+pub fn record_folder_error(
     conn: &Connection,
     account_id: &str,
     folder: &str,
@@ -121,10 +117,8 @@ pub(in crate::mail) fn record_folder_error(
     Ok(())
 }
 
-/// Write one step's result: messages, deletions, flag changes and the new
-/// watermark, then prune — all in one transaction.
 /// Milliseconds since the epoch (flag-change ordering).
-pub(in crate::mail) fn now_ms() -> i64 {
+pub fn now_ms() -> i64 {
     std::time::SystemTime::now()
         .duration_since(std::time::UNIX_EPOCH)
         .map(|d| d.as_millis() as i64)
@@ -133,7 +127,7 @@ pub(in crate::mail) fn now_ms() -> i64 {
 
 /// Apply one sync step. `started_ms` is when the step began talking to the
 /// server: flags changed locally after that are newer than what it read.
-pub(in crate::mail) fn apply_folder_step(
+pub fn apply_folder_step(
     conn: &Connection,
     account_id: &str,
     outcome: &FolderStepOutcome,
@@ -211,7 +205,7 @@ pub(in crate::mail) fn apply_folder_step(
         reindex_cached_contacts(&tx, account_id)?;
     }
     tx.commit()?;
-    let folder = super::super::list_cached_folders(conn, account_id)?
+    let folder = super::list_cached_folders(conn, account_id)?
         .into_iter()
         .find(|folder| folder.name == folder_name);
     Ok(AppliedStep {

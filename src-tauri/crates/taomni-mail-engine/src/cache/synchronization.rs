@@ -1,3 +1,4 @@
+use super::MailCacheSettings;
 use super::contacts::contact_email;
 use super::contacts::reindex_cached_contacts;
 use super::contacts::upsert_contact;
@@ -5,20 +6,17 @@ use super::pruning::prune_mail_cache;
 use super::upsert::upsert_folder;
 use super::upsert::upsert_message;
 use super::upsert::upsert_message_at;
-use crate::mail::account_model::MailCacheSettings;
-use crate::mail::cache;
-use crate::mail::folders;
-use crate::mail::message_model::MailFolder;
-use crate::mail::message_model::MailMessageCached;
-use crate::mail::sync;
-use crate::mail::utilities::now_ts;
+use super::watermarks::reset_folder_cache;
+use crate::MailFolder;
+use crate::MailMessageCached;
+use crate::now_ts;
 use rusqlite::Connection;
 use rusqlite::OptionalExtension;
 use rusqlite::Result as SqlResult;
 use rusqlite::params;
 use std::collections::HashSet;
 
-pub(in crate::mail) fn cache_sync_result(
+pub fn cache_sync_result(
     conn: &Connection,
     account_id: &str,
     folders: &[MailFolder],
@@ -39,7 +37,7 @@ pub(in crate::mail) fn cache_sync_result(
     tx.commit()
 }
 
-pub(in crate::mail) fn reset_folder_if_uid_validity_changed(
+pub fn reset_folder_if_uid_validity_changed(
     conn: &Connection,
     folder: &MailFolder,
 ) -> SqlResult<()> {
@@ -55,7 +53,7 @@ pub(in crate::mail) fn reset_folder_if_uid_validity_changed(
         .optional()?;
     if let Some(Some(current_uid_validity)) = current {
         if current_uid_validity as u32 != next_uid_validity {
-            sync::reset_folder_cache(conn, &folder.account_id, &folder.name)?;
+            reset_folder_cache(conn, &folder.account_id, &folder.name)?;
         }
     }
     Ok(())
@@ -64,7 +62,7 @@ pub(in crate::mail) fn reset_folder_if_uid_validity_changed(
 /// Sync plans normally contain only missing UIDs. Index their contacts once,
 /// instead of rebuilding all accounts' cached addresses after every page.
 /// Replayed/replaced rows request a rebuild so counts stay idempotent.
-pub(in crate::mail) fn cache_synced_messages(
+pub fn cache_synced_messages(
     conn: &Connection,
     messages: &[MailMessageCached],
     started_ms: i64,

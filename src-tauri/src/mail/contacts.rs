@@ -29,7 +29,7 @@ pub use model::{MailAddressBookEntry, MailCardDavSettings, MailCardDavSyncResult
 
 pub(super) use model::{CardChange, StoredCard};
 
-pub(super) use storage::{apply_changes, load_cards, migrate_contact_tables, store_card};
+pub(super) use storage::{apply_changes, load_cards, store_card};
 
 pub(super) use entries::{delete_entry, export_cards, import_cards, save_entry};
 

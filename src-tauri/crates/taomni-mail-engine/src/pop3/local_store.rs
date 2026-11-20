@@ -1,27 +1,24 @@
-use super::limits::LOCAL_FOLDERS;
-use crate::mail::MailAccountConfig;
-use crate::mail::MailFolder;
-use crate::mail::MailMessageCached;
-use crate::mail::list_cached_folders;
-use crate::mail::now_ts;
-use crate::mail::parse_body_message;
-use crate::mail::upsert_folder;
-use crate::mail::upsert_message;
+use crate::MailFolder;
+use crate::MailMessageCached;
+use crate::cache::{list_cached_folders, upsert_folder, upsert_message};
+use crate::now_ts;
+use crate::parse_body_message;
 use rusqlite::Connection;
 use rusqlite::OptionalExtension;
 use rusqlite::Result as SqlResult;
 use rusqlite::params;
 use std::collections::HashSet;
 
-pub(in crate::mail) fn is_pop3(config: &MailAccountConfig) -> bool {
-    config.incoming == super::super::MailIncomingProtocol::Pop3
-}
+/// Local folders every POP3 account has, with their SPECIAL-USE attribute.
+const LOCAL_FOLDERS: [(&str, &str); 5] = [
+    ("INBOX", ""),
+    ("Sent", "\\Sent"),
+    ("Drafts", "\\Drafts"),
+    ("Trash", "\\Trash"),
+    ("Junk", "\\Junk"),
+];
 
-// ---------------------------------------------------------------------------
-// Local store
-// ---------------------------------------------------------------------------
-
-pub(in crate::mail) fn migrate_local_tables(conn: &Connection) -> SqlResult<()> {
+pub fn migrate_local_tables(conn: &Connection) -> SqlResult<()> {
     conn.execute_batch(
         "CREATE TABLE IF NOT EXISTS mail_local_raw (
             account_id TEXT NOT NULL,
@@ -41,7 +38,7 @@ pub(in crate::mail) fn migrate_local_tables(conn: &Connection) -> SqlResult<()> 
 }
 
 /// True once the account keeps mail only locally (guards cache clearing).
-pub(in crate::mail) fn has_local_store(conn: &Connection, account_id: &str) -> SqlResult<bool> {
+pub fn has_local_store(conn: &Connection, account_id: &str) -> SqlResult<bool> {
     migrate_local_tables(conn)?;
     conn.query_row(
         "SELECT EXISTS(SELECT 1 FROM mail_pop3_uidl WHERE account_id = ?1)
@@ -51,10 +48,10 @@ pub(in crate::mail) fn has_local_store(conn: &Connection, account_id: &str) -> S
     )
 }
 
-pub(super) fn local_folder(account_id: &str, name: &str, attribute: &str) -> MailFolder {
+fn local_folder(account_id: &str, name: &str, attribute: &str) -> MailFolder {
     let mut flags = vec![
         "\\HasNoChildren".to_string(),
-        super::super::folders::SUBSCRIBED_ATTRIBUTE.to_string(),
+        crate::imap_folders::SUBSCRIBED_ATTRIBUTE.to_string(),
     ];
     if !attribute.is_empty() {
         flags.push(attribute.to_string());
@@ -71,7 +68,7 @@ pub(super) fn local_folder(account_id: &str, name: &str, attribute: &str) -> Mai
     }
 }
 
-pub(in crate::mail) fn ensure_local_folders(conn: &Connection, account_id: &str) -> SqlResult<()> {
+pub fn ensure_local_folders(conn: &Connection, account_id: &str) -> SqlResult<()> {
     migrate_local_tables(conn)?;
     let existing: HashSet<String> = list_cached_folders(conn, account_id)?
         .into_iter()
@@ -85,22 +82,14 @@ pub(in crate::mail) fn ensure_local_folders(conn: &Connection, account_id: &str)
     Ok(())
 }
 
-pub(in crate::mail) fn create_local_folder(
-    conn: &Connection,
-    account_id: &str,
-    name: &str,
-) -> SqlResult<()> {
+pub fn create_local_folder(conn: &Connection, account_id: &str, name: &str) -> SqlResult<()> {
     ensure_local_folders(conn, account_id)?;
     upsert_folder(conn, &local_folder(account_id, name, ""))?;
     refresh_counts(conn, account_id, name)
 }
 
 /// Recompute a local folder's totals and mark it fully synced.
-pub(in crate::mail) fn refresh_counts(
-    conn: &Connection,
-    account_id: &str,
-    folder: &str,
-) -> SqlResult<()> {
+pub fn refresh_counts(conn: &Connection, account_id: &str, folder: &str) -> SqlResult<()> {
     conn.execute(
         "UPDATE mail_folders SET
             total = (SELECT COUNT(*) FROM mail_messages WHERE account_id = ?1 AND folder = ?2),
@@ -119,7 +108,7 @@ pub(in crate::mail) fn refresh_counts(
     Ok(())
 }
 
-pub(super) fn next_uid(conn: &Connection, account_id: &str, folder: &str) -> SqlResult<u32> {
+fn next_uid(conn: &Connection, account_id: &str, folder: &str) -> SqlResult<u32> {
     conn.query_row(
         "SELECT MAX(COALESCE((SELECT MAX(uid) FROM mail_messages WHERE account_id = ?1 AND folder = ?2), 0),
                     COALESCE((SELECT MAX(uid) FROM mail_local_raw WHERE account_id = ?1 AND folder = ?2), 0),
@@ -132,7 +121,7 @@ pub(super) fn next_uid(conn: &Connection, account_id: &str, folder: &str) -> Sql
 }
 
 /// Store a raw message in a local folder; returns the cached row.
-pub(in crate::mail) fn insert_local(
+pub fn insert_local(
     conn: &Connection,
     account_id: &str,
     folder: &str,
@@ -166,7 +155,7 @@ pub(in crate::mail) fn insert_local(
     Ok(message)
 }
 
-pub(in crate::mail) fn local_raw(
+pub fn local_raw(
     conn: &Connection,
     account_id: &str,
     folder: &str,
@@ -182,7 +171,7 @@ pub(in crate::mail) fn local_raw(
 }
 
 /// Move (or copy) local messages; returns the count.
-pub(in crate::mail) fn move_local(
+pub fn move_local(
     conn: &Connection,
     account_id: &str,
     folder: &str,
@@ -218,12 +207,7 @@ pub(in crate::mail) fn move_local(
     Ok(moved)
 }
 
-pub(super) fn delete_rows(
-    conn: &Connection,
-    account_id: &str,
-    folder: &str,
-    uid: u32,
-) -> SqlResult<()> {
+fn delete_rows(conn: &Connection, account_id: &str, folder: &str, uid: u32) -> SqlResult<()> {
     conn.execute(
         "DELETE FROM mail_messages WHERE account_id = ?1 AND folder = ?2 AND uid = ?3",
         params![account_id, folder, uid],
@@ -236,7 +220,7 @@ pub(super) fn delete_rows(
 }
 
 /// Permanently delete local messages (`uids` None = the whole folder).
-pub(in crate::mail) fn delete_local(
+pub fn delete_local(
     conn: &Connection,
     account_id: &str,
     folder: &str,
@@ -258,13 +242,13 @@ pub(in crate::mail) fn delete_local(
         if conn.path().is_some_and(|p| !p.is_empty()) {
             let skipped:bool=conn.query_row("SELECT EXISTS(SELECT 1 FROM mail_archive_skipped WHERE account_id=?1 AND folder=?2 AND uid=?3 AND uid_validity=1)",params![account_id,folder,uid],|r|r.get(0))?;
             if !skipped
-                && super::super::storage::lookup(conn, account_id, folder, *uid)
-                    .map_err(super::super::storage::as_sql_error)?
+                && crate::storage::lookup(conn, account_id, folder, *uid)
+                    .map_err(crate::storage::as_sql_error)?
                     .is_none()
             {
                 if let Some(raw) = local_raw(conn, account_id, folder, *uid)? {
-                    super::super::storage::store(conn, account_id, folder, *uid, 1, raw.as_slice())
-                        .map_err(super::super::storage::as_sql_error)?;
+                    crate::storage::store(conn, account_id, folder, *uid, 1, raw.as_slice())
+                        .map_err(crate::storage::as_sql_error)?;
                 }
             }
         }
@@ -274,7 +258,7 @@ pub(in crate::mail) fn delete_local(
     Ok(targets.len())
 }
 
-pub(in crate::mail) fn rename_local_folder(
+pub fn rename_local_folder(
     conn: &Connection,
     account_id: &str,
     from: &str,
@@ -296,11 +280,7 @@ pub(in crate::mail) fn rename_local_folder(
     tx.commit()
 }
 
-pub(in crate::mail) fn delete_local_folder(
-    conn: &Connection,
-    account_id: &str,
-    name: &str,
-) -> SqlResult<()> {
+pub fn delete_local_folder(conn: &Connection, account_id: &str, name: &str) -> SqlResult<()> {
     delete_local(conn, account_id, name, None)?;
     conn.execute(
         "DELETE FROM mail_folders WHERE account_id = ?1 AND name = ?2",
@@ -308,3 +288,6 @@ pub(in crate::mail) fn delete_local_folder(
     )?;
     Ok(())
 }
+
+#[cfg(test)]
+mod tests;

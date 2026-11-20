@@ -187,3 +187,51 @@ fn migrate_search_index(conn: &Connection) -> SqlResult<()> {
             .replace("body_text", "new.body_text"),
     ))
 }
+
+pub fn migrate_contact_tables(conn: &Connection) -> SqlResult<()> {
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS mail_cards (
+            account_id TEXT NOT NULL,
+            uid TEXT NOT NULL,
+            book TEXT NOT NULL,
+            href TEXT,
+            etag TEXT,
+            card_json TEXT NOT NULL,
+            display_name TEXT NOT NULL DEFAULT '',
+            emails TEXT NOT NULL DEFAULT '',
+            dirty INTEGER NOT NULL DEFAULT 0,
+            deleted INTEGER NOT NULL DEFAULT 0,
+            updated_at INTEGER NOT NULL,
+            PRIMARY KEY (account_id, uid)
+        );
+        CREATE INDEX IF NOT EXISTS idx_mail_cards_href ON mail_cards(account_id, href);
+        CREATE TABLE IF NOT EXISTS mail_carddav_state (
+            account_id TEXT PRIMARY KEY,
+            collection_url TEXT,
+            base_url TEXT,
+            last_sync INTEGER,
+            last_error TEXT
+        );",
+    )
+}
+
+pub fn migrate_calendar_tables(conn: &Connection) -> SqlResult<()> {
+    conn.execute_batch(
+        "CREATE TABLE IF NOT EXISTS mail_calendar_events (
+            account_id TEXT NOT NULL,
+            href TEXT NOT NULL,
+            instance TEXT NOT NULL DEFAULT '',
+            event_json TEXT NOT NULL,
+            start_ts INTEGER,
+            updated_at INTEGER NOT NULL,
+            PRIMARY KEY (account_id, href, instance)
+        );
+        CREATE TABLE IF NOT EXISTS mail_caldav_state (
+            account_id TEXT PRIMARY KEY,
+            base_url TEXT,
+            collection_url TEXT,
+            last_sync INTEGER,
+            last_error TEXT
+        );",
+    )
+}

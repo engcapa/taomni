@@ -1,6 +1,6 @@
-use crate::mail::message_model::{MailMessageBody, MailMessageCached};
+use crate::{MailMessageBody, MailMessageCached};
 
-pub(in crate::mail) fn cached_to_body(message: MailMessageCached, source: &str) -> MailMessageBody {
+pub fn cached_to_body(message: MailMessageCached, source: &str) -> MailMessageBody {
     MailMessageBody {
         account_id: message.header.account_id,
         folder: message.header.folder,

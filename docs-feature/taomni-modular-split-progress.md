@@ -167,6 +167,8 @@ TASK-027 将 G1–G11 设为独立发布阻断门。每个门必须在匹配源�
 - 用户确认 G5 的 p95 容许增加最多 100%。模块化专项按原验收上限 65 ms 计算，允许最多 130 ms。Windows 之前的两条实测路径为 71.82 和 73.79 ms，两者均在该范围内。首帧、帧率、带宽和采样要求继续由原用例检查。 [Windows 原始采样](https://github.com/engcapa/taomni/actions/runs/44649616170)
 - 按新 p95 口径核对 Windows 历史原始数据，两条路径的连接、延迟和吞吐共六项达标。提交 `cd0668280` 的三端对照及 Browser/Native 回归已派发，选集记录模块化 p95 设置。 [三端采集对照](https://github.com/engcapa/taomni/actions/runs/44674876677) · [应用回归](https://github.com/engcapa/taomni/actions/runs/44674877474)
 - Mail 的 POP3 协议、TLS/STLS 握手、APOP、UIDL 去重规划和原信字节读取迁入独立引擎。核心过渡层持有会话转发及本地 SQLite 写入。TC-MAIL-POP3-01 在 Browser 和 Native 验证重复同步后打开新收邮件的正文。
+- `fad537a25` 的邮件引擎 35 项、桌面适配层 10 项单测通过。`30234305c` 迁出 IMAP 增量同步、历史补拉、对账、分页与正文预取，本地 42 项引擎及 29 项桌面单测通过。TC-MAIL-SYNC-01 新增重开后读取最新正文的断言。两个批次均启动三端 Browser、Native 和崩溃回归，分片上传后直接下载。 [POP3](https://github.com/engcapa/taomni/actions/runs/44677155053) · [IMAP](https://github.com/engcapa/taomni/actions/runs/44679358478)
+- 邮件引擎已接管 SQLite 缓存读写、同步水位、已读冲突处理、联系人索引和 POP3 本地文件夹。旧库重复初始化仍可读取原有标题和正文。45 项引擎单测、43 项桌面与备份单测及 QA 审计通过。TC-MAIL-SYNC-02 增加重开后观察删除和已读状态的 Browser 与 Native 检查。
 
 ## 当前结论
 

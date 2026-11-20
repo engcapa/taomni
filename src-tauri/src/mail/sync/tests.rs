@@ -10,7 +10,6 @@ use crate::mail::now_ts;
 use crate::mail::upsert_folder;
 use rusqlite::Connection;
 use rusqlite::params;
-use taomni_mail_engine::cache::{MAIL_SCHEMA_VERSION, migrate_mail_tables};
 
 #[test]
 fn full_reconcile_handles_sparse_uids_under_server_command_limit() {
@@ -455,17 +454,4 @@ fn header_limit_converges() {
     assert_eq!(cached(&conn), server[server.len() - 25..].to_vec());
     let again = step(&fake, &conn, &account, MailSyncRequestMode::Auto, 10);
     assert_eq!(again.fetched, 0);
-}
-
-#[test]
-fn migration_is_idempotent_and_keeps_rows() {
-    let conn = Connection::open_in_memory().unwrap();
-    init_mail_tables(&conn).unwrap();
-    conn.execute_batch("PRAGMA user_version = 0;").unwrap();
-    migrate_mail_tables(&conn).unwrap();
-    migrate_mail_tables(&conn).unwrap();
-    let version: i64 = conn
-        .query_row("PRAGMA user_version", [], |row| row.get(0))
-        .unwrap();
-    assert_eq!(version, MAIL_SCHEMA_VERSION);
 }

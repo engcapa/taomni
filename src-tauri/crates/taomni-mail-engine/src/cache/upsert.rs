@@ -1,11 +1,11 @@
-use crate::mail::message_model::MailFolder;
-use crate::mail::message_model::MailMessageCached;
-use crate::mail::utilities::now_ts;
+use crate::MailFolder;
+use crate::MailMessageCached;
+use crate::now_ts;
 use rusqlite::Connection;
 use rusqlite::Result as SqlResult;
 use rusqlite::params;
 
-pub(in crate::mail) fn upsert_folder(conn: &Connection, folder: &MailFolder) -> SqlResult<()> {
+pub fn upsert_folder(conn: &Connection, folder: &MailFolder) -> SqlResult<()> {
     let flags_json = serde_json::to_string(&folder.flags).unwrap_or_else(|_| "[]".into());
     conn.execute(
         "INSERT INTO mail_folders
@@ -34,14 +34,11 @@ pub(in crate::mail) fn upsert_folder(conn: &Connection, folder: &MailFolder) -> 
     Ok(())
 }
 
-pub(in crate::mail) fn upsert_message(
-    conn: &Connection,
-    message: &MailMessageCached,
-) -> SqlResult<()> {
+pub fn upsert_message(conn: &Connection, message: &MailMessageCached) -> SqlResult<()> {
     upsert_message_at(conn, message, None)
 }
 
-pub(in crate::mail) fn upsert_message_at(
+pub fn upsert_message_at(
     conn: &Connection,
     message: &MailMessageCached,
     observed_at: Option<i64>,

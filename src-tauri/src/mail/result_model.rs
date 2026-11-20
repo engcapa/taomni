@@ -62,15 +62,7 @@ pub struct MailTestConnectionResult {
     pub folder_count: usize,
 }
 
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "camelCase")]
-pub struct MailContactSuggestion {
-    pub name: Option<String>,
-    pub email: String,
-    pub source: String,
-    pub score: i64,
-    pub last_seen_at: Option<i64>,
-}
+pub use taomni_mail_engine::cache::MailContactSuggestion;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
