@@ -11,6 +11,7 @@ from unittest.mock import MagicMock, Mock, patch
 from installed_desktop_mode_lease import check_mode_lease, reserve_default_profile
 from installed_desktop_mfa_crash import observe_abrupt_exit
 from installed_desktop_upgrade import require_registration, select_candidate
+from installed_macos_permissions import compare_permissions
 from modular_bundle_inventory import plan_targets
 from qa_ui_auto.legacy_install import windows_install
 from qa_ui_auto.legacy_process import observe_same_profile_contender
@@ -185,3 +186,17 @@ class InstalledDesktopMfaCrashTests(unittest.TestCase):
                 core.kill.assert_called_once_with()
                 host.kill.assert_not_called()
                 launcher.kill.assert_not_called()
+
+
+class InstalledMacPermissionsTests(unittest.TestCase):
+    def test_reports_missing_and_lost_grants_without_counting_them_as_continuity(self):
+        trusted = {"screenRecording": "granted", "accessibility": "granted", "requirement": "fixed"}
+        self.assertTrue(compare_permissions(trusted, trusted)["retainedBothGrants"])
+
+        denied_screen = {**trusted, "screenRecording": "denied"}
+        denied_control = {**trusted, "accessibility": "denied"}
+        observed = compare_permissions(denied_screen, denied_control)
+        self.assertEqual(observed["missingBaselineGrants"], ["screenRecording"])
+        self.assertEqual(observed["lostGrants"], ["accessibility"])
+        self.assertFalse(observed["retainedBothGrants"])
+        self.assertFalse(compare_permissions(trusted, {**trusted, "requirement": "changed"})["retainedBothGrants"])

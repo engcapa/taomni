@@ -9,7 +9,8 @@ import platform
 from uuid import UUID
 
 from installed_desktop_mfa_crash import verify_crash_recovery
-from installed_desktop_mode_lease import check_mode_lease
+from installed_desktop_mode_lease import check_mode_lease, reserve_default_profile
+from installed_macos_permissions import compare_permissions, observe_permissions
 from modular_bundle_inventory import digest, inventory, write_json
 from qa_ui_auto.fixtures.module_legacy_install import insert_business_rows, retained_manifest, session_rows
 from qa_ui_auto.fixtures.module_signed_archive import platform_key
@@ -85,6 +86,8 @@ def execute(args):
     result = {"passed": False, "target": identity["target"], "producerSource": identity["producerSource"],
               "originalVersion": RELEASE_VERSION, "candidateVersion": version, "stages": {}}
     stages = result["stages"]
+    desktop_profile = None
+    permission_failure = None
     try:
         old_binary, stages["original"] = install(old_package, slot, report / "original", RELEASE_VERSION)
         initialize_profile(old_binary, profile, work, report, "original-start")
@@ -96,6 +99,12 @@ def execute(args):
             require_registration(msi_registration(old_package, report, "original-registered"),
                                  msi_registration(package, report, "candidate-before-install"), upgraded=False)
         else:
+            desktop_profile = reserve_default_profile(report)
+            try:
+                stages["originalPermissions"] = observe_permissions(old_binary, report, "original")
+            except Exception as error:
+                permission_failure = error
+                stages["originalPermissions"] = {"error": str(error)}
             old_binary.parents[2].rename(work / "original.app")
 
         candidate, stages["candidate"] = install(package, slot, report / "candidate", version)
@@ -110,7 +119,17 @@ def execute(args):
         stages["afterModeLeaseRelease"] = start_profile(
             candidate, profile, work, report, "candidate-after-mode-lease", expected_rows, retained,
         )
-        stages["desktopAndHeadlessModeLease"] = check_mode_lease(candidate, work, report)
+        stages["desktopAndHeadlessModeLease"] = check_mode_lease(candidate, work, report, profile=desktop_profile)
+        if system == "Darwin":
+            try:
+                stages["candidatePermissions"] = observe_permissions(candidate, report, "candidate")
+                if permission_failure is None:
+                    stages["permissionContinuity"] = compare_permissions(
+                        stages["originalPermissions"], stages["candidatePermissions"],
+                    )
+            except Exception as error:
+                permission_failure = permission_failure or error
+                stages["candidatePermissions"] = {"error": str(error)}
         recovery_failure = None
         try:
             stages["crashRecovery"] = verify_crash_recovery(
@@ -137,6 +156,10 @@ def execute(args):
         stages["afterRollback"] = start_profile(rollback, profile, work, report, "rollback-reopen", expected_rows)
         if recovery_failure is not None:
             raise recovery_failure
+        if permission_failure is not None:
+            raise permission_failure
+        if stages.get("permissionContinuity", {}).get("lostGrants"):
+            raise RuntimeError("The installed upgrade lost a previously granted macOS permission")
         result.update(passed=True, sessionTypes=[row["session_type"] for row in expected_rows], retainedFiles=retained)
     finally:
         write_json(report / "installed-desktop-upgrade.json", result)

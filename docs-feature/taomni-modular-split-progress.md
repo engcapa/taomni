@@ -142,11 +142,14 @@ TASK-027 将 G1–G11 设为独立发布阻断门。每个门必须在匹配源�
 - G11 双向互斥在早期 Windows 和 macOS 候选中触发了 GUI 启动 panic。桌面现在识别模式锁占用，在创建窗口和业务服务前记录冲突并退出 1。TC-MODULES-009 增加退出码断言，同时保留 owner 存活、无监听端口和重启后数据复原检查。7 项 Rust 单测、61 项 QA 工具单测、静态用例审计及重构边界检查通过。正常退出码由三端 Native 复验。
 - Intel DMG 也通过了真实升级、双向互斥和回滚。候选源码为 `514c95edb`，验证工具源码为 `1b1b7be08`。桌面竞争者报出模式冲突后退出码为 -6，headless 竞争者退出码为 1。最新原生用例以 `5b3850f2e` 复验两个退出码，安装验证也已采用相同规则。 [Intel 实装](https://github.com/engcapa/taomni/actions/runs/44639372096) · [三端原生复验](https://github.com/engcapa/taomni/actions/runs/44644557238)
 - Windows MSI 和 macOS DMG 实装验证已接入 G6。候选通过模块商店安装与候选 SHA 匹配的官方签名 MFA 包，创建 HOTP 账号并前进一次。验证器确认核心和宿主的路径、进程归属与启动时间，只强制结束核心，在驱动清理前等宿主自行退出，再重开同一安装件核对计数和活动版本。实装工件继续记录升级和回滚结果。
+- macOS DMG 实装验证会在同一安装路径分别启动旧版和候选版，经生产截图和 RDP IPC 查询屏幕录制及辅助功能。回执记录各版本二进制、应用标识和签名 designated requirement。原版本已授权、升级后变为拒绝会使验证失败。原版缺少授权时，回执记录缺失的前置授权。
 - Windows G5 在同一 `windows-2025` runner 的两种背景下各收齐 40 个样本。首帧、动画帧率和带宽均达标。原桌面两条路径的 p95 为 91.95 / 88.65 ms，静态背景为 97.51 / 84.71 ms，均超过 65 ms 预算。四组实验的输入到绘制提交 p95 均低于 2 ms，时间主要耗在绘制提交至探针收到更新之间。静态背景下两条路径都用 Planar，仍超出预算。 [Windows 对照](https://github.com/engcapa/taomni/actions/runs/44635990580)
 - Windows G5 复验增加采集时间和交给编码器的时间，取样点来自同一个用例。原先的 RDP 探针和四项预算继续用于判定。 [Windows 帧时间复验](https://github.com/engcapa/taomni/actions/runs/44649616170)
 - Windows Native 的 TC-MODULES-032 与 045 原分片显示，迁移按钮的实际点击目标是签名输入框，目录刷新则只有指针按下和释放记录，服务端从未收到新目录请求。两条用例改为对已启用的按钮发送 Enter，分别保留原 WAL 和签名目录的独立断言。 [Windows 原始分片](https://github.com/engcapa/taomni/actions/runs/44619095037)
 - Mail 的发件、已发送副本和服务器草稿共用的 MIME 组装已迁入邮件引擎。桌面适配层解析账户和附件来源，把地址参数和取得的附件内容交给引擎。引擎 15 项及核心撰写和草稿 10 项单测通过。复用 `TC-MAIL-SEND-01`、`TC-MAIL-OUTBOX-01` 和 `TC-MAIL-ATTACH-01` 覆盖现有 Browser 与 Native 入口。
 - Mail 的 IMAP LIST、LSUB、订阅状态和原始 STATUS 已迁入邮件引擎。桌面适配层继续管理连接和现有缓存同步。引擎 20 项和核心两项单测通过。TC-MAIL-FOLDER-01 增加重开后 INBOX 可见及无运行时错误检查，加入 CI/CD PR 的 Browser 与 Native 选集。 [CI/CD PR](https://github.com/engcapa/taomni/pull/840)
+- #840 已合入 `main` 的 `4b70e4838`，并同步至重构分支。新入口已派发固定 `fab39ad33` 的 G9/G11 清单验证。 [合并](https://github.com/engcapa/taomni/pull/840) · [main 派发](https://github.com/engcapa/taomni/actions/runs/44652323097)
+- Mail 的独立引擎接管分段 MIME 解码、日历邀请解析和 iTIP 回复生成。核心的 `mail-parser` 直接依赖仅用于剩余单元测试，正式构建通过邮件引擎使用解析器。25 项引擎单测和 7 项核心单测通过，邮件邀请流程由 TC-MAIL-INVITE-01 验证。
 
 ## 当前结论
 

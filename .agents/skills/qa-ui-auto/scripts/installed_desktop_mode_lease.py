@@ -47,10 +47,11 @@ def wait_for_generation(owner, profile):
     raise RuntimeError("The installed desktop did not initialize the fresh production profile")
 
 
-def check_mode_lease(executable, work, evidence):
+def check_mode_lease(executable, work, evidence, *, profile=None):
     observation = {"passed": False, "installedBinary": str(executable), "binarySha256": digest(executable)}
     try:
-        profile = reserve_default_profile(evidence)
+        if profile is None:
+            profile = reserve_default_profile(evidence)
         observation["profile"] = str(profile)
         launch = [str(executable)]
         with (evidence / "installed-desktop-owner.log").open("xb") as output, subprocess.Popen(
