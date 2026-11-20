@@ -9,25 +9,9 @@ from types import SimpleNamespace
 
 from modular_bundle_inventory import digest, write_json
 from qa_ui_auto.fixtures.module_legacy_mfa import (
-    create_account, desktop_action, element, installed_desktop, open_unlocked_mfa,
+    commit_mfa_upgrade, create_account, desktop_action, element, installed_desktop, open_unlocked_mfa,
 )
 from qa_ui_auto.fixtures.module_signed_archive import load_artifact, platform_key
-from qa_ui_auto.native_steps import NativeStepContext
-
-
-def install_module(steps, archive, signature):
-    desktop_action(steps, "wait_for", element("welcome-panel"))
-    desktop_action(steps, "click", element("ribbon-settings"))
-    desktop_action(steps, "wait_for", element("settings-panel"))
-    desktop_action(steps, "fill", {"selector": element("settings-search-input"), "value": "module store"})
-    desktop_action(steps, "wait_for", element("module-offline-install"))
-    desktop_action(steps, "fill", {"selector": element("module-offline-archive"), "value": str(archive)})
-    desktop_action(steps, "fill", {"selector": element("module-offline-signature"), "value": signature})
-    desktop_action(steps, "press", {"selector": element("module-offline-submit"), "key": "Enter"})
-    desktop_action(steps, "wait_for", element("module-offline-install") + '[data-phase="completed"]')
-    desktop_action(steps, "press", {"selector": element("module-action-enable-mfa") + ":not([disabled])", "key": "Enter"})
-    desktop_action(steps, "wait_for", element("module-action-disable-mfa"))
-    desktop_action(steps, "click", element("nav-mode-home"))
 
 
 def select_owned_process(processes, executable, process_errors):
@@ -66,7 +50,8 @@ def observe_abrupt_exit(driver, executable, module, observation):
 
 
 def verify_crash_recovery(executable, profile, signed, source, evidence):
-    receipt, archive, signature, _ = load_artifact(signed, source, platform_key(), "mfa")
+    receipt, archive, _, _ = load_artifact(signed, source, platform_key(), "mfa")
+    signature = archive.with_name(receipt["signature"])
     result = {
         "sourceSha": source,
         "installedBinarySha256": digest(executable),
@@ -77,9 +62,13 @@ def verify_crash_recovery(executable, profile, signed, source, evidence):
     active_path = profile / "plugins/mfa/active.json"
     account = {"selector": element("mfa-account-code"), "equals": "287 082"}
     try:
-        with installed_desktop(ctx, executable, evidence, evidence, "mfa-before-kill", environment={}) as (driver, session):
-            install_module(NativeStepContext(session, evidence, ctx.cfg), archive, signature)
+        with installed_desktop(ctx, executable, evidence, evidence, "mfa-legacy-seed", environment={}) as (_, session):
             create_account(session, ctx, evidence)
+        result["legacyDatabaseSha256"] = digest(profile / "mfa.db")
+        commit_mfa_upgrade(executable, profile, archive, signature, evidence)
+        with installed_desktop(ctx, executable, evidence, evidence, "mfa-before-kill", environment={}) as (driver, session):
+            steps = open_unlocked_mfa(ctx, session, evidence)
+            desktop_action(steps, "assert_text_equals", account)
             active = json.loads(active_path.read_text(encoding="utf-8"))
             if active["activeVersion"] != receipt["version"]:
                 raise RuntimeError("The installed MFA version differs from the signed package")
@@ -88,6 +77,8 @@ def verify_crash_recovery(executable, profile, signed, source, evidence):
                 raise RuntimeError("The installed MFA package differs from the signed artifact")
             suffix = ".exe" if platform.system() == "Windows" else ""
             module = (directory / f"taomni-plugin-mfa{suffix}").resolve(strict=True)
+            if not module.is_relative_to(profile.resolve(strict=True)):
+                raise RuntimeError("The installed MFA executable is outside the owned profile")
             result.update(moduleBinarySha256=digest(module), hotpBeforeExit=account["equals"])
             observe_abrupt_exit(driver, executable, module, result)
             session.session_id = None
