@@ -1,12 +1,40 @@
 import { svgGeometry } from "./docxImages";
+import { drawioFile } from "./drawioCodec";
+import { renderedDrawioPage } from "./drawioRender";
 
-export interface DiagramDefinition { source: string; theme: "light" | "dark" }
+export type DiagramKind = "mermaid" | "drawio";
+export const MARKDOWN_DIAGRAM_SELECTOR = ".fv-md-mermaid,.fv-md-drawio";
+export const MARKDOWN_IMAGE_SELECTOR = ".fv-md-image-frame > img,.fv-md-rendered-block img,.fv-md-doc img";
+export type MarkdownVisualKind = DiagramKind | "image";
+export function diagramKind(element: HTMLElement | null): DiagramKind {
+  return element?.classList.contains("fv-md-drawio") ? "drawio" : "mermaid";
+}
+
+export interface DiagramDefinition { source: string; theme: "light" | "dark"; kind?: DiagramKind }
 export interface DiagramSnapshot extends DiagramDefinition {
   svg: SVGSVGElement;
   width: number;
   height: number;
   text: string;
   filename: string;
+}
+export interface ImageSnapshot {
+  kind: "image";
+  src: string;
+  alt: string;
+  width: number;
+  height: number;
+  filename: string;
+}
+export type MarkdownVisualSnapshot = DiagramSnapshot | ImageSnapshot;
+
+export function loadedMarkdownImage(element: Element | null): element is HTMLImageElement {
+  return element instanceof HTMLImageElement && element.matches(MARKDOWN_IMAGE_SELECTOR)
+    && element.complete && element.naturalWidth > 0 && /^data:image\//i.test(element.src);
+}
+
+export function snapshotMarkdownImage(image: HTMLImageElement, filename: string): ImageSnapshot {
+  return { kind: "image", src: image.src, alt: image.alt, width: image.naturalWidth, height: image.naturalHeight, filename };
 }
 const definitions = new WeakMap<HTMLElement, DiagramDefinition>();
 
@@ -32,21 +60,25 @@ export function diagramLabelText(text: Element): string {
 /** Mermaid's SVG text is generated from its definition. Read those structured
  * labels, including multiline tspans, without OCR, node IDs or CSS/source code. */
 export function diagramText(svg: SVGSVGElement): string {
-  return Array.from(svg.querySelectorAll("text")).flatMap((text) => {
+  return Array.from(svg.querySelectorAll("text,foreignObject")).flatMap((text) => {
     if (text.closest("defs,title,desc,symbol")) return [];
+    if (text.localName === "text" && text.closest("switch")?.querySelector("foreignObject")) return [];
     for (let node: Element | null = text; node && svg.contains(node); node = node.parentElement) {
       const style = getComputedStyle(node);
       if (style.display === "none" || style.visibility === "hidden" || style.opacity === "0") return [];
     }
-    const value = diagramLabelText(text);
+    const value = text.localName === "foreignObject"
+      ? (text.firstElementChild instanceof HTMLElement ? text.firstElementChild.innerText : undefined) || text.textContent?.trim()
+      : diagramLabelText(text);
     return value ? [value] : [];
   }).join("\n");
 }
 
 export function snapshotDiagram(element: HTMLElement, filename: string): DiagramSnapshot {
   const svg = element.querySelector<SVGSVGElement>("svg");
-  const definition = definitions.get(element);
-  if (!svg || !definition) throw new Error("The Mermaid diagram is not ready");
+  const page = renderedDrawioPage(element);
+  const definition: DiagramDefinition | undefined = page ? { source: drawioFile([page]), theme: "light", kind: "drawio" } : definitions.get(element);
+  if (!svg || !definition) throw new Error("The diagram is not ready");
   return { ...definition, ...svgGeometry(svg), svg: svg.cloneNode(true) as SVGSVGElement, text: diagramText(svg), filename };
 }
 

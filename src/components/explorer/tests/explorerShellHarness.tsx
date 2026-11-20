@@ -48,7 +48,7 @@ vi.mock("../../../lib/explorer/openExplorer", () => ({ openExplorer: native.open
 vi.mock("../../../lib/openFile", async (original) => ({ ...await original<typeof import("../../../lib/openFile")>(), openFile: native.openFile }));
 vi.mock("../../../lib/sftpController", () => ({ useSftpController: () => ({}) }));
 vi.mock("@tauri-apps/api/event", () => ({ listen: vi.fn(async () => vi.fn()) }));
-vi.mock("../ExplorerNavTree", () => ({ ExplorerNavTree: () => <nav data-testid="explorer-nav-tree" /> }));
+vi.mock("../ExplorerNavTree", () => ({ ExplorerNavTree: ({ id, hidden }: { id: string; hidden: boolean }) => <nav id={id} hidden={hidden} data-testid="explorer-nav-tree" /> }));
 vi.mock("../preview/ExplorerPreviewPane", () => ({
   ExplorerPreviewPane: ({ entries, onClose }: { entries: FileEntry[]; onClose: () => void }) => <aside data-testid="explorer-preview"><span>{entries.map((entry) => entry.name).join(",")}</span><button onClick={onClose} data-testid="preview-test-close">Close</button></aside>,
 }));
@@ -130,7 +130,7 @@ export function installShellHarness() {
     useSftpStore.setState({ sessions: {} });
     sessionRefCounts.clear(); inFlightLocalAttaches.clear(); inFlightAttaches.clear();
     setLocale("en");
-    setExplorerPreferences({ view: "details", sortKey: "name", sortDir: "asc", showHidden: false, preview: true, previewPosition: "right", previewWidth: 300, navWidth: 210, wrap: false, pinnedPaths: [], expandedPaths: [] });
+    setExplorerPreferences({ view: "details", sortKey: "name", sortDir: "asc", showHidden: false, preview: true, previewPosition: "right", previewWidth: 300, navVisible: true, navWidth: 210, wrap: false, pinnedPaths: [], expandedPaths: [], columnWidths: {} });
     setExplorerClipboard(null);
     vi.stubGlobal("ResizeObserver", class {
       record: typeof observers[number];

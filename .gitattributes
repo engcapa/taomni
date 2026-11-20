@@ -2,3 +2,6 @@
 src-tauri/Cargo.toml text eol=lf
 # Shell hooks run via git-bash on the Windows CI runner; CRLF breaks them.
 *.sh text eol=lf
+# Keep the reported Markdown byte-identical on all QA hosts.
+.agents/skills/qa-ui-auto/scripts/qa_ui_auto/fixtures/data/markdown-testing.md text eol=lf
+src/components/viewer/markdown/vendor/viewer-static.min.js -text -diff

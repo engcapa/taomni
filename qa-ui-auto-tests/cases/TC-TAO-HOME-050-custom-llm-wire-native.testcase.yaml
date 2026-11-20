@@ -1,0 +1,158 @@
+id: TC-TAO-HOME-050
+title: Custom provider uses each protocol and native search reaches Responses
+description: Use the real Settings test path to send protocol-correct requests with a local test key. Initialize Vault while saving
+  Responses and use the stored key after a WebView reload. The rendered answer and loopback server confirm the model limit, reasoning effort, and
+  per-model web search.
+modes:
+- native
+covers:
+- F1.11
+- F12.1
+tags:
+- p1
+- regression
+- tao-home
+- settings
+fixtures:
+- reset_db
+- tao_custom_llm
+timeout_sec: 250
+steps:
+- open: ${cfg.app.base_url}
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- click: '[data-testid="tao-home-dock-more"]'
+- click: '[data-testid="tao-home-dock-settings"]'
+- wait_for: '[data-testid="tao-settings"]'
+- click: '[data-testid="llm-add-custom-provider"]'
+- wait_for: '[data-testid="llm-custom-fields"]'
+- fill:
+    selector: '[data-testid="llm-provider-row"][data-custom="true"] [data-testid="llm-custom-name"]'
+    value: QA Wire Provider
+- fill:
+    selector: '[data-testid="llm-provider-row"][data-custom="true"] [data-testid="llm-provider-base-url"]'
+    value: ${fixture.tao_custom_llm_url}
+- fill:
+    selector: '[data-testid="llm-provider-row"][data-custom="true"] [data-testid="llm-provider-key"]'
+    value: qa-custom-key
+- select_option:
+    selector: '[data-testid="llm-provider-row"][data-custom="true"] [data-testid="llm-proxy-mode"]'
+    value: none
+- fill:
+    selector: '[data-testid="llm-custom-model-id"]'
+    value: qa-wire-v1
+- fill:
+    selector: '[data-testid="llm-custom-max-output"]'
+    value: '240'
+- click: '[data-testid="llm-custom-effort-high"]'
+- click: '[data-testid="llm-provider-row"][data-custom="true"] [data-testid="llm-provider-test"]'
+- assert_file_contains:
+    path: ${fixture.tao_custom_llm_log}
+    contains: /v1/chat/completions model=qa-wire-v1 max=240 effort=high search=false stream=false
+- wait_for: '[data-testid="llm-provider-row"][data-custom="true"] [data-testid="llm-provider-test"]:enabled'
+- select_option:
+    selector: '[data-testid="llm-custom-protocol"]'
+    value: anthropic
+- click: '[data-testid="llm-provider-row"][data-custom="true"] [data-testid="llm-provider-test"]'
+- assert_file_contains:
+    path: ${fixture.tao_custom_llm_log}
+    contains: /v1/messages model=qa-wire-v1 max=240 effort=high search=false stream=false
+- wait_for: '[data-testid="llm-provider-row"][data-custom="true"] [data-testid="llm-provider-test"]:enabled'
+- select_option:
+    selector: '[data-testid="llm-custom-protocol"]'
+    value: openai-responses
+- click: '[data-testid="llm-provider-row"][data-custom="true"] [data-testid="llm-provider-test"]'
+- assert_file_contains:
+    path: ${fixture.tao_custom_llm_log}
+    contains: /v1/responses model=qa-wire-v1 max=240 effort=high search=false stream=false
+- wait_for: '[data-testid="llm-provider-row"][data-custom="true"] [data-testid="llm-provider-test"]:enabled'
+- click: '[data-testid="llm-custom-native-search"]'
+- select_option:
+    selector: '[data-testid="tao-settings-provider"]'
+    label: QA Wire Provider
+- click: '[data-testid="tao-settings-thinking"]'
+- click: '[data-testid="tao-settings-web"]'
+- click: '[data-testid="llm-providers-save"]'
+- wait_for: '[data-testid="vault-setup-dialog"]'
+- vault_first_run: qa-new-features
+- wait_for: '[data-testid="llm-providers-status"]'
+- reload_window: null
+- wait_for: '[data-testid="tao-home-composer-input"]:enabled'
+- fill:
+    selector: '[data-testid="tao-home-composer-input"]'
+    value: QA run using Responses
+- click: '[data-testid="tao-home-send"]'
+- assert_text:
+    selector: '[data-testid="tao-home-message-list"]'
+    contains: Custom provider completed
+- assert_file_contains:
+    path: ${fixture.tao_custom_llm_log}
+    contains: /v1/responses model=qa-wire-v1 max=240 effort=high search=true stream=true
+- assert_no_runtime_errors: null
+- screenshot: custom-provider-response.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Settings sends protocol-correct requests with a local test key. Configuring Vault allows the pending save to finish.
+      The stored key authenticates the request after reload. The rendered answer and loopback server confirm the model limit, reasoning
+      effort, and per-model web search.
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 7
+    - 9
+    - 10
+    - 11
+    - 12
+    - 13
+    - 14
+    - 15
+    - 16
+    - 19
+    - 20
+    - 23
+    - 24
+    - 27
+    - 28
+    - 29
+    - 30
+    - 31
+    - 33
+    - 35
+    - 37
+    - 38
+    checkpoints:
+    - step: 17
+      expectation: Chat Completions receives the model and completion limit.
+    - step: 21
+      expectation: Anthropic receives the proper messages request.
+    - step: 25
+      expectation: Responses receives the non-streaming input and output limit.
+    - step: 32
+      expectation: Saving a new API key prompts for Vault setup.
+    - step: 34
+      expectation: Settings reports a successful save after Vault setup.
+    - step: 39
+      expectation: Tao renders the streamed Responses answer.
+    - step: 40
+      expectation: Responses streaming has the requested tool and reasoning configuration.
+    results:
+    - 17
+    - 21
+    - 25
+    - 32
+    - 34
+    - 39
+    - 40
+  visual:
+  - check: Toolbar and current content remain visible.
+    method: manual
+    reason: Screenshot retains the real setup and content.
+  native:
+  - check: Real LLM HTTP transport and Vault-backed credentials
+    method: automated
+    reason: A disposable HTTP server independently records actual request shape and rejects invalid authorization.

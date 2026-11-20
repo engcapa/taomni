@@ -10,6 +10,7 @@ import { useGridEditing } from "./grid/useGridEditing";
 import { useGridExport } from "./grid/useGridExport";
 import { useGridFilters } from "./grid/useGridFilters";
 import { useGridGeneratedSql } from "./grid/useGridGeneratedSql";
+import { useGridSearch } from "./grid/useGridSearch";
 import { useGridSelection } from "./grid/useGridSelection";
 
 /** A virtualised result grid with a compact database-client toolbar. */
@@ -38,7 +39,6 @@ export function QueryResultGrid({
   const [visibleColumns, setVisibleColumns] = useState<Set<number>>(
     () => new Set(result.columns.map((_, index) => index)),
   );
-  const [searchText, setSearchText] = useState("");
   const [showStats, setShowStats] = useState(false);
   const [viewMode, setViewMode] = useState<ViewMode>("table");
   const [cellValueViewer, setCellValueViewer] = useState<CellValueViewer | null>(null);
@@ -116,17 +116,8 @@ export function QueryResultGrid({
   );
   const pendingChangeCount = changeCounts.inserted + changeCounts.updated + changeCounts.deleted;
 
-  const searchMatchCount = useMemo(() => {
-    const needle = searchText.trim().toLowerCase();
-    if (!needle) return 0;
-    let count = 0;
-    for (const row of filters.orderedRows) {
-      for (const index of visibleColumnIndexes) {
-        if ((row.values[index] ?? "").toLowerCase().includes(needle)) count += 1;
-      }
-    }
-    return count;
-  }, [filters.orderedRows, searchText, visibleColumnIndexes]);
+  const search = useGridSearch({ orderedRows: filters.orderedRows, visibleColumnIndexes, containerRef,
+    setActiveCell: selection.setActiveCell, setViewMode, viewMode, scrollTop, setScrollTop, setScrollLeft, columnWidths, autoFit });
 
   const openDropdown = (event: MouseEvent<HTMLButtonElement>, items: MenuItem[]) => {
     const rect = event.currentTarget.getBoundingClientRect();
@@ -314,7 +305,7 @@ export function QueryResultGrid({
   const startRow = Math.max(0, Math.floor(scrollTop / ROW_HEIGHT) - OVERSCAN);
   const endRow = Math.min(total, Math.ceil((scrollTop + viewportH) / ROW_HEIGHT) + OVERSCAN);
   const visible = filters.order.slice(startRow, endRow);
-  const searchNeedle = searchText.trim().toLowerCase();
+  const searchNeedle = search.needle;
 
   const stats = useMemo(() => {
     return visibleColumnIndexes.map((columnIndex) => {
@@ -374,9 +365,7 @@ export function QueryResultGrid({
     filters={filters}
     editSession={editSession}
     pendingChangeCount={pendingChangeCount}
-    searchText={searchText}
-    setSearchText={setSearchText}
-    searchMatchCount={searchMatchCount}
+    search={search}
     viewMode={viewMode}
     setViewMode={setViewMode}
     rows={rows}

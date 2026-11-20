@@ -57,7 +57,8 @@ export function drawioToMarkdown(pages: DrawioPage[], mode: DrawioImportMode): s
   return pages.map((page) => {
     const model = page.model.cloneNode(true) as Element;
     const cells = Array.from(model.querySelectorAll("root > mxCell"));
-    const textCells = cells.filter((cell) => cell.getAttribute("taomniKind") === "text" || /(?:^|;)(?:shape=)?text(?:;|$)/.test(cell.getAttribute("style") || ""));
+    const textCells = cells.filter((cell) => !cell.getAttribute("taomniKind")?.startsWith("sequence-")
+      && (cell.getAttribute("taomniKind") === "text" || /(?:^|;)(?:shape=)?text(?:;|$)/.test(cell.getAttribute("style") || "")));
     const tables = cells.filter((cell) => cell.getAttribute("taomniKind") === "table" || /(?:^|;)shape=table(?:;|$)/.test(cell.getAttribute("style") || ""));
     const blocks = [...textCells, ...tables].sort((a, b) => Number(a.querySelector("mxGeometry")?.getAttribute("y") || 0) - Number(b.querySelector("mxGeometry")?.getAttribute("y") || 0));
     const content = blocks.map((cell) => tables.includes(cell)

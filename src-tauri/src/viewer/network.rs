@@ -23,15 +23,41 @@ pub(crate) fn resolve_proxy(
         "app" => AppProxyConfig::load_strict(&crate::proxy::default_app_proxy_path())?,
         "custom" => AppProxyConfig {
             enabled: true,
-            ..custom.ok_or("Custom HTML proxy is required")?
+            ..custom.ok_or("Custom preview proxy is required")?
         },
-        _ => return Err("Unknown HTML proxy mode".into()),
+        _ => return Err("Unknown preview proxy mode".into()),
     };
     let db = state
         .db
         .lock()
         .map_err(|_| "Proxy session database is unavailable")?;
     crate::proxy::resolve_strict_with_db(&config, Some(&db), Some(&state.vault))
+}
+
+pub(super) fn resource_client(
+    proxy: Option<&ResolvedProxy>,
+    redirects: reqwest::redirect::Policy,
+) -> Result<reqwest::Client, String> {
+    let mut builder = reqwest::Client::builder()
+        .no_proxy()
+        .referer(false)
+        .connect_timeout(Duration::from_secs(10))
+        .timeout(Duration::from_secs(20))
+        .redirect(redirects);
+    if let Some(proxy) = proxy {
+        let endpoint = proxy.to_url();
+        let endpoint = if proxy.kind == "socks5" {
+            endpoint.replacen("socks5://", "socks5h://", 1)
+        } else {
+            endpoint
+        };
+        builder = builder.proxy(
+            reqwest::Proxy::all(&endpoint).map_err(|_| "permission: Invalid preview proxy")?,
+        );
+    }
+    builder
+        .build()
+        .map_err(|_| "permission: Cannot initialize preview network client".into())
 }
 
 pub(super) struct Network {
@@ -44,26 +70,8 @@ pub(super) struct Network {
 
 impl Network {
     pub fn new(proxy: Option<&ResolvedProxy>) -> Result<Self, String> {
-        let mut builder = reqwest::Client::builder()
-            .no_proxy()
-            .connect_timeout(Duration::from_secs(10))
-            .timeout(Duration::from_secs(20))
-            .redirect(reqwest::redirect::Policy::none());
-        if let Some(proxy) = proxy {
-            let endpoint = proxy.to_url();
-            let endpoint = if proxy.kind == "socks5" {
-                endpoint.replacen("socks5://", "socks5h://", 1)
-            } else {
-                endpoint
-            };
-            builder = builder.proxy(
-                reqwest::Proxy::all(&endpoint).map_err(|_| "permission: Invalid HTML proxy")?,
-            );
-        }
         Ok(Self {
-            client: builder
-                .build()
-                .map_err(|_| "permission: Cannot initialize HTML network client")?,
+            client: resource_client(proxy, reqwest::redirect::Policy::none())?,
             cancel: CancellationToken::new(),
             permits: tokio::sync::Semaphore::new(4),
             bytes: AtomicU64::new(0),

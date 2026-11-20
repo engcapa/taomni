@@ -335,6 +335,15 @@ controls:
 - id: tao-home-shell-menu
   selector: '[data-testid="tao-home-shell-menu"]'
   kind: interactive
+- id: tao-home-shell-options
+  selector: '[data-testid="tao-home-shell-options"]'
+  kind: interactive
+- id: tao-home-history-sort
+  selector: '[data-testid="tao-home-history-sort"]'
+  kind: interactive
+- id: tao-home-history-sort-options
+  selector: '[data-testid="tao-home-history-sort-options"]'
+  kind: display
 - id: tao-home-side-panel
   selector: '[data-testid="tao-home-side-panel"]'
   kind: display
@@ -379,9 +388,6 @@ controls:
   kind: interactive
 - id: tao-home-popup-web
   selector: '[role="dialog"] button:has-text("Web")'
-  kind: interactive
-- id: tao-home-popup-shell-select
-  selector: '[role="dialog"] select[aria-label="Choose shell"]'
   kind: interactive
 - id: tao-home-popup-shell-home
   selector: 'xpath=//*[@role="dialog"]//button[normalize-space(.)="Open home directory"]'
@@ -448,6 +454,106 @@ controls:
 - id: tao-settings-cost
   selector: '[data-testid="tao-settings-cost"]'
   kind: interactive
+- id: tao-privacy-summary
+  selector: '[data-testid="tao-privacy-summary"]'
+  kind: display
+  optional: true
+- id: tao-settings-thinking
+  selector: '[data-testid="tao-settings-thinking"]'
+  kind: interactive
+  optional: true
+- id: tao-settings-web
+  selector: '[data-testid="tao-settings-web"]'
+  kind: interactive
+  optional: true
+- id: tao-search-sources
+  selector: '[data-testid="tao-search-sources"]'
+  kind: interactive
+  optional: true
+- id: tao-search-sources-menu
+  selector: '[data-testid="tao-search-sources-menu"]'
+  kind: display
+  optional: true
+- id: tao-search-source-sql
+  selector: '[data-testid="tao-search-source-sql"]'
+  kind: interactive
+  optional: true
+- id: tao-search-source-groups
+  selector: '[data-testid="tao-search-source-groups"]'
+  kind: interactive
+  optional: true
+- id: tao-search-source-file_contents
+  selector: '[data-testid="tao-search-source-file_contents"]'
+  kind: interactive
+  optional: true
+- id: llm-add-custom-provider
+  selector: '[data-testid="llm-add-custom-provider"]'
+  kind: interactive
+  optional: true
+- id: llm-custom-toggle
+  selector: '[data-testid="llm-custom-toggle"]'
+  kind: interactive
+  optional: true
+- id: llm-custom-fields
+  selector: '[data-testid="llm-custom-fields"]'
+  kind: display
+  optional: true
+- id: llm-custom-name
+  selector: '[data-testid="llm-custom-name"]'
+  kind: interactive
+  optional: true
+- id: llm-custom-protocol
+  selector: '[data-testid="llm-custom-protocol"]'
+  kind: interactive
+  optional: true
+- id: llm-custom-add-model
+  selector: '[data-testid="llm-custom-add-model"]'
+  kind: interactive
+  optional: true
+- id: llm-custom-model-row
+  selector: '[data-testid="llm-custom-model-row"]'
+  kind: display
+  optional: true
+- id: llm-custom-model-id
+  selector: '[data-testid="llm-custom-model-id"]'
+  kind: interactive
+  optional: true
+- id: llm-custom-context
+  selector: '[data-testid="llm-custom-context"]'
+  kind: interactive
+  optional: true
+- id: llm-custom-max-output
+  selector: '[data-testid="llm-custom-max-output"]'
+  kind: interactive
+  optional: true
+- id: llm-custom-multimodal
+  selector: '[data-testid="llm-custom-multimodal"]'
+  kind: interactive
+  optional: true
+- id: llm-custom-native-search
+  selector: '[data-testid="llm-custom-native-search"]'
+  kind: interactive
+  optional: true
+- id: llm-custom-default-model
+  selector: '[data-testid="llm-custom-default-model"]'
+  kind: interactive
+  optional: true
+- id: llm-custom-remove-model
+  selector: '[data-testid="llm-custom-remove-model"]'
+  kind: interactive
+  optional: true
+- id: llm-custom-remove
+  selector: '[data-testid="llm-custom-remove"]'
+  kind: interactive
+  optional: true
+- id: llm-custom-effort-high
+  selector: '[data-testid="llm-custom-effort-high"]'
+  kind: interactive
+  optional: true
+- id: llm-custom-effort-xhigh
+  selector: '[data-testid="llm-custom-effort-xhigh"]'
+  kind: interactive
+  optional: true
 - id: tao-settings-tts
   selector: '[data-testid="tao-settings-tts"]'
   kind: interactive
@@ -621,6 +727,8 @@ controls:
   selector: '[data-testid="tao-home-search-filter-note"]'
   kind: interactive
 -->
+
+TC-WELCOME-RS-02 和 TC-WELCOME-RS-N-05 验证 Home 顶部的恢复入口、键盘启动、真实 PTY 的重启恢复与重复定位。TC-TAO-HOME-048 验证美元费用阈值和本地检索来源下拉多选。TC-TAO-HOME-049/050 验证自定义 Provider 的模型配置、保存以及三个协议的实际请求。
 
 Tao Home 将问、做、深研三种模式、绑定栏、Composer、消息状态、历史快捷行与本地资料搜索组合为独立宿主；首页入口移除 LAN 聊天，WSL 只在检测到可用发行版时显示。用例 `TC-TAO-HOME-001` 覆盖无 Key 空态、模式切换、历史三页签、搜索快捷键和托管 WebView smoke。
 
@@ -852,6 +960,9 @@ controls:
 - id: tab-overview-card
   selector: '[data-testid="tab-overview-card"]'
   kind: interactive
+- id: tab-overview-enlarged
+  selector: '[data-testid="tab-overview-enlarged"]'
+  kind: display
 - id: tab-overview-card-title
   selector: '[data-testid="tab-overview-card-title"]'
   kind: display
@@ -1069,6 +1180,7 @@ controls:
     kind: interactive
   - id: history-tab-directories
     selector: '[data-testid="welcome-history-tab-directories"]'
+    aliases: ['[data-testid="tao-home-history-popover"] [data-testid="tao-home-history-tab-directories"]']
     kind: interactive
   - id: local-directories
     selector: '[data-testid="welcome-local-directories"]'
@@ -5766,6 +5878,8 @@ status: done
 area: database/sql
 components: [DbClientTab, SchemaTree, SqlEditorPanel, QueryResultGrid, SessionEditor]
 files:
+  - src/components/database/grid/useGridSearch.ts
+  - src/components/database/grid/GridSearchBar.tsx
   - src/components/database/DbClientTab.tsx
   - src/components/database/SchemaTree.tsx
   - src/components/database/SqlEditorPanel.tsx
@@ -5787,6 +5901,34 @@ files:
   - src-tauri/src/database/history.rs
   - src/components/session/SessionEditor.tsx
 controls:
+  - id: query-result-current-match
+    selector: '[data-search-current="true"]'
+    kind: display
+    optional: true
+  - id: query-result-grid-scroll
+    selector: '[data-testid="query-result-grid-scroll"]'
+    kind: interactive
+    optional: true
+  - id: query-result-search
+    selector: '[data-testid="query-result-search"]'
+    kind: display
+    optional: true
+  - id: query-result-search-input
+    selector: 'input[aria-label="Search result set"]'
+    kind: interactive
+    optional: true
+  - id: query-result-search-next
+    selector: '[data-testid="query-result-search-next"]'
+    kind: interactive
+    optional: true
+  - id: query-result-search-previous
+    selector: '[data-testid="query-result-search-previous"]'
+    kind: interactive
+    optional: true
+  - id: query-result-search-count
+    selector: '[data-testid="query-result-search-count"]'
+    kind: display
+    optional: true
   # SQL DB session form body inside SessionEditor (proto + section TAB selectors are
   # owned by F6.3). These mount in browser mode and are the smoke-testable surface;
   # the live tab below only mounts on a successful desktop connection.
@@ -13467,6 +13609,8 @@ controls:
   optional: true
 - id: workspace-custom-switcher-option
   selector: '[data-testid^="workspace-switcher-option-"]:not([data-testid="workspace-switcher-option-default-workspace"])'
+  aliases:
+  - 'xpath=//*[@data-testid="workspace-switcher-menu"]//*[text()="Sample project"]'
   kind: interactive
   optional: true
 -->
@@ -13527,6 +13671,26 @@ files:
 - src/components/workspace/WorkspaceTabsFilter.tsx
 - src/lib/workspaceTabFilter.ts
 controls:
+- id: workspace-switcher-menu-delete
+  selector: '[data-testid="workspace-switcher-menu-delete"]'
+  kind: interactive
+  optional: true
+- id: workspace-root-current
+  selector: '[data-testid="workspace-root-current"]'
+  kind: interactive
+  optional: true
+- id: workspace-root-new
+  selector: '[data-testid="workspace-root-new"]'
+  kind: interactive
+  optional: true
+- id: workspace-root-name
+  selector: '[data-testid="workspace-root-name"]'
+  kind: interactive
+  optional: true
+- id: workspace-switcher-menu-rename
+  selector: '[data-testid="workspace-switcher-menu-rename"]'
+  kind: interactive
+  optional: true
 - id: code-workspace-tree-viewport
   selector: '[data-testid="code-workspace-tree-viewport"]'
   kind: display
@@ -15139,6 +15303,12 @@ controls:
   - id: explorer-cmd-more
     selector: '[data-testid="explorer-cmd-more"]'
     kind: interactive
+  - id: explorer-cmd-navigation
+    selector: '[data-testid="explorer-cmd-navigation"]'
+    kind: interactive
+  - id: explorer-nav-resize
+    selector: '[data-testid="explorer-nav-resize"]'
+    kind: interactive
   - id: explorer-cmd-new
     selector: '[data-testid="explorer-cmd-new"]'
     kind: interactive
@@ -15168,6 +15338,18 @@ controls:
     kind: interactive
   - id: explorer-column-name
     selector: '[data-testid="explorer-column-name"]'
+    kind: interactive
+  - id: explorer-column-resize-name
+    selector: '[data-testid="explorer-column-resize-name"]'
+    kind: interactive
+  - id: explorer-column-resize-mtime
+    selector: '[data-testid="explorer-column-resize-mtime"]'
+    kind: interactive
+  - id: explorer-column-resize-type
+    selector: '[data-testid="explorer-column-resize-type"]'
+    kind: interactive
+  - id: explorer-column-resize-size
+    selector: '[data-testid="explorer-column-resize-size"]'
     kind: interactive
   - id: explorer-column-size
     selector: '[data-testid="explorer-column-size"]'
@@ -15422,6 +15604,7 @@ status: implemented
 area: files/viewer
 components: [ViewerShell, TextEditor, ImageViewer, MarkdownEditor, HtmlPreview, FileOpenSettings]
 files:
+  - src/components/viewer/markdown/MarkdownExportResultActions.tsx
   - src/lib/openFile/index.ts
   - src/lib/openFile/preferences.ts
   - src/lib/fileOpenTemp.ts
@@ -15444,9 +15627,15 @@ files:
   - src/components/viewer/markdown/MarkdownDrawioImport.tsx
   - src/components/viewer/markdown/MarkdownDiagramActions.tsx
   - src/components/viewer/markdown/MarkdownDiagramViewer.tsx
+  - src/components/viewer/markdown/MarkdownLiveMenu.tsx
+  - src/lib/markdownRemoteImages.ts
+  - src-tauri/src/viewer/markdown_images.rs
   - src/components/viewer/markdown/drawioCodec.ts
   - src/components/viewer/markdown/drawioExport.ts
   - src/components/viewer/markdown/drawioImport.ts
+  - src/components/viewer/markdown/drawioImageStyle.ts
+  - src/components/viewer/markdown/drawioLabels.ts
+  - src/components/viewer/markdown/drawioModel.ts
   - src/components/viewer/markdown/drawioRender.ts
   - src/components/viewer/markdown/drawioMermaid.ts
   - src/components/viewer/markdown/diagramActions.tsx
@@ -15459,11 +15648,46 @@ files:
   - src/components/viewer/markdown/mathExportCss.ts
   - src/components/viewer/markdown/exportPdf.ts
   - src/components/viewer/markdown/pdfPages.ts
+  - src/components/viewer/markdown/TableWidget.ts
+  - src/components/viewer/markdown/tableCellContent.ts
+  - src/components/viewer/markdown/drawioMermaidGeometry.ts
   - src/components/viewer/markdown/wordSvg.ts
   - src/components/viewer/markdown/docxImages.ts
   - src/components/viewer/markdown/exportDocx.ts
   - src-tauri/src/viewer/mod.rs
 controls:
+  - id: file-open-markdown-restrict-remote
+    selector: '[data-testid="file-open-markdown-restrict-remote"]'
+    kind: interactive
+  - id: markdown-image-proxy-mode
+    selector: '[data-testid="markdown-image-proxy-mode"]'
+    kind: interactive
+  - id: markdown-image-proxy-host
+    selector: '[data-testid="markdown-image-custom-proxy-panel"] input[aria-label="Proxy host"]'
+    kind: interactive
+  - id: markdown-image-proxy-port
+    selector: '[data-testid="markdown-image-custom-proxy-panel"] input[type="number"]'
+    kind: interactive
+  - id: markdown-live-context-menu
+    selector: '[data-testid="markdown-live-context-menu"]'
+    kind: display
+  - id: markdown-live-copy-selection
+    selector: '[data-testid="markdown-live-copy-selection"]'
+    kind: interactive
+  - id: markdown-live-select-all
+    selector: '[data-testid="markdown-live-select-all"]'
+    kind: interactive
+  - id: markdown-image-tools
+    selector: '[data-testid="markdown-image-tools"]'
+    kind: display
+  - id: markdown-export-open-tao
+    selector: '[data-testid="markdown-export-open-tao"]'
+    kind: interactive
+    optional: true
+  - id: markdown-export-show-system
+    selector: '[data-testid="markdown-export-show-system"]'
+    kind: interactive
+    optional: true
   - id: file-viewer
     selector: '[data-testid="file-viewer"]'
     kind: display
@@ -15665,6 +15889,9 @@ controls:
   - id: markdown-outline
     selector: '[data-testid="markdown-outline"]'
     kind: interactive
+  - id: markdown-outline-toggle
+    selector: '[data-testid="markdown-outline-toggle"]'
+    kind: interactive
   - id: markdown-preview
     selector: '[data-testid="markdown-preview"]'
     kind: display
@@ -15676,6 +15903,15 @@ controls:
     kind: interactive
   - id: markdown-preview-appearance
     selector: '[data-testid="markdown-preview-appearance"]'
+    kind: interactive
+  - id: markdown-preview-appearance-options
+    selector: '[data-testid="markdown-preview-appearance-options"]'
+    kind: display
+  - id: markdown-heading-options
+    selector: '[data-testid="markdown-heading-options"]'
+    kind: display
+  - id: markdown-heading
+    selector: '[data-testid="markdown-heading"]'
     kind: interactive
   - id: markdown-table-widget
     selector: '[data-testid="markdown-table-widget"]'
@@ -15742,6 +15978,9 @@ controls:
     kind: interactive
   - id: markdown-import-drawio
     selector: '[data-testid="markdown-import-drawio"]'
+    aliases:
+    - '.fv-md-format [data-testid="markdown-import-drawio"]'
+    - '.fv-md-format [data-testid="markdown-insert-image"] + [data-testid="markdown-import-drawio"]'
     kind: interactive
   - id: markdown-drawio-input
     selector: '[data-testid="markdown-drawio-input"]'
@@ -16157,3 +16396,8 @@ TC-FILE-OPEN-001..006 是可执行行为用例并纳入 crash-regression；当�
 The retired Tao-specific key/save selectors are retained as optional absence assertions in HOME043; credentials and saving are owned by the combined LLM panel.
 
 - TC-FILE-OPEN-018: native release PDF performance comparison, three identical long-table/Mermaid/Unicode samples through actual save dialogs. Raw durations and PDF artifacts are reviewed against a fixed baseline; no speedup is inferred from pass status.
+
+真实用户 testing.md 回归由 TC-FILE-OPEN-027/028 验证 Live 表格内联格式、Word 流程图线身、draw.io 时序连接点和可搜索 PDF，并核对原文 SHA。实际 draw.io Desktop / LibreOffice 视觉证据另行留存；不将内部 maxGraph 预览当作外部编辑器验收。
+
+TC-FILE-OPEN-029/030 覆盖 Markdown Live 的实际拖选与选区对比度、深色源码标记以及 Live、源码和分栏的共享查找替换控件。
+TC-FILE-OPEN-031/032 覆盖左侧工具栏的 draw.io 导入、Live 和分栏预览与 draw.io Desktop 原图的像素比较，以及导出后可编辑节点和连线的往返校验。

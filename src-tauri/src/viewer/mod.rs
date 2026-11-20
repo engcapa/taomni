@@ -1,10 +1,13 @@
 //! Local file viewer I/O. Policy is independent of any window/document lifetime.
 mod assets;
 mod chunks;
+#[cfg(any(target_os = "macos", test))]
+mod drawio_frame;
 mod filesystem;
 mod html;
 mod html_document;
 mod html_loopback;
+pub(crate) mod markdown_images;
 mod network;
 mod network_rewrite;
 mod paths;
@@ -15,13 +18,21 @@ pub(crate) use assets::save_pasted_image;
 pub(crate) use chunks::read_text_chunk;
 pub(crate) use filesystem::{read_bytes, stat};
 pub(crate) use html::{HtmlSession, close_html, open_html, register_protocol};
-pub(crate) use network::resolve_proxy as resolve_html_proxy;
+pub(crate) use network::resolve_proxy as resolve_preview_proxy;
 pub(crate) use temporary::{
     allocate_temp, create_temp, release_temp, release_temp_token, shutdown,
 };
 pub(crate) use text::{read_text, write_text};
 
 use serde::Serialize;
+
+pub(crate) fn drawio_renderer_url() -> Option<String> {
+    #[cfg(target_os = "macos")]
+    return Some(drawio_frame::url());
+
+    #[cfg(not(target_os = "macos"))]
+    None
+}
 
 pub(crate) const DEFAULT_TEXT_BYTES: u64 = 5 * 1024 * 1024;
 pub(crate) const HARD_TEXT_BYTES: u64 = 20 * 1024 * 1024;

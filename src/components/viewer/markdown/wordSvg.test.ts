@@ -33,3 +33,12 @@ it("recognizes percent-encoded and base64 SVG image references as vectors", () =
   image.src = "data:image/png;base64,AQID";
   expect(embeddedSvg(image)).toBeUndefined();
 });
+
+it.each([['0px', 'none'], ['0px, 0px', 'none'], ['1px, 0px', 'none'], ['4px, 2px', '4 2'], ['3px', '3']])("writes Office-compatible solid/dashed strokes for %s", async (dash, expected) => {
+  const svg = new DOMParser().parseFromString('<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 0L100 0" marker-end="url(#arrow)"/></svg>', "image/svg+xml").documentElement;
+  vi.spyOn(window, "getComputedStyle").mockImplementation(() => ({ getPropertyValue: (name: string) => name === "stroke-dasharray" ? dash : name === "stroke" ? "#475569" : "" }) as CSSStyleDeclaration);
+  const output = new DOMParser().parseFromString(await portableWordSvg(svg, 100, 50, false), "image/svg+xml");
+  expect(output.querySelector("path")?.getAttribute("stroke-dasharray")).toBe(expected);
+  expect(output.querySelector("path")?.getAttribute("stroke")).toBe("#475569");
+  expect(output.querySelector("path")?.getAttribute("marker-end")).toBe("url(#arrow)");
+});

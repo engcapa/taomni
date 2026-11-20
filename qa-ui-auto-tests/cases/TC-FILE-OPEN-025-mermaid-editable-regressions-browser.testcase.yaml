@@ -1,0 +1,284 @@
+id: TC-FILE-OPEN-025
+title: Mermaid selection controls, distinct download formats and editable sequence/path exports (browser)
+description: Repeat actual CodeMirror selections and view changes without adding import controls. Download the reported Chinese
+  agent sequence and all four diagrams; independently parse XML for editable ungrouped cells, connected messages, activation/loop/numbering,
+  straight/stepped/curved paths and viewer transforms. Native additionally validates real chooser and host bytes. Curved edges
+  use compact native draw.io connector controls; independent saved-artifact checks reject dense SVG sample handles.
+modes:
+- browser
+covers:
+- F-FILEOPEN-1
+- F-EXPLORER-1
+tags:
+- p0
+- markdown
+- drawio
+- regression
+fixtures:
+- reset_db
+- markdown_drawio
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-mermaid-regression
+- reload_window: null
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-file-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Control+l
+    macos_key: Meta+l
+- fill:
+    selector: '[data-testid="explorer-address"]'
+    value: ${fixture.file_open_root}
+- press:
+    selector: '[data-testid="explorer-address"]'
+    key: Enter
+- dblclick: '[data-testid="explorer-file-row"][data-name="mermaid-regressions.md"]'
+- wait_for: '[data-testid="markdown-editor"]'
+- click: '[data-testid="markdown-mode-source"]'
+- press:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    key: Control+Home
+    macos_key: Meta+ArrowUp
+- assert_count:
+    selector: '[data-testid="markdown-import-drawio"]'
+    equal: 1
+- press:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    key: Shift+ArrowRight
+- assert_count:
+    selector: '[data-testid="markdown-import-drawio"]'
+    equal: 1
+- press:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    key: Control+End
+    macos_key: Meta+ArrowDown
+- assert_count:
+    selector: '[data-testid="markdown-import-drawio"]'
+    equal: 1
+- press:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    key: Shift+ArrowLeft
+- assert_count:
+    selector: '[data-testid="markdown-import-drawio"]'
+    equal: 1
+- press:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    key: Control+Home
+    macos_key: Meta+ArrowUp
+- assert_count:
+    selector: '[data-testid="markdown-import-drawio"]'
+    equal: 1
+- press:
+    selector: '[data-testid="viewer-editor"] .cm-content'
+    key: Shift+ArrowDown
+- assert_count:
+    selector: '[data-testid="markdown-import-drawio"]'
+    equal: 1
+- assert_count:
+    selector: '[data-testid="markdown-export"]'
+    equal: 1
+- click: '[data-testid="markdown-mode-live"]'
+- click: '[data-testid="markdown-mode-split"]'
+- wait_for: '[data-testid="markdown-preview"] .fv-md-doc > .fv-md-mermaid:nth-child(2) svg'
+- assert_count:
+    selector: '[data-testid="markdown-import-drawio"]'
+    equal: 1
+- dblclick: '[data-testid="markdown-preview"] .fv-md-doc > .fv-md-mermaid:nth-child(2)'
+- wait_for: '[data-testid="markdown-diagram-viewer"]'
+- assert_text:
+    selector: '[data-testid="markdown-diagram-view-save-svg"]'
+    contains: SVG
+- assert_text:
+    selector: '[data-testid="markdown-diagram-view-save-png"]'
+    contains: PNG
+- assert_text:
+    selector: '[data-testid="markdown-diagram-view-save-drawio"]'
+    contains: draw.io
+- eval_readonly:
+    expression: document.querySelector(".fv-md-diagram-save .lucide-file-code-2") !== null && document.querySelector(".fv-md-diagram-save
+      .lucide-file-image") !== null && document.querySelector(".fv-md-diagram-save .lucide-workflow") !== null
+    expect_truthy: true
+- screenshot: mermaid-viewer-download-formats.png
+- assert_download:
+    trigger: '[data-testid="markdown-diagram-view-save-svg"]'
+    filename: mermaid-regressions-diagram-1.svg
+    contains:
+    - <svg
+- assert_download:
+    trigger: '[data-testid="markdown-diagram-view-save-png"]'
+    filename: mermaid-regressions-diagram-1.png
+- click: '[data-testid="markdown-diagram-view-rotate-right"]'
+- click: '[data-testid="markdown-diagram-view-flip-h"]'
+- assert_download:
+    trigger: '[data-testid="markdown-diagram-view-save-drawio"]'
+    filename: mermaid-regressions-diagram-1.drawio
+    contains:
+    - sequence-message
+    - rotation=90;flipH=1;
+    artifact: drawio
+- click: '[data-testid="markdown-diagram-close"]'
+- click: '[data-testid="markdown-export"]'
+- click: '[data-testid="markdown-export-drawio"]'
+- wait_for: '[data-testid="markdown-drawio-export-settings"]'
+- select_option:
+    selector: '[data-testid="markdown-drawio-scope"]'
+    value: images
+- assert_download:
+    trigger: '[data-testid="markdown-drawio-save"]'
+    filename: mermaid-regressions.drawio
+    contains:
+    - sequence-message
+    - curved=0;
+    - curved=1;
+    artifact: drawio
+- wait_for: '[data-testid="markdown-export-status"][data-export-state="saved"]'
+- eval_readonly:
+    expression: /(?:4.*editable diagrams|4.*可编辑图表).*0.*SVG/.test(document.querySelector(".fv-md-export-notice").textContent)
+    expect_truthy: true
+- assert_count:
+    selector: '[data-testid="markdown-import-drawio"]'
+    equal: 1
+- assert_no_runtime_errors: null
+- screenshot: mermaid-independent-editable-exports.png
+verification:
+  review: reviewed
+  requirements:
+  - id: MERMAID-REGRESSIONS
+    requirement: Unique controls, visible format distinctions and independent editable diagram elements retain the rendered
+      line type and source. Curved connectors retain a bounded native control polygon.
+    actions:
+    - 4
+    - 5
+    - 7
+    - 8
+    - 9
+    - 10
+    - 12
+    - 13
+    - 15
+    - 17
+    - 19
+    - 21
+    - 23
+    - 26
+    - 27
+    - 30
+    - 39
+    - 40
+    - 42
+    - 43
+    - 44
+    - 46
+    results:
+    - 6
+    - 11
+    - 14
+    - 16
+    - 18
+    - 20
+    - 22
+    - 24
+    - 25
+    - 28
+    - 29
+    - 31
+    - 32
+    - 33
+    - 34
+    - 35
+    - 37
+    - 38
+    - 41
+    - 45
+    - 47
+    - 48
+    - 49
+    - 50
+    - 51
+    checkpoints:
+    - step: 6
+      expectation: 'wait_for: match the explicit count, visible control, saved XML or independent artifact assertions; preserve
+        the original Markdown.'
+    - step: 11
+      expectation: 'wait_for: match the explicit count, visible control, saved XML or independent artifact assertions; preserve
+        the original Markdown.'
+    - step: 14
+      expectation: 'assert_count: match the explicit count, visible control, saved XML or independent artifact assertions;
+        preserve the original Markdown.'
+    - step: 16
+      expectation: 'assert_count: match the explicit count, visible control, saved XML or independent artifact assertions;
+        preserve the original Markdown.'
+    - step: 18
+      expectation: 'assert_count: match the explicit count, visible control, saved XML or independent artifact assertions;
+        preserve the original Markdown.'
+    - step: 20
+      expectation: 'assert_count: match the explicit count, visible control, saved XML or independent artifact assertions;
+        preserve the original Markdown.'
+    - step: 22
+      expectation: 'assert_count: match the explicit count, visible control, saved XML or independent artifact assertions;
+        preserve the original Markdown.'
+    - step: 24
+      expectation: 'assert_count: match the explicit count, visible control, saved XML or independent artifact assertions;
+        preserve the original Markdown.'
+    - step: 25
+      expectation: 'assert_count: match the explicit count, visible control, saved XML or independent artifact assertions;
+        preserve the original Markdown.'
+    - step: 28
+      expectation: 'wait_for: match the explicit count, visible control, saved XML or independent artifact assertions; preserve
+        the original Markdown.'
+    - step: 29
+      expectation: 'assert_count: match the explicit count, visible control, saved XML or independent artifact assertions;
+        preserve the original Markdown.'
+    - step: 31
+      expectation: 'wait_for: match the explicit count, visible control, saved XML or independent artifact assertions; preserve
+        the original Markdown.'
+    - step: 32
+      expectation: 'assert_text: match the explicit count, visible control, saved XML or independent artifact assertions;
+        preserve the original Markdown.'
+    - step: 33
+      expectation: 'assert_text: match the explicit count, visible control, saved XML or independent artifact assertions;
+        preserve the original Markdown.'
+    - step: 34
+      expectation: 'assert_text: match the explicit count, visible control, saved XML or independent artifact assertions;
+        preserve the original Markdown.'
+    - step: 35
+      expectation: 'eval_readonly: match the explicit count, visible control, saved XML or independent artifact assertions;
+        preserve the original Markdown.'
+    - step: 37
+      expectation: 'assert_download: match the explicit count, visible control, saved XML or independent artifact assertions;
+        preserve the original Markdown.'
+    - step: 38
+      expectation: 'assert_download: match the explicit count, visible control, saved XML or independent artifact assertions;
+        preserve the original Markdown.'
+    - step: 41
+      expectation: 'assert_download: match the explicit count, visible control, saved XML or independent artifact assertions;
+        preserve the original Markdown.'
+    - step: 45
+      expectation: 'wait_for: match the explicit count, visible control, saved XML or independent artifact assertions; preserve
+        the original Markdown.'
+    - step: 47
+      expectation: 'assert_download: match the explicit count, visible control, saved XML or independent artifact assertions;
+        preserve the original Markdown.'
+    - step: 48
+      expectation: 'wait_for: match the explicit count, visible control, saved XML or independent artifact assertions; preserve
+        the original Markdown.'
+    - step: 49
+      expectation: 'eval_readonly: match the explicit count, visible control, saved XML or independent artifact assertions;
+        preserve the original Markdown.'
+    - step: 50
+      expectation: 'assert_count: match the explicit count, visible control, saved XML or independent artifact assertions;
+        preserve the original Markdown.'
+    - step: 51
+      expectation: 'assert_no_runtime_errors: match the explicit count, visible control, saved XML or independent artifact
+        assertions; preserve the original Markdown.'
+  native:
+  - check: Real draw.io save dialog and retained file bytes
+    method: not-applicable
+    reason: Native reads actual saved graph XML after Tauri dialogs; browser downloads establish renderer output only.
+  visual:
+  - check: Different SVG/PNG/draw.io icons and visible format names
+    method: manual
+    reason: Review mermaid-viewer-download-formats.png; structural checks do not establish legibility.

@@ -1,0 +1,22 @@
+<mxfile host="Desktop" type="device">
+  <diagram id="workflow" name="Service review">
+    <mxGraphModel>
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+        <mxCell id="lane" parent="1" vertex="1" value="Triage" style="swimlane;html=1;horizontal=0;startSize=28;fontStyle=1;strokeColor=default;">
+          <mxGeometry x="20" y="20" width="440" height="250" as="geometry"/>
+        </mxCell>
+        <mxCell id="request" parent="lane" vertex="1" value="&lt;b&gt;Check request&lt;/b&gt;&lt;br&gt;Confirm details" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;">
+          <mxGeometry x="52" y="35" width="132" height="64" as="geometry"/>
+        </mxCell>
+        <mxCell id="done" parent="lane" vertex="1" value="Verified" style="ellipse;html=1;aspect=fixed;whiteSpace=wrap;strokeColor=default;">
+          <mxGeometry x="295" y="137" width="62" height="62" as="geometry"/>
+        </mxCell>
+        <mxCell id="route" parent="lane" edge="1" source="request" target="done" style="shape=link;html=1;edgeStyle=orthogonalEdgeStyle;orthogonalLoop=1;jettySize=auto;rounded=1;strokeColor=default;">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

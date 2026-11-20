@@ -57,6 +57,24 @@ def raster(ctx: StepContext, args: Any) -> None:
     browser(ctx, args)
 
 
+@verb("assert_drawio_preview")
+def drawio_preview(ctx: StepContext, args: Any) -> None:
+    from ..drawio_roundtrip import assert_preview
+    assert_preview(ctx, args)
+
+
+@verb("assert_drawio_roundtrip")
+def drawio_roundtrip(ctx: StepContext, args: Any) -> None:
+    from ..drawio_roundtrip import assert_export
+    assert_export(ctx, args)
+
+
+@verb("control_wheel")
+def control_wheel(ctx: StepContext, args: Any) -> None:
+    from ..control_wheel import browser
+    browser(ctx, args)
+
+
 @verb("show_explorer_preview")
 def show_preview(ctx: StepContext, args: Any) -> None:
     from ..explorer_preview_visibility import browser

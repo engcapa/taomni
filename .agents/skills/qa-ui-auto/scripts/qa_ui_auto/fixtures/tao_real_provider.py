@@ -14,15 +14,22 @@ from pathlib import Path
 from native_build import QA_APP_ID
 from tauri_webdriver import native_isolation_env
 
+PROVIDERS = {
+    "opencode-go": ("OPENCODE", "https://opencode.ai/zen/go/v1", "deepseek-v4.1-flash", "opencode-go"),
+    "deepseek-app": ("DEEPSEEK", "https://api.deepseek.com", "deepseek-flash", "deepseek-messages"),
+    "agnes": ("AGNES", "https://apihub.agnes-ai.com/v1", "agnes-2.5-pro-beta", "openai-compat"),
+}
+
 
 def setup(ctx):
     if ctx.cfg["app"]["mode"] != "native":
         from . import FixtureSkip
         raise FixtureSkip("tao_real_provider requires native mode")
     provider_id = os.environ.get("TAOMNI_QA_TAO_PROVIDER", "opencode-go" if os.environ.get("TAOMNI_QA_OPENCODE_KEY") or os.environ.get("TAOMNI_QA_OPENCODE_KEY_FILE") else "deepseek-app")
-    if provider_id not in {"deepseek-app", "opencode-go"}:
+    if provider_id not in PROVIDERS:
         raise ValueError("Unsupported real Tao provider")
-    key_env = "TAOMNI_QA_OPENCODE_KEY" if provider_id == "opencode-go" else "TAOMNI_QA_DEEPSEEK_KEY"
+    env_name, base_url, model, runtime = PROVIDERS[provider_id]
+    key_env = "TAOMNI_QA_" + env_name + "_KEY"
     key = os.environ.get(key_env, "").strip()
     key_file = os.environ.get(key_env + "_FILE", "").strip()
     if not key and key_file:
@@ -37,13 +44,12 @@ def setup(ctx):
     root /= "taomni"
     root.mkdir(parents=True, exist_ok=True)
     proxy_url = os.environ.get("TAOMNI_QA_TAO_PROXY", os.environ.get("TAOMNI_QA_DEEPSEEK_PROXY", "")).strip()
-    model = "deepseek-v4.1-flash" if provider_id == "opencode-go" else "deepseek-flash"
     provider = {
-        "base_url": "https://opencode.ai/zen/go/v1" if provider_id == "opencode-go" else "https://api.deepseek.com",
+        "base_url": base_url,
         "api_key": key,
         "api_keys": [],
         "model": model,
-        "runtime": "opencode-go" if provider_id == "opencode-go" else "deepseek-messages",
+        "runtime": runtime,
         "proxy_mode": "manual" if proxy_url else "none",
         "proxy_url": proxy_url or None,
         "capabilities": {"chat": True, "image_generation": False, "video_generation": False},
@@ -65,7 +71,12 @@ def setup(ctx):
     config_path.write_text(json.dumps(config), encoding="utf-8")
     (ctx.case_dir / "real-provider-status.txt").write_text("request_prepared\n", encoding="utf-8")
     ctx.values["tao_real_provider_status"] = str(ctx.case_dir / "real-provider-status.txt")
-    (ctx.case_dir / "real-provider-config.json").write_text(json.dumps({"provider":provider_id,"model":model,"reasoningEffort":"max" if provider_id == "opencode-go" else "high","tokenBudget":50_000_000 if provider_id == "opencode-go" else 2_000_000}), encoding="utf-8")
+    (ctx.case_dir / "real-provider-config.json").write_text(json.dumps({
+        "provider": provider_id, "model": model, "baseUrl": base_url,
+        "proxyMode": provider["proxy_mode"],
+        "reasoningEffort": "max" if provider_id == "opencode-go" else "high",
+        "tokenBudget": 50_000_000 if provider_id == "opencode-go" else 2_000_000,
+    }), encoding="utf-8")
 
 
 def teardown(ctx):

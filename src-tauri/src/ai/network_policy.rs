@@ -11,11 +11,10 @@ pub fn is_local_url(url: &str) -> bool {
         return true; // empty/in-process counts as local
     }
     if let Ok(parsed) = url::Url::parse(url) {
-        match parsed.host_str() {
-            Some("localhost") => true,
-            Some(h) if h.starts_with("127.") => true,
-            Some("::1") => true,
-            Some("[::1]") => true,
+        match parsed.host() {
+            Some(url::Host::Domain("localhost")) => true,
+            Some(url::Host::Ipv4(address)) => address.is_loopback(),
+            Some(url::Host::Ipv6(address)) => address.is_loopback(),
             _ => false,
         }
     } else {

@@ -90,7 +90,10 @@ impl Reply {
                 }
                 let block = frame["content_block"].clone();
                 if block["type"] == "server_tool_use" {
-                    if block["name"] == "deepseek_web_search" {
+                    if matches!(
+                        block["name"].as_str(),
+                        Some("deepseek_web_search" | "web_search")
+                    ) {
                         self.search_calls += 1;
                     }
                     if block["name"] == "deepseek_read_url" {

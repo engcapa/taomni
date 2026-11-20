@@ -1,0 +1,55 @@
+.taomni-select-trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-width: 0;
+  min-height: 26px;
+  padding: 2px 7px;
+  background: var(--taomni-input-bg);
+  color: var(--taomni-text);
+  border: 1px solid var(--taomni-input-border);
+  border-radius: 5px;
+  cursor: pointer;
+  font: inherit;
+}
+.taomni-select-trigger > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.taomni-select-trigger svg, .taomni-select-options svg { width: 13px; height: 13px; flex: none; }
+.taomni-select-trigger:disabled { opacity: .45; cursor: default; }
+.taomni-select-trigger:focus-visible {
+  outline: 2px solid var(--taomni-accent);
+  outline-offset: 1px;
+}
+.taomni-select-options {
+  position: fixed;
+  z-index: 1250;
+  max-width: calc(100vw - 16px);
+  overflow: auto;
+  color-scheme: var(--taomni-color-scheme, light);
+  background: var(--taomni-card-bg);
+  color: var(--taomni-text);
+  border: 1px solid var(--taomni-card-border);
+  box-shadow: 0 8px 22px rgb(0 0 0 / 24%);
+  border-radius: 7px;
+  padding: 4px;
+  font-size: var(--taomni-ui-font-size, 12px);
+}
+.taomni-select-options button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  min-height: 25px;
+  padding: 3px 7px;
+  text-align: left;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.taomni-select-options button:disabled { opacity: .5; cursor: default; }
+.taomni-select-options button[aria-selected="true"] { color: var(--taomni-accent); }
+.taomni-select-options button[data-highlighted],
+.taomni-select-options button:hover:not(:disabled) { background: var(--taomni-hover); }

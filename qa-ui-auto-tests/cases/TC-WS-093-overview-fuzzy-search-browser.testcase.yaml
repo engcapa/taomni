@@ -17,14 +17,14 @@ steps:
     value: ${fixture.platform_workspace_root}
 - click: '[data-testid="workspace-fs-modal-confirm"]'
 - click: '[data-testid="code-workspace-tree-root"]'
-- dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
-- wait_for: '[data-testid="workspace-file-editor"] .cm-content'
-- fill:
-    selector: '[data-testid="workspace-file-editor"] .cm-content'
-    value: OverviewUniqueDraft
 - click: '[data-testid="code-workspace-tree-dir"][data-path="src"] [data-testid="code-workspace-tree-dir-arrow"]'
 - dblclick: '[data-testid="code-workspace-tree-file"][data-path="src/index.ts"]'
 - wait_for: '[data-testid="workspace-file-editor"][data-path="src/index.ts"]'
+- fill:
+    selector: '[data-testid="workspace-file-editor"][data-path="src/index.ts"] .cm-content'
+    value: OverviewUniqueDraft
+- dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
+- wait_for: '[data-testid="markdown-editor"]'
 - click: '[data-testid="tab-overview-trigger"]'
 - wait_for: '[data-testid="tab-overview"][data-scope="workspaces"]'
 - eval_readonly:
@@ -88,9 +88,9 @@ steps:
     selector: '[data-testid="tab-overview-card"]'
     equal: 1
 - click: '[data-testid="tab-overview-card"]'
-- wait_for: '[data-testid="workspace-file-editor"][data-path="README.md"][data-dirty="true"]'
+- wait_for: '[data-testid="workspace-file-editor"][data-path="src/index.ts"][data-dirty="true"]'
 - assert_text_equals:
-    selector: '[data-testid="workspace-file-editor"] .cm-content'
+    selector: '[data-testid="workspace-file-editor"][data-path="src/index.ts"] .cm-content'
     equals: OverviewUniqueDraft
 - click: '[data-testid="side-tab-tools"]'
 - click: '[data-testid="tab-overview-trigger"]'
@@ -117,7 +117,7 @@ verification:
   requirements:
   - id: R1
     requirement: Workspace Overview searches fuzzy titles, paths and the existing dirty document; no-result clear restores the exact original card collection.
-    actions: [3, 4, 5, 6, 7, 8, 9, 11, 12, 13, 15, 18, 21, 24, 27, 30, 32]
+    actions: [3, 4, 5, 6, 7, 8, 9, 10, 12, 13, 15, 18, 21, 24, 27, 30, 32]
     checkpoints:
     - step: 17
       expectation: Search receives focus when opening Overview.
@@ -155,7 +155,7 @@ verification:
     - step: 41
       expectation: Home fuzzy search finds the original dirty document once.
     - step: 43
-      expectation: Selecting the card restores the dirty README document.
+      expectation: Selecting the card restores the dirty TypeScript document.
     - step: 44
       expectation: Exact unsaved text is retained.
     - step: 47

@@ -35,6 +35,11 @@ def register(register_verb: RegisterVerb, verbs: dict[str, NativeVerb]) -> None:
     from .native_paste import run as native_paste
     from .export_quality import native as assert_export_quality
     register_verb("assert_export_quality")(assert_export_quality)
+    from .drawio_roundtrip import assert_preview, assert_export
+    register_verb("assert_drawio_preview")(assert_preview)
+    register_verb("assert_drawio_roundtrip")(assert_export)
+    from .control_wheel import native as control_wheel
+    register_verb("control_wheel")(control_wheel)
     from .markdown_export_observation import run as assert_markdown_artifact
     from .terminal_file_link import native as terminal_file_link
     from .html_preview_observation import native_click, native_observe

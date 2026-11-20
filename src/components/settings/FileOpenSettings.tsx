@@ -141,6 +141,17 @@ export function FileOpenSettings() {
         <label htmlFor="file-open-image-template">{label("文件名模板", "File name template")}</label>
         <div><input id="file-open-image-template" data-testid="file-open-image-template" className="taomni-input h-8 w-full max-w-sm font-mono" value={imageTemplate} onChange={(event) => { const value = event.target.value; setImageTemplate(value); if (value.trim()) update({ markdownImageTemplate: value }); }} onBlur={() => { if (!imageTemplate.trim()) setImageTemplate(preferences.markdownImageTemplate); }} /><p className="mt-1 text-[var(--taomni-text-muted)]">{label("文件名模板 image-{日期}-{时间}.png", "Template image-{date}-{time}.png")}</p></div>
         <span>{label("图片链接", "Image links")}</span><span>{label("相对路径（推荐）", "Relative paths (recommended)")}</span>
+        <label htmlFor="file-open-markdown-restrict-remote">{label("远程图片", "Remote images")}</label>
+        <label className="flex items-center gap-2"><input type="checkbox" id="file-open-markdown-restrict-remote" data-testid="file-open-markdown-restrict-remote" checked={preferences.markdownRestrictRemoteImages} onChange={(event) => update({ markdownRestrictRemoteImages: event.target.checked })} />{label("限制预览和导出访问远程图片", "Block remote images in preview and export")}</label>
+        {!preferences.markdownRestrictRemoteImages && <>
+          <label htmlFor="markdown-image-proxy-mode">{label("远程图片代理", "Remote image proxy")}</label>
+          <select id="markdown-image-proxy-mode" data-testid="markdown-image-proxy-mode" className="taomni-input h-8 w-full max-w-sm" value={preferences.markdownProxyMode} onChange={(event) => update({ markdownProxyMode: event.target.value as "app" | "custom" | "none" })}>
+            <option value="app">{label("使用应用代理（默认）", "Application proxy (default)")}</option>
+            <option value="custom">{label("使用独立代理", "Independent proxy")}</option>
+            <option value="none">{label("不使用代理（绕过系统代理）", "No proxy (bypass system/environment)")}</option>
+          </select>
+          {preferences.markdownProxyMode === "custom" && <div className="col-span-2" data-testid="markdown-image-custom-proxy-panel"><AppProxyPanel value={preferences.markdownCustomProxy} onSave={async (config) => update({ markdownCustomProxy: config })} /></div>}
+        </>}
         <span>{label("粘贴网页/Excel 表格", "Paste web/Excel tables")}</span>
         <label className="flex items-center gap-2"><input type="checkbox" data-testid="file-open-convert-tables" checked={preferences.convertTables} onChange={(event) => update({ convertTables: event.target.checked })} />{label("自动转为 Markdown 表格", "Convert to Markdown tables automatically")}</label>
       </div>

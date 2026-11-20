@@ -2,9 +2,7 @@
 .fv-bar.fv-md-toolbar{position:relative;flex-wrap:wrap;overflow:visible;gap:4px}
 .fv-md-format{display:flex;align-items:center;gap:1px;flex-wrap:wrap;min-width:0;overflow:visible}
 .fv-md-format .fv-icon-button{flex:none}
-.fv-md-heading-select{position:relative;min-width:74px;flex:none;padding:0 5px!important}
-.fv-md-heading-select select{appearance:none;background:transparent;color:inherit;border:0;outline:0;padding:0 16px 0 4px;width:100%;height:26px;font-size:12px;cursor:pointer}
-.fv-md-heading-select>svg{position:absolute;right:5px;pointer-events:none;width:12px!important}
+.fv-md-heading-select{min-width:74px;flex:none}
 .fv-md-toolbar .fv-seg{flex:none;white-space:nowrap}
 .fv-md-wrap{flex:1;min-height:0;min-width:0;display:flex}
 .fv-md-outline{width:210px;border-right:1px solid var(--divider);background:var(--panel);overflow:auto;padding:8px 6px;flex:none}
@@ -26,10 +24,27 @@
 .fv-selection-active .cm-activeLine,.fv-selection-active .cm-activeLineGutter{background-color:transparent!important}
 .fv-md-preview-pane{background:var(--bg);color:var(--text)}
 .fv-md-preview-pane{min-width:0;min-height:0;overflow:auto;border-left:1px solid var(--divider);position:relative}
+.fv-md-editor-pane,.fv-md-preview-pane{zoom:var(--fv-md-zoom,1)}
 .fv-md-doc{max-width:800px;margin:0 auto;padding:30px clamp(16px,4.5%,44px) 120px;font-size:15px;line-height:1.75;color:var(--text);position:relative}
 .fv-md-live-surface .cm-content{font-family:var(--taomni-font-sans,Inter,system-ui,-apple-system,"Segoe UI",sans-serif)!important}
 .fv-md-live-surface .cm-scroller{font-size:15px}
 .fv-md-live-surface .cm-line{white-space:pre-wrap;overflow-wrap:anywhere}
+.fv-md-syntax-marker{color:var(--taomni-code-syntax-punctuation,var(--text))}
+.fv-markdown .cm-workspace-search-row{flex-wrap:wrap}
+.fv-markdown .cm-workspace-search-field{flex-basis:min(260px, 100%)}
+::highlight(markdown-find-match){background:#ffe28a;color:#241800}
+::highlight(markdown-find-current){background:#fca65d;color:#2b1400}
+
+.fv-markdown[data-mode="live"][data-editing="false"] .cm-content {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
+.fv-markdown[data-mode="live"][data-editing="false"] .cm-content::selection,
+.fv-markdown[data-mode="live"][data-editing="false"] .cm-content *::selection {
+  background-color: var(--text);
+  color: var(--bg);
+}
 /* CM's break-spaces belongs to editable source, not marked's HTML formatting
    newlines. Otherwise each serializer newline adds a full 26.25px blank line. */
 .fv-md-rendered-block,.fv-md-table-wrap,.fv-md-image{white-space:normal}
@@ -93,7 +108,7 @@
 .fv-md-focus .fv-md-rendered-block:hover,.fv-md-focus .fv-md-table-wrap:focus-within,.fv-md-focus .fv-md-image:focus-within{opacity:1}
 .fv-md-insert-menu{position:absolute;left:44px;bottom:28px;z-index:20;min-width:200px}
 .fv-md-export-control{position:relative;flex:none}
-.fv-md-export-menu{min-width:min(270px,calc(100vw - 16px));max-width:calc(100vw - 16px);max-height:calc(100vh - 16px);overflow:auto;z-index:1100}
+.fv-menu.fv-md-export-menu{min-width:min(270px,calc(100vw - 16px));max-width:calc(100vw - 16px);max-height:calc(100vh - 16px);overflow:auto;z-index:1130}
 .fv-md-export-menu>button,.fv-md-insert-menu>button{display:flex;align-items:center;text-align:left;gap:8px;width:100%;padding:6px 10px;font-size:12px;border-radius:5px;white-space:nowrap}
 .fv-md-export-menu>button:hover,.fv-md-export-menu>button:focus,.fv-md-insert-menu>button:hover,.fv-md-insert-menu>button:focus{background:var(--hover);outline:none}
 .fv-md-export-menu svg,.fv-md-insert-menu svg{width:15px;height:15px;flex:none}
@@ -104,7 +119,7 @@
 .fv-md-export-fields{padding:4px 0 10px}
 .fv-md-field{display:flex;align-items:center;gap:10px;margin:14px 0;flex-wrap:wrap;font-size:12px}
 .fv-md-field>span:first-child{width:64px;flex:none;color:var(--muted)}
-.fv-md-field .fv-select{min-width:82px}
+.fv-md-field .taomni-select-trigger{min-width:82px}
 .fv-md-setting-check{display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
 .fv-md-setting-check input{accent-color:var(--accent-s);width:14px;height:14px}
 .fv-md-export-hint{font-size:12px;line-height:1.7;color:var(--muted);border:1px dashed var(--divider);background:var(--hover);border-radius:6px;padding:8px 10px}

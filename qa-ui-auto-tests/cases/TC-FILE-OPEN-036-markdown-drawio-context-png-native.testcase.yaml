@@ -1,0 +1,73 @@
+id: TC-FILE-OPEN-036
+title: Native Markdown draw.io context menu saves a high-resolution PNG
+covers: [F-FILEOPEN-1, F-EXPLORER-1]
+modes: [native]
+tags: [p1, markdown, drawio, regression]
+fixtures: [reset_db, markdown_drawio_roundtrip]
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-drawio-native-png
+- reload_window: null
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-file-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Control+l
+    macos_key: Meta+l
+- fill:
+    selector: '[data-testid="explorer-address"]'
+    value: ${fixture.platform_workspace_root}
+- press:
+    selector: '[data-testid="explorer-address"]'
+    key: Enter
+- dblclick: '[data-testid="explorer-file-row"][data-name="drawio-actions.md"]'
+- wait_for:
+    selector: '[data-testid="markdown-live"] .fv-md-drawio svg foreignObject b'
+    timeout_sec: 30
+- right_click: .fv-md-drawio
+- native_file_dialog:
+    kind: save
+    action: choose
+    path: ${fixture.drawio_context_png}
+    trigger: '[data-testid="markdown-diagram-menu-save-png"]'
+- assert_text:
+    selector: '[data-testid="markdown-diagram-status"]'
+    contains: Image saved
+- assert_export_quality:
+    path: ${fixture.drawio_context_png}
+    kind: drawio-png
+- eval_readonly:
+    expression: >
+      document.querySelector('iframe[data-drawio-renderer]').contentDocument === null &&
+      document.querySelector('iframe[data-drawio-renderer]').getAttribute('sandbox') === 'allow-scripts' &&
+      (!/mac/i.test(navigator.platform) || /^http:\/\/127\.0\.0\.1:\d+\/_drawio-renderer\//.test(document.querySelector('iframe[data-drawio-renderer]').src))
+    expect_truthy: true
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: DRAWIO-NATIVE-PNG
+    requirement: The draw.io context menu saves a high-resolution PNG from the packaged WebView.
+    actions: [10, 12, 13]
+    checkpoints:
+    - step: 11
+      expectation: Live browse renders the rich draw.io label.
+    - step: 14
+      expectation: The viewer reports that the native save completed.
+    - step: 15
+      expectation: Independently decode the saved PNG and verify its dimensions, node color and label pixels.
+    - step: 16
+      expectation: The draw.io renderer runs in an opaque sandbox and uses the local HTTP document in WKWebView.
+    - step: 17
+      expectation: No runtime errors were recorded.
+    results: [11, 14, 15, 16, 17]
+  native:
+  - check: Native PNG save and disk artifact.
+    method: automated
+    reason: Use the native chooser and independently decode the saved image.
+  visual:
+  - check: High-resolution PNG preserves the node and label.
+    method: automated
+    reason: Verify actual color pixels in the exported image.

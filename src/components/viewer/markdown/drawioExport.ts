@@ -2,7 +2,9 @@ import { bytesDataUrl } from "../../../lib/markdownAssets";
 import { drawioCell, drawioElement, drawioFile, newDrawioPage, type DrawioPage } from "./drawioCodec";
 import { DEFAULT_DIAGRAM_VIEW, snapshotDiagram, type DiagramSnapshot, type DiagramTransform } from "./diagramModel";
 import { diagramSvg } from "./diagramExport";
+import { svgGeometry } from "./docxImages";
 import { mermaidDrawioCells } from "./drawioMermaid";
+import { readDrawioGraph } from "./drawioModel";
 import { renderedDrawioPage } from "./drawioRender";
 
 export interface DrawioExportOptions { scope: "document" | "images"; layout: "separate" | "single" }
@@ -20,10 +22,40 @@ async function svgImageCell(page: DrawioPage, image: DiagramSnapshot, transform:
 }
 
 export async function singleDiagramDrawio(image: DiagramSnapshot, transform: DiagramTransform = DEFAULT_DIAGRAM_VIEW): Promise<DrawioExportDocument> {
+  if (image.kind === "drawio") return { xml: image.source, pages: 1, nativeDiagrams: 1, fallbackDiagrams: 0 };
   const page = newDrawioPage("diagram-1", image.filename);
   const converted = await mermaidDrawioCells(page, image, transform, "mermaid", 40, 40);
   if (!converted) await svgImageCell(page, image, transform, "mermaid", 40, 40);
   return { xml: drawioFile([page]), pages: 1, nativeDiagrams: Number(converted), fallbackDiagrams: Number(!converted) };
+}
+
+function appendImportedDiagram(page: DrawioPage, imported: DrawioPage, group: string, y: number, width: number, height: number) {
+  const { rootId, layerIds, cells } = readDrawioGraph(imported.model);
+  const layerSet = new Set(layerIds);
+  const root = page.model.querySelector("root")!;
+  const mapped = new Map(Array.from(cells.keys(), (id) => [id, `${group}-${id}`]));
+  mapped.set(rootId, group);
+  const onlyLayer = layerIds.length === 1 ? layerIds[0] : undefined;
+  if (onlyLayer && cells.get(onlyLayer)?.cell.getAttribute("visible") !== "0") mapped.set(onlyLayer, group);
+  drawioCell(page, { id: group, vertex: 1, value: "", style: "group;" }, { x: 40, y, width, height });
+  for (const [id, { element, cell }] of cells) {
+    const mappedId = mapped.get(id)!;
+    if (mappedId === group) continue;
+    if (layerSet.has(id)) {
+      drawioCell(page, { id: mappedId, parent: group, vertex: 1, value: cell.getAttribute("value") || "",
+        style: "group;noLabel=1;", visible: cell.getAttribute("visible") || "1" }, { width, height });
+    } else {
+      const copy = root.ownerDocument.importNode(element, true);
+      const inner = element === cell ? copy : Array.from(copy.children).find((child) => child.tagName === "mxCell")!;
+      copy.setAttribute("id", mappedId);
+      if (copy !== inner) inner.removeAttribute("id");
+      for (const key of ["parent", "source", "target"]) {
+        const reference = inner.getAttribute(key);
+        if (reference) inner.setAttribute(key, mapped.get(reference) ?? `${group}-${reference}`);
+      }
+      root.append(copy);
+    }
+  }
 }
 
 /** Text stays as editable HTML text cells. Each table cell has independent
@@ -65,31 +97,19 @@ export async function markdownDrawio(root: HTMLElement, title: string, options: 
     const imported = renderedDrawioPage(element);
     const name = imported?.name || (element instanceof HTMLImageElement ? element.alt || `Image ${number}` : `Mermaid ${number}`);
     const separate = options.layout === "separate";
-    const page = separate ? newDrawioPage(`image-${number}`, `${number} · ${name}`.slice(0, 100)) : main;
+    const id = `image-${number}`;
+    const title = `${number} · ${name}`.slice(0, 100);
+    const page = !separate ? main : imported ? { ...imported, id, name: title } : newDrawioPage(id, title);
     const y = separate ? 40 : cursor;
     let height: number;
     if (imported) {
-      const width = Number(element.querySelector("svg")?.getAttribute("width")) || 800;
-      height = Number(element.querySelector("svg")?.getAttribute("height")) || 600;
-      const group = `import-${number}`;
-      drawioCell(page, { id: group, vertex: 1, value: "", style: "group;" }, { x: 40, y, width, height });
-      const oldRoot = imported.model.querySelector("root")!;
-      for (const source of Array.from(oldRoot.children)) {
-        const cell = source.tagName === "mxCell" ? source : source.querySelector("mxCell");
-        const id = source.getAttribute("id") || cell?.getAttribute("id");
-        if (!cell || !id || id === "0" || id === "1") continue;
-        const copy = source.cloneNode(true) as Element;
-        copy.querySelectorAll("mxCell").forEach((node) => {
-          for (const key of ["id", "parent", "source", "target"]) {
-            const value = node.getAttribute(key);
-            if (value) node.setAttribute(key, value === "1" && key === "parent" ? group : `${group}-${value}`);
-          }
-        });
-        if (copy.tagName === "mxCell") for (const key of ["id", "parent", "source", "target"]) {
-          const value = copy.getAttribute(key); if (value) copy.setAttribute(key, value === "1" && key === "parent" ? group : `${group}-${value}`);
-        }
-        else copy.setAttribute("id", `${group}-${id}`);
-        page.model.querySelector("root")!.append(copy);
+      nativeDiagrams++;
+      height = 0;
+      if (!separate) {
+        const { width, height: diagramHeight } = svgGeometry(element.querySelector("svg")!);
+        height = diagramHeight;
+        const group = `import-${number}`;
+        appendImportedDiagram(page, imported, group, y, width, height);
       }
     } else if (element.classList.contains("fv-md-mermaid")) {
       const snapshot = snapshotDiagram(element, name);

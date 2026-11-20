@@ -90,3 +90,19 @@ describe("Git file actions", () => {
     expect(terminal?.terminalProfile).toBeDefined();
   });
 });
+
+it.each(["README.md", "diagram.svg", "photo.png", "page.html", "config.json", "src/main.ts"])("offers Tao opening for supported %s", (path) => {
+  const action = gitFileMenuItems([{ repoRoot: "/repo", path }])[0];
+  expect(action.label).toMatch(/Tao/);
+  expect(action.disabled).toBe(false);
+});
+
+it.each(["archive.zip", "report.pdf", "report.docx", "file.unknown"])("disables unsupported Tao opening for %s while keeping system reveal", async (path) => {
+  vi.mocked(openFile).mockClear();
+  const actions = gitFileMenuItems([{ repoRoot: "/repo", path }]);
+  expect(actions[0].disabled).toBe(true);
+  actions[0].onClick!();
+  await Promise.resolve();
+  expect(openFile).not.toHaveBeenCalled();
+  expect(actions.find((item) => item.testId === "git-file-reveal")?.disabled).toBe(false);
+});

@@ -1,4 +1,5 @@
 import { deflateSync, Inflate, strFromU8, strToU8 } from "fflate";
+import { readDrawioGraph } from "./drawioModel";
 
 export interface DrawioPage { id: string; name: string; model: Element }
 export const DRAWIO_MAX_BYTES = 20 * 1024 * 1024;
@@ -51,14 +52,8 @@ export function parseDrawio(input: string): DrawioPage[] {
     const model = page.tagName === "mxGraphModel" ? page : page.querySelector(":scope > mxGraphModel") ?? xmlDocument(decodeCompressed(page.textContent || "")).documentElement;
     expanded += serialize(model).length;
     cells += model.querySelectorAll("mxCell").length;
-    if (model.tagName !== "mxGraphModel" || !model.querySelector("root > mxCell[id='0']") || !model.querySelector("root > mxCell[id='1']")) throw new Error("Invalid draw.io graph model");
     if (cells > MAX_CELLS || expanded > DRAWIO_MAX_BYTES) throw new Error("draw.io document exceeds the safe import limit");
-    const cellIds = new Set<string>();
-    model.querySelectorAll("mxCell").forEach((cell) => {
-      const id = cell.getAttribute("id") || cell.parentElement?.getAttribute("id");
-      if (!id || cellIds.has(id)) throw new Error("draw.io contains missing or duplicate cell IDs");
-      cellIds.add(id);
-    });
+    readDrawioGraph(model);
     const id = page.getAttribute("id") || `sheet-${index + 1}`;
     if (ids.has(id)) throw new Error("draw.io contains duplicate sheet IDs");
     ids.add(id);

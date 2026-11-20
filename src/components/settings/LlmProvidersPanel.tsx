@@ -4,11 +4,12 @@ import { useAiStore, type AiConfig, type LlmProviderConfig, type LlmProviderGrou
 import { useVaultStore } from "../../stores/vaultStore";
 import { isVaultLockedError } from "../../lib/ipc";
 import { ensureVaultReady } from "../../lib/vaultGate";
-import { useT } from "../../lib/i18n";
+import { useLocale, useT } from "../../lib/i18n";
 import { ProviderRow } from "./LlmProviderRow";
 import { PROVIDER_LABELS, hasPlaintextVaultableKey } from "./llmProviderFields";
 import { TaoSettingsPanel } from "./TaoSettingsPanel";
 import { SettingsAnchor } from "./panel/search";
+import { customProviderDraft, customProviderError } from "../../stores/ai/customLlm";
 
 interface ProviderGroupRowProps {
   id: string;
@@ -65,7 +66,7 @@ function ProviderGroupRow({ id, group, providers, onChange, onRemove }: Provider
               checked={selected.has(providerId)}
               onChange={(e) => toggleProvider(providerId, e.target.checked)}
             />
-            <span className="truncate">{PROVIDER_LABELS[providerId] ?? providerId}</span>
+            <span className="truncate">{providers[providerId].custom?.label || PROVIDER_LABELS[providerId] || providerId}</span>
           </label>
         ))}
       </div>
@@ -74,9 +75,11 @@ function ProviderGroupRow({ id, group, providers, onChange, onRemove }: Provider
 }
 
 export function LlmProvidersPanel() {
-  const { config, loading, saving, testResults, loadConfig, saveConfig, updateLlmProvider, updateLlmProviderGroup, removeLlmProviderGroup, setActiveLlmProvider, testConnection } = useAiStore();
+  const { config, loading, saving, testResults, loadConfig, saveConfig, updateLlmProvider, removeCustomLlmProvider, updateLlmProviderGroup, removeLlmProviderGroup, setActiveLlmProvider, testConnection } = useAiStore();
   const vaultState = useVaultStore((s) => s.state);
   const t = useT();
+  const zh = useLocale().locale === "zh-CN";
+  const [newProviderId, setNewProviderId] = useState<string | null>(null);
   const [testingId, setTestingId] = useState<string | null>(null);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [saveOk, setSaveOk] = useState(false);
@@ -102,6 +105,8 @@ export function LlmProvidersPanel() {
     if (!config) return;
     const provider = config.llm.providers[id];
     if (!provider) return;
+    const error = customProviderError(provider, zh);
+    if (error) { setSaveError(error); return; }
     setTestingId(id);
     await testConnection(id, provider);
     setTestingId(null);
@@ -155,6 +160,14 @@ export function LlmProvidersPanel() {
   }
 
   const handleSave = async () => {
+    for (const provider of Object.values(config.llm.providers)) {
+      const error = customProviderError(provider, zh);
+      if (error) {
+        setSaveOk(false);
+        setSaveError(`${provider.custom?.label || (zh ? "自定义服务" : "Custom provider")} · ${error}`);
+        return;
+      }
+    }
     // Determine whether any provider carries a *plaintext* API key that would
     // need to be encrypted into the vault on save. (Keys already stored as a
     // `vault:<id>` reference, the local sidecar's literal "local", and
@@ -259,11 +272,20 @@ export function LlmProvidersPanel() {
 
       <SettingsAnchor id="ai-tao"><TaoSettingsPanel /></SettingsAnchor>
 
+      {!fullyDisabled && <button type="button" className="taomni-btn h-7 px-2 inline-flex items-center gap-1.5"
+        data-testid="llm-add-custom-provider" onClick={() => {
+          const id = `custom-${crypto.randomUUID()}`;
+          setNewProviderId(id);
+          updateLlmProvider(id, customProviderDraft(zh ? "自定义服务" : "Custom provider"));
+        }}><Plus size={14} />{zh ? "添加自定义服务" : "Add custom provider"}</button>}
+
       {!fullyDisabled && Object.entries(config.llm.providers).map(([id, provider]) => (
         <ProviderRow
           key={id}
           id={id}
           provider={provider}
+          startExpanded={id === newProviderId}
+          onRemove={provider.custom ? () => removeCustomLlmProvider(id) : undefined}
           isActive={config.llm.active === id}
           onActivate={() => setActiveLlmProvider(id)}
           onChange={(p) => updateLlmProvider(id, p)}

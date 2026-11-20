@@ -219,6 +219,30 @@
   flex-shrink: 0;
 }
 
+.welcome-restore-row {
+  border-color: var(--taomni-card-border);
+  background: var(--taomni-card-bg);
+}
+
+.tao-home-host .welcome-restore-row {
+  flex: none;
+  margin: 0;
+  border-width: 0 0 1px;
+  border-radius: 0;
+  padding: 5px 16px;
+}
+
+.tao-home-host .welcome-restore-row > button:first-child:enabled {
+  color: var(--taomni-text);
+  background: var(--taomni-selected);
+  border-color: var(--taomni-selected-border);
+  font-weight: 600;
+}
+
+.tao-home-host .welcome-restore-row > button:first-child:enabled:hover {
+  background: var(--taomni-hover);
+}
+
 .tao-home-usage-pill {
   white-space: nowrap;
 }

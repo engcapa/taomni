@@ -18,6 +18,7 @@ impl MessagesClient {
     pub async fn resolve_provider(state: &AppState, provider_id: &str) -> Result<Self, String> {
         let config = state.ai_ctx.read().await.config.clone();
         let provider = provider_config(&config, provider_id)?;
+        provider.validate_custom()?;
         let base_url = provider.base_url.trim_end_matches('/');
         let url =
             reqwest::Url::parse(base_url).map_err(|_| "configuration: invalid provider URL")?;
@@ -41,7 +42,8 @@ impl MessagesClient {
             .resolve(key)
             .map_err(|_| "vault_locked: unlock Vault to use the provider key")?
             .map(|key| key.to_string())
-            .unwrap_or_else(|| key.to_string());
+            .or_else(|| (!key.starts_with(crate::vault::VAULT_REF_PREFIX)).then(|| key.to_string()))
+            .ok_or("configuration: provider credential was not found")?;
         let proxy = {
             let db = state
                 .db
@@ -110,6 +112,7 @@ pub fn provider_config<'a>(
         || !matches!(
             provider.runtime.as_str(),
             "openai-compat"
+                | "openai-responses"
                 | "anthropic"
                 | "deepseek-messages"
                 | "opencode-go"
@@ -130,6 +133,15 @@ pub fn validate_request(
     provider: &crate::ai::config::LlmProviderConfig,
     request: &super::types::TaoRequest,
 ) -> Result<(), String> {
+    if let Some(model) = provider.custom_model(&request.model)? {
+        if request.thinking && !model.reasoning_efforts.contains(&request.reasoning_effort) {
+            return Err("configuration: choose a reasoning effort supported by this model".into());
+        }
+        if request.web && !model.native_search {
+            return Err("configuration: this model does not support native search".into());
+        }
+        return Ok(());
+    }
     if provider.runtime == "deepseek-messages"
         && !matches!(request.model.as_str(), "deepseek-flash" | "deepseek-v4-pro")
     {

@@ -4,7 +4,45 @@
 
 **结论：尚未全部完成。** 最近一批用户反馈已有实现和具名测试，但原设计还存在实现缺口、商业 provider 未执行项及完整 AC 未覆盖的边界。主表 39 个任务均保留早期未勾选状态，与后续追加回执没有逐项收敛；不能据此认为 39 项都未开发，也不能由某个测试批次通过推定全部任务完成。
 
-## 最新变化：macOS native 已补齐原缺失项
+## 2026-11-17 本轮覆盖说明
+
+用户随后优先要求修复 Markdown 导出和 Home 历史，并追加真实 OpenCode Agent 深测；本批进展与当前回执统一记录在 [verification-md-history-agent-2026-11-17.md](verification-md-history-agent-2026-11-17.md)。本页下面的版本、测试和商业请求状态均为 **11 月 16 日的历史审计基线**，不能替代新源码的验收。
+
+本轮已实际发起 OpenCode Go / `deepseek-v4.1-flash` / thinking=max 商业请求，图片数字与颜色、文档问答已有真实成功证据。R13 Python 与 TypeScript 工程均完成九轮真实模型调用，实际交付代码、运行测试、注入故障、模型修复和功能扩展；最终分别 16/15 项测试通过，独立补充检查也通过，未手工修补生成工程。随后 HOME046 在真实 native 中复现分支会话丢失附件授权，`c4925d0a3` 已修复；R14 Linux 50 项 deterministic native 及 macOS 50 项 native 均已通过；Windows 52 项中 HOME045/046 因附件控件遮挡失败。附件控件、导出提示布局和快速回复历史保存均已继续修复，当前源码验收见下段 R16，不用 R13 或 R14 代替。本次授权为全任务累计 **100M tokens**，覆盖旧 50M 计划；R13 后已知完成用量累计 **1,097,910 tokens**，取消或缺失用量仍未知。旧审批拒绝与“未发起新请求”不再是当前阻塞。真实费用/预算持久化、工作流执行器、增量索引、安全审计和语音等原有设计缺口仍按本表跟踪，不能随本批修复一并标为完成。
+
+R16 当前产品为 `dc6de5f80`，在 draw.io、Mermaid 查看、PDF 性能和共享 AI 设置之外，继续修复换行工具栏的导出提示遮挡和普通 provider 快速回复后的历史标题/配置保存。本地受影响单测 **60 文件 / 273 项通过**；三平台 browser 均 **46/46**，各含全部 **18 项 crash-regression**。匹配的 QA release 原生用例最终为 **Linux 54/54、Windows 54/54、macOS 52/52 通过**，各含全部 **22 项 crash-regression**。源码/构建/用例/配置/回执、产物及选集完整并集均已独立核验，索引为 `history-final-execution-coverage.json`。Windows 主批 **53/54** 中 AI009 在执行步骤前发生文档根节点准备超时；相同源码/用例的 AI009 加完整 crash 集合补跑 [44025575103](https://github.com/engcapa/taomni/actions/runs/44025575103) **23/23 通过**，未放宽超时或断言。Windows 最终 54 项为主批与补跑合并结果，原始失败及未明确归因的间歇启动问题均保留，不把原失败 workflow 改为通过。HOME045/046 当前仅声明 Linux/Windows native，不扩称 macOS 附件分支验收。原任务表的实现缺口和未验收范围继续保留。
+
+### 当前范围与统计口径
+
+原始主表共 **39 项**：**13 项具名范围已交付、11 项部分实现、15 项整体验收未齐**（含 TH-032）。这是原任务逐项复核的状态分布；验收未齐的任务已有主要实现，不能将此分布直接换算为代码完成百分比。本轮新增的 draw.io、Mermaid 查看器和 MD-008～011 等不计入这 39 项，也不以通过用例数替代全部原 AC 验收。
+
+| 最近追加的要求 | 当前交付与边界 |
+| --- | --- |
+| 导出下拉、无工具栏滚动条、窄窗提示遮挡 | 已实现并通过受影响 browser/native 回归；重复导出保留真实点击与布局断言。 |
+| 预览主题旁文案精简、记忆导出目录 | 已实现 tooltip 和跨格式的上次成功目录；取消或失败不更新目录记忆。 |
+| 独立、可搜索 PDF 与性能优化 | 三平台原生复测完成，性能与逐页质量结果见 [性能记录](../markdown-drawio/pdf-performance-2026-11-17.md)。 |
+| Word 图形与框中文字清晰度 | SVG 矢量、明确文字布局、600 DPI 回退和关闭 Office 自动压缩已实现；三平台实际文件经独立解析和 LibreOffice 渲染复核。当前 Microsoft Word 客户端视觉与完整版式矩阵仍待补验。 |
+| Mermaid 右键、悬浮按钮与大图查看 | 已实现缩放/平移、100%、适应窗口/宽度、双向 90° 旋转、水平/垂直翻转、重置、背景切换、保存 SVG/PNG、复制图片/文字/源码，不使用 OCR。 |
+| draw.io 导入导出与内容链接 | 已实现全文/全部图片、单 Sheet/每图独立 Sheet、可编辑正文表格，以及导入时选择布局或文字恢复并保留原始数据。此前流程/状态/类/ER 图的三平台回归完成；后续手测修复再加入可编辑时序图、默认无整体组合及保留原折线/曲线路由，新增源码验收见下段。其他未支持图族仍明确保留 SVG/源码并提示回退。 |
+| History 保存、恢复与显示 | 本批已修流式更新、离开刷新、快速回复后的标题/provider/草稿，以及附件分支授权与恢复；具名回归通过。全部冷重启/旧迁移组合仍随 TH-004 验收。 |
+| 合并 AI 设置、选择普通聊天 provider | 已实现共享保存及 OpenAI 兼容、Anthropic、本地模型等支持的聊天运行时；缺失 provider 不静默改路由。普通 provider 的原生附件/分支 HOME045/046 目前只验 Linux/Windows。 |
+| 真实 OpenCode Agent 多场景与工程开发 | 指定模型/max 已有简单、多轮、图片/文档及 Python/TypeScript 各九轮真实开发证据，包含测试、注入失败、模型修复和功能扩展。Python/TS 最终各 16/15 项测试通过；商业 CC/Codex、完整长任务及语音等边界仍待验。 |
+
+本次状态复核未新增商业请求或重跑产品用例；本页 R16 与 [最终验证记录](verification-md-history-agent-2026-11-17.md#r16-wrapped-export-notice-and-fast-reply-history) 指向已有的当前源码回执。深研/工作流真实执行、持久预算与费用确认、增量索引、本地结果导航、完整审计、长任务恢复等实现缺口仍在后文逐项跟踪。
+
+后续优先六项（Git 用 Tao 打开、Workspace 命名/添加目标、导出产物用 Tao 打开、Query Result 搜索导航、Agnes 无代理）及其验收，独立记录在 [workspace-result-follow-up-2026-11-17.md](../workspace-result-follow-up-2026-11-17.md)。新反馈的 Mermaid 保存图标、可编辑时序/原线路由和重复导入按钮，记录在 [修复与验收](../../docs-issue/markdown-mermaid-editable-export-2026-11-17.md)。产品提交 `97e89ead9`、修正用例 `00696cf81`；本机 149 项 Markdown 单测通过，当前源码与用例的有效并集为 Linux/Windows/macOS browser 各 28/28（18 项 crash）、匹配 QA release 的 native 各 33/33（22 项 crash），Linux Agnes 另有 1/1 无代理真实回复。[原批次 44052981988](https://github.com/engcapa/taomni/actions/runs/44052981988) 的 023/026 失败原件保留，[修正后 44057813183](https://github.com/engcapa/taomni/actions/runs/44057813183) 成功结束，Windows/macOS native 各 25/25。签名、身份、配置与绑定文件散列独立复核通过；R16 是历史基线，原 39 项状态统计不因这些追加修复整体关闭。
+
+用户随后用真实 `testing.md` 又报告 Word 流程图线身、draw.io 时序连接点与 Live 表格格式问题；追加修复和原文件 QA 验收见 [真实文档回归](../../docs-issue/markdown-mermaid-editable-export-2026-11-17.md#真实-testingmd-追加回归)。`b7f8252fc` 的本机验收及 [44113948966](https://github.com/engcapa/taomni/actions/runs/44113948966) 均已完成：三平台 browser 各 29/29（18 crash）、native 各 34/34（22 crash）。Linux 直接打开原文件，实际 draw.io Desktop 两图和 PDF/Word 逐页视觉已检查；Linux Word 使用 LibreOffice，不扩称 Win11 Microsoft Word 客户端验收。
+
+## 2026-11-18 新增两项
+
+`e07d7823b` 改为紧凑的 draw.io 原生曲线控制多边形；原文件长弧线从 87/101 个点降为 8/7 个，实际 Desktop 鼠标编辑、撤销及节点连接已验证。`839cda93d` 增加 [Explorer 明细列宽](../file-explorer/resizable-details-2026-11-18.md) 的四列拖动、双击适配、键盘调整、横滚对齐和持久化。Node 22.23.4 下受影响 unit 45 文件 / 293 项、独立导出检查器 16 项及 TypeScript/refactor/audit/开发契约均通过。
+
+Linux 当前有效并集为 browser **34/34（18 crash）**、native **37/38（全部 22 crash 通过）**，新 006 与原文件 028 均通过；唯一保留失败为 005 的既有后台终端标签关闭交互。最终本机签名、源码/runner/build、用例/配置和全部绑定文件核验为 `independent-local-node22.json/.log`。Windows/macOS 最终具名补跑 [44153057201](https://github.com/engcapa/taomni/actions/runs/44153057201) 成功结束，两端 browser 各 19/19、native 各 23/23，八片均在 workflow 结束前下载。完整当前有效并集为三平台 browser 各 34/34、Linux/Windows native 各 37/38、macOS native 38/38，全部 crash 18/22 通过；两个 37/38 都仅保留同一个既有 005 失败。48 份报告及其绑定产物独立核验通过，入口为 `independent-three-platform-final.json/.log` 与 `final-selection-matrix.json`；原失败和验证边界统一在列宽专项记录。本次新增两项完成，原 39 项实现缺口及统计不改变。
+
+Agnes 最近一次真实复验因服务端账户配额不足失败，明确返回 `Failed to pre-consume quota`（余额 $0.000814，所需 $0.000870）。该次为 `agnes-2.5-pro-beta` 且无代理；原始失败保留，不以之前成功的请求替代当前结果，也不重复消耗余额。工作流执行、持久预算、增量索引、审计和语音等旧任务仍未整体关闭。
+
+## 历史变化：macOS native 已补齐原缺失项
 
 [43886401191](https://github.com/engcapa/taomni/actions/runs/43886401191) 已成功结束。只选择 macOS native release，实际 **32 passed / 0 failed / 0 skipped**，包含此前缺失的全部 **21 项**及完整适用 **22 项 native crash-regression**。
 
@@ -79,16 +117,16 @@
 | TASK-DEV01 | loopback 的真实本机文件/进程开发闭环已通过；024/030 等商业模型从 0 到 1 工程流程未执行完成。 |
 | TASK-DEV02 | 原生 ACP 真实子进程、持久化、返回 Tao/显式继续已验；商业 CC/Codex 模型执行仍未验证。 |
 
-商业 OpenCode 当前不能标完成：`verification-agent-loop-2026-11-16.md` 的最后记录是当时 native 商业启动被审批拒绝；早期 403 是 WAF，并非已确认失效 Key。本轮未发起新的商业请求，也未推定旧 Windows 临时 Key 在 Linux 可用。50M 是用户测试预算，不是本产品已完成的预算状态机。
+上表与以下源码缺口保留 11 月 16 日复核时的范围；其中商业执行状态已由 11 月 17 日的实测更新：TASK-GO01 的指定 provider/model/max、TASK-GO02 的代表图片/文档路径，以及 TASK-DEV01 的 Python/TypeScript 开发闭环均已有真实 QA release 证据，详见本页“本轮覆盖说明”和 [11 月 17 日验证记录](verification-md-history-agent-2026-11-17.md)。完整长任务矩阵、CC/Codex 商业执行和未列举的设计 AC 仍未全部验收。旧记录中的审批拒绝不再是当前阻塞；当前授权为累计 100M tokens，也不等同于产品已实现持久预算状态机。
 
 ## 关键实现缺口的源码依据
 
 | 缺口 | 当前源码依据 |
 |---|---|
 | 工作流没有实际执行步骤 | `src-tauri/src/deepseek_app/workflow.rs:105` 的 advance 只读状态并更新步骤/run 表；`src/components/tao/ai-chat/WorkflowPanel.tsx` 的开始动作只创建 pending run。 |
-| 费用设置没有控制执行 | `cost_confirm_threshold_cny` 仅见配置默认值/持久化与 Settings 输入；`TaoHomeHost.tsx:28` 仍固定传入 0.5，未找到费用阈值确认的调用路径。 |
-| 重启后的预算续跑未实现 | `src/components/tao/ai-chat/controller.ts:396` hydrate 为每个线程重建 `usedTokens: 0` 的 runtime；工作流也没有真实阶段结果执行器。 |
-| 检索仍全量重建 | `src-tauri/src/deepseek_app/search.rs:140` 的 synchronize 在主库连接执行 `DELETE FROM ds_app_search` 再重新收集插入；产品源码未见独立 `tao_index.db` 或 `last_indexed_at` 水位。 |
+| 费用设置没有控制执行 | `cost_confirm_threshold_cny` 仅见配置默认值/持久化与 Settings 输入；`src/components/tao/home/TaoHomeHost.tsx:29` 仍固定传入 0.5，未找到费用阈值确认的调用路径。 |
+| 重启后的预算续跑未实现 | `src/components/tao/ai-chat/controller.ts:399` hydrate 为每个线程重建 `usedTokens: 0` 的 runtime；工作流也没有真实阶段结果执行器。 |
+| 检索仍全量重建 | `src-tauri/src/deepseek_app/search.rs:144` 的 synchronize 在主库连接执行 `DELETE FROM ds_app_search` 再重新收集插入；产品源码未见独立 `tao_index.db` 或 `last_indexed_at` 水位。 |
 | 本地检索结果不能打开原记录 | `src/components/tao/search/SearchPanel.tsx` 仅在 `result.ref.startsWith("http")` 时提供打开链接，没有本地 note/session/thread 的导航 adapter。 |
 | 完整安全中心未实现 | 已有 `TaoPrivacySettings.tsx` 的来源开关与迁移摘要；产品源码未见设计要求的 `tao_audit` 或审计读删导出链路。 |
 | 长上传的进度和重启恢复未闭环 | `src-tauri/src/deepseek_app/files.rs` 的上传进度只在开始/结束写入 0/总字节，任务表读取只返回存储 JSON；不能据此声称真实连续进度和重启后续传。 |
@@ -98,7 +136,7 @@
 1. 深研及五类工作流的实际执行器、真实阶段结果、取消/失败/重启检查点（TH-026、TASK-MODE02）。
 2. 预算/费用阈值的真实确认与持久续跑，设置到执行的接线（TH-011/021/022）。
 3. 独立增量索引、本地原记录导航、全部存储来源，以及完整审计/安全中心（TH-023/028/030）。
-4. OpenCode Go / deepseek-v4.1-flash / max 的商业 native 全集复跑，包括旧 DeepSeek 场景、图片/文档和开发工程；真实 CC/Codex、语音、管理员/WSL 条件分支按各自边界验收。
+4. 在已有 OpenCode Go / deepseek-v4.1-flash / max 图片、文档和 Python/TypeScript 工程实测基础上，按具名 AC 补齐尚未覆盖的商业长任务路径；真实 CC/Codex、语音、管理员/WSL 条件分支按各自边界验收。
 5. 文件长任务进度与重启恢复；完整原型状态/窗口/主题和 Markdown/Notes/Word 矩阵。
 6. 复核旧 F12 的评审元数据并按新 case 身份执行；恢复所需原始历史报告后再做三平台合并 gate，不改写旧失败/阻塞证据。
 
@@ -112,4 +150,4 @@
 
 历史证据迁移另有缺失：原 Windows `_local` 回执/日志未随代码带入，主表原有 `evidence/user-feedback-2026-11-15.png` 链接在当前 Linux checkout 也不存在。本轮只新增的链接均已校验，不把缺失的历史图片当作当前可查看证据。
 
-本轮校验为文档/源码/既有回执复核，未运行产品测试或重新构建。新增的是完成度记录，原用例及需求预期没有变更，因此不新建重复 QA case。
+11 月 16 日首次复核仅检查文档、源码和既有回执；11 月 17 日补充已实际构建、运行并独立核验产品证据，新增回归及最新输入范围见 [11 月 17 日验证记录](verification-md-history-agent-2026-11-17.md)。历史失败和未完成需求均保留。

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { sftpLocalHome, formatBytes } from "../../lib/sftp";
 import { openExplorer } from "../../lib/explorer/openExplorer";
 import { getAppPlatform } from "../../lib/runtime";
@@ -42,6 +42,7 @@ export function ExplorerShell({ tabId, initialPath, workspaceId, active = true, 
   const [previewOverlay, setPreviewOverlay] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const address = useRef<HTMLInputElement>(null);
+  const navigationId = useId();
   const resizeCleanup = useRef<(() => void) | null>(null);
   const dropPath = useExplorerDrop(root, operations);
   useEffect(() => {
@@ -65,7 +66,11 @@ export function ExplorerShell({ tabId, initialPath, workspaceId, active = true, 
     const paths = new Set(pane?.selection ?? []);
     return visible.filter((entry) => paths.has(entry.path));
   }, [pane?.selection, visible]);
-  const narrow = width < preferences.navWidth + preferences.previewWidth + 380;
+  const navigationWidth = preferences.navVisible ? preferences.navWidth : 0;
+  const narrow = width < navigationWidth + preferences.previewWidth + 380;
+  useEffect(() => {
+    if (!preferences.navVisible) resizeCleanup.current?.();
+  }, [preferences.navVisible]);
   const previewVisible = preferences.preview && (!narrow || previewOverlay);
   const togglePreview = useCallback(() => {
     if (narrow && preferences.preview) { setPreviewOverlay((old) => !old); return; }
@@ -108,7 +113,7 @@ export function ExplorerShell({ tabId, initialPath, workspaceId, active = true, 
     else if (event.altKey && event.key === "ArrowRight") void store.navigateForward(tabId, "local");
     else if ((event.altKey && event.key === "ArrowUp") || event.key === "Backspace") void store.navigateUp(tabId, "local");
     else if (event.altKey && event.key === "Enter" && selected.length) operations.setProperties(selected);
-    else if (event.key === "Enter" && selected.length === 1) void operations.open(selected[0], mod);
+    else if (event.key === "Enter" && selected.length === 1 && !target.closest("button")) void operations.open(selected[0], mod);
     else if (event.key === "Escape") { operations.setRenamePath(null); setPreviewOverlay(false); }
     else handled = false;
     if (handled) { event.preventDefault(); event.stopPropagation(); }
@@ -133,10 +138,12 @@ export function ExplorerShell({ tabId, initialPath, workspaceId, active = true, 
     <div ref={root} className="ex-shell" data-testid="explorer-tab" data-tab-id={tabId} data-path={pane?.path ?? initialPath} data-active={active}
       data-preview-collapsed={preferences.preview && narrow && !previewOverlay ? "true" : "false"} tabIndex={0} onKeyDown={onKeyDown}>
       <ExplorerAddressBar tabId={tabId} pane={pane} home={home} filter={filter} onFilter={setFilter} addressRef={address} />
-      <ExplorerCommandBar path={pane?.path ?? ""} workspaceId={workspaceId} selected={selected} operations={operations} onOpenTerminal={terminal} onOpenExplorer={openExplorerAt} previewVisible={previewVisible} onTogglePreview={togglePreview} />
+      <ExplorerCommandBar path={pane?.path ?? ""} workspaceId={workspaceId} selected={selected} operations={operations} onOpenTerminal={terminal} onOpenExplorer={openExplorerAt} previewVisible={previewVisible} onTogglePreview={togglePreview}
+        navigationId={navigationId} onToggleNavigation={() => setExplorerPreferences({ navVisible: !preferences.navVisible })} />
       <div className="ex-body">
-        <ExplorerNavTree home={home} path={pane?.path ?? initialPath} dropPath={dropPath} onNavigate={(path) => void useSftpStore.getState().navigate(tabId, "local", path)} onOpenExplorer={openExplorerAt} onOpenTerminal={terminal} />
-        <div className="ex-split" role="separator" aria-orientation="vertical" aria-label={label("调整导航宽度", "Resize navigation")} onPointerDown={(event) => resize(event, "nav")} />
+        <ExplorerNavTree id={navigationId} hidden={!preferences.navVisible} home={home} path={pane?.path ?? initialPath} dropPath={dropPath} onNavigate={(path) => void useSftpStore.getState().navigate(tabId, "local", path)} onOpenExplorer={openExplorerAt} onOpenTerminal={terminal} />
+        {preferences.navVisible && <div className="ex-split" data-testid="explorer-nav-resize" role="separator"
+          aria-orientation="vertical" aria-label={label("调整导航宽度", "Resize navigation")} onPointerDown={(event) => resize(event, "nav")} />}
         <div className={`ex-main ${preferences.previewPosition === "bottom" && !narrow ? "bottom" : ""}`}>
           <LocalFileBrowserPanel tabId={tabId} initialPath={initialPath} explorer={{
             renderView: ExplorerFileList,

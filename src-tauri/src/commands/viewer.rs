@@ -77,7 +77,7 @@ async fn viewer_html_open(
     let app = webview.app_handle().clone();
     on_worker(move || {
         let proxy = if allow_network {
-            viewer::resolve_html_proxy(
+            viewer::resolve_preview_proxy(
                 &app.state::<crate::state::AppState>(),
                 proxy_mode.as_deref().unwrap_or("app"),
                 custom_proxy,
@@ -101,6 +101,41 @@ async fn viewer_html_open(
 async fn viewer_html_close(webview: tauri::Webview, token: String) -> Result<(), String> {
     let owner = webview.label().to_string();
     on_worker(move || viewer::close_html(&token, &owner)).await
+}
+
+#[tauri::command]
+async fn viewer_markdown_image(
+    webview: tauri::Webview,
+    url: String,
+    proxy_mode: String,
+    custom_proxy: Option<crate::proxy::AppProxyConfig>,
+    ready: tauri::ipc::Channel<String>,
+) -> Result<BytesData, String> {
+    let request = viewer::markdown_images::ImageRequest::new(webview.label().into())?;
+    ready
+        .send(request.id())
+        .map_err(|_| "Cannot start the Markdown image request")?;
+    let _permit = request.acquire().await?;
+    let app = webview.app_handle().clone();
+    let proxy = on_worker(move || {
+        viewer::resolve_preview_proxy(
+            &app.state::<crate::state::AppState>(),
+            &proxy_mode,
+            custom_proxy,
+        )
+    })
+    .await?;
+    request.read(&url, proxy.as_ref()).await
+}
+
+#[tauri::command]
+fn viewer_markdown_image_cancel(webview: tauri::Webview, id: String) {
+    viewer::markdown_images::cancel(webview.label(), &id);
+}
+
+#[tauri::command]
+async fn viewer_drawio_renderer_url() -> Result<Option<String>, String> {
+    on_worker(|| Ok(viewer::drawio_renderer_url())).await
 }
 
 #[tauri::command]
@@ -134,6 +169,9 @@ pub(super) fn handles(command: &str) -> bool {
             | "viewer_save_pasted_image"
             | "viewer_html_open"
             | "viewer_html_close"
+            | "viewer_markdown_image"
+            | "viewer_markdown_image_cancel"
+            | "viewer_drawio_renderer_url"
             | "viewer_create_temp"
             | "viewer_release_temp"
             | "viewer_temp_allocate"
@@ -151,6 +189,9 @@ pub(super) fn handle(invoke: tauri::ipc::Invoke<tauri::Wry>) -> bool {
         crate::commands::viewer::viewer_save_pasted_image,
         crate::commands::viewer::viewer_html_open,
         crate::commands::viewer::viewer_html_close,
+        crate::commands::viewer::viewer_markdown_image,
+        crate::commands::viewer::viewer_markdown_image_cancel,
+        crate::commands::viewer::viewer_drawio_renderer_url,
         crate::commands::viewer::viewer_create_temp,
         crate::commands::viewer::viewer_release_temp,
         crate::commands::viewer::viewer_temp_allocate,

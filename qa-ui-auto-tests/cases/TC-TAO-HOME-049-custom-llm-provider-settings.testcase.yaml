@@ -1,0 +1,201 @@
+id: TC-TAO-HOME-049
+title: Add, reload and remove a custom provider and model capabilities
+description: Create an OpenAI Responses provider with two model IDs. Save model-specific context and output limits, image input,
+  effort choices and search. Verify persistence, default-model replacement and deletion.
+modes:
+- browser
+- native
+covers:
+- F1.11
+tags:
+- p1
+- regression
+- tao-home
+- settings
+fixtures:
+- reset_db
+timeout_sec: 210
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-home-markdown-isolated
+- click: '[data-testid="language-switcher"]'
+- click: '[data-testid="language-option-en"]'
+- click: '[data-testid="tao-home-dock-more"]'
+- click: '[data-testid="tao-home-dock-settings"]'
+- wait_for: '[data-testid="tao-settings"]'
+- click: '[data-testid="llm-add-custom-provider"]'
+- wait_for: '[data-testid="llm-custom-fields"]'
+- fill:
+    selector: '[data-testid="llm-provider-row"][data-custom="true"] [data-testid="llm-custom-name"]'
+    value: QA configured Responses
+- select_option:
+    selector: '[data-testid="llm-custom-protocol"]'
+    value: openai-responses
+- fill:
+    selector: '[data-testid="llm-provider-row"][data-custom="true"] [data-testid="llm-provider-base-url"]'
+    value: http://127.0.0.1:18080/v1/responses
+- fill:
+    selector: '[data-testid="llm-provider-row"][data-custom="true"] [data-testid="llm-custom-model-row"]:nth-of-type(1) [data-testid="llm-custom-model-id"]'
+    value: qa-responses-text
+- fill:
+    selector: '[data-testid="llm-provider-row"][data-custom="true"] [data-testid="llm-custom-model-row"]:nth-of-type(1) [data-testid="llm-custom-context"]'
+    value: '64000'
+- fill:
+    selector: '[data-testid="llm-provider-row"][data-custom="true"] [data-testid="llm-custom-model-row"]:nth-of-type(1) [data-testid="llm-custom-max-output"]'
+    value: '4096'
+- click: '[data-testid="llm-custom-add-model"]'
+- fill:
+    selector: '[data-testid="llm-provider-row"][data-custom="true"] [data-testid="llm-custom-model-row"]:nth-of-type(2) [data-testid="llm-custom-model-id"]'
+    value: qa-responses-vision
+- click: '[data-testid="llm-provider-row"][data-custom="true"] [data-testid="llm-custom-model-row"]:nth-of-type(2) [data-testid="llm-custom-multimodal"]'
+- click: '[data-testid="llm-provider-row"][data-custom="true"] [data-testid="llm-custom-model-row"]:nth-of-type(2) [data-testid="llm-custom-native-search"]'
+- click: '[data-testid="llm-provider-row"][data-custom="true"] [data-testid="llm-custom-model-row"]:nth-of-type(2) [data-testid="llm-custom-effort-high"]'
+- click: '[data-testid="llm-custom-effort-xhigh"]:is([data-testid="llm-custom-model-row"]:nth-of-type(2) *)'
+- select_option:
+    selector: '[data-testid="llm-custom-default-model"]'
+    value: qa-responses-vision
+- click: '[data-testid="llm-providers-save"]'
+- wait_for: '[data-testid="llm-providers-status"]'
+- reload_window: null
+- wait_for: '[data-testid="tao-home-host"]'
+- click: '[data-testid="tao-home-dock-more"]'
+- click: '[data-testid="tao-home-dock-settings"]'
+- wait_for: '[data-testid="tao-settings"]'
+- click: '[data-testid="llm-custom-toggle"]'
+- assert_attribute:
+    selector: '[data-testid="llm-custom-protocol"]'
+    name: value
+    equals: openai-responses
+- assert_attribute:
+    selector: '[data-testid="llm-provider-row"][data-custom="true"] [data-testid="llm-provider-base-url"]'
+    name: value
+    equals: http://127.0.0.1:18080/v1
+- assert_attribute:
+    selector: '[data-testid="llm-provider-row"][data-custom="true"] [data-testid="llm-custom-model-row"]:nth-of-type(1) [data-testid="llm-custom-context"]'
+    name: value
+    equals: '64000'
+- assert_attribute:
+    selector: '[data-testid="llm-provider-row"][data-custom="true"] [data-testid="llm-custom-model-row"]:nth-of-type(1) [data-testid="llm-custom-max-output"]'
+    name: value
+    equals: '4096'
+- assert_count:
+    selector: '[data-testid="llm-custom-model-row"]:nth-of-type(1) [data-testid="llm-custom-native-search"]:not(:checked), [data-testid="llm-custom-model-row"]:nth-of-type(2)
+      [data-testid="llm-custom-native-search"]:checked, [data-testid="llm-custom-model-row"]:nth-of-type(2) [data-testid="llm-custom-multimodal"]:checked'
+    equal: 3
+- assert_count:
+    selector: '[data-testid="llm-custom-effort-xhigh"]:checked'
+    equal: 1
+- assert_attribute:
+    selector: '[data-testid="llm-custom-default-model"]'
+    name: value
+    equals: qa-responses-vision
+- click: '[data-testid="llm-provider-row"][data-custom="true"] [data-testid="llm-custom-model-row"]:nth-of-type(2) [data-testid="llm-custom-remove-model"]'
+- assert_attribute:
+    selector: '[data-testid="llm-custom-default-model"]'
+    name: value
+    equals: qa-responses-text
+- click: '[data-testid="llm-custom-remove"]'
+- assert_count:
+    selector: '[data-testid="llm-provider-row"][data-custom="true"]'
+    equal: 0
+- click: '[data-testid="llm-providers-save"]'
+- wait_for: '[data-testid="llm-providers-status"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: CUSTOM-PROVIDER
+    requirement: Provider URL, protocol and model settings survive reload.
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 8
+    - 10
+    - 11
+    - 12
+    - 13
+    - 14
+    - 15
+    - 16
+    - 17
+    - 18
+    - 19
+    - 20
+    - 21
+    - 22
+    - 23
+    - 27
+    - 28
+    - 30
+    checkpoints:
+    - step: 31
+      expectation: Responses protocol survived reload.
+    - step: 32
+      expectation: The full endpoint was normalized to one API base.
+    - step: 33
+      expectation: Explicit context size survived.
+    - step: 34
+      expectation: Explicit output limit survived.
+    - step: 35
+      expectation: Only the second model supports search and images.
+    - step: 36
+      expectation: xhigh is retained as an enum option.
+    results:
+    - 31
+    - 32
+    - 33
+    - 34
+    - 35
+    - 36
+  - id: MODEL-REMOVAL
+    requirement: Removing the default model and then the provider updates the shared draft.
+    actions:
+    - 1
+    - 2
+    - 3
+    - 4
+    - 5
+    - 6
+    - 8
+    - 10
+    - 11
+    - 12
+    - 13
+    - 14
+    - 15
+    - 16
+    - 17
+    - 18
+    - 19
+    - 20
+    - 21
+    - 22
+    - 23
+    - 27
+    - 28
+    - 30
+    - 38
+    - 40
+    checkpoints:
+    - step: 37
+      expectation: Second model is the selected default.
+    - step: 39
+      expectation: Removing the second model selects the remaining ID.
+    - step: 41
+      expectation: The provider is removed before the shared Save.
+    results:
+    - 37
+    - 39
+    - 41
+  native:
+  - check: Persistent provider config through native AI settings IPC
+    method: automated
+    reason: The desktop checks native JSON persistence and browser uses its isolated configuration stub.
+  visual:
+  - check: Inspect the resulting controls and content in the case screenshots or WebView.
+    method: manual
+    reason: The automated checkpoints verify the semantic states independently.

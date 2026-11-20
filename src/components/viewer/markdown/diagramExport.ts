@@ -1,5 +1,8 @@
 import { portableWordSvg } from "./wordSvg";
 import { diagramBounds, normalizeRotation, type DiagramSnapshot, type DiagramTransform } from "./diagramModel";
+import { parseDrawio } from "./drawioCodec";
+import { renderDrawioPage } from "./drawioRender";
+import drawioFont from "./vendor/architects-daughter.ttf?inline";
 
 const SVG_NS = "http://www.w3.org/2000/svg";
 export const DIAGRAM_PNG_DPI = 300;
@@ -9,7 +12,22 @@ const MAX_PIXELS = 40_000_000;
  * never crops output or changes the original Markdown/Mermaid definition. */
 export async function diagramSvg(snapshot: DiagramSnapshot, transform: DiagramTransform): Promise<string> {
   const { width, height } = snapshot;
-  const portable = await portableWordSvg(snapshot.svg, width, height, snapshot.theme === "dark");
+  const portable = snapshot.kind === "drawio" ? serializeDrawioImage(snapshot.svg)
+    : await portableWordSvg(snapshot.svg, width, height, snapshot.theme === "dark");
+  return transformSvg(portable, width, height, transform);
+}
+
+function serializeDrawioImage(source: SVGSVGElement): string {
+  const svg = source.cloneNode(true) as SVGSVGElement;
+  if (svg.outerHTML.includes("Architects Daughter")) {
+    const font = document.createElementNS(SVG_NS, "style");
+    font.textContent = `@font-face{font-family:"Architects Daughter";src:url("${drawioFont}") format("truetype")}`;
+    svg.prepend(font);
+  }
+  return new XMLSerializer().serializeToString(svg);
+}
+
+function transformSvg(portable: string, width: number, height: number, transform: DiagramTransform): string {
   const rotation = normalizeRotation(transform.rotation);
   if (!rotation && !transform.flipX && !transform.flipY) return portable;
   const bounds = diagramBounds(width, height, rotation);
@@ -26,20 +44,37 @@ export async function diagramSvg(snapshot: DiagramSnapshot, transform: DiagramTr
 }
 
 export async function diagramPng(snapshot: DiagramSnapshot, transform: DiagramTransform): Promise<Blob> {
-  const bounds = diagramBounds(snapshot.width, snapshot.height, transform.rotation);
+  const drawioWithHtml = snapshot.kind === "drawio" && snapshot.svg.querySelector("foreignObject");
+  const webkit = /AppleWebKit/i.test(navigator.userAgent) && !/Chrome|Chromium/i.test(navigator.userAgent);
+  if (drawioWithHtml && webkit) {
+    // WebKit cannot reliably rasterize a foreignObject through an SVG image.
+    const portable = await renderDrawioPage(parseDrawio(snapshot.source)[0], false);
+    return rasterize(transformSvg(portable.svg, portable.width, portable.height, transform), portable.width, portable.height, transform);
+  }
+  return rasterize(await diagramSvg(snapshot, transform), snapshot.width, snapshot.height, transform);
+}
+
+async function rasterize(svg: string, sourceWidth: number, sourceHeight: number, transform: DiagramTransform): Promise<Blob> {
+  const bounds = diagramBounds(sourceWidth, sourceHeight, transform.rotation);
   const width = Math.ceil(bounds.width * DIAGRAM_PNG_DPI / 96), height = Math.ceil(bounds.height * DIAGRAM_PNG_DPI / 96);
   if (width * height > MAX_PIXELS || width > 32700 || height > 32700) throw new Error("This diagram is too large for a high-resolution PNG; save SVG instead");
-  const url = URL.createObjectURL(new Blob([await diagramSvg(snapshot, transform)], { type: "image/svg+xml" }));
+  const inline = svg.includes("<foreignObject");
+  const url = inline ? `data:image/svg+xml;charset=utf-8,${encodeURIComponent(svg)}`
+    : URL.createObjectURL(new Blob([svg], { type: "image/svg+xml" }));
   const canvas = document.createElement("canvas");
   try {
     const image = new Image();
     await new Promise<void>((resolve, reject) => {
-      image.onload = () => resolve(); image.onerror = () => reject(new Error("Cannot decode the Mermaid image")); image.src = url;
+      image.onload = () => resolve(); image.onerror = () => reject(new Error("Cannot decode the diagram image")); image.src = url;
     });
     canvas.width = width; canvas.height = height;
     const context = canvas.getContext("2d");
     if (!context) throw new Error("Image conversion is unavailable");
     context.drawImage(image, 0, 0, width, height);
     return await new Promise<Blob>((resolve, reject) => canvas.toBlob((blob) => blob ? resolve(blob) : reject(new Error("PNG encoding failed")), "image/png"));
-  } finally { URL.revokeObjectURL(url); canvas.width = 0; canvas.height = 0; }
+  } finally {
+    if (!inline) URL.revokeObjectURL(url);
+    canvas.width = 0;
+    canvas.height = 0;
+  }
 }

@@ -5,6 +5,7 @@ import { type TranslateFn } from "../../lib/i18n";
 import { GoProxyFields } from "./GoProxyFields";
 import { GoProviderFields } from "./GoProviderFields";
 import { ModelInspectorPanel } from "./ModelInspectorPanel";
+import { CustomLlmProviderFields } from "./CustomLlmProviderFields";
 import { openExternalUrl } from "../../lib/sftp";
 import { PROVIDER_LABELS, PROVIDER_NOTES, providerApiKeys, withProviderApiKeys } from "./llmProviderFields";
 
@@ -18,11 +19,13 @@ interface ProviderRowProps {
   testResult: { ok: boolean; message: string; latency_ms: number } | null;
   testing: boolean;
   t: TranslateFn;
+  startExpanded?: boolean;
+  onRemove?: () => void;
 }
 
-export function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, testResult, testing, t }: ProviderRowProps) {
+export function ProviderRow({ id, provider, isActive, onActivate, onChange, onTest, testResult, testing, t, startExpanded = false, onRemove }: ProviderRowProps) {
   const blocked = useAiStore((s) => !!(s.config?.full_local_mode || s.config?.fully_disabled));
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, setExpanded] = useState(startExpanded);
   const [inspecting, setInspecting] = useState(false);
   const inspectorButton = useRef<HTMLButtonElement>(null);
   const apiKeys = providerApiKeys(provider);
@@ -45,6 +48,7 @@ export function ProviderRow({ id, provider, isActive, onActivate, onChange, onTe
     <div
       data-testid={id === "opencode-go" ? "go-provider-row" : "llm-provider-row"}
       data-provider={id}
+      data-custom={provider.custom ? "true" : undefined}
       className={`rounded border transition-colors ${
         isActive
           ? "border-[var(--taomni-accent)] bg-[var(--taomni-accent)]/5"
@@ -62,7 +66,9 @@ export function ProviderRow({ id, provider, isActive, onActivate, onChange, onTe
         )}
 
         <div className="flex-1 min-w-0">
-          <div className="text-[13px] font-medium">{PROVIDER_LABELS[id] ?? id}</div>
+          {provider.custom ? <button type="button" className="text-left text-[13px] font-medium" data-testid="llm-custom-toggle"
+            aria-expanded={expanded} onClick={(event) => { event.stopPropagation(); setExpanded(!expanded); }}>{provider.custom.label || "Custom provider"}</button>
+            : <div className="text-[13px] font-medium">{PROVIDER_LABELS[id] ?? id}</div>}
           <div className="text-[11px] text-[var(--taomni-text-muted)] truncate">
             {id === "opencode-go" ? t("opencodeGo.subscription") : PROVIDER_NOTES[id] ?? provider.base_url}
           </div>
@@ -130,7 +136,7 @@ export function ProviderRow({ id, provider, isActive, onActivate, onChange, onTe
               </div>
             </div>
           )}
-          <div>
+          {provider.custom ? <CustomLlmProviderFields provider={provider} onChange={onChange} focusName={startExpanded} /> : <div>
             <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.llmModel")}</label>
             {id === "opencode-go" ? <>
               <a href="https://opencode.ai/console" data-testid="go-console" className="text-[11px] underline"
@@ -143,8 +149,8 @@ export function ProviderRow({ id, provider, isActive, onActivate, onChange, onTe
               value={provider.model}
               onChange={(e) => onChange({ ...provider, model: e.target.value })}
             />}
-          </div>
-          <div>
+          </div>}
+          {!provider.custom && <div>
             <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.llmCapabilities")}</label>
             <div className="flex flex-wrap gap-3 text-[11px] text-[var(--taomni-text-muted)]">
               <label className="inline-flex items-center gap-1.5">
@@ -175,7 +181,7 @@ export function ProviderRow({ id, provider, isActive, onActivate, onChange, onTe
                 {t("aiSettings.llmCapabilityVideo")}
               </label>
             </div>
-          </div>
+          </div>}
           {capabilities.image_generation && (
             <div>
               <label className="text-[11px] text-[var(--taomni-text-muted)] block mb-1">{t("aiSettings.llmImageModel")}</label>
@@ -213,9 +219,9 @@ export function ProviderRow({ id, provider, isActive, onActivate, onChange, onTe
             <GoProxyFields provider={provider} onChange={onChange} />
           </div>
           <div className="flex items-center gap-2 pt-1">
-            <button ref={inspectorButton} type="button" data-testid="model-inspector-open" data-provider={id}
+            {!provider.custom && <button ref={inspectorButton} type="button" data-testid="model-inspector-open" data-provider={id}
               className="taomni-btn h-7 px-3 text-[12px]" aria-expanded={inspecting}
-              onClick={() => setInspecting((open) => !open)}>{t("modelInspector.title")}</button>
+              onClick={() => setInspecting((open) => !open)}>{t("modelInspector.title")}</button>}
             <button
               type="button"
               className="taomni-btn h-7 px-3 text-[12px] inline-flex items-center gap-1.5"
@@ -229,6 +235,8 @@ export function ProviderRow({ id, provider, isActive, onActivate, onChange, onTe
                 t("aiSettings.llmTestConnection")
               )}
             </button>
+            {onRemove && <button type="button" className="taomni-btn h-7 w-7 inline-flex items-center justify-center"
+              data-testid="llm-custom-remove" title={t("common.delete")} aria-label={t("common.delete")} onClick={onRemove}><Trash2 size={14} /></button>}
             {testResult && (
               <span className={`text-[12px] flex items-center gap-1 ${testResult.ok ? "text-green-400" : "text-red-400"}`}>
                 {testResult.ok ? (

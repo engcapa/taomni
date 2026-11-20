@@ -5,6 +5,8 @@ import { isTauriRuntime } from "../../../lib/runtime";
 import { taoDefaults, taoProviderOptions } from "../../../stores/ai/taoProviders";
 import { useAiStore } from "../../../stores/aiStore";
 import type { WelcomePanelProps } from "../../welcome/types";
+import { RestoreLastSessionRow } from "../../welcome/RestoreLastSessionRow";
+import { useT } from "../../../lib/i18n";
 import { createChatController, deepSeekAppBackend, TaoAiChat, type ContextPorts, type ChatProfile, type TaoSearchResult } from "../ai-chat";
 import { NoKeyCard } from "./NoKeyCard";
 import { BindingBar } from "./BindingBar";
@@ -26,11 +28,12 @@ const PROFILE: ChatProfile = {
   defaultModel: "deepseek-flash",
   defaultThinking: false,
   defaultWeb: false,
-  budget: { limitTokens: 10_000_000, costConfirmThresholdCny: 0.5 },
+  budget: { limitTokens: 10_000_000 },
 };
 
 export function TaoHomeHost(props: WelcomePanelProps) {
   useTaoText();
+  const t = useT();
   const [storageError, setStorageError] = useState("");
   const controllerRef = useRef<ReturnType<typeof createChatController> | null>(null);
   if (!controllerRef.current) controllerRef.current = createChatController({ backend: deepSeekAppBackend, profile: PROFILE, actionPorts: createNativeActionPorts("tao-action") });
@@ -93,6 +96,7 @@ export function TaoHomeHost(props: WelcomePanelProps) {
         active={props.active !== false} onOpenSettings={openSettings} onOpenAppearance={openAppearance}
         slots={{
           headerTrailing: <BindingBar controller={controller} context={state.context} />,
+          belowHeader: props.restore && <RestoreLastSessionRow restore={props.restore} translate={t} redactNames={demoMode} />,
           emptyState: <>
             {!isTauriRuntime() ? <p data-testid="tao-home-browser-unavailable">{tr("浏览器预览不提供原生 AI 对话，请在桌面应用中使用。")}</p> : null}
             {!hasTaoKey ? <NoKeyCard onOpenSettings={openSettings} onReuse={handleReuse} canReuse={canReuse} /> : null}

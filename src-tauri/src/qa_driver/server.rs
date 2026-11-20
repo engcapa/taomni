@@ -108,8 +108,13 @@ pub fn start<R: Runtime>(app: AppHandle<R>, window: WebviewWindow<R>, host: Stri
             .route(
                 "/session/{session_id}/qa/desktop-screenshot",
                 get(desktop_screenshot),
-            )
-            .with_state(state);
+            );
+        #[cfg(target_os = "macos")]
+        let router = router.route(
+            "/session/{session_id}/qa/appkit-drag",
+            post(super::appkit_drag::drag::<R>),
+        );
+        let router = router.with_state(state);
         log::info!("qa webdriver bridge listening on {address}");
         if let Err(error) = axum::serve(listener, router).await {
             log::error!("qa webdriver bridge stopped: {error}");

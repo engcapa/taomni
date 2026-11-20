@@ -2,6 +2,7 @@ import { invoke } from "@tauri-apps/api/core";
 import { writeText } from "../../../lib/clipboard";
 import { loadTerminalDefaultProfile } from "../../../lib/terminalProfile";
 import { openFile } from "../../../lib/openFile";
+import { classifyFile, supportsFileViewer } from "../../../lib/openFile/classifyFile";
 import { getLocale } from "../../../lib/i18n";
 import { useAppStore } from "../../../stores/appStore";
 import { useWorkspacePlatformStore } from "../../../stores/workspacePlatformStore";
@@ -43,7 +44,7 @@ function openTerminal(directory: string) {
   });
 }
 
-/** Common worktree actions also work for deleted files in historical commits. */
+/** Open the worktree file; log diffs retain their independent revision owner. */
 export function gitFileMenuItems(
   targets: GitFileTarget[],
   contextTarget: GitFileTarget | undefined = targets[0],
@@ -56,16 +57,18 @@ export function gitFileMenuItems(
       useAppStore.getState().setStatusMessage(error instanceof Error ? error.message : String(error));
     });
   };
+  const kind = contextTarget ? classifyFile(contextTarget.path) : "binary";
+  const canOpen = !!contextTarget && (supportsFileViewer(kind) || kind === "source");
   const directory = contextTarget ? fileDirectory(contextTarget) : "";
   return [
     {
-      label: getLocale().startsWith("zh") ? "预览此文件" : "Preview file",
+      label: getLocale().startsWith("zh") ? "用 Tao 打开" : "Open with Tao",
       testId: "git-file-preview",
-      disabled: !contextTarget,
-      onClick: () => run(() => openFile({ path: gitFileAbsolutePath(contextTarget!) }, {
+      disabled: !canOpen,
+      onClick: () => canOpen && run(() => openFile({ path: gitFileAbsolutePath(contextTarget!) }, {
         context: "git", mode: "taomni", workspaceId: useAppStore.getState().activeSideTab === "workspaces"
           ? useWorkspacePlatformStore.getState().activeWorkspaceId : undefined,
-      }), "Opened file preview"),
+      }), "Opened file in Tao"),
     },
     {
       label: targets.length > 1 ? `Copy paths (${targets.length})` : "Copy Path",

@@ -38,6 +38,7 @@ mod go_compatibility_tests {
 ///    `content_block_delta`, `message_delta`, `message_stop`) rather than
 ///    OpenAI's `data: {choices: [{delta: ...}]}` chunks.
 pub struct AnthropicProvider {
+    configured_model: Option<crate::ai::config::CustomLlmModel>,
     extra_headers: reqwest::header::HeaderMap,
     client: Client,
     base_url: String,
@@ -77,6 +78,7 @@ impl AnthropicProvider {
             }
         }
         Self {
+            configured_model: None,
             extra_headers: reqwest::header::HeaderMap::new(),
             client: builder.build().expect("failed to build reqwest client"),
             base_url: base_url.into().trim_end_matches('/').to_string(),
@@ -90,6 +92,14 @@ impl AnthropicProvider {
     pub fn with_go_client(mut self, client: Client, headers: reqwest::header::HeaderMap) -> Self {
         self.client = client;
         self.extra_headers = headers;
+        self
+    }
+
+    pub(super) fn with_configured_model(
+        mut self,
+        model: crate::ai::config::CustomLlmModel,
+    ) -> Self {
+        self.configured_model = Some(model);
         self
     }
 
@@ -145,6 +155,15 @@ impl AnthropicProvider {
         }
         if !tools.is_empty() {
             body["tools"] = Value::Array(tools.iter().map(anthropic_tool).collect());
+        }
+        if let Some(model) = &self.configured_model {
+            model.apply_request_options(
+                "anthropic",
+                &mut body,
+                req.max_tokens.unwrap_or(model.max_output_tokens),
+                model.reasoning_efforts.first().map(String::as_str),
+                false,
+            );
         }
         body
     }

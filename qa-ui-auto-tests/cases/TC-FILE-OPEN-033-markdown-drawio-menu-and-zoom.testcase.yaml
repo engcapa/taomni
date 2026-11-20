@@ -1,0 +1,116 @@
+id: TC-FILE-OPEN-033
+title: Markdown zoom shortcuts and shared actions on a draw.io swimlane
+covers: [F-FILEOPEN-1, F-EXPLORER-1]
+modes: [browser, native]
+tags: [p1, markdown, drawio, regression]
+fixtures: [reset_db, markdown_drawio_roundtrip]
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-drawio-editing
+- reload_window: null
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-file-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Control+l
+    macos_key: Meta+l
+- fill:
+    selector: '[data-testid="explorer-address"]'
+    value: ${fixture.platform_workspace_root}
+- press:
+    selector: '[data-testid="explorer-address"]'
+    key: Enter
+- dblclick: '[data-testid="explorer-file-row"][data-name="drawio-actions.md"]'
+- wait_for: '[data-testid="markdown-live"]'
+- assert_text:
+    selector: '.fv-md-drawio svg foreignObject b'
+    contains: Check request
+    timeout_sec: 30
+- assert_visible: '.fv-md-drawio svg:has(path)'
+- press:
+    selector: '[data-testid="markdown-live"]'
+    key: Control+=
+- assert_attribute:
+    selector: '[data-testid="markdown-live"]'
+    name: data-zoom
+    equals: '110'
+- eval_readonly:
+    expression: parseFloat(getComputedStyle(document.querySelector('.fv-md-live-pane')).zoom) > 1
+    expect_truthy: true
+- click: '[data-testid="markdown-mode-source"]'
+- assert_attribute:
+    selector: '[data-testid="markdown-source"]'
+    name: data-zoom
+    equals: '110'
+- press:
+    selector: '[data-testid="markdown-source"]'
+    key: Control+-
+- assert_attribute:
+    selector: '[data-testid="markdown-source"]'
+    name: data-zoom
+    equals: '100'
+- click: '[data-testid="markdown-mode-split"]'
+- wait_for: '[data-testid="markdown-preview"] .fv-md-drawio svg'
+- right_click: '[data-testid="markdown-preview"] .fv-md-drawio'
+- assert_text:
+    selector: '[data-testid="markdown-diagram-menu-copy-source"]'
+    contains: Copy draw.io source
+- assert_visible: '[data-testid="markdown-diagram-menu-save-png"]'
+- assert_visible: '[data-testid="markdown-diagram-menu-save-drawio"]'
+- click: '[data-testid="markdown-diagram-menu-open"]'
+- wait_for: '[data-testid="markdown-diagram-stage"] .fv-md-diagram-svg svg:has(foreignObject)'
+- press:
+    selector: '[data-testid="markdown-diagram-stage"]'
+    key: r
+- assert_attribute:
+    selector: '[data-testid="markdown-diagram-stage"]'
+    name: data-rotation
+    equals: '90'
+- click: '[data-testid="markdown-diagram-close"]'
+- assert_not_visible: '[data-testid="markdown-diagram-viewer"]'
+- assert_no_runtime_errors: null
+- screenshot: markdown-drawio-actions.png
+verification:
+  review: reviewed
+  requirements:
+  - id: MARKDOWN-VIEW-ACTIONS
+    requirement: Markdown zoom shortcuts and shared actions on a draw.io swimlane.
+    actions: [14, 17, 19, 21, 23, 27, 29, 31]
+    checkpoints:
+    - step: 12
+      expectation: The draw.io preview displays the styled XHTML label.
+    - step: 13
+      expectation: The swimlane preview paints outline and connector paths.
+    - step: 15
+      expectation: Control+Equal increases Live zoom.
+    - step: 16
+      expectation: The visible document pane uses the updated CSS zoom.
+    - step: 18
+      expectation: Source keeps the current zoom.
+    - step: 20
+      expectation: Control+Minus reduces Source zoom.
+    - step: 24
+      expectation: The context menu identifies the draw.io source.
+    - step: 25
+      expectation: The menu exposes PNG export.
+    - step: 26
+      expectation: The menu exposes editable draw.io export.
+    - step: 28
+      expectation: The large view retains rich labels.
+    - step: 30
+      expectation: The large view supports the shared rotation controls.
+    - step: 32
+      expectation: The large view closes through its normal action.
+    - step: 33
+      expectation: The application reports no runtime errors.
+    results: [12, 13, 15, 16, 18, 20, 24, 25, 26, 28, 30, 32, 33]
+  visual:
+  - check: The content scale or diagram view responds to its controls.
+    method: automated
+    reason: Read the mounted controls and require the expected visible content.
+  native:
+  - check: Viewer interaction in the packaged application.
+    method: automated
+    reason: The native runner exercises the packaged UI using WebView input.

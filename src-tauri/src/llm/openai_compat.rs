@@ -96,6 +96,7 @@ impl ProviderCaps {
 /// Covers DeepSeek, GLM, SiliconFlow, Groq, Cerebras, Mistral, OpenAI, and any
 /// other provider that speaks the OpenAI chat completions API.
 pub struct OpenAiCompatProvider {
+    configured_model: Option<crate::ai::config::CustomLlmModel>,
     extra_headers: reqwest::header::HeaderMap,
     client: Client,
     base_url: String,
@@ -134,6 +135,7 @@ impl OpenAiCompatProvider {
             }
         }
         Self {
+            configured_model: None,
             extra_headers: reqwest::header::HeaderMap::new(),
             client: builder.build().expect("failed to build reqwest client"),
             base_url: base_url.into().trim_end_matches('/').to_string(),
@@ -148,6 +150,28 @@ impl OpenAiCompatProvider {
         self.client = client;
         self.extra_headers = headers;
         self
+    }
+
+    pub(super) fn with_configured_model(
+        mut self,
+        model: crate::ai::config::CustomLlmModel,
+    ) -> Self {
+        self.configured_model = Some(model);
+        self
+    }
+
+    fn request_body(&self, req: &ChatRequest, stream: bool, tools: &[ChatTool]) -> Value {
+        let mut body = openai_request_body(&self.model, req, stream, tools);
+        if let Some(model) = &self.configured_model {
+            model.apply_request_options(
+                "openai-compat",
+                &mut body,
+                req.max_tokens.unwrap_or(model.max_output_tokens),
+                model.reasoning_efforts.first().map(String::as_str),
+                false,
+            );
+        }
+        body
     }
 
     /// Build a preset for one of the known providers.
@@ -255,7 +279,7 @@ impl Llm for OpenAiCompatProvider {
         &self,
         req: ChatRequest,
     ) -> LlmResult<BoxStream<'static, LlmResult<ChatStreamEvent>>> {
-        let body = openai_request_body(&self.model, &req, true, &[]);
+        let body = self.request_body(&req, true, &[]);
 
         let url = format!("{}/chat/completions", self.base_url);
         let resp = self
@@ -344,7 +368,7 @@ impl Llm for OpenAiCompatProvider {
 
 impl OpenAiCompatProvider {
     async fn chat_once(&self, req: ChatRequest, tools: &[ChatTool]) -> LlmResult<ChatResponse> {
-        let body = openai_request_body(&self.model, &req, false, tools);
+        let body = self.request_body(&req, false, tools);
         let url = format!("{}/chat/completions", self.base_url);
         let resp = self
             .client

@@ -999,6 +999,13 @@
 
 ## database/sql (F-DB-1)
 
+- `[data-search-current="true"]` — display [optional] — F-DB-1.query-result-current-match
+- `[data-testid="query-result-grid-scroll"]` — interactive [optional] — F-DB-1.query-result-grid-scroll
+- `[data-testid="query-result-search"]` — display [optional] — F-DB-1.query-result-search
+- `input[aria-label="Search result set"]` — interactive [optional] — F-DB-1.query-result-search-input
+- `[data-testid="query-result-search-next"]` — interactive [optional] — F-DB-1.query-result-search-next
+- `[data-testid="query-result-search-previous"]` — interactive [optional] — F-DB-1.query-result-search-previous
+- `[data-testid="query-result-search-count"]` — display [optional] — F-DB-1.query-result-search-count
 - `[data-testid="session-database-section"]` — display [optional] — F-DB-1.database-section
 - `[data-testid="database-settings"]` — display [optional] — F-DB-1.database-settings
 - `input[aria-label="Database username"]` — interactive [optional] — F-DB-1.db-username
@@ -1138,6 +1145,8 @@
 - `[data-testid="explorer-cmd-cut"]` — interactive — F-EXPLORER-1.explorer-cmd-cut
 - `[data-testid="explorer-cmd-delete"]` — interactive — F-EXPLORER-1.explorer-cmd-delete
 - `[data-testid="explorer-cmd-more"]` — interactive — F-EXPLORER-1.explorer-cmd-more
+- `[data-testid="explorer-cmd-navigation"]` — interactive — F-EXPLORER-1.explorer-cmd-navigation
+- `[data-testid="explorer-nav-resize"]` — interactive — F-EXPLORER-1.explorer-nav-resize
 - `[data-testid="explorer-cmd-new"]` — interactive — F-EXPLORER-1.explorer-cmd-new
 - `[data-testid="explorer-cmd-newtab"]` — interactive — F-EXPLORER-1.explorer-cmd-newtab
 - `[data-testid="explorer-cmd-paste"]` — interactive — F-EXPLORER-1.explorer-cmd-paste
@@ -1148,6 +1157,10 @@
 - `[data-testid="explorer-cmd-view"]` — interactive — F-EXPLORER-1.explorer-cmd-view
 - `[data-testid="explorer-column-mtime"]` — interactive — F-EXPLORER-1.explorer-column-mtime
 - `[data-testid="explorer-column-name"]` — interactive — F-EXPLORER-1.explorer-column-name
+- `[data-testid="explorer-column-resize-name"]` — interactive — F-EXPLORER-1.explorer-column-resize-name
+- `[data-testid="explorer-column-resize-mtime"]` — interactive — F-EXPLORER-1.explorer-column-resize-mtime
+- `[data-testid="explorer-column-resize-type"]` — interactive — F-EXPLORER-1.explorer-column-resize-type
+- `[data-testid="explorer-column-resize-size"]` — interactive — F-EXPLORER-1.explorer-column-resize-size
 - `[data-testid="explorer-column-size"]` — interactive — F-EXPLORER-1.explorer-column-size
 - `[data-testid="explorer-column-type"]` — interactive — F-EXPLORER-1.explorer-column-type
 - `[data-testid="explorer-command-bar"]` — display — F-EXPLORER-1.explorer-command-bar
@@ -1233,6 +1246,16 @@
 
 ## files/viewer (F-FILEOPEN-1)
 
+- `[data-testid="file-open-markdown-restrict-remote"]` — interactive — F-FILEOPEN-1.file-open-markdown-restrict-remote
+- `[data-testid="markdown-image-proxy-mode"]` — interactive — F-FILEOPEN-1.markdown-image-proxy-mode
+- `[data-testid="markdown-image-custom-proxy-panel"] input[aria-label="Proxy host"]` — interactive — F-FILEOPEN-1.markdown-image-proxy-host
+- `[data-testid="markdown-image-custom-proxy-panel"] input[type="number"]` — interactive — F-FILEOPEN-1.markdown-image-proxy-port
+- `[data-testid="markdown-live-context-menu"]` — display — F-FILEOPEN-1.markdown-live-context-menu
+- `[data-testid="markdown-live-copy-selection"]` — interactive — F-FILEOPEN-1.markdown-live-copy-selection
+- `[data-testid="markdown-live-select-all"]` — interactive — F-FILEOPEN-1.markdown-live-select-all
+- `[data-testid="markdown-image-tools"]` — display — F-FILEOPEN-1.markdown-image-tools
+- `[data-testid="markdown-export-open-tao"]` — interactive [optional] — F-FILEOPEN-1.markdown-export-open-tao
+- `[data-testid="markdown-export-show-system"]` — interactive [optional] — F-FILEOPEN-1.markdown-export-show-system
 - `[data-testid="file-viewer"]` — display — F-FILEOPEN-1.file-viewer
 - `[data-testid="viewer-editor"]` — interactive — F-FILEOPEN-1.viewer-editor
 - `[data-testid="viewer-save"]` — interactive — F-FILEOPEN-1.viewer-save
@@ -1300,10 +1323,14 @@
 - `[data-testid="markdown-focus"]` — interactive — F-FILEOPEN-1.markdown-focus
 - `[data-testid="markdown-format-bold"]` — interactive — F-FILEOPEN-1.markdown-format-bold
 - `[data-testid="markdown-outline"]` — interactive — F-FILEOPEN-1.markdown-outline
+- `[data-testid="markdown-outline-toggle"]` — interactive — F-FILEOPEN-1.markdown-outline-toggle
 - `[data-testid="markdown-preview"]` — display — F-FILEOPEN-1.markdown-preview
 - `[data-testid="markdown-live-edit"]` — interactive — F-FILEOPEN-1.markdown-live-edit
 - `[data-testid="markdown-split-resize"]` — interactive — F-FILEOPEN-1.markdown-split-resize
 - `[data-testid="markdown-preview-appearance"]` — interactive — F-FILEOPEN-1.markdown-preview-appearance
+- `[data-testid="markdown-preview-appearance-options"]` — display — F-FILEOPEN-1.markdown-preview-appearance-options
+- `[data-testid="markdown-heading-options"]` — display — F-FILEOPEN-1.markdown-heading-options
+- `[data-testid="markdown-heading"]` — interactive — F-FILEOPEN-1.markdown-heading
 - `[data-testid="markdown-table-widget"]` — interactive — F-FILEOPEN-1.markdown-table-widget
 - `[data-testid="markdown-image-widget"]` — interactive — F-FILEOPEN-1.markdown-image-widget
 - `[data-testid="markdown-paste-status"]` — display — F-FILEOPEN-1.markdown-paste-status
@@ -1326,6 +1353,8 @@
 - `.fv-md-drawio-source` — display — F-FILEOPEN-1.markdown-original-drawio
 - `[data-testid="markdown-export-drawio"]` — interactive — F-FILEOPEN-1.markdown-export-drawio
 - `[data-testid="markdown-import-drawio"]` — interactive — F-FILEOPEN-1.markdown-import-drawio
+  ↳ `.fv-md-format [data-testid="markdown-import-drawio"]` — alias
+  ↳ `.fv-md-format [data-testid="markdown-insert-image"] + [data-testid="markdown-import-drawio"]` — alias
 - `[data-testid="markdown-drawio-input"]` — interactive — F-FILEOPEN-1.markdown-drawio-input
 - `[data-testid="markdown-drawio-export-settings"]` — display — F-FILEOPEN-1.markdown-drawio-export-settings
 - `[data-testid="markdown-drawio-import-dialog"]` — display — F-FILEOPEN-1.markdown-drawio-import-dialog
@@ -1957,6 +1986,7 @@
 - `[data-testid="tab-overview-trigger"]` — interactive — F1.5.tab-overview-trigger
 - `[data-testid="tab-overview"]` — display — F1.5.tab-overview
 - `[data-testid="tab-overview-card"]` — interactive — F1.5.tab-overview-card
+- `[data-testid="tab-overview-enlarged"]` — display — F1.5.tab-overview-enlarged
 - `[data-testid="tab-overview-card-title"]` — display — F1.5.tab-overview-card-title
 - `[data-testid="tab-overview-summary"]` — display — F1.5.tab-overview-summary
 - `[data-testid="tab-overview-close"]` — interactive — F1.5.tab-overview-close
@@ -2026,6 +2056,7 @@
 - `[data-testid="welcome-history-tab-sessions"]` — interactive — F1.6.history-tab-sessions
   ↳ `[data-testid="tao-home-history-popover"] [data-testid="tao-home-history-tab-sessions"]` — alias
 - `[data-testid="welcome-history-tab-directories"]` — interactive — F1.6.history-tab-directories
+  ↳ `[data-testid="tao-home-history-popover"] [data-testid="tao-home-history-tab-directories"]` — alias
 - `[data-testid="welcome-local-directories"]` — display — F1.6.local-directories
 - `[data-testid="welcome-local-directory-filter"]` — interactive — F1.6.local-directory-filter
 - `[data-testid="welcome-restore-row"]` — display — F1.6.restore-row
@@ -2112,9 +2143,15 @@
 - `[data-testid="workspace-create-button"]` — interactive [optional] — F-WS-1.workspace-create-button
 - `[data-testid^="open-tabs-tab-"]:not([data-testid^="open-tabs-tab-checkbox-"])` — interactive [optional] — F-WS-1.open-tabs-search-result
 - `[data-testid^="workspace-switcher-option-"]:not([data-testid="workspace-switcher-option-default-workspace"])` — interactive [optional] — F-WS-1.workspace-custom-switcher-option
+  ↳ `xpath=//*[@data-testid="workspace-switcher-menu"]//*[text()="Sample project"]` — alias
 
 ## main/workspace-platform (F-WS-2)
 
+- `[data-testid="workspace-switcher-menu-delete"]` — interactive [optional] — F-WS-2.workspace-switcher-menu-delete
+- `[data-testid="workspace-root-current"]` — interactive [optional] — F-WS-2.workspace-root-current
+- `[data-testid="workspace-root-new"]` — interactive [optional] — F-WS-2.workspace-root-new
+- `[data-testid="workspace-root-name"]` — interactive [optional] — F-WS-2.workspace-root-name
+- `[data-testid="workspace-switcher-menu-rename"]` — interactive [optional] — F-WS-2.workspace-switcher-menu-rename
 - `[data-testid="code-workspace-tree-viewport"]` — display [optional] — F-WS-2.code-workspace-tree-viewport
 - `[data-testid="code-workspace-tree-view-all-files"]` — interactive — F-WS-2.code-workspace-tree-view-all-files
 - `[data-testid="code-workspace-tree-search"]` — interactive — F-WS-2.code-workspace-tree-search
@@ -3652,6 +3689,9 @@
 - `[data-testid="tao-home-plus"]` — interactive — F1.11.tao-home-plus
 - `[data-testid="tao-home-voice"]` — interactive — F1.11.tao-home-voice
 - `[data-testid="tao-home-shell-menu"]` — interactive — F1.11.tao-home-shell-menu
+- `[data-testid="tao-home-shell-options"]` — interactive — F1.11.tao-home-shell-options
+- `[data-testid="tao-home-history-sort"]` — interactive — F1.11.tao-home-history-sort
+- `[data-testid="tao-home-history-sort-options"]` — display — F1.11.tao-home-history-sort-options
 - `[data-testid="tao-home-side-panel"]` — display — F1.11.tao-home-side-panel
 - `[data-testid="tao-home-files"]` — display — F1.11.tao-home-files
 - `[data-testid="tao-home-workflows"]` — display — F1.11.tao-home-workflows
@@ -3668,7 +3708,6 @@
 - `[role="dialog"] button:has-text("Skills / workflows")` — interactive — F1.11.tao-home-popup-workflows
 - `[role="dialog"] button:has-text("Thinking")` — interactive — F1.11.tao-home-popup-thinking
 - `[role="dialog"] button:has-text("Web")` — interactive — F1.11.tao-home-popup-web
-- `[role="dialog"] select[aria-label="Choose shell"]` — interactive — F1.11.tao-home-popup-shell-select
 - `xpath=//*[@role="dialog"]//button[normalize-space(.)="Open home directory"]` — interactive — F1.11.tao-home-popup-shell-home
 - `[data-testid="tao-home-send"]` — interactive — F1.11.tao-home-send
 - `[data-testid="tao-home-stop"]` — interactive — F1.11.tao-home-stop
@@ -3690,6 +3729,31 @@
 - `[data-testid="tao-settings-provider"]` — interactive — F1.11.tao-settings-provider
 - `[data-testid="tao-settings-model"]` — interactive — F1.11.tao-settings-model
 - `[data-testid="tao-settings-cost"]` — interactive — F1.11.tao-settings-cost
+- `[data-testid="tao-privacy-summary"]` — display [optional] — F1.11.tao-privacy-summary
+- `[data-testid="tao-settings-thinking"]` — interactive [optional] — F1.11.tao-settings-thinking
+- `[data-testid="tao-settings-web"]` — interactive [optional] — F1.11.tao-settings-web
+- `[data-testid="tao-search-sources"]` — interactive [optional] — F1.11.tao-search-sources
+- `[data-testid="tao-search-sources-menu"]` — display [optional] — F1.11.tao-search-sources-menu
+- `[data-testid="tao-search-source-sql"]` — interactive [optional] — F1.11.tao-search-source-sql
+- `[data-testid="tao-search-source-groups"]` — interactive [optional] — F1.11.tao-search-source-groups
+- `[data-testid="tao-search-source-file_contents"]` — interactive [optional] — F1.11.tao-search-source-file_contents
+- `[data-testid="llm-add-custom-provider"]` — interactive [optional] — F1.11.llm-add-custom-provider
+- `[data-testid="llm-custom-toggle"]` — interactive [optional] — F1.11.llm-custom-toggle
+- `[data-testid="llm-custom-fields"]` — display [optional] — F1.11.llm-custom-fields
+- `[data-testid="llm-custom-name"]` — interactive [optional] — F1.11.llm-custom-name
+- `[data-testid="llm-custom-protocol"]` — interactive [optional] — F1.11.llm-custom-protocol
+- `[data-testid="llm-custom-add-model"]` — interactive [optional] — F1.11.llm-custom-add-model
+- `[data-testid="llm-custom-model-row"]` — display [optional] — F1.11.llm-custom-model-row
+- `[data-testid="llm-custom-model-id"]` — interactive [optional] — F1.11.llm-custom-model-id
+- `[data-testid="llm-custom-context"]` — interactive [optional] — F1.11.llm-custom-context
+- `[data-testid="llm-custom-max-output"]` — interactive [optional] — F1.11.llm-custom-max-output
+- `[data-testid="llm-custom-multimodal"]` — interactive [optional] — F1.11.llm-custom-multimodal
+- `[data-testid="llm-custom-native-search"]` — interactive [optional] — F1.11.llm-custom-native-search
+- `[data-testid="llm-custom-default-model"]` — interactive [optional] — F1.11.llm-custom-default-model
+- `[data-testid="llm-custom-remove-model"]` — interactive [optional] — F1.11.llm-custom-remove-model
+- `[data-testid="llm-custom-remove"]` — interactive [optional] — F1.11.llm-custom-remove
+- `[data-testid="llm-custom-effort-high"]` — interactive [optional] — F1.11.llm-custom-effort-high
+- `[data-testid="llm-custom-effort-xhigh"]` — interactive [optional] — F1.11.llm-custom-effort-xhigh
 - `[data-testid="tao-settings-tts"]` — interactive — F1.11.tao-settings-tts
 - `[data-testid="tao-home-model"]` — interactive — F1.11.tao-home-model
 - `[data-provider="deepseek-app"] [data-testid="llm-proxy-mode"]` — interactive — F1.11.tao-shared-provider-proxy

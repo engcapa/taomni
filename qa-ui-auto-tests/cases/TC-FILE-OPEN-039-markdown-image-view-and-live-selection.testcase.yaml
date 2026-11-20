@@ -1,0 +1,86 @@
+id: TC-FILE-OPEN-039
+title: Markdown hover opens the image viewer and Live browse owns its context menus
+covers: [F-FILEOPEN-1, F-EXPLORER-1]
+modes: [browser, native]
+tags: [p1, markdown, file-open, drawio]
+fixtures: [reset_db, markdown_remote_images]
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-markdown-image-controls
+- reload_window: null
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-file-explorer"]'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Mod+l
+- fill:
+    selector: '[data-testid="explorer-address"]'
+    value: ${fixture.platform_workspace_root}
+- press:
+    selector: '[data-testid="explorer-address"]'
+    key: Enter
+- dblclick: '[data-testid="explorer-file-row"][data-name="image-interactions.md"]'
+- eval_readonly:
+    expression: document.querySelector('.fv-md-image img')?.naturalWidth === 96
+    expect_truthy: true
+    timeout_sec: 25
+- assert_not_visible: '[data-testid="markdown-image-tools"]'
+- hover: '[data-testid="markdown-image-widget"] img'
+- click: '[data-testid="markdown-image-tools"] [data-testid="markdown-diagram-open"]'
+- wait_for: '[data-testid="markdown-diagram-stage"] img[alt="Remote fixture"]'
+- click: '[data-testid="markdown-diagram-view-rotate-right"]'
+- assert_attribute:
+    selector: '[data-testid="markdown-diagram-stage"]'
+    name: data-rotation
+    equals: '90'
+- click: '[data-testid="markdown-diagram-view-flip-h"]'
+- assert_attribute:
+    selector: '[data-testid="markdown-diagram-stage"]'
+    name: data-flip-x
+    equals: 'true'
+- click: '[data-testid="markdown-diagram-close"]'
+- assert_not_visible: '[data-testid="markdown-diagram-viewer"]'
+- right_click: '[data-testid="markdown-live"] .fv-md-rendered-block > p'
+- click: '[data-testid="markdown-live-select-all"]'
+- eval_readonly:
+    expression: window.getSelection()?.toString().includes('Copy this rendered sentence.')
+    expect_truthy: true
+- right_click: '[data-testid="markdown-live"] .fv-md-rendered-block > p'
+- assert_visible: '[data-testid="markdown-live-copy-selection"]:not(:disabled)'
+- click: '[data-testid="markdown-live-copy-selection"]'
+- assert_not_visible: '[data-testid="markdown-live-context-menu"]'
+- wait_for: '[data-testid="markdown-live"] .fv-md-mermaid svg'
+- right_click: '[data-testid="markdown-live"] .fv-md-mermaid'
+- assert_visible: '[data-testid="markdown-diagram-menu-copy-source"]'
+- click: '[data-testid="markdown-outline-toggle"]'
+- assert_not_visible: '[data-testid="markdown-outline"]'
+- assert_not_visible: '[data-testid="markdown-diagram-menu"]'
+# The renderer bounds both frame startup and drawing to 20 seconds each.
+- wait_for:
+    selector: '[data-testid="markdown-live"] :is(.fv-md-drawio svg, .fv-md-render-error)'
+    timeout_sec: 42
+- assert_visible: '[data-testid="markdown-live"] .fv-md-drawio svg'
+- right_click: '[data-testid="markdown-live"] .fv-md-drawio'
+- assert_visible: '[data-testid="markdown-diagram-menu-copy-source"]'
+- blur: '[data-testid="markdown-diagram-menu-open"]'
+- click: '[data-testid="markdown-outline-toggle"]'
+- assert_visible: '[data-testid="markdown-outline"]'
+- assert_not_visible: '[data-testid="markdown-diagram-menu"]'
+- click: '[data-testid="markdown-mode-split"]'
+- eval_readonly:
+    expression: document.querySelector('.fv-md-preview-pane img')?.naturalWidth === 96
+    expect_truthy: true
+    timeout_sec: 20
+- hover: '[data-testid="markdown-preview"] img[alt="Remote fixture"]'
+- click: '[data-testid="markdown-image-tools"] [data-testid="markdown-diagram-open"]'
+- wait_for: '[data-testid="markdown-diagram-stage"] img[alt="Remote fixture"]'
+- press:
+    selector: '[data-testid="markdown-diagram-stage"]'
+    key: Escape
+- assert_not_visible: '[data-testid="markdown-diagram-viewer"]'
+- assert_attribute:
+    selector: '[data-testid="file-viewer"]'
+    name: data-dirty
+    equals: 'false'
+- assert_no_runtime_errors: null

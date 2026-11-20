@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { DrawioPage } from "./drawioCodec";
 import { drawioToMarkdown, type DrawioImportMode } from "./drawioImport";
 import { renderDrawioPage, safeDrawioModel, type DrawioPreview } from "./drawioRender";
+import { drawioMissingImagesMessage } from "./drawioImageStyle";
 import { useViewerLabels } from "../viewerLabels";
 import "./drawio.css";
 
@@ -42,7 +43,11 @@ export function DrawioImportDialog({ pages, onCancel, onInsert }: { pages: Drawi
         </div>
         <div className="fv-md-drawio-preview" data-testid="markdown-drawio-import-preview">
           {rendering && <p role="status">{label("正在生成预览…", "Rendering preview…")}</p>}
-          {preview && <><div dangerouslySetInnerHTML={{ __html: preview.svg }} />{preview.warnings.map((warning) => <p key={warning} role="status">{warning}</p>)}</>}
+          {preview && <>
+            <div dangerouslySetInnerHTML={{ __html: preview.svg }} />
+            {preview.missingImages > 0 && <p role="status">{drawioMissingImagesMessage(preview.missingImages)}</p>}
+            {preview.warnings.map((warning) => <p key={warning} role="status">{warning}</p>)}
+          </>}
           {error && <p role="alert">{error}</p>}
         </div>
       </div>
@@ -55,7 +60,7 @@ export function DrawioImportDialog({ pages, onCancel, onInsert }: { pages: Drawi
         if (!mode) return;
         try {
           const selection = pages.filter((page) => selected.has(page.id));
-          selection.forEach(safeDrawioModel);
+          selection.forEach((page) => safeDrawioModel(page));
           onInsert(drawioToMarkdown(selection, mode));
         } catch (cause) { setError(String(cause)); }
       }}>{label("插入所选页面", "Insert selected sheets")} ({selected.size})</button></footer>

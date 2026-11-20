@@ -1,7 +1,7 @@
 id: TC-WELCOME-RS-02-restore-single
-title: Home history restores a saved folder and locates the same tab on repeat
-description: Reuse the existing saved-folder snapshot through the Tao Home history footer. Assert the
-  active filesystem pane, selected absolute directory, and no duplicate tab after repeated restoration.
+title: Home restores a saved folder from the top action and locates the same tab from History
+description: Keyboard-activate the new Home restore row, then repeat from History and assert the original active filesystem pane
+  and tab count.
 covers:
 - F1.6
 - F1.11
@@ -27,9 +27,11 @@ steps:
     selector: '[data-testid="tao-home-history-popover"] [data-testid="tao-home-history-tab-sessions"]'
     name: aria-selected
     equals: 'true'
-- wait_for: '[data-testid="tao-home-history-restore"]:enabled'
-- assert_visible: .tao-home-history-footer
-- click: '[data-testid="tao-home-history-restore"]'
+- press: Escape
+- assert_visible: '[data-testid="welcome-restore-row"]'
+- press:
+    selector: '[data-testid="welcome-restore-last-session"]'
+    key: Enter
 - wait_for: '[data-testid="explorer-tab"][data-active="true"]'
 - assert_attribute:
     selector: '[data-testid="explorer-tab"][data-active="true"]'
@@ -52,8 +54,8 @@ verification:
   review: reviewed
   requirements:
   - id: HOME-RESTORE-FOLDER
-    requirement: Reuse the existing saved-folder snapshot through the Tao Home history footer. Assert
-      the active filesystem pane, selected absolute directory, and no duplicate tab after repeated restoration.
+    requirement: Keyboard-activate the new Home restore row, then repeat from History and assert the original active filesystem
+      pane and tab count.
     actions:
     - 3
     - 10
@@ -64,7 +66,7 @@ verification:
     - 6
     checkpoints:
     - step: 12
-      expectation: The Home footer restores the actual fixture folder.
+      expectation: Keyboard activation restores the actual fixture folder.
     - step: 13
       expectation: Restoration opens exactly one file-browser tab.
     - step: 19
@@ -72,7 +74,7 @@ verification:
     - step: 20
       expectation: Both routes complete without runtime errors.
     - step: 9
-      expectation: The migrated restore footer is visible inside Home history.
+      expectation: The restore row is visible directly in Home.
     - step: 7
       expectation: History switches from directories back to sessions while preserving the restore entry.
     results:
@@ -89,5 +91,4 @@ verification:
   native:
   - check: Native local PTY restoration is covered by TC-WELCOME-RS-N-04-restore-local-shell
     method: automated
-    reason: This case intentionally covers browser saved-folder restoration; native shell creation uses
-      its retained native case.
+    reason: This case intentionally covers browser saved-folder restoration; native shell creation uses its retained native case.

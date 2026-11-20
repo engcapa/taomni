@@ -30,11 +30,12 @@ export function explorerCrumbs(path: string): ExplorerCrumb[] {
   })];
 }
 
-export function sameExplorerPath(a: string, b: string) {
-  const windows = /^[a-z]:|^[\\/]{2}/i.test(a) || /^[a-z]:|^[\\/]{2}/i.test(b);
-  const key = (path: string) => {
-    const clean = (windows ? path.replace(/\\/g, "/") : path).replace(/\/+$/, "") || "/";
-    return windows ? clean.toLowerCase() : clean;
-  };
-  return key(a) === key(b);
+export function explorerPathKey(path: string): string {
+  const windows = /^[a-z]:|^[\\/]{2}/i.test(path);
+  const clean = (windows ? path.replace(/\\/g, "/") : path).replace(/\/+$/, "") || "/";
+  return windows ? clean.toLowerCase() : clean;
+}
+
+export function sameExplorerPath(a: string, b: string): boolean {
+  return explorerPathKey(a) === explorerPathKey(b);
 }

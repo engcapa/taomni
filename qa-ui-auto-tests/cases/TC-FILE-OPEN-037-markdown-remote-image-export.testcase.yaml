@@ -1,0 +1,64 @@
+id: TC-FILE-OPEN-037
+title: Markdown remote images render and export until disabled in Settings
+covers: [F-FILEOPEN-1, F-EXPLORER-1]
+modes: [browser]
+tags: [p1, markdown, file-open, export]
+fixtures: [reset_db, markdown_remote_images]
+timeout_sec: 150
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-markdown-remote
+- reload_window: null
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-file-explorer"]'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Mod+l
+- fill:
+    selector: '[data-testid="explorer-address"]'
+    value: ${fixture.platform_workspace_root}
+- press:
+    selector: '[data-testid="explorer-address"]'
+    key: Enter
+- dblclick: '[data-testid="explorer-file-row"][data-name="remote-images.md"]'
+- eval_readonly:
+    expression: document.querySelector('.fv-md-image img')?.naturalWidth === 96
+    expect_truthy: true
+    timeout_sec: 20
+- click: '[data-testid="markdown-export"]'
+- assert_download:
+    trigger: '[data-testid="markdown-export-html"]'
+    filename: remote-images.html
+    contains: [Remote fixture, 'src="data:image/png;base64,iVBORw0KGgo', 'img-src data:']
+- click: '[data-testid="ribbon-settings"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: files and opening
+- eval_readonly:
+    expression: document.getElementById('file-open-markdown-restrict-remote')?.checked === false && document.getElementById('markdown-image-proxy-mode')?.value === 'app'
+    expect_truthy: true
+- set_check:
+    selector: '[data-testid="file-open-markdown-restrict-remote"]'
+    checked: true
+- click: '[data-testid="tab-item"][data-tab-type="file-viewer"]'
+- assert_text:
+    selector: '[data-testid="markdown-image-widget"] figcaption'
+    contains: Remote images are blocked
+- click: '[data-testid="markdown-mode-split"]'
+- wait_for: '[data-testid="markdown-preview"] img[title*="Remote images are blocked"]:not([src])'
+- click: '[data-testid="markdown-export"]'
+- click: '[data-testid="markdown-export-html"]'
+- assert_attribute:
+    selector: '[data-testid="markdown-export-status"]'
+    name: data-export-state
+    equals: failed
+- click: '[data-testid="ribbon-settings"]'
+- set_check:
+    selector: '[data-testid="file-open-markdown-restrict-remote"]'
+    checked: false
+- click: '[data-testid="tab-item"][data-tab-type="file-viewer"]'
+- eval_readonly:
+    expression: document.querySelector('.fv-md-preview-pane img')?.naturalWidth === 96
+    expect_truthy: true
+    timeout_sec: 20
+- assert_no_runtime_errors: null

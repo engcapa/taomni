@@ -16,7 +16,9 @@ describe("Tao configured ordinary LLM providers", () => {
       harness: { ...base, runtime: "claude-cli" },
     };
     expect(taoProviderOptions(value).map((provider) => provider.id)).toEqual(["custom", "claude"]);
-    expect(taoProviderOptions(value)[0]).toMatchObject({ model: "custom-model", models: ["custom-model"], thinking: false, web: false });
+    const option = taoProviderOptions(value)[0];
+    expect(option).toMatchObject({ model: "custom-model", models: ["custom-model"] });
+    expect(option.capabilities("custom-model")).toMatchObject({ thinking: false, web: false });
   });
 
   it("allows keyless loopback, blocks cloud in local mode and respects AI disabled", () => {

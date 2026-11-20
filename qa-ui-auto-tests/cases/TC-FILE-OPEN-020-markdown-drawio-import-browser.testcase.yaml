@@ -35,8 +35,9 @@ steps:
     equal: 2
 - assert_disabled: '[data-testid="markdown-drawio-import-confirm"]'
 - assert_text:
-    selector: '[data-testid="markdown-drawio-import-preview"]'
+    selector: '[data-testid="markdown-drawio-import-preview"] svg'
     contains: Start 开始
+    timeout_sec: 30
 - click: '[data-testid="markdown-drawio-import-diagram"]'
 - click: '[data-testid="markdown-drawio-import-confirm"]'
 - wait_for: .fv-md-drawio svg
@@ -75,7 +76,7 @@ steps:
 - wait_for: '[data-testid="markdown-drawio-import-dialog"]'
 - assert_text:
     selector: '[data-testid="markdown-drawio-import-preview"]'
-    contains: external or unsupported image
+    contains: unsafe image reference
 - assert_disabled: '[data-testid="markdown-drawio-import-confirm"]'
 - press:
     selector: '[data-testid="markdown-drawio-import-dialog"]'

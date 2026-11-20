@@ -4,6 +4,7 @@ import { drawioToMarkdown } from "./drawioImport";
 import { drawioCell, newDrawioPage, parseDrawio } from "./drawioCodec";
 import { inspectMermaidDiagram } from "../../editor/workspace/model/mermaid";
 import { DEFAULT_DIAGRAM_VIEW, rememberDiagram, snapshotDiagram } from "./diagramModel";
+import { rememberDrawio } from "./drawioRender";
 
 vi.mock("../../editor/workspace/model/mermaid", () => ({ inspectMermaidDiagram: vi.fn() }));
 afterEach(() => vi.restoreAllMocks());
@@ -36,6 +37,39 @@ describe("editable document export and text/table recovery", () => {
     expect(text).toContain("```drawio\n"); expect(text).toContain("```drawio-source\n");
     expect(() => drawioToMarkdown([], "diagram")).toThrow(/Select/);
   });
+  it("re-exports an independent sheet with its original layers, IDs and page settings", async () => {
+    const page = newDrawioPage("original", "Parking map");
+    page.model.setAttribute("background", "#f0f5ff");
+    page.model.setAttribute("pageWidth", "1600");
+    page.model.querySelector("mxCell[id='1']")!.setAttribute("value", "Background layer");
+    drawioCell(page, { id: "spot", vertex: 1, value: "Parking spot", style: "shape=rectangle;" }, { x: 50, width: 120, height: 80 });
+    const root = document.createElement("div");
+    const preview = document.createElement("div");
+    preview.className = "fv-md-drawio";
+    root.append(preview);
+    rememberDrawio(preview, page);
+
+    const exported = await markdownDrawio(root, "parking", { scope: "images", layout: "separate" });
+    const [sheet] = parseDrawio(exported.xml);
+    expect(sheet.model.isEqualNode(page.model)).toBe(true);
+    expect(exported.nativeDiagrams).toBe(1);
+  });
+  it("keeps imported layer visibility and connected cells in a one-sheet export", async () => {
+    const [page] = parseDrawio('<mxGraphModel><root><mxCell id="diagram-root"/><mxCell id="primary" parent="diagram-root"/>'
+      + '<mxCell id="secondary" parent="diagram-root" visible="0"/><object id="start" label="Start"><mxCell parent="primary" vertex="1"/></object>'
+      + '<mxCell id="end" parent="secondary" vertex="1"/><mxCell id="link" parent="primary" edge="1" source="start" target="end"/></root></mxGraphModel>');
+    const root = document.createElement("div");
+    root.innerHTML = '<div class="fv-md-drawio"><svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 200"/></div>';
+    rememberDrawio(root.firstElementChild as HTMLElement, page);
+
+    const exported = await markdownDrawio(root, "Imported diagram", { scope: "images", layout: "single" });
+    const [{ model }] = parseDrawio(exported.xml);
+    expect(model.querySelector('mxCell[id="import-1-secondary"]')?.getAttribute("visible")).toBe("0");
+    expect(model.querySelector('object[id="import-1-start"] mxCell')?.getAttribute("parent")).toBe("import-1-primary");
+    expect(model.querySelector('mxCell[id="import-1-end"]')?.getAttribute("parent")).toBe("import-1-secondary");
+    expect(model.querySelector('mxCell[edge="1"]')?.getAttribute("source")).toBe("import-1-start");
+    expect(model.querySelector('mxCell[edge="1"]')?.getAttribute("target")).toBe("import-1-end");
+  });
   it("restores standard diagrams.net table rows without Taomni metadata", () => {
     const page = newDrawioPage("a", "External table");
     drawioCell(page, { id: "table", vertex: 1, style: "shape=table;" }, { width: 400, height: 80 });
@@ -57,7 +91,9 @@ it("converts parsed Mermaid nodes and real connected edges into editable native 
   const output = await singleDiagramDrawio(snapshotDiagram(element, "flow"), DEFAULT_DIAGRAM_VIEW);
   const model = parseDrawio(output.xml)[0].model;
   const edge = model.querySelector("mxCell[edge='1']")!;
-  expect(model.querySelectorAll("mxCell[vertex='1']")).toHaveLength(3);
+  expect(model.querySelectorAll("mxCell[vertex='1']")).toHaveLength(2);
+  expect(model.querySelectorAll("mxCell[vertex='1'],mxCell[edge='1']")).toSatisfy((cells: NodeListOf<Element>) => Array.from(cells).every((cell) => cell.getAttribute("parent") === "1"));
+  expect(model.querySelector("mxCell[style^='group;']")).toBeNull();
   expect(edge.getAttribute("source")).toBe("mermaid-node-0"); expect(edge.getAttribute("target")).toBe("mermaid-node-1");
   expect(edge.querySelector("mxGeometry")?.getAttribute("relative")).toBe("1");
   expect(model.querySelector("object")?.getAttribute("mermaidSource")).toContain("flowchart LR");

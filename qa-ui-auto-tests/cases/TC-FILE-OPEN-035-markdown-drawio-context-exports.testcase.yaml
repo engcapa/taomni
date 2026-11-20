@@ -1,0 +1,75 @@
+id: TC-FILE-OPEN-035
+title: Draw.io context actions produce rich SVG, PNG and editable XML downloads
+covers: [F-FILEOPEN-1, F-EXPLORER-1]
+modes: [browser]
+tags: [p1, markdown, drawio, regression]
+fixtures: [reset_db, markdown_drawio_roundtrip]
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-drawio-editing
+- reload_window: null
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-file-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Control+l
+    macos_key: Meta+l
+- fill:
+    selector: '[data-testid="explorer-address"]'
+    value: ${fixture.platform_workspace_root}
+- press:
+    selector: '[data-testid="explorer-address"]'
+    key: Enter
+- dblclick: '[data-testid="explorer-file-row"][data-name="drawio-actions.md"]'
+- wait_for: '[data-testid="markdown-live"]'
+- wait_for: .fv-md-drawio svg
+- right_click: .fv-md-drawio
+- click: '[data-testid="markdown-diagram-menu-copy-source"]'
+- assert_text:
+    selector: '[data-testid="markdown-diagram-status"]'
+    contains: Copied
+- right_click: .fv-md-drawio
+- assert_download:
+    trigger: '[data-testid="markdown-diagram-menu-save-png"]'
+    filename: drawio-actions-diagram-1.png
+    contains: [PNG]
+    artifact: drawio-png
+- right_click: .fv-md-drawio
+- assert_download:
+    trigger: '[data-testid="markdown-diagram-menu-save-svg"]'
+    filename: drawio-actions-diagram-1.svg
+    contains: [foreignObject, Check request]
+- right_click: .fv-md-drawio
+- assert_download:
+    trigger: '[data-testid="markdown-diagram-menu-save-drawio"]'
+    filename: drawio-actions-diagram-1.drawio
+    contains: ['source="request"', 'target="done"', 'shape=link']
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: DRAWIO-CONTEXT-EXPORT
+    requirement: Save SVG, PNG and editable draw.io XML through the shared context menu.
+    actions: [13, 14, 16, 18, 20]
+    checkpoints:
+    - step: 15
+      expectation: Copy Source completes through the browser clipboard.
+    - step: 17
+      expectation: Save PNG produces a high-resolution raster with the request node and its label.
+    - step: 19
+      expectation: The SVG retains its styled XHTML label.
+    - step: 21
+      expectation: The XML contains the editable routed connector and both original terminals.
+    - step: 22
+      expectation: No runtime errors were recorded.
+    results: [15, 17, 19, 21, 22]
+  visual:
+  - check: Export retains the diagram and its label.
+    method: automated
+    reason: Read the saved files and require their diagram content.
+  native:
+  - check: Clipboard and OS chooser.
+    method: not-applicable
+    reason: TC-FILE-OPEN-032 covers native editable save and TC-FILE-OPEN-036 covers the native PNG chooser and disk artifact.

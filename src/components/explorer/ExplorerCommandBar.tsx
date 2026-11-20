@@ -1,4 +1,4 @@
-import { ArrowDownWideNarrow, ChevronDown, ClipboardPaste, Copy, ExternalLink, FolderPlus, LayoutGrid, List, MoreHorizontal, PanelRight, Pencil, Plus, Scissors, Terminal, Trash2 } from "lucide-react";
+import { ArrowDownWideNarrow, ChevronDown, ClipboardPaste, Copy, ExternalLink, FolderPlus, LayoutGrid, List, MoreHorizontal, PanelLeft, PanelRight, Pencil, Plus, Scissors, Terminal, Trash2 } from "lucide-react";
 import type { FileEntry } from "../../lib/sftp";
 import { readExplorerRestoreEnabled, setExplorerRestoreEnabled } from "../../lib/explorer/tabRecovery";
 import { useContextMenu, type MenuItem } from "../ContextMenu";
@@ -9,10 +9,11 @@ import { fileOpenMenu } from "./fileOpenMenu";
 import { classifyFile, supportsFileViewer } from "../../lib/openFile";
 import { openFile } from "../../lib/openFile";
 
-export function ExplorerCommandBar({ path, workspaceId, selected, operations, onOpenTerminal, onOpenExplorer, previewVisible, onTogglePreview }: {
+export function ExplorerCommandBar({ path, workspaceId, selected, operations, onOpenTerminal, onOpenExplorer, previewVisible, onTogglePreview, navigationId, onToggleNavigation }: {
   path: string; workspaceId?: string; selected: FileEntry[]; operations: ExplorerOperations;
   onOpenTerminal: (path: string) => void; onOpenExplorer: (path: string, forceNew?: boolean) => void;
   previewVisible: boolean; onTogglePreview: () => void;
+  navigationId: string; onToggleNavigation: () => void;
 }) {
   const preferences = useExplorerPreferences();
   const label = useExplorerLabels();
@@ -49,6 +50,11 @@ export function ExplorerCommandBar({ path, workspaceId, selected, operations, on
   ];
   return <>
     <div className="ex-cmd" data-testid="explorer-command-bar">
+      <button type="button" className={`ex-cbtn icon ${preferences.navVisible ? "on" : ""}`}
+        data-testid="explorer-cmd-navigation" aria-label={label("文件夹导航", "Folder navigation")}
+        aria-controls={navigationId} aria-expanded={preferences.navVisible}
+        title={preferences.navVisible ? label("收起目录树", "Collapse folder tree") : label("展开目录树", "Expand folder tree")}
+        onClick={(event) => { event.currentTarget.focus(); onToggleNavigation(); }}><PanelLeft aria-hidden="true" /></button>
       <button className="ex-cbtn pri" data-testid="explorer-cmd-new" disabled={operations.busy || !path} onClick={(event) => show(event, newMenu)}><Plus />{label("新建", "New")}<ChevronDown className="ex-car" /></button>
       <span className="ex-vsep" />
       <button className="ex-cbtn icon" data-testid="explorer-cmd-cut" title={label("剪切", "Cut")} disabled={operations.busy || !selected.length} onClick={() => void operations.copy(selected, true)}><Scissors /></button>

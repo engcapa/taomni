@@ -121,6 +121,7 @@ steps:
 - assert_no_runtime_errors: null
 - screenshot: explorer-native-clipboard-terminal-preview.png
 - click: '[data-testid="tab-item"][data-tab-type="terminal"] [data-testid="tab-close"]'
+- click: '[data-testid="tab-item"][data-tab-type="file-browser"]'
 - click: '[data-testid="explorer-preview-close"]'
 - assert_localstorage:
     key: taomni.explorer.view.v1
@@ -233,39 +234,39 @@ verification:
     - 28
     - 30
     - 31
-    - 56
-    - 65
-    - 67
+    - 57
+    - 66
     - 68
+    - 69
     checkpoints:
     - step: 29
       expectation: Bottom position applies before the OS-process restart.
     - step: 32
       expectation: Wrap is persisted.
-    - step: 61
-      expectation: Current native directory restores after the verified OS-process restart, not a WebView reload.
     - step: 62
-      expectation: Restore does not duplicate Explorer.
+      expectation: Current native directory restores after the verified OS-process restart, not a WebView reload.
     - step: 63
-      expectation: Bottom position restores.
+      expectation: Restore does not duplicate Explorer.
     - step: 64
+      expectation: Bottom position restores.
+    - step: 65
       expectation: Wrap restores.
-    - step: 70
-      expectation: Force-new from terminal adds exactly one Explorer.
     - step: 71
-      expectation: Both same-cwd Explorer panes remain independently mounted.
+      expectation: Force-new from terminal adds exactly one Explorer.
     - step: 72
+      expectation: Both same-cwd Explorer panes remain independently mounted.
+    - step: 73
       expectation: No runtime errors after native restore and new tab.
     results:
     - 29
     - 32
-    - 61
     - 62
     - 63
     - 64
-    - 70
+    - 65
     - 71
     - 72
+    - 73
   visual:
   - check: Native packaged preview, terminal context menu and Explorer tabs.
     method: manual
@@ -276,7 +277,7 @@ verification:
     reason: These assertions cannot be established by browser stubs. Clipboard/paste permissions or unavailable actions fail rather than skip.
   - check: Exact visible exit confirmation, normal application/storage shutdown and a new owned native session with the isolated profile retained.
     method: automated
-    reason: Step 56 opts into the expected Exit title, one-open-tab message and Exit button. native-application-restarts.jsonl retains the observed
+    reason: Step 57 opts into the expected Exit title, one-open-tab message and Exit button. native-application-restarts.jsonl retains the observed
       dialog, single session.click attempt and resulting closure alongside native shutdown and before/after session ownership proof. Missing,
       changed, blocked or additional prompts fail; cleanup/kill never counts as successful shutdown.
   - check: Physical menu/drag/keyboard input

@@ -10,7 +10,7 @@ vi.mock("../../../lib/ipc/files", () => ({ selectOnePath: vi.fn() }));
 vi.mock("../../../lib/runtime", () => ({ isTauriRuntime: () => true }));
 vi.mock("./drawioFile", () => ({ readDrawioFile: vi.fn() }));
 vi.mock("../viewerLabels", () => ({ useViewerLabels: () => (_zh: string, en: string) => en }));
-vi.mock("./drawioRender", async (original) => ({ ...await original<typeof import("./drawioRender")>(), renderDrawioPage: vi.fn(async () => ({ svg: "<svg/>", width: 100, height: 100, warnings: [] })) }));
+vi.mock("./drawioRender", async (original) => ({ ...await original<typeof import("./drawioRender")>(), renderDrawioPage: vi.fn(async () => ({ svg: "<svg/>", width: 100, height: 100, warnings: [], missingImages: 0 })) }));
 const xml = '<mxfile><diagram name="Selected"><mxGraphModel><root><mxCell id="0"/><mxCell id="1" parent="0"/></root></mxGraphModel></diagram></mxfile>';
 function editor() {
   return { state: EditorState.create({ doc: "Original document" }), dispatch: vi.fn(), focus: vi.fn() };
@@ -26,7 +26,8 @@ it("cancels the native chooser without inserting, then allows a fresh import", a
   fireEvent.click(button);
   expect(button).toBeDisabled();
   await waitFor(() => expect(button).toBeEnabled());
-  expect(button).toHaveFocus(); expect(screen.queryByRole("dialog")).toBeNull();
+  await waitFor(() => expect(button).toHaveFocus());
+  expect(screen.queryByRole("dialog")).toBeNull();
   expect(readDrawioFile).not.toHaveBeenCalled(); expect(owner.dispatch).not.toHaveBeenCalled();
   fireEvent.click(button);
   await screen.findByTestId("markdown-drawio-import-dialog");

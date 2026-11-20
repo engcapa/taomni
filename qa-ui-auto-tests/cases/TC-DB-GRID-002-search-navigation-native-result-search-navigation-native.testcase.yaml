@@ -1,0 +1,316 @@
+id: TC-DB-GRID-002-search-navigation-native
+title: Native query-result search navigates virtual cells and respects sort/filter order
+description: A real database session returns 240 rows with three distant matching cells. Buttons and actual WebView key events
+  navigate, wrap, scroll and preserve row filtering. Cmd/Ctrl+F belongs to the focused results and macOS Cmd+Shift+G moves backward.
+  Sort the visible rightmost label header after horizontal navigation. Native validates real query delivery and WebView virtualization; mounted units cover editable and IME ownership.
+modes:
+- native
+covers:
+- F-DB-1
+tags:
+- p1
+- regression
+- result
+fixtures:
+- reset_db
+- mysql_required
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-db-grid-password
+- wait_for: '[data-testid="welcome-panel"]'
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="side-tab-sessions"]'
+- wait_for: '[data-testid="session-tree"]'
+- wait_for: '[data-testid="session-new"]'
+- click: '[data-testid="session-new"]'
+- wait_for: '[data-testid="session-editor"]'
+- click: '[data-testid="session-proto-mysql"]'
+- wait_for:
+    selector: '[data-testid="session-database-section"]'
+    timeout_sec: 10
+- fill:
+    selector: '[data-testid="session-host"]'
+    value: ${cfg.database.host}
+- fill:
+    selector: '[data-testid="session-port"]'
+    value: ${cfg.database.port}
+- fill:
+    selector: input[aria-label="Database username"]
+    value: ${cfg.database.user}
+- fill:
+    selector: input[aria-label="Database password"]
+    value: ${cfg.database.password}
+- fill:
+    selector: input[aria-label="Database name"]
+    value: ${cfg.database.database}
+- click: '[data-testid="db-save-in-vault"]'
+- click: '[data-testid="session-section-bookmark"]'
+- wait_for: '[data-testid="bookmark-settings"]'
+- fill:
+    selector: '[data-testid="session-name"]'
+    value: qa-db-grid
+- click: '[data-testid="session-save"]'
+- wait_for:
+    selector: '[data-testid="vault-setup-pw1"]'
+    timeout_sec: 15
+- fill:
+    selector: '[data-testid="vault-setup-pw1"]'
+    value: qa-db-grid-master
+- fill:
+    selector: '[data-testid="vault-setup-pw2"]'
+    value: qa-db-grid-master
+- click: '[data-testid="vault-setup-confirm"]'
+- wait_for: '[data-testid="session-tree-item"][data-session-name="qa-db-grid"]'
+- dblclick: '[data-testid="session-tree-item"][data-session-name="qa-db-grid"]'
+- wait_for:
+    selector: '[data-testid="db-query-tab"]'
+    timeout_sec: 60
+- assert_not_visible: '[data-testid="db-connection-error-banner"]'
+- wait_for:
+    selector: '[data-testid="schema-tree"]'
+    timeout_sec: 30
+- click: '[data-testid="sql-editor"] .cm-content'
+- press: Mod+a
+- type: WITH RECURSIVE seq(n) AS (SELECT 1 UNION ALL SELECT n+1 FROM seq WHERE n<240) SELECT n AS id, CONCAT('filler-',n) AS c1,
+    CONCAT('filler-',n) AS c2, CONCAT('filler-',n) AS c3, CONCAT('filler-',n) AS c4, CONCAT('filler-',n) AS c5, CONCAT('filler-',n)
+    AS c6, CONCAT('filler-',n) AS c7, CONCAT('filler-',n) AS c8, CONCAT('filler-',n) AS c9, CONCAT('filler-',n) AS c10, CONCAT('filler-',n)
+    AS c11, CONCAT('filler-',n) AS c12, CONCAT('filler-',n) AS c13, CONCAT('filler-',n) AS c14, CONCAT('filler-',n) AS c15, CONCAT('filler-',n)
+    AS c16, CONCAT('filler-',n) AS c17, CONCAT('filler-',n) AS c18, IF(n IN(1,151,240),CONCAT('Target-',n),CONCAT('row-',n)) AS
+    label FROM seq ORDER BY n;
+- click: '[data-testid="db-run-all"]'
+- wait_for: '[data-testid="query-result-row"]'
+- fill:
+    selector: input[aria-label="Search result set"]
+    value: target
+- assert_text:
+    selector: '[data-testid="query-result-search-count"]'
+    contains: 1/3
+- assert_text:
+    selector: '[data-search-current="true"]'
+    contains: Target-1
+- click: '[data-testid="query-result-search-next"]'
+- assert_text:
+    selector: '[data-search-current="true"]'
+    contains: Target-151
+- click: '[data-testid="query-result-search-previous"]'
+- assert_text:
+    selector: '[data-search-current="true"]'
+    contains: Target-1
+- click: '[data-testid="query-result-search-next"]'
+- assert_text:
+    selector: '[data-search-current="true"]'
+    contains: Target-151
+- eval_readonly:
+    expression: document.querySelector('[data-testid'+String.fromCharCode(61)+'"query-result-grid-scroll"]').scrollTop > 2000 &&
+      document.querySelector('[data-testid'+String.fromCharCode(61)+'"query-result-grid-scroll"]').scrollLeft > 0
+    expect_truthy: true
+- press:
+    selector: input[aria-label="Search result set"]
+    key: Enter
+- assert_text:
+    selector: '[data-search-current="true"]'
+    contains: Target-240
+- press:
+    selector: input[aria-label="Search result set"]
+    key: F3
+- assert_text:
+    selector: '[data-search-current="true"]'
+    contains: Target-1
+- press:
+    selector: input[aria-label="Search result set"]
+    key: Shift+F3
+- assert_text:
+    selector: '[data-search-current="true"]'
+    contains: Target-240
+- click: '[data-testid="query-result-sort-header"][data-column="label"]'
+- click: '[data-testid="query-result-sort-header"][data-column="label"]'
+- assert_text:
+    selector: '[data-testid="query-result-search-count"]'
+    contains: 1/3
+- click: '[data-testid="query-result-search-next"]'
+- assert_text:
+    selector: '[data-search-current="true"]'
+    contains: Target-151
+- press:
+    selector: '[data-testid="query-result-grid-scroll"]'
+    key: Control+f
+    macos_key: Meta+f
+- eval_readonly:
+    expression: document.activeElement?.getAttribute("aria-label") === "Search result set"
+    expect_truthy: true
+- press:
+    selector: input[aria-label="Search result set"]
+    key: Shift+Enter
+    macos_key: Meta+Shift+g
+- assert_text:
+    selector: '[data-search-current="true"]'
+    contains: Target-240
+- click: '[data-testid="query-result-grid"] button[aria-label="Filter rows"]'
+- fill:
+    selector: '[data-testid="query-result-grid"] input[placeholder="Filter rows"]'
+    value: Target-151
+- assert_text:
+    selector: '[data-testid="query-result-search-count"]'
+    contains: 1/1
+- assert_text:
+    selector: '[data-search-current="true"]'
+    contains: Target-151
+- fill:
+    selector: input[aria-label="Search result set"]
+    value: no-match
+- assert_text:
+    selector: '[data-testid="query-result-search-count"]'
+    contains: 0/0
+- assert_disabled: '[data-testid="query-result-search-next"]'
+- assert_disabled: '[data-testid="query-result-search-previous"]'
+- assert_no_runtime_errors: null
+- screenshot: result-search-navigation-native.png
+verification:
+  review: reviewed
+  requirements:
+  - id: R1
+    requirement: Native query-result search navigates virtual cells and respects sort/filter order
+    actions:
+    - 4
+    - 5
+    - 8
+    - 10
+    - 12
+    - 13
+    - 14
+    - 15
+    - 16
+    - 17
+    - 18
+    - 20
+    - 21
+    - 23
+    - 24
+    - 25
+    - 31
+    - 32
+    - 33
+    - 34
+    - 36
+    - 39
+    - 41
+    - 43
+    - 46
+    - 48
+    - 50
+    - 52
+    - 53
+    - 55
+    - 57
+    - 59
+    - 61
+    - 62
+    - 65
+    results:
+    - 3
+    - 6
+    - 7
+    - 9
+    - 11
+    - 19
+    - 22
+    - 26
+    - 28
+    - 29
+    - 30
+    - 35
+    - 37
+    - 38
+    - 40
+    - 42
+    - 44
+    - 45
+    - 47
+    - 49
+    - 51
+    - 54
+    - 56
+    - 58
+    - 60
+    - 63
+    - 64
+    - 66
+    - 67
+    - 68
+    - 69
+    checkpoints:
+    - step: 3
+      expectation: 'wait_for: ''[data-testid="welcome-panel"]'''
+    - step: 6
+      expectation: 'wait_for: ''[data-testid="session-tree"]'''
+    - step: 7
+      expectation: 'wait_for: ''[data-testid="session-new"]'''
+    - step: 9
+      expectation: 'wait_for: ''[data-testid="session-editor"]'''
+    - step: 11
+      expectation: "wait_for:\n  selector: '[data-testid=\"session-database-section\"]'\n  timeout_sec: 10"
+    - step: 19
+      expectation: 'wait_for: ''[data-testid="bookmark-settings"]'''
+    - step: 22
+      expectation: "wait_for:\n  selector: '[data-testid=\"vault-setup-pw1\"]'\n  timeout_sec: 15"
+    - step: 26
+      expectation: 'wait_for: ''[data-testid="session-tree-item"][data-session-name="qa-db-grid"]'''
+    - step: 28
+      expectation: "wait_for:\n  selector: '[data-testid=\"db-query-tab\"]'\n  timeout_sec: 60"
+    - step: 29
+      expectation: 'assert_not_visible: ''[data-testid="db-connection-error-banner"]'''
+    - step: 30
+      expectation: "wait_for:\n  selector: '[data-testid=\"schema-tree\"]'\n  timeout_sec: 30"
+    - step: 35
+      expectation: 'wait_for: ''[data-testid="query-result-row"]'''
+    - step: 37
+      expectation: "assert_text:\n  contains: 1/3\n  selector: '[data-testid=\"query-result-search-count\"]'"
+    - step: 38
+      expectation: "assert_text:\n  contains: Target-1\n  selector: '[data-search-current=\"true\"]'"
+    - step: 40
+      expectation: "assert_text:\n  contains: Target-151\n  selector: '[data-search-current=\"true\"]'"
+    - step: 42
+      expectation: "assert_text:\n  contains: Target-1\n  selector: '[data-search-current=\"true\"]'"
+    - step: 44
+      expectation: "assert_text:\n  contains: Target-151\n  selector: '[data-search-current=\"true\"]'"
+    - step: 45
+      expectation: The match is visible past row 150 and in the last of 20 columns; both vertical and horizontal scroll positions
+        are positive.
+    - step: 47
+      expectation: "assert_text:\n  contains: Target-240\n  selector: '[data-search-current=\"true\"]'"
+    - step: 49
+      expectation: "assert_text:\n  contains: Target-1\n  selector: '[data-search-current=\"true\"]'"
+    - step: 51
+      expectation: "assert_text:\n  contains: Target-240\n  selector: '[data-search-current=\"true\"]'"
+    - step: 54
+      expectation: "assert_text:\n  contains: 1/3\n  selector: '[data-testid=\"query-result-search-count\"]'"
+    - step: 56
+      expectation: "assert_text:\n  contains: Target-151\n  selector: '[data-search-current=\"true\"]'"
+    - step: 58
+      expectation: "eval_readonly:\n  expect_truthy: true\n  expression: document.activeElement?.getAttribute(\"aria-label\") ===\
+        \ \"Search result\n    set\""
+    - step: 60
+      expectation: "assert_text:\n  contains: Target-240\n  selector: '[data-search-current=\"true\"]'"
+    - step: 63
+      expectation: "assert_text:\n  contains: 1/1\n  selector: '[data-testid=\"query-result-search-count\"]'"
+    - step: 64
+      expectation: "assert_text:\n  contains: Target-151\n  selector: '[data-search-current=\"true\"]'"
+    - step: 66
+      expectation: "assert_text:\n  contains: 0/0\n  selector: '[data-testid=\"query-result-search-count\"]'"
+    - step: 67
+      expectation: 'assert_disabled: ''[data-testid="query-result-search-next"]'''
+    - step: 68
+      expectation: 'assert_disabled: ''[data-testid="query-result-search-previous"]'''
+    - step: 69
+      expectation: 'assert_no_runtime_errors: null'
+  native:
+  - check: Native query-result search navigates virtual cells and respects sort/filter order
+    method: automated
+    reason: A real database session returns 240 rows with three distant matching cells. Buttons and actual WebView key events navigate,
+      wrap, scroll and preserve row filtering. Cmd/Ctrl+F belongs to the focused results and macOS Cmd+Shift+G moves backward.
+      Sort the visible rightmost label header after horizontal navigation. Native validates real query delivery and WebView virtualization; mounted units cover editable and IME ownership.
+  visual:
+  - check: Changed controls remain visible and readable in the final retained screenshot
+    method: manual
+    reason: Review the saved packaged/browser image; assertions establish behavior, not visual fidelity.

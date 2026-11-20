@@ -27,7 +27,8 @@ it("keeps search marks, scroll and the completed diagram while changing only pre
   expect(screen.getByTestId("markdown-search-count")).toHaveTextContent("1/2");
   const marks = screen.getAllByTestId("markdown-search-match");
   root.scrollTop = 90;
-  fireEvent.change(screen.getByTestId("markdown-preview-appearance"), { target: { value: "dark" } });
+  fireEvent.click(screen.getByTestId("markdown-preview-appearance"));
+  fireEvent.click(screen.getByRole("option", { name: "Dark" }));
   expect(calls.render).toHaveBeenLastCalledWith(expect.any(String), expect.any(String), "dark");
   expect(root.querySelector('svg[data-theme="light"]')).not.toBeNull();
   expect(root.scrollTop).toBe(90);

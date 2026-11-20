@@ -27,7 +27,7 @@ export interface ChatControllerOptions {
   budget?: Partial<BudgetPort>;
 }
 
-const DEFAULT_BUDGET: BudgetPort = { limitTokens: 10_000_000, costConfirmThresholdCny: 0.5 };
+const DEFAULT_BUDGET: BudgetPort = { limitTokens: 10_000_000 };
 
 function id(prefix: string): string {
   const uuid = globalThis.crypto?.randomUUID?.();
@@ -228,10 +228,13 @@ export function createChatController(options: ChatControllerOptions = {}): TaoCh
     setMode(mode) { patch({ mode, composer: { ...state.composer, thinking: state.composer.capabilities?.thinking !== false && mode !== "ask", web: state.composer.capabilities?.web !== false && mode === "research" } }); },
     setComposerText(text) { patch({ composer: { ...state.composer, text } }); },
     setComposerOption(option, value) { if (value && state.composer.capabilities?.[option] === false) return; patch({ composer: { ...state.composer, [option]: value } }); },
-    setModel(model) { patch({ composer: { ...state.composer, model } }); },
+    setModel(model, options) {
+      const composer = state.composer;
+      patch({ composer: { ...composer, model, ...(options && { capabilities: { thinking: options.thinking, web: options.web }, thinking: composer.thinking && options.thinking, web: composer.web && options.web, reasoningEffort: options.reasoningEffort }) } });
+    },
     setProvider(provider, options) {
       const capabilities = { thinking: options?.thinking ?? ["deepseek-app", "opencode-go"].includes(provider), web: options?.web ?? ["deepseek-app", "opencode-go"].includes(provider) };
-      patch({ composer: { ...state.composer, provider, model: options?.model ?? (provider === "opencode-go" ? "deepseek-v4.1-flash" : provider === "deepseek-app" ? "deepseek-flash" : ""), capabilities, thinking: capabilities.thinking && state.composer.thinking, web: capabilities.web && state.composer.web, chips: state.composer.chips.filter((chip) => !chip.fileId || (chip.provider ?? "deepseek-app") === provider) } });
+      patch({ composer: { ...state.composer, provider, model: options?.model ?? (provider === "opencode-go" ? "deepseek-v4.1-flash" : provider === "deepseek-app" ? "deepseek-flash" : ""), capabilities, reasoningEffort: options?.reasoningEffort ?? state.composer.reasoningEffort, thinking: capabilities.thinking && state.composer.thinking, web: capabilities.web && state.composer.web, chips: state.composer.chips.filter((chip) => !chip.fileId || (chip.provider ?? "deepseek-app") === provider) } });
     },
     setReasoningEffort(reasoningEffort) { patch({ composer: { ...state.composer, reasoningEffort } }); },
     setContext(context) { patch({ context }); },

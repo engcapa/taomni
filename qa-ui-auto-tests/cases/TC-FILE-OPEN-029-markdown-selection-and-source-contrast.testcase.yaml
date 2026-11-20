@@ -1,0 +1,188 @@
+id: TC-FILE-OPEN-029
+title: Live browse text selection and dark source marker contrast
+description: Select visible Markdown spans with a real pointer drag in light and dark palettes. Compare computed selection colors
+  and source punctuation, then independently compare the original UTF-8 bytes.
+modes:
+- browser
+- native
+covers:
+- F-FILEOPEN-1
+tags:
+- p1
+- regression
+- markdown
+- file-open
+fixtures:
+- reset_db
+- file_open_files
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-home-markdown-isolated
+- reload_window: null
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-file-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Control+l
+    macos_key: Meta+l
+- fill:
+    selector: '[data-testid="explorer-address"]'
+    value: ${fixture.file_open_root}
+- press:
+    key: Enter
+    selector: '[data-testid="explorer-address"]'
+- dblclick: '[data-testid="explorer-file-row"][data-name="live.md"]'
+- wait_for: '[data-testid="markdown-editor"][data-mode="live"]'
+- assert_attribute:
+    selector: '[data-testid="markdown-editor"]'
+    name: data-editing
+    equals: 'false'
+- drag_to:
+    from: '[data-testid="markdown-live"] p strong'
+    by: {dx: 135, steps: 10}
+    macos_appkit: true
+- eval_readonly:
+    expression: /bold\s+and\s+inl/.test(window.getSelection().toString()) && document.querySelector('.fv-md-live-pane').contains(window.getSelection().anchorNode)
+    expect_truthy: true
+    timeout_sec: 8
+- eval_readonly:
+    expression: getComputedStyle(document.querySelector('.fv-md-live-pane strong'),'::selection').backgroundColor==='rgb(31, 41,
+      55)' && getComputedStyle(document.querySelector('.fv-md-live-pane strong'),'::selection').color==='rgb(255, 255, 255)'
+    expect_truthy: true
+    timeout_sec: 8
+- screenshot: live-selection-light.png
+- click: '[data-testid="ribbon-settings"]'
+- fill:
+    selector: '[data-testid="settings-search-input"]'
+    value: theme
+- click: '[data-testid="app-theme-select"]'
+- click: '[data-testid="app-theme-dark"]'
+- click: '[data-testid="tab-item"][data-tab-type="file-viewer"]'
+- assert_attribute:
+    selector: html
+    name: data-app-theme
+    equals: dark
+- drag_to:
+    from: '[data-testid="markdown-live"] p strong'
+    by: {dx: 135, steps: 10}
+    macos_appkit: true
+- eval_readonly:
+    expression: /bold\s+and\s+inl/.test(window.getSelection().toString()) && document.querySelector('.fv-md-live-pane').contains(window.getSelection().anchorNode)
+    expect_truthy: true
+    timeout_sec: 8
+- eval_readonly:
+    expression: getComputedStyle(document.querySelector('.fv-md-live-pane strong'),'::selection').backgroundColor==='rgb(241, 245,
+      249)' && getComputedStyle(document.querySelector('.fv-md-live-pane strong'),'::selection').color==='rgb(25, 28, 34)'
+    expect_truthy: true
+    timeout_sec: 8
+- screenshot: live-selection-dark.png
+- click: '[data-testid="markdown-mode-source"]'
+- eval_readonly:
+    expression: document.querySelector('.fv-md-source-pane .cm-line:nth-of-type(1) .fv-md-syntax-marker').textContent==='#' &&
+      getComputedStyle(document.querySelector('.fv-md-source-pane .cm-line:nth-of-type(1) .fv-md-syntax-marker')).color==='rgb(157,
+      165, 180)'
+    expect_truthy: true
+    timeout_sec: 8
+- eval_readonly:
+    expression: document.querySelector('.fv-md-source-pane .cm-line:nth-of-type(11) .fv-md-syntax-marker').textContent==='-' &&
+      getComputedStyle(document.querySelector('.fv-md-source-pane .cm-line:nth-of-type(11) .fv-md-syntax-marker')).color==='rgb(157,
+      165, 180)'
+    expect_truthy: true
+    timeout_sec: 8
+- screenshot: dark-source-markers.png
+- click: '[data-testid="markdown-mode-live"]'
+- assert_attribute:
+    selector: '[data-testid="markdown-editor"]'
+    name: data-editing
+    equals: 'false'
+- assert_attribute:
+    selector: '[data-testid="file-viewer"]'
+    name: data-dirty
+    equals: 'false'
+- assert_file_open_bytes:
+    path: ${fixture.file_open_root}/live.md
+    sha256: ${fixture.file_open_markdown_sha}
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: LIVE-SELECTION
+    requirement: Drag selects actual rendered text in both palettes with inverted foreground and background.
+    actions:
+    - 1
+    - 2
+    - 4
+    - 5
+    - 7
+    - 8
+    - 9
+    - 10
+    - 13
+    - 17
+    - 18
+    - 19
+    - 20
+    - 21
+    - 23
+    checkpoints:
+    - step: 14
+      expectation: Selected content spans the bold and code nodes.
+    - step: 15
+      expectation: Light selection uses the inverse canvas colors.
+    - step: 24
+      expectation: Dark selection retains the rendered text range.
+    - step: 25
+      expectation: Dark selection uses the inverse canvas colors.
+    results:
+    - 14
+    - 15
+    - 24
+    - 25
+  - id: SOURCE-CONTRAST
+    requirement: The dark application theme uses readable punctuation and the interaction leaves the document clean.
+    actions:
+    - 1
+    - 2
+    - 4
+    - 5
+    - 7
+    - 8
+    - 9
+    - 10
+    - 13
+    - 17
+    - 18
+    - 19
+    - 20
+    - 21
+    - 23
+    - 27
+    - 31
+    checkpoints:
+    - step: 28
+      expectation: Heading marker uses the dark punctuation color.
+    - step: 29
+      expectation: List marker uses the dark punctuation color.
+    - step: 32
+      expectation: Live mode returns to browse.
+    - step: 33
+      expectation: The viewer remains clean.
+    - step: 34
+      expectation: Original bytes match.
+    results:
+    - 28
+    - 29
+    - 32
+    - 33
+    - 34
+  native:
+  - check: Packaged WebView drag and independent host-disk digest
+    method: automated
+    reason: WebKitGTK, WebView2 and WKWebView may handle selectable widgets differently. The byte assertion reads the native fixture
+      independently.
+  visual:
+  - check: Inspect the resulting controls and content in the case screenshots or WebView.
+    method: manual
+    reason: The automated checkpoints verify the semantic states independently.

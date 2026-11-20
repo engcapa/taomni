@@ -271,6 +271,7 @@ def emit_runner_receipt(
     registry: dict[str, Any] | None = None,
     key_id: str | None = None,
     runner_id: str | None = None,
+    repository_root: Path | None = None,
 ) -> Path:
     """Runner-owned emitter: generates, cryptographically signs, and writes runner_receipt.json."""
     reg = registry or DEFAULT_RUNNER_KEY_REGISTRY
@@ -320,11 +321,9 @@ def emit_runner_receipt(
     # ED-REL-002: Bind source, test plan, and release bundle identity
     try:
         from .bundle_identity import inspect_repository_identities
-        repo_root = report_root.resolve()
-        for parent in (repo_root, *repo_root.parents):
-            if (parent / "package.json").is_file():
-                repo_root = parent
-                break
+        # Reports may live on another volume or behind a workspace symlink.
+        # Their physical ancestors do not identify the tested checkout.
+        repo_root = (repository_root or Path(__file__).resolve().parents[5]).resolve()
 
         id_info = inspect_repository_identities(repo_root, mode=mode)
         bundle_id_record = id_info.get("bundleIdentity")

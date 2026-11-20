@@ -2,6 +2,7 @@ mod persistence;
 
 mod asr;
 
+mod custom_llm;
 mod llm;
 
 mod proxy;
@@ -18,6 +19,7 @@ pub use persistence::{AiConfig, default_ai_config_path};
 
 pub use asr::{AsrConfig, AsrProviderConfig};
 
+pub use custom_llm::CustomLlmModel;
 pub use llm::{
     FallbackConfig, LlmConfig, LlmProviderCapabilities, LlmProviderConfig, LlmProviderGroupConfig,
     default_opencode_go_provider,

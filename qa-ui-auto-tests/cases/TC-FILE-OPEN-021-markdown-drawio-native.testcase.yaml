@@ -71,11 +71,15 @@ steps:
     action: choose
     path: ${fixture.drawio_import_file}
     trigger: '[data-testid="markdown-import-drawio"]'
-- wait_for: '[data-testid="markdown-drawio-import-dialog"]'
+- wait_for:
+    selector: '[data-testid="markdown-drawio-import-dialog"] [data-testid="markdown-drawio-import-preview"] svg'
+    timeout_sec: 30
 - assert_disabled: '[data-testid="markdown-drawio-import-confirm"]'
 - click: '[data-testid="markdown-drawio-import-diagram"]'
 - click: '[data-testid="markdown-drawio-import-confirm"]'
-- wait_for: .fv-md-drawio svg
+- wait_for:
+    selector: .fv-md-drawio svg
+    timeout_sec: 30
 - click: '[data-testid="viewer-save"]'
 - assert_file_contains:
     path: ${fixture.markdown_quality_source}

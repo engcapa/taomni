@@ -86,7 +86,7 @@ describe("Tao chat controller", () => {
       { type: "block_delta", index: 0, delta: { text: "partial" } },
       { type: "message_delta", usage: { inputTokens: 8, outputTokens: 3 } },
     ]) };
-    const controller = createChatController({ backend, profile, budget: { limitTokens: 10, costConfirmThresholdCny: 0.5 } });
+    const controller = createChatController({ backend, profile, budget: { limitTokens: 10 } });
     await controller.send("budget");
     const state = controller.getState();
     const thread = state.threads[state.activeThreadId!];

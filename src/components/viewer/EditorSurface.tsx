@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useRef } from "react";
 import { Compartment, EditorState, Transaction, type Extension } from "@codemirror/state";
-import { EditorView, drawSelection, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers } from "@codemirror/view";
+import { EditorView, drawSelection, highlightActiveLine, highlightActiveLineGutter, keymap, lineNumbers, type Panel } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
 import { bracketMatching, defaultHighlightStyle, indentOnInput, syntaxHighlighting } from "@codemirror/language";
 import { highlightSelectionMatches, search, searchKeymap } from "@codemirror/search";
@@ -14,6 +14,8 @@ export interface EditorSurfaceProps {
   onView?: (view: EditorView | null) => void;
   onCursorChange?: (cursor: { line: number; column: number }) => void;
   className?: string;
+  nativeSelection?: boolean;
+  createSearchPanel?: (view: EditorView) => Panel;
   onChange?: (content: string) => void;
   onSave?: () => Promise<unknown> | void;
 }
@@ -45,7 +47,7 @@ async function language(path: string): Promise<Extension> {
 
 /** The view owns selection and history; shared store owns document text. Remote
  * store updates never recreate the editor or echo themselves back as user edits. */
-export function EditorSurface({ document: current, extensions = EMPTY_EXTENSIONS, onView, onCursorChange, className = "", onChange, onSave }: EditorSurfaceProps) {
+export function EditorSurface({ document: current, extensions = EMPTY_EXTENSIONS, onView, onCursorChange, className = "", nativeSelection = false, createSearchPanel, onChange, onSave }: EditorSurfaceProps) {
   const host = useRef<HTMLDivElement>(null);
   const view = useRef<EditorView | null>(null);
   const currentRef = useRef(current);
@@ -54,7 +56,7 @@ export function EditorSurface({ document: current, extensions = EMPTY_EXTENSIONS
   const callbacks = useRef({ onChange, onSave });
   callbacks.current = { onChange, onSave };
   const preferences = useFileOpenPreferences();
-  const compartments = useRef({ editable: new Compartment(), wrap: new Compartment(), extra: new Compartment(), language: new Compartment() });
+  const compartments = useRef({ editable: new Compartment(), selection: new Compartment(), wrap: new Compartment(), extra: new Compartment(), language: new Compartment() });
   const external = useRef(false);
   currentRef.current = current;
   onViewRef.current = onView;
@@ -64,12 +66,13 @@ export function EditorSurface({ document: current, extensions = EMPTY_EXTENSIONS
     const settings = useFileOpenPreferences.getState();
     const parts = compartments.current;
     const editor = new EditorView({ parent: host.current, state: EditorState.create({ doc: currentRef.current.content,
-      extensions: [lineNumbers(), highlightActiveLineGutter(), drawSelection(), history(), indentOnInput(), bracketMatching(),
+      extensions: [lineNumbers(), highlightActiveLineGutter(), history(), indentOnInput(), bracketMatching(),
         EditorState.transactionFilter.of((transaction) => transaction.docChanged && transaction.startState.readOnly && !external.current ? [] : transaction),
-        syntaxHighlighting(defaultHighlightStyle, { fallback: true }), highlightActiveLine(), search({ top: true }), highlightSelectionMatches(),
+        syntaxHighlighting(defaultHighlightStyle, { fallback: true }), highlightActiveLine(), search({ top: true, createPanel: createSearchPanel }), highlightSelectionMatches(),
         keymap.of([{ key: "Mod-s", run: () => { void Promise.resolve(callbacks.current.onSave ? callbacks.current.onSave() : useDocumentStore.getState().save(currentRef.current.path)).catch(() => {}); return true; } },
           ...defaultKeymap, ...historyKeymap, ...searchKeymap, indentWithTab]),
         parts.editable.of([EditorState.readOnly.of(currentRef.current.readOnly), EditorView.editable.of(!currentRef.current.readOnly)]),
+        parts.selection.of(nativeSelection ? [] : drawSelection()),
         parts.wrap.of(settings.wrap ? EditorView.lineWrapping : []), parts.extra.of(extensions), parts.language.of([]), theme,
         EditorView.contentAttributes.of({ "data-testid": "viewer-editor-content", "aria-label": "File content" }),
         EditorView.updateListener.of((update) => {
@@ -109,9 +112,10 @@ export function EditorSurface({ document: current, extensions = EMPTY_EXTENSIONS
   useEffect(() => {
     view.current?.dispatch({ effects: [
       compartments.current.editable.reconfigure([EditorState.readOnly.of(current.readOnly), EditorView.editable.of(!current.readOnly)]),
+      compartments.current.selection.reconfigure(nativeSelection ? [] : drawSelection()),
       compartments.current.wrap.reconfigure(preferences.wrap ? EditorView.lineWrapping : []),
       compartments.current.extra.reconfigure(extensions),
     ] });
-  }, [current.readOnly, preferences.wrap, extensions]);
+  }, [current.readOnly, nativeSelection, preferences.wrap, extensions]);
   return <div ref={host} data-testid="viewer-editor" className={`fv-editor ${className}`} style={{ "--fv-font-size": `${preferences.fontSize}px` } as React.CSSProperties} />;
 }

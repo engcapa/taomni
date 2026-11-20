@@ -1062,6 +1062,7 @@ def main(argv: list[str] | None = None) -> int:
             return exit_code
         receipt_path = emit_runner_receipt(
             report_root=report_root,
+            repository_root=Path.cwd(),
             mode=mode,
             executed_cmd=sys.argv,
             started_at=started_iso,

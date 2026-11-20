@@ -311,7 +311,7 @@ steps:
 - wait_for: '[data-testid="markdown-export-settings"]'
 - assert_visible: '[data-testid="markdown-export-confirm"]'
 - press:
-    selector: '[data-testid="markdown-export-settings"] select[aria-label="Paper"]'
+    selector: '[data-testid="markdown-export-settings"] [role="combobox"][aria-label="Paper"]'
     key: Escape
 - assert_not_visible: '[data-testid="markdown-export-settings"]'
 - click: '[data-testid="markdown-export"]'
@@ -319,7 +319,7 @@ steps:
 - wait_for: '[data-testid="markdown-export-settings"]'
 - assert_visible: '[data-testid="markdown-export-confirm"]'
 - press:
-    selector: '[data-testid="markdown-export-settings"] select[aria-label="Paper"]'
+    selector: '[data-testid="markdown-export-settings"] [role="combobox"][aria-label="Paper"]'
     key: Escape
 - assert_not_visible: '[data-testid="markdown-export-settings"]'
 - click: '[data-testid="markdown-export"]'
@@ -327,7 +327,7 @@ steps:
 - wait_for: '[data-testid="markdown-export-settings"]'
 - assert_visible: '[data-testid="markdown-export-confirm"]'
 - press:
-    selector: '[data-testid="markdown-export-settings"] select[aria-label="Paper"]'
+    selector: '[data-testid="markdown-export-settings"] [role="combobox"][aria-label="Paper"]'
     key: Escape
 - assert_not_visible: '[data-testid="markdown-export-settings"]'
 - click: '[data-testid="markdown-export"]'

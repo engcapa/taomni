@@ -19,13 +19,14 @@ import {
   RefreshCw,
   RotateCcw,
   Save,
-  Search,
   Sigma,
   Table2,
   Trash2,
 } from "lucide-react";
 import { type CSSProperties, type KeyboardEvent, type MouseEvent } from "react";
 import { type MenuItem } from "../../ContextMenu";
+import { GridSearchBar } from "./GridSearchBar";
+import type { useGridSearch } from "./useGridSearch";
 import { CellValueDialog } from "./CellValueDialog";
 import { Divider, FragmentStats, StatsCell, ToolButton } from "./chrome";
 import { nowDateText, nowTimestampText, nowTimeText } from "./export";
@@ -55,9 +56,7 @@ export interface QueryResultGridViewProps {
   filters: ReturnType<typeof useGridFilters>;
   editSession: ReturnType<typeof useGridEditing>;
   pendingChangeCount: number;
-  searchText: string;
-  setSearchText: import("react").Dispatch<import("react").SetStateAction<string>>;
-  searchMatchCount: number;
+  search: ReturnType<typeof useGridSearch>;
   viewMode: ViewMode;
   setViewMode: import("react").Dispatch<import("react").SetStateAction<ViewMode>>;
   rows: GridRow[];
@@ -111,9 +110,7 @@ export function QueryResultGridView(inputs: QueryResultGridViewProps) {
     filters,
     editSession,
     pendingChangeCount,
-    searchText,
-    setSearchText,
-    searchMatchCount,
+    search,
     viewMode,
     setViewMode,
     rows,
@@ -153,6 +150,7 @@ export function QueryResultGridView(inputs: QueryResultGridViewProps) {
     <div
       className="flex-1 min-h-0 flex flex-col"
       data-testid="query-result-grid"
+      onKeyDownCapture={search.handleKeyDown}
       style={{ fontSize: "var(--taomni-db-font-size, 12px)" }}
     >
       <div
@@ -338,18 +336,7 @@ export function QueryResultGridView(inputs: QueryResultGridViewProps) {
             {filters.activeColumnFilterCount > 0 ? `${filters.activeColumnFilterCount} col` : "Clear"}
           </button>
         )}
-        <label className="ml-auto h-6 inline-flex items-center gap-1 px-1 text-[11px] text-[var(--taomni-text-muted)]">
-          <Search className="w-3.5 h-3.5" />
-          <input
-            type="search"
-            value={searchText}
-            onChange={(event) => setSearchText(event.target.value)}
-            className="taomni-input h-6 w-[150px] text-[11px]"
-            placeholder="Search"
-            aria-label="Search result set"
-          />
-          {searchText && <span className="min-w-6 text-right">{searchMatchCount}</span>}
-        </label>
+        <GridSearchBar search={search} />
         <div
           className="h-6 inline-flex items-center rounded"
           style={{ border: "1px solid var(--taomni-divider)", overflow: "hidden" }}
@@ -545,6 +532,7 @@ export function QueryResultGridView(inputs: QueryResultGridViewProps) {
                   <div
                     key={row.id}
                     data-testid="query-result-row"
+                    data-row-id={row.id}
                     className="flex absolute left-0 right-0"
                     style={{
                       top,
@@ -583,6 +571,8 @@ export function QueryResultGridView(inputs: QueryResultGridViewProps) {
                       return (
                         <div
                           key={columnIndex}
+                          data-column-index={columnIndex}
+                          data-search-current={search.current?.rowId === row.id && search.current.colIdx === columnIndex ? "true" : undefined}
                           className={`px-2 flex items-center truncate ${isNumeric(cell) ? "justify-end font-mono" : ""
                             }`}
                           style={{

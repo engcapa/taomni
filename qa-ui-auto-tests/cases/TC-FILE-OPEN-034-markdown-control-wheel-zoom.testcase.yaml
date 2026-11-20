@@ -1,0 +1,71 @@
+id: TC-FILE-OPEN-034
+title: Control wheel shares zoom between Markdown Live and Source
+covers: [F-FILEOPEN-1, F-EXPLORER-1]
+modes: [browser, native]
+native_platforms: [Linux]
+tags: [p1, markdown, drawio, regression]
+fixtures: [reset_db, markdown_drawio_roundtrip]
+timeout_sec: 180
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-drawio-editing
+- reload_window: null
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-file-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Control+l
+    macos_key: Meta+l
+- fill:
+    selector: '[data-testid="explorer-address"]'
+    value: ${fixture.platform_workspace_root}
+- press:
+    selector: '[data-testid="explorer-address"]'
+    key: Enter
+- dblclick: '[data-testid="explorer-file-row"][data-name="drawio-actions.md"]'
+- wait_for: '[data-testid="markdown-live"]'
+- control_wheel:
+    selector: '[data-testid="markdown-live"]'
+    direction: up
+- wait_for: '[data-testid="markdown-live"][data-zoom="110"]'
+- click: '[data-testid="markdown-mode-source"]'
+- wait_for: '[data-testid="markdown-source"][data-zoom="110"]'
+- control_wheel:
+    selector: '[data-testid="markdown-source"]'
+    direction: down
+- wait_for: '[data-testid="markdown-source"][data-zoom="100"]'
+- press:
+    selector: '[data-testid="markdown-source"]'
+    key: Control+=
+- press:
+    selector: '[data-testid="markdown-source"]'
+    key: Control+0
+- wait_for: '[data-testid="markdown-source"][data-zoom="100"]'
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: MARKDOWN-VIEW-ACTIONS
+    requirement: Control wheel shares zoom between Markdown Live and Source.
+    actions: [12, 14, 16, 18, 19]
+    checkpoints:
+    - step: 13
+      expectation: Control+wheel up zooms Live.
+    - step: 15
+      expectation: Source inherits the view zoom.
+    - step: 17
+      expectation: Control+wheel down reduces the Source zoom.
+    - step: 20
+      expectation: Control+0 restores the default scale.
+    - step: 21
+      expectation: No runtime errors were recorded.
+    results: [13, 15, 17, 20, 21]
+  visual:
+  - check: The content scale or diagram view responds to its controls.
+    method: automated
+    reason: Read the mounted controls and require the expected visible content.
+  native:
+  - check: Viewer interaction in the packaged application.
+    method: automated
+    reason: The Linux slice uses X11 Control+wheel in the isolated display.

@@ -71,6 +71,7 @@ vi.mock("../../lib/clipboard", () => ({
 
 vi.mock("../../lib/runtime", () => ({
   isTauriRuntime: () => false,
+  getAppPlatform: () => "linux",
 }));
 
 vi.mock("../../lib/sftp", () => ({

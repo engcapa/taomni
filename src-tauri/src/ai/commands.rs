@@ -47,6 +47,9 @@ pub async fn save_ai_config(
 ) -> Result<(), String> {
     let path = default_ai_config_path();
     config.normalize();
+    for provider in config.llm.providers.values() {
+        provider.validate_custom()?;
+    }
     config.save(&path).map_err(|e| e.to_string())?;
 
     let llm = {
@@ -95,10 +98,19 @@ pub async fn test_llm_connection(
 }
 
 async fn test_provider_connection(
-    provider: LlmProviderConfig,
+    mut provider: LlmProviderConfig,
     state: &AppState,
     deadline: Option<std::time::Duration>,
 ) -> Result<TestConnectionResult, String> {
+    provider.normalize();
+    provider.validate_custom()?;
+    if provider.custom.is_some() {
+        let config = &state.ai_ctx.read().await.config;
+        if config.fully_disabled {
+            return Err("AI is disabled in Settings".into());
+        }
+        crate::ai::network_policy::reject_if_remote(config.full_local_mode, &provider.base_url)?;
+    }
     if provider.runtime == "opencode-go" {
         let ctx = state.ai_ctx.read().await;
         if ctx.config.full_local_mode || ctx.config.fully_disabled {
@@ -118,7 +130,7 @@ async fn test_provider_connection(
     let api_key = if test_api_key.starts_with(crate::vault::VAULT_REF_PREFIX) {
         match state.vault.resolve(&test_api_key) {
             Ok(Some(plaintext)) => plaintext.to_string(),
-            Ok(None) if deadline.is_some() => {
+            Ok(None) if deadline.is_some() || provider.custom.is_some() => {
                 return Err("Credential reference was not found".into());
             }
             Ok(None) => test_api_key.clone(),
@@ -153,6 +165,11 @@ async fn test_provider_connection(
     };
 
     let llm: Arc<dyn Llm> = match provider.runtime.as_str() {
+        _ if provider.custom.is_some() => {
+            Arc::new(crate::llm::configured::ConfiguredProvider::new(
+                "test", &provider, &api_key, proxy_url,
+            )?)
+        }
         "opencode-go" => Arc::new(crate::llm::opencode_go::OpenCodeGoProvider::new(
             "opencode-go".into(),
             provider.base_url.clone(),
@@ -198,7 +215,7 @@ async fn test_provider_connection(
     let (ok, mut message, latency_ms) =
         crate::ai::model_inspector::guarded_probe(llm.as_ref(), blocked, deadline).await?;
     // A gateway can echo a credential in its error. Never persist it in the inspector.
-    if deadline.is_some() && !api_key.is_empty() {
+    if (deadline.is_some() || provider.custom.is_some()) && !api_key.is_empty() {
         message = message.replace(&api_key, "[redacted]");
     }
     Ok(TestConnectionResult {

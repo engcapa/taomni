@@ -6,8 +6,9 @@ import { writeImagePng, writeText } from "../../../lib/clipboard";
 import { markdownBasename } from "../../../lib/markdownAssets";
 import { useViewerLabels } from "../viewerLabels";
 import { diagramActions, type DiagramAction } from "./diagramActions";
-import { DEFAULT_DIAGRAM_VIEW, snapshotDiagram, type DiagramSnapshot, type DiagramTransform } from "./diagramModel";
+import { DEFAULT_DIAGRAM_VIEW, diagramKind, loadedMarkdownImage, MARKDOWN_DIAGRAM_SELECTOR, MARKDOWN_IMAGE_SELECTOR, snapshotDiagram, snapshotMarkdownImage, type MarkdownVisualSnapshot, type DiagramTransform } from "./diagramModel";
 import { diagramPng, diagramSvg } from "./diagramExport";
+import { markdownImagePng } from "./markdownImagePng";
 import { saveExportBlob } from "./exportFiles";
 import { MarkdownDiagramViewer } from "./MarkdownDiagramViewer";
 import { singleDiagramDrawio } from "./drawioExport";
@@ -16,13 +17,13 @@ import "./diagram.css";
 
 /** One delegated owner for Live and Split, including asynchronous rerenders.
  * Portals stay outside CodeMirror's widgets and the clipped preview pane. */
-export function MarkdownDiagramActions({ root, docPath, sourceOnDisk = true, onError }: {
-  root: RefObject<HTMLDivElement | null>; docPath: string; sourceOnDisk?: boolean; onError: (message: string) => void;
+export function MarkdownDiagramActions({ root, docPath, sourceOnDisk = true, enabled = true, onError }: {
+  root: RefObject<HTMLDivElement | null>; docPath: string; sourceOnDisk?: boolean; enabled?: boolean; onError: (message: string) => void;
 }) {
   const label = useViewerLabels();
   const [active, setActive] = useState<HTMLElement | null>(null);
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
-  const [viewer, setViewer] = useState<{ snapshot: DiagramSnapshot; action: DiagramAction } | null>(null);
+  const [viewer, setViewer] = useState<{ snapshot: MarkdownVisualSnapshot; action: DiagramAction } | null>(null);
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [position, setPosition] = useState({ left: 0, top: 0, visible: false });
@@ -32,7 +33,13 @@ export function MarkdownDiagramActions({ root, docPath, sourceOnDisk = true, onE
   const epoch = useRef(0), working = useRef(false);
   const focus = () => (state.current.active?.isConnected ? state.current.active : root.current?.querySelector<HTMLElement>(".fv-md-main") || root.current)?.focus();
   const closeViewer = () => { setViewer(null); focus(); };
-  const snapshot = (element: HTMLElement) => snapshotDiagram(element, `${markdownBasename(docPath).replace(/\.(md|markdown)$/i, "")}-diagram-${Array.from(root.current?.querySelectorAll(".fv-md-mermaid") || []).indexOf(element) + 1}`);
+  const snapshot = (element: HTMLElement) => {
+    const stem = markdownBasename(docPath).replace(/\.(md|markdown)$/i, "");
+    const index = (selector: string) => Array.from(root.current?.querySelectorAll(selector) ?? []).indexOf(element) + 1;
+    return loadedMarkdownImage(element)
+      ? snapshotMarkdownImage(element, `${stem}-image-${index(MARKDOWN_IMAGE_SELECTOR)}`)
+      : snapshotDiagram(element, `${stem}-diagram-${index(MARKDOWN_DIAGRAM_SELECTOR)}`);
+  };
   const open = (element: HTMLElement, action: DiagramAction = "open") => {
     try { setActive(element); setMenu(null); setNotice(""); setViewer({ snapshot: snapshot(element), action }); }
     catch (error) { onError(String(error)); }
@@ -42,24 +49,38 @@ export function MarkdownDiagramActions({ root, docPath, sourceOnDisk = true, onE
   const measure = useCallback(() => {
     const box = activeElement.current?.getBoundingClientRect();
     const visible = Boolean(box && activeElement.current?.isConnected && box.bottom > 0 && box.top < window.innerHeight && box.right > 0 && box.left < window.innerWidth);
-    const next = { left: Math.max(8, Math.min((box?.right || 0) - 156, window.innerWidth - 164)), top: Math.max(8, Math.min((box?.top || 0) + 6, window.innerHeight - 44)), visible };
+    const width = activeElement.current instanceof HTMLImageElement ? 40 : 156;
+    const next = { left: Math.max(8, Math.min((box?.right || 0) - width, window.innerWidth - width - 8)), top: Math.max(8, Math.min((box?.top || 0) + 6, window.innerHeight - 44)), visible };
     setPosition((old) => old.left === next.left && old.top === next.top && old.visible === next.visible ? old : next);
   }, []);
   const schedule = useElementResizeFrame(activeElement, measure);
   useLayoutEffect(() => { measure(); }, [active, measure]);
   useEffect(() => {
     const container = root.current;
-    if (!container) return;
-    const find = (target: EventTarget | null) => target instanceof Element ? target.closest<HTMLElement>(".fv-md-mermaid") : null;
+    if (!container || !enabled) return;
+    const find = (target: EventTarget | null) => {
+      if (!(target instanceof Element)) return null;
+      return target.closest<HTMLElement>(MARKDOWN_DIAGRAM_SELECTOR) ?? (loadedMarkdownImage(target) ? target : null);
+    };
     const prepare = () => {
-      container.querySelectorAll<HTMLElement>(".fv-md-mermaid").forEach((element) => {
+      container.querySelectorAll<HTMLElement>(MARKDOWN_DIAGRAM_SELECTOR).forEach((element) => {
         element.tabIndex = 0; element.setAttribute("role", "figure");
-        element.setAttribute("aria-label", label("Mermaid 图表；回车查看，Shift+F10 打开菜单", "Mermaid diagram; Enter to view, Shift+F10 for menu"));
+        const name = diagramKind(element) === "drawio" ? "draw.io" : "Mermaid";
+        element.setAttribute("aria-label", label(`${name} 图表，回车查看，Shift+F10 打开菜单`, `${name} diagram, Enter to view, Shift+F10 for menu`));
+      });
+      container.querySelectorAll<HTMLImageElement>(MARKDOWN_IMAGE_SELECTOR).forEach((image) => {
+        if (loadedMarkdownImage(image)) image.tabIndex = 0;
       });
       const current = state.current.active;
       if (current && !container.contains(current)) { setActive(null); setMenu(null); setViewer(null); epoch.current++; working.current = false; setBusy(false); }
     };
     const hover = (event: Event) => { const element = find(event.target); if (element && !state.current.menu && !state.current.viewer) setActive(element); };
+    const load = (event: Event) => {
+      if (!loadedMarkdownImage(event.target instanceof Element ? event.target : null)) return;
+      const image = event.target as HTMLImageElement;
+      image.tabIndex = 0;
+      if (image.matches(":hover")) hover(event);
+    };
     const leave = (event: MouseEvent) => {
       if (state.current.menu || state.current.viewer) return;
       const next = event.relatedTarget instanceof Node ? event.relatedTarget : null;
@@ -68,7 +89,7 @@ export function MarkdownDiagramActions({ root, docPath, sourceOnDisk = true, onE
     };
     const mouse = (event: MouseEvent) => {
       const element = find(event.target);
-      if (!element) return;
+      if (!element || element instanceof HTMLImageElement) return;
       event.stopPropagation();
       // Right-button default selection can replace a live Markdown widget
       // after contextmenu opens. Keep selection and the portal's owner stable.
@@ -87,31 +108,53 @@ export function MarkdownDiagramActions({ root, docPath, sourceOnDisk = true, onE
     };
     const observer = new MutationObserver(prepare); observer.observe(container, { childList: true, subtree: true }); prepare();
     container.addEventListener("mouseover", hover); container.addEventListener("focusin", hover);
+    container.addEventListener("load", load, true);
     container.addEventListener("mouseout", leave); container.addEventListener("mousedown", mouse, true); container.addEventListener("pointerdown", mouse, true);
     container.addEventListener("contextmenu", context, true); container.addEventListener("dblclick", double, true); container.addEventListener("keydown", key, true);
     window.addEventListener("scroll", schedule, true);
     return () => {
       observer.disconnect(); epoch.current++; working.current = false;
       container.removeEventListener("mouseover", hover); container.removeEventListener("focusin", hover); container.removeEventListener("mouseout", leave);
+      container.removeEventListener("load", load, true);
       container.removeEventListener("mousedown", mouse, true); container.removeEventListener("pointerdown", mouse, true); container.removeEventListener("contextmenu", context, true);
       container.removeEventListener("dblclick", double, true); container.removeEventListener("keydown", key, true); window.removeEventListener("scroll", schedule, true);
     };
-  }, [root, docPath, label, schedule]);
-  useEffect(() => { setActive(null); setMenu(null); setViewer(null); setBusy(false); setNotice(""); }, [docPath]);
+  }, [root, docPath, enabled, label, schedule]);
+  useEffect(() => { setActive(null); setMenu(null); setViewer(null); setBusy(false); setNotice(""); }, [docPath, enabled]);
   useEffect(() => {
     if (!menu) return;
-    const outside = (event: PointerEvent) => { if (!menuElement.current?.contains(event.target as Node) && !toolbar.current?.contains(event.target as Node)) setMenu(null); };
-    const escape = (event: KeyboardEvent) => { if (event.key === "Escape") { event.preventDefault(); setMenu(null); focus(); } };
-    window.addEventListener("pointerdown", outside); window.addEventListener("keydown", escape);
+    const dismiss = () => setMenu(null);
+    const outside = (event: Event) => {
+      if (event.target instanceof Node && !menuElement.current?.contains(event.target)) dismiss();
+    };
+    const escape = (event: KeyboardEvent) => { if (event.key === "Escape" && !event.isComposing) { event.preventDefault(); dismiss(); focus(); } };
+    // Capture runs even when the clicked diagram owns and stops pointer input.
+    document.addEventListener("pointerdown", outside, true);
+    document.addEventListener("click", outside, true);
+    document.addEventListener("focusin", outside, true);
+    window.addEventListener("blur", dismiss);
+    window.addEventListener("keydown", escape);
     menuElement.current?.querySelector<HTMLButtonElement>("button")?.focus();
-    return () => { window.removeEventListener("pointerdown", outside); window.removeEventListener("keydown", escape); };
+    return () => {
+      document.removeEventListener("pointerdown", outside, true);
+      document.removeEventListener("click", outside, true);
+      document.removeEventListener("focusin", outside, true);
+      window.removeEventListener("blur", dismiss);
+      window.removeEventListener("keydown", escape);
+    };
   }, [menu]);
-  const run = async (action: DiagramAction, image: DiagramSnapshot, transform: DiagramTransform) => {
+  const run = async (action: DiagramAction, image: MarkdownVisualSnapshot, transform: DiagramTransform) => {
     if (working.current) return;
     const token = epoch.current; working.current = true; setBusy(true); setNotice("");
     try {
       let result = label("已复制", "Copied");
-      if (action === "copy-source") await writeText(image.source);
+      if (image.kind === "image") {
+        if (action === "copy-image") await writeImagePng(await markdownImagePng(image, transform));
+        else if (action === "save-png") {
+          const path = await saveExportBlob(`${image.filename}.png`, () => markdownImagePng(image, transform), sourceOnDisk ? docPath : undefined);
+          result = path ? label("图片已保存", "Image saved") : label("已取消保存", "Save cancelled");
+        }
+      } else if (action === "copy-source") await writeText(image.source);
       else if (action === "copy-text") {
         if (!image.text) throw new Error(label("图中没有可复制的文字", "The diagram has no text to copy"));
         await writeText(image.text);
@@ -143,15 +186,18 @@ export function MarkdownDiagramActions({ root, docPath, sourceOnDisk = true, onE
       catch (error) { onError(String(error)); }
     } else open(active, id);
   };
-  const entries = diagramActions(label);
+  const kind = active instanceof HTMLImageElement ? "image" : diagramKind(active);
+  const name = kind === "drawio" ? "draw.io" : "Mermaid";
+  const entries = diagramActions(label, kind);
+  if (!enabled) return null;
   return <>
-    {active && position.visible && !viewer && createPortal(<div className="fv fv-md-diagram-tools" ref={toolbar} style={{ left: position.left, top: position.top }} role="toolbar" aria-label={label("Mermaid 图片操作", "Mermaid image actions")}
-      data-testid="markdown-diagram-tools" onMouseLeave={(event) => { if (!menu && !active.contains(event.relatedTarget instanceof Node ? event.relatedTarget : null) && !active.contains(document.activeElement)) setActive(null); }}>
+    {active && position.visible && !viewer && createPortal(<div className="fv fv-md-diagram-tools" ref={toolbar} style={{ left: position.left, top: position.top }} role="toolbar" aria-label={label(`${name} 图片操作`, `${name} image actions`)}
+      data-testid={kind === "image" ? "markdown-image-tools" : "markdown-diagram-tools"} onMouseLeave={(event) => { if (!menu && !active.contains(event.relatedTarget instanceof Node ? event.relatedTarget : null) && !active.contains(document.activeElement)) setActive(null); }}>
       {entries.filter((entry) => ["open", "save-svg", "copy-text"].includes(entry.id)).map(({ id, title, Icon }) => <button key={id} type="button" className="fv-icon-button" title={title} aria-label={title} data-testid={`markdown-diagram-${id}`} disabled={busy} onClick={() => choose(id)}><Icon /></button>)}
-      <button type="button" className="fv-icon-button" data-testid="markdown-diagram-more" aria-haspopup="menu" aria-expanded={!!menu} title={label("更多查看操作", "More viewing actions")} aria-label={label("更多查看操作", "More viewing actions")}
-        onClick={(event) => { const box = event.currentTarget.getBoundingClientRect(); openMenu(active, box.left, box.bottom); }}><MoreHorizontal /></button>
+      {kind !== "image" && <button type="button" className="fv-icon-button" data-testid="markdown-diagram-more" aria-haspopup="menu" aria-expanded={!!menu} title={label("更多查看操作", "More viewing actions")} aria-label={label("更多查看操作", "More viewing actions")}
+        onClick={(event) => { const box = event.currentTarget.getBoundingClientRect(); openMenu(active, box.left, box.bottom); }}><MoreHorizontal /></button>}
     </div>, document.body)}
-    {menu && active && createPortal(<div className="fv fv-menu fv-md-diagram-menu" ref={menuElement} role="menu" aria-label={label("Mermaid 图片菜单", "Mermaid image menu")} data-testid="markdown-diagram-menu"
+    {menu && active && createPortal(<div className="fv fv-menu fv-md-diagram-menu" ref={menuElement} role="menu" aria-label={label(`${name} 图片菜单`, `${name} image menu`)} data-testid="markdown-diagram-menu"
       style={{ left: Math.max(8, Math.min(menu.x, window.innerWidth - 278)), top: Math.max(8, Math.min(menu.y, window.innerHeight - 510)) }} onKeyDown={(event) => {
         if (event.key === "Tab") { setMenu(null); focus(); return; }
         if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;

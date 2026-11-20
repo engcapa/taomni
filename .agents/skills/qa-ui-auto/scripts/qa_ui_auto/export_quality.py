@@ -7,6 +7,30 @@ import zipfile
 
 from .steps import StepError
 
+EXPORT_KINDS = {"pdf", "docx", "drawio", "drawio-png", "testing-pdf", "testing-docx"}
+
+
+def inspect_swimlane_png(path):
+    import numpy as np
+    from PIL import Image
+
+    with Image.open(path) as image:
+        width, height = image.size
+        # The reference sheet is 466×276 CSS px. Allow for WebView bounds rounding.
+        if image.format != "PNG" or abs(width - 1457) > 12 or abs(height - 863) > 12:
+            raise StepError(f"draw.io PNG has an unexpected format or resolution: {image.format} {width}×{height}")
+        rgba = np.asarray(image.convert("RGBA"))
+    rgb, alpha = rgba[:, :, :3].astype(np.int16), rgba[:, :, 3]
+    y, x = np.where((np.max(np.abs(rgb - (255, 242, 204)), axis=2) <= 3) & (alpha > 240))
+    if x.size < 20_000:
+        raise StepError("draw.io PNG lost the yellow request node")
+    left, right, top, bottom = x.min(), x.max(), y.min(), y.max()
+    label = (np.max(rgb, axis=2) <= 100) & (alpha > 100)
+    label_pixels = label[top + 25:bottom - 25, left + 25:right - 25].sum()
+    if label_pixels < 100:
+        raise StepError("draw.io PNG lost the request label")
+    return {"width": width, "height": height, "yellowNodePixels": int(x.size), "labelPixels": int(label_pixels)}
+
 
 def raster_grid_pixels(image):
     # The fixture's original bitmap has red/blue grid lines. Diagram outlines
@@ -21,6 +45,14 @@ def raster_grid_pixels(image):
 
 
 def inspect_quality(path, kind):
+    if kind == "drawio-png":
+        return inspect_swimlane_png(path)
+    if kind in {"testing-pdf", "testing-docx"}:
+        from .markdown_testing_quality import inspect_testing
+        return inspect_testing(path, kind)
+    if kind == "drawio":
+        from .drawio_export_quality import inspect_drawio
+        return inspect_drawio(path)
     data = Path(path).read_bytes()
     if kind == "pdf":
         from pypdf import PdfReader
@@ -93,8 +125,8 @@ def inspect_quality(path, kind):
 
 
 def native(ctx, args):
-    if not isinstance(args, dict) or set(args) != {"path", "kind"} or args["kind"] not in {"pdf", "docx"}:
-        raise StepError("assert_export_quality expects path and pdf/docx kind")
+    if not isinstance(args, dict) or set(args) != {"path", "kind"} or args["kind"] not in EXPORT_KINDS:
+        raise StepError("assert_export_quality expects a path and a supported artifact kind")
     if getattr(ctx, "dry_run", False):
         return "dry-run export quality"
     path = Path(args["path"]).resolve()

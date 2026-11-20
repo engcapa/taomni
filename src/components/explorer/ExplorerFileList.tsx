@@ -1,8 +1,8 @@
-import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as ReactPointerEvent } from "react";
 import { useVirtualizer } from "@tanstack/react-virtual";
 import { startCustomDrag } from "../../lib/customDnD";
 import { observeElementOffsetClean } from "../../lib/virtualOffsetObserver";
-import { effectiveFileType, formatBytes } from "../../lib/sftp";
+import { effectiveFileType } from "../../lib/sftp";
 import { getAppPlatform } from "../../lib/runtime";
 import { useSftpStore } from "../../stores/sftpStore";
 import type { FilePanelViewProps } from "../filebrowser/filePanel/FilePanelView";
@@ -14,6 +14,9 @@ import { ExplorerRenameInput } from "./ExplorerRenameInput";
 import { useExplorerClipboard } from "./explorerClipboard";
 import { EXPLORER_DRAG_MIME, type ExplorerDragPayload } from "./useExplorerDrop";
 import { useElementResizeFrame } from "../../hooks/useElementResizeFrame";
+import { useExplorerColumns } from "./useExplorerColumns";
+import { ExplorerFileColumns } from "./ExplorerFileColumns";
+import { explorerColumnText } from "./explorerColumns";
 
 interface Rubber { left: number; top: number; width: number; height: number }
 /** Explorer presentation; FilePanel still owns sorting, filtering and pane selection. */
@@ -32,11 +35,15 @@ export function ExplorerFileList(inputs: FilePanelViewProps) {
   const rubberCleanup = useRef<(() => void) | null>(null);
   const anchor = useRef<string | null>(null);
   const icons = preferences.view === "icons";
+  const details = preferences.view === "details";
+  const headerHeight = icons ? 0 : 26;
+  const columnSizing = useExplorerColumns(details, preferences.columnWidths, entries, label, scroll);
   const columns = icons ? Math.max(1, Math.floor((width - 16) / 96)) : 1;
   const rowHeight = icons ? 96 : preferences.view === "list" ? 24 : 28;
   const virtual = useVirtualizer({
     count: Math.ceil(entries.length / columns), getScrollElement: () => scroll.current,
     estimateSize: () => rowHeight, overscan: 8, observeElementOffset: observeElementOffsetClean,
+    scrollMargin: headerHeight, scrollPaddingStart: headerHeight,
   });
   useElementResizeFrame(scroll, () => {
     const element = scroll.current;
@@ -64,12 +71,12 @@ export function ExplorerFileList(inputs: FilePanelViewProps) {
   // ranges while TanStack waits for its first ResizeObserver measurement.
   // Large directories retain virtualization for bounded DOM work.
   const rows = entries.length > 200
-    ? virtualItems
+    ? virtualItems.map(row => ({ ...row, start: row.start - headerHeight }))
     : Array.from({ length: Math.ceil(entries.length / columns) }, (_, index) => ({ index, start: index * rowHeight }));
   // Use the same store as FilePanel; Explorer has no independent selection model.
   const selectNow = (paths: string[]) => useSftpStore.getState().setSelection(inputs.sessionId, "local", paths);
   const handleKeys = (event: React.KeyboardEvent) => {
-    if (event.nativeEvent.isComposing || (event.target as HTMLElement).closest("input,textarea,[contenteditable=true]")) return;
+    if (event.nativeEvent.isComposing || (event.target as HTMLElement).closest("input,textarea,button,[role=columnheader],[contenteditable=true]")) return;
     const mod = getAppPlatform() === "macos" ? event.metaKey : event.ctrlKey;
     if (mod && !event.altKey && !event.shiftKey && !(getAppPlatform() === "macos" ? event.ctrlKey : event.metaKey) && event.key.toLowerCase() === "a") {
       event.preventDefault(); event.stopPropagation(); selectNow(entries.map((entry) => entry.path)); return;
@@ -94,7 +101,7 @@ export function ExplorerFileList(inputs: FilePanelViewProps) {
     virtual.scrollToIndex(Math.floor(index / columns), { align: "auto" });
   };
   const rubberStart = (event: ReactPointerEvent<HTMLDivElement>) => {
-    if (event.button !== 0 || (event.target as HTMLElement).closest("[data-row],button,input")) return;
+    if (event.button !== 0 || (event.target as HTMLElement).closest("[data-row],button,input,[role=columnheader]")) return;
     const element = scroll.current;
     if (!element) return;
     event.preventDefault(); element.focus();
@@ -108,9 +115,9 @@ export function ExplorerFileList(inputs: FilePanelViewProps) {
       const y = next.clientY - rect.top + element.scrollTop;
       const box = { left: Math.min(x, startX), top: Math.min(y, startY), width: Math.abs(x - startX), height: Math.abs(y - startY) };
       if (!moved && box.width + box.height < 4) return;
-      moved = true; setRubber(box);
+      moved = true; setRubber({ ...box, top: box.top - headerHeight });
       const paths = new Set(original);
-      const offset = icons ? 8 : 0;
+      const offset = icons ? 8 : headerHeight;
       const first = Math.max(0, Math.floor((box.top - offset) / rowHeight));
       const last = Math.min(Math.ceil(entries.length / columns) - 1, Math.floor((box.top + box.height - offset) / rowHeight));
       for (let row = first; row <= last; row++) {
@@ -120,7 +127,7 @@ export function ExplorerFileList(inputs: FilePanelViewProps) {
         for (let col = 0; col < columns; col++) {
           const index = row * columns + col;
           const left = icons ? 8 + col * 96 : 4;
-          const right = icons ? left + 92 : width - 4;
+          const right = icons ? left + 92 : Math.max(width, details ? columnSizing.minWidth : 0) - 4;
           if (entries[index] && right > box.left && left < box.left + box.width) paths.add(entries[index].path);
         }
       }
@@ -136,17 +143,15 @@ export function ExplorerFileList(inputs: FilePanelViewProps) {
     window.addEventListener("pointermove", update); window.addEventListener("pointerup", finish);
     window.addEventListener("pointercancel", finish); window.addEventListener("blur", finish);
   };
-  return <div className={`ex-files ${preferences.view === "list" ? "compact" : ""}`} data-testid="explorer-files" data-explorer-drop={pane.path}>
-    {!icons && <div className="ex-fhead" role="row">
-      {([ ["name", label("名称", "Name"), "ex-name"], ["mtime", label("修改日期", "Date modified"), "ex-mod"], ["type", label("类型", "Type"), "ex-type"], ["size", label("大小", "Size"), "ex-size"] ] as const).map(([key, title, cls]) =>
-        <button key={key} data-testid={`explorer-column-${key}`} className={`${cls} ${inputs.sortKey === key ? "on" : ""}`} onClick={() => inputs.onHeaderClick(key)}>{title}{inputs.sortKey === key ? inputs.sortDir === "asc" ? " ▲" : " ▼" : ""}</button>)}
-    </div>}
+  return <div className={`ex-files ${preferences.view === "list" ? "compact" : ""}`} data-testid="explorer-files" data-explorer-view={preferences.view} data-explorer-drop={pane.path}
+    style={{ "--ex-columns": columnSizing.template } as CSSProperties}>
     <div ref={scroll} className={`ex-fbody ${dropPath === pane.path ? "ex-drop" : ""}`} data-testid="explorer-file-list" role="listbox" aria-multiselectable="true" aria-label={label("文件", "Files")} tabIndex={0}
       onKeyDown={handleKeys} onPointerDown={rubberStart} onContextMenu={interactions.handleEmptyContext}>
+      {!icons && <ExplorerFileColumns details={details} inputs={inputs} columns={columnSizing} label={label} />}
       {inputs.skippedEntryCount > 0 && <div className="ex-warning" role="status" title={inputs.diagnosticTitle}>{label(`${inputs.skippedEntryCount} 个项目无法读取`, `${inputs.skippedEntryCount} unreadable items`)}</div>}
       {!entries.length && !pane.loading && !pane.error && <div className="ex-empty">{label(inputs.filterActive ? "没有匹配的项目" : "此文件夹为空", inputs.filterActive ? "No matching items" : "This folder is empty")}<br /><small>{label("右键可新建文件夹/文件，或把文件拖到这里", "Right-click to create a file or folder, or drag files here")}</small></div>}
       {pane.loading && !entries.length && <div className="ex-empty" role="status">{label("正在加载…", "Loading…")}</div>}
-      <div style={{ height: virtual.getTotalSize() + (icons ? 16 : 0), position: "relative", minWidth: icons ? undefined : preferences.view === "list" ? 0 : 460 }}>
+      <div style={{ height: virtual.getTotalSize() + (icons ? 16 : 0), position: "relative", minWidth: details ? columnSizing.minWidth : undefined }}>
         {rows.flatMap((row) => Array.from({ length: columns }, (_, col) => {
           const entry = entries[row.index * columns + col];
           if (!entry) return null;
@@ -168,9 +173,9 @@ export function ExplorerFileList(inputs: FilePanelViewProps) {
             onDoubleClick={(event) => { if (!renaming) { if (event.ctrlKey || event.metaKey) { void operations.open(entry, true); } else inputs.onItemDoubleClick(entry); } }} onContextMenu={(event) => interactions.handleRowContext(entry, event)}>
             {icons ? <><ExplorerFileIcon entry={entry} /><div className="ex-tile-name">{renaming ? <ExplorerRenameInput entry={entry} /> : entry.name}</div></> : <>
               <div className="ex-name"><ExplorerFileIcon entry={entry} /><span className="truncate flex-1">{renaming ? <ExplorerRenameInput entry={entry} /> : entry.name}</span></div>
-              <div className="ex-mod">{entry.mtime ? new Date(entry.mtime * 1000).toLocaleString(undefined, { year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit" }) : ""}</div>
-              <div className="ex-type">{directory ? label("文件夹", "File folder") : entry.name.includes(".") ? entry.name.split(".").at(-1)?.toUpperCase() : label("文件", "File")}</div>
-              <div className="ex-size">{directory ? "" : formatBytes(entry.size)}</div>
+              <div className="ex-mod">{explorerColumnText(entry, "mtime", label)}</div>
+              <div className="ex-type">{explorerColumnText(entry, "type", label)}</div>
+              <div className="ex-size">{explorerColumnText(entry, "size", label)}</div>
             </>}
           </div>;
         }))}

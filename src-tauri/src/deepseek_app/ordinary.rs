@@ -22,7 +22,35 @@ pub async fn stream(
 ) -> Result<(), String> {
     let messages = super::opencode_request::messages(&canonical, request, state).await?;
     let anthropic = client.provider.runtime == "anthropic";
-    let (endpoint, body) = wire_body(&messages, &request.model, anthropic)?;
+    let responses = client.provider.runtime == "openai-responses";
+    let (endpoint, mut body) = if responses {
+        (
+            "/responses",
+            super::ordinary_responses::body(&messages, &request.model)?,
+        )
+    } else {
+        wire_body(&messages, &request.model, anthropic)?
+    };
+    if let Some(model) = client.provider.custom_model(&request.model)? {
+        if !model.multimodal
+            && messages.iter().any(|message| {
+                message["content"]
+                    .as_array()
+                    .is_some_and(|parts| parts.iter().any(|part| part["type"] == "image_url"))
+            })
+        {
+            return Err("configuration: this model does not support image input".into());
+        }
+        model.apply_request_options(
+            &client.provider.runtime,
+            &mut body,
+            model.max_output_tokens,
+            request
+                .thinking
+                .then_some(request.reasoning_effort.as_str()),
+            request.web,
+        );
+    }
     let builder = if anthropic {
         client.post(endpoint)
     } else {
@@ -39,10 +67,7 @@ pub async fn stream(
         .await
         .map_err(|_| "network: provider connection or configured proxy failed")?;
     if !response.status().is_success() {
-        return Err(format!(
-            "http: provider returned HTTP {}",
-            response.status().as_u16()
-        ));
+        return Err(super::provider_error::describe(response, &client.api_key).await);
     }
     if !anthropic {
         let _ = channel.send(TaoEvent::new("message_start").with("model", request.model.clone()));
@@ -55,6 +80,8 @@ pub async fn stream(
         for value in decoder.push(&bytes)? {
             let events = if anthropic {
                 reply.apply(value)
+            } else if responses {
+                super::ordinary_responses::apply(value, &mut turn, reply)?
             } else {
                 turn.apply(value, reply)?
             };

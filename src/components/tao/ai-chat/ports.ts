@@ -3,7 +3,7 @@ import type { ReactNode } from "react";
 export type TaoMode = "ask" | "do" | "research";
 export type TaoProvider = string;
 export type TaoModel = string;
-export type TaoReasoningEffort = "low" | "medium" | "high" | "max";
+export type TaoReasoningEffort = import("../../../stores/ai/model").LlmReasoningEffort;
 export type TaoPhase =
   | "idle"
   | "sending"
@@ -172,7 +172,6 @@ export interface ActionPorts {
 
 export interface BudgetPort {
   limitTokens: number;
-  costConfirmThresholdCny: number;
   priceAsOf?: string;
 }
 
@@ -191,6 +190,7 @@ export interface ChatProfile {
 export interface TaoChatSlots {
   headerLeading?: ReactNode;
   headerTrailing?: ReactNode;
+  belowHeader?: ReactNode;
   composerContext?: ReactNode;
   belowComposer?: ReactNode;
   emptyState?: ReactNode;
@@ -225,8 +225,8 @@ export interface TaoChatController {
   setMode(mode: TaoMode): void;
   setComposerText(text: string): void;
   setComposerOption(option: "thinking" | "web", value: boolean): void;
-  setModel(model: TaoModel): void;
-  setProvider(provider: TaoProvider, options?: { model: string; thinking?: boolean; web?: boolean }): void;
+  setModel(model: TaoModel, options?: { thinking: boolean; web: boolean; reasoningEffort: TaoReasoningEffort }): void;
+  setProvider(provider: TaoProvider, options?: { model: string; thinking?: boolean; web?: boolean; reasoningEffort?: TaoReasoningEffort }): void;
   setReasoningEffort(effort: TaoReasoningEffort): void;
   setContext(context: Record<string, string | undefined>): void;
   setChips(chips: ContextChip[]): void;

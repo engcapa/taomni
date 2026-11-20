@@ -1,9 +1,9 @@
 id: TC-FILE-OPEN-014
 title: Markdown dropdown without toolbar scrollbars, independent PDF and portable Word downloads
-description: Production Explorer and export UI. Desktop and narrow layout, keyboard navigation/focus, default settings, real
-  printer-independent searchable PDF and Word downloads. Independent host parsing checks exact Chinese/English, accents, emoji, final-page text and original red/blue raster pixels in the 300DPI A4 PDF, three vector diagrams
-  with explicit label styles and 600DPI Word fallback; original raster stays 1600x800. Browser evidence is not native chooser
-  evidence.
+description: Production Explorer and export UI. Desktop and narrow layout, keyboard navigation/focus, default settings, real printer-independent
+  searchable PDF and Word downloads. Independent host parsing checks exact Chinese/English, accents, emoji, final-page text and
+  original red/blue raster pixels in the 300DPI A4 PDF, three vector diagrams with explicit label styles and 600DPI Word fallback;
+  original raster stays 1600x800. Browser evidence is not native chooser evidence.
 modes:
 - browser
 steps:
@@ -38,13 +38,11 @@ steps:
     expect_truthy: true
 - eval_readonly:
     expression: document.querySelector('.fv-md-toolbar').scrollHeight <= document.querySelector('.fv-md-toolbar').clientHeight
-      + 1 && document.querySelector('.fv-md-toolbar').scrollWidth <= document.querySelector('.fv-md-toolbar').clientWidth
-      + 1
+      + 1 && document.querySelector('.fv-md-toolbar').scrollWidth <= document.querySelector('.fv-md-toolbar').clientWidth + 1
     expect_truthy: true
 - eval_readonly:
-    expression: document.querySelector('.fv-md-format').scrollHeight <= document.querySelector('.fv-md-format').clientHeight
-      + 1 && document.querySelector('.fv-md-format').scrollWidth <= document.querySelector('.fv-md-format').clientWidth +
-      1
+    expression: document.querySelector('.fv-md-format').scrollHeight <= document.querySelector('.fv-md-format').clientHeight +
+      1 && document.querySelector('.fv-md-format').scrollWidth <= document.querySelector('.fv-md-format').clientWidth + 1
     expect_truthy: true
 - press:
     selector: '[data-testid="markdown-export-html"]'
@@ -64,13 +62,11 @@ steps:
     height: 700
 - eval_readonly:
     expression: document.querySelector('.fv-md-toolbar').scrollHeight <= document.querySelector('.fv-md-toolbar').clientHeight
-      + 1 && document.querySelector('.fv-md-toolbar').scrollWidth <= document.querySelector('.fv-md-toolbar').clientWidth
-      + 1
+      + 1 && document.querySelector('.fv-md-toolbar').scrollWidth <= document.querySelector('.fv-md-toolbar').clientWidth + 1
     expect_truthy: true
 - eval_readonly:
-    expression: document.querySelector('.fv-md-format').scrollHeight <= document.querySelector('.fv-md-format').clientHeight
-      + 1 && document.querySelector('.fv-md-format').scrollWidth <= document.querySelector('.fv-md-format').clientWidth +
-      1
+    expression: document.querySelector('.fv-md-format').scrollHeight <= document.querySelector('.fv-md-format').clientHeight +
+      1 && document.querySelector('.fv-md-format').scrollWidth <= document.querySelector('.fv-md-format').clientWidth + 1
     expect_truthy: true
 - click: '[data-testid="markdown-export"]'
 - assert_element_geometry:
@@ -112,6 +108,12 @@ steps:
     sha256: ${fixture.markdown_quality_sha}
 - assert_no_runtime_errors: null
 - screenshot: export-independent-pdf-word.png
+- assert_visible: '[data-testid="markdown-export-open-tao"]'
+- assert_visible: '[data-testid="markdown-export-show-system"]'
+- eval_readonly:
+    expression: document.querySelector(".fv-md-export-notice button").dataset.testid === "markdown-export-open-tao"
+    expect_truthy: true
+- screenshot: export-tao-primary-actions.png
 covers:
 - F-FILEOPEN-1
 - F-EXPLORER-1
@@ -128,8 +130,8 @@ verification:
   review: reviewed
   requirements:
   - id: DURABLE-RESULT
-    requirement: Export dropdown escapes clipping surfaces with no toolbar scrollbars, supports keyboard dismissal and narrow
-      windows, and produces searchable Unicode PDF and complete high-fidelity DOCX artifacts while retaining source bytes.
+    requirement: Export dropdown escapes clipping surfaces with no toolbar scrollbars, supports keyboard dismissal and narrow windows,
+      and produces searchable Unicode PDF and complete high-fidelity DOCX artifacts while retaining source bytes.
     actions:
     - 3
     - 4
@@ -155,53 +157,53 @@ verification:
     - 43
     checkpoints:
     - step: 14
-      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
-        original source bytes remain exact.
+      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion; original
+        source bytes remain exact.
     - step: 15
-      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
-        original source bytes remain exact.
+      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion; original
+        source bytes remain exact.
     - step: 16
-      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
-        original source bytes remain exact.
+      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion; original
+        source bytes remain exact.
     - step: 17
-      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
-        original source bytes remain exact.
+      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion; original
+        source bytes remain exact.
     - step: 19
-      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
-        original source bytes remain exact.
+      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion; original
+        source bytes remain exact.
     - step: 21
-      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
-        original source bytes remain exact.
+      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion; original
+        source bytes remain exact.
     - step: 22
-      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
-        original source bytes remain exact.
+      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion; original
+        source bytes remain exact.
     - step: 24
-      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
-        original source bytes remain exact.
+      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion; original
+        source bytes remain exact.
     - step: 25
-      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
-        original source bytes remain exact.
+      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion; original
+        source bytes remain exact.
     - step: 27
-      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
-        original source bytes remain exact.
+      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion; original
+        source bytes remain exact.
     - step: 34
-      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
-        original source bytes remain exact.
+      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion; original
+        source bytes remain exact.
     - step: 36
-      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
-        original source bytes remain exact.
+      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion; original
+        source bytes remain exact.
     - step: 41
-      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
-        original source bytes remain exact.
+      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion; original
+        source bytes remain exact.
     - step: 43
-      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
-        original source bytes remain exact.
+      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion; original
+        source bytes remain exact.
     - step: 45
-      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
-        original source bytes remain exact.
+      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion; original
+        source bytes remain exact.
     - step: 46
-      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion;
-        original source bytes remain exact.
+      expectation: Observed UI geometry/focus or independently parsed complete saved artifact matches the named assertion; original
+        source bytes remain exact.
     results:
     - 14
     - 15
@@ -219,11 +221,27 @@ verification:
     - 43
     - 45
     - 46
+  - id: TAO-RESULT-ACTIONS
+    requirement: Successful export shows Tao as the first primary action with system file manager secondary; browser validates
+      layout, native TC-FILE-OPEN-023 validates actual file opening.
+    actions:
+    - 42
+    - 43
+    results:
+    - 48
+    - 49
+    - 50
+    checkpoints:
+    - step: 48
+      expectation: Tao action is visible after export
+    - step: 49
+      expectation: System file-manager action remains visible
+    - step: 50
+      expectation: Tao action precedes the system action
   visual:
   - check: Diagram labels, page boundaries and popup placement
     method: manual
-    reason: Inspect retained screenshots and actual exported documents; structural evidence alone does not establish visual
-      fidelity.
+    reason: Inspect retained screenshots and actual exported documents; structural evidence alone does not establish visual fidelity.
   native:
   - check: Real save chooser and desktop WebView output
     method: external

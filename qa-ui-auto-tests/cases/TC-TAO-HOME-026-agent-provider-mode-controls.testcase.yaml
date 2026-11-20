@@ -21,9 +21,7 @@ steps:
 - click: '[data-testid="tao-home-capability-model-deepseek-v4.1-flash"]'
 - assert_text: {selector: '[data-testid="tao-home-capabilities"]', contains: v4.1-flash}
 - click: '[data-testid="tao-home-capabilities"]'
-- eval_readonly:
-    expression: "document.querySelector('.tao-home-popup-items label:nth-of-type(2) select').value === 'max'"
-    expect_truthy: true
+- assert_attribute: {selector: '[data-testid="tao-home-reasoning-effort"]', name: data-value, equals: max}
 - press: Escape
 - assert_not_visible: '[data-testid="tao-home-reasoning-effort"]'
 - click: '[data-testid="tao-home-mode-do"]'

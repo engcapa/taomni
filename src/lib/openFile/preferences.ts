@@ -7,6 +7,9 @@ export interface FileOpenPreferences {
   associations: Record<string, FileHandler>;
   markdownImageDir: string;
   markdownImageTemplate: string;
+  markdownRestrictRemoteImages: boolean;
+  markdownProxyMode: "app" | "custom" | "none";
+  markdownCustomProxy: AppProxyConfig;
   convertTables: boolean;
   wrap: boolean;
   fontSize: number;
@@ -19,6 +22,8 @@ export const FILE_OPEN_PREFERENCES_KEY = "taomni.fileOpen.preferences.v1";
 export const DEFAULT_FILE_OPEN_PREFERENCES: FileOpenPreferences = {
   defaultHandler: "taomni", associations: {}, markdownImageDir: "assets",
   markdownImageTemplate: "image-{date}-{time}.png", convertTables: true,
+  markdownRestrictRemoteImages: false, markdownProxyMode: "app",
+  markdownCustomProxy: { enabled: true, mode: "manual", session_id: "", kind: "http", host: "", port: 3128, username: "", password_ref: "" },
   wrap: true, fontSize: 13, htmlNetwork: "block", htmlScripts: true,
   htmlProxyMode: "app", htmlCustomProxy: { enabled: true, mode: "manual", session_id: "", kind: "http", host: "", port: 3128, username: "", password_ref: "" },
 };
@@ -30,6 +35,9 @@ function validated(value: Partial<FileOpenPreferences>): FileOpenPreferences {
     associations: Object.fromEntries(Object.entries(value.associations ?? {}).filter(([key, handler]) => /^[a-z0-9_-]+$/i.test(key) && ["taomni", "workspace", "system"].includes(handler))),
     markdownImageDir: typeof value.markdownImageDir === "string" && value.markdownImageDir.trim() ? value.markdownImageDir : defaults.markdownImageDir,
     markdownImageTemplate: typeof value.markdownImageTemplate === "string" && value.markdownImageTemplate.trim() ? value.markdownImageTemplate : defaults.markdownImageTemplate,
+    markdownRestrictRemoteImages: value.markdownRestrictRemoteImages === true,
+    markdownProxyMode: value.markdownProxyMode === "custom" || value.markdownProxyMode === "none" ? value.markdownProxyMode : "app",
+    markdownCustomProxy: { ...defaults.markdownCustomProxy, ...(value.markdownCustomProxy && typeof value.markdownCustomProxy === "object" ? value.markdownCustomProxy : {}), enabled: true },
     convertTables: value.convertTables !== false,
     wrap: value.wrap !== false,
     fontSize: typeof value.fontSize === "number" && Number.isFinite(value.fontSize) ? Math.max(10, Math.min(32, value.fontSize)) : defaults.fontSize,

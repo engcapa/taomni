@@ -1,7 +1,7 @@
-.fv-md-mermaid:focus-visible{outline:2px solid var(--accent-s);outline-offset:2px}
-.fv-md-diagram-tools{position:fixed;display:flex;gap:3px;padding:4px;background:var(--card);border:1px solid var(--divider);border-radius:8px;box-shadow:var(--shadow);z-index:1120}
+.fv-md-mermaid:focus-visible,.fv-md-drawio:focus-visible{outline:2px solid var(--accent-s);outline-offset:2px}
+.fv.fv-md-diagram-tools{position:fixed;display:flex;flex-direction:row;width:max-content;height:auto;gap:3px;padding:4px;background:var(--card);border:1px solid var(--divider);border-radius:8px;box-shadow:var(--shadow);z-index:1120}
 .fv-md-diagram-tools .fv-icon-button{width:32px;height:30px}
-.fv-md-diagram-menu{position:fixed;z-index:1140;width:270px;max-width:calc(100vw - 16px);max-height:calc(100vh - 16px);overflow:auto;padding:5px}
+.fv.fv-md-diagram-menu{position:fixed;z-index:1140;width:270px;height:auto;max-width:calc(100vw - 16px);max-height:calc(100vh - 16px);overflow:auto;padding:5px}
 .fv-md-diagram-menu>button{display:flex;align-items:center;gap:8px;width:100%;padding:6px 8px;border-radius:5px;font-size:12px;white-space:nowrap;text-align:left}
 .fv-md-diagram-menu>button:hover,.fv-md-diagram-menu>button:focus-visible{background:var(--hover);outline:none}
 .fv-md-diagram-menu svg{width:15px;height:15px;flex:none}
@@ -12,14 +12,15 @@
 .fv-md-diagram-heading strong{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .fv-md-diagram-controls{display:flex;align-items:center;flex-wrap:wrap;gap:3px;padding:6px 10px;border-bottom:1px solid var(--divider);flex:none}
 .fv-md-diagram-controls .fv-icon-button{width:30px;height:28px}
+.fv-md-diagram-controls .fv-md-diagram-save{width:auto;min-width:58px;padding:0 6px;gap:4px;font-size:11px}
 .fv-md-diagram-controls output{font-size:12px;font-variant-numeric:tabular-nums;min-width:48px;text-align:center}
-.fv-md-diagram-controls select{margin-left:auto;max-width:100%}
+.fv-md-diagram-controls .fv-md-diagram-background{margin-left:auto;max-width:100%}
 .fv-md-diagram-stage{position:relative;flex:1;min-width:0;min-height:80px;overflow:hidden;touch-action:none;cursor:grab;outline-offset:-3px;user-select:none}
 .fv-md-diagram-stage:active{cursor:grabbing}
 .fv-md-diagram-stage.background-checker{background-color:#f8fafc;background-image:linear-gradient(45deg,#e2e8f0 25%,transparent 25%),linear-gradient(-45deg,#e2e8f0 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#e2e8f0 75%),linear-gradient(-45deg,transparent 75%,#e2e8f0 75%);background-size:20px 20px;background-position:0 0,0 10px,10px -10px,-10px 0}
 .fv-md-diagram-stage.background-light{background:#fff}
 .fv-md-diagram-stage.background-dark{background:#171b23}
-.fv-md-diagram-stage>img{position:absolute;left:50%;top:50%;max-width:none;max-height:none;object-fit:contain;pointer-events:none;transform-origin:center}
+.fv-md-diagram-stage>img,.fv-md-diagram-stage>.fv-md-diagram-svg{position:absolute;left:50%;top:50%;max-width:none;max-height:none;object-fit:contain;pointer-events:none;transform-origin:center}
 .fv-md-diagram-stage>span,.fv-md-diagram-stage>[role=alert]{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--panel);color:var(--text);padding:8px 12px;border-radius:6px;font-size:12px}
 .fv-md-diagram-footer{padding:7px 12px;border-top:1px solid var(--divider);font-size:12px;color:var(--muted);flex:none}
 @media(max-width:600px){.fv-md-diagram-backdrop{padding:8px}.fv-md-diagram-controls{padding:5px;gap:2px}.fv-md-diagram-controls .fv-icon-button{width:28px}.fv-md-diagram-footer{font-size:11px}}

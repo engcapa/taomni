@@ -9,8 +9,10 @@
 .fv-md-drawio-import-mode{display:flex;flex-direction:column;gap:10px;margin-top:16px;padding:12px;border:1px solid var(--divider);border-radius:6px}
 .fv-md-drawio-import-mode label{display:flex;align-items:center;gap:8px}
 .fv-md-drawio{margin:16px 0;overflow:auto;background:#fff;color:#1f2937;border:1px solid var(--divider);border-radius:7px;padding:12px}
+.fv-md-drawio .fv-md-drawio-image-notice{margin:6px 0 0;color:#475569;font-size:12px}
 .fv-md-drawio>svg{max-width:100%;height:auto}
 .fv-md-drawio-source{font-size:12px;color:var(--muted);margin:12px 0}
 .fv-md-drawio-source summary{cursor:pointer}
 .fv-md-drawio-source pre{max-height:240px;overflow:auto}
 @media(max-width:650px){.fv-md-drawio-sheets{flex-direction:column;max-height:460px}.fv-md-drawio-sheet-list{flex:0 0 100px}.fv-md-drawio-dialog footer{flex-wrap:wrap}}
+@font-face{font-family:"Architects Daughter";src:url("./vendor/architects-daughter.ttf") format("truetype");font-display:swap}

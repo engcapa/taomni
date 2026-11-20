@@ -127,6 +127,10 @@ async fn handle_request(req: Request<Body>) -> Response<Body> {
     if !valid_host(req.headers(), &srv.host_header) {
         return plain_error(StatusCode::FORBIDDEN, "permission: Invalid preview host");
     }
+    #[cfg(any(target_os = "macos", test))]
+    if let Some(response) = super::drawio_frame::serve(&srv.origin, req.uri().path()) {
+        return response;
+    }
     let path_and_query = req
         .uri()
         .path_and_query()
@@ -171,6 +175,37 @@ mod tests {
         let mut response = String::new();
         stream.read_to_string(&mut response).unwrap();
         response
+    }
+
+    #[test]
+    fn drawio_renderer_serves_only_assets_under_its_own_capability() {
+        let entry = url::Url::parse(&crate::viewer::drawio_frame::url()).unwrap();
+        let srv = server();
+        let get = |path: &str| {
+            http_request(
+                srv.port,
+                &format!(
+                    "GET {path} HTTP/1.1\r\nHost: {}\r\nConnection: close\r\n\r\n",
+                    srv.host_header
+                ),
+            )
+        };
+        let response = get(entry.path());
+        assert!(response.starts_with("HTTP/1.1 200 OK"));
+        assert!(response.contains("sandbox allow-scripts; script-src http://127.0.0.1:"));
+        assert!(response.contains("img-src data:; font-src data:"));
+        assert!(response.contains("data-engine="));
+        let bridge = get(entry.join("bridge.js").unwrap().path());
+        assert!(bridge.starts_with("HTTP/1.1 200 OK"));
+        assert!(bridge.contains("drawio-ready"));
+        let engine = get(entry.join("viewer.js").unwrap().path());
+        assert!(engine.starts_with("HTTP/1.1 200 OK"));
+        assert!(engine.len() > 4_000_000);
+        let unknown = get(entry.join("unknown.js").unwrap().path());
+        assert!(unknown.starts_with("HTTP/1.1 404"));
+        let unowned = get("/_drawio-renderer/00000000000000000000000000000000/viewer.js");
+        assert!(unowned.starts_with("HTTP/1.1 404"));
+        assert!(!unowned.contains(entry.path().split('/').nth(2).unwrap()));
     }
 
     #[test]

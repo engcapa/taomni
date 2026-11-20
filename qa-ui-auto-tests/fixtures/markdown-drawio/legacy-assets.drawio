@@ -1,0 +1,44 @@
+<mxfile compressed="false">
+  <diagram id="plain-sheet" name="Plain example">
+    <mxGraphModel><root>
+      <mxCell id="0"/>
+      <mxCell id="1" parent="0"/>
+      <mxCell id="plain" parent="1" vertex="1" value="Unselected plain page" style="rounded=1;">
+        <mxGeometry x="20" y="20" width="180" height="45" as="geometry"/>
+      </mxCell>
+    </root></mxGraphModel>
+  </diagram>
+  <diagram id="legacy-sheet" name="Legacy assets">
+    <mxGraphModel adaptiveColors="auto"><root>
+      <mxCell id="legacy-root"/>
+      <mxCell id="legacy-layer" parent="legacy-root" value="Visible layer"/>
+      <mxCell id="hidden-layer" parent="legacy-root" visible="0" value="Hidden layer"/>
+      <mxCell id="hidden-shape" parent="hidden-layer" vertex="1" value="Hidden layer marker">
+        <mxGeometry x="20" y="400" width="200" height="45" as="geometry"/>
+      </mxCell>
+      <object id="label-node" label="&lt;b&gt;Gateway&amp;nbsp;node&lt;/b&gt;">
+        <mxCell parent="legacy-layer" vertex="1" style="rounded=1;html=1;">
+          <mxGeometry x="20" y="20" width="160" height="60" as="geometry"/>
+        </mxCell>
+      </object>
+      <mxCell id="png-node" parent="legacy-layer" vertex="1" style="shape=image;image=data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAABAAAAAKCAIAAAAy3EnLAAAAF0lEQVR4nGNkyN3MQApgIkn1qIZBowEAOXkBNJdc1iEAAAAASUVORK5CYII=;aspect=fixed;">
+        <mxGeometry x="245" y="20" width="80" height="50" as="geometry"/>
+      </mxCell>
+      <mxCell id="svg-node" parent="legacy-layer" vertex="1" style="shape=image;image=data:image/svg+xml,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIxNiIgaGVpZ2h0PSIxMCI+PHJlY3Qgd2lkdGg9IjE2IiBoZWlnaHQ9IjEwIiBmaWxsPSIjMTU5NDU1Ii8+PC9zdmc+;aspect=fixed;">
+        <mxGeometry x="350" y="20" width="80" height="50" as="geometry"/>
+      </mxCell>
+      <mxCell id="link-node" parent="legacy-layer" vertex="1" value="External icon" style="shape=image;image=https://example.invalid/diagram-icon.png;verticalLabelPosition=bottom;verticalAlign=top;">
+        <mxGeometry x="20" y="140" width="100" height="55" as="geometry"/>
+      </mxCell>
+      <mxCell id="library-node" parent="legacy-layer" vertex="1" value="Library icon" style="shape=image;image=img/lib/azure2/service.svg;verticalLabelPosition=bottom;verticalAlign=top;">
+        <mxGeometry x="150" y="140" width="100" height="55" as="geometry"/>
+      </mxCell>
+      <mxCell id="kubernetes-node" parent="legacy-layer" vertex="1" value="Kubernetes service" style="shape=mxgraph.kubernetes.icon;prIcon=api;fillColor=#2875E2;strokeColor=#111827;">
+        <mxGeometry x="290" y="130" width="150" height="65" as="geometry"/>
+      </mxCell>
+      <mxCell id="connector" parent="legacy-layer" edge="1" source="label-node" target="png-node" style="endArrow=classic;">
+        <mxGeometry relative="1" as="geometry"/>
+      </mxCell>
+    </root></mxGraphModel>
+  </diagram>
+</mxfile>

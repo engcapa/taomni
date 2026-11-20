@@ -21,7 +21,7 @@ steps:
 - click: '[data-testid="code-workspace-tree-root"]'
 - wait_for: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
 - dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
-- wait_for: '[data-testid="workspace-file-editor"][data-path="README.md"] .cm-content'
+- wait_for: '[data-testid="markdown-editor"] .cm-content'
 - click: '[data-testid="code-workspace-tree-dir"][data-path="src"] [data-testid="code-workspace-tree-dir-arrow"]'
 - wait_for: '[data-testid="code-workspace-tree-file"][data-path="src/index.ts"]'
 - dblclick: '[data-testid="code-workspace-tree-file"][data-path="src/index.ts"]'
@@ -47,7 +47,7 @@ steps:
 - click: '[data-testid="text-input-dialog-confirm"]'
 - wait_for: '[data-testid="workspace-file-editor"][data-path="overview-title-marquee-overflowing-three-column-card-header-width.ts"] .cm-content'
 - dblclick: '[data-testid="code-workspace-tree-file"][data-path="README.md"]'
-- wait_for: '[data-testid="workspace-file-editor"][data-path="README.md"] .cm-content'
+- wait_for: '[data-testid="markdown-editor"] .cm-content'
 - click: '[data-testid="tab-overview-trigger"]'
 - wait_for: '[data-testid="tab-overview"][data-scope="workspaces"]'
 - assert_count:
@@ -89,6 +89,16 @@ steps:
 - assert_not_visible: '[data-testid="tab-overview"]'
 - wait_for: '[data-testid="workspace-file-editor"][data-path="overview-title-marquee-overflowing-three-column-card-header-width.ts"] .cm-content'
 - assert_no_runtime_errors: null
+- click: '[data-testid="tab-overview-trigger"]'
+- press: ArrowDown
+- wait_for: '[data-testid="tab-overview-card"]:nth-child(1):focus'
+- press: ArrowDown
+- wait_for: '[data-testid="tab-overview-card"]:nth-child(4):focus'
+- press: ArrowUp
+- wait_for: '[data-testid="tab-overview-card"]:nth-child(1):focus'
+- assert_visible: '[data-testid="tab-overview-card"]:nth-child(4)[data-active="true"]'
+- press: Escape
+- wait_for: '[data-testid="workspace-file-editor"][data-path="overview-title-marquee-overflowing-three-column-card-header-width.ts"] .cm-content'
 verification:
   review: reviewed
   requirements:
@@ -137,6 +147,21 @@ verification:
     - step: 53
       expectation: No uncaught runtime errors occur during the case.
     results: [51, 52, 53]
+  - id: OVERVIEW-ROWS
+    requirement: Up and Down move focus between rows while keeping the active tab.
+    actions: [54, 55, 57, 59, 62]
+    checkpoints:
+    - step: 56
+      expectation: Down from search focuses the first card.
+    - step: 58
+      expectation: Down from the first card focuses the card directly below it.
+    - step: 60
+      expectation: Up returns focus to the first card.
+    - step: 61
+      expectation: Focus movement keeps the fourth document active.
+    - step: 63
+      expectation: Escape leaves the active document visible.
+    results: [56, 58, 60, 61, 63]
   visual:
   - check: Three-column overview grid proportions, enlarged summary previews, footer metadata spacing, and edge-faded marquee header layout.
     method: manual

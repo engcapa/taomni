@@ -93,7 +93,7 @@ export const useAiStore = create<AiStore>((set, get) => ({
               );
               throw err;
             }
-            storedKeys.push(key);
+            throw err;
           }
         }
         providers[id] = {
@@ -149,6 +149,20 @@ export const useAiStore = create<AiStore>((set, get) => ({
       },
     });
   },
+
+  removeCustomLlmProvider: (id) => set(({ config }) => {
+    if (!config?.llm.providers[id]?.custom) return {};
+    const { llm } = config;
+    const providers = { ...llm.providers };
+    delete providers[id];
+    const provider_groups = Object.fromEntries(Object.entries(llm.provider_groups).map(([groupId, group]) => [groupId, {
+      ...group, provider_ids: group.provider_ids.filter((providerId) => providerId !== id),
+    }]));
+    const task_routing = Object.fromEntries(Object.entries(llm.task_routing).filter(([, providerId]) => providerId !== id));
+    const fallback = llm.fallback.primary === id || llm.fallback.secondary === id ? { ...DEFAULT_CONFIG.llm.fallback, enabled: false } : llm.fallback;
+    const deepseek_app = config.deepseek_app?.provider === id ? { ...config.deepseek_app, provider: "deepseek-app", model: "deepseek-flash", thinking_default: false, search_default: false } : config.deepseek_app;
+    return { config: { ...config, deepseek_app, llm: { ...llm, providers, provider_groups, task_routing, fallback, active: llm.active === id ? DEFAULT_CONFIG.llm.active : llm.active } } };
+  }),
 
   updateLlmProviderGroup: (id: string, group: LlmProviderGroupConfig) => {
     const config = get().config;

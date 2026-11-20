@@ -32,6 +32,7 @@ steps:
 - assert_download:
     trigger: '[data-testid="markdown-drawio-save"]'
     filename: graph-types.drawio
+    artifact: drawio
     contains:
     - <mxfile
     - mermaidSource=

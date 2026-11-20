@@ -63,7 +63,7 @@ document.getElementById('security').onclick=async()=>{{
 
 
 class Servers:
-    def __init__(self, directory: Path, nonce: str):
+    def __init__(self, directory: Path, nonce: str, images=None):
         self.directory, self.nonce = directory, nonce
         self.log = directory / "html-network-server.jsonl"
         self.log.write_text("", encoding="utf-8")
@@ -133,9 +133,12 @@ class Servers:
                             self.wfile.write(b"x" * 1024)
                             self.wfile.flush()
                         return
-                    body = json.dumps({"nonce": owner.nonce, "route": self.headers.get("X-QA-Route", "direct"), "path": target.path}).encode()
+                    image = (images or {}).get(target.path)
+                    body = image if image is not None else json.dumps({"nonce": owner.nonce, "route": self.headers.get("X-QA-Route", "direct"), "path": target.path}).encode()
                     self.send_response(200)
-                    self.send_header("Content-Type", "application/json")
+                    self.send_header("Content-Type", "image/png" if image is not None else "application/json")
+                    if image is not None:
+                        self.send_header("Access-Control-Allow-Origin", "*")
                     self.send_header("Content-Length", str(len(body)))
                     self.send_header("Cache-Control", "no-store")
                     self.send_header("Connection", "close")

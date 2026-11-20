@@ -24,8 +24,8 @@ it("keeps rendered node geometry when reparse counters differ, including multili
   try {
     const page = newDrawioPage("a", "Classes");
     await mermaidDrawioCells(page, snapshot('<svg xmlns="http://www.w3.org/2000/svg"><g class="node" id="render-classId-Animal-0"><text><tspan x="0">Animal</tspan><tspan x="0" dy="20">+name: string</tspan></text></g><g class="node" id="render-classId-Dog-1"><text>Dog</text></g></svg>'), DEFAULT_DIAGRAM_VIEW, "graph");
-    const node = page.model.querySelector("mxCell[id='graph-node-0']")!;
-    expect(node.getAttribute("value")).toBe("Animal\n+name: string");
+    const node = page.model.querySelector("object[id='graph-node-0'] > mxCell")!;
+    expect(node.parentElement?.getAttribute("label")).toBe("Animal\n+name: string");
     expect(node.querySelector("mxGeometry")?.getAttribute("x")).toBe("40");
     expect(node.querySelector("mxGeometry")?.getAttribute("y")).toBe("100");
     expect(node.querySelector("mxGeometry")?.getAttribute("width")).toBe("180");

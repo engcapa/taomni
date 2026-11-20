@@ -36,6 +36,10 @@ steps:
     selector: '[data-testid="llm-providers-save"]'
     equal: 1
 - assert_not_visible: '[data-testid="tao-settings-save"]'
+- assert_attribute:
+    selector: '[data-testid="tao-settings-cost"]'
+    name: value
+    equals: '0'
 - assert_not_visible: '[data-testid="tao-settings-key"]'
 - select_option:
     selector: '[data-testid="tao-settings-provider"]'
@@ -62,7 +66,7 @@ steps:
     contains: qa-chat-default
 - click: '[data-testid="tao-home-capabilities"]'
 - eval_readonly:
-    expression: document.querySelector('.tao-home-popup-items select').value === "local"
+    expression: document.querySelector('.tao-home-control-field .taomni-select-trigger').dataset.value === "local"
     expect_truthy: true
 - assert_disabled: '[data-testid="tao-home-capability-thinking"]'
 - assert_disabled: '[data-testid="tao-home-capability-web"]'
@@ -109,22 +113,22 @@ verification:
     - 6
     - 8
     - 10
-    - 14
     - 15
     - 16
     - 17
     - 18
     - 19
     - 20
-    - 22
+    - 21
     - 23
-    - 25
-    - 29
+    - 24
+    - 26
     - 30
-    - 32
-    - 34
+    - 31
+    - 33
     - 35
-    - 40
+    - 36
+    - 41
     checkpoints:
     - step: 7
       expectation: '[data-testid="tao-settings"]'
@@ -135,61 +139,65 @@ verification:
       expectation: '{''selector'': ''[data-testid="llm-providers-save"]'', ''equal'': 1}'
     - step: 12
       expectation: '[data-testid="tao-settings-save"]'
-    - step: 13
+    - step: 14
       expectation: '[data-testid="tao-settings-key"]'
-    - step: 21
+    - step: 22
       expectation: '[data-testid="llm-providers-status"]'
-    - step: 24
+    - step: 25
       expectation: '{''selector'': ''[data-testid="tao-home-capabilities"]'', ''contains'': ''qa-chat-default''}'
-    - step: 26
-      expectation: '{''expression'': ''document.querySelector(\''.tao-home-popup-items select\'').value === "local"'', ''expect_truthy'':
-        True}'
     - step: 27
-      expectation: '[data-testid="tao-home-capability-thinking"]'
-    - step: 28
-      expectation: '[data-testid="tao-home-capability-web"]'
-    - step: 31
-      expectation: '{''expression'': ''!document.querySelector(\''.tao-home-capability-button\'').textContent.includes("Web")'', ''expect_truthy'':
+      expectation: '{''expression'': ''document.querySelector(\''.tao-home-control-field .taomni-select-trigger\'').dataset.value === "local"'', ''expect_truthy'':
         True}'
-    - step: 33
+    - step: 28
+      expectation: '[data-testid="tao-home-capability-thinking"]'
+    - step: 29
+      expectation: '[data-testid="tao-home-capability-web"]'
+    - step: 32
+      expectation: '{''expression'': ''!document.querySelector(\''.tao-home-capability-button\'').textContent.includes("Web")'',
+        ''expect_truthy'': True}'
+    - step: 34
       expectation: '[data-testid="tao-home-host"]'
-    - step: 36
-      expectation: '[data-testid="tao-settings"]'
     - step: 37
-      expectation: '{''selector'': ''[data-testid="tao-settings-model"]'', ''name'': ''value'', ''equals'': ''qa-chat-default''}'
+      expectation: '[data-testid="tao-settings"]'
     - step: 38
+      expectation: '{''selector'': ''[data-testid="tao-settings-model"]'', ''name'': ''value'', ''equals'': ''qa-chat-default''}'
+    - step: 39
       expectation: '{''expression'': "document.querySelector(''#tao-settings-heading'').parentElement.querySelectorAll(''select'')[2].value
         === ''tide''", ''expect_truthy'': True}'
-    - step: 39
+    - step: 40
       expectation: '{''selector'': ''[data-testid="tao-settings-cost"]'', ''name'': ''value'', ''equals'': ''2.5''}'
-    - step: 41
+    - step: 42
       expectation: '{''selector'': ''[data-provider="local"] [data-testid="llm-provider-model"]'', ''name'': ''value'', ''equals'':
         ''qa-provider-model''}'
-    - step: 42
+    - step: 43
       expectation: None
+    - step: 13
+      expectation: USD confirmation threshold defaults to zero.
     results:
     - 7
     - 9
     - 11
     - 12
-    - 13
-    - 21
-    - 24
-    - 26
+    - 14
+    - 22
+    - 25
     - 27
     - 28
-    - 31
-    - 33
-    - 36
+    - 29
+    - 32
+    - 34
     - 37
     - 38
     - 39
-    - 41
+    - 40
     - 42
+    - 43
+    - 13
   native:
   - check: Packaged settings and chat controls
     method: automated
-    reason: Actual QA binary, isolated profile and normalized Tao stream; loopback protocol success does not certify a commercial model.
+    reason: Actual QA binary, isolated profile and normalized Tao stream; loopback protocol success does not certify a commercial
+      model.
   visual:
   - check: Combined LLM and chat configuration
     method: manual

@@ -1,3 +1,4 @@
+import { useId } from "react";
 import { X, Trash2, RotateCcw } from "lucide-react";
 import { entryDisplayName, entryKindSummary } from "../../lib/welcomeSessionResume";
 import { type TranslateFn } from "../../lib/i18n";
@@ -8,24 +9,19 @@ import { type WelcomeRestoreProp } from "./types";
 export function RestoreLastSessionRow({
   restore,
   translate: t,
+  redactNames = false,
 }: {
   restore: WelcomeRestoreProp;
   translate: TranslateFn;
+  redactNames?: boolean;
 }) {
   const { view } = restore;
+  const statusId = useId();
   const clearConfirm = useConfirmDialog();
-  const busy =
-    view.state === "restoring" || view.state === "awaiting-auth" || view.state === "loading";
-  const disabled =
-    view.state === "loading" ||
-    view.state === "empty" ||
-    view.state === "unavailable" ||
-    busy;
+  const busy = view.state === "restoring" || view.state === "awaiting-auth";
   const available = view.state === "available";
   const finished = view.state === "succeeded" || view.state === "partial" || view.state === "failed";
-  const canRetry =
-    (view.state === "partial" || view.state === "failed") &&
-    restore.outcomes.some((o) => o.status === "failed" || o.status === "cancelled");
+  const failures = finished ? restore.outcomes.filter((o) => o.status === "failed" || o.status === "cancelled") : [];
 
   const summary = (() => {
     switch (view.state) {
@@ -39,12 +35,10 @@ export function RestoreLastSessionRow({
         if (!record) return "";
         const kinds = record.entries.map(entryKindSummary);
         const unique = [...new Set(kinds)].join(", ");
-        const names = record.entries
-          .slice(0, 3)
-          .map(entryDisplayName)
-          .join(", ");
-        const suffix = record.entries.length > 3 ? "…" : "";
-        return `${t("welcome.restoreEntryCount", { count: record.entries.length })} · ${unique} · ${names}${suffix}`;
+        const count = t("welcome.restoreEntryCount", { count: record.entries.length });
+        if (redactNames) return `${count} · ${unique}`;
+        const names = record.entries.slice(0, 3).map(entryDisplayName).join(", ");
+        return `${count} · ${unique} · ${names}${record.entries.length > 3 ? "…" : ""}`;
       }
       default:
         return "";
@@ -68,11 +62,11 @@ export function RestoreLastSessionRow({
         return t("welcome.restoreAwaitingAuth");
       case "succeeded":
         return t("welcome.restoreSucceeded", {
-          count: restore.outcomes.filter((o) => o.status === "ready").length,
+          count: restore.outcomes.length,
         });
       case "partial":
         return t("welcome.restorePartial", {
-          failed: restore.outcomes.filter((o) => o.status === "failed" || o.status === "cancelled").length,
+          failed: failures.length,
         });
       case "failed":
         return t("welcome.restoreFailed");
@@ -96,45 +90,42 @@ export function RestoreLastSessionRow({
   return (
     <div
       data-testid="welcome-restore-row"
-      className="mt-4 flex min-w-0 flex-wrap items-center gap-2 rounded-md border px-3 py-2"
-      style={{ borderColor: "var(--taomni-card-border)", background: "var(--taomni-card-bg)" }}
+      className="welcome-restore-row mt-4 flex min-w-0 flex-wrap items-center gap-2 rounded-md border px-3 py-2"
     >
       <button
         data-testid="welcome-restore-last-session"
         className="taomni-btn h-8 px-3 inline-flex items-center gap-1.5"
         type="button"
-        disabled={disabled}
-        aria-busy={view.state === "restoring" || view.state === "awaiting-auth" || undefined}
-        aria-live="polite"
+        disabled={!available && !finished}
+        aria-busy={busy || undefined}
+        aria-describedby={statusId}
         onClick={restore.onStartRestore}
       >
-        <RotateCcw className="h-4 w-4" />
+        <RotateCcw className="h-4 w-4" aria-hidden="true" />
         <span>{t("welcome.restoreTitle")}</span>
       </button>
       <div
+        id={statusId}
         data-testid="welcome-restore-status"
         data-state={view.state}
         className="min-w-0 flex-1 text-[12px] text-[var(--taomni-text-muted)]"
         role={view.state === "failed" ? "alert" : "status"}
       >
-        <span className="block truncate" title={statusText}>
+        <span className="block truncate" title={[statusText, summary].filter(Boolean).join(" · ")}>
           {statusText}
-          {summary ? <span className="ml-1 opacity-80">{summary}</span> : null}
+          {summary ? <span className="ml-1"> · {summary}</span> : null}
         </span>
-        {view.state === "partial" ? (
-          <ul className="mt-1 space-y-0.5">
-            {restore.outcomes
-              .filter((o) => o.status === "failed" || o.status === "cancelled")
-              .map((o) => (
-                <li key={o.identity} className="truncate" title={o.issue?.message ?? ""}>
-                  · {o.displayName}
-                  {o.issue ? ` — ${o.issue.code}` : ""}
-                </li>
-              ))}
+        {failures.length > 0 && !redactNames ? (
+          <ul className="mt-1 max-h-20 space-y-0.5 overflow-auto">
+            {failures.map((o) => (
+              <li key={o.identity} className="truncate" title={o.issue?.message ?? ""}>
+                {o.displayName}{o.issue ? ` · ${o.issue.code}` : ""}
+              </li>
+            ))}
           </ul>
         ) : null}
       </div>
-      {view.state === "restoring" || view.state === "awaiting-auth" ? (
+      {busy ? (
         <button
           data-testid="welcome-restore-cancel"
           className="taomni-btn h-8 px-2 inline-flex items-center"
@@ -145,7 +136,7 @@ export function RestoreLastSessionRow({
           <span>{t("welcome.restoreCancel")}</span>
         </button>
       ) : null}
-      {canRetry ? (
+      {failures.length > 0 ? (
         <button
           data-testid="welcome-restore-retry"
           className="taomni-btn h-8 px-2 inline-flex items-center gap-1"

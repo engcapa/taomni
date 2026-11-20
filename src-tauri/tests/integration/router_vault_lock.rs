@@ -25,6 +25,7 @@ fn make_config(api_key: String) -> AiConfig {
     providers.insert(
         "anthropic".into(),
         LlmProviderConfig {
+            custom: None,
             base_url: "https://api.anthropic.com/v1".into(),
             api_key,
             api_keys: Vec::new(),
@@ -43,6 +44,7 @@ fn make_config(api_key: String) -> AiConfig {
     providers.insert(
         "local".into(),
         LlmProviderConfig {
+            custom: None,
             base_url: "http://127.0.0.1:8080/v1".into(),
             api_key: "local".into(),
             api_keys: Vec::new(),

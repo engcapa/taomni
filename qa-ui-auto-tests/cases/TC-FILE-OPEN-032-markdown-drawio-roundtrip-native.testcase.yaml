@@ -1,0 +1,107 @@
+id: TC-FILE-OPEN-032
+title: Markdown draw.io round trip with genuine Desktop reference (native)
+description: >
+  Import from the left formatting toolbar. Compare Live browse and Split preview pixels
+  against a PNG exported by draw.io Desktop. Check exported XML against the original
+  editable shapes, labels, geometry, styles and edge terminals.
+covers: [F-FILEOPEN-1, F-EXPLORER-1]
+modes: [native]
+tags: [p1, markdown, drawio, regression]
+fixtures: [reset_db, markdown_drawio_roundtrip]
+timeout_sec: 300
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-drawio-roundtrip
+- reload_window: null
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-file-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Control+l
+    macos_key: Meta+l
+- fill:
+    selector: '[data-testid="explorer-address"]'
+    value: ${fixture.platform_workspace_root}
+- press:
+    selector: '[data-testid="explorer-address"]'
+    key: Enter
+- dblclick: '[data-testid="explorer-file-row"][data-name="drawio-roundtrip.md"]'
+- wait_for: '[data-testid="markdown-editor"][data-mode="live"]'
+- assert_visible: '.fv-md-format [data-testid="markdown-insert-image"] + [data-testid="markdown-import-drawio"]'
+- assert_disabled: '.fv-md-format [data-testid="markdown-import-drawio"]'
+- click: '[data-testid="markdown-live-edit"]'
+- wait_for: '.fv-md-format [data-testid="markdown-import-drawio"]:enabled'
+- native_file_dialog:
+    kind: open
+    action: choose
+    path: ${fixture.drawio_roundtrip_input}
+    trigger: '.fv-md-format [data-testid="markdown-import-drawio"]'
+- wait_for:
+    selector: '[data-testid="markdown-drawio-import-dialog"] [data-testid="markdown-drawio-import-preview"] svg'
+    timeout_sec: 30
+- click: '[data-testid="markdown-drawio-import-diagram"]'
+- click: '[data-testid="markdown-drawio-import-confirm"]'
+- click: '[data-testid="markdown-live-edit"]'
+- wait_for:
+    selector: '[data-testid="markdown-live"] .fv-md-drawio > svg'
+    timeout_sec: 30
+- assert_drawio_preview: live
+- click: '[data-testid="markdown-outline-toggle"]'
+- click: '[data-testid="markdown-mode-split"]'
+- wait_for: '[data-testid="markdown-preview"] .fv-md-drawio > svg'
+- assert_drawio_preview: split
+- assert_text:
+    selector: '[data-testid="markdown-preview"]'
+    contains: Keep this Markdown outside the diagram.
+- click: '[data-testid="viewer-save"]'
+- assert_file_contains:
+    path: ${fixture.drawio_roundtrip_markdown}
+    contains: '```drawio'
+- click: '[data-testid="markdown-export"]'
+- click: '[data-testid="markdown-export-drawio"]'
+- wait_for: '[data-testid="markdown-drawio-export-settings"]'
+- select_option:
+    selector: '[data-testid="markdown-drawio-scope"]'
+    value: images
+- select_option:
+    selector: '[data-testid="markdown-drawio-layout"]'
+    value: separate
+- native_file_dialog:
+    kind: save
+    action: choose
+    path: ${fixture.drawio_roundtrip_export}
+    trigger: '[data-testid="markdown-drawio-save"]'
+- wait_for: '[data-testid="markdown-export-status"][data-export-state="saved"]'
+- assert_drawio_roundtrip: save
+- assert_no_runtime_errors: null
+verification:
+  review: reviewed
+  requirements:
+  - id: DRAWIO-IMPORT-AND-EXPORT-FIDELITY
+    requirement: Import from the left toolbar and preserve the original drawing through both previews and editable re-export.
+    actions: [14, 16, 18, 19, 24, 33, 34, 35]
+    checkpoints:
+    - step: 12
+      expectation: Import draw.io is immediately after Insert image in the left formatting group.
+    - step: 13
+      expectation: Import stays disabled in Live browse.
+    - step: 15
+      expectation: Import becomes available when editing is enabled.
+    - step: 22
+      expectation: Live browse preserves the shapes, labels, colors and arrows in the Desktop reference.
+    - step: 26
+      expectation: Split preview preserves the same visible diagram.
+    - step: 27
+      expectation: Surrounding Markdown remains visible.
+    - step: 37
+      expectation: The exported sheet retains editable cells, style, geometry and all edge terminals.
+    results: [12, 13, 15, 22, 26, 27, 37]
+  native:
+  - check: Host Open and Save dialogs and file bytes
+    method: automated
+    reason: Use the system choosers and independently parse the saved .drawio file.
+  visual:
+  - check: Uploaded draw.io appearance in Live browse and Split preview
+    method: automated
+    reason: Compare captured PNG pixels by color and position against the independent Desktop PNG, and retain the reference, captures and difference.
