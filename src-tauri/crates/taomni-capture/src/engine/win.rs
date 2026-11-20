@@ -19,7 +19,7 @@ use windows::Win32::Graphics::Gdi::{
 };
 use windows::Win32::UI::WindowsAndMessaging::GetDesktopWindow;
 
-const FRAME_WAIT: Duration = Duration::from_millis(250);
+const FRAME_WAIT: Duration = Duration::from_millis(8);
 const TOPOLOGY_CHECK_INTERVAL: Duration = Duration::from_secs(1);
 const RESTART_BACKOFF: Duration = Duration::from_millis(250);
 const MAX_CAPTURE_BYTES: usize = 512 * 1024 * 1024;
@@ -80,21 +80,7 @@ impl WindowsCapturer {
         let width = initial.width;
         let height = initial.height;
 
-        let backend = match start_recorder(&monitor) {
-            Ok(backend) => {
-                log.line(format!(
-                    "Windows RDP capture: Windows Graphics Capture ready ({}x{})",
-                    width, height
-                ));
-                backend
-            }
-            Err(error) => {
-                log.line(format!(
-                    "Windows RDP capture: WGC unavailable ({error}); using GDI fallback"
-                ));
-                Backend::Gdi
-            }
-        };
+        log.line("Windows RDP capture: GDI 8 ms polling comparison");
 
         Ok(Self {
             monitor,
@@ -102,7 +88,7 @@ impl WindowsCapturer {
             requested_display,
             width,
             height,
-            backend,
+            backend: Backend::Gdi,
             pending: Some(initial),
             next_topology_check: Instant::now() + TOPOLOGY_CHECK_INTERVAL,
             next_restart: Instant::now(),
@@ -112,21 +98,7 @@ impl WindowsCapturer {
 
     fn install_monitor(&mut self, monitor: xcap::Monitor, key: MonitorKey) {
         self.backend.stop();
-        self.backend = match start_recorder(&monitor) {
-            Ok(backend) => {
-                self.log.line(format!(
-                    "Windows RDP capture: rebuilt WGC session for {}x{}",
-                    key.width, key.height
-                ));
-                backend
-            }
-            Err(error) => {
-                self.log.line(format!(
-                    "Windows RDP capture: WGC rebuild failed ({error}); using GDI"
-                ));
-                Backend::Gdi
-            }
-        };
+        self.backend = Backend::Gdi;
         // A newly selected monitor may be static and therefore produce no
         // Native capture present notification. Seed the next update with
         // a validated snapshot so the client receives the new geometry/frame
@@ -253,7 +225,7 @@ impl Capturer for WindowsCapturer {
     }
 
     fn is_self_paced(&self) -> bool {
-        matches!(self.backend, Backend::Recorder(_))
+        true
     }
 
     fn needs_frame_deduplication(&self) -> bool {
@@ -268,9 +240,6 @@ impl WindowsCapturer {
             return Ok(Some(frame));
         }
 
-        if matches!(self.backend, Backend::Gdi) {
-            self.restart_recorder();
-        }
         match &self.backend {
             Backend::Recorder(_) => match self.next_recorder_frame(wait) {
                 Ok(frame) => Ok(frame),
