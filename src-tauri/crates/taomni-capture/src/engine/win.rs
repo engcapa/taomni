@@ -13,9 +13,8 @@ use super::{Capturer, Frame};
 use crate::CaptureLogger;
 use scopeguard::guard;
 use windows::Win32::Graphics::Gdi::{
-    BITMAPINFO, BITMAPINFOHEADER, BitBlt, CreateCompatibleBitmap, CreateCompatibleDC,
-    DIB_RGB_COLORS, DeleteDC, DeleteObject, GetDIBits, GetWindowDC, RGBQUAD, ReleaseDC, SRCCOPY,
-    SelectObject,
+    BITMAPINFO, BITMAPINFOHEADER, BitBlt, CreateCompatibleDC, CreateDIBSection, DIB_RGB_COLORS,
+    DeleteDC, DeleteObject, GdiFlush, GetWindowDC, RGBQUAD, ReleaseDC, SRCCOPY, SelectObject,
 };
 use windows::Win32::UI::WindowsAndMessaging::GetDesktopWindow;
 
@@ -58,6 +57,7 @@ pub(crate) struct WindowsCapturer {
     /// waiting for a future native frame notification.
     pending: Option<Frame>,
     next_topology_check: Instant,
+    next_gdi_frame: Instant,
     next_restart: Instant,
     log: CaptureLogger,
 }
@@ -80,7 +80,7 @@ impl WindowsCapturer {
         let width = initial.width;
         let height = initial.height;
 
-        log.line("Windows RDP capture: GDI 8 ms polling comparison");
+        log.line("Windows RDP capture: GDI direct DIB readback comparison");
 
         Ok(Self {
             monitor,
@@ -91,6 +91,7 @@ impl WindowsCapturer {
             backend: Backend::Gdi,
             pending: Some(initial),
             next_topology_check: Instant::now() + TOPOLOGY_CHECK_INTERVAL,
+            next_gdi_frame: Instant::now(),
             next_restart: Instant::now(),
             log: log.clone(),
         })
@@ -251,7 +252,13 @@ impl WindowsCapturer {
             Backend::Gdi => {
                 // GDI is a compatibility path only. Keep its cadence bounded
                 // and let the display layer's hash suppress unchanged pixels.
-                std::thread::sleep(wait);
+                if !wait.is_zero() {
+                    std::thread::sleep(
+                        self.next_gdi_frame
+                            .saturating_duration_since(Instant::now()),
+                    );
+                }
+                self.next_gdi_frame = Instant::now() + FRAME_WAIT;
                 let frame = capture_gdi(&self.monitor)?;
                 self.width = frame.width;
                 self.height = frame.height;
@@ -310,8 +317,7 @@ fn capture_gdi(monitor: &xcap::Monitor) -> anyhow::Result<Frame> {
     let height_i32 = i32::from(height);
 
     let pixel_bytes = checked_frame_bytes(width, height)?;
-    let mut pixels = vec![0u8; pixel_bytes];
-    unsafe {
+    let pixels = unsafe {
         let desktop = GetDesktopWindow();
         let desktop_dc = GetWindowDC(Some(desktop));
         if desktop_dc.is_invalid() {
@@ -329,10 +335,27 @@ fn capture_gdi(monitor: &xcap::Monitor) -> anyhow::Result<Frame> {
             let _ = DeleteDC(dc);
         });
 
-        let bitmap = CreateCompatibleBitmap(*desktop_dc, width_i32, height_i32);
-        if bitmap.is_invalid() {
-            anyhow::bail!("GDI CreateCompatibleBitmap failed");
-        }
+        let bitmap_info = BITMAPINFO {
+            bmiHeader: BITMAPINFOHEADER {
+                biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
+                biWidth: width_i32,
+                biHeight: -height_i32,
+                biPlanes: 1,
+                biBitCount: 32,
+                biSizeImage: pixel_bytes as u32,
+                ..Default::default()
+            },
+            bmiColors: [RGBQUAD::default(); 1],
+        };
+        let mut bits = std::ptr::null_mut();
+        let bitmap = CreateDIBSection(
+            Some(*desktop_dc),
+            &bitmap_info,
+            DIB_RGB_COLORS,
+            &mut bits,
+            None,
+            0,
+        )?;
         let bitmap = guard(bitmap, |bitmap| {
             let _ = DeleteObject(bitmap.into());
         });
@@ -357,32 +380,13 @@ fn capture_gdi(monitor: &xcap::Monitor) -> anyhow::Result<Frame> {
         )
         .map_err(|error| anyhow::anyhow!("GDI BitBlt failed: {error}"))?;
 
-        let mut bitmap_info = BITMAPINFO {
-            bmiHeader: BITMAPINFOHEADER {
-                biSize: std::mem::size_of::<BITMAPINFOHEADER>() as u32,
-                biWidth: width_i32,
-                biHeight: -height_i32,
-                biPlanes: 1,
-                biBitCount: 32,
-                biCompression: 0,
-                biSizeImage: pixels.len() as u32,
-                ..Default::default()
-            },
-            bmiColors: [RGBQUAD::default(); 1],
-        };
-        if GetDIBits(
-            *memory_dc,
-            *bitmap,
-            0,
-            u32::from(height),
-            Some(pixels.as_mut_ptr().cast()),
-            &mut bitmap_info,
-            DIB_RGB_COLORS,
-        ) == 0
-        {
-            anyhow::bail!("GDI GetDIBits failed");
+        // The DIB exposes the 32-bit destination directly to the CPU. Flush
+        // the calling thread's GDI batch before reading that memory.
+        if bits.is_null() || !GdiFlush().as_bool() {
+            anyhow::bail!("GDI did not publish the desktop pixels");
         }
-    }
+        std::slice::from_raw_parts(bits.cast::<u8>(), pixel_bytes).to_vec()
+    };
 
     let stride = usize::from(width)
         .checked_mul(4)
