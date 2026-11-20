@@ -18,9 +18,15 @@ export function RestoreLastSessionRow({
   const { view } = restore;
   const statusId = useId();
   const clearConfirm = useConfirmDialog();
+
+  // A fully restored snapshot is no longer a pending action. Keep its outcomes
+  // in the controller for diagnostics, but remove the completed banner from Home.
+  // Partial/failed results remain visible so retry and error details stay reachable.
+  if (view.state === "succeeded") return null;
+
   const busy = view.state === "restoring" || view.state === "awaiting-auth";
   const available = view.state === "available";
-  const finished = view.state === "succeeded" || view.state === "partial" || view.state === "failed";
+  const finished = view.state === "partial" || view.state === "failed";
   const failures = finished ? restore.outcomes.filter((o) => o.status === "failed" || o.status === "cancelled") : [];
 
   const summary = (() => {
@@ -28,7 +34,6 @@ export function RestoreLastSessionRow({
       case "available":
       case "restoring":
       case "awaiting-auth":
-      case "succeeded":
       case "partial":
       case "failed": {
         const record = "record" in view ? view.record : null;
@@ -60,10 +65,6 @@ export function RestoreLastSessionRow({
         });
       case "awaiting-auth":
         return t("welcome.restoreAwaitingAuth");
-      case "succeeded":
-        return t("welcome.restoreSucceeded", {
-          count: restore.outcomes.length,
-        });
       case "partial":
         return t("welcome.restorePartial", {
           failed: failures.length,
