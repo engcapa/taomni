@@ -2,7 +2,7 @@
   "id": "taomni-plugin-mail",
   "slug": "mail",
   "name": "Mail",
-  "description": "Read cached folders, messages, drafts and the Outbox, including data staged from a legacy Mail cache.",
+  "description": "Read migrated mail and manage local drafts, templates and the Outbox.",
   "version": "0.1.0",
   "coreApiVersion": "1",
   "kind": "collaboration",
@@ -15,6 +15,8 @@
     "mail_list_cached_messages",
     "mail_get_cached_body",
     "mail_list_drafts",
+    "mail_save_draft",
+    "mail_delete_draft",
     "backup/prepare",
     "backup/snapshot",
     "backup/release"

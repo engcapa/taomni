@@ -13,6 +13,74 @@ use taomni_plugin_api::ErrorCode;
 
 use super::{commands, host_config, store::Store};
 
+fn invoke(
+    store: &Store,
+    method: &str,
+    input: Option<Value>,
+) -> Result<Value, taomni_plugin_api::RpcError> {
+    commands::invoke(store, method, input, &|| Ok(()))
+}
+
+#[test]
+fn draft_writes_are_account_scoped_and_retryable() {
+    let profile = tempfile::tempdir().unwrap();
+    let store = Store::new(&profile.path().canonicalize().unwrap());
+    let delete = |account| json!({"accountId":account, "draftId":"draft-id"});
+    invoke(&store, "mail_delete_draft", Some(delete("unknown"))).unwrap();
+    assert!(!profile.path().join("plugins").exists());
+    for subject in ["initial", "updated"] {
+        let saved = invoke(
+            &store,
+            "mail_save_draft",
+            Some(json!({
+                "accountId":"mail-a","draft":{"id":"draft-id","subject":subject}
+            })),
+        )
+        .unwrap();
+        assert_eq!(saved["subject"], subject);
+    }
+    invoke(&store, "mail_delete_draft", Some(delete("mail-b"))).unwrap();
+    let list = || {
+        invoke(
+            &store,
+            "mail_list_drafts",
+            Some(json!({"accountId":"mail-a"})),
+        )
+        .unwrap()
+    };
+    let drafts = list();
+    assert_eq!(drafts.as_array().unwrap().len(), 1);
+    assert_eq!(drafts[0]["subject"], "updated");
+    invoke(&store, "mail_delete_draft", Some(delete("mail-a"))).unwrap();
+    assert_eq!(list(), json!([]));
+}
+
+#[test]
+fn cancellation_during_first_draft_save_leaves_no_database() {
+    let profile = tempfile::tempdir().unwrap();
+    let store = Store::new(&profile.path().canonicalize().unwrap());
+    let checks = std::cell::Cell::new(0);
+    let result = commands::invoke(
+        &store,
+        "mail_save_draft",
+        Some(json!({"accountId":"cancelled","draft":{"id":"cancelled"}})),
+        &|| {
+            let count = checks.get() + 1;
+            checks.set(count);
+            if count == 3 {
+                return Err(taomni_plugin_api::RpcError::from_code(
+                    ErrorCode::RequestCancelled,
+                ));
+            }
+            Ok(())
+        },
+    );
+    assert_eq!(result.unwrap_err().code, ErrorCode::RequestCancelled as i32);
+    let module = profile.path().join("plugins/mail");
+    assert_eq!(module.join("data").read_dir().unwrap().count(), 0);
+    assert_eq!(module.read_dir().unwrap().count(), 1);
+}
+
 #[test]
 fn draft_pages_keep_outbox_fields_and_filter_by_account() {
     let profile = tempfile::tempdir().unwrap();
@@ -39,7 +107,7 @@ fn draft_pages_keep_outbox_fields_and_filter_by_account() {
         .execute("UPDATE mail_drafts SET updated_at=1", [])
         .unwrap();
     let page = |offset| {
-        commands::invoke(
+        invoke(
             &store,
             "mail_list_drafts",
             Some(json!({"accountId":"saved","limit":1,"offset":offset})),
@@ -74,7 +142,7 @@ fn queries_read_the_owned_mailbox_and_do_not_create_missing_data() {
     let store = Store::new(&profile.path().canonicalize().unwrap());
     let query = json!({"accountId": "saved-mail"});
     assert_eq!(
-        commands::invoke(&store, "mail_list_cached_folders", Some(query.clone())).unwrap(),
+        invoke(&store, "mail_list_cached_folders", Some(query.clone())).unwrap(),
         json!([])
     );
     assert!(!profile.path().join("plugins").exists());
@@ -100,11 +168,11 @@ fn queries_read_the_owned_mailbox_and_do_not_create_missing_data() {
     )
     .unwrap();
 
-    let folders = commands::invoke(&store, "mail_list_cached_folders", Some(query)).unwrap();
+    let folders = invoke(&store, "mail_list_cached_folders", Some(query)).unwrap();
     assert_eq!(folders[0]["name"], "INBOX");
     assert_eq!(folders[0]["cachedCount"], 1);
     let message = json!({"accountId":"saved-mail","folder":"INBOX","uid":5});
-    let body = commands::invoke(&store, "mail_get_cached_body", Some(message)).unwrap();
+    let body = invoke(&store, "mail_get_cached_body", Some(message)).unwrap();
     assert!(
         body["text"]
             .as_str()
@@ -112,7 +180,7 @@ fn queries_read_the_owned_mailbox_and_do_not_create_missing_data() {
             .contains("Saved message body")
     );
     assert_eq!(
-        commands::invoke(
+        invoke(
             &store,
             "mail_list_cached_messages",
             Some(json!({"accountId":"other-account","folder":"INBOX"}))
@@ -129,7 +197,7 @@ fn request_cannot_supply_a_database_path_and_oversized_bodies_get_an_rpc_error()
     let store = Store::new(&profile.path().canonicalize().unwrap());
     let path = json!({"accountId":"saved","path":"taomni.db"});
     assert_eq!(
-        commands::invoke(&store, "mail_list_cached_folders", Some(path))
+        invoke(&store, "mail_list_cached_folders", Some(path))
             .unwrap_err()
             .code,
         ErrorCode::InvalidParams as i32
@@ -147,7 +215,7 @@ fn request_cannot_supply_a_database_path_and_oversized_bodies_get_an_rpc_error()
     .unwrap();
     let args = json!({"accountId":"saved","folder":"INBOX","uid":4});
     assert_eq!(
-        commands::invoke(&store, "mail_get_cached_body", Some(args))
+        invoke(&store, "mail_get_cached_body", Some(args))
             .unwrap_err()
             .message,
         "MAIL_RESULT_TOO_LARGE"
@@ -167,7 +235,7 @@ fn directory_or_sqlite_sidecar_links_are_rejected() {
     let link = root.join("data");
     symlink(outside.path(), &link).unwrap();
     let args = json!({"accountId":"saved"});
-    assert!(commands::invoke(&store, "mail_list_cached_folders", Some(args.clone())).is_err());
+    assert!(invoke(&store, "mail_list_cached_folders", Some(args.clone())).is_err());
 
     fs::remove_file(&link).unwrap();
     fs::create_dir(&link).unwrap();
@@ -179,5 +247,5 @@ fn directory_or_sqlite_sidecar_links_are_rejected() {
         link.join(format!("{stem}.db-wal")),
     )
     .unwrap();
-    assert!(commands::invoke(&store, "mail_list_cached_folders", Some(args)).is_err());
+    assert!(invoke(&store, "mail_list_cached_folders", Some(args)).is_err());
 }

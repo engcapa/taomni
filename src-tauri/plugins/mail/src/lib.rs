@@ -63,7 +63,7 @@ impl PluginHandler for Handler {
         params: Option<Value>,
     ) -> Result<Value, RpcError> {
         operation.check_current()?;
-        commands::invoke(&self.store, method, params)
+        commands::invoke(&self.store, method, params, &|| operation.check_current())
     }
 }
 

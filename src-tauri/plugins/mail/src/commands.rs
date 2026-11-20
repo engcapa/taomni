@@ -1,6 +1,9 @@
 use serde::{Deserialize, Serialize, de::DeserializeOwned};
 use serde_json::Value;
-use taomni_mail_engine::{cache, drafts::list_mail_drafts_page};
+use taomni_mail_engine::{
+    cache,
+    drafts::{MailDraftSaveRequest, delete_mail_draft, list_mail_drafts_page, save_mail_draft},
+};
 use taomni_plugin_api::{ErrorCode, RpcError};
 
 use super::store::{Store, unavailable};
@@ -9,7 +12,16 @@ const LIST_FOLDERS: &str = "mail_list_cached_folders";
 const LIST_MESSAGES: &str = "mail_list_cached_messages";
 const READ_BODY: &str = "mail_get_cached_body";
 const LIST_DRAFTS: &str = "mail_list_drafts";
-pub(super) const METHODS: [&str; 4] = [LIST_FOLDERS, LIST_MESSAGES, READ_BODY, LIST_DRAFTS];
+const SAVE_DRAFT: &str = "mail_save_draft";
+const DELETE_DRAFT: &str = "mail_delete_draft";
+pub(super) const METHODS: [&str; 6] = [
+    LIST_FOLDERS,
+    LIST_MESSAGES,
+    READ_BODY,
+    LIST_DRAFTS,
+    SAVE_DRAFT,
+    DELETE_DRAFT,
+];
 
 #[derive(Deserialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
@@ -42,10 +54,25 @@ struct DraftsPage {
     offset: Option<u32>,
 }
 
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct DraftSave {
+    account_id: String,
+    draft: MailDraftSaveRequest,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase", deny_unknown_fields)]
+struct DraftDelete {
+    account_id: String,
+    draft_id: String,
+}
+
 pub(super) fn invoke(
     store: &Store,
     method: &str,
     params: Option<Value>,
+    check: &dyn Fn() -> Result<(), RpcError>,
 ) -> Result<Value, RpcError> {
     match method {
         LIST_FOLDERS => {
@@ -86,6 +113,26 @@ pub(super) fn invoke(
                 )
             })?;
             encode(drafts)
+        }
+        SAVE_DRAFT => {
+            let input: DraftSave = decode(params)?;
+            let account = input.account_id.trim();
+            store.mutate(account, true, check, |db| {
+                let saved = save_mail_draft(db, account, input.draft).map_err(|_| unavailable())?;
+                encode(saved)
+            })
+        }
+        DELETE_DRAFT => {
+            let input: DraftDelete = decode(params)?;
+            let draft_id = input.draft_id.trim();
+            if draft_id.is_empty() {
+                return Err(RpcError::from_code(ErrorCode::InvalidParams));
+            }
+            let account = input.account_id.trim();
+            store.mutate(account, false, check, |db| {
+                delete_mail_draft(db, account, draft_id).map_err(|_| unavailable())
+            })?;
+            Ok(Value::Null)
         }
         _ => Err(RpcError::from_code(ErrorCode::MethodNotFound)),
     }

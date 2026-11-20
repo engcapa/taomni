@@ -13,10 +13,10 @@ taomni-plugin-sdk = { path = "../../crates/taomni-plugin-sdk" }
 rusqlite = { version = "0.40", features = ["bundled"] }
 serde = { version = "1", features = ["derive"] }
 serde_json = "1"
+tempfile = "3"
 
 [target.'cfg(unix)'.dependencies]
 libc = "0.2"
 
 [dev-dependencies]
 taomni-sqlite-snapshot = { path = "../../crates/taomni-sqlite-snapshot" }
-tempfile = "3"

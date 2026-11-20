@@ -31,25 +31,70 @@ impl Store {
         read(&open_database(&path)?).map_err(|_| unavailable())
     }
 
-    fn database_path(&self, account_id: &str) -> Result<Option<PathBuf>, RpcError> {
-        if account_id.trim().is_empty() || account_id.len() > 1024 || account_id.contains('\0') {
-            return Err(RpcError::from_code(ErrorCode::InvalidParams));
+    pub(super) fn mutate<T: Default>(
+        &self,
+        account_id: &str,
+        create: bool,
+        check: &dyn Fn() -> Result<(), RpcError>,
+        change: impl FnOnce(&Connection) -> Result<T, RpcError>,
+    ) -> Result<T, RpcError> {
+        validate_account(account_id)?;
+        check()?;
+        let Some(root) = self.data_root(create)? else {
+            return if create {
+                Err(unavailable())
+            } else {
+                Ok(T::default())
+            };
+        };
+        let path = database_for(&root, account_id);
+        if regular(&path)? {
+            let db = connect(&path, OpenFlags::SQLITE_OPEN_READ_WRITE)?;
+            return apply_change(&db, check, change);
         }
-        let Some(root) = self.data_root()? else {
+        check_missing_sidecars(&path)?;
+        if !create {
+            return Ok(T::default());
+        }
+        // Partially initialized files stay outside the signed backup paths.
+        let module = root.parent().ok_or_else(unavailable)?;
+        let temporary = tempfile::NamedTempFile::new_in(module).map_err(|_| unavailable())?;
+        let db = connect(temporary.path(), OpenFlags::SQLITE_OPEN_READ_WRITE)?;
+        taomni_mail_engine::cache::init_mail_tables(&db).map_err(|_| unavailable())?;
+        let changed = apply_change(&db, check, change)?;
+        db.close().map_err(|_| unavailable())?;
+        temporary.as_file().sync_all().map_err(|_| unavailable())?;
+        check()?;
+        temporary
+            .persist_noclobber(path)
+            .map_err(|_| unavailable())?;
+        Ok(changed)
+    }
+
+    fn database_path(&self, account_id: &str) -> Result<Option<PathBuf>, RpcError> {
+        validate_account(account_id)?;
+        let Some(root) = self.data_root(false)? else {
             return Ok(None);
         };
-        let stem = mail_db_file_stem(account_id);
-        let path = root.join(format!("{stem}.db"));
+        let path = database_for(&root, account_id);
         if !regular(&path)? {
+            check_missing_sidecars(&path)?;
             return Ok(None);
         }
         Ok(Some(path))
     }
 
-    fn data_root(&self) -> Result<Option<PathBuf>, RpcError> {
+    fn data_root(&self, create: bool) -> Result<Option<PathBuf>, RpcError> {
         let mut root = self.profile.clone();
         for component in ["plugins", "mail", "data"] {
             root.push(component);
+            if create {
+                match fs::create_dir(&root) {
+                    Ok(()) => (),
+                    Err(error) if error.kind() == ErrorKind::AlreadyExists => (),
+                    Err(_) => return Err(unavailable()),
+                }
+            }
             if !directory(&root)? {
                 return Ok(None);
             }
@@ -60,7 +105,7 @@ impl Store {
     pub(super) fn snapshot_source(&self, relative: &str) -> Result<PathBuf, RpcError> {
         let path = SafeRelativePath::parse(relative)
             .map_err(|_| RpcError::from_code(ErrorCode::InvalidParams))?;
-        let mut source = self.data_root()?.ok_or_else(unavailable)?;
+        let mut source = self.data_root(false)?.ok_or_else(unavailable)?;
         let parts: Vec<_> = path.as_str().split('/').collect();
         for part in &parts[..parts.len() - 1] {
             source.push(part);
@@ -76,17 +121,43 @@ impl Store {
     }
 }
 
+fn validate_account(account_id: &str) -> Result<(), RpcError> {
+    if account_id.trim().is_empty() || account_id.len() > 1024 || account_id.contains('\0') {
+        return Err(RpcError::from_code(ErrorCode::InvalidParams));
+    }
+    Ok(())
+}
+
+fn database_for(root: &Path, account_id: &str) -> PathBuf {
+    root.join(format!("{}.db", mail_db_file_stem(account_id)))
+}
+
+fn apply_change<T>(
+    database: &Connection,
+    check: &dyn Fn() -> Result<(), RpcError>,
+    change: impl FnOnce(&Connection) -> Result<T, RpcError>,
+) -> Result<T, RpcError> {
+    check()?;
+    let transaction = database
+        .unchecked_transaction()
+        .map_err(|_| unavailable())?;
+    let changed = change(&transaction)?;
+    check()?;
+    transaction.commit().map_err(|_| unavailable())?;
+    Ok(changed)
+}
+
 pub(super) fn open_database(path: &Path) -> Result<Connection, RpcError> {
-    for suffix in ["-wal", "-shm", "-journal"] {
-        let mut sidecar = path.as_os_str().to_owned();
-        sidecar.push(suffix);
-        regular(Path::new(&sidecar))?;
+    connect(path, OpenFlags::SQLITE_OPEN_READ_ONLY)
+}
+
+fn connect(path: &Path, mode: OpenFlags) -> Result<Connection, RpcError> {
+    for sidecar in sidecars(path) {
+        regular(&sidecar)?;
     }
     let db = Connection::open_with_flags(
         path,
-        OpenFlags::SQLITE_OPEN_READ_ONLY
-            | OpenFlags::SQLITE_OPEN_NO_MUTEX
-            | OpenFlags::SQLITE_OPEN_NOFOLLOW,
+        mode | OpenFlags::SQLITE_OPEN_NO_MUTEX | OpenFlags::SQLITE_OPEN_NOFOLLOW,
     )
     .map_err(|_| unavailable())?;
     db.busy_timeout(Duration::from_secs(3))
@@ -94,6 +165,23 @@ pub(super) fn open_database(path: &Path) -> Result<Connection, RpcError> {
     db.pragma_update(None, "trusted_schema", false)
         .map_err(|_| unavailable())?;
     Ok(db)
+}
+
+fn check_missing_sidecars(path: &Path) -> Result<(), RpcError> {
+    for sidecar in sidecars(path) {
+        if regular(&sidecar)? {
+            return Err(unavailable());
+        }
+    }
+    Ok(())
+}
+
+fn sidecars(path: &Path) -> impl Iterator<Item = PathBuf> + '_ {
+    ["-wal", "-shm", "-journal"].into_iter().map(|suffix| {
+        let mut sidecar = path.as_os_str().to_owned();
+        sidecar.push(suffix);
+        sidecar.into()
+    })
 }
 
 pub(super) fn open_snapshot_file(path: &Path) -> Result<File, RpcError> {

@@ -21,10 +21,10 @@ setup fails or the connection closes.
 
 The provisional host serves cached folders, paged headers, bodies and drafts
 from `plugins/mail/data/<account-stem>.db` while the SDK holds its profile and
-module leases. The host opens existing SQLite data in read-only mode. The
-manifest declares the commands and permissions implemented by this host. The
-core's authenticated backup barrier exports standalone SQLite snapshots and
-copies the granted originals and attachment files from the module data root.
+module leases. Draft updates and deletions use a transaction under the same
+host owner. The core's authenticated backup barrier pauses ordinary requests,
+exports standalone SQLite snapshots and copies the granted originals and
+attachment files from the module data root.
 The hosted protocol workflow stages a legacy cache containing committed WAL
 data, then verifies that the host reads it and the scheduled Outbox, detects
 competing ownership and can reopen it after exit. Linux, Windows and macOS

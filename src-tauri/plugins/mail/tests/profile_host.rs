@@ -18,7 +18,7 @@ use taomni_mail_engine::{
     parse_body_message,
 };
 use taomni_plugin_api::{
-    HandshakeRequest, HandshakeResponse, RpcMessage, RpcRequest,
+    HandshakeRequest, HandshakeResponse, RpcMessage, RpcRequest, RpcResponse,
     services::{
         HOST_PROFILE_ENV, HostInstanceId, HostProfileContext, ProfileGeneration, SNAPSHOT_METHOD,
         SNAPSHOT_PREPARE_METHOD, SNAPSHOT_RELEASE_METHOD, SnapshotResult,
@@ -63,6 +63,12 @@ impl MailHost {
     }
 
     fn call(&mut self, method: &str, params: Value) -> Value {
+        let response = self.send(method, params);
+        assert!(response.error.is_none(), "{method}: {:?}", response.error);
+        response.result.unwrap()
+    }
+
+    fn send(&mut self, method: &str, params: Value) -> RpcResponse {
         let request = RpcRequest::new(method, method, Some(params));
         let input = self.child.stdin.as_mut().unwrap();
         serde_json::to_writer(&mut *input, &RpcMessage::Request(request.clone())).unwrap();
@@ -72,8 +78,7 @@ impl MailHost {
             panic!("expected a response to {method}");
         };
         assert_eq!(response.id.as_ref(), Some(&request.id));
-        assert!(response.error.is_none(), "{method}: {:?}", response.error);
-        response.result.unwrap()
+        response
     }
 
     fn handshake(&mut self, context: &HostProfileContext) {
@@ -86,6 +91,8 @@ impl MailHost {
                 "mail_list_cached_messages",
                 "mail_get_cached_body",
                 "mail_list_drafts",
+                "mail_save_draft",
+                "mail_delete_draft",
                 SNAPSHOT_PREPARE_METHOD,
                 SNAPSHOT_METHOD,
                 SNAPSHOT_RELEASE_METHOD,
@@ -134,6 +141,11 @@ fn snapshot_cache(
             },
         }),
     );
+    let blocked = host.send(
+        "mail_save_draft",
+        json!({"accountId":ACCOUNT,"draft":{"id":"scheduled","subject":"blocked by backup"}}),
+    );
+    assert_eq!(blocked.error.unwrap().message, "PLUGIN_SNAPSHOT_BUSY");
     let snapshot = host.call(
         SNAPSHOT_METHOD,
         json!({
@@ -249,6 +261,7 @@ fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
     fs::rename(stage.data(), &root).unwrap();
     assert_eq!(fs::read(&source).unwrap(), legacy_bytes);
     drop(writer);
+    let legacy_bytes = fs::read(&source).unwrap();
     let path = root.join(&filename);
     let before = fs::read(&path).unwrap();
     let mut host = MailHost::spawn(&profile, &context);
@@ -277,17 +290,27 @@ fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
             .unwrap()
             .contains("Profile retains mail")
     );
+    assert_eq!(fs::read(&path).unwrap(), before);
+    let saved = host.call(
+        "mail_save_draft",
+        json!({"accountId":ACCOUNT,"draft":{"id":"module-draft","subject":"Edited in the Mail host"}}),
+    );
+    assert_eq!(saved["id"], "module-draft");
+    host.call(
+        "mail_delete_draft",
+        json!({"accountId":ACCOUNT,"draftId":"scheduled"}),
+    );
+    let after = fs::read(&path).unwrap();
     drop(host.child.stdin.take());
     assert_eq!(host.exit_code(), Some(0));
 
     let mut reopened = MailHost::spawn(&profile, &context);
     reopened.handshake(&context);
     assert_eq!(reopened.call("mail_get_cached_body", params), body);
-    assert_eq!(
-        reopened.call("mail_list_drafts", json!({"accountId":ACCOUNT})),
-        drafts
-    );
+    let reopened_drafts = reopened.call("mail_list_drafts", json!({"accountId":ACCOUNT}));
+    assert_eq!(reopened_drafts, json!([saved]));
     drop(reopened.child.stdin.take());
     assert_eq!(reopened.exit_code(), Some(0));
-    assert_eq!(fs::read(path).unwrap(), before);
+    assert_eq!(fs::read(path).unwrap(), after);
+    assert_eq!(fs::read(source).unwrap(), legacy_bytes);
 }
