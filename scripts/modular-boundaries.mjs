@@ -39,7 +39,7 @@ function sharedLibraryViolations(root) {
       }
     }
   }
-  for (const name of ["taomni-file-uri", "taomni-rdp-common", "taomni-mail-engine"]) {
+  for (const name of ["taomni-file-uri", "taomni-rdp-common", "taomni-mail-engine", "taomni-vnc-key-protocol", "taomni-redirector"]) {
     const directory = path.join(root, "src-tauri/crates", name);
     const manifest = fs.readFileSync(path.join(directory, "Cargo.toml"), "utf8");
     for (const match of manifest.matchAll(/\bpackage\s*=\s*"(tauri(?:-[^"\s]+)?|wry|taomni|taomni-plugin-[^"\s]+)"/g)) {

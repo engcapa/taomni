@@ -133,3 +133,4 @@ output
 # Generated standalone mobile PWA, embedded by build.rs
 src-tauri/resources/mobile-web/
 src-tauri/resources/vnc/windows/taomni-vnc-key-helper.exe
+src-tauri/resources/sockscap/macos/sockscap-redirector-bridge

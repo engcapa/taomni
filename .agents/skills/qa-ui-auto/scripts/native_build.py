@@ -20,10 +20,15 @@ QA_APP_ID = "com.taomni.app.qa"
 QA_CONFIG = Path(__file__).resolve().parent.parent / "assets" / "tauri.qa.conf.json"
 BUILD_RECIPE = "python .agents/skills/qa-ui-auto/scripts/native_build.py"
 REPLIT_NATIVE_SETUP = ROOT / "scripts" / "setup-replit-native-qa.sh"
-WINDOWS_HELPERS = (
-    ("taomni-sockscap-tools", "sockscap-helper", "sockscap_helper_sha256"),
-    ("taomni-vnc-key-helper", "taomni-vnc-key-helper", "vnc_key_helper_sha256"),
-)
+PLATFORM_HELPERS = {
+    "Windows": (
+        ("taomni-sockscap-tools", "sockscap-helper", ".exe", "sockscap_helper_sha256"),
+        ("taomni-vnc-key-helper", "taomni-vnc-key-helper", ".exe", "vnc_key_helper_sha256"),
+    ),
+    "Darwin": (
+        ("taomni-sockscap-tools", "sockscap-redirector-bridge", "", "redirector_bridge_sha256"),
+    ),
+}
 
 
 def add_target_bindgen_args(env: dict[str, str]) -> dict[str, str]:
@@ -85,9 +90,10 @@ def verify_identity(binary: Path) -> dict:
             raise ValueError("expected the independent QA application ID")
         if record.get("binary_sha256") != binary_digest(binary):
             raise ValueError("binary differs from its QA build record")
-        for _, name, key in WINDOWS_HELPERS:
-            if key in record and record[key] != binary_digest(binary.with_name(f"{name}.exe")):
-                raise ValueError(f"{name} differs from its QA build record")
+        for helpers in PLATFORM_HELPERS.values():
+            for _, name, suffix, key in helpers:
+                if key in record and record[key] != binary_digest(binary.with_name(f"{name}{suffix}")):
+                    raise ValueError(f"{name} differs from its QA build record")
     except (OSError, ValueError) as exc:
         raise ValueError(f"Native QA identity check failed: {exc}. Build with: {BUILD_RECIPE}") from exc
     return record
@@ -170,10 +176,9 @@ def check_build(*, release: bool = False, inputs: dict | None = None) -> dict:
     except ValueError as exc:
         return dict(result, reason=str(exc))
     expected = inputs if inputs is not None else build_inputs(release=release)
-    if platform.system() == "Windows":
-        for _, name, key in WINDOWS_HELPERS:
-            if key not in previous:
-                return dict(result, reason=f"{name} identity missing from its QA build record")
+    for _, name, _, key in PLATFORM_HELPERS.get(platform.system(), ()):
+        if key not in previous:
+            return dict(result, reason=f"{name} identity missing from its QA build record")
     recorded = previous.get("build_inputs")
     recorded = recorded if isinstance(recorded, dict) else {}
     changed = sorted(key for key in set(expected) | set(recorded)
@@ -240,14 +245,13 @@ def build_qa(*, release: bool = False, force: bool = False) -> Path:
     subprocess.run(command, cwd=ROOT, env=env, check=True)
     subprocess.run(probe, cwd=ROOT, env=env, check=True)
     tool_hashes = {}
-    if platform.system() == "Windows":
-        for package, name, key in WINDOWS_HELPERS:
-            helper = ["cargo", "build", "--locked", "--manifest-path", "src-tauri/Cargo.toml",
-                      "--package", package, "--bin", name]
-            if release:
-                helper.append("--release")
-            subprocess.run(helper, cwd=ROOT, env=env, check=True)
-            tool_hashes[key] = binary_digest(binary.with_name(f"{name}.exe"))
+    for package, name, suffix, key in PLATFORM_HELPERS.get(platform.system(), ()):
+        helper = ["cargo", "build", "--locked", "--manifest-path", "src-tauri/Cargo.toml",
+                  "--package", package, "--bin", name]
+        if release:
+            helper.append("--release")
+        subprocess.run(helper, cwd=ROOT, env=env, check=True)
+        tool_hashes[key] = binary_digest(binary.with_name(f"{name}{suffix}"))
     if inputs != build_inputs(release=release, env=env):
         raise ValueError("Build inputs changed during compilation; rebuild before collecting evidence")
     record = {

@@ -24,6 +24,9 @@ function fixture(t) {
   put(join(app, "Contents/MacOS/taomni"), "#!/bin/sh\n# app executable\n", true);
   put(join(app, "Contents/Frameworks/libgssapi_krb5.2.2.dylib"), "bundled krb5");
   put(join(app, "Contents/Resources/sockscap/macos/xray"), "#!/bin/sh\n# xray executable\n", true);
+  const bridge = "sockscap/macos/sockscap-redirector-bridge";
+  put(join(root, "src-tauri/resources", bridge), "bridge executable", true);
+  put(join(app, "Contents/Resources", bridge), "bridge executable", true);
   for (const name of ["Mitmproxy Redirector.app.tar", "manifest.json", "LICENSE"]) {
     const relative = `sockscap/macos/redirector/0.12.11/${name}`;
     put(join(root, "src-tauri/resources", relative), `pinned ${name}`);

@@ -131,6 +131,19 @@ if [ -n "$foreign_resources" ]; then
   exit 1
 fi
 
+bridge_count="$(find "$resource_root" -type f -path '*/sockscap/macos/sockscap-redirector-bridge' | wc -l | tr -d ' ')"
+test "$bridge_count" = "1" || {
+  echo "Expected one SocksCap Redirector bridge in the macOS bundle, found $bridge_count" >&2
+  exit 1
+}
+bridge="$(find "$resource_root" -type f -path '*/sockscap/macos/sockscap-redirector-bridge' -print -quit)"
+test -x "$bridge"
+test "$(lipo -archs "$bridge")" = "$expected_arch"
+cmp "$bridge" "$repo_root/src-tauri/resources/sockscap/macos/sockscap-redirector-bridge"
+if [ -n "${updater_app:-}" ]; then
+  cmp "$bridge" "$updater_app/${bridge#"$app"/}"
+fi
+
 xray_count="$(find "$resource_root" -type f -path '*/sockscap/macos/xray' | wc -l | tr -d ' ')"
 test "$xray_count" = "1" || {
   echo "Expected one bundled macOS xray executable, found $xray_count" >&2

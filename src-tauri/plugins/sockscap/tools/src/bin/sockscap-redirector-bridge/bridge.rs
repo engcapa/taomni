@@ -1,7 +1,7 @@
 //! Standalone macOS Redirector bridge process mode.
 //!
-//! The bridge is launched from the signed Taomni executable with a private CLI
-//! flag. It owns Redirector's control socket and survives long enough to send an
+//! SocksCap launches the bridge helper as a separate executable. It owns
+//! Redirector's control socket and survives long enough to send an
 //! inert scope when the UI/backend process disappears. Flow byte streams are
 //! forwarded to a separate Unix listener owned by the main process.
 
@@ -16,13 +16,13 @@ use tokio::signal::unix::{SignalKind, signal};
 use tokio::task::JoinSet;
 use tokio::time::Instant;
 
-use super::bridge_protocol::{
+use taomni_redirector::bridge_protocol::{
     BRIDGE_PROTOCOL_VERSION, BridgeCommand, BridgeEvent, MAX_MANAGEMENT_LINE, decode_line,
     encode_line,
 };
-use super::ipc::send_intercept_config;
-use super::scope::inert_actions;
-use super::{redirector_peer_pid, verify_redirector_peer};
+use taomni_redirector::identity::{redirector_peer_pid, verify_redirector_peer};
+use taomni_redirector::inert_actions;
+use taomni_redirector::ipc::send_intercept_config;
 
 const CONTROL_CONNECT_TIMEOUT: Duration = Duration::from_secs(180);
 const HEARTBEAT_TIMEOUT: Duration = Duration::from_secs(10);
@@ -543,7 +543,7 @@ async fn write_error<W: tokio::io::AsyncWrite + Unpin>(
 }
 
 fn parse_options() -> Result<Options, String> {
-    let mut args = std::env::args().skip(2);
+    let mut args = std::env::args().skip(1);
     let mut provider_socket = None;
     let mut flow_socket = None;
     let mut redirector = None;

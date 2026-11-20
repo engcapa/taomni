@@ -172,6 +172,8 @@ TASK-027 将 G1–G11 设为独立发布阻断门。每个门必须在匹配源�
 - `b9c6d34e7` 的邮件缓存、旧 Mail 预检和完整崩溃回归由三端运行验证。独立 Mail 宿主已实现只读模块目录中的缓存文件夹、分页标题和正文，4 项宿主单测通过。三端协议运行验证独占 profile 的实际进程、退出重开和缓存原件不变。Mail 面板、旧缓存搬迁和网络服务仍处于 TASK-026 实施阶段。 [缓存三端运行](https://github.com/engcapa/taomni/actions/runs/44681017385)
 - `58c293a5b` 的 Mail 宿主进程、源码与二进制身份由三端专项收证。IMAP 的大邮件正文、附件分段读取、原件获取及分批已读和删除操作已迁入邮件引擎。47 项引擎单测、30 项桌面单测及 QA 审计通过。桌面单测核对截断片段不会保存为原件，按分段获取的正文和附件字节完整。TC-MAIL-BULK-01 补查读标记与删除并发时的运行时错误。 [宿主三端运行](https://github.com/engcapa/taomni/actions/runs/44682092156)
 - `0c19232a7` 的邮件大正文、归档和分批操作由三端 Browser、Native 和完整崩溃回归验证。Windows VNC 特殊键入口已迁入独立辅助程序，核心不再提供原 re-exec 分支。发布过渡包按 Windows 资源路径暂存辅助程序，MSI 与 NSIS 解包检查其摘要，QA 核对实际辅助程序在控制端断开时退出。VNC 宿主和前端迁出后由模块包提供该程序。 [邮件三端运行](https://github.com/engcapa/taomni/actions/runs/44683732219)
+- `cd0668280` 的 Windows `windows-2025` G5 工件已收齐六项对照结果。进程内和独立编码宿主各使用 40 个输入样本，p95 分别为 71.48 ms 和 73.95 ms，均落在 130 ms 上限内。对应连接和吞吐检查也全部通过。原始数据、源码、可执行文件摘要保存在该运行的 `modular-rdp-pipeline-Windows-X64` 工件。 [Windows 工件](https://github.com/engcapa/taomni/actions/runs/44674876677/artifacts/14605924642)
+- macOS SocksCap Redirector 桥接程序迁入独立工具，核心通过同一控制与数据协议启动。共用代码保留 peer PID、audit token、签名身份和文件摘要验证。过渡 DMG 及 updater 核对桥接程序的可执行权限、目标架构及一致字节。SocksCap 模块包接管该工具及系统扩展资源后，才能完成其核心安装包依赖裁剪。
 
 ## 当前结论
 

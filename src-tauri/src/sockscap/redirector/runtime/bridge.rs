@@ -55,6 +55,31 @@ pub(super) fn bind_private_listener(path: &PathBuf) -> Result<UnixListener, Stri
     Ok(listener)
 }
 
+fn bridge_executable() -> Result<PathBuf, String> {
+    const NAME: &str = "sockscap-redirector-bridge";
+    let app =
+        std::env::current_exe().map_err(|error| format!("resolve Taomni executable: {error}"))?;
+    let alongside = app.with_file_name(NAME);
+    if cfg!(debug_assertions) && alongside.is_file() {
+        return Ok(alongside);
+    }
+    if let Some(contents) = app.parent().and_then(std::path::Path::parent) {
+        for relative in [
+            "Resources/resources/sockscap/macos",
+            "Resources/sockscap/macos",
+        ] {
+            let bundled = contents.join(relative).join(NAME);
+            if bundled.is_file() {
+                return Ok(bundled);
+            }
+        }
+    }
+    if alongside.is_file() {
+        return Ok(alongside);
+    }
+    Err(format!("SocksCap is missing its Redirector helper: {NAME}"))
+}
+
 pub(super) async fn launch_bridge(
     redirector: &std::path::Path,
     provider_socket: &std::path::Path,
@@ -72,10 +97,8 @@ pub(super) async fn launch_bridge(
             "Redirector bridge session id must not be empty",
         ));
     }
-    let executable = std::env::current_exe()
-        .map_err(|error| format!("resolve Taomni bridge executable: {error}"))?;
+    let executable = bridge_executable()?;
     let mut child = Command::new(&executable)
-        .arg("--sockscap-redirector-bridge")
         .arg("--provider-socket")
         .arg(provider_socket)
         .arg("--flow-socket")

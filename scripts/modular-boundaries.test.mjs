@@ -10,11 +10,12 @@ function fixture(t, manifest = "") {
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
   for (const child of ["src/screenshot", "src/mfa", "src/mobile", "src/servers", "src/config",
     "crates/taomni-capture/src", "crates/taomni-file-uri/src", "crates/taomni-rdp-common/src",
-    "crates/taomni-mail-engine/src", "crates/taomni-mfa-engine/src"]) {
+    "crates/taomni-mail-engine/src", "crates/taomni-mfa-engine/src",
+    "crates/taomni-vnc-key-protocol/src", "crates/taomni-redirector/src"]) {
     fs.mkdirSync(path.join(root, "src-tauri", child), { recursive: true });
   }
   fs.writeFileSync(path.join(root, "src-tauri/crates/taomni-capture/Cargo.toml"), manifest);
-  for (const name of ["taomni-file-uri", "taomni-rdp-common", "taomni-mail-engine", "taomni-mfa-engine"]) {
+  for (const name of ["taomni-file-uri", "taomni-rdp-common", "taomni-mail-engine", "taomni-mfa-engine", "taomni-vnc-key-protocol", "taomni-redirector"]) {
     fs.writeFileSync(path.join(root, "src-tauri/crates", name, "Cargo.toml"), "");
   }
   return root;

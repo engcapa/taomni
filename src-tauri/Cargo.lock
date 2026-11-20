@@ -10941,6 +10941,7 @@ dependencies = [
  "taomni-plugin-stream",
  "taomni-profile-locks",
  "taomni-rdp-common",
+ "taomni-redirector",
  "taomni-sqlite-snapshot",
  "taomni-vnc-key-protocol",
  "tauri",
@@ -11257,14 +11258,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "taomni-redirector"
+version = "0.1.0"
+dependencies = [
+ "bytes",
+ "hex",
+ "libc",
+ "prost",
+ "serde",
+ "serde_json",
+ "sha2 0.11.0",
+ "tokio",
+ "uuid",
+]
+
+[[package]]
 name = "taomni-sockscap-tools"
 version = "0.1.0"
 dependencies = [
  "anyhow",
  "bytes",
+ "libc",
  "prost",
  "serde",
  "serde_json",
+ "taomni-redirector",
  "tokio",
  "tracing",
  "winapi",

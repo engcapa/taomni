@@ -59,6 +59,8 @@ class NativeBuildTest(unittest.TestCase):
                         ("taomni-sockscap-tools", "sockscap-helper"),
                         ("taomni-vnc-key-helper", "taomni-vnc-key-helper"),
                     ])
+                if system == "Darwin":
+                    expected_tools.append(("taomni-sockscap-tools", "sockscap-redirector-bridge"))
                 compiled_tools = []
 
                 def compile_binary(command, *, cwd, env, check):
@@ -73,6 +75,8 @@ class NativeBuildTest(unittest.TestCase):
                         compiled_tools.append((package, name))
                         if system == "Windows" and name in {"sockscap-helper", "taomni-vnc-key-helper"}:
                             expected.with_name(f"{name}.exe").write_bytes(name.encode())
+                        if system == "Darwin" and name == "sockscap-redirector-bridge":
+                            expected.with_name(name).write_bytes(name.encode())
                         self.assertEqual("--release" in command, release)
                         return
                     self.assertEqual(command[command.index("--config") + 1], str(native_build.QA_CONFIG))
@@ -102,6 +106,9 @@ class NativeBuildTest(unittest.TestCase):
                                      native_build.binary_digest(binary.with_name("sockscap-helper.exe")))
                     self.assertEqual(record["vnc_key_helper_sha256"],
                                      native_build.binary_digest(binary.with_name("taomni-vnc-key-helper.exe")))
+                if system == "Darwin":
+                    self.assertEqual(record["redirector_bridge_sha256"],
+                                     native_build.binary_digest(binary.with_name("sockscap-redirector-bridge")))
 
     def test_failed_rebuild_invalidates_old_authorization(self):
         with TemporaryDirectory() as directory:

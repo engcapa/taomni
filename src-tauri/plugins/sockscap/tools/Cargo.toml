@@ -16,5 +16,7 @@ winapi = { version = "0.3", features = [
 [target.'cfg(target_os = "macos")'.dependencies]
 anyhow = "1"
 bytes = "1"
+libc = "0.2"
+taomni-redirector = { path = "../../../crates/taomni-redirector" }
 prost = "0.14"
-tokio = { version = "1", features = ["io-util", "macros", "net", "process", "rt-multi-thread", "signal", "time"] }
+tokio = { version = "1", features = ["io-std", "io-util", "macros", "net", "process", "rt-multi-thread", "signal", "time"] }
