@@ -31,8 +31,14 @@ done
     LIBS="-framework Kerberos" \
     ./configure --prefix="$prefix" --enable-static --disable-shared \
       --disable-nls --without-system-verto --with-tls-impl=openssl --with-spake-openssl
-  make -j"$(sysctl -n hw.logicalcpu)"
-  make install
+  # Build the library prerequisites in the order of MIT's top-level Makefile.
+  # The static kadmin utilities have their own linker requirements.
+  jobs="$(sysctl -n hw.logicalcpu)"
+  make update-autoconf-h install-mkdirs
+  for directory in util include lib build-tools; do
+    make -C "$directory" -j"$jobs"
+    make -C "$directory" install
+  done
 )
 pc="$prefix/lib/pkgconfig/mit-krb5.pc"
 sed -i '' '/^Libs.private: /s/$/ -lssl -lcrypto -lresolv -framework Kerberos/' "$pc"
