@@ -192,6 +192,8 @@ TASK-027 将 G1–G11 设为独立发布阻断门。每个门必须在匹配源�
 - 两个 macOS Mail 签名作业在打包工具的路径大小写单测处停止。修订后在内存中验证路径冲突，同时检查归档根清单的准确名称和保留的 `SHA256SUMS` 大小写别名。20 项本地单测通过。新签名批次已收到匹配源码的 Linux 和 Windows 模块资产，实装与 macOS 回执仍待收取。 [macOS 失败](https://github.com/engcapa/taomni/actions/runs/44718152405) · [签名复验](https://github.com/engcapa/taomni/actions/runs/44726111709)
 - ARM64 加固运行时的第二轮构建定位到 MIT Kerberos 1.22 与 OpenSSL 4 头文件的类型差异。验证分支选用 OpenSSL 3，并保留 Kerberos 系统框架链接。新 run 仅构建用于实装验证的 macOS 26 ARM64 工件。 [失败日志](https://github.com/engcapa/taomni/actions/runs/44711792115/job/136232223359) · [ARM64 构建](https://github.com/engcapa/taomni/actions/runs/44726859603)
 - Mail 地址簿 SQLite 操作、vCard 转换和收件人建议移入邮件引擎。独立宿主按账号分页列出、保存和删除联系人，已迁移的 CardDAV 卡片保留待同步状态。TC-MAIL-CONTACTS-01 检查重开地址簿仍显示原邮箱，签名升级用例检查默认及自定义旧缓存，另有跨进程重开读取。55 项引擎单测、10 项宿主单测、核心编译和用例审计通过。跨进程与三端用例等待 GitHub 执行。
+- VNC 的画质策略、帧队列和 WebSocket relay 已迁入独立引擎。桌面通过适配层交付已连接的 TCP 流和 Windows 窗口指针采样器。TC-156 在多轮缩放并绘制后，继续检查原连接能转发新按键。32 项定向单测、引擎与核心编译通过，真实 loopback 验证由协议工作流记录编译产物摘要、runner 镜像和日志。
+- `ae46db7a9` 的 ARM64 Mail 模块已完成固定证书签名并封入验签包。归档中的宿主摘要与 `codesign` 回执一致，运行时标志为 `0x10000(runtime)`，Gatekeeper 返回 3。实装后启动和 Intel 回执由签名升级 run 继续验证。 [Mail 签名资产](https://github.com/engcapa/taomni/actions/runs/44726111709)
 
 ## 当前结论
 

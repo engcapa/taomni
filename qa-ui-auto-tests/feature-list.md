@@ -4018,7 +4018,7 @@ files:
 controls: []   # backend-only — RFB protocol + WebSocket bridge; the canvas surface is owned by F9.6
 -->
 
-- `taomni-vnc-engine` 提供 RFB 握手、协议编解码、画面和剪贴板数据。桌面适配层 `src-tauri/src/vnc/` 负责 IPC、会话、代理连接、WebSocket relay 与系统输入。
+- `taomni-vnc-engine` 提供 RFB 握手、协议编解码、画质策略、帧队列和 WebSocket relay。桌面适配层 `src-tauri/src/vnc/` 提供 IPC、会话记录、代理连接和 Windows 系统光标采样。
 - Tauri 命令：`vnc_connect / vnc_cancel_connect / vnc_disconnect / vnc_test_connection / vnc_create_detach_claim / vnc_consume_detach_claim / vnc_set_special_key_capture / vnc_special_key_capture_status`
 - 本地动态端口 WebSocket relay：VNC server ↔ 前端 Canvas（前端不再直接持有 TCP 套接字）
 
@@ -4178,7 +4178,7 @@ controls:
 - 浏览器预览（`pnpm dev`）经 dev server VNC bridge 连接真实 RFB 服务器：None/VNCAuth、Raw、DesktopSize、Bell、legacy 与 ExtendedClipboard；不含原生 relay 的编码、OS 输入和系统剪贴板（TC-151 双模式）
 - VNC tab 常驻挂载，切换标签时连接不主动销毁
 - 已修复 VNC 剪贴板与输入延迟、Windows 11 上的 client→server 文本粘贴
-- 连续鼠标与键盘输入后，relay 以画布 ACK 作为帧背压、鼠标移动按显示帧合并，仍持续请求并绘制后续 framebuffer 更新（VNC-REG-001；TC-156 双模式）
+- 连续鼠标与键盘输入后，relay 以画布 ACK 作为帧背压、鼠标移动按显示帧合并，仍持续请求并绘制后续 framebuffer 更新。TC-156 在 Browser 和 Native 核对远端缩放完成后，原连接还能传送新的按键。
 - 连接警告、用户名/密码表单和认证错误使用浅色/深色主题的实色卡片，保留密码焦点、遮掩与 Enter 提交（TC-157 双模式，截图检查对比度与布局）
 - ExtendedClipboard 接收兼容完整 zlib 流与 TigerVNC 的每消息 Z_SYNC_FLUSH 边界，继续限制解压大小并拒绝截断格式数据；连续远端复制后反向复制、输入与绘制保持连接（TC-158 native 系统剪贴板、TC-159 browser bridge）
 - Linux WebKitGTK 读取剪贴板为空时，VNC 使用原生读取核对外部 X11 剪贴板，避免反向粘贴丢失新文本（TC-158，系统剪贴板写入后先独立读取核验）

@@ -1,8 +1,11 @@
+use super::transport::{accept_authorized_ws, is_authorized_origin};
 use super::*;
-use crate::vnc::encodings::ENCODING_DESKTOP_SIZE;
+use crate::encodings::ENCODING_DESKTOP_SIZE;
+use crate::queue::QueuedWsOutgoing;
+use futures::{SinkExt, StreamExt};
 use tokio::sync::oneshot;
 use tokio_tungstenite::connect_async;
-use tungstenite::client::IntoClientRequest;
+use tokio_tungstenite::tungstenite::{self, Message, client::IntoClientRequest};
 
 fn ws_request(
     port: u16,
@@ -82,8 +85,8 @@ fn frame_flow_waits_for_frontend_ack_after_pixel_damage() {
 
 #[tokio::test]
 async fn deferred_request_waits_for_accumulated_damage_to_be_painted() {
-    let limits = crate::vnc::limits::DecodeLimits::default();
-    let framebuffer = crate::vnc::framebuffer::Framebuffer::new(2, 2, &limits)
+    let limits = crate::limits::DecodeLimits::default();
+    let framebuffer = crate::framebuffer::Framebuffer::new(2, 2, &limits)
         .unwrap()
         .shared();
     let flow = Arc::new(std::sync::Mutex::new(FrameFlow::new()));
@@ -181,7 +184,7 @@ fn native_pointer_messages_carry_the_canvas_geometry() {
         None
     );
 
-    let limits = crate::vnc::limits::DecodeLimits::default();
+    let limits = crate::limits::DecodeLimits::default();
     let start = VncControl::NativePointer(Some(target));
     assert!(control_allowed(
         &start,
@@ -255,7 +258,7 @@ fn connected_message_offers_native_pointer_sampling() {
 
 #[test]
 fn backend_enforces_view_only_and_clipboard_direction() {
-    let limits = crate::vnc::limits::DecodeLimits::default();
+    let limits = crate::limits::DecodeLimits::default();
     let key = VncControl::Key {
         down: true,
         keysym: 0x41,
@@ -288,7 +291,7 @@ fn backend_enforces_view_only_and_clipboard_direction() {
 
 #[test]
 fn backend_rejects_oversized_clipboard_controls() {
-    let mut limits = crate::vnc::limits::DecodeLimits::default();
+    let mut limits = crate::limits::DecodeLimits::default();
     limits.max_clipboard_format_bytes = 4;
     limits.max_clipboard_decompressed_bytes = 6;
     assert!(!control_allowed(
@@ -377,6 +380,33 @@ fn desktop_size_notification_carries_a_monotonic_generation() {
         json,
         r#"{"type":"desktop_size","width":2560,"height":1440,"generation":3}"#
     );
+}
+
+#[tokio::test]
+async fn cancelling_during_websocket_handshake_closes_the_connection() {
+    let listener = TcpListener::bind(("127.0.0.1", 0)).await.unwrap();
+    let mut client = TcpStream::connect(listener.local_addr().unwrap())
+        .await
+        .unwrap();
+    let cancel = CancellationToken::new();
+    let server = accept_authorized_ws(listener, "cancelled", &cancel);
+    tokio::pin!(server);
+    // Poll the ready accept and leave the application waiting for the client
+    // upgrade. The fixture does not send any application data.
+    assert!(futures::poll!(server.as_mut()).is_pending());
+    cancel.cancel();
+    let result = tokio::time::timeout(Duration::from_secs(2), &mut server)
+        .await
+        .expect("relay should stop waiting for the WebSocket client");
+    assert_eq!(result.unwrap_err(), "VNC relay cancelled");
+    let mut byte = [0_u8; 1];
+    let received = tokio::time::timeout(
+        Duration::from_secs(2),
+        tokio::io::AsyncReadExt::read(&mut client, &mut byte),
+    )
+    .await
+    .expect("relay should close the pending connection");
+    assert!(matches!(received, Ok(0)));
 }
 
 #[tokio::test]
@@ -570,16 +600,23 @@ fn start_pipeline_fixture() -> (
 async fn relay_waits_for_paint_ack_and_repaints_after_desktop_size() {
     let (port, server, delivered, no_request_before_ack) = start_pipeline_fixture();
     let mut no_request_before_ack = Some(no_request_before_ack);
-    let session = spawn_vnc_relay(
-        "127.0.0.1".into(),
-        port,
+    let session = spawn_relay(
+        RelayRequest {
+            host: "127.0.0.1".into(),
+            username: None,
+            password: None,
+            security_policy: VncSecurityPolicy::AllowNone,
+            view_only: false,
+            clipboard_policy: VncClipboardPolicy::Disabled,
+            options: VncRelayOptions::default(),
+        },
+        async {
+            Ok(VncDialedTransport {
+                stream: TcpStream::connect(("127.0.0.1", port)).await.unwrap(),
+                network_forward_task: None,
+            })
+        },
         None,
-        None,
-        None,
-        VncSecurityPolicy::AllowNone,
-        false,
-        VncClipboardPolicy::Disabled,
-        VncRelayOptions::default(),
         CancellationToken::new(),
     )
     .await

@@ -108,6 +108,8 @@ jobs:
           "OPENSSL_SRC_PERL=$perl" >> $env:GITHUB_ENV
           'C:\Strawberry\perl\bin' >> $env:GITHUB_PATH
       - name: Verify the standalone VNC protocol and loopback fixtures
+        env:
+          VNC_ENGINE_RUNNER: ${{ matrix.os }}
         run: |
           set -o pipefail
           cargo tree --manifest-path src-tauri/Cargo.toml -p taomni-vnc-engine --edges normal,build --prefix none --locked > modular-protocol-evidence/vnc-engine-tree.txt
@@ -115,7 +117,38 @@ jobs:
             echo 'The standalone VNC engine links the desktop runtime.' >&2
             exit 1
           fi
-          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-vnc-engine --lib --locked 2>&1 | tee modular-protocol-evidence/vnc-engine.log
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-vnc-engine --lib --locked --no-run --message-format=json > modular-protocol-evidence/vnc-engine-build.jsonl
+          python - <<'PY'
+          import hashlib, json, os, subprocess
+          from pathlib import Path
+
+          evidence = Path('modular-protocol-evidence')
+          rows = map(json.loads, (evidence / 'vnc-engine-build.jsonl').read_text(encoding='utf-8').splitlines())
+          (binary,) = [Path(row['executable']) for row in rows
+                       if row.get('reason') == 'compiler-artifact' and row.get('executable')
+                       and row['target']['name'] == 'taomni_vnc_engine' and row['profile']['test']]
+          log = evidence / 'vnc-engine.log'
+          with log.open('wb') as stream:
+              result = subprocess.run([str(binary)], stdout=stream, stderr=subprocess.STDOUT, timeout=180)
+          output = log.read_text(encoding='utf-8', errors='replace')
+          print(output, end='')
+          result.check_returncode()
+          for case in ('authenticated_websocket_rejects_bad_requests_and_is_single_use',
+                       'cancelling_during_websocket_handshake_closes_the_connection',
+                       'relay_waits_for_paint_ack_and_repaints_after_desktop_size'):
+              assert f'test ws::tests::{case} ... ok' in output, f'Missing successful VNC relay fixture {case}'
+          with binary.open('rb') as stream:
+              digest = hashlib.file_digest(stream, 'sha256').hexdigest()
+          receipt = {
+              'sourceSha': (evidence / 'source-sha.txt').read_text().strip(),
+              'runner': os.environ['VNC_ENGINE_RUNNER'],
+              'runnerImage': os.environ.get('ImageVersion'),
+              'runnerArchitecture': os.environ['RUNNER_ARCH'],
+              'binarySha256': digest,
+              'artifactLog': log.name,
+          }
+          (evidence / 'vnc-engine-receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
+          PY
       - name: Verify the Mail module's cached mailbox and profile ownership
         env:
           MAIL_HOST_RUNNER: ${{ matrix.os }}

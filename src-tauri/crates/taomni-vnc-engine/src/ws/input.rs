@@ -167,7 +167,7 @@ pub(super) fn control_allowed(
     control: &VncControl,
     view_only: bool,
     clipboard_policy: VncClipboardPolicy,
-    limits: &crate::vnc::limits::DecodeLimits,
+    limits: &crate::limits::DecodeLimits,
 ) -> bool {
     match control {
         VncControl::Key { .. }

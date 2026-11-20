@@ -1,13 +1,12 @@
 pub use taomni_vnc_engine::{
-    clipboard, encodings, error, framebuffer, limits, pixel, policy, rfb, tight, tls,
+    clipboard, encodings, error, framebuffer, limits, pixel, policy, quality, queue, rfb, tight,
+    tls,
 };
 
 pub mod keyboard_hook;
 #[cfg(test)]
 mod live_bench;
 pub mod native_pointer;
-pub mod quality;
-pub mod queue;
 pub mod ws;
 
 use serde::{Deserialize, Serialize};

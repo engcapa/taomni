@@ -119,6 +119,13 @@ steps:
     timeout_sec: 10
 - wait: 1.5
 - screenshot: 156-vnc-sustained-input.png
+- press:
+    key: b
+    selector: '[data-testid="vnc-canvas"]'
+- assert_file_contains:
+    path: ${fixture.vnc_events}
+    contains: '"keysym": 98, "keysym_hex": "0x62"'
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -210,6 +217,18 @@ verification:
     - 33
     - 36
     - 37
+  - id: R3
+    requirement: The real session forwards input after the resized framebuffer is painted.
+    actions:
+    - 40
+    checkpoints:
+    - step: 41
+      expectation: The RFB fixture records the new key on the existing connection.
+    - step: 42
+      expectation: The session produces no uncaught runtime errors.
+    results:
+    - 41
+    - 42
   visual:
   - check: The final connected session shows the fixture gradient without a stale overlay, clipped canvas or frozen blank surface.
     method: manual

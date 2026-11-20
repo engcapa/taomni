@@ -10,13 +10,13 @@ use std::time::{Duration, Instant};
 
 use serde::{Deserialize, Serialize};
 
-use crate::vnc::clipboard::{ENCODING_EXTENDED_CLIPBOARD, ENCODING_EXTENDED_CLIPBOARD_LEGACY};
-use crate::vnc::encodings::{
+use crate::clipboard::{ENCODING_EXTENDED_CLIPBOARD, ENCODING_EXTENDED_CLIPBOARD_LEGACY};
+use crate::encodings::{
     ENCODING_DESKTOP_SIZE, ENCODING_POINTER_POS, ENCODING_RICH_CURSOR, ENCODING_X_CURSOR,
 };
-use crate::vnc::pixel::PixelFormat;
-use crate::vnc::rfb::encoding_name;
-use crate::vnc::tight::{ENCODING_COMPRESS_LEVEL_0, ENCODING_JPEG_QUALITY_0, ENCODING_TIGHT};
+use crate::pixel::PixelFormat;
+use crate::rfb::encoding_name;
+use crate::tight::{ENCODING_COMPRESS_LEVEL_0, ENCODING_JPEG_QUALITY_0, ENCODING_TIGHT};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Deserialize, Serialize)]
 #[serde(rename_all = "kebab-case")]

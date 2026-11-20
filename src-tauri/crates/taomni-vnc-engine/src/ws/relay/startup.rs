@@ -1,81 +1,76 @@
 use super::runtime::run_relay;
-use crate::terminal::network::NetworkSettings;
-use crate::vnc::policy::VncClipboardPolicy;
-use crate::vnc::policy::VncSecurityPolicy;
-use crate::vnc::quality::QualityController;
-use crate::vnc::queue::FrameQueueSender;
-use crate::vnc::ws::ForwardTaskGuard;
-use crate::vnc::ws::VNC_AUTH_TIMEOUT;
-use crate::vnc::ws::VncControl;
-use crate::vnc::ws::VncRelayOptions;
-use crate::vnc::ws::VncSession;
-use crate::vnc::ws::WsOutgoingText;
-use crate::vnc::ws::transport;
-use crate::vnc::ws::transport::dial_vnc_transport;
-use futures::StreamExt;
+use crate::policy::VncClipboardPolicy;
+use crate::policy::VncSecurityPolicy;
+use crate::quality::QualityController;
+use crate::queue::FrameQueueSender;
+use crate::ws::ForwardTaskGuard;
+use crate::ws::NativePointer;
+use crate::ws::VNC_AUTH_TIMEOUT;
+use crate::ws::VncControl;
+use crate::ws::VncDialedTransport;
+use crate::ws::VncRelayOptions;
+use crate::ws::VncSession;
+use crate::ws::WsOutgoingText;
+use std::future::Future;
 use std::sync::Arc;
 use tokio::net::TcpListener;
 use tokio::sync::mpsc;
 use tokio_util::sync::CancellationToken;
 use uuid::Uuid;
 
-// ── Main entry point ────────────────────────────────────────────────
+pub struct RelayRequest {
+    /// Original server name for the TLS handshake, including forwarded sessions.
+    pub host: String,
+    pub username: Option<String>,
+    pub password: Option<String>,
+    pub security_policy: VncSecurityPolicy,
+    pub view_only: bool,
+    pub clipboard_policy: VncClipboardPolicy,
+    pub options: VncRelayOptions,
+}
 
-/// Connect to a VNC server and spawn the relay. Returns a session handle.
-pub async fn spawn_vnc_relay(
-    host: String,
-    port: u16,
-    username: Option<String>,
-    password: Option<String>,
-    network: Option<NetworkSettings>,
-    security_policy: VncSecurityPolicy,
-    view_only: bool,
-    clipboard_policy: VncClipboardPolicy,
-    options: VncRelayOptions,
+/// Authenticate an RFB transport and start its WebSocket relay.
+pub async fn spawn_relay(
+    request: RelayRequest,
+    dial: impl Future<Output = Result<VncDialedTransport, String>> + Send,
+    native_pointer: Option<Box<dyn NativePointer>>,
     attempt: CancellationToken,
 ) -> Result<VncSession, String> {
     tokio::select! {
-        result = spawn_vnc_relay_inner(
-            host,
-            port,
-            username,
-            password,
-            network,
-            security_policy,
-            view_only,
-            clipboard_policy,
-            options,
+        result = start_relay(
+            request,
+            dial,
+            native_pointer,
             attempt.clone(),
         ) => result,
         _ = attempt.cancelled() => Err("VNC connection attempt stopped by the user".into()),
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-pub(in crate::vnc::ws) async fn spawn_vnc_relay_inner(
-    host: String,
-    port: u16,
-    username: Option<String>,
-    password: Option<String>,
-    network: Option<NetworkSettings>,
-    security_policy: VncSecurityPolicy,
-    view_only: bool,
-    clipboard_policy: VncClipboardPolicy,
-    options: VncRelayOptions,
+async fn start_relay(
+    request: RelayRequest,
+    dial: impl Future<Output = Result<VncDialedTransport, String>> + Send,
+    native_pointer: Option<Box<dyn NativePointer>>,
     attempt: CancellationToken,
 ) -> Result<VncSession, String> {
+    let RelayRequest {
+        host,
+        username,
+        password,
+        security_policy,
+        view_only,
+        clipboard_policy,
+        options,
+    } = request;
     let cancel = CancellationToken::new();
     let ws_token = format!("{}{}", Uuid::new_v4().simple(), Uuid::new_v4().simple());
     let quality = QualityController::new(options.picture_quality);
     let initial_profile = quality.applied().clone();
 
-    // 1. Connect + handshake + auth. Route proxy and SSH-jump connections
-    // through the shared loopback forwarder, allowing the synchronous RA2
-    // framing code to keep its tested std::net transport while the upstream
-    // network path remains fully asynchronous and cancellable.
-    let transport = dial_vnc_transport(host.clone(), port, network).await?;
-    let mut network_forward_guard = ForwardTaskGuard(transport.network_forward_task);
-    let mut prepared = crate::vnc::tls::prepare_rfb_transport(
+    // A direct or forwarded transport has the same RFB authentication path.
+    let transport = dial.await?;
+    let mut network_forward_guard = ForwardTaskGuard::new(transport.network_forward_task);
+    let mut prepared = crate::tls::prepare_rfb_transport(
         transport.stream,
         &host,
         security_policy,
@@ -86,7 +81,7 @@ pub(in crate::vnc::ws) async fn spawn_vnc_relay_inner(
             .is_some_and(|name| !name.trim().is_empty()),
     )
     .await?;
-    let mut tls_guard = ForwardTaskGuard(prepared.take_tls_task());
+    let mut tls_guard = ForwardTaskGuard::new(prepared.take_tls_task());
     // Stop closes the socket so the blocking authentication read returns
     // instead of waiting for a slow server (VNC-SESS-003).
     let stop_handle = prepared
@@ -103,7 +98,7 @@ pub(in crate::vnc::ws) async fn spawn_vnc_relay_inner(
         let mut rfb = prepared.into_connection(
             VNC_AUTH_TIMEOUT,
             security_policy,
-            crate::vnc::limits::DecodeLimits::default(),
+            crate::limits::DecodeLimits::default(),
         )?;
         rfb.set_shared(options.shared);
         let server_init = rfb.authenticate_with_policy(
@@ -139,7 +134,7 @@ pub(in crate::vnc::ws) async fn spawn_vnc_relay_inner(
         .map_err(|e| format!("local addr: {}", e))?
         .port();
     // 3. Channel setup
-    let limits = crate::vnc::limits::DecodeLimits::default();
+    let limits = crate::limits::DecodeLimits::default();
     let (control_tx, control_rx) = mpsc::channel::<VncControl>(limits.max_control_queue);
     let (ws_out_tx, ws_out_rx) = FrameQueueSender::new(limits);
 
@@ -152,7 +147,7 @@ pub(in crate::vnc::ws) async fn spawn_vnc_relay_inner(
         protocol: rfb.protocol_version(),
         security: rfb.security_label(),
         encrypted: rfb.encrypted(),
-        native_pointer: crate::vnc::native_pointer::supported() && !view_only,
+        native_pointer: native_pointer.is_some() && !view_only,
     })
     .unwrap();
     let _ = ws_out_tx.send_critical_control(connected);
@@ -180,6 +175,7 @@ pub(in crate::vnc::ws) async fn spawn_vnc_relay_inner(
             clipboard_policy,
             Arc::new(std::sync::Mutex::new(quality)),
             options,
+            native_pointer,
         )
         .await
         {
@@ -193,7 +189,7 @@ pub(in crate::vnc::ws) async fn spawn_vnc_relay_inner(
         ws_port,
         ws_token,
         cancel,
-        network_forward_task: network_forward_guard.0.take(),
-        tls_task: tls_guard.0.take(),
+        network_forward_task: network_forward_guard.take(),
+        tls_task: tls_guard.take(),
     })
 }

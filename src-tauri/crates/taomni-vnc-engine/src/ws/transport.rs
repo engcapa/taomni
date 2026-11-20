@@ -1,42 +1,21 @@
 use super::*;
 
+impl ForwardTaskGuard {
+    pub fn new(task: Option<tokio::task::JoinHandle<()>>) -> Self {
+        Self(task)
+    }
+
+    pub fn take(&mut self) -> Option<tokio::task::JoinHandle<()>> {
+        self.0.take()
+    }
+}
+
 impl Drop for ForwardTaskGuard {
     fn drop(&mut self) {
         if let Some(task) = self.0.as_ref() {
             task.abort();
         }
     }
-}
-
-pub(crate) async fn dial_vnc_transport(
-    host: String,
-    port: u16,
-    network: Option<NetworkSettings>,
-) -> Result<VncDialedTransport, String> {
-    tokio::time::timeout(VNC_CONNECT_TIMEOUT, async move {
-        let network_forward = match network.as_ref() {
-            Some(settings) if settings.proxy_kind != "none" && !settings.proxy_kind.is_empty() => {
-                Some(crate::database::forward::start(host.clone(), port, settings.clone()).await?)
-            }
-            _ => None,
-        };
-        let local_port = network_forward.as_ref().map(|forward| forward.local_port);
-        let mut forward_guard = ForwardTaskGuard(network_forward.map(|forward| forward.task));
-        let socket = match local_port {
-            Some(local_port) => TcpStream::connect(("127.0.0.1", local_port))
-                .await
-                .map_err(|e| format!("VNC TCP connection failed: {e}"))?,
-            None => crate::terminal::network::establish_transport(&host, port, network.as_ref())
-                .await
-                .map_err(|e| format!("VNC TCP connection failed: {e}"))?,
-        };
-        Ok(VncDialedTransport {
-            stream: socket,
-            network_forward_task: forward_guard.0.take(),
-        })
-    })
-    .await
-    .map_err(|_| "VNC TCP connection timed out after 15 seconds".to_string())?
 }
 
 pub(super) async fn accept_authorized_ws(
@@ -46,7 +25,7 @@ pub(super) async fn accept_authorized_ws(
 ) -> Result<tokio_tungstenite::WebSocketStream<tokio::net::TcpStream>, String> {
     let deadline = tokio::time::Instant::now() + WS_ACCEPT_TIMEOUT;
     let expected_protocol = format!("taomni-vnc.{ws_token}");
-    let relay_limits = crate::vnc::limits::DecodeLimits::default();
+    let relay_limits = crate::limits::DecodeLimits::default();
     loop {
         let (stream, _) = tokio::select! {
             accepted = tokio::time::timeout_at(deadline, listener.accept()) => match accepted {
@@ -91,9 +70,15 @@ pub(super) async fn accept_authorized_ws(
             .max_message_size(Some(relay_limits.max_relay_message_bytes))
             .max_frame_size(Some(relay_limits.max_relay_message_bytes))
             .max_write_buffer_size(relay_limits.max_frame_queue_bytes);
-        match tokio_tungstenite::accept_hdr_async_with_config(stream, callback, Some(ws_config))
-            .await
-        {
+        let handshake =
+            tokio_tungstenite::accept_hdr_async_with_config(stream, callback, Some(ws_config));
+        let result = tokio::select! {
+            result = tokio::time::timeout_at(deadline, handshake) => {
+                result.map_err(|_| "VNC WebSocket authorization timed out")?
+            },
+            _ = cancel.cancelled() => return Err("VNC relay cancelled".into()),
+        };
+        match result {
             Ok(socket) => return Ok(socket),
             Err(error) => tracing::warn!("rejected unauthorized VNC WebSocket attempt: {error}"),
         }

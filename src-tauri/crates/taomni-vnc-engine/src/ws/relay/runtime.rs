@@ -1,66 +1,65 @@
-use crate::vnc::clipboard::ClipboardFormats;
-use crate::vnc::clipboard::FORMAT_HTML;
-use crate::vnc::clipboard::FORMAT_RTF;
-use crate::vnc::clipboard::FORMAT_TEXT;
-use crate::vnc::clipboard::build_notify_body;
-use crate::vnc::clipboard::build_provide_body;
-use crate::vnc::native_pointer::NativePointerSampler;
-use crate::vnc::policy::VncClipboardPolicy;
-use crate::vnc::quality::UpdateSummary;
-use crate::vnc::queue::FrameQueueReceiver;
-use crate::vnc::queue::FrameQueueSender;
-use crate::vnc::queue::QueuedWsOutgoing;
-use crate::vnc::rfb::RfbConnection;
-use crate::vnc::rfb::RfbWriter;
-use crate::vnc::rfb::RuntimeStats;
-use crate::vnc::rfb::ServerMessage;
-use crate::vnc::ws::FrameFlow;
-use crate::vnc::ws::PointerArbiter;
-use crate::vnc::ws::RELAY_TICK;
-use crate::vnc::ws::ServerClipboardCaps;
-use crate::vnc::ws::SharedFrameFlow;
-use crate::vnc::ws::SharedQuality;
-use crate::vnc::ws::StatsWindow;
-use crate::vnc::ws::VncControl;
-use crate::vnc::ws::VncRelayOptions;
-use crate::vnc::ws::WS_IDLE_CHECK_INTERVAL;
-use crate::vnc::ws::WS_IDLE_TIMEOUT;
-use crate::vnc::ws::WS_PING_INTERVAL;
-use crate::vnc::ws::WsIncoming;
-use crate::vnc::ws::WsOutgoingText;
-use crate::vnc::ws::clipboard::can_send_notify;
-use crate::vnc::ws::clipboard::can_send_provide;
-use crate::vnc::ws::clipboard::handle_server_ext_clipboard;
-use crate::vnc::ws::clipboard::server_clipboard_message_allowed;
-use crate::vnc::ws::frame_flow::apply_pending_quality;
-use crate::vnc::ws::frame_flow::damage_full_framebuffer;
-use crate::vnc::ws::frame_flow::flush_frame;
-use crate::vnc::ws::frame_flow::note_request;
-use crate::vnc::ws::frame_flow::quality_ready;
-use crate::vnc::ws::frame_flow::stats_labels;
-use crate::vnc::ws::input::coalesce_pointer_control;
-use crate::vnc::ws::input::control_allowed;
-use crate::vnc::ws::input::native_pointer_target;
-use crate::vnc::ws::input::parse_binary_control;
-use crate::vnc::ws::input::serialize_cursor;
-use crate::vnc::ws::transport::accept_authorized_ws;
+use crate::clipboard::ClipboardFormats;
+use crate::clipboard::FORMAT_HTML;
+use crate::clipboard::FORMAT_RTF;
+use crate::clipboard::FORMAT_TEXT;
+use crate::clipboard::build_notify_body;
+use crate::clipboard::build_provide_body;
+use crate::policy::VncClipboardPolicy;
+use crate::quality::UpdateSummary;
+use crate::queue::FrameQueueReceiver;
+use crate::queue::FrameQueueSender;
+use crate::queue::QueuedWsOutgoing;
+use crate::rfb::RfbConnection;
+use crate::rfb::RfbWriter;
+use crate::rfb::RuntimeStats;
+use crate::rfb::ServerMessage;
+use crate::ws::FrameFlow;
+use crate::ws::NativePointer;
+use crate::ws::PointerArbiter;
+use crate::ws::RELAY_TICK;
+use crate::ws::ServerClipboardCaps;
+use crate::ws::SharedFrameFlow;
+use crate::ws::SharedQuality;
+use crate::ws::StatsWindow;
+use crate::ws::VncControl;
+use crate::ws::VncRelayOptions;
+use crate::ws::WS_IDLE_CHECK_INTERVAL;
+use crate::ws::WS_IDLE_TIMEOUT;
+use crate::ws::WS_PING_INTERVAL;
+use crate::ws::WsIncoming;
+use crate::ws::WsOutgoingText;
+use crate::ws::clipboard::can_send_notify;
+use crate::ws::clipboard::can_send_provide;
+use crate::ws::clipboard::handle_server_ext_clipboard;
+use crate::ws::clipboard::server_clipboard_message_allowed;
+use crate::ws::frame_flow::apply_pending_quality;
+use crate::ws::frame_flow::damage_full_framebuffer;
+use crate::ws::frame_flow::flush_frame;
+use crate::ws::frame_flow::note_request;
+use crate::ws::frame_flow::quality_ready;
+use crate::ws::frame_flow::stats_labels;
+use crate::ws::input::coalesce_pointer_control;
+use crate::ws::input::control_allowed;
+use crate::ws::input::native_pointer_target;
+use crate::ws::input::parse_binary_control;
+use crate::ws::input::serialize_cursor;
+use crate::ws::transport::accept_authorized_ws;
 use futures::SinkExt;
 use futures::StreamExt;
 use std::sync::Arc;
 use std::time::Duration;
 use std::time::Instant;
 use tokio::net::TcpListener;
-use tokio::net::TcpStream;
 use tokio::sync::Mutex as AsyncMutex;
 use tokio::sync::mpsc;
 use tokio::sync::mpsc::Receiver;
 use tokio::sync::mpsc::Sender;
+use tokio_tungstenite::tungstenite::Message;
 use tokio_util::sync::CancellationToken;
-use tungstenite::Message;
 
 // ── Relay orchestration ─────────────────────────────────────────────
 
-pub(in crate::vnc::ws) async fn run_relay(
+pub(in crate::ws) async fn run_relay(
     listener: TcpListener,
     mut rfb: RfbConnection,
     writer: Arc<tokio::sync::Mutex<RfbWriter>>,
@@ -75,6 +74,7 @@ pub(in crate::vnc::ws) async fn run_relay(
     clipboard_policy: VncClipboardPolicy,
     quality: SharedQuality,
     options: VncRelayOptions,
+    mut native_pointer: Option<Box<dyn NativePointer>>,
 ) -> Result<(), String> {
     let ws_stream = accept_authorized_ws(listener, &ws_token, &cancel).await?;
 
@@ -141,7 +141,7 @@ pub(in crate::vnc::ws) async fn run_relay(
     let ctrl = control_tx.clone();
     let cancel_read = cancel.clone();
     let last_seen_read = last_seen.clone();
-    let control_limits = crate::vnc::limits::DecodeLimits::default();
+    let control_limits = crate::limits::DecodeLimits::default();
     let mut ws_read = tokio::spawn(async move {
         let mut reader = ws_reader;
         while let Some(Ok(msg)) = reader.next().await {
@@ -263,7 +263,7 @@ pub(in crate::vnc::ws) async fn run_relay(
             let (msg, fb_width, fb_height, stats) = match result {
                 Ok(value) => value,
                 Err(message) => {
-                    let error = crate::vnc::error::VncError::classify(message);
+                    let error = crate::error::VncError::classify(message);
                     let json = serde_json::to_string(&WsOutgoingText::Disconnected {
                         code: error.code,
                         stage: error.stage,
@@ -414,7 +414,7 @@ pub(in crate::vnc::ws) async fn run_relay(
     let cl_cancel = cancel.clone();
     let server_caps_ctrl = server_clip_caps.clone();
     let latest_clipboard_ctrl = latest_local_clipboard.clone();
-    let dispatch_limits = crate::vnc::limits::DecodeLimits::default();
+    let dispatch_limits = crate::limits::DecodeLimits::default();
     let flow_ctrl = flow.clone();
     let framebuffer_ctrl = framebuffer.clone();
     let ws_out_ctrl = ws_out_tx.clone();
@@ -423,8 +423,7 @@ pub(in crate::vnc::ws) async fn run_relay(
     let mut vnc_ctrl = tokio::spawn(async move {
         let mut deferred_ctrl: Option<VncControl> = None;
         let mut last_pointer_buttons = 0u8;
-        // Dropped with this task, which stops its sampling thread.
-        let mut native_pointer = NativePointerSampler::new();
+        // The sampler is dropped with this task, stopping its thread.
         let mut pointer_arbiter = PointerArbiter::default();
         loop {
             let ctrl = match deferred_ctrl.take() {
@@ -445,7 +444,9 @@ pub(in crate::vnc::ws) async fn run_relay(
             );
             if let VncControl::Pointer { buttons, .. } = &ctrl {
                 last_pointer_buttons = *buttons;
-                native_pointer.set_buttons_held(*buttons != 0);
+                if let Some(sampler) = &mut native_pointer {
+                    sampler.set_buttons_held(*buttons != 0);
+                }
             }
             if !control_allowed(&ctrl, view_only, clipboard_policy, &dispatch_limits) {
                 continue;
@@ -587,8 +588,10 @@ pub(in crate::vnc::ws) async fn run_relay(
                     }
                 }
                 VncControl::NativePointer(target) => {
-                    pointer_arbiter.set_native(target.is_some());
-                    native_pointer.set(target, &native_pointer_tx);
+                    if let Some(sampler) = &mut native_pointer {
+                        pointer_arbiter.set_native(target.is_some());
+                        sampler.set(target, &native_pointer_tx);
+                    }
                     Ok(())
                 }
                 VncControl::SampledPointer { x, y } => {
@@ -643,7 +646,7 @@ pub(in crate::vnc::ws) async fn run_relay(
             }
             match probe_sent {
                 Some(sent) if sent.elapsed() >= options.keepalive_timeout => {
-                    let error = crate::vnc::error::VncError::classify(format!(
+                    let error = crate::error::VncError::classify(format!(
                         "VNC keepalive: no response from the server for {} s",
                         (last_server.elapsed().as_secs())
                     ));

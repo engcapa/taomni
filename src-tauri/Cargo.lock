@@ -11312,9 +11312,12 @@ name = "taomni-vnc-engine"
 version = "0.1.0"
 dependencies = [
  "aes 0.9.3",
+ "base64 0.22.1",
  "des",
  "flate2",
+ "futures",
  "image",
+ "log",
  "md-5 0.11.0",
  "openssl",
  "rsa 0.9.10",
@@ -11324,7 +11327,10 @@ dependencies = [
  "sha2 0.11.0",
  "tokio",
  "tokio-openssl",
+ "tokio-tungstenite",
+ "tokio-util 0.7.19",
  "tracing",
+ "uuid",
  "zlib-rs",
  "zune-core",
  "zune-jpeg",

@@ -3,7 +3,7 @@ use std::sync::{Arc, Mutex};
 
 use tokio::sync::Notify;
 
-use crate::vnc::limits::DecodeLimits;
+use crate::limits::DecodeLimits;
 
 pub enum QueuedWsOutgoing {
     Control(String),
