@@ -154,11 +154,7 @@ pub fn imap_list_folders<T: Read + Write>(
                 display_name: decode_imap_modified_utf7(&raw_name),
                 name: raw_name,
                 delimiter: name.delimiter().map(ToOwned::to_owned),
-                flags: name
-                    .attributes()
-                    .iter()
-                    .map(attribute_string)
-                    .collect(),
+                flags: name.attributes().iter().map(attribute_string).collect(),
                 uid_validity: None,
                 uid_next: None,
                 total: None,

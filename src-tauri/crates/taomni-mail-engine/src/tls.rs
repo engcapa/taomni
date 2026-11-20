@@ -92,4 +92,3 @@ pub fn certificate_error_hint(error: &str, pinned: bool) -> String {
         format!("{error} (untrusted server certificate; review it to add an exception)")
     }
 }
-

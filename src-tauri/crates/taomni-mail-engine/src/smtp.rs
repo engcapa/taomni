@@ -32,7 +32,10 @@ impl SmtpClient {
         let mut builder = SmtpTransport::builder_dangerous(endpoint.connect_host)
             .port(endpoint.connect_port)
             .timeout(Some(endpoint.timeout))
-            .credentials(Credentials::new(endpoint.username.into(), endpoint.secret.into()));
+            .credentials(Credentials::new(
+                endpoint.username.into(),
+                endpoint.secret.into(),
+            ));
         if endpoint.authentication == MailAuthMode::OAuth2 {
             builder = builder.authentication(vec![Mechanism::Xoauth2]);
         }
@@ -51,15 +54,22 @@ impl SmtpClient {
     }
 
     pub fn send(&self, message: &Message) -> Result<Response, String> {
-        self.0.send(message).map_err(|error| send_error(&error.to_string()))
+        self.0
+            .send(message)
+            .map_err(|error| send_error(&error.to_string()))
     }
 
     pub fn send_raw(&self, envelope: &Envelope, raw: &[u8]) -> Result<Response, String> {
-        self.0.send_raw(envelope, raw).map_err(|error| send_error(&error.to_string()))
+        self.0
+            .send_raw(envelope, raw)
+            .map_err(|error| send_error(&error.to_string()))
     }
 
     pub fn test_connection(&self) -> Result<(), String> {
-        let connected = self.0.test_connection().map_err(|error| format!("SMTP test failed: {error}"))?;
+        let connected = self
+            .0
+            .test_connection()
+            .map_err(|error| format!("SMTP test failed: {error}"))?;
         if connected {
             Ok(())
         } else {
@@ -89,7 +99,13 @@ mod tests {
 
     #[test]
     fn smtp_size_rejections_get_a_hint() {
-        assert!(send_error("permanent error (552): 5.3.4 Message size exceeds fixed limit").contains("SIZE limit"));
-        assert_eq!(send_error("permanent error (550): no such user"), "SMTP send failed: permanent error (550): no such user");
+        assert!(
+            send_error("permanent error (552): 5.3.4 Message size exceeds fixed limit")
+                .contains("SIZE limit")
+        );
+        assert_eq!(
+            send_error("permanent error (550): no such user"),
+            "SMTP send failed: permanent error (550): no such user"
+        );
     }
 }

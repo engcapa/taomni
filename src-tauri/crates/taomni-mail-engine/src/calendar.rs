@@ -355,10 +355,7 @@ mod tests {
         assert_eq!(invite.uid, "040000008200E00074C5B7101A82E008");
         // The reader looks the invite up only when the body lists a calendar part.
         let parsed = MessageParser::default().parse(raw.as_bytes()).unwrap();
-        let listed: Vec<_> = parsed
-            .attachments()
-            .map(crate::attachment_info)
-            .collect();
+        let listed: Vec<_> = parsed.attachments().map(crate::attachment_info).collect();
         assert!(
             listed
                 .iter()

@@ -69,10 +69,7 @@ fn address_matches(op: MailFilterOp, addresses: &[&MailAddress], value: &str) ->
     }
 }
 
-pub(super) fn condition_matches(
-    condition: &MailFilterCondition,
-    message: &FilterMessage,
-) -> bool {
+pub(super) fn condition_matches(condition: &MailFilterCondition, message: &FilterMessage) -> bool {
     let header = message.header;
     let value = condition.value.as_str();
     match condition.field {

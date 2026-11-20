@@ -41,11 +41,7 @@ pub fn load_filters(conn: &Connection, account_id: &str) -> SqlResult<Vec<MailFi
     Ok(filters)
 }
 
-pub fn store_filters(
-    conn: &Connection,
-    account_id: &str,
-    filters: &[MailFilter],
-) -> SqlResult<()> {
+pub fn store_filters(conn: &Connection, account_id: &str, filters: &[MailFilter]) -> SqlResult<()> {
     let tx = conn.unchecked_transaction()?;
     tx.execute(
         "DELETE FROM mail_filters WHERE account_id = ?1",
@@ -92,11 +88,7 @@ fn max_cached_uid(conn: &Connection, account_id: &str, folder: &str) -> SqlResul
 
 /// Highest UID already offered to the incoming filters, or `None` when the
 /// mark is missing or belongs to an older UIDVALIDITY.
-pub fn filter_mark(
-    conn: &Connection,
-    account_id: &str,
-    folder: &str,
-) -> SqlResult<Option<u32>> {
+pub fn filter_mark(conn: &Connection, account_id: &str, folder: &str) -> SqlResult<Option<u32>> {
     let stored: Option<(Option<i64>, i64)> = conn
         .query_row(
             "SELECT uid_validity, high_uid FROM mail_filter_marks WHERE account_id = ?1 AND folder = ?2",
@@ -129,11 +121,7 @@ pub fn set_filter_mark(
 
 /// Mark everything cached as already filtered (called when filters are saved
 /// so only mail that arrives afterwards is filtered).
-pub fn ensure_filter_mark(
-    conn: &Connection,
-    account_id: &str,
-    folder: &str,
-) -> SqlResult<()> {
+pub fn ensure_filter_mark(conn: &Connection, account_id: &str, folder: &str) -> SqlResult<()> {
     if filter_mark(conn, account_id, folder)?.is_none() {
         let high = max_cached_uid(conn, account_id, folder)?;
         set_filter_mark(conn, account_id, folder, high)?;

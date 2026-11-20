@@ -30,10 +30,7 @@ impl MessagePlan {
 
 /// Run `filters` in order against one message (Thunderbird semantics: every
 /// matching filter applies; "Stop", move and delete end the chain).
-pub fn plan_message(
-    filters: &[&MailFilter],
-    message: &FilterMessage,
-) -> MessagePlan {
+pub fn plan_message(filters: &[&MailFilter], message: &FilterMessage) -> MessagePlan {
     let mut plan = MessagePlan::default();
     'filters: for filter in filters {
         if !filter.enabled || !filter_matches(filter, message) {
