@@ -15,6 +15,7 @@ pub struct FullMessage {
     pub hash: String,
     pub raw_size: u64,
     pub stored_size: u64,
+    pub stored_at: i64,
 }
 
 pub struct PreparedMessage {

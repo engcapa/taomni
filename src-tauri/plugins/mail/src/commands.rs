@@ -246,20 +246,21 @@ fn read_body(
         }
         Ok(read_local_raw(db, account_id, folder, *uid)?.map(SavedBody::LocalOriginal))
     })?;
-    let (raw, source, parse_limit) = match body {
+    let (raw, source, parse_limit, cached_at) = match body {
         None => return Ok(None),
         Some(SavedBody::Cached(body)) => return Ok(Some(body)),
         Some(SavedBody::Archive(original)) => {
+            let stored_at = original.stored_at;
             let raw = original.read_with(|| check().map_err(|error| error.message));
             check()?;
             let raw = raw.map_err(|_| unavailable())?;
             let limit = raw.len();
-            (raw, "archive", limit)
+            (raw, "archive", limit, Some(stored_at))
         }
-        Some(SavedBody::LocalOriginal(raw)) => (raw, "cache", 8 * 1024 * 1024),
+        Some(SavedBody::LocalOriginal(raw)) => (raw, "cache", 8 * 1024 * 1024, None),
     };
     check()?;
-    let message = parse_body_message(
+    let mut message = parse_body_message(
         account_id,
         folder,
         *uid,
@@ -267,6 +268,7 @@ fn read_body(
         &raw,
         parse_limit,
     );
+    message.body_cached_at = cached_at;
     check()?;
     Ok(Some(cache::cached_to_body(message, source)))
 }

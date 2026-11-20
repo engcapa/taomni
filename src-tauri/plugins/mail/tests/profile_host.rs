@@ -30,6 +30,7 @@ use taomni_plugin_api::{
 use taomni_sqlite_snapshot::SnapshotControl;
 
 const ACCOUNT: &str = "existing-mail";
+const ARCHIVED_AT: i64 = 1_710_000_010;
 const WAIT: Duration = Duration::from_secs(15);
 const HOST: &str = "b1234567-1234-1234-1234-123456789abc";
 const JOB: &str = "c1234567-1234-1234-1234-123456789abc";
@@ -252,6 +253,11 @@ fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
         .unwrap();
         let original = b"Subject: Original\r\n\r\nComplete migrated message\r\n";
         storage::store(&db, ACCOUNT, "INBOX", 9, 1, &original[..]).unwrap();
+        db.execute(
+            "UPDATE mail_full_messages SET stored_at = ?1 WHERE account_id = ?2 AND uid = 9",
+            rusqlite::params![ARCHIVED_AT, ACCOUNT],
+        )
+        .unwrap();
         migrate_local_tables(&db).unwrap();
         db.execute(
             "INSERT INTO mail_local_raw(account_id, folder, uid, raw) VALUES (?1, 'Sent', 3, ?2)",
@@ -326,9 +332,11 @@ fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
             .contains("Complete migrated message")
     );
     assert_eq!(body["source"], "archive");
+    assert_eq!(body["cachedAt"], ARCHIVED_AT);
     let sent_params = json!({"accountId":ACCOUNT,"folder":"Sent","uid":3});
     let sent = host.call("mail_get_cached_body", sent_params.clone());
     assert_eq!(sent["subject"], "Original sent mail");
+    assert!(sent["cachedAt"].is_null());
     assert!(sent["text"].as_str().unwrap().contains("Saved POP3 copy"));
     assert_eq!(fs::read(&path).unwrap(), before);
     let listed = host.call(

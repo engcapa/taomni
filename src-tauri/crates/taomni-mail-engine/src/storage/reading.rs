@@ -16,6 +16,7 @@ pub struct OpenMessage {
     pub(super) file: File,
     pub(super) hash: String,
     pub raw_size: u64,
+    pub stored_at: i64,
 }
 
 impl OpenMessage {
@@ -48,6 +49,7 @@ fn open_object(
     account: &str,
     hash: String,
     raw_size: u64,
+    stored_at: i64,
     open_file: impl FnOnce(&Path) -> Result<File, String>,
 ) -> Result<OpenMessage, String> {
     let file = open_file(&object_path(&account_root(db, account)?, &hash)?)?;
@@ -55,6 +57,7 @@ fn open_object(
         file,
         hash,
         raw_size,
+        stored_at,
     })
 }
 
@@ -76,7 +79,16 @@ pub fn open_with(
     open_file: impl FnOnce(&Path) -> Result<File, String>,
 ) -> Result<Option<OpenMessage>, String> {
     lookup(db, account, folder, uid)?
-        .map(|entry| open_object(db, account, entry.hash, entry.raw_size, open_file))
+        .map(|entry| {
+            open_object(
+                db,
+                account,
+                entry.hash,
+                entry.raw_size,
+                entry.stored_at,
+                open_file,
+            )
+        })
         .transpose()
 }
 
@@ -85,12 +97,12 @@ pub fn open_entry(
     account: &str,
     entry: &ArchiveEntry,
 ) -> Result<OpenMessage, String> {
-    let (hash, size): (String, u64) = db.query_row(
-        "SELECT sha256,raw_size FROM mail_full_messages WHERE account_id=?1 AND folder=?2 AND uid_validity=?3 AND uid=?4",
+    let (hash, size, stored_at): (String, u64, i64) = db.query_row(
+        "SELECT sha256,raw_size,stored_at FROM mail_full_messages WHERE account_id=?1 AND folder=?2 AND uid_validity=?3 AND uid=?4",
         params![account,entry.folder,entry.uid_validity,entry.uid],
-        |row| Ok((row.get(0)?, row.get::<_,i64>(1)? as u64)),
+        |row| Ok((row.get(0)?, row.get::<_,i64>(1)? as u64, row.get(2)?)),
     ).map_err(|e| e.to_string())?;
-    open_object(db, account, hash, size, open_file)
+    open_object(db, account, hash, size, stored_at, open_file)
 }
 
 fn open_file(path: &Path) -> Result<File, String> {

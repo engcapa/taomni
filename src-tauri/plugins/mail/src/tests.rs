@@ -272,6 +272,12 @@ fn saved_original_takes_precedence_and_corruption_is_reported() {
     .unwrap();
     let original = b"Subject: Original\r\n\r\nFull archived body\r\n";
     let saved = storage::store(&db, account, "INBOX", 5, 1, &original[..]).unwrap();
+    let stored_at = 1_710_000_010_i64;
+    db.execute(
+        "UPDATE mail_full_messages SET stored_at = ?1 WHERE account_id = ?2 AND uid = 5",
+        rusqlite::params![stored_at, account],
+    )
+    .unwrap();
     let read = || {
         invoke(
             &store,
@@ -281,6 +287,7 @@ fn saved_original_takes_precedence_and_corruption_is_reported() {
     };
     let body = read().unwrap();
     assert_eq!(body["source"], "archive");
+    assert_eq!(body["cachedAt"], stored_at);
     assert!(
         body["text"]
             .as_str()
@@ -328,6 +335,7 @@ fn pop3_original_restores_the_body_when_only_headers_are_cached() {
     )
     .unwrap();
     assert_eq!(body["subject"], "Local original");
+    assert!(body["cachedAt"].is_null());
     assert!(
         body["text"]
             .as_str()

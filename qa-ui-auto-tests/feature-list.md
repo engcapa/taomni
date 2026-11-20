@@ -8720,6 +8720,8 @@ controls:
 
 ### 13.23 完整邮件存储、本地归档与目录迁移
 
+Mail 宿主从旧库的归档记录返回保存时间。只有 POP3 原件时，读取正文不生成缓存时间。归档和本地原件的内容、时间字段及重开后的结果由 `profile_host` 跨进程用例核对，Browser 和 Native 归档操作由 `TC-MAIL-STORAGE-01/02` 覆盖。
+
 <!-- feature
 id: F-MAIL-23
 status: partial

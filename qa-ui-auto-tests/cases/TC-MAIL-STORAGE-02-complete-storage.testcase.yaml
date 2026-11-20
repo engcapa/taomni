@@ -279,6 +279,7 @@ steps:
 - screenshot: mail-storage-decoded-folders.png
 - click: '[data-testid="session-cancel"]'
 - assert_not_visible: '[data-testid="session-editor"]'
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -439,6 +440,8 @@ verification:
       expectation: '{"assert_attribute": {"selector": "[data-testid=\"mail-storage-folder-names\"]", "name": "value", "equals": "&U,BTFw-"}}'
     - step: 113
       expectation: '{"assert_not_visible": "[data-testid=\"session-editor\"]"}'
+    - step: 114
+      expectation: The native archive and settings workflow produces no uncaught runtime errors.
     results:
     - 97
     - 99
@@ -446,6 +449,7 @@ verification:
     - 106
     - 108
     - 113
+    - 114
   visual:
   - check: Storage settings, progress and archive list remain readable without clipping.
     method: manual

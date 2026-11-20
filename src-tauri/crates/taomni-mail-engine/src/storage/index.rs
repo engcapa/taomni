@@ -80,11 +80,16 @@ pub fn lookup(
     uid: u32,
 ) -> Result<Option<FullMessage>, String> {
     db.query_row(
-        "SELECT sha256, raw_size, stored_size, uid_validity FROM mail_full_messages
+        "SELECT sha256, raw_size, stored_size, stored_at FROM mail_full_messages
          WHERE account_id = ?1 AND folder = ?2 AND uid = ?3
            AND uid_validity = COALESCE((SELECT uid_validity FROM mail_folders WHERE account_id=?1 AND name=?2),uid_validity)
          ORDER BY stored_at DESC LIMIT 1",
         params![account, folder, uid],
-        |row| Ok(FullMessage { hash: row.get(0)?, raw_size: row.get::<_,i64>(1)? as u64, stored_size: row.get::<_,i64>(2)? as u64 }),
+        |row| Ok(FullMessage {
+            hash: row.get(0)?,
+            raw_size: row.get::<_, i64>(1)? as u64,
+            stored_size: row.get::<_, i64>(2)? as u64,
+            stored_at: row.get(3)?,
+        }),
     ).optional().map_err(|e| e.to_string())
 }

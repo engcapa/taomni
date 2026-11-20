@@ -290,6 +290,7 @@ steps:
 - assert_count:
     selector: '[data-testid="mail-storage-pause"]'
     equal: 0
+- assert_no_runtime_errors: null
 verification:
   review: reviewed
   requirements:
@@ -493,17 +494,20 @@ verification:
     - 123
     - 128
   - id: R5
-    requirement: Returning from settings retains Resume for the completed archive; polling during a press is also covered by mounted tests.
+    requirement: The archive and settings workflow completes without runtime errors and returning from settings retains Resume.
     actions:
     - 127
     results:
     - 129
     - 130
+    - 131
     checkpoints:
     - step: 129
       expectation: The completed archive has a usable Resume action.
     - step: 130
       expectation: The opposite Pause action is absent.
+    - step: 131
+      expectation: The renderer reports no uncaught errors during the archive and settings workflow.
   visual:
   - check: Storage settings, progress and archive list remain readable without clipping.
     method: manual

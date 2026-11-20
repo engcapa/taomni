@@ -86,17 +86,19 @@ pub fn publish(
         header.has_attachments = has_attachments;
     }
     let header_json = serde_json::to_string(&header).map_err(|e| e.to_string())?;
+    let stored_at = crate::now_ts();
     tx.execute("DELETE FROM mail_full_messages WHERE account_id=?1 AND folder=?2 AND uid=?3 AND uid_validity=?4", params![account,folder,uid,uid_validity]).map_err(|e|e.to_string())?;
     tx.execute(
         "INSERT INTO mail_full_messages(account_id,folder,uid,uid_validity,sha256,raw_size,stored_size,stored_at,header_json)
          VALUES(?1,?2,?3,?4,?5,?6,?7,?8,?9)",
-        params![account,folder,uid,uid_validity,hash,raw_size as i64,stored_size as i64,crate::now_ts(),header_json],
+        params![account,folder,uid,uid_validity,hash,raw_size as i64,stored_size as i64,stored_at,header_json],
     ).map_err(|e|e.to_string())?;
     tx.commit().map_err(|e| e.to_string())?;
     Ok(FullMessage {
         hash,
         raw_size,
         stored_size,
+        stored_at,
     })
 }
 
