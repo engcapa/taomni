@@ -47,7 +47,7 @@ steps:
 - assert_file_contains: {path: '${fixture.vnc_events}', contains: '"type": "session_closed"'}
 - click: '[data-testid="module-action-enable-vnc-client"]'
 - wait_for: '[data-testid="module-action-disable-vnc-client"]'
-- click: '[data-testid="nav-mode-home"]'
+- click: '[data-testid="side-tab-sessions"]'
 - click: '[data-testid="tab-item"][data-tab-type="vnc"] [data-testid="tab-close"]'
 - dblclick: '[data-testid="session-tree-item"][data-session-name="qa-signed-vnc"]'
 - click: '[data-testid="vnc-unencrypted-continue"]'
