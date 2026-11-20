@@ -433,6 +433,7 @@ jobs:
             echo 'Select an artifact-only macOS ARM64 build for the static Kerberos comparison.' >&2
             exit 1
           fi
+          brew list --versions openssl@3 >/dev/null || brew install openssl@3
           prefix="$RUNNER_TEMP/taomni-static-krb5"
           bash scripts/build-macos-static-krb5.sh "$prefix"
           echo 'MIT_KRB5_GSSAPI_STATIC=1' >> "$GITHUB_ENV"

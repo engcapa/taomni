@@ -16,7 +16,8 @@ curl --proto '=https' --fail --silent --show-error --location --retry 3 \
 printf '%s  %s\n' "$expected_sha" "$archive" | shasum -a 256 --check
 tar -xzf "$archive" -C "$work"
 
-openssl_prefix="$(brew --prefix openssl@4)"
+# MIT Kerberos 1.22 uses the OpenSSL 3 X509 getter signatures.
+openssl_prefix="$(brew --prefix openssl@3)"
 mkdir -p "$prefix/lib"
 for library in libssl.a libcrypto.a; do
   cp "$openssl_prefix/lib/$library" "$prefix/lib/"
