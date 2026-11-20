@@ -3,6 +3,7 @@ import { EditorView } from "@codemirror/view";
 import { undo, redo } from "@codemirror/commands";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ViewerDocument } from "../../../lib/viewer";
+import type { MarkdownDocumentOwner } from "./markdownOwner";
 import { viewerReadBytes, viewerSavePastedImage } from "../../../lib/viewer";
 import { readClipboardImageFiles, readNativeClipboardImagePath } from "../../../lib/clipboard";
 import { useDocumentStore } from "../../../stores/documentStore";
@@ -26,10 +27,10 @@ vi.mock("../../../lib/viewer", async (original) => ({
   viewerSavePastedImage: vi.fn(),
 }));
 const source = "# Title\n\nA **bold** line\n\n## Details\n\n| A | B |\n| --- | --- |\n| c | d |\n";
-function fixture(): ViewerDocument {
-  return { key: "/docs/a.md", path: "/docs/a.md", kind: "markdown", content: source, savedContent: source, savedHash: "hash",
+function fixture(content = source): ViewerDocument {
+  return { key: "/docs/a.md", path: "/docs/a.md", kind: "markdown", content, savedContent: content, savedHash: "hash",
     encoding: "UTF-8", bom: false, eol: "LF", savedEncoding: "UTF-8", savedBom: false, savedEol: "LF", originalLineEndings: [], dirty: false,
-    mtime: 0, size: source.length, readOnly: false, loading: false, saving: false, large: false, truncated: false, revision: 0, chunkOffset: 0, nextOffset: 0, eof: true };
+    mtime: 0, size: content.length, readOnly: false, loading: false, saving: false, large: false, truncated: false, revision: 0, chunkOffset: 0, nextOffset: 0, eof: true };
 }
 function Harness() {
   const document = useDocumentStore((state) => state.documents["/docs/a.md"]);
@@ -271,6 +272,59 @@ describe("MarkdownEditor real host lifecycle", () => {
   it("keeps Mermaid split preview width >= 340px and clamps doc padding on narrow panes", () => {
     expect(markdownStyles).toContain(".fv-md-doc{max-width:800px;margin:0 auto;padding:30px clamp(16px,4.5%,44px) 120px;");
     expect(markdownStyles).toContain(".fv-md-mermaid svg{width:max(100%,340px);height:auto;margin:auto}");
+  });
+
+  it("deduplicates dismissible render warnings without hiding placeholders or readable content", async () => {
+    const content = "# Fallback\n\n![Missing image](assets/missing.png)\n\nReadable **content**.";
+    const current = fixture(content);
+    const onError = vi.fn();
+    const owner: MarkdownDocumentOwner = {
+      readImage: vi.fn(async () => { throw new Error("ENOENT: assets/missing.png"); }),
+      onChange: vi.fn(),
+      onSave: vi.fn(),
+    };
+    render(<MarkdownEditor document={current} owner={owner} onError={onError} />);
+
+    await waitFor(() => expect(screen.getByTestId("markdown-render-warnings")).toBeInTheDocument());
+    expect(screen.getAllByTestId("markdown-render-warning-item")).toHaveLength(1);
+    expect(screen.getByTestId("markdown-live").querySelector('[data-kind="image"]')).toHaveTextContent("Image unavailable");
+    expect(screen.getByTestId("markdown-live")).toHaveTextContent("Readable content.");
+    expect(screen.getByTestId("markdown-render-warnings")).toHaveTextContent("Preview and export will use placeholders");
+
+    fireEvent.click(screen.getByTestId("markdown-mode-split"));
+    await waitFor(() => expect(screen.getByTestId("markdown-preview").querySelector('[data-kind="image"]')).not.toBeNull());
+    expect(screen.getAllByTestId("markdown-render-warning-item")).toHaveLength(1);
+    expect(screen.getAllByTestId("markdown-render-placeholder")).toHaveLength(1);
+    expect(screen.getByTestId("markdown-split")).toHaveTextContent("![Missing image](assets/missing.png)");
+
+    fireEvent.click(screen.getByTestId("markdown-render-warning-dismiss"));
+    expect(screen.queryByTestId("markdown-render-warnings")).not.toBeInTheDocument();
+    expect(screen.getAllByTestId("markdown-render-placeholder")).toHaveLength(1);
+    expect(onError).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByTestId("markdown-mode-live"));
+    expect(screen.queryByTestId("markdown-render-warnings")).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.getByTestId("markdown-live").querySelector('[data-kind="image"]')).not.toBeNull());
+  });
+
+  it("clears resolved warnings and restores the real image when its asset reader recovers", async () => {
+    const current = fixture("![Recovered](assets/recovered.png)");
+    const failingOwner: MarkdownDocumentOwner = {
+      readImage: vi.fn(async () => { throw new Error("temporarily unavailable"); }),
+      onChange: vi.fn(), onSave: vi.fn(),
+    };
+    const { rerender } = render(<MarkdownEditor document={current} owner={failingOwner} onError={vi.fn()} />);
+    await waitFor(() => expect(screen.getByTestId("markdown-render-warnings")).toHaveTextContent("temporarily unavailable"));
+    expect(screen.getByTestId("markdown-render-placeholder")).toBeInTheDocument();
+
+    const recoveredOwner: MarkdownDocumentOwner = {
+      readImage: vi.fn(async () => "data:image/png;base64,AQID"),
+      onChange: vi.fn(), onSave: vi.fn(),
+    };
+    rerender(<MarkdownEditor document={current} owner={recoveredOwner} onError={vi.fn()} />);
+    await waitFor(() => expect(screen.getByTestId("markdown-image-widget").querySelector("img")).toHaveAttribute("src", "data:image/png;base64,AQID"));
+    expect(screen.queryByTestId("markdown-render-warnings")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("markdown-render-placeholder")).not.toBeInTheDocument();
   });
 
   it("falls back to native clipboard image bytes on WebKitGTK X11 paste without ClipboardItem files", async () => {

@@ -16160,6 +16160,8 @@ files:
   - src/components/viewer/markdown/MarkdownDiagramActions.tsx
   - src/components/viewer/markdown/MarkdownDiagramViewer.tsx
   - src/components/viewer/markdown/MarkdownLiveMenu.tsx
+  - src/components/viewer/markdown/MarkdownRenderWarnings.tsx
+  - src/components/viewer/markdown/markdownRenderFallback.ts
   - src/lib/markdownRemoteImages.ts
   - src-tauri/src/viewer/markdown_images.rs
   - src/components/viewer/markdown/drawioCodec.ts
@@ -16452,6 +16454,18 @@ controls:
     kind: interactive
   - id: markdown-paste-status
     selector: '[data-testid="markdown-paste-status"]'
+    kind: display
+  - id: markdown-render-warnings
+    selector: '[data-testid="markdown-render-warnings"]'
+    kind: display
+  - id: markdown-render-warning-item
+    selector: '[data-testid="markdown-render-warning-item"]'
+    kind: display
+  - id: markdown-render-warning-dismiss
+    selector: '[data-testid="markdown-render-warning-dismiss"]'
+    kind: interactive
+  - id: markdown-render-placeholder
+    selector: '[data-testid="markdown-render-placeholder"]'
     kind: display
   - id: markdown-export-fileHeader
     selector: '[data-testid="markdown-export-fileHeader"]'

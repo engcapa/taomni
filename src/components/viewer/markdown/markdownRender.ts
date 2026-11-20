@@ -10,6 +10,12 @@ import { rememberDiagram } from "./diagramModel";
 import { parseDrawio } from "./drawioCodec";
 import { rememberDrawio, renderDrawioPage } from "./drawioRender";
 import { drawioMissingImagesMessage } from "./drawioImageStyle";
+import {
+  createMarkdownRenderPlaceholder,
+  createMarkdownRenderWarning,
+  type MarkdownRenderLabel,
+  type MarkdownWarningHandler,
+} from "./markdownRenderFallback";
 import "./drawio.css";
 import "katex/dist/katex.min.css";
 
@@ -20,7 +26,15 @@ export function renderMarkdown(content: string): string {
   return renderFormatted(math.content, "md") ?? "";
 }
 
-export interface RenderOwner { docPath: string; cancelled: () => boolean; onResize?: () => void; theme?: "light" | "dark"; readImage?: (reference: string) => Promise<string> }
+export interface RenderOwner {
+  docPath: string;
+  cancelled: () => boolean;
+  onResize?: () => void;
+  onWarning?: MarkdownWarningHandler;
+  theme?: "light" | "dark";
+  readImage?: (reference: string) => Promise<string>;
+  label?: MarkdownRenderLabel;
+}
 let diagramId = 0;
 
 async function highlightCode(block: HTMLElement, language: string): Promise<void> {
@@ -51,7 +65,7 @@ async function highlightCode(block: HTMLElement, language: string): Promise<void
   block.replaceChildren(fragment);
 }
 
-export async function enhanceMarkdown(root: HTMLElement, owner: RenderOwner, strict = false): Promise<void> {
+export async function enhanceMarkdown(root: HTMLElement, owner: RenderOwner): Promise<void> {
   const jobs: Promise<unknown>[] = [];
   root.querySelectorAll<HTMLImageElement>("img").forEach((image) => {
     const src = image.dataset.fvSource || image.getAttribute("src") || "";
@@ -64,11 +78,11 @@ export async function enhanceMarkdown(root: HTMLElement, owner: RenderOwner, str
       image.src = url;
       image.onload = () => owner.onResize?.();
     }).catch((error: unknown) => {
-      if (strict) throw error;
       if (owner.cancelled()) return;
-      image.classList.add("fv-md-image-error");
-      image.alt = `${image.alt || src} — ${error instanceof Error ? error.message : String(error)}`;
-      image.title = image.alt;
+      const warning = createMarkdownRenderWarning("image", src, image.alt || src || "Image", error);
+      owner.onWarning?.(warning);
+      image.replaceWith(createMarkdownRenderPlaceholder(warning, owner.label));
+      owner.onResize?.();
     }));
   });
   root.querySelectorAll<HTMLElement>("pre > code").forEach((block) => {
@@ -87,19 +101,24 @@ export async function enhanceMarkdown(root: HTMLElement, owner: RenderOwner, str
           const diagram = document.createElement("div"); diagram.className = "fv-md-drawio";
           diagram.setAttribute("aria-label", page.name);
           diagram.innerHTML = preview.svg;
-          if (!strict && preview.missingImages) {
+          if (preview.missingImages) {
+            const message = drawioMissingImagesMessage(preview.missingImages);
+            const warning = createMarkdownRenderWarning("drawio", block.textContent || "", page.name, message);
+            owner.onWarning?.(warning);
             const notice = document.createElement("p");
             notice.className = "fv-md-drawio-image-notice";
-            notice.textContent = drawioMissingImagesMessage(preview.missingImages);
+            notice.textContent = message;
             diagram.append(notice);
           }
           rememberDrawio(diagram, page); container.append(diagram);
         }
         if (!owner.cancelled()) { block.parentElement?.replaceWith(container); owner.onResize?.(); }
       })().catch((error: unknown) => {
-        if (strict) throw error;
         if (owner.cancelled()) return;
-        const message = document.createElement("div"); message.className = "fv-md-render-error"; message.textContent = String(error); block.parentElement?.append(message);
+        const warning = createMarkdownRenderWarning("drawio", block.textContent || "", "draw.io diagram", error);
+        owner.onWarning?.(warning);
+        block.parentElement?.replaceWith(createMarkdownRenderPlaceholder(warning, owner.label));
+        owner.onResize?.();
       }));
     } else if (language === "mermaid") {
       const source = block.textContent || "";
@@ -116,12 +135,11 @@ export async function enhanceMarkdown(root: HTMLElement, owner: RenderOwner, str
         block.parentElement?.replaceWith(diagram);
         owner.onResize?.();
       }).catch((error: unknown) => {
-        if (strict) throw new Error(`Mermaid: ${error instanceof Error ? error.message : String(error)}`);
         if (owner.cancelled()) return;
-        const message = document.createElement("div");
-        message.className = "fv-md-render-error";
-        message.textContent = `Mermaid: ${error instanceof Error ? error.message : String(error)}`;
-        block.parentElement?.append(message);
+        const warning = createMarkdownRenderWarning("mermaid", source, "Mermaid diagram", error);
+        owner.onWarning?.(warning);
+        block.parentElement?.replaceWith(createMarkdownRenderPlaceholder(warning, owner.label));
+        owner.onResize?.();
       }));
     } else if (language) jobs.push(highlightCode(block, language));
   });

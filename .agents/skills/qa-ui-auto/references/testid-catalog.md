@@ -1342,6 +1342,10 @@
 - `[data-testid="markdown-table-widget"]` — interactive — F-FILEOPEN-1.markdown-table-widget
 - `[data-testid="markdown-image-widget"]` — interactive — F-FILEOPEN-1.markdown-image-widget
 - `[data-testid="markdown-paste-status"]` — display — F-FILEOPEN-1.markdown-paste-status
+- `[data-testid="markdown-render-warnings"]` — display — F-FILEOPEN-1.markdown-render-warnings
+- `[data-testid="markdown-render-warning-item"]` — display — F-FILEOPEN-1.markdown-render-warning-item
+- `[data-testid="markdown-render-warning-dismiss"]` — interactive — F-FILEOPEN-1.markdown-render-warning-dismiss
+- `[data-testid="markdown-render-placeholder"]` — display — F-FILEOPEN-1.markdown-render-placeholder
 - `[data-testid="markdown-export-fileHeader"]` — interactive — F-FILEOPEN-1.markdown-export-fileHeader
 - `[data-testid="markdown-export"]` — interactive — F-FILEOPEN-1.markdown-export
 - `[data-testid="markdown-export-menu"]` — display — F-FILEOPEN-1.markdown-export-menu

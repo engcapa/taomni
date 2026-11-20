@@ -1,0 +1,134 @@
+id: TC-FILE-OPEN-044
+title: Native Markdown missing assets export real HTML and SVG placeholders
+description: The packaged app renders the same mixed valid/failed Mermaid README fixture, saves HTML through the OS dialog, and exports
+  a Markdown folder whose missing reference resolves to an independently readable SVG placeholder instead of aborting.
+covers: [F-FILEOPEN-1, F-EXPLORER-1]
+modes: [native]
+tags: [p1, markdown, file-open, export, regression]
+fixtures: [reset_db, markdown_missing_assets]
+timeout_sec: 240
+steps:
+- open: ${cfg.app.base_url}
+- vault_first_run: qa-markdown-missing-assets-native
+- reload_window: null
+- click: '[data-testid="side-tab-tools"]'
+- click: '[data-testid="sidebar-tool-file-explorer"]'
+- wait_for: '[data-testid="explorer-tab"][data-active="true"]'
+- press:
+    selector: '[data-testid="explorer-tab"][data-active="true"]'
+    key: Control+l
+    macos_key: Meta+l
+- fill:
+    selector: '[data-testid="explorer-address"]'
+    value: ${fixture.markdown_missing_root}
+- press:
+    selector: '[data-testid="explorer-address"]'
+    key: Enter
+- dblclick: '[data-testid="explorer-file-row"][data-name="mermaid-readme.md"]'
+- eval_readonly:
+    expression: document.querySelector('.fv-md-image img')?.naturalWidth === 96
+    expect_truthy: true
+    timeout_sec: 25
+- wait_for: '[data-testid="markdown-live"] .fv-md-mermaid svg'
+- wait_for: '[data-testid="markdown-live"] [data-kind="drawio"]'
+- eval_readonly:
+    expression: >-
+      document.querySelectorAll('.fv-md-live-pane .fv-md-render-placeholder-image').length === 1 && document.querySelectorAll('.fv-md-live-pane .fv-md-render-placeholder-mermaid').length === 1 && document.querySelectorAll('.fv-md-live-pane .fv-md-render-placeholder-drawio').length === 1
+    expect_truthy: true
+- assert_count:
+    selector: '[data-testid="markdown-render-warning-item"]'
+    equal: 3
+- assert_text:
+    selector: '[data-testid="markdown-live"]'
+    contains: 'Readable tail: export must complete with explicit placeholders.'
+- screenshot: markdown-missing-assets-native-live-warning.png
+- click: '[data-testid="markdown-render-warning-dismiss"]'
+- assert_not_visible: '[data-testid="markdown-render-warnings"]'
+- assert_count:
+    selector: '[data-testid="markdown-live"] [data-testid="markdown-render-placeholder"]'
+    equal: 3
+- click: '[data-testid="markdown-export"]'
+- native_file_dialog:
+    kind: save
+    action: choose
+    path: ${fixture.markdown_missing_exports}/mermaid-readme.html
+    trigger: '[data-testid="markdown-export-html"]'
+- wait_for: '[data-testid="markdown-export-status"][data-export-state="saved"]'
+- assert_file_contains:
+    path: ${fixture.markdown_missing_exports}/mermaid-readme.html
+    contains: Image unavailable
+- assert_file_contains:
+    path: ${fixture.markdown_missing_exports}/mermaid-readme.html
+    contains: ./img/header.png
+- assert_file_contains:
+    path: ${fixture.markdown_missing_exports}/mermaid-readme.html
+    contains: Mermaid diagram unavailable
+- assert_file_contains:
+    path: ${fixture.markdown_missing_exports}/mermaid-readme.html
+    contains: draw.io diagram unavailable
+- assert_file_contains:
+    path: ${fixture.markdown_missing_exports}/mermaid-readme.html
+    contains: data:image/png;base64,
+- click: '[data-testid="markdown-export"]'
+- native_file_dialog:
+    kind: folder
+    action: choose
+    path: ${fixture.markdown_missing_exports}
+    trigger: '[data-testid="markdown-export-markdown"]'
+- wait_for: '[data-testid="markdown-export-status"][data-export-state="saved"]'
+- assert_file_contains:
+    path: ${fixture.markdown_missing_exports}/mermaid-readme/mermaid-readme.md
+    contains: assets/image-1.svg
+- assert_file_contains:
+    path: ${fixture.markdown_missing_exports}/mermaid-readme/assets/image-1.svg
+    contains: Image unavailable
+- assert_file_contains:
+    path: ${fixture.markdown_missing_exports}/mermaid-readme/mermaid-readme.md
+    contains: assets/image-2.png
+- assert_file_open_bytes:
+    path: ${fixture.markdown_missing_source}
+    sha256: ${fixture.markdown_missing_sha}
+- assert_no_runtime_errors: null
+- screenshot: markdown-missing-assets-native-export.png
+verification:
+  review: reviewed
+  requirements:
+  - id: LIVE-FALLBACK
+    requirement: Packaged Live retains the valid PNG/SVG/text, shows three placeholders and three warnings, and permits dismissing only
+      the warning banner.
+    actions: [10, 18]
+    checkpoints:
+    - {step: 11, expectation: The native WebView decodes the seeded valid PNG.}
+    - {step: 12, expectation: The valid Mermaid block renders an actual SVG.}
+    - {step: 14, expectation: Each failed element has a native Live placeholder.}
+    - {step: 15, expectation: Warnings are deduplicated across the failed source elements.}
+    - {step: 16, expectation: Ordinary content remains visible.}
+    - {step: 19, expectation: The warning banner is dismissible.}
+    - {step: 20, expectation: Placeholders survive warning dismissal.}
+    results: [11, 12, 14, 15, 16, 19, 20]
+  - id: NATIVE-EXPORT-FALLBACK
+    requirement: Real OS save/folder dialogs complete successfully; host reads prove HTML contains all fallbacks and valid embedded media,
+      Markdown references resolve to real SVG/PNG assets, and source bytes remain exact.
+    actions: [21, 22, 29, 30]
+    checkpoints:
+    - {step: 23, expectation: Native HTML export reports saved.}
+    - {step: 24, expectation: Host-read HTML contains the image fallback.}
+    - {step: 25, expectation: Host-read HTML retains the missing reference as diagnostic context.}
+    - {step: 26, expectation: Host-read HTML contains the Mermaid fallback.}
+    - {step: 27, expectation: Host-read HTML contains the draw.io fallback.}
+    - {step: 28, expectation: The valid image remains embedded in HTML.}
+    - {step: 31, expectation: Native Markdown folder export reports saved.}
+    - {step: 32, expectation: The missing Markdown reference is rewritten to an SVG placeholder.}
+    - {step: 33, expectation: The exported SVG is a real readable placeholder asset.}
+    - {step: 34, expectation: The valid Markdown image remains a bundled PNG.}
+    - {step: 35, expectation: Both exports preserve exact source bytes.}
+    - {step: 36, expectation: The packaged workflow has no unhandled runtime errors.}
+    results: [23, 24, 25, 26, 27, 28, 31, 32, 33, 34, 35, 36]
+  visual:
+  - check: Inspect native warning/placeholder layout and final saved state in the retained screenshots.
+    method: manual
+    reason: Host file assertions and DOM state do not certify visual contrast or overflow.
+  native:
+  - check: Packaged WebView, real OS choosers, host HTML/Markdown/SVG reads and source hash
+    method: automated
+    reason: Browser downloads and stubs cannot establish native dialog or disk behavior.

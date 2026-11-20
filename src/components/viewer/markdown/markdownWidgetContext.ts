@@ -1,6 +1,7 @@
 import { EditorView } from "@codemirror/view";
 import { Transaction } from "@codemirror/state";
 import { isolateHistory } from "@codemirror/commands";
+import type { MarkdownWarningHandler } from "./markdownRenderFallback";
 
 export interface WidgetEdit { userEvent?: string; isolate?: "before" | "full" }
 
@@ -12,6 +13,7 @@ export interface MarkdownWidgetContext {
   label: (zh: string, en: string) => string;
   onChange?: (content: string) => void;
   onError: (message: string) => void;
+  onWarning?: MarkdownWarningHandler;
   replaceImage: (from: number, to: number) => void;
   revealImage: (reference: string) => void;
 }

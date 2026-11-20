@@ -1,7 +1,7 @@
 id: TC-WELCOME-RS-N-05-home-cold-restore
 title: Home restores a saved terminal after normal process restart
 description: Create and launch a saved local shell. Restart through the production exit confirmation, then restore from Home with
-  Enter. A repeat locates the existing live PTY.
+  Enter. The completed restore banner disappears while the recovered live PTY remains available.
 modes:
 - native
 covers:
@@ -54,9 +54,7 @@ steps:
     selector: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
     equal: 1
 - click: '[data-testid="nav-mode-home"]'
-- wait_for: '[data-testid="welcome-restore-status"][data-state="succeeded"]'
-- click: '[data-testid="welcome-restore-last-session"]'
-- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
+- assert_not_visible: '[data-testid="welcome-restore-row"]'
 - assert_count:
     selector: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
     equal: 1
@@ -66,7 +64,8 @@ verification:
   review: reviewed
   requirements:
   - id: COLD-RESTORE
-    requirement: The Home action recovers the persisted snapshot and a live PTY on a new app process.
+    requirement: The Home action recovers the persisted snapshot and a live PTY on a new app process, then removes the completed
+      restore banner without removing the terminal.
     actions:
     - 1
     - 2
@@ -83,7 +82,7 @@ verification:
     - 17
     - 21
     - 24
-    - 26
+    - 25
     checkpoints:
     - step: 5
       expectation: Empty state is visible before any session is opened.
@@ -96,9 +95,11 @@ verification:
     - step: 22
       expectation: Keyboard activation starts a ready terminal.
     - step: 25
-      expectation: Home retains the success result.
-    - step: 28
-      expectation: Repeat keeps one live terminal.
+      expectation: Successful restoration removes the completed banner from Home.
+    - step: 26
+      expectation: The recovered terminal remains open after the banner disappears.
+    - step: 27
+      expectation: Cold restoration and banner dismissal complete without runtime errors.
     results:
     - 5
     - 16
@@ -106,7 +107,8 @@ verification:
     - 20
     - 22
     - 25
-    - 28
+    - 26
+    - 27
   native:
   - check: Normal process restart and actual PTY readiness
     method: automated
