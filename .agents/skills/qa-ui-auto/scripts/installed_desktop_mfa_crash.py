@@ -69,7 +69,7 @@ def observe_abrupt_exit(driver, executable, module, observation):
     observation["hostExitedBeforeDriverCleanup"] = True
 
 
-def verify_crash_recovery(executable, profile, signed, source, evidence, *, macos_hardened_mfa=False):
+def verify_crash_recovery(executable, profile, signed, source, evidence, work, *, macos_hardened_mfa=False):
     receipt, archive, _, _ = load_artifact(signed, source, platform_key(), "mfa")
     signature = archive.with_name(receipt["signature"])
     result = {
@@ -82,7 +82,14 @@ def verify_crash_recovery(executable, profile, signed, source, evidence, *, maco
     active_path = profile / "plugins/mfa/active.json"
     account = {"selector": element("mfa-account-code"), "equals": "287 082"}
     try:
-        with installed_desktop(ctx, executable, evidence, evidence, "mfa-legacy-seed", environment={}) as (_, session):
+        environment = {}
+        if platform.system() == "Windows":
+            webview = work / "mfa-webview"
+            webview.mkdir()
+            environment["TAOMNI_QA_WEBVIEW_DIR"] = str(webview)
+            environment["WEBVIEW2_USER_DATA_FOLDER"] = str(webview)
+            result["webviewDataFolder"] = str(webview)
+        with installed_desktop(ctx, executable, work, evidence, "mfa-legacy-seed", environment=environment) as (_, session):
             create_account(session, ctx, evidence)
         result["legacyDatabaseSha256"] = digest(profile / "mfa.db")
         commit_mfa_upgrade(executable, profile, archive, signature, evidence)
@@ -100,7 +107,7 @@ def verify_crash_recovery(executable, profile, signed, source, evidence, *, maco
             result["macosHostExecution"] = observe_hardened_host(
                 executable, module, evidence, os.environ.get("MACOS_SIGNING_CERT_SHA1", "").upper(),
             )
-        with installed_desktop(ctx, executable, evidence, evidence, "mfa-before-kill", environment={}) as (driver, session):
+        with installed_desktop(ctx, executable, work, evidence, "mfa-before-kill", environment=environment) as (driver, session):
             steps = open_unlocked_mfa(ctx, session, evidence)
             desktop_action(steps, "assert_text_equals", account)
             active = json.loads(active_path.read_text(encoding="utf-8"))
@@ -109,7 +116,7 @@ def verify_crash_recovery(executable, profile, signed, source, evidence, *, maco
             result.update(moduleBinarySha256=digest(module), hotpBeforeExit=account["equals"])
             observe_abrupt_exit(driver, executable, module, result)
             session.session_id = None
-        with installed_desktop(ctx, executable, evidence, evidence, "mfa-after-kill", environment={}) as (_, session):
+        with installed_desktop(ctx, executable, work, evidence, "mfa-after-kill", environment=environment) as (_, session):
             steps = open_unlocked_mfa(ctx, session, evidence)
             desktop_action(steps, "assert_text_equals", account)
             desktop_action(steps, "click", element("mfa-account-hotp-next"))

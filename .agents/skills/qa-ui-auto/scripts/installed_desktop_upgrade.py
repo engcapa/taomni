@@ -134,7 +134,7 @@ def execute(args):
         try:
             stages["crashRecovery"] = verify_crash_recovery(
                 candidate, Path(stages["desktopAndHeadlessModeLease"]["profile"]),
-                args.signed.resolve(strict=True), identity["producerSource"], report,
+                args.signed.resolve(strict=True), identity["producerSource"], report, work,
                 macos_hardened_mfa=args.macos_hardened_mfa,
             )
         except Exception as error:

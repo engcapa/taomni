@@ -2,10 +2,12 @@
 from __future__ import annotations
 
 import os
+from pathlib import Path
 import subprocess
 import time
 from typing import Callable, Protocol
 
+from native_build import QA_APP_ID
 from native_process_group import wait_for_driver_ports
 from native_webdriver_transport import WebDriverError
 
@@ -27,6 +29,21 @@ def driver_start_environment(driver: DriverOwner) -> dict[str, str]:
     environment = dict(os.environ)
     driver._inherited_path = environment.get("PATH")
     return environment
+
+
+def windows_webview_options() -> dict[str, str | list[str]]:
+    """Keep EdgeDriver and the application on the same run-owned profile."""
+    directory = os.environ.get("TAOMNI_QA_WEBVIEW_DIR")
+    if not directory:
+        data_root = os.environ.get("NEWMOB_DATA_DIR")
+        if not data_root:
+            raise WebDriverError("Windows WebView2 session requires an isolated data directory")
+        directory = str(Path(data_root) / QA_APP_ID / "webview")
+    return {
+        "userDataFolder": directory,
+        # Match the canvas color space independently of the runner's monitor profile.
+        "additionalBrowserArguments": ["--force-color-profile=srgb"],
+    }
 
 
 def ensure_owned_driver_running(

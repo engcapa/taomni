@@ -2,6 +2,7 @@
 from contextlib import nullcontext
 import hashlib
 import json
+import os
 from pathlib import Path
 import subprocess
 import sys
@@ -16,6 +17,7 @@ from installed_desktop_upgrade import require_registration, select_candidate
 from installed_macos_host_signature import require_hardened_signature
 from installed_macos_permissions import compare_permissions, observe_hosted_screen_scan
 from modular_bundle_inventory import plan_targets
+from native_driver_lifecycle import windows_webview_options
 from qa_ui_auto.legacy_install import windows_install
 from qa_ui_auto.legacy_process import observe_same_profile_contender
 
@@ -24,6 +26,14 @@ class InstalledDesktopUpgradeTests(unittest.TestCase):
     old = {"ProductCode": "{bc571798-c76e-41ce-b022-ebdc0c5c33e1}",
            "UpgradeCode": "{cd0d07ef-a2b5-4a17-8d25-434297419ccd}", "InstalledState": 5}
     candidate = {**old, "ProductCode": "{a5e2ebb2-b24a-4a54-ae83-80154c4a8b0e}", "InstalledState": -1}
+
+    def test_installed_webview_options_require_only_the_explicit_webview_root(self):
+        webview = str(Path("installed-mfa-webview").resolve())
+        with patch.dict(os.environ, {"TAOMNI_QA_WEBVIEW_DIR": webview}, clear=True):
+            self.assertEqual(windows_webview_options(), {
+                "userDataFolder": webview,
+                "additionalBrowserArguments": ["--force-color-profile=srgb"],
+            })
 
     def test_requires_only_one_version_from_the_same_registered_msi_family(self):
         require_registration(self.old, self.candidate, upgraded=False)
