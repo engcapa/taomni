@@ -2,7 +2,7 @@
   "id": "taomni-plugin-mail",
   "slug": "mail",
   "name": "Mail",
-  "description": "Read migrated mail, archived originals and local POP3 messages. Manage drafts, templates, the Outbox and address books.",
+  "description": "Read migrated mail, archived originals and local POP3 messages. Keep drafts, templates, the Outbox and address books in separate account stores.",
   "version": "0.1.0",
   "coreApiVersion": "1",
   "kind": "collaboration",

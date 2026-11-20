@@ -21,7 +21,7 @@ use taomni_mail_engine::{
     storage,
 };
 use taomni_plugin_api::{
-    HandshakeRequest, HandshakeResponse, RpcMessage, RpcRequest, RpcResponse,
+    HandshakeRequest, HandshakeResponse, RequestId, RpcMessage, RpcRequest, RpcResponse,
     services::{
         HOST_PROFILE_ENV, HostInstanceId, HostProfileContext, ProfileGeneration, SNAPSHOT_METHOD,
         SNAPSHOT_PREPARE_METHOD, SNAPSHOT_RELEASE_METHOD, SnapshotResult,
@@ -30,6 +30,7 @@ use taomni_plugin_api::{
 use taomni_sqlite_snapshot::SnapshotControl;
 
 const ACCOUNT: &str = "existing-mail";
+const FRESH_ACCOUNT: &str = "new-mail";
 const ARCHIVED_AT: i64 = 1_710_000_010;
 const WAIT: Duration = Duration::from_secs(15);
 const HOST: &str = "b1234567-1234-1234-1234-123456789abc";
@@ -78,16 +79,27 @@ impl MailHost {
     }
 
     fn send(&mut self, method: &str, params: Value) -> RpcResponse {
+        let id = self.write_request(method, params);
+        let response = self.read_response();
+        assert_eq!(response.id.as_ref(), Some(&id));
+        response
+    }
+
+    fn write_request(&mut self, method: &str, params: Value) -> RequestId {
         let request = RpcRequest::new(self.next_request_id, method, Some(params));
         self.next_request_id += 1;
+        let id = request.id.clone();
         let input = self.child.stdin.as_mut().unwrap();
-        serde_json::to_writer(&mut *input, &RpcMessage::Request(request.clone())).unwrap();
+        serde_json::to_writer(&mut *input, &RpcMessage::Request(request)).unwrap();
         input.write_all(b"\n").unwrap();
         input.flush().unwrap();
+        id
+    }
+
+    fn read_response(&mut self) -> RpcResponse {
         let RpcMessage::Response(response) = self.replies.recv_timeout(WAIT).unwrap() else {
-            panic!("expected a response to {method}");
+            panic!("expected a Mail response");
         };
-        assert_eq!(response.id.as_ref(), Some(&request.id));
         response
     }
 
@@ -370,6 +382,25 @@ fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
         json!({"accountId":ACCOUNT,"draftId":"scheduled"}),
     );
     let after = fs::read(&path).unwrap();
+    let mut outstanding = ["template", "queued"]
+        .into_iter()
+        .map(|id| {
+            host.write_request(
+                "mail_save_draft",
+                json!({"accountId":FRESH_ACCOUNT,"draft":{"id":id,"subject":id}}),
+            )
+        })
+        .collect::<Vec<_>>();
+    for _ in 0..2 {
+        let response = host.read_response();
+        assert!(response.error.is_none(), "{:?}", response.error);
+        let id = response.id.unwrap();
+        let index = outstanding
+            .iter()
+            .position(|pending| *pending == id)
+            .unwrap();
+        outstanding.swap_remove(index);
+    }
     drop(host.child.stdin.take());
     assert_eq!(host.exit_code(), Some(0));
 
@@ -379,6 +410,15 @@ fn reads_migrated_cache_and_releases_profile_ownership_on_exit() {
     assert_eq!(reopened.call("mail_get_cached_body", sent_params), sent);
     let reopened_drafts = reopened.call("mail_list_drafts", json!({"accountId":ACCOUNT}));
     assert_eq!(reopened_drafts, json!([saved]));
+    let fresh = reopened.call("mail_list_drafts", json!({"accountId":FRESH_ACCOUNT}));
+    let mut ids = fresh
+        .as_array()
+        .unwrap()
+        .iter()
+        .map(|draft| draft["id"].as_str().unwrap())
+        .collect::<Vec<_>>();
+    ids.sort_unstable();
+    assert_eq!(ids, ["queued", "template"]);
     let suggestions = reopened.call("mail_search_contacts", search);
     assert_eq!(suggestions[0]["name"], "Migrated Card Edited");
     assert_eq!(suggestions[0]["email"], "migrated@example.com");

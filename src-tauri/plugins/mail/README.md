@@ -21,14 +21,16 @@ setup fails or the connection closes.
 
 The provisional host serves cached folders, paged headers, bodies, drafts and
 address books from `plugins/mail/data/<account-stem>.db` while the SDK holds its
-profile and module leases. Draft and contact edits use transactions. Recipient
+profile and module leases. Draft and contact edits use transactions. Concurrent
+first writes publish one account database and retain each committed edit. Recipient
 suggestions prioritize address book entries over collected mail contacts.
 The core's authenticated backup barrier pauses ordinary requests, exports
 standalone SQLite snapshots and copies the granted originals and attachment
 files from the module data root.
 The hosted protocol workflow stages a legacy cache containing committed WAL
 data, then verifies that the host reads the cache, scheduled Outbox and address
-book, detects competing ownership and reopens the edited data after exit.
+book, detects competing ownership, issues two first saves and reopens the
+edited and newly created drafts after exit.
 Linux, Windows and macOS run this check.
 
 The signed offline upgrade command requires a closed profile. It imports the

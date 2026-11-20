@@ -2,21 +2,24 @@ use std::{
     fs::{self, File, Metadata, OpenOptions},
     io::ErrorKind,
     path::{Component, Path, PathBuf},
+    sync::Mutex,
     time::Duration,
 };
 
-use rusqlite::{Connection, OpenFlags};
+use rusqlite::{Connection, OpenFlags, TransactionBehavior};
 use taomni_mail_engine::database::mail_db_file_stem;
 use taomni_plugin_api::{ErrorCode, RpcError, services::SafeRelativePath};
 
 pub(super) struct Store {
     profile: PathBuf,
+    create_database: Mutex<()>,
 }
 
 impl Store {
     pub(super) fn new(profile: &Path) -> Self {
         Self {
             profile: profile.to_owned(),
+            create_database: Mutex::new(()),
         }
     }
 
@@ -48,9 +51,18 @@ impl Store {
             };
         };
         let path = database_for(&root, account_id);
+        // The first writer publishes a complete database. Later writers wait
+        // for that publication and add their changes to the same database.
+        let creation = if create && !regular(&path)? {
+            Some(self.create_database.lock().map_err(|_| unavailable())?)
+        } else {
+            None
+        };
+        check()?;
         if regular(&path)? {
-            let db = connect(&path, OpenFlags::SQLITE_OPEN_READ_WRITE)?;
-            return apply_change(&db, check, change);
+            drop(creation);
+            let mut db = connect(&path, OpenFlags::SQLITE_OPEN_READ_WRITE)?;
+            return apply_change(&mut db, check, change);
         }
         check_missing_sidecars(&path)?;
         if !create {
@@ -59,9 +71,9 @@ impl Store {
         // Partially initialized files stay outside the signed backup paths.
         let module = root.parent().ok_or_else(unavailable)?;
         let temporary = tempfile::NamedTempFile::new_in(module).map_err(|_| unavailable())?;
-        let db = connect(temporary.path(), OpenFlags::SQLITE_OPEN_READ_WRITE)?;
+        let mut db = connect(temporary.path(), OpenFlags::SQLITE_OPEN_READ_WRITE)?;
         taomni_mail_engine::cache::init_mail_tables(&db).map_err(|_| unavailable())?;
-        let changed = apply_change(&db, check, change)?;
+        let changed = apply_change(&mut db, check, change)?;
         db.close().map_err(|_| unavailable())?;
         temporary.as_file().sync_all().map_err(|_| unavailable())?;
         check()?;
@@ -147,14 +159,15 @@ fn database_for(root: &Path, account_id: &str) -> PathBuf {
 }
 
 fn apply_change<T>(
-    database: &Connection,
+    database: &mut Connection,
     check: &dyn Fn() -> Result<(), RpcError>,
     change: impl FnOnce(&Connection) -> Result<T, RpcError>,
 ) -> Result<T, RpcError> {
     check()?;
     let transaction = database
-        .unchecked_transaction()
+        .transaction_with_behavior(TransactionBehavior::Immediate)
         .map_err(|_| unavailable())?;
+    check()?;
     let changed = change(&transaction)?;
     check()?;
     transaction.commit().map_err(|_| unavailable())?;
