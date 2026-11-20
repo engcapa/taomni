@@ -1,9 +1,9 @@
 id: TC-FILE-OPEN-007
-title: Native Markdown OS image paste and real export artifacts preserve source through cancel/failure
+title: Native Markdown OS image paste and real export artifacts preserve source through cancel/placeholders
 description: 'AC12/15. Native only: an independent OS clipboard owner publishes a known PNG; an actual OS Ctrl/Cmd+V reaches focused
   CodeMirror. Real GTK/NSSavePanel/Common Item Dialog save choices select isolated fresh paths. Host-side PNG pixels, DOCX ZIP/XML/media,
-  self-contained HTML and bundled Markdown assets are read independently, not inferred from a toast. Save cancel, missing-image failure
-  and PDF/print page-setup cancel keep the source exact. PDF/print final OS output is not certified: this case cancels page setup before
+  self-contained HTML and bundled Markdown assets are read independently, not inferred from a toast. Save cancel, missing-image placeholder
+  export and PDF/print page-setup cancel keep the source exact. PDF/print final OS output is not certified: this case cancels page setup before
   invoking printing.'
 modes:
 - native
@@ -221,10 +221,21 @@ steps:
 - click: '[data-testid="tab-item"][data-tab-type="file-browser"]'
 - dblclick: '[data-testid="explorer-file-row"][data-name="missing-image.md"]'
 - wait_for: '[data-testid="markdown-editor"]'
+- wait_for: '[data-testid="markdown-image-widget"] [data-testid="markdown-render-placeholder"][data-kind="image"]'
 - click: '[data-testid="markdown-export"]'
-- click: '[data-testid="markdown-export-html"]'
-- wait_for: '[data-testid="markdown-export-status"][data-export-state="failed"]'
-- assert_visible: '[data-testid="viewer-operation-error"]'
+- native_file_dialog:
+    kind: save
+    action: choose
+    path: ${fixture.markdown_native_exports}/missing-image.html
+    trigger: '[data-testid="markdown-export-html"]'
+- wait_for: '[data-testid="markdown-export-status"][data-export-state="saved"]'
+- assert_file_contains:
+    path: ${fixture.markdown_native_exports}/missing-image.html
+    contains: Image unavailable
+- assert_file_contains:
+    path: ${fixture.markdown_native_exports}/missing-image.html
+    contains: assets/does-not-exist.png
+- assert_not_visible: '[data-testid="viewer-operation-error"]'
 - assert_file_open_bytes:
     path: ${fixture.markdown_native_root}/missing-image.md
     sha256: ${fixture.markdown_native_missing_sha}
@@ -289,7 +300,7 @@ verification:
     - 67
     - 68
   - id: R3
-    requirement: Native chooser cancel, PDF/print setup cancel and missing-image failure are explicit and never modify source.
+    requirement: Native chooser cancel, PDF/print setup cancel and missing-image placeholder export are explicit and never modify source.
     actions:
     - 69
     - 70
@@ -301,8 +312,8 @@ verification:
     - 82
     - 84
     - 89
-    - 91
     - 92
+    - 93
     checkpoints:
     - step: 71
       expectation: Cancel returns the production cancelled state.
@@ -318,11 +329,21 @@ verification:
       expectation: Print settings cancel closes its real dialog.
     - step: 86
       expectation: Print settings cancellation leaves source exact.
-    - step: 93
-      expectation: Missing native image fails before reporting successful export.
+    - step: 91
+      expectation: The missing native image renders a visible placeholder.
+    - step: 94
+      expectation: Missing-image HTML export reports saved instead of failing.
     - step: 95
-      expectation: Failed export preserves exact missing-image source.
+      expectation: Host-read HTML contains the image placeholder.
+    - step: 96
+      expectation: Host-read HTML retains the missing reference as diagnostic context.
     - step: 97
+      expectation: Recoverable rendering failure does not surface an operation error.
+    - step: 98
+      expectation: Placeholder export preserves exact missing-image source bytes.
+    - step: 99
+      expectation: Export does not mark the source document dirty.
+    - step: 100
       expectation: Native clipboard/chooser/export lifecycle has no unhandled runtime errors.
     results:
     - 71
@@ -332,9 +353,14 @@ verification:
     - 80
     - 85
     - 86
-    - 93
+    - 91
+    - 94
     - 95
+    - 96
     - 97
+    - 98
+    - 99
+    - 100
   - id: R4
     requirement: Real native Mermaid flowchart and KaTeX math render with node/formula output and nonzero geometry in live/split; actual
       theme controls produce light/dark evidence; exported HTML/PNG/DOCX/MD retain diagram and rendered math.
