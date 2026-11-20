@@ -135,6 +135,7 @@ def execute(args):
             stages["crashRecovery"] = verify_crash_recovery(
                 candidate, Path(stages["desktopAndHeadlessModeLease"]["profile"]),
                 args.signed.resolve(strict=True), identity["producerSource"], report,
+                macos_hardened_mfa=args.macos_hardened_mfa,
             )
         except Exception as error:
             # Preserve rollback evidence after the hosted crash scenario fails.
@@ -169,4 +170,5 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     for name in ("identity", "legacy", "candidate", "signed", "evidence", "work"):
         parser.add_argument("--" + name, required=True, type=Path)
+    parser.add_argument("--macos-hardened-mfa", action="store_true")
     execute(parser.parse_args())

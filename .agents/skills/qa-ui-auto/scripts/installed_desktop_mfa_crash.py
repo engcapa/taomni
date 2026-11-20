@@ -3,10 +3,12 @@ from __future__ import annotations
 
 from contextlib import suppress
 import json
+import os
 from pathlib import Path
 import platform
 from types import SimpleNamespace
 
+from installed_macos_host_signature import observe_hardened_host
 from modular_bundle_inventory import digest, write_json
 from qa_ui_auto.fixtures.module_legacy_mfa import (
     create_account, desktop_action, element, installed_desktop, open_unlocked_mfa,
@@ -25,6 +27,9 @@ def install_module(steps, archive, signature):
     desktop_action(steps, "fill", {"selector": element("module-offline-signature"), "value": signature})
     desktop_action(steps, "press", {"selector": element("module-offline-submit"), "key": "Enter"})
     desktop_action(steps, "wait_for", element("module-offline-install") + '[data-phase="completed"]')
+
+
+def enable_module(steps):
     desktop_action(steps, "press", {"selector": element("module-action-enable-mfa") + ":not([disabled])", "key": "Enter"})
     desktop_action(steps, "wait_for", element("module-action-disable-mfa"))
     desktop_action(steps, "click", element("nav-mode-home"))
@@ -65,7 +70,7 @@ def observe_abrupt_exit(driver, executable, module, observation):
     observation["hostExitedBeforeDriverCleanup"] = True
 
 
-def verify_crash_recovery(executable, profile, signed, source, evidence):
+def verify_crash_recovery(executable, profile, signed, source, evidence, *, macos_hardened_mfa=False):
     receipt, archive, signature, _ = load_artifact(signed, source, platform_key(), "mfa")
     result = {
         "sourceSha": source,
@@ -78,18 +83,31 @@ def verify_crash_recovery(executable, profile, signed, source, evidence):
     account = {"selector": element("mfa-account-code"), "equals": "287 082"}
     try:
         with installed_desktop(ctx, executable, evidence, evidence, "mfa-before-kill", environment={}) as (driver, session):
-            install_module(NativeStepContext(session, evidence, ctx.cfg), archive, signature)
-            create_account(session, ctx, evidence)
-            active = json.loads(active_path.read_text(encoding="utf-8"))
-            if active["activeVersion"] != receipt["version"]:
+            steps = NativeStepContext(session, evidence, ctx.cfg)
+            install_module(steps, archive, signature)
+            installed = json.loads(active_path.read_text(encoding="utf-8"))
+            if installed["activeVersion"] != receipt["version"]:
                 raise RuntimeError("The installed MFA version differs from the signed package")
             directory = active_path.parent / "versions" / receipt["version"]
             if digest(directory / ".taomni-trust/package.taomni-plugin") != receipt["sha256"]:
                 raise RuntimeError("The installed MFA package differs from the signed artifact")
             suffix = ".exe" if platform.system() == "Windows" else ""
             module = (directory / f"taomni-plugin-mfa{suffix}").resolve(strict=True)
+            if not module.is_relative_to(profile.resolve(strict=True)):
+                raise RuntimeError("The installed MFA executable is outside the owned profile")
+            if macos_hardened_mfa:
+                result["macosHostExecution"] = observe_hardened_host(
+                    executable, module, evidence, os.environ.get("MACOS_SIGNING_CERT_SHA1", "").upper(),
+                )
+            enable_module(steps)
+            create_account(session, ctx, evidence)
+            active = json.loads(active_path.read_text(encoding="utf-8"))
+            if active["activeVersion"] != installed["activeVersion"]:
+                raise RuntimeError("Enabling MFA selected a different installed version")
             result.update(moduleBinarySha256=digest(module), hotpBeforeExit=account["equals"])
             observe_abrupt_exit(driver, executable, module, result)
+            if macos_hardened_mfa:
+                result["macosHostExecution"]["launched"] = True
             session.session_id = None
         with installed_desktop(ctx, executable, evidence, evidence, "mfa-after-kill", environment={}) as (_, session):
             steps = open_unlocked_mfa(ctx, session, evidence)

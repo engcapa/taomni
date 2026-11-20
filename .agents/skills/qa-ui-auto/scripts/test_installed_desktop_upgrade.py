@@ -1,4 +1,5 @@
 """Pure contracts for the installed-upgrade inputs and registration checks."""
+import hashlib
 import json
 from pathlib import Path
 import subprocess
@@ -11,6 +12,7 @@ from unittest.mock import MagicMock, Mock, patch
 from installed_desktop_mode_lease import check_mode_lease, reserve_default_profile
 from installed_desktop_mfa_crash import observe_abrupt_exit
 from installed_desktop_upgrade import require_registration, select_candidate
+from installed_macos_host_signature import require_hardened_signature
 from installed_macos_permissions import compare_permissions
 from modular_bundle_inventory import plan_targets
 from qa_ui_auto.legacy_install import windows_install
@@ -93,6 +95,25 @@ class InstalledDesktopUpgradeTests(unittest.TestCase):
             log = (evidence / "opened-contender.log").read_text(encoding="utf-8")
             self.assertIn("[ephemeral pairing code omitted]", log)
             self.assertNotIn("123456", log)
+
+
+class InstalledHardenedSignatureTests(unittest.TestCase):
+    def test_requires_pinned_leaf_and_hardened_code_directory(self):
+        leaf = b"fixed-certificate"
+        fingerprint = hashlib.sha1(leaf, usedforsecurity=False).hexdigest().upper()
+        details = "Executable=/Applications/Taomni.app\nCodeDirectory v=20500 size=320 flags=0x10000(runtime) hashes=5+3\n"
+        self.assertEqual(require_hardened_signature(details, leaf, fingerprint), {
+            "certificateSha1": fingerprint, "hardenedRuntime": True,
+        })
+        with self.assertRaisesRegex(RuntimeError, "different leaf certificate"):
+            require_hardened_signature(details, b"different-certificate", fingerprint)
+        for invalid in [
+            details.replace("0x10000(runtime)", "0x0(none)"),
+            details + "Signature=adhoc\n",
+            "Executable=/fake flags=0x10000(runtime)\n",
+        ]:
+            with self.subTest(invalid=invalid), self.assertRaisesRegex(RuntimeError, "hardened runtime"):
+                require_hardened_signature(invalid, leaf, fingerprint)
 
 
 class InstalledDesktopModeLeaseTests(unittest.TestCase):

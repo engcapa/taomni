@@ -24,9 +24,13 @@ on:
       module: {type: string, default: hello-plugin}
       macos_runner: {type: string, default: macos-latest}
       native_builds: {type: string, default: ''}
+      macos_hardened_mfa: {type: boolean, default: false}
     secrets:
       TAURI_SIGNING_PRIVATE_KEY: {required: true}
       TAURI_SIGNING_PRIVATE_KEY_PASSWORD: {required: false}
+      APPLE_CERTIFICATE: {required: false}
+      APPLE_CERTIFICATE_PASSWORD: {required: false}
+      APPLE_SIGNING_IDENTITY: {required: false}
 
 permissions:
   contents: read
@@ -71,6 +75,7 @@ jobs:
         env:
           PACKAGE_MACOS_RUNNER: ${{ inputs.macos_runner || 'macos-latest' }}
           PACKAGE_NATIVE_BUILDS: ${{ inputs.native_builds }}
+          MACOS_HARDENED_MFA: ${{ inputs.macos_hardened_mfa }}
         run: |
           python - <<'PY'
           import json, os
@@ -103,6 +108,9 @@ jobs:
               if not requested:
                   raise SystemExit('No signed module target selected')
               targets = [target for target in targets if target['platform'] in requested]
+          if os.environ['MACOS_HARDENED_MFA'] == 'true':
+              if os.environ['QA_MODULE'] != 'mfa' or any(not target['platform'].startswith('darwin-') for target in targets):
+                  raise SystemExit('The hardened MFA comparison requires only Darwin module targets')
           for target in targets:
               target['legacy_roster'] = target['platform'] in roster
           with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
@@ -213,7 +221,7 @@ jobs:
     # Fork pull requests cannot request a production signature. A manual or
     # reusable invocation runs the workflow revision trusted by its operator.
     if: github.event_name != 'pull_request' && github.repository == 'engcapa/taomni'
-    runs-on: ubuntu-24.04
+    runs-on: ${{ inputs.macos_hardened_mfa && needs.source.outputs.macos_runner || 'ubuntu-24.04' }}
     timeout-minutes: 20
     strategy:
       fail-fast: false
@@ -287,6 +295,28 @@ jobs:
               shutil.copytree(root / 'unsigned-module', failing)
               (failing / 'module.json').write_text(json.dumps({**expected, 'version': '0.1.1'}), encoding='utf-8')
           PY
+      - uses: actions/setup-node@v4
+        if: inputs.macos_hardened_mfa
+        with:
+          node-version: '22'
+      - name: Import the fixed macOS signing identity
+        if: inputs.macos_hardened_mfa
+        env:
+          RELEASE_PLATFORM: macOS
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
+          MACOS_SIGNING_CERT_SHA1: ${{ vars.MACOS_SIGNING_CERT_SHA1 }}
+        run: node scripts/configure-release-signing.mjs
+      - name: Sign the MFA host before signing its module archive
+        if: inputs.macos_hardened_mfa
+        run: |
+          set -euo pipefail
+          test -n "${MACOS_SIGNING_WORK_DIR:-}"
+          binary=candidate/unsigned-module/taomni-plugin-mfa
+          codesign --force --sign "$MACOS_SIGNING_CERT_SHA1" --options runtime --timestamp=none \
+            --identifier com.taomni.module.mfa "$binary"
+          codesign --verify --strict "$binary"
       - name: Sign and independently verify against the production pinned public key
         env:
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
@@ -313,6 +343,9 @@ jobs:
                 --output "signed-module/$destination" --source-sha "$MODULE_SOURCE_SHA"
             done
           fi
+      - name: Clean temporary macOS signing keychain
+        if: always() && inputs.macos_hardened_mfa
+        run: node scripts/configure-release-signing.mjs --cleanup-macos
       - uses: actions/upload-artifact@v4
         with:
           name: qa-modular-package-${{ matrix.platform }}-${{ inputs.artifact_key || github.run_id }}
