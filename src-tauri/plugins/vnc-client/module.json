@@ -1,0 +1,21 @@
+{
+  "id": "taomni-plugin-vnc-client",
+  "slug": "vnc-client",
+  "name": "VNC Client",
+  "description": "Connect to VNC desktops and exchange keyboard, pointer, display and clipboard updates.",
+  "version": "0.1.0",
+  "coreApiVersion": "1",
+  "kind": "remote-client",
+  "status": "provisional",
+  "platforms": ["windows-x86_64", "darwin-aarch64", "darwin-x86_64", "linux-x86_64"],
+  "entry": { "host": "taomni-plugin-vnc-client", "protocol": 1 },
+  "tabs": [],
+  "commands": ["vnc/start", "vnc/close"],
+  "permissions": [],
+  "dataDir": "plugins/vnc-client",
+  "dataSchemaVersion": 1,
+  "backupPaths": [],
+  "legacyTables": [],
+  "vaultFixedKeys": [],
+  "snapshot": "file"
+}

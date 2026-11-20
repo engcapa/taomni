@@ -11232,6 +11232,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "taomni-plugin-vnc-client"
+version = "0.1.0"
+dependencies = [
+ "futures",
+ "serde",
+ "serde_json",
+ "taomni-plugin-api",
+ "taomni-plugin-sdk",
+ "taomni-vnc-engine",
+ "tempfile",
+ "tokio",
+ "tokio-tungstenite",
+ "tokio-util 0.7.19",
+ "uuid",
+]
+
+[[package]]
 name = "taomni-profile-locks"
 version = "0.1.0"
 dependencies = [

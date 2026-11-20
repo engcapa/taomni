@@ -149,6 +149,38 @@ jobs:
           }
           (evidence / 'vnc-engine-receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
           PY
+      - name: Verify the VNC module process owns and releases its relays
+        env:
+          VNC_HOST_RUNNER: ${{ matrix.os }}
+        run: |
+          set -o pipefail
+          cargo tree --manifest-path src-tauri/Cargo.toml -p taomni-plugin-vnc-client --edges normal,build --prefix none --locked > modular-protocol-evidence/vnc-host-tree.txt
+          if grep -E '^(tauri(-[^[:space:]]+)?|wry|taomni|taomni-hello-plugin|taomni-plugin-[^[:space:]]+) ' modular-protocol-evidence/vnc-host-tree.txt | grep -Ev '^taomni-plugin-(vnc-client|api|sdk|stream) '; then
+            echo 'The VNC host links the desktop runtime or a peer module.' >&2
+            exit 1
+          fi
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-vnc-client --lib --locked 2>&1 | tee modular-protocol-evidence/vnc-host-unit.log
+          cargo test --manifest-path src-tauri/Cargo.toml -p taomni-plugin-vnc-client --test relay_host --locked -- --ignored 2>&1 | tee modular-protocol-evidence/vnc-host-process.log
+          python - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+
+          evidence = Path('modular-protocol-evidence')
+          log = evidence / 'vnc-host-process.log'
+          assert '2 passed; 0 failed; 0 ignored' in log.read_text(encoding='utf-8')
+          binary = Path('src-tauri/target/debug') / ('taomni-plugin-vnc-client.exe' if os.name == 'nt' else 'taomni-plugin-vnc-client')
+          with binary.open('rb') as stream:
+              digest = hashlib.file_digest(stream, 'sha256').hexdigest()
+          receipt = {
+              'sourceSha': (evidence / 'source-sha.txt').read_text().strip(),
+              'runner': os.environ['VNC_HOST_RUNNER'],
+              'runnerImage': os.environ.get('ImageVersion'),
+              'runnerArchitecture': os.environ['RUNNER_ARCH'],
+              'binarySha256': digest,
+              'artifactLog': log.name,
+          }
+          (evidence / 'vnc-host-receipt.json').write_text(json.dumps(receipt, indent=2) + '\n')
+          PY
       - name: Verify the Mail module's cached mailbox and profile ownership
         env:
           MAIL_HOST_RUNNER: ${{ matrix.os }}

@@ -194,6 +194,8 @@ TASK-027 将 G1–G11 设为独立发布阻断门。每个门必须在匹配源�
 - Mail 地址簿 SQLite 操作、vCard 转换和收件人建议移入邮件引擎。独立宿主按账号分页列出、保存和删除联系人，已迁移的 CardDAV 卡片保留待同步状态。TC-MAIL-CONTACTS-01 检查重开地址簿仍显示原邮箱，签名升级用例检查默认及自定义旧缓存，另有跨进程重开读取。55 项引擎单测、10 项宿主单测、核心编译和用例审计通过。跨进程与三端用例等待 GitHub 执行。
 - VNC 的画质策略、帧队列和 WebSocket relay 已迁入独立引擎。桌面通过适配层交付已连接的 TCP 流和 Windows 窗口指针采样器。TC-156 在多轮缩放并绘制后，继续检查原连接能转发新按键。32 项定向单测、引擎与核心编译通过，真实 loopback 验证由协议工作流记录编译产物摘要、runner 镜像和日志。
 - `ae46db7a9` 的 ARM64 Mail 模块已完成固定证书签名并封入验签包。归档中的宿主摘要与 `codesign` 回执一致，运行时标志为 `0x10000(runtime)`，Gatekeeper 返回 3。实装后启动和 Intel 回执由签名升级 run 继续验证。 [Mail 签名资产](https://github.com/engcapa/taomni/actions/runs/44726111709)
+- `ae46db7a9` 的 Linux Native 四个分片已下载并核验，38/39。TC-MODULES-039 的迁移凭据确认 MFA 数据已提交，宿主协商阶段拒绝了缺少 `capture.still` 应答的握手。`c0918edf4` 使 SDK 回应双方支持的可选服务。MFA 声明屏幕采集为可选服务，较早仅提供固定密钥服务的核心仍能启动该宿主。38 项 SDK/MFA 单测通过，签名升级及实屏扫码待复验。 [原生分片](https://github.com/engcapa/taomni/actions/runs/44725968775)
+- VNC 客户端新增独立的临时宿主。它持有活动 RFB/WS 会话，接收直接连接端点或同机代理转发端口。GitHub 协议用例使用真实宿主检查帧、连接取消、关闭和退出，留存 runner、源码与宿主 SHA-256。3 项本地单测通过。产品路由、前端、Windows 辅助程序与签名包接线继续按 TASK-016 交付。
 
 ## 当前结论
 

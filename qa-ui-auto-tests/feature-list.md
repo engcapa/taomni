@@ -4019,6 +4019,7 @@ controls: []   # backend-only — RFB protocol + WebSocket bridge; the canvas su
 -->
 
 - `taomni-vnc-engine` 提供 RFB 握手、协议编解码、画质策略、帧队列和 WebSocket relay。桌面适配层 `src-tauri/src/vnc/` 提供 IPC、会话记录、代理连接和 Windows 系统光标采样。
+- `src-tauri/plugins/vnc-client/` 的宿主专项经真实子进程检查帧像素、协商期间取消、主动断开与退出后的 TCP/WS 释放。桌面入口的回归由 TC-151、TC-156 与原有剪贴板用例覆盖。
 - Tauri 命令：`vnc_connect / vnc_cancel_connect / vnc_disconnect / vnc_test_connection / vnc_create_detach_claim / vnc_consume_detach_claim / vnc_set_special_key_capture / vnc_special_key_capture_status`
 - 本地动态端口 WebSocket relay：VNC server ↔ 前端 Canvas（前端不再直接持有 TCP 套接字）
 

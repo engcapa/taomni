@@ -35,6 +35,7 @@ members = [
     "plugins/mail",
     "plugins/mfa",
     "plugins/sockscap/tools",
+    "plugins/vnc-client",
     "plugins/vnc-client/key-helper",
     "vendor/ironrdp-acceptor",
     "vendor/ironrdp-bulk",
