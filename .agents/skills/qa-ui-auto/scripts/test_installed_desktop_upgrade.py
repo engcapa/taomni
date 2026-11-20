@@ -195,7 +195,9 @@ class InstalledDesktopMfaCrashTests(unittest.TestCase):
                 observer = SimpleNamespace(Process=Mock(return_value=launcher),
                                            NoSuchProcess=ProcessLookupError, AccessDenied=PermissionError)
                 result = {}
-                with patch.dict(sys.modules, {"psutil": observer}):
+                with patch.dict(sys.modules, {"psutil": observer}), patch(
+                    "installed_desktop_mfa_crash.platform.system", return_value="Windows",
+                ):
                     driver = SimpleNamespace(proc=SimpleNamespace(pid=launcher.pid))
                     if host_survives:
                         with self.assertRaisesRegex(TimeoutError, "host survived"):
@@ -204,6 +206,8 @@ class InstalledDesktopMfaCrashTests(unittest.TestCase):
                         observe_abrupt_exit(driver, application, module, result)
                 self.assertNotEqual(host_survives, result.get("hostExitedBeforeDriverCleanup", False))
                 self.assertTrue(result["coreExited"])
+                self.assertEqual(result["coreIdentity"], "owned-driver-descendant")
+                self.assertEqual(result["termination"], "TerminateProcess")
                 core.kill.assert_called_once_with()
                 host.kill.assert_not_called()
                 launcher.kill.assert_not_called()
