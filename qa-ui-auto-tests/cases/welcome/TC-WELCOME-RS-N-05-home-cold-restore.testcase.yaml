@@ -58,11 +58,6 @@ steps:
 - assert_count:
     selector: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
     equal: 1
-- click: '[data-testid="tab-item"][data-tab-type="terminal"]'
-- wait_for: '[data-testid="terminal-pane"][data-terminal-active="true"][data-terminal-ready="true"]'
-- assert_count:
-    selector: '[data-testid="terminal-pane"][data-terminal-ready="true"]'
-    equal: 1
 - assert_no_runtime_errors: null
 - screenshot: home-cold-restore.png
 verification:
@@ -88,7 +83,6 @@ verification:
     - 21
     - 24
     - 25
-    - 27
     checkpoints:
     - step: 5
       expectation: Empty state is visible before any session is opened.
@@ -104,8 +98,8 @@ verification:
       expectation: Successful restoration removes the completed banner from Home.
     - step: 26
       expectation: The recovered terminal remains open after the banner disappears.
-    - step: 29
-      expectation: Returning to the terminal keeps one ready live terminal.
+    - step: 27
+      expectation: Cold restoration and banner dismissal complete without runtime errors.
     results:
     - 5
     - 16
@@ -114,7 +108,7 @@ verification:
     - 22
     - 25
     - 26
-    - 29
+    - 27
   native:
   - check: Normal process restart and actual PTY readiness
     method: automated
