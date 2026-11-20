@@ -182,6 +182,9 @@ fn desktop_fixture(relay: bool) -> (u16, thread::JoinHandle<()>) {
             0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0, 0, 0, 42, 42, 42, 0,
         ])
         .unwrap();
+        #[cfg(windows)]
+        // The helper observation can use its full budget before client close.
+        peer.set_read_timeout(Some(WAIT * 2)).unwrap();
         let result = peer.read_to_end(&mut Vec::new());
         if let Err(error) = result {
             assert_eq!(error.kind(), std::io::ErrorKind::ConnectionReset);

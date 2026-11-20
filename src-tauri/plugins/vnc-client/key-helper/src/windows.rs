@@ -150,6 +150,10 @@ pub fn run(parent: u32) -> i32 {
         )
     };
     if hook.is_null() {
+        eprintln!(
+            "VNC keyboard hook installation failed: {}",
+            std::io::Error::last_os_error()
+        );
         return 1;
     }
     // Low-level hooks are called on this thread's message loop.

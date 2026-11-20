@@ -53,7 +53,7 @@ impl Keyboard {
             .env_remove(taomni_plugin_api::services::HOST_PROFILE_ENV)
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::null())
+            .stderr(Stdio::inherit())
             .creation_flags(CREATE_NO_WINDOW)
             .spawn()?;
         let stdin = child
@@ -78,7 +78,11 @@ impl Keyboard {
                     }
                 }
                 active.store(false, Ordering::Release);
-                let _ = child.wait();
+                match child.wait() {
+                    Ok(status) if !status.success() => eprintln!("VNC key helper exited: {status}"),
+                    Err(error) => eprintln!("Could not observe VNC key helper exit: {error}"),
+                    _ => (),
+                }
             })?;
         let mut capture = Capture { id, stdin, alive };
         capture.stdin.write_all(b"on\n")?;
@@ -132,7 +136,10 @@ impl NativeSpecialKeys for CaptureOwner {
             *capture = Some(
                 self.keyboard
                     .start(self.id, emit.clone())
-                    .map_err(|error| format!("start signed VNC key helper: {error}"))?,
+                    .map_err(|error| {
+                        eprintln!("VNC key helper startup failed: {error}");
+                        format!("start signed VNC key helper: {error}")
+                    })?,
             );
         }
         Ok(())
