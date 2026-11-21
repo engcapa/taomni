@@ -132,7 +132,7 @@ pub(super) fn detect_eol(content: &str) -> &'static str {
     }
 }
 
-fn normalize_eol(content: &str, eol: &str) -> Result<String, String> {
+pub(crate) fn normalize_eol(content: &str, eol: &str) -> Result<String, String> {
     if eol == "mixed" {
         return Ok(content.to_string());
     }
