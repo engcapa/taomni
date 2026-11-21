@@ -7,6 +7,7 @@ import { t as tr } from "../../lib/i18n";
 import { saveBackupSettingsBeforeExit } from "../../stores/backupSettingsStore";
 import { confirmViewerExit } from "../../lib/openFile/closeGuard";
 import { useDocumentStore } from "../../stores/documentStore";
+import { useExplorerStore } from "../../stores/explorerStore";
 
 
 export interface UseApplicationExitContext {
@@ -21,7 +22,10 @@ export function useApplicationExit(context: UseApplicationExitContext) {
   const confirmExitWithOpenTabs = useCallback(async () => {
     const currentTabs = tabsRef.current;
     const terminalCount = currentTabs.filter((tab) => tab.type === "terminal" && tab.closable).length;
-    const tabCount = currentTabs.filter((tab) => tab.closable).length;
+    // Dedicated Explorer tabs are real open work; exiting must confirm with them
+    // exactly as it did when file browsing lived in Sessions tabs.
+    const explorerCount = useExplorerStore.getState().tabs.filter((tab) => tab.closable).length;
+    const tabCount = currentTabs.filter((tab) => tab.closable).length + explorerCount;
     if (tabCount === 0) return true;
 
     const isOne = tabCount === 1;
